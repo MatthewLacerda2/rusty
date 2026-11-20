@@ -12,6 +12,7 @@ use rusty_components::CameraComponent;
 use rusty_scene::create::{create_entity, Primitive};
 
 use super::*;
+use rusty_dev::bench::scenes::editor::EditorRound;
 
 /// The project's root and its one scene's path.
 fn project() -> (PathBuf, String) {
@@ -51,8 +52,9 @@ fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
-/// The smallest size the editor's panels leave the Scene view room at.
-const SIZE: (u32, u32) = (320, 180);
+/// A size at which the editor's panels leave the Scene view room, as they do
+/// on a desktop window (at 320x180 they leave none).
+const SIZE: (u32, u32) = (640, 360);
 
 #[test]
 fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() {
@@ -76,15 +78,27 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
     let Some(round) = round(&mut game, &opts).unwrap() else {
         return; // no adapter: nothing measured, nothing made up
     };
+    has_its_rows(&round);
+    assert!(
+        !game.scene().borrow().is_playing(),
+        "the round ends in edit mode"
+    );
+    assert_eq!(files(&root), before, "the project is read-only");
+    assert!(!save_dir.exists(), "the save is deleted after");
+}
+
+/// Every row the round names, measured: the single samples with their spread
+/// over the two runs, `play_rss_mb` the first run's alone.
+fn has_its_rows(round: &EditorRound) {
     let row = |m: &str| round.rows.iter().find(|r| r.metric == m);
-    let rows = [
+    let timed = [
         "editor.ui_ms",
         "editor.edit_ms",
         "play_enter_ms",
         "play_stop_ms",
         "save_ms",
     ];
-    for metric in rows {
+    for metric in timed {
         let found = row(metric);
         assert!(
             found.is_some_and(|r| r.avg > 0.0),
@@ -99,15 +113,8 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
         let rss = row("play_rss_mb").unwrap_or_else(|| panic!("{:?}", round.rows));
         assert_eq!(rss.lo, rss.hi, "the first run's alone: {rss:?}");
     }
-    // Two runs: each single sample has its run-to-run spread.
     let enter = row("play_enter_ms").unwrap();
     assert!(enter.lo <= enter.avg && enter.avg <= enter.hi, "{enter:?}");
-    assert!(
-        !game.scene().borrow().is_playing(),
-        "the round ends in edit mode"
-    );
-    assert_eq!(files(&root), before, "the project is read-only");
-    assert!(!save_dir.exists(), "the save is deleted after");
 }
 
 /// The inode of the file at `path` (`None`: no file): a rewrite through

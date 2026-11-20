@@ -1273,8 +1273,8 @@ every binary's open makes them.
     (`editor.render.handles` is the editor's gizmos, `editor.render.outline` the
     selection's). With no GPU or no timestamp queries (lavapipe) the `editor.gpu`
     rows are absent and the report says so; with no adapter the round has no rows,
-    and at a size whose Scene view the editor's panels leave no room (narrower than
-    about 320x180) it draws nothing and warns;
+    and at a size whose Scene view the editor's panels leave no room (320x180 is
+    one) it draws nothing and warns;
   - `play_enter_ms` (edit mode to the first Play tick done: the snapshot, Play's
     entry, the first `FixedUpdate`; **not** the texture refresh the editor runs
     before every Play, `asset::texture_import::refresh_all`, which compresses
