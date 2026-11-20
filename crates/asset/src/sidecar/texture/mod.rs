@@ -101,9 +101,10 @@ pub fn parse_max_size(size: u32) -> Result<u32, String> {
 /// per file and read as [`DEFAULT_MAX_SIZE`], as the setter would refuse it.
 pub fn texture(source: &Path) -> TextureSettings {
     let extracted = || crate::convert::texture_ref::extracted::settings(source);
-    let mut settings = match meta_path(source).exists() {
-        true => load(source).map(|s| s.texture).unwrap_or_default(),
-        false => extracted().unwrap_or_default(),
+    let mut settings = match super::stored(source) {
+        Ok(Some(stored)) => stored.texture,
+        Ok(None) => extracted().unwrap_or_default(),
+        Err(_) => TextureSettings::default(),
     };
     if let Err(why) = parse_max_size(settings.max_size) {
         warn_once(source, &why);
@@ -132,7 +133,20 @@ fn warn_once(source: &Path, why: &str) {
 /// compressed copy is re-made by the import (`asset::texture_import`): in the
 /// background when the editor's watch sees the sidecar change, else by the
 /// refresh before Play.
+///
+/// A texture a conversion extracted is refused: its settings follow the slots
+/// its model samples it in ([`texture`]), and a sidecar in the import cache
+/// would go with the next conversion's folder. Unity's embedded textures are
+/// read-only the same way until they are extracted into the project.
 pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), ImportError> {
+    if let Some(glb) = crate::convert::texture_ref::extracted::glb_of(source) {
+        return Err(ImportError::Sidecar(format!(
+            "{} is a texture extracted from a model ({}): its import settings follow \
+             the slots the model uses it in and cannot be set",
+            source.display(),
+            glb.display()
+        )));
+    }
     let mut stored = load(source)?;
     if stored.texture == settings {
         return Ok(());

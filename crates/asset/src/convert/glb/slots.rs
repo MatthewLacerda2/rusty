@@ -48,7 +48,9 @@ pub fn image_slots(path: &Path) -> Option<BTreeMap<String, Vec<Slot>>> {
     Some(slots)
 }
 
-/// Each texture reference `material` holds, with the slot it fills.
+/// Each texture reference `material` holds, with the slot it fills: the slots a
+/// material has (`gltf::material`), so `KHR_materials_specular`'s
+/// `specularColorTexture`, which no slot reads, is not among them.
 fn textures(material: &Value) -> Vec<(&Value, Slot)> {
     let at = |path: &[&str]| path.iter().try_fold(material, |v, key| v.get(key));
     let named = [
@@ -66,14 +68,6 @@ fn textures(material: &Value) -> Vec<(&Value, Slot)> {
         (
             &["extensions", "KHR_materials_specular", "specularTexture"],
             Slot::Data,
-        ),
-        (
-            &[
-                "extensions",
-                "KHR_materials_specular",
-                "specularColorTexture",
-            ],
-            Slot::Colour,
         ),
     ];
     named

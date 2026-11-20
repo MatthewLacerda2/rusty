@@ -124,6 +124,11 @@ pub fn meta_path(source: &Path) -> PathBuf {
 /// Load a source file's sidecar, or `Default` if none exists yet. Collision meshes
 /// that name each other (a hand edit) read as their own, warned once per file.
 pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
+    Ok(stored(source)?.unwrap_or_default())
+}
+
+/// [`load`], with `None` when the file has no sidecar at all.
+pub(crate) fn stored(source: &Path) -> Result<Option<ImportSettings>, ImportError> {
     let path = meta_path(source);
     match std::fs::read_to_string(&path) {
         Ok(text) => {
@@ -133,9 +138,9 @@ pub fn load(source: &Path) -> Result<ImportSettings, ImportError> {
             if !looped.is_empty() {
                 collider::warn_loop(source, &looped);
             }
-            Ok(settings)
+            Ok(Some(settings))
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(ImportSettings::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(e) => Err(ImportError::Sidecar(e.to_string())),
     }
 }

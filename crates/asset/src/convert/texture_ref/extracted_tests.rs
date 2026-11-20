@@ -86,3 +86,53 @@ fn only_an_image_in_a_cached_models_textures_folder_is_extracted() {
     assert_eq!(glb_of(authored), None, "outside the import cache");
     assert_eq!(settings(authored), None);
 }
+
+#[test]
+fn a_packed_specular_map_is_data_and_its_colour_twin_no_slot() {
+    let dir = rusty_test_support::temp::dir();
+    let gltf = r#"{"asset":{"version":"2.0"},
+     "images":[{"uri":"spec.png"},{"uri":"tint.png"}],
+     "textures":[{"source":0},{"source":1}],
+     "materials":[{"extensions":{"KHR_materials_specular":
+        {"specularTexture":{"index":0},"specularColorTexture":{"index":1}}}}]}"#;
+    let glb = dir.join("m.glb");
+    std::fs::write(&glb, container(gltf.as_bytes().to_vec(), Vec::new())).unwrap();
+    let slots = image_slots(&glb).unwrap();
+    assert_eq!(slots["spec.png"], [Slot::Data], "its alpha, raw");
+    assert!(
+        !slots.contains_key("tint.png"),
+        "no material slot reads specularColorTexture"
+    );
+}
+
+#[test]
+fn a_noted_conversion_re_reads_the_slots_and_a_miss_is_warned_of() {
+    let dir = rusty_test_support::temp::dir();
+    let cache = dir.join(crate::convert::IMPORT_CACHE_DIR);
+    let folder = cache.join("m.fbx.glb.textures");
+    std::fs::create_dir_all(&folder).unwrap();
+    let glb = cache.join("m.fbx.glb");
+    let write = |slot: &str| {
+        let gltf = format!(
+            r#"{{"asset":{{"version":"2.0"}},"images":[{{"uri":"m.fbx.glb.textures/n.png"}}],
+             "textures":[{{"source":0}}],"materials":[{{{slot}:{{"index":0}}}}]}}"#
+        );
+        std::fs::write(&glb, container(gltf.into_bytes(), Vec::new())).unwrap();
+    };
+    let typed = |name: &str| settings(&folder.join(name)).map(|s| s.texture_type);
+    write(r#""normalTexture""#);
+    assert_eq!(typed("n.png"), Some(TextureType::NormalMap));
+    write(r#""emissiveTexture""#);
+    rusty_core::fs::written::note_written(&glb.to_string_lossy());
+    assert_eq!(
+        typed("n.png"),
+        Some(TextureType::Default),
+        "the table dropped"
+    );
+    let warned = rusty_test_support::logs::during(|| {
+        assert_eq!(typed("gone.png"), Some(TextureType::Default));
+        assert_eq!(typed("gone.png"), Some(TextureType::Default));
+    });
+    assert_eq!(warned.len(), 1, "once: {warned:?}");
+    assert!(warned[0].contains("gone.png"), "{warned:?}");
+}

@@ -105,6 +105,9 @@ impl Watch {
         // Every image whose compressed copy is missing or stale is made in the
         // background, so a project opens without a freeze (#1574).
         rusty_asset::texture_import::queue(rusty_asset::texture_import::images(assets));
+        // And a model this thread converts (a scene load, an instancing) has the
+        // textures it extracted compressed the same way (#2365).
+        rusty_asset::texture_import::import_in_background();
         watch.ignored = vec![rusty_asset::convert::IMPORT_CACHE_DIR.into()];
         Some(watch)
     }

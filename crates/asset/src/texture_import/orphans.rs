@@ -18,6 +18,7 @@
 //! ever walked. A model's cache is never touched: an exported project ships it
 //! without its source, on purpose (`convert::served_from_cache`).
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::CACHE_SUFFIX;
@@ -40,7 +41,13 @@ pub(super) fn collect(root: &Path) -> usize {
     for cache in orphans(&cache_dir, root) {
         let _lock = convert::lock_cache(&cache);
         match std::fs::remove_file(&cache) {
-            Ok(()) => removed += 1,
+            Ok(()) => {
+                removed += 1;
+                // A deleted model's folder, once empty (a full one stays).
+                if let Some(folder) = extracted_folder(&cache) {
+                    let _ = std::fs::remove_dir(folder);
+                }
+            }
             Err(e) => log::warn!("[Import] cannot remove {}: {e}", cache.display()),
         }
     }
@@ -55,6 +62,8 @@ pub(super) fn collect(root: &Path) -> usize {
 /// kept at 16 bits, sorted.
 pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
+    // Each `<glb>.bctex/` folder's images, read from its glTF once a folder.
+    let mut named = BTreeMap::new();
     walk(cache_dir, &mut |cache| {
         let Ok(rel) = cache.strip_prefix(cache_dir) else {
             return;
@@ -62,7 +71,7 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
         let Some(name) = rel.to_str().and_then(|r| r.strip_suffix(CACHE_SUFFIX)) else {
             return;
         };
-        let source = match extracted_source(cache) {
+        let source = match extracted_source(cache, &mut named) {
             Some(extracted) => extracted,
             None => sources.join(name),
         };
@@ -79,19 +88,38 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
 /// extracted beside a model's cache (`<glb>.bctex/<name>.bctex`,
 /// `super::extracted_cache`): the image of that name in the textures folder the
 /// model's glTF names now, or where it would lie when the glTF names none (so it
-/// is gone). `None` for any other copy.
-fn extracted_source(cache: &Path) -> Option<PathBuf> {
+/// is gone). `None` for any other copy. `named` holds each folder's images by
+/// name, read on its first copy.
+fn extracted_source(cache: &Path, named: &mut Named) -> Option<PathBuf> {
+    let folder = extracted_folder(cache)?;
+    let name = cache.file_name()?.to_str()?.strip_suffix(CACHE_SUFFIX)?;
+    let images = named.entry(folder.to_path_buf()).or_insert_with(|| {
+        let glb = folder
+            .as_os_str()
+            .to_str()
+            .and_then(|f| f.strip_suffix(CACHE_SUFFIX));
+        let images = glb
+            .map(|g| extracted::images(Path::new(g)))
+            .unwrap_or_default();
+        let by_name = |i: PathBuf| Some((i.file_name()?.to_str()?.to_string(), i));
+        images.into_iter().filter_map(by_name).collect()
+    });
+    Some(
+        images
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| folder.join(name)),
+    )
+}
+
+/// Each `<glb>.bctex/` folder's extracted images, by file name.
+type Named = BTreeMap<PathBuf, BTreeMap<String, PathBuf>>;
+
+/// The `<glb>.bctex/` folder holding the copy at `cache`, when it is one.
+fn extracted_folder(cache: &Path) -> Option<&Path> {
     let folder = cache.parent()?;
     let glb = folder.to_str()?.strip_suffix(CACHE_SUFFIX)?;
-    if !glb.ends_with(".glb") {
-        return None;
-    }
-    let glb = Path::new(glb);
-    let name = cache.file_name()?.to_str()?.strip_suffix(CACHE_SUFFIX)?;
-    let named = extracted::images(glb)
-        .into_iter()
-        .find(|image| image.file_name().is_some_and(|n| n == name));
-    Some(named.unwrap_or_else(|| folder.join(name)))
+    glb.ends_with(".glb").then_some(folder)
 }
 
 /// Whether `cache`, the copy of the existing image at `source`, is a 16-bit normal

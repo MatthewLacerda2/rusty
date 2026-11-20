@@ -37,7 +37,7 @@
 //! through its model's cache, its settings follow the slots its model samples it
 //! in (`convert::texture_ref::extracted`), its copy lies beside the model's cache.
 //!
-//! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`)
+//! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`), and an extracted texture's `<glb>.bctex/<image>.bctex` (`location`)
 //!
 //! **What it skips**: a baked lightmap page (`asset::lightmap_page`, #1694), which
 //! is not a colour texture, and a normal map kept at 16 bits ([`is_deep_normal`]).
@@ -53,6 +53,7 @@
 //! A file it shrinks is warned of once (`shrink::warn_if_shrunk`); a bake raises
 //! a Max Size the engine chose to its own size instead (`sidecar::prepare_bake`).
 
+mod background;
 mod cache;
 mod encode;
 mod location;
@@ -67,13 +68,13 @@ use std::path::Path;
 
 use image::ImageReader;
 
+pub(crate) use background::queue_extracted;
+pub use background::{import_in_background, queue, queue_changed};
 pub(crate) use encode::banded;
 pub use encode::blocks_len;
 pub use encode::{full_chain_len, BlockFormat, Compressed};
 pub use location::{cache_file, cache_path_in, extracted_cache, CACHE_SUFFIX};
-pub use refresh::{
-    images, imports, pending, queue, queue_changed, refresh, refresh_all, Refreshed,
-};
+pub use refresh::{images, imports, pending, refresh, refresh_all, Refreshed};
 pub use shrink::{fit, fitted_size};
 
 use super::convert::{source_digest, Seen};

@@ -17,10 +17,11 @@
 //! sidecar someone wrote beside it wins, as for any image, until the next
 //! conversion replaces its folder.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::Duration;
+
+use rusty_core::fs::written::{written_since, Stale};
 
 use crate::convert::{glb, is_import_cache, textures_owner};
 use crate::gltf::uri;
@@ -81,53 +82,69 @@ pub fn model_source(image: &Path) -> Option<PathBuf> {
 
 /// The import settings of the extracted image at `image`, by the slots its
 /// model's glTF samples it in (the module doc): `None` when it is not one. Each
-/// glTF's table is read once and kept until its size or modified time moves.
+/// glTF's table is read once and kept until the write log names the `.glb` (a
+/// conversion notes it, `stage::note`), as `resolved` keeps its tables. An image
+/// the table does not hold re-reads it once (another process may have written
+/// the `.glb`); still absent, it takes the defaults, warned of once.
 pub fn settings(image: &Path) -> Option<TextureSettings> {
     let glb = absolute(&glb_of(image)?);
-    let stamp = stamp(&glb);
+    let image = absolute(image);
     let mut tables = TABLES.lock().unwrap_or_else(|e| e.into_inner());
-    let fresh = tables.get(&glb).is_some_and(|t| t.stamp == stamp);
-    if !fresh {
-        tables.insert(glb.clone(), read(&glb, stamp));
+    tables.forget_written();
+    let held = |t: &Tables| t.by_glb.get(&glb).and_then(|f| f.get(&image)).copied();
+    if let Some(found) = held(&tables) {
+        return Some(found);
     }
-    let table = tables.get(&glb)?;
-    Some(
-        table
-            .files
-            .get(&absolute(image))
-            .copied()
-            .unwrap_or_default(),
-    )
+    tables.by_glb.insert(glb.clone(), read(&glb));
+    if let Some(found) = held(&tables) {
+        return Some(found);
+    }
+    if tables.warned.insert(image.clone()) {
+        log::warn!(
+            "[Import] {}: {} samples it in no material slot; it imports with the default settings",
+            image.display(),
+            glb.display()
+        );
+    }
+    Some(TextureSettings::default())
 }
 
-/// One glTF's settings by extracted image (absolute), as of `stamp`.
-struct Table {
-    stamp: Option<Stamp>,
-    files: BTreeMap<PathBuf, TextureSettings>,
+/// Each glTF's settings by extracted image (both absolute), and the images
+/// warned of as in none of its slots.
+struct Tables {
+    /// The write generation already seen (`core::fs::written`).
+    seen: u64,
+    by_glb: BTreeMap<PathBuf, BTreeMap<PathBuf, TextureSettings>>,
+    warned: BTreeSet<PathBuf>,
 }
 
-/// A file's size and modified time, as `resolved` stamps a `.glb`.
-type Stamp = (u64, Option<Duration>);
-
-static TABLES: Mutex<BTreeMap<PathBuf, Table>> = Mutex::new(BTreeMap::new());
-
-fn stamp(glb: &Path) -> Option<Stamp> {
-    let meta = std::fs::metadata(glb).ok()?;
-    let modified = meta.modified().ok();
-    Some((
-        meta.len(),
-        modified.and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()),
-    ))
+impl Tables {
+    /// Drop the tables whose `.glb` was written. Allocates nothing when nothing was.
+    fn forget_written(&mut self) {
+        let (seen, written) = written_since(self.seen);
+        self.seen = seen;
+        if written.is_empty() {
+            return;
+        }
+        let stale = Stale::new(written);
+        self.by_glb
+            .retain(|glb, _| !stale.matches(&glb.to_string_lossy()));
+    }
 }
 
-fn read(glb: &Path, stamp: Option<Stamp>) -> Table {
+static TABLES: Mutex<Tables> = Mutex::new(Tables {
+    seen: 0,
+    by_glb: BTreeMap::new(),
+    warned: BTreeSet::new(),
+});
+
+fn read(glb: &Path) -> BTreeMap<PathBuf, TextureSettings> {
     let base = glb.parent().unwrap_or(Path::new(""));
-    let files = glb::image_slots(glb)
+    glb::image_slots(glb)
         .unwrap_or_default()
         .into_iter()
         .filter_map(|(u, slots)| Some((absolute(&uri::file(base, &u)?), of_slots(&slots))))
-        .collect();
-    Table { stamp, files }
+        .collect()
 }
 
 /// The settings an image sampled in `slots` imports with (the module doc's table).

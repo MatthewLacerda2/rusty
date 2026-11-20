@@ -116,3 +116,18 @@ fn imports_counts_an_extracted_texture_of_a_model_under_the_root() {
     );
     assert!(!imports(&dir.join("other"), &tex), "its model is not");
 }
+
+#[test]
+fn an_editor_side_conversion_queues_its_extracted_textures() {
+    model(&rusty_test_support::temp::dir(), 1, true);
+    assert_eq!(super::background::take_queued(), Vec::<PathBuf>::new());
+    import_in_background();
+    let glb = model(&rusty_test_support::temp::dir(), 2, true);
+    let queued = super::background::take_queued();
+    assert_eq!(
+        queued,
+        extracted::images(&glb),
+        "a model with no cache, converted"
+    );
+    assert_eq!(queued.len(), 2);
+}

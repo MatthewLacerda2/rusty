@@ -377,7 +377,17 @@ packed metallic/roughness or specular map, a `"Default"` with `srgb` off; as a c
 map (albedo, emissive), or in two kinds of slot at once, a `"Default"` (BC7), which
 every slot reads whole. Its copy lives beside the model's cache
 (`<model's cache>.glb.bctex/<image>.bctex`), so a re-import of the model re-encodes
-only the images whose pixels changed, and an export ships it.
+only the images whose pixels changed, and an export ships it. In the editor it is
+compressed in the background as soon as the model converts (a scene load, an
+instancing, an import), not only before Play.
+
+`GetTextureImportSettings` takes such a texture by its reference
+(`model.fbx#tex/Skin`) or by its extracted file's path, and returns the settings
+its import uses (an embedded normal map says `"NormalMap"`); a reference the
+model's cache does not hold is an error. Its settings are **read-only**, as Unity's
+embedded textures are until extracted into the project:
+`SetTextureImportSettings` on one is an error saying so. To change them, save the
+image under `assets/` and point the material at that file.
 
 ```lua no-run
 Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point", compression = "None" })

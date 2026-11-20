@@ -88,6 +88,9 @@ pub(super) fn convert(
     at(Step::Stamped);
     note::swapped_in(source, out);
     clear::clear(&dir, &name);
+    // Its extracted textures' compressed copies, made off this thread in the
+    // editor, whatever converted it (a scene load, an instancing, an API import).
+    crate::texture_import::queue_extracted(out);
     Ok(converted)
 }
 
