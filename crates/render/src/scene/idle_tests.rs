@@ -115,7 +115,7 @@ fn gpu_a_preview_tab_beside_a_moving_scene_keeps_both() {
     for step in 0..5 {
         main.world.transform_mut(mover).unwrap().position.y = step as f32 * 0.2;
         let (_, m) = frame(&mut r, &main);
-        let (_, p) = frame(&mut r, &preview);
+        let (_, p) = r.aside(|r| frame(r, &preview)); // a preview tab draws aside
         if step > 1 {
             assert_eq!(extracted(&m), (0, 1), "the main scene re-places its mover");
             assert_eq!(extracted(&p), (0, 0), "the preview holds still");

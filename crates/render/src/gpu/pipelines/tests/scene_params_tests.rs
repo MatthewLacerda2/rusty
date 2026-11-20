@@ -34,7 +34,8 @@ fn gpu_two_kept_scenes_draw_a_same_named_material_with_their_own_values() {
     let (preview, other) = flashing(&flash.0, [0.0, 0.0, 1.0]);
     assert_eq!(key, other, "one name in both libraries");
     let red = halves(&mut renderer, &main)[0];
-    let blue = halves(&mut renderer, &preview)[0];
+    // A preview draws beside the main view, as the editor's Inspector does.
+    let blue = renderer.aside(|r| halves(r, &preview)[0]);
     assert!(
         red.0 > red.1 && blue.1 > blue.0,
         "red {red:?}, blue {blue:?}"
@@ -46,11 +47,11 @@ fn gpu_two_kept_scenes_draw_a_same_named_material_with_their_own_values() {
         red,
         "the main scene stays red"
     );
-    assert_eq!(halves(&mut renderer, &preview)[0], blue);
+    assert_eq!(renderer.aside(|r| halves(r, &preview)[0]), blue);
     let owner = |s: &Scene| ParamOwner::Material(s.id(), key.clone());
     let values = [&main, &preview].map(|s| renderer.materials.params_of(&owner(s)).copied());
     assert!(values[0].is_some() && values[0] != values[1], "{values:?}");
-    // Four more scenes evict the main one: its buffer goes with it.
+    // Loading other scenes drops the main one: its buffer goes with it.
     for _ in 0..4 {
         halves(&mut renderer, &flashing(&flash.0, [0.0, 1.0, 0.0]).0);
     }
