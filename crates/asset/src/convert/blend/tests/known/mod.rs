@@ -1,15 +1,17 @@
 //! The Blender version kept across processes (`known`), with a fake executable
-//! that counts its runs: a fresh process (`forget`) reads the kept answer and
+//! that counts its runs: a fresh process (a new `Memo`) reads the kept answer and
 //! starts no Blender.
 
 use super::super::known::{self, Known, FILE, READS};
-use super::super::locate::forget;
+use super::super::locate::Memo;
 use super::super::Search;
 use super::locate::{script, search};
 use std::path::{Path, PathBuf};
 
+mod keys;
+
 /// A fake Blender in `dir` that says `version` and counts each run in `dir/runs`.
-fn counting(dir: &Path, version: &str) -> PathBuf {
+pub(super) fn counting(dir: &Path, version: &str) -> PathBuf {
     let runs = dir.join("runs");
     script(
         dir,
@@ -17,12 +19,12 @@ fn counting(dir: &Path, version: &str) -> PathBuf {
     )
 }
 
-fn runs(dir: &Path) -> usize {
+pub(super) fn runs(dir: &Path) -> usize {
     std::fs::read_to_string(dir.join("runs")).map_or(0, |s| s.lines().count())
 }
 
 /// A search finding the fake at `blender`, keeping its answer in `dir/cache/`.
-fn kept_in(dir: &Path, blender: &Path) -> (Search, PathBuf) {
+pub(super) fn kept_in(dir: &Path, blender: &Path) -> (Search, PathBuf) {
     let file = dir.join("cache").join(FILE);
     let search = Search {
         known: Some(file.clone()),
@@ -32,9 +34,9 @@ fn kept_in(dir: &Path, blender: &Path) -> (Search, PathBuf) {
 }
 
 /// The version `search` finds in a fresh process.
-fn fresh(search: &Search) -> Result<String, String> {
-    forget();
-    search.find().map(|b| b.version).map_err(|e| e.to_string())
+pub(super) fn fresh(search: &Search) -> Result<String, String> {
+    let found = search.find_in(&Memo::default());
+    found.map(|b| b.version).map_err(|e| e.to_string())
 }
 
 #[test]
@@ -44,34 +46,11 @@ fn a_second_process_reads_the_kept_version_and_starts_no_blender() {
     let (search, file) = kept_in(&dir, &blender);
     assert_eq!(fresh(&search).as_deref(), Ok("5.0.1"));
     let entry = known::read(&file).expect("the first ask is kept");
-    assert_eq!(entry.path, std::fs::canonicalize(&blender).unwrap());
+    assert_eq!(entry.path, blender);
+    assert_eq!(entry.canonical, std::fs::canonicalize(&blender).unwrap());
     assert_eq!(fresh(&search).as_deref(), Ok("5.0.1"));
-    assert_eq!(
-        runs(&dir.join("bin")),
-        1,
-        "the second process read the file"
-    );
-    assert_eq!(
-        search.find().as_ref().map(|b| b.version.as_str()),
-        Ok("5.0.1")
-    );
-}
-
-#[test]
-fn a_changed_executable_is_asked_again() {
-    let dir = rusty_test_support::temp::dir();
     let bin = dir.join("bin");
-    let blender = counting(&bin, "5.0.1");
-    let (search, _) = kept_in(&dir, &blender);
-    fresh(&search).unwrap();
-    counting(&bin, "5.1.10");
-    assert_eq!(fresh(&search).as_deref(), Ok("5.1.10"), "a new length");
-    let epoch = std::time::UNIX_EPOCH + std::time::Duration::from_secs(1_000_000);
-    let file = std::fs::File::options().write(true).open(&blender).unwrap();
-    file.set_modified(epoch).unwrap();
-    drop(file); // closed before it runs: never "text file busy"
-    fresh(&search).unwrap();
-    assert_eq!(runs(&bin), 3, "a new modification time asks again");
+    assert_eq!(runs(&bin), 1, "the second process read the file");
 }
 
 #[test]
@@ -105,14 +84,15 @@ fn a_garbage_file_is_a_miss_and_is_rewritten() {
 }
 
 #[test]
-fn a_refused_version_is_kept_and_still_refused() {
+fn a_refused_version_is_never_kept() {
     let dir = rusty_test_support::temp::dir();
     let blender = counting(&dir.join("bin"), "4.2.3");
-    let (search, _) = kept_in(&dir, &blender);
+    let (search, file) = kept_in(&dir, &blender);
     let first = fresh(&search).expect_err("4 is refused");
-    assert_eq!(fresh(&search), Err(first.clone()), "the same refusal");
     assert!(first.contains("is Blender 4.2.3"), "{first}");
-    assert_eq!(runs(&dir.join("bin")), 1);
+    assert!(!file.exists(), "a refusal is asked again by each process");
+    assert_eq!(fresh(&search), Err(first));
+    assert_eq!(runs(&dir.join("bin")), 2);
 }
 
 #[test]
