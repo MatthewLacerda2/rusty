@@ -241,11 +241,19 @@ def build_env(env=None) -> dict:
     return env
 
 
-BUILD = ["cargo", "build", "--release", "--locked", "--quiet", "--features", "dev", "--bin", "bench-scenes"]
+BUILD = ["cargo", "build", "--release", "--locked", "--quiet", "--features", "dev"]
+BENCH, PLAY = "bench-scenes", "play"  # the scenes' bench; the stress yard's (`STRESS=1`, `bench/stress.py`)
 
 
-def build(tree: Path, git=run) -> Path:
-    """Build `tree`'s `bench-scenes` (release, `dev`) into `<tree>/target`, returning the binary."""
+def binary(tree: Path, name: str) -> Path:
+    """Where `tree`'s release build keeps the binary `name`."""
+    return tree / "target" / "release" / name
+
+
+def build(tree: Path, git=run, bins: tuple[str, ...] = (BENCH,)) -> Path:
+    """Build `tree`'s `bins` (release, `dev`) into `<tree>/target` in one cargo invocation,
+    so their shared crates build once; the first binary's path ([`binary`] names the rest)."""
     target = tree / "target"
-    git([*BUILD, "--target-dir", str(target)], cwd=tree, env=build_env())
-    return target / "release" / "bench-scenes"
+    named = [arg for name in bins for arg in ("--bin", name)]
+    git([*BUILD, *named, "--target-dir", str(target)], cwd=tree, env=build_env())
+    return binary(tree, bins[0])

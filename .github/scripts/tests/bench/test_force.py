@@ -29,6 +29,14 @@ class BusyBeforeEachLeg(unittest.TestCase):
         self.assertIn("before the main-again leg", gate.overridden[0])
         self.assertIn("cargo (PID 9)", gate.overridden[0])
 
+    def test_one_build_held_over_every_run_is_said_once(self):
+        gate = bench_ab.Gate(True)
+        for _ in range(3):
+            self.assertIsNone(gate.leg("stress pr", BUSY))
+        self.assertEqual(len(gate.overridden), 1)
+        self.assertIsNone(gate.leg("stress main-again", BUSY))
+        self.assertEqual(len(gate.overridden), 2, "another leg is its own line")
+
     def test_a_quiet_machine_is_noted_by_nobody(self):
         gate = bench_ab.Gate(True)
         self.assertIsNone(gate.leg("pr", None))

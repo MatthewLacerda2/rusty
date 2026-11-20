@@ -58,6 +58,18 @@ class Refusal(unittest.TestCase):
         self.assertIn("needs 6.0 GiB", said)
         self.assertIn("bench-main/target/release 2.0 GiB, pr-2-head/target/release 2.0 GiB", said)
 
+    def test_a_second_binary_counts_until_its_folder_holds_it(self):
+        root, run = machine({"bench-main/target/release": 2 * GIB})
+        tree = root / ".claude" / "worktrees" / "bench-main"
+        self.assertIsNone(space.refusal(root, [(tree, "release")], "bench-ab", run, free=lambda _: 2 * GIB))
+        said = space.refusal(root, [(tree, "release", ("play",))], "bench-ab", run, free=lambda _: 2 * GIB)
+        self.assertIn(f"bench-main/target/release {space.gib(space.EXTRA['play'])}", said)
+        both = [(tree, "release", ("bench-scenes", "play"))]
+        self.assertIn("needs 2.2 GiB", space.refusal(root, both, "bench-ab", run, free=lambda _: 2 * GIB),
+                      "the first binary adds nothing beyond NEEDS, the second is counted")
+        (tree / "target" / "release" / "play").write_text("")
+        self.assertIsNone(space.refusal(root, [(tree, "release", ("play",))], "bench-ab", run, free=lambda _: 2 * GIB))
+
 
 class Full(unittest.TestCase):
     def test_a_full_disk_is_told_apart_and_said_with_the_advice(self):

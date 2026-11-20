@@ -11,9 +11,11 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
   lock is never left behind for a reused PID to keep; the file names the
   holder's PID for the refusal;
 - **a build or a bench on the machine**: a `cargo`, `cargo-<tool>` (a running
-  `cargo nextest` is `cargo-nextest`), `rustc` or `bench-scenes` process
-  ([`BUSY`]), from the process table, before any build and again
-  before each leg (a build started mid-run would skew the legs after it);
+  `cargo nextest` is `cargo-nextest`), `rustc`, `bench-scenes` or `play` process
+  ([`BUSY`]; `play` since `STRESS=1` benches the yard with it, #2450: another
+  `make bench` beside a yard run skews both), from the process table, before any
+  build and again before each leg and each yard run (a build started mid-run
+  would skew the legs after it);
 - **un-imported textures and models**: the images an import would encode now,
   and the models whose cooked file is missing or stale, which
   `bench-scenes --pending-imports` lists from the engine's own checks
@@ -49,7 +51,7 @@ from merging.watch import lock
 
 LOCK = Path("out/bench/.timed-run.lock")
 # Processes that skew a timed run: a build, or another bench.
-BUSY = ("cargo", "rustc", "bench-scenes")
+BUSY = ("cargo", "rustc", "bench-scenes", "play")
 
 
 def hold(path: Path):
