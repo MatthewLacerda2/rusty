@@ -514,16 +514,17 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # SCENES names some by their path under assets/scenes/ without .scene (default:
 # every one, subfolders included); RES=WxH overrides 1920x1080. PROFILE=1 adds a
 # sampling profile of the measured frames (perf on Linux, sample on macOS) as
-# <scene>.profile.txt and .folded, on a release build with line tables. Nothing is
-# written into the project. A signal, never a gate; docs/testing.md.
+# <scene>.profile.txt and .folded, on a release build with line tables. Each scene's
+# editor round (its own process: Scene-view frames, Play entry, Stop, a save beside the
+# reports) adds the editor. rows; EDITOR=0 skips it. Nothing is written into the project. A signal, never a gate; docs/testing.md.
 # PROFILE=1 builds the `profiling` profile with frame pointers forced on, so perf walks
 # its stacks by frame pointer (`dev::bench::scenes::profile::perf`). That one binary runs
 # the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
 # on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
 # reaches that profile's own target folder; a run without PROFILE=1 is the release build.
-bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1]
-	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1]" >&2; exit 1; }
-	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) out/bench/scenes
+bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0]
+	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0]" >&2; exit 1; }
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) $(if $(filter 0,$(EDITOR)),--no-editor) out/bench/scenes
 
 # A pull request's measured rows (#2381): `main`, the PR's head, `main` again, back to
 # back, each built in a detached worktree of its own; the second `main` leg is each
@@ -533,6 +534,6 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # running quality preset in every leg: dotted keys with plain values
 # (SET='a=true ssao.high.radius=1.5'), each passed quoted; a JSON object value
 # ({...}) is refused. The table lands in out/bench/ab/pr-<n>/table.md.
-bench-ab: ## A PR's measured rows in three legs (main, PR, main again). make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [FORCE=1]
-	@test -n "$(PR)" -a -n "$(PROJECT)" || { echo "bench-ab: make bench-ab PR=<n> PROJECT=<project dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [FORCE=1]" >&2; exit 1; }
-	@python3 .github/scripts/bench-ab.py --pr $(PR) --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(RES),--size $(RES)) $(foreach s,$(SET),--set '$(s)') $(if $(filter 1,$(FORCE)),--force)
+bench-ab: ## A PR's measured rows in three legs (main, PR, main again). make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0] [FORCE=1]
+	@test -n "$(PR)" -a -n "$(PROJECT)" || { echo "bench-ab: make bench-ab PR=<n> PROJECT=<project dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0] [FORCE=1]" >&2; exit 1; }
+	@python3 .github/scripts/bench-ab.py --pr $(PR) --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(RES),--size $(RES)) $(foreach s,$(SET),--set '$(s)') $(if $(filter 0,$(EDITOR)),--no-editor) $(if $(filter 1,$(FORCE)),--force)

@@ -20,8 +20,10 @@
 //! No adapter → `Ok(false)`, the same skip contract as every headless capture.
 //! [`capture_demo`] captures the editor with a demo open on the Game view's
 //! timeline (#1598). The Inspector's Preview tab renders through the window's own
-//! call (`preview`, #2239).
+//! call (`preview`, #2239). [`bench`](mod@bench) draws the same frame for `make bench-scenes`'
+//! editor round, timed, with Play, Stop and a save between (#2314).
 
+pub mod bench;
 mod demo;
 mod paint;
 mod preview;

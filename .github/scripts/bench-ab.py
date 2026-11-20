@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`bench-ab.py --pr N --project DIR [--scenes a,b] [--runs n] [--load-runs n] [--size WxH] [--set k=v]... [--force]` (#2381).
+"""`bench-ab.py --pr N --project DIR [--scenes a,b] [--runs n] [--load-runs n] [--size WxH] [--set k=v]... [--no-editor] [--force]` (#2381).
 
 `make bench-ab` is this: a pull request's measured rows in three legs, `main`,
 the PR's head, `main` again, the second `main` leg each row's noise floor
@@ -52,6 +52,7 @@ def args(argv):
     p.add_argument("--load-runs", type=int, dest="load_runs")
     p.add_argument("--size")
     p.add_argument("--set", action="append", default=[], dest="sets")
+    p.add_argument("--no-editor", action="store_true", dest="no_editor")
     p.add_argument("--force", action="store_true")
     a = p.parse_args(argv)
     for pair in a.sets:
@@ -162,7 +163,7 @@ def main(argv) -> int:
         plan = legs.plan(main_bin, pr_bin, out)
         prefix, said = capped_scope()
         print(f"bench-ab: {said}", file=sys.stderr)
-        ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs)
+        ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs, a.no_editor)
 
         def before_each(leg):
             return gate.leg(leg.name, refuse.busy_refusal(refuse.busy(ps(), me)))

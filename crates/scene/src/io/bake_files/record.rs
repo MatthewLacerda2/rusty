@@ -1,9 +1,11 @@
 //! One path's record in [`BakeFiles`](super::BakeFiles), and what a save would
 //! bring that path to.
 
+use std::path::Path;
 use std::sync::Arc;
 
-use super::disk::Disk;
+use super::disk::{key, Disk};
+use super::BakeFiles;
 use rusty_core::hash::content;
 
 /// Why a save may write a path even when this world holds what it held.
@@ -15,6 +17,21 @@ pub(super) enum Mark {
     Refused,
     /// This world baked since: written whatever is on disk (the last write wins).
     Baked,
+}
+
+impl BakeFiles {
+    /// The file at `from` was copied to `to` byte for byte (none there: none at
+    /// either): `to` takes `from`'s record, so a save to `to` does what a save to
+    /// `from` would, as `make bench-scenes`' editor round times a save of a loaded
+    /// scene outside its project. Nothing without a record at `from`.
+    pub fn copied(&self, from: &Path, to: &Path) {
+        let Some(seen) = self.seen.borrow().get(&key(from)).cloned() else {
+            return;
+        };
+        let to = key(to);
+        self.warned.borrow_mut().remove(&to);
+        self.seen.borrow_mut().insert(to, seen);
+    }
 }
 
 /// What this world saw at one path.

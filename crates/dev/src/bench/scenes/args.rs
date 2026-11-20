@@ -28,6 +28,12 @@ pub struct Args {
     /// A child's `--import-out` and `--import-ms` (`scenes::import`).
     pub import_out: Option<PathBuf>,
     pub import_ms: Option<f64>,
+    /// A child's `--editor-out <file>`: run the editor round, keep it there, exit;
+    /// the timed child's `--editor <file>`: the round to fold (`super::editor`).
+    pub editor_out: Option<PathBuf>,
+    pub editor: Option<PathBuf>,
+    /// `--no-editor`: skip the editor round (`EDITOR=0`).
+    pub no_editor: bool,
     pub profile: bool,
     pub import: bool,
     /// `--script`: time the scripts' engine verbs (`bench::verbs`).
@@ -65,6 +71,9 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
         before: take_value(&mut args, "--before")?.map(PathBuf::from),
         import_out: take_value(&mut args, "--import-out")?.map(PathBuf::from),
         import_ms,
+        editor_out: take_value(&mut args, "--editor-out")?.map(PathBuf::from),
+        editor: take_value(&mut args, "--editor")?.map(PathBuf::from),
+        no_editor: take_switch(&mut args, "--no-editor"),
         profile: take_switch(&mut args, "--profile"),
         import: take_switch(&mut args, "--import"),
         script: take_switch(&mut args, "--script"),
