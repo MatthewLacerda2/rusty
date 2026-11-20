@@ -65,9 +65,10 @@ impl<T: ?Sized> DerefMut for CompMut<'_, T> {
 
 /// Generate the accessor family for one OPTIONAL first-class component:
 /// `get` / `get_mut` (None when absent), `has`, `set` (Some = attach/replace,
-/// None = detach), `take` (detach returning the component — the sim's
-/// take/simulate/write-back idiom), and `ids_with` (stable ids carrying the
-/// component, in insertion order).
+/// None = detach), `take` (detach returning the component: an edit-time call,
+/// since a detach moves the entity to another archetype; a per-tick system edits
+/// through `get_mut`), and `ids_with` (stable ids carrying the component, in
+/// insertion order).
 ///
 /// A uniform family on purpose: `make dead-pub` lists the members nothing calls
 /// today (most `take_*`), and they stay so every component has the same shape.

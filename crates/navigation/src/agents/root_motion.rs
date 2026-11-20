@@ -36,16 +36,20 @@ impl NavigationGraph {
     /// the navmesh as its steering would: only onto walkable spans linked to the
     /// one it stands on, then onto that floor's height. The agent's own velocity
     /// is left as it was. Nothing moves without an agent.
+    /// Only `slide` runs while the agent is borrowed, so it is edited in its column.
     pub fn move_agent(&self, scene: &mut Scene, id: u32, motion: Vec3) {
-        let Some(mut agent) = scene.world.take_nav_agent(id) else {
-            return;
+        let body = scene.world.world_position(id);
+        let to = {
+            let Some(mut agent) = scene.world.nav_agent_mut(id) else {
+                return;
+            };
+            let velocity = agent.velocity;
+            // One "second" of a velocity equal to the displacement.
+            agent.velocity = Vec3::new(motion.x, 0.0, motion.z);
+            let to = self.slide(&mut agent, body, 1.0);
+            agent.velocity = velocity;
+            to
         };
-        let velocity = agent.velocity;
-        // One "second" of a velocity equal to the displacement.
-        agent.velocity = Vec3::new(motion.x, 0.0, motion.z);
-        let to = self.slide(&mut agent, scene.world.world_position(id), 1.0);
-        agent.velocity = velocity;
-        scene.world.set_nav_agent(id, Some(agent));
         scene.world.set_world_position(id, to);
     }
 }
