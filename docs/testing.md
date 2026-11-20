@@ -1120,7 +1120,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   Rigidbody; one under a soldier's `hand_r` bone, kinematic) and 4 destroyed after
   30 ticks, 2 of 8 muzzle-flash meshes toggled (`Scene.SetActive`), 1 decal stamped
   and its oldest past 64 removed, a pickup re-parented between two holders, and 4
-  raycasts. After 120 frames, when its live entity and decal counts hold still,
+  shots: a `Physics.RaycastAllNonAlloc` from each shooter's muzzle to the
+  Player's chest, the first hit not on the shooter's own rig taken (as a weapon
+  does: its hitboxes surround the muzzle), the decal stamped where the first
+  lands. After 120 frames, when its live entity and decal counts hold still,
   600 more are measured (`Harness.Bench(600, "firefight")`): the same rows, named
   `firefight.<row>` (`firefight.cpu_ms`, `firefight.cpu.follow_bones`,
   `firefight.render.<stage>`, …), where such a result's invalidation costs.
@@ -1211,7 +1214,8 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `bench.txt`), both windows in one, and each run prints every row's change
   against the last one, a window's table against that window's rows; a row the
   last run did not measure (the firefight's, the first time) reads "absent on the
-  last run". To
+  last run". A run stopped before a window keeps the last run's rows of it, so
+  the kept report always holds each window's last complete measurement. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the
   engine that measured it (`engine <commit> content <digest>`, and the last run's
   content when it moved), and warns when the binary's `engine/` is not the one it was

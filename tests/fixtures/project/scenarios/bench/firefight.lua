@@ -17,7 +17,8 @@ local MUZZLES = 8   -- muzzle-flash meshes, two under each shooter's hand
 local TOGGLES = 2   -- of them toggled a tick
 local DECALS = 64   -- this script's decals kept: one stamped a tick, the oldest dropped
 local RAYS = 4      -- raycasts a tick, one a shooter
-local EYES = 1.6
+local RANGE = 60    -- a shot's reach, metres
+local CHEST = 1.0   -- where on the Player a shot aims, above its pivot
 
 local Firefight = {
     fields = {
@@ -25,6 +26,11 @@ local Firefight = {
             type = "string",
             default = "scenarios/bench/casing.prefab",
             tooltip = "The casing spawned, SPAWNS a tick",
+        },
+        trace = {
+            type = "boolean",
+            default = false,
+            tooltip = "Log every shot (for the firefight's tests, never the bench)",
         },
     },
 }
@@ -48,20 +54,6 @@ local function pop(q)
     return v
 end
 
--- The descendant of `id` named `name`, depth first.
-local function find(id, name)
-    for _, child in ipairs(Scene.GetChildren(id)) do
-        if Scene.GetName(child) == name then
-            return child
-        end
-        local found = find(child, name)
-        if found then
-            return found
-        end
-    end
-    return nil
-end
-
 local function box(name, parent, x, y, z, sx, sy, sz)
     local id = Scene.CreateEntity(name, "Box")
     Scene.RemoveComponent(id, "Collider") -- draw-only
@@ -82,7 +74,7 @@ function Firefight.Start(id)
             break
         end
         shooters[i] = soldier
-        hands[i] = find(soldier, "hand_r")
+        hands[i] = Animator.GetBone(soldier, "hand_r")
     end
     -- A smaller stress scene has fewer shooters; none is a scenario error.
     SHOOTERS = #shooters
@@ -121,22 +113,39 @@ local function spawn()
     end
 end
 
--- This tick's shots: a ray from each shooter's eyes to the Player, and one decal
--- where the first lands (on the deck below it when it hits nothing).
+-- This tick's shots: a ray from each shooter's muzzle to the Player's chest, the
+-- first hit not on the shooter's own rig taken (`root`, as a game's weapon does:
+-- the shooter's hitboxes surround its muzzle), and one decal where the first
+-- shot lands (on the deck below the muzzle when it hits nothing).
+local hits = {} -- kept across ticks: RaycastAllNonAlloc refills it
 local function shoot()
     local player = Scene.FindEntityByName("Player")
-    local px, py, pz = 0, 1.5, -15
+    local px, py, pz = 0, 0.5, -15
     if player then
         px, py, pz = Transform.GetPosition(player)
     end
+    py = py + CHEST
     local decal_at
     for r = 1, RAYS do
-        local shooter = shooters[(r - 1) % SHOOTERS + 1]
-        local x, y, z = Transform.GetPosition(shooter)
-        local hit, _, _, hx, hy, hz, nx, ny, nz =
-            Physics.Raycast(x, y + EYES, z, px - x, py - y - EYES, pz - z, shooter)
+        local s = (r - 1) % SHOOTERS + 1
+        local x, y, z = Transform.GetPosition(muzzles[s])
+        local dx, dy, dz = px - x, py - y, pz - z
+        local n = Physics.RaycastAllNonAlloc(hits, x, y, z, dx, dy, dz, RANGE)
+        local hit
+        for i = 1, n do
+            if hits[i].root ~= shooters[s] then
+                hit = hits[i]
+                break
+            end
+        end
+        if Firefight.trace then
+            Debug.Log(string.format("firefight shot %d from %d: %s at %.3f, eye %.3f %.3f %.3f",
+                r, shooters[s], hit and tostring(hit.root) or "nothing",
+                hit and hit.distance or -1, Transform.GetPosition(shooters[s])))
+        end
         if r == 1 then
-            decal_at = hit and { hx, hy, hz, nx, ny, nz } or { x, 0, z + 1, 0, 1, 0 }
+            decal_at = hit and { hit.point.x, hit.point.y, hit.point.z,
+                hit.normal.x, hit.normal.y, hit.normal.z } or { x, 0, z, 0, 1, 0 }
         end
     end
     push(decals, Decals.Spawn(decal_at[1], decal_at[2], decal_at[3],

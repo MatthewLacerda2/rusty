@@ -253,13 +253,9 @@ fn push_parts<'a>(
     samples.push(&format!("{prefix}.other"), (total - sum) * scale);
 }
 
-/// Measure `ticks` frames, print the report with its change against the last one
-/// kept in `out_dir`, and keep this one there instead: a run of one window
-/// (`window::Run`). Returns the report.
-pub fn run(harness: &mut Harness, ticks: u32) -> Report {
-    window::Run::default().first(harness, ticks)
-}
-
+#[cfg(test)]
+#[path = "firefight_shot_tests.rs"]
+mod firefight_shot_tests;
 #[cfg(test)]
 #[path = "firefight_tests.rs"]
 mod firefight_tests;

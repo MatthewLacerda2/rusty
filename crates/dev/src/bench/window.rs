@@ -7,10 +7,16 @@
 //! against its own row of the last run. A window prints as its own table, its rows
 //! by their plain names, so each window's sums (`cpu_ms` = its `cpu.` rows) read
 //! as the first window's do.
+//!
+//! **The kept report always holds the last complete measurement of each window.**
+//! It is written after every window, and a window this run has not measured (yet,
+//! or at all: a run stopped early) keeps the last run's rows for it, so a stopped
+//! run never erases a window it never reached.
 
 use super::report::{read, tick_timed_since, write, Report};
 use super::{clock, measure};
 use crate::harness::Harness;
+use rusty_core::project::EngineStamp;
 
 /// The run so far: the last run it compares against, read once at its start,
 /// and what it has measured.
@@ -20,11 +26,14 @@ pub struct Run {
     previous: Option<Report>,
     /// Every window measured so far, the later ones' rows prefixed.
     kept: Report,
-    /// The windows after the first, by name.
-    windows: Vec<String>,
     /// Each window's printed table, in order: `bench.txt`.
     text: String,
     started: bool,
+    /// Whether this run measured its first (unprefixed) window.
+    first_measured: bool,
+    /// The engine that measured the run, stamped once: its mismatch warning is
+    /// the run's, printed under the first window it measures.
+    engine: Option<EngineStamp>,
 }
 
 impl Run {
@@ -56,7 +65,7 @@ impl Run {
                 "Bench: a window's name is a lowercase word (a-z, 0-9, _), got `{name}`"
             ));
         }
-        if self.windows.iter().any(|w| w == name) {
+        if self.kept.windows.iter().any(|w| w == name) {
             return Err(format!(
                 "Bench: window `{name}` was already measured this run"
             ));
@@ -65,15 +74,17 @@ impl Run {
             self.previous = read(harness.out_dir());
             self.started = true;
         }
-        self.windows.push(name.to_string());
         Ok(self.window(harness, ticks, Some(name)))
     }
 
     fn window(&mut self, harness: &mut Harness, ticks: u32, name: Option<&str>) -> Report {
         let mut report = measure(harness, ticks);
-        let engine = rusty_core::project::engine_content::stamp();
-        report.warnings.extend(engine.warning());
-        report.engine = Some(engine);
+        if self.engine.is_none() {
+            let engine = rusty_core::project::engine_content::stamp();
+            report.warnings.extend(engine.warning());
+            self.engine = Some(engine);
+        }
+        report.engine.clone_from(&self.engine);
         let last = self.previous.as_ref().map(|p| match name {
             Some(name) => window_of(p, name),
             None => p.clone(),
@@ -96,9 +107,9 @@ impl Run {
             Some(name) => prefixed(report, name),
             None => report,
         };
-        self.keep(&report, name.is_none());
+        self.keep(&report, name);
         let out_dir = harness.out_dir().to_path_buf();
-        if let Err(e) = write(&out_dir, &self.kept, &self.text) {
+        if let Err(e) = write(&out_dir, &self.with_unmeasured(), &self.text) {
             harness.console.borrow_mut().error(format!("[Bench] {e}"));
         }
         let what = name.map_or(String::new(), |n| format!(" in window `{n}`"));
@@ -108,17 +119,47 @@ impl Run {
 
     /// Add a window's (prefixed) `report` to the run's: the first window gives the
     /// run its frame count and engine; a later one adds its rows and warnings.
-    fn keep(&mut self, report: &Report, first: bool) {
-        if first {
+    fn keep(&mut self, report: &Report, name: Option<&str>) {
+        let Some(name) = name else {
             self.kept = report.clone();
+            self.first_measured = true;
             return;
-        }
+        };
+        self.kept.windows.push(name.to_string());
         self.kept.metrics.extend(report.metrics.iter().cloned());
         self.kept.warnings.extend(report.warnings.iter().cloned());
         if self.kept.engine.is_none() {
             self.kept.frames = report.frames;
             self.kept.engine.clone_from(&report.engine);
         }
+    }
+
+    /// What is kept: this run's windows, and for each window the last run
+    /// measured and this one has not, the last run's rows of it.
+    fn with_unmeasured(&self) -> Report {
+        let mut out = self.kept.clone();
+        let Some(last) = &self.previous else {
+            return out;
+        };
+        let of = |w: &str, m: &str| m.strip_prefix(w).is_some_and(|r| r.starts_with('.'));
+        let windowed = |m: &str| last.windows.iter().any(|w| of(w, m));
+        if !self.first_measured {
+            let plain = last.metrics.iter().filter(|(m, _)| !windowed(m));
+            let mut metrics: Vec<_> = plain.cloned().collect();
+            metrics.append(&mut out.metrics);
+            out.metrics = metrics;
+            out.frames = last.frames;
+            out.engine.clone_from(&last.engine);
+        }
+        for w in &last.windows {
+            if out.windows.contains(w) {
+                continue;
+            }
+            let rows = last.metrics.iter().filter(|(m, _)| of(w, m));
+            out.metrics.extend(rows.cloned());
+            out.windows.push(w.clone());
+        }
+        out
     }
 }
 
@@ -148,6 +189,7 @@ pub fn window_of(run: &Report, name: &str) -> Report {
         metrics: metrics.collect(),
         warnings: Vec::new(),
         engine: run.engine.clone(),
+        windows: Vec::new(),
     }
 }
 

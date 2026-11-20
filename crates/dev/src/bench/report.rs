@@ -48,6 +48,10 @@ pub struct Report {
     /// with another tree's shaders says so in its own report.
     #[serde(default)]
     pub engine: Option<EngineStamp>,
+    /// The later windows whose rows a kept run holds, each `<window>.<row>`
+    /// (`bench::window`): what tells a window's rows from a set's (`cpu.`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub windows: Vec<String>,
 }
 
 /// Per-frame samples, kept in the order metrics were first seen.

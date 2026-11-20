@@ -16,7 +16,7 @@ const WARMUP: u32 = 120;
 const WINDOW: u32 = 90;
 
 /// A harness on four soldiers and a few decals, the firefight attached.
-fn fight(name: &str) -> Harness {
+pub(super) fn fight(name: &str, trace: bool) -> Harness {
     let out =
         rusty_test_support::temp::dir().join(format!("firefight_{name}_{}", std::process::id()));
     let h = Harness::new(out, "");
@@ -36,7 +36,10 @@ fn fight(name: &str) -> Harness {
         let dir = fixture_project().join("scenarios/bench");
         let id = scene.add_entity("Firefight".to_string());
         let prefab = dir.join("casing.prefab").to_string_lossy().into_owned();
-        let fields = BTreeMap::from([("prefab".to_string(), ScriptFieldValue::Text(prefab))]);
+        let fields = BTreeMap::from([
+            ("prefab".to_string(), ScriptFieldValue::Text(prefab)),
+            ("trace".to_string(), ScriptFieldValue::Boolean(trace)),
+        ]);
         let script = dir.join("firefight.lua").to_string_lossy().into_owned();
         assert!(rusty_edit::authoring::add_script(
             &mut scene.world,
@@ -60,7 +63,7 @@ fn counts(h: &Harness) -> (usize, usize, usize) {
 
 #[test]
 fn the_firefight_churns_at_a_steady_state() {
-    let h = fight("steady");
+    let h = fight("steady", false);
     let (quiet, quiet_decals, _) = counts(&h);
     h.step(WARMUP);
     let first = counts(&h);
@@ -107,7 +110,7 @@ fn the_firefight_churns_at_a_steady_state() {
 #[test]
 fn two_firefights_do_the_same_edits() {
     let run = |name| {
-        let h = fight(name);
+        let h = fight(name, false);
         h.step(WARMUP + 10);
         let names = |h: &Harness| {
             let world = h.world.borrow();

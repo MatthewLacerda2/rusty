@@ -84,6 +84,7 @@ fn a_report_round_trips_through_json() {
         )],
         warnings: vec!["noisy".to_string()],
         engine: Some(EngineStamp::of(Some("a"), Some("b"))),
+        windows: vec!["firefight".to_string()],
     };
     let json = serde_json::to_string(&report).unwrap();
     assert_eq!(serde_json::from_str::<Report>(&json).unwrap(), report);
