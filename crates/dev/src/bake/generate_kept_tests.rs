@@ -1,25 +1,30 @@
 //! Generate Lighting keeps an unchanged PVS (#2348): a lamp moved between two
 //! Generates re-bakes no occlusion and leaves its file byte for byte, a static box
-//! moved re-bakes it, and Bake Occlusion always re-bakes.
+//! moved re-bakes it (Generate's occlusion step alone: the two Generates before it
+//! are the test's cost), and Bake Occlusion always re-bakes.
 
 use glam::Vec3;
 use serde_json::Value;
 
-use super::{bake_occlusion_only, generate_lighting, GenerateReport};
+use super::{apply_occlusion, bake_occlusion_only, generate_lighting, GenerateReport};
+use crate::bake::occlusion::generate_occlusion_logged;
 use crate::bake::progress::{BakeLog, Line};
 use crate::bake::report::{read, Kind};
 use rusty_lighting::occlusion::test_level::corridors;
 use rusty_scene::lighting::occlusion::occlusion_path;
 use rusty_scene::Scene;
 
-/// The corridors level saved at a fresh path with cheap lightmaps, and loaded back.
+/// The corridors level saved at a fresh path with cheap bakes, and loaded back.
 fn saved() -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join("generate_kept");
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("level.scene").to_string_lossy().into_owned();
     let mut level = corridors();
     let s = &mut level.lighting_settings.lightmaps;
-    (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (1.0, 2, 1, 32);
+    (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (0.5, 1, 1, 16);
+    // The probes are most of a Generate's time on a software adapter.
+    let r = &mut level.lighting_settings.reflections;
+    (r.resolution, r.max_probes) = (16, 1);
     rusty_edit::save_to_file(&level, &path).unwrap();
     let mut scene = Scene::new();
     rusty_edit::load_from_file(&mut scene, &path).unwrap();
@@ -73,8 +78,9 @@ fn gpu_an_unchanged_pvs_is_kept_and_a_moved_static_box_re_bakes_it() {
     assert_eq!(std::fs::read(occlusion_path(&path)).unwrap(), pvs);
 
     moved(&mut scene, "Crate");
-    let (third, _) = generate(&mut scene, &path);
-    assert!(!third.occlusion_kept, "a static box moved");
+    let third = generate_occlusion_logged(&scene, &mut BakeLog::off()).unwrap();
+    assert!(!third.kept, "a static box moved");
+    apply_occlusion(&mut scene, &path, third).unwrap();
     assert_eq!(stages(&path), ["bake", "write"]);
     assert_ne!(std::fs::read(occlusion_path(&path)).unwrap(), pvs);
 }
