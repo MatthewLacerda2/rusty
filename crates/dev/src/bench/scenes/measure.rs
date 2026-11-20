@@ -39,7 +39,7 @@ pub(super) fn all(harness: &mut Harness, probe: Option<&ClockProbe>, opts: Optio
         runs.push(fold::aggregate(&round));
     }
     let mut warnings = views.warnings;
-    warnings.extend(fold::spread_warnings(&spreads));
+    warnings.extend(fold::spread_warnings(&spreads, clock::GAME_ROWS));
     let planned = opts.runs.max(1) * views.views.len() as u32 * opts.frames;
     warnings.extend(quit.map(|at| quit_warning(&at, measured, planned)));
     SceneReport {
