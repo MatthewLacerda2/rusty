@@ -151,3 +151,22 @@ pub(super) fn draws_of<'a>(
         std::iter::repeat_n((b.key.indices.len(), per), calls as usize)
     })
 }
+
+impl RenderCounters {
+    /// Add one opaque scene pass's `batches` to the forward draw split (#2334):
+    /// unlit, or lit in a pass `primed` or not.
+    pub(crate) fn count_forward<'a>(
+        &mut self,
+        batches: impl Iterator<Item = &'a DrawBatch>,
+        primed: bool,
+    ) {
+        for batch in batches {
+            let count = match (batch.key.traits.lit, primed) {
+                (false, _) => &mut self.forward_unlit,
+                (true, true) => &mut self.forward_lit_primed,
+                (true, false) => &mut self.forward_lit_unprimed,
+            };
+            *count += 1;
+        }
+    }
+}

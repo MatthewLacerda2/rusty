@@ -140,7 +140,10 @@ impl Renderer {
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
         self.frame_counters.velocity_passes += u32::from(velocity);
-        self.frame_counters.primed_passes += u32::from(self.primes(view, &frame));
+        let primes = self.primes(view, &frame);
+        self.frame_counters.primed_passes += u32::from(primes);
+        self.frame_counters
+            .count_forward(solid_batches.iter(), primes);
         self.frame_counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
