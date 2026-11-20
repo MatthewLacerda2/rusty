@@ -12,8 +12,9 @@
 //! It runs on the edit frame (`app::GameWorld::edit_frame`), every frame outside
 //! Play, stepped or frozen. A model written during Play (an `.obj` or glTF writer;
 //! conversion itself waits for Stop, #1253) has its note wait for the first edit
-//! frame after Stop, and by then the restored edit scene was read from disk after it
-//! (`Scene::meshes_read_at`), so nothing is read twice.
+//! frame after Stop, and by then Stop's restore rebuilt every mesh of a model
+//! written since Play began (`RehydratedScene::adopting`) and stamped the scene
+//! after it (`Scene::meshes_read_at`), so nothing is read twice.
 
 use std::collections::{BTreeMap, BTreeSet};
 

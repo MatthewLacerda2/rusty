@@ -47,7 +47,7 @@ impl RehydratedScene {
 
     /// [`Self::new`] stamped `read_at`, taken before the document was read: a load
     /// off the ticking thread (#2123) still follows a model written while it ran.
-    /// Each model file is looked up once for the whole document ([`Imports`]).
+    /// Each model file is looked up once for the whole document.
     pub fn read_since(mut data: crate::serialize::SceneData, read_at: u64) -> Self {
         let mut imports = Imports::default();
         for entity in &mut data.entities {
