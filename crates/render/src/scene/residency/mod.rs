@@ -1,4 +1,4 @@
-//! crates/render/src/scene/residency.rs — which GPU meshes stay resident (#2440): a
+//! crates/render/src/scene/residency/mod.rs — which GPU meshes stay resident (#2440): a
 //! mesh is released once no loaded scene references it, on a load that replaced
 //! the World, as Unity's non-additive `SceneManager.LoadScene` unloads what the
 //! scene before it alone used.
@@ -235,9 +235,7 @@ mod tests {
 }
 
 #[cfg(test)]
-#[path = "residency_gpu_tests.rs"]
 mod gpu_tests;
 
 #[cfg(test)]
-#[path = "residency_edges_gpu_tests.rs"]
 mod edges_gpu_tests;

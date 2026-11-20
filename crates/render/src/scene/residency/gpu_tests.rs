@@ -1,4 +1,4 @@
-//! crates/render/src/scene/residency_gpu_tests.rs — a load that replaced the World
+//! crates/render/src/scene/residency/gpu_tests.rs — a load that replaced the World
 //! releases the GPU meshes only the scene before used (#2440), keeps the shared
 //! ones, releases nothing on Play and Stop, and retries a mesh the pool refused.
 

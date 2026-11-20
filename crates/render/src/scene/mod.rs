@@ -132,7 +132,7 @@ pub(crate) struct Retained {
     pub render_textures: u64,
     /// The scenes, least recently drawn first.
     scenes: Vec<(SceneId, RenderScene)>,
-    /// Which loaded scenes keep their GPU meshes (`residency.rs`).
+    /// Which loaded scenes keep their GPU meshes (`residency`).
     pub residency: residency::Residency,
 }
 

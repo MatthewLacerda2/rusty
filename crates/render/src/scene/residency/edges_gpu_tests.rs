@@ -1,4 +1,4 @@
-//! crates/render/src/scene/residency_edges_gpu_tests.rs — what a release keeps at its
+//! crates/render/src/scene/residency/edges_gpu_tests.rs — what a release keeps at its
 //! edges (#2440): a mesh emitter's mesh while it emits nothing, the edit scene when
 //! the Play-entry tick loaded a level, and what a pending warm-up already made.
 
