@@ -20,7 +20,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::SystemTime;
+use std::time::Duration;
 
 use crate::convert::{glb, is_import_cache, textures_owner};
 use crate::gltf::uri;
@@ -102,18 +102,25 @@ pub fn settings(image: &Path) -> Option<TextureSettings> {
 
 /// One glTF's settings by extracted image (absolute), as of `stamp`.
 struct Table {
-    stamp: Option<(u64, Option<SystemTime>)>,
+    stamp: Option<Stamp>,
     files: BTreeMap<PathBuf, TextureSettings>,
 }
 
+/// A file's size and modified time, as `resolved` stamps a `.glb`.
+type Stamp = (u64, Option<Duration>);
+
 static TABLES: Mutex<BTreeMap<PathBuf, Table>> = Mutex::new(BTreeMap::new());
 
-fn stamp(glb: &Path) -> Option<(u64, Option<SystemTime>)> {
+fn stamp(glb: &Path) -> Option<Stamp> {
     let meta = std::fs::metadata(glb).ok()?;
-    Some((meta.len(), meta.modified().ok()))
+    let modified = meta.modified().ok();
+    Some((
+        meta.len(),
+        modified.and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok()),
+    ))
 }
 
-fn read(glb: &Path, stamp: Option<(u64, Option<SystemTime>)>) -> Table {
+fn read(glb: &Path, stamp: Option<Stamp>) -> Table {
     let base = glb.parent().unwrap_or(Path::new(""));
     let files = glb::image_slots(glb)
         .unwrap_or_default()
