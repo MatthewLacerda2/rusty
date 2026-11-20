@@ -270,6 +270,8 @@ mod deep_gpu_tests;
 #[cfg(test)]
 mod deep_tests;
 #[cfg(test)]
+mod extracted_gpu_tests;
+#[cfg(test)]
 mod formats_tests;
 #[cfg(test)]
 mod freshness_tests;

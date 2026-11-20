@@ -324,7 +324,8 @@ clamped sampler.
   `Normal` picks BC1 (half a byte) for an opaque colour map; rusty does not, because
   the pure-Rust BC1 encoders flatten a block of two contrasting colours (red beside
   blue) to one. The blocks and every mip are made at import, never at a draw, into
-  the project's import cache (`assets/generated/imported/<path>.bctex`; a
+  the project's import cache (`assets/generated/imported/<path>.bctex`, or beside
+  the model's cache for a texture a model embeds, below; a
   `"NormalMap"` copy also keeps how much each mip level's normals spread, which BC5's
   two channels cannot, for the renderer's specular AA, #1702), and made
   again only when the image, its type, `sRGB`, compression, max size or mipmaps, or
@@ -368,7 +369,15 @@ clamped sampler.
 file with none gets one), and the texture is re-uploaded with the new settings on the
 next frame — the same verb the inspector's card runs. An unknown mode name is an
 error naming the known ones. A texture extracted from a converted model
-(`model.fbx#tex/Skin`) keeps the defaults.
+(`model.fbx#tex/Skin`, an FBX's embedded image or a `.blend`'s packed one) has no
+sidecar of its own: it imports with the defaults, typed by the slots the model's
+materials use it in, and is compressed like any image. Used only as a normal map it
+is a `"NormalMap"` (BC5); only as occlusion, a `"SingleChannel"` (BC4); only as a
+packed metallic/roughness or specular map, a `"Default"` with `srgb` off; as a colour
+map (albedo, emissive), or in two kinds of slot at once, a `"Default"` (BC7), which
+every slot reads whole. Its copy lives beside the model's cache
+(`<model's cache>.glb.bctex/<image>.bctex`), so a re-import of the model re-encodes
+only the images whose pixels changed, and an export ships it.
 
 ```lua no-run
 Assets.SetTextureImportSettings("project/textures/pixel_font.png", { filterMode = "Point", compression = "None" })

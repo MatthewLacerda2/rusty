@@ -94,11 +94,17 @@ pub fn parse_max_size(size: u32) -> Result<u32, String> {
 }
 
 /// The import settings of the image at `source`: its sidecar's, or the defaults
-/// when it has none or the sidecar does not parse.
+/// when it has none or the sidecar does not parse. A texture a conversion
+/// extracted with no sidecar takes the defaults typed by the slots its model
+/// samples it in (`convert::texture_ref::extracted`, #2365).
 /// A *Max Size* outside [`MAX_SIZES`] (a hand-edited sidecar) is warned of once
 /// per file and read as [`DEFAULT_MAX_SIZE`], as the setter would refuse it.
 pub fn texture(source: &Path) -> TextureSettings {
-    let mut settings = load(source).map(|s| s.texture).unwrap_or_default();
+    let extracted = || crate::convert::texture_ref::extracted::settings(source);
+    let mut settings = match meta_path(source).exists() {
+        true => load(source).map(|s| s.texture).unwrap_or_default(),
+        false => extracted().unwrap_or_default(),
+    };
     if let Err(why) = parse_max_size(settings.max_size) {
         warn_once(source, &why);
         settings.max_size = DEFAULT_MAX_SIZE;
@@ -186,7 +192,8 @@ pub fn fit_single_channel_slot(source: &Path, used: &str) {
 /// Apply `fix` to the import settings of `source` when it asks for a change, and
 /// log it as `used` (what it was used as, and what changed). Only an image on disk, and only while imports may change (never
 /// in Play, `convert::conversion_allowed`). A texture a converted model's cache
-/// holds is left alone: those are never compressed.
+/// holds is left alone: its settings follow the slots its model's glTF samples
+/// it in ([`texture`]), and its folder is re-made by the next conversion.
 fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<TextureSettings>) {
     if !engine_may_write(source) {
         return;

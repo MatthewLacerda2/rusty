@@ -10,6 +10,7 @@ use std::sync::Mutex;
 
 use super::encode::{self, Cores};
 use super::{cache, cache_file, fit, format_of, keeps_deep, open, reader, shrink, TextureKind};
+use crate::convert::texture_ref::extracted;
 use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
 use crate::{is_image_path, sidecar};
@@ -119,15 +120,22 @@ fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<bool, Strin
     Ok(true)
 }
 
-/// Every image under `root` ([`crate::IMAGE_EXTENSIONS`]), sorted: what a
-/// refresh compresses and an export ships the caches of. A baked lightmap page is
-/// not among them (`asset::lightmap_page::is_baked`, #1694): it is not a colour
-/// texture, and the renderer loads the page the bake wrote.
+/// Every image under `root` ([`crate::IMAGE_EXTENSIONS`]), and every texture
+/// extracted from a model under it (`convert::texture_ref::extracted`, #2365),
+/// sorted: what a refresh compresses and an export ships the caches of. A baked
+/// lightmap page is not among them (`asset::lightmap_page::is_baked`, #1694): it
+/// is not a colour texture, and the renderer loads the page the bake wrote. A
+/// model's extracted textures are found from its cache as the last conversion
+/// left it, which this never converts.
 pub fn images(root: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     crate::manifest::walk(root, &mut |path| {
         if is_compressible(path) {
             found.push(path.to_path_buf());
+        } else if convert::converter_for(path).is_some() {
+            if let Ok(glb) = convert::cache_location(path) {
+                found.extend(extracted::images(&glb).into_iter().filter(|i| !is_baked(i)));
+            }
         }
     });
     found.sort();
@@ -135,17 +143,26 @@ pub fn images(root: &Path) -> Vec<PathBuf> {
 }
 
 /// Whether [`refresh_all`] on `root` visits `file`: an image under `root`
-/// ([`images`]' test), outside the import cache (`manifest::walk` leaves it out,
-/// so a texture extracted beside a converted model is never compressed) and not
-/// a baked page. What an audit of uploads asks (`Renderer::uncached_textures`),
-/// so the audit and the import cannot disagree on which files an import makes a
-/// cache for. Paths are compared made absolute, so `assets/a.png` and its
-/// absolute spelling are one file.
+/// outside the import cache (`manifest::walk` leaves the cache out), or a texture
+/// extracted from a model under `root`, and not a baked page ([`images`]). What an
+/// audit of uploads asks (`Renderer::uncached_textures`), so the audit and the
+/// import cannot disagree on which files an import makes a cache for. Paths are
+/// compared made absolute, so `assets/a.png` and its absolute spelling are one
+/// file. An extracted texture's model is read from its project cache's path, or
+/// found among the models under `root` outside a project (the temp folder's cache).
 pub fn imports(root: &Path, file: &Path) -> bool {
     let absolute = |p: &Path| std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
-    absolute(file).starts_with(absolute(root))
-        && !convert::is_import_cache(file)
-        && is_compressible(file)
+    let under = |p: &Path| absolute(p).starts_with(absolute(root));
+    let visited = match extracted::glb_of(file) {
+        Some(glb) => match extracted::model_source(file) {
+            Some(model) => under(&model),
+            None => convert::convertible_sources(root).iter().any(|model| {
+                convert::cache_location(model).is_ok_and(|g| absolute(&g) == absolute(&glb))
+            }),
+        },
+        None => under(file) && !convert::is_import_cache(file),
+    };
+    visited && is_compressible(file)
 }
 
 /// The per-file half of [`images`] and [`imports`]: an image, not a baked page.

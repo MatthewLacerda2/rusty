@@ -39,7 +39,7 @@ mod clear;
 pub(in crate::convert) mod hook;
 mod note;
 
-pub use clear::textures_dirs;
+pub use clear::{textures_dirs, textures_owner};
 pub(in crate::convert) use note::write;
 
 use super::{record, stamp_path, write_error, Converted, Converter, ImportError};

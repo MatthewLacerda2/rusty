@@ -10,7 +10,10 @@
 //! found*, is a baked page by its path, or is a `NormalMap` (by its sidecar) whose
 //! copy is not current and whose file's header says 16 bits. A current copy is
 //! never one of those, so it costs a `stat` and the cache's head, never the
-//! source's header. A source that exists but cannot be read is not gone, and nothing
+//! source's header. A texture extracted beside a model's cache has its copy beside
+//! that cache (`super::extracted_cache`, #2365), and is gone once the textures
+//! folder the model's glTF names holds no image of its name: the model gone, or
+//! re-converted without it. A source that exists but cannot be read is not gone, and nothing
 //! outside the import cache (the system temp folder a non-project caches in) is
 //! ever walked. A model's cache is never touched: an exported project ships it
 //! without its source, on purpose (`convert::served_from_cache`).
@@ -18,6 +21,7 @@
 use std::path::{Path, PathBuf};
 
 use super::CACHE_SUFFIX;
+use crate::convert::texture_ref::extracted;
 use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
 use crate::sidecar::TextureType;
@@ -58,7 +62,10 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
         let Some(name) = rel.to_str().and_then(|r| r.strip_suffix(CACHE_SUFFIX)) else {
             return;
         };
-        let source = sources.join(name);
+        let source = match extracted_source(cache) {
+            Some(extracted) => extracted,
+            None => sources.join(name),
+        };
         let deep = || deep_orphan(cache, &source);
         if is_baked(&source) || is_gone(&source) || deep() {
             found.push(cache.to_path_buf());
@@ -66,6 +73,25 @@ pub(super) fn orphans(cache_dir: &Path, sources: &Path) -> Vec<PathBuf> {
     });
     found.sort();
     found
+}
+
+/// The image the compressed copy at `cache` was made from when it is a texture
+/// extracted beside a model's cache (`<glb>.bctex/<name>.bctex`,
+/// `super::extracted_cache`): the image of that name in the textures folder the
+/// model's glTF names now, or where it would lie when the glTF names none (so it
+/// is gone). `None` for any other copy.
+fn extracted_source(cache: &Path) -> Option<PathBuf> {
+    let folder = cache.parent()?;
+    let glb = folder.to_str()?.strip_suffix(CACHE_SUFFIX)?;
+    if !glb.ends_with(".glb") {
+        return None;
+    }
+    let glb = Path::new(glb);
+    let name = cache.file_name()?.to_str()?.strip_suffix(CACHE_SUFFIX)?;
+    let named = extracted::images(glb)
+        .into_iter()
+        .find(|image| image.file_name().is_some_and(|n| n == name));
+    Some(named.unwrap_or_else(|| folder.join(name)))
 }
 
 /// Whether `cache`, the copy of the existing image at `source`, is a 16-bit normal
