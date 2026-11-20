@@ -55,6 +55,6 @@ impl crate::Renderer {
         mesh: &rusty_scene::MeshComponent,
     ) {
         self.update_gpu_mesh(id.clone(), revision, &mesh.vertices, &mesh.indices);
-        self.attach_clusters(&id, mesh.clusters());
+        self.attach_clusters(&id, (mesh.clusters(), &mesh.indices));
     }
 }
