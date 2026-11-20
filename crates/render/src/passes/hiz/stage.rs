@@ -19,11 +19,12 @@ impl Renderer {
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         ctx.solids.culled = None;
-        let opaque = ctx.solids.draws.opaque.last();
-        let Some(last) = opaque.filter(|_| self.hiz_culls(ctx.cam)) else {
+        // The camera's opaque instance count: under the floor it is drawn whole,
+        // as with its flag off, holding nothing here (#2338).
+        let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
+        let Some(n) = n.filter(|&n| self.hiz_culls_draws(ctx.cam, n)) else {
             return;
         };
-        let n = last.instances.end;
         let idx = ctx.uniform.stack[0] as usize;
         self.hold_hiz(view, idx);
         let ([first, mut last], plan) =

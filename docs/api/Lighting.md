@@ -795,7 +795,11 @@ is wholly behind depth the camera drew this frame.
   bake, an orthographic camera and one whose near plane is far out cull too: the test
   reads the depth the camera drew, so a wall its near plane clips away hides
   nothing. Probe and reflection bakes, and a GPU without indirect first-instance
-  draws, cull nothing this way.
+  draws, cull nothing this way. Nor does a camera drawing fewer than 32 opaque
+  mesh instances this frame (a viewmodel camera drawing a gun): culling so few
+  costs more than it could hide, so it draws them all, as with its
+  `use_occlusion_culling` off. The floor counts instances, not whether the camera
+  is stacked, so an overlay showing the whole level still culls.
 - **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
   of the depth, and one compute test per opaque mesh; the draw calls stay the same
   (indirect). That first depth is kept: the depth prepass (SSAO's or SSIL's, or,
