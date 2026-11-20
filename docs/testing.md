@@ -1150,9 +1150,12 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `cpu.flush_bounds` (the collider-AABB flush after each stage, summed over the
   stages) and `cpu.other` (the tick's work outside every system: publishing
   input and finished async loads, the UI textures' sizes, the camera, shader-time
-  and audio sync, an async load's start, timer overhead), together summing to
+  and audio sync, an async load's start, the schedule's dispatch and timer
+  overhead), together summing to
   `cpu_ms`; beside them, in no sum, `taps_ms` (the demo recorder's taps, `make
-  bench` only: `bench-scenes` records no demo), since `frame_ms` and `cpu_ms`
+  bench` only: `bench-scenes` records no demo) and `probe_ms` (the stats' own
+  bookkeeping: the world counters read at the frame's end and the tick's rows
+  recorded), since `frame_ms` and `cpu_ms`
   time only what a shipped, windowed game does on its tick (`docs/api/Debug.md`,
   `frame_ms`); and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
@@ -1173,7 +1176,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `frame_ms` are the systems' sum, lower by what those two rows now hold: compare
   its `cpu.<system>` rows with today's, and its `cpu_ms` with today's less
   `cpu.flush_bounds` and `cpu.other`; both `make bench` and `make bench-scenes`
-  warn when the kept run they compare with is such a report. The stages are timed only on frames the dev layer
+  warn when the kept run they compare with is such a report. A report from
+  before the stats' own bookkeeping left the tick (#2445) has no `probe_ms`
+  row, and its `cpu_ms` and `cpu.other` are higher by about what `probe_ms` now
+  holds; both warn of that kept run too. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
   rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on

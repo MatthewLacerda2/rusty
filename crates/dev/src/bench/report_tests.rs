@@ -116,3 +116,14 @@ fn a_last_run_that_mixed_builds_is_flagged_even_when_the_tree_is_the_same() {
         "{clean}"
     );
 }
+
+/// A kept report whose tick held the stats' bookkeeping (no `probe_ms`) is warned of.
+#[test]
+fn a_kept_report_that_counted_the_probe_in_its_tick_is_warned_of() {
+    let rows = |probe: bool| {
+        move |k: &str| ["cpu_ms", "cpu.flush_bounds"].contains(&k) || (probe && k == "probe_ms")
+    };
+    let w = tick_timed_since(rows(true), rows(false)).expect("warned");
+    assert!(w.contains("no probe_ms row"), "{w}");
+    assert_eq!(tick_timed_since(rows(true), rows(true)), None);
+}
