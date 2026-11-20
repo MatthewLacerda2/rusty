@@ -14,7 +14,8 @@ use rusty_core::project::EngineStamp;
 use serde::{Deserialize, Serialize};
 
 use super::super::engine::engine_line;
-use super::super::report::{num, quiet_moved, unshown_line};
+use super::super::quiet::{quiet_moved, unshown_line};
+use super::super::report::num;
 mod compare;
 mod notes;
 mod view_key;
@@ -185,8 +186,7 @@ impl SceneReport {
 
     /// The rows, `w` wide, against `comparable`: a quiet one only when it moved.
     fn rows_table(&self, comparable: Option<&SceneReport>, against: &str, w: usize) -> String {
-        let mut out = String::new();
-        let mut unshown = 0;
+        let (mut out, mut unshown) = (String::new(), 0);
         for row in &self.rows {
             let last = comparable.and_then(|p| p.row(&row.metric));
             if row.quiet && !quiet_moved(comparable.is_some(), last.map(|b| b.avg), row.avg) {
@@ -208,8 +208,8 @@ impl SceneReport {
                 row.worst
             );
         }
-        let file = format!("{}.json", self.scene);
-        out.push_str(&unshown_line(unshown, comparable.is_some(), &file));
+        let (kept, file) = (comparable.is_some(), format!("{}.json", self.scene));
+        out.push_str(&unshown_line(unshown, kept, &file));
         out
     }
 }

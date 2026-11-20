@@ -43,6 +43,7 @@
 mod clock;
 mod engine;
 mod lua;
+mod quiet;
 mod report;
 mod rig;
 mod sample;
