@@ -38,10 +38,13 @@ fn shots(console: &str) -> Vec<Shot> {
 fn every_shot_leaves_its_muzzle_and_lands_away_from_the_shooter() {
     let h = fight("shots", true);
     let before = h.world.borrow().scene().borrow().decals.len();
-    h.step(40);
-    let console = h.console_text();
-    let shots = shots(&console);
-    assert_eq!(shots.len(), 40 * 4, "four shots a tick: {console}");
+    let mut shots = Vec::new();
+    for _ in 0..40 {
+        h.step(1); // the console keeps 100 lines: read it every tick
+        shots.extend(self::shots(&h.console_text()));
+        h.console.borrow_mut().messages.clear();
+    }
+    assert_eq!(shots.len(), 40 * 4, "four shots a tick");
     let hits: Vec<_> = shots.iter().filter(|s| s.root != "nothing").collect();
     assert!(!hits.is_empty(), "some shot hits something");
     for s in &hits {
