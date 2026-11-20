@@ -61,6 +61,8 @@ def args(argv):
     p.add_argument("--no-editor", action="store_true", dest="no_editor")
     p.add_argument("--force", action="store_true")
     a = p.parse_args(argv)
+    if a.runs is not None and a.runs < 1:
+        p.error(f"--runs {a.runs}: a leg takes at least one run")
     if a.project is None and not a.stress:
         p.error("give --project DIR (the project's scenes), --stress (the fixture's stress yard), or both")
     alone = [f for f, v in (("--scenes", a.scenes), ("--load-runs", a.load_runs), ("--size", a.size),

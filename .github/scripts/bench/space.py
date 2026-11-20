@@ -34,8 +34,11 @@ GIB = 2**30
 # a little still fits.
 NEEDS = {"release": 2 * GIB, "debug": 12 * GIB}
 # A second binary linked in the same cargo invocation, beyond what `NEEDS` holds:
-# its own objects and the binary, the crates being shared. EXTRA_MEASURED
-EXTRA = {"play": 1 * GIB}
+# its own objects and the binary, the crates being shared: `play` beside a cold
+# release `bench-scenes` grew `target/release` from 1.58 to 1.63 GiB, 57 MiB, in a
+# 4-core Linux cloud container (#2450; 7 min 12 s for `bench-scenes`, 3 min 31 s more
+# for `play`). Rounded up, as `NEEDS` is.
+EXTRA = {"play": GIB // 4}
 HEADROOM = 2 * GIB  # left free after the build: git, logs, the queue supervisor
 SHOWN = 5  # trees named in a refusal, largest first
 # What git and the OS say when a write found the disk full (Linux; git's own; macOS).

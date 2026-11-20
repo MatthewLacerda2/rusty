@@ -83,6 +83,15 @@ class Section(unittest.TestCase):
         self.assertEqual(moved, ["hiz", "cpu.nav_ms", "gpu_ms", "firefight.cpu_ms"], "largest change first")
         self.assertIn("the CPU clock spread (only PR: the legs disagree)", text)
 
+    def test_a_malformed_report_is_skipped_not_a_traceback(self):
+        legs = plan(Path(tempfile.mkdtemp()), 2)
+        write(legs[0].runs[0], {"cpu_ms": 2.0})
+        (legs[0].runs[1] / "bench.json").parent.mkdir(parents=True)
+        (legs[0].runs[1] / "bench.json").write_text('{"metrics": [["cpu_ms", {"p95": 1}], 7, ["gpu_ms", {"avg": 1')
+        self.assertEqual(stress.averages(legs[0]), {"cpu_ms": 2.0})
+        (legs[0].runs[1] / "bench.json").write_text('{"metrics": [["cpu_ms", {"p95": 1}], 7, ["x"]]}')
+        self.assertEqual(stress.averages(legs[0]), {"cpu_ms": 2.0})
+
     def test_a_yard_that_wrote_no_report_says_so(self):
         self.assertIn("neither the main leg nor the PR's wrote a report", stress.section(plan(Path(tempfile.mkdtemp()))))
 

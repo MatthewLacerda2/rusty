@@ -117,8 +117,8 @@ parallelise the work and stagger the compiles. Everything a container can prove
 never the one-at-a-time merge. A branch goes local only when it needs the machine:
 a real GPU (Metal, performance, driver races), the display, the speakers, the
 operator's files or keys, or a measurement (a performance PR's measured row is
-`make bench-ab PR=<n> PROJECT=<dir>`, run on the desktop by the orchestrator, never a
-script outside the repository). With the coding in the cloud, the merge
+`make bench-ab PR=<n> PROJECT=<dir>`, with `STRESS=1` for a sim PR's stress-yard
+rows, run on the desktop by the orchestrator, never a script outside the repository). With the coding in the cloud, the merge
 queue is the only local work (*The orchestrator's loop*). Once the local-only proof
 is in the PR, the rest of the branch can go to the cloud. **A bug seen only in the
 real case** (the operator's scene, this machine's driver, a load measurement) gets

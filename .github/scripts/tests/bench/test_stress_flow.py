@@ -105,7 +105,7 @@ class Order(unittest.TestCase):
         self.assertNotIn("stress yard", said)
 
     def test_scene_flags_without_a_project_and_no_ask_at_all_are_usage_errors(self):
-        for argv in ((), ("--stress", "--scenes", "a")):
+        for argv in ((), ("--stress", "--scenes", "a"), ("--stress", "--runs", "0")):
             with redirect_stderr(StringIO()), self.assertRaises(SystemExit) as stop:
                 bench_ab.args(["--pr", "7", *argv])
             self.assertEqual(stop.exception.code, 2)

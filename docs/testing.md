@@ -1199,7 +1199,9 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   extra pass boundaries' cost is in the stage's own rows. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
   `bench.txt`), and each run prints every row's change against the last one. To
-  measure an optimisation: `make bench`, change, `make bench`. The report names the
+  measure an optimisation: `make bench`, change, `make bench`; to measure a pull
+  request against `main`, with a floor, `make bench-ab PR=<n> STRESS=1` (*A pull
+  request's measured rows*, below). The report names the
   engine that measured it (`engine <commit> content <digest>`, and the last run's
   content when it moved), and warns when the binary's `engine/` is not the one it was
   built with (*Comparing two builds*, above).
@@ -1515,7 +1517,7 @@ Like `make bench`, it is a release build and a signal, never a gate: it is not i
 
 ### A pull request's measured rows: `make bench-ab` (#2381)
 A performance PR's row is measured on the operator's desktop with
-`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0]`,
+`make bench-ab PR=<n> PROJECT=<dir> [STRESS=1] [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
 `.claude/worktrees/` with its own `target/`, both heads read from origin and fetched
@@ -1559,6 +1561,24 @@ the table shows how tightly each kind of row repeated rather than assuming it.
 Legs run whole, one after another: interleaving the two binaries scene by scene
 halves the drift but doubles the scene loads.
 
+**A sim PR is measured on the stress yard too**: `STRESS=1` adds `make bench`'s
+scenario (*Benchmark*, above: fifty rigs and a hundred agents, where a change to
+physics, navigation, the ECS or animation shows when a standing camera on a game
+level shows nothing) in three legs of its own after the scenes', `RUNS` runs a leg
+(3 by default: a yard run is seconds), each a `play` of the leg's own tree's fixture
+into `out/bench/ab/pr-<n>/<leg>/stress-<i>/`. `play` is built beside `bench-scenes`
+in the same cargo invocation, and the disk check counts it. The PR's tree holds
+`main` merged in through its last yard run and is put back at its head only after,
+so the yard measures the PR's diff alone, as the scenes do; `out/bench/bench.json`,
+`make bench`'s own kept run, is neither read nor written. The table gains a
+**stress yard** section of the scenes' shape: each row the average of the leg's
+runs, the lead largest change first, the floor from the second `main` leg, a row
+absent on `main` said so, and a row from zero shown as its two values. With no
+`PROJECT` (`make bench-ab PR=<n> STRESS=1`) only the yard runs: no `bench-scenes` is
+built, the texture refusals do not apply, and `SCENES`, `LOAD_RUNS`, `RES`, `SET`
+and `EDITOR` are refused as the scenes' own. `SET` does not reach the yard, which
+runs at the fixture's own settings, and the header says so.
+
 **The lead.** Each scene's table opens with the rows whose change is outside the
 floor, largest change first (a row from zero first), and only those that moved by
 at least 0.05 (a ms row, 0.3% of a 60 Hz frame, or a count, which moves by whole
@@ -1580,9 +1600,9 @@ different code.
 
 **What it refuses**, before it builds (`FORCE=1` runs anyway, and the table's
 header lists every refusal it ran past): another timed run (an `flock` under
-`out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc` or
-`bench-scenes` process on the machine, checked again before each leg, under
-`FORCE=1` too. Un-imported textures and models (the images an import would encode
+`out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc`,
+`bench-scenes` or `play` process on the machine, checked again before each leg and
+each yard run, under `FORCE=1` too. Un-imported textures and models (the images an import would encode
 now and the models with no current cooked file, `bench-scenes --pending-imports`,
 the engine's own checks) are asked of `main`'s
 build and of the PR's, and refused once both are built, naming the build that
@@ -1602,7 +1622,8 @@ without `--set` refuses outright. `SET` takes dotted keys with plain values
 Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
 --scope`, the cap a fraction of the memory available when the run starts, printed);
 without one (macOS, no user session) the legs run plain and the run says so. The
-legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`),
+legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`, the
+yard's runs as `stress-<i>/` inside each),
 and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
 as it is. Each scene's section opens with the warnings its legs' reports carry (a
 missing bake, textures drawn uncompressed, console errors), each once, a warning

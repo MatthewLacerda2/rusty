@@ -96,11 +96,16 @@ def report(out: Path) -> dict:
 
 
 def averages(leg: Leg) -> dict[str, float]:
-    """Each row's average over the leg's runs that report it, in the first run's order."""
+    """Each row's average over the leg's runs that report it, in the first run's order;
+    an entry that is not `[metric, {"avg": number, …}]` is skipped."""
     sums: dict[str, list[float]] = {}
     for out in leg.runs:
-        for metric, summary in report(out).get("metrics", []):
-            sums.setdefault(metric, []).append(summary["avg"])
+        for entry in report(out).get("metrics", []):
+            try:
+                metric, avg = entry[0], float(entry[1]["avg"])
+            except (TypeError, KeyError, IndexError, ValueError):
+                continue
+            sums.setdefault(metric, []).append(avg)
     return {m: sum(v) / len(v) for m, v in sums.items()}
 
 
