@@ -38,36 +38,23 @@ type Physics = std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>;
 /// into the play loop, a canonical `fn(&mut World, &mut Resources)` system.
 pub(crate) fn tick_particles(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
-    let ids = world.scene.borrow().world.ids_with_particles();
     let mut events = Vec::new();
-    for id in ids {
-        // Pull the emitter + spawn origin out, simulate, then write it back. Taking
-        // the component out avoids holding the scene borrow across the physics
-        // ray-casts (which immutably borrow the scene through the filter).
-        let taken = {
-            let mut scene = world.scene.borrow_mut();
-            if !scene.world.contains(id) || !scene.world.is_active_in_hierarchy(id) {
+    {
+        // Each emitter is edited where it sits, under one scene borrow: its
+        // ray-casts reach only the physics world (`res.physics`), never the scene.
+        let mut scene = world.scene.borrow_mut();
+        for id in scene.world.ids_with_particles() {
+            if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
             // World space, as `render::passes::particles::draw` reads it (#1196).
             let origin = scene.world.emitter_frame(id);
-            scene
-                .world
-                .take_particles(id)
-                .map(|emitter| (emitter, origin))
-        };
-        let Some((mut emitter, origin)) = taken else {
-            continue;
-        };
-
-        simulate_emitter(&mut emitter, origin, dt, &res.physics);
-        events.append(&mut emitter.runtime.pending);
-
-        world
-            .scene
-            .borrow_mut()
-            .world
-            .set_particles(id, Some(emitter));
+            let Some(mut emitter) = scene.world.particles_mut(id) else {
+                continue;
+            };
+            simulate_emitter(&mut emitter, origin, dt, &res.physics);
+            events.append(&mut emitter.runtime.pending);
+        }
     }
     dispatch_sub_emitters(world, &events);
 }
