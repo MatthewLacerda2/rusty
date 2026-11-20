@@ -53,10 +53,13 @@ impl World {
     /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm. This
     /// module's walk, `world_space::store`, `world_space::bounds` and the change
     /// log's stamps read children through it; [`World::children`] clones the list.
-    pub(crate) fn push_children(&self, id: u32, out: &mut Vec<u32>) {
-        if let Some(core) = self.component::<Core>(id) {
-            out.extend_from_slice(&core.children);
-        }
+    /// Returns `id`'s static flag, from the same lookup (`false` for a dead id).
+    pub(crate) fn push_children(&self, id: u32, out: &mut Vec<u32>) -> bool {
+        let Some(core) = self.component::<Core>(id) else {
+            return false;
+        };
+        out.extend_from_slice(&core.children);
+        core.is_static
     }
 
     /// `id`, then every descendant, pre-order in declared child order; nothing for a
