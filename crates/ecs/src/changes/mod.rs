@@ -53,6 +53,8 @@ pub mod ops;
 mod seam_tests;
 mod stamp;
 #[cfg(test)]
+mod stamp_tests;
+#[cfg(test)]
 mod tests;
 
 use std::any::TypeId;
@@ -104,6 +106,8 @@ pub(crate) struct ChangeLogs {
     names: Vec<&'static str>,
     /// Epochs taken since this World was made: what a test counts an Undo by.
     rewinds: u64,
+    /// The subtree stamps' kept stack and seen set (`stamp.rs`).
+    scratch: stamp::Scratch,
 }
 
 /// One opened channel's counters ([`World::change_stats`]).
@@ -125,6 +129,7 @@ impl Default for ChangeLogs {
             index: BTreeMap::new(),
             names: Vec::new(),
             rewinds: 0,
+            scratch: Default::default(),
         };
         logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
         logs
@@ -153,6 +158,11 @@ impl ChangeLogs {
         self.epoch = fresh_epoch();
         self.rewinds += 1;
         self.logs.iter_mut().for_each(Log::reset);
+    }
+
+    /// Drop the subtree stamps' kept walk state, sized for the World just emptied.
+    pub(crate) fn reset_scratch(&mut self) {
+        self.scratch = Default::default();
     }
 }
 

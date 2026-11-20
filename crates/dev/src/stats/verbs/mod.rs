@@ -50,8 +50,8 @@ thread_local! {
     static DRIVEN: Cell<Option<(Instant, Duration)>> = const { Cell::new(None) };
 }
 
-/// The recorder's clock: the wall clock, or in a test the one it drives.
-fn now() -> Instant {
+/// The dev layer's clock (verbs' and `TimingProbe`'s): the wall clock, or a test's.
+pub(crate) fn now() -> Instant {
     #[cfg(test)]
     if let Some((start, moved)) = DRIVEN.with(Cell::get) {
         return start + moved;
@@ -62,13 +62,13 @@ fn now() -> Instant {
 /// From now on this thread's recorder reads a clock that stands still until
 /// [`advance`]d, so a test asserts exactly what each stretch is charged.
 #[cfg(test)]
-fn drive() {
+pub(crate) fn drive() {
     DRIVEN.with(|d| d.set(Some((Instant::now(), Duration::ZERO))));
 }
 
 /// Move the driven clock on by `ms`; nothing unless this thread [`drive`]s it.
 #[cfg(test)]
-fn advance(ms: u64) {
+pub(crate) fn advance(ms: u64) {
     DRIVEN.with(|d| {
         let moved = d
             .get()

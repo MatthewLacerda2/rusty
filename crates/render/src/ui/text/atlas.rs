@@ -122,6 +122,9 @@ impl GlyphAtlas {
 #[derive(Default)]
 pub(crate) struct FontAtlases {
     pub(crate) atlases: HashMap<Option<String>, GlyphAtlas>,
+    /// Moves whenever an atlas grows: every glyph's uv rect in that font changed, so
+    /// a mesh built before it is stale (`ui::kept`).
+    pub(crate) generation: u64,
 }
 
 impl FontAtlases {
@@ -132,7 +135,10 @@ impl FontAtlases {
         glyph: GlyphId,
     ) -> Option<(AtlasGlyph, (Vec2, Vec2))> {
         let atlas = self.atlases.entry(path.clone()).or_default();
-        let g = atlas.glyph(&font::load(path.as_deref()), glyph)?;
+        let height = atlas.height;
+        let g = atlas.glyph(&font::load(path.as_deref()), glyph);
+        self.generation += u64::from(atlas.height != height);
+        let g = g?;
         Some((g, atlas.uv(&g)))
     }
 }

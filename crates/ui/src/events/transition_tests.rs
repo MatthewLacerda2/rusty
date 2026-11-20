@@ -5,7 +5,7 @@ use glam::{Vec2, Vec4};
 
 use super::fixture::{button, panel, scene, Handlers, Rig};
 use rusty_asset::MapRef;
-use rusty_components::{SelectableTransition, SelectionState, TextComponent};
+use rusty_components::{ImageComponent, SelectableTransition, SelectionState, TextComponent};
 
 fn tint(rig: &Rig, id: u32) -> Vec4 {
     rig.scene.world.image(id).expect("image").state_tint
@@ -83,4 +83,25 @@ fn sprite_swap_and_a_separate_target_graphic() {
     );
     let text_tint = rig.scene.world.text(icon).expect("text").state_tint;
     assert!(near(text_tint, disabled));
+}
+
+#[test]
+fn a_settled_state_writes_nothing() {
+    let (mut s, canvas) = scene();
+    let btn = button(&mut s, canvas, Vec2::ZERO, Vec2::splat(100.0));
+    s.world.set_text(btn, Some(TextComponent::default()));
+    let mut rig = Rig::new(s, Handlers::default());
+    rig.tick();
+    rig.events.apply_transitions(&mut rig.scene.world, 0.1);
+    let world = &rig.scene.world;
+    let (mut images, mut texts) = (
+        world.change_cursor::<ImageComponent>(),
+        world.change_cursor::<TextComponent>(),
+    );
+    rig.tick();
+    rig.events.apply_transitions(&mut rig.scene.world, 0.1);
+    let world = &rig.scene.world;
+    let none = rusty_ecs::Changes::Ids(Vec::new());
+    assert_eq!(world.changes(&mut images), none, "the image is not written");
+    assert_eq!(world.changes(&mut texts), none, "nor the text");
 }

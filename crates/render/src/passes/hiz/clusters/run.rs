@@ -1,9 +1,8 @@
 //! One camera's cluster cull (#1968): its buffers, kept per view and stack
 //! place like the instance cull's, readied before the stage's one pass after
 //! phase one (#2327) and read after it; `record` records its three stages
-//! between: the test, a workgroup per instance's scan, and the copy, dispatched
-//! indirect from what the scan kept (#2406), a dispatch each per group, the
-//! clustered batches of one mesh (`plan::Group`).
+//! between, one dispatch each for the frame (#2417): the test and the copy over
+//! the plan's chunks, the scan over its jobs.
 
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
@@ -11,7 +10,6 @@ use std::sync::Arc;
 use glam::Mat4;
 
 use super::eye::eye_of;
-use super::layout::RUN_STRIDE;
 use super::plan::Plan;
 use super::ClusterDraws;
 use crate::gpu::grow_buffer::GrowBuffer;
@@ -29,44 +27,42 @@ struct Params {
     size: [f32; 2],
     levels: u32,
     object_stride: u32,
+    jobs: u32,
+    chunks: u32,
+    _pad: [u32; 2],
 }
 
-/// What the test's and scan's group 0 binds, by binding: kept while none of
-/// them was replaced.
-type GroupKey = ([wgpu::Buffer; 8], wgpu::TextureView);
-/// What the copy's group 0 binds.
-type CopyKey = [wgpu::Buffer; 4];
-/// The words of a group's copy dispatch in the tally (x, y, z).
-const COPY_WORDS: u32 = 3;
+/// What a stage's group 0 binds besides the params, by binding (the test's
+/// pyramid aside): kept while none of them was replaced.
+type GroupKey<const N: usize> = ([wgpu::Buffer; N], Option<wgpu::TextureView>);
 
 /// One stacked camera's cluster buffers.
 pub(crate) struct ClusterCull {
     params: wgpu::Buffer,
     jobs: GrowBuffer,
+    chunks: GrowBuffer,
     state: GrowBuffer,
+    /// The tested clusters kept, for `Debug.Stats`.
     pub(super) tally: GrowBuffer,
     out_indices: GrowBuffer,
     out_args: GrowBuffer,
-    runs: GrowBuffer,
     pub(crate) counter: Counter,
-    pub(super) group: Kept<GroupKey, wgpu::BindGroup>,
-    pub(super) copy_group: Kept<CopyKey, wgpu::BindGroup>,
+    pub(super) test_group: Kept<GroupKey<6>, wgpu::BindGroup>,
+    pub(super) scan_group: Kept<GroupKey<3>, wgpu::BindGroup>,
+    pub(super) copy_group: Kept<GroupKey<4>, wgpu::BindGroup>,
     /// The jobs its last cull ran.
     #[cfg(test)]
     pub(crate) ran: u32,
     /// The clustered runs (batches) its last cull recorded.
     #[cfg(test)]
     pub(crate) runs_ran: u32,
-    /// The dispatch groups its last cull recorded: dispatches a stage.
+    /// The chunks its last cull's test and copy ran over.
     #[cfg(test)]
-    pub(crate) groups_ran: u32,
-    /// The (instance, cluster) rows its last cull's dispatches started, and the
-    /// real pairs among them (`Plan::rows_and_pairs`).
+    pub(crate) chunks_ran: u32,
+    /// The stages its last cull dispatched, in order, with each dispatch's
+    /// workgroups (x, y).
     #[cfg(test)]
-    pub(crate) rows_and_pairs: (u64, u64),
-    /// The (step, group) dispatches its last cull recorded, in order.
-    #[cfg(test)]
-    pub(crate) dispatched: std::cell::RefCell<Vec<(crate::timing::GpuPart, usize)>>,
+    pub(crate) dispatched: std::cell::RefCell<Vec<(crate::timing::GpuPart, (u32, u32))>>,
 }
 
 impl ClusterCull {
@@ -88,22 +84,21 @@ impl ClusterCull {
                 U::UNIFORM | U::COPY_DST,
             ),
             jobs: buffer("Cluster Jobs", U::STORAGE),
+            chunks: buffer("Cluster Chunks", U::STORAGE),
             state: buffer("Cluster State", U::STORAGE),
-            tally: buffer("Cluster Tally", U::STORAGE | U::INDIRECT | U::COPY_SRC),
+            tally: buffer("Cluster Tally", U::STORAGE | U::COPY_SRC),
             out_indices: buffer("Cluster Indices", U::STORAGE | U::INDEX | U::COPY_SRC),
             out_args: buffer("Cluster Args", U::STORAGE | U::INDIRECT | U::COPY_SRC),
-            runs: buffer("Cluster Runs", U::UNIFORM),
             counter: Counter::default(),
-            group: Kept::default(),
+            test_group: Kept::default(),
+            scan_group: Kept::default(),
             copy_group: Kept::default(),
             #[cfg(test)]
             ran: 0,
             #[cfg(test)]
             runs_ran: 0,
             #[cfg(test)]
-            groups_ran: 0,
-            #[cfg(test)]
-            rows_and_pairs: (0, 0),
+            chunks_ran: 0,
             #[cfg(test)]
             dispatched: Default::default(),
         }
@@ -121,7 +116,7 @@ impl ClusterCull {
         self.out_indices.buffer()
     }
 
-    /// The count, then each group's copy dispatch, for a test's read back.
+    /// The tested clusters kept, for a test's read back.
     #[cfg(test)]
     pub(crate) fn tally(&self) -> &wgpu::Buffer {
         self.tally.buffer()
@@ -130,9 +125,8 @@ impl ClusterCull {
 
 impl Renderer {
     /// Ready `cull` for `plan` before the stage's merged pass opens: upload its
-    /// jobs, params and tally (a zero count, and each group's copy dispatch at
-    /// no cluster yet), and bind its groups against `pyramid` and `visible`
-    /// (this frame's instance verdicts).
+    /// jobs, chunks, params and tally (a zero count), and bind its stages' groups
+    /// against `pyramid` and `visible` (this frame's instance verdicts).
     pub(crate) fn ready_clusters(
         &self,
         (cull, plan): (&mut ClusterCull, &Plan),
@@ -144,8 +138,7 @@ impl Renderer {
         {
             cull.ran = plan.jobs.len() as u32;
             cull.runs_ran = plan.runs.len() as u32;
-            cull.groups_ran = plan.groups.len() as u32;
-            cull.rows_and_pairs = plan.rows_and_pairs();
+            cull.chunks_ran = plan.chunks.len() as u32;
             cull.dispatched.borrow_mut().clear();
         }
     }
@@ -167,26 +160,43 @@ impl Renderer {
         }
     }
 
-    /// Bind `cull`'s two group 0s, each rebuilt only when a buffer or the
+    /// Bind `cull`'s three group 0s, each rebuilt only when a buffer or the
     /// pyramid it names was replaced.
     fn bind_clusters(&self, cull: &mut ClusterCull, (pyramid, visible): (&Pyramid, &wgpu::Buffer)) {
-        let buffers = cull_buffers(cull, self, visible).map(Clone::clone);
-        let copy = [&cull.jobs, &cull.state, &cull.runs, &cull.out_indices];
-        let copy = copy.map(|b| b.buffer().clone());
+        use super::layout::{stage_group, COPY, SCAN, TEST};
         let pipes = &self.hiz.clusters;
-        let device = &self.device;
-        let view = &pyramid.view;
-        cull.group.get((buffers.clone(), view.clone()), || {
-            let at = (&[0, 1, 2, 3, 4, 5, 6, 8][..], &buffers.each_ref()[..]);
-            super::layout::cull_group(device, &pipes.cull_layout, at, Some(view))
+        let (device, params) = (&self.device, &cull.params);
+        let [jobs, chunks, state] = [&cull.jobs, &cull.chunks, &cull.state].map(GrowBuffer::buffer);
+        let [tally, args, indices] =
+            [&cull.tally, &cull.out_args, &cull.out_indices].map(GrowBuffer::buffer);
+        let objects = self.draw_buffers.objects();
+        let test = [jobs, objects, visible, state, tally, chunks].map(Clone::clone);
+        let view = Some(pyramid.view.clone());
+        cull.test_group.get((test.clone(), view.clone()), || {
+            let at = (params, &TEST[..], &test[..]);
+            stage_group(device, &pipes.test_layout, at, view.as_ref())
         });
-        cull.copy_group.get(copy.clone(), || {
-            let at = (&[1, 4, 8, 9][..], &copy.each_ref()[..]);
-            super::layout::cull_group(device, &pipes.copy_layout, at, None)
+        let scan = [jobs, state, args].map(Clone::clone);
+        cull.scan_group.get((scan.clone(), None), || {
+            stage_group(
+                device,
+                &pipes.scan_layout,
+                (params, &SCAN[..], &scan[..]),
+                None,
+            )
+        });
+        let copy = [jobs, state, indices, chunks].map(Clone::clone);
+        cull.copy_group.get((copy.clone(), None), || {
+            stage_group(
+                device,
+                &pipes.copy_layout,
+                (params, &COPY[..], &copy[..]),
+                None,
+            )
         });
     }
 
-    /// Write `plan`'s jobs, runs and the camera's params into `cull`'s buffers.
+    /// Write `plan`'s jobs, chunks and the camera's params into `cull`'s buffers.
     fn upload_clusters(
         &self,
         cull: &mut ClusterCull,
@@ -201,28 +211,16 @@ impl Renderer {
             size: [pyramid.depth.0 as f32, pyramid.depth.1 as f32],
             levels: pyramid.levels(),
             object_stride: stride as u32,
+            jobs: plan.jobs.len() as u32,
+            chunks: plan.chunks.len() as u32,
+            _pad: [0; 2],
         };
         queue.counted_write_buffer(&cull.params, 0, bytemuck::bytes_of(&params));
         cull.jobs
             .upload(device, queue, bytemuck::cast_slice(&plan.jobs));
-        let mut runs = vec![0u32; plan.groups.len().max(1) * RUN_STRIDE as usize / 4];
-        for (g, group) in plan.groups.iter().enumerate() {
-            let at = g * RUN_STRIDE as usize / 4;
-            runs[at..at + 4].copy_from_slice(&[
-                group.jobs.start,
-                group.jobs.len() as u32,
-                group.clusters,
-                copy_at(g),
-            ]);
-        }
-        cull.runs.upload(device, queue, bytemuck::cast_slice(&runs));
-        // The count, then each group's copy dispatch: no cluster yet, its jobs.
-        let mut tally = vec![0u32];
-        for group in &plan.groups {
-            tally.extend([0, group.jobs.len() as u32, 1]);
-        }
-        cull.tally
-            .upload(device, queue, bytemuck::cast_slice(&tally));
+        cull.chunks
+            .upload(device, queue, bytemuck::cast_slice(&plan.chunks));
+        cull.tally.upload(device, queue, bytemuck::bytes_of(&0u32));
         cull.state
             .reserve(device, 4 * u64::from(plan.states.max(1)));
         cull.out_indices
@@ -230,27 +228,4 @@ impl Renderer {
         let args = crate::passes::hiz::ARGS * plan.jobs.len().max(1) as u64;
         cull.out_args.reserve(device, args);
     }
-}
-
-/// The word of the tally where group `g`'s copy dispatch starts: after the count.
-pub(super) fn copy_at(g: usize) -> u32 {
-    1 + COPY_WORDS * g as u32
-}
-
-/// The test's and scan's group 0 buffers, by binding, the pyramid aside.
-fn cull_buffers<'a>(
-    cull: &'a ClusterCull,
-    r: &'a Renderer,
-    visible: &'a wgpu::Buffer,
-) -> [&'a wgpu::Buffer; 8] {
-    [
-        &cull.params,
-        cull.jobs.buffer(),
-        r.draw_buffers.objects(),
-        visible,
-        cull.state.buffer(),
-        cull.tally.buffer(),
-        cull.out_args.buffer(),
-        cull.runs.buffer(),
-    ]
 }

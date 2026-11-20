@@ -288,7 +288,8 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
   `game --test`, a scenario) read it ready on the tick after the call, every run,
   with one exception: a call from `Awake` or `Start` on entering Play comes before
   that first tick's head, so it is prepared and swapped in on that same tick. In
-  the editor's Play and the player a worker thread prepares it, then the renderer
+  the editor's Play and the player a worker thread prepares it (a model it imports
+  spreads over every core but two, which stay the running game's), then the renderer
   makes its GPU resources (below), and it is ready on the first tick head after both
   finish. Which tick that was, and the progress a script read meanwhile, are recorded
   in the demo, so a replay swaps on the same tick and reads the same progress.

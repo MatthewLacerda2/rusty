@@ -186,6 +186,7 @@ impl World {
         self.next_seq = 0;
         self.reset_caches();
         self.bounds = BoundsQueue::default();
+        self.changes.get_mut().reset_scratch();
         self.awaited.clear();
     }
 

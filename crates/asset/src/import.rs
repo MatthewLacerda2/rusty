@@ -2,6 +2,9 @@
 //! compressed copy under a folder brought up to date in the import cache, as
 //! Unity's `AssetDatabase.Refresh` imports everything before it returns.
 //!
+//! Every model under the folder is imported too, so its cooked derived geometry
+//! (`cook`) is current: a later load reads it instead of computing it.
+//!
 //! The one routine behind `Assets.Refresh` ([`import_all`]) and, stopping on a
 //! broken model before any image ([`import_strict`]), `make import` (`export
 //! --import-only`), an export's first step (`dev::export::import`) and `make
@@ -23,8 +26,13 @@ type Failed = Vec<(PathBuf, String)>;
 pub struct Imported {
     /// Every model source looked at (each converted when its cache was stale), sorted.
     pub sources: Vec<PathBuf>,
-    /// The model sources that failed to convert, with why; each was warned of.
+    /// The model files that failed to convert or import, with why; each was
+    /// warned of.
     pub failed: Failed,
+    /// How many cooked files were written (`cook`): every model under the folder
+    /// is imported as a load imports it, and a cooked file that read refuses
+    /// (missing, stale, malformed) is written again.
+    pub cooked: usize,
     /// What the images' refresh did (`texture_import::refresh_all`).
     pub textures: Refreshed,
 }
@@ -37,11 +45,13 @@ pub struct Imported {
 /// then, and the error says to stop first. A source that fails is warned of,
 /// listed, and the rest still run.
 pub fn import_all(root: &Path) -> Result<Imported, String> {
-    let (sources, failed) = models(root)?;
+    let (sources, mut failed) = models(root)?;
+    let cooked = cook_models(root, &mut failed);
     let textures = texture_import::refresh_all(root);
     Ok(Imported {
         sources,
         failed,
+        cooked,
         textures,
     })
 }
@@ -51,19 +61,28 @@ pub fn import_all(root: &Path) -> Result<Imported, String> {
 /// broken model, so they fail in seconds, not after minutes of encoding. The
 /// error names every model that failed.
 pub fn import_strict(root: &Path) -> Result<Imported, String> {
-    let (sources, failed) = models(root)?;
-    if !failed.is_empty() {
-        let named: Vec<String> = failed
-            .iter()
-            .map(|(source, e)| format!("{}: {e}", source.display()))
-            .collect();
-        return Err(named.join("; "));
-    }
+    let (sources, mut failed) = models(root)?;
+    refuse(&failed)?;
+    let cooked = cook_models(root, &mut failed);
+    refuse(&failed)?;
     Ok(Imported {
         sources,
         failed,
+        cooked,
         textures: texture_import::refresh_all(root),
     })
+}
+
+/// The error naming every model in `failed`, when there is one.
+fn refuse(failed: &Failed) -> Result<(), String> {
+    if failed.is_empty() {
+        return Ok(());
+    }
+    let named: Vec<String> = failed
+        .iter()
+        .map(|(source, e)| format!("{}: {e}", source.display()))
+        .collect();
+    Err(named.join("; "))
 }
 
 /// What an import of `root` says before it starts (a verb that runs it prints
@@ -93,6 +112,45 @@ fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     Ok((sources, failed))
 }
 
+/// Bring the cooked file of every model file under `root` up to date, returning
+/// how many were written. Each model is imported its own (`import_own`, no
+/// borrowed clips retargeted) as a load imports it: a cooked file the read takes
+/// (its stamp, every sub-mesh's parse digest, counts and positions) is left as it
+/// is; one it refuses, stale or not, is cooked and written again. So currency is
+/// the load's own test, not the stamp alone (`cook::is_stamped`), and an export
+/// never ships a file every launch would refuse. A model that has a current file
+/// is parsed for it, never cooked. Nothing is imported when this thread writes
+/// no cooked file (`cook::writes`: a standalone game, a build without authoring)
+/// or the model has no place for one (outside an open project). A source
+/// already in `failed` (its conversion, warned of) is not tried again; a model
+/// that will not import is warned of and added to it.
+fn cook_models(root: &Path, failed: &mut Failed) -> usize {
+    if !crate::cook::writes() {
+        return 0;
+    }
+    let before = crate::cook::written();
+    let mut models = Vec::new();
+    crate::manifest::walk(root, &mut |path| {
+        if crate::is_model_path(path) && !failed.iter().any(|(f, _)| f == path) {
+            models.push(path.to_path_buf());
+        }
+    });
+    models.sort();
+    let placed = models
+        .iter()
+        .filter(|m| crate::cook::cooked_path(m).is_some());
+    for model in placed {
+        if let Err(e) = crate::import_own_file(model) {
+            log::warn!("[Asset] {}: {e}", model.display());
+            failed.push((model.clone(), e.to_string()));
+        }
+    }
+    crate::cook::written() - before
+}
+
+#[cfg(test)]
+#[path = "import_cook_tests.rs"]
+mod cook_tests;
 #[cfg(test)]
 #[path = "import_tests.rs"]
 mod tests;
