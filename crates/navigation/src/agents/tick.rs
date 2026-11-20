@@ -44,9 +44,10 @@ impl NavigationGraph {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
-            // Take the agent out, steer, write it back — the same idiom as the
-            // particle tick, so the transform borrow never aliases the agent's.
-            let Some(mut agent) = scene.world.take_nav_agent(id) else {
+            // Hold the agent outside its column while it steers, so the calls
+            // that take the World (its transform, its Animator) never alias the
+            // agent's borrow; the column keeps a default one meanwhile.
+            let Some(mut agent) = hold_agent(scene, id) else {
                 continue;
             };
             // Steering is in world space: the agent's world position and facing,
@@ -77,7 +78,7 @@ impl NavigationGraph {
                     moving: (steering || agent.velocity != Vec3::ZERO) && root.is_none(),
                 });
             }
-            scene.world.set_nav_agent(id, Some(agent));
+            put_back(scene, id, agent);
         }
 
         // Non-carving obstacles join after the agents, as neighbours that never
@@ -159,21 +160,23 @@ impl NavigationGraph {
         let moved = agent
             .auto_traverse_off_mesh_link
             .then(|| auto_traverse(&mut agent, position, delta_time));
-        scene.world.set_nav_agent(id, Some(agent));
+        put_back(scene, id, agent);
         if let Some(p) = moved {
             scene.world.set_world_position(id, p);
         }
     }
 
     /// Move a steering agent by its avoided `velocity` and write the new position.
+    /// Only `slide` runs while the agent is borrowed, so it is edited in its column.
     fn integrate(&self, scene: &mut Scene, t: &Ticked, velocity: Vec3, delta_time: f32) {
-        let Some(mut agent) = scene.world.take_nav_agent(t.id) else {
-            return;
+        let new_pos = {
+            let Some(mut agent) = scene.world.nav_agent_mut(t.id) else {
+                return;
+            };
+            agent.velocity = velocity;
+            self.slide(&mut agent, t.position, delta_time)
         };
-        agent.velocity = velocity;
-        let new_pos = self.slide(&mut agent, t.position, delta_time);
         scene.world.set_world_position(t.id, new_pos);
-        scene.world.set_nav_agent(t.id, Some(agent));
     }
 
     /// Return the slide-constrained position after one step of `agent.velocity`.
@@ -221,6 +224,23 @@ impl NavigationGraph {
 
         final_pos.y = self.surface_y(on, final_pos.x, final_pos.z);
         agent.body(final_pos)
+    }
+}
+
+/// Swap agent `id` out of its column, leaving a default agent (which allocates
+/// nothing) in its place: an edit in place, not a detach, which would move the
+/// entity to another archetype and copy every column it has, twice a tick.
+fn hold_agent(scene: &mut Scene, id: u32) -> Option<NavMeshAgentComponent> {
+    scene
+        .world
+        .nav_agent_mut(id)
+        .map(|mut a| std::mem::take(&mut *a))
+}
+
+/// Write a held agent back over the placeholder [`hold_agent`] left.
+fn put_back(scene: &mut Scene, id: u32, agent: NavMeshAgentComponent) {
+    if let Some(mut slot) = scene.world.nav_agent_mut(id) {
+        *slot = agent;
     }
 }
 
