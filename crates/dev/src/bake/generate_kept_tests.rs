@@ -8,7 +8,7 @@ use glam::Vec3;
 use serde_json::Value;
 
 use super::{apply_occlusion, bake_occlusion_only, generate_lighting, GenerateReport};
-use crate::bake::occlusion::generate_occlusion_logged;
+use crate::bake::occlusion::{generate_occlusion_logged, reach};
 use crate::bake::progress::{BakeLog, Line};
 use crate::bake::report::{read, Kind};
 use rusty_lighting::occlusion::bake_occlusion;
@@ -102,7 +102,8 @@ fn gpu_an_unchanged_pvs_is_kept_and_a_moved_static_box_re_bakes_it() {
     assert_eq!(file, pvs, "the kept PVS's file, over another writer's");
 
     moved(&mut scene, "Crate");
-    let third = generate_occlusion_logged(&scene, &mut BakeLog::off()).unwrap();
+    let third =
+        generate_occlusion_logged(&scene, reach(&scene, None), &mut BakeLog::off()).unwrap();
     assert!(!third.kept, "a static box moved");
     apply_occlusion(&mut scene, &path, third).unwrap();
     assert_eq!(stages(&path), ["bake", "write"]);
@@ -112,9 +113,9 @@ fn gpu_an_unchanged_pvs_is_kept_and_a_moved_static_box_re_bakes_it() {
 #[test]
 fn bake_occlusion_re_bakes_an_unchanged_scene() {
     let (mut scene, path) = saved();
-    bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off()).unwrap();
+    bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off()).unwrap();
     let pvs = std::fs::read(occlusion_path(&path)).unwrap();
-    bake_occlusion_only(&mut scene, Some(&path), &mut BakeLog::off()).unwrap();
+    bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off()).unwrap();
     assert_eq!(stages(&path), ["bake", "write"], "baked again");
     assert_eq!(std::fs::read(occlusion_path(&path)).unwrap(), pvs);
 }

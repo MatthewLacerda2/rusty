@@ -14,7 +14,7 @@ use rusty_scene::lighting::occlusion::encode;
 /// PVS with its stamp's version zeroed (so the hash is the bake's bytes alone).
 /// Under its one test's `cfg`, so no other build holds an unused constant.
 #[cfg(target_os = "linux")]
-const PINNED: (u32, u64) = (1, 0x69fc_da1c_7ac0_6094);
+const PINNED: (u32, u64) = (2, 0x6d14_53fc_688c_888a);
 
 /// The corridors level's PVS bytes, the version field zeroed.
 fn bytes_hash() -> u64 {

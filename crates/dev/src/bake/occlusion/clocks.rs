@@ -3,10 +3,11 @@
 //! starts and ends; this side reads the clock, so no time value ever reaches the
 //! bake. A cell runs on one worker, start to end, so its time is that worker's.
 //!
-//! One counter per cell: the grid is capped at [`MAX_CELLS`], so the clocks hold
-//! at most 128 KiB, whatever the level.
+//! One counter per cell: the grid is capped at [`MAX_GRID_CELLS`], so the clocks
+//! hold at most 512 KiB, whatever the level. A cell the bake skips (#2328) is
+//! never started, and reads as untimed.
 //!
-//! [`MAX_CELLS`]: rusty_scene::lighting::occlusion::MAX_CELLS
+//! [`MAX_GRID_CELLS`]: rusty_scene::lighting::occlusion::MAX_GRID_CELLS
 
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -15,11 +16,15 @@ use std::time::{Duration, Instant};
 
 use rusty_lighting::occlusion::OcclusionObserver;
 
-/// Each cell's sampling time so far, in nanoseconds, by cell index.
+/// Each cell's sampling time so far, in nanoseconds, by cell index; `UNTIMED`
+/// until it is sampled.
 #[derive(Default)]
 pub struct CellClocks {
     cells: OnceLock<Vec<AtomicU64>>,
 }
+
+/// A cell no worker has sampled.
+const UNTIMED: u64 = u64::MAX;
 
 thread_local! {
     /// When this thread's cell began: a cell starts and ends on one thread.
@@ -27,10 +32,14 @@ thread_local! {
 }
 
 impl CellClocks {
-    /// Each cell's time, by cell index; empty before the bake laid its grid.
-    pub fn times(&self) -> Vec<Duration> {
+    /// Each cell's time, by cell index, `None` for a cell never sampled; empty
+    /// before the bake laid its grid.
+    pub fn times(&self) -> Vec<Option<Duration>> {
         let cells = self.cells.get().map_or(&[][..], Vec::as_slice);
-        let time = |nanos: &AtomicU64| Duration::from_nanos(nanos.load(Ordering::Relaxed));
+        let time = |nanos: &AtomicU64| match nanos.load(Ordering::Relaxed) {
+            UNTIMED => None,
+            n => Some(Duration::from_nanos(n)),
+        };
         cells.iter().map(time).collect()
     }
 }
@@ -39,7 +48,7 @@ impl OcclusionObserver for CellClocks {
     fn cells(&self, total: usize) {
         let _ = self
             .cells
-            .set((0..total).map(|_| AtomicU64::new(0)).collect());
+            .set((0..total).map(|_| AtomicU64::new(UNTIMED)).collect());
     }
 
     fn cell_started(&self, _cell: usize) {
@@ -51,7 +60,9 @@ impl OcclusionObserver for CellClocks {
             return;
         };
         if let Some(nanos) = self.cells.get().and_then(|c| c.get(cell)) {
-            nanos.fetch_add(from.elapsed().as_nanos() as u64, Ordering::Relaxed);
+            let took = (from.elapsed().as_nanos() as u64).min(UNTIMED - 1);
+            let add = |n: u64| Some(if n == UNTIMED { took } else { n + took });
+            let _ = nanos.fetch_update(Ordering::Relaxed, Ordering::Relaxed, add);
         }
     }
 }
