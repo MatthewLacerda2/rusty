@@ -130,7 +130,7 @@ impl SceneReport {
             ),
             (
                 round && !rendered,
-                "(editor round: no GPU or software adapter: no editor.render or editor.gpu rows)",
+                "(editor round: no Scene-view frame rendered: no editor.render or editor.gpu rows)",
             ),
             (
                 rendered && self.row("editor.gpu_ms").is_none(),

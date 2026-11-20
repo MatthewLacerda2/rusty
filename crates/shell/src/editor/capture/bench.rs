@@ -101,7 +101,16 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
         Ok::<_, String>(())
     });
     let _ = std::fs::remove_dir_all(&opts.save_dir);
-    saved.map(|()| Some(meter.finish()))
+    saved?;
+    let mut round = meter.finish();
+    if !round.rows.iter().any(|r| r.metric == "editor.renderer_ms") {
+        let (w, h) = opts.size;
+        round.warnings.push(format!(
+            "editor round: the Scene view drew nothing at {w}x{h} (the editor's panels \
+             leave it no room): no editor.render or editor.gpu rows; bench at a larger RES"
+        ));
+    }
+    Ok(Some(round))
 }
 
 /// One Play entry, one Stop and one save, each a single sample of the run.
@@ -239,6 +248,7 @@ impl Editor {
         for id in &output.textures_delta.free {
             self.egui.free_texture(id);
         }
+        output.textures_delta.clear(); // egui asserts every delta is consumed
         renderer.wait_idle();
         let gpu = renderer.take_gpu_times();
         let frame = cost.map(|(cpu_ms, stages, counters)| RenderedFrame {
@@ -274,3 +284,7 @@ fn pose(ui: &mut EditorUi, game: &GameWorld) {
         ui.scene_view.camera = SceneCamera::from_camera(&Camera::new(view.at, view.yaw, 0.0));
     }
 }
+
+#[cfg(test)]
+#[path = "bench_tests.rs"]
+mod tests;
