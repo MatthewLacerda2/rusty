@@ -7,7 +7,8 @@
 //! draw calls, triangles, dropped and culled counts, the Hi-Z culls and late set, the GPU calls
 //! (passes, submits, bind groups made, buffer writes), each system's CPU ms
 //! (`cpu.<system>`) and the renderer's by stage (`render.<stage>`), each set with an `other` row for
-//! what none of its parts holds. A stage timed in parts (the Hi-Z `occlusion`
+//! what none of its parts holds. Every other `Debug.Stats` counter is a row too, quiet:
+//! printed only when it changed (`bench::sample`). A stage timed in parts (the Hi-Z `occlusion`
 //! stage, #2401) adds `render.<stage>.<part>` and `gpu.<pass>.<part>` rows beside
 //! its own, which they sit inside: no sum of a set counts them.
 //!

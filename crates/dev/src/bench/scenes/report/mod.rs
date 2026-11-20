@@ -47,8 +47,7 @@ pub struct Row {
     /// one-off row, or a run of one.
     pub lo: f64,
     pub hi: f64,
-    /// A quiet counter (`bench::Summary::quiet`): the printed table shows it only
-    /// when it changed against the run it is compared with.
+    /// A quiet counter (`bench::Summary::quiet`): printed only when it changed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub quiet: bool,
 }
@@ -170,6 +169,23 @@ impl SceneReport {
             "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
+        out.push_str(&self.rows_table(comparable, against, w));
+        if let Some(engine) = &self.engine {
+            out.push_str(&engine_line(
+                engine,
+                previous.and_then(|p| p.engine.as_ref()),
+            ));
+        }
+        for warning in &self.warnings {
+            let _ = writeln!(out, "warning: {warning}");
+        }
+        out.push_str(&self.notes(previous.is_none()));
+        out
+    }
+
+    /// The rows, `w` wide, against `comparable`: a quiet one only when it moved.
+    fn rows_table(&self, comparable: Option<&SceneReport>, against: &str, w: usize) -> String {
+        let mut out = String::new();
         let mut unshown = 0;
         for row in &self.rows {
             let last = comparable.and_then(|p| p.row(&row.metric));
@@ -194,16 +210,6 @@ impl SceneReport {
         }
         let file = format!("{}.json", self.scene);
         out.push_str(&unshown_line(unshown, comparable.is_some(), &file));
-        if let Some(engine) = &self.engine {
-            out.push_str(&engine_line(
-                engine,
-                previous.and_then(|p| p.engine.as_ref()),
-            ));
-        }
-        for warning in &self.warnings {
-            let _ = writeln!(out, "warning: {warning}");
-        }
-        out.push_str(&self.notes(previous.is_none()));
         out
     }
 }
