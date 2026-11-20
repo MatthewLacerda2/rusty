@@ -22,13 +22,21 @@ use super::watch::{carriers, Owners};
 use super::world::{body_to_write, collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
-/// The body-type pairs a collider generates contacts for: every one but
-/// static↔static (#1779). rapier's broad phase refuses to create a filtered pair,
-/// and a body type change forces its colliders back through it, so a body switched
-/// to or from static in Play is filtered by what it is now. Setting this on a live
+/// The body-type pairs a collider generates contacts for: rapier's default, only
+/// pairs with a dynamic body in them. Nothing reads any other pair: a collision
+/// event needs the solver to have pushed on it (`CollisionEvents::from_contact_sets`,
+/// Unity's rule that a collision needs a dynamic body), triggers and the
+/// CharacterController's sweeps go through queries, and the world steps with no
+/// physics hooks. So a kinematic mover against the level, or against another
+/// kinematic, builds no manifold and joins no island; against a dynamic body it
+/// still pairs, so it wakes and pushes it. rapier's broad phase refuses to create a
+/// filtered pair, and a body type change forces its colliders back through it, so a
+/// body whose type changes in Play is filtered by what it is now (a pair whose
+/// dynamic side turns kinematic is dropped and exits). Setting this on a live
 /// collider alone would not do that.
-const ACTIVE_TYPES: ActiveCollisionTypes =
-    ActiveCollisionTypes::all().difference(ActiveCollisionTypes::FIXED_FIXED);
+const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNAMIC_DYNAMIC
+    .union(ActiveCollisionTypes::DYNAMIC_KINEMATIC)
+    .union(ActiveCollisionTypes::DYNAMIC_FIXED);
 
 impl PhysicsWorld {
     /// Re-derive the body plan and rebuild exactly the owners whose collider set
@@ -164,11 +172,9 @@ impl PhysicsWorld {
         collider.set_sensor(inp.is_trigger);
         apply_material(&mut collider, &inp.material);
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
-        // The demo's bodies are kinematic/static, so the default
-        // "only-if-one-is-dynamic" filtering would suppress every player↔wall
-        // and player↔enemy pair. Enable every combination but static↔static:
-        // as in Unity, two static colliders never collide, and a wall standing
-        // on a floor would otherwise keep a solved pair every tick (#1779).
+        // Only pairs with a dynamic body generate contacts (`ACTIVE_TYPES` says
+        // why): as in Unity, a kinematic or static collider meets another
+        // non-dynamic one only through queries (triggers, character sweeps).
         collider.set_active_collision_types(ACTIVE_TYPES);
         // The collision matrix (#91) decides which layers interact: a collider
         // is a member of its own layer and filters to the layers it may collide

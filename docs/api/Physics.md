@@ -20,7 +20,7 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.AddForceAtPosition` | `(id, fx, fy, fz, px, py, pz)` | — (continuous force at a world point: moves and spins the body) |
 | `Physics.AddImpulseAtPosition` | `(id, jx, jy, jz, px, py, pz)` | — (impulse in N·s at a world point — a shot hitting a ragdoll bone) |
-| `Physics.SetKinematic` | `(id, is_kinematic)` | — |
+| `Physics.SetKinematic` | `(id, is_kinematic)` | — (a kinematic body pairs only with dynamic ones: its contacts with static or kinematic colliders end, `OnCollisionExit`) |
 | `Physics.GetMass` | `(id)` | `number` — kilograms (`0` without a Rigidbody) |
 | `Physics.SetMass` | `(id, kg)` | — (clamped to `[0.01, 1000]`, as the inspector's field is; see [Mass](#mass-and-forces-at-a-point-466)) |
 | `Physics.GetUseGravity` | `(id)` | `bool` (`false` without a Rigidbody) |
@@ -551,7 +551,7 @@ solid colliders in proportion to their volume (a trigger carries none), which
 also sets the body's centre of mass and inertia. `Physics.SetMass(id, kg)` sets
 it (`GetMass` reads it back), and changing it during Play takes effect on the
 next step. So do `SetKinematic` and an entity's layer: the body
-switches class in place (keeping its joints and contacts), and a collider follows
+switches class in place (keeping its joints, and its contacts with dynamic bodies), and a collider follows
 its layer's Collision Matrix row.
 
 ### Drag and angular drag (#2062)
