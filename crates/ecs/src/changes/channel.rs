@@ -20,6 +20,9 @@ pub trait Channel: sealed::Sealed + 'static {
     const COLUMN: bool;
     /// Its name in [`super::World::change_stats`] and `Debug.Stats` (`changes_<name>`).
     const NAME: &'static str;
+    /// A column whose write on a static entity moves
+    /// [`super::World::static_geometry`]'s revision (the Collider's).
+    const STATIC_GEOMETRY: bool = false;
 }
 
 /// The derived channel stamped wherever the set of static entities active in the
@@ -44,37 +47,49 @@ pub struct Activity;
 pub struct Layer;
 
 macro_rules! channels {
-    ($column:literal: $($ty:ty => $name:expr,)*) => {
+    ($column:literal: $($ty:ty => $name:expr $(, geometry: $geometry:expr)?;)*) => {
         $(
             impl sealed::Sealed for $ty {}
             impl Channel for $ty {
                 const COLUMN: bool = $column;
                 const NAME: &'static str = $name;
+                $(const STATIC_GEOMETRY: bool = $geometry;)?
             }
         )*
     };
 }
 
 channels! { false:
-    StaticSet => "static_set",
-    WorldPose => "world_pose",
-    Activity => "activity",
-    Layer => "layer",
+    StaticSet => "static_set";
+    WorldPose => "world_pose";
+    Activity => "activity";
+    Layer => "layer";
 }
 
 channels! { true:
-    Core => "core",
-    String => "name",
-    TransformComponent => "transform",
-    Vec<ScriptComponent> => "scripts",
-    MaterialAsset => "pending_material",
-    PrefabLink => "prefab_link",
+    Core => "core";
+    String => "name";
+    TransformComponent => "transform";
+    Vec<ScriptComponent> => "scripts";
+    MaterialAsset => "pending_material";
+    PrefabLink => "prefab_link";
+}
+
+/// The registry columns that are static geometry, by `Entity` field: a new one is
+/// one more arm.
+macro_rules! static_geometry {
+    (collider) => {
+        true
+    };
+    ($field:ident) => {
+        false
+    };
 }
 
 /// Each registry row's column is a channel named after its `Entity` field.
 macro_rules! registry_channels {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        channels! { true: $($ty => stringify!($field),)* }
+        channels! { true: $($ty => stringify!($field), geometry: static_geometry!($field);)* }
     };
 }
 
