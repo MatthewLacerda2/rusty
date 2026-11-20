@@ -39,6 +39,10 @@ pub(crate) struct SolidResources {
     /// ran, the opaque draws it decided.
     pub tested: Vec<(u32, (Vec3, Vec3))>,
     pub culled: Option<crate::passes::hiz::Culled>,
+    /// The camera culls by Hi-Z but tests too few objects for the stage to run
+    /// (`passes::hiz::MIN_INSTANCES`): drawn whole, its forward pass primed by a
+    /// prepass of its batches, as it was while it culled.
+    pub floored: bool,
 }
 // Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
 // one overlay group 1 ([`OverlayBindings`], #1616): its uniform there places it and
@@ -180,6 +184,7 @@ impl Renderer {
             outline_bounds,
             tested,
             culled: None,
+            floored: false,
         }
     }
 
