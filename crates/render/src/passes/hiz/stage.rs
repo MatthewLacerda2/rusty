@@ -18,13 +18,10 @@ impl Renderer {
     /// The `occlusion` stage: cull this camera's opaque instances by the GPU's
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
-        ctx.solids.culled = None;
-        let opaque = ctx.solids.draws.opaque.last();
-        let Some(last) = opaque.filter(|_| self.hiz_culls(ctx.cam)) else {
+        let idx = ctx.uniform.stack[0] as usize;
+        let Some(n) = self.hiz_instances(view, ctx, idx) else {
             return;
         };
-        let n = last.instances.end;
-        let idx = ctx.uniform.stack[0] as usize;
         self.hold_hiz(view, idx);
         let ([first, mut last], plan) =
             self.prepare_cull(view, idx, (&ctx.solids, ctx.view_proj), n);
@@ -71,6 +68,26 @@ impl Renderer {
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
         self.lap("occlusion.submit");
+    }
+
+    /// How many of camera `idx`'s instances its stage culls; `None` when it is
+    /// drawn whole, `ctx.solids.culled` left `None`. Under the instance floor,
+    /// or with its flag off, a camera holds nothing new here (#2338), and a
+    /// read it left in flight is dropped: its first frame back must not report
+    /// it. Under the floor it is [`floored`](crate::draw::resources::SolidResources::floored):
+    /// its forward pass is still primed, by a prepass of its few batches.
+    fn hiz_instances(&self, view: &mut RenderView, ctx: &mut CameraCtx, idx: usize) -> Option<u32> {
+        (ctx.solids.culled, ctx.solids.floored) = (None, false);
+        let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
+        let culls = n.is_some() && self.hiz_culls(ctx.cam);
+        if culls && self.hiz_draws_enough(&ctx.solids) {
+            return n;
+        }
+        ctx.solids.floored = culls;
+        if let Some(cam) = view.hiz.cameras.get_mut(idx) {
+            cam.forget_reads();
+        }
+        None
     }
 
     /// Record everything after phase one: the pyramid over `depth`, the test,
@@ -137,6 +154,12 @@ impl Renderer {
 }
 
 impl CameraCull {
+    /// Drop both counters' reads in flight, for a frame this camera skips.
+    fn forget_reads(&mut self) {
+        self.counter.forget();
+        self.clusters.counter.forget();
+    }
+
     /// Copy what its final draws and its late set (#2336) drew, `batches` args
     /// each and adjacent ([`late_args`]), in one copy for one read back
     /// ([`Counter::final_and_late`](super::counters::Counter::final_and_late)).

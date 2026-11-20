@@ -64,6 +64,7 @@ pub(super) fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut Came
         base: ctx.is_first,
         ssil: ctx.ssil,
         culled: ctx.solids.culled.clone(),
+        floored: ctx.solids.floored,
     };
     r.execute_scene_pass(view, frame, &ctx.solids.draws.opaque);
 }
