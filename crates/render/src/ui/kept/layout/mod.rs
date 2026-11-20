@@ -136,6 +136,11 @@ impl KeptLayout {
         };
         match (&mut self.held, self.why) {
             (Some(held), None) => {
+                // Kept, so an unshared table holds equal sizes: hold the new one, so
+                // later frames compare pointers, not the whole map.
+                if !Rc::ptr_eq(&held.textures, &view.textures) {
+                    held.textures = Rc::clone(&view.textures);
+                }
                 if held.placed || written.is_some_and(|w| w.canvas) {
                     Rc::make_mut(&mut held.layout).respace(world, view);
                     held.placed = placed(&held.layout);
@@ -188,11 +193,15 @@ impl Held {
         if (w.canvas || canvas_moved) && self.canvases != canvas_keys(world, view.screen) {
             return Some(Why::Screen);
         }
+        // An id that may join (a RectTransform, or an element activated that was left
+        // out, a marker hidden behind the camera) counts under a laid-out parent; a
+        // parent's own `Children` stamp covers a re-parent, so the rest count only held.
+        let joins = |&id: &u32| e.moved(world, id, true);
         let held_only = |&id: &u32| e.holds(id).then(|| e.moved(world, id, false)).flatten();
         let why = (w.rect.iter())
-            .find_map(|&id| e.moved(world, id, true))
+            .find_map(joins)
             .or_else(|| w.hierarchy.iter().find_map(held_only))
-            .or_else(|| w.activity.iter().find_map(held_only))
+            .or_else(|| w.activity.iter().find_map(joins))
             .or_else(|| w.content.iter().find_map(held_only));
         if why.is_some() {
             return why;

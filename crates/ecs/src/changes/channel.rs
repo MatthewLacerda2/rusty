@@ -75,7 +75,7 @@ macro_rules! channels {
 /// their count, so a new one cannot take another's slot or a registry column's.
 macro_rules! fixed_channels {
     ($($column:literal $ty:ty => $name:ident;)*) => {
-        #[allow(non_camel_case_types, dead_code)] // the names are the channels' `NAME`s
+        #[expect(non_camel_case_types, reason = "each variant is its channel's `NAME`")]
         enum FixedSlot { $($name,)* Count }
         $(channels! { $column: $ty => stringify!($name), FixedSlot::$name as usize; })*
         /// The slots before the registry's columns.

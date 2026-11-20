@@ -1,12 +1,13 @@
 //! crates/render/src/ui/kept/layout/watch.rs — the change cursors a kept layout reads
 //! (`layout`'s module docs). A channel nothing stamped since the last read is asked
-//! and skipped ([`World::quiet`]), so a still frame collects no id.
+//! and skipped (`kept::ids`, [`World::quiet`]), so a still frame collects no id.
 
+use super::super::ids;
 use rusty_components::{
     CanvasComponent, ImageComponent, LayoutElementComponent, LayoutGroupComponent,
     RectTransformComponent, TextComponent,
 };
-use rusty_ecs::{Activity, Changes, Channel, Children, Cursor, World};
+use rusty_ecs::{Activity, Children, Cursor, World};
 
 /// The cursors of every column the layout reads.
 pub(super) struct Watch {
@@ -32,18 +33,6 @@ pub(super) struct Written {
     pub(super) content: Vec<u32>,
     /// Whether any Canvas was written (its placement, or what the rects read).
     pub(super) canvas: bool,
-}
-
-/// `cursor`'s ids since its last read, nothing collected when it is quiet; `None`
-/// when the log cannot say.
-fn ids<T: Channel>(w: &World, cursor: &mut Cursor<T>) -> Option<Vec<u32>> {
-    if w.quiet(cursor) {
-        return Some(Vec::new());
-    }
-    match w.changes(cursor) {
-        Changes::Rebuild => None,
-        Changes::Ids(ids) => Some(ids),
-    }
 }
 
 impl Watch {

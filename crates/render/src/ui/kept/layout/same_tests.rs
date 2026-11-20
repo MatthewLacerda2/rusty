@@ -65,3 +65,42 @@ fn an_inactive_marker_reads_no_camera_until_it_is_activated() {
     assert!(rig.frame(&super::ui().scene.world), "another World");
     assert_eq!(rig.why(), Some(Why::Rebuild));
 }
+
+#[test]
+fn a_marker_hidden_behind_the_camera_then_activated_is_laid_out() {
+    let (mut ui, mut rig) = (ui(), Rig::new());
+    let foe = ui.scene.add_entity("Foe".to_string());
+    let w = &mut ui.scene.world;
+    w.transform_mut(foe).expect("t").position = Vec3::new(0.0, 0.0, 10.0);
+    let number = element(&mut ui.scene, ui.canvas);
+    let w = &mut ui.scene.world;
+    let anchor = WorldAnchor {
+        target: Some(foe),
+        hide_when_behind: true,
+        ..Default::default()
+    };
+    w.rect_transform_mut(number).expect("rt").world_anchor = Some(anchor);
+    w.set_active(number, false);
+    assert!(rig.frame(&ui.scene.world), "the foe behind the camera");
+    rig.camera.as_mut().expect("camera").yaw += 180.0;
+    assert!(
+        !rig.frame(&ui.scene.world),
+        "an inactive number reads no camera"
+    );
+    ui.scene.world.set_active(number, true);
+    assert!(rig.frame(&ui.scene.world), "the number shown, now in view");
+    assert_eq!(rig.why(), Some(Why::Structure));
+}
+
+#[test]
+fn an_equal_texture_table_is_kept_and_held_in_its_place() {
+    let (ui, mut rig) = (ui(), Rig::new());
+    rig.frame(&ui.scene.world);
+    rig.textures = std::rc::Rc::new((*rig.textures).clone());
+    assert!(!rig.frame(&ui.scene.world), "equal sizes, a new table");
+    let held = rig.kept.held.as_ref().expect("held");
+    assert!(
+        std::rc::Rc::ptr_eq(&held.textures, &rig.textures),
+        "swapped in"
+    );
+}

@@ -424,7 +424,8 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   element's `Transform` rotation and scale, the hierarchy (a parent, the order of
   siblings) or active flags, the `Image` or `Text` of an element its content sizes
   (one with a `LayoutElement`, or under a `LayoutGroup`), a root Canvas's sort
-  order, mode or size, whether a Canvas is a root, the screen size or the texture
+  order, size, scale factor and whether it is world space (not which screen-space
+  mode), whether a Canvas is a root, the screen size or the texture
   sizes, and, while a `WorldAnchor` marker is placed (active, under a screen-space
   canvas seen through a camera), the camera or a marker's target moving
   (`RenderCounters::ui_laid_out`, and one `ui_relaid_<reason>` counter per reason). A
@@ -432,7 +433,8 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   (a script setting the value already set) lays nothing out. A label's changing
   string outside a group, a Canvas's sway and tilt, a world canvas carried around and
   an inactive marker (a pooled damage number) only move where the rects land, or
-  draw nothing, so they lay nothing out; activating the marker does. A
+  draw nothing, so they lay nothing out; activating the marker does, hidden behind
+  the camera when it was last laid out or not. A
   canvas is meshed again only when its rects, its frame, a texture size it read or
   the glyph atlases' generation differ, or
   a write touched one of its elements' UI components (`Image`, `Text`, `Shape`,

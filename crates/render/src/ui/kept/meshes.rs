@@ -8,12 +8,12 @@ use std::rc::Rc;
 use glam::Vec2;
 
 use super::super::mesh::{build_canvas, canvas_frame, CanvasMesh, Sources, TexSize};
-use super::canvas_runs;
+use super::{canvas_runs, ids};
 use rusty_components::{
     BackdropFilterComponent, CanvasGroupComponent, ImageComponent, MaskComponent,
     RectMaskComponent, ShapeComponent, TextComponent,
 };
-use rusty_ecs::{Activity, Changes, Cursor, World};
+use rusty_ecs::{Activity, Cursor, World};
 use rusty_ui::{UiLayout, UiRect};
 
 /// What one canvas's mesh was built from, besides its elements' components (the
@@ -76,26 +76,23 @@ impl Watch {
     }
 
     /// Every id written on any channel since the last read, or `None` for a whole
-    /// rebuild. Reads every cursor, so each is current after.
+    /// rebuild. Reads every cursor, so each is current after; a quiet one collects nothing.
     fn read(&mut self, w: &World) -> Option<BTreeSet<u32>> {
         let all = [
-            w.changes(&mut self.image),
-            w.changes(&mut self.shape),
-            w.changes(&mut self.text),
-            w.changes(&mut self.mask),
-            w.changes(&mut self.rect_mask),
-            w.changes(&mut self.group),
-            w.changes(&mut self.backdrop),
-            w.changes(&mut self.activity),
+            ids(w, &mut self.image),
+            ids(w, &mut self.shape),
+            ids(w, &mut self.text),
+            ids(w, &mut self.mask),
+            ids(w, &mut self.rect_mask),
+            ids(w, &mut self.group),
+            ids(w, &mut self.backdrop),
+            ids(w, &mut self.activity),
         ];
-        let mut ids = BTreeSet::new();
-        for changes in all {
-            match changes {
-                Changes::Rebuild => return None,
-                Changes::Ids(changed) => ids.extend(changed),
-            }
+        let mut written = BTreeSet::new();
+        for changed in all {
+            written.extend(changed?);
         }
-        Some(ids)
+        Some(written)
     }
 }
 

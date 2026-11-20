@@ -42,8 +42,7 @@ use super::mesh::{build_canvas, CanvasMesh};
 use super::text::atlas::FontAtlases;
 #[cfg(test)]
 use glam::Vec2;
-#[cfg(test)]
-use rusty_ecs::World;
+use rusty_ecs::{Changes, Channel, Cursor, World};
 #[cfg(test)]
 use rusty_ui::UiLayout;
 use rusty_ui::UiRect;
@@ -78,6 +77,18 @@ fn canvas_runs(entries: &[(u32, &UiRect)]) -> Vec<std::ops::Range<usize>> {
         }
     }
     runs
+}
+
+/// `cursor`'s ids since its last read, nothing collected when it is quiet; `None`
+/// when the log cannot say.
+fn ids<T: Channel>(w: &World, cursor: &mut Cursor<T>) -> Option<Vec<u32>> {
+    if w.quiet(cursor) {
+        return Some(Vec::new());
+    }
+    match w.changes(cursor) {
+        Changes::Rebuild => None,
+        Changes::Ids(ids) => Some(ids),
+    }
 }
 
 #[cfg(test)]
