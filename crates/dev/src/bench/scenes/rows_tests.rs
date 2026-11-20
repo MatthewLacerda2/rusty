@@ -122,6 +122,7 @@ fn resident_bytes_by_kind_are_rows_in_mib() {
     let counters = rusty_render::RenderCounters {
         texture_bytes: 3 << 20,
         lightmap_bytes: 1 << 19,
+        mesh_bytes: 2 << 20,
         ..Default::default()
     };
     let mut report = SceneReport::default();
@@ -129,6 +130,7 @@ fn resident_bytes_by_kind_are_rows_in_mib() {
     let mb = |k: &str| report.row(k).map(|r| r.avg);
     assert_eq!(mb("gpu_texture_mb"), Some(3.0));
     assert_eq!(mb("gpu_lightmap_mb"), Some(0.5));
+    assert_eq!(mb("gpu_mesh_mb"), Some(2.0));
     assert_eq!(
         mb("gpu_reflection_mb"),
         Some(0.0),

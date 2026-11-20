@@ -186,7 +186,7 @@ impl Renderer {
             self.draw_ui(view);
             self.lap("ui");
         }
-        self.finish_counters(view);
+        self.finish_main_frame(view, scene);
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
