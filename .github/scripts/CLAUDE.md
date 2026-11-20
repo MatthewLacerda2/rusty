@@ -2,7 +2,7 @@
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
 `make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
-`make coder`, `make coders`, `make review-level`, `make rebriefs`, `make mutants-remote`, `make bench-ab` and
+`make coder`, `make coders`, `make review-level`, `make rebriefs`, `make coder-cost`, `make mutants-remote`, `make bench-ab` and
 `make test-gpu PR=`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
@@ -33,8 +33,9 @@ coder *changing* it must know.
   routine, the routines API, the coders waiting for a slot (`dispatch/waiting.py`, kept in
   `merge-queue/coders-waiting.json` through `merging/state.py`, and launched from it under
   its lock by `dispatch/drain.py`), the review level, the
-  re-brief counts. `coder.py`, `coders.py`, `review-level.py` and `rebriefs.py` are only
-  the command lines. The routines API is
+  re-brief counts, and what a coder session costs (`dispatch/cost.py`, reading run logs
+  with `dispatch/runlog.py`, kept in `.git/coder-cost.json`). `coder.py`, `coders.py`,
+  `review-level.py`, `rebriefs.py` and `coder-cost.py` are only the command lines. The routines API is
   reached through `claude mcp serve` (`dispatch/remote.py` says why), never with a
   token a script reads: the claude.ai login stays inside `claude`.
 - **`.github/scripts/bench/` is a PR's measured rows**: its trees (`main` and the

@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bench-ab bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes bench-ab bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -398,6 +398,11 @@ review-level: ## The independent review's level (high or medium) and why. make r
 # re-briefs by their `Round:` line. A report, never a gate: exits 0.
 rebriefs: ## Briefs per issue and re-briefs by Round. ARGS="--since 2026-10-29" sets the window
 	@python3 .github/scripts/rebriefs.py $(ARGS)
+
+# Reads the run log of every coder routine the routines API still lists (its 20
+# newest) and keeps the numbers in .git/coder-cost.json. Needs the claude.ai login.
+coder-cost: ## What coder sessions cost: sandbox, reading, gates and the rest, first briefs vs rounds
+	@python3 .github/scripts/coder-cost.py
 
 # ---- signals (#750)---------------------------------------------------------
 

@@ -445,7 +445,10 @@ checks and the `planning`+`human` issues. Then `make rebriefs ARGS="--since <bat
 start>"`: briefs per issue, issues that took one brief, and re-briefs by `Round:`.
 A cause that dominates is what the next infrastructure issue attacks (CLAUDE.md,
 *Once is a case; twice is an issue*), and `unstated` means a re-brief left its
-line out. Then the result, what surprised you (not only what went wrong), and the
+line out. `make coder-cost` then says what those sessions cost in
+wall-clock (sandbox, reading to the first edit, gates, the rest; first briefs
+against rounds) from the run logs of the coder routines still listed, adding to
+`.git/coder-cost.json` each time; it has no token counts, which the run log lacks. Then the result, what surprised you (not only what went wrong), and the
 lessons mapped to their changes. Two things are raised even mid-batch, while they
 can still be overruled: a change to the user's files outside the repo, and a
 decision reversed from what the issue said.
