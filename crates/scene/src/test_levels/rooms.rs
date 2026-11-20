@@ -108,4 +108,5 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
     (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
+    mesh.own_geometry = Some(mesh.revision); // not the box's: a slot of its own
 }

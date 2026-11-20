@@ -68,6 +68,7 @@ pub(super) fn install(scene: &mut Scene, changed: &BTreeSet<String>) {
                 mesh.indices = indices;
                 mesh.ranges.clear();
                 mesh.revision = entry.revision;
+                mesh.own_geometry = None;
                 mesh.clusters = None;
             }
             refit(scene, id);

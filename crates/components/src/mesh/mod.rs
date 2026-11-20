@@ -63,8 +63,9 @@ pub struct MeshComponent {
     #[serde(default = "one_f32")]
     pub scale_in_lightmap: f32,
     /// The vertices, shared with the import cache and every other instance of the
-    /// same sub-mesh (#2351): a clone shares them, and an edit
-    /// (`vertices.edit()`) copies them first when anyone else holds them.
+    /// same sub-mesh (#2351): a clone shares them. Write them in place only through
+    /// [`Self::vertices_mut`] (which renews the revision and, for a buffer another
+    /// mesh holds, the mesh's own identity), or replace them whole.
     #[serde(skip)]
     pub vertices: Shared<Vertex>,
     /// The indices, shared as `vertices` are.
@@ -114,12 +115,19 @@ pub struct MeshComponent {
     #[serde(default, skip_serializing_if = "is_zero")]
     pub min_screen_size: f32,
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
-    /// `vertices` or `indices` change, so every renderer re-uploads them. A
-    /// primitive's geometry is the exception: it carries the one revision of its
-    /// (primitive, cut) (`scene::create::primitive_revision`), so an edit to a
-    /// primitive's vertices must give it a new `MeshId` as well as a new revision.
+    /// `vertices` or `indices` change, so every renderer re-uploads them. The
+    /// renderer keeps one GPU slot per source (`render::MeshId`), so geometry that
+    /// stops being its source's must also stop being keyed by it: an edit in place
+    /// through [`Self::vertices_mut`] / [`Self::indices_mut`] does that
+    /// (`own_geometry`); a whole replacement names a new source (`Mesh.Create`).
     #[serde(skip)]
     pub revision: MeshRevision,
+    /// Set once an edit in place gave this mesh geometry of its own (Unity's
+    /// `MeshFilter.mesh` over `sharedMesh`): the renderer keys its GPU slot by it
+    /// too, so the edit is drawn on this mesh alone, never on the meshes still
+    /// sharing its source. Moves with the geometry; never saved.
+    #[serde(skip)]
+    pub own_geometry: Option<MeshRevision>,
     /// The clusters its import built (#1968, `asset::clusters`), with the
     /// revision they describe: any later edit takes a new revision, so stale
     /// clusters are never read. Read through [`Self::clusters`]; rehydrated with the
@@ -190,6 +198,7 @@ impl MeshComponent {
             max_draw_distance: 0.0,
             min_screen_size: 0.0,
             revision: MeshRevision::next(),
+            own_geometry: None,
             clusters: None,
         }
     }

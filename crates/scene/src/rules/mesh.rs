@@ -79,5 +79,6 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
     mesh.vertices = vertices.into();
     mesh.indices = indices.into();
     mesh.revision = primitive_revision(Primitive::Plane, subdivisions);
+    mesh.own_geometry = None;
     Ok(())
 }
