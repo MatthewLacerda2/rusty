@@ -7,7 +7,7 @@ fn view(rows: &[(&str, f64, f64)]) -> Report {
         frames: 3,
         metrics: rows
             .iter()
-            .map(|&(k, avg, p95)| (k.to_string(), Summary { avg, p95 }))
+            .map(|&(k, avg, p95)| (k.to_string(), Summary::new(avg, p95)))
             .collect(),
         ..Report::default()
     }
