@@ -78,18 +78,17 @@ pub fn register(lua: &Lua) -> Reg {
         &table,
         "GetTextureImportSettings",
         lua.create_function(|lua, path: String| {
-            let stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
-            texture::table(lua, &stored.texture)
+            let file = texture::file(&path)?;
+            texture::table(lua, &sidecar::read_texture(&file).map_err(runtime)?)
         }),
     )?;
     put(
         &table,
         "SetTextureImportSettings",
         lua.create_function(|_, (path, t): (String, Table)| {
-            let path = Path::new(&path);
-            let stored = sidecar::load(path).map_err(runtime)?.texture;
-            let s = texture::settings(stored, &t)?;
-            sidecar::set_texture(path, s).map_err(runtime)
+            let file = texture::file(&path)?;
+            let s = texture::settings(sidecar::texture(&file), &t)?;
+            sidecar::set_texture(&file, s).map_err(runtime)
         }),
     )?;
 

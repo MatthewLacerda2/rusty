@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use rusty_asset::convert::{
     cache_path, cache_path_as, converter_for, lock_cache, with_cache_files, IMPORT_CACHE_DIR,
 };
-use rusty_asset::texture_import::CACHE_SUFFIX;
+use rusty_asset::texture_import::cache_path_in;
 use rusty_core::paths;
 
 /// Copy the file `rel` of the project at `root` to the same place under `out`,
@@ -118,8 +118,8 @@ pub(super) fn caches(
 }
 
 /// Copy the compressed copy (`.bctex`, #1574) of each image in `images`
-/// (project-relative) that has one, under its lock, so the exported game never
-/// encodes. An image left uncompressed has none, and uploads as it is.
+/// (project-relative, a texture a model's conversion extracted among them,
+/// #2365) that has one, under its lock, so the exported game never encodes. An image left uncompressed has none, and uploads as it is.
 pub(super) fn texture_caches(
     root: &Path,
     images: &[PathBuf],
@@ -127,7 +127,7 @@ pub(super) fn texture_caches(
     written: &mut Vec<String>,
 ) -> Result<(), String> {
     for image in images {
-        let cache = cache_path_as(root, image, CACHE_SUFFIX);
+        let cache = cache_path_in(root, image);
         // Looked for before the lock, whose folder an image never compressed
         // lacks: a lock that cannot be taken warns once per process, falsely.
         if !cache.is_file() {

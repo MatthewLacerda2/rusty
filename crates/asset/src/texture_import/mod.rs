@@ -33,8 +33,11 @@
 //! (`convert::cache_location_as`), `<source>.bctex`, stamped with a digest of the
 //! source's bytes, the settings and [`ENCODER_VERSION`]; any difference re-encodes
 //! (`cache`). An export ships it (`dev::export`), so a shipped game never encodes.
+//! A texture a conversion extracted (#2365) is an image too: [`images`] finds it
+//! through its model's cache, its settings follow the slots its model samples it
+//! in (`convert::texture_ref::extracted`), its copy lies beside the model's cache.
 //!
-//! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`)
+//! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`), and an extracted texture's `<glb>.bctex/<image>.bctex` (`location`)
 //!
 //! **What it skips**: a baked lightmap page (`asset::lightmap_page`, #1694), which
 //! is not a colour texture, and a normal map kept at 16 bits ([`is_deep_normal`]).
@@ -50,8 +53,10 @@
 //! A file it shrinks is warned of once (`shrink::warn_if_shrunk`); a bake raises
 //! a Max Size the engine chose to its own size instead (`sidecar::prepare_bake`).
 
+pub(crate) mod background;
 mod cache;
 mod encode;
+mod location;
 mod orphans;
 mod refresh;
 mod shrink;
@@ -59,16 +64,17 @@ pub mod variance;
 
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use image::ImageReader;
 
+pub(crate) use background::queue_extracted;
+pub use background::{import_in_background, queue, queue_changed};
 pub(crate) use encode::banded;
 pub use encode::blocks_len;
 pub use encode::{full_chain_len, BlockFormat, Compressed};
-pub use refresh::{
-    images, imports, pending, queue, queue_changed, refresh, refresh_all, Refreshed,
-};
+pub use location::{cache_file, cache_path_in, extracted_cache, CACHE_SUFFIX};
+pub use refresh::{images, imports, pending, refresh, refresh_all, Refreshed};
 pub use shrink::{fit, fitted_size};
 
 use super::convert::{source_digest, Seen};
@@ -276,18 +282,12 @@ fn open(source: &Path) -> image::ImageResult<ImageReader<BufReader<File>>> {
     reader(source, BufReader::new(File::open(source)?))
 }
 
-/// Where the import cache keeps the image at `source`'s compressed copy.
-pub fn cache_file(source: &Path) -> Result<PathBuf, String> {
-    super::convert::cache_location_as(source, CACHE_SUFFIX).map_err(|e| e.to_string())
-}
-
-/// What a compressed copy's name adds to its source's.
-pub const CACHE_SUFFIX: &str = ".bctex";
-
 #[cfg(test)]
 mod cache_tests;
 #[cfg(test)]
 mod deep_tests;
+#[cfg(test)]
+mod extracted_tests;
 #[cfg(test)]
 mod load_tests;
 #[cfg(test)]

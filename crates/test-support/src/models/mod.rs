@@ -5,8 +5,10 @@
 //! tests of every module above it (`scene`'s) read the same files.
 
 pub mod anim;
+mod fbx;
 mod quad;
 
+pub use fbx::{embedded_fbx, png, Embedded};
 pub use quad::quad_file;
 
 /// A two-triangle (quad) `.obj` with a single named object `Quad`.
