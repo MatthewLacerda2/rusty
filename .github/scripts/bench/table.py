@@ -36,7 +36,8 @@ load did, and `models_converted` tells a cached load from a cold import; where t
 differ between legs, [`count_changes`] says so for the run's header, as the
 texture refusals do, since the load rows then compare different loads.
 
-Above the lead, a scene's notes ([`notes`]): the warnings `bench-scenes` wrote
+Above the lead, the line saying `main`'s and the PR's editor rounds drew the Scene view at
+other sizes (`view_size`), then a scene's notes ([`notes`]): the warnings `bench-scenes` wrote
 into each leg's report (a bake the scene lacks, textures drawn uncompressed,
 console errors), each said once, and those not every leg wrote marked with the legs
 that did. A note is why a table's absolute numbers may not be the game's (#2420),
@@ -47,12 +48,23 @@ A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
 `STRESS=1` its stress runs' folders beside it ([`STRESS_RUNS`], `bench/stress.py`),
 which are never read as a project's. The stress section is drawn by the same
 [`section`].
+
+A run that stops before its last leg (a build that outlasted `refuse.settle`'s
+wait, a failed leg) still gets its table, from the legs that finished (#2463:
+a run that had measured `main` and the PR for 19 minutes ended with no table
+when a build appeared before its third leg). A leg that did not finish is
+`None` here: it is read as no report and its warnings are not counted, and a
+section the second `main` leg has no report for opens its lead with *No floor*
+(every change reads *floor unknown*), one the PR's leg has none for with *No PR
+measurement*, so the lead never says nothing moved where nothing was measured.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
+from bench import view_size
 
 
 # The folder under a leg holding the stress runs (`<leg>/stress/<i>/`, `bench/stress.py`):
@@ -63,7 +75,7 @@ STRESS_RUNS = "stress"
 
 def projects(leg: Path) -> list[Path]:
     """The leg's project folders, sorted: every folder but its stress runs'."""
-    if not leg.is_dir():
+    if leg is None or not leg.is_dir():
         return []
     return sorted(p for p in leg.iterdir() if p.is_dir() and p.name != STRESS_RUNS)
 
@@ -84,29 +96,33 @@ LEGS = ("main", "PR", "main again")
 def warnings(leg: Path, report: dict | None) -> list[str]:
     """The report's warnings, the leg's own folder spelled `<leg>` so one note
     (the console kept beside the report) reads the same in every leg."""
+    if not report:
+        return []
     spelled = sorted({str(leg), str(leg.resolve())}, key=len, reverse=True)
     out = []
-    for said in (report or {}).get("warnings", []):
+    for said in report.get("warnings", []):
         for path in spelled:
             said = said.replace(path, "<leg>")
         out.append(said)
     return out
 
 
-def notes(scene: str, legs: tuple[Path, Path, Path]) -> list[str]:
-    """The lines heading `scene`'s section ([`notes_of`] the legs' warnings)."""
-    return notes_of([warnings(leg, read(leg, scene)) for leg in legs], "`bench-scenes`' notes")
+def notes(scene: str, legs: tuple[Path | None, Path | None, Path | None]) -> list[str]:
+    """The lines heading `scene`'s section ([`notes_of`] the finished legs' warnings)."""
+    present = [(name, leg) for name, leg in zip(LEGS, legs) if leg is not None]
+    return notes_of([warnings(leg, read(leg, scene)) for _, leg in present], "`bench-scenes`' notes",
+                    [name for name, _ in present])
 
 
-def notes_of(said: list[list[str]], whose: str) -> list[str]:
-    """Each leg's warning (`said`, one list a leg) once, in the order the legs first
-    wrote them, one not every leg wrote marked with those that did."""
+def notes_of(said: list[list[str]], whose: str, names=LEGS) -> list[str]:
+    """Each leg's warning (`said`, one list a leg, the legs `names`) once, in the order the
+    legs first wrote them, one not every leg wrote marked with those that did."""
     seen = list(dict.fromkeys(w for leg in said for w in leg))
     if not seen:
         return []
     lines = []
     for w in seen:
-        wrote = [name for name, leg in zip(LEGS, said) if w in leg]
+        wrote = [name for name, leg in zip(names, said) if w in leg]
         only = "" if len(wrote) == len(said) else f" (only {', '.join(wrote)}: the legs disagree)"
         lines.append(f"- {w}{only}")
     return [f"**Warnings** ({whose}; the absolute numbers may not be the game's):"] + lines + [""]
@@ -143,6 +159,9 @@ def row(metric: str, main: float | None, pr: float | None, again: float | None) 
     """One table row: metric, main, PR, change, floor."""
     if main is None:
         return [metric, num(main), num(pr), "absent on main", "n/a"]
+    if metric in view_size.ROWS:  # a size, not a time: said above the lead when it moved
+        return [metric, num(main), num(pr), "absent on the PR" if pr is None else view_size.plain(main, pr),
+                "unknown: absent on main again" if again is None else view_size.plain(main, again)]
     moved = None if pr is None else change(main, pr)
     floor = None if again is None else change(main, again)
     if pr is None:
@@ -185,25 +204,37 @@ def outside(a: float, b: float, again: float) -> float | None:
 
 def lead(main: dict, pr: dict, again: dict) -> list[str]:
     """The lines above a scene's table: its rows outside the floor, largest change
-    first, then the rows that have no floor (the second `main` leg lacks them) and
-    the rows only the PR has, each marked so, as the table marks them."""
+    first, then the rows that have no floor (the second `main` leg lacks them), also
+    largest change first (one from zero leading), and the rows only the PR has, each
+    marked so, as the table marks them. The Scene view's size rows are left out: a
+    size, not a time, said once above the lead (`view_size`)."""
     found, unfloored = [], []
     for metric, a in main.items():
         b, f = pr.get(metric), again.get(metric)
-        if b is None or abs(b - a) < least(metric):
+        if b is None or metric in view_size.ROWS or abs(b - a) < least(metric):
             continue
         moved = change(a, b)
         said = f"{num(a)} → {num(b)}" + ("" if moved is None else f", {pct(moved)}")
         if f is None:
-            unfloored.append(f"- `{metric}` {said} (floor unknown)")
+            unfloored.append((float("inf") if moved is None else abs(moved), f"- `{metric}` {said} (floor unknown)"))
             continue
         size = outside(a, b, f)
         if size is not None:
             floor = change(a, f)
             found.append((size, f"- `{metric}` {said} (floor {pct(floor) if floor is not None else num(f)})"))
-    new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main]
+    new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main and m not in view_size.ROWS]
     found.sort(key=lambda x: -x[0])
-    lines = [line for _, line in found] + unfloored + new
+    unfloored.sort(key=lambda x: -x[0])
+    lines = [line for _, line in found] + [line for _, line in unfloored] + new
+    first = []
+    if main and not pr:
+        first.append("No PR measurement: the PR's leg has no report here, so nothing below compares.")
+    elif not again:
+        first.append("No floor: the second main leg has no report here, so no change below is judged.")
+    if first and not lines:
+        return first
+    if first:
+        return first + [f"Rows that moved by at least the lead's size ({LEAST}), largest first:"] + lines
     if not lines:
         return [f"Nothing moved outside the floor by at least the lead's size ({LEAST})."]
     return [f"Outside the floor, largest change first, then rows with no floor ({LEAST}):"] + lines
@@ -214,7 +245,7 @@ def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     reports = [read(leg, scene) for leg in legs]
     main, pr, again = (averages(r) for r in reports)
     hushed = quiet(reports[0]) | quiet(reports[1])
-    return section(f"**{scene}**", (main, pr, again), notes(scene, legs), hushed)
+    return section(f"**{scene}**", (main, pr, again), view_size.moved(*reports[:2]) + notes(scene, legs), hushed)
 
 
 def section(title: str, rows: tuple[dict, dict, dict], heading: list[str], hushed: frozenset | set = frozenset()) -> str:

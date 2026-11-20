@@ -89,6 +89,12 @@ impl Renderer {
         let rr = &self.ribbon_renderer;
         self.queue
             .counted_write_buffer(&rr.globals_buffer, 0, bytemuck::bytes_of(&globals));
+        // On a due render only, as the sprite particles (`scene::residency::notes`).
+        if self.notes_due() {
+            for texture in ribbons.draws.iter().filter_map(|d| d.texture.as_ref()) {
+                self.note_map(scene.id(), texture.as_str());
+            }
+        }
         let textures: Vec<Option<Rc<GpuTexture>>> = ribbons
             .draws
             .iter()
