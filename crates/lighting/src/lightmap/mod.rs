@@ -146,6 +146,8 @@ mod share_tests;
 #[cfg(test)]
 mod skybox_tests;
 #[cfg(test)]
+mod slit_probe_tests;
+#[cfg(test)]
 mod sliver_tests;
 #[cfg(test)]
 mod tests;

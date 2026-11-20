@@ -445,11 +445,19 @@ lighting settings (above), whose defaults are the ones listed here.
   points per texel. `directSamples` (#2355, Unity's *Direct Samples* beside `samples`,
   its *Indirect Samples*) defaults to `0`, which follows `samples`; lower it to bake a
   floor under many Area panels faster, at the cost of noisier penumbrae. Past 16
-  points, each panel is first probed with a 4 × 4 stratified set of shadow rays: all
-  seen, its light is summed over the full set unshadowed; all hidden, it gives none;
-  only in a penumbra does every point cast its ray. An occluder thin enough to slip
-  between all 16 probe rays (narrower than about a quarter of the panel as the texel
-  sees it) casts no shadow of that panel there. A texel buried inside other geometry (floor
+  points, each panel is first probed with 20 shadow rays: one to each corner and one to
+  a point picked in each of 4 × 4 blocks of the full set. All seen, its light is summed
+  over the full set unshadowed; all hidden, two more rounds of a point per block (52 rays
+  in all) must be hidden too before it gives none; otherwise (a penumbra) the rest of
+  the set casts its rays, the probe's points counting among them, so a penumbra costs
+  only the four corners more. An occluder's straight edge across the panel always hides
+  a corner, so shadow edges are kept, but one that hides no corner can slip between the
+  20 rays and cast no shadow of that panel on that texel, by chance well above a quarter
+  of the panel's width: measured straight under a 1.2 × 0.6 m panel, a rod across it
+  1/8 of its width is missed 10% of the time and 1/16 34%, a centred blob 0.3 of its
+  width and height 18% and 0.2 50%. The dark side is held: a floor seeing the panel only
+  through a slit 1/4, 1/8 or 1/16 of its width stays within a second exhaustive bake's
+  own noise at 256 direct samples. A texel buried inside other geometry (floor
   under a crate) is filled from its neighbours rather than baked black (*Backface
   Tolerance*, below). No GPU is needed; it runs headless.
 - **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,

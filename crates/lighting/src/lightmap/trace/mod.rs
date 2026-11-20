@@ -117,9 +117,9 @@ pub(super) struct Tracer<'a> {
     pub rays: &'a Rays,
     /// The lamps by reach and the emitters, what next-event estimation picks from.
     sources: Sources,
-    /// Cells per side of the probe an Area light's direct light casts first
-    /// (`lights::area::PROBE`), `0` for none: what a test compares the probe with.
-    probe: u32,
+    /// Whether an Area light's direct light is probed before the rest of its
+    /// set (`lights::area::PROBE`); off, what a test compares the probe with.
+    probe: bool,
 }
 
 impl<'a> Tracer<'a> {
@@ -130,7 +130,7 @@ impl<'a> Tracer<'a> {
             scene,
             rays,
             sources,
-            probe: super::lights::area::PROBE,
+            probe: true,
         }
     }
 
@@ -138,7 +138,10 @@ impl<'a> Tracer<'a> {
     /// the exhaustive estimate the probe is held to (#2355).
     #[cfg(test)]
     pub(super) fn without_probe(self) -> Self {
-        Self { probe: 0, ..self }
+        Self {
+            probe: false,
+            ..self
+        }
     }
 
     /// The radiance one path from `origin` brings back and its luminance-weighted

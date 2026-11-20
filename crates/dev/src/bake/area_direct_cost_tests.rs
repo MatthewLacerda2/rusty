@@ -49,7 +49,8 @@ pub(in crate::bake) fn panels_over_floor() -> BakeScene {
 #[test]
 fn the_cost_bench_counts_a_floors_own_direct_rays_apart() {
     // The share of the floor's rays that are its own direct light's shadow rays,
-    // at the default settings: 75% before the probe (#2355), about 40% after.
+    // at the default settings, measured: 67 520 of 90 212 (75%) before the probe
+    // (#2355), 21 500 of 44 192 (49%) after.
     let settings = BakeSettings::default();
     let cost = trace_texels(&panels_over_floor(), &settings, 200, 1);
     let share = cost.direct as f64 / cost.rays as f64;
@@ -68,8 +69,9 @@ fn the_cost_bench_counts_a_floors_own_direct_rays_apart() {
 fn the_shadow_probe_casts_a_fraction_of_the_full_sets_rays() {
     // At 16 direct samples a panel casts 16 rays, its whole set and no probe; an
     // exhaustive bake at 64 would cast four times that. The probe casts 20 where
-    // a panel is fully seen or hidden (its corners and a 4 × 4 set), and 20 + 64
-    // only in a penumbra.
+    // a panel is fully seen (its corners and a point in each of 4 × 4 blocks), 52
+    // where it is hidden (two more rounds confirm it), and 4 + 64 in a penumbra,
+    // the probe's points counted among the 64.
     let direct = |direct_samples| {
         let settings = BakeSettings {
             direct_samples,

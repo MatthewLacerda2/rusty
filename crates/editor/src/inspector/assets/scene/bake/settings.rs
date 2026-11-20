@@ -8,14 +8,8 @@ use rusty_scene::lighting::{DiffuseModel, MixedLightingMode};
 /// The scene's lightmap knobs; returns whether any changed.
 pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let mut changed = false;
-    let mut row = |ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str| {
-        ui.horizontal(|ui| {
-            changed |= ui.add(drag).on_hover_text(hover).changed();
-            ui.label(label);
-        });
-    };
     let texels = egui::DragValue::new(&mut s.texels_per_unit).ranged(BakeSettings::TEXELS_PER_UNIT);
-    row(
+    changed |= row(
         ui,
         texels.speed(0.1),
         "Texels per unit",
@@ -23,7 +17,7 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     );
     let samples = draw_samples(ui, s);
     let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
-    row(
+    changed |= row(
         ui,
         bounces,
         "Bounces",
@@ -32,7 +26,7 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let tolerance = egui::DragValue::new(&mut s.backface_tolerance)
         .ranged(BakeSettings::BACKFACE_TOLERANCE)
         .speed(0.01);
-    row(
+    changed |= row(
         ui,
         tolerance,
         "Backface tolerance",
@@ -52,14 +46,8 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
 /// whether either changed.
 fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let mut changed = false;
-    let mut row = |ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str| {
-        ui.horizontal(|ui| {
-            changed |= ui.add(drag).on_hover_text(hover).changed();
-            ui.label(label);
-        });
-    };
     let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
-    row(
+    changed |= row(
         ui,
         samples,
         "Samples",
@@ -71,7 +59,7 @@ fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
             0 => "as Samples".into(),
             n => n.to_string(),
         });
-    row(
+    changed |= row(
         ui,
         direct,
         "Direct samples",
@@ -80,18 +68,25 @@ fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     changed
 }
 
+/// One drag value labelled `label`, `hover` on it; returns whether it changed.
+fn row(ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str) -> bool {
+    ui.horizontal(|ui| {
+        let changed = ui.add(drag).on_hover_text(hover).changed();
+        ui.label(label);
+        changed
+    })
+    .inner
+}
+
 /// The progressive bake's knobs (#1970); returns whether either changed.
 fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let per_pass = egui::DragValue::new(&mut s.samples_per_pass).ranged(BakeSettings::SAMPLES);
-    let mut changed = ui
-        .horizontal(|ui| {
-            let hover = "Paths each pass adds to every texel; the scene shows the lightmaps \
-                         after each pass";
-            let changed = ui.add(per_pass).on_hover_text(hover).changed();
-            ui.label("Samples per pass");
-            changed
-        })
-        .inner;
+    let mut changed = row(
+        ui,
+        per_pass,
+        "Samples per pass",
+        "Paths each pass adds to every texel; the scene shows the lightmaps after each pass",
+    );
     changed |= ui
         .checkbox(&mut s.prioritize_view, "Prioritize view")
         .on_hover_text(
