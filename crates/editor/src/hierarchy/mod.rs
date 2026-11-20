@@ -1,5 +1,5 @@
-//! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree
-//! (`tree`). Object creation lives in the menu bar's GameObject menu (#255);
+//! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree,
+//! flattened into rows (`flat`) and drawn only where it is in view (`tree`). Object creation lives in the menu bar's GameObject menu (#255);
 //! deleting is Unity's (#1915): Edit ▸ Delete, the Delete key (Cmd+Backspace on
 //! macOS) and a row's right-click *Delete*, all through `delete`.
 
@@ -9,7 +9,21 @@ use crate::theme::chrome;
 use crate::EditorUi;
 use rusty_scene::Scene;
 
+mod flat;
+mod glyph;
+#[cfg(test)]
+mod tests;
 mod tree;
+#[cfg(test)]
+mod width_tests;
+
+use flat::Flattener;
+
+/// The panel's egui id, under which egui keeps the width the user dragged.
+const PANEL_ID: &str = "Hierarchy Panel";
+
+/// The panel's width, margins included, until the user drags its edge.
+const DEFAULT_WIDTH: f32 = 220.0;
 
 /// Draw the Hierarchy panel, or its collapsed rail.
 pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
@@ -20,31 +34,33 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     }
     let mut doomed = None;
     let frame = chrome::panel_frame(&t);
-    egui::Panel::left("Hierarchy Panel")
+    // Unity's Hierarchy: as wide as the user dragged it, never as its content.
+    // Rows clip to it (`tree`), so a long name scrolling into view cannot widen
+    // the panel and resize the Scene view beside it.
+    egui::Panel::left(PANEL_ID)
         .resizable(true)
         .size_range((154.0 + frame.inner_margin.sum().x)..=340.0)
+        .default_size(DEFAULT_WIDTH)
         .frame(frame)
         .show(ui, |ui| {
             let title = (icon::TREE_STRUCTURE, "Hierarchy");
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
             }
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                let root_ids: Vec<u32> = scene
-                    .entity_ids()
-                    .into_iter()
-                    .filter(|&id| scene.world.parent_id(id).is_none())
-                    .collect();
-                let mut rows = tree::Rows {
-                    sel_entity: &mut editor.selected_entity_id,
-                    sel_asset: &mut editor.selected_asset_path,
-                    delete: &mut doomed,
-                    theme: t,
-                };
-                for entity_id in root_ids {
-                    rows.draw_node(ui, scene, entity_id);
-                }
-            });
+            // The walk's buffers live in egui's memory between frames, so a frame
+            // allocates nothing for them once warm.
+            let kept = egui::Id::new("hierarchy_flattener");
+            let mut flat =
+                ui.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Flattener>(kept)));
+            flat.flatten(ui.ctx(), scene);
+            let mut rows = tree::Rows {
+                sel_entity: &mut editor.selected_entity_id,
+                sel_asset: &mut editor.selected_asset_path,
+                delete: &mut doomed,
+                theme: t,
+            };
+            rows.draw(ui, scene, &flat.rows);
+            ui.data_mut(|d| d.insert_temp(kept, flat));
         });
     if let Some(id) = doomed {
         delete(editor, scene, id);
