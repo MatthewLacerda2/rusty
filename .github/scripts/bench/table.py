@@ -97,7 +97,7 @@ def warnings(leg: Path, report: dict | None) -> list[str]:
         return []
     spelled = sorted({str(leg), str(leg.resolve())}, key=len, reverse=True)
     out = []
-    for said in (report or {}).get("warnings", []):
+    for said in report.get("warnings", []):
         for path in spelled:
             said = said.replace(path, "<leg>")
         out.append(said)
@@ -198,8 +198,9 @@ def outside(a: float, b: float, again: float) -> float | None:
 
 def lead(main: dict, pr: dict, again: dict) -> list[str]:
     """The lines above a scene's table: its rows outside the floor, largest change
-    first, then the rows that have no floor (the second `main` leg lacks them) and
-    the rows only the PR has, each marked so, as the table marks them."""
+    first, then the rows that have no floor (the second `main` leg lacks them), also
+    largest change first (one from zero leading), and the rows only the PR has, each
+    marked so, as the table marks them."""
     found, unfloored = [], []
     for metric, a in main.items():
         b, f = pr.get(metric), again.get(metric)
@@ -208,7 +209,7 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
         moved = change(a, b)
         said = f"{num(a)} → {num(b)}" + ("" if moved is None else f", {pct(moved)}")
         if f is None:
-            unfloored.append(f"- `{metric}` {said} (floor unknown)")
+            unfloored.append((float("inf") if moved is None else abs(moved), f"- `{metric}` {said} (floor unknown)"))
             continue
         size = outside(a, b, f)
         if size is not None:
@@ -216,7 +217,8 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
             found.append((size, f"- `{metric}` {said} (floor {pct(floor) if floor is not None else num(f)})"))
     new = [f"- `{m}` {num(b)} (absent on main)" for m, b in pr.items() if m not in main]
     found.sort(key=lambda x: -x[0])
-    lines = [line for _, line in found] + unfloored + new
+    unfloored.sort(key=lambda x: -x[0])
+    lines = [line for _, line in found] + [line for _, line in unfloored] + new
     first = []
     if main and not pr:
         first.append("No PR measurement: the PR's leg has no report here, so nothing below compares.")

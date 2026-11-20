@@ -16,8 +16,10 @@ spread 9%), and a run on a project whose textures were never imported (`gpu_mb`
   `make bench` beside a yard run skews both), from the process table, before any
   build and again before each leg and each yard run (a build started mid-run
   would skew the legs after it). What it finds is **waited out first**
-  ([`settle`]: polled every [`POLL`] s for up to [`LIMIT`] s, one line when the
-  wait starts and one when it ends), and refused only if still there: on
+  ([`settle`]: polled every [`POLL`] s for up to [`LIMIT`] s, until [`QUIET_POLLS`]
+  polls in a row find nothing, one line when the wait starts and one when it
+  ends; under `FORCE=1` only the run's first wait runs to the limit), and
+  refused only if still there: on
   2026-11-20 two runs were lost to a `cargo-fmt` gone within seconds (#2463),
   the merge queue's `make resolved` after merging `main` into a queued branch,
   one refused in its first second and one after 19 minutes of finished legs.
@@ -64,6 +66,8 @@ BUSY = ("cargo", "rustc", "bench-scenes", "play")
 # a formatter or a `make resolved` is seconds, a build minutes; past the limit it refuses.
 POLL = 5.0
 LIMIT = 600.0
+# Empty polls in a row that end a wait (two tools back to back leave one between them).
+QUIET_POLLS = 2
 # The clock and the sleep [`settle`] waits with, so a test drives a fake one.
 CLOCK = time.monotonic
 SLEEP = time.sleep
@@ -107,19 +111,26 @@ def busy(ps: str, me: int) -> list[str]:
     return found
 
 
-def settle(find, say) -> list[str]:
+def settle(find, say, wait: bool = True) -> list[str]:
     """Wait while `find()` (a [`busy`] read) finds something, polling every [`POLL`] s for up
     to [`LIMIT`] s; what it still finds then (`[]` once the machine is quiet). `say(line)` is
-    told once when a wait starts (what was found) and once when it ends (how long)."""
+    told once when a wait starts (what was found) and once when it ends (how long).
+
+    A wait that started ends only on [`QUIET_POLLS`] empty polls in a row: one can land
+    between two tools run back to back (`make resolved` runs two `cargo fmt --check`), and
+    the leg would start beside the second. A first read that finds nothing costs no sleep.
+    `wait=False` reads once and never sleeps: under `--force`, once one wait has run out,
+    the run's later checks do not wait again (`bench-ab.py`'s `Gate`)."""
     found = find()
-    if not found:
-        return []
-    say(f"bench-ab: waiting for {', '.join(found)} to end (polled every {POLL:.0f} s, "
-        f"up to {LIMIT / 60:.0f} min): a timed benchmark runs alone")
-    start = CLOCK()
-    while found and CLOCK() - start < LIMIT:
+    if not found or not wait:
+        return found
+    say(f"bench-ab: waiting for {', '.join(found)} to end (polled every {POLL:.0f} s until "
+        f"{QUIET_POLLS} in a row find nothing, up to {LIMIT / 60:.0f} min): a timed benchmark runs alone")
+    start, calm = CLOCK(), 0
+    while calm < QUIET_POLLS and CLOCK() - start < LIMIT:
         SLEEP(POLL)
         found = find()
+        calm = 0 if found else calm + 1
     took = CLOCK() - start
     if found:
         say(f"bench-ab: waited {took:.0f} s and still found {', '.join(found)}")

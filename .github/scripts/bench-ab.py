@@ -90,10 +90,12 @@ def ps() -> str:
 
 class Gate:
     """Each refusal stops the run, or with `--force` is noted for the table, once: the busy
-    check before every stress run would otherwise say one held-over build a run (#2462's review)."""
+    check before every stress run would otherwise say one held-over build a run (#2462's review).
+    Under `--force` a busy wait runs out once a run (`waits`): beside a long build every later
+    check would otherwise sleep the whole `refuse.LIMIT` again (#2463's review)."""
 
     def __init__(self, force: bool):
-        self.force, self.overridden = force, []
+        self.force, self.overridden, self.waits = force, [], True
 
     def check(self, said: str | None) -> None:
         if not said:
@@ -113,18 +115,22 @@ class Gate:
         return said
 
 
-def quiet(me: int) -> str | None:
-    """The busy refusal once `refuse.settle` has waited for the machine, or `None` when it went quiet."""
-    return refuse.busy_refusal(refuse.settle(lambda: refuse.busy(ps(), me), lambda line: print(line, file=sys.stderr)))
+def quiet(me: int, gate: Gate) -> str | None:
+    """The busy refusal once `refuse.settle` has waited for the machine (unless `gate` has
+    outwaited one under `--force` already), or `None` when it went quiet."""
+    found = refuse.settle(lambda: refuse.busy(ps(), me), lambda line: print(line, file=sys.stderr), gate.waits)
+    if found and gate.force:
+        gate.waits = False
+    return refuse.busy_refusal(found)
 
 
-def stopped_header(why: str, plan: list, yard: list, finished: list) -> list[str]:
+def stopped_header(why: str, plan: list, finished: list, yard_lost: list) -> list[str]:
     """The header lines of a table written from a stopped run: why, which legs did not
-    finish, and whether either section is left without its floor."""
-    lost = [leg.name for leg in plan if leg not in finished]
-    lost += ["stress " + leg.name for leg in yard if leg not in finished]
-    floorless = [what for what, legs_of in (("the scenes", plan), ("the stress yard", yard))
-                 if legs_of and legs_of[-1] not in finished]
+    finish (`yard_lost`: the stress legs that did not), and whether either section is left
+    without its floor (the yard's legs run in order, so any lost one takes its last)."""
+    lost = [leg.name for leg in plan if leg not in finished] + ["stress " + leg.name for leg in yard_lost]
+    floorless = [what for what, gone in (("the scenes", bool(plan) and plan[-1] not in finished),
+                                         ("the stress yard", bool(yard_lost))) if gone]
     lines = [f"- **this run stopped** ({why}): the {', '.join(lost)} leg{'s' if len(lost) != 1 else ''} "
              "did not finish, so their columns are empty"]
     if floorless:
@@ -186,7 +192,7 @@ def main(argv) -> int:
     locked: list[Path] = []
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
-        gate.check(quiet(me))
+        gate.check(quiet(me, gate))
         # every binary the invocation links, the first included: a yard-only run's `play` in a
         # profile folder an earlier `bench-scenes` build filled is still counted (`space.EXTRA`)
         builds = [(trees.path(root, trees.MAIN_TREE), "release", bins), (pr_tree, "release", bins)]
@@ -216,7 +222,7 @@ def main(argv) -> int:
         ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs, a.no_editor)
 
         def before(label):
-            return lambda leg: gate.leg(label + leg.name, quiet(me))
+            return lambda leg: gate.leg(label + leg.name, quiet(me, gate))
 
         def runner(argv):
             return subprocess.run(argv).returncode
@@ -247,11 +253,12 @@ def main(argv) -> int:
         header += [f"- quality preset overridden: {', '.join(a.sets)}"
                    + (" (the scenes only: the stress yard runs at its own)" if yard else "")] if a.sets else []
         header += [f"- FORCE=1 ran past: {o}" for o in gate.overridden]
-        header += stopped_header(why, plan, yard, finished) if why else []
+        yard_lost = [leg for leg in yard if leg not in finished]
+        header += stopped_header(why, plan, finished, yard_lost) if why else []
         legs_dirs = tuple(leg.out if leg in finished else None for leg in plan)
         scenes = table.scenes_of_all(legs_dirs[:2]) if plan else []
         header += table.count_changes(scenes, legs_dirs)
-        lost = frozenset(leg.name for leg in yard if leg not in finished)
+        lost = frozenset(leg.name for leg in yard_lost)
         text = table.render(scenes, legs_dirs, header, (stress.section(yard, lost),) if yard else ())
         out.mkdir(parents=True, exist_ok=True)
         (out / "table.md").write_text(text)

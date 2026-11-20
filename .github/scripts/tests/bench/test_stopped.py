@@ -61,7 +61,7 @@ class Waits(unittest.TestCase):
         self.assertEqual(code, 0, said)
         self.assertEqual([e[2].name for e in fake.runs()], ["main", "pr", "main-again"])
         self.assertIn("waiting for cargo-fmt (PID 4155958) to end", said)
-        self.assertIn(f"quiet after {2 * refuse.POLL:.0f} s", said)
+        self.assertIn(f"quiet after {3 * refuse.POLL:.0f} s", said)
         self.assertNotIn("this run stopped", fake.table())
 
     def test_busy_at_the_start_past_the_limit_refuses_as_before(self):
@@ -77,6 +77,14 @@ class Waits(unittest.TestCase):
         self.assertEqual(code, 0, said)
         self.assertIn("FORCE=1 ran past: before the main-again leg", fake.table())
         self.assertGreaterEqual(fake.now, refuse.LIMIT, "--force waits too")
+
+    def test_under_force_a_machine_busy_all_run_sleeps_one_limit_not_one_a_check(self):
+        fake = Busy(busy_at=0, polls=None)
+        code, said = fake.go("--force", "--stress", "--runs", "2")
+        self.assertEqual(code, 0, said)
+        self.assertEqual(len(fake.runs()), 3 + 6, "every scene leg and yard run ran")
+        self.assertLess(fake.now, refuse.LIMIT + refuse.POLL, "the later checks did not wait again")
+        self.assertEqual(said.count("bench-ab: waiting for"), 1)
 
 
 class Stopped(unittest.TestCase):

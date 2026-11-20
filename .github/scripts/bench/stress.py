@@ -31,6 +31,10 @@ later window the report declares (its `windows`, `dev::bench::window`) follows
 under its own heading, with its own lead and the same floor rule, its rows
 keeping their `<window>.` prefix (`firefight.cpu_ms`) so a lead line names the
 window it moved in. A prefix no run declares stays among the first window's rows.
+A quiet counter ([`quiet`], every `Debug.Stats` counter but the few `make bench`
+always shows, #2449) gets a row only when `main` and the PR differ, as in a
+scene's section, and the rest are counted in one line a window: without it a
+yard section listed about 180 counters (#2463's review).
 """
 
 from __future__ import annotations
@@ -116,6 +120,22 @@ def averages(leg: Leg) -> dict[str, float]:
     return {m: sum(v) / len(v) for m, v in sums.items()}
 
 
+def quiet(legs: list[Leg]) -> set[str]:
+    """The rows any run of `legs` marks quiet (`[metric, {"quiet": true, …}]`,
+    `dev::bench::quiet`): counters a section shows only when main and the PR differ. A
+    later window's row keeps its prefix and its own mark (`firefight.bones`)."""
+    marked = set()
+    for leg in legs:
+        for out in leg.runs:
+            for entry in report(out).get("metrics", []):
+                try:
+                    if entry[1].get("quiet"):
+                        marked.add(entry[0])
+                except (TypeError, AttributeError, IndexError):
+                    continue
+    return marked
+
+
 def windows(legs: list[Leg]) -> list[str]:
     """The later windows any run of `legs` declares (`bench.json`'s `windows`,
     `dev::bench::window`), in the order first declared."""
@@ -142,8 +162,10 @@ def section(legs: list[Leg], missing: frozenset[str] = frozenset()) -> str:
     leg_names = [n for n, leg in zip(table.LEGS, legs) if leg.name not in missing]
     runs = len(legs[0].runs)
     title = f"**stress yard** (`make bench`'s scenario, {runs} run{'s' if runs != 1 else ''} a leg, averaged)"
+    hushed = quiet([leg for leg in present if leg.name != "main-again"])
     parts = [table.section(title, tuple(rows[0] for rows in per_leg),
-                           table.notes_of(said, "`play`'s notes", leg_names))]
+                           table.notes_of(said, "`play`'s notes", leg_names), hushed)]
     for i, name in enumerate(names, start=1):
-        parts.append(table.section(f"**stress yard, `{name}` window**", tuple(rows[i] for rows in per_leg), []))
+        parts.append(table.section(f"**stress yard, `{name}` window**", tuple(rows[i] for rows in per_leg), [],
+                                   hushed))
     return "\n".join(parts)

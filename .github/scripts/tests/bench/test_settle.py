@@ -45,11 +45,23 @@ class Settle(unittest.TestCase):
     def test_busy_for_two_polls_then_clear_goes_on_saying_both_lines(self):
         found, said, clock = settle([FMT, FMT, []])
         self.assertEqual(found, [])
-        self.assertEqual(clock.sleeps, 2)
+        self.assertEqual(clock.sleeps, 3, "one busy poll, then two quiet ones")
         self.assertEqual(len(said), 2)
         self.assertIn("waiting for cargo-fmt (PID 4099819) to end", said[0])
         self.assertIn(f"every {refuse.POLL:.0f} s", said[0])
-        self.assertIn(f"quiet after {2 * refuse.POLL:.0f} s", said[1])
+        self.assertIn(f"quiet after {3 * refuse.POLL:.0f} s", said[1])
+
+    def test_one_quiet_poll_between_two_tools_does_not_end_the_wait(self):
+        found, said, clock = settle([FMT, [], FMT, [], []])
+        self.assertEqual(found, [])
+        self.assertEqual(clock.sleeps, 4, "goes on only after two quiet polls in a row")
+        self.assertIn(f"quiet after {4 * refuse.POLL:.0f} s", said[-1])
+
+    def test_no_wait_reads_once_and_never_sleeps(self):
+        clock, said = Clock(), []
+        with mock.patch.object(refuse, "SLEEP", clock.sleep):
+            found = refuse.settle(lambda: FMT, said.append, wait=False)
+        self.assertEqual((found, said, clock.sleeps), (FMT, [], 0))
 
     def test_busy_past_the_limit_is_still_found(self):
         found, said, clock = settle([FMT])
