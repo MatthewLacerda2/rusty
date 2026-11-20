@@ -39,7 +39,7 @@ pub(super) struct Speeds {
 }
 
 /// One frame's row values: the tick's CPU time, every system's share of it
-/// (`cpu.<system>`, `flush_bounds` among them), a demo's `taps_ms` beside it, what
+/// (`cpu.<system>`, `flush_bounds` among them), `taps_ms` and `probe_ms` beside it, what
 /// rendering cost and each stage's share (`render.<stage>`), its counters. Every GPU
 /// pass is sampled every frame (zero when it did not run), so the rows are stable.
 /// CPU and GPU times are scaled by the frame's clock `speed`s; a frame a probe
@@ -57,8 +57,8 @@ pub(super) fn sample(
             samples.push("cpu_clock_pct", cpu * 100.0);
             let systems = stats.tick_systems.iter().copied();
             push_parts(samples, "cpu", s.last, systems, cpu);
-            let taps = stats.get("taps_ms"); // beside the tick, not in it
-            taps.inspect(|t| samples.push("taps_ms", t.last * cpu));
+            let beside = ["taps_ms", "probe_ms"].into_iter(); // not in the tick
+            beside.for_each(|k| _ = stats.get(k).inspect(|t| samples.push(k, t.last * cpu)));
         }
     }
     if let Some(frame) = frame {
