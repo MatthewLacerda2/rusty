@@ -137,6 +137,10 @@ Before building a layout or pipeline by hand, use these:
 - `render::gpu::layout_entries`: one uniform, texture, sampler, depth or storage entry.
 - `render::gpu::DEPTH_FORMAT`: every view depth target and every pipeline drawing into
   one; shadow maps keep their own format in `passes::shadows`.
+- `render::gpu::commands::Commands`: a camera's stages record into its one
+  encoder (`CameraCtx::commands`) and never make or submit their own; a read-back
+  maps through `Commands::after_send`, and a mid-camera change to a buffer a pass
+  already read is a recorded copy (`draw::camera::buffer`) or a `Commands::flush`.
 - `render::gpu::kept::Kept`: a bind group or draw kept across frames, rebuilt only
   when a resource its key names was replaced (the Hi-Z cull's, SSR's targets).
 - `render::gpu::fullscreen::Fullscreen`: any fullscreen-triangle pass (post-FX, SSAO,

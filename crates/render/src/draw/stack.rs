@@ -162,6 +162,10 @@ impl Renderer {
             self.lap("stack");
             for (name, stage) in CAMERA_PASSES {
                 stage(self, view, &mut ctx);
+                #[cfg(test)]
+                if super::camera::split_stages() {
+                    ctx.commands.flush(); // each stage its own submit, as before #2353
+                }
                 self.lap(name);
             }
             commands = ctx.commands;

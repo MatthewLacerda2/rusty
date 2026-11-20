@@ -3,6 +3,14 @@
 //! [`CameraCtx::new`]. The order is the table's order, reviewable in one place, the
 //! same way `app/registry.rs` orders the sim systems.
 //!
+//! **One encoder a camera** (#2353): every stage records into
+//! [`CameraCtx::commands`] and submits nothing itself; the camera's commands go
+//! out once, before the next camera rewrites the camera uniform and the draw
+//! buffers. The shadow sweep records into the frame's first camera's, the
+//! screen's last camera's takes the upscale and the UI. A stage never rewrites a
+//! buffer a pass it follows reads (`gpu::commands`, which the debug build holds):
+//! a mid-camera change of the camera uniform is a copy ([`buffer`]).
+//!
 //! **Adding a render stage:** write a `fn(&mut Renderer, &mut RenderView,
 //! &mut CameraCtx)` (usually a one-line call into the feature's own module, taking
 //! what it needs from the context) and add one `(name, fn)` row to [`CAMERA_PASSES`]
@@ -206,3 +214,20 @@ pub(crate) fn ssr_march(is_first: bool, march: [f32; 4]) -> ([f32; 4], bool) {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "encoder_gpu_tests.rs"]
+mod encoder_gpu_tests;
+
+#[cfg(test)]
+thread_local! {
+    /// Test-only: submit after every stage, the way each stage submitted its own
+    /// encoder before a camera's frame was one (`encoder_gpu_tests`).
+    pub(crate) static SPLIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Test-only: whether [`SPLIT`] is on.
+#[cfg(test)]
+pub(crate) fn split_stages() -> bool {
+    SPLIT.with(std::cell::Cell::get)
+}

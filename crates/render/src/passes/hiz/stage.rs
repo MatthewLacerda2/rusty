@@ -1,5 +1,5 @@
 //! The `occlusion` stage (#1963, the [module docs](super)): one camera's two
-//! phases recorded into one encoder and one submit, and timed whole or, on a
+//! phases recorded into the camera's encoder (`CameraCtx::commands`), and timed whole or, on a
 //! timed frame, by part (#2401): the select, phase one's depth draw, the
 //! pyramid, the instance test and compaction, and the cluster cull, each its own
 //! GPU pair (`gpu.occlusion.<part>`) and CPU lap (`render.occlusion.<part>`); the
@@ -32,7 +32,7 @@ impl Renderer {
         let batches = opaque.len() as u32;
         // Before the timer lends out its pairs: phase one draws through this group.
         self.update_global_bind_group();
-        // The stage is one encoder and one submit. A timed frame records each part
+        // The stage records into the camera's encoder. A timed frame records each part
         // in a pass and pair of its own (#2401), since a pair cannot open and
         // close inside a pass; any other frame takes no pair, so it records the
         // parts after phase one in one pass (#2327).
