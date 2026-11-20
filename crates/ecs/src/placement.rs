@@ -43,9 +43,10 @@ impl World {
         self.next_seq = self.next_seq.max(seq + 1);
         self.touch_entity(id, entity.is_static);
         let mut builder = build_bundle(entity, seq);
-        // lint: allow(ecs-write) the funnel: `touch_entity` stamped the placement above
+        // lint: allow(ecs-write) the funnel: `touch_entity` noted the placement above
         let handle = self.inner.spawn(builder.build());
         self.handles.insert(id, handle);
+        self.stamp_carried(id);
         self.order.insert(slot, id);
         self.list_in_parent(id, parent);
         self.adopt_waiting(id);
@@ -133,6 +134,7 @@ impl World {
         // lint: allow(ecs-write) the same overwrite's respawn
         let new_handle = self.inner.spawn(builder.build());
         self.handles.insert(id, new_handle);
+        self.stamp_carried(id); // the new row's columns; `touch_entity` stamped the old's
         self.moved(id);
         if let Some(p) = parent.filter(|&p| !self.contains(p)) {
             self.await_parent(id, p); // a live parent's list is the caller's

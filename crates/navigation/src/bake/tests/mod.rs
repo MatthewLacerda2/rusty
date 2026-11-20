@@ -18,6 +18,7 @@ mod object_modifier_sync;
 mod settings;
 mod slope;
 mod steps;
+mod still_spawn;
 mod still_watch;
 mod surface;
 mod tracked;
