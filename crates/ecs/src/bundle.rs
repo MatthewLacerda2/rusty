@@ -147,9 +147,10 @@ impl World {
     }
 
     /// [`World::entity_document`] with every saved field of the mesh and of a
-    /// collider's own meshes and none of their geometry ([`saved_mesh`],
-    /// [`ColliderComponent::without_geometry`]): a saved document is byte-equal
-    /// either way, since the geometry is never written.
+    /// collider's own meshes and none of their geometry
+    /// ([`MeshComponent::without_geometry`] keeping the skin, which a save reads to
+    /// strip the bones, and [`ColliderComponent::without_geometry`]): a saved
+    /// document is byte-equal either way, since the geometry is never written.
     pub fn saved_document(&self, id: u32) -> Option<Entity> {
         self.document(id, saved_mesh, ColliderComponent::without_geometry)
     }
