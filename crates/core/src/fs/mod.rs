@@ -3,7 +3,8 @@
 //! A plain write truncates first, so a reader in another process (or thread) at
 //! that moment sees an empty or torn file. [`write_atomic`] writes beside the
 //! target and renames over it: a reader gets the whole old file or the whole new
-//! one. It is the one copy: the import sidecar, the import cache's stamp, the seed
+//! one, and [`write_cache`] does the same without syncing, for a cache the engine
+//! re-makes (the Blender version `asset` keeps). It is the one copy: the import sidecar, the import cache's stamp, the seed
 //! manifest, the authored UI widgets, imported audio, the bake files, and every
 //! authored document (scene, prefab, animation graph, project file, save data, the
 //! provider ledger, #1991) all write through it, and
@@ -36,14 +37,32 @@ pub const TEMP_SUFFIX: &str = "tmp";
 /// The rename replaces the file's folder entry, so it needs the folder writable,
 /// and a file read-only or linked there becomes a plain file of the default mode.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let temp = unique_sibling(path, TEMP_SUFFIX);
-    let result = write_synced(&temp, bytes).and_then(|()| std::fs::rename(&temp, path));
-    if result.is_err() {
-        let _ = std::fs::remove_file(&temp);
-        return result;
-    }
+    replace(path, bytes, write_synced)?;
     sync_folder(path);
     Ok(())
+}
+
+/// [`write_atomic`] without the syncs, for a cache the engine re-makes by itself
+/// and reads a torn file of as a miss: a reader still sees the whole old file or
+/// the whole new one, but a power cut may leave an empty one. It costs no disk
+/// flush, so a file rewritten on every launch costs the launch nothing to wait on.
+pub fn write_cache(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    replace(path, bytes, |temp, bytes| std::fs::write(temp, bytes))
+}
+
+/// Write `bytes` with `write` to a temp file beside `path` and rename it into
+/// place, removing the temp file when either step fails.
+fn replace(
+    path: &Path,
+    bytes: &[u8],
+    write: impl FnOnce(&Path, &[u8]) -> io::Result<()>,
+) -> io::Result<()> {
+    let temp = unique_sibling(path, TEMP_SUFFIX);
+    let result = write(&temp, bytes).and_then(|()| std::fs::rename(&temp, path));
+    if result.is_err() {
+        let _ = std::fs::remove_file(&temp);
+    }
+    result
 }
 
 /// Write `bytes` to a new file at `path` and sync it (`F_FULLFSYNC` on macOS, where

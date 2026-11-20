@@ -1,6 +1,8 @@
 //! The atomic write (#1129): no torn file, no litter, no collision.
 
-use super::{is_temp_name, is_unique_sibling, unique_sibling, write_atomic, TEMP_SUFFIX};
+use super::{
+    is_temp_name, is_unique_sibling, unique_sibling, write_atomic, write_cache, TEMP_SUFFIX,
+};
 use std::path::Path;
 
 /// Every file name in `dir`, sorted.
@@ -24,12 +26,23 @@ fn a_write_replaces_the_file_and_leaves_nothing_beside_it() {
 }
 
 #[test]
+fn a_cache_write_replaces_the_file_and_leaves_nothing_beside_it() {
+    let dir = rusty_test_support::temp::dir();
+    let path = dir.join("a.json");
+    write_cache(&path, b"one").unwrap();
+    write_cache(&path, b"two").unwrap();
+    assert_eq!(std::fs::read(&path).unwrap(), b"two");
+    assert_eq!(names(&dir), ["a.json"]);
+}
+
+#[test]
 fn a_failed_write_leaves_no_temp_file() {
     let dir = rusty_test_support::temp::dir();
     // A non-empty directory in the way: the temp file is written, the rename fails.
     let path = dir.join("taken");
     std::fs::create_dir_all(path.join("inside")).unwrap();
     assert!(write_atomic(&path, b"lost").is_err());
+    assert!(write_cache(&path, b"lost").is_err());
     assert_eq!(names(&dir), ["taken"]);
 }
 

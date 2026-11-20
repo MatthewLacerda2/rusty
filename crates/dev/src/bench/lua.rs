@@ -1,5 +1,5 @@
 //! The scenario-VM verbs behind `make bench`: `Harness.LoadStress([opts])` and
-//! `Harness.Bench(frames)`. Registered onto the `Harness` table by the bridge.
+//! `Harness.Bench(frames, [window])`. Registered onto the `Harness` table by the bridge.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -7,6 +7,7 @@ use std::rc::Rc;
 use mlua::{Lua, Result as LuaResult, Table};
 
 use super::stress::{self, StressSpec};
+use super::window::Run;
 use super::Report;
 use crate::harness::Harness;
 
@@ -32,13 +33,24 @@ pub fn register(lua: &Lua, harness: &Rc<RefCell<Harness>>, t: &Table) -> LuaResu
         })?,
     )?;
 
-    // Bench(frames) -> { frames, metrics = { <name> = { avg, p95 } }, warnings = { <text> } }.
-    // Steps and renders `frames` frames, prints the report and keeps it in the out dir.
+    // Bench(frames, [window]) -> { frames, metrics = { <name> = { avg, p95 } },
+    // warnings = { <text> } }. Steps and renders `frames` frames, prints the report
+    // and keeps it in the out dir. Without `window` it starts a run; with one it
+    // measures a later window of the same run, its rows `<window>.<row>`
+    // (`super::window`).
     let h = Rc::clone(harness);
+    let run = Rc::new(RefCell::new(Run::default()));
     t.set(
         "Bench",
-        lua.create_function(move |lua, frames: u32| {
-            let report = super::run(&mut h.borrow_mut(), frames);
+        lua.create_function(move |lua, (frames, window): (u32, Option<String>)| {
+            let mut harness = h.borrow_mut();
+            let mut run = run.borrow_mut();
+            let report = match window {
+                None => run.first(&mut harness, frames),
+                Some(name) => {
+                    (run.then(&mut harness, frames, &name)).map_err(mlua::Error::runtime)?
+                }
+            };
             report_to_lua(lua, &report)
         })?,
     )

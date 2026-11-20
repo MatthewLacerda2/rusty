@@ -49,6 +49,7 @@
 )]
 
 mod drop;
+mod known;
 mod locate;
 mod pack;
 mod run;
