@@ -1137,11 +1137,14 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   row, the frame's render counters and then the tick's (`entities`, `bones`,
   `changes_<channel>`, …), so a counter is in the bench the moment it is recorded.
   Each is the window's average: a 0/1 counter's is the share of frames it was set
-  on (0.0015 is one frame in 660; the table prints three decimals). Beyond the
+  on (0.0015 is one frame in 660; the table prints three decimals), and one first
+  recorded partway through (a change channel that opens late) counts as zero on
+  the frames before it. Beyond the
   ones named above a counter is **quiet**: the report file (`bench.json`,
   `<scene>.json`, its rows marked `"quiet": true`) holds it always, the printed
   table only when its average changed against the run it is compared with (or that
-  run lacks it: *absent in last*), and one line counts the rest; `bench-ab`'s table
+  run lacks it: *absent in last*, or *in before* under `BEFORE=`), and one line
+  counts the rest, naming that run; `bench-ab`'s table
   prints a quiet counter only where `main` and the PR differ, and counts the
   identical ones. Then
   where the CPU time went, by name:
