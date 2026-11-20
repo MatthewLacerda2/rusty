@@ -34,7 +34,7 @@ pub struct StaticGeometry {
 
 impl StaticGeometry {
     /// Whether anything changed since the last ask (or the watch opened); `true`
-    /// too when the cursor reads [`Changes::Rebuild`] (a clear, an Undo step, a
+    /// too when the cursor reads [`Changes::Rebuild`](super::Changes::Rebuild) (a clear, an Undo step, a
     /// rewind, another World). Then everything up to now has been seen.
     pub fn changed(&mut self, w: &World) -> bool {
         let held = w.read(&mut self.pose, |log, seen| log.skip(seen).then_some(()));
