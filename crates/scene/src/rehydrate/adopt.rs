@@ -57,9 +57,7 @@ impl RehydratedScene {
         let read_at = rusty_core::fs::written::written_since(u64::MAX).0;
         let mut imports = Imports::default();
         for doc in &mut data.entities {
-            if !adopt_or_rehydrate(live, doc, Keep::Current, &mut imports) {
-                unbind(doc);
-            }
+            adopt_or_rehydrate(live, doc, Keep::Current, &mut imports);
         }
         Self {
             data,
@@ -72,7 +70,7 @@ impl RehydratedScene {
 /// Leave `doc`'s adopted Mesh unbound and at rest, as a rebuilt one is: for a
 /// restore whose skeleton sync binds rebuilt bones (Stop, a prefab rebuild), not
 /// for Undo's, which keeps the live bones.
-pub fn unbind(doc: &mut Entity) {
+fn unbind(doc: &mut Entity) {
     if let Some(mesh) = &mut doc.mesh {
         mesh.pose_palette.clear();
         mesh.skeleton.bones.clear();
@@ -80,26 +78,55 @@ pub fn unbind(doc: &mut Entity) {
 }
 
 /// Give `doc` (recorded without geometry) its live entity's geometry where `keep`
-/// holds (`take_live`), and rebuild it from its reference otherwise. Whether its
-/// Mesh was rebuilt, so the caller binds its skeleton.
+/// holds (`take_live`), and rebuild it from its reference otherwise
+/// ([`rehydrate_in`]). Either way its Mesh fields are held to range first, as a
+/// load holds them (`hold_fields`: an override or a hand-written file can set
+/// them out of range). An adopted mesh under [`Keep::Current`] then ends as a
+/// rebuilt one does ([`settle`]); under [`Keep::SameSource`] (Undo) it keeps its
+/// live bones and its recorded box. Whether its Mesh was rebuilt, so the caller
+/// binds its skeleton.
 pub fn adopt_or_rehydrate(
     world: &mut World,
     doc: &mut Entity,
     keep: Keep,
     imports: &mut Imports,
 ) -> bool {
+    if let Some(mesh) = &mut doc.mesh {
+        super::hold_fields(doc.id, mesh);
+    }
     if !take_live(world, doc, keep, imports) {
         // Rebuilds the collider's meshes too.
         rehydrate_in(doc, imports);
         return true;
     }
+    if keep == Keep::Current {
+        settle(doc);
+    }
     false
+}
+
+/// End an adopted entity as [`rehydrate_in`] ends a rebuilt one: its Mesh unbound
+/// (the restore's skeleton sync binds the bones it respawns) and a Mesh-shaped
+/// collider's box refit to what it builds from, so a box the document carries
+/// that its geometry does not (an override, a hand-written file) is held as a
+/// load holds it.
+fn settle(doc: &mut Entity) {
+    unbind(doc);
+    let mesh_shaped = |c: &&mut ColliderComponent| matches!(c.shape, ColliderShape::Mesh { .. });
+    let Some(collider) = doc.collider.as_mut().filter(mesh_shaped) else {
+        return;
+    };
+    let own = doc
+        .mesh
+        .as_ref()
+        .map(|m| m.vertices.iter().map(|v| v.position));
+    super::refit_collider(collider, own.and_then(super::bounds_of));
 }
 
 /// Give `doc` (recorded without geometry) its live entity's mesh geometry when
 /// `keep` holds for the two, and its collider's own meshes by
 /// [`restore_collider_meshes`]. `false` when `doc`'s Mesh must be rebuilt instead
-/// (with its collider, by `rehydrate_entity_mesh`).
+/// (with its collider, by [`rehydrate_in`]).
 fn take_live(world: &mut World, doc: &mut Entity, keep: Keep, imports: &mut Imports) -> bool {
     if let Some(mesh) = &mut doc.mesh {
         let Some(mut live) = world.mesh_mut(doc.id) else {
@@ -117,7 +144,7 @@ fn take_live(world: &mut World, doc: &mut Entity, keep: Keep, imports: &mut Impo
 /// Put back `doc`'s collider's own meshes, recorded without geometry: the kept copy
 /// when it has no Mesh (#1657), and the collision mesh (#1960) whatever it has. Both
 /// are restored before the box is refit, once, to what it builds from, as
-/// `rehydrate_entity_mesh` does: refitting after the first would size it to a kept
+/// [`rehydrate_in`] does: refitting after the first would size it to a kept
 /// copy while the collision mesh still had no geometry.
 fn restore_collider_meshes(world: &mut World, doc: &mut Entity, keep: Keep, imports: &mut Imports) {
     let own = doc

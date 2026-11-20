@@ -15,7 +15,7 @@ mod imports;
 mod rebuilt;
 mod warned;
 
-pub use adopt::{adopt_or_rehydrate, unbind, Keep};
+pub use adopt::{adopt_or_rehydrate, Keep};
 pub use collider::{refit_collider, Which};
 #[doc(hidden)]
 pub use counts::rebuilds;
@@ -137,18 +137,14 @@ fn rehydrate_one(mesh: &crate::MeshComponent, imports: &mut Imports) -> Rehydrat
     }
 }
 
-/// Rebuild one entity's mesh (if any) from its on-disk reference. Shared by scene
-/// load and prefab instantiate (#215) so both rehydrate identically; GPU buffers
-/// are never stored on disk, only rebuilt here.
+/// Rebuild one entity's mesh (if any) from its on-disk reference, each model file
+/// looked up once through `imports`. Shared by scene load, prefab stamp (#215) and
+/// a restore's rebuild (`adopt_or_rehydrate`) so all rehydrate identically; GPU
+/// buffers are never stored on disk, only rebuilt here.
 /// A Mesh-shaped collider's shared mesh (#1657, when the entity has no Mesh) and
 /// collision mesh (#1960) are rebuilt the same way, and its saved box is refit to
 /// what it builds from (`collider::refit_collider`), so an import setting changed
 /// since the save (the Scale Factor, #1398) reaches it.
-pub fn rehydrate_entity_mesh(entity: &mut Entity) {
-    rehydrate_in(entity, &mut Imports::default());
-}
-
-/// [`rehydrate_entity_mesh`] within a pass that looks each file up once.
 pub fn rehydrate_in(entity: &mut Entity, imports: &mut Imports) {
     if let Some(mesh) = &mut entity.mesh {
         hold_fields(entity.id, mesh);

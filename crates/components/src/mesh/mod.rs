@@ -21,6 +21,8 @@ mod skeleton;
 mod vertex;
 
 pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
+#[doc(hidden)]
+pub use geometry::copies;
 pub use runs::{clip_runs, material_runs};
 pub use shadow_casting::ShadowCasting;
 pub use skeleton::{BoneBinding, BoneBody};
@@ -30,7 +32,7 @@ pub use vertex::Vertex;
 /// importer, which hands one out per import (#857).
 pub use rusty_asset::MeshRevision;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct MeshComponent {
     /// How this mesh's geometry is rehydrated on load. `"Box"`/`"Sphere"`/
     /// `"Plane"`/`"Cylinder"`/`"Capsule"` rebuild a primitive; `"Asset"` re-imports an

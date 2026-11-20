@@ -12,6 +12,7 @@
 //! the propagation and the propagation share one lookup per file.
 
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 use crate::authoring::material::drop_unused;
 use crate::prefab::source::read_source_in;
@@ -27,7 +28,7 @@ pub(super) struct Pass<'a> {
     /// Whether a document is being applied (a load, a Play snapshot:
     /// `structure::reshape`).
     pub(super) applying: bool,
-    sources: BTreeMap<String, Option<PrefabData>>,
+    sources: BTreeMap<String, Option<Rc<PrefabData>>>,
     baselines: BTreeMap<String, BTreeMap<u32, Entity>>,
     /// The material keys the baselines' merges added, dropped at [`Self::finish`]
     /// where no slot names them (#1576).
@@ -45,10 +46,11 @@ impl<'a> Pass<'a> {
         }
     }
 
-    /// The source at `path`, read once per pass; `None` when it can't be read.
-    pub(super) fn source(&mut self, path: &str) -> Option<PrefabData> {
+    /// The source at `path`, read once per pass and shared by every instance of
+    /// it (never copied per instance); `None` when it can't be read.
+    pub(super) fn source(&mut self, path: &str) -> Option<Rc<PrefabData>> {
         let imports = &mut *self.imports;
-        let read = |p: &String| read_source_in(p, imports).ok();
+        let read = |p: &String| read_source_in(p, imports).ok().map(Rc::new);
         self.sources
             .entry(path.to_string())
             .or_insert_with_key(read)

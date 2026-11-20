@@ -1,6 +1,8 @@
 //! Stop and a load over whole models placed in a level, each a linked instance
 //! whose propagation rebuilds it from its model: one lookup of the model file per
-//! pass, and no copy of any instance's geometry, whatever the count of instances.
+//! pass, and no copy of any instance's geometry, whatever the count of instances:
+//! a pass copies the model's vertices for the model alone (its node tree's build
+//! and its baseline stamp, both rebuilds from the import), never per instance.
 
 use glam::Vec3;
 
@@ -8,6 +10,7 @@ use crate::asset_instance::instantiate_asset;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::snapshot::SceneSnapshot;
 use rusty_asset::import_cache::lookups;
+use rusty_components::mesh::copies;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::rehydrate::rebuilds;
 use rusty_scene::Scene;
@@ -36,17 +39,23 @@ fn indices(scene: &Scene, id: u32) -> Vec<u32> {
     scene.world.mesh(id).unwrap().indices.clone()
 }
 
-/// What an untouched Play -> Stop over `n` instances costs: (lookups, rebuilds).
-fn untouched_stop(dir: &str, n: usize) -> (usize, usize) {
+/// The geometry copies made since `from` (rebuilds, clones): every mesh given
+/// vertices by a rebuild from its import, or cloned with them.
+fn copied(from: (usize, usize)) -> (usize, usize) {
+    (rebuilds() - from.0, copies() - from.1)
+}
+
+/// What an untouched Play -> Stop over `n` instances costs: (lookups, copies).
+fn untouched_stop(dir: &str, n: usize) -> (usize, (usize, usize)) {
     let (mut scene, parts, _) = level(dir, n);
     let revisions: Vec<_> = parts
         .iter()
         .map(|&id| scene.world.mesh(id).unwrap().revision)
         .collect();
     let snapshot = SceneSnapshot::capture(&scene); // Play
-    let (looked, rebuilt) = (lookups(), rebuilds());
+    let (looked, from) = (lookups(), (rebuilds(), copies()));
     snapshot.restore(&mut scene); // Stop
-    let cost = (lookups() - looked, rebuilds() - rebuilt);
+    let cost = (lookups() - looked, copied(from));
     for (i, &id) in parts.iter().enumerate() {
         assert_eq!(indices(&scene, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
         let revision = scene.world.mesh(id).unwrap().revision;
@@ -62,8 +71,9 @@ fn stop_over_linked_models_looks_the_file_up_once_and_copies_no_instance() {
     assert_eq!(many.0, 1, "one lookup of the model file for the whole Stop");
     assert_eq!(
         many.1, one.1,
-        "the model's own build, never one per instance"
+        "the model's own copies, never one per instance"
     );
+    assert_eq!(many.1 .1, 0, "no mesh is cloned with its geometry");
 }
 
 #[test]
@@ -89,13 +99,11 @@ fn a_load_of_linked_models_looks_the_file_up_once() {
     let (scene, parts, _) = level("rusty_load_linked", 20);
     let data = to_scene_data(&scene);
     let mut loaded = Scene::new();
-    let looked = lookups();
+    let (looked, from) = (lookups(), (rebuilds(), copies()));
     apply_scene_data(&mut loaded, data);
-    assert_eq!(
-        lookups() - looked,
-        1,
-        "one lookup of the model file for the load"
-    );
+    assert_eq!(lookups() - looked, 1, "one lookup of the model file");
+    // Each part's own rebuild, plus the model's build and its baseline's.
+    assert_eq!(copied(from), (parts.len() + 2, 0), "no copy per instance");
     for &id in &parts {
         assert_eq!(indices(&loaded, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
     }

@@ -87,6 +87,9 @@ impl SceneSnapshot {
 }
 
 #[cfg(test)]
+#[path = "snapshot_held_tests.rs"]
+mod held_tests;
+#[cfg(test)]
 #[path = "snapshot_linked_tests.rs"]
 mod linked_tests;
 #[cfg(test)]

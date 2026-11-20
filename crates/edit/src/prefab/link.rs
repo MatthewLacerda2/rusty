@@ -31,8 +31,7 @@ use crate::prefab::source::{is_model_source, read_source, rekey, GONE};
 use crate::prefab::structure::reshape;
 use crate::PrefabData;
 use rusty_components::{Entity, EntityRefs};
-use rusty_scene::rehydrate::{adopt_or_rehydrate, bounds_of, refit_collider, unbind};
-use rusty_scene::rehydrate::{Imports, Keep};
+use rusty_scene::rehydrate::{adopt_or_rehydrate, Imports, Keep};
 use rusty_scene::Scene;
 
 /// `baselines` (keyed by local id) with their component references moved from
@@ -114,7 +113,7 @@ pub(super) fn rebuild_instance(
     }
     rekey(&mut scene.world, &ids, prefab);
     if is_model_source(source) {
-        ids = reshape(scene, root_id, &ids, source, prefab, pass.applying);
+        ids = reshape(scene, root_id, &ids, source, prefab, pass);
     }
     let baselines = pass.baselines(scene, source, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
@@ -195,8 +194,9 @@ pub fn propagate_linked_instances_in(scene: &mut Scene, imports: &mut Imports) {
 /// own placement. Its meshes take the live entity's geometry where that is still
 /// what they build ([`Keep::Current`]: the same source, at the baseline's revision,
 /// current in `imports`), and are rebuilt from their reference otherwise: an
-/// override that re-meshes the part, or a source that changed. Either way unbound
-/// from the bones, which `finish_rebuild` binds, and the collider refit.
+/// override that re-meshes the part, or a source that changed. Either way its
+/// Mesh fields are held, it is unbound from the bones, which `finish_rebuild`
+/// binds, and its collider refit (`adopt_or_rehydrate`).
 fn rebuild_entity(
     scene: &mut Scene,
     id: u32,
@@ -230,16 +230,7 @@ fn rebuild_entity(
         }
     }
     keep_root_placement(&mut rebuilt, placement.as_ref());
-    if !adopt_or_rehydrate(&mut scene.world, &mut rebuilt, Keep::Current, imports) {
-        unbind(&mut rebuilt);
-        let own = rebuilt
-            .mesh
-            .as_ref()
-            .map(|m| m.vertices.iter().map(|v| v.position));
-        if let Some(collider) = &mut rebuilt.collider {
-            refit_collider(collider, own.and_then(bounds_of));
-        }
-    }
+    adopt_or_rehydrate(&mut scene.world, &mut rebuilt, Keep::Current, imports);
     scene.world.replace_entity(rebuilt);
     // The source file and the overrides are held as a scene file is (#1418).
     crate::authoring::fields::hold_entity(&mut scene.world, id);
