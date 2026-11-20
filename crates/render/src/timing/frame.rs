@@ -145,6 +145,11 @@ impl Renderer {
         self.gpu_timer.lap(stage);
     }
 
+    /// Whether this render runs inside [`Self::aside`]: no main-view frame.
+    pub(crate) fn is_aside(&self) -> bool {
+        self.gpu_timer.cpu.aside
+    }
+
     /// Run `draw` (a render beside the measured frame) without it counting as one:
     /// [`Renderer::frame_counters`] and [`Renderer::frame_cost`] read afterwards as
     /// they did before, and its passes take no GPU timestamps. Inside an open frame

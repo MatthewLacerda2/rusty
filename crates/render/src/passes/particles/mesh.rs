@@ -58,14 +58,16 @@ impl Renderer {
         let (opaque, transparent) = lists;
         let before = opaque.len() + transparent.len();
         for id in scene.world.ids_with_particles() {
-            if !scene.world.is_active_in_hierarchy(id)
-                || !rusty_scene::layer_in_mask(scene.world.layer(id), cam.culling_mask)
-            {
+            let emitter = scene.world.particles(id).expect("id has particles");
+            if emitter.render.mode != ParticleRenderMode::Mesh {
                 continue;
             }
-            let emitter = scene.world.particles(id).expect("id has particles");
-            if emitter.render.mode != ParticleRenderMode::Mesh
-                || emitter.runtime.particles.is_empty()
+            // Every mesh emitter's mesh is the scene's, drawn this frame or not, as
+            // an inactive entity's is: a load keeps it (`scene::residency`).
+            self.note_emitter_mesh(scene, &emitter);
+            if emitter.runtime.particles.is_empty()
+                || !scene.world.is_active_in_hierarchy(id)
+                || !rusty_scene::layer_in_mask(scene.world.layer(id), cam.culling_mask)
             {
                 continue;
             }
@@ -103,6 +105,14 @@ impl Renderer {
             }
         }
         (opaque.len() + transparent.len() - before) as u32
+    }
+
+    /// Load mesh `emitter`'s mesh, and note it as used by `scene`.
+    fn note_emitter_mesh(&mut self, scene: &Scene, emitter: &ParticleEmitterComponent) {
+        if let Some((mesh, _)) = self.particle_mesh(emitter) {
+            let handle = self.retained.meshes.intern(&mesh);
+            self.note_particle_mesh(scene.id(), handle);
+        }
     }
 
     /// What every particle of a mesh emitter shares: the batch key (pipeline — the
