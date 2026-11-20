@@ -19,7 +19,7 @@
 //! finder's rooms: rooms are found on one floor's plan (`placement::rooms`), while a
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
 //! through. A uniform grid holds all of them. The bake samples only the cells a
-//! camera can be in, over walkable floor and at shadow-casting lights, and their
+//! camera can be in, over walkable floor, at cameras and at shadow-casting lights, and their
 //! ring (#2328, `reach`), found on the navmesh when it is current, else every cell;
 //! every other cell sees every object. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
@@ -103,7 +103,7 @@ pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
 /// first (`file`): bump it whenever the bake would write other bytes for the same
 /// objects (its sampling, the dilation, `rusty_lighting::occlusion::OCCLUSION_SEED`,
 /// the grid's [`CELL_SIZE`], [`MAX_CELL`], [`MAX_CELLS`] and [`MAX_GRID_CELLS`],
-/// which cells it samples (`rusty_lighting::occlusion::Reach`, its `PLAY_HEIGHT`),
+/// which cells it samples (`rusty_lighting::occlusion::Reach`, its `play_height`),
 /// the step `Grid::fitting` grows a cell by, the sampling of a large cell as
 /// `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants) or the
 /// file would hold another layout. Generate Lighting then re-bakes a PVS an older
@@ -130,7 +130,9 @@ pub struct BakedObject {
 /// can count; and which cells it sampled (#2328): where it found the floor, how
 /// many cells, a hash of the cells it was seeded from, and the bounds its grid
 /// was laid over, so a keep can lay the grid again. On a PVS no bake stamped,
-/// this build's version and the rest zero.
+/// this build's version, every cell baked and the rest zero. A stamp that sampled
+/// every cell ([`FloorSource::Everywhere`]) baked them all with no reach hash, or
+/// the file is refused.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BakeStamp {
     pub version: u32,
@@ -221,6 +223,7 @@ impl OcclusionData {
             grid,
             stamp: BakeStamp {
                 version: OCCLUSION_VERSION,
+                baked: grid.cell_count() as u32,
                 ..BakeStamp::default()
             },
             objects,

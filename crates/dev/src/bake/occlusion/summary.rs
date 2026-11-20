@@ -12,6 +12,11 @@ use rusty_scene::Scene;
 pub const EVERYWHERE: &str = "no fresh navmesh: every cell sampled; bake the navmesh to \
                               sample only where a camera can be";
 
+/// What the bake says when a current navmesh marked no cell of its grid where a
+/// camera can be, so it sampled every cell, and what to do.
+pub const MISSED: &str = "the navmesh marks no cell where a camera can be: every cell \
+                          sampled; re-bake the navmesh over the level";
+
 /// The occlusion bake's part of the summary line: empty when nothing occludes.
 pub(crate) fn occlusion_summary(o: &OcclusionBakeReport, ms: u64) -> String {
     let never = match o.never_culled {
@@ -38,6 +43,7 @@ pub(crate) fn occlusion_summary(o: &OcclusionBakeReport, ms: u64) -> String {
 /// the share of the level it covers), or every cell and why.
 fn sampled(o: &OcclusionBakeReport, cells: usize) -> String {
     match o.floor {
+        FloorSource::Everywhere if o.navmesh_missed => format!(" ({MISSED})"),
         FloorSource::Everywhere => format!(" ({EVERYWHERE})"),
         FloorSource::Navmesh => format!(
             " ({} sampled, where a camera can be over a navmesh covering {:.0}% of the level)",

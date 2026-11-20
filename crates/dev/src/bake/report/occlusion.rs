@@ -4,8 +4,10 @@
 //! cell sees, and the time each cell took with the slowest cells (#1987) and
 //! each grid layer's sum and mean (#2328). The
 //! bake samples only the cells a camera can be in (#2328): `bakedCells` and
-//! `unbakedCells` count them, `floorSource` says where it found the floor and
-//! `floorCoverage` the share of the level's footprint it covers, the times are
+//! `unbakedCells` count them, `floorSource` says where it found the floor
+//! (`navmeshMissed` when a current navmesh marked no cell, so every cell was
+//! sampled), `floorCoverage` the share of the level's footprint it covers and
+//! `settings.playHeight` how far over it a camera can be (0 with no floor), the times are
 //! the sampled cells', and `visibility` is taken over the cells a camera can be in
 //! (their rows are exact; the rest see everything), so it means what a full
 //! bake's does. The times come from the cell clocks the bake was lent (`dev::bake::occlusion::
@@ -19,9 +21,7 @@ use std::time::Duration;
 use serde_json::{json, Value};
 
 use super::{entity_name, point, Kind, Report, Stages, TOP};
-use rusty_lighting::occlusion::{
-    OcclusionBakeReport, OCCLUSION_SEED, OCCLUSION_VERSION, PLAY_HEIGHT,
-};
+use rusty_lighting::occlusion::{OcclusionBakeReport, OCCLUSION_SEED, OCCLUSION_VERSION};
 use rusty_scene::lighting::occlusion::{OcclusionData, CELL_SIZE, MAX_CELL};
 use rusty_scene::Scene;
 
@@ -46,7 +46,7 @@ pub fn report(
         "seed": OCCLUSION_SEED,
         "cellSize": CELL_SIZE,
         "maxCell": MAX_CELL,
-        "playHeight": PLAY_HEIGHT,
+        "playHeight": r.play_height,
     });
     let fingerprint = data.map_or(0, fingerprint);
     let (triangles, biggest) = data.map_or((0, json!([])), |d| occluder_triangles(scene, d));
@@ -55,6 +55,7 @@ pub fn report(
         "bakedCells": r.baked_cells,
         "unbakedCells": r.cells - r.baked_cells.min(r.cells),
         "floorSource": r.floor.name(),
+        "navmeshMissed": r.navmesh_missed,
         "floorCoverage": r.floor_coverage.map(|c| (c * 1000.0).round() / 1000.0),
         "cellSize": r.cell_size,
         "tooLarge": r.too_large,

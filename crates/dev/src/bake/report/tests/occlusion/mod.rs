@@ -7,6 +7,9 @@ use crate::bake::report::{occlusion, point, Stages, TOP};
 use rusty_lighting::occlusion::bake_occlusion;
 use rusty_lighting::occlusion::test_level::corridors;
 
+mod kept;
+mod reach;
+
 #[test]
 fn the_corridors_cull_a_share_of_their_objects() {
     let scene = corridors();

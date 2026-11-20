@@ -20,12 +20,12 @@
 
 use super::super::NavigationGraph;
 use super::erosion;
-use super::inputs::{collider_keys, diff, obstacle_keys, Source};
-use super::modifiers::{modifier_keys, ModifierVolume};
+use super::inputs::{diff, InputKeys};
+use super::modifiers::ModifierVolume;
 use super::raster;
 use super::region::{merge_overlapping, CellRect};
 use super::{link_rect, BakeState, ObstacleVolume};
-use crate::offmesh::{authored_keys, sort_generated, AuthoredKey, LinkEnd, LinkParams};
+use crate::offmesh::{sort_generated, AuthoredKey, LinkEnd, LinkParams};
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
@@ -66,14 +66,20 @@ impl NavigationGraph {
     /// last sync, or a graph never baked, is not. What a bake that takes the
     /// navmesh as the level's floor asks first (the occlusion bake's reach).
     pub fn is_current_for(&self, scene: &Scene) -> bool {
+        self.bakes_current(scene, false)
+            && (self.bake_state.as_ref())
+                .is_some_and(|st| st.inputs.are(InputKeys::of(scene, false)))
+    }
+
+    /// Whether a sync may splice into this bake rather than bake in full: baked,
+    /// with the settings `scene` holds and its grid's bounds and spacing
+    /// (`statics_still` skips the reshape check, which reads only the static
+    /// geometry and the settings). The half of "current" that is not the inputs,
+    /// shared by [`Self::sync`] and [`Self::is_current_for`].
+    fn bakes_current(&self, scene: &Scene, statics_still: bool) -> bool {
         self.bake_state.as_ref().is_some_and(|st| {
-            let i = &st.inputs;
-            i.settings.bakes_like(&scene.nav_settings)
-                && !self.needs_reshape(scene)
-                && same(&i.colliders, collider_keys(scene))
-                && same(&i.obstacles, obstacle_keys(scene))
-                && same(&i.modifiers, modifier_keys(scene))
-                && same(&i.links, authored_keys(scene))
+            st.inputs.settings.bakes_like(&scene.nav_settings)
+                && (statics_still || !self.needs_reshape(scene))
         })
     }
 
@@ -81,10 +87,7 @@ impl NavigationGraph {
     /// since the last sync, `still`) skips the static collider diff and the
     /// reshape check, which read only that geometry and the settings.
     pub(super) fn sync_inner(&mut self, scene: &Scene, statics_still: bool) -> Rebake {
-        let current = self.bake_state.as_ref().is_some_and(|st| {
-            st.inputs.settings.bakes_like(&scene.nav_settings)
-                && (statics_still || !self.needs_reshape(scene))
-        });
+        let current = self.bakes_current(scene, statics_still);
         if current {
             self.set_area_costs(&scene.nav_settings.areas);
         }
@@ -92,8 +95,14 @@ impl NavigationGraph {
             self.bake(scene);
             return Rebake::Full;
         };
-        let dirty = st.update_inputs(scene, statics_still);
-        let link_dirty = st.update_links(scene, self);
+        let InputKeys {
+            colliders,
+            obstacles,
+            modifiers,
+            links,
+        } = InputKeys::of(scene, statics_still);
+        let dirty = st.update_inputs(scene, colliders, (obstacles, modifiers));
+        let link_dirty = st.update_links(links, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
             self.islands.still(); // a carried island map rebuilds after a quiet spell (#2111)
@@ -164,62 +173,47 @@ impl NavigationGraph {
 }
 
 impl BakeState {
-    /// Diff the recorded inputs against `scene`, record the current ones, and
-    /// return the cells whose inputs changed. With `statics_still` the static
-    /// colliders are known unchanged and keep their records undiffed.
-    fn update_inputs(&mut self, scene: &Scene, statics_still: bool) -> Vec<CellRect> {
+    /// Diff the recorded inputs against `scene`'s keys, record the current ones,
+    /// and return the cells whose inputs changed. With no `colliders` (unread:
+    /// `InputKeys::of`) the static colliders keep their records undiffed.
+    fn update_inputs(
+        &mut self,
+        scene: &Scene,
+        colliders: Option<Vec<(u32, super::inputs::ColliderKey)>>,
+        (obstacles, modifiers): (Vec<(u32, ObstacleVolume)>, Vec<(u32, ModifierVolume)>),
+    ) -> Vec<CellRect> {
         let mut dirty = Vec::new();
         let raw = &self.raw;
-        if !statics_still {
+        if let Some(colliders) = colliders {
             #[cfg(test)]
             STATIC_DIFFS.with(|n| n.set(n.get() + 1));
             let collider_rect = |id: u32, _: &_| {
                 let mesh = collider_world_triangles(scene, id)?;
                 raster::footprint(raw, &mesh.vertices)
             };
-            self.inputs.colliders = diff(
-                &self.inputs.colliders,
-                collider_keys(scene),
-                collider_rect,
-                &mut dirty,
-            );
+            self.inputs.colliders =
+                diff(&self.inputs.colliders, colliders, collider_rect, &mut dirty);
         }
         let obstacle_rect =
             |_: u32, v: &ObstacleVolume| raster::footprint(raw, &v.triangles().concat());
-        let obstacles = diff(
-            &self.inputs.obstacles,
-            obstacle_keys(scene),
-            obstacle_rect,
-            &mut dirty,
-        );
+        let obstacles = diff(&self.inputs.obstacles, obstacles, obstacle_rect, &mut dirty);
         let modifier_rect = |_: u32, v: &ModifierVolume| v.footprint(raw);
-        let modifiers = diff(
-            &self.inputs.modifiers,
-            modifier_keys(scene),
-            modifier_rect,
-            &mut dirty,
-        );
+        let modifiers = diff(&self.inputs.modifiers, modifiers, modifier_rect, &mut dirty);
         self.inputs.obstacles = obstacles;
         self.inputs.modifiers = modifiers;
         dirty
     }
 
-    /// Diff the recorded authored links against `scene`, record the current ones, and
-    /// return the cells a changed link spanned (before or after).
-    fn update_links(&mut self, scene: &Scene, g: &NavigationGraph) -> Vec<CellRect> {
+    /// Diff the recorded authored links against `links` (the scene's now), record
+    /// them, and return the cells a changed link spanned (before or after).
+    fn update_links(
+        &mut self,
+        links: Vec<(u32, AuthoredKey)>,
+        g: &NavigationGraph,
+    ) -> Vec<CellRect> {
         let mut dirty = Vec::new();
         let rect = |_: u32, k: &AuthoredKey| link_rect(g, k);
-        self.inputs.links = diff(&self.inputs.links, authored_keys(scene), rect, &mut dirty);
+        self.inputs.links = diff(&self.inputs.links, links, rect, &mut dirty);
         dirty
     }
-}
-
-/// Whether the records `old` are the keys `new` (both by ascending id), each the
-/// same input unchanged.
-fn same<K: PartialEq>(old: &[Source<K>], new: Vec<(u32, K)>) -> bool {
-    old.len() == new.len()
-        && old
-            .iter()
-            .zip(new)
-            .all(|(s, (id, k))| s.id == id && s.key == k)
 }

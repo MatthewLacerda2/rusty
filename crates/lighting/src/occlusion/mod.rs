@@ -13,19 +13,21 @@ mod fold;
 use rusty_scene::lighting::occlusion::gather;
 mod progress;
 mod reach;
+mod report;
 mod sample;
 #[cfg(feature = "dev")]
 mod sampler;
 mod unsaved;
 
 pub use bake::{
-    bake_occlusion, current_pvs, gather_occlusion, gather_with, is_current, OcclusionBakeReport,
-    OcclusionInput, OCCLUSION_SEED, OCCLUSION_VERSION,
+    bake_occlusion, current_pvs, gather_occlusion, gather_with, is_current, OcclusionInput,
+    OCCLUSION_SEED, OCCLUSION_VERSION,
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use progress::OcclusionObserver;
 pub use progress::OcclusionProgress;
-pub use reach::{Cells, Reach, PLAY_HEIGHT};
+pub use reach::{play_height, Cells, Reach, JUMP_ALLOWANCE, MIN_PLAY_HEIGHT};
+pub use report::OcclusionBakeReport;
 pub use sample::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 #[cfg(feature = "dev")]
 #[doc(hidden)]

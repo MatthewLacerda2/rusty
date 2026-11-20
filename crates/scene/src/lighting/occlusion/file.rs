@@ -133,8 +133,14 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     if !finite || cells_in.is_none_or(|n| n > MAX_GRID_CELLS as u64) {
         return Err("grid out of range".into());
     }
-    if cells_in.is_some_and(|n| u64::from(stamp.baked) > n) {
+    let all = cells_in.unwrap_or(0);
+    if u64::from(stamp.baked) > all {
         return Err("more cells baked than the grid holds".into());
+    }
+    // A bake that sampled every cell has no reach to hash and baked them all.
+    if stamp.floor == FloorSource::Everywhere && (stamp.reach != 0 || u64::from(stamp.baked) != all)
+    {
+        return Err("a stamp sampling every cell with a reach or fewer cells baked".into());
     }
     let words = r.u32()? as usize;
     let rows = (0..words).map(|_| r.array().map(u64::from_le_bytes));

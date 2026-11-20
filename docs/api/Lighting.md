@@ -643,21 +643,32 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   cell culls nothing.
 - **Which cells are sampled** (#2328, as Unreal places its precomputed-visibility
   cells): only those a camera can be in. A cell is *standable* when it reaches the
-  air within the **play height**, 3 m (`PLAY_HEIGHT`: the navmesh's 2 m agent and a
-  1 m jump), over a walkable floor; the cell holding a shadow-casting point, spot or
-  area light is sampled too, since its shadows cull by that cell's row; and so is the
-  ring of cells round each, which the dilation (below) reads. The floor is the scene's
-  navmesh, every walkable span, while it is baked and current for the scene (the
-  editor keeps it so as you edit; one a scene edit has outdated is not read). With
+  air within the **play height** over a walkable floor, the floor reaching out to
+  the walls by the navmesh's agent radius (the walkable surface stops short of them
+  by it), so a player against a wall stands in a sampled cell. The play height comes
+  from the scene's navmesh settings: `agentHeight` plus the larger of `jumpHeight`
+  and 1 m (`JUMP_ALLOWANCE`), never under 3 m (`MIN_PLAY_HEIGHT`: a navmesh baked
+  for a small agent still has a camera riding the player, or over their shoulder),
+  3 m with the defaults. The cell holding a shadow-casting point, spot or area light
+  is sampled too, since its shadows cull by that cell's row; so is the cell of every
+  `Camera` in the scene, active or not (a fixed, overhead or cutscene camera above
+  the play height keeps its PVS; one moved within its cell keeps the bake, to
+  another cell re-bakes it); and so is the ring of cells round each, which the
+  dilation (below) reads. The floor is the scene's navmesh, every walkable span,
+  while it is baked and current for the scene (the editor keeps it so as you edit;
+  one a scene edit has outdated is not read). A headless session's edit frame does
+  not sync the navmesh as the editor does: there call `Navigation.Bake()` before
+  `Lighting.Generate()` to sample only where a camera can be. With
   none, every cell is sampled, as before this existed, and the console line says
   `no fresh navmesh: every cell sampled; bake the navmesh to sample only where a
   camera can be`. No floor is guessed from the colliders: a guess that missed a
   storey or a building's inside would cull less there than sampling every cell. A
   navmesh that marks no cell of the grid falls back to every cell too, with a
-  console warning, and one that covers a small share of the level is still used,
+  console warning, and its console line says `the navmesh marks no cell where a
+  camera can be: every cell sampled; re-bake the navmesh over the level`; one that covers a small share of the level is still used,
   its share in the bake report's `floorCoverage`, so a partial navmesh shows. Every other cell (the air under a high roof, over a courtyard, under the
-  ground floor) **sees every object**: a camera there, a spectator or a cutscene
-  camera above the play height, is culled by nothing from the PVS, as outside the
+  ground floor) **sees every object**: a camera there, a spectator or a camera a
+  script moves above the play height, is culled by nothing from the PVS, as outside the
   grid, and the GPU's Hi-Z test still culls. A standable cell keeps exactly what it
   would with every cell sampled. A light a script moves at runtime into an unsampled
   cell culls no shadow caster by the PVS there. Unity's authored Occlusion Areas, the
@@ -732,10 +743,11 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   its bake reads changed since the PVS the scene holds was baked: the same static
   meshes, in the same order, each with the same fingerprint (*A bake older than the
   scene*, below) and occluder flag, baked by the same version of the bake, from the
-  same sampled cells (#2328: the same floor source, and the same cells over its floor
-  and holding a shadow-casting light). A lamp moved (a shadow-casting one within its
-  cell), a light's intensity changed or a probe added keeps it; a shadow-casting light
-  moved to another cell, or a navmesh re-baked so a camera reaches other cells,
+  same sampled cells (#2328: the same floor source and play height, and the same
+  cells over its floor and holding a camera or a shadow-casting light). A lamp moved
+  (a shadow-casting one within its cell), a light's intensity changed or a probe
+  added keeps it; a shadow-casting light or a camera moved to another cell, a changed
+  agent or jump height, or a navmesh re-baked so a camera reaches other cells,
   re-bakes it. A kept PVS's file stays too,
   byte for byte: it is exactly what a re-bake would write (the bake is seeded). The
   kept PVS owns its file as a bake does: one another process wrote there since is
@@ -957,8 +969,11 @@ Then each kind's own:
 - **`occlusion`:** `cells`, `bakedCells` and `unbakedCells` (of them, the cells
   sampled and the cells left seeing every object), `floorSource` (`"navmesh"` or
   `"everywhere"`: where the bake found the floor, *Occlusion culling*),
-  `floorCoverage` (the share, 0 to 1, of the static meshes' footprint the navmesh's
-  floor covers; `nil` with no floor), `cellSize`, `tooLarge`, `rows`, `dataBytes`,
+  `navmeshMissed` (`true` when a current navmesh marked no cell of the grid, so
+  every cell was sampled), `floorCoverage` (the share, 0 to 1, of the static meshes'
+  footprint the navmesh's floor covers; `nil` when the bake had no floor, a kept one
+  too), `settings.playHeight` (how far over the floor a camera can be, metres, from
+  the navmesh settings; 0 with no floor), `cellSize`, `tooLarge`, `rows`, `dataBytes`,
   `objects`, `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders`
   (`{ entity, name, triangles }`, at most 20) and `visibility`, taken over the cells a
   camera can be in (every cell when every cell was sampled; the air left seeing

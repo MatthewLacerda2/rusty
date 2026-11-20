@@ -15,6 +15,7 @@ const OBJECTS_AT: usize = 56;
 /// Where the stamp's floor source, baked cells and bounds are.
 const FLOOR_AT: usize = 12;
 const BAKED_AT: usize = 16;
+const REACH_AT: usize = 20;
 const BOUNDS_AT: usize = 28;
 
 fn object_count(bytes: &[u8]) -> usize {
@@ -49,6 +50,20 @@ fn a_stamp_out_of_range_is_refused() {
     let mut nan = bytes;
     nan[BOUNDS_AT + 4..BOUNDS_AT + 8].copy_from_slice(&f32::NAN.to_le_bytes());
     assert_eq!(decode(&nan), Err("bounds not finite".into()));
+}
+
+#[test]
+fn a_stamp_sampling_every_cell_with_a_reach_or_fewer_cells_is_refused() {
+    let bytes = bytes();
+    let mut reach = bytes.clone();
+    reach[REACH_AT..REACH_AT + 8].copy_from_slice(&7u64.to_le_bytes());
+    let mut fewer = bytes.clone();
+    let baked = u32::from_le_bytes(bytes[BAKED_AT..BAKED_AT + 4].try_into().unwrap());
+    fewer[BAKED_AT..BAKED_AT + 4].copy_from_slice(&(baked - 1).to_le_bytes());
+    for refused in [reach, fewer] {
+        let err = decode(&refused).unwrap_err();
+        assert!(err.contains("sampling every cell"), "{err}");
+    }
 }
 
 #[test]

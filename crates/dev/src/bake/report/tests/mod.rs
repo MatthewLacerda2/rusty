@@ -3,7 +3,6 @@
 
 mod navmesh;
 mod occlusion;
-mod occlusion_reach;
 mod probes;
 mod reflections;
 

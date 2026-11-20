@@ -96,6 +96,9 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
         "{line}"
     );
     assert!(line.contains("), 9 object(s), 2 never culled"), "{line}");
+    report.occlusion.navmesh_missed = true;
+    let line = report.summary();
+    assert!(line.contains(super::summary::MISSED), "{line}");
     report.occlusion.baked_cells = 12;
     report.occlusion.floor = rusty_scene::lighting::occlusion::FloorSource::Navmesh;
     report.occlusion.floor_coverage = Some(0.25);

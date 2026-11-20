@@ -12,6 +12,7 @@ use super::fold::fold_rows;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
 use super::reach::{Cells, Reach};
+use super::report::OcclusionBakeReport;
 use super::sample::Baking;
 #[cfg(feature = "dev")]
 use super::sampler::Sampler;
@@ -25,35 +26,6 @@ pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 /// The bake's version ([`rusty_scene::lighting::occlusion::OCCLUSION_VERSION`],
 /// where the file's decoder reads it and where its rule is written).
 pub use rusty_scene::lighting::occlusion::OCCLUSION_VERSION;
-
-/// What one occlusion bake found. All zero when it baked nothing.
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct OcclusionBakeReport {
-    /// Static meshes baked as occludees.
-    pub objects: usize,
-    /// Of them, the ones that occlude.
-    pub occluders: usize,
-    /// Of them, the ones too large to sample (`targets::MAX_TARGETS`) or with a
-    /// corner that is not finite, kept in sight of every cell.
-    pub never_culled: usize,
-    pub cells: usize,
-    /// Of them, the cells sampled (#2328); every other one sees every object.
-    pub baked_cells: usize,
-    /// Where the bake found the floor that decided which cells it sampled.
-    pub floor: FloorSource,
-    /// The share of the static bounds' footprint that floor covers (0 to 1),
-    /// `None` with no floor: a small one reads as a stale or partial navmesh.
-    pub floor_coverage: Option<f32>,
-    /// The cells' edge, metres (0 when no grid was laid).
-    pub cell_size: f32,
-    /// Whether the level needs cells over `grid::MAX_CELL`, so nothing was baked
-    /// and nothing is occlusion-culled.
-    pub too_large: bool,
-    /// Distinct visible sets the cells share.
-    pub rows: usize,
-    /// Bytes of the stored data.
-    pub bytes: usize,
-}
 
 /// The static scene as the bake reads it, owned, so a worker thread can bake it
 /// while the scene goes on ([`gather_occlusion`]).
@@ -159,26 +131,6 @@ pub fn current_pvs<'a>(scene: &'a Scene, reach: &Reach) -> Result<&'a OcclusionD
     }
 }
 
-impl OcclusionBakeReport {
-    /// The report of the bake that made `data`, read back from the PVS alone: what
-    /// Generate Lighting says of a PVS it kept unchanged (#2348).
-    pub fn of_kept(data: &OcclusionData) -> Self {
-        Self {
-            objects: data.objects.len(),
-            occluders: data.objects.iter().filter(|o| o.occluder).count(),
-            never_culled: data.stamp.never_culled as usize,
-            cells: data.grid.cell_count(),
-            baked_cells: data.stamp.baked as usize,
-            floor: data.stamp.floor,
-            floor_coverage: None,
-            cell_size: data.grid.cell,
-            too_large: false,
-            rows: data.row_count(),
-            bytes: rusty_scene::lighting::occlusion::encoded_len(data),
-        }
-    }
-}
-
 impl OcclusionInput {
     /// The scene ready to sample and its grid, for a measurement that times or
     /// counts cells one by one, counting its rays; `None` when no grid is laid.
@@ -240,7 +192,8 @@ impl OcclusionInput {
             report.too_large = true;
             return Some((None, report));
         };
-        if laid.source != self.reach.source {
+        let navmesh_missed = laid.source != self.reach.source;
+        if navmesh_missed {
             log::warn!(
                 "[Occlusion] the navmesh marks no cell of the PVS grid where a camera can \
                  be: every cell sampled; re-bake the navmesh over the level"
@@ -259,6 +212,11 @@ impl OcclusionInput {
             cells: grid.cell_count(),
             baked_cells: baked,
             floor: laid.source,
+            navmesh_missed,
+            play_height: match laid.source {
+                FloorSource::Everywhere => 0.0,
+                FloorSource::Navmesh => self.reach.play_height,
+            },
             floor_coverage,
             cell_size: grid.cell,
             rows: data.row_count(),

@@ -2,7 +2,7 @@
 //! over a bake that sampled only where a camera can be (#2328): its visibility is taken over those cells and matches a full bake's
 //! there, and the floor is read from a navmesh only while it is current.
 
-use super::{assert_common, scene_path};
+use super::super::{assert_common, scene_path};
 use crate::bake::generate_lighting::bake_occlusion_only;
 use crate::bake::occlusion::reach;
 use crate::bake::progress::BakeLog;
