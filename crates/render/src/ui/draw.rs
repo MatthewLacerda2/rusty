@@ -67,11 +67,7 @@ impl Renderer {
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = view.ui.layout.update(&scene.world, &ui_view);
         self.lap("ui.layout");
-        for path in texture_paths(scene, &layout) {
-            let tex = self.load_texture(&path);
-            self.ui_renderer
-                .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
-        }
+        self.bind_ui_textures(scene, &layout);
         self.lap("ui.textures");
         let textures = &self.gpu_textures;
         // Source pixels, not the upload's, which *Max Size* may have shrunk (#1574).
@@ -213,6 +209,55 @@ fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
     let (sw, sh) = (size.width.max(1), size.height.max(1));
     let (x, y) = (x.min(sw - 1), y.min(sh - 1));
     (x, y, w.clamp(1, sw - x), h.clamp(1, sh - y))
+}
+
+impl Renderer {
+    /// Load and bind every texture an active, laid-out Image of `scene` samples.
+    fn bind_ui_textures(&mut self, scene: &Scene, layout: &UiLayout) {
+        let due = self.notes_due();
+        for path in texture_paths(scene, layout) {
+            let tex = self.load_texture(&path);
+            let rebuilt =
+                (self.ui_renderer).bind_group(&self.device, path.as_str(), Rc::clone(&tex));
+            // On a due render, or when this image's group was rebuilt: its texture
+            // changed (`scene::residency::notes`).
+            if due || rebuilt {
+                self.note_map(scene.id(), path.as_str());
+            }
+        }
+    }
+}
+
+impl super::UiRenderer {
+    /// The bind group sampling image `path`'s `tex`, creating and caching it on
+    /// first use or when the texture behind the path changed; whether it was built
+    /// now.
+    fn bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        path: &str,
+        tex: Rc<crate::GpuTexture>,
+    ) -> bool {
+        let fresh = self
+            .textures
+            .get(path)
+            .is_some_and(|(cached, _)| Rc::ptr_eq(cached, &tex));
+        if !fresh {
+            let sampler = self
+                .image_samplers
+                .entry(tex.filter)
+                .or_insert_with(|| crate::gpu::textures::ui_sampler(device, tex.filter));
+            let group = super::bind(device, &self.layout, &tex.view, sampler);
+            self.textures.insert(path.to_string(), (tex, group));
+        }
+        !fresh
+    }
+
+    /// Drop the bind group of every image path `gone` names (a texture residency
+    /// released), so its upload is freed.
+    pub(crate) fn forget_textures(&mut self, gone: impl Fn(&str) -> bool) {
+        self.textures.retain(|path, _| !gone(path));
+    }
 }
 
 /// Every texture path an active, laid-out Image samples — gathered first so the

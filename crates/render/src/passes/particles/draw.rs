@@ -89,6 +89,13 @@ impl Renderer {
             bytemuck::bytes_of(&globals),
         );
 
+        // On a due render only: an emitter has no change signal of its own, and a
+        // map new to the cache makes the next render due (`scene::residency::notes`).
+        if self.notes_due() {
+            for texture in runs.iter().filter_map(|r| r.texture.as_ref()) {
+                self.note_map(scene.id(), texture.as_str());
+            }
+        }
         let (all, batches, drawn) = self.batch_runs(runs);
         // Only `Gpu` emitters: no instance is built, and no buffer either.
         let instance_buffer = (!all.is_empty()).then(|| {
