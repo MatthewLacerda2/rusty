@@ -15,7 +15,7 @@ use rusty_scene::Scene;
 use rusty_test_support::panorama::fixture as panorama;
 
 /// An overlay canvas with an Image of `map`; the image's id.
-fn image(scene: &mut Scene, map: &MapRef) -> u32 {
+pub(super) fn image(scene: &mut Scene, map: &MapRef) -> u32 {
     let root = scene.add_entity("Canvas".to_string());
     scene
         .world

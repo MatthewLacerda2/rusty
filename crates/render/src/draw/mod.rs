@@ -252,10 +252,14 @@ impl Renderer {
         // Update skybox texture if path changed, marking the global bind group dirty
         // so it is rebuilt once (next frame) rather than every camera every frame —
         // the only thing in group 0 that changes outside its persistent buffers (#210).
+        // The sky is noted every frame, as the other holders are: a scene opened
+        // while its sky is already bound still keeps it (`scene::residency::maps`).
+        if !scene.skybox_path.is_empty() {
+            self.note_map(scene.id(), &scene.skybox_path);
+        }
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
             let path = scene.skybox_path.clone();
             self.skybox_path = path.clone();
-            self.note_map(scene.id(), &rusty_asset::MapRef::from(path.as_str()));
             self.skybox_texture = Some(self.load_panorama(&path));
             self.global_bind_group_dirty = true;
         } else if scene.skybox_path.is_empty() && self.skybox_texture.is_some() {

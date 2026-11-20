@@ -134,7 +134,7 @@ impl Renderer {
             .map(|(key, asset)| (key.as_str(), asset));
         let material = entry.map(|(_, asset)| asset);
         for (path, kind) in material_maps(material) {
-            self.note_map(scene.id(), &path);
+            self.note_map(scene.id(), path.as_str());
             self.load_texture_as(&path, kind);
         }
         let shader = material.and_then(|m| m.shader.as_deref());

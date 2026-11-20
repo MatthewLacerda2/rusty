@@ -327,8 +327,11 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
   `mesh_count`, `mesh_bytes`, `texture_bytes` and `lightmap_bytes`). A texture is
   kept while a loaded scene can draw it: a material map of any of its entities
   (inactive ones included), and its UI images (hidden ones and `SpriteSwap` sprites
-  included), particles', ribbons' and mesh emitters' textures and its sky. Decal maps
-  live in their own atlas and are not released.
+  included), particles', ribbons' and mesh emitters' textures and its sky. The edit
+  scene a Play started on counts as loaded until Stop, so Stop uploads nothing again;
+  if Play's first tick loads another scene (a bootstrap scene's `Start()`), that edit
+  scene keeps only what it drew, and Stop reads the rest again. Decal maps live in
+  their own atlas and are not released.
 - **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
   World replaced, the physics world built and the navmesh restored.
 - **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and

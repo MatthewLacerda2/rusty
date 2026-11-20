@@ -77,6 +77,12 @@ impl Residency {
         Some(left)
     }
 
+    /// Whether the main view's frame of `scene` steps into Play on the scene it
+    /// drew last: the scene the step holds, with its content still in the World.
+    fn enters_play(&self, scene: &Scene) -> bool {
+        scene.is_playing() && self.main == Some((scene.id(), false))
+    }
+
     /// The warm-up alive as `token` made mesh `id`.
     pub(crate) fn warmed(&mut self, token: &Arc<()>, id: MeshId) {
         self.warmup(token).meshes.insert(id);
@@ -133,6 +139,9 @@ impl Renderer {
     fn settle_residency(&mut self, scene: &Scene) {
         if self.is_aside() {
             return;
+        }
+        if self.retained.residency.enters_play(scene) {
+            self.note_held_maps(scene);
         }
         let residency = &mut self.retained.residency;
         let Some(left) = residency.drew(scene.id(), scene.is_playing()) else {
@@ -264,3 +273,6 @@ mod maps_gpu_tests;
 
 #[cfg(test)]
 mod holders_gpu_tests;
+
+#[cfg(test)]
+mod held_gpu_tests;

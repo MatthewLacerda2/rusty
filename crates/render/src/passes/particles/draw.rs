@@ -90,7 +90,7 @@ impl Renderer {
         );
 
         for texture in runs.iter().filter_map(|r| r.texture.as_ref()) {
-            self.note_map(scene.id(), texture);
+            self.note_map(scene.id(), texture.as_str());
         }
         let (all, batches, drawn) = self.batch_runs(runs);
         // Only `Gpu` emitters: no instance is built, and no buffer either.

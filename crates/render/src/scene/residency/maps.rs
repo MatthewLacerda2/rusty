@@ -14,7 +14,11 @@
 //!   sky's panorama** — noted per scene as each loads its map (`note_map`), since
 //!   the renderer keeps no World of a held or preview scene to walk; the scene the
 //!   main view draws is walked whole at the release besides (`scene_maps`), so its
-//!   hidden UI, inactive emitters and swap sprites are kept too. The UI's bind
+//!   hidden UI, inactive emitters and swap sprites are kept too, and so is the edit
+//!   scene a Play holds, walked once at the Play entry (`note_held_maps`) as Play's
+//!   first tick left it. A Play whose first tick loaded another scene (a bootstrap
+//!   `Start()`) has no World of the edit scene to walk: that held scene keeps what
+//!   it drew. The sky is noted every frame it is bound. The UI's bind
 //!   group per path (`UiRenderer::forget_textures`) goes with a released map.
 //! - **A pending `Scene.LoadAsync` warm-up's maps and page lists**, until its
 //!   `Warming` is dropped, as its meshes are.
@@ -81,10 +85,21 @@ impl Residency {
 impl Renderer {
     /// Scene `id` drew `map` through a holder other than a material group (a UI
     /// image, a particle, a ribbon, a mesh emitter's material, the sky).
-    pub(crate) fn note_map(&mut self, id: SceneId, map: &MapRef) {
+    pub(crate) fn note_map(&mut self, id: SceneId, map: &str) {
         let maps = self.retained.residency.maps.entry(id).or_default();
         if !maps.contains(map) {
-            maps.insert(map.clone());
+            maps.insert(MapRef::from(map));
+        }
+    }
+
+    /// `scene` enters Play and is held until Stop: note every map its holders name
+    /// (`scene_maps`), drawn or not, so a play-mode load keeps its hidden UI,
+    /// idle emitters and swap sprites as it keeps a drawn scene's. One walk per
+    /// Play entry.
+    pub(super) fn note_held_maps(&mut self, scene: &Scene) {
+        let maps: Vec<MapRef> = scene_maps(scene).collect();
+        for map in maps {
+            self.note_map(scene.id(), map.as_str());
         }
     }
 
