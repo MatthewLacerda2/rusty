@@ -44,21 +44,25 @@ impl Scene {
         owner: u32,
         parked: &BTreeSet<u32>,
     ) -> Vec<BoneRef> {
-        let Some((skin, bound)) = self
-            .world
-            .mesh(owner)
-            .and_then(|m| Some((m.skin.clone()?, m.skeleton.bones.clone())))
-        else {
+        let Some((skin, bound, pending)) = self.world.mesh(owner).and_then(|m| {
+            let pending = !m.skeleton.overrides.is_empty() || !m.skeleton.bodies.is_empty();
+            Some((m.skin.clone()?, m.skeleton.bones.clone(), pending))
+        }) else {
             return Vec::new();
         };
-        let bones = if self.binding_is_live(&skin, &bound) {
-            bound
-        } else {
-            self.bind_bones(owner, &skin, parked)
-        };
+        let rebound = (!self.binding_is_live(&skin, &bound))
+            .then(|| self.bind_bones(owner, &skin, parked))
+            .filter(|bones| *bones != bound);
+        // A live binding with nothing to take leaves the Mesh untouched: a write
+        // stamps it, and every prefab stamp runs this over every skinned owner.
+        if rebound.is_none() && !pending {
+            return Vec::new();
+        }
         let (overrides, bodies) = match self.world.mesh_mut(owner) {
             Some(mut mesh) => {
-                mesh.skeleton.bones = bones.clone();
+                if let Some(bones) = rebound {
+                    mesh.skeleton.bones = bones;
+                }
                 (
                     std::mem::take(&mut mesh.skeleton.overrides),
                     std::mem::take(&mut mesh.skeleton.bodies),
