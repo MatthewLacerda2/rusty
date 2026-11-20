@@ -77,6 +77,7 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
         objects: 9,
         never_culled: 2,
         cells: 40,
+        baked_cells: 40,
         cell_size: 2.0,
         bytes: 900,
         ..Default::default()
@@ -92,6 +93,12 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
     let line = report.summary();
     assert!(
         line.contains("40 cell(s) of 2.0 m, 9 object(s), 2 never culled"),
+        "{line}"
+    );
+    report.occlusion.baked_cells = 12;
+    let line = report.summary();
+    assert!(
+        line.contains("40 cell(s) of 2.0 m (12 sampled, where a camera can be), 9 object(s)"),
         "{line}"
     );
     report.occlusion = OcclusionBakeReport {

@@ -20,7 +20,7 @@ pub(crate) fn occlusion_summary(o: &OcclusionBakeReport, ms: u64) -> String {
             ", occlusion over {cells} cell(s) of {:.1} m{}, {} object(s){never} ({} KiB, {ms} ms)",
             o.cell_size,
             match o.baked_cells {
-                n if n < cells => format!(" ({n} a camera reaches sampled)"),
+                n if n < cells => format!(" ({n} sampled, where a camera can be)"),
                 _ => String::new(),
             },
             o.objects,
