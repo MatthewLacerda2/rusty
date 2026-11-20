@@ -72,12 +72,15 @@ fn pick(scene: &Scene, i: usize) -> u32 {
 /// Make `op` to `scene`, whose skinned rig is `rig`.
 pub(super) fn apply(scene: &mut Scene, rig: u32, op: &Op) {
     match *op {
-        Op::Spawn(_) | Op::Reparent(..) | Op::Destroy(_) => hierarchy(scene, rig, op),
+        Op::Spawn(_) | Op::Reparent(..) | Op::Destroy(_) | Op::SetActive(..) | Op::Resync => {
+            hierarchy(scene, rig, op)
+        }
         _ => components(scene, rig, op),
     }
 }
 
-/// The edits that move an entity in, out of or around the hierarchy.
+/// The edits that move an entity in, out of or around the hierarchy, or stamp it
+/// there.
 fn hierarchy(scene: &mut Scene, rig: u32, op: &Op) {
     match *op {
         Op::Spawn(i) => {
@@ -97,6 +100,11 @@ fn hierarchy(scene: &mut Scene, rig: u32, op: &Op) {
                 scene.destroy_entity(id);
             }
         }
+        Op::SetActive(i, on) => {
+            let id = i.map_or(rig, |i| pick(scene, i));
+            scene.world.set_active(id, on);
+        }
+        Op::Resync => scene.hang_on_skeletons(Vec::new(), Vec::new()),
         _ => {}
     }
 }
@@ -205,11 +213,6 @@ fn components(scene: &mut Scene, rig: u32, op: &Op) {
             }
         }
         Op::Plank(i, cube) => plank(scene, rig, i, cube),
-        Op::SetActive(i, on) => {
-            let id = i.map_or(rig, |i| pick(scene, i));
-            scene.world.set_active(id, on);
-        }
-        Op::Resync => scene.hang_on_skeletons(Vec::new(), Vec::new()),
         _ => {}
     }
 }
