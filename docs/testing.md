@@ -1617,7 +1617,8 @@ is only shown when it is larger than one binary differs from itself, so the seco
 average, the PR's, the change, and the floor (`main` again against `main`), and a
 change no larger than its floor reads *inside the floor*, beside the change it
 measured. A quiet counter (above) gets a row only where `main`'s and the PR's
-averages differ, and a line under the table counts the identical ones. A row only the PR reports (a new
+averages differ, and a line under the table counts the identical ones, in a scene's
+section and in each window of the stress yard's alike. A row only the PR reports (a new
 counter or stage) is listed, *absent on main*; a row the second `main` leg lacks
 shows its change with the floor *unknown*. Every row gets its own floor, so
 the table shows how tightly each kind of row repeated rather than assuming it.
@@ -1669,7 +1670,18 @@ different code.
 header lists every refusal it ran past): another timed run (an `flock` under
 `out/bench/`, dropped by the kernel when its run dies), and a `cargo`, `rustc`,
 `bench-scenes` or `play` process on the machine, checked again before each leg and
-each yard run, under `FORCE=1` too. Un-imported textures and models (the images an import would encode
+each yard run, under `FORCE=1` too. A process found there is **waited out first**:
+the run says what it found, polls every 5 s for up to 10 minutes, and once two polls
+in a row find nothing says how long it waited and goes on (a `cargo fmt` the merge
+queue runs for a second costs a few seconds, not the run; one empty poll between two
+such tools back to back is not enough); only a process still there after the wait
+is refused (under `FORCE=1`, noted, and only the run's first wait runs to the
+limit: the later checks note without waiting again), and a leg never starts beside one.
+Another timed run's lock is refused at once. **A run that stops** (that refusal
+before a leg, or a failed leg) still writes its table, from the legs that finished,
+and exits 1: its header names the legs that did not finish, and a section without
+its second `main` leg says *no floor* first, every change reading *floor unknown*.
+A later run measures every leg afresh. Un-imported textures and models (the images an import would encode
 now and the models with no current cooked file, `bench-scenes --pending-imports`,
 the engine's own checks) are asked of `main`'s
 build and of the PR's, and refused once both are built, naming the build that
