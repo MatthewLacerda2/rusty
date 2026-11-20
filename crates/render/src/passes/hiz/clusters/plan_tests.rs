@@ -17,6 +17,7 @@ fn of_mesh(mesh: u32, instances: Range<u32>, indices: Range<u32>, facing: Facing
             record: 0,
             traits: RecordTraits::of(&crate::MaterialData::flat([1.0; 4])),
             bone_base: 0,
+            depth_only: false,
         },
         uniform_slot: 0,
         instances,

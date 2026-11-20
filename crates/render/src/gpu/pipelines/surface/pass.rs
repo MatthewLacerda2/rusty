@@ -3,8 +3,8 @@
 //! (#1499).
 
 use super::super::{
-    DepthPostpassPipelines, FacedPipeline, Facing, PrimedPipelines, TransparentBlend,
-    TransparentPipelines, VelocityPipelines,
+    DepthPostpassPipelines, FacedPipeline, Facing, PrepassPipelines, PrimedPipelines,
+    TransparentBlend, TransparentPipelines, VelocityPipelines,
 };
 use super::SurfaceShaders;
 
@@ -18,8 +18,9 @@ use super::SurfaceShaders;
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
     /// The SSAO depth prepass; the standard pipeline unless a variant cuts, moves its
-    /// UVs or moves its vertices (#648, #1499, #1524).
-    Prepass(&'a FacedPipeline),
+    /// UVs or moves its vertices (#648, #1499, #1524), or the fragment-less one for a
+    /// batch nothing clips (`BatchKey::depth_only`, #2347).
+    Prepass(&'a PrepassPipelines),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a FacedPipeline, Option<&'a PrimedPipelines>),
     /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
@@ -58,20 +59,23 @@ impl SurfaceShaders {
     /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
     /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
     /// depth; in the transparent pass, the one for its `blend` (#1523); in every
-    /// pass, the one keeping `facing`'s triangles (#1615).
+    /// pass, the one keeping `facing`'s triangles (#1615); in the prepass, the
+    /// fragment-less one for a `depth_only` batch (#2347).
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,
-        id: usize,
+        (id, depth_only): (usize, bool),
         primed: bool,
         blend: TransparentBlend,
         facing: Facing,
     ) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
-            SolidPass::Prepass(standard) => {
-                self.cut(id).map_or(standard, |c| &c.prepass).get(facing)
-            }
+            SolidPass::Prepass(standard) if depth_only => standard.depth_only.get(facing),
+            SolidPass::Prepass(standard) => self
+                .cut(id)
+                .map_or(&standard.clip, |c| &c.prepass)
+                .get(facing),
             SolidPass::Opaque(_, Some(p)) if primed => variant
                 .map_or(&p.forward, |v| &v.primed.forward)
                 .get(facing),

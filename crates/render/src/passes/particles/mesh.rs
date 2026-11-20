@@ -145,7 +145,7 @@ impl Renderer {
         // Debris flies through decal boxes; it never takes their stamp (#638).
         let (record, traits) = self.material_record(scene.id(), entry, Variant::Debris);
         // Particles are placed unmirrored: the material's face alone picks the cull.
-        let key = BatchKey {
+        let mut key = BatchKey {
             pipeline,
             facing: Facing::of_material(Mat4::IDENTITY, material),
             mesh: self.retained.meshes.intern(&mesh),
@@ -155,7 +155,9 @@ impl Renderer {
             record,
             traits,
             bone_base: 0,
+            depth_only: false,
         };
+        key.depth_only = crate::passes::shadows::depth_only(&self.surface_shaders, &key, material);
         let glass = material.filter(|m| m.is_transparent());
         Some((key, glass.map(MaterialAsset::sort_priority)))
     }

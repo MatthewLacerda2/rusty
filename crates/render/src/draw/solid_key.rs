@@ -5,6 +5,7 @@
 use super::batch::{BatchKey, RecordTraits};
 use super::materials::entity_params;
 use crate::gpu::pipelines::Facing;
+use crate::passes::shadows::depth_only;
 use crate::scene::{MeshHandle, Variant};
 use crate::{MaterialData, Renderer};
 use rusty_components::MaterialAsset;
@@ -31,7 +32,7 @@ impl Renderer {
         let (record, traits) = self.material_record(scene.id(), entry, variant);
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-        let key = BatchKey {
+        let mut key = BatchKey {
             pipeline,
             facing: Facing::of_material(world, material),
             mesh,
@@ -45,7 +46,9 @@ impl Renderer {
             record,
             traits,
             bone_base: 0,
+            depth_only: false,
         };
+        key.depth_only = depth_only(&self.surface_shaders, &key, material);
         (key, material.is_some_and(MaterialAsset::is_transparent))
     }
 

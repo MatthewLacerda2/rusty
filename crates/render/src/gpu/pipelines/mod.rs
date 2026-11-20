@@ -17,6 +17,7 @@ pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 pub(crate) use winding::{FacedPipeline, Facing};
 
 use prepass::prepass_set;
+pub(crate) use prepass::PrepassPipelines;
 use specs::{
     forward_spec, line_spec, primed_spec, primed_velocity_spec, transparent_spec, velocity_spec,
     vertex_line_spec, PipelineSpec,
@@ -44,7 +45,7 @@ pub(crate) struct ForwardPipelines {
     /// The collider and debug-line gizmos (#1882): lines coloured per vertex.
     pub vertex_line: LazyPipeline,
     /// The SSAO depth prepass (#436): the forward vertex stage, no colour target.
-    pub prepass: FacedPipeline,
+    pub prepass: PrepassPipelines,
     /// The opaque and velocity ones over a primed depth (#1499).
     pub primed: PrimedPipelines,
     /// Their layout, groups 0–3, which the selection mask (#1175) draws through too.
@@ -78,6 +79,7 @@ pub(crate) fn create_pipelines(
         shadow_layout,
     );
     let set = SpecSet::new(device, shader, format, &render_layout);
+    let groups = [camera_lighting_layout, entity_bones_layout];
     ForwardPipelines {
         forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
         velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
@@ -93,7 +95,7 @@ pub(crate) fn create_pipelines(
             &line_layout,
             vertex_line_spec(),
         ),
-        prepass: prepass_set(device, shader, &render_layout, "fs_prepass"),
+        prepass: PrepassPipelines::new(device, shader, &render_layout, groups),
         primed: PrimedPipelines::new(&set),
         layout: render_layout,
     }

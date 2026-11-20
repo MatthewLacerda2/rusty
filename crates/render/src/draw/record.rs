@@ -18,7 +18,8 @@ pub(crate) type Solids<'a> = (&'a OpaqueBatches, Option<&'a Culled>);
 impl Renderer {
     /// Record `batches` into `pass`: per batch, its pipeline when it differs from the
     /// last one (see [`SolidPass`]), the mesh buffers, the frame's group-1 bind group
-    /// at the batch's uniform offset, the shared material group, and one instanced
+    /// at the batch's uniform offset, the shared material group (but for a prepass
+    /// batch nothing clips, whose pipeline has no fragment stage, #2347), and one instanced
     /// draw over its instance range (#470). The translucent passes' path: the
     /// opaque batches are an [`OpaqueBatches`], which this cannot take, and draw
     /// through [`Self::draw_solids`].
@@ -63,7 +64,9 @@ impl Renderer {
             let primed = solid_pass.primed() && in_prepass;
             let blend = batch.key.traits.blend;
             let facing = batch.key.facing;
-            let pipeline = (batch.key.pipeline, primed, blend, facing);
+            // A batch nothing clips draws the prepass with no fragment stage (#2347).
+            let depth_only = solid_pass.is_prepass() && batch.key.depth_only;
+            let pipeline = ((batch.key.pipeline, depth_only), primed, blend, facing);
             if bound != Some(pipeline) {
                 let pick = self
                     .surface_shaders
@@ -76,7 +79,9 @@ impl Renderer {
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_bind_group(1, group, &offsets);
-            render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
+            if !depth_only {
+                render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
+            }
             let by_cluster = culled
                 .and_then(|c| c.clusters.as_ref())
                 .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));
