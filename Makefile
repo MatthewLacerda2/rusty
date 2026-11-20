@@ -530,7 +530,9 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # back, each built in a detached worktree of its own; the second `main` leg is each
 # row's noise floor, and a change inside it reads *inside the floor*. Refuses another timed
 # run, a build or bench on the machine, and un-imported textures (FORCE=1 runs anyway,
-# and the table says so). SET=key=value (several, space-separated) overrides the
+# and the table says so); a build tool found before a build or a leg is waited out first
+# (up to 10 minutes, a formatter is seconds) and refused only if still there, and a run
+# that stops keeps the table of the legs that finished. SET=key=value (several, space-separated) overrides the
 # running quality preset in every leg: dotted keys with plain values
 # (SET='a=true ssao.high.radius=1.5'), each passed quoted; a JSON object value
 # ({...}) is refused. STRESS=1 adds `make bench`'s stress yard in three legs of its own,
