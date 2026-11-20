@@ -163,6 +163,10 @@ impl Renderer {
             Texels::Blocks(b) if b.format == texture_import::BlockFormat::Bc5 => Some(b.variance),
             _ => None,
         };
+        // Its bytes go now; what staging holds of them is bounded (`staging`).
+        drop(loaded);
+        let gpu = (&self.device, &self.queue);
+        (self.texture_staging).wrote(gpu, compressed::gpu_bytes(&texture.texture));
         Rc::new(texture)
     }
 

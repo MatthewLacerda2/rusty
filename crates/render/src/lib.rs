@@ -44,7 +44,7 @@ pub use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub use frustum::{transform_aabb, Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
-pub use gpu::textures::GpuTexture;
+pub use gpu::textures::{staging::STAGING_BUDGET, GpuTexture};
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BakedDirect, BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -81,21 +81,6 @@ pub struct GpuMesh {
     /// Its rows of the shared cluster table and its indices in the pool (#1968,
     /// #2417), when its import split it (`passes::hiz::clusters`).
     pub(crate) clusters: Option<crate::passes::hiz::clusters::GpuClusters>,
-}
-
-impl GpuMesh {
-    /// The draws of `mesh` under `material` (#1285): each material slot with the
-    /// index run it draws ([`rusty_components::mesh::material_runs`]), clipped to this
-    /// geometry's indices so a mesh edited ahead of its upload never reads past the
-    /// buffer ([`rusty_components::mesh::clip_runs`]).
-    pub(crate) fn runs(
-        &self,
-        mesh: &rusty_scene::MeshComponent,
-        material: Option<&rusty_components::MaterialComponent>,
-    ) -> Vec<(usize, std::ops::Range<u32>)> {
-        let runs = rusty_components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
-        rusty_components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
-    }
 }
 
 pub struct Renderer {
@@ -181,10 +166,12 @@ pub struct Renderer {
     /// An uncompressed copy of a cached upload whose block format a slot cannot
     /// read (a BC5 normal map drawn as albedo, #1574), by the same key.
     pub(crate) texture_fallbacks: HashMap<rusty_asset::MapRef, Rc<GpuTexture>>,
-    /// Which cached uploads went stale: re-written files and failed loads (#689).
     /// What each cached upload's mips were built for (#1416).
     pub(crate) texture_kinds: crate::gpu::textures::kind_watch::KindWatch,
+    /// Which cached uploads went stale: re-written files and failed loads (#689).
     pub(crate) texture_freshness: rusty_core::fs::freshness::Freshness,
+    /// What texture uploads hold in staging, bounded (`gpu::textures::staging`).
+    pub(crate) texture_staging: gpu::textures::staging::Staging,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,

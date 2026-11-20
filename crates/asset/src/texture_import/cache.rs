@@ -14,6 +14,7 @@ use std::path::Path;
 use super::encode::{full_chain_len, BlockFormat, Compressed};
 use super::variance::{VarianceTable, VARIANCE_LEVELS};
 use super::{TextureSettings, ENCODER_VERSION};
+use crate::convert::{source_digest, Seen};
 use rusty_core::hash::content;
 
 const MAGIC: &[u8; 4] = b"RBCT";
@@ -80,21 +81,33 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
     current() == Some(true)
 }
 
-/// The texture cached at `path`, when it was made with `stamp`.
+/// The texture cached at `path`, when it was made with `stamp`. Each level is
+/// read into its own buffer, so the file is never held twice (#2372), and only
+/// once the file is long enough to hold it: a malformed head allocates nothing.
 pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
-    let bytes = std::fs::read(path).ok()?;
-    let mut r = Reader(&bytes);
-    let (format, width, height, count, variance) = head(&mut r, stamp)?;
+    use std::io::Read;
+    let file = std::fs::File::open(path).ok()?;
+    let mut left = file.metadata().ok()?.len().checked_sub(HEAD_LEN as u64)?;
+    let mut file = std::io::BufReader::new(file);
+    let mut bytes = [0; HEAD_LEN];
+    file.read_exact(&mut bytes).ok()?;
+    let (format, width, height, count, variance) = head(&mut Reader(&bytes), stamp)?;
     let mut levels = Vec::with_capacity(count as usize);
     for mip in 0..count {
-        let len = r.u32()? as usize;
+        let mut len = [0; 4];
+        file.read_exact(&mut len).ok()?;
         let side = |s: u32| (s >> mip).max(1);
-        if len != format.level_bytes(side(width), side(height)) {
+        let want = format.level_bytes(side(width), side(height));
+        left = left.checked_sub(4 + want as u64)?;
+        if u32::from_le_bytes(len) as usize != want {
             return None;
         }
-        levels.push(r.take(len)?.to_vec());
+        let mut level = vec![0; want];
+        file.read_exact(&mut level).ok()?;
+        levels.push(level);
     }
-    r.0.is_empty().then_some(Compressed {
+    // Nothing may follow the last level.
+    (left == 0).then_some(Compressed {
         format,
         width,
         height,
@@ -124,6 +137,35 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     }
     // lint: allow(asset-write) a cache only `compressed` reads, by its stamp, never by path watch
     rusty_core::fs::write_atomic(path, &out)
+}
+
+/// A test hook (#2372): cache the image at `source` as an import with `settings`
+/// would, stamped the same, but with every block zero and nothing encoded: a
+/// memory test's fixture, whose peak an encode's would hide.
+#[doc(hidden)]
+pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
+    let Seen::Read(digest) = source_digest(source) else {
+        return Err(format!("{} cannot be read", source.display()));
+    };
+    let format = super::format_of(settings).ok_or("compression is off")?;
+    let (_, (width, height)) = super::imported_size(source, settings).ok_or("no size")?;
+    let count = match settings.generate_mipmaps {
+        true => full_chain_len(width, height),
+        false => 1,
+    };
+    let side = |s: u32, mip: u32| (s >> mip).max(1);
+    let levels = (0..count)
+        .map(|mip| vec![0; format.level_bytes(side(width, mip), side(height, mip))])
+        .collect();
+    let texture = Compressed {
+        format,
+        width,
+        height,
+        levels,
+        variance: VarianceTable::default(),
+    };
+    let path = super::cache_file(source)?;
+    write(&path, stamp(digest, settings), &texture).map_err(|e| e.to_string())
 }
 
 /// Reads the cache file front to back.

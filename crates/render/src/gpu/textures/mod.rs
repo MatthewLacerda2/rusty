@@ -6,6 +6,7 @@ mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
+pub(crate) mod staging;
 mod uncached;
 
 use crate::gpu::ops::CountedDevice as _;

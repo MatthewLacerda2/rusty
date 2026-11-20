@@ -70,9 +70,9 @@ use image::ImageReader;
 
 pub(crate) use background::queue_extracted;
 pub use background::{import_in_background, queue, queue_changed};
+pub use cache::write_blank;
 pub(crate) use encode::banded;
-pub use encode::blocks_len;
-pub use encode::{full_chain_len, BlockFormat, Compressed};
+pub use encode::{blocks_len, full_chain_len, BlockFormat, Compressed};
 pub use location::{cache_file, cache_path_in, extracted_cache, CACHE_SUFFIX};
 pub use refresh::{images, imports, pending, refresh, refresh_all, Refreshed};
 pub use shrink::{fit, fitted_size};
