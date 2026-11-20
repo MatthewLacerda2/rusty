@@ -3,6 +3,7 @@
 
 use super::super::{Composite, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect};
 use super::ExposureParams;
+use crate::gpu::commands::Commands;
 use crate::motion::HistoryKey;
 use crate::postfx::params::Gate;
 use crate::postfx::params::PostSource;
@@ -52,7 +53,7 @@ fn automatic<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
 /// next metered frame snaps. On a view TAA upscales (#1702) the meter reads the
 /// resolved image at the output's size (`PostFx::chain_size`), never the jittered
 /// scene.
-fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let (meter, scene) = view.post_fx.exposure_and_scene();
     let Some(ae) = automatic(cx.stack.post).filter(|_| cx.effect.full) else {
         return meter.cut();
@@ -61,7 +62,8 @@ fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let step = meter.step(key, cx.stack.editor_mode, cx.scene.shader_time);
     let params = ExposureParams::new(ae, step);
     let gpu = (&r.device, &r.queue);
-    meter.run(gpu, (&r.post_passes.exposure, &r.gpu_timer), scene, &params);
+    let passes = (&r.post_passes.exposure, &r.gpu_timer);
+    meter.run(gpu, commands, passes, scene, &params);
 }
 
 /// The view's side of the readout: what a frontend publishes.

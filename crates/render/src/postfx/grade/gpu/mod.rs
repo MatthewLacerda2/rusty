@@ -12,6 +12,7 @@ mod knobs;
 mod lookup;
 mod saturation;
 
+use crate::gpu::commands::Commands;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::effects::EffectCx;
@@ -122,8 +123,10 @@ impl Chain {
             },
             full: true,
         };
-        self.pfx
-            .run((device, queue), ctx, &cx, PostParams::default());
+        let mut commands = Commands::new(device, queue, "Grade Test");
+        let frame = (&cx, PostParams::default());
+        self.pfx.run((device, queue), &mut commands, ctx, frame);
+        commands.send();
         let bytes = readback::read_texture_rgba8(device, queue, &self.out, W, 1);
         bytes.chunks(4).map(|p| [p[0], p[1], p[2], p[3]]).collect()
     }

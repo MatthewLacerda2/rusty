@@ -5,6 +5,7 @@
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
 use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::motion::{self, HistoryKey, Velocity};
 use crate::passes::ssao::SsaoPlan;
@@ -170,8 +171,10 @@ impl Renderer {
             stack,
             effect,
         };
+        // The chain is one encoder and one submit (#2353).
+        let mut commands = Commands::new(&self.device, &self.queue, "PostFX Encoder");
         for run in effects::scene_passes() {
-            run(self, view, &pass);
+            run(self, view, &pass, &mut commands);
         }
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
@@ -193,8 +196,13 @@ impl Renderer {
             timer: &self.gpu_timer,
             passes: &self.post_passes,
         };
-        view.post_fx
-            .run((&self.device, &self.queue), chain, &effect, params);
+        view.post_fx.run(
+            (&self.device, &self.queue),
+            &mut commands,
+            chain,
+            (&effect, params),
+        );
+        commands.send();
     }
 }
 

@@ -190,8 +190,11 @@ pub(crate) enum Pass {
     },
 }
 
-/// A scene pass: the renderer's shared pipelines, the view, and the frame.
-pub(crate) type ScenePass = fn(&Renderer, &mut RenderView, &PassCx);
+/// A scene pass: the renderer's shared pipelines, the view, the frame, and the
+/// camera's open [`Commands`](crate::gpu::commands::Commands) it records into
+/// (#2353): it submits nothing of its own.
+pub(crate) type ScenePass =
+    fn(&Renderer, &mut RenderView, &PassCx, &mut crate::gpu::commands::Commands);
 
 /// How an LDR pass runs.
 pub(crate) enum LdrRun {

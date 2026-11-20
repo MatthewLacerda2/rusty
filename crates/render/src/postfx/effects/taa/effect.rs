@@ -3,6 +3,7 @@
 //! (20), URP's order. Like FXAA it needs no volume.
 
 use super::super::{History, Owner, Pass, PassCx, PostEffect};
+use crate::gpu::commands::Commands;
 use crate::postfx::params::Gate;
 use crate::postfx::params::{effect_runs, PostSource};
 use crate::{RenderView, Renderer};
@@ -28,7 +29,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 
 /// The resolve; [`super::begin`] already chose whether this view runs it, and held
 /// the history only then.
-fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let gpu = (&r.device, &r.queue);
     let lenses = super::params::lenses(cx.stack.stack, view.aspect());
     // The base camera's TAA knobs (#1847); a view with no camera resolves as a
@@ -39,8 +40,14 @@ fn resolve(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
         .camera
         .map(super::params::TaaTune::from_camera)
         .unwrap_or_default();
-    view.post_fx
-        .run_taa(gpu, &r.post_passes.taa, &r.gpu_timer, tune, lenses);
+    let encoder = commands.encoder();
+    view.post_fx.run_taa(
+        gpu,
+        encoder,
+        &r.post_passes.taa,
+        &r.gpu_timer,
+        (tune, lenses),
+    );
 }
 
 /// Whether `post`'s camera runs TAA, through [`effect_runs`]: its component has it

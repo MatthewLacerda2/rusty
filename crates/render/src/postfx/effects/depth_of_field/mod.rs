@@ -217,6 +217,7 @@ impl PostFx {
     pub(crate) fn run_depth_of_field(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        encoder: &mut wgpu::CommandEncoder,
         passes: &DofPasses,
         params: Option<DofParams>,
         timer: &GpuTimer,
@@ -253,14 +254,10 @@ impl PostFx {
             .map(|(pipeline, views, target)| (pipeline, group(views), target))
             .collect();
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("DoF Encoder"),
-        });
         for (pipeline, bind_group, target) in &steps {
             let timed = (pipeline.get(), timer.writes(GpuPass::DepthOfField));
-            Self::fullscreen(&mut encoder, timed, &[bind_group], &target.view);
+            Self::fullscreen(encoder, timed, &[bind_group], &target.view);
         }
-        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

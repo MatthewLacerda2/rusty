@@ -6,6 +6,7 @@
 
 use super::effects::{self, EffectCx, Gpu, LdrRun, Pass};
 use super::{PostFx, PostFxContext, PostParams};
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::timing::GpuPass;
 
@@ -17,9 +18,9 @@ impl PostFx {
     pub(crate) fn run(
         &mut self,
         gpu: Gpu,
+        commands: &mut Commands,
         ctx: PostFxContext<'_>,
-        cx: &EffectCx,
-        params: PostParams,
+        (cx, params): (&EffectCx, PostParams),
     ) {
         let (device, queue) = gpu;
         queue.counted_write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
@@ -35,9 +36,7 @@ impl PostFx {
             })
             .collect();
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("PostFX Encoder"),
-        });
+        let encoder = commands.encoder();
         // When an LDR pass follows the composite it lands in the LDR target for that
         // pass to sample; otherwise it writes the output directly, so the plain path
         // is byte-for-byte what the chain produced before those existed.
@@ -45,18 +44,18 @@ impl PostFx {
         let followed = !ldr.is_empty();
         let composite_target = if followed { &self.ldr.view } else { ctx.output };
         let composite = (&self.composite_pipeline, ctx.timer.writes(GpuPass::PostFx));
-        Self::fullscreen(&mut encoder, composite, &[&io, &textures], composite_target);
+        Self::fullscreen(encoder, composite, &[&io, &textures], composite_target);
 
         let mut finish = None;
         let mut ended = false;
         let count = ldr.len();
         for (i, run) in ldr.into_iter().enumerate() {
             match run {
-                LdrRun::InPlace(run) => run(self, gpu, &mut encoder, &ctx, cx),
+                LdrRun::InPlace(run) => run(self, gpu, encoder, &ctx, cx),
                 LdrRun::MayEnd(run) => {
                     // Only a finishing pass comes after the in-place ones, so the
                     // last one in the list is the chain's last.
-                    ended = run(self, gpu, &mut encoder, &ctx, cx, i + 1 == count);
+                    ended = run(self, gpu, encoder, &ctx, cx, i + 1 == count);
                 }
                 LdrRun::Finish(pipeline) => finish = Some(*pipeline),
             }
@@ -77,10 +76,8 @@ impl PostFx {
                 ctx.skybox,
             );
             let last = (pipeline, ctx.timer.writes(GpuPass::PostFx));
-            Self::fullscreen(&mut encoder, last, &[&bg], ctx.output);
+            Self::fullscreen(encoder, last, &[&bg], ctx.output);
         }
-
-        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Composite this frame's scene once more into `ctx.output` — graded,
