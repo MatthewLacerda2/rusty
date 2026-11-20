@@ -36,6 +36,32 @@ fn the_selection_is_not_an_unsaved_edit() {
     assert!(crate::has_unsaved_edits(&scene, &path));
 }
 
+/// A script attached by absolute path inside the workspace is saved relative to
+/// it: the live scene still matches the file it wrote.
+#[test]
+fn a_workspace_script_by_absolute_path_is_no_unsaved_edit() {
+    let (mut scene, path) = loaded("script");
+    let id = scene.find_entity_by_name("Authored").unwrap();
+    let script = std::env::current_dir()
+        .unwrap()
+        .join("assets")
+        .join("x.lua");
+    scene
+        .world
+        .scripts_mut(id)
+        .unwrap()
+        .push(rusty_scene::ScriptComponent {
+            path: script.to_string_lossy().into_owned(),
+            ..Default::default()
+        });
+    assert!(
+        crate::has_unsaved_edits(&scene, &path),
+        "attaching it is an edit"
+    );
+    crate::save_to_file(&scene, &path).unwrap();
+    assert!(!crate::has_unsaved_edits(&scene, &path), "saved, relative");
+}
+
 /// Generate Lighting rewrites the file's lighting fields: the new text is the
 /// engine's own, and edits elsewhere stay unsaved (#832).
 #[test]
