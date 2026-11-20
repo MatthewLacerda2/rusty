@@ -48,9 +48,9 @@ pub(crate) struct SolidResources {
 pub(crate) type GridResource = u32;
 pub(crate) type AabbResource = (wgpu::Buffer, u32);
 pub(crate) type AxisResource = (usize, u32);
-// One probe gizmo line draw (#284): its world-space line-list vertex buffer, its
-// slot, and the vertex count to draw.
-pub(crate) type ProbeResource = (wgpu::Buffer, u32, u32);
+// One vertex-coloured line-list draw (the probe family's, the wires'): its
+// world-space vertex buffer, its slot, and the vertex count to draw.
+pub(crate) type LineResource = (wgpu::Buffer, u32, u32);
 
 /// The editor-only overlay resources for one handles pass (grid, occlusion boxes,
 /// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
@@ -62,16 +62,16 @@ pub(crate) struct Overlays {
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
-    // Light- and reflection-probe gizmos (#284): probe markers tinted by baked SH plus
-    // reflection parallax-box wireframes. Editor-only, like the rest of `Overlays`.
-    pub probes: Vec<ProbeResource>,
+    /// The light- and reflection-probe gizmos (#284) and the Area lights' (#1674):
+    /// one draw, coloured per vertex, through the vertex-colour line pipeline.
+    pub probes: Option<LineResource>,
     /// The reflection probes' mirror balls (#1911).
     pub balls: Vec<BallResource>,
     /// The navmesh gizmo's slot (#1910); its vertex buffer is the renderer's, kept.
     pub navmesh: Option<u32>,
     /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
     /// vertex, through the vertex-colour line pipeline.
-    pub wires: Option<ProbeResource>,
+    pub wires: Option<LineResource>,
 }
 
 impl Renderer {

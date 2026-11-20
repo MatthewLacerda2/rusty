@@ -25,7 +25,7 @@ use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
 use super::OverlayDraws;
-use crate::draw::resources::ProbeResource;
+use crate::draw::resources::LineResource;
 use crate::interpolate::DrawPoses;
 use crate::Renderer;
 use rusty_components::mesh::Vertex;
@@ -123,20 +123,31 @@ impl Renderer {
         scene: &Scene,
         view: (ColliderScope, Vec3),
         draws: &mut OverlayDraws,
-    ) -> Option<ProbeResource> {
+    ) -> Option<LineResource> {
         let wires = (&mut *self.wire_cache.borrow_mut(), &self.draw_poses);
         let verts = wire_vertices(scene, wires, view);
+        self.vertex_lines(draws, &verts, "Collider & Debug Line Gizmo Vertices")
+    }
+
+    /// One vertex-coloured line list's draw (each vertex's colour in its `tangent`):
+    /// `verts` in one vertex buffer, at a slot of `draws` drawn white, so the colour
+    /// is each vertex's own. `None` when there is nothing to draw.
+    pub(super) fn vertex_lines(
+        &self,
+        draws: &mut OverlayDraws,
+        verts: &[Vertex],
+        label: &str,
+    ) -> Option<LineResource> {
         if verts.is_empty() {
             return None;
         }
         let buffer = self
             .device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                label: Some("Collider & Debug Line Gizmo Vertices"),
-                contents: bytemuck::cast_slice(&verts),
+                label: Some(label),
+                contents: bytemuck::cast_slice(verts),
                 usage: wgpu::BufferUsages::VERTEX,
             });
-        // White: the colour is each vertex's own.
         let slot = draws.push(Mat4::IDENTITY, [1.0; 4]);
         Some((buffer, slot, verts.len() as u32))
     }
