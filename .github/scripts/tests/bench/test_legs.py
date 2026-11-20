@@ -39,6 +39,11 @@ class Legs(unittest.TestCase):
         argv = legs.command(self.plan[0], ask)
         self.assertEqual(argv[argv.index("--load-runs") + 1], "5")
 
+    def test_no_editor_passes_through_only_when_asked(self):
+        self.assertNotIn("--no-editor", legs.command(self.plan[0], self.ask))
+        ask = legs.Ask(Path("/games/yard"), no_editor=True)
+        self.assertIn("--no-editor", legs.command(self.plan[0], ask))
+
     def test_a_failed_leg_stops_the_run_and_a_stale_leg_folder_is_emptied(self):
         stale = self.root / "pr" / "old.json"
         stale.parent.mkdir(parents=True)
