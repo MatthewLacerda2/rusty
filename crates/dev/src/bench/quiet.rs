@@ -10,12 +10,17 @@ pub(crate) fn quiet_moved(kept: bool, last: Option<f64>, avg: f64) -> bool {
 }
 
 /// The line counting the `unshown` quiet counters a table left out (none: no
-/// line): unchanged since the kept run, or with none, kept for the next to
-/// compare against; all of them are in `file`.
-pub(crate) fn unshown_line(unshown: usize, kept: bool, file: &str) -> String {
-    match (unshown, kept) {
+/// line): unchanged against the kept run `against` names, as the table's header
+/// does ("last": the last run; "before": `BEFORE=<dir>`'s), or with none, kept
+/// for the next to compare against; all of them are in `file`.
+pub(crate) fn unshown_line(unshown: usize, against: Option<&str>, file: &str) -> String {
+    let since = |run| match run {
+        "last" => "since the last run".to_string(),
+        run => format!("against {run}"),
+    };
+    match (unshown, against) {
         (0, _) => String::new(),
-        (n, true) => format!("({n} other counters unchanged since the last run: in {file})\n"),
-        (n, false) => format!("({n} other counters in {file}: each prints once it changes)\n"),
+        (n, Some(run)) => format!("({n} other counters unchanged {}: in {file})\n", since(run)),
+        (n, None) => format!("({n} other counters in {file}: each prints once it changes)\n"),
     }
 }

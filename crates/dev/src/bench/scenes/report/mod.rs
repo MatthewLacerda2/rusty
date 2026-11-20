@@ -208,8 +208,8 @@ impl SceneReport {
                 row.worst
             );
         }
-        let (kept, file) = (comparable.is_some(), format!("{}.json", self.scene));
-        out.push_str(&unshown_line(unshown, kept, &file));
+        let file = format!("{}.json", self.scene);
+        out.push_str(&unshown_line(unshown, comparable.map(|_| against), &file));
         out
     }
 }

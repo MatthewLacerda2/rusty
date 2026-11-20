@@ -117,3 +117,25 @@ fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
     let tick = 1; // made_up_counter
     assert_eq!(quiet.count(), counted - SHOWN.len() + tick, "every counter");
 }
+
+/// A tick counter first recorded at the window's middle (a change channel that
+/// opens late) is zero on the frames before it: set on one frame of four, it
+/// averages 1/4, the share of the window's frames.
+#[test]
+fn a_counter_first_recorded_late_averages_over_the_whole_window() {
+    let mut stats = FrameStats::default();
+    stats.record("frame_ms", 4.0);
+    let mut samples = Samples::default();
+    for frame in 0..4 {
+        if frame == 2 {
+            stats.record("changes_late", 1.0);
+        } else if frame == 3 {
+            stats.record("changes_late", 0.0);
+        }
+        sample(&mut samples, &stats, None, Speeds::default());
+    }
+    assert_eq!(samples.values("changes_late"), [0.0, 0.0, 1.0, 0.0]);
+    let report = samples.report();
+    let late = report.metrics.iter().find(|(m, _)| m == "changes_late");
+    assert_eq!(late.map(|r| r.1.avg), Some(0.25));
+}

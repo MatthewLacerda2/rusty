@@ -83,11 +83,19 @@ pub(super) fn sample(
 /// The tick's counters (`entities`, `changes_<channel>`, ...): every count in
 /// `stats` but the render counters, which the frame itself carries
 /// ([`sample_render`]), each at its newest value, the tick the frame stepped.
+/// One first recorded partway through the window (a change channel opened at
+/// frame 300) is zero on the window's earlier frames, as `push_stage_parts` does
+/// for a late part, so it averages over the whole window and a 0/1 counter reads
+/// as the share of the window's frames.
 fn push_tick_counters(samples: &mut Samples, stats: &FrameStats) {
     let render = RenderCounters::default().pairs();
     let rendered = |key: &str| render.iter().any(|(k, _)| *k == key);
+    let earlier = samples.values("frame_ms").len().saturating_sub(1);
     for (key, s) in &stats.metrics {
         if is_counter(key) && !rendered(key) {
+            if samples.values(key).is_empty() {
+                (0..earlier).for_each(|_| push_counter(samples, key, 0.0));
+            }
             push_counter(samples, key, s.last);
         }
     }

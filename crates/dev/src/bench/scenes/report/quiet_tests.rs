@@ -57,3 +57,16 @@ fn a_scene_prints_a_quiet_counter_only_when_it_moved() {
     let first = now.render(None);
     assert!(!first.contains("ui_meshed") && first.contains("(3 other counters in pool.json"));
 }
+
+/// Against `BEFORE=<dir>`, the count line names that run, as the header and
+/// `absent in before` do, not the last one.
+#[test]
+fn the_count_line_names_the_run_it_compared_with() {
+    let mut now = scene(0.5, None);
+    now.baseline = Some("out/bench/main".into());
+    let text = now.render(Some(&scene(0.5, None)));
+    assert!(
+        text.contains("(2 other counters unchanged against before: in pool.json)"),
+        "{text}"
+    );
+}

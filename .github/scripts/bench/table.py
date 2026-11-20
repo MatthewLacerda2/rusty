@@ -26,7 +26,9 @@ A quiet counter (a row the report marks `quiet`: every `Debug.Stats` counter
 but the bench's usual few, `dev::bench::sample`) gets a table row only when
 `main`'s and the PR's averages differ, or one leg lacks it; one line under the
 table counts the rest as identical, so the table holds the counters a PR moved
-and not the eighty it did not.
+and not the eighty it did not. The bench once reported a hand-kept list of
+counters, and a PR that kept the UI layout between frames could not show the
+counter proving it (#2449): every counter is now a row, quiet unless it moved.
 
 The load rows' counts (`load.count.<what>`: model files the scene uses, sources
 converted, textures compressed and decoded, MB uploaded) say what each leg's

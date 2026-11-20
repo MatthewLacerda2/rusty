@@ -229,7 +229,8 @@ impl Report {
                 num(s.p95)
             );
         }
-        out.push_str(&unshown_line(unshown, previous.is_some(), "bench.json"));
+        let against = previous.map(|_| "last");
+        out.push_str(&unshown_line(unshown, against, "bench.json"));
         if let Some(engine) = &self.engine {
             out.push_str(&engine_line(
                 engine,
