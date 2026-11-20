@@ -13,7 +13,8 @@ use std::path::{Path, PathBuf};
 use rusty_core::project::EngineStamp;
 use serde::{Deserialize, Serialize};
 
-use super::super::report::{engine_line, num};
+use super::super::engine::engine_line;
+use super::super::report::{num, quiet_moved, unshown_line};
 mod compare;
 mod notes;
 mod view_key;
@@ -46,6 +47,10 @@ pub struct Row {
     /// one-off row, or a run of one.
     pub lo: f64,
     pub hi: f64,
+    /// A quiet counter (`bench::Summary::quiet`): the printed table shows it only
+    /// when it changed against the run it is compared with.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub quiet: bool,
 }
 
 impl Row {
@@ -60,6 +65,7 @@ impl Row {
             worst,
             lo,
             hi,
+            quiet: false,
         }
     }
 }
@@ -164,10 +170,18 @@ impl SceneReport {
             "{:<w$} {:>12} {:>19} {:>12}  {:<18} vs {against} avg",
             "metric", "avg", "spread", "worst p95", "worst at"
         );
+        let mut unshown = 0;
         for row in &self.rows {
-            let delta = comparable
-                .and_then(|p| p.row(&row.metric))
-                .map_or(String::new(), |b| delta(b, row));
+            let last = comparable.and_then(|p| p.row(&row.metric));
+            if row.quiet && !quiet_moved(comparable.is_some(), last.map(|b| b.avg), row.avg) {
+                unshown += 1;
+                continue;
+            }
+            let delta = match last {
+                Some(b) => delta(b, row),
+                None if row.quiet => format!("absent in {against}"),
+                None => String::new(),
+            };
             let _ = writeln!(
                 out,
                 "{:<w$} {:>12} {:>19} {:>12}  {:<18} {delta}",
@@ -178,6 +192,8 @@ impl SceneReport {
                 row.worst
             );
         }
+        let file = format!("{}.json", self.scene);
+        out.push_str(&unshown_line(unshown, comparable.is_some(), &file));
         if let Some(engine) = &self.engine {
             out.push_str(&engine_line(
                 engine,
@@ -270,6 +286,9 @@ pub fn write(out_dir: &Path, report: &SceneReport, text: &str) -> std::io::Resul
     std::fs::write(txt, text)
 }
 
+#[cfg(test)]
+#[path = "quiet_tests.rs"]
+mod quiet_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;

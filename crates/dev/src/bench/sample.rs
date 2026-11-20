@@ -1,16 +1,27 @@
 //! One measured frame's rows (#835): the tick's CPU time and its systems', the
-//! renderer's by stage, the GPU passes and the render counters, each scaled by the
-//! frame's clock speeds (`clock`). `make bench`, `make bench-scenes`' viewpoints and
-//! its editor round (`scenes::editor`) all sample through here.
+//! renderer's by stage, the GPU passes, each scaled by the frame's clock speeds
+//! (`clock`), and every counter `Debug.Stats` records. `make bench`, `make
+//! bench-scenes`' viewpoints and its editor round (`scenes::editor`) all sample
+//! through here.
+//!
+//! **The counters are derived, not listed**: every key `core::frame_stats` classes
+//! as a count ([`is_counter`]) is a row, the frame's render counters in their
+//! `RenderCounters::pairs` order and then the tick's (the world's, the change
+//! channels') in the stats' order, so a counter is in the bench the moment it is
+//! recorded. Each folds to its average over the window, like any row: a 0/1
+//! counter's is the share of frames it was set on (0.0015, one frame in 660).
+//! [`SHOWN`] always print; every other counter is quiet ([`Samples::push_quiet`]),
+//! printed only when it changed.
 
-use rusty_core::frame_stats::FrameStats;
-use rusty_render::{GpuPart, GpuPass};
+use rusty_core::frame_stats::{is_counter, FrameStats};
+use rusty_render::{GpuPart, GpuPass, RenderCounters};
 
 use super::Samples;
 use crate::capture::RenderedFrame;
 
-/// The render counters a bench row reports, in order.
-const COUNTERS: [&str; 18] = [
+/// The counters every printed report shows, changed or not: the bench's usual
+/// reading of what a frame drew and culled, and of its GPU calls.
+pub(super) const SHOWN: [&str; 18] = [
     "draw_calls",
     "triangles",
     "lights_dropped",
@@ -64,11 +75,36 @@ pub(super) fn sample(
     if let Some(frame) = frame {
         sample_render(samples, frame, speed.gpu);
     }
+    if stats.get("frame_ms").is_some() {
+        push_tick_counters(samples, stats);
+    }
+}
+
+/// The tick's counters (`entities`, `changes_<channel>`, ...): every count in
+/// `stats` but the render counters, which the frame itself carries
+/// ([`sample_render`]), each at its newest value, the tick the frame stepped.
+fn push_tick_counters(samples: &mut Samples, stats: &FrameStats) {
+    let render = RenderCounters::default().pairs();
+    let rendered = |key: &str| render.iter().any(|(k, _)| *k == key);
+    for (key, s) in &stats.metrics {
+        if is_counter(key) && !rendered(key) {
+            push_counter(samples, key, s.last);
+        }
+    }
+}
+
+/// A counter's row: printed always when [`SHOWN`], else quiet.
+fn push_counter(samples: &mut Samples, key: &str, value: f64) {
+    if SHOWN.contains(&key) {
+        samples.push(key, value);
+    } else {
+        samples.push_quiet(key, value);
+    }
 }
 
 /// A rendered frame's rows: the renderer's CPU time and each stage's share
 /// (`render.<stage>`), the GPU passes at the clock `gpu_speed` (none where its
-/// probe missed), its counters. The editor round samples its frames with it
+/// probe missed), every render counter. The editor round samples its frames with it
 /// (`scenes::editor`).
 pub(super) fn sample_render(samples: &mut Samples, frame: &RenderedFrame, gpu_speed: Option<f64>) {
     samples.push("renderer_ms", frame.cpu_ms);
@@ -96,8 +132,8 @@ pub(super) fn sample_render(samples: &mut Samples, frame: &RenderedFrame, gpu_sp
         samples.push("gpu_clock_pct", speed * 100.0);
     }
     for (key, value) in frame.counters.pairs() {
-        if COUNTERS.contains(&key) {
-            samples.push(key, value as f64);
+        if is_counter(key) {
+            push_counter(samples, key, value as f64);
         }
     }
 }

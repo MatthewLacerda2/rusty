@@ -40,6 +40,7 @@
 //! `SCRIPT=1` adds the `script.` rows ([`verbs`]).
 
 mod clock;
+mod engine;
 mod lua;
 mod report;
 mod rig;

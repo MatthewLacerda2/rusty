@@ -1,6 +1,6 @@
 //! A frame's rows scaled by its clock speeds (#862, #1719).
 
-use rusty_core::frame_stats::FrameStats;
+use rusty_core::frame_stats::{is_counter, FrameStats};
 
 use super::*;
 use crate::capture::RenderedFrame;
@@ -72,4 +72,48 @@ fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
     assert_eq!(samples.values("cpu.tick_nav"), [1.0]);
     assert_eq!(samples.values("cpu_clock_pct"), [50.0]);
     assert!(samples.values("tick_nav").is_empty(), "no raw system rows");
+}
+
+/// The counters are derived from the stats (#2449): a counter no list names
+/// (here one a test made up) is a row the moment it is recorded, a render
+/// counter beyond the shown few too, both quiet; a shown one is not quiet, and no
+/// timing is a counter row (`render_extract_us` stays out).
+#[test]
+fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
+    let mut stats = FrameStats::default();
+    stats.record("frame_ms", 4.0);
+    stats.record("made_up_counter", 3.0);
+    stats.record("load_scene_ms", 9.0);
+    let mut frame = RenderedFrame::default();
+    frame.counters.draw_calls = 7;
+    frame.counters.ui_meshed = 1;
+    frame.counters.render_extract_us = 250;
+    let mut samples = Samples::default();
+    sample(&mut samples, &stats, Some(&frame), Speeds::default());
+    let report = samples.report();
+    let row = |k: &str| report.metrics.iter().find(|(m, _)| m == k).map(|r| r.1);
+    assert_eq!(
+        row("made_up_counter").map(|s| (s.avg, s.quiet)),
+        Some((3.0, true))
+    );
+    assert_eq!(
+        row("ui_meshed").map(|s| (s.avg, s.quiet)),
+        Some((1.0, true))
+    );
+    assert_eq!(
+        row("draw_calls").map(|s| (s.avg, s.quiet)),
+        Some((7.0, false))
+    );
+    for timing in ["render_extract_us", "load_scene_ms"] {
+        assert!(
+            row(timing).is_none(),
+            "{timing} is a timing, no counter row"
+        );
+    }
+    let quiet = report.metrics.iter().filter(|(_, s)| s.quiet);
+    assert!(quiet.clone().all(|(m, _)| !SHOWN.contains(&m.as_str())));
+    let pairs = RenderedFrame::default().counters.pairs();
+    let counted = pairs.iter().filter(|(k, _)| is_counter(k)).count();
+    let tick = 1; // made_up_counter
+    assert_eq!(quiet.count(), counted - SHOWN.len() + tick, "every counter");
 }

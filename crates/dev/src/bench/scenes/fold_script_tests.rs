@@ -7,7 +7,7 @@ use super::*;
 fn view(rows: &[(&str, f64)]) -> Report {
     let metrics = rows
         .iter()
-        .map(|&(k, avg)| (k.to_string(), Summary { avg, p95: avg }))
+        .map(|&(k, avg)| (k.to_string(), Summary::new(avg, avg)))
         .collect();
     Report {
         frames: 3,
