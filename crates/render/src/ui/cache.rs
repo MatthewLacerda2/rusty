@@ -74,7 +74,14 @@ impl UiViewCache {
     /// Whether the last render of this view computed its UI layout (a kept one
     /// was not).
     pub fn last_laid_out(&self) -> bool {
-        self.layout.computed()
+        self.layout.why().is_some()
+    }
+
+    /// Why the last render of this view computed its UI layout, one flag per
+    /// reason in [`crate::RenderCounters::ui_relaid`]'s order; all `0` when it kept it.
+    pub fn last_relaid(&self) -> [u32; 7] {
+        let why = self.layout.why();
+        super::kept::Why::ALL.map(|w| u32::from(why == Some(w)))
     }
 
     /// Canvas buffers (re-)uploaded by the last render of this view.

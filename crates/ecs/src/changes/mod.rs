@@ -32,13 +32,13 @@
 //! its own cursors; every stamp still takes `&mut World`.
 //!
 //! **Cost.** A channel no cursor was ever opened on costs a write one test and,
-//! when another channel is being read, one lookup; nothing accumulates for it, and
+//! when another channel is being read, one indexed lookup (however many are open); nothing accumulates for it, and
 //! a derived channel's subtree walk is not taken. A read channel's log is bounded
 //! (`log.rs`).
 //!
 //! **Determinism.** The log is sim state: ids come back ascending, channels are
-//! found by type and walked only in the order they were first opened, never by
-//! `TypeId`. A consumer computes, for the ids it is given, exactly what its full
+//! found by their fixed [`Channel::SLOT`] and walked only in the order they were
+//! first opened, never by slot. A consumer computes, for the ids it is given, exactly what its full
 //! pass computes for them.
 
 mod channel;
@@ -54,15 +54,17 @@ mod log;
 #[doc(hidden)]
 pub mod ops;
 #[cfg(test)]
+mod quiet_tests;
+#[cfg(test)]
 mod seam_tests;
+#[cfg(test)]
+mod slot_tests;
 mod stamp;
 #[cfg(test)]
 mod stamp_tests;
 #[cfg(test)]
 mod tests;
 
-use std::any::TypeId;
-use std::collections::BTreeMap;
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -98,14 +100,18 @@ fn fresh_epoch() -> u64 {
 /// `StaticSet`'s index in `ChangeLogs::logs`: it is opened first, by every World.
 const STATIC: usize = 0;
 
+/// An [`ChangeLogs::index`] entry for a channel no cursor was opened on.
+const UNOPENED: u32 = u32::MAX;
+
 /// The World's logs.
 #[derive(Debug)]
 pub(crate) struct ChangeLogs {
     epoch: u64,
     /// The logs, in the order their channels were first opened.
     logs: Vec<Log>,
-    /// Channel -> index into `logs`. Looked up, never iterated.
-    index: BTreeMap<TypeId, usize>,
+    /// [`Channel::SLOT`] -> index into `logs` ([`UNOPENED`] for none): every write
+    /// looks its column up here, so it is an index, not a search.
+    index: Vec<u32>,
     /// [`Channel::NAME`]s, parallel to `logs`.
     names: Vec<&'static str>,
     /// Epochs taken since this World was made: what a test counts an Undo by.
@@ -130,7 +136,7 @@ impl Default for ChangeLogs {
         let mut logs = Self {
             epoch: fresh_epoch(),
             logs: Vec::new(),
-            index: BTreeMap::new(),
+            index: Vec::new(),
             names: Vec::new(),
             rewinds: 0,
             scratch: Default::default(),
@@ -142,19 +148,27 @@ impl Default for ChangeLogs {
 
 impl ChangeLogs {
     fn slot<T: Channel>(&mut self) -> &mut Log {
-        let next = self.logs.len();
-        let at = *self.index.entry(TypeId::of::<T>()).or_insert(next);
-        if at == next {
-            self.logs.push(Log::new(T::COLUMN));
-            self.names.push(T::NAME);
-        }
+        let at = match self.find::<T>() {
+            Some(at) => at,
+            None => {
+                let at = self.logs.len();
+                if self.index.len() <= T::SLOT {
+                    self.index.resize(T::SLOT + 1, UNOPENED);
+                }
+                self.index[T::SLOT] = at as u32;
+                self.logs.push(Log::new(T::COLUMN));
+                self.names.push(T::NAME);
+                at
+            }
+        };
         &mut self.logs[at]
     }
 
     /// `T`'s index in `logs`: it exists once a cursor was opened on `T` (always, for
     /// [`StaticSet`]).
     fn find<T: Channel>(&self) -> Option<usize> {
-        self.index.get(&TypeId::of::<T>()).copied()
+        let at = *self.index.get(T::SLOT)?;
+        (at != UNOPENED).then_some(at as usize)
     }
 
     /// The World was replaced or rewound: every cursor reads `Rebuild` next.
@@ -196,6 +210,17 @@ impl World {
             seen,
             _channel: PhantomData,
         }
+    }
+
+    /// Whether nothing was stamped on `T` since `cursor`'s last read, in the World it
+    /// read: what a reader asks before [`World::changes`], which collects the ids, so
+    /// a quiet channel costs one comparison. `false` does not promise an id: a stamp
+    /// may have landed on one the reader ignores, or the World was replaced (the
+    /// read is then [`Changes::Rebuild`]).
+    pub fn quiet<T: Channel>(&self, cursor: &Cursor<T>) -> bool {
+        let changes = self.changes.borrow();
+        let revision = changes.find::<T>().map(|at| changes.logs[at].revision);
+        cursor.epoch == changes.epoch && revision == Some(cursor.seen)
     }
 
     /// What changed on `T` since `cursor`'s last read; the cursor then has read it all.

@@ -125,6 +125,12 @@ pub struct RenderCounters {
     /// Views whose UI layout was computed this frame (#2412): `0` while nothing
     /// the layout reads changed (`ui::kept::layout`).
     pub ui_laid_out: u32,
+    /// Why it was (#2412), one per reason, in this order: a rebuild (a first frame,
+    /// another World, an Undo, a dropped log), the screen or a Canvas, the texture
+    /// sizes, the structure (a RectTransform, LayoutGroup, LayoutElement, parent,
+    /// child order or active flag), the content (a sized Image or Text), a Transform,
+    /// a marker (`ui::kept::layout::Why`). All `0` when the layout was kept.
+    pub ui_relaid: [u32; 7],
     /// UI `Mask` coverage textures rendered (#428): one pass per visible Mask.
     pub ui_mask_passes: u32,
     /// Fullscreen passes the UI backdrop blur ran (#426): the downsampled

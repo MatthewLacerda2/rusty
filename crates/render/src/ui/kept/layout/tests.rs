@@ -7,7 +7,8 @@ use glam::{Vec2, Vec3};
 
 use super::*;
 use rusty_components::{
-    CanvasComponent, LayoutAxisFit, LayoutElementComponent, LayoutGroupComponent,
+    CanvasComponent, ImageComponent, LayoutAxisFit, LayoutElementComponent, LayoutGroupComponent,
+    RectTransformComponent, TextComponent,
 };
 use rusty_scene::{Camera, Scene};
 
@@ -15,6 +16,8 @@ use rusty_scene::{Camera, Scene};
 mod hierarchy;
 #[path = "inputs_tests.rs"]
 mod inputs;
+#[path = "same_tests.rs"]
+mod same;
 
 /// A canvas holding a group with a sized label, a plain label, and an Image fitted
 /// to its texture.
@@ -105,9 +108,23 @@ impl Rig {
             None => UiView::screen(self.screen, t),
         };
         let kept = self.kept.update(world, &view);
-        assert_eq!(*kept, UiLayout::compute_in(world, &view), "a stale layout");
-        self.kept.computed()
+        let fresh = UiLayout::compute_in(world, &view);
+        assert_eq!(drawn(world, &kept), drawn(world, &fresh), "a stale layout");
+        self.kept.why().is_some()
     }
+
+    /// Why the last frame computed, if it did.
+    pub(super) fn why(&self) -> Option<Why> {
+        self.kept.why()
+    }
+}
+
+/// What the renderer draws of `layout`: every active element's rect, and the roots'
+/// spaces (an inactive marker's rect may lag: the module docs).
+fn drawn(world: &World, layout: &UiLayout) -> Vec<(u32, rusty_ui::UiRect, rusty_ui::CanvasSpace)> {
+    let active = |(id, _): &(u32, &rusty_ui::UiRect)| world.is_active_in_hierarchy(*id);
+    let row = |(id, r): (u32, &rusty_ui::UiRect)| (id, *r, layout.space(r.canvas));
+    layout.iter().filter(active).map(row).collect()
 }
 
 #[test]

@@ -4,120 +4,97 @@
 //! The layout's rects are a function of the screen size, the texture-size table,
 //! which Canvases are roots and what each root's Canvas gives it (`sort_order`,
 //! world space or not, its size and scale factor on this screen; a nested Canvas's
-//! fields are never read), the hierarchy and active flags, the
-//! elements' `RectTransform`, `LayoutGroup` and `LayoutElement`, the rotation and
-//! scale of every non-root element's `Transform`, the child order, the `Image` and
-//! `Text` of an element its content sizes (it has a `LayoutElement` or its parent a
-//! `LayoutGroup`), and, while a `WorldAnchor` marker is placed (under a screen-space
-//! root seen through a camera, `markers`), the camera's projection and its targets'
-//! world poses. The values are compared and the writes read from the World's change
-//! log ([`Watch`]): a write to an element the layout laid out, or to a child of one
-//! (it may join), dirties it; a reorder under one stamps it on `Children`.
+//! fields are never read), and, per element it lays out (`held`): its parent and
+//! child order, its active flag, its `RectTransform`, `LayoutGroup` and
+//! `LayoutElement`, its Transform's rotation and scale (a non-root element), the
+//! `Image` and `Text` its content sizes it by (it has a `LayoutElement` or its parent
+//! a `LayoutGroup`), and, while a `WorldAnchor` marker is placed (active, under a
+//! screen-space root seen through a camera, `markers`), the camera's projection and
+//! its targets' world positions.
 //!
-//! **The Transform column is not watched**: a cursor on it would have every
-//! Transform write of the sim recorded, for a handful of UI elements. The held
-//! rotation and scale of each laid-out non-root element are compared instead.
+//! **A stamp selects, a value decides.** The World's change log names the ids
+//! written since the last frame (`watch`; a channel nothing stamped is skipped
+//! without collecting ids); a written id the layout laid out is read again and its
+//! values compared with the held ones, and one it did not lay out counts only when it
+//! joins a laid-out parent. A write of the same value, whoever makes it, costs a
+//! comparison. What has no channel to read, or is read whole, is compared each
+//! frame: the screen, the camera's presence, the texture table, every non-root
+//! element's rotation and scale (a Transform cursor would have every Transform write
+//! of the sim recorded, for a handful of UI elements), and the markers' camera and
+//! targets. The Canvases are compared only on a frame a Canvas was written or one's
+//! hierarchy moved.
 //!
 //! **What the layout does not read never recomputes it**: the Canvas's placement
 //! (`sway` and its lag, `tilt`, `plane_distance`, `pixels_per_unit`), a root's own
 //! Transform, and the camera while no marker is placed only move where the finished
-//! rects land, the canvas *spaces*, which are placed again every frame
-//! ([`UiLayout::respace`]). So a visor HUD swaying with a turning camera, or a world
-//! canvas carried through the level, lays out nothing; a marker HUD lays out on every
-//! frame the camera or a target moves, since that moves the marker's rect.
+//! rects land, the canvas *spaces*, placed again on a kept frame
+//! ([`UiLayout::respace`]) when a root is not an overlay or a Canvas was written. So
+//! a visor HUD swaying with a turning camera, or a world canvas carried through the
+//! level, lays out nothing; a marker HUD lays out on every frame the camera or a
+//! target moves, since that moves the marker's rect.
+//!
+//! **Not drawn, not kept exact.** An element that is not active in the hierarchy
+//! draws nothing, so an inactive marker reads no camera: its rect (and its
+//! children's) may lag the camera until it is activated, which lays out again.
+//! Every rect the renderer draws equals a fresh `compute_in`'s.
 //!
 //! **Whole recomputes**: the first frame, `Changes::Rebuild` on any channel (another
 //! World, Play and Stop, a load, an Undo or Redo, a dropped log), or any compared
-//! value moved.
+//! value moved. [`Why`] names the reason, one `Debug.Stats` counter each
+//! (`ui_relaid_<reason>`).
 
+mod held;
 mod markers;
+mod watch;
 
 use std::rc::Rc;
 
-use glam::{Quat, Vec2, Vec3};
+use glam::Vec2;
 
-use markers::{eye, marker_targets, Eye};
-use rusty_components::{
-    ImageComponent, LayoutElementComponent, LayoutGroupComponent, RectTransformComponent,
-    TextComponent,
-};
-use rusty_ecs::{Activity, Changes, Children, Cursor, World, WorldPose};
-use rusty_ui::{TextureSizes, UiLayout, UiView};
+use held::Elements;
+use markers::Markers;
+use rusty_ecs::World;
+use rusty_ui::{CanvasSpace, TextureSizes, UiLayout, UiView};
+use watch::{Watch, Written};
+
+/// Why a frame computed its layout: the first check that failed, in this order.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Why {
+    /// The first frame, or a channel answered `Changes::Rebuild`.
+    Rebuild,
+    /// The screen size, the camera's presence, or a Canvas the layout reads.
+    Screen,
+    /// The texture-size table.
+    Textures,
+    /// An element's RectTransform, LayoutGroup, LayoutElement, parent, children or
+    /// active flag; or one joining.
+    Structure,
+    /// The Image or Text an element is sized by.
+    Content,
+    /// A non-root element's Transform rotation or scale.
+    Transform,
+    /// A placed marker's camera or target.
+    Marker,
+}
+
+impl Why {
+    /// Every reason, in the order of [`crate::RenderCounters::ui_relaid`].
+    pub(crate) const ALL: [Why; 7] = [
+        Why::Rebuild,
+        Why::Screen,
+        Why::Textures,
+        Why::Structure,
+        Why::Content,
+        Why::Transform,
+        Why::Marker,
+    ];
+}
 
 /// What a Canvas gives the layout: its id and, for a root (no Canvas above it,
 /// which `compute_in` lays out), its `sort_order`, world space, size and scale
 /// factor on this screen. A nested canvas lays out as part of its root, which
 /// reads none of its fields: only its id and that it is no root are compared.
 type CanvasKey = (u32, Option<(i32, bool, Vec2, f32)>);
-
-/// The cursors of every column the layout reads (the module docs).
-struct Watch {
-    rect: Cursor<RectTransformComponent>,
-    activity: Cursor<Activity>,
-    children: Cursor<Children>,
-    group: Cursor<LayoutGroupComponent>,
-    element: Cursor<LayoutElementComponent>,
-    image: Cursor<ImageComponent>,
-    text: Cursor<TextComponent>,
-    /// Open only while a marker is placed: a target's world pose moves it. Other
-    /// readers (the retained scene, physics) keep the channel recording anyway, so
-    /// closing it saves only this read, which collects every moved id.
-    pose: Option<Cursor<WorldPose>>,
-}
-
-/// The ids each channel wrote since the last read, `None` for a whole recompute.
-struct Written {
-    /// RectTransform, activity, child order, LayoutGroup and LayoutElement.
-    structure: Vec<u32>,
-    content: Vec<u32>,
-    pose: Vec<u32>,
-}
-
-impl Watch {
-    fn open(w: &World) -> Self {
-        Self {
-            rect: w.change_cursor(),
-            activity: w.change_cursor(),
-            children: w.change_cursor(),
-            group: w.change_cursor(),
-            element: w.change_cursor(),
-            image: w.change_cursor(),
-            text: w.change_cursor(),
-            pose: None,
-        }
-    }
-
-    /// Every cursor read (each current after), or `None` when one cannot say.
-    fn read(&mut self, w: &World) -> Option<Written> {
-        let ids = |c: Changes| match c {
-            Changes::Rebuild => None,
-            Changes::Ids(ids) => Some(ids),
-        };
-        let all = [
-            ids(w.changes(&mut self.rect)),
-            ids(w.changes(&mut self.activity)),
-            ids(w.changes(&mut self.children)),
-            ids(w.changes(&mut self.group)),
-            ids(w.changes(&mut self.element)),
-            ids(w.changes(&mut self.image)),
-            ids(w.changes(&mut self.text)),
-            self.pose
-                .as_mut()
-                .map_or(Some(Vec::new()), |p| ids(w.changes(p))),
-        ];
-        let [rect, activity, children, group, element, image, text, pose] = all;
-        let mut structure = rect?;
-        let more = [activity?, children?, group?, element?];
-        structure.extend(more.into_iter().flatten());
-        let mut content = image?;
-        content.extend(text?);
-        Some(Written {
-            structure,
-            content,
-            pose: pose?,
-        })
-    }
-}
 
 /// The layout a view last computed and what it was computed from.
 struct Held {
@@ -126,11 +103,11 @@ struct Held {
     camera: bool,
     canvases: Vec<CanvasKey>,
     textures: Rc<TextureSizes>,
-    /// Each laid-out non-root element's Transform rotation and scale.
-    spins: Vec<(u32, Quat, Vec3)>,
-    /// The markers' targets (sorted) and the camera they were placed through, when
-    /// a marker is placed.
-    markers: Option<(Vec<u32>, Eye)>,
+    elements: Elements,
+    markers: Option<Markers>,
+    /// Whether a root's space follows anything but the screen (a world or camera
+    /// canvas), so a kept frame places the spaces again.
+    placed: bool,
 }
 
 /// A view's kept UI layout (the module docs).
@@ -138,8 +115,8 @@ struct Held {
 pub(crate) struct KeptLayout {
     watch: Option<Watch>,
     held: Option<Held>,
-    /// Whether the last [`Self::update`] computed the layout (else it kept it).
-    computed: bool,
+    /// Why the last [`Self::update`] computed the layout; `None` when it kept it.
+    why: Option<Why>,
 }
 
 impl KeptLayout {
@@ -153,93 +130,91 @@ impl KeptLayout {
                 None
             }
         };
-        let canvases = canvas_keys(world, view.screen);
-        let kept = match (&mut self.held, written) {
-            (Some(held), Some(written)) if held.holds(world, view, &canvases, &written) => {
-                Rc::make_mut(&mut held.layout).respace(world, view);
-                Some(Rc::clone(&held.layout))
-            }
-            _ => None,
+        self.why = match (&self.held, &written) {
+            (Some(held), Some(written)) => held.why(world, view, written),
+            _ => Some(Why::Rebuild),
         };
-        self.computed = kept.is_none();
-        kept.unwrap_or_else(|| self.compute(world, view, canvases))
-    }
-
-    /// Whether the last [`Self::update`] computed the layout.
-    pub(crate) fn computed(&self) -> bool {
-        self.computed
-    }
-
-    fn compute(&mut self, world: &World, view: &UiView, canvases: Vec<CanvasKey>) -> Rc<UiLayout> {
-        let layout = Rc::new(UiLayout::compute_in(world, view));
-        let markers = view.camera.as_ref().and_then(|cam| {
-            let targets = marker_targets(world, &layout)?;
-            Some((targets, eye(cam, view.screen)))
-        });
-        if let Some(watch) = &mut self.watch {
-            // Opened here, it reads from now on: this layout read the poses.
-            match &markers {
-                Some(_) => _ = watch.pose.get_or_insert_with(|| world.change_cursor()),
-                None => watch.pose = None,
+        match (&mut self.held, self.why) {
+            (Some(held), None) => {
+                if held.placed || written.is_some_and(|w| w.canvas) {
+                    Rc::make_mut(&mut held.layout).respace(world, view);
+                    held.placed = placed(&held.layout);
+                }
+                Rc::clone(&held.layout)
             }
+            _ => self.compute(world, view),
         }
+    }
+
+    /// Why the last [`Self::update`] computed the layout; `None` when it kept it.
+    pub(crate) fn why(&self) -> Option<Why> {
+        self.why
+    }
+
+    fn compute(&mut self, world: &World, view: &UiView) -> Rc<UiLayout> {
+        let layout = Rc::new(UiLayout::compute_in(world, view));
+        let markers = view
+            .camera
+            .as_ref()
+            .and_then(|cam| Markers::read(world, &layout, cam, view.screen));
+        let placed = placed(&layout);
         self.held = Some(Held {
             layout: Rc::clone(&layout),
             screen: view.screen,
             camera: view.camera.is_some(),
-            canvases,
+            canvases: canvas_keys(world, view.screen),
             textures: Rc::clone(&view.textures),
-            spins: spins(world, &layout),
+            elements: Elements::read(world, &layout),
             markers,
+            placed,
         });
         layout
     }
 }
 
 impl Held {
-    /// Whether the held rects are what `compute_in` lays out now: the plain
-    /// comparisons first, the written ids next, the Transforms and the markers'
-    /// view-projection last.
-    fn holds(&self, world: &World, view: &UiView, canvases: &[CanvasKey], w: &Written) -> bool {
-        let laid = |id: u32| self.layout.get(id).is_some();
-        // A write to an element, or to a child that may join (or leave) its parent.
-        let touches = |id: u32| laid(id) || world.parent_id(id).is_some_and(laid);
-        let sized_by_content = |id: u32| {
-            world.has_layout_element(id)
-                || world
-                    .parent_id(id)
-                    .is_some_and(|p| world.has_layout_group(p))
-        };
-        let still = |&(id, rotation, scale): &(u32, Quat, Vec3)| {
-            world
-                .transform(id)
-                .is_some_and(|t| t.rotation == rotation && t.scale == scale)
-        };
-        self.screen == view.screen
-            && self.camera == view.camera.is_some()
-            && self.canvases == canvases
-            && (Rc::ptr_eq(&self.textures, &view.textures) || *self.textures == *view.textures)
-            && !w.structure.iter().any(|&id| touches(id))
-            && !w
-                .content
-                .iter()
-                .any(|&id| touches(id) && sized_by_content(id))
-            && self.spins.iter().all(still)
-            && self.markers_still(view, &w.pose)
-    }
-
-    /// Whether every marker would land where it did: neither the camera nor a
-    /// target moved.
-    fn markers_still(&self, view: &UiView, posed: &[u32]) -> bool {
+    /// Why the held rects are not what `compute_in` lays out now, if they are not:
+    /// the plain comparisons first, the written ids next, the Transforms and the
+    /// markers last.
+    fn why(&self, world: &World, view: &UiView, w: &Written) -> Option<Why> {
+        let e = &self.elements;
+        if self.screen != view.screen || self.camera != view.camera.is_some() {
+            return Some(Why::Screen);
+        }
+        if !Rc::ptr_eq(&self.textures, &view.textures) && *self.textures != *view.textures {
+            return Some(Why::Textures);
+        }
+        let canvas_moved = w.activity.iter().any(|&id| e.was_canvas(id));
+        if (w.canvas || canvas_moved) && self.canvases != canvas_keys(world, view.screen) {
+            return Some(Why::Screen);
+        }
+        let held_only = |&id: &u32| e.holds(id).then(|| e.moved(world, id, false)).flatten();
+        let why = (w.rect.iter())
+            .find_map(|&id| e.moved(world, id, true))
+            .or_else(|| w.hierarchy.iter().find_map(held_only))
+            .or_else(|| w.activity.iter().find_map(held_only))
+            .or_else(|| w.content.iter().find_map(held_only));
+        if why.is_some() {
+            return why;
+        }
+        if !e.spins_still(world) {
+            return Some(Why::Transform);
+        }
         match (&self.markers, &view.camera) {
-            (None, _) => true,
-            (Some((targets, at)), Some(cam)) => {
-                !posed.iter().any(|id| targets.binary_search(id).is_ok())
-                    && *at == eye(cam, view.screen)
-            }
-            (Some(_), None) => false,
+            (Some(m), Some(cam)) if !m.still(world, cam, view.screen) => Some(Why::Marker),
+            _ => None,
         }
     }
+}
+
+/// Whether a root of `layout` is placed by more than the screen (a world or camera
+/// canvas): its space moves with the camera or its Transform.
+fn placed(layout: &UiLayout) -> bool {
+    let root = |(id, r): (u32, &rusty_ui::UiRect)| r.canvas == id;
+    layout
+        .iter()
+        .filter(|&e| root(e))
+        .any(|(id, _)| layout.space(id) != CanvasSpace::Screen)
 }
 
 /// Every Canvas's [`CanvasKey`] on `screen`, in the World's order (the layout's
@@ -256,16 +231,6 @@ fn canvas_keys(world: &World, screen: Vec2) -> Vec<CanvasKey> {
         Some((id, Some(fields)))
     };
     ids.filter_map(key).collect()
-}
-
-/// What the layout read of each laid-out non-root element's Transform.
-fn spins(world: &World, layout: &UiLayout) -> Vec<(u32, Quat, Vec3)> {
-    let non_root = layout.iter().filter(|(id, r)| r.canvas != *id);
-    let spin = |(id, _)| {
-        let t = world.transform(id)?;
-        Some((id, t.rotation, t.scale))
-    };
-    non_root.filter_map(spin).collect()
 }
 
 #[cfg(test)]

@@ -33,7 +33,7 @@
 
 mod layout;
 mod meshes;
-pub(crate) use layout::KeptLayout;
+pub(crate) use layout::{KeptLayout, Why};
 pub(crate) use meshes::KeptMeshes;
 
 #[cfg(test)]

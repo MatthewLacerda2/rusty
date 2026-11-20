@@ -20,6 +20,9 @@ pub trait Channel: sealed::Sealed + 'static {
     const COLUMN: bool;
     /// Its name in [`super::World::change_stats`] and `Debug.Stats` (`changes_<name>`).
     const NAME: &'static str;
+    /// Its own place in the World's table of logs, fixed at compile time and unique
+    /// (`slots_are_unique`), so a write finds its column's log by index.
+    const SLOT: usize;
 }
 
 /// The derived channel stamped wherever the set of static entities active in the
@@ -50,38 +53,45 @@ pub struct Layer;
 pub struct Children;
 
 macro_rules! channels {
-    ($column:literal: $($ty:ty => $name:expr,)*) => {
+    ($column:literal: $($ty:ty => $name:expr, $slot:expr;)*) => {
         $(
             impl sealed::Sealed for $ty {}
             impl Channel for $ty {
                 const COLUMN: bool = $column;
                 const NAME: &'static str = $name;
+                const SLOT: usize = $slot;
             }
         )*
     };
 }
 
 channels! { false:
-    StaticSet => "static_set",
-    WorldPose => "world_pose",
-    Activity => "activity",
-    Layer => "layer",
-    Children => "children",
+    StaticSet => "static_set", 0;
+    WorldPose => "world_pose", 1;
+    Activity => "activity", 2;
+    Layer => "layer", 3;
+    Children => "children", 4;
 }
 
 channels! { true:
-    Core => "core",
-    String => "name",
-    TransformComponent => "transform",
-    Vec<ScriptComponent> => "scripts",
-    MaterialAsset => "pending_material",
-    PrefabLink => "prefab_link",
+    Core => "core", 5;
+    String => "name", 6;
+    TransformComponent => "transform", 7;
+    Vec<ScriptComponent> => "scripts", 8;
+    MaterialAsset => "pending_material", 9;
+    PrefabLink => "prefab_link", 10;
 }
 
-/// Each registry row's column is a channel named after its `Entity` field.
+/// The slots before the registry's columns.
+const FIXED_SLOTS: usize = 11;
+
+/// Each registry row's column is a channel named after its `Entity` field, its slot
+/// after the fixed ones in the registry's order.
 macro_rules! registry_channels {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        channels! { true: $($ty => stringify!($field),)* }
+        #[allow(non_camel_case_types, dead_code)]
+        enum RegistrySlot { $($field,)* }
+        channels! { true: $($ty => stringify!($field), FIXED_SLOTS + RegistrySlot::$field as usize;)* }
     };
 }
 

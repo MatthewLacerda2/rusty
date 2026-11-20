@@ -7,7 +7,7 @@ use glam::{Vec2, Vec3};
 
 use std::rc::Rc;
 
-use super::{element, ui, Rig, Ui};
+use super::{element, ui, Rig, Ui, Why};
 use rusty_components::{CanvasComponent, CanvasRenderMode, WorldAnchor};
 use rusty_scene::Camera;
 
@@ -60,9 +60,21 @@ fn a_still_ui_lays_out_once_and_each_input_lays_it_out_again() {
     let (mut ui, mut rig) = (ui(), Rig::new());
     assert!(rig.frame(&ui.scene.world), "the first frame computes");
     assert!(!rig.frame(&ui.scene.world), "a still frame keeps it");
-    for i in 0..8 {
+    let (s, c) = (Why::Structure, Why::Content);
+    let whys = [
+        s,
+        c,
+        c,
+        Why::Transform,
+        Why::Screen,
+        Why::Textures,
+        s,
+        Why::Screen,
+    ];
+    for (i, why) in whys.into_iter().enumerate() {
         let name = change(i, &mut ui, &mut rig);
         assert!(rig.frame(&ui.scene.world), "{name}: computes again");
+        assert_eq!(rig.why(), Some(why), "{name}: says why");
         assert!(!rig.frame(&ui.scene.world), "{name}: then keeps it");
     }
 }

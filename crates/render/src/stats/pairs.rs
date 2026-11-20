@@ -2,6 +2,17 @@
 
 use super::RenderCounters;
 
+/// [`RenderCounters::ui_relaid`]'s metric names, in its order.
+const UI_RELAID: [&str; 7] = [
+    "ui_relaid_rebuild",
+    "ui_relaid_screen",
+    "ui_relaid_textures",
+    "ui_relaid_structure",
+    "ui_relaid_content",
+    "ui_relaid_transform",
+    "ui_relaid_marker",
+];
+
 impl RenderCounters {
     /// Every counter under its `FrameStats` metric name.
     pub fn pairs(&self) -> Vec<(&'static str, u64)> {
@@ -48,6 +59,7 @@ impl RenderCounters {
         ]);
         pairs.extend(self.shadow_pairs());
         pairs.extend(self.ui_pairs());
+        pairs.extend(UI_RELAID.into_iter().zip(self.ui_relaid.map(u64::from)));
         pairs.extend(self.uploads.pairs());
         pairs.extend(self.ops.pairs());
         pairs
