@@ -25,9 +25,11 @@ impl BakeFiles {
     /// `from` would, as `make bench-scenes`' editor round times a save of a loaded
     /// scene outside its project. Nothing without a record at `from`.
     pub fn copied(&self, from: &Path, to: &Path) {
-        let Some(seen) = self.seen.borrow().get(&key(from)).cloned() else {
+        let Some(mut seen) = self.seen.borrow().get(&key(from)).cloned() else {
             return;
         };
+        // What `from`'s load did not use is that load's to tell, not the copy's.
+        seen.why = None;
         let to = key(to);
         self.warned.borrow_mut().remove(&to);
         self.seen.borrow_mut().insert(to, seen);
@@ -45,6 +47,24 @@ pub(super) struct Seen {
     /// a save of the same `Arc` is not hashed again.
     pub(super) buffer: Option<Arc<[u8]>>,
     pub(super) mark: Mark,
+    /// Why this world did not use the file it read here (`"refused (…)"`, `"could
+    /// not be read (…)"`): set only by the record of that read, cleared by any
+    /// later record and by a bake.
+    pub(super) why: Option<String>,
+}
+
+impl Seen {
+    /// A read that this world used, or found nothing at: no reason to give.
+    pub(super) fn loaded(disk: Disk, held: Option<u64>, buffer: Option<Arc<[u8]>>) -> Self {
+        let (mark, why) = (Mark::Loaded, None);
+        Self {
+            disk,
+            held,
+            buffer,
+            mark,
+            why,
+        }
+    }
 }
 
 /// What a save would bring a path to: bytes, maybe in a shared buffer.
