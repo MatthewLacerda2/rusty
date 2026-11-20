@@ -12,7 +12,7 @@ use super::bin::{bin_spheres, Binned, Budget};
 use super::grid::AabbCache;
 use super::{bin, ClusterGrid, LocalLight, CLUSTER_COUNT};
 use crate::gpu::grow_buffer::GrowBuffer;
-use crate::Renderer;
+use crate::{RenderSwitch, Renderer};
 
 pub(crate) struct ClusterBuffers {
     lights: GrowBuffer,
@@ -82,9 +82,8 @@ impl Renderer {
     pub(crate) fn bin_clusters(&mut self, grid: &ClusterGrid, decals: bool) {
         let started = Instant::now();
         let c = &mut self.clusters;
-        // The `clustered_lights` measurement switch bins none: every range empty.
-        let on = self.switches.on(crate::RenderSwitch::ClusteredLights);
-        let frame: &[LocalLight] = if on { &c.frame_lights } else { &[] };
+        // With the `clustered_lights` switch off none is binned: every range empty.
+        let frame = (self.switches).listed(RenderSwitch::ClusteredLights, &c.frame_lights);
         let lights = bin(grid, frame, &mut c.aabbs);
         let spheres: &[_] = if decals { &self.decals.spheres } else { &[] };
         let stamps = bin_spheres(grid, spheres, &Budget::nearest(spheres.len()), &mut c.aabbs);

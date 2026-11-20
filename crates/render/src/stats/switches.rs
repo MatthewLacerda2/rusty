@@ -57,6 +57,16 @@ impl RenderSwitches {
         self.off[switch as usize] = !on;
     }
 
+    /// `items` while `switch` is on, else none: the list the renderer places or
+    /// bins (the reflection probes, the clustered lights).
+    pub(crate) fn listed<T>(self, switch: RenderSwitch, items: &[T]) -> &[T] {
+        if self.on(switch) {
+            items
+        } else {
+            &[]
+        }
+    }
+
     /// The colour, direction and shadowmask page lists the renderer binds for
     /// `set`: none with the `lightmaps` switch off, as for an unbaked scene.
     pub(crate) fn lightmap_lists(self, set: &LightmapSet) -> [&[String]; 3] {

@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::{ProbeArray, MAX_REFLECTION_PROBES, SPARE_SLOTS};
 use crate::ibl::cubemap::{read_cube_shape, CubeShape, Refusal};
-use crate::Renderer;
+use crate::{RenderSwitch, Renderer};
 use rusty_scene::{ReflectionProbe, Scene};
 
 impl Renderer {
@@ -37,14 +37,9 @@ impl Renderer {
     /// One pass of [`Self::update_reflection_probes`]: false when a cube it had to
     /// load was refused.
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
-        // The `reflection_probes` measurement switch places none: every object
-        // reads the sky's cube, as in a scene with no baked probe.
-        let on = self.switches.on(crate::RenderSwitch::ReflectionProbes);
-        let probes: &[_] = if on {
-            &scene.reflection_probes.probes
-        } else {
-            &[]
-        };
+        // With the `reflection_probes` switch off none is placed: the sky's cube.
+        let probes = &scene.reflection_probes.probes;
+        let probes = self.switches.listed(RenderSwitch::ReflectionProbes, probes);
         let budget = scene.lighting_settings.reflections.budget_bytes();
         let format = self.reflection_probes.format();
         let mut wanted: Vec<(usize, CubeShape)> = Vec::new();

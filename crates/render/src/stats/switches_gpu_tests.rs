@@ -45,7 +45,7 @@ fn everything() -> Scene {
 }
 
 /// What each feature costs, as the counter its switch or option takes away.
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 struct Costs {
     shadow_draws: u32,
     ssao_samples: u64,
@@ -81,47 +81,46 @@ fn costs(switches: RenderSwitches, options: GraphicsOptions) -> Option<Costs> {
     Some(r.frame_counters.into())
 }
 
+/// The costs with everything on, each checked present; `None` with no adapter.
+fn baseline() -> Option<Costs> {
+    let all = costs(RenderSwitches::ON, GraphicsOptions::default())?;
+    assert!(all.shadow_draws > 0 && all.ssao_samples > 0, "{all:?}");
+    assert!(all.ssil_samples > 0 && all.lightmap_bytes > 0, "{all:?}");
+    assert!(all.light_cluster_refs > 0, "{all:?}");
+    Some(all)
+}
+
+impl Costs {
+    /// These costs with one taken away by `zero`.
+    fn without(mut self, zero: fn(&mut Costs)) -> Costs {
+        zero(&mut self);
+        self
+    }
+}
+
 #[test]
 fn gpu_each_switch_takes_away_its_own_counter_and_no_other() {
-    let Some(all) = costs(RenderSwitches::ON, GraphicsOptions::default()) else {
+    let Some(all) = baseline() else {
         return;
     };
-    let zeroed = |field: fn(&mut Costs)| {
-        let mut want = Costs { ..all };
-        field(&mut want);
-        want
-    };
-    assert!(
-        all.shadow_draws > 0 && all.ssao_samples > 0 && all.ssil_samples > 0,
-        "{all:?}"
-    );
-    assert!(
-        all.lightmap_bytes > 0 && all.light_cluster_refs > 0,
-        "{all:?}"
-    );
     let switched = |switch| {
         let mut s = RenderSwitches::ON;
         s.set(switch, false);
         costs(s, GraphicsOptions::default()).unwrap()
     };
-    assert_eq!(
-        switched(RenderSwitch::Shadows),
-        zeroed(|c| c.shadow_draws = 0)
-    );
-    assert_eq!(
-        switched(RenderSwitch::Lightmaps),
-        zeroed(|c| c.lightmap_bytes = 0)
-    );
-    assert_eq!(
-        switched(RenderSwitch::ClusteredLights),
-        zeroed(|c| c.light_cluster_refs = 0)
-    );
+    let shadowless = switched(RenderSwitch::Shadows);
+    assert_eq!(shadowless, all.without(|c| c.shadow_draws = 0));
+    let unbaked = switched(RenderSwitch::Lightmaps);
+    assert_eq!(unbaked, all.without(|c| c.lightmap_bytes = 0));
+    let unlit = switched(RenderSwitch::ClusteredLights);
+    assert_eq!(unlit, all.without(|c| c.light_cluster_refs = 0));
+    // The array shrinks to its stand-in cube, which is not nothing.
     let probeless = switched(RenderSwitch::ReflectionProbes);
+    let reflection_bytes = probeless.reflection_bytes;
     assert!(
-        probeless.reflection_bytes < all.reflection_bytes,
+        reflection_bytes < all.reflection_bytes,
         "{probeless:?} {all:?}"
     );
-    let reflection_bytes = probeless.reflection_bytes;
     assert_eq!(
         probeless,
         Costs {
@@ -129,17 +128,20 @@ fn gpu_each_switch_takes_away_its_own_counter_and_no_other() {
             ..all
         }
     );
+}
+
+#[test]
+fn gpu_the_ssao_and_ssil_options_take_away_their_own_counter_and_no_other() {
+    let Some(all) = baseline() else {
+        return;
+    };
     let option_off = |option| {
         let mut o = GraphicsOptions::default();
         o.set(option, false);
         costs(RenderSwitches::ON, o).unwrap()
     };
-    assert_eq!(
-        option_off(GraphicsOption::Ssao),
-        zeroed(|c| c.ssao_samples = 0)
-    );
-    assert_eq!(
-        option_off(GraphicsOption::Ssil),
-        zeroed(|c| c.ssil_samples = 0)
-    );
+    let no_ao = option_off(GraphicsOption::Ssao);
+    assert_eq!(no_ao, all.without(|c| c.ssao_samples = 0));
+    let no_il = option_off(GraphicsOption::Ssil);
+    assert_eq!(no_il, all.without(|c| c.ssil_samples = 0));
 }
