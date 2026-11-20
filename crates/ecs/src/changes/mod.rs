@@ -50,6 +50,7 @@ mod derived_tests;
 mod epoch_tests;
 #[cfg(test)]
 mod funnel_tests;
+mod geometry;
 mod log;
 #[doc(hidden)]
 pub mod ops;
@@ -69,6 +70,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 pub use channel::{Activity, Channel, Children, Layer, StaticSet, WorldPose};
+pub use geometry::StaticGeometry;
 use log::Log;
 
 use super::world::World;
@@ -125,6 +127,8 @@ pub(crate) struct ChangeLogs {
     rewinds: u64,
     /// The subtree stamps' kept stack and seen set (`stamp.rs`).
     scratch: stamp::Scratch,
+    /// [`StaticGeometry`]'s revision.
+    static_geometry: u64,
 }
 
 /// One opened channel's counters ([`World::change_stats`]).
@@ -147,6 +151,7 @@ impl Default for ChangeLogs {
             names: Vec::new(),
             rewinds: 0,
             scratch: Default::default(),
+            static_geometry: 0,
         };
         logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
         logs
@@ -182,6 +187,7 @@ impl ChangeLogs {
     pub(crate) fn new_epoch(&mut self) {
         self.epoch = fresh_epoch();
         self.rewinds += 1;
+        self.static_geometry += 1;
         self.logs.iter_mut().for_each(Log::reset);
     }
 
@@ -234,18 +240,30 @@ impl World {
     /// Takes `&self` for the same reason as [`World::change_cursor`]: a read moves only
     /// the log's own bookkeeping (what no cursor has read past), never the World.
     pub fn changes<T: Channel>(&self, cursor: &mut Cursor<T>) -> Changes {
+        self.read(cursor, Log::since)
+            .map_or(Changes::Rebuild, Changes::Ids)
+    }
+
+    /// The one read under [`World::changes`] and [`StaticGeometry::changed`]: `read`
+    /// asks `T`'s log from `cursor`'s revision, unless the cursor is another World's
+    /// (`None`, as for a log that no longer holds it); the cursor then has read it all.
+    fn read<T: Channel, R>(
+        &self,
+        cursor: &mut Cursor<T>,
+        read: impl FnOnce(&mut Log, u64) -> Option<R>,
+    ) -> Option<R> {
         let mut changes = self.changes.borrow_mut();
         let epoch = changes.epoch;
         let log = changes.slot::<T>();
-        let ids = (cursor.epoch == epoch)
-            .then(|| log.since(cursor.seen))
+        let got = (cursor.epoch == epoch)
+            .then(|| read(log, cursor.seen))
             .flatten();
         *cursor = Cursor {
             epoch,
             seen: log.open(),
             _channel: PhantomData,
         };
-        ids.map_or(Changes::Rebuild, Changes::Ids)
+        got
     }
 
     /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.

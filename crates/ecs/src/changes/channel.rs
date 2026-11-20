@@ -20,9 +20,13 @@ pub trait Channel: sealed::Sealed + 'static {
     const COLUMN: bool;
     /// Its name in [`super::World::change_stats`] and `Debug.Stats` (`changes_<name>`).
     const NAME: &'static str;
-    /// Its own place in the World's table of logs, fixed at compile time and unique
-    /// (`slots_are_unique`), so a write finds its column's log by index.
+    /// Its own place in the World's table of logs, fixed at compile time and unique:
+    /// an enum's discriminant, the fixed channels' then the registry's after them
+    /// (`fixed_channels!`), so a write finds its column's log by index.
     const SLOT: usize;
+    /// A column whose write on a static entity moves
+    /// [`super::World::static_geometry`]'s revision (the Collider's).
+    const STATIC_GEOMETRY: bool = false;
 }
 
 /// The derived channel stamped wherever the set of static entities active in the
@@ -53,44 +57,64 @@ pub struct Layer;
 pub struct Children;
 
 macro_rules! channels {
-    ($column:literal: $($ty:ty => $name:expr, $slot:expr;)*) => {
+    ($column:literal: $($ty:ty => $name:expr, $slot:expr $(, geometry: $geometry:expr)?;)*) => {
         $(
             impl sealed::Sealed for $ty {}
             impl Channel for $ty {
                 const COLUMN: bool = $column;
                 const NAME: &'static str = $name;
                 const SLOT: usize = $slot;
+                $(const STATIC_GEOMETRY: bool = $geometry;)?
             }
         )*
     };
 }
 
-channels! { false:
-    StaticSet => "static_set", 0;
-    WorldPose => "world_pose", 1;
-    Activity => "activity", 2;
-    Layer => "layer", 3;
-    Children => "children", 4;
+/// The channels outside the registry, each listed once: its slot is its
+/// `FixedSlot` discriminant, and `FIXED_SLOTS` (where the registry's start) is
+/// their count, so a new one cannot take another's slot or a registry column's.
+macro_rules! fixed_channels {
+    ($($column:literal $ty:ty => $name:ident;)*) => {
+        #[allow(non_camel_case_types, dead_code)] // the names are the channels' `NAME`s
+        enum FixedSlot { $($name,)* Count }
+        $(channels! { $column: $ty => stringify!($name), FixedSlot::$name as usize; })*
+        /// The slots before the registry's columns.
+        const FIXED_SLOTS: usize = FixedSlot::Count as usize;
+    };
 }
 
-channels! { true:
-    Core => "core", 5;
-    String => "name", 6;
-    TransformComponent => "transform", 7;
-    Vec<ScriptComponent> => "scripts", 8;
-    MaterialAsset => "pending_material", 9;
-    PrefabLink => "prefab_link", 10;
+fixed_channels! {
+    false StaticSet => static_set;
+    false WorldPose => world_pose;
+    false Activity => activity;
+    false Layer => layer;
+    false Children => children;
+    true Core => core;
+    true String => name;
+    true TransformComponent => transform;
+    true Vec<ScriptComponent> => scripts;
+    true MaterialAsset => pending_material;
+    true PrefabLink => prefab_link;
 }
 
-/// The slots before the registry's columns.
-const FIXED_SLOTS: usize = 11;
+/// The registry columns that are static geometry, by `Entity` field: a new one is
+/// one more arm.
+macro_rules! static_geometry {
+    (collider) => {
+        true
+    };
+    ($field:ident) => {
+        false
+    };
+}
 
 /// Each registry row's column is a channel named after its `Entity` field, its slot
 /// after the fixed ones in the registry's order.
 macro_rules! registry_channels {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
         enum RegistrySlot { $($field,)* }
-        channels! { true: $($ty => stringify!($field), FIXED_SLOTS + RegistrySlot::$field as usize;)* }
+        channels! { true: $($ty => stringify!($field), FIXED_SLOTS + RegistrySlot::$field as usize,
+            geometry: static_geometry!($field);)* }
     };
 }
 

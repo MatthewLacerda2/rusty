@@ -1,5 +1,6 @@
-//! crates/ecs/src/changes/slot_tests.rs — every channel's `Channel::SLOT` is its own, so
-//! two channels never share a log, and a channel's log is found by it.
+//! crates/ecs/src/changes/slot_tests.rs — every channel's `Channel::SLOT` is its own (derived from
+//! enum discriminants in `channel.rs`), so two channels never share a log, and a channel's
+//! log is found by it.
 
 use super::{Activity, Channel, Children, Layer, StaticSet, WorldPose};
 use crate::bundle::Core;
