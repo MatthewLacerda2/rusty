@@ -61,8 +61,13 @@ impl Tracer<'_> {
     /// ([`Self::rest`]).
     ///
     /// So a texel's estimate is either the verdict, with every ray it cast
-    /// agreeing, or the exhaustive one: nothing is weighted, so no speckle. What
-    /// can still be lost is an occluder or a slit thin enough to dodge the
+    /// agreeing, or, contradicted, the full set's with the 16 block points the
+    /// probe cast kept: nothing is weighted, so no speckle, but those 16 all
+    /// agreed with the dropped verdict, so such a texel reads a shade lighter
+    /// under a thin occluder (darker beside a thin opening) than the exhaustive
+    /// estimate, by about their share of the set. A panel partly under the
+    /// receiver's horizon is judged and confirmed by the points whose light
+    /// reaches it only ([`casts`]). What can still be lost is an occluder or a slit thin enough to dodge the
     /// corners, the 16 block points and the checks; the texel that misses it is
     /// off by at most its share of that one panel's light. The probe's points
     /// are points of the set, so a penumbra casts only the four corners more
@@ -166,7 +171,13 @@ impl Tracer<'_> {
                 Verdict::Cast => self.own_lamp(set.light, set.point, set.normal, u, set.weight),
                 Verdict::Lit | Verdict::Hidden => {
                     let seen = matches!(verdict, Verdict::Lit);
-                    let (lit, d) = self.unshadowed(set, u);
+                    // A hidden verdict's light is zero, so only a checked cell
+                    // needs to know whether light arrives through it.
+                    let (lit, d) = if seen || checked(k) {
+                        self.unshadowed(set, u)
+                    } else {
+                        (Vec3::ZERO, Vec3::ZERO)
+                    };
                     if checked(k) && lit != Vec3::ZERO && self.blocked(set, u) == seen {
                         return self.rest(set, Verdict::Cast, probed, checked, rng);
                     }

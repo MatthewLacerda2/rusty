@@ -10,7 +10,7 @@
 use glam::Vec3;
 
 use super::area_tests::{lit, panel};
-use super::shadow_probe_tests::{direct_over, mean_rays};
+use super::shadow_probe_tests::{mean_rays, Fixture};
 use super::tests::quad;
 use super::*;
 
@@ -46,11 +46,11 @@ pub(super) fn under(hx: f32, hz: f32) -> BakeScene {
 /// The share of `seeds` seeds at each floor point of `xs`, at `samples` direct
 /// samples, whose probe and checks all missed what `scene` puts across the
 /// panel: those that cast fewer rays than the set, a unanimous verdict kept.
-fn miss_rate(scene: &BakeScene, xs: &[f32], seeds: u64, samples: u32) -> f64 {
+fn miss_rate(scene: &Fixture, xs: &[f32], seeds: u64, samples: u32) -> f64 {
     let missed = xs
         .iter()
         .flat_map(|&x| (0..seeds).map(move |s| (x, s)))
-        .filter(|&(x, s)| direct_over(scene, x, s, true, samples).1 < samples as u64)
+        .filter(|&(x, s)| scene.direct(x, s, true, samples).1 < samples as u64)
         .count();
     missed as f64 / (xs.len() as u64 * seeds) as f64
 }
@@ -60,7 +60,7 @@ fn seen_through_a_slit_a_texel_rarely_keeps_the_probes_dark_verdict() {
     // Each of these texels sees the panel only through the slit. Measured over
     // 31 points and 1000 seeds: 1.8% at 256 samples, against 2.9% for one point
     // a block in two confirming rounds; checks drawn at random left a third.
-    let rate = miss_rate(&slit(0.0625), &[-0.1, 0.0, 0.2], 256, 256);
+    let rate = miss_rate(&Fixture::new(slit(0.0625)), &[-0.1, 0.0, 0.2], 256, 256);
     assert!(rate < 0.03, "slit 1/16: {rate} of texels black");
 }
 
@@ -69,7 +69,12 @@ fn under_a_thin_rod_a_texel_rarely_loses_its_shadow() {
     // Measured over 11 points and 1000 seeds at 256 samples: rod 1/8 5.2% and
     // rod 1/16 26% (10% and 36% with two confirming rounds and no checks).
     for (frac, bound) in [(0.125, 0.07), (0.0625, 0.31)] {
-        let rate = miss_rate(&under(frac * 0.6, 1.0), &[-0.2, 0.0, 0.2], 256, 256);
+        let rate = miss_rate(
+            &Fixture::new(under(frac * 0.6, 1.0)),
+            &[-0.2, 0.0, 0.2],
+            256,
+            256,
+        );
         assert!(rate < bound, "rod {frac}: {rate} of texels unshadowed");
     }
 }
@@ -91,7 +96,7 @@ fn a_panel_flush_in_a_recess_seen_whole_takes_the_probes_cheap_path() {
     let walls = (0..4)
         .map(|i| wall(corners[i], corners[(i + 1) % 4], 9 + i as u32))
         .collect();
-    let scene = lit(vec![panel(1.2, 0.6, 3.0, 10.0)], walls);
+    let scene = Fixture::new(lit(vec![panel(1.2, 0.6, 3.0, 10.0)], walls));
     for x in [0.0, 0.05] {
         let rays = mean_rays(&scene, x, 256);
         assert!(

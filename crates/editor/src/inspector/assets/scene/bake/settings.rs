@@ -63,7 +63,10 @@ fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         ui,
         direct,
         "Direct samples",
-        "Points each Area light's direct light is integrated over; 0 follows Samples",
+        "Points each Area light's direct light is integrated over; 0 follows Samples. \
+         From 50 up a probe prices a fully lit or hidden panel at a fixed 24 or 52 rays, \
+         so this only prices penumbrae; under 50 every panel takes every point, so 49 \
+         costs more than 64 and only about 25 or under is cheaper",
     );
     changed
 }
