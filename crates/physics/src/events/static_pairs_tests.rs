@@ -1,19 +1,25 @@
 //! crates/physics/src/events/static_pairs_tests.rs — two static colliders never pair
 //! (#1779): a wall standing on a floor keeps no contact and raises no event, a
-//! static trigger ignores the static wall it overlaps, while a kinematic mover
-//! still meets the wall and a body made non-static in Play pairs again.
+//! static trigger ignores the static wall it overlaps but not a mover, and a body
+//! made dynamic in Play pairs again. Kinematic pairs: `kinematic_pairs_tests`.
 
 use glam::Vec3;
 
 use crate::PhysicsWorld;
-use rusty_components::{ColliderComponent, ColliderShape};
+use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty_scene::Scene;
 
-const DT: f32 = 1.0 / 60.0;
+pub(super) const DT: f32 = 1.0 / 60.0;
 
 /// An entity at `pos` with a `size` box collider, static when `is_static`
 /// (else, with no Rigidbody, a kinematic collider).
-fn boxed(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool, trigger: bool) -> u32 {
+pub(super) fn boxed(
+    scene: &mut Scene,
+    pos: Vec3,
+    size: Vec3,
+    is_static: bool,
+    trigger: bool,
+) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
     scene.world.set_static(id, is_static);
@@ -27,7 +33,7 @@ fn boxed(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool, trigger: boo
 }
 
 /// A static floor with its top face at `y = 0` and a 1×2×1 wall standing on it.
-fn wall_on_floor(wall_static: bool) -> (Scene, u32, u32) {
+pub(super) fn wall_on_floor(wall_static: bool) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let floor = boxed(
         &mut scene,
@@ -47,7 +53,7 @@ fn wall_on_floor(wall_static: bool) -> (Scene, u32, u32) {
 }
 
 /// How many collider pairs rapier holds an actual contact for.
-fn touching(world: &PhysicsWorld) -> usize {
+pub(super) fn touching(world: &PhysicsWorld) -> usize {
     let pairs = world.narrow_phase.contact_pairs();
     pairs.filter(|p| p.has_any_active_contact()).count()
 }
@@ -63,21 +69,22 @@ fn a_static_wall_on_a_static_floor_keeps_no_contact_or_event() {
     assert_eq!(touching(&world), 0, "static↔static is never solved");
 }
 
-#[test]
-fn a_kinematic_wall_on_a_static_floor_still_touches() {
-    let (mut scene, _, _) = wall_on_floor(false);
-    let mut world = PhysicsWorld::from_scene(&scene);
-    world.step(&mut scene, DT);
-    world.step(&mut scene, DT);
-    assert_eq!(touching(&world), 1, "kinematic↔static still pairs");
+/// Give `id` a Rigidbody: dynamic, or kinematic when `kinematic`.
+pub(super) fn set_body(scene: &mut Scene, id: u32, kinematic: bool) {
+    let rb = RigidBodyComponent {
+        is_kinematic: kinematic,
+        ..rusty_scene::create::defaults::default_rigidbody()
+    };
+    scene.world.set_rigidbody(id, Some(rb));
 }
 
 #[test]
-fn a_wall_made_non_static_in_play_pairs_again_and_back() {
+fn a_wall_made_dynamic_in_play_pairs_again_and_back() {
     let (mut scene, _, wall) = wall_on_floor(true);
     let mut world = PhysicsWorld::from_scene(&scene);
     world.step(&mut scene, DT);
     assert_eq!(touching(&world), 0);
+    set_body(&mut scene, wall, false);
     scene.world.set_static(wall, false);
     world.step(&mut scene, DT);
     world.step(&mut scene, DT);
@@ -94,6 +101,20 @@ fn a_wall_made_non_static_in_play_pairs_again_and_back() {
         0,
         "made static again, the pair is dropped"
     );
+}
+
+#[test]
+fn a_wall_made_non_static_in_play_keeps_no_pair() {
+    let (mut scene, _, wall) = wall_on_floor(true);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    world.step(&mut scene, DT);
+    // Collider-only, so static to kinematic: still no dynamic side.
+    scene.world.set_static(wall, false);
+    for _ in 0..30 {
+        let ev = world.step(&mut scene, DT);
+        assert!(ev.collisions.is_empty(), "{:?}", ev.collisions);
+    }
+    assert_eq!(touching(&world), 0, "kinematic↔static is never solved");
 }
 
 #[test]
