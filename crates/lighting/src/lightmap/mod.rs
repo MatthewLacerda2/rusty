@@ -128,6 +128,8 @@ mod pool_tests;
 #[cfg(test)]
 mod prioritize_tests;
 #[cfg(test)]
+mod probe_check_tests;
+#[cfg(test)]
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;

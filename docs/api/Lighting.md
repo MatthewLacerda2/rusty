@@ -450,18 +450,20 @@ lighting settings (above), whose defaults are the ones listed here.
   point picked in each of 4 × 4 blocks of the full set. Mixed (a penumbra), the rest of
   the set casts its rays, the probe's points counting among them, so a penumbra costs
   only the four corners more. All seen, the rest of the set is taken as unshadowed, and
-  about 4 of its points cast their rays anyway (24 rays a panel); all hidden, it is taken
-  as giving nothing, and about 32 of its points are checked (52 rays). A check that finds
-  the verdict wrong corrects it by its point's light over its chance of being checked, so
-  the bake shows no missing shadow and no missing light on average: a thin occluder that
-  all 20 probe rays miss (a pipe under a panel) still casts its shadow, and a slit the
-  probe misses still lets its light through. Where the verdict was wrong, the texel is
-  noisier instead, by an amount set by the checks, not by `directSamples` (baked direct
-  light is never denoised): measured straight under a 1.2 × 0.6 m panel, a rod across it
-  1/8 of its width leaves the texel's light varying by about 8% from seed to seed, where
-  the exhaustive set varies by under 1%; through a slit 1/8 of the panel's width, about
-  15% against 7%. On a floor that shows as dark specks across a thin occluder's faint
-  shadow. A fully seen or fully hidden panel is as quiet as the exhaustive set.
+  4 more of its points, one in each quarter of the panel, cast their rays to confirm it
+  (24 rays a panel); all hidden, it is taken as giving nothing, and 32 more points, two
+  in each block, spread over rows and columns its other points left, confirm that (52
+  rays). The first confirming ray that contradicts the verdict drops it, and the texel
+  casts the rest of the set in full, as in a penumbra: a texel's light is either the
+  verdict, with every ray it cast agreeing, or the full set's, never a weighted mix, so
+  a wrong verdict that a check finds costs rays, not speckle. What it can still lose is a shadow or a sliver of light from
+  an occluder or an opening too thin for those two dozen or so points to find (a pipe
+  under a panel, a narrow slit), and only on the texels where all of them missed it; such
+  a texel is off by at most that occluder's or opening's share of the one panel's light.
+  Measured straight under a 1.2 × 0.6 m panel at 256 points, a rod across it 1/8 of its
+  width keeps its shadow on 95% of texels, and a slit 1/16 of its width lets its light
+  through on 98%. A `directSamples` of 49 or under (`16` say) integrates every panel in
+  full, with no probe.
   A texel buried inside other geometry (floor under a crate) is filled from its neighbours rather than baked black (*Backface
   Tolerance*, below). No GPU is needed; it runs headless.
 - **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,

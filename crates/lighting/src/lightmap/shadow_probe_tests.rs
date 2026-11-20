@@ -1,9 +1,6 @@
-//! The Area light's shadow probe (#2355): a texel fully seeing or fully hidden
-//! from a panel casts 20 probe rays (four corners and one point in each of 4 × 4
-//! blocks) and about 16 checks among the rest of the set, one in its penumbra the
-//! full set plus the corners, so the probe changes the cost and the noise, not
-//! the mean light; `area_tests`' penumbra widths hold it at a shadow's edges,
-//! `slit_probe_tests` through a gap and under a thin occluder.
+//! The Area light's shadow probe (#2355): a fully seen or hidden texel casts 20
+//! probe rays and 4 or 32 checks, a penumbra the full set plus the corners;
+//! `slit_probe_tests` and `probe_check_tests` hold where the probe can be wrong.
 
 use std::sync::atomic::Ordering;
 
@@ -36,7 +33,13 @@ fn direct(scene: &BakeScene, x: f32, seed: u64, probed: bool) -> (f32, u64) {
 }
 
 /// [`direct`] over `samples` direct samples.
-fn direct_over(scene: &BakeScene, x: f32, seed: u64, probed: bool, samples: u32) -> (f32, u64) {
+pub(super) fn direct_over(
+    scene: &BakeScene,
+    x: f32,
+    seed: u64,
+    probed: bool,
+    samples: u32,
+) -> (f32, u64) {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
     let tracer = if probed {

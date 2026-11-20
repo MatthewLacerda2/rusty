@@ -36,6 +36,7 @@ use glam::{Vec2, Vec3, Vec4};
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
+mod check;
 mod direct;
 mod emitter;
 #[cfg(test)]

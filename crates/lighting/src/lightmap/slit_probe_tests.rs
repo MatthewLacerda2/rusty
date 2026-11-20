@@ -2,20 +2,16 @@
 //! only through a slit that shows none of its corners, and one with a thin rod
 //! under it that hides none. A probe whose points all miss the slit calls the
 //! panel hidden, one whose points all miss the rod calls it seen; the checks
-//! (`trace::own`, `LIT_CHECKS`, `HIDDEN_CHECKS`) correct either verdict on
-//! average, so the probed light's mean is the exhaustive one's, with more noise.
+//! (`trace::check`) find most such verdicts wrong, and the texel then casts the
+//! whole set. These hold how often a verdict survives where it is wrong.
 //! And a panel in a recess whose walls meet its edges, which the corner rays
 //! must not graze.
 
 use glam::Vec3;
 
 use super::area_tests::{lit, panel};
-use super::bake::triangles;
-use super::rays::Rays;
-use super::rng::Rng;
-use super::shadow_probe_tests::mean_rays;
+use super::shadow_probe_tests::{direct_over, mean_rays};
 use super::tests::quad;
-use super::trace::Tracer;
 use super::*;
 
 /// The 1.2 × 0.6 m panel 3 m up, under a cover 0.3 m below it whose one slit,
@@ -47,61 +43,35 @@ pub(super) fn under(hx: f32, hz: f32) -> BakeScene {
     lit(vec![panel(1.2, 0.6, 3.0, 10.0)], vec![q])
 }
 
-/// The mean and the standard error of the direct light at floor point `x` over
-/// `seeds` seeds at 256 direct samples, probed or not.
-fn light(scene: &BakeScene, x: f32, seeds: u64, probed: bool) -> (f64, f64) {
-    let rays = Rays::build(triangles(scene));
-    let tracer = Tracer::new(scene, &rays);
-    let tracer = if probed {
-        tracer
-    } else {
-        tracer.without_probe()
-    };
-    let at = Vec3::new(x, 0.0, 0.1);
-    let all: Vec<f64> = (0..seeds)
-        .map(|s| {
-            let mut rng = Rng::new(s + 1000 * probed as u64, 0, 0);
-            tracer.texel(at, Vec3::Y, (1, 256), 1, &mut rng).direct.x as f64
-        })
-        .collect();
-    let n = all.len() as f64;
-    let mean = all.iter().sum::<f64>() / n;
-    let var = all.iter().map(|e| (e - mean).powi(2)).sum::<f64>() / (n - 1.0);
-    (mean, (var / n).sqrt())
-}
-
-/// Asserts the probed mean at `x` is the exhaustive one within three standard
-/// errors of their difference and within `within` of it, relatively.
-fn holds(scene: &BakeScene, x: f32, seeds: u64, within: f64, what: &str) {
-    let (truth, truth_se) = light(scene, x, seeds, false);
-    let (probed, probed_se) = light(scene, x, seeds, true);
-    let se = truth_se.hypot(probed_se);
-    println!(
-        "{what} at {x}: probed {probed:.5} ± {probed_se:.5}, exhaustive {truth:.5} ± {truth_se:.5}"
-    );
-    assert!(truth > 0.0, "{what}: the floor at {x} is lit");
-    assert!(
-        (probed - truth).abs() < 3.0 * se && (probed - truth).abs() < within * truth,
-        "{what} at {x}: probed {probed} against {truth} (± {se})"
-    );
+/// The share of `seeds` seeds at each floor point of `xs`, at `samples` direct
+/// samples, whose probe and checks all missed what `scene` puts across the
+/// panel: those that cast fewer rays than the set, a unanimous verdict kept.
+fn miss_rate(scene: &BakeScene, xs: &[f32], seeds: u64, samples: u32) -> f64 {
+    let missed = xs
+        .iter()
+        .flat_map(|&x| (0..seeds).map(move |s| (x, s)))
+        .filter(|&(x, s)| direct_over(scene, x, s, true, samples).1 < samples as u64)
+        .count();
+    missed as f64 / (xs.len() as u64 * seeds) as f64
 }
 
 #[test]
-fn seen_through_a_slit_the_probed_floors_mean_light_is_the_exhaustive_ones() {
-    // Without the checks, the probe called a third of these samples black.
-    for x in [-0.1, 0.0, 0.2] {
-        holds(&slit(0.0625), x, 128, 0.15, "slit 1/16");
+fn seen_through_a_slit_a_texel_rarely_keeps_the_probes_dark_verdict() {
+    // Each of these texels sees the panel only through the slit. Measured over
+    // 31 points and 1000 seeds: 1.8% at 256 samples, against 2.9% for one point
+    // a block in two confirming rounds; checks drawn at random left a third.
+    let rate = miss_rate(&slit(0.0625), &[-0.1, 0.0, 0.2], 256, 256);
+    assert!(rate < 0.03, "slit 1/16: {rate} of texels black");
+}
+
+#[test]
+fn under_a_thin_rod_a_texel_rarely_loses_its_shadow() {
+    // Measured over 11 points and 1000 seeds at 256 samples: rod 1/8 5.2% and
+    // rod 1/16 26% (10% and 36% with two confirming rounds and no checks).
+    for (frac, bound) in [(0.125, 0.07), (0.0625, 0.31)] {
+        let rate = miss_rate(&under(frac * 0.6, 1.0), &[-0.2, 0.0, 0.2], 256, 256);
+        assert!(rate < bound, "rod {frac}: {rate} of texels unshadowed");
     }
-}
-
-#[test]
-fn under_a_thin_rod_the_probed_floor_keeps_its_shadow_on_average() {
-    // The rod hides 1/16 of the panel's width: about 6% of its light straight
-    // under it. All 20 probe rays miss it on about a third of texels, which,
-    // left unchecked, gave back about 2% of the light; the checks hold the
-    // mean to the exhaustive one well inside that.
-    let rod = under(0.0625 * 0.6, 1.0);
-    holds(&rod, 0.0, 256, 0.012, "rod 1/16");
 }
 
 #[test]

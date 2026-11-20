@@ -6,6 +6,7 @@ use glam::{Vec2, Vec3};
 use super::super::input::{BakeLight, LightShape};
 use super::super::lights::area::{block_of, block_span, cell_point, strata, PROBE};
 use super::super::rng::Rng;
+use super::check::{below, check_cells, HIDDEN_CHECKS, LIT_CHECKS};
 use super::direct::{casts, Lit};
 use super::{Tracer, T_MIN};
 use rusty_core::color::luminance;
@@ -53,18 +54,20 @@ impl Tracer<'_> {
     /// shadow ray to each of the panel's four corners (inset by [`INSET`]) and to
     /// one point picked in each of the set's `PROBE × PROBE` blocks. Mixed, or
     /// nothing cast: every other point of the set casts its ray. Unanimous, the
-    /// verdict decides the rest's light (all of it unshadowed, or none), and each
-    /// other point casts its ray anyway with probability `p` ([`chance`], about
-    /// [`LIT_CHECKS`] or [`HIDDEN_CHECKS`] rays a panel); a ray that finds the
-    /// verdict wrong corrects it by that point's light over `p`.
+    /// verdict decides the rest's light (all of it unshadowed, or none), and
+    /// [`LIT_CHECKS`] or [`HIDDEN_CHECKS`] other points, stratified over the
+    /// blocks ([`check_cells`]), cast their rays anyway; the first that finds the
+    /// verdict wrong drops it and the rest of the set is cast in full
+    /// ([`Self::rest`]).
     ///
-    /// The estimate is unbiased whatever the probe says: a probe that misses a
-    /// thin occluder or a slit costs noise on that texel, not a missing shadow
-    /// or a missing light. Where it was right the correction is zero, so a fully
-    /// lit or fully hidden texel is as quiet as the exhaustive estimate. The
-    /// probe's points are points of the set, so a penumbra casts only the four
-    /// corners more than it. `shadow_probe_tests` and `slit_probe_tests` measure
-    /// it against the exhaustive estimate.
+    /// So a texel's estimate is either the verdict, with every ray it cast
+    /// agreeing, or the exhaustive one: nothing is weighted, so no speckle. What
+    /// can still be lost is an occluder or a slit thin enough to dodge the
+    /// corners, the 16 block points and the checks; the texel that misses it is
+    /// off by at most its share of that one panel's light. The probe's points
+    /// are points of the set, so a penumbra casts only the four corners more
+    /// than it. `shadow_probe_tests` and `slit_probe_tests` measure it against
+    /// the exhaustive estimate.
     fn area(
         &self,
         light: &BakeLight,
@@ -82,7 +85,7 @@ impl Tracer<'_> {
             weight: 1.0 / (m * m) as f32,
         };
         if !self.probe || !probes(m) {
-            return self.rest(&set, Verdict::Cast, |_| false, rng);
+            return self.rest(&set, Verdict::Cast, |_| false, |_| false, rng);
         }
         let mut tally = Tally::default();
         for u in CORNERS {
@@ -91,12 +94,17 @@ impl Tracer<'_> {
         let picks = self.probe_points(&set, &mut tally, rng);
         let verdict = match (tally.passed, tally.blocked) {
             (0, 0) => Verdict::Cast,
-            (_, 0) => Verdict::Lit(chance(m, LIT_CHECKS)),
-            (0, _) => Verdict::Hidden(chance(m, HIDDEN_CHECKS)),
+            (_, 0) => Verdict::Lit,
+            (0, _) => Verdict::Hidden,
             _ => Verdict::Cast,
         };
+        let checks = match verdict {
+            Verdict::Cast => [[u32::MAX; 2]; BLOCKS],
+            _ => check_cells(m, &picks, matches!(verdict, Verdict::Lit), rng),
+        };
         let probed = |k: u32| picks[block_of(k, m)] == k;
-        let rest = self.rest(&set, verdict, probed, rng);
+        let checked = |k: u32| checks[block_of(k, m)].contains(&k);
+        let rest = self.rest(&set, verdict, probed, checked, rng);
         (tally.lit.0 + rest.0, tally.lit.1 + rest.1)
     }
 
@@ -110,8 +118,7 @@ impl Tracer<'_> {
                 block_span(b as u32 % PROBE, m),
                 block_span(b as u32 / PROBE, m),
             );
-            let n = (x1 - x0) * (y1 - y0);
-            let q = ((rng.next_f32() * n as f32) as u32).min(n - 1);
+            let q = below((x1 - x0) * (y1 - y0), rng);
             *cell = (y0 + q / (x1 - x0)) * m + x0 + q % (x1 - x0);
             let u = cell_point(*cell, m, jitter(rng));
             self.probe_ray(set, u, tally, true);
@@ -139,12 +146,17 @@ impl Tracer<'_> {
     }
 
     /// The light of `set`'s points the probe did not cast (`probed` says which it
-    /// did), in row order, as `verdict` has it.
+    /// did), in row order, as `verdict` has it. Unanimous, the points `checked`
+    /// says cast their rays anyway; the first that contradicts the verdict drops
+    /// it and the rest of the set is cast in full from fresh points, as a
+    /// penumbra's is. Nothing is weighted, so a wrong verdict a check finds
+    /// costs rays, never a speckle.
     fn rest(
         &self,
         set: &Set,
         verdict: Verdict,
-        probed: impl Fn(u32) -> bool,
+        probed: impl Fn(u32) -> bool + Copy,
+        checked: impl Fn(u32) -> bool + Copy,
         rng: &mut Rng,
     ) -> Lit {
         let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
@@ -152,20 +164,16 @@ impl Tracer<'_> {
             let u = cell_point(k, set.m, jitter(rng));
             let (lit, d) = match verdict {
                 Verdict::Cast => self.own_lamp(set.light, set.point, set.normal, u, set.weight),
-                // A checked point whose ray finds the verdict wrong moves the
-                // estimate by its light over `p`, which keeps it unbiased.
-                Verdict::Lit(p) => {
+                Verdict::Lit | Verdict::Hidden => {
+                    let seen = matches!(verdict, Verdict::Lit);
                     let (lit, d) = self.unshadowed(set, u);
-                    match rng.next_f32() < p && lit != Vec3::ZERO && self.blocked(set, u) {
-                        true => (lit - lit / p, d - d / p),
-                        false => (lit, d),
+                    if checked(k) && lit != Vec3::ZERO && self.blocked(set, u) == seen {
+                        return self.rest(set, Verdict::Cast, probed, checked, rng);
                     }
-                }
-                Verdict::Hidden(p) => {
-                    let (lit, d) = self.unshadowed(set, u);
-                    match rng.next_f32() < p && lit != Vec3::ZERO && !self.blocked(set, u) {
-                        true => (lit / p, d / p),
-                        false => (Vec3::ZERO, Vec3::ZERO),
+                    if seen {
+                        (lit, d)
+                    } else {
+                        (Vec3::ZERO, Vec3::ZERO)
                     }
                 }
             };
@@ -207,7 +215,7 @@ impl Tracer<'_> {
 }
 
 /// The probe's blocks, one picked point in each.
-const BLOCKS: usize = (PROBE * PROBE) as usize;
+pub(super) const BLOCKS: usize = (PROBE * PROBE) as usize;
 
 /// How far inside the panel's edges, as a fraction of each side, the probe's
 /// corner rays aim. A corner exactly on the edge sits where a coffer's or a
@@ -228,25 +236,6 @@ const CORNERS: [Vec2; 4] = [
 /// The probe's rays: the corners and one point per block.
 const PROBE_RAYS: u32 = 4 + BLOCKS as u32;
 
-/// The checking rays a probe that found a panel fully seen casts among the rest
-/// of its set, on average ([`chance`]): 24 rays in all, few because most panels
-/// over a floor are fully seen, so it keeps most of the probe's saving. Their count, not the set's, sets the noise a wrongly
-/// seen panel (a thin occluder all 20 probe rays missed) leaves on the texel:
-/// each check stands for `1 / p` points, whatever `directSamples` is.
-const LIT_CHECKS: u32 = 4;
-
-/// The checking rays a probe that found a panel fully hidden casts among the
-/// rest of its set, on average: 52 rays in all, more than [`LIT_CHECKS`] because
-/// a hidden panel is rarer over a floor, so a texel lit only through a slit the
-/// probe missed is less noisy than one under a rod it missed.
-const HIDDEN_CHECKS: u32 = 32;
-
-/// The probability each point a unanimous probe left is cast anyway, for an
-/// `m × m` set: `checks` rays among its `m² − PROBE²` points on average.
-fn chance(m: u32, checks: u32) -> f32 {
-    (checks as f32 / (m * m - PROBE * PROBE) as f32).min(1.0)
-}
-
 /// Whether an `m × m` set is probed: when a unanimous probe and its checks cost
 /// fewer rays than the set, whichever way it finds the panel.
 fn probes(m: u32) -> bool {
@@ -254,13 +243,13 @@ fn probes(m: u32) -> bool {
 }
 
 /// What a probe decided about the rest of an Area light's set: cast every
-/// point's ray (no probe, mixed, or nothing cast), or take it lit or hidden and
-/// check each point with the probability carried.
+/// point's ray (no probe, mixed, or nothing cast), or take it lit or hidden,
+/// checking a few of its points ([`check_cells`]).
 #[derive(Clone, Copy)]
 enum Verdict {
     Cast,
-    Lit(f32),
-    Hidden(f32),
+    Lit,
+    Hidden,
 }
 
 /// One Area light's stratified set at a receiving point: `m × m` points, each
