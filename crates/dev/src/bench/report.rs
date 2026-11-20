@@ -126,7 +126,26 @@ impl Samples {
     }
 }
 
+/// The warning for a kept report from before `cpu_ms` timed the whole tick
+/// (#2342), by which rows each has (`has`): the kept one a `cpu_ms` and no
+/// `cpu.flush_bounds`, the current one that row. `cpu_ms` and `cpu.other` then grew
+/// by what was hidden, so a sim change reads in its `cpu.<system>` rows.
+pub fn tick_timed_since(now: impl Fn(&str) -> bool, kept: impl Fn(&str) -> bool) -> Option<String> {
+    let old = kept("cpu_ms") && !kept("cpu.flush_bounds");
+    (old && now("cpu.flush_bounds")).then(|| {
+        "the kept report predates `cpu_ms` timing the whole tick (it has no \
+         cpu.flush_bounds row): cpu_ms and cpu.other now hold the tick's work outside \
+         its systems, so compare the cpu.<system> rows"
+            .to_string()
+    })
+}
+
 impl Report {
+    /// Whether this report has a row for `metric`.
+    pub fn has(&self, metric: &str) -> bool {
+        self.metrics.iter().any(|(k, _)| k == metric)
+    }
+
     /// The table the terminal shows: one row per metric, with the change in its
     /// average against `previous` where that run measured it too.
     pub fn render(&self, previous: Option<&Report>) -> String {

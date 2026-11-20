@@ -91,18 +91,20 @@ mod args_gpu_tests;
 mod cluster_gpu_tests;
 #[cfg(test)]
 mod copy_gpu_tests;
+#[cfg(test)]
+mod dispatch_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
 mod gpu_tests;
-#[cfg(test)]
-mod group_gpu_tests;
 #[cfg(test)]
 mod late_gpu_tests;
 #[cfg(test)]
 mod moving_gpu_tests;
 #[cfg(test)]
 mod passes_gpu_tests;
+#[cfg(test)]
+mod pool_gpu_tests;
 #[cfg(test)]
 mod projection_gpu_tests;
 #[cfg(test)]

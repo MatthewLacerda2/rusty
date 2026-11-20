@@ -7,7 +7,8 @@
 //! `FixedUpdate → Update → LateUpdate → Render` order (see [`Stage::FRAME_ORDER`]).
 //!
 //! Each system is stored with its function name, so an installed
-//! [`SystemProbe`](super::SystemProbe) can attribute per-system cost (#433). With no
+//! [`SystemProbe`](super::SystemProbe) can attribute per-system cost (#433); the
+//! collider-AABB flush after each stage is handed to it as `flush_bounds`. With no
 //! probe installed the frame runs the systems directly — the default, and the only
 //! path a ship build takes.
 
@@ -96,8 +97,15 @@ impl Schedule {
         // The stage's Transform writes queued their colliders' AABBs: store them once
         // here, for the readers of the stored box. `World::collider_bounds` never
         // depends on it, so a scene borrowed elsewhere just waits for the next stage.
-        if let Ok(mut scene) = world.scene.try_borrow_mut() {
-            scene.world.flush_bounds();
+        // A probe times it as `flush_bounds`, once per stage.
+        let mut flush = || {
+            if let Ok(mut scene) = world.scene.try_borrow_mut() {
+                scene.world.flush_bounds();
+            }
+        };
+        match probe.as_mut() {
+            Some(p) => p.run(stage, "flush_bounds", &mut flush),
+            None => flush(),
         }
     }
 }

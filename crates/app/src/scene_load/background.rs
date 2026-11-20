@@ -39,6 +39,12 @@ pub trait SceneLoader: std::any::Any {
     fn progress(&mut self, _op: u32) -> f32 {
         0.0
     }
+    /// Whether [`Self::take`] does the preparation itself, on the ticking thread (a
+    /// headless host's [`Inline`]), rather than handing back a job a worker finished:
+    /// a timing probe then times the take beside the tick, not in it.
+    fn prepares_inline(&self) -> bool {
+        false
+    }
 }
 
 /// The host's loader — inline by default, a worker thread in the windowed shell
@@ -82,6 +88,10 @@ impl SceneLoader for Inline {
 
     fn cancel(&mut self) {
         self.job = None;
+    }
+
+    fn prepares_inline(&self) -> bool {
+        true
     }
 }
 
@@ -232,7 +242,8 @@ impl GameWorld {
             if self.world.scene.borrow().loads.waiting() != Some(op) {
                 continue;
             }
-            let prepared = res.loading.loader.take(op);
+            let prepared = self.take_load(op);
+            let res = &mut self.resources;
             let ok = prepared.is_ok();
             match prepared {
                 Ok(scene) => res.loading.ready = Some((op, scene)),

@@ -10,7 +10,15 @@
 //! **Granularity.** Per-system *and* per-stage. The schedule is ~a dozen systems, so a
 //! clock read around each costs well under a microsecond a frame, and "FixedUpdate is
 //! slow" is only actionable once it names `update_scripts` or `step_physics`. A stage's
-//! time is the sum of its systems' times.
+//! time is the sum of its systems' times and its collider-AABB flush (`flush_bounds`).
+//! `frame_ms` is the [`GameWorld::tick`](rusty_app::GameWorld::tick), from its
+//! `begin_tick` (after the play transition) to its `end_tick`, so it holds what no
+//! system does (#2342), less its parts (`run_part`: a demo's taps, an inline load's
+//! preparation), work a shipped, windowed game does not do on its tick: each is
+//! recorded beside it as `<part>_ms` (`taps_ms`, `loads_ms`) on a tick it ran.
+//! `end_tick` is the one place a frame closes: its system rows, each name summed
+//! over the tick (`flush_bounds` runs once a stage), its parts, `frame_ms` and the
+//! frame count; a schedule frame run outside a host's tick is never closed.
 //!
 //! **Sessions.** The stats restart on each Play session's first frame, so a window
 //! reports the current run; a frame drawn outside Play reaches only the recent ring
@@ -25,12 +33,14 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use super::capture::RenderedFrame;
-use rusty_app::{GameWorld, LoadProbe, Resources, Stage, SystemProbe, World};
+use rusty_app::{GameWorld, Resources, Stage, SystemProbe, World};
 use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
-use rusty_script::scripting::ConsoleLogs;
 
+mod counters;
+mod load;
 pub mod verbs;
 mod window;
+pub use load::LoadTimer;
 pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
 
 /// The metric each per-frame stage's CPU time is recorded under.
@@ -49,13 +59,21 @@ pub struct TimingProbe {
     stats: Rc<RefCell<FrameStats>>,
     /// This frame's CPU ms per stage, indexed by [`Stage::FRAME_ORDER`] position.
     stage_ms: [f64; 4],
-    /// This frame's per-system times, held until `end_frame` knows whether the frame
-    /// opened a new Play session (and so must reset the stats first).
+    /// This tick's per-system (and per-part) times, held until `end_tick`, after
+    /// `end_frame` knows whether the frame opened a new Play session (and so must
+    /// reset the stats first).
     system_ms: Vec<(&'static str, f64)>,
+    /// This tick's parts (`run_part`), timed beside `frame_ms`, not in it.
+    part_ms: Vec<(&'static str, f64)>,
     /// Each change channel's `logged` count at the last frame's end, for its delta.
     logged: BTreeMap<&'static str, u64>,
     /// The [`LoadTimer`]'s samples of a load this frame, recorded at its end.
     loads: LoadSamples,
+    /// When the host's tick began (`begin_tick`), for `frame_ms` at its end.
+    tick_start: Option<Instant>,
+    /// This tick ran a schedule frame (`end_frame`), so `end_tick` closes one: an
+    /// edit tick records nothing.
+    frame_ran: bool,
 }
 
 /// A finished load's `load_*` samples (#2123), held until the frame's end: a load in
@@ -69,8 +87,11 @@ impl TimingProbe {
             stats,
             stage_ms: [0.0; 4],
             system_ms: Vec::new(),
+            part_ms: Vec::new(),
             logged: BTreeMap::new(),
             loads: LoadSamples::default(),
+            tick_start: None,
+            frame_ran: false,
         }
     }
 
@@ -83,13 +104,17 @@ impl TimingProbe {
 impl SystemProbe for TimingProbe {
     fn run(&mut self, stage: Stage, name: &'static str, system: &mut dyn FnMut()) {
         verbs::enter_system(name);
-        let start = Instant::now();
-        system();
-        let ms = start.elapsed().as_secs_f64() * 1000.0;
+        let ms = time_ms(system);
         if let Some(slot) = Stage::FRAME_ORDER.iter().position(|s| *s == stage) {
             self.stage_ms[slot] += ms;
         }
         self.system_ms.push((name, ms));
+    }
+
+    fn run_part(&mut self, name: &'static str, part: &mut dyn FnMut()) {
+        verbs::enter_system(name);
+        let ms = time_ms(part);
+        self.part_ms.push((name, ms));
     }
 
     fn end_frame(&mut self, world: &World, res: &Resources) {
@@ -102,109 +127,71 @@ impl SystemProbe for TimingProbe {
         for (key, ms) in self.loads.borrow_mut().drain(..) {
             stats.record(&key, ms);
         }
-        for (name, ms) in self.system_ms.drain(..) {
-            stats.record_system(name, ms);
-        }
-        let mut total = 0.0;
         for (stage, ms) in Stage::FRAME_ORDER.iter().zip(self.stage_ms) {
             stats.record(stage_key(*stage), ms);
-            total += ms;
         }
-        stats.record("frame_ms", total);
         self.stage_ms = [0.0; 4];
-        record_world(&mut stats, world, res);
+        counters::record_world(&mut stats, world, res);
         let changes = world.scene.borrow().world.change_stats();
         let changes = changes.into_iter().map(|s| (s.name, s.logged));
-        record_changes(&mut stats, changes, &mut self.logged);
+        counters::record_changes(&mut stats, changes, &mut self.logged);
+        self.frame_ran = true;
+    }
+
+    fn begin_tick(&mut self) {
+        self.system_ms.clear();
+        self.part_ms.clear();
+        self.tick_start = Some(verbs::now());
+    }
+
+    /// Closes the frame, if a schedule frame ran this tick: every system row (one
+    /// sample a name, summed over the stages it ran in), each part that ran as
+    /// `<part>_ms`, `frame_ms` (the tick less its parts), the count.
+    fn end_tick(&mut self) {
+        let start = self.tick_start.take();
+        let ran = std::mem::take(&mut self.frame_ran);
+        let systems = summed(self.system_ms.drain(..));
+        let parts = summed(self.part_ms.drain(..));
+        let Some(start) = start.filter(|_| ran) else {
+            return; // an edit tick: no frame stats
+        };
+        let mut stats = self.stats.borrow_mut();
+        for (name, ms) in systems {
+            stats.record_system(name, ms);
+        }
+        let mut beside = 0.0;
+        for (name, ms) in parts {
+            stats.record(&format!("{name}_ms"), ms);
+            beside += ms;
+        }
+        let tick = ms_since(start);
+        stats.record("frame_ms", (tick - beside).max(0.0));
         stats.end_tick();
     }
 }
 
-/// The world counters: entities, rigid bodies, nav agents, live particles, scripts,
-/// skeletons and their bones (#1617).
-fn record_world(stats: &mut FrameStats, world: &World, res: &Resources) {
-    let scene = world.scene.borrow();
-    let w = &scene.world;
-    let particles: usize = w
-        .ids_with_particles()
-        .into_iter()
-        .filter_map(|id| w.particles(id).map(|p| p.live_count()))
-        .sum();
-    let skinned = scene.skinned_ids();
-    let bones: usize = skinned
-        .iter()
-        .filter_map(|&id| {
-            w.mesh(id)
-                .map(|m| m.skeleton.bones.iter().flatten().count())
-        })
-        .sum();
-    stats.record("entities", w.len() as f64);
-    stats.record("rigid_bodies", w.ids_with_rigidbody().len() as f64);
-    stats.record("nav_agents", w.ids_with_nav_agent().len() as f64);
-    stats.record("particles", particles as f64);
-    stats.record("scripts", res.script_manager.live_script_count() as f64);
-    stats.record("skeletons", skinned.len() as f64);
-    stats.record("bones", bones as f64);
+/// Run `f`, returning how long it took in milliseconds.
+fn time_ms(f: &mut dyn FnMut()) -> f64 {
+    let start = verbs::now();
+    f();
+    ms_since(start)
 }
 
-/// `changes_<channel>`: per change channel a cursor reads, the distinct ids dirtied
-/// this frame (the entries its log appended since the last frame, #1705).
-fn record_changes(
-    stats: &mut FrameStats,
-    channels: impl Iterator<Item = (&'static str, u64)>,
-    last: &mut BTreeMap<&'static str, u64>,
-) {
-    for (name, logged) in channels {
-        let before = last.insert(name, logged).unwrap_or(0);
-        let key = format!("changes_{name}");
-        stats.record(&key, logged.saturating_sub(before) as f64);
-    }
+/// The milliseconds from `start` to now, on the dev layer's clock.
+fn ms_since(start: Instant) -> f64 {
+    verbs::now().saturating_duration_since(start).as_secs_f64() * 1000.0
 }
 
-/// Times each step of a play-mode scene load (#2123) and, once it swapped in,
-/// reports them: one console line at once, and `load_<step>_ms` plus `load_ms`
-/// (their sum) into `loads`, which the [`TimingProbe`] records at the frame's end
-/// into the stats `Debug.Stats()` reads, so a series spans every load of the session.
-pub struct LoadTimer {
-    loads: LoadSamples,
-    steps: Vec<(&'static str, f64)>,
-}
-
-impl LoadTimer {
-    pub fn new(loads: LoadSamples) -> Self {
-        let steps = Vec::new();
-        Self { loads, steps }
+/// Each name's times added up, in the order the names first ran.
+fn summed(times: impl Iterator<Item = (&'static str, f64)>) -> Vec<(&'static str, f64)> {
+    let mut out: Vec<(&'static str, f64)> = Vec::new();
+    for (name, ms) in times {
+        match out.iter_mut().find(|(n, _)| *n == name) {
+            Some((_, sum)) => *sum += ms,
+            None => out.push((name, ms)),
+        }
     }
-}
-
-impl LoadProbe for LoadTimer {
-    fn step(&mut self, name: &'static str, step: &mut dyn FnMut()) {
-        let start = Instant::now();
-        step();
-        self.steps
-            .push((name, start.elapsed().as_secs_f64() * 1000.0));
-    }
-
-    fn finish(&mut self, loaded: Option<&str>, console: &mut ConsoleLogs) {
-        let steps = std::mem::take(&mut self.steps);
-        let Some(path) = loaded else {
-            return; // a failed load swapped nothing in: nothing to compare against
-        };
-        let total: f64 = steps.iter().map(|(_, ms)| ms).sum();
-        let mut loads = self.loads.borrow_mut();
-        let parts: Vec<String> = steps
-            .iter()
-            .map(|(name, ms)| {
-                loads.push((format!("load_{name}_ms"), *ms));
-                format!("{name} {ms:.1}")
-            })
-            .collect();
-        loads.push(("load_ms".to_string(), total));
-        console.info(format!(
-            "Scene load {path}: {total:.1} ms ({})",
-            parts.join(", ")
-        ));
-    }
+    out
 }
 
 /// Install a [`TimingProbe`] and a [`LoadTimer`] on `world`, writing into the script
@@ -295,6 +282,9 @@ mod stats_load_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod stats_tests;
+#[cfg(test)]
+#[path = "tick_tests.rs"]
+mod stats_tick_tests;
 #[cfg(test)]
 #[path = "wall_tests.rs"]
 mod stats_wall_tests;
