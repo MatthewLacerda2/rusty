@@ -173,14 +173,19 @@ fn bench_one(run: &Run, scene: &str, key: String, kept: Kept) {
         .as_deref()
         .map(scenes::load::read_all)
         .transpose();
-    let editor = kept.editor.as_deref().map(scenes::editor::read).transpose();
+    // A round that cannot be read is said, and the scene benched without it.
+    let editor = kept.editor.as_deref().and_then(|file| {
+        let read = scenes::editor::read(file);
+        read.map_err(|e| eprintln!("bench-scenes: {scene}: no editor rows: {e}"))
+            .ok()
+    });
     let extra = Extra {
         baseline: run.before.clone(),
         key,
         import_ms: kept.import_ms,
         loads: loads.unwrap_or_else(|e| fail(&e)).unwrap_or_default(),
         set: run.set.said.clone(),
-        editor: editor.unwrap_or_else(|e| fail(&e)),
+        editor,
     };
     let done = scenes::bench(
         &opened.root,
