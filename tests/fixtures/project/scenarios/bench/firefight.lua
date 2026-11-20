@@ -10,7 +10,7 @@
 -- window measured after that measures churn, not growth. No randomness, no
 -- clock: two runs do the same edits.
 
-local SHOOTERS = 4  -- the first soldiers, who "fire"
+local SHOOTERS = 4  -- the first soldiers, who "fire" (fewer if the scene has fewer)
 local SPAWNS = 4    -- prefab instances spawned a tick, and as many destroyed
 local LIFETIME = 30 -- ticks an instance lives: SPAWNS * LIFETIME live at once
 local MUZZLES = 8   -- muzzle-flash meshes, two under each shooter's hand
@@ -78,9 +78,15 @@ end
 function Firefight.Start(id)
     for i = 1, SHOOTERS do
         local soldier = Scene.FindEntityByName("Soldier_" .. (i - 1))
+        if soldier == nil then
+            break
+        end
         shooters[i] = soldier
-        hands[i] = soldier and find(soldier, "hand_r")
+        hands[i] = find(soldier, "hand_r")
     end
+    -- A smaller stress scene has fewer shooters; none is a scenario error.
+    SHOOTERS = #shooters
+    assert(SHOOTERS > 0, "firefight: no Soldier_0 in the scene (Harness.LoadStress first)")
     for i = 1, MUZZLES do
         local hand = hands[(i - 1) % SHOOTERS + 1]
         muzzles[i] = box("Muzzle_" .. i, hand, 0, -0.1, 0.3, 0.08, 0.08, 0.15)
