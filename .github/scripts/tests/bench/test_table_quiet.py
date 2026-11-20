@@ -46,5 +46,23 @@ class Quiet(unittest.TestCase):
         self.assertIn("draw_calls", self.rows)
 
 
+class Prefixed(unittest.TestCase):
+    """A window's rows (`firefight.<row>`) are quiet by their own mark, never by name."""
+
+    def test_a_prefixed_row_follows_its_own_mark(self):
+        root = Path(tempfile.mkdtemp())
+        main = {"firefight.ui_meshed": (1.0, True), "firefight.bones": (3.0, True),
+                "firefight.draw_calls": (5.0, False), "ui_meshed": (1.0, False)}
+        pr = {**main, "firefight.ui_meshed": (0.5, True)}
+        text = table.scene_table("levels/a", (leg(root, "main", main), leg(root, "pr", pr),
+                                              leg(root, "again", main)))
+        printed = {line.split(" | ")[0].strip("| ") for line in text.splitlines() if line.startswith("| ")}
+        self.assertIn("firefight.ui_meshed", printed)
+        self.assertIn("firefight.draw_calls", printed)
+        self.assertIn("ui_meshed", printed)
+        self.assertNotIn("firefight.bones", printed)
+        self.assertIn("The other 1 counters are identical", text)
+
+
 if __name__ == "__main__":
     unittest.main()

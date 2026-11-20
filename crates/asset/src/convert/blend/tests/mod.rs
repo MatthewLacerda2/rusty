@@ -10,6 +10,7 @@ use std::path::{Path, PathBuf};
 
 mod drop;
 mod fingerprint;
+mod known;
 mod library_image;
 mod linked;
 mod locate;

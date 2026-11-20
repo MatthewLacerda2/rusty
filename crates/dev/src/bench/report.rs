@@ -65,6 +65,10 @@ pub struct Report {
     /// with another tree's shaders says so in its own report.
     #[serde(default)]
     pub engine: Option<EngineStamp>,
+    /// The later windows whose rows a kept run holds, each `<window>.<row>`
+    /// (`bench::window`): what tells a window's rows from a set's (`cpu.`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub windows: Vec<String>,
 }
 
 /// Per-frame samples, kept in the order metrics were first seen.
@@ -197,9 +201,10 @@ impl Report {
     }
 
     /// The table the terminal shows: one row per metric, with the change in its
-    /// average against `previous` where that run measured it too. A quiet counter
-    /// ([`Summary::quiet`]) prints only when it changed against `previous`, or reads
-    /// `absent in last` where `previous` lacks it; one line counts the rest.
+    /// average against `previous` where that run measured it too, and "absent on
+    /// the last run" where it did not. A quiet counter ([`Summary::quiet`]) prints
+    /// only when it changed or `previous` lacks it, one line counting the rest; none
+    /// does against a `previous` with no rows (a window the last run never measured).
     pub fn render(&self, previous: Option<&Report>) -> String {
         let before: BTreeMap<&str, &Summary> = previous
             .map(|p| p.metrics.iter().map(|(k, s)| (k.as_str(), s)).collect())
@@ -210,17 +215,18 @@ impl Report {
             "{:<22} {:>12} {:>12}  vs last avg",
             "metric", "avg", "p95"
         );
+        let compared = previous.is_some_and(|p| !p.metrics.is_empty());
         let mut unshown = 0;
         for (metric, s) in &self.metrics {
             let last = before.get(metric.as_str());
-            if s.quiet && !quiet_moved(previous.is_some(), last.map(|b| b.avg), s.avg) {
+            if s.quiet && !quiet_moved(compared, last.map(|b| b.avg), s.avg) {
                 unshown += 1;
                 continue;
             }
-            let delta = match last {
-                Some(b) => change(b.avg, s.avg),
-                None if s.quiet => "absent in last".to_string(),
-                None => String::new(),
+            let delta = match (previous, last) {
+                (_, Some(b)) => change(b.avg, s.avg),
+                (Some(_), None) => "absent on the last run".to_string(),
+                (None, None) => String::new(),
             };
             let _ = writeln!(
                 out,
@@ -229,7 +235,7 @@ impl Report {
                 num(s.p95)
             );
         }
-        let against = previous.map(|_| "last");
+        let against = compared.then_some("last");
         out.push_str(&unshown_line(unshown, against, "bench.json"));
         if let Some(engine) = &self.engine {
             out.push_str(&engine_line(

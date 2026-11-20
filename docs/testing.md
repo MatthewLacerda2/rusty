@@ -1109,8 +1109,27 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   lights, 8 flickering like muzzle flashes (`bench/flicker.lua`) and 6 casting
   shadows; 256 decals; four smoke columns; the sun's shadows. The
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
-- **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
-  at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
+- **the run** — two measured windows of one run, each stepped and rendered at
+  1280x720. **The quiet window**: 60 warm-up frames, then 600 measured ones
+  (`Harness.LoadStress{…}` then `Harness.Bench(600)`), the yard as it stands: what
+  a level costs while nothing is spawned, destroyed, re-parented or toggled, so a
+  result kept until its inputs change is measured at its best. **The firefight
+  window**: then `bench/firefight.lua` starts, a script whose `Update` does what
+  about four automatic weapons ask every tick through the API a game uses: 4
+  prefab instances spawned (`bench/casing.prefab`, a box with a Collider and a
+  Rigidbody; one under a soldier's `hand_r` bone, kinematic) and 4 destroyed after
+  30 ticks, 2 of 8 muzzle-flash meshes toggled (`Scene.SetActive`), 1 decal stamped
+  and its oldest past 64 removed, a pickup re-parented between two holders, and 4
+  shots: a `Physics.RaycastAllNonAlloc` from each shooter's muzzle to the
+  Player's chest, the first hit not on the shooter's own rig taken (as a weapon
+  does: its hitboxes surround the muzzle), the decal stamped where the first
+  lands. After 120 frames, when its live entity and decal counts hold still,
+  600 more are measured (`Harness.Bench(600, "firefight")`): the same rows, named
+  `firefight.<row>` (`firefight.cpu_ms`, `firefight.cpu.follow_bones`,
+  `firefight.render.<stage>`, …), where such a result's invalidation costs.
+  Nothing of the firefight exists during the quiet window, so its rows compare
+  with every report kept before it. The counts are constants at the top of
+  `firefight.lua`.
 - **the report** — per row the average and p95: `frame_ms` (the CPU time of the
   tick, `GameWorld::tick`, as measured, from after its play transition, so
   entering Play, a load, is in no tick's time: the schedule and the tick's own work
@@ -1139,12 +1158,17 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   Each is the window's average: a 0/1 counter's is the share of frames it was set
   on (0.0015 is one frame in 660; the table prints three decimals), and one first
   recorded partway through (a change channel that opens late) counts as zero on
-  the frames before it. Beyond the
-  ones named above a counter is **quiet**: the report file (`bench.json`,
-  `<scene>.json`, its rows marked `"quiet": true`) holds it always, the printed
-  table only when its average changed against the run it is compared with (or that
-  run lacks it: *absent in last*, or *in before* under `BEFORE=`), and one line
-  counts the rest, naming that run; `bench-ab`'s table
+  the window's frames before it. Each window samples on its own, so a counter
+  first recorded in the firefight window averages over that window's frames and
+  has no row in the quiet window (absent there, not zero). Beyond the
+  ones named above a counter is **quiet**, in every window: the report file
+  (`bench.json`, its `firefight.<row>` rows too, and `<scene>.json`, its rows
+  marked `"quiet": true`) holds it always, the printed table only when its average
+  changed against the run it is compared with, a window's against that window's
+  rows (or that run lacks it: *absent on the last run* under `make bench`, *absent
+  in last* or *in before* under `bench-scenes`), and one line a table counts the
+  rest, naming that run; against a run that never measured the window (the
+  firefight's, the first time) no quiet counter prints. `bench-ab`'s table
   prints a quiet counter only where `main` and the PR differ, and counts the
   identical ones. Then
   where the CPU time went, by name:
@@ -1214,7 +1238,11 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   by cluster) where an untimed frame (lavapipe, a shipped game) records 2, and the
   extra pass boundaries' cost is in the stage's own rows. Under the table come the run's warnings, if any (below).
 - **before and after** — the report is kept in `out/bench/bench.json` (and
-  `bench.txt`), and each run prints every row's change against the last one. To
+  `bench.txt`), both windows in one, and each run prints every row's change
+  against the last one, a window's table against that window's rows; a row the
+  last run did not measure (the firefight's, the first time) reads "absent on the
+  last run". A run stopped before a window keeps the last run's rows of it, so
+  the kept report always holds each window's last complete measurement. To
   measure an optimisation: `make bench`, change, `make bench`. The report names the
   engine that measured it (`engine <commit> content <digest>`, and the last run's
   content when it moved), and warns when the binary's `engine/` is not the one it was
@@ -1233,7 +1261,12 @@ timestamp queries the GPU rows are absent and the report says so.
 error) and must run before the first `Step`, so the spawned scripts load when play
 starts. `Harness.Bench(n)` works on any scenario: it steps and renders `n` frames,
 prints the report, keeps it in the run's out dir and returns `{ frames, metrics =
-{ <row> = { avg, p95 } }, warnings = { <text>, … } }`.
+{ <row> = { avg, p95 } }, warnings = { <text>, … } }`. `Harness.Bench(n, window)`
+measures a later window of the same run (`dev::bench::window`): `window` is a
+lowercase word (a-z, 0-9, `_`), measured once a run (either is an error), and
+its rows are returned and kept as `<window>.<row>` beside the first window's,
+its table printed under its own heading; each window's sums hold inside it, as
+the first's do. A `Harness.Bench(n)` starts a new run.
 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
@@ -1395,7 +1428,9 @@ every binary's open makes them.
     renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
     does not: `gpu_texture_mb` (image textures by path), `gpu_lightmap_mb` (the
     lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
-    array), as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
+    array), `gpu_mesh_mb` (the mesh vertex and index buffers) and
+    `gpu_cluster_pool_mb` (what the clustered meshes lease of the cluster pool),
+    as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its

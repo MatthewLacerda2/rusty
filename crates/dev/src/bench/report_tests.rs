@@ -45,7 +45,7 @@ fn the_table_shows_the_change_against_the_last_run() {
         .find(|l| l.starts_with("draw_calls"))
         .unwrap();
     assert!(draws.trim_end().ends_with('='), "{draws}");
-    // A metric the last run never measured shows no change.
+    // A metric the last run never measured says so.
     let only_now = Report {
         frames: 1,
         metrics: vec![("tick_nav".to_string(), Summary::of(&[0.5]))],
@@ -55,7 +55,7 @@ fn the_table_shows_the_change_against_the_last_run() {
     let line = only_now.render(Some(&run(4.0)));
     assert!(line
         .lines()
-        .any(|l| l.starts_with("tick_nav") && l.trim_end().ends_with("0.500")));
+        .any(|l| l.starts_with("tick_nav") && l.trim_end().ends_with("absent on the last run")));
     assert!(line.contains("warning: the CPU clock moved"), "{line}");
 }
 
@@ -66,6 +66,7 @@ fn a_report_round_trips_through_json() {
         metrics: vec![("frame_ms".to_string(), Summary::new(1.25, 2.0))],
         warnings: vec!["noisy".to_string()],
         engine: Some(EngineStamp::of(Some("a"), Some("b"))),
+        windows: vec!["firefight".to_string()],
     };
     let json = serde_json::to_string(&report).unwrap();
     assert_eq!(serde_json::from_str::<Report>(&json).unwrap(), report);
