@@ -129,6 +129,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/render/src/passes/a.rs",
             "fn f(q: &wgpu::Queue) {\n    q.submit([]);\n}\n",
         ),
+        "held-warn" => one(
+            "crates/asset/src/tangents.rs",
+            "fn f() {\n    log::warn!(\"[Asset] x\");\n}\n",
+        ),
         "ignored" => case(
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],
             "crates/app/src/secret.rs",

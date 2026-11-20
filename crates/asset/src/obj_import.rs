@@ -9,6 +9,7 @@
 
 use super::material_range::push_range;
 use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
+use super::tangents::Missing;
 use super::ImportError;
 use crate::MapRef;
 use std::path::Path;
@@ -16,6 +17,11 @@ use std::path::Path;
 /// Import a `.obj` (resolving its sibling `.mtl` if present) into addressable
 /// sub-meshes. Triangulated and single-indexed by `tobj`.
 pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
+    import_as(path, Missing::Generate)
+}
+
+/// [`import`], doing for the tangents `.obj` never has what `missing` says.
+pub fn import_as(path: &Path, missing: Missing) -> Result<ImportedAsset, ImportError> {
     let opts = tobj::LoadOptions {
         triangulate: true,
         single_index: true,
@@ -47,9 +53,14 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
         })
         .collect();
 
+    // Each piece on its own thread (`cook::par`), joined in file order.
+    let numbered: Vec<(usize, tobj::Model)> = models.into_iter().enumerate().collect();
+    let triangles = |(_, m): &(usize, tobj::Model)| m.mesh.indices.len() / 3;
+    let pieces = crate::cook::par::map(numbered, triangles, |(i, model)| {
+        sub_mesh_from_model(i, model, missing)
+    });
     let mut sub_meshes: Vec<SubMesh> = Vec::new();
-    for (i, model) in models.into_iter().enumerate() {
-        let piece = sub_mesh_from_model(i, model);
+    for piece in pieces {
         match sub_meshes.iter_mut().find(|s| s.id == piece.id) {
             Some(sub) => append_piece(sub, piece),
             None => sub_meshes.push(piece),
@@ -63,7 +74,7 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
     })
 }
 
-fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
+fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> SubMesh {
     let mesh = model.mesh;
     let id = Some(model.name)
         .filter(|n| !n.is_empty())
@@ -103,11 +114,11 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model) -> SubMesh {
     // `.obj` carries no tangents; generate them so normal maps work (#207).
     let (vertices, indices) = if has_normals {
         (
-            with_generated_tangents(vertices, &mesh.indices),
+            with_tangents(vertices, &mesh.indices, missing),
             mesh.indices,
         )
     } else {
-        super::flat_normals::flat_shaded(&vertices, &mesh.indices)
+        super::flat_normals::flat_shaded(&vertices, &mesh.indices, missing)
     };
 
     SubMesh {
@@ -136,12 +147,17 @@ fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
     }
 }
 
-/// Fill each vertex's tangent from positions + UVs (`.obj` has no tangent data).
-fn with_generated_tangents(mut vertices: Vec<MeshVertex>, indices: &[u32]) -> Vec<MeshVertex> {
+/// Fill each vertex's tangent from positions + UVs (`.obj` has no tangent data),
+/// as `missing` says.
+fn with_tangents(
+    mut vertices: Vec<MeshVertex>,
+    indices: &[u32],
+    missing: Missing,
+) -> Vec<MeshVertex> {
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
     let normals: Vec<[f32; 3]> = vertices.iter().map(|v| v.normal).collect();
     let uvs: Vec<[f32; 2]> = vertices.iter().map(|v| v.tex_coords).collect();
-    let tangents = super::tangents::generate_tangents(&positions, &normals, &uvs, indices);
+    let tangents = super::tangents::fill(missing, &positions, &normals, &uvs, indices);
     for (v, t) in vertices.iter_mut().zip(tangents) {
         v.tangent = t;
     }

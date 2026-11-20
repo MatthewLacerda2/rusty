@@ -53,6 +53,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Full component literals in tests | `tools/lint -- --rules` (`full-literal`) | **hard gate**: test code builds a first-class component with `..rest` or a constructor, never a literal naming every field (#663, #976) |
 | Function ("endpoint") length | clippy `too_many_lines` + `tools/lint -- --determinism` | **hard gate**: `too-many-lines-threshold = 50` (`clippy.toml`), denied crate-wide in `Cargo.toml`'s `[lints]`; its one exception, `Renderer::assemble`, is locked (`ESCAPE`, #961) |
 | Fuzz target compiles | `make fuzz-check` (`.github/scripts/fuzz_gate.py check`: `cargo check --manifest-path fuzz/Cargo.toml --locked --target-dir target/fuzz`) | **hard gate**: `fuzz/` is its own workspace, so no other gate builds it; this checks it on the pinned stable toolchain, `--locked` to a `fuzz/Cargo.lock` it first derives from the root `Cargo.lock` (`make fuzz-lock`; gitignored, so nothing drifts), and fails if that derivation moves a shared package off the root's version. A second cold engine build, so CI's `fuzz-check` job and `make gates` build only when the diff matches `ci.yml`'s `fuzz` filter (the one list both read; nightly always), and say they skipped otherwise; `make fuzz-check` by name always builds. The fuzz-only crates (`libfuzzer-sys`, `arbitrary`) are pinned exactly in `fuzz/Cargo.toml` |
+| Import workers warn held | `tools/lint -- --rules` (`held-warn`) | **hard gate**: no code line of a module a `asset::cook::par::map` closure reaches (`held_warn::REACHED`: `crates/asset/src/` `clusters`, `cook/sub`, `flat_normals`, `gltf/anim`, `gltf/import`, `lightmap_uv/`, `obj_import`, `tangents`) names `log::` or a bare logging macro: it warns through `rusty_core::warn_held!`, which the caller says after the join, in item order, under its own quiet flag and log capture (#2332) |
 | Lint exceptions carry a reason | clippy `allow_attributes` + `allow_attributes_without_reason` | **hard gate**: an exception is `#[expect(lint, reason = "…")]` (outer `#[allow]` is denied; a module-root `#![allow]` still needs its `reason`), and an expectation that no longer fires fails too (#961) |
 | Lint gates and rules are wired | `make test-lint` (`gates_tests.rs`, `rules/wiring.rs`) | **hard gate**: every row of `gates::GATES` and of `rules::RULES` is run, through the entry point the tool dispatches, over a scratch repository it must flag, and must report the planted file; a row with no such case fails naming it, so a gate emptied to "no findings" or no longer reached cannot stay green |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964); a suite CI splits with `--partition` across a matrix names every shard of the split once, each `--partition` reads `count:${{ matrix.shard }}` (and the macOS leg's `shard_plan.py args`, `"${{ matrix.shard }}"`, #2397) in a job whose one-line split it read, the plan's `shard_plan.py plan --shards N` (and its job's `shard: k/N`) is the count of that job's matrix (`gate_mirror.plan_gaps`), and every shard runs the GPU and OIDN canaries (`test_shards.py`, #2264) |
@@ -551,6 +552,16 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   out of scope by design. A text match: a method of the renderer's own named
   `submit` (and so on) would be flagged, so such a method takes another name. A call
   that must stay raw says why with `// lint: allow(gpu-ops) <why>`.
+- **`held-warn`** (#2332) — a model's import spreads each sub-mesh's work over
+  threads (`asset::cook::par::map`), and a worker thread carries neither
+  `core::quiet::quietly`'s flag nor a test's per-thread log capture, and logs in
+  whatever order the threads ran. So each item runs `core::quiet::holding`, and the
+  caller says what it held after the join, in item order: only
+  `rusty_core::warn_held!` is held, so a module those closures reach
+  (`REACHED` in `rules/held_warn.rs`, a folder or a file; a module a closure comes
+  to reach joins it) names no `log::` and no bare logging macro. `warn_held!` logs
+  as usual when nothing holds, so a whole module takes it at no cost. A real need
+  says why with `// lint: allow(held-warn) <why>`.
 - **`ignored`** — what you push must be what CI builds. A scanned `.rs` file that
   `git check-ignore --no-index` matches fails, tracked or not, because the next
   new file beside it is the one a push silently drops

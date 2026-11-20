@@ -70,7 +70,7 @@ fn one_load_stands_as_load_ms_with_no_cold_row() {
 
 /// A project of one scene holding a model instanced twice, the file forgotten by
 /// this thread's import cache so the load parses it.
-fn project_with_a_model() -> std::path::PathBuf {
+pub(super) fn project_with_a_model() -> std::path::PathBuf {
     let root = rusty_test_support::temp::dir().join(format!("load_rows_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("assets/scenes")).unwrap();
@@ -132,11 +132,10 @@ fn a_load_in_steps() {
         "a glTF converts nothing"
     );
     tiles(&load, &want);
+    assert_eq!(counts[2].0, "models_cooked");
+    let rendered = ["textures_compressed", "textures_decoded", "upload_mb"];
     let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
-    assert_eq!(
-        names[2..],
-        ["textures_compressed", "textures_decoded", "upload_mb"]
-    );
+    assert_eq!(names[3..], rendered);
 }
 
 /// The load's rows: its steps' rows sum to its `load_ms` (nothing timed twice or

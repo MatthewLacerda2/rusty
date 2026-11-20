@@ -150,20 +150,23 @@ fn max_index(indices: &[u32]) -> usize {
 
 /// Replace `sub`'s lightmap UV with a generated unwrap, splitting its vertices along
 /// the chart seams. A skinned sub-mesh is left alone: the bake never lightmaps one.
-pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) {
+/// Returns, when it unwrapped, the source vertex each new vertex copies
+/// ([`Unwrap::source`]): what a cooked import (`asset::cook`) rebuilds the split
+/// vertices from.
+pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32>> {
     if sub.skin.is_some() {
-        return;
+        return None;
     }
     let with_uv = |v: &MeshVertex, lightmap_uv| MeshVertex { lightmap_uv, ..*v };
-    if let Some((vertices, indices)) = unwrap_vertices(
+    let (vertices, indices, source) = split(
         &sub.vertices,
         &sub.indices,
         |v| v.position,
         with_uv,
         settings,
-    ) {
-        (sub.vertices, sub.indices) = (vertices, indices);
-    }
+    )?;
+    (sub.vertices, sub.indices) = (vertices, indices);
+    Some(source)
 }
 
 /// [`unwrap`] any vertex type: read each vertex's position with `position`, and
@@ -176,13 +179,24 @@ pub fn unwrap_vertices<V>(
     with_uv: impl Fn(&V, [f32; 2]) -> V,
     settings: &LightmapUvSettings,
 ) -> Option<(Vec<V>, Vec<u32>)> {
+    split(vertices, indices, position, with_uv, settings).map(|(v, i, _)| (v, i))
+}
+
+/// [`unwrap_vertices`], also returning the source vertex each new one copies.
+fn split<V>(
+    vertices: &[V],
+    indices: &[u32],
+    position: impl Fn(&V) -> [f32; 3],
+    with_uv: impl Fn(&V, [f32; 2]) -> V,
+    settings: &LightmapUvSettings,
+) -> Option<(Vec<V>, Vec<u32>, Vec<u32>)> {
     let positions: Vec<[f32; 3]> = vertices.iter().map(position).collect();
     let u = unwrap(&positions, indices, settings)?;
     let out = u.source.iter().zip(&u.uvs);
     let out = out
         .map(|(&s, &uv)| with_uv(&vertices[s as usize], uv))
         .collect();
-    Some((out, u.indices))
+    Some((out, u.indices, u.source))
 }
 
 #[cfg(test)]

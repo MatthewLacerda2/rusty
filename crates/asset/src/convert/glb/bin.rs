@@ -12,7 +12,7 @@ const ELEMENT_ARRAY_BUFFER: u32 = 34963;
 const NO_TARGET: u32 = 0;
 
 #[derive(Default)]
-pub(super) struct Bin {
+pub(crate) struct Bin {
     pub bytes: Vec<u8>,
     pub views: Vec<Value>,
     pub accessors: Vec<Value>,
@@ -92,6 +92,15 @@ impl Bin {
         let accessor =
             json!({"componentType": UNSIGNED_SHORT, "count": joints.len(), "type": "VEC4"});
         self.push(data, ARRAY_BUFFER, accessor)
+    }
+
+    /// Unsigned ints that are not a vertex or index stream (a cooked model's
+    /// tables, `cook::file`).
+    pub fn uints(&mut self, items: &[u32]) -> usize {
+        let data = items.iter().flat_map(|i| i.to_le_bytes()).collect();
+        let accessor =
+            json!({"componentType": UNSIGNED_INT, "count": items.len(), "type": "SCALAR"});
+        self.push(data, NO_TARGET, accessor)
     }
 
     pub fn indices(&mut self, indices: &[u32]) -> usize {
