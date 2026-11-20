@@ -40,9 +40,9 @@ use std::path::Path;
 use egui_phosphor::regular as icon;
 
 use crate::EditorUi;
-use rusty_dev::bake::generate_lighting::unsaved_materials_warning;
 use rusty_dev::bake::lighting::LightingBakeReport;
 use rusty_dev::bake::lightmap::LightmapBakeJob;
+use rusty_dev::bake::occlusion::unsaved_materials_warning;
 use rusty_dev::bake::occlusion::OcclusionBakeJob;
 use rusty_dev::bake::steps::LightingBake;
 use rusty_lighting::lightmap::BakeView;

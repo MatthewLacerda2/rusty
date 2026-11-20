@@ -1,6 +1,7 @@
 //! The `<scene>.occlusion` file (#1714): the baked PVS beside the scene, as the
 //! lightmap pages and the SH sidecar sit beside it. Binary and little-endian, read
-//! whole: `RPVS`, the objects (entity `u32`, fingerprint `u64`, occluder `u8`), the
+//! whole: `RPVS`, the bake's stamp (its version `u32`, its never-culled count
+//! `u32`), the objects (entity `u32`, fingerprint `u64`, occluder `u8`), the
 //! grid (origin `3 × f32`, cell `f32`, dims `3 × u32`), the rows' words (a `u32`
 //! count, then `u64`s) and the cells' rows (a `u32` count, then `u32`s).
 //!
@@ -12,7 +13,7 @@ use std::sync::Arc;
 
 use glam::{UVec3, Vec3};
 
-use super::{BakedObject, Grid, OcclusionData, MAX_CELLS};
+use super::{BakeStamp, BakedObject, Grid, OcclusionData, MAX_CELLS};
 use crate::io::Saved;
 use crate::Scene;
 
@@ -30,6 +31,8 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
     let (rows, cells) = data.parts();
     let mut out = Vec::with_capacity(data.byte_size());
     out.extend_from_slice(MAGIC);
+    put(&mut out, data.stamp.version);
+    put(&mut out, data.stamp.never_culled);
     put(&mut out, data.objects.len() as u32);
     for o in &data.objects {
         put(&mut out, o.entity);
@@ -56,6 +59,10 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     if r.take(4)? != MAGIC {
         return Err("not an occlusion file".into());
     }
+    let stamp = BakeStamp {
+        version: r.u32()?,
+        never_culled: r.u32()?,
+    };
     let count = r.u32()? as usize;
     let mut objects = Vec::with_capacity(count.min(bytes.len() / 13));
     for _ in 0..count {
@@ -71,6 +78,12 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
             fingerprint,
             occluder,
         });
+    }
+    if stamp.never_culled as usize > objects.len() {
+        return Err(format!(
+            "{} never culled of {count} objects",
+            stamp.never_culled
+        ));
     }
     let origin = Vec3::new(r.f32()?, r.f32()?, r.f32()?);
     let cell = r.f32()?;
@@ -93,8 +106,9 @@ pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
         return Err("trailing bytes".into());
     }
     let grid = Grid { origin, cell, dims };
-    OcclusionData::new(grid, objects, rows, cells)
-        .ok_or_else(|| "rows disagree with the grid".into())
+    let data = OcclusionData::new(grid, objects, rows, cells);
+    let data = data.ok_or("rows disagree with the grid")?;
+    Ok(data.stamped(stamp))
 }
 
 /// Bring the PVS file beside `scene_path` to what `scene` holds, by the bake

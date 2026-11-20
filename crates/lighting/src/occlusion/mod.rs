@@ -14,6 +14,7 @@ mod unsaved;
 
 pub use bake::{
     bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
+    OCCLUSION_VERSION,
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use progress::OcclusionObserver;
@@ -31,6 +32,8 @@ pub mod bench;
 mod dense_tests;
 #[cfg(test)]
 mod file_tests;
+#[cfg(test)]
+mod kept_tests;
 #[cfg(all(test, feature = "dev"))]
 mod opening_tests;
 #[cfg(test)]

@@ -86,6 +86,7 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
         probes: Default::default(),
         occlusion,
         occlusion_ms: 5,
+        occlusion_kept: false,
         saved: rusty_edit::LightingSave::Written,
     };
     let line = report.summary();

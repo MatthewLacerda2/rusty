@@ -49,20 +49,28 @@ pub fn report(
     }))
 }
 
+/// The one stage of a Generate Lighting that kept the scene's PVS unchanged
+/// instead of baking it (#2348).
+pub const SKIPPED: &str = "skipped: unchanged";
+
 /// Write the report of an occlusion bake now on `scene` (#1980): it reported `r`,
 /// took `ms` and `cells` per cell, and writing its file beside `path` took `saved`
-/// (`None` when the file waits for a scene save, so nothing is written yet).
+/// (`None` when the file waits for a scene save, so nothing is written yet). A
+/// `kept` PVS (#2348) has one stage, [`SKIPPED`], its `ms`, and no write.
 pub fn keep(
     scene: &Scene,
     path: &str,
     (r, ms, cells): (&OcclusionBakeReport, u64, &[Duration]),
-    saved: Option<std::time::Duration>,
+    (saved, kept): (Option<std::time::Duration>, bool),
 ) {
     let mut stages = Stages::start();
-    stages.push("bake", std::time::Duration::from_millis(ms));
+    let name = if kept { SKIPPED } else { "bake" };
+    stages.push(name, std::time::Duration::from_millis(ms));
     let mut written = 0;
     if let Some(took) = saved {
-        stages.push("write", took);
+        if !kept {
+            stages.push("write", took);
+        }
         written = super::bytes_under(&rusty_scene::lighting::occlusion::occlusion_path(path));
     }
     let data = scene.occlusion.as_deref();
