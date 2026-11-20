@@ -26,6 +26,7 @@ pub mod link;
 pub mod live;
 mod merge;
 pub mod overrides;
+mod pass;
 mod pointer;
 pub mod restamp;
 pub mod source;
@@ -39,7 +40,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use rusty_components::{Entity, EntityRefs, MaterialAsset, PrefabLink};
-use rusty_scene::serialize::rehydrate_entity_mesh;
+use rusty_scene::rehydrate::{rehydrate_in, Imports};
 use rusty_scene::skeleton::{take_bone_parents, take_bone_refs, BoneRef, Hung};
 use rusty_scene::Scene;
 
@@ -68,7 +69,8 @@ pub struct PrefabData {
 /// material is inserted under a uniquified name and the instance's references are
 /// rewritten to it — so an instance never silently adopts a different scene material.
 pub fn instantiate_prefab(scene: &mut Scene, prefab: &PrefabData, parent: Option<u32>) -> u32 {
-    stamp_prefab(scene, prefab, parent, None, Merge::Uniquify).0
+    let imports = &mut Imports::default();
+    stamp_prefab(scene, prefab, parent, None, Merge::Uniquify, imports).0
 }
 
 /// Clone a prefab into `scene` as a **linked** instance (#216): identical to
@@ -83,20 +85,23 @@ pub fn instantiate_prefab_linked(
     source: &str,
 ) -> u32 {
     let merge = Merge::for_source(source);
-    stamp_prefab(scene, prefab, parent, Some(source), merge).0
+    let imports = &mut Imports::default();
+    stamp_prefab(scene, prefab, parent, Some(source), merge, imports).0
 }
 
 /// Stamp one fresh copy of `prefab` into `scene`. `link_source = Some(path)` makes it
 /// a linked instance (every entity gets a `PrefabLink`); `None` is the unpacked v1
 /// copy. Fresh sequential ids come from the allocator (local id `l` -> `base + l`),
-/// so the operation is deterministic (no wall-clock/RNG). Returns the new root and
-/// the material keys the merge added to the library.
+/// so the operation is deterministic (no wall-clock/RNG). Meshes are rebuilt
+/// through `imports`, each file looked up once. Returns the new root and the
+/// material keys the merge added to the library.
 fn stamp_prefab(
     scene: &mut Scene,
     prefab: &PrefabData,
     parent: Option<u32>,
     link_source: Option<&str>,
     merge: Merge,
+    imports: &mut Imports,
 ) -> (u32, Vec<String>) {
     let (renames, added) = merge_materials(scene, &prefab.materials, merge);
     let base = scene.world.next_id();
@@ -115,7 +120,7 @@ fn stamp_prefab(
             node: nodes.get(&entity.id).cloned(),
             ..Default::default()
         });
-        let stamped = stamp_entity(entity, |l| base + l, &renames, link);
+        let stamped = stamp_entity(entity, |l| base + l, &renames, link, imports);
         if stamped.entity.parent_id.is_none() {
             new_root = stamped.entity.id;
         }
@@ -150,12 +155,14 @@ struct Stamped {
 /// instance taking a node its model gained (`structure`, #1665): `entity`'s id,
 /// parent, children and component references moved through `id_of` (local id to
 /// scene id), its materials renamed through the merge's `renames`, its mesh
-/// rehydrated, `link` set, and its bone parent and bone references taken out.
+/// rehydrated through `imports`, `link` set, and its bone parent and bone
+/// references taken out.
 fn stamp_entity(
     entity: &Entity,
     id_of: impl Fn(u32) -> u32,
     renames: &BTreeMap<String, String>,
     link: Option<PrefabLink>,
+    imports: &mut Imports,
 ) -> Stamped {
     let mut entity = entity.clone();
     entity.id = id_of(entity.id);
@@ -163,7 +170,7 @@ fn stamp_entity(
     entity.children = entity.children.iter().map(|&c| id_of(c)).collect();
     entity.remap_refs(&|r| Some(id_of(r)));
     rename_entity_material(&mut entity, renames);
-    rehydrate_entity_mesh(&mut entity);
+    rehydrate_in(&mut entity, imports);
     entity.prefab_link = link;
     let one = std::slice::from_mut(&mut entity);
     let hung = take_bone_parents(one);

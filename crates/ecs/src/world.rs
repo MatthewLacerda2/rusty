@@ -199,8 +199,11 @@ impl World {
         &self.order
     }
 
-    /// Collect all entities (assembled as documents) in insertion order — used
-    /// for serialization snapshots.
+    /// Collect all entities (assembled as documents, geometry included) in
+    /// insertion order. A test hook (crates/CLAUDE.md): engine code collects
+    /// without the geometry ([`World::collect_documents`]), which no reader of a
+    /// document uses; tests in several crates compare the full copy.
+    #[doc(hidden)]
     pub fn collect_entities(&self) -> Vec<Entity> {
         self.order
             .iter()
