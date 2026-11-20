@@ -22,6 +22,14 @@ first real use's table ran about 120 rows a scene, most inside the floor or
 zero, and the row a PR is about had to be searched for (#2323). The size is
 absolute because a ratio is not: a row at 0.001 ms moving 20% is nothing.
 
+A quiet counter (a row the report marks `quiet`: every `Debug.Stats` counter
+but the bench's usual few, `dev::bench::sample`) gets a table row only when
+`main`'s and the PR's averages differ, or one leg lacks it; one line under the
+table counts the rest as identical, so the table holds the counters a PR moved
+and not the eighty it did not. The bench once reported a hand-kept list of
+counters, and a PR that kept the UI layout between frames could not show the
+counter proving it (#2449): every counter is now a row, quiet unless it moved.
+
 The load rows' counts (`load.count.<what>`: model files the scene uses, sources
 converted, textures compressed and decoded, MB uploaded) say what each leg's
 load did, and `models_converted` tells a cached load from a cold import; where they
@@ -35,7 +43,10 @@ that did. A note is why a table's absolute numbers may not be the game's (#2420)
 so it heads the section the reader reads, not only the leg's own output.
 
 A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
-(`dev::bench::scenes::report`); a leg holds one project's folder.
+(`dev::bench::scenes::report`); a leg holds one project's folder, and under
+`STRESS=1` its stress runs' folders beside it ([`STRESS_RUNS`], `bench/stress.py`),
+which are never read as a project's. The stress section is drawn by the same
+[`section`].
 """
 
 from __future__ import annotations
@@ -44,9 +55,22 @@ import json
 from pathlib import Path
 
 
+# The folder under a leg holding the stress runs (`<leg>/stress/<i>/`, `bench/stress.py`):
+# a name `bench-scenes`' `<project>-<hash>/` folders never take, so a project called
+# `stress-…` is still read as one.
+STRESS_RUNS = "stress"
+
+
+def projects(leg: Path) -> list[Path]:
+    """The leg's project folders, sorted: every folder but its stress runs'."""
+    if not leg.is_dir():
+        return []
+    return sorted(p for p in leg.iterdir() if p.is_dir() and p.name != STRESS_RUNS)
+
+
 def read(leg: Path, scene: str) -> dict | None:
     """The leg's report of `scene`, if it wrote one."""
-    for path in sorted(leg.glob(f"*/{scene}.json")):
+    for path in sorted(p for project in projects(leg) for p in project.glob(f"{scene}.json")):
         try:
             return json.loads(path.read_text())
         except (OSError, ValueError):
@@ -70,23 +94,32 @@ def warnings(leg: Path, report: dict | None) -> list[str]:
 
 
 def notes(scene: str, legs: tuple[Path, Path, Path]) -> list[str]:
-    """The lines heading `scene`'s section: each leg's warning once, in the order
-    the legs first wrote them, one not every leg wrote marked with those that did."""
-    said = [warnings(leg, read(leg, scene)) for leg in legs]
+    """The lines heading `scene`'s section ([`notes_of`] the legs' warnings)."""
+    return notes_of([warnings(leg, read(leg, scene)) for leg in legs], "`bench-scenes`' notes")
+
+
+def notes_of(said: list[list[str]], whose: str) -> list[str]:
+    """Each leg's warning (`said`, one list a leg) once, in the order the legs first
+    wrote them, one not every leg wrote marked with those that did."""
     seen = list(dict.fromkeys(w for leg in said for w in leg))
     if not seen:
         return []
     lines = []
     for w in seen:
         wrote = [name for name, leg in zip(LEGS, said) if w in leg]
-        only = "" if len(wrote) == len(legs) else f" (only {', '.join(wrote)}: the legs disagree)"
+        only = "" if len(wrote) == len(said) else f" (only {', '.join(wrote)}: the legs disagree)"
         lines.append(f"- {w}{only}")
-    return ["**Warnings** (`bench-scenes`' notes; the absolute numbers may not be the game's):"] + lines + [""]
+    return [f"**Warnings** ({whose}; the absolute numbers may not be the game's):"] + lines + [""]
 
 
 def averages(report: dict | None) -> dict[str, float]:
     """Each row's average, in the report's order."""
     return {r["metric"]: r["avg"] for r in (report or {}).get("rows", [])}
+
+
+def quiet(report: dict | None) -> set[str]:
+    """The rows the report marks quiet: counters a table shows only when they moved."""
+    return {r["metric"] for r in (report or {}).get("rows", []) if r.get("quiet")}
 
 
 def change(a: float, b: float) -> float | None:
@@ -178,20 +211,36 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
 
 def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     """The markdown table of `scene` over the three legs' folders (main, PR, main again)."""
-    main, pr, again = (averages(read(leg, scene)) for leg in legs)
+    reports = [read(leg, scene) for leg in legs]
+    main, pr, again = (averages(r) for r in reports)
+    hushed = quiet(reports[0]) | quiet(reports[1])
+    return section(f"**{scene}**", (main, pr, again), notes(scene, legs), hushed)
+
+
+def section(title: str, rows: tuple[dict, dict, dict], heading: list[str], hushed: frozenset | set = frozenset()) -> str:
+    """One section: `title`, the `heading` lines (its notes), the lead and the table of the
+    three legs' averages (`rows`: main, PR, main again). A row in `hushed` (the quiet
+    counters) is left out when main and the PR agree, and counted in one line."""
+    main, pr, again = rows
     if not main and not pr:
-        return f"**{scene}**: neither the main leg nor the PR's wrote a report\n"
-    lines = [f"**{scene}**", ""] + notes(scene, legs) + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
-                                                            "|---|---:|---:|---|---:|"]
+        return f"{title}: neither the main leg nor the PR's wrote a report\n"
+    lines = [title, ""] + heading + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
+                                                             "|---|---:|---:|---|---:|"]
     metrics = list(main) + [m for m in pr if m not in main]
+    identical = 0
     for metric in metrics:
+        if metric in hushed and metric in main and main.get(metric) == pr.get(metric):
+            identical += 1
+            continue
         lines.append("| " + " | ".join(row(metric, main.get(metric), pr.get(metric), again.get(metric))) + " |")
+    if identical:
+        lines += ["", f"The other {identical} counters are identical between main and the PR (in each leg's report)."]
     return "\n".join(lines) + "\n"
 
 
-def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str]) -> str:
-    """Every scene's table under the run's header lines."""
-    parts = ["\n".join(header), ""] + [scene_table(s, legs) for s in scenes]
+def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str], more: tuple[str, ...] = ()) -> str:
+    """Every scene's table under the run's header lines, then the `more` sections (the stress yard's)."""
+    parts = ["\n".join(header), ""] + [scene_table(s, legs) for s in scenes] + list(more)
     return "\n".join(parts)
 
 
@@ -199,7 +248,7 @@ def scenes_of_all(legs) -> list[str]:
     """The scenes any of `legs` reported, sorted: a scene only the PR reports still gets its table."""
     names = []
     for leg in legs:
-        for project in sorted(p for p in leg.iterdir() if p.is_dir()) if leg.is_dir() else []:
+        for project in projects(leg):
             for path in project.rglob("*.json"):
                 names.append(path.relative_to(project).with_suffix("").as_posix())
     return sorted(set(names))

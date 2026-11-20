@@ -18,5 +18,7 @@ on a project whose textures were never imported.
   kept between runs, the PR's tree removed once the PR is finished.
 - `refuse`: what stops a timed run before it starts.
 - `legs`: the three legs, each in a memory-capped scope where the machine has one.
+- `stress`: `STRESS=1`'s three legs of the fixture's stress yard (`make bench`'s
+  scenario), run on the same trees before the PR's is put back.
 - `table`: the three legs' reports as the table a PR comment takes.
 """
