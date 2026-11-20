@@ -10,14 +10,14 @@ use std::sync::Arc;
 use super::{bake_occlusion_logged, CellClocks, OcclusionBakeJob};
 use crate::bake::progress::{BakeLog, Line};
 use rusty_lighting::occlusion::test_level::corridors;
-use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion, OcclusionProgress};
+use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion, OcclusionProgress, Reach};
 use rusty_scene::lighting::occlusion::encode;
 
 #[test]
 fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     let scene = corridors();
     let inline = encode(&bake_occlusion(&scene, 2).0.expect("occluders"));
-    let mut job = OcclusionBakeJob::start(&scene).unwrap();
+    let mut job = OcclusionBakeJob::start(&scene, Reach::everywhere()).unwrap();
     let baked = loop {
         if let Some(done) = job.poll() {
             break done.unwrap();
@@ -31,7 +31,7 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
 
     let lines: RefCell<Vec<Line>> = RefCell::default();
     let mut log = BakeLog::new(|| Duration::ZERO, |l| lines.borrow_mut().push(l));
-    let logged = bake_occlusion_logged(&scene, &mut log).unwrap();
+    let logged = bake_occlusion_logged(&scene, Reach::everywhere(), &mut log).unwrap();
     drop(log);
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
     assert_eq!(logged.cells.len(), logged.report.cells);
@@ -52,7 +52,7 @@ fn an_observed_bake_writes_the_bytes_an_unobserved_one_does() {
     let times = clocks.times();
     assert_eq!(times.len(), plain.1.cells);
     assert!(
-        times.iter().sum::<Duration>() > Duration::ZERO,
+        times.iter().flatten().sum::<Duration>() > Duration::ZERO,
         "the cells ran"
     );
 }
@@ -77,6 +77,7 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
         objects: 9,
         never_culled: 2,
         cells: 40,
+        baked_cells: 40,
         cell_size: 2.0,
         bytes: 900,
         ..Default::default()
@@ -91,7 +92,20 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
     };
     let line = report.summary();
     assert!(
-        line.contains("40 cell(s) of 2.0 m, 9 object(s), 2 never culled"),
+        line.contains("40 cell(s) of 2.0 m (no fresh navmesh: every cell sampled; "),
+        "{line}"
+    );
+    assert!(line.contains("), 9 object(s), 2 never culled"), "{line}");
+    report.occlusion.navmesh_missed = true;
+    let line = report.summary();
+    assert!(line.contains(super::summary::MISSED), "{line}");
+    report.occlusion.baked_cells = 12;
+    report.occlusion.floor = rusty_scene::lighting::occlusion::FloorSource::Navmesh;
+    report.occlusion.floor_coverage = Some(0.25);
+    let line = report.summary();
+    let sampled = "(12 sampled, where a camera can be over a navmesh covering 25% of the level)";
+    assert!(
+        line.contains(&format!("40 cell(s) of 2.0 m {sampled}, 9")),
         "{line}"
     );
     report.occlusion = OcclusionBakeReport {
@@ -112,7 +126,7 @@ fn the_editors_generate_keeps_a_current_pvs_on_its_first_poll() {
     let mut scene = corridors();
     let (data, report) = bake_occlusion(&scene, 2);
     scene.put_baked_occlusion(data);
-    let mut job = OcclusionBakeJob::generate(&scene).unwrap();
+    let mut job = OcclusionBakeJob::generate(&scene, Reach::everywhere()).unwrap();
     let kept = job.poll().expect("finished at once").unwrap();
     assert!(kept.kept && kept.data.is_none());
     assert_eq!(kept.report, report, "the held PVS's counts");

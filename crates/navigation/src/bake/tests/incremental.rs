@@ -125,3 +125,18 @@ fn a_settings_change_rebakes_in_full() {
     assert_eq!(g.sync(&scene), Rebake::Full);
     assert_same_mesh(&g, &baked(&scene));
 }
+
+#[test]
+fn a_graph_is_current_until_the_scene_moves_on_and_again_after_a_sync() {
+    let (mut scene, ids) = level(0.3, 0.5);
+    let unbaked = NavigationGraph::new(-16.0, 16.0, -16.0, 16.0, 0.5);
+    assert!(!unbaked.is_current_for(&scene), "never baked");
+    let mut g = baked(&scene);
+    assert!(g.is_current_for(&scene));
+    move_to(&mut scene, ids[0], Vec3::new(5.0, 0.0, -10.0));
+    assert!(!g.is_current_for(&scene), "a crate moved since the bake");
+    g.sync(&scene);
+    assert!(g.is_current_for(&scene), "synced");
+    scene.nav_settings.agent_radius = 0.6;
+    assert!(!g.is_current_for(&scene), "the settings changed");
+}

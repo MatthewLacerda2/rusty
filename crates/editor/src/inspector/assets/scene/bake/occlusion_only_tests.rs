@@ -20,7 +20,8 @@ fn started(tag: &str) -> (EditorUi, Scene, String, ConsoleLogs) {
     let mut editor = EditorUi::new(Default::default());
     editor.set_current_scene_path(Some(path.clone()));
     let mut console = ConsoleLogs::default();
-    start_occlusion(&mut editor, &mut scene, &mut console);
+    let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
+    start_occlusion(&mut editor, &mut scene, &mut console, &nav);
     let active = editor.dev.lightmap_bake.as_ref().expect("started");
     assert!(matches!(active.step, Step::OcclusionOnly { .. }));
     assert!(scene.lighting_bake_running, "a script's bake waits");
