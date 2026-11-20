@@ -7,9 +7,11 @@
 //! `Vec<ScriptComponent>`, the `Core` flags). It is stamped at the World's write
 //! funnels, in the same call that notes the write for the edit journal
 //! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_mut_and_ref`),
-//! attached, detached or taken (`set_component`, `take_component`), and every
-//! column of an entity placed, overwritten or removed. A write to a column the
-//! entity lacks stamps nothing (`ecs/funnel.rs`). A mutable borrow counts as
+//! attached, detached or taken (`set_component`, `take_component`), and, for an
+//! entity placed, overwritten or removed, the columns it carries or carried (an
+//! overwrite stamps both sets). A write to a column the entity lacks stamps
+//! nothing (`ecs/funnel.rs`), so a column's channel names only entities that have
+//! or had its component: "any entity appeared or went" is [`Activity`]'s. A mutable borrow counts as
 //! a change, as in Bevy: a write that changed nothing is over-reported, which is
 //! safe; a missed one would be the bug. Two writes compare first because they are
 //! hot: a Transform landing its old value and a collider's derived world box stamp
@@ -41,6 +43,8 @@
 //! first opened, never by slot. A consumer computes, for the ids it is given, exactly what its full
 //! pass computes for them.
 
+#[cfg(test)]
+mod carried_tests;
 mod channel;
 #[cfg(test)]
 mod derived_case_tests;
@@ -112,6 +116,11 @@ const STATIC: usize = 0;
 /// An [`ChangeLogs::index`] entry for a channel no cursor was opened on.
 const UNOPENED: u32 = u32::MAX;
 
+/// Whether `row` carries column `T` ([`log::Carried`]).
+fn carries<T: Channel>(row: &hecs::EntityRef<'_>) -> bool {
+    row.has::<T>()
+}
+
 /// The World's logs.
 #[derive(Debug)]
 pub(crate) struct ChangeLogs {
@@ -168,7 +177,7 @@ impl ChangeLogs {
                     self.index.resize(T::SLOT + 1, UNOPENED);
                 }
                 self.index[T::SLOT] = at as u32;
-                self.logs.push(Log::new(T::COLUMN));
+                self.logs.push(Log::new(T::COLUMN.then_some(carries::<T>)));
                 self.names.push(T::NAME);
                 at
             }
