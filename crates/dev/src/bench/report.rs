@@ -126,16 +126,29 @@ impl Samples {
     }
 }
 
-/// The warning for a kept report from before `cpu_ms` timed the whole tick
-/// (#2342), by which rows each has (`has`): the kept one a `cpu_ms` and no
-/// `cpu.flush_bounds`, the current one that row. `cpu_ms` and `cpu.other` then grew
-/// by what was hidden, so a sim change reads in its `cpu.<system>` rows.
+/// The warning for a kept report that times the tick another way, by which rows
+/// each has (`has`), so a sim change reads in its `cpu.<system>` rows:
+/// - from before `cpu_ms` timed the whole tick (#2342): the kept one has a
+///   `cpu_ms` and no `cpu.flush_bounds`, the current one that row, and `cpu_ms`
+///   and `cpu.other` grew by what was hidden;
+/// - from before the stats' own bookkeeping left the tick (#2445): the kept one
+///   has `cpu.flush_bounds` and no `probe_ms`, the current one that row, and
+///   `cpu_ms` and `cpu.other` shrank by about what `probe_ms` now holds.
 pub fn tick_timed_since(now: impl Fn(&str) -> bool, kept: impl Fn(&str) -> bool) -> Option<String> {
     let old = kept("cpu_ms") && !kept("cpu.flush_bounds");
-    (old && now("cpu.flush_bounds")).then(|| {
-        "the kept report predates `cpu_ms` timing the whole tick (it has no \
-         cpu.flush_bounds row): cpu_ms and cpu.other now hold the tick's work outside \
-         its systems, so compare the cpu.<system> rows"
+    if old && now("cpu.flush_bounds") {
+        return Some(
+            "the kept report predates `cpu_ms` timing the whole tick (it has no \
+             cpu.flush_bounds row): cpu_ms and cpu.other now hold the tick's work outside \
+             its systems, so compare the cpu.<system> rows"
+                .to_string(),
+        );
+    }
+    let counted = kept("cpu.flush_bounds") && !kept("probe_ms");
+    (counted && now("probe_ms")).then(|| {
+        "the kept report counts the stats' own bookkeeping in its tick (it has no \
+         probe_ms row): cpu_ms and cpu.other now leave it out, lower by about probe_ms, \
+         so compare the cpu.<system> rows"
             .to_string()
     })
 }

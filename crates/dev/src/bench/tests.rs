@@ -263,12 +263,13 @@ fn the_occlusion_parts_have_no_rows_with_the_cull_off() {
 }
 
 /// `cpu_ms` is the whole tick (#2342): the systems' rows, `cpu.flush_bounds` and
-/// `cpu.other` (what no system held) fold back to it; `taps_ms` is beside it.
+/// `cpu.other` (what no system held) fold back to it; `taps_ms`, `probe_ms` beside.
 #[test]
 fn cpu_rows_fold_to_the_timed_tick() {
     let mut stats = FrameStats::default();
-    stats.record("frame_ms", 5.0);
-    stats.record("taps_ms", 1.0); // a demo's taps: timed beside the tick
+    for (key, ms) in [("frame_ms", 5.0), ("taps_ms", 1.0), ("probe_ms", 0.5)] {
+        stats.record(key, ms); // a demo's taps and the probe's own work: beside the tick
+    }
     for (name, ms) in [
         ("tick_nav", 2.0),
         ("flush_bounds", 0.25),
@@ -282,11 +283,8 @@ fn cpu_rows_fold_to_the_timed_tick() {
         gpu: None,
     };
     sample(&mut samples, &stats, None, at_reference);
-    assert_eq!(
-        samples.values("cpu.flush_bounds"),
-        [0.5],
-        "summed over the stages"
-    );
+    let flush = samples.values("cpu.flush_bounds");
+    assert_eq!(flush, [0.5], "summed over the stages");
     let other = samples.values("cpu.other");
     assert_eq!(other, [2.5], "the tick less what its systems held");
     let parts = ["cpu.tick_nav", "cpu.flush_bounds", "cpu.other"];
@@ -296,5 +294,6 @@ fn cpu_rows_fold_to_the_timed_tick() {
         samples.values("cpu_ms")[0],
         "the taps are in no cpu. row"
     );
-    assert_eq!(samples.values("taps_ms"), [1.0]);
+    let beside = ["taps_ms", "probe_ms"].map(|k| samples.values(k));
+    assert_eq!(beside, [[1.0], [0.5]]);
 }
