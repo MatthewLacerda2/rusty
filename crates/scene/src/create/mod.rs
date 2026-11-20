@@ -15,7 +15,7 @@ pub use defaults::{
 };
 pub use primitive::{
     primitive_collider, primitive_geometry, primitive_mesh_component, primitive_revision,
-    subdivided_geometry, Primitive,
+    subdivided_geometry, Geometry, Primitive,
 };
 
 use crate::Scene;

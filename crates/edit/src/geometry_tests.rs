@@ -18,7 +18,7 @@ fn level() -> Scene {
     let mut collider = ColliderComponent::from_mesh_bounds(false, Vec3::splat(-1.0), Vec3::ONE);
     let mut collision = rusty_components::SharedMesh::of(&scene.world.mesh(id).unwrap());
     collision.positions = vec![[0.0; 3]; 3];
-    collision.indices = vec![0, 1, 2];
+    collision.indices = vec![0, 1, 2].into();
     collider.collision_mesh = Some(collision);
     scene.world.set_collider(id, Some(collider));
     scene

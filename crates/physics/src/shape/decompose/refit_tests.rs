@@ -74,7 +74,7 @@ fn a_refit_that_fails_warns_once_not_every_step() {
     let mut world = PhysicsWorld::from_scene(&scene);
     steps(&mut scene, &mut world, 1);
     // The mesh goes bad in Play; the body then turns dynamic and keeps moving.
-    scene.world.mesh_mut(id).unwrap().vertices[3].position[1] = f32::NAN;
+    scene.world.mesh_mut(id).unwrap().vertices_mut()[3].position[1] = f32::NAN;
     rusty_test_support::logs::init();
     rusty_test_support::logs::take();
     let at = scene.world.transform(id).unwrap().position;

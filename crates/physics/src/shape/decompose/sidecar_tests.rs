@@ -21,7 +21,7 @@ fn import(path: &std::path::Path) -> Mesh {
     let import = rusty_asset::imported(path).expect("imports");
     let sub = &import.sub_meshes[0];
     let positions = sub.vertices.iter().map(|v| v.position).collect();
-    (positions, sub.indices.clone())
+    (positions, sub.indices.to_vec())
 }
 
 /// Enter "Play": a dynamic Suzanne, her collider's shape, and the V-HACD runs.

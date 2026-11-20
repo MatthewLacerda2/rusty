@@ -71,7 +71,7 @@ pub fn apply(sub: &mut SubMesh) {
         return;
     }
     let positions: Vec<[f32; 3]> = sub.vertices.iter().map(|v| v.position).collect();
-    sub.clusters = build(&positions, &mut sub.indices, &sub.ranges).map(Arc::new);
+    sub.clusters = build(&positions, sub.indices.edit(), &sub.ranges).map(Arc::new);
 }
 
 /// The clusters of `indices` over `positions`, each run of `runs` split on its

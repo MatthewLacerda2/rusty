@@ -16,7 +16,7 @@
 
 use super::{anim, material, nodes, skin};
 use crate::material_range::push_range;
-use crate::mesh_data::{ImportedAsset, MeshVertex, SkinData, SubMesh};
+use crate::mesh_data::{ImportedAsset, SkinData, SubMesh, Vertex};
 use crate::tangents::Missing;
 use crate::ImportError;
 use gltf::mesh::Mode;
@@ -99,7 +99,7 @@ fn sub_mesh_from_gltf(
         .map(str::to_string)
         .unwrap_or_else(|| format!("mesh_{}", mesh.index()));
 
-    let mut vertices: Vec<MeshVertex> = Vec::new();
+    let mut vertices: Vec<Vertex> = Vec::new();
     let mut indices: Vec<u32> = Vec::new();
     let mut ranges = Vec::new();
 
@@ -121,8 +121,8 @@ fn sub_mesh_from_gltf(
 
     SubMesh {
         id,
-        vertices,
-        indices,
+        vertices: vertices.into(),
+        indices: indices.into(),
         ranges,
         skin,
         clips,
@@ -137,7 +137,7 @@ fn sub_mesh_from_gltf(
 fn append_primitive(
     primitive: &gltf::Primitive,
     buffers: &[gltf::buffer::Data],
-    (vertices, indices): (&mut Vec<MeshVertex>, &mut Vec<u32>),
+    (vertices, indices): (&mut Vec<Vertex>, &mut Vec<u32>),
     missing: Missing,
 ) {
     let Some((own, local, has_normals)) = read_primitive(primitive, buffers, missing) else {
@@ -159,7 +159,7 @@ fn read_primitive(
     primitive: &gltf::Primitive,
     buffers: &[gltf::buffer::Data],
     missing: Missing,
-) -> Option<(Vec<MeshVertex>, Vec<u32>, bool)> {
+) -> Option<(Vec<Vertex>, Vec<u32>, bool)> {
     let reader = primitive.reader(|b| buffers.get(b.index()).map(|d| d.0.as_slice()));
 
     let positions: Vec<[f32; 3]> = reader.read_positions()?.collect();
@@ -206,11 +206,11 @@ fn read_primitive(
         None => Vec::new(),
     };
 
-    let mut own: Vec<MeshVertex> = Vec::with_capacity(positions.len());
+    let mut own: Vec<Vertex> = Vec::with_capacity(positions.len());
     for (i, position) in positions.iter().enumerate() {
         let normal = normals.as_ref().map_or([0.0; 3], |n| n[i]);
         let uv = uvs.get(i).copied().unwrap_or([0.0, 0.0]);
-        let mut vertex = MeshVertex::new(*position, normal, uv);
+        let mut vertex = Vertex::new((*position).into(), normal.into(), uv);
         vertex.tangent = tangents.get(i).copied().unwrap_or([1.0, 0.0, 0.0, 1.0]);
         vertex.lightmap_uv = lightmap_uvs.get(i).copied().unwrap_or([0.0, 0.0]);
         if let (Some(j), Some(w)) = (joints.get(i), weights.get(i)) {

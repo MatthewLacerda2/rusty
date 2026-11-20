@@ -107,7 +107,7 @@ fn an_edit_that_changes_nothing_saved_records_nothing() {
     let (mut scene, id) = scene_with_crate();
     edit(&mut scene, |s| {
         drop(s.world.mesh_mut(id)); // borrowed mutably, nothing written
-        s.world.mesh_mut(id).expect("mesh").vertices.clear(); // runtime-only
+        s.world.mesh_mut(id).expect("mesh").vertices = Default::default(); // runtime-only
         move_to(s, id, 0.0); // written, but to the value it had
     });
     assert_eq!(scene.undo_name(), None);
