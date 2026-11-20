@@ -3,7 +3,8 @@
 //! (a BC texture cannot be rendered into). Colour formats keep the sRGB storage
 //! and raw data view every image upload has (#647). The renderer never encodes:
 //! a texture without a current cache uploads uncompressed until the import makes
-//! one.
+//! one. With no GPU pass of its own, its levels wait in staging for a submit,
+//! which `super::staging` makes as they pile up (#2372).
 
 use std::collections::BTreeSet;
 use std::sync::{Mutex, Once};

@@ -47,7 +47,7 @@ pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<Stri
         .map(|i| {
             let path = dir.join(format!("{name}{i}.png"));
             std::fs::copy(&source, &path).expect("copied");
-            set_texture(&path, settings.clone()).expect("set");
+            set_texture(&path, settings).expect("set");
             if cached {
                 write_blank(&path, &settings).expect("cached");
             }

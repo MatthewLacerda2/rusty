@@ -17,7 +17,7 @@ use std::cell::{Cell, RefCell};
 
 use crate::gpu::ops::CountedQueue as _;
 
-/// The texture bytes written between two of [`Staging`]'s submits: two 2048² BC7
+/// The texture bytes written between two of `Staging`'s submits: two 2048² BC7
 /// textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
 pub const STAGING_BUDGET: u64 = 16 << 20;
 
