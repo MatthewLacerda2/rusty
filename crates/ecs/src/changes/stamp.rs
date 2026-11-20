@@ -67,10 +67,13 @@ impl World {
     }
 
     /// `id` written whole (placed, overwritten or removed; `is_static` its flag):
-    /// noted for the journal and stamped on every column, [`Activity`], [`Layer`],
-    /// [`Children`] and, when static, [`super::StaticSet`]. [`WorldPose`] follows from
-    /// `World::moved` (or, for a removal, its own walk), so its stamps are always a
-    /// whole subtree's.
+    /// noted for the journal and stamped on the columns its row carries now
+    /// ([`World::stamp_carried`]), [`Activity`], [`Layer`], [`Children`] and, when
+    /// static, [`super::StaticSet`]. Called before the row is written, so a removal
+    /// stamps what it had and a placement no column yet: the writer stamps the new
+    /// row's with [`World::stamp_carried`] once it is spawned. [`WorldPose`] follows
+    /// from `World::moved` (or, for a removal, its own walk), so its stamps are always
+    /// a whole subtree's.
     pub(crate) fn touch_entity(&mut self, id: u32, is_static: bool) {
         self.note(id);
         if is_static {
@@ -79,16 +82,35 @@ impl World {
         if self.changes.get_mut().logs.len() == 1 {
             return;
         }
-        let live = self.order.len();
-        for log in self.changes.get_mut().logs.iter_mut().filter(|l| l.column) {
-            log.stamp(id, live);
-        }
+        self.stamp_carried(id);
         for at in [
             self.changes.get_mut().find::<Activity>(),
             self.changes.get_mut().find::<Layer>(),
             self.changes.get_mut().find::<Children>(),
         ] {
             at.into_iter().for_each(|at| self.stamp_at(at, id));
+        }
+    }
+
+    /// Stamp `id` on each opened column its row carries (none for a dead id): what a
+    /// whole-entity write stamps, so a column's channel never names an entity that
+    /// lacks its component. One archetype lookup per opened column
+    /// (`EntityRef::has`), on the row looked up once.
+    pub(crate) fn stamp_carried(&mut self, id: u32) {
+        if self.changes.get_mut().logs.len() == 1 {
+            return; // only `StaticSet` exists: no column was ever opened
+        }
+        let Some(handle) = self.handles.get(id) else {
+            return;
+        };
+        let Ok(row) = self.inner.entity(handle) else {
+            return;
+        };
+        let live = self.order.len();
+        for log in self.changes.get_mut().logs.iter_mut() {
+            if log.carried.is_some_and(|carried| carried(&row)) {
+                log.stamp(id, live);
+            }
         }
     }
 

@@ -13,8 +13,11 @@
 //!   stamp also stamps for each static entity it reaches (an `active` flag flipped,
 //!   a re-parent, a placement or removal), and which names a removed static entity.
 //!
-//! A `NavMeshModifier` (#1959) changes how they bake from anywhere above them, so
-//! any write on its channel counts as a change.
+//! A `NavMeshModifier` (#1959) changes how they bake from anywhere above them, so a
+//! change of one counts wherever it is. A stamp selects, a value decides: an id its
+//! channel names counts when its modifier now differs from the one kept at the last
+//! read (one added, removed or edited), so a modifier's unchanged rewrite costs a
+//! comparison, not the collider diff.
 //! When the watch saw nothing, `StaticSet` named nothing and no cursor read
 //! `Rebuild` (a clear, a scene load, Play's snapshot restored, an Undo or a
 //! rewind), the collider diff, the bounds' geometry extent and the reshape check
@@ -26,14 +29,67 @@
 use super::super::NavigationGraph;
 use super::sync::Rebake;
 use rusty_components::NavMeshModifierComponent;
-use rusty_ecs::{Cursor, StaticGeometry, StaticSet, World};
+use rusty_core::collections::Map;
+use rusty_ecs::{Changes, Cursor, StaticGeometry, StaticSet, World};
 use rusty_scene::Scene;
 
 /// What a play-mode navmesh reads its static geometry's changes from.
 pub(crate) struct StaticWatch {
     geometry: StaticGeometry,
     statics: Cursor<StaticSet>,
-    modifiers: Cursor<NavMeshModifierComponent>,
+    modifiers: Modifiers,
+}
+
+/// The `NavMeshModifier` channel's cursor and every modifier as it was at its last
+/// read (they are rare: a few per level).
+struct Modifiers {
+    cursor: Cursor<NavMeshModifierComponent>,
+    kept: Map<u32, NavMeshModifierComponent>,
+}
+
+impl Modifiers {
+    fn open(w: &World) -> Self {
+        let mut m = Self {
+            cursor: w.change_cursor(),
+            kept: Map::default(),
+        };
+        m.rebuild(w);
+        m
+    }
+
+    fn rebuild(&mut self, w: &World) {
+        self.kept.clear();
+        for id in w.ids_with_nav_mesh_modifier() {
+            if let Some(m) = w.nav_mesh_modifier(id) {
+                self.kept.insert(id, m.clone());
+            }
+        }
+    }
+
+    /// Whether every modifier is as at the last read; each id the channel named is
+    /// kept anew. A `Rebuild` is a change.
+    fn still(&mut self, w: &World) -> bool {
+        let ids = match w.changes(&mut self.cursor) {
+            Changes::Rebuild => {
+                self.rebuild(w);
+                return false;
+            }
+            Changes::Ids(ids) => ids,
+        };
+        let mut still = true;
+        for id in ids {
+            let now = w.nav_mesh_modifier(id).map(|m| m.clone());
+            if now.as_ref() == self.kept.get(&id) {
+                continue;
+            }
+            still = false;
+            match now {
+                Some(m) => self.kept.insert(id, m),
+                None => self.kept.remove(&id),
+            };
+        }
+        still
+    }
 }
 
 impl StaticWatch {
@@ -41,7 +97,7 @@ impl StaticWatch {
         Self {
             geometry: w.static_geometry(),
             statics: w.change_cursor(),
-            modifiers: w.change_cursor(),
+            modifiers: Modifiers::open(w),
         }
     }
 
@@ -49,9 +105,9 @@ impl StaticWatch {
     /// cursor, so each has read everything after this.
     pub(crate) fn still(&mut self, w: &mut World) -> bool {
         let membership = w.changes(&mut self.statics).is_empty();
-        // Any `NavMeshModifier` write counts: one on a non-static parent changes
-        // how its static children bake (#1959). They are rare.
-        let modifiers = w.changes(&mut self.modifiers).is_empty();
+        // A modifier changed anywhere counts: one on a non-static parent changes
+        // how its static children bake (#1959).
+        let modifiers = self.modifiers.still(w);
         let geometry = self.geometry.changed(w);
         membership && modifiers && !geometry
     }
