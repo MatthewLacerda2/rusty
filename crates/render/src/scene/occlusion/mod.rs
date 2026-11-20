@@ -251,6 +251,8 @@ impl OcclusionBinding {
     }
 }
 
+mod stale;
+
 #[cfg(test)]
 mod camera_gpu_tests;
 #[cfg(test)]

@@ -180,6 +180,10 @@ pub fn bench(
     extra: &Extra,
 ) -> Result<SceneReport, String> {
     let (mut harness, own) = load(out_dir, root, scene, settings, opts)?;
+    // Judged at the load's first frame, before a gameplay tick: a static the game
+    // then moves or destroys is the game's doing, not a stale bake.
+    let loaded = harness.world.borrow().scene().borrow().id();
+    let stale = harness.renderer().and_then(|r| r.stale_occlusion(loaded));
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let mut report = measure::all(&mut harness, probe.as_ref(), opts);
@@ -198,10 +202,10 @@ pub fn bench(
     if let Some(r) = harness.renderer() {
         push_gpu_memory(&mut report, r);
     }
-    {
-        let world = harness.world.borrow();
-        report.warnings.extend(unbaked(&world.scene().borrow()));
-    }
+    let own = root.join(format!("assets/scenes/{scene}.scene"));
+    report
+        .warnings
+        .extend(notes::scene_bakes(&harness, &own, loaded, stale));
     let assets = std::path::Path::new(rusty_core::project::ASSETS_DIR);
     let uncached = harness.renderer().map(|r| r.uncached_textures(assets));
     report.warnings.extend(uncached.and_then(uncompressed));
@@ -274,6 +278,9 @@ fn mb(bytes: u64) -> f64 {
     (bytes as f64 / (1024.0 * 1024.0) * 10.0).round() / 10.0
 }
 
+#[cfg(test)]
+#[path = "baked_gpu_tests.rs"]
+mod baked_gpu_tests;
 #[cfg(test)]
 #[path = "run_tests.rs"]
 mod run_tests;
