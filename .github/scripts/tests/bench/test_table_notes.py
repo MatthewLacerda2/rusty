@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""#2420: each leg's `bench-scenes` warnings head the scene's section, once, and a note not every leg wrote says so."""
+"""#2420, #2481: each leg's `bench-scenes` warnings head the scene's section, once, and a note not every leg wrote says so."""
 
 from __future__ import annotations
 
@@ -47,6 +47,11 @@ class Notes(unittest.TestCase):
         text = table.scene_table("levels/a", tuple(legs))
         self.assertIn("the console is in <leg>/yard-0123abcd/levels/a.console.log\n", text)
         self.assertNotIn("disagree", text)
+
+    def test_baked_data_one_leg_ran_without_names_that_leg(self):
+        refused = "baked occlusion not used: refused (occluder flag 30)"
+        text = self.section([[], [refused], []])
+        self.assertIn(f"- {refused} (only PR: the legs disagree)\n", text.split("Nothing moved")[0])
 
     def test_a_scene_with_no_warnings_has_no_notes(self):
         text = self.section([[], [], []])

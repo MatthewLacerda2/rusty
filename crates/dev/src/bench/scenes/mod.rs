@@ -282,6 +282,9 @@ fn mb(bytes: u64) -> f64 {
 }
 
 #[cfg(test)]
+#[path = "baked_gpu_tests.rs"]
+mod baked_gpu_tests;
+#[cfg(test)]
 #[path = "run_tests.rs"]
 mod run_tests;
 
