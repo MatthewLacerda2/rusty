@@ -90,4 +90,18 @@ fn the_wall_ray_is_cast_only_when_a_world_canvas_is_laid_out() {
     let (mut rig, _) = terminal();
     rig.hooks();
     assert_eq!(rig.wall_casts, 1, "a world canvas ahead: one cast a tick");
+    // A camera-space canvas with a camera lies on a world plane too.
+    let (mut s, canvas) = scene();
+    let c = CanvasComponent {
+        render_mode: CanvasRenderMode::ScreenSpaceCamera,
+        ..Default::default()
+    };
+    s.world.set_canvas(canvas, Some(c));
+    let mut rig = Rig::new(s, Handlers::default());
+    rig.camera = Some(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
+    rig.hooks();
+    assert_eq!(
+        rig.wall_casts, 1,
+        "a ScreenSpaceCamera canvas: one cast a tick"
+    );
 }

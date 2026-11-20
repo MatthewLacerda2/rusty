@@ -105,6 +105,15 @@ impl UiLayout {
             .map(|(id, _)| (*id, self.space(*id)))
     }
 
+    /// Whether any laid-out root canvas lies on a plane in the world: a
+    /// `WorldSpace` canvas, or a `ScreenSpaceCamera` canvas seen through a camera
+    /// ([`crate::space::canvas_space`]). Reads the root spaces only, not the rects.
+    pub fn has_world_canvas(&self) -> bool {
+        self.spaces
+            .values()
+            .any(|s| matches!(s, CanvasSpace::World(_)))
+    }
+
     /// The rect of `id`, when it was laid out.
     pub fn get(&self, id: u32) -> Option<&UiRect> {
         self.index.get(&id).map(|&i| &self.rects[i].1)
