@@ -61,7 +61,8 @@ impl Renderer {
     /// prepass, occlusion and blur, then SSIL's gather over that prepass's depth
     /// (#1750; it draws its own without SSAO). With neither, a camera the GPU
     /// culls whose forward pass primes still draws the prepass, which is then
-    /// only the late set over phase one's depth (#2336).
+    /// only the late set over phase one's depth (#2336), and so does one under
+    /// the cull's instance floor, its few batches whole (#2338).
     pub(crate) fn record_screen_space(
         &mut self,
         view: &mut RenderView,

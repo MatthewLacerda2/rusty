@@ -795,7 +795,16 @@ is wholly behind depth the camera drew this frame.
   bake, an orthographic camera and one whose near plane is far out cull too: the test
   reads the depth the camera drew, so a wall its near plane clips away hides
   nothing. Probe and reflection bakes, and a GPU without indirect first-instance
-  draws, cull nothing this way.
+  draws, cull nothing this way. Nor does a camera whose cull would test fewer than 32 mesh
+  entities this frame (a viewmodel camera drawing a gun), unless it draws a
+  clustered mesh (*Per cluster*, below) with `gpu_cluster_culling` on: culling so
+  few costs more than it could hide, so it draws them all, as with its
+  `use_occlusion_culling` off, except that where depth priming runs (never on
+  macOS) a depth prepass of those few still primes its forward pass, as it did
+  while it culled, so overlapping arms and gun shade each pixel once. The floor counts the mesh entities the cull tests
+  (mesh particles, a vertex-moving material and an outlined object are never
+  tested, so they do not count), not whether the camera is stacked, so an
+  overlay showing the whole level still culls.
 - **Cost.** Per camera, a depth-only draw of last frame's set, a compute reduction
   of the depth, and one compute test per opaque mesh; the draw calls stay the same
   (indirect). That first depth is kept: the depth prepass (SSAO's or SSIL's, or,
@@ -814,7 +823,10 @@ is wholly behind depth the camera drew this frame.
   facing test; a skinned mesh is never split. A mesh whose custom shader moves
   its vertices is split and reordered at import like any other, but the instance
   test never judges it, so its clusters are never tested and it keeps one
-  instanced draw; mesh particles likewise. It changes no pixel either. It is its own switch, the
+  instanced draw; mesh particles likewise. It changes no pixel either. A
+  camera drawing a split mesh culls by cluster however few entities it shows,
+  past the instance floor of *Which cameras* above: one big shell gains by
+  cluster whatever the count. It is its own switch, the
   preset's `gpu_cluster_culling` (off in every seeded preset), and does nothing
   without `gpu_occlusion_culling`: a preset that wants it names both
   ([`Graphics`](Graphics.md), *Quality presets*). A split mesh is
