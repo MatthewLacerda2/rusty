@@ -40,22 +40,30 @@ impl Grid {
     /// their margin. `None` when that needs cells over [`MAX_CELL`], or the bounds
     /// are not finite.
     pub fn over(min: Vec3, max: Vec3) -> Option<Self> {
-        Self::fitting(min, max, Self::cell_count)
+        Self::fitting(min, max, |g| (g.cell_count(), ())).map(|(grid, ())| grid)
     }
 
     /// The grid over `(min, max)` of the smallest cell, from [`CELL_SIZE`] and
     /// growing by a quarter, that holds at most [`MAX_GRID_CELLS`] and of which
-    /// `sampled` counts at most [`MAX_CELLS`]. `None` when that needs cells over
-    /// [`MAX_CELL`], or the bounds are not finite.
-    pub fn fitting(min: Vec3, max: Vec3, mut sampled: impl FnMut(&Self) -> usize) -> Option<Self> {
+    /// `sampled` counts at most [`MAX_CELLS`], with what `sampled` counted them
+    /// from (the cells it marked), so the caller marks no grid twice. `None` when
+    /// that needs cells over [`MAX_CELL`], or the bounds are not finite.
+    pub fn fitting<T>(
+        min: Vec3,
+        max: Vec3,
+        mut sampled: impl FnMut(&Self) -> (usize, T),
+    ) -> Option<(Self, T)> {
         if !(min.is_finite() && max.is_finite()) {
             return None;
         }
         let mut cell = CELL_SIZE;
         while cell <= MAX_CELL {
             let grid = Self::with_cell(min, max, cell);
-            if grid.cell_count() <= MAX_GRID_CELLS && sampled(&grid) <= MAX_CELLS {
-                return Some(grid);
+            if grid.cell_count() <= MAX_GRID_CELLS {
+                let (count, marked) = sampled(&grid);
+                if count <= MAX_CELLS {
+                    return Some((grid, marked));
+                }
             }
             cell *= 1.25;
         }

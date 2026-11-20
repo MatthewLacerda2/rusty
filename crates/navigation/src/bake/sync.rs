@@ -20,7 +20,7 @@
 
 use super::super::NavigationGraph;
 use super::erosion;
-use super::inputs::{collider_keys, diff, obstacle_keys};
+use super::inputs::{collider_keys, diff, obstacle_keys, Source};
 use super::modifiers::{modifier_keys, ModifierVolume};
 use super::raster;
 use super::region::{merge_overlapping, CellRect};
@@ -57,6 +57,24 @@ impl NavigationGraph {
     /// without rebaking anything, and only makes cached agent paths stale.
     pub fn sync(&mut self, scene: &Scene) -> Rebake {
         self.sync_inner(scene, false)
+    }
+
+    /// Whether the navmesh is what a bake of `scene` gives now, read without
+    /// rebaking: baked, with the settings, the grid and every input (static
+    /// collider, carving obstacle, modifier volume, authored link) the scene holds.
+    /// The editor's per-frame [`Self::sync`] keeps it so; a scene edited since its
+    /// last sync, or a graph never baked, is not. What a bake that takes the
+    /// navmesh as the level's floor asks first (the occlusion bake's reach).
+    pub fn is_current_for(&self, scene: &Scene) -> bool {
+        self.bake_state.as_ref().is_some_and(|st| {
+            let i = &st.inputs;
+            i.settings.bakes_like(&scene.nav_settings)
+                && !self.needs_reshape(scene)
+                && same(&i.colliders, collider_keys(scene))
+                && same(&i.obstacles, obstacle_keys(scene))
+                && same(&i.modifiers, modifier_keys(scene))
+                && same(&i.links, authored_keys(scene))
+        })
     }
 
     /// [`Self::sync`]; `statics_still` (the change log saw no static entity change
@@ -194,4 +212,14 @@ impl BakeState {
         self.inputs.links = diff(&self.inputs.links, authored_keys(scene), rect, &mut dirty);
         dirty
     }
+}
+
+/// Whether the records `old` are the keys `new` (both by ascending id), each the
+/// same input unchanged.
+fn same<K: PartialEq>(old: &[Source<K>], new: Vec<(u32, K)>) -> bool {
+    old.len() == new.len()
+        && old
+            .iter()
+            .zip(new)
+            .all(|(s, (id, k))| s.id == id && s.key == k)
 }

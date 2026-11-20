@@ -163,8 +163,9 @@ pub fn finish(
             // The next save writes it ([`Scene::put_baked_occlusion`]); the bake is
             // reported now. A kept PVS is already the scene's, and owns its file.
             let (kept, cells) = (occlusion.kept, std::mem::take(&mut occlusion.cells));
+            let standable = occlusion.standable.take();
             occlusion.put_on(scene);
-            let measured = (&report, ms, &cells[..]);
+            let measured = (&report, ms, (&cells[..], standable.as_deref()));
             let written = (None, kept);
             super::report::occlusion::keep(scene, path, measured, written);
             (report, ms)
@@ -238,11 +239,16 @@ pub fn apply_occlusion(
         ms: baked.ms,
     };
     let (kept, cells) = (baked.kept, std::mem::take(&mut baked.cells));
+    let standable = baked.standable.take();
     baked.put_on(scene);
     let saving = std::time::Instant::now();
     rusty_scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    let measured = (&report.occlusion, report.ms, &cells[..]);
+    let measured = (
+        &report.occlusion,
+        report.ms,
+        (&cells[..], standable.as_deref()),
+    );
     super::report::occlusion::keep(scene, path, measured, (saved, kept));
     Ok(report)
 }

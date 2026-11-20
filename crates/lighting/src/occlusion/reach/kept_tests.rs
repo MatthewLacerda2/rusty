@@ -4,10 +4,8 @@
 
 use glam::Vec3;
 
-use super::reach_tests::{bake_reaching, hangar, LAMP};
+use super::tests::{bake_reaching, floor, hangar, LAMP};
 use crate::occlusion::{is_current, Reach};
-use rusty_scene::lighting::floor::FloorGrid;
-use rusty_scene::lighting::occlusion::FloorSource;
 use rusty_scene::Scene;
 
 fn lamp(scene: &Scene) -> u32 {
@@ -22,8 +20,12 @@ fn lamp(scene: &Scene) -> u32 {
 #[test]
 fn a_light_moved_within_its_cell_keeps_and_to_another_cell_re_bakes() {
     let scene = hangar(LAMP);
-    let (held, _) = bake_reaching(&scene, Reach::survey(&scene, None));
-    assert!(is_current(&scene, &held, &Reach::survey(&scene, None)));
+    let (held, _) = bake_reaching(&scene, Reach::over(&scene, &floor(&scene)));
+    assert!(is_current(
+        &scene,
+        &held,
+        &Reach::over(&scene, &floor(&scene))
+    ));
     let cell = held.grid.index_of(LAMP).expect("in the grid");
     let near = LAMP + Vec3::splat(0.1);
     assert_eq!(held.grid.index_of(near), Some(cell), "the same cell");
@@ -33,7 +35,11 @@ fn a_light_moved_within_its_cell_keeps_and_to_another_cell_re_bakes() {
         .transform_mut(lamp(&nudged))
         .expect("lamp")
         .position = near;
-    assert!(is_current(&nudged, &held, &Reach::survey(&nudged, None)));
+    assert!(is_current(
+        &nudged,
+        &held,
+        &Reach::over(&nudged, &floor(&nudged))
+    ));
     let mut moved = hangar(LAMP);
     let far = Vec3::new(6.0, 8.5, -6.0);
     moved
@@ -41,21 +47,24 @@ fn a_light_moved_within_its_cell_keeps_and_to_another_cell_re_bakes() {
         .transform_mut(lamp(&moved))
         .expect("lamp")
         .position = far;
-    assert!(!is_current(&moved, &held, &Reach::survey(&moved, None)));
+    assert!(!is_current(
+        &moved,
+        &held,
+        &Reach::over(&moved, &floor(&moved))
+    ));
 }
 
 #[test]
 fn a_floor_that_changes_the_reachable_cells_re_bakes() {
     let scene = hangar(LAMP);
-    let floor = FloorGrid::from_static(&scene, 0.5).expect("colliders");
-    let navmesh = |floor: &FloorGrid| Reach::over(&scene, floor, FloorSource::Navmesh);
-    let (held, _) = bake_reaching(&scene, navmesh(&floor));
-    assert!(is_current(&scene, &held, &navmesh(&floor)));
-    let mut ledge = floor.clone();
+    let plan = floor(&scene);
+    let (held, _) = bake_reaching(&scene, Reach::over(&scene, &plan));
+    assert!(is_current(&scene, &held, &Reach::over(&scene, &plan)));
+    let mut ledge = plan.clone();
     let open = ledge.cells.iter().position(Option::is_some).expect("open");
     ledge.upper.push((open, 6.0));
     assert!(
-        !is_current(&scene, &held, &navmesh(&ledge)),
+        !is_current(&scene, &held, &Reach::over(&scene, &ledge)),
         "a ledge up high"
     );
     assert!(

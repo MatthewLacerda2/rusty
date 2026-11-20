@@ -92,13 +92,17 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
     };
     let line = report.summary();
     assert!(
-        line.contains("40 cell(s) of 2.0 m, 9 object(s), 2 never culled"),
+        line.contains("40 cell(s) of 2.0 m (no fresh navmesh: every cell sampled; "),
         "{line}"
     );
+    assert!(line.contains("), 9 object(s), 2 never culled"), "{line}");
     report.occlusion.baked_cells = 12;
+    report.occlusion.floor = rusty_scene::lighting::occlusion::FloorSource::Navmesh;
+    report.occlusion.floor_coverage = Some(0.25);
     let line = report.summary();
+    let sampled = "(12 sampled, where a camera can be over a navmesh covering 25% of the level)";
     assert!(
-        line.contains("40 cell(s) of 2.0 m (12 sampled, where a camera can be), 9 object(s)"),
+        line.contains(&format!("40 cell(s) of 2.0 m {sampled}, 9")),
         "{line}"
     );
     report.occlusion = OcclusionBakeReport {

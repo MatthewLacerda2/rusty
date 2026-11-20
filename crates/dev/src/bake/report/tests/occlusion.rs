@@ -1,13 +1,9 @@
 //! The occlusion report: on the corridor test level the PVS culls a share of the
-//! objects, the slowest cells come slowest first, and Bake Occlusion writes the
-//! report beside the scene.
+//! objects, and the slowest cells and each grid layer's time are read right.
 
 use std::time::Duration;
 
-use super::{assert_common, scene_path};
-use crate::bake::generate_lighting::bake_occlusion_only;
-use crate::bake::progress::BakeLog;
-use crate::bake::report::{occlusion, point, read, Kind, Stages, TOP};
+use crate::bake::report::{occlusion, point, Stages, TOP};
 use rusty_lighting::occlusion::bake_occlusion;
 use rusty_lighting::occlusion::test_level::corridors;
 
@@ -16,7 +12,8 @@ fn the_corridors_cull_a_share_of_their_objects() {
     let scene = corridors();
     let (data, r) = bake_occlusion(&scene, 2);
     let data = data.expect("the corridors occlude");
-    let report = occlusion::report(&scene, (&r, Some(&data), &[]), &Stages::start(), 0).to_json();
+    let report =
+        occlusion::report(&scene, (&r, Some(&data), (&[], None)), &Stages::start(), 0).to_json();
     let v = &report["visibility"];
     let culled = v["culledFraction"].as_f64().unwrap();
     assert!(
@@ -48,7 +45,12 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
         Some(Duration::from_millis(9)),
         Some(Duration::from_millis(5)),
     );
-    let report = occlusion::report(&scene, (&r, Some(&data), &cells), &Stages::start(), 0);
+    let report = occlusion::report(
+        &scene,
+        (&r, Some(&data), (&cells, None)),
+        &Stages::start(),
+        0,
+    );
     let report = report.to_json();
     let slowest = report["slowestCells"].as_array().unwrap();
     let order: Vec<u64> = slowest
@@ -72,7 +74,12 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
         "{seconds}"
     );
     // Times for another grid are not this bake's.
-    let other = occlusion::report(&scene, (&r, Some(&data), &cells[1..]), &Stages::start(), 0);
+    let other = occlusion::report(
+        &scene,
+        (&r, Some(&data), (&cells[1..], None)),
+        &Stages::start(),
+        0,
+    );
     assert!(other.to_json()["slowestCells"].is_null());
 }
 
@@ -87,7 +94,12 @@ fn each_grid_layer_sums_its_cells_times() {
     let cells: Vec<_> = (0..r.cells)
         .map(|i| Some(Duration::from_millis((i / per_layer) as u64 + 1)))
         .collect();
-    let report = occlusion::report(&scene, (&r, Some(&data), &cells), &Stages::start(), 0);
+    let report = occlusion::report(
+        &scene,
+        (&r, Some(&data), (&cells, None)),
+        &Stages::start(),
+        0,
+    );
     let layers = report.to_json()["layerSeconds"].clone();
     let layers = layers.as_array().expect("timed");
     assert_eq!(layers.len(), g.dims.y as usize);
@@ -100,51 +112,4 @@ fn each_grid_layer_sums_its_cells_times() {
         let bottom = g.origin.y + y as f32 * g.cell;
         assert!((layer["minY"].as_f64().unwrap() - bottom as f64).abs() < 0.01);
     }
-}
-
-#[test]
-fn bake_occlusion_writes_its_report() {
-    let path = scene_path("occlusion");
-    let mut scene = corridors();
-    let baked = bake_occlusion_only(&mut scene, Some(&path), None, &mut BakeLog::off()).unwrap();
-    let report = read(&path, Kind::Occlusion).expect("the bake wrote its report");
-    assert_common(&report, Kind::Occlusion);
-    assert_eq!(report["cells"].as_u64(), Some(baked.occlusion.cells as u64));
-    assert_eq!(
-        report["floorSource"], "colliders",
-        "no navmesh: the colliders"
-    );
-    let (sampled, skipped) = (
-        report["bakedCells"].as_u64(),
-        report["unbakedCells"].as_u64(),
-    );
-    assert_eq!(
-        sampled.unwrap() + skipped.unwrap(),
-        baked.occlusion.cells as u64
-    );
-    let layers = report["layerSeconds"].as_array().expect("timed");
-    let per_layer: u64 = layers.iter().map(|l| l["cells"].as_u64().unwrap()).sum();
-    assert_eq!(
-        Some(per_layer),
-        sampled,
-        "the layers count the sampled cells"
-    );
-    let size = std::fs::metadata(format!("{path}.occlusion"))
-        .unwrap()
-        .len();
-    assert_eq!(report["outputBytes"].as_u64(), Some(size));
-    assert_eq!(report["stages"][0]["name"], "bake");
-    let slowest = report["slowestCells"]
-        .as_array()
-        .expect("the bake timed its cells");
-    assert!(!slowest.is_empty() && slowest.len() <= TOP);
-    let secs: Vec<f64> = slowest
-        .iter()
-        .map(|c| c["seconds"].as_f64().unwrap())
-        .collect();
-    assert!(
-        secs.windows(2).all(|w| w[0] >= w[1]),
-        "slowest first: {secs:?}"
-    );
-    assert_eq!(report["cellSeconds"]["max"].as_f64(), Some(secs[0]));
 }

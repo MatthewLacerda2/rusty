@@ -115,30 +115,23 @@ impl Baking {
 
     /// Each cell's own visible bits, `words` per cell, baked on `threads` workers;
     /// `None` when `progress` was cancelled. Only the cells `sampled` marks are
-    /// sampled (all of them when `None`): every other cell sees every object
-    /// (#2328), so the dilation needs no special case.
+    /// sampled (all of them when `None`): every other one is `None`, a cell that
+    /// sees every object (#2328), which the dilation reads as such
+    /// (`bake::fold_rows`).
     pub fn cells(
         &self,
         grid: &Grid,
         threads: usize,
         progress: &OcclusionProgress,
         sampled: Option<&[bool]>,
-    ) -> Option<Vec<Vec<u64>>> {
+    ) -> Option<Vec<Option<Vec<u64>>>> {
         let count = grid.cell_count();
-        let objects = self.targets.len();
-        let mut every = vec![u64::MAX; objects / 64];
-        if !objects.is_multiple_of(64) {
-            every.push((1u64 << (objects % 64)) - 1);
-        }
         let todo: Vec<usize> = match sampled {
             Some(s) => (0..count).filter(|&c| s[c]).collect(),
             None => (0..count).collect(),
         };
         let next = AtomicUsize::new(0);
-        let out = Mutex::new(match sampled {
-            Some(_) => vec![every; count],
-            None => vec![Vec::new(); count],
-        });
+        let out = Mutex::new(vec![None; count]);
         std::thread::scope(|s| {
             for _ in 0..threads.min(todo.len()) {
                 s.spawn(|| loop {
@@ -150,7 +143,7 @@ impl Baking {
                     progress.cell_started(cell);
                     let bits = self.cell(grid, cell);
                     progress.cell_done(cell);
-                    out.lock().unwrap_or_else(|e| e.into_inner())[cell] = bits;
+                    out.lock().unwrap_or_else(|e| e.into_inner())[cell] = Some(bits);
                 });
             }
         });

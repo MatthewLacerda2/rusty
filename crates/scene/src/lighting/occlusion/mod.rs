@@ -20,7 +20,8 @@
 //! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
 //! through. A uniform grid holds all of them. The bake samples only the cells a
 //! camera can be in, over walkable floor and at shadow-casting lights, and their
-//! ring (#2328, `reach`); every other cell sees every object. Cells that see the same set share one
+//! ring (#2328, `reach`), found on the navmesh when it is current, else every cell;
+//! every other cell sees every object. Cells that see the same set share one
 //! row (`rows`); after the dilation few do, so the data is about one bit per cell
 //! per object (11.8 MB for a Dust2-sized level of 6344 meshes, `docs/api/Lighting.md`).
 //!
@@ -54,7 +55,7 @@
 //! occluder moved or removed turns the bake off until it is re-baked. Never stale
 //! pixels.
 //!
-//! **Stored** (`file`) beside the scene as `<scene>.occlusion`, a small binary file
+//! **Stored** (`file`, `sidecar`) beside the scene as `<scene>.occlusion`, a small binary file
 //! the lighting save writes and the scene load reads; absent, the scene culls
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
 //! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
@@ -64,12 +65,13 @@
 mod file;
 pub mod gather;
 mod grid;
+mod sidecar;
 
 pub use file::{
-    apply_sidecar, decode, encode, encoded_len, load_sidecar, occlusion_path, read_sidecar,
-    save_sidecar, OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
+    decode, encode, encoded_len, occlusion_path, version_of, SUFFIX as OCCLUSION_SUFFIX,
 };
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS, MAX_GRID_CELLS};
+pub use sidecar::{apply_sidecar, load_sidecar, read_sidecar, save_sidecar, OcclusionFile};
 
 #[cfg(test)]
 mod grid_tests;
@@ -96,6 +98,22 @@ pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
     perspective && near <= MAX_CULLING_NEAR
 }
 
+/// The occlusion bake's version, stamped on every PVS it makes ([`BakeStamp`]) and
+/// the file's first field after its magic, so a decoder of any layout reads it
+/// first (`file`): bump it whenever the bake would write other bytes for the same
+/// objects (its sampling, the dilation, `rusty_lighting::occlusion::OCCLUSION_SEED`,
+/// the grid's [`CELL_SIZE`], [`MAX_CELL`], [`MAX_CELLS`] and [`MAX_GRID_CELLS`],
+/// which cells it samples (`rusty_lighting::occlusion::Reach`, its `PLAY_HEIGHT`),
+/// the step `Grid::fitting` grows a cell by, the sampling of a large cell as
+/// `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants) or the
+/// file would hold another layout. Generate Lighting then re-bakes a PVS an older
+/// engine made instead of keeping it (`rusty_lighting::occlusion::is_current`), and a
+/// load refuses an older file whole, saying so. `rusty_lighting`'s `version_tests`
+/// holds the rule only in part: it pins this version beside the bytes a small
+/// fixed scene bakes to, so it covers the small-level path alone (2 m cells, no
+/// growth, no sub-cubes), and a change to the rest is bumped by hand.
+pub const OCCLUSION_VERSION: u32 = 2;
+
 /// One baked object: the entity, what it was baked as (its fingerprint), and
 /// whether it occludes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -106,12 +124,13 @@ pub struct BakedObject {
 }
 
 /// What a PVS was baked by, beside what it was baked against: the occlusion bake's
-/// version (`rusty_lighting::occlusion::OCCLUSION_VERSION`), so Generate Lighting
+/// version ([`OCCLUSION_VERSION`]), so Generate Lighting
 /// keeps a PVS only an unchanged bake made (#2348); the objects the bake kept in
 /// sight of every cell, too large or not finite to sample, which only the bake
 /// can count; and which cells it sampled (#2328): where it found the floor, how
 /// many cells, a hash of the cells it was seeded from, and the bounds its grid
-/// was laid over, so a keep can lay the grid again. Zero on a PVS no bake stamped.
+/// was laid over, so a keep can lay the grid again. On a PVS no bake stamped,
+/// this build's version and the rest zero.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BakeStamp {
     pub version: u32,
@@ -128,9 +147,8 @@ pub struct BakeStamp {
 }
 
 /// Where an occlusion bake found the floor a camera can stand on (#2328), which
-/// decides the cells it samples: the scene's baked navmesh (every walkable span),
-/// else a floor plan rasterized from the static colliders, else none, and then it
-/// samples every cell.
+/// decides the cells it samples: the scene's navmesh (every walkable span) when it
+/// is baked and current, else none, and then it samples every cell.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FloorSource {
     /// No floor: every cell is sampled.
@@ -138,8 +156,6 @@ pub enum FloorSource {
     Everywhere,
     /// The navmesh's walkable spans.
     Navmesh,
-    /// The static colliders' floor plan (`floor::FloorGrid::from_static`).
-    Colliders,
 }
 
 impl FloorSource {
@@ -148,7 +164,6 @@ impl FloorSource {
         match self {
             Self::Everywhere => "everywhere",
             Self::Navmesh => "navmesh",
-            Self::Colliders => "colliders",
         }
     }
 
@@ -159,7 +174,7 @@ impl FloorSource {
 
     /// The source numbered `code`, `None` past the last.
     pub fn of_code(code: u32) -> Option<Self> {
-        [Self::Everywhere, Self::Navmesh, Self::Colliders]
+        [Self::Everywhere, Self::Navmesh]
             .get(code as usize)
             .copied()
     }
@@ -204,7 +219,10 @@ impl OcclusionData {
         let unique = index.windows(2).all(|w| w[0].0 < w[1].0);
         (whole && cells_ok && unique && (words == 0 || count > 0)).then_some(Self {
             grid,
-            stamp: BakeStamp::default(),
+            stamp: BakeStamp {
+                version: OCCLUSION_VERSION,
+                ..BakeStamp::default()
+            },
             objects,
             index,
             words,

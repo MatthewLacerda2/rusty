@@ -4,8 +4,11 @@
 //! cell sees, and the time each cell took with the slowest cells (#1987) and
 //! each grid layer's sum and mean (#2328). The
 //! bake samples only the cells a camera can be in (#2328): `bakedCells` and
-//! `unbakedCells` count them, `floorSource` says where it found the floor, and
-//! the times are the sampled cells'. The times come from the cell clocks the bake was lent (`dev::bake::occlusion::
+//! `unbakedCells` count them, `floorSource` says where it found the floor and
+//! `floorCoverage` the share of the level's footprint it covers, the times are
+//! the sampled cells', and `visibility` is taken over the cells a camera can be in
+//! (their rows are exact; the rest see everything), so it means what a full
+//! bake's does. The times come from the cell clocks the bake was lent (`dev::bake::occlusion::
 //! CellClocks`), the rest from the bake's report and its PVS, outside the bake.
 //! Being read outside, `neverCulled` is a count with no names: the objects too large or not finite
 //! to sample are only known inside the bake. Every cell sees them, so they are among
@@ -25,11 +28,16 @@ use rusty_scene::Scene;
 /// A cell's sampling time, `None` when it was not sampled.
 pub type CellTime = Option<Duration>;
 
-/// The report of a bake of `scene` that reported `r`, baked `data`, took `cells`
-/// per cell (by cell index; empty when it was not timed) and wrote `output_bytes`.
+/// What a bake measured beside its report: each cell's time (by cell index;
+/// empty when it was not timed) and the cells a camera can be in (`None`: every
+/// cell, all sampled).
+pub type Measured<'a> = (&'a [CellTime], Option<&'a [bool]>);
+
+/// The report of a bake of `scene` that reported `r`, baked `data`, measured
+/// `cells` and `standable` ([`Measured`]) and wrote `output_bytes`.
 pub fn report(
     scene: &Scene,
-    (r, data, cells): (&OcclusionBakeReport, Option<&OcclusionData>, &[CellTime]),
+    (r, data, (cells, standable)): (&OcclusionBakeReport, Option<&OcclusionData>, Measured),
     stages: &Stages,
     output_bytes: u64,
 ) -> Report {
@@ -47,6 +55,7 @@ pub fn report(
         "bakedCells": r.baked_cells,
         "unbakedCells": r.cells - r.baked_cells.min(r.cells),
         "floorSource": r.floor.name(),
+        "floorCoverage": r.floor_coverage.map(|c| (c * 1000.0).round() / 1000.0),
         "cellSize": r.cell_size,
         "tooLarge": r.too_large,
         "rows": r.rows,
@@ -56,7 +65,7 @@ pub fn report(
         "neverCulled": r.never_culled,
         "occluderTriangles": triangles,
         "biggestOccluders": biggest,
-        "visibility": data.map_or(Value::Null, |d| visibility(scene, d)),
+        "visibility": data.map_or(Value::Null, |d| visibility(scene, d, standable)),
         "cellSeconds": data.map_or(Value::Null, |d| cell_seconds(d, cells)),
         "layerSeconds": data.map_or(Value::Null, |d| layer_seconds(d, cells)),
         "slowestCells": data.map_or(Value::Null, |d| slowest_cells(d, cells)),
@@ -68,13 +77,13 @@ pub fn report(
 pub const SKIPPED: &str = "skipped: unchanged";
 
 /// Write the report of an occlusion bake now on `scene` (#1980): it reported `r`,
-/// took `ms` and `cells` per cell, and writing its file beside `path` took `saved`
+/// took `ms` and measured `cells` ([`Measured`]), and writing its file beside `path` took `saved`
 /// (`None` when the file waits for a scene save, so nothing is written yet). A
 /// `kept` PVS (#2348) has [`SKIPPED`] for its bake stage, its `ms` the comparison's.
 pub fn keep(
     scene: &Scene,
     path: &str,
-    (r, ms, cells): (&OcclusionBakeReport, u64, &[CellTime]),
+    (r, ms, cells): (&OcclusionBakeReport, u64, Measured),
     (saved, kept): (Option<std::time::Duration>, bool),
 ) {
     let mut stages = Stages::start();
@@ -120,19 +129,23 @@ fn occluder_triangles(scene: &Scene, data: &OcclusionData) -> (usize, Value) {
     (total, Value::Array(top.collect()))
 }
 
-/// How many objects each cell sees: the mean and the most, the share of the
-/// objects culled on average, and the objects every cell sees (at most [`TOP`]
-/// named; the count holds them all).
-pub(super) fn visibility(scene: &Scene, data: &OcclusionData) -> Value {
+/// How many objects each cell a camera can be in sees (`standable`, every cell
+/// when `None`): the mean and the most, the share of the objects culled on
+/// average, and the objects every such cell sees (at most [`TOP`] named; the
+/// count holds them all). The air no camera reaches sees everything and is left
+/// out, so a level that culls as before reports as before.
+pub(super) fn visibility(scene: &Scene, data: &OcclusionData, standable: Option<&[bool]>) -> Value {
     let (rows, cells) = data.parts();
     let objects = data.objects.len();
     let words = objects.div_ceil(64);
-    if words == 0 || cells.is_empty() {
+    let counted = |c: &usize| standable.is_none_or(|s| s.get(*c).copied().unwrap_or(false));
+    let counted: Vec<u32> = (0..cells.len()).filter(counted).map(|c| cells[c]).collect();
+    if words == 0 || counted.is_empty() {
         return Value::Null;
     }
     // How many cells use each row: one pass over the rows then counts every cell.
     let mut uses = vec![0u64; rows.len() / words];
-    for &row in cells {
+    for &row in &counted {
         uses[row as usize] += 1;
     }
     let (mut seen_by, mut sum, mut most) = (vec![0u64; objects], 0u64, 0u32);
@@ -154,11 +167,13 @@ pub(super) fn visibility(scene: &Scene, data: &OcclusionData) -> Value {
             }
         }
     }
-    let mean = sum as f64 / cells.len() as f64;
-    let every = (data.objects.iter().zip(&seen_by)).filter(|(_, &n)| n == cells.len() as u64);
+    let total = counted.len() as u64;
+    let mean = sum as f64 / total as f64;
+    let every = (data.objects.iter().zip(&seen_by)).filter(|(_, &n)| n == total);
     let every: Vec<u32> = every.map(|(o, _)| o.entity).collect();
     let named = every.iter().take(TOP).map(|&id| entity_name(scene, id));
     json!({
+        "cells": total,
         "meanVisible": (mean * 100.0).round() / 100.0,
         "maxVisible": most,
         "culledFraction": ((1.0 - mean / objects as f64) * 1000.0).round() / 1000.0,

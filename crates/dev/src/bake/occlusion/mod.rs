@@ -16,8 +16,8 @@
 //! [`BakedOcclusion::kept`]. Bake Occlusion always bakes.
 //!
 //! Both sample only the cells a camera can be in (#2328, [`reach`]): over the
-//! live navmesh's walkable spans when it is baked, else the static colliders'
-//! floor plan, else every cell.
+//! live navmesh's walkable spans when it is baked and current for the scene, else
+//! every cell, as the console summary then says.
 //!
 //! Both runs lend the bake [`CellClocks`], so each cell's sampling time reaches
 //! the bake report's `slowestCells` (#1987) without a clock inside the sim.
@@ -33,34 +33,41 @@ use rusty_lighting::occlusion::{
     Reach,
 };
 use rusty_navigation::NavigationGraph;
-use rusty_scene::lighting::occlusion::OcclusionData;
+use rusty_scene::lighting::occlusion::{FloorSource, OcclusionData};
 use rusty_scene::Scene;
 
 mod clocks;
 pub(crate) mod summary;
 
+pub use summary::unsaved_materials_warning;
+
 pub use clocks::CellClocks;
 
 /// Where a camera can be in `scene` (#2328), which decides the cells its PVS
-/// bake samples: over `nav`'s every walkable span when it is baked (the live
-/// navmesh, kept in step with the scene), else over the static colliders' floor
-/// plan, else everywhere.
+/// bake samples: over `nav`'s every walkable span when it is baked and current
+/// for the scene (`NavigationGraph::is_current_for`: the editor's per-frame sync
+/// keeps it so), else everywhere. A stale navmesh is never read: its floor may be
+/// gone, and a floor that misses where a camera can be would cull less there.
 pub fn reach(scene: &Scene, nav: Option<&NavigationGraph>) -> Reach {
-    let floor = nav.and_then(|n| n.floor_grid(scene.nav_settings.agent_radius, None));
-    Reach::survey(scene, floor)
+    let fresh = nav.filter(|n| n.is_current_for(scene));
+    let floor = fresh.and_then(|n| n.floor_grid(scene.nav_settings.agent_radius, None));
+    floor.map_or_else(Reach::everywhere, |f| Reach::over(scene, &f))
 }
 
 /// A finished occlusion bake: its PVS (`None` when nothing occludes or the level is too large to cull), its report,
 /// the wall-clock milliseconds it took, and each cell's sampling time by cell
 /// index (#1987; empty when no grid was laid). Or, when `kept`, the PVS the scene
 /// already holds, unchanged (#2348): no `data` to apply, the held PVS's report,
-/// the milliseconds the comparison took and no cell times.
+/// the milliseconds the comparison took and no cell times. `standable` marks the
+/// cells a camera can be in, whose rows are exact (`None`: every cell's is), which
+/// the report's visibility figures are taken over.
 #[derive(Debug)]
 pub struct BakedOcclusion {
     pub data: Option<OcclusionData>,
     pub report: OcclusionBakeReport,
     pub ms: u64,
     pub cells: Vec<Option<Duration>>,
+    pub standable: Option<Vec<bool>>,
     pub kept: bool,
 }
 
@@ -73,11 +80,16 @@ impl BakedOcclusion {
     pub fn kept(scene: &Scene, reach: &Reach) -> Result<Self, Fingerprints> {
         let started = Instant::now();
         let held = current_pvs(scene, reach)?;
+        let report = OcclusionBakeReport {
+            floor_coverage: reach.coverage(held.stamp.bounds),
+            ..OcclusionBakeReport::of_kept(held)
+        };
         Ok(Self {
             data: None,
-            report: OcclusionBakeReport::of_kept(held),
+            report,
             ms: started.elapsed().as_millis() as u64,
             cells: Vec::new(),
+            standable: reach.standable(&held.grid),
             kept: true,
         })
     }
@@ -100,6 +112,8 @@ pub struct OcclusionBakeJob {
     progress: Arc<OcclusionProgress>,
     clocks: Arc<CellClocks>,
     worker: Option<JoinHandle<Baked>>,
+    /// The cells it samples, for the report's standable cells.
+    reach: Reach,
     started: Instant,
     /// Generate Lighting's held PVS, unchanged: finished before it began.
     kept: Option<BakedOcclusion>,
@@ -109,7 +123,8 @@ impl OcclusionBakeJob {
     /// Gather `scene`'s statics and start baking them on a worker, sampling the
     /// cells `reach` can be in: Bake Occlusion, which always bakes.
     pub fn start(scene: &Scene, reach: Reach) -> Result<Self, String> {
-        Self::bake(gather_with(scene, &Fingerprints::of_scene(scene), reach))
+        let input = gather_with(scene, &Fingerprints::of_scene(scene), reach.clone());
+        Self::bake(input, reach)
     }
 
     /// Generate Lighting's occlusion step: [`Self::start`] through the fingerprints
@@ -119,18 +134,19 @@ impl OcclusionBakeJob {
     pub fn generate(scene: &Scene, reach: Reach) -> Result<Self, String> {
         let kept = match BakedOcclusion::kept(scene, &reach) {
             Ok(kept) => kept,
-            Err(prints) => return Self::bake(gather_with(scene, &prints, reach)),
+            Err(prints) => return Self::bake(gather_with(scene, &prints, reach.clone()), reach),
         };
         Ok(Self {
             progress: Arc::default(),
             clocks: Arc::default(),
             worker: None,
+            reach,
             started: Instant::now(),
             kept: Some(kept),
         })
     }
 
-    fn bake(input: OcclusionInput) -> Result<Self, String> {
+    fn bake(input: OcclusionInput, reach: Reach) -> Result<Self, String> {
         let clocks = Arc::new(CellClocks::default());
         let progress = Arc::new(OcclusionProgress::observed(clocks.clone()));
         let watch = Arc::clone(&progress);
@@ -142,6 +158,7 @@ impl OcclusionBakeJob {
             progress,
             clocks,
             worker: Some(worker),
+            reach,
             started: Instant::now(),
             kept: None,
         })
@@ -164,6 +181,7 @@ impl OcclusionBakeJob {
         let ms = self.started.elapsed().as_millis() as u64;
         Some(match self.worker.take()?.join() {
             Ok(Some((data, report))) => Ok(BakedOcclusion {
+                standable: standable(&self.reach, data.as_ref()),
                 data,
                 report,
                 ms,
@@ -193,13 +211,14 @@ pub fn bake_occlusion_logged(
     log: &mut BakeLog,
 ) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
-    let input = gather_with(scene, &Fingerprints::of_scene(scene), reach);
-    bake_logged(input, started, log)
+    let input = gather_with(scene, &Fingerprints::of_scene(scene), reach.clone());
+    bake_logged(input, &reach, started, log)
 }
 
 /// Bake `input`, gathered from the clock `started` at, saying its cells to `log`.
 fn bake_logged(
     input: OcclusionInput,
+    reach: &Reach,
     started: Instant,
     log: &mut BakeLog,
 ) -> Result<BakedOcclusion, String> {
@@ -213,6 +232,7 @@ fn bake_logged(
     let ms = started.elapsed().as_millis() as u64;
     let cells = clocks.times();
     Ok(BakedOcclusion {
+        standable: standable(reach, data.as_ref()),
         data,
         report,
         ms,
@@ -235,8 +255,18 @@ pub fn generate_occlusion_logged(
             log.kept(Step::Occlusion);
             Ok(kept)
         }
-        Err(prints) => bake_logged(gather_with(scene, &prints, reach), started, log),
+        Err(prints) => {
+            let input = gather_with(scene, &prints, reach.clone());
+            bake_logged(input, &reach, started, log)
+        }
     }
+}
+
+/// The cells of `data`'s grid a camera can be in over `reach`, `None` when every
+/// cell was sampled.
+fn standable(reach: &Reach, data: Option<&OcclusionData>) -> Option<Vec<bool>> {
+    let data = data.filter(|d| d.stamp.floor != FloorSource::Everywhere)?;
+    reach.standable(&data.grid)
 }
 
 fn bake(
@@ -246,27 +276,6 @@ fn bake(
     input
         .bake(crate::bake::report::threads(), progress)
         .ok_or_else(|| "never cancelled".to_string())
-}
-
-/// The warning a bake gives when the scene file at `path` lacks, or holds
-/// otherwise, a material the baked meshes draw (#1958,
-/// [`unsaved_materials`](rusty_lighting::occlusion::unsaved_materials)):
-/// the PVS fingerprints the live library, so the next load of the file would read
-/// it as stale. `None` when the file agrees, or cannot be read.
-pub fn unsaved_materials_warning(scene: &Scene, path: &str) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let saved = rusty_scene::parse_scene_text(&text, path).ok()?.materials;
-    let keys = rusty_lighting::occlusion::unsaved_materials(scene, &saved);
-    if keys.is_empty() {
-        return None;
-    }
-    let keys: Vec<_> = keys.iter().map(|k| format!("{k:?}")).collect();
-    Some(format!(
-        "[Occlusion] material(s) {} are defined in memory but not as the scene file holds \
-         them: save the scene so its materials are written, or the bake won't match the \
-         next load",
-        keys.join(", ")
-    ))
 }
 
 /// The bake's counters as the log reads them.

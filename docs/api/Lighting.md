@@ -647,9 +647,15 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   1 m jump), over a walkable floor; the cell holding a shadow-casting point, spot or
   area light is sampled too, since its shadows cull by that cell's row; and so is the
   ring of cells round each, which the dilation (below) reads. The floor is the scene's
-  baked navmesh, every walkable span; without one, a floor plan rasterized from the
-  static colliders at 0.5 m; with neither, every cell is sampled, as for a level with
-  no floor. Every other cell (the air under a high roof, over a courtyard, under the
+  navmesh, every walkable span, while it is baked and current for the scene (the
+  editor keeps it so as you edit; one a scene edit has outdated is not read). With
+  none, every cell is sampled, as before this existed, and the console line says
+  `no fresh navmesh: every cell sampled; bake the navmesh to sample only where a
+  camera can be`. No floor is guessed from the colliders: a guess that missed a
+  storey or a building's inside would cull less there than sampling every cell. A
+  navmesh that marks no cell of the grid falls back to every cell too, with a
+  console warning, and one that covers a small share of the level is still used,
+  its share in the bake report's `floorCoverage`, so a partial navmesh shows. Every other cell (the air under a high roof, over a courtyard, under the
   ground floor) **sees every object**: a camera there, a spectator or a cutscene
   camera above the play height, is culled by nothing from the PVS, as outside the
   grid, and the GPU's Hi-Z test still culls. A standable cell keeps exactly what it
@@ -756,7 +762,10 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   by the bake, and by a save only by the rule in
   [*Bake files and the scene save*](#bake-files-and-the-scene-save)). A file that
   is truncated or out of range is refused on load with a warning, and nothing is
-  occlusion-culled, and the next save removes or rewrites it. One that is there but
+  occlusion-culled, and the next save removes or rewrites it. A file another
+  version of the bake wrote is refused by its version, read first: `<file> is an
+  older occlusion bake (version 1, this build writes 2): nothing is
+  occlusion-culled until it is re-baked (Generate Lighting or Bake Occlusion)`. One that is there but
   cannot be read (a permission) also culls nothing, with a warning, and the next save
   leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
@@ -946,14 +955,18 @@ Then each kind's own:
   second, secondWeight }`, `probe` `nil` for the sky). The picks rank the scene's whole
   set: a probe the memory budget leaves out at runtime is not skipped here.
 - **`occlusion`:** `cells`, `bakedCells` and `unbakedCells` (of them, the cells
-  sampled and the cells left seeing every object), `floorSource` (`"navmesh"`,
-  `"colliders"` or `"everywhere"`: where the bake found the floor, *Occlusion culling*),
-  `cellSize`, `tooLarge`, `rows`, `dataBytes`, `objects`,
-  `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders` (`{ entity, name,
-  triangles }`, at most 20) and `visibility`: `meanVisible` and `maxVisible` (objects a
-  cell sees), `culledFraction` (the share of the objects a cell culls, on average),
-  `alwaysVisible` (how many objects every cell sees; the never culled are among them) and
-  `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
+  sampled and the cells left seeing every object), `floorSource` (`"navmesh"` or
+  `"everywhere"`: where the bake found the floor, *Occlusion culling*),
+  `floorCoverage` (the share, 0 to 1, of the static meshes' footprint the navmesh's
+  floor covers; `nil` with no floor), `cellSize`, `tooLarge`, `rows`, `dataBytes`,
+  `objects`, `occluders`, `neverCulled`, `occluderTriangles`, `biggestOccluders`
+  (`{ entity, name, triangles }`, at most 20) and `visibility`, taken over the cells a
+  camera can be in (every cell when every cell was sampled; the air left seeing
+  everything is not counted, so a level culls in these figures as a bake of every
+  cell reports it): `cells` (how many it counts), `meanVisible` and `maxVisible`
+  (objects such a cell sees), `culledFraction` (the share of the objects such a cell
+  culls, on average), `alwaysVisible` (how many objects every such cell sees; the never
+  culled are among them) and `alwaysVisibleNames` (at most 20). `neverCulled` is a count with no names of its own:
   which objects the bake could not sample is known only inside it. `cellSeconds` (`{ mean,
   max }`) is the time a cell took to sample, and `slowestCells` the 20 slowest, slowest
   first (ties to the lower cell): `{ cell, centre, seconds, visible }`, `cell` its index in

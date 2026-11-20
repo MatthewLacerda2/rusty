@@ -6,32 +6,23 @@
 //! A pure function of the scene and [`OCCLUSION_SEED`]: each cell draws from its own
 //! stream and is baked alone, so the result is the same at any worker count.
 
-use std::collections::BTreeMap;
-
+use super::fold::fold_rows;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
 use super::reach::Reach;
 use super::sample::Baking;
 #[cfg(feature = "dev")]
 use super::sampler::Sampler;
-use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, FloorSource, Grid, OcclusionData};
+use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, FloorSource, OcclusionData};
 use rusty_scene::Scene;
 
 /// The bake's seed: one fixed stream, so a re-bake of an unchanged scene writes
 /// the same bytes.
 pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
-/// The bake's version, stamped on every PVS it makes ([`BakeStamp`]): bump it
-/// whenever the bake would write other bytes for the same objects (its sampling,
-/// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE`, `MAX_CELL`,
-/// `MAX_CELLS` and `MAX_GRID_CELLS`, which cells it samples (`reach`, its
-/// `PLAY_HEIGHT`), the step `Grid::over` grows a cell by, the sampling of a large
-/// cell as `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants), so Generate Lighting
-/// re-bakes a PVS an older engine made instead of keeping it ([`is_current`]).
-/// `version_tests` holds the rule only in part: it pins this version beside the
-/// bytes a small fixed scene bakes to, so it covers the small-level path alone
-/// (2 m cells, no growth, no sub-cubes), and a change to the rest is bumped by hand.
-pub const OCCLUSION_VERSION: u32 = 2;
+/// The bake's version ([`rusty_scene::lighting::occlusion::OCCLUSION_VERSION`],
+/// where the file's decoder reads it and where its rule is written).
+pub use rusty_scene::lighting::occlusion::OCCLUSION_VERSION;
 
 /// What one occlusion bake found. All zero when it baked nothing.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -48,6 +39,9 @@ pub struct OcclusionBakeReport {
     pub baked_cells: usize,
     /// Where the bake found the floor that decided which cells it sampled.
     pub floor: FloorSource,
+    /// The share of the static bounds' footprint that floor covers (0 to 1),
+    /// `None` with no floor: a small one reads as a stale or partial navmesh.
+    pub floor_coverage: Option<f32>,
     /// The cells' edge, metres (0 when no grid was laid).
     pub cell_size: f32,
     /// Whether the level needs cells over `grid::MAX_CELL`, so nothing was baked
@@ -127,8 +121,11 @@ pub fn is_current(scene: &Scene, held: &OcclusionData, reach: &Reach) -> bool {
 /// [`is_current`] through `prints`.
 fn matches(scene: &Scene, held: &OcclusionData, prints: &Fingerprints, reach: &Reach) -> bool {
     let (lo, hi) = held.stamp.bounds;
-    let regrid = || reach.grid(lo, hi).map(|(grid, _)| grid);
-    let seeded = || regrid().is_some_and(|g| g == held.grid && reach.key(&g) == held.stamp.reach);
+    let seeded = || {
+        reach
+            .grid(lo, hi)
+            .is_some_and(|c| c.grid == held.grid && c.key == held.stamp.reach)
+    };
     if held.stamp.version != OCCLUSION_VERSION || !seeded() {
         return false;
     }
@@ -171,6 +168,7 @@ impl OcclusionBakeReport {
             cells: data.grid.cell_count(),
             baked_cells: data.stamp.baked as usize,
             floor: data.stamp.floor,
+            floor_coverage: None,
             cell_size: data.grid.cell,
             too_large: false,
             rows: data.row_count(),
@@ -188,7 +186,7 @@ impl OcclusionInput {
     pub fn sampler(&self) -> Option<Sampler> {
         let baking = Baking::of(&self.objects).counted();
         let (min, max) = baking.bounds?;
-        let (grid, _) = self.reach.grid(min, max)?;
+        let grid = self.reach.grid(min, max)?.grid;
         Some(Sampler { baking, grid })
     }
 
@@ -236,16 +234,21 @@ impl OcclusionInput {
         let Some((min, max)) = scene.bounds else {
             return Some((None, report));
         };
-        let Some((grid, sampled)) = self.reach.grid(min, max) else {
+        let Some(laid) = self.reach.grid(min, max) else {
             report.too_large = true;
             return Some((None, report));
         };
-        let baked = sampled
-            .as_ref()
-            .map_or(grid.cell_count(), |s| s.iter().filter(|&&b| b).count());
+        if laid.source != self.reach.source {
+            log::warn!(
+                "[Occlusion] the navmesh marks no cell of the PVS grid where a camera can \
+                 be: every cell sampled; re-bake the navmesh over the level"
+            );
+        }
+        let grid = laid.grid;
+        let baked = laid.sampled_count();
         progress.start(grid.cell_count(), baked);
-        let seen = scene.cells(&grid, threads.max(1), progress, sampled.as_deref())?;
-        let (rows, cells) = fold_rows(&grid, &seen, objects.len().div_ceil(64));
+        let seen = scene.cells(&grid, threads.max(1), progress, laid.sampled.as_deref())?;
+        let (rows, cells) = fold_rows(&grid, &seen, objects.len());
         let held = objects.iter().map(|o| BakedObject {
             entity: o.entity,
             fingerprint: o.fingerprint,
@@ -255,16 +258,21 @@ impl OcclusionInput {
         let stamp = BakeStamp {
             version: OCCLUSION_VERSION,
             never_culled: report.never_culled as u32,
-            floor: self.reach.source,
+            floor: laid.source,
             baked: baked as u32,
-            reach: self.reach.key(&grid),
+            reach: laid.key,
             bounds: (min, max),
         };
         let data = data.expect("rows fit the grid").stamped(stamp);
+        let floor_coverage = match laid.source {
+            FloorSource::Everywhere => None,
+            FloorSource::Navmesh => self.reach.coverage((min, max)),
+        };
         let report = OcclusionBakeReport {
             cells: grid.cell_count(),
             baked_cells: baked,
-            floor: self.reach.source,
+            floor: laid.source,
+            floor_coverage,
             cell_size: grid.cell,
             rows: data.row_count(),
             bytes: rusty_scene::lighting::occlusion::encoded_len(&data),
@@ -272,24 +280,4 @@ impl OcclusionInput {
         };
         Some((Some(data), report))
     }
-}
-
-/// Each cell's set widened by its neighbours' (the dilation), then the distinct
-/// sets as rows in first-seen cell order and each cell's row.
-fn fold_rows(grid: &Grid, seen: &[Vec<u64>], words: usize) -> (Vec<u64>, Vec<u32>) {
-    let mut ids: BTreeMap<Vec<u64>, u32> = BTreeMap::new();
-    let (mut rows, mut cells) = (Vec::new(), Vec::with_capacity(seen.len()));
-    for cell in 0..seen.len() {
-        let mut bits = vec![0u64; words];
-        for n in grid.neighbourhood(cell) {
-            bits.iter_mut().zip(&seen[n]).for_each(|(b, s)| *b |= s);
-        }
-        let next = ids.len() as u32;
-        let row = *ids.entry(bits).or_insert_with_key(|bits| {
-            rows.extend_from_slice(bits);
-            next
-        });
-        cells.push(row);
-    }
-    (rows, cells)
 }
