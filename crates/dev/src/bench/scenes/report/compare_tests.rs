@@ -103,6 +103,25 @@ fn the_hiz_gpu_parts_note_needs_gpu_timing() {
     assert!(cpu.notes(true).contains("6 with a clustered batch"));
 }
 
+/// A kept report from before `cpu_ms` timed the whole tick (#2342), which has no
+/// `cpu.flush_bounds` row, is warned of; two runs after it are not.
+#[test]
+fn a_kept_report_from_before_the_whole_tick_timing_is_warned_of() {
+    let timed = |flush: bool| {
+        let mut r = scene(2.0);
+        r.push_value("cpu_ms", 1.0);
+        if flush {
+            r.push_value("cpu.flush_bounds", 0.01);
+        }
+        r
+    };
+    let w = timed(true).against(Some(&timed(false)));
+    assert!(w.iter().any(|w| w.contains("predates `cpu_ms`")), "{w:?}");
+    assert!(timed(true).against(Some(&timed(true))).is_empty());
+    let untimed = scene(2.0).against(Some(&timed(false)));
+    assert!(untimed.is_empty(), "a run with no CPU rows: {untimed:?}");
+}
+
 #[test]
 fn a_script_runs_baseline_is_the_script_report_beside_the_plain_one() {
     let dir = rusty_test_support::temp::dir().join(format!("scenes_sbase_{}", std::process::id()));

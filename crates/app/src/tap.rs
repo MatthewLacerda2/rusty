@@ -90,7 +90,7 @@ impl GameWorld {
     /// The tap at [`TapPoint::BeforeInput`], then the tick's `dt` as it has it, then
     /// the `Scene.LoadAsync` operations the loader finished (`publish_loads`).
     pub(super) fn tap_input(&mut self, dt: f32) -> f32 {
-        self.tap(TapPoint::BeforeInput);
+        self.tap_timed(TapPoint::BeforeInput);
         let dt = self.resources.tap.as_mut().map_or(dt, |tap| tap.dt(dt));
         self.publish_loads();
         dt

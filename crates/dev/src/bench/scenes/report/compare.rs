@@ -7,7 +7,7 @@
 //! shape (`SceneReport::same_shape`); [`SceneReport::against`] says why not.
 
 use super::super::super::clock::clock_drift;
-use super::super::super::report::{change, num};
+use super::super::super::report::{change, num, tick_timed_since};
 use super::{Row, SceneReport, ViewKey};
 
 impl SceneReport {
@@ -52,7 +52,13 @@ impl SceneReport {
         let drift = clock(self)
             .zip(clock(previous))
             .and_then(|(now, before)| clock_drift(now, before));
-        drift.into_iter().chain(self.set_moved(previous)).collect()
+        let warnings = drift.into_iter().chain(self.set_moved(previous));
+        warnings.chain(self.tick_timed_since(previous)).collect()
+    }
+
+    /// [`tick_timed_since`] on this report's rows and `previous`'s.
+    fn tick_timed_since(&self, previous: &SceneReport) -> Option<String> {
+        tick_timed_since(|k| self.row(k).is_some(), |k| previous.row(k).is_some())
     }
 
     /// The warning for a comparison across other `--set` overrides: the change
