@@ -31,7 +31,7 @@ fn a_reimport_rebuilds_only_that_models_unskinned_meshes() {
     ];
     scene.world.mesh_mut(ids[2]).unwrap().skin = Some(SkinData::default());
     for id in ids {
-        scene.world.mesh_mut(id).unwrap().vertices.clear();
+        scene.world.mesh_mut(id).unwrap().vertices = Default::default();
     }
 
     assert_eq!(reimport_model(&mut scene, &a, Rig::Keep), 1);

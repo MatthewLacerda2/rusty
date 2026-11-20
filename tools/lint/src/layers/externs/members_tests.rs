@@ -2,15 +2,15 @@ use super::{dev_stray, display, stray, support};
 use crate::layers::externs::policy::POLICY;
 use crate::layers::table::{Layer, LAYERS};
 
-const MANIFEST: &str = "[package]\nname = \"rusty-components\"\n\n[dependencies]\n\
-    rusty-asset = { workspace = true }\nrusty-core = { workspace = true }\n\
-    rusty-procgen = { workspace = true }\nbytemuck = { workspace = true }\n\
+const MANIFEST: &str = "[package]\nname = \"rusty-ecs\"\n\n[dependencies]\n\
+    rusty-components = { workspace = true }\nrusty-core = { workspace = true }\n\
+    hecs = { workspace = true }\n\
     glam = { workspace = true }\nserde = { workspace = true }\n\n\
     [dev-dependencies]\nrusty-test-support = { workspace = true }\nimage = { workspace = true }\n";
 
 #[test]
 fn a_member_naming_only_its_row_passes() {
-    assert!(stray("components", MANIFEST, LAYERS, &POLICY).is_empty());
+    assert!(stray("ecs", MANIFEST, LAYERS, &POLICY).is_empty());
 }
 
 #[test]
@@ -19,7 +19,7 @@ fn a_stray_crate_or_sibling_is_flagged_by_name() {
         "glam = { workspace = true }\n",
         "glam = { workspace = true }\nimage = { workspace = true }\nrusty-render = { workspace = true }\n",
     );
-    let found = stray("components", &text, LAYERS, &POLICY).join("\n");
+    let found = stray("ecs", &text, LAYERS, &POLICY).join("\n");
     for name in ["→ image —", "→ rusty-render —"] {
         assert!(found.contains(name), "not flagged: {name}\n{found}");
     }
@@ -74,10 +74,10 @@ fn a_stray_crate_under_a_bare_target_triple_is_flagged() {
 #[test]
 fn a_crate_the_row_names_but_the_manifest_lacks_is_flagged() {
     let text = MANIFEST
-        .replace("rusty-procgen = { workspace = true }\n", "")
-        .replace("bytemuck = { workspace = true }\n", "");
-    let found = stray("components", &text, LAYERS, &POLICY).join("\n");
-    for name in ["MISSING_CRATE", "→ rusty-procgen —", "→ bytemuck —"] {
+        .replace("rusty-components = { workspace = true }\n", "")
+        .replace("hecs = { workspace = true }\n", "");
+    let found = stray("ecs", &text, LAYERS, &POLICY).join("\n");
+    for name in ["MISSING_CRATE", "→ rusty-components —", "→ hecs —"] {
         assert!(found.contains(name), "not flagged: {name}\n{found}");
     }
     assert_eq!(found.lines().count(), 2, "{found}");

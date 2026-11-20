@@ -34,7 +34,7 @@ pub fn level(cells: u32) -> (Scene, PhysicsWorld, u32) {
     );
     col.shared_mesh = Some(SharedMesh {
         positions: grid(cells),
-        indices: indices(cells),
+        indices: indices(cells).into(),
         ..Default::default()
     });
     scene.world.set_collider(floor, Some(col));

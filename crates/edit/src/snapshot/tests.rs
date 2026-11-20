@@ -49,7 +49,7 @@ mod geometry {
         let mesh = scene.world.mesh(id).unwrap();
         (
             mesh.vertices.iter().map(|v| v.position).collect(),
-            mesh.indices.clone(),
+            mesh.indices.to_vec(),
         )
     }
 

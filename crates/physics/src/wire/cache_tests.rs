@@ -18,7 +18,7 @@ fn with_mesh(positions: Vec<[f32; 3]>, indices: Vec<u32>) -> (Scene, u32) {
     };
     col.shared_mesh = Some(SharedMesh {
         positions,
-        indices,
+        indices: indices.into(),
         ..Default::default()
     });
     scene.world.set_collider(id, Some(col));
@@ -95,7 +95,7 @@ fn the_cache_builds_only_on_a_change() {
     frame(&mut cache, &scene);
     assert_eq!(cache.builds(), 2, "a new scale builds");
     let mut col = scene.world.collider_mut(id).expect("collider");
-    col.shared_mesh.as_mut().expect("mesh").indices = vec![0, 1, 9];
+    col.shared_mesh.as_mut().expect("mesh").indices = vec![0, 1, 9].into();
     drop(col);
     assert_eq!(frame(&mut cache, &scene), None, "an edit is seen");
     frame(&mut cache, &scene);

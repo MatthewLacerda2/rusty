@@ -106,6 +106,6 @@ fn furnish(scene: &mut Scene, lo: Vec3, props: usize, k: usize) {
     );
     let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
-    (mesh.vertices, mesh.indices) = (vertices, indices);
+    (mesh.vertices, mesh.indices) = (vertices.into(), indices.into());
     mesh.revision = MeshRevision::next();
 }

@@ -48,8 +48,8 @@ pub fn soldier() -> MeshComponent {
         subdivisions: 1,
         cast_shadows: Default::default(),
         scale_in_lightmap: 1.0,
-        vertices,
-        indices,
+        vertices: vertices.into(),
+        indices: indices.into(),
         ranges: Vec::new(),
         bind_palette: skin.bind_palette(),
         skin: Some(skin),
@@ -59,6 +59,7 @@ pub fn soldier() -> MeshComponent {
         max_draw_distance: 0.0,
         min_screen_size: 0.0,
         revision: Default::default(),
+        own_geometry: None,
         clusters: None,
     }
 }

@@ -8,6 +8,7 @@ use glam::Vec3;
 
 use super::block;
 use crate::Scene;
+use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::{primitives, MeshRevision, Vertex};
 
 const ROOM: f32 = 10.0;
@@ -20,9 +21,10 @@ pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let extent = n as f32 * ROOM;
-    // One sphere for every statue: generating it (its lightmap unwrap) is most of
+    // One sphere shared by every statue: generating it (its lightmap unwrap) is most of
     // the level's build time when done once per room.
-    let sphere = primitives::generate_sphere(0.5, 24, 24);
+    let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
+    let sphere = (vertices.into(), indices.into());
     for storey in 0..2 {
         let y = storey as f32 * STOREY;
         for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
@@ -87,7 +89,7 @@ fn wall(
 
 /// Two crates and a dense 1.5 m statue (`sphere`'s vertices and indices) in the
 /// room whose floor corner is `lo`.
-fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Vec<Vertex>, Vec<u32>)) {
+fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared<u32>)) {
     let shift = (k % 4) as f32;
     for at in [
         Vec3::new(2.0 + shift, 0.5, 2.5),
@@ -106,4 +108,5 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Vec<Vertex>, Vec<u32>)
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
     (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
+    mesh.own_geometry = Some(mesh.revision); // not the box's: a slot of its own
 }

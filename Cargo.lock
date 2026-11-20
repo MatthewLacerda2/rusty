@@ -3350,6 +3350,7 @@ version = "0.1.0"
 dependencies = [
  "bevy_mikktspace",
  "block_compression",
+ "bytemuck",
  "glam 0.33.12",
  "gltf",
  "image",
@@ -3385,7 +3386,6 @@ dependencies = [
 name = "rusty-components"
 version = "0.1.0"
 dependencies = [
- "bytemuck",
  "glam 0.33.12",
  "rusty-asset",
  "rusty-core",

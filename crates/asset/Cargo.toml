@@ -16,6 +16,7 @@ workspace = true
 rusty-core = { workspace = true }
 bevy_mikktspace = { workspace = true }
 block_compression = { workspace = true }
+bytemuck = { workspace = true }
 glam = { workspace = true }
 gltf = { workspace = true }
 image = { workspace = true }

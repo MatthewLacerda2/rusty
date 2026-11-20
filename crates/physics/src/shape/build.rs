@@ -98,7 +98,7 @@ pub(crate) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
     // The collision mesh wins while it has triangles (#1960); else the entity's own
     // Mesh; else the copy kept when that Mesh was removed (#1657).
     let mesh_geom = if matches!(collider.shape, ColliderShape::Mesh { .. }) {
-        let own_copy = |s: &rusty_components::SharedMesh| (s.positions.clone(), s.indices.clone());
+        let own_copy = |s: &rusty_components::SharedMesh| (s.positions.clone(), s.indices.to_vec());
         collider
             .built_collision_mesh()
             .map(own_copy)
@@ -106,7 +106,7 @@ pub(crate) fn collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> 
                 world.mesh(id).map(|m| {
                     (
                         m.vertices.iter().map(|v| v.position).collect::<Vec<_>>(),
-                        m.indices.clone(),
+                        m.indices.to_vec(),
                     )
                 })
             })

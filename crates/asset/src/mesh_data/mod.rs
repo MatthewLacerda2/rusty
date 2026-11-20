@@ -2,61 +2,23 @@
 //! `skin`).
 //!
 //! These are deliberately decoupled from the renderer: an `ImportedAsset` is pure
-//! geometry + material values (glam only), never a GPU `Vertex` or a wgpu buffer.
-//! The scene layer converts a `MeshVertex` into the render `Vertex` when it
-//! rehydrates a mesh, so the importer never depends on wgpu/egui/mlua.
+//! geometry + material values (glam only), never a wgpu buffer. Its [`Vertex`] is
+//! the one every mesh draws, and a sub-mesh's vertex and index buffers are
+//! [`Shared`]: a mesh instancing it holds the same allocation, copied only when one
+//! instance is edited (`shared::edit`).
 
 use super::anim_data::AnimationClip;
 use super::convert::texture_ref::MapRef;
 use super::material_range::MaterialRange;
 use glam::Vec3;
 
+pub mod shared;
 mod skin;
+mod vertex;
 
+pub use shared::Shared;
 pub use skin::{JointTransform, SkinData};
-
-/// One vertex of imported geometry: position, normal, the texture and lightmap UVs and the
-/// optional skin binding. `joint_indices` index into the sub-mesh's [`SkinData`]
-/// joints (and thus the GPU bone palette); `joint_weights` are the linear-blend
-/// weights. Unskinned vertices (every primitive, and any glTF mesh without a skin)
-/// default to the identity binding — bone 0, full weight — so the shader leaves
-/// them untouched (#79).
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct MeshVertex {
-    pub position: [f32; 3],
-    pub normal: [f32; 3],
-    pub tex_coords: [f32; 2],
-    pub joint_indices: [u32; 4],
-    pub joint_weights: [f32; 4],
-    /// Tangent basis for normal mapping: `xyz` unit tangent, `w` handedness (±1).
-    /// From the glTF `TANGENT` accessor when present, else generated from positions +
-    /// UVs at import. Defaults to the `+X` placeholder.
-    pub tangent: [f32; 4],
-    /// The lightmap UV (#438), from glTF `TEXCOORD_1`; all zeros when the source has
-    /// no second UV map.
-    pub lightmap_uv: [f32; 2],
-}
-
-impl MeshVertex {
-    pub fn new(position: [f32; 3], normal: [f32; 3], tex_coords: [f32; 2]) -> Self {
-        Self {
-            position,
-            normal,
-            tex_coords,
-            joint_indices: [0, 0, 0, 0],
-            joint_weights: [1.0, 0.0, 0.0, 0.0],
-            tangent: [1.0, 0.0, 0.0, 1.0],
-            lightmap_uv: [0.0, 0.0],
-        }
-    }
-
-    /// Attach a skin binding (glTF `JOINTS_0`/`WEIGHTS_0`) to a vertex.
-    pub fn with_skin(mut self, joint_indices: [u32; 4], joint_weights: [f32; 4]) -> Self {
-        self.joint_indices = joint_indices;
-        self.joint_weights = joint_weights;
-        self
-    }
-}
+pub use vertex::Vertex;
 
 /// A material's values, as read from the source file — the asset-layer DTO for the
 /// full glTF 2.0 metallic-roughness model. Pure data (no GPU buffers): the scalar
@@ -139,13 +101,13 @@ impl Default for MaterialData {
 ///
 /// `id` is the stable, human-readable handle used in scene references; it is the
 /// source mesh's name when present, else a deterministic fallback (`mesh_<n>`).
-/// Geometry is plain `MeshVertex` + index data; `ranges` splits the index list into
+/// Geometry is [`Vertex`] + index data, each [`Shared`] with every mesh drawing it; `ranges` splits the index list into
 /// runs, each drawn with its own material (#1285).
 #[derive(Clone, Debug, PartialEq)]
 pub struct SubMesh {
     pub id: String,
-    pub vertices: Vec<MeshVertex>,
-    pub indices: Vec<u32>,
+    pub vertices: Shared<Vertex>,
+    pub indices: Shared<u32>,
     /// The runs of `indices` and the material each draws with, in index order and
     /// covering every index: Unity's sub-meshes. One run for a one-material mesh.
     pub ranges: Vec<MaterialRange>,

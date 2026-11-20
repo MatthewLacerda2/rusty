@@ -2,31 +2,17 @@
 
 use glam::Mat4;
 
-use rusty_asset::{MeshRevision, MeshVertex, SubMesh};
+use rusty_asset::mesh_data::Shared;
+use rusty_asset::{MeshRevision, SubMesh};
 use rusty_components::mesh::Vertex;
 
-/// Convert one imported `MeshVertex` (pure data) into the renderer's `Vertex`,
-/// carrying the skin binding (`joint_indices`/`joint_weights`) through to the GPU
-/// vertex; static meshes keep the unskinned identity binding (#79).
-fn vertex_from_imported(v: &MeshVertex) -> Vertex {
-    Vertex {
-        position: v.position,
-        normal: v.normal,
-        tex_coords: v.tex_coords,
-        joint_indices: v.joint_indices,
-        joint_weights: v.joint_weights,
-        tangent: v.tangent,
-        lightmap_uv: v.lightmap_uv,
-    }
-}
-
 /// The non-serialized data a mesh component is rebuilt with on load: GPU-ready
-/// geometry plus the imported rig (bind palette, skeleton, clips). A primitive or a
+/// geometry, shared with the import it came from (#2351), plus the imported rig (bind palette, skeleton, clips). A primitive or a
 /// failed import yields the empty default — no skin, no clips, GPU bones at identity.
 #[derive(Default)]
 pub(super) struct RehydratedMesh {
-    pub(super) vertices: Vec<Vertex>,
-    pub(super) indices: Vec<u32>,
+    pub(super) vertices: Shared<Vertex>,
+    pub(super) indices: Shared<u32>,
     pub(super) ranges: Vec<std::ops::Range<u32>>,
     pub(super) bind_palette: Vec<Mat4>,
     pub(super) skin: Option<rusty_asset::SkinData>,
@@ -41,7 +27,7 @@ pub(super) struct RehydratedMesh {
 impl RehydratedMesh {
     /// A primitive's geometry with no rig — primitives are never skinned/animated —
     /// at its one revision (`create::primitive_revision`).
-    pub(super) fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
+    pub(super) fn primitive(geometry: crate::create::Geometry, revision: MeshRevision) -> Self {
         Self {
             vertices: geometry.0,
             indices: geometry.1,
@@ -51,7 +37,8 @@ impl RehydratedMesh {
     }
 
     /// Pull geometry + the full rig (bind palette, skeleton, clips) out of an
-    /// imported sub-mesh, which carries `revision`, its import's.
+    /// imported sub-mesh, which carries `revision`, its import's. The vertex and
+    /// index buffers are the sub-mesh's own, shared, never copied.
     pub(super) fn from_sub_mesh(sub: &SubMesh, revision: MeshRevision) -> Self {
         let bind_palette = sub
             .skin
@@ -59,7 +46,7 @@ impl RehydratedMesh {
             .map(|s| s.bind_palette())
             .unwrap_or_default();
         Self {
-            vertices: sub.vertices.iter().map(vertex_from_imported).collect(),
+            vertices: sub.vertices.clone(),
             indices: sub.indices.clone(),
             ranges: sub.ranges.iter().map(|r| r.indices.clone()).collect(),
             bind_palette,

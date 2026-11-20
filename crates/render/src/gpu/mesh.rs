@@ -8,19 +8,22 @@ use rusty_components::mesh::Vertex;
 /// (`primitive_type` + `asset_ref`) rather than the entity referencing it (#127).
 /// Many entities sharing the same primitive or imported asset therefore map to a
 /// single `MeshId` and share one vertex/index buffer pair instead of allocating
-/// N copies. The string form keeps a future runtime-mutated mesh expressible with
-/// its own unique key (e.g. by entity id) without colliding with the shared ones.
+/// N copies. A mesh edited in place (`MeshComponent::own_geometry`) adds its own
+/// key, so its edit never replaces the slot its source's other meshes draw.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct MeshId(pub String);
 
 impl MeshId {
     /// Geometry key: `"<primitive_type>|<asset_ref>"`, plus `"|<subdivisions>"` for a
-    /// Plane cut finer than one quad, so it never shares the 1-quad buffer (#1524).
+    /// Plane cut finer than one quad, so it never shares the 1-quad buffer (#1524),
+    /// plus `"|own<n>"` for geometry an edit in place made the mesh's own.
     pub fn from_mesh(mesh: &rusty_scene::MeshComponent) -> Self {
         let (kind, asset) = (&mesh.primitive_type, mesh.asset_ref.as_deref());
         let cuts = Some(mesh.subdivisions).filter(|&n| n != 1);
         let cuts = cuts.map(|n| format!("|{n}")).unwrap_or_default();
-        MeshId(format!("{kind}|{}{cuts}", asset.unwrap_or("")))
+        let own = mesh.own_geometry.map(|r| format!("|own{r:?}"));
+        let own = own.unwrap_or_default();
+        MeshId(format!("{kind}|{}{cuts}{own}", asset.unwrap_or("")))
     }
 }
 

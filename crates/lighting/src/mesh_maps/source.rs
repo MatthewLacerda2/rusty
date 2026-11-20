@@ -37,7 +37,7 @@ impl MeshSource {
                 .map(|v| Vec3::from(v.normal).try_normalize().unwrap_or(Vec3::Y))
                 .collect(),
             uvs: v.iter().map(|v| Vec2::from(v.tex_coords)).collect(),
-            indices: mesh.indices.clone(),
+            indices: mesh.indices.to_vec(),
             runs: mesh
                 .ranges
                 .iter()

@@ -28,8 +28,7 @@ fn import_pair(dir: &str, stem: &str, (json, bin): (String, Vec<u8>)) -> SubMesh
 /// The bake's input for one imported mesh, placed at the origin under a white sky.
 fn bake_input(mesh: &SubMesh) -> super::BakeScene {
     use super::{BakeMesh, BakeRun, BakeScene};
-    let field =
-        |f: fn(&rusty_asset::MeshVertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
+    let field = |f: fn(&rusty_asset::Vertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();
     BakeScene {
         shadowmask: Default::default(),
         meshes: vec![BakeMesh {
@@ -37,7 +36,7 @@ fn bake_input(mesh: &SubMesh) -> super::BakeScene {
             positions: field(|v| v.position.into()),
             normals: field(|_| glam::Vec3::Z),
             lightmap_uvs: mesh.vertices.iter().map(|v| v.lightmap_uv.into()).collect(),
-            indices: mesh.indices.clone(),
+            indices: mesh.indices.to_vec(),
             runs: vec![BakeRun {
                 end: mesh.indices.len() as u32,
                 albedo: glam::Vec3::ONE,

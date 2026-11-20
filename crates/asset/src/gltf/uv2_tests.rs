@@ -1,5 +1,5 @@
 //! crates/asset/src/gltf/uv2_tests.rs — the lightmap UV import (#438): glTF `TEXCOORD_1`
-//! (Blender's second UV map) lands in `MeshVertex::lightmap_uv`, and a mesh without
+//! (Blender's second UV map) lands in `Vertex::lightmap_uv`, and a mesh without
 //! one imports all-zero lightmap UVs, the bake's "no lightmap" signal.
 
 use crate::import_file;
