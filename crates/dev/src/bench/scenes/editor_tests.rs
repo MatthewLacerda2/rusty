@@ -21,7 +21,11 @@ pub(super) fn round(ui_ms: [f64; 2], enter: [f64; 2]) -> EditorRound {
             stages: vec![("handles", 0.2)],
             ..RenderedFrame::default()
         };
-        meter.frame(ui(ui_ms[run]), Some(&frame), None);
+        let drawn = Drawn {
+            frame,
+            view: (1306, 963),
+        };
+        meter.frame(ui(ui_ms[run]), Some(&drawn), None);
         meter.frame(ui(ui_ms[run]), None, None);
         meter.single("play_enter_ms", enter[run]);
         meter.end_run();
@@ -43,6 +47,15 @@ fn the_meter_folds_each_runs_frames_and_singles_into_rows_with_their_spread() {
     assert_eq!(row(&round, "editor.cpu_clock_pct").avg, 100.0);
     assert_eq!(row(&round, "editor.render.handles").avg, 0.2);
     assert_eq!(row(&round, "editor.renderer_ms").avg, 0.5);
+    let view = VIEW_ROWS.map(|m| row(&round, m));
+    assert_eq!(
+        view.map(|r| (r.avg, r.lo, r.hi, r.quiet)),
+        [
+            (1306.0, 1306.0, 1306.0, false),
+            (963.0, 963.0, 963.0, false)
+        ],
+        "always printed"
+    );
     let enter = row(&round, "play_enter_ms");
     assert_eq!((enter.avg, enter.lo, enter.hi), (120.0, 100.0, 140.0));
     assert!(enter.worst.is_empty(), "a single sample has no viewpoint");
@@ -66,7 +79,15 @@ fn a_clock_that_moves_inside_a_run_warns_in_the_rounds_own_words() {
         meter.frame(time, None, None);
     }
     meter.end_run();
-    let warnings = meter.finish().warnings;
+    let round = meter.finish();
+    assert!(
+        !round
+            .rows
+            .iter()
+            .any(|r| VIEW_ROWS.contains(&r.metric.as_str())),
+        "no frame drew the Scene view: no size made up"
+    );
+    let warnings = round.warnings;
     let clock = warnings.iter().find(|w| w.contains("CPU clock moved"));
     let clock = clock.unwrap_or_else(|| panic!("{warnings:?}"));
     assert!(clock.starts_with("editor round: "), "{clock}");

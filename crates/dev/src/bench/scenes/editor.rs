@@ -16,6 +16,10 @@
 //!   counters: the Scene view's frame, sampled as a viewpoint's is
 //!   (`bench::sample`), under the `editor.` prefix so they never mix with the game
 //!   rows of the same name;
+//! - `editor.view_w` and `editor.view_h`: the size in pixels the Scene view was
+//!   drawn at ([`Drawn::view`], its colour target's): what is left of the window
+//!   after the panels, so a panel's width moves every per-pixel GPU row, and the
+//!   report says so when two rounds' views differ (`report::notes`);
 //! - `play_enter_ms`, `play_stop_ms` and `save_ms`: one sample a run
 //!   ([`Meter::single`]), wall clock like `load_ms`, each with its spread over the
 //!   runs; `play_rss_mb`: the first run's alone ([`Meter::first_run`]), since the
@@ -132,6 +136,17 @@ pub fn gpu_speed(before: Option<f64>, after: Option<f64>) -> Option<f64> {
     clock::speed(before, after)
 }
 
+/// The Scene view's frame as the round drew it: the renderer's costs, and the
+/// size in pixels of the colour target it drew into.
+#[derive(Clone, Debug)]
+pub struct Drawn {
+    pub frame: RenderedFrame,
+    pub view: (u32, u32),
+}
+
+/// The rows the Scene view's size is kept in: its width, its height.
+pub const VIEW_ROWS: [&str; 2] = ["editor.view_w", "editor.view_h"];
+
 /// Collects the round's numbers, run by run, into an [`EditorRound`].
 #[derive(Default)]
 pub struct Meter {
@@ -139,6 +154,7 @@ pub struct Meter {
     singles: Vec<Row>,
     runs: Vec<Vec<Row>>,
     spreads: Vec<(String, Vec<(Spread, f64)>)>,
+    view: Option<(u32, u32)>,
 }
 
 impl Meter {
@@ -148,14 +164,15 @@ impl Meter {
 
     /// One measured frame: its UI time, and the viewport frame when one rendered,
     /// with the GPU's speed over it.
-    pub fn frame(&mut self, ui: UiTime, rendered: Option<&RenderedFrame>, gpu: Option<f64>) {
+    pub fn frame(&mut self, ui: UiTime, drawn: Option<&Drawn>, gpu: Option<f64>) {
         if let Some(cpu) = ui.speed {
             self.samples.push("edit_ms", ui.edit_ms * cpu);
             self.samples.push("ui_ms", ui.ms * cpu);
             self.samples.push("cpu_clock_pct", cpu * 100.0);
         }
-        if let Some(frame) = rendered {
-            sample_render(&mut self.samples, frame, gpu);
+        if let Some(drawn) = drawn {
+            sample_render(&mut self.samples, &drawn.frame, gpu);
+            self.view = Some(drawn.view);
         }
         self.samples.end_frame();
     }
@@ -171,7 +188,8 @@ impl Meter {
         self.runs.is_empty()
     }
 
-    /// End a run: its frames folded into prefixed rows, its singles after them.
+    /// End a run: its frames folded into prefixed rows, the Scene view's size
+    /// its last drawn frame was drawn at, then its singles.
     pub fn end_run(&mut self) {
         let samples = std::mem::take(&mut self.samples);
         let n = self.runs.len() + 1;
@@ -180,6 +198,11 @@ impl Meter {
         let mut rows = fold::aggregate(&[("editor".into(), samples.report())]);
         for row in &mut rows {
             row.metric.insert_str(0, PREFIX);
+        }
+        if let Some((w, h)) = self.view.take() {
+            for (metric, px) in VIEW_ROWS.into_iter().zip([w, h]) {
+                rows.push(Row::value(metric.into(), f64::from(px)));
+            }
         }
         rows.append(&mut self.singles);
         self.runs.push(rows);
