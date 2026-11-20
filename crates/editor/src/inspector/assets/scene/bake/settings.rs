@@ -21,6 +21,43 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Texels per unit",
         "Lightmap resolution",
     );
+    let samples = draw_samples(ui, s);
+    let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
+    row(
+        ui,
+        bounces,
+        "Bounces",
+        "Surfaces a path bounces off before it stops",
+    );
+    let tolerance = egui::DragValue::new(&mut s.backface_tolerance)
+        .ranged(BakeSettings::BACKFACE_TOLERANCE)
+        .speed(0.01);
+    row(
+        ui,
+        tolerance,
+        "Backface tolerance",
+        "Share of a texel's rays that must see front faces; below it the texel is \
+         inside geometry and its own chart fills it",
+    );
+    changed |= samples | draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
+    changed |= draw_denoiser(ui, &mut s.denoiser);
+    changed |= ui
+        .checkbox(&mut s.directional, "Directional lightmaps")
+        .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
+        .changed();
+    changed | draw_progressive(ui, s)
+}
+
+/// The paths per texel and Unity's *Direct Samples* beside them (#2355); returns
+/// whether either changed.
+fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
+    let mut changed = false;
+    let mut row = |ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str| {
+        ui.horizontal(|ui| {
+            changed |= ui.add(drag).on_hover_text(hover).changed();
+            ui.label(label);
+        });
+    };
     let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
     row(
         ui,
@@ -40,30 +77,7 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Direct samples",
         "Points each Area light's direct light is integrated over; 0 follows Samples",
     );
-    let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
-    row(
-        ui,
-        bounces,
-        "Bounces",
-        "Surfaces a path bounces off before it stops",
-    );
-    let tolerance = egui::DragValue::new(&mut s.backface_tolerance)
-        .ranged(BakeSettings::BACKFACE_TOLERANCE)
-        .speed(0.01);
-    row(
-        ui,
-        tolerance,
-        "Backface tolerance",
-        "Share of a texel's rays that must see front faces; below it the texel is \
-         inside geometry and its own chart fills it",
-    );
-    changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
-    changed |= draw_denoiser(ui, &mut s.denoiser);
-    changed |= ui
-        .checkbox(&mut s.directional, "Directional lightmaps")
-        .on_hover_text("Bake light directions too, so normal maps show under baked light (#810)")
-        .changed();
-    changed | draw_progressive(ui, s)
+    changed
 }
 
 /// The progressive bake's knobs (#1970); returns whether either changed.
