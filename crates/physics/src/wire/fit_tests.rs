@@ -22,7 +22,7 @@ fn arched() -> (Scene, u32) {
     };
     col.shared_mesh = Some(SharedMesh {
         positions,
-        indices,
+        indices: indices.into(),
         ..Default::default()
     });
     scene.world.set_collider(id, Some(col));

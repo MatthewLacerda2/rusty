@@ -56,11 +56,12 @@ fn a_cooked_sub_mesh_is_laid_only_on_the_parse_it_was_cooked_from() {
     assert_eq!(cooked[1].clone().apply(&mut parse()), Ok(()));
     // What a parser fix would change, the positions and counts kept.
     let mut uv = parse();
-    uv.vertices[0].tex_coords[1] = 1.0 - uv.vertices[0].tex_coords[1];
+    let v = &mut uv.vertices.edit()[0];
+    v.tex_coords[1] = 1.0 - v.tex_coords[1];
     let mut winding = parse();
-    winding.indices.swap(0, 1);
+    winding.indices.edit().swap(0, 1);
     let mut normal = parse();
-    normal.vertices[2].normal[0] += 0.5;
+    normal.vertices.edit()[2].normal[0] += 0.5;
     for mut changed in [uv, winding, normal] {
         let before = changed.clone();
         let e = cooked[1].clone().apply(&mut changed).unwrap_err();

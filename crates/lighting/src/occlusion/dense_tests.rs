@@ -27,7 +27,7 @@ fn dense(scene: &mut Scene, at: Vec3) -> u32 {
     );
     let (vertices, indices) = primitives::generate_sphere(0.5, 32, 32);
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
-    (mesh.vertices, mesh.indices) = (vertices, indices);
+    (mesh.vertices, mesh.indices) = (vertices.into(), indices.into());
     mesh.revision = MeshRevision::next();
     id
 }
@@ -76,8 +76,7 @@ fn a_mesh_that_is_not_finite_bakes_and_is_never_culled() {
     let mut scene = corridors();
     let vertex = dense(&mut scene, SOUTH);
     let mut mesh = scene.world.mesh_mut(vertex).unwrap();
-    mesh.vertices[5].position[1] = f32::NAN;
-    mesh.revision = MeshRevision::next();
+    mesh.vertices_mut()[5].position[1] = f32::NAN;
     drop(mesh);
     let matrix = block(&mut scene, "Nan", SOUTH, SOUTH + Vec3::ONE);
     scene.world.transform_mut(matrix).unwrap().scale = Vec3::new(1.0, f32::NAN, 1.0);

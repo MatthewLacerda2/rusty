@@ -58,6 +58,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Lint gates and rules are wired | `make test-lint` (`gates_tests.rs`, `rules/wiring.rs`) | **hard gate**: every row of `gates::GATES` and of `rules::RULES` is run, through the entry point the tool dispatches, over a scratch repository it must flag, and must report the planted file; a row with no such case fails naming it, so a gate emptied to "no findings" or no longer reached cannot stay green |
 | Local gate = CI gate | `unittest` (`make scripts`, `test_gate_mirror.py`) | **hard gate**: every command a `GATES` recipe runs appears in a step of `ci.yml`/`lint.yml`, and every clippy run passes nothing after `--` but `-D warnings` (#964); a suite CI splits with `--partition` across a matrix names every shard of the split once, each `--partition` reads `count:${{ matrix.shard }}` (and the macOS leg's `shard_plan.py args`, `"${{ matrix.shard }}"`, #2397) in a job whose one-line split it read, the plan's `shard_plan.py plan --shards N` (and its job's `shard: k/N`) is the count of that job's matrix (`gate_mirror.plan_gaps`), and every shard runs the GPU and OIDN canaries (`test_shards.py`, #2264) |
 | Merge helpers | `unittest` (`make scripts`) | **hard gate**: `.github/scripts/tests` pass — `make mergeable` judges every merge, and the ruleset's required checks (`make ruleset`, #491) cannot tell a draft's run from a ready one (#486) |
+| Mesh buffers are written through their accessors | `tools/lint -- --rules` (`mesh-buffer-write`) | **hard gate**: outside `crates/asset/src/` (the importer, on buffers it owns alone) and `crates/components/src/mesh/geometry.rs`, no line (tests too) calls `.vertices.edit(` or `.indices.edit(`: an edit in place goes through `MeshComponent::vertices_mut` / `indices_mut`, which renew the revision and give the mesh a GPU slot of its own (#2351) |
 | Module layering | `tools/lint -- --layers` | **hard gate**: the declared table (`tools/lint/src/layers/table.rs`) equals the workspace's manifests (each row's `deps` and `uses` are its crate's `[dependencies]`), rows run bottom-up, no sim crate depends on a platform one or names a display crate (the `wgpu` and `egui` families: `wgpu`, `wgpu_*`, `egui`, `egui_*`), not even as a dev-dependency, no sim crate's dev-dependency is a platform sibling, no dev-dependency reaches up, `test-support` names no sibling and no display crate, and nothing declared is unused (#724, #938, #494) |
 | No render code only without `dev` | `tools/lint -- --rules` (`gpu-default-only`) | **hard gate**: in `rusty-render`, every crate its `dev` turns on (transitively, from the manifests) and every crate with an in-crate `gpu_` test, no production line holds a `cfg!(…)` naming `feature = "dev"`, and no line, test code included, starts a `cfg`/`cfg_attr` attribute (wrapped or not) whose `not(…)` names it — the default suite leaves the GPU tests to the `dev` one, so such code would be drawn by none (#2352) |
 | No shared process state | clippy `disallowed_methods` + `tools/lint -- --determinism` | **hard gate**: `std::env::{set_var, remove_var, set_current_dir}` are banned crate-wide in `clippy.toml`, tests included, since `cargo test` runs every in-crate test in one process; production opts out inline with a reason (`project::open`), and `--determinism` keeps the three on the list (#977) |
@@ -581,6 +582,13 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
 - **`markers`** — nothing in rusty is temporary. A marker word (`TODO`, `FIXME`,
   `XXX`, `HACK`) standing alone in a scanned `.rs` file fails, comment or not;
   part of a longer identifier (`TODOS`, `MY_HACK`) does not. File an issue instead.
+- **`mesh-buffer-write`** (#2351) — a mesh's vertex and index buffers are
+  `Shared`, held by the import cache and every instance of a sub-mesh, and only
+  `MeshComponent::vertices_mut` / `indices_mut` renew the revision and give the
+  edited mesh its own GPU slot (`own_geometry`), so the edit is drawn on it alone.
+  A line calling `.vertices.edit(` or `.indices.edit(` outside the importer
+  (`crates/asset/src/`) and the accessors' file is a finding, test code included.
+  A text match: a call split across lines is not seen (`rules/mesh_buffer_write.rs`).
 - **`named-enum`** — a script-facing enum's names are written once, by
   `core::named_enum!` (#1329), which writes `ALL`, `name()`, a case-insensitive
   `parse()` (aliases too), `names()` for an error's list, `Display` and its serde
@@ -950,8 +958,9 @@ is never a second copy that drifts. It adds what cargo cannot know.
   rows: a sim row's `[dependencies]` can't name one (`SIM_LEAK`), and its
   `[dev-dependencies]` can't either, above its row (`STRAY_DEV_CRATE`) or below it
   (`PLATFORM_DEV_CRATE`), each line one finding. Plain
-  data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
-  primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
+  data the renderer and the sim share lives sim-side: the mesh `Vertex` in
+  `asset::mesh_data` (re-exported by `components::mesh`), the primitive builders in
+  `components::mesh`, `Camera` and `Decal` in `scene`,
   `QualityPreset` in `core::settings::quality`; the renderer keeps only the GPU half
   (`render::gpu::mesh::vertex_layout`), and `shadergen::compose` holds the GPU-free
   `naga_oil` composition the renderer's `ShaderRegistry` calls.

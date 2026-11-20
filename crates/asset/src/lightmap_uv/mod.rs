@@ -33,7 +33,7 @@ pub use overlap::interiors_overlap;
 
 use serde::{Deserialize, Serialize};
 
-use super::mesh_data::{MeshVertex, SubMesh};
+use super::mesh_data::{SubMesh, Vertex};
 
 /// The texels per world unit the pack margin is measured at: the lightmap bake's
 /// default `texelsPerUnit` (`BakeSettings::default`). A test holds the two equal.
@@ -157,7 +157,7 @@ pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32
     if sub.skin.is_some() {
         return None;
     }
-    let with_uv = |v: &MeshVertex, lightmap_uv| MeshVertex { lightmap_uv, ..*v };
+    let with_uv = |v: &Vertex, lightmap_uv| Vertex { lightmap_uv, ..*v };
     let (vertices, indices, source) = split(
         &sub.vertices,
         &sub.indices,
@@ -165,7 +165,7 @@ pub fn apply(sub: &mut SubMesh, settings: &LightmapUvSettings) -> Option<Vec<u32
         with_uv,
         settings,
     )?;
-    (sub.vertices, sub.indices) = (vertices, indices);
+    (sub.vertices, sub.indices) = (vertices.into(), indices.into());
     Some(source)
 }
 
