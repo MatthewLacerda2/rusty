@@ -47,9 +47,9 @@ pub(in crate::bake) fn panels_over_floor() -> BakeScene {
 }
 
 #[test]
-fn a_floor_under_area_panels_spends_most_of_its_rays_on_its_own_direct_light() {
-    // The measurement #2355 is conditioned on: the share of the floor's rays that
-    // are its own direct light's shadow rays, at the default settings.
+fn the_cost_bench_counts_a_floors_own_direct_rays_apart() {
+    // The share of the floor's rays that are its own direct light's shadow rays,
+    // at the default settings: 75% before the probe (#2355), about 40% after.
     let settings = BakeSettings::default();
     let cost = trace_texels(&panels_over_floor(), &settings, 200, 1);
     let share = cost.direct as f64 / cost.rays as f64;
@@ -61,5 +61,26 @@ fn a_floor_under_area_panels_spends_most_of_its_rays_on_its_own_direct_light() {
         share * 100.0
     );
     assert!(cost.texels > 0 && cost.direct > 0, "{cost:?}");
-    assert!(share > 1.0 / 3.0, "direct rays are {share:.2} of {cost:?}");
+    assert!(cost.direct < cost.rays, "{cost:?}");
+}
+
+#[test]
+fn the_shadow_probe_casts_a_fraction_of_the_full_sets_rays() {
+    // At 16 direct samples a panel casts 16 rays, its whole set and no probe; an
+    // exhaustive bake at 64 would cast four times that. The probe casts 20 where
+    // a panel is fully seen or hidden (its corners and a 4 × 4 set), and 20 + 64
+    // only in a penumbra.
+    let direct = |direct_samples| {
+        let settings = BakeSettings {
+            direct_samples,
+            ..Default::default()
+        };
+        trace_texels(&panels_over_floor(), &settings, 200, 1).direct
+    };
+    let (sixteen, probed) = (direct(16), direct(64));
+    println!("16 direct samples: {sixteen} rays; 64, probed: {probed}");
+    assert!(
+        probed < sixteen * 2,
+        "{probed} against {sixteen} (exhaustive: 4×)"
+    );
 }

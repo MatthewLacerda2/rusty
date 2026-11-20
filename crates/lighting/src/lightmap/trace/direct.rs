@@ -1,13 +1,12 @@
-//! Direct light at a point: every `Baked` lamp in range for a receiving texel's
-//! own direct light ([`Tracer::direct`]), and one importance-picked source per
-//! path vertex for the bounce ([`Tracer::next_event`], #1883).
+//! Direct light at a point: one importance-picked source per path vertex for
+//! the bounce ([`Tracer::next_event`], #1883), and the lamp and shadow-ray parts
+//! a receiving texel's own direct light (`own`) shares with it.
 
 use std::f32::consts::PI;
 
 use glam::{Vec2, Vec3};
 
 use super::super::input::{BakeLight, LightShape};
-use super::super::lights::area::{strata, stratified};
 use super::super::rng::Rng;
 use super::sources::{lamp_weight, Picks, Source};
 use super::{Tracer, T_MIN};
@@ -19,46 +18,6 @@ use rusty_core::color::luminance;
 pub(super) type Lit = (Vec3, Vec3);
 
 impl Tracer<'_> {
-    /// The direct irradiance of the `Baked` lamps at a receiving texel's `point`
-    /// facing `normal`, shadowed, each weighted by the scene's diffuse model
-    /// (`DiffuseModel::response`, #1698), and the luminance-weighted sum of the
-    /// directions it arrived from. Every such lamp in range counts (this part is
-    /// never filtered, so it is not sampled): an Area light that
-    /// [reaches](super::super::lights::area::AreaShape::reaches) `point` over
-    /// `area_samples` or more stratified points drawn from `rng` (#1674), the
-    /// rest with one shadow ray each.
-    pub(super) fn direct(
-        &self,
-        point: Vec3,
-        normal: Vec3,
-        area_samples: u32,
-        rng: &mut Rng,
-    ) -> Lit {
-        let (mut e, mut dir) = (Vec3::ZERO, Vec3::ZERO);
-        for i in self.sources.grid.near(point) {
-            let light = &self.scene.lights[i];
-            if !light.bakes_direct {
-                continue;
-            }
-            match light.shape {
-                LightShape::Area(area) if area.reaches(point) => {
-                    let m = strata(area_samples);
-                    let weight = 1.0 / (m * m) as f32;
-                    for u in stratified(m, || rng.next_f32()) {
-                        let (lit, d) = self.own_lamp(light, point, normal, u, weight);
-                        (e, dir) = (e + lit, dir + d);
-                    }
-                }
-                LightShape::Area(_) => {}
-                _ => {
-                    let (lit, d) = self.own_lamp(light, point, normal, Vec2::ZERO, 1.0);
-                    (e, dir) = (e + lit, dir + d);
-                }
-            }
-        }
-        (e, dir)
-    }
-
     /// One sample of the light reaching a path vertex at `point` facing `normal`
     /// (next-event estimation, #1883): one source picked from the lamps in range
     /// (when `lamps`) and the emitters near it (when `emitters`), with probability
@@ -119,16 +78,6 @@ impl Tracer<'_> {
         (lit / chance, dir / chance)
     }
 
-    /// [`Self::lamp`] for a receiving texel's own direct light: its shadow ray, if
-    /// it casts one, counted apart (`Rays::count_direct`) for the cost bench.
-    fn own_lamp(&self, light: &BakeLight, point: Vec3, normal: Vec3, u: Vec2, weight: f32) -> Lit {
-        let arrived = self.received(light, point, normal, u, weight);
-        if casts(&arrived) {
-            self.rays.count_direct();
-        }
-        self.shadowed(point, arrived)
-    }
-
     /// Lamp `light`'s light at `point` facing `normal` through its point at `u`,
     /// shadowed and times `weight`, with its luminance-weighted direction.
     pub(super) fn lamp(
@@ -144,7 +93,7 @@ impl Tracer<'_> {
 
     /// Lamp `light`'s light arriving at `point` facing `normal` through its point
     /// at `u`, unshadowed and times `weight`: direction, distance and irradiance.
-    fn received(
+    pub(super) fn received(
         &self,
         light: &BakeLight,
         point: Vec3,
@@ -193,7 +142,7 @@ impl Tracer<'_> {
 }
 
 /// Whether `arrived` light is worth a shadow ray: some arrives at all.
-fn casts(arrived: &Option<(Vec3, f32, Vec3)>) -> bool {
+pub(super) fn casts(arrived: &Option<(Vec3, f32, Vec3)>) -> bool {
     arrived.is_some_and(|(_, _, lit)| lit.max_element() > 0.0)
 }
 

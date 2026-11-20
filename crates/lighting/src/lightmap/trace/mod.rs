@@ -45,6 +45,7 @@ mod grid;
 mod grid_tests;
 #[cfg(test)]
 mod mis_tests;
+mod own;
 mod paths;
 #[cfg(test)]
 mod pick_tests;
@@ -116,6 +117,9 @@ pub(super) struct Tracer<'a> {
     pub rays: &'a Rays,
     /// The lamps by reach and the emitters, what next-event estimation picks from.
     sources: Sources,
+    /// Cells per side of the probe an Area light's direct light casts first
+    /// (`lights::area::PROBE`), `0` for none: what a test compares the probe with.
+    probe: u32,
 }
 
 impl<'a> Tracer<'a> {
@@ -126,7 +130,15 @@ impl<'a> Tracer<'a> {
             scene,
             rays,
             sources,
+            probe: super::lights::area::PROBE,
         }
+    }
+
+    /// This tracer casting every Area light's full stratified set, no probe first:
+    /// the exhaustive estimate the probe is held to (#2355).
+    #[cfg(test)]
+    pub(super) fn without_probe(self) -> Self {
+        Self { probe: 0, ..self }
     }
 
     /// The radiance one path from `origin` brings back and its luminance-weighted

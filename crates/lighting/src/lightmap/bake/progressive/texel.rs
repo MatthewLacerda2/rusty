@@ -78,14 +78,20 @@ impl Work<'_> {
             &mut t.paths,
         );
         if self.last {
-            return Some(tracer.resolve(position, normal, s.samples, &t.paths, &mut t.rng));
+            return Some(tracer.resolve(
+                position,
+                normal,
+                (s.samples, s.direct_sample_count()),
+                &t.paths,
+                &mut t.rng,
+            ));
         }
         if !self.show {
             return None;
         }
         let shown = t.shown.get_or_insert_with(|| {
             let mut display = Rng::preview(s.seed, mesh, index);
-            tracer.shown(position, normal, s.samples, &mut display)
+            tracer.shown(position, normal, s.direct_sample_count(), &mut display)
         });
         Some(t.paths.light(done + count, shown))
     }

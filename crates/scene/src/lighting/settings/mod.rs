@@ -195,3 +195,5 @@ impl ReflectionSettings {
 
 #[cfg(test)]
 mod diffuse_tests;
+#[cfg(test)]
+mod direct_samples_tests;

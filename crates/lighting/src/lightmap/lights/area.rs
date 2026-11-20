@@ -26,6 +26,12 @@ pub const GRID: u32 = 8;
 
 pub use rusty_scene::lighting::area::{AreaShape, EMIT_OFFSET};
 
+/// Cells per side of the probe a lightmap texel casts at an Area light before
+/// its full stratified set (#2355, `trace::direct`): `PROBE²` stratified shadow
+/// rays and one per corner decide whether the panel is fully seen, fully hidden,
+/// or in penumbra. A direct sample count of `PROBE²` or fewer skips the probe.
+pub const PROBE: u32 = 4;
+
 /// The side of the smallest square grid with at least `n` cells: [`stratified`]
 /// yields its square.
 pub fn strata(n: u32) -> u32 {

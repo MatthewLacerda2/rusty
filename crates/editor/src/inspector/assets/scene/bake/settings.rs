@@ -28,6 +28,18 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
         "Samples",
         "Paths traced per texel; more is smoother and slower",
     );
+    let direct = egui::DragValue::new(&mut s.direct_samples)
+        .ranged(BakeSettings::DIRECT_SAMPLES)
+        .custom_formatter(|n, _| match n as u32 {
+            0 => "as Samples".into(),
+            n => n.to_string(),
+        });
+    row(
+        ui,
+        direct,
+        "Direct samples",
+        "Points each Area light's direct light is integrated over; 0 follows Samples",
+    );
     let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
     row(
         ui,

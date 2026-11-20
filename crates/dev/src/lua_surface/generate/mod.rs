@@ -9,7 +9,7 @@
 //! reflection probes' default resolution, memory budget and probe ceiling, #1584,
 //! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884, and
 //! Backface Tolerance, #1949, and the progressive bake's samples per pass and
-//! Prioritize View, #1970).
+//! Prioritize View, #1970, and the direct samples, #2355).
 
 use std::cell::RefCell;
 
@@ -31,6 +31,8 @@ use rusty_script::scripting::ConsoleLogs;
 pub(super) struct Overrides {
     pub texels_per_unit: Option<f32>,
     pub samples: Option<u32>,
+    /// Direct Samples, `0` following `samples` (#2355).
+    pub direct_samples: Option<u32>,
     pub bounces: Option<u32>,
     pub seed: Option<u64>,
     pub directional: Option<bool>,
@@ -52,6 +54,7 @@ impl Overrides {
         BakeSettings {
             texels_per_unit: self.texels_per_unit.unwrap_or(base.texels_per_unit),
             samples: self.samples.unwrap_or(base.samples),
+            direct_samples: self.direct_samples.unwrap_or(base.direct_samples),
             bounces: self.bounces.unwrap_or(base.bounces),
             seed: self.seed.unwrap_or(base.seed),
             directional: self.directional.unwrap_or(base.directional),
@@ -69,6 +72,7 @@ impl Overrides {
         Ok(Self {
             texels_per_unit: t.get("texelsPerUnit")?,
             samples: t.get("samples")?,
+            direct_samples: t.get("directSamples")?,
             bounces: t.get("bounces")?,
             seed: t.get("seed")?,
             directional: t.get("directional")?,
@@ -167,6 +171,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
             let out = lua.create_table()?;
             out.set("texelsPerUnit", s.texels_per_unit)?;
             out.set("samples", s.samples)?;
+            out.set("directSamples", s.direct_samples)?;
             out.set("bounces", s.bounces)?;
             out.set("seed", s.seed)?;
             out.set("directional", s.directional)?;
