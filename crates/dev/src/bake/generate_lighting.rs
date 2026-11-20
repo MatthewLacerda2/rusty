@@ -16,10 +16,14 @@
 //! the PVS on a worker (`occlusion::OcclusionBakeJob`) and calls [`finish`];
 //! `Lighting.Generate()` calls [`generate_lighting`], which runs the same steps in
 //! line (Unity's `Lightmapping.Bake`). Same path, so the two never drift.
+//!
+//! Both keep the PVS the scene holds when no input of its bake changed (#2348):
+//! a lamp moved, a probe added, an intensity changed re-bake no PVS. Bake
+//! Occlusion ([`bake_occlusion_only`]) always re-bakes.
 
 use crate::bake::lighting::{run_to_end, start_lighting, LightingBakeParams, LightingBakeReport};
 use crate::bake::lightmap::bake_scene_lightmaps_logged;
-use crate::bake::occlusion::{bake_occlusion_logged, BakedOcclusion};
+use crate::bake::occlusion::{bake_occlusion_logged, generate_occlusion_logged, BakedOcclusion};
 use crate::bake::progress::{BakeLog, Step};
 use crate::bake::steps::LightingBake;
 use rusty_edit::{save_lighting, LightingSave, LIGHTING_IN_PLAY};
@@ -45,6 +49,9 @@ pub struct GenerateReport {
     pub occlusion: OcclusionBakeReport,
     /// Wall-clock milliseconds the occlusion bake took.
     pub occlusion_ms: u64,
+    /// Whether the scene's PVS was kept unchanged instead (#2348): `occlusion` is
+    /// then the kept PVS's.
+    pub occlusion_kept: bool,
     /// Whether the lighting reached the scene file or needs a full save.
     pub saved: LightingSave,
 }
@@ -57,7 +64,10 @@ impl GenerateReport {
             "Generated lighting: {} lightmap(s), {} light probe(s), {} reflection probe(s)",
             self.lightmaps, p.light_probes, p.reflection_probes
         );
-        line.push_str(&occlusion_summary(&self.occlusion, self.occlusion_ms));
+        match self.occlusion_kept {
+            true => line.push_str(", occlusion unchanged, kept"),
+            false => line.push_str(&occlusion_summary(&self.occlusion, self.occlusion_ms)),
+        }
         line.push_str(match self.saved {
             LightingSave::Written => "; saved",
             LightingSave::NeedsSceneSave => "; save the scene to keep it",
@@ -115,7 +125,8 @@ pub fn generate_lighting(
         probes.commit(scene)?;
         let saved = write_lighting(scene, path)?;
         // The PVS file `finish` writes is occlusion's own output, and counts there.
-        let occlusion = bake_occlusion_logged(scene, log)?;
+        // An unchanged PVS is kept, not re-baked (#2348).
+        let occlusion = generate_occlusion_logged(scene, log)?;
         let lighting = (lightmaps, probes.report(), saved);
         let report = finish(scene, path, lighting, occlusion)?;
         log.finish();
@@ -155,9 +166,10 @@ pub fn finish(
     scene: &mut Scene,
     path: &str,
     (lightmaps, probes, saved): (usize, LightingBakeReport, LightingSave),
-    occlusion: BakedOcclusion,
+    mut occlusion: BakedOcclusion,
 ) -> Result<GenerateReport, String> {
     refuse_in_play(scene)?;
+    let occlusion_kept = occlusion.kept;
     let (report, ms) = match saved {
         LightingSave::Written => {
             let o = apply_occlusion(scene, path, occlusion)?;
@@ -166,10 +178,12 @@ pub fn finish(
         LightingSave::NeedsSceneSave => {
             let (report, ms) = (occlusion.report, occlusion.ms);
             // The next save writes it ([`Scene::put_baked_occlusion`]); the bake is
-            // reported now.
-            scene.put_baked_occlusion(occlusion.data);
-            let measured = (&report, ms, &occlusion.cells[..]);
-            super::report::occlusion::keep(scene, path, measured, None);
+            // reported now. A kept PVS is already the scene's, and owns its file.
+            let (kept, cells) = (occlusion.kept, std::mem::take(&mut occlusion.cells));
+            occlusion.put_on(scene);
+            let measured = (&report, ms, &cells[..]);
+            let written = (None, kept);
+            super::report::occlusion::keep(scene, path, measured, written);
             (report, ms)
         }
     };
@@ -178,6 +192,7 @@ pub fn finish(
         probes,
         occlusion: report,
         occlusion_ms: ms,
+        occlusion_kept,
         saved,
     })
 }
@@ -225,44 +240,26 @@ impl OcclusionOnlyReport {
 
 /// Apply a finished occlusion bake to `scene` and write it beside the scene file
 /// at `path`: Bake Occlusion's last step, the script's and the editor's worker's.
+/// A kept one (#2348) is the scene's already: the file is brought to it as to a
+/// bake's ([`BakedOcclusion::put_on`]), even over one another process wrote.
 pub fn apply_occlusion(
     scene: &mut Scene,
     path: &str,
-    baked: BakedOcclusion,
+    mut baked: BakedOcclusion,
 ) -> Result<OcclusionOnlyReport, String> {
     refuse_in_play(scene)?;
     let report = OcclusionOnlyReport {
         occlusion: baked.report,
         ms: baked.ms,
     };
-    scene.put_baked_occlusion(baked.data);
+    let (kept, cells) = (baked.kept, std::mem::take(&mut baked.cells));
+    baked.put_on(scene);
     let saving = std::time::Instant::now();
     rusty_scene::lighting::occlusion::save_sidecar(scene, path)?;
     let saved = Some(saving.elapsed());
-    let measured = (&report.occlusion, report.ms, &baked.cells[..]);
-    super::report::occlusion::keep(scene, path, measured, saved);
+    let measured = (&report.occlusion, report.ms, &cells[..]);
+    super::report::occlusion::keep(scene, path, measured, (saved, kept));
     Ok(report)
-}
-
-/// The warning a bake gives when the scene file at `path` lacks, or holds
-/// otherwise, a material the baked meshes draw (#1958,
-/// [`unsaved_materials`](rusty_lighting::occlusion::unsaved_materials)):
-/// the PVS fingerprints the live library, so the next load of the file would read
-/// it as stale. `None` when the file agrees, or cannot be read.
-pub fn unsaved_materials_warning(scene: &Scene, path: &str) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let saved = rusty_scene::parse_scene_text(&text, path).ok()?.materials;
-    let keys = rusty_lighting::occlusion::unsaved_materials(scene, &saved);
-    if keys.is_empty() {
-        return None;
-    }
-    let keys: Vec<_> = keys.iter().map(|k| format!("{k:?}")).collect();
-    Some(format!(
-        "[Occlusion] material(s) {} are defined in memory but not as the scene file holds \
-         them: save the scene so its materials are written, or the bake won't match the \
-         next load",
-        keys.join(", ")
-    ))
 }
 
 /// Why a script's bake is refused while the editor's runs: the two would bake the same
@@ -287,6 +284,9 @@ fn refuse_in_play(scene: &Scene) -> Result<(), String> {
     }
 }
 
+#[cfg(test)]
+#[path = "generate_kept_tests.rs"]
+mod kept_tests;
 #[cfg(test)]
 #[path = "pvs_only_tests.rs"]
 mod pvs_only_tests;

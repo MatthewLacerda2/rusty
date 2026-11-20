@@ -13,7 +13,8 @@ mod sample;
 mod unsaved;
 
 pub use bake::{
-    bake_occlusion, gather_occlusion, OcclusionBakeReport, OcclusionInput, OCCLUSION_SEED,
+    bake_occlusion, current_pvs, gather_occlusion, gather_with, is_current, OcclusionBakeReport,
+    OcclusionInput, OCCLUSION_SEED, OCCLUSION_VERSION,
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use progress::OcclusionObserver;
@@ -31,6 +32,8 @@ pub mod bench;
 mod dense_tests;
 #[cfg(test)]
 mod file_tests;
+#[cfg(test)]
+mod kept_tests;
 #[cfg(all(test, feature = "dev"))]
 mod opening_tests;
 #[cfg(test)]
@@ -43,5 +46,7 @@ mod tessellated_tests;
 pub mod test_gap;
 #[doc(hidden)]
 pub mod test_level;
+#[cfg(test)]
+mod version_tests;
 #[cfg(test)]
 mod window_tests;

@@ -103,6 +103,7 @@ fn the_summary_says_whether_the_scene_needs_saving() {
         probes: Default::default(),
         occlusion: Default::default(),
         occlusion_ms: 0,
+        occlusion_kept: false,
         saved: LightingSave::Written,
     };
     assert_eq!(
