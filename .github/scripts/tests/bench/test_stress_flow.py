@@ -74,17 +74,17 @@ class Order(unittest.TestCase):
         kinds = [entry[0] for entry in fake.log]
         merge, back = kinds.index("merge"), kinds.index("put back")
         self.assertEqual(fake.log[back][1:], (str(fake.root / ".claude/worktrees/pr-7-head"), "p" * 40))
-        yard = [i for i, e in enumerate(fake.log) if e[0] == "run" and e[2].name.startswith("stress-")]
-        pr_yard = [i for i in yard if fake.log[i][2].parent.name == "pr"]
+        yard = [i for i, e in enumerate(fake.log) if e[0] == "run" and e[2].parent.name == "stress"]
+        pr_yard = [i for i in yard if fake.log[i][2].parent.parent.name == "pr"]
         self.assertEqual(len(yard), 6, "three legs of two runs")
         self.assertEqual(len(pr_yard), 2)
         self.assertTrue(merge < min(pr_yard) and max(yard) < back, "the PR's yard runs on the merged tree")
-        scenes = [i for i, e in enumerate(fake.log) if e[0] == "run" and not e[2].name.startswith("stress-")]
+        scenes = [i for i, e in enumerate(fake.log) if e[0] == "run" and not e[2].parent.name == "stress"]
         self.assertLess(max(scenes), min(yard), "the yard after the scenes' legs")
         self.assertIn(("build", "pr-7-head", ("bench-scenes", "play")), fake.log, "one invocation, both binaries")
         self.assertIn("**stress yard**", said)
         self.assertIn("**stress yard**", (fake.root / "out/bench/ab/pr-7/table.md").read_text())
-        self.assertEqual(fake.space[0][0][2], ("play",), "the disk check counts the second binary")
+        self.assertEqual(fake.space[0][0][2], ("bench-scenes", "play"), "the disk check counts both binaries")
 
     def test_the_yard_alone_builds_play_only_and_asks_no_texture_question(self):
         fake = Fake()
@@ -92,9 +92,9 @@ class Order(unittest.TestCase):
         self.assertEqual(code, 0, said)
         self.assertNotIn(("ask", "main"), fake.log)
         self.assertIn(("build", "bench-main", ("play",)), fake.log)
-        self.assertTrue(all(e[2].name.startswith("stress-") for e in fake.log if e[0] == "run"), "no scene leg")
+        self.assertTrue(all(e[2].parent.name == "stress" for e in fake.log if e[0] == "run"), "no scene leg")
         self.assertIn("the stress yard alone", said)
-        self.assertEqual(fake.space[0][0][2], ())
+        self.assertEqual(fake.space[0][0][2], ("play",), "a yard-only run counts play")
 
     def test_without_stress_the_run_is_as_before(self):
         fake = Fake()

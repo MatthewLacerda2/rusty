@@ -536,6 +536,6 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # ({...}) is refused. STRESS=1 adds `make bench`'s stress yard in three legs of its own,
 # RUNS a leg (3 by default), on the same trees; with no PROJECT only the yard runs.
 # The table lands in out/bench/ab/pr-<n>/table.md.
-bench-ab: ## A PR's measured rows in three legs (main, PR, main again). make bench-ab PR=<n> PROJECT=<dir> [STRESS=1] [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0] [FORCE=1]
+bench-ab: ## A PR's measured rows in three legs (main, PR, main again). make bench-ab PR=<n> PROJECT=<dir> [STRESS=1] [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0] [FORCE=1], or make bench-ab PR=<n> STRESS=1 [RUNS=n] [FORCE=1] for the stress yard alone
 	@test -n "$(PR)" && test -n "$(PROJECT)$(filter 1,$(STRESS))" || { echo "bench-ab: make bench-ab PR=<n> PROJECT=<project dir> [STRESS=1] [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0] [FORCE=1], or PR=<n> STRESS=1 for the stress yard alone" >&2; exit 1; }
 	@python3 .github/scripts/bench-ab.py --pr $(PR) $(if $(PROJECT),--project $(PROJECT)) $(if $(filter 1,$(STRESS)),--stress) $(if $(SCENES),--scenes $(SCENES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(RES),--size $(RES)) $(foreach s,$(SET),--set '$(s)') $(if $(filter 0,$(EDITOR)),--no-editor) $(if $(filter 1,$(FORCE)),--force)

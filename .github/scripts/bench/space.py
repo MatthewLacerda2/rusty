@@ -9,7 +9,7 @@ command that writes failed, `make reclaim` among them, and what shares the disk
 was at risk. So the heavy verbs read the free space of the filesystem holding
 `.claude/worktrees/` and refuse **before** building when it is under what the
 build still needs ([`refusal`]): the build's size ([`NEEDS`]) less what the
-tree's own `target/` already holds of that profile, plus each second binary the
+tree's own `target/` already holds of that profile, plus each binary the
 same invocation links ([`EXTRA`]: `make bench-ab STRESS=1`'s `play`) that the
 profile's folder does not hold yet, plus [`HEADROOM`] kept free for everything
 else. The refusal names the free figure, the need, `make reclaim`
@@ -33,12 +33,16 @@ GIB = 2**30
 # a re-run pays after a green run deletes it). Rounded up, so a build that grows
 # a little still fits.
 NEEDS = {"release": 2 * GIB, "debug": 12 * GIB}
-# A second binary linked in the same cargo invocation, beyond what `NEEDS` holds:
-# its own objects and the binary, the crates being shared: `play` beside a cold
+# Each binary a build links, beyond what `NEEDS` holds, counted when the profile's
+# folder lacks it, the first binary included: `bench-scenes` is what `NEEDS`
+# measures, so 0; a second one adds its own objects and the binary, the crates
+# being shared. A yard-only `make bench-ab STRESS=1` builds `play` alone into a
+# `target/release` an earlier `bench-scenes` filled, which `NEEDS` less what the
+# folder holds would count as nothing (#2462's review). `play` beside a cold
 # release `bench-scenes` grew `target/release` from 1.58 to 1.63 GiB, 57 MiB, in a
 # 4-core Linux cloud container (#2450; 7 min 12 s for `bench-scenes`, 3 min 31 s more
 # for `play`). Rounded up, as `NEEDS` is.
-EXTRA = {"play": GIB // 4}
+EXTRA = {"bench-scenes": 0, "play": GIB // 4}
 HEADROOM = 2 * GIB  # left free after the build: git, logs, the queue supervisor
 SHOWN = 5  # trees named in a refusal, largest first
 # What git and the OS say when a write found the disk full (Linux; git's own; macOS).
@@ -84,7 +88,7 @@ def still(tree: Path, profile: str, extra: tuple[str, ...], run) -> int:
 def refusal(root: Path, builds: list[tuple], what: str, run, free=None) -> str | None:
     """Why `what` must not start, or `None` when it fits: `builds` are `(tree, profile)`,
     each a build of `profile` into `<tree>/target`, or `(tree, profile, extra)` with
-    the second binaries ([`EXTRA`]) the same invocation links.
+    the binaries ([`EXTRA`]) the same invocation links.
 
     `free(path)` is the free bytes of the filesystem holding `path`
     (`shutil.disk_usage`, faked in tests); what a tree's `target/<profile>`

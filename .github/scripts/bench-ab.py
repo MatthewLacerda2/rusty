@@ -82,7 +82,8 @@ def ps() -> str:
 
 
 class Gate:
-    """Each refusal stops the run, or with `--force` is noted for the table."""
+    """Each refusal stops the run, or with `--force` is noted for the table, once: the busy
+    check before every stress run would otherwise say one held-over build a run (#2462's review)."""
 
     def __init__(self, force: bool):
         self.force, self.overridden = force, []
@@ -92,6 +93,8 @@ class Gate:
             return
         if not self.force:
             sys.exit(f"bench-ab: refused: {said}\n(FORCE=1 runs anyway, and the table says so)")
+        if said.splitlines()[0] in self.overridden:
+            return
         print(f"bench-ab: FORCE=1 runs past: {said}", file=sys.stderr)
         self.overridden.append(said.splitlines()[0])
 
@@ -158,8 +161,9 @@ def main(argv) -> int:
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
         gate.check(refuse.busy_refusal(refuse.busy(ps(), me)))
-        extra = bins[1:]  # what the invocation links beside the first binary (`space.EXTRA`)
-        builds = [(trees.path(root, trees.MAIN_TREE), "release", extra), (pr_tree, "release", extra)]
+        # every binary the invocation links, the first included: a yard-only run's `play` in a
+        # profile folder an earlier `bench-scenes` build filled is still counted (`space.EXTRA`)
+        builds = [(trees.path(root, trees.MAIN_TREE), "release", bins), (pr_tree, "release", bins)]
         roomless = space.refusal(root, builds, f"`make bench-ab PR={a.pr}`'s two release builds", subprocess.run)
         if roomless:
             raise RuntimeError(f"refused: {roomless}")

@@ -1566,7 +1566,7 @@ scenario (*Benchmark*, above: fifty rigs and a hundred agents, where a change to
 physics, navigation, the ECS or animation shows when a standing camera on a game
 level shows nothing) in three legs of its own after the scenes', `RUNS` runs a leg
 (3 by default: a yard run is seconds), each a `play` of the leg's own tree's fixture
-into `out/bench/ab/pr-<n>/<leg>/stress-<i>/`. `play` is built beside `bench-scenes`
+into `out/bench/ab/pr-<n>/<leg>/stress/<i>/`. `play` is built beside `bench-scenes`
 in the same cargo invocation, and the disk check counts it. The PR's tree holds
 `main` merged in through its last yard run and is put back at its head only after,
 so the yard measures the PR's diff alone, as the scenes do; `out/bench/bench.json`,
@@ -1623,7 +1623,7 @@ Each leg runs in a memory-capped scope of its own on Linux (`systemd-run --user
 --scope`, the cap a fraction of the memory available when the run starts, printed);
 without one (macOS, no user session) the legs run plain and the run says so. The
 legs' reports stay under `out/bench/ab/pr-<n>/` (`main/`, `pr/`, `main-again/`, the
-yard's runs as `stress-<i>/` inside each),
+yard's runs as `stress/<i>/` inside each),
 and the table, printed and kept as `out/bench/ab/pr-<n>/table.md`, is the PR comment
 as it is. Each scene's section opens with the warnings its legs' reports carry (a
 missing bake, textures drawn uncompressed, console errors), each once, a warning

@@ -28,10 +28,10 @@ class Plan(unittest.TestCase):
         root = Path(tempfile.mkdtemp())
         legs = plan(root)
         self.assertEqual([leg.name for leg in legs], ["main", "pr", "main-again"])
-        self.assertEqual(legs[1].runs, tuple(root / "pr" / f"stress-{i}" for i in range(stress.RUNS)))
+        self.assertEqual(legs[1].runs, tuple(root / "pr" / "stress" / str(i) for i in range(stress.RUNS)))
         argv = stress.command(legs[1], legs[1].runs[0])
         self.assertEqual(argv, [str(PR / "target/release/play"), "--project", str(PR / "tests/fixtures/project"),
-                                str(PR / "tests/fixtures/project/scenarios/bench/bench.lua"), str(root / "pr/stress-0")])
+                                str(PR / "tests/fixtures/project/scenarios/bench/bench.lua"), str(root / "pr/stress/0")])
         self.assertEqual(legs[2].tree, MAIN, "main again runs main's yard")
         self.assertEqual(len(plan(root, 5)[0].runs), 5)
 
@@ -97,12 +97,21 @@ class Section(unittest.TestCase):
 
     def test_a_stress_run_is_never_read_as_a_project(self):
         root = Path(tempfile.mkdtemp())
-        write(root / "main" / "stress-0", {"cpu_ms": 1.0})
+        write(root / "main" / "stress" / "0", {"cpu_ms": 1.0})
         scene = root / "main" / "yard-0123abcd" / "levels" / "a.json"
         scene.parent.mkdir(parents=True)
         scene.write_text(json.dumps({"rows": []}))
         self.assertEqual(table.scenes_of_all([root / "main"]), ["levels/a"])
         self.assertIsNone(table.read(root / "main", "bench"))
+
+    def test_a_project_named_stress_is_still_read(self):
+        root = Path(tempfile.mkdtemp())
+        write(root / "main" / "stress" / "0", {"cpu_ms": 1.0})
+        scene = root / "main" / "stress-test-0123abcd" / "levels" / "a.json"
+        scene.parent.mkdir(parents=True)
+        scene.write_text(json.dumps({"rows": []}))
+        self.assertEqual(table.projects(root / "main"), [scene.parent.parent])
+        self.assertEqual(table.scenes_of_all([root / "main"]), ["levels/a"])
 
 
 if __name__ == "__main__":

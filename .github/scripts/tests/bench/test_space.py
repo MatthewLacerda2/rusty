@@ -64,6 +64,9 @@ class Refusal(unittest.TestCase):
         self.assertIsNone(space.refusal(root, [(tree, "release")], "bench-ab", run, free=lambda _: 2 * GIB))
         said = space.refusal(root, [(tree, "release", ("play",))], "bench-ab", run, free=lambda _: 2 * GIB)
         self.assertIn(f"bench-main/target/release {space.gib(space.EXTRA['play'])}", said)
+        both = [(tree, "release", ("bench-scenes", "play"))]
+        self.assertIn("needs 2.2 GiB", space.refusal(root, both, "bench-ab", run, free=lambda _: 2 * GIB),
+                      "the first binary adds nothing beyond NEEDS, the second is counted")
         (tree / "target" / "release" / "play").write_text("")
         self.assertIsNone(space.refusal(root, [(tree, "release", ("play",))], "bench-ab", run, free=lambda _: 2 * GIB))
 

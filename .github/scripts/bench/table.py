@@ -36,7 +36,7 @@ so it heads the section the reader reads, not only the leg's own output.
 
 A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
 (`dev::bench::scenes::report`); a leg holds one project's folder, and under
-`STRESS=1` its stress runs' folders beside it ([`STRESS_RUN`], `bench/stress.py`),
+`STRESS=1` its stress runs' folders beside it ([`STRESS_RUNS`], `bench/stress.py`),
 which are never read as a project's. The stress section is drawn by the same
 [`section`].
 """
@@ -47,15 +47,17 @@ import json
 from pathlib import Path
 
 
-# A stress run's folder under a leg (`bench/stress.py`), not a project's.
-STRESS_RUN = "stress-"
+# The folder under a leg holding the stress runs (`<leg>/stress/<i>/`, `bench/stress.py`):
+# a name `bench-scenes`' `<project>-<hash>/` folders never take, so a project called
+# `stress-…` is still read as one.
+STRESS_RUNS = "stress"
 
 
 def projects(leg: Path) -> list[Path]:
     """The leg's project folders, sorted: every folder but its stress runs'."""
     if not leg.is_dir():
         return []
-    return sorted(p for p in leg.iterdir() if p.is_dir() and not p.name.startswith(STRESS_RUN))
+    return sorted(p for p in leg.iterdir() if p.is_dir() and p.name != STRESS_RUNS)
 
 
 def read(leg: Path, scene: str) -> dict | None:

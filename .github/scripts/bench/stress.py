@@ -17,7 +17,7 @@ the order).
 Each leg is [`RUNS`] runs by default (a yard run is seconds), each a `play`
 of the leg's own tree's fixture (`<tree>/tests/fixtures/project` and its
 `scenarios/bench/bench.lua`, so each tree's yard is its own, as `make bench`
-runs it) into `out/bench/ab/pr-<n>/<leg>/stress-<i>/`, emptied first: `play`
+runs it) into `out/bench/ab/pr-<n>/<leg>/stress/<i>/`, emptied first: `play`
 compares with a `bench.json` its out folder holds, and an empty one holds none,
 so neither `out/bench/bench.json` nor an older run is read or written. Every run
 goes through the legs' memory-capped scope prefix and the busy check before it
@@ -55,7 +55,7 @@ def plan(main: tuple[Path, Path], pr: tuple[Path, Path], root: Path, runs: int |
     n = runs or RUNS
 
     def leg(name, tree_bin):
-        return Leg(name, tree_bin[0], tree_bin[1], tuple(root / name / f"{table.STRESS_RUN}{i}" for i in range(n)))
+        return Leg(name, tree_bin[0], tree_bin[1], tuple(root / name / table.STRESS_RUNS / str(i) for i in range(n)))
     return [leg("main", main), leg("pr", pr), leg("main-again", main)]
 
 
