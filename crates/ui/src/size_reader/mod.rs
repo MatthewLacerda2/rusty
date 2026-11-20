@@ -19,11 +19,16 @@
 //! has no entry and is remembered as a miss, read again once its file appears or
 //! the engine writes it, as the renderer's own texture cache does.
 //!
-//! **A refresh with nothing to do does nothing**: no write, no retry due, the
-//! same measured paths as last time and no hand edit of the table since
-//! ([`TextureSizes::edits`]) cost one walk of the Images, with no allocation and
-//! no copy of the shared table. Headers are read before the table is touched, so
-//! a retried file that still cannot be read copies nothing either.
+//! **A refresh with nothing to do does nothing**: no write of a file it measures
+//! (a write of any other file is passed over), no retry due, the same measured
+//! paths as last time and no hand edit of the table since
+//! ([`TextureSizes::edits`]) cost one walk of the Images and no copy of the
+//! shared table; it allocates only when the engine wrote something. When it did,
+//! even only other files, telling them apart costs a `canonicalize` of each newly
+//! written path and of each measured key ([`Stale`]'s match by another spelling of
+//! the same file), with no sweep after it. Headers are
+//! read before the table is touched, so a retried file that still cannot be read
+//! copies nothing either.
 //!
 //! The table holds only paths the scene's Images measure by: a size set by hand
 //! for any other path is dropped at the next refresh, and one set for a scene path
@@ -72,15 +77,28 @@ impl TextureSizeReader {
         let changes = self.freshness.poll_with(texture_ref::exists);
         let scene_changed = self.scan(world);
         let in_step = self.left_at == Some(sizes.edits());
-        if changes.stale.is_empty() && !scene_changed && in_step {
+        let stale = Stale::new(changes.stale);
+        if !scene_changed && in_step && !self.concerns(&stale) {
             return;
         }
         #[cfg(test)]
         {
             self.sweeps += 1;
         }
-        self.sweep(Stale::new(changes.stale), sizes);
+        self.sweep(stale, sizes);
         self.left_at = Some(sizes.edits());
+    }
+
+    /// Whether `stale` names a path the scene's Images measure by. With the scene
+    /// and the table unchanged since the last refresh, the table and the misses
+    /// hold only measured paths, so a write of any other file leaves them as
+    /// they are.
+    fn concerns(&self, stale: &Stale) -> bool {
+        !stale.is_empty()
+            && self
+                .measured
+                .keys()
+                .any(|map| texture_ref::is_written(stale, map.as_str()))
     }
 
     /// Drop what went stale or is no longer measured, then read every measured
