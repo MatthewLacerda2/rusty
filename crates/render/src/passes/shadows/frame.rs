@@ -99,10 +99,12 @@ impl Renderer {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
-        if !self.casts_shadows() {
+        let casts = self.casts_shadows();
+        if !casts {
             requests.clear(); // a probe captured without shadows plans no tile
         }
-        let plan = if self.capture.static_only {
+        // Without shadows the kept tiles stay as they are, for when they come back.
+        let plan = if self.capture.static_only || !casts {
             atlas::plan(&requests, view_proj, camera.position)
         } else {
             let ids = local_light_ids(scene, false);

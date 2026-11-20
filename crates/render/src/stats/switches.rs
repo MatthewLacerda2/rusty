@@ -85,3 +85,7 @@ impl Renderer {
         self.switches = switches;
     }
 }
+
+#[cfg(test)]
+#[path = "switches_gpu_tests.rs"]
+mod gpu_tests;
