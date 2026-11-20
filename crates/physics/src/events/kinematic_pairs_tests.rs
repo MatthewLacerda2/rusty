@@ -4,14 +4,16 @@
 //! sleeping dynamic body, and a pair whose dynamic side turns kinematic exits.
 
 use glam::Vec3;
+use rapier3d::prelude::ActiveCollisionTypes;
 
 use super::static_pairs_tests::{boxed, set_body, touching, wall_on_floor, DT};
+use crate::assemble::ACTIVE_TYPES;
 use crate::PhysicsWorld;
 use rusty_scene::Scene;
 
 #[test]
 fn a_kinematic_wall_on_a_static_floor_keeps_no_contact_or_event() {
-    let (mut scene, _, wall) = wall_on_floor(false);
+    let (mut scene, floor, wall) = wall_on_floor(false);
     // A kinematic neighbour overlapping the wall: kinematic↔kinematic.
     boxed(
         &mut scene,
@@ -32,11 +34,12 @@ fn a_kinematic_wall_on_a_static_floor_keeps_no_contact_or_event() {
     );
     // Turned dynamic in Play, the wall pairs with the floor (and its neighbour).
     set_body(&mut scene, wall, false);
+    let key = (floor.min(wall), floor.max(wall));
     let entered = (0..30).any(|_| {
         let ev = world.step(&mut scene, DT).collisions;
-        ev.entered.iter().any(|p| p.a == wall || p.b == wall)
+        ev.entered.iter().any(|p| p.key() == key)
     });
-    assert!(entered, "a body made dynamic raises OnCollisionEnter again");
+    assert!(entered, "the wall made dynamic enters with the floor");
     assert!(touching(&world) >= 1);
 }
 
@@ -101,4 +104,9 @@ fn a_resting_body_switched_kinematic_exits_on_the_next_step() {
     let ev = world.step(&mut scene, DT).collisions;
     assert_eq!(ev.exited, vec![key], "neither side is dynamic any more");
     assert!(world.step(&mut scene, DT).collisions.is_empty());
+}
+
+#[test]
+fn active_types_are_rapiers_default() {
+    assert_eq!(ACTIVE_TYPES, ActiveCollisionTypes::default());
 }

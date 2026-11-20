@@ -33,8 +33,9 @@ use rusty_scene::Scene;
 /// filtered pair, and a body type change forces its colliders back through it, so a
 /// body whose type changes in Play is filtered by what it is now (a pair whose
 /// dynamic side turns kinematic is dropped and exits). Setting this on a live
-/// collider alone would not do that.
-const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNAMIC_DYNAMIC
+/// collider alone would not do that. It equals `ActiveCollisionTypes::default()`,
+/// spelled out because that is not a `const fn` (`active_types_are_rapiers_default`).
+pub(crate) const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNAMIC_DYNAMIC
     .union(ActiveCollisionTypes::DYNAMIC_KINEMATIC)
     .union(ActiveCollisionTypes::DYNAMIC_FIXED);
 

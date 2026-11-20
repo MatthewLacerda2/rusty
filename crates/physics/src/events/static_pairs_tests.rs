@@ -104,6 +104,20 @@ fn a_wall_made_dynamic_in_play_pairs_again_and_back() {
 }
 
 #[test]
+fn a_wall_made_non_static_in_play_keeps_no_pair() {
+    let (mut scene, _, wall) = wall_on_floor(true);
+    let mut world = PhysicsWorld::from_scene(&scene);
+    world.step(&mut scene, DT);
+    // Collider-only, so static to kinematic: still no dynamic side.
+    scene.world.set_static(wall, false);
+    for _ in 0..30 {
+        let ev = world.step(&mut scene, DT);
+        assert!(ev.collisions.is_empty(), "{:?}", ev.collisions);
+    }
+    assert_eq!(touching(&world), 0, "kinematic↔static is never solved");
+}
+
+#[test]
 fn a_static_trigger_ignores_static_walls_but_not_movers() {
     let (mut scene, floor, wall) = wall_on_floor(true);
     let zone = boxed(&mut scene, Vec3::ZERO, Vec3::splat(4.0), true, true);

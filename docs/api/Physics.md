@@ -20,7 +20,7 @@ every number after `hit` is `0` and the rest are `nil`.
 | `Physics.AddForce` | `(id, fx, fy, fz)` | — (continuous force, see below) |
 | `Physics.AddForceAtPosition` | `(id, fx, fy, fz, px, py, pz)` | — (continuous force at a world point: moves and spins the body) |
 | `Physics.AddImpulseAtPosition` | `(id, jx, jy, jz, px, py, pz)` | — (impulse in N·s at a world point — a shot hitting a ragdoll bone) |
-| `Physics.SetKinematic` | `(id, is_kinematic)` | — (a kinematic body pairs only with dynamic ones: its contacts with static or kinematic colliders end, `OnCollisionExit`) |
+| `Physics.SetKinematic` | `(id, is_kinematic)` | — (a kinematic body pairs only with dynamic ones: `SetKinematic(id, true)` ends its contacts with static or kinematic colliders, `OnCollisionExit`; `SetKinematic(id, false)` makes it dynamic and those pairs begin again, `OnCollisionEnter`) |
 | `Physics.GetMass` | `(id)` | `number` — kilograms (`0` without a Rigidbody) |
 | `Physics.SetMass` | `(id, kg)` | — (clamped to `[0.01, 1000]`, as the inspector's field is; see [Mass](#mass-and-forces-at-a-point-466)) |
 | `Physics.GetUseGravity` | `(id)` | `bool` (`false` without a Rigidbody) |
