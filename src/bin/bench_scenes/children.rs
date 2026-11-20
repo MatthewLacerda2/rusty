@@ -1,6 +1,6 @@
 //! `bench-scenes`' children (`src/bin/bench_scenes.rs`): the processes one scene
-//! runs in, its earlier loads, its timed bench and its profile, and the run's cold
-//! import, each this binary again.
+//! runs in, its earlier loads, its editor round, its timed bench and its profile,
+//! and the run's cold import, each this binary again.
 
 use std::ffi::OsString;
 use std::path::Path;
@@ -20,9 +20,10 @@ pub enum Benched {
     Unprofiled,
 }
 
-/// Bench `scene` in its children: its loads before the bench's own, the timed
-/// run (given those loads and the run's `import_ms`), then the profile when asked
-/// for, whose failure leaves the timings standing.
+/// Bench `scene` in its children: its loads before the bench's own, the editor
+/// round unless `--no-editor` (a failed one said, and the scene benched without
+/// it), the timed run (given those loads, the round and the run's `import_ms`),
+/// then the profile when asked for, whose failure leaves the timings standing.
 pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
     let loads = run.out.join(".loads");
     let _ = std::fs::remove_dir_all(&loads);
@@ -30,8 +31,15 @@ pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
         let _ = std::fs::remove_dir_all(&loads);
         return Benched::Failed;
     }
+    let editor = run
+        .editor
+        .then(|| editor_round(run, scene, &loads))
+        .flatten();
     let mut timed = child(run, &run.project, scene);
     timed.arg("--loads").arg(&loads);
+    if let Some(file) = &editor {
+        timed.arg("--editor").arg(file);
+    }
     if let Some(ms) = import_ms {
         timed.args(["--import-ms", &ms.to_string()]);
     }
@@ -54,6 +62,22 @@ pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
         eprintln!("bench-scenes: {scene}: the profile failed; its timings stand");
         Benched::Unprofiled
     }
+}
+
+/// The editor round on `scene`, in a child of its own, kept in `dir` (the
+/// scene's loads' folder, removed after its bench): the file, or `None` (said)
+/// when it failed or had no adapter, and the scene is benched without it.
+fn editor_round(run: &Run, scene: &str, dir: &Path) -> Option<std::path::PathBuf> {
+    let file = dir.join("editor.json");
+    let mut round = child(run, &run.project, scene);
+    let status = round.arg("--editor-out").arg(&file).status();
+    if !status.is_ok_and(|s| s.success()) {
+        eprintln!(
+            "bench-scenes: {scene}: the editor round failed; the scene is benched without it"
+        );
+        return None;
+    }
+    file.exists().then_some(file)
 }
 
 /// `scene`'s loads before its bench's own, `run.load_runs` less one, each in a

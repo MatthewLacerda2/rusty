@@ -1216,7 +1216,7 @@ prints the report, keeps it in the run's out dir and returns `{ frames, metrics 
 ### A project's own scenes: `make bench-scenes`
 `make bench` measures one synthetic yard; an optimisation also needs numbers from
 real levels. `make bench-scenes PROJECT=<dir> [SCENES=a,b] [RES=WxH] [RUNS=n]
-[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1] [SCRIPT=1]` benches a game project's own scenes, wherever the
+[LOAD_RUNS=n] [BEFORE=<dir>] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0]` benches a game project's own scenes, wherever the
 project is on disk (`bench-scenes`, `dev::bench::scenes`). `SCENES` names scenes by
 their path under `assets/scenes/` without the extension (`levels/a`); by default
 every `.scene` there, subfolders included (a folder linked twice is walked once), is
@@ -1248,6 +1248,58 @@ every binary's open makes them.
   every viewpoint of a scene. A game that calls `Application.Quit()` ends the
   measuring: the report warns, naming the viewpoint and run, and counts the frames
   really measured (`measured` in the report), which the rows are over.
+- **the editor round** (`dev::bench::scenes::editor`, driven by
+  `shell::editor::capture::bench`): after the loads and before the timed run, a
+  process of its own opens the scene as the editor does, in edit mode and not
+  standalone, so Play takes its edit snapshot and Stop restores it. Each of `RUNS`
+  runs draws 60 warm-up and 300 measured frames of the editor at the bench's size,
+  headless as `make editor-capture` draws it: the Scene tab with its default gizmos
+  (the light probes' among them), the scene's first screen camera selected (its
+  outline and gizmo draw), the Scene view posed at the scene's first viewpoint
+  (above: its first camera, or the fallback after it; its position, yaw and pitch,
+  while the lens stays the Scene view's own, as in the editor). Each frame is the
+  windowed editor's outside Play, waited on. Then one Play entry, one Stop and one
+  save. Its rows:
+  - `editor.edit_ms`: the world's edit-mode frame (`GameWorld::edit_frame`: held
+    conversions, the UI's texture sizes, model writes followed, skin palettes);
+  - `editor.ui_ms`: `EditorUi::draw` and egui's tessellation; it and
+    `editor.edit_ms` at the reference CPU clock as `cpu_ms` is (the CPU probe timed
+    right before and after both; `editor.cpu_clock_pct` is the clock they ran at); the round's clock moving
+    across a run, or `editor.ui_ms` spreading, warns as a viewpoint's does, and so
+    does `editor.cpu_clock_pct` moving since the last run;
+  - `editor.renderer_ms`, `editor.render.<stage>`, `editor.gpu.<pass>` (the GPU
+    rows at the reference GPU clock) and the counters: the viewport's frame,
+    sampled as a viewpoint's is, prefixed so they never mix with the game rows
+    (`editor.render.handles` is the editor's gizmos, `editor.render.outline` the
+    selection's). With no GPU or no timestamp queries (lavapipe) the `editor.gpu`
+    rows are absent and the report says so; with no adapter the round has no rows,
+    and at a size whose Scene view the editor's panels leave no room (320x180 is
+    one) it draws nothing and warns;
+  - `play_enter_ms` (edit mode to the first Play tick done: the snapshot, Play's
+    entry, the first `FixedUpdate`; **not** the texture refresh the editor runs
+    before every Play, `asset::texture_import::refresh_all`, which compresses
+    changed images into the project: the round leaves it out to write nothing
+    there, so on a project whose images changed the editor's Play costs more),
+    `play_stop_ms` (Stop to the first edit frame drawn: the restore, the rehydrate,
+    the frame, one that probes no clock and reads back no GPU time) and `save_ms`
+    (the scene saved into a folder beside the reports, deleted after, as the
+    editor's Ctrl+S saves the loaded scene: its bake files are copied there first
+    with the world's record of them, so the save keeps them as Ctrl+S does, where
+    a Save As would rewrite them): one sample a run, wall clock as `load_ms` is (a
+    disk write and an allocation do not shrink with the CPU clock), each with its
+    spread; `play_rss_mb` (the resident memory, Linux `VmRSS`, macOS
+    `phys_footprint`, after Play entry less before it) is the **first run's** alone,
+    what one Play costs a fresh editor: Stop frees the snapshot and the Play scene,
+    but the pages stay resident and the later runs' Play re-uses them.
+
+  The round's process is its own, so the game rows' `rss_peak_mb` never holds a
+  Play snapshot. Nothing is written into the project: the world's store has no
+  file, and Play's refresh compresses no texture, as the harness's. It costs a
+  scene about one more viewpoint's measuring, `RUNS` x 360 editor frames, plus a
+  load and `RUNS` Play entries, Stops and saves; `EDITOR=0` (`--no-editor`; `make bench-ab EDITOR=0`) skips it. A round
+  that fails is said, and the scene is benched without it. A last run without
+  the round's rows (an `EDITOR=0` run, or one from before the round) gives them
+  no change column, and the rest compares.
 - **the report**: every `Harness.Bench` row (`cpu.<system>` and `render.<stage>`
   included, *Benchmark*, above) over the viewpoints (the average of their averages,
   the worst p95 and the viewpoint it came from), then over the runs: the average,
@@ -1459,7 +1511,7 @@ Like `make bench`, it is a release build and a signal, never a gate: it is not i
 
 ### A pull request's measured rows: `make bench-ab` (#2381)
 A performance PR's row is measured on the operator's desktop with
-`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value]`,
+`make bench-ab PR=<n> PROJECT=<dir> [SCENES=a,b] [RUNS=n] [LOAD_RUNS=n] [RES=WxH] [SET=key=value] [EDITOR=0]`,
 never by hand. It runs `bench-scenes` three times back to back: on `main`, on the
 PR's head, and on `main` again, each built in a detached worktree of its own under
 `.claude/worktrees/` with its own `target/`, both heads read from origin and fetched
