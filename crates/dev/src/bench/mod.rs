@@ -255,7 +255,7 @@ fn push_parts<'a>(
 
 /// Measure `ticks` frames, print the report with its change against the last one
 /// kept in `out_dir`, and keep this one there instead: a run of one window
-/// ([`window::Run`]). Returns the report.
+/// (`window::Run`). Returns the report.
 pub fn run(harness: &mut Harness, ticks: u32) -> Report {
     window::Run::default().first(harness, ticks)
 }
