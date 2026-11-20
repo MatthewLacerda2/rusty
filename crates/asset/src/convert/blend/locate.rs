@@ -256,7 +256,9 @@ fn kept(file: &Path, path: &Path, len: u64, modified: Option<Duration>) -> Optio
 /// hook, for what the `known` file alone must answer.
 #[cfg(test)]
 pub(super) fn forget() {
+    // lint: allow(test-static-write) only empties two memos: a test sharing the process then asks or searches again, never gets a wrong answer
     ASKED.lock().unwrap_or_else(PoisonError::into_inner).clear();
+    // lint: allow(test-static-write) the same: an emptied memo is searched again
     *FOUND.lock().unwrap_or_else(PoisonError::into_inner) = None;
 }
 

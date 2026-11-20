@@ -60,5 +60,6 @@ pub(super) fn write(file: &Path, known: &Known) -> std::io::Result<()> {
         std::fs::create_dir_all(dir)?;
     }
     let bytes = serde_json::to_vec_pretty(known).map_err(std::io::Error::other)?;
+    // lint: allow(asset-write) Blender's version, read by `locate`, never a path-keyed asset cache
     rusty_core::fs::write_atomic(file, &bytes)
 }
