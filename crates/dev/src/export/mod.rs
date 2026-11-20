@@ -170,7 +170,7 @@ fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Ve
         .map(|i| i.strip_prefix(root).unwrap_or(i).to_path_buf())
         .collect();
     copy::texture_caches(root, &images, out, &mut files)?;
-    copy::hull_caches(root, out, &mut files)?;
+    copy::model_caches(root, out, &mut files)?;
     let missing = textures::missing(out, &glbs, &files);
     if !missing.is_empty() {
         return Err(format!(

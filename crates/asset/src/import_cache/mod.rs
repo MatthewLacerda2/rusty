@@ -40,6 +40,9 @@
 //!   once; only a real re-import takes a new one.
 //! - **Deterministic**: a cached import is the same value a fresh one is, a pure
 //!   function of (file, settings); the cache only decides whether to parse.
+//! - **Across launches**: a parse reads what its model's import derives
+//!   (tangents, lightmap UVs, clusters) from the model's cooked file when that is
+//!   current, and computes it only on a miss (`cook`): the same value either way.
 //! - **A failed import is not kept**: the next lookup tries again, as before.
 //!
 //! One cache per process (#2123), so a scene a load worker prepares imports into
@@ -57,6 +60,7 @@ use counts::PARSES;
 #[doc(hidden)]
 pub use counts::{forget, parses};
 use reads::{files_of, stamp, Files, Stamp};
+pub(crate) use reads::{glb_json, parsed};
 pub use revision::MeshRevision;
 pub use size::approx_bytes;
 

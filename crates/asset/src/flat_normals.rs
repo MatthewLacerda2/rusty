@@ -10,6 +10,7 @@
 //! split: [`flat_shaded`] gives every triangle corner its own copy.
 
 use super::mesh_data::MeshVertex;
+use super::tangents::Missing;
 use glam::Vec3;
 
 /// The unit normal of the triangle `a, b, c`, facing the side it winds
@@ -29,7 +30,11 @@ pub fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
 /// against it (a source tangent is dropped, as the spec says). Returns the new
 /// vertices and their indices, `0..n`. A triangle naming a vertex past the end is
 /// dropped rather than read out of bounds.
-pub fn flat_shaded(vertices: &[MeshVertex], indices: &[u32]) -> (Vec<MeshVertex>, Vec<u32>) {
+pub fn flat_shaded(
+    vertices: &[MeshVertex],
+    indices: &[u32],
+    missing: Missing,
+) -> (Vec<MeshVertex>, Vec<u32>) {
     let mut out = Vec::with_capacity(indices.len());
     for tri in indices.chunks_exact(3) {
         let Some(corners) = tri
@@ -50,7 +55,7 @@ pub fn flat_shaded(vertices: &[MeshVertex], indices: &[u32]) -> (Vec<MeshVertex>
     let positions: Vec<[f32; 3]> = out.iter().map(|v| v.position).collect();
     let normals: Vec<[f32; 3]> = out.iter().map(|v| v.normal).collect();
     let uvs: Vec<[f32; 2]> = out.iter().map(|v| v.tex_coords).collect();
-    let tangents = super::tangents::generate_tangents(&positions, &normals, &uvs, &indices);
+    let tangents = super::tangents::fill(missing, &positions, &normals, &uvs, &indices);
     for (v, t) in out.iter_mut().zip(tangents) {
         v.tangent = t;
     }
@@ -89,7 +94,7 @@ mod tests {
             [0.0, 0.0, -1.0],
         ]
         .map(vertex);
-        let (out, indices) = flat_shaded(&vertices, &[0, 1, 2, 0, 1, 3]);
+        let (out, indices) = flat_shaded(&vertices, &[0, 1, 2, 0, 1, 3], Missing::Generate);
         assert_eq!(indices, vec![0, 1, 2, 3, 4, 5]);
         let normals: Vec<[f32; 3]> = out.iter().map(|v| v.normal).collect();
         assert_eq!(normals[..3], [[0.0, 0.0, 1.0]; 3]);
@@ -105,7 +110,7 @@ mod tests {
     #[test]
     fn a_triangle_past_the_end_is_dropped() {
         let vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]].map(vertex);
-        let (out, indices) = flat_shaded(&vertices, &[0, 1, 2, 0, 1, 9]);
+        let (out, indices) = flat_shaded(&vertices, &[0, 1, 2, 0, 1, 9], Missing::Generate);
         assert_eq!((out.len(), indices.len()), (3, 3));
     }
 }

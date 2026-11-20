@@ -74,7 +74,8 @@ impl Job {
 }
 
 /// Prepare `path` on a thread of its own, which checks `abandoned` between steps
-/// and counts them in `steps`, and plans its warm-up when `warms`.
+/// and counts them in `steps`, and plans its warm-up when `warms`. Its model
+/// imports spread over the cores the game leaves free (`asset::cook::par::beside_play`).
 fn spawn(
     path: String,
     abandoned: Arc<AtomicBool>,
@@ -85,7 +86,9 @@ fn spawn(
     let thread = std::thread::Builder::new()
         .name("scene-load".into())
         .spawn(move || {
-            let prepared = prepare_counted(&path, &abandoned, &steps);
+            // The game ticks and draws meanwhile: the import leaves it its cores.
+            let prepare = || prepare_counted(&path, &abandoned, &steps);
+            let prepared = rusty_asset::cook::par::beside_play(prepare);
             let plan = |p: &PreparedScene| Warming::plan(p.data());
             let warm = prepared.as_ref().ok().filter(|_| warms).map(plan);
             drop(tx.send((prepared, warm)));

@@ -17,6 +17,7 @@
 use super::{anim, material, nodes, skin};
 use crate::material_range::push_range;
 use crate::mesh_data::{ImportedAsset, MeshVertex, SkinData, SubMesh};
+use crate::tangents::Missing;
 use crate::ImportError;
 use gltf::mesh::Mode;
 use std::path::Path;
@@ -33,6 +34,15 @@ pub fn import(path: &Path) -> Result<ImportedAsset, ImportError> {
 /// conversion extracted and named comes back as a reference to it in `source`
 /// (`convert::texture_ref`), never as its path in the cache (#1130).
 pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, ImportError> {
+    import_as(path, source, Missing::Generate)
+}
+
+/// [`import_from`], doing for a mesh with no `TANGENT` what `missing` says.
+pub fn import_as(
+    path: &Path,
+    source: Option<&str>,
+    missing: Missing,
+) -> Result<ImportedAsset, ImportError> {
     let parse = |e: gltf::Error| ImportError::Parse(e.to_string());
     let gltf::Gltf { document, blob } = gltf::Gltf::open(path).map_err(parse)?;
     // External texture and buffer URIs resolve relative to the glTF file's own directory.
@@ -44,19 +54,21 @@ pub fn import_from(path: &Path, source: Option<&str>) -> Result<ImportedAsset, I
         .collect();
     let skins = skin::skins_by_mesh(&document, &buffers);
 
-    let sub_meshes: Vec<SubMesh> = document
-        .meshes()
-        .map(|mesh| {
-            let mut sub = sub_mesh_from_gltf(
-                &mesh,
-                &buffers,
-                skins.get(&mesh.index()).cloned(),
-                &document,
-            );
-            sub.node_name = node_name(&document, mesh.index());
-            sub
-        })
-        .collect();
+    // Each mesh on its own thread, in document order (`cook::par`): reading it
+    // and generating the tangents it lacks are a function of that mesh alone.
+    let meshes: Vec<gltf::Mesh> = document.meshes().collect();
+    let triangles = |m: &gltf::Mesh| m.primitives().map(|p| corners(&p) / 3).sum();
+    let sub_meshes: Vec<SubMesh> = crate::cook::par::map(meshes, triangles, |mesh| {
+        let mut sub = sub_mesh_from_gltf(
+            &mesh,
+            &buffers,
+            skins.get(&mesh.index()).cloned(),
+            &document,
+            missing,
+        );
+        sub.node_name = node_name(&document, mesh.index());
+        sub
+    });
 
     let ids: Vec<&str> = sub_meshes.iter().map(|s| s.id.as_str()).collect();
     let nodes = nodes::model_nodes(&document, &ids);
@@ -80,6 +92,7 @@ fn sub_mesh_from_gltf(
     buffers: &[gltf::buffer::Data],
     skin: Option<SkinData>,
     document: &gltf::Document,
+    missing: Missing,
 ) -> SubMesh {
     let id = mesh
         .name()
@@ -94,7 +107,7 @@ fn sub_mesh_from_gltf(
     // own material (#1285), merged with the last when the material is the same.
     for primitive in mesh.primitives() {
         let start = indices.len() as u32;
-        append_primitive(&primitive, buffers, &mut vertices, &mut indices);
+        append_primitive(&primitive, buffers, (&mut vertices, &mut indices), missing);
         let run = start..indices.len() as u32;
         push_range(&mut ranges, run, primitive.material().index());
     }
@@ -124,15 +137,15 @@ fn sub_mesh_from_gltf(
 fn append_primitive(
     primitive: &gltf::Primitive,
     buffers: &[gltf::buffer::Data],
-    vertices: &mut Vec<MeshVertex>,
-    indices: &mut Vec<u32>,
+    (vertices, indices): (&mut Vec<MeshVertex>, &mut Vec<u32>),
+    missing: Missing,
 ) {
-    let Some((own, local, has_normals)) = read_primitive(primitive, buffers) else {
+    let Some((own, local, has_normals)) = read_primitive(primitive, buffers, missing) else {
         return;
     };
     let (own, local) = match has_normals {
         true => (own, local),
-        false => crate::flat_normals::flat_shaded(&own, &local),
+        false => crate::flat_normals::flat_shaded(&own, &local, missing),
     };
     let base = vertices.len() as u32;
     vertices.extend(own);
@@ -145,6 +158,7 @@ fn append_primitive(
 fn read_primitive(
     primitive: &gltf::Primitive,
     buffers: &[gltf::buffer::Data],
+    missing: Missing,
 ) -> Option<(Vec<MeshVertex>, Vec<u32>, bool)> {
     let reader = primitive.reader(|b| buffers.get(b.index()).map(|d| d.0.as_slice()));
 
@@ -188,9 +202,7 @@ fn read_primitive(
         Some(normals) => reader
             .read_tangents()
             .map(|t| t.collect())
-            .unwrap_or_else(|| {
-                crate::tangents::generate_tangents(&positions, normals, &uvs, &local)
-            }),
+            .unwrap_or_else(|| crate::tangents::fill(missing, &positions, normals, &uvs, &local)),
         None => Vec::new(),
     };
 
@@ -210,6 +222,14 @@ fn read_primitive(
     Some((own, local, normals.is_some()))
 }
 
+/// How many corners a primitive's triangles have: its indices, or its vertices
+/// when it has none. What the thread split weighs it by.
+fn corners(primitive: &gltf::Primitive) -> usize {
+    let indices = primitive.indices();
+    let positions = || primitive.get(&gltf::Semantic::Positions);
+    indices.or_else(positions).map_or(0, |a| a.count())
+}
+
 /// Normalize a primitive's index stream to a triangle list per its topology
 /// `mode` (#317). glTF's three triangle modes carry the same kind of surface
 /// under different index conventions: `TRIANGLES` passes through untouched,
@@ -226,7 +246,9 @@ fn triangle_list(mode: Mode, indices: Option<Vec<u32>>, vertex_count: u32) -> Op
         Mode::TriangleStrip => Some(strip_triangles(&indices)),
         Mode::TriangleFan => Some(fan_triangles(&indices)),
         Mode::Points | Mode::Lines | Mode::LineLoop | Mode::LineStrip => {
-            log::warn!("[Asset] skipping glTF primitive: mode {mode:?} is not a triangle surface");
+            rusty_core::warn_held!(
+                "[Asset] skipping glTF primitive: mode {mode:?} is not a triangle surface"
+            );
             None
         }
     }

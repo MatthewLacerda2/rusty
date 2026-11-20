@@ -65,11 +65,11 @@
 
 mod blend;
 mod converter;
-mod depends;
+pub(crate) mod depends;
 mod fbx;
 #[cfg(test)]
 mod fingerprint;
-mod gate;
+pub(crate) mod gate;
 pub mod glb;
 mod lock;
 mod record;
@@ -96,7 +96,6 @@ use stale::{stale, Tool};
 use std::path::{Component, Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-/// Conversions run in this process, on any thread ([`conversions`]).
 static CONVERSIONS: AtomicUsize = AtomicUsize::new(0);
 
 /// How many sources this process has converted (a current cache not counted):
@@ -133,14 +132,15 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
 }
 
 /// Where the import cache keeps a file made from the source at `path`, named as
-/// the source plus `suffix`: the same place and rules as [`cache_location`]
-/// (a compressed texture, #1574, is one).
+/// the source plus `suffix`, by [`cache_location`]'s rules (a compressed texture).
 pub fn cache_location_as(path: &Path, suffix: &str) -> Result<PathBuf, ImportError> {
+    Ok(project_cache_as(path, suffix)?.unwrap_or_else(|| temp_path(path, suffix)))
+}
+
+/// [`cache_location_as`] inside the open project; `None` outside it.
+pub fn project_cache_as(path: &Path, suffix: &str) -> Result<Option<PathBuf>, ImportError> {
     let root = Path::new(".");
-    Ok(match project_relative(root, path)? {
-        Some(rel) => cache_path_as(root, &rel, suffix),
-        None => temp_path(path, suffix),
-    })
+    Ok(project_relative(root, path)?.map(|rel| cache_path_as(root, &rel, suffix)))
 }
 
 /// Make `out` the conversion of `source`, unless its stamp says it already is. A

@@ -46,6 +46,14 @@ pub(super) fn files_of(read: &Path, borrowed: &[String]) -> Files {
         .collect()
 }
 
+/// The files a parse of `read` reads for its geometry: `read`, then the others it
+/// pulls in. What a cooked model is stamped by (`cook::stamp`).
+pub(crate) fn parsed(read: &Path) -> Vec<PathBuf> {
+    std::iter::once(read.to_path_buf())
+        .chain(reads(read))
+        .collect()
+}
+
 pub(super) fn stamp(path: &Path) -> Stamp {
     let meta = std::fs::metadata(path).ok()?;
     let modified = meta.modified().ok();
@@ -93,8 +101,8 @@ fn buffers(json: &[u8], base: &Path) -> Vec<PathBuf> {
 }
 
 /// A `.glb`'s JSON chunk: the 12-byte header, then the first chunk's length and
-/// type, then its bytes.
-fn glb_json(path: &Path) -> Option<Vec<u8>> {
+/// type, then its bytes (a cooked file's stamp is read so, `cook::is_stamped`).
+pub(crate) fn glb_json(path: &Path) -> Option<Vec<u8>> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut head = [0u8; 20];
     file.read_exact(&mut head).ok()?;
