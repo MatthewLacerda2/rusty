@@ -10,7 +10,9 @@ use crate::draw::map_slots::material_texture_paths;
 use crate::draw::uniforms::solid_object;
 use crate::frustum::transform_aabb;
 use crate::gpu::pipelines::Facing;
-use crate::passes::shadows::{moves, shadow_runs, slot_clip, CasterClip, ObjectCasting, ShadowRun};
+use crate::passes::shadows::{
+    depth_only, moves, shadow_runs, slot_clip, CasterClip, ObjectCasting, ShadowRun,
+};
 use crate::render_texture::is_render_texture;
 use crate::{MeshId, Renderer, SmallLimits};
 use rusty_components::{MaterialAsset, MaterialComponent, RenderFace, ShadowCasting};
@@ -186,7 +188,8 @@ impl Renderer {
     }
 
     /// Add material slot `slot` (drawing `indices`) of entity `id` to `object`: its
-    /// key, whether it is transparent, its face and its shadow clip.
+    /// key, whether it is transparent, its face and its shadow clip, and from that
+    /// clip whether the depth prepass draws it depth-only (#2347).
     fn push_slot(
         &mut self,
         scene: &Scene,
@@ -197,10 +200,11 @@ impl Renderer {
         let entry = scene.material_entry_at(id, slot);
         let material = entry.map(|(_, asset)| asset);
         let at = (object.world, object.mesh);
-        let (key, transparent) = self.slot_key(scene, id, (slot, indices), at);
+        let (mut key, transparent) = self.slot_key(scene, id, (slot, indices), at);
         let maps = material_texture_paths(material).into_iter().flatten();
         object.reads_render_texture |= maps.into_iter().any(|m| is_render_texture(m.as_str()));
         let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
+        key.depth_only = depth_only(key.pipeline, clip.as_ref());
         object.slots.push(SlotDraw {
             key,
             transparent,

@@ -276,6 +276,7 @@ fn create_forward_passes(
         &textures.material_layout,
         shadow_layout,
     );
+    pl.prepass.prime();
 
     ForwardPasses {
         render_pipeline: pl.forward,

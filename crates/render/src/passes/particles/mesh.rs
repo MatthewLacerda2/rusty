@@ -18,6 +18,7 @@ use crate::draw::map_slots::material_maps;
 use crate::draw::uniforms::{probe_occlusion_at, probe_sh_at};
 use crate::gpu::pipelines::Facing;
 use crate::gpu::uniforms::ObjectData;
+use crate::passes::shadows::{depth_only, slot_clip};
 use crate::scene::Variant;
 use crate::{InstanceData, Renderer};
 use rusty_components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
@@ -157,7 +158,8 @@ impl Renderer {
             bone_base: 0,
             depth_only: false,
         };
-        key.depth_only = crate::passes::shadows::depth_only(&self.surface_shaders, &key, material);
+        let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
+        key.depth_only = depth_only(key.pipeline, clip.as_ref());
         let glass = material.filter(|m| m.is_transparent());
         Some((key, glass.map(MaterialAsset::sort_priority)))
     }

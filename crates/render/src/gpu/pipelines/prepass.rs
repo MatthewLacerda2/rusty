@@ -33,9 +33,11 @@ pub(crate) struct PrepassPipelines {
 }
 
 impl PrepassPipelines {
-    /// Both sets of the forward `shader`, the usual facing of each built now: the
-    /// clipping ones over the forward `layout`, the depth-only ones over one of the
-    /// forward pass's `globals` and `draws` groups alone ([`depth_only_layout`]).
+    /// Both sets of the forward `shader`: the clipping ones over the forward
+    /// `layout`, their usual facing built now, and the depth-only ones over one of
+    /// the forward pass's `globals` and `draws` groups alone ([`depth_only_layout`]),
+    /// none built until [`Self::prime`] or a draw: the shader preview's throwaway
+    /// set never draws them.
     pub(super) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -49,6 +51,12 @@ impl PrepassPipelines {
         }
     }
 
+    /// Build the depth-only set's usual facing now, as the clipping one's is: the
+    /// renderer's own set, which every prepass draws.
+    pub(crate) fn prime(&self) {
+        self.depth_only.get(Facing::Ccw);
+    }
+
     /// The facings still to build, for warming.
     pub(crate) fn twins(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.clip.twins().chain(self.depth_only.twins())
@@ -59,17 +67,15 @@ impl PrepassPipelines {
 /// as [`prepass_set`]'s, so the depth it writes is bit-identical, but no fragment
 /// stage, so a batch nothing clips pays no fragment work and keeps the GPU's
 /// depth-only fast path. `layout` is [`depth_only_layout`]'s, which ends before
-/// the material group; the usual facing is built now.
+/// the material group; nothing is built yet.
 fn depth_only_set(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
     layout: &wgpu::PipelineLayout,
 ) -> FacedPipeline {
-    let set = FacedPipeline::lazy(device, shader, layout, |d, s, l, f| {
+    FacedPipeline::lazy(device, shader, layout, |d, s, l, f| {
         make_prepass(d, s, l, None, f)
-    });
-    set.get(Facing::Ccw);
-    set
+    })
 }
 
 /// The depth-only prepass's layout: the forward pass's groups 0 (globals) and 1

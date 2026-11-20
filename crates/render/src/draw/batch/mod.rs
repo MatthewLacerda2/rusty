@@ -63,8 +63,9 @@ pub(crate) struct BatchKey {
     /// palette of its own, is a draw of its own.
     pub bone_base: u32,
     /// Whether the depth prepass draws it with no fragment stage and no material
-    /// group (#2347): nothing clips it, by the shadow pass's own rule
-    /// (`passes::shadows::depth_only`), so its depth is its triangles'. Last, so it
+    /// group (#2347): nothing clips it, by the shadow clip its slot derives with it
+    /// (`passes::shadows::depth_only`, set in `push_slot`), so its depth is its
+    /// triangles'. Last, so it
     /// never reorders a run; equal keys otherwise never differ in it, since a Cutout
     /// material's record differs from an opaque one's.
     pub depth_only: bool,

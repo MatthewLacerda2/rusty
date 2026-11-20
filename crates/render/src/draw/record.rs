@@ -65,23 +65,35 @@ impl Renderer {
             let blend = batch.key.traits.blend;
             let facing = batch.key.facing;
             // A batch nothing clips draws the prepass with no fragment stage (#2347).
-            let depth_only = solid_pass.is_prepass() && batch.key.depth_only;
-            let pipeline = ((batch.key.pipeline, depth_only), primed, blend, facing);
+            let plain = batch.key.depth_only.then(|| solid_pass.depth_only(facing));
+            let depth_only = plain.flatten();
+            let pipeline = (
+                batch.key.pipeline,
+                depth_only.is_some(),
+                primed,
+                blend,
+                facing,
+            );
             if bound != Some(pipeline) {
-                let pick = self
-                    .surface_shaders
-                    .pick(solid_pass, pipeline.0, primed, blend, facing);
+                let pick = depth_only.unwrap_or_else(|| {
+                    self.surface_shaders
+                        .pick(solid_pass, batch.key.pipeline, primed, blend, facing)
+                });
                 render_pass.set_pipeline(pick);
                 bound = Some(pipeline);
+                #[cfg(test)]
+                probe::set(solid_pass, pick);
             }
             let offsets = DrawBuffers::offsets(batch.uniform_slot);
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass
                 .set_index_buffer(gpu_mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
             render_pass.set_bind_group(1, group, &offsets);
-            if !depth_only {
+            if depth_only.is_none() {
                 render_pass.set_bind_group(2, self.materials.group(batch.key.material), &[]);
             }
+            #[cfg(test)]
+            probe::draw(solid_pass, depth_only.is_none());
             let by_cluster = culled
                 .and_then(|c| c.clusters.as_ref())
                 .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));
@@ -101,5 +113,70 @@ impl Renderer {
                 }
             }
         }
+    }
+}
+
+/// What the depth prepass recorded (#2347), a test's evidence that a batch nothing
+/// clips draws through the fragment-less pipeline and binds no material: counted
+/// per thread from the pipeline each draw was recorded with, compared by identity
+/// with the pass's own depth-only ones, so a wrong pick shows even when the batch's
+/// key says depth-only. Test code only.
+#[cfg(test)]
+pub(crate) mod probe {
+    use super::SolidPass;
+    use crate::gpu::pipelines::Facing;
+    use std::cell::Cell;
+
+    /// The prepass draws since the last [`take`].
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub(crate) struct PrepassDraws {
+        /// Draws recorded in a prepass.
+        pub draws: u32,
+        /// Of those, the ones whose pipeline was a fragment-less one.
+        pub depth_only: u32,
+        /// Of those, the ones that bound a material group.
+        pub material_binds: u32,
+    }
+
+    thread_local! {
+        static COUNTS: Cell<PrepassDraws> = const { Cell::new(PrepassDraws {
+            draws: 0,
+            depth_only: 0,
+            material_binds: 0,
+        }) };
+        /// Whether the pipeline last set in a prepass is a fragment-less one.
+        static PLAIN: Cell<bool> = const { Cell::new(false) };
+    }
+
+    /// Note `pipeline`, just set in `pass`.
+    pub(super) fn set(pass: SolidPass<'_>, pipeline: &wgpu::RenderPipeline) {
+        // Only the built ones: comparing must build no pipeline.
+        let plain = match pass {
+            SolidPass::Prepass(p) => Facing::ALL
+                .into_iter()
+                .any(|f| p.depth_only.is_built(f) && std::ptr::eq(p.depth_only.get(f), pipeline)),
+            _ => false,
+        };
+        PLAIN.with(|c| c.set(plain));
+    }
+
+    /// Count one draw of `pass`, which bound its material group when `material`.
+    pub(super) fn draw(pass: SolidPass<'_>, material: bool) {
+        if !pass.is_prepass() {
+            return;
+        }
+        let plain = PLAIN.with(Cell::get);
+        COUNTS.with(|c| {
+            let mut n = c.get();
+            n.draws += 1;
+            n.depth_only += u32::from(plain);
+            n.material_binds += u32::from(material);
+            c.set(n);
+        });
+    }
+
+    /// What this thread counted since the last call, and start again from zero.
+    pub(crate) fn take() -> PrepassDraws {
+        COUNTS.with(Cell::take)
     }
 }

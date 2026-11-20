@@ -37,13 +37,23 @@ pub(crate) enum SolidPass<'a> {
     MotionPostpass(&'a DepthPostpassPipelines),
 }
 
-impl SolidPass<'_> {
+impl<'a> SolidPass<'a> {
     /// Whether this is the SSAO prepass, which draws only the batches
     /// [`BatchKey::in_prepass`] admits.
     ///
     /// [`BatchKey::in_prepass`]: crate::draw::batch::BatchKey::in_prepass
     pub(crate) fn is_prepass(self) -> bool {
         matches!(self, Self::Prepass(_))
+    }
+
+    /// The fragment-less pipeline keeping `facing`'s triangles a batch nothing
+    /// clips draws this pass with (`BatchKey::depth_only`, #2347): the prepass's;
+    /// `None` in every other pass.
+    pub(crate) fn depth_only(self, facing: Facing) -> Option<&'a wgpu::RenderPipeline> {
+        match self {
+            Self::Prepass(p) => Some(p.depth_only.get(facing)),
+            _ => None,
+        }
     }
 
     /// Whether this pass draws over a primed depth (#1499).
@@ -59,19 +69,18 @@ impl SurfaceShaders {
     /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
     /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
     /// depth; in the transparent pass, the one for its `blend` (#1523); in every
-    /// pass, the one keeping `facing`'s triangles (#1615); in the prepass, the
-    /// fragment-less one for a `depth_only` batch (#2347).
+    /// pass, the one keeping `facing`'s triangles (#1615). In the prepass, the
+    /// clipping one: a batch nothing clips draws [`SolidPass::depth_only`]'s instead.
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,
-        (id, depth_only): (usize, bool),
+        id: usize,
         primed: bool,
         blend: TransparentBlend,
         facing: Facing,
     ) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
-            SolidPass::Prepass(standard) if depth_only => standard.depth_only.get(facing),
             SolidPass::Prepass(standard) => self
                 .cut(id)
                 .map_or(&standard.clip, |c| &c.prepass)

@@ -3,11 +3,14 @@
 //! byte for byte. A plain textured opaque box (its albedo clear on one half, which
 //! an opaque never clips), a Cutout box and a dissolving box: only the plain one
 //! is depth-only, and its depth is unchanged when it is drawn through the clipping
-//! pipeline instead (Cutout with a cutoff of 0, which clips nothing). Skips with
-//! no adapter.
+//! pipeline instead (Cutout with a cutoff of 0, which clips nothing). The
+//! recorder's probe (`draw::record::probe`) shows the path each draw took: which
+//! pipeline it was recorded with, by identity, and whether it bound a material.
+//! Skips with no adapter.
 
 use glam::Vec3;
 
+use crate::draw::record::probe::{self, PrepassDraws};
 use crate::gpu::pipelines::surface::cut_depth_tests::dissolve;
 use crate::gpu::pipelines::surface::mask_tests::Dissolve;
 use crate::readback::read_texture_bytes;
@@ -67,13 +70,26 @@ fn classes(r: &Renderer, scene: &Scene, ids: [u32; 4]) -> [bool; 4] {
     })
 }
 
-/// One frame from above the boxes; the view's depth after it.
-fn depth(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
+/// One frame from above the boxes; the view's depth after it, and what its
+/// prepass recorded.
+fn depth(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, PrepassDraws) {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 4.0, 5.0), -90.0, -40.0);
+    probe::take();
     r.render(&mut view, scene, &cam, &out, false);
-    read_texture_bytes(&r.device, &r.queue, &view.depth_texture, (RES, RES), 4)
+    let drawn = probe::take();
+    let bytes = read_texture_bytes(&r.device, &r.queue, &view.depth_texture, (RES, RES), 4);
+    (bytes, drawn)
+}
+
+/// A file removed when dropped, a panic's unwinding included.
+struct Removed(std::path::PathBuf);
+
+impl Drop for Removed {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
 }
 
 #[test]
@@ -82,40 +98,45 @@ fn gpu_only_an_unclipped_batch_draws_the_prepass_depth_only_and_its_depth_holds(
     let albedo = image::RgbaImage::from_fn(4, 1, |x, _| {
         image::Rgba([255, 255, 255, 255 * (x / 2) as u8])
     });
-    let path = rusty_test_support::temp::dir()
-        .join(format!("rusty_depth_only_{}.png", std::process::id()));
-    albedo.save(&path).expect("albedo written");
     let mask = image::RgbaImage::from_fn(4, 1, |x, _| image::Rgba([255 * (x / 2) as u8; 4]));
     let d = Dissolve::with_mask("depth_only", &mask);
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    let (scene, plain, ids) = yard(&path.to_string_lossy(), &d.shader);
+    let path = rusty_test_support::temp::dir()
+        .join(format!("rusty_depth_only_{}.png", std::process::id()));
+    albedo.save(&path).expect("albedo written");
+    let path = Removed(path);
+    let (scene, plain, ids) = yard(&path.0.to_string_lossy(), &d.shader);
     let cutting = ids[3];
     let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     dissolve(&scene, cutting, &d, 0.5);
-    let today = depth(&mut r, &scene.borrow());
+    let (today, drawn) = depth(&mut r, &scene.borrow());
+    // One prepass of four batches: the floor and the plain box through the
+    // fragment-less pipeline with no material, the other two through the clipping.
+    let path_of = |depth_only, material_binds| PrepassDraws {
+        draws: 4,
+        depth_only,
+        material_binds,
+    };
+    assert_eq!(drawn, path_of(2, 2), "the depth-only path taken");
     // The floor and the plain box; neither the Cutout box nor the dissolving one.
     let classed = classes(&r, &scene.borrow(), ids);
-    assert_eq!(
-        classed,
-        [true, true, false, false],
-        "floor, plain, cutout, cutting"
-    );
+    assert_eq!(classed, [true, true, false, false], "by box");
 
     // The plain box through the clipping pipeline: Cutout, clipping nothing.
     let mut s = scene.borrow_mut();
     let m = s.materials.get_mut(&plain).unwrap();
     (m.render_mode, m.alpha_cutoff) = (RenderMode::Cutout, 0.0);
     drop(s);
-    let clipped = depth(&mut r, &scene.borrow());
-    let classed = classes(&r, &scene.borrow(), ids);
+    let (clipped, drawn) = depth(&mut r, &scene.borrow());
     assert_eq!(
-        classed,
-        [true, false, false, false],
-        "the plain box now clips"
+        drawn,
+        path_of(1, 3),
+        "the plain box now draws the clipping path"
     );
-    let _ = std::fs::remove_file(&path);
+    let classed = classes(&r, &scene.borrow(), ids);
+    assert_eq!(classed, [true, false, false, false], "the plain box clips");
     let drawn = today.chunks(4).filter(|d| *d != 1f32.to_le_bytes()).count();
     assert!(
         drawn > (RES * RES / 2) as usize,
