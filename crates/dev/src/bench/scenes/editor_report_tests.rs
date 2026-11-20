@@ -87,3 +87,55 @@ fn the_rounds_clock_drift_since_the_last_run_is_its_own_warning() {
         "{said:?}"
     );
 }
+
+/// `report`'s round with its Scene view drawn at `view`.
+fn viewed(view: (f64, f64)) -> SceneReport {
+    let mut r = report(Some(&round([2.0, 2.0], [1.0, 1.0])));
+    for (metric, px) in super::VIEW_ROWS.into_iter().zip([view.0, view.1]) {
+        r.rows
+            .iter_mut()
+            .find(|row| row.metric == metric)
+            .unwrap()
+            .avg = px;
+    }
+    r
+}
+
+#[test]
+fn a_scene_view_of_another_size_is_said_once_above_the_table() {
+    let said = "the Scene view is 1416x963 against 1306x963 in the last run";
+    let table = viewed((1416.0, 963.0)).render(Some(&viewed((1306.0, 963.0))));
+    assert_eq!(table.matches(said).count(), 1, "{table}");
+    let (head, rows) = table.split_once("\nmetric ").unwrap();
+    assert!(
+        head.contains(said) && !rows.contains(said),
+        "above the table: {table}"
+    );
+    assert!(table.contains("not comparable pixel for pixel"), "{table}");
+    let same = viewed((1306.0, 963.0)).render(Some(&viewed((1306.0, 963.0))));
+    assert!(!same.contains("the Scene view is"), "{same}");
+    assert!(
+        line(&same, "editor.view_w").trim_end().ends_with('='),
+        "always printed: {same}"
+    );
+    let row = line(&table, "editor.view_w");
+    assert!(
+        row.trim_end().ends_with("was 1306") && !row.contains('%'),
+        "a size, not a percentage: {table}"
+    );
+    // Averages that print as one size are one size.
+    let near = viewed((1416.4, 963.0)).render(Some(&viewed((1416.0, 963.0))));
+    assert!(!near.contains("the Scene view is"), "{near}");
+    assert!(
+        line(&near, "editor.view_w").trim_end().ends_with('='),
+        "{near}"
+    );
+    // A report from before the rows: the size reads as absent, and no line.
+    let mut older = viewed((1306.0, 963.0));
+    older.rows.retain(|r| !r.metric.starts_with("editor.view_"));
+    let table = viewed((1416.0, 963.0)).render(Some(&older));
+    assert!(!table.contains("the Scene view is"), "{table}");
+    assert!(!older
+        .render(Some(&viewed((1416.0, 963.0))))
+        .contains("the Scene view is"));
+}

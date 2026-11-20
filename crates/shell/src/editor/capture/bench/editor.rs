@@ -2,7 +2,7 @@
 //! share, one frame at a time, probed or not.
 
 use rusty_app::GameWorld;
-use rusty_dev::bench::scenes::editor::{gpu_speed, UiTime, UiTimer};
+use rusty_dev::bench::scenes::editor::{gpu_speed, Drawn, UiTime, UiTimer};
 use rusty_dev::bench::scenes::views::View;
 use rusty_dev::capture::{CaptureHost, RenderedFrame};
 use rusty_editor::viewport::scene_camera::SceneCamera;
@@ -64,11 +64,9 @@ impl Editor {
     }
 
     /// Draw one editor frame and wait for it: its edit-frame and UI times, the
-    /// viewport frame when one rendered, and the GPU's speed over the frame.
-    pub(super) fn frame(
-        &mut self,
-        game: &mut GameWorld,
-    ) -> (UiTime, Option<RenderedFrame>, Option<f64>) {
+    /// viewport frame and the size it drew at when one rendered, and the GPU's
+    /// speed over the frame.
+    pub(super) fn frame(&mut self, game: &mut GameWorld) -> (UiTime, Option<Drawn>, Option<f64>) {
         let mut timer = UiTimer::start();
         game.edit_frame();
         timer.edit_done();
@@ -80,11 +78,14 @@ impl Editor {
         let renderer = self.host.renderer(w, h).expect("built in new");
         renderer.wait_idle();
         let gpu = renderer.take_gpu_times();
-        let frame = cost.map(|(cpu_ms, stages, counters)| RenderedFrame {
-            counters,
-            cpu_ms,
-            stages,
-            gpu,
+        let frame = cost.map(|(cpu_ms, stages, counters, view)| Drawn {
+            frame: RenderedFrame {
+                counters,
+                cpu_ms,
+                stages,
+                gpu,
+            },
+            view,
         });
         let after = self.probed();
         (ui, frame, gpu_speed(before, after))
@@ -121,7 +122,7 @@ impl Editor {
     }
 
     /// Render the viewport and paint the UI over it: the renderer's CPU time,
-    /// stages and counters when the viewport rendered.
+    /// stages and counters, and the size the view drew at, when it rendered.
     fn render(
         &mut self,
         game: &GameWorld,
@@ -135,13 +136,10 @@ impl Editor {
         let rendered =
             super::super::viewport::render_viewport(host, egui, game, &self.ui, drawn, texture);
         let renderer = host.renderer(w, h).expect("built in new");
-        let cost = rendered.then(|| {
+        let cost = rendered.map(|view| {
             let cpu_ms = renderer.frame_cost().cpu_ms;
-            (
-                cpu_ms,
-                renderer.frame_stages().to_vec(),
-                renderer.frame_counters,
-            )
+            let stages = renderer.frame_stages().to_vec();
+            (cpu_ms, stages, renderer.frame_counters, view)
         });
         self.paint(output, jobs);
         cost
@@ -169,6 +167,12 @@ impl Editor {
         output.textures_delta.clear(); // egui asserts every delta is consumed
     }
 
+    /// The editor's UI, for a test to change its layout (close a panel).
+    #[cfg(test)]
+    pub(super) fn editor_ui(&mut self) -> &mut EditorUi {
+        &mut self.ui
+    }
+
     /// The GPU clock probe's time, `None` without one.
     fn probed(&mut self) -> Option<f64> {
         let (w, h) = self.size;
@@ -177,8 +181,13 @@ impl Editor {
     }
 }
 
-/// A viewport frame's renderer CPU ms, stages and counters.
-type Cost = (f64, Vec<(&'static str, f64)>, rusty_render::RenderCounters);
+/// A viewport frame's renderer CPU ms, stages and counters, and the view's size.
+type Cost = (
+    f64,
+    Vec<(&'static str, f64)>,
+    rusty_render::RenderCounters,
+    (u32, u32),
+);
 
 /// Select the scene's first screen camera, and pose the Scene view at the
 /// scene's first game viewpoint (its first camera, or the fallbacks after it):
