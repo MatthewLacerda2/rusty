@@ -19,6 +19,7 @@ use std::collections::{HashMap, HashSet};
 use image::imageops::FilterType;
 
 use super::record::NO_LAYER;
+use crate::gpu::ops::Writes;
 use crate::gpu::textures::kind_watch::KindWatch;
 use crate::gpu::textures::{TextureKind, Uploader};
 use rusty_asset::MapRef;
@@ -83,7 +84,7 @@ impl DecalAtlas {
     /// replaced, so group 0 is rebuilt.
     pub(crate) fn prepare(
         &mut self,
-        (device, queue, mips): Uploader,
+        (device, writes, mips): Uploader,
         maps: &[(&MapRef, TextureKind)],
         misses: &mut Freshness,
     ) -> bool {
@@ -108,7 +109,7 @@ impl DecalAtlas {
             let needed = (self.slots.len() + fresh.len()) as u32;
             let capacity = needed.next_power_of_two().clamp(MIN_LAYERS, MAX_LAYERS);
             if capacity > self.capacity() as u32 {
-                self.grow(device, queue, capacity);
+                self.grow(device, writes.0, capacity);
                 replaced = true;
             }
         }
@@ -118,8 +119,8 @@ impl DecalAtlas {
             };
             match crate::gpu::textures::open(path) {
                 Some(img) => {
-                    upload(queue, &self.texture, layer, img.to_rgba8());
-                    mips.generate_layer(device, queue, (&self.texture, layer), kind);
+                    upload(writes, &self.texture, layer, img.to_rgba8());
+                    mips.generate_layer(device, writes.0, (&self.texture, layer), kind);
                     self.kinds.uploaded(path.as_str(), kind);
                     self.slots.insert(path.clone(), layer);
                 }
@@ -208,9 +209,10 @@ fn views(texture: &wgpu::Texture) -> (wgpu::TextureView, wgpu::TextureView) {
 
 /// Resize `img` to a layer and write it to `layer`'s base level; the mip pass
 /// draws the rest.
-fn upload(queue: &wgpu::Queue, texture: &wgpu::Texture, layer: u32, img: image::RgbaImage) {
+fn upload((queue, staging): Writes, texture: &wgpu::Texture, layer: u32, img: image::RgbaImage) {
     let base = image::imageops::resize(&img, LAYER_SIZE, LAYER_SIZE, FilterType::Triangle);
-    queue.write_texture(
+    queue.counted_write_texture(
+        staging,
         wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,

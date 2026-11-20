@@ -18,6 +18,12 @@ fn a_raw_call_in_a_render_module_is_flagged_naming_its_helper() {
     assert!(found[0].message.contains("counted_render_pass"));
     let all = "q.submit(x);\nq.write_buffer(b, 0, d);\nd.create_bind_group(&g);\ne.begin_compute_pass(&c);\n";
     assert_eq!(check_file("crates/render/src/lib.rs", all).len(), 4);
+    let texture = check_file(
+        "crates/render/src/gpu/lightmaps/upload.rs",
+        "q.write_texture(to, d, l, s);\n",
+    );
+    assert_eq!(texture.len(), 1);
+    assert!(texture[0].message.contains("counted_write_texture"));
 }
 
 #[test]
@@ -38,7 +44,7 @@ fn the_helpers_tests_comments_and_other_crates_pass() {
     let doc = "/// a raw `encoder.begin_render_pass(` is counted nowhere\nlet s = \".submit(\";\n";
     assert!(check_file("crates/render/src/passes/a.rs", doc).is_empty());
     assert!(check_file("crates/shell/src/editor/paint.rs", PASS).is_empty());
-    let counted = "    let p = encoder.counted_render_pass(&desc);\nq.counted_submit(x);\n";
+    let counted = "    let p = encoder.counted_render_pass(&desc);\nq.counted_submit(x);\nq.counted_write_texture(s, to, d, l, z);\n";
     assert!(check_file("crates/render/src/passes/a.rs", counted).is_empty());
     let custom = "ring.resolve_frame(device, queue);\nself.submit_copy(x);\n";
     assert!(check_file("crates/render/src/passes/a.rs", custom).is_empty());

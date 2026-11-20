@@ -97,7 +97,7 @@ impl Renderer {
         let filter = self
             .probe_prefilter
             .get_or_init(|| ProbePrefilter::new(&self.device));
-        filter.run((&self.device, &self.queue), capture)
+        filter.run((&self.device, (&self.queue, &self.staging)), capture)
     }
 
     /// Bake every reflection probe in `scene` at its resolution, writing each one's KTX2 cubemap into

@@ -1,6 +1,7 @@
 //! A page list's load off the frame (#1694): read on a worker, then uploaded when
 //! it lands, or why it failed told once.
 
+use crate::gpu::ops::Writes;
 use std::rc::Rc;
 use std::sync::mpsc::{channel, Receiver};
 
@@ -28,14 +29,14 @@ pub(super) fn start(list: Vec<String>, kind: Kind, bc: bool) -> Receiver<Result<
 /// #1704, #1996).
 pub(super) fn finish(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    writes: Writes,
     list: &[String],
     result: Result<Loaded, String>,
 ) -> Option<Rc<LightmapArray>> {
     let limits = device.limits();
     let fit = |l: Loaded| fits(&limits, l.edge, l.layers.len(), l.bytes()).map(|()| l);
     match result.and_then(fit) {
-        Ok(loaded) => Some(Rc::new(upload(device, queue, &loaded))),
+        Ok(loaded) => Some(Rc::new(upload(device, writes, &loaded))),
         Err(e) => {
             log::warn!("[Lightmap] cannot load the pages {list:?}: {e}");
             None

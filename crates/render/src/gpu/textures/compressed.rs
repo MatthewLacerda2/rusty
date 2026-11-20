@@ -3,11 +3,13 @@
 //! (a BC texture cannot be rendered into). Colour formats keep the sRGB storage
 //! and raw data view every image upload has (#647). The renderer never encodes:
 //! a texture without a current cache uploads uncompressed until the import makes
-//! one.
+//! one. With no GPU pass of its own, its levels wait in staging for a submit,
+//! which `gpu::ops::Staging` makes as they pile up (#2372).
 
 use std::collections::BTreeSet;
 use std::sync::{Mutex, Once};
 
+use crate::gpu::ops::CountedQueue as _;
 use rusty_asset::sidecar::{Compression, TextureSettings};
 use rusty_asset::texture_import::{self, BlockFormat, Compressed, TextureKind};
 
@@ -99,7 +101,7 @@ pub(crate) fn reads_as(format: wgpu::TextureFormat, kind: TextureKind) -> bool {
 /// Create a texture holding `texture`'s levels, stored sRGB when `srgb`
 /// ([`formats`]); returns it with its data view's format.
 pub(super) fn upload(
-    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    (device, (queue, staging)): (&wgpu::Device, crate::gpu::ops::Writes),
     label: &str,
     texture: &Compressed,
     srgb: bool,
@@ -129,7 +131,8 @@ pub(super) fn upload(
     for (mip, blocks) in texture.levels.iter().enumerate() {
         let level = size.mip_level_size(mip as u32, wgpu::TextureDimension::D2);
         let physical = level.physical_size(format);
-        queue.write_texture(
+        queue.counted_write_texture(
+            staging,
             wgpu::TexelCopyTextureInfo {
                 texture: &gpu,
                 mip_level: mip as u32,
