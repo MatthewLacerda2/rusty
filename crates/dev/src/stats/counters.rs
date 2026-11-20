@@ -82,4 +82,7 @@ thread_local! {
     /// What each `record_frame` charges a test's driven clock, in ms: the probe's
     /// own work made visible (`probe_cost_tests`).
     pub(super) static RECORD_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+    /// What each closing `end_tick` charges a test's driven clock, in ms, inside its
+    /// recording, after the tick's span has closed (`probe_cost_tests`).
+    pub(super) static END_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }

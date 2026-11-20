@@ -1,19 +1,24 @@
-//! The timing probe's own work inside the tick's span (its frame-end counter read
-//! and the recording at the tick's end) is `probe_ms`, beside `frame_ms` and never
-//! in it: a shipped game runs no probe, so a budget on the tick never reads it.
-//! The driven clock (`verbs::drive`) charges the counter read exactly.
+//! The timing probe's end-of-frame work (its frame-end counter read and the
+//! recording at the tick's end) is `probe_ms`, beside `frame_ms` and never in it:
+//! a shipped game runs no probe, so a budget on the tick never reads it. The
+//! driven clock (`verbs::drive`) charges both steps exactly, each its own cost.
 
-use super::counters::RECORD_COST;
+use super::counters::{END_COST, RECORD_COST};
 use super::stats_tick_tests::play;
 
 /// What the probe's counter read charges the driven clock, in ms.
 const COST: u64 = 7;
+/// What the tick's end-of-tick recording charges it, in ms.
+const END: u64 = 3;
 
-/// `ticks` play ticks with the probe's counter read charged [`COST`] each.
+/// `ticks` play ticks with the probe's counter read charged [`COST`] each and its
+/// end-of-tick recording [`END`].
 fn costly(name: &str, ticks: u32) -> rusty_core::frame_stats::FrameStats {
     RECORD_COST.with(|c| c.set(COST));
+    END_COST.with(|c| c.set(END));
     let stats = play(name, ticks, |_| {}, |_, _| {});
     RECORD_COST.with(|c| c.set(0));
+    END_COST.with(|c| c.set(0));
     stats
 }
 
@@ -29,7 +34,12 @@ fn the_probes_own_work_is_beside_the_tick_never_in_it() {
     assert!(stats.check_budget("frame_ms", 1.0).is_ok());
     let probe = stats.get("probe_ms").expect("the probe's work is timed");
     assert_eq!(probe.samples, 4, "one sample a play tick");
-    assert_eq!((probe.min, probe.max), (COST as f64, COST as f64));
+    let both = (COST + END) as f64;
+    assert_eq!(
+        (probe.min, probe.max),
+        (both, both),
+        "the counter read and the end-of-tick recording, each tick"
+    );
 }
 
 #[test]

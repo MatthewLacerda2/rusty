@@ -19,7 +19,11 @@
 //! The probe's own work inside the span is left out the same way, as `probe_ms`:
 //! `end_frame`'s counter read and the recording at the tick's end (the span closes
 //! as `end_tick` is entered). A shipped game runs no probe, and on a small level
-//! that work is most of what no system holds (#2445).
+//! that work is most of what no system holds (#2445). What stays in the span is
+//! the timing itself: each system's and part's two clock reads, its
+//! `verbs::enter_system`, stage lookup and row push in [`TimingProbe::run`] and
+//! `run_part`, a few µs a tick over ~45 systems, inside `cpu.other` with the
+//! schedule's dispatch. They cannot be taken out of a span they bracket.
 //! `end_tick` is the one place a frame closes: its system rows, each name summed
 //! over the tick (`flush_bounds` runs once a stage), its parts, `frame_ms`,
 //! `probe_ms` and the frame count; a schedule frame run outside a host's tick is
@@ -154,6 +158,8 @@ impl SystemProbe for TimingProbe {
             return; // an edit tick: no frame stats
         };
         let mut stats = self.stats.borrow_mut();
+        #[cfg(test)]
+        verbs::advance(counters::END_COST.with(std::cell::Cell::get));
         for (name, ms) in systems {
             stats.record_system(name, ms);
         }
