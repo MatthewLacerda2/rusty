@@ -27,6 +27,7 @@ impl Clone for MeshComponent {
             skin: self.skin.clone(),
             clips: self.clips.clone(),
             pose_palette: self.pose_palette.clone(),
+            own_geometry: self.own_geometry,
             clusters: self.clusters.clone(),
             ..self.without_geometry()
         }
@@ -35,9 +36,8 @@ impl Clone for MeshComponent {
 
 impl MeshComponent {
     /// This mesh with every saved field and every light runtime one copied, and its
-    /// heavy rehydrated ones (vertices, indices, runs, palettes, skin, clips, clusters) left
-    /// empty. `own_geometry` is kept: it is what tells a restore that the live
-    /// geometry is no longer its source's ([`Self::same_source`]). Every field is named, so a new one must be placed here.
+    /// heavy rehydrated ones (vertices, indices, runs, palettes, skin, clips, clusters,
+    /// and the identity an edit in place gave them) left empty. Every field is named, so a new one must be placed here.
     pub fn without_geometry(&self) -> Self {
         Self {
             primitive_type: self.primitive_type.clone(),
@@ -56,7 +56,7 @@ impl MeshComponent {
             max_draw_distance: self.max_draw_distance,
             min_screen_size: self.min_screen_size,
             revision: self.revision,
-            own_geometry: self.own_geometry,
+            own_geometry: None,
             clusters: None,
         }
     }
@@ -87,18 +87,16 @@ impl MeshComponent {
     }
 
     /// Whether `other`'s geometry is this mesh's: the same primitive or asset, cut
-    /// the same way, and the same edit in place of it, if any (so an Undo of that
-    /// edit rebuilds the source's geometry). What decides that a restore can keep
-    /// the live geometry.
+    /// the same way. What decides that a restore can keep the live geometry, with
+    /// any edit in place of it (an edit of the vertices is no Undo step).
     pub fn same_source(&self, other: &Self) -> bool {
         self.primitive_type == other.primitive_type
             && self.asset_ref == other.asset_ref
             && self.subdivisions == other.subdivisions
-            && self.own_geometry == other.own_geometry
     }
 
     /// Move `from`'s heavy rehydrated fields (the ones [`Self::without_geometry`]
-    /// empties) and its revision onto this mesh: the renderer has that geometry
+    /// empties, its own identity among them) and its revision onto this mesh: the renderer has that geometry
     /// already, so nothing is uploaded again.
     pub fn adopt_geometry(&mut self, from: &mut Self) {
         self.vertices = std::mem::take(&mut from.vertices);
@@ -109,7 +107,7 @@ impl MeshComponent {
         self.clips = std::mem::take(&mut from.clips);
         self.pose_palette = std::mem::take(&mut from.pose_palette);
         self.revision = from.revision;
-        self.own_geometry = from.own_geometry;
+        self.own_geometry = from.own_geometry.take();
         self.clusters = from.clusters.take();
     }
 }

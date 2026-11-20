@@ -31,6 +31,11 @@ fn an_edit_of_one_instance_leaves_its_sibling_and_the_cache_alone() {
         "its indices stay shared"
     );
     assert!(edited.revision > before, "re-uploaded");
+    assert!(
+        edited.own_geometry.is_some(),
+        "drawn under a slot of its own"
+    );
+    assert_eq!(scene.world.mesh(b).unwrap().own_geometry, None);
 }
 
 #[test]
@@ -62,4 +67,25 @@ fn mesh_create_over_one_instance_leaves_its_sibling_and_the_cache_alone() {
     assert!(scene.undo().is_some());
     assert!(shares(&scene, a, &buffers), "Undo shares the cache's again");
     assert!(shares(&scene, b, &buffers));
+}
+
+/// An edit of the vertices is no Undo step (no saved field moves), so an Undo of
+/// an earlier edit keeps it, and keeps it on its own GPU slot.
+#[test]
+fn an_undo_after_an_edit_in_place_keeps_the_edit_and_its_identity() {
+    let (mut scene, ids, path) = level("rusty_sharing_edit_undo", 2);
+    scene.begin_edits();
+    scene.world.transform_mut(ids[0]).unwrap().position.x = 3.0;
+    scene.commit_edits(None);
+    scene.world.mesh_mut(ids[0]).unwrap().vertices_mut()[0].position = [5.0; 3];
+    let own = scene.world.mesh(ids[0]).unwrap().own_geometry;
+    assert!(own.is_some());
+    assert!(scene.undo().is_some());
+    let kept = scene.world.mesh(ids[0]).unwrap();
+    assert_eq!(kept.vertices[0].position, [5.0; 3], "the edit stays");
+    assert_eq!(kept.own_geometry, own, "on its own slot still");
+    assert!(
+        shares(&scene, ids[1], &cached(&path)),
+        "the sibling, the cache's"
+    );
 }

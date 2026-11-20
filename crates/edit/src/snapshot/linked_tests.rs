@@ -10,6 +10,7 @@ use crate::asset_instance::instantiate_asset;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::snapshot::SceneSnapshot;
 use rusty_asset::import_cache::lookups;
+use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::copies;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::rehydrate::rebuilds;
@@ -33,6 +34,16 @@ fn level(dir: &str, n: usize) -> (Scene, Vec<u32>, String) {
         })
         .collect();
     (scene, parts, path)
+}
+
+/// Whether entity `id`'s buffers are its import's own: a deep copy fails it.
+fn shares_import(scene: &Scene, id: u32) -> bool {
+    let mesh = scene.world.mesh(id).unwrap();
+    let reference = mesh.asset_ref.as_deref().unwrap();
+    let (file, sub) = reference.rsplit_once("::").unwrap();
+    let import = rusty_asset::imported(std::path::Path::new(file)).unwrap();
+    let sub = import.sub_mesh(sub).unwrap();
+    Shared::same(&mesh.vertices, &sub.vertices) && Shared::same(&mesh.indices, &sub.indices)
 }
 
 fn indices(scene: &Scene, id: u32) -> Vec<u32> {
@@ -61,6 +72,7 @@ fn untouched_stop(dir: &str, n: usize) -> (usize, (usize, usize)) {
         assert_eq!(indices(&scene, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
         let revision = scene.world.mesh(id).unwrap().revision;
         assert_eq!(revision, revisions[i], "part {id}: the live geometry, kept");
+        assert!(shares_import(&scene, id), "part {id}: the import's buffers");
     }
     cost
 }
@@ -107,6 +119,10 @@ fn a_load_of_linked_models_looks_the_file_up_once() {
     assert_eq!(copied(from), (parts.len() + 2, 0), "no copy per instance");
     for &id in &parts {
         assert_eq!(indices(&loaded, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
+        assert!(
+            shares_import(&loaded, id),
+            "part {id}: the import's buffers"
+        );
     }
 }
 

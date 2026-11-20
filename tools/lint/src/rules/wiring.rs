@@ -140,6 +140,7 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
         "key-guard" => package("dev-dependencies", "rusty-dev", "", "Cargo.toml"),
         "log-tag" => one(app, "fn f() {\n    log::warn!(\"no tag\");\n}\n"),
         "markers" => one(app, concat!("// TO", "DO: later\n")),
+        "mesh-buffer-write" => one(app, "fn f(m: &mut M) {\n    m.indices.edit();\n}\n"),
         "named-enum" => one(
             app,
             "impl T {\n    fn parse(s: &str) -> Option<Self> {\n        None\n    }\n    \
