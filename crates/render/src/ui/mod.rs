@@ -48,9 +48,10 @@ pub(crate) mod world;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use crate::gpu::bind_layouts;
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _, Writes};
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
-use crate::gpu::{bind_layouts, ops::CountedDevice as _};
 use crate::GpuTexture;
 use rusty_asset::sidecar::FilterMode;
 use rusty_components::UiBlend;
@@ -102,7 +103,7 @@ impl UiRenderer {
     /// Load the UI shader and build the shared layout, sampler and white texture.
     pub(crate) fn new(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        writes: Writes,
         registry: &mut ShaderRegistry,
     ) -> Self {
         let shader = registry.load(device, "ui.wgsl", "UI Shader");
@@ -122,7 +123,7 @@ impl UiRenderer {
             lod_max_clamp: 0.0,
             ..Default::default()
         });
-        let white_view = white_texture(device, queue);
+        let white_view = white_texture(device, writes);
         let white = bind(device, &layout, &white_view, &sampler);
         let world = world::WorldUiPipeline::new(device, &shader, &[&layout, &batch_layout]);
         let shaders = custom::UiShaders::new(device, [&layout, &batch_layout, &world.layout]);
@@ -251,7 +252,7 @@ pub(crate) fn bind(
 }
 
 /// A 1×1 opaque white sRGB texture's view.
-fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::TextureView {
+fn white_texture(device: &wgpu::Device, (queue, staging): Writes) -> wgpu::TextureView {
     let size = wgpu::Extent3d {
         width: 1,
         height: 1,
@@ -267,7 +268,8 @@ fn white_texture(device: &wgpu::Device, queue: &wgpu::Queue) -> wgpu::TextureVie
         usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
         view_formats: &[],
     });
-    queue.write_texture(
+    queue.counted_write_texture(
+        staging,
         texture.as_image_copy(),
         &[255; 4],
         wgpu::TexelCopyBufferLayout {

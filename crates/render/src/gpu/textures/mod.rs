@@ -6,10 +6,9 @@ mod load;
 pub(crate) mod mips;
 mod panorama;
 mod sampler;
-pub(crate) mod staging;
 mod uncached;
 
-use crate::gpu::ops::CountedDevice as _;
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _, Writes};
 use crate::Renderer;
 pub(crate) use freshness::texture_written;
 pub(crate) use load::{decode, Decoded};
@@ -60,18 +59,18 @@ impl Renderer {
     /// repeating); 32-texel cells keep the checker's edges crisp under its linear
     /// magnification.
     pub(crate) fn create_default_checkerboard_texture(
-        (device, queue, mips): Uploader,
+        (device, writes, mips): Uploader,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
         let label = "Default Checkerboard Texture";
         let checker = checkerboard(256, 32);
         let texture = upload(
-            (device, queue),
+            (device, writes),
             label,
             &checker,
             (full_chain_len(256, 256), true),
         );
-        mips.generate(device, queue, &texture, TextureKind::Colour);
+        mips.generate(device, writes.0, &texture, TextureKind::Colour);
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -81,15 +80,15 @@ impl Renderer {
     /// checker, which marks a map that failed to load; with mips, so a far
     /// particle stays round.
     pub(crate) fn create_soft_disc_texture(
-        (device, queue, mips): Uploader,
+        (device, writes, mips): Uploader,
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
         let label = "Default Particle Texture";
         let side = SOFT_DISC_SIDE;
         let disc = soft_disc(side);
         let levels = (full_chain_len(side, side), true);
-        let texture = upload((device, queue), label, &disc, levels);
-        mips.generate(device, queue, &texture, TextureKind::Colour);
+        let texture = upload((device, writes), label, &disc, levels);
+        mips.generate(device, writes.0, &texture, TextureKind::Colour);
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -97,13 +96,12 @@ impl Renderer {
     /// A 1×1 white texture: what an effect with no texture of its own samples, so
     /// its colour is its tint alone (#441's ribbons).
     pub(crate) fn create_white_texture(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        (device, writes): (&wgpu::Device, Writes),
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
         let label = "White Texture";
         let white = image::RgbaImage::from_pixel(1, 1, image::Rgba([255; 4]));
-        let texture = upload((device, queue), label, &white, (1, true));
+        let texture = upload((device, writes), label, &white, (1, true));
         let sampler = default_sampler(device);
         Self::finalize_texture(device, layout, (texture, DATA_FORMAT), sampler, Some(label))
     }
@@ -162,16 +160,16 @@ fn default_sampler(device: &wgpu::Device) -> (wgpu::Sampler, FilterMode) {
     (sampler(device, &settings), settings.filter_mode)
 }
 
-/// What uploading an image with mips needs of the GPU: the device, the queue and
-/// the mip pass.
-pub(crate) type Uploader<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a MipGenerator);
+/// What uploading an image with mips needs of the GPU: the device, the queue with
+/// its staging and the mip pass.
+pub(crate) type Uploader<'a> = (&'a wgpu::Device, Writes<'a>, &'a MipGenerator);
 
 /// Create a texture of `levels` mips with `image` written to its base; the
 /// caller draws the rest ([`MipGenerator::generate`]). Stored sRGB when `srgb`,
 /// else linear (*sRGB* off, `texture_import::is_linear`); either way it can be
 /// viewed as the other.
 pub(super) fn upload(
-    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    (device, writes): (&wgpu::Device, Writes),
     label: &str,
     image: &image::RgbaImage,
     (levels, srgb): (u32, bool),
@@ -191,7 +189,7 @@ pub(super) fn upload(
             &[IMAGE_FORMAT]
         },
     });
-    write_base(queue, &texture, image, 4);
+    write_base(writes, &texture, image, 4);
     texture
 }
 
@@ -212,9 +210,10 @@ fn usage(levels: u32) -> wgpu::TextureUsages {
 }
 
 /// Write `bytes`, `texel` bytes a texel, to `texture`'s whole base level.
-fn write_base(queue: &wgpu::Queue, texture: &wgpu::Texture, bytes: &[u8], texel: u32) {
+fn write_base((queue, staging): Writes, texture: &wgpu::Texture, bytes: &[u8], texel: u32) {
     let size = texture.size();
-    queue.write_texture(
+    queue.counted_write_texture(
+        staging,
         wgpu::TexelCopyTextureInfo {
             texture,
             mip_level: 0,

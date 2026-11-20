@@ -10,6 +10,12 @@
 //! in the memory the process's footprint counts. They are read from the device
 //! (`rusty_render::gpu_memory`, 0 where a backend reports none) and taken off the
 //! growth, so what is asserted is what the load held beside them.
+//!
+//! So the tests bite only where the GPU copies are in resident memory, as on
+//! lavapipe (Linux CI, cloud sessions) and Apple silicon. On a discrete GPU the
+//! copies sit in VRAM yet are still taken off, so the allowance is wider than
+//! what staging could hold and the tests cannot fail there: the desktop's figure
+//! is `make bench-scenes`' `rss_peak_mb`, not these tests.
 
 use std::path::Path;
 
@@ -57,7 +63,7 @@ pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<Stri
 }
 
 /// What the device's live allocations hold now, after every queued upload ran.
-fn device_bytes(renderer: &Renderer) -> u64 {
+pub(super) fn device_bytes(renderer: &Renderer) -> u64 {
     renderer.queue.submit([]);
     let memory = gpu_memory(&renderer.device);
     // Metal's figure is allocated bytes already.
@@ -116,10 +122,11 @@ fn gpu_four_times_the_cached_textures_peak_higher_only_by_their_gpu_copies() {
         // each at most the budget plus the one upload that crossed it.
         let bound = 2 * (STAGING_BUDGET + four.1 / (4 * N as u64)) + MARGIN;
         println!(
-            "{N} then {}: peak {} then {} MB",
+            "{N} then {}: peak {} then {} MB, their GPU copies {} MB",
             4 * N,
             mb(one.0),
-            mb(four.0)
+            mb(four.0),
+            mb(four.1)
         );
         assert!(
             grew <= four.1 + bound,

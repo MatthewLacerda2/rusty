@@ -52,7 +52,7 @@ pub(crate) fn serves(tex: &GpuTexture, kind: TextureKind) -> bool {
 /// base, each 16-bit value turned straight into a half float; the caller draws
 /// the rest, as [`super::upload`]'s.
 pub(super) fn upload(
-    (device, queue): (&wgpu::Device, &wgpu::Queue),
+    (device, writes): (&wgpu::Device, crate::gpu::ops::Writes),
     label: &str,
     image: &ImageBuffer<Rgba<u16>, Vec<u16>>,
     levels: u32,
@@ -73,6 +73,6 @@ pub(super) fn upload(
         .iter()
         .flat_map(|&v| f32_to_f16(f32::from(v) / 65535.0).to_le_bytes())
         .collect();
-    super::write_base(queue, &texture, &bytes, 8);
+    super::write_base(writes, &texture, &bytes, 8);
     texture
 }

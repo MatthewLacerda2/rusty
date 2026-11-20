@@ -1,6 +1,7 @@
 //! Creating a lightmap page array and writing its levels (#438, #1694).
 
 use super::load::Loaded;
+use crate::gpu::ops::{CountedQueue as _, Writes};
 
 /// One uploaded page array.
 pub(crate) struct LightmapArray {
@@ -56,7 +57,11 @@ pub(crate) fn fits(
 }
 
 /// Upload `loaded` as a 2D texture array with its mip chain.
-pub(crate) fn upload(device: &wgpu::Device, queue: &wgpu::Queue, loaded: &Loaded) -> LightmapArray {
+pub(crate) fn upload(
+    device: &wgpu::Device,
+    (queue, staging): Writes,
+    loaded: &Loaded,
+) -> LightmapArray {
     let levels = loaded.layers[0].len() as u32;
     let array = create(
         device,
@@ -75,7 +80,8 @@ pub(crate) fn upload(device: &wgpu::Device, queue: &wgpu::Queue, loaded: &Loaded
                 depth_or_array_layers: 1,
                 ..level.physical_size(loaded.format)
             };
-            queue.write_texture(
+            queue.counted_write_texture(
+                staging,
                 wgpu::TexelCopyTextureInfo {
                     texture,
                     mip_level: mip as u32,
@@ -135,5 +141,28 @@ pub(crate) fn create(
         bytes: 0,
         texture,
         view,
+    }
+}
+
+impl crate::Renderer {
+    /// A test hook: upload `pages`, each one level of an `edge`² `Rgba16Float`
+    /// page, as a scene's lightmap array is uploaded, and return its texture and
+    /// the pages. The pages are the caller's, made before it measures and handed
+    /// back, so a memory test sees only what the upload holds
+    /// (`dev::memory`'s lightmap test).
+    #[doc(hidden)]
+    pub fn upload_lightmap_pages(
+        &self,
+        edge: u32,
+        pages: Vec<Vec<u8>>,
+    ) -> (wgpu::Texture, Vec<Vec<u8>>) {
+        let loaded = Loaded {
+            format: wgpu::TextureFormat::Rgba16Float,
+            edge,
+            layers: pages.into_iter().map(|page| vec![page]).collect(),
+        };
+        let writes = (&self.queue, &self.staging);
+        let texture = upload(&self.device, writes, &loaded).texture;
+        (texture, loaded.layers.into_iter().flatten().collect())
     }
 }

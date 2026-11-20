@@ -44,7 +44,8 @@ pub use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub use frustum::{transform_aabb, Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
-pub use gpu::textures::{staging::STAGING_BUDGET, GpuTexture};
+pub use gpu::ops::STAGING_BUDGET;
+pub use gpu::textures::GpuTexture;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
 pub use ibl::probe::bounce::{BakedDirect, BounceReport, CONVERGENCE_EPSILON, MAX_BOUNCES};
@@ -170,8 +171,8 @@ pub struct Renderer {
     pub(crate) texture_kinds: crate::gpu::textures::kind_watch::KindWatch,
     /// Which cached uploads went stale: re-written files and failed loads (#689).
     pub(crate) texture_freshness: rusty_core::fs::freshness::Freshness,
-    /// What texture uploads hold in staging, bounded (`gpu::textures::staging`).
-    pub(crate) texture_staging: gpu::textures::staging::Staging,
+    /// What texture writes hold in staging, bounded (`gpu::ops::Staging`).
+    pub(crate) staging: gpu::ops::Staging,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,

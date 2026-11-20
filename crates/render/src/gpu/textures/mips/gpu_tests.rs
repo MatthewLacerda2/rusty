@@ -99,10 +99,9 @@ fn level_one(renderer: &Renderer, kind: TextureKind, image: &image::RgbaImage) -
     let (device, queue) = (&renderer.device, &renderer.queue);
     let (w, h) = image.dimensions();
     let levels = super::full_chain_len(w, h);
-    let texture = super::super::upload((device, queue), "mip test", image, (levels, true));
-    renderer
-        .mip_generator
-        .generate(device, queue, &texture, kind);
+    let writes = (queue, &renderer.staging);
+    let texture = super::super::upload((device, writes), "mip", image, (levels, true));
+    (renderer.mip_generator).generate(device, queue, &texture, kind);
     let below = ((w / 2).max(1), (h / 2).max(1));
     readback::read_mip_rgba8(device, queue, (&texture, 1, 0), below)
 }

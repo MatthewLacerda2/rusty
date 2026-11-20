@@ -66,6 +66,8 @@ pub fn relieve() {
 mod decoded_gpu_tests;
 mod heap;
 #[cfg(test)]
+mod lightmaps_gpu_tests;
+#[cfg(test)]
 mod textures_gpu_tests;
 pub use heap::{heap, Heap};
 

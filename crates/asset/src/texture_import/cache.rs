@@ -59,26 +59,17 @@ const HEAD_LEN: usize = 4 + 8 + 1 + 4 * 3 + VARIANCE_LEVELS;
 /// what a refresh asks of every image on each Play.
 pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
     use std::io::{Read, Seek, SeekFrom};
-    let current = || -> Option<bool> {
+    let current = || -> Option<()> {
         let mut file = std::fs::File::open(path).ok()?;
+        let len = file.metadata().ok()?.len();
         let mut bytes = [0; HEAD_LEN];
         file.read_exact(&mut bytes).ok()?;
-        let (format, width, height, count, _) = head(&mut Reader(&bytes), stamp)?;
-        let mut at = HEAD_LEN as u64;
-        for mip in 0..count {
-            let mut len = [0; 4];
-            file.read_exact(&mut len).ok()?;
-            let side = |s: u32| (s >> mip).max(1);
-            let want = format.level_bytes(side(width), side(height));
-            if u32::from_le_bytes(len) as usize != want {
-                return None;
-            }
-            at += 4 + want as u64;
-            file.seek(SeekFrom::Start(at)).ok()?;
-        }
-        Some(file.metadata().ok()?.len() == at)
+        let head = head(&mut Reader(&bytes), stamp)?;
+        walk(&mut file, len, head, |file, want| {
+            file.seek(SeekFrom::Current(want as i64)).ok().map(drop)
+        })
     };
-    current() == Some(true)
+    current().is_some()
 }
 
 /// The texture cached at `path`, when it was made with `stamp`. Each level is
@@ -87,33 +78,51 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
 pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;
-    let mut left = file.metadata().ok()?.len().checked_sub(HEAD_LEN as u64)?;
+    let len = file.metadata().ok()?.len();
     let mut file = std::io::BufReader::new(file);
     let mut bytes = [0; HEAD_LEN];
     file.read_exact(&mut bytes).ok()?;
-    let (format, width, height, count, variance) = head(&mut Reader(&bytes), stamp)?;
+    let head = head(&mut Reader(&bytes), stamp)?;
+    let (format, width, height, count, variance) = head;
     let mut levels = Vec::with_capacity(count as usize);
-    for mip in 0..count {
-        let mut len = [0; 4];
-        file.read_exact(&mut len).ok()?;
-        let side = |s: u32| (s >> mip).max(1);
-        let want = format.level_bytes(side(width), side(height));
-        left = left.checked_sub(4 + want as u64)?;
-        if u32::from_le_bytes(len) as usize != want {
-            return None;
-        }
+    walk(&mut file, len, head, |file, want| {
         let mut level = vec![0; want];
         file.read_exact(&mut level).ok()?;
         levels.push(level);
-    }
-    // Nothing may follow the last level.
-    (left == 0).then_some(Compressed {
+        Some(())
+    })?;
+    Some(Compressed {
         format,
         width,
         height,
         levels,
         variance,
     })
+}
+
+/// Walk the levels after `head` in `file`, `len` bytes in all: check each one's
+/// length against the size `head` gives it and that the file still holds it,
+/// then hand its `want` bytes to `level`, which reads or skips them. `None` when a
+/// length is wrong, the file is short, or anything follows the last level.
+fn walk<F: std::io::Read>(
+    file: &mut F,
+    len: u64,
+    (format, width, height, count, _): Head,
+    mut level: impl FnMut(&mut F, usize) -> Option<()>,
+) -> Option<()> {
+    let mut left = len.checked_sub(HEAD_LEN as u64)?;
+    for mip in 0..count {
+        let mut bytes = [0; 4];
+        file.read_exact(&mut bytes).ok()?;
+        let side = |s: u32| (s >> mip).max(1);
+        let want = format.level_bytes(side(width), side(height));
+        left = left.checked_sub(4 + want as u64)?;
+        if u32::from_le_bytes(bytes) as usize != want {
+            return None;
+        }
+        level(file, want)?;
+    }
+    (left == 0).then_some(())
 }
 
 /// Cache `texture` at `path` under `stamp`, atomically, so a reader in another
@@ -141,7 +150,9 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
 
 /// A test hook (#2372): cache the image at `source` as an import with `settings`
 /// would, stamped the same, but with every block zero and nothing encoded: a
-/// memory test's fixture, whose peak an encode's would hide.
+/// memory test's fixture, whose peak an encode's would hide. `Err` where an import
+/// would make no cache (compression off, a side not a multiple of 4), so a
+/// fixture never measures the decode path thinking it cached.
 #[doc(hidden)]
 pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
     let Seen::Read(digest) = source_digest(source) else {
@@ -149,6 +160,12 @@ pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), Stri
     };
     let format = super::format_of(settings).ok_or("compression is off")?;
     let (_, (width, height)) = super::imported_size(source, settings).ok_or("no size")?;
+    if width % 4 != 0 || height % 4 != 0 {
+        // The encoder leaves such a size uncompressed, and the cache refuses it.
+        return Err(format!(
+            "{width}x{height} is not a multiple of 4: never compressed"
+        ));
+    }
     let count = match settings.generate_mipmaps {
         true => full_chain_len(width, height),
         false => 1,

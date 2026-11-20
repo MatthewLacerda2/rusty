@@ -161,6 +161,7 @@ impl Renderer {
             grade_bake,
             post_passes,
             quality,
+            staging,
         } = gpu;
         let draw_buffers =
             crate::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);
@@ -248,7 +249,7 @@ impl Renderer {
             texture_fallbacks: HashMap::new(),
             texture_kinds: Default::default(),
             texture_freshness: rusty_core::fs::freshness::Freshness::new(),
-            texture_staging: Default::default(),
+            staging,
             grid_vertex_buffer: None,
             grid_count: 0,
             axis_x_buffer: None,

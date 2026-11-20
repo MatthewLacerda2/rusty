@@ -33,15 +33,18 @@ fn gpu_a_list_the_warm_up_lands_is_bound_by_the_next_frame() {
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };
-    let (device, queue) = (&renderer.device, &renderer.queue);
+    let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let mut maps = Lightmaps::new(device, false);
     let level = list("retry.png", 2);
     // A retry of the level whose pages are still being read: the warm-up lands them.
-    maps.bind(device, queue, &level, &[], &[]);
-    until(|| maps.warm(device, queue, [&level, &[], &[]]));
-    assert!(maps.bind(device, queue, &level, &[], &[]), "rebinds");
+    maps.bind(device, writes, &level, &[], &[]);
+    until(|| maps.warm(device, writes, [&level, &[], &[]]));
+    assert!(maps.bind(device, writes, &level, &[], &[]), "rebinds");
     assert!(maps.resident(), "the level is lit");
-    assert!(!maps.bind(device, queue, &level, &[], &[]), "and only once");
+    assert!(
+        !maps.bind(device, writes, &level, &[], &[]),
+        "and only once"
+    );
 }
 
 #[test]
@@ -49,22 +52,22 @@ fn gpu_a_warm_up_and_the_drawing_scene_never_take_each_others_landing() {
     let Some(renderer) = headless_or_skip(4, 4) else {
         return;
     };
-    let (device, queue) = (&renderer.device, &renderer.queue);
+    let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let mut maps = Lightmaps::new(device, false);
     let (splash, next) = (list("splash.png", 2), list("next.png", 4));
-    maps.bind(device, queue, &splash, &[], &[]);
+    maps.bind(device, writes, &splash, &[], &[]);
     // The splash's `Start` loads the next level: its warm-up runs beside its frames.
     let mut warmed = Uploads::default();
     let mut framed = Uploads::default();
     until(|| {
-        let ready = maps.warm(device, queue, [&next, &[], &[]]);
+        let ready = maps.warm(device, writes, [&next, &[], &[]]);
         warmed.add_all(std::mem::take(&mut maps.uploads));
-        maps.bind(device, queue, &splash, &[], &[]);
+        maps.bind(device, writes, &splash, &[], &[]);
         framed.add_all(std::mem::take(&mut maps.uploads));
         ready
     });
     until(|| {
-        maps.bind(device, queue, &splash, &[], &[]);
+        maps.bind(device, writes, &splash, &[], &[]);
         framed.add_all(std::mem::take(&mut maps.uploads));
         maps.resident()
     });
@@ -75,7 +78,7 @@ fn gpu_a_warm_up_and_the_drawing_scene_never_take_each_others_landing() {
     );
     assert_eq!((warmed.count, framed.count), (1, 1), "each counts its own");
     assert!(
-        maps.bind(device, queue, &next, &[], &[]),
+        maps.bind(device, writes, &next, &[], &[]),
         "the level swaps in"
     );
     assert_eq!(maps.bound_edge(), Some(4), "warm: bound on its first frame");
