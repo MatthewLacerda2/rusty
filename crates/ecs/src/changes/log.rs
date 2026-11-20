@@ -30,10 +30,15 @@ pub(super) struct Log {
     /// Entries ever appended: a repeat no cursor has read past is not one, so with a
     /// reader every tick its growth per tick is the distinct ids dirtied in it.
     pub logged: u64,
-    /// Whether whole-entity writes (place, overwrite, remove) stamp this channel:
-    /// true for a component column, false for a derived channel stamped by hand.
-    pub column: bool,
+    /// For a component column, whether an entity's row carries it: a whole-entity
+    /// write (place, overwrite, remove) stamps the columns the row carries
+    /// (`stamp.rs`). `None` for a derived channel, stamped by hand.
+    pub carried: Option<Carried>,
 }
+
+/// Whether a hecs row carries a column: `EntityRef::has`, one lookup in the row's
+/// archetype.
+pub(super) type Carried = fn(&hecs::EntityRef<'_>) -> bool;
 
 /// The most entries a log keeps when `live` entities exist: four stamps of every
 /// live entity, so a consumer reading once a tick never falls behind a tick that
@@ -43,9 +48,9 @@ pub(super) fn cap(live: usize) -> usize {
 }
 
 impl Log {
-    pub fn new(column: bool) -> Self {
+    pub fn new(carried: Option<Carried>) -> Self {
         Self {
-            column,
+            carried,
             ..Self::default()
         }
     }

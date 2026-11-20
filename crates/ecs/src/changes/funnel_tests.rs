@@ -67,12 +67,13 @@ fn the_despawn_walk_names_only_the_columns_each_holder_has() {
     w.set_component(full, Some(joint));
     let mut joints = w.change_cursor::<JointComponent>();
     let mut lods = w.change_cursor::<LodGroupComponent>();
-    w.despawn(plain); // `forget_in(full)` borrows every reference column `full` might hold
-    assert_eq!(w.changes(&mut joints), Changes::Ids(vec![plain, full]));
-    let only_the_removal = Changes::Ids(vec![plain]);
+    // `forget_in(full)` borrows every reference column `full` might hold; `plain`'s
+    // removal stamps only the columns it had: neither a Joint nor a LOD group.
+    w.despawn(plain);
+    assert_eq!(w.changes(&mut joints), Changes::Ids(vec![full]));
     assert_eq!(
         w.changes(&mut lods),
-        only_the_removal,
-        "{full} has no LOD group"
+        Changes::Ids(vec![]),
+        "neither has a LOD group"
     );
 }

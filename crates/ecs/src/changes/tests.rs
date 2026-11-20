@@ -46,20 +46,6 @@ fn cursors_on_one_channel_read_at_their_own_pace() {
 }
 
 #[test]
-fn whole_entity_writes_stamp_every_column_channel() {
-    let (mut w, ids) = world_of(2);
-    let mut joints = w.change_cursor::<JointComponent>();
-    let born = w.spawn("born".into());
-    w.despawn(ids[0]);
-    let doc = w.entity_document(ids[1]).expect("live");
-    w.replace_entity(doc);
-    assert_eq!(
-        w.changes(&mut joints),
-        Changes::Ids(vec![ids[0], ids[1], born])
-    );
-}
-
-#[test]
 fn a_cleared_world_an_undo_step_and_another_world_read_rebuild() {
     let (mut w, _) = world_of(2);
     let mut cursor = w.change_cursor::<TransformComponent>();
