@@ -94,7 +94,7 @@ class FakeMachine(reclaim.Machine):
             out = f"{MAIN}/.git"
         elif argv[3:5] == ["worktree", "list"]:
             out = PORCELAIN
-        elif argv[3:5] == ["status", "--porcelain"]:
+        elif argv[3:6] == ["--no-optional-locks", "status", "--porcelain"]:
             out = " M src/lib.rs" if argv[2].endswith("dirty") else ""
         elif "--is-ancestor" in argv:
             code = 0  # every detached HEAD here is on origin/main
@@ -113,6 +113,9 @@ class FakeMachine(reclaim.Machine):
 
     def target_size(self, wt):
         return 3 * 2**30
+
+    def drop_target(self, wt):
+        self.calls.append(["drop", wt.name])
 
     def remove(self, main, wt):
         self.removed.append(wt.name)

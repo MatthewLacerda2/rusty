@@ -1106,8 +1106,10 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   Player stands 3 m in from its spawn, so the camera looks down the whole yard.
 - **the run** — 60 warm-up frames, then 600 measured ones, each stepped and rendered
   at 1280x720 (`Harness.LoadStress{…}` then `Harness.Bench(600)`).
-- **the report** — per row the average and p95: `frame_ms` (the sim's CPU time as
-  measured), `cpu_ms` (the same at a fixed reference CPU clock, below) and
+- **the report** — per row the average and p95: `frame_ms` (the CPU time of the
+  tick, `GameWorld::tick`, as measured, from after its play transition, so
+  entering Play, a load, is in no tick's time: the schedule and the tick's own work
+  around it), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
   frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below; `gpu_ms` is the passes' sum, busy time only,
@@ -1126,8 +1128,15 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   render-CPU fix whose timing moves inside the spread proves itself by these); then
   where the CPU time went, by name:
   `cpu.<system>` for every system the schedule runs, named as it registers them
-  (`update_scripts`, `step_physics`, … at the reference CPU clock, summing to
-  `cpu_ms`), and `render.<stage>` for every stage of the renderer's frame, summing
+  (`update_scripts`, `step_physics`, … at the reference CPU clock), with
+  `cpu.flush_bounds` (the collider-AABB flush after each stage, summed over the
+  stages) and `cpu.other` (the tick's work outside every system: publishing
+  input and finished async loads, the UI textures' sizes, the camera, shader-time
+  and audio sync, an async load's start, timer overhead), together summing to
+  `cpu_ms`; beside them, in no sum, `taps_ms` (the demo recorder's taps, `make
+  bench` only: `bench-scenes` records no demo), since `frame_ms` and `cpu_ms`
+  time only what a shipped, windowed game does on its tick (`docs/api/Debug.md`,
+  `frame_ms`); and `render.<stage>` for every stage of the renderer's frame, summing
   to `renderer_ms`: `setup`, `assets`, `prepare`, `extract` (the retained scene's
   update), `shadows` and `shadow_gather` (the sweeps' caster gather, cull and
   batch, a lap of its own, so absent from a frame no shadow sweep ran), `render_textures`, `ui` (its layout and its draw),
@@ -1139,8 +1148,14 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   land in `scene`, `solids` and the other pass rows, beside the screen cameras'.
   Last, `finish` (the
   frame's counters and its GPU timestamps' resolve). Each set ends with an `other`
-  row, what no part held: timer overhead, a few microseconds; a stage left
-  untimed would show there. The stages are timed only on frames the dev layer
+  row, what no part held: for `render.` and `gpu.` timer overhead, a few
+  microseconds, where a stage left untimed would show; for `cpu.` the tick's own
+  work above. A report from before `frame_ms` timed the whole tick (#2342) has
+  no `cpu.flush_bounds` and a `cpu.other` of zero, and its `cpu_ms` and
+  `frame_ms` are the systems' sum, lower by what those two rows now hold: compare
+  its `cpu.<system>` rows with today's, and its `cpu_ms` with today's less
+  `cpu.flush_bounds` and `cpu.other`; both `make bench` and `make bench-scenes`
+  warn when the kept run they compare with is such a report. The stages are timed only on frames the dev layer
   captures (`Renderer::time_stages`): the window, the editor and the player never
   pay for them. Every GPU pass prints every run (0 when it did not run), so the
   rows are stable. **The Hi-Z stage is also split into its parts** (#2401), on
@@ -1327,7 +1342,7 @@ every binary's open makes them.
   probes placed whose SH never loaded, or reflection probes placed with no cube on
   disk (what a scene does not place is not missing). Its
   lighting cost is then not the shipped one. The run ends with a summary table of
-  one line per scene: `cpu_ms` (the sim at the reference CPU clock), `frame_ms`,
+  one line per scene: `cpu_ms` (the tick at the reference CPU clock), `frame_ms`,
   `gpu_ms`, `load_ms`, `rss_peak_mb`, `gpu_mb`, and the run's `import_ms` under
   it when asked for.
 - **a fixed baseline**: `BEFORE=<dir>` compares with the kept report in `<dir>`
@@ -1459,7 +1474,12 @@ warm between runs (reclaim keeps it by name: its cold build is most of a run's
 wait; `git worktree remove` it by hand for the disk); `pr-<n>-head` is put back at
 the PR's head after the run, and `make reclaim` judges it by the PR in its name,
 removing it once that PR is merged or closed, even when a power cut left it at the
-run's local merge commit.
+run's local merge commit. **Before building, the run checks the disk**: when the
+filesystem holding `.claude/worktrees/` has less free than the two release builds
+still need (a tree's warm `target/release` counts as built) plus some headroom, it
+refuses, naming the free space, the need, `make reclaim` and the trees whose
+`target/` holds the most; `FORCE=1` does not run past it. How much is free is the
+machine's: check it (`df -h`).
 
 **Why three legs.** Not every row repeats. On a desktop the GPU rows, the memory
 rows and the op counters repeat to under 1% between two takes of one binary; the
@@ -1526,8 +1546,15 @@ missing bake, textures drawn uncompressed, console errors), each once, a warning
 not every leg wrote marked with the legs that did: the table is what gets read, so
 a scene benched without its bake says so there, not only in a leg's output. `make test-gpu PR=<n> [FILTER='<nextest filter>']` runs GPU tests on a
 PR's head in the same `pr-<n>-head` tree, but as pushed: no `main` merged in, no
-timed-run lock and none of the refusals above. It only refuses a tree a live
-`make bench-ab` run holds, whose sources it would otherwise swap mid-build.
+timed-run lock and none of the refusals above. It refuses a tree a live
+`make bench-ab` run holds, whose sources it would otherwise swap mid-build, and a
+disk without room for the `dev` test build, the largest build a tree takes (the
+same check and refusal as `make bench-ab`'s). **A green run then deletes that
+tree's `target/debug`**, so each PR measured does not keep its test build; a red
+run keeps it warm for the fix's re-run, and the bench's `target/release` stays.
+`make reclaim` works on a full disk: it judges without a git write, deletes the
+build output of the trees it removes before any git command that writes, and says a
+git write refused for lack of space as a full disk, naming the largest trees.
 
 ### GPU time and the GPU clock (#862)
 A laptop GPU does not run at one speed. On Apple silicon the governor re-picks the

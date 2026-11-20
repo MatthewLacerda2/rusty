@@ -52,8 +52,7 @@ fn gpu_hiz_dust2_counts() {
         let by_cluster = view.hiz.cameras[0].clusters.ran > 0;
         let skip = if by_cluster { statue } else { 0 };
         let with = triangles(&r, &view, skip) + cluster_indices(&r, &view) / 3;
-        let copies = copy_groups(&r, &view);
-        let (rows, pairs) = view.hiz.cameras[0].clusters.rows_and_pairs;
+        let (dispatches, chunks) = dispatches(&view);
         r.quality.gpu_cluster_culling = false;
         let mut fresh = offscreen(&r);
         shot(&mut r, &mut fresh, &scene, &cam);
@@ -62,7 +61,7 @@ fn gpu_hiz_dust2_counts() {
         r.quality.gpu_cluster_culling = true;
         let same = ["PIXELS DIFFER", "same pixels"][usize::from(on == off)];
         println!(
-            "{name}: {with} triangles drawn with clusters, {without} without ({} clusters tested, {} culled, {copies} copy workgroups, {rows} rows started for {pairs} pairs), {same}",
+            "{name}: {with} triangles drawn with clusters, {without} without ({} clusters tested, {} culled, {dispatches} dispatches over {chunks} chunks), {same}",
             c.cluster_tested, c.cluster_culled
         );
         assert!(on == off, "{name}: cluster culling moved pixels");
@@ -134,11 +133,9 @@ fn triangles(r: &Renderer, view: &RenderView, clustered: u32) -> u32 {
         .sum()
 }
 
-/// Workgroups the base camera's last cluster copy started: each group's
-/// indirect dispatch (#2406), one per (instance, cluster) before it.
-fn copy_groups(r: &Renderer, view: &RenderView) -> u32 {
+/// The base camera's last cluster cull's dispatches (one a stage, #2417) and
+/// the chunks its test and copy ran over.
+fn dispatches(view: &RenderView) -> (usize, u32) {
     let cull = &view.hiz.cameras[0].clusters;
-    let tally = words(r, cull.tally());
-    let runs = tally[1..].chunks_exact(3).take(cull.groups_ran as usize);
-    runs.map(|x| x[0] * x[1] * x[2]).sum()
+    (cull.dispatched.borrow().len(), cull.chunks_ran)
 }

@@ -80,7 +80,7 @@ pub const LAYERS: &[Layer] = &[
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
     sim("components", &["asset", "core", "procgen"]).uses(&["bytemuck"]),
-    sim("ecs", &["components"]).uses(&["hecs"]),
+    sim("ecs", &["components", "core"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
     sim("audio", &["asset", "components", "core"]).uses(&["kira"]),
     sim("scene", &["asset", "components", "core", "ecs"]),

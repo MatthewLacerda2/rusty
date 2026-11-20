@@ -1,19 +1,19 @@
 // Per-cluster occlusion culling (#1968): the culling half of UE5's Nanite. A mesh
 // split into clusters at import (`asset::clusters`) is drawn, per instance, as the
 // clusters this camera may see, with no mesh shaders. `render::passes::hiz`
-// dispatches it per group (the clustered batches of one mesh and cluster
-// count), stage by stage, after `cs_test` has its instances' verdicts against
-// this frame's pyramid:
-//   1. `cs_cluster_test`: each (instance, cluster) is kept unless its instance is
-//      hidden, or it is outside the frustum, faces wholly away (its normal cone),
-//      or is behind the pyramid (`hidden`). One crossing the near plane is kept;
-//   2. `cs_cluster_scan`: a workgroup per instance gives its kept clusters, in
+// dispatches each stage once for the whole frame (#2417): every clustered mesh's
+// table and indices are in one pool (group 1), so one dispatch reaches every
+// job. After `cs_test` has its instances' verdicts against this frame's pyramid:
+//   1. `cs_cluster_test`, a workgroup per chunk (64 clusters of one job): each
+//      (instance, cluster) is kept unless its instance is hidden, or it is
+//      outside the frustum, faces wholly away (its normal cone), or is behind
+//      the pyramid (`hidden`). One crossing the near plane is kept;
+//   2. `cs_cluster_scan`, a workgroup per job: gives its kept clusters, in
 //      order, their place in the output index list by a parallel prefix sum,
-//      lists them, and writes the instance's indirect draw and how many
-//      clusters the copy dispatches per instance (the most any one kept);
-//   3. `cs_cluster_copy`, dispatched indirect from that: a workgroup per kept
-//      cluster of each instance copies its indices there. No workgroup starts
-//      for a culled cluster but an instance's beyond its own count.
+//      lists them, and writes the instance's indirect draw;
+//   3. `cs_cluster_copy`, a workgroup per chunk again: copies the kept clusters
+//      listed in its 64 places of the job's list, returning at once when the
+//      job kept fewer than its first.
 // The output keeps the clusters' order, which is the mesh's own reordered index
 // order, so a frame that culls nothing draws exactly the uncull triangles, and
 // every place is a prefix sum: two frames of one view write one index stream.
@@ -29,6 +29,9 @@ struct Params {
     levels: u32,
     // `ObjectData`'s size in `vec4`s: the world matrix is the first four.
     object_stride: u32,
+    // The frame's jobs and chunks: the scan's and the other two's workgroups.
+    jobs: u32,
+    chunks: u32,
 };
 
 // One instance of a clustered batch.
@@ -38,30 +41,19 @@ struct Job {
     instance: u32,
     object: u32,
     tested: u32,
-    // Where its output indices start, its first cluster in the mesh's table,
+    // Where its output indices start, its first cluster in the shared table,
     // its first state word (its region: `1 + 2 * clusters` words), and 1 when
     // its batch keeps front faces only.
     out_first: u32,
     cluster_first: u32,
     state_first: u32,
     cone: u32,
-    // Its batch's clusters: its group's dispatch covers `run.clusters`, the most
-    // of any job in it, and a job skips the clusters past its own (the plan
-    // bounds that padding, `plan::MAX_PADDING`).
+    // Its batch's clusters.
     clusters: u32,
 };
 
-// The group a dispatch covers: its jobs, the most clusters any of them has, and
-// the word of `tally` its copy's indirect dispatch starts at.
-struct Run {
-    job_first: u32,
-    jobs: u32,
-    clusters: u32,
-    copy_at: u32,
-};
-
-// A cluster, local space: `min.w` and `max.w` are its first index and index
-// count (as bits); the cone's apex and cutoff, then its axis.
+// A cluster, local space: `min.w` and `max.w` are its first index in the pool
+// and its index count (as bits); the cone's apex and cutoff, then its axis.
 struct Cluster {
     min: vec4<f32>,
     max: vec4<f32>,
@@ -79,18 +71,24 @@ struct Cluster {
 // at `1 + 2k`; the scan lists its `m`-th kept cluster at `1 + 2m` (which) and
 // `2 + 2m` (its output offset), over verdicts it has already read.
 @group(0) @binding(4) var<storage, read_write> state: array<u32>;
-// Word 0: the tested clusters kept, for `Debug.Stats`; then per group, at its
-// `run.copy_at`, the copy's indirect dispatch (most kept clusters, jobs, 1).
-@group(0) @binding(5) var<storage, read_write> tally: array<atomic<u32>>;
+// The tested clusters kept, for `Debug.Stats`.
+@group(0) @binding(5) var<storage, read_write> tally: atomic<u32>;
 // One `DrawIndexedIndirectArgs` (five words) per job.
 @group(0) @binding(6) var<storage, read_write> out_args: array<u32>;
 @group(0) @binding(7) var pyramid: texture_2d<f32>;
-@group(0) @binding(8) var<uniform> run: Run;
-// The copy's own group 0 binds this beside `jobs`, `state` and `run`, and not
-// `tally`, which its dispatch reads as indirect args.
 @group(0) @binding(9) var<storage, read_write> out_indices: array<u32>;
+// Per chunk: its job and the job's first cluster it covers. Each stage's own
+// group 0 binds only what it reads (`clusters::layout`).
+@group(0) @binding(10) var<storage, read> chunks: array<vec2<u32>>;
+// The pool: every clustered mesh's rows, and a copy of its indices.
 @group(1) @binding(0) var<storage, read> clusters: array<Cluster>;
 @group(1) @binding(1) var<storage, read> mesh_indices: array<u32>;
+
+// A workgroup's place in a dispatch that may take a second dimension past
+// 65,535 workgroups (`clusters::record::workgroups`).
+fn flat(group: vec3<u32>, groups: vec3<u32>) -> u32 {
+    return group.y * groups.x + group.x;
+}
 
 // How far past its cutoff a cone must face away before it is culled.
 const CONE_MARGIN: f32 = 1e-3;
@@ -157,16 +155,22 @@ fn culled(c: Cluster, world: mat4x4<f32>, cone: bool) -> bool {
 
 var<workgroup> kept_here: atomic<u32>;
 
+// A workgroup per chunk, a lane per cluster of it.
 @compute @workgroup_size(64)
 fn cs_cluster_test(
-    @builtin(global_invocation_id) id: vec3<u32>,
+    @builtin(workgroup_id) group: vec3<u32>,
+    @builtin(num_workgroups) groups: vec3<u32>,
     @builtin(local_invocation_index) lane: u32,
 ) {
-    let t = id.x;
-    let job = jobs[run.job_first + min(t / run.clusters, run.jobs - 1u)];
-    let k = t % run.clusters;
-    // Past the group's pairs, or past the job's own clusters: nothing to judge.
-    if t < run.jobs * run.clusters && k < job.clusters {
+    let w = flat(group, groups);
+    // The last row's overhang: the whole workgroup leaves, before any barrier.
+    if w >= params.chunks {
+        return;
+    }
+    let chunk = chunks[w];
+    let job = jobs[chunk.x];
+    let k = chunk.y + lane;
+    if k < job.clusters {
         var keep = true;
         if job.tested != 0u {
             let c = clusters[job.cluster_first + k];
@@ -182,7 +186,7 @@ fn cs_cluster_test(
     if lane == 0u {
         let n = atomicLoad(&kept_here);
         if n > 0u {
-            atomicAdd(&tally[0], n);
+            atomicAdd(&tally, n);
         }
     }
 }
@@ -192,14 +196,18 @@ const CHUNK: u32 = 256u;
 // Per lane: its four clusters' (kept, indices) totals, then their running sum.
 var<workgroup> sums: array<vec2<u32>, 64>;
 
-// Dispatched (jobs, 1, 1): one workgroup an instance, its clusters a chunk at a
-// time, each chunk's places an inclusive scan over the lanes' totals.
+// One workgroup a job, its clusters 256 at a time, each such run's places an
+// inclusive scan over the lanes' totals.
 @compute @workgroup_size(64)
 fn cs_cluster_scan(
     @builtin(workgroup_id) group: vec3<u32>,
+    @builtin(num_workgroups) groups: vec3<u32>,
     @builtin(local_invocation_index) lane: u32,
 ) {
-    let j = run.job_first + group.x;
+    let j = flat(group, groups);
+    if j >= params.jobs {
+        return;
+    }
     let job = jobs[j];
     let base = job.state_first;
     // Kept clusters and their indices before this chunk.
@@ -248,28 +256,34 @@ fn cs_cluster_scan(
         out_args[args + 2u] = job.out_first;
         out_args[args + 3u] = 0u;
         out_args[args + 4u] = job.instance;
-        atomicMax(&tally[run.copy_at], before.x);
     }
 }
 
-// Dispatched indirect (the most kept clusters of an instance, jobs, 1): a
-// workgroup per kept cluster, its lanes over the cluster's indices.
+// A workgroup per chunk: the job's kept clusters listed at the chunk's 64
+// places (from its first cluster), each copied by all 64 lanes. A chunk past
+// what its job kept returns at once.
 @compute @workgroup_size(64)
 fn cs_cluster_copy(
     @builtin(workgroup_id) group: vec3<u32>,
+    @builtin(num_workgroups) groups: vec3<u32>,
     @builtin(local_invocation_index) lane: u32,
 ) {
-    let job = jobs[run.job_first + group.y];
-    let base = job.state_first;
-    if group.x >= state[base] {
+    let w = flat(group, groups);
+    if w >= params.chunks {
         return;
     }
-    let k = state[base + 1u + 2u * group.x];
-    let at = state[base + 2u + 2u * group.x];
-    let c = clusters[job.cluster_first + k];
-    let first = bitcast<u32>(c.min.w);
-    let count = bitcast<u32>(c.max.w);
-    for (var i = lane; i < count; i += 64u) {
-        out_indices[at + i] = mesh_indices[first + i];
+    let chunk = chunks[w];
+    let job = jobs[chunk.x];
+    let base = job.state_first;
+    let end = min(chunk.y + 64u, state[base]);
+    for (var m = chunk.y; m < end; m++) {
+        let k = state[base + 1u + 2u * m];
+        let at = state[base + 2u + 2u * m];
+        let c = clusters[job.cluster_first + k];
+        let first = bitcast<u32>(c.min.w);
+        let count = bitcast<u32>(c.max.w);
+        for (var i = lane; i < count; i += 64u) {
+            out_indices[at + i] = mesh_indices[first + i];
+        }
     }
 }
