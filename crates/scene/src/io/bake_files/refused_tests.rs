@@ -19,7 +19,7 @@ fn file(name: &str, bytes: &[u8]) -> PathBuf {
 fn a_refused_file_is_removed_while_it_is_still_that_file() {
     let path = file("refused.occlusion", b"trunc");
     let files = BakeFiles::default();
-    files.refused(&path, b"trunc");
+    files.refused(&path, b"trunc", "test");
     let saved = files.store(&path, None, "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Removed, None));
     assert!(!path.exists());
@@ -29,7 +29,7 @@ fn a_refused_file_is_removed_while_it_is_still_that_file() {
 fn a_valid_file_baked_over_a_refused_one_is_kept_without_a_false_overwrite() {
     let path = file("refused_then_baked.occlusion", b"trunc");
     let files = BakeFiles::default();
-    files.refused(&path, b"trunc");
+    files.refused(&path, b"trunc", "test");
     // Another process bakes a valid PVS there.
     std::fs::write(&path, b"a valid bake").unwrap();
     let saved = files.store(&path, None, "T").unwrap();
@@ -86,4 +86,38 @@ fn pathdiff(path: &Path, base: &Path) -> PathBuf {
     let shared = p.iter().zip(&b).take_while(|(x, y)| x == y).count();
     let ups = (shared..b.len()).map(|_| std::path::Component::ParentDir);
     ups.chain(p[shared..].iter().copied()).collect()
+}
+
+#[test]
+fn a_file_not_used_says_why_until_the_path_is_read_again() {
+    let (path, fine) = (
+        file("listed.occlusion", b"trunc"),
+        file("fine.navmesh", b"ok"),
+    );
+    let files = BakeFiles::default();
+    files.loaded(&fine, Some(b"ok"), Some(b"ok"));
+    files.refused(&path, b"trunc", "occluder flag 30");
+    assert_eq!(files.not_used(&fine), None, "a file read and kept was used");
+    let why = files.not_used(&path);
+    assert_eq!(why.as_deref(), Some("refused (occluder flag 30)"));
+    files.loaded(&path, Some(b"good"), Some(b"good"));
+    assert_eq!(files.not_used(&path), None, "read afresh: used");
+    files.unreadable(&path, "permission denied");
+    let why = files.not_used(&path);
+    assert_eq!(
+        why.as_deref(),
+        Some("could not be read (permission denied)")
+    );
+}
+
+#[test]
+fn a_bake_or_a_copy_carries_no_reason_a_file_was_not_used() {
+    let path = file("baked_over.occlusion", b"trunc");
+    let files = BakeFiles::default();
+    files.refused(&path, b"trunc", "truncated");
+    let to = file("copied.occlusion", b"trunc");
+    files.copied(&path, &to);
+    assert_eq!(files.not_used(&to), None, "the copy was never read");
+    files.baked(".occlusion");
+    assert_eq!(files.not_used(&path), None, "this world's bake replaces it");
 }

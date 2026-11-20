@@ -243,6 +243,16 @@ pub use crate::gpu::ops::OpCounts;
 pub use memory::{gpu_memory, GpuMemory};
 pub use uploads::Uploads;
 
+/// A scene's baked PVS older than its statics at the last extract
+/// (`Renderer::stale_occlusion`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StaleOcclusion {
+    /// Baked meshes that changed since the bake: always drawn.
+    pub changed: usize,
+    /// Of them, occluders: while any is, nothing is occlusion-culled.
+    pub occluders: usize,
+}
+
 #[cfg(test)]
 use frame::{count_lights, draws_of};
 

@@ -9,7 +9,7 @@ mod bake {
         _: &mut crate::EditorUi,
         _: &mut rusty_scene::Scene,
         _: &mut rusty_script::scripting::ConsoleLogs,
-        _: &str,
+        _: (&str, &rusty_navigation::NavigationGraph),
     ) {
     }
 }
@@ -50,7 +50,7 @@ pub fn draw(
     #[cfg(feature = "dev")]
     draw_bake_navigation(ui, editor, scene, console, nav, path);
     reflections::draw(ui, editor, scene);
-    bake::draw(ui, editor, scene, console, path);
+    bake::draw(ui, editor, scene, console, (path, &*nav));
 }
 
 /// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
