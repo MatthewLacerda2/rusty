@@ -73,6 +73,8 @@ pub struct Rig {
     pub camera: Option<Camera>,
     /// How far the nearest wall is along every ray.
     pub wall: f32,
+    /// How many times the event system has asked for the wall along a ray.
+    pub wall_casts: u32,
 }
 
 impl Rig {
@@ -84,6 +86,7 @@ impl Rig {
             handlers,
             camera: None,
             wall: f32::INFINITY,
+            wall_casts: 0,
         }
     }
 
@@ -103,16 +106,23 @@ impl Rig {
         let handlers = &self.handlers.0;
         let handles = |id: u32, hook: UiHook| handlers.contains(&(id, hook));
         let wall = self.wall;
+        let casts = std::cell::Cell::new(0);
+        let walls = |_, _| {
+            casts.set(casts.get() + 1);
+            wall
+        };
         let frame = Frame {
             world: &self.scene.world,
             layout: &layout,
             input: &self.input,
             view: &view,
-            walls: &|_, _| wall,
+            walls: &walls,
             handles: &handles,
             dt: rusty_time::FIXED_DELTA_TIME,
         };
-        self.events.process(&frame)
+        let out = self.events.process(&frame);
+        self.wall_casts += casts.get();
+        out
     }
 
     /// [`Rig::tick`], reduced to `(entity, hook)` pairs.
