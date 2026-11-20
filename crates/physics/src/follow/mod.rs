@@ -13,25 +13,30 @@
 //! Rigidbody's or a CharacterController's — is the step's to place.
 //!
 //! **The kept list** ([`Kept`], on `watch::Tracked`). Which entities hang from a
-//! bone and carry a collider is found by walking every skeleton's subtrees
-//! ([`Scene::bone_subtrees`]), and is kept between ticks: the walk runs again only
-//! when the follow's own cursors read an id or a `Rebuild` since its last run, on
-//! - `Activity`: a re-parent, a placement or a removal stamps the subtree
-//!   (`World::stamp_hierarchy_below`, `World::touch_entity`), so a child spawned
-//!   under a bone, a hitbox moved off one or a bone destroyed shows here;
-//! - `MeshComponent`: a skeleton bound or re-imported, a bone slot cleared. The
+//! bone is found by walking every skeleton's subtrees ([`Scene::bone_subtrees`]),
+//! and is kept between ticks with the bones the skeletons list. The walk runs
+//! again only when the follow's own cursors say the hung set may have changed:
+//! - `MeshComponent`: a `Rebuild`, or a stamped id that was a skinned owner or is
+//!   one now: a skeleton bound, re-imported or a bone slot cleared changes which
+//!   ids are bones. A decal's or a muzzle flash's Mesh is no owner's, and the
 //!   palette written every tick (`World::set_pose_palette`) stamps nothing, so an
 //!   animating rig keeps its list.
+//! - `Activity`: a `Rebuild`, or a stamped id that touches a rig. A re-parent, a
+//!   placement or a removal stamps the whole subtree (`World::stamp_hierarchy_below`,
+//!   `World::touch_entity`), so its top is stamped too: a stamped id touches a rig
+//!   when it was hung, or when it or an ancestor is hung or listed as a bone now.
+//!   A casing spawned at the root, a projectile destroyed or a prop toggled
+//!   touches none, so a busy tick away from the rigs walks nothing.
 //!
-//! It walks again, too, when the colliders rapier holds changed since
-//! (`Tracked::handles`: a body plan rebuilt, a mesh collider rebuilt or dropped,
-//! #2059). That is what a Collider attached, detached or toggled changes, so
-//! no cursor on `ColliderComponent` is needed: the list keeps ids by handle. A scene load, Play's restore and an Undo or Redo read `Rebuild` on
-//! every cursor, and a fresh physics world (entering Play, a caught rapier panic)
-//! starts with no list. The list keeps every hung id with a collider handle;
-//! each tick still looks the handle up and skips a body's own collider (a
-//! Rigidbody added to a static hitbox keeps its plan, so no walk sees it). A
-//! quiet tick therefore writes exactly what the walk would: the same colliders,
+//! The list itself is the hung ids that have a collider handle. When the handle
+//! table changed since (`ColliderIds::generation`: a body plan rebuilt, a mesh
+//! collider rebuilt or dropped, which is what a Collider attached, detached or
+//! toggled does), the kept hung set is filtered again, without a walk. A scene
+//! load, Play's restore and an Undo or Redo read `Rebuild` on every cursor, and a
+//! fresh physics world (entering Play, a caught rapier panic) starts with no list.
+//! Each tick still looks the handle up and skips a body's own collider (a
+//! Rigidbody added to a static hitbox keeps its plan, so no walk sees it). A quiet
+//! tick therefore writes exactly what the walk would: the same colliders,
 //! ascending, so the refit set and the next step's query tree are the walk's.
 
 #[cfg(test)]
@@ -39,18 +44,20 @@ mod cost_tests;
 #[cfg(test)]
 mod edit_ops;
 #[cfg(test)]
+mod narrow_tests;
+#[cfg(test)]
 mod prop_tests;
 
 use std::cell::Cell;
 
-use rapier3d::prelude::{Collider, ColliderHandle};
+use rapier3d::prelude::Collider;
 
+use super::collider_ids::ColliderIds;
 use super::compound::world_pose;
 use super::convert::to_pose;
 use super::world::{collider_to_write, PhysicsWorld};
 use rusty_components::MeshComponent;
-use rusty_core::collections::Map;
-use rusty_ecs::{Activity, Changes, Channel, Cursor, World};
+use rusty_ecs::{Activity, Changes, Cursor};
 use rusty_scene::Scene;
 
 /// The bone-hung colliders kept between follows, and the cursors that say when
@@ -58,9 +65,15 @@ use rusty_scene::Scene;
 pub(crate) struct Kept {
     activity: Cursor<Activity>,
     mesh: Cursor<MeshComponent>,
-    /// `Tracked::handles` at the last walk.
-    handles: u64,
-    /// Every id on or under a bone with a collider handle, ascending.
+    /// `ColliderIds::generation` when `ids` was filtered.
+    generation: u64,
+    /// Every id on or under a bone, ascending: the walk's answer.
+    hung: Vec<u32>,
+    /// Every id a skeleton's slots list, ascending, under its owner or not.
+    bones: Vec<u32>,
+    /// The skinned owners (`Scene::skinned_ids`), ascending.
+    owners: Vec<u32>,
+    /// `hung`'s ids with a collider handle.
     ids: Vec<u32>,
     /// Walks taken since this list was opened, for the cost tests.
     #[cfg(test)]
@@ -69,34 +82,74 @@ pub(crate) struct Kept {
 
 impl Kept {
     /// Open the cursors and walk once.
-    fn open(scene: &Scene, handles: &Map<u32, ColliderHandle>, generation: u64) -> Self {
+    fn open(scene: &Scene, handles: &ColliderIds) -> Self {
         let w = &scene.world;
-        Self {
+        let mut kept = Self {
             activity: w.change_cursor(),
             mesh: w.change_cursor(),
-            handles: generation,
-            ids: walked(scene, handles),
+            generation: handles.generation(),
+            hung: Vec::new(),
+            bones: Vec::new(),
+            owners: Vec::new(),
+            ids: Vec::new(),
             #[cfg(test)]
-            walks: 1,
-        }
+            walks: 0,
+        };
+        kept.walk(scene, handles);
+        kept
     }
 
-    /// Walk again when any cursor read an id or a `Rebuild` since the last follow,
-    /// or the collider handles changed (`generation`). Every cursor is read either
+    /// Walk again when a cursor says the hung set may have changed (the module
+    /// docs), else filter again when the handles did. Every cursor is read either
     /// way, so each has read everything after this.
-    fn refresh(&mut self, scene: &Scene, handles: &Map<u32, ColliderHandle>, generation: u64) {
+    fn refresh(&mut self, scene: &Scene, handles: &ColliderIds) {
         let w = &scene.world;
-        let stamped = [
-            stamped(w, &mut self.activity),
-            stamped(w, &mut self.mesh),
-            std::mem::replace(&mut self.handles, generation) != generation,
-        ];
-        if stamped.contains(&true) {
-            self.ids = walked(scene, handles);
-            #[cfg(test)]
-            {
-                self.walks += 1;
-            }
+        let skins = match w.changes(&mut self.mesh) {
+            Changes::Rebuild => true,
+            Changes::Ids(ids) => ids.iter().any(|&id| self.skins(scene, id)),
+        };
+        let touched = match w.changes(&mut self.activity) {
+            Changes::Rebuild => true,
+            Changes::Ids(ids) => ids.iter().any(|&id| self.touches(scene, id)),
+        };
+        if skins || touched {
+            self.walk(scene, handles);
+        } else if handles.generation() != self.generation {
+            self.ids = filtered(&self.hung, handles);
+        }
+        self.generation = handles.generation();
+    }
+
+    /// Whether Mesh-stamped `id` can have changed which ids are bones: it was a
+    /// skinned owner, or is one now.
+    fn skins(&self, scene: &Scene, id: u32) -> bool {
+        let skinned = |m: &MeshComponent| !m.skeleton.bones.is_empty();
+        self.owners.binary_search(&id).is_ok() || scene.world.mesh(id).is_some_and(|m| skinned(&m))
+    }
+
+    /// Whether stamped `id` can have changed the hung set: it was hung, or it or
+    /// an ancestor is hung or listed as a bone now. A removed id has no
+    /// ancestors left; it mattered only if it was hung.
+    fn touches(&self, scene: &Scene, id: u32) -> bool {
+        let kept =
+            |a: u32| self.hung.binary_search(&a).is_ok() || self.bones.binary_search(&a).is_ok();
+        let w = &scene.world;
+        if !w.contains(id) {
+            return self.hung.binary_search(&id).is_ok();
+        }
+        w.self_and_ancestors(id).any(kept)
+    }
+
+    /// Find the hung set and the bones again, and the list from them.
+    fn walk(&mut self, scene: &Scene, handles: &ColliderIds) {
+        self.hung = scene.bone_subtrees().into_iter().collect();
+        self.owners = scene.skinned_ids();
+        self.owners.sort_unstable();
+        self.bones = listed_bones(scene, &self.owners);
+        self.ids = filtered(&self.hung, handles);
+        #[cfg(test)]
+        {
+            self.walks += 1;
         }
     }
 
@@ -107,16 +160,32 @@ impl Kept {
     }
 }
 
-/// Whether `cursor` read anything since its last read: an id or a `Rebuild`.
-fn stamped<T: Channel>(world: &World, cursor: &mut Cursor<T>) -> bool {
-    !matches!(world.changes(cursor), Changes::Ids(ids) if ids.is_empty())
+/// Every id the skeleton slots of `owners` list, ascending, each once.
+fn listed_bones(scene: &Scene, owners: &[u32]) -> Vec<u32> {
+    let mut bones = Vec::new();
+    for &owner in owners {
+        if let Some(mesh) = scene.world.mesh(owner) {
+            bones.extend(mesh.skeleton.bones.iter().flatten().copied());
+        }
+    }
+    bones.sort_unstable();
+    bones.dedup();
+    bones
+}
+
+/// `hung`'s ids that have a collider handle, ascending.
+fn filtered(hung: &[u32], handles: &ColliderIds) -> Vec<u32> {
+    hung.iter()
+        .copied()
+        .filter(|id| handles.contains_key(id))
+        .collect()
 }
 
 /// What the kept list holds, by the walk: every id on or under a bone that has a
 /// collider handle, ascending.
-fn walked(scene: &Scene, handles: &Map<u32, ColliderHandle>) -> Vec<u32> {
-    let hung = scene.bone_subtrees().into_iter();
-    hung.filter(|id| handles.contains_key(id)).collect()
+fn walked(scene: &Scene, handles: &ColliderIds) -> Vec<u32> {
+    let hung: Vec<u32> = scene.bone_subtrees().into_iter().collect();
+    filtered(&hung, handles)
 }
 
 thread_local! {
@@ -125,40 +194,43 @@ thread_local! {
 
 /// Have every follow on this thread also walk the skeletons and panic when the
 /// kept list differs from the walk's. A test hook: the hitbox and ragdoll suites
-/// arm it, so every tick they run holds the kept list to the walk.
+/// arm it, so every tick they run holds the kept list to the walk. A build
+/// without `debug_assertions` (a shipped game) never reads it.
 #[doc(hidden)]
 pub fn check_kept_bones() {
     CHECKED.with(|c| c.set(true));
 }
 
+/// Whether this follow walks for a reference: always in a twin built to
+/// (`Tracked::always_walk`, tests only), or when the check above is armed.
+fn walks_too(physics: &PhysicsWorld) -> bool {
+    #[cfg(test)]
+    if physics.tracked.always_walk {
+        return true;
+    }
+    let _ = physics;
+    cfg!(debug_assertions) && CHECKED.with(Cell::get)
+}
+
 impl PhysicsWorld {
     /// Re-place each collider on or under a bone at its live world pose and refit
     /// the query pipeline over the ones that moved. Visits the kept list
-    /// (above), walking the skeletons' subtrees only when the hierarchy, a
-    /// collider or a skeleton changed since the last follow, never the scene's
-    /// other colliders, so a map's static colliders cost nothing here (#1617).
+    /// (above), walking the skeletons' subtrees only when an edit touched a rig
+    /// since the last follow, never the scene's other colliders, so a map's
+    /// static colliders cost nothing here (#1617).
     pub fn follow_bones(&mut self, scene: &Scene) {
-        let generation = self.tracked.handles;
         let kept = match self.tracked.follow.take() {
             Some(mut k) => {
-                k.refresh(scene, &self.id_to_collider, generation);
+                k.refresh(scene, &self.id_to_collider);
                 k
             }
-            None => Kept::open(scene, &self.id_to_collider, generation),
+            None => Kept::open(scene, &self.id_to_collider),
         };
-        #[cfg(test)]
-        let walk_every_tick = self
-            .tracked
-            .always_walk
-            .then(|| walked(scene, &self.id_to_collider));
-        #[cfg(not(test))]
-        let walk_every_tick: Option<Vec<u32>> = None;
-        if CHECKED.with(Cell::get) {
-            let walk = walked(scene, &self.id_to_collider);
-            assert_eq!(kept.ids, walk, "the kept bone colliders went stale");
+        let walk = walks_too(self).then(|| walked(scene, &self.id_to_collider));
+        if let Some(walk) = &walk {
+            assert_eq!(&kept.ids, walk, "the kept bone colliders went stale");
         }
-        let ids = walk_every_tick.as_deref().unwrap_or(&kept.ids);
-        self.place_on_bones(scene, ids);
+        self.place_on_bones(scene, walk.as_deref().unwrap_or(&kept.ids));
         self.tracked.follow = Some(kept);
     }
 

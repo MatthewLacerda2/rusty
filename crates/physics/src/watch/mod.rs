@@ -221,9 +221,6 @@ pub(crate) struct Tracked {
     pub mesh_keys: mesh_keys::MeshKeys,
     /// The bone-hung colliders `follow_bones` keeps between ticks (`follow`).
     pub follow: Option<crate::follow::Kept>,
-    /// Bumped whenever `id_to_collider` gains or loses an entry or a handle: what
-    /// tells the kept bone list its handles moved (`follow`).
-    pub handles: u64,
     /// What the incremental sync visited, for the cost tests.
     #[cfg(test)]
     pub visits: changed::Visits,

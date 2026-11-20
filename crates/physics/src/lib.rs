@@ -17,6 +17,7 @@ mod assemble;
 #[cfg(test)]
 mod ccd_tests;
 mod character;
+mod collider_ids;
 mod compound;
 #[cfg(test)]
 mod compound_tests;
