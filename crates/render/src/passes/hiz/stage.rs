@@ -18,20 +18,8 @@ impl Renderer {
     /// The `occlusion` stage: cull this camera's opaque instances by the GPU's
     /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
-        (ctx.solids.culled, ctx.solids.floored) = (None, false);
         let idx = ctx.uniform.stack[0] as usize;
-        // Under the instance floor, or with its flag off, a camera is drawn
-        // whole, holding nothing new here (#2338), and a read it left in flight
-        // is dropped: its first frame back must not report it. Under the floor
-        // its forward pass is still primed, by a prepass of its few batches.
-        let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
-        let culls = n.is_some() && self.hiz_culls(ctx.cam);
-        let enough = culls && self.hiz_draws_enough(&ctx.solids);
-        let Some(n) = n.filter(|_| enough) else {
-            ctx.solids.floored = culls;
-            if let Some(cam) = view.hiz.cameras.get_mut(idx) {
-                cam.forget_reads();
-            }
+        let Some(n) = self.hiz_instances(view, ctx, idx) else {
             return;
         };
         self.hold_hiz(view, idx);
@@ -80,6 +68,26 @@ impl Renderer {
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
         self.lap("occlusion.submit");
+    }
+
+    /// How many of camera `idx`'s instances its stage culls; `None` when it is
+    /// drawn whole, `ctx.solids.culled` left `None`. Under the instance floor,
+    /// or with its flag off, a camera holds nothing new here (#2338), and a
+    /// read it left in flight is dropped: its first frame back must not report
+    /// it. Under the floor it is [`floored`](crate::draw::resources::SolidResources::floored):
+    /// its forward pass is still primed, by a prepass of its few batches.
+    fn hiz_instances(&self, view: &mut RenderView, ctx: &mut CameraCtx, idx: usize) -> Option<u32> {
+        (ctx.solids.culled, ctx.solids.floored) = (None, false);
+        let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
+        let culls = n.is_some() && self.hiz_culls(ctx.cam);
+        if culls && self.hiz_draws_enough(&ctx.solids) {
+            return n;
+        }
+        ctx.solids.floored = culls;
+        if let Some(cam) = view.hiz.cameras.get_mut(idx) {
+            cam.forget_reads();
+        }
+        None
     }
 
     /// Record everything after phase one: the pyramid over `depth`, the test,

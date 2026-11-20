@@ -85,6 +85,24 @@ fn frame(
     (px, c.hiz_tested, view.hiz.cameras.len(), c.primed_passes)
 }
 
+/// The step's two frames, flag on in `views.0` and off in `views.1`: their
+/// pixels equal and primed alike, under the floor or culling as with the flag
+/// off (#2338). The on frame's tested count and Hi-Z places, the off one's count.
+fn step(
+    r: &mut Renderer,
+    (view, off): (&mut RenderView, &mut RenderView),
+    at: (&mut Scene, u32),
+    label: &str,
+) -> (u32, usize, u32) {
+    let (px, tested, held, primed) = frame(r, view, (&mut *at.0, at.1), true);
+    let (px_off, tested_off, _, primed_off) = frame(r, off, at, false);
+    // Culling or under the floor, it is primed as the base is; off, not.
+    let primes = u32::from(r.depth_priming && r.priming_recommended);
+    assert_eq!((primed, primed_off), (2 * primes, primes), "{label}");
+    assert!(px == px_off, "{label}: the stacked camera's pixels moved");
+    (tested, held, tested_off)
+}
+
 #[test]
 fn gpu_a_stacked_camera_under_the_floor_draws_as_with_its_flag_off() {
     // SSAO's prepass, the priming one, and the priming one under a velocity pass.
@@ -104,44 +122,24 @@ fn gpu_a_stacked_camera_under_the_floor_draws_as_with_its_flag_off() {
             for &id in &parked {
                 scene.world.set_layer(id, layer);
             }
-            let (px, tested, held, primed) = frame(&mut r, &mut view, (&mut scene, gun), true);
-            let (px_off, tested_off, _, primed_off) =
-                frame(&mut r, &mut off, (&mut scene, gun), false);
-            // Culling or under the floor, it is primed as the base is; off, not.
-            let primes = u32::from(r.depth_priming && r.priming_recommended);
-            assert_eq!(
-                (primed, primed_off),
-                (2 * primes, primes),
-                "{case:?} {step}"
-            );
-            assert!(
-                px == px_off,
-                "{case:?} step {step}: the stacked camera's pixels moved"
-            );
+            let label = format!("{case:?} step {step}");
+            let views = (&mut view, &mut off);
+            let (tested, held, tested_off) = self::step(&mut r, views, (&mut scene, gun), &label);
             match (step, more) {
                 (0, _) => {
                     base = tested;
-                    assert!(
-                        base >= MIN_INSTANCES,
-                        "{case:?}: the base camera culls: {base}"
-                    );
+                    assert!(base >= MIN_INSTANCES, "{label}: the base culls: {base}");
                     assert_eq!(held, 1, "{case:?}: the stacked camera holds no Hi-Z place");
                 }
                 (_, false) => {
-                    assert_eq!(tested, base, "{case:?} step {step}: only the base tested")
+                    assert_eq!(tested, base, "{label}: only the base tested")
                 }
                 (_, true) => {
-                    assert!(
-                        tested >= base + MIN_INSTANCES,
-                        "{case:?} step {step}: {tested}"
-                    );
+                    assert!(tested >= base + MIN_INSTANCES, "{label}: {tested}");
                     assert_eq!(held, 2, "{case:?}: above the floor it culls");
                 }
             }
-            assert_eq!(
-                tested_off, base,
-                "{case:?} step {step}: the flag off tests none of it"
-            );
+            assert_eq!(tested_off, base, "{label}: the flag off tests none of it");
         }
     }
 }
