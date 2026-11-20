@@ -33,8 +33,7 @@ pub(super) fn volumetric_fog(r: &mut Renderer, view: &mut RenderView, ctx: &mut 
 /// The opaque runs are ranked for the priming its scene pass will draw with (#2484).
 pub(super) fn batch_solids(r: &mut Renderer, view: &mut RenderView, ctx: &mut CameraCtx) {
     let outline = ctx.stack.editor_mode;
-    let screen_space = ctx.ssao.is_some() || ctx.ssil.is_some();
-    let order = r.opaque_order(view, ctx.cam, screen_space);
+    let order = r.opaque_order(view, ctx.cam, ctx.screen_space());
     let motion = &mut view.post_fx.motion;
     let history = motion.active().then_some(&mut motion.history);
     let (scene, cam) = (ctx.scene, ctx.cam);
@@ -66,6 +65,7 @@ pub(super) fn scene_pass(r: &mut Renderer, view: &mut RenderView, ctx: &mut Came
             .map(|plan| SsaoFrame::for_camera(plan, ctx.view_proj, ctx.cam)),
         base: ctx.is_first,
         ssil: ctx.ssil,
+        screen_space: ctx.screen_space(),
         culled: ctx.solids.culled.clone(),
         floored: ctx.solids.floored,
     };

@@ -10,8 +10,8 @@ use super::{DrawBatch, OpaqueOrder};
 /// cannot be given them: a pass that did would draw what the cull hid, or break the
 /// forward pass's primed `Equal` depth test, and pass every other gate.
 ///
-/// They keep the [`OpaqueOrder`] they were sorted in (#2484), so the scene pass can
-/// hold it to the priming it draws with.
+/// They keep the [`OpaqueOrder`] they were ranked in (#2484), instanced or not, so
+/// the scene pass can hold it to the priming it draws with.
 #[derive(Default)]
 pub(crate) struct OpaqueBatches(Vec<DrawBatch>, OpaqueOrder);
 

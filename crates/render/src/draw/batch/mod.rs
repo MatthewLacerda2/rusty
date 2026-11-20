@@ -141,7 +141,8 @@ pub(crate) struct FrameDraws {
 impl FrameDraws {
     /// Batch `opaque` (sorted by key, its runs ranked by `order`, then nearest first) and `transparent` (order kept — the caller sorted
     /// it by priority, then back-to-front). With `instancing` off every item is its own draw, in the
-    /// order given: the pre-#470 path, kept for equivalence tests and measurement.
+    /// order given inside its rank: the pre-#470 path, kept for equivalence tests and measurement.
+    /// Either way the opaque draws are in `order`'s ranks, which [`OpaqueBatches`] records.
     ///
     /// Each item's record slot is first turned into its value class's representative
     /// ([`MaterialRecords::rep`]), so two draws whose records hold equal bytes batch
@@ -155,8 +156,10 @@ impl FrameDraws {
         for item in opaque.iter_mut().chain(&mut transparent) {
             item.key.record = records.rep(item.key.record);
         }
-        if instancing {
-            opaque = sort::front_to_back(opaque, order);
+        match instancing {
+            true => opaque = sort::front_to_back(opaque, order),
+            // Stable: the given order holds inside a rank.
+            false => opaque.sort_by_key(|item| order.rank(&item.key)),
         }
         let mut out = Self::default();
         out.opaque = OpaqueBatches::new(out.push_runs(opaque, instancing, 0), order);

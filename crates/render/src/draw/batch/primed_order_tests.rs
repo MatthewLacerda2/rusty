@@ -2,9 +2,8 @@
 //! prepass, which write their own depth, draw ahead of the primed ones whatever
 //! their depth and interning order, and the rank splits no run. No GPU.
 
-use super::order_tests::{at, meshes};
+use super::tests::{at, meshes, ordered as batched};
 use super::{DrawItem, FrameDraws, OpaqueOrder};
-use crate::scene::MaterialRecords;
 
 /// [`at`], lit: in the prepass.
 fn lit(mesh: &str, tag: f32, depth: f32) -> DrawItem {
@@ -20,12 +19,9 @@ fn unlit(mesh: &str, tag: f32, depth: f32) -> DrawItem {
     item
 }
 
+/// `opaque` batched instanced, its runs ranked by `order`.
 fn ordered(opaque: Vec<DrawItem>, order: OpaqueOrder) -> FrameDraws {
-    FrameDraws::build(
-        (opaque, Vec::new()),
-        &MaterialRecords::default(),
-        (true, order),
-    )
+    batched((opaque, Vec::new()), (true, order))
 }
 
 #[test]
@@ -47,15 +43,9 @@ fn over_a_primed_depth_the_unlit_panel_draws_first_whichever_mesh_was_interned_f
 fn an_unprimed_pass_keeps_the_key_order_inside_a_bucket() {
     // Today's sequence: inside one bucket the key (here the mesh) decides.
     let opaque = vec![lit("B", 0.0, 10.5), unlit("A", 1.0, 10.0)];
-    assert_eq!(
-        meshes(&ordered(opaque, OpaqueOrder::FrontToBack)),
-        ["A", "B"]
-    );
+    assert_eq!(meshes(&ordered(opaque, OpaqueOrder::Unranked)), ["A", "B"]);
     let opaque = vec![lit("A", 0.0, 10.5), unlit("B", 1.0, 10.0)];
-    assert_eq!(
-        meshes(&ordered(opaque, OpaqueOrder::FrontToBack)),
-        ["A", "B"]
-    );
+    assert_eq!(meshes(&ordered(opaque, OpaqueOrder::Unranked)), ["A", "B"]);
 }
 
 #[test]
@@ -72,9 +62,24 @@ fn the_rank_splits_no_run() {
         ]
     };
     let primed = ordered(opaque(), OpaqueOrder::OwnDepthFirst);
-    let unprimed = ordered(opaque(), OpaqueOrder::FrontToBack);
+    let unprimed = ordered(opaque(), OpaqueOrder::Unranked);
     assert_eq!(primed.opaque.len(), unprimed.opaque.len());
     assert_eq!(meshes(&primed), ["Box", "Crate", "Wall"]);
     assert_eq!(meshes(&unprimed), ["Crate", "Wall", "Box"]);
     assert!(primed.opaque.ranked_for(true) && !primed.opaque.ranked_for(false));
+}
+
+#[test]
+fn without_instancing_the_rank_holds_and_the_given_order_inside_it() {
+    // One draw per item, so no sort by key or depth: only the rank moves them,
+    // and the batches record the order they are really in.
+    let opaque = vec![
+        lit("Wall", 0.0, 10.0),
+        unlit("Box", 1.0, 30.0),
+        lit("Crate", 2.0, 3.0),
+        unlit("A", 3.0, 5.0),
+    ];
+    let draws = batched((opaque, Vec::new()), (false, OpaqueOrder::OwnDepthFirst));
+    assert_eq!(meshes(&draws), ["Box", "A", "Wall", "Crate"]);
+    assert!(draws.opaque.ranked_for(true) && !draws.opaque.ranked_for(false));
 }

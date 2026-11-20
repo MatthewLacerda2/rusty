@@ -3,20 +3,7 @@
 //! key order. No GPU. Over a primed depth: `primed_order_tests`.
 
 use super::sort::depth_bucket;
-use super::tests::{batched, item, name};
-use super::{DrawItem, FrameDraws};
-
-/// `item` of mesh `mesh`, tagged `tag`, at view depth `depth`.
-pub(super) fn at(mesh: &str, tag: f32, depth: f32) -> DrawItem {
-    DrawItem {
-        depth,
-        ..item(mesh, 0, 1.0, tag)
-    }
-}
-
-pub(super) fn meshes(draws: &FrameDraws) -> Vec<&str> {
-    draws.opaque.iter().map(|b| name(b.key.mesh)).collect()
-}
+use super::tests::{at, batched, item, meshes, tags};
 
 #[test]
 fn layered_walls_draw_nearest_first_whatever_the_given_order() {
@@ -75,4 +62,17 @@ fn without_instancing_the_given_order_is_kept() {
     let opaque = vec![at("Far", 0.0, 40.0), at("Near", 1.0, 5.0)];
     let draws = batched((opaque, Vec::new()), false);
     assert_eq!(meshes(&draws), ["Far", "Near"]);
+}
+
+#[test]
+fn instancing_off_is_one_draw_per_entity_in_scene_order() {
+    let opaque = vec![
+        item("Box", 0, 1.0, 0.0),
+        item("Barrel", 0, 1.0, 1.0),
+        item("Box", 0, 1.0, 2.0),
+    ];
+    let draws = batched((opaque, Vec::new()), false);
+    assert_eq!(draws.opaque.len(), 3);
+    assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
+    assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));
 }

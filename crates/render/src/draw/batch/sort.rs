@@ -79,13 +79,15 @@ pub(crate) fn depth_bucket(depth: f32) -> i32 {
 /// (`Renderer::opaque_order`, the same rule as `Renderer::primes`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum OpaqueOrder {
-    /// No prepass under the forward pass: every solid writes its depth, so the runs
-    /// order by depth alone.
+    /// No prepass under the forward pass: every solid writes its depth, so every
+    /// run shares one rank and they order by depth alone (with instancing off, as
+    /// given).
     #[default]
-    FrontToBack,
+    Unranked,
     /// A primed forward pass: the runs outside the prepass first
     /// ([`BatchKey::in_prepass`] false; every opaque pipeline such a run draws with
-    /// writes depth), then the primed ones, each rank front to back.
+    /// writes depth), then the primed ones, each rank front to back (with
+    /// instancing off, each in the order given).
     OwnDepthFirst,
 }
 
@@ -94,15 +96,15 @@ impl OpaqueOrder {
     pub(crate) fn primed(primed: bool) -> Self {
         match primed {
             true => Self::OwnDepthFirst,
-            false => Self::FrontToBack,
+            false => Self::Unranked,
         }
     }
 
     /// `key`'s rank: a lower one draws first, whatever its depth. A pure function of
     /// the key, so equal keys (one run) share it and the rank never splits a run.
-    fn rank(self, key: &BatchKey) -> u8 {
+    pub(super) fn rank(self, key: &BatchKey) -> u8 {
         match self {
-            Self::FrontToBack => 0,
+            Self::Unranked => 0,
             Self::OwnDepthFirst => u8::from(key.in_prepass()),
         }
     }
