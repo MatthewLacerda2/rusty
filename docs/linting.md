@@ -860,6 +860,19 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   `rusty_test_support::alone!`, and a "went up" compare (`core::wake::rings`)
   needs nothing. Telling those apart would mean resolving which accessor, often
   in another crate, reads a process-wide `static`, past what a line scan reads.
+  A marker on the reader functions would not make it a rule either: a test
+  reaches the state several calls down (the UI size reader's idle test went
+  through its own `tick` helper, `TextureSizeReader::refresh`,
+  `Freshness::poll_with` and `written_since` to the write log), so a marker on
+  the accessor (`written_since`, `conversions`) flags none of those tests, and
+  one on every public entry point that reaches it (`Renderer::render`,
+  `GameWorld::tick`, `asset::imported`, …) flags dozens whose asserts hold
+  (their keys are per-test temp paths, their counters `thread_local!`), each
+  then owing an allow. What sets the broken ones apart is what they assert (an
+  exact count, or an absence, of what another test can also drive), which a
+  scan does not read. Holding the kind is the consumer's job instead: a reader
+  of a process-wide log acts on the entries naming its own keys only
+  (`docs/testing.md`, *What is process-wide by nature*).
 - **`test-temp-dir`** — a path under `std::env::temp_dir()` is shared by every test
   process, every worktree and (under `cargo test`) every test
   thread, so a fixed or process-keyed name races. Test code (the *Test code* bullet)
