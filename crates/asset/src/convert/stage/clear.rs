@@ -54,6 +54,19 @@ pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
         .collect()
 }
 
+/// The name of the cached glTF whose textures folder is named `entry`
+/// (`<name>.<tag>.textures`, or an older converter's untagged
+/// `<name>.textures`): `None` when it names none. A cached glTF's name ends
+/// `.glb`, which tells the two forms apart.
+pub fn textures_owner(entry: &str) -> Option<&str> {
+    let rest = entry.strip_suffix(TEXTURES)?.strip_suffix('.')?;
+    let untagged = rest.ends_with(".glb").then_some(rest);
+    let tagged = rest.rsplit_once('.').filter(|(name, tag)| {
+        name.ends_with(".glb") && tag.len() == 16 && tag.bytes().all(|b| b.is_ascii_hexdigit())
+    });
+    tagged.map(|(name, _)| name).or(untagged)
+}
+
 fn is_textures_of(entry: &str, name: &str) -> bool {
     let Some(middle) = entry
         .strip_prefix(name)

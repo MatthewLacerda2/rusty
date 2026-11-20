@@ -14,6 +14,7 @@
 //! `core::fs::written`, so a cache keyed by a reference drops it by its
 //! [`source`]. A map that is not a reference is the path it is.
 
+pub mod extracted;
 mod map_ref;
 mod resolved;
 
@@ -61,11 +62,19 @@ pub fn exists(map: &str) -> bool {
 }
 
 /// Whether the map `map` names a file in `stale`: the file itself, or a texture
-/// extracted from a source that was converted again.
+/// extracted from a source that was converted again or whose extracted image was
+/// written (its compressed copy made, `texture_import::refresh`).
 pub fn is_written(stale: &Stale, map: &str) -> bool {
-    stale.matches(map) || source(map).is_some_and(|s| stale.matches(s))
+    let Some((source, identity)) = split(map) else {
+        return stale.matches(map);
+    };
+    let extracted =
+        || resolved::file(source, identity).is_some_and(|f| stale.matches(&f.to_string_lossy()));
+    stale.matches(map) || stale.matches(source) || extracted()
 }
 
+#[cfg(test)]
+mod extracted_tests;
 #[cfg(test)]
 mod resolved_tests;
 #[cfg(test)]

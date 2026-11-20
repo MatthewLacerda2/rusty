@@ -16,10 +16,9 @@ impl Renderer {
     /// fits the slot of their first use, and an import would make them a cache
     /// (no 16-bit normal map, sides a multiple of 4): how many, and their GPU
     /// bytes with every mip. Only a file an import of `root` visits counts
-    /// (`texture_import::imports`): a render texture, a file gone, one outside
-    /// `root` (the engine's own maps) and one inside the import cache (a texture
-    /// extracted beside a converted model) are not, since no import would make
-    /// them a cache.
+    /// (`texture_import::imports`), a texture extracted from a model under `root`
+    /// among them: a render texture, a file gone and one outside `root` (the
+    /// engine's own maps) are not, since no import would make them a cache.
     pub fn uncached_textures(&self, root: &Path) -> Uploads {
         let mut found = Uploads::default();
         for (map, tex) in &self.gpu_textures {

@@ -94,16 +94,28 @@ pub fn parse_max_size(size: u32) -> Result<u32, String> {
 }
 
 /// The import settings of the image at `source`: its sidecar's, or the defaults
-/// when it has none or the sidecar does not parse.
+/// when it has none or the sidecar does not parse ([`read_texture`] says which).
+pub fn texture(source: &Path) -> TextureSettings {
+    read_texture(source).unwrap_or_default()
+}
+
+/// [`texture`] from one read of the sidecar, with an error when it exists and
+/// does not parse: what `Assets.GetTextureImportSettings` reports. A texture a
+/// conversion extracted with no sidecar takes the defaults typed by the slots its
+/// model samples it in (`convert::texture_ref::extracted`, #2365).
 /// A *Max Size* outside [`MAX_SIZES`] (a hand-edited sidecar) is warned of once
 /// per file and read as [`DEFAULT_MAX_SIZE`], as the setter would refuse it.
-pub fn texture(source: &Path) -> TextureSettings {
-    let mut settings = load(source).map(|s| s.texture).unwrap_or_default();
+pub fn read_texture(source: &Path) -> Result<TextureSettings, ImportError> {
+    let extracted = || crate::convert::texture_ref::extracted::settings(source);
+    let mut settings = match super::stored(source)? {
+        Some(stored) => stored.texture,
+        None => extracted().unwrap_or_default(),
+    };
     if let Err(why) = parse_max_size(settings.max_size) {
         warn_once(source, &why);
         settings.max_size = DEFAULT_MAX_SIZE;
     }
-    settings
+    Ok(settings)
 }
 
 /// Files whose sidecar has been warned of.
@@ -126,7 +138,20 @@ fn warn_once(source: &Path, why: &str) {
 /// compressed copy is re-made by the import (`asset::texture_import`): in the
 /// background when the editor's watch sees the sidecar change, else by the
 /// refresh before Play.
+///
+/// A texture a conversion extracted is refused: its settings follow the slots
+/// its model samples it in ([`texture`]), and a sidecar in the import cache
+/// would go with the next conversion's folder. Unity's embedded textures are
+/// read-only the same way until they are extracted into the project.
 pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), ImportError> {
+    if let Some(glb) = crate::convert::texture_ref::extracted::glb_of(source) {
+        return Err(ImportError::Sidecar(format!(
+            "{} is a texture extracted from a model ({}): its import settings follow \
+             the slots the model uses it in and cannot be set",
+            source.display(),
+            glb.display()
+        )));
+    }
     let mut stored = load(source)?;
     if stored.texture == settings {
         return Ok(());
@@ -186,7 +211,8 @@ pub fn fit_single_channel_slot(source: &Path, used: &str) {
 /// Apply `fix` to the import settings of `source` when it asks for a change, and
 /// log it as `used` (what it was used as, and what changed). Only an image on disk, and only while imports may change (never
 /// in Play, `convert::conversion_allowed`). A texture a converted model's cache
-/// holds is left alone: those are never compressed.
+/// holds is left alone: its settings follow the slots its model's glTF samples
+/// it in ([`texture`]), and its folder is re-made by the next conversion.
 fn fit_slot(source: &Path, used: &str, fix: impl Fn(&TextureSettings) -> Option<TextureSettings>) {
     if !engine_may_write(source) {
         return;

@@ -44,7 +44,7 @@ fn images(path: &Path) -> Option<Vec<(Option<String>, String)>> {
 
 /// The JSON chunk of the `.glb` at `path`: the 12-byte header, then the first
 /// chunk, which glTF 2.0 §4.4 requires to be the JSON one.
-fn json_chunk(path: &Path) -> Option<Vec<u8>> {
+pub(super) fn json_chunk(path: &Path) -> Option<Vec<u8>> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut head = [0u8; 20];
     file.read_exact(&mut head).ok()?;

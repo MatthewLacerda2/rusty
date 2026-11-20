@@ -1,8 +1,29 @@
 //! A model whose texture lies outside `assets/` fails the export, naming it; an
 //! image's compressed copy ships, and a play-test on the export never re-makes it; an image that
-//! does not decode ships uncompressed, never failing the export (#1574).
+//! does not decode ships uncompressed, never failing the export (#1574). A texture
+//! a model embeds ships its compressed copy too (#2365).
 
 use super::{export, fixture, play, project, tree, CACHE};
+use rusty_test_support::models::{embedded_fbx, png, Embedded};
+
+#[test]
+fn an_embedded_textures_compressed_copy_ships_beside_its_models_cache() {
+    let game = project(&[], "");
+    let albedo = png(8, 5);
+    let maps = [Embedded {
+        name: "Albedo",
+        property: "DiffuseColor",
+        png: &albedo,
+    }];
+    let fbx = game.join("assets").join("models").join("m.fbx");
+    std::fs::write(fbx, embedded_fbx(&maps)).unwrap();
+    let out = crate::temp::dir().join("out");
+    let exported = export(&game, &out);
+    assert!(exported.status.success(), "{exported:?}");
+    let shipped = tree(&out);
+    let copy = format!("{CACHE}/assets/models/m.fbx.glb.bctex/Albedo.png.bctex");
+    assert!(shipped.contains_key(&copy), "{:?}", shipped.keys());
+}
 
 #[test]
 fn an_images_compressed_copy_ships_and_a_play_test_writes_none() {

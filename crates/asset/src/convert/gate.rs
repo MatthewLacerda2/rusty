@@ -166,7 +166,8 @@ pub fn convertible_sources(root: &Path) -> Vec<PathBuf> {
 /// conversion read a file `changed` names. Returns how many it converted; a failure
 /// is warned of, as an import's is. An image `changed` names, or whose sidecar it
 /// names, is queued for its compressed copy (`texture_import::queue`, #1574), off
-/// this thread. A no-op while conversion is off.
+/// this thread; a converted source's extracted textures are queued by its
+/// conversion (`texture_import::queue_extracted`). A no-op while conversion is off.
 pub fn refresh_changed(root: &Path, changed: Vec<String>) -> usize {
     if !conversion_allowed() {
         return 0;

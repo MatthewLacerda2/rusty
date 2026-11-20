@@ -87,7 +87,7 @@ pub use gate::{
 };
 pub use lock::hold as lock_cache;
 pub use shipped::{cached_without_source, served_from_cache, with_cache_files};
-pub use stage::{textures_dirs, Staging};
+pub use stage::{textures_dirs, textures_owner, Staging};
 
 use super::ImportError;
 use record::{record, stamp_path};

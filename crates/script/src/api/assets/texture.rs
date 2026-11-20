@@ -2,12 +2,27 @@
 //! Lua table `Assets.GetTextureImportSettings` returns and
 //! `SetTextureImportSettings` takes (#1323, #1574, #2259).
 
+use std::path::PathBuf;
+
 use mlua::{Lua, Table};
+use rusty_asset::convert::texture_ref;
 
 use super::runtime;
 use rusty_asset::sidecar::{
     parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
 };
+
+/// The image `path` names: a texture extracted from a model
+/// (`model.fbx#tex/Skin`) resolved to its file in the import cache
+/// (`texture_ref::file`), any other path as it is. An error when the model's
+/// cache holds no such texture.
+pub(super) fn file(path: &str) -> mlua::Result<PathBuf> {
+    texture_ref::file(path).ok_or_else(|| {
+        runtime(format!(
+            "{path}: the model's import cache holds no such texture (import the model first)"
+        ))
+    })
+}
 
 /// `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize,
 /// maxSizeChosen }`.
@@ -67,3 +82,7 @@ pub(super) fn settings(mut s: TextureSettings, t: &Table) -> mlua::Result<Textur
 #[cfg(test)]
 #[path = "texture_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "extracted_tests.rs"]
+mod extracted_tests;
