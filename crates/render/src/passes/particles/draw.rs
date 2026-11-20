@@ -89,6 +89,9 @@ impl Renderer {
             bytemuck::bytes_of(&globals),
         );
 
+        for texture in runs.iter().filter_map(|r| r.texture.as_ref()) {
+            self.note_map(scene.id(), texture);
+        }
         let (all, batches, drawn) = self.batch_runs(runs);
         // Only `Gpu` emitters: no instance is built, and no buffer either.
         let instance_buffer = (!all.is_empty()).then(|| {

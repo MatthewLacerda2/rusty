@@ -68,6 +68,7 @@ impl Renderer {
         let layout = view.ui.layout.update(&scene.world, &ui_view);
         self.lap("ui.layout");
         for path in texture_paths(scene, &layout) {
+            self.note_map(scene.id(), &path);
             let tex = self.load_texture(&path);
             self.ui_renderer
                 .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
@@ -217,6 +218,14 @@ fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
 
 /// Every texture path an active, laid-out Image samples — gathered first so the
 /// scene borrow ends before the textures load.
+impl super::UiRenderer {
+    /// Drop the bind group of every image path `gone` names (a texture residency
+    /// released), so its upload is freed.
+    pub(crate) fn forget_textures(&mut self, gone: impl Fn(&str) -> bool) {
+        self.textures.retain(|path, _| !gone(path));
+    }
+}
+
 fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<MapRef> {
     let mut paths: Vec<MapRef> = layout
         .iter()

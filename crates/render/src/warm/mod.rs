@@ -211,11 +211,13 @@ impl Renderer {
             }
             Item::Texture(map, kind) => {
                 let (map, kind) = (map.clone(), *kind);
+                self.retained.residency.warmed_map(&warming.token, &map);
                 self.warm_texture(warming, index, &map, kind)
             }
             Item::Lightmaps => {
                 let set = &data.lightmaps;
                 let lists = [&set.pages[..], &set.directions[..], &set.masks[..]];
+                (self.retained.residency).warmed_lightmaps(&warming.token, lists);
                 self.lightmaps.warm(&self.device, &self.queue, lists)
             }
         }

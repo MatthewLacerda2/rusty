@@ -71,6 +71,7 @@ impl Renderer {
         ) {
             self.global_bind_group_dirty = true;
         }
+        self.note_lightmaps(scene.id(), [&set.pages, &set.directions, &set.masks]);
 
         // The volumetric fog's volume (#1703) goes back to its stand-in once no
         // camera has run it for a few renders.
@@ -254,6 +255,7 @@ impl Renderer {
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
             let path = scene.skybox_path.clone();
             self.skybox_path = path.clone();
+            self.note_map(scene.id(), &rusty_asset::MapRef::from(path.as_str()));
             self.skybox_texture = Some(self.load_panorama(&path));
             self.global_bind_group_dirty = true;
         } else if scene.skybox_path.is_empty() && self.skybox_texture.is_some() {
