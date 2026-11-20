@@ -121,11 +121,30 @@ impl crate::Renderer {
             return plan::Plan::default();
         }
         let tested = |i: usize| tables.bounds.get(i).is_some_and(|b| b[3] > 0.5);
-        let clusters_of = |b: &crate::draw::batch::DrawBatch| {
-            let mesh = self.gpu_mesh_of(b.key.mesh)?.clusters.as_ref()?;
-            mesh.covering(b.key.indices.range())
-        };
         let instances = (&draws.instances[..], &tested as &dyn Fn(usize) -> bool);
+        let clusters_of = |b: &crate::draw::batch::DrawBatch| self.batch_clusters(b);
         plan::Plan::of(draws.opaque.iter(), instances, clusters_of)
+    }
+
+    /// The shared table's cluster range of `batch`, when its mesh is split and
+    /// its run is whole clusters: a batch the cluster cull can draw by cluster.
+    pub(crate) fn batch_clusters(
+        &self,
+        batch: &crate::draw::batch::DrawBatch,
+    ) -> Option<Range<u32>> {
+        let mesh = self.gpu_mesh_of(batch.key.mesh)?.clusters.as_ref()?;
+        mesh.covering(batch.key.indices.range())
+    }
+
+    /// Whether any of `draws`' opaque batches is drawn by cluster while the
+    /// preset's `gpu_cluster_culling` is on: such a camera culls whatever its
+    /// instance count (the [instance floor](super::MIN_INSTANCES)), since a
+    /// cluster cull's gain grows with a mesh's triangles, not its instances.
+    pub(crate) fn draws_clustered(&self, draws: &crate::draw::batch::FrameDraws) -> bool {
+        self.cluster_culls()
+            && draws
+                .opaque
+                .iter()
+                .any(|b| self.batch_clusters(b).is_some())
     }
 }

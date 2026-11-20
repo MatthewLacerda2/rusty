@@ -65,6 +65,9 @@ pub(crate) struct ScenePassFrame {
     /// The opaque draws GPU occlusion culling decided (#1963); `None` draws every
     /// batched instance.
     pub culled: Option<Culled>,
+    /// The camera culls by Hi-Z but is under the stage's instance floor
+    /// (`SolidResources::floored`, #2338): drawn whole, still primed.
+    pub floored: bool,
 }
 
 impl ScenePassFrame {
@@ -225,10 +228,12 @@ impl Renderer {
     /// Whether this camera's forward pass is primed ([`Self::prime_depth`]): it
     /// ran SSAO's prepass, or SSIL's, the same one (#1750), or the GPU culls it,
     /// whose phase one left most of the depth, the prepass drawing only the late
-    /// set (#2336, `record_screen_space`).
+    /// set (#2336, `record_screen_space`), or it would but is under the stage's
+    /// instance floor, the prepass then drawing its few batches whole (#2338).
+    /// A camera with its cull off is not primed by it.
     pub(crate) fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
         let screen_space = (frame.ssao.is_some() && view.ssao.is_some()) || frame.ssil.is_some();
-        let prepass = screen_space || frame.culled.is_some();
+        let prepass = screen_space || frame.culled.is_some() || frame.floored;
         let on = self.depth_priming && self.priming_recommended;
         on && prepass && !view.has_forward_override()
     }
