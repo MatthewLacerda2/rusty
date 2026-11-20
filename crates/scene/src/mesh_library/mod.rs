@@ -65,6 +65,15 @@ impl SceneMesh {
             (vertices.into(), indices.into())
         })
     }
+
+    /// Its indices, without building its vertices: the built geometry's, shared,
+    /// once built, else a copy of the data's (the same values: a build keeps them).
+    pub fn indices(&self) -> Shared<u32> {
+        match self.built.get() {
+            Some((_, indices)) => indices.clone(),
+            None => self.data.indices.clone().into(),
+        }
+    }
 }
 
 thread_local! {

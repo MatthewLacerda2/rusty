@@ -27,10 +27,10 @@ pub(super) struct RehydratedMesh {
 impl RehydratedMesh {
     /// A primitive's geometry with no rig — primitives are never skinned/animated —
     /// at its one revision (`create::primitive_revision`).
-    pub(super) fn primitive(geometry: (Vec<Vertex>, Vec<u32>), revision: MeshRevision) -> Self {
+    pub(super) fn primitive(geometry: crate::create::Geometry, revision: MeshRevision) -> Self {
         Self {
-            vertices: geometry.0.into(),
-            indices: geometry.1.into(),
+            vertices: geometry.0,
+            indices: geometry.1,
             revision: Some(revision),
             ..Self::default()
         }
