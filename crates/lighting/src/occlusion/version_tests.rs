@@ -12,6 +12,8 @@ use rusty_scene::lighting::occlusion::encode;
 
 /// The version the pin was taken at, and the content hash of the corridors level's
 /// PVS with its stamp's version zeroed (so the hash is the bake's bytes alone).
+/// Under its one test's `cfg`, so no other build holds an unused constant.
+#[cfg(target_os = "linux")]
 const PINNED: (u32, u64) = (1, 0x69fc_da1c_7ac0_6094);
 
 /// The corridors level's PVS bytes, the version field zeroed.
@@ -35,7 +37,9 @@ fn the_occlusion_version_is_bumped_when_the_bake_writes_other_bytes() {
     assert_eq!(
         hash, pinned,
         "the occlusion bake writes other bytes for the same objects: bump \
-         `OCCLUSION_VERSION` and re-pin `PINNED` to (the new version, {hash:#x})"
+         `OCCLUSION_VERSION` and re-pin `PINNED` to (the new version, {hash:#x}), \
+         or `test_level::corridors()` or the fingerprint's encoding changed: then \
+         re-pin without a bump"
     );
 }
 

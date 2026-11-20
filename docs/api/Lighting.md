@@ -714,7 +714,9 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   overwritten with it, and the warning says so. The step then takes about the time to
   fingerprint the static meshes (no triangle is gathered); `Lighting.Generate()` logs
   `[Lighting] 9:41 occlusion unchanged, kept` as its step line, and the editor's
-  Generate Lighting ends its summary line with `…, occlusion unchanged, kept`. The
+  Generate Lighting's summary line reads `Generated lighting: 3 lightmap(s), 12 light
+  probe(s), 2 reflection probe(s), occlusion unchanged, kept; saved` (or `; save the
+  scene to keep it` in place of `; saved` on a scene not yet saved). The
   `occlusion` bake report keeps the PVS's counts, its stages `skipped: unchanged` and
   then `write` (when the file is written beside the scene), and `Lighting.Generate()`
   returns the kept PVS's counts. The report's `settings` carry the bake's `version`,

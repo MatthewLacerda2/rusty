@@ -25,7 +25,8 @@ use std::time::{Duration, Instant};
 use crate::bake::lightmap::logged::watch;
 use crate::bake::progress::{BakeLog, Progress, Step};
 use rusty_lighting::occlusion::{
-    current_pvs, gather_occlusion, OcclusionBakeReport, OcclusionInput, OcclusionProgress,
+    current_pvs, gather_occlusion, gather_with, Fingerprints, OcclusionBakeReport, OcclusionInput,
+    OcclusionProgress,
 };
 use rusty_scene::lighting::occlusion::OcclusionData;
 use rusty_scene::Scene;
@@ -51,11 +52,12 @@ pub struct BakedOcclusion {
 impl BakedOcclusion {
     /// The PVS `scene` holds, kept, when it is what a bake would write
     /// ([`current_pvs`]): Generate Lighting's one keep-or-bake decision, the
-    /// editor's and the script's. `None`: bake.
-    pub fn kept(scene: &Scene) -> Option<Self> {
+    /// editor's and the script's. Otherwise the fingerprints it compared with,
+    /// for the bake to gather through ([`gather_with`]): no mesh is hashed twice.
+    pub fn kept(scene: &Scene) -> Result<Self, Fingerprints> {
         let started = Instant::now();
         let held = current_pvs(scene)?;
-        Some(Self {
+        Ok(Self {
             data: None,
             report: OcclusionBakeReport::of_kept(held),
             ms: started.elapsed().as_millis() as u64,
@@ -94,12 +96,14 @@ impl OcclusionBakeJob {
         Self::bake(gather_occlusion(scene))
     }
 
-    /// Generate Lighting's occlusion step: [`Self::start`], unless the scene holds
-    /// the PVS that bake would write ([`BakedOcclusion::kept`]), which the job then
-    /// hands back finished, on its first [`Self::poll`].
+    /// Generate Lighting's occlusion step: [`Self::start`] through the fingerprints
+    /// the comparison read, unless the scene holds the PVS that bake would write
+    /// ([`BakedOcclusion::kept`]), which the job then hands back finished, on its
+    /// first [`Self::poll`].
     pub fn generate(scene: &Scene) -> Result<Self, String> {
-        let Some(kept) = BakedOcclusion::kept(scene) else {
-            return Self::start(scene);
+        let kept = match BakedOcclusion::kept(scene) {
+            Ok(kept) => kept,
+            Err(prints) => return Self::bake(gather_with(scene, &prints)),
         };
         Ok(Self {
             progress: Arc::default(),
@@ -168,7 +172,15 @@ impl Drop for OcclusionBakeJob {
 /// `Lighting.BakeOcclusion()`). An off log bakes on this thread's workers with no watcher.
 pub fn bake_occlusion_logged(scene: &Scene, log: &mut BakeLog) -> Result<BakedOcclusion, String> {
     let started = Instant::now();
-    let input = gather_occlusion(scene);
+    bake_logged(gather_occlusion(scene), started, log)
+}
+
+/// Bake `input`, gathered from the clock `started` at, saying its cells to `log`.
+fn bake_logged(
+    input: OcclusionInput,
+    started: Instant,
+    log: &mut BakeLog,
+) -> Result<BakedOcclusion, String> {
     let clocks = Arc::new(CellClocks::default());
     let progress = OcclusionProgress::observed(clocks.clone());
     let run = |p: &OcclusionProgress| bake(&input, p);
@@ -194,11 +206,14 @@ pub fn generate_occlusion_logged(
     scene: &Scene,
     log: &mut BakeLog,
 ) -> Result<BakedOcclusion, String> {
-    let Some(kept) = BakedOcclusion::kept(scene) else {
-        return bake_occlusion_logged(scene, log);
-    };
-    log.kept(Step::Occlusion);
-    Ok(kept)
+    let started = Instant::now();
+    match BakedOcclusion::kept(scene) {
+        Ok(kept) => {
+            log.kept(Step::Occlusion);
+            Ok(kept)
+        }
+        Err(prints) => bake_logged(gather_with(scene, &prints), started, log),
+    }
 }
 
 fn bake(

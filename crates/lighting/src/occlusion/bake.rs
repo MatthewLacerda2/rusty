@@ -20,10 +20,13 @@ pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
 /// The bake's version, stamped on every PVS it makes ([`BakeStamp`]): bump it
 /// whenever the bake would write other bytes for the same objects (its sampling,
-/// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE` or `MAX_CELL`, the
-/// targets' constants), so Generate Lighting re-bakes a PVS an older engine made
-/// instead of keeping it ([`is_current`]). `version_tests` holds the rule:
-/// it pins this version beside the bytes a small fixed scene bakes to.
+/// the dilation, [`OCCLUSION_SEED`], the grid's `CELL_SIZE`, `MAX_CELL` and
+/// `MAX_CELLS`, the step `Grid::over` grows a cell by, the sampling of a large
+/// cell as `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants), so Generate Lighting
+/// re-bakes a PVS an older engine made instead of keeping it ([`is_current`]).
+/// `version_tests` holds the rule only in part: it pins this version beside the
+/// bytes a small fixed scene bakes to, so it covers the small-level path alone
+/// (2 m cells, no growth, no sub-cubes), and a change to the rest is bumped by hand.
 pub const OCCLUSION_VERSION: u32 = 1;
 
 /// What one occlusion bake found. All zero when it baked nothing.
@@ -56,13 +59,30 @@ pub struct OcclusionInput {
 
 /// What `scene`'s occlusion bake reads, gathered on the caller's thread.
 pub fn gather_occlusion(scene: &Scene) -> OcclusionInput {
-    let prints = Fingerprints::of_scene(scene);
-    let mut ids = scene.world.ids_with_mesh();
-    ids.sort_unstable();
-    let objects = ids.iter().filter_map(|&id| prints.object(scene, id));
+    gather_with(scene, &Fingerprints::of_scene(scene))
+}
+
+/// [`gather_occlusion`] through `prints`, whose geometry hashes it reuses: a
+/// Generate that compared the held PVS ([`current_pvs`]) and goes on to bake
+/// hashes no mesh twice.
+pub fn gather_with(scene: &Scene, prints: &Fingerprints) -> OcclusionInput {
+    let objects = walk(scene, |id| prints.object(scene, id));
     OcclusionInput {
         objects: objects.collect(),
     }
+}
+
+/// What `read` makes of each entity the bake reads, in the bake's order (by
+/// entity), skipping those it gives `None` (no part in the bake). The one walk
+/// [`gather_with`] bakes and [`is_current`] compares, so the two never disagree on
+/// which objects, or in what order.
+fn walk<'a, T: 'a>(
+    scene: &'a Scene,
+    read: impl FnMut(u32) -> Option<T> + 'a,
+) -> impl Iterator<Item = T> + 'a {
+    let mut ids = scene.world.ids_with_mesh();
+    ids.sort_unstable();
+    ids.into_iter().filter_map(read)
 }
 
 /// Bake `scene`'s PVS on `threads` workers, in line. `None` when there is nothing
@@ -87,16 +107,17 @@ pub fn bake_occlusion(
 /// Reads the fingerprints alone, never a triangle: what Generate Lighting pays to
 /// keep an unchanged PVS.
 pub fn is_current(scene: &Scene, held: &OcclusionData) -> bool {
+    matches(scene, held, &Fingerprints::of_scene(scene))
+}
+
+/// [`is_current`] through `prints`.
+fn matches(scene: &Scene, held: &OcclusionData, prints: &Fingerprints) -> bool {
     if held.stamp.version != OCCLUSION_VERSION {
         return false;
     }
-    let prints = Fingerprints::of_scene(scene);
-    let mut ids = scene.world.ids_with_mesh();
-    ids.sort_unstable();
-    let mut now = ids.iter().filter_map(|&id| {
-        prints
-            .of(scene, id)
-            .map(|(print, occluder)| (id, print, occluder))
+    let mut now = walk(scene, |id| {
+        let (print, occluder) = prints.of(scene, id)?;
+        Some((id, print, occluder))
     });
     let mut was = held
         .objects
@@ -111,9 +132,15 @@ pub fn is_current(scene: &Scene, held: &OcclusionData) -> bool {
     }
 }
 
-/// The PVS `scene` holds when it is what a bake would write ([`is_current`]).
-pub fn current_pvs(scene: &Scene) -> Option<&OcclusionData> {
-    scene.occlusion.as_deref().filter(|h| is_current(scene, h))
+/// The PVS `scene` holds when it is what a bake would write ([`is_current`]);
+/// otherwise the fingerprints the comparison read, for the bake to gather with
+/// ([`gather_with`]).
+pub fn current_pvs(scene: &Scene) -> Result<&OcclusionData, Fingerprints> {
+    let prints = Fingerprints::of_scene(scene);
+    match scene.occlusion.as_deref() {
+        Some(held) if matches(scene, held, &prints) => Ok(held),
+        _ => Err(prints),
+    }
 }
 
 impl OcclusionBakeReport {

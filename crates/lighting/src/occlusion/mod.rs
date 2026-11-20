@@ -13,8 +13,8 @@ mod sample;
 mod unsaved;
 
 pub use bake::{
-    bake_occlusion, current_pvs, gather_occlusion, is_current, OcclusionBakeReport, OcclusionInput,
-    OCCLUSION_SEED, OCCLUSION_VERSION,
+    bake_occlusion, current_pvs, gather_occlusion, gather_with, is_current, OcclusionBakeReport,
+    OcclusionInput, OCCLUSION_SEED, OCCLUSION_VERSION,
 };
 pub use gather::{fingerprint, Fingerprints};
 pub use progress::OcclusionObserver;
