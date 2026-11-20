@@ -22,10 +22,12 @@
 mod anim;
 mod bin;
 mod read;
+mod slots;
 mod write;
 
 pub(crate) use bin::Bin;
 pub use read::{image_files, image_uris};
+pub use slots::{image_slots, Slot};
 pub use write::{container, write};
 
 /// One glTF scene: a node forest plus the meshes, materials, skins and animations

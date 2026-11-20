@@ -64,8 +64,8 @@ pub mod gather;
 mod grid;
 
 pub use file::{
-    apply_sidecar, decode, encode, load_sidecar, occlusion_path, read_sidecar, save_sidecar,
-    OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
+    apply_sidecar, decode, encode, encoded_len, load_sidecar, occlusion_path, read_sidecar,
+    save_sidecar, OcclusionFile, SUFFIX as OCCLUSION_SUFFIX,
 };
 pub use grid::{Grid, CELL_SIZE, MAX_CELL, MAX_CELLS};
 
@@ -103,11 +103,24 @@ pub struct BakedObject {
     pub occluder: bool,
 }
 
+/// What a PVS was baked by, beside what it was baked against: the occlusion bake's
+/// version (`rusty_lighting::occlusion::OCCLUSION_VERSION`), so Generate Lighting
+/// keeps a PVS only an unchanged bake made (#2348), and the objects the bake kept
+/// in sight of every cell, too large or not finite to sample, which only the bake
+/// can count. Zero on a PVS no bake stamped.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BakeStamp {
+    pub version: u32,
+    pub never_culled: u32,
+}
+
 /// A scene's baked PVS: the cells, the objects, and per cell one row of bits, bit
 /// `i` set when object `i` may be seen from the cell.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OcclusionData {
     pub grid: Grid,
+    /// The bake that made it ([`BakeStamp`]).
+    pub stamp: BakeStamp,
     /// A row's bit `i` is `objects[i]`; baked in entity order.
     pub objects: Vec<BakedObject>,
     /// `(entity, index into objects)`, by entity.
@@ -140,6 +153,7 @@ impl OcclusionData {
         let unique = index.windows(2).all(|w| w[0].0 < w[1].0);
         (whole && cells_ok && unique && (words == 0 || count > 0)).then_some(Self {
             grid,
+            stamp: BakeStamp::default(),
             objects,
             index,
             words,
@@ -176,7 +190,13 @@ impl OcclusionData {
         for o in &mut objects {
             o.entity = moved.get(&o.entity).copied().unwrap_or(o.entity);
         }
-        Self::new(self.grid, objects, self.rows.clone(), self.cells.clone())
+        let data = Self::new(self.grid, objects, self.rows.clone(), self.cells.clone())?;
+        Some(data.stamped(self.stamp))
+    }
+
+    /// The same data, stamped by the bake that made it.
+    pub fn stamped(self, stamp: BakeStamp) -> Self {
+        Self { stamp, ..self }
     }
 
     /// How many distinct rows the cells share.
@@ -187,7 +207,7 @@ impl OcclusionData {
     /// The bytes the data holds in memory, near enough (the file is a little less:
     /// no entity index).
     pub fn byte_size(&self) -> usize {
-        self.objects.len() * 21 + self.rows.len() * 8 + self.cells.len() * 4 + 64
+        self.objects.len() * 21 + self.rows.len() * 8 + self.cells.len() * 4 + 72
     }
 
     /// The distinct rows (`words` words each, bit `i` object `i`) and each cell's

@@ -15,9 +15,8 @@ use std::cell::RefCell;
 
 use mlua::{Lua, Table};
 
-use super::super::bake::generate_lighting::{
-    bake_occlusion_only, generate_lighting, unsaved_materials_warning,
-};
+use super::super::bake::generate_lighting::{bake_occlusion_only, generate_lighting};
+use super::super::bake::occlusion::unsaved_materials_warning;
 use super::super::bake::progress::BakeLog;
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};

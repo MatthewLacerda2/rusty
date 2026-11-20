@@ -9,10 +9,26 @@ fn bytes() -> Vec<u8> {
     encode(&bake_occlusion(&corridors(), 2).0.expect("occluders"))
 }
 
+/// Where the objects start: the magic, the stamp's two words, the count.
+const OBJECTS_AT: usize = 16;
+
+fn object_count(bytes: &[u8]) -> usize {
+    u32::from_le_bytes(bytes[12..16].try_into().unwrap()) as usize
+}
+
 #[test]
 fn a_bake_reads_back_as_it_was_written() {
     let data = bake_occlusion(&corridors(), 2).0.unwrap();
+    assert_eq!(data.stamp.version, crate::occlusion::OCCLUSION_VERSION);
     assert_eq!(decode(&encode(&data)), Ok(data));
+}
+
+#[test]
+fn a_never_culled_count_past_the_objects_is_refused() {
+    let mut bytes = bytes();
+    let past = object_count(&bytes) as u32 + 1;
+    bytes[8..12].copy_from_slice(&past.to_le_bytes());
+    assert!(decode(&bytes).unwrap_err().contains("never culled"));
 }
 
 #[test]
@@ -29,8 +45,7 @@ fn a_truncated_or_padded_file_is_refused() {
 #[test]
 fn a_nan_cell_or_a_row_past_the_rows_is_refused() {
     let bytes = bytes();
-    let objects = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
-    let cell_at = 8 + objects * 13 + 12;
+    let cell_at = OBJECTS_AT + object_count(&bytes) * 13 + 12;
     let mut nan = bytes.clone();
     nan[cell_at..cell_at + 4].copy_from_slice(&f32::NAN.to_le_bytes());
     assert!(decode(&nan).is_err());
@@ -39,15 +54,14 @@ fn a_nan_cell_or_a_row_past_the_rows_is_refused() {
     row[last..].copy_from_slice(&u32::MAX.to_le_bytes());
     assert_eq!(decode(&row), Err("rows disagree with the grid".into()));
     let mut flag = bytes;
-    flag[20] = 2; // the first object's occluder flag
+    flag[OBJECTS_AT + 12] = 2; // the first object's occluder flag
     assert!(decode(&flag).is_err());
 }
 
 #[test]
 fn dims_whose_product_overflows_are_refused_not_a_panic() {
     let mut bytes = bytes();
-    let objects = u32::from_le_bytes(bytes[4..8].try_into().unwrap()) as usize;
-    let dims_at = 8 + objects * 13 + 16;
+    let dims_at = OBJECTS_AT + object_count(&bytes) * 13 + 16;
     for k in 0..3 {
         let at = dims_at + k * 4;
         bytes[at..at + 4].copy_from_slice(&u32::MAX.to_le_bytes());

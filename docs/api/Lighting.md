@@ -66,7 +66,7 @@ first.
 
 | Function | Signature | Returns |
 |---|---|---|
-| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull) |
+| `Lighting.Generate` *(dev-only)* | `()` | `{ lightmaps, lightProbes, reflectionProbes, occlusionCells, occlusionObjects, occlusionBytes, occlusionNeverCulled, saved }` (the occlusion fields `0` when nothing occludes, or when the level is too large to cull; a PVS kept unchanged reports its own counts, *Occlusion culling*, below) |
 | `Lighting.GenerateAsync` *(dev-only)* | `()` | `true` once the editor's Generate Lighting job is asked for; returns at once (*Generate Lighting*, above). Errors during Play or once it is asked for, while a bake runs, on an unsaved scene, and in a host with no editor window to step the job |
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's or `GenerateAsync`'s). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended |
@@ -724,6 +724,26 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   seconds for the primitive bench at Kolvik's size, minutes for a Dust2-sized
   level. (Kolvik itself took 20 minutes before #1981; its time since is not yet
   measured.)
+- **Kept when unchanged** (#2348): Generate Lighting re-bakes no PVS when nothing
+  its bake reads changed since the PVS the scene holds was baked: the same static
+  meshes, in the same order, each with the same fingerprint (*A bake older than the
+  scene*, below) and occluder flag, baked by the same version of the bake. A lamp
+  moved, a light's intensity changed or a probe added keeps it, and so does the file,
+  byte for byte: it is exactly what a re-bake would write (the bake is seeded). The
+  kept PVS owns its file as a bake does: one another process wrote there since is
+  overwritten with it, and the warning says so. The step then takes about the time to
+  fingerprint the static meshes (no triangle is gathered); `Lighting.Generate()` logs
+  `[Lighting] 9:41 occlusion unchanged, kept` as its step line, and the editor's
+  Generate Lighting's summary line reads `Generated lighting: 3 lightmap(s), 12 light
+  probe(s), 2 reflection probe(s), occlusion unchanged, kept; saved` (or `; save the
+  scene to keep it` in place of `; saved` on a scene not yet saved). The
+  `occlusion` bake report keeps the PVS's counts, its stages `skipped: unchanged` and
+  then `write` (when the file is written beside the scene), and `Lighting.Generate()`
+  returns the kept PVS's counts. The report's `settings` carry the bake's `version`,
+  bumped whenever the bake would write other bytes for the same objects, so an engine
+  update re-bakes. A scene
+  with no PVS, one baked from anything else, or a level too large to cull bakes as
+  before. **`Lighting.BakeOcclusion()` and the "Bake Occlusion" button always re-bake.**
 - **Runs** as Generate Lighting's last step, after the lightmaps and probes are
   written into the scene, so a bake dropped or failed during it (the scene closed or
   reloaded, another opened) loses none of the lighting: in the editor on a worker
@@ -936,7 +956,8 @@ Then each kind's own:
   objects its PVS row sees. A cell runs on one worker, so its time is that worker's, read on
   the platform's clock: the sampling itself never reads one, and a timed bake writes the
   same PVS as an untimed one. Both are `nil` when no PVS was kept, or when the bake was
-  not timed cell by cell.
+  not timed cell by cell, as for a PVS Generate Lighting kept unchanged, whose
+  bake stage is `skipped: unchanged`.
 
 A stage baked in the editor a step a frame (the probes) counts the frames between its
 steps too. Lists of "heaviest first" keep the top 20; the counts hold them all.
