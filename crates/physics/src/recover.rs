@@ -121,6 +121,7 @@ impl PhysicsWorld {
         #[cfg(test)]
         {
             fresh.tracked.always_full = self.tracked.always_full;
+            fresh.tracked.always_walk = self.tracked.always_walk;
         }
         fresh.recovery.catch = self.recovery.catch;
         *self = fresh;

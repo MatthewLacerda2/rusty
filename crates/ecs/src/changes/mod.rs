@@ -89,6 +89,13 @@ pub enum Changes {
     Ids(Vec<u32>),
 }
 
+impl Changes {
+    /// Whether nothing changed: no id stamped and no `Rebuild`.
+    pub fn is_empty(&self) -> bool {
+        matches!(self, Changes::Ids(ids) if ids.is_empty())
+    }
+}
+
 /// Every World (and every `clear` or restore of one) takes a fresh epoch, so a
 /// cursor never reads a log it was not opened on. Only compared, never read as sim.
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
