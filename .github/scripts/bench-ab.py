@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`bench-ab.py --pr N --project DIR [--scenes a,b] [--runs n] [--load-runs n] [--size WxH] [--set k=v]... [--no-editor] [--force]` (#2381).
+"""`bench-ab.py --pr N [--project DIR] [--stress] [--scenes a,b] [--runs n] [--load-runs n] [--size WxH] [--set k=v]... [--no-editor] [--force]` (#2381).
 
 `make bench-ab` is this: a pull request's measured rows in three legs, `main`,
 the PR's head, `main` again, the second `main` leg each row's noise floor
@@ -22,6 +22,11 @@ the PR's head, `main` again, the second `main` leg each row's noise floor
    project never imported), then the three legs (`bench/legs.py`), each in a
    memory-capped scope where the machine has one, the machine checked again
    before each, under `--force` too;
+   `--stress` (#2450) then runs the fixture's stress yard in its own three legs
+   (`bench/stress.py`), `play` built beside `bench-scenes` in the same cargo
+   invocation, **while the PR's tree still holds `main` merged in**; without
+   `--project` only the stress legs run, no `bench-scenes` is built and the
+   texture refusals do not apply;
 5. the table (`bench/table.py`), printed and kept as
    `out/bench/ab/pr-<n>/table.md`, beside each leg's reports; the PR's tree
    put back at its head and the trees unlocked, each only if this run locked it.
@@ -40,13 +45,14 @@ import subprocess
 import sys
 from pathlib import Path
 
-from bench import legs, refuse, space, table, trees
+from bench import legs, refuse, space, stress, table, trees
 
 
 def args(argv):
     p = argparse.ArgumentParser(prog="bench-ab.py")
     p.add_argument("--pr", type=int, required=True)
-    p.add_argument("--project", type=Path, required=True)
+    p.add_argument("--project", type=Path)
+    p.add_argument("--stress", action="store_true")
     p.add_argument("--scenes")
     p.add_argument("--runs", type=int)
     p.add_argument("--load-runs", type=int, dest="load_runs")
@@ -55,6 +61,15 @@ def args(argv):
     p.add_argument("--no-editor", action="store_true", dest="no_editor")
     p.add_argument("--force", action="store_true")
     a = p.parse_args(argv)
+    if a.runs is not None and a.runs < 1:
+        p.error(f"--runs {a.runs}: a leg takes at least one run")
+    if a.project is None and not a.stress:
+        p.error("give --project DIR (the project's scenes), --stress (the fixture's stress yard), or both")
+    alone = [f for f, v in (("--scenes", a.scenes), ("--load-runs", a.load_runs), ("--size", a.size),
+                            ("--set", a.sets), ("--no-editor", a.no_editor)) if v]
+    if a.project is None and alone:
+        p.error(f"{', '.join(alone)} ask(s) the scenes' bench: give --project DIR, or leave them out for "
+                "the stress yard alone")
     for pair in a.sets:
         if "{" in pair:  # make splits SET on spaces and the shell eats its quotes: no JSON objects
             p.error(f"--set {pair}: a JSON object value is not taken; set each field by its dotted key "
@@ -67,7 +82,8 @@ def ps() -> str:
 
 
 class Gate:
-    """Each refusal stops the run, or with `--force` is noted for the table."""
+    """Each refusal stops the run, or with `--force` is noted for the table, once: the busy
+    check before every stress run would otherwise say one held-over build a run (#2462's review)."""
 
     def __init__(self, force: bool):
         self.force, self.overridden = force, []
@@ -77,6 +93,8 @@ class Gate:
             return
         if not self.force:
             sys.exit(f"bench-ab: refused: {said}\n(FORCE=1 runs anyway, and the table says so)")
+        if said.splitlines()[0] in self.overridden:
+            return
         print(f"bench-ab: FORCE=1 runs past: {said}", file=sys.stderr)
         self.overridden.append(said.splitlines()[0])
 
@@ -131,9 +149,10 @@ def check_textures(main: tuple[str, str | None], pr: tuple[str, str | None], gat
 
 def main(argv) -> int:
     a = args(argv)
-    project = a.project.expanduser().resolve()
-    if not project.is_dir():
+    project = a.project.expanduser().resolve() if a.project else None
+    if project is not None and not project.is_dir():
         sys.exit(f"bench-ab: no project at {project}")
+    bins = ((trees.BENCH,) if project else ()) + ((trees.PLAY,) if a.stress else ())
     me, gate = os.getpid(), Gate(a.force)
     root = trees.main_checkout()
     held, said = refuse.hold(root / refuse.LOCK)
@@ -142,7 +161,9 @@ def main(argv) -> int:
     pr_tree, pr_sha = trees.path(root, trees.pr_tree(a.pr)), None
     try:
         gate.check(refuse.busy_refusal(refuse.busy(ps(), me)))
-        builds = [(trees.path(root, trees.MAIN_TREE), "release"), (pr_tree, "release")]
+        # every binary the invocation links, the first included: a yard-only run's `play` in a
+        # profile folder an earlier `bench-scenes` build filled is still counted (`space.EXTRA`)
+        builds = [(trees.path(root, trees.MAIN_TREE), "release", bins), (pr_tree, "release", bins)]
         roomless = space.refusal(root, builds, f"`make bench-ab PR={a.pr}`'s two release builds", subprocess.run)
         if roomless:
             raise RuntimeError(f"refused: {roomless}")
@@ -153,37 +174,49 @@ def main(argv) -> int:
         trees.take(root, trees.pr_tree(a.pr), pr_sha, me, locked, exclusive=exclusive)
         merged = trees.merge_main(pr_tree, a.pr, main_sha)
         print(f"bench-ab: building main {main_sha[:9]} in {main_tree}", file=sys.stderr)
-        main_bin = trees.build(main_tree)
-        main_said = ask_binary(main_bin, project, tuple(a.sets), "main")
+        main_bin = trees.build(main_tree, bins=bins)
+        main_said = ask_binary(main_bin, project, tuple(a.sets), "main") if project else None
         print(f"bench-ab: building PR #{a.pr} {pr_sha[:9]} (main merged in: {merged[:9]}) in {pr_tree}",
               file=sys.stderr)
-        pr_bin = trees.build(pr_tree)
-        comparable = check_textures(main_said, ask_binary(pr_bin, project, tuple(a.sets), "the PR"), gate)
+        pr_bin = trees.build(pr_tree, bins=bins)
+        comparable = project is None or check_textures(main_said, ask_binary(pr_bin, project, tuple(a.sets),
+                                                                             "the PR"), gate)
         out = root / "out" / "bench" / "ab" / f"pr-{a.pr}"
-        plan = legs.plan(main_bin, pr_bin, out)
+        plan = legs.plan(main_bin, pr_bin, out) if project else []
+        yard = stress.plan((main_tree, trees.binary(main_tree, trees.PLAY)),
+                           (pr_tree, trees.binary(pr_tree, trees.PLAY)), out, a.runs) if a.stress else []
         prefix, said = capped_scope()
         print(f"bench-ab: {said}", file=sys.stderr)
         ask = legs.Ask(project, a.scenes, a.runs, a.size, tuple(a.sets), a.load_runs, a.no_editor)
 
-        def before_each(leg):
-            return gate.leg(leg.name, refuse.busy_refusal(refuse.busy(ps(), me)))
+        def before(label):
+            return lambda leg: gate.leg(label + leg.name, refuse.busy_refusal(refuse.busy(ps(), me)))
 
-        done = legs.run(plan, ask, prefix, lambda argv: subprocess.run(argv).returncode, before_each)
-        failed = [leg.name for leg, code in done if code != 0]
-        if failed or len(done) != len(plan):
+        def runner(argv):
+            return subprocess.run(argv).returncode
+
+        done = legs.run(plan, ask, prefix, runner, before(""))
+        if len(done) == len(plan) and all(code == 0 for _, code in done):
+            # the PR's tree still holds main merged in: `finally` puts it back only after this
+            done += stress.run(yard, prefix, runner, before("stress "))
+        failed = [("stress " if isinstance(leg, stress.Leg) else "") + leg.name for leg, code in done if code != 0]
+        if failed or len(done) != len(plan) + len(yard):
             print(f"bench-ab: the {', '.join(failed) or 'last'} leg failed: no table", file=sys.stderr)
             return 1
-        header = [f"`make bench-ab` PR #{a.pr}, project `{project.name}`; floor = main again against main",
+        what = f"project `{project.name}`" if project else "the stress yard alone"
+        header = [f"`make bench-ab` PR #{a.pr}, {what}; floor = main again against main",
                   f"- main: {main_sha[:9]}; PR head: {pr_sha[:9]}, measured with main merged in ({merged[:9]})",
                   f"- {said}"]
         header += [] if comparable else ["- **gpu_mb and the load rows are not comparable**: the two builds "
                                          "disagree on the texture cache, so one leg loaded textures uncompressed"]
-        header += [f"- quality preset overridden: {', '.join(a.sets)}"] if a.sets else []
+        header += [f"- quality preset overridden: {', '.join(a.sets)}"
+                   + (" (the scenes only: the stress yard runs at its own)" if yard else "")] if a.sets else []
         header += [f"- FORCE=1 ran past: {o}" for o in gate.overridden]
         legs_dirs = tuple(leg.out for leg in plan)
-        scenes = table.scenes_of_all(legs_dirs[:2])
+        scenes = table.scenes_of_all(legs_dirs[:2]) if plan else []
         header += table.count_changes(scenes, legs_dirs)
-        text = table.render(scenes, legs_dirs, header)
+        text = table.render(scenes, legs_dirs, header, (stress.section(yard),) if yard else ())
+        out.mkdir(parents=True, exist_ok=True)
         (out / "table.md").write_text(text)
         print(text)
         return 0

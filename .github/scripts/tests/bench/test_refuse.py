@@ -15,6 +15,7 @@ PS = """    1 systemd
   101 rustc
   102 bench-scenes
   103 python3
+  105 play
   104 cargo-nextest
   200 bash
 """
@@ -61,7 +62,8 @@ class Flags(unittest.TestCase):
 
 class Busy(unittest.TestCase):
     def test_builds_and_benches_are_found_and_this_process_is_not(self):
-        self.assertEqual(refuse.busy(PS, 101), ["cargo (PID 100)", "bench-scenes (PID 102)", "cargo-nextest (PID 104)"])
+        self.assertEqual(refuse.busy(PS, 101), ["cargo (PID 100)", "bench-scenes (PID 102)", "play (PID 105)",
+                                                    "cargo-nextest (PID 104)"])
         self.assertIn("runs alone", refuse.busy_refusal(refuse.busy(PS, 0)))
         self.assertIsNone(refuse.busy_refusal(refuse.busy("  1 systemd\n 5 bash\n", 0)))
 
