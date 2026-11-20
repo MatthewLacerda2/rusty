@@ -1,9 +1,11 @@
-//! The lines under a scene's table: what the run could not measure, what a
-//! row in parts or the load rows are, and what it was compared with.
+//! The lines around a scene's table: under its title, what the run changed
+//! and a Scene view of another size; under it, what the run could not measure,
+//! what a row in parts or the load rows are, and what it was compared with.
 
 use std::fmt::Write;
 
-use super::{SceneReport, PROFILING_NOTE};
+use super::super::editor;
+use super::{SceneReport, PROFILING_NOTE, SCRIPT_NOTE};
 
 impl SceneReport {
     /// The lines under the table that say what the run could not measure.
@@ -114,7 +116,7 @@ impl SceneReport {
 impl SceneReport {
     /// What the editor round's rows are (#2314), and what of them this adapter
     /// could not measure.
-    fn editor_notes(&self) -> [(bool, &'static str); 2] {
+    fn editor_notes(&self) -> [(bool, &'static str); 3] {
         let round = self.row("editor.ui_ms").is_some();
         let rendered = self.row("editor.renderer_ms").is_some();
         [
@@ -131,9 +133,60 @@ impl SceneReport {
                  run; play_rss_mb the resident memory the first run's Play entry added)",
             ),
             (
+                self.row(editor::VIEW_ROWS[0]).is_some(),
+                "(editor.view_w, editor.view_h: the Scene view's size in pixels, what the \
+                 editor's panels leave of the window; every editor.gpu row shades it, so a \
+                 panel's width moves them)",
+            ),
+            (
                 rendered && self.row("editor.gpu_ms").is_none(),
                 "(editor round: this adapter has no timestamp queries: no editor.gpu rows)",
             ),
         ]
+    }
+}
+
+impl SceneReport {
+    /// What the run changed from a plain one, under the title: the `--set`
+    /// overrides, the verb timers.
+    pub(super) fn run_notes(&self) -> String {
+        let mut out = String::new();
+        if !self.set.is_empty() {
+            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+        }
+        if self.script {
+            out.push_str(SCRIPT_NOTE);
+        }
+        out
+    }
+
+    /// The line heading the table when the editor round's Scene view was drawn at
+    /// another size than `previous`'s (`editor::VIEW_ROWS`): a panel's width
+    /// moves every per-pixel pass, so its GPU rows then compare other pixels.
+    /// `None` when the sizes agree or either report lacks them (one from before
+    /// the rows, or with no round).
+    pub(super) fn view_moved(&self, previous: &SceneReport) -> Option<String> {
+        let against = ["the last run", "the baseline"][usize::from(self.baseline.is_some())];
+        let view = |r: &SceneReport| {
+            let [w, h] = editor::VIEW_ROWS.map(|m| r.row(m).map(|row| row.avg));
+            w.zip(h)
+        };
+        let (now, before) = (view(self)?, view(previous)?);
+        (now != before).then(|| {
+            let px = |(w, h): (f64, f64)| format!("{w:.0}x{h:.0}");
+            format!(
+                "{}the Scene view is {} against {} in {against}: the editor's GPU rows \
+                 are not comparable pixel for pixel",
+                editor::SAID,
+                px(now),
+                px(before)
+            )
+        })
+    }
+
+    /// [`Self::view_moved`] against `comparable` as the table's line, or nothing.
+    pub(super) fn view_line(&self, comparable: Option<&SceneReport>) -> String {
+        let moved = comparable.and_then(|p| self.view_moved(p));
+        moved.map_or_else(String::new, |m| format!("warning: {m}\n"))
     }
 }

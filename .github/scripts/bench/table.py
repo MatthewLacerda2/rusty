@@ -54,6 +54,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from bench import views
+
 
 # The folder under a leg holding the stress runs (`<leg>/stress/<i>/`, `bench/stress.py`):
 # a name `bench-scenes`' `<project>-<hash>/` folders never take, so a project called
@@ -214,7 +216,7 @@ def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     reports = [read(leg, scene) for leg in legs]
     main, pr, again = (averages(r) for r in reports)
     hushed = quiet(reports[0]) | quiet(reports[1])
-    return section(f"**{scene}**", (main, pr, again), notes(scene, legs), hushed)
+    return section(f"**{scene}**", (main, pr, again), views.moved(*reports[:2]) + notes(scene, legs), hushed)
 
 
 def section(title: str, rows: tuple[dict, dict, dict], heading: list[str], hushed: frozenset | set = frozenset()) -> str:
