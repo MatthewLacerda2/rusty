@@ -11,7 +11,7 @@ use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
 /// A scene of `prims` and one clustered panel cut `n` a side, named `panel`.
-fn level(prims: &[Primitive], (panel, n): (&str, u32)) -> Scene {
+pub(super) fn level(prims: &[Primitive], (panel, n): (&str, u32)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
@@ -31,7 +31,7 @@ fn leased(r: &Renderer, name: &str) -> u64 {
     64 * lease.table.len() as u64 + 4 * lease.indices.len() as u64
 }
 
-fn resident(r: &Renderer) -> Vec<String> {
+pub(super) fn resident(r: &Renderer) -> Vec<String> {
     let mut ids: Vec<String> = r.gpu_meshes.keys().map(|id| id.0.clone()).collect();
     ids.sort();
     ids

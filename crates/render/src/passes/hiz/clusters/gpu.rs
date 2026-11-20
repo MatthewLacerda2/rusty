@@ -66,6 +66,8 @@ impl crate::Renderer {
         id: &crate::MeshId,
         (clusters, indices): (Option<&Clusters>, &[u32]),
     ) {
+        // Noted again below only if the pool refuses it this time.
+        self.retained.residency.refused.remove(id);
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
@@ -83,12 +85,8 @@ impl crate::Renderer {
         let lease = pipes
             .pool
             .lease(at, &pipes.pool_layout, (clusters, indices));
-        let refused = &mut self.retained.residency.refused;
-        match lease.is_some() {
-            true => refused.remove(id),
-            false => refused.insert(id.clone()),
-        };
         if lease.is_none() {
+            self.retained.residency.refused.insert(id.clone());
             log::warn!(
                 "[Render] {}: its {} clusters do not fit the cluster pool under the device's \
                  storage binding limit; it is drawn whole",

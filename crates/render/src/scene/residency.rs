@@ -17,8 +17,15 @@
 //!   main view just left, which is dropped with its objects and records. The one
 //!   kept past it is the edit scene a Play started on (`held`): a play-mode
 //!   `Scene.Load` leaves it in the editor's snapshot, and Stop draws it again.
-//! - **Used** is the meshes those scenes' objects name (inactive ones included)
-//!   and the mesh particles their emitters drew. A release drops the buffers and
+//!   Any step from a frame not playing to one playing is a Play entry and holds
+//!   the scene drawn before it, also when the entry tick loaded another (a
+//!   bootstrap scene's `Start()` calling `Scene.Load`).
+//! - **Used** is the meshes those scenes' objects name (inactive ones included),
+//!   the mesh of each of their Mesh-mode emitters (inactive or emitting nothing
+//!   included, noted by `push_mesh_particles` each frame it walks them), and the
+//!   meshes a pending `Scene.LoadAsync` warm-up made, until its `Warming` is
+//!   dropped (its load swapped in or was abandoned): a scene that opens the next
+//!   load in its first tick keeps what that warm-up already uploaded. A release drops the buffers and
 //!   the mesh's `GpuClusters`, whose lease gives the cluster pool its ranges;
 //!   the handle stays interned, so an upload under it later is a plain one.
 //! - **A mesh the pool refused** (`refused`) is retried after a release freed
@@ -27,6 +34,7 @@
 //!   upload.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Weak};
 
 use super::MeshHandle;
 use crate::{MeshId, Renderer};
@@ -39,10 +47,13 @@ pub(crate) struct Residency {
     main: Option<(SceneId, bool)>,
     /// The edit scene Play started on, kept loaded until Stop.
     held: Option<SceneId>,
-    /// Per kept scene, the meshes its mesh particles drew.
+    /// Per kept scene, the meshes its Mesh-mode emitters name.
     particles: BTreeMap<SceneId, BTreeSet<MeshHandle>>,
     /// Meshes resident without clusters because the pool was full.
     pub(crate) refused: BTreeSet<MeshId>,
+    /// Per pending `Scene.LoadAsync` warm-up (alive while its `Warming` is), the
+    /// meshes it made: used until its load swaps in or is abandoned.
+    warmed: Vec<(Weak<()>, BTreeSet<MeshId>)>,
 }
 
 impl Residency {
@@ -51,11 +62,29 @@ impl Residency {
         let last = self.main.replace((id, playing));
         match (last, playing) {
             (_, false) => self.held = None,
-            (Some((was, false)), true) if was == id => self.held = Some(id),
+            // A Play entry, even one whose first tick loaded a scene (a bootstrap
+            // `Start()` calling `Scene.Load`): the edit scene Stop goes back to.
+            (Some((was, false)), true) => self.held = Some(was),
             _ => {}
         }
         let left = last.map(|(was, _)| was).filter(|&was| was != id)?;
         Some(left)
+    }
+
+    /// The warm-up alive as `token` made mesh `id`.
+    pub(crate) fn warmed(&mut self, token: &Arc<()>, id: MeshId) {
+        let at = (self.warmed.iter()).position(|(w, _)| w.as_ptr() == Arc::as_ptr(token));
+        let at = at.unwrap_or_else(|| {
+            self.warmed.push((Arc::downgrade(token), BTreeSet::new()));
+            self.warmed.len() - 1
+        });
+        self.warmed[at].1.insert(id);
+    }
+
+    /// What the warm-ups still alive made; a dropped one's notes go.
+    fn warming(&mut self) -> impl Iterator<Item = &MeshId> {
+        self.warmed.retain(|(token, _)| token.strong_count() > 0);
+        self.warmed.iter().flat_map(|(_, ids)| ids)
     }
 
     /// Scene `id`'s objects are gone: so are its particles' notes.
@@ -72,7 +101,7 @@ pub(crate) struct Released {
 }
 
 impl Renderer {
-    /// A mesh particle of scene `id` drew mesh `handle`.
+    /// A Mesh-mode emitter of scene `id` names mesh `handle`.
     pub(crate) fn note_particle_mesh(&mut self, id: SceneId, handle: MeshHandle) {
         let residency = &mut self.retained.residency;
         residency.particles.entry(id).or_default().insert(handle);
@@ -112,14 +141,18 @@ impl Renderer {
         self.retained.residency.forget(id);
     }
 
-    /// Release every GPU mesh no kept scene's objects or mesh particles name.
+    /// Release every GPU mesh no kept scene's objects or mesh emitters name, and no
+    /// pending warm-up made.
     pub(crate) fn release_unused_meshes(&mut self) -> Released {
-        let retained = &self.retained;
+        let retained = &mut self.retained;
         let objects = retained.scenes.iter().flat_map(|(_, s)| s.objects.values());
         let particles = retained.residency.particles.values().flatten();
         let used: BTreeSet<MeshHandle> =
             objects.map(|o| o.mesh).chain(particles.copied()).collect();
-        let used: BTreeSet<&MeshId> = used.into_iter().map(|h| retained.meshes.id(h)).collect();
+        let mut used: BTreeSet<MeshId> = (used.into_iter())
+            .map(|h| retained.meshes.id(h).clone())
+            .collect();
+        used.extend(retained.residency.warming().cloned());
         let gone: Vec<MeshId> = (self.gpu_meshes.keys())
             .filter(|id| !used.contains(id))
             .cloned()
@@ -183,6 +216,15 @@ mod tests {
     }
 
     #[test]
+    fn a_play_entry_whose_first_tick_loaded_a_scene_holds_the_edit_scene() {
+        let (edit, level) = (SceneId::next(), SceneId::next());
+        let mut r = Residency::default();
+        r.drew(edit, false);
+        assert_eq!(r.drew(level, true), Some(edit), "Start() loaded a level");
+        assert_eq!(r.held, Some(edit), "Stop goes back to the edit scene");
+    }
+
+    #[test]
     fn a_game_playing_from_its_first_frame_holds_nothing() {
         let (a, b) = (SceneId::next(), SceneId::next());
         let mut r = Residency::default();
@@ -195,3 +237,7 @@ mod tests {
 #[cfg(test)]
 #[path = "residency_gpu_tests.rs"]
 mod gpu_tests;
+
+#[cfg(test)]
+#[path = "residency_edges_gpu_tests.rs"]
+mod edges_gpu_tests;

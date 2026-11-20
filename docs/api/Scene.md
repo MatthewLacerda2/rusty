@@ -322,8 +322,8 @@ namespaces hand out ids, not objects, so Unity's `AsyncOperation` is polled thro
 - **What the old scene leaves:** after the new scene's first frame, the renderer
   releases the meshes no loaded scene still uses (Unity's unload of unused assets on
   a non-additive load), so a session of many levels holds one level's meshes, not
-  all of them; a mesh both levels use stays (`Debug.Stats()`'s `mesh_count` and
-  `mesh_bytes`). Textures and lightmaps are not released yet.
+  all of them; a mesh both levels use stays, and so does what a `LoadAsync` still
+  pending has warmed (`Debug.Stats()`'s `mesh_count` and `mesh_bytes`). Textures and lightmaps are not released yet.
 - **What stays on the tick:** the swap itself — the outgoing scene's teardown, the
   World replaced, the physics world built and the navmesh restored.
 - **Loading screens:** a `DontDestroyOnLoad` canvas, shown before the call and

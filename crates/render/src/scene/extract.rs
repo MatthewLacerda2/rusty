@@ -37,8 +37,9 @@ impl Renderer {
         for name in &rs.library_meshes {
             if !scene.meshes.contains_key(name) {
                 let kind = rusty_components::mesh::SCENE_KIND;
-                self.gpu_meshes
-                    .remove(&crate::MeshId(format!("{kind}|{name}")));
+                let id = crate::MeshId(format!("{kind}|{name}"));
+                self.gpu_meshes.remove(&id);
+                self.retained.residency.refused.remove(&id);
             }
         }
         rs.library_meshes = scene.meshes.keys().cloned().collect();
