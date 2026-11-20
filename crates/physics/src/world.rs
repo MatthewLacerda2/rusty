@@ -26,6 +26,7 @@ use rusty_core::collections::Map;
 use rapier3d::prelude::*;
 
 use super::character::ControllerBodies;
+use super::collider_ids::ColliderIds;
 use super::compound::{world_to_local, BodyPlan};
 use super::convert::{from_pose, to_pose};
 use super::events::collision::CollisionEvents;
@@ -65,7 +66,7 @@ pub struct PhysicsWorld {
     /// root), so a hit on a compound reports which part was hit.
     pub(super) collider_to_id: Map<ColliderHandle, u32>,
     /// collider entity id -> its collider handle (inverse of `collider_to_id`).
-    pub(super) id_to_collider: Map<u32, ColliderHandle>,
+    pub(super) id_to_collider: ColliderIds,
     /// Last tick's trigger-overlap pairs, diffed each step to recover the
     /// enter/exit edges (#310). Starts empty, so a play session's first
     /// overlapping tick is an "enter".
@@ -108,7 +109,7 @@ impl PhysicsWorld {
             id_to_body: Map::default(),
             body_to_id: Map::default(),
             collider_to_id: Map::default(),
-            id_to_collider: Map::default(),
+            id_to_collider: ColliderIds::default(),
             prev_triggers: Vec::new(),
             prev_collisions: Vec::new(),
             joints: JointMap::new(),
