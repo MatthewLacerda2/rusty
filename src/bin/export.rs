@@ -100,9 +100,10 @@ fn import_only(project: Option<PathBuf>) -> ! {
         Ok(done) => {
             let t = &done.textures;
             println!(
-                "import: {} model sources up to date; {} images compressed, {} failed \
-                 (they draw uncompressed)",
+                "import: {} model sources up to date, {} cooked models written; {} images \
+                 compressed, {} failed (they draw uncompressed)",
                 done.sources.len(),
+                done.cooked,
                 t.encoded,
                 t.failed.len(),
             );

@@ -24,6 +24,7 @@ mod bin;
 mod read;
 mod write;
 
+pub(crate) use bin::Bin;
 pub use read::{image_files, image_uris};
 pub use write::{container, write};
 

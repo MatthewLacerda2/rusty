@@ -96,6 +96,9 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
 /// shipped game reads them but never rewrites them; the graphics defaults are what
 /// a first launch's options fall back to, #1438), then Play entered for good.
 fn world(plan: &rusty_core::project::BootPlan, settings: ProjectSettings) -> GameWorld {
+    // Standalone before the startup scene's import: a player built with `dev` or
+    // `editor` too reads the cooked models and writes none (`asset::cook`).
+    rusty_asset::convert::mark_standalone();
     let mut game = boot::load_game(plan);
     game.open_project(ProjectSource::ReadOnly(settings));
     game.boot_standalone();
