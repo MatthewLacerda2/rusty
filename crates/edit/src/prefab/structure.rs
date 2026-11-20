@@ -154,7 +154,8 @@ fn add_missing(
         // A reference to a node not stamped yet has no id: the rebuild that
         // follows sets every reference from the baseline anyway.
         let id_of = |l: u32| instance.get(&l).copied().unwrap_or(GONE);
-        let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link));
+        let imports = &mut rusty_scene::rehydrate::Imports::default();
+        let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link), imports);
         // Linked through `set_parent`, so the parent's children list has it.
         (stamped.entity.parent_id, stamped.entity.children) = (None, Vec::new());
         hung.extend(stamped.hung);

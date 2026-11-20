@@ -24,10 +24,18 @@ pub use rusty_scene::prefab_link::{is_model_source, GONE};
 /// The source at `path` as a prefab: the `.prefab` document, or the model's node
 /// tree as its current import builds it.
 pub fn read_source(path: &str) -> Result<PrefabData, String> {
+    read_source_in(path, &mut rusty_scene::rehydrate::Imports::default())
+}
+
+/// [`read_source`] within a pass whose `imports` look each model up once.
+pub fn read_source_in(
+    path: &str,
+    imports: &mut rusty_scene::rehydrate::Imports,
+) -> Result<PrefabData, String> {
     if !is_model_source(path) {
         return read_prefab_file(path);
     }
-    let asset = rusty_asset::imported(std::path::Path::new(path)).map_err(|e| e.to_string())?;
+    let asset = imports.of(path).map_err(|e| e.to_string())?;
     Ok(crate::model_instance::model_prefab(path, &asset))
 }
 

@@ -20,7 +20,8 @@ fn stop_restoring_the_play_snapshot_reads_rebuild() {
 
 mod geometry {
     //! Stop takes each mesh Play left as it was back from the World Play leaves,
-    //! importing nothing, and rebuilds every other one from its reference.
+    //! copying nothing and looking each file up once, and rebuilds every other one
+    //! from its reference.
 
     use glam::Vec3;
 
@@ -53,7 +54,7 @@ mod geometry {
     }
 
     #[test]
-    fn stop_after_an_untouched_play_imports_nothing() {
+    fn stop_after_an_untouched_play_looks_each_file_up_once_and_copies_nothing() {
         let (mut scene, ids, _) = level("rusty_stop_untouched", 30);
         let edit: Vec<_> = ids.iter().map(|&id| drawn(&scene, id)).collect();
         let revisions: Vec<_> = ids
@@ -61,13 +62,11 @@ mod geometry {
             .map(|&id| scene.world.mesh(id).unwrap().revision)
             .collect();
         let snapshot = SceneSnapshot::capture(&scene); // Play
-        let before = lookups();
+        let (before, rebuilt) = (lookups(), rusty_scene::rehydrate::rebuilds());
         snapshot.restore(&mut scene); // Stop
-        assert_eq!(
-            lookups(),
-            before,
-            "no import for a mesh Play left as it was"
-        );
+        assert_eq!(lookups(), before + 1, "the quad's file, once, to check it");
+        let rebuilt = rusty_scene::rehydrate::rebuilds() - rebuilt;
+        assert_eq!(rebuilt, 0, "no copy of a mesh Play left as it was");
         for (i, &id) in ids.iter().enumerate() {
             assert_eq!(drawn(&scene, id), edit[i], "entity {id}");
             assert_eq!(scene.world.mesh(id).unwrap().revision, revisions[i]);
@@ -117,5 +116,23 @@ mod geometry {
             );
         }
         assert_eq!(follow.follow(&mut scene), 0, "already read: not read twice");
+    }
+
+    /// The model missing when Play began, so every copy drew nothing, and put back
+    /// during Play: Stop's lookup retries the import.
+    #[test]
+    fn stop_retries_an_import_that_failed_at_play_entry() {
+        let (mut scene, ids, path) = level("rusty_stop_retried", 2);
+        let gltf = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let data = crate::serialize::to_scene_data(&scene);
+        crate::serialize::apply_scene_data(&mut scene, data); // a load without it
+        assert!(drawn(&scene, ids[0]).1.is_empty(), "the file is gone");
+        let snapshot = SceneSnapshot::capture(&scene); // Play
+        std::fs::write(&path, gltf).unwrap();
+        snapshot.restore(&mut scene); // Stop
+        for &id in &ids[..2] {
+            assert_eq!(drawn(&scene, id).1.len(), 6, "entity {id}: imported again");
+        }
     }
 }

@@ -11,10 +11,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::rehydrate::{rehydrate_in, take_live, Imports};
+use crate::rehydrate::{adopt_or_rehydrate, Imports, Keep};
 use crate::{Despawn, Scene};
-use rusty_components::MeshComponent;
-use rusty_core::fs::written::Stale;
 use rusty_ecs::Recorded;
 
 use super::{side::Side, Step};
@@ -61,14 +59,10 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
     let world = &mut scene.world;
     let mut rebuilt = Vec::new();
     let mut imports = Imports::default();
-    // Undo's restore runs on an edit frame, whose model follow catches a write.
-    let written = Stale::new(Vec::new());
     for recorded in entities.into_values().flatten() {
         let Recorded { mut doc, seq } = recorded;
-        let same = |m: &MeshComponent, l: &MeshComponent| m.same_source(l);
-        if !take_live(world, &mut doc, same, &written, &mut imports) {
-            // Rebuilds the collider's meshes too.
-            rehydrate_in(&mut doc, &mut imports);
+        // Undo's restore runs on an edit frame, whose model follow catches a write.
+        if adopt_or_rehydrate(world, &mut doc, Keep::SameSource, &mut imports) {
             rebuilt.push(doc.id);
         }
         world.restore_entity(doc, seq);

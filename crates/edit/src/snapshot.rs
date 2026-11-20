@@ -46,9 +46,6 @@ pub struct SceneSnapshot {
     /// What the edit scene last read or wrote at its bake sidecars (#1982): a Play
     /// load adds its own, which Stop drops.
     bake_files: rusty_scene::io::BakeFiles,
-    /// The write-log generation at capture: a model written after it is rebuilt on
-    /// Stop rather than taken back from the World Play leaves.
-    read_at: u64,
 }
 
 impl SceneSnapshot {
@@ -66,7 +63,6 @@ impl SceneSnapshot {
             occlusion: (*scene.occlusion).clone(),
             navmesh: scene.navmesh.clone(),
             bake_files: scene.bake_files().clone(),
-            read_at: rusty_core::fs::written::written_since(u64::MAX).0,
         }
     }
 
@@ -75,7 +71,7 @@ impl SceneSnapshot {
     /// persistent ones too (#1518), as Unity's play-mode revert does.
     /// Consumes the snapshot since a snapshot is single-use per Play session.
     pub fn restore(self, scene: &mut Scene) {
-        apply_world_data(scene, self.data, self.read_at);
+        apply_world_data(scene, self.data);
         scene.decals.restore(self.decals);
         // Re-apply the baked SH the document-level apply dropped (it only carries
         // probe positions). Positions are identical, so this overwrites cleanly.
@@ -90,6 +86,9 @@ impl SceneSnapshot {
     }
 }
 
+#[cfg(test)]
+#[path = "snapshot_linked_tests.rs"]
+mod linked_tests;
 #[cfg(test)]
 #[path = "snapshot_tests.rs"]
 mod tests;

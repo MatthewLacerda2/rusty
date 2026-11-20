@@ -10,13 +10,16 @@
 
 mod adopt;
 mod collider;
+mod counts;
 mod imports;
 mod rebuilt;
 mod warned;
 
-pub(crate) use adopt::take_live;
+pub use adopt::{adopt_or_rehydrate, take_live, unbind, Keep};
 pub use collider::{refit_collider, Which};
-pub(crate) use imports::Imports;
+#[doc(hidden)]
+pub use counts::rebuilds;
+pub use imports::Imports;
 use rebuilt::RehydratedMesh;
 use warned::warn_once;
 pub use warned::warn_once_of;
@@ -29,13 +32,15 @@ use crate::create::{primitive_revision, subdivided_geometry, Primitive};
 use rusty_asset::{MeshRevision, SubMesh};
 use rusty_components::Entity;
 
-/// A document with every mesh rebuilt from its reference, and the write-log stamp
-/// taken once they were (`meshes_read_at`, #1242): the file-only half of a load,
-/// which never touches a live scene (#2123).
+/// A document with every mesh rebuilt from its reference, the write-log stamp
+/// taken once they were (`meshes_read_at`, #1242), and the model lookups the
+/// rebuild made, which the prefab propagation applying it reuses: the file-only
+/// half of a load, which never touches a live scene (#2123).
 #[derive(Clone)]
 pub struct RehydratedScene {
     data: crate::serialize::SceneData,
     read_at: u64,
+    imports: Imports,
 }
 
 impl RehydratedScene {
@@ -53,7 +58,11 @@ impl RehydratedScene {
         for entity in &mut data.entities {
             rehydrate_in(entity, &mut imports);
         }
-        Self { data, read_at }
+        Self {
+            data,
+            read_at,
+            imports,
+        }
     }
 
     /// The document, for the id moves a load makes before applying it
@@ -67,9 +76,9 @@ impl RehydratedScene {
         &self.data
     }
 
-    /// The document and its stamp, for `serialize`'s apply.
-    pub fn into_parts(self) -> (crate::serialize::SceneData, u64) {
-        (self.data, self.read_at)
+    /// The document, its stamp and its pass's lookups, for `serialize`'s apply.
+    pub fn into_parts(self) -> (crate::serialize::SceneData, u64, Imports) {
+        (self.data, self.read_at, self.imports)
     }
 }
 
@@ -140,7 +149,7 @@ pub fn rehydrate_entity_mesh(entity: &mut Entity) {
 }
 
 /// [`rehydrate_entity_mesh`] within a pass that looks each file up once.
-pub(crate) fn rehydrate_in(entity: &mut Entity, imports: &mut Imports) {
+pub fn rehydrate_in(entity: &mut Entity, imports: &mut Imports) {
     if let Some(mesh) = &mut entity.mesh {
         hold_fields(entity.id, mesh);
         let rebuilt = rehydrate_one(mesh, imports);
@@ -191,6 +200,7 @@ pub fn install_sub_mesh(mesh: &mut crate::MeshComponent, sub: &SubMesh, revision
 /// mesh starts at its rest pose, and the animation system repopulates the posed
 /// palette once a clip plays. `Scene::sync_skeleton` binds the bones.
 fn install(mesh: &mut crate::MeshComponent, rebuilt: RehydratedMesh) {
+    counts::count_rebuild();
     mesh.vertices = rebuilt.vertices;
     mesh.indices = rebuilt.indices;
     mesh.ranges = rebuilt.ranges;

@@ -56,9 +56,9 @@ mod reads;
 mod revision;
 mod size;
 
+use counts::{count_lookup, count_parse};
 #[doc(hidden)]
 pub use counts::{forget, lookups, parses};
-use counts::{LOOKUPS, PARSES};
 use reads::{files_of, stamp, Files, Stamp};
 pub(crate) use reads::{glb_json, parsed};
 pub use revision::MeshRevision;
@@ -157,7 +157,7 @@ fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
 /// one when the file, its settings and the write log say it is current, a fresh
 /// [`super::import_file`] otherwise.
 pub fn imported(path: &Path) -> Result<Imported, ImportError> {
-    LOOKUPS.set(LOOKUPS.get() + 1);
+    count_lookup();
     let key = path.to_string_lossy().into_owned();
     // The one conversion check: a re-conversion notes the source in the write
     // log, which the lookup below drains.
@@ -179,7 +179,7 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     if let Some(import) = held {
         return Ok(import);
     }
-    PARSES.set(PARSES.get() + 1);
+    count_parse();
     // Stamped before the parse: a write during it is a change next time.
     let files = files_of(&read, &settings.humanoid.clips_from);
     // With its meshes' decompositions, from the hull sidecar (#1940).
