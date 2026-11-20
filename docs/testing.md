@@ -1332,6 +1332,17 @@ every binary's open makes them.
     rows are absent and the report says so; with no adapter the round has no rows,
     and at a size whose Scene view the editor's panels leave no room (320x180 is
     one) it draws nothing and warns;
+  - `editor.view_w` and `editor.view_h`: the size in pixels the Scene view was
+    drawn at (its colour target's), what the panels leave of the window. Every
+    per-pixel pass shades it, so a change to a panel's width (the Hierarchy, the
+    Inspector, the chrome) moves every `editor.gpu` row alike with no change to the
+    renderer. Both rows always print, their change column `=` or the other size,
+    never a percentage; when the last run's (or `BEFORE=`'s) view was another size
+    in whole pixels, a warning above the table names both sizes and says the
+    editor's GPU rows are not comparable pixel for pixel, and `bench-ab`'s table
+    opens the scene's section with the same line when `main`'s and the PR's differ,
+    keeping the two rows out of its lead. A report
+    from before these rows reads as absent: no line;
   - `play_enter_ms` (edit mode to the first Play tick done: the snapshot, Play's
     entry, the first `FixedUpdate`; **not** the texture refresh the editor runs
     before every Play, `asset::texture_import::refresh_all`, which compresses

@@ -186,3 +186,6 @@ fn ms_since(start: Instant) -> f64 {
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+#[path = "view_tests.rs"]
+mod view_tests;
