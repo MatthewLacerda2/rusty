@@ -5,7 +5,9 @@
 use glam::{Vec2, Vec4};
 
 use super::*;
-use rusty_components::{CanvasComponent, ImageType, RectTransformComponent};
+use rusty_components::{
+    CanvasComponent, ImageComponent, ImageType, RectTransformComponent, TextComponent,
+};
 use rusty_scene::Scene;
 
 #[path = "canvas.rs"]

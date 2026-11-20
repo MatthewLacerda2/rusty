@@ -393,8 +393,9 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   draws the game's screen UI only while its **UI** overlay toggle is on (see
   *Authoring in the editor*); a targetless view given no output (the
   reflection-probe cubemap capture) never does.
-- **What.** The layout is recomputed for the view's pixel size with the same pure
-  `UiLayout::compute` the sim runs, then walked in draw order. A graphic draws when it
+- **What.** The view lays out at its own pixel size with the same pure
+  `UiLayout::compute_in` the sim runs (kept while its inputs hold, *Dirty*), then
+  walked in draw order. A graphic draws when it
   and every ancestor are `active`.
 - **Colour space.** UI blends in **display (sRGB-encoded) space with premultiplied
   alpha**, the way designers author it: 50% white over black is mid-grey `128`, as in
@@ -417,8 +418,25 @@ batch together as `Normal` solid geometry; the scan line's `Additive` is a new b
   An entity with several graphics draws its `Image`, then its `Shape`, then its `Text`.
 - **Dirty.** Each view keeps every root canvas's mesh beside its buffer, with what
   it was built from: the canvas's laid-out rects, the frame it is meshed into, the
-  size of every texture it read and the glyph atlases' generation. The layout is
-  recomputed every frame; a canvas is meshed again only when one of those differs or
+  size of every texture it read and the glyph atlases' generation. The view keeps
+  its layout too, and lays out again only when something the layout reads changed:
+  an element's `RectTransform`, `LayoutGroup` or `LayoutElement`, a non-root
+  element's `Transform` rotation and scale, the hierarchy (a parent, the order of
+  siblings) or active flags, the `Image` or `Text` of an element its content sizes
+  (one with a `LayoutElement`, or under a `LayoutGroup`), a root Canvas's sort
+  order, size, scale factor and whether it is world space (not which screen-space
+  mode), whether a Canvas is a root, the screen size or the texture
+  sizes, and, while a `WorldAnchor` marker is placed (active, under a screen-space
+  canvas seen through a camera), the camera or a marker's target moving
+  (`RenderCounters::ui_laid_out`, and one `ui_relaid_<reason>` counter per reason). A
+  write is compared, not trusted: one that leaves what the layout reads as it was
+  (a script setting the value already set) lays nothing out. A label's changing
+  string outside a group, a Canvas's sway and tilt, a world canvas carried around and
+  an inactive marker (a pooled damage number) only move where the rects land, or
+  draw nothing, so they lay nothing out; activating the marker does, hidden behind
+  the camera when it was last laid out or not. A
+  canvas is meshed again only when its rects, its frame, a texture size it read or
+  the glyph atlases' generation differ, or
   a write touched one of its elements' UI components (`Image`, `Text`, `Shape`,
   `Mask`, `RectMask`, `CanvasGroup`, `BackdropFilter`) or active flags, which the
   World's change log reports. The `Canvas` component's own placement (`sway` and its
