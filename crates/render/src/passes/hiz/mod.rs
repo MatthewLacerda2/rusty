@@ -107,7 +107,7 @@ mod args_gpu_tests;
 #[cfg(test)]
 mod cluster_floor_gpu_tests;
 #[cfg(test)]
-mod cluster_gpu_tests;
+pub(crate) mod cluster_gpu_tests;
 #[cfg(test)]
 mod copy_gpu_tests;
 #[cfg(test)]

@@ -23,7 +23,7 @@ pub(super) fn panel(scene: &mut Scene, name: &str, at: (Vec3, f32, Quat)) -> u32
 }
 
 /// [`panel`] cut `n`×`n` (at least 46, for the import's `MIN_TRIANGLES`).
-pub(super) fn panel_of(
+pub(crate) fn panel_of(
     scene: &mut Scene,
     (name, n): (&str, u32),
     (at, size, turn): (Vec3, f32, Quat),

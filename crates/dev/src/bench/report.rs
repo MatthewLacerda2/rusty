@@ -48,6 +48,10 @@ pub struct Report {
     /// with another tree's shaders says so in its own report.
     #[serde(default)]
     pub engine: Option<EngineStamp>,
+    /// The later windows whose rows a kept run holds, each `<window>.<row>`
+    /// (`bench::window`): what tells a window's rows from a set's (`cpu.`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub windows: Vec<String>,
 }
 
 /// Per-frame samples, kept in the order metrics were first seen.
@@ -160,7 +164,8 @@ impl Report {
     }
 
     /// The table the terminal shows: one row per metric, with the change in its
-    /// average against `previous` where that run measured it too.
+    /// average against `previous` where that run measured it too, and "absent on
+    /// the last run" where it did not.
     pub fn render(&self, previous: Option<&Report>) -> String {
         let before: BTreeMap<&str, &Summary> = previous
             .map(|p| p.metrics.iter().map(|(k, s)| (k.as_str(), s)).collect())
@@ -172,9 +177,11 @@ impl Report {
             "metric", "avg", "p95"
         );
         for (metric, s) in &self.metrics {
-            let delta = before
-                .get(metric.as_str())
-                .map_or(String::new(), |b| change(b.avg, s.avg));
+            let delta = match (previous, before.get(metric.as_str())) {
+                (_, Some(b)) => change(b.avg, s.avg),
+                (Some(_), None) => "absent on the last run".to_string(),
+                (None, None) => String::new(),
+            };
             let _ = writeln!(
                 out,
                 "{metric:<22} {:>12} {:>12}  {delta}",
