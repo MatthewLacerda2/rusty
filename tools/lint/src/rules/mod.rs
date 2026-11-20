@@ -30,6 +30,7 @@ mod full_literal;
 mod fullscreen_triangle;
 mod gpu_default_only;
 mod gpu_ops;
+mod held_warn;
 mod ignored;
 mod key_guard;
 mod log_tag;
@@ -111,6 +112,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     ),
     (gpu_default_only::RULE, gpu_default_only::run, Allow::Inline),
     (gpu_ops::RULE, gpu_ops::run, Allow::Inline),
+    (held_warn::RULE, held_warn::run, Allow::Inline),
     (ignored::RULE, ignored::run, Allow::Never),
     (key_guard::RULE, key_guard::run, Allow::Never),
     (log_tag::RULE, log_tag::run, Allow::Inline),

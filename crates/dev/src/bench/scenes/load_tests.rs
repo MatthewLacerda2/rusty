@@ -70,7 +70,7 @@ fn one_load_stands_as_load_ms_with_no_cold_row() {
 
 /// A project of one scene holding a model instanced twice, the file forgotten by
 /// this thread's import cache so the load parses it.
-fn project_with_a_model() -> std::path::PathBuf {
+pub(super) fn project_with_a_model() -> std::path::PathBuf {
     let root = rusty_test_support::temp::dir().join(format!("load_rows_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("assets/scenes")).unwrap();
@@ -125,12 +125,13 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         (CONVERTED.to_string(), 0.0),
         "a glTF converts nothing"
     );
+    assert_eq!(counts[2].0, "models_cooked");
     tiles(&load, &want);
     // Rendered (an adapter was there): the texture and upload counts follow.
-    if counts.len() > 2 {
+    if counts.len() > 3 {
         let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
         assert_eq!(
-            names[2..],
+            names[3..],
             ["textures_compressed", "textures_decoded", "upload_mb"]
         );
     }
