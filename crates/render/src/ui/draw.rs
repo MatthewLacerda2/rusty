@@ -67,11 +67,16 @@ impl Renderer {
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = view.ui.layout.update(&scene.world, &ui_view);
         self.lap("ui.layout");
+        let due = self.notes_due();
         for path in texture_paths(scene, &layout) {
-            self.note_map(scene.id(), path.as_str());
             let tex = self.load_texture(&path);
-            self.ui_renderer
-                .bind_group(&self.device, Some((path.as_str(), Rc::clone(&tex))));
+            let rebuilt =
+                (self.ui_renderer).bind_group(&self.device, path.as_str(), Rc::clone(&tex));
+            // On a due render, or when this image's group was rebuilt: its texture
+            // changed (`scene::residency::notes`).
+            if due || rebuilt {
+                self.note_map(scene.id(), path.as_str());
+            }
         }
         self.lap("ui.textures");
         let textures = &self.gpu_textures;
@@ -217,6 +222,30 @@ fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
 }
 
 impl super::UiRenderer {
+    /// The bind group sampling image `path`'s `tex`, creating and caching it on
+    /// first use or when the texture behind the path changed; whether it was built
+    /// now.
+    fn bind_group(
+        &mut self,
+        device: &wgpu::Device,
+        path: &str,
+        tex: Rc<crate::GpuTexture>,
+    ) -> bool {
+        let fresh = self
+            .textures
+            .get(path)
+            .is_some_and(|(cached, _)| Rc::ptr_eq(cached, &tex));
+        if !fresh {
+            let sampler = self
+                .image_samplers
+                .entry(tex.filter)
+                .or_insert_with(|| crate::gpu::textures::ui_sampler(device, tex.filter));
+            let group = super::bind(device, &self.layout, &tex.view, sampler);
+            self.textures.insert(path.to_string(), (tex, group));
+        }
+        !fresh
+    }
+
     /// Drop the bind group of every image path `gone` names (a texture residency
     /// released), so its upload is freed.
     pub(crate) fn forget_textures(&mut self, gone: impl Fn(&str) -> bool) {

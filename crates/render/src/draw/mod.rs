@@ -42,6 +42,7 @@ impl Renderer {
     fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
         // What the frame did before (the cameras posed, the render textures synced).
         self.lap("setup");
+        self.open_notes(scene);
         // Keep this view's scene targets sized to it — a cheap no-op unless its size
         // or render scale changed (#355); bloom sizes its own buffers as it runs.
         let size = view.size();
@@ -71,7 +72,7 @@ impl Renderer {
         ) {
             self.global_bind_group_dirty = true;
         }
-        self.note_lightmaps(scene.id(), [&set.pages, &set.directions, &set.masks]);
+        self.note_scene_lightmaps(scene);
 
         // The volumetric fog's volume (#1703) goes back to its stand-in once no
         // camera has run it for a few renders.
@@ -252,12 +253,8 @@ impl Renderer {
         // Update skybox texture if path changed, marking the global bind group dirty
         // so it is rebuilt once (next frame) rather than every camera every frame —
         // the only thing in group 0 that changes outside its persistent buffers (#210).
-        // The sky is noted every frame, as the other holders are: a scene opened
-        // while its sky is already bound still keeps it (`scene::residency::maps`).
-        if !scene.skybox_path.is_empty() {
-            self.note_map(scene.id(), &scene.skybox_path);
-        }
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
+            self.note_map(scene.id(), &scene.skybox_path);
             let path = scene.skybox_path.clone();
             self.skybox_path = path.clone();
             self.skybox_texture = Some(self.load_panorama(&path));
@@ -266,6 +263,9 @@ impl Renderer {
             self.skybox_path = "".to_string();
             self.skybox_texture = None;
             self.global_bind_group_dirty = true;
+        } else if !scene.skybox_path.is_empty() && self.notes_due() {
+            // On its change above, or a due render (`scene::residency::notes`).
+            self.note_map(scene.id(), &scene.skybox_path);
         }
     }
 

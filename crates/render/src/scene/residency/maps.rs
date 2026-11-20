@@ -11,15 +11,15 @@
 //!   from the groups' keys, so a map the walk keeps is one a kept object binds. A
 //!   group binding a released map is dropped with it; none of a kept object's is.
 //! - **UI images, sprite particles, ribbons, mesh emitters' materials and the
-//!   sky's panorama** — noted per scene as each loads its map (`note_map`), since
+//!   sky's panorama** — noted per scene as each binds its map (`note_map`, on the renders `notes`
+//!   makes due), since
 //!   the renderer keeps no World of a held or preview scene to walk; the scene the
 //!   main view draws is walked whole at the release besides (`scene_maps`), so its
 //!   hidden UI, inactive emitters and swap sprites are kept too, and so is the edit
 //!   scene a Play holds, walked once at the Play entry (`note_held_maps`) as Play's
 //!   first tick left it. A Play whose first tick loaded another scene (a bootstrap
 //!   `Start()`) has no World of the edit scene to walk: that held scene keeps what
-//!   it drew. The sky is noted every frame it is bound. The UI's bind
-//!   group per path (`UiRenderer::forget_textures`) goes with a released map.
+//!   it drew. The UI's bind group per path (`UiRenderer::forget_textures`) goes with a released map.
 //! - **A pending `Scene.LoadAsync` warm-up's maps and page lists**, until its
 //!   `Warming` is dropped, as its meshes are.
 //! - **Render textures** (`rt:`) are re-registered by every frame that draws one
@@ -28,6 +28,9 @@
 //! Not holders of a cached upload, so not released here: the decal atlas (its own
 //! copy of each map, at most `decals::atlas::MAX_LAYERS` layers, reclaimed when
 //! full) and bloom's lens dirt (its own cache, `postfx::effects::bloom::cache`).
+//!
+//! A holder notes only on a render where what it binds can have changed
+//! (`notes`): a settled frame notes nothing.
 //!
 //! **Lightmaps**: every cached page list no kept scene last bound (noted per scene
 //! by `note_lightmaps`), no warm-up named and the renderer does not bind is dropped.
@@ -86,6 +89,7 @@ impl Renderer {
     /// Scene `id` drew `map` through a holder other than a material group (a UI
     /// image, a particle, a ribbon, a mesh emitter's material, the sky).
     pub(crate) fn note_map(&mut self, id: SceneId, map: &str) {
+        super::notes::counted();
         let maps = self.retained.residency.maps.entry(id).or_default();
         if !maps.contains(map) {
             maps.insert(MapRef::from(map));
@@ -104,7 +108,8 @@ impl Renderer {
     }
 
     /// Scene `id` bound the lightmap page `lists`.
-    pub(crate) fn note_lightmaps(&mut self, id: SceneId, lists: [&[String]; 3]) {
+    pub(super) fn note_lightmaps(&mut self, id: SceneId, lists: [&[String]; 3]) {
+        super::notes::counted();
         let noted = &mut self.retained.residency.lightmaps;
         let same = |kept: &[Vec<String>; 3]| kept.iter().zip(lists).all(|(k, l)| k == l);
         if !noted.get(&id).is_some_and(same) {

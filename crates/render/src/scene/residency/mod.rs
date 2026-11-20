@@ -60,6 +60,8 @@ pub(crate) struct Residency {
     maps: BTreeMap<SceneId, BTreeSet<MapRef>>,
     /// Per kept scene, the lightmap page lists it last bound (`maps`).
     lightmaps: BTreeMap<SceneId, [Vec<String>; 3]>,
+    /// Whether this render's holders note what they bind (`notes`).
+    notes: notes::Gate,
 }
 
 impl Residency {
@@ -261,6 +263,7 @@ mod tests {
 }
 
 mod maps;
+pub(crate) mod notes;
 
 #[cfg(test)]
 mod gpu_tests;
@@ -276,3 +279,6 @@ mod holders_gpu_tests;
 
 #[cfg(test)]
 mod held_gpu_tests;
+
+#[cfg(test)]
+mod notes_gpu_tests;

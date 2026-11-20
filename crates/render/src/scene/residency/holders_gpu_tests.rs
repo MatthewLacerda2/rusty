@@ -36,7 +36,7 @@ pub(super) fn image(scene: &mut Scene, map: &MapRef) -> u32 {
 }
 
 /// A sprite emitter of `map` holding one live particle in view.
-fn sprites(scene: &mut Scene, map: &MapRef) {
+pub(super) fn sprites(scene: &mut Scene, map: &MapRef) {
     let id = scene.add_entity("Smoke".to_string());
     let mut emitter = ParticleEmitterComponent {
         texture: Some(map.clone()),
