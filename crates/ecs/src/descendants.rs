@@ -52,9 +52,10 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
 impl World {
     /// Push `id`'s child ids onto `out`, allocating nothing once `out` is warm. This
     /// module's walk, `world_space::store`, `world_space::bounds` and the change
-    /// log's stamps read children through it; [`World::children`] clones the list.
-    /// Returns `id`'s static flag, from the same lookup (`false` for a dead id).
-    pub(crate) fn push_children(&self, id: u32, out: &mut Vec<u32>) -> bool {
+    /// log's stamps and the editor's Hierarchy read children through it;
+    /// [`World::children`] clones the list. Returns `id`'s static flag, from the
+    /// same lookup (`false` for a dead id).
+    pub fn push_children(&self, id: u32, out: &mut Vec<u32>) -> bool {
         let Some(core) = self.component::<Core>(id) else {
             return false;
         };

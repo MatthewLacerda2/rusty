@@ -111,6 +111,16 @@ struct Documented<'w> {
 
 first_class!(bundle_rows);
 
+/// `mesh` without its geometry ([`MeshComponent::without_geometry`]) but with its
+/// skin, the joints' names and hierarchy a save reads to strip the bones it rebuilds
+/// on load (`scene::skeleton::strip_bones`): one entry per joint, never per vertex.
+fn saved_mesh(mesh: &MeshComponent) -> MeshComponent {
+    MeshComponent {
+        skin: mesh.skin.clone(),
+        ..mesh.without_geometry()
+    }
+}
+
 /// Build the full component bundle for one `Entity` document — the mandatory
 /// core/name/transform/scripts plus every present optional component, so the
 /// whole entity lands in ONE archetype placement.
@@ -134,6 +144,23 @@ impl World {
     /// Assemble one live entity's columns into a document (serialization).
     pub fn entity_document(&self, id: u32) -> Option<Entity> {
         self.document(id, MeshComponent::clone, ColliderComponent::clone)
+    }
+
+    /// [`World::entity_document`] with every saved field of the mesh and of a
+    /// collider's own meshes and none of their geometry
+    /// ([`MeshComponent::without_geometry`] keeping the skin, which a save reads to
+    /// strip the bones, and [`ColliderComponent::without_geometry`]): a saved
+    /// document is byte-equal either way, since the geometry is never written.
+    pub fn saved_document(&self, id: u32) -> Option<Entity> {
+        self.document(id, saved_mesh, ColliderComponent::without_geometry)
+    }
+
+    /// [`World::collect_entities`] without the meshes' geometry
+    /// ([`World::saved_document`]): what a save, a Play snapshot and the
+    /// unsaved-edits check read, none of which keeps the vertices a load rebuilds.
+    pub fn collect_documents(&self) -> Vec<Entity> {
+        let ids = self.ids().iter();
+        ids.filter_map(|&id| self.saved_document(id)).collect()
     }
 
     /// [`World::entity_document`] with the mesh's reference and none of its

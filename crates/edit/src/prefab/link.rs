@@ -21,60 +21,18 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::authoring::material::drop_unused;
 use crate::prefab::diff::masked;
 use crate::prefab::instance::instance_members;
 use crate::prefab::live::{entity_overrides, keep_root_placement, sync_overrides};
 use crate::prefab::overrides::apply_overrides;
+use crate::prefab::pass::Pass;
 use crate::prefab::restamp::{instance_roots, propagate_roots};
 use crate::prefab::source::{is_model_source, read_source, rekey, GONE};
 use crate::prefab::structure::reshape;
-use crate::prefab::{stamp_prefab, Merge};
 use crate::PrefabData;
 use rusty_components::{Entity, EntityRefs};
-use rusty_scene::serialize::rehydrate_entity_mesh;
+use rusty_scene::rehydrate::{adopt_or_rehydrate, Imports, Keep};
 use rusty_scene::Scene;
-
-/// Build the fresh source baselines for one instance of `source`, keyed by source
-/// `local_id`. Instantiates the source into a SCRATCH scene that borrows `scene`'s
-/// material library (moved in and back, never cloned), so the merge reuses its
-/// entries and rewrites references to the very same library keys the instance uses,
-/// and what it adds comes back with it. A model's keys resolve to the scene's entry
-/// as it stands, an edited one included (`Merge::KeepScene`, #1637). The returned
-/// entities are mesh-rehydrated and carry
-/// their LOCAL ids, component references included (callers move those into the
-/// instance's ids with [`in_instance_space`] and overwrite identity/structure). A
-/// reference to one of the scratch skeleton's bones keeps the bone by name in
-/// `bone_refs` (#1264), naming its skinned entity meanwhile. Also returns the keys
-/// the merge added, for [`drop_unused`] once the instance is rebuilt (#1576).
-fn fresh_baselines(
-    scene: &mut Scene,
-    source: &str,
-    prefab: &PrefabData,
-) -> (BTreeMap<u32, Entity>, Vec<String>) {
-    let mut scratch = Scene::new();
-    scratch.materials = std::mem::take(&mut scene.materials);
-    let merge = Merge::for_source(source);
-    let (root, added) = stamp_prefab(&mut scratch, prefab, None, None, merge);
-    scene.materials = std::mem::take(&mut scratch.materials);
-
-    // Map each scratch entity back to its source local id via subtree order: the
-    // instantiate assigned local `l` -> `base + l`, so subtracting the base recovers
-    // `l`. The base is the scratch root's id minus the prefab root's local id.
-    let base = root.wrapping_sub(prefab.root);
-    let mut docs: Vec<Entity> = scratch
-        .entity_ids()
-        .into_iter()
-        .filter_map(|id| scratch.world.entity_document(id))
-        .collect();
-    scratch.bone_doc_refs(&mut docs);
-    let mut out = BTreeMap::new();
-    for mut entity in docs {
-        entity.remap_refs(&|r| Some(r.wrapping_sub(base)));
-        out.insert(entity.id.wrapping_sub(base), entity);
-    }
-    (out, added)
-}
 
 /// `baselines` (keyed by local id) with their component references moved from
 /// local ids to the ids of the instance entities `ids`, so an untouched reference
@@ -122,24 +80,28 @@ pub(super) fn propagate_from(
     source: &str,
     prefab: &PrefabData,
 ) -> Result<(), String> {
-    rebuild_instance(scene, root_id, source, prefab, true, false)?;
+    let mut imports = Imports::default();
+    let mut pass = Pass::new(&mut imports, false);
+    rebuild_instance(scene, root_id, source, prefab, true, &mut pass)?;
+    pass.finish(scene);
     finish_rebuild(scene);
     Ok(())
 }
 
 /// Rebuild every entity of the instance at `root_id` from `prefab` (its `source` as
 /// already read), re-applying its overrides when `keep` and dropping them
-/// otherwise (a removed part's among them, so it comes back). `applying` says a
-/// document is being applied (`structure::reshape`). Leaves out the whole-scene
-/// passes ([`finish_rebuild`]), which a caller rebuilding many instances runs once
-/// after them (`restamp::propagate_roots`).
+/// otherwise (a removed part's among them, so it comes back). The baselines and
+/// lookups come from `pass`, and whether a document is being applied
+/// (`structure::reshape`). Leaves out the whole-scene passes ([`finish_rebuild`],
+/// [`Pass::finish`]), which a caller rebuilding many instances runs once after
+/// them (`restamp::propagate_roots`).
 pub(super) fn rebuild_instance(
     scene: &mut Scene,
     root_id: u32,
     source: &str,
     prefab: &PrefabData,
     keep: bool,
-    applying: bool,
+    pass: &mut Pass,
 ) -> Result<(), String> {
     let mut ids = require_instance(scene, root_id)?;
     if !keep {
@@ -151,16 +113,13 @@ pub(super) fn rebuild_instance(
     }
     rekey(&mut scene.world, &ids, prefab);
     if is_model_source(source) {
-        ids = reshape(scene, root_id, &ids, source, prefab, applying);
+        ids = reshape(scene, root_id, &ids, source, prefab, pass);
     }
-    let (baselines, added) = fresh_baselines(scene, source, prefab);
+    let baselines = pass.baselines(scene, source, prefab);
     let baselines = in_instance_space(scene, &ids, baselines);
     for id in ids {
-        rebuild_entity(scene, id, &baselines, keep);
+        rebuild_entity(scene, id, &baselines, keep, pass.imports);
     }
-    // Only what a slot still names after the overrides stays: a material deleted
-    // from the scene is not brought back by its prefab's copy (#1576).
-    drop_unused(scene, &added);
     Ok(())
 }
 
@@ -180,14 +139,11 @@ pub(super) fn finish_rebuild(scene: &mut Scene) {
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     require_instance(scene, root_id)?;
     let source = link_source(scene, root_id)?;
-    rebuild_instance(
-        scene,
-        root_id,
-        &source,
-        &read_source(&source)?,
-        false,
-        false,
-    )?;
+    let prefab = read_source(&source)?;
+    let mut imports = Imports::default();
+    let mut pass = Pass::new(&mut imports, false);
+    rebuild_instance(scene, root_id, &source, &prefab, false, &mut pass)?;
+    pass.finish(scene);
     finish_rebuild(scene);
     Ok(())
 }
@@ -223,16 +179,31 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
 /// not tracked until the source is back. Each source is read once, however many
 /// instances it has: a level holding hundreds of one model builds it once. It runs
 /// as a document is applied (`apply_scene_data`), so a part whose node the model
-/// lost goes at once, in Play too (`structure::reshape`).
-pub fn propagate_all_linked_instances(scene: &mut Scene) {
+/// lost goes at once, in Play too (`structure::reshape`). Each model file is
+/// looked up once through `imports`, the lookups of the rehydrate that applied
+/// the document, and a part whose live geometry is still what its source builds
+/// keeps it (`rebuild_entity`).
+pub fn propagate_linked_instances_in(scene: &mut Scene, imports: &mut Imports) {
     let roots = instance_roots(scene, |_| true);
-    propagate_roots(scene, roots, true);
+    propagate_roots(scene, roots, true, imports);
 }
 
-/// Rebuild one instance entity from its baseline, preserving live identity/structure
-/// and (when `keep`) re-applying its override map; the baseline it was built from is
-/// stored on its link, and a root keeps its own placement.
-fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>, keep: bool) {
+/// Rebuild one instance entity from its baseline (recorded without geometry),
+/// preserving live identity/structure and (when `keep`) re-applying its override
+/// map; the baseline it was built from is stored on its link, and a root keeps its
+/// own placement. Its meshes take the live entity's geometry where that is still
+/// what they build ([`Keep::Current`]: the same source, at the baseline's revision,
+/// current in `imports`), and are rebuilt from their reference otherwise: an
+/// override that re-meshes the part, or a source that changed. Either way its
+/// Mesh fields are held, it is unbound from the bones, which `finish_rebuild`
+/// binds, and its collider refit (`adopt_or_rehydrate`).
+fn rebuild_entity(
+    scene: &mut Scene,
+    id: u32,
+    baselines: &BTreeMap<u32, Entity>,
+    keep: bool,
+    imports: &mut Imports,
+) {
     let Some(local_id) = local_id_of(scene, id) else {
         return;
     };
@@ -259,7 +230,7 @@ fn rebuild_entity(scene: &mut Scene, id: u32, baselines: &BTreeMap<u32, Entity>,
         }
     }
     keep_root_placement(&mut rebuilt, placement.as_ref());
-    rehydrate_entity_mesh(&mut rebuilt);
+    adopt_or_rehydrate(&mut scene.world, &mut rebuilt, Keep::Current, imports);
     scene.world.replace_entity(rebuilt);
     // The source file and the overrides are held as a scene file is (#1418).
     crate::authoring::fields::hold_entity(&mut scene.world, id);
