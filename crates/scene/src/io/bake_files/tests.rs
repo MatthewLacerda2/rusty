@@ -73,6 +73,18 @@ fn save_as_writes_the_new_path() {
 }
 
 #[test]
+fn a_copy_takes_its_sources_record_so_saving_it_is_saving_the_source() {
+    let (path, copy) = (
+        file("src.occlusion", b"old"),
+        file("copy.occlusion", b"old"),
+    );
+    let files = loaded(&path);
+    files.copied(&path, &copy);
+    let saved = files.store(&copy, Some(b"old"), "T").unwrap();
+    assert_eq!((saved.action, saved.warning), (Action::Kept, None));
+}
+
+#[test]
 fn holding_none_unbaked_removes_only_the_file_this_world_saw_unchanged() {
     let path = file("cleared.occlusion", b"old");
     let files = loaded(&path);

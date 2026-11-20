@@ -109,17 +109,48 @@ pub enum Spread {
     Cpu,
 }
 
+/// The rows a clock warning names: the CPU row timed at the reference clock, and
+/// the wall-clock rows that move with the clock.
+#[derive(Clone, Copy, Debug)]
+pub struct ClockRows {
+    pub reference: &'static str,
+    pub wall: &'static [&'static str],
+}
+
+/// The game rows' [`ClockRows`]: `cpu_ms`, and `frame_ms` the wall clock.
+pub const GAME_ROWS: ClockRows = ClockRows {
+    reference: "cpu_ms",
+    wall: &["frame_ms"],
+};
+
+impl ClockRows {
+    /// The wall rows as a list, its last two joined by `and` (`or`).
+    fn wall_list(self, and: &str) -> String {
+        match self.wall.split_last() {
+            None => String::new(),
+            Some((last, [])) => (*last).into(),
+            Some((last, rest)) => format!("{} {and} {last}", rest.join(", ")),
+        }
+    }
+}
+
 impl Spread {
-    /// The warning a window spread `by` (a fraction) this way earns.
-    pub fn warning(self, by: f64) -> String {
+    /// The warning a window spread `by` (a fraction) this way earns, naming `rows`.
+    pub fn warning(self, by: f64, rows: ClockRows) -> String {
         let pct = by * 100.0;
+        let reference = rows.reference;
         match self {
-            Self::Clock => format!(
-                "the CPU clock moved {pct:.0}% across the window: frame_ms is unreliable, read cpu_ms"
-            ),
+            Self::Clock => {
+                let verb = if rows.wall.len() > 1 { "are" } else { "is" };
+                format!(
+                    "the CPU clock moved {pct:.0}% across the window: {} {verb} unreliable, \
+                     read {reference}",
+                    rows.wall_list("and")
+                )
+            }
             Self::Cpu => format!(
-                "cpu_ms spread {pct:.0}% across the window: compare p95 with care, and take CPU \
-                 numbers from a small-frame run (docs/testing.md)"
+                "{reference} spread {pct:.0}% across the window: compare p95 with care, and take \
+                 CPU numbers from a small-frame run (docs/testing.md)"
             ),
         }
     }
@@ -150,7 +181,7 @@ pub fn cpu_warnings(samples: &Samples) -> Vec<String> {
     let spreads = cpu_spreads(samples);
     spreads
         .into_iter()
-        .map(|(kind, by)| kind.warning(by))
+        .map(|(kind, by)| kind.warning(by, GAME_ROWS))
         .collect()
 }
 
@@ -161,20 +192,22 @@ pub fn cpu_drift(now: &Report, previous: Option<&Report>) -> Option<String> {
         let row = r.metrics.iter().find(|(k, _)| k == "cpu_clock_pct");
         row.map(|(_, s)| s.avg)
     };
-    clock_drift(clock(now)?, clock(previous?)?)
+    clock_drift(clock(now)?, clock(previous?)?, GAME_ROWS)
 }
 
-/// [`cpu_drift`] on the two runs' average `cpu_clock_pct`s (`None` for a clock
-/// that is not positive).
-pub fn clock_drift(now: f64, before: f64) -> Option<String> {
+/// [`cpu_drift`] on the two runs' average clocks (`None` for a clock that is not
+/// positive), naming `rows`.
+pub fn clock_drift(now: f64, before: f64, rows: ClockRows) -> Option<String> {
     if now <= 0.0 || before <= 0.0 {
         return None;
     }
     let moved = (now - before) / before;
     (moved.abs() > CLOCK_DRIFT).then(|| {
         format!(
-            "the CPU clock moved {:+.0}% since the last run: compare cpu_ms, not frame_ms",
-            moved * 100.0
+            "the CPU clock moved {:+.0}% since the last run: compare {}, not {}",
+            moved * 100.0,
+            rows.reference,
+            rows.wall_list("or")
         )
     })
 }

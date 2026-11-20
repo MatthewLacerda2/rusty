@@ -1,9 +1,11 @@
 //! The editor round end to end (#2314), on a primitive project written to a temp
-//! dir: a floor, a camera and a light probe. Renders when an adapter is there
-//! (hence `gpu_`); without one the round answers `None` and makes no rows up.
+//! dir: a floor with a baked navmesh, a camera and a light probe. Renders when an
+//! adapter is there (hence `gpu_`); without one the round answers `None` and makes
+//! no rows up.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use glam::Vec3;
 use rusty_components::CameraComponent;
@@ -25,6 +27,8 @@ fn project() -> (PathBuf, String) {
     yard.world
         .set_world_position(cam, Vec3::new(0.0, 2.0, -4.0));
     yard.probes.add_probe(Vec3::new(0.0, 1.0, 0.0));
+    let navmesh = rusty_navigation::NavigationGraph::baked_bytes(&yard);
+    yard.put_baked_navmesh(Arc::from(navmesh));
     let path = scenes.join("yard.scene").to_string_lossy().into_owned();
     rusty_edit::save_to_file(&yard, &path).unwrap();
     (root, path)
@@ -47,6 +51,9 @@ fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
+/// The smallest size the editor's panels leave the Scene view room at.
+const SIZE: (u32, u32) = (320, 180);
+
 #[test]
 fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() {
     let (root, scene) = project();
@@ -54,7 +61,7 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
     let save_dir =
         rusty_test_support::temp::dir().join(format!("editor_save_{}", std::process::id()));
     let opts = Round {
-        size: (160, 90),
+        size: (SIZE.0, SIZE.1),
         warmup: 1,
         frames: 2,
         runs: 2,
@@ -70,7 +77,14 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
         return; // no adapter: nothing measured, nothing made up
     };
     let row = |m: &str| round.rows.iter().find(|r| r.metric == m);
-    for metric in ["editor.ui_ms", "play_enter_ms", "play_stop_ms", "save_ms"] {
+    let rows = [
+        "editor.ui_ms",
+        "editor.edit_ms",
+        "play_enter_ms",
+        "play_stop_ms",
+        "save_ms",
+    ];
+    for metric in rows {
         let found = row(metric);
         assert!(
             found.is_some_and(|r| r.avg > 0.0),
@@ -82,7 +96,8 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
         assert!(row(metric).is_some(), "{metric}: {:?}", round.rows);
     }
     if cfg!(any(target_os = "linux", target_os = "macos")) {
-        assert!(row("play_rss_mb").is_some(), "{:?}", round.rows);
+        let rss = row("play_rss_mb").unwrap_or_else(|| panic!("{:?}", round.rows));
+        assert_eq!(rss.lo, rss.hi, "the first run's alone: {rss:?}");
     }
     // Two runs: each single sample has its run-to-run spread.
     let enter = row("play_enter_ms").unwrap();
@@ -93,4 +108,35 @@ fn gpu_the_editor_round_measures_frames_play_stop_and_save_and_writes_nothing() 
     );
     assert_eq!(files(&root), before, "the project is read-only");
     assert!(!save_dir.exists(), "the save is deleted after");
+}
+
+/// The inode of the file at `path` (`None`: no file): a rewrite through
+/// `write_atomic` renames a new file in, so it changes.
+fn inode(path: &Path) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(path).ok().map(|m| m.ino())
+}
+
+#[test]
+fn the_rounds_save_keeps_the_bake_files_as_a_save_of_the_loaded_scene_does() {
+    let (_root, scene) = project();
+    let game = editor_world(&scene, ProjectSettings::default()).unwrap();
+    let dir = rusty_test_support::temp::dir().join(format!("editor_stage_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let save = |name: &str| dir.join(name).to_string_lossy().into_owned();
+    let navmesh = |path: &str| rusty_scene::nav_settings::navmesh_path(path);
+    let world = game.scene().borrow();
+    // A Save As to a path the world has no record of writes the bake there.
+    rusty_edit::save_to_file(&world, &save("as.scene")).unwrap();
+    assert!(navmesh(&save("as.scene")).exists(), "a Save As writes it");
+    let staged = save("staged.scene");
+    stage_save(&world, &scene, &staged).unwrap();
+    let before = inode(&navmesh(&staged));
+    assert!(before.is_some(), "the navmesh is copied beside the save");
+    rusty_edit::save_to_file(&world, &staged).unwrap();
+    assert_eq!(inode(&navmesh(&staged)), before, "kept, not rewritten");
+    let occlusion = rusty_scene::lighting::occlusion::occlusion_path(&staged);
+    assert!(!occlusion.exists(), "none loaded, none written");
+    drop(world);
+    let _ = std::fs::remove_dir_all(&dir);
 }

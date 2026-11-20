@@ -5,6 +5,7 @@ use super::*;
 
 fn ui(ms: f64) -> UiTime {
     UiTime {
+        edit_ms: ms / 2.0,
         ms,
         speed: Some(1.0),
     }
@@ -38,6 +39,7 @@ fn the_meter_folds_each_runs_frames_and_singles_into_rows_with_their_spread() {
     let round = round([2.0, 4.0], [100.0, 140.0]);
     let ui_ms = row(&round, "editor.ui_ms");
     assert_eq!((ui_ms.avg, ui_ms.lo, ui_ms.hi), (3.0, 2.0, 4.0));
+    assert_eq!(row(&round, "editor.edit_ms").avg, 1.5, "a row of its own");
     assert_eq!(row(&round, "editor.cpu_clock_pct").avg, 100.0);
     assert_eq!(row(&round, "editor.render.handles").avg, 0.2);
     assert_eq!(row(&round, "editor.renderer_ms").avg, 0.5);
@@ -57,6 +59,7 @@ fn a_clock_that_moves_inside_a_run_warns_in_the_rounds_own_words() {
     let mut meter = Meter::new();
     for speed in [0.5, 1.0, 1.5, 2.0] {
         let time = UiTime {
+            edit_ms: 0.5,
             ms: 1.0,
             speed: Some(speed),
         };
@@ -68,9 +71,17 @@ fn a_clock_that_moves_inside_a_run_warns_in_the_rounds_own_words() {
     let clock = clock.unwrap_or_else(|| panic!("{warnings:?}"));
     assert!(clock.starts_with("editor round: "), "{clock}");
     assert!(
-        clock.contains("editor run 1") && !clock.contains("read cpu_ms"),
+        clock.contains("editor run 1") && clock.contains("read editor.ui_ms"),
         "{clock}"
     );
+}
+
+#[test]
+fn only_the_first_run_is_a_fresh_process() {
+    let mut meter = Meter::new();
+    assert!(meter.first_run());
+    meter.end_run();
+    assert!(!meter.first_run(), "the pages Play used are resident now");
 }
 
 #[test]

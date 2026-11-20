@@ -114,23 +114,21 @@ impl SceneReport {
 impl SceneReport {
     /// What the editor round's rows are (#2314), and what of them this adapter
     /// could not measure.
-    fn editor_notes(&self) -> [(bool, &'static str); 3] {
+    fn editor_notes(&self) -> [(bool, &'static str); 2] {
         let round = self.row("editor.ui_ms").is_some();
         let rendered = self.row("editor.renderer_ms").is_some();
         [
             (
                 round,
                 "(editor.<row>: the editor round, in a process of its own: the Scene view with \
-                 its default gizmos and the scene's first camera selected; editor.ui_ms the \
-                 editor's UI draw and egui's tessellation at the reference CPU clock, \
-                 editor.render.<stage> and editor.gpu.<pass> its viewport frame; play_enter_ms \
-                 edit mode to the first Play tick, play_stop_ms Stop to the first edit frame \
-                 drawn, save_ms a save beside the reports, wall clock, one a run; play_rss_mb \
-                 the resident memory Play entry added)",
-            ),
-            (
-                round && !rendered,
-                "(editor round: no Scene-view frame rendered: no editor.render or editor.gpu rows)",
+                 its default gizmos and the scene's first camera selected; editor.edit_ms the \
+                 world's edit-mode frame and editor.ui_ms the editor's UI draw and egui's \
+                 tessellation, at the reference CPU clock, editor.render.<stage> and \
+                 editor.gpu.<pass> its viewport frame; play_enter_ms edit mode to the first Play \
+                 tick, without the texture refresh the editor runs before Play (it compresses \
+                 into the project), play_stop_ms Stop to the first edit frame drawn, save_ms a \
+                 save beside the reports that keeps the bake files as loaded, wall clock, one a \
+                 run; play_rss_mb the resident memory the first run's Play entry added)",
             ),
             (
                 rendered && self.row("editor.gpu_ms").is_none(),

@@ -82,5 +82,8 @@ fn the_rounds_clock_drift_since_the_last_run_is_its_own_warning() {
         said[0].starts_with("editor round: the CPU clock moved"),
         "{said:?}"
     );
-    assert!(!said[0].contains("compare cpu_ms"), "{said:?}");
+    assert!(
+        said[0].contains("compare editor.ui_ms, not play_enter_ms"),
+        "{said:?}"
+    );
 }

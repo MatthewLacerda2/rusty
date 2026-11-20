@@ -1256,11 +1256,15 @@ every binary's open makes them.
   headless as `make editor-capture` draws it: the Scene tab with its default gizmos
   (the light probes' among them), the scene's first screen camera selected (its
   outline and gizmo draw), the Scene view posed at the scene's first viewpoint
-  (above: its first camera, or the fallback after it). Each frame is waited on.
-  Then one Play entry, one Stop and one save. Its rows:
-  - `editor.ui_ms`: `EditorUi::draw` and egui's tessellation, at the reference CPU
-    clock as `cpu_ms` is (the CPU probe timed right before and after it;
-    `editor.cpu_clock_pct` is the clock it ran at); the round's clock moving
+  (above: its first camera, or the fallback after it; its position, yaw and pitch,
+  while the lens stays the Scene view's own, as in the editor). Each frame is the
+  windowed editor's outside Play, waited on. Then one Play entry, one Stop and one
+  save. Its rows:
+  - `editor.edit_ms`: the world's edit-mode frame (`GameWorld::edit_frame`: held
+    conversions, the UI's texture sizes, model writes followed, skin palettes);
+  - `editor.ui_ms`: `EditorUi::draw` and egui's tessellation; it and
+    `editor.edit_ms` at the reference CPU clock as `cpu_ms` is (the CPU probe timed
+    right before and after both; `editor.cpu_clock_pct` is the clock they ran at); the round's clock moving
     across a run, or `editor.ui_ms` spreading, warns as a viewpoint's does, and so
     does `editor.cpu_clock_pct` moving since the last run;
   - `editor.renderer_ms`, `editor.render.<stage>`, `editor.gpu.<pass>` (the GPU
@@ -1269,15 +1273,24 @@ every binary's open makes them.
     (`editor.render.handles` is the editor's gizmos, `editor.render.outline` the
     selection's). With no GPU or no timestamp queries (lavapipe) the `editor.gpu`
     rows are absent and the report says so; with no adapter the round has no rows,
-    and at a size whose Scene view the editor's panels leave no room (a few hundred
-    pixels wide) it draws nothing and warns;
+    and at a size whose Scene view the editor's panels leave no room (narrower than
+    about 320x180) it draws nothing and warns;
   - `play_enter_ms` (edit mode to the first Play tick done: the snapshot, Play's
-    entry, the first `FixedUpdate`), `play_stop_ms` (Stop to the first edit frame
-    drawn: the restore, the rehydrate, the frame), `play_rss_mb` (the resident
-    memory, Linux `VmRSS`, macOS `phys_footprint`, after Play entry less before
-    it) and `save_ms` (the scene saved, into a folder beside the reports, deleted
-    after): one sample a run, wall clock as `load_ms` is (a disk write and an
-    allocation do not shrink with the CPU clock), each with its spread.
+    entry, the first `FixedUpdate`; **not** the texture refresh the editor runs
+    before every Play, `asset::texture_import::refresh_all`, which compresses
+    changed images into the project: the round leaves it out to write nothing
+    there, so on a project whose images changed the editor's Play costs more),
+    `play_stop_ms` (Stop to the first edit frame drawn: the restore, the rehydrate,
+    the frame, one that probes no clock and reads back no GPU time) and `save_ms`
+    (the scene saved into a folder beside the reports, deleted after, as the
+    editor's Ctrl+S saves the loaded scene: its bake files are copied there first
+    with the world's record of them, so the save keeps them as Ctrl+S does, where
+    a Save As would rewrite them): one sample a run, wall clock as `load_ms` is (a
+    disk write and an allocation do not shrink with the CPU clock), each with its
+    spread; `play_rss_mb` (the resident memory, Linux `VmRSS`, macOS
+    `phys_footprint`, after Play entry less before it) is the **first run's** alone,
+    what one Play costs a fresh editor: Stop frees the snapshot and the Play scene,
+    but the pages stay resident and the later runs' Play re-uses them.
 
   The round's process is its own, so the game rows' `rss_peak_mb` never holds a
   Play snapshot. Nothing is written into the project: the world's store has no
