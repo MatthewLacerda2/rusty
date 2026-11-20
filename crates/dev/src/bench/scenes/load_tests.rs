@@ -87,10 +87,14 @@ fn project_with_a_model() -> std::path::PathBuf {
     root
 }
 
+/// Alone: `converted` counts the process's conversions. Under `cargo test` the body's
+/// child holds a renderer outside this process's headless budget (`setup::budget`).
 #[test]
 fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
-    // Alone: `converted` counts the process's conversions, any test's.
-    rusty_test_support::alone!(a_load_in_steps);
+    // Checked before `alone!`, so a machine without an adapter starts no child.
+    if rusty_render::test_gpu::headless_or_skip(8, 8).is_some() {
+        rusty_test_support::alone!(a_load_in_steps);
+    }
 }
 
 fn a_load_in_steps() {
@@ -128,14 +132,11 @@ fn a_load_in_steps() {
         "a glTF converts nothing"
     );
     tiles(&load, &want);
-    // Rendered (an adapter was there): the texture and upload counts follow.
-    if counts.len() > 2 {
-        let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
-        assert_eq!(
-            names[2..],
-            ["textures_compressed", "textures_decoded", "upload_mb"]
-        );
-    }
+    let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(
+        names[2..],
+        ["textures_compressed", "textures_decoded", "upload_mb"]
+    );
 }
 
 /// The load's rows: its steps' rows sum to its `load_ms` (nothing timed twice or

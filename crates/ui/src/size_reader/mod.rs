@@ -23,7 +23,10 @@
 //! (a write of any other file is passed over), no retry due, the same measured
 //! paths as last time and no hand edit of the table since
 //! ([`TextureSizes::edits`]) cost one walk of the Images and no copy of the
-//! shared table; it allocates only when the engine wrote something. Headers are
+//! shared table; it allocates only when the engine wrote something. When it did,
+//! even only other files, telling them apart costs a `canonicalize` of each newly
+//! written path and of each measured key ([`Stale`]'s match by another spelling of
+//! the same file), with no sweep after it. Headers are
 //! read before the table is touched, so a retried file that still cannot be read
 //! copies nothing either.
 //!

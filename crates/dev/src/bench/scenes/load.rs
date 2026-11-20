@@ -164,6 +164,8 @@ pub fn load(
     let path = root.join(format!("assets/scenes/{scene}.scene"));
     let clock = StepClock::default();
     let parsed = rusty_asset::import_cache::parses();
+    // The process's count: a bench process converts nothing but its loads, and a
+    // conversion may run on any thread, so a per-thread count could miss one.
     let converted = rusty_asset::convert::conversions();
     let mut probe: Option<Box<dyn LoadProbe>> = Some(Box::new(clock.clone()));
     let path = path.to_string_lossy();

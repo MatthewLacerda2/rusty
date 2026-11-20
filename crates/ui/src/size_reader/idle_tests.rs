@@ -41,7 +41,7 @@ fn a_write_of_another_file_sweeps_nothing() {
     bake_to_png(&Image::new(4), Slot::BaseColor, &path).expect("bake");
     let (scene, id) = fitted_image(&path);
     let mut state = fresh();
-    tick(&scene, id, &mut state);
+    assert_eq!(tick(&scene, id, &mut state), Vec2::splat(4.0));
     let other = rusty_test_support::temp::dir().join("other.bin");
     for n in 0..3u8 {
         // What another test of the binary, or a background bake, does.
@@ -84,10 +84,10 @@ fn a_file_that_cannot_be_read_copies_nothing_on_a_retry() {
     assert!(Rc::ptr_eq(&held, &state.1), "a failed read copies nothing");
 }
 
-#[test]
-fn a_texture_reference_measures_the_file_it_resolves_to() {
-    let dir = rusty_test_support::temp::dir();
-    let source = dir.join("quad.fbx");
+/// `embedded_textures.fbx` imported from a temp copy: the copy's path and the
+/// reference its `Red` material's map names.
+fn imported_reference() -> (String, String) {
+    let source = rusty_test_support::temp::dir().join("quad.fbx");
     let fixture =
         rusty_core::project::checkout().join("tests/fixtures/models/embedded_textures.fbx");
     std::fs::copy(fixture, &source).expect("copy the fixture");
@@ -98,10 +98,43 @@ fn a_texture_reference_measures_the_file_it_resolves_to() {
         map.source().is_some(),
         "an extracted texture is a reference"
     );
-    let (w, h) = image::image_dimensions(map.file().expect("resolves")).unwrap();
-    let (scene, id) = fitted_image(map.as_str());
+    (
+        source.to_string_lossy().into_owned(),
+        map.as_str().to_string(),
+    )
+}
+
+#[test]
+fn a_texture_reference_measures_the_file_it_resolves_to() {
+    let (_, map) = imported_reference();
+    let file = rusty_asset::convert::texture_ref::file(&map).expect("resolves");
+    let (w, h) = image::image_dimensions(file).unwrap();
+    let (scene, id) = fitted_image(&map);
     assert_eq!(
         tick(&scene, id, &mut fresh()),
         Vec2::new(w as f32, h as f32)
+    );
+}
+
+#[test]
+fn a_reconverted_source_remeasures_its_extracted_texture() {
+    let (source, map) = imported_reference();
+    let (scene, id) = fitted_image(&map);
+    let mut state = fresh();
+    let file = rusty_asset::convert::texture_ref::file(&map).expect("resolves");
+    let (w, h) = image::image_dimensions(&file).unwrap();
+    assert_eq!(tick(&scene, id, &mut state), Vec2::new(w as f32, h as f32));
+    // A conversion writes the extracted file and notes the source, never the
+    // reference: only the source names it in the write log.
+    let (nw, nh) = (w + 3, h + 1);
+    image::RgbaImage::new(nw, nh)
+        .save(&file)
+        .expect("re-extract");
+    rusty_core::fs::written::note_written(&source);
+    let size = tick(&scene, id, &mut state);
+    assert_eq!(
+        size,
+        Vec2::new(nw as f32, nh as f32),
+        "the source's re-conversion"
     );
 }
