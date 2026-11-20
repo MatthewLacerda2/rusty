@@ -15,7 +15,7 @@
 //! `Channel::STATIC_GEOMETRY` column (the Collider), on a static entity also move
 //! [`World::static_geometry`]'s revision.
 
-use super::{Activity, Channel, Layer, WorldPose, STATIC};
+use super::{Activity, Channel, Children, Layer, WorldPose, STATIC};
 use crate::World;
 
 /// A subtree stamp's walk state, kept on the change log between walks so a warm
@@ -67,8 +67,8 @@ impl World {
     }
 
     /// `id` written whole (placed, overwritten or removed; `is_static` its flag):
-    /// noted for the journal and stamped on every column, [`Activity`], [`Layer`]
-    /// and, when static, [`super::StaticSet`]. [`WorldPose`] follows from
+    /// noted for the journal and stamped on every column, [`Activity`], [`Layer`],
+    /// [`Children`] and, when static, [`super::StaticSet`]. [`WorldPose`] follows from
     /// `World::moved` (or, for a removal, its own walk), so its stamps are always a
     /// whole subtree's.
     pub(crate) fn touch_entity(&mut self, id: u32, is_static: bool) {
@@ -86,6 +86,7 @@ impl World {
         for at in [
             self.changes.get_mut().find::<Activity>(),
             self.changes.get_mut().find::<Layer>(),
+            self.changes.get_mut().find::<Children>(),
         ] {
             at.into_iter().for_each(|at| self.stamp_at(at, id));
         }
@@ -104,6 +105,13 @@ impl World {
     /// `id`'s layer changed ([`Layer`]).
     pub(crate) fn stamp_layer(&mut self, id: u32) {
         if let Some(at) = self.changes.get_mut().find::<Layer>() {
+            self.stamp_at(at, id);
+        }
+    }
+
+    /// `id`'s child list changed ([`Children`]).
+    pub(crate) fn stamp_children(&mut self, id: u32) {
+        if let Some(at) = self.changes.get_mut().find::<Children>() {
             self.stamp_at(at, id);
         }
     }
