@@ -6,10 +6,12 @@
 //! A pure function of the scene and [`OCCLUSION_SEED`]: each cell draws from its own
 //! stream and is baked alone, so the result is the same at any worker count.
 
+use glam::Vec3;
+
 use super::fold::fold_rows;
 use super::gather::{Fingerprints, Object};
 use super::progress::OcclusionProgress;
-use super::reach::Reach;
+use super::reach::{Cells, Reach};
 use super::sample::Baking;
 #[cfg(feature = "dev")]
 use super::sampler::Sampler;
@@ -107,7 +109,7 @@ pub fn bake_occlusion(
 /// would write (#2348): stamped by this [`OCCLUSION_VERSION`], baked from these
 /// very objects, in order, each its entity, fingerprint and occluder flag, and
 /// seeded from the same cells (#2328: the grid laid again over the held bounds,
-/// and the hash of `reach`'s cells on it, [`Reach::key`]). The bake reads nothing
+/// and the hash of `reach`'s cells on it, `Cells::key`). The bake reads nothing
 /// else: the fingerprint hashes all it reads of an object
 /// (`gather::Fingerprints::read`), the grid is laid over the objects' bounds and
 /// the cells sampled, and its constants and the seed are the version's. So a
@@ -248,22 +250,7 @@ impl OcclusionInput {
         let baked = laid.sampled_count();
         progress.start(grid.cell_count(), baked);
         let seen = scene.cells(&grid, threads.max(1), progress, laid.sampled.as_deref())?;
-        let (rows, cells) = fold_rows(&grid, &seen, objects.len());
-        let held = objects.iter().map(|o| BakedObject {
-            entity: o.entity,
-            fingerprint: o.fingerprint,
-            occluder: !o.occluding.is_empty(),
-        });
-        let data = OcclusionData::new(grid, held.collect(), rows, cells);
-        let stamp = BakeStamp {
-            version: OCCLUSION_VERSION,
-            never_culled: report.never_culled as u32,
-            floor: laid.source,
-            baked: baked as u32,
-            reach: laid.key,
-            bounds: (min, max),
-        };
-        let data = data.expect("rows fit the grid").stamped(stamp);
+        let data = self.assemble(&laid, &seen, (min, max), report.never_culled);
         let floor_coverage = match laid.source {
             FloorSource::Everywhere => None,
             FloorSource::Navmesh => self.reach.coverage((min, max)),
@@ -279,5 +266,33 @@ impl OcclusionInput {
             ..report
         };
         Some((Some(data), report))
+    }
+
+    /// The PVS the cells `laid` saw (`seen`), dilated and folded into rows, stamped
+    /// with the bake that laid them over `bounds`.
+    fn assemble(
+        &self,
+        laid: &Cells,
+        seen: &[Option<Vec<u64>>],
+        bounds: (Vec3, Vec3),
+        never_culled: usize,
+    ) -> OcclusionData {
+        let objects = &self.objects;
+        let (rows, cells) = fold_rows(&laid.grid, seen, objects.len());
+        let held = objects.iter().map(|o| BakedObject {
+            entity: o.entity,
+            fingerprint: o.fingerprint,
+            occluder: !o.occluding.is_empty(),
+        });
+        let data = OcclusionData::new(laid.grid, held.collect(), rows, cells);
+        let stamp = BakeStamp {
+            version: OCCLUSION_VERSION,
+            never_culled: never_culled as u32,
+            floor: laid.source,
+            baked: laid.sampled_count() as u32,
+            reach: laid.key,
+            bounds,
+        };
+        data.expect("rows fit the grid").stamped(stamp)
     }
 }
