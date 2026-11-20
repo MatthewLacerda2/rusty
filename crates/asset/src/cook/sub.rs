@@ -18,7 +18,7 @@
 use std::sync::Arc;
 
 use crate::clusters::Clusters;
-use crate::mesh_data::{MeshVertex, SubMesh};
+use crate::mesh_data::{SubMesh, Vertex};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Cooked {
@@ -47,7 +47,7 @@ impl Cooked {
             positions: sub.vertices.iter().map(|v| v.position).collect(),
             tangents: sub.vertices.iter().map(|v| v.tangent).collect(),
             lightmap_uvs: sub.vertices.iter().map(|v| v.lightmap_uv).collect(),
-            indices: sub.indices.clone(),
+            indices: sub.indices.to_vec(),
             clusters: sub.clusters.clone(),
         }
     }
@@ -95,13 +95,13 @@ impl Cooked {
                 self.id
             ));
         }
-        let vertex = |i: usize| MeshVertex {
+        let vertex = |i: usize| Vertex {
             tangent: self.tangents[i],
             lightmap_uv: self.lightmap_uvs[i],
             ..sub.vertices[at(i)]
         };
         sub.vertices = (0..count).map(vertex).collect();
-        sub.indices = self.indices;
+        sub.indices = self.indices.into();
         sub.clusters = self.clusters;
         Ok(())
     }

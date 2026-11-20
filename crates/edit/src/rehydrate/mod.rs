@@ -14,4 +14,8 @@ pub use reimport::{
 #[cfg(test)]
 mod shared_tests;
 #[cfg(test)]
+mod sharing_edit_tests;
+#[cfg(test)]
+mod sharing_tests;
+#[cfg(test)]
 mod tests;

@@ -68,6 +68,7 @@ pub const LAYERS: &[Layer] = &[
     sim("asset", &["core"]).uses(&[
         "bevy_mikktspace",
         "block_compression",
+        "bytemuck",
         "gltf",
         "image",
         "ktx2",
@@ -79,7 +80,7 @@ pub const LAYERS: &[Layer] = &[
     sim("procgen", &["core", "font"]).uses(&["image"]),
     // Shader authoring; GPU-free composition lives here so `render` imports it (#722).
     sim("shadergen", &["core"]).uses(&["naga", "naga_oil"]),
-    sim("components", &["asset", "core", "procgen"]).uses(&["bytemuck"]),
+    sim("components", &["asset", "core", "procgen"]),
     sim("ecs", &["components", "core"]).uses(&["hecs"]),
     // A sim `Resource` stepped by sim time; its device thread never reads a clock.
     sim("audio", &["asset", "components", "core"]).uses(&["kira"]),

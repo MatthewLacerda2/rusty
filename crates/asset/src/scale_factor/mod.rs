@@ -50,7 +50,7 @@ pub fn apply(asset: &mut ImportedAsset, s: f32) {
 }
 
 fn scale_sub_mesh(sub: &mut SubMesh, s: f32) {
-    for v in &mut sub.vertices {
+    for v in sub.vertices.edit() {
         v.position = v.position.map(|c| c * s);
     }
     if let Some(skin) = &mut sub.skin {

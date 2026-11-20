@@ -47,7 +47,7 @@ fn a_lone_entry_over_the_budget_stays_beside_smaller_ones() {
     let (mut cache, asset, size) = budget_cache("over");
     let geometry = Geometry::of(&ImportSettings::default());
     let mut small = asset.clone();
-    small.sub_meshes[0].indices.truncate(3);
+    small.sub_meshes[0].indices.edit().truncate(3);
     let small_size = approx_bytes(&small);
     assert!(small_size < size);
     let budget = small_size;

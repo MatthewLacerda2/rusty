@@ -34,7 +34,8 @@
 //!   more than [`BUDGET_BYTES`] of geometry (vertices, indices and animation
 //!   keys, estimated by [`approx_bytes`]) beside its largest entry: one level
 //!   file over the budget on its own stays while smaller files come and go, so
-//!   it is still parsed once per load.
+//!   it is still parsed once per load. Instances share an entry's buffers
+//!   ([`approx_bytes`] says what that means for the budget).
 //! - **Revision**: each import takes one [`MeshRevision`], which every instance
 //!   built from it shares, so the renderer's mesh slot for a reference uploads
 //!   once; only a real re-import takes a new one.

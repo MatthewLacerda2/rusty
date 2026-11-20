@@ -83,6 +83,7 @@ mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;
 mod settle_frames;
+mod shared_mesh_edit;
 mod skinned_shadows_screenshot;
 mod skinning_joint_cap;
 mod sky_reflection_screenshot;

@@ -57,7 +57,7 @@ pub(super) fn cut(scene: &mut Scene, id: u32, (name, n): (&str, u32)) {
         .iter()
         .map(|&p| Vertex::new(Vec3::from_array(p), Vec3::Z, [0.0, 0.0]))
         .collect();
-    mesh.indices = indices;
+    mesh.indices = indices.into();
     mesh.revision = MeshRevision::next();
     mesh.clusters = Some((mesh.revision, Arc::new(clusters)));
 }

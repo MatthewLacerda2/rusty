@@ -10,6 +10,7 @@ use glam::Vec3;
 use crate::create::defaults::{default_collider, light};
 use crate::rehydrate::bounds_of;
 use crate::{LightComponent, LightType, MeshComponent};
+use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::primitives;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape};
@@ -57,29 +58,31 @@ impl Primitive {
 /// the single source of truth for primitive shapes, reused by serialization's
 /// `rehydrate_one` so a created primitive and a loaded one are byte-identical.
 /// Returns `None` for the light primitives, which carry no mesh.
-pub fn primitive_geometry(primitive: Primitive) -> Option<(Vec<Vertex>, Vec<u32>)> {
+pub fn primitive_geometry(primitive: Primitive) -> Option<Geometry> {
     subdivided_geometry(primitive, 1)
 }
 
+/// A primitive's vertices and indices, shared by every mesh holding them.
+pub type Geometry = (Shared<Vertex>, Shared<u32>);
+
 /// [`primitive_geometry`], a `Plane` cut into `subdivisions` quads per side (#1524,
 /// `MeshComponent::subdivisions`, clamped to its range); every other shape ignores it.
-pub fn subdivided_geometry(
-    primitive: Primitive,
-    subdivisions: u32,
-) -> Option<(Vec<Vertex>, Vec<u32>)> {
-    if primitive == Primitive::Plane {
-        return generated(primitive, subdivisions);
+/// Built once per process for each shape at one cut and shared (#2351): a level of
+/// a thousand spheres holds one buffer pair. A finer cut of a `Plane` is built
+/// afresh each call, so a cut tried once (a slider dragged) is not kept for good.
+pub fn subdivided_geometry(primitive: Primitive, subdivisions: u32) -> Option<Geometry> {
+    if primitive == Primitive::Plane && subdivisions != 1 {
+        return generated(primitive, subdivisions).map(|(v, i)| (v.into(), i.into()));
     }
-    // The other shapes take no argument, and the round ones carry a generated
-    // lightmap unwrap that costs ~1 ms each (#2123): build each once per process
-    // (a pure function, so a copy is what building again would give) and copy it.
-    type Built = Option<(Vec<Vertex>, Vec<u32>)>;
+    // The round ones carry a generated lightmap unwrap that costs ~1 ms each
+    // (#2123), and the result is a pure function of the shape: build it once.
+    type Built = Option<Geometry>;
     static BUILT: std::sync::Mutex<Vec<(Primitive, Built)>> = std::sync::Mutex::new(Vec::new());
     let mut built = BUILT.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((_, geometry)) = built.iter().find(|(p, _)| *p == primitive) {
         return geometry.clone();
     }
-    let geometry = generated(primitive, subdivisions);
+    let geometry = generated(primitive, 1).map(|(v, i)| (v.into(), i.into()));
     built.push((primitive, geometry.clone()));
     geometry
 }
@@ -206,7 +209,7 @@ mod tests {
             let fresh = generated(p, 1).expect("a mesh primitive has geometry");
             for _ in 0..2 {
                 let kept = subdivided_geometry(p, 7).expect("and keeps it");
-                assert_eq!(format!("{kept:?}"), format!("{fresh:?}"), "{p:?}");
+                assert!(kept.0[..] == fresh.0[..] && kept.1 == fresh.1, "{p:?}");
             }
         }
         assert!(subdivided_geometry(Primitive::SpotLight, 1).is_none());
@@ -215,5 +218,17 @@ mod tests {
             plane(4) > plane(1),
             "a Plane is still cut by its subdivisions"
         );
+    }
+
+    /// Every mesh of one primitive holds the one build, not a copy of it (#2351).
+    #[test]
+    fn two_entities_of_one_primitive_share_its_buffers() {
+        for p in [Primitive::Sphere, Primitive::Plane] {
+            let mut scene = crate::Scene::new();
+            let [a, b] = [0, 1].map(|_| crate::create::create_entity(&mut scene, "P", Some(p)));
+            let (a, b) = (scene.world.mesh(a).unwrap(), scene.world.mesh(b).unwrap());
+            assert!(Shared::same(&a.vertices, &b.vertices), "{p:?}");
+            assert!(Shared::same(&a.indices, &b.indices), "{p:?}");
+        }
     }
 }

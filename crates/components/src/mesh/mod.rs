@@ -8,6 +8,7 @@
 //! each bake's headless one), and a flag cleared by the first hid the change from
 //! the rest, so the editor kept drawing a re-imported mesh's old vertices.
 
+use rusty_asset::mesh_data::Shared;
 use rusty_asset::{AnimationClip, SkinData};
 use serde::{Deserialize, Serialize};
 use std::ops::Range;
@@ -18,15 +19,15 @@ pub mod primitives;
 mod runs;
 mod shadow_casting;
 mod skeleton;
-mod vertex;
 
 pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
-#[doc(hidden)]
-pub use geometry::copies;
 pub use runs::{clip_runs, material_runs};
+#[doc(hidden)]
+pub use rusty_asset::mesh_data::shared::copies;
+/// The one vertex layout (#2351): the import's, so an instance shares its buffer.
+pub use rusty_asset::Vertex;
 pub use shadow_casting::ShadowCasting;
 pub use skeleton::{BoneBinding, BoneBody};
-pub use vertex::Vertex;
 
 /// Which edit of a mesh's geometry its vertices are (#1540): defined with the
 /// importer, which hands one out per import (#857).
@@ -61,10 +62,15 @@ pub struct MeshComponent {
     /// without it reads 1.
     #[serde(default = "one_f32")]
     pub scale_in_lightmap: f32,
+    /// The vertices, shared with the import cache and every other instance of the
+    /// same sub-mesh (#2351): a clone shares them. Write them in place only through
+    /// [`Self::vertices_mut`] (which renews the revision and, for a buffer another
+    /// mesh holds, the mesh's own identity), or replace them whole.
     #[serde(skip)]
-    pub vertices: Vec<Vertex>,
+    pub vertices: Shared<Vertex>,
+    /// The indices, shared as `vertices` are.
     #[serde(skip)]
-    pub indices: Vec<u32>,
+    pub indices: Shared<u32>,
     /// The sub-mesh runs of `indices` (#1285), in order: run `i` draws with the
     /// entity's material `i` (`MaterialComponent::materials`). Empty means one run
     /// over every index, as a primitive has. Rehydrated from the imported sub-mesh's
@@ -109,12 +115,19 @@ pub struct MeshComponent {
     #[serde(default, skip_serializing_if = "is_zero")]
     pub min_screen_size: f32,
     /// Which edit of the geometry this is; set a [`MeshRevision::next`] whenever
-    /// `vertices` or `indices` change, so every renderer re-uploads them. A
-    /// primitive's geometry is the exception: it carries the one revision of its
-    /// (primitive, cut) (`scene::create::primitive_revision`), so an edit to a
-    /// primitive's vertices must give it a new `MeshId` as well as a new revision.
+    /// `vertices` or `indices` change, so every renderer re-uploads them. The
+    /// renderer keeps one GPU slot per source (`render::MeshId`), so geometry that
+    /// stops being its source's must also stop being keyed by it: an edit in place
+    /// through [`Self::vertices_mut`] / [`Self::indices_mut`] does that
+    /// (`own_geometry`); a whole replacement names a new source (`Mesh.Create`).
     #[serde(skip)]
     pub revision: MeshRevision,
+    /// Set once an edit in place gave this mesh geometry of its own (Unity's
+    /// `MeshFilter.mesh` over `sharedMesh`): the renderer keys its GPU slot by it
+    /// too, so the edit is drawn on this mesh alone, never on the meshes still
+    /// sharing its source. Moves with the geometry; never saved.
+    #[serde(skip)]
+    pub own_geometry: Option<MeshRevision>,
     /// The clusters its import built (#1968, `asset::clusters`), with the
     /// revision they describe: any later edit takes a new revision, so stale
     /// clusters are never read. Read through [`Self::clusters`]; rehydrated with the
@@ -165,8 +178,8 @@ impl MeshComponent {
     /// Set the skinned and asset fields on top with `..MeshComponent::new(…)`.
     pub fn new(
         primitive_type: impl Into<String>,
-        vertices: Vec<Vertex>,
-        indices: Vec<u32>,
+        vertices: impl Into<Shared<Vertex>>,
+        indices: impl Into<Shared<u32>>,
     ) -> Self {
         Self {
             primitive_type: primitive_type.into(),
@@ -174,8 +187,8 @@ impl MeshComponent {
             subdivisions: 1,
             cast_shadows: ShadowCasting::On,
             scale_in_lightmap: 1.0,
-            vertices,
-            indices,
+            vertices: vertices.into(),
+            indices: indices.into(),
             ranges: Vec::new(),
             bind_palette: Vec::new(),
             skin: None,
@@ -185,6 +198,7 @@ impl MeshComponent {
             max_draw_distance: 0.0,
             min_screen_size: 0.0,
             revision: MeshRevision::next(),
+            own_geometry: None,
             clusters: None,
         }
     }
