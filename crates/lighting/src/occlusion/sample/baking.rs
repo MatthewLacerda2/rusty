@@ -127,7 +127,7 @@ impl Baking {
         let count = grid.cell_count();
         let objects = self.targets.len();
         let mut every = vec![u64::MAX; objects / 64];
-        if objects % 64 != 0 {
+        if !objects.is_multiple_of(64) {
             every.push((1u64 << (objects % 64)) - 1);
         }
         let todo: Vec<usize> = match sampled {

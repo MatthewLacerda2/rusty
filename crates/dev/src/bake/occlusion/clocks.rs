@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 
 use rusty_lighting::occlusion::OcclusionObserver;
 
-/// Each cell's sampling time so far, in nanoseconds, by cell index; [`UNTIMED`]
+/// Each cell's sampling time so far, in nanoseconds, by cell index; `UNTIMED`
 /// until it is sampled.
 #[derive(Default)]
 pub struct CellClocks {
