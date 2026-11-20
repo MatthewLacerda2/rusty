@@ -123,3 +123,7 @@ fn make_prepass(
         cache: None,
     })
 }
+
+#[cfg(test)]
+#[path = "tests/depth_only_tests.rs"]
+mod depth_only_tests;
