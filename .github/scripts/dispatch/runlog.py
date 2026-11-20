@@ -1,4 +1,4 @@
-"""One coder session's run log, read for its times and nothing else (#2452).
+r"""One coder session's run log, read for its times and nothing else (#2452).
 
 `RemoteTrigger get_run_log` answers a condensed log: a page of the session's
 newest events, each line `[<created_at>] <kind>…`, oldest first within the page,
