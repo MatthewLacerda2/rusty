@@ -67,17 +67,7 @@ impl Renderer {
         let ui_view = UiView::with_camera(screen, camera.clone(), textures);
         let layout = view.ui.layout.update(&scene.world, &ui_view);
         self.lap("ui.layout");
-        let due = self.notes_due();
-        for path in texture_paths(scene, &layout) {
-            let tex = self.load_texture(&path);
-            let rebuilt =
-                (self.ui_renderer).bind_group(&self.device, path.as_str(), Rc::clone(&tex));
-            // On a due render, or when this image's group was rebuilt: its texture
-            // changed (`scene::residency::notes`).
-            if due || rebuilt {
-                self.note_map(scene.id(), path.as_str());
-            }
-        }
+        self.bind_ui_textures(scene, &layout);
         self.lap("ui.textures");
         let textures = &self.gpu_textures;
         // Source pixels, not the upload's, which *Max Size* may have shrunk (#1574).
@@ -219,6 +209,23 @@ fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
     let (sw, sh) = (size.width.max(1), size.height.max(1));
     let (x, y) = (x.min(sw - 1), y.min(sh - 1));
     (x, y, w.clamp(1, sw - x), h.clamp(1, sh - y))
+}
+
+impl Renderer {
+    /// Load and bind every texture an active, laid-out Image of `scene` samples.
+    fn bind_ui_textures(&mut self, scene: &Scene, layout: &UiLayout) {
+        let due = self.notes_due();
+        for path in texture_paths(scene, layout) {
+            let tex = self.load_texture(&path);
+            let rebuilt =
+                (self.ui_renderer).bind_group(&self.device, path.as_str(), Rc::clone(&tex));
+            // On a due render, or when this image's group was rebuilt: its texture
+            // changed (`scene::residency::notes`).
+            if due || rebuilt {
+                self.note_map(scene.id(), path.as_str());
+            }
+        }
+    }
 }
 
 impl super::UiRenderer {
