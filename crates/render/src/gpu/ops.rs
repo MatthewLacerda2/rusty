@@ -189,7 +189,7 @@ impl CountedQueue for wgpu::Queue {
 /// A queue and its [`Staging`]: what a counted texture write needs.
 pub(crate) type Writes<'a> = (&'a wgpu::Queue, &'a Staging);
 
-/// The texture bytes written between two of [`Staging`]'s own submits: two 2048²
+/// The texture bytes written between two of `Staging`'s own submits: two 2048²
 /// BC7 textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
 pub const STAGING_BUDGET: u64 = 16 << 20;
 

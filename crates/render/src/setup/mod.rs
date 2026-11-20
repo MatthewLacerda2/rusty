@@ -112,10 +112,11 @@ impl Renderer {
         // bindings, shadow system, forward/billboard passes), then assemble the
         // flat renderer from those groups and seed the editor gizmo meshes. Per-view
         // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
-        let gpu = GpuResources::build(&device, &queue, config.format);
+        let staging = crate::gpu::ops::Staging::new(&device);
+        let gpu = GpuResources::build(&device, (&queue, &staging), config.format);
         let mut renderer = Self::assemble(
             device,
-            queue,
+            (queue, staging),
             surface,
             config,
             present_modes,
@@ -141,7 +142,7 @@ impl Renderer {
     )]
     fn assemble(
         device: wgpu::Device,
-        queue: wgpu::Queue,
+        (queue, staging): (wgpu::Queue, crate::gpu::ops::Staging),
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
         present_modes: Vec<wgpu::PresentMode>,
@@ -161,7 +162,6 @@ impl Renderer {
             grade_bake,
             post_passes,
             quality,
-            staging,
         } = gpu;
         let draw_buffers =
             crate::gpu::draw_buffers::DrawBuffers::new(&device, &entity_bones_layout);

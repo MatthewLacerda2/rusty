@@ -9,7 +9,7 @@ use crate::draw::{ball_pipeline, NavMeshGizmo};
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::lightmaps::Lightmaps;
 use crate::gpu::shaders::ShaderRegistry;
-use crate::gpu::{bind_layouts, ops::Staging, pipelines};
+use crate::gpu::{bind_layouts, ops::Writes, pipelines};
 use crate::ibl::reflection_probes::ProbeArray;
 use crate::ibl::sky_cube::SkyReflection;
 use crate::passes::outline::OutlinePasses;
@@ -90,8 +90,6 @@ pub(crate) struct GpuResources {
     pub grade_bake: GradeBake,
     pub post_passes: Passes,
     pub quality: QualityValues,
-    /// What texture writes hold in staging, bounded (`gpu::ops::Staging`).
-    pub staging: Staging,
 }
 
 impl GpuResources {
@@ -101,11 +99,9 @@ impl GpuResources {
     /// post-FX writes, which the editor's outline ring and gizmos draw over (#1224).
     pub(crate) fn build(
         device: &wgpu::Device,
-        queue: &wgpu::Queue,
+        gpu: Writes,
         output_format: wgpu::TextureFormat,
     ) -> Self {
-        let staging = Staging::new(device);
-        let gpu = (queue, &staging);
         let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
         let camera_lighting_layout = bind_layouts::create_camera_lighting_layout(device);
         let entity_bones_layout = bind_layouts::create_entity_bones_layout(device);
@@ -158,7 +154,6 @@ impl GpuResources {
             // editor's panels, captures): the two an LDR pass writes.
             post_passes: Passes::new(device, &mut registry, &[output_format, OFFSCREEN_FORMAT]),
             quality: QualityValues::default(),
-            staging,
         }
     }
 }
