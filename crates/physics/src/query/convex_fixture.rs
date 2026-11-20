@@ -32,14 +32,16 @@ pub fn turned_hull() -> (Scene, u32, Vec<Vec3>) {
 pub(super) fn flat_hull() -> (Scene, u32) {
     let (vertices, indices) = primitive_geometry(Primitive::Plane).expect("a mesh");
     let pose = (Vec3::ZERO, Quat::IDENTITY, Vec3::ONE);
-    let (scene, id, _) = convex_collider("Plane", (vertices, indices), pose);
+    let geometry = (vertices.to_vec(), indices.to_vec());
+    let (scene, id, _) = convex_collider("Plane", geometry, pose);
     (scene, id)
 }
 
 /// The Cylinder primitive moved off its origin, so its local box is not centred:
 /// rings of coplanar points, the classic quickhull degeneracy.
 pub(crate) fn off_centre_cylinder() -> (Vec<Vertex>, Vec<u32>) {
-    let (mut vertices, indices) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
+    let (vertices, indices) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
+    let (mut vertices, indices) = (vertices.to_vec(), indices.to_vec());
     let offset = Vec3::new(0.3, 0.2, -0.1);
     vertices
         .iter_mut()

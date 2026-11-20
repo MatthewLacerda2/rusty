@@ -221,7 +221,8 @@ fn advance_probes(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> 
                 Err(e) => return fail(scene, log, e, true),
             };
             let needs_save = saved == LightingSave::NeedsSceneSave;
-            match OcclusionBakeJob::start(scene) {
+            // An unchanged PVS is kept, not re-baked (#2348).
+            match OcclusionBakeJob::generate(scene) {
                 Ok(occlusion) => {
                     *step = Step::Occlusion {
                         job: occlusion,

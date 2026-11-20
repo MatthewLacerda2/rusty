@@ -93,8 +93,8 @@ mod tests {
     fn sub(id: &str, node: Option<&str>) -> SubMesh {
         SubMesh {
             id: id.to_string(),
-            vertices: Vec::new(),
-            indices: Vec::new(),
+            vertices: Default::default(),
+            indices: Default::default(),
             ranges: Vec::new(),
             skin: None,
             clips: Vec::new(),

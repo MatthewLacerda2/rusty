@@ -3,7 +3,11 @@
 
 use crate::mesh_data::ImportedAsset;
 
-/// About how much memory an import's geometry and animation keys take.
+/// About how much memory an import's geometry and animation keys take. Every mesh
+/// instancing it draws its vertex and index buffers (`mesh_data::Shared`, #2351),
+/// so this counts geometry once, however many instances there are; an entry
+/// dropped while instances still hold its buffers frees nothing until they drop
+/// them too, which is right: that memory is still in use.
 pub fn approx_bytes(asset: &ImportedAsset) -> usize {
     use std::mem::size_of;
     let keys = |c: &crate::AnimationClip| -> usize {
@@ -17,7 +21,7 @@ pub fn approx_bytes(asset: &ImportedAsset) -> usize {
         .sum()
     };
     let subs = asset.sub_meshes.iter().map(|s| {
-        s.vertices.len() * size_of::<crate::MeshVertex>()
+        s.vertices.len() * size_of::<crate::Vertex>()
             + s.indices.len() * size_of::<u32>()
             + s.clips.iter().map(keys).sum::<usize>()
     });

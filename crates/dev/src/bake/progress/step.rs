@@ -82,3 +82,20 @@ pub fn stage_progress(stage: Stage) -> Option<Progress> {
         meshes: None,
     })
 }
+
+impl super::BakeLog<'_> {
+    /// Begin `step` and say it kept what it would have baked, unchanged (#2348):
+    /// `[Lighting] 9:41 occlusion unchanged, kept`. It is timed as a step, and its
+    /// line is a milestone, so the console keeps it.
+    pub fn kept(&mut self, step: Step) {
+        self.enter(step);
+        let (Some(started), Some((clock, out))) = (self.started, self.on.as_mut()) else {
+            return;
+        };
+        let at = super::format::clock(clock().saturating_sub(started));
+        out(super::Line {
+            text: format!("[Lighting] {at} {} unchanged, kept", step.name()),
+            milestone: true,
+        });
+    }
+}

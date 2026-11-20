@@ -80,14 +80,14 @@ pub fn entity(scene: &mut Scene, name: &str, quads: &[[Vec3; 4]]) -> u32 {
     }
     let first = (0..quads.len() as u32).flat_map(|k| [4 * k, 4 * k + 1, 4 * k + 2]);
     let second = (0..quads.len() as u32).flat_map(|k| [4 * k, 4 * k + 2, 4 * k + 3]);
-    let indices = first.chain(second).collect();
+    let indices: Vec<u32> = first.chain(second).collect();
     let id = create_drawn_entity(scene, name, Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).expect("a new entity");
     (t.position, t.scale) = (Vec3::ZERO, Vec3::ONE);
     drop(t);
     scene.world.set_static(id, true);
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
-    (mesh.vertices, mesh.indices) = (vertices, indices);
+    (mesh.vertices, mesh.indices) = (vertices.into(), indices.into());
     mesh.revision = MeshRevision::next();
     id
 }

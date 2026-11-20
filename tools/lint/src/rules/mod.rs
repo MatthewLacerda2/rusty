@@ -36,6 +36,7 @@ mod ignored;
 mod key_guard;
 mod log_tag;
 mod markers;
+mod mesh_buffer_write;
 mod named_enum;
 mod one_logger;
 mod orphan_module;
@@ -119,6 +120,11 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (key_guard::RULE, key_guard::run, Allow::Never),
     (log_tag::RULE, log_tag::run, Allow::Inline),
     (markers::RULE, markers::run, Allow::Inline),
+    (
+        mesh_buffer_write::RULE,
+        mesh_buffer_write::run,
+        Allow::Inline,
+    ),
     (named_enum::RULE, named_enum::run, Allow::Inline),
     (one_logger::RULE, one_logger::run, Allow::Inline),
     (orphan_module::RULE, orphan_module::run, Allow::Own),

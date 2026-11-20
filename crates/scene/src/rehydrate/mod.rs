@@ -206,6 +206,7 @@ fn install(mesh: &mut crate::MeshComponent, rebuilt: RehydratedMesh) {
     mesh.pose_palette = Vec::new();
     mesh.skeleton.bones.clear();
     mesh.revision = rebuilt.revision.unwrap_or_else(MeshRevision::next);
+    mesh.own_geometry = None;
     mesh.clusters = rebuilt.clusters.map(|c| (mesh.revision, c));
 }
 

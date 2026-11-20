@@ -16,7 +16,7 @@ pub(super) fn scene() -> (Scene, u32, u32) {
         let id = scene.add_entity(name.to_string());
         if name == "Ball" {
             let ball = mesh.as_mut().expect("a sphere mesh");
-            ball.vertices
+            ball.vertices_mut()
                 .iter_mut()
                 .for_each(|v| v.lightmap_uv = [0.0; 2]);
         }

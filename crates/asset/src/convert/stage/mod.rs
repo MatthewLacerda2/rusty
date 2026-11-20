@@ -39,7 +39,7 @@ mod clear;
 pub(in crate::convert) mod hook;
 mod note;
 
-pub use clear::textures_dirs;
+pub use clear::{textures_dirs, textures_owner};
 pub(in crate::convert) use note::write;
 
 use super::{record, stamp_path, write_error, Converted, Converter, ImportError};
@@ -88,6 +88,9 @@ pub(super) fn convert(
     at(Step::Stamped);
     note::swapped_in(source, out);
     clear::clear(&dir, &name);
+    // Its extracted textures' compressed copies, made off this thread in the
+    // editor, whatever converted it (a scene load, an instancing, an API import).
+    crate::texture_import::queue_extracted(out);
     Ok(converted)
 }
 

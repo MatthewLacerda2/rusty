@@ -98,6 +98,12 @@ impl Watch {
             .into_iter()
             .filter(|r| r.is_dir())
             .collect();
+        // A model this thread converts (a scene load, an instancing) has the
+        // textures it extracted compressed in the background (#2365), whether or
+        // not the watch below starts: switched on first, so a watch that fails
+        // still leaves conversions' maps compressed. No test holds the order: it
+        // needs a watch that cannot start, which neither backend gives on demand.
+        rusty_asset::texture_import::import_in_background();
         let mut watch = Self::start(&roots, backend)
             .map_err(|e| log::warn!("[Editor] not watching the project's files: {e}"))
             .ok()?;

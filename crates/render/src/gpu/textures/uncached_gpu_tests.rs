@@ -2,7 +2,7 @@
 //! but that has no current import cache counts, with its RGBA8 bytes; once the
 //! import made its cache, its upload is compressed and it no longer counts. A
 //! map set to Compression None, too small to block-compress, inside the import
-//! cache (extracted beside a converted model) or outside the imported folder (the
+//! cache but no model's extracted texture, or outside the imported folder (the
 //! engine's own maps) never counts: no import would make it a cache.
 
 use std::path::Path;

@@ -8,7 +8,7 @@
 //! types.
 
 use super::material_range::push_range;
-use super::mesh_data::{ImportedAsset, MaterialData, MeshVertex, SubMesh};
+use super::mesh_data::{ImportedAsset, MaterialData, SubMesh, Vertex};
 use super::tangents::Missing;
 use super::ImportError;
 use crate::MapRef;
@@ -107,7 +107,7 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
             } else {
                 [0.0, 0.0]
             };
-            MeshVertex::new(position, normal, tex_coords)
+            Vertex::new(position.into(), normal.into(), tex_coords)
         })
         .collect();
 
@@ -124,8 +124,8 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
     SubMesh {
         id,
         ranges: super::material_range::whole(indices.len(), mesh.material_id),
-        vertices,
-        indices,
+        vertices: vertices.into(),
+        indices: indices.into(),
         // `.obj` is static-mesh only: no skin/anim, ever.
         skin: None,
         clips: Vec::new(),
@@ -139,8 +139,10 @@ fn sub_mesh_from_model(index: usize, model: tobj::Model, missing: Missing) -> Su
 fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
     let base = sub.vertices.len() as u32;
     let start = sub.indices.len() as u32;
-    sub.vertices.extend(piece.vertices);
-    sub.indices.extend(piece.indices.iter().map(|i| i + base));
+    sub.vertices.edit().extend_from_slice(&piece.vertices);
+    sub.indices
+        .edit()
+        .extend(piece.indices.iter().map(|i| i + base));
     for run in piece.ranges {
         let indices = run.indices.start + start..run.indices.end + start;
         push_range(&mut sub.ranges, indices, run.material);
@@ -149,11 +151,7 @@ fn append_piece(sub: &mut SubMesh, piece: SubMesh) {
 
 /// Fill each vertex's tangent from positions + UVs (`.obj` has no tangent data),
 /// as `missing` says.
-fn with_tangents(
-    mut vertices: Vec<MeshVertex>,
-    indices: &[u32],
-    missing: Missing,
-) -> Vec<MeshVertex> {
+fn with_tangents(mut vertices: Vec<Vertex>, indices: &[u32], missing: Missing) -> Vec<Vertex> {
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
     let normals: Vec<[f32; 3]> = vertices.iter().map(|v| v.normal).collect();
     let uvs: Vec<[f32; 2]> = vertices.iter().map(|v| v.tex_coords).collect();
