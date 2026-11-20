@@ -74,6 +74,32 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
 }
 
 #[test]
+fn each_grid_layer_sums_its_cells_times() {
+    let scene = corridors();
+    let (data, r) = bake_occlusion(&scene, 2);
+    let data = data.expect("the corridors occlude");
+    let g = data.grid;
+    let per_layer = (g.dims.x * g.dims.z) as usize;
+    // Every cell of layer `y` takes `y + 1` ms.
+    let cells: Vec<_> = (0..r.cells)
+        .map(|i| Duration::from_millis((i / per_layer) as u64 + 1))
+        .collect();
+    let report = occlusion::report(&scene, (&r, Some(&data), &cells), &Stages::start(), 0);
+    let layers = report.to_json()["layerSeconds"].clone();
+    let layers = layers.as_array().expect("timed");
+    assert_eq!(layers.len(), g.dims.y as usize);
+    for (y, layer) in layers.iter().enumerate() {
+        assert_eq!(layer["layer"].as_u64(), Some(y as u64));
+        assert_eq!(layer["cells"].as_u64(), Some(per_layer as u64));
+        assert_eq!(layer["mean"].as_f64(), Some((y + 1) as f64 / 1000.0));
+        let sum = (per_layer * (y + 1)) as f64 / 1000.0;
+        assert!((layer["seconds"].as_f64().unwrap() - sum).abs() < 1e-6);
+        let bottom = g.origin.y + y as f32 * g.cell;
+        assert!((layer["minY"].as_f64().unwrap() - bottom as f64).abs() < 0.01);
+    }
+}
+
+#[test]
 fn bake_occlusion_writes_its_report() {
     let path = scene_path("occlusion");
     let mut scene = corridors();

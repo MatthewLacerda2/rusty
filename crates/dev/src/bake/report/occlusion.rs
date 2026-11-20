@@ -1,7 +1,8 @@
 //! The occlusion bake's report (#1980): the grid, the objects baked with their
 //! triangles (the biggest occluders first), and how well the finished PVS culls:
 //! the mean and most objects a cell sees, the share culled, the objects every
-//! cell sees, and the time each cell took with the slowest cells (#1987). The
+//! cell sees, and the time each cell took with the slowest cells (#1987) and
+//! each grid layer's sum and mean (#2328). The
 //! times come from the cell clocks the bake was lent (`dev::bake::occlusion::
 //! CellClocks`), the rest from the bake's report and its PVS, outside the bake.
 //! Being read outside, `neverCulled` is a count with no names: the objects too large or not finite
@@ -46,6 +47,7 @@ pub fn report(
         "biggestOccluders": biggest,
         "visibility": data.map_or(Value::Null, |d| visibility(scene, d)),
         "cellSeconds": data.map_or(Value::Null, |d| cell_seconds(d, cells)),
+        "layerSeconds": data.map_or(Value::Null, |d| layer_seconds(d, cells)),
         "slowestCells": data.map_or(Value::Null, |d| slowest_cells(d, cells)),
     }))
 }
@@ -177,6 +179,31 @@ fn cell_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
         "mean": cell_secs(total / cells.len() as u32),
         "max": cell_secs(max),
     })
+}
+
+/// The time the cells of each grid layer took, bottom layer first (#2328): its
+/// index, the heights it spans, its cells, and the sum and mean of their times, so
+/// the cost of the air over a floor is read apart from the floor's own.
+fn layer_seconds(data: &OcclusionData, cells: &[Duration]) -> Value {
+    let Some(cells) = timed(data, cells) else {
+        return Value::Null;
+    };
+    let grid = &data.grid;
+    let per_layer = (grid.dims.x * grid.dims.z) as usize;
+    let layer = |(y, times): (usize, &[Duration])| {
+        let total: Duration = times.iter().sum();
+        let bottom = grid.origin.y + y as f32 * grid.cell;
+        json!({
+            "layer": y,
+            "minY": (bottom * 100.0).round() / 100.0,
+            "maxY": ((bottom + grid.cell) * 100.0).round() / 100.0,
+            "cells": times.len(),
+            "seconds": cell_secs(total),
+            "mean": cell_secs(total / times.len().max(1) as u32),
+        })
+    };
+    let layers = cells.chunks(per_layer.max(1)).enumerate().map(layer);
+    Value::Array(layers.collect())
 }
 
 /// The [`TOP`] slowest cells, slowest first (ties to the lower index): each its
