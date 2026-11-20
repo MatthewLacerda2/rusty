@@ -103,6 +103,8 @@ mod upload;
 #[cfg(test)]
 mod args_gpu_tests;
 #[cfg(test)]
+mod cluster_floor_gpu_tests;
+#[cfg(test)]
 mod cluster_gpu_tests;
 #[cfg(test)]
 mod copy_gpu_tests;
@@ -110,8 +112,6 @@ mod copy_gpu_tests;
 mod dispatch_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
-#[cfg(test)]
-mod floor_cluster_gpu_tests;
 #[cfg(test)]
 mod floor_gpu_tests;
 #[cfg(test)]
