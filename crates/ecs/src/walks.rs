@@ -50,11 +50,12 @@ pub(crate) fn collected(ids: usize) {
 /// In a build without `debug_assertions` (release, ship), where ids are not
 /// counted: run the test in a debug or test profile.
 pub fn ids_collected() -> u64 {
-    assert!(
-        cfg!(debug_assertions),
-        "walks::ids_collected: ids are counted only with debug_assertions on; \
-         run this test in a debug or test profile, not release"
-    );
+    if !cfg!(debug_assertions) {
+        panic!(
+            "walks::ids_collected: ids are counted only with debug_assertions on; \
+             run this test in a debug or test profile, not release"
+        )
+    }
     ARMED.with(|a| a.set(true));
     COLLECTED.with(Cell::get)
 }
