@@ -1,7 +1,7 @@
 //! The edits the kept bone list's property test makes to a rig (#2345): each one
 //! a way the set of bone-hung colliders can change, edits away from the rig that
 //! must not change it (a prop spawned at the root, then re-parented, toggled or
-//! destroyed by the ops that pick it), and a pose write.
+//! destroyed by the ops that pick it, a prefab stamp's resync), and a pose write.
 
 use glam::{Quat, Vec3};
 use proptest::prelude::*;
@@ -26,6 +26,12 @@ pub(super) enum Op {
     Unslot(usize),
     /// A Collider's `active` flipped.
     Toggle(usize),
+    /// The picked entity (a hitbox, a bone, a prop), or the rig itself,
+    /// deactivated or activated, as a disabled enemy is.
+    SetActive(Option<usize>, bool),
+    /// Every skeleton synced again, as a prefab stamp ends
+    /// (`Scene::hang_on_skeletons`).
+    Resync,
     /// A kinematic Rigidbody added, or the one there removed.
     Body(usize),
     /// The rig re-imported to a shorter chain, or back to the full one.
@@ -46,6 +52,8 @@ pub(super) fn op() -> impl Strategy<Value = Op> {
         (i(), proptest::option::of(i())).prop_map(|(a, b)| Op::Reparent(a, b)),
         i().prop_map(Op::Destroy),
         i().prop_map(Op::Toggle),
+        (proptest::option::of(i()), any::<bool>()).prop_map(|(a, on)| Op::SetActive(a, on)),
+        Just(Op::Resync),
         i().prop_map(Op::Attach),
         i().prop_map(Op::Unslot),
         i().prop_map(Op::Body),
@@ -197,6 +205,11 @@ fn components(scene: &mut Scene, rig: u32, op: &Op) {
             }
         }
         Op::Plank(i, cube) => plank(scene, rig, i, cube),
+        Op::SetActive(i, on) => {
+            let id = i.map_or(rig, |i| pick(scene, i));
+            scene.world.set_active(id, on);
+        }
+        Op::Resync => scene.hang_on_skeletons(Vec::new(), Vec::new()),
         _ => {}
     }
 }

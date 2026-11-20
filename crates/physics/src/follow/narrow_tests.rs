@@ -1,5 +1,6 @@
 //! What reaches the kept bone list (#2345): edits away from the rigs, a busy
-//! firefight's spawns and destroys among them, walk no skeleton; a hung mesh
+//! firefight's spawns, destroys and prefab stamps among them, walk no skeleton;
+//! one on or carrying a rig walks; a hung mesh
 //! collider rebuilt from new triangles joins and leaves the list without one.
 
 use super::cost_tests::{collider, rig, tick};
@@ -7,7 +8,9 @@ use super::edit_ops::{define_plank, give_plank};
 use crate::compound::world_pose;
 use crate::convert::to_pose;
 use crate::PhysicsWorld;
-use rusty_components::RigidBodyComponent;
+use rusty_components::{MeshComponent, RigidBodyComponent};
+use rusty_ecs::Changes;
+use rusty_scene::skeleton::rig::armature_owner;
 use rusty_scene::{mesh_library, Scene};
 
 fn walks(physics: &PhysicsWorld) -> u64 {
@@ -86,5 +89,57 @@ fn a_hung_mesh_collider_rebuilt_from_its_triangles_joins_and_leaves_the_list() {
         walks(&physics),
         walked,
         "a rebuild filters, it does not walk"
+    );
+}
+
+/// A prefab stamp's tail: every skeleton synced again (`Scene::hang_on_skeletons`).
+fn stamp_tail(scene: &mut Scene) {
+    scene.hang_on_skeletons(Vec::new(), Vec::new());
+}
+
+#[test]
+fn a_prefab_stamped_away_from_the_rigs_walks_no_skeleton() {
+    let mut scene = Scene::new();
+    let rig = rig(&mut scene, true);
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    tick(&mut physics, &mut scene);
+    let mut meshes = scene.world.change_cursor::<MeshComponent>();
+    let casing = scene.add_entity("Casing".to_string());
+    scene.world.set_collider(casing, Some(collider()));
+    stamp_tail(&mut scene);
+    match scene.world.changes(&mut meshes) {
+        Changes::Ids(ids) => assert!(!ids.contains(&rig), "the rig's Mesh untouched"),
+        Changes::Rebuild => panic!("a stamp rebuilds no channel"),
+    }
+    tick(&mut physics, &mut scene);
+    assert_eq!(walks(&physics), 1, "the first follow only");
+}
+
+#[test]
+fn a_prefab_stamped_on_a_rig_or_carrying_one_walks() {
+    let mut scene = Scene::new();
+    let first = rig(&mut scene, true);
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    tick(&mut physics, &mut scene);
+    let head = scene.find_bone(first, "head").unwrap();
+    let visor = scene.add_entity("Visor".to_string());
+    scene.set_parent(visor, Some(head)).unwrap();
+    scene.world.set_collider(visor, Some(collider()));
+    stamp_tail(&mut scene);
+    tick(&mut physics, &mut scene);
+    assert_eq!(walks(&physics), 2, "stamped under a bone");
+    assert!(kept(&physics).contains(&visor));
+    let second = armature_owner(&mut scene);
+    stamp_tail(&mut scene);
+    let bone = scene.find_bone(second, "head").unwrap();
+    tick(&mut physics, &mut scene);
+    assert_eq!(walks(&physics), 3, "a skinned model stamped");
+    let hitbox = scene.add_entity("Hitbox".to_string());
+    scene.set_parent(hitbox, Some(bone)).unwrap();
+    scene.world.set_collider(hitbox, Some(collider()));
+    tick(&mut physics, &mut scene);
+    assert!(
+        kept(&physics).contains(&hitbox),
+        "the new rig's bones are kept"
     );
 }

@@ -22,7 +22,9 @@ fn check(scene: &Scene, kept: &PhysicsWorld, walking: &PhysicsWorld) -> Result<(
     prop_assert_eq!(ids, walk.as_slice());
     prop_assert_eq!(kept.id_to_collider.len(), walking.id_to_collider.len());
     for (id, &h) in kept.id_to_collider.iter() {
-        let twin = walking.id_to_collider[id];
+        let twin = walking.id_to_collider.get(id).copied();
+        prop_assert!(twin.is_some(), "collider {} missing from the twin", id);
+        let Some(twin) = twin else { continue };
         prop_assert_eq!(
             kept.colliders[h].position(),
             walking.colliders[twin].position()

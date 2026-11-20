@@ -95,9 +95,6 @@ impl Log {
         if !self.recording || seen < self.floor {
             return None;
         }
-        if seen == self.revision {
-            return Some(Vec::new()); // nothing since: a quiet read builds no list
-        }
         let start = self.entries.partition_point(|&(rev, _)| rev <= seen);
         let mut ids: Vec<u32> = self.entries[start..].iter().map(|&(_, id)| id).collect();
         ids.sort_unstable();

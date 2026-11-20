@@ -16,22 +16,28 @@
 //! bone is found by walking every skeleton's subtrees ([`Scene::bone_subtrees`]),
 //! and is kept between ticks with the bones the skeletons list. The walk runs
 //! again only when the follow's own cursors say the hung set may have changed:
-//! - `MeshComponent`: a `Rebuild`, or a stamped id that was a skinned owner or is
-//!   one now: a skeleton bound, re-imported or a bone slot cleared changes which
-//!   ids are bones. A decal's or a muzzle flash's Mesh is no owner's, and the
-//!   palette written every tick (`World::set_pose_palette`) stamps nothing, so an
-//!   animating rig keeps its list.
+//! - `MeshComponent`: a `Rebuild`, or a stamped id whose skeleton's bone slots
+//!   differ from the kept ones (it became a skinned owner, stopped being one, or
+//!   a skeleton was bound, re-imported or had a slot cleared), which changes
+//!   which ids are bones. Any other write to a Mesh (a decal's, a muzzle flash's,
+//!   a script setting a character's draw distance) walks nothing, and the palette
+//!   written every tick (`World::set_pose_palette`) stamps nothing, so an
+//!   animating rig keeps its list. A prefab stamp syncs every skeleton
+//!   (`Scene::hang_on_skeletons`), and one already bound is left unwritten.
 //! - `Activity`: a `Rebuild`, or a stamped id that touches a rig. A re-parent, a
 //!   placement or a removal stamps the whole subtree (`World::stamp_hierarchy_below`,
 //!   `World::touch_entity`), so its top is stamped too: a stamped id touches a rig
 //!   when it was hung, or when it or an ancestor is hung or listed as a bone now.
-//!   A casing spawned at the root, a projectile destroyed or a prop toggled
-//!   touches none, so a busy tick away from the rigs walks nothing.
+//!   A casing spawned at the root (a prefab's included), a projectile destroyed
+//!   or a prop toggled touches none, so a busy tick away from the rigs walks
+//!   nothing; an edit on or under a rig (a hitbox moved, a bone deactivated, a
+//!   prefab stamped under a bone) walks once.
 //!
-//! The list itself is the hung ids that have a collider handle. When the handle
-//! table changed since (`ColliderIds::generation`: a body plan rebuilt, a mesh
-//! collider rebuilt or dropped, which is what a Collider attached, detached or
-//! toggled does), the kept hung set is filtered again, without a walk. A scene
+//! The list itself is the hung ids that have a collider handle. When an id gained
+//! or lost one since (`ColliderIds::generation`: a Collider attached, detached or
+//! toggled, a mesh collider built or dropped), the kept hung set is filtered again,
+//! without a walk; a handle only replaced (a body plan rebuilt, a projectile's
+//! among them) moves nothing, since each tick looks the handle up. A scene
 //! load, Play's restore and an Undo or Redo read `Rebuild` on every cursor, and a
 //! fresh physics world (entering Play, a caught rapier panic) starts with no list.
 //! Each tick still looks the handle up and skips a body's own collider (a
@@ -71,8 +77,9 @@ pub(crate) struct Kept {
     hung: Vec<u32>,
     /// Every id a skeleton's slots list, ascending, under its owner or not.
     bones: Vec<u32>,
-    /// The skinned owners (`Scene::skinned_ids`), ascending.
-    owners: Vec<u32>,
+    /// The skinned owners (`Scene::skinned_ids`), ascending, each with the bone
+    /// slots its skeleton held: the hung set reads nothing else of a Mesh.
+    owners: Vec<(u32, Vec<Option<u32>>)>,
     /// `hung`'s ids with a collider handle.
     ids: Vec<u32>,
     /// Walks taken since this list was opened, for the cost tests.
@@ -115,16 +122,24 @@ impl Kept {
         if skins || touched {
             self.walk(scene, handles);
         } else if handles.generation() != self.generation {
-            self.ids = filtered(&self.hung, handles);
+            refilter(&mut self.ids, &self.hung, handles);
         }
         self.generation = handles.generation();
     }
 
-    /// Whether Mesh-stamped `id` can have changed which ids are bones: it was a
-    /// skinned owner, or is one now.
+    /// Whether Mesh-stamped `id` can have changed which ids are bones: it is a
+    /// skinned owner now and was not, was one and is not, or its bone slots
+    /// moved. Any other field written (a script's `Mesh.SetMaxDrawDistance`) walks
+    /// nothing.
     fn skins(&self, scene: &Scene, id: u32) -> bool {
-        let skinned = |m: &MeshComponent| !m.skeleton.bones.is_empty();
-        self.owners.binary_search(&id).is_ok() || scene.world.mesh(id).is_some_and(|m| skinned(&m))
+        let was = self.owners.binary_search_by_key(&id, |(o, _)| *o).ok();
+        let was = was.map(|at| self.owners[at].1.as_slice());
+        let mesh = scene.world.mesh(id);
+        let now = mesh
+            .as_deref()
+            .map(|m: &MeshComponent| m.skeleton.bones.as_slice());
+        let now = now.filter(|slots| !slots.is_empty());
+        was != now
     }
 
     /// Whether stamped `id` can have changed the hung set: it was hung, or it or
@@ -143,10 +158,15 @@ impl Kept {
     /// Find the hung set and the bones again, and the list from them.
     fn walk(&mut self, scene: &Scene, handles: &ColliderIds) {
         self.hung = scene.bone_subtrees().into_iter().collect();
-        self.owners = scene.skinned_ids();
-        self.owners.sort_unstable();
-        self.bones = listed_bones(scene, &self.owners);
-        self.ids = filtered(&self.hung, handles);
+        let mut owners = scene.skinned_ids();
+        owners.sort_unstable();
+        self.bones = listed_bones(scene, &owners);
+        let slots = |o: u32| scene.world.mesh(o).map(|m| m.skeleton.bones.clone());
+        self.owners = owners
+            .into_iter()
+            .map(|o| (o, slots(o).unwrap_or_default()))
+            .collect();
+        refilter(&mut self.ids, &self.hung, handles);
         #[cfg(test)]
         {
             self.walks += 1;
@@ -175,10 +195,15 @@ fn listed_bones(scene: &Scene, owners: &[u32]) -> Vec<u32> {
 
 /// `hung`'s ids that have a collider handle, ascending.
 fn filtered(hung: &[u32], handles: &ColliderIds) -> Vec<u32> {
-    hung.iter()
-        .copied()
-        .filter(|id| handles.contains_key(id))
-        .collect()
+    let mut ids = Vec::new();
+    refilter(&mut ids, hung, handles);
+    ids
+}
+
+/// Fill `ids` with [`filtered`]'s answer, reusing its buffer.
+fn refilter(ids: &mut Vec<u32>, hung: &[u32], handles: &ColliderIds) {
+    ids.clear();
+    ids.extend(hung.iter().copied().filter(|id| handles.contains_key(id)));
 }
 
 /// What the kept list holds, by the walk: every id on or under a bone that has a

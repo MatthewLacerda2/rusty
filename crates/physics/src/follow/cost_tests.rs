@@ -109,3 +109,17 @@ fn a_rewound_world_and_a_new_hitbox_walk_again() {
     tick(&mut physics, &mut scene);
     assert!(physics.tracked.follow.as_ref().unwrap().ids().contains(&hb));
 }
+
+#[test]
+fn a_write_to_a_characters_mesh_walks_only_when_its_slots_move() {
+    let mut scene = Scene::new();
+    let rig = rig(&mut scene, true);
+    let mut physics = PhysicsWorld::from_scene(&scene);
+    tick(&mut physics, &mut scene);
+    scene.world.mesh_mut(rig).unwrap().max_draw_distance = 40.0;
+    tick(&mut physics, &mut scene);
+    assert_eq!(walks(&physics), 1, "a draw distance moves no bone");
+    scene.world.mesh_mut(rig).unwrap().skeleton.bones[2] = None;
+    tick(&mut physics, &mut scene);
+    assert_eq!(walks(&physics), 2, "a slot cleared");
+}
