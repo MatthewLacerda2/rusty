@@ -1,12 +1,17 @@
-//! Scene-hierarchy tree rendering (VS Code Explorer style): a genuine collapsible
-//! tree with per-entity expand state, type glyphs and full-row selection. Kept in
-//! its own module so `hierarchy`'s root stays under the size gate.
+//! Scene-hierarchy tree rendering (VS Code Explorer style): a collapsible tree
+//! with per-entity expand state, type glyphs and full-row selection, drawn from
+//! `flat`'s rows so only the ones in view are laid out.
 
-use egui::collapsing_header::CollapsingState;
+use egui::collapsing_header::paint_default_icon;
 use egui_phosphor::regular as icon;
 
+use super::flat::{node_state, Row};
+use super::glyph::node_glyph;
 use crate::theme::Theme;
 use rusty_scene::Scene;
+
+/// The tree's scroll area, named so its offset is found again (and by tests).
+pub(super) const SCROLL_SALT: &str = "hierarchy_rows";
 
 /// What a row reads and writes besides the scene: the editor's selection fields
 /// (clicking a row updates them), the row a context-menu *Delete* asked for
@@ -19,31 +24,51 @@ pub(super) struct Rows<'a> {
 }
 
 impl Rows<'_> {
-    /// Draw `entity_id` and (when expanded) its subtree.
-    pub(super) fn draw_node(&mut self, ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {
-        let Some(name) = scene.world.name(entity_id).map(|n| n.clone()) else {
+    /// Draw the flattened tree in a vertical scroll area, laying out only the
+    /// rows in its view: one off screen costs its share of the scroll height and
+    /// nothing else. Every row is one height, which `show_rows` needs.
+    pub(super) fn draw(&mut self, ui: &mut egui::Ui, scene: &Scene, flat: &[Row]) {
+        let row_h = ui.spacing().interact_size.y;
+        // As wide as the panel, not as the rows: only the rows in view are laid
+        // out, so following their width would move the scroll bar while scrolling.
+        let scroll = egui::ScrollArea::vertical()
+            .id_salt(SCROLL_SALT)
+            .auto_shrink([false, true]);
+        scroll.show_rows(ui, row_h, flat.len(), |ui, range| {
+            let pitch = row_h + ui.spacing().item_spacing.y;
+            let indent = ui.spacing().indent;
+            // Where row 0 would sit: `show_rows` starts its ui at `range.start`.
+            let origin = ui.max_rect().left_top() - egui::vec2(0.0, range.start as f32 * pitch);
+            for (i, row) in flat.iter().enumerate().take(range.end).skip(range.start) {
+                let min = origin + egui::vec2(row.depth as f32 * indent, i as f32 * pitch);
+                let right = ui.max_rect().right();
+                let rect = egui::Rect::from_min_max(min, egui::pos2(right, min.y + row_h));
+                self.draw_row(ui, scene, row, rect);
+            }
+            guide_lines(ui, flat, range, origin, pitch);
+        });
+    }
+
+    /// One row in `rect`, laid out as `ui.horizontal` lays it out: a branch's
+    /// twisty or a leaf's matching space, then the glyph and the name. The name
+    /// is borrowed from the World for the row's draw, never copied.
+    fn draw_row(&mut self, ui: &mut egui::Ui, scene: &Scene, row: &Row, rect: egui::Rect) {
+        let Some(name) = scene.world.name(row.id) else {
             return;
         };
-        let children = scene.world.children(entity_id);
-        if children.is_empty() {
-            // Leaf: indent to line up with the parents' twisty, then the row.
-            ui.horizontal(|ui| {
+        let layout = egui::Layout::left_to_right(egui::Align::Center);
+        let builder = egui::UiBuilder::new()
+            .id_salt(("hierarchy_row", row.id))
+            .max_rect(rect)
+            .layout(layout);
+        ui.scope_builder(builder, |ui| {
+            if row.open.is_some() {
+                twisty(ui, scene, row.id);
+            } else {
                 ui.add_space(ui.spacing().icon_width);
-                self.row(ui, scene, entity_id, &name);
-            });
-            return;
-        }
-        // Branch: a real collapsible node. egui's body indent draws the guide line.
-        let id = ui.make_persistent_id(("hierarchy_node", entity_id));
-        // A skeleton is ~65 bones (#453): its subtrees start collapsed.
-        let default_open = !scene.is_bone(entity_id);
-        CollapsingState::load_with_default_open(ui.ctx(), id, default_open)
-            .show_header(ui, |ui| self.row(ui, scene, entity_id, &name))
-            .body(|ui| {
-                for child in children {
-                    self.draw_node(ui, scene, child);
-                }
-            });
+            }
+            self.row(ui, scene, row.id, &name);
+        });
     }
 
     /// The clickable row: type glyph + name. Selecting toggles off to None (which
@@ -92,77 +117,48 @@ fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
     let _ = rusty_edit::save_prefab(scene, entity_id, &path.to_string_lossy());
 }
 
-/// How a hierarchy glyph is tinted, resolved against the theme when drawn.
-#[derive(Clone, Copy)]
-enum Tint {
-    Muted,
-    Accent,
-    Warning,
-    Teal,
+/// A branch's expand toggle, as `CollapsingState::show_header` draws it: the full
+/// indent wide with no spacing after it. A click flips the stored state, and the
+/// next frame's walk shows or skips the subtree.
+fn twisty(ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {
+    let mut state = node_state(ui.ctx(), scene, entity_id);
+    let spacing = ui.spacing().item_spacing;
+    ui.spacing_mut().item_spacing.x = 0.0;
+    if state.show_toggle_button(ui, paint_default_icon).clicked() {
+        state.store(ui.ctx());
+    }
+    ui.spacing_mut().item_spacing = spacing;
 }
 
-type Has = fn(&rusty_ecs::World, u32) -> bool;
-
-/// The row glyph per kind of GameObject, most telling component first (#668): a
-/// row says what the object *is* — camera, light, UI, audio, character — before
-/// falling back to the plain mesh cube, and an empty object gets a dashed circle.
-const KINDS: &[(Has, &str, Tint)] = &[
-    (|w, id| w.has_camera(id), icon::VIDEO_CAMERA, Tint::Accent),
-    (|w, id| w.has_light(id), icon::LIGHTBULB, Tint::Warning),
-    (|w, id| w.has_canvas(id), icon::BROWSER, Tint::Teal),
-    (
-        |w, id| w.has_rect_transform(id),
-        icon::FRAME_CORNERS,
-        Tint::Teal,
-    ),
-    (|w, id| w.has_particles(id), icon::SPARKLE, Tint::Warning),
-    (
-        |w, id| w.has_audio(id) || w.has_reverb_zone(id),
-        icon::SPEAKER_HIGH,
-        Tint::Teal,
-    ),
-    (
-        |w, id| w.has_character_controller(id) || w.has_animator(id),
-        icon::PERSON_SIMPLE,
-        Tint::Accent,
-    ),
-    (
-        |w, id| w.has_nav_agent(id),
-        icon::NAVIGATION_ARROW,
-        Tint::Accent,
-    ),
-    (
-        |w, id| w.has_nav_obstacle(id) || w.has_nav_modifier(id) || w.has_offmesh_link(id),
-        icon::PATH,
-        Tint::Muted,
-    ),
-    (
-        |w, id| w.has_trail(id) || w.has_line(id),
-        icon::LINE_SEGMENTS,
-        Tint::Muted,
-    ),
-    (|w, id| w.has_mesh(id), icon::CUBE, Tint::Muted),
-    (|w, id| w.has_collider(id), icon::BOUNDING_BOX, Tint::Muted),
-    (|w, id| w.has_joint(id), icon::LINK, Tint::Muted),
-];
-
-/// The row's glyph and its colour. Skeleton bones read as bones whatever they carry.
-fn node_glyph(scene: &Scene, id: u32, t: Theme) -> (&'static str, egui::Color32) {
-    let (glyph, tint) = if scene.is_bone(id) {
-        (icon::BONE, Tint::Muted)
-    } else {
-        KINDS
-            .iter()
-            .find(|(has, _, _)| has(&scene.world, id))
-            .map_or((icon::CIRCLE_DASHED, Tint::Muted), |&(_, g, tint)| {
-                (g, tint)
-            })
+/// The guide line down an open branch's body, as egui's indent draws it: half an
+/// indent in from the branch's row, from the first child's top to 2 px above the
+/// last descendant's bottom. Drawn for each open branch with a row in `range`,
+/// and for those above it whose body reaches into it (the first row's ancestors).
+fn guide_lines(
+    ui: &egui::Ui,
+    flat: &[Row],
+    range: std::ops::Range<usize>,
+    origin: egui::Pos2,
+    pitch: f32,
+) {
+    let row_h = ui.spacing().interact_size.y;
+    let indent = ui.spacing().indent;
+    let stroke = ui.visuals().widgets.noninteractive.bg_stroke;
+    let line = |i: usize| {
+        let row = &flat[i];
+        if row.open != Some(true) || row.end <= i + 1 {
+            return;
+        }
+        let x = origin.x + row.depth as f32 * indent + 0.5 * indent;
+        let top = origin.y + (i + 1) as f32 * pitch;
+        let bottom = origin.y + (row.end - 1) as f32 * pitch + row_h - 2.0;
+        ui.painter()
+            .line_segment([egui::pos2(x, top), egui::pos2(x, bottom)], stroke);
     };
-    let color = match tint {
-        Tint::Muted => t.text_secondary,
-        Tint::Accent => t.accent,
-        Tint::Warning => t.warning,
-        Tint::Teal => t.teal,
-    };
-    (glyph, color)
+    let mut above = flat.get(range.start).and_then(|r| r.parent);
+    while let Some(p) = above {
+        line(p);
+        above = flat[p].parent;
+    }
+    range.for_each(line);
 }
