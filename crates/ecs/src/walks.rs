@@ -6,8 +6,8 @@
 //! `World::moving_bodies`); lookups by `World::component`, under every typed
 //! getter. A test hook: compiled in every build, since the test that reads it is
 //! another crate's, and counting only on a thread that asked [`of`],
-//! [`lookups_of`] or [`moves`] once. A walk happens a few times a frame, so a build that never
-//! asks pays one thread-local read per walk. A lookup is the hottest call the sim
+//! [`lookups_of`], [`moves`] or [`ids_collected`] once. A walk happens a few times
+//! a frame, so a build that never asks pays one thread-local read per walk. A lookup is the hottest call the sim
 //! makes, so lookups are counted only where `debug_assertions` holds (every test
 //! profile): a release or ship build compiles the call away, and [`lookups_of`]
 //! panics there rather than answer a silent 0. Archetype moves are counted too
@@ -17,7 +17,11 @@
 //! overwrite of a held column, and whole-entity placement (spawn, despawn,
 //! restore), move no column and are not counted. On a thread that never asked,
 //! an attach or detach pays one thread-local read; whether it moves a column is
-//! asked only once armed. Re-exported as `world::walks`.
+//! asked only once armed. The ids change-log reads collect are counted too
+//! ([`ids_collected`]): what a test holds a reader that wants only a yes or no to.
+//! Like lookups, they are counted only where `debug_assertions` holds, since every
+//! `World::changes` read would otherwise pay a thread-local read in a ship build.
+//! Re-exported as `world::walks`.
 
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
@@ -27,6 +31,33 @@ thread_local! {
     static WALKS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
     static LOOKUPS: RefCell<BTreeMap<&'static str, u64>> = RefCell::default();
     static MOVES: Cell<u64> = const { Cell::new(0) };
+    static COLLECTED: Cell<u64> = const { Cell::new(0) };
+}
+
+/// Counts the ids a change-log read handed back, when this thread is armed;
+/// nothing, and compiles to nothing, without `debug_assertions`.
+#[inline(always)]
+pub(crate) fn collected(ids: usize) {
+    if cfg!(debug_assertions) && ARMED.with(Cell::get) {
+        COLLECTED.with(|c| c.set(c.get() + ids as u64));
+    }
+}
+
+/// Ids every change-log read (`World::changes`) collected on this thread since the
+/// first call of a reader here on it, which starts the count.
+///
+/// # Panics
+/// In a build without `debug_assertions` (release, ship), where ids are not
+/// counted: run the test in a debug or test profile.
+pub fn ids_collected() -> u64 {
+    if !cfg!(debug_assertions) {
+        panic!(
+            "walks::ids_collected: ids are counted only with debug_assertions on; \
+             run this test in a debug or test profile, not release"
+        )
+    }
+    ARMED.with(|a| a.set(true));
+    COLLECTED.with(Cell::get)
 }
 
 /// Counts one archetype move when this thread is armed and `moving()` holds;
