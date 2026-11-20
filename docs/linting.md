@@ -950,8 +950,9 @@ is never a second copy that drifts. It adds what cargo cannot know.
   rows: a sim row's `[dependencies]` can't name one (`SIM_LEAK`), and its
   `[dev-dependencies]` can't either, above its row (`STRAY_DEV_CRATE`) or below it
   (`PLATFORM_DEV_CRATE`), each line one finding. Plain
-  data the renderer and the sim share lives sim-side: the mesh `Vertex` and the
-  primitive builders in `components::mesh`, `Camera` and `Decal` in `scene`,
+  data the renderer and the sim share lives sim-side: the mesh `Vertex` in
+  `asset::mesh_data` (re-exported by `components::mesh`), the primitive builders in
+  `components::mesh`, `Camera` and `Decal` in `scene`,
   `QualityPreset` in `core::settings::quality`; the renderer keeps only the GPU half
   (`render::gpu::mesh::vertex_layout`), and `shadergen::compose` holds the GPU-free
   `naga_oil` composition the renderer's `ShaderRegistry` calls.

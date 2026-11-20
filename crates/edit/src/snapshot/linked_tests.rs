@@ -1,8 +1,8 @@
 //! Stop and a load over whole models placed in a level, each a linked instance
 //! whose propagation rebuilds it from its model: one lookup of the model file per
 //! pass, and no copy of any instance's geometry, whatever the count of instances:
-//! a pass copies the model's vertices for the model alone (its node tree's build
-//! and its baseline stamp, both rebuilds from the import), never per instance.
+//! a pass rebuilds the model alone (its node tree's build and its baseline stamp,
+//! both sharing the import's buffers), never per instance.
 
 use glam::Vec3;
 
@@ -36,11 +36,12 @@ fn level(dir: &str, n: usize) -> (Scene, Vec<u32>, String) {
 }
 
 fn indices(scene: &Scene, id: u32) -> Vec<u32> {
-    scene.world.mesh(id).unwrap().indices.clone()
+    scene.world.mesh(id).unwrap().indices.to_vec()
 }
 
-/// The geometry copies made since `from` (rebuilds, clones): every mesh given
-/// vertices by a rebuild from its import, or cloned with them.
+/// The geometry work done since `from` (rebuilds, copies): every mesh given
+/// geometry by a rebuild from its import (which shares the import's buffers), and
+/// every vertex or index buffer copied to edit it (`mesh::copies`).
 fn copied(from: (usize, usize)) -> (usize, usize) {
     (rebuilds() - from.0, copies() - from.1)
 }
@@ -73,7 +74,7 @@ fn stop_over_linked_models_looks_the_file_up_once_and_copies_no_instance() {
         many.1, one.1,
         "the model's own copies, never one per instance"
     );
-    assert_eq!(many.1 .1, 0, "no mesh is cloned with its geometry");
+    assert_eq!(many.1 .1, 0, "no geometry buffer is copied");
 }
 
 #[test]
@@ -88,7 +89,7 @@ fn stop_rebuilds_an_instance_whose_override_re_meshes_it() {
     assert_eq!(lookups() - looked, 1, "the model file, once");
     assert_eq!(
         indices(&scene, parts[1]),
-        sphere.indices,
+        sphere.indices.to_vec(),
         "the override's sphere"
     );
     assert_eq!(indices(&scene, parts[0]), vec![0, 1, 2, 0, 2, 3]);

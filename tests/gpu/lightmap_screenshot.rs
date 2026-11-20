@@ -25,7 +25,9 @@ fn add(scene: &mut Scene, primitive: Primitive, position: Vec3, scale: Vec3) -> 
     let id = scene.add_entity(format!("{primitive:?}"));
     let mut mesh = primitive_mesh_component(primitive);
     if let (Primitive::Sphere, Some(m)) = (primitive, &mut mesh) {
-        m.vertices.iter_mut().for_each(|v| v.lightmap_uv = [0.0; 2]);
+        m.vertices_mut()
+            .iter_mut()
+            .for_each(|v| v.lightmap_uv = [0.0; 2]);
     }
     scene.world.set_mesh(id, mesh);
     scene.world.set_static(id, true);

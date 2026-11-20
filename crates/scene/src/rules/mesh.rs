@@ -76,8 +76,8 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
     let (vertices, indices) =
         subdivided_geometry(Primitive::Plane, subdivisions).expect("a Plane has geometry");
     mesh.subdivisions = subdivisions;
-    mesh.vertices = vertices;
-    mesh.indices = indices;
+    mesh.vertices = vertices.into();
+    mesh.indices = indices.into();
     mesh.revision = primitive_revision(Primitive::Plane, subdivisions);
     Ok(())
 }

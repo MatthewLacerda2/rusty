@@ -4,7 +4,7 @@
 //! The library sits beside the material library (`Scene::materials`): named
 //! entries saved with the scene (`SceneData::meshes`), each a [`MeshData`]. An
 //! entity draws one when its Mesh's `primitive_type` is [`SCENE_KIND`] and its
-//! `asset_ref` is the entry's name. Its geometry is a copy of the entry's, so
+//! `asset_ref` is the entry's name. Its geometry is the entry's, shared (#2351), so
 //! everything that reads a mesh (the renderer, physics, the bakes) reads it as it
 //! reads a primitive's.
 //!
@@ -32,15 +32,17 @@ use serde::{Deserialize, Serialize};
 
 use crate::create::Primitive;
 use crate::Scene;
+use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::{MeshData, MeshRevision, Vertex, SCENE_KIND};
 use rusty_components::{ColliderComponent, MeshComponent};
 
-/// What an entry draws: its vertices and indices, built from its data.
-pub type Geometry = (Vec<Vertex>, Vec<u32>);
+/// What an entry draws: its vertices and indices, built from its data, shared by
+/// every entity drawing it.
+pub type Geometry = (Shared<Vertex>, Shared<u32>);
 
 /// One library entry: the data as authored, shared (a Play snapshot or an Undo
 /// baseline clones the library, never the vertices), the geometry built from it
-/// once (on first use, so every entity drawing it copies one build), and the
+/// once (on first use, so every entity drawing it shares one build), and the
 /// revision every entity drawing it carries. Two entries are equal when their data
 /// is: the revision is not an edit (Undo compares the library). Saved as its data
 /// alone.
@@ -59,7 +61,8 @@ impl SceneMesh {
     pub fn geometry(&self) -> &Geometry {
         self.built.get_or_init(|| {
             BUILDS.with(|n| n.set(n.get() + 1));
-            self.data.geometry()
+            let (vertices, indices) = self.data.geometry();
+            (vertices.into(), indices.into())
         })
     }
 }

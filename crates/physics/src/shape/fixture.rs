@@ -90,7 +90,7 @@ pub(crate) fn prop(
     let (lo, hi) = mesh.0.iter().fold((Vec3::MAX, Vec3::MIN), |(lo, hi), &p| {
         (lo.min(p.into()), hi.max(p.into()))
     });
-    let vertices = (mesh.0.iter())
+    let vertices: Vec<Vertex> = (mesh.0.iter())
         .map(|&p| Vertex::new(Vec3::from_array(p), Vec3::Y, [0.0, 0.0]))
         .collect();
     let component = MeshComponent::new("Asset", vertices, mesh.1);

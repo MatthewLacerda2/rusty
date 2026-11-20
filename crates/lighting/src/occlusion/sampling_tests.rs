@@ -75,8 +75,7 @@ fn a_reexport_that_moves_a_vertex_is_a_new_fingerprint() {
     );
     // A doorway moved in Blender: the same counts, one vertex elsewhere.
     let mut mesh = scene.world.mesh_mut(id).unwrap();
-    mesh.vertices[0].position[0] += 0.5;
-    mesh.revision = MeshRevision::next();
+    mesh.vertices_mut()[0].position[0] += 0.5;
     drop(mesh);
     assert_ne!(fingerprint(&scene, id), Some(before));
 }

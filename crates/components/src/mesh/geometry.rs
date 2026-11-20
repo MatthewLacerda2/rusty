@@ -5,36 +5,20 @@
 //! mesh's saved fields and drops the heavy rehydrated ones; restoring takes the
 //! geometry back from the live mesh when it still comes from the same source.
 //!
-//! [`copies`] is a test hook (crates/CLAUDE.md): it counts the meshes this thread
-//! cloned with their geometry, for a restore's tests to hold its copies to,
-//! compiled in every build since those tests are `rusty-edit`'s, and counting
-//! only on a thread that asked once.
+//! The vertex and index buffers are shared (`rusty_asset::mesh_data::Shared`,
+//! #2351) with the import cache and every other instance, so a [`Clone`] of a mesh
+//! points at the same geometry. An edit in place goes through
+//! [`MeshComponent::vertices_mut`] or [`MeshComponent::indices_mut`], which copy
+//! the buffer first when anyone else holds it (counted by `mesh::copies`) and
+//! renew the revision; replacing a buffer whole (`mesh.vertices = vec.into()`)
+//! copies nothing.
 
-use std::cell::Cell;
-
-use super::MeshComponent;
-
-thread_local! {
-    static ARMED: Cell<bool> = const { Cell::new(false) };
-    static COPIES: Cell<usize> = const { Cell::new(0) };
-}
-
-/// Meshes this thread cloned with geometry (a vertex or more) since the first
-/// call of this function on it, which starts the count.
-#[doc(hidden)]
-pub fn copies() -> usize {
-    ARMED.set(true);
-    COPIES.get()
-}
+use super::{MeshComponent, MeshRevision, Vertex};
 
 /// A full copy: [`MeshComponent::without_geometry`]'s fields (every one named
-/// there) with the heavy ones cloned too, counted by [`copies`] when it has a
-/// vertex.
+/// there) with the heavy ones too, the vertices and indices shared, not copied.
 impl Clone for MeshComponent {
     fn clone(&self) -> Self {
-        if !self.vertices.is_empty() && ARMED.get() {
-            COPIES.set(COPIES.get() + 1);
-        }
         Self {
             vertices: self.vertices.clone(),
             indices: self.indices.clone(),
@@ -60,8 +44,8 @@ impl MeshComponent {
             subdivisions: self.subdivisions,
             cast_shadows: self.cast_shadows,
             scale_in_lightmap: self.scale_in_lightmap,
-            vertices: Vec::new(),
-            indices: Vec::new(),
+            vertices: Default::default(),
+            indices: Default::default(),
             ranges: Vec::new(),
             bind_palette: Vec::new(),
             skin: None,
@@ -73,6 +57,20 @@ impl MeshComponent {
             revision: self.revision,
             clusters: None,
         }
+    }
+
+    /// The vertices, to edit in place: this mesh's own copy when another mesh or
+    /// the import cache shares them, at a new revision so every renderer re-uploads
+    /// them. A primitive's edit needs a new `MeshId` too (see `revision`).
+    pub fn vertices_mut(&mut self) -> &mut Vec<Vertex> {
+        self.revision = MeshRevision::next();
+        self.vertices.edit()
+    }
+
+    /// The indices, to edit in place, as [`Self::vertices_mut`] gives the vertices.
+    pub fn indices_mut(&mut self) -> &mut Vec<u32> {
+        self.revision = MeshRevision::next();
+        self.indices.edit()
     }
 
     /// Whether `other`'s geometry is this mesh's: the same primitive or asset, cut

@@ -92,7 +92,7 @@ fn fill_kept_copy(scene: &mut Scene, id: u32, changed: &BTreeSet<String>) {
     if let Some(mut collider) = scene.world.collider_mut(id) {
         if let Some(kept) = collider.shared_mesh.as_mut() {
             kept.positions = entry.data.positions.clone();
-            kept.indices = entry.data.indices.clone();
+            kept.indices = entry.geometry().1.clone();
         }
     }
     refit(scene, id);

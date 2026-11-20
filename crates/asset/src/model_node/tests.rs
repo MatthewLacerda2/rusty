@@ -4,14 +4,14 @@
 use glam::{Quat, Vec3};
 
 use super::{worlds, ModelNode};
-use crate::{ImportedAsset, MeshVertex, SubMesh};
+use crate::{ImportedAsset, SubMesh, Vertex};
 
 fn tri(id: &str) -> SubMesh {
-    let v = |p: [f32; 3]| MeshVertex::new(p, [0.0, 0.0, 1.0], [0.0; 2]);
+    let v = |p: [f32; 3]| Vertex::new(p.into(), glam::Vec3::Z, [0.0; 2]);
     SubMesh {
         id: id.to_string(),
-        vertices: vec![v([0.0; 3]), v([1.0, 0.0, 0.0]), v([0.0, 1.0, 0.0])],
-        indices: vec![0, 1, 2],
+        vertices: vec![v([0.0; 3]), v([1.0, 0.0, 0.0]), v([0.0, 1.0, 0.0])].into(),
+        indices: vec![0, 1, 2].into(),
         ranges: Vec::new(),
         skin: None,
         clips: Vec::new(),

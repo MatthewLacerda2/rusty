@@ -16,6 +16,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::mesh::MeshComponent;
+use rusty_asset::mesh_data::Shared;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SharedMesh {
@@ -30,9 +31,10 @@ pub struct SharedMesh {
     /// Rest-pose vertex positions, rebuilt from the reference, never saved.
     #[serde(skip)]
     pub positions: Vec<[f32; 3]>,
-    /// Triangle indices into `positions`, rebuilt like them.
+    /// Triangle indices into `positions`, rebuilt like them: the Mesh's own buffer,
+    /// shared (#2351).
     #[serde(skip)]
-    pub indices: Vec<u32>,
+    pub indices: Shared<u32>,
 }
 
 fn one() -> u32 {
@@ -48,7 +50,7 @@ impl Default for SharedMesh {
             asset_ref: None,
             subdivisions: one(),
             positions: Vec::new(),
-            indices: Vec::new(),
+            indices: Shared::default(),
         }
     }
 }
@@ -92,7 +94,7 @@ impl SharedMesh {
             asset_ref: self.asset_ref.clone(),
             subdivisions: self.subdivisions,
             positions: Vec::new(),
-            indices: Vec::new(),
+            indices: Shared::default(),
         }
     }
 

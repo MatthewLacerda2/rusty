@@ -20,7 +20,7 @@ fn unwelded(scene: &mut Scene, id: u32) {
         .map(|&i| mesh.vertices[i as usize])
         .collect();
     mesh.indices = (0..corners.len() as u32).collect();
-    mesh.vertices = corners;
+    mesh.vertices = corners.into();
     mesh.revision = MeshRevision::next();
 }
 
@@ -35,8 +35,7 @@ fn the_same_triangles_stored_another_way_keep_the_print_and_a_moved_corner_does_
         Some(before),
         "only the buffer moved"
     );
-    scene.world.mesh_mut(id).unwrap().vertices[0].position[1] += 0.01;
-    scene.world.mesh_mut(id).unwrap().revision = MeshRevision::next();
+    scene.world.mesh_mut(id).unwrap().vertices_mut()[0].position[1] += 0.01;
     assert_ne!(fingerprint(&scene, id), Some(before), "a corner moved");
 }
 

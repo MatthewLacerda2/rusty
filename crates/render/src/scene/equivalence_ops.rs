@@ -7,7 +7,6 @@ use proptest::prelude::*;
 use super::fixture::{on, probe};
 use super::shadow_ops::{self, s_op, S};
 use crate::Renderer;
-use rusty_components::mesh::MeshRevision;
 use rusty_components::{LightComponent, MaterialComponent, RenderMode};
 use rusty_ecs::changes::ops::{apply, Op};
 use rusty_scene::create::{create_entity, Primitive};
@@ -112,8 +111,10 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         }),
         R::Reshape(i) => on(scene, pick(scene, i), |s, id| {
             if let Some(mut mesh) = s.world.mesh_mut(id) {
-                mesh.vertices.iter_mut().for_each(|v| v.position[1] *= 1.5);
-                mesh.revision = MeshRevision::next(); // every sharer's buffers change
+                // A new revision (`vertices_mut`): every sharer's buffers change.
+                mesh.vertices_mut()
+                    .iter_mut()
+                    .for_each(|v| v.position[1] *= 1.5);
             }
         }),
     }

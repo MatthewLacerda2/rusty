@@ -26,7 +26,7 @@ fn imported_part(scene: &mut Scene) -> u32 {
         [1.0, 1.0, 0.5],
         [-1.0, 1.0, 0.5],
     ];
-    let vertices = corners
+    let vertices: Vec<Vertex> = corners
         .iter()
         .map(|&p| Vertex::new(Vec3::from_array(p), Vec3::Y, [0.0, 0.0]))
         .collect();

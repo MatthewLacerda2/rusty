@@ -4,6 +4,7 @@
 //! then, with each room's statue an 8064-triangle clustered sphere (#1968), the
 //! triangles drawn with cluster culling on and off.
 
+use rusty_asset::mesh_data::Shared;
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -103,6 +104,7 @@ fn with_dense_statues(mut scene: Scene) -> (Scene, u32) {
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
     let clusters = rusty_asset::clusters::build(&positions, &mut indices, &[]);
     let clusters = Arc::new(clusters.expect("8064 triangles"));
+    let (vertices, indices): (Shared<_>, Shared<_>) = (vertices.into(), indices.into());
     let ids: Vec<u32> = scene
         .world
         .ids()

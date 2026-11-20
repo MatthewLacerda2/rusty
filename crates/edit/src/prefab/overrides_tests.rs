@@ -91,7 +91,7 @@ fn identity_and_geometry_are_never_overrides() {
     instance.id = 999;
     instance.parent_id = Some(123);
     if let Some(m) = instance.mesh.as_mut() {
-        m.vertices.clear();
+        m.vertices = Default::default();
     }
     assert!(
         diff_entity(&instance, &baseline).is_empty(),

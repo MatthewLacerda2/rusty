@@ -9,7 +9,7 @@
 //! A flat normal belongs to a face, not a vertex, so a vertex two faces share is
 //! split: [`flat_shaded`] gives every triangle corner its own copy.
 
-use super::mesh_data::MeshVertex;
+use super::mesh_data::Vertex;
 use super::tangents::Missing;
 use glam::Vec3;
 
@@ -31,10 +31,10 @@ pub fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
 /// vertices and their indices, `0..n`. A triangle naming a vertex past the end is
 /// dropped rather than read out of bounds.
 pub fn flat_shaded(
-    vertices: &[MeshVertex],
+    vertices: &[Vertex],
     indices: &[u32],
     missing: Missing,
-) -> (Vec<MeshVertex>, Vec<u32>) {
+) -> (Vec<Vertex>, Vec<u32>) {
     let mut out = Vec::with_capacity(indices.len());
     for tri in indices.chunks_exact(3) {
         let Some(corners) = tri
@@ -49,7 +49,7 @@ pub fn flat_shaded(
             corners[1].position,
             corners[2].position,
         );
-        out.extend(corners.into_iter().map(|v| MeshVertex { normal, ..v }));
+        out.extend(corners.into_iter().map(|v| Vertex { normal, ..v }));
     }
     let indices: Vec<u32> = (0..out.len() as u32).collect();
     let positions: Vec<[f32; 3]> = out.iter().map(|v| v.position).collect();
@@ -66,8 +66,8 @@ pub fn flat_shaded(
 mod tests {
     use super::*;
 
-    fn vertex(position: [f32; 3]) -> MeshVertex {
-        MeshVertex::new(position, [0.0; 3], [0.0; 2])
+    fn vertex(position: [f32; 3]) -> Vertex {
+        Vertex::new(position.into(), glam::Vec3::ZERO, [0.0; 2])
     }
 
     #[test]

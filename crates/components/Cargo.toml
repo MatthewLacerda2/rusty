@@ -12,7 +12,6 @@ workspace = true
 rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
 rusty-procgen = { workspace = true }
-bytemuck = { workspace = true }
 glam = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
