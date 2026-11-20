@@ -121,7 +121,7 @@ impl Renderer {
         let mut pass = color_pass(encoder, timed, target, load);
         pass.set_scissor_rect(x, y, w, h);
         pass.set_pipeline(pipeline.get());
-        pass.set_bind_group(0, group, &[]);
+        pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
         pass.draw(0..3, 0..1);
     }
 }

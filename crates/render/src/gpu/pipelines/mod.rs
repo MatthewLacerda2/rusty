@@ -48,7 +48,7 @@ pub(crate) struct ForwardPipelines {
     pub prepass: FacedPipeline,
     /// The opaque and velocity ones over a primed depth (#1499).
     pub primed: PrimedPipelines,
-    /// Their layout ([`forward_groups`]), which the selection mask (#1175) draws through too.
+    /// Their layout ([`Groups`]), which the selection mask (#1175) draws through too.
     pub layout: wgpu::PipelineLayout,
 }
 
@@ -71,12 +71,12 @@ pub(crate) fn create_pipelines(
     material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
 ) -> ForwardPipelines {
-    let groups = forward_groups(
-        camera_lighting_layout,
-        entity_bones_layout,
-        material_layout,
-        shadow_layout,
-    );
+    let groups = Groups {
+        global: camera_lighting_layout,
+        scene: Some(shadow_layout),
+        material: Some(material_layout),
+        draw: entity_bones_layout,
+    };
     let (render_layout, line_layout) = create_pipeline_layouts(device, groups);
     let set = SpecSet::new(device, shader, format, &render_layout);
     ForwardPipelines {
@@ -225,20 +225,11 @@ impl PrimedPipelines {
     }
 }
 
-/// The forward passes' groups by role: every forward-target layout (the solids,
-/// their prepass, translucents, lines, the selection mask and a surface variant's)
-/// places them through this, so all of them share one order ([`Groups`]).
-pub(crate) fn forward_groups<T>(global: T, draw: T, material: T, scene: T) -> Groups<T> {
-    Groups {
-        global,
-        scene: Some(scene),
-        material: Some(material),
-        draw,
-    }
-}
-
-/// The forward passes' pipeline layout for a surface variant (#396), over
-/// [`forward_groups`].
+/// The forward passes' pipeline layout for a surface variant (#396). Every
+/// forward-target layout (the solids, their prepass, translucents, lines, the
+/// selection mask and a surface variant's) places its groups by role through
+/// [`Groups`]: camera + lighting global, the shadows as the scene group, the
+/// material, and the entity + bones group per draw, so all of them share one order.
 pub(crate) fn forward_layout(
     device: &wgpu::Device,
     groups: Groups<&wgpu::BindGroupLayout>,

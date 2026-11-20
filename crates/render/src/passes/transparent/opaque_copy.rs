@@ -193,7 +193,7 @@ impl Renderer {
             let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
             let mut rp = color_pass(&mut encoder, timed, target, clear);
             rp.set_pipeline(pass.pipeline.get());
-            rp.set_bind_group(0, &inputs, &[]);
+            rp.set_bind_group(crate::gpu::ONLY_GROUP, &inputs, &[]);
             rp.draw(0..3, 0..1);
         }
         self.queue.counted_submit(std::iter::once(encoder.finish()));

@@ -102,7 +102,7 @@ impl ClockProbe {
                 }),
             });
             pass.set_pipeline(&self.pipeline);
-            pass.set_bind_group(0, &self.bind_group, &[]);
+            pass.set_bind_group(crate::gpu::ONLY_GROUP, &self.bind_group, &[]);
             pass.dispatch_workgroups(WORKGROUPS, 1, 1);
         }
         encoder.resolve_query_set(&self.set, 0..2, &self.resolve, 0);

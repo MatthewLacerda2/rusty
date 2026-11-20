@@ -265,6 +265,6 @@ fn fullscreen(
     let clear = wgpu::LoadOp::Clear(wgpu::Color::BLACK);
     let mut pass = color_pass(encoder, ("UI Blur Pass", timer, GpuPass::Ui), target, clear);
     pass.set_pipeline(pipeline);
-    pass.set_bind_group(0, group, &[]);
+    pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
     pass.draw(0..3, 0..1);
 }

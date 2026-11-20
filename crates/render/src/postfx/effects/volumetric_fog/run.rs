@@ -13,6 +13,11 @@ use crate::gpu::bind_entry as entry;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
+/// The scatter and integrate steps' own uniforms and inputs.
+const INPUTS: u32 = 0;
+/// The integrate step's froxel grids.
+const GRIDS: u32 = 1;
+
 /// Invocations per workgroup along each axis of `cs_scatter` and of `cs_integrate`.
 const SCATTER_GROUP: u32 = 4;
 const INTEGRATE_GROUP: u32 = 8;
@@ -105,12 +110,12 @@ impl Renderer {
                 timestamp_writes,
             });
             pass.set_pipeline(passes.scatter.get());
-            pass.set_bind_group(0, &scatter, &[]);
+            pass.set_bind_group(INPUTS, &scatter, &[]);
             let n = SCATTER_GROUP;
             pass.dispatch_workgroups(w.div_ceil(n), h.div_ceil(n), d.div_ceil(n));
             pass.set_pipeline(passes.integrate.get());
-            pass.set_bind_group(0, &uniforms, &[]);
-            pass.set_bind_group(1, &grids, &[]);
+            pass.set_bind_group(INPUTS, &uniforms, &[]);
+            pass.set_bind_group(GRIDS, &grids, &[]);
             let n = INTEGRATE_GROUP;
             pass.dispatch_workgroups(w.div_ceil(n), h.div_ceil(n), 1);
         }

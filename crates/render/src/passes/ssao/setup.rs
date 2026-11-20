@@ -76,7 +76,7 @@ impl SsaoRenderer {
             occlusion_query_set: None,
         });
         pass.set_pipeline(self.pipelines[stage as usize].get());
-        pass.set_bind_group(0, group, &[]);
+        pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
         pass.draw(0..3, 0..1);
     }
 

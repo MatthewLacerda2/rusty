@@ -1,7 +1,7 @@
 //! What a forward draw reads, split as Unity's SRP Batcher splits it (#1616): a small
-//! per-draw uniform ([`DrawUniform`], group 1 binding 0, at a dynamic offset) and the
-//! draw's material record ([`MaterialData`], one element of the group 1 binding 4
-//! storage array), which the per-draw uniform names by index.
+//! per-draw uniform ([`DrawUniform`], the per-draw group's (`groups::DRAW`) binding
+//! 0, at a dynamic offset) and the draw's material record ([`MaterialData`], one
+//! element of that group's binding 4 storage array), which the per-draw uniform names by index.
 //!
 //! **Per draw** is what differs between two draws of one material: the draw's own
 //! transform (identity for instanced solids, an editor gizmo's placement), where its

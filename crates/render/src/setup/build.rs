@@ -249,7 +249,8 @@ fn create_global_bindings(
 /// Build the forward-lit, line, outline and skybox passes, the solids through the
 /// forward `shader`. Solids and sky draw into the HDR offscreen target; the editor's
 /// outline ring and line gizmos into `output_format`, over post-FX (#1224).
-/// `layouts` are groups 0, 1 and 3: camera + lighting, entity + bones, shadows.
+/// `layouts` are the global, per-draw and scene groups (`groups::GLOBAL`, `DRAW`,
+/// `SCENE`): camera + lighting, entity + bones, shadows.
 fn create_forward_passes(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

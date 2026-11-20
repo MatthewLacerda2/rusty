@@ -73,8 +73,13 @@ pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
 pub(crate) fn create_scene_depth_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Scene Depth Layout"),
-        entries: &[depth_entry(0, wgpu::TextureViewDimension::D2)],
+        entries: &scene_depth_entries(),
     })
+}
+
+/// [`create_scene_depth_layout`]'s entries.
+pub(crate) fn scene_depth_entries() -> [wgpu::BindGroupLayoutEntry; 1] {
+    [depth_entry(0, wgpu::TextureViewDimension::D2)]
 }
 
 /// The per-draw group (#470): the per-draw uniform (0) at a dynamic offset into the frame's
@@ -115,30 +120,35 @@ pub(crate) fn entity_bones_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
     ]
 }
 
-/// Group 2 (single-texture): Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
+/// A single-texture group: Texture (0) & Sampler (1). Kept for `GpuTexture`'s own
 /// bind group, used by the particle/skybox passes that bind one texture each.
 pub(crate) fn create_texture_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Texture Layout"),
-        entries: &[
-            wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Texture {
-                    sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                    view_dimension: wgpu::TextureViewDimension::D2,
-                    multisampled: false,
-                },
-                count: None,
-            },
-            wgpu::BindGroupLayoutEntry {
-                binding: 1,
-                visibility: wgpu::ShaderStages::FRAGMENT,
-                ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                count: None,
-            },
-        ],
+        entries: &texture_entries(),
     })
+}
+
+/// [`create_texture_layout`]'s entries.
+pub(crate) fn texture_entries() -> [wgpu::BindGroupLayoutEntry; 2] {
+    [
+        wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                view_dimension: wgpu::TextureViewDimension::D2,
+                multisampled: false,
+            },
+            count: None,
+        },
+        wgpu::BindGroupLayoutEntry {
+            binding: 1,
+            visibility: wgpu::ShaderStages::FRAGMENT,
+            ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
+            count: None,
+        },
+    ]
 }
 
 /// Bytes in a material's runtime shader-param uniform (#399).

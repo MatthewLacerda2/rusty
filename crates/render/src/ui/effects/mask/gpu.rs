@@ -206,9 +206,17 @@ impl Renderer {
             );
             pass.set_pipeline(&ui.mask_pipeline);
             pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-            pass.set_bind_group(0, ui.source_group(&draw.source), &[]);
+            pass.set_bind_group(
+                crate::ui::pipeline::SOURCE_GROUP,
+                ui.source_group(&draw.source),
+                &[],
+            );
             let slot = cache.effects.mask_offset(i, m);
-            pass.set_bind_group(1, cache.effects.group(&key(draw)), &[slot]);
+            pass.set_bind_group(
+                crate::ui::pipeline::BATCH_GROUP,
+                cache.effects.group(&key(draw)),
+                &[slot],
+            );
             pass.draw(draw.range.clone(), 0..1);
         }
         let commands = encoder.finish();

@@ -4,8 +4,9 @@
 //! cap.
 
 use super::cascades::MAX_CASCADES;
-use super::layouts::{caster_entries, caster_groups, clip_layout, global_group, global_layout};
+use super::layouts::{caster_entries, clip_layout, global_group, global_layout};
 use super::ShadowRenderer;
+use crate::gpu::groups::Groups;
 use crate::gpu::mesh::vertex_layout;
 use crate::gpu::pipelines::winding::Facing;
 use crate::gpu::pipelines::LazyPipeline;
@@ -115,13 +116,19 @@ impl ShadowRenderer {
     /// The plain depth-only pipeline and the clipping one (#648), both from the
     /// forward `shader`'s shadow stage, then their mirrored twins (#1134) and their
     /// two-sided ones (#1571), built on first draw; the clip pipelines' layout adds
-    /// the forward pass's material layout to the two shadow groups ([`caster_groups`]).
+    /// the forward pass's material layout to the two shadow groups ([`Groups`]).
     pub(super) fn create_pipelines(
         device: &wgpu::Device,
         [global, entity, material]: [&wgpu::BindGroupLayout; 3],
         shader: &wgpu::ShaderModule,
     ) -> ([wgpu::RenderPipeline; 2], [[LazyPipeline; 2]; 2]) {
-        let plain = caster_groups(global, entity, None).layout(device, "Shadow Pipeline Layout");
+        let plain = Groups {
+            global,
+            scene: None,
+            material: None,
+            draw: entity,
+        };
+        let plain = plain.layout(device, "Shadow Pipeline Layout");
         let clip = clip_layout(device, [global, entity, material]);
         let twins = |facing| {
             [

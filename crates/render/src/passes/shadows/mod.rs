@@ -36,7 +36,7 @@ use glam::Mat4;
 pub(crate) use casters::{shadow_runs, ShadowRun};
 pub(crate) use clips::{moves, slot_clip, CasterClip, Cutout};
 #[cfg(test)]
-pub(crate) use layouts::{caster_entries, caster_groups, light_entries};
+pub(crate) use layouts::{caster_entries, light_entries};
 pub(crate) use setup::{depth_pipeline, lazy_depth_pipeline};
 #[cfg(test)]
 pub(crate) use statics::statics_key;

@@ -7,8 +7,8 @@
 //! bloom/tonemap apply to additive (emissive) sparks. Two pipelines share one
 //! shader: alpha-blended (smoke) and additive (sparks/fire). Both read the scene
 //! depth as a read-only attachment (occlusion) *and* a texture (soft particles),
-//! and bind the renderer's group 0 so lit particles read the forward lighting
-//! uniform.
+//! and bind the renderer's global group (`groups::GLOBAL`) so lit particles read
+//! the forward lighting uniform.
 //!
 //! The simulation owns particle *state*; this module only reads it — the invariant
 //! that keeps headless play renderer-free. A GPU-simulated emitter (`gpu`, #2170)
@@ -39,7 +39,7 @@ use rusty_components::particle::ParticleBlend;
 
 /// The layouts the particle pipelines share with other passes: the single-texture
 /// sprite layout, the scene-depth layout (the decal pass's), and the renderer's
-/// camera + lighting group 0.
+/// camera + lighting group (`groups::GLOBAL`).
 pub(crate) struct SharedLayouts<'a> {
     pub texture: &'a wgpu::BindGroupLayout,
     pub depth: &'a wgpu::BindGroupLayout,
@@ -67,7 +67,9 @@ pub struct ParticleRenderer {
 
 impl ParticleRenderer {
     /// Build the pass: a globals bind group + two blend-variant pipelines over
-    /// groups globals (0), sprite (1), scene depth (2) and camera + lighting (3);
+    /// the solid path's group order ([`Groups`]): camera + lighting at
+    /// `GLOBAL`, scene depth at `SCENE`, the sprite at `MATERIAL` and the globals
+    /// at `DRAW`;
     /// `default_sprite` is what an emitter with no texture binds as its sprite.
     pub(crate) fn new(
         device: &wgpu::Device,
@@ -141,20 +143,11 @@ impl ParticleRenderer {
     }
 }
 
-/// A particle draw's groups by role ([`Groups`]): the renderer's camera + lighting
-/// group, the scene `depth`, the `sprite` at the material's index, and `draw` (the
-/// pass globals, or a GPU emitter's own) per draw, last.
-pub(crate) fn particle_groups<T>(camera_lighting: T, depth: T, sprite: T, draw: T) -> Groups<T> {
-    Groups {
-        global: camera_lighting,
-        scene: Some(depth),
-        material: Some(sprite),
-        draw,
-    }
-}
-
 /// The blend pipelines of `shader`'s vertex entry point `vertex.0` (drawing the
-/// `vertex.1` buffer, if any) over [`particle_groups`] with `draw`.
+/// `vertex.1` buffer, if any) with `draw` per draw. A particle draw's groups by role
+/// ([`Groups`]): the renderer's camera + lighting group, the scene depth, the
+/// sprite at the material's index, and `draw` (the pass globals, or a GPU
+/// emitter's own) per draw, last.
 fn blend_pipelines(
     device: &wgpu::Device,
     label: &'static str,
@@ -162,12 +155,12 @@ fn blend_pipelines(
     draw: &wgpu::BindGroupLayout,
     vertex: (&'static str, Option<wgpu::VertexBufferLayout<'static>>),
 ) -> BlendPipelines {
-    let groups = particle_groups(
-        layouts.camera_lighting,
-        layouts.depth,
-        layouts.texture,
+    let groups = Groups {
+        global: layouts.camera_lighting,
+        scene: Some(layouts.depth),
+        material: Some(layouts.texture),
         draw,
-    );
+    };
     let layout = groups.layout(device, label);
     BlendPipelines::new(device, label, (shader, &layout), vertex)
 }

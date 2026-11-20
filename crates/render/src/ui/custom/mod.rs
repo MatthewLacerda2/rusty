@@ -241,9 +241,9 @@ impl UiShaders {
         };
         rp.set_pipeline(pipeline);
         if matches!(pass, UiPass::Screen(_)) {
-            rp.set_bind_group(2, &self.empty, &[]);
+            rp.set_bind_group(crate::ui::pipeline::CANVAS_GROUP, &self.empty, &[]);
         }
-        rp.set_bind_group(3, group, &[offset]);
+        rp.set_bind_group(crate::ui::pipeline::SHADE_GROUP, group, &[offset]);
         true
     }
 }

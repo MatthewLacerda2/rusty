@@ -1,5 +1,5 @@
 //! The shadow pass's bind-group layouts: the light group, the caster group, and
-//! the pipeline layouts that place them ([`caster_groups`]).
+//! the pipeline layouts that place them ([`Groups`]).
 
 use crate::gpu::groups::Groups;
 use crate::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
@@ -77,22 +77,19 @@ pub(super) fn global_group(
     })
 }
 
-/// A shadow caster's groups by role: the light (the forward pass's global slot),
-/// its material only when it clips, and the casters at the per-draw slot, last
-/// ([`Groups`]); the scene slot is a gap.
-pub(crate) fn caster_groups<T>(global: T, casters: T, material: Option<T>) -> Groups<T> {
-    Groups {
-        global,
-        scene: None,
-        material,
-        draw: casters,
-    }
-}
-
-/// The clipping shadow pipelines' layout: light, material, casters (#648).
+/// The clipping shadow pipelines' layout: light, material, casters (#648). A
+/// shadow caster's groups by role ([`Groups`]): the light at the forward pass's
+/// global slot, its material only when it clips, and the casters at the per-draw
+/// slot, last; the scene slot is a gap.
 pub(crate) fn clip_layout(
     device: &wgpu::Device,
     [global, casters, material]: [&wgpu::BindGroupLayout; 3],
 ) -> wgpu::PipelineLayout {
-    caster_groups(global, casters, Some(material)).layout(device, "Shadow Clip Pipeline Layout")
+    let groups = Groups {
+        global,
+        scene: None,
+        material: Some(material),
+        draw: casters,
+    };
+    groups.layout(device, "Shadow Clip Pipeline Layout")
 }

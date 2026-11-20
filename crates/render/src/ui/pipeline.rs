@@ -19,6 +19,14 @@ use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::HDR_FORMAT;
 use rusty_components::UiBlend;
 
+/// The UI pipelines' bind groups by index: a batch's source texture,
+/// its effects record (a dynamic offset), a world canvas's uniform (an empty group
+/// on screen) and a custom shader's own uniform.
+pub(crate) const SOURCE_GROUP: u32 = 0;
+pub(crate) const BATCH_GROUP: u32 = 1;
+pub(crate) const CANVAS_GROUP: u32 = 2;
+pub(crate) const SHADE_GROUP: u32 = 3;
+
 /// Which UI pass a pipeline draws in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum UiPass {

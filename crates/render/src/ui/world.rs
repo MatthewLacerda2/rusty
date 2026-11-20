@@ -203,14 +203,22 @@ impl Renderer {
             for &(i, offset) in draws {
                 let canvas = view.ui.canvas(i);
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-                pass.set_bind_group(2, &uniforms.group, &[offset]);
+                pass.set_bind_group(
+                    crate::ui::pipeline::CANVAS_GROUP,
+                    &uniforms.group,
+                    &[offset],
+                );
                 for (b, batch) in canvas.mesh.batches.iter().enumerate() {
                     // A custom ui shader (#427) swaps the pipeline and adds its uniform.
                     ui.bind_batch(&mut pass, (&view.ui, i, b), UiPass::World, &mut blend);
                     let slot = view.ui.effects.batch_offset(i, b);
-                    pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
                     pass.set_bind_group(
-                        1,
+                        crate::ui::pipeline::SOURCE_GROUP,
+                        ui.source_group(&batch.source),
+                        &[],
+                    );
+                    pass.set_bind_group(
+                        crate::ui::pipeline::BATCH_GROUP,
                         view.ui.effects.group(&GroupKey::of(batch, None)),
                         &[slot],
                     );

@@ -50,8 +50,8 @@ impl Renderer {
             .collect()
     }
 
-    /// Draw `balls` into the handles pass, then put the line pipeline back. Groups 0,
-    /// 2 and 3 are the ones the lines bound; each ball binds its slot of `bindings`.
+    /// Draw `balls` into the handles pass, then put the line pipeline back. The global,
+    /// scene and material groups are the ones the lines bound; each ball binds its slot of `bindings`.
     pub(super) fn draw_probe_balls<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,

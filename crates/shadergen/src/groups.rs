@@ -1,7 +1,7 @@
 //! The solid path's bind-group indices, the one place they are named: every
 //! forward, prepass, transparent, outline, overlay, shadow-caster and particle
 //! layout, every `set_bind_group` that draws through one, and the surface
-//! shaders' declarations read these, and `render::gpu::groups_tests` holds the
+//! shaders' declarations read these, and `render::gpu::groups::tests` holds the
 //! engine's WGSL `@group` literals equal to them.
 //!
 //! **Ordered by how often each group changes**, slowest first. wgpu-core never

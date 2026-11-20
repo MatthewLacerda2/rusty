@@ -1,5 +1,6 @@
 //! crates/render/src/passes/blended.rs — the shape the particle and ribbon passes share
-//! (#939): a globals uniform at group 0, and an alpha and an additive pipeline into
+//! (#939): a globals uniform (the ribbons bind it at their group 0, the particles
+//! at the solid path's `groups::DRAW`), and an alpha and an additive pipeline into
 //! the HDR target that test the scene depth without writing it (and into TAA's
 //! reactive mask beside it in a view running TAA, #1845; the pass opens with
 //! `taa::reactive::hdr_attachments`).
@@ -12,7 +13,7 @@ use crate::postfx::effects::taa;
 use crate::postfx::HDR_FORMAT;
 use rusty_components::ParticleBlend;
 
-/// A pass's group-0 globals: one `size`-byte uniform, its layout and bind group,
+/// A pass's globals group: one `size`-byte uniform, its layout and bind group,
 /// labelled `"{name} Globals …"`.
 pub(crate) struct Globals {
     pub(crate) layout: wgpu::BindGroupLayout,
@@ -21,10 +22,15 @@ pub(crate) struct Globals {
 }
 
 impl Globals {
+    /// The globals group's one entry: the uniform at binding 0.
+    pub(crate) fn entries() -> [wgpu::BindGroupLayoutEntry; 1] {
+        [uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)]
+    }
+
     pub(crate) fn new(device: &wgpu::Device, name: &str, size: u64) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some(&format!("{name} Globals Layout")),
-            entries: &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)],
+            entries: &Self::entries(),
         });
         let buffer = device.create_buffer(&wgpu::BufferDescriptor {
             label: Some(&format!("{name} Globals")),

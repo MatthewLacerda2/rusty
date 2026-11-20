@@ -177,9 +177,17 @@ impl Renderer {
                     if !ui.bind_batch(&mut pass, at, UiPass::Screen(format), &mut bound) {
                         continue;
                     }
-                    pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
+                    pass.set_bind_group(
+                        crate::ui::pipeline::SOURCE_GROUP,
+                        ui.source_group(&batch.source),
+                        &[],
+                    );
                     let slot = cache.effects.batch_offset(i, b);
-                    pass.set_bind_group(1, cache.effects.group(&self.screen_key(batch)), &[slot]);
+                    pass.set_bind_group(
+                        crate::ui::pipeline::BATCH_GROUP,
+                        cache.effects.group(&self.screen_key(batch)),
+                        &[slot],
+                    );
                     let s = batch
                         .clip
                         .rect
