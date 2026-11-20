@@ -87,8 +87,17 @@ pub(super) fn project_with_a_model() -> std::path::PathBuf {
     root
 }
 
+/// Alone: `converted` counts the process's conversions. Under `cargo test` the body's
+/// child holds a renderer outside this process's headless budget (`setup::budget`).
 #[test]
 fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
+    // Checked before `alone!`, so a machine without an adapter starts no child.
+    if rusty_render::test_gpu::headless_or_skip(8, 8).is_some() {
+        rusty_test_support::alone!(a_load_in_steps);
+    }
+}
+
+fn a_load_in_steps() {
     let root = project_with_a_model();
     let opts = Options {
         size: (32, 32),
@@ -103,11 +112,8 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         "startup", "tick", "frame",
     ];
     assert_eq!(names, want);
-    assert!(
-        load.steps.iter().all(|(_, ms)| *ms >= 0.0),
-        "{:?}",
-        load.steps
-    );
+    let steps = &load.steps;
+    assert!(steps.iter().all(|(_, ms)| *ms >= 0.0), "{steps:?}");
     assert!(load.total_ms() > 0.0);
     assert_eq!(
         harness.frame(),
@@ -125,16 +131,11 @@ fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
         (CONVERTED.to_string(), 0.0),
         "a glTF converts nothing"
     );
-    assert_eq!(counts[2].0, "models_cooked");
     tiles(&load, &want);
-    // Rendered (an adapter was there): the texture and upload counts follow.
-    if counts.len() > 3 {
-        let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
-        assert_eq!(
-            names[3..],
-            ["textures_compressed", "textures_decoded", "upload_mb"]
-        );
-    }
+    assert_eq!(counts[2].0, "models_cooked");
+    let rendered = ["textures_compressed", "textures_decoded", "upload_mb"];
+    let names: Vec<&str> = counts.iter().map(|(c, _)| c.as_str()).collect();
+    assert_eq!(names[3..], rendered);
 }
 
 /// The load's rows: its steps' rows sum to its `load_ms` (nothing timed twice or
