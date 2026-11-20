@@ -1,21 +1,27 @@
 //! Memory as the platform reports it: the process's peak resident memory, for
 //! `make bench-scenes`' `rss_peak_mb` (each scene runs in a process of its own, so
-//! the peak is that scene's) and a bake's report (#2312), and the machine's free
+//! the peak is that scene's) and a bake's report (#2312), its current resident
+//! memory, for the editor round's `play_rss_mb` (#2314), and the machine's free
 //! and total memory, which a lightmap bake's estimate is held to before it starts
 //! (`bake::lightmap::fits`).
 //!
-//! Linux reads `VmHWM` from `/proc/self/status` and `MemAvailable` / `MemTotal`
+//! Linux reads `VmHWM` (and `VmRSS`) from `/proc/self/status` and `MemAvailable` / `MemTotal`
 //! from `/proc/meminfo`, each held to the process's memory cgroup (v2) when one
 //! caps it (`cgroup`): a bake run under `systemd-run -p MemoryMax=…` is killed at
 //! the cap, not at the host's memory. macOS reads the peak physical footprint
 //! `task_info(TASK_VM_INFO)` reports (`ledger_phys_footprint_peak`, what Activity
-//! Monitor's Memory column counts), the free and inactive pages
+//! Monitor's Memory column counts; `phys_footprint` for the current one), the free and inactive pages
 //! `host_statistics64` counts (what a process can have without swapping), and
 //! `hw.memsize`.
 
 /// The process's peak resident memory in bytes; `None` where it cannot be read.
 pub fn rss_peak_bytes() -> Option<u64> {
     peak()
+}
+
+/// The process's resident memory now, in bytes; `None` where it cannot be read.
+pub fn rss_now_bytes() -> Option<u64> {
+    now()
 }
 
 /// Have the allocator hand every large block it frees back to the system at once
@@ -80,6 +86,12 @@ fn peak() -> Option<u64> {
 }
 
 #[cfg(target_os = "linux")]
+fn now() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    kb_line(&status, "VmRSS:")
+}
+
+#[cfg(target_os = "linux")]
 fn machine_now() -> Option<Machine> {
     let info = std::fs::read_to_string("/proc/meminfo").ok()?;
     let host = Machine {
@@ -112,6 +124,17 @@ fn kb_line(text: &str, key: &str) -> Option<u64> {
 
 #[cfg(target_os = "macos")]
 fn peak() -> Option<u64> {
+    u64::try_from(vm_info()?.ledger_phys_footprint_peak).ok()
+}
+
+#[cfg(target_os = "macos")]
+fn now() -> Option<u64> {
+    u64::try_from(vm_info()?.phys_footprint).ok()
+}
+
+/// This task's `task_info(TASK_VM_INFO)`, `None` when the call fails.
+#[cfg(target_os = "macos")]
+fn vm_info() -> Option<mach2::task_info::task_vm_info> {
     use mach2::kern_return::KERN_SUCCESS;
     use mach2::message::mach_msg_type_number_t;
     use mach2::task::task_info;
@@ -135,8 +158,7 @@ fn peak() -> Option<u64> {
         return None;
     }
     // SAFETY: `task_info` succeeded, so it filled the struct (zeroed beyond `count`).
-    let info = unsafe { info.assume_init() };
-    u64::try_from(info.ledger_phys_footprint_peak).ok()
+    Some(unsafe { info.assume_init() })
 }
 
 #[cfg(target_os = "macos")]
@@ -213,6 +235,11 @@ fn peak() -> Option<u64> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+fn now() -> Option<u64> {
+    None
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
 fn machine_now() -> Option<Machine> {
     None
 }
@@ -256,6 +283,18 @@ mod tests {
         let peak = rss_peak_bytes();
         if cfg!(any(target_os = "linux", target_os = "macos")) {
             assert!(peak.is_some_and(|b| b > 0), "{peak:?}");
+        }
+    }
+
+    #[test]
+    fn the_resident_memory_now_is_read_and_within_the_peak() {
+        let now = rss_now_bytes();
+        if cfg!(any(target_os = "linux", target_os = "macos")) {
+            let now = now.expect("read");
+            assert!(
+                now > 0 && rss_peak_bytes().is_some_and(|p| now <= p),
+                "{now}"
+            );
         }
     }
 }

@@ -6,7 +6,7 @@
 //! a verb it never called, so it counts there as zero: each verb's row is over the
 //! same frames as `cpu.update_scripts`.
 
-use super::super::clock::Spread;
+use super::super::clock::{ClockRows, Spread};
 use super::super::{Report, Summary};
 use super::report::Row;
 use crate::bench::verbs::absent_is_zero;
@@ -92,8 +92,8 @@ fn first(metric: &str, label: &str, s: &Summary) -> Row {
 
 /// One warning per kind of CPU spread the measured windows showed (each
 /// window, a viewpoint in a run, labelled, with its spreads, `clock::cpu_spreads`): the worst one's,
-/// naming its viewpoint and how many of them had it.
-pub fn spread_warnings(spreads: &[(String, Vec<(Spread, f64)>)]) -> Vec<String> {
+/// naming its viewpoint and how many of them had it, in `rows`' names.
+pub fn spread_warnings(spreads: &[(String, Vec<(Spread, f64)>)], rows: ClockRows) -> Vec<String> {
     let mut out = Vec::new();
     for kind in [Spread::Clock, Spread::Cpu] {
         let had: Vec<(&str, f64)> = spreads
@@ -108,7 +108,7 @@ pub fn spread_warnings(spreads: &[(String, Vec<(Spread, f64)>)]) -> Vec<String> 
         };
         out.push(format!(
             "{} (worst at {worst}; {} of {} measured windows)",
-            kind.warning(by),
+            kind.warning(by, rows),
             had.len(),
             spreads.len()
         ));

@@ -6,8 +6,9 @@
 //! its change is printed as measured. Rows compare only between runs of one
 //! shape (`SceneReport::same_shape`); [`SceneReport::against`] says why not.
 
-use super::super::super::clock::clock_drift;
+use super::super::super::clock::{clock_drift, GAME_ROWS};
 use super::super::super::report::{change, num, tick_timed_since};
+use super::super::editor;
 use super::{Row, SceneReport, ViewKey};
 
 impl SceneReport {
@@ -48,11 +49,18 @@ impl SceneReport {
                 what.join(", ")
             )];
         }
-        let clock = |r: &SceneReport| r.row("cpu_clock_pct").map(|r| r.avg);
-        let drift = clock(self)
-            .zip(clock(previous))
-            .and_then(|(now, before)| clock_drift(now, before));
-        let warnings = drift.into_iter().chain(self.set_moved(previous));
+        // The game rows' clock, and the editor round's (#2314), each on its own.
+        let rounds = [
+            ("cpu_clock_pct", GAME_ROWS, ""),
+            ("editor.cpu_clock_pct", editor::CLOCK_ROWS, editor::SAID),
+        ];
+        let drift = rounds.map(|(row, rows, said)| {
+            let clock = |r: &SceneReport| r.row(row).map(|r| r.avg);
+            let moved = clock(self).zip(clock(previous));
+            let drift = moved.and_then(|(now, before)| clock_drift(now, before, rows));
+            drift.map(|w| format!("{said}{w}"))
+        });
+        let warnings = drift.into_iter().flatten().chain(self.set_moved(previous));
         warnings.chain(self.tick_timed_since(previous)).collect()
     }
 
