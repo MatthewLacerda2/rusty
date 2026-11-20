@@ -78,3 +78,16 @@ fn a_wall_in_front_stops_the_ray() {
     rig.wall = 5.5;
     assert_eq!(click(&mut rig).len(), 2, "a wall behind it does not matter");
 }
+
+#[test]
+fn the_wall_ray_is_cast_only_when_a_world_canvas_is_laid_out() {
+    // A camera and a screen canvas: the pointer has a ray, but nothing it bounds.
+    let (s, _) = scene();
+    let mut rig = Rig::new(s, Handlers::default());
+    rig.camera = Some(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));
+    rig.hooks();
+    assert_eq!(rig.wall_casts, 0, "no world canvas: no physics query");
+    let (mut rig, _) = terminal();
+    rig.hooks();
+    assert_eq!(rig.wall_casts, 1, "a world canvas ahead: one cast a tick");
+}

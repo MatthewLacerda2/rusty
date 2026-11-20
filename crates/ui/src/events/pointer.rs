@@ -85,7 +85,9 @@ impl EventSystem {
         };
         self.pointer = position;
         let mut pointer = f.view.pointer(position);
-        if let Some((origin, dir)) = pointer.ray {
+        // The wall ray only bounds world-canvas hits; with none laid out the limit
+        // stays unbounded and the physics query is skipped.
+        if let Some((origin, dir)) = pointer.ray.filter(|_| has_world_canvas(f)) {
             pointer.ray_limit = (f.walls)(origin, dir);
         }
         let hit = raycast_pointer(f.world, f.layout, &pointer);
@@ -224,6 +226,14 @@ impl EventSystem {
 /// The pointer in UI screen pixels (bottom-left, y-up), or `None` while the cursor
 /// is locked (its ray then runs through the screen centre). `Input` reports it
 /// top-left, y-down.
+/// Whether this tick's layout holds a `WorldSpace` canvas: the only thing
+/// `ray_limit` filters.
+fn has_world_canvas(f: &Frame) -> bool {
+    f.layout
+        .canvases()
+        .any(|(_, s)| matches!(s, CanvasSpace::World(_)))
+}
+
 fn pointer_position(f: &Frame) -> Option<Vec2> {
     if f.input.cursor().locked {
         return None;
