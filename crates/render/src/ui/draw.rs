@@ -12,8 +12,9 @@
 //! and a camera canvas glued to the editor's free-fly camera are not.
 //!
 //! **Dirty strategy.** Each view keeps its layout with what it was computed from
-//! (`kept::layout`): a frame where nothing the layout reads changed places the held
-//! rects' canvas spaces again and lays out nothing. It keeps every root canvas's mesh
+//! (`kept::layout`): a frame where nothing the layout reads changed lays out
+//! nothing, and places the held rects' canvas spaces again where they can move (a
+//! world or camera canvas). It keeps every root canvas's mesh
 //! with what it was built from too (`kept`): a canvas whose rects,
 //! frame, texture sizes and glyph atlases are unchanged and whose UI components no
 //! write touched (the World's change log) keeps its mesh unbuilt. One vertex buffer

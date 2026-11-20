@@ -89,7 +89,6 @@ const FIXED_SLOTS: usize = 11;
 /// after the fixed ones in the registry's order.
 macro_rules! registry_channels {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        #[allow(non_camel_case_types, dead_code)]
         enum RegistrySlot { $($field,)* }
         channels! { true: $($ty => stringify!($field), FIXED_SLOTS + RegistrySlot::$field as usize;)* }
     };
