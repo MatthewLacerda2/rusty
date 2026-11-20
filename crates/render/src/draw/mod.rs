@@ -186,9 +186,7 @@ impl Renderer {
             self.draw_ui(view);
             self.lap("ui");
         }
-        // A load that replaced the World releases what only the scene before used.
-        self.settle_residency(scene);
-        self.finish_counters(view);
+        self.finish_main_frame(view, scene);
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 

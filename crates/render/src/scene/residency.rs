@@ -78,9 +78,16 @@ impl Renderer {
         residency.particles.entry(id).or_default().insert(handle);
     }
 
+    /// Close a main-view frame of `scene` (`Renderer::render`): settle what stays
+    /// resident, then the frame's counters, so they read what is left.
+    pub(crate) fn finish_main_frame(&mut self, view: &crate::RenderView, scene: &Scene) {
+        self.settle_residency(scene);
+        self.finish_counters(view);
+    }
+
     /// The end of a main-view frame that drew `scene`: on a load that replaced
     /// the World, drop the scene left and release what no kept scene uses.
-    pub(crate) fn settle_residency(&mut self, scene: &Scene) {
+    fn settle_residency(&mut self, scene: &Scene) {
         if self.is_aside() {
             return;
         }

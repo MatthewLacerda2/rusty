@@ -1321,7 +1321,9 @@ every binary's open makes them.
     renderer's own resident bytes by kind, which follow the scene where `gpu_mb`
     does not: `gpu_texture_mb` (image textures by path), `gpu_lightmap_mb` (the
     lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
-    array), as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
+    array), `gpu_mesh_mb` (the mesh vertex and index buffers) and
+    `gpu_cluster_pool_mb` (what the clustered meshes lease of the cluster pool),
+    as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its

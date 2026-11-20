@@ -22,8 +22,10 @@
 //! it; a step that meets one still being read, or lightmap pages still being read,
 //! makes nothing, and the host tries again on a later frame. What one step costs the
 //! frame is then one GPU upload: a mesh's buffers, a texture's levels and its mips
-//! drawn, or a page array. A warmed resource the activated scene does not use (a
-//! load replaced) stays in its cache as any unused entry does.
+//! drawn, or a page array. Nothing here releases: the old scene's meshes go at the
+//! end of the activated scene's first frame (`scene::residency`), so the scene still
+//! drawing loses none, and a warmed mesh the activated scene does not use (a load
+//! replaced) goes with them. A warmed texture stays in its cache as any unused entry does.
 //!
 //! What it does not warm, and the new scene's first frame still makes: the material
 //! bind groups and object records (kept per scene, and the scene's identity is new
