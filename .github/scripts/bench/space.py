@@ -9,8 +9,10 @@ command that writes failed, `make reclaim` among them, and what shares the disk
 was at risk. So the heavy verbs read the free space of the filesystem holding
 `.claude/worktrees/` and refuse **before** building when it is under what the
 build still needs ([`refusal`]): the build's size ([`NEEDS`]) less what the
-tree's own `target/` already holds of that profile, plus [`HEADROOM`] kept free
-for everything else. The refusal names the free figure, the need, `make reclaim`
+tree's own `target/` already holds of that profile, plus each second binary the
+same invocation links ([`EXTRA`]: `make bench-ab STRESS=1`'s `play`) that the
+profile's folder does not hold yet, plus [`HEADROOM`] kept free for everything
+else. The refusal names the free figure, the need, `make reclaim`
 and the trees holding the most, largest first. The figures are measured, never a
 machine's free space: the check reads the machine each run.
 
@@ -31,6 +33,9 @@ GIB = 2**30
 # a re-run pays after a green run deletes it). Rounded up, so a build that grows
 # a little still fits.
 NEEDS = {"release": 2 * GIB, "debug": 12 * GIB}
+# A second binary linked in the same cargo invocation, beyond what `NEEDS` holds:
+# its own objects and the binary, the crates being shared. EXTRA_MEASURED
+EXTRA = {"play": 1 * GIB}
 HEADROOM = 2 * GIB  # left free after the build: git, logs, the queue supervisor
 SHOWN = 5  # trees named in a refusal, largest first
 # What git and the OS say when a write found the disk full (Linux; git's own; macOS).
@@ -65,15 +70,24 @@ def advice(root: Path, run) -> str:
             f"runs in; the largest under .claude/worktrees/: {named}")
 
 
-def refusal(root: Path, builds: list[tuple[Path, str]], what: str, run, free=None) -> str | None:
+def still(tree: Path, profile: str, extra: tuple[str, ...], run) -> int:
+    """Bytes a build of `profile` into `<tree>/target` still writes: [`NEEDS`] less what
+    the profile's folder holds, plus each `extra` binary ([`EXTRA`]) not yet built there."""
+    built = tree / "target" / profile
+    more = max(NEEDS[profile] - du(built, run), 0)
+    return more + sum(EXTRA[name] for name in extra if not (built / name).exists())
+
+
+def refusal(root: Path, builds: list[tuple], what: str, run, free=None) -> str | None:
     """Why `what` must not start, or `None` when it fits: `builds` are `(tree, profile)`,
-    each a build of `profile` into `<tree>/target`.
+    each a build of `profile` into `<tree>/target`, or `(tree, profile, extra)` with
+    the second binaries ([`EXTRA`]) the same invocation links.
 
     `free(path)` is the free bytes of the filesystem holding `path`
     (`shutil.disk_usage`, faked in tests); what a tree's `target/<profile>`
     already holds is counted as built."""
     free = free or (lambda p: shutil.disk_usage(p).free)
-    more = [(tree, profile, max(NEEDS[profile] - du(tree / "target" / profile, run), 0)) for tree, profile in builds]
+    more = [(b[0], b[1], still(b[0], b[1], tuple(b[2]) if len(b) > 2 else (), run)) for b in builds]
     need = sum(m for _, _, m in more) + HEADROOM
     base = root / ".claude" / "worktrees"
     left = free(base if base.is_dir() else root)

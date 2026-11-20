@@ -35,7 +35,10 @@ that did. A note is why a table's absolute numbers may not be the game's (#2420)
 so it heads the section the reader reads, not only the leg's own output.
 
 A leg's report is `bench-scenes`' `<leg>/<project>-<hash>/<scene>.json`
-(`dev::bench::scenes::report`); a leg holds one project's folder.
+(`dev::bench::scenes::report`); a leg holds one project's folder, and under
+`STRESS=1` its stress runs' folders beside it ([`STRESS_RUN`], `bench/stress.py`),
+which are never read as a project's. The stress section is drawn by the same
+[`section`].
 """
 
 from __future__ import annotations
@@ -44,9 +47,20 @@ import json
 from pathlib import Path
 
 
+# A stress run's folder under a leg (`bench/stress.py`), not a project's.
+STRESS_RUN = "stress-"
+
+
+def projects(leg: Path) -> list[Path]:
+    """The leg's project folders, sorted: every folder but its stress runs'."""
+    if not leg.is_dir():
+        return []
+    return sorted(p for p in leg.iterdir() if p.is_dir() and not p.name.startswith(STRESS_RUN))
+
+
 def read(leg: Path, scene: str) -> dict | None:
     """The leg's report of `scene`, if it wrote one."""
-    for path in sorted(leg.glob(f"*/{scene}.json")):
+    for path in sorted(p for project in projects(leg) for p in project.glob(f"{scene}.json")):
         try:
             return json.loads(path.read_text())
         except (OSError, ValueError):
@@ -70,18 +84,22 @@ def warnings(leg: Path, report: dict | None) -> list[str]:
 
 
 def notes(scene: str, legs: tuple[Path, Path, Path]) -> list[str]:
-    """The lines heading `scene`'s section: each leg's warning once, in the order
-    the legs first wrote them, one not every leg wrote marked with those that did."""
-    said = [warnings(leg, read(leg, scene)) for leg in legs]
+    """The lines heading `scene`'s section ([`notes_of`] the legs' warnings)."""
+    return notes_of([warnings(leg, read(leg, scene)) for leg in legs], "`bench-scenes`' notes")
+
+
+def notes_of(said: list[list[str]], whose: str) -> list[str]:
+    """Each leg's warning (`said`, one list a leg) once, in the order the legs first
+    wrote them, one not every leg wrote marked with those that did."""
     seen = list(dict.fromkeys(w for leg in said for w in leg))
     if not seen:
         return []
     lines = []
     for w in seen:
         wrote = [name for name, leg in zip(LEGS, said) if w in leg]
-        only = "" if len(wrote) == len(legs) else f" (only {', '.join(wrote)}: the legs disagree)"
+        only = "" if len(wrote) == len(said) else f" (only {', '.join(wrote)}: the legs disagree)"
         lines.append(f"- {w}{only}")
-    return ["**Warnings** (`bench-scenes`' notes; the absolute numbers may not be the game's):"] + lines + [""]
+    return [f"**Warnings** ({whose}; the absolute numbers may not be the game's):"] + lines + [""]
 
 
 def averages(report: dict | None) -> dict[str, float]:
@@ -179,19 +197,26 @@ def lead(main: dict, pr: dict, again: dict) -> list[str]:
 def scene_table(scene: str, legs: tuple[Path, Path, Path]) -> str:
     """The markdown table of `scene` over the three legs' folders (main, PR, main again)."""
     main, pr, again = (averages(read(leg, scene)) for leg in legs)
+    return section(f"**{scene}**", (main, pr, again), notes(scene, legs))
+
+
+def section(title: str, rows: tuple[dict, dict, dict], heading: list[str]) -> str:
+    """One section: `title`, the `heading` lines (its notes), the lead and the table of the
+    three legs' averages (`rows`: main, PR, main again)."""
+    main, pr, again = rows
     if not main and not pr:
-        return f"**{scene}**: neither the main leg nor the PR's wrote a report\n"
-    lines = [f"**{scene}**", ""] + notes(scene, legs) + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
-                                                            "|---|---:|---:|---|---:|"]
+        return f"{title}: neither the main leg nor the PR's wrote a report\n"
+    lines = [title, ""] + heading + lead(main, pr, again) + ["", "| row | main | PR | change | floor (main again) |",
+                                                             "|---|---:|---:|---|---:|"]
     metrics = list(main) + [m for m in pr if m not in main]
     for metric in metrics:
         lines.append("| " + " | ".join(row(metric, main.get(metric), pr.get(metric), again.get(metric))) + " |")
     return "\n".join(lines) + "\n"
 
 
-def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str]) -> str:
-    """Every scene's table under the run's header lines."""
-    parts = ["\n".join(header), ""] + [scene_table(s, legs) for s in scenes]
+def render(scenes: list[str], legs: tuple[Path, Path, Path], header: list[str], more: tuple[str, ...] = ()) -> str:
+    """Every scene's table under the run's header lines, then the `more` sections (the stress yard's)."""
+    parts = ["\n".join(header), ""] + [scene_table(s, legs) for s in scenes] + list(more)
     return "\n".join(parts)
 
 
@@ -199,7 +224,7 @@ def scenes_of_all(legs) -> list[str]:
     """The scenes any of `legs` reported, sorted: a scene only the PR reports still gets its table."""
     names = []
     for leg in legs:
-        for project in sorted(p for p in leg.iterdir() if p.is_dir()) if leg.is_dir() else []:
+        for project in projects(leg):
             for path in project.rglob("*.json"):
                 names.append(path.relative_to(project).with_suffix("").as_posix())
     return sorted(set(names))
