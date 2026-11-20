@@ -74,7 +74,7 @@ fn a_rig_animating_beside_the_floor_is_still_and_collects_no_ids() {
     let before = walks::ids_collected();
     for tick in 0..4 {
         for &bone in &rig {
-            scene.world.transform_mut(bone).unwrap().position.y += 0.01 * tick as f32;
+            scene.world.transform_mut(bone).unwrap().position.y += 0.01 * (tick + 1) as f32;
         }
         assert!(still(&mut scene, &mut g), "tick {tick}: only the rig moved");
     }
@@ -121,18 +121,12 @@ fn a_rewound_or_cleared_world_is_a_change() {
     assert!(still(&mut scene, &mut g), "and was read");
 }
 
-/// A World swapped in whose revision equals the one the watch last saw still reads
-/// as changed: its cursors are another World's.
+/// A World swapped in, built the same way (so its revisions match the old one's),
+/// reads as changed: the watch's cursors are another World's (the revision's own
+/// epoch check: `ecs`'s `a_watch_asked_of_another_world_reads_a_change`).
 #[test]
-fn a_replaced_world_with_an_equal_revision_is_a_change() {
+fn a_replaced_world_is_a_change() {
     let (mut scene, mut g, ..) = yard();
-    let twin = yard().0;
-    let seen = scene.world.static_geometry_revision();
-    assert_eq!(
-        twin.world.static_geometry_revision(),
-        seen,
-        "the twin's revision"
-    );
-    scene.world = twin.world;
+    scene.world = yard().0.world;
     assert!(!still(&mut scene, &mut g), "another World");
 }

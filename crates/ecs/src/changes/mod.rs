@@ -108,7 +108,7 @@ pub(crate) struct ChangeLogs {
     rewinds: u64,
     /// The subtree stamps' kept stack and seen set (`stamp.rs`).
     scratch: stamp::Scratch,
-    /// [`World::static_geometry_revision`].
+    /// [`StaticGeometry`]'s revision.
     static_geometry: u64,
 }
 
@@ -202,45 +202,39 @@ impl World {
     /// Takes `&self` for the same reason as [`World::change_cursor`]: a read moves only
     /// the log's own bookkeeping (what no cursor has read past), never the World.
     pub fn changes<T: Channel>(&self, cursor: &mut Cursor<T>) -> Changes {
+        self.read(cursor, Log::since)
+            .map_or(Changes::Rebuild, Changes::Ids)
+    }
+
+    /// The one read under [`World::changes`] and [`StaticGeometry::changed`]: `read`
+    /// asks `T`'s log from `cursor`'s revision, unless the cursor is another World's
+    /// (`None`, as for a log that no longer holds it); the cursor then has read it all.
+    fn read<T: Channel, R>(
+        &self,
+        cursor: &mut Cursor<T>,
+        read: impl FnOnce(&mut Log, u64) -> Option<R>,
+    ) -> Option<R> {
         let mut changes = self.changes.borrow_mut();
         let epoch = changes.epoch;
         let log = changes.slot::<T>();
-        let ids = (cursor.epoch == epoch)
-            .then(|| log.since(cursor.seen))
+        let got = (cursor.epoch == epoch)
+            .then(|| read(log, cursor.seen))
             .flatten();
         *cursor = Cursor {
             epoch,
             seen: log.open(),
             _channel: PhantomData,
         };
-        ids.map_or(Changes::Rebuild, Changes::Ids)
+        got
     }
 
-    /// [`World::changes`] without the ids: the cursor has read everything after this,
-    /// and `false` when the read would have been [`Changes::Rebuild`]. For a reader
-    /// that wants only a yes or no from another source but keeps the channel's walks
-    /// stamping (`World::static_geometry_revision` rides on `WorldPose`'s).
-    pub fn catch_up<T: Channel>(&self, cursor: &mut Cursor<T>) -> bool {
-        let mut changes = self.changes.borrow_mut();
-        let epoch = changes.epoch;
-        let log = changes.slot::<T>();
-        let held = cursor.epoch == epoch && log.skip(cursor.seen);
-        *cursor = Cursor {
-            epoch,
-            seen: log.open(),
-            _channel: PhantomData,
-        };
-        held
-    }
-
-    /// A revision that moves whenever a static entity's world pose or Collider may
-    /// have changed (and on every clear or rewind), so a cache of static geometry
-    /// compares it instead of reading ids. A pose counts only while a cursor is open on
-    /// [`WorldPose`]: it is bumped by that channel's subtree walk, at each static node
-    /// it stamps (`stamp.rs`). Not [`World::static_revision`], whose readers (the
-    /// shadow sweeps, probe lighting) must not re-run on a static entity's move.
-    pub fn static_geometry_revision(&self) -> u64 {
-        self.changes.borrow().static_geometry
+    /// Watch the static geometry: every static entity's world pose and Collider.
+    /// [`StaticGeometry::changed`] answers yes or no without reading ids.
+    pub fn static_geometry(&self) -> StaticGeometry {
+        StaticGeometry {
+            pose: self.change_cursor(),
+            seen: self.changes.borrow().static_geometry,
+        }
     }
 
     /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.
@@ -262,5 +256,34 @@ impl World {
                 logged: log.logged,
             })
             .collect()
+    }
+}
+
+/// Whether a static entity's world pose or Collider may have changed since the last
+/// ask ([`World::static_geometry`]), so a cache of static geometry skips its diff
+/// without reading ids. Not [`World::static_revision`], whose readers (the shadow
+/// sweeps, probe lighting) must not re-run on a static entity's move.
+///
+/// It is a revision and a `WorldPose` cursor held together on purpose. A pose moves
+/// the revision from `WorldPose`'s subtree walk, at each static node it stamps
+/// (`stamp.rs`); the walk runs only while a cursor is open on that channel, and is
+/// skipped for a subtree still unread since the newest read of any of its cursors.
+/// So the cursor must be caught up every time the revision is compared: one that
+/// lagged would let a second move of a subtree already counted go unbumped. Asking
+/// does both, so the contract cannot be half-kept.
+pub struct StaticGeometry {
+    pose: Cursor<WorldPose>,
+    seen: u64,
+}
+
+impl StaticGeometry {
+    /// Whether anything changed since the last ask (or the watch opened); `true`
+    /// too when the cursor reads [`Changes::Rebuild`] (a clear, an Undo step, a
+    /// rewind, another World). Then everything up to now has been seen.
+    pub fn changed(&mut self, w: &World) -> bool {
+        let held = w.read(&mut self.pose, |log, seen| log.skip(seen).then_some(()));
+        let now = w.changes.borrow().static_geometry;
+        let moved = std::mem::replace(&mut self.seen, now) != now;
+        held.is_none() || moved
     }
 }

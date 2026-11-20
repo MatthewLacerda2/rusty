@@ -11,12 +11,9 @@
 //! [`World::stamp_pose_below`] from `World::moved`, [`World::stamp_hierarchy_below`]
 //! wherever an `active` flag or a parent link changes. A walk is taken only while a
 //! cursor is open on the channel it feeds; with none, an `any` and one stamp keep
-//! [`World::static_revision`] moving. The pose walk and a Collider write on a
-//! static entity also move [`World::static_geometry_revision`].
-
-use std::any::TypeId;
-
-use rusty_components::ColliderComponent;
+//! [`World::static_revision`] moving. The pose walk, and a write to a
+//! `Channel::STATIC_GEOMETRY` column (the Collider), on a static entity also move
+//! [`World::static_geometry`]'s revision.
 
 use super::{Activity, Channel, Layer, WorldPose, STATIC};
 use crate::World;
@@ -58,8 +55,8 @@ impl World {
     pub(crate) fn touch<T: Channel>(&mut self, id: u32) {
         const { assert!(T::COLUMN, "a derived channel is stamped at its source") };
         self.note(id);
-        if TypeId::of::<T>() == TypeId::of::<ColliderComponent>() && self.is_static(id) {
-            self.changes.get_mut().static_geometry += 1; // `static_geometry_revision`
+        if T::STATIC_GEOMETRY && self.is_static(id) {
+            self.static_geometry_moved();
         }
         if self.changes.get_mut().logs.len() == 1 {
             return; // only `StaticSet` exists: no column was ever opened
@@ -134,7 +131,7 @@ impl World {
     }
 
     /// `id`'s world pose and every descendant's may have changed ([`WorldPose`]); a
-    /// static node among them moves [`World::static_geometry_revision`].
+    /// static node among them moves [`World::static_geometry`]'s revision.
     /// Skipped when `id` is still unread in the log: every stamp on this channel is
     /// a subtree walk, so its subtree was stamped with it (an entity joining it
     /// since was moved, and walked, itself), and its static nodes bumped the
@@ -149,9 +146,15 @@ impl World {
         self.each_below(id, |w, e, is_static| {
             w.stamp_at(at, e);
             if is_static {
-                w.changes.get_mut().static_geometry += 1;
+                w.static_geometry_moved();
             }
         });
+    }
+
+    /// A static entity's pose or static-geometry column changed:
+    /// [`World::static_geometry`]'s revision moves.
+    fn static_geometry_moved(&mut self) {
+        self.changes.get_mut().static_geometry += 1;
     }
 
     /// `visit` each id [`World::self_and_descendants`] yields, in its order, with the

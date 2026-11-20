@@ -4,35 +4,34 @@
 //! The bake's colliders are the static ones (`bounds::static_collider_ids`): an
 //! entity static and active in the hierarchy, with an active, solid Collider, at
 //! its world pose. The World answers each of those facts without a list of ids:
-//! - a static entity's pose or Collider: [`World::static_geometry_revision`], which
-//!   the `WorldPose` walk and a Collider write bump when the entity is static. The
-//!   watch keeps a `WorldPose` cursor it only catches up ([`World::catch_up`]), so
-//!   the walk runs and the skip that spares a subtree already stamped never spares
-//!   one this watch has not seen;
+//! - a static entity's pose or Collider: a [`StaticGeometry`] watch, a revision the
+//!   `WorldPose` walk and a Collider write bump when the entity is static, held
+//!   with the `WorldPose` cursor it catches up on every ask (so the walk runs, and
+//!   the skip that spares a subtree already stamped never spares one this watch
+//!   has not seen);
 //! - `activeInHierarchy` and static membership: `StaticSet`, which every Activity
 //!   stamp also stamps for each static entity it reaches (an `active` flag flipped,
 //!   a re-parent, a placement or removal), and which names a removed static entity.
 //!
 //! A `NavMeshModifier` (#1959) changes how they bake from anywhere above them, so
 //! any write on its channel counts as a change.
-//! When the revision is the one last seen, `StaticSet` named nothing and no cursor
-//! read `Rebuild` (a clear, a scene load, Play's snapshot restored, an Undo or a
+//! When the watch saw nothing, `StaticSet` named nothing and no cursor read
+//! `Rebuild` (a clear, a scene load, Play's snapshot restored, an Undo or a
 //! rewind), the collider diff, the bounds' geometry extent and the reshape check
 //! would all find what they found last tick, so [`NavigationGraph::sync_changes`]
-//! skips them. A dynamic entity moving costs the watch nothing per entity.
+//! skips them. A dynamic entity moving costs the watch no id list and no `is_static`
+//! lookup per id; its move still walks its subtree and appends its `WorldPose`
+//! entries, which the open cursor keeps recording.
 
 use super::super::NavigationGraph;
 use super::sync::Rebake;
 use rusty_components::NavMeshModifierComponent;
-use rusty_ecs::{Changes, Cursor, StaticSet, World, WorldPose};
+use rusty_ecs::{Changes, Cursor, StaticGeometry, StaticSet, World};
 use rusty_scene::Scene;
 
 /// What a play-mode navmesh reads its static geometry's changes from.
 pub(crate) struct StaticWatch {
-    /// Caught up, never read: it keeps `WorldPose`'s walks (and so the revision's
-    /// pose bumps) running, and reads `false` on a `Rebuild`.
-    pose: Cursor<WorldPose>,
-    geometry: u64,
+    geometry: StaticGeometry,
     statics: Cursor<StaticSet>,
     modifiers: Cursor<NavMeshModifierComponent>,
 }
@@ -40,8 +39,7 @@ pub(crate) struct StaticWatch {
 impl StaticWatch {
     fn open(w: &mut World) -> Self {
         Self {
-            pose: w.change_cursor(),
-            geometry: w.static_geometry_revision(),
+            geometry: w.static_geometry(),
             statics: w.change_cursor(),
             modifiers: w.change_cursor(),
         }
@@ -55,9 +53,8 @@ impl StaticWatch {
         // Any `NavMeshModifier` write counts: one on a non-static parent changes
         // how its static children bake (#1959). They are rare.
         let modifiers = unchanged(w.changes(&mut self.modifiers));
-        let pose = w.catch_up(&mut self.pose);
-        let geometry = std::mem::replace(&mut self.geometry, w.static_geometry_revision());
-        membership && modifiers && pose && geometry == self.geometry
+        let geometry = self.geometry.changed(w);
+        membership && modifiers && !geometry
     }
 }
 
