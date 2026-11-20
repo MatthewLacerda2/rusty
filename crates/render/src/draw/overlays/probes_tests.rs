@@ -19,23 +19,54 @@ fn probed(n: usize) -> Scene {
     scene
 }
 
+/// Two Area lights at `x`, the second selected.
+fn lit(scene: &mut Scene) {
+    for x in [10.0, 20.0] {
+        let id = scene.add_entity(format!("panel{x}"));
+        scene.world.transform_mut(id).expect("fresh").position = Vec3::X * x;
+        let light = rusty_scene::LightComponent {
+            light_type: rusty_scene::LightType::Area,
+            ..rusty_scene::create::default_light()
+        };
+        scene.world.set_light(id, Some(light));
+        scene.selected_entity_id = Some(id);
+    }
+}
+
+/// Each run of `got` matches `want`'s positions, every vertex in `tint`.
+fn holds(got: &[Vertex], want: &[Vertex], tint: [f32; 4]) {
+    assert_eq!(got.len(), want.len());
+    for (v, a) in got.iter().zip(want) {
+        assert_eq!((v.tangent, v.position), (tint, a.position));
+    }
+}
+
 #[test]
 fn every_probe_segment_carries_its_probes_tint_on_both_ends() {
-    let scene = probed(3);
+    use super::super::lights::{area_light_gizmos, AREA_SELECTED_TINT, AREA_TINT};
+    let mut scene = probed(3);
+    lit(&mut scene);
     let lines = probe_lines(&scene, &SceneGizmos::default());
     let crosses = 3 * 6;
     let volumes = 2 * 24;
-    assert_eq!(lines.len(), crosses + volumes);
+    let areas = area_light_gizmos(&scene);
+    assert_eq!(areas.len(), 2, "both panels draw");
+    let panels: usize = areas.iter().map(|(v, _)| v.len()).sum();
+    assert_eq!(lines.len(), crosses + volumes + panels);
     for (i, probe) in scene.probes.probes().iter().enumerate() {
-        let want = sh_marker_tint(&probe.sh);
-        let mine = &lines[i * 6..i * 6 + 6];
         let at = probe_marker_verts(probe.position, MARKER_HALF);
-        for (v, a) in mine.iter().zip(&at) {
-            assert_eq!((v.tangent, v.position), (want, a.position));
-        }
+        holds(&lines[i * 6..i * 6 + 6], &at, sh_marker_tint(&probe.sh));
     }
-    let tints = &lines[crosses..];
-    assert!(tints.iter().all(|v| v.tangent == REFLECTION_TINT));
+    for (i, probe) in scene.reflection_probes.probes.iter().enumerate() {
+        let from = crosses + i * 24;
+        let want = reflection_volume_verts(probe);
+        holds(&lines[from..from + 24], &want, REFLECTION_TINT);
+    }
+    let mut from = crosses + volumes;
+    for ((verts, _), tint) in areas.iter().zip([AREA_TINT, AREA_SELECTED_TINT]) {
+        holds(&lines[from..from + verts.len()], verts, tint);
+        from += verts.len();
+    }
 }
 
 #[test]

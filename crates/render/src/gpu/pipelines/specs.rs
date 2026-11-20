@@ -154,8 +154,9 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
-/// The collider and debug-line gizmos' lines (#1882): [`line_spec`]'s, each vertex
-/// its own colour (`vs_gizmo_vertex` / `fs_gizmo_vertex`), so one draw holds them all.
+/// The vertex-coloured gizmo lines: the probe family and Area-light outlines, then the
+/// collider and debug lines (#1882). [`line_spec`]'s, each vertex its own colour
+/// (`vs_gizmo_vertex` / `fs_gizmo_vertex`), so one draw holds a whole list.
 pub(super) fn vertex_line_spec() -> PipelineSpec {
     PipelineSpec {
         label: "Vertex Colour Line Pipeline",
