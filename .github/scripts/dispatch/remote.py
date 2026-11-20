@@ -16,8 +16,11 @@ from a script:
   its stdio runs the tool with the login's token and no model in between, so
   the call is exactly the body this package built. That is what [`call`] does.
 
-The tool answers `{"status": <HTTP status>, "json": "<body>"}` as text, or an
-`isError` result naming what was wrong with the arguments.
+The tool answers `{"status": <HTTP status>, "json": "<body>", "summary": "<text>"}`
+as text, or an `isError` result naming what was wrong with the arguments. Only
+`get_run_log` fills `summary`: its `json` is a small header (`session_id`,
+`events_fetched`, `events_shown`, `next_cursor`) and the condensed log itself is
+the summary ([`answer`]; `dispatch/runlog.py` reads it, #2452).
 """
 
 from __future__ import annotations
@@ -64,6 +67,13 @@ def call(arguments: dict, command: tuple[str, ...] = SERVE, timeout: float = TIM
     refuses the arguments. A non-2xx status is returned, not raised: the caller
     says what it meant.
     """
+    status, body, _ = answer(arguments, command, timeout)
+    return status, body
+
+
+def answer(arguments: dict, command: tuple[str, ...] = SERVE,
+           timeout: float = TIMEOUT_SECONDS) -> tuple[int, object, str]:
+    """[`call`], and the answer's `summary` text too (`""` when it has none)."""
     try:
         process = subprocess.Popen(list(command), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
                                    stderr=subprocess.DEVNULL, text=True)
@@ -94,8 +104,8 @@ def call(arguments: dict, command: tuple[str, ...] = SERVE, timeout: float = TIM
     if result.get("isError"):
         raise RemoteError(f"RemoteTrigger refused the call: {text}")
     try:
-        answer = json.loads(text)
-        body = answer.get("json")
-        return int(answer["status"]), json.loads(body) if body else None
+        told = json.loads(text)
+        body = told.get("json")
+        return int(told["status"]), json.loads(body) if body else None, str(told.get("summary") or "")
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as odd:
         raise RemoteError(f"RemoteTrigger answered something unexpected: {text[:300]}") from odd
