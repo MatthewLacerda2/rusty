@@ -26,7 +26,7 @@
 use super::super::NavigationGraph;
 use super::sync::Rebake;
 use rusty_components::NavMeshModifierComponent;
-use rusty_ecs::{Changes, Cursor, StaticGeometry, StaticSet, World};
+use rusty_ecs::{Cursor, StaticGeometry, StaticSet, World};
 use rusty_scene::Scene;
 
 /// What a play-mode navmesh reads its static geometry's changes from.
@@ -48,11 +48,10 @@ impl StaticWatch {
     /// Whether the static geometry is as it was at the last read. Reads every
     /// cursor, so each has read everything after this.
     pub(crate) fn still(&mut self, w: &mut World) -> bool {
-        let unchanged = |c: Changes| matches!(c, Changes::Ids(ids) if ids.is_empty());
-        let membership = unchanged(w.changes(&mut self.statics));
+        let membership = w.changes(&mut self.statics).is_empty();
         // Any `NavMeshModifier` write counts: one on a non-static parent changes
         // how its static children bake (#1959). They are rare.
-        let modifiers = unchanged(w.changes(&mut self.modifiers));
+        let modifiers = w.changes(&mut self.modifiers).is_empty();
         let geometry = self.geometry.changed(w);
         membership && modifiers && !geometry
     }
