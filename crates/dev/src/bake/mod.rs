@@ -19,6 +19,8 @@ pub mod report;
 pub mod steps;
 
 #[cfg(test)]
+mod area_direct_cost_tests;
+#[cfg(test)]
 mod drawn;
 #[cfg(test)]
 mod lightmap_cost_tests;

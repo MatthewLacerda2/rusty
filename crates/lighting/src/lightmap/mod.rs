@@ -81,7 +81,7 @@ pub(crate) use rays::{Rays, Tri};
 pub(crate) use rng::Rng;
 #[cfg(feature = "dev")]
 #[doc(hidden)]
-pub use trace::bench::trace_texels;
+pub use trace::bench::{trace_texels, TraceCost};
 pub(crate) use trace::cosine_sample;
 // The knobs the bake reads, in the scope of the tests' `use super::*`.
 #[cfg(test)]

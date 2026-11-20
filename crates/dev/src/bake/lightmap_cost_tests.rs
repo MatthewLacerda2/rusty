@@ -69,13 +69,17 @@ fn lightmap_trace_cost() {
     for (name, n, count) in [("Kolvik-sized", 5, 12000), ("Dust2-sized", 20, 6000)] {
         let scene = lit_level(n);
         let t = Instant::now();
-        let (traced, _) = trace_texels(&scene, &settings, count, 4);
+        let cost = trace_texels(&scene, &settings, count, 4);
         let secs = t.elapsed().as_secs_f64();
         println!(
-            "{name}: {} meshes, {} lights, {traced} texels in {secs:.2} s, {:.0} texels/s",
+            "{name}: {} meshes, {} lights, {} texels in {secs:.2} s, {:.0} texels/s, \
+             {} rays ({} direct)",
             scene.meshes.len(),
             scene.lights.len(),
-            traced as f64 / secs
+            cost.texels,
+            cost.texels as f64 / secs,
+            cost.rays,
+            cost.direct
         );
     }
 }
@@ -111,7 +115,7 @@ fn a_hundred_and_fifty_lamps_cast_a_small_factor_of_ones_rays() {
         samples: 16,
         ..Default::default()
     };
-    let rays = |lamps| trace_texels(&crowded(lamps), &settings, 96, 1).1;
+    let rays = |lamps| trace_texels(&crowded(lamps), &settings, 96, 1).rays;
     let (one, many) = (rays(1), rays(150));
     println!(
         "1 lamp {one} rays, 150 lamps {many}: {:.2}×",

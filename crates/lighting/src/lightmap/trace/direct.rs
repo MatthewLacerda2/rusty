@@ -45,13 +45,13 @@ impl Tracer<'_> {
                     let m = strata(area_samples);
                     let weight = 1.0 / (m * m) as f32;
                     for u in stratified(m, || rng.next_f32()) {
-                        let (lit, d) = self.lamp(light, point, normal, u, weight);
+                        let (lit, d) = self.own_lamp(light, point, normal, u, weight);
                         (e, dir) = (e + lit, dir + d);
                     }
                 }
                 LightShape::Area(_) => {}
                 _ => {
-                    let (lit, d) = self.lamp(light, point, normal, Vec2::ZERO, 1.0);
+                    let (lit, d) = self.own_lamp(light, point, normal, Vec2::ZERO, 1.0);
                     (e, dir) = (e + lit, dir + d);
                 }
             }
@@ -119,6 +119,16 @@ impl Tracer<'_> {
         (lit / chance, dir / chance)
     }
 
+    /// [`Self::lamp`] for a receiving texel's own direct light: its shadow ray, if
+    /// it casts one, counted apart (`Rays::count_direct`) for the cost bench.
+    fn own_lamp(&self, light: &BakeLight, point: Vec3, normal: Vec3, u: Vec2, weight: f32) -> Lit {
+        let arrived = self.received(light, point, normal, u, weight);
+        if casts(&arrived) {
+            self.rays.count_direct();
+        }
+        self.shadowed(point, arrived)
+    }
+
     /// Lamp `light`'s light at `point` facing `normal` through its point at `u`,
     /// shadowed and times `weight`, with its luminance-weighted direction.
     pub(super) fn lamp(
@@ -129,11 +139,23 @@ impl Tracer<'_> {
         u: Vec2,
         weight: f32,
     ) -> Lit {
-        let arrived = arrival(light, point, u).map(|(to_light, d, received)| {
+        self.shadowed(point, self.received(light, point, normal, u, weight))
+    }
+
+    /// Lamp `light`'s light arriving at `point` facing `normal` through its point
+    /// at `u`, unshadowed and times `weight`: direction, distance and irradiance.
+    fn received(
+        &self,
+        light: &BakeLight,
+        point: Vec3,
+        normal: Vec3,
+        u: Vec2,
+        weight: f32,
+    ) -> Option<(Vec3, f32, Vec3)> {
+        arrival(light, point, u).map(|(to_light, d, received)| {
             let response = self.scene.diffuse.response(normal.dot(to_light));
             (to_light, d, received * response * weight)
-        });
-        self.shadowed(point, arrived)
+        })
     }
 
     /// `arrived`'s light (direction, distance, irradiance) if it is positive and
@@ -161,14 +183,18 @@ impl Tracer<'_> {
     ) -> Lit {
         match arrived {
             Some((to, d, lit))
-                if lit.max_element() > 0.0
-                    && !self.rays.occluded_by(point, to, (T_MIN, d), stops) =>
+                if casts(&arrived) && !self.rays.occluded_by(point, to, (T_MIN, d), stops) =>
             {
                 (lit, to * luminance(lit))
             }
             _ => (Vec3::ZERO, Vec3::ZERO),
         }
     }
+}
+
+/// Whether `arrived` light is worth a shadow ray: some arrives at all.
+fn casts(arrived: &Option<(Vec3, f32, Vec3)>) -> bool {
+    arrived.is_some_and(|(_, _, lit)| lit.max_element() > 0.0)
 }
 
 /// The balance heuristic's share for the strategy whose density is `this`, beside
