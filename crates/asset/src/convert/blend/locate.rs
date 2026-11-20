@@ -12,11 +12,14 @@
 //! per check) is remembered by the executable's path, length and modification
 //! time, and an upgraded Blender is asked again. No answer at all (it could not
 //! start, or ran past its limit, as a slow first launch may) is not remembered,
-//! and is asked again next time. The executable a search found is remembered too,
+//! and is asked again next time. A version reported is also kept in the open
+//! project's `cache/` ([`super::known`]), so the next process reads it there
+//! instead of starting Blender. The executable a search found is remembered too,
 //! while the search and that file stay the same and it was not refused: a check
 //! of a current cache costs two `stat`s, not one per `PATH` folder, and a newer
 //! Blender put earlier on `PATH` after a refusal is found without a restart.
 
+use super::known::{self, Known};
 use crate::ImportError;
 use rusty_core::collections::Map;
 use std::ffi::OsString;
@@ -62,6 +65,10 @@ pub struct Search {
     pub places: Vec<PathBuf>,
     /// [`RUSTY_BLENDER_TIMEOUT`]'s value, if set.
     pub timeout: Option<OsString>,
+    /// The file that keeps the version asked across processes
+    /// ([`super::known`]); `None` outside a project, where this process's memo
+    /// alone remembers it.
+    pub known: Option<PathBuf>,
 }
 
 impl Search {
@@ -73,6 +80,7 @@ impl Search {
             path: std::env::var_os("PATH"),
             places: places(home.as_deref()),
             timeout: std::env::var_os(RUSTY_BLENDER_TIMEOUT).filter(|v| !v.is_empty()),
+            known: super::known::in_project(Path::new(".")),
         }
     }
 
@@ -110,10 +118,11 @@ impl Search {
                 missing("no Blender was found on PATH or where it is usually installed")
             })?,
         };
-        let checked = version(&path).and_then(|version| match major(&version) {
-            Some(m) if m >= MIN_MAJOR => Ok(Blender { path, version }),
-            _ => Err(missing(&format!("{} is Blender {version}", path.display()))),
-        });
+        let checked =
+            version(&path, self.known.as_deref()).and_then(|version| match major(&version) {
+                Some(m) if m >= MIN_MAJOR => Ok(Blender { path, version }),
+                _ => Err(missing(&format!("{} is Blender {version}", path.display()))),
+            });
         if checked.is_err() {
             *FOUND.lock().unwrap_or_else(PoisonError::into_inner) = None;
         }
@@ -185,28 +194,70 @@ fn major(version: &str) -> Option<u32> {
 /// the answer.
 type Asked = (u64, Option<Duration>, Result<String, ImportError>);
 
-/// Versions already asked, by executable path.
+/// Versions already asked, by canonical executable path.
 static ASKED: LazyLock<Mutex<Map<PathBuf, Asked>>> = LazyLock::new(Mutex::default);
 
 /// The last search made, and what it found.
 static FOUND: Mutex<Option<(Search, PathBuf)>> = Mutex::new(None);
 
-/// The version the Blender at `path` reports, asked once per build of it.
-fn version(path: &Path) -> Result<String, ImportError> {
-    let meta = std::fs::metadata(path).ok();
+/// The version the Blender at `path` reports, asked once per build of it: from
+/// this process's memo, else from the `known` file, else from Blender itself.
+fn version(path: &Path, known: Option<&Path>) -> Result<String, ImportError> {
+    // Keyed by the file a link names, so a link moved to another install asks
+    // again; run as found, since a launcher may dispatch on its own name (snap).
+    let key = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let meta = std::fs::metadata(&key).ok();
     let len = meta.as_ref().map_or(0, std::fs::Metadata::len);
     let modified = meta
         .and_then(|m| m.modified().ok())
         .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok());
     let lock = || ASKED.lock().unwrap_or_else(PoisonError::into_inner);
-    if let Some((l, m, version)) = lock().get(path) {
+    if let Some((l, m, version)) = lock().get(&key) {
         if (*l, *m) == (len, modified) {
             return version.clone();
         }
     }
-    let answer = super::run::version(path)?;
-    lock().insert(path.to_path_buf(), (len, modified, answer.clone()));
+    let answer = match known.and_then(|file| kept(file, &key, len, modified)) {
+        Some(version) => Ok(version),
+        None => {
+            let answer = super::run::version(path)?;
+            if let (Some(file), Ok(version)) = (known, &answer) {
+                let entry = Known {
+                    path: key.clone(),
+                    len,
+                    modified,
+                    version: version.clone(),
+                    reads: 0,
+                };
+                // A version not kept is asked again by the next process: no error.
+                super::known::write(file, &entry).unwrap_or(());
+            }
+            answer
+        }
+    };
+    lock().insert(key, (len, modified, answer.clone()));
     answer
+}
+
+/// The version `file` keeps for the executable at `path` as it is now, counted
+/// (canonical) as one more read; `None` once it has been read [`known::READS`] times.
+fn kept(file: &Path, path: &Path, len: u64, modified: Option<Duration>) -> Option<String> {
+    let mut entry = known::read(file).filter(|k| k.answers(path, len, modified))?;
+    if entry.reads >= known::READS {
+        return None;
+    }
+    entry.reads += 1;
+    // An uncounted read only lets the answer be read once more: no error.
+    known::write(file, &entry).unwrap_or(());
+    Some(entry.version)
+}
+
+/// Forget what this process asked and found, as a fresh process starts: a test
+/// hook, for what the `known` file alone must answer.
+#[cfg(test)]
+pub(super) fn forget() {
+    ASKED.lock().unwrap_or_else(PoisonError::into_inner).clear();
+    *FOUND.lock().unwrap_or_else(PoisonError::into_inner) = None;
 }
 
 /// The version in `blender --version`'s output: the word after the first
