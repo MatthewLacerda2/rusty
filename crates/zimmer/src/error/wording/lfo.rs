@@ -7,6 +7,9 @@ use crate::error::SynthError;
 impl SynthError {
     pub(super) fn say_lfo(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::NegativeLfoRate { rate, .. } => {
+                write!(f, "patch: lfo `rate` must not be negative, got {rate}")
+            }
             Self::LfoTwoRates { rate, beats } => write!(
                 f,
                 "patch: lfo writes both `rate` ({rate} Hz) and `beats` ({beats}) — keep one: `rate` for a speed in Hz, `beats` for one cycle per that many beats of the song"
