@@ -81,6 +81,10 @@ pub(crate) struct Rays {
     /// in a test build, and for `dev::bake`'s bench ([`Rays::counted`]), so a bake
     /// shares no counter across its workers.
     pub cast: std::sync::atomic::AtomicU64,
+    /// Of `cast`, the shadow rays a receiving texel's own direct light cast
+    /// (`Tracer::direct` says which, [`Rays::count_direct`]): the share the cost
+    /// bench reports apart from the bounce and next-event rays (#2355).
+    pub direct: std::sync::atomic::AtomicU64,
     counting: bool,
 }
 
@@ -91,6 +95,7 @@ impl Rays {
                 tris,
                 mesh: None,
                 cast: Default::default(),
+                direct: Default::default(),
                 // lint: allow(cfg-test-switch) scene's own tests; another crate counts through `Rays::counted`
                 counting: cfg!(test),
             };
@@ -109,6 +114,7 @@ impl Rays {
             tris,
             mesh: Some(mesh),
             cast: Default::default(),
+            direct: Default::default(),
             // lint: allow(cfg-test-switch) scene's own tests; another crate counts through `Rays::counted`
             counting: cfg!(test),
         }
@@ -194,6 +200,15 @@ impl Rays {
         Self {
             counting: true,
             ..self
+        }
+    }
+
+    /// One more of `cast` was a texel's own direct-light shadow ray, when
+    /// counting; nothing otherwise. The tracer calls it beside the cast.
+    pub(crate) fn count_direct(&self) {
+        if self.counting {
+            self.direct
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 

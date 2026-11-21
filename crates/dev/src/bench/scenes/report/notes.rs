@@ -152,7 +152,11 @@ impl SceneReport {
     pub(super) fn run_notes(&self) -> String {
         let mut out = String::new();
         if !self.set.is_empty() {
-            let _ = writeln!(out, "quality preset overridden: {}", self.set.join(", "));
+            let _ = writeln!(
+                out,
+                "overridden for the run (--set): {}",
+                self.set.join(", ")
+            );
         }
         if self.script {
             out.push_str(SCRIPT_NOTE);

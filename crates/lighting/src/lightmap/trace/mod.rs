@@ -36,6 +36,7 @@ use glam::{Vec2, Vec3, Vec4};
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
+mod check;
 mod direct;
 mod emitter;
 #[cfg(test)]
@@ -45,6 +46,7 @@ mod grid;
 mod grid_tests;
 #[cfg(test)]
 mod mis_tests;
+mod own;
 mod paths;
 #[cfg(test)]
 mod pick_tests;
@@ -116,6 +118,9 @@ pub(super) struct Tracer<'a> {
     pub rays: &'a Rays,
     /// The lamps by reach and the emitters, what next-event estimation picks from.
     sources: Sources,
+    /// Whether an Area light's direct light is probed before the rest of its
+    /// set (`lights::area::PROBE`); off, what a test compares the probe with.
+    probe: bool,
 }
 
 impl<'a> Tracer<'a> {
@@ -126,6 +131,17 @@ impl<'a> Tracer<'a> {
             scene,
             rays,
             sources,
+            probe: true,
+        }
+    }
+
+    /// This tracer casting every Area light's full stratified set, no probe first:
+    /// the exhaustive estimate the probe is held to (#2355).
+    #[cfg(test)]
+    pub(super) fn without_probe(self) -> Self {
+        Self {
+            probe: false,
+            ..self
         }
     }
 

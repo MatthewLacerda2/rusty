@@ -27,8 +27,11 @@
 //! profiler is tried once before any scene, so a refusal ends the run. With
 //! `--import`, once a run, one more imports a copy of the project without its
 //! import cache and loads its first scene (`--import-out`, `scenes::import`),
-//! handing both's time to that scene's run as `--import-ms`. `--set` overrides the
-//! running quality preset in every child (`scenes::set`). `--script` times the
+//! handing both's time to that scene's run as `--import-ms`. `--set` overrides a
+//! quality field, a graphics option (`option.<name>`) or a renderer switch
+//! (`render.<switch>`) in every child (`scenes::set`); the editor round's Scene
+//! view takes the quality fields and the switches, never an option, which only
+//! the game views honour (`render.ssao` and `render.ssil` reach both). `--script` times the
 //! scripts' engine verbs in the timed child (`bench::verbs`), and every child of
 //! the run writes under `<out_dir>/<project>-<hash>/script/`, so a plain run's
 //! history is never compared with one and a `--profile` beside it (played without
@@ -100,6 +103,7 @@ fn main() {
     let opts = Options {
         size: a.size.unwrap_or(scenes::DEFAULT_SIZE),
         runs: a.runs.unwrap_or(scenes::RUNS),
+        switches: a.set.switches(),
         ..Options::default()
     };
     let run = Run {
@@ -152,7 +156,9 @@ fn reports_dir(root: &Path, key: &str, script: bool) -> PathBuf {
     }
 }
 
-/// The project at `path` opened to run, the run's `--set` over its running preset.
+/// The project at `path` opened to run, the run's `--set` quality fields over its
+/// running preset and its `option.` overrides over its graphics option defaults
+/// (`scenes::open`); the `render.` switches go to the renderer (`Options::switches`).
 fn open(run: &Run, path: &Path, what: &str) -> Opened {
     scenes::open(path, &run.set).unwrap_or_else(|e| fail(&format!("cannot open {what}: {e}")))
 }

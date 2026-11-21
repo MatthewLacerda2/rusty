@@ -45,6 +45,7 @@ impl Renderer {
             record,
             traits,
             bone_base: 0,
+            depth_only: false, // set beside the slot's shadow clip, `push_slot`
         };
         (key, material.is_some_and(MaterialAsset::is_transparent))
     }

@@ -110,8 +110,23 @@ pub(crate) fn slot_clip(
     Some(CasterClip { clip, cutout })
 }
 
+/// Whether the depth prepass may draw a slot through surface pipeline `pipeline`,
+/// whose shadow clip [`slot_clip`] gave as `clip`, with no fragment stage (#2347):
+/// it draws through the standard pipeline and nothing clips it, so no fragment of
+/// it is discarded. On the standard pipeline that is "not Cutout"; a variant keeps
+/// its own prepass whether it cuts or not. The prepass reads the shadow pass's
+/// clip rather than a rule of its own, derived once per slot with it: a slot
+/// wrongly marked would prime depth where the forward pass discards.
+pub(crate) fn depth_only(pipeline: usize, clip: Option<&CasterClip>) -> bool {
+    pipeline == STANDARD && clip.is_none()
+}
+
 /// Whether surface pipeline `pipeline` is a variant whose cut moves at runtime: a
 /// caster with a slot drawn through one draws in the dynamic sweep, even when static.
 pub(crate) fn moves(surfaces: &SurfaceShaders, pipeline: usize) -> bool {
     pipeline != STANDARD && surfaces.cut(pipeline).is_some()
 }
+
+#[cfg(test)]
+#[path = "clips_tests.rs"]
+mod tests;

@@ -34,7 +34,7 @@ impl Renderer {
     ) {
         let fitted = frame_cascades(scene, self.capture.static_only, camera, aspect, settings);
         // A probe captured without shadows (#1584) samples no cascade.
-        let sampled: &[_] = if self.capture.shadows { &fitted } else { &[] };
+        let sampled: &[_] = if self.casts_shadows() { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue.counted_write_buffer(
             &self.shadow_uniform_buffer,
@@ -73,7 +73,7 @@ impl Renderer {
             statics: objects.statics_key(scene),
             small,
         };
-        if self.capture.shadows {
+        if self.casts_shadows() {
             // a probe captured without shadows samples no cascade, so draws none;
             // without a live sun there is no cascade to draw (#1713)
             self.shadow_renderer.render_cascades(encoder, &frame, lod);
@@ -94,10 +94,12 @@ impl Renderer {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
-        if !self.capture.shadows {
+        let casts = self.casts_shadows();
+        if !casts {
             requests.clear(); // a probe captured without shadows plans no tile
         }
-        let plan = if self.capture.static_only {
+        // Without shadows the kept tiles stay as they are, for when they come back.
+        let plan = if self.capture.static_only || !casts {
             atlas::plan(&requests, view_proj, camera.position)
         } else {
             let ids = local_light_ids(scene, false);
@@ -132,6 +134,12 @@ impl Renderer {
 }
 
 impl Renderer {
+    /// Whether the frame's lights cast shadows: not in a reflection probe captured
+    /// without them (#1584), nor with the `shadows` measurement switch off.
+    fn casts_shadows(&self) -> bool {
+        self.switches.casts_shadows(self.capture.shadows)
+    }
+
     /// Whether this frame's realtime shadows leave a masked light's static casters
     /// out (#1695): the frame (never a bake capture, which draws `Mixed` lights as
     /// `BakedIndirect` does) of a scene on `Shadowmask` under the plain

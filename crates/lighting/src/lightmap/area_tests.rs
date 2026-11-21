@@ -35,7 +35,7 @@ pub(super) fn direct_at(scene: &BakeScene, p: Vec3, normal: Vec3) -> f32 {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
     let mut rng = Rng::new(3, 0, 0);
-    tracer.texel(p, normal, 1024, 1, &mut rng).direct.x * std::f32::consts::PI
+    tracer.texel(p, normal, (1024, 1024), 1, &mut rng).direct.x * std::f32::consts::PI
 }
 
 pub(super) fn lit(lights: Vec<BakeLight>, meshes: Vec<BakeMesh>) -> BakeScene {

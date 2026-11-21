@@ -516,15 +516,17 @@ bench: ## Benchmark the stress scene (release build), with the change against th
 # sampling profile of the measured frames (perf on Linux, sample on macOS) as
 # <scene>.profile.txt and .folded, on a release build with line tables. Each scene's
 # editor round (its own process: Scene-view frames, Play entry, Stop, a save beside the
-# reports) adds the editor. rows; EDITOR=0 skips it. Nothing is written into the project. A signal, never a gate; docs/testing.md.
+# reports) adds the editor. rows; EDITOR=0 skips it. SET=key=value (several, space-separated)
+# overrides a quality field, an option.<name> or a render.<switch> for the run, as bench-ab's
+# SET does. Nothing is written into the project. A signal, never a gate; docs/testing.md.
 # PROFILE=1 builds the `profiling` profile with frame pointers forced on, so perf walks
 # its stacks by frame pointer (`dev::bench::scenes::profile::perf`). That one binary runs
 # the whole run, so a PROFILE=1 run's timed rows come from it too (each report says so):
 # on a desktop GPU they measured inside the release build's spread. RUSTFLAGS only
 # reaches that profile's own target folder; a run without PROFILE=1 is the release build.
-bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0]
-	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0]" >&2; exit 1; }
-	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) $(if $(filter 0,$(EDITOR)),--no-editor) out/bench/scenes
+bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/games/horde [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0] [SET=key=value]
+	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0] [SET=key=value]" >&2; exit 1; }
+	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) $(if $(filter 0,$(EDITOR)),--no-editor) $(foreach s,$(SET),--set '$(s)') out/bench/scenes
 
 # A pull request's measured rows (#2381): `main`, the PR's head, `main` again, back to
 # back, each built in a detached worktree of its own; the second `main` leg is each
@@ -532,9 +534,12 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # run, a build or bench on the machine, and un-imported textures (FORCE=1 runs anyway,
 # and the table says so); a build tool found before a build or a leg is waited out first
 # (up to 10 minutes, a formatter is seconds) and refused only if still there, and a run
-# that stops keeps the table of the legs that finished. SET=key=value (several, space-separated) overrides the
-# running quality preset in every leg: dotted keys with plain values
-# (SET='a=true ssao.high.radius=1.5'), each passed quoted; a JSON object value
+# that stops keeps the table of the legs that finished. SET=key=value (several, space-separated) overrides, in
+# every leg, a quality field (dotted keys with plain values), a graphics option
+# (option.<name>=false, the game rounds only) or a renderer switch (render.shadows,
+# render.lightmaps, render.reflection_probes, render.clustered_lights, render.ssao,
+# render.ssil =false; the editor round's too), bisecting a GPU cost by
+# feature (SET='a=true ssao.high.radius=1.5 render.shadows=false'), each passed quoted; a JSON object value
 # ({...}) is refused. STRESS=1 adds `make bench`'s stress yard in three legs of its own,
 # RUNS a leg (3 by default), on the same trees; with no PROJECT only the yard runs.
 # The table lands in out/bench/ab/pr-<n>/table.md.

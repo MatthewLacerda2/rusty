@@ -10,9 +10,13 @@ mod debug_meshes;
 pub(crate) mod decals;
 mod draw;
 mod frustum;
+pub mod gpu;
+pub mod ibl;
 pub mod interpolate;
 pub(crate) mod lod;
 pub(crate) mod motion;
+pub(crate) mod passes;
+pub mod postfx;
 mod preview;
 pub mod readback;
 pub(crate) mod render_texture;
@@ -22,22 +26,16 @@ mod stats;
 #[doc(hidden)] // A test hook: the crates above reach it from their own tests.
 pub mod test_gpu;
 pub(crate) mod timing;
+pub mod ui;
 mod view;
 pub mod warm;
-
-pub mod gpu;
-pub mod ibl;
-pub(crate) mod passes;
-pub mod postfx;
-pub mod ui;
 
 // Moved submodules, pulled back under short names this module's body names them by.
 use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
 use rusty_components::MeshRevision;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
 pub use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
@@ -53,6 +51,7 @@ pub use ibl::probe::capture::ProbeCapture;
 pub use setup::headless::{gpu_required, ADAPTER_ENV, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::{gpu_memory, GpuMemory, OpCounts, RenderCounters, StaleOcclusion, Uploads};
+pub use stats::{RenderSwitch, RenderSwitches};
 pub use timing::{ClockProbe, FrameCost, GpuPart, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
@@ -215,7 +214,7 @@ pub struct Renderer {
     /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
     /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
-    pub(crate) prepass_pipeline: gpu::pipelines::FacedPipeline,
+    pub(crate) prepass_pipeline: gpu::pipelines::PrepassPipelines,
     /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     /// The grading-LUT bake every view's table is written through (#1440).
@@ -250,13 +249,14 @@ pub struct Renderer {
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
     /// Group 0's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
     linear_clamp: wgpu::Sampler,
-
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 
     /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
     /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
     capture: ibl::cubemap_capture::CaptureMode,
+    /// The measurement switches (`stats::switches`): all on unless a bench set one.
+    switches: RenderSwitches,
 
     /// The retained render scene (#1706): mesh handles and each drawn scene's objects.
     pub(crate) retained: scene::Retained,

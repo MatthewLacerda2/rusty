@@ -39,6 +39,7 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
             record,
             traits,
             bone_base,
+            depth_only: false,
         },
         instance,
         depth: 0.0,

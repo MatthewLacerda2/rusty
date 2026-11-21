@@ -8,7 +8,7 @@ use crate::Renderer;
 use rusty_scene::Scene;
 
 /// A one-mip `size`² cube file named `name`, every texel `value`; returns its path.
-pub(super) fn cube_file(name: &str, size: u32, value: u8) -> String {
+pub(crate) fn cube_file(name: &str, size: u32, value: u8) -> String {
     let face = vec![value; (size * size * 8) as usize];
     let cube = PrefilteredCubemap {
         mips: vec![std::array::from_fn(|_| face.clone())],

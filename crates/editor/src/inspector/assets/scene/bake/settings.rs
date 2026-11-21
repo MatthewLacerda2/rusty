@@ -8,28 +8,16 @@ use rusty_scene::lighting::{DiffuseModel, MixedLightingMode};
 /// The scene's lightmap knobs; returns whether any changed.
 pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let mut changed = false;
-    let mut row = |ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str| {
-        ui.horizontal(|ui| {
-            changed |= ui.add(drag).on_hover_text(hover).changed();
-            ui.label(label);
-        });
-    };
     let texels = egui::DragValue::new(&mut s.texels_per_unit).ranged(BakeSettings::TEXELS_PER_UNIT);
-    row(
+    changed |= row(
         ui,
         texels.speed(0.1),
         "Texels per unit",
         "Lightmap resolution",
     );
-    let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
-    row(
-        ui,
-        samples,
-        "Samples",
-        "Paths traced per texel; more is smoother and slower",
-    );
+    let samples = draw_samples(ui, s);
     let bounces = egui::DragValue::new(&mut s.bounces).ranged(BakeSettings::BOUNCES);
-    row(
+    changed |= row(
         ui,
         bounces,
         "Bounces",
@@ -38,14 +26,14 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let tolerance = egui::DragValue::new(&mut s.backface_tolerance)
         .ranged(BakeSettings::BACKFACE_TOLERANCE)
         .speed(0.01);
-    row(
+    changed |= row(
         ui,
         tolerance,
         "Backface tolerance",
         "Share of a texel's rays that must see front faces; below it the texel is \
          inside geometry and its own chart fills it",
     );
-    changed |= draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
+    changed |= samples | draw_max_lightmap_size(ui, &mut s.max_lightmap_size);
     changed |= draw_denoiser(ui, &mut s.denoiser);
     changed |= ui
         .checkbox(&mut s.directional, "Directional lightmaps")
@@ -54,18 +42,54 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     changed | draw_progressive(ui, s)
 }
 
+/// The paths per texel and Unity's *Direct Samples* beside them (#2355); returns
+/// whether either changed.
+fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
+    let mut changed = false;
+    let samples = egui::DragValue::new(&mut s.samples).ranged(BakeSettings::SAMPLES);
+    changed |= row(
+        ui,
+        samples,
+        "Samples",
+        "Paths traced per texel; more is smoother and slower",
+    );
+    let direct = egui::DragValue::new(&mut s.direct_samples)
+        .ranged(BakeSettings::DIRECT_SAMPLES)
+        .custom_formatter(|n, _| match n as u32 {
+            0 => "as Samples".into(),
+            n => n.to_string(),
+        });
+    changed |= row(
+        ui,
+        direct,
+        "Direct samples",
+        "Points each Area light's direct light is integrated over; 0 follows Samples. \
+         From 50 up a probe prices a fully lit or hidden panel at a fixed 24 or 52 rays, \
+         so this only prices penumbrae; under 50 every panel takes every point, so 49 \
+         costs more than 64 and only about 25 or under is cheaper",
+    );
+    changed
+}
+
+/// One drag value labelled `label`, `hover` on it; returns whether it changed.
+fn row(ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str) -> bool {
+    ui.horizontal(|ui| {
+        let changed = ui.add(drag).on_hover_text(hover).changed();
+        ui.label(label);
+        changed
+    })
+    .inner
+}
+
 /// The progressive bake's knobs (#1970); returns whether either changed.
 fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let per_pass = egui::DragValue::new(&mut s.samples_per_pass).ranged(BakeSettings::SAMPLES);
-    let mut changed = ui
-        .horizontal(|ui| {
-            let hover = "Paths each pass adds to every texel; the scene shows the lightmaps \
-                         after each pass";
-            let changed = ui.add(per_pass).on_hover_text(hover).changed();
-            ui.label("Samples per pass");
-            changed
-        })
-        .inner;
+    let mut changed = row(
+        ui,
+        per_pass,
+        "Samples per pass",
+        "Paths each pass adds to every texel; the scene shows the lightmaps after each pass",
+    );
     changed |= ui
         .checkbox(&mut s.prioritize_view, "Prioritize view")
         .on_hover_text(

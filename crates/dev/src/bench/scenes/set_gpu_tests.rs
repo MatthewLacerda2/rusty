@@ -18,6 +18,7 @@ const OPTS: Options = Options {
     frames: 2,
     runs: 1,
     warm: false,
+    switches: rusty_render::RenderSwitches::ON,
 };
 
 /// A walled yard and its project file, written to a temp dir.
@@ -87,7 +88,7 @@ fn gpu_set_turns_the_occlusion_cull_on_for_one_run_and_writes_nothing() {
     assert!(
         on.warnings
             .iter()
-            .any(|w| w.contains("other quality overrides")),
+            .any(|w| w.contains("other --set overrides")),
         "{:?}",
         on.warnings
     );

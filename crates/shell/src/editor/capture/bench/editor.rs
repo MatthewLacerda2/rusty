@@ -34,6 +34,7 @@ impl Editor {
         let size = (opts.size.0.max(1), opts.size.1.max(1));
         let mut host = CaptureHost::new();
         let renderer = host.renderer(size.0, size.1)?;
+        renderer.set_switches(opts.switches);
         if opts.warm {
             renderer.warm_pipelines(true);
         }
