@@ -112,6 +112,8 @@ fn views_moved(before: &[ViewKey], now: &[ViewKey]) -> String {
     })
 }
 
+/// `now`'s average against `before`'s: `unresolved` when either has a spread
+/// and the two overlap, else the change (`+0.123 (+4.5%)`, `=`).
 pub fn delta(before: &Row, now: &Row) -> String {
     let spread = now.hi > now.lo || before.hi > before.lo;
     let overlap = now.lo <= before.hi && before.lo <= now.hi;
@@ -121,6 +123,7 @@ pub fn delta(before: &Row, now: &Row) -> String {
     change(before.avg, now.avg)
 }
 
+/// The row's spread as the table prints it, `lo..hi`; empty without one.
 pub fn spread(row: &Row) -> String {
     if row.hi > row.lo {
         format!("{}..{}", num(row.lo), num(row.hi))

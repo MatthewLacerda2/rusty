@@ -6,7 +6,11 @@ use rusty_render::ibl::probe::bounce::MAX_BOUNCES;
 pub enum Step {
     Lightmaps,
     LightmapPages,
-    LightProbes { bounce: u32, max: u32 },
+    LightProbes {
+        bounce: u32,
+        // The solve stops at `max` or when it converges.
+        max: u32,
+    },
     ReflectionProbes,
     Occlusion,
     WritingLightmaps,

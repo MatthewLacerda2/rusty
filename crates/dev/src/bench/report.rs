@@ -231,6 +231,7 @@ pub(super) fn change(before: f64, after: f64) -> String {
     format!("{d:+.3}{pct}")
 }
 
+/// The last run's report, if `out_dir` holds a readable one.
 pub(super) fn read(out_dir: &Path) -> Option<Report> {
     let json = std::fs::read_to_string(out_dir.join("bench.json")).ok()?;
     serde_json::from_str(&json).ok()
