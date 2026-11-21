@@ -139,6 +139,15 @@ impl CameraCull {
         self.args[1].buffer()
     }
 
+    /// Take both counters' finished reads, if they came back: the instance
+    /// cull's by the layout it copied ([`Layout::read`]), the cluster cull's count.
+    fn collect_reads(&mut self, device: &wgpu::Device) {
+        let reading = &self.reading;
+        self.counter.collect(device, |words| reading.read(words));
+        let clusters = &mut self.clusters.counter;
+        clusters.collect(device, Counter::first_word);
+    }
+
     /// Make room for `slots` object slots of history. The verdicts it holds are
     /// kept; only the new slots, `[old, slots)`, read "drawn", so a growth past a
     /// power of two (a spawn, a stream-in) costs phase one just the new objects.
@@ -189,12 +198,7 @@ impl Renderer {
     ) -> ([Culled; 2], Plan) {
         let cam = &mut view.hiz.cameras[idx];
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
-        let reading = &cam.reading;
-        cam.counter
-            .collect(&self.device, |words| reading.read(words));
-        cam.clusters
-            .counter
-            .collect(&self.device, Counter::first_word);
+        cam.collect_reads(&self.device);
         self.lap(HOLD_LAP);
         let instances = &solids.draws.instances[..n as usize];
         let tested = pack_bounds(&mut cam.tables, instances, &solids.tested);
