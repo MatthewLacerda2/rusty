@@ -40,3 +40,36 @@ fn a_refused_file_is_removed_by_the_next_save() {
     assert_eq!(saved.action, Action::Removed);
     assert!(!path.exists(), "the corrupt file is gone");
 }
+
+/// The layout before the version field (#2515): `RPVS`, `objects` objects, an empty
+/// grid, no row words and no cells.
+fn unversioned(objects: u32) -> Vec<u8> {
+    let mut bytes = b"RPVS".to_vec();
+    bytes.extend(objects.to_le_bytes());
+    bytes.extend(std::iter::repeat_n(0u8, objects as usize * 13 + 28));
+    bytes.extend([0u8; 8]); // the rows' and the cells' counts
+    bytes
+}
+
+/// Its object count is no version: neither a count above this build's version
+/// ("newer") nor one equal to it (a later field) is what the warning says.
+#[test]
+fn a_file_from_before_the_version_field_is_told_as_older_and_unversioned() {
+    let scene_path = level("occlusion_unversioned");
+    for objects in [137, super::OCCLUSION_VERSION] {
+        std::fs::write(occlusion_path(&scene_path), unversioned(objects)).unwrap();
+        let mut scene = Scene::new();
+        let logs = rusty_test_support::logs::during(|| load_sidecar(&mut scene, &scene_path));
+        assert!(scene.occlusion.is_none(), "refused");
+        let logs = logs.join("\n");
+        assert!(
+            logs.contains("is an occlusion bake from an older engine, which wrote no version"),
+            "{objects} objects: {logs}"
+        );
+        assert!(!logs.contains("newer"), "{logs}");
+        assert!(
+            logs.contains("re-baked (Generate Lighting or Bake Occlusion)"),
+            "{logs}"
+        );
+    }
+}
