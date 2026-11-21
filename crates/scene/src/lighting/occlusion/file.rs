@@ -134,7 +134,7 @@ pub(super) fn is_unversioned(bytes: &[u8]) -> bool {
 
 /// The data `bytes` hold, or why they are refused. A file another bake version
 /// wrote is refused by its version before any other field is read, and one from
-/// before the version field ([`is_unversioned`]) as that, whatever its first `u32`.
+/// before the version field (`is_unversioned`) as that, whatever its first `u32`.
 pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
     decode_versioned(bytes).map_err(|e| {
         if is_unversioned(bytes) {

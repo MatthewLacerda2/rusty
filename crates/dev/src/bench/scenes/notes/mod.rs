@@ -266,11 +266,11 @@ pub fn bakes_unused(
 }
 
 #[cfg(test)]
-#[path = "notes_baked_tests.rs"]
+#[path = "baked_tests.rs"]
 mod baked_tests;
 #[cfg(test)]
-#[path = "notes_lights_tests.rs"]
+#[path = "lights_tests.rs"]
 mod lights_tests;
 #[cfg(test)]
-#[path = "notes_tests.rs"]
+#[path = "tests.rs"]
 mod tests;
