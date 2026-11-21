@@ -142,8 +142,8 @@ fn soldier(scene: &mut Scene, i: u32, script: &str) {
     attach(scene, id, script);
 }
 
-/// Light `i`: even ones are point lights along the side walls, odd ones spots
-/// hanging over the pool and deck, pointing down.
+/// Light `i`, `Mixed` so it is live: even ones are point lights along the side
+/// walls, odd ones spots hanging over the pool and deck, pointing down.
 fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
     let row = (i / 2) as f32;
     let side = alternate(i / 2);
@@ -162,6 +162,8 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
         authoring::rendering::light::set_intensity(&mut l, 2.0);
         authoring::rendering::light::set_range(&mut l, 9.0);
         authoring::rendering::light::set_cast_shadows(&mut l, shadowed);
+        // The live lights the bench measures (#2522: a light is Baked unless told).
+        authoring::rendering::light::set_mode(&mut l, rusty_components::LightMode::Mixed);
     }
     if let Some(script) = flicker {
         attach(scene, id, script);

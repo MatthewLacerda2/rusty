@@ -93,7 +93,7 @@ fn clamps_negatives_and_ignores_unknown_type() {
     assert_eq!(light.light_type, LightType::Point);
     assert_eq!(
         light.mode,
-        LightMode::Mixed,
+        LightMode::Baked,
         "unknown mode kept the default"
     );
 }

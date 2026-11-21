@@ -33,6 +33,7 @@ fn scene(scale: Vec3) -> Scene {
     let light = LightComponent {
         light_type: LightType::Directional,
         intensity: 1.0,
+        mode: rusty::components::LightMode::Mixed,
         ..default_light()
     };
     scene.world.set_light(sun, Some(light));

@@ -46,7 +46,8 @@ pub(super) fn asset(scene: &mut Scene, id: u32) -> &mut MaterialAsset {
 fn ball(face: RenderFace, turn: f32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-0.6);
     let wall = create_entity(&mut scene, "Wall", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(wall).unwrap();
@@ -88,7 +89,8 @@ fn gpu_a_refracting_ball_shows_no_back_faces() {
 pub(super) fn card(face: RenderFace, above: bool, up: bool) -> (Scene, Camera) {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let tilt = if up { 1.2 } else { -1.2 };
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(tilt);
     let id = create_entity(&mut scene, "Card", Some(Primitive::Plane));

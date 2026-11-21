@@ -14,6 +14,7 @@ fn light(at: Vec3, range: f32, intensity: f32) -> LocalLight {
     let light = LightComponent {
         intensity,
         range,
+        mode: rusty_components::LightMode::Mixed,
         ..rusty_scene::create::default_light()
     };
     LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")

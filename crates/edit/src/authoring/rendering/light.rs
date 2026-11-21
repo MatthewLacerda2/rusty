@@ -16,6 +16,7 @@
 use glam::{Vec2, Vec3};
 
 use rusty_components::{LightComponent, LightMode, LightType};
+use rusty_scene::create::RUNTIME_SHADOW_FADE_RANGES;
 use rusty_scene::rules::sanitize::{clamped, finite2_or, finite3, non_negative};
 
 /// Set the light's linear RGB colour.
@@ -28,9 +29,17 @@ pub fn set_intensity(l: &mut LightComponent, value: f32) {
     l.intensity = non_negative(value);
 }
 
-/// Set the light's range, clamped to `≥ 0`.
+/// Set the light's range, clamped to `≥ 0`. A shadow fade still at the runtime
+/// default (`scene::create::live_in_play`: [`RUNTIME_SHADOW_FADE_RANGES`] times
+/// the range before this write) follows the range; a fade set otherwise, or `0`
+/// (no fade), stays.
 pub fn set_range(l: &mut LightComponent, value: f32) {
+    let follows = l.shadow_fade_distance > 0.0
+        && l.shadow_fade_distance == l.range * RUNTIME_SHADOW_FADE_RANGES;
     l.range = non_negative(value);
+    if follows {
+        l.shadow_fade_distance = l.range * RUNTIME_SHADOW_FADE_RANGES;
+    }
 }
 
 pub use rusty_scene::create::defaults::DEFAULT_CONES;

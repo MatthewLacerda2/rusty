@@ -58,6 +58,7 @@ fn wall(taa: bool, map: String) -> Scene {
     let light = LightComponent {
         intensity: 20.0,
         cast_shadows: false,
+        mode: rusty_components::LightMode::Mixed,
         ..default_light()
     };
     scene.world.set_light(lamp, Some(light));

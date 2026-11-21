@@ -33,7 +33,8 @@ pub fn stage(sun_pitch: f32) -> Scene {
 pub fn stage_with(sun: Quat, tweak: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let light = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let light =
+        rusty::scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(light).unwrap().rotation = sun;
     let volume = create_entity(&mut scene, "Volume", None);
     let mut vc = default_post_processing();

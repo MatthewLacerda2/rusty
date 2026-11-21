@@ -90,7 +90,10 @@ it; the navmesh bakes on the parts marked `Scene.SetStatic(id, true)`, as it rea
 static colliders): the Box a `Box` 1 × 1 × 1, the Sphere a `Sphere` of
 radius 0.5, the Capsule *and the Cylinder* a `Capsule` of radius 0.5 and height 2
 along Y (Unity gives a cylinder a capsule too), and the Plane a `Mesh` collider
-(`convex = false`) on its own mesh. A light primitive gets none. For a draw-only
+(`convex = false`) on its own mesh. A light primitive gets none. A light primitive
+(or a `Light` added with `Scene.AddComponent`) is `Baked` in edit mode and
+`Realtime` and shadowed while the game plays, since no bake can take in a light
+made at runtime (`Light.md`, *Mode*). For a draw-only
 part, remove it: `Scene.RemoveComponent(id, "Collider")`. The editor's Create menu
 makes the same entity. Omit `primitive` (or pass an unknown name) to create a bare entity carrying
 only its mandatory `Transform` — the menu's **Create Empty**.

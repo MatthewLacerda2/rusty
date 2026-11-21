@@ -98,7 +98,8 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         }),
         R::Lightmap(i, l) => on(scene, pick(scene, i), |s, id| match l {
             0 => drop(s.lightmaps.remove(id)),
-            1 => drop(s.lightmaps.lights.insert(id)),
+            1 => s.lightmaps.took_in_baked(id),
+            // Its bounce forgotten, its direct light still held: any record draws.
             2 => drop(s.lightmaps.lights.remove(&id)),
             _ => s.lightmaps.insert(LightmapEntry {
                 entity: id,

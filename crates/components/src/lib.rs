@@ -6,6 +6,10 @@
 //! attached only when present; `Entity` (defined in `entity/mod.rs`) is the
 //! document shape one GameObject's columns assemble into/out of, not live
 //! storage. `Transform` is mandatory.
+//!
+//! stored-format: each component's serde shape and defaults, as scenes and prefabs store them
+//!
+//! A field's `#[serde(default)]` is what a scene or prefab omitting it reads as.
 
 // Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
 // or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.

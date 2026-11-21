@@ -9,7 +9,7 @@ use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::primitives::generate_sphere;
 use rusty_components::MeshComponent;
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
 const W: u32 = 64;
@@ -39,7 +39,7 @@ fn skinned_sphere(pose: Vec3) -> MeshComponent {
 fn scene(at: Option<Vec3>, pose: Vec3) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun = create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     if let Some(at) = at {
         let id = scene.add_entity("Soldier".to_string());

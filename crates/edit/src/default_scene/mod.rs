@@ -215,6 +215,9 @@ fn add_sun(scene: &mut Scene) {
     };
     authoring::rendering::light::set_color(&mut l, Vec3::new(1.0, 0.95, 0.85));
     authoring::rendering::light::set_intensity(&mut l, 1.2);
+    // Baked, as a level's lights are meant to be (#2522): the editor previews it
+    // live until the first Generate Lighting, and the console says to run it.
+    authoring::rendering::light::set_mode(&mut l, rusty_components::LightMode::Baked);
 }
 
 #[cfg(test)]

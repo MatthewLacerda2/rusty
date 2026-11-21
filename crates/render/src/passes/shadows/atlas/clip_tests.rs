@@ -11,7 +11,7 @@ use crate::gpu::pipelines::surface::cut_depth_tests::{dissolve, ground_halves, s
 use crate::gpu::pipelines::surface::mask_tests::Dissolve;
 use rusty_asset::MapRef;
 use rusty_components::RenderMode;
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Scene;
 
 /// [`slab_yard`] lit by a shadowing spotlight straight overhead instead of its sun.
@@ -21,7 +21,7 @@ fn under_a_spotlight(shader: Option<&str>) -> (Scene, u32) {
         scene.world.set_light(id, None);
     }
     scene.ambient_intensity = 0.0;
-    let lamp = create_entity(&mut scene, "Lamp", Some(Primitive::SpotLight));
+    let lamp = create_live_light(&mut scene, "Lamp", Primitive::SpotLight);
     let mut t = scene.world.transform_mut(lamp).unwrap();
     (t.position, t.rotation) = (Vec3::Y * 8.0, Quat::from_rotation_x(-90f32.to_radians()));
     drop(t);

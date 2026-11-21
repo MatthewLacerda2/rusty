@@ -32,7 +32,7 @@ fn clear(red: f32, refraction_model: RefractionModel) -> MaterialAsset {
 fn bottle(slots: [&str; 2]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene
         .materials
         .insert("glass".into(), clear(GLASS, RefractionModel::None));

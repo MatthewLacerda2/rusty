@@ -30,6 +30,7 @@ fn lit(scene: &mut Scene) -> Vec<u32> {
         scene.world.transform_mut(id).expect("fresh").position = Vec3::X * x;
         let light = rusty_scene::LightComponent {
             light_type: rusty_scene::LightType::Area,
+            mode: rusty_components::LightMode::Mixed,
             ..rusty_scene::create::default_light()
         };
         scene.world.set_light(id, Some(light));

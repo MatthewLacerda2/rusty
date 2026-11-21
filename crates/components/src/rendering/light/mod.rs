@@ -33,21 +33,22 @@ rusty_core::named_enum! {
     /// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
     ///   the probe bake sees it, so it bounces nowhere.
     /// * `Mixed` — realtime direct light and shadows, plus its bounce baked into
-    ///   lightmaps and light probes. The default, because it is what every light did
-    ///   before modes existed (rendered live, bounced into the probe bake). What else
-    ///   it bakes is the scene's `MixedLightingMode` (#1695): nothing under
+    ///   lightmaps and light probes. What else it bakes is the scene's `MixedLightingMode` (#1695): nothing under
     ///   `BakedIndirect` (Unity's *Baked Indirect*), its static occlusion under
     ///   `Shadowmask`, where a light that finds no free mask channel bakes as `Baked`
     ///   (`Scene::light_mode`).
     /// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
     ///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
     ///   bake adds its direct light). It costs nothing at runtime and casts no realtime
-    ///   shadow.
+    ///   shadow. The default (#2522; Unity's is `Realtime`): a level is lit by its
+    ///   bake, and a light that must move, flash or switch at runtime says
+    ///   `Realtime`. One no bake has taken in yet is previewed live in the editor
+    ///   (`Scene::drawn_mode`).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LightMode {
         Realtime = "Realtime",
-        #[default]
         Mixed = "Mixed",
+        #[default]
         Baked = "Baked",
     }
 }
@@ -91,7 +92,7 @@ pub struct LightComponent {
     /// spot light a mask channel (#1695), as in Unity.
     #[serde(default)]
     pub cast_shadows: bool,
-    /// Realtime / Mixed / Baked (#438); `Mixed` when the file names none.
+    /// Realtime / Mixed / Baked (#438); `Baked` when the file names none (#2522).
     #[serde(default)]
     pub mode: LightMode,
     /// An Area light's width (local X) and height (local Y) in world units,
@@ -135,7 +136,7 @@ mod tests {
 
     #[test]
     fn mode_bake_rules() {
-        assert_eq!(LightMode::default(), LightMode::Mixed);
+        assert_eq!(LightMode::default(), LightMode::Baked);
         assert!(!LightMode::Realtime.bakes_indirect() && !LightMode::Realtime.bakes_direct());
         assert!(LightMode::Mixed.bakes_indirect() && !LightMode::Mixed.bakes_direct());
         assert!(LightMode::Baked.bakes_indirect() && LightMode::Baked.bakes_direct());
@@ -159,11 +160,11 @@ mod tests {
     }
 
     #[test]
-    fn pre_mode_light_loads_as_mixed() {
+    fn a_light_naming_no_mode_loads_as_baked() {
         let json = r#"{"light_type":"Point","color":[1,1,1],"intensity":1,
             "range":5,"inner_cone":0,"outer_cone":0}"#;
         let l: LightComponent = serde_json::from_str(json).unwrap();
-        assert_eq!(l.mode, LightMode::Mixed);
+        assert_eq!(l.mode, LightMode::Baked);
         assert_eq!(l.area_size, Vec2::ONE, "Unity's default area size");
     }
 

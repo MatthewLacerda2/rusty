@@ -225,6 +225,7 @@ impl Renderer {
             draw_buffers,
             hiz,
             proxy_volumes: Default::default(),
+            unbaked: Default::default(),
             materials: crate::gpu::material_cache::MaterialCache::new(textures.zero_params),
             surface_shaders,
             instancing: true,

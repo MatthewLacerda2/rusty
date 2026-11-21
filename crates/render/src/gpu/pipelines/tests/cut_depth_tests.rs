@@ -35,7 +35,8 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, shader: Option<&str>) -
 pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.3);
     let ground = (Vec3::new(0.0, -0.5, 0.0), Vec3::new(40.0, 1.0, 40.0));
     block(&mut scene, ground.0, ground.1, None);

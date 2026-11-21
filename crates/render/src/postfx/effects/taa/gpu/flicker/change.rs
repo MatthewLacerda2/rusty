@@ -49,6 +49,7 @@ pub(super) fn lamp(s: &mut Scene, name: &str, intensity: Option<f32>) {
     });
     let light = intensity.map(|intensity| rusty_components::LightComponent {
         intensity,
+        mode: rusty_components::LightMode::Mixed,
         ..default_light()
     });
     s.world.set_light(id, light);

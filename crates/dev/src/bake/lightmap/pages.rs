@@ -35,9 +35,10 @@ pub struct EncodedPages {
     /// which a glossy surface's baked highlight showed as a sawtooth (#1996).
     pub directions: Vec<Spilled>,
     pub entries: Vec<LightmapEntry>,
-    /// The lights the bake took in (`LightmapSet::lights`, #1750), set by whoever
+    /// The lights the bake took in, each with the mode it baked as
+    /// (`LightmapSet::lights` and `baked_as`, #1750, #2522), set by whoever
     /// gathered its input (`taken_lights`); empty from [`encode_pages`].
-    pub lights: std::collections::BTreeSet<u32>,
+    pub lights: rusty_lighting::lightmap::TakenLights,
     /// Per shadowmask page (#1695): its RGBA8 PNG file. Empty unless the bake
     /// gave a light a channel.
     pub masks: Vec<Spilled>,

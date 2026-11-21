@@ -347,7 +347,7 @@ not (one at *Scale In Lightmap* 0 or with no UV2 still emits in it), so once a
 scene has a bake no such mesh's glow is gathered; a mesh that isn't static (a
 moving prop, an enemy's glowing parts) bounces its glow as ever. A light that moved since
 still reads as baked, as in Unity; a light spawned since (a script's muzzle flash,
-in the default `Mixed` mode) was never baked and bounces. So a lightmapped scene
+set `Realtime`, or a `Baked` one previewed before its bake) was never baked and bounces. So a lightmapped scene
 whose lights were all baked brightens by **at most 0.5%** of its light with SSIL on
 (the tests hold it for a `Baked` and a `Mixed` light; both measure 0), and so does a
 scene lit only by flat ambient. A scene with no lightmap bake has no record: its

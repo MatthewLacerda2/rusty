@@ -6,7 +6,7 @@ use glam::{Quat, Vec3};
 
 use super::OpCounts;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_entity, create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// What each still frame after the first makes, at the default settings (the GPU
@@ -71,7 +71,7 @@ const H: u32 = 48;
 fn still_scene() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun = create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let floor = create_entity(&mut scene, "Floor", Some(Primitive::Plane));
     scene.world.transform_mut(floor).unwrap().scale = Vec3::splat(4.0);

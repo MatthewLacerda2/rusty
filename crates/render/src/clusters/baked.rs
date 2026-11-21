@@ -158,7 +158,7 @@ impl BakedLamps {
 fn is_baked_lamp(scene: &Scene, id: u32) -> bool {
     scene.world.light(id).is_some_and(|l| {
         matches!(l.light_type, LightType::Point | LightType::Spotlight)
-            && !scene.light_mode(id, &l).renders_live(false)
+            && !crate::clusters::drawn_mode(scene, id, &l).renders_live(false)
     })
 }
 
@@ -179,7 +179,9 @@ fn baked_lamps(scene: &Scene) -> Vec<LocalLight> {
             let light = world.light(id)?;
             let at = world.world_position(id);
             let forward = world.transform_direction(id, Vec3::NEG_Z);
-            LocalLight::new(at, forward, &light)
+            // Every lamp listed is drawn `Baked` (`is_baked_lamp`).
+            let lamp = LocalLight::new(at, forward, &light)?;
+            Some(LocalLight { baked: 1.0, ..lamp })
         })
         .collect()
 }

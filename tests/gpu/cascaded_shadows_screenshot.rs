@@ -14,7 +14,8 @@ const FAR_OUT: Vec3 = Vec3::new(100.0, 0.0, -40.0);
 fn yard(shadow_distance: f32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty::scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.3);
     for (name, offset, scale) in [
         (

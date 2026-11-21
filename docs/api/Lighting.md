@@ -421,7 +421,7 @@ lighting settings (above), whose defaults are the ones listed here.
   Scale In Lightmap `0` (below) gets no lightmap and reads the light probes. Dynamic objects keep
   the light probes; bake those with `Lighting.Bake()` so both read the same lights.
 - **What it bakes.** A deterministic CPU path tracer: `samples` (default `64`, enough for OIDN, below) paths
-  per texel, `bounces` (default `3`) surfaces deep, seeded by `seed` (default `0`) — the
+  per texel, `bounces` (default `5`, where Unity starts at `2`, so a level lit only by its bake reaches rooms the sun never does) surfaces deep, seeded by `seed` (default `0`) — the
   same scene and seed always write byte-identical lightmaps, however many cores ran it
   (on any machine under the `"Filter"` denoiser; on one machine under OIDN).
   Each surface a path lands on aims one shadow ray at one source picked from the lamps

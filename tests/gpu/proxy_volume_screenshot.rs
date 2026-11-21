@@ -58,6 +58,9 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
+    // As a lightmap bake would record it: a Baked light no bake took in is
+    // previewed live (#2522), and a probe bake records no light.
+    scene.lightmaps.took_in_baked(lamp);
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.9, 2.2, -0.4);
     let locker = add(
         &mut scene,

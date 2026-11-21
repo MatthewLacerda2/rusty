@@ -20,7 +20,8 @@ const DEPTHS: [f32; 4] = [4.0, 8.0, 16.0, 32.0];
 fn props(settings: (f32, f32), fixed: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let floor = create_entity(&mut scene, "Floor", Some(Primitive::Plane));
     scene.world.transform_mut(floor).unwrap().position = Vec3::new(0.0, -1.0, -10.0);

@@ -95,7 +95,7 @@ fn gpu_a_rendered_frame_reports_its_passes_when_the_adapter_has_timestamps() {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 64, 64);
     let mut scene = rusty_scene::Scene::new();
     create_entity(&mut scene, "Box", Some(Primitive::Box));
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let camera = rusty_scene::Camera::new(glam::Vec3::new(0.0, 1.0, 5.0), -90.0, 0.0);
     let target = view.color_target_view().expect("offscreen view");
     renderer.render(&mut view, &scene, &camera, &target, false);

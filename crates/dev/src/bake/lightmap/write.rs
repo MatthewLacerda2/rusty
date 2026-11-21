@@ -44,10 +44,13 @@ pub fn apply_encoded(
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     if encoded.maps == 0 {
-        // No lightmap, but the probes still mask by these channels (#1695).
+        // No lightmap, but the probes still mask by these channels (#1695), and
+        // hold the direct light of the lights it baked as `Baked` (#2522): no page
+        // holds their bounce, so `lights` stays empty for SSIL.
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
         set.fell_back = encoded.shadowmask.fell_back.clone();
+        set.record_taken(&encoded.lights);
         warn_fell_back(&set);
         // The scene points away from the old pages before they go, as below.
         scene.lightmaps = set.into();
@@ -137,9 +140,10 @@ pub(super) fn write_set(
         set.masks.push(link(png, &path)?);
     }
     set.extend(encoded.entries.iter().cloned());
-    set.lights = encoded.lights.clone();
+    set.lights = encoded.lights.keys().copied().collect();
     set.channels = encoded.shadowmask.channels.clone();
     set.fell_back = encoded.shadowmask.fell_back.clone();
+    set.record_taken(&encoded.lights);
     Ok(set)
 }
 

@@ -59,7 +59,9 @@ pub(crate) struct LocalLight {
 
 impl LocalLight {
     /// The light's record at world `position`, shining along world `forward`, or
-    /// `None` for a type that is not a local light.
+    /// `None` for a type that is not a local light. Its `baked` flag starts at 0:
+    /// the caller sets it from the mode the frame draws the light as
+    /// (`clusters::drawn_mode`), which this record cannot know.
     ///
     /// An Area light (#1674) only ever gets here in a bake capture, being always
     /// `Baked`: it is drawn as its far field, a spot at its centre of intensity
@@ -92,7 +94,7 @@ impl LocalLight {
             inner_cone: f32::to_radians(cones.0).cos(),
             outer_cone: f32::to_radians(cones.1).cos(),
             shadow: NO_SHADOW,
-            baked: f32::from(u8::from(light.effective_mode().bakes_direct())),
+            baked: 0.0,
             shadow_fade: Some(light.shadow_fade_distance)
                 .filter(|d| d.is_finite() && *d > 0.0)
                 .unwrap_or(0.0),
@@ -160,7 +162,7 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
         .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
-            let mode = scene.light_mode(id, &light);
+            let mode = crate::clusters::drawn_mode(scene, id, &light);
             if !mode.renders_live(capture) {
                 return None;
             }

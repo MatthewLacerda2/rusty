@@ -15,7 +15,8 @@ use rusty_scene::{Camera, Scene};
 fn group(cull: [f32; 2]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let at = Vec3::new(0.0, 0.0, -10.0);
     let lods = cull.map(|distance| {
