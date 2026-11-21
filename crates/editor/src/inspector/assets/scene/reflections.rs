@@ -67,16 +67,19 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
     for i in 0..scene.reflection_probes.len() {
         let mut probe = scene.reflection_probes.probes[i].clone();
         let title = format!("Probe {i}");
-        let edited = egui::CollapsingHeader::new(title)
+        let card = egui::CollapsingHeader::new(title)
             .id_salt(("reflection_probe", i))
             .show(ui, |ui| {
                 if ui.button(format!("{}  Remove", icon::TRASH)).clicked() {
                     remove = Some(i);
                 }
                 draw_probe(ui, i, &mut probe, default)
-            })
-            .body_returned
-            .unwrap_or(false);
+            });
+        // An open card is the probe's selection: the Scene view draws its volume.
+        if card.body_returned.is_some() && scene.inspected_reflection_probe.is_none() {
+            scene.inspected_reflection_probe = Some(i);
+        }
+        let edited = card.body_returned.unwrap_or(false);
         if edited {
             // A hand edit makes it manual (#1737), unless the edit was unticking it.
             let was = &scene.reflection_probes.probes[i];
@@ -253,3 +256,7 @@ fn resolution_menu(
         });
     changed
 }
+
+#[cfg(test)]
+#[path = "reflections_tests.rs"]
+mod tests;

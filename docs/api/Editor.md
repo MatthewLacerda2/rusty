@@ -1,7 +1,10 @@
 ## `Editor` — **dev builds only**
 
 Mirrors Unity's `EditorApplication.isPlaying` (#1360): enter and leave Play from a
-script, the console or an agent, so a play-test needs no one to press Play. And
+script, the console or an agent, so a play-test needs no one to press Play (by
+hand: the header's Play button, or **Ctrl+P** (Cmd+P on macOS), which enters and
+leaves Play from wherever the keyboard is, a text field or the Game view holding
+the cursor included, as Unity's does). And
 Unity's `Undo` (#1631): step the edit-mode history back and forth. Registered
 only under the `dev` Cargo feature, like [`Debug`](Debug.md); a shipped game (the
 `player` build) has no `Editor` namespace. A **standalone** run in a dev build (a
@@ -43,7 +46,7 @@ flag, `docs/testing.md`).
 |---|---|---|---|
 | `"UI"` | **UI** | the screen-space canvases over the scene, and the rect tool on them ([`ui.md`](../ui.md)) | on |
 | `"LightProbes"` | **Light Probes** | a cross at each light probe, tinted by the light it baked | on |
-| `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point and parallax volume (its turned box or its sphere) | on |
+| `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point (a mirror ball), and the parallax volume (its turned box or its sphere) of the one whose card is open in the scene inspector's **Reflection Probes** section: a probe is no GameObject, so its open card is its selection, and Unity draws a probe's bounds on selection | on |
 | `"Colliders"` | **Colliders** | every collider's real shape (box, sphere, capsule, cylinder, hull and mesh edges) in Unity's green, triggers paler; the **selected** object's colliders draw with it off too, as Unity's do (#1882) | off |
 | `"NavMesh"` | **NavMesh** | the baked navmesh as translucent cyan over the floor: one quad per walkable span, on its floor plane (ramps tilt), holes where the agent radius erodes it; kept on the GPU in 32-cell tiles: a rebake (a dragged crate, a moving carving obstacle) re-uploads only the tiles it changed, and a full bake, an area-cost edit or a restored navmesh rebuilds it whole (#1910). Scene view only, as Unity's | off |
 | `"GameGizmos"` | **Gizmos**, on the **Game** tab's strip | Unity's Game-view Gizmos: every collider and the `Debug.Draw*` lines over the game frame, through the main (base) camera of its stack (#1882) | off |
@@ -53,8 +56,10 @@ flag, `docs/testing.md`).
   does per user; a new editor starts from the defaults above.
 - A set takes effect at the next frame, as the toggle's click does, and
   `Editor.GetGizmo` reads it back at once.
-- Area lights are not probes: their gizmo always draws, and so do the
-  `Debug.DrawLine` / `Debug.DrawRay` lines ([`Debug.md`](Debug.md)).
+- The **selected** Area light draws its rectangle and an arrow out of its lit
+  face, whatever the toggles, as Unity shows a light's shape on selection; an
+  unselected one draws nothing. The `Debug.DrawLine` / `Debug.DrawRay` lines
+  ([`Debug.md`](Debug.md)) always draw.
 - `"GameGizmos"` is the Game view's own **Gizmos** toggle, as Unity's is: it draws
   what `Harness.Screenshot(path, { gizmos = true })` draws, and
   `make editor-capture ARGS="--game --gizmo GameGizmos=on"` captures it. Not while

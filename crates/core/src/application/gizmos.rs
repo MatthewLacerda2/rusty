@@ -77,7 +77,7 @@ gizmos! {
     ReflectionProbes => GizmoRow {
         name: "ReflectionProbes",
         label: "Reflection Probes",
-        hover: "Draw each reflection probe's capture point and parallax box",
+        hover: "Draw each reflection probe's capture point, and the volume of the one open in the inspector",
         on: true,
         shown: true,
         game: false,
