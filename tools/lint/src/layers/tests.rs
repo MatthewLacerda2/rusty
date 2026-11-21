@@ -173,6 +173,7 @@ fn sim_set_is_pinned() {
         "shadergen",
         "time",
         "ui",
+        "zimmer",
     ];
     assert_eq!(dirs, want.map(|m| format!("src/{m}")));
 }

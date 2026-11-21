@@ -126,6 +126,8 @@ pub const LAYERS: &[Layer] = &[
         "ai",
         &["components", "core", "navigation", "physics", "scene"],
     ),
+    // The synthesiser behind `Sound.*`: a recipe to samples and a WAV, with no I/O.
+    sim("zimmer", &["core"]),
     // The Lua side: `scripting` (the VM, lifecycle, timers, console) and `api` (the
     // one surface) name each other, so they are one module, two halves of one crate.
     sim(
@@ -146,9 +148,10 @@ pub const LAYERS: &[Layer] = &[
             "shadergen",
             "time",
             "ui",
+            "zimmer",
         ],
     )
-    .uses(&["mlua", "zimmer"]),
+    .uses(&["mlua"]),
     sim(
         "app",
         &[

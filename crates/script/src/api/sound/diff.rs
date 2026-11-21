@@ -13,7 +13,7 @@
 //! zero, zero says the two matched.
 
 use mlua::{Lua, Table};
-use zimmer::level::Difference;
+use rusty_zimmer::level::Difference;
 
 use super::level::{band_table, measure_file};
 

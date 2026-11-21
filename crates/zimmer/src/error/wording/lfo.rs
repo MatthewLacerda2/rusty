@@ -1,0 +1,36 @@
+//! What an LFO's speed and onset are refused with.
+
+use std::fmt;
+
+use crate::error::SynthError;
+
+impl SynthError {
+    pub(super) fn say_lfo(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NegativeLfoRate { rate, .. } => {
+                write!(f, "patch: lfo `rate` must not be negative, got {rate}")
+            }
+            Self::LfoTwoRates { rate, beats } => write!(
+                f,
+                "patch: lfo writes both `rate` ({rate} Hz) and `beats` ({beats}) — keep one: `rate` for a speed in Hz, `beats` for one cycle per that many beats of the song"
+            ),
+            Self::LfoNoRate => write!(
+                f,
+                "patch: lfo has no speed — write a positive `rate` in Hz, or `beats` for one cycle per that many beats of the song"
+            ),
+            Self::BadLfoBeats { beats } => write!(
+                f,
+                "patch: lfo `beats` must be a positive number of beats, got {beats}"
+            ),
+            Self::LfoBeatsWithoutTempo { beats } => write!(
+                f,
+                "patch: lfo is timed in `beats` ({beats}), and a patch played on its own has no tempo to count them by — write `rate` in Hz, or play it in a song"
+            ),
+            Self::BadLfoOnset { field, seconds } => write!(
+                f,
+                "patch: lfo `{field}` must be zero or more seconds, got {seconds}"
+            ),
+            _ => unreachable!("`say_lfo` is handed only the refusals it words"),
+        }
+    }
+}

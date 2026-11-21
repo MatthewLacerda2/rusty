@@ -93,8 +93,8 @@ fn zimmers_patch_enums_read_in_any_case_from_lua() {
     };
     let canonical = patch("osc_stack", "saw", "lowpass", "reverb");
     let shouted = patch("OSC_STACK", "Saw", "LowPass", "REVERB");
-    let a: zimmer::Patch = recipe_from_lua(&eval(&lua, &canonical)).unwrap();
-    let b: zimmer::Patch = recipe_from_lua(&eval(&lua, &shouted)).unwrap();
+    let a: rusty_zimmer::Patch = recipe_from_lua(&eval(&lua, &canonical)).unwrap();
+    let b: rusty_zimmer::Patch = recipe_from_lua(&eval(&lua, &shouted)).unwrap();
     assert_eq!(
         serde_json::to_value(a).unwrap(),
         serde_json::to_value(b).unwrap()

@@ -1,0 +1,68 @@
+//! What a note and a song do with the LFO's onset, second slot and beats. `lfo` has the document;
+//! `core::lfo` pins the curves.
+
+use crate::common::songs::song;
+use crate::common::{opts, render, saw_patch};
+use rusty_zimmer::patch::{Lfo, LfoShape, LfoTarget};
+use rusty_zimmer::song::{InlineOnly, PatchRef};
+use rusty_zimmer::{render_song, Patch};
+
+fn vibrato() -> Lfo {
+    Lfo::new(5.0, 0.5, LfoTarget::Pitch)
+}
+
+fn with(lfo: Lfo) -> Patch {
+    Patch {
+        lfo: Some(lfo),
+        ..saw_patch()
+    }
+}
+
+fn on_the_beat() -> Lfo {
+    Lfo {
+        beats: Some(0.5),
+        ..Lfo::new(0.0, 0.8, LfoTarget::Amp)
+    }
+}
+
+#[test]
+fn a_delayed_vibrato_leaves_the_start_of_the_note_alone() {
+    let late = with(Lfo {
+        delay: 0.2,
+        fade: 0.3,
+        depth: 1.0,
+        ..vibrato()
+    });
+    let plain = render(&saw_patch(), 60.0, &opts(0.8));
+    let moved = render(&late, 60.0, &opts(0.8));
+    let start = (0.2 * 44_100.0) as usize;
+    assert_eq!(moved[..start], plain[..start]);
+    assert_ne!(moved[start + 10_000..], plain[start + 10_000..]);
+}
+
+#[test]
+fn the_second_slot_moves_the_note_as_the_first_does() {
+    let first = render(&with(vibrato()), 60.0, &opts(0.4));
+    let second = Patch {
+        lfo2: Some(vibrato()),
+        ..saw_patch()
+    };
+    assert_eq!(render(&second, 60.0, &opts(0.4)), first);
+}
+
+#[test]
+fn a_song_plays_an_lfo_timed_in_beats() {
+    let play = |lfo: Option<Lfo>| {
+        let mut song = song();
+        let patch = Patch { lfo, ..saw_patch() };
+        song.tracks[0].patch = PatchRef::Inline(Box::new(patch));
+        render_song(&song, &InlineOnly).expect("the song renders")
+    };
+    let square = Lfo {
+        shape: LfoShape::Square,
+        ..on_the_beat()
+    };
+    let once = play(Some(square));
+    assert_eq!(once, play(Some(square)));
+    assert_ne!(once, play(None), "the wobble moved nothing");
+}

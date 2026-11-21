@@ -14,7 +14,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-# The Rust ecosystem's standard dual licence, the same one scorsese carries
+# The Rust ecosystem's standard dual licence
 # (`LICENSE-MIT`, `LICENSE-APACHE`). Every member inherits it with
 # `license.workspace = true`, and `make deny` fails one that does not: the license
 # gate reads our own crates too (`deny.toml`, `[licenses]`).
@@ -177,6 +177,7 @@ rusty-physics = { path = "crates/physics" }
 rusty-navigation = { path = "crates/navigation" }
 rusty-ai = { path = "crates/ai" }
 rusty-render = { path = "crates/render" }
+rusty-zimmer = { path = "crates/zimmer" }
 rusty-script = { path = "crates/script" }
 rusty-logging = { path = "crates/logging" }
 rusty-preview = { path = "crates/preview" }
@@ -265,12 +266,6 @@ arboard = { version = "3.6.1", default-features = false }
 kira = { version = "0.12.5", default-features = false, features = ["cpal"] }
 # Clip decoding (#212, #545): `.ogg` Vorbis, `.wav` and `.mp3`. The version kira uses.
 symphonia = { version = "0.6", default-features = false, features = ["mp3", "ogg", "vorbis", "wav", "pcm"] }
-# The synthesiser behind `Sound.*` (#413): scorsese's zimmer crate, pinned to a
-# commit — never a branch — because `zimmer::SYNTH_VERSION` moves whenever a recipe
-# would render differently, and rusty's bakes should change only when someone moves
-# this pin on purpose. No I/O inside it: rusty writes the files and resolves patch
-# references. Bump the rev in its own PR and record the new SYNTH_VERSION there.
-zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
 # Open Image Denoise, opened at run time (#1884, `crates/dev/src/bake/denoise/`): the
 # lightmap bake's trained denoiser is a native library a machine may lack, so it is
 # `dlopen`ed, never linked, and a bake without it filters. Already in the tree
@@ -325,6 +320,7 @@ rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
 rusty-font = { workspace = true }
 rusty-time = { workspace = true }
+rusty-zimmer = { workspace = true }
 
 [build-dependencies]
 xxhash-rust = { workspace = true }
@@ -361,6 +357,13 @@ serde_json = { workspace = true }
 debug = "line-tables-only"
 
 [profile.dev.package."*"]
+opt-level = 2
+debug = false
+
+# The one member optimised as a dependency is: zimmer's DSP inner loops run hot in
+# every bake, the harness and the sound tests, and the crate is edited rarely, so its
+# slower rebuild is seldom paid. `crates/CLAUDE.md`, *Profiles*.
+[profile.dev.package.rusty-zimmer]
 opt-level = 2
 debug = false
 

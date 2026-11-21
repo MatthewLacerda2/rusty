@@ -29,7 +29,7 @@
 use mlua::{Table, Value};
 
 use crate::api::lua_json::recipe_from_lua;
-use zimmer::{parse_note, Glide, NoteOpts, Patch, Song};
+use rusty_zimmer::{parse_note, Glide, NoteOpts, Patch, Song};
 
 /// Parse a patch argument — a Lua table or its JSON string — into a [`Patch`].
 pub fn patch_from_lua(value: &Value) -> Result<Patch, String> {
@@ -130,7 +130,7 @@ mod tests {
     use mlua::Lua;
 
     use super::*;
-    use zimmer::patch::{FilterKind, Source};
+    use rusty_zimmer::patch::{FilterKind, Source};
 
     fn eval_table(lua: &Lua, src: &str) -> Table {
         lua.load(src).eval().expect("the table evaluates")

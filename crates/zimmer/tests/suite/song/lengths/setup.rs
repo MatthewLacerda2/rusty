@@ -1,0 +1,25 @@
+//! Shared setup for the length-and-level tests.
+
+use rusty_zimmer::song::{Fit, FitMode, InlineOnly};
+use rusty_zimmer::{render_song, Song, SAMPLE_RATE};
+
+use crate::common::channel;
+use crate::common::songs::song;
+
+pub(crate) fn render(song: &Song) -> Vec<f32> {
+    channel(
+        &render_song(song, &InlineOnly).expect("the song renders"),
+        0,
+    )
+}
+
+pub(crate) fn samples(seconds: f32) -> usize {
+    (seconds * SAMPLE_RATE as f32).round() as usize
+}
+
+pub(crate) fn fitted(seconds: f32, mode: FitMode) -> Song {
+    Song {
+        fit: Some(Fit::lasting(seconds, mode)),
+        ..song()
+    }
+}

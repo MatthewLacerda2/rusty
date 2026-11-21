@@ -39,7 +39,8 @@ not authoring tooling that calls an external service.
 - **auxmd.md** *(gitignored)* — the operator's scratchpad; read it if pointed there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files
   there: `.github/scripts/CLAUDE.md` (merge and batch tooling), `tools/lint/CLAUDE.md`,
-  `crates/render/src/CLAUDE.md` (with `engine/shaders/`) and `crates/procgen/src/CLAUDE.md`.
+  `crates/render/src/CLAUDE.md` (with `engine/shaders/`), `crates/procgen/src/CLAUDE.md`
+  and `crates/zimmer/CLAUDE.md` (the synthesiser).
 
 **Three skills carry the working protocols**: `issue-batch` (issues from board to
 merged: coders, worktrees, briefs, filing a bug), `ci-merge` (the gates, CI, the merge
@@ -215,9 +216,8 @@ scene saves only per-bone overrides and what hangs from a bone.
    and the dev-only `Debug` and `Editor`) shared by gameplay scripts, the console REPL,
    and bot-players. One surface, three callers — they never drift apart.
 
-Outside the five: **zimmer**, `Sound.*`'s synthesiser, a git dependency on
-[scorsese](https://github.com/MatthewLacerda2/scorsese) by `rev`; `crates/script/src/api/sound/`
-adapts it.
+Outside the five: **zimmer** (`crates/zimmer/`), `Sound.*`'s synthesiser, a crate of the
+workspace that does no I/O; `crates/script/src/api/sound/` adapts it.
 
 ## Conventions that matter
 - **Backward compatibility is not a concern; everything is version 1.** rusty's one user

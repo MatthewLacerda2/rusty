@@ -7,7 +7,7 @@
 //! sounds that are all `noise` under a lowpass between 700 and 900 Hz. It reads the
 //! documents only: no bake, no decode, no samples.
 //!
-//! Songs are zimmer's survey (`zimmer::survey`): per track the source, gain,
+//! Songs are zimmer's survey (`rusty_zimmer::survey`): per track the source, gain,
 //! cutoff, sustain, note count, median pitch and duty, and the "loudest" track by
 //! gain × duty, never by gain alone. One-shot **patches** are rusty's own rows:
 //! zimmer leaves them out on purpose (an effect has no arrangement to be loudest
@@ -23,17 +23,17 @@ mod lua;
 
 use std::collections::BTreeMap;
 
+use rusty_zimmer::survey::{Register, SongSurvey, Survey};
+use rusty_zimmer::{Patch, Song};
 use serde::de::DeserializeOwned;
 use serde_json::Value as Json;
-use zimmer::survey::{Register, SongSurvey, Survey};
-use zimmer::{Patch, Song};
 
 use crate::api::lua_json::decode;
 
 pub use lua::survey;
 
 /// One one-shot patch, as its document states it — the patch half of a
-/// [`zimmer::survey::TrackSurvey`]: what the instrument **is**.
+/// [`rusty_zimmer::survey::TrackSurvey`]: what the instrument **is**.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchSurvey {
     /// The path it was read from, or `#n` for the n-th inline document.
@@ -103,7 +103,7 @@ impl SetSurvey {
     /// else a patch; a song's named patches resolve with `resolve`.
     pub fn of(
         documents: impl IntoIterator<Item = Document>,
-        resolve: &dyn zimmer::PatchResolver,
+        resolve: &dyn rusty_zimmer::PatchResolver,
     ) -> Self {
         let mut set = Self::default();
         for (name, json, origin) in documents {
@@ -120,7 +120,7 @@ impl SetSurvey {
         name: &str,
         json: Json,
         origin: Origin,
-        resolve: &dyn zimmer::PatchResolver,
+        resolve: &dyn rusty_zimmer::PatchResolver,
     ) -> Result<(), String> {
         if json.get("tracks").is_some() {
             let song: Song = origin

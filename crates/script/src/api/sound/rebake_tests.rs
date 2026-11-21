@@ -23,7 +23,7 @@ fn the_clip_cache_follows_bakes_at_one_path() {
         },
         |p| cache.get_or_decode(p).map(|clip| clip.frames()),
         |frames, which| {
-            let want = seconds(which) * zimmer::SAMPLE_RATE as f32;
+            let want = seconds(which) * rusty_zimmer::SAMPLE_RATE as f32;
             frames.is_some_and(|n| (n as f32 - want).abs() < want * 0.5)
         },
     );
