@@ -15,6 +15,8 @@ fn flags_a_pass_that_reads_the_scenes_light_mode() {
     assert_eq!(found("crates/render/src/passes/shadows/frame.rs", src), [2]);
     let f = check("crates/render/src/passes/a.rs", src, &[]);
     assert!(f[0].message.contains("drawn_mode"), "says what to read");
+    let own = "    baked: light.effective_mode().bakes_direct(),\n";
+    assert_eq!(found("crates/render/src/clusters/lights.rs", own), [1]);
 }
 
 #[test]
@@ -25,7 +27,7 @@ fn passes_the_entry_point_the_bake_crates_and_other_names() {
     assert!(found("crates/lighting/src/lightmap/lights/mod.rs", src).is_empty());
     let drawn = "    let m = crate::clusters::drawn_mode(scene, id, &l);\n";
     assert!(found("crates/render/src/draw/lighting.rs", drawn).is_empty());
-    let longer = "    scene.baked_light_mode(id)\n";
+    let longer = "    scene.baked_light_mode(id) + l.light_effective_mode()\n";
     assert!(found("crates/render/src/draw/lighting.rs", longer).is_empty());
     assert!(found("crates/render/src/a.rs", "// scene.light_mode(id, l)\n").is_empty());
     let test = "#[cfg(test)]\nmod tests {\n    fn t() { scene.light_mode(id, l); }\n}\n";

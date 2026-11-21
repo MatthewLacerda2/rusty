@@ -19,7 +19,7 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.GetColor` | `(id)` | `r, g, b` (linear) |
 | `Light.SetColor` | `(id, r, g, b)` | — (each channel floored at 0, HDR above 1 allowed; a NaN or infinite channel makes it black) |
 | `Light.GetIntensity` / `SetIntensity` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
-| `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
+| `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0); a shadow fade still at four times the old range, a runtime light's default, moves to four times the new one |
 | `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
 | `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`, `true` for a light created during Play, *Mode*; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
 | `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade, or four times the range for a light created during Play; clamped ≥ 0; NaN or `math.huge` reads as 0) |
@@ -127,7 +127,8 @@ shadowed. **Shadow fade distance** (`SetShadowFadeDistance`, HDRP's *Shadow Fade
 Distance*, #1712) stops a far light's shadow from being sampled: over the last tenth
 of that distance between the camera and the light the shadow fades out, and past it
 the light shades unshadowed. `0`, the default, never fades; a light created
-during Play starts at four times its range. The light keeps its
+during Play starts at four times its range, and `SetRange` keeps it there while it
+is still that default (a fade the script set stays). The light keeps its
 atlas tiles either way.
 
 ### Cast Shadows
@@ -226,7 +227,14 @@ whether it is drawn live:
   a scene with no lightmapped mesh whose probes alone hold the light; a `Mixed`
   light a `Shadowmask` bake found no channel for was baked direct, and is not
   previewed. `Probe.Bake()` alone records no light, so a lamp only it holds is
-  still previewed; Generate Lighting ends it.
+  still previewed, **over** its probe bake: the probes hold its direct light and
+  the preview draws it live too, so a probe-lit (dynamic) object under it reads
+  about twice as bright until Generate Lighting ends it (the console's line says
+  so when the scene has probes). The line's advice follows the case: a scene
+  never baked is told to run Generate Lighting; a baked scene whose record lacks
+  the light (added since, or inactive or at intensity 0 when it baked) to bake
+  again with it active and lit; a light spawned during Play (a prefab's) is in no
+  bake, so it should say `Realtime`.
   An Area light (always `Baked`) is never previewed: a panel has no live path.
 
   **Its highlight** (#1695 step 1). A lightmap holds a `Baked` light's diffuse light only, so

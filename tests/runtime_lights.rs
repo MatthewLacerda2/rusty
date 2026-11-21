@@ -61,3 +61,40 @@ fn a_light_created_in_edit_mode_is_baked() {
         assert!(!light.cast_shadows && light.shadow_fade_distance == 0.0);
     }
 }
+
+/// A runtime light's fade follows its range while it is still the runtime
+/// default; a fade the script set stays where the script put it.
+#[test]
+fn a_runtime_lights_fade_follows_its_range_until_a_script_sets_it() {
+    let scene = Rc::new(RefCell::new(Scene::new()));
+    let gun = scene.borrow_mut().add_entity("Gun".to_string());
+    let source = r#"
+        local step, flash = 0, nil
+        return { Update = function()
+            step = step + 1
+            if step == 1 then
+                flash = Scene.CreateEntity("Flash", "PointLight")
+                Light.SetRange(flash, 2)
+            elseif step == 2 then
+                Light.SetShadowFadeDistance(flash, 30)
+                Light.SetRange(flash, 5)
+            end
+        end }
+    "#;
+    attach_script(&mut scene.borrow_mut(), gun, "flash.lua", source);
+    let mut game = playing(scene.clone(), 1.0);
+    let fade = |s: &Rc<RefCell<Scene>>| {
+        let s = s.borrow();
+        let id = s.world.find_by_name("Flash").expect("the script made it");
+        let light = s.world.light(id).expect("a light").clone();
+        (light.range, light.shadow_fade_distance)
+    };
+    run(&mut game, 1);
+    assert_eq!(
+        fade(&scene),
+        (2.0, 8.0),
+        "four times the range it was set to"
+    );
+    run(&mut game, 1);
+    assert_eq!(fade(&scene), (5.0, 30.0), "the script's fade stays");
+}

@@ -11,7 +11,7 @@
 //! [`drawn_mode`] is the renderer's one reading of a light's mode: no other
 //! renderer line calls `Scene::light_mode` (`tools/lint`'s `drawn-mode` rule).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use rusty_components::{LightComponent, LightMode};
 use rusty_ecs::{Activity, Changes, Cursor};
@@ -30,18 +30,36 @@ pub(crate) fn drawn_mode(scene: &Scene, id: u32, light: &LightComponent) -> Ligh
 /// How many waiting lights the note names before it says "and N more".
 const NAMED: usize = 3;
 
+/// What of the bake's record decides which lights wait: the mode each light was
+/// baked as, and the `Mixed` lights the shadowmask fell back on
+/// (`Scene::awaits_bake`).
+type Record = (BTreeMap<u32, LightMode>, BTreeSet<u32>);
+
+fn record(scene: &Scene) -> Record {
+    (
+        scene.lightmaps.baked_as.clone(),
+        scene.lightmaps.fell_back.clone(),
+    )
+}
+
+fn same_record(scene: &Scene, kept: &Record) -> bool {
+    scene.lightmaps.baked_as == kept.0 && scene.lightmaps.fell_back == kept.1
+}
+
 /// What the note was last brought up to date with: the scene, its bake's
-/// record, and the change cursors of its lights and their activity.
+/// record (and the revision it was last compared at), and the change cursors of
+/// its lights and their activity.
 struct Seen {
     scene: SceneId,
     lightmaps: Revision,
+    record: Record,
     light: Cursor<LightComponent>,
     activity: Cursor<Activity>,
 }
 
 /// The lights the console has named as waiting for a bake, so each is named once
 /// per scene, and what they were read from. Kept, not walked: the lights are read
-/// again only when a light or an activity changed, or the bake's record did.
+/// again only when a light that may now wait changed, or the bake's record did.
 #[derive(Default)]
 pub(crate) struct UnbakedNote {
     seen: Option<Seen>,
@@ -52,7 +70,8 @@ impl UnbakedNote {
     /// The console line for `scene`'s waiting lights, when one of them has not
     /// been named yet (`preview`: whether they are drawn live meanwhile). A light
     /// is named once per scene, whatever its activity or intensity does after; a
-    /// bake (a new record) or another scene names afresh what still waits.
+    /// bake that changes the record or another scene names afresh what still
+    /// waits.
     pub(crate) fn note(&mut self, scene: &Scene, preview: bool) -> Option<String> {
         if !self.changed(scene) {
             return None;
@@ -64,32 +83,41 @@ impl UnbakedNote {
     }
 
     /// Whether a light may have started waiting since the last read: another
-    /// scene or bake record (which forgets the names), a light's change, or an
-    /// activity change (a parent's reaches its children).
+    /// scene or bake record (which forgets the names), or a light or activity
+    /// change on an unnamed light that now waits. An activity change stamps the
+    /// whole subtree it reaches (`ecs::changes`), so a parent's reaches its
+    /// lights' own ids. The lightmaps' revision moves at every `&mut` access (a
+    /// despawn's `remove`, an Undo's restore), so it only says when to compare
+    /// the record again.
     fn changed(&mut self, scene: &Scene) -> bool {
         let world = &scene.world;
-        let (id, lightmaps) = (scene.id(), scene.lightmaps.revision());
-        let Some(seen) = (self.seen.as_mut()).filter(|s| s.scene == id && s.lightmaps == lightmaps)
-        else {
+        let (id, revision) = (scene.id(), scene.lightmaps.revision());
+        let kept = (self.seen.as_mut())
+            .filter(|s| s.scene == id)
+            .filter(|s| s.lightmaps == revision || same_record(scene, &s.record));
+        let Some(seen) = kept else {
             self.seen = Some(Seen {
                 scene: id,
-                lightmaps,
+                lightmaps: revision,
+                record: record(scene),
                 light: world.change_cursor(),
                 activity: world.change_cursor(),
             });
             self.named.clear();
             return true;
         };
+        seen.lightmaps = revision;
         let named = &self.named;
-        let light = match world.changes(&mut seen.light) {
+        // A set lookup per changed id: a live light flickering every frame, or a
+        // waiting one that is off or dark, walks nothing.
+        let fresh = |changes: Changes| match changes {
             Changes::Rebuild => true,
-            // A set lookup per changed id: a live light flickering every frame
-            // is no waiting one, and walks nothing.
-            Changes::Ids(ids) => ids.iter().any(|&id| {
-                !named.contains(&id) && world.light(id).is_some_and(|l| scene.awaits_bake(id, &l))
-            }),
+            Changes::Ids(ids) => {
+                (ids.iter()).any(|&id| !named.contains(&id) && scene.waits_for_bake(id))
+            }
         };
-        let active = !world.changes(&mut seen.activity).is_empty();
+        let light = fresh(world.changes(&mut seen.light));
+        let active = fresh(world.changes(&mut seen.activity));
         light | active
     }
 }
@@ -118,27 +146,53 @@ fn message(scene: &Scene, waiting: &[u32], preview: bool) -> String {
         names.push(format!("{} more", waiting.len() - NAMED));
     }
     let (count, names) = (waiting.len(), names.join(", "));
-    let lights = if count == 1 {
-        "light waits"
-    } else {
-        "lights wait"
-    };
-    match preview {
-        true => format!(
-            "{count} Baked {lights} for a bake ({names}), drawn live as a preview \
-             until then: run Generate Lighting (Lighting.Generate()), or set a light \
-             that must move, flash or switch at runtime to Realtime"
-        ),
+    let one = count == 1;
+    let lights = if one { "light waits" } else { "lights wait" };
+    let (it, they) = if one { ("it", "it") } else { ("them", "they") };
+    let head = format!("{count} Baked {lights} for a bake ({names})");
+    if !preview {
         // The player has no bake verb: it can only say what the build shipped.
-        false => format!(
-            "{count} Baked {lights} for a bake ({names}): the scene shipped without \
-             a bake that covers {them}, so {they} light nothing",
-            them = if count == 1 { "it" } else { "them" },
-            they = if count == 1 { "it" } else { "they" },
-        ),
+        return format!(
+            "{head}: the scene shipped without a bake that covers {it}, so {they} \
+             light nothing; a light that only exists at runtime (a prefab spawned \
+             during play) says Realtime"
+        );
     }
+    // A probe bake holds a lamp's direct light without recording it, so a light
+    // the lightmap bake has no record of may already be in the probes.
+    let unrecorded = waiting
+        .iter()
+        .any(|id| !scene.lightmaps.baked_as.contains_key(id));
+    let probes = match !scene.probes.is_empty() && unrecorded {
+        true => {
+            " over its probe bake (probe-lit objects can read brighter, the probes \
+                  may hold its light already)"
+        }
+        false => "",
+    };
+    let advice = if scene.is_playing() {
+        format!(
+            "a light spawned during Play is in no bake: make it Realtime (a \
+             prefab's light says so in its file), or bake the scene with {it} in it"
+        )
+    } else if scene.lightmaps.holds_bake() {
+        format!(
+            "run Generate Lighting (Lighting.Generate()) with {it} active and above \
+             intensity 0, or set a light that must move, flash or switch at runtime \
+             to Realtime"
+        )
+    } else {
+        "run Generate Lighting (Lighting.Generate()), or set a light that must move, \
+         flash or switch at runtime to Realtime"
+            .to_string()
+    };
+    format!("{head}, drawn live as a preview{probes} until then: {advice}")
 }
 
 #[cfg(test)]
 #[path = "unbaked_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "unbaked_kept_tests.rs"]
+mod kept_tests;

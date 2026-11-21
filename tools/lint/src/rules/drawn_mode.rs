@@ -2,11 +2,16 @@
 //! (#2522), `render::clusters::unbaked::drawn_mode`.
 //!
 //! A `Baked` light no bake holds is previewed live in the editor and dev builds
-//! and drawn from its bake in a shipped player; `Scene::light_mode` knows neither.
-//! A pass that reads `light_mode(` draws such a light dark where every other pass
-//! draws it lit, so outside the entry point no renderer line calls it. Test code
-//! is not scanned (a test may check what the scene says), nor the bake crates,
-//! which bake from a light's own mode.
+//! and drawn from its bake in a shipped player; `Scene::light_mode` and
+//! `LightComponent::effective_mode` know neither. A pass that reads either draws
+//! such a light dark where every other pass draws it lit, so outside the entry
+//! point no renderer line calls `light_mode(` or `effective_mode(`. Test code is
+//! not scanned (a test may check what the scene says), nor the bake crates, which
+//! bake from a light's own mode.
+//!
+//! A bare `.mode` read is not held: the field name is shared by the renderer's
+//! other settings (exposure, depth of field, a particle emitter's render mode), so
+//! text alone cannot tell a light's from theirs. Review holds that one.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -17,10 +22,13 @@ pub const RULE: &str = "drawn-mode";
 /// The renderer, at its module path.
 const SCOPE: &str = "src/render/";
 
-/// The one renderer file that reads `Scene::light_mode`, through `drawn_mode`.
+/// The one renderer file that reads a light's mode, through `drawn_mode`.
 const ENTRY: &str = "src/render/clusters/unbaked.rs";
 
-/// Every renderer line of `source` that calls `light_mode(`; `test` marks its
+/// The calls that read a light's mode short of what the frame draws.
+const READS: [&str; 2] = ["light_mode(", "effective_mode("];
+
+/// Every renderer line of `source` that calls one of [`READS`]; `test` marks its
 /// test lines.
 pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
@@ -29,7 +37,7 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     }
     let is_test = |i: usize| test.get(i).copied().unwrap_or(false);
     (code_lines(source).iter().enumerate())
-        .filter(|&(i, line)| !is_test(i) && calls_light_mode(line.as_ref()))
+        .filter(|&(i, line)| !is_test(i) && reads_mode(line.as_ref()))
         .map(|(i, _)| Finding {
             path: path.to_string(),
             line: i + 1,
@@ -42,10 +50,12 @@ pub fn check(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
         .collect()
 }
 
-/// Whether `code` calls `light_mode(` itself, not a longer name ending in it.
-fn calls_light_mode(code: &str) -> bool {
-    code.match_indices("light_mode(").any(|(at, _)| {
-        !(code[..at].chars().next_back()).is_some_and(|c| c.is_alphanumeric() || c == '_')
+/// Whether `code` calls one of [`READS`] itself, not a longer name ending in it.
+fn reads_mode(code: &str) -> bool {
+    READS.iter().any(|read| {
+        code.match_indices(read).any(|(at, _)| {
+            !(code[..at].chars().next_back()).is_some_and(|c| c.is_alphanumeric() || c == '_')
+        })
     })
 }
 

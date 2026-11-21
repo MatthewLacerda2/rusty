@@ -41,16 +41,19 @@ impl Scene {
         }
     }
 
-    /// The active lights above intensity 0 that [await a
-    /// bake](Self::awaits_bake), in entity order: what the renderer's console note
-    /// names.
-    pub fn lights_awaiting_bake(&self) -> Vec<u32> {
+    /// Whether entity `id` holds a light the console note names: one that [awaits
+    /// a bake](Self::awaits_bake), active in the hierarchy and above intensity 0.
+    pub fn waits_for_bake(&self, id: u32) -> bool {
         let world = &self.world;
-        (world.ids_with_light().into_iter())
-            .filter(|&id| world.is_active_in_hierarchy(id))
-            .filter(|&id| {
-                (world.light(id)).is_some_and(|l| l.intensity > 0.0 && self.awaits_bake(id, &l))
-            })
+        world.is_active_in_hierarchy(id)
+            && (world.light(id)).is_some_and(|l| l.intensity > 0.0 && self.awaits_bake(id, &l))
+    }
+
+    /// The lights that [wait for a bake](Self::waits_for_bake), in entity order:
+    /// what the renderer's console note names.
+    pub fn lights_awaiting_bake(&self) -> Vec<u32> {
+        (self.world.ids_with_light().into_iter())
+            .filter(|&id| self.waits_for_bake(id))
             .collect()
     }
 
