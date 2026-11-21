@@ -11,10 +11,10 @@
 //!
 //! | switch | what goes | what the forward pass reads instead |
 //! |---|---|---|
-//! | `shadows` | the cascades and the point/spot atlas tiles drawn (group 3, bindings 0, 1, 4, 5) | a cascade count of 0 and no light's tile, as a probe captured without shadows |
-//! | `lightmaps` | the colour, direction and shadowmask pages bound (group 0, bindings 14, 16, 19) | the 1x1 stand-in pages, each object's `lightmap_page` 0 |
-//! | `reflection_probes` | the resident probes' cube array (group 0, binding 4) | the 1-cube stand-in, each instance's `reflection_probe` 0 (the sky's cube) |
-//! | `clustered_lights` | the cluster light lists (group 0, bindings 8 and 9) | every cluster's light range empty; the lights stay uploaded at binding 7 |
+//! | `shadows` | the cascades and the point/spot atlas tiles drawn (the scene group, `groups::SCENE`: bindings 0, 1, 4, 5) | a cascade count of 0 and no light's tile, as a probe captured without shadows |
+//! | `lightmaps` | the colour, direction and shadowmask pages bound (the global group, bindings 14, 16, 19) | the 1x1 stand-in pages, each object's `lightmap_page` 0 |
+//! | `reflection_probes` | the resident probes' cube array (the global group, binding 4) | the 1-cube stand-in, each instance's `reflection_probe` 0 (the sky's cube) |
+//! | `clustered_lights` | the cluster light lists (the global group, bindings 8 and 9) | every cluster's light range empty; the lights stay uploaded at binding 7 |
 //! | `ssao` | the SSAO pass, in every view (the Scene view's too) | the 1x1 white AO, as with `GraphicsOption::Ssao` off |
 //! | `ssil` | the SSIL pass, in every view | no indirect term, as with `GraphicsOption::Ssil` off |
 //!

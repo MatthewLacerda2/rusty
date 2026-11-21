@@ -211,7 +211,7 @@ impl ExposureMeter {
                 label: Some("Auto Exposure"),
                 timestamp_writes: timer.compute_writes(GpuPass::PostFx),
             });
-            pass.set_bind_group(0, &bind_group, &[]);
+            pass.set_bind_group(crate::gpu::ONLY_GROUP, &bind_group, &[]);
             pass.set_pipeline(&passes.histogram);
             // One invocation per block, rounded up at a ragged edge.
             let groups = size.map(|n| n.div_ceil(BLOCK).div_ceil(GROUP).max(1));

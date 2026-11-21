@@ -29,7 +29,7 @@ rusty_core::named_enum! {
         /// Forward/surface pass: the standard `vs_main` vertex stage + lighting from
         /// `shader.wgsl`, with the fragment look varied by the chosen surface blocks.
         /// Consumes `LightingUniforms`, `DrawUniforms` and its `MaterialData`, and the
-        /// group(2) material texture bindings.
+        /// material group's texture bindings (`groups::MATERIAL`).
         Surface = "surface",
         /// Postfx pass: a fullscreen-triangle fragment program over the HDR target,
         /// the most self-contained pass. The chosen postfx blocks transform the

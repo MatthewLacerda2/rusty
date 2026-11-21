@@ -41,9 +41,9 @@ impl RenderCounters {
             ("ssil_samples", self.ssil_samples),
             ("volumetric_froxels", self.volumetric_froxels),
             ("particles_drawn", self.particles_drawn.into()),
-            ("render_texture_draws", self.render_texture_draws.into()),
-            ("velocity_passes", self.velocity_passes.into()),
-            ("primed_passes", self.primed_passes.into()),
+        ]);
+        pairs.extend(self.forward_pairs());
+        pairs.extend([
             ("history_passes", self.history_passes.into()),
             ("ssr_surface_passes", self.ssr_surface_passes.into()),
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
@@ -78,6 +78,19 @@ impl RenderCounters {
             ("hiz_late", self.hiz_late.into()),
             ("cluster_tested", self.cluster_tested.into()),
             ("cluster_culled", self.cluster_culled.into()),
+        ]
+    }
+
+    /// The render-texture cameras, the opaque scene passes' kinds and their draws
+    /// by kind (#2334), under their metric names.
+    fn forward_pairs(&self) -> [(&'static str, u64); 6] {
+        [
+            ("render_texture_draws", self.render_texture_draws.into()),
+            ("velocity_passes", self.velocity_passes.into()),
+            ("primed_passes", self.primed_passes.into()),
+            ("forward_lit_primed", self.forward_lit_primed.into()),
+            ("forward_lit_unprimed", self.forward_lit_unprimed.into()),
+            ("forward_unlit", self.forward_unlit.into()),
         ]
     }
 

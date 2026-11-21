@@ -4,10 +4,10 @@
 //! cap.
 
 use super::cascades::MAX_CASCADES;
+use super::layouts::{caster_entries, clip_layout, global_group, global_layout};
 use super::ShadowRenderer;
-use crate::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
+use crate::gpu::groups::Groups;
 use crate::gpu::mesh::vertex_layout;
-use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::winding::Facing;
 use crate::gpu::pipelines::LazyPipeline;
 
@@ -105,16 +105,9 @@ impl ShadowRenderer {
         // skinned casters are posed with (#599), and the material records a clipped
         // draw reads through `material()` with the per-draw uniform naming its record
         // (#1616), at the forward pass's own bindings.
-        let both = wgpu::ShaderStages::VERTEX_FRAGMENT;
-        let draw_size = std::mem::size_of::<crate::DrawUniform>() as u64;
         let entity_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Caster Layout"),
-            entries: &[
-                storage_entry(CASTERS_BINDING, both),
-                storage_entry(JOINTS_BINDING, wgpu::ShaderStages::VERTEX),
-                dynamic_uniform_entry(DRAW_BINDING, both, draw_size),
-                storage_entry(MATERIALS_BINDING, both),
-            ],
+            entries: &caster_entries(),
         });
 
         (global_layout, global_bind_group, entity_layout)
@@ -123,17 +116,19 @@ impl ShadowRenderer {
     /// The plain depth-only pipeline and the clipping one (#648), both from the
     /// forward `shader`'s shadow stage, then their mirrored twins (#1134) and their
     /// two-sided ones (#1571), built on first draw; the clip pipelines' layout adds
-    /// the forward pass's group-2 material layout to the two shadow groups.
+    /// the forward pass's material layout to the two shadow groups ([`Groups`]).
     pub(super) fn create_pipelines(
         device: &wgpu::Device,
         [global, entity, material]: [&wgpu::BindGroupLayout; 3],
         shader: &wgpu::ShaderModule,
     ) -> ([wgpu::RenderPipeline; 2], [[LazyPipeline; 2]; 2]) {
-        let plain = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Shadow Pipeline Layout"),
-            bind_group_layouts: &[Some(global), Some(entity)],
-            immediate_size: 0,
-        });
+        let plain = Groups {
+            global,
+            scene: None,
+            material: None,
+            draw: entity,
+        };
+        let plain = plain.layout(device, "Shadow Pipeline Layout");
         let clip = clip_layout(device, [global, entity, material]);
         let twins = |facing| {
             [
@@ -149,72 +144,6 @@ impl ShadowRenderer {
             [twins(Facing::Cw), twins(Facing::Both)],
         )
     }
-}
-
-/// Where `shader.wgsl`'s shadow stage reads the cascade's matrix and the game time
-/// (group 0), its casters, their joints and the material records with the per-draw
-/// uniform naming one (group 1, the last two the forward pass's own) — beside the forward pass's
-/// bindings, sharing `camera` and `bones` (#648).
-const LIGHT_BINDING: u32 = 6;
-const TIME_BINDING: u32 = 0;
-pub(super) const CASTERS_BINDING: u32 = 3;
-pub(super) const JOINTS_BINDING: u32 = 1;
-pub(super) const DRAW_BINDING: u32 = 0;
-pub(super) const MATERIALS_BINDING: u32 = 4;
-
-/// The shadow stage's group 0: the cascade's light-space matrix (dynamic offset,
-/// one per cascade) and the game time.
-fn global_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
-    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("Shadow Global Layout"),
-        entries: &[
-            dynamic_uniform_entry(LIGHT_BINDING, wgpu::ShaderStages::VERTEX, 64),
-            // The forward `camera` slot, holding only the game time: a cutting
-            // variant's UV chain reads `camera.time` (#648), and `vs_shadow` moves
-            // the caster with a variant's vertex blocks at it (#1524).
-            uniform_entry(TIME_BINDING, wgpu::ShaderStages::VERTEX_FRAGMENT),
-        ],
-    })
-}
-
-/// A shadow stage's group 0 over `layout`: one light matrix of `light_space` (picked
-/// by dynamic offset) and the game time — the cascades' and the atlas's (#468).
-pub(super) fn global_group(
-    device: &wgpu::Device,
-    layout: &wgpu::BindGroupLayout,
-    light_space: &wgpu::Buffer,
-    time_buffer: &wgpu::Buffer,
-) -> wgpu::BindGroup {
-    device.counted_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Shadow Global Bind Group"),
-        layout,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: LIGHT_BINDING,
-                resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
-                    buffer: light_space,
-                    offset: 0,
-                    size: wgpu::BufferSize::new(64),
-                }),
-            },
-            wgpu::BindGroupEntry {
-                binding: TIME_BINDING,
-                resource: time_buffer.as_entire_binding(),
-            },
-        ],
-    })
-}
-
-/// The clipping shadow pipelines' layout: light, casters, material (#648).
-pub(crate) fn clip_layout(
-    device: &wgpu::Device,
-    layouts: [&wgpu::BindGroupLayout; 3],
-) -> wgpu::PipelineLayout {
-    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Shadow Clip Pipeline Layout"),
-        bind_group_layouts: &layouts.map(Some),
-        immediate_size: 0,
-    })
 }
 
 /// [`depth_pipeline`], built on its first draw (#985).

@@ -149,7 +149,7 @@ impl MipGenerator {
             ..Default::default()
         });
         pass.set_pipeline(pipeline);
-        pass.set_bind_group(0, &group, &[]);
+        pass.set_bind_group(crate::gpu::ONLY_GROUP, &group, &[]);
         pass.draw(0..3, 0..1);
     }
 }

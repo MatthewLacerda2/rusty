@@ -192,7 +192,7 @@ impl GradeLut {
                 timestamp_writes: None,
             });
             pass.set_pipeline(pipeline);
-            pass.set_bind_group(0, group, &[]);
+            pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
             let groups = Self::SIZE.div_ceil(Self::GROUP);
             pass.dispatch_workgroups(groups, groups, groups);
         }

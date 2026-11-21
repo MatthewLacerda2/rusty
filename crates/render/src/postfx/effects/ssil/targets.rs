@@ -39,7 +39,7 @@ pub(crate) struct SsilTargets {
     /// What the source and last result hold; `None` until the source is first kept,
     /// and after anything that invalidates them.
     pub(super) history: Option<History>,
-    /// The forward pass's group 3 with this frame's result, while it runs this frame.
+    /// The forward pass's scene group with this frame's result, while it runs this frame.
     pub(crate) forward_group: Option<wgpu::BindGroup>,
 }
 

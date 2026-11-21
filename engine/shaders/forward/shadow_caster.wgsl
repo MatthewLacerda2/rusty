@@ -33,5 +33,5 @@ struct Caster {
 
 // Every caster, one per instance: a draw covers a run of casters sharing one mesh
 // (and material, when it clips), indexed by `instance_index`.
-@group(1) @binding(3)
+@group(3) @binding(3)
 var<storage, read> casters: array<Caster>;

@@ -16,6 +16,7 @@ pub(crate) use lazy::{lazy_compute, LazyCompute, LazyPipeline};
 pub(crate) use transparent::{TransparentBlend, TransparentPipelines};
 pub(crate) use winding::{FacedPipeline, Facing};
 
+use crate::gpu::groups::Groups;
 use prepass::prepass_set;
 pub(crate) use prepass::PrepassPipelines;
 use specs::{
@@ -48,7 +49,7 @@ pub(crate) struct ForwardPipelines {
     pub prepass: PrepassPipelines,
     /// The opaque and velocity ones over a primed depth (#1499).
     pub primed: PrimedPipelines,
-    /// Their layout, groups 0–3, which the selection mask (#1175) draws through too.
+    /// Their layout ([`Groups`]), which the selection mask (#1175) draws through too.
     pub layout: wgpu::PipelineLayout,
 }
 
@@ -71,15 +72,14 @@ pub(crate) fn create_pipelines(
     material_layout: &wgpu::BindGroupLayout,
     shadow_layout: &wgpu::BindGroupLayout,
 ) -> ForwardPipelines {
-    let (render_layout, line_layout) = create_pipeline_layouts(
-        device,
-        camera_lighting_layout,
-        entity_bones_layout,
-        material_layout,
-        shadow_layout,
-    );
+    let groups = Groups {
+        global: camera_lighting_layout,
+        scene: Some(shadow_layout),
+        material: Some(material_layout),
+        draw: entity_bones_layout,
+    };
+    let (render_layout, line_layout) = create_pipeline_layouts(device, groups);
     let set = SpecSet::new(device, shader, format, &render_layout);
-    let groups = [camera_lighting_layout, entity_bones_layout];
     ForwardPipelines {
         forward: FacedPipeline::eager(|f| set.lazy(forward_spec().facing(f))),
         velocity: VelocityPipelines::new(|surface| set.faced(velocity_spec(surface))),
@@ -226,44 +226,28 @@ impl PrimedPipelines {
     }
 }
 
-/// The forward passes' pipeline layout — groups 0–3 — for a surface variant (#396).
+/// The forward passes' pipeline layout for a surface variant (#396). Every
+/// forward-target layout (the solids, their prepass, translucents, lines, the
+/// selection mask and a surface variant's) places its groups by role through
+/// [`Groups`]: camera + lighting global, the shadows as the scene group, the
+/// material, and the entity + bones group per draw, so all of them share one order.
 pub(crate) fn forward_layout(
     device: &wgpu::Device,
-    layouts: [&wgpu::BindGroupLayout; 4],
+    groups: Groups<&wgpu::BindGroupLayout>,
 ) -> wgpu::PipelineLayout {
-    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Surface Variant Pipeline Layout"),
-        bind_group_layouts: &layouts.map(Some),
-        immediate_size: 0,
-    })
+    groups.layout(device, "Surface Variant Pipeline Layout")
 }
 
 /// The forward and line pipelines share the same four bind-group layouts
 /// but carry distinct labels, so build both pipeline layouts here.
 fn create_pipeline_layouts(
     device: &wgpu::Device,
-    camera_lighting_layout: &wgpu::BindGroupLayout,
-    entity_bones_layout: &wgpu::BindGroupLayout,
-    material_layout: &wgpu::BindGroupLayout,
-    shadow_layout: &wgpu::BindGroupLayout,
+    groups: Groups<&wgpu::BindGroupLayout>,
 ) -> (wgpu::PipelineLayout, wgpu::PipelineLayout) {
-    let layouts = [
-        camera_lighting_layout,
-        entity_bones_layout,
-        material_layout,
-        shadow_layout,
-    ];
-    let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Render Pipeline Layout"),
-        bind_group_layouts: &layouts.map(Some),
-        immediate_size: 0,
-    });
-    let line_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Line Pipeline Layout"),
-        bind_group_layouts: &layouts.map(Some),
-        immediate_size: 0,
-    });
-    (render_pipeline_layout, line_pipeline_layout)
+    (
+        groups.layout(device, "Render Pipeline Layout"),
+        groups.layout(device, "Line Pipeline Layout"),
+    )
 }
 
 #[cfg(test)]

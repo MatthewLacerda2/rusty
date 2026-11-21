@@ -45,7 +45,7 @@ pub(crate) struct SolidResources {
     pub floored: bool,
 }
 // Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
-// one overlay group 1 ([`OverlayBindings`], #1616): its uniform there places it and
+// one overlay per-draw group ([`OverlayBindings`], #1616): its uniform there places it and
 // names its tint's record, and the joints and instance it binds are the renderer's
 // shared identities (#210). The selection outline is not an overlay: it is its own
 // pass over the solids' own draws (`passes::outline`, #1175).
@@ -61,7 +61,7 @@ pub(crate) type LineResource = (wgpu::Buffer, u32, u32);
 /// takes a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
-    /// The group 1 every overlay binds at its slot; `None` when there is none.
+    /// The per-draw group every overlay binds at its slot; `None` when there is none.
     pub bindings: Option<OverlayBindings>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,

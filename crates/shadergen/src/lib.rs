@@ -38,6 +38,8 @@
 //!   recipe when the engine's shaders change (#1638).
 //! - [`baked`] — the one loader every renderer reads an authored module through,
 //!   up to date with the engine's shaders (#1638).
+//! - [`groups`] — the solid path's bind-group indices, ordered by how often each
+//!   changes; the WGSL declarations and the renderer's layouts read them.
 //! - [`params`] — a surface shader's runtime params (#399): which block params a
 //!   material sets from scripts, their uniform slots, and the `<name>.params.json`
 //!   sidecar that records them.
@@ -57,6 +59,7 @@ pub mod bake;
 pub mod baked;
 pub mod blocks;
 pub mod compose;
+pub mod groups;
 pub mod params;
 pub mod post_params;
 pub mod rebake;

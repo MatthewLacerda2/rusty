@@ -3,6 +3,7 @@
 
 use crate::draw::batch::{OpaqueBatches, OpaqueOrder};
 use crate::gpu::global_group::GlobalGroup;
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::gpu::pipelines::PrimedPipelines;
@@ -141,13 +142,14 @@ impl Renderer {
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
-        self.frame_counters.velocity_passes += u32::from(velocity);
         let primed = self.primes(view, &frame);
-        self.frame_counters.primed_passes += u32::from(primed);
         // Ranked before the cull ran; why the two agree: `Self::opaque_order`.
         debug_assert!(solid_batches.ranked_for(primed), "opaque order != priming");
-        self.frame_counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
-
+        let counters = &mut self.frame_counters;
+        counters.velocity_passes += u32::from(velocity);
+        counters.primed_passes += u32::from(primed);
+        counters.count_forward(solid_batches.iter(), primed);
+        counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
         // post-FX run from the per-camera loop in `draw`.
         self.queue.counted_submit(std::iter::once(encoder.finish()));
@@ -186,15 +188,13 @@ impl Renderer {
             timestamp_writes: self.gpu_timer.writes(GpuPass::Forward),
             occlusion_query_set: None,
         });
-
-        // Set global bindings
         let surface = frame.surface(view).is_some();
         let solid_pass = match velocity {
             Some(_) => SolidPass::Velocity(&self.velocity_pipeline, primed, surface),
             None => SolidPass::Opaque(view.forward_pipeline(&self.render_pipeline), primed),
         };
-        render_pass.set_bind_group(0, &self.global_bind_group, &[]);
-        render_pass.set_bind_group(3, self.scene_group3(view, frame), &[]);
+        render_pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        render_pass.set_bind_group(groups::SCENE, self.scene_group(view, frame), &[]);
         // Solid entities (each batch binds its shader's pipeline).
         let solids = (solid_batches, frame.culled.as_ref());
         self.draw_solids(&mut render_pass, solids, solid_pass);
