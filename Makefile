@@ -454,6 +454,19 @@ test-one-process: ## Signal: the dev suite under plain cargo test, one process p
 dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lint --dead-pub)
 	$(LINT) -- --dead-pub
 
+# The comment checks' strict run: `comment-cap` and `comment-history` findings
+# under PATHS (files or folders), failing; the size gate only prints their totals.
+# `comment-only` proves the branch since its merge base with BASE changes only
+# comments (docs/linting.md, *Comments*).
+.PHONY: comments comment-only
+BASE ?= origin/main
+comments: ## The comment checks over PATHS, failing on any finding. make comments PATHS=crates/audio
+	@test -n "$(PATHS)" || { echo "comments: which paths? e.g. make comments PATHS=crates/audio" >&2; exit 1; }
+	$(LINT) -- --strict-comments $(PATHS)
+
+comment-only: ## Prove the branch changes only comments since its merge base with BASE (default origin/main)
+	$(LINT) -- --comment-only $(BASE)
+
 # The whole editor, headless, to a PNG (#731): what an editor-visible PR attaches.
 # Needs a GPU or lavapipe. ARGS passes the binary's options (--select, --play, ...).
 OUT ?= editor-capture.png

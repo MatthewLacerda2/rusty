@@ -23,7 +23,8 @@ file is what a coder changing the tool must keep.
   path under `base`. A new gate is a row and its must-flag cases in `gates_tests.rs`,
   one per pass it runs; `make test-lint` fails naming a row without one. One call
   runs one gate: two gate flags are refused. `--dead-pub` is a signal, not a row: it
-  builds the workspace and fails only when it cannot.
+  builds the workspace and fails only when it cannot. `--comment-only` is a tool
+  mode, not a row: it proves a branch changes only comments (`comments::proof`).
 - **A scanner you write or touch advances by what it consumes** (a shrinking slice,
   an iterator's `next`), not an index a step may forget to move, so it ends on any
   input, and a mutated increment fails a test instead of timing out.
@@ -60,6 +61,9 @@ file is what a coder changing the tool must keep.
   `CLAUDE.md`, skill file and subagent definition) runs in `make size`, which the commit hook and CI's
   Markdown-only runs reach and `--rules` does not. It still reports `Finding`s and
   reads the shared allow, whose Markdown form is `<!-- lint: allow(<rule>) <why> -->`.
+- **The comment checks ride the size gate** (`comments/`), over the files it
+  measures, and split a file with one scanner per language that the comment-only
+  proof shares, so what is counted and what is proved never drift apart.
 - **Signals print and never fail.** What CLAUDE.md only says to *aim* for (≲10 files
   per directory) prints under `signal (not a failure)` after the findings and leaves
   the exit code alone. It becomes a finding only with the decision that makes it a

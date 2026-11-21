@@ -67,13 +67,18 @@ pub const GATES: &[(Check, &str)] = &[
 pub const DEAD_PUB: &str = "--dead-pub";
 
 /// The gate `args` selects: the row whose flag is among them, else the size gate.
-/// `Err` when they name two (a gate's flag, or [`DEAD_PUB`], twice over): `main`
+/// `Err` when they name two (a gate's flag, [`DEAD_PUB`] or the comment-only
+/// proof, twice over): `main`
 /// runs one, and which would be a guess.
 pub fn select(args: &[String]) -> Result<Check, String> {
     let named: Vec<&str> = args
         .iter()
         .map(String::as_str)
-        .filter(|a| *a == DEAD_PUB || GATES.iter().any(|(_, f)| !f.is_empty() && f == a))
+        .filter(|a| {
+            *a == DEAD_PUB
+                || *a == crate::comments::proof::FLAG
+                || GATES.iter().any(|(_, f)| !f.is_empty() && f == a)
+        })
         .collect();
     if let [_, _, ..] = named.as_slice() {
         return Err(format!(
