@@ -125,17 +125,18 @@ fn occlusion_laps(r: &crate::Renderer) -> Vec<&'static str> {
 
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
-    // Measured: lavapipe 2/86/2/8204, Metal 2/86/2/8204.
+    // Measured: lavapipe 2/86/4/24 (#2387: phase one's two draws counted, and
+    // the triangles drawn, read back: the wall twice, the hidden panel none).
     if let Some(decided) = stage_with(1) {
-        assert_eq!(decided, (2, 86, 2, 8204));
+        assert_eq!(decided, (2, 86, 4, 24));
     }
 }
 
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_three_clustered_batches() {
-    // Measured: lavapipe 4/258/4/24588, Metal 4/258/4/24588 (the same before
-    // #2327; it culled 1 and 122).
+    // Measured: lavapipe 4/258/8/29342 (#2387: phase one's four draws counted,
+    // and the triangles drawn, read back, the hidden panel and clusters none).
     if let Some(decided) = stage_with(3) {
-        assert_eq!(decided, (4, 258, 4, 24588));
+        assert_eq!(decided, (4, 258, 8, 29342));
     }
 }
