@@ -106,25 +106,34 @@ pub(crate) fn measure_posed(
         if harness.world.borrow().quit_requested() {
             break;
         }
-        let cpu_before = clock::cpu_probe_ms();
-        let tick = Instant::now();
-        harness.step(1);
-        let mut wall_ms = ms_since(tick);
-        let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
-        pose(harness);
-        let before = time_probe(probe, harness);
-        let drawn = Instant::now();
-        let frame = harness.render_frame();
-        wall_ms += ms_since(drawn);
-        let after = time_probe(probe, harness);
+        let (frame, speed, wall_ms) = step_and_draw(harness, probe, pose);
         samples.push("wall_ms", wall_ms);
-        let gpu = clock::speed(before, after);
-        let speed = Speeds { cpu, gpu };
         sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
         verbs.sample(&mut samples, &harness.stats.borrow(), speed.cpu);
         samples.end_frame();
     }
     (samples.report(), samples)
+}
+
+/// Step one frame, `pose`, draw it: the frame, its clock speeds, and its
+/// `wall_ms`, the step and the draw on the wall with the probes and the pose out.
+fn step_and_draw(
+    harness: &mut Harness,
+    probe: Option<&ClockProbe>,
+    pose: &mut dyn FnMut(&mut Harness),
+) -> (Option<crate::capture::RenderedFrame>, Speeds, f64) {
+    let cpu_before = clock::cpu_probe_ms();
+    let tick = Instant::now();
+    harness.step(1);
+    let mut wall_ms = ms_since(tick);
+    let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
+    pose(harness);
+    let before = time_probe(probe, harness);
+    let drawn = Instant::now();
+    let frame = harness.render_frame();
+    wall_ms += ms_since(drawn);
+    let gpu = clock::speed(before, time_probe(probe, harness));
+    (frame, Speeds { cpu, gpu }, wall_ms)
 }
 
 /// Milliseconds on the wall since `start`.

@@ -28,17 +28,6 @@ impl SceneReport {
                  gpu_clock_pct of the reference)",
             ),
             (
-                self.row("cpu_ms").is_some(),
-                "(cpu_ms, cpu.<system>: ms at the reference CPU clock; frame_ms as measured, \
-                 at cpu_clock_pct of it)",
-            ),
-            (
-                self.row("wall_ms").is_some(),
-                "(wall_ms: the frame end to end on the wall, its sim step and its draw until \
-                 the GPU finished, as measured: it moves with cpu_clock_pct and gpu_clock_pct; \
-                 not the windowed game's frame time, docs/testing.md)",
-            ),
-            (
                 self.row("gpu_mb").is_none(),
                 "(this backend reports no GPU memory: no gpu_mb)",
             ),
@@ -48,7 +37,8 @@ impl SceneReport {
                  render.other is what no stage timed)",
             ),
         ];
-        let notes = notes.into_iter().chain(self.part_notes());
+        let notes = notes.into_iter().chain(self.clock_notes());
+        let notes = notes.chain(self.part_notes());
         let notes = notes.chain(self.load_notes());
         let notes = notes.chain(self.editor_notes());
         let notes = notes.chain(self.comparison_notes(first));
@@ -73,6 +63,23 @@ impl SceneReport {
     /// wherever a UI was prepared, the Hi-Z stage's CPU parts
     /// wherever it ran, its GPU parts only with GPU timing (an untimed frame
     /// records the stage in 2 compute passes).
+    /// What the CPU rows and `wall_ms` are measured at.
+    fn clock_notes(&self) -> [(bool, &'static str); 2] {
+        [
+            (
+                self.row("cpu_ms").is_some(),
+                "(cpu_ms, cpu.<system>: ms at the reference CPU clock; frame_ms as measured, \
+                 at cpu_clock_pct of it)",
+            ),
+            (
+                self.row("wall_ms").is_some(),
+                "(wall_ms: the frame end to end on the wall, its sim step and its draw until \
+                 the GPU finished, as measured: it moves with cpu_clock_pct and gpu_clock_pct; \
+                 not the windowed game's frame time, docs/testing.md)",
+            ),
+        ]
+    }
+
     fn part_notes(&self) -> [(bool, &'static str); 3] {
         [
             (
