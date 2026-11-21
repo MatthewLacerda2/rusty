@@ -19,13 +19,13 @@ fn a_light_created_in_update_is_realtime_and_drawn_live() {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let gun = scene.borrow_mut().add_entity("Gun".to_string());
     let source = r#"
-        function Update()
-            if flash == nil then
-                flash = Scene.CreateEntity("Flash", "PointLight")
-                local spot = Scene.CreateEntity("Spot")
-                Scene.AddComponent(spot, "Light")
-            end
-        end
+        local done = false
+        return { Update = function()
+            if done then return end
+            done = true
+            Scene.CreateEntity("Flash", "PointLight")
+            Scene.AddComponent(Scene.CreateEntity("Spot"), "Light")
+        end }
     "#;
     attach_script(&mut scene.borrow_mut(), gun, "flash.lua", source);
     let mut game = playing(scene.clone(), 1.0);
