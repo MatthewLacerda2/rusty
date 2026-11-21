@@ -25,8 +25,8 @@ pub(super) fn round(ui_ms: [f64; 2], enter: [f64; 2]) -> EditorRound {
             frame,
             view: (1306, 963),
         };
-        meter.frame(ui(ui_ms[run]), Some(&drawn), None);
-        meter.frame(ui(ui_ms[run]), None, None);
+        meter.frame(ui(ui_ms[run]), Some(&drawn), None, 1.0);
+        meter.frame(ui(ui_ms[run]), None, None, 1.0);
         meter.single("play_enter_ms", enter[run]);
         meter.end_run();
     }
@@ -76,7 +76,7 @@ fn a_clock_that_moves_inside_a_run_warns_in_the_rounds_own_words() {
             ms: 1.0,
             speed: Some(speed),
         };
-        meter.frame(time, None, None);
+        meter.frame(time, None, None, 1.0);
     }
     meter.end_run();
     let round = meter.finish();
@@ -137,7 +137,7 @@ fn the_round_carries_the_scene_views_counters() {
         frame,
         view: (8, 8),
     };
-    meter.frame(ui(1.0), Some(&drawn), None);
+    meter.frame(ui(1.0), Some(&drawn), None, 1.0);
     meter.end_run();
     let round = meter.finish();
     assert_eq!(row(&round, "editor.draw_calls").avg, 90.0);

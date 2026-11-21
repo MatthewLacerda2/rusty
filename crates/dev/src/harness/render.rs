@@ -150,6 +150,12 @@ impl Harness {
         self.capture.renderer(width, height)
     }
 
+    /// When the GPU finished the last frame drawn, before its readbacks
+    /// ([`CaptureHost::idle_at`](crate::capture::CaptureHost::idle_at)).
+    pub fn idle_at(&self) -> Option<std::time::Instant> {
+        self.capture.idle_at
+    }
+
     /// Render the current scene/camera offscreen at the run's size, writing
     /// nothing, and fold the frame's cost into the stats. `None` when no GPU or
     /// software adapter is available (a skip, as for a screenshot) or on an error,

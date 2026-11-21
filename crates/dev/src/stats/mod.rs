@@ -45,10 +45,12 @@ use super::capture::RenderedFrame;
 use rusty_app::{GameWorld, Resources, Stage, SystemProbe, World};
 use rusty_core::frame_stats::{DrawnFrame, FrameStats, Series};
 
+mod clock;
 mod counters;
 mod load;
 pub mod verbs;
 mod window;
+pub use clock::{ms_between, ms_since, now};
 pub use load::LoadTimer;
 pub use window::{known_keys, record_window, whole_count, window_ended, window_opt, WindowFrame};
 
@@ -180,11 +182,6 @@ fn time_ms(f: &mut dyn FnMut()) -> f64 {
     let start = verbs::now();
     f();
     ms_since(start)
-}
-
-/// The milliseconds from `start` to now, on the dev layer's clock.
-fn ms_since(start: Instant) -> f64 {
-    verbs::now().saturating_duration_since(start).as_secs_f64() * 1000.0
 }
 
 /// Each name's times added up, in the order the names first ran.

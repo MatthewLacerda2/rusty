@@ -83,7 +83,7 @@ fn the_rounds_clock_drift_since_the_last_run_is_its_own_warning() {
         "{said:?}"
     );
     assert!(
-        said[0].contains("compare editor.ui_ms, not play_enter_ms"),
+        said[0].contains("compare editor.ui_ms, not editor.wall_ms, play_enter_ms"),
         "{said:?}"
     );
 }
