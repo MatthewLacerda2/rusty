@@ -89,6 +89,13 @@
 //! culled cluster by cluster against the same pyramid and drawn per instance
 //! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it on.
 //!
+//! **What it counts.** The CPU records the cull's draws as indirect ones, so the
+//! triangles they drew are read back from their args with the stage's counts
+//! ([`drawn`]), a frame or so late, and counted where each pass draws: phase
+//! one's in the stage (`hiz_depth_triangles` beside), the late set's with the
+//! prepass, the final set's with the camera. Nothing hidden, no triangle is
+//! drawn twice: phase one's depth stands in for the prepass's where one runs.
+//!
 //! **Seams.** The pyramid ([`pyramid::Pyramid`]) is built once per camera and
 //! read by mip level and texel through `hiz/hidden.wgsl`'s `hidden`, which the
 //! instance and cluster tests share; a light's shadow views and the CPU frustum
@@ -97,6 +104,7 @@
 pub(crate) mod clusters;
 mod counters;
 mod cull;
+mod drawn;
 pub(crate) mod pyramid;
 mod stage;
 mod tables;
@@ -112,8 +120,12 @@ pub(crate) mod cluster_gpu_tests;
 mod copy_gpu_tests;
 #[cfg(test)]
 mod dispatch_gpu_tests;
+#[cfg(test)]
+mod draws_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
+#[cfg(test)]
+mod first_read_gpu_tests;
 #[cfg(test)]
 mod floor_gpu_tests;
 #[cfg(test)]

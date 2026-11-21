@@ -70,14 +70,16 @@ impl RenderCounters {
 
     /// The camera views' occlusion counters (the PVS's, Hi-Z's and the cluster
     /// cull's), under their metric names.
-    fn occlusion_pairs(&self) -> [(&'static str, u64); 6] {
+    fn occlusion_pairs(&self) -> [(&'static str, u64); 8] {
         [
             ("occlusion_culled", self.occlusion_culled.into()),
             ("hiz_tested", self.hiz_tested.into()),
             ("hiz_culled", self.hiz_culled.into()),
             ("hiz_late", self.hiz_late.into()),
+            ("hiz_depth_triangles", self.hiz_depth_triangles),
             ("cluster_tested", self.cluster_tested.into()),
             ("cluster_culled", self.cluster_culled.into()),
+            ("cluster_draws", self.cluster_draws.into()),
         ]
     }
 
