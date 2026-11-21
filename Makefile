@@ -335,7 +335,7 @@ queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, cod
 # "Blocked by #N" written in an issue body but never recorded as a GitHub
 # relationship is invisible to everything that plans from the graph (#624).
 # Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
-blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
+blockers: ## Diff body "Blocked by #N" against GitHub: ARGS=--fix records prose-only blockers, removes stale ones
 	@python3 .github/scripts/blockers.py $(ARGS)
 
 # The PR-on-first-commit rule exists so nothing goes stale unnoticed; this is
