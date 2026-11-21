@@ -63,7 +63,7 @@ intensity does, and seen from far away it acts as a spot light of `intensity ×
 area` whose light fades as the cosine off the panel's facing. Its light fades to zero
 at `range`, measured from its centre, so no receiver that far from the centre is lit,
 like a point light's. The lightmap bake integrates the whole
-rectangle, so its shadows have soft edges that widen with the panel's size, and the
+rectangle (over the scene's `directSamples` points, `Lighting.md`), so its shadows have soft edges that widen with the panel's size, and the
 light-probe bake adds its direct light (a fixed 8 × 8 grid of shadow rays per
 probe) for dynamic objects. It is never drawn live, so a surface without a lightmap
 and an object before the probes are baked get nothing from it. Transform scale

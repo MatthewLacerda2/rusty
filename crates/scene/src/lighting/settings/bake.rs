@@ -60,6 +60,11 @@ pub struct BakeSettings {
     pub texels_per_unit: f32,
     /// Paths traced per texel; more is smoother and slower.
     pub samples: u32,
+    /// Unity's *Direct Samples* (#2355): the stratified points a texel's own
+    /// direct light integrates each `Baked` Area light over, beside
+    /// [`Self::samples`] (Unity's *Indirect Samples*). `0`, the default, follows
+    /// `samples`; read through [`Self::direct_sample_count`].
+    pub direct_samples: u32,
     /// Surfaces a path bounces off before it stops.
     pub bounces: u32,
     /// The seed every texel's sample stream derives from.
@@ -104,6 +109,7 @@ impl Default for BakeSettings {
         Self {
             texels_per_unit: 8.0,
             samples: Self::DEFAULT_SAMPLES,
+            direct_samples: 0,
             bounces: 3,
             seed: 0,
             max_lightmap_size: 1024,
@@ -138,6 +144,19 @@ impl BakeSettings {
     pub const TEXELS_PER_UNIT: RangeInclusive<f32> = 0.25..=64.0;
     /// The samples per texel a bake takes.
     pub const SAMPLES: RangeInclusive<u32> = 1..=4096;
+    /// The direct samples a bake takes: [`Self::SAMPLES`], or `0` to follow
+    /// `samples`.
+    pub const DIRECT_SAMPLES: RangeInclusive<u32> = 0..=4096;
+
+    /// The stratified points a texel's direct light integrates an Area light
+    /// over: [`Self::direct_samples`], or [`Self::samples`] where it is `0`.
+    pub fn direct_sample_count(&self) -> u32 {
+        match self.direct_samples {
+            0 => self.samples,
+            n => n,
+        }
+    }
+
     /// How many passes a progressive bake makes: [`Self::samples`] in steps of
     /// [`Self::samples_per_pass`] (0 held to 1), the last pass taking the rest.
     pub fn passes(&self) -> u32 {
@@ -181,6 +200,7 @@ impl BakeSettings {
             texels_per_unit: texels
                 .clamp(*Self::TEXELS_PER_UNIT.start(), *Self::TEXELS_PER_UNIT.end()),
             samples: clamp(self.samples, Self::SAMPLES),
+            direct_samples: clamp(self.direct_samples, Self::DIRECT_SAMPLES),
             samples_per_pass: clamp(self.samples_per_pass, Self::SAMPLES),
             bounces: clamp(self.bounces, Self::BOUNCES),
             max_lightmap_size: self.page(),

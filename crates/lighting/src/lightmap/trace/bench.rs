@@ -13,15 +13,26 @@ use super::Tracer;
 use crate::lightmap::max_map_edge;
 use rusty_scene::lighting::settings::BakeSettings;
 
+/// What [`trace_texels`] traced and cast: counts, so they hold on any machine.
+#[derive(Clone, Copy, Debug)]
+pub struct TraceCost {
+    /// The texels traced.
+    pub texels: usize,
+    /// Every ray cast, of any kind.
+    pub rays: u64,
+    /// Of `rays`, the shadow rays of the texels' own direct light (#2355), apart
+    /// from the validity probes, the bounce paths and their next-event rays.
+    pub direct: u64,
+}
+
 /// Trace about `count` texels of `scene` spread evenly over its receiving meshes,
-/// on `threads` workers, exactly as the bake traces each one; returns how many
-/// were traced, and how many rays that cast (a cost that holds on any machine).
+/// on `threads` workers, exactly as the bake traces each one, and count the rays.
 pub fn trace_texels(
     scene: &BakeScene,
     settings: &BakeSettings,
     count: usize,
     threads: usize,
-) -> (usize, u64) {
+) -> TraceCost {
     let rays = Rays::build(triangles(scene)).counted();
     let tracer = Tracer::new(scene, &rays);
     let max = max_map_edge(settings.page());
@@ -54,6 +65,10 @@ pub fn trace_texels(
             });
         }
     });
-    let cast = rays.cast.load(std::sync::atomic::Ordering::Relaxed);
-    (points.len(), cast)
+    let load = |n: &std::sync::atomic::AtomicU64| n.load(std::sync::atomic::Ordering::Relaxed);
+    TraceCost {
+        texels: points.len(),
+        rays: load(&rays.cast),
+        direct: load(&rays.direct),
+    }
 }

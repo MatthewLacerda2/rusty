@@ -81,7 +81,7 @@ pub(crate) use rays::{Rays, Tri};
 pub(crate) use rng::Rng;
 #[cfg(feature = "dev")]
 #[doc(hidden)]
-pub use trace::bench::trace_texels;
+pub use trace::bench::{trace_texels, TraceCost};
 pub(crate) use trace::cosine_sample;
 // The knobs the bake reads, in the scope of the tests' `use super::*`.
 #[cfg(test)]
@@ -128,6 +128,8 @@ mod pool_tests;
 #[cfg(test)]
 mod prioritize_tests;
 #[cfg(test)]
+mod probe_check_tests;
+#[cfg(test)]
 mod probe_direct_tests;
 #[cfg(test)]
 mod progress_tests;
@@ -140,9 +142,13 @@ mod run_tests;
 #[cfg(test)]
 mod scale_tests;
 #[cfg(test)]
+mod shadow_probe_tests;
+#[cfg(test)]
 mod share_tests;
 #[cfg(test)]
 mod skybox_tests;
+#[cfg(test)]
+mod slit_probe_tests;
 #[cfg(test)]
 mod sliver_tests;
 #[cfg(test)]

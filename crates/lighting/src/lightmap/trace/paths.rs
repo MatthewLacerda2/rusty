@@ -54,18 +54,19 @@ impl Paths {
 impl Tracer<'_> {
     /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
     /// and sky over `samples` paths `bounces` deep, and the direct light of `Baked`
-    /// lights. The bake filters the first and adds the second.
+    /// lights (an Area light over `direct` or more points). The bake filters the
+    /// first and adds the second.
     pub(in crate::lightmap) fn texel(
         &self,
         position: Vec3,
         normal: Vec3,
-        samples: u32,
+        (samples, direct): (u32, u32),
         bounces: u32,
         rng: &mut Rng,
     ) -> TexelLight {
         let mut paths = Paths::default();
         self.gather(position, normal, (samples, bounces), rng, &mut paths);
-        self.resolve(position, normal, samples, &paths, rng)
+        self.resolve(position, normal, (samples, direct), &paths, rng)
     }
 
     /// `count` more bounce paths, `bounces` deep, from the texel at `position`
@@ -88,16 +89,17 @@ impl Tracer<'_> {
     }
 
     /// The texel's light once all `samples` of its `paths` are in: the mean of the
-    /// bounce, and its direct light drawn from `rng` (where the paths left it).
+    /// bounce, and its direct light (an Area light over `direct` or more points)
+    /// drawn from `rng` (where the paths left it).
     pub(in crate::lightmap) fn resolve(
         &self,
         position: Vec3,
         normal: Vec3,
-        samples: u32,
+        (samples, direct): (u32, u32),
         paths: &Paths,
         rng: &mut Rng,
     ) -> TexelLight {
-        let shown = self.shown(position, normal, samples, rng);
+        let shown = self.shown(position, normal, direct, rng);
         paths.light(samples, &shown)
     }
 

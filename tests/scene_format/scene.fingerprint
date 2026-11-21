@@ -897,6 +897,7 @@ scene.lighting_settings.diffuse_model: enum Lambert|HalfLambert
 scene.lighting_settings.lightmaps.backface_tolerance: f32
 scene.lighting_settings.lightmaps.bounces: u32
 scene.lighting_settings.lightmaps.denoiser: enum Oidn|Filter|None
+scene.lighting_settings.lightmaps.direct_samples: u32
 scene.lighting_settings.lightmaps.directional: bool
 scene.lighting_settings.lightmaps.filter_radius: u32
 scene.lighting_settings.lightmaps.max_lightmap_size: u32

@@ -94,7 +94,10 @@ fn under(scene: &BakeScene) -> f32 {
     let tracer = Tracer::new(scene, &rays);
     let mut rng = Rng::new(9, 0, 0);
     let at = Vec3::new(-0.3, 0.0, -0.2);
-    tracer.texel(at, Vec3::Y, 4000, 2, &mut rng).indirect.x
+    tracer
+        .texel(at, Vec3::Y, (4000, 4000), 2, &mut rng)
+        .indirect
+        .x
 }
 
 #[test]
