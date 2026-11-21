@@ -3,7 +3,7 @@
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
 `make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
 `make coder`, `make coders`, `make review-level`, `make rebriefs`, `make coder-cost`, `make mutants-remote`, `make bench-ab` and
-`make test-gpu PR=`, and the CI helpers
+`make test-gpu PR=`, `make round-gates`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
 project-wide rules (merging is serialized, gates vs. signals, issues and labels); the
 `ci-merge` and `issue-batch` skills say how to *run* this tooling. This file is what a
@@ -45,6 +45,11 @@ coder *changing* it must know.
   tree is put back at its bare head) and the table, written from the legs that
   finished when a run stops (`legs.Stopped`). `bench-ab.py` and `pr-tree.py` are only the command lines. A test never
   builds or benches: the legs take a stub runner.
+- **`.github/scripts/deps/` reads what an issue body says about its dependencies**
+  for `make blockers` (`blockers.py`, the command line and the audit): `prose.stated`
+  decides what to record, and `prose.named`, a token search, how a recorded
+  blocker no body states is reported. Prose never deletes: `--lift`, with both
+  numbers given, is the only removal.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an
