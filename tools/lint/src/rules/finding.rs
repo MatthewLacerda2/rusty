@@ -38,12 +38,13 @@ impl fmt::Display for Finding {
 }
 
 /// Which comment an allow is written in, chosen by the file's type: code's
-/// `// lint: allow(<rule>) <why>`, or Markdown's
+/// `// lint: allow(<rule>) <why>`, Lua's `-- lint: allow(<rule>) <why>`, or Markdown's
 /// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`. Each file
 /// reads only its own form, so code quoting the other in a string is not an allow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     Code,
+    Lua,
     Markdown,
 }
 
@@ -52,6 +53,8 @@ impl Form {
     pub fn of(path: &str) -> Form {
         if path.ends_with(".md") {
             Form::Markdown
+        } else if path.ends_with(".lua") {
+            Form::Lua
         } else {
             Form::Code
         }
@@ -60,6 +63,7 @@ impl Form {
     fn opener(self) -> &'static str {
         match self {
             Form::Code => "//",
+            Form::Lua => "--",
             Form::Markdown => "<!--",
         }
     }
@@ -81,7 +85,7 @@ pub(super) fn parse_allow(line: &str, form: Form) -> Option<(&str, &str)> {
     let why = &rest[close + 1..];
     let why = match form {
         Form::Markdown => why.split_once("-->").map_or(why, |(w, _)| w),
-        Form::Code => why,
+        Form::Code | Form::Lua => why,
     };
     Some((rest[..close].trim(), why.trim()))
 }
