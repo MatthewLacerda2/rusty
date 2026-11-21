@@ -51,7 +51,7 @@ pub use ibl::probe::capture::ProbeCapture;
 pub use setup::headless::{gpu_required, ADAPTER_ENV, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::{gpu_memory, GpuMemory, OpCounts, RenderCounters, StaleOcclusion, Uploads};
-pub use stats::{RenderSwitch, RenderSwitches};
+pub use stats::{EarlyFlushes, RenderSwitch, RenderSwitches};
 pub use timing::{ClockProbe, FrameCost, GpuPart, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 

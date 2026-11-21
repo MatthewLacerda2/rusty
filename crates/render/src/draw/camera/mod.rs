@@ -5,9 +5,10 @@
 //!
 //! **One encoder a camera** (#2353): every stage records into
 //! [`CameraCtx::commands`] and submits nothing itself; the camera's commands go
-//! out once, before the next camera rewrites the camera uniform and the draw
-//! buffers. The shadow sweep records into the frame's first camera's, the
-//! screen's last camera's takes the upscale and the UI. A stage never rewrites a
+//! out at its end, before the next camera rewrites the camera uniform and the draw
+//! buffers, and early at the [`EARLY_FLUSHES`] points, so the GPU starts while the
+//! CPU still records. The shadow sweep records into the frame's first camera's,
+//! the screen's last camera's takes the upscale and the UI. A stage never rewrites a
 //! buffer a pass it follows reads (`gpu::commands`): a mid-camera change of the
 //! camera uniform is a copy ([`buffer`]). Debug builds panic on a byte range
 //! written twice while the camera records (`gpu::commands::check_write`); a single
@@ -48,6 +49,32 @@ use crate::postfx::effects::volumetric_fog::{self, VolumetricPlan, VolumetricVie
 use crate::{CameraUniform, Frustum, RenderView, Renderer};
 use rusty_scene::{Camera, ClearFlags, Scene};
 use stages::*;
+
+/// The stages after which a camera sends what it recorded so far
+/// (`Commands::flush`, which keeps recording), in pass order; the renderer's
+/// [`crate::EarlyFlushes`] says how many of them, from the first, it uses (all by
+/// default; `--set render.flushes=` measures the others).
+///
+/// **Why they are there: the GPU's start, measured.** With one submit at the
+/// camera's end the GPU waits for the camera's whole recording: on the operator's
+/// desktop that made the same frames 25% (tower-bar) and 42% (cozy-coffee) longer
+/// on the wall while doing 2% fewer instructions. Each point is where the GPU has
+/// a stage's worth of work and the CPU still has one to record:
+/// - `occlusion`: the depth work (the shadow sweep, which heads the first
+///   camera's encoder, the fog and the Hi-Z stage) goes out while the CPU
+///   records the scene pass;
+/// - `scene`: the opaque pass (SSAO and SSIL in it) goes out while the CPU
+///   records SSR, the translucents, the effects and the post chain.
+///
+/// A flush only adds a submit: what a stage writes still lands before every
+/// command recorded after it, so the pixels are the same in every shape
+/// (`encoder_gpu_tests`).
+pub(crate) const EARLY_FLUSHES: [&str; 2] = ["occlusion", "scene"];
+
+/// Whether a camera drawn with `flushes` sends its commands after stage `name`.
+pub(crate) fn flushes_after(flushes: crate::EarlyFlushes, name: &str) -> bool {
+    EARLY_FLUSHES[..flushes.count()].contains(&name)
+}
 
 /// One stage of a camera's frame.
 pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);

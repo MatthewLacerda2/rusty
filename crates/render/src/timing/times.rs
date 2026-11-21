@@ -121,9 +121,11 @@ pub struct GpuTimes {
     pub parts: Vec<(GpuPart, f64)>,
     /// Untimed GPU work, in ms: what of the span no row holds inside one submit,
     /// where the GPU never waits for the CPU. A pass left untimed shows here, and
-    /// so does a copy between a camera's passes (SSR's copy of the opaque image,
-    /// the Hi-Z counters' copies), a camera being one submit. It is GPU work, so
-    /// it scales with the GPU's clock as the rows do.
+    /// so does a copy between two timed passes of one submit; one at a camera's
+    /// early flush (`draw::camera::EARLY_FLUSHES`: SSR's copy of the opaque image
+    /// heads the submit after the scene pass's) is at a submit's edge, in
+    /// [`Self::between_submits_ms`]. It is GPU work, so it scales with the GPU's
+    /// clock as the rows do.
     pub other_ms: f64,
     /// The gaps from one submit's last timed work to the next's first, in ms:
     /// mostly the GPU waiting for the CPU to record and submit, plus any untimed

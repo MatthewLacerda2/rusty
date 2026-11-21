@@ -1,6 +1,11 @@
 //! crates/render/src/gpu/commands.rs — one command encoder that several stages
-//! record into and that goes out in one submit (#2353): a camera's whole frame,
+//! record into and that goes out at a few submits (#2353): a camera's whole frame,
 //! the shadow sweep in the first camera's, the screen's UI in its last camera's.
+//! A camera sends at its end and, early, at `draw::camera::EARLY_FLUSHES`'
+//! points ([`Commands::flush`]): measured on a desktop GPU, one submit at the
+//! camera's end left the GPU idle until the whole camera was recorded, and the
+//! same frames took a quarter to two fifths longer on the wall. Don't merge the
+//! flushes away without measuring that again (`--set render.flushes=none`).
 //!
 //! **What a stage may do while one records.** A `queue.write_buffer` (or
 //! `write_texture`) lands at the next submit, *ahead of every command already

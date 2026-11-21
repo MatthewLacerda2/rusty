@@ -233,7 +233,7 @@ pub(crate) mod switches;
 mod uploads;
 pub use crate::gpu::ops::OpCounts;
 pub use memory::{gpu_memory, GpuMemory};
-pub use switches::{RenderSwitch, RenderSwitches};
+pub use switches::{EarlyFlushes, RenderSwitch, RenderSwitches};
 pub use uploads::Uploads;
 
 /// A scene's baked PVS older than its statics at the last extract

@@ -1226,8 +1226,9 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `.select` (the uploads and binds before its pass, and the pass), `.phase_one`,
   `.pyramid` and `.record` (requesting the counters' read-back and handing the
   cull on), summing to `render.occlusion` but for its returns. The stage submits
-  nothing: its commands go out with the camera's, timed in `render.camera.submit`
-  between cameras and `render.submit` for the last.
+  nothing: its commands go out at the camera's early flush right after it, timed
+  in `render.camera.flush` (with the flush after the scene pass), then the rest
+  in `render.camera.submit` between cameras and `render.submit` for the last.
   **The UI stage is split too**: `render.ui.layout`, `.textures` (loading and
   binding the Images' textures), `.mesh` (the canvas meshes and glyph atlases),
   `.sync`, `.shades`, `.uniforms`, `.masks`, then for the overlay pass
@@ -1506,6 +1507,15 @@ every binary's open makes them.
     defaults (a bench has no saved player choice). It reaches **the game rounds
     only**: the editor round's Scene view ignores the player's options, as
     Unity's ignores PlayerPrefs, so its `editor.` rows do not move;
+  - **`render.flushes`**, where a camera's commands go out early
+    (`render::draw::camera::EARLY_FLUSHES`): `occlusion_scene` (the default:
+    after the occlusion stage and after the opaque scene pass), `occlusion` (the
+    first alone) or `none` (one submit at the camera's end). Every shape draws
+    the same pixels; `submits` and when the GPU starts move, so compare the
+    three on the wall (the run's wall time, a windowed run), not by the `render.`
+    rows alone.
+    The key is new with the flushes, so a `make bench-ab` against a build
+    without them refuses it: measure the shapes on one build;
   - **`render.<switch>`**, a renderer measurement switch that turns off one input
     the forward pass reads by binding the stand-in it reads when the scene has
     none, so no pipeline or bind group layout changes and a build that renumbers

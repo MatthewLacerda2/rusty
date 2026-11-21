@@ -28,6 +28,11 @@
 //!
 //! `ssao` and `ssil` reach the editor's Scene view, which ignores the player's
 //! graphics options (`option.ssao` reaches only the game views).
+//!
+//! One more key changes no input but when the GPU starts: `flushes`
+//! ([`EarlyFlushes`], `--set render.flushes=none|occlusion|occlusion_scene`)
+//! picks how many of `draw::camera::EARLY_FLUSHES`' points a camera's commands go
+//! out early at. Every shape draws the same pixels; only the submits move.
 
 #[cfg(feature = "dev")]
 use crate::Renderer;
@@ -53,17 +58,54 @@ rusty_core::named_enum! {
     }
 }
 
-/// Which [`RenderSwitch`]es are on: all of them unless a measurement turned one off.
+rusty_core::named_enum! {
+    /// How many of a camera's early flush points (`draw::camera::EARLY_FLUSHES`,
+    /// in its order) send what the camera recorded so far, as `--set
+    /// render.flushes=<name>` spells it: a measurement of the GPU's start.
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub enum EarlyFlushes {
+        /// None: one submit at the camera's end.
+        None = "none",
+        /// After the depth work (the shadow sweep, the fog, the occlusion stage).
+        Occlusion = "occlusion",
+        /// After the depth work and after the opaque scene pass: what every
+        /// renderer draws with.
+        #[default]
+        OcclusionScene = "occlusion_scene",
+    }
+}
+
+impl EarlyFlushes {
+    /// How many of the points, from the first, it flushes at.
+    pub(crate) fn count(self) -> usize {
+        self as usize
+    }
+}
+
+/// Which [`RenderSwitch`]es are on: all of them unless a measurement turned one
+/// off; and the [`EarlyFlushes`] a camera sends at.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RenderSwitches {
     off: [bool; RenderSwitch::ALL.len()],
+    flushes: EarlyFlushes,
 }
 
 impl RenderSwitches {
-    /// Every switch on: what every renderer draws with.
+    /// Every switch on and the default flushes: what every renderer draws with.
     pub const ON: Self = Self {
         off: [false; RenderSwitch::ALL.len()],
+        flushes: EarlyFlushes::OcclusionScene,
     };
+
+    /// Where a camera's commands go out early.
+    pub fn flushes(self) -> EarlyFlushes {
+        self.flushes
+    }
+
+    /// Send a camera's commands early at `flushes`' points.
+    pub fn set_flushes(&mut self, flushes: EarlyFlushes) {
+        self.flushes = flushes;
+    }
 
     /// Whether `switch` is on.
     pub fn on(self, switch: RenderSwitch) -> bool {
@@ -114,7 +156,7 @@ impl RenderSwitches {
         options
     }
 
-    /// Whether every switch is on.
+    /// Whether every switch is on, at the default flushes.
     pub fn all_on(self) -> bool {
         self == Self::ON
     }

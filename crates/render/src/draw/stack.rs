@@ -4,7 +4,7 @@
 //! base camera's settings (#1434). The screen stack and every render-texture camera (#430)
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
-use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use super::camera::{flushes_after, CameraCtx, StackShared, CAMERA_PASSES};
 use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::motion::{self, HistoryKey, Velocity};
@@ -160,6 +160,7 @@ impl Renderer {
             }
             let mut ctx = CameraCtx::new(scene, pass, shared, (idx, commands));
             self.lap("stack");
+            let flushes = self.switches.flushes();
             for (name, stage) in CAMERA_PASSES {
                 stage(self, view, &mut ctx);
                 #[cfg(test)]
@@ -167,6 +168,11 @@ impl Renderer {
                     ctx.commands.flush(); // each stage its own submit, as before #2353
                 }
                 self.lap(name);
+                if flushes_after(flushes, name) {
+                    // The GPU starts on what is recorded (`EARLY_FLUSHES`).
+                    ctx.commands.flush();
+                    self.lap("camera.flush");
+                }
             }
             commands = ctx.commands;
         }

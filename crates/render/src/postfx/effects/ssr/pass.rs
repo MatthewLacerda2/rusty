@@ -23,9 +23,11 @@
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
 //! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
 //! timer's rows: `ssr` holds the trace, charged from its own start; the copy before
-//! it is a command, not a pass, so no row holds it: it sits inside the camera's
-//! one encoder, after the opaque pass and before the trace (#2353), so it is in
-//! `gpu_other_ms`; `ssr_pyramids` and `ssr_resolve` hold the
+//! it is a command, not a pass, so no row holds it: it sits in the camera's
+//! encoder after the opaque pass and before the trace (#2353), at the head of the
+//! submit after the scene pass's early flush (`draw::camera::EARLY_FLUSHES`), so
+//! it is in `gpu_between_submits_ms` (in `gpu_other_ms` when no flush follows
+//! the scene pass); `ssr_pyramids` and `ssr_resolve` hold the
 //! other two.
 
 use crate::gpu::commands::Commands;
@@ -203,8 +205,8 @@ fn trace_and_resolve(
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
-        // The colour copy recorded just before is no pass: it sits between the
-        // opaque pass and this one in the camera's encoder, so it is in `gpu_other_ms`.
+        // The colour copy recorded just before is no pass: it heads the submit
+        // after the scene pass's early flush, so it is in `gpu_between_submits_ms`.
         let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());
