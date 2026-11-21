@@ -1,12 +1,10 @@
-//! Another take of one patch (#1038): through the whole signal path, two
-//! seeds of a varied one-shot differ in **envelope**, not merely in grain —
-//! and without `vary` they are still the same sound.
+//! Another take of one patch: through the whole signal path, two seeds of a varied one-shot differ
+//! in **envelope**, not merely in grain — and without `vary` they are still the same sound.
 
 use crate::common::{adsr, minimal, osc, render};
 use scorsese_zimmer::patch::{PitchEnv, Source, Wave};
 use scorsese_zimmer::{NoteOpts, Patch};
 
-/// A pop: a sine falling an octave onto its note, gone in a tenth of a second.
 fn pop() -> Patch {
     let mut amp = adsr(0.001, 0.07, 0.0, 0.02);
     amp.curve = 4.0;
@@ -24,7 +22,6 @@ fn pop() -> Patch {
     }
 }
 
-/// The level, 5 ms at a time — what the ear hears as the shape of a hit.
 fn envelope(patch: &Patch, seed: u64) -> Vec<f32> {
     let opts = NoteOpts {
         duration: 0.1,
@@ -38,7 +35,6 @@ fn envelope(patch: &Patch, seed: u64) -> Vec<f32> {
         .collect()
 }
 
-/// Pearson correlation of two envelopes.
 fn correlation(a: &[f32], b: &[f32]) -> f32 {
     let mean = |x: &[f32]| x.iter().sum::<f32>() / x.len() as f32;
     let (ma, mb) = (mean(a), mean(b));
@@ -51,7 +47,6 @@ fn correlation(a: &[f32], b: &[f32]) -> f32 {
     dot(a, ma, b, mb) / (dot(a, ma, a, ma) * dot(b, mb, b, mb)).sqrt()
 }
 
-/// The lowest correlation between seed 0's envelope and seeds 1 to 7's.
 fn least_alike(vary: f32) -> f32 {
     let first = envelope(&pop().varied(vary, 0), 0);
     (1..8)

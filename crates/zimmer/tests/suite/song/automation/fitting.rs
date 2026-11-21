@@ -1,16 +1,10 @@
 //! What a curve does when `fit` decides the length.
-//!
-//! Beats are counted from the start of the **rendered piece**, once. That is
-//! one decision with two visible consequences, and both are asserted here: a
-//! `loop` does not take the curve back to the beginning with it, and a
-//! `stretch` carries the curve along with the tempo it moved.
 
 use scorsese_zimmer::song::{Fit, FitMode, Param};
 use scorsese_zimmer::{SAMPLE_RATE, song::Song};
 
 use super::setup::{BEATS, at, curve, frame, held, render, rms};
 
-/// The fixture at a target length, with a gain curve over `beats` of it.
 fn fitted(seconds: f32, mode: FitMode, beats: f32, to: f32) -> Song {
     let mut song = held(0.5);
     song.fit = Some(Fit::lasting(seconds, mode));
@@ -18,11 +12,6 @@ fn fitted(seconds: f32, mode: FitMode, beats: f32, to: f32) -> Song {
     song
 }
 
-/// A build across a looped bed builds **once**. A curve that went back with
-/// the arrangement would be a saw — the same swell over and over — which is
-/// the defect this decision exists to avoid.
-///
-/// The fixture is four seconds, so eight is two passes; the curve spans both.
 #[test]
 fn a_curve_does_not_go_back_when_the_arrangement_loops() {
     let mix = render(&fitted(8.0, FitMode::Loop, BEATS * 2.0, 0.5));
@@ -35,9 +24,6 @@ fn a_curve_does_not_go_back_when_the_arrangement_loops() {
     );
 }
 
-/// The same song without a curve loops to two passes of one level, which is
-/// what the assertion above is measured against: the difference is the curve
-/// and not the loop.
 #[test]
 fn a_looped_bed_with_no_curve_is_the_same_level_both_passes() {
     let mut song = held(0.5);
@@ -51,13 +37,6 @@ fn a_looped_bed_with_no_curve_is_the_same_level_both_passes() {
     );
 }
 
-/// `stretch` moves the tempo and leaves the beats alone, so a build over eight
-/// bars is still a build over eight bars — read at the tempo the piece is
-/// actually played at, not the one it was written at.
-///
-/// The fixture is eight beats of 120 bpm — four seconds — stretched to five,
-/// which is 96 bpm. At four seconds in, that is beat 6.4 and not beat 8, so a
-/// curve read at the written tempo would already have finished.
 #[test]
 fn a_stretch_fit_carries_the_curve_along_with_the_tempo() {
     let flat = {

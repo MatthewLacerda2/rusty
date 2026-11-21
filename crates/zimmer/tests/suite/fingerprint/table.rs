@@ -1,27 +1,18 @@
-//! What the probes measured, and the version they were measured at. Written by
-//! the test's own failure message, never by hand: a row edited to make the
-//! test pass is a missed bump.
+//! What the probes measured, and the version they were measured at. Written by the test's own
+//! failure message, never by hand: a row edited to make the test pass is a missed bump.
 
-/// One probe's bake, measured.
 #[derive(Debug)]
 pub(crate) struct Row {
     pub(crate) probe: &'static str,
-    /// Stereo frames in the file.
     pub(crate) frames: u64,
-    /// The whole file's RMS level, in dBFS.
     pub(crate) rms_db: f64,
-    /// The energy below 250 Hz, as a share of the whole.
     pub(crate) low: f64,
-    /// Between 250 Hz and 4 kHz.
     pub(crate) mid: f64,
-    /// Above 4 kHz.
     pub(crate) high: f64,
 }
 
 pub(crate) const RECORDED_AT: u32 = 10;
 
-// One row per line, the form the failure message prints, so a re-record is a
-// paste and a diff reads probe by probe.
 #[rustfmt::skip]
 pub(crate) const TABLE: &[Row] = &[
     Row { probe: "saw_filtered", frames: 17614, rms_db: -13.433, low: 0.8468, mid: 0.1525, high: 0.0007 },

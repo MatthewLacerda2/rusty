@@ -6,8 +6,6 @@ use scorsese_zimmer::patch::{
     Adsr, Filter, FilterKind, Fx, Lfo, LfoTarget, PitchEnv, Slope, Source, Wave,
 };
 
-/// A patch touching every optional stage — the round-trip has to carry all of
-/// them, so the fixture has all of them.
 fn full_patch() -> Patch {
     Patch {
         layers: Vec::new(),
@@ -59,8 +57,6 @@ fn a_patch_round_trips_through_json_unchanged() {
     assert_eq!(Patch::from_json(&json).expect("deserialise"), patch);
 }
 
-/// The tags are the words a recipe is written in, so they are part of the
-/// contract rather than an implementation detail of the derive.
 #[test]
 fn tags_are_snake_case_and_named_as_documented() {
     let json = serde_json::to_string(&Source::OscStack { oscs: vec![] }).expect("serialise");
@@ -95,11 +91,6 @@ fn optional_stages_and_osc_fields_have_defaults() {
     }
 }
 
-/// The promise that every recipe written before velocity routing existed still
-/// bakes the byte-identical file it always did: both new fields are absent from
-/// those documents, and absent has to mean *off*. A bake is addressed by the
-/// hash of its recipe, so a default that moved the audio would leave
-/// `generated/` serving files no recipe describes.
 #[test]
 fn velocity_routing_is_off_unless_a_recipe_asks_for_it() {
     let json = r#"{ "kind": "lowpass", "cutoff": 800 }"#;
@@ -116,11 +107,6 @@ fn velocity_routing_is_off_unless_a_recipe_asks_for_it() {
     }
 }
 
-/// The same promise, for the two envelope fields — and it is the stronger half
-/// that matters here: a serialiser that wrote `"curve": 0.0` into every
-/// envelope of every document it re-saved would change no audio at all and
-/// still invalidate every cached bake in every project, because a bake is
-/// addressed by the hash of the recipe's *bytes*.
 #[test]
 fn a_straight_envelope_and_an_unswept_pitch_are_absent_from_the_document() {
     let json = r#"{

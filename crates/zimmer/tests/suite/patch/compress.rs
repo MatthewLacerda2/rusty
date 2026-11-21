@@ -2,11 +2,6 @@
 
 use scorsese_zimmer::patch::Fx;
 
-/// A compressor written the short way — the two numbers that say what it does,
-/// and four that fill themselves in. Those four *are* audio, so they are
-/// asserted here rather than left to the derive: a default that moved would
-/// change what every recipe using the short form bakes to, and a bake is
-/// addressed by the hash of its recipe.
 #[test]
 fn a_compressor_carries_its_documented_defaults() {
     let json = r#"{ "fx": "compress", "threshold": -18.0, "ratio": 4.0 }"#;

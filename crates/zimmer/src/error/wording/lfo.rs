@@ -1,16 +1,10 @@
 //! What an LFO's speed and onset are refused with.
-//!
-//! Out of [`super`] for the reason [`super::pulse`] is: the parent's match
-//! hands these variants here by name, and the catch-all below is there for
-//! the same reason that one's is.
 
 use std::fmt;
 
 use crate::error::SynthError;
 
 impl SynthError {
-    /// The words for an LFO refusal. Only ever called from
-    /// [`SynthError::say`] with one of the variants it names.
     pub(super) fn say_lfo(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LfoTwoRates { rate, beats } => write!(
@@ -33,7 +27,6 @@ impl SynthError {
                 f,
                 "patch: lfo `{field}` must be zero or more seconds, got {seconds}"
             ),
-            // `say` hands over only the variants above; see `length`'s catch-all.
             other => write!(f, "{other:?}"),
         }
     }

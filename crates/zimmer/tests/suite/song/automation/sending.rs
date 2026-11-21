@@ -1,8 +1,4 @@
-//! A send that moves: how much of a part reaches the song's room, across the
-//! piece.
-//!
-//! The fixture's held saw plays for all eight beats and then stops, so the
-//! piece after it is the room alone: what rings there is what was sent.
+//! A send that moves: how much of a part reaches the song's room, across the piece.
 
 use scorsese_zimmer::patch::Fx;
 use scorsese_zimmer::song::{InlineOnly, Param, Song};
@@ -10,7 +6,6 @@ use scorsese_zimmer::{SynthError, render_song};
 
 use super::setup::{BEATS, at, curve, frame, held, ramp, render, rms};
 
-/// The fixture in a reverb, its track writing `send` and carrying `moving`.
 fn roomy(send: f32, moving: Option<scorsese_zimmer::song::Automation>) -> Song {
     let mut song = held(0.5);
     song.fx = vec![Fx::Reverb {
@@ -24,13 +19,10 @@ fn roomy(send: f32, moving: Option<scorsese_zimmer::song::Automation>) -> Song {
     song
 }
 
-/// The stretch after the last note, where only the room is left.
 fn tail(mix: &[f32]) -> &[f32] {
     &mix[frame(BEATS) + 2_000..]
 }
 
-/// A curve parked at a number is that number, written: the same samples a
-/// track whose `send` says it, to within the rounding of a second multiply.
 #[test]
 fn a_flat_send_curve_renders_what_the_written_send_did() {
     let written = render(&roomy(0.4, None));
@@ -44,11 +36,6 @@ fn a_flat_send_curve_renders_what_the_written_send_did() {
     assert!(worst < 1e-6, "they differ by up to {worst}");
 }
 
-/// A wash-out: the send opens from nothing to everything across the piece. The
-/// start is as dry as a part that sends nothing, the end as wet as one that
-/// sends everything, and the tail rings — which it could not if the fast path
-/// that skips the sent sum had read the written `1.0` and stopped there, or if
-/// the curve had been ignored for the written `send`.
 #[test]
 fn a_send_opening_across_the_piece_washes_the_part_out() {
     let dry = render(&roomy(0.0, None));
@@ -78,7 +65,6 @@ fn a_send_opening_across_the_piece_washes_the_part_out() {
     );
 }
 
-/// Clamped like the written field: a curve past either end is the end.
 #[test]
 fn a_send_curve_past_its_range_is_clamped() {
     let over = render(&roomy(1.0, Some(curve(Param::Send, vec![at(0.0, 3.0)]))));
@@ -88,8 +74,6 @@ fn a_send_curve_past_its_range_is_clamped() {
     assert_eq!(rms(tail(&under)), 0.0, "below nothing is nothing");
 }
 
-/// A send reaches the song's `reverb` and `delay`; with neither, the curve
-/// moves nothing, and a curve that moves nothing is refused.
 #[test]
 fn a_send_curve_with_no_room_to_reach_is_refused() {
     let mut song = held(0.5);

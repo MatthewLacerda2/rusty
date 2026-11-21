@@ -1,68 +1,21 @@
-//! vary: another take of the same one-shot, from one number (#1038).
-//!
-//! A one-shot's `seed` re-rolls its noise grain and where its oscillators
-//! start, and nothing else: two seeds of one pop are two files and one sound
-//! to the ear (the 5 ms envelopes of #1001's kit correlated at 0.96–1.00).
-//! In a song a performance's `humanize` varies each hit; a single hit has no
-//! performance around it. So a one-shot that asks for it is played from a
-//! **scattered copy** of its patch instead: the numbers that set a struck
-//! sound's character — how fast it speaks and dies, where its filter sits,
-//! how far its pitch bounces — each nudged by a seeded draw, as far as the
-//! amount allows.
-//!
-//! A draw is a multiplication by `2^(amount × reach × u)`, `u` in `-1..1`,
-//! so a time of zero stays an instant and a falling bounce never turns into
-//! a rising one. Each number has a **fixed slot** in the draw, so a patch
-//! that gains a filter keeps the amp envelope every seed gave it before, and
-//! a [layer](super::Layer) is scattered the same way on slots of its own.
-//!
-//! Free and deterministic like everything here: the same patch, amount and
-//! seed give the same copy on every machine, and an amount of zero gives the
-//! patch back untouched, which is what every recipe written before the field
-//! still means.
+//! vary: another take of the same one-shot, from one number.
 
 use super::{Adsr, Filter, Patch, PitchEnv};
 use crate::hash::unit2;
 
-/// Hash channel the scatter draws on, apart from the noise and the start
-/// phases that read the same seed.
-const VARY_CHANNEL: u64 = 0x5641; // "VA"
+const VARY_CHANNEL: u64 = 0x5641;
 
-/// How far a timing moves at full `vary`, in octaves: half as long to twice
-/// as long — a snap to a thud's bloom, and no further.
 const TIME_REACH: f32 = 1.0;
-/// How far a filter's cutoff moves at full `vary`, in octaves.
 const CUTOFF_REACH: f32 = 1.0;
-/// How far a pitch envelope's depth moves at full `vary`, in octaves of its
-/// size: `log2(1.5)`, so a twelve-semitone bounce lands between eight and
-/// eighteen.
 const BOUNCE_REACH: f32 = 0.585;
 
-/// The first slot of each stage's draws: the amp envelope's three open the
-/// path (slots 0–2), then one cutoff and three timings for the filter, one
-/// depth and three timings for the pitch envelope.
-///
-/// Each is counted from the first slot of the path it scatters: the patch's
-/// own path starts at zero, and layer `i` at `(i + 1) × PATH_SLOTS`, after
-/// every slot the patch's own path takes, so a patch that gains a layer keeps
-/// every draw a seed gave it before.
 const CUTOFF_SLOT: i64 = 3;
 const FILTER_SLOTS: i64 = 4;
 const BOUNCE_SLOT: i64 = 7;
 const PITCH_SLOTS: i64 = 8;
-/// How many slots one path takes.
 const PATH_SLOTS: i64 = 11;
 
 impl Patch {
-    /// This patch as another take of itself: its envelope timings, its
-    /// filter's cutoff and its pitch envelope's depth each scattered by a
-    /// draw from `seed`, as far as `amount` (`0..=1`) allows.
-    ///
-    /// At full amount a timing lands anywhere from half to twice what was
-    /// written and a cutoff an octave either side; `0`, or anything that is
-    /// not a number, returns the patch unchanged. Past one is one. It is what
-    /// a one-shot's `vary` field asks for, and the caller hands it the seed
-    /// the note is struck with, so one number is one take.
     pub fn varied(&self, amount: f32, seed: u64) -> Patch {
         let mut patch = self.clone();
         let amount = if amount.is_finite() {
@@ -88,21 +41,17 @@ impl Patch {
     }
 }
 
-/// One take's scatter: how much, and from which seed.
 struct Draw {
     amount: f32,
     seed: u64,
 }
 
 impl Draw {
-    /// `value` moved by up to `reach` octaves either way, by the draw in
-    /// `slot`.
     fn scale(&self, value: f32, slot: i64, reach: f32) -> f32 {
         let u = 2.0 * unit2(slot, 0, VARY_CHANNEL, self.seed) - 1.0;
         value * (self.amount * reach * u).exp2()
     }
 
-    /// One path's envelopes, cutoff and bounce, on the slots from `first`.
     fn path(
         &self,
         amp: &mut Adsr,
@@ -110,7 +59,6 @@ impl Draw {
         pitch_env: &mut Option<PitchEnv>,
         first: i64,
     ) {
-        // The amp envelope's three draws open the path, on its first slots.
         self.times(amp, first);
         if let Some(filter) = filter {
             filter.cutoff = self.scale(filter.cutoff, first + CUTOFF_SLOT, CUTOFF_REACH);
@@ -122,9 +70,6 @@ impl Draw {
         }
     }
 
-    /// An envelope's three timings, each on its own draw. The sustain is a
-    /// level rather than a time, and a struck sound's is usually zero, so it
-    /// is left where it was written.
     fn times(&self, adsr: &mut Adsr, first: i64) {
         adsr.a = self.scale(adsr.a, first, TIME_REACH);
         adsr.d = self.scale(adsr.d, first + 1, TIME_REACH);
@@ -137,7 +82,6 @@ mod tests {
     use super::*;
     use crate::patch::{Filter, FilterKind, Osc, PitchEnv, Slope, Source, Wave};
 
-    /// A pop: a sine falling an octave onto its note, through a filter.
     fn pop() -> Patch {
         let adsr = Adsr {
             a: 0.001,
@@ -181,7 +125,6 @@ mod tests {
         }
     }
 
-    /// The promise every existing recipe rests on: no amount, no change.
     #[test]
     fn nothing_to_vary_is_the_patch_as_written() {
         for amount in [0.0, -0.5, f32::NAN, f32::NEG_INFINITY] {
@@ -189,7 +132,6 @@ mod tests {
         }
     }
 
-    /// Every number lands inside its reach, on the side of zero it started.
     #[test]
     fn a_full_take_stays_inside_its_reach() {
         for seed in 0..64 {
@@ -207,11 +149,9 @@ mod tests {
             assert!((-18.0..=-8.0).contains(&bounce), "bounce {bounce}");
             assert_eq!(take.amp.s, 0.0, "a level is not a time");
         }
-        // And past one is one.
         assert_eq!(pop().varied(4.0, 3), pop().varied(1.0, 3));
     }
 
-    /// Two seeds are two takes, and a smaller amount is a smaller nudge.
     #[test]
     fn each_seed_is_a_different_take_and_amount_is_how_far() {
         let decays: Vec<f32> = (0..8).map(|seed| pop().varied(1.0, seed).amp.d).collect();
@@ -227,8 +167,6 @@ mod tests {
         assert_eq!(pop().varied(0.6, 5), pop().varied(0.6, 5), "and replays");
     }
 
-    /// A stage's draws are its own: adding a filter does not re-roll the amp
-    /// envelope a seed already gave.
     #[test]
     fn a_stage_keeps_its_draws_whatever_else_the_patch_has() {
         let bare = Patch {
@@ -239,8 +177,6 @@ mod tests {
         assert_eq!(bare.varied(0.7, 21).amp, pop().varied(0.7, 21).amp);
     }
 
-    /// A layer is scattered too, on draws of its own, and gaining one moves
-    /// nothing a seed already gave the patch's own path.
     #[test]
     fn a_layer_takes_its_own_draws_after_the_patch_s() {
         let layer = crate::patch::Layer {
@@ -271,9 +207,6 @@ mod tests {
         assert_ne!(layers[0].amp, pop().amp, "and was scattered");
     }
 
-    /// One take, pinned to the number: the patch's own path draws what it drew
-    /// before layers existed, and each layer's slots sit after it. A slot that
-    /// moves re-rolls every existing seed's take, and only exact numbers see it.
     #[test]
     fn one_take_lands_on_the_numbers_its_slots_give() {
         let layer = crate::patch::Layer {

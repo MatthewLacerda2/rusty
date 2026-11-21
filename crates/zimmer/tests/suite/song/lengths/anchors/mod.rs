@@ -1,6 +1,5 @@
-//! Sections pinned to times (#1009): each anchored downbeat lands exactly on
-//! its time, the tempo between anchors is what moves, and what the clock
-//! cannot honour is refused by name.
+//! Sections pinned to times: each anchored downbeat lands exactly on its time, the tempo between
+//! anchors is what moves, and what the clock cannot honour is refused by name.
 
 mod landing;
 mod refusals;
@@ -8,9 +7,6 @@ mod refusals;
 use scorsese_zimmer::Song;
 use scorsese_zimmer::song::Anchor;
 
-/// Four sections of four beats at 120 bpm — two seconds each, so a written
-/// boundary is a round number and every anchor is a deliberate distance off
-/// one.
 pub(crate) fn four_sections(anchors: Vec<Anchor>) -> Song {
     let mut song = Song::from_json(
         r#"{
@@ -28,7 +24,6 @@ pub(crate) fn four_sections(anchors: Vec<Anchor>) -> Song {
     song
 }
 
-/// Where each section ends, in seconds.
 pub(crate) fn ends(song: &Song) -> Vec<f64> {
     song.sections().iter().map(|cut| cut.end_seconds).collect()
 }

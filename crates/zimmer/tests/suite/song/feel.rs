@@ -6,8 +6,6 @@ use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Slope};
 use scorsese_zimmer::song::{Humanize, InlineOnly, PatchRef};
 use scorsese_zimmer::{SAMPLE_RATE, Song, render_song};
 
-/// Renders a song whose instruments are all inline, as one channel of it —
-/// a performance is a matter of when and how hard, not of where.
 fn render(song: &Song) -> Vec<f32> {
     channel(
         &render_song(song, &InlineOnly).expect("the song renders"),
@@ -15,24 +13,16 @@ fn render(song: &Song) -> Vec<f32> {
     )
 }
 
-/// The fixture with a *deterministic* instrument.
-///
-/// The stock one is noise, which already differs from pass to pass by design
-/// and would hide the thing these tests are about. With a plain saw, two
-/// passes of one pattern are bit-identical unless something moved them apart.
 fn steady() -> Song {
     let mut steady = song();
     steady.tracks[0].patch = PatchRef::Inline(Box::new(saw_patch()));
     steady
 }
 
-/// How many samples one pass of the two-beat fixture pattern takes.
 fn pass(song: &Song) -> usize {
     (2.0 * song.beat_seconds() * SAMPLE_RATE as f32) as usize
 }
 
-/// The strongest form the claim takes: swinging a song equals writing its
-/// off-beats late by hand, to the sample.
 #[test]
 fn swinging_equals_writing_the_off_beats_late() {
     let mut swung = song();
@@ -45,8 +35,6 @@ fn swinging_equals_writing_the_off_beats_late() {
     assert_eq!(render(&swung), render(&by_hand));
 }
 
-/// Swing moves the off-beats and nothing else: a note on the beat is left
-/// where it was written, which is what makes swing a feel rather than a delay.
 #[test]
 fn a_note_on_the_beat_does_not_move_however_hard_the_song_swings() {
     let straight = song();
@@ -63,25 +51,12 @@ fn a_note_on_the_beat_does_not_move_however_hard_the_song_swings() {
     assert_eq!(render(&swung), render(&straight));
 }
 
-/// Where the first note of a pass sounds, as a sample offset inside it.
-///
-/// The fixture's saw sustains fully and releases instantly, so a pass holds
-/// nothing of the one before it and the first sample with any signal in it is
-/// the onset.
 fn onset(pass: &[f32]) -> usize {
     pass.iter()
         .position(|sample| sample.abs() > 0.01)
         .expect("the pass has a note in it")
 }
 
-/// The point of keying the draw on the note's ordinal rather than on its
-/// pattern: eight bars nudged identically both times round is still a
-/// photocopy, just a crooked one.
-///
-/// Measured as *where the note lands* rather than by comparing the samples,
-/// because the samples of two passes already differ — each note starts its
-/// oscillators somewhere in their cycle, drawn from its own seed — and a
-/// comparison that passed on that alone would say nothing about humanising.
 #[test]
 fn a_pattern_played_twice_is_humanised_differently_each_time() {
     let one = pass(&steady());
@@ -107,9 +82,6 @@ fn a_pattern_played_twice_is_humanised_differently_each_time() {
     );
 }
 
-/// And a repeat is not a photocopy even with no `humanize` written at all: the
-/// note the second pass plays is the same note struck a second time, which no
-/// instrument has ever answered identically.
 #[test]
 fn a_repeated_note_is_not_the_same_waveform_twice() {
     let one = pass(&steady());
@@ -126,8 +98,6 @@ fn a_repeated_note_is_not_the_same_waveform_twice() {
     );
 }
 
-/// The fixture again, with an instrument that routes velocity at its filter —
-/// the only kind of patch `timbre` can reach, and the kind that shows it.
 fn expressive() -> Song {
     let mut patch = saw_patch();
     patch.filter = Some(Filter {
@@ -145,8 +115,6 @@ fn expressive() -> Song {
     expressive
 }
 
-/// `timbre` scatters the tone and nothing else: the notes land where the score
-/// put them, and what arrives there is played with a different touch each time.
 #[test]
 fn a_timbre_amount_moves_the_tone_and_leaves_the_timing_alone() {
     let one = pass(&expressive());
@@ -166,8 +134,6 @@ fn a_timbre_amount_moves_the_tone_and_leaves_the_timing_alone() {
     assert_ne!(rigid, played, "the touch never reached the instrument");
 }
 
-/// A note written on beat zero and nudged early has nowhere to go, so it is
-/// clamped to the start of the buffer rather than lost off the front of it.
 #[test]
 fn an_early_nudge_on_the_very_first_beat_still_sounds() {
     let window = (0.6 * SAMPLE_RATE as f32) as usize;

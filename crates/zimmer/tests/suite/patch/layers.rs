@@ -1,11 +1,10 @@
-//! Layers: several sounds summed into one note before the patch's fx chain —
-//! how they are written down, what is refused, and what they render to.
+//! Layers: several sounds summed into one note before the patch's fx chain — how they are written
+//! down, what is refused, and what they render to.
 
 use crate::common::{channel, peak, render_stereo};
 use scorsese_zimmer::patch::MAX_LAYERS;
 use scorsese_zimmer::{NoteOpts, Patch, SynthError};
 
-/// A snare: a short pink-noise crack on top, a falling sine body beneath.
 const SNARE: &str = r#"{
     "source": { "kind": "noise", "color": "pink" },
     "amp": { "a": 0.001, "d": 0.08, "s": 0.0, "r": 0.02 },
@@ -126,7 +125,6 @@ fn the_note_rings_as_long_as_its_longest_layer() {
     )
     .len()
         / 2;
-    // 0.05 s held, then the body's 0.3 s release rather than the crack's 0.02.
     assert_eq!(layered, ((0.05f32 + 0.3) * 44_100.0).ceil() as usize);
     assert!(layered > top * 4, "{layered} against {top}");
 }
@@ -150,7 +148,6 @@ fn two_noise_layers_are_not_the_same_noise() {
         ),
         0,
     );
-    // The same noise twice would be exactly double; two draws add in power.
     let ratio = peak(&both) / peak(&one);
     assert!(ratio < 1.9, "the layer replayed the top's noise: {ratio}");
 }

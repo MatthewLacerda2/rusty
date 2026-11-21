@@ -1,21 +1,12 @@
-//! What a patch's sources are refused with, and its layers: an empty, oversized
-//! or silent oscillator stack or additive series, a ratio that names no
-//! frequency, an `fm4` heard through silent carriers, too many layers, a
-//! silent one, and a layer whose own stage was refused.
-//!
-//! Out of [`super`] for the reason [`length`](super::length) is: that file is
-//! at the size gate, and a source is the seam the instrument group already
-//! had. The parent's match hands every one of these variants here by name;
-//! one that reaches the catch-all arm below prints its `Debug` form rather
-//! than panicking inside a `Display`.
+//! What a patch's sources are refused with, and its layers: an empty, oversized or silent
+//! oscillator stack or additive series, a ratio that names no frequency, an `fm4` heard through
+//! silent carriers, too many layers, a silent one, and a layer whose own stage was refused.
 
 use std::fmt;
 
 use crate::error::SynthError;
 
 impl SynthError {
-    /// The words for a source or layer refusal. Only ever called from
-    /// [`SynthError::say`] with one of the variants it names.
     pub(super) fn say_source(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::EmptyOscStack => write!(f, "patch: `osc_stack` needs at least one oscillator"),

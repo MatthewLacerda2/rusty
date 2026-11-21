@@ -1,13 +1,9 @@
 //! Key tracking by the number: how far the cutoff follows the played note.
-//!
-//! Every expected value is a power of two worked out by hand, so each
-//! assertion is exact, for the reason the parent module's tests give.
 
 use super::cutoff_track;
 use crate::core::lfo::Lfos;
 use crate::patch::{Adsr, Filter, FilterKind, Slope};
 
-/// A cutoff with no movement of its own, so the note is all that moves it.
 fn lowpass(key_track: f32) -> Filter {
     Filter {
         kind: FilterKind::Lowpass,
@@ -21,7 +17,6 @@ fn lowpass(key_track: f32) -> Filter {
     }
 }
 
-/// Where the cutoff sits for a note at `midi`.
 fn at(key_track: f32, midi: f32) -> f32 {
     cutoff_track(
         &lowpass(key_track),
@@ -58,14 +53,12 @@ fn half_tracking_moves_half_an_octave_per_octave() {
     assert_eq!(at(0.5, 84.0), 2_000.0);
 }
 
-/// Out of `0..=1` is clamped rather than refused.
 #[test]
 fn an_amount_out_of_range_is_clamped() {
     assert_eq!(at(3.0, 72.0), 2_000.0);
     assert_eq!(at(-1.0, 72.0), 1_000.0);
 }
 
-/// It joins the octave sum, so it multiplies a song's cutoff curve too.
 #[test]
 fn it_follows_a_moved_base_cutoff() {
     let base = [400.0; 4];

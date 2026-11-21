@@ -1,12 +1,11 @@
-//! Pulse width inside a layer (#1771 over #1773): a layer's square is moved
-//! by the patch's pulse-width LFO like the top level's, and a width written
-//! on a layer's other wave is refused by the layer's index.
+//! Pulse width inside a layer ( over ): a layer's square is moved by the patch's pulse-width LFO
+//! like the top level's, and a width written on a layer's other wave is refused by the layer's
+//! index.
 
 use crate::common::render;
 use scorsese_zimmer::patch::{LfoTarget, Wave};
 use scorsese_zimmer::{NoteOpts, Patch, SynthError};
 
-/// Noise on top, a 25% square in the one layer, and a pulse-width LFO.
 const BUZZ: &str = r#"{
     "source": { "kind": "noise" },
     "amp": { "a": 0.001, "d": 0.1, "s": 0.5, "r": 0.05 },

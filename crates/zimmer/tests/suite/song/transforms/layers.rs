@@ -1,9 +1,4 @@
-//! Layered entries: several patterns in one slot, each written once (#506).
-//!
-//! The claim is the module's own, one level up: **a layered entry must equal
-//! writing its layers out as one pattern by hand.** A solo over a groove is
-//! then the same music whether the groove was copied into the solo or named
-//! beside it — only the second keeps the groove in one place.
+//! Layered entries: several patterns in one slot, each written once.
 
 use crate::common::songs::{note, played, song};
 use scorsese_zimmer::Song;
@@ -11,9 +6,6 @@ use scorsese_zimmer::song::{ArrangementEntry, Layer, Layers, Pattern, Play, Trac
 
 use super::setup::{play, render};
 
-/// The fixture's bass `verse` as the groove, a `solo` on a second track over
-/// it, and `both` — the two written out as one pattern, groove first, which is
-/// the order a layered entry walks in.
 fn band(solo_beats: f32) -> Song {
     let mut band = song();
     band.tracks.push(Track {
@@ -48,8 +40,6 @@ fn a_layered_entry_equals_its_layers_written_out_as_one_pattern() {
     assert_eq!(render(&layers), render(&by_hand));
 }
 
-/// One layer is the bare entry: the form is additive, and wrapping a name in
-/// `layers` changes nothing it plays.
 #[test]
 fn a_single_layer_plays_exactly_what_the_bare_name_plays() {
     let mut bare = song();
@@ -60,8 +50,6 @@ fn a_single_layer_plays_exactly_what_the_bare_name_plays() {
     assert_eq!(render(&wrapped), render(&bare));
 }
 
-/// A layer's transforms are its own: the solo goes up an octave and the
-/// groove under it does not move.
 #[test]
 fn each_layer_is_transformed_alone() {
     let mut by_hand = band(2.0);
@@ -83,9 +71,6 @@ fn each_layer_is_transformed_alone() {
     assert_eq!(render(&layers), render(&by_hand));
 }
 
-/// The slot is as long as its longest layer, so what follows it waits for
-/// everything in it — and the report still has one row for it, named after
-/// both.
 #[test]
 fn the_slot_is_its_longest_layer_and_one_section() {
     let mut layers = band(4.0);

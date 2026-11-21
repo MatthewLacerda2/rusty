@@ -1,10 +1,4 @@
 //! Defects that live between samples: clicks, dropouts and stepped gain.
-//!
-//! Every signal here is built so the answer is known by construction — a jump
-//! put at a named sample, a gap of a named length, a gain changed once every
-//! 800 samples — and every clean signal is one a careless detector would flag:
-//! a sawtooth is a jump every period, a low tone ripples, a smooth fade moves
-//! the level all the time, and noise is nothing but jumps.
 
 use std::f64::consts::TAU;
 
@@ -23,7 +17,6 @@ mod trains;
 
 pub(super) const RATE: u32 = 48_000;
 
-/// `seconds` of a sine at `hz` and `amplitude`, gained by `gain(t)` in dB.
 pub(super) fn tone(hz: f64, amplitude: f64, seconds: f64, gain: impl Fn(f64) -> f64) -> Vec<f32> {
     let samples = (seconds * f64::from(RATE)) as usize;
     (0..samples)
@@ -48,7 +41,6 @@ pub(super) fn interleaved(left: &[f32], right: &[f32]) -> Vec<f32> {
     left.iter().zip(right).flat_map(|(l, r)| [*l, *r]).collect()
 }
 
-/// A deterministic white noise, so the assertion is the same on every run.
 pub(super) fn noise(amplitude: f32, samples: usize) -> Vec<f32> {
     let mut state: u32 = 0x1234_5678;
     (0..samples)
@@ -91,8 +83,6 @@ fn clean_signals_have_no_defects() {
     }
 }
 
-/// Clean is nothing of *any* kind: one of a kind alone is not clean, and nor
-/// are two kinds whose counts would cancel or multiply away.
 #[test]
 fn a_defect_of_any_kind_is_not_clean() {
     let one = || Tally {

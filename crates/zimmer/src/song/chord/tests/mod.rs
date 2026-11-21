@@ -4,7 +4,6 @@ use super::*;
 
 mod voicing;
 
-/// A chord to voice, at the octave the document gave it.
 fn chord(name: &str, oct: Option<i32>) -> Chord {
     Chord {
         track: "keys".to_owned(),
@@ -22,22 +21,18 @@ fn chord(name: &str, oct: Option<i32>) -> Chord {
     }
 }
 
-/// The MIDI numbers a chord comes out as.
 fn voiced(chord: &Chord) -> Result<Vec<f32>, SynthError> {
     let mut out = Vec::new();
     chord.voice_into(&mut Led::default(), &mut out)?;
     out.iter().map(|note| note.note.to_midi()).collect()
 }
 
-/// The voicing rule, stated as numbers: close position, root upward.
 #[test]
 fn a_name_voices_close_position_from_its_root() {
-    // D3 F3 A3 C4 — the chord the module doc promises.
     assert_eq!(
         voiced(&chord("Dm7", Some(3))).expect("Dm7 voices"),
         vec![50.0, 53.0, 57.0, 60.0]
     );
-    // C4 E4 G4, and the same triad over a slash bass under it.
     assert_eq!(
         voiced(&chord("C", Some(4))).expect("C voices"),
         vec![60.0, 64.0, 67.0]
@@ -48,8 +43,6 @@ fn a_name_voices_close_position_from_its_root() {
     );
 }
 
-/// An absent octave is a documented default rather than a guess, and it is
-/// the one the field's own doc names.
 #[test]
 fn an_absent_octave_roots_the_chord_at_three() {
     assert_eq!(
@@ -59,8 +52,6 @@ fn an_absent_octave_roots_the_chord_at_three() {
     assert_eq!(DEFAULT_OCT, 3, "the doc on `oct` says three");
 }
 
-/// Every voice keeps the chord's timing and force — that shared line is
-/// the whole point of writing it as one entry.
 #[test]
 fn every_voice_carries_the_chord_it_came_from() {
     let mut out = Vec::new();
@@ -77,9 +68,6 @@ fn every_voice_carries_the_chord_it_came_from() {
     );
 }
 
-/// Refused rather than clamped: the octave is in the same entry, so this
-/// is a document that can be corrected rather than a pattern meeting a
-/// transform written somewhere else.
 #[test]
 fn a_chord_voiced_off_the_keyboard_is_refused() {
     assert!(matches!(
@@ -92,7 +80,6 @@ fn a_chord_voiced_off_the_keyboard_is_refused() {
     ));
 }
 
-/// The escape hatch, and the two ways of writing it that say nothing.
 #[test]
 fn spelled_pitches_are_the_chord_and_take_no_octave() {
     let spelled = |oct, pitches: Vec<Pitch>| Chord {

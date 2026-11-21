@@ -1,17 +1,10 @@
 //! What a curve is refused for.
-//!
-//! One rule underneath all of it: **a curve that moves nothing is refused, not
-//! ignored.** A misspelled track, an empty list, a second curve on the same
-//! parameter and a sweep on an instrument with no filter are all the same
-//! failure — a build the recipe says is there and nothing can hear — and it is
-//! the failure that costs an agent a whole iteration to even notice.
 
 use scorsese_zimmer::song::{Automation, InlineOnly, Param, Point};
 use scorsese_zimmer::{SynthError, render_song};
 
 use super::setup::{at, curve, filtered, held, voiced};
 
-/// The refusal a song carrying these curves is turned away with.
 fn refused(moving: Vec<Automation>) -> SynthError {
     let mut song = held(0.5);
     song.automation = moving;
@@ -101,8 +94,6 @@ fn a_cutoff_curve_through_zero_hertz_is_refused() {
     ));
 }
 
-/// The one refusal that needs the instrument rather than the document, so it
-/// arrives when the patch is resolved rather than when the song is read.
 #[test]
 fn a_cutoff_curve_on_an_instrument_with_no_filter_is_refused() {
     let mut song = held(0.5);
@@ -115,8 +106,6 @@ fn a_cutoff_curve_on_an_instrument_with_no_filter_is_refused() {
     ));
 }
 
-/// The point of a closed list: a misspelled parameter is refused by the reader,
-/// against the words that work, rather than parsed into a curve on nothing.
 #[test]
 fn a_parameter_that_is_not_one_of_the_words_is_refused_by_the_reader() {
     let written = r#"{ "track": "pad", "param": "cutof", "points": [] }"#;
@@ -129,8 +118,6 @@ fn a_parameter_that_is_not_one_of_the_words_is_refused_by_the_reader() {
     );
 }
 
-/// And an unknown field on a point, for the same reason a note's entry denies
-/// them: `{ "beat": 0, "vaule": 1 }` is a point that moves nothing.
 #[test]
 fn a_misspelled_field_on_a_point_is_refused() {
     let written = r#"{ "beat": 0.0, "vaule": 1.0 }"#;

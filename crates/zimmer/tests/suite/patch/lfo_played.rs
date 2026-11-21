@@ -1,5 +1,5 @@
-//! What a note and a song do with the LFO's onset, second slot and beats
-//! (#1772). `lfo` has the document; `core::lfo` pins the curves.
+//! What a note and a song do with the LFO's onset, second slot and beats. `lfo` has the document;
+//! `core::lfo` pins the curves.
 
 use crate::common::songs::song;
 use crate::common::{opts, render, saw_patch};
@@ -25,8 +25,6 @@ fn on_the_beat() -> Lfo {
     }
 }
 
-/// Through its delay a vibrato moves nothing: the note is sample for sample
-/// the note with no LFO, and after it the two part.
 #[test]
 fn a_delayed_vibrato_leaves_the_start_of_the_note_alone() {
     let late = with(Lfo {
@@ -42,8 +40,6 @@ fn a_delayed_vibrato_leaves_the_start_of_the_note_alone() {
     assert_ne!(moved[start + 10_000..], plain[start + 10_000..]);
 }
 
-/// `lfo2` is an LFO like `lfo`: one written there renders what it renders in
-/// the first slot.
 #[test]
 fn the_second_slot_moves_the_note_as_the_first_does() {
     let first = render(&with(vibrato()), 60.0, &opts(0.4));
@@ -54,9 +50,6 @@ fn the_second_slot_moves_the_note_as_the_first_does() {
     assert_eq!(render(&second, 60.0, &opts(0.4)), first);
 }
 
-/// A song plays a patch whose LFO is timed in beats, the same way twice, and
-/// the LFO moves it: a square on the amp, read off the song's clock, dips
-/// the level for half of every cycle.
 #[test]
 fn a_song_plays_an_lfo_timed_in_beats() {
     let play = |lfo: Option<Lfo>| {

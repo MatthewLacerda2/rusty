@@ -1,8 +1,4 @@
-//! Stopping a bake part way (#661).
-//!
-//! The hook is additive, so the claim that matters most is the dull one: a
-//! `stop` that never says yes bakes exactly what `bake_song` bakes. The other
-//! two are that it is honoured — before anything, and part way through.
+//! Stopping a bake part way.
 
 use std::cell::Cell;
 

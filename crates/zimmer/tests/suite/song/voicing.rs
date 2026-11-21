@@ -1,13 +1,10 @@
-//! A chord voiced other than in root position, held to the notes it stands
-//! for: `inv` and `voicing: "near"` must render exactly as the pitches they
-//! choose, written out.
+//! A chord voiced other than in root position, held to the notes it stands for: `inv` and `voicing:
+//! "near"` must render exactly as the pitches they choose, written out.
 
 use crate::common::songs::{note, played, song, verse};
 use scorsese_zimmer::song::{Chord, InlineOnly, Leading, Note, PatternEntry, Voicing};
 use scorsese_zimmer::{Song, render_song};
 
-/// The one-track fixture over four beats, playing `entries` once and quietly
-/// enough that the master limiter never acts.
 fn playing(entries: Vec<PatternEntry>) -> Song {
     let mut once = song();
     once.arrangement = vec!["verse".into()];
@@ -18,7 +15,6 @@ fn playing(entries: Vec<PatternEntry>) -> Song {
     once
 }
 
-/// A two-beat named chord at `start` on the fixture's track, voiced as asked.
 fn chord(name: &str, start: f32, inv: Option<u8>, voicing: Option<Leading>) -> PatternEntry {
     Chord {
         track: "bass".to_owned(),
@@ -37,7 +33,6 @@ fn chord(name: &str, start: f32, inv: Option<u8>, voicing: Option<Leading>) -> P
     .into()
 }
 
-/// The same chords written out a voice at a time, one group per two beats.
 fn by_hand(groups: &[&str]) -> Song {
     let notes: Vec<Note> = groups
         .iter()
@@ -51,13 +46,10 @@ fn by_hand(groups: &[&str]) -> Song {
     playing(played(notes))
 }
 
-/// Rendered samples, which is where the two spellings have to agree.
 fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
-/// The issue's progression: root position jumps every voice, `near` keeps the
-/// shared notes — and either way the chord is the notes it names.
 #[test]
 fn near_plays_the_voicing_it_chose() {
     let near = Some(Leading::Near);
@@ -71,8 +63,6 @@ fn near_plays_the_voicing_it_chose() {
     );
 }
 
-/// An inversion is the chord turned, and a pattern placed twice leads from
-/// nothing each time: its first `near` chord is root position on every pass.
 #[test]
 fn inversions_and_the_pattern_edge() {
     let turned = playing(vec![chord("C", 0.0, Some(1), None)]);
@@ -85,8 +75,6 @@ fn inversions_and_the_pattern_edge() {
     assert_eq!(render(&twice), render(&root));
 }
 
-/// The words round-trip, and a chord that asks for neither writes neither — a
-/// bake is addressed by its recipe's bytes.
 #[test]
 fn the_fields_round_trip_and_are_silent_at_their_default() {
     let asked = playing(vec![

@@ -1,14 +1,11 @@
-//! A track's row when it is summed through a bus of its own — one with a chain,
-//! or with a fader that moves — rather than added straight into the master.
+//! A track's row when it is summed through a bus of its own — one with a chain, or with a fader
+//! that moves — rather than added straight into the master.
 
 use scorsese_zimmer::patch::Fx;
 use scorsese_zimmer::song::{Automation, Easing, Param, Point, Song};
 
 use super::tracks::{bake, duet, mean};
 
-/// And the same for a track summed through a bus of its own — one with a
-/// chain, or with a fader that moves — whose part is measured where the
-/// master hears it, at its fader once and not twice.
 #[test]
 fn a_bussed_track_is_measured_after_its_gain_too() {
     let mut chained = duet();
@@ -42,7 +39,6 @@ fn a_bussed_track_is_measured_after_its_gain_too() {
     );
 }
 
-/// [`duet`] with its bass at half its fader.
 fn quieter_sub() -> Song {
     let mut song = duet();
     song.tracks[0].gain = 0.5;

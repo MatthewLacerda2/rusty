@@ -1,16 +1,8 @@
 //! sweep — a cutoff moved from outside the note, as the per-sample base
 //! [`super::tracks::cutoff_track`] multiplies.
 
-/// How often a moving base cutoff is read, in sample-frames — about 0.7 ms.
-///
-/// A curve is a handful of points read through an easing; reading it at every
-/// sample of every note costs more than the filter does. Between two reads the
-/// value is a straight line, and over 32 samples the difference between that
-/// and the curve is far below anything a filter's response can show.
 const SWEEP_STEP: usize = 32;
 
-/// `sweep`, a cutoff in Hz at each sample-frame of a note, read every
-/// [`SWEEP_STEP`] frames and joined by straight lines into `n` of them.
 pub(crate) fn swept(sweep: &dyn Fn(usize) -> f32, n: usize) -> Vec<f32> {
     let last = n.saturating_sub(1);
     let read = |k: usize| (k * SWEEP_STEP).min(last);

@@ -7,8 +7,6 @@ use super::{RATE, found, interleaved, steady, tone};
 #[test]
 fn a_jump_in_a_smooth_tone_is_a_click_at_its_moment() {
     let mut signal = tone(220.0, 0.4, 2.0, steady);
-    // Everything from 1.25 s on is shifted up by a fifth of full scale: one
-    // step discontinuity, nowhere else.
     let at = (1.25 * f64::from(RATE)) as usize;
     for sample in &mut signal[at..] {
         *sample += 0.2;
@@ -41,8 +39,6 @@ fn a_gap_in_continuous_sound_is_a_dropout_with_its_length() {
     assert!(gap.size_db >= 40.0, "{gap:?}");
 }
 
-/// A pause is not a dropout: speech stops between sentences, and a song
-/// stops before its last chord.
 #[test]
 fn a_pause_longer_than_a_dropout_is_not_one() {
     let mut signal = tone(440.0, 0.4, 3.0, steady);
@@ -65,8 +61,6 @@ fn a_defect_in_one_channel_says_which() {
     assert_eq!(both.dropouts.worst[0].channel, None);
 }
 
-/// A render feeds its mix a segment at a time, so the answer cannot depend on
-/// where the runs were cut.
 #[test]
 fn a_signal_fed_in_runs_reads_as_it_does_fed_whole() {
     let mut signal = tone(220.0, 0.4, 2.0, steady);

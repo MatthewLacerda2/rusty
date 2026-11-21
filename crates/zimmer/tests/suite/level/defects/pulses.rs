@@ -1,13 +1,8 @@
-//! Sounds that pulse on their own, which a staircase detector must not take
-//! for stepped gain: notes rich in harmonics, beats and a level that climbs
-//! within every frame, each with a fade under it.
+//! Sounds that pulse on their own, which a staircase detector must not take for stepped gain: notes
+//! rich in harmonics, beats and a level that climbs within every frame, each with a fade under it.
 
 use super::{RATE, found, steady, tone};
 
-/// A note rich in harmonics pulses once a cycle, at a period in the same
-/// range a game's control rate is, and as it dies away the pulse can read as
-/// a staircase. Stepped gain is not reported on a sound that pulses on its
-/// own: it misses there rather than invents.
 #[test]
 fn a_low_note_dying_away_is_not_a_staircase() {
     for hz in [60.0, 120.0, 180.0, 250.0, 270.0, 339.0, 523.0] {
@@ -22,9 +17,6 @@ fn a_low_note_dying_away_is_not_a_staircase() {
     }
 }
 
-/// A dropout in a note dying away is not a staircase either: the note's pulse
-/// is still there on both sides of the gap, and the gap itself must not
-/// drown it out.
 #[test]
 fn a_note_with_a_dropout_dying_away_is_not_a_staircase() {
     for hz in [339.0, 440.0, 523.0, 659.0] {
@@ -44,8 +36,6 @@ fn a_note_with_a_dropout_dying_away_is_not_a_staircase() {
     }
 }
 
-/// A note with a sharp pulse a cycle, as a voice or a reed has: the first
-/// eight harmonics of `hz`, gained by `gain(t)` in dB.
 fn buzz(hz: f64, seconds: f64, gain: impl Fn(f64) -> f64) -> Vec<f32> {
     let samples = (seconds * f64::from(RATE)) as usize;
     (0..samples)
@@ -59,10 +49,6 @@ fn buzz(hz: f64, seconds: f64, gain: impl Fn(f64) -> f64) -> Vec<f32> {
         .collect()
 }
 
-/// Two notes a few tens of hertz apart beat, and as they die away the beat
-/// can read as a staircase at its own period: halved, each beat's halves are
-/// level, but quartered they are not. A beat is not stepped gain, at any
-/// decay.
 #[test]
 fn two_notes_beating_as_they_fade_are_not_a_staircase() {
     for (low, high) in [
@@ -94,10 +80,6 @@ fn two_notes_beating_as_they_fade_are_not_a_staircase() {
     }
 }
 
-/// A level that drops at every frame and climbs back part of the way inside
-/// it, in two quarter-frame steps, fades frame by frame but is not flat
-/// within a frame. Halved at the frame it reads as a staircase; quartered,
-/// or cut half a frame later, it does not, and it is not one.
 #[test]
 fn a_level_that_climbs_within_every_frame_is_not_a_staircase() {
     for (frame_ms, step_db) in [(12.0, 1.0), (12.0, 2.0), (16.6667, 0.5), (16.6667, 1.0)] {

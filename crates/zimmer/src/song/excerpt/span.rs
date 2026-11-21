@@ -1,33 +1,15 @@
 //! The grammar of "part of it": `12:48`, `12:`, `:48`.
-//!
-//! Its own file because it is a *notation* rather than a decision — the same
-//! two numbers and one colon that `render --range` already takes, and the only
-//! thing here that a caller types by hand. What those numbers then mean is
-//! [`super::Window`]'s business, and keeping the two apart is what lets the
-//! same span be read as beats or as seconds without the parser knowing which.
 
 use std::fmt;
 use std::str::FromStr;
 
-/// Two numbers with a colon between them: `12:48` is 12 up to but not
-/// including 48, `12:` runs to the end of the piece, `:48` from its start.
-///
-/// End-exclusive, and spelled the way `render --range` already spells a slice
-/// of the timeline: one grammar for "part of it" across the program is one
-/// fewer thing to look up.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span {
-    /// Where it opens. Never negative and always known — an open start is
-    /// zero.
     pub(super) start: f32,
-    /// Where it closes, or `None` to run to the end of whatever it is a span
-    /// of. Only [`super::Window`] knows what that is.
     pub(super) end: Option<f32>,
 }
 
 impl Span {
-    /// A span from `start`, ending at `end` or running to the end of the
-    /// piece.
     pub fn new(start: f32, end: Option<f32>) -> Result<Self, SpanError> {
         if !start.is_finite() || start < 0.0 {
             return Err(SpanError::Malformed);
@@ -66,16 +48,9 @@ impl FromStr for Span {
     }
 }
 
-/// Text that is not a span.
-///
-/// Written out by hand rather than derived, because this crate has no error
-/// derive to reach for — [`SynthError`](crate::SynthError) says its own
-/// wording in one place too.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpanError {
-    /// No colon, a number that is not one, or a negative start.
     Malformed,
-    /// Includes the equal case: end-exclusive means `8:8` selects nothing.
     Backwards,
 }
 
@@ -115,8 +90,6 @@ mod tests {
         assert_eq!("-1:8".parse::<Span>(), Err(SpanError::Malformed));
     }
 
-    /// The wording of a refusal is the whole of what a caller repairing a
-    /// command line reads, so it is asserted rather than assumed.
     #[test]
     fn a_refusal_says_what_a_range_should_look_like() {
         assert!(

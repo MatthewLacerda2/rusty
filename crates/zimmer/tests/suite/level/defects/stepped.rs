@@ -2,11 +2,9 @@
 
 use super::{RATE, found, tone};
 
-/// The defect the measurement was asked for: a gain set once per game frame
-/// and held for the frame, so a fade arrives as a staircase.
 #[test]
 fn a_fade_stepped_at_a_control_rate_is_zipper_with_its_period() {
-    let period = 800.0 / f64::from(RATE); // 16.67 ms, a 60 Hz control rate
+    let period = 800.0 / f64::from(RATE);  // 16.67 ms, a 60 Hz control rate
     let signal = tone(440.0, 0.5, 2.0, |t| {
         if !(0.5..1.5).contains(&t) {
             return if t < 0.5 { 0.0 } else { -30.0 };
@@ -23,10 +21,6 @@ fn a_fade_stepped_at_a_control_rate_is_zipper_with_its_period() {
     assert_eq!(defects.clicks.count, 0, "{defects:?}");
 }
 
-/// A fade over a quarter of a second — fifteen steps — is found on its own,
-/// in a file where most of the sound is steady. Its last few steps may go
-/// unclaimed: a window that reaches past the end of a staircase is mostly
-/// flat, and only windows that are mostly staircase vouch for one.
 #[test]
 fn a_short_staircase_is_found_where_it_is() {
     let period = 800.0 / f64::from(RATE);
@@ -41,8 +35,6 @@ fn a_short_staircase_is_found_where_it_is() {
     assert!((1.15..1.27).contains(&run.to_seconds), "{run:?}");
 }
 
-/// A fade-out at the very end of a file is judged like one anywhere else,
-/// whatever the file's length.
 #[test]
 fn a_staircase_at_the_end_of_a_file_is_found() {
     let period = 800.0 / f64::from(RATE);
@@ -56,8 +48,6 @@ fn a_staircase_at_the_end_of_a_file_is_found() {
     }
 }
 
-/// Noise is nothing but random change, and a staircase under it is still
-/// found: the steps all go one way, and noise goes every way.
 #[test]
 fn noise_faded_in_steps_is_a_staircase() {
     let period = 800.0 / f64::from(RATE);
@@ -76,9 +66,6 @@ fn noise_faded_in_steps_is_a_staircase() {
     assert!((run.size_db - 1.0).abs() < 0.3, "{run:?}");
 }
 
-/// A fade in large steps, one game frame apart, is a staircase as
-/// plainly as one in small steps: its steps stand far clear of the noise, and
-/// a segment's halves are as level as ever.
 #[test]
 fn a_fade_in_large_steps_is_a_staircase() {
     let period = 800.0 / f64::from(RATE);

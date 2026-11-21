@@ -5,7 +5,6 @@ use scorsese_zimmer::song::{Anchor, Fit, FitMode};
 
 use super::four_sections;
 
-/// The refusal, as the section it names and the words it says.
 fn refused(anchors: Vec<Anchor>, fit: Option<Fit>) -> (usize, String) {
     let mut song = four_sections(anchors);
     song.fit = fit;
@@ -27,7 +26,6 @@ fn a_clip_nobody_resolved_is_refused_by_name() {
     assert!(said.contains("clip `logo`"), "{said}");
 }
 
-/// Twice as fast is far past a quarter: refused, with the tempo it needed.
 #[test]
 fn a_stretch_past_the_bound_says_what_tempo_it_needed() {
     let (section, said) = refused(vec![Anchor::at(2, 2.0)], None);
@@ -36,15 +34,12 @@ fn a_stretch_past_the_bound_says_what_tempo_it_needed() {
     assert!(said.contains("120.0 bpm written"), "{said}");
 }
 
-/// A quarter exactly is within the bound, as it is for a `stretch` fit:
-/// three sections written over 6 s, played over 8, are three quarters as fast.
 #[test]
 fn a_quarter_exactly_is_allowed() {
     let song = four_sections(vec![Anchor::at(3, 8.0)]);
     assert_eq!(song.validate(), Ok(()));
 }
 
-/// The end a stretch fit lands is held to the same bound, and says so.
 #[test]
 fn the_end_of_a_stretch_fit_is_bounded_too() {
     let fit = Some(Fit::lasting(20.0, FitMode::Stretch));
@@ -53,8 +48,6 @@ fn the_end_of_a_stretch_fit_is_bounded_too() {
     assert!(said.contains("the end `fit` stretches to"), "{said}");
 }
 
-/// A stretch fit whose end comes before the last anchor has nowhere to put
-/// the sections between them.
 #[test]
 fn a_stretch_fit_ending_before_the_last_anchor_is_refused() {
     let fit = Some(Fit::lasting(4.0, FitMode::Stretch));

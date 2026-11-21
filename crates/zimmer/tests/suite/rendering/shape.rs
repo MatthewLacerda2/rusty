@@ -4,7 +4,6 @@ use crate::common::{opts, peak, refusal, render, saw_patch};
 use scorsese_zimmer::patch::{Fx, Source};
 use scorsese_zimmer::{SAMPLE_RATE, SynthError};
 
-/// Samples in `seconds` of audio, the way the renderer counts them.
 fn samples(seconds: f32) -> usize {
     (seconds * SAMPLE_RATE as f32).ceil() as usize
 }
@@ -22,8 +21,6 @@ fn the_buffer_is_the_gate_plus_the_release_tail() {
     assert!(buf[buf.len() - 1].abs() < 1e-3, "and ends in silence");
 }
 
-/// An echo cut off mid-repeat is a click, not an echo — so the buffer grows to
-/// hold whatever the chain needs.
 #[test]
 fn an_fx_chain_lengthens_the_buffer_so_its_tail_survives() {
     let mut patch = saw_patch();
@@ -42,9 +39,6 @@ fn an_fx_chain_lengthens_the_buffer_so_its_tail_survives() {
     );
 }
 
-/// The other half of that rule. A waveshaper has no memory, so it colours the
-/// note without adding a millisecond to it — and a note that grew would mean
-/// state had crept into an effect that is a per-sample function.
 #[test]
 fn a_saturator_colours_the_note_without_lengthening_it() {
     let mut patch = saw_patch();
@@ -72,10 +66,6 @@ fn a_note_with_no_length_is_refused_by_the_number_that_is_wrong() {
     ));
 }
 
-/// A typo in a duration should fail loudly rather than allocate for an hour of
-/// audio — and a note past the ceiling is refused, never cut off at it with a
-/// click (#1093). The tail counts: a 58 s drone through a reverb is longer
-/// than 58 s.
 #[test]
 fn a_note_past_the_ceiling_is_refused_tail_included() {
     let too_long = refusal(&saw_patch(), 60.0, &opts(70.0));

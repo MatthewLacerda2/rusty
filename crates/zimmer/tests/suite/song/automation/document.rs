@@ -1,16 +1,11 @@
-//! The document: what a curve looks like on the page, and what it costs a song
-//! that does not use one.
+//! The document: what a curve looks like on the page, and what it costs a song that does not use
+//! one.
 
 use scorsese_zimmer::song::{Easing, Param, Song};
 
 use super::setup::{at, curve, eased, held};
 use crate::common::songs::song;
 
-/// A song that automates nothing writes nothing about it.
-///
-/// This is not tidiness. A bake is addressed by a hash of the recipe's bytes,
-/// so a serialiser that started emitting `"automation": []` would invalidate
-/// every cached bake in every project at once, for no change in the audio.
 #[test]
 fn a_song_that_automates_nothing_writes_nothing_about_it() {
     let written = song().to_json().expect("the fixture serialises");
@@ -20,8 +15,6 @@ fn a_song_that_automates_nothing_writes_nothing_about_it() {
     );
 }
 
-/// And the same for the one default a point has: a point that travels at a
-/// constant rate does not say so.
 #[test]
 fn a_linear_point_does_not_write_its_easing() {
     let mut straight = held(0.5);
@@ -38,7 +31,6 @@ fn a_linear_point_does_not_write_its_easing() {
     assert!(written.contains("\"easing\": \"ease_in_out\""), "{written}");
 }
 
-/// Round-trip: what is read back is what was written, curves and all.
 #[test]
 fn a_song_with_curves_round_trips() {
     let mut written = held(0.5);
@@ -60,8 +52,6 @@ fn a_song_with_curves_round_trips() {
     );
 }
 
-/// The parameter names, as a recipe spells them — the closed list an agent has
-/// to be able to guess right the first time.
 #[test]
 fn the_parameters_are_spelled_the_way_the_document_writes_them() {
     let mut song = held(0.5);

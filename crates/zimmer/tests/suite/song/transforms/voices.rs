@@ -25,12 +25,10 @@ fn scaling_velocity_equals_writing_the_notes_quieter() {
     assert_eq!(render(&scaled), render(&by_hand));
 }
 
-/// The arrangement dial: drop to one instrument for a section, and everything
-/// coming back is a chorus arriving for free.
 #[test]
 fn a_tracks_filter_silences_exactly_the_tracks_it_does_not_name() {
-    // Two instruments, each playing on its own beat, so "was it silenced?" is a
-    // question about a region of the buffer rather than about a sum.
+    // Two instruments, each playing on its own beat, so "was it silenced?" is a question about a
+    // region of the buffer rather than about a sum.
     let mut duet = song();
     duet.tracks.push(Track {
         name: "lead".to_owned(),
@@ -62,9 +60,6 @@ fn a_tracks_filter_silences_exactly_the_tracks_it_does_not_name() {
     }
 }
 
-/// A silenced note still consumes its seed ordinal, so muting a track for a
-/// section does not re-roll the noise of every note after it — the fixture's
-/// patch is noise precisely so this is audible if it breaks.
 #[test]
 fn silencing_a_track_leaves_the_other_notes_bit_identical() {
     let mut duet = song();

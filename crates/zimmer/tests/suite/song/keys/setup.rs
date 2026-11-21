@@ -1,11 +1,5 @@
-//! What every key test is written against: one instrument, one pattern, and
-//! the shorthands for putting a degree or a triad into it.
-//!
-//! The instrument is a **plucked string** on purpose. It is pitched, so a
-//! degree that resolves to the wrong note fails rather than passing silently,
-//! and it is stochastic, so byte-equality between two renders also says the
-//! entries took the same ordinals — and therefore the same seeds — as each
-//! other. A noise patch would prove the second and none of the first.
+//! What every key test is written against: one instrument, one pattern, and the shorthands for
+//! putting a degree or a triad into it.
 
 use crate::common::minimal;
 use crate::common::songs::{note, played, song, verse};
@@ -15,12 +9,10 @@ use scorsese_zimmer::song::{
 };
 use scorsese_zimmer::{Song, render_song};
 
-/// Renders a song whose instruments are all inline.
 pub(crate) fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
-/// The fixture in `key`, playing `entries` once through.
 pub(crate) fn playing(key: Option<&str>, entries: Vec<PatternEntry>) -> Song {
     let mut one_pass = song();
     one_pass.arrangement = vec!["verse".into()];
@@ -33,7 +25,6 @@ pub(crate) fn playing(key: Option<&str>, entries: Vec<PatternEntry>) -> Song {
     one_pass
 }
 
-/// One degree on the fixture's `bass` track, half a beat long.
 pub(crate) fn degree(written: Degree, oct: i32, start: f32) -> PatternEntry {
     DegreeNote {
         track: "bass".to_owned(),
@@ -47,7 +38,6 @@ pub(crate) fn degree(written: Degree, oct: i32, start: f32) -> PatternEntry {
     .into()
 }
 
-/// The fixture's one pattern, played with the transposes given.
 pub(crate) fn lifted(song: &mut Song, transpose: Option<f32>, degrees: Option<i32>) {
     song.arrangement = vec![ArrangementEntry::from(Play {
         pattern: "verse".to_owned(),
@@ -58,7 +48,6 @@ pub(crate) fn lifted(song: &mut Song, transpose: Option<f32>, degrees: Option<i3
     })];
 }
 
-/// The three notes of a D minor triad, by name, at half a beat each.
 pub(crate) fn triad(names: [&str; 3]) -> Vec<PatternEntry> {
     played(
         names

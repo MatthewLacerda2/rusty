@@ -9,7 +9,6 @@ fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
-/// One band, spelled out.
 fn band(kind: EqKind, gain_db: f32) -> EqBand {
     EqBand {
         kind,
@@ -19,9 +18,6 @@ fn band(kind: EqKind, gain_db: f32) -> EqBand {
     }
 }
 
-/// The move the issue is about, at the place a mix decision is made: the
-/// report says the low band is swollen, and one line takes it out without
-/// taking the instrument out with it.
 #[test]
 fn a_song_eq_changes_the_mix_without_lengthening_it() {
     let dry = render(&song());
@@ -39,8 +35,6 @@ fn a_song_eq_changes_the_mix_without_lengthening_it() {
     assert_ne!(carved, dry, "and it did reach the mix");
 }
 
-/// The same on a track, which is where a *single* muddy instrument gets
-/// treated — the row-per-track half of the bake report is what points here.
 #[test]
 fn a_track_eq_reaches_that_instrument_s_part() {
     let dry = render(&song());
@@ -53,10 +47,6 @@ fn a_track_eq_reaches_that_instrument_s_part() {
     assert_ne!(treated, dry);
 }
 
-/// The bypass rule, stated where it matters most: a recipe carrying a shortlist
-/// of bands it is still thinking about renders the *identical file* to one
-/// carrying none. Not almost-identical — a bake is addressed by a hash, so
-/// "within rounding" would be a different asset.
 #[test]
 fn bands_parked_at_zero_gain_bake_the_identical_mix() {
     let parked = render(&Song {
@@ -72,14 +62,8 @@ fn bands_parked_at_zero_gain_bake_the_identical_mix() {
     assert_eq!(parked, render(&song()));
 }
 
-/// The loop the whole feature exists to close: the report says a layer is
-/// sitting too low, one band treats *that layer*, and the report says so next
-/// time. Measured through the per-track rows the report itself prints, so this
-/// is the finding and the fix in the same units.
 #[test]
 fn the_report_s_own_rows_show_the_treated_track_moving_and_the_others_still() {
-    // A saw held low: the layer a report calls muddy, and the one thing the
-    // noise fixture cannot be, since noise has no pitch to sit too far down.
     let pad = Patch {
         layers: Vec::new(),
         source: Source::OscStack {
@@ -119,8 +103,6 @@ fn the_report_s_own_rows_show_the_treated_track_moving_and_the_others_still() {
         swing: None,
         humanize: None,
     });
-    // A plain note is one kind of pattern entry, and a chord is the other; the
-    // fixture's own `played` says the same thing for a whole list.
     verse(&mut muddy)
         .notes
         .push(note("pad", "E2", 0.0, 2.0).into());
@@ -153,8 +135,6 @@ fn the_report_s_own_rows_show_the_treated_track_moving_and_the_others_still() {
     );
 }
 
-/// The cap belongs to the chain, not to where the chain is written — so the
-/// song's own and a track's are both checked, and by the same code.
 #[test]
 fn the_band_cap_holds_in_both_of_the_song_s_chain_locations() {
     let over = || Fx::Eq {

@@ -1,9 +1,4 @@
-//! A `fit` whose length comes from somewhere else: `to: "clip"` (#1000).
-//!
-//! This crate never reads a clip, so the claims are about the hand-off: the
-//! document says `to` and keeps saying it when written back, nothing renders
-//! until a caller has turned it into seconds, and once it has, the song is
-//! exactly the song a written `seconds` would have been.
+//! A `fit` whose length comes from somewhere else: `to: "clip"`.
 
 use scorsese_zimmer::SynthError;
 use scorsese_zimmer::song::{Fit, FitMode, FitTo, InlineOnly};
@@ -12,7 +7,6 @@ use scorsese_zimmer::{Song, render_song};
 use super::setup::{fitted, render, samples};
 use crate::common::songs::song;
 
-/// The fixture fitted to its clip, the way a recipe writes it.
 fn to_clip(mode: FitMode) -> Song {
     let mut song = song();
     song.fit = Some(Fit {
@@ -36,8 +30,6 @@ fn to_clip_reads_and_writes_back_as_written() {
     );
 }
 
-/// Refused, never rendered at some length nobody chose — and named, so the
-/// caller learns the length was its to supply.
 #[test]
 fn an_unresolved_clip_fit_is_refused_before_anything_renders() {
     let refusal = render_song(&to_clip(FitMode::Loop), &InlineOnly).expect_err("refused");
@@ -70,8 +62,6 @@ fn a_fit_needs_exactly_one_length() {
     }
 }
 
-/// Resolved, it is the song a written number would have made — sample for
-/// sample, in every mode, and the mode survives the resolution.
 #[test]
 fn a_resolved_clip_fit_is_the_written_one() {
     for mode in [FitMode::Loop, FitMode::Stretch, FitMode::Once] {

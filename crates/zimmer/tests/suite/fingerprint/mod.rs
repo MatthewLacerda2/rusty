@@ -1,34 +1,4 @@
-//! The sound did not move unless `SYNTH_VERSION` did (#1216).
-//!
-//! A change to what a recipe renders to needs a [`SYNTH_VERSION`] bump, or
-//! every project that baked the recipe keeps audio it no longer describes,
-//! silently — and rusty with them. Determinism within one build
-//! (`promises.rs`) cannot see that; this can. A small probe corpus
-//! (`probes.rs`) is baked, and each bake measured: its length, its level, and
-//! where its energy sits. The measures are recorded in `table.rs` beside the
-//! version they were taken at.
-//!
-//! - **Measures moved, version did not**: the sound changed, so bump the
-//!   version (its table, and `SYNTH_VERSION.md`) and re-record.
-//! - **Version moved**: re-recording is expected, and asked for.
-//!
-//! **Measures, with tolerance, never a digest.** The constant's own doc
-//! explains why a digest cannot work: `sin`, `exp` and `powf` are not
-//! bit-identical between platforms. A length, a level and three band shares
-//! carry a tolerance a platform's last bit cannot reach and a sound change
-//! does.
-//!
-//! **Every platform runs it**, unlike the golden renders: those compare
-//! frames an encoder and a font rasteriser shaped, these compare sums over a
-//! whole 16-bit file, where libm's last-bit drift averages away. CI's x86_64
-//! Linux records the table and is the authority if a platform ever disagrees;
-//! widening a tolerance for one is where that would be said.
-//!
-//! **What it is sized to catch**: lowering the limiter's ceiling by a tenth of
-//! a decibel moves two rows, and a pluck's delay line one sample shorter moves
-//! its row. What it cannot see is a change no measure here reaches — a pitch
-//! moved by well under a percent, a stereo image swapped — so a branch that
-//! touches rendering maths still checks its own diff (`SYNTH_VERSION.md`).
+//! The sound did not move unless `SYNTH_VERSION` did.
 
 mod probes;
 mod table;
@@ -38,11 +8,8 @@ use scorsese_zimmer::song::InlineOnly;
 use scorsese_zimmer::{NoteOpts, Patch, SAMPLE_RATE, SYNTH_VERSION, Song};
 use table::{RECORDED_AT, Row, TABLE};
 
-/// One millisecond: where a file's tail is cut can shift by a sample or two.
 const FRAMES: u64 = 44;
-/// A twentieth of a decibel on the whole file's RMS level.
 const DB: f64 = 0.05;
-/// Two thousandths of the energy, in each band's share.
 const SHARE: f64 = 0.002;
 
 #[test]
@@ -110,7 +77,6 @@ fn measure_all() -> Vec<Row> {
     rows
 }
 
-/// What a file is, read back from the bytes a project would store.
 fn measure(probe: &'static str, wav: &[u8]) -> Row {
     let at = wav
         .windows(4)
@@ -136,7 +102,6 @@ fn measure(probe: &'static str, wav: &[u8]) -> Row {
     }
 }
 
-/// `table.rs`'s body as it would be recorded now.
 fn reprint(rows: &[Row]) -> String {
     let mut out = format!("pub(crate) const RECORDED_AT: u32 = {SYNTH_VERSION};\n\n");
     out.push_str("#[rustfmt::skip]\npub(crate) const TABLE: &[Row] = &[\n");

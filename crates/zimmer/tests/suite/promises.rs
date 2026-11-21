@@ -1,9 +1,5 @@
-//! The two claims the rest of scorsese is built on: a bake is **deterministic**,
-//! and a note comes out at the **pitch it was asked for**.
-//!
-//! Everything else here is a detail of how a sound is made. These two are the
-//! contract: `generated/` addresses a bake by the hash of its recipe, which is
-//! only sound if the same recipe really does produce the same bytes.
+//! The two claims the rest of scorsese is built on: a bake is **deterministic**, and a note comes
+//! out at the **pitch it was asked for**.
 
 use crate::common;
 
@@ -13,9 +9,6 @@ use scorsese_zimmer::patch::{Adsr, Osc, Patch, Source, Wave};
 use scorsese_zimmer::song::{Humanize, InlineOnly};
 use scorsese_zimmer::{NoteOpts, Song, bake_named_note, bake_note, bake_song};
 
-/// A bare sine with no envelope movement, so the spacing of its rising
-/// zero-crossings *is* the frequency and the pitch can be asserted without an
-/// FFT.
 fn sine() -> Patch {
     Patch {
         amp: Adsr {
@@ -65,15 +58,6 @@ fn a_note_lands_on_the_pitch_it_was_asked_for() {
     close(81.0, 880.0);
 }
 
-/// The limiter's promise, checked with the meter that reports on the same
-/// bake — because a guarantee and a measurement that disagree are worse than
-/// either alone.
-///
-/// Judged on the **true** peak, which is what a converter or a lossy encoder
-/// has to reproduce. An ordinary song is the case worth asserting on rather
-/// than a contrived one: this one's loudest *sample* sits nearly two decibels
-/// under the ceiling, so the limiter barely engages, and the waveform between
-/// its samples went past full scale anyway.
 #[test]
 fn a_bake_does_not_clip() {
     let song = bake_song(&song(), &InlineOnly).expect("bakes");
@@ -90,8 +74,6 @@ fn a_bake_does_not_clip() {
     );
 }
 
-/// The claim `generated/` rests on. If this ever fails, a cache hit is serving
-/// bytes the recipe no longer describes.
 #[test]
 fn the_same_recipe_bakes_the_same_bytes() {
     let patch = saw_patch();
@@ -103,8 +85,6 @@ fn the_same_recipe_bakes_the_same_bytes() {
     );
 }
 
-/// A stochastic source is the interesting case: noise that is *seeded* still
-/// has to be reproducible, and a different seed still has to differ.
 #[test]
 fn seeded_noise_is_reproducible_and_a_new_seed_is_not() {
     let noise = minimal(noise());
@@ -114,9 +94,6 @@ fn seeded_noise_is_reproducible_and_a_new_seed_is_not() {
     assert_ne!(seeded(11), seeded(12));
 }
 
-/// A song with a *feel* is the case that could quietly break this: "played,
-/// not clocked" is the one place a clock or an `rand` would be tempting, and
-/// either would put an asterisk on everything above.
 #[test]
 fn a_humanised_song_bakes_the_same_bytes_and_a_new_seed_does_not() {
     let played = |seed: u64| {
@@ -140,8 +117,6 @@ fn a_humanised_song_bakes_the_same_bytes_and_a_new_seed_does_not() {
     assert_ne!(played(4), played(5), "and the seed still re-rolls it");
 }
 
-/// Absent means what it meant before the fields existed — which is what keeps
-/// every bake already in a `generated/` directory valid.
 #[test]
 fn asking_for_no_feel_bakes_what_a_song_that_never_heard_of_it_does() {
     let plain = song();

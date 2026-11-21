@@ -6,8 +6,6 @@ use scorsese_zimmer::patch::Fx;
 use scorsese_zimmer::song::{InlineOnly, PatchRef, Song, Tail, Track};
 use scorsese_zimmer::{SAMPLE_RATE, render_song};
 
-/// Renders a song whose instruments are all inline — every fixture here — as
-/// one channel of it. These tests ask where a chain runs, not how wide it is.
 fn render(song: &Song) -> Vec<f32> {
     channel(
         &render_song(song, &InlineOnly).expect("the song renders"),
@@ -15,14 +13,10 @@ fn render(song: &Song) -> Vec<f32> {
     )
 }
 
-/// Where the arrangement ends, in samples.
 fn arrangement_end(song: &Song) -> usize {
     (song.arrangement_beats() * song.beat_seconds() * SAMPLE_RATE as f32).round() as usize
 }
 
-/// The room every test here puts a song in. Small enough that its tail is well
-/// inside the padding a note is already given, which is what makes the
-/// equivalence below a fair comparison rather than a race with `MAX_TAIL`.
 fn room() -> Fx {
     Fx::Reverb {
         size: 0.5,
@@ -32,7 +26,6 @@ fn room() -> Fx {
     }
 }
 
-/// The fixture with a chain over the whole mix.
 fn in_a_room() -> Song {
     Song {
         fx: vec![room()],
@@ -40,8 +33,6 @@ fn in_a_room() -> Song {
     }
 }
 
-/// The point of the feature: one line puts the piece somewhere, and that
-/// somewhere decays once, past the end of the music.
 #[test]
 fn a_song_chain_colours_the_mix_and_rings_past_the_last_note() {
     let dry = render(&song());
@@ -59,13 +50,6 @@ fn a_song_chain_colours_the_mix_and_rings_past_the_last_note() {
     );
 }
 
-/// The claim that justifies the feature. A reverb on the sum is the same room
-/// as the identical reverb copied into every patch — so the field is not a new
-/// sound, it is the same sound said once, for free, and kept in sync.
-///
-/// *Approximately*, not exactly: applied per note, the tail is truncated at
-/// each note's own buffer, and the summation order differs. What must hold is
-/// that the difference is inaudible next to the signal.
 #[test]
 fn a_room_on_the_song_is_the_room_every_patch_would_have_had_to_spell_out() {
     let mut per_patch = song();
@@ -87,8 +71,6 @@ fn a_room_on_the_song_is_the_room_every_patch_would_have_had_to_spell_out() {
     );
 }
 
-/// A chain on one instrument must not reach the others — otherwise it is a mix
-/// chain wearing a track's name.
 #[test]
 fn a_track_chain_shapes_its_own_instrument_and_leaves_the_rest_alone() {
     let mut duet = song();
@@ -107,8 +89,8 @@ fn a_track_chain_shapes_its_own_instrument_and_leaves_the_rest_alone() {
     let plain = render(&duet);
     let coloured = render(&on_the_lead);
 
-    // `bass` plays alone on the first beat, and it was never bussed, so that
-    // region has to be the very same samples.
+    // `bass` plays alone on the first beat, and it was never bussed, so that region has to be the
+    // very same samples.
     let beat = (duet.beat_seconds() * SAMPLE_RATE as f32) as usize;
     assert_eq!(plain[..beat], coloured[..beat], "`bass` must be untouched");
     assert_ne!(
@@ -119,8 +101,6 @@ fn a_track_chain_shapes_its_own_instrument_and_leaves_the_rest_alone() {
     assert!(coloured.len() > plain.len(), "and its tail extends the mix");
 }
 
-/// The promise that lets both fields exist at all: a song that does not use
-/// them is the song it was before they did.
 #[test]
 fn an_empty_chain_is_not_written_down_and_changes_no_sample() {
     let plain = song();
@@ -140,9 +120,6 @@ fn an_empty_chain_is_not_written_down_and_changes_no_sample() {
     assert_eq!(render(&spelled_out), render(&plain));
 }
 
-/// Length stays the length fields' business: a mix tail is audio like any
-/// other, so `exact` cuts it on the final beat exactly as it cuts a note's
-/// ring-out.
 #[test]
 fn tail_exact_still_lands_on_the_final_beat_with_a_mix_chain() {
     let cut = Song {

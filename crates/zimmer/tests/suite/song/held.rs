@@ -1,6 +1,5 @@
-//! A note held longer than one note may render to (#1093): refused, and named
-//! by where the song writes it, rather than cut off at the ceiling with a
-//! click at sixty seconds.
+//! A note held longer than one note may render to: refused, and named by where the song writes it,
+//! rather than cut off at the ceiling with a click at sixty seconds.
 
 use crate::common::songs::{song, verse, voice};
 use scorsese_zimmer::song::{InlineOnly, render_song};

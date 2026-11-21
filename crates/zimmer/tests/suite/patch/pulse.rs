@@ -1,14 +1,9 @@
-//! Pulse width: a square narrowed into the chiptune duties, and an LFO that
-//! moves it (#1773).
-//!
-//! What the document says and what a rendered note does with it — as against
-//! `core::osc::pulse`, where the waveform itself is pinned.
+//! Pulse width: a square narrowed into the chiptune duties, and an LFO that moves it.
 
 use crate::common::{minimal, opts, osc, refusal, render, spectrum::band_power};
 use scorsese_zimmer::patch::{Lfo, LfoTarget, Osc, Source, Wave};
 use scorsese_zimmer::{Patch, SynthError};
 
-/// A single oscillator of `wave` at `pulse_width`.
 fn pulse(wave: Wave, pulse_width: f32) -> Patch {
     minimal(Source::OscStack {
         oscs: vec![Osc {
@@ -18,7 +13,6 @@ fn pulse(wave: Wave, pulse_width: f32) -> Patch {
     })
 }
 
-/// The same patch with an LFO moving the width by `depth`.
 fn modulated(patch: Patch, depth: f32) -> Patch {
     Patch {
         lfo: Some(Lfo::new(2.0, depth, LfoTarget::PulseWidth)),
@@ -26,13 +20,10 @@ fn modulated(patch: Patch, depth: f32) -> Patch {
     }
 }
 
-/// A3, 220 Hz, held half a second: long enough for two analysis blocks.
 fn note(patch: &Patch) -> Vec<f32> {
     render(patch, 57.0, &opts(0.5))
 }
 
-/// The default is the square there always was, and it is not written down —
-/// so a recipe from before the field keeps its bytes and its cached bake.
 #[test]
 fn a_half_width_square_is_written_without_it() {
     let json = pulse(Wave::Square, 0.5).to_json().expect("serialise");
@@ -43,9 +34,6 @@ fn a_half_width_square_is_written_without_it() {
     assert_eq!(Patch::from_json(&json).expect("deserialise"), narrow);
 }
 
-/// The audible difference, by the number: a 50% square has only odd
-/// harmonics, and a 25% pulse has its second back — which is why the three
-/// duties are three instruments and not one at three levels.
 #[test]
 fn narrowing_a_square_brings_its_even_harmonics_in() {
     let second = |patch: &Patch| {
@@ -64,8 +52,6 @@ fn narrowing_a_square_brings_its_even_harmonics_in() {
     );
 }
 
-/// Past either end is the end: a pulse of zero width is silence, which is
-/// never what was meant, so the width is clamped rather than refused.
 #[test]
 fn a_width_past_the_range_is_clamped_to_its_edge() {
     assert_eq!(
@@ -78,7 +64,6 @@ fn a_width_past_the_range_is_clamped_to_its_edge() {
     );
 }
 
-/// A width on a wave that has none is a field nothing can hear.
 #[test]
 fn a_pulse_width_on_another_wave_is_refused() {
     for wave in [Wave::Sine, Wave::Triangle, Wave::Saw] {
@@ -93,8 +78,6 @@ fn a_pulse_width_on_another_wave_is_refused() {
     }
 }
 
-/// An LFO aimed at the width needs a square to reach, and so does nothing on a
-/// stack of saws or on any other source.
 #[test]
 fn a_pulse_width_lfo_with_no_square_to_move_is_refused() {
     let saws = modulated(pulse(Wave::Saw, 0.5), 0.3);
@@ -114,8 +97,6 @@ fn a_pulse_width_lfo_with_no_square_to_move_is_refused() {
     );
 }
 
-/// PWM through the whole path: the moving width changes the note, a still one
-/// is the square it sits on, and one square in a mixed stack is enough.
 #[test]
 fn an_lfo_moves_the_width_of_every_square_in_the_stack() {
     let square = pulse(Wave::Square, 0.5);

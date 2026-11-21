@@ -6,7 +6,6 @@ use scorsese_zimmer::SynthError;
 use scorsese_zimmer::patch::{Fx, Patch};
 use scorsese_zimmer::song::Humanize;
 
-/// Each field a track can write, at a value that stops meaning what it says.
 #[test]
 fn a_track_feel_that_is_not_one_is_refused_by_name() {
     let refused = |edit: &dyn Fn(&mut scorsese_zimmer::Song)| {
@@ -41,7 +40,6 @@ fn a_track_feel_that_is_not_one_is_refused_by_name() {
     assert_eq!(fine.validate(), Ok(()));
 }
 
-/// Beats on a patch, which has no tempo, and two spacings on one delay.
 #[test]
 fn a_delay_in_beats_is_refused_where_it_cannot_be_counted() {
     let delay = |time, beats| Fx::Delay {

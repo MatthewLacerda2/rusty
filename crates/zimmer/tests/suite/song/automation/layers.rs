@@ -1,5 +1,5 @@
-//! A `cutoff` curve on a layered instrument moves the top-level filter, and
-//! only that one: a layer's own filter stays where the layer wrote it.
+//! A `cutoff` curve on a layered instrument moves the top-level filter, and only that one: a
+//! layer's own filter stays where the layer wrote it.
 
 use scorsese_zimmer::patch::Layer;
 use scorsese_zimmer::song::{InlineOnly, Param};
@@ -7,7 +7,6 @@ use scorsese_zimmer::{Patch, SynthError, render_song};
 
 use super::setup::{at, curve, filtered, render, voiced};
 
-/// A filtered saw over a layer of the same saw, filtered at `cutoff`.
 fn layered(cutoff: f32) -> Patch {
     let below = filtered(cutoff);
     Patch {

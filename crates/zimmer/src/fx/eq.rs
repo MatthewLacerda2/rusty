@@ -1,86 +1,18 @@
 //! Filter bands, from the RBJ cookbook.
-//!
-//! Robert Bristow-Johnson's **Audio EQ Cookbook** is the public-domain page
-//! every equaliser at this scale is built from: closed-form second-order
-//! coefficients for a low-pass, a high-pass, a peaking bell and a shelf at
-//! either end, derived from an analog prototype and bilinear-transformed. Six
-//! lines of arithmetic per band, no tuning tables to invent, and the same
-//! formulas are inside more or less every plugin anyone has ever mixed
-//! through — the "standard, proven algorithm" bar this layer is held to, the
-//! way [`super::reverb`] is held to Freeverb.
-//!
-//! ## Why a biquad and not the SVF already in the crate
-//!
-//! [`crate::core::filter`] is a Chamberlin state-variable filter, and it is
-//! there for a property this does not need: it takes a **new cutoff every
-//! sample** for free, which is what an envelope sweep and an LFO wobble are
-//! made of. It pays for that with a response that is only approximately what
-//! its cutoff says, and it has no shelving or peaking form at all.
-//!
-//! An EQ band is the opposite case. It is *static* — set once for the whole
-//! signal — so the coefficients are computed once and the per-sample cost is
-//! five multiplies. What matters instead is that the curve is exactly the one
-//! asked for: a flat pass band, a cut of exactly the decibels written, and no
-//! surprise resonance at the corner. That is the biquad's whole reason to
-//! exist, and it is why a mixing move belongs in one and an instrument's
-//! filter sweep does not.
-//!
-//! ## Zero gain is a bypass, and it is exact
-//!
-//! A peaking band at `0.0` dB is mathematically the identity, but running the
-//! difference equation for it is not: the coefficients round, and a signal
-//! comes back a few ulps away from where it went in. So a band whose kind
-//! reads a gain and whose gain is zero is **skipped entirely** rather than
-//! computed. That is the difference between a recipe that can list its bands
-//! and sweep one of them, and a recipe where every parked band quietly
-//! colours the mix.
-//!
-//! ## No tail
-//!
-//! [`super::tail_seconds`] gets nothing from an EQ, the way it gets nothing
-//! from [`super::saturate`]. A biquad does have memory, so this is a claim
-//! rather than a definition — but its ring-down is bounded by roughly
-//! `Q / (π · f)`, which at the extremes this clamps to ([`MAX_Q`] at
-//! [`MIN_HZ`]) is a few hundred milliseconds and at any band anyone would
-//! write is under ten. More to the point it decays *with* the signal rather
-//! than after it: an EQ neither delays nor repeats anything, so there is no
-//! echo to cut off mid-repeat, which is what the tail exists to protect.
-//! Padding every note for it would grow every recipe using an EQ for nothing.
 
 use crate::level::db_to_gain_f32;
 use crate::patch::{EqBand, EqKind};
 
-/// The widest a band may be. Below this a "band" is most of the spectrum and
-/// the shelves stop having a corner at all.
 const MIN_Q: f32 = 0.1;
 
-/// The narrowest a band may be. A `Q` of 30 at 250 Hz is 8 Hz wide — past
-/// surgical and into ringing on its own, which is a resonator rather than an
-/// equaliser.
 const MAX_Q: f32 = 30.0;
 
-/// The most a band may move, in decibels either way. 24 dB is a region
-/// removed or a region tripled; anything past it is not mixing.
 const MAX_GAIN_DB: f32 = 24.0;
 
-/// The lowest a band may sit. Under this is below what anything reproduces,
-/// and a corner at 0 Hz has no `w0` to speak of.
 const MIN_HZ: f32 = 10.0;
 
-/// How far below Nyquist the highest band may sit, as a fraction of the rate.
-///
-/// The bilinear transform warps the frequency axis, and a corner pushed
-/// against Nyquist warps into a shape that is no longer the one asked for. At
-/// 44.1 kHz this puts the ceiling near 19.8 kHz, which is above anything a
-/// mix decision is made about.
 const NYQUIST_MARGIN: f32 = 0.45;
 
-/// Filter `buf` in place through each band in turn.
-///
-/// Every band is computed once and then run over the whole signal, so the cost
-/// is linear in bands and samples both. A band that would do nothing — a zero
-/// gain, a nonsense frequency — is skipped rather than run at unity, which is
-/// what makes the bypass exact.
 pub(crate) fn apply(buf: &mut [f32], bands: &[EqBand], rate: f32) {
     for band in bands {
         if let Some(biquad) = Biquad::of(band, rate) {
@@ -89,7 +21,6 @@ pub(crate) fn apply(buf: &mut [f32], bands: &[EqBand], rate: f32) {
     }
 }
 
-/// One band's coefficients, normalised so `a0` is 1.
 #[derive(Clone, Copy, Debug)]
 struct Biquad {
     b0: f32,
@@ -100,8 +31,6 @@ struct Biquad {
 }
 
 impl Biquad {
-    /// The cookbook coefficients for `band`, or `None` when the band is a
-    /// bypass.
     fn of(band: &EqBand, rate: f32) -> Option<Self> {
         if !rate.is_finite() || rate <= 0.0 {
             return None;
@@ -117,8 +46,8 @@ impl Biquad {
         let w0 = std::f32::consts::TAU * hz / rate;
         let (sin, cos) = w0.sin_cos();
         let alpha = sin / (2.0 * q);
-        // The cookbook's `A`: an amplitude ratio at *half* the gain, because a
-        // bell and a shelf each apply it twice over.
+        // The cookbook's `A`: an amplitude ratio at *half* the gain, because a bell and a shelf
+        // each apply it twice over.
         let a = db_to_gain_f32(gain_db / 2.0);
 
         let (b, denominator) = match band.kind {
@@ -174,9 +103,6 @@ impl Biquad {
             a1: denominator[1] / a0,
             a2: denominator[2] / a0,
         };
-        // A degenerate `a0` would hand the signal a buffer of NaN rather than
-        // an equalised one, and a report of a silent mix is a long way from
-        // the field that caused it.
         coefficients.is_finite().then_some(coefficients)
     }
 
@@ -186,18 +112,9 @@ impl Biquad {
             .all(|c| c.is_finite())
     }
 
-    /// Run the band over the whole signal, transposed direct form II.
-    ///
-    /// That form rather than direct form I because it carries two state
-    /// variables instead of four and is the better-conditioned of the two in
-    /// `f32` — the difference shows up exactly where an EQ is most used, on a
-    /// low-frequency band where the poles crowd together.
     fn run(self, buf: &mut [f32]) {
         let (mut z1, mut z2) = (0.0f32, 0.0f32);
         for sample in buf.iter_mut() {
-            // A non-finite sample would poison the state for the rest of the
-            // signal rather than for itself, so it is dropped — the same guard
-            // the patch filter and the band meter keep.
             let x = if sample.is_finite() { *sample } else { 0.0 };
             let y = self.b0 * x + z1;
             z1 = self.b1 * x - self.a1 * y + z2;
@@ -207,7 +124,6 @@ impl Biquad {
     }
 }
 
-/// `value` if it is a number at all, and `fallback` if it is not.
 fn finite(value: f32, fallback: f32) -> f32 {
     if value.is_finite() { value } else { fallback }
 }
@@ -219,8 +135,6 @@ mod tests {
     use std::f32::consts::TAU;
 
     const RATE: f32 = 44_100.0;
-    /// A quarter-second, long enough for every band here to settle well before
-    /// the window the magnitude is read over.
     const N: usize = 11_025;
 
     fn sine(freq: f32) -> Vec<f32> {
@@ -238,8 +152,6 @@ mod tests {
         }
     }
 
-    /// Amplitude at `freq`, over the settled second half of the buffer so the
-    /// filter's own start-up transient is not measured as signal.
     fn magnitude_at(buf: &[f32], freq: f32) -> f64 {
         let settled = &buf[N / 2..];
         let w = std::f64::consts::TAU * f64::from(freq) / f64::from(RATE);
@@ -253,7 +165,6 @@ mod tests {
         2.0 * re.hypot(im) / settled.len() as f64
     }
 
-    /// What one band does to a tone at `probe`, in decibels.
     fn response_db(band: EqBand, probe: f32) -> f64 {
         let mut buf = sine(probe);
         apply(&mut buf, &[band], RATE);
@@ -317,8 +228,8 @@ mod tests {
 
     #[test]
     fn a_gain_of_zero_is_not_an_approximation_of_the_input() {
-        // The property that lets a recipe park a band it is still thinking
-        // about: identical samples, not almost-identical ones.
+        // The property that lets a recipe park a band it is still thinking about: identical
+        // samples, not almost-identical ones.
         for kind in [EqKind::LowShelf, EqKind::Peak, EqKind::HighShelf] {
             let original = sine(440.0);
             let mut parked = original.clone();
@@ -327,18 +238,6 @@ mod tests {
         }
     }
 
-    /// Which kinds read a `gain_db`, asserted on [`EqKind::takes_gain`]
-    /// directly — because the classification is the contract and no
-    /// measurement can see it move (#485).
-    ///
-    /// The function gates the zero-gain bypass and nothing else: the gain
-    /// reaches the coefficients whatever it says, and the cookbook's `A` at
-    /// 0 dB is exactly 1, which makes a parked band's biquad an exact identity
-    /// rather than an approximate one. So `takes_gain` returning `false` for
-    /// all five kinds costs a pass over the buffer and moves no sample — which
-    /// is why the bypass can promise bit-equality in the first place, and why
-    /// pinning it means saying which kinds are in the set. The same three are
-    /// what `docs/recipes.md` promises whoever writes the band.
     #[test]
     fn every_kind_that_reads_a_gain_moves_its_own_band_by_it() {
         for (kind, corner, probe) in [
@@ -357,11 +256,6 @@ mod tests {
         }
     }
 
-    /// The mirror, and the half of the rule a bare `false` would also satisfy:
-    /// `gain_db` is not a field these two read, so writing one changes nothing
-    /// — not within rounding, but the same samples. That a zero gain does not
-    /// switch them off, the way it switches off the three above, is what the
-    /// filtering test over these same two bands already says.
     #[test]
     fn the_pass_filters_have_no_gain_to_read() {
         for (kind, corner, probe) in [

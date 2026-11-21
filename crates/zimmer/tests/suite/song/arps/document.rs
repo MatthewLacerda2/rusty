@@ -4,9 +4,6 @@ use super::setup::{arped, playing, same};
 use scorsese_zimmer::song::{Arp, Chord};
 use scorsese_zimmer::{Song, SynthError};
 
-/// The words round-trip, and a block chord writes none of the three fields — a
-/// bake is addressed by the bytes of its recipe, so a default written into
-/// every chord would miss the cache for every song in every project.
 #[test]
 fn an_arpeggio_round_trips_and_a_block_chord_says_nothing() {
     let figure = playing(vec![
@@ -23,10 +20,6 @@ fn an_arpeggio_round_trips_and_a_block_chord_says_nothing() {
     }
 }
 
-/// The fields an arpeggio needs, and the ones it forbids — each held to the
-/// **sentence** it prints, not merely to being refused. Every one of these is
-/// repaired by editing a different field, so a refusal that names the wrong one
-/// sends the reader to the wrong line, and the reader is usually an agent.
 #[test]
 fn what_an_arpeggio_is_refused_for_and_what_it_says() {
     let refused = |chord: Chord, says: &str| {
@@ -53,10 +46,6 @@ fn what_an_arpeggio_is_refused_for_and_what_it_says() {
     refused(up(Some(0.0001), None), "more than 4096 notes");
 }
 
-/// Both edges of the figure, stated as the last legal step on each side. A
-/// boundary nothing exercises is a boundary that can move without anybody
-/// noticing, and these two decide whether a one-note figure sounds at all and
-/// where the cap actually falls.
 #[test]
 fn the_edges_of_a_figure_are_legal_and_the_step_past_them_is_not() {
     let one_step = Chord {
@@ -70,8 +59,8 @@ fn the_edges_of_a_figure_are_legal_and_the_step_past_them_is_not() {
             dur,
             ..arped("Dm7", Some(Arp::Up), Some(1.0), None)
         };
-        // Fast enough that 4096 beats is under the ten minutes a song may
-        // last, so the figure's own cap is the one met.
+        // Fast enough that 4096 beats is under the ten minutes a song may last, so the figure's own
+        // cap is the one met.
         let mut song = playing(vec![long.into()]);
         song.bpm = 480.0;
         song.validate()

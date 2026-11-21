@@ -1,14 +1,9 @@
 //! Unison: one oscillator written down, several sounding.
-//!
-//! What the document says, what it refuses, and what the widened entry does to
-//! the rendered note — as against `core::osc::unison`, which is where the
-//! three per-voice numbers themselves are pinned down.
 
 use crate::common::{minimal, opts, osc, peak, render};
 use scorsese_zimmer::patch::{MAX_VOICES, Osc, Source, Wave};
 use scorsese_zimmer::{Patch, SynthError};
 
-/// A stack of one oscillator, widened.
 fn stack(voices: usize, spread: f32) -> Patch {
     minimal(Source::OscStack {
         oscs: vec![Osc {
@@ -19,8 +14,6 @@ fn stack(voices: usize, spread: f32) -> Patch {
     })
 }
 
-/// The default is one voice, and one voice is written into no document — so a
-/// recipe from before unison existed keeps its bytes and its cached bake.
 #[test]
 fn a_recipe_that_says_nothing_gets_the_single_voice_it_always_did() {
     let json = stack(1, 12.0).to_json().expect("serialise");
@@ -46,9 +39,6 @@ fn a_widened_oscillator_round_trips_as_written() {
     assert_eq!(Patch::from_json(&json).expect("deserialise"), patch);
 }
 
-/// Both ends of the range are refused rather than quietly rendered: no voices
-/// is an oscillator asked for silence without saying so, and past the cap is
-/// arithmetic for copies the ear cannot separate.
 #[test]
 fn a_voice_count_outside_the_range_is_refused() {
     for count in [0, MAX_VOICES + 1, 64] {
@@ -66,8 +56,6 @@ fn a_voice_count_outside_the_range_is_refused() {
     }
 }
 
-/// The refusal carries the number, so an agent repairing a recipe unattended
-/// fixes it from the error alone.
 #[test]
 fn the_refusal_names_the_count_and_the_cap() {
     let message = stack(12, 12.0).validate().expect_err("refused").to_string();
@@ -75,8 +63,6 @@ fn the_refusal_names_the_count_and_the_cap() {
     assert!(message.contains(&MAX_VOICES.to_string()), "{message}");
 }
 
-/// The whole point of the field: one entry is a supersaw, and the four-slot
-/// stack is still free for the sub-oscillator underneath it.
 #[test]
 fn seven_voices_cost_one_stack_slot() {
     let fat = minimal(Source::OscStack {
@@ -96,8 +82,6 @@ fn seven_voices_cost_one_stack_slot() {
     assert!(peak(&buf) > 0.2, "the supersaw is inaudible");
 }
 
-/// Widening an entry thickens it and does not turn it up, through the whole
-/// signal path rather than only inside the stack.
 #[test]
 fn unison_does_not_raise_the_level_of_a_note() {
     let one = peak(&render(&stack(1, 20.0), 57.0, &opts(0.5)));
@@ -114,14 +98,10 @@ fn unison_does_not_raise_the_level_of_a_note() {
     }
 }
 
-/// And it is genuinely a different sound rather than the same one quieter: the
-/// copies are detuned, so they beat.
 #[test]
 fn a_widened_oscillator_is_not_the_narrow_one_over_again() {
     let narrow = render(&stack(1, 20.0), 57.0, &opts(0.3));
     let wide = render(&stack(5, 20.0), 57.0, &opts(0.3));
     assert_ne!(narrow, wide);
-    // A spread of nothing is still five voices, and still not the one — they
-    // start in five different places in the cycle.
     assert_ne!(render(&stack(5, 0.0), 57.0, &opts(0.3)), narrow);
 }

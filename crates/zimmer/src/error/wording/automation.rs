@@ -1,19 +1,11 @@
-//! What an automation curve is refused with: a curve that names nothing, says
-//! nothing, or moves nothing anyone can hear.
-//!
-//! Out of [`super`] because that file is at the size gate, and this is a
-//! group with one subject — [`crate::song::Automation`]. The parent's match
-//! hands every one of these variants here by name, as it does
-//! [`super::length`]'s, and the catch-all below is there for the same reason
-//! that one's is.
+//! What an automation curve is refused with: a curve that names nothing, says nothing, or moves
+//! nothing anyone can hear.
 
 use std::fmt;
 
 use crate::error::SynthError;
 
 impl SynthError {
-    /// The words for an automation refusal. Only ever called from
-    /// [`SynthError::say`] with one of the seven variants it names.
     pub(super) fn say_automation(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownAutomationTrack { track, param, .. } => write!(
@@ -50,7 +42,6 @@ impl SynthError {
                 "song: automation of `send` on track `{track}`, but the song's `fx` has no \
                  `reverb` or `delay` for a send to reach"
             ),
-            // `say` hands over only the seven above; see `length`'s catch-all.
             other => write!(f, "{other:?}"),
         }
     }

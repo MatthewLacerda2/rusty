@@ -1,5 +1,5 @@
-//! Where the report's lines are drawn: what counts as one finding, and the
-//! exact edge of a passing note.
+//! Where the report's lines are drawn: what counts as one finding, and the exact edge of a passing
+//! note.
 
 use super::{RUB, harmony};
 use crate::survey::harmony::percent;
@@ -9,7 +9,6 @@ fn a_song_with_a_rub_is_not_clean() {
     assert!(!harmony(RUB).is_clean());
 }
 
-/// Two rubs at two beats are two findings, and so are two accidentals.
 #[test]
 fn different_beats_of_one_section_are_different_findings() {
     let found = harmony(
@@ -35,7 +34,6 @@ fn different_beats_of_one_section_are_different_findings() {
     assert_eq!(close.longest.len(), 2);
 }
 
-/// The same accidental in every chorus is one row, counted each time.
 #[test]
 fn a_repeated_accidental_is_listed_once_and_counted_every_time() {
     let found = harmony(&format!(
@@ -47,8 +45,6 @@ fn a_repeated_accidental_is_listed_once_and_counted_every_time() {
     assert_eq!(strays[0].at.times, 3);
 }
 
-/// An eighth of a beat is where a passing note stops: shorter is passing,
-/// exactly that long is held.
 #[test]
 fn an_eighth_of_a_beat_exactly_is_held_and_anything_shorter_passes() {
     let at = |dur: f32| {

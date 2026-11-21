@@ -1,46 +1,9 @@
-//! A chain run beside a **send**: the whole mix, and the part of it that
-//! reaches the room.
-//!
-//! A song's chain is one chain over the sum, and most of it means the same
-//! thing to every track — glue, a shelf, a little drive. The room does not: a
-//! kick and a bass want to stay dry while the pad over them rings, all in one
-//! space. So the song's chain is run over **two** signals carried side by
-//! side, the mix itself and the *sent* mix (each track at its `send`), and the
-//! only stages that tell them apart are [`super::reverb`] and [`super::delay`]:
-//! their dry side is the mix's and their tail is the sent mix's.
-//!
-//! Everything else runs on both, so the sent mix stays the same piece of music
-//! as the mix it was taken from — an EQ before the reverb shapes what reaches
-//! the room as well as what does not. Two choices make that hold:
-//!
-//! - **The room's own output is sent onward in full.** After a reverb the sent
-//!   mix carries the tail too, so a delay further down the chain echoes the
-//!   room, and a dry kick stays dry through both.
-//! - **A compressor reads its level from the mix and applies the same gain to
-//!   the sent mix.** Compressing the sent mix on its own level would duck it by
-//!   a different amount than the signal it is a part of, and the room would
-//!   pump against the music.
-//!
-//! The one stage that is honestly approximate is a `saturate` **before** a
-//! room: drive is not linear, so the sent mix driven alone is not the sent
-//! share of the mix driven whole. It is close, it is the obvious meaning, and
-//! drive belongs after the room more often than before it.
-//!
-//! When every track sends everything, the sent mix *is* the mix, sample for
-//! sample, at every stage — so this produces the samples [`super::apply_chain`]
-//! does. The mixer still takes the plain path then, because it is half the
-//! work; that it would agree is what makes a send of `1.0` mean "as before".
+//! A chain run beside a **send**: the whole mix, and the part of it that reaches the room.
 
 use super::{NoKeys, Spacing, Tempo, apply_one, compress, delay, reverb};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 
-/// Runs `chain` over `buf`, with its rooms hearing `sent` instead of `buf`,
-/// and its delays timed in beats reading them off `tempo`.
-///
-/// `sent` is carried through the chain too, and comes out as the sent share of
-/// the result; the caller wants `buf`. The two should be the same length — the
-/// rooms hear silence past the end of a shorter `sent`.
 pub(crate) fn apply_chain_sent(
     buf: &mut Stereo,
     sent: &mut Stereo,
@@ -89,8 +52,6 @@ pub(crate) fn apply_chain_sent(
                 release,
                 makeup,
                 mix,
-                // A song's chain has no tracks to key from; validation refuses
-                // one there, and the plain chain ignores it the same way.
                 sidechain: _,
             } => {
                 let compressor =
@@ -107,7 +68,6 @@ pub(crate) fn apply_chain_sent(
     }
 }
 
-/// What the send changes, and what it leaves alone, by the sample.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -115,7 +75,6 @@ mod tests {
 
     const RATE: f32 = 44_100.0;
 
-    /// A burst at the start and silence after it, long enough for a tail.
     fn burst() -> Stereo {
         let mut mono = vec![0.0; 22_050];
         for (i, sample) in mono.iter_mut().take(200).enumerate() {
@@ -124,8 +83,6 @@ mod tests {
         Stereo::centred(mono)
     }
 
-    /// Every kind of stage, rooms between the others, so the identity below
-    /// covers each arm.
     fn everything() -> Vec<Fx> {
         vec![
             Fx::Saturate {
@@ -164,7 +121,6 @@ mod tests {
         ]
     }
 
-    /// The promise a send of `1.0` makes: the same samples, not nearly.
     #[test]
     fn sending_everything_is_the_plain_chain_sample_for_sample() {
         let mut plain = burst();
@@ -175,8 +131,6 @@ mod tests {
         assert_eq!(mixed, plain);
     }
 
-    /// Sending nothing leaves a room nothing to ring with: what comes out is
-    /// the dry side alone, at the room's dry level.
     #[test]
     fn sending_nothing_leaves_only_the_dry_side() {
         let room = [Fx::Reverb {
@@ -195,7 +149,6 @@ mod tests {
         assert!(sent.l.iter().all(|s| *s == 0.0), "nothing was sent");
     }
 
-    /// The tail is the sent mix's: half the signal sent is half the tail.
     #[test]
     fn the_tail_scales_with_what_was_sent() {
         let echo = [Fx::Delay {
@@ -214,8 +167,6 @@ mod tests {
         assert_eq!(mixed.l[10], burst().l[10] * 0.5, "the dry side, whole");
     }
 
-    /// A compressor on the mix reaches the sent mix with the mix's own gain,
-    /// so a quiet send is not compressed less than the signal it belongs to.
     #[test]
     fn a_compressor_ducks_the_send_by_what_it_ducked_the_mix() {
         let squeeze = [Fx::Compress {

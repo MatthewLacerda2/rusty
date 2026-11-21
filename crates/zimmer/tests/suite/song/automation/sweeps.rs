@@ -1,10 +1,5 @@
-//! A filter opening across the piece — the build, read at every moment of every
-//! note rather than once at its onset (#1123).
-//!
-//! The exactness here is deliberate: a note rendered under a flat curve is
-//! compared against the *same note rendered at a written cutoff*, so what is
-//! asserted is the number the filter was given and not merely that something
-//! got brighter.
+//! A filter opening across the piece — the build, read at every moment of every note rather than
+//! once at its onset.
 
 use scorsese_zimmer::song::{Param, Song};
 
@@ -12,15 +7,10 @@ use super::setup::{BEATS, at, curve, filtered, frame, render, rms, voiced};
 use crate::common::brightness;
 use crate::common::songs::voice;
 
-/// A rising sweep from 300 Hz to 8300 Hz across the fixture's eight beats, so
-/// the value at beat `b` is `300 + 1000·b` and lands on a round number at
-/// every beat a test asks about.
 fn sweep() -> scorsese_zimmer::song::Automation {
     curve(Param::Cutoff, vec![at(0.0, 300.0), at(BEATS, 8300.0)])
 }
 
-/// One two-beat note struck at `beat`, on an instrument whose filter sits at
-/// `cutoff` unless something moves it.
 fn struck(beat: f32, cutoff: f32) -> Song {
     let mut song = voiced(filtered(cutoff), 0.5);
     let pattern = song.patterns.get_mut("a").expect("the fixture defines `a`");
@@ -30,9 +20,6 @@ fn struck(beat: f32, cutoff: f32) -> Song {
     song
 }
 
-/// The number the filter is given, pinned: under a curve that holds one
-/// value, a note is exactly the note written at that cutoff, wherever it is
-/// struck.
 #[test]
 fn a_flat_curve_plays_the_note_written_at_its_value() {
     for (onset, wanted) in [(0.0, 300.0), (4.0, 4300.0)] {
@@ -49,8 +36,6 @@ fn a_flat_curve_plays_the_note_written_at_its_value() {
     }
 }
 
-/// The point of reading the curve across the note: one held note opens while
-/// it is held, where an onset reading held it at 300 Hz throughout.
 #[test]
 fn a_held_note_opens_while_it_is_held() {
     let mut song = struck(0.0, 300.0);
@@ -68,9 +53,6 @@ fn a_held_note_opens_while_it_is_held() {
     );
 }
 
-/// The negative half of the same claim: a curve that is not flat gives two
-/// notes two different instruments. Without this, the test above would pass on
-/// a sweep that had quietly become a constant.
 #[test]
 fn two_notes_at_different_beats_are_not_the_same_note() {
     let mut early = struck(0.0, 300.0);
@@ -85,8 +67,6 @@ fn two_notes_at_different_beats_are_not_the_same_note() {
     );
 }
 
-/// And what it sounds like, which is the reason the field exists: each note of
-/// a repeated part is brighter than the one before it.
 #[test]
 fn a_sweep_opens_the_part_note_by_note() {
     let mut song = voiced(filtered(300.0), 0.5);

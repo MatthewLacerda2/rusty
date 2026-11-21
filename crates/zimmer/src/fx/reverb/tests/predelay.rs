@@ -2,7 +2,6 @@
 
 use super::*;
 
-/// Where the first non-silent sample of a channel is.
 fn first(channel: &[f32]) -> usize {
     channel
         .iter()
@@ -10,9 +9,6 @@ fn first(channel: &[f32]) -> usize {
         .expect("the room answered")
 }
 
-/// The first reflection lands the pre-delay later than it did without one,
-/// on both sides, and is otherwise the same room: the tail is the one Freeverb
-/// always made, moved.
 #[test]
 fn the_room_answers_the_predelay_later_and_is_the_same_room() {
     let plain = rung(44_100, 0.7, 0.4, 1.0);
@@ -25,8 +21,6 @@ fn the_room_answers_the_predelay_later_and_is_the_same_room() {
     assert_eq!(late.r[gap..], plain.r[..44_100 - gap]);
 }
 
-/// The dry sound arrives alone: at half wet, everything before the room's
-/// first answer is the input at half level and nothing else.
 #[test]
 fn the_dry_sound_is_heard_alone_before_the_room() {
     let mut buf = impulse(4_410);
@@ -36,8 +30,6 @@ fn the_dry_sound_is_heard_alone_before_the_room() {
     assert!(first(&buf.l[1..]) + 1 >= 2_205 + COMB_LENGTHS[0]);
 }
 
-/// A pre-delay of nothing is no line at all, and one that is not a number, or
-/// one past the cap, is the nearest one the room can take.
 #[test]
 fn a_predelay_is_clamped_and_none_is_the_room_as_it_was() {
     let mut zero = impulse(4_410);

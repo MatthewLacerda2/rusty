@@ -1,7 +1,4 @@
 //! What a patch is refused for — and, as much as it matters, what it is not.
-//!
-//! Only the settings that would produce silence, a divide-by-zero or an
-//! unstable filter are rejected. Everything else renders, however ugly.
 
 use crate::common::{minimal, noise, osc};
 use scorsese_zimmer::SynthError;
@@ -60,8 +57,6 @@ fn an_oversized_stack_says_what_the_limit_is() {
     );
 }
 
-/// A stack of oscillators all weighted zero parses fine and renders silence,
-/// which is never what was meant — so it is caught rather than delivered.
 #[test]
 fn a_stack_weighted_entirely_to_zero_is_refused() {
     let mut silent = osc(Wave::Saw, 0.0, 0);
@@ -112,8 +107,6 @@ fn an_fm_modulator_needs_somewhere_to_sit() {
     );
 }
 
-/// The refusal carries the offending number, so an agent repairing a recipe
-/// unattended can fix it from the error alone.
 #[test]
 fn a_refusal_names_the_value_that_caused_it() {
     let mut patch = minimal(noise());

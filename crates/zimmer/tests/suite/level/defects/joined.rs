@@ -1,10 +1,8 @@
-//! The same defect in several channels is one defect, placed and sized by the
-//! worst of them; defects that do not overlap stay apart.
+//! The same defect in several channels is one defect, placed and sized by the worst of them;
+//! defects that do not overlap stay apart.
 
 use super::{RATE, found, interleaved};
 
-/// A second of stereo silence with an impulse of `left` at `at` in the left
-/// channel and one of `right` `late` samples later in the right.
 fn impulses(at: usize, left: f32, late: usize, right: f32) -> Vec<f32> {
     let mut l = vec![0.0; RATE as usize];
     let mut r = l.clone();
@@ -13,10 +11,6 @@ fn impulses(at: usize, left: f32, late: usize, right: f32) -> Vec<f32> {
     interleaved(&l, &r)
 }
 
-/// The same click in both channels, the right a few samples late and exactly
-/// as large: one click in every channel, placed where it was first heard. A
-/// tie keeps the earlier moment, so the answer does not depend on which
-/// channel is read last.
 #[test]
 fn a_click_in_both_channels_is_placed_at_the_first() {
     let at = RATE as usize / 2;
@@ -27,7 +21,6 @@ fn a_click_in_both_channels_is_placed_at_the_first() {
     assert_eq!(click.at_seconds, at as f64 / f64::from(RATE), "{click:?}");
 }
 
-/// Joined, the click is the larger of the two, where the larger one is.
 #[test]
 fn a_click_in_both_channels_is_the_larger_of_them() {
     let at = RATE as usize / 2;
@@ -41,8 +34,6 @@ fn a_click_in_both_channels_is_the_larger_of_them() {
     }
 }
 
-/// A click occupies 5 ms either side of it: clicks in two channels 10 ms
-/// apart only touch, and are two; a sample nearer, they overlap and are one.
 #[test]
 fn clicks_in_two_channels_that_only_touch_are_two() {
     let at = RATE as usize / 2;

@@ -6,7 +6,6 @@ use scorsese_zimmer::{Song, SynthError};
 
 use super::setup::play;
 
-/// What an agent writes: a bare name, and a solo layered over it an octave up.
 const SOLO_OVER_GROOVE: &str =
     r#"{ "layers": ["verse", { "pattern": "verse", "transpose": 12 }] }"#;
 
@@ -33,8 +32,6 @@ fn a_layered_entry_round_trips_with_each_layer_in_its_own_form() {
     assert_eq!(Song::from_json(&json).expect("deserialise"), layered);
 }
 
-/// A key is refused by name in either long form — and `pattern` beside
-/// `layers` is refused rather than one of the two being quietly dropped.
 #[test]
 fn a_layered_entry_names_the_key_it_does_not_take() {
     for (written, key) in [
@@ -53,8 +50,6 @@ fn a_layered_entry_names_the_key_it_does_not_take() {
     }
 }
 
-/// An empty `layers` is a slot of no length playing nothing — a typo, since a
-/// rest is a pattern with no notes and the beats it should last.
 #[test]
 fn an_entry_with_no_layers_is_refused() {
     let mut empty = song();
@@ -62,8 +57,6 @@ fn an_entry_with_no_layers_is_refused() {
     assert_eq!(empty.validate(), Err(SynthError::NoLayers));
 }
 
-/// Every layer is held to what a whole entry is: a name that matches no
-/// pattern, or a transform that is not a number, is refused wherever it sits.
 #[test]
 fn every_layer_is_checked_like_an_entry() {
     let mut typo = song();

@@ -1,5 +1,5 @@
-//! Where things land once the tempo moves: notes, gates, sections, windows
-//! and faders, all off the one map.
+//! Where things land once the tempo moves: notes, gates, sections, windows and faders, all off the
+//! one map.
 
 use scorsese_zimmer::song::{Automation, Easing, Param, Point, TempoChange};
 use scorsese_zimmer::{Excerpt, Span, Window, render_excerpt};
@@ -11,16 +11,16 @@ use scorsese_zimmer::song::{InlineOnly, PatchRef, Song};
 #[test]
 fn a_note_after_a_jump_lands_at_the_new_tempo() {
     let buf = left(&slowing());
-    // Beat 2 is one second in, at 120; beat 3 one second after, at 60. An
-    // attack starts from silence, so the first sound is the frame after.
+    // Beat 2 is one second in, at 120; beat 3 one second after, at 60. An attack starts from
+    // silence, so the first sound is the frame after.
     assert_eq!(onset(&buf, 0.9), frame(1.0) + 1);
     assert_eq!(onset(&buf, 1.9), frame(2.0) + 1);
 }
 
 #[test]
 fn a_gate_is_held_for_as_long_as_its_beats_last_where_it_is_played() {
-    // The fixture's blip, held rather than decaying, so the note sounds for
-    // exactly its gate and then its 50 ms release.
+    // The fixture's blip, held rather than decaying, so the note sounds for exactly its gate and
+    // then its 50 ms release.
     let held = |song: Song| {
         let mut patch = blip();
         patch.amp.s = 1.0;
@@ -28,9 +28,6 @@ fn a_gate_is_held_for_as_long_as_its_beats_last_where_it_is_played() {
         song.tracks[0].patch = PatchRef::Inline(Box::new(patch));
         left(&song)
     };
-    // The note on beat 2 is half a beat long: a quarter of a second at 120,
-    // half a second at 60. At 120 the next note is on at 1.5 s, so the search
-    // stops short of it; at 60 it is on at 2.
     let sounding = |buf: &[f32], until: f32| {
         buf[frame(1.0)..frame(until)]
             .iter()
@@ -50,8 +47,6 @@ fn sections_end_where_the_map_puts_their_last_beat() {
 
 #[test]
 fn sections_under_a_ramp_follow_the_integral() {
-    // 120 rising evenly to 240 over eight beats: 15 bpm a beat, so beat b
-    // falls at (60 / 15) · ln(1 + 15b / 120) = 4 · ln(1 + b / 8).
     let mut song = song();
     song.arrangement = vec!["verse".into(); 4];
     song.tempo = vec![TempoChange::ramp(8.0, 240.0)];
@@ -74,9 +69,6 @@ fn a_window_in_beats_opens_and_closes_on_the_map() {
 
 #[test]
 fn a_fader_reads_its_curve_at_the_beat_the_map_says_it_is() {
-    // Silent everywhere but beats 3 to 3.5. The note on beat 3 is two seconds
-    // in; a fader reading the written 120 bpm would think that beat 4, and
-    // silence it.
     let point = |beat, value| Point {
         beat,
         value,

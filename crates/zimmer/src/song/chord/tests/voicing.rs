@@ -5,15 +5,12 @@ use crate::error::SynthError;
 use crate::song::Pitch;
 use crate::song::chord::{Chord, Leading, Led, Voicing};
 
-/// `inv` rotates the voices above the bass and nothing else, and stops at
-/// the last inversion.
 #[test]
 fn an_inversion_turns_the_voices_above_the_bass() {
     let inverted = |name, inv| Chord {
         inv: Some(inv),
         ..chord(name, Some(4))
     };
-    // E4 G4 C5, then G4 C5 E5.
     assert_eq!(
         voiced(&inverted("C", 1)).expect("v"),
         vec![64.0, 67.0, 72.0]
@@ -22,7 +19,6 @@ fn an_inversion_turns_the_voices_above_the_bass() {
         voiced(&inverted("C", 2)).expect("v"),
         vec![67.0, 72.0, 76.0]
     );
-    // The G under C/G stays put while the triad turns.
     assert_eq!(
         voiced(&inverted("C/G", 1)).expect("v"),
         vec![55.0, 64.0, 67.0, 72.0]
@@ -42,8 +38,6 @@ fn an_inversion_turns_the_voices_above_the_bass() {
     ));
 }
 
-/// `near` reads the last chord on its own track, and is root position
-/// when there is none.
 #[test]
 fn near_leads_from_the_last_chord_on_its_track() {
     let near = |name, track: &str| Chord {
@@ -66,8 +60,6 @@ fn near_leads_from_the_last_chord_on_its_track() {
         .iter()
         .map(|n| n.note.to_midi().expect("midi"))
         .collect();
-    // Dmaj7 in root position; Bm7 alone on `pad` likewise; Bm7 after
-    // Dmaj7 on `keys` keeps D, F# and A and moves C# down to B.
     assert_eq!(
         midi,
         [
@@ -76,7 +68,6 @@ fn near_leads_from_the_last_chord_on_its_track() {
     );
 }
 
-/// The combinations that say two things, or nothing, are refused.
 #[test]
 fn a_voicing_that_cannot_apply_is_refused() {
     let both = Chord {

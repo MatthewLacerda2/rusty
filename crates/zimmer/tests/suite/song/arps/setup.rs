@@ -4,8 +4,6 @@ use crate::common::songs::{note, played, song, verse};
 use scorsese_zimmer::song::{Arp, Chord, InlineOnly, Note, PatternEntry, Voicing};
 use scorsese_zimmer::{Song, render_song};
 
-/// The one-track fixture over four beats, playing `entries` once and quietly
-/// enough that the master limiter never acts.
 pub(crate) fn playing(entries: Vec<PatternEntry>) -> Song {
     let mut once = song();
     once.arrangement = vec!["verse".into()];
@@ -16,7 +14,6 @@ pub(crate) fn playing(entries: Vec<PatternEntry>) -> Song {
     once
 }
 
-/// A four-beat chord on the fixture's track, arpeggiated as the fields say.
 pub(crate) fn arped(name: &str, arp: Option<Arp>, div: Option<f32>, gate: Option<f32>) -> Chord {
     Chord {
         track: "bass".to_owned(),
@@ -34,8 +31,6 @@ pub(crate) fn arped(name: &str, arp: Option<Arp>, div: Option<f32>, gate: Option
     }
 }
 
-/// The same figure written out one note at a time, on the same grid — the
-/// pitches in the order they sound, which is how the page prints them too.
 fn by_hand(pitches: &str, div: f32, gate: f32) -> Vec<Note> {
     pitches
         .split_whitespace()
@@ -44,14 +39,10 @@ fn by_hand(pitches: &str, div: f32, gate: f32) -> Vec<Note> {
         .collect()
 }
 
-/// Rendered samples, which is where the two spellings have to agree.
 fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
-/// That the shorthand is the long form. The fixture's instrument is
-/// *stochastic* on purpose: matching here means every note of the figure took
-/// the ordinal it would have taken written out, noise seed and all.
 pub(crate) fn same(chord: Chord, pitches: &str, div: f32, gate: f32) {
     assert_eq!(
         render(&playing(vec![chord.into()])),
@@ -60,8 +51,6 @@ pub(crate) fn same(chord: Chord, pitches: &str, div: f32, gate: f32) {
     );
 }
 
-/// The same song under a player who neither clocks nor lands square, so what a
-/// comparison proves is that expansion happened before the performance.
 pub(crate) fn scattered(song: Song, feel: scorsese_zimmer::song::Humanize) -> Vec<f32> {
     render(&Song {
         humanize: Some(feel),
@@ -70,7 +59,6 @@ pub(crate) fn scattered(song: Song, feel: scorsese_zimmer::song::Humanize) -> Ve
     })
 }
 
-/// The figure written by hand, as pattern entries.
 pub(crate) fn spelled(pitches: &str, div: f32, gate: f32) -> Vec<PatternEntry> {
     played(by_hand(pitches, div, gate))
 }

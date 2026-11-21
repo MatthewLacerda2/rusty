@@ -1,6 +1,6 @@
-//! The LFO as a document: its shapes, its onset, a rate in beats and a second
-//! one (#1772) — what is written and what is refused. `lfo_played` has what a
-//! note does with them, and `core::lfo` pins the curves by the number.
+//! The LFO as a document: its shapes, its onset, a rate in beats and a second one — what is written
+//! and what is refused. `lfo_played` has what a note does with them, and `core::lfo` pins the
+//! curves by the number.
 
 use crate::common::{minimal, opts, osc, refusal, saw_patch};
 use scorsese_zimmer::patch::{Lfo, LfoShape, LfoTarget, Source, Wave};
@@ -25,8 +25,6 @@ fn on_the_beat() -> Lfo {
     }
 }
 
-/// A plain LFO is written as it always was; every new field is left out at
-/// its default, and so is an absent `lfo2`, so no recipe's bytes move.
 #[test]
 fn an_lfo_at_its_defaults_writes_only_what_it_always_did() {
     let json = with(vibrato()).to_json().expect("serialise");
@@ -67,8 +65,6 @@ fn an_lfo_with_two_speeds_or_none_is_refused() {
     }
 }
 
-/// A patch played on its own has no tempo, so `beats` is refused there and
-/// accepted in a song; a cycle of no beats is refused everywhere.
 #[test]
 fn beats_need_a_song_and_a_positive_length() {
     let patch = with(on_the_beat());
@@ -113,8 +109,6 @@ fn a_negative_onset_is_refused() {
     }
 }
 
-/// The second LFO is held to the same rules as the first, its pulse-width
-/// target included.
 #[test]
 fn the_second_lfo_is_checked_like_the_first() {
     let patch = Patch {

@@ -6,8 +6,6 @@ use crate::common::songs::{song, verse, voice};
 use scorsese_zimmer::song::{Fade, FitMode, Tail};
 use scorsese_zimmer::{Song, SynthError};
 
-/// `exact` is for music that has to butt against something: the file ends on
-/// the last beat rather than wherever the ring-out happens to stop.
 #[test]
 fn an_exact_tail_ends_on_the_final_beat() {
     let mut rings_out = song();
@@ -42,9 +40,6 @@ fn fades_move_the_level_at_each_end() {
     let rendered = render(&faded);
     let plain = render(&fitted(4.0, FitMode::Loop));
     assert_eq!(rendered.len(), samples(4.0), "a fade changes no lengths");
-    // Against the unfaded render rather than an absolute level: what a fade
-    // does is make the start *quieter than it would have been*, and how loud
-    // that is depends on the instrument.
     let opening = samples(0.05);
     assert!(
         peak(&rendered[..opening]) < peak(&plain[..opening]) * 0.2,
@@ -72,7 +67,6 @@ fn a_negative_fade_is_refused() {
     assert!(matches!(faded.validate(), Err(SynthError::BadFade { .. })));
 }
 
-/// Absent means what every song did before these fields existed.
 #[test]
 fn a_song_with_none_of_this_is_unchanged() {
     let plain = song();

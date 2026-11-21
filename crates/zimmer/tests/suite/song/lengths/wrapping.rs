@@ -1,5 +1,5 @@
-//! `tail: wrap`: a song that comes back round without a seam, because what
-//! rang past its last beat is summed onto its first.
+//! `tail: wrap`: a song that comes back round without a seam, because what rang past its last beat
+//! is summed onto its first.
 
 use super::setup::{fitted, samples};
 use crate::common::peak;
@@ -10,20 +10,10 @@ use scorsese_zimmer::song::{
 };
 use scorsese_zimmer::{Song, SynthError, render_song};
 
-/// Both channels, interleaved, as a file holds them — the fold is the same
-/// sum on each side, and asserting on one would let the other drift.
 fn stereo(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
-/// The fixture with its last note held past the final beat on an instrument
-/// that sustains, so there is a real tail to fold, and turned down far enough
-/// that the limiter never has to act on it.
-///
-/// That last part is what lets these tests see the sum **before the
-/// limiter** through the public API: a signal that never approaches the
-/// ceiling is left untouched, sample for sample, so what comes out is exactly
-/// what was folded.
 fn ringing(tail: Tail) -> Song {
     let mut rings_out = song();
     let sustains = Patch {
@@ -68,9 +58,6 @@ fn a_wrapped_song_starts_with_its_own_tail() {
     }
 }
 
-/// The fold is an addition, and it happens before the master limiter rather
-/// than after it — so a loud song whose tail lands on a loud first bar still
-/// comes out under the ceiling (−1 dBTP, and so under 0.9 at every sample).
 #[test]
 fn a_loud_wrapped_song_still_does_not_clip() {
     let mut loud = ringing(Tail::Wrap);
@@ -79,8 +66,6 @@ fn a_loud_wrapped_song_still_does_not_clip() {
     assert!(peak(&rendered) <= 0.9, "peaked at {}", peak(&rendered));
 }
 
-/// 64 beats at 96 bpm is forty seconds, and forty seconds is 1,764,000
-/// samples — not one more for the tail, not one fewer for rounding.
 #[test]
 fn a_wrapped_song_is_exactly_the_arrangement_long() {
     let mut long = ringing(Tail::Wrap);
@@ -94,8 +79,6 @@ fn a_wrapped_song_is_exactly_the_arrangement_long() {
     assert_eq!(rendered.len(), 2 * samples(40.0));
 }
 
-/// A tail that would still be ringing the next time round is a recipe that
-/// does not loop, and it says so with both lengths rather than cutting one.
 #[test]
 fn a_tail_longer_than_the_loop_is_refused() {
     let mut rings_on = ringing(Tail::Wrap);
@@ -110,8 +93,6 @@ fn a_tail_longer_than_the_loop_is_refused() {
     assert!(said.contains("2.00 s loop"), "{said}");
 }
 
-/// `stretch` lands a whole number of passes on the target, so it has a loop
-/// point — and the file comes out at the target, to the sample.
 #[test]
 fn a_stretched_song_wraps_on_its_target() {
     let stretched = Song {
@@ -121,8 +102,6 @@ fn a_stretched_song_wraps_on_its_target() {
     assert_eq!(stereo(&stretched).len(), 2 * samples(4.1));
 }
 
-/// Everything that would put a seam back into the loop is refused, before a
-/// sample is rendered.
 #[test]
 fn what_would_break_the_loop_is_refused() {
     let wrapped = |song: Song| Song {
@@ -154,9 +133,6 @@ fn what_would_break_the_loop_is_refused() {
     }
 }
 
-/// An excerpt's promise holds under `wrap`: the first bar of a window is the
-/// first bar of the file, tail and all — which means the notes at the end
-/// are rendered for it, however early the window closes.
 #[test]
 fn a_window_on_a_wrapped_song_is_the_same_samples() {
     let wrap = ringing(Tail::Wrap);

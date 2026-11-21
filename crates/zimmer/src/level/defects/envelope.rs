@@ -1,41 +1,22 @@
-//! Dropouts and stepped gain, both read off a channel's energy every half
-//! millisecond.
-//!
-//! **A dropout** is a run of blocks [`DEPTH_DB`] under the sound on both sides
-//! of it, no longer than [`LONGEST_DROPOUT`]: longer than that and it is a
-//! pause, which speech and music both have on purpose.
-//!
-//! **Stepped gain** is [`super::zipper`]'s, read off the energy of the
-//! envelope, which is kept beside the waveform's.
+//! Dropouts and stepped gain, both read off a channel's energy every half millisecond.
 
 use super::Found;
 use super::quadrature::Quadrature;
 
-/// The length of one block of energy, in seconds.
 const BLOCK: f64 = 0.0005;
 
-/// How far under the sound either side a dropout falls, in decibels.
 const DEPTH_DB: f64 = 40.0;
-/// How loud the sound either side of a dropout must be, as a mean square:
-/// −40 dBFS. A gap in a whisper of room tone is not a dropout anybody hears.
 const SOUNDING: f64 = 1e-4;
-/// How much sound either side of a gap is read, in seconds.
 const AROUND: f64 = 0.02;
-/// The shortest and the longest a dropout is, in seconds.
 const SHORTEST_DROPOUT: f64 = 0.001;
 const LONGEST_DROPOUT: f64 = 0.04;
 
-/// One channel's energy, a block at a time.
 #[derive(Debug, Clone)]
 pub(super) struct Envelope {
     block: usize,
     quadrature: Quadrature,
-    /// The mean square of each whole block so far.
     energy: Vec<f64>,
     sum: f64,
-    /// The same, of the envelope rather than the waveform: what stepped gain
-    /// is read from. A dropout is read from the waveform, because the
-    /// envelope's all-pass chains ring on through a gap.
     envelope: Vec<f64>,
     envelope_sum: f64,
     filled: usize,
@@ -67,7 +48,6 @@ impl Envelope {
         }
     }
 
-    /// The frame a block boundary falls on.
     fn frame(&self, block: usize) -> u64 {
         (block * self.block) as u64
     }
@@ -76,7 +56,6 @@ impl Envelope {
         ((seconds / BLOCK).round() as usize).max(1)
     }
 
-    /// The mean energy of `blocks`.
     fn mean(&self, blocks: std::ops::Range<usize>) -> f64 {
         let len = blocks.len().max(1) as f64;
         self.energy[blocks].iter().sum::<f64>() / len
@@ -129,10 +108,6 @@ impl Envelope {
 mod tests {
     use super::{Envelope, SOUNDING};
 
-    /// Sound whose 20 ms before a gap average exactly −40 dBFS is loud enough
-    /// for a dropout. The forty blocks are at that energy but the last, which
-    /// takes up the rounding, so their sum is exactly forty times the floor
-    /// and their mean exactly [`SOUNDING`].
     #[test]
     fn a_gap_after_sound_at_exactly_the_floor_is_a_dropout() {
         let mut envelope = Envelope::new(48_000);

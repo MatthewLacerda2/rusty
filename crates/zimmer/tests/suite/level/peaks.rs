@@ -2,8 +2,6 @@
 
 use scorsese_zimmer::level::{FramePeaks, Meter};
 
-/// A quarter-rate tone read half a sample late, in stereo with the right side
-/// at half level: its waveform overshoots its samples.
 fn signal() -> Vec<f32> {
     (0..2_000)
         .flat_map(|i| {
@@ -23,7 +21,6 @@ fn every(samples: &[f32], run: usize) -> Vec<f64> {
     read
 }
 
-/// One reading per frame, whatever the run size, and the same readings.
 #[test]
 fn every_frame_is_read_once_whatever_the_runs() {
     let signal = signal();
@@ -34,8 +31,6 @@ fn every_frame_is_read_once_whatever_the_runs() {
     }
 }
 
-/// The largest reading is the meter's true peak, louder side first: the two
-/// cannot disagree about where the waveform goes.
 #[test]
 fn the_loudest_frame_is_the_meters_true_peak() {
     let signal = signal();

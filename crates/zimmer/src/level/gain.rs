@@ -1,31 +1,17 @@
-//! Decibels and linear gain, the one conversion every level reading and every
-//! gain stage needs.
-//!
-//! Each function is the textbook expression and nothing more, so a caller that
-//! used to write it inline gets the same bits back: a bake is addressed by a
-//! hash of its samples' inputs, and moving one onto these must not move a
-//! sample. The `f32` pair exists because the synthesis path works in `f32` and
-//! the measuring path in `f64`; converting through the other precision would
-//! round differently, so each keeps its own.
+//! Decibels and linear gain, the one conversion every level reading and every gain stage needs.
 
-/// The linear amplitude factor `db` decibels stands for: `0.0` is unity,
-/// `-6.0` about half.
 pub fn db_to_gain(db: f64) -> f64 {
     10_f64.powf(db / 20.0)
 }
 
-/// The decibels a linear amplitude factor `gain` stands for: `1.0` is `0.0`,
-/// and silence is negative infinity.
 pub fn gain_to_db(gain: f64) -> f64 {
     20.0 * gain.log10()
 }
 
-/// [`db_to_gain`] in `f32`, for the synthesis path.
 pub fn db_to_gain_f32(db: f32) -> f32 {
     10f32.powf(db / 20.0)
 }
 
-/// [`gain_to_db`] in `f32`, for the synthesis path.
 pub fn gain_to_db_f32(gain: f32) -> f32 {
     20.0 * gain.log10()
 }

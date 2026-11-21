@@ -1,93 +1,22 @@
-//! the compressor a recipe chooses — and the one effect here that can be
-//! listening to something other than the signal it changes.
-//!
-//! ## Not the limiter at a different setting
-//!
-//! [`super::limiter`] is a **safety device**. It is not listed among the
-//! effects at all, every bake goes through it whether the recipe asked or not,
-//! and a signal that never approaches the ceiling comes back untouched — its
-//! whole job is that a file cannot clip. A compressor is a **musical device**:
-//! it is chosen, it is meant to be audible, and it decides how a part sits.
-//! The two share the shape of their implementation and nothing else.
-//!
-//! What it buys is **crest factor** — the distance between a signal's peaks
-//! and its body. A mix with nothing compressing anywhere has peaks towering
-//! over its average: it measures loud, sounds quiet, and reads as several
-//! parts summed rather than as one performance. Pulling the peaks down and
-//! handing the difference back as `makeup` is what closes that gap, and a
-//! gentle one over the sum is most of what the word *glue* means.
-//!
-//! ## Offline, so the attack is free
-//!
-//! The trick [`super::limiter`]'s doc already argues for: this crate renders a
-//! whole buffer rather than streaming it, so the gain every sample needs can
-//! be worked out first and *then* smoothed: already down before a peak
-//! arrives, and recovering over the release in decibels, so a light duck and a
-//! deep one let go over the same time. [`super::gain`] has the passes, shared
-//! with the limiter, and why the detector holds a peak rather than chasing the
-//! waveform.
-//!
-//! That is a transparent attack rather than a click followed by an overshoot,
-//! and it is the one place this behaves unlike a hardware compressor: the duck
-//! is *centred on* the transient instead of chasing it, so a slow attack here
-//! does not let the transient through the way a streaming compressor's does.
-//! `mix` is how a recipe keeps one — a hard-compressed copy under an untouched
-//! one is parallel, or "New York", compression, and it is the safest way to
-//! add density without flattening what made the part interesting.
-//!
-//! ## The detector is linked, and it may be listening elsewhere
-//!
-//! One gain track, taken from whichever channel is louder at each frame and
-//! applied to both, for exactly the reason the limiter gives: an unlinked
-//! compressor is a fader that moves one side and not the other every time it
-//! acts, and a centred part drifts away from whichever side happened to be
-//! loud.
-//!
-//! *Where* the level is read is the other half. Normally it is the signal
-//! being changed. With a sidechain it is another track's part, and what comes
-//! out is the most recognisable production move of the last twenty years: a
-//! kick pressing the pad and the bass down on every beat, so the low end is
-//! taken in turns rather than fought over. [`crate::song`]'s mixer decides
-//! which part is handed over and says why; this module only ever reads the one
-//! it is given.
+//! the compressor a recipe chooses — and the one effect here that can be listening to something
+//! other than the signal it changes.
 
 use super::gain::Ballistics;
 use crate::level::{db_to_gain_f32, gain_to_db_f32};
 use crate::stereo::Stereo;
 
-/// The quietest a threshold may be set, in dBFS. Below this a compressor is
-/// acting on the noise between the notes as hard as on the notes.
 const MIN_THRESHOLD_DB: f32 = -60.0;
 
-/// The loudest a threshold may be set, in dBFS. Full scale is where the
-/// limiter's job starts, and holding a signal under the ceiling is that
-/// device's promise rather than this one's.
 const MAX_THRESHOLD_DB: f32 = 0.0;
 
-/// The hardest ratio allowed. Past about 20:1 a compressor stops sliding the
-/// level and starts holding a wall in front of it, which is a limiter — and
-/// there is already one of those, at the only place it belongs.
 const MAX_RATIO: f32 = 20.0;
 
-/// The fastest either time constant may be, in seconds. About twenty samples:
-/// shorter than one cycle of anything with a pitch, so the gain would be
-/// tracking the waveform rather than the level and the result is distortion
-/// rather than compression.
 const MIN_TIME: f32 = 0.0005;
 
-/// The slowest either time constant may be, in seconds. Two seconds is longer
-/// than most phrases; past it the gain is a fader move rather than an effect.
 const MAX_TIME: f32 = 2.0;
 
-/// The most makeup allowed either way, in decibels. The same ceiling the EQ's
-/// bands take, and for the same reason: past it this is not mixing.
 const MAX_MAKEUP_DB: f32 = 24.0;
 
-/// One compressor, with every setting already clamped to what it can honour.
-///
-/// A struct rather than six arguments because it is built once per chain entry
-/// and then asked to run, and because the clamping has exactly one home that
-/// way — the same shape [`super::eq`]'s `Biquad` takes.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Compressor {
     threshold_db: f32,
@@ -99,8 +28,6 @@ pub(crate) struct Compressor {
 }
 
 impl Compressor {
-    /// The settings as the document wrote them, clamped rather than refused —
-    /// which is what every other fx parameter in this crate already does.
     pub(crate) fn new(
         threshold: f32,
         ratio: f32,
@@ -119,19 +46,12 @@ impl Compressor {
         }
     }
 
-    /// Compress `buf` in place, reading the level from `key` when there is one
-    /// and from `buf` itself when there is not.
-    ///
-    /// The two are indexed from the same frame, because both are positions in
-    /// the same piece. A key that runs out first stops ducking; one that runs
-    /// on past the end of the signal has nothing left to duck.
     pub(crate) fn apply(&self, buf: &mut Stereo, key: Option<&Stereo>, rate: f32) {
         if self.is_bypass() || buf.is_empty() {
             return;
         }
-        // Flushed before the detector reads them, so one poisoned sample is a
-        // gap rather than a whole buffer of silence — the guard the limiter
-        // and the EQ both keep.
+        // Flushed before the detector reads them, so one poisoned sample is a gap rather than a
+        // whole buffer of silence — the guard the limiter and the EQ both keep.
         buf.each(|channel| {
             for sample in channel.iter_mut().filter(|s| !s.is_finite()) {
                 *sample = 0.0;
@@ -147,18 +67,10 @@ impl Compressor {
         });
     }
 
-    /// Whether this compressor is the identity, sample for sample.
-    ///
-    /// A fully dry one changes nothing, and so does a ratio of 1:1 with no
-    /// makeup to add. Both are skipped rather than computed at unity, for the
-    /// reason [`super::eq`]'s zero-gain bypass is exact: a bake is addressed
-    /// by a hash, and "identical to within rounding" is a different file.
     fn is_bypass(&self) -> bool {
         self.mix <= 0.0 || (self.ratio <= 1.0 && self.makeup_db == 0.0)
     }
 
-    /// The gain each of `frames` sample-frames is multiplied by: the static
-    /// curve first, then given [`Ballistics`].
     fn gain_track(&self, key: &Stereo, frames: usize, rate: f32) -> Vec<f32> {
         let target: Vec<f32> = (0..frames)
             .map(|frame| self.target(level_at(key, frame)))
@@ -178,9 +90,6 @@ impl Compressor {
     }
 }
 
-/// How loud the key is at one frame: the louder of its two channels, which is
-/// what links them. Past its end it is silent, so a short key stops ducking
-/// rather than repeating.
 fn level_at(key: &Stereo, frame: usize) -> f32 {
     let side = |channel: &[f32]| channel.get(frame).copied().unwrap_or(0.0).abs();
     let (left, right) = (side(&key.l), side(&key.r));
@@ -191,7 +100,6 @@ fn level_at(key: &Stereo, frame: usize) -> f32 {
     }
 }
 
-/// `value`, or `fallback` when it is not a number.
 fn finite(value: f32, fallback: f32) -> f32 {
     if value.is_finite() { value } else { fallback }
 }
@@ -206,7 +114,6 @@ mod tests {
         buf.iter().fold(0.0f32, |most, s| most.max(s.abs()))
     }
 
-    /// A steady tone at `amplitude`, long enough for the ramps to settle.
     fn tone(amplitude: f32, frames: usize) -> Vec<f32> {
         (0..frames)
             .map(|i| amplitude * (std::f32::consts::TAU * 220.0 * i as f32 / RATE).sin())
@@ -219,8 +126,8 @@ mod tests {
 
     #[test]
     fn a_signal_over_the_threshold_comes_back_at_the_ratio() {
-        // 0 dBFS in, 20 dB over a -20 dB threshold at 4:1, so 15 dB of that
-        // excess is given back: −15 dBFS out, about 0.178.
+        // 0 dBFS in, 20 dB over a -20 dB threshold at 4:1, so 15 dB of that excess is given back:
+        // −15 dBFS out, about 0.178.
         let mut buf = Stereo::centred(tone(1.0, 22_050));
         four_to_one().apply(&mut buf, None, RATE);
         let out = peak(&buf.l[11_025..]);
@@ -239,9 +146,6 @@ mod tests {
         assert_eq!(buf, quiet, "nothing crossed the threshold");
     }
 
-    /// The linked detector, stated the way the limiter states it: a peak on
-    /// one side moves both sides by the same amount, so the balance between
-    /// them survives every moment the compressor acts.
     #[test]
     fn a_peak_on_one_side_pulls_both_down_together() {
         let mut buf = Stereo {
@@ -256,8 +160,6 @@ mod tests {
         );
     }
 
-    /// The whole point of the sidechain: the gain follows a signal that is not
-    /// the one being changed.
     #[test]
     fn a_key_ducks_a_signal_that_never_crosses_the_threshold_itself() {
         let mut key = Stereo::silence(8820);
@@ -300,14 +202,6 @@ mod tests {
         }
     }
 
-    /// The lookahead, asserted on the gain track itself rather than inferred
-    /// from the output — because "the peak came out quieter" is equally true of
-    /// a compressor with no ramp at all, and the ramp is the whole difference
-    /// between a duck and a step.
-    ///
-    /// Two claims, and each rules out one way of getting the other right by
-    /// accident: the gain is **already moving** before the peak arrives, and it
-    /// gets there **by a ramp** rather than by collapsing to nothing.
     #[test]
     fn the_gain_is_already_on_its_way_down_before_the_peak_arrives() {
         let mut key = Stereo::silence(2000);
@@ -332,11 +226,6 @@ mod tests {
         );
     }
 
-    /// The exactness the module doc claims for a parked compressor, at the
-    /// setting that would give it away: at `mix` 0.3 a "bypass" computed as
-    /// `0.7·s + 0.3·s` is *not* `s` in `f32`, so a compressor that ran its
-    /// arithmetic at unity instead of standing aside would change the bytes of
-    /// every bake carrying one — and a bake is addressed by a hash.
     #[test]
     fn a_parked_compressor_hands_back_the_signal_it_was_given() {
         let original = Stereo::centred(tone(0.7, 8820));
@@ -345,11 +234,6 @@ mod tests {
         assert_eq!(parked, original, "1:1 with no makeup is not an effect");
     }
 
-    /// Parallel — "New York" — compression: a hard-compressed copy under an
-    /// untouched one, which is the whole reason `mix` is a field rather than
-    /// always 1. Asserted sample by sample against the two copies it is made
-    /// of, so neither side of the blend can be reaching the arithmetic
-    /// sideways.
     #[test]
     fn a_partial_mix_is_the_two_copies_blended() {
         let original = Stereo::centred(tone(1.0, 8820));
@@ -377,10 +261,6 @@ mod tests {
         );
     }
 
-    /// A key is another track's part, so unlike the signal it is not flushed on
-    /// the way past and the guard has to be in the detector. A frame it cannot
-    /// read is silence rather than a peak: read as one, an infinity asks for
-    /// infinite reduction and punches a hole in a track that did nothing.
     #[test]
     fn a_frame_of_the_key_that_cannot_be_read_ducks_nothing() {
         let mut key = Stereo::silence(4410);

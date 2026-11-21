@@ -1,9 +1,4 @@
 //! Shared setup for the automation tests.
-//!
-//! Everything here renders a **held saw**: one note, full sustain, no release,
-//! present at every sample of the piece. A curve can then be read straight off
-//! the waveform at any beat, which is what lets these tests assert the value a
-//! parameter actually had rather than that something came out.
 
 use std::collections::BTreeMap;
 
@@ -16,16 +11,12 @@ use scorsese_zimmer::{SAMPLE_RATE, render_song};
 use crate::common::songs::{note, played};
 use crate::common::{channel, saw_patch};
 
-/// The fixture's tempo and length: 8 beats at 120 bpm, so a beat is half a
-/// second and the whole piece is four.
 pub(crate) const BEATS: f32 = 8.0;
 
-/// One held note on one track, `gain` at the fader and nothing moving.
 pub(crate) fn held(gain: f32) -> Song {
     voiced(saw_patch(), gain)
 }
 
-/// [`held`], on a named instrument of the caller's choosing.
 pub(crate) fn voiced(patch: Patch, gain: f32) -> Song {
     let mut patterns = BTreeMap::new();
     patterns.insert(
@@ -64,7 +55,6 @@ pub(crate) fn voiced(patch: Patch, gain: f32) -> Song {
     }
 }
 
-/// A saw through a lowpass, for the tests about a moving cutoff.
 pub(crate) fn filtered(cutoff: f32) -> Patch {
     Patch {
         filter: Some(Filter {
@@ -81,7 +71,6 @@ pub(crate) fn filtered(cutoff: f32) -> Patch {
     }
 }
 
-/// A curve on the `pad` track, from its written points.
 pub(crate) fn curve(param: Param, points: Vec<Point>) -> Automation {
     Automation {
         track: "pad".to_owned(),
@@ -90,7 +79,6 @@ pub(crate) fn curve(param: Param, points: Vec<Point>) -> Automation {
     }
 }
 
-/// One control point, travelling linearly to the next.
 pub(crate) fn at(beat: f32, value: f32) -> Point {
     Point {
         beat,
@@ -99,7 +87,6 @@ pub(crate) fn at(beat: f32, value: f32) -> Point {
     }
 }
 
-/// One control point with an easing of its own.
 pub(crate) fn eased(beat: f32, value: f32, easing: Easing) -> Point {
     Point {
         beat,
@@ -108,12 +95,10 @@ pub(crate) fn eased(beat: f32, value: f32, easing: Easing) -> Point {
     }
 }
 
-/// A ramp from `from` to `to` across the fixture's eight beats.
 pub(crate) fn ramp(param: Param, from: f32, to: f32) -> Automation {
     curve(param, vec![at(0.0, from), at(BEATS, to)])
 }
 
-/// The left channel of a rendered song.
 pub(crate) fn render(song: &Song) -> Vec<f32> {
     channel(
         &render_song(song, &InlineOnly).expect("the song renders"),
@@ -121,19 +106,15 @@ pub(crate) fn render(song: &Song) -> Vec<f32> {
     )
 }
 
-/// Both channels of a rendered song, left first.
 pub(crate) fn sides(song: &Song) -> (Vec<f32>, Vec<f32>) {
     let mix = render_song(song, &InlineOnly).expect("the song renders");
     (channel(&mix, 0), channel(&mix, 1))
 }
 
-/// The sample index a beat falls on, at the fixture's 120 bpm.
 pub(crate) fn frame(beat: f32) -> usize {
     (beat * 0.5 * SAMPLE_RATE as f32).round() as usize
 }
 
-/// Root-mean-square of a slice — the level over a window, for the questions
-/// that are about a stretch of the piece rather than one sample.
 pub(crate) fn rms(buf: &[f32]) -> f32 {
     let sum: f32 = buf.iter().map(|sample| sample * sample).sum();
     (sum / buf.len() as f32).sqrt()

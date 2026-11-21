@@ -17,8 +17,6 @@ fn looping_lands_on_the_target_to_the_sample() {
     }
 }
 
-/// A loop is a bed: a gap in the middle of one is worse than a seam, so the
-/// music has to actually reach the end rather than being padded to it.
 #[test]
 fn a_loop_is_music_all_the_way_to_the_target() {
     let rendered = render(&fitted(7.0, FitMode::Loop));
@@ -29,8 +27,6 @@ fn a_loop_is_music_all_the_way_to_the_target() {
     );
 }
 
-/// Truncation lands mid-waveform, which is a click. The seam fade is what
-/// makes an arbitrary cut usable, so the final sample has to be at rest.
 #[test]
 fn a_cut_loop_does_not_end_on_a_click() {
     let rendered = render(&fitted(3.3, FitMode::Loop));
@@ -52,12 +48,6 @@ fn once_plays_through_and_pads_the_rest_with_silence() {
     );
 }
 
-/// `stretch` keeps the music intact and moves the tempo instead, so it lands
-/// on a whole number of passes and on the target exactly.
-///
-/// 4.4 s of a 2 s song is two passes at 109.09 bpm rather than 120, which puts
-/// the last note on beat 7 at 3.85 s — where at the written tempo it would
-/// have fallen at 3.50 s and the buffer would have ended at 4.00 s.
 #[test]
 fn stretching_moves_the_tempo_to_land_on_the_target() {
     let rendered = render(&fitted(4.4, FitMode::Stretch));
@@ -72,12 +62,8 @@ fn stretching_moves_the_tempo_to_land_on_the_target() {
     );
 }
 
-/// The refusal that keeps `stretch` honest: a bed at 40% speed is not a bed.
 #[test]
 fn stretching_too_far_is_refused_with_the_tempo_it_would_have_needed() {
-    // 3 s of a 2 s song is two passes crammed into three seconds: 160 bpm
-    // against the 120 written, a third faster, which is past what a piece of
-    // music survives.
     let refused = fitted(3.0, FitMode::Stretch)
         .validate()
         .expect_err("a third faster is too far");
@@ -89,8 +75,6 @@ fn stretching_too_far_is_refused_with_the_tempo_it_would_have_needed() {
         (needed - 160.0).abs() < 0.1,
         "it should name the tempo it needed, got {needed}"
     );
-    // And the same target under `loop` is fine, which is what the message
-    // tells the caller to reach for.
     assert_eq!(fitted(3.0, FitMode::Loop).validate(), Ok(()));
 }
 

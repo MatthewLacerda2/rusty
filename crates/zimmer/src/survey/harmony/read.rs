@@ -1,5 +1,5 @@
-//! The arithmetic behind a [`Harmony`](super::Harmony): which notes are read, which of them
-//! overlap a semitone apart, and which leave the key.
+//! The arithmetic behind a [`Harmony`](super::Harmony): which notes are read, which of them overlap
+//! a semitone apart, and which leave the key.
 
 use std::collections::HashMap;
 
@@ -9,27 +9,17 @@ use crate::song::{PatchResolver, Song};
 use crate::survey::song::{instrument, source};
 use crate::survey::walk::{Sounded, walk};
 
-/// A note the report reads: on a pitched track, with a pitch.
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Held {
-    /// Its track, by index into the song's tracks.
     track: usize,
-    /// The pitch it sounds at, in MIDI.
     midi: f32,
-    /// When it starts and stops, in beats from the top of one pass.
     start: f32,
     end: f32,
-    /// The arrangement entry it starts in, and where that entry's slot starts.
     entry: usize,
     slot: f32,
-    /// A copy of a note ringing past the end of the arrangement, moved back by
-    /// one pass, because the piece plays again under it.
     wrapped: bool,
 }
 
-/// Every note on a pitched track, with a pitch, sorted by onset — and, when
-/// the arrangement plays more than once, a copy of each note still ringing at
-/// the end, laid over the top of the next pass.
 pub(super) fn pitched(song: &Song, resolve: &dyn PatchResolver) -> Vec<Held> {
     let mut stated = vec![false; song.tracks.len()];
     let mut notes = Vec::new();
@@ -78,23 +68,17 @@ pub(super) fn pitched(song: &Song, resolve: &dyn PatchResolver) -> Vec<Held> {
     notes
 }
 
-/// Whether two pitches are a semitone apart in any octave.
 fn rub(a: f32, b: f32) -> bool {
     let apart = (a.round() as i32 - b.round() as i32).rem_euclid(12);
     apart == 1 || apart == 11
 }
 
-/// What a finding is grouped by: the same notes, on the same tracks, at the
-/// same beat of a section of the same name, are one finding however many
-/// times the arrangement plays it.
 type Group = (String, i64, usize, i64, usize, i64);
 
-/// A beat or a pitch as a key: thousandths, rounded.
 fn whole(n: f32) -> i64 {
     (f64::from(n) * 1000.0).round() as i64
 }
 
-/// The clashes in `notes`: how many, how long in all, and the longest few.
 pub(super) fn clashes(song: &Song, notes: &[Held]) -> (usize, f32, Vec<Clash>) {
     let mut found: Vec<(Group, Clash)> = Vec::new();
     let mut at: HashMap<Group, usize> = HashMap::new();
@@ -164,10 +148,6 @@ pub(super) fn clashes(song: &Song, notes: &[Held]) -> (usize, f32, Vec<Clash>) {
     (count, total, longest)
 }
 
-/// One track's notes that `inside` says are outside the key: their share of
-/// its held time and the longest few, or nothing when there are none.
-///
-/// A wrapped copy is the same note again, so it is not counted twice.
 pub(super) fn strays(
     song: &Song,
     notes: &[Held],
@@ -213,10 +193,6 @@ pub(super) fn strays(
     Some((outside / held, found))
 }
 
-/// Where `note` starts, as a section and a beat into it.
-///
-/// Never asked of a wrapped copy: a clash is placed at the later onset, which
-/// a copy moved back a pass never is, and strays skip copies.
 fn place(song: &Song, note: &Held) -> Place {
     Place {
         section: song

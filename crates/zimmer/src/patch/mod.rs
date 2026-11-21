@@ -1,19 +1,4 @@
 //! The patch document: one instrument, as serde data.
-//!
-//! A [`Patch`] is a "Minimoog-lite" description of a single sound. It is
-//! **structured, not a free graph**: the signal path is fixed —
-//! `source → filter → amp envelope → fx`, with up to two LFOs tapping one target each ([`Lfo`]), and
-//! up to [`MAX_LAYERS`] more `source → filter → amp` paths summed in parallel
-//! before the fx ([`Layer`]) — because a patch has to honour a contract, *playable as a note*. The recipe
-//! chooses what goes in each stage, never how the stages connect.
-//!
-//! That is not a simplification for its own sake. A free graph would let a
-//! recipe describe something that is not a note — a feedback loop with no
-//! output, a stage that never terminates — and the whole point of a patch is
-//! that `(pitch, velocity, duration) in → buffer out` always holds.
-//!
-//! Patch-as-truth: no buffers and no handles, so it round-trips losslessly.
-//! [`render_note`](crate::render_note) renders it.
 
 pub(crate) mod fm;
 pub(crate) mod fx;
@@ -35,12 +20,6 @@ pub use stages::{
     NoiseColor, Osc, Partial, PitchEnv, Slope, Source, Wave,
 };
 
-/// Rejects an fx chain the renderer cannot honour.
-///
-/// It lives beside the patch rather than inside it because a chain lives in
-/// **three** places — a patch, a track and the song — and one check for all
-/// three is what stops the cap being a property of where the chain happens to
-/// be written. The song's own validation calls this for the other two.
 pub(crate) fn check_chain(chain: &[Fx]) -> Result<(), SynthError> {
     for fx in chain {
         match fx {
@@ -66,9 +45,6 @@ pub(crate) fn check_chain(chain: &[Fx]) -> Result<(), SynthError> {
     Ok(())
 }
 
-/// Rejects a delay timed in `beats` on a patch's chain, which plays one note
-/// and has no tempo to count them by — refused, like a `sidechain` there,
-/// rather than played as no delay at all.
 fn check_no_beats(chain: &[Fx]) -> Result<(), SynthError> {
     for fx in chain {
         if let Fx::Delay {
@@ -84,11 +60,6 @@ fn check_no_beats(chain: &[Fx]) -> Result<(), SynthError> {
     Ok(())
 }
 
-/// Every track a chain is keyed from, in list order.
-///
-/// It lives beside the patch for the reason [`check_chain`] does: a chain is a
-/// chain wherever it is written, and both the mixer that honours a sidechain
-/// and the validation that refuses one read it through this.
 pub(crate) fn sidechains(chain: &[Fx]) -> impl Iterator<Item = &str> {
     chain.iter().filter_map(|fx| match fx {
         Fx::Compress { sidechain, .. } => sidechain.as_deref(),
@@ -96,13 +67,6 @@ pub(crate) fn sidechains(chain: &[Fx]) -> impl Iterator<Item = &str> {
     })
 }
 
-/// Rejects a chain that names a track from somewhere no track can be named.
-///
-/// A patch's chain runs per note and the song's runs on the sum; in neither
-/// does a track exist as a thing to listen to. Refusing is the crate's usual
-/// answer to what it cannot honour — a silently ignored `sidechain` would be a
-/// duck the recipe wrote and never got, which is exactly the failure the song
-/// validator exists to prevent.
 pub(crate) fn check_no_sidechain(chain: &[Fx], place: &'static str) -> Result<(), SynthError> {
     match sidechains(chain).next() {
         Some(key) => Err(SynthError::MisplacedSidechain {
@@ -113,75 +77,42 @@ pub(crate) fn check_no_sidechain(chain: &[Fx], place: &'static str) -> Result<()
     }
 }
 
-/// One instrument.
-///
-/// `source` and `amp` are mandatory — a sound needs a tone and a shape.
-/// `filter`, `lfo` and `fx` are optional stages.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Patch {
-    /// What makes the raw tone.
     pub source: Source,
-    /// The amplitude envelope: what turns a continuous tone into a note.
     pub amp: Adsr,
-    /// The optional filter stage, with its own envelope.
     #[serde(default)]
     pub filter: Option<Filter>,
-    /// An optional one-shot sweep of the note's own pitch. Absent means the
-    /// note holds the pitch it was played at, which is what every patch
-    /// written before this stage existed already meant.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pitch_env: Option<PitchEnv>,
-    /// More sounds in the same note, each its own `source → filter → amp`,
-    /// added to the one above before `fx`. Empty means the patch is the one
-    /// sound written above, which is what every patch before layers meant.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<Layer>,
-    /// The optional low-frequency oscillator, bending one stage of every
-    /// layer.
     #[serde(default)]
     pub lfo: Option<Lfo>,
-    /// A second LFO, for a patch that moves two ways at once — a pad that
-    /// breathes and shimmers. Aimed at the same target as `lfo`, the two add.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub lfo2: Option<Lfo>,
-    /// The post-chain, applied in list order.
     #[serde(default)]
     pub fx: Vec<Fx>,
 }
 
 impl Patch {
-    /// Serialises to pretty JSON — the on-disk recipe form.
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
 
-    /// Parses a patch from its JSON form.
     pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
         serde_json::from_str(json)
     }
 
-    /// Rejects a patch the renderer cannot honour, *before* any samples are
-    /// produced.
-    ///
-    /// Only the bounds that would produce silence, a divide-by-zero or an
-    /// unstable filter are checked. Musical taste is the recipe's business: an
-    /// ugly patch renders.
-    ///
-    /// This is the patch played on its own, as a one-shot, which has no tempo:
-    /// an LFO timed in `beats` is refused here and accepted by
-    /// [`Patch::validate_in_song`].
     pub fn validate(&self) -> Result<(), SynthError> {
         self.check(false)
     }
 
-    /// [`Patch::validate`] for a patch a song plays, where an LFO may be timed
-    /// in `beats` of the song.
     pub fn validate_in_song(&self) -> Result<(), SynthError> {
         self.check(true)
     }
 
-    /// The LFOs the patch carries, `lfo` first.
     pub(crate) fn lfos(&self) -> impl Iterator<Item = &Lfo> {
         self.lfo.iter().chain(&self.lfo2)
     }
@@ -198,10 +129,6 @@ impl Patch {
         check_no_sidechain(&self.fx, "patch")
     }
 
-    /// An LFO aimed at the pulse width of a patch with no square in any of
-    /// its sounds, top level or layer, to move. A width written on a wave
-    /// other than a square is [`check_source`]'s, so a layer's is named by
-    /// its index.
     fn check_pulse(&self) -> Result<(), SynthError> {
         let squared = std::iter::once(&self.source)
             .chain(self.layers.iter().map(|layer| &layer.source))
@@ -214,7 +141,6 @@ impl Patch {
     }
 }
 
-/// The oscillators of a source: a stack's, and none for any other kind.
 fn oscillators(source: &Source) -> &[Osc] {
     match source {
         Source::OscStack { oscs } => oscs,
@@ -222,8 +148,6 @@ fn oscillators(source: &Source) -> &[Osc] {
     }
 }
 
-/// The two stages a patch and each of its layers carry and can get wrong: the
-/// source and the filter's cutoff.
 fn check_stages(source: &Source, filter: Option<&Filter>) -> Result<(), SynthError> {
     check_source(source)?;
     match filter {
@@ -234,8 +158,6 @@ fn check_stages(source: &Source, filter: Option<&Filter>) -> Result<(), SynthErr
     }
 }
 
-/// The head of the signal path, which is where every unrenderable patch so
-/// far has gone wrong.
 fn check_source(source: &Source) -> Result<(), SynthError> {
     if let Some(osc) = oscillators(source)
         .iter()
@@ -252,9 +174,6 @@ fn check_source(source: &Source) -> Result<(), SynthError> {
         Source::OscStack { oscs } if oscs.iter().all(|osc| osc.gain <= 0.0) => {
             Err(SynthError::SilentOscStack)
         }
-        // Both ends of the unison range, in one pass: no voices at all is
-        // an oscillator the recipe asked to be silent without saying so,
-        // and too many is [`MAX_VOICES`]'s argument.
         Source::OscStack { oscs } => match oscs
             .iter()
             .find(|osc| !(1..=MAX_VOICES).contains(&osc.voices))
@@ -276,17 +195,6 @@ fn check_source(source: &Source) -> Result<(), SynthError> {
     }
 }
 
-/// Rejects an additive series the renderer cannot honour.
-///
-/// The same four questions `check_source` asks of an oscillator stack — is
-/// there anything in it, is there too much of it, does each entry name a
-/// frequency, and does any of it sound — because a series is the same kind of
-/// table with the same ways of being wrong.
-///
-/// **Not asked: whether a partial is above Nyquist.** That depends on the
-/// pitch played, and a patch is validated once while it is played at many
-/// pitches, so refusing here would refuse a legal organ for the top note of a
-/// part. The renderer drops those per note instead.
 fn check_partials(partials: &[Partial]) -> Result<(), SynthError> {
     if partials.is_empty() {
         return Err(SynthError::EmptyPartials);
@@ -313,27 +221,6 @@ fn check_partials(partials: &[Partial]) -> Result<(), SynthError> {
     Ok(())
 }
 
-/// Rejects a four-operator source the renderer cannot honour.
-///
-/// Two of the four questions [`check_partials`] asks, because the shape of the
-/// document has already answered the other two: an `fm4` source carries
-/// exactly [`FM_OPERATORS`] operators as a fixed-size array, so it can be
-/// neither empty nor oversized by the time serde has finished with it.
-///
-/// What is left is the same pair. Does each entry name a frequency — the
-/// [`SynthError::BadPartialRatio`] question, and refusing a non-finite one for
-/// the same reason. And does any of it sound: the
-/// [`SynthError::SilentOscStack`] question, one indirection further away,
-/// because which operators are audible is a property of the *algorithm* rather
-/// than of the list. A recipe that picks [`Algorithm::Chain`] and then writes
-/// its levels as if they were faders silences the whole source by zeroing the
-/// one operator it happens to be heard through, with nothing on the page to
-/// say so.
-///
-/// **Not asked: whether an operator is above Nyquist** — the same answer
-/// [`check_partials`] gives, for the same reason. That depends on the pitch
-/// played, and a patch is validated once while it is played at many pitches.
-/// The renderer drops those per note instead.
 fn check_operators(
     algorithm: Algorithm,
     operators: &[Operator; FM_OPERATORS],
@@ -344,11 +231,6 @@ fn check_operators(
         .find(|(_, operator)| operator.ratio <= 0.0 || !operator.ratio.is_finite())
     {
         return Err(SynthError::BadOperatorRatio {
-            // Numbered from **one**, unlike a partial's index, and the field
-            // name says which: a partial's is its place in a list whose order
-            // carries no meaning, while an operator's number is part of the
-            // algorithm's own vocabulary. An error reading "operator 0" would
-            // send a reader looking for a row that is not on the page.
             operator: index + 1,
             ratio: operator.ratio,
         });

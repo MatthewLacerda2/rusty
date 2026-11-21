@@ -1,11 +1,5 @@
 //! The probe corpus: a handful of documents reaching every main path.
-//!
-//! Each is short, because the whole fingerprint renders on every test run, and
-//! each leans on one part of the signal path so a change there moves its row
-//! rather than averaging out across the corpus. A probe is never edited in
-//! place: a new path gets a new probe, and the table is re-recorded.
 
-/// A one-shot: the patch, the note it plays and how long it holds.
 pub(crate) struct Note {
     pub(crate) name: &'static str,
     pub(crate) note: &'static str,
@@ -13,9 +7,7 @@ pub(crate) struct Note {
     pub(crate) patch: &'static str,
 }
 
-/// The one-shots, one per source plus the stages that sit on every source.
 pub(crate) const NOTES: &[Note] = &[
-    // Oscillators, unison, a curved envelope and a resonant filter on an envelope.
     Note {
         name: "saw_filtered",
         note: "A2",
@@ -28,7 +20,6 @@ pub(crate) const NOTES: &[Note] = &[
         "filter": { "kind": "lowpass", "cutoff": 800, "resonance": 0.5,
             "env_octaves": 2.5, "adsr": { "a": 0.0, "d": 0.15, "s": 0.2, "r": 0.1 } } }"#,
     },
-    // Noise, a highpass, saturation and a reverb tail.
     Note {
         name: "noise_snare",
         note: "C4",
@@ -40,7 +31,6 @@ pub(crate) const NOTES: &[Note] = &[
         "fx": [ { "fx": "saturate", "drive": 2.0, "mix": 0.6 },
                 { "fx": "reverb", "size": 0.3, "damp": 0.5, "mix": 0.2 } ] }"#,
     },
-    // A sine with a pitch envelope: the kick, and the pitch path.
     Note {
         name: "sine_kick",
         note: "A1",
@@ -51,7 +41,6 @@ pub(crate) const NOTES: &[Note] = &[
         "pitch_env": { "semitones": 10,
             "adsr": { "a": 0.0, "d": 0.04, "s": 0.0, "r": 0.0, "curve": 5.0 } } }"#,
     },
-    // Two operators, and a cutoff LFO under a bandpass.
     Note {
         name: "fm2_bell",
         note: "E4",
@@ -63,7 +52,6 @@ pub(crate) const NOTES: &[Note] = &[
         "filter": { "kind": "bandpass", "cutoff": 2000, "resonance": 0.3 },
         "lfo": { "rate": 6.0, "depth": 1.0, "target": "cutoff" } }"#,
     },
-    // Four operators with feedback, a ping-pong delay.
     Note {
         name: "fm4_growl",
         note: "F2",
@@ -79,7 +67,6 @@ pub(crate) const NOTES: &[Note] = &[
         "fx": [ { "fx": "delay", "time": 0.08, "feedback": 0.3, "mix": 0.3,
             "ping_pong": true } ] }"#,
     },
-    // Partials, a pitch LFO, a chorus and an EQ.
     Note {
         name: "additive_organ",
         note: "C4",
@@ -94,7 +81,6 @@ pub(crate) const NOTES: &[Note] = &[
                 { "fx": "eq", "bands": [ { "kind": "highpass" },
                     { "kind": "peak", "freq": 800, "gain_db": 4, "q": 1.0 } ] } ] }"#,
     },
-    // A plucked string, and a tremolo.
     Note {
         name: "karplus_pluck",
         note: "G3",
@@ -106,8 +92,6 @@ pub(crate) const NOTES: &[Note] = &[
     },
 ];
 
-/// The song sequencer: chords and plain notes, swing, pan, a sidechain
-/// compressor, a track delay and the master chain, then the master limiter.
 pub(crate) const SONG: &str = r#"{
     "bpm": 140, "swing": 0.2,
     "tracks": [

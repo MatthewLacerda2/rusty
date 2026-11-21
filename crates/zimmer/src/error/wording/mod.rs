@@ -1,27 +1,4 @@
 //! What each refusal says out loud.
-//!
-//! Here rather than beside its variant because [`SynthError`] does not fit in
-//! one file under the size gate, and a message is the half that can leave:
-//! nothing matches on one, so moving it costs no caller anything. The groups
-//! and the order are [the enum's](super), one arm per variant.
-//!
-//! **The match is exhaustive**, which is what makes keeping the two apart
-//! safe: a variant added next door and left without words here does not
-//! compile, and the error names it.
-//!
-//! **Six small groups are worded apart**: a square's pulse width in
-//! [`pulse`], an LFO's speed and onset in [`lfo`], where notes and echoes land against the beat in [`timing`], the
-//! curves that move a value across a piece in [`automation`], and **two more
-//! in [`length`] and [`source`]**: the refusals of `fit`, `fade`, `tail` and
-//! `anchors`, split off when this file reached the size gate, and the two
-//! about how long a single note lasts, which joined them for the same reason;
-//! and a patch's sources and layers, split off when it reached the gate
-//! again. The
-//! match here still names each of them, in the one arm that hands them over,
-//! so a new variant still does not compile until it has a home. What the
-//! compiler cannot check is that `length`'s and `source`'s matches have an arm
-//! for every name in their lists — which is why each list is short and the
-//! words sit right beside it, rather than a whole group of thirty being moved.
 
 mod automation;
 mod length;
@@ -35,17 +12,8 @@ use std::fmt;
 use super::SynthError;
 
 impl SynthError {
-    /// The words this refusal is printed with — the sentence its reader acts
-    /// on, which is usually an agent repairing a recipe unattended.
     pub(super) fn say(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            // ────────────────────────────────────────────────────────────────────
-            // An instrument and its chain: what a source, a filter, an envelope, an
-            // LFO or an effect is refused for. An fx chain is a patch's own stage, so
-            // the three refusals a `sidechain` earns sit here too.
-            // ────────────────────────────────────────────────────────────────────
-            // A source and the layers that carry their own have their words
-            // in `source`, spelled out of this match like `length`'s.
             Self::EmptyOscStack
             | Self::TooManyOscs { .. }
             | Self::SilentOscStack
@@ -89,11 +57,6 @@ impl SynthError {
             | Self::BadLfoOnset { .. } => self.say_lfo(f),
             Self::PulseWidthOffSquare { .. } | Self::NoPulseToModulate => self.say_pulse(f),
 
-            // ────────────────────────────────────────────────────────────────────
-            // A note as it is written: how long it lasts, and what it is called.
-            // ────────────────────────────────────────────────────────────────────
-            // How long a note lasts is worded with the other lengths, in
-            // `length`, and handed over in its one arm below.
             Self::EmptyNoteName => write!(f, "empty note name"),
             Self::BadNoteLetter { name, letter, .. } => {
                 write!(f, "note `{name}`: expected a letter A–G, got `{letter}`")
@@ -105,11 +68,6 @@ impl SynthError {
                 write!(f, "note `{name}`: MIDI {midi} is outside 0..=127")
             }
 
-            // ────────────────────────────────────────────────────────────────────
-            // A piece: its tempo, its tracks, its patterns and arrangement, how it is
-            // played, the curves that move a value across it, and the length it has to
-            // come out at.
-            // ────────────────────────────────────────────────────────────────────
             Self::BadBpm { bpm, .. } => write!(f, "song: bpm must be positive, got {bpm}"),
             Self::NoTracks => write!(f, "song: no tracks"),
             Self::EmptyArrangement => {
@@ -273,14 +231,13 @@ impl SynthError {
                 f,
                 "song: `tempo[{index}]` is at beat {beat}, not after the change before it at beat {previous} — tempo changes must ascend"
             ),
-            // Where notes and echoes land against the beat — swing, humanise,
-            // a track's own feel and a delay in beats — in `timing`.
+            // Where notes and echoes land against the beat — swing, humanise, a track's own feel
+            // and a delay in beats — in `timing`.
             Self::BadSwing { .. }
             | Self::BadHumanize { .. }
             | Self::BadTrackFeel { .. }
             | Self::MisplacedBeats { .. }
             | Self::DelayTwoTimes { .. } => self.say_timing(f),
-            // The curves that move a value across the piece, in `automation`.
             Self::UnknownAutomationTrack { .. }
             | Self::DuplicateAutomation { .. }
             | Self::BadAutomationCurve { .. }
@@ -288,9 +245,6 @@ impl SynthError {
             | Self::BadAutomationCutoff { .. }
             | Self::AutomationWithoutFilter { .. }
             | Self::AutomationWithoutRoom { .. } => self.say_automation(f),
-            // The length and level fields — `fit`, `fade` and `tail` — and a
-            // note's own length have their words in `length`, the one group
-            // spelled out of this match.
             Self::BadDuration { .. }
             | Self::NoteTooLong { .. }
             | Self::BadFitSeconds { .. }
@@ -302,9 +256,6 @@ impl SynthError {
             | Self::WrapOverhang { .. }
             | Self::SongTooLong { .. } => self.say_length(f),
 
-            // ────────────────────────────────────────────────────────────────────
-            // The caller's resolver — the one refusal this crate does not make itself.
-            // ────────────────────────────────────────────────────────────────────
             Self::UnresolvedPatch {
                 track,
                 reference,

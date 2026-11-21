@@ -1,5 +1,5 @@
-//! The note renderer: the shape of the buffer it returns, and that each
-//! optional stage actually reaches the signal.
+//! The note renderer: the shape of the buffer it returns, and that each optional stage actually
+//! reaches the signal.
 
 mod envelopes;
 mod length;

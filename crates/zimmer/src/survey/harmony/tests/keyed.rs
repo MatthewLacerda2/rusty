@@ -1,9 +1,7 @@
-//! The key section, and the one case a loop adds: a note ringing over the
-//! top of the next pass.
+//! The key section, and the one case a loop adds: a note ringing over the top of the next pass.
 
 use super::{RUB, harmony};
 
-/// Under a loop, the last bar's ring runs into the first bar's notes.
 #[test]
 fn a_note_held_over_a_loop_point_clashes_with_the_top_of_the_piece() {
     let looped = r#"

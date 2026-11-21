@@ -2,7 +2,6 @@
 
 use scorsese_zimmer::{NoteOpts, SynthError, midi_to_freq, parse_note};
 
-/// The note name, or the refusal, without the `Result` ceremony at every call.
 fn midi(name: &str) -> f32 {
     parse_note(name).expect("a real note name")
 }

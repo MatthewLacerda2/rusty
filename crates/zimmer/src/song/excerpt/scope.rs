@@ -1,10 +1,4 @@
-//! An excerpt resolved against the song it excerpts, and the guard that makes
-//! it exact.
-//!
-//! [`super::Excerpt`] is what was *asked for*; this is what that comes to for
-//! one song at one tempo — which samples are kept, which tracks are heard, and
-//! how far past the window the renderer still has to go. The last of those is
-//! the whole of the exactness argument, and [`guard`] carries it.
+//! An excerpt resolved against the song it excerpts, and the guard that makes it exact.
 
 use super::{Excerpt, Song};
 use crate::core::RATE;
@@ -14,30 +8,16 @@ use crate::song::clock::Clock;
 use crate::song::shape::SEAM;
 use crate::song::timing::Tail;
 
-/// The extra rendering a window does past its own end so that the stages
-/// which look ahead see what they would have seen, expressed in samples.
-///
-/// Small change against the reconstruction the limiter measures peaks with,
-/// which reads a handful of samples either side of the frame it is asked
-/// about. Rounded up generously — the cost of a few spare milliseconds is
-/// nothing and the cost of being one sample short is a promise broken.
 const RECONSTRUCTION: usize = 64;
 
-/// An [`Excerpt`] resolved against the song and the tempo it will be rendered
-/// at: which samples are kept, how far the renderer has to go to make them
-/// exactly, and which tracks reach the mix.
 pub(crate) struct Scope {
     from: usize,
     to: Option<usize>,
-    /// The last sample-frame worth putting a note at. Past it nothing rendered
-    /// can reach anything kept — see the module doc.
     until: Option<usize>,
-    /// One flag per track, in track order: whether it is heard in the mix.
     heard: Vec<bool>,
 }
 
 impl Scope {
-    /// Resolves `excerpt` against `song` at the tempo it renders at.
     pub(crate) fn of(song: &Song, excerpt: &Excerpt, clock: &Clock) -> Result<Self, SynthError> {
         for name in &excerpt.only {
             if !song.tracks.iter().any(|track| &track.name == name) {
@@ -54,9 +34,6 @@ impl Scope {
         let (from, to) = excerpt
             .window
             .map_or((0, None), |window| window.frames(clock));
-        // A wrapped song's start is summed from its end, so under `wrap` there
-        // is no note late enough to leave out of any window — see the module
-        // doc on what a window saves.
         let wraps = song.tail() == Tail::Wrap;
         Ok(Self {
             from,
@@ -66,45 +43,28 @@ impl Scope {
         })
     }
 
-    /// Whether this track reaches the mix at all.
     pub(crate) fn heard(&self, track: usize) -> bool {
         self.heard.get(track).copied().unwrap_or(true)
     }
 
-    /// How many tracks are heard — what decides whether a per-track table says
-    /// anything the summary above it does not.
     pub(crate) fn heard_count(&self) -> usize {
         self.heard.iter().filter(|heard| **heard).count()
     }
 
-    /// Whether a note starting at this sample-frame can still affect anything
-    /// kept.
     pub(crate) fn reaches(&self, at: usize) -> bool {
         self.until.is_none_or(|until| at <= until)
     }
 
-    /// The stretch of a buffer of `frames` this keeps, clamped to it.
     pub(crate) fn keep(&self, frames: usize) -> (usize, usize) {
         let from = self.from.min(frames);
         (from, self.to.unwrap_or(frames).clamp(from, frames))
     }
 
-    /// Where the kept stretch starts, in seconds — what the section rows of a
-    /// report are measured from.
     pub(crate) fn opens_at_seconds(&self) -> f64 {
         self.from as f64 / f64::from(RATE)
     }
 }
 
-/// How far past its own end a window has to render for the stages that look
-/// ahead to see what a whole render would have shown them.
-///
-/// Three terms, each the reach of one non-causal thing in the path, and they
-/// **add** because they run in series: a track's compressors duck ahead of
-/// their key, the song chain's duck ahead of the sum, and the limiter ducks
-/// ahead of that. `SEAM` joins them because a truncation to a `fit` length is
-/// faded over it, and a window ending inside that fade has to be on the same
-/// side of the cut as the whole render was.
 fn guard(song: &Song) -> usize {
     let track = song
         .tracks
@@ -124,8 +84,6 @@ mod tests {
     use crate::song::{PatchRef, Track};
     use crate::song::{Span, Window};
 
-    /// A song of two silent tracks — enough for a scope, which reads names,
-    /// chains and a tempo and never a note.
     fn two_tracks() -> Song {
         let track = |name: &str| Track {
             name: name.to_owned(),
@@ -161,10 +119,6 @@ mod tests {
         Scope::of(&two_tracks(), excerpt, &Clock::at(120.0)).expect("the excerpt resolves")
     }
 
-    /// The saving, asserted where it can be: past the guard a note cannot
-    /// reach anything kept, so it is never synthesised. Without this the
-    /// window would still be *correct* and would cost what a whole bake costs,
-    /// which is the entire point of it missing.
     #[test]
     fn a_note_past_the_window_and_its_guard_is_not_rendered() {
         let scope = scope(&Excerpt::of(Window::seconds(
@@ -185,7 +139,6 @@ mod tests {
         );
     }
 
-    /// An open window has no end, so nothing is ever late for it.
     #[test]
     fn an_open_window_never_calls_a_note_late() {
         let scope = scope(&Excerpt::of(Window::beats(Span::new(4.0, None).unwrap())));
@@ -194,7 +147,6 @@ mod tests {
         assert_eq!(scope.keep(frames), (RATE as usize * 2, frames));
     }
 
-    /// A solo names the tracks that are heard, and nothing else.
     #[test]
     fn a_solo_hears_the_tracks_it_names_and_no_others() {
         let scope = scope(&Excerpt::only(vec!["pad".to_owned()]));
@@ -212,8 +164,6 @@ mod tests {
         assert!(Excerpt::default().is_whole());
     }
 
-    /// Anything asked for is not the whole piece — both halves, because either
-    /// on its own is a partial bake and neither may be cached.
     #[test]
     fn asking_for_anything_less_is_not_the_whole_piece() {
         let window = Window::beats(Span::new(0.0, Some(8.0)).expect("a legal span"));
@@ -224,7 +174,6 @@ mod tests {
         );
     }
 
-    /// Where the rows of a report start, which for a window is not zero.
     #[test]
     fn a_window_opens_where_it_says_it_does() {
         let window = Window::beats(Span::new(4.0, Some(8.0)).expect("a legal span"));
@@ -236,10 +185,6 @@ mod tests {
         );
     }
 
-    /// The guard is the whole of the exactness argument, so it is asserted as a
-    /// number rather than left to the songs that happen to exercise it: the
-    /// chain lookaheads **in series**, plus the limiter's, plus the seam a
-    /// truncation is faded over.
     #[test]
     fn the_guard_is_every_lookahead_in_the_path_added_up() {
         let compress = |attack| Fx::Compress {
@@ -267,9 +212,6 @@ mod tests {
         );
     }
 
-    /// An excerpt says what it is in the words it was asked in — a window
-    /// round-trips through the grammar it was parsed from, and a solo names its
-    /// tracks.
     #[test]
     fn an_excerpt_says_what_was_asked_for() {
         let window = Window::beats("0:32".parse::<Span>().expect("a legal span"));
@@ -286,8 +228,6 @@ mod tests {
         assert_eq!(Excerpt::default().to_string(), "all of it");
     }
 
-    /// Beats are the piece's own unit, so a window in them converts at the
-    /// tempo the piece is rendered at and nowhere else.
     #[test]
     fn beats_become_samples_at_the_rendered_tempo() {
         let window = Window::beats(Span::new(4.0, Some(8.0)).unwrap());
@@ -306,8 +246,6 @@ mod tests {
         assert_eq!(window.frames(&Clock::at(75.0)).1, Some(RATE as usize * 12));
     }
 
-    /// The open end is the whole rest of the piece, so nothing is skipped for
-    /// being late and there is no guard to compute.
     #[test]
     fn an_open_window_renders_every_note() {
         let window = Window::beats(Span::new(4.0, None).unwrap());

@@ -1,12 +1,5 @@
-//! voice: one `source → filter → amp` path of a note, and how a patch's
-//! layers share the note they are summed into.
-//!
-//! A patch is its own path plus up to [`MAX_LAYERS`](crate::patch::MAX_LAYERS)
-//! more, each rendered here the same way and added before the fx chain, which
-//! [`render_swept`](super::render_swept) runs once on the sum. What a path
-//! takes from the note ([`Struck`]) is the same for all of them; what it brings
-//! of its own ([`Voice`]) is a source, an amp envelope, an optional filter and
-//! pitch envelope, and a gain.
+//! voice: one `source → filter → amp` path of a note, and how a patch's layers share the note they
+//! are summed into.
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};
@@ -16,34 +9,21 @@ use crate::note::{NoteOpts, midi_to_freq};
 use crate::patch::{Adsr, Filter, Layer, Patch, PitchEnv, Source};
 use crate::stereo::Stereo;
 
-/// Hash channel a layer's seed is drawn on, apart from every draw the seed
-/// itself feeds.
-const LAYER_CHANNEL: u64 = 0x4c59; // "LY"
+const LAYER_CHANNEL: u64 = 0x4c59;
 
-/// The seed layer `index` is struck with: the note's, re-drawn per layer, so
-/// two noise layers are two noises and two stacks start in different places.
-/// The top-level sound keeps the note's own seed, which is what every patch
-/// before layers was struck with.
 pub(super) fn layer_seed(seed: u64, index: usize) -> u64 {
     u64::from(hash3(index as i64, 0, LAYER_CHANNEL, seed))
 }
 
-/// What every layer of one note shares: the pitch it is played at, how it is
-/// played, the patch's LFOs, and how long it is held and rings.
 pub(super) struct Struck<'a> {
     pub(super) midi: f32,
     pub(super) opts: &'a NoteOpts,
-    /// The patch's LFOs over this note, worked out once so every layer moves
-    /// together.
     pub(super) lfos: Lfos,
     pub(super) gate: f32,
     pub(super) n: usize,
-    /// How far an LFO aimed at `pulse_width` swings every square's width at
-    /// each sample, in every layer, or nothing.
     pub(super) pulse: Option<Vec<f32>>,
 }
 
-/// One `source → filter → amp` path: the patch's own, or one of its layers.
 pub(super) struct Voice<'a> {
     source: &'a Source,
     amp: &'a Adsr,
@@ -75,9 +55,6 @@ impl<'a> Voice<'a> {
 }
 
 impl Struck<'_> {
-    /// Renders one path of the note, `n` frames long, before the fx chain.
-    /// `base` is a cutoff moved from outside the note, for the one path whose
-    /// filter a song may move.
     pub(super) fn voice(&self, voice: &Voice<'_>, seed: u64, base: Option<&[f32]>) -> Stereo {
         let (gate, n) = (self.gate, self.n);
         let velocity = self.opts.velocity.clamp(0.0, 1.0);
@@ -88,8 +65,6 @@ impl Struck<'_> {
         let pulse = self.pulse.as_deref();
         let mut buf = source::render(voice.source, &freqs, pulse, seed, brightness, gate, RATE);
         if let Some(f) = voice.filter {
-            // One cutoff track, both channels: the filter's *state* belongs to a
-            // channel, and the curve it is following belongs to the note.
             let cutoffs = cutoff_track(&f, &self.lfos, gate, n, brightness, self.midi, base);
             buf.each(|channel| filter::apply(channel, &f, &cutoffs, RATE));
         }
@@ -98,15 +73,8 @@ impl Struck<'_> {
     }
 }
 
-/// Apply velocity, the amp envelope and any tremolo — the stage that turns a
-/// continuous tone into a note. `velocity` arrives already clamped from
-/// [`Struck::voice`], times the layer's gain.
 fn apply_amp(buf: &mut Stereo, amp: &Adsr, lfos: &Lfos, gate: f32, velocity: f32) {
     let envelope = env::track(amp, gate, buf.frames(), RATE);
-    // The gain curve is worked out once and both channels are walked with it:
-    // an envelope is a property of the note, and a tremolo that ran at a
-    // slightly different phase on each side would be a stereo effect nobody
-    // asked for.
     let gains: Vec<f32> = (0..buf.frames())
         .map(|i| velocity * envelope[i] * lfos.tremolo(i))
         .collect();
@@ -133,7 +101,6 @@ mod tests {
         }
     }
 
-    /// A sine body under a filtered, bending noise crack.
     fn layered() -> Patch {
         let crack = Layer {
             source: Source::Noise {
@@ -179,7 +146,6 @@ mod tests {
         }
     }
 
-    /// A layer alone, as the patch it would be with no layers.
     fn alone(patch: &Patch, layer: &Layer) -> Patch {
         Patch {
             source: layer.source.clone(),
@@ -191,8 +157,6 @@ mod tests {
         }
     }
 
-    /// The promise: a layered note is the sample-wise sum of its paths, each
-    /// rendered as a patch of its own and struck with its layer's seed.
     #[test]
     fn a_layered_note_is_the_sum_of_its_layers_played_alone() {
         let patch = layered();
@@ -215,7 +179,6 @@ mod tests {
             ..opts
         };
         let part = render_note(&alone(&patch, layer), 60.0, &seeded).expect("renders");
-        // Summed by hand rather than with `Stereo::add`, which is under test.
         expected.resize(part.frames().max(expected.frames()));
         for (sample, added) in expected.l.iter_mut().zip(&part.l) {
             *sample += added * layer.gain;

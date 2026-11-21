@@ -1,16 +1,10 @@
-//! Every song document type refuses a key it does not know, and says which —
-//! including inside the forms a song writes more than one way.
-//!
-//! The second half is the harder one. A track's patch, an arrangement entry
-//! and a pattern entry each accept several shapes, and serde's untagged reader
-//! answers a typo in any of them with *"data did not match any variant"*,
-//! losing the key. These tests hold that the key survives (#592).
+//! Every song document type refuses a key it does not know, and says which — including inside the
+//! forms a song writes more than one way.
 
 use scorsese_zimmer::Song;
 use scorsese_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Track};
 use serde::de::DeserializeOwned;
 
-/// Asserts `json` does not parse as `T`, and that the refusal names `key`.
 fn refused<T: DeserializeOwned + std::fmt::Debug>(json: &str, key: &str) {
     let refusal = serde_json::from_str::<T>(json)
         .expect_err("a misspelled key is refused")
@@ -21,8 +15,6 @@ fn refused<T: DeserializeOwned + std::fmt::Debug>(json: &str, key: &str) {
     );
 }
 
-/// A song with one track playing `patch`, one empty pattern, and `extra`
-/// spliced in at the top level.
 fn song(patch: &str, extra: &str) -> String {
     format!(
         r#"{{ "bpm": 120, "tracks": [ {{ "name": "a", "patch": {patch} }} ],
@@ -47,8 +39,6 @@ fn a_pattern_refuses_a_misspelled_notes() {
     refused::<Pattern>(r#"{ "beats": 4, "notes": [], "note": [] }"#, "note");
 }
 
-/// Inside an inline patch, three levels down, through the untagged
-/// name-or-patch form.
 #[test]
 fn an_inline_patch_names_its_misspelled_key() {
     let patch = r#"{ "source": { "kind": "noise" },
@@ -62,7 +52,6 @@ fn a_play_in_the_arrangement_names_its_misspelled_key() {
     refused::<ArrangementEntry>(r#"{ "pattern": "chorus", "transpse": 3 }"#, "transpse");
 }
 
-/// Each of the four forms a pattern entry is written in, misspelled.
 #[test]
 fn every_pattern_entry_form_names_its_misspelled_key() {
     for (entry, key) in [
@@ -87,16 +76,12 @@ fn every_pattern_entry_form_names_its_misspelled_key() {
     }
 }
 
-/// Two forms in one entry are still refused rather than resolved, and the
-/// refusal says which key did not belong.
 #[test]
 fn an_entry_naming_two_forms_is_refused_by_name() {
     let both = r#"{ "track": "a", "chord": "Dm7", "degree": 1, "start": 0, "dur": 1 }"#;
     refused::<PatternEntry>(both, "degree");
 }
 
-/// A step string may carry the pitch it plays, so `note` beside `steps` is a
-/// field of the steps and not a second form.
 #[test]
 fn a_step_string_with_a_pitch_is_still_a_step_string() {
     let written = r#"{ "track": "a", "steps": "x-x-", "div": 0.5, "note": "C2" }"#;

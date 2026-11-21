@@ -1,27 +1,15 @@
 //! A fader that moves, read off the samples it produced.
-//!
-//! Every assertion here is against a **second render** of the same song, so
-//! the waveform cancels and what is left is the number the curve had. A test
-//! that only asked whether an automated song came out louder somewhere would
-//! pass on a curve read at the wrong beat, upside down, or half as fast.
 
 use scorsese_zimmer::song::{Param, Song};
 
 use super::setup::{BEATS, at, curve, frame, held, ramp, render, rms, sides};
 
-/// The fixture with one curve on it.
 fn riding(gain: f32, moving: scorsese_zimmer::song::Automation) -> Song {
     let mut song = held(gain);
     song.automation = vec![moving];
     song
 }
 
-/// The promise the whole mechanism rests on: a curve parked at the number the
-/// document already wrote is that number. Sample for sample, not nearly.
-///
-/// It is also the strong form of "a song without automation renders what it
-/// always did" — an automated track is routed through a bus that a plain one
-/// is not, and this says the two arrive at the same `f32`.
 #[test]
 fn a_flat_curve_renders_exactly_what_the_written_gain_did() {
     let parked = riding(0.5, curve(Param::Gain, vec![at(0.0, 0.5)]));
@@ -32,10 +20,6 @@ fn a_flat_curve_renders_exactly_what_the_written_gain_did() {
     );
 }
 
-/// The mechanism, pinned: the level at any beat is the *curve* at that beat.
-///
-/// Divided out against a render of the same song at a constant fader, so what
-/// is compared is the gain and not the waveform.
 #[test]
 fn the_level_at_a_beat_is_what_the_curve_says_at_that_beat() {
     let flat = render(&riding(0.5, curve(Param::Gain, vec![at(0.0, 0.5)])));
@@ -51,9 +35,6 @@ fn the_level_at_a_beat_is_what_the_curve_says_at_that_beat() {
     }
 }
 
-/// The build, end to end and in the direction it was written: quiet at the
-/// start, loud at the end. The test above could pass on a curve read backwards
-/// at every beat but the middle; this one could not.
 #[test]
 fn a_rising_curve_grows_across_the_piece() {
     let mix = render(&riding(0.6, ramp(Param::Gain, 0.0, 0.6)));
@@ -72,15 +53,9 @@ fn a_rising_curve_grows_across_the_piece() {
     );
 }
 
-/// A moving `pan` is a moving *position*: the part travels from one side to
-/// the other, and the law that keeps it the same loudness on the way is the
-/// constant-power law a written `pan` already obeys.
 #[test]
 fn a_pan_curve_carries_the_part_across_without_changing_its_level() {
     let (left, right) = sides(&riding(0.4, ramp(Param::Pan, -1.0, 1.0)));
-    // A short window at each end, because the position is *travelling*: a
-    // beat into an eight-beat sweep it is already a quarter of the way across,
-    // and the claim being made is about where it starts and stops.
     let opening = frame(0.05);
     let closing = frame(BEATS - 0.05);
     assert!(
@@ -103,8 +78,6 @@ fn a_pan_curve_carries_the_part_across_without_changing_its_level() {
     }
 }
 
-/// A curve on one parameter leaves the other where the document put it, which
-/// is what lets a part be automated in level and placed by hand at once.
 #[test]
 fn automating_the_level_leaves_the_written_position_alone() {
     let mut song = riding(0.5, curve(Param::Gain, vec![at(0.0, 0.5)]));
@@ -114,8 +87,6 @@ fn automating_the_level_leaves_the_written_position_alone() {
     assert!(left.iter().any(|sample| sample.abs() > 0.1), "and audible");
 }
 
-/// And the other way round: a moving position does not quietly take the
-/// written fader with it.
 #[test]
 fn automating_the_position_leaves_the_written_level_alone() {
     let loud = sides(&riding(0.6, curve(Param::Pan, vec![at(0.0, 0.0)])));

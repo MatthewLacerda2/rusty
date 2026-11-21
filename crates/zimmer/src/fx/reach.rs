@@ -1,52 +1,13 @@
-//! How far a chain reaches beyond the signal it was handed — forwards in
-//! time, and backwards.
-//!
-//! Two numbers, and a renderer that means to produce anything other than a
-//! whole piece needs both. A **tail** is how much buffer a chain still has to
-//! write into after its input stops: the echo that has not repeated yet, the
-//! room that has not finished decaying. A **lookahead** is the opposite
-//! question and the less obvious one — how much input a chain has to have
-//! *seen* for the sample it is producing now to be right. A compressor's gain
-//! is already on its way down before the peak that asks for it, so a sample
-//! here depends on signal an attack away.
-//!
-//! They live together because they are the same fact from either end, and
-//! because the two callers are the same two callers: the note and bus lengths
-//! come off the tail, and [`crate::song::excerpt`]'s guard comes off the
-//! lookahead.
+//! How far a chain reaches beyond the signal it was handed — forwards in time, and backwards.
 
 use super::{Spacing, Tempo, chorus, delay, reverb};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 
-/// Longest fx tail a note is padded by, in seconds. A chain of long effects should
-/// not turn a 200 ms blip into a half-minute file — but a full-size room rings
-/// for over ten (#1123), so the cap sits past the longest one effect makes.
 const MAX_TAIL: f32 = 15.0;
 
-/// How long the very end of a ring-out is faded over, in seconds.
-///
-/// A tail is sized to where an effect has fallen 60 dB, which is quiet but not
-/// zero, and [`MAX_TAIL`] can cut a long chain sooner. Either way the buffer
-/// stops on whatever sample the echo was at; a few milliseconds of fade turn
-/// that step into nothing an ear can find.
 const FADE: f32 = 0.01;
 
-/// How far **ahead of itself** the chain looks: the sum of the attack ramps
-/// its compressors duck over.
-///
-/// The mirror of [`tail_seconds`], and the other thing a renderer that means
-/// to produce less than a whole piece has to know. A tail says how much extra
-/// buffer a chain needs at the end; this says how much extra *signal* it needs
-/// to have seen — a compressor's gain is already on its way down before the
-/// peak that asks for it, so a sample here depends on input up to an attack
-/// away. Summed rather than maxed because a chain runs in series, and each
-/// stage's lookahead is spent on the stage before it.
-///
-/// Everything else answers zero, and each for a reason it already carries: a
-/// delay, a reverb and a chorus read only the past, a waveshaper reads only
-/// the present, and an EQ's biquad is the same. Only [`compress`] and
-/// [`limiter`] compute a gain track and walk it backwards.
 pub(crate) fn lookahead_seconds(chain: &[Fx]) -> f32 {
     chain
         .iter()
@@ -57,29 +18,10 @@ pub(crate) fn lookahead_seconds(chain: &[Fx]) -> f32 {
         .sum()
 }
 
-/// How much extra time the chain needs to ring out after the note itself ends —
-/// what the renderer pads the buffer by, so an echo or a reverb tail is never cut
-/// off mid-repeat. A fully dry effect asks for nothing, and neither does a
-/// waveshaper: [`saturate`] is memoryless, so there is no state left in it to
-/// decay once the signal stops. Nor does [`eq`], which does have state but
-/// neither delays nor repeats — its own module doc argues that one. Nor does
-/// [`compress`], for the plainest reason of the three: it only ever scales the
-/// samples it was handed, so silence stays silence however long the release
-/// says the gain takes to come back.
-///
-/// [`chorus`] does ask, and asks for very little: it has no feedback path, so
-/// its tail is exactly the deepest its delay line is ever read from — a
-/// fortieth of a second rather than a decay to be estimated.
-///
-/// A delay timed in beats is measured at the longest beat `tempo` plays, and a
-/// reverb's pre-delay is added to its room: both move the ring-out later.
 pub(crate) fn tail_seconds(chain: &[Fx], tempo: &dyn Tempo) -> f32 {
     let total: f32 = chain
         .iter()
         .map(|fx| match fx {
-            // `ping_pong` is not read: the repeats are the same repeats,
-            // decaying at the same rate, and only the side they land on
-            // differs — so the tail is the same length either way.
             Fx::Delay {
                 time,
                 beats,
@@ -103,11 +45,6 @@ pub(crate) fn tail_seconds(chain: &[Fx], tempo: &dyn Tempo) -> f32 {
     total.min(MAX_TAIL)
 }
 
-/// Fades the last [`FADE`] of `buf` to silence when `chain` rang out into it.
-///
-/// Called on a buffer [`tail_seconds`] grew, after the chain ran: the end of
-/// that buffer is where a ring-out was cut. A chain with no tail leaves the
-/// buffer alone, since its end is the signal's own.
 pub(crate) fn close_tail(buf: &mut Stereo, chain: &[Fx], rate: f32, tempo: &dyn Tempo) {
     if tail_seconds(chain, tempo) <= 0.0 {
         return;
@@ -188,10 +125,6 @@ mod tests {
         assert_eq!(tail_seconds(&dry, &NoTempo), 0.0);
     }
 
-    /// A chorus asks for the length of its own deepest read and nothing more:
-    /// a fortieth of a second against a room's seconds. Both halves of the
-    /// `mix` guard are here — a dry one is in the test above, a wet one is
-    /// this, and the number moves with `depth` because the delay does.
     #[test]
     fn a_chorus_asks_for_its_deepest_read_and_no_more() {
         let ensemble = |depth, mix| {
@@ -244,9 +177,6 @@ mod tests {
         assert!(short.l[0] > short.l[1] && short.l[1] > 0.0);
     }
 
-    /// The other end of the same question: only the two stages that walk a
-    /// gain track backwards ask to have seen anything, and a chain's asks add
-    /// because it runs in series.
     #[test]
     fn only_a_compressor_asks_to_have_seen_the_future() {
         let compress = |attack, mix| Fx::Compress {

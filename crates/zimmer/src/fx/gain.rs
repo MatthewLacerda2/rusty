@@ -1,50 +1,11 @@
-//! gain — how a gain track moves: the ballistics [`super::compress`] and
-//! [`super::limiter`] share.
-//!
-//! Both devices start the same way: a **target**, the gain each frame would
-//! need if it could jump there instantly. What they hand back is that target
-//! smoothed into something a listener hears as a level moving rather than a
-//! waveform being bent, and the smoothing is the whole difference between a
-//! compressor and a distortion. Four passes, each of which may only ever
-//! *lower* the gain, so whatever ceiling the target promised still holds:
-//!
-//! 1. **Hold.** Each frame takes the deepest target of the last [`HOLD`]
-//!    seconds. A detector reading `|sample|` sees a 50 Hz kick reach its peak
-//!    a hundred times a second and fall to zero between, and a gain that
-//!    follows that ripples at twice the bass's frequency: low-frequency
-//!    distortion over everything the device touches. Held over half a cycle
-//!    of the lowest note a mix carries, the detector reads the level instead.
-//! 2. **Attack, ahead of the peak.** This crate renders a whole buffer, so the
-//!    gain can start falling *before* the peak that asks for it. Each frame
-//!    takes the deepest target of the next `attack`, and then the average of
-//!    the last `attack` of those: a ramp that lasts exactly the attack however
-//!    deep the duck, and that has reached the full depth by the peak itself —
-//!    every value averaged at a peak's frame already saw that peak.
-//! 3. **Release, in decibels.** Recovery is a one-pole filter on the gain in
-//!    dB, so it covers two thirds of the remaining distance in each `release`
-//!    whatever the depth. The straight line this replaced (#1123) recovered at
-//!    a fixed rate in *linear* gain, so a 2 dB duck came back ten times faster
-//!    than the setting said, and how long a compressor took to let go depended
-//!    on how hard it had been working.
-//! 4. **Settle.** A release never quite arrives; it is snapped to its target
-//!    once within [`SETTLE_DB`], which is what lets a signal far from any peak
-//!    come back bit-identical rather than a millionth of a decibel down.
+//! gain — how a gain track moves: the ballistics [`super::compress`] and [`super::limiter`] share.
 
-/// How long the detector holds a peak, in seconds — half a cycle of 25 Hz,
-/// below the lowest note a kick or a sub plays.
 pub(crate) const HOLD: f32 = 0.02;
 
-/// The deepest a gain track is taken, in dB. A target below this is a signal
-/// a hundred and twenty decibels too loud, which is a bug upstream rather than
-/// a level; capping it keeps a release's length finite ([`reach_frames`]).
 const FLOOR_DB: f32 = -120.0;
 
-/// How close a release has to come to its target to be put there, in dB — a
-/// thousandth of a decibel, a hundred times under the smallest step an ear
-/// can tell.
 const SETTLE_DB: f32 = 0.001;
 
-/// How a gain track moves, in frames and a release coefficient.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Ballistics {
     hold: usize,
@@ -54,7 +15,6 @@ pub(crate) struct Ballistics {
 }
 
 impl Ballistics {
-    /// The ballistics of an `attack` and a `release` in seconds, at `rate`.
     pub(crate) fn new(attack: f32, release: f32, rate: f32) -> Self {
         let frames = |seconds: f32| (seconds * rate).round().max(1.0);
         let release_frames = frames(release);
@@ -66,15 +26,11 @@ impl Ballistics {
         }
     }
 
-    /// The furthest one frame's target can move another frame's gain, in
-    /// frames, either way: what a caller rendering a loop has to wrap.
     pub(crate) fn reach_frames(&self) -> usize {
         let settle = self.release_frames * (-FLOOR_DB / SETTLE_DB).ln();
         self.hold + 2 * self.attack + settle.ceil() as usize
     }
 
-    /// Smooths `target`, linear gains in `0..=1`, into the gain track to
-    /// apply. Every frame of the result is at most its target.
     pub(crate) fn smooth(&self, target: &[f32]) -> Vec<f32> {
         let depth: Vec<f32> = target.iter().map(|gain| decibels(*gain)).collect();
         let held = deepest(&depth, self.hold, Side::Behind);
@@ -93,7 +49,6 @@ impl Ballistics {
     }
 }
 
-/// A linear gain as dB, `0.0` exactly for unity and never below [`FLOOR_DB`].
 fn decibels(gain: f32) -> f32 {
     if gain >= 1.0 || gain.is_nan() {
         0.0
@@ -104,15 +59,12 @@ fn decibels(gain: f32) -> f32 {
     }
 }
 
-/// Which way a window looks from the frame it answers for.
 #[derive(Clone, Copy)]
 enum Side {
     Behind,
     Ahead,
 }
 
-/// The lowest value in a window of `width` frames ending (behind) or starting
-/// (ahead) at each frame — a monotonic queue, so linear in the length.
 fn deepest(values: &[f32], width: usize, side: Side) -> Vec<f32> {
     let n = values.len();
     let at = |k: usize| match side {
@@ -137,10 +89,6 @@ fn deepest(values: &[f32], width: usize, side: Side) -> Vec<f32> {
     out
 }
 
-/// The mean of the last `width` values at each frame (fewer at the start).
-///
-/// Exactly `0.0` wherever the whole window is, which a running sum alone
-/// would not promise once a duck has passed through it.
 fn averaged(values: &[f32], width: usize) -> Vec<f32> {
     let mut sum = 0.0f64;
     let mut ducked = 0usize;
@@ -163,8 +111,6 @@ fn averaged(values: &[f32], width: usize) -> Vec<f32> {
     out
 }
 
-/// The forward pass: a frame deeper than the one before takes its own value,
-/// one shallower recovers towards it by `coefficient` per frame.
 fn released(values: &[f32], coefficient: f32) -> Vec<f32> {
     let mut out = Vec::with_capacity(values.len());
     let mut previous = 0.0f32;
@@ -217,8 +163,6 @@ mod tests {
         }
     }
 
-    /// The point of the change: a shallow duck and a deep one let go over
-    /// the same time, so a release setting means what it says.
     #[test]
     fn a_shallow_duck_and_a_deep_one_recover_over_the_same_time() {
         let ballistics = Ballistics::new(0.001, 0.2, RATE);
@@ -277,8 +221,6 @@ mod tests {
         );
     }
 
-    /// A duck of uneven depths, once out of the window, leaves exactly unity
-    /// behind — not the rounding a running sum carries away from it.
     #[test]
     fn an_uneven_duck_leaves_nothing_behind_once_it_has_passed() {
         let mut depths: Vec<f32> = (0..400)

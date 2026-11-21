@@ -17,16 +17,12 @@ fn filter(kind: FilterKind, cutoff: f32) -> Filter {
     }
 }
 
-/// A sine at `hz`, one second long at 44.1 kHz. The phase is worked in `f64`:
-/// in `f32` it rounds by ~2·10⁻⁴ a second in, a noise floor near −72 dB that
-/// would hide the filter's own.
 fn sine(hz: f32) -> Vec<f32> {
     (0..44_100)
         .map(|i| (TAU * f64::from(hz) * f64::from(i) / 44_100.0).sin() as f32)
         .collect()
 }
 
-/// Peak amplitude over the settled second half of a buffer.
 fn settled_peak(buf: &[f32]) -> f32 {
     buf[buf.len() / 2..]
         .iter()
@@ -75,9 +71,6 @@ fn highpass_is_the_mirror_image() {
     assert!(settled_peak(&high) > 0.7, "8 kHz passes");
 }
 
-/// The stopband of a highpass is the filter's, not the oversampler's: a tone
-/// four octaves under a 24 dB cutoff is ~96 dB down in theory, and the 2× run
-/// must not fold an image of it back on top of itself at a higher level.
 #[test]
 fn a_steep_highpass_holds_a_low_tone_far_down() {
     let cutoffs = vec![9000.0; 44_100];
@@ -113,9 +106,6 @@ fn bandpass_keeps_the_middle_and_drops_both_ends() {
     assert!(centre > settled_peak(&high) * 4.0, "9 kHz is off the top");
 }
 
-/// A notch is the mirror: the ends survive and the middle is what goes. It is
-/// tested against the bandpass rather than on its own because the two are one
-/// sum apart, and a sign error would pass a test that only looked at one.
 #[test]
 fn notch_is_the_bandpass_turned_inside_out() {
     let cutoffs = vec![1000.0; 44_100];
@@ -132,7 +122,6 @@ fn notch_is_the_bandpass_turned_inside_out() {
     );
 }
 
-/// The whole point of the steeper slope: the same cutoff rejects harder.
 #[test]
 fn two_pole_pairs_reject_further_past_the_cutoff_than_one() {
     let cutoffs = vec![1000.0; 44_100];
@@ -161,8 +150,6 @@ fn two_pole_pairs_reject_further_past_the_cutoff_than_one() {
     );
 }
 
-/// The interaction a reader has to be warned about: at 24 dB the emphasis is
-/// applied once per pair, so the same `resonance` rings considerably harder.
 #[test]
 fn resonance_is_a_stronger_control_at_the_steeper_slope() {
     let cutoffs = vec![1000.0; 44_100];
@@ -179,10 +166,6 @@ fn resonance_is_a_stronger_control_at_the_steeper_slope() {
     );
 }
 
-/// The stability claim the module doc makes for the cascade, pinned: two pairs
-/// at the top of the band with the resonance knob at its maximum stay finite,
-/// which is the half that matters, and stay bounded, which is the half a
-/// cascade of resonant peaks could plausibly have lost.
 #[test]
 fn cascading_at_the_ceiling_stays_finite() {
     for cutoff in [20.0, 14_700.0, 1e9] {
@@ -232,8 +215,8 @@ fn extreme_cutoffs_stay_finite_and_bounded() {
 
 #[test]
 fn a_poisoned_sample_resets_the_filter_instead_of_spreading() {
-    // One non-finite input would otherwise infect the integrators forever, so
-    // every later sample would come out NaN. The guard flushes the state.
+    // One non-finite input would otherwise infect the integrators forever, so every later sample
+    // would come out NaN. The guard flushes the state.
     let mut buf = sine(440.0);
     buf[100] = f32::INFINITY;
     buf[200] = f32::NAN;
@@ -248,7 +231,6 @@ fn a_poisoned_sample_resets_the_filter_instead_of_spreading() {
         buf.iter().all(|s| s.is_finite()),
         "the poison was contained"
     );
-    // And the filter is still a filter afterwards, not a stuck zero.
     assert!(
         settled_peak(&buf) > 0.5,
         "it recovered and kept passing signal"

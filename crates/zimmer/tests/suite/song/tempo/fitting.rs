@@ -1,5 +1,5 @@
-//! A tempo map under `fit`: each pass plays the map again, and a stretch moves
-//! every tempo in it by one factor.
+//! A tempo map under `fit`: each pass plays the map again, and a stretch moves every tempo in it by
+//! one factor.
 
 use scorsese_zimmer::SynthError;
 use scorsese_zimmer::song::{Fit, FitMode, Song};
@@ -15,16 +15,16 @@ fn fitted(seconds: f32, mode: FitMode) -> Song {
 
 #[test]
 fn a_loop_plays_the_map_again_every_pass() {
-    // One pass is three seconds, so seven takes three passes, and every one
-    // of them slows on its own beat 2.
+    // One pass is three seconds, so seven takes three passes, and every one of them slows on its
+    // own beat 2.
     let song = fitted(7.0, FitMode::Loop);
     assert!(close(&ends(&song), &[1.0, 3.0, 4.0, 6.0, 7.0, 9.0]));
 }
 
 #[test]
 fn a_stretch_moves_the_whole_map_by_one_factor() {
-    // Three seconds stretched to 3.3: every tempo slows by the same tenth, so
-    // the jump still falls on beat 2 and the pass lands on the target.
+    // Three seconds stretched to 3.3: every tempo slows by the same tenth, so the jump still falls
+    // on beat 2 and the pass lands on the target.
     let song = fitted(3.3, FitMode::Stretch);
     assert!(close(&ends(&song), &[1.1, 3.3]), "{:?}", ends(&song));
 }
