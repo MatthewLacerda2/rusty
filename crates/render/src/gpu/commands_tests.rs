@@ -1,6 +1,7 @@
 //! `Commands`: one encoder, one submit, and the debug check on its writes.
 
 use super::Commands;
+use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::{self, CountedQueue as _};
 use crate::test_gpu::headless_or_skip;
 use std::cell::Cell;
@@ -47,6 +48,26 @@ fn gpu_a_range_written_twice_while_one_encoder_records_is_refused() {
         "says what to do: {message}"
     );
     assert!(!super::recording(), "the dropped recording closed");
+}
+
+#[test]
+fn gpu_a_twice_written_range_names_the_stages_not_the_wrapper() {
+    if !cfg!(debug_assertions) {
+        return; // the check is a debug build's
+    }
+    let Some(r) = headless_or_skip(4, 4) else {
+        return;
+    };
+    let usage = wgpu::BufferUsages::STORAGE;
+    let buffer = GrowBuffer::new(&r.device, "Twice", usage);
+    let message = panic_of(|| {
+        let _commands = Commands::new(&r.device, &r.queue, "Twice");
+        buffer.write_at(&r.queue, 0, &[0; 16]);
+        buffer.write_at(&r.queue, 0, &[1; 16]);
+    })
+    .expect("a range written twice through a wrapper");
+    assert!(message.contains("commands_tests.rs"), "{message}");
+    assert!(!message.contains("grow_buffer.rs"), "{message}");
 }
 
 #[test]

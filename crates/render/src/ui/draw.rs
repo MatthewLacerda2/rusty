@@ -30,9 +30,11 @@
 //! **Laps.** Both halves cut their CPU time into `ui.<part>` laps (`Renderer::lap`),
 //! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
 //! `textures` (loading and binding the Images' textures), `mesh` (the canvases'
-//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
+//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms` and `masks`, then
 //! `pipelines` (making the overlay's pipelines current), `blur` (the backdrop
-//! chain alone), `groups`, `encode` and `submit` for the overlay pass.
+//! chain alone), `groups` and `encode` for the overlay pass. The UI submits
+//! nothing: it records into the last camera's [`Commands`], sent (and lapped as
+//! the frame's top-level `submit`) after it.
 
 use crate::gpu::commands::Commands;
 use std::rc::Rc;

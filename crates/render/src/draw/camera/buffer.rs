@@ -54,12 +54,14 @@ impl CameraBuffer {
     }
 
     /// Upload a camera's uniform, before its encoder records anything that reads it.
+    #[track_caller]
     pub(crate) fn upload(&self, queue: &wgpu::Queue, uniform: &CameraUniform) {
         queue.counted_write_buffer(&self.uniform, 0, bytemuck::bytes_of(uniform));
     }
 
     /// Make the uniform `uniform` from here on in `encoder`'s order: written into
     /// `slot`, copied from there into the uniform.
+    #[track_caller]
     pub(crate) fn record(
         &self,
         (queue, encoder): (&wgpu::Queue, &mut wgpu::CommandEncoder),

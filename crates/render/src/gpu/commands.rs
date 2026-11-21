@@ -6,9 +6,13 @@
 //! `write_texture`) lands at the next submit, *ahead of every command already
 //! recorded*, so a stage never rewrites a buffer a command recorded before it reads:
 //! it gives what changes its own buffer, or [`Commands::flush`]es first and says
-//! why. Debug builds hold that for buffers (`gpu::ops::check_write`). A read-back
-//! maps its buffer only after the copy into it is submitted: it registers the map
-//! with [`Commands::after_send`], which runs it once the commands are sent.
+//! why. Debug builds catch one half of that: a byte range of a buffer written
+//! **twice** while a recording is open panics ([`check_write`]), naming both
+//! writes. A single write after a command that reads the buffer was recorded is
+//! *not* checked (nothing here sees what a pass reads): keeping that one is the
+//! stage author's. A read-back maps its buffer only after the copy into it is
+//! submitted: it registers the map with [`Commands::after_send`], which runs it
+//! once the commands are sent.
 
 use super::ops::{self, CountedQueue as _};
 use std::cell::Cell;
@@ -19,7 +23,8 @@ use std::panic::Location;
 type AfterSend = Box<dyn FnOnce()>;
 
 /// An open command encoder, sent once ([`Commands::send`]; dropping it sends
-/// it too, so a read-back it holds is never left unmapped).
+/// it too, so a read-back it holds is never left unmapped, except while the
+/// thread panics: a half-recorded frame is dropped unsent).
 pub(crate) struct Commands {
     encoder: Option<wgpu::CommandEncoder>,
     device: wgpu::Device,
@@ -88,7 +93,9 @@ impl Commands {
 
 impl Drop for Commands {
     fn drop(&mut self) {
-        self.submit_recorded();
+        if !std::thread::panicking() {
+            self.submit_recorded();
+        }
         end_recording(self.outer);
     }
 }
@@ -131,21 +138,21 @@ pub(crate) fn end_recording(outer: Option<u64>) {
 }
 
 /// Whether a recording is open on this thread.
+#[cfg(any(debug_assertions, test))]
 pub(crate) fn recording() -> bool {
     RECORDING.with(Cell::get).is_some()
 }
 
-/// One buffer range written while a recording is open, and where.
+/// Where each range of a buffer was written while a recording is open.
 #[cfg(debug_assertions)]
-struct Written {
-    buffer: wgpu::Buffer,
-    range: Range<u64>,
-    at: &'static Location<'static>,
-}
+type Written = Vec<(Range<u64>, &'static Location<'static>)>;
 
 #[cfg(debug_assertions)]
 thread_local! {
-    static WRITTEN: std::cell::RefCell<Vec<Written>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// The open recording's writes, keyed by buffer: a check walks only its own
+    /// buffer's ranges.
+    static WRITTEN: std::cell::RefCell<std::collections::HashMap<wgpu::Buffer, Written>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
 /// Forget the writes checked so far: the recording went out ([`Commands::flush`]).
@@ -165,17 +172,14 @@ pub(crate) fn check_write(
     if recording() {
         WRITTEN.with(|w| {
             let mut w = w.borrow_mut();
-            let overlaps = |o: &&Written| {
-                &o.buffer == buffer && o.range.start < range.end && range.start < o.range.end
-            };
-            if let Some(first) = w.iter().find(overlaps) {
-                panic!("{}", twice_message(buffer.size(), &range, (first.at, at)));
+            let ranges = w.entry(buffer.clone()).or_default();
+            let overlaps = |(o, _): &&(Range<u64>, _)| o.start < range.end && range.start < o.end;
+            if let Some((_, first)) = ranges.iter().find(overlaps) {
+                let message = twice_message(buffer.size(), &range, (first, at));
+                drop(w);
+                panic!("{message}");
             }
-            w.push(Written {
-                buffer: buffer.clone(),
-                range,
-                at,
-            });
+            ranges.push((range, at));
         });
     }
     #[cfg(not(debug_assertions))]
@@ -183,6 +187,7 @@ pub(crate) fn check_write(
 }
 
 /// [`check_write`]'s failure: which buffer, which writes, and what to do.
+#[cfg(debug_assertions)]
 fn twice_message(size: u64, range: &Range<u64>, (first, again): (&Location, &Location)) -> String {
     format!(
         "a {size}-byte buffer's bytes {}..{} were written twice while one encoder \

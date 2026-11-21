@@ -8,8 +8,10 @@
 //! out once, before the next camera rewrites the camera uniform and the draw
 //! buffers. The shadow sweep records into the frame's first camera's, the
 //! screen's last camera's takes the upscale and the UI. A stage never rewrites a
-//! buffer a pass it follows reads (`gpu::commands`, which the debug build holds):
-//! a mid-camera change of the camera uniform is a copy ([`buffer`]).
+//! buffer a pass it follows reads (`gpu::commands`): a mid-camera change of the
+//! camera uniform is a copy ([`buffer`]). Debug builds panic on a byte range
+//! written twice while the camera records (`gpu::commands::check_write`); a single
+//! write after a recorded read is not checked and is the stage author's to keep.
 //!
 //! **Adding a render stage:** write a `fn(&mut Renderer, &mut RenderView,
 //! &mut CameraCtx)` (usually a one-line call into the feature's own module, taking

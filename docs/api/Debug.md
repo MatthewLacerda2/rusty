@@ -283,7 +283,7 @@ each kind's passes summed, under names that never change so two reports diff:
 | `ssil` | screen-space indirect lighting (#1750): its gather, blur, accumulate and upsample before the base camera's opaque pass, and the source it keeps after it; the depth prepass it draws on a camera without SSAO is under `depth_prepass` |
 | `volumetric_fog` | volumetric fog (#1703): its froxels' scatter and integrate, before the base camera draws |
 | `forward` | the opaque scene pass: solids, decals folded in, skybox — every camera's, render-texture cameras included |
-| `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command at the head of SSR's submit, not a pass, so it is in `gpu_between_submits_ms` |
+| `ssr` | screen-space reflections (#1526): the trace over the base camera's opaque image, which writes each pixel's hit. The copy of that image before it is a command between the camera's passes, not a pass, so it is in `gpu_other_ms` |
 | `ssr_pyramids` | SSR's hit and spread pyramids (#2028, #2158), built from the trace's targets; absent on a view whose shorter side is 8 px or less, which has one level |
 | `ssr_resolve` | SSR's resolve (#2028): each pixel's hits averaged over its blur and drawn over the image |
 | `transparent` | translucent solids |
