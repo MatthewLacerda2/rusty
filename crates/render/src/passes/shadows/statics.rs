@@ -58,8 +58,15 @@ fn mix(key: u64, word: u64) -> u64 {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Word {
-    Face { slot: u64, face: u64 },
-    Cutout { slot: u64 },
+    /// A slot whose Render Face is not `Front`.
+    Face {
+        slot: u64,
+        face: u64,
+    },
+    /// A Cutout slot, followed by its test's raw words.
+    Cutout {
+        slot: u64,
+    },
     Raw(u32),
 }
 
