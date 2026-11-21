@@ -1,8 +1,3 @@
-//! Measuring a loaded scene: every viewpoint in order, warmed up and held, run
-//! after run, folded into one report (`fold`). A viewpoint's frames end early
-//! when the game quits (`Application.Quit()`); the report then says where, and
-//! counts the frames really measured.
-
 use rusty_render::ClockProbe;
 
 use super::super::super::harness::Harness;
@@ -10,7 +5,6 @@ use super::super::{clock, Report};
 use super::views::{self, Viewpoint};
 use super::{fold, Options, SceneReport};
 
-/// Measure every viewpoint of the harness's scene, `opts.runs` times, into one report.
 pub(super) fn all(harness: &mut Harness, probe: Option<&ClockProbe>, opts: Options) -> SceneReport {
     let views = {
         let world = harness.world.borrow();
@@ -53,7 +47,6 @@ pub(super) fn all(harness: &mut Harness, probe: Option<&ClockProbe>, opts: Optio
     }
 }
 
-/// Warm `viewpoint` up and measure it, its pose held after every sim step.
 fn one(
     harness: &mut Harness,
     probe: Option<&ClockProbe>,
@@ -63,8 +56,6 @@ fn one(
     one_with(harness, probe, viewpoint, opts, &mut || {})
 }
 
-/// [`one`], calling `warmed` between the warm-up and the measured frames (a
-/// profiler starts there).
 pub(super) fn one_with(
     harness: &mut Harness,
     probe: Option<&ClockProbe>,
@@ -87,7 +78,6 @@ pub(super) fn one_with(
     measured
 }
 
-/// Draw `frames` frames, each after a sim step and `pose`.
 fn warm(harness: &mut Harness, frames: u32, pose: &mut dyn FnMut(&mut Harness)) {
     for _ in 0..frames {
         harness.step(1);
@@ -96,8 +86,6 @@ fn warm(harness: &mut Harness, frames: u32, pose: &mut dyn FnMut(&mut Harness)) 
     }
 }
 
-/// The warning for a game that quit during the bench: its frames after the quit
-/// are not measured, so the rows average fewer frames than the table's header says.
 fn quit_warning(at: &str, measured: u32, planned: u32) -> String {
     format!(
         "the game called Application.Quit() at {at}: {measured} of {planned} frames \

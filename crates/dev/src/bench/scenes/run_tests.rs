@@ -1,8 +1,3 @@
-//! [`bench`] end to end, on a project of two primitive scenes written to a temp
-//! dir: one with a camera and a navmesh, one with neither. Renders when an adapter
-//! is there (hence `gpu_`); without one the rendered rows are absent and the
-//! memory and load rows still hold.
-
 use glam::Vec3;
 use rusty_components::CameraComponent;
 use rusty_navigation::test_support::add_floor;
@@ -36,7 +31,7 @@ const OPTS: Options = Options {
     warmup: 1,
     frames: 2,
     runs: 2,
-    warm: false, // the views, rows and files are proved, not a frame's cost (#2350)
+    warm: false,
     switches: rusty_render::RenderSwitches::ON,
 };
 
@@ -44,7 +39,6 @@ fn labels(report: &SceneReport) -> Vec<&str> {
     report.views.iter().map(|k| k.label.as_str()).collect()
 }
 
-/// The one-off rows every bench adds: its load, and its memory where readable.
 fn has_load_and_memory(report: &SceneReport) {
     assert!(report.row("frame_ms").is_some(), "{:?}", report.rows);
     assert!(report.row("load_ms").is_some_and(|r| r.avg > 0.0));
@@ -54,7 +48,6 @@ fn has_load_and_memory(report: &SceneReport) {
     if report.row("renderer_ms").is_some() && cfg!(any(target_os = "linux", target_os = "macos")) {
         let gpu = report.row("gpu_mb");
         assert!(gpu.is_some_and(|r| r.avg > 0.0), "{:?}", report.rows);
-        // The renderer's GPU calls and Hi-Z culls are rows too (#2341).
         for k in ["submits", "render_passes", "hiz_tested", "cluster_culled"] {
             assert!(report.row(k).is_some(), "{k}: {:?}", report.rows);
         }
@@ -96,7 +89,6 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
     for report in [&yard, &empty] {
         has_load_and_memory(report);
     }
-    // Nothing was written into the project but the out dir asked for.
     let mut written: Vec<_> = std::fs::read_dir(&root)
         .unwrap()
         .map(|e| e.unwrap().file_name())
@@ -108,7 +100,6 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
         "the console is kept"
     );
 
-    // The second run compares against the first, and picks the same viewpoints.
     let again = bench(&root, "yard", settings(), &out, OPTS, &extra).unwrap();
     assert_eq!(again.views, yard.views);
     let text = std::fs::read_to_string(out.join("yard.txt")).unwrap();
@@ -119,7 +110,6 @@ fn gpu_a_projects_scenes_bench_from_their_viewpoints_with_load_and_memory() {
 fn unbaked_names_what_the_scene_places_but_never_loaded() {
     let mut scene = Scene::new();
     let lightmaps_only = "not baked: lightmaps (its lighting cost is not the shipped one)";
-    // Placing no probes is not missing them.
     assert_eq!(unbaked(&scene).as_deref(), Some(lightmaps_only));
     scene.probes.add_probe(Vec3::ZERO);
     scene.probes.add_probe(Vec3::X);

@@ -4,14 +4,12 @@ use crate::bench::Summary;
 #[test]
 fn speed_is_the_reference_over_the_probe() {
     assert_eq!(speed(Some(REFERENCE_MS), Some(REFERENCE_MS)), Some(1.0));
-    // Twice as slow as the reference: half the speed.
     let slow = 2.0 * REFERENCE_MS;
     assert_eq!(speed(Some(slow), Some(slow)), Some(0.5));
 }
 
 #[test]
 fn speed_averages_the_probes_on_either_side_of_the_frame() {
-    // Probes of 1x and 3x the reference average to 2x: half the speed.
     let got = speed(Some(REFERENCE_MS), Some(3.0 * REFERENCE_MS));
     assert_eq!(got, Some(0.5));
 }
@@ -29,7 +27,6 @@ fn cpu_speed_is_the_cpu_reference_over_the_probes_mean() {
     let r = CPU_REFERENCE_MS;
     assert_eq!(cpu_speed(r, r), Some(1.0));
     assert_eq!(cpu_speed(r, 3.0 * r), Some(0.5));
-    // A probe that read nothing, or nonsense, is not a reading.
     assert_eq!(cpu_speed(0.0, 0.0), None);
     assert_eq!(cpu_speed(f64::NAN, r), None);
 }
@@ -38,7 +35,6 @@ fn cpu_speed_is_the_cpu_reference_over_the_probes_mean() {
 fn the_cpu_probe_takes_well_under_a_millisecond() {
     cpu_probe_ms();
     let best = (0..5).map(|_| cpu_probe_ms()).fold(f64::MAX, f64::min);
-    // A debug build runs the chain far slower than the bench's release one.
     assert!(best > 0.0 && best < 20.0, "{best} ms");
 }
 
@@ -80,6 +76,5 @@ fn a_clock_that_moved_since_the_last_run_earns_a_warning() {
     assert_eq!(cpu_drift(&at(80.0), Some(&at(85.0))), None);
     let w = cpu_drift(&at(40.0), Some(&at(80.0))).unwrap();
     assert!(w.contains("-50%"), "{w}");
-    // A last run without the row (an older report) compares nothing.
     assert_eq!(cpu_drift(&at(40.0), Some(&Report::default())), None);
 }

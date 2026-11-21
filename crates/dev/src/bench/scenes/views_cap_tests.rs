@@ -1,5 +1,3 @@
-//! [`pick`]'s cap on positions, and a spawn in a scene without a navmesh.
-
 use glam::Vec3;
 use rusty_components::CameraComponent;
 use rusty_navigation::test_support::add_floor;
@@ -60,7 +58,6 @@ fn exactly_the_cap_of_cameras_says_what_it_left_out_and_only_what_the_scene_has(
     assert_eq!(views.views.len(), MAX_POINTS);
     let said = "8 cameras, 8 benched (at most 8 positions), left out: the navmesh points";
     assert_eq!(views.warnings, [said], "no spawn in the scene: none named");
-    // Neither a spawn nor a navmesh: nothing was left out, nothing said.
     let mut bare = Scene::new();
     add_cameras(&mut bare, MAX_POINTS);
     let nav = NavigationGraph::from_scene(&bare);
@@ -104,7 +101,6 @@ fn cameras_and_the_spawn_leave_the_navmesh_what_is_left() {
     add_spawn(&mut scene);
     let nav = NavigationGraph::from_scene(&scene);
     let views = pick(&scene, &nav);
-    // 3 cameras, the spawn, 4 navmesh points x 4 yaws: 8 positions.
     assert_eq!(views.views.len(), 3 + 1 + 4 * YAWS.len());
     assert!(views.warnings.is_empty(), "{:?}", views.warnings);
 }

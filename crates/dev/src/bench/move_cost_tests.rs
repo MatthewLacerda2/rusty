@@ -1,8 +1,3 @@
-//! What one `CharacterController.Move` costs (#2335), timed: a capsule standing,
-//! then walking, on a 60 m triangle-mesh floor of half-metre quads
-//! (`physics::character_bench`). Here because the sim may not read a clock; the
-//! counted gate run is `physics`' `character::cost_tests`.
-
 use std::time::Instant;
 
 use rusty_physics::character_bench::{level, stand, walk};

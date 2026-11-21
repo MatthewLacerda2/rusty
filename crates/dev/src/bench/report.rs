@@ -1,7 +1,3 @@
-//! The bench report: per-frame samples summarised as average and 95th percentile,
-//! printed as a short table with each row's change against the previous run.
-//! The summaries are pure; [`read`] and [`write`] keep the report in the out dir.
-//!
 //! stored-format: `bench.json`, the last run's report the next one compares against
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -14,19 +10,15 @@ use super::engine::engine_line;
 use super::quiet::{quiet_moved, unshown_line};
 use serde::{Deserialize, Serialize};
 
-/// One metric over the measured frames.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Summary {
     pub avg: f64,
     pub p95: f64,
-    /// A counter the printed report shows only when it changed against the last
-    /// run ([`Samples::push_quiet`]); the report file holds it always.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub quiet: bool,
 }
 
 impl Summary {
-    /// A loud row's summary: `avg` and `p95`, not [`quiet`](Self::quiet).
     pub fn new(avg: f64, p95: f64) -> Self {
         Self {
             avg,
@@ -35,7 +27,6 @@ impl Summary {
         }
     }
 
-    /// The mean and the nearest-rank 95th percentile of `values` (zero when empty).
     pub fn of(values: &[f64]) -> Self {
         if values.is_empty() {
             return Self::default();
@@ -51,38 +42,27 @@ impl Summary {
     }
 }
 
-/// A finished run: what was measured, and each metric's summary in report order.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Report {
     pub frames: u32,
-    /// `(metric, summary)` in the order rows print — stable, so reports diff.
     pub metrics: Vec<(String, Summary)>,
-    /// Why some rows should be read with care (a CPU clock that moved, #1719),
-    /// printed under the table.
     #[serde(default)]
     pub warnings: Vec<String>,
-    /// Which engine measured it (`core::project::EngineStamp`): a "before" taken
-    /// with another tree's shaders says so in its own report.
     #[serde(default)]
     pub engine: Option<EngineStamp>,
-    /// The later windows whose rows a kept run holds, each `<window>.<row>`
-    /// (`bench::window`): what tells a window's rows from a set's (`cpu.`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub windows: Vec<String>,
 }
 
-/// Per-frame samples, kept in the order metrics were first seen.
 #[derive(Default)]
 pub struct Samples {
     order: Vec<String>,
     values: BTreeMap<String, Vec<f64>>,
-    /// The metrics pushed by [`Samples::push_quiet`].
     quiet: BTreeSet<String>,
     frames: u32,
 }
 
 impl Samples {
-    /// Record one frame's `value` for `metric`.
     pub fn push(&mut self, metric: &str, value: f64) {
         if !self.values.contains_key(metric) {
             self.order.push(metric.to_string());
@@ -93,8 +73,6 @@ impl Samples {
             .push(value);
     }
 
-    /// Record one frame's `value` of a counter the printed report shows only when
-    /// it changed (`bench::sample`): its row is [`Summary::quiet`].
     pub fn push_quiet(&mut self, metric: &str, value: f64) {
         self.push(metric, value);
         if !self.quiet.contains(metric) {
@@ -102,11 +80,6 @@ impl Samples {
         }
     }
 
-    /// Record a frame's parts of `stage` (a row pushed this frame), each named
-    /// `<stage>.<part>`. Once a frame ran the stage, every part any of its frames
-    /// lapped is sampled, zero when absent (a Mask submit on a frame with no Mask
-    /// drawn), and a part first lapped late is zero on the stage's earlier frames:
-    /// each part averages over its stage's frames, so the parts sum to it.
     pub fn push_stage_parts(
         &mut self,
         stage: &str,
@@ -134,12 +107,10 @@ impl Samples {
         }
     }
 
-    /// Every frame's value of `metric`, in order (empty when never pushed).
     pub fn values(&self, metric: &str) -> &[f64] {
         self.values.get(metric).map_or(&[], Vec::as_slice)
     }
 
-    /// Count one measured frame.
     pub fn end_frame(&mut self) {
         self.frames += 1;
     }
@@ -167,14 +138,6 @@ impl Samples {
     }
 }
 
-/// The warning for a kept report that times the tick another way, by which rows
-/// each has (`has`), so a sim change reads in its `cpu.<system>` rows:
-/// - from before `cpu_ms` timed the whole tick (#2342): the kept one has a
-///   `cpu_ms` and no `cpu.flush_bounds`, the current one that row, and `cpu_ms`
-///   and `cpu.other` grew by what was hidden;
-/// - from before the stats' own bookkeeping left the tick (#2445): the kept one
-///   has `cpu.flush_bounds` and no `probe_ms`, the current one that row, and
-///   `cpu_ms` and `cpu.other` shrank by about what `probe_ms` now holds.
 pub fn tick_timed_since(now: impl Fn(&str) -> bool, kept: impl Fn(&str) -> bool) -> Option<String> {
     let old = kept("cpu_ms") && !kept("cpu.flush_bounds");
     if old && now("cpu.flush_bounds") {
@@ -195,16 +158,10 @@ pub fn tick_timed_since(now: impl Fn(&str) -> bool, kept: impl Fn(&str) -> bool)
 }
 
 impl Report {
-    /// Whether this report has a row for `metric`.
     pub fn has(&self, metric: &str) -> bool {
         self.metrics.iter().any(|(k, _)| k == metric)
     }
 
-    /// The table the terminal shows: one row per metric, with the change in its
-    /// average against `previous` where that run measured it too, and "absent on
-    /// the last run" where it did not. A quiet counter ([`Summary::quiet`]) prints
-    /// only when it changed or `previous` lacks it, one line counting the rest; none
-    /// does against a `previous` with no rows (a window the last run never measured).
     pub fn render(&self, previous: Option<&Report>) -> String {
         let before: BTreeMap<&str, &Summary> = previous
             .map(|p| p.metrics.iter().map(|(k, s)| (k.as_str(), s)).collect())
@@ -253,7 +210,6 @@ impl Report {
     }
 }
 
-/// A value at a precision that suits its size: ms to the microsecond, counts whole.
 pub(super) fn num(v: f64) -> String {
     if v.fract() == 0.0 {
         format!("{v:.0}")
@@ -262,7 +218,6 @@ pub(super) fn num(v: f64) -> String {
     }
 }
 
-/// `+0.123 (+4.5%)`; `=` when unchanged.
 pub(super) fn change(before: f64, after: f64) -> String {
     let d = after - before;
     if d == 0.0 {
@@ -276,7 +231,6 @@ pub(super) fn change(before: f64, after: f64) -> String {
     format!("{d:+.3}{pct}")
 }
 
-/// The last run's report, if `out_dir` holds a readable one.
 pub(super) fn read(out_dir: &Path) -> Option<Report> {
     let json = std::fs::read_to_string(out_dir.join("bench.json")).ok()?;
     serde_json::from_str(&json).ok()

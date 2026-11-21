@@ -3,7 +3,6 @@ use super::*;
 const OWN: &str = "bench-scenes";
 const BIN: &str = "/repo/target/profiling/bench-scenes";
 
-/// A sample stamped `secs` with frame-pointer frames `frames` (symbol, image), leaf first.
 fn sample(secs: &str, frames: &[(&str, &str)]) -> String {
     let mut out = format!("  {secs}: \n");
     for (i, (sym, image)) in frames.iter().enumerate() {
@@ -50,13 +49,13 @@ fn only_the_samples_inside_a_window_are_kept() {
         "/usr/lib/x86_64-linux-gnu/libc.so.6",
     )];
     let text = [
-        sample("4.999999", &own),    // before the first window
-        sample("5.000000", &own),    // its first instant
-        sample("6.25", &libc),       // inside it
-        sample("7.500000001", &own), // between the windows: a warm-up
-        sample("9.0", &own),         // inside the second
-        sample("10.000000", &libc),  // its last instant
-        sample("12.0", &own),        // after both
+        sample("4.999999", &own),
+        sample("5.000000", &own),
+        sample("6.25", &libc),
+        sample("7.500000001", &own),
+        sample("9.0", &own),
+        sample("10.000000", &libc),
+        sample("12.0", &own),
     ]
     .concat();
     let (f, tally) = parse(&text, &[win(5, 7), win(9, 10)], OWN);

@@ -1,14 +1,8 @@
-//! A frame's rows scaled by its clock speeds (#862, #1719).
-
 use rusty_core::frame_stats::{is_counter, FrameStats};
 
 use super::*;
 use crate::capture::RenderedFrame;
 
-/// GPU rows are the frame's times scaled by the clock speed the probe read; the
-/// raw total and the clock get rows of their own, and the GPU's wait for the CPU
-/// stays as measured. A frame the probe missed has no GPU rows, so an unscaled time
-/// never mixes in.
 #[test]
 fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     use rusty_render::{GpuPass, GpuTimes};
@@ -37,16 +31,13 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu.shadows"), 1.0);
     assert_eq!(avg("gpu.forward"), 3.0);
     assert_eq!(avg("gpu.ui"), 0.0);
-    // Untimed work is GPU work, scaled like the rows; the wait for the CPU is not.
     assert_eq!(avg("gpu.other"), 0.2);
     assert_eq!(avg("gpu_between_submits_ms"), 0.6, "a wait as measured");
-    // The `gpu.` rows, `other` included, are the GPU's work at the reference clock.
     let rows = report.metrics.iter().filter(|(m, _)| m.starts_with("gpu."));
     let work: f64 = rows.map(|(_, s)| s.avg).sum();
     assert!((work - 4.2).abs() < 1e-9, "gpu. rows {work} vs 4.2");
     assert_eq!(avg("gpu_raw_ms"), 8.0);
     assert_eq!(avg("gpu_clock_pct"), 50.0);
-    // Without timestamps (lavapipe) no GPU row, `gpu.other` included.
     let mut untimed = Samples::default();
     sample(
         &mut untimed,
@@ -61,8 +52,6 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
         .any(|(m, _)| m.starts_with("gpu")));
 }
 
-/// CPU rows mirror the GPU's (#1719): `cpu_ms` and `cpu.<system>` are scaled, `frame_ms`
-/// stays as measured, and a frame the CPU probe missed has no scaled rows.
 #[test]
 fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
     let mut stats = FrameStats::default();
@@ -79,10 +68,6 @@ fn cpu_rows_are_scaled_by_the_cpu_clock_speed() {
     assert!(samples.values("tick_nav").is_empty(), "no raw system rows");
 }
 
-/// The counters are derived from the stats (#2449): a counter no list names
-/// (here one a test made up) is a row the moment it is recorded, a render
-/// counter beyond the shown few too, both quiet; a shown one is not quiet, and no
-/// timing is a counter row (`render_extract_us` stays out).
 #[test]
 fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
     let mut stats = FrameStats::default();
@@ -119,13 +104,10 @@ fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
     assert!(quiet.clone().all(|(m, _)| !SHOWN.contains(&m.as_str())));
     let pairs = RenderedFrame::default().counters.pairs();
     let counted = pairs.iter().filter(|(k, _)| is_counter(k)).count();
-    let tick = 1; // made_up_counter
+    let tick = 1;
     assert_eq!(quiet.count(), counted - SHOWN.len() + tick, "every counter");
 }
 
-/// A tick counter first recorded at the window's middle (a change channel that
-/// opens late) is zero on the frames before it: set on one frame of four, it
-/// averages 1/4, the share of the window's frames.
 #[test]
 fn a_counter_first_recorded_late_averages_over_the_whole_window() {
     let mut stats = FrameStats::default();

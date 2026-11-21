@@ -1,8 +1,3 @@
-//! What a scene's report warns of beside its rows: the console errors the bench
-//! logged (with the console kept beside the report), the bake the scene lacks, the
-//! baked data on disk it ran without, the textures it drew uncompressed for want
-//! of an import, and the models its loads cooked for want of one.
-
 use std::path::Path;
 
 use rusty_components::{LightMode, LightType};
@@ -13,9 +8,6 @@ use rusty_script::scripting::LogLevel;
 
 use super::super::super::harness::Harness;
 
-/// Keep the bench's console as `<scene>.console.log` in `out_dir`, and the
-/// warning for the errors it logged: a script failing every tick, or a sidecar
-/// that failed to load, makes the scene look cheaper than the game is.
 pub(super) fn keep_console(harness: &Harness, out_dir: &Path, scene: &str) -> Option<String> {
     rusty_logging::forward(&harness.console);
     let path = out_dir.join(format!("{scene}.console.log"));
@@ -45,7 +37,6 @@ pub(super) fn keep_console(harness: &Harness, out_dir: &Path, scene: &str) -> Op
     ))
 }
 
-/// How many times a kept console line stands for: `msg (×3)` is three.
 fn repeats(msg: &str) -> u64 {
     msg.strip_suffix(')')
         .and_then(|m| m.rsplit_once(" (×"))
@@ -53,12 +44,6 @@ fn repeats(msg: &str) -> u64 {
         .unwrap_or(1)
 }
 
-/// The warning for a scene benched without its baked lighting, naming what is
-/// missing from what it places: no lightmaps, or lightmap pages the scene names
-/// that are not on disk (colour, direction and shadowmask pages, counted); light
-/// probes placed whose SH never loaded (every one zero: no sidecar, or one that
-/// failed); reflection probes placed with no cube on disk. What a scene does not
-/// place is not missing.
 pub fn unbaked(scene: &Scene) -> Option<String> {
     let mut missing = Vec::new();
     let lightmaps = &scene.lightmaps;
@@ -103,11 +88,6 @@ pub fn unbaked(scene: &Scene) -> Option<String> {
     })
 }
 
-/// A level's lights by how they are shaded (#2523): every light but the ambient
-/// (which ignores modes) active in the hierarchy, and of them those shaded live
-/// every frame, `Realtime` or `Mixed` by [`Scene::light_mode`] (what the level's
-/// file means, `LightComponent::effective_mode`, so an `Area` light is `Baked`, held to
-/// what the last bake made of it, so a `Shadowmask` fallback is `Baked` too).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Lights {
     pub total: u32,
@@ -115,7 +95,6 @@ pub struct Lights {
     pub mixed: u32,
 }
 
-/// [`Lights`] of `scene`, counted once a level: they do not change by viewpoint.
 pub fn lights(scene: &Scene) -> Lights {
     let mut out = Lights::default();
     for id in scene.world.ids_with_light() {
@@ -133,17 +112,12 @@ pub fn lights(scene: &Scene) -> Lights {
     out
 }
 
-/// The `level_lights` and `level_lights_live` rows of `lights` (named apart from
-/// the frame counter `lights`, which counts what a frame drew, ambient included), and its [`mixed_lights`] line.
 pub(super) fn push_lights(report: &mut super::SceneReport, lights: Lights) {
     report.push_value("level_lights", f64::from(lights.total));
     report.push_value("level_lights_live", f64::from(lights.live));
     report.warnings.extend(mixed_lights(lights));
 }
 
-/// The line under the table for a level with `Mixed` lights: their direct light
-/// is shaded live every frame, which a level left on the old default does
-/// unnoticed. A `Realtime` light is somebody's choice, so it gets none.
 pub fn mixed_lights(lights: Lights) -> Option<String> {
     let Lights { total, mixed, .. } = lights;
     let s = if total == 1 { "" } else { "s" };
@@ -156,10 +130,6 @@ pub fn mixed_lights(lights: Lights) -> Option<String> {
     })
 }
 
-/// The warning for a scene whose textures `found` (`Renderer::uncached_textures`)
-/// were uploaded uncompressed only because the project has no current import
-/// cache for them: a headless run compresses none (`asset::import::import_all`,
-/// #2319), so the scene's memory and load are not what the shipped game's are.
 pub fn uncompressed(found: rusty_render::Uploads) -> Option<String> {
     let s = if found.count == 1 { "" } else { "s" };
     (found.count > 0).then(|| {
@@ -172,11 +142,6 @@ pub fn uncompressed(found: rusty_render::Uploads) -> Option<String> {
     })
 }
 
-/// The warning for a scene whose timed loads cooked models (`models_cooked` > 0,
-/// the most of any load): the project has no cooked file the read takes for them
-/// (`asset::cook`: none made yet, or one made from another parse), so each load ran
-/// the unwrap, the tangents and the clusters a cooked project reads from disk, and
-/// `load.import` is not the shipped one.
 pub fn cooked_at_load(loads: &[super::load::Load]) -> Option<String> {
     let cooked = |l: &super::load::Load| {
         let count = l.counts.iter().find(|(k, _)| k == "models_cooked");
@@ -192,11 +157,6 @@ pub fn cooked_at_load(loads: &[super::load::Load]) -> Option<String> {
     })
 }
 
-/// The bake warnings of the scene live in `harness` after its run: what it lacks
-/// ([`unbaked`]) and what it has on disk and ran without ([`bakes_unused`]), read
-/// from the live scene's own path (`own`, the bench's, unless a play-mode
-/// `Scene.Load` swapped another in). `stale` was judged at the first frame of the
-/// scene `loaded`, so a scene swapped in since is not given it.
 pub fn scene_bakes(
     harness: &Harness,
     own: &Path,
@@ -215,14 +175,6 @@ pub fn scene_bakes(
     out
 }
 
-/// The warnings for baked data the live scene, loaded from `path`, has on disk and
-/// its run did not use, one a kind: a sidecar its load refused or could not read
-/// (`BakeFiles::not_used`, why included), a PVS its statics no longer matched when
-/// it loaded (`stale`, `Renderer::stale_occlusion` at the first frame), a navmesh
-/// Play's start refused (`nav`, `NavigationGraph::last_start`, with why). The scene
-/// was measured as another one: nothing PVS-culled, or a navmesh baked at Play. A
-/// scene that never had the artefact gets no line, and the records of a scene
-/// loaded before it in the same world (a play-mode `Scene.Load`) are not read.
 pub fn bakes_unused(
     scene: &Scene,
     path: &str,
