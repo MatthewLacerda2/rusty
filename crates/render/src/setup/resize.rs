@@ -45,8 +45,10 @@ impl Renderer {
                 ..Default::default()
             },
         };
+        // A measurement switch (`stats::switches`) reaches the Scene view too.
         GraphicsSettings {
             quality: self.quality,
+            options: self.switches.gate(player.options),
             ..player
         }
     }

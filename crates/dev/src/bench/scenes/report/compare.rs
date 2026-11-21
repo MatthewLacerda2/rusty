@@ -78,7 +78,7 @@ impl SceneReport {
         };
         (self.set != previous.set).then(|| {
             format!(
-                "compared with a run of other quality overrides ({} -> {}): the change \
+                "compared with a run of other --set overrides ({} -> {}): the change \
                  is the settings' as well as the code's",
                 said(&previous.set),
                 said(&self.set)
