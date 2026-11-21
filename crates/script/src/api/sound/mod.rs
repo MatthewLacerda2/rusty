@@ -60,7 +60,7 @@ use mlua::{Lua, Table, Value};
 use super::{put, Reg};
 use from_lua::{note_from_value, opts_from_table, patch_from_lua, song_from_lua};
 use level::{measure_file, report_table};
-use zimmer::{Bake, Patch, Song};
+use rusty_zimmer::{Bake, Patch, Song};
 
 /// Register the `Sound` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
@@ -143,13 +143,13 @@ fn register_song(lua: &Lua, table: &Table) -> Reg {
 fn bake(lua: &Lua, patch: &Patch, note: &Value, path: &str, opts: Option<&Table>) -> Baked {
     let midi = note_from_value(note).map_err(mlua::Error::RuntimeError)?;
     let opts = opts_from_table(opts).map_err(mlua::Error::RuntimeError)?;
-    let bake = zimmer::bake_note(patch, midi, &opts).map_err(lua_err)?;
+    let bake = rusty_zimmer::bake_note(patch, midi, &opts).map_err(lua_err)?;
     write_bake(lua, bake, path)
 }
 
 /// Bake `song`, resolving any track that names its patch by reading that `.json`.
 fn bake_song(lua: &Lua, song: &Song, path: &str) -> Baked {
-    let bake = zimmer::bake_song(song, &load_patch).map_err(lua_err)?;
+    let bake = rusty_zimmer::bake_song(song, &load_patch).map_err(lua_err)?;
     write_bake(lua, bake, path)
 }
 

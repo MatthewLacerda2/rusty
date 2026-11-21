@@ -68,6 +68,9 @@ TABLE: dict[str, tuple[str, ...]] = {
         # `results.json`: a timing key let through makes two runs of one seed differ
         # (#1872 found `render_extract_us` leaking, and read `medium`)
         "crates/core/src/frame_stats/",
+        # the synthesiser: a recipe's bake is a pure function of its document and
+        # `SYNTH_VERSION`, so a change here moves every bake on disk
+        "crates/zimmer/src/",
     ),
     "scripting sandbox": (
         "crates/script/src/scripting/sandbox/",  # the gameplay VM's stdlib: no os/io, require's reach

@@ -11,8 +11,8 @@
 //! set of fewer than two.
 
 use mlua::{Lua, Table, Value};
+use rusty_zimmer::survey::{Register, SongSurvey, TrackSurvey};
 use serde_json::Value as Json;
-use zimmer::survey::{Register, SongSurvey, TrackSurvey};
 
 use super::{Document, Origin, PatchSurvey, SetRollup, SetSurvey, SourceRow};
 use crate::api::lua_json::recipe_json;

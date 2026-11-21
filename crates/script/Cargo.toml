@@ -27,12 +27,12 @@ rusty-scene = { workspace = true }
 rusty-shadergen = { workspace = true }
 rusty-time = { workspace = true }
 rusty-ui = { workspace = true }
+rusty-zimmer = { workspace = true }
 glam = { workspace = true }
 log = { workspace = true }
 mlua = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-zimmer = { workspace = true }
 
 [dev-dependencies]
 rusty-test-support = { workspace = true }

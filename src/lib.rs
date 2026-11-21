@@ -29,6 +29,7 @@ pub use rusty_shadergen as shadergen;
 pub use rusty_shell as shell;
 pub use rusty_time as time;
 pub use rusty_ui as ui;
+pub use rusty_zimmer as zimmer;
 
 #[cfg(feature = "dev")]
 pub use rusty_dev as dev;

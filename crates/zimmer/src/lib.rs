@@ -2,6 +2,8 @@
 //! renders to samples and a WAV, a pure function of the document and [`SYNTH_VERSION`]: no I/O,
 //! no clock, no unseeded randomness. The caller does the I/O.
 
+#![deny(clippy::unwrap_used)]
+
 pub(crate) mod core;
 pub(crate) mod error;
 pub(crate) mod fx;

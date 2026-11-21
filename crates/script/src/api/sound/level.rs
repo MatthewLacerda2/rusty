@@ -3,7 +3,7 @@
 //!
 //! **The agent cannot hear**, so a bake reports its own level: every bake verb
 //! returns this table as its second value, and `Sound.Level(path)` measures any
-//! clip on disk the same way. The arithmetic is zimmer's (`zimmer::level`) — a bake
+//! clip on disk the same way. The arithmetic is zimmer's (`rusty_zimmer::level`) — a bake
 //! arrives already measured, and a file is decoded by the engine's own `ClipCache`
 //! decoder and fed to zimmer's `Profiler` — so there is one meter, not two.
 //!
@@ -27,7 +27,7 @@
 use mlua::{Lua, Table};
 
 use rusty_audio::device::decode::decode_file;
-use zimmer::level::{Cut, Layer, Profile, Profiler, Span};
+use rusty_zimmer::level::{Cut, Layer, Profile, Profiler, Span};
 
 /// The most sections a `sections` grid may cut a clip into.
 pub const MAX_SECTIONS: f64 = 10_000.0;
