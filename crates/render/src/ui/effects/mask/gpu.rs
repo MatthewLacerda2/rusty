@@ -32,6 +32,7 @@ use crate::timing::GpuPass;
 use crate::ui::cache::{CanvasGpu, UiViewCache};
 use crate::ui::effects::{BatchUniform, GroupKey};
 use crate::ui::mesh::UiSource;
+use crate::ui::pipeline::{BATCH_GROUP, SOURCE_GROUP};
 use crate::{RenderView, Renderer};
 
 /// The coverage textures' format: one 8-bit channel.
@@ -206,9 +207,9 @@ impl Renderer {
             );
             pass.set_pipeline(&ui.mask_pipeline);
             pass.set_vertex_buffer(0, canvas.buffer.slice(..));
-            pass.set_bind_group(0, ui.source_group(&draw.source), &[]);
+            pass.set_bind_group(SOURCE_GROUP, ui.source_group(&draw.source), &[]);
             let slot = cache.effects.mask_offset(i, m);
-            pass.set_bind_group(1, cache.effects.group(&key(draw)), &[slot]);
+            pass.set_bind_group(BATCH_GROUP, cache.effects.group(&key(draw)), &[slot]);
             pass.draw(draw.range.clone(), 0..1);
         }
         let commands = encoder.finish();

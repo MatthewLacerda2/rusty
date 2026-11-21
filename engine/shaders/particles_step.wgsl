@@ -16,9 +16,9 @@
 
 #import particles::gpu::{GpuParticle, GpuBirth, EMPTY, gpu_emitter, life_t, lut_at}
 
-@group(0) @binding(2) var<storage, read_write> particles: array<GpuParticle>;
-@group(0) @binding(4) var<storage, read> dts: array<f32>;
-@group(0) @binding(5) var<storage, read> births: array<GpuBirth>;
+@group(3) @binding(2) var<storage, read_write> particles: array<GpuParticle>;
+@group(3) @binding(4) var<storage, read> dts: array<f32>;
+@group(3) @binding(5) var<storage, read> births: array<GpuBirth>;
 
 @compute @workgroup_size(64)
 fn cs_birth(@builtin(global_invocation_id) id: vec3<u32>) {

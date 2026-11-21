@@ -1,5 +1,5 @@
 //! The forward shader's view of the cascades (#435): `ShadowCascades` in
-//! `shader.wgsl`, group 3 binding 0. Everything it needs to pick a cascade for a
+//! `shader.wgsl`, the scene group's binding 0. Everything it needs to pick a cascade for a
 //! fragment and bias against it, packed into `vec4`s for WGSL's uniform layout.
 
 use glam::Vec3;

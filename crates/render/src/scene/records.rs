@@ -1,13 +1,13 @@
 //! crates/render/src/scene/records.rs — the renderer's material table (#1706): one
 //! [`MaterialData`] per (scene, library material, [`Variant`]), at a slot of a
-//! [`SlotTable`] mirrored on the GPU (group 1 binding 4), which a draw's uniform names.
+//! [`SlotTable`] mirrored on the GPU (the per-draw group, binding 4), which a draw's uniform names.
 //!
 //! **Why a variant.** A record is the material's, but two inputs of it are not:
 //! a light's own mesh draws its material unlit (`is_lit`, and the decal, preserve
 //! specular, refraction and SSR terms that follow it), and a mesh particle never
 //! takes decals. Each is a fixed transform of the material, so each is its own record
 //! of it, and an edit rewrites every variant drawn. Nothing else a record holds reads
-//! the entity: a slot's per-object overrides live in its param buffer (group 2,
+//! the entity: a slot's per-object overrides live in its param buffer (the material group,
 //! `ParamOwner::Entity`), the world matrix, probe SH and lightmap in its object record.
 //!
 //! **Lifetime.** A slot is allocated the first time a draw names its record (an

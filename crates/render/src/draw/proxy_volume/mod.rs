@@ -4,7 +4,7 @@
 //! a grid of probe-field samples over its box, interpolated per pixel by
 //! `engine/shaders/forward/proxy_volume.wgsl`, instead of the one sample at its
 //! bounds centre (`uniforms::entity_probe_sh`). Each camera's solids append their volumes
-//! to one storage array (group 1, binding 5) and point their instance at theirs.
+//! to one storage array (the per-draw group, binding 5) and point their instance at theirs.
 //!
 //! [`pack`] samples the grid exactly as the single sample is taken
 //! (`ProbeVolume::sample`: trilinear over a probe grid, else the nearest probes

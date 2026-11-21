@@ -1,13 +1,14 @@
 //! The editor overlays' draws for one handles pass (#1616): every gizmo's per-draw
 //! uniform in one array and every distinct tint's record in one material array,
-//! behind one group-1 bind group, as the solids' `DrawBuffers` are. A gizmo keeps only
+//! behind one per-draw bind group, as the solids' `DrawBuffers` are. A gizmo keeps only
 //! its uniform's slot and binds the group at that slot's dynamic offset, so a frame
 //! with a hundred probe boxes builds three buffers, not two per box.
 
 use glam::Mat4;
 use wgpu::util::DeviceExt;
 
-use crate::gpu::draw_buffers::{group1, uniform_array_bytes, DrawBuffers};
+use crate::gpu::draw_buffers::{draw_group, uniform_array_bytes, DrawBuffers};
+use crate::gpu::groups;
 use crate::gpu::uniforms::{RecordTable, RecordWords};
 use crate::{DrawUniform, MaterialData, Renderer};
 
@@ -50,7 +51,7 @@ impl OverlayDraws {
     }
 }
 
-/// The handles pass's group 1: the overlays' uniform and record arrays over the
+/// The handles pass's per-draw group: the overlays' uniform and record arrays over the
 /// shared identity bones and identity instance (an overlay is one draw of instance
 /// 0, its transform in its uniform).
 pub(crate) struct OverlayBindings {
@@ -60,7 +61,7 @@ pub(crate) struct OverlayBindings {
 impl OverlayBindings {
     /// Bind the group for the gizmo at `slot`.
     pub(crate) fn bind<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>, slot: u32) {
-        pass.set_bind_group(1, &self.group, &DrawBuffers::offsets(slot));
+        pass.set_bind_group(groups::DRAW, &self.group, &DrawBuffers::offsets(slot));
     }
 }
 
@@ -89,7 +90,7 @@ impl Renderer {
             bytemuck::cast_slice(&records),
             wgpu::BufferUsages::STORAGE,
         );
-        let group = group1(
+        let group = draw_group(
             &self.device,
             &self.entity_bones_layout,
             "Overlay Bind Group",

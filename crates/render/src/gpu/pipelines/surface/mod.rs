@@ -7,7 +7,7 @@
 //! variant keeps the forward contract by construction (#272: same `VertexInput`, bind
 //! groups and entry points), so only the module differs: its pipelines (opaque, motion
 //! (#1435), one transparent per blend and the depth postpass (#1523)) reuse the
-//! forward layout. Its runtime params (#399) ride the material's group-2 uniform, packed
+//! forward layout. Its runtime params (#399) ride the material group's param uniform, packed
 //! by the slot's [`ParamLayout`] (`<name>.params.json`).
 //!
 //! **Pipeline ids.** Every draw carries a `usize` pipeline id: [`STANDARD`] (0) is the

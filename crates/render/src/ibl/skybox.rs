@@ -6,6 +6,11 @@ use crate::postfx::effects::ssr::surface;
 use crate::GpuTexture;
 use wgpu::util::DeviceExt;
 
+/// The camera and lighting group.
+const CAMERA: u32 = 0;
+/// The sky's cube texture.
+const SKY: u32 = 1;
+
 /// One sky shader and its layout: what its pipelines, with and without the velocity
 /// target, are built from.
 struct SkyKind {
@@ -185,8 +190,8 @@ impl SkyboxRenderer {
     ) {
         let pipeline = self.pick(&self.pipeline, 0, targets);
         render_pass.set_pipeline(pipeline);
-        render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
-        render_pass.set_bind_group(1, &skybox_texture.bind_group, &[]);
+        render_pass.set_bind_group(CAMERA, camera_lighting_bind_group, &[]);
+        render_pass.set_bind_group(SKY, &skybox_texture.bind_group, &[]);
         self.draw_box(render_pass);
     }
 
@@ -216,7 +221,7 @@ impl SkyboxRenderer {
     ) {
         let pipeline = self.pick(&self.gradient_pipeline, 1, targets);
         render_pass.set_pipeline(pipeline);
-        render_pass.set_bind_group(0, camera_lighting_bind_group, &[]);
+        render_pass.set_bind_group(CAMERA, camera_lighting_bind_group, &[]);
         self.draw_box(render_pass);
     }
 

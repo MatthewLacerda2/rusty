@@ -116,11 +116,13 @@ assembles byte-identical WGSL.
 
 - **`surface`** — varies the *look* of the forward/surface pass. The full PBR
   lighting is kept **verbatim** (so the variant binds against the forward pipeline
-  unchanged — same `VertexInput`, the `LightingUniforms`, the group-1 `draw` and
-  material record, the group(2) material maps, and `vs_main`/`fs_main` entry points); each colour block restyles
+  unchanged — same `VertexInput`, the `LightingUniforms`, the per-draw group's `draw`
+  and material record, the material group's maps, and `vs_main`/`fs_main` entry points); each colour block restyles
   the shaded color before the final write. The vertex stage is the standard one
   too, unless a **vertex-stage** block (`vertex_waves`, below) moves the vertices.
-  Group 1 is the instanced layout (#470): the small per-draw `draw` uniform (its
+  The bind groups: global 0, the material 1, the pass's scene inputs (shadows, AO,
+  the opaque copy) 2, the per-draw group 3 (last, as it changes every draw). The
+  per-draw group is the instanced layout (#470): the small per-draw `draw` uniform (its
   transform, joint base and record index), the draw's material record read through
   `material()` (#1616: tint, PBR scalars, map flags, cutout, the transparent-surface
   and mapping terms), and a per-instance `instances` array (world matrix, probe SH).

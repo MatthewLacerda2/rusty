@@ -36,27 +36,27 @@ struct ParticleGlobals {
     fog: Fog,
 };
 
-@group(0) @binding(0) var<uniform> globals: ParticleGlobals;
+@group(3) @binding(0) var<uniform> globals: ParticleGlobals;
 @group(1) @binding(0) var sprite_tex: texture_2d<f32>;
 @group(1) @binding(1) var sprite_sampler: sampler;
 // The scene depth (read-only this pass) — soft particles fade against it.
 @group(2) @binding(0) var scene_depth: texture_depth_2d;
-// The renderer's group 0 (camera + lighting + env + light clusters, #434); the
+// The renderer's global group (camera + lighting + env + light clusters, #434); the
 // camera is read only to find a vertex's light cluster.
-@group(3) @binding(0) var<uniform> camera: CameraUniforms;
-@group(3) @binding(1) var<uniform> lighting: LightingUniforms;
-@group(3) @binding(7) var<storage, read> local_lights: array<LocalLight>;
-@group(3) @binding(8) var<storage, read> cluster_ranges: array<vec2<u32>>;
-@group(3) @binding(9) var<storage, read> cluster_lights: array<u32>;
+@group(0) @binding(0) var<uniform> camera: CameraUniforms;
+@group(0) @binding(1) var<uniform> lighting: LightingUniforms;
+@group(0) @binding(7) var<storage, read> local_lights: array<LocalLight>;
+@group(0) @binding(8) var<storage, read> cluster_ranges: array<vec2<u32>>;
+@group(0) @binding(9) var<storage, read> cluster_lights: array<u32>;
 // A GPU-simulated emitter's particles (#2170), beside its uniform and curves
-// (`particles::gpu`), in its draw's group 0.
-@group(0) @binding(2) var<storage, read> gpu_particles: array<GpuParticle>;
+// (`particles::gpu`), in its draw's group, the per-draw one.
+@group(3) @binding(2) var<storage, read> gpu_particles: array<GpuParticle>;
 // The integrated volumetric fog (#1703), read per vertex like the scene fog.
-@group(3) @binding(17) var t_fog_volume: texture_3d<f32>;
-// Group 0's one linear-clamp sampler (`render::gpu::linear_clamp`), shared by the
+@group(0) @binding(17) var t_fog_volume: texture_3d<f32>;
+// The global group's one linear-clamp sampler (`render::gpu::linear_clamp`), shared by the
 // sky and probe cubes, the lightmap and shadowmask pages and the fog volume; this
 // shader reads only the fog volume through it.
-@group(3) @binding(18) var s_linear_clamp: sampler;
+@group(0) @binding(18) var s_linear_clamp: sampler;
 
 struct InstanceInput {
     @location(0) center: vec3<f32>,

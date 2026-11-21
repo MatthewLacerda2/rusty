@@ -4,6 +4,7 @@
 use super::{SsaoFrame, SsaoTargets, Stage};
 use crate::draw::pass::ScenePassFrame;
 use crate::draw::record::Solids;
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::passes::hiz::Culled;
@@ -20,7 +21,7 @@ pub(crate) type DepthPass<'a> = (
 
 impl Renderer {
     /// Record `frame`'s SSAO for `solids` into `encoder`, leaving the result in
-    /// `view.ssao` for the forward pass's group 3, and count its cost.
+    /// `view.ssao` for the forward pass's scene group, and count its cost.
     pub(crate) fn record_ssao(
         &mut self,
         view: &mut RenderView,
@@ -97,10 +98,10 @@ impl Renderer {
         self.frame_counters.add_draws(draws);
     }
 
-    /// The forward pass's group 3 for `view` under `frame`: SSIL's (with the AO
+    /// The forward pass's scene group for `view` under `frame`: SSIL's (with the AO
     /// beside it) when SSIL ran this camera (#1750), else its AO when the SSAO
     /// passes ran this camera, else the white no-AO group.
-    pub(crate) fn scene_group3<'a>(
+    pub(crate) fn scene_group<'a>(
         &'a self,
         view: &'a RenderView,
         frame: &ScenePassFrame,
@@ -164,9 +165,9 @@ impl Renderer {
             timestamp_writes,
             occlusion_query_set: None,
         });
-        pass.set_bind_group(0, &self.global_bind_group, &[]);
-        // The prepass reads nothing from group 3; the no-AO group satisfies the layout.
-        pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+        pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        // The prepass reads nothing from the scene group; the no-AO one satisfies the layout.
+        pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         self.draw_solids(
             &mut pass,
             solids,

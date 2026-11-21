@@ -1,7 +1,7 @@
 //! What a forward draw reads, split as Unity's SRP Batcher splits it (#1616): a small
-//! per-draw uniform ([`DrawUniform`], group 1 binding 0, at a dynamic offset) and the
-//! draw's material record ([`MaterialData`], one element of the group 1 binding 4
-//! storage array), which the per-draw uniform names by index.
+//! per-draw uniform ([`DrawUniform`], the per-draw group's (`groups::DRAW`) binding
+//! 0, at a dynamic offset) and the draw's material record ([`MaterialData`], one
+//! element of that group's binding 4 storage array), which the per-draw uniform names by index.
 //!
 //! **Per draw** is what differs between two draws of one material: the draw's own
 //! transform (identity for instanced solids, an editor gizmo's placement), where its
@@ -54,7 +54,7 @@ pub(crate) struct MaterialData {
     pub is_lit: u32,
     pub metallic: f32,
     pub roughness: f32,
-    // Map flags (#202, #207). When set, the shader samples the matching group(2)
+    // Map flags (#202, #207). When set, the shader samples the matching material-group
     // texture: metallic/roughness multiply their scalar by the sampled channel
     // (glTF's blue/green at 1, red at 2: a one-channel BC4 upload, #1574);
     // `use_normal_map` perturbs the shading normal in tangent space (2: a BC5 map,

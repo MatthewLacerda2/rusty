@@ -119,3 +119,28 @@ fn a_round_round_trips_through_its_file() {
         "a malformed round is said, not read as empty"
     );
 }
+
+#[test]
+fn the_round_carries_the_scene_views_counters() {
+    let mut meter = Meter::new();
+    let mut counters = rusty_render::RenderCounters::default();
+    (
+        counters.draw_calls,
+        counters.triangles,
+        counters.forward_unlit,
+    ) = (90, 5000, 42);
+    let frame = RenderedFrame {
+        counters,
+        ..RenderedFrame::default()
+    };
+    let drawn = Drawn {
+        frame,
+        view: (8, 8),
+    };
+    meter.frame(ui(1.0), Some(&drawn), None);
+    meter.end_run();
+    let round = meter.finish();
+    assert_eq!(row(&round, "editor.draw_calls").avg, 90.0);
+    assert_eq!(row(&round, "editor.triangles").avg, 5000.0);
+    assert_eq!(row(&round, "editor.forward_unlit").avg, 42.0);
+}

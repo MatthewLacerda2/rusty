@@ -8,6 +8,11 @@ use super::run::ClusterCull;
 use crate::timing::GpuPart;
 use crate::Renderer;
 
+/// A cluster step's own group (test, scan or copy).
+const STEP: u32 = 0;
+/// The cluster table and index pool every step shares.
+const POOL: u32 = 1;
+
 /// A dispatch dimension's limit, in workgroups (wgpu's default
 /// `max_compute_workgroups_per_dimension`).
 const MAX_DIMENSION: u32 = 65535;
@@ -26,7 +31,7 @@ impl Renderer {
     ) {
         let pipes = &self.hiz.clusters;
         let bound = "bound by ready_clusters";
-        pass.set_bind_group(1, &pipes.pool.group, &[]);
+        pass.set_bind_group(POOL, &pipes.pool.group, &[]);
         for &step in steps {
             let (group, pipeline, count) = match step {
                 GpuPart::OcclusionClustersTest => {
@@ -43,7 +48,7 @@ impl Renderer {
             let (x, y) = workgroups(count as u32);
             #[cfg(test)]
             cull.dispatched.borrow_mut().push((step, (x, y)));
-            pass.set_bind_group(0, group.expect(bound), &[]);
+            pass.set_bind_group(STEP, group.expect(bound), &[]);
             pass.set_pipeline(pipeline.get());
             pass.dispatch_workgroups(x, y, 1);
         }

@@ -3,6 +3,7 @@
 //! no fragment stage at all, for the batches nothing clips (#2347).
 
 use super::{FacedPipeline, Facing, LazyPipeline};
+use crate::gpu::groups::Groups;
 use crate::gpu::mesh::vertex_layout;
 use crate::gpu::DEPTH_FORMAT;
 
@@ -35,14 +36,14 @@ pub(crate) struct PrepassPipelines {
 impl PrepassPipelines {
     /// Both sets of the forward `shader`: the clipping ones over the forward
     /// `layout`, their usual facing built now, and the depth-only ones over one of
-    /// the forward pass's `globals` and `draws` groups alone ([`depth_only_layout`]),
+    /// the forward pass's global and per-draw groups alone ([`depth_only_layout`]),
     /// none built until [`Self::prime`] or a draw: the shader preview's throwaway
     /// set never draws them.
     pub(super) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
         layout: &wgpu::PipelineLayout,
-        groups: [&wgpu::BindGroupLayout; 2],
+        groups: Groups<&wgpu::BindGroupLayout>,
     ) -> Self {
         let plain = depth_only_layout(device, groups);
         Self {
@@ -66,8 +67,8 @@ impl PrepassPipelines {
 /// The depth-only prepass (#2347): the same vertex stage, primitive and depth state
 /// as [`prepass_set`]'s, so the depth it writes is bit-identical, but no fragment
 /// stage, so a batch nothing clips pays no fragment work and keeps the GPU's
-/// depth-only fast path. `layout` is [`depth_only_layout`]'s, which ends before
-/// the material group; nothing is built yet.
+/// depth-only fast path. `layout` is [`depth_only_layout`]'s, which has no
+/// material group; nothing is built yet.
 fn depth_only_set(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -78,19 +79,21 @@ fn depth_only_set(
     })
 }
 
-/// The depth-only prepass's layout: the forward pass's groups 0 (globals) and 1
-/// (draw buffers), which `vs_main` reads, and nothing after, so a depth-only batch
-/// binds no material group (2) and the pass's group 3 stays bound for the next
-/// clipping batch.
+/// The depth-only prepass's layout: the forward pass's global and per-draw groups,
+/// which `vs_main` reads, at their indices (`gpu::groups`), with gaps where the
+/// material and scene groups sit, so a depth-only batch binds no material group.
+/// The pass's scene group stays bound for the next clipping batch, which re-flushes
+/// from the material group up, as a material change does.
 fn depth_only_layout(
     device: &wgpu::Device,
-    [globals, draws]: [&wgpu::BindGroupLayout; 2],
+    groups: Groups<&wgpu::BindGroupLayout>,
 ) -> wgpu::PipelineLayout {
-    device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-        label: Some("Depth-Only Prepass Layout"),
-        bind_group_layouts: &[Some(globals), Some(draws)],
-        immediate_size: 0,
-    })
+    let groups = Groups {
+        scene: None,
+        material: None,
+        ..groups
+    };
+    groups.layout(device, "Depth-Only Prepass Layout")
 }
 
 /// One prepass pipeline: through `fragment`, or with no fragment stage.

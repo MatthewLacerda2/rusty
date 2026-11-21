@@ -135,6 +135,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 ## Reuse `render::gpu`
 Before building a layout or pipeline by hand, use these:
 - `render::gpu::layout_entries`: one uniform, texture, sampler, depth or storage entry.
+- `render::gpu::groups`: the solid path's bind-group indices (`rusty_shadergen::groups`,
+  by how often each changes, the per-draw group last). A solid-path pipeline layout is
+  built through `Groups::layout`, and its `set_bind_group` names `groups::DRAW` and the
+  rest, never a number (any other pass names its own `const`; `make rules`,
+  `bind-group-index`); `groups`' tests hold the WGSL `@group`s to them.
 - `render::gpu::DEPTH_FORMAT`: every view depth target and every pipeline drawing into
   one; shadow maps keep their own format in `passes::shadows`.
 - `render::gpu::kept::Kept`: a bind group or draw kept across frames, rebuilt only
