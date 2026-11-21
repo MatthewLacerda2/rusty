@@ -1,8 +1,3 @@
-//! OIDN's binding (#1884): where it looks, what a bake without it says, and, on a
-//! machine that has it, that it cleans a noisy lightmap and gives the same bytes
-//! every time (a whole bake: `bake_tests`). The tests that run OIDN skip without it, except where
-//! [`REQUIRE_OIDN_ENV`] is set (CI), whose canary then fails.
-
 use std::path::{Path, PathBuf};
 
 use glam::Vec3;
@@ -10,7 +5,6 @@ use glam::Vec3;
 use super::{available, ffi, missing, Oidn, REQUIRE_OIDN_ENV};
 use rusty_lighting::lightmap::LightmapDenoiser;
 
-/// OIDN's denoiser, or `None` (skip) on a machine without it.
 pub(super) fn oidn_or_skip() -> Option<Oidn> {
     available().ok().map(|()| Oidn::default())
 }
@@ -48,7 +42,6 @@ fn a_missing_library_is_an_error_not_a_crash() {
 
 #[test]
 fn a_library_that_loads_without_oidns_calls_is_passed_over() {
-    // A system library every machine of that OS loads, with no OIDN symbols in it.
     let decoy = PathBuf::from(if cfg!(target_os = "macos") {
         "/usr/lib/libSystem.B.dylib"
     } else {
@@ -82,7 +75,6 @@ fn the_missing_warning_says_what_to_install() {
     }
 }
 
-/// A 32² chart of flat light 1.0 with seeded ±0.5 grain.
 fn noisy() -> Vec<Vec3> {
     let mut state = 0x2545_f491_u32;
     let mut next = move || {
@@ -94,7 +86,6 @@ fn noisy() -> Vec<Vec3> {
     (0..32 * 32).map(|_| Vec3::splat(1.0 + next())).collect()
 }
 
-/// Mean distance from the flat 1.0 the grain sits on.
 fn grain(image: &[Vec3]) -> f32 {
     image.iter().map(|v| (v.x - 1.0).abs()).sum::<f32>() / image.len() as f32
 }

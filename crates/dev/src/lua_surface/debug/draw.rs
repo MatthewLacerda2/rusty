@@ -1,14 +1,3 @@
-//! `Debug.DrawLine` / `Debug.DrawRay` (#1882): Unity's debug lines, held on the
-//! scene for a duration in sim time counted in fixed ticks
-//! (`scene::runtime::debug_lines`) and drawn by the gizmo pass: always in the
-//! editor's Scene view, and over the game with its gizmos on (the Game view's
-//! toggle, `Harness.Screenshot(path, { gizmos = true })`). Draw-only: nothing in
-//! the sim reads them back.
-//!
-//! Vectors and the colour cross flat, as everywhere in the API:
-//! `(x, y, z, x, y, z [, r, g, b, a [, duration]])`, Unity's order and defaults
-//! (white; a duration of 0, one frame).
-
 use glam::Vec3;
 use mlua::{Lua, MultiValue, Table};
 
@@ -16,7 +5,6 @@ use rusty_scene::runtime::debug_lines::duration_ticks;
 use rusty_scene::Scene;
 use rusty_script::api::{put, ApiCell, Reg};
 
-/// Register `Debug.DrawLine` and `Debug.DrawRay` onto `table`.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -47,7 +35,6 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
-/// One call's arguments: two vectors, the colour and the duration in ticks.
 #[derive(Debug, PartialEq)]
 struct Drawn {
     a: Vec3,
@@ -56,7 +43,6 @@ struct Drawn {
     ticks: u32,
 }
 
-/// Read `(x, y, z, x, y, z [, r, g, b, a [, duration]])`: six, ten or eleven numbers.
 fn parse(verb: &str, args: MultiValue) -> mlua::Result<Drawn> {
     let bad = |why: String| mlua::Error::RuntimeError(format!("{verb}: {why}"));
     let mut n = Vec::with_capacity(args.len());

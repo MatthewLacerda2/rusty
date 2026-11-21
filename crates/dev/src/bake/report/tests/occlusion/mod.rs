@@ -1,6 +1,3 @@
-//! The occlusion report: on the corridor test level the PVS culls a share of the
-//! objects, and the slowest cells and each grid layer's time are read right.
-
 use std::time::Duration;
 
 use crate::bake::report::{occlusion, point, Stages, TOP};
@@ -42,7 +39,6 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
     let (data, r) = bake_occlusion(&scene, 2);
     let data = data.expect("the corridors occlude");
     assert!(r.cells > TOP + 2, "enough cells to cut: {}", r.cells);
-    // Cell 3 slowest, cell 1 next, then every other cell tied at 1 ms.
     let mut cells = vec![Some(Duration::from_millis(1)); r.cells];
     (cells[3], cells[1]) = (
         Some(Duration::from_millis(9)),
@@ -76,7 +72,6 @@ fn the_slowest_cells_come_first_and_ties_go_to_the_lower_cell() {
         (seconds["mean"].as_f64().unwrap() - mean).abs() < 2e-6,
         "{seconds}"
     );
-    // Times for another grid are not this bake's.
     let other = occlusion::report(
         &scene,
         (&r, Some(&data), (&cells[1..], None)),
@@ -93,7 +88,6 @@ fn each_grid_layer_sums_its_cells_times() {
     let data = data.expect("the corridors occlude");
     let g = data.grid;
     let per_layer = (g.dims.x * g.dims.z) as usize;
-    // Every cell of layer `y` takes `y + 1` ms.
     let cells: Vec<_> = (0..r.cells)
         .map(|i| Some(Duration::from_millis((i / per_layer) as u64 + 1)))
         .collect();

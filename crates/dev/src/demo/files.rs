@@ -1,29 +1,17 @@
-//! Where demos go: `saved/demos/<scene>-<UTC time>.demo`, the newest N kept (#1581).
-//!
-//! The platform layer names the file: the wall-clock time is in the name only and
-//! never reaches the sim.
-
 use std::fs::{File, TryLockError};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// The project folder demos are written to (inside the git-ignored `saved/`).
 pub const DEMOS_DIR: &str = "saved/demos";
 
-/// The extension every demo file carries.
 pub const EXTENSION: &str = "demo";
 
-/// Where a recorder writes.
 pub enum Destination {
-    /// A folder of demos, one per Play session, pruned to the project's `keep`.
     Folder(PathBuf),
-    /// One file, rewritten by each Play session (tests, a chosen path).
     File(PathBuf),
 }
 
 impl Destination {
-    /// The path the next demo of `scene` goes to, after pruning the folder so it
-    /// holds at most `keep` with the new one. `None` when the project keeps none.
     pub fn next(&self, scene: &str, keep: usize) -> Option<PathBuf> {
         match self {
             Self::File(path) => Some(path.clone()),
@@ -40,8 +28,6 @@ impl Destination {
     }
 }
 
-/// Delete the oldest demos in `dir` until at most `keep` are left, never one a
-/// recorder still writes (a paused Play's demo can look oldest by its time).
 fn prune(dir: &Path, keep: usize) {
     let demos = demos_in(dir);
     let excess = demos.len().saturating_sub(keep);
@@ -51,8 +37,6 @@ fn prune(dir: &Path, keep: usize) {
     }
 }
 
-/// Whether a recorder holds the lock it takes on the demo it writes, released
-/// when the file closes, however the process ends.
 fn is_being_written(path: &Path) -> bool {
     let Ok(file) = File::open(path) else {
         return false;
@@ -60,7 +44,6 @@ fn is_being_written(path: &Path) -> bool {
     matches!(file.try_lock_shared(), Err(TryLockError::WouldBlock))
 }
 
-/// The demos in `dir`, oldest first (by modification time, then name).
 pub fn demos_in(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -78,7 +61,6 @@ pub fn demos_in(dir: &Path) -> Vec<PathBuf> {
     demos.into_iter().map(|(_, path)| path).collect()
 }
 
-/// `<dir>/<scene stem>-<YYYYMMDD-HHMMSS>.demo`, with `-2`, `-3`… when taken.
 fn fresh_name(dir: &Path, scene: &str) -> PathBuf {
     let stem = Path::new(scene)
         .file_stem()
@@ -96,10 +78,8 @@ fn fresh_name(dir: &Path, scene: &str) -> PathBuf {
     path
 }
 
-/// `YYYYMMDD-HHMMSS` in UTC for `seconds` since the Unix epoch.
 fn utc_stamp(seconds: u64) -> String {
     let (days, rest) = (seconds / 86_400, seconds % 86_400);
-    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
     let z = days as i64 + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;

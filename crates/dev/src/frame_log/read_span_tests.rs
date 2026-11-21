@@ -1,11 +1,6 @@
-//! The span a full read stops at, and what it counts in it (#2206).
-
 use super::{segment, ts};
 use crate::frame_log::read::*;
 
-/// A full answer stops at the segment that filled it and says "at least" how
-/// many more; the drops counted are those in the span returned, not an earlier
-/// session's; a bad line older than the look-back is not counted.
 #[test]
 fn a_full_read_stops_and_counts_only_its_own_span() {
     let dir = rusty_test_support::temp::dir();

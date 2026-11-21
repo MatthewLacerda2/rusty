@@ -1,6 +1,3 @@
-//! The engine's Lua-written verbs: `Particles`' Rust halves are timed as the
-//! verbs they serve, and the script's `fn` and the Lua loop are not.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -41,7 +38,6 @@ fn particles_verbs_have_rows_and_their_fn_is_not_one() {
     assert_eq!(seen, 8, "ForEach still visits every particle");
     let frame = take();
     let calls = |name| verb(&frame.verbs, name).map(|v| v.calls);
-    // ForEach: its read and its edit, one row.
     assert_eq!(calls("Particles.ForEach"), Some(2), "{:?}", frame.verbs);
     assert_eq!(calls("Particles.GetParticles"), Some(1));
     assert_eq!(calls("Particles.SetParticles"), Some(1));

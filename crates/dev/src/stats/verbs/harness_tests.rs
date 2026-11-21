@@ -1,6 +1,3 @@
-//! The verb timers on a played scene: off unless armed, armed per thread, and
-//! an armed run plays the same frames as a plain one.
-
 use crate::harness::Harness;
 
 use crate::stats::verbs::{arm, armed, take, Frame};
@@ -24,8 +21,6 @@ fn a_plain_run_wraps_nothing() {
 #[test]
 fn an_armed_run_times_the_bots_verbs_and_plays_the_same_frames() {
     let (plain, _) = played("verbs_before");
-    // Armed on a thread of its own: the arm dies with it, and this thread's VMs
-    // (every other test's, in one process) stay bare.
     let armed_run = std::thread::spawn(|| {
         arm();
         played("verbs_after")

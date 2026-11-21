@@ -1,32 +1,16 @@
-//! crates/dev/src/mcp/resources.rs — the MCP `resources/list` and `resources/read` handlers.
-//!
-//! Two resources are exposed, each read from the engine checkout on each request
-//! (#931), so it is always the doc the checkout holds and a doc edit rebuilds
-//! nothing:
-//!
-//! * the engine's Lua scripting-API reference — `docs/api/`, assembled into one
-//!   document (#569) — which the agent reads to learn what it can drive through the
-//!   `eval` tool;
-//! * the game guide, `docs/game-agent.md` (#1313): the engine's rules for an agent
-//!   building a game, which a game project's `CLAUDE.md` points at.
-
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 
-/// The canonical URI for the scripting-API reference resource.
 pub const SCRIPTING_API_URI: &str = "rusty://scripting-api.md";
-/// The canonical URI for the game guide resource.
 pub const GAME_GUIDE_URI: &str = "rusty://game-guide.md";
 
-/// The game guide in this build's engine checkout.
 fn game_guide_path() -> PathBuf {
     rusty_core::project::checkout()
         .join("docs")
         .join("game-agent.md")
 }
 
-/// The `resources/list` result: the game guide and the scripting-API reference.
 pub fn resources_list() -> Value {
     json!({
         "resources": [{
@@ -43,9 +27,6 @@ pub fn resources_list() -> Value {
     })
 }
 
-/// Handle `resources/read`. `Ok` is the MCP result with the resource contents; `Err`
-/// is a JSON-RPC protocol error `(code, message)` for an unknown URI, or an internal
-/// error when the checkout's doc can't be read.
 pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
     read_from(
         params,
@@ -54,8 +35,6 @@ pub fn resources_read(params: &Value) -> Result<Value, (i64, String)> {
     )
 }
 
-/// [`resources_read`] with the reference assembled from `doc_dir` and the guide read
-/// from `guide`.
 fn read_from(params: &Value, doc_dir: &Path, guide: &Path) -> Result<Value, (i64, String)> {
     let uri = params.get("uri").and_then(Value::as_str).unwrap_or("");
     let text = match uri {

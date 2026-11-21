@@ -1,9 +1,3 @@
-//! SSIL over a lightmap bake (#1750): what the bake holds is never gathered twice.
-//! A lightmapped scene whose light is all baked gains nothing; a default-mode
-//! (`Mixed`) light the bake took in gains nothing either, as Unity's
-//! `Light.bakingOutput` keeps it out; the same light spawned after the bake (a
-//! script's muzzle flash) still bounces.
-
 use crate::bake::lightmap::bake_scene_lightmaps;
 use rusty_components::{LightMode, Ssil};
 use rusty_render::test_gpu::ssil::{
@@ -12,11 +6,8 @@ use rusty_render::test_gpu::ssil::{
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
-/// How much brighter a scene whose light is all baked may get with SSIL on, as a
-/// share of its light: `INDIRECT_GAIN` in `bounce`, the documented bound.
 pub(super) const BAKED_GAIN: f32 = 0.005;
 
-/// The fixture's scene with its lamp in `mode`, baked into a temp folder `name`.
 pub(super) fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
     let (mut scene, lamp) = scene(Ssil::default(), LAMP);
     scene.world.set_light(lamp, Some(point(LAMP, mode)));
@@ -28,12 +19,10 @@ pub(super) fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
     (scene, lamp)
 }
 
-/// Bake `scene` into a temp folder `name`; the lightmaps it wrote.
 pub(super) fn bake(scene: &mut Scene, name: &str) -> usize {
     bake_with(scene, name, false)
 }
 
-/// [`bake`], into `directional` pages (#810) or not.
 pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usize {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_ssil_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -54,7 +43,6 @@ pub(super) fn bake_with(scene: &mut Scene, name: &str, directional: bool) -> usi
     bake_scene_lightmaps(scene, Some(&path), &settings).expect("baked")
 }
 
-/// The whole frame's light, settled, with SSIL off and on.
 pub(super) fn off_and_on(r: &mut rusty_render::Renderer, scene: &mut Scene) -> (f32, f32) {
     set_ssil(scene, Ssil::default());
     let off = energy(&settled(r, scene, 4));
@@ -85,7 +73,6 @@ fn gpu_a_mixed_light_in_the_bake_bounces_once_and_one_spawned_after_bounces() {
         "its bounce is baked: {with} vs {off}"
     );
 
-    // The same light again, spawned after the bake: no bake holds its bounce.
     let at = scene.world.transform(lamp).unwrap().position;
     scene.destroy_entity(lamp);
     let flash = scene.add_entity("Flash".to_string());

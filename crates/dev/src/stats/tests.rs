@@ -49,7 +49,6 @@ fn render_counters_fold_in_with_the_renderer_time() {
     record_render(&mut stats, &frame);
     assert_eq!(stats.get("draw_calls").map(|s| s.max), Some(3.0));
     assert_eq!(stats.get("renderer_ms").map(|s| s.last), Some(1.5));
-    // No timestamps: no GPU key at all, in the stats, the Lua table or the JSON.
     assert!(stats.get("gpu_ms").is_none() && stats.gpu_passes.is_empty());
     let lua = mlua::Lua::new();
     let t = to_lua(&lua, &stats).unwrap();
@@ -83,7 +82,6 @@ fn gpu_times_fold_in_as_a_total_and_per_pass() {
         .eval()
         .unwrap();
     assert_eq!(got, (0.5, 2.0));
-    // Timings stay out of the replay-stable JSON.
     assert!(stats.to_json(false).get("gpu_passes").is_none());
     assert!(stats.to_json(true)["gpu_passes"]["forward"].is_object());
 }

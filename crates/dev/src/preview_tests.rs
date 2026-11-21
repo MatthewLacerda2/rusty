@@ -1,17 +1,8 @@
-//! Tests for the headless asset preview (#353). Everything up to the GPU is covered
-//! here — subject resolution, the resolution clamp, and the end-to-end capture, which
-//! skips itself when the box has no adapter (the same graceful-degradation contract
-//! `screenshot` has, so CI never depends on a GPU).
-
 use super::*;
 
-/// A real, committed asset of each previewable kind, so the dispatch is exercised
-/// against the repo rather than made-up paths.
 const MODEL: &str = "engine/models/suzanne.obj";
 const SHADER: &str = "engine/shaders/shader.wgsl";
 
-/// `rel` in the checkout, as the string path the preview takes: a crate's tests run
-/// in the crate's folder, not the checkout's root.
 fn checkout_path(rel: &str) -> String {
     rusty_core::project::checkout()
         .join(rel)
@@ -21,8 +12,6 @@ fn checkout_path(rel: &str) -> String {
 
 #[test]
 fn unknown_extension_is_a_caller_error_not_an_empty_picture() {
-    // A `.lua` file exists but has no preview story: it must fail loudly rather than
-    // render an empty sky that looks like a successful preview.
     let err = resolve_subject("Cargo.toml").expect_err("no preview story for a manifest");
     assert!(err.contains("no preview for"), "{err}");
 }
@@ -35,8 +24,6 @@ fn missing_asset_is_reported_by_path() {
 
 #[test]
 fn a_converted_source_with_no_cache_is_missing_too() {
-    // An exported project previews a `.fbx` from its cache (#1267); with neither, the
-    // path is reported as it was.
     let err = resolve_subject("assets/models/never-imported.fbx").expect_err("no file");
     assert!(err.contains("no such asset"), "{err}");
 }
@@ -83,13 +70,11 @@ fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
         resolution: 64,
         ..PreviewOptions::default()
     };
-    // An `Err` (including no adapter under RUSTY_REQUIRE_GPU=1, #885) fails here.
     if !capture_asset(&checkout_path(SHADER), &out, options).expect("preview must not error") {
         eprintln!("no GPU adapter — skipping the render half of this test");
         return;
     }
 
-    // The nested directory was created for us, and the image is what was asked for.
     let image = image::open(&out).expect("a readable PNG landed on disk");
     assert_eq!((image.width(), image.height()), (64, 64));
     let _ = std::fs::remove_file(&out);
@@ -97,10 +82,6 @@ fn gpu_capture_writes_a_square_png_at_the_requested_resolution() {
 
 #[test]
 fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
-    // `embedded_textures.fbx`: a 1 cm quad (the FBX default unit) whose triangles
-    // have no colour of their own, only an embedded red texture on one and a blue one
-    // on the other. It used to preview as empty sky — a sub-pixel speck, and black
-    // besides (#1280) — then all red, its second material dropped (#1285).
     let fixture =
         rusty_core::project::checkout().join("tests/fixtures/models/embedded_textures.fbx");
     let dir = rusty_test_support::temp::dir();
@@ -117,8 +98,6 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
     }
     let image = image::open(&out).unwrap().to_rgb8();
     let count = |own: usize| {
-        // Dominant, not pure: seen near edge-on, the quad's Fresnel sheen of the sky
-        // (#1543) greys both faces as it would in Unity.
         let hue = |p: &&image::Rgb<u8>| {
             let others = (0..3).filter(|&c| c != own).map(|c| p[c]).max().unwrap();
             p[own] > 96 && p[own] > others.saturating_add(48)

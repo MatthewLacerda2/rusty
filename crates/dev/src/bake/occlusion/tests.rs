@@ -1,7 +1,3 @@
-//! The occlusion bake's runs (#1714): the editor's worker and a script's logged
-//! run write the same bytes as the in-line bake, timed or not (#1987), and the
-//! log says its step.
-
 use std::cell::RefCell;
 use std::time::Duration;
 
@@ -35,7 +31,6 @@ fn the_worker_and_the_logged_run_bake_what_the_inline_bake_does() {
     drop(log);
     assert_eq!(encode(logged.data.as_ref().unwrap()), inline);
     assert_eq!(logged.cells.len(), logged.report.cells);
-    // A frozen clock: the step's first line, and no other step's.
     let lines: Vec<String> = lines.into_inner().into_iter().map(|l| l.text).collect();
     assert_eq!(lines[0], "[Lighting] 0:00 occlusion preparing", "{lines:?}");
     assert!(lines.iter().all(|l| l.contains(" occlusion ")));
@@ -119,8 +114,6 @@ fn the_summary_counts_the_never_culled_and_says_a_level_too_large() {
     );
 }
 
-/// The editor's Generate (#2348): a scene holding its own bake hands it back kept,
-/// on the job's first poll, with nothing to apply and no worker to wait on.
 #[test]
 fn the_editors_generate_keeps_a_current_pvs_on_its_first_poll() {
     let mut scene = corridors();

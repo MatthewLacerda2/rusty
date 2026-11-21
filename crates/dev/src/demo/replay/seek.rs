@@ -1,16 +1,3 @@
-//! Seeking a replay (#1597): `Harness.SeekDemo(tick)` fast-forwards to a found
-//! moment, the same steps a straight replay takes (the recorded input, the
-//! recorded `dt`, the digests checked on the way), and draws nothing.
-//!
-//! Seeking back restarts the replay from the demo's start state: Play is left,
-//! and the world is put back as [`prepare`](super::prepare) found it (its scene
-//! by [`Origin`], which the editor's close shares, then the camera, the clock and
-//! the Game view size), then prepared again from the file, read before anything
-//! is torn down.
-//! It is the same world, not a new one: a scenario's API is bound to the world's
-//! own cells for the whole run, so a fresh world would leave it reading the old
-//! one.
-
 use std::path::{Path, PathBuf};
 
 use super::super::read::Demo;
@@ -20,7 +7,6 @@ use rusty_app::GameWorld;
 use rusty_scene::Camera;
 use rusty_time::Time;
 
-/// What the world was when the replay was prepared: where a seek back restarts.
 pub struct Start {
     path: PathBuf,
     scene: Origin,
@@ -32,7 +18,6 @@ pub struct Start {
 }
 
 impl Start {
-    /// `world` as it stands, right before the demo at `path` is prepared on it.
     pub(super) fn of(world: &GameWorld, path: &Path) -> Self {
         Self {
             path: path.to_path_buf(),
@@ -49,13 +34,11 @@ impl Start {
         &self.path
     }
 
-    /// Put `world` back as it was, Play left first.
     fn restore(self, world: &mut GameWorld) {
         self.scene.restore(world);
         *world.script_manager().scene_path_cell().borrow_mut() = self.scene_path;
         *world.camera().borrow_mut() = self.camera;
         *world.time().borrow_mut() = self.time;
-        // A tick past the start may have resized the Game view.
         let mut screen = world.resources.screen.borrow_mut();
         screen.restore_game_view(self.game_view);
         screen.restore_display_scale(self.display_scale);
@@ -66,9 +49,6 @@ impl Start {
 
 pub const NO_DEMO: &str = "this run replays no demo: run the scenario with `play --demo <file>`";
 
-/// Replay `world`'s demo up to and including tick `tick`: forward from where it
-/// stands, or from its start when `tick` has already run (or the world ran on
-/// past the demo's end).
 pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     let (done, of) = (replayer.verdict().ticks, replayer.verdict().of);
@@ -93,10 +73,6 @@ pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
     }
 }
 
-/// Start the replay over: the world as it was prepared, prepared again. What the
-/// verdict found stays found: a divergence, and that a scenario steps it. What
-/// can fail (the file read again, the replay's VM) is done first, so a failed
-/// restart leaves the run as it stood.
 fn restart(world: &mut GameWorld) -> Result<(), String> {
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     let demo = Demo::read(replayer.demo_path())?;

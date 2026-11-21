@@ -1,12 +1,3 @@
-//! A bake's memory through its page stage (#2312), on the shape that was killed:
-//! many meshes whose lightmap squares their UVs cover only a sliver of, a page
-//! each. Four times the meshes may peak higher only by what their finished maps
-//! keep of their covered texels, through the trace and the pages: a map that
-//! kept its whole square, or a page stage that held every page it made, grows
-//! with the squares instead. Each test runs in a process of its own
-//! (`rusty_test_support::alone!`), so the peak
-//! (`memory::rss_peak_bytes`) is this test's bakes'.
-
 use std::sync::Arc;
 
 use glam::Vec2;
@@ -19,11 +10,8 @@ use crate::memory::rss_peak_bytes;
 use rusty_lighting::lightmap::{bake_on, BakeScene};
 use rusty_scene::lighting::settings::Denoiser;
 
-/// The share of its UV square's height each sliver's UVs cover.
 const BAND: f32 = 0.1;
 
-/// `n` 20-unit planes whose UVs cover a band [`BAND`] of their square tall: at
-/// 16 texels a unit, each a 1012² square, about a tenth of it covered.
 fn slivers(n: usize) -> BakeScene {
     let mut scene = planes(n, 20.0);
     for mesh in &mut scene.meshes {
@@ -33,7 +21,6 @@ fn slivers(n: usize) -> BakeScene {
     scene
 }
 
-/// The cheapest trace, directional, on 1024² pages: a sliver's square fills one.
 fn settings() -> BakeSettings {
     BakeSettings {
         texels_per_unit: 16.0,
@@ -47,8 +34,6 @@ fn settings() -> BakeSettings {
     }
 }
 
-/// Bake and encode `n` slivers, spilled for a scene of its own: the process's
-/// peak after, what the maps kept, and the pages made.
 fn baked(n: usize) -> (u64, u64, usize) {
     crate::memory::return_large_frees();
     let progress = BakeProgress::observed(Arc::new(MeshClocks::default()));

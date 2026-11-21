@@ -1,5 +1,3 @@
-//! What `export` refuses before it opens the project or writes anything.
-
 use super::super::{check, check_out};
 use super::project;
 

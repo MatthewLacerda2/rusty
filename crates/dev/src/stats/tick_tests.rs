@@ -1,9 +1,3 @@
-//! `frame_ms` times the tick a shipped, windowed game runs (#2342): from after its
-//! play transition to its end, so it holds the tick's work outside any system, never
-//! the entry into Play; a system run in every stage (`flush_bounds`) is one sample a
-//! tick; a demo's taps and an inline load's preparation are timed beside it, not in
-//! it. Every test drives the dev layer's clock (`verbs::drive`), so a charge is exact.
-
 use rusty_app::{GameWorld, PlayTransition, SceneLoader, TapPoint, TickTap};
 use rusty_core::frame_stats::FrameStats;
 use rusty_edit::load::prepare::PreparedScene;
@@ -11,13 +5,9 @@ use rusty_edit::load::prepare::PreparedScene;
 use super::stats_load_tests::world_with_level;
 use super::verbs::{advance, drive};
 
-/// What a fixture charges the driven clock, in ms.
 const NAP: u64 = 30;
 const NAP_MS: f64 = NAP as f64;
 
-/// A loader whose job, once started, is finished at once and whose `take` costs
-/// [`NAP`]: work done there when `inline`, as a headless host's loader does, else
-/// a worker's result handed back, tick work outside the schedule and any system.
 struct Loader {
     inline: bool,
     job: Option<u32>,
@@ -41,8 +31,6 @@ impl SceneLoader for Loader {
     }
 }
 
-/// A tap costing [`NAP`] as Play is entered (work before the span) and at the end
-/// of every third tick, as a demo recorder digests the world every 120th.
 #[derive(Default)]
 struct Recorder(u32);
 
@@ -61,8 +49,6 @@ impl TickTap for Recorder {
     }
 }
 
-/// `ticks` play ticks on a fresh world, `setup` run before Play, `playing` after
-/// its first tick (which enters Play).
 pub(super) fn play(
     world: &str,
     ticks: u32,

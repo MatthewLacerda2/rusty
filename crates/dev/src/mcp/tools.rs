@@ -1,18 +1,7 @@
-//! crates/dev/src/mcp/tools.rs — the MCP `tools/list` and `tools/call` handlers.
-//!
-//! Two tools front the *one* evaluator: `eval` (run a line of the rusty Lua API
-//! against the live world, in edit mode or Play) and `snapshot` (a convenience wrapper for
-//! `Debug.Snapshot()`). Both ultimately call the active [`EvalBackend`], so the MCP
-//! surface is the same control surface the console and the headless session already
-//! drive — no second engine API exists, and the embed and attach modes go through one
-//! code path here. The `bench_*` tools (rusty bench, #942) manage projects instead
-//! and live in [`super::bench`].
-
 use serde_json::{json, Value};
 
 use super::EvalBackend;
 
-/// The `tools/list` result: the tools and their JSON-Schema input shapes.
 pub fn tools_list() -> Value {
     let mut list = json!({
         "tools": [
@@ -58,10 +47,6 @@ pub fn tools_list() -> Value {
     list
 }
 
-/// Handle `tools/call`. `Ok` is the MCP result value (including the in-band
-/// `isError` flag for engine/eval failures, per MCP convention); `Err` is a
-/// JSON-RPC protocol error `(code, message)` for a malformed call (unknown tool, or
-/// `eval` missing its `line` argument).
 pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i64, String)> {
     let name = params.get("name").and_then(Value::as_str).unwrap_or("");
     let arguments = params.get("arguments").cloned().unwrap_or(Value::Null);
@@ -85,16 +70,12 @@ pub fn tools_call(backend: &dyn EvalBackend, params: &Value) -> Result<Value, (i
     }
 }
 
-/// Map one evaluator outcome to an MCP tool-result value. A Lua/eval error is *not*
-/// a protocol error: per MCP it is reported in-band with `isError: true` so the
-/// agent sees the message and can recover.
 fn eval_result(outcome: Result<String, String>, warnings: &[String]) -> Value {
     let (text, is_error) = match outcome {
         Ok(text) => (text, false),
         Err(err) => (err, true),
     };
     let mut content = vec![json!({ "type": "text", "text": text })];
-    // A second block, so the result text itself (a snapshot's JSON) stays parseable.
     if !warnings.is_empty() {
         let text = format!("engine warnings:\n{}", warnings.join("\n"));
         content.push(json!({ "type": "text", "text": text }));

@@ -1,12 +1,6 @@
-//! A recipe's parameters from the command line: `--param key=value`, handed to
-//! `recipe.lua` as a table literal. The recipe owns the defaults and refuses a key
-//! it does not know; the generator only types the values.
-
-/// The parameters a command line named, in its order.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Params(Vec<(String, Value)>);
 
-/// One parameter's value: a boolean, a number, or a plain word.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Bool(bool),
@@ -15,9 +9,6 @@ pub enum Value {
 }
 
 impl Params {
-    /// Parse `key=value` pairs. `true`/`false` are booleans, a finite number is a
-    /// number (an integer when it is whole), and anything else is a word of letters, digits, `_`, `-` and `.`
-    /// (so the Lua literal [`to_lua`](Self::to_lua) writes needs no escaping).
     pub fn parse<'a>(pairs: impl IntoIterator<Item = &'a str>) -> Result<Self, String> {
         let mut params = Vec::new();
         for pair in pairs {
@@ -32,7 +23,6 @@ impl Params {
         Ok(Self(params))
     }
 
-    /// The parameters as a Lua table constructor, `{ size = 30, bake = true }`.
     pub fn to_lua(&self) -> String {
         let fields: Vec<String> = self
             .0
@@ -50,10 +40,8 @@ impl Params {
     }
 }
 
-/// A whole number as a Lua integer, so a param a binding takes as an integer (a
-/// bake's `seed`) is one; anything else as a float.
 fn lua_number(n: f64) -> String {
-    const WHOLE: f64 = 9_007_199_254_740_992.0; // 2^53: every integer below is exact
+    const WHOLE: f64 = 9_007_199_254_740_992.0;
     match n.fract() == 0.0 && n.abs() < WHOLE {
         true => format!("{}", n as i64),
         false => format!("{n:?}"),

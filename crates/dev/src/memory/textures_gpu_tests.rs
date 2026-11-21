@@ -1,22 +1,3 @@
-//! A scene's textures loaded from their import caches hold each one's blocks only
-//! until its upload (#2372): staging is bounded (`rusty_render::STAGING_BUDGET`),
-//! so four times the textures peak higher only by their GPU copies, and a cached
-//! load peaks no higher than the same textures decoded from their PNGs
-//! (`decoded_gpu_tests`). Each test runs in a process of its own
-//! (`rusty_test_support::alone!`), so the peak (`memory::rss_peak_bytes`) is its
-//! loads'.
-//!
-//! The GPU copies count on both sides: lavapipe's and Apple silicon's textures sit
-//! in the memory the process's footprint counts. They are read from the device
-//! (`rusty_render::gpu_memory`, 0 where a backend reports none) and taken off the
-//! growth, so what is asserted is what the load held beside them.
-//!
-//! So the tests bite only where the GPU copies are in resident memory, as on
-//! lavapipe (Linux CI, cloud sessions) and Apple silicon. On a discrete GPU the
-//! copies sit in VRAM yet are still taken off, so the allowance is wider than
-//! what staging could hold and the tests cannot fail there: the desktop's figure
-//! is `make bench-scenes`' `rss_peak_mb`, not these tests.
-
 use std::path::Path;
 
 use rusty_asset::sidecar::{set_texture, Compression, TextureSettings};
@@ -26,16 +7,10 @@ use rusty_render::{gpu_memory, Renderer, STAGING_BUDGET};
 
 use crate::memory::rss_peak_bytes;
 
-/// The textures' side: a level's map.
 const SIDE: u32 = 2048;
-/// The smaller load; the larger is four times it.
 pub(super) const N: usize = 8;
-/// Slack on top of the bound: the allocator's and the driver's.
 const MARGIN: u64 = 24 << 20;
 
-/// `n` copies of one flat `SIDE`² image in `dir`, named `name<i>.png`: with an
-/// import cache each when `cached` (blank blocks, `texture_import::write_blank`,
-/// so no encode lifts the peak before the loads), else with compression off.
 pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<String> {
     let source = dir.join("source.png");
     if !source.exists() {
@@ -62,16 +37,12 @@ pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<Stri
         .collect()
 }
 
-/// What the device's live allocations hold now, after every queued upload ran.
 pub(super) fn device_bytes(renderer: &Renderer) -> u64 {
     renderer.queue.submit([]);
     let memory = gpu_memory(&renderer.device);
-    // Metal's figure is allocated bytes already.
     memory.map_or(0, |m| m.allocated.unwrap_or(m.bytes))
 }
 
-/// Load `paths` as a frame's lookups do: the peak after, and what the device
-/// holds for them.
 pub(super) fn load(renderer: &mut Renderer, paths: &[String]) -> (u64, u64) {
     let before = device_bytes(renderer);
     for path in paths {
@@ -81,7 +52,6 @@ pub(super) fn load(renderer: &mut Renderer, paths: &[String]) -> (u64, u64) {
     (rss_peak_bytes().expect("read"), held)
 }
 
-/// A renderer and a fresh folder, or `None` where no peak or adapter is had.
 pub(super) fn set_up(name: &str) -> Option<(Renderer, std::path::PathBuf)> {
     rss_peak_bytes()?;
     crate::memory::return_large_frees();
@@ -95,8 +65,6 @@ pub(super) fn mb(bytes: u64) -> u64 {
     bytes >> 20
 }
 
-/// Whether the first of `cached` uploads compressed: with no BC on the adapter, no
-/// cache is read, and there is nothing to measure.
 pub(super) fn compresses(renderer: &mut Renderer, cached: &[String]) -> bool {
     let first = renderer.load_texture(&MapRef::from(cached[0].as_str()));
     first.texture.format().is_compressed()
@@ -118,8 +86,6 @@ fn gpu_four_times_the_cached_textures_peak_higher_only_by_their_gpu_copies() {
         let one = load(&mut renderer, &few[1..]);
         let four = load(&mut renderer, &many);
         let grew = four.0.saturating_sub(one.0);
-        // In staging at once: the uploads pending and those of the submit before,
-        // each at most the budget plus the one upload that crossed it.
         let bound = 2 * (STAGING_BUDGET + four.1 / (4 * N as u64)) + MARGIN;
         println!(
             "{N} then {}: peak {} then {} MB, their GPU copies {} MB",

@@ -1,5 +1,3 @@
-//! `calls`: what a scenario's VM notes, and how a replay makes it again.
-
 use super::*;
 
 #[test]
@@ -47,9 +45,6 @@ fn a_function_argument_taints() {
     assert!(matches!(&calls[..], [HostCall::Taint(what)] if what.contains("passed a function")));
 }
 
-/// Each of `forwards::FORWARDS` replays in the gameplay VM, never the replay's
-/// own: the check that a verb forwarded when recorded is forwarded on replay
-/// (#1929). It walks the table, so a verb added to it is held too.
 #[test]
 fn every_forwarded_verb_replays_in_the_gameplay_vm() {
     let out = rusty_test_support::temp::dir().join(format!("demo_forwards_{}", std::process::id()));
@@ -58,7 +53,6 @@ fn every_forwarded_verb_replays_in_the_gameplay_vm() {
     let world = harness.world.borrow();
     let replay = super::super::replay::replay_vm(&world).unwrap();
     let game = world.script_manager();
-    // Each VM's `ns.name` stubbed: the game's counts, the replay's refuses.
     let stub = |lua: &Lua, (ns, name): (&str, &str), body: &str| {
         let code = format!(
             "local ns, name = ...; local real = _G[ns][name]; \

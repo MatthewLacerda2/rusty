@@ -1,7 +1,3 @@
-//! What a lightmap bake records it made of each light (#2522,
-//! `LightmapSet::baked_as`): the one record a `Baked` light's wait for a bake is
-//! read from, written whether or not the bake made a page.
-
 use glam::Vec3;
 
 use super::tests::{quick, scene, scene_path};
@@ -10,7 +6,6 @@ use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_edit::authoring::default_light;
 use rusty_scene::lighting::MixedLightingMode;
 
-/// A lamp of `mode` over the floor, shadowed, at `x`.
 fn lamp(scene: &mut Scene, name: &str, mode: LightMode, x: f32) -> u32 {
     let id = scene.add_entity(name.to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 1.0, 0.0);
@@ -29,8 +24,6 @@ fn waits(scene: &Scene, id: u32) -> bool {
     scene.awaits_bake(id, &scene.world.light(id).unwrap().clone())
 }
 
-/// A lamp baked as `Mixed` holds only its bounce: made `Baked` after, it waits
-/// (previewed and named) until the next bake, which takes its direct light in.
 #[test]
 fn a_mixed_lamp_made_baked_after_its_bake_waits_for_the_next() {
     let (mut scene, _, _) = scene();
@@ -57,8 +50,6 @@ fn a_mixed_lamp_made_baked_after_its_bake_waits_for_the_next() {
     assert_eq!(scene.drawn_mode(mixed, &light, true), LightMode::Baked);
 }
 
-/// A scene with no lightmapped mesh (its probes hold the light) makes no page,
-/// but the bake still records its lights: none waits after it.
 #[test]
 fn a_bake_with_no_page_still_records_its_lights() {
     let mut scene = Scene::new();
@@ -83,8 +74,6 @@ fn a_bake_with_no_page_still_records_its_lights() {
     );
 }
 
-/// A `Mixed` lamp the shadowmask found no channel for was baked as `Baked`, so it
-/// is drawn from its bake and never previewed on top of it.
 #[test]
 fn a_fallen_back_mixed_lamp_is_not_previewed_twice() {
     let (mut scene, _, _) = scene();

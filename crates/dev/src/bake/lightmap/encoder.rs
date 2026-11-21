@@ -1,7 +1,3 @@
-//! The thread writing a progressive bake's preview passes beside its worker
-//! (#1970): it writes a pass's pages without holding the lock the UI shares, then
-//! takes it only to hand the pass over and remove the pages nobody will show.
-
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::{Arc, Condvar, Mutex, PoisonError};
@@ -19,11 +15,8 @@ use rusty_lighting::lightmap::{
 };
 use rusty_scene::lighting::lightmap_set::{LightmapEntry, LightmapSet};
 
-/// A pass's lightmaps, handed to the encoder.
 type Handed = (Pass, Vec<Lightmap>);
 
-/// The pass waiting for the encoder (a newer one replaces it), whether one is
-/// being written, and whether the bake is over.
 #[derive(Default)]
 struct State {
     waiting: Option<Handed>,
@@ -37,16 +30,12 @@ struct Queue {
     woken: Condvar,
 }
 
-/// The thread writing a bake's preview passes, beside its worker.
 pub(super) struct Encoder {
     queue: Arc<Queue>,
     thread: Option<JoinHandle<()>>,
 }
 
 impl Encoder {
-    /// Start writing the passes [`Self::put`] hands in as `previews`' pages of at
-    /// most `page` texels, labelled with what the bake `taken`; it stops once
-    /// `progress` is cancelled.
     pub fn start(
         previews: &Previews,
         page: u32,
@@ -60,7 +49,6 @@ impl Encoder {
             .name("lightmap-preview".into())
             .spawn(move || {
                 while let Some((pass, maps)) = from.take() {
-                    // Written without the lock, so the UI never waits on a write.
                     let written = write_preview(&at, &maps, page, &taken);
                     drop(maps);
                     let over = hand_over(&at, &shared, (pass, written), &progress);
@@ -77,15 +65,11 @@ impl Encoder {
         })
     }
 
-    /// Hand `pass`'s lightmaps `maps` in, replacing a pass still waiting.
     pub fn put(&self, pass: Pass, maps: Vec<Lightmap>) {
         lock(&self.queue.state).waiting = Some((pass, maps));
         self.queue.woken.notify_one();
     }
 
-    /// Whether a pass is waiting or being written: the bake builds no lightmaps
-    /// for a preview while it is (#1970's review), so at most one pass's are
-    /// alive beside the shown pages.
     pub fn busy(&self) -> bool {
         let state = lock(&self.queue.state);
         state.waiting.is_some() || state.writing
@@ -102,11 +86,6 @@ impl PassSink for Encoder {
     }
 }
 
-/// Under the lock, make `written` the newest pass (unless the bake was
-/// cancelled) and remove every preview page neither shown nor newest: the pass it
-/// replaced before it was shown, a failed write's pages, or after a cancel its
-/// own. Only this bake's pages (named from `prefix`): a writer finishing after
-/// its bake was dropped never touches the next bake's. Whether the bake is over.
 fn hand_over(
     (dir, prefix): &(PathBuf, String),
     shared: &Mutex<Shared>,
@@ -134,8 +113,6 @@ fn hand_over(
 }
 
 impl Drop for Encoder {
-    /// The bake is over: let the pass being written finish, drop a waiting one,
-    /// and wait for the thread, so no preview page lands after the bake.
     fn drop(&mut self) {
         let mut state = lock(&self.queue.state);
         (state.waiting, state.over) = (None, true);
@@ -148,7 +125,6 @@ impl Drop for Encoder {
 }
 
 impl Queue {
-    /// The next pass to write, waiting for one; `None` once the bake is over.
     fn take(&self) -> Option<Handed> {
         let mut state = lock(&self.state);
         loop {
@@ -166,19 +142,11 @@ impl Queue {
         }
     }
 
-    /// The pass taken is written (or dropped).
     fn written(&self) {
         lock(&self.state).writing = false;
     }
 }
 
-/// `maps` laid out on pages of at most `page` texels and written, a page at a
-/// time, into `dir` as
-/// preview pages named from `prefix`, each an uncompressed PNG of one level (no
-/// BC encode, no mips written), and the set that points at them. A colour or
-/// direction page uploads that one level as written, so both read the same level
-/// at any `lod`; the loader makes only a mask page's mips
-/// (`render::gpu::lightmaps::load`). The finished bake's pages carry their mips.
 fn write_preview(
     (dir, prefix): &(PathBuf, String),
     maps: &[Lightmap],
@@ -186,7 +154,6 @@ fn write_preview(
     (lights, shadowmask): &Taken,
 ) -> Result<LightmapSet, String> {
     check_page_count(maps, page, MAX_PAGES)?;
-    // One page composed and written at a time (#2312), as the finished bake's.
     let layout = packing(maps, page);
     let size = layout.page_size;
     std::fs::create_dir_all(dir).map_err(|e| format!("lightmap folder: {e}"))?;
@@ -220,8 +187,6 @@ fn write_preview(
     Ok(set)
 }
 
-/// A `size`² RGBA8 page as an uncompressed PNG's bytes: the cheapest the loader
-/// reads.
 fn raw_png(size: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
     let mut bytes = Vec::with_capacity(rgba.len() + rgba.len() / 1024 + 1024);
     let png = PngEncoder::new_with_quality(

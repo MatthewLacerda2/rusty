@@ -1,6 +1,3 @@
-//! The load timer (#2123): what a swapped-in load reports, and that a load in a Play
-//! session's first tick survives the stats reset that tick ends with.
-
 use super::*;
 use rusty_app::LoadProbe;
 use rusty_core::input::InputState;
@@ -31,7 +28,6 @@ fn a_load_timer_reports_a_swapped_in_load_and_drops_a_failed_one() {
     );
 }
 
-/// A world on an empty scene with the frame stats installed, and a saved level.
 pub(super) fn world_with_level(tag: &str) -> (GameWorld, Rc<RefCell<FrameStats>>, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2123_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -56,7 +52,7 @@ fn a_load_on_the_first_play_tick_survives_the_stats_reset() {
     let (mut gw, stats, level) = world_with_level("first_tick");
     gw.set_playing(true);
     gw.scene().borrow_mut().request_load(level);
-    gw.tick(1.0 / 60.0); // the load swaps in, then the tick's end resets the stats
+    gw.tick(1.0 / 60.0);
     assert!(gw.scene().borrow().find_entity_by_name("Level").is_some());
     let stats = stats.borrow();
     assert_eq!(stats.frames, 1, "the reset ran this tick");

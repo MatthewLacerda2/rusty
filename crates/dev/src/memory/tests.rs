@@ -1,5 +1,3 @@
-//! The platform's memory figures: read, in bytes, and consistent.
-
 use super::*;
 
 #[test]

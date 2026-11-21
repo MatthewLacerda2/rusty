@@ -1,18 +1,8 @@
-//! The verb timers on a bare VM: what they count, what they leave out, and that a
-//! wrapped verb behaves as the bare one. `harness_tests` runs them on a scene.
-//! A test about which stretch time is charged to [`drive`]s the clock and moves
-//! it by known amounts, so it asserts exact charges, never a span of real time.
-
 use mlua::{Function, Lua};
 
 use super::wrap::wrap_globals;
 use super::{advance, drive, take, Verb};
 
-/// A VM with a `Fake` namespace: `Cheap`, `Work(ms)` (moves the driven clock),
-/// `Fail` (a Rust error), `Reenter(f)` (calls `f` back from Rust, as `Move`
-/// raises its hits) and `Lua` (a function written in Lua); a lowercase `fake`
-/// table with a Rust function; and a global `spend(ms)`: Lua's own work, which
-/// moves the driven clock outside any verb.
 pub(super) fn vm(wrapped: bool) -> Lua {
     let lua = Lua::new();
     let fake = lua.create_table().unwrap();
@@ -46,7 +36,6 @@ pub(super) fn vm(wrapped: bool) -> Lua {
     lua
 }
 
-/// `got` is `want` ms, but for the float rounding of a sum of durations.
 pub(super) fn assert_ms(got: f64, want: f64, what: &str) {
     assert!((got - want).abs() < 1e-9, "{what}: {got} ms, not {want}");
 }
@@ -91,7 +80,6 @@ fn lua_a_verb_re_enters_is_not_the_verbs_time_and_a_nested_verb_is_its_own() {
     let lua = vm(true);
     drive();
     take();
-    // 7 ms of Lua inside `Reenter`, then a nested verb's 30 ms of work.
     lua.load("Fake.Reenter(function() spend(7) Fake.Work(30) end)")
         .exec()
         .unwrap();
@@ -124,7 +112,6 @@ fn a_verb_called_inside_a_coroutine_is_timed_and_the_coroutine_still_yields() {
     assert_eq!(verb(&frame.verbs, "Fake.Cheap").map(|v| v.calls), Some(2));
 }
 
-/// Each chunk's error, as a script's console line would show it.
 fn errors(lua: &Lua) -> Vec<String> {
     let chunks = [
         "Fake.Fail()",
@@ -140,10 +127,7 @@ fn errors(lua: &Lua) -> Vec<String> {
 fn a_wrapped_verbs_error_reads_as_the_bare_verbs() {
     let (bare, wrapped) = (errors(&vm(false)), errors(&vm(true)));
     assert!(bare[0].contains("no such entity 7"), "{}", bare[0]);
-    // Raised in the verb: the same text, traceback and all.
     assert_eq!(bare[..2], wrapped[..2]);
-    // Raised in Lua the verb called back: the same but for the bare verb's own
-    // frame, which its wrapper calls, as one `[C]: in ?` line above the verb.
     for (bare, wrapped) in bare[2..].iter().zip(&wrapped[2..]) {
         let wrapped = wrapped.replacen("\t[C]: in ?\n\t[C]: in field", "\t[C]: in field", 1);
         let wrapped = wrapped.replacen("\t[C]: in ?\n\t>[C]: in field", "\t>[C]: in field", 1);

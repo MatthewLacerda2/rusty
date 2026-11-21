@@ -1,11 +1,5 @@
-//! `Lighting.GenerateAsync()` refuses where the button does, and where no frame
-//! loop would step its job (#1999). The round trip through the editor's job is
-//! `editor::inspector::assets::scene::bake`'s `async_tests`.
-
 use crate::session::Session;
 
-/// A session whose host steps a background bake, as the editor window marks itself,
-/// with its scene saved under `tag` unless `saved` is false.
 fn hosted(tag: &str, saved: bool) -> Session {
     let s = Session::new("").expect("an empty session boots");
     s.world()
@@ -57,7 +51,6 @@ fn a_running_bake_is_refused_and_reads_as_running() {
     assert!(err.contains("already running"), "{err}");
 }
 
-/// The request runs from the call: a second one, and the blocking verb, wait for it.
 #[test]
 fn a_request_reads_as_running_and_holds_off_another_bake() {
     let s = hosted("requested", true);
@@ -70,8 +63,6 @@ fn a_request_reads_as_running_and_holds_off_another_bake() {
     assert!(blocking.contains("already running"), "{blocking}");
 }
 
-/// A load replaces the scene the request asked about: it is dropped, and the
-/// status says so in band (#1999's review: it baked the loaded scene).
 #[test]
 fn a_load_drops_a_request_and_the_status_says_why() {
     let s = hosted("load_drops", true);
@@ -87,8 +78,6 @@ fn a_load_drops_a_request_and_the_status_says_why() {
     assert!(why.contains("another scene was loaded"), "{why}");
 }
 
-/// Play asked for but not yet taken refuses, as Play does (#1999's review): the
-/// script's own `EnterPlay` earlier in the line, and the host's pending Play.
 #[test]
 fn play_requested_but_not_taken_is_refused() {
     let s = hosted("play_heading", true);
@@ -103,7 +92,6 @@ fn play_requested_but_not_taken_is_refused() {
     assert!(err.contains(rusty_edit::LIGHTING_IN_PLAY), "{err}");
 }
 
-/// `Scene.New()` (File ▸ New's path) drops a request and says why, as a load does.
 #[test]
 fn a_new_scene_drops_a_request_and_the_status_says_why() {
     let s = hosted("new_drops", true);

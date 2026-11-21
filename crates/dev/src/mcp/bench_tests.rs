@@ -1,11 +1,8 @@
-//! rusty bench on the MCP (#942): the four tools over a bench held in memory.
-
 use std::cell::RefCell;
 
 use super::*;
 use rusty_core::project::{pin_engine, ProjectFile, PROJECT_FILE};
 
-/// Attach mode's shape: evaluates nothing, cannot move to another project.
 struct Window;
 
 impl EvalBackend for Window {
@@ -21,7 +18,6 @@ fn fresh(name: &str) -> PathBuf {
     std::fs::canonicalize(&dir).unwrap()
 }
 
-/// Call `name` and return its text parsed as JSON, or its in-band error as `Err`.
 fn run(
     backend: &dyn EvalBackend,
     bench: &mut Bench,
@@ -120,9 +116,6 @@ fn an_older_engines_project_opens_only_when_confirmed() {
     );
 }
 
-/// Embed mode's shape, minus the move: records the root `bench_open` hands it. The
-/// real `Embedded::switch` moves the process's working directory, so it is proven in
-/// its own process instead (`tests/mcp_bench_embed.rs`, #1042).
 #[derive(Default)]
 struct Mover(RefCell<Option<PathBuf>>);
 

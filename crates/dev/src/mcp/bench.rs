@@ -1,15 +1,3 @@
-//! crates/dev/src/mcp/bench.rs — **rusty bench** on the MCP: list, create, open and forget
-//! projects without the editor's picker (#942).
-//!
-//! Four `bench_*` tools over [`Bench`] (`core::project::bench`), the code the
-//! picker calls too. `bench_open` checks the folder as the picker does; a project
-//! a newer engine (or a branch build) last opened is *reported*, and opens only
-//! when the call repeats with `confirm: true` (the picker's *Open anyway*). Then the
-//! backend moves to it ([`EvalBackend::reopen`]): embed mode drives the new project
-//! at once, attach mode answers with the command that relaunches the window on it.
-//! Either way the result's `upgrade` says when this engine is newer than the one
-//! that last opened the project, and names the `git log` of what changed (#1319).
-
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
@@ -18,10 +6,8 @@ use super::EvalBackend;
 use rusty_core::project::bench::{check_existing, recent::ago, Bench};
 use rusty_core::project::inspect;
 
-/// A protocol error: `(code, message)`.
 type Fault = (i64, String);
 
-/// The four tools' `tools/list` entries.
 pub fn tools() -> Vec<Value> {
     let path = json!({ "type": "string", "description": "The project folder, absolute." });
     let schema = |props: Value, required: &[&str]| json!({ "type": "object", "properties": props, "required": required });
@@ -63,13 +49,11 @@ pub fn tools() -> Vec<Value> {
     ]
 }
 
-/// Handle a `bench_*` call against this user's bench; `None` for any other tool.
 pub fn call(backend: &dyn EvalBackend, name: &str, args: &Value) -> Option<Result<Value, Fault>> {
     name.starts_with("bench_")
         .then(|| call_on(backend, &mut Bench::for_user(), name, args, unix_now()))
 }
 
-/// [`call`] against `bench`, at `now` (Unix seconds).
 pub fn call_on(
     backend: &dyn EvalBackend,
     bench: &mut Bench,
@@ -123,7 +107,6 @@ fn open(
             ));
         }
     }
-    // Read before the backend opens it: an edit-open records this engine.
     let upgrade = inspect(dir)?.upgrade();
     let (root, warning) = bench.open(dir, now)?;
     match backend.reopen(&root) {
@@ -154,7 +137,6 @@ fn path_arg(args: &Value, key: &str) -> Result<PathBuf, Fault> {
     str_arg(args, key).map(PathBuf::from)
 }
 
-/// An MCP tool result: the value as JSON text, or the failure in-band.
 fn tool_result(outcome: Result<Value, String>) -> Value {
     let (text, is_error) = match outcome {
         Ok(value) => (value.to_string(), false),

@@ -1,7 +1,3 @@
-//! A stepped bake works on a snapshot and applies only when it completes (#1602):
-//! nothing reaches the scene before the commit, and a probe set changed midway drops
-//! the bake with nothing applied and no staged file left behind.
-
 use glam::Vec3;
 
 use super::super::lighting::{start_lighting, LightingBakeParams};
@@ -12,10 +8,9 @@ use rusty_scene::Scene;
 
 fn start(scene: &mut Scene, path: &str) -> Option<LightingBake> {
     let job = start_lighting(scene, Some(path), None, LightingBakeParams::default()).unwrap();
-    job.report().ran_reflection_bake.then_some(job) // None: no adapter
+    job.report().ran_reflection_bake.then_some(job)
 }
 
-/// Step until `until` holds or the bake is done.
 fn step_until(job: &mut LightingBake, scene: &mut Scene, until: impl Fn(Stage) -> bool) {
     while !until(job.stage()) && !job.step(scene, &mut |_| {}).unwrap() {}
 }
@@ -51,8 +46,6 @@ fn gpu_nothing_reaches_the_scene_until_the_commit() {
     assert_eq!(staged_files(&path), 0, "moved into place");
 }
 
-/// Removing a reflection probe midway used to skip one and report success, or bake
-/// probe i over another probe's file.
 #[test]
 fn gpu_a_reflection_probe_removed_midway_drops_the_bake() {
     let (mut scene, path) = probed("snapshot_reflection", 1, 3);
@@ -81,7 +74,6 @@ fn gpu_a_reflection_probe_removed_midway_drops_the_bake() {
     );
 }
 
-/// `Probe.Remove(0)` or a `FillGrid` midway used to shift every probe's SH by one.
 #[test]
 fn gpu_a_light_probe_removed_or_regridded_midway_drops_the_bake() {
     for edit in [
@@ -102,8 +94,6 @@ fn gpu_a_light_probe_removed_or_regridded_midway_drops_the_bake() {
     }
 }
 
-/// An edit the cubes are not baked from (a box, an intensity) does not drop the bake,
-/// and survives the commit.
 #[test]
 fn gpu_an_edit_the_bake_does_not_read_survives_the_commit() {
     let (mut scene, path) = probed("snapshot_box", 0, 1);

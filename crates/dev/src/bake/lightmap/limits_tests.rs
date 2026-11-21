@@ -1,7 +1,3 @@
-//! What a bake refuses and what it does not blame (#1704): a bake past the page
-//! limit fails before a page is drawn and leaves the scene's lightmaps as they
-//! were; a mesh at Scale In Lightmap 0 is not counted as missing a lightmap UV.
-
 use glam::Vec3;
 
 use super::tests::{quick, scene};
@@ -11,7 +7,6 @@ use rusty_lighting::lightmap::max_map_edge;
 use rusty_lighting::lightmap::{bake, check_page_count, Lightmap, MAX_PAGES};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 
-/// `n` lightmaps each as large as a 32-texel page holds: one page apiece.
 fn page_fillers(n: usize) -> Vec<Lightmap> {
     let size = max_map_edge(32);
     (0..n as u32)

@@ -1,5 +1,3 @@
-//! The `.demo` encoding: floats and plain values come back bit for bit.
-
 use super::*;
 
 #[test]

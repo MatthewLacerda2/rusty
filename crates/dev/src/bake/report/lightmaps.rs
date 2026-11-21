@@ -1,12 +1,3 @@
-//! The lightmap bake's report (#1980): per mesh its lightmap edge and texels, UV
-//! charts, worker seconds and texels per second, the lights in reach, and the
-//! texel density it asked for beside the one it got; per page how full it is;
-//! the meshes at Scale In Lightmap 0; what OIDN took; the process's peak resident
-//! memory (#2312); per light the texels in its reach. A light is in reach of a mesh when the mesh's bounds meet the sphere of
-//! its range (a directional light reaches every mesh), so a spot light's cone is
-//! not read. What only the tracer knows (the backface texels it filled) is not in
-//! it.
-
 use std::collections::BTreeMap;
 use std::time::Duration;
 
@@ -19,20 +10,13 @@ use rusty_lighting::lightmap::{BakeLight, BakeMesh, BakeScene, LightShape};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
-/// What a lightmap bake measured beside its pages.
 #[derive(Debug, Default)]
 pub struct Measured {
-    /// Each mesh's worker time, over every thread.
     pub times: Vec<MeshTime>,
-    /// The lightmaps OIDN cleaned and its worker time.
     pub denoised: Option<(u64, Duration)>,
-    /// The process's peak resident memory once the bake was done, in bytes
-    /// (#2312, `memory::rss_peak_bytes`); `None` where it cannot be read.
     pub peak_memory: Option<u64>,
 }
 
-/// The report of a bake of `scene` that read `input` with `settings`, ran
-/// `stages`, made `pages` and wrote `output_bytes`.
 pub fn report(
     scene: &Scene,
     (input, settings): (&BakeScene, &BakeSettings),
@@ -68,8 +52,6 @@ pub fn report(
     }))
 }
 
-/// One row per lightmapped mesh, slowest first, and per light the texels in its
-/// reach.
 fn mesh_rows(
     scene: &Scene,
     (input, settings): (&BakeScene, &BakeSettings),
@@ -83,7 +65,6 @@ fn mesh_rows(
         .collect();
     let mut texels_lit = vec![0u64; input.lights.len()];
     let mut meshes = Vec::new();
-    // By entity, so a Dust2-sized bake's thousands of meshes look each up once.
     let entries: BTreeMap<u32, _> = pages.entries.iter().map(|e| (e.entity, e)).collect();
     let busy_of: BTreeMap<u32, _> = measured.times.iter().map(|t| (t.entity, t.busy)).collect();
     for (mesh, lights) in input.meshes.iter().zip(&reach) {
@@ -115,12 +96,10 @@ fn mesh_rows(
             }),
         ));
     }
-    // Slowest first; untimed ones after, in entity order.
     meshes.sort_by_key(|m| std::cmp::Reverse(m.0));
     (meshes.into_iter().map(|m| m.1).collect(), texels_lit)
 }
 
-/// Per page: its maps and the share of its texels they cover.
 fn occupancy(pages: &EncodedPages) -> Value {
     let mut per = vec![(0usize, 0.0f64); pages.colour.len()];
     for e in &pages.entries {
@@ -135,7 +114,6 @@ fn occupancy(pages: &EncodedPages) -> Value {
     Value::Array(per.iter().enumerate().map(page).collect())
 }
 
-/// One light: its kind, where it is, its range and the texels in its reach.
 fn light(index: usize, l: &BakeLight, texels: u64) -> Value {
     let (kind, at, range) = match l.shape {
         LightShape::Directional { .. } => ("directional", None, None),
@@ -155,7 +133,6 @@ fn light(index: usize, l: &BakeLight, texels: u64) -> Value {
     })
 }
 
-/// The lights whose range meets `mesh`'s bounds, by index.
 fn lights_in_reach(mesh: &BakeMesh, lights: &[BakeLight]) -> Vec<usize> {
     let at = mesh.positions.iter().copied();
     let (Some(min), Some(max)) = (
@@ -179,8 +156,6 @@ fn lights_in_reach(mesh: &BakeMesh, lights: &[BakeLight]) -> Vec<usize> {
         .collect()
 }
 
-/// UV charts: the mesh's triangles joined through shared vertices (a UV seam
-/// splits a vertex, so each chart is its own run of them).
 pub(super) fn charts(mesh: &BakeMesh) -> usize {
     let mut parent: Vec<u32> = (0..mesh.positions.len() as u32).collect();
     fn root(parent: &mut [u32], mut i: u32) -> u32 {
@@ -207,8 +182,6 @@ pub(super) fn charts(mesh: &BakeMesh) -> usize {
         .count()
 }
 
-/// What the bake reads: every mesh's geometry, runs and settings, the lights,
-/// the sky, the diffuse model, the shadowmask channels, and the settings.
 fn fingerprint(input: &BakeScene, settings: &BakeSettings) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     for m in &input.meshes {

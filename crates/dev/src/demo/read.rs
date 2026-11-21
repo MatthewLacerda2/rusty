@@ -1,12 +1,3 @@
-//! Reading a `.demo` back: the header, then every tick in order (#1581).
-//!
-//! [`Demo::read`] checks the whole file once and keeps only its header and end
-//! line; [`Demo::ticks`] then streams it from disk, yielding each tick from 0 with
-//! its whole input frame rebuilt, its `dt`, its host acts, the Game view size and
-//! the digest when one was stored. Nothing holds a whole demo in memory: an hour
-//! of play with a pasted clipboard would be gigabytes. It is the reader a replay
-//! steps through, and what a search over a demo reads.
-
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
 use std::path::{Path, PathBuf};
@@ -19,40 +10,26 @@ use crate::harness::FIXED_DT;
 use rusty_core::input::InputFrame;
 use rusty_script::scripting::HostCall;
 
-/// A demo on disk, checked: its header and end line, its ticks streamed on demand.
 pub struct Demo {
     pub header: Header,
     path: PathBuf,
-    /// How many ticks it holds: its end line's count, or (cut short by a crash)
-    /// one past its last line.
     pub ticks: u64,
-    /// The end line Stop wrote (`End::default()` for a demo cut short).
     pub end: End,
 }
 
-/// One tick of a demo, whole.
 #[derive(Clone, Debug, Default)]
 pub struct DemoTick {
     pub t: u64,
-    /// The tick's `dt` in seconds.
     pub dt: f32,
     pub input: InputFrame,
-    /// The host acts made before this tick, in order.
     pub host: Vec<HostCall>,
-    /// The Game view's size from this tick on.
     pub size: Option<(u32, u32)>,
-    /// The display scale from this tick on (#1715).
     pub display_scale: Option<f32>,
-    /// The state digest stored after this tick, if one was.
     pub digest: Option<String>,
-    /// The `Scene.LoadAsync` operations ready from this tick's head (#2123).
     pub loads: Vec<u32>,
-    /// The pending operation's progress, in percent, when it moved at this head.
     pub load_progress: Option<u8>,
 }
 
-/// The lines after a demo's header: a tick's [`Entry`], an index line (or one
-/// that does not parse: never a reason to lose the replay), the [`End`].
 enum Line {
     Entry(Box<Entry>),
     Index,
@@ -60,7 +37,6 @@ enum Line {
     End(End),
 }
 
-/// Serialized field order puts `at` first: an index line is told apart unparsed.
 fn is_index(line: &str) -> bool {
     line.starts_with("{\"at\":")
 }
@@ -89,7 +65,6 @@ fn parse_line(line: &str, n: usize) -> Result<Line, String> {
 }
 
 impl Demo {
-    /// Read the demo at `path`: its header, and every line checked in order.
     pub fn read(path: &Path) -> Result<Self, String> {
         Self::check(path).map_err(|e| format!("demo {}: {e}", path.display()))
     }
@@ -136,21 +111,16 @@ impl Demo {
         })
     }
 
-    /// The file it was read from.
     pub fn path(&self) -> &Path {
         &self.path
     }
 
-    /// Every index line in order (#1597), read from disk as it goes: what a
-    /// search reads, never replaying anything.
     pub fn index(&self) -> impl Iterator<Item = IndexLine> {
         index_of(&self.path, self.ticks)
     }
 
-    /// Every tick from 0, in order, read from disk as it goes.
     pub fn ticks(&self) -> DemoTicks {
         let mut lines = lines_of(&self.path).ok();
-        // The header was checked by `read`.
         if let Some(lines) = &mut lines {
             lines.next();
         }
@@ -170,10 +140,6 @@ impl Demo {
     }
 }
 
-/// Every index line of the demo at `path`, which holds `ticks` ticks, in order,
-/// read from disk as it goes: what a search reads, never replaying anything. A
-/// line that does not parse ([`Demo::read`] warned of it) and a line past the
-/// last tick (a demo cut short) are skipped.
 pub fn index_of(path: &Path, ticks: u64) -> impl Iterator<Item = IndexLine> {
     let lines = lines_of(path).into_iter().flatten();
     lines.skip(1).filter_map(move |line| {
@@ -184,23 +150,16 @@ pub fn index_of(path: &Path, ticks: u64) -> impl Iterator<Item = IndexLine> {
     })
 }
 
-/// The ticks of a [`Demo`], rebuilt one by one from its deltas.
 pub struct DemoTicks {
     lines: Option<Lines<BufReader<File>>>,
     of: u64,
     next: u64,
-    /// The file's line number last read.
     line: usize,
-    /// The next entry read, not yet reached.
     ahead: Option<Entry>,
-    /// The last tick yielded; the next starts from its input, `dt` and size.
     tick: DemoTick,
 }
 
 impl DemoTicks {
-    /// The next entry in the file, unless the end line or the file's end comes
-    /// first. A line that no longer parses (the file changed since `read`) ends
-    /// the stream, said in the log.
     fn read_entry(&mut self) -> Option<Entry> {
         let lines = self.lines.as_mut()?;
         loop {
@@ -241,12 +200,10 @@ impl Iterator for DemoTicks {
         self.tick.digest = None;
         self.tick.loads.clear();
         self.tick.load_progress = None;
-        // A capture is an edge: it is published on its own tick only.
         self.tick.input.clipboard = None;
         if let Some(entry) = self.ahead.take_if(|e| e.t == t) {
             self.tick.input = entry.input.apply(&self.tick.input);
             if let Some(dt) = entry.dt {
-                // An `f32` widened to `f64` narrows back exactly.
                 self.tick.dt = dt.0 as f32;
             }
             self.tick.host = entry.host.iter().filter_map(host_call).collect();

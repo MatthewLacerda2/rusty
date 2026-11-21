@@ -1,7 +1,3 @@
-//! The frame log's segment files (#2206), owned by the writer thread: numbered
-//! `frames-<n>.jsonl`, rotated at a tenth of the budget, pruned oldest first past
-//! the budget or the period, under the folder's lock (`writer`'s module doc).
-
 use std::collections::VecDeque;
 use std::fs::{File, OpenOptions};
 use std::io::{BufWriter, Write};
@@ -9,20 +5,16 @@ use std::path::{Path, PathBuf};
 
 use super::now_ms;
 
-/// Segments a budget is cut into.
 const SEGMENTS: u64 = 10;
 
-/// The lock file a log holds in its folder.
 pub const LOCK: &str = ".lock";
 
-/// One closed segment: its number, its bytes and its newest record's time.
 pub(super) struct Closed {
     pub(super) n: u64,
     pub(super) bytes: u64,
     pub(super) newest: u64,
 }
 
-/// The segment files: the closed ones oldest first, and the one being written.
 pub(super) struct Segments {
     dir: PathBuf,
     budget: u64,
@@ -32,7 +24,6 @@ pub(super) struct Segments {
     open: Option<(u64, BufWriter<File>, u64)>,
     next: u64,
     failed: bool,
-    /// The folder's [`LOCK`], held while the log runs.
     _lock: File,
 }
 
@@ -73,7 +64,6 @@ impl Segments {
         segment_path(&self.dir, n)
     }
 
-    /// Append one line, rotating first when it would overfill the open segment.
     pub(super) fn write(&mut self, line: &str) {
         let len = line.len() as u64 + 1;
         if self
@@ -112,8 +102,6 @@ impl Segments {
         }
     }
 
-    /// Close the open segment, flushed and synced, so a power cut after this
-    /// leaves it whole.
     pub(super) fn close(&mut self) {
         if let Some((n, out, bytes)) = self.open.take() {
             match out.into_inner() {
@@ -134,8 +122,6 @@ impl Segments {
         }
     }
 
-    /// Delete the oldest closed segments past the budget or the period. The open
-    /// segment counts as full, so the log holds its budget until the next prune.
     pub(super) fn prune(&mut self, now: u64) {
         let open = self.per_segment;
         let mut total: u64 = self.closed.iter().map(|c| c.bytes).sum::<u64>() + open;
@@ -150,7 +136,6 @@ impl Segments {
         }
     }
 
-    /// Say a write failed, once: the log then keeps trying without repeating it.
     fn fail(&mut self, err: &std::io::Error) {
         if !self.failed {
             self.failed = true;
@@ -159,7 +144,6 @@ impl Segments {
     }
 }
 
-/// Take `dir`'s [`LOCK`], or say another process holds it.
 fn lock(dir: &Path) -> std::io::Result<File> {
     // lint: allow(asset-write) the frame log's lock file, never read as content
     let file = OpenOptions::new()
@@ -176,12 +160,10 @@ fn lock(dir: &Path) -> std::io::Result<File> {
     }
 }
 
-/// The path of segment `n` in `dir`.
 pub fn segment_path(dir: &Path, n: u64) -> PathBuf {
     dir.join(format!("frames-{n}.jsonl"))
 }
 
-/// The segments in `dir`, by number, oldest first.
 pub fn numbered(dir: &Path) -> Vec<(u64, PathBuf)> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();

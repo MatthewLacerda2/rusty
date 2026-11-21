@@ -1,19 +1,3 @@
-//! crates/dev/src/lua_surface/mod.rs — the dev-only part of the Lua surface (#737).
-//!
-//! `Debug.*`, the GPU bake verbs (`Lighting.Bake`, `Reflection.Bake`, `Probe.Bake`,
-//! `Lighting.Generate`, `Lighting.GenerateAsync`) with their reports (`GetBakeReport`, #1980),
-//! the play switch `Editor.*` (#1360) and the audio capture `Audio.StartCapture` (#1579)
-//! belong to the one API surface, but they render or record, so they live here in the
-//! platform layer and are installed onto the surface through [`api::extend`]. The arrow
-//! runs `dev → api` only: the sim surface never compiles the renderer. A script sees the
-//! same namespaces it always did.
-//!
-//! Every dev entry point that builds a world ([`Session`](super::session::Session),
-//! [`Harness`](super::harness::Harness), the windowed shell) calls [`install_api`]
-//! first, before its first Lua VM starts: a VM installs the surface once, when it
-//! starts (#1709), so one started before the extension never has it. The call is
-//! idempotent, so the count doesn't matter.
-
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
 mod bake_report;
@@ -29,14 +13,11 @@ use mlua::Lua;
 
 use rusty_script::api::{self, ApiCtx, Reg};
 
-/// Install the dev namespaces onto the Lua surface, once per process.
 pub fn install_api() {
     static INSTALL: Once = Once::new();
     INSTALL.call_once(|| api::extend(register));
 }
 
-/// The [`api::Extension`] itself: `Debug`, the bake verbs and the audio capture
-/// (#1579) on the tables `api` already registered, and `Editor` (#1360).
 fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     // sorted: each registrar adds its own table or extends one `api` made
     bake::register(lua, ctx)?;

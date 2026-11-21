@@ -1,7 +1,3 @@
-//! Bake Occlusion (#1958): Generate Lighting's occlusion step alone, from a
-//! script, written beside the scene and touching nothing else; and Generate
-//! Lighting writes the PVS file only once its PVS is baked (#1982).
-
 use super::{apply_occlusion, write_lighting};
 use super::{bake_occlusion_only, OcclusionOnlyReport, UNSAVED_OCCLUSION};
 use crate::bake::progress::BakeLog;
@@ -12,7 +8,6 @@ use rusty_scene::lighting::occlusion::occlusion_path;
 use rusty_scene::{MaterialComponent, Scene};
 use rusty_script::scripting::LogLevel;
 
-/// The corridors level saved at a fresh path.
 fn saved(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("occlusion_only_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -91,7 +86,6 @@ fn a_level_too_large_to_cull_claims_nothing_saved() {
     assert!(!line.ends_with("; saved"), "{line}");
 }
 
-/// The script's material, two-sided, is not in the file: the bake says so once.
 #[test]
 fn the_script_verb_warns_of_a_material_the_file_lacks() {
     let path = saved("warns");
@@ -120,17 +114,14 @@ fn the_lighting_save_keeps_a_newer_pvs_and_a_failed_pvs_step_loses_nothing() {
     std::fs::remove_file(&pvs).ok();
     let mut editor = Scene::new();
     rusty_edit::load_from_file(&mut editor, &path).unwrap();
-    // Another process bakes the PVS while the editor has the scene open.
     std::fs::write(&pvs, b"theirs").unwrap();
     let lit = write_lighting(&editor, &path);
     assert_eq!(lit, Ok(rusty_edit::LightingSave::Written));
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "the lighting save");
-    // The PVS step fails, so `finish` never runs: a plain save keeps the newer file.
     editor.ambient_intensity = 0.5;
     rusty_edit::save_to_file(&editor, &path).unwrap();
     assert_eq!(std::fs::read(&pvs).unwrap(), b"theirs", "a save after");
     assert!(editor.bake_files().warned(&pvs), "the save says it kept it");
-    // A PVS step that ends writes this world's bake (the last write wins).
     let baked = super::super::occlusion::bake_occlusion_logged(
         &editor,
         Reach::everywhere(),

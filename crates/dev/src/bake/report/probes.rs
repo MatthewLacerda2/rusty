@@ -1,11 +1,3 @@
-//! The light-probe bake's report (#1980): the count and bounds, the wall time of
-//! each bounce, how the field is read (a grid trilinear, else the
-//! `BLEND_PROBES` nearest blended: rusty has no tetrahedral mesh, so there are
-//! no tetrahedra to count), and the dynamic objects sampling far from any probe,
-//! which light from a probe across the room. [`Timeline`] times the stepped probe
-//! job (`steps::LightingBake`) for both reports a probe bake writes: this one and
-//! the reflection probes' (`report::reflections`).
-
 use std::time::{Duration, Instant};
 
 use serde_json::{json, Value};
@@ -16,13 +8,8 @@ use rusty_render::DEFAULT_BAKE_RESOLUTION;
 use rusty_scene::lighting::probe::{ProbeVolume, BLEND_PROBES};
 use rusty_scene::Scene;
 
-/// A dynamic object whose nearest probe is farther than this, metres, samples
-/// light from far away: twice the automatic placement's default spacing.
 pub const FAR: f32 = 8.0;
 
-/// The wall time of each stage of a probe bake: per bounce of the light probes,
-/// per reflection probe. Stepped in the editor, a stage's time includes the
-/// frames between its steps.
 #[derive(Debug, Default)]
 pub struct Timeline {
     last: Option<(Stage, Instant)>,
@@ -31,13 +18,10 @@ pub struct Timeline {
 }
 
 impl Timeline {
-    /// The bake is at `stage` now: the time since the last note was the last stage's.
     pub fn note(&mut self, stage: Stage) {
         self.note_at(stage, Instant::now());
     }
 
-    /// [`Self::note`] at the instant `now`, which must not be before the last
-    /// note's: a test drives fixed instants through it (#2011).
     pub fn note_at(&mut self, stage: Stage, now: Instant) {
         let Some((was, at)) = self.last.replace((stage, now)) else {
             return;
@@ -53,7 +37,6 @@ impl Timeline {
         list[i] += now.saturating_duration_since(at);
     }
 
-    /// The bounces' and the reflection probes' stages, in order.
     pub fn stages(&self) -> (Stages, Stages) {
         let (mut light, mut reflection) = (Stages::start(), Stages::start());
         for (b, took) in self.bounces.iter().enumerate() {
@@ -64,8 +47,6 @@ impl Timeline {
     }
 }
 
-/// Write both reports of a finished probe bake of `scene` (saved at `path`), as
-/// `timeline` timed it (#1980).
 pub fn keep_both(scene: &Scene, path: &str, timeline: &Timeline) {
     let (light, reflection) = timeline.stages();
     let print = scene_fingerprint(scene);
@@ -78,14 +59,11 @@ pub fn keep_both(scene: &Scene, path: &str, timeline: &Timeline) {
     );
 }
 
-/// The report of a light-probe bake of `scene` that ran `stages` (one a bounce)
-/// and read the scene `scene_print` ([`scene_fingerprint`]).
 pub fn report(scene: &Scene, stages: &Stages, scene_print: u64) -> Report {
     let volume = &scene.probes;
     let probes = volume.probes();
     let keys: String = probes.iter().map(|p| format!("{:?}", p.position)).collect();
     let fingerprint = keyed(scene_print, &keys);
-    // The baked SH and shadowmask occlusion each probe carries.
     let per_probe = std::mem::size_of::<rusty_scene::lighting::sh::Sh9>() + 16;
     let output = (probes.len() * per_probe) as u64;
     let settings = json!({ "resolution": DEFAULT_BAKE_RESOLUTION, "blendProbes": BLEND_PROBES });
@@ -100,7 +78,6 @@ pub fn report(scene: &Scene, stages: &Stages, scene_print: u64) -> Report {
     }))
 }
 
-/// The probes' bounds, `None` with none.
 fn bounds(volume: &ProbeVolume) -> (Option<glam::Vec3>, Option<glam::Vec3>) {
     let at = volume.probes().iter().map(|p| p.position);
     (
@@ -109,8 +86,6 @@ fn bounds(volume: &ProbeVolume) -> (Option<glam::Vec3>, Option<glam::Vec3>) {
     )
 }
 
-/// The active dynamic drawn objects whose centre ([`super::drawn_centre`]) is over [`FAR`] from
-/// the nearest probe, farthest first (at most [`TOP`] listed), and their count.
 pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
     let world = &scene.world;
     let probes = volume.probes();
@@ -135,15 +110,6 @@ pub(super) fn far_objects(scene: &Scene, volume: &ProbeVolume) -> Value {
     json!({ "count": far.len(), "list": listed.collect::<Vec<_>>() })
 }
 
-/// A fingerprint of what a probe or reflection capture reads of `scene`,
-/// hashed once per bake and shared by both its reports ([`keyed`] adds each
-/// report's own probes): every active static mesh (its geometry and world matrix
-/// as the occlusion bake prints them, through one `Fingerprints` for the whole
-/// sweep, its raw corners when it takes no part there, and every material it
-/// draws with in full: albedo, emission, textures, render mode), every light,
-/// the ambient, sky, skybox and fog, the lightmaps static surfaces wear, where
-/// the light probes stand (never the SH a bake writes into them), and the
-/// lighting settings.
 pub fn scene_fingerprint(scene: &Scene) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     let world = &scene.world;
@@ -181,15 +147,12 @@ pub fn scene_fingerprint(scene: &Scene) -> u64 {
         (&scene.ambient, &scene.sky, &scene.fog),
         (&*scene.lightmaps, &scene.lighting_settings),
     );
-    // Where the light probes stand, never the SH this bake writes into them.
     let probes = scene.probes.probes().iter().map(|p| (p.position, p.manual));
     hash.write(format!("{:?}", probes.collect::<Vec<_>>()).as_bytes());
     hash.write(format!("{environment:?}").as_bytes());
     hash.finish()
 }
 
-/// A static mesh the occlusion print skips (it casts no shadow, say), still
-/// drawn by a capture: its world matrix, corners and triangles.
 fn raw_geometry(scene: &Scene, id: u32, hash: &mut rusty_core::hash::Content) {
     let matrix = scene.world.local_to_world(id).to_cols_array();
     hash.write(bytemuck::cast_slice(&matrix));
@@ -201,8 +164,6 @@ fn raw_geometry(scene: &Scene, id: u32, hash: &mut rusty_core::hash::Content) {
     }
 }
 
-/// A report's input fingerprint: the bake's [`scene_fingerprint`] and `keys`,
-/// the report's probes as the bake reads them.
 pub fn keyed(scene_print: u64, keys: &str) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     hash.write(&scene_print.to_le_bytes());

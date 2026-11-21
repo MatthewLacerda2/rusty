@@ -1,18 +1,3 @@
-//! The recorder: a [`TickTap`] that writes every Play session to a `.demo` (#1581).
-//!
-//! It opens a demo right before Play is entered, however it is entered (a tick, a
-//! paused frame's poll, `Editor.EnterPlay`): the header is read before `Awake` and
-//! `Start` run, and the host acts made since the last tick (a scenario's set-up)
-//! go in it as `before_play`. Then it writes one line per tick that changed anything
-//! (the input delta, the `dt`, the host acts before it, a new Game view size, the
-//! `Scene.LoadAsync` operations ready from its head and the pending one's progress, a
-//! digest every [`digest::EVERY`] ticks), and right before Play is left (or the run
-//! ends, [`Recorder::stop`]) the end line: the acts after the last tick and a final digest. After each tick's line comes its index line (`index`,
-//! #1597). Host acts come from the world's journal
-//! (`scripting::HostJournal`); acts in edit mode are dropped frame by frame,
-//! ticked or paused, and `Editor.EnterPlay` / `Editor.ExitPlay` are never kept:
-//! the transition they ask for is the demo's start or end.
-
 use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::PathBuf;
@@ -27,11 +12,9 @@ use rusty_app::{GameWorld, PlayTransition, TapPoint, TickTap};
 use rusty_core::input::InputFrame;
 use rusty_script::scripting::HostCall;
 
-/// One open demo.
 struct Session {
     out: BufWriter<File>,
     path: PathBuf,
-    /// The tick in flight, from the first after Play was entered.
     t: u64,
     last: InputFrame,
     last_dt: f32,
@@ -42,26 +25,19 @@ struct Session {
     index: Indexer,
 }
 
-/// Records a world's Play sessions; install with [`record`](super::record).
 pub struct Recorder {
     destination: Destination,
     session: Option<Session>,
-    /// Whether the scene had no unsaved edits at install, until a tick passes: acts
-    /// made then (a scenario's set-up) are replayed, so no unsaved edit of their own.
     clean_at_install: Option<bool>,
-    /// The demos this recorder wrote, oldest first.
     written: Vec<PathBuf>,
 }
 
-/// Whether `world`'s scene is its file's, as saved; `None` without a file.
 fn is_saved(world: &GameWorld) -> Option<bool> {
     let path = world.script_manager().scene_path_cell().borrow().clone()?;
     let scene = world.scene();
     Some(!rusty_edit::has_unsaved_edits(&scene.borrow(), &path))
 }
 
-/// `file` locked for as long as it is open, so no pruning deletes it meanwhile
-/// (`files::prune`); a filesystem without locks only loses that guard.
 fn lock(file: File) -> BufWriter<File> {
     if let Err(err) = file.try_lock() {
         log::debug!("[Demo] cannot lock the demo being written: {err}");
@@ -69,7 +45,6 @@ fn lock(file: File) -> BufWriter<File> {
     BufWriter::new(file)
 }
 
-/// The host acts since the last drain, without the Play and Stop verbs.
 fn drain(world: &GameWorld) -> Vec<HostCall> {
     let mut acts = world.script_manager().journal().borrow_mut().take();
     acts.retain(|act| !is_play_verb(act));
@@ -86,14 +61,10 @@ impl Recorder {
         }
     }
 
-    /// The demos written (or being written) so far, oldest first.
     pub fn written(&self) -> &[PathBuf] {
         &self.written
     }
 
-    /// End the open demo, if any, on `world` as it stands: the host acts since
-    /// its last tick and the state digest go in its end line. Right before Stop,
-    /// and when a run ends without one.
     pub fn stop(&mut self, world: &GameWorld) {
         let acts = drain(world);
         if let Some(session) = &mut self.session {
@@ -112,7 +83,6 @@ impl Recorder {
         }
     }
 
-    /// Close the open demo with `end`, flushed.
     fn close(&mut self, end: End) {
         if let Some(mut session) = self.session.take() {
             let wrote = serde_json::to_string(&end)
@@ -125,8 +95,6 @@ impl Recorder {
         }
     }
 
-    /// An edit-mode frame ended without entering Play, ticked or paused: what a
-    /// host did in it is no part of a demo.
     fn edit_frame_done(&mut self, world: &GameWorld) {
         world.script_manager().journal().borrow_mut().take();
         self.clean_at_install = None;
@@ -178,7 +146,6 @@ impl Recorder {
 }
 
 impl Session {
-    /// The tick's input and size, read right before it is published.
     fn read_input(&mut self, world: &GameWorld) {
         let frame = world.input().borrow().frame();
         let screen = world.resources.screen.borrow();
@@ -199,7 +166,6 @@ impl Session {
         self.display_scale = scale;
     }
 
-    /// The tick's `dt`, written when it is not the last tick's (bit for bit).
     fn read_dt(&mut self, dt: f32) {
         if dt.to_bits() != self.last_dt.to_bits() {
             self.entry.dt = Some(Exact(f64::from(dt)));
@@ -211,7 +177,6 @@ impl Session {
         writeln!(self.out, "{}", serde_json::to_string(line)?)
     }
 
-    /// The tick is done: its line written, if it has anything to say.
     fn end_tick(&mut self, world: &GameWorld) -> std::io::Result<()> {
         if digest::due(self.t) {
             self.entry.digest = Some(digest::of(world));
@@ -287,7 +252,6 @@ impl TickTap for Recorder {
 }
 
 impl Drop for Recorder {
-    /// A world dropped mid-Play: the end line, without a final digest.
     fn drop(&mut self) {
         let end = self.session.as_ref().map(|s| End {
             end: s.t,

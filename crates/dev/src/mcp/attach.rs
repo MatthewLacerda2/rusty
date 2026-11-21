@@ -1,20 +1,3 @@
-//! crates/dev/src/mcp/attach.rs — the **attach** backend: drive a *running window* (#307).
-//!
-//! [`SocketClient`] is the second [`EvalBackend`] (the first is the in-process
-//! [`Session`](crate::session::Session)): instead of
-//! evaluating in-process against a headless world, it forwards each line to a live
-//! windowed engine over its command socket ([`crate::command_channel`], #282) and
-//! unwraps the framed reply. This is what turns the MCP bridge from "drive a headless
-//! engine" into "drive the engine you are watching on screen."
-//!
-//! ## Lifecycle: stay up, connect per call
-//! Claude Code does not auto-restart an stdio MCP server that exits, so this backend
-//! never exits when the window goes away. It holds **no** persistent connection: each
-//! [`eval`](SocketClient::eval) dials the socket fresh, sends one line, reads one
-//! reply, and drops the connection. So when idle it holds zero engine resources, and a
-//! window that closes and reopens is picked up transparently by the next call. A dial
-//! failure (no window running) is reported in-band as a tool error, never a crash.
-
 use std::cell::RefCell;
 use std::io;
 
@@ -23,19 +6,12 @@ use serde_json::Value;
 use super::EvalBackend;
 use crate::command_channel::client::{self, Client};
 
-/// An [`EvalBackend`] that forwards to a running windowed engine's command socket.
-///
-/// This type holds no world of its own — it is a thin client over the socket.
 pub struct SocketClient {
-    /// An explicit `--attach <addr>` override (a socket path), or `None` to use the shared default address the listener binds.
     explicit: Option<String>,
-    /// The engine warnings the last reply carried, until [`EvalBackend::take_warnings`].
     warnings: RefCell<Vec<String>>,
 }
 
 impl SocketClient {
-    /// Build an attach backend. `explicit` is the `--attach <addr>` override; `None`
-    /// uses the default address.
     pub fn new(explicit: Option<String>) -> Self {
         Self {
             explicit,
@@ -43,8 +19,6 @@ impl SocketClient {
         }
     }
 
-    /// The in-band message for "no engine reachable" — naming where we looked and how
-    /// to start one. Surfaced to the agent as a tool error so it can recover.
     fn no_engine(&self, err: &io::Error) -> String {
         let addr = client::address_label(self.explicit.as_deref());
         format!(
@@ -56,12 +30,8 @@ impl SocketClient {
 
 impl EvalBackend for SocketClient {
     fn eval(&self, line: &str) -> Result<String, String> {
-        // Connect per call: no persistent socket is held between evals, so a window
-        // restart is picked up transparently on the next call.
         let mut client =
             Client::connect(self.explicit.as_deref()).map_err(|e| self.no_engine(&e))?;
-        // The window's bake progress, asked for only when someone listens here: a
-        // request with a progress token (#1999).
         use crate::bake::progress::listen;
         let framed = match listen::is_listening() {
             true => client.request_progress(line, &mut |text| listen::tell(text)),
@@ -73,18 +43,11 @@ impl EvalBackend for SocketClient {
         outcome
     }
 
-    /// What the window raised while the last line was evaluated; the window's own
-    /// console has those and everything else.
     fn take_warnings(&self) -> Vec<String> {
         std::mem::take(&mut *self.warnings.borrow_mut())
     }
 }
 
-/// Unwrap one framed reply line (`{"ok":true,"result":"…"}` /
-/// `{"ok":false,"error":"…"}`, the byte-identical framing from
-/// [`crate::session::response_line`]) into the evaluator's `Result`, plus the
-/// engine warnings its optional `"warnings"` key carries. A reply that doesn't parse
-/// is itself an error (the engine should never send one — we never panic).
 fn parse_framed(framed: &str) -> (Result<String, String>, Vec<String>) {
     let value: Value = match serde_json::from_str(framed) {
         Ok(value) => value,
@@ -154,8 +117,6 @@ mod tests {
 
     #[test]
     fn eval_reports_a_clean_error_when_nothing_is_listening() {
-        // An address with no listener: connect fails and the failure surfaces as an
-        // in-band `Err` naming how to start the engine — never a panic.
         let backend = SocketClient::new(Some(absent_address()));
         let err = backend.eval("1 + 1").expect_err("no engine listening");
         assert!(err.contains("no rusty engine reachable"), "got: {err}");

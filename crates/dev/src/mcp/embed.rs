@@ -1,11 +1,3 @@
-//! crates/dev/src/mcp/embed.rs — the embed-mode backend: a headless session that can move
-//! to another project (#942).
-//!
-//! Unity's model is one open project per editor process, and so is rusty's: opening
-//! another project closes this one (its unsaved scene edits are lost, as Unity's
-//! *Open Project* loses them) and boots a fresh session on the new root, exactly as
-//! `session-mcp --project <root>` would have.
-
 use std::cell::RefCell;
 use std::path::Path;
 
@@ -14,7 +6,6 @@ use crate::session::{self, Session};
 use rusty_app::ProjectSource;
 use rusty_core::project::{self, Access};
 
-/// The in-process session `session-mcp` drives without `--attach`.
 pub struct Embedded {
     session: RefCell<Session>,
 }
@@ -42,8 +33,6 @@ impl EvalBackend for Embedded {
 }
 
 impl Embedded {
-    /// Open `root` (it becomes the working directory) and boot its boot scene, as
-    /// `--project <root>` would. On failure the old project stays open and current.
     fn switch(&self, root: &Path) -> Result<(), String> {
         let back = std::env::current_dir().map_err(|e| e.to_string())?;
         let opened = project::open(root, Access::Edit)?;

@@ -1,8 +1,3 @@
-//! A shadowmasked lamp over dynamic objects (#1695): a dynamic caster still casts a
-//! realtime shadow, and a dynamic receiver behind baked cover is shaded by the
-//! probes' occlusion, since under `Shadowmask` the static cover is in no
-//! realtime map.
-
 use glam::{Vec3, Vec4};
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
@@ -13,7 +8,6 @@ use rusty_scene::lighting::MixedLightingMode::Shadowmask;
 #[test]
 fn gpu_a_dynamic_cube_under_a_shadowmask_lamp_casts_a_realtime_shadow() {
     let Some(mut r) = renderer() else { return };
-    // On the floor toward the camera, in the cube's shadow from the lamp.
     let shade = Vec3::new(0.0, 0.0, -3.5);
     let mut frame = |cube: bool, name: &str| {
         let (mut s, _) = scene(LightMode::Mixed, Shadowmask, 1.0);
@@ -40,7 +34,6 @@ fn gpu_a_dynamic_cube_behind_baked_cover_reads_the_probes_occlusion() {
     let at = Vec3::new(2.0, 0.3, -5.0);
     block(&mut s, "cube", (at, Vec3::splat(0.6)), 1.0, false);
     s.probes.add_probe(at);
-    // As the probe bake writes it (`ibl::probe::bounce::add_baked_direct`).
     let occlusion = mixed_occlusion(&BakeScene::gather(&s, &|_, _| None), &[at]);
     assert_eq!(
         occlusion,

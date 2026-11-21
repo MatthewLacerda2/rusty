@@ -1,6 +1,3 @@
-//! The staged cubes' commit (#1737): a cube that cannot be moved into place leaves
-//! the probe set untouched, and a retry resumes where it failed.
-
 use glam::Vec3;
 
 use super::staged::StagedCubemaps;
@@ -20,7 +17,6 @@ fn a_failed_move_touches_no_probe_and_a_retry_resumes() {
     };
     staged.write(&dir, &cube(b"cube 0")).unwrap();
     staged.write(&dir, &cube(b"cube 1")).unwrap();
-    // A non-empty directory where cube 1 goes: its rename fails.
     let blocked = dir.join("reflection_probe_1.ktx2");
     std::fs::create_dir_all(blocked.join("x")).unwrap();
     let mut set = ReflectionProbeSet::default();

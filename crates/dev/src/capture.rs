@@ -1,35 +1,3 @@
-//! crates/dev/src/capture.rs — one renderer, many shots (#355 step 5).
-//!
-//! Every dev-layer capture — the screenshot, the asset preview — used to open with the
-//! same line: build a whole `Renderer`, draw one frame, drop it. A `Renderer` is a wgpu
-//! device, the full pipeline set, the shader registry, the shadow maps and every cached
-//! mesh/texture, so "one shot, one device" meant a scenario taking six screenshots paid
-//! for six devices, and a test comparing an effect on-vs-off paid for two. On a
-//! software adapter that cost is not abstract: its textures live in system RAM beside
-//! rustc, and unbounded concurrent renderers is exactly what exhausted it in #366.
-//!
-//! That pattern existed because it *had* to. The renderer was a single-view machine:
-//! size, depth buffer and post-FX chain were one shared copy, so a second consumer could
-//! not borrow it without trampling the first's targets. Now that [`RenderView`] owns the
-//! per-view state (#355 step 2) and the caches are namespaced per scene (step 3), a
-//! renderer can serve any number of views of any number of scenes at any sizes — the
-//! render path reads nothing size-dependent off the `Renderer` at all (`config` is
-//! surface state, inert offscreen).
-//!
-//! [`CaptureHost`] is that fact made usable: hold one, take as many shots as you like.
-//! It keeps the renderer *and* a view, both built on first use and reused after, so a
-//! second shot at the same size allocates nothing — no device, no pipelines, no post-FX
-//! shader compile. This is the step-5 proof the shared/per-view/per-scene boundaries are
-//! drawn in the right places: if they weren't, the second shot would come out wrong.
-//!
-//! **No adapter is a skip, not a failure — unless a GPU is required.** On a machine with
-//! no GPU or software driver the host reports `None` and its callers return `Ok(false)`
-//! — the same contract `Renderer::new_headless` has always had. Under
-//! `RUSTY_REQUIRE_GPU=1` (every CI job) the same answer is an `Err` instead, decided in
-//! one place, [`no_adapter`], so a capture path that wrongly reports "no adapter" fails
-//! the visual tests rather than turning them all into silent skips (#885). The probe is
-//! attempted once; a box with no adapter does not retry per shot.
-
 use std::path::Path;
 use std::time::Instant;
 
@@ -40,10 +8,6 @@ use rusty_render::{
 };
 use rusty_scene::{Camera, Scene};
 
-/// What a capture does when this box has no GPU or software adapter, decided once for
-/// every dev-layer capture (#885): `Ok(())` after a warning — the caller then skips
-/// with its own `Ok(false)` / `Ok(None)` — or, under [`REQUIRE_GPU_ENV`]`=1`, an `Err`
-/// naming `what` could not be done, so a missing adapter cannot pass as a skip.
 pub fn no_adapter(what: &str) -> Result<(), String> {
     if gpu_required() {
         return Err(format!(
@@ -55,65 +19,30 @@ pub fn no_adapter(what: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// What one captured frame cost (#433, #835).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct RenderedFrame {
     pub counters: RenderCounters,
-    /// CPU ms `Renderer::render` took to record the frame.
     pub cpu_ms: f64,
-    /// `cpu_ms` by stage (`Renderer::frame_stages`), in the order reached.
     pub stages: Vec<(&'static str, f64)>,
-    /// GPU ms per render pass; `None` where the adapter has no timestamps.
     pub gpu: Option<GpuTimes>,
 }
 
-/// A renderer + view held across captures, so N shots cost one device.
-///
-/// Build one, hand it to as many capture calls as you like, and drop it when the batch
-/// is done — the renderer holds a slot in the headless budget
-/// (`render::setup::budget`) for exactly as long as the host lives, so a long-lived
-/// host is a long-held slot. Own one per batch of work (a harness run, a test), not one
-/// per process.
 #[derive(Default)]
 pub struct CaptureHost {
-    /// The shared renderer, built on the first capture. `None` until then, and
-    /// permanently `None` on a box with no adapter (see `probed`).
     renderer: Option<Renderer>,
-    /// The view every shot draws through, resized in place when a shot asks for a size
-    /// the last one didn't use. Owning its colour target (`RenderView::offscreen`) is
-    /// what lets the readback copy from the very texture the pass drew.
     view: Option<RenderView>,
-    /// Whether an adapter request has already been made. Stops a GPU-less box from
-    /// paying for a failed adapter probe on every single shot.
     probed: bool,
-    /// What the last [`draw`](Self::draw) cost — what a harness screenshot folds
-    /// into the frame stats (#433).
     pub last_frame: Option<RenderedFrame>,
-    /// The automatic exposure the last [`draw`](Self::draw) applied, read back exactly
-    /// (#1444): what the harness publishes as `Scene::screen_exposure`.
     pub exposure: Option<f32>,
-    /// When the GPU finished the last [`draw`](Self::draw) (its `wait_idle`
-    /// returned), before the readbacks that follow: where the bench's `wall_ms`
-    /// ends a frame.
     pub idle_at: Option<Instant>,
-    /// Draw the colliders and the `Debug.Draw*` lines over the next frames (#1882),
-    /// as the Game view's **Gizmos** toggle does: `Harness.Screenshot`'s `gizmos`.
     pub gizmos: bool,
 }
 
 impl CaptureHost {
-    /// An empty host. Nothing is allocated until the first capture asks for a frame.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// The renderer and a view sized to `width` x `height` with its scene at
-    /// `render_scale` (#1498; native for anything but the screen), building either on
-    /// first use and reusing both afterwards.
-    ///
-    /// `None` means this machine has no GPU or software adapter: **skip, don't fail**.
-    /// Callers turn that into their own graceful outcome (`Ok(false)`), matching the
-    /// contract every headless path in the engine already has.
     pub fn frame(
         &mut self,
         width: u32,
@@ -123,8 +52,6 @@ impl CaptureHost {
         let (width, height) = (width.max(1), height.max(1));
         self.renderer(width, height)?;
         let renderer = self.renderer.as_mut()?;
-        // Create-or-resize, the same guard the editor viewport uses: a repeat shot at
-        // the same size and scale is a no-op rather than a reallocation.
         let view = RenderView::ensure_offscreen(
             &mut self.view,
             &renderer.device,
@@ -135,20 +62,11 @@ impl CaptureHost {
         Some((renderer, view))
     }
 
-    /// Just the renderer, built on first use (at `width` x `height`) and never resizing
-    /// the view — for a caller that draws into targets of its own, like the editor
-    /// capture's egui pass (#731). `None` on a box with no adapter, as for [`frame`].
-    ///
-    /// [`frame`]: Self::frame
     pub fn renderer(&mut self, width: u32, height: u32) -> Option<&mut Renderer> {
         if !self.probed {
             self.probed = true;
-            // Born at the first shot's size purely so a lone capture is identical to the
-            // unshared path; nothing in the render path reads `config` offscreen, which
-            // is precisely why later shots may ask for any other size.
             let (width, height) = (width.max(1), height.max(1));
             self.renderer = pollster::block_on(Renderer::new_headless(width, height));
-            // A capture's frame is measured (the stats, the benches): by stage too.
             if let Some(r) = self.renderer.as_mut() {
                 r.time_stages(true);
             }
@@ -156,10 +74,6 @@ impl CaptureHost {
         self.renderer.as_mut()
     }
 
-    /// Render `scene` from `camera` into the host's view at `width` x `height`, and
-    /// wait for the GPU to finish it. An offline frame, so its GPU times are read
-    /// back at once instead of a frame or two later. `Ok(None)` without an adapter, or
-    /// `Err` when one is required ([`no_adapter`]).
     pub fn draw(
         &mut self,
         scene: &Scene,
@@ -167,8 +81,6 @@ impl CaptureHost {
         width: u32,
         height: u32,
     ) -> Result<Option<RenderedFrame>, String> {
-        // A capture of the screen renders at its render scale (#1498), read as the
-        // player and the Game view read it.
         let scale = self.renderer(width, height).map(|r| r.render_scale(false));
         let gizmos = self.gizmos;
         let Some((renderer, view)) = self.frame(width, height, scale.unwrap_or_default()) else {
@@ -179,9 +91,6 @@ impl CaptureHost {
         let target = view
             .color_target_view()
             .ok_or_else(|| "capture view owns no colour target".to_string())?;
-        // The Game view's exact render path (editor_mode = false: no grid or editor
-        // gizmos; the colliders and debug lines only with `gizmos`), its CPU ms
-        // the renderer's own frame clock, as the window reads it.
         renderer.render(view, scene, camera, &target, false);
         let cpu_ms = renderer.frame_cost().cpu_ms;
         renderer.wait_idle();
@@ -199,10 +108,6 @@ impl CaptureHost {
         Ok(Some(frame))
     }
 
-    /// Copy the view's colour target back to the CPU and encode it as a PNG at `path`.
-    ///
-    /// Call after a `render` into the frame's target view. Errors only on an actual
-    /// I/O / encode failure — by this point a frame has definitely been produced.
     pub fn write_png(&self, path: impl AsRef<Path>) -> Result<(), String> {
         let (Some(renderer), Some(view)) = (self.renderer.as_ref(), self.view.as_ref()) else {
             return Err("capture host has no rendered frame to write".to_string());

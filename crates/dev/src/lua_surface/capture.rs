@@ -1,21 +1,9 @@
-//! crates/dev/src/lua_surface/capture.rs — `Audio.StartCapture` / `Audio.StopCapture`
-//! (#1579): record the final mix the speakers get to a WAV, so an agent that cannot
-//! hear can measure it (`Sound.Level`).
-//!
-//! A measuring tool, not a game feature, so it is added here, onto the `Audio` table
-//! `api` registered, and a ship build has neither verb (#737). In the windowed
-//! editor it taps the real device; with no device (a scenario, a silent box) the
-//! maestro mixes offline in step with the engine's time (`audio::capture`).
-
 use std::path::Path;
 
 use mlua::Lua;
 
 use rusty_script::api::{global_table, put, ApiCtx, Reg};
 
-/// Add `StartCapture(path)` and `StopCapture()` to the `Audio` table. Both raise a
-/// Lua error on a refusal (a second start, a stop with nothing running, a file that
-/// cannot be written); `StopCapture` returns the path it wrote.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = global_table(lua, "Audio")?;
     let audio = ctx.audio;

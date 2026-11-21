@@ -1,16 +1,8 @@
-//! Folder plumbing for the generator: clear or remove an output it owns, copy a
-//! game's files in, and compare two generated trees file by file.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-/// The file that marks a folder as a generated test game, so regenerating may
-/// delete it whole. A folder without it is never deleted.
 pub(super) const MARKER: &str = ".test-game";
 
-/// Make `out` an empty folder: create it, or clear one a generation made (it holds
-/// [`MARKER`]). Refuses any other folder that is not empty, so `OUT=<dir>` never
-/// deletes a folder it did not make.
 pub(super) fn clear(out: &Path) -> Result<(), String> {
     let shown = |e: std::io::Error| format!("{}: {e}", out.display());
     if out.join(MARKER).is_file() {
@@ -24,8 +16,6 @@ pub(super) fn clear(out: &Path) -> Result<(), String> {
     std::fs::create_dir_all(out).map_err(shown)
 }
 
-/// The folder beside `out` named `<out's file name>.<suffix>`, built from the file
-/// name so `OUT=~/proj.v2` sets `~/proj.v2.first` aside, never `~/proj.first`.
 pub(super) fn beside(out: &Path, suffix: &str) -> Result<PathBuf, String> {
     let name = out
         .file_name()
@@ -35,9 +25,6 @@ pub(super) fn beside(out: &Path, suffix: &str) -> Result<PathBuf, String> {
     Ok(out.with_file_name(aside))
 }
 
-/// Delete `dir` if a generation made it (it holds [`MARKER`]) or it is empty; a
-/// missing `dir` is fine. Refuses anything else, as [`clear`] does, so no folder a
-/// generation did not make is ever deleted.
 pub(super) fn remove(dir: &Path) -> Result<(), String> {
     let shown = |e: std::io::Error| format!("{}: {e}", dir.display());
     match std::fs::symlink_metadata(dir) {
@@ -56,8 +43,6 @@ pub(super) fn remove(dir: &Path) -> Result<(), String> {
     }
 }
 
-/// Copy every file under `from` to the same relative path under `to`; a missing
-/// `from` copies nothing.
 pub(super) fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
     for (rel, path) in files(from)? {
         let dest = to.join(&rel);
@@ -69,8 +54,6 @@ pub(super) fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// The relative paths of the files that differ between two trees (in one only, or
-/// with other bytes), sorted.
 pub(super) fn differences(a: &Path, b: &Path) -> Result<Vec<PathBuf>, String> {
     let (a, b) = (files(a)?, files(b)?);
     let mut differ: Vec<PathBuf> = a
@@ -87,7 +70,6 @@ fn same_bytes(a: &Path, b: &Path) -> bool {
     matches!((std::fs::read(a), std::fs::read(b)), (Ok(x), Ok(y)) if x == y)
 }
 
-/// Every file under `root`, keyed by its path relative to `root`.
 fn files(root: &Path) -> Result<BTreeMap<PathBuf, PathBuf>, String> {
     let mut found = BTreeMap::new();
     if !root.is_dir() {

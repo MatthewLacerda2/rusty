@@ -1,18 +1,13 @@
-//! `Debug.AudioEvents` / `Debug.AudioVoices` (#1247), read with no sound card: the
-//! session's maestro carries the `NullBackend`.
-
 use crate::session::Session;
 
 fn session() -> Session {
     Session::new("").expect("an empty session boots")
 }
 
-/// Move the frame counter, the tick every audio action is logged under.
 fn at_frame(s: &Session, frame: u64) {
     s.world().time().borrow_mut().frame_count = frame;
 }
 
-/// The `field` of every event after `after_seq`, comma-joined.
 fn read(s: &Session, after_seq: &str, field: &str) -> String {
     let line = format!(
         "local t = {{}} for _, e in ipairs(Debug.AudioEvents({after_seq})) do
@@ -68,7 +63,6 @@ fn the_oldest_seq_held_signals_events_that_rolled_off() {
         .unwrap();
     let read = "local ev, oldest = Debug.AudioEvents(0)
         return table.concat({ #ev, oldest, ev[1].seq, ev[#ev].seq }, ' ')";
-    // A cursor of 0 is below `oldest - 1`: six events rolled off the ring.
     assert_eq!(s.eval(read).unwrap(), "1024 7 7 1030");
     let fresh = "local ev, oldest = Debug.AudioEvents(1030) return #ev .. ' ' .. oldest";
     assert_eq!(
