@@ -28,6 +28,9 @@ Unity's `EditorApplication` doesn't exist in a player: there `EnterPlay` and
 | `Editor.RedoName` | `()` | the name of the step `Redo` would re-apply, or `nil` |
 | `Editor.SetGizmo` | `(name, on)` | `true` when it set gizmo `name` (a Scene-view one, or the Game view's `"GameGizmos"` or `"Stats"`) on or off; `false` (a no-op, warned) for an unknown name or outside the editor window |
 | `Editor.GetGizmo` | `(name)` | whether gizmo `name` is drawn; `nil` (warned) for an unknown name |
+| `Editor.InspectReflectionProbe` | `(index)` | — : makes reflection probe `index` (0-based, as `Reflection.*` counts) the inspected one, as opening its card in the scene inspector does: its card opens, any other closes, and the Scene view draws its volume (*Scene-view gizmos*). It holds until cleared, its card closed, probes removed (`Reflection.Remove`, `Reflection.Clear`, the card's **Remove**), Generate Lighting moving it, or the scene changing (a load; Stop puts back edit mode's). An index past the probes is an error (`no reflection probe <i>: the scene has <n>`), and nothing changes. `make editor-capture ARGS="--inspect-reflection-probe <i>"` does the same |
+| `Editor.ClearInspectedReflectionProbe` | `()` | — : no reflection probe is inspected, as closing its card does |
+| `Editor.InspectedReflectionProbe` | `()` | the inspected reflection probe's index, or `nil` |
 | `Editor.SetGameViewSize` | `(width, height)` | `true` when it gave the Game view a fixed size of `width × height` pixels; `false` (a no-op, warned) for a side that is not a whole number from 1 to 8192 (NaN included), or outside the editor window; a missing or non-numeric argument is an error, as `SetGizmo`'s |
 | `Editor.SetGameViewAspect` | `(width, height)` | `true` when it gave the Game view the largest `width:height` size inside its panel; `false` as `SetGameViewSize` |
 | `Editor.SetGameViewLowResolution` | `(on)` | `true` when it set "1x on HiDPI" (Unity's *Low Resolution Aspect Ratios*) on or off; `false` (warned) outside the editor window |
@@ -46,7 +49,7 @@ flag, `docs/testing.md`).
 |---|---|---|---|
 | `"UI"` | **UI** | the screen-space canvases over the scene, and the rect tool on them ([`ui.md`](../ui.md)) | on |
 | `"LightProbes"` | **Light Probes** | a cross at each light probe, tinted by the light it baked | on |
-| `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point (a mirror ball), and the parallax volume (its turned box or its sphere) of the one whose card is open in the scene inspector's **Reflection Probes** section: a probe is no GameObject, so its open card is its selection, and Unity draws a probe's bounds on selection | on |
+| `"ReflectionProbes"` | **Reflection Probes** | each reflection probe's capture point (a mirror ball), and the parallax volume (its turned box or its sphere) of the inspected one, whose card is open in the scene inspector's **Reflection Probes** section (`Editor.InspectReflectionProbe`, above): a probe is no GameObject, so its open card is its selection, and Unity draws a probe's bounds on selection | on |
 | `"Colliders"` | **Colliders** | every collider's real shape (box, sphere, capsule, cylinder, hull and mesh edges) in Unity's green, triggers paler; the **selected** object's colliders draw with it off too, as Unity's do (#1882) | off |
 | `"NavMesh"` | **NavMesh** | the baked navmesh as translucent cyan over the floor: one quad per walkable span, on its floor plane (ramps tilt), holes where the agent radius erodes it; kept on the GPU in 32-cell tiles: a rebake (a dragged crate, a moving carving obstacle) re-uploads only the tiles it changed, and a full bake, an area-cost edit or a restored navmesh rebuilds it whole (#1910). Scene view only, as Unity's | off |
 | `"GameGizmos"` | **Gizmos**, on the **Game** tab's strip | Unity's Game-view Gizmos: every collider and the `Debug.Draw*` lines over the game frame, through the main (base) camera of its stack (#1882) | off |
@@ -56,9 +59,11 @@ flag, `docs/testing.md`).
   does per user; a new editor starts from the defaults above.
 - A set takes effect at the next frame, as the toggle's click does, and
   `Editor.GetGizmo` reads it back at once.
-- The **selected** Area light draws its rectangle and an arrow out of its lit
-  face, whatever the toggles, as Unity shows a light's shape on selection; an
-  unselected one draws nothing. The `Debug.DrawLine` / `Debug.DrawRay` lines
+- A **selected** Area light draws its rectangle and an arrow out of its lit
+  face, whatever the toggles, as Unity shows a light's shape on selection: the
+  selected GameObject's and every descendant's, as Unity draws a selected
+  object's children's gizmos (a lamp's root selected shows its panel); any other
+  draws nothing. The `Debug.DrawLine` / `Debug.DrawRay` lines
   ([`Debug.md`](Debug.md)) always draw.
 - `"GameGizmos"` is the Game view's own **Gizmos** toggle, as Unity's is: it draws
   what `Harness.Screenshot(path, { gizmos = true })` draws, and

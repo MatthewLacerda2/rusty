@@ -245,8 +245,6 @@ impl EditorUi {
             .selected_entity_id
             .filter(|&id| scene.world.contains(id));
         scene.selected_entity_id = self.selected_entity_id;
-        // Set again by the scene inspector's open probe card, if it draws one.
-        scene.inspected_reflection_probe = None;
 
         let ui = &mut theme::chrome::root_ui(ctx);
         // 1. TOP HEADER PANEL (Controls engine state) — ALWAYS VISIBLE

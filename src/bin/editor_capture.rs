@@ -34,6 +34,9 @@ options (all optional):
   --select <name>     select this entity first (the Inspector shows its cards)
   --select-asset <p>  an asset file in the project to select first (its card)
   --frame             frame the selection in the Scene view (the F key)
+  --inspect-reflection-probe <i>
+                      inspect reflection probe i (0-based) first, as
+                      `Editor.InspectReflectionProbe` does: its volume draws
   --play              draw the Play-mode chrome (the sim is not stepped)
   --game              show the Game tab instead of the Scene tab
   --size <W>x<H>      capture size (default 1600x900)
@@ -164,6 +167,10 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
+            "--inspect-reflection-probe" => {
+                let index = value()?.parse().map_err(|e| format!("{flag}: {e}"))?;
+                opts.inspect_reflection_probe = Some(index);
+            }
             "--play" => opts.playing = true,
             "--game" => opts.tab = ViewportTab::Game,
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,

@@ -50,12 +50,14 @@ fn holds(got: &[Vertex], want: &[Vertex], tint: [f32; 4]) {
 
 #[test]
 fn every_probe_segment_carries_its_probes_tint_on_both_ends() {
-    use super::super::lights::{area_light_gizmo, AREA_TINT};
+    use super::super::lights::{area_light_gizmos, AREA_TINT};
     let mut scene = probed(3);
     lit(&mut scene);
     let lines = probe_lines(&scene, &SceneGizmos::default());
     let crosses = 3 * 6;
-    let (panel, _) = area_light_gizmo(&scene).expect("the selected panel draws");
+    let (panel, _) = area_light_gizmos(&scene)
+        .pop()
+        .expect("the selected panel draws");
     assert_eq!(lines.len(), crosses + 24 + panel.len());
     for (i, probe) in scene.probes.probes().iter().enumerate() {
         let at = probe_marker_verts(probe.position, MARKER_HALF);

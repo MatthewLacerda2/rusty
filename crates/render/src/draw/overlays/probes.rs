@@ -5,7 +5,7 @@
 //! grid/AABB/axis overlays, in the handles pass an editor camera runs after post-FX
 //! (`overlays::handles`, #1224), never in a shipped game render.
 //!
-//! Two families of lines, drawn with the selected Area light's (`lights`) as one
+//! Two families of lines, drawn with the selected Area lights' (`lights`) as one
 //! vertex-coloured line list: one buffer and one draw for the whole family, each
 //! vertex carrying its gizmo's tint, as the collider wires are (`wires`):
 //!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
@@ -24,7 +24,7 @@
 //! tested, as is [`probe_lines`], the merged list; the GPU pre-creation uploads it
 //! into one vertex buffer per frame. Each family draws only while the Scene view's
 //! gizmo set has it on (`Gizmo::LightProbes`, `Gizmo::ReflectionProbes`, #1909).
-//! The selected Area light is not a probe and draws whatever the gizmos.
+//! A selected Area light is not a probe and draws whatever the gizmos.
 
 use glam::{Quat, Vec3};
 
@@ -44,7 +44,7 @@ const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
     /// Pre-create the probe-family gizmos for one editor pass: the light-probe
-    /// lines, the inspected reflection probe's and the selected Area light's
+    /// lines, the inspected reflection probe's and the selected Area lights'
     /// (`lights`, #1674), as one vertex-coloured line list in one buffer at one slot
     /// of `draws`, drawn in one draw ([`probe_lines`]). `None` when none of them
     /// draws.
@@ -63,8 +63,8 @@ impl Renderer {
 /// tint in its `tangent` (as the vertex-colour line pipeline reads it, `wires`):
 /// a cross per light probe in its baked SH tint, the inspected reflection probe's
 /// volume (`Scene::inspected_reflection_probe`) in [`REFLECTION_TINT`], then the
-/// selected Area light. Each probe family only while its gizmo is on; the Area
-/// light whatever the gizmos.
+/// selected Area lights (the selected entity's and its descendants'). Each probe
+/// family only while its gizmo is on; the Area lights whatever the gizmos.
 pub(crate) fn probe_lines(scene: &Scene, gizmos: &SceneGizmos) -> Vec<Vertex> {
     let mut out = Vec::new();
     let mut add = |verts: Vec<Vertex>, tint: [f32; 4]| {
@@ -84,8 +84,8 @@ pub(crate) fn probe_lines(scene: &Scene, gizmos: &SceneGizmos) -> Vec<Vertex> {
     if let Some(probe) = probe.filter(|_| gizmos.on(Gizmo::ReflectionProbes)) {
         add(reflection_volume_verts(probe), REFLECTION_TINT);
     }
-    // The selected Area light (#1674), baked only, rides the same line list.
-    if let Some((verts, tint)) = super::lights::area_light_gizmo(scene) {
+    // The selected Area lights (#1674), baked only, ride the same line list.
+    for (verts, tint) in super::lights::area_light_gizmos(scene) {
         add(verts, tint);
     }
     out

@@ -160,6 +160,8 @@ fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
     // their ranges once, here (#1584), so every reader sees the same values.
     scene.reflection_probes = data.reflection_probes;
     scene.reflection_probes.hold();
+    // Its index named a probe of the set just replaced.
+    scene.inspected_reflection_probe = None;
     scene.lightmaps = data.lightmaps.into();
     scene.lighting_settings = data.lighting_settings;
     scene.lighting_settings.reflections.clamp();

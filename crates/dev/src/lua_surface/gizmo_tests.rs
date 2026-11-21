@@ -70,3 +70,29 @@ fn an_unknown_name_warns() {
     assert_eq!(run(&mut s, r#"Editor.GetGizmo("colliders")"#), "nil");
     assert!(warned(&s, r#"no gizmo "colliders""#));
 }
+
+/// `Editor.InspectReflectionProbe` (#2525) makes a probe the inspected one, whose
+/// volume the Scene view draws; it holds until cleared, and an index past the
+/// probes is an error a script reads, changing nothing.
+#[test]
+fn a_reflection_probe_is_inspected_until_cleared_and_a_stray_index_errors() {
+    let mut s = session();
+    run(&mut s, "Reflection.Add(0, 1, 0, 1, 1, 1)");
+    run(&mut s, "Reflection.Add(5, 1, 0, 1, 1, 1)");
+    assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "nil");
+    run(&mut s, "Editor.InspectReflectionProbe(1)");
+    assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "1");
+    let caught = "local ok, e = pcall(Editor.InspectReflectionProbe, 2); return e";
+    let e = run(&mut s, caught);
+    assert!(e.contains("no reflection probe 2: the scene has 2"), "{e}");
+    assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "1");
+    run(&mut s, "Editor.ClearInspectedReflectionProbe()");
+    assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "nil");
+    run(&mut s, "Editor.InspectReflectionProbe(0)");
+    run(&mut s, "Reflection.Remove(0)");
+    assert_eq!(
+        run(&mut s, "Editor.InspectedReflectionProbe()"),
+        "nil",
+        "removed"
+    );
+}

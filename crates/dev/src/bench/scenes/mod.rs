@@ -11,7 +11,7 @@
 //! `bench-scenes` list names: `load_ms` and its parts ([`load`](mod@load)),
 //! `import_ms` (`IMPORT=1`, [`import`]), `rss_peak_mb` ([`crate::memory`]), the
 //! GPU memory rows (`rusty_render::gpu_memory`, the renderer's own bytes by kind)
-//! and `lights` / `lights_live` (`notes::lights`), each compared with that scene's
+//! and `level_lights` / `level_lights_live` (`notes::lights`), each compared with that scene's
 //! last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
 //! profile of the measured frames ([`profile`]), in a run of its own. The editor

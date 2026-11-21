@@ -1,5 +1,6 @@
 //! A reflection probe's card open in the scene inspector is its selection (#2525):
-//! the Scene view draws that probe's volume alone (`Scene::inspected_reflection_probe`).
+//! the Scene view draws that probe's volume alone (`Scene::inspected_reflection_probe`),
+//! and the cards follow it, one open at a time.
 
 use egui::{Event, Modifiers, PointerButton, Pos2};
 use glam::Vec3;
@@ -8,8 +9,7 @@ use super::draw_probes;
 use rusty_scene::Scene;
 
 /// One inspector frame of the probe cards with `events`, a second after the last
-/// (past a card's open or close animation), the field cleared as the editor's
-/// frame clears it; returns each card header's label and centre.
+/// (past a card's open or close animation); returns each widget's label and centre.
 fn frame(ctx: &egui::Context, scene: &mut Scene, events: Vec<Event>) -> Vec<(String, Pos2)> {
     let input = egui::RawInput {
         events,
@@ -17,7 +17,6 @@ fn frame(ctx: &egui::Context, scene: &mut Scene, events: Vec<Event>) -> Vec<(Str
         ..Default::default()
     };
     let mut output = ctx.run_ui(input, |ui| {
-        scene.inspected_reflection_probe = None;
         draw_probes(ui, scene);
     });
     output.textures_delta.clear();
@@ -34,10 +33,14 @@ fn frame(ctx: &egui::Context, scene: &mut Scene, events: Vec<Event>) -> Vec<(Str
         .collect()
 }
 
-/// Click the card header labelled `label`, then draw a settled frame.
-fn open(ctx: &egui::Context, scene: &mut Scene, label: &str) {
+/// Click the widget whose label ends with `label`, then draw a settled frame.
+fn click(ctx: &egui::Context, scene: &mut Scene, label: &str) {
     let drawn = frame(ctx, scene, Vec::new());
-    let at = drawn.iter().find(|(l, _)| l == label).expect("drawn").1;
+    let at = drawn
+        .iter()
+        .find(|(l, _)| l.ends_with(label))
+        .expect("drawn")
+        .1;
     let press = |pressed| Event::PointerButton {
         pos: at,
         button: PointerButton::Primary,
@@ -49,8 +52,13 @@ fn open(ctx: &egui::Context, scene: &mut Scene, label: &str) {
     frame(ctx, scene, Vec::new());
 }
 
-#[test]
-fn the_open_card_names_the_inspected_probe_and_a_closed_one_none() {
+/// The open cards' Remove buttons, as a settled frame draws them.
+fn open_cards(ctx: &egui::Context, scene: &mut Scene) -> usize {
+    let drawn = frame(ctx, scene, Vec::new());
+    drawn.iter().filter(|(l, _)| l.ends_with("Remove")).count()
+}
+
+fn three() -> (egui::Context, Scene) {
     let mut scene = Scene::new();
     for x in [0.0, 5.0, 10.0] {
         scene.reflection_probes.add(Vec3::X * x, Vec3::ONE);
@@ -58,19 +66,53 @@ fn the_open_card_names_the_inspected_probe_and_a_closed_one_none() {
     let ctx = egui::Context::default();
     ctx.enable_accesskit();
     frame(&ctx, &mut scene, Vec::new());
+    (ctx, scene)
+}
+
+#[test]
+fn the_open_card_names_the_inspected_probe_and_one_is_open_at_a_time() {
+    let (ctx, mut scene) = three();
     assert_eq!(scene.inspected_reflection_probe, None, "every card closed");
-    open(&ctx, &mut scene, "Probe 1");
+    click(&ctx, &mut scene, "Probe 1");
     assert_eq!(scene.inspected_reflection_probe, Some(1), "card 1 open");
-    open(&ctx, &mut scene, "Probe 2");
+    click(&ctx, &mut scene, "Probe 2");
+    assert_eq!(scene.inspected_reflection_probe, Some(2), "card 2 takes it");
+    assert_eq!(open_cards(&ctx, &mut scene), 1, "card 1 closed");
+    click(&ctx, &mut scene, "Probe 2");
     assert_eq!(
-        scene.inspected_reflection_probe,
-        Some(1),
-        "the first open card wins"
+        scene.inspected_reflection_probe, None,
+        "card 2 closed again"
     );
-    open(&ctx, &mut scene, "Probe 1");
+    assert_eq!(open_cards(&ctx, &mut scene), 0);
+}
+
+/// `Editor.InspectReflectionProbe`'s write opens the card, as a click does.
+#[test]
+fn inspecting_a_probe_opens_its_card() {
+    let (ctx, mut scene) = three();
+    scene.inspect_reflection_probe(2).unwrap();
+    assert_eq!(open_cards(&ctx, &mut scene), 1);
     assert_eq!(
         scene.inspected_reflection_probe,
         Some(2),
-        "card 1 closed again"
+        "drawing keeps it"
+    );
+    scene.inspected_reflection_probe = None;
+    assert_eq!(open_cards(&ctx, &mut scene), 0, "cleared, it closes");
+}
+
+/// Removing the open card's probe leaves no card open: not the next probe's,
+/// which now sits at the removed index.
+#[test]
+fn removing_the_inspected_probe_opens_no_other_card() {
+    let (ctx, mut scene) = three();
+    click(&ctx, &mut scene, "Probe 1");
+    click(&ctx, &mut scene, "Remove");
+    assert_eq!(scene.reflection_probes.len(), 2);
+    assert_eq!(scene.inspected_reflection_probe, None);
+    assert_eq!(
+        open_cards(&ctx, &mut scene),
+        0,
+        "probe 2, now 1, stays closed"
     );
 }

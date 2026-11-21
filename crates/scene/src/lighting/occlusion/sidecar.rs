@@ -6,8 +6,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::file::{decode, encode, is_unversioned, occlusion_path, version_of, SUFFIX};
-use super::{OcclusionData, OCCLUSION_VERSION};
+use super::file::{encode, occlusion_path, read, Refusal, SUFFIX};
+use super::OcclusionData;
 use crate::io::Saved;
 use crate::Scene;
 
@@ -44,7 +44,8 @@ enum Read {
     Unreadable(std::io::Error),
     Refused(Vec<u8>, String),
     /// Another bake version's file, refused by its version alone, and why
-    /// (`file::other_version`: older, newer, or from before the version field).
+    /// (`file::Refusal::OtherVersion`: older, newer, or `file::unversioned`'s
+    /// from before the version field).
     OtherVersion(Vec<u8>, String),
     /// The file's bytes, what a save would write (encoded afresh: a file that does
     /// not round-trip byte for byte never reads as a bake since), and the PVS.
@@ -57,20 +58,13 @@ pub fn read_sidecar(scene_path: &str) -> OcclusionFile {
     let read = match std::fs::read(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(e) => Read::Unreadable(e),
-        Ok(bytes) => match decode(&bytes) {
-            Err(e) if is_unversioned(&bytes) || other_version(&bytes) => {
-                Read::OtherVersion(bytes, e)
-            }
-            Err(e) => Read::Refused(bytes, e),
+        Ok(bytes) => match read(&bytes) {
+            Err(Refusal::OtherVersion(why)) => Read::OtherVersion(bytes, why),
+            Err(Refusal::Malformed(why)) => Read::Refused(bytes, why),
             Ok(data) => Read::Decoded(bytes, encode(&data), data),
         },
     };
     OcclusionFile { path, read }
-}
-
-/// Whether `bytes` are an occlusion file of another bake version.
-fn other_version(bytes: &[u8]) -> bool {
-    version_of(bytes).is_some_and(|v| v != OCCLUSION_VERSION)
 }
 
 /// Put what [`read_sidecar`] found on `scene` ([`load_sidecar`] says what each

@@ -1,11 +1,11 @@
-//! A level's lights by how they are shaded (#2523): the `lights` and `lights_live`
-//! rows, and the line under the table when any light is `Mixed`.
+//! A level's lights by how they are shaded (#2523): the `level_lights` and
+//! `level_lights_live` rows, and the line under the table when any light is `Mixed`.
 
 use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_scene::create::default_light;
 use rusty_scene::Scene;
 
-use super::{lights, mixed_lights, Lights};
+use super::{lights, mixed_lights, push_lights, Lights};
 use crate::bench::scenes::SceneReport;
 
 /// A scene with a point light of each of `modes`, and their ids.
@@ -44,20 +44,41 @@ fn a_light_of_each_mode_is_three_lights_two_live_and_one_mixed_named() {
         note,
         "1 of 3 lights is Mixed: their direct light is shaded live every frame"
     );
+}
+
+/// A report beside the frame counter `lights` (what a frame drew, ambient
+/// included) holding `drawn` of them, with the level's lights pushed after it.
+fn report(drawn: f64, level: Lights) -> SceneReport {
     let mut report = SceneReport::default();
-    report.push_value("lights", 3.0);
-    report.push_value("lights_live", 2.0);
-    report.warnings.push(note);
-    let text = report.render(None);
+    report.push_value("lights", drawn);
+    push_lights(&mut report, level);
+    report
+}
+
+/// The level's rows are named apart from the frame counter `lights`: each is
+/// found by its own name, and a comparison pairs each with its own.
+#[test]
+fn the_level_rows_sit_beside_the_frame_counter_and_compare_with_their_own() {
+    let level = lights(&scene(&[
+        LightMode::Realtime,
+        LightMode::Mixed,
+        LightMode::Baked,
+    ]));
+    let now = report(4.0, level);
+    let value = |r: &SceneReport, m: &str| r.row(m).map(|row| row.avg);
+    assert_eq!(value(&now, "lights"), Some(4.0));
+    assert_eq!(value(&now, "level_lights"), Some(3.0));
+    assert_eq!(value(&now, "level_lights_live"), Some(2.0));
+    let text = now.render(Some(&report(5.0, level)));
     let row = |m: &str| {
-        text.lines()
-            .find(|l| l.split_whitespace().next() == Some(m))
+        let line = text
+            .lines()
+            .find(|l| l.split_whitespace().next() == Some(m));
+        line.unwrap_or_else(|| panic!("no {m} row in\n{text}"))
     };
-    assert!(row("lights").is_some_and(|l| l.contains(" 3")), "{text}");
-    assert!(
-        row("lights_live").is_some_and(|l| l.contains(" 2")),
-        "{text}"
-    );
+    assert!(row("lights").ends_with("-1.000 (-20.0%)"), "{text}");
+    assert!(row("level_lights").ends_with(" ="), "{text}");
+    assert!(row("level_lights_live").ends_with(" ="), "{text}");
     assert!(text.contains("warning: 1 of 3 lights is Mixed"), "{text}");
 }
 

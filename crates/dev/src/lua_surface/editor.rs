@@ -3,6 +3,10 @@
 //! `Editor.Undo()` / `Editor.Redo()` walk the edit-mode history (`scene::undo`, #1631),
 //! Unity's `Undo.PerformUndo` / `PerformRedo`; `UndoName` / `RedoName` read it.
 //!
+//! `Editor.InspectReflectionProbe` / `ClearInspectedReflectionProbe` /
+//! `InspectedReflectionProbe` (#2525) set and read which reflection probe is
+//! selected (`probe_verbs`), as its card in the scene inspector does.
+//!
 //! `Editor.SetGizmo` / `Editor.GetGizmo` (#1909), Unity's
 //! `GizmoUtility.SetGizmoEnabled`: the Scene view's gizmo toggles, by the names of
 //! `core::application::Gizmo`'s table, through the same mailbox the demo verbs use
@@ -62,6 +66,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().is_playing())),
     )?;
     undo_verbs(&table, lua, scene)?;
+    probe_verbs(&table, lua, scene)?;
     demo_verbs(&table, lua, app, console)?;
     gizmo_verbs(&table, lua, app, console)?;
     super::game_view::verbs(&table, lua, app, console)?;
@@ -117,6 +122,37 @@ fn undo_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Re
         lua.create_function(move |lua, ()| {
             Ok(scene.get(lua)?.borrow().redo_name().map(str::to_string))
         }),
+    )?;
+    Ok(())
+}
+
+/// The inspected reflection probe (#2525, `Scene::inspected_reflection_probe`): a
+/// probe is no GameObject, so its open card in the scene inspector is its
+/// selection, the one whose volume the Scene view draws. `InspectReflectionProbe`
+/// does what opening its card does; an index past the probes is an error.
+fn probe_verbs(table: &mlua::Table, lua: &mlua::Lua, scene: ApiCell<Scene>) -> Reg {
+    put(
+        table,
+        "InspectReflectionProbe",
+        lua.create_function(move |lua, index: usize| {
+            let scene = scene.get(lua)?;
+            let inspected = scene.borrow_mut().inspect_reflection_probe(index);
+            let why = |e| mlua::Error::runtime(format!("Editor.InspectReflectionProbe: {e}"));
+            inspected.map_err(why)
+        }),
+    )?;
+    put(
+        table,
+        "ClearInspectedReflectionProbe",
+        lua.create_function(move |lua, ()| {
+            scene.get(lua)?.borrow_mut().inspected_reflection_probe = None;
+            Ok(())
+        }),
+    )?;
+    put(
+        table,
+        "InspectedReflectionProbe",
+        lua.create_function(move |lua, ()| Ok(scene.get(lua)?.borrow().inspected_reflection_probe)),
     )?;
     Ok(())
 }

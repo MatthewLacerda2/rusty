@@ -1,8 +1,9 @@
-//! Editor gizmo for the selected Area light (#1674): the rectangle the light emits
+//! Editor gizmo for the selected Area lights (#1674): the rectangle the light emits
 //! from and an arrow out of its lit face. Area lights are baked only, so in the
 //! editor viewport nothing else shows where one is or which way it shines; drawn
-//! for the selected light alone, as Unity shows a light's shape on selection, so a
-//! level of dozens of panels is not crossed by lines nobody asked for. Drawn as a
+//! for the selected entity and its descendants alone, as Unity draws a selected
+//! object's and its children's gizmos (a lamp's root selected shows its panel), so
+//! a level of dozens of panels is not crossed by lines nobody asked for. Drawn as a
 //! line list through the probe gizmos' path (`probes`), in the handles pass, never
 //! in a shipped game render.
 
@@ -12,22 +13,34 @@ use rusty_components::mesh::Vertex;
 use rusty_scene::lighting::area::AreaShape;
 use rusty_scene::{LightType, Scene};
 
-/// The selected Area light's gizmo tint: a pale yellow.
+/// A selected Area light's gizmo tint: a pale yellow.
 pub(super) const AREA_TINT: [f32; 4] = [1.0, 0.95, 0.5, 1.0];
 /// Length of the facing arrow, in world units.
 const ARROW: f32 = 0.5;
 
-/// The selected entity's gizmo when it is an active Area light: its world-space
-/// line list and tint. `None` for anything else.
-pub(super) fn area_light_gizmo(scene: &Scene) -> Option<(Vec<Vertex>, [f32; 4])> {
-    let id = scene.selected_entity_id?;
-    let light = scene.world.light(id)?;
-    if light.light_type != LightType::Area || !scene.world.is_active_in_hierarchy(id) {
-        return None;
+/// One gizmo per active Area light that is the selected entity or under it: its
+/// world-space line list and tint. None without a selection.
+pub(super) fn area_light_gizmos(scene: &Scene) -> Vec<(Vec<Vertex>, [f32; 4])> {
+    let Some(selected) = scene.selected_entity_id else {
+        return Vec::new();
+    };
+    let world = &scene.world;
+    let under = |id: u32| id == selected || world.ancestors(id).any(|a| a == selected);
+    let mut out = Vec::new();
+    for id in world.ids_with_light() {
+        let Some(light) = world.light(id) else {
+            continue;
+        };
+        if light.light_type != LightType::Area || !under(id) || !world.is_active_in_hierarchy(id) {
+            continue;
+        }
+        let area = AreaShape::of(scene, id, &light);
+        out.push((
+            area_lines(area.center, area.right, area.up, area.forward),
+            AREA_TINT,
+        ));
     }
-    let area = AreaShape::of(scene, id, &light);
-    let verts = area_lines(area.center, area.right, area.up, area.forward);
-    Some((verts, AREA_TINT))
+    out
 }
 
 /// The line list of one Area light: the rectangle spanned by the full edges
@@ -74,5 +87,31 @@ mod tests {
             (reach - ARROW).abs() < 1e-5,
             "nothing past the arrow: {reach}"
         );
+    }
+
+    /// A lamp: a root with an Area light under a shade; and an unrelated entity.
+    fn lamp() -> (Scene, [u32; 4]) {
+        let mut scene = Scene::new();
+        let [root, shade, panel, other] =
+            ["Lamp", "Shade", "Panel", "Crate"].map(|n| scene.add_entity(n.into()));
+        scene.set_parent(shade, Some(root)).unwrap();
+        scene.set_parent(panel, Some(shade)).unwrap();
+        let light = rusty_scene::LightComponent {
+            light_type: LightType::Area,
+            ..rusty_scene::create::default_light()
+        };
+        scene.world.set_light(panel, Some(light));
+        (scene, [root, shade, panel, other])
+    }
+
+    #[test]
+    fn an_area_light_draws_when_it_or_an_ancestor_is_selected() {
+        let (mut scene, [root, shade, panel, other]) = lamp();
+        for (selected, drawn) in [(root, 1), (shade, 1), (panel, 1), (other, 0)] {
+            scene.selected_entity_id = Some(selected);
+            assert_eq!(area_light_gizmos(&scene).len(), drawn, "{selected}");
+        }
+        scene.selected_entity_id = None;
+        assert!(area_light_gizmos(&scene).is_empty(), "nothing selected");
     }
 }

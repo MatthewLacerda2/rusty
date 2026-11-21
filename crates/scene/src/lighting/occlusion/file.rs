@@ -81,7 +81,7 @@ pub fn version_of(bytes: &[u8]) -> Option<u32> {
 
 /// Why a file of bake `version` is refused by this build, which reads and writes
 /// [`OCCLUSION_VERSION`] alone.
-fn other_version(version: u32) -> String {
+fn version_refused(version: u32) -> String {
     let age = if version < OCCLUSION_VERSION {
         "an older"
     } else {
@@ -112,7 +112,7 @@ fn rebake(what: &str) -> String {
 /// words (a `u32` count, 8 bytes each) and the cells (a `u32` count, 4 bytes each),
 /// ending exactly at the file's end. Its counts say how long it is, so a versioned
 /// file matches it only by an exact coincidence of lengths.
-pub(super) fn is_unversioned(bytes: &[u8]) -> bool {
+fn is_unversioned(bytes: &[u8]) -> bool {
     let count_at = |at: usize| -> Option<usize> {
         let b = bytes.get(at..at.checked_add(4)?)?;
         Some(u32::from_le_bytes(b.try_into().ok()?) as usize)
@@ -132,16 +132,37 @@ pub(super) fn is_unversioned(bytes: &[u8]) -> bool {
     bytes.starts_with(MAGIC) && walk() == Some(bytes.len())
 }
 
+/// Why [`read`] refused an occlusion file.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) enum Refusal {
+    /// Written by another bake version: an older or a newer one, or from before
+    /// the version field ([`unversioned`]). Re-baking is what clears it.
+    OtherVersion(String),
+    /// Of this version, or no occlusion file, and malformed.
+    Malformed(String),
+}
+
 /// The data `bytes` hold, or why they are refused. A file another bake version
 /// wrote is refused by its version before any other field is read, and one from
-/// before the version field (`is_unversioned`) as that, whatever its first `u32`.
-pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
-    decode_versioned(bytes).map_err(|e| {
+/// before the version field ([`is_unversioned`]) as that, whatever its first `u32`.
+/// The one place a refusal is told as another version's.
+pub(super) fn read(bytes: &[u8]) -> Result<OcclusionData, Refusal> {
+    decode_versioned(bytes).map_err(|why| {
         if is_unversioned(bytes) {
-            unversioned()
+            Refusal::OtherVersion(unversioned())
+        } else if version_of(bytes).is_some_and(|v| v != OCCLUSION_VERSION) {
+            Refusal::OtherVersion(why)
         } else {
-            e
+            Refusal::Malformed(why)
         }
+    })
+}
+
+/// The data `bytes` hold, or why they are refused, as text (`read`, which tells
+/// another version's file from a malformed one).
+pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
+    read(bytes).map_err(|refusal| match refusal {
+        Refusal::OtherVersion(why) | Refusal::Malformed(why) => why,
     })
 }
 
@@ -153,7 +174,7 @@ fn decode_versioned(bytes: &[u8]) -> Result<OcclusionData, String> {
     }
     let version = r.u32()?;
     if version != OCCLUSION_VERSION {
-        return Err(other_version(version));
+        return Err(version_refused(version));
     }
     let never_culled = r.u32()?;
     let floor = FloorSource::of_code(r.u32()?).ok_or("floor source out of range")?;

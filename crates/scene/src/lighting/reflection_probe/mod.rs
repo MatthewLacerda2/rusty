@@ -33,6 +33,7 @@
 //! This module is pure data + math — deterministic, no RNG/clock.
 
 mod blend;
+mod inspected;
 mod projection;
 mod set;
 mod volume;

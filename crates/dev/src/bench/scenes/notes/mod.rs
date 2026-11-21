@@ -133,10 +133,11 @@ pub fn lights(scene: &Scene) -> Lights {
     out
 }
 
-/// The `lights` and `lights_live` rows of `lights`, and its [`mixed_lights`] line.
+/// The `level_lights` and `level_lights_live` rows of `lights` (named apart from
+/// the frame counter `lights`, which counts what a frame drew, ambient included), and its [`mixed_lights`] line.
 pub(super) fn push_lights(report: &mut super::SceneReport, lights: Lights) {
-    report.push_value("lights", f64::from(lights.total));
-    report.push_value("lights_live", f64::from(lights.live));
+    report.push_value("level_lights", f64::from(lights.total));
+    report.push_value("level_lights_live", f64::from(lights.live));
     report.warnings.extend(mixed_lights(lights));
 }
 

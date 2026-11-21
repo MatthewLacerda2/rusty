@@ -837,7 +837,9 @@ make editor-capture OUT=after.png ARGS="--select Player"
 Options: `--project <dir>` (default `./project`), `--scene <path>` (a `.scene` in the
 project; default: the built-in default scene, in memory), `--select
 <name>`, `--select-asset <path>` (project-relative, e.g. `assets/scenes/a.scene`: open an asset's Inspector card — a `.scene`'s bake
-buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does), `--play`
+buttons, an image, audio or prefab card; exclusive with `--select`), `--frame` (frame the selection in the Scene view, as the F key does),
+`--inspect-reflection-probe <i>` (reflection probe `i` inspected first, as
+`Editor.InspectReflectionProbe` makes it: its card open and its volume drawn), `--play`
 (the Play-mode chrome; the sim is not stepped), `--game` (the Game tab), `--size <W>x<H>`
 (default 1600x900), `--demo <file>` and `--demo-tick <n>` (a demo open on the Game
 view's timeline, replayed to tick `n`, default 0; #1598), `--pointer <X>,<Y>` (the
@@ -1458,7 +1460,8 @@ every binary's open makes them.
     array), `gpu_mesh_mb` (the mesh vertex and index buffers) and
     `gpu_cluster_pool_mb` (what the clustered meshes lease of the cluster pool),
     as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys);
-  - `lights` and `lights_live`: the level's lights active in its hierarchy (the
+  - `level_lights` and `level_lights_live` (apart from the frame counter `lights`,
+    what a frame drew): the level's lights active in its hierarchy (the
     ambient light aside, which ignores modes), and of them those shaded live every
     frame, `Realtime` or `Mixed`, counted once after the load by what the level's
     file means (`LightComponent::effective_mode`, held to what the last bake made

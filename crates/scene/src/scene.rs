@@ -131,8 +131,9 @@ pub struct Scene {
     /// The reflection probe whose card the editor's scene inspector has open, by
     /// index into `reflection_probes`: probes are no entities, so this is their
     /// selection, the one whose volume the Scene view draws (Unity draws a probe's
-    /// bounds on selection). Written by the editor every frame; `None` outside it.
-    /// Never serialized.
+    /// bounds on selection). Set by opening its card, `Editor.InspectReflectionProbe`
+    /// (`Scene::inspect_reflection_probe`) and cleared by closing it,
+    /// `Editor.ClearInspectedReflectionProbe` or removing probes. Never serialized.
     pub inspected_reflection_probe: Option<usize>,
     /// The exposure the screen's view applied last, in EV (#1444): its automatic
     /// exposure's adapted value, read back from the GPU a frame or so late and
