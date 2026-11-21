@@ -185,7 +185,7 @@ fn the_size_gate_prints_the_signal_and_a_strict_run_fails_under_its_paths() {
     );
     assert!(signal
         .body
-        .contains("comment-history: 1 issue or PR numbers in 1 files"));
+        .contains("comment-history: 1 lines naming an issue or PR, in 1 files"));
     let strict = |paths: &[&str]| {
         let mut args = vec![STRICT.to_string()];
         args.extend(paths.iter().map(ToString::to_string));

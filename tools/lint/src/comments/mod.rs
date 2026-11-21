@@ -201,7 +201,7 @@ impl Tally {
         format!(
             "signal (not a failure): {CAP}: {} of {} files over their cap, {} words over; \
              `make comments PATHS=<dir>` lists them\n\
-             signal (not a failure): {HISTORY}: {} issue or PR numbers in {} files; \
+             signal (not a failure): {HISTORY}: {} lines naming an issue or PR, in {} files; \
              `make comments PATHS=<dir>` lists them\n",
             self.over, self.files, self.words_over, self.refs, self.with_refs
         )

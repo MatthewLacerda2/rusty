@@ -328,8 +328,9 @@ read.
 
 **They are signals while the tree is cut down to them**: `make size` (and so `make
 gates`, the commit hook and CI) prints one line each under `signal (not a
-failure)` with the totals, files over the cap and words over, references and the
-files holding them, and stays green. **`make comments PATHS=<files or folders>`**
+failure)` with the totals, files over the cap and words over, lines naming an
+issue or PR (each counted once, by its first reference) and the files holding
+them, and stays green. **`make comments PATHS=<files or folders>`**
 (`tools/lint -- --strict-comments <paths>`) is the strict run: every finding under
 those paths as `path:line: [rule] message`, exit 1 on any, so a cleanup branch asks
 "is `crates/audio` clean?".
