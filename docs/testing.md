@@ -1062,7 +1062,9 @@ Harness.AssertBudget{ draw_calls = 2000, lights_dropped = 0, fixed_update_ms = 4
   `draw_calls` budget in a run with no `Screenshot` is a mistake, not a pass.
 - **Counts are deterministic, timings are not.** Budget counters (`draw_calls`,
   `triangles`, `lights_dropped`, `entities`, …) for a regression guard that must hold on
-  every machine. A `_ms` budget measures *this* machine — CI runners are slow software
+  every machine; under a preset with `gpu_occlusion_culling` on, `triangles`,
+  `hiz_culled`, `hiz_late`, `hiz_depth_triangles` and `cluster_culled` are read back from the GPU a frame or so late, so budget
+  them with room. A `_ms` budget measures *this* machine — CI runners are slow software
   adapters — so keep it generous or for local profiling only.
 - **Where the numbers land:** `results.json` gains a `stats` block with the counts only
   (`frames`, `drawn_frames` and the count metrics), so a replay stays byte-identical; `<out_dir>/stats.json` holds everything, per-system
