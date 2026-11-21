@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 use rusty_components::LightMode;
 
+use crate::runtime::renumber::Moves;
+
 /// Whether the lightmap bake takes mesh `id` in: active, static, unskinned and no
 /// light gizmo. Such a mesh occludes, bounces and emits in the bake whether or not
 /// it receives a lightmap, so the renderer's SSIL gathers none of its emission once
@@ -127,30 +129,49 @@ impl LightmapSet {
         }
     }
 
-    /// Rename every entity the set names through `moved` (old id → new), under a
-    /// preview ([`Self::shown_over`]) too: a load moving incoming ids out of the
-    /// survivors' way (`Scene::renumber`). `moved`'s new ids are fresh, so no
-    /// two entities end on one id.
-    pub fn remap(&mut self, moved: &BTreeMap<u32, u32>) {
-        let to = |id: u32| moved.get(&id).copied().unwrap_or(id);
-        let entries = std::mem::take(&mut self.entries).into_values();
-        self.entries = entries
+    /// The same set with every entity it names renamed through `moves` (a load on
+    /// the document's set, which holds no preview). `None` when two would share an
+    /// id, as `OcclusionData::remap` refuses: a merge would give one entity
+    /// another's page or channel. New ids are fresh, so only a malformed file (a
+    /// baked id at or past its next id) collides.
+    pub(crate) fn remap(&self, moves: &Moves) -> Option<Self> {
+        let to = |id: u32| moves.to(id);
+        let entries: BTreeMap<_, _> = self
+            .entries
+            .values()
             .map(|e| {
                 (
                     to(e.entity),
                     LightmapEntry {
                         entity: to(e.entity),
-                        ..e
+                        ..e.clone()
                     },
                 )
             })
             .collect();
-        self.lights = self.lights.iter().map(|&id| to(id)).collect();
-        self.channels = self.channels.iter().map(|(&id, &c)| (to(id), c)).collect();
-        self.fell_back = self.fell_back.iter().map(|&id| to(id)).collect();
-        if let Some(own) = &mut self.shown_over {
-            own.remap(moved);
-        }
+        let lights: BTreeSet<_> = self.lights.iter().map(|&id| to(id)).collect();
+        let channels: BTreeMap<_, _> = self.channels.iter().map(|(&id, &c)| (to(id), c)).collect();
+        let fell_back: BTreeSet<_> = self.fell_back.iter().map(|&id| to(id)).collect();
+        let whole = entries.len() == self.entries.len()
+            && lights.len() == self.lights.len()
+            && channels.len() == self.channels.len()
+            && fell_back.len() == self.fell_back.len();
+        whole.then(|| Self {
+            entries,
+            lights,
+            channels,
+            fell_back,
+            ..self.clone()
+        })
+    }
+
+    /// Drop `ids` from the four fields keyed by entity: a load's survivors carry
+    /// none of the level's baked data (on the document's set: no preview).
+    pub(crate) fn forget(&mut self, ids: &BTreeSet<u32>) {
+        self.entries.retain(|id, _| !ids.contains(id));
+        self.lights.retain(|id| !ids.contains(id));
+        self.channels.retain(|id, _| !ids.contains(id));
+        self.fell_back.retain(|id| !ids.contains(id));
     }
 
     /// Every entry, in entity order.

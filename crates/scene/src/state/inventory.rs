@@ -112,7 +112,7 @@ authored_fields!(scene_state {
         // file the lighting save writes beside the lightmaps, so it saves as them.
         // Keyed by entity, but checked against each entity's fingerprint on use, so
         // a despawn or a Play load leaves it as it is; a load's renumbering renames
-        // its objects (`runtime::load::RENUMBERED`).
+        // its objects once its file is in (`runtime::renumber::RENUMBERED`).
         occlusion: BakeOutput, Checked as ["lightmaps"];
         // The saved navmesh (#1887) is no document field either: it is the
         // `<scene>.navmesh` file a save writes beside the scene, read on load. Checked

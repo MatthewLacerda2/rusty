@@ -148,7 +148,8 @@ pub enum Keyed {
     /// Dropped on despawn, and put back with its entity when the Destroy is undone.
     Restored,
     /// Names entities, but checks each against its fingerprint on use, so a
-    /// despawn and a Play load leave it as it is (the baked PVS).
+    /// despawn leaves it as it is and a Play load keeps it, though the load may
+    /// rename its ids (`runtime::renumber`): the baked PVS.
     Checked,
 }
 

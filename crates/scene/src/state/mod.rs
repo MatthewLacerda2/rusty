@@ -26,7 +26,7 @@
 //!   same for the tables keyed by entity id
 //!   (lightmap entries, owned decals, …), through the despawn door and the Undo of
 //!   a Destroy, and `renumber_tests` holds every saved one to the renumbering a
-//!   load runs when it moves incoming ids (`runtime::load::RENUMBERED`).
+//!   load runs when it moves incoming ids (`runtime::renumber::RENUMBERED`).
 //!
 //! The host's state (the save data, the
 //! settings, the seed, the clock, the Game view), is not the scene's: a replay
