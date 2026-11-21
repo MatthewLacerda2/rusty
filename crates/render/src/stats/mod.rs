@@ -12,7 +12,10 @@ pub struct RenderCounters {
     /// prepass, particle batches and UI batches; one mesh + material is one instanced
     /// draw (#470). Decals (folded into surfaces, #638), post-FX and the sky: none.
     pub draw_calls: u32,
-    /// Triangles of the solid, transparent, shadow and prepass draws (not the GPU cull's late set).
+    /// Triangles of the solid, transparent, shadow and prepass draws. A pass the
+    /// GPU occlusion cull draws (its phase one, the late set, the final set, by
+    /// cluster where it draws so) counts what its indirect args drew, read back
+    /// like `hiz_culled`, a frame or so late (#2387).
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,
@@ -55,6 +58,14 @@ pub struct RenderCounters {
     /// Of the visible ones, those phase one did not draw (#2336, the late set the
     /// prepass adds), summed over the views: `0` held still. Read back likewise.
     pub hiz_late: u32,
+    /// Of `triangles`, those the GPU occlusion cull's phase one drew (#2387): last
+    /// frame's visible set's depth, the occluders the pyramid is built from,
+    /// summed over the camera views. Read back like `hiz_culled`.
+    pub hiz_depth_triangles: u64,
+    /// Of `draw_calls`, the forward draws of the batches drawn by cluster
+    /// (#1968, #2387): one per instance where a batch otherwise is one, summed
+    /// over the camera views.
+    pub cluster_draws: u32,
     /// Clusters of big meshes tested one by one after the Hi-Z instance test
     /// (#1968): every cluster of each instance it judged in a batch drawn by
     /// cluster, summed over the camera views.

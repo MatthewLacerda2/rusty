@@ -46,9 +46,24 @@ impl Renderer {
     /// batches.
     pub(crate) fn count_camera(&mut self, solids: &SolidResources, particles: ParticleDraws) {
         let c = &mut self.frame_counters;
-        let clustered = solids.culled.as_ref().and_then(|c| c.clusters.as_ref());
+        let culled = solids.culled.as_ref();
+        let clustered = culled.and_then(|c| c.clusters.as_ref());
         let clustered = clustered.map_or(&[][..], |c| &c.draws[..]);
-        c.add_draws(draws_of(solids.draws.batches(), clustered));
+        c.add_draws(draws_of(solids.draws.transparent.iter(), &[]));
+        let draws = draws_of(solids.draws.opaque.iter(), clustered);
+        match culled {
+            // The GPU decided what each opaque draw drew: its last read back says (#2387).
+            Some(culled) => {
+                c.draw_calls += draws.count() as u32;
+                c.triangles += culled.triangles.last;
+                c.cluster_draws += clustered
+                    .iter()
+                    .flatten()
+                    .map(|j| j.len() as u32)
+                    .sum::<u32>();
+            }
+            None => c.add_draws(draws),
+        }
         c.visible_entities += solids.visible;
         c.cull_tested += solids.culls.tested;
         c.culled_entities += solids.culls.culled;

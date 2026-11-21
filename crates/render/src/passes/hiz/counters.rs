@@ -33,30 +33,48 @@ pub(crate) struct Counter {
     /// The second count the last read's words carried: the late set's drawn
     /// instances for an instance cull's (#2336), `0` for a cluster cull's.
     pub(crate) late: u32,
+    /// The triangles the last read's draws drew (#2387), by pass; none for a
+    /// cluster cull's.
+    pub(crate) triangles: Triangles,
 }
 
-/// Reads what a copy's words drew: the items drawn, and a second count beside
-/// them ([`Counter::late`]).
-pub(crate) type Reader = fn(&[u32]) -> (u32, u32);
+/// What a read's words say: the items drawn, a second count beside them
+/// ([`Counter::late`]) and the triangles drawn ([`Counter::triangles`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Read {
+    pub drawn: u32,
+    pub late: u32,
+    pub triangles: Triangles,
+}
+
+/// The triangles a camera's indirect draws drew (#2387), read from their args:
+/// phase one's depth, the late set's (drawn by the depth prepass, where it
+/// runs) and the final set's (the forward pass's, by cluster where it draws so).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Triangles {
+    pub phase_one: u64,
+    pub late: u64,
+    pub last: u64,
+}
 
 impl Counter {
-    /// How many instances the final args and, after them, the late set's draw
-    /// (five words a batch, as many batches each): one copy of both (#2336), so
-    /// the two counts describe the same frame.
-    pub(crate) fn final_and_late(words: &[u32]) -> (u32, u32) {
-        let instances = |args: &[u32]| args.chunks_exact(5).map(|a| a[1]).sum();
-        let (last, late) = words.split_at(words.len() / 10 * 5);
-        (instances(last), instances(late))
+    /// The count in a buffer's first word.
+    pub(crate) fn first_word(words: &[u32]) -> Read {
+        Read {
+            drawn: words.first().copied().unwrap_or(0),
+            ..Read::default()
+        }
     }
 
-    /// The count in a buffer's first word.
-    pub(crate) fn first_word(words: &[u32]) -> (u32, u32) {
-        (words.first().copied().unwrap_or(0), 0)
+    /// Whether no read is in flight, so the next [`Self::copy`] copies.
+    pub(crate) fn idle(&self) -> bool {
+        self.in_flight.is_none()
     }
 
     /// Take a finished read's counts, if one came back: `read` reads how many
-    /// tested items were drawn, and its second count, from the copied words.
-    pub(crate) fn collect(&mut self, device: &wgpu::Device, read: Reader) {
+    /// tested items were drawn, its second count and its triangles, from the
+    /// copied words.
+    pub(crate) fn collect(&mut self, device: &wgpu::Device, read: impl FnOnce(&[u32]) -> Read) {
         let Some((tested, bytes)) = self.in_flight else {
             return;
         };
@@ -74,10 +92,10 @@ impl Counter {
             .get_mapped_range()
             .map(|view| read(bytemuck::cast_slice(&view)));
         staging.unmap();
-        if let Ok((drawn, late)) = read {
-            self.culled = tested.saturating_sub(drawn);
-            self.drawn = drawn;
-            self.late = late;
+        if let Ok(read) = read {
+            self.culled = tested.saturating_sub(read.drawn);
+            (self.drawn, self.late) = (read.drawn, read.late);
+            self.triangles = read.triangles;
         }
         self.in_flight = None;
     }
@@ -93,6 +111,7 @@ impl Counter {
         }
         self.copied = false;
         (self.culled, self.drawn, self.late) = (0, 0, 0);
+        self.triangles = Triangles::default();
     }
 
     /// Whether the read in flight is mapped and readable now. A refused map
@@ -119,19 +138,20 @@ impl Counter {
         self.culled
     }
 
-    /// Record a copy of `bytes` (a multiple of 4) of `source` from byte `at`, when
-    /// no read is in flight.
+    /// Record a copy of `segments`, each `(source, from byte, bytes)` (multiples
+    /// of 4), one after another into one staging buffer, when no read is in
+    /// flight: one read back of them all, so their counts describe one frame.
     pub(crate) fn copy(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        (source, at, bytes): (&wgpu::Buffer, u64, u64),
+        segments: &[(&wgpu::Buffer, u64, u64)],
     ) {
         self.copied = false;
         if self.in_flight.is_some() {
             return;
         }
-        let bytes = bytes.max(4);
+        let bytes = segments.iter().map(|s| s.2).sum::<u64>().max(4);
         if self.staging.as_ref().is_none_or(|s| s.size() < bytes) {
             self.staging = Some(device.create_buffer(&wgpu::BufferDescriptor {
                 label: Some("Hi-Z Counter Read Back"),
@@ -141,8 +161,14 @@ impl Counter {
             }));
         }
         let staging = self.staging.as_ref().expect("made above");
-        let copied = bytes.min(source.size().saturating_sub(at));
-        encoder.copy_buffer_to_buffer(source, at, staging, 0, copied);
+        let mut to = 0;
+        for &(source, at, wanted) in segments {
+            let copied = wanted.min(source.size().saturating_sub(at));
+            if copied > 0 {
+                encoder.copy_buffer_to_buffer(source, at, staging, to, copied);
+            }
+            to += wanted;
+        }
         self.copied = true;
         self.in_flight = Some((0, bytes));
     }
@@ -224,14 +250,5 @@ mod tests {
         let mut mapped = reading(MAPPED);
         assert!(mapped.settle());
         assert_eq!(mapped.mapped.load(Ordering::Acquire), PENDING);
-    }
-
-    #[test]
-    fn one_copy_of_both_args_counts_the_final_and_the_late_draws_apart() {
-        // Two batches: final args drawing 3 and 4, then late args drawing 1 and 0.
-        let words = [6, 3, 0, 0, 0, 6, 4, 0, 0, 3, 6, 1, 0, 0, 3, 6, 0, 0, 0, 7];
-        assert_eq!(Counter::final_and_late(&words), (7, 1));
-        assert_eq!(Counter::final_and_late(&words[..10]), (3, 4), "one batch");
-        assert_eq!(Counter::final_and_late(&[]), (0, 0));
     }
 }

@@ -104,8 +104,7 @@ impl ClusterCull {
         }
     }
 
-    /// The jobs' indirect args, for a test's read back.
-    #[cfg(test)]
+    /// The jobs' indirect args: the per-instance draws' (#2387's read back).
     pub(crate) fn args(&self) -> &wgpu::Buffer {
         self.out_args.buffer()
     }
@@ -152,7 +151,7 @@ impl Renderer {
         batches: usize,
     ) -> ClusterDraws {
         cull.counter
-            .copy(&self.device, encoder, (cull.tally.buffer(), 0, 4));
+            .copy(&self.device, encoder, &[(cull.tally.buffer(), 0, 4)]);
         ClusterDraws {
             indices: cull.out_indices.buffer().clone(),
             args: cull.out_args.buffer().clone(),

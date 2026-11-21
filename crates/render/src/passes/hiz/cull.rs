@@ -4,7 +4,8 @@
 
 use super::clusters::plan::Plan;
 use super::clusters::{ClusterCull, ClusterDraws};
-use super::counters::Counter;
+use super::counters::{Counter, Triangles};
+use super::drawn::Layout;
 use super::pyramid::Pyramid;
 use super::stage::{lap_of, HOLD_LAP};
 use super::tables::Tables;
@@ -31,6 +32,9 @@ pub(crate) struct Culled {
     /// The final draws' only: where in `args` the late set's draws start
     /// (#2336, [`Self::late`]).
     late: Option<u64>,
+    /// The final draws' only: the triangles the camera's culled passes drew,
+    /// as last read back ([`drawn`](super::drawn), #2387), a frame or so late.
+    pub triangles: Triangles,
 }
 
 impl Culled {
@@ -73,8 +77,10 @@ pub(crate) struct CameraCull {
     pub(super) kept: [GrowBuffer; 2],
     pub(super) args: [GrowBuffer; 2],
     /// How many instances its final draws and its late set (#2336) drew, one
-    /// read back of both ([`Counter::final_and_late`]).
+    /// read back of both and of what they drew ([`Layout::read`]).
     pub(super) counter: Counter,
+    /// Which batches the read in flight's draws drew ([`Layout`], #2387).
+    pub(super) reading: Layout,
     /// Its per-cluster cull (#1968).
     pub(crate) clusters: ClusterCull,
     /// The two `hiz.wgsl` groups (phase one's, then the test's and final), kept
@@ -117,6 +123,7 @@ impl CameraCull {
             kept: [0, 1].map(|_| buffer("Hi-Z Kept Instances", U::empty())),
             args: [0, 1].map(|_| buffer("Hi-Z Indirect Args", indirect)),
             counter: Counter::default(),
+            reading: Layout::default(),
             clusters: ClusterCull::new(device),
             groups: Kept::default(),
             culled: Kept::default(),
@@ -182,7 +189,9 @@ impl Renderer {
     ) -> ([Culled; 2], Plan) {
         let cam = &mut view.hiz.cameras[idx];
         let pyramid = view.hiz.pyramid.as_ref().expect("held");
-        cam.counter.collect(&self.device, Counter::final_and_late);
+        let reading = &cam.reading;
+        cam.counter
+            .collect(&self.device, |words| reading.read(words));
         cam.clusters
             .counter
             .collect(&self.device, Counter::first_word);
@@ -224,11 +233,13 @@ impl Renderer {
             at: 0,
             clusters: None,
             late: None,
+            triangles: Triangles::default(),
         };
         let mut culled = std::mem::take(&mut cam.culled);
         let mut draws = culled.get(key.clone(), || key.each_ref().map(make)).clone();
         cam.culled = culled;
         draws[1].late = Some(late_args(solids.draws.opaque.len()));
+        draws[1].triangles = cam.counter.triangles;
         (draws, plan)
     }
 }
