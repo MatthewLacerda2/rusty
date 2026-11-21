@@ -82,6 +82,7 @@ mod reflection_probe_seam_screenshot;
 mod render_texture_scene;
 mod render_texture_screenshot;
 mod ribbons_screenshot;
+mod runtime_light_shadow;
 mod settle_frames;
 mod shared_mesh_edit;
 mod skinned_shadows_screenshot;

@@ -43,18 +43,30 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
     id
 }
 
-/// Make entity `id`'s light `Realtime` when it was created during Play (#2522):
-/// no bake can take in a light the edit-mode scene never held, so a `Baked` one
-/// made at runtime (a muzzle flash) would light nothing in a shipped game. As in
-/// Unity, a light made at runtime is live. In edit mode it keeps the default,
-/// `Baked`. `Scene.CreateEntity` and `Scene.AddComponent` both come through here;
-/// a prefab instantiated at runtime keeps what its file says.
+/// How far from the camera, in multiples of its range, a light made during Play
+/// keeps its shadow (#2522): four ranges, so a shadow is drawn while the light's
+/// pool can still fill a fair part of the screen, and past that the light samples
+/// no shadow map. The shadow atlas already sizes a tile by the light's size on
+/// screen, so a far shadow was a small tile; the fade drops it altogether.
+pub const RUNTIME_SHADOW_FADE_RANGES: f32 = 4.0;
+
+/// Make entity `id`'s light live when it was created during Play (#2522): no bake
+/// can take in a light the edit-mode scene never held, so a `Baked` one made at
+/// runtime (a muzzle flash) would light nothing in a shipped game. As in Unity, a
+/// light made at runtime is `Realtime`. It casts shadows, at the cheapest settings
+/// the component has: `cast_shadows` on and a `shadow_fade_distance` of
+/// [`RUNTIME_SHADOW_FADE_RANGES`] times its range. In edit mode it keeps the
+/// defaults, `Baked` and unshadowed. `Scene.CreateEntity` and `Scene.AddComponent`
+/// both come through here; a prefab instantiated at runtime keeps what its file
+/// says.
 pub fn live_in_play(scene: &mut Scene, id: u32) {
     if !scene.is_playing() {
         return;
     }
     if let Some(mut light) = scene.world.light_mut(id) {
         light.mode = rusty_components::LightMode::Realtime;
+        light.cast_shadows = true;
+        light.shadow_fade_distance = light.range * RUNTIME_SHADOW_FADE_RANGES;
     }
 }
 

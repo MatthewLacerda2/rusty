@@ -1,12 +1,14 @@
 //! A light made while the game plays is live (#2522): no bake can take in a light
 //! the edit-mode scene never held, so `Baked`, the edit-mode default, would light
-//! nothing in a shipped game. One made in edit mode stays `Baked`.
+//! nothing in a shipped game. It casts a shadow that fades a few ranges from the
+//! camera. One made in edit mode stays `Baked` and unshadowed.
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use rusty::components::LightMode;
 use rusty::edit::authoring::{add_component, create_entity, ComponentKind, Primitive};
+use rusty::scene::create::RUNTIME_SHADOW_FADE_RANGES;
 use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};
@@ -35,6 +37,9 @@ fn a_light_created_in_update_is_realtime_and_drawn_live() {
         let id = scene.world.find_by_name(name).expect("the script made it");
         let light = scene.world.light(id).expect("a light").clone();
         assert_eq!(light.mode, LightMode::Realtime, "{name}");
+        assert!(light.cast_shadows, "{name}: a runtime light casts shadows");
+        let fade = light.range * RUNTIME_SHADOW_FADE_RANGES;
+        assert_eq!(light.shadow_fade_distance, fade, "{name}: and fades them");
         for preview in [true, false] {
             let drawn = scene.drawn_mode(id, &light, preview);
             assert!(drawn.renders_live(false), "{name} preview={preview}");
@@ -43,7 +48,7 @@ fn a_light_created_in_update_is_realtime_and_drawn_live() {
     }
 }
 
-/// In edit mode both entry points give the default, `Baked`.
+/// In edit mode both entry points give the defaults: `Baked`, no shadow.
 #[test]
 fn a_light_created_in_edit_mode_is_baked() {
     let mut scene = Scene::new();
@@ -51,6 +56,8 @@ fn a_light_created_in_edit_mode_is_baked() {
     let empty = scene.add_entity("Empty".to_string());
     assert!(add_component(&mut scene, empty, ComponentKind::Light));
     for id in [lamp, empty] {
-        assert_eq!(scene.world.light(id).unwrap().mode, LightMode::Baked);
+        let light = scene.world.light(id).unwrap();
+        assert_eq!(light.mode, LightMode::Baked);
+        assert!(!light.cast_shadows && light.shadow_fade_distance == 0.0);
     }
 }

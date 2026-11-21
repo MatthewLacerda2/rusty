@@ -21,8 +21,8 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.GetIntensity` / `SetIntensity` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
-| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
-| `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade; clamped ≥ 0; NaN or `math.huge` reads as 0) |
+| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`, `true` for a light created during Play, *Mode*; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
+| `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade, or four times the range for a light created during Play; clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` (an Area light reads `"Baked"` and refuses all but `"Baked"`, with a console warning) |
 | `Light.GetAreaSize` / `SetAreaSize` | `(id)` / `(id, width, height)` | `width, height` in world units (default `1, 1`; each side floored at `0.01`; a NaN or `math.huge` side refuses the whole size, keeping the current one; `0, 0` with no light) |
 
@@ -97,7 +97,8 @@ one included, with its single colour (`Lighting.md`, *Environment*).
 it live and shadow it, a scene with no live directional light fits, draws and samples
 no cascade at all (#1713). A point or
 spot light casts only when `SetCastShadows(id, true)` (off by default, as in Unity:
-each one costs a depth pass per tile). Shadowed point and spot lights share one
+each one costs a depth pass per tile), or when a script creates it while the game
+plays (*Mode*, below). Shadowed point and spot lights share one
 2048² **shadow atlas** (#468): a spotlight takes one tile, a point light six (one
 per cube face). Each frame the atlas goes to the most important lights the camera
 can see — screen coverage times intensity — at 512² down to 128² per tile, nearer
@@ -125,7 +126,8 @@ their shadow, skinned meshes cast in their animated pose. Lit particles are not
 shadowed. **Shadow fade distance** (`SetShadowFadeDistance`, HDRP's *Shadow Fade
 Distance*, #1712) stops a far light's shadow from being sampled: over the last tenth
 of that distance between the camera and the light the shadow fades out, and past it
-the light shades unshadowed. `0`, the default, never fades. The light keeps its
+the light shades unshadowed. `0`, the default, never fades; a light created
+during Play starts at four times its range. The light keeps its
 atlas tiles either way.
 
 ### Cast Shadows
@@ -189,8 +191,14 @@ whether it is drawn live:
   a scene or prefab file whose light has no `mode`). A light created **while the
   game plays** (`Scene.CreateEntity` or `Scene.AddComponent` during Play: a muzzle
   flash) is `Realtime` instead, as in Unity: no bake can take in a light the
-  edit-mode scene never held. A prefab instantiated at runtime keeps the mode its
-  file says. Unity's default is `Realtime`; rusty's levels are lit by
+  edit-mode scene never held. It also casts shadows, at the cheapest settings the
+  component has: `cast_shadows` on and a shadow fade distance of four times its
+  range (both off in edit mode), so its shadow is drawn while its pool can fill a
+  fair part of the screen and sampled no further (*Shadows*, below). To make it
+  cheaper still: a spot is one shadow view where a point is six, a short range
+  keeps its tiles small and its fade near, and a flash too brief to read a shadow
+  from takes `SetCastShadows(id, false)`. A prefab instantiated at runtime keeps
+  the mode and shadows its file says. Unity's default is `Realtime`; rusty's levels are lit by
   their bake, so a light is `Baked` unless it must move, flash or switch at
   runtime, and then it says `Realtime` (`SetMode`). Once baked it costs nothing at
   runtime: it is never drawn live. Static
