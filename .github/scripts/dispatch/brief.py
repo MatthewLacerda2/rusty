@@ -13,6 +13,7 @@ from __future__ import annotations
 import re
 
 import ghrest
+from dispatch import routine
 
 #: Who may brief a coder: people who can push to the repository, the one
 #: definition the merge path's review gate reads too (#1764).
@@ -40,7 +41,8 @@ def newest(comments: list[dict]) -> dict | None:
 
 
 def read(issue: dict, comments: list[dict]) -> dict:
-    """The brief to launch on, or [`Refused`] saying why not."""
+    """The brief to launch on, or [`Refused`] saying why not (a `Model:` line naming no
+    model too, so a launch is refused before it waits in the line)."""
     number = issue.get("number")
     if "pull_request" in issue:
         raise Refused(f"#{number} is a pull request; brief its issue")
@@ -49,6 +51,10 @@ def read(issue: dict, comments: list[dict]) -> dict:
     stops = STOPS & {label.get("name") for label in issue.get("labels") or []}
     if stops:
         raise Refused(f"#{number} is labelled {', '.join(sorted(stops))}: not startable (CLAUDE.md, stage labels)")
+    try:
+        routine.model_for(issue.get("body"))
+    except ValueError as why:
+        raise Refused(f"#{number}: {why}") from None
     brief = newest(comments)
     if brief is None:
         raise Refused(f"#{number} has no comment starting with `Brief` (issue-batch, the brief template)")

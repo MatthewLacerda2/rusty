@@ -262,7 +262,7 @@ fn close(line: &str, from: usize, kind: Open) -> Option<usize> {
 
 /// After a `'` at `from - 1`: past a char literal (`'x'`, `'\''`, `'\u{7f}'`), or
 /// `None` for a lifetime (`'a`).
-fn char_end(line: &str, from: usize) -> Option<usize> {
+pub(crate) fn char_end(line: &str, from: usize) -> Option<usize> {
     let rest = &line[from..];
     if let Some(escaped) = rest.strip_prefix('\\') {
         let skip = escaped.chars().next()?.len_utf8();
