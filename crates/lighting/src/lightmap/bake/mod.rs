@@ -180,7 +180,8 @@ pub(in crate::lightmap) fn texel(
         return TexelLight::INSIDE;
     }
     let mut rng = Rng::new(s.seed, mesh, index);
-    tracer.texel(p.position, p.normal, s.samples, s.bounces, &mut rng)
+    let samples = (s.samples, s.direct_sample_count());
+    tracer.texel(p.position, p.normal, samples, s.bounces, &mut rng)
 }
 
 /// The bake log's one line for UV islands with no valid texel (#1949): a box's face

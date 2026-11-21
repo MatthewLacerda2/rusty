@@ -71,8 +71,8 @@ first.
 | `Lighting.IsRunning` *(dev-only)* | `()` | `true` while the editor's Generate Lighting or Bake Occlusion runs, or a `GenerateAsync` waits to start it |
 | `Lighting.GetBakeStatus` *(dev-only)* | `()` | `{ state, message }`: the editor's last background bake (the button's or `GenerateAsync`'s). `state` is `idle`, `requested`, `running`, `done`, `cancelled`, `failed` or `refused`; `message` is its summary or why, `nil` until it ended |
 | `Lighting.BakeOcclusion` *(dev-only)* | `()` | `{ cells, objects, occluders, neverCulled, bytes, tooLarge }` — only Generate Lighting's occlusion step (*Occlusion culling*, below), written beside the scene; the counts `0` when nothing occludes, and `tooLarge` (a boolean) `true`, with `cells` and `bytes` `0` and no PVS kept, when the level is too large to cull |
-| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
-| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
+| `Lighting.GetSettings` *(dev-only)* | `()` | `{ texelsPerUnit, samples, directSamples, bounces, seed, directional, maxLightmapSize, denoiser, backfaceTolerance, samplesPerPass, prioritizeView, diffuseModel, mixedLightingMode, reflectionResolution, reflectionBudgetMB, reflectionMaxProbes }` |
+| `Lighting.SetSettings` *(dev-only)* | `({ texelsPerUnit?, samples?, directSamples?, bounces?, seed?, directional?, maxLightmapSize?, denoiser?, backfaceTolerance?, samplesPerPass?, prioritizeView?, diffuseModel?, mixedLightingMode?, reflectionResolution?, reflectionBudgetMB?, reflectionMaxProbes? })` | — |
 | `Lighting.Bake` *(dev-only)* | `([probeSpacing], [reflectionRegion])` | `true` if at least one GPU bake ran, `false` if both skipped (no adapter) |
 | `Lighting.BakeLightmaps` *(dev-only)* | `([texelsPerUnit], [samples], [bounces], [seed], [directional])` | number of lightmaps written |
 | `Lighting.ClearLightmaps` *(dev-only)* | `()` | — |
@@ -81,11 +81,12 @@ first.
 ### Generate Lighting
 
 - **Settings live with the scene** (Unity's Lighting Settings): texels per unit, samples,
-  bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance, the directional mode and
+  direct samples, bounces, seed, Max Lightmap Size, the denoiser, Backface Tolerance, the directional mode and
   the progressive bake's samples per pass and Prioritize View are saved in the scene file's
   `lighting_settings` block, so a rebake never asks for them again.
   `Lighting.SetSettings{ samples = 256 }` changes only the fields it names (each clamped
-  to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `1`–`16`
+  to the editor's range: `0.25`–`64` texels per unit, `1`–`4096` samples, `0`–`4096`
+  direct samples, `1`–`16`
   bounces, `0`–`1` Backface Tolerance, Max Lightmap Size below; a NaN or infinite density takes
   the default `8` (a NaN or infinite tolerance its default `0.9`), and
   a file's out-of-range value is held the same way when the scene loads); the editor's card edits the
@@ -440,9 +441,39 @@ lighting settings (above), whose defaults are the ones listed here.
   ring: `maxLightmapSize − 8` (1016 at the default 1024, #1704). A map above half the page
   leaves the rest of it to smaller maps. The bounce is then cleaned by the denoiser
   (*Denoising*, below); baked direct light never is, so a point, spot or directional light's shadows stay sharp; an Area
-  light's (#1674) are soft, its rectangle integrated over `samples` or more jittered
-  points per texel. A texel buried inside other geometry (floor
-  under a crate) is filled from its neighbours rather than baked black (*Backface
+  light's (#1674) are soft, its rectangle integrated over `directSamples` or more jittered
+  points per texel. `directSamples` (#2355, Unity's *Direct Samples* beside `samples`,
+  its *Indirect Samples*) defaults to `0`, which follows `samples`. Its points round up
+  to a square (`n` points take a `⌈√n⌉ × ⌈√n⌉` set), and how it costs depends on which
+  side of 50 it sits. **From 50 up** (a set of 64 points or more) each panel is first
+  probed with 20 shadow rays: one to each corner (aimed just inside it, so a recess's
+  walls meeting its edge don't block them) and one to a point picked in each of 4 × 4
+  blocks of the full set. Mixed (a penumbra), the rest of the set casts its rays, the
+  probe's points counting among them, so a penumbra costs the full set plus the four
+  corners. All seen, the rest of the set is taken as unshadowed, and 4 more of its
+  points, one in each quarter of the panel, cast their rays to confirm it (24 rays a
+  panel); all hidden, it is taken as giving nothing, and 32 more points, two in each
+  block, spread over rows and columns its other points left, confirm that (52 rays).
+  Those two costs hold whatever `directSamples` is, so above 50 the setting only prices
+  penumbrae. **Under 50** there is no probe and every panel casts every point of its
+  set, so `49` costs more than `64` on a floor that is mostly lit or mostly shadowed,
+  and only about `25` or under is cheaper than the probe there. Lowering it trades
+  penumbra quality for penumbra speed; it is not a general speed knob.
+  The first confirming ray that contradicts the verdict drops it, and the texel casts
+  the rest of the set from fresh points, keeping the 16 block points the probe already
+  cast: the full set's estimate with those 16 kept, never a weighted mix, so a wrong
+  verdict that a check finds costs rays, not speckle. Since those 16 all agreed with
+  the dropped verdict, such a texel reads a shade lighter under a thin occluder (or
+  darker beside a thin opening) than a plain full set would, by about their share of
+  the set. A panel partly below the receiver's horizon is judged, and confirmed, by
+  the points whose light reaches the receiver only; the rest cast nothing. What it can
+  still lose is a shadow or a sliver of light from an occluder or an opening too thin
+  for those two dozen or so points to find (a pipe under a panel, a narrow slit), and
+  only on the texels where all of them missed it; such a texel is off by at most that
+  occluder's or opening's share of the one panel's light. Measured straight under a
+  1.2 × 0.6 m panel at 256 points, a rod across it 1/8 of its width keeps its shadow on
+  95% of texels, and a slit 1/16 of its width lets its light through on 98%.
+  A texel buried inside other geometry (floor under a crate) is filled from its neighbours rather than baked black (*Backface
   Tolerance*, below). No GPU is needed; it runs headless.
 - **Backface Tolerance** (`backfaceTolerance`, #1949, Unity's setting of that name,
   default `0.9`, `0`–`1`). Each texel shoots 32 probe rays of its own; it is

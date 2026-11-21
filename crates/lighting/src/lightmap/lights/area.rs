@@ -26,20 +26,36 @@ pub const GRID: u32 = 8;
 
 pub use rusty_scene::lighting::area::{AreaShape, EMIT_OFFSET};
 
-/// The side of the smallest square grid with at least `n` cells: [`stratified`]
-/// yields its square.
+/// Blocks per side of the probe a lightmap texel casts at an Area light before
+/// the rest of its stratified set (#2355, `trace::own`): the full set's `m × m`
+/// cells are split into `PROBE × PROBE` blocks ([`block_span`]), and the probe
+/// casts the ray of one cell picked in each, plus one per corner. Its stratified
+/// rays are points of the full set, so where the set follows they count toward
+/// it. A set too small for the probe to pay (`trace::own`'s `probes`) skips it.
+pub const PROBE: u32 = 4;
+
+/// The side of the smallest square grid with at least `n` cells: [`cell_point`]
+/// places a point in each of its `m²` cells.
 pub fn strata(n: u32) -> u32 {
     (n.max(1) as f32).sqrt().ceil() as u32
 }
 
-/// `m²` jittered, stratified points in `[0, 1)²`, one per cell of an `m × m`
-/// grid in row order, each drawn lazily with two values from `next` (the texel's
-/// seeded stream). Allocates nothing.
-pub fn stratified(m: u32, mut next: impl FnMut() -> f32) -> impl Iterator<Item = Vec2> {
-    (0..m * m).map(move |k| {
-        let jitter = Vec2::new(next(), next());
-        (Vec2::new((k % m) as f32, (k / m) as f32) + jitter) / m as f32
-    })
+/// Cell `k` (row order) of an `m × m` grid over `[0, 1)²`, at `jitter` (each in
+/// `[0, 1)`) inside it: one jittered, stratified point, its two values drawn from
+/// the texel's seeded stream.
+pub fn cell_point(k: u32, m: u32, jitter: Vec2) -> Vec2 {
+    (Vec2::new((k % m) as f32, (k / m) as f32) + jitter) / m as f32
+}
+
+/// The cells `[lo, hi)` of an `m`-cell side that probe block `b` spans: cell `i`
+/// is in block `i * PROBE / m`, so for `m ≥ PROBE` every block holds at least one.
+pub fn block_span(b: u32, m: u32) -> (u32, u32) {
+    ((b * m).div_ceil(PROBE), ((b + 1) * m).div_ceil(PROBE))
+}
+
+/// The probe block (row order, of `PROBE²`) cell `k` of an `m × m` grid is in.
+pub fn block_of(k: u32, m: u32) -> usize {
+    ((k / m * PROBE / m) * PROBE + k % m * PROBE / m) as usize
 }
 
 /// The [`GRID`]² cell centres the probe bake samples a rectangle at.

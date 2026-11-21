@@ -81,7 +81,7 @@ fn bounce_under_a_ceiling_lamp() -> Vec<f32> {
         .map(|k| {
             let at = Vec3::new((k % 5) as f32 * 0.5 - 1.0, 0.0, (k / 5) as f32 * 0.5 - 1.0);
             let mut rng = Rng::new(11, k, 0);
-            tracer.texel(at, Vec3::Y, 64, 1, &mut rng).indirect.x
+            tracer.texel(at, Vec3::Y, (64, 64), 1, &mut rng).indirect.x
         })
         .collect()
 }
