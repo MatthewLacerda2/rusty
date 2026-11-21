@@ -32,9 +32,9 @@ The steps and the traps. `CLAUDE.md` says why merging is serialized; this is how
 
     make gates           # a review round's session: make round-gates
 
-All green, fastest-failing first; a round's run only what its diff can break. The `Makefile`'s `GATES` list mirrors
-`.github/workflows/{ci,lint}.yml` (`make scripts` fails when they drift), and
-`make help` names each gate.
+All green, fastest-failing first (a round's: only those its diff can break).
+The `Makefile`'s `GATES` list mirrors `.github/workflows/{ci,lint}.yml` (`make
+scripts` fails when they drift), and `make help` names each gate.
 
 - **Both feature sets, always.** Half the crate is behind `dev` (the harness, the
   session, the MCP bridge, `Debug.*`); a default-features run compiles none of it.
