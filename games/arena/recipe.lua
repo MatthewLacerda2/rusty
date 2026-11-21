@@ -1,10 +1,8 @@
--- A two-floor deathmatch arena, the CS:GO yardstick in miniature, built from
--- primitives. `...` is the command line's `--param` table.
+-- `...` is the command line's `--param` table.
 -- A grid of 12 m rooms joined by doorways; `size = "dust2"` is a 5 × 5 grid of
 -- blocks (120 m a side, Dust2's footprint), run on request.
 -- `bake = true` also runs Generate Lighting at the showroom's lowest settings:
--- about 90 s per generation at the default size on a software adapter, minutes
--- at dust2. Off by default, so CI never runs it.
+-- slow (about 90 s at the default size on a software adapter): off by default.
 
 local p = { size = "default", seed = 1, bots = 4, kills = 10, time = 120, bake = false }
 for key, value in pairs(... or {}) do
@@ -14,11 +12,11 @@ end
 local BLOCKS = ({ default = 1, dust2 = 5 })[p.size]
 if BLOCKS == nil then error("arena: size is 'default' or 'dust2', not '" .. tostring(p.size) .. "'") end
 
-local ROOM = 12      -- metres, a room's side
-local WALL_H = 4     -- metres, every wall's height
-local WALL_T = 0.4   -- metres, a wall's thickness: stops a bullet
-local DOOR = 2.4     -- metres, a doorway's width
-local UPPER = 3      -- metres, the upper floor's height
+local ROOM = 12      -- m
+local WALL_H = 4     -- m
+local WALL_T = 0.4   -- m, thick enough to stop a bullet
+local DOOR = 2.4     -- m
+local UPPER = 3      -- m
 local ROOMS = 2 * BLOCKS
 local SIDE = ROOMS * ROOM
 

@@ -1,13 +1,4 @@
--- games/runner/recipe.lua — a plain endless runner (#2034): a capsule runs down
--- three lanes, switching lanes, jumping boxes and sliding under bars, while crates
--- and barrels are dropped onto the track ahead as rigidbodies. The track is built in
--- chunks ahead of the runner and destroyed behind it, and the speed rises. It proves
--- a runner body (kinematic, #2061) at rising speed, a following camera, seeded spawning that
--- runs for as long as the run lasts, rigidbodies dropped at speed, particles and a
--- trail, collisions ending the run and a UI counter.
---
--- Run in edit mode by `make game`: `...` is the command line's `--param` table;
--- the defaults below are what CI runs. `runner.lua` is the game.
+-- `...` is the command line's `--param` table; the defaults are what CI runs.
 
 local p = { seed = 1, speed = 10, max_speed = 25, accel = 0.15 }
 for key, value in pairs(... or {}) do
@@ -17,7 +8,6 @@ end
 
 Scene.New()
 
--- Snyder textures: worn planks for the crates, a stone grain for the track.
 local function bake(name, seed, dark, light, scale)
     return Texture.Bake({
         resolution = 64, seed = seed,
@@ -39,13 +29,12 @@ Material.DefineAsset("bar", { base_color = { 0.9, 0.15, 0.2 }, roughness = 0.5 }
 Material.DefineAsset("wall", { base_color = { 0.25, 0.45, 0.85 }, roughness = 0.6 })
 Material.DefineAsset("runner", { base_color = { 0.95, 0.95, 1.0 }, roughness = 0.35 })
 
--- The start pad: the first 40 m of track, clear of obstacles, and 20 m behind the
--- start. `runner/track.lua` builds the rest as the runner goes.
+-- The start pad: the first 40 m of track, clear of obstacles, and 20 m behind the start.
 local function slab(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- #2051: a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
     Scene.SetStatic(id, true)
     Material.Set(id, material)
 end
@@ -53,10 +42,9 @@ slab("StartFloor", 0, -0.5, 10, 9.0, 1, 60, "track")
 slab("StartRailLeft", 4.3, 0.3, 10, 0.4, 0.6, 60, "rail")
 slab("StartRailRight", -4.3, 0.3, 10, 0.4, 0.6, 60, "rail")
 
--- The runner: a kinematic body, its feet at its origin, that `runner.lua` moves
--- itself (#2061: a CharacterController stalls on a flat floor in Play). The drawn
--- capsule child carries its collider, on layer 8 so the runner's own ground
--- probe and crash test skip it, and the trail; `runner.lua` squashes it for a slide.
+-- The runner is a kinematic body `runner.lua` moves itself (a CharacterController
+-- stalls on a flat floor in Play). The capsule child carries the collider, on
+-- layer 8 so the runner's own ground probe and crash test skip it.
 local runner = Scene.CreateEntity("Runner")
 Scene.AddComponent(runner, "RigidBody")
 Physics.SetKinematic(runner, true)
@@ -84,7 +72,6 @@ Scene.AddComponent(camera, "Camera")
 Transform.SetPosition(camera, 0, 3.2, -6.5)
 Transform.SetRotation(camera, 15, 0, 0)
 
--- The particles' sprite: a soft white disc (#2052: no texture draws the checker).
 local puff = Texture.Bake({
     resolution = 64, seed = p.seed, output = "puff",
     nodes = {
@@ -111,8 +98,6 @@ emitter("Dust", 0.75, 0.68, 0.55, 0.6, 0.8, 1.5)
 local sparks = emitter("Sparks", 1.6, 1.0, 0.4, 0.08, 0.3, 6.0, "stretched")
 Particles.SetStretch(sparks, 1, 0.04)
 
--- The sounds `runner.lua` plays: zimmer one-shots for a jump, a slide, a crate
--- landing, a near miss and the crash.
 local function sound(name, patch, note, opts)
     opts.seed = p.seed
     return Sound.Bake(patch, note, "assets/sounds/" .. name .. ".wav", opts)
@@ -132,7 +117,6 @@ local game = Scene.CreateEntity("Game")
 Scene.AddScript(game, "assets/scripts/runner.lua",
     { seed = p.seed, start_speed = p.speed, max_speed = p.max_speed, accel = p.accel })
 
--- The HUD: the distance counter, and a banner shown once the run ends.
 local canvas = UI.Create("Canvas")
 Scene.SetName(canvas, "HUD")
 local function text(name, ax, ay, x, y, w, h, size, r, g, b)

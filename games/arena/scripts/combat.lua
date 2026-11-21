@@ -1,19 +1,17 @@
--- A plain module required by bots (snowman.lua) and the player (shooter.lua); it
--- defines no callback, so it is not a behaviour of its own.
+-- Required by bots (snowman.lua) and the player (shooter.lua); defines no callback.
 
 local Combat = {}
 
-Combat.FIGHTER = 8   -- the layer fighters stand on (the recipe names it)
-Combat.SMOKE = 9     -- the layer a smoke cloud is on: blocks sight, not bullets
-Combat.EYE = 1.6     -- metres from a fighter's feet to its eye
+Combat.FIGHTER = 8   -- the layer fighters stand on
+Combat.SMOKE = 9     -- smoke cloud layer: blocks sight, not bullets
+Combat.EYE = 1.6     -- m, feet to eye
 Combat.HEALTH = 100
 
-local SHOT_MASK = 1 | (1 << Combat.FIGHTER) -- the level and the fighters
-local RANGE = 60       -- metres a shot reaches
-local DAMAGE = 20      -- what a clean hit deals: five to kill
-local RESIST = 4       -- shot power lost per metre of solid crossed: a 10 cm
-                       -- wall keeps 60 %, a 40 cm one stops it
-local RESPAWN = 1.0    -- seconds a dead fighter waits before it respawns
+local SHOT_MASK = 1 | (1 << Combat.FIGHTER)
+local RANGE = 60       -- m
+local DAMAGE = 20      -- five hits kill
+local RESIST = 4       -- shot power lost per metre of solid: a 10 cm wall keeps 60 %
+local RESPAWN = 1.0    -- s
 
 -- A gun's state: `rate` seconds between shots, `spread` radians of aim error,
 -- `kick` radians of recoil each shot adds, recovering at `recover` per second.
@@ -27,7 +25,6 @@ function Combat.tick(gun, dt)
     gun.recoil = math.max(0, gun.recoil - gun.recover * dt)
 end
 
--- Looked up once and kept; `Combat.start` empties the cache so a reloaded level is looked up afresh.
 local found = {}
 
 function Combat.start()
@@ -47,9 +44,7 @@ local function burst(name, x, y, z, count)
     end
 end
 
--- Fire `gun` from `shooter`'s eye along the unit vector `dx, dy, dz`. The shot
--- goes through whatever is thin enough (power falls per metre of solid).
--- `false` while the gun is cooling down.
+-- Fire `gun` from `shooter`'s eye along the unit vector `dx, dy, dz`; `false` while cooling down.
 function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
     if gun.cooldown > 0 then return false end
     gun.cooldown = gun.rate

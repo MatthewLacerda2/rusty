@@ -1,14 +1,4 @@
--- games/topple/recipe.lua — a tower-toppling physics game (#2037): throw balls at
--- stacks of boxes and planks, at figures of boxes held together by joints, and at
--- explosive barrels. A level is cleared when every target (the red boxes, the
--- figures' torsos) has fallen off its platform. Built from primitives; run in
--- edit mode by `make game`, `...` is the command line's `--param` table.
---
--- Four levels of rising size, one scene each, chained by scripts/level.lua:
---   1 tower    one stack of boxes;
---   2 planks   a plank tower and a jointed figure;
---   3 barrels  a barrel among boxes and a figure, a far stack out of its reach;
---   4 pile     a pyramid `pile` boxes a side, its top layer the targets.
+-- `...` is the command line's `--param` table. Levels (chained by scripts/level.lua): tower, planks, barrels, pile.
 
 local p = { seed = 1, pile = 6, start = 1 }
 for key, value in pairs(... or {}) do
@@ -24,10 +14,9 @@ end
 whole("pile", 2, 16)
 whole("start", 1, 4)
 
-local TOP = 1.0   -- metres, the height of every platform's top
-local BOX = 0.5   -- metres, a box's side
+local TOP = 1.0   -- m
+local BOX = 0.5   -- m
 
--- The art every level shares: Snyder textures and zimmer sounds, made once.
 local function noise_map(name, scale, dark, light)
     return Texture.Bake({
         resolution = 64, seed = p.seed,
@@ -62,11 +51,10 @@ local function sound(name, kind, note, a, d, duration)
         amp = { a = a, d = d, s = 0.0, r = d / 2 },
     }, note, "assets/sounds/" .. name .. ".wav", { duration = duration, seed = p.seed })
 end
-sound("knock", "triangle", "C3", 0.001, 0.08, 0.15)  -- a ball striking something
-sound("thud", "noise", "C2", 0.002, 0.12, 0.2)       -- a body landing hard
-sound("boom", "noise", "C1", 0.004, 0.9, 1.2)        -- a barrel going off
+sound("knock", "triangle", "C3", 0.001, 0.08, 0.15)
+sound("thud", "noise", "C2", 0.002, 0.12, 0.2)
+sound("boom", "noise", "C1", 0.004, 0.9, 1.2)
 
--- Materials are a scene's, so each level defines them again.
 local function materials()
     Material.DefineAsset("wood", { base_color_map = maps.wood, roughness = 0.8 })
     Material.DefineAsset("plank", { base_color_map = maps.wood, base_color = { 0.8, 0.7, 0.55 }, roughness = 0.8 })
@@ -81,13 +69,13 @@ local function materials()
 end
 
 -- A primitive of full size `sx, sy, sz` centred at `x, y, z`, with a collider
--- that fits it (#2051: a primitive gets none of its own).
+-- that fits it (a primitive gets none of its own).
 local SHAPES = {
     Box = { kind = "Box", x = 1, y = 1, z = 1 },
     Sphere = { kind = "Sphere", radius = 0.5 },
     Cylinder = { kind = "Cylinder", radius = 0.5, height = 2 },
 }
-local bodies -- the level's group of dynamic bodies, which the scripts list
+local bodies
 local function solid(name, kind, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, kind)
     Transform.SetPosition(id, x, y, z)
@@ -110,7 +98,6 @@ local function body(name, kind, x, y, z, sx, sy, sz, mass, material)
     return id
 end
 
--- A box whose bottom sits at `y`: a target when its name starts "Target".
 local function box(name, x, y, z, material)
     return body(name, "Box", x, y + BOX / 2, z, BOX, BOX, BOX, 1.0, material or "wood")
 end
@@ -120,14 +107,12 @@ local function stack(x, z, n, y0)
         box(top and "Target" or "Box", x, (y0 or TOP) + (k - 1) * BOX, z, top and "target" or nil)
     end
 end
--- A platform of `w` by `d` metres, its top at TOP, centred at `x, z`.
 local function platform(x, z, w, d)
     static("Platform", x, TOP / 2, z, w, TOP, d, "stone")
 end
 
--- A figure: six boxes, the head and limbs ball-jointed to the torso, standing
--- on the platform at `x, z`. Its joints' drives hold it up until a hard hit
--- turns them off (scripts/figure.lua): then it is a ragdoll.
+-- A figure: six boxes, limbs ball-jointed to the torso. Its joints' drives hold
+-- it up until a hard hit turns them off (scripts/figure.lua): then a ragdoll.
 local function figure(x, z)
     local group = Scene.CreateEntity("Figure")
     Scene.SetParent(group, bodies)
@@ -160,15 +145,12 @@ local function figure(x, z)
     limb("Leg", 0.13, 0.35, 0, 0.2, 0.7, 0.24, 1.5, "cloth", 0.5, 120)
 end
 
--- An explosive barrel standing on `y` (scripts/barrel.lua).
 local function barrel(x, y, z)
     local id = body("Barrel", "Cylinder", x, y + 0.45, z, 0.6, 0.45, 0.6, 2.0, "barrel")
     Scene.AddScript(id, "assets/scripts/barrel.lua")
     return id
 end
 
--- What every level has around its targets: ground, light, the camera that
--- throws, the effects, the HUD and the level's own script.
 local function level(n, balls, eye, build)
     Scene.New()
     materials()
@@ -177,7 +159,7 @@ local function level(n, balls, eye, build)
     build()
 
     local sun = Scene.CreateEntity("Sun", "DirectionalLight")
-    Light.SetMode(sun, "Mixed") -- live: the level is not baked
+    Light.SetMode(sun, "Mixed")
     Transform.SetRotation(sun, -55, 35, 0)
     local camera = Scene.CreateEntity("Player")
     Scene.AddComponent(camera, "Camera")
@@ -195,7 +177,7 @@ local function level(n, balls, eye, build)
         Particles.SetSpeed(id, speed / 2, speed)
         Particles.SetSize(id, size / 2, size)
         Particles.SetColor(id, r, g, b, 1)
-        Component.Set(id, "Particles", { texture = puff }) -- #2052: no texture draws a checker
+        Component.Set(id, "Particles", { texture = puff }) -- no texture draws a checker
     end
     emitter("Fire", 1.0, 0.6, 0.2, 0.9, 0.5, 6.0)
     emitter("Dust", 0.6, 0.55, 0.45, 0.3, 0.6, 1.5)
@@ -218,8 +200,7 @@ local function level(n, balls, eye, build)
     label(canvas, "Status", 1, -30, 28)
     label(canvas, "Banner", 0.5, 0, 56)
 
-    -- The loading screen (#2123): drawn over the level while the next one is
-    -- prepared in the background, which keeps this one running until the swap.
+    -- Drawn over the level while the next one prepares in the background.
     local loading = UI.Create("Canvas")
     Scene.SetName(loading, "Loading")
     local shade = UI.Create("Image", loading)
@@ -227,7 +208,7 @@ local function level(n, balls, eye, build)
     RectTransform.SetAnchorMax(shade, 1, 1)
     RectTransform.SetSizeDelta(shade, 0, 0)
     Image.SetColor(shade, 0.05, 0.05, 0.07, 0.85)
-    Text.SetColor(label(loading, "LoadingText", 0.5, 0, 44), 1, 1, 1, 1) -- hidden by level.lua's Start
+    Text.SetColor(label(loading, "LoadingText", 0.5, 0, 44), 1, 1, 1, 1)
 
     local next_scene = n < 4 and string.format("assets/scenes/level_%d.scene", n + 1) or ""
     local manager = Scene.CreateEntity("Level")
@@ -235,7 +216,6 @@ local function level(n, balls, eye, build)
     Scene.Save(string.format("assets/scenes/level_%d.scene", n))
 end
 
--- The camera stands on -Z looking along +Z: yaw 90 is +Z (Camera.SetYaw).
 level(1, 5, { 0, 2.2, -7, 90, -5 }, function()
     platform(0, 0, 2, 2)
     stack(0, 0, 5)
@@ -243,7 +223,6 @@ end)
 
 level(2, 6, { 0, 2.4, -8, 90, -5 }, function()
     platform(0, 0, 5, 2)
-    -- A plank tower, Jenga style: layers of two planks, crossing each other.
     local PL, PH, PW = 1.2, 0.2, 0.3
     for k = 0, 4 do
         local y = TOP + PH / 2 + k * PH
@@ -265,7 +244,6 @@ level(3, 4, { 0, 2.6, -9, 90, -6 }, function()
     stack(-1.3, 0, 2)
     stack(1.3, 0, 2)
     figure(0, 0.9)
-    -- Out of the blast's 3.5 m reach: a stack on a platform of its own.
     platform(7, 0, 2, 2)
     stack(7, 0, 3)
 end)

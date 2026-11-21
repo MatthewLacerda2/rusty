@@ -1,19 +1,5 @@
--- fruit.lua — the slicing game: bursts of thrown fruit and the odd bomb, the
--- swipe (the left mouse button held and dragged) cutting what it crosses on
--- screen, the score and combo, lives lost to fruit that falls away uncut, and game
--- over. Everything runs on the fixed tick; the bodies, effects and HUD are
--- `fruit/view.lua`.
---
--- A swipe is hit-tested on screen, as the player sees it: each tick the pointer's
--- path since the last tick is a segment, and a body whose projected centre lies
--- within its projected radius of that segment is cut.
---
--- A scenario reads the state through `Scene.GetScript(id, "fruit")`: `score`,
--- `lives`, `over`, `sliced`, `missed`, `combo` (fruit cut by the current swipe),
--- `best_combo` and `waves` (how many bursts were thrown). It may set `auto =
--- false` to stop the bursts, and call `game:Restart()`,
--- `game:Throw(kind, x, vx, vy)` (a kind of `fruit/view.lua`'s KINDS; returns its id)
--- and `game:Halves(kind)` (the ids of the cut halves of `kind` still in the air).
+-- A swipe is hit-tested on screen: a body whose projected centre lies within its
+-- projected radius of the pointer's path since the last tick is cut.
 
 local View = require("fruit.view")
 
@@ -26,15 +12,15 @@ local Fruit = {
     },
 }
 
-local LAUNCH_Y, LAUNCH_Z = -7, 1.5 -- where bursts start: below the view, before the counter
-local GONE_Y = -9                   -- a body falling past this is gone
-local FIRST_WAVE, WAVE_GAP = 30, 100 -- ticks before the first burst, and between bursts
-local RESTART_TICKS = 60            -- how long game over holds before a click restarts
+local LAUNCH_Y, LAUNCH_Z = -7, 1.5 -- below the view
+local GONE_Y = -9
+local FIRST_WAVE, WAVE_GAP = 30, 100 -- ticks
+local RESTART_TICKS = 60            -- ticks
 
-local items = {}  -- what is in the air: { id, kind, cut } (cut: a half, never scored)
+local items = {}  -- { id, kind, cut } (cut: a half, never scored)
 local hud
 local wave_wait, over_for, flash = 0, 0, 0
-local last_x, last_y -- the pointer at the last tick, while the button is held
+local last_x, last_y
 
 function Fruit.Throw(_, kind, x, vx, vy)
     local spin = Random.Range(-3.0, 3.0)
@@ -51,7 +37,6 @@ function Fruit.Halves(_, kind)
     return ids
 end
 
--- A burst: one to four items from around the bottom, thrown up and inwards.
 local function burst()
     Fruit.waves = Fruit.waves + 1
     local n = Random.Range(1, 5)
@@ -65,7 +50,6 @@ local function burst()
     end
 end
 
--- Distance from (`px`, `py`) to the segment (`ax`, `ay`)–(`bx`, `by`).
 local function to_segment(px, py, ax, ay, bx, by)
     local dx, dy = bx - ax, by - ay
     local len2 = dx * dx + dy * dy
@@ -75,7 +59,6 @@ local function to_segment(px, py, ax, ay, bx, by)
     return math.sqrt(cx * cx + cy * cy)
 end
 
--- Is the body `item` under the screen segment (`ax`, `ay`)–(`bx`, `by`)?
 local function under(item, ax, ay, bx, by)
     local x, y, z = Transform.GetPosition(item.id)
     local sx, sy, depth = Camera.WorldToScreen(x, y, z)
@@ -91,7 +74,6 @@ local function game_over()
     Fruit.over, over_for = true, 0
 end
 
--- Cut whatever the swipe segment crosses this tick.
 local function swipe(ax, ay, bx, by)
     for i = #items, 1, -1 do
         local item = items[i]
@@ -111,8 +93,6 @@ local function swipe(ax, ay, bx, by)
     end
 end
 
--- Follow the pointer while the button is held; a release ends the swipe, scoring
--- its combo (three fruit or more: one more point each).
 local function pointer()
     local _, h = UI.GetScreenSize()
     local mx, my = Input.GetMousePosition()
@@ -127,7 +107,6 @@ local function pointer()
     last_x, Fruit.combo = nil, 0
 end
 
--- Destroy what has fallen away; an uncut fruit costs a life.
 local function despawn()
     for i = #items, 1, -1 do
         local item = items[i]
@@ -145,7 +124,6 @@ local function despawn()
     end
 end
 
--- Clear the air and start a new game from `seed`.
 function Fruit.Restart()
     for _, item in ipairs(items) do Scene.DestroyEntity(item.id) end
     items = {}
