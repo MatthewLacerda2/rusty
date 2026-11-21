@@ -92,6 +92,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   instance (a particle, a ringed object) stays drawn unless it adds itself there.
   A material whose vertices move past the mesh's bounds (`RenderObject::moving`)
   is never listed (`scene/draw.rs`, `hiz_testable`).
+  What those indirect draws drew is the GPU's: `Debug.Stats`' `triangles` takes it
+  from their args, read back with the stage's counts (`passes::hiz::drawn`), so a
+  new pass drawing through `Culled` counts its calls on the CPU and its triangles
+  from that read (`RenderCounters::add_read_draws`), the batches' whole count
+  standing in only until a read has come back.
 - **A big mesh is then culled by cluster** (`passes::hiz::clusters`): the
   import splits a static mesh of at least `asset::clusters::MIN_TRIANGLES` into
   clusters and reorders its indices to match (`MeshComponent::clusters`, valid

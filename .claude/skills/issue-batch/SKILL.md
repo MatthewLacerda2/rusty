@@ -244,7 +244,9 @@ issue with a `Round:` line under `Brief` naming why it happened, `Round: review 
 ci | conflict | other` (a review sent it back, CI went red, it conflicts, anything
 else; `make rebriefs` counts them), and that says **add commits on top, merge
 `origin/main` in only if the PR conflicts, never rebase**, so no brief needs to
-authorise a force-push, and the PR turned back to draft. **Then `make coder
+authorise a force-push, and the PR turned back to draft. A round's session
+readies on `make round-gates` (the gates its diff can break), a first brief's on
+`make gates` (`cloud-brief.md`). **Then `make coder
 ISSUE=N` again right away**: a new routine whose prompt names the new `Brief`.
 Don't wait for the old session: a readied session ends for good (`cloud-brief.md`),
 so it never races the fresh one. So never put the re-brief, or a pointer to it,
@@ -349,10 +351,17 @@ Per pull request:
 
 ## Starting, and re-reading the board
 
-At the start: `make blockers ARGS=--fix` (records prose-only blockers) and
+At the start: `make blockers ARGS=--fix` (records prose-only blockers, and reports
+a recorded open blocker no body states any more) and
 `make board` (stray branches, stale assignments, unlabelled issues, bugs with
 no `Kind:` line); close out
-what it names. Unassign an issue that turns out never started.
+what it names. Unassign an issue that turns out never started. **A dependency is
+lifted by taking its line out of the body (or striking it through) and running
+`make blockers ARGS='--lift <issue> <blocker>'`**: the merge queue reads the
+recorded relationship, not the prose, and `--lift` is the only thing that removes
+one. `--fix` never deletes; `make blockers` reports each recorded open blocker no
+body states with its `--lift` command, and a "Blocked by" it could not read until
+it is rewritten as `#N` items.
 
 **After every merge, re-read the whole board**, not your list of it: coders and
 the operator file mid-batch, and what the merge unblocked is startable now. Count

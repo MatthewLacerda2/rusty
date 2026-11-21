@@ -936,7 +936,10 @@ is wholly behind depth the camera drew this frame.
   when it is leased again (the next upload of a mesh only a preview or a mesh
   particle draws). `Debug.Stats().cluster_pool_bytes` reads what is leased.
 - **Measure** with `Debug.Stats().hiz_tested`, `hiz_culled` and `hiz_late` (read
-  back a frame or so late), and `cluster_tested` / `cluster_culled` for the clusters. What it
+  back a frame or so late), and `cluster_tested` / `cluster_culled` for the clusters;
+  `draw_calls` and `triangles` count what its passes drew, phase one's depth apart in
+  `hiz_depth_triangles` and the per-instance draws of a clustered batch in
+  `cluster_draws` (#2387). What it
   costs is `gpu_passes.occlusion` and, in a bench, its parts' rows
   (`gpu.occlusion.<part>`, `render.occlusion.<part>`, [`docs/testing.md`](../testing.md)).
 
