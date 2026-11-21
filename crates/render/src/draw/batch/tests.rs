@@ -1,6 +1,6 @@
 //! The instancing grouping rules (#470), pinned without a GPU.
 
-use super::{BatchKey, DrawItem, FrameDraws, RecordTraits};
+use super::{BatchKey, DrawItem, FrameDraws, OpaqueOrder, RecordTraits};
 use crate::scene::MaterialRecords;
 use crate::scene::MeshHandle;
 use crate::InstanceData;
@@ -47,12 +47,39 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
     }
 }
 
+/// [`item`] of mesh `mesh`, tagged `tag`, at view depth `depth`.
+pub(super) fn at(mesh: &str, tag: f32, depth: f32) -> DrawItem {
+    DrawItem {
+        depth,
+        ..item(mesh, 0, 1.0, tag)
+    }
+}
+
+/// `items` (opaque, transparent) batched with no material classes, the opaque
+/// runs ranked by `order`, instanced when `instancing`.
+pub(super) fn ordered(
+    items: (Vec<DrawItem>, Vec<DrawItem>),
+    how: (bool, OpaqueOrder),
+) -> FrameDraws {
+    FrameDraws::build(items, &MaterialRecords::default(), how)
+}
+
+/// [`ordered`], unranked.
+pub(super) fn batched(items: (Vec<DrawItem>, Vec<DrawItem>), instancing: bool) -> FrameDraws {
+    ordered(items, (instancing, OpaqueOrder::Unranked))
+}
+
+/// The mesh of each opaque draw, in draw order.
+pub(super) fn meshes(draws: &FrameDraws) -> Vec<&str> {
+    draws.opaque.iter().map(|b| name(b.key.mesh)).collect()
+}
+
 /// The tag [`item`] gave `instance`.
 pub(super) fn tag_of(instance: &InstanceData) -> f32 {
     f32::from_bits(instance.object)
 }
 
-fn tags(draws: &FrameDraws) -> Vec<f32> {
+pub(super) fn tags(draws: &FrameDraws) -> Vec<f32> {
     draws.instances.iter().map(tag_of).collect()
 }
 
@@ -64,7 +91,7 @@ fn copies_of_one_mesh_and_material_become_one_draw() {
         item("Box", 0, 1.0, 2.0),
         item("Box", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
+    let draws = batched((opaque, Vec::new()), true);
     let runs: Vec<_> = draws
         .opaque
         .iter()
@@ -83,7 +110,7 @@ fn a_different_uniform_or_skinned_palette_splits_the_batch() {
         item("Box", 1, 1.0, 2.0),
         item("Box", 2, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), true);
+    let draws = batched((opaque, Vec::new()), true);
     assert_eq!(
         draws.opaque.len(),
         4,
@@ -110,11 +137,7 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
         item("B", 0, 1.0, 2.0),
         item("A", 0, 1.0, 3.0),
     ];
-    let draws = FrameDraws::build(
-        (vec![item("Box", 0, 1.0, 9.0)], transparent),
-        &MaterialRecords::default(),
-        true,
-    );
+    let draws = batched((vec![item("Box", 0, 1.0, 9.0)], transparent), true);
     let runs: Vec<_> = draws
         .transparent
         .iter()
@@ -124,17 +147,4 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
     assert_eq!(tags(&draws), [9.0, 0.0, 1.0, 2.0, 3.0]);
     // Uniform slots continue after the opaque batches.
     assert_eq!(draws.transparent[0].uniform_slot, 1);
-}
-
-#[test]
-fn instancing_off_is_one_draw_per_entity_in_scene_order() {
-    let opaque = vec![
-        item("Box", 0, 1.0, 0.0),
-        item("Barrel", 0, 1.0, 1.0),
-        item("Box", 0, 1.0, 2.0),
-    ];
-    let draws = FrameDraws::build((opaque, Vec::new()), &MaterialRecords::default(), false);
-    assert_eq!(draws.opaque.len(), 3);
-    assert_eq!(tags(&draws), [0.0, 1.0, 2.0]);
-    assert!(draws.opaque.iter().all(|b| b.instances.len() == 1));
 }
