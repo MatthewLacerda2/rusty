@@ -1,9 +1,3 @@
-//! crates/ecs/src/changes/derived_tests.rs — every derived channel, and the Transform column,
-//! against the full pass it lets a consumer skip (#1705): a value kept per id from a
-//! cursor's ids alone equals the value rebuilt from every entity, after any sequence
-//! of writes (`ops.rs`). Two consumers read each channel, at different paces.
-//! A writer that forgets to stamp, or stamps an id without its subtree, breaks it.
-
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 
@@ -41,8 +35,6 @@ fn catch_up<T: Channel, V>(
     }
 }
 
-/// Run `ops` with two cursors on `T` (one reading at every `Read`, one at every
-/// other), each keeping `value` per id from its ids alone, checked at each read.
 pub(super) fn kept_equals_rebuilt<T: Channel, V: PartialEq + Debug>(
     ops: &[Op],
     value: impl Fn(&World, u32) -> Option<V>,

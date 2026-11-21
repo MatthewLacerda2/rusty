@@ -1,6 +1,3 @@
-//! crates/ecs/src/changes/tests.rs — what a cursor reads (#1705): the writes it sees, the
-//! events that make it rebuild, and a log that stays bounded at Dust2 scale.
-
 use crate::{Changes, World};
 use rusty_components::{JointComponent, TransformComponent};
 
@@ -21,8 +18,8 @@ fn a_cursor_reads_each_write_once_ascending_and_only_its_channel() {
     let mut moves = w.change_cursor::<TransformComponent>();
     w.set_joint(ids[3], Some(JointComponent::default()));
     w.set_joint(ids[1], Some(JointComponent::default()));
-    let _ = w.joint_mut(ids[3]); // a borrow counts as a change
-    w.set_joint(ids[1], None); // so does a detach
+    let _ = w.joint_mut(ids[3]);
+    w.set_joint(ids[1], None);
     assert_eq!(w.changes(&mut joints), Changes::Ids(vec![ids[1], ids[3]]));
     assert_eq!(w.changes(&mut joints), Changes::Ids(vec![]), "read once");
     assert_eq!(
@@ -39,7 +36,7 @@ fn cursors_on_one_channel_read_at_their_own_pace() {
     let mut slow = w.change_cursor::<TransformComponent>();
     nudge(&mut w, ids[0], 1.0);
     assert_eq!(w.changes(&mut fast), Changes::Ids(vec![ids[0]]));
-    nudge(&mut w, ids[0], 2.0); // read by `fast` once already: logged again
+    nudge(&mut w, ids[0], 2.0);
     nudge(&mut w, ids[2], 2.0);
     assert_eq!(w.changes(&mut fast), Changes::Ids(vec![ids[0], ids[2]]));
     assert_eq!(w.changes(&mut slow), Changes::Ids(vec![ids[0], ids[2]]));
@@ -96,7 +93,7 @@ fn the_log_stays_bounded_at_dust2_scale_while_a_cursor_keeps_up() {
     const N: usize = 3000;
     let (mut w, ids) = world_of(N);
     let mut every_tick = w.change_cursor::<TransformComponent>();
-    let mut idle = w.change_cursor::<TransformComponent>(); // opened, never read
+    let mut idle = w.change_cursor::<TransformComponent>();
     let cap = super::log::cap(N);
     for tick in 0..60 {
         for &id in &ids {

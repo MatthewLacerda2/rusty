@@ -1,34 +1,19 @@
-//! crates/ecs/src/activity_tests.rs — the kept `activeInHierarchy` answers against the walk
-//! they replaced (#1388): after any sequence of `Core` writes, every live id's answer
-//! is `self_and_ancestors(id).all(is_active_self)`. A future writer that forgets to
-//! invalidate breaks this. Parent links are mostly written with their `children`
-//! entries, as `Scene::set_parent` writes them (the subtree invalidation walks
-//! those, #1708), and sometimes raw, one-sided (the whole-store fallback).
-
 use proptest::prelude::*;
 
 use crate::World;
 use rusty_components::Entity;
 
-/// One write. Ids are picked as an index into the live ids (or past them, for a dead,
-/// fresh or orphan-named id), so a sequence stays meaningful as the world changes.
 #[derive(Clone, Debug)]
 enum Op {
     Spawn,
     SetActive(usize, bool),
-    /// Parent `None` unparents; the parent may be the entity itself or a descendant.
     SetParent(usize, Option<usize>),
-    /// The same link written raw: the parent's `children` does not list it.
     RawParent(usize, usize),
     Despawn(usize),
-    /// An id no live entity has: a despawned one, or one an orphan may already name;
-    /// its document may name a parent, live or not, that does not list it.
     Insert(u32, bool, Option<usize>),
     Overwrite(usize, bool, Option<usize>),
     Clear,
-    /// Ask one id, so later writes meet a partly warm cache.
     Read(usize),
-    /// Ask every id, children before parents.
     ReadAll,
 }
 
@@ -50,8 +35,6 @@ fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
-/// The `i`th live id, wrapping; an id past them all when `i` overshoots, so a write
-/// sometimes names a dead entity.
 fn pick(w: &World, i: usize) -> u32 {
     let ids = w.ids();
     ids.get(i).copied().unwrap_or(i as u32 + 1)
@@ -100,7 +83,6 @@ fn apply(w: &mut World, op: &Op) {
     }
 }
 
-/// Re-parent `id`, its old and new parents' `children` kept in step.
 fn relink(w: &mut World, id: u32, parent: Option<u32>) {
     if let Some(old) = w.parent_id(id) {
         w.remove_child(old, id);

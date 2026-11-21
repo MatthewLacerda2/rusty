@@ -1,33 +1,18 @@
-//! crates/core/src/project/bench/recent.rs — the projects opened before (#854).
-//!
-//! Per-user engine state, never project state: one JSON file in the user's config
-//! directory ([`config_dir`]), Unity Hub's project list. The editor records a project
-//! each time it opens one ([`record`]), with or without the picker, as Unity's editor
-//! does. Times are Unix seconds handed in by the caller, so this module never reads a
-//! clock and its tests pin "now".
-//!
-//! stored-format: the recent-projects list in the user's config directory
-
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-/// The file the list lives in, under [`config_dir`].
 pub const RECENT_FILE: &str = "recent_projects.json";
-/// The most projects the list keeps; the oldest drop off.
 pub const MAX_RECENT: usize = 32;
 
-/// One project opened before.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecentProject {
-    /// The project root, absolute.
     pub path: PathBuf,
     /// When it was last opened, in Unix seconds.
     pub opened_at: u64,
 }
 
 impl RecentProject {
-    /// The folder's name, what the list shows in bold.
     pub fn name(&self) -> String {
         self.path.file_name().map_or_else(
             || self.path.display().to_string(),
@@ -35,13 +20,11 @@ impl RecentProject {
         )
     }
 
-    /// Whether the folder is gone (moved or deleted since): shown greyed out.
     pub fn is_missing(&self) -> bool {
         !self.path.is_dir()
     }
 }
 
-/// The list, most recent first.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecentProjects {
     pub projects: Vec<RecentProject>,
@@ -55,7 +38,6 @@ impl RecentProjects {
         serde_json::from_str(&text).unwrap_or_default()
     }
 
-    /// Write the list to `path`, creating its folder.
     pub fn save(&self, path: &Path) -> Result<(), String> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -66,8 +48,6 @@ impl RecentProjects {
             .map_err(|e| format!("{}: {e}", path.display()))
     }
 
-    /// Put `root` at the top, opened at `now`, dropping its older entry and anything
-    /// past [`MAX_RECENT`].
     pub fn touch(&mut self, root: &Path, now: u64) {
         self.remove(root);
         let entry = RecentProject {
@@ -78,16 +58,11 @@ impl RecentProjects {
         self.projects.truncate(MAX_RECENT);
     }
 
-    /// Take `root` off the list (the folder itself is left alone).
     pub fn remove(&mut self, root: &Path) {
         self.projects.retain(|p| p.path != root);
     }
 }
 
-/// The user's config directory for rusty: `$XDG_CONFIG_HOME/rusty` (else
-/// `~/.config/rusty`) on Linux, `~/Library/Application Support/rusty` on macOS.
-/// `None` when the environment names no home. `var` reads an environment variable,
-/// so tests can hand in their own.
 pub fn config_dir(var: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     let nonempty = |name: &str| var(name).filter(|v| !v.is_empty()).map(PathBuf::from);
     let base = if cfg!(target_os = "macos") {
@@ -98,7 +73,6 @@ pub fn config_dir(var: impl Fn(&str) -> Option<String>) -> Option<PathBuf> {
     base.map(|dir| dir.join("rusty"))
 }
 
-/// Where this user's list lives, from the real environment.
 pub fn default_path() -> Option<PathBuf> {
     config_dir(|name| std::env::var(name).ok()).map(|dir| dir.join(RECENT_FILE))
 }

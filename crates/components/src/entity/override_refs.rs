@@ -1,9 +1,3 @@
-//! crates/components/src/entity/override_refs.rs — the one walk over every entity id a
-//! prefab instance's overrides hold (#1527), in each of Unity's three shapes
-//! ([`PrefabOverrides`]): a modification's id leaf, an id inside a modification's
-//! whole value, and an id inside an added component, which goes through that
-//! component's own typed [`EntityRefs`] walk.
-
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -12,13 +6,6 @@ use super::refs::{escape_token, EntityRefs, RefVisit};
 use super::Entity;
 use crate::with_ref_components;
 
-/// Visit every entity id the overrides hold, each with its pointer in the entity
-/// document (`/joint/connected_body`): an id leaf of a modification, one inside a
-/// modification's whole value, and one inside an added component, which goes
-/// through that component's own [`EntityRefs`] walk, so a list of ids drops a
-/// dropped one as the component itself does. A dropped id elsewhere becomes `null`,
-/// the override of "no reference", except an element of a list of ids
-/// ([`Entity::is_ref_list_pointer`]), which leaves the list, as the typed walk does.
 pub fn visit_override_refs(overrides: &mut PrefabOverrides, visit: &mut RefVisit<'_>) {
     for (path, value) in &mut overrides.modifications {
         visit_value_refs(path, value, visit);
@@ -30,7 +17,6 @@ pub fn visit_override_refs(overrides: &mut PrefabOverrides, visit: &mut RefVisit
     }
 }
 
-/// Every id the overrides hold, read-only ([`visit_override_refs`] without a copy).
 pub fn each_override_ref(overrides: &PrefabOverrides, visit: &mut dyn FnMut(&str, u32)) {
     for (path, value) in &overrides.modifications {
         each_value_ref(path, value, visit);
@@ -42,9 +28,6 @@ pub fn each_override_ref(overrides: &PrefabOverrides, visit: &mut dyn FnMut(&str
     }
 }
 
-/// Walk `value`, the document's value at `pointer`, visiting every leaf whose pointer
-/// is an id field ([`Entity::is_ref_pointer`]). A list-of-ids element dropped leaves
-/// its list.
 fn visit_value_refs(pointer: &str, value: &mut Value, visit: &mut RefVisit<'_>) {
     match value {
         Value::Object(map) => {
@@ -76,7 +59,6 @@ fn visit_value_refs(pointer: &str, value: &mut Value, visit: &mut RefVisit<'_>) 
     }
 }
 
-/// [`visit_value_refs`], read-only.
 fn each_value_ref(pointer: &str, value: &Value, visit: &mut dyn FnMut(&str, u32)) {
     match value {
         Value::Object(map) => {
@@ -98,16 +80,12 @@ fn each_value_ref(pointer: &str, value: &Value, visit: &mut dyn FnMut(&str, u32)
     }
 }
 
-/// An id leaf's id, if it holds one.
 fn id_of(leaf: &Value) -> Option<u32> {
     leaf.as_u64().and_then(|n| u32::try_from(n).ok())
 }
 
 macro_rules! component_walks {
     ($($field:ident: $ty:ty,)*) => {
-        /// Run added component `name`'s own [`EntityRefs`] walk over `value`, when its
-        /// kind holds references; `false` (and `value` untouched) when it is not one
-        /// of those kinds or doesn't read back as one.
         fn visit_component_refs(name: &str, value: &mut Value, visit: &mut RefVisit<'_>) -> bool {
             match name {
                 $(stringify!($field) => {
@@ -128,7 +106,6 @@ macro_rules! component_walks {
             }
         }
 
-        /// [`visit_component_refs`], read-only: the component's `each_ref`.
         fn each_component_ref(name: &str, value: &Value, visit: &mut dyn FnMut(&str, u32)) -> bool {
             match name {
                 $(stringify!($field) => {

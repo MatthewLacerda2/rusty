@@ -1,16 +1,3 @@
-//! crates/components/src/animator/playback.rs — one layer's playback state (#457).
-//!
-//! What one state machine is playing: its motion (a clip, or the blend tree of a
-//! graph node), the playhead, an outgoing motion while a crossfade blends, and the
-//! active graph node. The base layer's lives flattened at the top of
-//! [`AnimatorComponent`](super::AnimatorComponent) (a one-layer animator
-//! reads as it always has); every extra layer has its own in a [`LayerState`](super::LayerState).
-//!
-//! A clip's playhead is in clip seconds. A blend tree's is **normalized** (0..1 is
-//! one cycle), because its children have different lengths and are sampled at the
-//! same phase — that is what keeps a walk and a run blended together in step
-//! (or, with sync markers, at the same place between them, #1896).
-
 use serde::{Deserialize, Serialize};
 
 use rusty_asset::animation_graph::GraphNode;
@@ -19,8 +6,6 @@ use super::playhead::{finite, Bounds, Playhead, Step};
 use super::states::NodeStates;
 use super::sync::SyncState;
 
-/// What a playback plays: a clip by name, or the blend tree of the named graph
-/// node.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Motion<'a> {
     Clip(&'a str),
@@ -29,35 +14,24 @@ pub enum Motion<'a> {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Playback {
-    /// Name of the clip playing (matched against the mesh's clip list). Empty
-    /// while a blend tree plays.
     #[serde(default)]
     pub current_clip: String,
-    /// The graph node whose blend tree plays, if one does (#457).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_tree: Option<String>,
     /// Playhead: clip seconds, or a tree's normalized phase.
     #[serde(default)]
     pub time: f32,
-    /// Loop the current motion: the playhead wraps at its end; without it, it is
-    /// clamped to the length (#1362), so reversing moves back at once. Persists
-    /// across `play`/`crossfade`, like `speed` (#313).
     #[serde(default)]
     pub loop_clip: bool,
-    /// A non-looping playhead has reached its end and rests there, so its next
-    /// steps don't fire `End` again; cleared when it leaves the end (#1386).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub ended: bool,
-    /// The clip being faded *out* during a crossfade. `None` outside one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_clip: Option<String>,
-    /// The graph node whose blend tree is being faded out (#457).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_tree: Option<String>,
     /// Playhead of the outgoing motion; it keeps running, never wraps.
     #[serde(default)]
     pub previous_time: f32,
-    /// The outgoing motion's `loop_clip`, so it samples the way it played.
     #[serde(default)]
     pub previous_loop: bool,
     /// Seconds elapsed in the active crossfade.
@@ -66,22 +40,15 @@ pub struct Playback {
     /// Total crossfade length in seconds; `0.0` means no crossfade is active.
     #[serde(default)]
     pub crossfade_duration: f32,
-    /// Name of the active graph node (#316). `None` until the evaluator binds the
-    /// graph, or after the graph reference changes.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub current_node: Option<String>,
-    /// The active node's playback-rate multiplier, stacked on the component's
-    /// `speed`. `1.0` outside a graph.
     #[serde(
         default = "default_node_speed",
         skip_serializing_if = "is_default_speed"
     )]
     pub node_speed: f32,
-    /// Sync-group state (#1896): the node's group, a placement still to make
-    /// and a crossfade whose lighter motion follows the heavier.
     #[serde(default, skip_serializing_if = "SyncState::is_idle")]
     pub sync: SyncState,
-    /// The node a crossfade leaves and the entry counts (#1901).
     #[serde(skip)]
     pub states: NodeStates,
 }
@@ -117,7 +84,6 @@ impl Default for Playback {
 }
 
 impl Playback {
-    /// The motion playing now.
     pub fn motion(&self) -> Motion<'_> {
         match &self.current_tree {
             Some(node) => Motion::Tree(node),
@@ -125,7 +91,6 @@ impl Playback {
         }
     }
 
-    /// The motion being faded out, while a crossfade blends.
     pub fn previous_motion(&self) -> Option<Motion<'_>> {
         if !self.is_crossfading() {
             return None;
@@ -137,8 +102,6 @@ impl Playback {
         }
     }
 
-    /// Hard-cut to `motion` from its start, discarding any crossfade and any
-    /// sync group (a graph node re-applies its own, [`enter_node`](Self::enter_node)).
     pub fn play(&mut self, motion: Motion<'_>) {
         self.set_current(motion);
         self.time = 0.0;
@@ -146,8 +109,6 @@ impl Playback {
         self.sync = SyncState::default();
     }
 
-    /// Crossfade into `motion` over `duration` seconds. A non-positive duration,
-    /// or a fade into the motion already playing, degrades to [`play`](Self::play).
     pub fn crossfade(&mut self, motion: Motion<'_>, duration: f32) {
         if duration <= 0.0 || motion == self.motion() {
             self.play(motion);
@@ -157,7 +118,7 @@ impl Playback {
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
         self.previous_loop = self.loop_clip;
-        self.states.previous_node = None; // `enter_node` names a node it leaves
+        self.states.previous_node = None;
         self.sync.begin_fade();
         self.set_current(motion);
         self.time = 0.0;
@@ -165,10 +126,6 @@ impl Playback {
         self.crossfade_duration = duration;
     }
 
-    /// Enter graph `node`: crossfade into its motion over `blend` seconds, adopt
-    /// its loop flag and per-node speed, and make it the active state. From a
-    /// node of its sync group (#1896) the incoming motion starts at the
-    /// outgoing one's phase and follows it while they blend ([`SyncState`]).
     pub fn enter_node(&mut self, node: &GraphNode, blend: f32) {
         let motion = match node.blend_tree {
             Some(_) => Motion::Tree(&node.name),
@@ -184,8 +141,6 @@ impl Playback {
         self.start_sync(node, previous, source);
     }
 
-    /// The crossfade weight in `[0, 1]`: 0 fully on the outgoing motion, 1 fully
-    /// on the current one (`1.0` outside a crossfade).
     pub fn crossfade_weight(&self) -> f32 {
         if self.crossfade_duration <= 0.0 {
             return 1.0;
@@ -193,18 +148,11 @@ impl Playback {
         (self.crossfade_elapsed / self.crossfade_duration).clamp(0.0, 1.0)
     }
 
-    /// While a crossfade blends.
     pub fn is_crossfading(&self) -> bool {
         (self.previous_clip.is_some() || self.previous_tree.is_some())
             && self.crossfade_duration > 0.0
     }
 
-    /// Advance the playheads by `dt` seconds at `speed × node_speed`: the current
-    /// one by `current`, within its [`Bounds`] under `loop_clip` — wrapped when
-    /// looping, otherwise clamped to `[0, wrap]` (#1362), so reversing from past an
-    /// end moves back at once; the outgoing one at `previous_per_second`, never
-    /// wrapping. Both stay finite whatever the speed. The crossfade itself runs on
-    /// unscaled `dt` and, once done, drops the outgoing motion.
     pub fn advance(
         &mut self,
         dt: f32,
@@ -230,8 +178,6 @@ impl Playback {
         })
     }
 
-    /// Move the outgoing playhead by `step` at `per_second` (never wrapping)
-    /// and the crossfade by `dt`; a finished fade drops the outgoing motion.
     pub fn advance_previous(&mut self, dt: f32, step: f32, per_second: f32) {
         if self.is_crossfading() {
             self.previous_time = finite(self.previous_time + finite(step * per_second));
@@ -242,11 +188,10 @@ impl Playback {
         }
     }
 
-    /// Move the current playhead to `to(from)` within its bounds; report it.
     pub(super) fn move_current(&mut self, current: Playhead, to: impl FnOnce(f32) -> f32) -> Step {
         let bounds = current.bounds(self.loop_clip);
         // Past the end before any clamp: the clip's length was unknown while it
-        // ran on and is known now (#1386).
+        // ran on and is known now.
         let late = matches!(bounds, Bounds::Clamp(end) if self.time > end);
         let from = finite(match bounds {
             Bounds::Clamp(end) => self.time.clamp(0.0, end),
@@ -254,18 +199,12 @@ impl Playback {
         });
         let to = finite(to(from));
         self.time = bounds.apply(to);
-        // A length that isn't known (or doesn't clamp) says nothing about the
-        // end: `ended` holds, so a clip that stops resolving for a step doesn't
-        // end (and fire its end markers) again once it resolves.
         let Bounds::Clamp(end) = bounds else {
             return Step::travel(from, to);
         };
         let resting = self.ended && from >= end;
         let end_now = !self.ended && (late || (self.time >= end && to >= from));
         self.ended = (self.ended || end_now) && self.time >= end;
-        // Pinned: a push against the end it rests on, a reverse push against the
-        // start, and the late step, whose travel the unresolved run already made,
-        // so a marker it crossed isn't replayed where it clamps onto the end.
         let pinned = late || (resting && to > from) || (from <= 0.0 && to < from);
         let span = if pinned { (from, from) } else { (from, to) };
         Step {

@@ -1,57 +1,11 @@
-//! crates/core/src/application/ — `Application`: build settings + the quit request.
+//! Engine-wide state that is neither scene nor save data (most of it from
+//! `project.rusty`), plus the editor's mailboxes and the quit and play requests.
 //!
-//! The standalone player (#431) needs a few small pieces of engine-wide state that are
-//! neither scene data nor save data:
+//! `Quit()` only records; what it means is the host's call (Unity ignores it in the
+//! editor). A script's play request is kept apart from the host's so the transport,
+//! rewriting its own every frame, never overwrites it.
 //!
-//! * **[`BuildSettings`]** — Unity's "Build Settings / Player Settings", minimal: which
-//!   scene a shipped build boots into, the product name (the player's window title) and
-//!   the default window mode. They live in the project's **tracked** `project.rusty`
-//!   ([`PROJECT_FILE`](crate::project::PROJECT_FILE), #853, under `"build"`), so
-//!   they travel with the project in git instead of with a developer's local save. The editor edits them (File → Build Settings) and scripts
-//!   through the `Application` namespace — one surface, per the parity rule.
-//! * **The project's graphics option defaults** — what a fresh install's player
-//!   graphics options start as (#1438), in the same file under `"graphics_options"`.
-//!   `Graphics.SetDefaultOption` and the Build Settings window edit them, the same way.
-//! * **The project's render-scale default** (#1715), under `"graphics"`: what runs
-//!   while the player has chosen no render scale. `Graphics.SetDefaultRenderScale`
-//!   and the Build Settings window edit it (`render_scale`).
-//! * **The project's quality presets** (#1522), under `"quality"`, and the one the
-//!   player selected (persisted in `Storage`, not the file): `quality`.
-//! * **The project's decal budgets** (#1517), under `"decals"`: read, never written
-//!   here, so an edit to the file is what the next Play applies (and Stop restores).
-//!   They and the quality presets are re-read from the bound file at each Play and
-//!   before each write (`reread`), so a hand edit reaches the running editor and a
-//!   save never erases it.
-//! * **The background loading priority** (#2123, Unity's `backgroundLoadingPriority`):
-//!   a frame's budget for a `Scene.LoadAsync`'s GPU warm-up, for this run (`loading`).
-//! * **The editor's mailboxes** — the demo timeline (`demo`), the gizmo toggles
-//!   (`gizmos`) and the Game view's size (`game_view`, #2207): what a dev-only
-//!   `Editor.*` call asks of the editor window, taken at its frame boundary.
-//! * **The quit request** — `Application.Quit()` only *records* that the game asked to
-//!   quit. What that means is the host's call: the player closes the window, the editor
-//!   stops Play (Unity ignores `Quit` in the editor), and the headless harness ends the
-//!   run. The sim never touches the window; it raises a flag the platform layer reads.
-//! * **The play request** — every host asks to enter or leave Play here
-//!   (`GameWorld::set_playing`: the editor transport, the player, the harness), and so
-//!   do the dev-only `Editor.EnterPlay()` / `Editor.ExitPlay()` (#1360, Unity's
-//!   `EditorApplication.isPlaying`). A script's request is kept apart from the host's
-//!   until `GameWorld` takes it at the next frame boundary, so a script never runs the
-//!   transition from inside its own call and the transport, writing its own request
-//!   back every frame, never overwrites it. A **standalone** run (the player, the
-//!   harness) has no edit mode to return to, and refuses a script's request.
-//!
-//! ## Persistence
-//! Like [`Storage`](crate::storage::Storage), the file is read at a boundary
-//! (boot; a bound instance re-reads the budgets and presets, see `reread`) and an
-//! unbound instance ([`Application::new`]) never touches disk — the
-//! harness and tests stay reproducible. Unlike `Storage`, a setter on a *bound*
-//! instance writes the file straight away: build settings are authoring-time project
-//! config, edited rarely and deliberately, never from inside `FixedUpdate`. Every
-//! entry point fills it through `GameWorld::open_project` (#1652): the editor and the
-//! headless session bind the project file; the player and `play` take the settings
-//! opening the project read
-//! ([`Opened::settings`](crate::project::Opened::settings)) into an unbound instance,
-//! so a shipped game can never rewrite its own build settings.
+//! An unbound instance never touches disk; a bound one's setters write the file.
 
 use std::path::PathBuf;
 
@@ -86,13 +40,9 @@ pub use gizmos::{Gizmo, GizmoRow, SceneGizmos};
 /// `edit::DEFAULT_SCENE_PATH` (a unit test pins it) without `core` importing `edit`.
 pub const DEFAULT_STARTUP_SCENE: &str = "assets/scenes/default.scene";
 
-/// The product name when none is configured.
 pub const DEFAULT_PRODUCT_NAME: &str = "rusty game";
 
 crate::named_enum! {
-    /// How the player's window opens on a first launch. A player who later changes
-    /// `Video.SetFullscreen` keeps that choice (it persists through `Storage`); this is
-    /// only the default before any such choice exists.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum WindowMode {
         #[default]
@@ -101,16 +51,11 @@ crate::named_enum! {
     }
 }
 
-/// Project-level build configuration (Unity's "Scenes In Build", minimal). Every field
-/// is `#[serde(default)]`, so a partial file keeps the defaults for what it omits.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct BuildSettings {
-    /// The scene the player loads and enters Play in on launch.
     pub startup_scene: String,
-    /// The shipped game's name — the player's window title.
     pub product_name: String,
-    /// The player's window mode on a first launch.
     pub window_mode: WindowMode,
 }
 
@@ -124,66 +69,37 @@ impl Default for BuildSettings {
     }
 }
 
-/// The `Application` resource: the project's build settings plus the game's pending
-/// quit request. One per World, shared by the script runtime and the platform layer.
 #[derive(Default)]
 pub struct Application {
     build: BuildSettings,
-    /// The project's default player graphics options (#1438).
     graphics_defaults: GraphicsOptions,
-    /// The project's `"graphics"` block: its render-scale default (#1715).
     graphics: ProjectGraphics,
-    /// The project's quality presets (#1522).
     quality: QualityPresets,
-    /// The preset the player selected, by name; `None` (or a name no preset has
-    /// any more) runs the presets' initial one.
     quality_selected: Option<String>,
-    /// The project's decal budgets (#1517) as last read or set.
     decal_limits: DecalLimits,
-    /// How many play demos the project keeps (#1581).
     demos: DemoSettings,
-    /// The project's audio settings (#1749) as last read or set.
     audio: AudioSettings,
-    /// The project's rolling frame log (#2206) as last read or set.
     logs: LogSettings,
-    /// The bound file's text the budgets and presets were last parsed from, good or
-    /// bad: the same text again is not re-parsed, so its warnings are not repeated.
     read_from: Option<String>,
-    /// `Some` once bound to a file via [`Application::open`]: setters then write it.
     path: Option<PathBuf>,
     quit_requested: bool,
-    /// Whether the host asked for Play (`GameWorld::set_playing`); the next tick's
-    /// transition acts on it.
     host_play: bool,
-    /// `Some(playing)` once a script asked to enter or leave Play (#1360).
     play_request: Option<bool>,
-    /// A standalone run (the player, the harness, #431): no edit mode to return to.
     standalone: bool,
-    /// Whether the host steps a background bake each frame (the editor window,
-    /// #1999): what `Lighting.GenerateAsync()` needs.
     bake_host: bool,
-    /// The editor's demo timeline mailbox (#1598).
     demo: demo::DemoDesk,
-    /// The Scene view's gizmo mailbox (#1909).
     gizmos: gizmos::GizmoDesk,
-    /// The Game view's size mailbox (#2207).
     game_view: game_view::GameViewDesk,
-    /// Unity's `backgroundLoadingPriority` (#2123): a load's warm-up budget.
     loading_priority: LoadingPriority,
 }
 
 impl Application {
-    /// Default settings, bound to no file — the harness and tests.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Read the project file at `path` and bind it (the editor, the session), so every
-    /// setter writes the settings back into it.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
-        // Read once and parse that text, so the text kept for `reread` is the one
-        // the budgets and presets came from.
         // lint: allow(stored-format) `project.rusty`'s format is `core::project::file`'s
         let read = match std::fs::read_to_string(&path) {
             Ok(text) => Ok(Some(text)),
@@ -193,8 +109,6 @@ impl Application {
         self.path = Some(path);
         let text = read?;
         let parsed = text.as_deref().map(ProjectFile::from_json);
-        // Kept even when it doesn't parse: `reread` then waits for the file to
-        // change instead of saying the same parse error again (#1652).
         self.read_from = text;
         let file = parsed.transpose()?.unwrap_or_default();
         (self.build, self.graphics_defaults) = (file.build, file.graphics_options);
@@ -205,8 +119,6 @@ impl Application {
         Ok(())
     }
 
-    /// Take a run's project settings, unbound (the player, the harness: what opening
-    /// the project read), so nothing is written back.
     pub fn run_with(&mut self, settings: ProjectSettings) {
         self.build = settings.build;
         self.graphics_defaults = settings.graphics_options;
@@ -216,8 +128,6 @@ impl Application {
         (self.demos, self.audio, self.logs) = (settings.demos, settings.audio, settings.logs);
     }
 
-    /// The project settings this run plays under, as [`run_with`](Self::run_with)
-    /// takes them: what a demo records so its replay plays under the same (#1581).
     pub fn settings(&self) -> ProjectSettings {
         ProjectSettings {
             build: self.build.clone(),
@@ -231,38 +141,29 @@ impl Application {
         }
     }
 
-    /// The current build settings.
     pub fn build(&self) -> &BuildSettings {
         &self.build
     }
 
-    /// Replace the build settings, writing the bound file (if any) once.
     pub fn set_build(&mut self, build: BuildSettings) -> Result<(), String> {
         self.build = build;
         self.save()
     }
 
-    /// Edit the build settings in place, then write the bound file (if any) once.
     pub fn update(&mut self, edit: impl FnOnce(&mut BuildSettings)) -> Result<(), String> {
         edit(&mut self.build);
         self.save()
     }
 
-    /// The project's default player graphics options.
     pub fn graphics_defaults(&self) -> GraphicsOptions {
         self.graphics_defaults
     }
 
-    /// Replace the default graphics options, writing the bound file (if any) once.
     pub fn set_graphics_defaults(&mut self, defaults: GraphicsOptions) -> Result<(), String> {
         self.graphics_defaults = defaults;
         self.save()
     }
 
-    /// Set one default graphics option (`Graphics.SetDefaultOption`, the Build
-    /// Settings window: one op), writing the bound file (if any). The `live`
-    /// options follow it wherever the player hasn't chosen, so the editor previews
-    /// what a fresh install sees.
     pub fn set_default_option(
         &mut self,
         option: GraphicsOption,
@@ -274,10 +175,6 @@ impl Application {
         self.save()
     }
 
-    /// Write the settings into the bound project file, keeping the rest of it. A
-    /// no-op when unbound. The presets written are the ones [`reread`](Self::reread)
-    /// just took from the file (a preset edit rereads before it edits), so a save
-    /// never writes back presets from before a hand edit.
     fn save(&mut self) -> Result<(), String> {
         self.reread();
         let Some(path) = &self.path else {

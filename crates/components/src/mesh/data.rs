@@ -1,35 +1,17 @@
-//! crates/components/src/mesh/data.rs — a mesh made from vertex data (#2059): Unity's
-//! `Mesh` built from `vertices`, `triangles`, `normals` and `uv`.
-//!
-//! [`MeshData`] is what a script hands `Mesh.Create` and what the scene's mesh
-//! library saves (`scene::mesh_library`): flat, 0-based, as authored. Normals left
-//! out are computed when it is built (Unity's `RecalculateNormals`, area-weighted);
-//! the bounds are always the vertices'. Building it is plain CPU work, so the sim
-//! (a Mesh collider) reads the same geometry the renderer uploads.
-
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use super::Vertex;
 use rusty_asset::tangents::generate_tangents;
 
-/// The `primitive_type` of a mesh drawn from the scene's mesh library; its
-/// `asset_ref` names the library entry.
 pub const SCENE_KIND: &str = "Scene";
 
-/// The most vertices one mesh takes: 2^20. A Dust2-sized level piece built in a
-/// script stays far under it, and a runaway loop fails with a message instead of
-/// allocating gigabytes of vertex buffer (Unity's 32-bit index format reaches 4
-/// billion; a script-built table that size never fits in a Lua VM anyway).
 pub const MAX_VERTICES: usize = 1 << 20;
 
 /// The most indices one mesh takes: two triangles per vertex at the cap, about what
 /// a closed grid of [`MAX_VERTICES`] vertices needs.
 pub const MAX_INDICES: usize = 6 * MAX_VERTICES;
 
-/// One mesh as data. `indices` lists triangles (triples, counter-clockwise from
-/// the front, as every rusty mesh is). `normals` and `uvs`, when given, hold one
-/// entry per position; empty means "compute" (normals) or "all zero" (UVs).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct MeshData {
     pub positions: Vec<[f32; 3]>,
@@ -41,9 +23,6 @@ pub struct MeshData {
 }
 
 impl MeshData {
-    /// Why this data cannot be a mesh, or `Ok` when it can: a count past the caps,
-    /// indices not in triangles or out of range, normals or UVs not one per vertex,
-    /// a NaN or infinite value.
     pub fn validate(&self) -> Result<(), String> {
         let n = self.positions.len();
         if n > MAX_VERTICES {
@@ -81,12 +60,7 @@ impl MeshData {
         finite("uv", self.uvs.iter().position(|p| !all_finite(p)))
     }
 
-    /// The vertices and indices a `MeshComponent` draws: the given normals, or
-    /// area-weighted ones; MikkTSpace tangents from the UVs, as every mesh gets; no
-    /// lightmap UV (a static one reads light probes, as a mesh without one does).
-    /// Call it on data that passed [`Self::validate`].
     pub fn geometry(&self) -> (Vec<Vertex>, Vec<u32>) {
-        // A zero normal is given its +Y fallback before the tangents read it.
         let normals: Vec<[f32; 3]> = match self.normals.is_empty() {
             true => area_weighted_normals(&self.positions, &self.indices),
             false => (self.normals.iter())
@@ -113,9 +87,6 @@ fn all_finite<const N: usize>(v: &[f32; N]) -> bool {
     v.iter().all(|x| x.is_finite())
 }
 
-/// Each vertex's normal as the sum of its triangles' face normals, each weighted by
-/// its area (the unnormalised cross product), then normalised: Unity's
-/// `RecalculateNormals`. A vertex no triangle with area touches points up.
 pub fn area_weighted_normals(positions: &[[f32; 3]], indices: &[u32]) -> Vec<[f32; 3]> {
     let mut sums = vec![Vec3::ZERO; positions.len()];
     for tri in indices.chunks_exact(3) {

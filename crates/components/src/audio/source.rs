@@ -1,73 +1,42 @@
-//! crates/components/src/audio/source.rs — AudioSource component (#212, #213, #412).
-//!
-//! Unity's `AudioSource`: a per-entity emitter referencing an audio `clip` to play,
-//! with a linear 3D rolloff (`spatial_blend`, `initial_distance`, `final_distance`),
-//! a time-scale opt-out, the mixer group it plays through (#465), an occlusion
-//! opt-out (#467) and a doppler level (#1749). The windowed
-//! runtime applies all of it to the device every tick (`api/audio/frame.rs`).
-//!
-//! Pure authoring data — every field serde-persists. The component knows nothing
-//! about the audio device: the platform-layer `AudioMaestro` (the resource) owns
-//! the mixer and turns these fields into actual sound. Keeping the component
-//! device-free is what lets the deterministic harness carry `AudioSource`s with no
-//! audio backend at all.
+//! Unity's `AudioSource`. Pure authoring data: it knows nothing of the audio device, so the
+//! deterministic harness carries it with no audio backend.
 
 use serde::{Deserialize, Serialize};
 
-/// Per-entity audio emitter. Mirrors Unity's `AudioSource`. All fields persist; the
-/// `AudioMaestro` reads them when (re)starting a voice for this entity.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AudioSourceComponent {
-    /// Asset path to the clip (`.ogg` / `.wav` / `.mp3`). Empty means "no clip assigned".
+    /// Empty means no clip assigned.
     pub clip: String,
-    /// Per-source linear gain in `[0, 1]`, multiplied by the master volume.
     pub volume: f32,
-    /// Whether playback loops when it reaches the end.
     #[serde(rename = "loop")]
     pub looping: bool,
-    /// Start playing automatically when the entity enters Play (Unity's "Play On
-    /// Awake").
     pub play_on_start: bool,
-    /// `true` ⇒ the voice's rate follows `Time.timeScale` (slows in slow-mo, stops
-    /// when paused) — for diegetic gameplay sound. `false` ⇒ wall-clock rate, for
-    /// music and UI that should keep playing through a pause/slow-mo.
     pub is_time_scaled: bool,
 
-    // --- Spatial fields (3D spatialization, #213; applied to the device by #412). ---
-    /// 0.0 = fully 2D (no attenuation/panning, stereo image kept), 1.0 = fully 3D
-    /// (a stereo clip is downmixed to mono, then panned).
+    /// 0.0 = fully 2D (stereo kept), 1.0 = fully 3D (stereo downmixed to mono, then panned).
     pub spatial_blend: f32,
-    /// Rolloff: full volume out to this distance (model: flat ≤ initial, linear
-    /// falloff initial→final, silent beyond).
+    /// Full volume out to this distance, then linear falloff to `final_distance`.
     pub initial_distance: f32,
-    /// Rolloff: silent at/after this distance.
+    /// Silent at and after this distance.
     pub final_distance: f32,
 
-    /// The mixer group the voice plays through (#465; Unity's `outputAudioMixerGroup`).
-    /// Empty means Master. Read when the voice starts, so a change reroutes the next
-    /// `Play`, not a voice already sounding.
+    /// Empty means Master. Read when the voice starts, so a change reroutes the next `Play`.
     #[serde(default)]
     pub output_group: String,
 
-    /// Whether geometry between the listener and this source muffles it (#467,
-    /// Steam Audio's per-source occlusion toggle). Only a spatialized source
-    /// (`spatial_blend > 0`) is ever occluded.
+    /// Only a spatialized source (`spatial_blend > 0`) is ever occluded.
     #[serde(default = "occlusion_default")]
     pub occlusion_enabled: bool,
 
-    /// How strongly the source's and the listener's motion bend its pitch (#1749,
-    /// Unity's *Doppler Level*): `0` off, `1` physical, above `1` exaggerated. It is
-    /// scaled by `spatial_blend`, so a 2D source never shifts whatever it says.
+    /// `0` off, `1` physical, above `1` exaggerated; scaled by `spatial_blend`.
     #[serde(default = "doppler_default")]
     pub doppler_level: f32,
 }
 
-/// Physical doppler unless a source says otherwise.
 fn doppler_default() -> f32 {
     1.0
 }
 
-/// Occlusion is on unless a source opts out.
 fn occlusion_default() -> bool {
     true
 }

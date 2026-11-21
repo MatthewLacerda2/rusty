@@ -1,12 +1,9 @@
-//! crates/components/src/physics/collider/tests.rs — the collider's world AABB and serde.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::Quat;
 
 use super::*;
 
-/// A pose at `pos`, turned by `rot`, scaled by `scale`.
 fn at(pos: Vec3, rot: Quat, scale: Vec3) -> Pose {
     Pose { pos, rot, scale }
 }
@@ -20,7 +17,6 @@ fn mesh_collider_world_aabb_follows_transform() {
     let c = ColliderComponent::from_mesh_bounds(false, Vec3::splat(-1.0), Vec3::splat(1.0));
     assert!(matches!(c.shape, ColliderShape::Mesh { convex: false, .. }));
 
-    // Translate +Y by 5 and scale x2: the local [-1,1] box maps to [-2,2]±offset.
     let world = at(Vec3::new(0.0, 5.0, 0.0), Quat::IDENTITY, Vec3::splat(2.0));
     let (min, max) = c.calculate_world_aabb(world);
     assert!((min - Vec3::new(-2.0, 3.0, -2.0)).length() < 1e-4);
@@ -44,7 +40,6 @@ fn assert_vec(got: Vec3, want: Vec3) {
 
 #[test]
 fn capsule_world_aabb_spans_full_height_along_its_axis() {
-    // Unity semantics: height 2 is the full end-to-end length, caps included.
     let c = capsule(0.5, 2.0, CapsuleAxis::Y);
     let (min, max) = c.calculate_world_aabb(moved(Vec3::new(1.0, 3.0, 0.0)));
     assert_vec(min, Vec3::new(0.5, 2.0, -0.5));
@@ -61,7 +56,6 @@ fn capsule_world_aabb_spans_full_height_along_its_axis() {
 
 #[test]
 fn short_capsule_bounds_are_its_sphere() {
-    // height < 2r: the caps meet, the capsule is a sphere of radius r.
     let (min, max) = capsule(1.0, 0.5, CapsuleAxis::Y).calculate_world_aabb(moved(Vec3::ZERO));
     assert_vec(min, Vec3::splat(-1.0));
     assert_vec(max, Vec3::splat(1.0));
@@ -69,7 +63,6 @@ fn short_capsule_bounds_are_its_sphere() {
 
 #[test]
 fn rotated_capsule_bounds_follow_the_rotation() {
-    // A Y capsule turned 90° about Z lies along X.
     let rot = at(Vec3::ZERO, Quat::from_rotation_z(FRAC_PI_2), Vec3::ONE);
     let (min, max) = capsule(0.5, 4.0, CapsuleAxis::Y).calculate_world_aabb(rot);
     assert_vec(min, Vec3::new(-2.0, -0.5, -0.5));
@@ -105,8 +98,6 @@ fn axis_aligned_cylinder_bounds_are_unchanged() {
 
 #[test]
 fn stretched_cylinder_and_capsule_bounds_stay_round() {
-    // #1140: physics sizes the radius by the larger cross scale, so the box does
-    // too — scale z 3 widens x as well (it used to say x = ±0.5).
     let s = at(Vec3::ZERO, Quat::IDENTITY, Vec3::new(1.0, 1.0, 3.0));
     let (min, max) = cylinder(0.5, 2.0).calculate_world_aabb(s);
     assert_vec(min, Vec3::new(-1.5, -1.0, -1.5));
@@ -126,8 +117,6 @@ fn round_radius_takes_the_larger_cross_scale_and_ignores_mirrors() {
 
 #[test]
 fn a_flattened_capsule_keeps_its_rotation() {
-    // A zero scale used to lose the rotation; the pose carries it, so a flat Y
-    // capsule turned 90° about Z still lies along X.
     let flat = at(
         Vec3::ZERO,
         Quat::from_rotation_z(FRAC_PI_2),

@@ -1,13 +1,8 @@
-//! crates/ecs/src/despawn/cost_tests.rs — a despawn pays for what it kills, not for the
-//! level (#1708): once the reverse index is open, killing a leaf nothing names
-//! re-reads the same few holders in a level of ten meshes and of two thousand.
-
 use std::collections::BTreeSet;
 
 use crate::World;
 use rusty_components::{JointComponent, MeshComponent};
 
-/// `meshes` static meshes, a body with a joint naming it, and `leaves` projectiles.
 fn level(meshes: usize, leaves: usize) -> (World, u32, Vec<u32>) {
     let mut w = World::new();
     for _ in 0..meshes {
@@ -26,10 +21,9 @@ fn level(meshes: usize, leaves: usize) -> (World, u32, Vec<u32>) {
     (w, hinge, leaves)
 }
 
-/// Holders the index touched while despawning the second of two leaves.
 fn second_leaf(meshes: usize) -> u64 {
     let (mut w, _, leaves) = level(meshes, 2);
-    w.despawn(leaves[0]); // opens the index: one walk over every holder
+    w.despawn(leaves[0]);
     let before = w.refs.as_ref().expect("opened").touched;
     w.despawn(leaves[1]);
     w.refs.as_ref().expect("opened").touched - before

@@ -1,5 +1,3 @@
-//! The volume's grid: its box, its resolution and its points (#1672).
-
 use super::*;
 
 const UNIT: (Vec3, Vec3) = (Vec3::splat(-0.5), Vec3::splat(0.5));

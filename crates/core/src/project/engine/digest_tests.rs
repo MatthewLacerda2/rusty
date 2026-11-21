@@ -1,5 +1,3 @@
-//! The engine content digest: what it hashes, and when it says it can't.
-
 use super::digest;
 use std::path::{Path, PathBuf};
 
@@ -50,8 +48,6 @@ fn a_changed_byte_a_renamed_file_or_a_new_file_changes_the_digest() {
 
 #[test]
 fn bytes_moved_across_a_file_boundary_change_the_digest() {
-    // Without the length after each path these two feed the same stream:
-    // `a \0 b \0 X` either way.
     let one = digest(&tree("digest_moved_one", &[("a", "b\0X")]));
     let two = digest(&tree("digest_moved_two", &[("a", ""), ("b", "X")]));
     assert_ne!(one.unwrap(), two.unwrap());

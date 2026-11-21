@@ -1,6 +1,3 @@
-//! crates/components/src/particle/runtime.rs — the transient play-mode state of an
-//! emitter: live particles, spawn carry, PRNG and pending sub-emitter events.
-
 use glam::{Quat, Vec3};
 
 use super::simulation::GpuSim;
@@ -18,19 +15,12 @@ pub struct Particle {
     pub age: f32,
     /// Total lifetime in seconds; despawns when `age >= lifetime`.
     pub lifetime: f32,
-    /// Size at birth (world units); the emitter's size curve scales it over life.
     pub size: f32,
     /// Sprite rotation in radians (about the view axis).
     pub rotation: f32,
-    /// RGBA tint at birth; the emitter's colour gradient scales it over life.
     pub color: [f32; 4],
-    /// Flipbook frame the particle starts on (random-start sheets, #440; else 0).
     pub start_frame: u32,
-    /// Unit axis a mesh particle tumbles about by `rotation` (#440; else `Y`).
     pub axis: Vec3,
-    /// The turn a `Local` emitter has given the particle (its rotation at birth,
-    /// then every turn it carried the particle through, #1529), applied on top of
-    /// the tumble. Identity for a `World` emitter.
     pub turn: Quat,
     /// Four numbers a script keeps per particle (Unity's *Custom Data*): zero at
     /// birth, never read by the engine, written by `Particles.SetParticles`.
@@ -38,9 +28,6 @@ pub struct Particle {
 }
 
 impl Particle {
-    /// A particle at `position` with the render-only extras at their defaults — for
-    /// tests and tools that place particles by hand.
-    /// Test seam for `tests/gpu/particle/scene.rs`.
     pub fn at(position: Vec3, size: f32, color: [f32; 4], lifetime: f32) -> Self {
         Self {
             position,
@@ -57,9 +44,6 @@ impl Particle {
         }
     }
 
-    /// A mesh particle's orientation: its tumble by `rotation` about `axis`, under
-    /// the emitter's `turn`. Exactly the tumble when `turn` is identity, so a
-    /// `World` emitter draws bit for bit as before Simulation Space.
     pub fn orientation(&self) -> Quat {
         let axis = self.axis.try_normalize().unwrap_or(Vec3::Y);
         let tumble = Quat::from_axis_angle(axis, self.rotation);
@@ -80,9 +64,6 @@ impl Particle {
     }
 }
 
-/// A sub-emitter firing owed by this emitter: `target`'s burst at `position`,
-/// each spawned particle inheriting `velocity`. Queued during the tick (or by a
-/// scripted emit) and dispatched by `app::systems::particles` once every emitter has run.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SubEmitEvent {
     pub target: u32,
@@ -93,31 +74,16 @@ pub struct SubEmitEvent {
 /// Transient per-emitter runtime. Reset on entering Play.
 #[derive(Clone, Debug)]
 pub struct EmitterRuntime {
-    /// A `Cpu` emitter's live particles; always empty on a `Gpu` one, whose live
-    /// particles are the renderer's (#2170).
     pub particles: Vec<Particle>,
-    /// A `Gpu` emitter's births, steps and exact live count (`simulation`).
     pub gpu: GpuSim,
-    /// Accumulated fractional particles owed by continuous emission.
     pub spawn_accum: f32,
     pub rng: Random,
-    /// For a non-looping `Burst`: set once the single burst has been emitted.
     pub burst_fired: bool,
-    /// Whether the runtime has been seeded for the current Play session.
     pub initialized: bool,
     /// Sub-emitter firings not yet dispatched.
     pub pending: Vec<SubEmitEvent>,
-    /// The `Local` emitter frame its live particles were last placed under
-    /// (`space`); `None` until it first emits or is carried.
     pub anchor: Option<EmitterFrame>,
-    /// The first `anchor` this Play: what a `Local` `Gpu` emitter's stored
-    /// particles are relative to (`ParticleEmitterComponent::gpu_space`).
     pub base: Option<EmitterFrame>,
-    /// Bumped by everything that changes which particle sits where or what it
-    /// holds outside a script's own read: a tick, an emit, a clear and each
-    /// scripted write. A script's read records it, and a write against an older
-    /// one is refused or takes no identity (`script::api::particle`). Nothing in
-    /// the sim reads it.
     pub revision: u64,
 }
 
@@ -138,13 +104,7 @@ impl Default for EmitterRuntime {
     }
 }
 
-/// The configuration apart from the runtime.
 impl super::ParticleEmitterComponent {
-    /// A copy of the configuration, with a fresh runtime: what an editor or an
-    /// all-or-nothing write reads and edits without copying the live particles (a
-    /// `Gpu` emitter keeps a birth per live particle, up to
-    /// [`GPU_MAX_PARTICLES`](super::GPU_MAX_PARTICLES)). The destructuring names every field, so a new one
-    /// is a compile error here until it is copied.
     pub fn config(&self) -> Self {
         macro_rules! copy {
             ($($field:ident),* $(,)?) => {{

@@ -1,12 +1,6 @@
-//! crates/ecs/src/changes/seam_tests.rs — what the consumers of #1706–#1710 are briefed to
-//! rely on (#1705): a write that changed nothing names nothing, a move or re-parent
-//! names the whole subtree on `WorldPose`, a derived box is not a collider edit, and
-//! restoring a live entity names it like any overwrite.
-
 use crate::{Activity, Changes, World, WorldPose};
 use rusty_components::{ColliderComponent, TransformComponent};
 
-/// root -> mid -> leaf, plus a separate root `other`.
 fn chain() -> (World, [u32; 4]) {
     let mut w = World::new();
     let [root, mid, leaf, other] = ["root", "mid", "leaf", "other"].map(|n| w.spawn(n.into()));
@@ -23,7 +17,7 @@ fn a_transform_landing_its_old_value_names_nothing() {
     let mut local = w.change_cursor::<TransformComponent>();
     let mut poses = w.change_cursor::<WorldPose>();
     let held = w.transform(root).expect("live").position.x;
-    w.transform_mut(root).expect("live").position.x = held; // physics' write-back of a sleeper
+    w.transform_mut(root).expect("live").position.x = held;
     assert_eq!(w.changes(&mut local), Changes::Ids(vec![]));
     assert_eq!(w.changes(&mut poses), Changes::Ids(vec![]));
 }
@@ -34,7 +28,7 @@ fn a_move_names_the_subtree_on_world_pose_and_only_the_entity_on_transform() {
     let mut local = w.change_cursor::<TransformComponent>();
     let mut poses = w.change_cursor::<WorldPose>();
     w.transform_mut(mid).expect("live").position.y = 2.0;
-    w.transform_mut(mid).expect("live").position.y = 3.0; // still unread: no second walk
+    w.transform_mut(mid).expect("live").position.y = 3.0;
     assert_eq!(w.changes(&mut local), Changes::Ids(vec![mid]));
     assert_eq!(w.changes(&mut poses), Changes::Ids(vec![mid, leaf]));
     w.transform_mut(root).expect("live").position.y = 1.0;
@@ -49,7 +43,7 @@ fn a_re_parent_names_the_subtree_on_world_pose_and_activity() {
     let mut poses = w.change_cursor::<WorldPose>();
     let mut activity = w.change_cursor::<Activity>();
     w.remove_child(root, mid);
-    w.set_parent_id(mid, Some(other)); // keeps its local Transform
+    w.set_parent_id(mid, Some(other));
     w.add_child(other, mid);
     assert_eq!(w.changes(&mut local), Changes::Ids(vec![]));
     assert_eq!(w.changes(&mut poses), Changes::Ids(vec![mid, leaf]));
@@ -83,7 +77,7 @@ fn restoring_a_live_entity_names_it_and_its_subtree() {
     let before = w.record(root).expect("live");
     w.transform_mut(root).expect("live").position.x = 4.0;
     let _ = (w.changes(&mut local), w.changes(&mut poses));
-    w.restore_entity(before.doc, before.seq); // an Undo step's own rewind is `scene::undo`'s
+    w.restore_entity(before.doc, before.seq);
     assert_eq!(w.changes(&mut local), Changes::Ids(vec![root]));
     assert_eq!(w.changes(&mut poses), Changes::Ids(vec![root, mid, leaf]));
 }

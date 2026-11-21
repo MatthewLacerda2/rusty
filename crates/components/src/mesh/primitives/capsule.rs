@@ -1,15 +1,8 @@
-//! The Capsule primitive (#1191): a tube along Y capped by two hemispheres, sized
-//! like Unity's (and like `ColliderShape::Capsule`): `height` is the full length,
-//! caps included. Lightmap UVs come from the generated unwrap (#831).
-
 use glam::Vec3;
 
 use super::fill_tangents_unwrapped;
 use crate::mesh::Vertex;
 
-/// Generates a capsule centred at the origin along Y: `segments` around, `rings`
-/// latitude bands per hemisphere. A `height` under `2 * radius` collapses the
-/// tube, leaving a sphere of `radius`, as the collider does.
 pub fn generate_capsule(
     radius: f32,
     height: f32,
@@ -40,8 +33,6 @@ pub fn generate_capsule(
         }
     }
 
-    // Each band is a quad strip; at a pole one of its two triangles has no area,
-    // so it is left out.
     let last = rows.len() as u32 - 2;
     let mut indices = Vec::new();
     for r in 0..=last {
@@ -60,10 +51,6 @@ pub fn generate_capsule(
     fill_tangents_unwrapped(vertices, indices)
 }
 
-/// Each latitude row as `(polar angle from +Y, Y offset of its sphere centre)`:
-/// the top hemisphere around `+half_tube`, then the bottom one around
-/// `-half_tube`. The two equator rows share a normal, so the band between them is
-/// the tube wall.
 fn capsule_rows(rings: u32, half_tube: f32) -> Vec<(f32, f32)> {
     let step = std::f32::consts::FRAC_PI_2 / (rings as f32);
     let top = (0..=rings).map(|r| (r as f32 * step, half_tube));

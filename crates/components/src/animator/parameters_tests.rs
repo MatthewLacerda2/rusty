@@ -1,4 +1,4 @@
-//! Unit tests for the typed animator parameters (#314): typed set/get round-trips,
+//! Unit tests for the typed animator parameters: typed set/get round-trips,
 //! the wrong-type no-op rule, trigger latch/consume semantics, and the store's
 //! deterministic (name-sorted) iteration order.
 
@@ -17,7 +17,6 @@ fn typed_set_get_round_trips_every_kind() {
     assert_eq!(anim.get_int("weapon"), Some(2));
     assert!(anim.trigger_is_set("Jump"));
 
-    // Same-type overwrite updates in place.
     assert!(anim.set_float("speed", 0.0));
     assert_eq!(anim.get_float("speed"), Some(0.0));
     assert_eq!(anim.parameters.len(), 4, "overwrite adds no entry");
@@ -53,10 +52,8 @@ fn typed_get_on_missing_or_wrong_type_is_none() {
 fn trigger_latches_until_consumed_then_clears() {
     let mut anim = AnimatorComponent::default();
     anim.set_trigger("Jump");
-    // Latched: non-consuming checks may read it any number of times.
     assert!(anim.trigger_is_set("Jump"));
     assert!(anim.trigger_is_set("Jump"));
-    // A fired transition consumes it exactly once (#316's read-site).
     assert!(anim.consume_trigger("Jump"));
     assert!(
         !anim.trigger_is_set("Jump"),
@@ -71,7 +68,6 @@ fn trigger_latches_until_consumed_then_clears() {
         anim.parameters.get("Jump"),
         Some(&AnimatorParameter::Trigger(false))
     );
-    // Re-latching works.
     anim.set_trigger("Jump");
     assert!(anim.consume_trigger("Jump"));
 }

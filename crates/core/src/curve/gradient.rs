@@ -1,20 +1,15 @@
-//! crates/core/src/curve/gradient.rs — an RGBA gradient over `t ∈ [0, 1]`.
-//!
-//! Unity's shape: colour keys and alpha keys are separate lists, so fading alpha
-//! never needs a colour key at the same `t`. Alpha reuses [`Curve`].
+//! Unity's shape: colour keys and alpha keys are separate lists.
 
 use serde::{Deserialize, Serialize};
 
 use super::{lerp_keys, Curve};
 
-/// One colour keyframe: RGB at normalised time `t`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ColorKey {
     pub t: f32,
     pub color: [f32; 3],
 }
 
-/// Colour + alpha over `t`. No colour keys is white; no alpha keys is opaque.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Gradient {
     #[serde(default)]
@@ -24,7 +19,6 @@ pub struct Gradient {
 }
 
 impl Gradient {
-    /// White, alpha fading linearly from 1 to 0 — the pre-#439 particle look.
     pub fn fade_out() -> Self {
         Self {
             color_keys: Vec::new(),
@@ -32,12 +26,10 @@ impl Gradient {
         }
     }
 
-    /// One constant RGBA everywhere.
     pub fn solid([r, g, b, a]: [f32; 4]) -> Self {
         Self::linear([r, g, b, a], [r, g, b, a])
     }
 
-    /// A straight blend from `start` at `t = 0` to `end` at `t = 1`.
     pub fn linear(start: [f32; 4], end: [f32; 4]) -> Self {
         let key = |t, c: [f32; 4]| ColorKey {
             t,
@@ -49,13 +41,11 @@ impl Gradient {
         }
     }
 
-    /// Re-sort both key lists by `t`.
     pub fn sort(&mut self) {
         self.color_keys.sort_by(|a, b| a.t.total_cmp(&b.t));
         self.alpha.sort();
     }
 
-    /// RGBA at `t` (each key list clamped to its own span).
     pub fn evaluate(&self, t: f32) -> [f32; 4] {
         let [r, g, b] = self.rgb(t);
         [r, g, b, self.alpha.evaluate(t)]

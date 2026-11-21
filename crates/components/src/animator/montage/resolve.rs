@@ -1,7 +1,3 @@
-//! crates/components/src/animator/montage/resolve.rs — turning a name into a
-//! montage ready to start (#1894): a montage of the graph, else a clip
-//! played as a one-section montage in `DefaultSlot`.
-
 use super::{find, ActiveMontage, DEFAULT_SECTION};
 use rusty_asset::anim_data::AnimationClip;
 use rusty_asset::animation_graph::{AnimationGraph, Montage, MontageSection, DEFAULT_SLOT};
@@ -9,7 +5,6 @@ use rusty_asset::animation_graph::{AnimationGraph, Montage, MontageSection, DEFA
 /// Why a montage would not start.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MontageRefused {
-    /// No montage of that name, and no clip either.
     Unknown,
     /// The montage's clip is not on the mesh.
     NoClip(String),
@@ -18,10 +13,6 @@ pub enum MontageRefused {
 }
 
 impl ActiveMontage {
-    /// Resolve `name` against `graph`'s montages, else as a clip name in
-    /// `clips` (played as a one-section montage), into a montage ready to
-    /// start in `slot` (the montage's own when `None`) from `start` (its first
-    /// section when `None`) at `rate`.
     pub fn resolve(
         graph: Option<&AnimationGraph>,
         clips: &[AnimationClip],
@@ -78,8 +69,6 @@ impl ActiveMontage {
         Ok(active)
     }
 
-    /// Blend in and out over these times instead of its own (`PlayMontage`'s
-    /// `blend_in` / `blend_out`); a negative or non-finite one is ignored.
     pub fn with_blends(mut self, blend_in: Option<f32>, blend_out: Option<f32>) -> Self {
         let valid = |b: Option<f32>| b.filter(|b| b.is_finite() && *b >= 0.0);
         if let Some(b) = valid(blend_in) {

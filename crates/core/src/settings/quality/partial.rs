@@ -1,8 +1,3 @@
-//! Writing a partial set of quality values over a full one (#1522): how a preset in
-//! `project.rusty` that names only some values loads (the rest are the seeded
-//! `Medium` preset's, so a partial file keeps the defaults for what it omits, as
-//! the rest of `ProjectFile` does), and how `Graphics.SetQualityPreset` edits one.
-
 use serde::de::{DeserializeOwned, Error};
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -26,7 +21,6 @@ pub(super) fn merge(base: &mut Value, patch: &Value, path: &str) -> Result<(), S
     Ok(())
 }
 
-/// Read one effect's levels as `patch` over `base`, the seeded `Medium` preset's.
 fn over<'de, D, T>(d: D, base: T, path: &str) -> Result<T, D::Error>
 where
     D: Deserializer<'de>,

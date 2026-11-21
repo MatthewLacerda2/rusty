@@ -1,41 +1,27 @@
-//! Whether and how a mesh casts shadows (#1571): Unity's
-//! `MeshRenderer.shadowCastingMode`, honoured by every shadow path (the sun's
-//! cascades, the point/spot atlas, their static bakes, and the lightmap bake).
-
 rusty_core::named_enum! {
     /// How a mesh takes part in shadows — Unity's *Cast Shadows*. `On` is the
     /// default, and what a file without the field reads.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum ShadowCasting {
-        /// Casts from its front faces, as every mesh did before the switch.
         #[default]
         On = "On",
-        /// Casts nothing, realtime or baked: water, glass, a muzzle flash. The bake
-        /// still sees it (it bounces and emits) and lightmaps it.
         Off = "Off",
         /// Casts from both faces (culling off in the shadow pass): a single-sided
         /// card or plane that must shadow whichever way it faces the light.
         TwoSided = "TwoSided",
-        /// Casts as `On` but is drawn by no camera and seen by no bake (no bounce,
-        /// no emission, no lightmap): an invisible stand-in that only throws a
-        /// shadow (a first-person body, a low-poly shadow proxy).
         ShadowsOnly = "ShadowsOnly",
     }
 }
 
 impl ShadowCasting {
-    /// Whether the mesh is drawn into shadow maps and blocks baked light.
     pub fn casts(self) -> bool {
         self != Self::Off
     }
 
-    /// Whether a camera draws the mesh (and the bake sees it, picking and outlines
-    /// find it).
     pub fn is_visible(self) -> bool {
         self != Self::ShadowsOnly
     }
 
-    /// Whether the default.
     pub fn is_on(&self) -> bool {
         *self == Self::On
     }

@@ -1,9 +1,3 @@
-//! `world_rotation` / `local_rotation` (#1119): they agree with the rotation
-//! glam reads off the child's world matrix, mirrored parent or not, and each
-//! undoes the other; a local direction and a local frame seen through the
-//! mirror the child's signed scale carries land where its matrix draws them
-//! (#1125).
-
 use std::f32::consts::FRAC_PI_3;
 
 use glam::{Mat3, Mat4, Quat, Vec3};
@@ -14,7 +8,6 @@ fn same(a: Quat, b: Quat) -> bool {
     a.dot(b).abs() > 1.0 - 1e-5
 }
 
-/// Parents with and without a reflection, each rotated off the axes.
 fn parents() -> Vec<Mat4> {
     let rot = Quat::from_rotation_y(0.7) * Quat::from_rotation_x(-0.4);
     [
@@ -36,8 +29,6 @@ fn world_rotation_is_what_the_world_matrix_decomposes_to() {
         let ours = world_rotation(parent, local);
         assert!(same(ours, decomposed), "under {parent:?}");
         assert!(same(local_rotation(parent, ours), local));
-        // The reflection is all in the scale: rotation × signed scale is the
-        // child's world matrix.
         let rebuilt = Mat3::from_quat(ours) * Mat3::from_diagonal(scale);
         assert!(rebuilt.abs_diff_eq(Mat3::from_mat4(world), 1e-5));
     }
@@ -58,14 +49,12 @@ fn an_unmirrored_parent_is_the_plain_product() {
     );
 }
 
-/// Own scales with and without a reflection, on X and off it.
 const OWN: [Vec3; 3] = [
     Vec3::ONE,
     Vec3::new(1.0, 1.0, -1.0),
     Vec3::new(-1.0, 1.0, 1.0),
 ];
 
-/// A child's world matrix's linear part, and its world rotation and mirror.
 fn child(parent: Mat4, local: Quat, own: Vec3) -> (Mat3, Quat, Vec3) {
     let world = parent * Mat4::from_scale_rotation_translation(own, local, Vec3::X);
     let mirror = mirror(parent.to_scale_rotation_translation().0 * own);
@@ -76,7 +65,6 @@ fn child(parent: Mat4, local: Quat, own: Vec3) -> (Mat3, Quat, Vec3) {
     )
 }
 
-/// The rotation whose X is `x` and Y is `y` made perpendicular to it.
 fn basis(x: Vec3, y: Vec3) -> Mat3 {
     let x = x.normalize();
     let y = (y - x * y.dot(x)).normalize();
@@ -98,9 +86,6 @@ fn a_mirrored_direction_lands_on_the_drawn_world_direction() {
     assert_eq!(mirrored_direction(Vec3::ONE, dir), dir);
 }
 
-/// A frame seen through the mirror turns the way the mirror image does: a twist
-/// about its X, drawn through the child's matrix, is the twist about the world
-/// frame's X, and that X lies on the drawn line in the mirror-image sense.
 #[test]
 fn a_mirrored_frame_twists_as_the_drawn_frame_does() {
     let local = Quat::from_rotation_y(0.9) * Quat::from_rotation_x(-0.3);

@@ -1,37 +1,23 @@
-//! The volume's lighting settings (#435, #436): the sun's shadow cascades and
-//! screen-space ambient occlusion, HDRP's Shadows and Ambient Occlusion overrides.
-//! They shape the lighting passes, not the post chain, so they are no post effect.
-
 use serde::{Deserialize, Serialize};
 
 use rusty_core::settings::quality::EffectQuality;
 
-/// How the sun's cascaded shadow map covers the view (#435) — HDRP's Shadows volume
-/// override: how many cascades split the view, and how far from the camera shadows
-/// reach. Without an active volume the renderer uses [`ShadowSettings::default`].
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ShadowSettings {
-    /// Cascades the view is split into, `1..=4`. More cascades keep near shadows
-    /// sharp over a longer reach, at one more depth pass each.
+    /// `1..=4`; each cascade is one more depth pass.
     pub cascades: u32,
-    /// Distance from the camera, in world units, past which nothing casts or receives
-    /// a sun shadow (they fade out over its last tenth).
+    /// World units; nothing casts or receives a sun shadow past it (fades over the last tenth).
     pub distance: f32,
 }
 
 impl ShadowSettings {
-    /// The cascade-count range the shadow map supports.
     pub const MAX_CASCADES: u32 = 4;
-    /// The shortest shadow reach a write accepts.
     pub const MIN_DISTANCE: f32 = 1.0;
 }
 
 impl Default for ShadowSettings {
-    /// Four cascades over 100 m: the whole of a large room or a street-scale outdoor
-    /// space shadowed, with the first cascade a few metres deep for first-person
-    /// contact shadows. Unity's High tier is 4 cascades over 150 m; 100 m spends the
-    /// same four maps on less ground, since a shooter's fights are closer than that.
+    /// Unity's High tier is 4 cascades over 150 m; 100 m suits a shooter's closer fights.
     fn default() -> Self {
         Self {
             cascades: Self::MAX_CASCADES,
@@ -40,43 +26,29 @@ impl Default for ShadowSettings {
     }
 }
 
-/// Screen-space ambient occlusion (#436) — HDRP's Ambient Occlusion volume override.
-/// Darkens only the ambient/indirect light where geometry crowds a point (a crate's
-/// foot on the floor, a room's corners), never direct light. `quality` picks the
-/// sample count and resolution (#1522): a level of the active quality preset, or
-/// `samples` and `resolution_divisor` here when `Custom`. The rest is the look.
+/// HDRP's Ambient Occlusion override: darkens only ambient/indirect light, never direct.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SsaoSettings {
-    /// Whether the AO passes run at all. Off costs nothing.
     pub active: bool,
-    /// World-space reach of the occlusion search: how far from a surface another
-    /// surface still shades it.
     pub radius: f32,
-    /// How strongly occlusion darkens the ambient term; `0` is none, `1` the
-    /// physically-plausible amount, above `1` exaggerated.
+    /// `0` is none, `1` physically plausible, above `1` exaggerated.
     pub intensity: f32,
-    /// Which sample count and resolution run.
     pub quality: EffectQuality,
-    /// `Custom`: hemisphere samples per occlusion texel, `1..=64`.
+    /// `Custom`: samples per occlusion texel, `1..=64`.
     pub samples: u32,
-    /// `Custom`: the occlusion target is the view's size divided by this, `1..=4`.
+    /// `Custom`: the view's size divided by this, `1..=4`.
     pub resolution_divisor: u32,
 }
 
 impl SsaoSettings {
-    /// The most samples a write accepts.
     pub const MAX_SAMPLES: u32 = 64;
-    /// The shortest radius a write accepts.
     pub const MIN_RADIUS: f32 = 0.01;
-    /// The strongest intensity a write accepts.
     pub const MAX_INTENSITY: f32 = 4.0;
 }
 
 impl Default for SsaoSettings {
-    /// On, half a metre, plain strength, at the preset's `Medium` level (`Custom`
-    /// starts at 8 samples at half resolution): the contact and corner shading an interior
-    /// needs, without the dark halo a wider radius paints around a character.
+    /// Half a metre at `Medium` (`Custom` starts at 8 samples, half resolution).
     fn default() -> Self {
         Self {
             active: true,

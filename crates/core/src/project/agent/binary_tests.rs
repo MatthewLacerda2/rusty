@@ -1,12 +1,8 @@
-//! Which `session-mcp` the engine's `.mcp.json` entries run (#2024): an entry already
-//! on a build of this checkout keeps it, a fresh one takes the running build's profile.
-
 use serde_json::json;
 
 use super::super::*;
 use super::{is_checkout_binary, merge, session_binary, SERVERS};
 
-/// [`session_binary`] for `/engine`, run from `exe`, with only `built` on disk.
 fn pick(exe: Option<&str>, built: &[&str]) -> PathBuf {
     let built: Vec<PathBuf> = built.iter().map(PathBuf::from).collect();
     let exe = exe.map(PathBuf::from);

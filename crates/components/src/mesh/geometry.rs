@@ -1,18 +1,3 @@
-//! crates/components/src/mesh/geometry.rs — a mesh without its geometry, and back (#1631).
-//!
-//! The editor's Undo records an entity's state before every edit, and a model's
-//! vertices are megabytes the edit almost never touched. So a record keeps the
-//! mesh's saved fields and drops the heavy rehydrated ones; restoring takes the
-//! geometry back from the live mesh when it still comes from the same source.
-//!
-//! The vertex and index buffers are shared (`rusty_asset::mesh_data::Shared`,
-//! #2351) with the import cache and every other instance, so a [`Clone`] of a mesh
-//! points at the same geometry. An edit in place goes through
-//! [`MeshComponent::vertices_mut`] or [`MeshComponent::indices_mut`], which copy
-//! the buffer first when anyone else holds it (counted by `mesh::copies`) and
-//! renew the revision; replacing a buffer whole (`mesh.vertices = vec.into()`)
-//! copies nothing.
-
 use super::{MeshComponent, MeshRevision, Vertex};
 
 /// A full copy: [`MeshComponent::without_geometry`]'s fields (every one named
@@ -35,9 +20,6 @@ impl Clone for MeshComponent {
 }
 
 impl MeshComponent {
-    /// This mesh with every saved field and every light runtime one copied, and its
-    /// heavy rehydrated ones (vertices, indices, runs, palettes, skin, clips, clusters,
-    /// and the identity an edit in place gave them) left empty. Every field is named, so a new one must be placed here.
     pub fn without_geometry(&self) -> Self {
         Self {
             primitive_type: self.primitive_type.clone(),
@@ -61,24 +43,16 @@ impl MeshComponent {
         }
     }
 
-    /// The vertices, to edit in place: this mesh's own copy when another mesh or
-    /// the import cache shares them, at a new revision so every renderer re-uploads
-    /// them, and under an identity of this mesh's own ([`Self::own_geometry`]) so
-    /// the renderer draws the edit on this mesh alone.
     pub fn vertices_mut(&mut self) -> &mut Vec<Vertex> {
         self.renew(!self.vertices.is_unique());
         self.vertices.edit()
     }
 
-    /// The indices, to edit in place, as [`Self::vertices_mut`] gives the vertices.
     pub fn indices_mut(&mut self) -> &mut Vec<u32> {
         self.renew(!self.indices.is_unique());
         self.indices.edit()
     }
 
-    /// A new revision for an edit in place, and a new identity unless this mesh
-    /// already has one no other mesh holds: a buffer `shared` with another mesh
-    /// means the other may carry this identity too (a clone does).
     fn renew(&mut self, shared: bool) {
         self.revision = MeshRevision::next();
         if shared || self.own_geometry.is_none() {
@@ -86,18 +60,12 @@ impl MeshComponent {
         }
     }
 
-    /// Whether `other`'s geometry is this mesh's: the same primitive or asset, cut
-    /// the same way. What decides that a restore can keep the live geometry, with
-    /// any edit in place of it (an edit of the vertices is no Undo step).
     pub fn same_source(&self, other: &Self) -> bool {
         self.primitive_type == other.primitive_type
             && self.asset_ref == other.asset_ref
             && self.subdivisions == other.subdivisions
     }
 
-    /// Move `from`'s heavy rehydrated fields (the ones [`Self::without_geometry`]
-    /// empties, its own identity among them) and its revision onto this mesh: the renderer has that geometry
-    /// already, so nothing is uploaded again.
     pub fn adopt_geometry(&mut self, from: &mut Self) {
         self.vertices = std::mem::take(&mut from.vertices);
         self.indices = std::mem::take(&mut from.indices);

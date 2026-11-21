@@ -1,10 +1,3 @@
-//! crates/ecs/src/despawn/index_tests.rs — the reverse index against the full scan it
-//! replaced (#1708): after any sequence of edits (`changes::ops`'s, plus
-//! writes to every reference-holding column, a skinned mesh's bone slots, a
-//! reference to the holder itself or to an id nobody has), the holders it names for
-//! any dead set are exactly the scan's, and a despawn leaves no live holder naming
-//! a dead id.
-
 use std::collections::BTreeSet;
 
 use proptest::prelude::*;
@@ -13,7 +6,6 @@ use crate::changes::ops::{self, apply};
 use crate::{Channel, World};
 use rusty_components::{with_ref_components, EntityRefs, MeshComponent};
 
-/// Give `id` a `T` whose every slot names `target`, or take its `T` away.
 fn hold<T: EntityRefs + Channel + Send + Sync>(w: &mut World, id: u32, target: Option<u32>) {
     let held = target.map(|t| {
         let mut c = T::every_ref();
@@ -34,7 +26,6 @@ with_ref_components!(kinds);
 enum Target {
     At(usize),
     Itself,
-    /// An id no entity has had yet.
     Unborn,
     Drop,
 }
@@ -43,9 +34,7 @@ enum Target {
 enum Op {
     Base(ops::Op),
     Hold(usize, usize, Target),
-    /// A skinned mesh whose bone slots name these, at their indices.
     Bones(usize, Vec<usize>),
-    /// A batch: these entities and every descendant of the first.
     Despawn(Vec<usize>),
 }
 
@@ -70,7 +59,6 @@ fn pick(w: &World, i: usize) -> Option<u32> {
     w.ids().get(i).copied()
 }
 
-/// The index and the scan agree on every single live id, and on `extra`.
 fn agree(w: &mut World, extra: &BTreeSet<u32>) -> Result<(), TestCaseError> {
     let mut sets: Vec<BTreeSet<u32>> = w.ids().iter().map(|&id| BTreeSet::from([id])).collect();
     sets.push(extra.clone());
@@ -137,7 +125,6 @@ proptest! {
     }
 }
 
-/// Undo revives a dead id, a holder names it again before the next refresh (#1774).
 #[test]
 fn a_holder_naming_a_revived_id_again_is_listed() {
     use ops::{Edit::UndoDespawn, Op::*};

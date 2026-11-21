@@ -1,12 +1,7 @@
-//! crates/ecs/src/changes/derived_case_tests.rs — the cases `derived_tests`' op
-//! sequences once found, each held as its fixed sequence.
-
 use super::derived_tests::{bits, kept_equals_rebuilt};
 use super::ops::{apply, Edit, Op};
 use crate::{Activity, World, WorldPose};
 
-/// The flake of #1777: an Undo of a despawn put the child back without its place in
-/// the parent's `children`, so switching the parent off missed it.
 #[test]
 fn undoing_a_despawn_keeps_the_child_in_its_parents_subtree() {
     use Edit::*;
@@ -25,9 +20,6 @@ fn undoing_a_despawn_keeps_the_child_in_its_parents_subtree() {
         .expect("kept equals rebuilt");
 }
 
-/// #1853: an adopted entity's parent is younger than it, so "re-parent under an
-/// older entity" made a cycle `Scene::set_parent` refuses, and a cycle has no world
-/// pose to keep. The op generator now refuses one too.
 #[test]
 fn a_reparent_under_an_adopted_child_is_refused() {
     use Edit::*;

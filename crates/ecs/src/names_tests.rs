@@ -1,8 +1,3 @@
-//! crates/ecs/src/names_tests.rs — the name index against the scan it replaced (#2089):
-//! after any sequence of spawns, renames, despawns, re-parents, (de)activations,
-//! overwrites, Undo steps and scene loads, `find_by_name` answers what walking
-//! `ids()` for the first active entity with that name answers, for every name.
-
 use proptest::prelude::*;
 
 use crate::World;
@@ -16,14 +11,10 @@ enum Op {
     Despawn(usize),
     Parent(usize, Option<usize>),
     SetActive(usize, bool),
-    /// Overwrite in place with a renamed document (the prefab rebuild).
     Overwrite(usize, usize),
-    /// Start recording an edit; `Undo` takes it back.
     Begin,
     Undo,
-    /// Save and reload: clear, then insert every document.
     Load,
-    /// No lookup before this op, so the next one catches up on several.
     Quiet,
 }
 
@@ -44,7 +35,6 @@ fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
-/// The `i`th live id; an id past them all when `i` overshoots.
 fn pick(w: &World, i: usize) -> u32 {
     w.ids().get(i).copied().unwrap_or(i as u32 + 1)
 }
@@ -94,7 +84,6 @@ fn apply(w: &mut World, op: &Op) {
     }
 }
 
-/// What `scene::undo` does with a recorded step: put every entity back as it was.
 fn undo(w: &mut World) {
     w.journal_pause();
     for (id, before) in w.journal_take().map(|j| j.before).unwrap_or_default() {
@@ -107,7 +96,6 @@ fn undo(w: &mut World) {
     w.rewind_changes();
 }
 
-/// The lookup the index replaced.
 fn scanned(w: &World, name: &str) -> Option<u32> {
     w.ids()
         .iter()
@@ -122,7 +110,7 @@ proptest! {
         for (k, op) in ops.iter().enumerate() {
             apply(&mut w, op);
             if matches!(ops.get(k + 1), Some(Op::Quiet)) {
-                continue; // the next lookup catches up on this op and the ones after
+                continue;
             }
             for name in NAMES.iter().chain(&["missing"]) {
                 prop_assert_eq!(w.find_by_name(name), scanned(&w, name), "{} after {:?}", name, op);

@@ -1,10 +1,6 @@
-//! A cache's freshness hands back what the engine wrote at once, a missing file
-//! only once it appears, and nothing otherwise (#1241).
-
 use super::{Freshness, MISS_RETRY_FRAMES};
 use crate::fs::written::{note_written, Stale};
 
-/// Poll `freshness` through one whole retry window; the stale paths of every poll.
 fn window(freshness: &mut Freshness) -> Vec<String> {
     (0..MISS_RETRY_FRAMES)
         .flat_map(|_| freshness.poll().stale)

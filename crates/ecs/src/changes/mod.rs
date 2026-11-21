@@ -1,48 +1,3 @@
-//! crates/ecs/src/changes/ — change detection: which entities changed on a channel since a
-//! consumer last looked (#1705). Bevy's `Changed<T>` / `RemovedComponents<T>` and
-//! Unity's `transform.hasChanged`, as one log per channel read through cursors.
-//!
-//! **Channels** ([`Channel`], sealed). Every component column is one (`T` is the
-//! column's type: a `ColliderComponent`, the `TransformComponent`,
-//! `Vec<ScriptComponent>`, the `Core` flags). It is stamped at the World's write
-//! funnels, in the same call that notes the write for the edit journal
-//! (`stamp.rs`): a column borrowed mutably (`component_mut`, `with_mut_and_ref`),
-//! attached, detached or taken (`set_component`, `take_component`), and, for an
-//! entity placed, overwritten or removed, the columns it carries or carried (an
-//! overwrite stamps both sets). A write to a column the entity lacks stamps
-//! nothing (`ecs/funnel.rs`), so a column's channel names only entities that have
-//! or had its component: "any entity appeared or went" is [`Activity`]'s. A mutable borrow counts as
-//! a change, as in Bevy: a write that changed nothing is over-reported, which is
-//! safe; a missed one would be the bug. Two writes compare first because they are
-//! hot: a Transform landing its old value and a collider's derived world box stamp
-//! nothing. A *derived* channel is a marker stamped at the source of its fact, so a
-//! consumer never expands ids itself. [`WorldPose`], [`Activity`] and [`StaticSet`]
-//! cover a subtree (a move, an activation or a re-parent stamps every descendant
-//! it reaches); [`Layer`] (an entity's own layer) and [`Children`] (an entity's
-//! own child list, the parent alone) are per id.
-//!
-//! **Cursors.** A consumer opens a [`Cursor`] once ([`World::change_cursor`]) and
-//! asks [`World::changes`] each time it runs: [`Changes::Ids`], the ids stamped
-//! since its last read, ascending, each once; or [`Changes::Rebuild`] when the
-//! cursor cannot be answered from the log (the World was cleared or replaced, a
-//! Play snapshot restored, an Undo or Redo stepped ([`World::rewind_changes`]), or
-//! the log dropped what the cursor had not read yet). What an id holds *now* is the World's answer: a
-//! consumer re-reads it, and an id that is gone or lost the column was removed.
-//! Any number of cursors read one channel, each at its own pace. Opening and
-//! reading take `&World` (the logs sit in a `RefCell`), so a reader that only
-//! borrows the World, the renderer's retained scene (`render::scene`, #1706), keeps
-//! its own cursors; every stamp still takes `&mut World`.
-//!
-//! **Cost.** A channel no cursor was ever opened on costs a write one test and,
-//! when another channel is being read, one indexed lookup (however many are open); nothing accumulates for it, and
-//! a derived channel's subtree walk is not taken. A read channel's log is bounded
-//! (`log.rs`).
-//!
-//! **Determinism.** The log is sim state: ids come back ascending, channels are
-//! found by their fixed [`Channel::SLOT`] and walked only in the order they were
-//! first opened, never by slot. A consumer computes, for the ids it is given, exactly what its full
-//! pass computes for them.
-
 #[cfg(test)]
 mod carried_tests;
 mod channel;
@@ -79,75 +34,53 @@ use log::Log;
 
 use super::world::World;
 
-/// A consumer's place in one channel's log. Opened by [`World::change_cursor`].
 pub struct Cursor<T> {
     epoch: u64,
     seen: u64,
     _channel: PhantomData<fn() -> T>,
 }
 
-/// What changed on a channel since a cursor's last read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Changes {
-    /// The log cannot say: rebuild from the whole World.
     Rebuild,
-    /// The ids stamped since the last read, ascending, each once.
     Ids(Vec<u32>),
 }
 
 impl Changes {
-    /// Whether nothing changed: no id stamped and no `Rebuild`.
     pub fn is_empty(&self) -> bool {
         matches!(self, Changes::Ids(ids) if ids.is_empty())
     }
 }
 
-/// Every World (and every `clear` or restore of one) takes a fresh epoch, so a
-/// cursor never reads a log it was not opened on. Only compared, never read as sim.
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
 
 fn fresh_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
 }
 
-/// `StaticSet`'s index in `ChangeLogs::logs`: it is opened first, by every World.
 const STATIC: usize = 0;
 
-/// An [`ChangeLogs::index`] entry for a channel no cursor was opened on.
 const UNOPENED: u32 = u32::MAX;
 
-/// Whether `row` carries column `T` ([`log::Carried`]).
 fn carries<T: Channel>(row: &hecs::EntityRef<'_>) -> bool {
     row.has::<T>()
 }
 
-/// The World's logs.
 #[derive(Debug)]
 pub(crate) struct ChangeLogs {
     epoch: u64,
-    /// The logs, in the order their channels were first opened.
     logs: Vec<Log>,
-    /// [`Channel::SLOT`] -> index into `logs` ([`UNOPENED`] for none): every write
-    /// looks its column up here, so it is an index, not a search.
     index: Vec<u32>,
-    /// [`Channel::NAME`]s, parallel to `logs`.
     names: Vec<&'static str>,
-    /// Epochs taken since this World was made: what a test counts an Undo by.
     rewinds: u64,
-    /// The subtree stamps' kept stack and seen set (`stamp.rs`).
     scratch: stamp::Scratch,
-    /// [`StaticGeometry`]'s revision.
     static_geometry: u64,
 }
 
-/// One opened channel's counters ([`World::change_stats`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ChangeStat {
     pub name: &'static str,
-    /// Entries the log holds now (bounded, `log.rs`).
     pub held: usize,
-    /// Entries ever appended; per tick, with a reader every tick, the distinct ids
-    /// dirtied in it.
     pub logged: u64,
 }
 
@@ -162,7 +95,7 @@ impl Default for ChangeLogs {
             scratch: Default::default(),
             static_geometry: 0,
         };
-        logs.slot::<StaticSet>(); // index `STATIC`; its revision is `static_revision`, read unopened
+        logs.slot::<StaticSet>();
         logs
     }
 }
@@ -185,14 +118,11 @@ impl ChangeLogs {
         &mut self.logs[at]
     }
 
-    /// `T`'s index in `logs`: it exists once a cursor was opened on `T` (always, for
-    /// [`StaticSet`]).
     fn find<T: Channel>(&self) -> Option<usize> {
         let at = *self.index.get(T::SLOT)?;
         (at != UNOPENED).then_some(at as usize)
     }
 
-    /// The World was replaced or rewound: every cursor reads `Rebuild` next.
     pub(crate) fn new_epoch(&mut self) {
         self.epoch = fresh_epoch();
         self.rewinds += 1;
@@ -200,30 +130,21 @@ impl ChangeLogs {
         self.logs.iter_mut().for_each(Log::reset);
     }
 
-    /// Drop the subtree stamps' kept walk state, sized for the World just emptied.
     pub(crate) fn reset_scratch(&mut self) {
         self.scratch = Default::default();
     }
 }
 
 impl World {
-    /// The World was taken back to an earlier state as a whole (an Undo or Redo
-    /// step, `scene::undo`): every cursor reads [`Changes::Rebuild`] next. One per
-    /// step, not per entity: each costs every recording log a reset.
     pub fn rewind_changes(&mut self) {
         self.changes.get_mut().new_epoch();
     }
 
-    /// How many times the change logs were reset ([`World::rewind_changes`], a clear).
-    /// A test hook (`scene::undo`'s tests count the rewinds a step costs).
     #[doc(hidden)]
     pub fn change_rewinds(&self) -> u64 {
         self.changes.borrow().rewinds
     }
 
-    /// Open a cursor on channel `T`: it has read everything up to now. Takes `&self`
-    /// so a reader that only borrows the World (the renderer, #1706) can open one;
-    /// opening still starts `T`'s recording, as with `&mut`.
     pub fn change_cursor<T: Channel>(&self) -> Cursor<T> {
         let mut changes = self.changes.borrow_mut();
         let seen = changes.slot::<T>().open();
@@ -234,28 +155,17 @@ impl World {
         }
     }
 
-    /// Whether nothing was stamped on `T` since `cursor`'s last read, in the World it
-    /// read: what a reader asks before [`World::changes`], which collects the ids, so
-    /// a quiet channel costs one comparison. `false` does not promise an id: a stamp
-    /// may have landed on one the reader ignores, or the World was replaced (the
-    /// read is then [`Changes::Rebuild`]).
     pub fn quiet<T: Channel>(&self, cursor: &Cursor<T>) -> bool {
         let changes = self.changes.borrow();
         let revision = changes.find::<T>().map(|at| changes.logs[at].revision);
         cursor.epoch == changes.epoch && revision == Some(cursor.seen)
     }
 
-    /// What changed on `T` since `cursor`'s last read; the cursor then has read it all.
-    /// Takes `&self` for the same reason as [`World::change_cursor`]: a read moves only
-    /// the log's own bookkeeping (what no cursor has read past), never the World.
     pub fn changes<T: Channel>(&self, cursor: &mut Cursor<T>) -> Changes {
         self.read(cursor, Log::since)
             .map_or(Changes::Rebuild, Changes::Ids)
     }
 
-    /// The one read under [`World::changes`] and [`StaticGeometry::changed`]: `read`
-    /// asks `T`'s log from `cursor`'s revision, unless the cursor is another World's
-    /// (`None`, as for a log that no longer holds it); the cursor then has read it all.
     fn read<T: Channel, R>(
         &self,
         cursor: &mut Cursor<T>,
@@ -275,13 +185,10 @@ impl World {
         got
     }
 
-    /// [`StaticSet`]'s revision, which moves on every stamp: `World::static_revision`.
     pub(crate) fn static_set_revision(&self) -> u64 {
         self.changes.borrow().logs[STATIC].revision
     }
 
-    /// Each opened channel's counters, in opening order: how much churn a game makes,
-    /// per channel (`Debug.Stats`'s `changes_<name>`). [`StaticSet`] is always listed.
     pub fn change_stats(&self) -> Vec<ChangeStat> {
         let changes = self.changes.borrow();
         let logs = changes.logs.iter();

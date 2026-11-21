@@ -1,6 +1,3 @@
-//! crates/ecs/src/active_tests.rs — `activeSelf` vs `activeInHierarchy` (#1363): an
-//! inactive ancestor hides the whole subtree without touching its own flags.
-
 use crate::World;
 
 fn chain(w: &mut World) -> (u32, u32, u32) {
@@ -54,8 +51,6 @@ fn find_by_name_skips_an_entity_under_an_inactive_parent() {
     w.set_active(pivot, false);
     assert_eq!(w.find_by_name("gun"), None, "Unity's GameObject.Find");
 }
-
-// The kept answers (#1388): every write that can change one is seen by the next read.
 
 #[test]
 fn a_kept_answer_follows_a_reparent_and_a_parent_despawn() {

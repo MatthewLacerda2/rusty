@@ -1,5 +1,3 @@
-//! crates/components/src/ribbon/line.rs — LineRenderer: a ribbon through authored points.
-
 use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -8,11 +6,9 @@ use super::RibbonStyle;
 /// Authoring component: a ribbon through `positions` (Unity's `LineRenderer`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LineComponent {
-    /// The points, in order. World space, or the entity's local space when
-    /// `use_world_space` is off (so a laser sight follows the gun it hangs on).
+    /// World space, or the entity's local space when `use_world_space` is off.
     pub positions: Vec<Vec3>,
     pub use_world_space: bool,
-    /// Join the last point back to the first.
     #[serde(default)]
     pub looping: bool,
     pub style: RibbonStyle,
@@ -30,7 +26,6 @@ impl Default for LineComponent {
 }
 
 impl LineComponent {
-    /// The points in world space, given the entity's world matrix.
     pub fn world_positions(&self, world: Mat4) -> Vec<Vec3> {
         if self.use_world_space {
             return self.positions.clone();

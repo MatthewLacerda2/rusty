@@ -1,7 +1,5 @@
 use super::*;
 
-/// Unity's defaults: UI and the probes on, every collider and the navmesh off; the
-/// navmesh's toggle shown (#1910).
 #[test]
 fn defaults_follow_unity() {
     let set = SceneGizmos::default();
@@ -25,7 +23,6 @@ fn defaults_follow_unity() {
     assert!(!set.on(Gizmo::Stats), "Unity's Stats starts closed");
 }
 
-/// Every row's name finds its own gizmo, and the names are unique.
 #[test]
 fn names_round_trip() {
     for &gizmo in Gizmo::ALL {
@@ -35,8 +32,6 @@ fn names_round_trip() {
     assert_eq!(Gizmo::named("colliders"), None);
 }
 
-/// A script's request reads back at once, reaches the editor's set at its frame, and
-/// the editor's own change (a toggle click) is mirrored back.
 #[test]
 fn requests_reach_the_editor_and_mirror_back() {
     let mut app = Application::new();
@@ -62,7 +57,6 @@ fn requests_reach_the_editor_and_mirror_back() {
     );
 }
 
-/// Two requests in one frame land in order: the later wins.
 #[test]
 fn the_later_request_wins() {
     let mut app = Application::new();

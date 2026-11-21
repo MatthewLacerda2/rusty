@@ -1,13 +1,3 @@
-//! crates/components/src/animator.rs — Animator component
-//!
-//! The runtime state of an entity's skeletal animation: which clip is playing, the
-//! playhead, speed, and a minimal current-state machine for crossfades (#80). The
-//! clips themselves live on the entity's skinned `MeshComponent` (rehydrated from
-//! the imported source, never serialized); this component only references one by
-//! name and tracks where the playhead is. Since #457 an animator plays one
-//! [`Playback`] per graph layer: the base layer's, plus one [`LayerState`] per
-//! extra layer. Unity analog: `Animator`.
-
 use serde::{Deserialize, Serialize};
 
 mod graph_state;
@@ -32,77 +22,42 @@ pub use sync::{follow_clamped, stored_leaf, LeafTime, SyncSource, SyncState};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct AnimatorComponent {
-    /// The base layer's playback: clip or blend tree, playhead, crossfade and
-    /// active graph node. Flattened, so its fields sit at the top of the saved
-    /// component exactly as before layers existed (#457).
     #[serde(flatten)]
     pub base: Playback,
-    /// Playback rate multiplier applied to the fixed timestep, every layer.
     pub speed: f32,
     pub is_playing: bool,
-    /// Pause hold (`Animator.Pause`/`Resume`, the editor's Freeze toggle): freezes
-    /// every playhead without clearing `is_playing`, so the pose holds and
-    /// playback resumes from the same frame.
     pub freeze: bool,
-    /// Typed graph parameters (#314): the named `Bool`/`Float`/`Int`/`Trigger`
-    /// values scripts set (`Animator.Set*`) and the `AnimationGraph`'s edge
-    /// conditions and blend trees read. Values live here and serialize with the
-    /// entity; declarations belong to the graph asset. Name-sorted (`BTreeMap`) so
-    /// the evaluator's fixed-step walk is deterministic. Shared by every layer.
     #[serde(default, skip_serializing_if = "AnimatorParameters::is_empty")]
     pub parameters: AnimatorParameters,
-    /// Path to the `AnimationGraph` asset (`guard.animgraph`, #315) driving this
-    /// animator — a path-based reference, exactly like a mesh references its source
-    /// file, so the scene stores the reference and the graph is rehydrated on load.
-    /// `None` means no graph: the animator only does what scripts tell it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub graph: Option<String>,
-    /// Auto-evaluate the referenced graph each fixed step (#316). On by default;
-    /// off (`Animator.SetGraphEnabled(id, false)`), the graph is inert data and
-    /// the animator stays under direct `Play`/`Crossfade` control.
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub graph_enabled: bool,
-    /// The graph's extra layers' runtime state (#457), index `i` for layer `i + 1`.
-    /// Filled when the evaluator binds them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub layers: Vec<LayerState>,
-    /// IK constraints over the skeleton (#461), solved after `LateUpdate` and
-    /// before skinning: two-bone limbs and aim chains, addressed by name.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ik: Vec<IkConstraint>,
-    /// Unity's *Apply Root Motion* (#1745), off by default: the root bone's
-    /// horizontal travel and turn leave the pose and move the entity instead —
-    /// through its CharacterController's `Move` when it has one (walls stop it),
-    /// else along the navmesh when it has an active NavMeshAgent, else its
-    /// Transform. Off, the pose plays as authored and the delta is only reported.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub apply_root_motion: bool,
-    /// The bone whose motion is the root motion, by name (usually the hips).
-    /// Empty means the skeleton's first root joint.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub root_bone: String,
     /// The last step's root motion and what it moved (`Animator.GetRootMotion`);
     /// runtime only, never saved.
     #[serde(skip)]
     pub root_motion: RootMotionState,
-    /// The montages playing in its slots (#1894); runtime only, never saved,
+    /// The montages playing in its slots; runtime only, never saved,
     /// so a load or a Play/Stop restore leaves every slot empty.
     #[serde(skip)]
     pub montages: Montages,
-    /// The graph states last reported to the scripts (#1901); runtime only.
+    /// The graph states last reported to the scripts; runtime only.
     #[serde(skip)]
     pub states: StateTracker,
 }
 
-/// One extra layer's runtime state (#457).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct LayerState {
-    /// The layer's name in the graph, refreshed by the evaluator — how a script
-    /// addresses the layer by name.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub name: String,
-    /// The layer's live weight in `[0, 1]`: the graph's authored weight when the
-    /// layer binds, then whatever `Animator.SetLayerWeight` sets.
     pub weight: f32,
     #[serde(flatten)]
     pub playback: Playback,
@@ -138,8 +93,6 @@ impl Default for AnimatorComponent {
 }
 
 impl AnimatorComponent {
-    /// Start `clip` on the base layer immediately, discarding any crossfade — a
-    /// hard cut from the current pose, from the clip's start.
     pub fn play(&mut self, clip: String) {
         self.base.play(Motion::Clip(&clip));
         self.run();
@@ -153,15 +106,11 @@ impl AnimatorComponent {
         self.run();
     }
 
-    /// The base layer's crossfade weight (see [`Playback::crossfade_weight`]).
-    /// A test hook: other modules' tests read it.
     #[doc(hidden)]
     pub fn crossfade_weight(&self) -> f32 {
         self.base.crossfade_weight()
     }
 
-    /// True while the base layer is crossfading.
-    /// A test hook: other modules' tests read it.
     #[doc(hidden)]
     pub fn is_crossfading(&self) -> bool {
         self.base.is_crossfading()
@@ -172,13 +121,10 @@ impl AnimatorComponent {
         self.is_playing && !self.freeze
     }
 
-    /// The IK constraint named `name` (#461).
     pub fn ik_mut(&mut self, name: &str) -> Option<&mut IkConstraint> {
         self.ik.iter_mut().find(|c| c.name == name)
     }
 
-    /// Add `constraint`, replacing one of the same name in place (keeping its
-    /// place in the list; the runtime target and hint are reset with it).
     pub fn set_ik(&mut self, mut constraint: IkConstraint) {
         match self.ik_mut(&constraint.name) {
             Some(slot) => {
