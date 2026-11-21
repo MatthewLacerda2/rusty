@@ -91,8 +91,9 @@ fn gpu_with_nothing_hidden_the_cull_draws_no_triangle_twice() {
         let depth = on.hiz_depth_triangles;
         assert!(depth > 0, "{label}: phase one drew the view: {on:?}");
         // One depth batch: phase one's call, and the late set's when the cull
-        // primes a camera no prepass would (with AO the prepass draws it).
-        let late = u32::from(!ssao);
+        // primes a camera no prepass would (with AO the prepass draws it; on
+        // Metal nothing primes, so with neither no late set is drawn).
+        let late = if ssao { 0 } else { on.primed_passes };
         let split = on.cluster_draws.saturating_sub(1);
         assert_eq!(on.draw_calls, off.draw_calls + 1 + late + split, "{label}");
         if ssao {
