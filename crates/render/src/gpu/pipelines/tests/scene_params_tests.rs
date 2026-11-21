@@ -1,17 +1,8 @@
-//! Runtime shader params per kept scene (#1706): two scenes the renderer keeps (the
-//! main scene and a preview tab) holding a same-named material with other values
-//! each draw their own, frame after frame, and an evicted scene gives its buffers
-//! back. A library edit of a material's params rewrites its buffer in place, no
-//! object re-derived but the one overriding them, whose buffer merges them. Skips
-//! with no adapter.
-
 use super::{halves, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
 use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Scene;
 
-/// A scene of one flashing sphere at the left whose material flashes `color`; its
-/// material's library key.
 fn flashing(shader: &str, color: [f32; 3]) -> (Scene, String) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -34,14 +25,11 @@ fn gpu_two_kept_scenes_draw_a_same_named_material_with_their_own_values() {
     let (preview, other) = flashing(&flash.0, [0.0, 0.0, 1.0]);
     assert_eq!(key, other, "one name in both libraries");
     let red = halves(&mut renderer, &main)[0];
-    // A preview draws beside the main view, as the editor's Inspector does.
     let blue = renderer.aside(|r| halves(r, &preview)[0]);
     assert!(
         red.0 > red.1 && blue.1 > blue.0,
         "red {red:?}, blue {blue:?}"
     );
-    // Nothing in either scene changed: neither is re-derived, so each binds the
-    // buffer it was keyed with, not the last one written.
     assert_eq!(
         halves(&mut renderer, &main)[0],
         red,
@@ -51,7 +39,6 @@ fn gpu_two_kept_scenes_draw_a_same_named_material_with_their_own_values() {
     let owner = |s: &Scene| ParamOwner::Material(s.id(), key.clone());
     let values = [&main, &preview].map(|s| renderer.materials.params_of(&owner(s)).copied());
     assert!(values[0].is_some() && values[0] != values[1], "{values:?}");
-    // Loading other scenes drops the main one: its buffer goes with it.
     for _ in 0..4 {
         halves(&mut renderer, &flashing(&flash.0, [0.0, 1.0, 0.0]).0);
     }
@@ -72,7 +59,6 @@ fn gpu_a_param_edit_rewrites_its_buffer_and_re_derives_only_the_overriding() {
     let right = sphere(&mut scene, 1.2, &flash.0);
     let shared = scene.world.material(left).map(|m| m.clone());
     scene.world.set_material(right, shared.clone());
-    // The right one flashes blue where its material flashes red.
     let blue = vec![0.0, 0.0, 1.0];
     scene
         .shader_overrides

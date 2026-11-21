@@ -1,14 +1,9 @@
-//! The procedural sky's settings on a GPU (#1620): they reach the cube's bake, a
-//! change bakes once, and coverage 0 is a cloud-free sky.
-
 use glam::Vec3;
 
 use super::gpu_tests::half;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::{Camera, Scene, SkySettings};
 
-/// Render one frame of `scene`; returns how many sky cubes it baked and the bound
-/// procedural cube's mip-0 +Y face (the sky overhead, clouds and all), raw halves.
 fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> (u32, Vec<u8>) {
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let out = view.color_target_view().unwrap();
@@ -44,12 +39,10 @@ fn gpu_sky_settings_rebake_once_and_coverage_zero_is_clear() {
         "the sky bound before is still held"
     );
 
-    // No clouds either way: coverage 0 carves none, opacity 0 hides them.
     scene.sky.cloud_opacity = 0.0;
     let (_, hidden) = frame(&mut r, &mut view, &scene);
     assert_eq!(hidden, clear, "coverage 0 is the cloud-free sky");
 
-    // Every colour set to what the defaults derive draws the default sky.
     let [zenith, horizon, ground] = SkySettings::default().resolved(scene.ambient_color);
     scene.sky = SkySettings {
         zenith: Some(zenith),
@@ -58,8 +51,6 @@ fn gpu_sky_settings_rebake_once_and_coverage_zero_is_clear() {
         ..SkySettings::default()
     };
     let (_, explicit) = frame(&mut r, &mut view, &scene);
-    // The set colours' cube holds no ambient term, so compare the drawn sky: the
-    // terms' rgb plus the ambient times their alpha.
     let ambient = scene.ambient_color;
     let drawn = |face: &[u8]| -> Vec<Vec3> {
         face.chunks_exact(8)

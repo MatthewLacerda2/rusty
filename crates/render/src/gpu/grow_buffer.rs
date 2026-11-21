@@ -1,17 +1,5 @@
-//! crates/render/src/gpu/grow_buffer.rs — a GPU buffer rewritten wholesale every frame, grown
-//! (never shrunk) when a frame's contents outgrow it (#470).
-//!
-//! The instanced draw lists pack a whole frame's per-draw uniforms, bone palettes and
-//! instances into a few of these, so a frame costs a handful of `write_buffer` calls
-//! instead of one per entity. Growth reallocates, which invalidates any bind group that
-//! names the old buffer — `upload` says so, and the owner rebuilds. The object table
-//! (#1706) is kept instead: [`GrowBuffer::reserve`] grows it, and
-//! [`GrowBuffer::write_at`] writes only the slots that changed; and
-//! [`GrowBuffer::reserve_kept`] grows one whose contents the GPU wrote (#1963).
-
 use crate::gpu::ops::CountedQueue as _;
 
-/// Smallest allocation, so a near-empty scene does not reallocate on its first props.
 const MIN_BYTES: u64 = 4096;
 
 pub(crate) struct GrowBuffer {
@@ -72,10 +60,6 @@ impl GrowBuffer {
         grown
     }
 
-    /// Make room for `bytes`, keeping what the buffer holds: on growth its old
-    /// contents are copied into the new one's start (a submit of their own), and
-    /// the old size is returned, so the caller writes only past it and rebuilds its
-    /// bind groups. Needs `COPY_SRC` among the usages.
     pub(crate) fn reserve_kept(
         &mut self,
         device: &wgpu::Device,

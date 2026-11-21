@@ -1,5 +1,3 @@
-//! The adapter-free half of the priming gate (#1499): which backends prime.
-
 use super::priming::recommended;
 
 #[test]

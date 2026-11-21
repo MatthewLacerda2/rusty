@@ -1,15 +1,9 @@
-//! A material whose baked shader went stale against the engine draws it again once
-//! the renderer re-bakes it from its recipe (#1638); a recipe-less module that no
-//! longer composes keeps the standard look and is left as it is. Skips with no adapter.
-
 use std::collections::BTreeMap;
 
 use crate::test_gpu::headless_or_skip;
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir};
 
-/// What a pre-#1616 bake looks like now: an old fingerprint over a module importing
-/// a binding the engine no longer has.
 const STRANDED: &str = "// rusty engine fingerprint: 0000000000000000\n\
     #import forward::bindings::{entity}\n\
     @fragment fn fs_main() -> @location(0) vec4<f32> { return entity.color_tint; }\n";

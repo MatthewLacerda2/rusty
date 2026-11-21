@@ -1,6 +1,3 @@
-//! A `data` bake is a 16-bit PNG (#1491); the texture loader still reads it as a
-//! material map, drawing exactly what its 8-bit twin draws.
-
 use super::freshness_tests::{centre, emissive_scene, temp_png};
 use rusty_procgen::bake::{bake_to_png, encode};
 use rusty_procgen::{Image, Slot};

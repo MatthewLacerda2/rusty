@@ -1,6 +1,3 @@
-//! Choosing the frame's resident probes (#1238): ranked by box, ties by scene index,
-//! cubes that don't fit passed over before the budget.
-
 use std::panic::AssertUnwindSafe;
 
 use glam::Vec3;
@@ -11,7 +8,6 @@ use crate::ibl::cubemap::read_cube_shape;
 use crate::ibl::reflection_probes::MAX_REFLECTION_PROBES;
 use rusty_scene::Scene;
 
-/// A probe whose box holds the camera ranks first, however far its capture point.
 #[test]
 fn a_box_holding_the_camera_ranks_first() {
     let mut scene = probes_at(&[(3.0, "near"), (50.0, "room")]);
@@ -20,8 +16,6 @@ fn a_box_holding_the_camera_ranks_first() {
     assert_eq!(ranked(&set.probes, Vec3::ZERO), vec![1, 0]);
 }
 
-/// A level of more probes than the budget: the camera's own room has the farthest
-/// capture point and still keeps its probe.
 #[test]
 fn gpu_the_camera_room_keeps_its_probe_past_the_budget() {
     let Some(mut renderer) = renderer() else {
@@ -44,8 +38,6 @@ fn gpu_the_camera_room_keeps_its_probe_past_the_budget() {
     assert_eq!(probes.uniforms()[first(p)].center, [0.0, -90.0, 0.0]);
 }
 
-/// Two symmetric probes covering one object give it the same probe from either side
-/// of the midline.
 #[test]
 fn gpu_symmetric_probes_do_not_snap_with_the_camera() {
     let Some(mut renderer) = renderer() else {
@@ -70,9 +62,6 @@ fn gpu_symmetric_probes_do_not_snap_with_the_camera() {
     assert_eq!(left, [-1.0, 0.0, 0.0], "the lower scene index");
 }
 
-/// A cube whose size is not a power of two is passed over: it neither takes a budget
-/// slot nor knocks out the other probes, it is never uploaded, and it warns once per
-/// load: again only after a re-bake reads it again.
 #[test]
 fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     let Some(mut renderer) = renderer() else {
@@ -109,8 +98,6 @@ fn gpu_a_larger_cube_is_passed_over_and_never_uploaded() {
     );
 }
 
-/// `place` takes only admitted cubes: one whose size is not a power of two would give
-/// the array a mip count wgpu rejects, so a debug build stops at the contract.
 #[test]
 #[cfg(debug_assertions)]
 fn gpu_update_refuses_a_cube_that_does_not_fit() {

@@ -1,20 +1,3 @@
-//! What both GGX prefilters read and write (#1696): the captured cube's source mip
-//! chain, the mip a sample reads from it (filtered importance sampling), and the
-//! half-float texels a prefiltered face comes out as, before `ktx2_encode` turns
-//! them into the BC6H blocks a baked cube stores (#1885).
-//!
-//! **Filtered importance sampling** (Křivánek & Colbert 2008, as Filament's `cmgen`
-//! and UE's prefilter do): a sample drawn where the GGX lobe is thin covers a small
-//! solid angle and reads the sharp base; one drawn in a wide lobe covers a large one
-//! and reads a box-filtered mip whose texels are about that size. A small bright
-//! source then reaches every sample of a rough lobe already spread over the texels
-//! around it, so the rough mips are a smooth glow instead of speckle from the few
-//! taps that land on it.
-//!
-//! The chain is built here, on the CPU, and quantized to half floats once, so the
-//! GPU prefilter (which uploads it) and the CPU reference (which reads it) see the
-//! same values, texel for texel.
-
 #[cfg(test)]
 use std::f32::consts::PI;
 
@@ -24,13 +7,8 @@ use super::mip_count;
 use crate::CubemapCapture;
 use rusty_core::color::{f16_to_f32, f32_to_f16};
 
-/// Bytes per texel of a prefiltered cube before it is encoded, and of a baked cube
-/// decoded on an adapter without BC: `Rgba16Float`.
 pub(crate) const TEXEL_BYTES: usize = 8;
 
-/// The capture's source mip chain: level 0 the capture itself, each later level a
-/// 2×2 box average of the one above, down to 1×1, every value rounded to a half
-/// float as the GPU texture stores it. `chain[level][face]`, row-major.
 pub(crate) fn source_chain(capture: &CubemapCapture) -> Vec<[Vec<Vec3>; 6]> {
     let base = capture.resolution.max(1);
     let mut chain = vec![capture.faces.clone().map(|face| quantize(&face))];
@@ -43,7 +21,6 @@ pub(crate) fn source_chain(capture: &CubemapCapture) -> Vec<[Vec<Vec3>; 6]> {
     chain
 }
 
-/// A face of edge `size` box-filtered to half its edge.
 fn halve(face: &[Vec3], size: usize) -> Vec<Vec3> {
     let half = (size / 2).max(1);
     let at = |x: usize, y: usize| face[y.min(size - 1) * size + x.min(size - 1)];
@@ -55,7 +32,6 @@ fn halve(face: &[Vec3], size: usize) -> Vec<Vec3> {
         .collect()
 }
 
-/// Every texel rounded to the half float it will be stored as.
 fn quantize(face: &[Vec3]) -> Vec<Vec3> {
     let round = |c: f32| f16_to_f32(f32_to_f16(c));
     (face.iter())
@@ -63,8 +39,6 @@ fn quantize(face: &[Vec3]) -> Vec<Vec3> {
         .collect()
 }
 
-/// A face's texels as `Rgba16Float` bytes, alpha 1: the prefilter's output, which
-/// `ktx2_encode` compresses to BC6H for the file (and the CPU fallback decodes back to).
 pub(crate) fn encode_face(face: &[Vec3]) -> Vec<u8> {
     let mut out = Vec::with_capacity(face.len() * TEXEL_BYTES);
     for c in face {
@@ -75,7 +49,6 @@ pub(crate) fn encode_face(face: &[Vec3]) -> Vec<u8> {
     out
 }
 
-/// A stored face's texels, decoded from its half floats: [`encode_face`] undone.
 #[cfg(test)]
 pub(crate) fn decode_face(bytes: &[u8]) -> Vec<Vec3> {
     let half = |b: &[u8]| f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
@@ -84,14 +57,6 @@ pub(crate) fn decode_face(bytes: &[u8]) -> Vec<Vec3> {
         .collect()
 }
 
-/// The (fractional) source mip a GGX sample reads: the level whose texels subtend
-/// the sample's solid angle, `0.5·log2(Ωs / Ωp) + 1`, clamped to the chain. `ndoth`
-/// is the sample's half-vector cosine, `a2` roughness⁴, `samples` the sample count
-/// and `base` the capture's face size. Under the split-sum's N = V the sample's pdf
-/// is `D(h) / 4`, so `Ωs = 4 / (samples · D)`; a base texel is `Ωp = 4π / (6·base²)`.
-/// The `+ 1` is Křivánek & Colbert's bias, which trades a little blur for noise.
-/// `probe_prefilter.wgsl`'s `sample_mip` is this, line for line; only the CPU
-/// reference calls it here.
 #[cfg(test)]
 pub(crate) fn sample_mip(ndoth: f32, a2: f32, samples: u32, base: u32) -> f32 {
     let d = ndoth * ndoth * (a2 - 1.0) + 1.0;

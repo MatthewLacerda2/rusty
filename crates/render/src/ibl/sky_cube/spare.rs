@@ -1,17 +1,6 @@
-//! Group 0 kept per procedural sky slot (#1620): two skies drawn in one frame (the
-//! Inspector preview's default sky beside a scene's own) bind different procedural
-//! cubes, and a group-0 rebuild per switch would be two bind-group creations a frame.
-//! The group built for the slot not bound is kept, so a switch swaps the two.
-//!
-//! Generic over the group so its rule is tested without an adapter; the renderer
-//! holds one over `wgpu::BindGroup`.
-
-/// The group-0 bind group last built for the procedural slot not bound now.
 pub(crate) struct SpareGroup<G> {
     spare: Option<(usize, G)>,
-    /// The procedural slot the bound group shows (`None`: a panorama, or unknown).
     bound: Option<usize>,
-    /// The bound procedural slot changed since group 0 was last built.
     pub switched: bool,
 }
 
@@ -26,11 +15,6 @@ impl<G> Default for SpareGroup<G> {
 }
 
 impl<G> SpareGroup<G> {
-    /// Replace `group` with one showing procedural `slot` (`None`: a panorama shows).
-    /// When only the sky slot changed (`only_sky`), the spare built for `slot` is
-    /// reused, and the replaced group kept as the spare for the slot it showed; any
-    /// other change (a buffer, a panorama, a probe array) drops the spare, since it
-    /// names what was replaced. `build` makes a fresh group.
     pub(crate) fn replace(
         &mut self,
         group: &mut G,
@@ -56,7 +40,6 @@ impl<G> SpareGroup<G> {
 mod tests {
     use super::SpareGroup;
 
-    /// Groups are numbered by build; `build` hands out the next one.
     fn replace(
         cache: &mut SpareGroup<u32>,
         group: &mut u32,

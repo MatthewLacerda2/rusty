@@ -1,14 +1,9 @@
-//! What a direction page loads as (#1996): its RGBA8 KTX2 levels exactly as the
-//! bake stored them, with or without BC compression; a preview's PNG its one
-//! level as written; a page of another format, or a truncated one, refused naming it.
-
 use glam::{Vec3, Vec4};
 
 use super::load::{load, Kind};
 use rusty_asset::lightmap_page;
 use rusty_lighting::lightmap::{colour_page, direction_page, encode_directions};
 
-/// An `edge`² direction field turning across the page, with a lamp share.
 fn directions(edge: u32) -> Vec<Vec4> {
     (0..edge * edge)
         .map(|i| {
@@ -18,7 +13,6 @@ fn directions(edge: u32) -> Vec<Vec4> {
         .collect()
 }
 
-/// Write `bytes` as `name` under the test's temp dir; its path.
 fn file(name: &str, bytes: &[u8]) -> String {
     let dir = rusty_test_support::temp::dir().join("rusty_1996");
     std::fs::create_dir_all(&dir).unwrap();

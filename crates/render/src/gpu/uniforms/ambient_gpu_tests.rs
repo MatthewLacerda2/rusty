@@ -1,15 +1,8 @@
-//! The ambient's one evaluation (#1647), run on the GPU: `lighting::ambient::ambient_radiance`
-//! fed the uniform a scene uploads must draw, in `Color` mode, exactly what the
-//! forward pass drew before the gradient, and in either mode what the CPU's
-//! `AmbientRadiance::at` (what the lightmap and probe bakes are held to) computes.
-
 use glam::Vec3;
 
 use crate::draw::scene_ambient;
 use rusty_scene::{AmbientMode, Scene};
 
-/// `flat_ambient` as `main` drew it at fe8afe0, before the gradient: frozen here as
-/// the reference, never edited to follow a change.
 const TODAY: &str = "
 fn today_ambient(color: vec3<f32>, intensity: f32, N: vec3<f32>) -> vec3<f32> {
     let sky_color = color;
@@ -18,11 +11,8 @@ fn today_ambient(color: vec3<f32>, intensity: f32, N: vec3<f32>) -> vec3<f32> {
 }
 ";
 
-/// What the probe reads, imported ahead of the `AMBIENT` it declares.
 const IMPORTS: &str = "#import common::AmbientLight\n#import lighting::ambient::ambient_radiance\n";
 
-/// Per invocation (128): a unit direction spread over the sphere, then the ambient
-/// under `AMBIENT` along it, and today's.
 const PROBE: &str = "
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;
 @compute @workgroup_size(1)
@@ -37,7 +27,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 ";
 
-/// The same 128 directions on the CPU.
 fn directions() -> impl Iterator<Item = Vec3> {
     (0..128).map(|i| {
         let y = 1.0 - i as f32 / 127.0 * 2.0;
@@ -47,7 +36,6 @@ fn directions() -> impl Iterator<Item = Vec3> {
     })
 }
 
-/// `scene`'s ambient uniform as a WGSL `AmbientLight` literal.
 fn literal(scene: &Scene) -> String {
     let u = scene_ambient(scene);
     let v = |c: [f32; 3]| format!("vec3<f32>({:?}, {:?}, {:?})", c[0], c[1], c[2]);
@@ -68,7 +56,6 @@ fn literal(scene: &Scene) -> String {
     )
 }
 
-/// `(new, today)` per direction, as the GPU computes them for `scene`.
 pub(super) fn probe(r: &crate::Renderer, scene: &Scene) -> Vec<(Vec3, Vec3)> {
     let base = rusty_shadergen::engine_shader_dir();
     let mut composer = rusty_shadergen::compose::composer_with_common(base).unwrap();
@@ -86,7 +73,6 @@ pub(super) fn probe(r: &crate::Renderer, scene: &Scene) -> Vec<(Vec3, Vec3)> {
         .collect()
 }
 
-/// The largest gap between the GPU's ambient and the CPU's, over every direction.
 pub(super) fn cpu_gap(scene: &Scene, gpu: &[(Vec3, Vec3)]) -> f32 {
     let cpu = scene.drawn_ambient().radiance();
     directions()
@@ -100,9 +86,6 @@ fn gpu_the_ambient_is_todays_in_color_mode_and_the_cpus_in_both() {
     let Some(r) = crate::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    // The default scene, and a coloured, brighter one: the Color path is today's
-    // expression term for term, so the two agree to the last bit (a hair of slack
-    // only for a driver that contracts the two copies differently).
     let mut bright = Scene::new();
     bright.ambient_color = Vec3::new(0.9, 0.3, 0.1);
     bright.ambient_intensity = 2.5;
@@ -113,7 +96,6 @@ fn gpu_the_ambient_is_todays_in_color_mode_and_the_cpus_in_both() {
         assert!(drift <= 1e-6, "Color drifts {drift} from today");
         assert!(cpu_gap(&scene, &gpu) <= 1e-5, "Color: CPU and GPU disagree");
     }
-    // A warm ground under a blue sky.
     let mut gradient = Scene::new();
     gradient.ambient.mode = AmbientMode::Gradient;
     gradient.ambient.sky = Vec3::new(0.2, 0.4, 1.0);

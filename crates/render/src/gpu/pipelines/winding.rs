@@ -1,49 +1,25 @@
-//! Which triangles of a placed mesh a pipeline keeps (#1134, #1142, #1571, #1615).
-//!
-//! A material's *Render Face* (`RenderFace`, URP's `_Cull`) says which faces of the
-//! mesh draw: the ones turned toward the viewer, the ones turned away, or both. A
-//! world matrix with a negative determinant mirrors what it places and reverses its
-//! winding, so on screen the mesh's front faces wind clockwise. The two together
-//! leave three cull states, a [`Facing`]: keep the counter-clockwise triangles, keep
-//! the clockwise ones, or keep all. A mirrored mesh's front faces and an unmirrored
-//! one's back faces are the same state, so every pass needs three pipelines, not
-//! six. Which side of a kept triangle is shaded is the fragment shader's (it flips
-//! the normal of a face seen from behind), so no pipeline state says it.
-//!
-//! [`FacedPipeline`] holds one pass's three, each built on its first draw.
+//! A mirrored mesh's front faces and an unmirrored one's back faces are the same cull state, so every pass needs three pipelines, not six. Which side of a kept triangle is shaded is the fragment shader's.
 
 use glam::Mat4;
 
 use super::LazyPipeline;
 use rusty_components::{MaterialAsset, RenderFace};
 
-/// Whether `world` mirrors what it places: a negative determinant reverses a
-/// mesh's winding, so face culling would keep the wrong side.
 pub(crate) fn is_mirrored(world: Mat4) -> bool {
     world.determinant() < 0.0
 }
 
-/// Which triangles a pipeline keeps, by their winding on screen. Order is draw
-/// order: the usual state first, so the others bind last.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Facing {
-    /// Counter-clockwise triangles, the clockwise culled: a mesh's front faces, the
-    /// usual case.
     #[default]
     Ccw,
-    /// Clockwise triangles: a mirrored mesh's front faces (#1134), or an unmirrored
-    /// one's back faces (`RenderFace::Back`).
     Cw,
-    /// Every triangle, nothing culled: `RenderFace::Both`, or a two-sided shadow
-    /// caster (#1571).
     Both,
 }
 
 impl Facing {
-    /// Every state, in [`FacedPipeline`]'s order.
     pub(crate) const ALL: [Self; 3] = [Self::Ccw, Self::Cw, Self::Both];
 
-    /// The state a mesh placed by `world` draws its `face` with.
     pub(crate) fn of(world: Mat4, face: RenderFace) -> Self {
         match face {
             RenderFace::Both => Self::Both,
@@ -54,13 +30,10 @@ impl Facing {
         }
     }
 
-    /// The state a mesh placed by `world` draws `material` with: its render face,
-    /// `Front` with none.
     pub(crate) fn of_material(world: Mat4, material: Option<&MaterialAsset>) -> Self {
         Self::of(world, material.map_or(RenderFace::Front, |m| m.render_face))
     }
 
-    /// The winding the pipeline takes as front.
     pub(crate) fn front_face(self) -> wgpu::FrontFace {
         match self {
             Self::Cw => wgpu::FrontFace::Cw,
@@ -68,7 +41,6 @@ impl Facing {
         }
     }
 
-    /// The faces the pipeline culls.
     pub(crate) fn cull_mode(self) -> Option<wgpu::Face> {
         match self {
             Self::Ccw | Self::Cw => Some(wgpu::Face::Back),
@@ -76,7 +48,6 @@ impl Facing {
         }
     }
 
-    /// `primitive` drawing this state's triangles.
     pub(crate) fn primitive(self, primitive: wgpu::PrimitiveState) -> wgpu::PrimitiveState {
         wgpu::PrimitiveState {
             front_face: self.front_face(),
@@ -86,20 +57,13 @@ impl Facing {
     }
 }
 
-/// One pass's pipeline per [`Facing`], each built on its first draw (#985): a
-/// headless renderer whose scene has no mirrored, back- or double-sided mesh never
-/// builds the other two (a windowed one warms them, `Renderer::warm_pipelines`).
 pub(crate) struct FacedPipeline([LazyPipeline; 3]);
 
 impl FacedPipeline {
-    /// The set `make(facing)` builds.
     pub(crate) fn new(make: impl Fn(Facing) -> LazyPipeline) -> Self {
         Self(Facing::ALL.map(make))
     }
 
-    /// The set `build` makes from `shader` and `layout`, each one built at first use
-    /// from its own clones of them: what a pass whose pipelines differ only by
-    /// facing writes instead of a clone-then-build closure per facing.
     pub(crate) fn lazy<B>(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -126,32 +90,25 @@ impl FacedPipeline {
         })
     }
 
-    /// The set, with the usual [`Facing::Ccw`] one built now: for a pass every
-    /// frame draws (the opaque pass, its prepass).
     pub(crate) fn eager(make: impl Fn(Facing) -> LazyPipeline) -> Self {
         let set = Self::new(make);
         set.get(Facing::Ccw);
         set
     }
 
-    /// The pipeline for `facing`.
     pub(crate) fn get(&self, facing: Facing) -> &wgpu::RenderPipeline {
         self.0[facing as usize].get()
     }
 
-    /// Whether `facing`'s pipeline has been built.
     #[cfg(test)]
     pub(crate) fn is_built(&self, facing: Facing) -> bool {
         self.0[facing as usize].is_built()
     }
 
-    /// Every one, for warming.
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.0.iter()
     }
 
-    /// The [`Facing::Cw`] and [`Facing::Both`] ones: what an [`Self::eager`] set
-    /// still has to build.
     pub(crate) fn twins(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.0[1..].iter()
     }

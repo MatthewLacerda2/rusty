@@ -8,7 +8,6 @@ use crate::passes::blended::Globals;
 use crate::passes::particles::gpu::{draw_layout_entries, step_layout_entries};
 use crate::passes::shadows::{caster_entries, light_entries};
 
-/// What a WGSL binding is, as far as a layout entry can disagree with it.
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Kind {
     Uniform,
@@ -17,7 +16,6 @@ enum Kind {
     Sampler,
 }
 
-/// One `@group(g) @binding(b) var… name: type` of a module.
 #[derive(Debug)]
 struct Decl {
     group: u32,
@@ -38,13 +36,11 @@ fn kind_of(ty: &wgpu::BindingType) -> Kind {
     }
 }
 
-/// The number in `text`'s leading `(<n>)`.
 fn number(text: &str) -> u32 {
     let end = text.find(')').expect("a closing paren");
     text[..end].trim().parse().expect("a binding number")
 }
 
-/// Every binding `wgsl` declares.
 fn declared(wgsl: &str) -> Vec<Decl> {
     let mut out = Vec::new();
     for piece in wgsl.split("@group(").skip(1) {
@@ -81,7 +77,6 @@ fn engine_wgsl(path: &str) -> String {
     std::fs::read_to_string(format!("{dir}/{path}")).expect("an engine shader")
 }
 
-/// `decl` has an entry of its kind at its binding in `groups`' layout at its index.
 fn assert_in_layout(decl: &Decl, groups: &[Option<&[wgpu::BindGroupLayoutEntry]>; COUNT]) {
     let layout = groups
         .get(decl.group as usize)
@@ -106,7 +101,6 @@ fn assert_in_layout(decl: &Decl, groups: &[Option<&[wgpu::BindGroupLayoutEntry]>
     );
 }
 
-/// A layout of all four groups, by role.
 fn four<T>(global: T, scene: T, material: T, draw: T) -> Groups<T> {
     Groups {
         global,
@@ -116,8 +110,6 @@ fn four<T>(global: T, scene: T, material: T, draw: T) -> Groups<T> {
     }
 }
 
-/// A shadow caster's layout: the light, the casters per draw, the material when
-/// it clips, no scene group.
 fn caster<T>(global: T, draw: T, material: Option<T>) -> Groups<T> {
     Groups {
         global,
@@ -127,8 +119,6 @@ fn caster<T>(global: T, draw: T, material: Option<T>) -> Groups<T> {
     }
 }
 
-/// What a surface shader declares beside the engine's bindings: its param uniform
-/// and each extra map slot, all in the material group.
 fn authored() -> String {
     let mut wgsl = rusty_shadergen::params::uniform_decl();
     for slot in rusty_shadergen::textures::SLOTS {
@@ -140,7 +130,6 @@ fn authored() -> String {
 #[test]
 fn the_indices_put_the_per_draw_group_last_and_the_scene_group_off_set_one() {
     assert_eq!(DRAW as usize, COUNT - 1);
-    // The scene group at set 1 costs a driver GPU time (`rusty_shadergen::groups`).
     assert_eq!((MATERIAL, SCENE), (1, 2));
     let mut all = [GLOBAL, SCENE, MATERIAL, DRAW];
     all.sort_unstable();
@@ -177,7 +166,6 @@ fn the_forward_wgsl_declares_each_binding_in_its_rust_group() {
     for decl in &decls {
         assert_in_layout(decl, &groups);
     }
-    // What a surface shader adds: its param uniform and each extra map slot.
     for decl in &declared(&authored()) {
         assert_eq!(decl.group, MATERIAL, "{decl:?}");
         assert_in_layout(decl, &groups);
@@ -223,7 +211,6 @@ fn the_particle_wgsl_declares_each_binding_in_its_rust_group() {
         draw_layout_entries(),
         step_layout_entries(),
     );
-    // The CPU path binds the pass globals per draw, a GPU emitter its own group.
     let cpu = four(&global[..], &depth[..], &sprite[..], &globals[..]).ordered();
     let gpu = four(&global[..], &depth[..], &sprite[..], &draw[..]).ordered();
     let emitter = declared(&engine_wgsl("particles/gpu.wgsl"));
@@ -240,7 +227,6 @@ fn the_particle_wgsl_declares_each_binding_in_its_rust_group() {
             assert_in_layout(decl, &gpu);
         }
     }
-    // The step shares the emitter's declarations, in its own group at `DRAW`.
     let stepped = draw_only(&step[..]);
     for decl in declared(&engine_wgsl("particles_step.wgsl"))
         .iter()
@@ -258,7 +244,6 @@ fn a_swapped_group_is_caught() {
         layouts::material_entries(),
         layouts::shadow_entries(),
     );
-    // The draw and scene groups swapped on the Rust side alone.
     let groups = four(&g[..], &d[..], &m[..], &s[..]).ordered();
     let decls = declared(&engine_wgsl("forward/bindings.wgsl"));
     let caught = std::panic::catch_unwind(|| {

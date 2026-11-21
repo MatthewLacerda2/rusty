@@ -1,8 +1,3 @@
-//! The extra shader texture socket on the GPU (#400): a `dissolve` surface burns a
-//! sphere away where its `mask` texture is below the runtime `amount`, while a
-//! sphere whose material names no mask samples the white fallback — not the
-//! checker a missing map shows — and stays whole. Skips with no adapter.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,14 +8,12 @@ use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// A dissolve surface shader and a mask PNG, unique to this run; removed on drop.
 pub(crate) struct Dissolve {
     pub shader: String,
     pub mask: String,
 }
 
 impl Dissolve {
-    /// With a mid-gray mask.
     fn bake() -> Self {
         Self::with_mask(
             "gray",
@@ -28,7 +21,6 @@ impl Dissolve {
         )
     }
 
-    /// With `mask` saved as this run's `<tag>` mask.
     pub(crate) fn with_mask(tag: &str, mask: &image::RgbaImage) -> Self {
         let shader = format!("test_dissolve_{tag}_{}", std::process::id());
         let recipe = ShaderRecipe {
@@ -56,8 +48,6 @@ impl Drop for Dissolve {
     }
 }
 
-/// A lit scene with two spheres drawn by the dissolve shader; only the left
-/// (`masked`) one names the gray mask. Returns the scene and the two ids.
 fn two_spheres(d: &Dissolve) -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -69,7 +59,6 @@ fn two_spheres(d: &Dissolve) -> (Rc<RefCell<Scene>>, u32, u32) {
     (scene, masked, plain)
 }
 
-/// The left half with the masked sphere moved out of view: what a hole shows.
 fn backdrop(renderer: &mut Renderer, scene: &Rc<RefCell<Scene>>, masked: u32) -> (u32, u32) {
     let moved = |x: f32| {
         scene
@@ -103,13 +92,10 @@ fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white()
     let backdrop = backdrop(&mut renderer, &scene, masked);
     assert_ne!(backdrop, l0, "the sphere shows against the backdrop");
 
-    // Gray (128, read raw as ≈ 0.5, #647) is above 0.4: the threshold, not a
-    // blanket discard. Decoded as sRGB it would read ≈ 0.22 and burn here.
     set(masked, 0.4);
     let left = |r: &mut Renderer| halves(r, &scene.borrow())[0];
     assert_eq!(left(&mut renderer), l0, "above amount stays");
 
-    // ...and below 0.6, so the masked sphere burns away; the white fallback is not.
     set(masked, 0.6);
     set(plain, 0.6);
     let [l1, r1] = halves(&mut renderer, &scene.borrow());

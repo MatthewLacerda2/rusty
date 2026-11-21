@@ -1,12 +1,3 @@
-//! Tests for the probe capture + SH projection (#241). Sibling of `bake.rs`;
-//! shares its 300-line source cap. The multi-bounce iteration is tested separately in
-//! `bounce_tests.rs` (#285).
-//!
-//! The GPU bake skips gracefully when no adapter is present — same contract as the
-//! cubemap-capture and screenshot headless tests. The pure SH projection
-//! (`project_cubemap`) is also exercised on a synthetic cubemap, so the directional
-//! math is covered even on an adapter-less CI host.
-
 use glam::{Quat, Vec3};
 
 use crate::{project_cubemap, CubemapCapture, CubemapFace};
@@ -20,7 +11,6 @@ fn box_mesh() -> MeshComponent {
     MeshComponent::new("Box", vertices, indices)
 }
 
-/// A bright emissive static box at `pos`, scaled `scale`, glowing `emissive`.
 fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f32; 3]) {
     let mat_name = format!("{name}_mat");
     scene.materials.insert(
@@ -45,8 +35,6 @@ fn add_static_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissiv
         .set_material(id, Some(rusty_components::MaterialComponent::new(mat_name)));
 }
 
-/// A scene with a single big red static wall 6 units out on +X (and otherwise empty),
-/// so a probe near it bounces red and one far away barely sees it.
 fn red_wall_scene() -> Scene {
     let mut scene = Scene::new();
     add_static_box(
@@ -59,9 +47,6 @@ fn red_wall_scene() -> Scene {
     scene
 }
 
-/// Baking a probe next to a red wall yields an SH whose +X-facing irradiance is
-/// red-dominant (directional, not a flat grey), and a probe far on the other side of
-/// the room carries less red — the bake is position-dependent, the issue's acceptance.
 #[test]
 fn gpu_bake_red_wall_is_directional_and_position_dependent() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -72,7 +57,6 @@ fn gpu_bake_red_wall_is_directional_and_position_dependent() {
     let near = renderer.bake_probe(&scene, Vec3::new(4.0, 0.0, 0.0), RES);
     let far = renderer.bake_probe(&scene, Vec3::new(-4.0, 0.0, 0.0), RES);
 
-    // Directional: facing the wall (+X) the irradiance is red-dominant, not uniform.
     let toward = near.eval(Vec3::X);
     assert!(
         toward.x > toward.y && toward.x > toward.z,
@@ -84,7 +68,6 @@ fn gpu_bake_red_wall_is_directional_and_position_dependent() {
         "expected brighter facing the wall: {toward} vs {away}"
     );
 
-    // Position-dependent: the near probe catches more red than the far one.
     assert!(
         near.eval(Vec3::X).x > far.eval(Vec3::X).x,
         "expected near probe redder than far: {} vs {}",
@@ -93,7 +76,6 @@ fn gpu_bake_red_wall_is_directional_and_position_dependent() {
     );
 }
 
-/// `bake_probes` writes SH onto every probe in place (skips with no adapter).
 #[test]
 fn gpu_bake_probes_fills_all_in_place() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -110,16 +92,10 @@ fn gpu_bake_probes_fills_all_in_place() {
         .all(|p| p.sh != rusty_scene::lighting::sh::Sh9::zero()));
 }
 
-/// A synthetic cubemap with a single red face projects to a red, directional SH —
-/// covers the projection math on hosts with no GPU adapter at all. Painting the
-/// `PosX` face buffer lights the world hemisphere that face saw, +X (#1615 aimed the
-/// capture's faces down their own axes), so irradiance must be brightest toward +X,
-/// red, and dim the other way.
 #[test]
 fn project_red_face_is_red_and_directional() {
     let res = 8;
     let mut faces: [Vec<Vec3>; 6] = std::array::from_fn(|_| vec![Vec3::ZERO; (res * res) as usize]);
-    // Paint the PosX face fully red.
     faces[CubemapFace::PosX as usize] = vec![Vec3::X; (res * res) as usize];
     let capture = CubemapCapture {
         resolution: res,

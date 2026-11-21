@@ -1,6 +1,3 @@
-//! Every extension `asset::IMAGE_EXTENSIONS` offers decodes (#994): the list is a
-//! promise the `image` crate's compiled-in features have to keep.
-
 use rusty_asset::IMAGE_EXTENSIONS;
 
 #[test]

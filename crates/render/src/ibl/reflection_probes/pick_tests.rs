@@ -1,7 +1,3 @@
-//! The pick a draw's instance carries (#2324): as the camera crosses from one probe
-//! to the next and the resident set changes, `probe_for` reads the prepared set and
-//! still equals a blend of the residents built afresh from the scene.
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, probes_at, renderer};
@@ -9,8 +5,6 @@ use super::super::pack_blend;
 use crate::Renderer;
 use rusty_scene::{ReflectionProbeSet, Scene};
 
-/// The scene's resident probes, cloned from the scene in resident order: an
-/// unprepared set nothing was kept for.
 fn fresh(r: &Renderer, scene: &Scene) -> ReflectionProbeSet {
     let mut held: Vec<_> = (scene.reflection_probes.probes.iter())
         .filter_map(|p| Some((r.reflection_probes.resident(p)?, p.clone())))
@@ -33,7 +27,6 @@ fn gpu_a_camera_crossing_probes_picks_as_a_fresh_blend() {
         p.blend_distance = 1.5;
     });
     assert!(turned);
-    // A zero budget keeps only the nearest probe: each step moves the resident set.
     scene.lighting_settings.reflections.budget_mb = 0;
     let mut seen = Vec::new();
     for step in 0..=30 {

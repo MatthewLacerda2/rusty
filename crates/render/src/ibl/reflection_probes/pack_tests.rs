@@ -1,5 +1,3 @@
-//! Tests for `pack_blend` (#1584): what the shader unpacks.
-
 use super::*;
 
 fn unpack(p: u32) -> (u32, u32, f32, f32) {

@@ -1,10 +1,6 @@
-//! Reading a cube file's header alone (#1584), and a re-bake reaching the probe array
-//! (#1207).
-
 use super::cubemap_tests::{build_cubemap_ktx2, BC6H_UFLOAT, R16G16B16A16_SFLOAT, R8G8B8A8_SRGB};
 use super::*;
 
-/// The shape a blob's first 48 bytes state, as [`read_cube_shape`] reads them.
 fn shape(bytes: &[u8]) -> Option<CubeShape> {
     cube_shape(bytes.get(..48)?.try_into().unwrap()).ok()
 }
@@ -30,15 +26,12 @@ fn the_header_refuses_what_the_loader_refuses() {
     assert!(read_cube_shape("no/such/cube.ktx2").is_err());
 }
 
-/// A BC6H cube's base level is whole 4×4 blocks: a 2-texel one is refused.
 #[test]
 fn rejects_a_cube_under_a_block() {
     let why = parse_ktx2_cubemap_mips(&build_cubemap_ktx2(2, BC6H_UFLOAT, 6)).err();
     assert_eq!(why, Some("its faces are not whole 4×4 blocks"));
 }
 
-/// A reflection cubemap re-baked at a path the probe array already read (or failed
-/// to) is read again on the next frame (#1207).
 #[test]
 fn gpu_a_cubemap_rebaked_at_a_cached_path_reloads() {
     use rusty_test_support::rebakes::{follows_rebakes, Bake};

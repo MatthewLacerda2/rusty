@@ -1,7 +1,3 @@
-//! A baked cube uploaded both ways (#1885): its BC6H blocks as they are, and decoded
-//! to `Rgba16Float` as on an adapter without BC. Every mip, the padded 2×2 and 1×1
-//! ones included, reads back its own colour through a `texture_cube` either way.
-
 use glam::Vec3;
 
 use crate::ibl::cubemap::read_cube_shape;
@@ -11,13 +7,10 @@ use crate::ibl::reflection_prefilter::{mip_count, PrefilteredCubemap};
 
 use super::super::tap_tests as tap;
 
-/// Mip `level`'s colour: each level its own, so a tap shows which one it read.
 fn colour(level: u32) -> Vec3 {
     Vec3::new(0.1 + 0.2 * level as f32, 0.5, 0.8 - 0.15 * level as f32)
 }
 
-/// A `size`-texel cube with its full chain, each level solid [`colour`], written to
-/// a file named `name`; returns its path.
 pub(crate) fn chained_cube(name: &str, size: u32) -> String {
     let mips = (0..mip_count(size))
         .map(|l| {

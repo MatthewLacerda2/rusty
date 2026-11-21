@@ -1,13 +1,3 @@
-//! The depth prepass draws a batch nothing clips with no fragment stage and no
-//! material group (#2347), and the depth it leaves is the clipping pipeline's,
-//! byte for byte. A plain textured opaque box (its albedo clear on one half, which
-//! an opaque never clips), a Cutout box and a dissolving box: only the plain one
-//! is depth-only, and its depth is unchanged when it is drawn through the clipping
-//! pipeline instead (Cutout with a cutoff of 0, which clips nothing). The
-//! recorder's probe (`draw::record::probe`) shows the path each draw took: which
-//! pipeline it was recorded with, by identity, and whether it bound a material.
-//! Skips with no adapter.
-
 use glam::Vec3;
 
 use crate::draw::record::probe::{self, PrepassDraws};
@@ -22,17 +12,12 @@ use rusty_scene::{Camera, Scene};
 
 const RES: u32 = 64;
 
-/// A box at `x` on a floor, its material's key.
 fn boxed(scene: &mut Scene, x: f32) -> (u32, String) {
     let id = create_entity(scene, "Box", Some(Primitive::Box));
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.5, 0.0);
     (id, scene.ensure_material_key(id).unwrap())
 }
 
-/// The floor and the three boxes under an AO volume (so the prepass runs): the
-/// plain one textured with `albedo`, the Cutout one clipping at 0.5, the third
-/// drawn by `cut`'s shader. The scene, the plain box's key, and the floor's and
-/// the boxes' entities, in that order.
 fn yard(albedo: &str, cut: &str) -> (Scene, String, [u32; 4]) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -59,7 +44,6 @@ fn yard(albedo: &str, cut: &str) -> (Scene, String, [u32; 4]) {
     (scene, plain, [floor, plain_id, cutout_id, cutting])
 }
 
-/// Whether each of `ids`' one slot is depth-only, after a frame.
 fn classes(r: &Renderer, scene: &Scene, ids: [u32; 4]) -> [bool; 4] {
     let kept = r.retained.scene(scene.id()).expect("extracted");
     let of = |id| kept.objects().find(|(e, _)| *e == id).map(|(_, o)| o);
@@ -70,8 +54,6 @@ fn classes(r: &Renderer, scene: &Scene, ids: [u32; 4]) -> [bool; 4] {
     })
 }
 
-/// One frame from above the boxes; the view's depth after it, and what its
-/// prepass recorded.
 fn depth(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, PrepassDraws) {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -83,7 +65,6 @@ fn depth(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, PrepassDraws) {
     (bytes, drawn)
 }
 
-/// A file removed when dropped, a panic's unwinding included.
 struct Removed(std::path::PathBuf);
 
 impl Drop for Removed {
@@ -94,7 +75,6 @@ impl Drop for Removed {
 
 #[test]
 fn gpu_only_an_unclipped_batch_draws_the_prepass_depth_only_and_its_depth_holds() {
-    // Clear where u < 0.5: the Cutout box shows its hole there, the plain one none.
     let albedo = image::RgbaImage::from_fn(4, 1, |x, _| {
         image::Rgba([255, 255, 255, 255 * (x / 2) as u8])
     });
@@ -112,19 +92,15 @@ fn gpu_only_an_unclipped_batch_draws_the_prepass_depth_only_and_its_depth_holds(
     let scene = std::rc::Rc::new(std::cell::RefCell::new(scene));
     dissolve(&scene, cutting, &d, 0.5);
     let (today, drawn) = depth(&mut r, &scene.borrow());
-    // One prepass of four batches: the floor and the plain box through the
-    // fragment-less pipeline with no material, the other two through the clipping.
     let path_of = |depth_only, material_binds| PrepassDraws {
         draws: 4,
         depth_only,
         material_binds,
     };
     assert_eq!(drawn, path_of(2, 2), "the depth-only path taken");
-    // The floor and the plain box; neither the Cutout box nor the dissolving one.
     let classed = classes(&r, &scene.borrow(), ids);
     assert_eq!(classed, [true, true, false, false], "by box");
 
-    // The plain box through the clipping pipeline: Cutout, clipping nothing.
     let mut s = scene.borrow_mut();
     let m = s.materials.get_mut(&plain).unwrap();
     (m.render_mode, m.alpha_cutoff) = (RenderMode::Cutout, 0.0);

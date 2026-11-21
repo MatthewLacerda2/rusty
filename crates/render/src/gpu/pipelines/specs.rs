@@ -1,7 +1,3 @@
-//! The forward-pass pipelines' fixed-function knobs and the one function that turns
-//! a [`PipelineSpec`] into a pipeline. The layouts and entry points are shared, so
-//! each pipeline names only what it changes from [`PipelineSpec::opaque`].
-
 use super::transparent::TransparentBlend;
 use super::winding::Facing;
 use crate::gpu::mesh::vertex_layout;
@@ -9,39 +5,22 @@ use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::effects::ssr::surface::target_state as surface_target_state;
 use crate::postfx::effects::taa::reactive;
 
-/// Fixed-function knobs that distinguish the forward-pass pipelines. The default is
-/// the opaque forward pass: counter-clockwise triangles kept (each pass builds one
-/// per [`Facing`], #1615), REPLACE, depth written and tested `Less`.
 #[derive(Clone, Copy)]
 pub(super) struct PipelineSpec {
     pub label: &'static str,
     pub topology: wgpu::PrimitiveTopology,
-    /// Which triangles it keeps: a material's render face, by the mesh's winding.
     pub facing: Facing,
     pub blend: wgpu::BlendState,
     pub depth_write_enabled: bool,
     pub depth_compare: wgpu::CompareFunction,
-    /// The vertex entry point: `vs_main`, or the motion-vector `vs_velocity` (#1435).
     pub vertex: &'static str,
-    /// The fragment entry point: `fs_main`, the gizmos' unfogged `fs_gizmo`, the
-    /// motion-vector `fs_velocity`, or `fs_velocity_ssr`, which writes the SSR surface
-    /// targets too (#1526).
     pub fragment: &'static str,
-    /// The velocity target's write mask when the pipeline draws into a view's
-    /// velocity target too (#1435), as its second colour target; `None` draws colour
-    /// alone.
     pub velocity: Option<wgpu::ColorWrites>,
-    /// Whether it draws into a view's two SSR surface targets too (#1526), as its
-    /// third and fourth colour targets, after the velocity one.
     pub surface: bool,
-    /// Whether it draws into TAA's reactive mask too (#1845), as its second colour
-    /// target (a translucent's `fs_transparent`; no velocity target beside it).
     pub reactive: bool,
 }
 
 impl PipelineSpec {
-    /// The opaque forward pass under `label`; a spec names only what it changes. The
-    /// label has no default, so a spec that forgets one does not compile.
     fn opaque(label: &'static str) -> Self {
         Self {
             label,
@@ -58,21 +37,15 @@ impl PipelineSpec {
         }
     }
 
-    /// This spec keeping `facing`'s triangles.
     pub(super) fn facing(self, facing: Facing) -> Self {
         Self { facing, ..self }
     }
 }
 
-/// Opaque/cutout forward pass: REPLACE, depth write on.
 pub(super) fn forward_spec() -> PipelineSpec {
     PipelineSpec::opaque("Forward Lit Pipeline")
 }
 
-/// The opaque pass of a view writing motion vectors (#1435): colour and velocity
-/// from the shader's `vs_velocity` / `fs_velocity`, which every surface module has;
-/// with `surface`, a view running SSR, its surface target too through
-/// `fs_velocity_ssr` (#1526).
 pub(super) fn velocity_spec(surface: bool) -> PipelineSpec {
     let (label, fragment) = match surface {
         false => ("Forward Velocity Pipeline", "fs_velocity"),
@@ -87,19 +60,11 @@ pub(super) fn velocity_spec(surface: bool) -> PipelineSpec {
     }
 }
 
-/// The opaque pass over a primed depth (#1499), Unity URP's *Depth Priming*: the
-/// SSAO prepass already wrote these solids' depth, so the pass tests it and writes
-/// none, and the fragment shader runs once per visible pixel. With no depth write, a
-/// GPU tests depth before a shader that discards (a cutout) too. URP tests `Equal`;
-/// with the vertex position `@invariant`, `LessEqual` passes the same fragments, and
-/// still draws one a driver rounds a step nearer than its prepass depth. Two lit
-/// surfaces at bit-identical depth both pass, so the one drawn last wins, as under
-/// URP's `Equal`, where the unprimed pass's `Less` kept the first.
+/// URP tests `Equal`; with the vertex position `@invariant`, `LessEqual` passes the same fragments and still draws one a driver rounds a step nearer. Two lit surfaces at identical depth both pass, so the last drawn wins.
 pub(super) fn primed_spec() -> PipelineSpec {
     primed(PipelineSpec::opaque("Forward Primed Pipeline"))
 }
 
-/// [`velocity_spec`] over a primed depth (#1499), as [`primed_spec`] is.
 pub(super) fn primed_velocity_spec(surface: bool) -> PipelineSpec {
     let label = match surface {
         false => "Forward Primed Velocity Pipeline",
@@ -111,7 +76,6 @@ pub(super) fn primed_velocity_spec(surface: bool) -> PipelineSpec {
     }
 }
 
-/// `spec` testing a primed depth (#1499): `LessEqual`, no depth write.
 fn primed(spec: PipelineSpec) -> PipelineSpec {
     PipelineSpec {
         depth_write_enabled: false,
@@ -120,11 +84,6 @@ fn primed(spec: PipelineSpec) -> PipelineSpec {
     }
 }
 
-/// Transparent pass (#242): same shader/layout as the forward pass but blended by
-/// `blend` (#1523) and depth-WRITE-off (still depth-TESTED against opaque) so
-/// overlapping translucent surfaces all blend rather than z-cull each other. Drawn
-/// after opaque, by sorting priority then back-to-front (#2039). With `reactive`, a view running TAA, it writes TAA's
-/// reactive mask too through `fs_transparent` (#1845).
 pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> PipelineSpec {
     PipelineSpec {
         blend: blend.state(),
@@ -139,9 +98,7 @@ pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> Pipel
     }
 }
 
-/// The editor's line gizmos: don't write depth so they display over the grid. Drawn
-/// on the finished image after post-FX (#1224), so `fs_gizmo` writes the authored
-/// colour unfogged, as Unity draws its gizmos. Lines have no face, so nothing culls.
+/// `fs_gizmo` writes the authored colour unfogged, as Unity draws its gizmos.
 pub(super) fn line_spec() -> PipelineSpec {
     PipelineSpec {
         facing: Facing::Both,
@@ -154,9 +111,6 @@ pub(super) fn line_spec() -> PipelineSpec {
     }
 }
 
-/// The vertex-coloured gizmo lines: the probe family and Area-light outlines, then the
-/// collider and debug lines (#1882). [`line_spec`]'s, each vertex its own colour
-/// (`vs_gizmo_vertex` / `fs_gizmo_vertex`), so one draw holds a whole list.
 pub(super) fn vertex_line_spec() -> PipelineSpec {
     PipelineSpec {
         label: "Vertex Colour Line Pipeline",
@@ -166,8 +120,7 @@ pub(super) fn vertex_line_spec() -> PipelineSpec {
     }
 }
 
-/// The velocity target of a pipeline that writes motion vectors (#1435), under
-/// `write_mask`. It is never blended: the nearest surface's motion wins.
+/// Never blended: the nearest surface's motion wins.
 pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTargetState {
     wgpu::ColorTargetState {
         format: crate::motion::VELOCITY_FORMAT,
@@ -176,8 +129,6 @@ pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTarge
     }
 }
 
-/// `spec`'s colour targets: colour into `format`, then the velocity target, the
-/// two SSR surface targets or the reactive mask, as it draws into them.
 fn targets(
     format: wgpu::TextureFormat,
     spec: &PipelineSpec,
@@ -201,9 +152,6 @@ fn targets(
         .collect()
 }
 
-/// Create one forward-pass render pipeline from a [`PipelineSpec`]. The pipelines
-/// share the same vertex layout and depth format; only the spec's fixed-function
-/// knobs, entry points and velocity and surface targets differ.
 pub(super) fn make_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

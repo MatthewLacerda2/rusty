@@ -1,7 +1,3 @@
-//! The probe bake honours light modes (#809), end to end on the GPU: a `Realtime`
-//! light bakes nothing, a `Mixed` one bakes its bounce, a `Baked` one its bounce and
-//! its direct light. Skips with no adapter, like every in-crate GPU test.
-
 use glam::Vec3;
 
 use rusty_components::{LightComponent, LightMode, MaterialAsset};
@@ -11,8 +7,6 @@ use rusty_scene::{MaterialComponent, Scene};
 
 const RES: u32 = 16;
 
-/// A dark scene: a white static floor slab under a probe at y = 1, and, unless
-/// `mode` is `None`, a point light above at y = 3.
 fn floor_scene(mode: Option<LightMode>) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
@@ -53,7 +47,6 @@ fn floor_scene(mode: Option<LightMode>) -> Scene {
     scene
 }
 
-/// The baked probe, or `None` with no adapter.
 fn bake(mode: Option<LightMode>) -> Option<Sh9> {
     let mut renderer = crate::test_gpu::headless_or_skip(RES, RES)?;
     let mut scene = floor_scene(mode);
@@ -88,7 +81,6 @@ fn gpu_probe_bake_light_modes() {
         down(&baked),
         down(&mixed)
     );
-    // Its direct light comes from above: 4 × falloff(2, 20), about 1, at the probe, facing up.
     assert!(
         up(&baked) - up(&mixed) > 0.6,
         "a Baked light's direct light is in the probe: {} vs {}",
