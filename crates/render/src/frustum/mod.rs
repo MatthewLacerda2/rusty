@@ -11,7 +11,14 @@ impl Frustum {
         let r2 = view_proj.row(2);
         let r3 = view_proj.row(3);
         Self {
-            planes: [r3 + r0, r3 - r0, r3 + r1, r3 - r1, r2, r3 - r2],
+            planes: [
+                r3 + r0, // left
+                r3 - r0, // right
+                r3 + r1, // bottom
+                r3 - r1, // top
+                r2,      // near: wgpu depth is 0..w
+                r3 - r2, // far
+            ],
         }
     }
 
