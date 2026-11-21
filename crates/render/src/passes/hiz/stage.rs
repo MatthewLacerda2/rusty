@@ -7,7 +7,8 @@
 
 use super::clusters::plan::Plan;
 use super::clusters::ClusterDraws;
-use super::cull::{late_args, CameraCull, ARGS};
+use super::cull::CameraCull;
+use super::drawn::Layout;
 use super::pyramid::Pyramid;
 use crate::draw::camera::CameraCtx;
 use crate::gpu::ops::CountedEncoder as _;
@@ -52,11 +53,18 @@ impl Renderer {
         let phase_one = ("Hi-Z Phase One", phase_one.flatten(), CLEAR);
         let solids = (opaque, Some(&first));
         self.record_depth(encoder, &view.depth_view, solids, phase_one);
+        let read = cam.counter.triangles.map(|t| t.phase_one);
+        self.count_phase_one(opaque, read);
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
         last.clusters = self.record_cull(encoder, cull, at, (n, batches, split));
-        cam.copy_counts(&self.device, encoder, batches);
+        // Built only for a read that goes: one is copied while none is in flight.
+        if cam.counter.idle() {
+            let clustered = last.clusters.as_ref().map_or(&[][..], |c| &c.draws[..]);
+            let reading = Layout::of(opaque, clustered, plan.jobs.len());
+            cam.copy_counts(&self.device, encoder, reading);
+        }
         self.lap(lap_of(GpuPart::OcclusionTest));
         // Mapped once the camera's commands are submitted (#2353).
         cam.counter.request(n, &mut ctx.commands);
@@ -161,18 +169,23 @@ impl CameraCull {
         self.clusters.counter.forget();
     }
 
-    /// Copy what its final draws and its late set (#2336) drew, `batches` args
-    /// each and adjacent ([`late_args`]), in one copy for one read back
-    /// ([`Counter::final_and_late`](super::counters::Counter::final_and_late)).
+    /// Copy what its final draws, its late set (#2336), phase one and its
+    /// clustered draws drew, laid out as `reading` says, in one read back
+    /// ([`Layout::read`], #2387), kept with it while that read is in flight.
+    /// Called only while [`Counter::idle`](super::counters::Counter::idle).
     fn copy_counts(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
-        batches: u32,
+        reading: Layout,
     ) {
-        let bytes = late_args(batches as usize) + ARGS * u64::from(batches);
-        self.counter
-            .copy(device, encoder, (self.args[1].buffer(), 0, bytes));
+        let args = (
+            self.args[0].buffer(),
+            self.args[1].buffer(),
+            self.clusters.args(),
+        );
+        self.counter.copy(device, encoder, &reading.segments(args));
+        self.reading = reading;
     }
 }
 
