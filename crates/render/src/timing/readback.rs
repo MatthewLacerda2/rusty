@@ -1,41 +1,29 @@
-//! The timer's readback ring: a few mappable buffers, each holding one frame's
-//! resolved timestamps until the CPU reads them. A buffer is free, mapping (its
-//! frame's copy is in flight), or mapped (ready to read); the ring hands out free
-//! ones and never waits for a busy one.
-
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use super::Pair;
 
-/// Frames that may be in flight at once before one goes untimed.
 const SLOTS: usize = 3;
 
 const FREE: u8 = 0;
 const MAPPING: u8 = 1;
 const MAPPED: u8 = 2;
 
-/// One frame's readback buffer.
 struct Slot {
     buffer: wgpu::Buffer,
-    /// The frame's query pairs, in pair order.
     passes: Vec<Pair>,
-    /// The drawn frame it measures (`FrameCost::frames` at its end), which is also
-    /// its place in submission order, so the newest finished one wins.
     frame: u64,
     /// `FREE` / `MAPPING` / `MAPPED`, set by the map callback from wgpu's thread.
     state: Arc<AtomicU8>,
 }
 
 pub(super) struct Ring {
-    /// The query set resolves here first: a resolve target cannot be mapped.
     resolve: wgpu::Buffer,
     slots: Vec<Slot>,
 }
 
 impl Ring {
-    /// A ring whose buffers hold `queries` timestamps each.
     pub fn new(device: &wgpu::Device, queries: u64) -> Self {
         let size = queries * std::mem::size_of::<u64>() as u64;
         let buffer = |label, usage| {
@@ -64,8 +52,6 @@ impl Ring {
         Self { resolve, slots }
     }
 
-    /// Resolve the first `passes.len()` query pairs of `set`, drawn frame `frame`'s,
-    /// into a free slot and start mapping it. No free slot: the frame goes untimed.
     pub fn resolve_frame(
         &mut self,
         device: &wgpu::Device,
@@ -99,8 +85,6 @@ impl Ring {
             });
     }
 
-    /// Read every mapped slot through `read` (its ticks and passes), free them, and
-    /// return the newest frame's result with that frame's index.
     pub fn read_finished<T>(&mut self, read: impl Fn(&[u64], &[Pair]) -> T) -> Option<(u64, T)> {
         let mut newest: Option<(u64, T)> = None;
         for slot in &mut self.slots {

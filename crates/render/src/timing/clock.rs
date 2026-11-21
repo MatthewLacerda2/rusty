@@ -1,19 +1,6 @@
-//! [`ClockProbe`]: how fast the GPU is clocked right now, read off a fixed load
-//! (#862; moved here from the bench in #989).
-//!
-//! Apple silicon's GPU governor moves the clock with how busy the GPU is (338-1470
-//! MHz on an M4, re-decided many times a second), so GPU milliseconds measure the
-//! governor as much as the work. The probe times the same small arithmetic dispatch
-//! with a pair of timestamp queries: its duration follows the clock and nothing
-//! else. What to do with that reading (the bench's clock scaling) is the caller's;
-//! a caller that calibrates against it depends on [`SHADER`] and [`WORKGROUPS`]
-//! staying exactly as they are.
-
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::Renderer;
 
-/// The fixed load: every invocation runs a dependent multiply-add chain and writes
-/// the result, so the compiler cannot drop it. Pure arithmetic, no memory traffic.
 const SHADER: &str = "
 @group(0) @binding(0) var<storage, read_write> sink: array<f32, 64>;
 
@@ -31,7 +18,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>,
 /// Workgroups per probe: enough to fill every core of a laptop GPU.
 const WORKGROUPS: u32 = 256;
 
-/// A fixed compute dispatch timed with a pair of timestamp queries.
 pub struct ClockProbe {
     pipeline: wgpu::ComputePipeline,
     bind_group: wgpu::BindGroup,
@@ -43,7 +29,6 @@ pub struct ClockProbe {
 }
 
 impl ClockProbe {
-    /// A probe for `renderer`'s device; `None` when it has no timestamp queries.
     pub fn new(renderer: &Renderer) -> Option<Self> {
         let (device, queue) = (&renderer.device, &renderer.queue);
         if !device.features().contains(wgpu::Features::TIMESTAMP_QUERY) {
@@ -87,8 +72,6 @@ impl ClockProbe {
         })
     }
 
-    /// Run the probe on an otherwise idle GPU and return how long it took, in ms.
-    /// Waits for the GPU: an offline caller's tool, like the harness's frames.
     pub fn time(&self, renderer: &Renderer) -> Option<f64> {
         let (device, queue) = (&renderer.device, &renderer.queue);
         let mut encoder = device.create_command_encoder(&Default::default());
@@ -123,7 +106,6 @@ impl ClockProbe {
     }
 }
 
-/// The fixed load's compute pipeline, its bind group layout inferred from [`SHADER`].
 fn pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: Some("Bench clock probe"),

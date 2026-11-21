@@ -1,20 +1,3 @@
-//! crates/render/src/ui/shape/ — a `Shape` (#425) → SDF quads in the canvas mesh.
-//!
-//! A shape is drawn by the fragment shader from a signed distance field, so its
-//! geometry is just quads over the element's rect: one for the shape itself
-//! (grown by an antialiasing margin), preceded by one for its drop shadow (offset,
-//! grown by the blur) and one for its outer glow (grown by the glow's reach) — the
-//! effects are drawn under the shape. Every quad carries the same rect-local
-//! frame (`local`: position from the rect's centre and the half size), so the
-//! shader evaluates the same field on all three; only the mode parameters differ.
-//! The quads map through the element's laid-out corners, so rotation and scale
-//! carry the shape, and its vertices are solid (white texture), so shapes batch
-//! with solid images.
-//!
-//! Shape kind codes (`UiVertex::shape[0]`) and parameters, matching `ui.wgsl`:
-//! `0` rounded rect, `1` chamfered rect (`radii` per corner), `2` ellipse, `3` ring
-//! (`[inner radius, arc start, arc end]`), `4` line (`[thickness, dash, gap]`).
-
 use glam::{Vec2, Vec4};
 
 use super::custom::shaded::shade;
@@ -23,26 +6,19 @@ use super::vertex::{Fill, MODE_SHAPE};
 use rusty_components::{ShapeComponent, ShapeCorner, ShapeKind};
 use rusty_ui::UiRect;
 
-/// A quad's colours: its fill and its border's (both tinted).
 #[derive(Clone, Copy)]
 struct Paint {
     fill: Fill,
     border: Vec4,
 }
 
-/// What one quad of a shape draws.
 #[derive(Clone, Copy)]
 enum Layer {
-    /// The soft copy: offset, edge softened over `blur` either side.
     Shadow { offset: Vec2, blur: f32 },
-    /// The halo reaching `reach` past the edge.
     Glow { reach: f32 },
-    /// The shape: fill and border.
     Body,
 }
 
-/// Emit `id`'s Shape (if any, visible and not fully clipped) into `mesh`: shadow,
-/// glow, then the shape.
 pub(in crate::ui) fn push_shape(
     mesh: &mut CanvasMesh,
     frame: &Frame,
@@ -56,7 +32,6 @@ pub(in crate::ui) fn push_shape(
     let Some(clip) = visible_clip(state, state.alpha, frame.screen) else {
         return;
     };
-    // A Selectable's ColorTint (#420) multiplies every colour, like the group alpha.
     let tint = shape.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
     let start = mesh.vertices.len() as u32;
     push_effects(mesh, frame, rect, &shape, tint);
@@ -75,8 +50,6 @@ pub(in crate::ui) fn push_shape(
     close_batch(mesh, (UiSource::Solid, shape.blend, &shade), clip, start);
 }
 
-/// Just `shape`'s body over `rect`, painted `fill` border included — the shape a
-/// Mask clips to or a backdrop shows through (#426, #428).
 pub(in crate::ui) fn push_shape_body(
     mesh: &mut CanvasMesh,
     frame: &Frame,
@@ -95,7 +68,6 @@ pub(in crate::ui) fn push_shape_body(
     );
 }
 
-/// The shadow and glow quads (whichever are on), tinted by `tint`.
 fn push_effects(
     mesh: &mut CanvasMesh,
     frame: &Frame,
@@ -141,7 +113,6 @@ fn push_effects(
     }
 }
 
-/// Append one quad (two triangles) of `layer` over `rect`.
 fn push_quad(
     mesh: &mut CanvasMesh,
     frame: &Frame,
@@ -156,7 +127,6 @@ fn push_quad(
     let axis = |v: Vec2, len: f32| if len > 1e-6 { v / len } else { Vec2::ZERO };
     let (ax, ay) = (axis(br - bl, size.x), axis(tl - bl, size.y));
     let centre = bl + (br - bl) * 0.5 + (tl - bl) * 0.5;
-    // One screen pixel of antialiasing margin, in reference units.
     let aa = 1.5 / rect.scale_factor.max(1e-3);
     let (offset, grow, sdf) = match layer {
         Layer::Shadow { offset, blur } => (offset, blur + aa, [MODE_SHAPE, 0.0, blur, 0.0]),
@@ -189,7 +159,6 @@ fn push_quad(
     }));
 }
 
-/// The shape's kind code and its three parameters (see the module docs).
 fn kind_params(shape: &ShapeComponent) -> (f32, [f32; 3]) {
     match shape.kind {
         ShapeKind::Rect => match shape.corner {

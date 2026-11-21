@@ -1,5 +1,3 @@
-//! The instancing grouping rules (#470), pinned without a GPU.
-
 use super::{BatchKey, DrawItem, FrameDraws, OpaqueOrder, RecordTraits};
 use crate::scene::MaterialRecords;
 use crate::scene::MeshHandle;
@@ -11,20 +9,15 @@ const MESHES: [&str; 10] = [
     "A", "B", "Barrel", "Box", "Crate", "Far", "Glass", "Mid", "Near", "Wall",
 ];
 
-/// The handle of test mesh `name`.
 pub(super) fn handle(name: &str) -> MeshHandle {
     let at = MESHES.iter().position(|&m| m == name);
     MeshHandle(at.unwrap_or_else(|| panic!("add {name} to MESHES")) as u32)
 }
 
-/// The name of test mesh `handle`.
 pub(super) fn name(handle: MeshHandle) -> &'static str {
     MESHES[handle.0 as usize]
 }
 
-/// An item of mesh `mesh`, palette `bone_base`, tint `tint` (its material record's
-/// slot is ten times it), tagged by `tag` (its bits as the instance's object slot)
-/// so a test can read back the order instances were packed in.
 pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem {
     let record = (tint * 10.0) as u32;
     let traits = RecordTraits::of(&crate::MaterialData::flat([tint; 4]));
@@ -47,7 +40,6 @@ pub(super) fn item(mesh: &str, bone_base: u32, tint: f32, tag: f32) -> DrawItem 
     }
 }
 
-/// [`item`] of mesh `mesh`, tagged `tag`, at view depth `depth`.
 pub(super) fn at(mesh: &str, tag: f32, depth: f32) -> DrawItem {
     DrawItem {
         depth,
@@ -64,7 +56,6 @@ pub(super) fn ordered(
     FrameDraws::build(items, &MaterialRecords::default(), how)
 }
 
-/// [`ordered`], unranked.
 pub(super) fn batched(items: (Vec<DrawItem>, Vec<DrawItem>), instancing: bool) -> FrameDraws {
     ordered(items, (instancing, OpaqueOrder::Unranked))
 }
@@ -74,7 +65,6 @@ pub(super) fn meshes(draws: &FrameDraws) -> Vec<&str> {
     draws.opaque.iter().map(|b| name(b.key.mesh)).collect()
 }
 
-/// The tag [`item`] gave `instance`.
 pub(super) fn tag_of(instance: &InstanceData) -> f32 {
     f32::from_bits(instance.object)
 }
@@ -145,6 +135,5 @@ fn transparent_order_is_kept_and_only_neighbours_merge() {
         .collect();
     assert_eq!(runs, [("A", 1..3), ("B", 3..4), ("A", 4..5)]);
     assert_eq!(tags(&draws), [9.0, 0.0, 1.0, 2.0, 3.0]);
-    // Uniform slots continue after the opaque batches.
     assert_eq!(draws.transparent[0].uniform_slot, 1);
 }

@@ -1,5 +1,3 @@
-//! Render textures (#430): which are worth drawing, and when.
-
 use super::slots::{frames_since, is_due};
 use super::*;
 use rusty_components::{ImageComponent, MaterialAsset, MaterialComponent};
@@ -13,21 +11,16 @@ fn only_rt_prefixed_paths_are_render_textures() {
 
 #[test]
 fn update_every_spaces_the_draws() {
-    // Never drawn: due at once, whatever the rate.
     assert!(is_due(None, 7, 4));
-    // Every frame.
     assert!(is_due(Some(7), 8, 1));
-    // Every 4th: not on the next three frames, then due.
     assert!(!is_due(Some(8), 9, 4));
     assert!(!is_due(Some(8), 11, 4));
     assert!(is_due(Some(8), 12, 4));
-    // 0 reads as every frame, never as "never".
     assert!(is_due(Some(8), 9, 0));
 }
 
 #[test]
 fn a_draw_spans_the_frames_since_the_last() {
-    // A first draw has no history: one frame. Every 4th frame: four.
     assert_eq!(frames_since(None, 7), 1);
     assert_eq!(frames_since(Some(8), 12), 4);
     assert_eq!(frames_since(Some(8), 8), 1, "never 0");
@@ -63,12 +56,10 @@ fn referenced_textures_come_from_active_images_and_material_maps() {
     scene.world.set_material(monitor, Some(material));
     let asset = MaterialAsset {
         emissive_map: Some("rt:security".into()),
-        // An extra shader texture slot (#400) may name one too.
         shader_textures: [("mask".to_string(), "rt:scanner".into())].into(),
         ..Default::default()
     };
     scene.materials.insert("screen".to_string(), asset);
-    // And a volume's lens dirt (#1442).
     let volume = scene.add_entity("Volume".to_string());
     let mut vc = rusty_components::PostProcessingComponent::default();
     vc.bloom.dirt_texture = Some("rt:smudge".into());

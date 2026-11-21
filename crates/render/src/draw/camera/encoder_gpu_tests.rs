@@ -1,9 +1,3 @@
-//! A camera's frame in one encoder (#2353) draws what a submit after every stage
-//! drew: the SSIL flag read set by the opaque pass and clear after it, the game
-//! gizmos through the base camera and the camera's own uniform back after them,
-//! with one camera and under a stacked viewmodel, at every early-flush shape. A
-//! glass pane reads the flag clear: the translucents' alpha blends.
-
 use super::SPLIT;
 use crate::test_gpu::ssil::{block, draw, eye, on, renderer, scene, view, LAMP};
 use crate::{EarlyFlushes, Renderer};
@@ -11,8 +5,6 @@ use glam::Vec3;
 use rusty_components::{CameraComponent, RenderMode};
 use rusty_scene::{ClearFlags, Scene};
 
-/// The SSIL fixture with a glass pane and a debug line before the wall, under a `DepthOnly`
-/// viewmodel camera that draws nothing when `stacked`.
 fn lit(stacked: bool) -> Scene {
     let (mut scene, _) = scene(on(1.0), LAMP);
     let pane = (Vec3::new(-1.0, 1.0, -4.0), Vec3::new(1.5, 1.5, 0.1));
@@ -35,8 +27,6 @@ fn lit(stacked: bool) -> Scene {
     scene
 }
 
-/// Four frames of `scene` into a fresh view with its game gizmos on, each stage
-/// submitted alone when `split`, else at `flushes`' points: every frame's pixels.
 fn frames(r: &mut Renderer, scene: &Scene, split: bool, flushes: EarlyFlushes) -> Vec<Vec<u8>> {
     SPLIT.with(|s| s.set(split));
     r.switches.set_flushes(flushes);
@@ -54,7 +44,6 @@ fn gpu_a_frame_in_one_encoder_draws_what_a_submit_per_stage_drew() {
         let scene = lit(stacked);
         let apart = frames(&mut r, &scene, true, EarlyFlushes::None);
         assert!(r.frame_counters.ssil_samples > 0, "SSIL ran");
-        // Every early-flush shape (`EARLY_FLUSHES`) draws the same frames.
         for flushes in EarlyFlushes::ALL {
             let one = frames(&mut r, &scene, false, flushes);
             let green = |img: &[u8]| img.chunks(4).filter(|p| p[1] > 200 && p[0] < 80).count();

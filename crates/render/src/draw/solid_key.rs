@@ -1,7 +1,3 @@
-//! The batch key of one material slot of a solid (#470, #1615): what two draws must
-//! share to be one instanced call — its shader, cull state, mesh run, material group
-//! and record slot, and palette — and the record that slot holds.
-
 use super::batch::{BatchKey, RecordTraits};
 use super::materials::entity_params;
 use crate::gpu::pipelines::Facing;
@@ -11,9 +7,6 @@ use rusty_components::MaterialAsset;
 use rusty_scene::{Scene, SceneId};
 
 impl Renderer {
-    /// The batch key of entity `id`'s material `slot`, drawing `indices` of its mesh
-    /// `mesh` placed by `world`, with its palette at 0 (a camera places a skinned
-    /// one's, `render::scene::draw`); and whether that material is transparent.
     pub(crate) fn slot_key(
         &mut self,
         scene: &Scene,
@@ -23,7 +16,6 @@ impl Renderer {
     ) -> (BatchKey, bool) {
         let entry = scene.material_entry_at(id, slot);
         let material = entry.map(|(_, asset)| asset);
-        // A light's own gizmo mesh draws its material unlit.
         let variant = match scene.world.has_light(id) {
             true => Variant::Unlit,
             false => Variant::Lit,
@@ -45,15 +37,11 @@ impl Renderer {
             record,
             traits,
             bone_base: 0,
-            depth_only: false, // set beside the slot's shadow clip, `push_slot`
+            depth_only: false,
         };
         (key, material.is_some_and(MaterialAsset::is_transparent))
     }
 
-    /// The slot of scene `scene`'s record of `material` — `(library key, asset)`,
-    /// `None` for no material — under `variant`, kept in the material table
-    /// (`render::scene::MaterialRecords`, #1706) and made to hold what it holds now
-    /// ([`Self::variant_record`]); and what the CPU reads of it.
     pub(crate) fn material_record(
         &mut self,
         scene: SceneId,
@@ -67,8 +55,6 @@ impl Renderer {
         (slot, RecordTraits::of(&record))
     }
 
-    /// `material`'s record under `variant`, its map channels set by what is
-    /// resident ([`Self::with_map_channels`]).
     pub(crate) fn variant_record(
         &self,
         variant: Variant,

@@ -1,6 +1,3 @@
-//! The probe ball on a GPU (#1911): a baked probe's ball mirrors its cube along the
-//! reflected view ray, an unbaked one's is grey, and the gizmo toggle hides both.
-
 use glam::Vec3;
 
 use crate::ibl::ktx2_encode::encode_cubemap;
@@ -10,11 +7,8 @@ use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 64;
-/// Where the probe sits: off the floor grid, which the camera would see edge-on.
 const AT: Vec3 = Vec3::new(0.0, 1.0, 0.0);
 
-/// Linear colour of each cube face, in `+X, -X, +Y, -Y, +Z, -Z` order: all distinct,
-/// so the centre pixel names the face it reflected.
 pub(super) const FACES: [[f32; 3]; 6] = [
     [0.9, 0.1, 0.1],
     [0.1, 0.9, 0.1],
@@ -24,7 +18,6 @@ pub(super) const FACES: [[f32; 3]; 6] = [
     [0.9, 0.1, 0.9],
 ];
 
-/// A one-mip 4² cube file whose faces are [`FACES`], in half floats; returns its path.
 pub(super) fn faced_cube(name: &str) -> String {
     let face = |c: [f32; 3]| {
         let texel: Vec<u8> = [c[0], c[1], c[2], 1.0]
@@ -42,7 +35,6 @@ pub(super) fn faced_cube(name: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A scene with one reflection probe at [`AT`] whose cube is at `path`.
 fn probe_scene(path: &str) -> Scene {
     let mut scene = Scene::new();
     let i = scene.reflection_probes.add(AT, Vec3::splat(2.0));
@@ -50,7 +42,6 @@ fn probe_scene(path: &str) -> Scene {
     scene
 }
 
-/// The editor frame (RGBA8, sRGB, `RES`²) `cam` renders of `scene` with `gizmos`.
 pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera, gizmos: SceneGizmos) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     view.gizmos = gizmos;
@@ -59,19 +50,16 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera, gizmos: Scene
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), RES, RES)
 }
 
-/// The pixel at column `x`, row `y` of a [`frame`].
 pub(super) fn pixel(px: &[u8], x: u32, y: u32) -> [u8; 4] {
     let i = (y * RES + x) as usize * 4;
     [px[i], px[i + 1], px[i + 2], px[i + 3]]
 }
 
-/// The centre pixel of the editor frame looking down -Z at the probe from 2 m.
 fn centre(r: &mut Renderer, scene: &Scene, gizmos: SceneGizmos) -> [u8; 4] {
     let cam = Camera::new(AT + Vec3::Z * 2.0, -90.0, 0.0);
     pixel(&frame(r, scene, &cam, gizmos), RES / 2, RES / 2)
 }
 
-/// `linear` as the sRGB target stores it.
 pub(super) fn srgb(linear: [f32; 3]) -> [u8; 3] {
     linear.map(|c| (rusty_core::color::linear_to_srgb(c) * 255.0).round() as u8)
 }
@@ -81,8 +69,6 @@ pub(super) fn assert_near(got: [u8; 4], want: [u8; 3], what: &str) {
     assert!(close, "{what}: got {got:?}, want about {want:?}");
 }
 
-/// Head-on, the eye ray meets the ball's normal +Z and reflects back along +Z: the
-/// centre pixel is the cube's +Z face, raw (no lighting, no tonemapping).
 #[test]
 fn gpu_a_baked_probe_ball_mirrors_its_cube() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -93,7 +79,6 @@ fn gpu_a_baked_probe_ball_mirrors_its_cube() {
     assert_near(got, srgb(FACES[4]), "the +Z face");
 }
 
-/// A probe whose cube is not resident (here, never baked) shows a flat grey ball.
 #[test]
 fn gpu_an_unbaked_probe_ball_is_grey() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -105,8 +90,6 @@ fn gpu_an_unbaked_probe_ball_is_grey() {
     assert_near(got, srgb([0.5; 3]), "unbaked grey");
 }
 
-/// With the Reflection Probes gizmo off, no ball is drawn: the centre is whatever the
-/// scene shows there without it.
 #[test]
 fn gpu_the_toggle_hides_the_ball() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {

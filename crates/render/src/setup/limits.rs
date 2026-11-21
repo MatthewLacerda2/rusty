@@ -1,45 +1,14 @@
-//! The limits every device is created with: wgpu's defaults, but for the sampled
-//! textures one shader stage may bind (#1703).
-//!
-//! The forward pass's fragment stage binds 23: the 16 of wgpu's default (the sky
-//! and probe cubes, the decal atlas twice, the lightmap pages twice, the material
-//! maps, the cascades, the AO, the shadow atlas and the opaque copy, #1750), the
-//! integrated volumetric fog (#1703), the shadowmask pages (#1695), the
-//! material's detail map (#1997), its occlusion and specular-level maps (#2151) and
-//! its height map (#2191) and its detail mask (#2258). Every adapter rusty ships on has room: Metal
-//! allows 96 sampled textures per stage on macOS GPUs and Apple6 or later, 72 on
-//! Apple4 and Apple5 (wgpu-hal's `metal/adapter.rs`), desktop Vulkan drivers and
-//! lavapipe far more. Asking for exactly what is bound costs nothing (it is a
-//! validation limit, not an allocation) and fails the device loudly on an adapter
-//! that cannot draw the forward pass, rather than the pipeline later.
-//!
-//! Samplers are the tighter budget: Metal binds at most 16 per stage, a hard cap
-//! no limit request lifts. The forward fragment stage uses 15, leaving 1 free:
-//! each material map keeps its own (#1323), while group 0's engine-owned textures
-//! (the sky and probe cubes, the lightmap pages, the fog volume) share one
-//! (`gpu::linear_clamp`), and the decal atlas, the shadow comparison and the
-//! opaque copy keep theirs. A new material map takes a free one; the tests count
-//! both from the bind-group layouts themselves, and fail naming Metal's cap.
-
-/// The features a device takes where its adapter has them: BC texture
-/// compression (#1574) and GPU occlusion culling's indirect draws (#1963). Each
-/// has a path without it.
 pub(crate) const OPTIONAL: wgpu::Features =
     crate::gpu::textures::compressed::FEATURE.union(crate::passes::hiz::FEATURE);
 
-/// What the window's device takes where its adapter has it: [`OPTIONAL`], and in a
-/// `dev` build the timestamps that time its live frames for `Debug.Stats()` (#2205).
-/// A shipped game reads no GPU times, so it asks for none.
 // lint: allow(gpu-default-only) only the window's device takes it; every GPU test renders headless, which never does
 pub(crate) const WINDOW: wgpu::Features = match cfg!(feature = "dev") {
     true => OPTIONAL.union(wgpu::Features::TIMESTAMP_QUERY),
     false => OPTIONAL,
 };
 
-/// The most sampled textures one stage binds: the forward fragment stage's.
 pub(crate) const SAMPLED_TEXTURES_PER_STAGE: u32 = 23;
 
-/// What [`super::Renderer`]'s device asks for.
 pub(crate) fn device_limits() -> wgpu::Limits {
     let defaults = wgpu::Limits::default();
     wgpu::Limits {

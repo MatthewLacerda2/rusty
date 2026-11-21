@@ -1,7 +1,3 @@
-//! The light budget (#834): the camera keeps the lights that contribute most to the
-//! view, each cluster the ones that contribute most to it, and the cut is the same
-//! every time for the same input.
-
 use glam::Vec3;
 
 use super::bin::{bin_spheres, Binned, Budget};
@@ -14,7 +10,6 @@ fn grid() -> ClusterGrid {
     ClusterGrid::new(&Camera::new(Vec3::ZERO, -90.0, 0.0), 16.0 / 9.0)
 }
 
-/// A white point light at `at`.
 fn light(at: Vec3, range: f32, intensity: f32) -> LocalLight {
     let light = LightComponent {
         intensity,
@@ -35,7 +30,6 @@ fn bin_with(spheres: &[(Vec3, f32)], budget: &Budget) -> Binned {
     bin_spheres(&grid(), spheres, budget, &mut AabbCache::default())
 }
 
-/// Every non-empty cluster list.
 fn lists(binned: &Binned) -> impl Iterator<Item = &[u32]> {
     binned
         .ranges
@@ -46,7 +40,6 @@ fn lists(binned: &Binned) -> impl Iterator<Item = &[u32]> {
 
 #[test]
 fn the_brighter_far_light_beats_the_dimmer_near_one() {
-    // A dim lamp beside the camera, a bright one lighting the far end of the room.
     let near = light(Vec3::new(0.0, 0.0, -2.0), 1.5, 0.5);
     let far = light(Vec3::new(0.0, 0.0, -15.0), 8.0, 8.0);
     let spheres = [near.sphere(), far.sphere()];
@@ -59,14 +52,12 @@ fn the_brighter_far_light_beats_the_dimmer_near_one() {
     let binned = bin_with(&spheres, &budget);
     assert_eq!((binned.visible, binned.dropped), (1, 1));
     assert!(binned.indices.iter().all(|&i| i == 1), "the bright stays");
-    // Nearest-surface ranking (the decals' budget) would have kept the near one.
     let nearest = bin_with(&spheres, &Budget::nearest(1));
     assert!(nearest.indices.iter().all(|&i| i == 0));
 }
 
 #[test]
 fn past_the_camera_budget_a_bright_far_light_outranks_dim_near_ones() {
-    // A grid of dim, tight lights near the camera fills the budget exactly.
     let mut lights: Vec<_> = (0..MAX_VISIBLE_LIGHTS)
         .map(|i| {
             let (x, y) = ((i % 8) as f32 - 3.5, (i / 8) as f32 - 3.5);
@@ -108,8 +99,6 @@ fn cluster_lists_never_exceed_the_cluster_budget() {
 
 #[test]
 fn within_a_cluster_the_light_reaching_in_brightest_wins() {
-    // Equal lights: the one whose centre sits in the cluster beats ones that only
-    // graze it, so a crowded corner keeps its nearest lamps.
     let mut lights: Vec<_> = (0..MAX_CLUSTER_LIGHTS)
         .map(|_| light(Vec3::new(0.0, 0.0, -9.0), 3.0, 1.0))
         .collect();
@@ -126,7 +115,6 @@ fn within_a_cluster_the_light_reaching_in_brightest_wins() {
 
 #[test]
 fn the_same_input_gives_the_same_cut() {
-    // Identical lights tie everywhere: the index decides, so the lowest stay.
     let lights: Vec<_> = (0..MAX_VISIBLE_LIGHTS + 16)
         .map(|_| light(Vec3::new(1.0, 0.5, -8.0), 4.0, 2.0))
         .collect();

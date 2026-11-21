@@ -1,8 +1,3 @@
-//! The caster index (#1874), adapter-free: it reaches every entry a light volume's
-//! frustum keeps, over seeded random levels and volumes (point-light faces, spots,
-//! cascades, one degenerate), reaches few of them for a small volume, and answers
-//! for an entity only under the bounds it was indexed with.
-
 use glam::camera::rh::proj::directx;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Vec3};
@@ -10,7 +5,6 @@ use glam::{Mat4, Vec3};
 use super::CasterIndex;
 use crate::Frustum;
 
-/// A seeded xorshift's next value in `0..1`.
 fn next(state: &mut u64) -> f32 {
     *state ^= *state << 13;
     *state ^= *state >> 7;
@@ -30,8 +24,6 @@ fn level(n: usize, seed: u64) -> Vec<(u32, (Vec3, Vec3))> {
         .collect()
 }
 
-/// A point light's six faces and a spot at `at`, reaching `range`; a cascade over
-/// the level; and a degenerate view-projection.
 fn volumes(at: Vec3, range: f32) -> Vec<Mat4> {
     let face = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, 0.05, range);
     let spot = directx::perspective(0.6, 1.0, 0.05, range);
@@ -48,7 +40,6 @@ fn volumes(at: Vec3, range: f32) -> Vec<Mat4> {
     out
 }
 
-/// The entries `index` reaches through `view_proj`, as entity ids, sorted.
 fn reached(index: &CasterIndex, view_proj: Mat4) -> Vec<u32> {
     let mut hits = Vec::new();
     index.visit(&Frustum::from_view_proj(view_proj), |e| {
@@ -114,8 +105,6 @@ fn an_entity_is_answered_for_only_under_the_bounds_it_was_indexed_with() {
         (index.entry(9, Some(nan)), index.entry(5, Some(a))),
         (None, None)
     );
-    // Out of every volume: none reached, but the loose ones are unanswered, then
-    // a stray too; the per-frame casters are listed whatever their bounds.
     let nowhere = [Frustum::from_view_proj(directx::orthographic(
         90.0, 91.0, 90.0, 91.0, 0.0, 1.0,
     ))];

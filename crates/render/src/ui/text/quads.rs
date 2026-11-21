@@ -1,13 +1,3 @@
-//! crates/render/src/ui/text/quads.rs — a laid-out Text → SDF glyph quads (#419).
-//!
-//! Lays the text out with the sim's own `ui::text::layout_text`, then turns each
-//! glyph into a quad over its atlas field, in **rect-local reference units**
-//! (origin at the rect's bottom-left, y up) — the mesh builder maps them through
-//! the element's corners. The drop shadow is a second copy of every glyph, offset
-//! and emitted first, so it never covers a neighbouring glyph. Synthesized italic
-//! shears the quad; synthesized bold, the outline and the glow are shader
-//! parameters (distances in atlas pixels) carried per vertex.
-
 use glam::{Vec2, Vec4};
 
 use super::atlas::FontAtlases;
@@ -16,28 +6,20 @@ use crate::ui::vertex::MODE_TEXT;
 use rusty_components::TextComponent;
 use rusty_ui::text::{layout_text, PlacedGlyph};
 
-/// Synthesized italic's shear (x per unit of height above the baseline, ≈ 11°).
 const ITALIC_SHEAR: f32 = 0.2;
-/// Synthesized bold's dilation, in ems (per side).
 const FAUX_BOLD_DILATE: f32 = 0.02;
 
-/// One glyph quad.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct TextQuad {
-    /// The atlas (font path) it samples.
     pub(crate) font: Option<String>,
-    /// Bottom-left, top-left, top-right, bottom-right; rect-local reference units.
     pub(crate) corners: [Vec2; 4],
-    /// Texture coordinates `(min, max)`, v down.
     pub(crate) uv: (Vec2, Vec2),
     pub(crate) fill: Vec4,
     pub(crate) outline: Vec4,
     pub(crate) glow: Vec4,
-    /// `[1 (SDF), dilate, outline width, glow reach]`, atlas pixels.
     pub(crate) sdf: [f32; 4],
 }
 
-/// The quads drawing `text` in a `size` rect (shadow first).
 pub(crate) fn text_quads(
     text: &TextComponent,
     size: Vec2,
@@ -85,7 +67,6 @@ pub(crate) fn text_quads(
         .collect()
 }
 
-/// The quad over `(lo, hi)`, sheared for synthesized italic.
 fn corners(lo: Vec2, hi: Vec2, g: &PlacedGlyph) -> [Vec2; 4] {
     let shear = |p: Vec2| {
         let dx = if g.faux_italic {
@@ -103,9 +84,6 @@ fn corners(lo: Vec2, hi: Vec2, g: &PlacedGlyph) -> [Vec2; 4] {
     ]
 }
 
-/// `[1, dilate, outline, glow]` in atlas pixels, the total kept inside the field's
-/// reach. A zero width also zeroes that effect's colour (see [`text_quads`]), so
-/// no fringe of it shows at the edge.
 fn effects(text: &TextComponent, g: &PlacedGlyph) -> [f32; 4] {
     let reach = SPREAD - 1.0;
     let dilate = if g.faux_bold {

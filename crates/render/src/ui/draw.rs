@@ -1,41 +1,3 @@
-//! crates/render/src/ui/draw.rs — the UI pass: per-view vertex buffers + the draw (#418).
-//!
-//! [`Renderer::prepare_ui`] runs inside `Renderer::render` before the camera stack:
-//! the view lays its UI out at its own pixel size through its camera (the
-//! same pure `UiLayout::compute_in` the sim's `LateUpdate` system runs, with the
-//! sim's own texture-size table ([`Renderer::set_ui_textures`]) — so in Play it
-//! equals `Resources::ui_layout` whenever the view is the game view) and turned
-//! into per-canvas meshes, each kept while its inputs hold. World canvases then draw inside the stack (`world`,
-//! #429); [`Renderer::draw_ui`] draws the screen canvases right after post-FX, with
-//! `LoadOp::Load` over the finished frame. The Scene view (editor mode) keeps only
-//! `WorldSpace` canvases — signs and terminals are scene geometry; the game's HUD
-//! and a camera canvas glued to the editor's free-fly camera are not.
-//!
-//! **Dirty strategy.** Each view keeps its layout with what it was computed from
-//! (`kept::layout`): a frame where nothing the layout reads changed lays out
-//! nothing, and places the held rects' canvas spaces again where they can move (a
-//! world or camera canvas). It keeps every root canvas's mesh
-//! with what it was built from too (`kept`): a canvas whose rects,
-//! frame, texture sizes and glyph atlases are unchanged and whose UI components no
-//! write touched (the World's change log) keeps its mesh unbuilt. One vertex buffer
-//! per canvas (`cache`) is re-uploaded only when a rebuilt mesh differs. A still HUD
-//! therefore meshes nothing and uploads nothing per frame; a canvas that moves (a
-//! turning minimap) is rebuilt alone.
-//!
-//! **Effects.** After the sync, every batch's clip slot is written and each Mask's
-//! coverage texture rendered (`effects`, #428), before the camera stack — world
-//! canvases need them too. Right before the overlay pass, the backdrop blur runs
-//! over the finished frame (`effects::blur`, #426), only when a backdrop shows.
-//!
-//! **Laps.** Both halves cut their CPU time into `ui.<part>` laps (`Renderer::lap`),
-//! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
-//! `textures` (loading and binding the Images' textures), `mesh` (the canvases'
-//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms` and `masks`, then
-//! `pipelines` (making the overlay's pipelines current), `blur` (the backdrop
-//! chain alone), `groups` and `encode` for the overlay pass. The UI submits
-//! nothing: it records into the last camera's [`Commands`], sent (and lapped as
-//! the frame's top-level `submit`) after it.
-
 use crate::gpu::commands::Commands;
 use crate::ui::pipeline::{BATCH_GROUP, SOURCE_GROUP};
 use std::rc::Rc;
@@ -54,9 +16,6 @@ use rusty_scene::{Camera, Scene};
 use rusty_ui::{CanvasSpace, UiLayout, UiView};
 
 impl Renderer {
-    /// Lay out and mesh `scene`'s UI for `view` through `camera`, uploading only
-    /// what changed (see the module docs). Runs before the camera stack; its masks
-    /// record into `commands`, the frame's open encoder (#2353).
     pub(crate) fn prepare_ui(
         &mut self,
         commands: &mut Commands,
@@ -75,7 +34,6 @@ impl Renderer {
         self.bind_ui_textures(scene, &layout);
         self.lap("ui.textures");
         let textures = &self.gpu_textures;
-        // Source pixels, not the upload's, which *Max Size* may have shrunk (#1574).
         let tex_size = |p: &str| {
             let (w, h) = textures.get(p)?.source_size;
             Some(Vec2::new(w as f32, h as f32))
@@ -113,10 +71,6 @@ impl Renderer {
         self.render_masks(commands.encoder(), view);
     }
 
-    /// Draw the screen canvases [`Renderer::prepare_ui`] synced over `view`'s
-    /// finished frame. A no-op for a view with nowhere to draw them (a targetless
-    /// view given no `set_ui_output`: the cubemap capture). Recorded into
-    /// `commands`, the screen's last camera's (#2353).
     pub(crate) fn draw_ui(&mut self, commands: &mut Commands, view: &mut RenderView) {
         let Some((target, format)) = view.take_ui_target() else {
             return;
@@ -138,20 +92,16 @@ impl Renderer {
         self.encode_ui(commands.encoder(), pass, screen_box(view));
     }
 
-    /// Make the batch group of every screen canvas's batch current.
     fn screen_groups(&self, cache: &mut UiViewCache) {
         let batches = screen_canvases(cache).flat_map(|(_, c)| c.mesh.batches.iter());
         let keys: Vec<_> = batches.map(|b| self.screen_key(b)).collect();
         self.batch_groups(&mut cache.effects, keys);
     }
 
-    /// The batch group a screen batch binds: the one key [`Self::screen_groups`]
-    /// makes and [`Self::encode_ui`] reads.
     fn screen_key(&self, batch: &UiBatch) -> GroupKey {
         GroupKey::of(batch, Some(self.quality.backdrop_divisor()))
     }
 
-    /// Record the UI pass over `target`.
     fn encode_ui(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -195,15 +145,11 @@ impl Renderer {
     }
 }
 
-/// The screen canvases (the overlay pass's), by index in draw order: the one
-/// filter the groups and the pass share.
 fn screen_canvases(cache: &UiViewCache) -> impl Iterator<Item = (usize, &CanvasGpu)> {
     let all = cache.canvases().iter().enumerate();
     all.filter(|(_, c)| c.place.space == CanvasSpace::Screen)
 }
 
-/// The rect the screen canvases lay out and draw in: the view's `screen_box`,
-/// kept inside the view, else the whole view.
 fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
     let size = view.size();
     let Some((x, y, w, h)) = view.ui.screen_box else {
@@ -215,15 +161,12 @@ fn screen_box(view: &RenderView) -> (u32, u32, u32, u32) {
 }
 
 impl Renderer {
-    /// Load and bind every texture an active, laid-out Image of `scene` samples.
     fn bind_ui_textures(&mut self, scene: &Scene, layout: &UiLayout) {
         let due = self.notes_due();
         for path in texture_paths(scene, layout) {
             let tex = self.load_texture(&path);
             let rebuilt =
                 (self.ui_renderer).bind_group(&self.device, path.as_str(), Rc::clone(&tex));
-            // On a due render, or when this image's group was rebuilt: its texture
-            // changed (`scene::residency::notes`).
             if due || rebuilt {
                 self.note_map(scene.id(), path.as_str());
             }
@@ -232,9 +175,6 @@ impl Renderer {
 }
 
 impl super::UiRenderer {
-    /// The bind group sampling image `path`'s `tex`, creating and caching it on
-    /// first use or when the texture behind the path changed; whether it was built
-    /// now.
     fn bind_group(
         &mut self,
         device: &wgpu::Device,
@@ -256,15 +196,11 @@ impl super::UiRenderer {
         !fresh
     }
 
-    /// Drop the bind group of every image path `gone` names (a texture residency
-    /// released), so its upload is freed.
     pub(crate) fn forget_textures(&mut self, gone: impl Fn(&str) -> bool) {
         self.textures.retain(|path, _| !gone(path));
     }
 }
 
-/// Every texture path an active, laid-out Image samples — gathered first so the
-/// scene borrow ends before the textures load.
 fn texture_paths(scene: &Scene, layout: &UiLayout) -> Vec<MapRef> {
     let mut paths: Vec<MapRef> = layout
         .iter()

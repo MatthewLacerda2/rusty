@@ -2,7 +2,6 @@ use glam::{Vec2, Vec4};
 
 use super::*;
 
-/// Total unit-square area of a triangle list.
 fn area(tris: &[UnitVertex]) -> f32 {
     tris.chunks(3)
         .map(|t| (t[1].0 - t[0].0).perp_dot(t[2].0 - t[0].0).abs() * 0.5)
@@ -23,7 +22,6 @@ fn simple_covers_the_rect_and_preserve_aspect_letterboxes() {
     assert_eq!(tris.len(), 6);
     assert!((area(&tris) - 1.0).abs() < 1e-6);
     img.preserve_aspect = true;
-    // A square texture in a 2:1 rect fills the middle half.
     let tris = image_triangles(&img, Vec2::new(200.0, 100.0), Some(Vec2::splat(64.0)));
     assert!((area(&tris) - 0.5).abs() < 1e-6);
     let xs: Vec<f32> = tris.iter().map(|v| v.0.x).collect();
@@ -37,11 +35,9 @@ fn sliced_keeps_borders_at_texel_size() {
     let tris = image_triangles(&img, Vec2::new(200.0, 100.0), Some(Vec2::splat(40.0)));
     assert_eq!(tris.len(), 9 * 6);
     assert!((area(&tris) - 1.0).abs() < 1e-5);
-    // The left column spans 10 of 200 units and samples 10 of 40 texels.
     let bl = tris[0..6].iter().map(|v| v.0.x).fold(0.0, f32::max);
     let bl_u = tris[0..6].iter().map(|v| v.1.x).fold(0.0, f32::max);
     assert!((bl - 0.05).abs() < 1e-6 && (bl_u - 0.25).abs() < 1e-6);
-    // Without a texture it degrades to one Simple quad.
     assert_eq!(image_triangles(&img, Vec2::splat(50.0), None).len(), 6);
 }
 
@@ -84,8 +80,6 @@ fn radial_sweeps_the_right_share_in_the_right_direction() {
     img.fill_method = FillMethod::Radial360;
     img.fill_origin = FillOrigin::Bottom;
     img.fill_amount = 0.25;
-    // Clockwise from the bottom edge (y-up): through the bottom-left corner to the
-    // left edge — the left-bottom quadrant.
     let tris = image_triangles(&img, Vec2::splat(100.0), None);
     assert!((area(&tris) - 0.25).abs() < 1e-5);
     assert!(tris

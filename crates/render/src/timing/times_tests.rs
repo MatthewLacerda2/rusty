@@ -4,7 +4,6 @@ use crate::timing::GpuPass;
 /// Ticks of 1 ms each.
 const MS: f64 = 1e6;
 
-/// A pair of `pass` that went out in submit `submit`.
 fn sent(pass: GpuPass, submit: u64) -> Pair {
     Pair {
         pass,
@@ -15,8 +14,6 @@ fn sent(pass: GpuPass, submit: u64) -> Pair {
 
 #[test]
 fn a_pair_spread_over_several_passes_is_one_entry_charged_once() {
-    // SSR's pyramids' one pair opens on its first level (1) and closes on its
-    // last (7): whatever ran between, 6 ms, once; the resolve after it is its own.
     let pairs = [GpuPass::SsrPyramids, GpuPass::SsrResolve].map(Pair::from);
     let times = GpuTimes::from_ticks(&[1, 7, 7, 9], &pairs, MS);
     let want = [(GpuPass::SsrPyramids, 6.0), (GpuPass::SsrResolve, 2.0)];
@@ -41,8 +38,6 @@ fn a_gap_inside_one_submit_is_untimed_work() {
 
 #[test]
 fn a_gap_from_one_submit_to_the_next_is_told_apart_and_charged_to_no_row() {
-    // Forward 1..5 in submit 1; SSR's copy and a wait 5..7 head submit 2, whose
-    // trace runs 7..9 and resolve, after an untimed 9..10, 10..11.
     let pairs = [
         sent(GpuPass::Forward, 1),
         sent(GpuPass::Ssr, 2),
@@ -65,9 +60,6 @@ fn a_gap_from_one_submit_to_the_next_is_told_apart_and_charged_to_no_row() {
 
 #[test]
 fn rows_other_and_the_wait_are_the_span_split_in_ticks() {
-    // Forward 100..400 in submit 1, then 50 ticks before post-FX's 450..733 in
-    // submit 2, at a period with no whole ms in it: the rows, the untimed work and
-    // the wait add up to the span, which no part of it is left out of.
     let pairs = [sent(GpuPass::Forward, 1), sent(GpuPass::PostFx, 2)];
     let period = 41.666_666;
     let times = GpuTimes::from_ticks(&[100, 400, 450, 733], &pairs, period);
@@ -84,8 +76,6 @@ fn rows_other_and_the_wait_are_the_span_split_in_ticks() {
 
 #[test]
 fn overlapping_pairs_charge_each_tick_once_and_the_span_counts_from_the_earliest() {
-    // Post-FX starts at 1, inside forward's 2..10, and ends at 11: it costs 1, and
-    // the span opens at its start, the earliest written. Overlap is no gap.
     let pairs = [sent(GpuPass::Forward, 1), sent(GpuPass::PostFx, 2)];
     let times = GpuTimes::from_ticks(&[2, 10, 1, 11], &pairs, MS);
     assert_eq!(times.total_ms(), 9.0);
@@ -96,14 +86,10 @@ fn overlapping_pairs_charge_each_tick_once_and_the_span_counts_from_the_earliest
 
 #[test]
 fn a_pair_not_written_whole_is_charged_to_no_row_nor_the_span_nor_the_gaps() {
-    // A pair taken and never written reads a start of 0 (or one past its end):
-    // counted, its row and the span would run from tick 0, hours on a real clock,
-    // and mid-frame it would charge the interval the next pair is charged again.
-    let at = 3_600_000; // an hour in, in ms ticks
+    let at = 3_600_000;
     let want = [(GpuPass::Forward, 2.0), (GpuPass::PostFx, 2.0)];
     for bad in [[0, at + 2], [at + 9, at + 2]] {
         let good = [[at, at + 2], [at + 2, at + 4]];
-        // The broken pair first in the frame, then between the two whole ones.
         let first = [bad, good[0], good[1]];
         let middle = [good[0], bad, good[1]];
         for (frame, slot) in [(first, 0), (middle, 1)] {

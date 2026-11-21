@@ -1,8 +1,3 @@
-//! Baked occlusion culling per camera (#1714): a long wall seen through a door
-//! draws the same pixels on and off; an orthographic camera and one whose near
-//! plane clips a wall away cull nothing by occlusion; and a static tween
-//! re-checks one fingerprint a frame, not one per baked object.
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -25,7 +20,6 @@ fn baked(mut scene: Scene) -> Scene {
     scene
 }
 
-/// One frame of `scene` through `cam`, culling by occlusion `on`.
 fn shot(r: &mut Renderer, scene: &Scene, cam: &Camera, on: bool) -> (Vec<u8>, RenderCounters) {
     let mut cam = cam.clone();
     cam.use_occlusion_culling = on;
@@ -45,7 +39,7 @@ fn gpu_a_long_wall_through_a_door_draws_the_same_pixels_on_and_off() {
     let x = 3.37;
     let scene = baked(gap(40.0, x).0);
     let mut cam = Camera::new(Vec3::new(x, 1.5, 20.0), -90.0, 0.0);
-    cam.fov = 20.0; // the door fills the middle of the frame
+    cam.fov = 20.0;
     let (off, _) = shot(&mut r, &scene, &cam, false);
     let (on, counters) = shot(&mut r, &scene, &cam, true);
     assert!(on == off, "the PVS moved pixels ({counters:?})");
@@ -57,13 +51,10 @@ fn gpu_an_orthographic_or_far_near_camera_culls_nothing_by_occlusion() {
         return;
     };
     let scene = baked(corridors());
-    // Down the corridor: a perspective camera with a near plane close in culls.
     let base = Camera::new(Vec3::new(1.0, 1.6, 0.0), 0.0, 0.0);
     assert!(shot(&mut r, &scene, &base, true).1.occlusion_culled > 0);
-    // A minimap over the level, inside the grid.
     let mut ortho = Camera::new(Vec3::new(10.0, 2.5, 0.0), 0.0, -89.0);
     ortho.projection = Projection::Orthographic { size: 12.0 };
-    // A near plane past the corridor's side wall: the room behind shows.
     let mut far = Camera::new(Vec3::new(5.0, 1.6, 0.0), 90.0, 0.0);
     far.near = 3.0;
     for (name, cam) in [("orthographic", ortho), ("far near plane", far)] {
@@ -98,7 +89,6 @@ fn gpu_a_static_tween_rechecks_one_object_a_frame() {
     assert_eq!(rechecked(&r, &scene), 0, "nothing moved");
 }
 
-/// Fingerprints the last extract of `scene` on `r` computed.
 fn rechecked(r: &Renderer, scene: &Scene) -> usize {
     r.retained.scene(scene.id()).unwrap().occlusion.rechecked
 }

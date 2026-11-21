@@ -1,15 +1,9 @@
-//! The animated bound (#833): it holds every vertex of an animated pose, skinned the
-//! way the shader skins it, and refuses what it cannot bound. The poses are built
-//! here, joint by joint down the chain, since the animation that samples a clip
-//! sits above this crate; the bound holds for any palette of them.
-
 use glam::{Mat4, Quat, Vec3, Vec4};
 
 use super::SkinBounds;
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::Vertex;
 
-/// A vertex at `p` weighted to `joints` by `weights`.
 fn vertex(p: Vec3, joints: [u32; 4], weights: [f32; 4]) -> Vertex {
     let mut v = Vertex::new(p, Vec3::Y, [0.0, 0.0]);
     v.joint_indices = joints;
@@ -17,10 +11,6 @@ fn vertex(p: Vec3, joints: [u32; 4], weights: [f32; 4]) -> Vertex {
     v
 }
 
-/// A three-joint chain up +Y (`hips` at the origin, one unit apart). Vertices ring
-/// the chain from y = -0.3 to 2.6, blending each pair of neighbouring joints; one
-/// carries weights that do not sum to 1 and one none at all (the shader skins it as
-/// identity).
 fn chain() -> (SkinData, Vec<Vertex>) {
     let local_bind: Vec<JointTransform> = (0..3)
         .map(|s| JointTransform {
@@ -59,10 +49,6 @@ fn chain() -> (SkinData, Vec<Vertex>) {
     (skin, vertices)
 }
 
-/// The palette of a pose that moves every joint, `t` from 0 to 1: the hips slide
-/// and squash, the spine bends up to 70° about Z, the head twists about X and grows.
-/// Each joint's local transform is composed down the chain (`parents`), as a frame
-/// poses its bones, then multiplied by its inverse bind.
 fn bend(skin: &SkinData, t: f32) -> Vec<Mat4> {
     let wave = (t * std::f32::consts::TAU).sin();
     let locals = [
@@ -87,7 +73,6 @@ fn bend(skin: &SkinData, t: f32) -> Vec<Mat4> {
     palette.map(|(g, inverse)| *g * *inverse).collect()
 }
 
-/// Where the shader draws `v` under `palette` (`blend_joints`, then the divide).
 fn skinned(v: &Vertex, palette: &[Mat4]) -> Vec3 {
     let w = v.joint_weights;
     let skin = if w.iter().sum::<f32>() < 0.01 {

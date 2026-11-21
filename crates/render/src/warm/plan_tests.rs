@@ -1,7 +1,3 @@
-//! What a load's warm-up lists (#2123): each geometry slot once, from its newest revision,
-//! each material map once as its slot reads it, the sky, and the lightmaps only
-//! when the scene has pages.
-
 use super::{Item, Warming};
 use crate::gpu::textures::TextureKind;
 use rusty_asset::MapRef;
@@ -11,8 +7,6 @@ use rusty_scene::parse_scene_text;
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{MaterialAsset, Scene};
 
-/// Two boxes and a sphere wearing `mapped`, whose albedo and normal maps are files,
-/// and an entity with no mesh.
 fn scene() -> Scene {
     let mut scene = Scene::new();
     for primitive in [Primitive::Box, Primitive::Box, Primitive::Sphere] {
@@ -35,11 +29,8 @@ fn scene() -> Scene {
     scene
 }
 
-/// A scene file with nothing in it: every other block at its default.
 const SPARSE: &str = r#"{"entities": [], "next_entity_id": 1, "selected_entity_id": null}"#;
 
-/// `scene`'s document as the load prepares it: its entities, library and sky,
-/// each block a save writes left at a sparse file's default.
 fn document(scene: &Scene) -> SceneData {
     let mut data = parse_scene_text(SPARSE, "plan.scene").unwrap();
     data.entities = scene.world.collect_entities();
@@ -55,7 +46,6 @@ fn data() -> SceneData {
 #[test]
 fn each_geometry_is_listed_once_by_its_newest_revision() {
     let mut data = data();
-    // The second box edited since: its slot is uploaded from it.
     data.entities[1].mesh.as_mut().unwrap().revision = MeshRevision::next();
     let warming = Warming::plan(&data);
     let meshes: Vec<usize> = (warming.items.iter())

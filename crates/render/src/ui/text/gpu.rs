@@ -1,22 +1,13 @@
-//! crates/render/src/ui/text/gpu.rs — the atlases' GPU copies (#419).
-//!
-//! Each font atlas is an `R8Unorm` texture (distances are data, not colour, so no
-//! sRGB decode), re-uploaded whole when its CPU side is dirty and recreated when
-//! it has grown. A static HUD therefore uploads nothing per frame; a new glyph
-//! costs one atlas upload.
-
 use super::atlas::{GlyphAtlas, WIDTH};
 use crate::gpu::ops::{CountedQueue as _, Writes};
 use crate::ui::{bind, UiRenderer};
 
-/// One atlas on the GPU.
 pub(crate) struct AtlasGpu {
     texture: wgpu::Texture,
     pub(crate) group: wgpu::BindGroup,
 }
 
 impl UiRenderer {
-    /// Upload every dirty atlas.
     pub(crate) fn upload_atlases(&mut self, device: &wgpu::Device, writes: Writes) {
         for (path, atlas) in self.atlases.atlases.iter_mut().filter(|(_, a)| a.dirty) {
             let fits = self

@@ -1,7 +1,3 @@
-//! crates/render/src/scene/draw.rs — one camera's solids from the retained objects (#1706):
-//! cull each object by what the camera decides, then turn it into draw items. Only
-//! the per-camera inputs (`inputs.rs`) are computed here; the rest is the object's.
-
 use glam::{Mat4, Vec3};
 
 use super::RenderObject;
@@ -17,10 +13,6 @@ use rusty_scene::Scene;
 /// A mesh's world bounds, `None` when they cannot be known (never culled).
 type Bounds = Option<(Vec3, Vec3)>;
 
-/// What one camera collects: its opaque items, its transparent items with their
-/// sorting priority and view depth, the joint palettes and proxy volumes they index, and, when the camera
-/// culls by Hi-Z, the objects GPU occlusion culling may test, by slot, with their
-/// world bounds (#1963).
 pub(crate) struct CameraSolids<'a> {
     pub opaque: &'a mut Vec<DrawItem>,
     pub transparent: &'a mut Vec<(DrawItem, TransparentOrder)>,
@@ -29,23 +21,11 @@ pub(crate) struct CameraSolids<'a> {
     pub tested: Option<&'a mut Vec<(u32, (Vec3, Vec3))>>,
 }
 
-/// Whether GPU occlusion culling may test `object` by its bounds (#1963). Not
-/// when the selection outline rings it (drawn whatever hides it, as the PVS
-/// leaves it), nor when a surface variant whose cut moves draws one of its slots
-/// (`RenderObject::moving`): a `vertex_waves` swell rises out of the undisplaced
-/// bounds (a water plane's box is zero metres tall), so behind a rim the box is
-/// hidden while its crests show. Dissolving and scrolling variants are left out
-/// with it, since the pipeline cannot tell a move from a cut; they are only drawn.
 fn hiz_testable(object: &RenderObject, outline: bool) -> bool {
     !outline && !object.moving
 }
 
 impl Renderer {
-    /// Collect `scene`'s retained solids `view` draws into `out`, each marked for the
-    /// outline when `ringed` names it; with `history`, each carries its last-frame
-    /// pose (#1435). An object the frustum and the small-object cull kept is then
-    /// left out when the scene's baked PVS hides it from the camera's cell (#1714).
-    /// Returns what culling skipped and how many objects drew.
     pub(crate) fn camera_solids(
         &mut self,
         scene: &Scene,
@@ -54,7 +34,7 @@ impl Renderer {
         mut history: Option<&mut MotionHistory>,
     ) -> (CameraCulls, u32) {
         if self.retained.scene(scene.id()).is_none() {
-            self.extract_scene(scene); // drawn with no frame prepared (a test)
+            self.extract_scene(scene);
         }
         let retained = self.retained.take(scene.id());
         let (mut culls, mut visible) = (CameraCulls::default(), 0);
@@ -64,7 +44,6 @@ impl Renderer {
             let Some(bounds) = self.cull_object(scene, (id, object), view, &mut culls) else {
                 continue;
             };
-            // The selection outline rings a solid through walls: a ringed one stays.
             if row.is_some_and(|row| pvs.hides(row, id)) && !ringed.contains(&id) {
                 culls.occluded += 1;
                 continue;
@@ -85,10 +64,6 @@ impl Renderer {
         (culls, visible)
     }
 
-    /// `object`'s world bounds when `view` draws it, its verdict counted in `culls`
-    /// when it doesn't: its mask or a capture leaves it out, then its LOD level is
-    /// hidden (#472), then the frustum (#330), then too far or too small on what the
-    /// frustum kept (#1714). Whichever culls first counts.
     fn cull_object(
         &self,
         scene: &Scene,
@@ -96,8 +71,6 @@ impl Renderer {
         view: &ViewCull,
         culls: &mut CameraCulls,
     ) -> Option<Bounds> {
-        // An inactive mesh, or a shadows-only one: it casts, no camera draws it (#1571).
-        // A bake's capture gathers static geometry alone (#243).
         let static_only = self.capture.static_only && !object.is_static;
         if !object.shown || static_only || !rusty_scene::layer_in_mask(object.layer, view.mask) {
             return None;
@@ -124,8 +97,6 @@ impl Renderer {
         Some(bounds)
     }
 
-    /// `object`'s world bounds: kept, or for one with a palette its posed bound now
-    /// (#833). `None` when its mesh is not resident.
     fn object_bounds(&self, scene: &Scene, id: u32, object: &RenderObject) -> Bounds {
         if !object.palette {
             return object.bounds;
@@ -135,10 +106,6 @@ impl Renderer {
             .world_bounds(&mesh, object.world)
     }
 
-    /// `object`'s draw items, one per material slot (#1285), into `out`: an instance
-    /// of its object-table slot with the reflection probe picked at its bounds' centre (#1206) and its proxy
-    /// volume (#1672), its palette appended to the joints (a skinned one is a draw of
-    /// its own), and with `history` its last-frame pose.
     fn object_items(
         &mut self,
         scene: &Scene,
@@ -152,7 +119,6 @@ impl Renderer {
         let centre = object.centre(bounds);
         let mut instance = InstanceData::of(object.slot);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
-        // A capture draws static geometry for a bake: its probes are in flux.
         let use_sh = self.retained.objects.get(object.slot).use_sh == 1;
         if use_sh && !self.capture.static_only {
             let at = (object.world, object.local_aabb);

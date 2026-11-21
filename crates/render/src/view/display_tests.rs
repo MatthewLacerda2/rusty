@@ -1,16 +1,10 @@
-//! `RenderView::display_view` (#333): egui samples a texture as the bytes stored, not
-//! decoded to linear, so the view the editor hands it must read the sRGB target through
-//! its non-sRGB twin. Through the plain sRGB view the viewport shows darker.
-
 use super::RenderView;
 use crate::{readback, OFFSCREEN_FORMAT};
 
 const SIZE: u32 = 4;
-/// Linear mid-grey, cleared through the sRGB view: the target stores it encoded, as 188.
 const LINEAR: f64 = 0.5;
 const STORED: u8 = 188;
 
-/// Texel (0,0) of the sampled view, copied onto an 8-bit target with no conversion.
 const COPY_TEXEL: &str = r"
 @group(0) @binding(0) var src: texture_2d<f32>;
 @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> {
@@ -22,7 +16,6 @@ const COPY_TEXEL: &str = r"
 }
 ";
 
-/// One pass onto `view`: cleared to `clear` (in the view's own encoding) or loaded.
 fn pass<'a>(
     encoder: &'a mut wgpu::CommandEncoder,
     view: &wgpu::TextureView,
@@ -54,7 +47,6 @@ fn pass<'a>(
     })
 }
 
-/// A pipeline drawing texel (0,0) of its one bound texture over an 8-bit target.
 fn copy_texel_pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
     let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,
@@ -83,7 +75,6 @@ fn copy_texel_pipeline(device: &wgpu::Device) -> wgpu::RenderPipeline {
     })
 }
 
-/// What a shader reading `view` sees at texel (0,0), as an 8-bit red channel.
 fn sampled_red(device: &wgpu::Device, queue: &wgpu::Queue, view: &wgpu::TextureView) -> u8 {
     let pipeline = copy_texel_pipeline(device);
     let bind = device.create_bind_group(&wgpu::BindGroupDescriptor {
@@ -144,7 +135,6 @@ fn gpu_display_view_samples_the_stored_bytes() {
         raw.abs_diff(STORED) <= 1,
         "display view read {raw}, not the stored {STORED}"
     );
-    // The control: the plain sRGB view decodes to linear, which egui must not get.
     let decoded = sampled_red(&r.device, &r.queue, &srgb);
     assert!(decoded.abs_diff(128) <= 1, "the sRGB view read {decoded}");
 }

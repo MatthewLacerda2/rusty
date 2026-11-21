@@ -15,9 +15,6 @@ fn ticks_sum_per_pass_kind_in_frame_order() {
 
 #[test]
 fn an_overlapping_pass_is_charged_only_past_the_work_ahead_of_it() {
-    // Forward runs 1..11; post-FX starts its vertices at 3 but cannot finish its
-    // fragments before forward's, ending at 12: it costs 1, not 9, and the frame 11.
-    // (A real clock never reads 0, which marks a pair not written whole.)
     let ticks = [1, 11, 3, 12, 13, 14];
     let passes = [GpuPass::Forward, GpuPass::PostFx, GpuPass::Ui];
     let times = GpuTimes::from_ticks(&ticks, &passes.map(Pair::from), 1e6);
@@ -83,8 +80,6 @@ fn a_disabled_timer_hands_out_no_writes() {
     assert!(timer.compute_writes(GpuPass::SkyReflection).is_none());
 }
 
-/// On an adapter with timestamps (Metal, most Vulkan GPUs) a rendered frame comes
-/// back timed; without them (lavapipe) it never does — absent, not zero.
 #[test]
 fn gpu_a_rendered_frame_reports_its_passes_when_the_adapter_has_timestamps() {
     use crate::{test_gpu, RenderView, OFFSCREEN_FORMAT};

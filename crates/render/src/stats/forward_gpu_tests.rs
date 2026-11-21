@@ -1,6 +1,3 @@
-//! The forward pass's draws split by kind (#2334): a lit wall behind an unlit light
-//! panel counts one lit draw, primed or not as the pass is, and one unlit draw.
-
 use glam::Vec3;
 
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -9,7 +6,6 @@ use rusty_scene::{Camera, Scene};
 
 const RES: u32 = 32;
 
-/// A sun, a lit wall, and a light's own panel in front of it, which draws unlit.
 fn wall_and_panel() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -54,7 +50,6 @@ fn gpu_a_primed_pass_counts_its_lit_draws_primed() {
         return;
     };
     let c = counters(&mut r);
-    // Metal never primes (`primed_passes`): its lit draw is unprimed there.
     let want = match c.primed_passes {
         0 => [0, 1, 1],
         _ => [1, 0, 1],

@@ -1,7 +1,3 @@
-//! A kept canvas mesh is never stale (#2416): each input a mesh is built from,
-//! changed in turn, rebuilds exactly the canvas it touches, and every frame's kept
-//! meshes equal a fresh build's byte for byte.
-
 use glam::{Vec2, Vec4};
 
 use super::*;
@@ -15,8 +11,6 @@ mod canvas;
 #[path = "inputs.rs"]
 mod inputs;
 
-/// Two canvases: `a` holds a sliced, textured panel with a label under it, `b` one
-/// solid bar.
 pub(super) struct Hud {
     pub(super) scene: Scene,
     pub(super) a: u32,
@@ -69,15 +63,12 @@ pub(super) fn hud() -> Hud {
     }
 }
 
-/// One view's kept meshes, drawn frame after frame.
 pub(super) struct Rig {
     kept: KeptMeshes,
     pub(super) screen: Vec2,
     pub(super) texture: Vec2,
-    /// A canvas this view does not draw (an editor-mode view's filter).
     pub(super) skip: Option<u32>,
     pub(super) atlases: FontAtlases,
-    /// The camera the view looks through (`None`: overlay layout only).
     pub(super) camera: Option<rusty_scene::Camera>,
 }
 
@@ -95,8 +86,6 @@ impl Rig {
         }
     }
 
-    /// Draw `scene`, check the kept meshes against a fresh build, and return how
-    /// many canvases were built.
     pub(super) fn frame(&mut self, scene: &Scene) -> usize {
         let world = &scene.world;
         let view = match &self.camera {

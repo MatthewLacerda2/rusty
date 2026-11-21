@@ -1,8 +1,3 @@
-//! Skinned meshes are frustum-culled by their pose (#833), on the GPU: a character
-//! off-screen and out of every shadow volume submits nothing, and one whose rest
-//! pose is off-screen but whose posed limb is in view still draws. Skips when no
-//! adapter is present.
-
 use glam::{Mat4, Quat, Vec3};
 
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -15,7 +10,6 @@ use rusty_scene::{Camera, Scene};
 const W: u32 = 64;
 const H: u32 = 64;
 
-/// A one-joint skinned unit sphere whose pose moves it by `pose` (mesh space).
 fn skinned_sphere(pose: Vec3) -> MeshComponent {
     let (vertices, indices) = generate_sphere(1.0, 12, 16);
     let skin = SkinData {
@@ -35,7 +29,6 @@ fn skinned_sphere(pose: Vec3) -> MeshComponent {
     }
 }
 
-/// A sun, and (when `at` is given) the skinned sphere placed there, posed by `pose`.
 fn scene(at: Option<Vec3>, pose: Vec3) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -49,7 +42,6 @@ fn scene(at: Option<Vec3>, pose: Vec3) -> Scene {
     scene
 }
 
-/// Render `scene` once from a camera at `(0, 1.5, 1)` looking down -Z.
 fn render(renderer: &mut Renderer, scene: &Scene) -> RenderCounters {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -66,7 +58,6 @@ fn gpu_skinned_meshes_are_culled_by_their_pose() {
     let empty = render(&mut renderer, &scene(None, Vec3::ZERO));
     let far = Vec3::new(500.0, 0.0, 0.0);
 
-    // Far off to the side: outside the camera and every shadow volume.
     let away = render(&mut renderer, &scene(Some(far), Vec3::ZERO));
     assert_eq!(
         (away.visible_entities, away.culled_entities),
@@ -78,8 +69,6 @@ fn gpu_skinned_meshes_are_culled_by_their_pose() {
         "no pass draws it: {away:?}"
     );
 
-    // The same entity, its pose carrying the mesh back in front of the camera: the
-    // rest-pose box is still 500 m away, the posed bound is not.
     let posed = render(
         &mut renderer,
         &scene(Some(far), Vec3::new(-500.0, 0.5, -5.0)),

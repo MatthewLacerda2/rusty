@@ -1,7 +1,3 @@
-//! Top-level per-frame rendering: mesh/texture upload, uniform updates, and the
-//! orchestration of pre-created resources into the scene render pass. Extracted
-//! from the original monolithic `Renderer::render` (behavior unchanged).
-
 pub(crate) mod batch;
 pub(crate) mod camera;
 mod detail;
@@ -22,7 +18,6 @@ pub(crate) mod visibility;
 #[cfg(test)]
 mod inactive_parent_tests;
 
-/// The frame's ambient uniform, for the GPU probe that runs it (`ambient_gpu_tests`).
 #[cfg(test)]
 pub(crate) use lighting::scene_ambient;
 pub(crate) use overlays::{ball_pipeline, NavMeshGizmo};
@@ -37,31 +32,19 @@ use crate::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Rendere
 use rusty_scene::{Camera, Scene};
 
 impl Renderer {
-    /// Per-frame work that doesn't depend on the camera stack: the view's post-FX
-    /// buffers, scene assets, the resident reflection probes and the lighting uniform.
     fn prepare_frame(&mut self, view: &mut RenderView, scene: &Scene, camera: &Camera) {
-        // What the frame did before (the cameras posed, the render textures synced).
         self.lap("setup");
         self.open_notes(scene);
-        // Keep this view's scene targets sized to it — a cheap no-op unless its size
-        // or render scale changed (#355); bloom sizes its own buffers as it runs.
         let size = view.size();
         view.resize(&self.device, size.width, size.height);
 
         self.upload_scene_assets(scene);
         self.lap("assets");
-        // The Light Probe Proxy Volumes' view of the probe field (#1672), once per
-        // render rather than per camera: hashing a large field is not free. A bake's
-        // capture draws static geometry alone, which never reads a volume.
         if !self.capture.static_only {
             self.proxy_volumes.begin_frame(scene);
         }
 
-        // The baked reflection probes nearest the primary camera (#245, #1206); each
-        // object then blends up to two of them and the sky (#1584).
         self.update_reflection_probes(scene, camera.position);
-        // The scene's baked lightmap pages (#438) and their direction pages (#810):
-        // rebinding group 0 only on a change.
         let [pages, directions, masks] = self.switches.lightmap_lists(&scene.lightmaps);
         let gpu = (&self.queue, &self.staging);
         if (self.lightmaps).bind(&self.device, gpu, pages, directions, masks) {
@@ -69,20 +52,12 @@ impl Renderer {
         }
         self.note_scene_lightmaps(scene);
 
-        // The volumetric fog's volume (#1703) goes back to its stand-in once no
-        // camera has run it for a few renders.
         self.global_bind_group_dirty |= self.fog_volume.tick(&self.device);
-        // Build + write the camera-independent lighting uniform once (it starts the
-        // frame's counters).
         self.upload_lighting(scene);
         self.note_unbaked(scene);
         self.lap("prepare");
-        // The retained objects, brought up to date once every renderer-side input
-        // their keys and instances read is settled (#1706).
         self.extract_scene(scene);
         self.lap("extract");
-        // The sky's reflection cube (#1553), baked only when the sky changed: a new
-        // panorama, or procedural sky settings no cube holds (#1620).
         let gpu = (&self.device, &self.queue);
         let panorama = self.skybox_texture.as_deref();
         let settings = crate::gpu::uniforms::ProceduralSkyUniform::from_settings(&scene.sky);
@@ -91,23 +66,11 @@ impl Renderer {
         self.frame_counters.sky_reflection_bakes += u32::from(sky.baked);
         self.global_bind_group_dirty |= sky.rebind;
         self.spare_global_group.switched |= sky.switched;
-        // Every decal and its maps, once for the whole frame (#638); each camera
-        // bins them into its clusters.
         self.upload_decals(scene);
-        // The GPU-simulated emitters' births and steps, once for every camera (#2170).
         self.step_gpu_particles(scene);
         self.lap("prepare");
     }
 
-    /// Renders the 3D scene into `view` (a per-view target/depth/post-FX bundle, #355),
-    /// compositing the final image to `output`.
-    ///
-    /// In play mode this first draws the scene's render-texture cameras (#430) into
-    /// their textures, then composites the screen camera stack (#93): the active
-    /// `CameraComponent` entities, sorted by `render_order`, each with their own
-    /// culling mask / lens / clear flags so a viewmodel or UI camera layers on top of
-    /// the world. In edit mode the free-fly `camera` is the single pass. Post-FX runs
-    /// once over the composited HDR target.
     pub fn render(
         &mut self,
         view: &mut RenderView,
@@ -116,10 +79,7 @@ impl Renderer {
         output: &wgpu::TextureView,
         editor_mode: bool,
     ) {
-        // The frame's CPU cost (`frame_cost`) and GPU call counts span the whole call.
         self.begin_frame_clocks();
-        // The game's main view blended between the last two ticks (#1877): every
-        // camera entity is posed here, by `draw_poses`, never by a frontend.
         let main = rusty_scene::camera::main_camera(scene).filter(|_| !editor_mode);
         let mut blended = camera.clone();
         if let Some(id) = main {
@@ -133,35 +93,21 @@ impl Renderer {
         self.sync_render_textures(view, &textures);
         self.prepare_frame(view, scene, camera);
 
-        // The ordered camera stack (one entry in edit mode / when no scene camera).
         let screen = build_camera_stack(camera, scene, !editor_mode, &self.draw_poses);
         let stack = screen.cameras;
-        // The screen's base camera's components, borrowed once for its post-FX,
-        // SSAO and the sun's shadows (#1434).
         let guards = borrow_post_source(scene, screen.base_id);
         let post = guards.source();
         let shadows = post.volume.map(|vc| vc.shadows).unwrap_or_default();
-        // The sun's cascades follow the base camera; every stacked camera — and every
-        // render-texture camera (#430) — samples them. So do the dynamic casters' LOD
-        // levels (#472): a shadow shows the level its caster shows in the main view.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
         self.lap("setup");
-        // The frame's first camera records into the encoder the shadow sweep opens
-        // (#2353): a render texture's, else the screen's base camera.
         let mut commands = Commands::new(&self.device, &self.queue, "Frame Encoder");
         let lights = (&shadows, &base_lod);
         self.run_shadow_passes(&mut commands, scene, (&stack[0], view.aspect()), lights);
         self.lap("shadows");
         let mut commands = self.draw_render_textures(view, scene, &textures, commands);
         self.lap("render_textures");
-        // Lay out and mesh the UI through the base camera (#418, #429): world
-        // canvases draw inside each camera's pass below, screen canvases after it.
         self.prepare_ui(&mut commands, view, scene, &stack[0], editor_mode);
         self.lap("ui");
-        // A scaled view composites into its own scene-sized target and upscales it to
-        // `output` after post-FX, before the UI (#1498), bilinearly. A view running
-        // TAA upscales inside the chain instead (TAAU, #1702), at TAA's place, and
-        // the chain writes `output` itself: it holds no scaled target then.
         let graphics = self.graphics(editor_mode);
         let taa_on = taa::runs(view, post, graphics, true, editor_mode);
         let scaled = view.scaled_output(&self.device, !taa::upscales(view, taa_on));
@@ -181,9 +127,6 @@ impl Renderer {
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
-    /// Into the screen's last camera's `commands`, then sent: a scaled view's upscale
-    /// onto `output`, then the in-game UI (#418), after post-FX so a HUD is never
-    /// tonemapped, bloomed or FXAA-softened; in the Scene view only with its UI overlay (#423).
     fn finish_screen(
         &mut self,
         mut commands: Commands,
@@ -203,12 +146,6 @@ impl Renderer {
         self.lap("submit");
     }
 
-    /// Render one face of a static cubemap capture (#243, #1615): `camera` alone,
-    /// through its own lens — no scene camera stack, no render-texture cameras, no
-    /// UI, no post-FX (the HDR image is only brought to display) — so a probe or
-    /// reflection capture is the same in every scene, whatever its cameras.
-    /// Shadows keep the scene's main camera's settings: they are how the scene is
-    /// lit, not how the camera sees it.
     pub(crate) fn render_capture_face(
         &mut self,
         view: &mut RenderView,
@@ -242,30 +179,17 @@ impl Renderer {
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
 
-    /// Refresh the per-frame GPU assets every camera in the stack shares (textures,
-    /// colour lookups, lens dirt, skybox; the meshes are the extract's), and mark
-    /// re-baked surface shaders for a rebuild (#396).
     fn upload_scene_assets(&mut self, scene: &Scene) {
-        // Re-baked or newly present texture files drop their stale uploads (#689).
         self.refresh_textures();
-        // And the Color Lookups the views' grading bakes read (#1441).
         self.grade_bake.luts.refresh();
-        // And the lens dirt bloom lights (#1442), once its files are fresh.
         self.load_lens_dirt(scene);
         if self.surface_shaders.refresh() {
-            self.retained.touch(); // a re-built slot may change its pipeline id
+            self.retained.touch();
         }
-        // An entity whose last shader-param override was cleared draws with its
-        // material's shared group again; free the buffer and group it owned (#670).
         let overrides = &scene.shader_overrides;
         self.materials
             .release_entities(scene.id(), |id| overrides.has(id));
-        // The meshes and the material maps are uploaded by the extract, for the
-        // objects it re-derives (`render::scene`, #1706).
 
-        // Update skybox texture if path changed, marking the global bind group dirty
-        // so it is rebuilt once (next frame) rather than every camera every frame —
-        // the only thing in group 0 that changes outside its persistent buffers (#210).
         if !scene.skybox_path.is_empty() && self.skybox_path != scene.skybox_path {
             self.note_map(scene.id(), &scene.skybox_path);
             let path = scene.skybox_path.clone();
@@ -277,16 +201,10 @@ impl Renderer {
             self.skybox_texture = None;
             self.global_bind_group_dirty = true;
         } else if !scene.skybox_path.is_empty() && self.notes_due() {
-            // On its change above, or a due render (`scene::residency::notes`).
             self.note_map(scene.id(), &scene.skybox_path);
         }
     }
 
-    /// The skybox panorama the post-FX chain binds (the UI backdrop blur and the
-    /// upscale copy only to satisfy its layout), or the default texture when the scene
-    /// has none. No built-in reader samples it as light: forward reflections read the
-    /// sky through the prefiltered sky cube (`ibl::sky_cube`, #1553), SSR samples no sky
-    /// at all (#1542), and the sky pass draws `skybox_texture` itself.
     pub(crate) fn sky_panorama(&self) -> &GpuTexture {
         self.skybox_texture
             .as_deref()

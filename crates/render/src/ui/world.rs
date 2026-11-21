@@ -1,24 +1,3 @@
-//! crates/render/src/ui/world.rs — world canvases drawn in the scene (#429).
-//!
-//! `WorldSpace` and `ScreenSpaceCamera` canvases are geometry in the world: after
-//! each stacked camera's transparent pass (and before its particles and the post-FX
-//! chain) their cached meshes are drawn into the HDR scene target, depth-tested
-//! against the camera's depth without writing it — so a wall in front occludes a
-//! sign, and the canvas is fogged, tonemapped and bloomed like the world around it.
-//! A canvas draws in a camera whose culling mask includes the canvas entity's
-//! layer; canvases draw back to front by distance, each in hierarchy order.
-//!
-//! The vertices are the same NDC the overlay uses (a world canvas's "screen" is its
-//! own rect, `mesh`); one uniform per canvas maps them onto its plane
-//! ([`CanvasSpace::World`]) and through the camera. They are rewritten per camera,
-//! never the vertex buffers, so a static sign uploads nothing while the view moves.
-//! A scissor cannot follow a plane in perspective, so `RectMask` clips in canvas
-//! space instead (#619): each batch binds its slot of the view's batch uniform
-//! (`effects`, shared with the overlay) carrying its clip as canvas-NDC bounds,
-//! feather and Mask texture (#428), and the fragment shader fades or drops what
-//! falls outside — the same space the hit-test checks masks in, so what draws is
-//! what is hit. A `BackdropFilter` is not drawn here (`effects::backdrop`).
-
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _};
 use crate::ui::pipeline::{BATCH_GROUP, CANVAS_GROUP, SOURCE_GROUP};
 use glam::Mat4;
@@ -36,7 +15,6 @@ use rusty_components::UiBlend;
 use rusty_scene::Camera;
 use rusty_ui::CanvasSpace;
 
-/// One world canvas's placement for one camera — matches `ui.wgsl`'s `WorldUi`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct WorldUiUniform {
@@ -46,18 +24,12 @@ struct WorldUiUniform {
     fog: FogUniform,
 }
 
-/// The world pass's shared GPU state: its uniform layout and pipeline.
 pub(crate) struct WorldUiPipeline {
     pub(super) layout: wgpu::BindGroupLayout,
-    /// One per blend mode, in `UiBlend::ALL` order (#425), each built the first time
-    /// a world canvas draws with it (#985).
     pipelines: Vec<LazyPipeline>,
 }
 
 impl WorldUiPipeline {
-    /// Prepare the pipelines, one per blend mode: into the HDR target, depth-tested
-    /// (`LessEqual`) but never written, no culling (a canvas reads from both sides).
-    /// `shared` is the overlay's groups (texture, batch); the placement is group 2.
     pub(crate) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -87,30 +59,22 @@ impl WorldUiPipeline {
         Self { layout, pipelines }
     }
 
-    /// The pipeline compositing with `mode`, built on its first draw.
     pub(super) fn pipeline(&self, mode: UiBlend) -> Option<&wgpu::RenderPipeline> {
         let lazy = self.pipelines.get(super::blend::index(mode))?;
         Some(lazy.get())
     }
 
-    /// Every blend mode's pipeline, built or not (#985).
     pub(super) fn lazy(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.pipelines.iter()
     }
 }
 
-/// A view's world-canvas uniforms: one aligned slot per canvas, rewritten per
-/// camera.
 pub(crate) struct WorldUniforms {
     buffer: GrowBuffer,
     group: wgpu::BindGroup,
 }
 
 impl Renderer {
-    /// Draw `view`'s world canvases that `cam` sees into its HDR target, fogged by
-    /// `fog` (see the module docs), through `view_proj`, the camera's as the solids
-    /// drew (`CameraCtx::view_proj`: jittered on a TAA view, #1702), since a canvas
-    /// is depth-tested against them. A no-op without any.
     pub(crate) fn draw_world_ui(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -145,8 +109,6 @@ impl Renderer {
         self.encode_world_ui(encoder, view, &draws);
     }
 
-    /// Write `bytes` into the view's uniform buffer, (re)building its bind group
-    /// when the buffer is new or grew.
     fn upload_world_uniforms(&self, view: &mut RenderView, bytes: &[u8]) {
         let layout = &self.ui_renderer.world.layout;
         let slot = std::mem::size_of::<WorldUiUniform>() as u64;
@@ -180,8 +142,6 @@ impl Renderer {
         }
     }
 
-    /// Record and submit the world pass: `(canvas index, placement offset)` in
-    /// draw order.
     fn encode_world_ui(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -207,7 +167,6 @@ impl Renderer {
                 pass.set_vertex_buffer(0, canvas.buffer.slice(..));
                 pass.set_bind_group(CANVAS_GROUP, &uniforms.group, &[offset]);
                 for (b, batch) in canvas.mesh.batches.iter().enumerate() {
-                    // A custom ui shader (#427) swaps the pipeline and adds its uniform.
                     ui.bind_batch(&mut pass, (&view.ui, i, b), UiPass::World, &mut blend);
                     let slot = view.ui.effects.batch_offset(i, b);
                     pass.set_bind_group(SOURCE_GROUP, ui.source_group(&batch.source), &[]);
@@ -223,7 +182,6 @@ impl Renderer {
     }
 }
 
-/// The world pass over `view`'s HDR scene colour and depth, both loaded.
 fn world_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     view: &'e RenderView,
@@ -248,7 +206,6 @@ fn world_pass<'e>(
     })
 }
 
-/// Load and store: draw over what the camera's passes left.
 fn keep<T>() -> wgpu::Operations<T> {
     wgpu::Operations {
         load: wgpu::LoadOp::Load,
@@ -256,8 +213,6 @@ fn keep<T>() -> wgpu::Operations<T> {
     }
 }
 
-/// `(distance, canvas index, NDC → world)` for every synced world canvas `cam`
-/// renders (its culling mask includes the canvas's layer).
 fn world_items(cache: &UiViewCache, cam: &Camera) -> Vec<(f32, usize, Mat4)> {
     cache
         .places()

@@ -1,16 +1,9 @@
-//! The Canvas component and a kept mesh: what the mesh reads of it is compared
-//! (`kept`, *The Canvas component is not watched*), so a visor HUD that sways with
-//! a turning camera keeps its mesh, and each field that shapes the mesh still
-//! rebuilds it, to what a fresh build makes (`Rig::frame` compares).
-
 use glam::{Vec2, Vec3};
 
 use super::{hud, Hud, Rig};
 use rusty_components::CanvasRenderMode;
 use rusty_scene::Camera;
 
-/// `hud()` with canvas A a swaying `ScreenSpaceCamera` visor, seen through a
-/// camera on a square screen (so `match_width_or_height` moves the scale).
 fn visor() -> (Hud, Rig) {
     let mut hud = hud();
     let mut canvas = hud.scene.world.canvas_mut(hud.a).expect("canvas");
@@ -22,7 +15,6 @@ fn visor() -> (Hud, Rig) {
     (hud, rig)
 }
 
-/// One tick of the camera turning by `yaw` degrees, swaying the visor.
 fn turn(hud: &mut Hud, rig: &mut Rig, yaw: f32) {
     let cam = rig.camera.as_mut().expect("camera");
     cam.yaw += yaw;
@@ -45,8 +37,6 @@ fn a_turning_camera_meshes_no_canvas() {
     assert_ne!(lag.offset, Vec2::ZERO, "the turn did write the visor's lag");
 }
 
-/// Each Canvas field on A changed in turn, and the canvases it re-meshes: the
-/// fields that shape the mesh rebuild A; those that only place it rebuild none.
 const FIELDS: [(&str, usize); 8] = [
     ("render_mode", 1),
     ("sort_order", 0),
@@ -66,7 +56,7 @@ fn each_canvas_field_rebuilds_only_what_its_mesh_reads() {
         let mut c = hud.scene.world.canvas_mut(hud.a).expect("canvas");
         match step {
             0 => c.render_mode = CanvasRenderMode::ScreenSpaceOverlay,
-            1 => c.sort_order = 7, // A now draws after B: the order moves, not the mesh
+            1 => c.sort_order = 7,
             2 => c.reference_resolution = Vec2::new(1280.0, 720.0),
             3 => c.match_width_or_height = 1.0,
             4 => c.pixels_per_unit = 50.0,
@@ -76,7 +66,6 @@ fn each_canvas_field_rebuilds_only_what_its_mesh_reads() {
         }
         drop(c);
         if step == 3 {
-            // Back on the camera, so the placement fields act on a visor.
             let mut c = hud.scene.world.canvas_mut(hud.a).expect("canvas");
             c.render_mode = CanvasRenderMode::ScreenSpaceCamera;
             drop(c);

@@ -1,5 +1,3 @@
-//! A frame's volumes never outgrow one storage binding (#1672).
-
 use glam::{Mat4, Vec3};
 
 use super::*;
@@ -27,7 +25,6 @@ fn a_volume_past_the_frame_s_room_takes_the_single_sample() {
     );
     let mut volumes = ProxyVolumes::default();
     volumes.begin_frame(&scene);
-    // One volume is 21 vec4s; 32 fit (the largest power of two within 40 * 16 bytes).
     let mut frame = volumes.frame(40 * 16);
     assert_eq!(volumes.push(&scene, a, at, &mut frame), 1);
     assert_eq!(volumes.push(&scene, b, at, &mut frame), 0, "no room left");

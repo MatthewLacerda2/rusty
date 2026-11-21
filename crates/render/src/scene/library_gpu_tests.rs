@@ -1,11 +1,6 @@
-//! crates/render/src/scene/library_gpu_tests.rs — the renderer and the scene's mesh
-//! library (#2059).
-
 use super::fixture::{frame, yard, RES};
 use rusty_scene::mesh_library;
 
-/// `Mesh.DeleteAsset` (#2059) frees the deleted library mesh's buffers on the next
-/// frame, and a mesh made again under its name uploads afresh.
 #[test]
 fn gpu_a_deleted_library_mesh_frees_its_buffers() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {

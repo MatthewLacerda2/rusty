@@ -1,6 +1,3 @@
-//! The frame's point and spot lights as one GPU array (#434), in the order every
-//! camera's cluster lists index.
-
 use glam::Vec3;
 
 use super::cone::{Bounds, Cone, WIDEST_CULLED_CONE};
@@ -8,15 +5,9 @@ use super::cone::{Bounds, Cone, WIDEST_CULLED_CONE};
 use rusty_components::LightComponent;
 use rusty_scene::{LightType, Scene};
 
-/// `LocalLight::kind` for a point light (no cone).
 pub(crate) const KIND_POINT: u32 = 0;
-/// `LocalLight::kind` for a spotlight (cone cosines apply).
 pub(crate) const KIND_SPOT: u32 = 1;
-/// `LocalLight::kind` for an Area light's stand-in in a bake capture (#1674): a
-/// spot shadowed as one, whose light fades as the Lambert `cos θ` off its facing
-/// instead of a spotlight's squared cone (#1699).
 pub(crate) const KIND_AREA: u32 = 2;
-/// `LocalLight::shadow` for a light with no tile in the shadow atlas (#468).
 pub(crate) const NO_SHADOW: u32 = u32::MAX;
 
 /// One point or spot light, mirroring `LocalLight` in `common.wgsl` byte-for-byte.
@@ -32,42 +23,17 @@ pub(crate) struct LocalLight {
     /// Where a spotlight points (unit); unused for a point light.
     pub direction: [f32; 3],
     pub kind: u32,
-    /// Cosines of the spotlight's inner and outer cone half-angles.
     pub inner_cone: f32,
     pub outer_cone: f32,
-    /// Its first tile in the shadow atlas (#468) — a spotlight's one, a point light's
-    /// six cube faces in order — or [`NO_SHADOW`]. Set by the atlas plan each frame.
     pub shadow: u32,
-    /// 1.0 for a `Baked` light (#438): lightmapped surfaces skip its direct light.
     pub baked: f32,
-    /// The camera distance past which its shadow is not sampled (#1712,
-    /// `LightComponent::shadow_fade_distance`); `0` never fades.
     pub shadow_fade: f32,
-    /// The distance its inverse square is floored at (`components::falloff_near`,
-    /// #1699): an Area light's stand-in's `sqrt(area / π)`, so a surface touching
-    /// the panel gets its true limit of `π × intensity`, not one point's
-    /// `intensity × area / ε²`; `0` for a point or spot light.
     pub near: f32,
-    /// 1.0 when the scene's lightmap bake took this light in (#1750,
-    /// `LightmapSet::baked_light`): SSIL gathers none of its light. Set by
-    /// [`local_lights`], which knows the scene.
     pub bounce_baked: f32,
-    /// Its shadowmask channel (#1695, `Scene::mask_channel`); `-1.0` for none.
-    /// Set by [`local_lights`], which knows the scene.
     pub mask_channel: f32,
 }
 
 impl LocalLight {
-    /// The light's record at world `position`, shining along world `forward`, or
-    /// `None` for a type that is not a local light. Its `baked` flag starts at 0:
-    /// the caller sets it from the mode the frame draws the light as
-    /// (`clusters::drawn_mode`), which this record cannot know.
-    ///
-    /// An Area light (#1674) only ever gets here in a bake capture, being always
-    /// `Baked`: it is drawn as its far field, a spot at its centre of intensity
-    /// `intensity × area` ([`KIND_AREA`]) whose light fades as `cos θ` off its
-    /// facing, a one-sided Lambertian emitter's falloff. The lightmap and the probes' direct term
-    /// integrate the rectangle itself.
     pub(crate) fn new(position: Vec3, forward: Vec3, light: &LightComponent) -> Option<Self> {
         let (kind, intensity, cones, near) = match light.light_type {
             LightType::Point => (KIND_POINT, light.intensity, (0.0, 0.0), 0.0),
@@ -104,14 +70,10 @@ impl LocalLight {
         })
     }
 
-    /// How bright the light is, for ranking it against others (#834): intensity
-    /// times its colour's Rec. 709 luminance.
     pub(crate) fn brightness(&self) -> f32 {
         self.intensity * rusty_core::color::luminance(self.color)
     }
 
-    /// Whether it shadows through one spot frustum (a spotlight or an Area
-    /// light's stand-in) rather than a point light's six cube faces.
     pub(crate) fn one_frustum(&self) -> bool {
         self.kind != KIND_POINT
     }
@@ -122,10 +84,6 @@ impl LocalLight {
         (Vec3::from(self.position), self.range)
     }
 
-    /// What the binner tests (#1712): the range [`Self::sphere`], and for a
-    /// spotlight its [`Cone`], which decides which clusters list it once kept. A
-    /// cone wider than [`WIDEST_CULLED_CONE`], and an Area light's 90° stand-in,
-    /// get no cone and list by their range sphere alone.
     pub(crate) fn bounds(&self) -> Bounds {
         let (apex, range) = self.sphere();
         let axis = Vec3::from(self.direction);
@@ -148,12 +106,6 @@ impl LocalLight {
     }
 }
 
-/// Every active point and spot light in the scene that the frame (or, with
-/// `capture`, a bake capture) draws live (`LightMode::renders_live`, #809), in entity
-/// order, each with whether it asks for a shadow (`LightComponent::cast_shadows`,
-/// #468). The one place `Baked` local lights leave the realtime path. A capture
-/// takes no shadow fade (#1712): its camera is a probe, not the player, so a
-/// fade measured from it would bake a lamp unshadowed through walls for good.
 pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, bool)> {
     scene
         .world
@@ -166,8 +118,6 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
             if !mode.renders_live(capture) {
                 return None;
             }
-            // World space: a light on a child (a flashlight in a hand) lights
-            // where it is drawn (#1196).
             let (at, forward) = (
                 scene.world.world_position(id),
                 scene.world.transform_direction(id, Vec3::NEG_Z),

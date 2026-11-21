@@ -1,12 +1,8 @@
-//! Packing a Light Probe Proxy Volume and when it is sampled again (#1672).
-
 use glam::{Mat4, Vec3};
 
 use super::*;
 use rusty_components::{ProxyQuality, ProxyResolutionMode};
 
-/// A probe grid over `[-2, 2] x [0, 4] x [-2, 2]` whose light grows with height:
-/// SH band 0 is `y`, band 1's y term `-y` (light from above), band 2 is `1`.
 pub(super) fn rising_probes() -> ProbeVolume {
     let mut probes = ProbeVolume::new();
     probes.fill_grid(Vec3::new(-2.0, 0.0, -2.0), Vec3::new(2.0, 4.0, 2.0), 1.0);
@@ -20,7 +16,6 @@ pub(super) fn rising_probes() -> ProbeVolume {
     probes
 }
 
-/// A 1 x 4 x 1 grid over a 2 m locker standing at the origin.
 pub(super) fn locker() -> (Volume, ProxyGrid) {
     let v = Volume {
         resolution_mode: ProxyResolutionMode::Custom,
@@ -43,7 +38,6 @@ fn a_volume_packs_its_box_its_dims_and_each_point_s_l1_sample() {
     let head = to_box.transform_point3(Vec3::new(1.3, 2.0, 0.3));
     assert!(foot.abs_diff_eq(Vec3::ZERO, 1e-5) && head.abs_diff_eq(Vec3::ONE, 1e-5));
     assert_eq!(data[4], [1.0, 4.0, 1.0, 0.0], "dims as ordinary floats");
-    // Points at cell centres up the locker: 0.25, 0.75, 1.25, 1.75 m.
     let bands0: Vec<f32> = (0..4).map(|p| data[HEADER + p * COEFFS][0]).collect();
     assert_eq!(bands0, [0.25, 0.75, 1.25, 1.75]);
     let first = &data[HEADER..HEADER + COEFFS];
@@ -96,7 +90,6 @@ fn a_volume_is_sampled_again_only_when_something_it_reads_changed() {
         "back to back"
     );
     let sampled = |v: &ProxyVolumes| v.cache[&id].1[HEADER][0];
-    // Poison the cache: a still object keeps it, anything it reads refreshes it.
     volumes.cache.get_mut(&id).unwrap().1[HEADER][0] = -1.0;
     volumes.begin_frame(&scene);
     let mut frame = volumes.frame(u64::MAX);

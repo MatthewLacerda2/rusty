@@ -12,9 +12,6 @@ use self::build::GpuResources;
 use crate::{PixelSize, RenderSwitches, Renderer};
 use std::collections::HashMap;
 
-/// What [`Renderer::new`] presents to: a window wgpu can build a surface from, whose
-/// display handle also goes to the instance. `shell` hands in its `Arc` of the OS
-/// window, so render never names the windowing crate (#988).
 pub trait SurfaceWindow:
     wgpu::WindowHandle + wgpu::rwh::HasDisplayHandle + std::fmt::Debug + Clone + 'static
 {
@@ -25,15 +22,7 @@ impl<W> SurfaceWindow for W where
 }
 
 impl Renderer {
-    /// Build the windowed renderer. Returns `Err` with a human-readable message
-    /// when surface/adapter/device acquisition fails (unsupported or broken GPU
-    /// drivers), so `main` can report it cleanly and exit instead of unwinding
-    /// through a panic + backtrace. Mirrors the graceful headless path in
-    /// `setup_headless.rs`. `size` is the window's inner size in physical pixels.
     pub async fn new(window: impl SurfaceWindow, size: PixelSize) -> Result<Self, String> {
-        // 1. Create wgpu Instance
-        // The window's display handle goes in with the instance: the GL backend
-        // needs it to present (Wayland especially); Vulkan and Metal ignore it.
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
@@ -58,7 +47,6 @@ impl Renderer {
         // 3. Create Device & Queue
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                // What the GPU has of `limits::OPTIONAL`, and a dev build's timestamps.
                 required_features: adapter.features() & limits::WINDOW,
                 required_limits: limits::device_limits(),
                 label: None,
@@ -70,8 +58,6 @@ impl Renderer {
         // 4. Configure surface swapchain.
         let surface_caps = surface.get_capabilities(&adapter);
         let mut config = resize::surface_config(&surface_caps, size);
-        // Let the UI pass view the sRGB swapchain as its non-sRGB twin, so a HUD
-        // blends in display space on the player's window too (#418).
         let flags = adapter.get_downlevel_capabilities().flags;
         let alias = config.format.remove_srgb_suffix();
         if flags.contains(wgpu::DownlevelFlags::SURFACE_VIEW_FORMATS) && alias != config.format {
@@ -80,25 +66,12 @@ impl Renderer {
         surface.configure(&device, &config);
 
         let present_modes = surface_caps.present_modes.clone();
-        // No budget permit: there is exactly one windowed renderer and it is the
-        // application itself, so it never queues behind the headless budget (#366).
         let mut renderer =
             Self::from_parts(device, queue, Some(surface), config, present_modes, None);
-        // A game must not compile a pipeline mid-frame; only headless stays lazy (#985).
         renderer.warm_pipelines(cfg!(feature = "editor"));
         Ok(renderer)
     }
 
-    /// Shared constructor body: builds all pipelines, layouts, buffers and bind
-    /// groups from an already-created device/queue. Both the windowed (`new`) and
-    /// the headless offscreen (`new_headless`) paths funnel through here, so they
-    /// produce a byte-identical renderer apart from the optional window surface;
-    /// only `new` then warms the pipelines built on first draw (#985).
-    ///
-    /// `gpu_permit` is the caller's slot in the headless budget (#366): `Some` from the
-    /// headless path, `None` from the windowed one. It is merely *stored* here — it must
-    /// already have been acquired before the device was created, since the point of the
-    /// budget is to bound live GPU allocations, not constructor calls.
     pub(crate) fn from_parts(
         device: wgpu::Device,
         queue: wgpu::Queue,
@@ -107,10 +80,6 @@ impl Renderer {
         present_modes: Vec<wgpu::PresentMode>,
         gpu_permit: Option<budget::Permit>,
     ) -> Self {
-        // Build every shared GPU resource up-front, grouped by role (textures, global
-        // bindings, shadow system, forward/billboard passes), then assemble the
-        // flat renderer from those groups and seed the editor gizmo meshes. Per-view
-        // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
         let staging = crate::gpu::ops::Staging::new(&device);
         let gpu = GpuResources::build(&device, (&queue, &staging), config.format);
         let mut renderer = Self::assemble(
@@ -122,16 +91,12 @@ impl Renderer {
             gpu,
             gpu_permit,
         );
-        // Headless reads lightmap pages in line (a lit first frame); windowed on a worker.
         renderer.lightmaps.read_in_line(renderer.surface.is_none());
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();
         renderer
     }
 
-    /// Flatten the grouped [`GpuResources`] plus the window-dependent parameters into
-    /// the renderer's single struct. Trivial fields (the asset caches, the editor gizmo
-    /// buffers, the skybox slots) start empty and are filled by the caller or at runtime.
     // A flat field-mapping constructor: no logic, just one line per `Renderer`
     // field, so the line/argument counts are inherent to the struct's width.
     #[expect(
@@ -180,7 +145,6 @@ impl Renderer {
                 .clip_layout(&device, &textures.material_layout),
             crate::postfx::HDR_FORMAT,
         );
-        // Depth priming follows the adapter's backend (#1499): never on Metal.
         let backend = device.adapter_info().backend;
         let hiz = crate::passes::hiz::HiZ::new(&device);
         Self {

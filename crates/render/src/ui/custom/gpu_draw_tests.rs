@@ -1,7 +1,3 @@
-//! How a custom-shaded ui graphic draws through the real UI pass (#427): a RectMask
-//! or a shaped mask still clips it, a shape draws through its shader, and a shaded
-//! graphic gets its own batch while its text is one. Skips with no adapter.
-
 use glam::Vec4;
 
 use super::fixture::{element, scene, shade, shot, Baked, RES};
@@ -40,12 +36,10 @@ fn gpu_a_shaded_graphic_is_its_own_batch_and_its_text_one_batch() {
     };
     let baked = Baked::new("batch", &[("scanlines", &[])]);
     let (mut scene, root, _) = scene(Some(&baked.0));
-    // Backdrop | shaded image | plain image: the shade breaks the run twice.
     element(&mut scene, root, [0.0, 0.0, 8.0, 8.0], Some(Vec4::ONE));
     let mut view = None;
     shot(&mut renderer, &mut view, &scene);
     assert_eq!(view.as_ref().unwrap().ui.last_batches(), 3);
-    // A shaded label: every glyph shares the element's shade, so one draw.
     let label = element(&mut scene, root, [0.0, 48.0, 64.0, 16.0], None);
     let text = rusty_components::TextComponent {
         text: "GLITCH".into(),
@@ -91,7 +85,6 @@ fn gpu_a_shaped_mask_still_cuts_a_custom_shaded_graphic() {
     };
     let baked = Baked::new("mask", &[("hologram", &[("hue", 240.0), ("flicker", 0.0)])]);
     let (mut scene, _, mask) = scene(None);
-    // The mask is a hidden circle over RECT; its shaded child covers the whole screen.
     scene.world.set_image(mask, None);
     let circle = rusty_components::ShapeComponent {
         kind: rusty_components::ShapeKind::Ellipse,

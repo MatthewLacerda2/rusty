@@ -1,6 +1,5 @@
 use super::*;
 
-/// A navmesh tile past the buffer limit is cut at a whole quad, never mid-triangle.
 #[test]
 fn a_navmesh_past_the_limit_keeps_whole_quads() {
     assert_eq!(vertices_that_fit(12, 1 << 20), 12);
@@ -23,7 +22,6 @@ fn quad(y: f32) -> Vec<Vec3> {
     vec![Vec3::new(0.0, y, 0.0); 6]
 }
 
-/// A patch uploads only the tiles it names and keeps the others; a reset drops all.
 #[test]
 fn gpu_a_patch_rewrites_only_its_tiles() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {

@@ -1,7 +1,3 @@
-//! crates/render/src/scene/fixture.rs — what the retained scene's tests share: a scene of
-//! primitives, the objects a renderer holds for it, and the objects a build from
-//! scratch gives.
-
 use glam::Vec3;
 
 use super::{RenderObject, RenderScene};
@@ -13,8 +9,6 @@ use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 32;
 
-/// `n` primitives on a row (boxes, spheres, planes), every third red, every fifth
-/// glass, a sun above; the library holds `red` and `glass`.
 pub(super) fn yard(n: u32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -45,12 +39,10 @@ pub(super) fn yard(n: u32) -> Scene {
     scene
 }
 
-/// The camera every test looks through: down the row.
 pub(super) fn eye() -> Camera {
     Camera::new(Vec3::new(0.0, 1.0, 3.0), -90.0, -10.0)
 }
 
-/// Render `scene` once into a fresh view; its pixels and counters.
 pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters) {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -60,9 +52,6 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters
     (px, r.frame_counters)
 }
 
-/// One object as a test compares it: its id, the object with its slot number
-/// blanked (a kept and a fresh build allocate different slots), what its slot of
-/// the object table holds, and what each material slot's record holds.
 pub(super) type Held = (u32, RenderObject, ObjectData, Vec<MaterialData>);
 
 fn as_held(r: &Renderer, rs: &RenderScene) -> Vec<Held> {
@@ -99,8 +88,6 @@ pub(super) fn held(r: &Renderer, scene: &Scene) -> Vec<Held> {
     as_held(r, kept)
 }
 
-/// The objects a build of `scene` from scratch gives, through `r`'s own handles
-/// and resident buffers, with their records; their slots are given back after.
 pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<Held> {
     let mut rs = RenderScene::default();
     r.rebuild_objects(scene, &mut rs);
@@ -109,9 +96,6 @@ pub(super) fn fresh(r: &mut Renderer, scene: &Scene) -> Vec<Held> {
     held
 }
 
-/// The tables are whole: every object slot in use is a kept object's (or the
-/// identity's), every material slot in use a kept record's (or the flat one's), and
-/// the GPU holds what each table holds, slot for slot.
 pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
     let live = (r.retained.objects.live(), r.retained.kept_objects() + 1);
     let kept = &r.retained.records;
@@ -129,15 +113,12 @@ pub(super) fn table_holds(r: &mut Renderer) -> Result<(), String> {
     }
 }
 
-/// Run `f` on entity `id` of `scene`, when there is one.
 pub(super) fn on(scene: &mut Scene, id: Option<u32>, f: impl FnOnce(&mut Scene, u32)) {
     if let Some(id) = id {
         f(scene, id);
     }
 }
 
-/// Add a probe at `x` along +X, or for an odd `x` write the first probe's
-/// shadowmask occlusion (#1695, `ObjectData::occlusion`).
 pub(super) fn probe(scene: &mut Scene, x: u8) {
     match (x % 2, scene.probes.probes_mut().first_mut()) {
         (1, Some(p)) => p.occlusion = glam::Vec4::splat(0.25 * f32::from(x)),
