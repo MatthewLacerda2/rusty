@@ -24,11 +24,14 @@ use crate::Scene;
 /// A renumbering's moves, old id → new; every new id is fresh.
 pub type Moves = BTreeMap<u32, u32>;
 
+/// How one field follows a renumbering.
+pub type Follow = fn(&mut Scene, &Moves);
+
 /// Every field of `Scene` outside the World that names entity ids loaded from the
 /// scene's files, with how it follows a renumbering. [`Scene::renumber`] runs each
 /// one, and the state inventory's test fails a saved field keyed by entity that is
 /// not here.
-pub const RENUMBERED: &[(&str, fn(&mut Scene, &Moves))] = &[
+pub const RENUMBERED: &[(&str, Follow)] = &[
     ("selected_entity_id", |scene, moved| {
         let id = scene.selected_entity_id;
         scene.selected_entity_id = id.map(|id| moved.get(&id).copied().unwrap_or(id));
