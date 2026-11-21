@@ -94,23 +94,31 @@ impl Renderer {
             }
             #[cfg(test)]
             probe::draw(solid_pass, depth_only.is_none());
-            let by_cluster = culled
-                .and_then(|c| c.clusters.as_ref())
-                .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));
-            match (culled, by_cluster) {
-                (_, Some((c, jobs))) => {
-                    // A clustered batch (#1968): each instance's kept clusters.
-                    render_pass.set_index_buffer(c.indices.slice(..), wgpu::IndexFormat::Uint32);
-                    for job in jobs {
-                        render_pass.draw_indexed_indirect(&c.args, ARGS * u64::from(job));
-                    }
+            Self::issue(render_pass, culled, i, batch);
+        }
+    }
+
+    /// Batch `i`'s draw: by cluster, through the cull's indirect args, or as kept.
+    fn issue<'a>(
+        render_pass: &mut wgpu::RenderPass<'a>,
+        culled: Option<&'a Culled>,
+        i: usize,
+        batch: &DrawBatch,
+    ) {
+        let by_cluster = culled
+            .and_then(|c| c.clusters.as_ref())
+            .and_then(|c| Some((c, c.draws.get(i)?.clone()?)));
+        match (culled, by_cluster) {
+            (_, Some((c, jobs))) => {
+                // A clustered batch (#1968): each instance's kept clusters.
+                render_pass.set_index_buffer(c.indices.slice(..), wgpu::IndexFormat::Uint32);
+                for job in jobs {
+                    render_pass.draw_indexed_indirect(&c.args, ARGS * u64::from(job));
                 }
-                (Some(c), None) => {
-                    render_pass.draw_indexed_indirect(&c.args, c.at + ARGS * i as u64)
-                }
-                (None, None) => {
-                    render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone())
-                }
+            }
+            (Some(c), None) => render_pass.draw_indexed_indirect(&c.args, c.at + ARGS * i as u64),
+            (None, None) => {
+                render_pass.draw_indexed(batch.key.indices.range(), 0, batch.instances.clone())
             }
         }
     }
