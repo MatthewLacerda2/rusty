@@ -8,7 +8,8 @@
 //! them. An incoming entity whose id a survivor already holds is moved to a fresh id
 //! instead (`make_room`), its references rewritten with it through the one id-field
 //! walk; a survivor's references to the entities left behind are cleared through the
-//! same walk, and the level's baked PVS renames its objects with the moves (#1714).
+//! same walk, and what the scene keys by entity id outside the World (the selection,
+//! the lightmaps, the baked PVS) follows the moves through `Scene::renumber`.
 
 pub mod prepare;
 
@@ -104,26 +105,8 @@ pub fn swap_in_prepared(
     scene.renew_id();
     rusty_scene::nav_settings::apply_navmesh(scene, sidecars.navmesh);
     let loaded = rusty_scene::lighting::io::apply_lighting_sidecar(scene, sidecars.lighting);
-    remap_occlusion(scene, &moved);
+    scene.renumber(&moved);
     loaded
-}
-
-/// The baked PVS was baked against the file's ids: rename the objects
-/// `make_room` moved, so a carried entity never turns the level's culling off.
-fn remap_occlusion(scene: &mut Scene, moved: &BTreeMap<u32, u32>) {
-    if moved.is_empty() {
-        return;
-    }
-    let Some(data) = scene.occlusion.as_deref() else {
-        return;
-    };
-    let remapped = data.remap(moved);
-    if remapped.is_none() {
-        log::warn!(
-            "[Occlusion] the bake's ids collide after the load: nothing is occlusion-culled"
-        );
-    }
-    *scene.occlusion = remapped.map(std::sync::Arc::new);
 }
 
 /// The library meshes (#2059) `carried` use (a Mesh, or a Mesh collider's kept
@@ -140,7 +123,8 @@ fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_librar
 /// Move every incoming entity whose id is in `taken` to a fresh id past both the
 /// document's ids and `taken`, in document order (so the result is a pure function of
 /// the inputs), rewriting parent, child and component references to match. Returns
-/// the moves, old id → new.
+/// the moves, old id → new, which the scene's other id-keyed fields follow once the
+/// document is in (`Scene::renumber`).
 pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> BTreeMap<u32, u32> {
     let mut next = data
         .entities
@@ -168,6 +152,5 @@ pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> BTreeMap
         }
         entity.remap_refs(&|r| Some(remap(r)));
     }
-    data.selected_entity_id = data.selected_entity_id.map(remap);
     moved
 }

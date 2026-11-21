@@ -127,6 +127,32 @@ impl LightmapSet {
         }
     }
 
+    /// Rename every entity the set names through `moved` (old id → new), under a
+    /// preview ([`Self::shown_over`]) too: a load moving incoming ids out of the
+    /// survivors' way (`Scene::renumber`). `moved`'s new ids are fresh, so no
+    /// two entities end on one id.
+    pub fn remap(&mut self, moved: &BTreeMap<u32, u32>) {
+        let to = |id: u32| moved.get(&id).copied().unwrap_or(id);
+        let entries = std::mem::take(&mut self.entries).into_values();
+        self.entries = entries
+            .map(|e| {
+                (
+                    to(e.entity),
+                    LightmapEntry {
+                        entity: to(e.entity),
+                        ..e
+                    },
+                )
+            })
+            .collect();
+        self.lights = self.lights.iter().map(|&id| to(id)).collect();
+        self.channels = self.channels.iter().map(|(&id, &c)| (to(id), c)).collect();
+        self.fell_back = self.fell_back.iter().map(|&id| to(id)).collect();
+        if let Some(own) = &mut self.shown_over {
+            own.remap(moved);
+        }
+    }
+
     /// Every entry, in entity order.
     pub fn entries(&self) -> impl Iterator<Item = &LightmapEntry> {
         self.entries.values()

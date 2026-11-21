@@ -76,10 +76,11 @@ fn a_moved_entity_keeps_its_baked_lighting_and_a_survivor_gains_none() {
 }
 
 #[test]
-fn a_load_with_no_survivors_keeps_the_lightmaps_as_saved() {
+fn a_load_with_no_survivors_saves_byte_for_byte_what_it_loaded() {
     let level = lit_level();
     let mut s = Scene::new();
     s.add_entity("Leftover".to_string());
     crate::load::swap_in(&mut s, to_scene_data(&level), NO_SIDECAR, &BTreeSet::new()).unwrap();
-    assert_eq!(*s.lightmaps, *level.lightmaps);
+    let bytes = |scene: &Scene| serde_json::to_vec(&to_scene_data(scene)).unwrap();
+    assert_eq!(bytes(&s), bytes(&level));
 }

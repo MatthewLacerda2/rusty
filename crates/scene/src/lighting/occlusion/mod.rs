@@ -58,7 +58,8 @@
 //! **Stored** (`file`, `sidecar`) beside the scene as `<scene>.occlusion`, a small binary file
 //! the lighting save writes and the scene load reads; absent, the scene culls
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
-//! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
+//! carried entity's way renames the baked objects with them ([`OcclusionData::remap`],
+//! through `Scene::renumber`).
 //!
 //! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `gather`)
 

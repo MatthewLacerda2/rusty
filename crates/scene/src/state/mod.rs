@@ -25,7 +25,8 @@
 //!   compares what came back with what the class promises; `keyed_tests` does the
 //!   same for the tables keyed by entity id
 //!   (lightmap entries, owned decals, …), through the despawn door and the Undo of
-//!   a Destroy.
+//!   a Destroy, and `renumber_tests` holds every saved one to the renumbering a
+//!   load runs when it moves incoming ids (`runtime::load::RENUMBERED`).
 //!
 //! The host's state (the save data, the
 //! settings, the seed, the clock, the Game view), is not the scene's: a replay
@@ -48,6 +49,8 @@ pub mod inventory;
 mod keyed_tests;
 #[doc(hidden)]
 pub mod marks;
+#[cfg(test)]
+mod renumber_tests;
 
 #[doc(hidden)]
 pub use class::{promise, Class, Field, Keyed, Lifecycle, Outcome};

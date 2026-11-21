@@ -147,6 +147,9 @@ pub enum Keyed {
     Dropped,
     /// Dropped on despawn, and put back with its entity when the Destroy is undone.
     Restored,
+    /// Names entities, but checks each against its fingerprint on use, so a
+    /// despawn and a Play load leave it as it is (the baked PVS).
+    Checked,
 }
 
 /// One field of [`Scene`](crate::Scene), classified.

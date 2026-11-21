@@ -111,8 +111,9 @@ authored_fields!(scene_state {
         // The baked PVS (#1714) is no document field: it is the `<scene>.occlusion`
         // file the lighting save writes beside the lightmaps, so it saves as them.
         // Keyed by entity, but checked against each entity's fingerprint on use, so
-        // a despawn or a Play load leaves it as it is.
-        occlusion: BakeOutput, No as ["lightmaps"];
+        // a despawn or a Play load leaves it as it is; a load's renumbering renames
+        // its objects (`runtime::load::RENUMBERED`).
+        occlusion: BakeOutput, Checked as ["lightmaps"];
         // The saved navmesh (#1887) is no document field either: it is the
         // `<scene>.navmesh` file a save writes beside the scene, read on load. Checked
         // against the scene's fingerprint on use, so a despawn leaves it as it is.

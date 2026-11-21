@@ -66,7 +66,7 @@ impl RehydratedScene {
     }
 
     /// The document, for the id moves a load makes before applying it
-    /// (`scene::runtime::load::make_room`): ids are not what rehydration reads.
+    /// (`rusty_edit::load::make_room`): ids are not what rehydration reads.
     pub fn data_mut(&mut self) -> &mut crate::serialize::SceneData {
         &mut self.data
     }
