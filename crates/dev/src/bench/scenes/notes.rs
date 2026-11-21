@@ -5,6 +5,7 @@
 
 use std::path::Path;
 
+use rusty_components::{LightMode, LightType};
 use rusty_navigation::Start;
 use rusty_render::StaleOcclusion;
 use rusty_scene::{Scene, Sh9};
@@ -98,6 +99,58 @@ pub fn unbaked(scene: &Scene) -> Option<String> {
         format!(
             "not baked: {} (its lighting cost is not the shipped one)",
             missing.join(", ")
+        )
+    })
+}
+
+/// A level's lights by how they are shaded (#2523): every light but the ambient
+/// (which ignores modes) active in the hierarchy, and of them those shaded live
+/// every frame, `Realtime` or `Mixed` by [`Scene::light_mode`] (what the level's
+/// file means, `LightComponent::effective_mode`, so an `Area` light is `Baked`, held to
+/// what the last bake made of it, so a `Shadowmask` fallback is `Baked` too).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Lights {
+    pub total: u32,
+    pub live: u32,
+    pub mixed: u32,
+}
+
+/// [`Lights`] of `scene`, counted once a level: they do not change by viewpoint.
+pub fn lights(scene: &Scene) -> Lights {
+    let mut out = Lights::default();
+    for id in scene.world.ids_with_light() {
+        let Some(light) = scene.world.light(id) else {
+            continue;
+        };
+        if light.light_type == LightType::Ambient || !scene.world.is_active_in_hierarchy(id) {
+            continue;
+        }
+        let mode = scene.light_mode(id, &light);
+        out.total += 1;
+        out.live += u32::from(mode.renders_live(false));
+        out.mixed += u32::from(mode == LightMode::Mixed);
+    }
+    out
+}
+
+/// The `lights` and `lights_live` rows of `lights`, and its [`mixed_lights`] line.
+pub(super) fn push_lights(report: &mut super::SceneReport, lights: Lights) {
+    report.push_value("lights", f64::from(lights.total));
+    report.push_value("lights_live", f64::from(lights.live));
+    report.warnings.extend(mixed_lights(lights));
+}
+
+/// The line under the table for a level with `Mixed` lights: their direct light
+/// is shaded live every frame, which a level left on the old default does
+/// unnoticed. A `Realtime` light is somebody's choice, so it gets none.
+pub fn mixed_lights(lights: Lights) -> Option<String> {
+    let Lights { total, mixed, .. } = lights;
+    let s = if total == 1 { "" } else { "s" };
+    let are = if mixed == 1 { "is" } else { "are" };
+    (mixed > 0).then(|| {
+        format!(
+            "{mixed} of {total} light{s} {are} Mixed: their direct light is shaded live every \
+             frame"
         )
     })
 }
@@ -215,6 +268,9 @@ pub fn bakes_unused(
 #[cfg(test)]
 #[path = "notes_baked_tests.rs"]
 mod baked_tests;
+#[cfg(test)]
+#[path = "notes_lights_tests.rs"]
+mod lights_tests;
 #[cfg(test)]
 #[path = "notes_tests.rs"]
 mod tests;

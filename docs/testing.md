@@ -1457,7 +1457,17 @@ every binary's open makes them.
     lightmap page arrays) and `gpu_reflection_mb` (the reflection probes' cube
     array), `gpu_mesh_mb` (the mesh vertex and index buffers) and
     `gpu_cluster_pool_mb` (what the clustered meshes lease of the cluster pool),
-    as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys).
+    as of the last measured frame (`docs/api/Debug.md`, the `_bytes` keys);
+  - `lights` and `lights_live`: the level's lights active in its hierarchy (the
+    ambient light aside, which ignores modes), and of them those shaded live every
+    frame, `Realtime` or `Mixed`, counted once after the load by what the level's
+    file means (`LightComponent::effective_mode`, held to what the last bake made
+    of it: an `Area` light and a `Mixed` light a `Shadowmask` bake fell back count
+    as `Baked`), never by what an unbaked preview draws. Counters with no spread,
+    so a change prints as measured. When any light is `Mixed`, a line under the
+    table says how many (`N of M lights are Mixed: their direct light is shaded
+    live every frame`): a `Realtime` light is somebody's choice, a `Mixed` one may
+    be left on a default.
 
   It is kept as `out/bench/scenes/<project>-<hash>/<scene>.json` (and `.txt`; the
   project folder's name and a short hash of its canonical path, so a copy and its
