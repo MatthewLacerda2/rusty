@@ -74,7 +74,7 @@ fn the_wav_writer_keeps_stereo_channels_apart() {
 }
 
 fn project(name: &str) -> std::path::PathBuf {
-    let root = rusty_test_support::temp::dir().join(folder);
+    let root = rusty_test_support::temp::dir().join(name);
     let _ = std::fs::remove_dir_all(&root);
     std::fs::create_dir_all(root.join("audio").join("sfx")).unwrap();
     root
