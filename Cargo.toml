@@ -235,7 +235,8 @@ pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
 # `float_roundtrip`: a number written and read back is the same `f64`, bit for bit,
 # so a stored document (a scene, a bench report a later run compares with) reads
-# back what was saved. The default parser can land one ulp off.
+# back what was saved. The default parser can land one ulp off. Named for every build,
+# so the player parses saved floats exactly as `dev` builds do.
 serde_json = { version = "1.0.120", features = ["float_roundtrip"] }
 # Font parsing, metrics and glyph outlines for UI `Text` (#419, #1328), and its shaping
 # (ligatures, marks, kerning). Direct, not through egui: egui is editor-only (#431) and

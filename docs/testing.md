@@ -432,9 +432,9 @@ CI for a leak that only breaks the informational mutation runs (#1338).
 To check a branch before it merges: `make test-one-process` runs the `dev` suite that
 way locally (quiet, every binary, the failing tests named at the end), and
 `gh workflow run cargo-test.yml --ref <branch>` runs the whole signal on GitHub.
-A test starts an engine binary with `tests/spawn.rs`'
-`crate::spawn::engine_bin!("session")`. Doctests stay on `cargo test --doc`, which nextest
-cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
+`crate::spawn::engine_bin!("session")` (`tests/spawn.rs`) is shorthand for a
+`Command` of that engine binary, for a test that starts one. Doctests stay on
+`cargo test --doc`, which nextest cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
 `build-test` job's summary.
 
 Handy forms: `cargo nextest run -E 'test(physics_)'` (filter by name),
