@@ -346,13 +346,16 @@ Per pull request:
 ## Starting, and re-reading the board
 
 At the start: `make blockers ARGS=--fix` (records prose-only blockers, and removes a
-recorded open blocker the body no longer states) and
+recorded open blocker no body states any more) and
 `make board` (stray branches, stale assignments, unlabelled issues, bugs with
 no `Kind:` line); close out
 what it names. Unassign an issue that turns out never started. **A lifted
-dependency is lifted in the body, then with `make blockers ARGS=--fix`**: the
-merge queue reads the recorded relationship, not the prose, and the body is the
-source of truth for an open blocker.
+dependency is lifted in the body, then with `make blockers ARGS=--fix`**: delete
+the `Blocked by #N` line or strike it through (`~~Blocked by #N~~`), and the
+blocker's `Blocks #M` line too if it has one, then run the verb. The merge queue
+reads the recorded relationship, not the prose, and the bodies are the source of
+truth for an open blocker. A recorded blocker in a "Blocked by" the verb could not
+read is kept and reported, never removed: rewrite it as `#N` items.
 
 **After every merge, re-read the whole board**, not your list of it: coders and
 the operator file mid-batch, and what the merge unblocked is startable now. Count

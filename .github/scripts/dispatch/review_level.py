@@ -81,6 +81,9 @@ TABLE: dict[str, tuple[str, ...]] = {
         ".github/scripts/mergeable.py",
         ".github/scripts/queue-daemon.py",  # the queue's supervisor
         ".github/scripts/ghrest.py",  # how the verdict reads a pull request
+        # writes the blocked_by relationships the verdict refuses a merge from: a
+        # relationship deleted in error lets a PR merge before its blocker (#2489)
+        ".github/scripts/blockers.py",
         ".github/workflows/",
         ".github/actions/",  # the workflows' shared steps (#1973)
     ),
