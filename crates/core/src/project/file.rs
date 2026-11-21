@@ -1,3 +1,4 @@
+//! stored-format: `project.rusty`, the project file
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};

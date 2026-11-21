@@ -1,3 +1,4 @@
+//! stored-format: the engine's entries in a project's `.mcp.json`
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};

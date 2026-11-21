@@ -1,3 +1,4 @@
+//! stored-format: the recent-projects list in the user's config directory
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
