@@ -1,7 +1,3 @@
-//! A mesh moving between two ticks is drawn blended by the retained scene (#1877):
-//! re-posed each frame with no log entry, at the tick before (alpha 0), and exactly
-//! as a fresh renderer draws the live scene once the blend reaches the tick.
-
 use glam::Vec3;
 
 use super::fixture::{frame, yard, RES};
@@ -21,11 +17,11 @@ fn gpu_a_mesh_between_two_ticks_is_drawn_at_its_blend() {
     assert_eq!(frame(&mut r, &scene).0, start, "alpha 0: the tick before");
     r.draw_poses.set_alpha(0.5);
     let half = frame(&mut r, &scene).0;
-    r.draw_poses.set_alpha(1.0); // no tick, no log entry: the re-pose alone
+    r.draw_poses.set_alpha(1.0);
     let at_tick = frame(&mut r, &scene).0;
     assert_ne!(half, start);
     assert_ne!(half, at_tick);
-    drop(r); // one renderer per thread at a time
+    drop(r);
     let Some(mut fresh) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };

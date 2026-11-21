@@ -1,7 +1,3 @@
-//! crates/render/src/scene/residency/gpu_tests.rs — a load that replaced the World
-//! releases the GPU meshes only the scene before used (#2440), keeps the shared
-//! ones, releases nothing on Play and Stop, and retries a mesh the pool refused.
-
 use glam::{Quat, Vec3};
 
 use super::super::fixture::frame;
@@ -10,7 +6,6 @@ use crate::{MeshId, Renderer};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// A scene of `prims` and one clustered panel cut `n` a side, named `panel`.
 pub(super) fn level(prims: &[Primitive], (panel, n): (&str, u32)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -24,7 +19,6 @@ pub(super) fn level(prims: &[Primitive], (panel, n): (&str, u32)) -> Scene {
     scene
 }
 
-/// What the panel `name`'s lease holds of the pool, in bytes.
 fn leased(r: &Renderer, name: &str) -> u64 {
     let id = MeshId(format!("Asset|test://{name}"));
     let lease = &r.gpu_meshes[&id].clusters.as_ref().expect("leased").lease;
@@ -119,7 +113,6 @@ fn gpu_a_mesh_the_pool_refused_is_retried_when_a_release_frees_room() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
-    // Room for B's 64×64 panel alone, not beside A's 48×48 one.
     r.hiz.clusters.pool.limit = 4 * 64 * 64 * 6;
     frame(&mut r, &level(&[], ("A", 48)));
     let b = level(&[], ("B", 64));

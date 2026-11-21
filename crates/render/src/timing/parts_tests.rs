@@ -1,9 +1,5 @@
-//! A stage timed in parts (#2401): [`GpuPart`]'s pairs, summed into their
-//! kind's row and their own.
-
 use super::{GpuPart, GpuPass, GpuTimes, Pair};
 
-/// A stage timed in parts (#2401), then a forward pass, at 1 ms a tick.
 fn parts_over(parts: &[GpuPart], ticks: &[u64]) -> GpuTimes {
     let part = |p: &GpuPart| Pair {
         part: Some(*p),
@@ -17,7 +13,6 @@ fn parts_over(parts: &[GpuPart], ticks: &[u64]) -> GpuTimes {
     GpuTimes::from_ticks(ticks, &pairs, 1e6)
 }
 
-/// The parts that take a pair: every part but one its sub-parts sum to.
 fn paired() -> Vec<GpuPart> {
     let has_subs = |p: &GpuPart| GpuPart::ALL.iter().any(|s| s.within() == Some(*p));
     GpuPart::ALL.into_iter().filter(|p| !has_subs(p)).collect()
@@ -25,8 +20,6 @@ fn paired() -> Vec<GpuPart> {
 
 #[test]
 fn the_occlusion_parts_sum_to_its_row_and_a_missing_one_is_absent() {
-    // Select 1..2, phase one 2..5, pyramid 4..6 (charged from 5), test 6..7,
-    // the cluster cull's test 7..8, scan 8..9 and copy 9..10, then forward 10..11.
     let ticks = [1, 2, 2, 5, 4, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11];
     let times = parts_over(&paired(), &ticks);
     let ms: Vec<_> = times.parts.iter().map(|(_, ms)| *ms).collect();

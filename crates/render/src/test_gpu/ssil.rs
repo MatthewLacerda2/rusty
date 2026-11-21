@@ -1,10 +1,3 @@
-//! What the SSIL GPU tests share: a white floor, a red wall 6 m out and a point
-//! light 0.7 m in front of it, seen from 1.5 m up looking down -Z and a little down,
-//! with no tonemap, so a frame reads back linear.
-//!
-//! A test hook: render's SSIL tests and `dev`'s, which bake lightmaps under it
-//! (`dev::bake::drawn::ssil`), share it, so it is compiled into `dev` builds.
-
 use glam::{Vec2, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -17,24 +10,18 @@ use rusty_scene::{Camera, Scene};
 pub const W: u32 = 96;
 pub const H: u32 = 72;
 
-/// The floor point the tests read: half a metre in front of the wall, beside the
-/// light's pool.
 pub const FLOOR: Vec3 = Vec3::new(1.5, 0.0, -5.5);
 
-/// The light's intensity: bright enough to light the wall red, not so bright the
-/// floor under it clips white.
 pub const LAMP: f32 = 6.0;
 
 pub fn renderer() -> Option<Renderer> {
     crate::test_gpu::headless_or_skip(W, H)
 }
 
-/// The eye, turned `yaw` degrees off -Z.
 pub fn eye(yaw: f32) -> Camera {
     Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0 + yaw, -12.0)
 }
 
-/// A static box named `name` at `position`, `scale`, of a rough `color`.
 pub fn block(
     scene: &mut Scene,
     name: &str,
@@ -58,8 +45,6 @@ pub fn block(
     id
 }
 
-/// The scene with SSIL `ssil` and the light at `light` intensity (0: none at all,
-/// so only the ambient lights it). Returns it and the light's entity.
 pub fn scene(ssil: Ssil, light: f32) -> (Scene, u32) {
     let mut scene = floor(ssil);
     let wall = (Vec3::new(0.0, 1.5, -6.0), Vec3::new(6.0, 3.0, 0.2));
@@ -74,7 +59,6 @@ pub fn scene(ssil: Ssil, light: f32) -> (Scene, u32) {
     (scene, lamp)
 }
 
-/// The camera, its volume with SSIL `ssil`, a dim ambient and the white floor alone.
 pub fn floor(ssil: Ssil) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -91,7 +75,6 @@ pub fn floor(ssil: Ssil) -> Scene {
     scene
 }
 
-/// A realtime [`point`] light of `intensity` at `at`.
 pub fn lamp(scene: &mut Scene, at: Vec3, intensity: f32) -> u32 {
     let lamp = scene.add_entity("Lamp".to_string());
     scene.world.transform_mut(lamp).unwrap().position = at;
@@ -101,7 +84,6 @@ pub fn lamp(scene: &mut Scene, at: Vec3, intensity: f32) -> u32 {
     lamp
 }
 
-/// An unshadowed point light of `intensity` over 4 m, in `mode`.
 pub fn point(intensity: f32, mode: LightMode) -> LightComponent {
     LightComponent {
         light_type: LightType::Point,
@@ -113,7 +95,6 @@ pub fn point(intensity: f32, mode: LightMode) -> LightComponent {
     }
 }
 
-/// SSIL on, at `intensity`, at its defaults otherwise.
 pub fn on(intensity: f32) -> Ssil {
     Ssil {
         active: true,
@@ -122,19 +103,16 @@ pub fn on(intensity: f32) -> Ssil {
     }
 }
 
-/// Render `scene` through `cam` into `view` and read the frame (RGBA8).
 pub fn draw(r: &mut Renderer, view: &mut RenderView, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     r.render(view, scene, cam, &out, false);
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
-/// A fresh view.
 pub fn view(r: &Renderer) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)
 }
 
-/// The last of `frames` frames of `scene` drawn into one fresh view from [`eye`].
 pub fn settled(r: &mut Renderer, scene: &Scene, frames: u32) -> Vec<u8> {
     let mut v = view(r);
     let mut last = Vec::new();
@@ -144,7 +122,6 @@ pub fn settled(r: &mut Renderer, scene: &Scene, frames: u32) -> Vec<u8> {
     last
 }
 
-/// The pixel world point `p` lands on through [`eye`] turned `yaw` degrees.
 pub fn pixel_at(p: Vec3, yaw: f32) -> (u32, u32) {
     let clip = eye(yaw).build_view_projection(W as f32 / H as f32) * p.extend(1.0);
     let ndc: Vec2 = clip.truncate().truncate() / clip.w;
@@ -153,12 +130,10 @@ pub fn pixel_at(p: Vec3, yaw: f32) -> (u32, u32) {
     (x.min(W - 1), y.min(H - 1))
 }
 
-/// The summed linear RGB of the 5x3 patch around `p`.
 pub fn patch(frame: &[u8], p: Vec3) -> [f32; 3] {
     patch_at(frame, p, 0.0)
 }
 
-/// [`patch`] through [`eye`] turned `yaw` degrees.
 pub fn patch_at(frame: &[u8], p: Vec3, yaw: f32) -> [f32; 3] {
     let (x, y) = pixel_at(p, yaw);
     let mut sum = [0.0; 3];
@@ -173,7 +148,6 @@ pub fn patch_at(frame: &[u8], p: Vec3, yaw: f32) -> [f32; 3] {
     sum
 }
 
-/// The whole frame's summed linear light.
 pub fn energy(frame: &[u8]) -> f32 {
     let lin = |c: &u8| rusty_core::color::srgb_to_linear(*c);
     frame
@@ -182,7 +156,6 @@ pub fn energy(frame: &[u8]) -> f32 {
         .sum()
 }
 
-/// Turn every volume in `scene` to `ssil`.
 #[cfg(feature = "dev")]
 pub fn set_ssil(scene: &mut Scene, ssil: Ssil) {
     for id in scene.world.ids_with_post_processing() {

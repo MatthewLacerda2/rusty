@@ -1,8 +1,3 @@
-//! crates/render/src/scene/residency/holders_gpu_tests.rs — each holder of a cached
-//! upload keeps its map through a release that drops another scene's (#2458): a UI
-//! image, a sprite particle's texture, the sky's panorama and a decal's map of the
-//! edit scene a Play holds, and the hidden UI of the scene a load drew.
-
 use glam::{Vec2, Vec3};
 
 use super::super::fixture::frame;
@@ -14,7 +9,6 @@ use rusty_scene::decal::DecalSpec;
 use rusty_scene::Scene;
 use rusty_test_support::panorama::fixture as panorama;
 
-/// An overlay canvas with an Image of `map`; the image's id.
 pub(super) fn image(scene: &mut Scene, map: &MapRef) -> u32 {
     let root = scene.add_entity("Canvas".to_string());
     scene
@@ -35,7 +29,6 @@ pub(super) fn image(scene: &mut Scene, map: &MapRef) -> u32 {
     id
 }
 
-/// A sprite emitter of `map` holding one live particle in view.
 pub(super) fn sprites(scene: &mut Scene, map: &MapRef) {
     let id = scene.add_entity("Smoke".to_string());
     let mut emitter = ParticleEmitterComponent {
@@ -101,7 +94,6 @@ fn gpu_a_hidden_image_of_the_scene_a_load_drew_keeps_its_map() {
     let mut first = textured(&[&a]);
     image(&mut first, &menu);
     frame(&mut r, &first);
-    // The next scene's menu is hidden: its image is laid out by no frame yet.
     let mut next = textured(&[]);
     let hidden = image(&mut next, &menu);
     next.world.set_active(hidden, false);
@@ -117,7 +109,6 @@ fn gpu_a_load_drops_the_lightmap_lists_no_kept_scene_binds() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {
         return;
     };
-    // Pages that fail to load are cached all the same: one list each.
     let lit = |page: &str| {
         let mut scene = textured(&[]);
         scene.lightmaps.pages = vec![format!("{page}.png")];

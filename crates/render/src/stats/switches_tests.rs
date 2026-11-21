@@ -1,11 +1,7 @@
-//! The switches' choices, adapter-free: what each hands the renderer with its
-//! switch on and off (`gpu_tests` measures what the frame then costs).
-
 use super::{RenderSwitch, RenderSwitches};
 use rusty_core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty_scene::lighting::lightmap_set::LightmapSet;
 
-/// Every switch on but `switch`.
 fn without(switch: RenderSwitch) -> RenderSwitches {
     let mut s = RenderSwitches::ON;
     s.set(switch, false);
@@ -18,7 +14,6 @@ fn a_list_is_handed_whole_while_its_switch_is_on_and_empty_once_it_is_off() {
     let probes = RenderSwitch::ReflectionProbes;
     assert_eq!(RenderSwitches::ON.listed(probes, &items), &items);
     assert!(without(probes).listed(probes, &items).is_empty());
-    // Another switch off leaves this list whole.
     let lamps = without(RenderSwitch::ClusteredLights);
     assert_eq!(lamps.listed(probes, &items), &items);
 }
@@ -61,7 +56,6 @@ fn the_ssao_and_ssil_switches_turn_their_option_off_and_leave_the_rest() {
         expected.set(option, false);
         assert_eq!(gated, expected, "{switch:?}");
     }
-    // A switch never turns an option back on.
     let mut chosen = options;
     chosen.set(GraphicsOption::Ssr, false);
     assert!(!without(RenderSwitch::Ssao)

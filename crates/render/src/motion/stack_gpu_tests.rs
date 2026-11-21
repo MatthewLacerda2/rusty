@@ -1,6 +1,3 @@
-//! The velocity target on lavapipe (#1435), past one rigid body: a skinned mesh's
-//! moved bone, a viewmodel camera stacked on the world's, and a scene load's cut.
-
 use glam::{Mat4, Quat, Vec3};
 
 use super::gpu_fixture::{cube, eye, project, render, renderer, scene, view};
@@ -8,8 +5,6 @@ use rusty_components::mesh::primitives::generate_box;
 use rusty_components::CameraComponent;
 use rusty_scene::{ClearFlags, MeshComponent, Scene};
 
-/// Two half-metre boxes in one skinned mesh at z = -5: the left one weighted to
-/// joint 0, the right one to joint 1, whose bind pose is `right`. Returns its id.
 fn rig(scene: &mut Scene, right: Mat4) -> u32 {
     let id = scene.add_entity("MotionRig".to_string());
     let (mut vertices, mut indices) = (Vec::new(), Vec::new());
@@ -38,7 +33,6 @@ fn gpu_a_skinned_mesh_writes_velocity_where_its_bone_moved() {
     let Some(mut r) = renderer() else { return };
     let mut view = view(&r);
     let cam = eye(0.0);
-    // One scene, posed twice: the same entity, so its history carries over.
     let (mut posed, _) = scene(true);
     let id = rig(&mut posed, Mat4::IDENTITY);
     render(&mut r, &mut view, &posed, &cam).unwrap();
@@ -61,7 +55,6 @@ fn gpu_a_viewmodel_turning_with_its_camera_writes_no_motion() {
     let mut view = view(&r);
     let (mut scene, _) = scene(true);
     cube(&mut scene, Vec3::new(2.0, 0.0, -6.0));
-    // The overlay camera and its gun, stacked over the world camera.
     let overlay = scene.add_entity("ViewmodelCamera".to_string());
     let lens = CameraComponent {
         render_order: 1,
@@ -103,7 +96,6 @@ fn gpu_the_first_frame_after_a_scene_load_writes_no_object_motion() {
     let id = cube(&mut scene, Vec3::new(-0.5, 0.0, -5.0));
     let cam = eye(0.0);
     render(&mut r, &mut view, &scene, &cam).unwrap();
-    // The same ids, another scene: a load, not a move.
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.5, 0.0, -5.0);
     scene.renew_id();
     let loaded = render(&mut r, &mut view, &scene, &cam).unwrap();

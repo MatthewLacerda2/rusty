@@ -1,5 +1,3 @@
-//! The console's word on `Baked` lights no bake has taken in yet (#2522).
-
 use super::UnbakedNote;
 use rusty_components::LightMode;
 use rusty_scene::create::default_light;
@@ -84,8 +82,6 @@ fn another_scene_has_its_waiting_lights_named_afresh() {
     assert!(note.note(&b, true).is_none());
 }
 
-/// Named once per scene, whatever the light does after: turned off and on, or
-/// dimmed to 0 and raised, it is not named again.
 #[test]
 fn a_named_light_is_not_named_again_for_its_activity_or_intensity() {
     let mut scene = Scene::default();
@@ -102,8 +98,6 @@ fn a_named_light_is_not_named_again_for_its_activity_or_intensity() {
     assert_eq!(note.note(&scene, true), None, "raised: already named");
 }
 
-/// A light baked as `Mixed` and made `Baked` since waits: its direct light is in
-/// no bake. One the shadowmask fell back on was baked direct, and does not.
 #[test]
 fn a_mixed_light_made_baked_after_its_bake_is_named() {
     let mut scene = Scene::default();

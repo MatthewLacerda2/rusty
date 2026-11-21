@@ -1,8 +1,3 @@
-//! The forward renderer's texture setup: the single-texture and the material-group
-//! material bind-group layouts, the default checker texture, and the all-default
-//! material bind group. A cohesive unit ([`Textures`]) that `setup_build` builds and
-//! `Renderer::from_parts` flattens into the renderer.
-
 use crate::gpu::ops::Writes;
 use std::rc::Rc;
 
@@ -13,24 +8,16 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::MipGenerator;
 use crate::{GpuTexture, Renderer};
 
-/// The single-texture and material-group layouts and the default texture/material bind group.
 pub(crate) struct Textures {
     pub texture_layout: wgpu::BindGroupLayout,
     pub material_layout: wgpu::BindGroupLayout,
     pub default_texture: Rc<GpuTexture>,
-    /// The 1×1 white an extra shader texture slot samples when a material names
-    /// none, or its file is missing (#400): a neutral mask.
     pub white_texture: Rc<GpuTexture>,
     pub default_material_bind_group: wgpu::BindGroup,
-    /// All-zero runtime shader params (#399), bound by every material whose shader
-    /// has none — the standard shader never reads them.
     pub zero_params: wgpu::Buffer,
-    /// Draws every uploaded image's mip chain (#1322).
     pub mip_generator: MipGenerator,
 }
 
-/// Build the single-texture and material-group layouts, the default
-/// checker texture, and the all-default material bind group (#202).
 pub(crate) fn create_textures(
     device: &wgpu::Device,
     writes: Writes,
@@ -71,11 +58,6 @@ pub(crate) fn create_textures(
     }
 }
 
-/// A material bind group with all ten map slots (albedo, metallic,
-/// roughness, normal, emissive, detail, occlusion, specular, height, detail mask) pointing at the default texture and every extra
-/// shader texture slot at white (#400).
-/// Bound by passes that need the material group but never sample the maps (the editor grid
-/// and gizmos) (#202, #207).
 fn create_default_material_bind_group(
     device: &wgpu::Device,
     material_layout: &wgpu::BindGroupLayout,

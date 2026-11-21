@@ -1,21 +1,5 @@
-//! A game frame's gizmos (#1882): the colliders and the `Debug.Draw*` lines over
-//! the finished image, as Unity's Game view draws them with its **Gizmos** toggle
-//! on (`RenderView::game_gizmos`).
-//!
-//! **Through the base camera.** Unity's Game-view gizmos follow the main camera. In
-//! a stack (a world camera under a `DepthOnly` viewmodel) the last camera, whose
-//! uniform group 0 holds when the handles stage runs, is the viewmodel: its field of
-//! view and near plane would misplace every outline, and its cleared depth would
-//! let them show through walls. So the gizmos draw with the base camera's
-//! (unjittered) view-projection, against its depth: kept by the `gizmo_depth`
-//! stage before the next camera clears it, or the view's own when the base camera
-//! is the only one.
-//!
-//! **Not under TAA upscaling.** There the finished image is the output's size and
-//! the depth the scene's, which no pass can attach together; the gizmos are left
-//! out, and the console says so once per view. Their depth is not kept there, and
-//! the kept texture is freed whenever nothing will read it (gizmos off, or
-//! upscaling).
+//! Gizmos use the base camera, as Unity's Game view does: in a stack the last camera is the
+//! viewmodel, whose fov, near plane and cleared depth would misplace them.
 
 use crate::draw::camera::buffer::Slot;
 use crate::draw::camera::CameraCtx;
@@ -24,8 +8,6 @@ use crate::postfx::effects::taa;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
-    /// Keep the base camera's depth for the game gizmos, before a stacked camera
-    /// clears it.
     pub(crate) fn keep_gizmo_depth(&self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let size = view.depth_texture.size();
         let stale = view
@@ -54,8 +36,6 @@ impl Renderer {
         encoder.copy_texture_to_texture(from, kept.as_image_copy(), size);
     }
 
-    /// Whether TAA upscales this stack's view, where the game gizmos are not drawn
-    /// (the module docs), so their depth is not kept either.
     pub(crate) fn gizmos_upscaled(&self, view: &RenderView, ctx: &CameraCtx) -> bool {
         let stack = ctx.stack;
         let editor = stack.editor_mode;
@@ -64,7 +44,6 @@ impl Renderer {
         taa::upscales(view, taa_on)
     }
 
-    /// Draw the game gizmos onto the stack's output, on its last camera.
     pub(crate) fn draw_game_gizmos(&self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let stack = ctx.stack;
         if self.gizmos_upscaled(view, ctx) {
@@ -88,12 +67,10 @@ impl Renderer {
         uniform.view_proj = ctx.base_view_proj.to_cols_array();
         uniform.inv_view_proj = ctx.base_view_proj.inverse().to_cols_array();
         uniform.camera_pos = base.position.to_array();
-        // Copies in the camera's encoder, around the gizmos' pass (`camera::buffer`).
         let (camera, queue) = (&self.camera_buffer, &self.queue);
         camera.record((queue, ctx.commands.encoder()), Slot::GizmoBase, &uniform);
         let overlays = self.precreate_game_overlays(ctx.scene, base.position);
         self.draw_overlay_pass(ctx.commands.encoder(), &overlays, stack.output, depth);
-        // Back to this camera's own, for anything after the stack that reads it.
         camera.record(
             (queue, ctx.commands.encoder()),
             Slot::GizmoBack,

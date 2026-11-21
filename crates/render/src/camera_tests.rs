@@ -1,10 +1,7 @@
-//! The camera stack (#93) and render-texture cameras (#430).
-
 use super::*;
 use glam::Vec3;
 use rusty_components::{CameraComponent, ClearFlags, Projection, RenderTarget};
 
-/// No blend: every camera at its live pose.
 fn still() -> DrawPoses {
     DrawPoses::default()
 }
@@ -34,7 +31,6 @@ fn edit_mode_is_a_single_base_pass() {
     let mut scene = Scene::new();
     let comp = cam_component(0, u32::MAX, ClearFlags::Skybox);
     add_camera(&mut scene, "Cam", comp, Vec3::ZERO);
-    // Edit mode ignores the scene cameras entirely.
     assert_eq!(
         build_camera_stack(&base, &scene, false, &still())
             .cameras
@@ -47,7 +43,6 @@ fn edit_mode_is_a_single_base_pass() {
 fn play_mode_sorts_by_render_order_and_layers_lens() {
     let base = Camera::new(Vec3::new(1.0, 2.0, 3.0), 10.0, 20.0);
     let mut scene = Scene::new();
-    // Authored out of order; the viewmodel (order 1) must come after the world.
     let view = cam_component(1, 0b10, ClearFlags::DepthOnly);
     add_camera(&mut scene, "View", view, Vec3::new(7.0, 0.0, 0.0));
     let world = cam_component(0, 0b01, ClearFlags::Skybox);
@@ -59,7 +54,6 @@ fn play_mode_sorts_by_render_order_and_layers_lens() {
     assert_eq!(stack[0].clear_flags, ClearFlags::Skybox);
     assert_eq!(stack[1].culling_mask, 0b10);
     assert_eq!(stack[1].clear_flags, ClearFlags::DepthOnly);
-    // The base pass keeps the caller's pose; the overlay renders from its own entity.
     assert_eq!(stack[0].position, base.position);
     assert_eq!(stack[0].yaw, base.yaw);
     assert_eq!(stack[1].position, Vec3::new(7.0, 0.0, 0.0));
@@ -96,7 +90,6 @@ fn texture_cameras_leave_the_screen_stack_and_keep_their_own_pose() {
     mini.projection = Projection::Orthographic { size: 20.0 };
     add_camera(&mut scene, "Minimap", mini, Vec3::new(0.0, 50.0, 0.0));
 
-    // A lower render_order must not make the texture camera the screen's base.
     let stack = build_camera_stack(&base, &scene, true, &still()).cameras;
     assert_eq!(stack.len(), 1);
     assert_eq!(stack[0].position, base.position);
@@ -127,7 +120,6 @@ fn only_texture_cameras_falls_back_to_the_base_screen_pass() {
 fn base_id_is_the_lowest_order_screen_camera_in_either_mode() {
     let base = Camera::new(Vec3::ZERO, 0.0, 0.0);
     let mut scene = Scene::new();
-    // Created first but stacked on top: not the base.
     let overlay = cam_component(1, u32::MAX, ClearFlags::DepthOnly);
     let overlay = add_camera(&mut scene, "Overlay", overlay, Vec3::ZERO);
     let mut rt = cam_component(-5, u32::MAX, ClearFlags::Skybox);

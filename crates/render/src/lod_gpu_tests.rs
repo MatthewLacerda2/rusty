@@ -1,8 +1,3 @@
-//! LOD groups on the GPU (#472): a row of props receding from the camera submits far
-//! fewer triangles with a sphere LOD0 and a box LOD1 than with the sphere alone, each
-//! prop still drawing exactly one level; and a group near enough for LOD0 renders
-//! exactly the pixels of that LOD0 on its own. Skips when no adapter is present.
-
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -13,9 +8,6 @@ use rusty_scene::{Camera, Scene};
 const W: u32 = 96;
 const H: u32 = 64;
 
-/// A sun and one prop per `z` in `depths`, 1 m across: with `lod`, an empty group
-/// carrying a sphere LOD0 (shown down to 30% of the screen) and a box LOD1 (never
-/// culled); without, the sphere alone — the scene before LODs existed.
 fn prop_row(depths: &[f32], lod: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -50,7 +42,6 @@ fn prop_row(depths: &[f32], lod: bool) -> Scene {
     scene
 }
 
-/// Render `scene` once from just behind the row; the pixels and what was submitted.
 fn render(renderer: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters) {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -71,7 +62,6 @@ fn gpu_lod_groups_cut_distant_triangles_and_keep_near_pixels() {
     let (_, after) = render(&mut renderer, &prop_row(&depths, true));
     eprintln!("LOD row (#472): before {before:?}\n                 after  {after:?}");
 
-    // Every prop still draws exactly one level; the other is hidden, not culled.
     assert_eq!(after.visible_entities, before.visible_entities);
     assert!(
         before.visible_entities >= 12,
@@ -79,13 +69,11 @@ fn gpu_lod_groups_cut_distant_triangles_and_keep_near_pixels() {
     );
     assert_eq!(after.lod_hidden_entities, depths.len() as u32);
     assert_eq!(before.lod_hidden_entities, 0);
-    // Distant spheres became boxes, on screen and in the shadow casters.
     assert!(
         after.triangles * 3 < before.triangles,
         "LOD1 should cut the triangles: {before:?} -> {after:?}"
     );
 
-    // Near enough for LOD0, a group is pixel-identical to its LOD0 alone.
     let (sphere_only, _) = render(&mut renderer, &prop_row(&[2.0], false));
     let (grouped, near) = render(&mut renderer, &prop_row(&[2.0], true));
     assert_eq!(near.lod_hidden_entities, 1, "the box is hidden: {near:?}");

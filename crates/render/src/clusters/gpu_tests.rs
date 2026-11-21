@@ -1,8 +1,3 @@
-//! Clustered lighting on the GPU (#434): eight point lights over a dark floor all
-//! light their own patch (the old forward uniform kept four), and lights outside
-//! the view are culled before binning — the frame is pixel-identical without them
-//! and their cluster work is zero. Skips when no adapter is present.
-
 use glam::{Vec2, Vec3};
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -24,8 +19,6 @@ fn ring(n: usize) -> Vec3 {
     Vec3::new(4.0 * a.cos(), 0.5, 4.0 * a.sin())
 }
 
-/// A dark floor, no ambient or sun, and a short-range point light at each `ring`
-/// position but `skip`, then one per `hidden` position.
 fn scene(skip: Option<usize>, hidden: &[Vec3]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -56,7 +49,6 @@ fn render(renderer: &mut Renderer, scene: &Scene) -> (Vec<u8>, RenderCounters) {
     (px, renderer.frame_counters)
 }
 
-/// The summed RGB of the pixel under world point `p` on the floor.
 fn brightness(px: &[u8], p: Vec3) -> u32 {
     let at = camera().world_to_screen(Vec3::new(p.x, 0.0, p.z), Vec2::new(W as f32, H as f32));
     let (x, y) = (at.position.x as u32, H - 1 - at.position.y as u32);
@@ -76,7 +68,6 @@ fn gpu_more_than_four_point_lights_all_contribute() {
     for n in 0..LIGHTS {
         let lit = brightness(&all, ring(n));
         assert!(lit > dark + 60, "light {n} lit nothing: {lit} vs {dark}");
-        // Taking that one lamp away darkens exactly its own patch.
         let (without, _) = render(&mut renderer, &scene(Some(n), &[]));
         let left = brightness(&without, ring(n));
         assert!(
@@ -91,7 +82,6 @@ fn gpu_lights_outside_the_view_cost_nothing() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    // Above and behind the camera, and far off to every side.
     let hidden: Vec<Vec3> = (0..64)
         .map(|i| match i % 4 {
             0 => Vec3::new(i as f32, 20.0, 0.0),

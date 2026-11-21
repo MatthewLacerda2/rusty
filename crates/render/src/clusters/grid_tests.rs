@@ -1,5 +1,3 @@
-//! The cluster-box cache (#434): keyed by lens, so moving a camera rebuilds nothing.
-
 use glam::Vec3;
 
 use super::{AabbCache, ClusterGrid};

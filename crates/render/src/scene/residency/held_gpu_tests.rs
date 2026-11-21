@@ -1,7 +1,3 @@
-//! crates/render/src/scene/residency/held_gpu_tests.rs — the edit scene a Play holds
-//! keeps everything it can draw through a play-mode load (#2458): a sky it was
-//! opened with already bound, and the UI image and emitter it was not drawing.
-
 use glam::Vec3;
 
 use super::super::fixture::frame;
@@ -22,7 +18,6 @@ fn gpu_a_scene_opened_on_its_bound_sky_keeps_it_while_held() {
     let mut z = textured(&[]);
     z.skybox_path = sky.clone();
     frame(&mut r, &z);
-    // A new scene opened on the same sky: the panorama is already bound.
     let mut edit = textured(&[]);
     edit.skybox_path = sky;
     frame(&mut r, &edit);
@@ -37,8 +32,6 @@ fn gpu_a_scene_opened_on_its_bound_sky_keeps_it_while_held() {
     assert_eq!(stop.uploads.count, 0, "Stop decodes the sky again");
 }
 
-/// A scene with a pause menu of `menu` and a sprite emitter of `smoke`: the
-/// menu's id and the emitter's.
 fn menu_and_smoke(menu: &MapRef, smoke: &MapRef) -> (Scene, u32, u32) {
     let mut scene = textured(&[]);
     let pause = image(&mut scene, menu);
@@ -69,7 +62,6 @@ fn gpu_the_held_scenes_hidden_image_and_idle_emitter_keep_their_maps() {
         return;
     };
     let (menu, smoke) = (png("menu", [200, 0, 0]), png("smoke", [0; 3]));
-    // A scene before uploads both maps, drawing them.
     let (mut before, _, puff) = menu_and_smoke(&menu, &smoke);
     emit(&mut before, puff, true);
     frame(&mut r, &before);

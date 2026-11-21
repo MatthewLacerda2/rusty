@@ -1,6 +1,3 @@
-//! The surface-decal GPU tests' stage (#638): a floor seen straight down from 12 m,
-//! no sun and a black sky, and helpers to stamp, light and read it back.
-
 use glam::{Vec2, Vec3};
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -12,13 +9,10 @@ use rusty_scene::{Camera, Scene};
 pub(super) const W: u32 = 96;
 pub(super) const H: u32 = 96;
 
-/// Looking straight down at the floor's centre.
 pub(super) fn camera() -> Camera {
     Camera::new(Vec3::new(0.0, 12.0, 0.0), -90.0, -89.0)
 }
 
-/// A 30 m floor of `floor` (also defined as the library material `"floor"`), with
-/// `ambient` intensity and nothing else lighting it.
 pub(super) fn stage(floor: MaterialAsset, ambient: f32) -> Scene {
     let mut scene = Scene::new();
     crate::test_gpu::black_sky(&mut scene);
@@ -33,7 +27,6 @@ pub(super) fn stage(floor: MaterialAsset, ambient: f32) -> Scene {
     scene
 }
 
-/// A floor material: `albedo` grey, fully rough.
 pub(super) fn grey(albedo: f32) -> MaterialAsset {
     MaterialAsset {
         base_color: [albedo; 3],
@@ -42,7 +35,6 @@ pub(super) fn grey(albedo: f32) -> MaterialAsset {
     }
 }
 
-/// A point light `height` metres over the floor's centre.
 pub(super) fn lamp(scene: &mut Scene, height: f32) {
     let id = rusty_scene::create::create_live_light(scene, "Lamp", Primitive::PointLight);
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, height, 0.0);
@@ -51,7 +43,6 @@ pub(super) fn lamp(scene: &mut Scene, height: f32) {
     scene.world.set_light(id, Some(light));
 }
 
-/// Stamp a 4 m decal at the floor's centre, projected against `normal`.
 pub(super) fn stamp(scene: &mut Scene, normal: Vec3, spec: DecalSpec) {
     let spec = DecalSpec {
         size: 4.0,
@@ -61,7 +52,6 @@ pub(super) fn stamp(scene: &mut Scene, normal: Vec3, spec: DecalSpec) {
     scene.spawn_decal(Vec3::ZERO, normal, spec);
 }
 
-/// A red decal that changes only the albedo (the positional `Decals.Spawn`).
 pub(super) fn red() -> DecalSpec {
     DecalSpec {
         color: [1.0, 0.0, 0.0, 1.0],
@@ -69,8 +59,6 @@ pub(super) fn red() -> DecalSpec {
     }
 }
 
-/// Render `scene` (in play mode when `playing`, so its cameras stack) and return
-/// the RGB under the floor's centre with the frame's counters.
 pub(super) fn centre(
     renderer: &mut Renderer,
     scene: &Scene,
@@ -88,7 +76,6 @@ pub(super) fn centre(
     (rgb, renderer.frame_counters)
 }
 
-/// Whether two pixels match within `tolerance` per channel.
 pub(super) fn close(a: [i32; 3], b: [i32; 3], tolerance: i32) -> bool {
     a.iter().zip(&b).all(|(x, y)| (x - y).abs() <= tolerance)
 }

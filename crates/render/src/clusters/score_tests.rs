@@ -1,7 +1,3 @@
-//! A cluster ranks its lights by what they deliver across it (#1699): a dim lamp
-//! inside the cluster's box does not outrank a bright one a few metres off, which
-//! the windowed falloff's bare `1/d²` (its `ε²` floor alone) would let it do.
-
 use glam::Vec3;
 
 use super::bin::{bin_spheres, Budget};

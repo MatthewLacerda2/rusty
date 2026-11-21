@@ -1,9 +1,3 @@
-//! The editor overlays' draws for one handles pass (#1616): every gizmo's per-draw
-//! uniform in one array and every distinct tint's record in one material array,
-//! behind one per-draw bind group, as the solids' `DrawBuffers` are. A gizmo keeps only
-//! its uniform's slot and binds the group at that slot's dynamic offset, so a frame
-//! with a hundred probe boxes builds three buffers, not two per box.
-
 use glam::Mat4;
 use wgpu::util::DeviceExt;
 
@@ -19,15 +13,12 @@ pub(crate) struct OverlayDraws {
 }
 
 impl OverlayDraws {
-    /// Add a gizmo placed by `model_matrix` and drawn flat in `tint`
-    /// ([`MaterialData::flat`]); returns its slot. Gizmos of one tint share a record.
     pub(crate) fn push(&mut self, model_matrix: Mat4, tint: [f32; 4]) -> u32 {
         self.gizmos
             .push((model_matrix, MaterialData::flat(tint).words()));
         (self.gizmos.len() - 1) as u32
     }
 
-    /// How many gizmo slots were taken.
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.gizmos.len()
@@ -51,22 +42,17 @@ impl OverlayDraws {
     }
 }
 
-/// The handles pass's per-draw group: the overlays' uniform and record arrays over the
-/// shared identity bones and identity instance (an overlay is one draw of instance
-/// 0, its transform in its uniform).
 pub(crate) struct OverlayBindings {
     group: wgpu::BindGroup,
 }
 
 impl OverlayBindings {
-    /// Bind the group for the gizmo at `slot`.
     pub(crate) fn bind<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>, slot: u32) {
         pass.set_bind_group(groups::DRAW, &self.group, &DrawBuffers::offsets(slot));
     }
 }
 
 impl Renderer {
-    /// Upload `draws` as one bind group, or `None` when no gizmo was added.
     pub(crate) fn overlay_bindings(&self, draws: &OverlayDraws) -> Option<OverlayBindings> {
         if draws.gizmos.is_empty() {
             return None;

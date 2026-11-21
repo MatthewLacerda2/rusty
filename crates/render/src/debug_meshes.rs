@@ -8,15 +8,10 @@ use super::{GpuMesh, MeshId, Renderer, SkinBounds};
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_scene::Scene;
 
-/// A mesh index buffer's usage: STORAGE too, since the cluster cull copies a
-/// clustered mesh's runs from it (#1968).
 const INDEX_USAGE: wgpu::BufferUsages = wgpu::BufferUsages::INDEX
     .union(wgpu::BufferUsages::STORAGE)
     .union(wgpu::BufferUsages::COPY_DST);
 
-/// The local-space AABB `(min, max)` over a mesh's vertices. Callers upload only
-/// non-empty geometry, so the fold always sees at least one vertex; an empty slice
-/// degenerates to a zero-extent box at the origin (never rendered).
 fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
     let mut min = Vec3::splat(f32::MAX);
     let mut max = Vec3::splat(f32::MIN);
@@ -32,25 +27,17 @@ fn local_aabb(vertices: &[Vertex]) -> (Vec3, Vec3) {
     }
 }
 
-/// Whether a mesh has anything to draw: vertices and indices both. A mesh without
-/// either never replaces a slot's buffers.
 pub(crate) fn has_geometry(vertices: &[Vertex], indices: &[u32]) -> bool {
     !vertices.is_empty() && !indices.is_empty()
 }
 
-/// One mesh a geometry slot could be uploaded from.
 pub(crate) struct UploadCandidate {
     pub id: MeshId,
     pub revision: MeshRevision,
     pub entity: u32,
-    /// Has vertices and indices: an empty mesh never replaces a slot's buffers.
     pub has_geometry: bool,
 }
 
-/// Which slots to (re-)upload, each from which mesh (#1540): a slot whose resident
-/// buffers hold a revision at least as new as a candidate's skips it; otherwise the
-/// newest candidate with geometry under the slot wins. `resident` is the revision a
-/// renderer uploaded per slot, `None` when nothing is.
 pub(crate) fn stale_uploads(
     candidates: impl IntoIterator<Item = UploadCandidate>,
     resident: impl Fn(&MeshId) -> Option<MeshRevision>,
@@ -69,16 +56,6 @@ pub(crate) fn stale_uploads(
 }
 
 impl Renderer {
-    /// Upload the meshes of `entities` once per unique mesh-asset identity (#127): N
-    /// entities sharing a primitive/asset collapse to a single buffer pair. The
-    /// retained scene (`render::scene`, #1706) passes the entities whose mesh changed
-    /// since it last looked, or every mesh entity on a rebuild, inactive ones included
-    /// as Unity keeps them loaded: only what is drawn follows activity, so re-enabling a
-    /// holstered weapon doesn't stall on uploads (#1363). An identity is (re-)uploaded
-    /// when it is not resident or a mesh under it carries a newer [`MeshRevision`]
-    /// than the resident buffers, from the newest such mesh, once. Reading the
-    /// revision changes nothing, so every renderer drawing the scene sees the same
-    /// edit (#1540).
     pub(crate) fn upload_meshes_of(&mut self, scene: &Scene, entities: &[u32]) {
         let candidates = entities.iter().filter_map(|&entity| {
             let mesh = scene.world.mesh(entity)?;
@@ -96,12 +73,6 @@ impl Renderer {
         }
     }
 
-    /// Uploads mesh data to the GPU, caching it under its mesh-asset identity
-    /// (#127) so geometry shared by many entities is stored once. When a buffer
-    /// for this `MeshId` is already resident and large enough, the data is written
-    /// in place (`queue.write_buffer`) rather than reallocating a fresh buffer.
-    /// `revision` is the geometry's [`MeshRevision`], recorded so a newer one
-    /// replaces it.
     pub fn update_gpu_mesh(
         &mut self,
         id: MeshId,
@@ -115,18 +86,11 @@ impl Renderer {
 
         let v_bytes: &[u8] = bytemuck::cast_slice(vertices);
         let i_bytes: &[u8] = bytemuck::cast_slice(indices);
-        // Local-space AABB computed once here, at upload, so frustum culling never walks
-        // the vertices per frame (#330). Re-derived on every re-upload so an edited mesh's
-        // bounds stay correct.
         let local_aabb = local_aabb(vertices);
         let skin_bounds = SkinBounds::from_vertices(vertices);
-        // Every retained object drawing this geometry re-reads its runs and bounds.
         self.retained.meshes.uploaded(&id);
         self.uploads.add((v_bytes.len() + i_bytes.len()) as u64);
 
-        // Re-use resident buffers when the new data still fits (a newer revision
-        // of geometry already resident under this id). Both buffers carry COPY_DST
-        // so they can be written without reallocation.
         let queue = &self.queue;
         if let Some(existing) = self.gpu_meshes.get_mut(&id) {
             if existing.vertex_buffer.size() >= v_bytes.len() as u64
@@ -173,7 +137,6 @@ impl Renderer {
         );
     }
 
-    /// Pre-generates the static 3D line grid mesh for Editor visual feedback
     pub(crate) fn generate_grid_mesh(&mut self) {
         let mut vertices = Vec::new();
         let spacing = 2.0;
@@ -183,7 +146,6 @@ impl Renderer {
         let normal = Vec3::Y;
         let uv = [0.0, 0.0];
 
-        // Draw horizontal and vertical lines in XZ plane
         let mut x = -extent;
         while x <= extent {
             vertices.push(Vertex::new(Vec3::new(x, 0.0, -extent), normal, uv));
@@ -206,13 +168,11 @@ impl Renderer {
         self.grid_count = count;
     }
 
-    /// Pre-generates 3D line-based arrows for X, Y, Z global translation axes
     pub(crate) fn generate_axis_arrows(&mut self) {
         let axis_length = 2.0;
         let arrow_head_length = 0.35;
-        let w = 0.12; // arrow head half-width
+        let w = 0.12;
 
-        // X Axis (Red): tip on +X, arrowhead spread on ±Y and ±Z.
         let t_x = Vec3::new(axis_length, 0.0, 0.0);
         let s_x = Vec3::new(axis_length - arrow_head_length, 0.0, 0.0);
         let x_verts = axis_arrow_verts(
@@ -225,7 +185,6 @@ impl Renderer {
             ],
         );
 
-        // Y Axis (Green): tip on +Y, arrowhead spread on ±X and ±Z.
         let t_y = Vec3::new(0.0, axis_length, 0.0);
         let s_y = Vec3::new(0.0, axis_length - arrow_head_length, 0.0);
         let y_verts = axis_arrow_verts(
@@ -238,8 +197,6 @@ impl Renderer {
             ],
         );
 
-        // Z Axis (Blue): tip on +Z, arrowhead spread on ±X and ±Y. (Preserves the
-        // original quirk where the third and fourth head points coincide.)
         let t_z = Vec3::new(0.0, 0.0, axis_length);
         let s_z = Vec3::new(0.0, 0.0, axis_length - arrow_head_length);
         let z_verts = axis_arrow_verts(
@@ -258,7 +215,6 @@ impl Renderer {
         self.axis_count = x_verts.len() as u32;
     }
 
-    /// Create a VERTEX buffer initialised from `verts`.
     fn vertex_buffer(&self, label: &str, verts: &[Vertex]) -> wgpu::Buffer {
         self.device
             .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -269,9 +225,6 @@ impl Renderer {
     }
 }
 
-/// Build one axis arrow's line-list vertices: the shaft from the origin to `tip`,
-/// four lines from `tip` to the arrowhead points `[a1, a2, a3, a4]`, then the ring
-/// connecting them (a1-a3, a3-a2, a2-a4, a4-a1).
 fn axis_arrow_verts(tip: Vec3, head: [Vec3; 4]) -> Vec<Vertex> {
     let uv = [0.0, 0.0];
     let normal = Vec3::Y;
@@ -280,12 +233,10 @@ fn axis_arrow_verts(tip: Vec3, head: [Vec3; 4]) -> Vec<Vertex> {
     let mut verts = Vec::new();
     verts.push(Vertex::new(Vec3::ZERO, normal, uv));
     verts.push(Vertex::new(tip, normal, uv));
-    // Lines from the tip out to each arrowhead point.
     for a in [a1, a2, a3, a4] {
         verts.push(Vertex::new(tip, normal, uv));
         verts.push(Vertex::new(a, normal, uv));
     }
-    // Ring connecting the arrowhead points.
     for (p, q) in [(a1, a3), (a3, a2), (a2, a4), (a4, a1)] {
         verts.push(Vertex::new(p, normal, uv));
         verts.push(Vertex::new(q, normal, uv));

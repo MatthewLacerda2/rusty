@@ -1,8 +1,5 @@
-//! [`RenderCounters`] under their `FrameStats` metric names.
-
 use super::RenderCounters;
 
-/// [`RenderCounters::ui_relaid`]'s metric names, in its order.
 const UI_RELAID: [&str; 7] = [
     "ui_relaid_rebuild",
     "ui_relaid_screen",
@@ -14,7 +11,6 @@ const UI_RELAID: [&str; 7] = [
 ];
 
 impl RenderCounters {
-    /// Every counter under its `FrameStats` metric name.
     pub fn pairs(&self) -> Vec<(&'static str, u64)> {
         let mut pairs = vec![
             ("draw_calls", self.draw_calls.into()),
@@ -68,8 +64,6 @@ impl RenderCounters {
         pairs
     }
 
-    /// The camera views' occlusion counters (the PVS's, Hi-Z's and the cluster
-    /// cull's), under their metric names.
     fn occlusion_pairs(&self) -> [(&'static str, u64); 8] {
         [
             ("occlusion_culled", self.occlusion_culled.into()),
@@ -83,8 +77,6 @@ impl RenderCounters {
         ]
     }
 
-    /// The render-texture cameras, the opaque scene passes' kinds and their draws
-    /// by kind (#2334), under their metric names.
     fn forward_pairs(&self) -> [(&'static str, u64); 6] {
         [
             ("render_texture_draws", self.render_texture_draws.into()),
@@ -96,7 +88,6 @@ impl RenderCounters {
         ]
     }
 
-    /// The shadow views' counters, under their metric names.
     fn shadow_pairs(&self) -> [(&'static str, u64); 12] {
         [
             ("shadow_cull_tested", self.shadow_cull_tested.into()),
@@ -117,7 +108,6 @@ impl RenderCounters {
         ]
     }
 
-    /// The UI pass's counters, under their metric names.
     fn ui_pairs(&self) -> [(&'static str, u64); 5] {
         [
             ("ui_draws", self.ui_draws.into()),

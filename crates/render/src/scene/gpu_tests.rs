@@ -1,11 +1,3 @@
-//! crates/render/src/scene/gpu_tests.rs — a renderer that kept its objects through a run
-//! of edits draws what a renderer built fresh on the final state draws (#1706):
-//! moving, skinned (posed every frame, unstamped), static, transparent and
-//! lightmap-entried solids, with material, layer, activity and override edits, a
-//! two-sided, a Cutout and a mirrored static caster: their shadows included. And a
-//! move uploads the moved object's record alone (`render_upload_bytes`), and a
-//! rebuild none.
-
 use glam::{Mat4, Vec3};
 
 use super::fixture::{frame, yard, RES};
@@ -15,7 +7,6 @@ use rusty_components::{MaterialComponent, MeshComponent, RenderMode, ShadowCasti
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// A one-joint skinned sphere at `at`, posed by its palette.
 fn skinned(scene: &mut Scene, at: Vec3) -> u32 {
     let (vertices, indices) = generate_sphere(0.4, 8, 12);
     let skin = SkinData {
@@ -38,12 +29,11 @@ fn skinned(scene: &mut Scene, at: Vec3) -> u32 {
     id
 }
 
-/// Edit `scene` as frame `step` of a run.
 fn step(scene: &mut Scene, ids: &[u32], soldier: u32, step: u32) {
     let t = step as f32;
-    scene.world.transform_mut(ids[0]).unwrap().position.y = 0.3 * t; // a mover
+    scene.world.transform_mut(ids[0]).unwrap().position.y = 0.3 * t;
     let pose = Mat4::from_translation(Vec3::new(0.0, 0.2 * t, 0.0));
-    scene.world.set_pose_palette(soldier, &[pose]); // animation's unstamped write
+    scene.world.set_pose_palette(soldier, &[pose]);
     match step {
         1 => {
             scene.world.set_static(ids[1], true);
@@ -67,7 +57,7 @@ fn step(scene: &mut Scene, ids: &[u32], soldier: u32, step: u32) {
         6 => {
             let red = scene.materials.get_mut("red").unwrap();
             (red.render_mode, red.alpha_cutoff) = (RenderMode::Cutout, 0.5);
-            scene.world.transform_mut(ids[1]).unwrap().scale.x = -1.0; // mirrored
+            scene.world.transform_mut(ids[1]).unwrap().scale.x = -1.0;
         }
         _ => {}
     }
@@ -85,8 +75,6 @@ fn gpu_a_kept_scene_draws_what_a_fresh_renderer_draws_after_every_edit() {
     let mut shown = std::collections::HashSet::new();
     for n in 1..=7 {
         step(&mut scene, &ids, soldier, n);
-        // Its static bakes re-baked now, as a fresh renderer's are: the two then
-        // differ by nothing (whether a bake goes stale is `equivalence_tests`').
         kept.shadow_renderer.invalidate_static_cache();
         let (pixels, counters) = frame(&mut kept, &scene);
         let mut fresh = pair.renderer(RES, RES);
@@ -128,7 +116,6 @@ fn gpu_a_move_uploads_the_moved_record_alone_and_a_rebuild_none() {
         record as u64,
         "one object record, none per static object"
     );
-    // A rebuild re-derives every object; each keeps its slot, so none uploads.
     r.retained.touch();
     let rebuilt = frame(&mut r, &scene).1;
     assert_eq!(rebuilt.render_extracted, 6, "the six props, re-derived");

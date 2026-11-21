@@ -1,46 +1,3 @@
-//! crates/render/src/warm/ — a scene load's GPU warm-up (#2123): the resources a prepared
-//! scene draws with, made while the scene before it still draws, so the new scene's
-//! first frame finds them and uploads nothing.
-//!
-//! [`Warming::plan`] lists what the document references, through the renderer's
-//! caches keyed by asset, never by entity: each mesh identity's buffers (the slots
-//! the extract's own rule, `debug_meshes::stale_uploads`, would upload, at the
-//! revision activation moves into the world), every material map as the slot
-//! reading it holds it, the sky's panorama, and the lightmap page arrays. It runs
-//! on the load's worker (`shell::frame::load::worker`), never on the tick thread.
-//! A primitive's revision is one per geometry for the process
-//! (`scene::create::primitive_revision`) and an import's is its import's, so the
-//! linked prefab instances activation rebuilds from their `.prefab` draw the
-//! geometry planned from the saved document, and a reload's resident meshes are
-//! skipped, never rewritten under the scene still drawing. (A `.prefab` edited
-//! since the scene was saved can name a mesh the plan missed: the first frame
-//! uploads that one.)
-//!
-//! A step ([`Renderer::warm_step`]) makes one resource, whole: a resize, a lost
-//! surface or a Stop between two steps leaves nothing half-built. A texture is read,
-//! decoded and fitted on a thread of its own (`decode`), and its step only uploads
-//! it; a step that meets one still being read, or lightmap pages still being read,
-//! makes nothing, and the host tries again on a later frame. What one step costs the
-//! frame is then one GPU upload: a mesh's buffers, a texture's levels and its mips
-//! drawn, or a page array. Nothing here releases, and a mesh, texture or page list
-//! a warm-up made stays resident while its `Warming` lives, through any release meanwhile (a scene that
-//! opens the next load in its first tick): the old scene's meshes go at the end of
-//! the activated scene's first frame (`scene::residency`), so neither the scene
-//! still drawing nor the one warming loses one. What a warm-up made that the
-//! activated scene does not use, or an abandoned warm-up's, goes at the next release.
-//!
-//! What it does not warm, and the new scene's first frame still makes: the material
-//! bind groups and object records (kept per scene, and the scene's identity is new
-//! at the swap), the reflection probes' cubes (copied into the one cube array the
-//! frame places them in), the meshes of the scene's own library (`Mesh.Create`,
-//! filled at activation by `sync_scene_meshes`), the sky's panorama bind group and
-//! its reflection cube's prefilter when the sky changes, and the textures of
-//! particles, ribbons, decals and UI.
-//!
-//! Nothing here reads a clock: the host slices the steps by its frame budget
-//! (`shell::frame::load::warm`), and the sim only learns when the warm-up is done, as an
-//! input (`app::SceneLoader::finished`).
-
 mod decode;
 
 use std::collections::BTreeSet;
@@ -54,27 +11,18 @@ use crate::{MeshId, Renderer};
 use rusty_asset::MapRef;
 use rusty_scene::serialize::SceneData;
 
-/// One resource to make.
 #[derive(Debug, PartialEq)]
 enum Item {
-    /// The geometry of entity `entities[index]`, the newest of its identity.
     Mesh(usize),
-    /// A material map or the sky's panorama, as the slot reading it holds it.
     Texture(MapRef, TextureKind),
-    /// The colour, direction and shadowmask page arrays.
     Lightmaps,
 }
 
-/// What is left to warm of one prepared scene.
 pub struct Warming {
     items: Vec<Item>,
     next: usize,
-    /// The thread reading the plan's textures, once a step needed one.
     decoding: Option<decode::Decoding>,
-    /// What the steps so far uploaded.
     pub uploads: Uploads,
-    /// Alive while the warm-up is: the meshes it made stay resident until then
-    /// (`scene::residency`).
     token: Arc<()>,
 }
 
@@ -89,7 +37,6 @@ impl std::fmt::Debug for Warming {
 }
 
 impl Warming {
-    /// Everything `data` (a prepared scene's document) draws with, once each.
     pub fn plan(data: &SceneData) -> Self {
         let mut items = meshes(data);
         let mut seen = BTreeSet::new();
@@ -108,10 +55,8 @@ impl Warming {
             }
         }
         if !data.skybox_path.is_empty() {
-            // `load_panorama` loads the file as a colour texture.
             texture(MapRef::from(data.skybox_path.as_str()), TextureKind::Colour);
         }
-        // Directions and shadowmasks are bound only beside colour pages.
         if !data.lightmaps.pages.is_empty() {
             items.push(Item::Lightmaps);
         }
@@ -124,7 +69,6 @@ impl Warming {
         }
     }
 
-    /// How much is warmed, from 0 to 1 (1 for a scene with nothing to warm).
     pub fn progress(&self) -> f32 {
         match self.items.len() {
             0 => 1.0,
@@ -132,25 +76,19 @@ impl Warming {
         }
     }
 
-    /// Whether every resource is made.
     pub fn is_done(&self) -> bool {
         self.next >= self.items.len()
     }
 
-    /// How many resources the plan holds.
     pub fn len(&self) -> usize {
         self.items.len()
     }
 
-    /// Whether the plan holds nothing.
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
 }
 
-/// One mesh item per geometry slot the extract would upload for `data` on a
-/// renderer holding nothing (`stale_uploads`, its own rule), naming the entity
-/// carrying the slot's newest revision.
 fn meshes(data: &SceneData) -> Vec<Item> {
     let candidates = data.entities.iter().enumerate().filter_map(|(i, e)| {
         let mesh = e.mesh.as_ref()?;
@@ -166,11 +104,6 @@ fn meshes(data: &SceneData) -> Vec<Item> {
 }
 
 impl Renderer {
-    /// Make the next resource `warming` lists of `data`, the document it was planned
-    /// from. Returns whether one was made; `false` once the plan is done, or while
-    /// its next resource is still read on a worker (a texture, the lightmap pages),
-    /// when the host tries again on a later frame. What a step uploads is the
-    /// warm-up's, never counted in a frame's `asset_uploads`.
     pub fn warm_step(&mut self, data: &SceneData, warming: &mut Warming) -> bool {
         if warming.is_done() {
             return false;
@@ -188,7 +121,6 @@ impl Renderer {
         made
     }
 
-    /// Make `warming`'s next item; whether it is made.
     fn make(&mut self, data: &SceneData, warming: &mut Warming) -> bool {
         let index = warming.next;
         match &warming.items[index] {
@@ -222,9 +154,6 @@ impl Renderer {
         }
     }
 
-    /// Make the texture at `index` of `warming`'s plan: found by a lookup when it
-    /// reads nothing from disk, else uploaded from its thread's read. Whether it is
-    /// made (`false` while it is still being read).
     fn warm_texture(
         &mut self,
         warming: &mut Warming,
@@ -252,8 +181,6 @@ impl Renderer {
         true
     }
 
-    /// The textures of `items` (from plan index `from` on) a lookup would read from
-    /// disk.
     fn unsettled(&self, items: &[Item], from: usize) -> Vec<decode::Job> {
         let textures = items.iter().enumerate().filter_map(|(i, item)| match item {
             Item::Texture(map, kind) => Some((from + i, map.clone(), *kind)),

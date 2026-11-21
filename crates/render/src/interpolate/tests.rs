@@ -1,6 +1,3 @@
-//! The drawn pose between two ticks (#1877): blended while moving, never a jump,
-//! and the live pose whenever the sim is not on the tick.
-
 use glam::Vec3;
 
 use super::*;
@@ -21,7 +18,6 @@ fn drawn_x(poses: &DrawPoses, scene: &Scene, id: u32) -> f32 {
     poses.world(scene, id).w_axis.x
 }
 
-/// Two ticks recorded: the box at 0, then at `x`.
 fn moved(x: f32) -> (Scene, u32, DrawPoses) {
     let (mut scene, id) = scene_with_box();
     let mut poses = DrawPoses::default();
@@ -76,7 +72,7 @@ fn a_spawn_and_the_first_tick_are_drawn_where_they_are() {
     let (mut scene, first) = scene_with_box();
     let mut poses = DrawPoses::default();
     poses.set_alpha(0.5);
-    poses.record(&scene); // the first tick: nothing before it
+    poses.record(&scene);
     assert_eq!(
         poses.world(&scene, first),
         scene.world.local_to_world(first)
@@ -98,7 +94,7 @@ fn an_entity_that_stops_is_drawn_at_its_pose_and_reposed_once() {
         poses.repose(&scene).contains(&id),
         "moving: re-posed every frame"
     );
-    poses.record(&scene); // a tick that moved nothing
+    poses.record(&scene);
     assert_eq!(poses.world(&scene, id), scene.world.local_to_world(id));
     assert!(
         poses.repose(&scene).contains(&id),
@@ -107,7 +103,7 @@ fn an_entity_that_stops_is_drawn_at_its_pose_and_reposed_once() {
     assert!(poses.repose(&scene).is_empty());
     place(&mut scene, id, 1.5);
     poses.record(&scene);
-    poses.clear(); // Pause, Stop, edit mode
+    poses.clear();
     assert_eq!(poses.world(&scene, id), scene.world.local_to_world(id));
 }
 

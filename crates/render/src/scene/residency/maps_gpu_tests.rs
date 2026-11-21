@@ -1,7 +1,3 @@
-//! crates/render/src/scene/residency/maps_gpu_tests.rs — a load that replaced the World
-//! releases the textures only the scene before used (#2458), keeps the shared ones,
-//! releases nothing on Play and Stop, and a scene loaded again draws as it did.
-
 use glam::Vec3;
 
 use super::super::fixture::frame;
@@ -12,7 +8,6 @@ use rusty_components::{MaterialAsset, MaterialComponent};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// A 16² image of `rgb` saved as `<name>.png` in the test's folder.
 pub(super) fn png(name: &str, rgb: [u8; 3]) -> MapRef {
     let path = rusty_test_support::temp::dir().join(format!("{name}.png"));
     let [r, g, b] = rgb;
@@ -21,7 +16,6 @@ pub(super) fn png(name: &str, rgb: [u8; 3]) -> MapRef {
     MapRef::new(path.to_string_lossy().into_owned())
 }
 
-/// A row of boxes, one per map, each its own material sampling it.
 pub(super) fn textured(maps: &[&MapRef]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -42,7 +36,6 @@ pub(super) fn textured(maps: &[&MapRef]) -> Scene {
     scene
 }
 
-/// The file names of the cached uploads (render textures aside), sorted.
 pub(super) fn maps(r: &Renderer) -> Vec<String> {
     let keys = r
         .gpu_textures

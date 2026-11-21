@@ -1,34 +1,17 @@
-//! crates/render/src/draw/camera/buffer.rs — the camera uniform group 0 binds, and
-//! the copies that rewrite it inside a camera's one encoder (#2353).
-//!
-//! A camera uploads its uniform once, before anything records. Two stages change
-//! it mid-camera: SSIL's source clears the `ssil` flag after the opaque pass, and
-//! the game gizmos draw through the base camera and then put the camera's own back.
-//! A `write_buffer` would land at the camera's submit, ahead of every pass it
-//! recorded, so each of them writes its value into its own [`Slot`] of a staging
-//! buffer and records a copy from there into the uniform, at its place among the
-//! passes.
-
 use crate::gpu::ops::CountedQueue as _;
 use crate::CameraUniform;
 
-/// A mid-camera value of the uniform, each written at most once a camera.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Slot {
-    /// The camera after SSIL's source: its `ssil` flag clear.
     SsilCleared,
-    /// The base camera's, which the game gizmos draw through.
     GizmoBase,
-    /// The camera's own again, after the gizmos.
     GizmoBack,
 }
 
 const SLOTS: u64 = 3;
 const SIZE: u64 = std::mem::size_of::<CameraUniform>() as u64;
 
-/// The camera uniform and its mid-camera slots.
 pub(crate) struct CameraBuffer {
-    /// What group 0 binds.
     pub uniform: wgpu::Buffer,
     slots: wgpu::Buffer,
 }
@@ -53,7 +36,6 @@ impl CameraBuffer {
         }
     }
 
-    /// Upload a camera's uniform, before its encoder records anything that reads it.
     #[track_caller]
     pub(crate) fn upload(&self, queue: &wgpu::Queue, uniform: &CameraUniform) {
         queue.counted_write_buffer(&self.uniform, 0, bytemuck::bytes_of(uniform));

@@ -1,8 +1,3 @@
-//! Baked occlusion culling on the GPU (#1714): in the corridors-and-rooms level, at
-//! camera positions down the corridor, in doorways and on cell borders, a frame
-//! with the PVS on is byte-identical to one with it off, and the PVS culls a stated
-//! floor down the corridor. A moved occluder turns it off; a moved prop is drawn.
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -14,8 +9,6 @@ use rusty_scene::{Camera, Scene};
 const W: u32 = 128;
 const H: u32 = 80;
 
-/// Down the corridor, on cell borders (x and y even from the grid's origin),
-/// in each doorway, and in the rooms: `(eye, yaw, pitch)`.
 const VIEWS: [(Vec3, f32, f32); 10] = [
     (Vec3::new(1.0, 1.6, 0.0), 0.0, 0.0),
     (Vec3::new(4.0, 1.8, 0.0), 0.0, 0.0),
@@ -29,7 +22,6 @@ const VIEWS: [(Vec3, f32, f32); 10] = [
     (Vec3::new(14.0, 1.0, 3.0), 0.0, -10.0),
 ];
 
-/// The level with its PVS baked.
 fn baked() -> Scene {
     let mut scene = corridors();
     let data = bake_occlusion(&scene, 4)
@@ -39,7 +31,6 @@ fn baked() -> Scene {
     scene
 }
 
-/// One frame of `scene` from `view` on `r`, with occlusion culling `on`.
 fn frame(r: &mut Renderer, scene: &Scene, view: (Vec3, f32, f32), on: bool) -> Shot {
     let mut cam = Camera::new(view.0, view.1, view.2);
     (cam.fov, cam.use_occlusion_culling) = (70.0, on);
@@ -48,7 +39,6 @@ fn frame(r: &mut Renderer, scene: &Scene, view: (Vec3, f32, f32), on: bool) -> S
 
 type Shot = (Vec<u8>, RenderCounters);
 
-/// One frame of `scene` through `cam`: its pixels and counters.
 fn shot(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Shot {
     let mut target = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = target.color_target_view().unwrap();
@@ -82,7 +72,6 @@ fn gpu_the_pvs_never_changes_a_pixel_and_culls_down_the_corridor() {
         );
         culled.push(c.occlusion_culled);
     }
-    // Down the corridor from its end: the rooms' far props and walls are hidden.
     assert!(culled[0] >= 8, "culled per view: {culled:?}");
 }
 
@@ -91,7 +80,6 @@ fn gpu_a_moved_occluder_turns_the_bake_off_and_a_moved_prop_is_drawn() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    // A prop with a draw distance (one that culls nothing here) only is occluded.
     let mut scene = corridors();
     let prop = nearest(&scene, Vec3::new(17.0, 0.5, -7.0));
     scene.world.mesh_mut(prop).unwrap().max_draw_distance = 1000.0;
@@ -109,12 +97,10 @@ fn gpu_a_moved_occluder_turns_the_bake_off_and_a_moved_prop_is_drawn() {
         moved.occlusion_culled > 0 && moved.occlusion_culled < before.occlusion_culled,
         "{moved:?}"
     );
-    // An occluder moved: anything may show behind it now, so nothing is culled.
     let wall = nearest(&scene, Vec3::new(2.0, 1.5, 1.0));
     scene.world.transform_mut(wall).unwrap().position.y += 0.01;
     let (_, off) = frame(&mut r, &scene, view, true);
     assert_eq!(off.occlusion_culled, 0, "{off:?}");
-    // A camera that leaves the walls' layer out sees past them: it culls nothing.
     let mut scene = baked();
     for id in scene.world.ids_with_mesh() {
         if scene.world.name(id).is_some_and(|n| n.as_str() == "Wall") {
@@ -127,7 +113,6 @@ fn gpu_a_moved_occluder_turns_the_bake_off_and_a_moved_prop_is_drawn() {
     assert_eq!(masked.occlusion_culled, 0, "{masked:?}");
 }
 
-/// The mesh entity whose origin is nearest `at`.
 fn nearest(scene: &Scene, at: Vec3) -> u32 {
     let d = |id: u32| {
         scene

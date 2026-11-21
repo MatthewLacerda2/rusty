@@ -23,14 +23,13 @@ pub(crate) mod render_texture;
 pub(crate) mod scene;
 mod setup;
 mod stats;
-#[doc(hidden)] // A test hook: the crates above reach it from their own tests.
+#[doc(hidden)]
 pub mod test_gpu;
 pub(crate) mod timing;
 pub mod ui;
 mod view;
 pub mod warm;
 
-// Moved submodules, pulled back under short names this module's body names them by.
 use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
@@ -55,135 +54,71 @@ pub use stats::{EarlyFlushes, RenderSwitch, RenderSwitches};
 pub use timing::{ClockProbe, FrameCost, GpuPart, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
-// GPU uniform memory layouts live in `gpu/uniforms/` (split out to keep files under
-// the size cap); re-imported here so the render module body still names them directly.
 pub(crate) use gpu::uniforms::{
     AmbientLightUniform, CameraUniform, DirectionalLightUniform, DrawUniform, InstanceData,
     LightingUniform, MaterialData,
 };
 
-// Stores GPU Buffer handlers for meshes
 pub struct GpuMesh {
     pub vertex_buffer: wgpu::Buffer,
     pub index_buffer: wgpu::Buffer,
     pub num_indices: u32,
-    /// Local-space AABB `(min, max)` over this geometry's vertices, computed once at
-    /// upload and stored alongside the vertex data (#330). Frustum culling transforms
-    /// it by the entity's world matrix (8 corners, O(1)) each frame instead of ever
-    /// re-walking the vertices.
     pub local_aabb: (glam::Vec3, glam::Vec3),
-    /// Per-joint bind-pose boxes, computed at the same upload: a skinned entity's
-    /// animated bound is built from them and its palette each frame (#833).
     pub skin_bounds: SkinBounds,
-    /// The geometry revision these buffers hold (#1540): a mesh carrying a newer
-    /// one is re-uploaded.
     pub revision: MeshRevision,
-    /// Its rows of the shared cluster table and its indices in the pool (#1968,
-    /// #2417), when its import split it (`passes::hiz::clusters`).
     pub(crate) clusters: Option<crate::passes::hiz::clusters::GpuClusters>,
 }
 
 pub struct Renderer {
     pub device: wgpu::Device,
     pub queue: wgpu::Queue,
-    /// `None` in the headless (offscreen screenshot) path — there is no window
-    /// surface to present to, only an offscreen colour texture.
     pub surface: Option<wgpu::Surface<'static>>,
     pub config: wgpu::SurfaceConfiguration,
 
-    // Pipelines
     render_pipeline: gpu::pipelines::FacedPipeline,
-    /// Forward pipelines also writing velocity (#1435) and SSR surface (#1526) targets.
     velocity_pipeline: gpu::pipelines::VelocityPipelines,
-    /// The opaque ones over a view's primed depth (#1499).
     primed_pipelines: gpu::pipelines::PrimedPipelines,
-    /// The post effects' shared pipelines (#1467): bloom, depth of field (#1445), the
-    /// exposure meter (#1444) and motion blur (#1436).
     pub(crate) post_passes: postfx::effects::Passes,
-    /// Alpha-blended translucent solids (#242); depth write off, drawn by sorting priority,
-    /// then back-to-front (#2039), in the transparent pass after opaque. Built on first use, like the three
-    /// editor-only pipelines below (#985).
     transparent_pipelines: gpu::pipelines::TransparentPipelines,
-    /// The translucents' depth postpass (#1523).
     depth_postpass_pipelines: gpu::pipelines::DepthPostpassPipelines,
     line_pipeline: gpu::pipelines::LazyPipeline,
-    /// The collider and debug-line gizmos' lines, coloured per vertex (#1882).
     vertex_line_pipeline: gpu::pipelines::LazyPipeline,
-    /// Each collider's gizmo shape, kept until physics' inputs for it change (#1882).
     wire_cache: std::cell::RefCell<rusty_physics::WireCache>,
-    /// The reflection probes' mirror-ball gizmo (#1911).
     probe_ball_pipeline: gpu::pipelines::LazyPipeline,
-    /// The navmesh gizmo (#1910): its pipeline and the kept triangles the shell hands it.
     navmesh: draw::NavMeshGizmo,
-    /// The editor's selection outline (#1175).
     outline: passes::outline::OutlinePasses,
 
-    // Bind Group Layouts
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub texture_layout: wgpu::BindGroupLayout,
-    /// Expanded material-group layout (the material maps, their samplers and the shader
-    /// slots, `gpu::bind_layouts`) each cached material bind group is built against (#202).
     pub material_layout: wgpu::BindGroupLayout,
 
-    // Buffers and Bind Groups (Global)
     camera_buffer: draw::camera::buffer::CameraBuffer,
     lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
-    /// Rebuild the global bind group only when something it binds changed (the sky
-    /// cube, the probe array, a regrown light/decal buffer, the lightmap pages), not every
-    /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
-    /// The global group kept for the procedural sky slot not bound (#1620).
     spare_global_group: ibl::sky_cube::SpareGroup<wgpu::BindGroup>,
-    /// The light-cluster buffers the global group binds (#434), refilled per camera.
     clusters: clusters::ClusterBuffers,
-    /// The baked lightmap pages the global group binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
-    /// What every solid draw binds as its per-draw group (#470): per-draw uniforms, palettes and
-    /// instances per camera, and the object and material tables (#1706).
     draw_buffers: gpu::draw_buffers::DrawBuffers,
-    /// GPU occlusion culling's compute pipelines (#1963).
     hiz: passes::hiz::HiZ,
-    /// Each Light Probe Proxy Volume's last grid samples (#1672).
     proxy_volumes: draw::proxy_volume::ProxyVolumes,
-    /// The `Baked` lights the console has named as waiting for a bake (#2522).
     unbaked: clusters::UnbakedNote,
-    /// One material bind group (`gpu::groups::MATERIAL`) per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
-    /// The pipelines materials' authored surface shaders draw with, by name (#396).
     pub(crate) surface_shaders: gpu::pipelines::surface::SurfaceShaders,
-    /// Group repeated mesh + material pairs into instanced draws (#470). Always on in
-    /// the engine; tests turn it off to compare against one-draw-per-entity.
     pub(crate) instancing: bool,
-    /// Reuse the SSAO prepass's depth in the forward pass (#1499). Always on in the
-    /// engine; tests turn it off to compare against the unprimed pass.
     pub(crate) depth_priming: bool,
-    /// Whether the adapter's backend primes at all (`pipelines::priming`): not Metal.
     pub(crate) priming_recommended: bool,
 
-    // Asset caches. Meshes by mesh-asset identity (#127): one buffer pair per geometry.
     pub gpu_meshes: HashMap<MeshId, GpuMesh>,
     pub gpu_textures: HashMap<rusty_asset::MapRef, Rc<GpuTexture>>,
-    /// An uncompressed copy of a cached upload whose block format a slot cannot
-    /// read (a BC5 normal map drawn as albedo, #1574), by the same key.
     pub(crate) texture_fallbacks: HashMap<rusty_asset::MapRef, Rc<GpuTexture>>,
-    /// What each cached upload's mips were built for (#1416).
     pub(crate) texture_kinds: crate::gpu::textures::kind_watch::KindWatch,
-    /// Which cached uploads went stale: re-written files and failed loads (#689).
     pub(crate) texture_freshness: rusty_core::fs::freshness::Freshness,
-    /// What texture writes hold in staging, bounded (`gpu::ops::Staging`).
     pub(crate) staging: gpu::ops::Staging,
     pub default_texture: Rc<GpuTexture>,
-    /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,
-    /// Draws every uploaded image's mip chain (#1322).
     pub(crate) mip_generator: gpu::textures::MipGenerator,
-    /// A material bind group whose six map slots point at
-    /// `default_texture` (its shader slots at `white_texture`) — used by the
-    /// editor-grid and gizmo passes, which never sample the maps (they render unlit /
-    /// use the default checker) but still must supply a bind group matching the
-    /// expanded `material_layout` (#202).
     pub default_material_bind_group: wgpu::BindGroup,
 
     grid_vertex_buffer: Option<wgpu::Buffer>,
@@ -198,93 +133,45 @@ pub struct Renderer {
     pub shadow_renderer: shadows::ShadowRenderer,
     pub skybox_texture: Option<Rc<GpuTexture>>,
     pub skybox_path: String,
-    /// The reflection probes the frame shades with (#1206): the nearest baked probes'
-    /// cubes in one cube array at the global group's binding 4, and the slots each draw blends.
     reflection_probes: reflection_probes::ProbeArray,
-    /// The sky's prefiltered reflection cubes at the global group's binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
-    /// The reflection-probe bake's GPU prefilter (#1602), built on the first bake.
     probe_prefilter: std::sync::OnceLock<ibl::reflection_prefilter::gpu::ProbePrefilter>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
-    /// The forward pass's scene group with the white no-AO fallback: every pass that
-    /// draws without SSAO (the transparent pass, SSAO off, a stacked DepthOnly camera)
-    /// binds this.
     pub shadow_bind_group: wgpu::BindGroup,
-    /// The opaque copy's pass, stand-in and sampler (#1523): every scene group binds the
-    /// stand-in but a transparent pass whose camera copied
-    /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
-    /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
     pub(crate) prepass_pipeline: gpu::pipelines::PrepassPipelines,
-    /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
     pub(crate) ssao: passes::ssao::SsaoRenderer,
-    /// The grading-LUT bake every view's table is written through (#1440).
     pub(crate) grade_bake: postfx::grade::GradeBake,
 
-    /// The running quality preset's values (#1522): what each effect's quality level
-    /// costs (`postfx::effects`, the SSAO pass, the UI backdrop blur).
     pub quality: rusty_core::settings::quality::QualityValues,
-    /// The player's graphics options (#1438): which effects the player allows,
-    /// ANDed with each camera's choice (`postfx::params::effect_runs`).
     pub graphics_options: rusty_core::settings::graphics_options::GraphicsOptions,
-    /// The screen's render scale (#1498); see [`RenderView::set_render_scale`].
     pub render_scale: rusty_core::settings::render_scale::RenderScale,
-    /// Present modes the surface advertises, captured at construction. Used to
-    /// decide whether vsync can be turned off (`Immediate`) without a wgpu panic;
-    /// the headless path has no real swapchain so it only ever lists `Fifo`.
     present_modes: Vec<wgpu::PresentMode>,
 
-    /// Billboard particle pass (draws into the HDR target before post-FX).
     particle_renderer: particles::ParticleRenderer,
 
-    /// Trail + line ribbon pass (#441), drawn just before the particles.
     ribbon_renderer: passes::ribbons::RibbonRenderer,
 
-    /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
     ui_renderer: ui::UiRenderer,
 
-    /// The frame's decals and their atlas (#638), in the global group and the forward material inputs.
     decals: decals::DecalBuffers,
 
-    /// The volumetric fog (#1703) in the global group, filled by each base camera running it before it draws.
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
-    /// The global group's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
     linear_clamp: wgpu::Sampler,
-    /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 
-    /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
-    /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
     capture: ibl::cubemap_capture::CaptureMode,
-    /// The measurement switches (`stats::switches`): all on unless a bench set one.
     switches: RenderSwitches,
 
-    /// The retained render scene (#1706): mesh handles and each drawn scene's objects.
     pub(crate) retained: scene::Retained,
-    /// What a frame draws between two fixed ticks (#1877): filled by the shell, read
-    /// by the retained scene and the game view's camera.
     pub draw_poses: interpolate::DrawPoses,
 
-    /// What the last `render` call submitted (#433) — read by the dev layer's stats.
     pub frame_counters: RenderCounters,
-    /// The scene assets uploaded since the last frame's counters closed.
     pub(crate) uploads: stats::Uploads,
-    /// GPU time per render pass (#835): disabled without `TIMESTAMP_QUERY`.
     pub(crate) gpu_timer: timing::GpuTimer,
 
-    /// Every registered render texture's current allocation id, by path, and the
-    /// last id handed out (#430) — the material cache's key for `"rt:"` maps.
     render_texture_ids: (HashMap<String, u64>, u64),
 
-    /// This renderer's slot in the headless budget (#366) — `Some` for headless
-    /// renderers, `None` for the windowed one, which is the application itself and
-    /// never queues behind a test budget.
-    ///
-    /// **Declared last on purpose.** Struct fields drop in declaration order, so the
-    /// permit is released only after the device, queue and every GPU resource above it
-    /// have been dropped. Freeing the slot any earlier would let the next renderer
-    /// allocate against memory this one has not actually returned yet — which is the
-    /// entire failure this guard exists to prevent.
     _gpu_permit: Option<setup::budget::Permit>,
 }

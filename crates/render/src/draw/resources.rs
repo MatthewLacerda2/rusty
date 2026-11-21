@@ -1,9 +1,3 @@
-//! Per-frame GPU resource pre-creation: the camera's solids (and mesh particles, #440)
-//! as instanced draws (#470), and the overlay resource-tuple type aliases. The
-//! material bind groups they share live in `materials`; editor overlays in
-//! `overlays` and its children. Each block returns owned resources that outlive the
-//! render pass.
-
 use super::batch::sort::{transparent_order, TransparentOrder};
 use super::batch::{DrawItem, FrameDraws, OpaqueOrder};
 use super::overlays::{BallResource, ColliderScope, OverlayBindings, OverlayDraws};
@@ -18,77 +12,39 @@ use glam::Vec3;
 use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::Scene;
 
-/// One camera's solids as instanced draws (#470), split into the two passes a frame
-/// draws (#242): `draws.opaque` (Opaque + Cutout; REPLACE, depth write on) and
-/// `draws.transparent` (by sorting priority, then back-to-front; alpha-blended). Both index the instance array
-/// uploaded into `draw_buffers` by `precreate_solid_resources`.
 #[derive(Default)]
 pub(crate) struct SolidResources {
     pub draws: FrameDraws,
-    /// What this camera's culling skipped, and how (#433, #472, #1714).
     pub culls: CameraCulls,
-    /// Mesh entities drawn: one each, however many material runs it draws in (#1285).
     pub visible: u32,
-    /// Mesh particles among the instances (#440) — counted as particles, not entities.
     pub mesh_particles: u32,
-    /// Where the solids the selection outline rings sit in world space (#1175);
-    /// `None` when it rings none.
     pub outline_bounds: Option<OutlineBounds>,
-    /// The objects GPU occlusion culling may test, by slot, with their world bounds
-    /// (#1963; empty when the camera does not cull by Hi-Z), and, once its stage
-    /// ran, the opaque draws it decided.
     pub tested: Vec<(u32, (Vec3, Vec3))>,
     pub culled: Option<crate::passes::hiz::Culled>,
-    /// The camera culls by Hi-Z but tests too few objects for the stage to run
-    /// (`passes::hiz::MIN_INSTANCES`): drawn whole, its forward pass primed by a
-    /// prepass of its batches, as it was while it culled.
     pub floored: bool,
 }
-// Each overlay keeps only what it owns (any vertex buffer) and its slot of the pass's
-// one overlay per-draw group ([`OverlayBindings`], #1616): its uniform there places it and
-// names its tint's record, and the joints and instance it binds are the renderer's
-// shared identities (#210). The selection outline is not an overlay: it is its own
-// pass over the solids' own draws (`passes::outline`, #1175).
 pub(crate) type GridResource = u32;
 pub(crate) type AabbResource = (wgpu::Buffer, u32);
 pub(crate) type AxisResource = (usize, u32);
-// One vertex-coloured line-list draw (the probe family's, the wires'): its
-// world-space vertex buffer, its slot, and the vertex count to draw.
 pub(crate) type LineResource = (wgpu::Buffer, u32, u32);
 
-/// The editor-only overlay resources for one handles pass (grid, occlusion boxes,
-/// axis arrows, probe gizmos), drawn after post-FX (#1224). Bundled so the pass
-/// takes a single value instead of four (#93).
 #[derive(Default)]
 pub(crate) struct Overlays {
-    /// The per-draw group every overlay binds at its slot; `None` when there is none.
     pub bindings: Option<OverlayBindings>,
     pub grid: Option<GridResource>,
     pub aabb: Vec<AabbResource>,
     pub axis: Vec<AxisResource>,
-    /// The light- and reflection-probe gizmos (#284) and the Area lights' (#1674):
-    /// one draw, coloured per vertex, through the vertex-colour line pipeline.
     pub probes: Option<LineResource>,
-    /// The reflection probes' mirror balls (#1911).
     pub balls: Vec<BallResource>,
-    /// The navmesh gizmo's slot (#1910); its vertex buffer is the renderer's, kept.
     pub navmesh: Option<u32>,
-    /// The collider and `Debug.Draw*` line gizmos (#1882): one draw, coloured per
-    /// vertex, through the vertex-colour line pipeline.
     pub wires: Option<LineResource>,
 }
 
 impl Renderer {
-    /// The one shared identity joint buffer the overlays bind, so none of them
-    /// allocate a per-draw palette (#210).
     pub(crate) fn shared_bones_buffer(&self) -> &wgpu::Buffer {
         self.draw_buffers.default_bones()
     }
 
-    /// Pre-create the editor overlay resources for one handles pass. Only an editor
-    /// camera draws one (`draw::camera`'s `handles` stage).
-    /// `gizmos` is the Scene view's set (#1909): what it leaves off is not built.
-    /// `eye` orders the colliders' wires nearest first (#1882).
     pub(crate) fn precreate_overlays(
         &self,
         scene: &Scene,
@@ -119,8 +75,6 @@ impl Renderer {
         }
     }
 
-    /// A game frame's gizmos (#1882): every collider and the debug lines, nothing
-    /// of the editor's own (no grid, arrows or probes).
     pub(crate) fn precreate_game_overlays(&self, scene: &Scene, eye: Vec3) -> Overlays {
         let mut draws = OverlayDraws::default();
         let wires = self.precreate_wires(scene, (ColliderScope::All, eye), &mut draws);
@@ -131,12 +85,6 @@ impl Renderer {
         }
     }
 
-    /// Collect this camera's visible solids (skipping the LOD levels `lod` hides), batch repeated mesh + material pairs into
-    /// instanced draws (#470), and upload the camera's packed draw data. `marks`:
-    /// with `outline` (an editor camera), the solids the selection outline rings are
-    /// marked, so it draws from their draws (#1175); with `history` (a view writing
-    /// motion vectors, #1435), each solid also carries its last-frame pose. `order`
-    /// ranks the opaque runs for the pass's priming (`Self::opaque_order`, #2484).
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
@@ -146,7 +94,6 @@ impl Renderer {
     ) -> SolidResources {
         let eye = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
-        // Only a camera that culls by Hi-Z reads what it may test (#1963).
         let mut tested = Vec::new();
         let hiz = self.hiz_culls(cam);
         let limits = self.device.limits();
@@ -188,8 +135,6 @@ impl Renderer {
         }
     }
 
-    /// Sort the translucent items by priority, then back to front (#2039), batch both lists into instanced
-    /// draws (#470) and upload the camera's packed draw data.
     fn upload_solids(
         &mut self,
         (opaque, mut transparent, order): (

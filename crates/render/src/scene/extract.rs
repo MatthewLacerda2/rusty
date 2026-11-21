@@ -1,8 +1,3 @@
-//! crates/render/src/scene/extract.rs — the one extract step a frame takes (#1706): bring
-//! the drawn scene's retained objects up to date from what changed, uploading the
-//! meshes and loading the maps of the objects it re-derives first, so their keys bind
-//! what is resident.
-
 use std::collections::BTreeSet;
 
 use super::inputs::{Dirty, Inputs, LibraryEdits, RendererInputs};
@@ -14,8 +9,6 @@ use crate::Renderer;
 use rusty_scene::{Scene, SceneId};
 
 impl Renderer {
-    /// Bring `scene`'s retained objects up to date. Once per frame, after everything
-    /// a key or instance reads on the renderer is settled (`prepare_frame`).
     pub(crate) fn extract_scene(&mut self, scene: &Scene) {
         let start = std::time::Instant::now();
         let mut retained = self.retained.take(scene.id());
@@ -27,9 +20,6 @@ impl Renderer {
         self.frame_counters.render_extract_us += start.elapsed().as_micros() as u64;
     }
 
-    /// Free the GPU buffers of each library mesh (#2059) `scene` defined at its
-    /// last extract and no longer does (`Mesh.DeleteAsset`). One comparison of the
-    /// names per frame; a mesh made again under the name uploads afresh.
     fn free_deleted_meshes(&mut self, scene: &Scene, rs: &mut RenderScene) {
         if scene.meshes.keys().eq(rs.library_meshes.iter()) {
             return;
@@ -45,7 +35,6 @@ impl Renderer {
         rs.library_meshes = scene.meshes.keys().cloned().collect();
     }
 
-    /// The renderer-side inputs every object reads, as they are now.
     fn renderer_inputs(&self) -> RendererInputs {
         RendererInputs {
             revision: self.retained.inputs,
@@ -66,8 +55,6 @@ impl Renderer {
             }
         };
         let rekeyed = self.apply_library(scene, rs, &library);
-        // Moving between two ticks moves what is drawn with no log entry (#1877); a
-        // rebuild poses them all anyway, but the set drawn blended is noted either way.
         let between_ticks = self.draw_poses.repose(scene);
         let stats = match dirty {
             Dirty::Rebuild => self.rebuild_objects(scene, rs),
@@ -92,11 +79,6 @@ impl Renderer {
         stats
     }
 
-    /// Act on the library's edits (#1706): a removed name's records are freed, and a
-    /// record-only edit rewrites the name's records in the material table and its
-    /// param buffer in place. Returns the objects to re-derive: the users of a name
-    /// added, removed or re-keyed, and those of a name whose params moved that
-    /// override them (their buffers merge the material's params).
     fn apply_library(
         &mut self,
         scene: &Scene,
@@ -122,8 +104,6 @@ impl Renderer {
             }
             let overriding = rs.users_of_name(name);
             rederive.extend(overriding.filter(|&id| scene.shader_overrides.of(id).is_some()));
-            // Only a buffer something draws is rewritten, so a params edit on a
-            // material nothing draws compiles no shader mid-extract.
             let owner = ParamOwner::Material(scene.id(), name.clone());
             if !self.materials.holds_params(&owner) {
                 continue;
@@ -139,10 +119,6 @@ impl Renderer {
         rederive
     }
 
-    /// Every mesh entity re-derived: the first frame, a load, an Undo, a renderer
-    /// input. The one walk of the World an extract takes. An object still there
-    /// keeps its slot, so a record whose value did not move uploads nothing; only
-    /// the slots of objects gone are freed.
     pub(super) fn rebuild_objects(&mut self, scene: &Scene, rs: &mut RenderScene) -> ExtractStats {
         let ids = scene.world.ids_with_mesh();
         self.upload_meshes_of(scene, &ids);
@@ -176,8 +152,6 @@ impl Renderer {
     ) -> ExtractStats {
         let changed: Vec<u32> = whole.iter().copied().collect();
         self.upload_meshes_of(scene, &changed);
-        // A geometry re-uploaded since the last extract (by this scene, another or a
-        // mesh particle) re-shapes every object drawing it. Walked only then.
         let seen = rs.inputs.as_ref().map_or(0, |i| i.uploads_seen);
         if self.retained.meshes.uploads() > seen {
             let meshes = &self.retained.meshes;
@@ -185,7 +159,6 @@ impl Renderer {
             let reshaped = reshaped.filter(|(_, o)| meshes.uploaded_since(o.mesh, seen));
             whole.extend(reshaped.map(|(&id, _)| id));
         }
-        // The views re-registered their render textures: re-key what binds one.
         if rs
             .inputs
             .as_ref()
@@ -217,8 +190,6 @@ impl Renderer {
         }
     }
 
-    /// Re-derive the objects of `ids`, each keeping its slot (an id without a mesh
-    /// drops its object and frees its slot); how many were derived.
     fn derive_objects(&mut self, scene: &Scene, rs: &mut RenderScene, ids: &[u32]) -> u32 {
         let mut derived = 0;
         for &id in ids {
@@ -233,10 +204,6 @@ impl Renderer {
         derived
     }
 
-    /// Load every map the materials of `entities` sample (albedo #201, metallic and
-    /// roughness #202, the rest and the shader texture slots #400), each as what its
-    /// slot holds (#1322), before their keys are built. Inactive entities' too:
-    /// re-enabling one must not stall on uploads and mip generation (#1363).
     fn load_maps_of(&mut self, scene: &Scene, entities: &[u32]) {
         for &id in entities {
             let maps = scene
@@ -249,20 +216,13 @@ impl Renderer {
     }
 }
 
-/// What one extract did. `extract_scene` adds it to the frame's
-/// `RenderCounters`, which `Debug.Stats` reports as `render_extracted` and
-/// `render_posed` (`render::stats`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ExtractStats {
-    /// Objects re-derived whole: ids the extract re-read that still have a mesh.
     pub extracted: u32,
-    /// Objects only re-placed (a move).
     pub posed: u32,
 }
 
 impl Renderer {
-    /// Keep `rs` as scene `id`'s objects. A scene that evicts gives back its slots
-    /// and its material param buffers (`MaterialCache::release_scene`).
     pub(super) fn keep_scene(&mut self, id: SceneId, rs: RenderScene) {
         if let Some(gone) = self.retained.put(id, rs) {
             self.materials.release_scene(gone);

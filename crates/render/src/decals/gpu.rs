@@ -1,8 +1,3 @@
-//! The frame's decals on the GPU (#638): one record array uploaded once per frame,
-//! and the atlas their maps live in, bound in group 0 at bindings 10–13. Each
-//! camera bins the same records into its clusters with its lights
-//! (`Renderer::bin_clusters`).
-
 use std::collections::BTreeMap;
 
 use glam::Vec3;
@@ -21,9 +16,7 @@ use rusty_scene::Scene;
 pub(crate) struct DecalBuffers {
     records: GrowBuffer,
     pub(crate) atlas: DecalAtlas,
-    /// The frame's decals' bounding spheres, in record order, for binning.
     pub(crate) spheres: Vec<(Vec3, f32)>,
-    /// Each decal's maps and the records uploaded, kept between frames.
     kept: KeptDecals,
 }
 
@@ -37,20 +30,12 @@ impl DecalBuffers {
         }
     }
 
-    /// The record buffer group 0 binds at binding 10.
     pub(crate) fn records(&self) -> &wgpu::Buffer {
         self.records.buffer()
     }
 }
 
 impl Renderer {
-    /// Upload the scene's decals, once per frame: load any new maps into the atlas,
-    /// then write every record, oldest first (the FIFO order they blend in). Each
-    /// decal draws at its pose this frame (#639): an owned one follows its owner
-    /// through its world matrix (`World::local_to_world`, never stale), and one
-    /// whose owner is inactive or that has faded out is left out. Each decal's maps
-    /// are kept from frame to frame, and records equal to the uploaded ones are not
-    /// written again (#1706, `kept`).
     pub(crate) fn upload_decals(&mut self, scene: &Scene) {
         let d = &mut self.decals;
         d.kept.begin(scene);
@@ -101,7 +86,6 @@ impl Renderer {
     }
 }
 
-/// The library material `decal` names, if it names one that exists.
 pub(super) fn resolve<'a>(
     materials: &'a BTreeMap<String, MaterialAsset>,
     decal: &Decal,

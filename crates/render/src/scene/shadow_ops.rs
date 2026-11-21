@@ -1,7 +1,3 @@
-//! crates/render/src/scene/shadow_ops.rs — the edits the equivalence tests add for what the
-//! shadow sweeps and the static bakes' key read off the retained objects (#1706):
-//! a casting mode, a small-object cull, a Cutout library material, a `LODGroup`.
-
 use glam::camera::rh::proj::directx;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Vec3};
@@ -31,7 +27,6 @@ pub(super) fn s_op() -> impl Strategy<Value = S> {
     ]
 }
 
-/// Apply `op` to `scene`.
 pub(super) fn edit(scene: &mut Scene, op: &S) {
     let ids = scene.world.ids();
     let pick = |i: usize| ids.get(i).copied();
@@ -71,8 +66,6 @@ pub(super) fn edit(scene: &mut Scene, op: &S) {
     }
 }
 
-/// Whether the static bakes' key and the unbaked renderers `r` keeps for `scene`
-/// equal a read of the ECS from scratch; what differs, when not.
 pub(super) fn kept_equals_fresh(r: &Renderer, scene: &Scene) -> Result<(), String> {
     let kept = r.retained.scene(scene.id()).expect("extracted");
     let (key, fresh) = (kept.statics_key(scene), statics_key(scene));
@@ -85,11 +78,6 @@ pub(super) fn kept_equals_fresh(r: &Renderer, scene: &Scene) -> Result<(), Strin
     gathers_what_a_walk_keeps(kept)
 }
 
-/// The shadow sweeps' gather through the caster BVH (#1874), for short point-light
-/// faces every half metre along the yard and a degenerate volume, in walk order:
-/// a static bake's holds every static object whose bounds the frustum keeps (or
-/// that has none), a per-frame sweep's every dynamic object and every static one
-/// that casts per frame.
 fn gathers_what_a_walk_keeps(kept: &RenderScene) -> Result<(), String> {
     let face = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, 0.05, 0.8);
     let mut views = vec![Mat4::ZERO];

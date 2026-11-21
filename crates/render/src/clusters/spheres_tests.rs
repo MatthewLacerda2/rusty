@@ -1,8 +1,3 @@
-//! Binning bare spheres (#638, the decals' path) and the range list the shader
-//! reads: the cull tally counts only what left the view, the budget keeps the
-//! nearest *surfaces*, and the decal ranges follow the lights', shifted past their
-//! indices.
-
 use glam::Vec3;
 
 use super::bin::{bin_spheres, Binned, Budget};
@@ -11,7 +6,6 @@ use super::grid::AabbCache;
 use super::{ClusterGrid, CLUSTER_COUNT};
 use rusty_scene::Camera;
 
-/// Bin `spheres` for a camera at the origin looking down -Z, keeping `budget`.
 fn bin(spheres: &[(Vec3, f32)], budget: usize) -> Binned {
     let grid = ClusterGrid::new(&Camera::new(Vec3::ZERO, -90.0, 0.0), 16.0 / 9.0);
     bin_spheres(
@@ -22,7 +16,6 @@ fn bin(spheres: &[(Vec3, f32)], budget: usize) -> Binned {
     )
 }
 
-/// A sphere `distance` straight ahead.
 fn ahead(distance: f32, radius: f32) -> (Vec3, f32) {
     (Vec3::new(0.0, 0.0, -distance), radius)
 }
@@ -36,7 +29,6 @@ fn only_spheres_out_of_view_count_as_culled() {
 
 #[test]
 fn the_budget_keeps_the_nearest_surfaces() {
-    // A big sphere farther out whose surface is nearer than a small close one's.
     let binned = bin(&[ahead(10.0, 4.0), ahead(7.0, 0.5)], 1);
     assert_eq!((binned.visible, binned.dropped), (1, 1));
     assert!(
