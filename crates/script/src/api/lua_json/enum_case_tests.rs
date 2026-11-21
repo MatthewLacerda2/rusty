@@ -1,7 +1,3 @@
-//! Every enum a Lua table reaches through serde reads its name in any case (#1216):
-//! the UI gradient kind, every texture op and op enum (walked from the op catalog),
-//! the shader pass, and zimmer's patch enums — each decoded from a Lua table.
-
 use mlua::{Lua, Value};
 use serde_json::{json, Map, Value as Json};
 
@@ -32,8 +28,6 @@ fn a_gradient_kind_reads_in_any_case_from_lua() {
     );
 }
 
-/// `info`'s op with its required params filled and every enum param at its
-/// `round`th value, the op tag and the enum values passed through `case`.
 fn op_doc(info: &OpInfo, round: usize, case: fn(&str) -> String) -> Json {
     let mut doc = Map::new();
     doc.insert("op".into(), json!(case(info.op)));

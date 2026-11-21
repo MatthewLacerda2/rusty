@@ -1,7 +1,3 @@
-//! The `NavMeshObstacle` namespace (#456), through Lua: setters route through the
-//! shared ops (clamped), getters read back, and an entity without an obstacle
-//! reads neutral defaults.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

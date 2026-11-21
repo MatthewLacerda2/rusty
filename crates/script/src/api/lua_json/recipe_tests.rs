@@ -1,7 +1,3 @@
-//! The texture and shader recipes as their Lua verbs read them (#1209): the
-//! on-disk JSON (`to_json`) comes back unchanged through [`recipe_from_lua`], and
-//! an unknown key is refused by name.
-
 use std::collections::BTreeMap;
 
 use mlua::{Lua, Value};
@@ -11,7 +7,6 @@ use rusty_procgen::recipe::{Checker, Node, OpKind};
 use rusty_procgen::TextureRecipe;
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 
-/// Read `json` the way a script passing it as a string to a recipe verb is read.
 fn read<T: DeserializeOwned>(lua: &Lua, json: &str) -> Result<T, String> {
     recipe_from_lua(&Value::String(lua.create_string(json).unwrap()))
 }

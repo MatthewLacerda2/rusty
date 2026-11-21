@@ -1,6 +1,3 @@
-//! `Component.Set` on the "read it, change it, `Set` it back" path (#1369's
-//! review): paired fields, holed lists, unchanged keys and number coercion.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,7 +8,6 @@ use crate::api::bind;
 use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
-/// Run `chunk` over entity `id` carrying every Add Component kind, after `prep`.
 fn run<R: mlua::FromLuaMulti>(prep: impl FnOnce(&mut Scene, u32), chunk: &str) -> (Scene, R) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());
@@ -31,8 +27,6 @@ fn run<R: mlua::FromLuaMulti>(prep: impl FnOnce(&mut Scene, u32), chunk: &str) -
 
 #[test]
 fn a_paired_op_sees_both_new_values() {
-    // Both past the other half's current value: the light's outer cone is 45, the
-    // text's auto-size max 72.
     let (_, out) = run::<(f32, f32, f32, f32)>(
         |_, _| {},
         r#"

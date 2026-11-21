@@ -1,7 +1,3 @@
-//! crates/script/src/api/assets/texture.rs — an image's import settings as the
-//! Lua table `Assets.GetTextureImportSettings` returns and
-//! `SetTextureImportSettings` takes (#1323, #1574, #2259).
-
 use std::path::PathBuf;
 
 use mlua::{Lua, Table};
@@ -12,10 +8,6 @@ use rusty_asset::sidecar::{
     parse_max_size, Compression, FilterMode, TextureSettings, TextureType, WrapMode,
 };
 
-/// The image `path` names: a texture extracted from a model
-/// (`model.fbx#tex/Skin`) resolved to its file in the import cache
-/// (`texture_ref::file`), any other path as it is. An error when the model's
-/// cache holds no such texture.
 pub(super) fn file(path: &str) -> mlua::Result<PathBuf> {
     texture_ref::file(path).ok_or_else(|| {
         runtime(format!(
@@ -24,8 +16,6 @@ pub(super) fn file(path: &str) -> mlua::Result<PathBuf> {
     })
 }
 
-/// `{ wrapMode, filterMode, generateMipmaps, textureType, sRGB, compression, maxSize,
-/// maxSizeChosen }`.
 pub(super) fn table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("wrapMode", s.wrap_mode.name())?;
@@ -39,13 +29,6 @@ pub(super) fn table(lua: &Lua, s: &TextureSettings) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `stored` with the keys `t` names replaced; an unknown mode name or a max size
-/// outside Unity's list is an error. A `maxSize` that changes the stored one is
-/// the developer's choice, so no bake changes it (`sidecar::prepare_bake`); one
-/// equal to it changes nothing, so a get-edit-set round-trip keeps the choice as
-/// it was. A `maxSizeChosen` that differs from the stored flag sets the choice
-/// outright (`false` hands Max Size back to the engine); one equal to it, as a Get
-/// table carries back, changes nothing.
 pub(super) fn settings(mut s: TextureSettings, t: &Table) -> mlua::Result<TextureSettings> {
     let stored_chosen = s.max_size_chosen;
     if let Some(name) = t.get::<Option<String>>("wrapMode")? {

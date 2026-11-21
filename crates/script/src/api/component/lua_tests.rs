@@ -1,5 +1,3 @@
-//! `Component.Get` / `Set` / `Fields` from Lua (#1369).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,8 +11,6 @@ use rusty_edit::authoring::fields::{Skip, KINDS};
 use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
-/// Run `chunk` with `Component` registered over a scene holding entity `id` (a
-/// Rigidbody and a Light), returning what it evaluates to.
 fn run<R: mlua::FromLuaMulti>(chunk: &str) -> (Scene, mlua::Result<R>) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Body".to_string());
@@ -111,9 +107,6 @@ fn fields_lists_types_defaults_and_access() {
 
 #[test]
 fn every_component_round_trips_get_into_set_through_lua() {
-    // What Lua's `Get` returns, `Set`'s decode takes back and every writable
-    // field's op accepts: empty lists crossing as `{}`, enums as their names. The
-    // ops run with no unchanged-key skip, so one that can't take its own value fails.
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());
     for add in ComponentKind::ALL {

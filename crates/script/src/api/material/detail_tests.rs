@@ -1,6 +1,3 @@
-//! `Material.SetDetailMask` / `GetDetailMask` and the recipe's nested `detail`
-//! table's `mask` (#2258), through a real Lua VM.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -9,7 +6,6 @@ use mlua::Lua;
 use crate::api::bind;
 use rusty_scene::Scene;
 
-/// Run `script` with the `Material` namespace over `scene`, returning its value.
 fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
     crate::api::attempt(|| {

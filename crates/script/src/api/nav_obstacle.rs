@@ -1,12 +1,4 @@
-//! crates/script/src/api/nav_obstacle.rs — `NavMeshObstacle` namespace (#456).
-//!
-//! Unity's `NavMeshObstacle`: the shape (box or upright capsule), whether it
-//! carves the navmesh and how (only once stationary, the move threshold, the time
-//! to stationary), plus what the play tick found (`IsCarving`, `GetVelocity`).
-//! Every setter routes through the shared `edit::authoring::nav::obstacle` ops the
-//! inspector card uses. Getters return a neutral default without an obstacle;
-//! setters are then no-ops. Attach one with
-//! `Scene.AddComponent(id, "NavMeshObstacle")`.
+//! Getters return a neutral default without an obstacle; setters are then no-ops.
 
 use std::cell::RefCell;
 
@@ -20,10 +12,8 @@ use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_edit::authoring::nav::obstacle as ops;
 use rusty_scene::Scene;
 
-/// A field's reader and its shared-op writer.
 type Field<T> = (fn(&Obstacle) -> T, fn(&mut Obstacle, T));
 
-/// Register the `NavMeshObstacle` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_shape(lua, &t, scene)?;
@@ -33,19 +23,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `id`'s obstacle, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<Obstacle> {
     scene.borrow().world.nav_obstacle(id).map(|o| o.clone())
 }
 
-/// Apply a shared op to `id`'s obstacle, if it has one.
 fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Obstacle)) {
     if let Some(mut o) = scene.borrow_mut().world.nav_obstacle_mut(id) {
         op(&mut o);
     }
 }
 
-/// `Get<name>` / `Set<name>` over one `f32` field (`0` without an obstacle).
 fn f32_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -66,7 +53,6 @@ fn f32_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get<name>` / `Set<name>` over one `bool` field (`false` without an obstacle).
 fn bool_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -87,7 +73,6 @@ fn bool_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get<name>` / `Set<name>` over one `Vec3` field, as `x, y, z`.
 fn vec3_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -109,7 +94,6 @@ fn vec3_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Shape`, `Center`, `Size`, `Radius`, `Height`.
 fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|o| o.shape.name()))
@@ -132,8 +116,6 @@ fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     f32_pair(lua, t, scene, "Height", (|o| o.height, ops::set_height))
 }
 
-/// `Active`, `Carving`, `CarveOnlyStationary`, `MoveThreshold`,
-/// `TimeToStationary`, and the runtime `IsCarving` / `GetVelocity`.
 fn register_carving(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     bool_pair(lua, t, scene, "Active", (|o| o.active, ops::set_active))?;
     bool_pair(lua, t, scene, "Carving", (|o| o.carve, ops::set_carve))?;

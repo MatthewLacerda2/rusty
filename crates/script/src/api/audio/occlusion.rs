@@ -1,9 +1,3 @@
-//! crates/script/src/api/audio/occlusion.rs — the `Audio` occlusion verbs (#467).
-//!
-//! The global settings (strength, the layers that occlude, the per-tick cast
-//! budget) and the per-source opt-out (`AudioSource.occlusion_enabled`). The
-//! factor itself is read back through `Audio.GetSpatial`.
-
 use mlua::{Table, Value};
 
 use super::super::{put, Reg};
@@ -14,10 +8,8 @@ use rusty_audio::{AudioMaestro, OcclusionSettings};
 use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::Scene;
 
-/// The keys `SetOcclusionSettings` takes.
 const KEYS: [&str; 3] = ["strength", "layer_mask", "voices_per_tick"];
 
-/// `settings` with the fields `patch` names replaced; an unknown key is an error.
 fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<OcclusionSettings> {
     for pair in patch.clone().pairs::<String, Value>() {
         let (key, value) = pair?;
@@ -30,7 +22,6 @@ fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<Occlu
         };
         match key.as_str() {
             "strength" => settings.strength = number(value)? as f32,
-            // A mask keeps its low 32 bits, so `~(1 << 8)` means "all but layer 8".
             "layer_mask" => match value {
                 Value::Integer(i) => settings.layer_mask = i as u32,
                 v => settings.layer_mask = number(v)? as u32,
@@ -45,7 +36,6 @@ fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<Occlu
     Ok(settings)
 }
 
-/// `SetOcclusionSettings` / `GetOcclusionSettings` and the per-source toggle.
 pub(super) fn register_occlusion(
     lua: &mlua::Lua,
     table: &Table,

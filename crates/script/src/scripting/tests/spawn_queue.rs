@@ -1,9 +1,3 @@
-//! The spawn queue against the full scan it replaced (#1710): after any sequence
-//! of World edits (`changes::ops`'s: spawn, clear, despawn, overwrite, Undo,
-//! re-parent…), scripts attached anywhere and entities destroyed through the
-//! manager, each drain loads exactly the slots the old every-entity scan would
-//! have: every script slot in the World with no load attempt yet.
-
 use std::collections::BTreeSet;
 
 use proptest::prelude::*;
@@ -16,12 +10,9 @@ use rusty_ecs::changes::ops::{self, apply};
 #[derive(Clone, Debug)]
 enum Op {
     World(ops::Op),
-    /// Attach a script to the entity at this index of the insertion order.
     Attach(usize),
-    /// `Scene.DestroyEntity` and the manager's teardown of it.
     Destroy(usize),
     Drain,
-    /// A fresh VM, as on Play.
     Restart,
 }
 
@@ -35,7 +26,6 @@ fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
-/// What the old scan would load now.
 fn unloaded(m: &ScriptManager) -> BTreeSet<(u32, usize)> {
     let scene = m.cells.scene.borrow();
     let w = &scene.world;

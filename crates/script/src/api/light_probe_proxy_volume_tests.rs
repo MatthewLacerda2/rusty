@@ -1,7 +1,3 @@
-//! The `LightProbeProxyVolume` namespace (#1672), through Lua: setters route
-//! through the shared ops, getters read back, and an entity without a volume reads
-//! `nil` and its setters raise.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,8 +8,6 @@ use crate::api::bind;
 use rusty_components::{LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyQuality};
 use rusty_scene::Scene;
 
-/// A scene with `id` (carrying a default volume) and `bare` (none); runs `body`
-/// with both bound as Lua globals, then hands the scene back.
 fn with_locker(body: impl FnOnce(&Lua) -> mlua::Result<()>) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("locker".to_string());

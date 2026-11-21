@@ -1,8 +1,3 @@
-//! The places a spec names (#1892): `querier` (always the caller), and whatever
-//! the `contexts` table gives, each an entity id, a point `{x, y, z}` or a list of
-//! points. Resolved once per call into [`Anchor`]s, so a destroyed or inactive
-//! entity is an error naming its field before anything runs.
-
 use std::collections::BTreeMap;
 
 use glam::Vec3;
@@ -12,21 +7,17 @@ use super::fields::{fail, is_point, point, points};
 use rusty_ai::query::Anchor;
 use rusty_scene::Scene;
 
-/// One named context.
 #[derive(Clone, Debug)]
 pub enum Context {
     One(Anchor),
     Many(Vec<Vec3>),
 }
 
-/// Every context a call can name.
 pub struct Contexts(BTreeMap<String, Context>);
 
-/// The name the querier always goes by.
 pub const QUERIER: &str = "querier";
 
 impl Contexts {
-    /// The querier plus `table`'s entries.
     pub fn read(scene: &Scene, querier: Anchor, table: Option<Table>) -> mlua::Result<Self> {
         let mut named = BTreeMap::new();
         named.insert(QUERIER.to_string(), Context::One(querier));
@@ -53,7 +44,6 @@ impl Contexts {
         Ok(Self(named))
     }
 
-    /// The single place `name` names, for the field at `path`.
     pub fn one(&self, name: &str, path: &str) -> mlua::Result<Anchor> {
         match self.0.get(name) {
             Some(Context::One(a)) => Ok(*a),
@@ -65,7 +55,6 @@ impl Contexts {
         }
     }
 
-    /// The points `name` names (one place reads as a list of one).
     pub fn many(&self, name: &str, path: &str) -> mlua::Result<Vec<Vec3>> {
         match self.0.get(name) {
             Some(Context::Many(p)) => Ok(p.clone()),
@@ -75,8 +64,6 @@ impl Contexts {
     }
 }
 
-/// An entity as a context ([`Anchor::of_entity`]: where it stands and its
-/// world forward). A destroyed or inactive entity is an error.
 pub fn entity(scene: &Scene, id: u32, path: &str) -> mlua::Result<Anchor> {
     if !scene.world.is_active_in_hierarchy(id) {
         return fail(path, format!("entity {id} is destroyed or inactive"));

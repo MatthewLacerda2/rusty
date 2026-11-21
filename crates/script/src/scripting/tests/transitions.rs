@@ -1,10 +1,3 @@
-//! Tests for the transition callbacks (#323): `OnEnable`/`OnDisable` on the
-//! entity's `active` edges, `OnDestroy` (preceded by `OnDisable` when active) on
-//! the deferred destroy path, and the once-per-edge diff. Scope, the active gate
-//! and dispatch order are in `active_gate.rs`.
-//! Each callback tags a shared string: `A`wake, `E`nable, `S`tart, `U`pdate,
-//! `D`isable, destro`X` — so one log asserts the exact order.
-
 use std::collections::BTreeMap;
 
 use super::lifecycle::{manager_with_entity, write_script};
@@ -21,9 +14,6 @@ pub(super) const LOGGER: &str = "_G.__log = _G.__log or ''\n\
     OnDestroy = function(id) __log = __log .. 'X' .. id end,\n\
     }";
 
-/// A manager whose sole entity carries the tagging `LOGGER` script (slot 0).
-/// `name` must be unique per test: `write_script` keys the temp path on it, so a
-/// shared name would race the parallel test writer against another's reader.
 pub(super) fn logging_manager(name: &str) -> (crate::scripting::manager::ScriptManager, u32) {
     let (mut m, id) = manager_with_entity();
     m.init_runtime().unwrap();
@@ -47,18 +37,15 @@ fn first_activation_orders_awake_enable_start() {
 #[test]
 fn disable_then_reenable_fire_each_edge_exactly_once() {
     let (mut m, id) = logging_manager("trans_edges");
-    // Two steady active ticks: Awake/OnEnable/Start once, then only Update.
     for _ in 0..2 {
         m.init_scripts();
         m.update_scripts(DT);
     }
-    // Disable: OnDisable fires at the next tick's head; no Update while inactive.
     m.cells.scene.borrow_mut().world.set_active(id, false);
     for _ in 0..2 {
         m.init_scripts();
         m.update_scripts(DT);
     }
-    // Re-enable: OnEnable fires (NOT Awake/Start again), then Update resumes.
     m.cells.scene.borrow_mut().world.set_active(id, true);
     m.init_scripts();
     m.update_scripts(DT);

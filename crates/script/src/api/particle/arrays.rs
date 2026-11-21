@@ -1,17 +1,4 @@
-//! crates/script/src/api/particle/arrays.rs — whole-array access to the live
-//! particles (#2233): `GetArrays` hands a script one plain array of numbers per
-//! field it names, `SetArrays` writes them back. A rule over every particle is
-//! then a loop over arrays inside one Lua function, with no call, table or
-//! string per particle: Unity's job-system access (`ParticleSystemJobData`),
-//! for the same reason.
-//!
-//! The arrays are index-aligned with the live particles, oldest first, so a
-//! write keeps each particle's hidden fields. They are tied to the read: the
-//! table carries the emitter's revision at the read (in a metatable a script
-//! cannot reach), and a write after anything bumped it (a tick, an emit, a
-//! clear, or a write through any of the live calls) is an error that changes
-//! nothing. A `Gpu` emitter's particles are the renderer's (#2170): `GetArrays`
-//! reads empty arrays, and `SetArrays` changes nothing and warns once.
+//! Arrays are index-aligned with the live particles, oldest first. They are tied to the read: a write after anything bumped the emitter's revision is an error that changes nothing. A `Gpu` emitter's particles are the renderer's: `GetArrays` reads empty, `SetArrays` changes nothing and warns once.
 
 use mlua::{AnyUserData, Lua, Table, Value};
 
@@ -22,18 +9,14 @@ use crate::api::{ApiCell, Reg};
 use rusty_components::particle::Particle;
 use rusty_scene::Scene;
 
-/// What a `GetArrays` table was read from: its emitter, the emitter's revision
-/// then, and how many particles were live.
 struct Stamp {
     id: u32,
     revision: i64,
     count: usize,
 }
 
-/// The metatable key holding a table's [`Stamp`].
 const STAMP: &str = "__particles_read";
 
-/// Register `GetArrays` and `SetArrays` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let get = lua
         .create_function(move |lua, (id, names): (EntityArg, Value)| {
@@ -73,8 +56,6 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `SetArrays(id, arrays)` on `scene`: the number live after, or an error that
-/// changed nothing.
 fn set_arrays(scene: &mut Scene, id: u32, arrays: &Table) -> mlua::Result<u32> {
     let stamp = arrays
         .metatable()
@@ -106,12 +87,10 @@ fn set_arrays(scene: &mut Scene, id: u32, arrays: &Table) -> mlua::Result<u32> {
     live.unwrap_or(Ok(0))
 }
 
-/// A `Particles.SetArrays` / `GetArrays` error.
 fn error(what: String) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Particles.{what}"))
 }
 
-/// `v`'s type as Lua's `type` names it.
 fn kind(v: &Value) -> &'static str {
     match v {
         Value::Integer(_) => "number",
@@ -119,7 +98,6 @@ fn kind(v: &Value) -> &'static str {
     }
 }
 
-/// The wire slots `names` (an array of field names) asks for, in its order.
 fn slots(verb: &str, names: Value) -> mlua::Result<Vec<usize>> {
     let Value::Table(names) = names else {
         return Err(error(format!(
@@ -147,8 +125,6 @@ fn slots(verb: &str, names: Value) -> mlua::Result<Vec<usize>> {
     Ok(slots)
 }
 
-/// The table `GetArrays` returns: one array per slot of `slots`, keyed by its
-/// name and built from `live` for that field alone, carrying `stamp`.
 fn columns(lua: &Lua, live: &[Particle], slots: &[usize], stamp: Stamp) -> mlua::Result<Table> {
     let out = lua.create_table_with_capacity(0, slots.len())?;
     for &slot in slots {
@@ -162,8 +138,6 @@ fn columns(lua: &Lua, live: &[Particle], slots: &[usize], stamp: Stamp) -> mlua:
     Ok(out)
 }
 
-/// Each field array `arrays` holds, as `(slot, values)`, checked: a whole array
-/// of `count` numbers, or an error naming the field and the entry.
 fn read_back(arrays: &Table, count: usize) -> mlua::Result<Vec<(usize, Vec<f32>)>> {
     let mut written = Vec::new();
     for (slot, name) in NAMES.iter().enumerate() {
@@ -201,7 +175,6 @@ fn read_back(arrays: &Table, count: usize) -> mlua::Result<Vec<(usize, Vec<f32>)
     Ok(written)
 }
 
-/// Write `written` into `ps` (index-aligned) and drop the particles dead after.
 fn write(ps: &mut Vec<Particle>, written: &[(usize, Vec<f32>)]) {
     for (i, p) in ps.iter_mut().enumerate() {
         let mut values = [f32::NAN; FIELDS];

@@ -1,15 +1,9 @@
-//! A script moving a parent moves its children's collider bounds with it (#1157),
-//! whether it writes through `Transform.Set*` or a tween: every writer lands its
-//! Transform through one guard, which re-derives the subtree. Adding a collider in Play
-//! sets its box at once, with nothing moving after.
-
 use glam::Vec3;
 
 use super::timers::{counted, rig, tick};
 use crate::scripting::manager::ScriptManager;
 use rusty_edit::authoring::defaults::default_collider;
 
-/// A collider child one unit along X from the script's entity; returns its id.
 fn child_crate(m: &ScriptManager, parent: u32) -> u32 {
     let mut scene = m.cells.scene.borrow_mut();
     let child = scene.add_entity("Wheel".to_string());
@@ -19,7 +13,6 @@ fn child_crate(m: &ScriptManager, parent: u32) -> u32 {
     child
 }
 
-/// The centre of `id`'s world AABB, and where `id` stands.
 fn centre_and_stand(m: &ScriptManager, id: u32) -> (Vec3, Vec3) {
     let scene = m.cells.scene.borrow();
     let (min, max) = scene.world.collider_bounds(id).unwrap();
@@ -58,7 +51,6 @@ fn a_tween_on_a_parent_moves_the_childs_bounds() {
 
 #[test]
 fn a_collider_added_in_play_reports_its_bounds_at_once() {
-    // A static entity is never moved again, so nothing but adding it may set its box.
     let (m, id) = rig("collider_added", &counted(""));
     {
         let mut scene = m.cells.scene.borrow_mut();

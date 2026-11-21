@@ -1,24 +1,3 @@
-//! crates/script/src/api/component/mod.rs — `Component` namespace (#1369): every serialized field
-//! of a first-class component, read and written by name (Unity's public fields).
-//!
-//! - `Get(id, name)` — the entity's component as a table of its serialized fields,
-//!   or `nil` without one.
-//! - `Set(id, name, fields)` — write the named fields, all or nothing. Each goes
-//!   through the `edit::authoring` op the inspector's card calls, so clamping,
-//!   sanitizing and what follows a write are the inspector's own; a field with no
-//!   op is read-only and writing it is an error naming why. The table itself is
-//!   `edit::authoring::fields`, which a scene load also holds its values through. A key left
-//!   as `Get` returned it is skipped (`write::Skip`): `Get` keeps what it returned
-//!   in the table's metatable, so a table held across ticks writes only its edits.
-//! - `Fields(name)` — what an inspector lists: each field's name, the Lua type of
-//!   its default, the default, and whether it can be written.
-//!
-//! Component names are the ones `Scene.AddComponent` takes, plus `Transform`;
-//! field names are as a saved scene spells them; enums travel by their
-//! serialized name (read in any case, through `core::naming::variant_case::decode`). An unknown
-//! component or field is an error naming the valid ones. `#[serde(skip)]` runtime
-//! state is never in a table: there is no field to name it by.
-
 mod value;
 
 #[cfg(test)]
@@ -39,15 +18,12 @@ use rusty_edit::authoring::fields::{self as kinds, Kind, Skip};
 use rusty_scene::Scene;
 use value::{from_lua, to_lua};
 
-/// The metatable key under which `Get` keeps what it returned, for `Set` to tell a
-/// field the script edited from one the sim moved since.
 const GOT: &str = "__component_get";
 
 fn err(msg: String) -> mlua::Error {
     mlua::Error::RuntimeError(msg)
 }
 
-/// Register the `Component` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     let get = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
@@ -101,7 +77,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Component", t).map_err(|e| e.to_string())
 }
 
-/// Keep `value`, what `Get` returned for `id`'s `kind`, in `table`'s metatable.
 fn remember(lua: &Lua, table: &Table, id: u32, kind: &Kind, value: &Value) -> mlua::Result<()> {
     let got = lua.create_table()?;
     got.set("id", id)?;
@@ -112,8 +87,6 @@ fn remember(lua: &Lua, table: &Table, id: u32, kind: &Kind, value: &Value) -> ml
     table.set_metatable(Some(meta))
 }
 
-/// What `Get` returned into `table`, when it was `id`'s `kind`: a table read from
-/// another entity, or written by hand, has none.
 fn recall(table: &Table, id: u32, kind: &Kind) -> Option<serde_json::Map<String, Value>> {
     let got: Table = table.metatable()?.raw_get(GOT).ok()?;
     let same = got.get::<u32>("id").ok()? == id && got.get::<String>("kind").ok()? == kind.name;
@@ -123,10 +96,6 @@ fn recall(table: &Table, id: u32, kind: &Kind) -> Option<serde_json::Map<String,
     }
 }
 
-/// `Component.Fields`: one `{ name, type, default, writable, read_only }` row per
-/// field, in the field table's order (the order `Set` writes them in). The defaults are the Add
-/// Component menu's (a fresh entity's, for `Transform`; the `Box` primitive, for
-/// `Mesh`).
 fn fields_table(lua: &Lua, kind: &Kind) -> mlua::Result<Table> {
     let defaults = defaults(kind).map_err(err)?;
     let rows = lua.create_table()?;
@@ -143,7 +112,6 @@ fn fields_table(lua: &Lua, kind: &Kind) -> mlua::Result<Table> {
     Ok(rows)
 }
 
-/// The component as the Add Component menu attaches it, serialized.
 fn defaults(kind: &Kind) -> Result<Option<Value>, String> {
     let mut scene = Scene::new();
     let id = scene.add_entity("Defaults".to_string());
@@ -153,9 +121,6 @@ fn defaults(kind: &Kind) -> Result<Option<Value>, String> {
     (kind.read)(&scene.world, id).transpose()
 }
 
-/// A field's type as `Fields` reports it: the Lua type of its default (an enum
-/// carrying data is a table), else of what its derive reads; `optional <type>`
-/// when it can hold nothing.
 fn type_name(kind: &Kind, name: &'static str, default: Option<&Value>) -> String {
     let (optional, read_as) = (kind.field_type)(name);
     let held = match default {

@@ -1,7 +1,3 @@
-//! `UI.SetShader` / `GetShader` / `SetShaderParam` / `GetShaderParam` (#427): the
-//! shader lands on every graphic an entity has, params are stored by canonical name
-//! and checked against the baked layout, and the errors say what to do.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +10,6 @@ use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// A dissolve ui shader baked under a name unique to this run; removed on drop.
 struct Baked(String);
 
 impl Baked {
@@ -41,7 +36,6 @@ impl Drop for Baked {
     }
 }
 
-/// Run `script` against the `UI` namespace, returning its error if any.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let screen = Rc::new(RefCell::new(rusty_ui::ScreenSize::default()));
     let video = Rc::new(RefCell::new(
@@ -62,7 +56,6 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// A scene with a labelled image (Image + Text) and a bare entity: `(scene, label, bare)`.
 fn scene() -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     let label = scene.add_entity("Label".into());

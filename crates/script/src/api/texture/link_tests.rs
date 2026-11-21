@@ -1,11 +1,7 @@
-//! Linked params from Lua (#1494): a bad link is refused before anything is
-//! written, and `Stats` reads a node that only drives a param like any other.
-
 use mlua::{Lua, Table};
 
 use super::register;
 
-/// A Lua VM with `Texture` registered and `OUT` a path to bake to.
 fn lua() -> (Lua, std::path::PathBuf) {
     let lua = Lua::new();
     register(&lua).unwrap();
@@ -14,7 +10,6 @@ fn lua() -> (Lua, std::path::PathBuf) {
     (lua, out)
 }
 
-/// `Texture.Bake` of a noise warped by itself, `warp`'s fields spliced in.
 fn bake_err(warp: &str, extra: &str) -> String {
     let (lua, out) = lua();
     let src = format!(
@@ -68,7 +63,6 @@ fn stats_reads_a_node_that_only_drives_a_param() {
         node.get::<Table>("mean").unwrap().get(1).unwrap()
     };
     assert_eq!(mean("k"), 0.5);
-    // Gamma 1 (0 + 2 × 0.5) leaves the noise as it is.
     assert_eq!(mean("g"), mean("n"));
     assert!(!out.exists());
 }

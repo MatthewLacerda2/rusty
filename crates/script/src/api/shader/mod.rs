@@ -1,34 +1,3 @@
-//! crates/script/src/api/shader/mod.rs — the `Shader` namespace (#272).
-//!
-//! Agent-facing surface for **WGSL shader authoring**: compose a recipe selecting
-//! a base pass (`surface` | `postfx` | `ui`) and a list of curated building blocks, then
-//! **bake** a `.wgsl` module that conforms to the engine's pass + bind-group
-//! contract. The bake **validates the assembled module by composing it through
-//! `naga_oil`** (the same path the engine loads it by) and **rejects a module that
-//! won't compile — no file is written** — so a bad shader never ships. On success
-//! the module is written to the authored-shader workspace, registered by name (a
-//! `ShaderRegistry` pointed at that dir loads `<name>.wgsl`).
-//!
-//! The recipe is authored as a Lua table whose shape mirrors the serde document
-//! exactly (see `from_lua`), so the same recipe describes a Lua-built shader and
-//! one loaded from `.json` — one surface, three callers. Every verb taking a
-//! `recipe` accepts either form: the table or its JSON string (#410).
-//!
-//! Verbs:
-//! - `Shader.Bake(recipe [, out_dir])` — assemble + validate + write; returns the
-//!   written path. `out_dir` defaults to the project shader workspace.
-//! - `Shader.Validate(recipe)` — assemble + compose-check **without writing**;
-//!   returns the composed entry-point names (the dry-run gate the agent checks a
-//!   recipe with before baking).
-//! - `Shader.ToJson(recipe)` — serialize a recipe to canonical JSON.
-//! - `Shader.Blocks(pass)` — list the curated blocks for a pass with their
-//!   descriptions and params (name, default, arity, runtime, and a choice param's
-//!   `choices`) — introspection so the
-//!   agent composes from the actual catalog, not guesswork (#411).
-//!
-//! `Shader` borrows no engine state — it reads a recipe and writes a file — so it
-//! registers as a plain static namespace, like `Texture`.
-
 mod blocks;
 mod from_lua;
 
@@ -42,7 +11,6 @@ use rusty_shadergen::recipe::PassKind;
 use rusty_shadergen::validate::validate;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
-/// Register the `Shader` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -88,23 +56,18 @@ pub fn register(lua: &Lua) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Assemble + validate + write a parsed recipe, surfacing any error to Lua. The
-/// engine shader dir is fixed (read-only base + `common`); `out_dir` defaults to
-/// the project's `assets/shaders`.
 fn bake(recipe: &ShaderRecipe, out_dir: Option<String>) -> mlua::Result<String> {
     let out = out_dir.as_deref().unwrap_or(DEFAULT_OUT_DIR);
     bake_recipe(recipe, engine_shader_dir(), out)
         .map_err(|e| mlua::Error::RuntimeError(e.to_string()))
 }
 
-/// Assemble + compose-check a recipe without writing; returns the entry points.
 fn dry_run(recipe: &ShaderRecipe) -> Result<Vec<String>, String> {
     let base = base_source(recipe.pass, engine_shader_dir())?;
     let module = assemble(recipe, &base)?;
     validate(engine_shader_dir(), &module)
 }
 
-/// Parse a pass tag from Lua (`"surface"` | `"postfx"` | `"ui"`).
 fn parse_pass(name: &str) -> Result<PassKind, String> {
     PassKind::parse(name).ok_or_else(|| {
         let lower = name.to_ascii_lowercase();

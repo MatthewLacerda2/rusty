@@ -1,6 +1,3 @@
-//! The scripting runtime's tests, one file per surface or behaviour (#934 grouped
-//! them here from `tests_*.rs` siblings).
-
 mod active_gate;
 mod assets;
 mod awake;

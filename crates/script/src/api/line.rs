@@ -1,12 +1,3 @@
-//! crates/script/src/api/line.rs — `Line` namespace (#441).
-//!
-//! Script control over an entity's `LineComponent` (Unity's `LineRenderer`): set
-//! its points all at once (`SetPositions`, e.g. a grenade arc each frame) or one
-//! at a time (0-based, like `Probe` and `Reflection`), choose world or local space
-//! and looping, and restyle it with the verbs it shares with `Trail`
-//! (`ribbon_style`). Setters route through `edit::authoring::ribbon::line` / `ribbon`.
-//! Without a Line, getters return a neutral default; setters no-op.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -20,10 +11,8 @@ use rusty_components::LineComponent;
 use rusty_edit::authoring::ribbon::line as ops;
 use rusty_scene::Scene;
 
-/// `(id, index, x, y, z)`.
 type IdPoint = (EntityArg, usize, f32, f32, f32);
 
-/// Register the `Line` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_positions(lua, &t, scene)?;
@@ -32,20 +21,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Line", t).map_err(|e| e.to_string())
 }
 
-/// Read `id`'s Line through `f`, or `None` without one.
 fn read<T>(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&LineComponent) -> T) -> Option<T> {
     scene.borrow().world.line(id).map(|l| f(&l))
 }
 
-/// Apply `f` to `id`'s Line, when it has one.
 fn write(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut LineComponent)) {
     if let Some(mut l) = scene.borrow_mut().world.line_mut(id) {
         f(&mut l);
     }
 }
 
-/// `GetPositions` / `SetPositions` (a list of `{x, y, z}`), `GetPosition` /
-/// `SetPosition` (one 0-based point), `GetPositionCount` / `SetPositionCount`.
 fn register_positions(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         let points = read(&*scene.get(lua)?, id.read(), |l| {
@@ -90,7 +75,6 @@ fn register_positions(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg 
     put(t, "SetPositionCount", f)
 }
 
-/// `GetUseWorldSpace` / `SetUseWorldSpace`, `GetLoop` / `SetLoop`.
 fn register_flags(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(read(&*scene.get(lua)?, id.read(), |l| l.use_world_space) == Some(true))

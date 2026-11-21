@@ -1,8 +1,3 @@
-//! A destroy tears down what it removes (#1283): `Scene.DestroyEntity` takes the
-//! entity's whole subtree (Unity's `Object.Destroy`), and every script on it gets
-//! `OnDisable` then `OnDestroy`, children before parents, and leaves no instance,
-//! timer or coroutine behind. One set, `Scene::destroy_set`, decides both.
-
 use std::collections::BTreeMap;
 
 use super::lifecycle::write_script;
@@ -11,7 +6,6 @@ use super::transitions::LOGGER;
 use crate::scripting::manager::ScriptManager;
 use rusty_scene::skeleton::rig::armature_owner;
 
-/// `LOGGER`'s tags, plus a pending invoke and a waiting coroutine from `Start`.
 const BUSY: &str = "_G.__log = _G.__log or ''\n\
     local M = {}\n\
     function M.Beat() end\n\
@@ -21,8 +15,6 @@ const BUSY: &str = "_G.__log = _G.__log or ''\n\
     function M.OnDestroy(id) __log = __log .. 'X' .. id end\n\
     return M";
 
-/// A started runtime whose `parent` carries `LOGGER`; `child` (made by `under`
-/// from the scene and the parent) carries `BUSY`. Returns the manager, parent, child.
 pub(super) fn scripted(
     name: &str,
     under: impl FnOnce(&mut rusty_scene::Scene, u32) -> u32,
@@ -44,14 +36,11 @@ pub(super) fn scripted(
     (m, parent, child)
 }
 
-/// Request `id`'s destroy and drain it, as the Play schedule does.
 pub(super) fn destroy(m: &mut ScriptManager, id: u32) {
     m.cells.scene.borrow_mut().request_destroy(id);
     m.apply_pending_destroys();
 }
 
-/// Nothing of `id` survives: no entity, script instance, Lua table (its script's
-/// file stem is `stem`) or timer.
 fn assert_forgotten(m: &ScriptManager, id: u32, stem: &str) {
     assert!(
         !m.cells.scene.borrow().world.contains(id),
@@ -70,7 +59,6 @@ fn assert_forgotten(m: &ScriptManager, id: u32, stem: &str) {
     );
 }
 
-/// A skinned rig (`parent` holds it) whose `head` bone carries the scripted child.
 fn rig_with_scripted_gun(name: &str) -> (ScriptManager, u32, u32, Vec<u32>) {
     let mut bones = Vec::new();
     let (m, holder, gun) = scripted(name, |scene, holder| {

@@ -1,15 +1,3 @@
-//! crates/script/src/scripting/lifecycle/physics.rs — dispatch the physics-step callbacks: the
-//! trigger overlaps (`OnTriggerEnter` / `OnTrigger` / `OnTriggerExit`, #310) and
-//! the solid contacts (`OnCollisionEnter` / `OnCollisionStay` / `OnCollisionExit`,
-//! #448), both fed by `PhysicsWorld::step`'s sorted pair lists, then the broken
-//! joints (`OnJointBreak`, #449).
-//!
-//! Order is fixed so replays stay byte-identical: all trigger phases, then all
-//! collision phases, each enter → stay → exit, each pair list ascending, and
-//! every pair notifies A about B then B about A; then the joint breaks, ascending
-//! by joint entity. Only awoken instances of active
-//! entities are called — the one active gate every gameplay hook obeys (#323).
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
@@ -22,8 +10,6 @@ use super::super::manager::ScriptManager;
 use rusty_physics::{CollisionEvents, Contact, JointBreak, PhysicsEvents, TriggerEvents};
 
 impl ScriptManager {
-    /// Dispatch one physics tick's events: triggers, then collisions, then the
-    /// broken joints.
     pub fn dispatch_physics_events(&mut self, events: PhysicsEvents) {
         if !events.triggers.is_empty() {
             self.dispatch_trigger_events(events.triggers);
@@ -36,8 +22,6 @@ impl ScriptManager {
         }
     }
 
-    /// `OnJointBreak(id, force, torque)` on the scripts of each entity whose
-    /// joint broke this tick (#449), in the list's ascending order.
     fn dispatch_joint_breaks(&mut self, breaks: &[JointBreak]) {
         self.with_lua(|lua| {
             for b in breaks {
@@ -48,10 +32,6 @@ impl ScriptManager {
         });
     }
 
-    /// Invokes the trigger callbacks on scripts of entities involved in trigger
-    /// overlaps: `OnTriggerEnter` for this tick's new pairs, then `OnTrigger`
-    /// (stay) for every overlapping pair, then `OnTriggerExit` for the pairs
-    /// that ended (#310), each called `(id, other)`.
     pub fn dispatch_trigger_events(&mut self, events: TriggerEvents) {
         let hooks = [
             (ON_TRIGGER_ENTER, &events.entered),
@@ -67,12 +47,6 @@ impl ScriptManager {
         });
     }
 
-    /// Invokes the collision callbacks (#448): `OnCollisionEnter(id, other,
-    /// contact)` for this tick's new solid pairs, `OnCollisionStay(id, other,
-    /// contact)` for every touching pair (enter tick included), then
-    /// `OnCollisionExit(id, other)` for the pairs that separated. Each side gets
-    /// the contact as it sees it (normal into itself, the other's velocity
-    /// relative to its own).
     pub fn dispatch_collision_events(&mut self, events: CollisionEvents) {
         let touching = [
             (ON_COLLISION_ENTER, &events.entered),
@@ -105,8 +79,6 @@ impl ScriptManager {
         });
     }
 
-    /// Call `hook(id, other)` on both sides of a pair — A about B, then B about A
-    /// — each entity's scripts in ascending script-index order.
     fn notify_pair(&self, lua: &Lua, hook: &str, (a, b): (u32, u32)) {
         for (id, other) in [(a, b), (b, a)] {
             for key in self.awoken_keys_for(id) {
@@ -116,14 +88,11 @@ impl ScriptManager {
     }
 }
 
-/// The physics material asset `other`'s collider names (#1878), as a hit does.
 pub(super) fn material_of(scene: &rusty_scene::Scene, other: u32) -> Option<String> {
     let collider = scene.world.collider(other)?;
     rusty_scene::physics_material::named(&collider)
 }
 
-/// `{ point = {x,y,z}, normal = {x,y,z}, relativeVelocity = {x,y,z}, impulse,
-/// otherBody, material }` — the contact a collision callback receives.
 fn contact_table(lua: &Lua, c: &Contact, material: Option<String>) -> mlua::Result<Table> {
     let vec = |v: Vec3| -> mlua::Result<Table> {
         let t = lua.create_table()?;

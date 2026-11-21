@@ -1,5 +1,3 @@
-//! Tests for the `Reflection` namespace (`reflection.rs`).
-
 use crate::api::bind;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -104,9 +102,6 @@ fn added_probes_are_manual_and_set_can_change_it() {
     assert!(!scene.borrow().reflection_probes.probes[0].manual);
 }
 
-/// A hand edit makes a placed probe manual, so the next bake keeps it (#1737),
-/// a Get-modify-Set round trip included; `Set{ manual = false }` un-marks a
-/// probe that is manual already.
 #[test]
 fn hand_edits_make_a_placed_probe_manual() {
     let scene = empty_scene();

@@ -1,13 +1,3 @@
-//! crates/script/src/api/layout_element.rs — `LayoutElement` namespace (#421).
-//!
-//! Get/Set over an entity's `LayoutElementComponent` (Unity's `LayoutElement` +
-//! `ContentSizeFitter`): `IgnoreLayout`, the min / preferred / flexible size
-//! overrides as `(width, height)` pairs where `nil` means "use the content's
-//! size", and the content fitter per axis (`Unconstrained` / `MinSize` /
-//! `PreferredSize`). Every setter routes through the shared
-//! `edit::authoring::ui::layout::element` ops the inspector card uses. Getters return
-//! a neutral default without the component; setters are then no-ops.
-
 use mlua::{FromLuaMulti, IntoLuaMulti, Lua, Table};
 
 use super::{put, Reg};
@@ -20,7 +10,6 @@ use rusty_scene::Scene;
 type E = LayoutElementComponent;
 type Size = (Option<f32>, Option<f32>);
 
-/// Register the `LayoutElement` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     let ignore = |e: &E| e.ignore_layout;
@@ -48,8 +37,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Register `Get<suffix>(id)` → `get(element)` (Lua's defaults without one) and
-/// `Set<suffix>(id, …)` → `set(element, …)` (a no-op without one).
 fn pair<R, A>(
     lua: &mlua::Lua,
     t: &Table,

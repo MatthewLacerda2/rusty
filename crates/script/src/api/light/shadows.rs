@@ -1,6 +1,3 @@
-//! `Light`'s shadow knobs: whether a point or spot light casts shadows through the
-//! shadow atlas (#468), and how far from the camera its shadow reaches (#1712).
-
 use mlua::Lua;
 
 use super::super::{put, Reg};
@@ -9,14 +6,11 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::Scene;
 
-/// Register `Get/SetCastShadows` and `Get/SetShadowFadeDistance` onto `table`.
 pub(super) fn register(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_cast_shadows(lua, table, scene)?;
     register_fade_distance(lua, table, scene)
 }
 
-/// `GetCastShadows` / `SetCastShadows`: whether a point or spot light casts shadows
-/// through the shadow atlas (#468). The sun always casts; it ignores the flag.
 fn register_cast_shadows(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -43,9 +37,6 @@ fn register_cast_shadows(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// `GetShadowFadeDistance` / `SetShadowFadeDistance`: the camera distance past
-/// which a point or spot light's shadow is no longer sampled (#1712, HDRP's
-/// Shadow Fade Distance); `0` is no fade.
 fn register_fade_distance(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

@@ -1,25 +1,3 @@
-//! crates/script/src/api/assets/ — `Assets` namespace (#179).
-//!
-//! The "see what I can place" half of authoring: surface the importer's per-file
-//! inventory as a project-wide, reference-ready manifest. `Assets.Manifest()` (and
-//! its `Assets.List` alias) walks the project asset root, imports every model file,
-//! and returns each file's addressable sub-objects with their footprint (AABB) and
-//! material count — the catalogue a human sees in the OS file manager and the
-//! asset inspector, so the agent gets parity. Every `reference` round-trips through `AssetRef` /
-//! `import_sub_mesh`, so the instantiate verb can place exactly what the manifest
-//! names. `Assets.Refresh()` is the editor's auto-refresh on demand: it imports what
-//! arrived since the last look (MP3 → WAV, #385).
-//! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831) read and write a
-//! model's Generate Lightmap UVs import setting, the model inspector's checkbox.
-//! `Assets.GetModelImportSettings` / `SetModelImportSettings` (#1398) read and write
-//! a model's Scale Factor, the inspector's drag, and its sub-objects' mesh colliders
-//! and collision meshes (#1960, `colliders`), the inspector's sub-object rows.
-//! `Assets.GetTextureImportSettings` / `SetTextureImportSettings` (#1323) read and
-//! write an image's wrap, filter, mipmap, texture type, compression and max-size
-//! settings (#1574), the image inspector's card.
-//! `Assets.GetHumanoid` / `SetHumanoid` (#1747, `humanoid`) read and write a
-//! model's humanoid bone map and the models it borrows clips from.
-
 use std::path::Path;
 
 use mlua::{Lua, Table};
@@ -36,15 +14,11 @@ use rusty_asset::{sidecar, LightmapUvSettings};
 use rusty_core::paths::to_slash;
 use rusty_scene::Scene;
 
-/// The project asset root the manifest walks — the open project's `assets/`, the
-/// tree every asset reference is relative to.
 const ASSET_ROOT: &str = rusty_core::project::ASSETS_DIR;
 
-/// Register the `Assets` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
-    // `List` is an alias for `Manifest` — same data, the more discoverable name.
     for name in ["Manifest", "List"] {
         put(
             &table,
@@ -98,11 +72,6 @@ pub fn register(lua: &Lua) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Add the verbs that borrow the scene onto `Assets`: `SetLightmapUVSettings(path,
-/// t)` writes the keys `t` names (the rest keep their value) through the verb the
-/// model inspector uses, re-importing the model's meshes in the scene, and returns
-/// how many it re-imported. `SetModelImportSettings(path, t)` does the same for the
-/// Scale Factor, after writing the `colliders` entries `t` names to the sidecar.
 pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = global_table(lua, "Assets")?;
     put(
@@ -127,7 +96,6 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
             let scene = &*scene.get(lua)?;
             let mut stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let scale = t.get::<Option<f32>>("scaleFactor")?.unwrap_or(stored.scale);
-            // Every key validates before anything is written.
             if let Some(given) = t.get::<Option<Table>>("colliders")? {
                 if colliders::merge(&mut stored.colliders, &given)? {
                     sidecar::save(Path::new(&path), &stored).map_err(runtime)?;
@@ -141,7 +109,6 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     humanoid::register_set(lua, &table, scene)
 }
 
-/// `{ generate, hardAngle, packMargin }`.
 fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("generate", s.generate)?;
@@ -150,7 +117,6 @@ fn lightmap_uv_table(lua: &Lua, s: &LightmapUvSettings) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ scaleFactor, colliders }`: the model at `path`'s import settings.
 fn model_import_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     let stored = sidecar::load(Path::new(path)).map_err(runtime)?;
     let t = lua.create_table()?;
@@ -163,8 +129,6 @@ fn runtime(e: impl ToString) -> mlua::Error {
     mlua::Error::RuntimeError(e.to_string())
 }
 
-/// Build the manifest under [`ASSET_ROOT`] and marshal it into a Lua array of
-/// per-file tables.
 fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     let manifest = build_manifest(Path::new(ASSET_ROOT));
     let assets = lua.create_table()?;
@@ -174,14 +138,9 @@ fn manifest_table(lua: &Lua) -> mlua::Result<Table> {
     Ok(assets)
 }
 
-/// `Assets.Refresh()`: every import brought up to date, audio, models and
-/// images (`asset::import::import_all`), and what it did ([`refresh_table`]).
-/// Audio imports in Play too, as Unity's `AssetDatabase.Refresh` does; models and
-/// images wait for Stop (`import_all` refuses then, and nothing is listed).
 fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
     let root = Path::new(ASSET_ROOT);
     let t = refresh_table(lua, &refresh(root))?;
-    // Each failure was warned of in the console as it ran.
     let imported = rusty_asset::import::import_all(root).unwrap_or_default();
     t.raw_set("compressed", imported.textures.encoded)?;
     let failed = lua.create_table()?;
@@ -193,8 +152,6 @@ fn refresh_all(lua: &Lua) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ converted = { wavPath, ... }, skipped = { { path, reason }, ... } }`; the
-/// caller adds `compressed` and `failed`.
 fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     let converted = lua.create_table()?;
     for (i, (_, wav)) in report.converted.iter().enumerate() {
@@ -213,7 +170,6 @@ fn refresh_table(lua: &Lua, report: &Refresh) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// One file's record: `path`, `materialCount`, and an array of `subObjects`.
 fn asset_entry_table(lua: &Lua, entry: &AssetEntry) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("path", entry.path.as_str())?;
@@ -226,8 +182,6 @@ fn asset_entry_table(lua: &Lua, entry: &AssetEntry) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// One sub-object's record: `id`, the round-trippable `reference`, its footprint
-/// `size` (and `min`/`max` AABB when present), and `materialCount`.
 fn sub_object_table(lua: &Lua, sub: &SubObjectEntry) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("id", sub.id.as_str())?;
@@ -242,8 +196,6 @@ fn sub_object_table(lua: &Lua, sub: &SubObjectEntry) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// A `{ x, y, z }` table — the structured form a footprint needs (a scalar triple
-/// can't be a nested field the way `Transform.GetPosition`'s multi-return can).
 fn vec3_table(lua: &Lua, x: f32, y: f32, z: f32) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.raw_set("x", x)?;

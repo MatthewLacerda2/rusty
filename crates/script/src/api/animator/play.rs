@@ -1,6 +1,3 @@
-//! `Animator.Play` / `Animator.Crossfade`: start a clip on the base layer, and
-//! warn when the entity's mesh has no clip of that name (#1718).
-
 use std::cell::RefCell;
 
 use mlua::Lua;
@@ -12,12 +9,6 @@ use rusty_scene::Scene;
 
 use super::{put, Reg};
 
-/// `Play` hard-cuts to a clip; `Crossfade` blends into it over its duration (#80),
-/// degrading to a play for a non-positive duration or the clip already playing.
-/// Neither checks the clip: an unknown one still replaces the current motion and
-/// resets the playhead (a clip that resolves late, #1386). A normal call logs
-/// nothing, as Unity's does (#1718), so a weapon restarting its fire clip 20 times a
-/// second cannot flood the console; a name the entity's mesh lacks warns.
 pub(super) fn register(
     lua: &Lua,
     table: &mlua::Table,
@@ -55,10 +46,6 @@ pub(super) fn register(
     )
 }
 
-/// Warn when `id`'s mesh carries clips and none is named `clip` (Unity warns on a
-/// state it can't find). No mesh, or one whose clips haven't loaded, stays quiet, so
-/// a `Play` issued before the mesh arrives is not a false alarm (#1386). Repeats
-/// collapse into one counted line.
 fn warn_unknown_clip(
     scene: &Scene,
     id: u32,

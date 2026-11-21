@@ -1,7 +1,3 @@
-//! `Assets.GetHumanoid` / `SetHumanoid` (#1747): an agent reads a model's
-//! resolved humanoid map, and naming a clip source gives the scene's meshes
-//! the borrowed clip at once.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,7 +8,6 @@ use rusty_edit::asset_instance::instantiate_asset;
 use rusty_scene::Scene;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
-/// `scene`'s humanoid model fixture (`asset_instance::humanoid_fixture`).
 fn model(
     dir: &std::path::Path,
     name: &str,

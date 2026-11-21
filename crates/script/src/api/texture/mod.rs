@@ -1,60 +1,7 @@
-//! crates/script/src/api/texture/mod.rs — the `Texture` namespace (#270).
-//!
-//! Agent-facing surface for procedural texture authoring: compose a recipe of ops and
-//! bake it to a tiling `.png` a material map slot consumes. The recipe is authored as
-//! a Lua table whose shape mirrors the serde document exactly (see
-//! `from_lua`), so the same DAG describes a Lua-built
-//! recipe and one loaded from `.json` — one surface, three callers.
-//!
-//! Verbs:
 //! - `Texture.Bake(recipe, path, slot)` — evaluate a recipe and write the PNG,
 //!   encoded for the named `slot` (base_color / emissive = sRGB; normal /
 //!   roughness / metallic / data = linear; `metallic_roughness` packs metallic→B,
 //!   roughness→G). Returns the written path.
-//! - `Texture.BakeSet(recipe, prefix)` — bake every entry of the recipe's
-//!   `outputs` (slot → node id) from one evaluation to `<prefix>_<slot>.png`
-//!   (#403). Returns a table canonical slot → path.
-//! - `Texture.BakeMeshMaps(model, maps, prefix, [resolution | settings])` — bake a
-//!   model's mesh maps (curvature, AO, world normal, position, thickness, ID) in
-//!   its UV0 to `<prefix><map>.png` (`mesh_maps`, #1849); `settings` sets the size,
-//!   the curvature band and the ray counts (#2260). Returns a table map → path.
-//! - `Texture.ToJson(recipe)` — serialize a recipe to its canonical JSON for
-//!   saving / diffing.
-//! - `Texture.Stats(recipe, [resolution])` — every node's min / max / mean / std /
-//!   p1 / p99 per channel, from one evaluation (#1486).
-//! - `Texture.Preview(recipe, path, [size])` — a PNG contact sheet of every node's
-//!   image, with the grid's column count and node order (#1486).
-//! - `Texture.Ops()` — the op catalog: each op's tag, category, input count and
-//!   params with their types and defaults (#411), so the agent discovers the op-set
-//!   from the engine rather than the docs; then the project's `.graph.json` graphs,
-//!   each as `op = "graph"` with its path, inputs and params (#1744), and the
-//!   engine's, by their `engine/…` paths (#2185).
-//!
-//! A recipe's graph instances (#1744) and `image` nodes read their files from the
-//! project root (an `engine/…` path from the engine's content folder) before any
-//! verb evaluates it (`edit::authoring::material::load_recipe`, #1491): procgen
-//! itself reads no files. Each verb evaluates the expanded recipe, so `Stats` and
-//! `Preview` show an instance's nodes under their prefixed ids (`brick/mortar`);
-//! `ToJson` writes the recipe as given, instances unexpanded.
-//!
-//! Every bake verb (`Bake`, `BakeSet`, `BakeMeshMaps`) readies its files through
-//! `asset::sidecar::prepare_bake` before it writes: a Max Size the engine chose
-//! moves to the bake's size, one the developer chose never does, so a recipe's
-//! `resolution` is what ships; a bake larger than 8192, the largest Max Size, is
-//! refused before anything is written.
-//!
-//! `Bake` and `BakeSet` make the missing folders above their target inside the
-//! project (`folder`, #1850), and a failed write names the verb and the path.
-//!
-//! A `recipe` is a Lua table **or** its JSON string (the on-disk form, #410), so a
-//! saved recipe re-bakes through the same verb without a round-trip through Lua.
-//!
-//! An unknown `slot`, or an unknown key anywhere in a recipe, is an error naming it
-//! (#395) — a typo never bakes a silently wrong map. So is a link (#1494) to a node
-//! that doesn't exist, one that closes a cycle, or one on a param that takes none.
-//!
-//! `Texture` borrows no engine state — it reads a recipe and writes a file — so it
-//! registers as a plain static namespace, like `Assets`.
 
 mod folder;
 mod from_lua;
@@ -74,7 +21,6 @@ use rusty_core::project::ContentRoots;
 use rusty_edit::authoring::material::{load_recipe, Loaded};
 use rusty_procgen::{bake_recipe, bake_set, check_set, set_paths, Slot, TextureRecipe};
 
-/// Register the `Texture` namespace onto `lua`.
 pub fn register(lua: &Lua) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -123,9 +69,6 @@ pub fn register(lua: &Lua) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Evaluate + bake a parsed recipe for the named slot, surfacing any error to Lua.
-/// The missing folders above `path` are made, after the size check, when they lie
-/// inside `root`.
 fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Result<String> {
     let slot = Slot::parse(slot).map_err(mlua::Error::RuntimeError)?;
     let loaded = load(recipe)?;
@@ -138,8 +81,6 @@ fn bake(recipe: &TextureRecipe, path: &str, slot: &str, root: &Path) -> mlua::Re
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.Bake: {e}")))
 }
 
-/// `Texture.BakeSet`'s body: every output of `recipe` to `<prefix>_<slot>.png`,
-/// the folder above `prefix` made, after the size check, when it lies inside `root`.
 fn bake_whole_set(
     recipe: &TextureRecipe,
     prefix: &str,
@@ -156,15 +97,11 @@ fn bake_whole_set(
         .map_err(|e| mlua::Error::RuntimeError(format!("Texture.BakeSet: {e}")))
 }
 
-/// [`load`] for a set bake: its `outputs` are checked first, so a recipe with
-/// none says so rather than naming a file it couldn't read.
 fn load_set(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
     check_set(recipe).map_err(mlua::Error::RuntimeError)?;
     load(recipe)
 }
 
-/// `recipe` ready to run: its graphs expanded and its images decoded, from the
-/// project root.
 fn load(recipe: &TextureRecipe) -> mlua::Result<Loaded> {
     load_recipe(recipe, &ContentRoots::new(&rusty_core::project::root()))
         .map_err(mlua::Error::RuntimeError)
@@ -206,7 +143,6 @@ mod tests {
         "#;
         let returned: String = lua.load(script).eval().unwrap();
         assert_eq!(returned, p);
-        // The bytes must decode as a real PNG of the requested size.
         let img = image::open(p).expect("baked PNG decodes");
         assert_eq!(image::GenericImageView::dimensions(&img), (16, 16));
         std::fs::remove_file(path).ok();

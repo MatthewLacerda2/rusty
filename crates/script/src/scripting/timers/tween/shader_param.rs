@@ -1,19 +1,3 @@
-//! Runtime shader params a tween may drive (#661): `"Material.<param>"`,
-//! `"UI.<param>"` and `"Graphics.<param>"`, where `<param>` is the name the
-//! matching setter takes — `block.param` or `block.index.param`.
-//!
-//! None of the fixed `"Component.field"` paths starts with those three words, so a
-//! path is one or the other. The shader's layout (its `<name>.params.json`
-//! sidecar, or a volume's chain of them) is read **once**, at `Tween.To`; every
-//! step then reads and writes through the same `edit::authoring` ops as
-//! `Material.SetShaderParam` (the entity's own override, #670), `UI.SetShaderParam`
-//! and `Graphics.SetPostParam`, so a name is checked and a value coerced in one
-//! place.
-//!
-//! A volume's built-in effect knobs tween the same way (#1445, #1467):
-//! `"Graphics.<effect>.<knob>"` (`"Graphics.depth_of_field.focus_distance"`,
-//! `"Graphics.bloom.intensity"`), one number, through the knob's op.
-
 use glam::Vec4;
 
 use rusty_edit::authoring::{
@@ -24,15 +8,12 @@ use rusty_scene::Scene;
 use rusty_shadergen::params::ParamLayout;
 use rusty_shadergen::post_params::PostChain;
 
-/// The three shader-param path shapes, for the error a typo gets.
 pub(crate) const PATHS: &str = "Material.<block.param>, UI.<block.param>, \
     Graphics.<block.param>";
 
-/// One runtime shader param of one entity, its layout already resolved.
 #[derive(Debug)]
 pub(crate) struct ShaderParam {
     path: String,
-    /// The param name, as the setter takes it.
     name: String,
     arity: usize,
     source: Source,
@@ -40,24 +21,14 @@ pub(crate) struct ShaderParam {
 
 #[derive(Debug)]
 enum Source {
-    /// The entity's own override of its material's shader param (#670).
     Material(ParamLayout),
-    /// Every graphic of the entity drawn with the ui shader `shader` (#427).
     Ui { shader: String, layout: ParamLayout },
-    /// The effects of the entity's post-processing volume (#671).
     Post(PostChain),
-    /// A built-in knob of the volume, `<effect>.<knob>` (#1445, #1467): one number,
-    /// through the knob's op, as the Inspector and `Graphics.*` write it.
     Knob(&'static vc_ops::Knob),
-    /// A camera effect's knob, `taa.<knob>` (#1847): one number on the entity's
-    /// `CameraComponent`, through the camera op.
     CameraKnob(&'static camera_ops::CameraKnob),
 }
 
 impl ShaderParam {
-    /// Resolve `path` on entity `id`: `None` when it is not a shader-param path,
-    /// else the param or why it cannot be tweened (no such component, no shader,
-    /// a baked or unknown param — the op's own error, listing the runtime params).
     pub(crate) fn parse(scene: &Scene, id: u32, path: &str) -> Option<Result<Self, String>> {
         let (prefix, name) = path.split_once('.')?;
         let source = match prefix {
@@ -90,7 +61,6 @@ impl ShaderParam {
         self.arity
     }
 
-    /// The value the param draws with, or `None` once its component or shader is gone.
     pub(crate) fn get(&self, scene: &Scene, id: u32) -> Option<Vec4> {
         let w = &scene.world;
         let value = match &self.source {
@@ -114,7 +84,6 @@ impl ShaderParam {
         value.ok().map(|v| lanes(&v))
     }
 
-    /// Write `v`'s first `arity` lanes. `false` once its component or shader is gone.
     pub(crate) fn set(&self, scene: &mut Scene, id: u32, v: Vec4) -> bool {
         let value = v.to_array()[..self.arity].to_vec();
         match &self.source {
@@ -167,9 +136,6 @@ fn ui_source(scene: &Scene, id: u32) -> Result<Source, String> {
     Ok(Source::Ui { shader, layout })
 }
 
-/// A camera effect's knob (`taa.<knob>`, #1847) on the entity's camera, else the
-/// volume's built-in knob `name` names, else its authored effects' chain. The
-/// camera knob needs no volume — a scene can run TAA without one.
 fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
     if let Some(knob) = camera_ops::camera_knob(name) {
         return scene
@@ -188,7 +154,6 @@ fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
     Ok(Source::Post(PostChain::load(&vc.custom_effects.names)))
 }
 
-/// A param value (1–4 numbers) as a tween's `Vec4`.
 fn lanes(v: &[f32]) -> Vec4 {
     let mut out = Vec4::ZERO;
     for (lane, x) in out.as_mut().iter_mut().zip(v) {

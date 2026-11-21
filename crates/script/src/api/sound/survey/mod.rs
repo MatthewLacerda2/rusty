@@ -1,24 +1,3 @@
-//! crates/script/src/api/sound/survey/mod.rs — what a **set** of patches and songs is made of,
-//! counted (#380): `Sound.Survey(paths)`.
-//!
-//! Every other `Sound` measurement looks at one bake. This one looks at a set, and
-//! catches what no per-bake number can: **the same instrument, everywhere** — six
-//! cues that each pass every check and are one guitar six times, or fourteen impact
-//! sounds that are all `noise` under a lowpass between 700 and 900 Hz. It reads the
-//! documents only: no bake, no decode, no samples.
-//!
-//! Songs are zimmer's survey (`rusty_zimmer::survey`): per track the source, gain,
-//! cutoff, sustain, note count, median pitch and duty, and the "loudest" track by
-//! gain × duty, never by gain alone. One-shot **patches** are rusty's own rows:
-//! zimmer leaves them out on purpose (an effect has no arrangement to be loudest
-//! in), but a shooter's hundreds of one-shots are exactly the set this is for.
-//!
-//! **It counts, and stops.** No score, no grade, no diversity number, nothing that
-//! can fail: a set of variations on one instrument is a legitimate thing to write on
-//! purpose. A document that cannot be read or parsed is listed under `skipped`
-//! rather than refusing the survey; a song track whose patch cannot be resolved
-//! leaves its instrument columns absent (zimmer's rule).
-
 mod lua;
 
 use std::collections::BTreeMap;
@@ -32,20 +11,12 @@ use crate::api::lua_json::decode;
 
 pub use lua::survey;
 
-/// One one-shot patch, as its document states it — the patch half of a
-/// [`rusty_zimmer::survey::TrackSurvey`]: what the instrument **is**.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PatchSurvey {
-    /// The path it was read from, or `#n` for the n-th inline document.
     pub name: String,
-    /// The source kind, as the recipe spells it (`noise`, `karplus`, `fm2`, …).
     pub source: &'static str,
-    /// The filter's kind (`lowpass`, …), absent when the patch has none.
     pub filter: Option<String>,
-    /// The filter's base cutoff in Hz, absent when the patch has no filter.
     pub cutoff: Option<f32>,
-    /// The **amp envelope's** sustain — not the source's: a `karplus` string or an
-    /// `fm2` modulator decays on its own whatever this reads.
     pub sustain: f32,
 }
 
@@ -67,13 +38,8 @@ impl PatchSurvey {
     }
 }
 
-/// One entry of the set: where it came from, its JSON document (or why not), and
-/// whether a script wrote it inline.
 pub type Document = (String, Result<Json, String>, Origin);
 
-/// Where a document came from, which says how its enum names are read: a script's
-/// inline document in any case, as every `Sound` verb reads it (#1216); a file in
-/// the canonical spelling only, as a song bake's `load_patch` reads the same file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Origin {
     File,
@@ -89,18 +55,14 @@ impl Origin {
     }
 }
 
-/// The whole set, sorted into patches and songs, plus what could not be read.
 #[derive(Debug, Default)]
 pub struct SetSurvey {
     pub patches: Vec<PatchSurvey>,
     pub songs: Survey,
-    /// `(name, why)` for every document that could not be read or parsed.
     pub skipped: Vec<(String, String)>,
 }
 
 impl SetSurvey {
-    /// Survey `documents` in order. A document with `tracks` is a song, anything
-    /// else a patch; a song's named patches resolve with `resolve`.
     pub fn of(
         documents: impl IntoIterator<Item = Document>,
         resolve: &dyn rusty_zimmer::PatchResolver,
@@ -136,8 +98,6 @@ impl SetSurvey {
         Ok(())
     }
 
-    /// The set counted across: absent for fewer than two documents, where a
-    /// summary would only repeat its one row.
     pub fn rollup(&self) -> Option<SetRollup> {
         if self.patches.len() + self.songs.songs.len() < 2 {
             return None;
@@ -181,17 +141,12 @@ impl SetSurvey {
     }
 }
 
-/// How often one source kind turns up across the set.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceRow {
     pub source: &'static str,
-    /// How many one-shot patches use it.
     pub patches: usize,
-    /// How many songs have at least one track using it.
     pub songs: usize,
-    /// How many songs have it in their loudest track (gain × duty).
     pub loudest: usize,
-    /// The lowest and highest base cutoff among the patches using it.
     pub cutoff: Option<(f32, f32)>,
 }
 
@@ -207,15 +162,12 @@ impl SourceRow {
     }
 }
 
-/// The set, counted: per-source rows, and the spread of tempos and registers.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SetRollup {
     pub patches: usize,
     pub songs: usize,
     pub sources: Vec<SourceRow>,
-    /// Slowest and fastest song tempo; absent with no songs.
     pub tempo: Option<(f32, f32)>,
-    /// Lowest and highest note any song plays; absent when none plays one.
     pub register: Option<Register>,
 }
 

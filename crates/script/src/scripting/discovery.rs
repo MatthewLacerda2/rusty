@@ -1,25 +1,12 @@
-//! crates/script/src/scripting/discovery.rs — find MonoBehaviour-equivalent project scripts.
-//!
-//! A project `.lua` script is a "MonoBehaviour" (addable from the inspector's Add
-//! Component menu, #83) when it `return`s a table exposing at least one lifecycle
-//! callback (the shared `callbacks::LIFECYCLE_CALLBACKS` list). Plain `require`-d
-//! helper modules, which return values/functions but no lifecycle table, are NOT
-//! offered.
-//!
 //! Detection evaluates each chunk in a throwaway sandboxed `Lua` and inspects the
 //! returned table — the same eval the runtime does, so the menu can never offer a
-//! script the runtime would reject. No wall-clock / RNG, so the determinism guard
-//! is satisfied.
-
+/// script the runtime would reject.
 use std::path::Path;
 
 use mlua::{Table, Value};
 
 use super::callbacks::LIFECYCLE_CALLBACKS;
 
-/// Scan `dir` (non-recursively) for `.lua` files that expose a lifecycle table.
-/// Returns their paths (using `dir`'s separator), sorted for a stable menu order.
-/// Unreadable dirs / files and scripts that fail to compile are simply skipped.
 pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -43,8 +30,6 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
     found
 }
 
-/// True if `code`, evaluated as a chunk, returns a table with at least one
-/// lifecycle method. A fresh `Lua` per call keeps detection side-effect-free.
 pub(crate) fn exposes_lifecycle(code: &str) -> bool {
     let lua = super::sandbox::inspection_vm();
     let Ok(table) = lua.load(code).eval::<Table>() else {
@@ -55,7 +40,6 @@ pub(crate) fn exposes_lifecycle(code: &str) -> bool {
         .any(|m| matches!(table.get::<Value>(*m), Ok(Value::Function(_))))
 }
 
-/// Display name (file stem) for a script path, for the Add Component menu label.
 pub fn script_label(path: &str) -> String {
     Path::new(path)
         .file_stem()
@@ -81,13 +65,9 @@ mod tests {
 
     #[test]
     fn helper_module_without_lifecycle_is_rejected() {
-        // A plain helper: returns a table of non-lifecycle functions.
         assert!(!exposes_lifecycle("return { helper = function() end }"));
-        // Returns a non-table value.
         assert!(!exposes_lifecycle("return 42"));
-        // A lifecycle name that is NOT a function does not count.
         assert!(!exposes_lifecycle("return { Start = 7 }"));
-        // Fails to compile.
         assert!(!exposes_lifecycle("this is not lua"));
     }
 

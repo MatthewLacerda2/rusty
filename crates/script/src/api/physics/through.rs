@@ -1,7 +1,3 @@
-//! crates/script/src/api/physics/through.rs — `Physics.RaycastThrough` (#830): every solid a
-//! ray crosses as an enter/exit pair, the wallbang query. The penetration
-//! counterpart to `RaycastAll`, with its hit shape and layer-mask handling.
-
 use glam::Vec3;
 use mlua::Table;
 
@@ -11,8 +7,6 @@ use crate::api::ApiCell;
 use rusty_physics::{PhysicsWorld, RayCrossing};
 use rusty_scene::Scene;
 
-/// One crossing: `{id, bone, bone_name, root, material, thickness, enter = {distance,
-/// point, normal}, exit = {distance, point, normal} | nil}`.
 fn crossing_table(lua: &mlua::Lua, scene: &Scene, c: &RayCrossing) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     set_owner(&t, scene, c.enter.id)?;
@@ -28,10 +22,6 @@ fn crossing_table(lua: &mlua::Lua, scene: &Scene, c: &RayCrossing) -> mlua::Resu
     Ok(t)
 }
 
-/// `RaycastThrough(ox,oy,oz, dx,dy,dz, max_distance [, layer_mask [,
-/// query_triggers]])` — an array
-/// of crossings sorted by entry distance (ties by entity id). Empty with no
-/// live physics world.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,

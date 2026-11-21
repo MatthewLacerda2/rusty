@@ -1,16 +1,10 @@
-//! Reading a spec table's fields with errors that name them (#1892):
-//! `tests[2].distance.to: unknown context 'targte'`, like the animation graph's
-//! load errors.
-
 use glam::Vec3;
 use mlua::{Table, Value};
 
-/// A Lua error naming the field at `path`.
 pub fn fail<T>(path: &str, what: impl std::fmt::Display) -> mlua::Result<T> {
     Err(mlua::Error::RuntimeError(format!("{path}: {what}")))
 }
 
-/// `path.key`, the way the errors spell a field.
 pub fn at(path: &str, key: &str) -> String {
     if path.is_empty() {
         key.to_string()
@@ -19,8 +13,6 @@ pub fn at(path: &str, key: &str) -> String {
     }
 }
 
-/// Refuse any key of `table` not in `allowed`, so a typo is an error, not a
-/// silently ignored field.
 pub fn only(table: &Table, path: &str, allowed: &[&str]) -> mlua::Result<()> {
     for pair in table.pairs::<Value, Value>() {
         let (key, _) = pair?;
@@ -44,8 +36,6 @@ pub fn only(table: &Table, path: &str, allowed: &[&str]) -> mlua::Result<()> {
     Ok(())
 }
 
-/// A finite number at `table[key]`, `default` when absent; `None` default makes
-/// it required.
 pub fn number(table: &Table, path: &str, key: &str, default: Option<f32>) -> mlua::Result<f32> {
     let here = at(path, key);
     match table.get::<Value>(key)? {
@@ -60,7 +50,6 @@ pub fn number(table: &Table, path: &str, key: &str, default: Option<f32>) -> mlu
     }
 }
 
-/// A whole number at least `min` at `table[key]`, `default` when absent.
 pub fn count(table: &Table, path: &str, key: &str, default: u32, min: u32) -> mlua::Result<u32> {
     let n = number(table, path, key, Some(default as f32))?;
     if n.fract() != 0.0 || n < min as f32 || n > u32::MAX as f32 {
@@ -72,7 +61,6 @@ pub fn count(table: &Table, path: &str, key: &str, default: u32, min: u32) -> ml
     Ok(n as u32)
 }
 
-/// A boolean at `table[key]`, `default` when absent.
 pub fn boolean(table: &Table, path: &str, key: &str, default: bool) -> mlua::Result<bool> {
     match table.get::<Value>(key)? {
         Value::Nil => Ok(default),
@@ -84,7 +72,6 @@ pub fn boolean(table: &Table, path: &str, key: &str, default: bool) -> mlua::Res
     }
 }
 
-/// A string at `table[key]`, or `None` when absent.
 pub fn text(table: &Table, path: &str, key: &str) -> mlua::Result<Option<String>> {
     match table.get::<Value>(key)? {
         Value::Nil => Ok(None),
@@ -96,7 +83,6 @@ pub fn text(table: &Table, path: &str, key: &str) -> mlua::Result<Option<String>
     }
 }
 
-/// A point table: `{x = 1, y = 2, z = 3}` or `{1, 2, 3}`.
 pub fn point(value: &Value, path: &str) -> mlua::Result<Vec3> {
     let Value::Table(t) = value else {
         return fail(
@@ -122,7 +108,6 @@ pub fn point(value: &Value, path: &str) -> mlua::Result<Vec3> {
     Ok(Vec3::from_array(xyz))
 }
 
-/// Whether `value` reads as one point (as opposed to a list of them).
 pub fn is_point(value: &Value) -> mlua::Result<bool> {
     Ok(match value {
         Value::Table(t) => {
@@ -132,7 +117,6 @@ pub fn is_point(value: &Value) -> mlua::Result<bool> {
     })
 }
 
-/// A list of point tables.
 pub fn points(value: &Value, path: &str) -> mlua::Result<Vec<Vec3>> {
     let Value::Table(t) = value else {
         return fail(

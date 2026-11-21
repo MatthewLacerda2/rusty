@@ -1,7 +1,3 @@
-//! `Assets.GetLightmapUVSettings` / `SetLightmapUVSettings` (#831): the API side of
-//! the model inspector's Generate Lightmap UVs checkbox; and
-//! `Assets.Get/SetTextureImportSettings` (#1323), the image inspector's card.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -61,7 +57,6 @@ fn the_assets_api_sets_and_reads_a_models_scale_factor() {
 
 #[test]
 fn instantiating_a_bare_model_path_spawns_the_whole_model() {
-    // Unity's `Instantiate` of a model prefab: the editor button's node tree (#1083).
     let path = quad_model("rusty_1083_api");
     let scene = Rc::new(RefCell::new(Scene::new()));
     let lua = format!("_G.root = Scene.Instantiate({path:?}, 'Kit', 1, 2, 3)");

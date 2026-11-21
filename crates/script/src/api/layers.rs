@@ -1,11 +1,3 @@
-//! crates/script/src/api/layers.rs — `Layers` namespace.
-//!
-//! Read/write an entity's layer index and resolve layer names against the
-//! project's shared registry (Unity's `gameObject.layer` + `LayerMask.NameToLayer`),
-//! and name a slot (#827) — the same `Layers::set_name` the editor's Tags & Layers
-//! section commits through. The collision matrix lives on `Physics` and a camera's
-//! culling mask on `Camera`, where Unity puts them.
-
 use mlua::Lua;
 
 use super::{put, Reg};
@@ -14,7 +6,6 @@ use crate::api::ApiCell;
 use rusty_scene::Scene;
 use rusty_scene::LAYER_COUNT;
 
-/// Register the `Layers` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -46,7 +37,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         }),
     )?;
 
-    // Slot 0 stays the fixed "Default" (a no-op); a blank name clears the slot.
     put(
         &table,
         "SetName",

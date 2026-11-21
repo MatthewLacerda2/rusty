@@ -1,7 +1,3 @@
-//! `Component.Set` with a table held across ticks, and the second review's fixes
-//! (#1369): unchanged means unchanged since `Get`, `graph = ""`, a renamed UI
-//! shader, LOD levels, flattened Animator types.
-
 use std::{cell::RefCell, rc::Rc};
 
 use glam::Vec3;
@@ -13,9 +9,6 @@ use rusty_components::UiShader;
 use rusty_edit::authoring::{add_component, ComponentKind};
 use rusty_scene::Scene;
 
-/// Run each chunk in turn over entities `id` (every Add Component kind) and `other`
-/// (a Rigidbody), with `tick` run on the scene between two chunks, as a frame
-/// would; the last chunk's value.
 fn run<R: mlua::FromLuaMulti>(chunks: &[&str], mut tick: impl FnMut(&mut Scene)) -> (Scene, R) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());

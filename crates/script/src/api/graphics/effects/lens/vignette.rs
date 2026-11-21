@@ -1,5 +1,3 @@
-//! `Graphics.{Get,Set}Vignette{Active,Intensity,Smoothness,Color,Center}` (#1439).
-
 use super::super::super::super::{put, Reg};
 use super::super::super::state::{with_vc, with_vc_mut};
 use super::super::knobs::{register as knobs, register_flag};
@@ -8,8 +6,6 @@ use rusty_components::Vignette;
 use rusty_edit::authoring::rendering::post_processing::lens::vignette;
 use rusty_scene::Scene;
 
-/// The switch, the knobs, and the colour and centre (a new volume's without an
-/// active volume).
 pub(in crate::api::graphics) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -27,8 +23,6 @@ pub(in crate::api::graphics) fn register(
     register_vectors(lua, table, scene)
 }
 
-/// `SetVignetteColor(r, g, b)` / `GetVignetteColor() -> r, g, b` and
-/// `SetVignetteCenter(x, y)` / `GetVignetteCenter() -> x, y`.
 fn register_vectors(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let defaults = Vignette::DEFAULT;
     put(

@@ -1,10 +1,3 @@
-//! crates/script/src/api/mask.rs — `Mask` namespace (#428).
-//!
-//! Get/Set over an entity's `MaskComponent` (Unity's `Mask`): whether the mask's
-//! own graphic also draws. Whether a mask exists is `Scene.AddComponent(id,
-//! "Mask")` / `RemoveComponent`. The setter routes through the shared
-//! `edit::authoring::ui::rect_mask` op the inspector card uses.
-
 use mlua::Lua;
 
 use super::{put, Reg};
@@ -13,7 +6,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::ui::rect_mask as mask_ops;
 use rusty_scene::Scene;
 
-/// Register the `Mask` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(

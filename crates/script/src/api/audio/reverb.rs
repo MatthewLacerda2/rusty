@@ -1,9 +1,3 @@
-//! crates/script/src/api/audio/reverb.rs — the `Audio` reverb-zone read-back (#469).
-//!
-//! The reverb the listener heard at the last `LateUpdate`: the zones around the
-//! active camera, blended. Zones themselves are authored through
-//! `AudioReverbZone.*`.
-
 use mlua::Table;
 
 use super::super::reverb_zone::params_table;
@@ -11,7 +5,6 @@ use super::super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_audio::AudioMaestro;
 
-/// `GetReverbState`.
 pub(super) fn register_reverb(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,

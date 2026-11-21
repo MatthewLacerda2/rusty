@@ -1,9 +1,4 @@
-//! crates/script/src/api/material/shader/textures.rs — `Material.SetShaderTexture` (#400): the
-//! texture an extra shader slot samples (a baked noise behind `dissolve`), Unity's
-//! `material.SetTexture("_Mask", …)`.
-//!
-//! A thin adapter over `authoring::material::set_shader_texture`, which refuses an
-//! unknown slot by name. `nil` or `""` clears the slot back to white.
+//! `nil` or `""` clears the slot back to white.
 
 use super::super::{put, Reg};
 use crate::api::entity_arg::EntityArg;
@@ -11,7 +6,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
-/// Register `SetShaderTexture` onto the `Material` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

@@ -1,20 +1,12 @@
-//! `Physics.Raycast` / `SphereCast` hit info and `Physics.RaycastAll` from
-//! script (#446), over `spatial`'s two boxes: `a` spanning [-1,1]³ on
-//! layer 0 and `b` spanning z ∈ [9,11] on layer 3.
-
 use super::spatial::spatial_runtime;
 
 #[test]
 fn raycast_appends_the_hit_point_and_surface_normal() {
     let (m, a, _) = spatial_runtime();
-    // From z=-5 along +Z: `a`'s -Z face at z=-1, 4 m away, facing back. `a` is
-    // on no skeleton (no bone, no bone name), is its own root (#464) and has an
-    // inline material (no asset, #1878).
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,1)").unwrap(),
         format!("true, {a}, 4, 0, 0, -1, 0, 0, -1, nil, nil, {a}, nil")
     );
-    // A miss zeroes every number after `hit` and leaves the rest nil.
     assert_eq!(
         m.eval("Physics.Raycast(0,0,-5, 0,0,-1)").unwrap(),
         "false, 0, 0, 0, 0, 0, 0, 0, 0, nil, nil, nil, nil"
@@ -33,9 +25,6 @@ fn three_value_callers_are_undisturbed() {
 #[test]
 fn sphere_cast_appends_the_contact_point_and_normal() {
     let (m, _, b) = spatial_runtime();
-    // A 0.5 m sphere from z=2 meets `b`'s z=9 face after 6.5 m of travel. The
-    // distance and point are a shape cast's, so they are compared to within
-    // parry's tolerance (rapier 0.36 lands a few float ulps past the face).
     let script = "local hit, id, d, px, py, pz, nx, ny, nz, bone, name, root = \
                   Physics.SphereCast(0,0,2, 0,0,1, 0.5) \
                   local function near(x, want) return math.abs(x - want) < 1e-4 end \
@@ -58,7 +47,6 @@ fn raycast_all_lists_every_hit_sorted_with_point_and_normal() {
         )
         .unwrap();
     assert_eq!(all, format!("2, {a}, 4, {b}, 14, 9, 0, 0, -1"));
-    // max_distance stops short of `b`.
     assert_eq!(
         m.eval("#Physics.RaycastAll(0,0,-5, 0,0,1, 10)").unwrap(),
         "1"

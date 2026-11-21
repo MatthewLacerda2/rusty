@@ -1,16 +1,9 @@
-//! A rebake moves the Max Size the engine chose and never the developer's
-//! (#2259), seen from Lua: `Texture.Bake` again at a larger size ships at it, a
-//! `maxSize` set through `Assets.SetTextureImportSettings` holds, the import
-//! warning once that the file is shrunk, a get-edit-set round-trip keeps the
-//! engine's, `BakeMeshMaps` ships at its size, and a bake above 8192 is refused.
-
 use std::path::Path;
 
 use mlua::Lua;
 
 use super::register;
 
-/// A Lua VM with `Texture` and `Assets`, `OUT` a fresh path named `file`.
 fn lua(file: &str) -> (Lua, std::path::PathBuf) {
     let lua = Lua::new();
     register(&lua).unwrap();
@@ -20,7 +13,6 @@ fn lua(file: &str) -> (Lua, std::path::PathBuf) {
     (lua, path)
 }
 
-/// `Texture.Bake` of a one-colour `{w}`×4 recipe to `OUT`.
 fn bake(lua: &Lua, w: u32) -> mlua::Result<()> {
     let recipe = format!(
         r#"{{ size = {{{w}, 4}}, nodes = {{ {{ id = "c", op = "constant", color = {{1, 0, 0, 1}} }} }} }}"#

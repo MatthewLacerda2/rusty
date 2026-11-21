@@ -1,16 +1,3 @@
-//! The component fields a tween may drive (#424), resolved by name.
-//!
-//! A property path is `"Component.field"` — `"CanvasGroup.alpha"`,
-//! `"RectTransform.anchored_position"`. Only the numeric fields listed here are
-//! animatable, so a typo is an error at `Tween.To`, never a silent no-op. Writes
-//! route through the same `edit::authoring` ops the inspector and the component
-//! namespaces use, so a tweened alpha is clamped exactly like a `SetAlpha`.
-//! `Transform.position` and `Transform.rotation` are world space, as
-//! `Transform.SetPosition` / `SetRotation` are; `Transform.scale` is the local scale,
-//! as `Transform.SetLocalScale` is (Unity's split, #1196).
-//!
-//! Every value travels as a `Vec4`; a property uses its first `arity` lanes.
-
 use glam::{Vec2, Vec3, Vec4};
 
 use rusty_components::transform::{euler_degrees, from_euler_degrees};
@@ -20,7 +7,6 @@ use rusty_edit::authoring::{
 };
 use rusty_scene::Scene;
 
-/// One animatable component field.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Field {
     Position,
@@ -43,7 +29,6 @@ pub(crate) enum Field {
     Volume,
 }
 
-/// `(path, property, arity)` — the whole animatable surface.
 const FIELDS: &[(&str, Field, usize)] = &[
     ("Transform.position", Field::Position, 3),
     ("Transform.rotation", Field::Rotation, 3),
@@ -70,12 +55,10 @@ const FIELDS: &[(&str, Field, usize)] = &[
 ];
 
 impl Field {
-    /// Resolve a `"Component.field"` path.
     pub(crate) fn parse(path: &str) -> Option<Self> {
         FIELDS.iter().find(|(p, ..)| *p == path).map(|e| e.1)
     }
 
-    /// Every accepted path, for the error a typo gets.
     pub(crate) fn paths() -> String {
         FIELDS
             .iter()
@@ -84,12 +67,10 @@ impl Field {
             .join(", ")
     }
 
-    /// The path this property was parsed from.
     pub(crate) fn path(self) -> &'static str {
         self.entry().0
     }
 
-    /// How many numbers the value has (1 = a number, 2..4 = a vector / colour).
     pub(crate) fn arity(self) -> usize {
         self.entry().2
     }
@@ -101,25 +82,15 @@ impl Field {
             .expect("every Field is listed in FIELDS")
     }
 
-    /// Whether the field's op holds a bound (the `held!` arms of [`Self::get`]),
-    /// so what it reads back is what was written, held. Transform's fields read
-    /// back through world space and an Euler decomposition, never a bound: a
-    /// `rotation` of 360 reads as 0 (#1418).
     pub(crate) fn is_held(self) -> bool {
         !matches!(self, Self::Position | Self::Rotation | Self::Scale)
     }
 
-    /// The field's current value as its write op holds it, or `None` when `id`
-    /// lacks the component. A stored value the op would clamp (a loaded
-    /// `fov: 500`) reads as the value the op makes of it, so a tween starts where
-    /// the target actually sits and moves from its first step (#1407).
     pub(crate) fn get(self, scene: &Scene, id: u32) -> Option<Vec4> {
         let w = &scene.world;
         let v3 = |v: Vec3| v.extend(0.0);
         let v2 = |v: Vec2| v.extend(0.0).extend(0.0);
         let f = |v: f32| Vec4::new(v, 0.0, 0.0, 0.0);
-        // Run the field's own op over a copy of the component, so the read applies
-        // exactly the rule the write does (`scene::camera::held_fov`'s shape).
         macro_rules! held {
             ($get:ident, $field:ident, $op:path) => {{
                 let mut c = (*w.$get(id)?).clone();
@@ -156,8 +127,6 @@ impl Field {
         })
     }
 
-    /// Write `v` through the field's authoring op. `false` when `id` lacks the
-    /// component (it was removed mid-tween).
     pub(crate) fn set(self, scene: &mut Scene, id: u32, v: Vec4) -> bool {
         let w = &mut scene.world;
         let xy = Vec2::new(v.x, v.y);
@@ -193,7 +162,6 @@ impl Field {
             Self::Fov => write!(camera_mut, |c| camera::set_fov(c, v.x)),
             Self::Volume => write!(audio_mut, |c| audio::set_volume(c, v.x)),
         };
-        // A moved transform drags its subtree's colliders along (`ecs::world_space`).
         written
     }
 }

@@ -1,8 +1,3 @@
-//! crates/script/src/scripting/tests/material_asset.rs — the physics material asset verbs
-//! (#1878): `Physics.CreateMaterialAsset` / `GetMaterialAsset` / `SetMaterialAsset`,
-//! `SetMaterial` / `GetMaterial`, and the collision contact naming the other
-//! collider's asset.
-
 use std::collections::BTreeMap;
 
 use super::collider::manager_with_collider;
@@ -25,7 +20,6 @@ fn an_asset_is_created_named_and_retuned_from_lua() {
            select(1, Physics.GetPhysicsMaterial({id})), a.bounce_combine, a.bounciness"
     );
     assert_eq!(m.eval(&lua).unwrap(), "true, 0.25, 0.5, Maximum, 0");
-    // Unity's `Collider.material`: inline values detach the collider from the asset.
     m.eval(&format!("Physics.SetPhysicsMaterial({id}, 0.75, 0)"))
         .unwrap();
     assert_eq!(

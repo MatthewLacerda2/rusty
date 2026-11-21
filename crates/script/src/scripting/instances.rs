@@ -1,17 +1,11 @@
-//! crates/script/src/scripting/instances.rs — the live script tables, by entity (#422).
-//!
-//! Unity's `GetComponent<Button>()`: an owning script reaches a widget's script
-//! instance to read its state or hand it a callback (`button.on_click = fn`). The
-//! index is a table in the Lua registry, `index[id][slot + 1] = { name, table }`,
+//! The index is a table in the Lua registry, `index[id][slot + 1] = { name, table }`,
 //! written when a script loads and cleared when its entity is forgotten; a fresh
 //! VM (every Play) starts with none. `Scene.GetScript` reads it.
 
 use mlua::{Lua, Table, Value};
 
-/// The registry name of the index.
 const KEY: &str = "rusty.script_instances";
 
-/// The index table, created on first use.
 fn index(lua: &Lua) -> mlua::Result<Table> {
     match lua.named_registry_value::<Value>(KEY)? {
         Value::Table(t) => Ok(t),
@@ -23,7 +17,6 @@ fn index(lua: &Lua) -> mlua::Result<Table> {
     }
 }
 
-/// Record `table` as entity `id`'s script in `slot`, named `name` (the file stem).
 pub(super) fn record(
     lua: &Lua,
     id: u32,
@@ -46,12 +39,10 @@ pub(super) fn record(
     slots.set(slot + 1, entry)
 }
 
-/// Drop every script of entity `id`.
 pub(super) fn forget(lua: &Lua, id: u32) -> mlua::Result<()> {
     index(lua)?.set(id, Value::Nil)
 }
 
-/// Entity `id`'s first script (lowest slot) named `name`, or `nil`.
 pub fn find(lua: &Lua, id: u32, name: &str) -> mlua::Result<Option<Table>> {
     let Value::Table(slots) = index(lua)?.get::<Value>(id)? else {
         return Ok(None);
@@ -67,8 +58,6 @@ pub fn find(lua: &Lua, id: u32, name: &str) -> mlua::Result<Option<Table>> {
     Ok(hits.into_iter().next().map(|(_, t)| t))
 }
 
-/// Entity `id`'s live script tables that define the function `callback`, in slot
-/// order: who a callback delivered through the index (`Damage`, #1893) calls.
 pub fn handlers(lua: &Lua, id: u32, callback: &str) -> mlua::Result<Vec<Table>> {
     let Value::Table(slots) = index(lua)?.get::<Value>(id)? else {
         return Ok(Vec::new());
@@ -86,17 +75,11 @@ pub fn handlers(lua: &Lua, id: u32, callback: &str) -> mlua::Result<Vec<Table>> 
 }
 
 impl super::ScriptManager {
-    /// Run `f` in this runtime's VM: `None` when the runtime is down. For a caller
-    /// in another VM that forwards a whole API call here (the scenario's `Damage`,
-    /// #1893), so the call sees this VM's script instances.
     pub fn with_vm<R>(&self, f: impl FnOnce(&Lua) -> mlua::Result<R>) -> mlua::Result<Option<R>> {
         self.lua.as_ref().map(f).transpose()
     }
 
-    /// Run `f` on entity `id`'s live script named `name`, in this runtime's VM:
-    /// `None` when the runtime is down or the entity has no such script. For a
-    /// caller in another VM (the dev layer's scenario proxy, #1384), which cannot
-    /// hold the table itself: a Lua table never leaves the VM that made it.
+    /// A Lua table never leaves the VM that made it.
     pub fn with_script<R>(
         &self,
         id: u32,

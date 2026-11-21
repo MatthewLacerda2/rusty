@@ -1,8 +1,3 @@
-//! `Material.SetAssetShaderParam` / `GetAssetShaderParam` (#399, #670): values land on
-//! the material under their canonical name, read back (defaults included), and a param
-//! the shader does not expose at runtime is an error naming it — from the asset and
-//! the per-entity verbs alike.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,8 +9,6 @@ use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// Bake a toon + hit-flash surface shader under a name unique to this test run,
-/// into the workspace the API resolves from; removed on drop.
 pub(super) struct Baked(pub(super) String);
 
 impl Baked {
@@ -43,7 +36,6 @@ impl Drop for Baked {
     }
 }
 
-/// A scene with one entity whose material names `shader`; returns (scene, id).
 pub(super) fn scene_with(shader: &str) -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("E".into());
@@ -52,7 +44,6 @@ pub(super) fn scene_with(shader: &str) -> (Rc<RefCell<Scene>>, u32) {
     (Rc::new(RefCell::new(scene)), id)
 }
 
-/// Run `script` against the `Material` namespace, returning its error if any.
 pub(super) fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
     crate::api::attempt(|| {

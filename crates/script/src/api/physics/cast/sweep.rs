@@ -1,13 +1,3 @@
-//! crates/script/src/api/physics/cast/sweep.rs — the single shape casts: `Physics.SphereCast`,
-//! `CapsuleCast` and `BoxCast` (#311, #1881).
-//!
-//! Each sweeps a [`Sweep`] along a direction and returns the first accepted
-//! hit as a [`CastResult`], with `Raycast`'s four trailing options
-//! (`ignore_id, layer_mask, max_distance, query_triggers`). Unity's argument
-//! order is kept, flattened into numbers, except that `SphereCast` takes its
-//! radius after the direction, as it always has here. Bad sizes and
-//! directions are Lua errors ([`check`](super::check)).
-
 use glam::Vec3;
 use mlua::Table;
 
@@ -18,8 +8,6 @@ use crate::api::ApiCell;
 use rusty_physics::{PhysicsWorld, Sweep};
 use rusty_scene::Scene;
 
-/// `Raycast`'s trailing options: `ignore_id, layer_mask, max_distance,
-/// query_triggers`.
 type Options = (Option<u32>, Option<u32>, Option<f32>, Option<bool>);
 
 /// The first hit of `sweep` along `dir` under `options`; a miss with no live
@@ -42,7 +30,6 @@ fn first_hit(
     Ok(cast_result(&scene, hit))
 }
 
-/// Register `SphereCast`, `CapsuleCast` and `BoxCast` onto `Physics`.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -50,8 +37,6 @@ pub(super) fn register(
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     let cells = (scene, physics);
-    // `SphereCast(ox,oy,oz, dx,dy,dz, radius, <options>)`: a raycast with a
-    // radius. Distance is how far the sphere's center traveled.
     type SphereArgs = (f32, f32, f32, f32, f32, f32, f32, Options);
     put(
         table,
@@ -96,7 +81,6 @@ fn register_box(
     table: &Table,
     cells: (ApiCell<Scene>, ApiCell<Option<PhysicsWorld>>),
 ) -> Reg {
-    // The center, half-extents and direction, the Euler angles, the options.
     type BoxArgs = (
         f32,
         f32,

@@ -1,12 +1,3 @@
-//! crates/script/src/api/nav/ — `Navigation` + `NavMeshAgent` namespaces.
-//!
-//! `Navigation` queries the shared nav graph (`GetNextPathStep`, and the path queries in
-//! `query`, #458) and exposes the
-//! per-scene navmesh bake settings (#276); `agent` registers `NavMeshAgent.*`, which
-//! reads and writes an entity's optional nav-agent component. Split into this `mod.rs`
-//! (the `Navigation` namespace), `settings.rs` (its bake settings and bounds) and
-//! `agent.rs` (the `NavMeshAgent` surface), each Lua namespace one cohesive unit.
-
 mod agent;
 mod areas;
 mod offmesh;
@@ -23,14 +14,11 @@ use crate::api::ApiCell;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 
-/// Register the `Navigation` and `NavMeshAgent` namespaces onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     register_navigation(lua, scene, nav)?;
     agent::register(lua, scene, nav)
 }
 
-/// `Navigation.GetNextPathStep` over the shared nav graph, plus the per-scene navmesh
-/// bake-settings getters/setters (#276).
 fn register_navigation(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -48,8 +36,7 @@ fn register_navigation(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<Navigation
         ),
     )?;
 
-    // `Navigation.Bake()` (#1887): a full bake now. A dev build replaces it with the
-    // one that also saves `<scene>.navmesh` (`dev::lua_surface::bake`).
+    // A dev build replaces this with one that also saves `<scene>.navmesh`.
     put(
         &table,
         "Bake",

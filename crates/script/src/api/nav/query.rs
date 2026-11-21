@@ -1,12 +1,3 @@
-//! crates/script/src/api/nav/query.rs — the `Navigation` path queries (#458): `CalculatePath`,
-//! `SamplePosition`, `Raycast` and `GetPathLength`, the agents' search budget
-//! (`Set`/`GetPathfindingIterationsPerFrame`, #2087), plus the path table they share
-//! with `NavMeshAgent.GetPath`. The first three take an optional trailing area mask
-//! (#460, Unity's `areaMask`; every area when omitted).
-//!
-//! A path is `{status = "complete"|"partial"|"invalid", corners = {{x,y,z}, ...},
-//! length = n}`: the Lua face of [`NavPath`].
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
@@ -15,10 +6,8 @@ use super::areas::mask_arg;
 use crate::api::ApiCell;
 use rusty_navigation::{path_length, NavPath, NavPathStatus, NavigationGraph};
 
-/// Two points and an optional area mask (#460): the path queries' arguments.
 type PathArgs = (f32, f32, f32, f32, f32, f32, Option<i64>);
 
-/// A path as its Lua table.
 pub(super) fn path_table(
     lua: &Lua,
     status: NavPathStatus,
@@ -39,7 +28,6 @@ pub(super) fn path_table(
     Ok(path)
 }
 
-/// The corners of a path table, read back for `GetPathLength`.
 fn corners_of(path: &Table) -> mlua::Result<Vec<Vec3>> {
     let list: Table = path.get("corners")?;
     list.sequence_values::<Table>()
@@ -50,7 +38,6 @@ fn corners_of(path: &Table) -> mlua::Result<Vec<Vec3>> {
         .collect()
 }
 
-/// Register the queries onto the `Navigation` table.
 pub(super) fn register(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGraph>) -> Reg {
     put(
         table,
@@ -101,8 +88,7 @@ pub(super) fn register(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGr
     register_budget(lua, table, nav)
 }
 
-/// The agents' path-search budget (#2087, Unity's `NavMesh.pathfindingIterationsPerFrame`):
-/// node expansions per tick, at least 1.
+/// Node expansions per tick, at least 1.
 fn register_budget(lua: &mlua::Lua, table: &Table, nav: ApiCell<NavigationGraph>) -> Reg {
     put(
         table,

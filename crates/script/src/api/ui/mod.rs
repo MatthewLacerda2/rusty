@@ -1,15 +1,3 @@
-//! crates/script/src/api/ui/ — `UI` namespace: EventSystem-level UI verbs (#417, #420).
-//!
-//! Reads the in-game UI's computed layout. `UI.GetRect(id)` returns an element's
-//! rect in its canvas's reference units and in screen pixels, computed on demand
-//! from the live scene (so it reflects a change made earlier in the same script, in
-//! edit mode as well as in Play) with the same math as the per-tick layout system —
-//! through the active camera, so markers sit where they draw (#429). The pointer
-//! and focus verbs (#420) are in `events`; `view` builds the screen + camera they
-//! all compute against. `UI.Create(kind, [parent])` (#422) is the Create ▸ UI
-//! menu's API face: the same `create_ui` builds the widget. A graphic's custom ui
-//! shader and its runtime params (#427) are in `shader`.
-
 mod events;
 mod shader;
 mod view;
@@ -29,7 +17,6 @@ use rusty_scene::{Camera, Scene};
 use rusty_ui::space::{rect_screen_bounds, space_of, CanvasSpace};
 use rusty_ui::{layout, ScreenSize, UiRect, UiView};
 
-/// Register the `UI` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
@@ -86,7 +73,6 @@ pub fn register(
     lua.globals().set("UI", table).map_err(|e| e.to_string())
 }
 
-/// `{ x, y, width, height }` of an axis-aligned `(min, max)` box.
 fn box_table(lua: &Lua, (lo, hi): (Vec2, Vec2)) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("x", lo.x)?;
@@ -116,8 +102,6 @@ fn rect_table(lua: &Lua, r: &UiRect, screen: Option<(Vec2, Vec2)>) -> mlua::Resu
     Ok(t)
 }
 
-/// The JSON shape of a rect, for `Debug.Snapshot`'s `ui_rect`: the same keys as
-/// `UI.GetRect`'s table.
 pub(crate) fn rect_value(world: &rusty_ecs::World, r: &UiRect, view: &UiView) -> Value {
     let boxed = |(lo, hi): (Vec2, Vec2)| json!({ "x": lo.x, "y": lo.y, "width": hi.x - lo.x, "height": hi.y - lo.y });
     let space = space_of(world, r.canvas, view);

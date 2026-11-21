@@ -1,26 +1,3 @@
-//! crates/script/src/api/damage/mod.rs — `Damage` namespace (#1893): Unreal's damage model.
-//!
-//! `UGameplayStatics::ApplyDamage` / `ApplyPointDamage` /
-//! `ApplyRadialDamageWithFalloff`, delivered to the target's `OnTakeDamage(id,
-//! amount, event)`. Unity has no damage system (projects `SendMessage` one), so
-//! this follows Unreal. The engine stores no health: what damage *does* is the
-//! game's Lua; the engine gives the delivery, the hit information and the
-//! radial query.
-//!
-//! - **Who receives it** (`deliver`): the nearest active ancestor-or-self of
-//!   the entity named (or hit) whose live script defines `OnTakeDamage` — the
-//!   bubbling walk the UI pointer callbacks take (`ui::events::nearest`), so a
-//!   hitbox under a bone reaches the character's script.
-//! - **When**: synchronously, inside the call, through the live instance index
-//!   (`scripting::instances`, what `Scene.GetScript` reads). No queue. A handler
-//!   may apply damage itself; past [`MAX_DEPTH`] nested calls the next one is a
-//!   Lua error, and every call under it unwinds with it.
-//! - **Radial** (`radial`): an overlap that ignores the causer, grouped by
-//!   receiver, a cover ray per collider (`cover`), the nearest reached point per
-//!   group, then the falloff — nearest first, ties by entity id.
-//! - **Impulse**: `opts.impulse` pushes the struck body through
-//!   `Physics.AddImpulseAtPosition` itself, the same code a script calls.
-
 mod cover;
 mod deliver;
 mod radial;
@@ -37,14 +14,11 @@ use crate::api::ApiCell;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// How many `Damage.*` calls may nest (a handler applying damage, whose target's
-/// handler applies damage, …) before the next one is a Lua error.
 pub const MAX_DEPTH: u32 = 16;
 
 /// The damage type when `opts.type` is absent (Unreal's `UDamageType` default).
 const GENERIC: &str = "generic";
 
-/// The options every verb takes: `type`, `instigator`, `causer`, `impulse`.
 pub(super) struct Common {
     kind: String,
     instigator: Option<u32>,
@@ -53,7 +27,6 @@ pub(super) struct Common {
 }
 
 impl Common {
-    /// Read the shared fields of `opts` (absent: the defaults).
     fn read(verb: &str, opts: Option<&Table>) -> mlua::Result<Self> {
         let Some(t) = opts else {
             return Ok(Self {
@@ -75,7 +48,6 @@ impl Common {
         })
     }
 
-    /// A fresh `event` table of `kind` (`"any"`, `"point"`, `"radial"`).
     fn event(&self, lua: &Lua, kind: &str) -> mlua::Result<Table> {
         let t = lua.create_table()?;
         t.set("kind", kind)?;
@@ -86,7 +58,6 @@ impl Common {
     }
 }
 
-/// A Lua error unless `value` is a finite number.
 fn finite(verb: &str, what: &str, value: f64) -> mlua::Result<f64> {
     if value.is_finite() {
         Ok(value)
@@ -97,7 +68,6 @@ fn finite(verb: &str, what: &str, value: f64) -> mlua::Result<f64> {
     }
 }
 
-/// `{x, y, z}`.
 fn vec_table(lua: &Lua, v: Vec3) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("x", v.x)?;
@@ -106,11 +76,9 @@ fn vec_table(lua: &Lua, v: Vec3) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// The VM's nesting count, made on first use.
 #[derive(Clone)]
 struct Depth(Rc<Cell<u32>>);
 
-/// One level of nesting, released when dropped (an error unwinding included).
 struct Nested(Rc<Cell<u32>>);
 
 impl Drop for Nested {
@@ -119,7 +87,6 @@ impl Drop for Nested {
     }
 }
 
-/// Enter one `Damage.<verb>` call: an error past [`MAX_DEPTH`] nested ones.
 fn enter(lua: &Lua, verb: &str) -> mlua::Result<Nested> {
     let existing = lua.app_data_ref::<Depth>().map(|d| d.clone());
     let depth = match existing {
@@ -141,8 +108,6 @@ fn enter(lua: &Lua, verb: &str) -> mlua::Result<Nested> {
     Ok(Nested(depth.0))
 }
 
-/// Push `id`'s body with `impulse` at `point`, through the script verb
-/// `Physics.AddImpulseAtPosition` (a no-op on a kinematic or bodiless entity).
 fn push(lua: &Lua, id: u32, impulse: Vec3, point: Vec3) -> mlua::Result<()> {
     if impulse == Vec3::ZERO {
         return Ok(());
@@ -153,7 +118,6 @@ fn push(lua: &Lua, id: u32, impulse: Vec3, point: Vec3) -> mlua::Result<()> {
     f.call::<()>((id, j.x, j.y, j.z, p.x, p.y, p.z))
 }
 
-/// Register `Damage` onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     let f = lua.create_function(
@@ -176,7 +140,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<Physic
         .map_err(|e| e.to_string())
 }
 
-/// `ApplyPoint(hit, amount, dx, dy, dz [, opts])`.
 fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function> {
     type Args = (Table, f64, f32, f32, f32, Option<Table>);
     lua.create_function(move |lua, (hit, amount, dx, dy, dz, opts): Args| {
@@ -191,13 +154,11 @@ fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function>
         let raw = Vec3::new(dx, dy, dz);
         finite("ApplyPoint", "the direction", raw.length() as f64)?;
         let direction = raw.normalize_or_zero();
-        // A copy, so a caller's reused `RaycastAllNonAlloc` entry is not written.
         let copy = lua.create_table()?;
         for pair in hit.pairs::<Value, Value>() {
             let (k, v) = pair?;
             copy.set(k, v)?;
         }
-        // A `RaycastThrough` crossing keeps where it landed under `enter`.
         if copy.get::<Option<Table>>("point")?.is_none() {
             if let Some(enter) = hit.get::<Option<Table>>("enter")? {
                 for key in ["point", "normal", "distance"] {
@@ -210,7 +171,6 @@ fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function>
         event.set("hit", copy.clone())?;
         let scene = &*scene.get(lua)?;
         let taken = deliver::to_receiver(lua, scene, id, amount, &event)?;
-        // The push needs where the shot landed; a hit without a `point` gets none.
         if let Some(p) = copy.get::<Option<Table>>("point")? {
             let point = Vec3::new(p.get("x")?, p.get("y")?, p.get("z")?);
             let body = scene.borrow().world.body_carrier(id).unwrap_or(id);

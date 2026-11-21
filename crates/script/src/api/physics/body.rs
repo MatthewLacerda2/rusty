@@ -1,13 +1,3 @@
-//! crates/script/src/api/physics/body.rs — `Physics.GetMass` / `SetMass` / `GetUseGravity` /
-//! `SetUseGravity` / `IsTrigger` / `SetTrigger` (#1365, #1368), and the drag
-//! pair `GetDrag` / `SetDrag` / `GetAngularDrag` / `SetAngularDrag` (#2062).
-//!
-//! The body's authorable switches, over the same `edit::authoring` ops the
-//! inspector's Rigidbody and Collider cards write through, so a script's mass is
-//! clamped exactly as the card's is. Unity: `Rigidbody.mass`, `Rigidbody.useGravity`,
-//! `Rigidbody.drag`, `Rigidbody.angularDrag` and `Collider.isTrigger`. Getters answer a neutral default without the
-//! component; setters are then no-ops.
-
 use mlua::Table;
 
 use super::super::{put, Reg};
@@ -17,8 +7,6 @@ use rusty_components::RigidBodyComponent;
 use rusty_edit::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
 use rusty_scene::Scene;
 
-/// Put a getter/setter pair over one `f32` Rigidbody field: the getter reads it
-/// (`0` without a Rigidbody), the setter writes it through `set` (a no-op then).
 fn number_pair(
     lua: &mlua::Lua,
     table: &Table,
@@ -43,7 +31,6 @@ fn number_pair(
     put(table, set_name, f)
 }
 
-/// Register the mass, drag, gravity and trigger accessors onto the `Physics` table.
 pub(super) fn register(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let names = ("GetDrag", "SetDrag");
     number_pair(lua, table, scene, names, |rb| rb.drag, rb_ops::set_drag)?;

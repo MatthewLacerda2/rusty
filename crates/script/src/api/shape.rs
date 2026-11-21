@@ -1,14 +1,3 @@
-//! crates/script/src/api/shape.rs — `Shape` namespace (#425).
-//!
-//! Get/Set over an entity's `ShapeComponent`, the texture-free SDF graphic: its
-//! kind and corner style (by name), the per-kind numbers (`Radius`, `InnerRadius`,
-//! `Arc`, `Thickness`, `Dash`), the fill (`Color`, `Gradient`), `Border`, the
-//! `Shadow` and `Glow` effects, `Blend` and `RaycastTarget`. Multi-value accessors
-//! travel as flat number lists, colours last. Every setter routes through the
-//! shared `edit::authoring::ui::shape` ops the inspector card uses. Getters return a
-//! neutral default without a Shape; setters are then no-ops. Whether a shape exists
-//! is `Scene.AddComponent(id, "Shape")` / `RemoveComponent`.
-
 use glam::{Vec2, Vec4};
 use mlua::{Lua, Table, Variadic};
 
@@ -24,7 +13,6 @@ use rusty_scene::Scene;
 type NumsGet = fn(&ShapeComponent) -> Vec<f32>;
 type NumsSet = fn(&mut ShapeComponent, &[f32]);
 
-/// `(suffix, how many numbers, get, set)`: `Get<suffix>(id) -> …` / `Set<suffix>(id, …)`.
 const NUMS: [(&str, usize, NumsGet, NumsSet); 9] = [
     (
         "Radius",
@@ -87,17 +75,14 @@ const NUMS: [(&str, usize, NumsGet, NumsSet); 9] = [
     ),
 ];
 
-/// The first four of `v` as a `Vec4`.
 fn v4(v: &[f32]) -> Vec4 {
     Vec4::new(v[0], v[1], v[2], v[3])
 }
 
-/// `scalars` then `color`'s channels.
 fn lead(scalars: &[f32], color: Vec4) -> Vec<f32> {
     scalars.iter().copied().chain(color.to_array()).collect()
 }
 
-/// Register the `Shape` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, count, get, set) in NUMS {
@@ -109,7 +94,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Shape", table).map_err(|e| e.to_string())
 }
 
-/// Run `f` on `id`'s Shape when it has one.
 fn with_shape(scene: &mut Scene, id: u32, f: impl FnOnce(&mut ShapeComponent)) {
     if let Some(mut s) = scene.world.shape_mut(id) {
         f(&mut s);
@@ -126,8 +110,6 @@ const GRADIENT: GradientAccess = GradientAccess {
     set: |s, id, g| with_shape(s, id, |c| ops::set_gradient(c, g)),
 };
 
-/// `Get<suffix>(id) -> …` (zeros without a Shape) / `Set<suffix>(id, …)`, which
-/// needs all `count` numbers.
 fn register_nums(
     lua: &mlua::Lua,
     table: &Table,
@@ -168,7 +150,6 @@ fn register_nums(
 type NameGet = fn(&ShapeComponent) -> &'static str;
 type NameSet = fn(&mut ShapeComponent, &str);
 
-/// `Get/SetKind` and `Get/SetCorner`, by name (case-insensitive; unknown ignored).
 const NAMES: [(&str, NameGet, NameSet); 2] = [
     (
         "Kind",
@@ -190,7 +171,6 @@ const NAMES: [(&str, NameGet, NameSet); 2] = [
     ),
 ];
 
-/// The [`NAMES`] accessors (`"None"` without a Shape) and `Get/SetRaycastTarget`.
 fn register_names(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     for (suffix, get, set) in NAMES {
         let read = move |lua: &Lua, id: EntityArg| {

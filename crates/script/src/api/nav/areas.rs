@@ -1,13 +1,4 @@
-//! crates/script/src/api/nav/areas.rs — navigation areas on the `Navigation` and `NavMeshAgent`
-//! namespaces (#460).
-//!
-//! `Navigation`: the scene's area table — `GetAreaFromName` (Unity's
-//! `NavMesh.GetAreaFromName`, `-1` when undefined), `DefineArea` (add a row or
-//! re-cost one), `GetAreaCost` / `SetAreaCost` (by name, as Unity's
-//! `NavMesh.SetAreaCost` by index) and `GetAreas`. A cost change writes the scene's
-//! table and the live graph at once: the next search reads it, every cached agent
-//! path re-plans, and nothing is rebaked. `NavMeshAgent`: `GetAreaMask` /
-//! `SetAreaMask` (Unity's `areaMask`, bit `i` = area `i`; `-1` is every area).
+//! `GetAreaFromName` is `-1` when undefined. A cost change writes the scene's table and the live graph at once; cached agent paths re-plan, nothing is rebaked. Area masks: bit `i` = area `i`, `-1` is every area.
 
 use std::cell::RefCell;
 
@@ -20,8 +11,6 @@ use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_navigation::{area_index, NavMeshSettings, NavigationGraph};
 use rusty_scene::Scene;
 
-/// Apply `edit` to the scene's area table and hand the new costs to the graph,
-/// or raise `err` when the edit refuses.
 fn edit_areas(
     scene: &RefCell<Scene>,
     nav: &RefCell<NavigationGraph>,
@@ -35,7 +24,6 @@ fn edit_areas(
     Ok(index)
 }
 
-/// The area table functions on `Navigation`.
 pub(super) fn register_navigation(
     lua: &mlua::Lua,
     t: &Table,
@@ -83,7 +71,6 @@ pub(super) fn register_navigation(
     put(t, "GetAreas", f)
 }
 
-/// `GetAreaMask` / `SetAreaMask` on `NavMeshAgent`.
 pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         let scene = &*scene.get(lua)?;
@@ -105,7 +92,6 @@ pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) 
     put(t, "SetAreaMask", f)
 }
 
-/// A query's optional area mask: every area when omitted.
 pub(super) fn mask_arg(mask: Option<i64>) -> u32 {
     mask.map_or(u32::MAX, |m| m as u32)
 }

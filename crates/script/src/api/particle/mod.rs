@@ -1,15 +1,3 @@
-//! crates/script/src/api/particle/mod.rs — `Particles` namespace.
-//!
-//! Script/REPL/bot control over an entity's `ParticleEmitterComponent`: fire
-//! one-off emissions (`Emit`/`Burst`), gate the emitter (`SetActive`), retune the
-//! continuous rate (`SetRate`), reshape it per shot (`SetShape`, `SetDirection`,
-//! the start ranges, `SetColor`, `SetSubEmitter` — #439), choose how it is drawn
-//! (`SetRenderMode`, `SetFlipbook`, `SetSoft`, `SetLit`, … — #440, in `render`), pick
-//! the simulation space (`SetSimulationSpace` — #1529, in `space`), and
-//! read/clear the live state. Emission goes
-//! through the component's own seeded spawn path (`emit_at`), so a scripted burst
-//! stays bit-for-bit reproducible alongside the sim's own emission.
-
 mod arrays;
 mod gpu;
 mod live;
@@ -29,7 +17,6 @@ use rusty_core::curve::{ColorRange, Range};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
-/// Register the `Particles` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -49,10 +36,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// One-off emissions: `Emit` (count) and `Burst` (the configured burst count).
 fn register_emission(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // Emit `count` particles at the entity's world position, right now. Returns the
-    // number actually spawned (the max-particle cap may swallow some).
     put(
         table,
         "Emit",
@@ -69,8 +53,6 @@ fn register_emission(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>
         }),
     )?;
 
-    // Fire one full configured burst (`burst_count`) immediately, independent of
-    // the emit mode or the auto-burst bookkeeping. Returns the number spawned.
     put(
         table,
         "Burst",
@@ -88,7 +70,6 @@ fn register_emission(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>
     )
 }
 
-/// Emitter tuning: `SetActive` (gate) and `SetRate` (continuous rate).
 fn register_tuning(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -119,7 +100,6 @@ fn register_tuning(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// The #439 shape setters: `SetShape` and `SetDirection` (the shape's axis).
 fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     // `SetShape(id, kind, opts?)` — opts: radius, angle (cone, degrees), x/y/z (box
     // size), surface. Returns false (and changes nothing) for an unknown kind.
@@ -167,10 +147,7 @@ fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// The #439 start-value setters: ranges, colour, and sub-emitters.
 fn register_start(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // `SetLifetime` / `SetSpeed` / `SetSize(id, min, max?)` — `max` omitted is a
-    // constant.
     type RangeOp = fn(&mut rusty_scene::ParticleEmitterComponent, Range);
     let ranges: [(&str, RangeOp); 3] = [
         ("SetLifetime", particle_ops::set_lifetime),
@@ -201,7 +178,6 @@ fn register_start(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
             },
         ),
     )?;
-    // `SetSubEmitter(id, "birth"|"death"|"collision", target?)` — nil clears.
     put(
         table,
         "SetSubEmitter",
@@ -221,7 +197,6 @@ fn register_start(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// Live state: `IsActive`, `GetCount`, and `Clear`.
 fn register_state(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

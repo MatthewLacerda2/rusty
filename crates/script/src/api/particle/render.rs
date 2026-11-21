@@ -1,7 +1,3 @@
-//! crates/script/src/api/particle/render.rs — the `Particles` render setters (#440): render mode,
-//! stretch, mesh, texture (#2052), flipbook, soft and lit. Each is a field write routed through the
-//! shared `edit::authoring::particles` op the inspector's Render section calls.
-
 use super::with_emitter;
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
@@ -11,15 +7,12 @@ use rusty_components::{Flipbook, ParticleRenderMode};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::Scene;
 
-/// Register the render setters onto the `Particles` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_shape(lua, table, scene)?;
     register_texture(lua, table, scene)?;
     register_look(lua, table, scene)
 }
 
-/// `SetTexture(id, path?)` / `GetTexture(id)`: the sprite image; `nil` (or `""`)
-/// goes back to the default soft disc (#2052).
 fn register_texture(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -44,11 +37,7 @@ fn register_texture(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
     )
 }
 
-/// What each particle is drawn as: `SetRenderMode`, `GetRenderMode`, then
-/// [`register_stretch_and_mesh`].
 fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // `SetRenderMode(id, "billboard"|"stretched"|"horizontal"|"vertical"|"mesh")`.
-    // Returns false (and changes nothing) for an unknown mode.
     put(
         table,
         "SetRenderMode",
@@ -79,10 +68,7 @@ fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     register_stretch_and_mesh(lua, table, scene)
 }
 
-/// `SetStretch` and `SetMesh`: the stretched and mesh render modes' settings.
 fn register_stretch_and_mesh(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // `SetStretch(id, length_scale, speed_scale?)` — quad length = size ×
-    // length_scale + speed × speed_scale.
     put(
         table,
         "SetStretch",
@@ -96,8 +82,6 @@ fn register_stretch_and_mesh(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
             },
         ),
     )?;
-    // `SetMesh(id, mesh?, material?)` — a primitive name or model path, and a scene
-    // material name; nil clears each.
     put(
         table,
         "SetMesh",
@@ -114,10 +98,7 @@ fn register_stretch_and_mesh(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
     )
 }
 
-/// How each particle is shaded: `SetFlipbook`, `SetSoft`, `SetLit`.
 fn register_look(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // `SetFlipbook(id, columns, rows, opts?)` — opts: cycles (default 1),
-    // random_start (default false). `1, 1` turns the flipbook off.
     put(
         table,
         "SetFlipbook",

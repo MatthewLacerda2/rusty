@@ -1,8 +1,3 @@
-//! crates/script/src/api/nav/agent.rs — the `NavMeshAgent` namespace.
-//!
-//! Reads and writes an entity's optional nav-agent component: destination, motion
-//! tuning, footprint, and the runtime queries the steering tick feeds.
-
 use glam::Vec3;
 use mlua::Lua;
 
@@ -13,8 +8,6 @@ use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_navigation::{is_at_target, NavigationGraph};
 use rusty_scene::Scene;
 
-/// `NavMeshAgent.*` target / speed / radius accessors over the nav-agent component, and
-/// its path state (`path_state`, #458).
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -34,7 +27,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, nav: ApiCell<NavigationGraph>)
         .map_err(|e| e.to_string())
 }
 
-/// `SetTarget` / `GetTarget` over the agent's destination.
 fn register_agent_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -66,7 +58,6 @@ fn register_agent_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Sc
     )
 }
 
-/// Motion tuning: `SetSpeed` / `SetAcceleration`.
 fn register_agent_motion(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -97,7 +88,6 @@ fn register_agent_motion(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Sc
     )
 }
 
-/// Footprint tuning: `SetStoppingDistance` / `SetRadius`, then [`register_base_offset`].
 fn register_agent_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -128,7 +118,6 @@ fn register_agent_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     register_base_offset(lua, table, scene)
 }
 
-/// `SetBaseOffset` / `GetBaseOffset`: the agent's height above the navmesh.
 fn register_base_offset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -157,7 +146,6 @@ fn register_base_offset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Sce
     )
 }
 
-/// Runtime queries / toggle: `IsAtTarget`, `GetVelocity`, and `SetActive`.
 fn register_agent_queries(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -205,7 +193,6 @@ fn register_agent_queries(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<S
     )
 }
 
-/// Local avoidance (#463): `SetAvoidancePriority` / `SetAvoidanceEnabled`.
 fn register_agent_avoidance(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

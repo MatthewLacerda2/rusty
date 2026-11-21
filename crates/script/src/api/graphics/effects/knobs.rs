@@ -1,8 +1,3 @@
-//! The `Graphics.Get/Set<api>` pair of every effect knob that is one on its own
-//! (#1467): each effect's knob table (`authoring::rendering::post_processing`)
-//! names the pair, so the functions, the Inspector's sliders and the
-//! `Graphics.<effect>.<knob>` tween paths reach the same value through one op.
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
@@ -12,9 +7,6 @@ use rusty_edit::authoring::default_post_processing;
 use rusty_edit::authoring::rendering::post_processing::Knob;
 use rusty_scene::Scene;
 
-/// Register `Set<api>(value)` / `Get<api>()` for each of `knobs` that names an
-/// `api`. Without an active volume the setter does nothing and the getter reports
-/// what a new volume starts with.
 pub(in crate::api::graphics) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -43,8 +35,6 @@ pub(in crate::api::graphics) fn register(
     Ok(())
 }
 
-/// Register `Set<name>(bool)` / `Get<name>()` over an effect's switch: `false`
-/// without an active volume, since nothing runs then.
 pub(in crate::api::graphics) fn register_flag(
     lua: &mlua::Lua,
     (table, scene): (&mlua::Table, ApiCell<Scene>),
@@ -67,7 +57,6 @@ pub(in crate::api::graphics) fn register_flag(
     )
 }
 
-/// `name` as a quality level, or `Graphics.<function>`'s refusal listing the levels.
 pub(in crate::api::graphics) fn parse_quality(
     function: &str,
     name: &str,
@@ -80,9 +69,6 @@ pub(in crate::api::graphics) fn parse_quality(
     })
 }
 
-/// Register `Set<name>(level)` / `Get<name>()` over an effect's quality level
-/// (#1522): `"Low"`, `"Medium"`, `"High"` or `"Custom"`, an unknown one refused.
-/// Without an active volume the getter reports a new volume's level.
 pub(in crate::api::graphics) fn register_quality(
     lua: &mlua::Lua,
     (table, scene): (&mlua::Table, ApiCell<Scene>),
@@ -110,9 +96,6 @@ pub(in crate::api::graphics) fn register_quality(
     )
 }
 
-/// Register `Set<name>(n)` / `Get<name>()` over a whole-number setting of the
-/// volume (a sample or step count, a resolution divisor: no tween), through its
-/// op. Without an active volume the getter reports a new volume's value.
 pub(in crate::api::graphics) fn register_count(
     lua: &mlua::Lua,
     (table, scene): (&mlua::Table, ApiCell<Scene>),

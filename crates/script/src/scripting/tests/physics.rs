@@ -12,9 +12,6 @@ use rusty_scene::Camera;
 use rusty_scene::Scene;
 use rusty_time::Time;
 
-/// #31: a script's `Physics.Raycast` and the engine's `raycast_hit` resolve to
-/// the *same* entity for the same ray, because both go through the one rapier
-/// world. The binding casts against the live world shared via the handle.
 #[test]
 fn raycast_matches_engine_cast_through_rapier() {
     let mut raw = Scene::new();
@@ -43,7 +40,6 @@ fn raycast_matches_engine_cast_through_rapier() {
     *physics.borrow_mut() = Some(PhysicsWorld::from_scene(&scene.borrow()));
     m.init_runtime().expect("runtime inits");
 
-    // Engine path: cast straight down +Z, expect the target.
     let engine = physics
         .borrow()
         .as_ref()
@@ -52,7 +48,6 @@ fn raycast_matches_engine_cast_through_rapier() {
         .map(|hit| hit.id);
     assert_eq!(engine, Some(target), "engine cast should hit the target");
 
-    // Script path: the binding returns (hit, id, dist); pull the id back out.
     let lua_id: u32 = m
         .eval("select(2, Physics.Raycast(0,0,0, 0,0,1))")
         .unwrap()
@@ -65,9 +60,6 @@ fn raycast_matches_engine_cast_through_rapier() {
     assert_eq!(Some(lua_id), engine, "script raycast must match the engine");
 }
 
-/// A `ScriptManager` with its runtime live over `scene` plus a dynamic rigidbody
-/// on entity `id`, ready for the `Physics.*` rigidbody setters. Keeps the physics
-/// handle alive for the manager's borrow.
 fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld>>>, u32) {
     let mut raw = Scene::new();
     let id = raw.add_entity("Body".to_string());
@@ -93,8 +85,6 @@ fn manager_with_dynamic_body() -> (ScriptManager, Rc<RefCell<Option<PhysicsWorld
     (m, physics, id)
 }
 
-/// #319: `Physics.SetAngularVelocity` writes the component and
-/// `Physics.GetAngularVelocity` reads it back — a plain binding round-trip.
 #[test]
 fn angular_velocity_round_trips_through_the_binding() {
     let (m, _physics, id) = manager_with_dynamic_body();
@@ -109,8 +99,6 @@ fn angular_velocity_round_trips_through_the_binding() {
     assert_eq!(y, 4.0, "the y-axis spin round-trips");
 }
 
-/// #321: `Physics.SetCollisionDetection` accepts the two mode names and
-/// `Physics.GetCollisionDetection` echoes the stored mode; an unknown name errors.
 #[test]
 fn collision_detection_mode_round_trips_and_rejects_garbage() {
     let (m, _physics, id) = manager_with_dynamic_body();

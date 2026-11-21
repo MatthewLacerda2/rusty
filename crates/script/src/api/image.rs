@@ -1,13 +1,3 @@
-//! crates/script/src/api/image.rs — `Image` namespace (#418).
-//!
-//! Get/Set over an entity's `ImageComponent`: tint colour, texture, image type,
-//! 9-slice border, the fill (method, origin, amount, direction), preserve-aspect,
-//! raycast target, and the look (#425): blend mode and gradient tint. Every setter
-//! routes through the shared `edit::authoring::ui::image` ops the inspector card
-//! uses, so validation lives once.
-//! Getters return a neutral default when the entity has no Image; setters are then
-//! no-ops. Enum values travel as their names (case-insensitive; unknown ignored).
-
 use std::cell::RefCell;
 
 use glam::Vec4;
@@ -30,13 +20,11 @@ type NameSet = fn(&mut ImageComponent, &str);
 type BoolGet = fn(&ImageComponent) -> bool;
 type BoolSet = fn(&mut ImageComponent, bool);
 
-/// `Get/SetColor` (`r, g, b, a`) and `Get/SetBorder` (`left, bottom, right, top`).
 const VEC4S: [(&str, Vec4Get, Vec4Set); 2] = [
     ("Color", |i| i.color, image_ops::set_color),
     ("Border", |i| i.border, image_ops::set_border),
 ];
 
-/// `Get/SetType`, `Get/SetFillMethod`, `Get/SetFillOrigin` — by name.
 const NAMES: [(&str, NameGet, NameSet); 3] = [
     (
         "Type",
@@ -67,7 +55,6 @@ const NAMES: [(&str, NameGet, NameSet); 3] = [
     ),
 ];
 
-/// `Get/SetFillClockwise`, `Get/SetPreserveAspect`, `Get/SetRaycastTarget`.
 const BOOLS: [(&str, BoolGet, BoolSet); 3] = [
     (
         "FillClockwise",
@@ -86,7 +73,6 @@ const BOOLS: [(&str, BoolGet, BoolSet); 3] = [
     ),
 ];
 
-/// `Get/SetBlend` (#425).
 const BLEND: BlendAccess = BlendAccess {
     get: |s, id| s.world.image(id).map(|i| i.blend),
     set: |s, id, b| {
@@ -96,7 +82,6 @@ const BLEND: BlendAccess = BlendAccess {
     },
 };
 
-/// `Get/SetGradient` (#425): the tint's gradient.
 const GRADIENT: GradientAccess = GradientAccess {
     get: |s, id| s.world.image(id).map(|i| i.gradient.clone()),
     set: |s, id, g| {
@@ -106,7 +91,6 @@ const GRADIENT: GradientAccess = GradientAccess {
     },
 };
 
-/// Register the `Image` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (suffix, get, set) in VEC4S {
@@ -124,14 +108,12 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Image", table).map_err(|e| e.to_string())
 }
 
-/// Run `f` on `id`'s Image when it has one.
 fn with_image(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut ImageComponent)) {
     if let Some(mut i) = scene.borrow_mut().world.image_mut(id) {
         f(&mut i);
     }
 }
 
-/// `Get<suffix>(id) -> x, y, z, w` (zeros without an Image) / `Set<suffix>(id, x, y, z, w)`.
 fn register_vec4(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -168,7 +150,6 @@ fn register_vec4(
     )
 }
 
-/// `Get<suffix>(id) -> name` (`"None"` without an Image) / `Set<suffix>(id, name)`.
 fn register_name(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -202,7 +183,6 @@ fn register_name(
     )
 }
 
-/// `Get<suffix>(id) -> bool` (`false` without an Image) / `Set<suffix>(id, bool)`.
 fn register_bool(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -232,7 +212,6 @@ fn register_bool(
     )
 }
 
-/// `Get/SetTexture` (a path, or `nil` for a solid colour) and `Get/SetFillAmount`.
 fn register_texture_and_amount(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

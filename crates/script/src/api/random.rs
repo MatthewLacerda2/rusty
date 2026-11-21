@@ -1,11 +1,3 @@
-//! crates/script/src/api/random.rs — `Random` namespace (#443).
-//!
-//! Unity's `UnityEngine.Random` subset, backed by the seeded
-//! [`Random`] resource the script runtime owns.
-//! `Value` / `Range` / `InsideUnitSphere` / `OnUnitSphere` / `InsideUnitCircle` /
-//! `SetSeed`. The sandboxed `math.random` / `math.randomseed` (installed by the
-//! scripting layer) route through this namespace, so there is exactly one stream.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Value};
@@ -14,7 +6,6 @@ use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_core::random::Random;
 
-/// Register the `Random` namespace onto `lua`.
 pub fn register(lua: &Lua, rng: ApiCell<Random>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(

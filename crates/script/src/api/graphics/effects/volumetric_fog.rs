@@ -1,7 +1,3 @@
-//! `Graphics.{Get,Set}VolumetricFog{Active,Quality,Resolution,Slices,Albedo}` and
-//! the knobs, `Graphics.{Get,Set}VolumetricFog{MeanFreePath,Anisotropy,BaseHeight,
-//! MaximumHeight,DepthExtent,GlobalLightProbeDimmer}` (#1703), over the active volume.
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use super::knobs::{register_count, register_flag, register_quality};
@@ -10,8 +6,6 @@ use rusty_components::VolumetricFog;
 use rusty_edit::authoring::rendering::post_processing::volumetric_fog as fog;
 use rusty_scene::Scene;
 
-/// The switch, the quality level, its `Custom` counts, the albedo and the knobs (a
-/// new volume's values without an active volume, `false` for the switch).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let cx = (table, scene);
     let active = |vc: &rusty_components::PostProcessingComponent| vc.volumetric_fog.active;
@@ -32,7 +26,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     super::knobs::register(lua, table, scene, fog::EFFECT.knobs)
 }
 
-/// `SetVolumetricFogAlbedo(r, g, b)` / `GetVolumetricFogAlbedo() -> r, g, b`.
 fn register_albedo(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
