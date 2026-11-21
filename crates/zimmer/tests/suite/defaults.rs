@@ -1,7 +1,5 @@
 //! A field left out of a document stays out when the document is written back — the rule
 //! `common/written.rs` explains and enforces, here on the smallest patch and song the parser takes.
-//! The worked recipes in `docs/recipes.md`, which reach every stage, are held to it in
-//! `crates/providers/tests/suite/documented`, where the recipe wrapper lives.
 
 #[path = "common/written.rs"]
 mod written;

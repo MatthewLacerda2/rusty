@@ -11,14 +11,14 @@ A bake is free, and a recipe reproduces byte-for-byte. A sound whose realism *is
 the point (a door with a latch, glass, gravel, cloth, a casing on concrete, a voice
 line) is beyond synthesis: bring it as an audio file, which plays like any other clip.
 
-**The synthesiser is zimmer**, from [scorsese](https://github.com/MatthewLacerda2/scorsese)
-(#413) — an external crate, not a module of rusty. It is a git dependency pinned to
-one commit in `Cargo.toml`, so rusty's bakes change only when someone moves that pin
-on purpose (and `zimmer::SYNTH_VERSION` says whether they will). `Sound` is a thin
-adapter over it: rusty turns the Lua table into zimmer's document, zimmer renders,
-rusty writes the file. **The full patch and song vocabulary is zimmer's rustdoc** —
-this page carries worked examples and the fields you reach for first; build the
-reference locally from the pinned rev with `cargo doc -p scorsese-zimmer --open`.
+**The synthesiser is zimmer**, the engine's own crate `rusty-zimmer` (`crates/zimmer/`).
+It does no I/O, so `Sound` is a thin adapter over it: rusty turns the Lua table into
+zimmer's document, zimmer renders, rusty writes the file. A bake changes only when
+zimmer's rendering changes, and `zimmer::SYNTH_VERSION` moves with every such change.
+**The full patch and song vocabulary is zimmer's document types**, `zimmer::patch` and
+`zimmer::song`, whose serde field names are the keys; this page carries worked
+examples and the fields you reach for first (`cargo doc -p rusty-zimmer --open` lists
+every type and field).
 
 A patch is authored as a Lua **table** whose shape mirrors the on-disk JSON document
 one-to-one, so the same document describes a Lua-built patch and one loaded from a
@@ -73,7 +73,7 @@ optional.
 }
 ```
 
-The stages at a glance (field-level detail is in zimmer's rustdoc, `zimmer::patch`):
+The stages at a glance (every field is in `zimmer::patch`'s types):
 
 - **`source`**, tagged by `kind`: `osc_stack` (up to 4 band-limited oscillators,
   `sine`/`triangle`/`saw`/`square`, each with optional unison `voices`/`spread`),
@@ -165,7 +165,7 @@ Audio.PlayAt(clip, 0, 0, 0, 1.0)
 
 The fields you reach for first (the rest — `key` and scale degrees, chords, step
 strings, `swing`, `humanize`, track and song `fx`, `automation`, `tempo` changes,
-arrangement transforms — are in `zimmer::song`'s rustdoc; `tail`, `fit` and `fade` have
+arrangement transforms — are in `zimmer::song`'s types; `tail`, `fit` and `fade` have
 their own section below):
 
 | Field | Default | Meaning |

@@ -5,7 +5,7 @@ use std::fmt;
 use crate::error::SynthError;
 
 impl SynthError {
-    pub(super) fn say_pattern(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub(in crate::error) fn say_pattern(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownTrack {
                 pattern,

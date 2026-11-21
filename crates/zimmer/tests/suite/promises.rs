@@ -1,4 +1,4 @@
-//! The two claims the rest of scorsese is built on: a bake is **deterministic**, and a note comes
+//! The two claims every bake rests on: a bake is **deterministic**, and a note comes
 //! out at the **pitch it was asked for**.
 
 use crate::common;

@@ -1,15 +1,11 @@
 //! What each refusal says out loud.
 
-mod arrangement;
 mod automation;
-mod harmony;
 mod length;
 mod lfo;
-mod pattern;
 mod pulse;
 mod song;
 mod source;
-mod steps;
 mod timing;
 
 use std::fmt;

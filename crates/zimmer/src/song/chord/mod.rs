@@ -10,7 +10,7 @@ pub use arp::Arp;
 pub use lead::Leading;
 pub(crate) use lead::Led;
 
-use super::{one, Articulation, Note, Pitch};
+use super::{Articulation, Note, Pitch};
 use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
 
@@ -25,7 +25,7 @@ pub struct Chord {
     pub oct: Option<i32>,
     pub start: f32,
     pub dur: f32,
-    #[serde(default = "one")]
+    #[serde(default = "crate::song::one")]
     pub vel: f32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub articulation: Option<Articulation>,

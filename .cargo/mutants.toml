@@ -93,5 +93,9 @@ exclude_re = [
   '^crates/scene/src/nav_settings/area\.rs:\d+:\d+: replace (default_areas) -> ',
   '^crates/scene/src/nav_settings/mod\.rs:\d+:\d+: replace (default_agent_height|default_agent_radius|default_grid_spacing|default_link_spacing|default_max_slope|default_max_step) -> ',
   '^crates/scene/src/serialize\.rs:\d+:\d+: replace (default_ambient_color|default_ambient_intensity|default_skybox_path) -> ',
-
+  '^crates/zimmer/src/patch/fm\.rs:\d+:\d+: replace (one) -> ',
+  '^crates/zimmer/src/patch/fx\.rs:\d+:\d+: replace (attack_default|gentle_q|release_default|voices_default) -> ',
+  '^crates/zimmer/src/patch/layer\.rs:\d+:\d+: replace (unity) -> ',
+  '^crates/zimmer/src/patch/stages\.rs:\d+:\d+: replace (damping_default|half|mod_decay_default|one|solo|spread_default) -> ',
+  '^crates/zimmer/src/song/mod\.rs:\d+:\d+: replace (one) -> ',
 ]

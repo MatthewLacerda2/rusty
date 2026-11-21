@@ -1,11 +1,17 @@
-//! What a song's tempo, tracks and arrangement as a whole are refused with.
+//! What a song is refused with: here its tempo, tracks and arrangement as a whole; beside it,
+//! arrangement entries, pattern notes, harmony and step strings.
+
+mod arrangement;
+mod harmony;
+mod pattern;
+mod steps;
 
 use std::fmt;
 
 use crate::error::SynthError;
 
 impl SynthError {
-    pub(super) fn say_song(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub(in crate::error) fn say_song(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadBpm { bpm, .. } => write!(f, "song: bpm must be positive, got {bpm}"),
             Self::NoTracks => write!(f, "song: no tracks"),

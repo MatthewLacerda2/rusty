@@ -5,7 +5,7 @@ use std::fmt;
 use crate::error::SynthError;
 
 impl SynthError {
-    pub(super) fn say_arrangement(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    pub(in crate::error) fn say_arrangement(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::BadTranspose {
                 pattern, transpose, ..
