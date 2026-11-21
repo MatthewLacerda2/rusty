@@ -104,8 +104,8 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
             editor.frame(game);
         }
         for _ in 0..opts.frames {
-            let (ui, rendered, gpu) = editor.frame(game);
-            meter.frame(ui, rendered.as_ref(), gpu);
+            let (ui, rendered, gpu, wall_ms) = editor.frame(game);
+            meter.frame(ui, rendered.as_ref(), gpu, wall_ms);
         }
         play_stop_save(&mut editor, game, &mut meter, opts)?;
         meter.end_run();

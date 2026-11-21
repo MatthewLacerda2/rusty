@@ -3,7 +3,7 @@
 //! `make bench` runs `tests/fixtures/project/scenarios/bench/bench.lua`: it loads the
 //! shooter-shaped stress scene ([`stress`]) onto the default yard, warms up, then
 //! `Harness.Bench(n)` steps and renders `n` frames, sampling each one, and prints
-//! a short report — frame, render and GPU ms (average and p95), GPU ms per pass,
+//! a short report — frame, render, wall and GPU ms (average and p95), GPU ms per pass,
 //! draw calls, triangles, dropped and culled counts, the Hi-Z culls and late set, the GPU calls
 //! (passes, submits, bind groups made, buffer writes), each system's CPU ms
 //! (`cpu.<system>`) and the renderer's by stage (`render.<stage>`), each set with an `other` row for
@@ -37,6 +37,15 @@
 //! `cpu_clock_pct` the clock it ran at; the report says when either spreads across
 //! the window, or the clock moved since the last run.
 //!
+//! **`wall_ms` is the frame end to end** (#2494): its sim step and its draw on the
+//! wall, the draw waiting for the GPU to finish, so it is the one row that moves
+//! when a change shifts *when* the GPU starts or how long the CPU waits on it
+//! (`frame_ms`, `renderer_ms` and `gpu_ms` can stay level while it grows). A raw
+//! time: it moves with both clocks (`cpu_clock_pct`, `gpu_clock_pct`), and the
+//! clock warnings name it beside `frame_ms`. The probes and the bench's pose are
+//! left out of it. It is not the windowed game's frame time: the bench draws one
+//! frame after another offscreen, each finished before the next steps.
+//!
 //! A signal, never a gate: timings are this machine's (a CI runner's software GPU
 //! makes them meaningless), only the counts portable. The scene is deterministic
 //! (fixed dt, seeded scripts, no RNG in placement): one machine, the same frames.
@@ -61,12 +70,15 @@ pub use lua::register;
 pub(crate) use lua::spec_from_lua;
 pub use report::{Report, Samples, Summary};
 
+use std::time::Instant;
+
 use super::harness::Harness;
 use rusty_render::ClockProbe;
 use sample::{sample, Speeds};
 
 /// Step and render `ticks` frames (fewer if the game quits), sampling each one.
-/// The CPU probe runs right before and right after each sim step, the GPU probe
+/// `wall_ms` is each frame on the wall: its sim step and its draw, which waits
+/// for the GPU to finish, the probes and the pose left out. The CPU probe runs right before and right after each sim step, the GPU probe
 /// right before and right after each frame's GPU work: both outside what they scale.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
@@ -95,12 +107,17 @@ pub(crate) fn measure_posed(
             break;
         }
         let cpu_before = clock::cpu_probe_ms();
+        let tick = Instant::now();
         harness.step(1);
+        let mut wall_ms = ms_since(tick);
         let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
         pose(harness);
         let before = time_probe(probe, harness);
+        let drawn = Instant::now();
         let frame = harness.render_frame();
+        wall_ms += ms_since(drawn);
         let after = time_probe(probe, harness);
+        samples.push("wall_ms", wall_ms);
         let gpu = clock::speed(before, after);
         let speed = Speeds { cpu, gpu };
         sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
@@ -108,6 +125,11 @@ pub(crate) fn measure_posed(
         samples.end_frame();
     }
     (samples.report(), samples)
+}
+
+/// Milliseconds on the wall since `start`.
+fn ms_since(start: Instant) -> f64 {
+    start.elapsed().as_secs_f64() * 1000.0
 }
 
 fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> {
@@ -134,3 +156,6 @@ mod run_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "wall_tests.rs"]
+mod wall_tests;

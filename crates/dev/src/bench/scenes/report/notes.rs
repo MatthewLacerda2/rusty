@@ -33,6 +33,12 @@ impl SceneReport {
                  at cpu_clock_pct of it)",
             ),
             (
+                self.row("wall_ms").is_some(),
+                "(wall_ms: the frame end to end on the wall, its sim step and its draw until \
+                 the GPU finished, as measured: it moves with cpu_clock_pct and gpu_clock_pct; \
+                 not the windowed game's frame time, docs/testing.md)",
+            ),
+            (
                 self.row("gpu_mb").is_none(),
                 "(this backend reports no GPU memory: no gpu_mb)",
             ),

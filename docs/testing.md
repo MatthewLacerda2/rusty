@@ -1122,7 +1122,16 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   entering Play, a load, is in no tick's time: the schedule and the tick's own work
   around it), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
-  frame, as measured), `gpu_ms` and `gpu.<pass>` (GPU time
+  frame, as measured), `wall_ms` (the frame end to end on the wall: its sim step
+  and its draw, which waits for the GPU to finish, the clock probes and the
+  bench's pose left out; the one row that moves when a change shifts *when* the GPU
+  starts or how long the CPU waits on it, which can leave `frame_ms`,
+  `renderer_ms` and `gpu_ms` level; a raw time, so it moves with
+  `cpu_clock_pct` and `gpu_clock_pct`, and the clock warnings name it beside
+  `frame_ms`. It is **not** the windowed game's frame time: the bench draws one
+  frame after another offscreen, each finished before the next steps, with no
+  present and no frame overlapping the next; `Debug.Stats{ window = n }`'s
+  `wall_ms` is the live window's), `gpu_ms` and `gpu.<pass>` (GPU time
   at a fixed reference clock, below; `gpu_ms` is the passes' sum, busy time only,
   and `gpu.other` untimed GPU work inside a submit, where a pass left untimed
   shows, scaled like the rows), `gpu_between_submits_ms` (the GPU waiting for the
@@ -1324,6 +1333,9 @@ every binary's open makes them.
     rows are absent and the report says so; with no adapter the round has no rows,
     and at a size whose Scene view the editor's panels leave no room (320x180 is
     one) it draws nothing and warns;
+  - `editor.wall_ms`: the whole editor frame end to end on the wall (the edit
+    frame, the UI and the Scene view's draw until the GPU finished, the probes
+    left out), as measured, as a viewpoint's `wall_ms` is;
   - `editor.view_w` and `editor.view_h`: the size in pixels the Scene view was
     drawn at (its colour target's), what the panels leave of the window. Every
     per-pixel pass shades it, so a change to a panel's width (the Hierarchy, the
@@ -1692,6 +1704,12 @@ ratio is not, and a row at 0.001 ms moving 20% is nothing. After them come the
 rows of that size the second `main` leg lacks, marked *floor unknown*, and every
 row only the PR has, marked *absent on main*: the lead never reads "nothing
 moved" above a move the table cannot judge. The full table follows.
+
+**A frame-time claim** reads `wall_ms` beside the parts it claims to move: a
+change to how the CPU's recording and the GPU's work overlap (when a submit
+goes, what waits on what) can move `renderer_ms` one way and leave every GPU row
+level while the frame takes longer on the wall, and only `wall_ms` shows it.
+Like every row that is not a quiet counter, the table always prints it, with its floor.
 
 **A load claim** reads `load_ms` and the `load.<step>` row the PR is about, never
 `load_cold_ms` alone (the page cache and what ran before it decide it). It needs a spread on both sides,

@@ -212,6 +212,12 @@ fn footnotes(report: &Report) -> String {
         "(cpu_ms, cpu.<system>: ms at the reference CPU clock; frame_ms as measured, \
          at cpu_clock_pct of it)\n",
     );
+    if report.has("wall_ms") {
+        text.push_str(
+            "(wall_ms: the frame end to end on the wall, its sim step and its draw until the \
+             GPU finished, as measured: it moves with cpu_clock_pct and gpu_clock_pct)\n",
+        );
+    }
     text
 }
 

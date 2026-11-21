@@ -7,7 +7,7 @@ use super::*;
 
 /// The Scene view's size in one measured frame of `editor`.
 fn view(editor: &mut Editor, game: &mut GameWorld) -> (u32, u32) {
-    let (_, drawn, _) = editor.frame(game);
+    let (_, drawn, _, _) = editor.frame(game);
     drawn.expect("the Scene view has room at SIZE").view
 }
 

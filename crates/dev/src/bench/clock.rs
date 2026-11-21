@@ -117,10 +117,10 @@ pub struct ClockRows {
     pub wall: &'static [&'static str],
 }
 
-/// The game rows' [`ClockRows`]: `cpu_ms`, and `frame_ms` the wall clock.
+/// The game rows' [`ClockRows`]: `cpu_ms`, and `frame_ms` and `wall_ms` the wall clock.
 pub const GAME_ROWS: ClockRows = ClockRows {
     reference: "cpu_ms",
-    wall: &["frame_ms"],
+    wall: &["frame_ms", "wall_ms"],
 };
 
 impl ClockRows {
@@ -186,7 +186,7 @@ pub fn cpu_warnings(samples: &Samples) -> Vec<String> {
 }
 
 /// A warning when the average CPU clock moved past [`CLOCK_DRIFT`] since the
-/// `previous` run: their `frame_ms` rows then measure the clock, not the work.
+/// `previous` run: their `frame_ms` and `wall_ms` rows then measure the clock, not the work.
 pub fn cpu_drift(now: &Report, previous: Option<&Report>) -> Option<String> {
     let clock = |r: &Report| {
         let row = r.metrics.iter().find(|(k, _)| k == "cpu_clock_pct");
