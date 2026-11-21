@@ -98,7 +98,9 @@ fn world_vertex(model: VertexInput, to_world: mat4x4<f32>, world_pos: vec4<f32>)
 // a light's own mesh) never reach it: `BatchKey::in_prepass` leaves them out on the
 // CPU, the one rule depth priming reads too (#1499). A surface variant whose blocks
 // cut fragments or move the UVs adds `fs_prepass_cut`, which opens like
-// `surface_color`, runs its cuts and then this (#648).
+// `surface_color`, runs its cuts and then this (#648). Only a batch that can clip
+// draws through these: one nothing clips (`BatchKey::depth_only`, the shadow pass's
+// `slot_clip` rule) draws `vs_main` alone, with no fragment stage (#2347).
 fn prepass_clip(in: VertexOutput) {
     let m = material();
     var alpha = m.color_tint.a;

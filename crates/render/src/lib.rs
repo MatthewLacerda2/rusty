@@ -214,7 +214,7 @@ pub struct Renderer {
     /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
     /// The SSAO depth prepass (#436): the forward vertex stage, depth only.
-    pub(crate) prepass_pipeline: gpu::pipelines::FacedPipeline,
+    pub(crate) prepass_pipeline: gpu::pipelines::PrepassPipelines,
     /// The SSAO occlusion + blur passes and their no-AO fallback (#436).
     pub(crate) ssao: passes::ssao::SsaoRenderer,
     /// The grading-LUT bake every view's table is written through (#1440).

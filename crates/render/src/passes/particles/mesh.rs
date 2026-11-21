@@ -18,6 +18,7 @@ use crate::draw::map_slots::material_maps;
 use crate::draw::uniforms::{probe_occlusion_at, probe_sh_at};
 use crate::gpu::pipelines::Facing;
 use crate::gpu::uniforms::ObjectData;
+use crate::passes::shadows::{depth_only, slot_clip};
 use crate::scene::Variant;
 use crate::{InstanceData, Renderer};
 use rusty_components::{MaterialAsset, ParticleEmitterComponent, ParticleRenderMode};
@@ -145,7 +146,7 @@ impl Renderer {
         // Debris flies through decal boxes; it never takes their stamp (#638).
         let (record, traits) = self.material_record(scene.id(), entry, Variant::Debris);
         // Particles are placed unmirrored: the material's face alone picks the cull.
-        let key = BatchKey {
+        let mut key = BatchKey {
             pipeline,
             facing: Facing::of_material(Mat4::IDENTITY, material),
             mesh: self.retained.meshes.intern(&mesh),
@@ -155,7 +156,10 @@ impl Renderer {
             record,
             traits,
             bone_base: 0,
+            depth_only: false,
         };
+        let clip = material.and_then(|m| slot_clip(&self.surface_shaders, &key, m));
+        key.depth_only = depth_only(key.pipeline, clip.as_ref());
         let glass = material.filter(|m| m.is_transparent());
         Some((key, glass.map(MaterialAsset::sort_priority)))
     }

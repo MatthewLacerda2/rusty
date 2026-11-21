@@ -71,6 +71,7 @@ fn a_batch_drawn_by_cluster_counts_a_draw_per_instance() {
             record: 0,
             traits: RecordTraits::of(&crate::MaterialData::flat([1.0; 4])),
             bone_base: 0,
+            depth_only: false,
         },
         uniform_slot: 0,
         instances,

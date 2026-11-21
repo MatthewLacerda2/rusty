@@ -3,8 +3,8 @@
 //! (#1499).
 
 use super::super::{
-    DepthPostpassPipelines, FacedPipeline, Facing, PrimedPipelines, TransparentBlend,
-    TransparentPipelines, VelocityPipelines,
+    DepthPostpassPipelines, FacedPipeline, Facing, PrepassPipelines, PrimedPipelines,
+    TransparentBlend, TransparentPipelines, VelocityPipelines,
 };
 use super::SurfaceShaders;
 
@@ -18,8 +18,9 @@ use super::SurfaceShaders;
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
     /// The SSAO depth prepass; the standard pipeline unless a variant cuts, moves its
-    /// UVs or moves its vertices (#648, #1499, #1524).
-    Prepass(&'a FacedPipeline),
+    /// UVs or moves its vertices (#648, #1499, #1524), or the fragment-less one for a
+    /// batch nothing clips (`BatchKey::depth_only`, #2347).
+    Prepass(&'a PrepassPipelines),
     /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a FacedPipeline, Option<&'a PrimedPipelines>),
     /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
@@ -36,13 +37,23 @@ pub(crate) enum SolidPass<'a> {
     MotionPostpass(&'a DepthPostpassPipelines),
 }
 
-impl SolidPass<'_> {
+impl<'a> SolidPass<'a> {
     /// Whether this is the SSAO prepass, which draws only the batches
     /// [`BatchKey::in_prepass`] admits.
     ///
     /// [`BatchKey::in_prepass`]: crate::draw::batch::BatchKey::in_prepass
     pub(crate) fn is_prepass(self) -> bool {
         matches!(self, Self::Prepass(_))
+    }
+
+    /// The fragment-less pipeline keeping `facing`'s triangles a batch nothing
+    /// clips draws this pass with (`BatchKey::depth_only`, #2347): the prepass's;
+    /// `None` in every other pass.
+    pub(crate) fn depth_only(self, facing: Facing) -> Option<&'a wgpu::RenderPipeline> {
+        match self {
+            Self::Prepass(p) => Some(p.depth_only.get(facing)),
+            _ => None,
+        }
     }
 
     /// Whether this pass draws over a primed depth (#1499).
@@ -58,7 +69,8 @@ impl SurfaceShaders {
     /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
     /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
     /// depth; in the transparent pass, the one for its `blend` (#1523); in every
-    /// pass, the one keeping `facing`'s triangles (#1615).
+    /// pass, the one keeping `facing`'s triangles (#1615). In the prepass, the
+    /// clipping one: a batch nothing clips draws [`SolidPass::depth_only`]'s instead.
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,
@@ -69,9 +81,10 @@ impl SurfaceShaders {
     ) -> &'a wgpu::RenderPipeline {
         let variant = self.get(id);
         match pass {
-            SolidPass::Prepass(standard) => {
-                self.cut(id).map_or(standard, |c| &c.prepass).get(facing)
-            }
+            SolidPass::Prepass(standard) => self
+                .cut(id)
+                .map_or(&standard.clip, |c| &c.prepass)
+                .get(facing),
             SolidPass::Opaque(_, Some(p)) if primed => variant
                 .map_or(&p.forward, |v| &v.primed.forward)
                 .get(facing),
