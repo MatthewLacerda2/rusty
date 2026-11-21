@@ -1,20 +1,5 @@
-//! `comment-cap` and `comment-history`: what the comments in code may hold.
-//!
-//! Every agent that reads a file pays for its comments, so a file's comments hold
-//! at most [`Kind::cap`] words, and none names one of this repository's issues
-//! or pull requests: the code says what it does, and `git blame` finds the story.
-//!
-//! A comment is Rust's `//`, `///`, `//!`, `/* */` and the string of a doc
-//! attribute ([`rust`]), WGSL's `//` and `/* */` ([`wgsl`]) and Lua's `--` and
-//! `--[[ ]]` ([`lua`]), at a line's end too. A word is a whitespace-separated
-//! run holding a letter or digit, so a comment's markers and rulers are free.
-//! Free too: the line of a marker a tool reads ([`MARKERS`]), and a `SAFETY:`
-//! note directly above the `unsafe` it justifies.
-//!
-//! They ride the size gate over the files it measures, as a signal: one line
-//! each under `signal (not a failure)`, unless `--strict-comments` names paths,
-//! whose findings then fail ([`pass`]). The same split proves a diff touches
-//! only comments ([`proof`]).
+//! `comment-cap` and `comment-history` (docs/linting.md, *Comments*), riding the
+//! size gate as a signal; `--strict-comments` makes them fail.
 
 mod literals;
 mod lua;
@@ -31,15 +16,11 @@ use std::path::{Path, PathBuf};
 
 pub const CAP: &str = "comment-cap";
 pub const HISTORY: &str = "comment-history";
-/// The size gate's flag that turns these checks' findings under the paths after
-/// it into failures.
 pub const STRICT: &str = "--strict-comments";
 
-/// The markers a tool reads, each free on its own line: a comment that starts
-/// with one costs no words.
+/// A comment opening with one of these costs no words.
 const MARKERS: &[&str] = &["lint: allow(", "sorted:", "stored-format:", "comment-cut:"];
 
-/// The languages whose comments are held.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Kind {
     Rust,
@@ -57,7 +38,6 @@ impl Kind {
         }
     }
 
-    /// The words of comment one file may hold: a shader's maths earns twice.
     pub fn cap(self) -> usize {
         match self {
             Kind::Rust | Kind::Lua => 100,
@@ -66,14 +46,12 @@ impl Kind {
     }
 }
 
-/// One line of source: its code, comments cut, and its comment text.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Line {
     pub code: String,
     pub comment: String,
 }
 
-/// Every line of `source`, read as `kind`.
 pub fn split(kind: Kind, source: &str) -> Vec<Line> {
     match kind {
         Kind::Rust => rust::split(source),
@@ -88,13 +66,11 @@ fn words(text: &str) -> usize {
         .count()
 }
 
-/// A comment's text with its markers and decoration laid aside.
 fn bare(comment: &str) -> &str {
     comment.trim_start_matches(|c: char| c.is_whitespace() || "/!*-[=".contains(c))
 }
 
-/// Which lines' comments are free: a marker's line, and in Rust each line of a
-/// `SAFETY:` note directly above a line of code holding `unsafe`.
+/// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`.
 fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     let mut free: Vec<bool> = lines
         .iter()
@@ -117,15 +93,13 @@ fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     free
 }
 
-/// What one file's comments break: the cap (the line its first word past the cap
-/// sits on, and the words it holds) and each line naming an issue or PR.
+/// `over`: the line of the first word past the cap, and the words in all.
 #[derive(Debug, Default, PartialEq)]
 pub struct Report {
     pub over: Option<(usize, usize)>,
     pub history: Vec<(usize, String)>,
 }
 
-/// The report for the file at repo-relative `path`, its text `source`.
 pub fn check(path: &str, kind: Kind, source: &str) -> Report {
     let lines = split(kind, source);
     let mut report = Report::default();
@@ -148,7 +122,6 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
 }
 
 impl Report {
-    /// Its findings, in the one report shape.
     pub fn findings(&self, path: &str, kind: Kind) -> Vec<Finding> {
         let at = |line: usize, rule: &'static str, message: String| Finding {
             path: path.to_string(),
@@ -175,7 +148,6 @@ impl Report {
     }
 }
 
-/// The totals the signal prints.
 #[derive(Debug, Default, PartialEq)]
 pub struct Tally {
     pub files: usize,
@@ -196,7 +168,6 @@ impl Tally {
         self.with_refs += usize::from(!report.history.is_empty());
     }
 
-    /// The two signal lines.
     pub fn signal(&self) -> String {
         format!(
             "signal (not a failure): {CAP}: {} of {} files over their cap, {} words over; \
@@ -208,8 +179,7 @@ impl Tally {
     }
 }
 
-/// The checks over `files` (on disk, under `base`): the findings under `strict`'s
-/// paths, which fail, and the tally of all of them, which only prints.
+/// The findings (only when `strict`) and the tally over `files`.
 pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tally) {
     let mut tally = Tally::default();
     let mut found = Vec::new();

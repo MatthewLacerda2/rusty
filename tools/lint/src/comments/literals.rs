@@ -1,13 +1,10 @@
-//! Where a literal starts and ends in code a comment has been cut from: what the
-//! comment-only proof keeps byte for byte while it lays the code's whitespace
-//! aside, and where a Rust doc attribute's text sits.
+//! Where literals start and end in code with its comments cut.
 
 use super::Kind;
 use crate::code::is_ident;
 use std::ops::Range;
 
-/// The byte length of the literal `rest` opens with, `prev` the char before it;
-/// `None` when it opens with none. One never closed runs to the end of `rest`.
+/// The length of the literal `rest` opens with; an unclosed one runs to its end.
 pub(super) fn literal(kind: Kind, rest: &str, prev: Option<char>) -> Option<usize> {
     match kind {
         Kind::Rust => rust(rest, prev),
@@ -19,7 +16,6 @@ pub(super) fn literal(kind: Kind, rest: &str, prev: Option<char>) -> Option<usiz
     }
 }
 
-/// A Rust string, byte string, raw string or char literal; a lifetime is none.
 fn rust(rest: &str, prev: Option<char>) -> Option<usize> {
     if prev.is_some_and(is_ident) {
         return None;
@@ -39,8 +35,6 @@ fn rust(rest: &str, prev: Option<char>) -> Option<usize> {
     Some(prefix + hashes + 1 + len)
 }
 
-/// A `"…"` (or, in Lua, `'…'`) string with `\` escapes. A `'` only opens one
-/// in Lua: in Rust it is a char literal or a lifetime ([`char_literal`]).
 pub(super) fn quoted(rest: &str) -> Option<usize> {
     let quote = rest.chars().next().filter(|&c| c == '"' || c == '\'')?;
     let mut chars = rest.char_indices().skip(1);
@@ -54,7 +48,7 @@ pub(super) fn quoted(rest: &str) -> Option<usize> {
     Some(rest.len())
 }
 
-/// A char literal (`'x'`, `'\''`, `'\u{7f}'`), or `None` for a lifetime (`'a`).
+/// `None` for a lifetime.
 fn char_literal(rest: &str) -> Option<usize> {
     let body = rest.strip_prefix('\'')?;
     if let Some(escaped) = body.strip_prefix('\\') {
@@ -67,8 +61,7 @@ fn char_literal(rest: &str) -> Option<usize> {
         .then(|| 1 + c.len_utf8() + 1)
 }
 
-/// A Lua long bracket `[`, `=`×level, `[` at the start of `rest`: its level and
-/// its length.
+/// Lua's `[==[`: its level and length.
 pub(super) fn long_open(rest: &str) -> Option<(usize, usize)> {
     let after = rest.strip_prefix('[')?;
     let level = after.bytes().take_while(|&b| b == b'=').count();
@@ -77,15 +70,12 @@ pub(super) fn long_open(rest: &str) -> Option<(usize, usize)> {
         .then_some((level, level + 2))
 }
 
-/// Past the `]`, `=`×level, `]` that closes a long bracket in `rest`, if it does.
 pub(super) fn long_close(rest: &str, level: usize) -> Option<usize> {
     let close = format!("]{}]", "=".repeat(level));
     rest.find(&close).map(|at| at + close.len())
 }
 
-/// `code` with its whitespace laid aside outside literals: a run of it is dropped,
-/// or kept as one space where it parts two word characters (`let x`), so a line
-/// re-joined or re-indented reads the same and a literal's spaces still count.
+/// Whitespace outside literals dropped, or one space between two word chars.
 pub(super) fn normalize(kind: Kind, code: &str) -> String {
     let mut out = String::new();
     let (mut rest, mut prev, mut gap) = (code, None::<char>, false);
@@ -106,9 +96,7 @@ pub(super) fn normalize(kind: Kind, code: &str) -> String {
     out
 }
 
-/// Every `#[doc = …]` and `#![doc = …]` attribute in Rust `code`, outside its
-/// literals: its byte range and the ranges of the string literals in it, the
-/// text a doc comment would hold.
+/// Each `#[doc = …]` attribute's range, and its strings' ranges.
 pub(super) fn doc_attributes(code: &str) -> Vec<(Range<usize>, Vec<Range<usize>>)> {
     let at = |rest: &str| code.len() - rest.len();
     let mut found = Vec::new();
@@ -147,8 +135,6 @@ pub(super) fn doc_attributes(code: &str) -> Vec<(Range<usize>, Vec<Range<usize>>
     found
 }
 
-/// After a `#`: the length of `[doc =` (or `![doc =`, spaces anywhere) that
-/// `rest` opens with.
 fn doc_value(rest: &str) -> Option<usize> {
     let after = rest.strip_prefix('!').unwrap_or(rest).strip_prefix('[')?;
     let name = after.trim_start().strip_prefix("doc")?;

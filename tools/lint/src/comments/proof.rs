@@ -1,24 +1,14 @@
-//! `--comment-only [<rev>]`: proof that a branch changes only comments.
-//!
-//! Over the files changed between the merge base of `<rev>` (default
-//! `origin/main`) and `HEAD`, each file's two versions have their comments cut
-//! by the same split the cap counts with (a doc attribute is a comment there too)
-//! and are compared as code, whitespace and blank lines aside, since rustfmt may
-//! re-join a line once its trailing comment goes. A file added, deleted or
-//! renamed, or one that is not Rust, Lua or WGSL, fails. A tool mode, not a gate:
-//! a cleanup branch runs it before readying.
+//! `--comment-only [<rev>]`: the branch since its merge base with `<rev>` changes
+//! only comments (docs/linting.md, *Comments*). A tool mode, not a gate.
 
 use super::{bare, literals, split, Kind, Line};
 use crate::gates::Verdict;
 use crate::repo::git;
 use std::path::Path;
 
-/// The flag that runs it, and the base it compares against by default.
 pub const FLAG: &str = "--comment-only";
 pub const DEFAULT_BASE: &str = "origin/main";
 
-/// The proof over the repository at `root`, against the merge base of `rev` and
-/// `HEAD`.
 pub fn verdict(root: &Path, rev: &str) -> Verdict {
     let failed = |why: String| Verdict::listed("comment-only", vec![why], |_| String::new());
     let base = match run(root, &["merge-base", rev, "HEAD"]) {
@@ -79,8 +69,7 @@ pub fn verdict(root: &Path, rev: &str) -> Verdict {
     verdict
 }
 
-/// The first line of `new` where its code stops matching `old`'s, or `None` when
-/// the two are the same code.
+/// The first line of `new` whose code differs from `old`'s.
 fn differs(kind: Kind, old: &[Line], new: &[Line]) -> Option<usize> {
     let code = |lines: &[Line]| {
         let code: Vec<&str> = lines.iter().map(|l| l.code.as_str()).collect();
@@ -105,7 +94,6 @@ fn differs(kind: Kind, old: &[Line], new: &[Line]) -> Option<usize> {
     Some(new.len().max(1))
 }
 
-/// How many fenced examples `lines`' comments hold: a fence opens and closes one.
 fn fenced(lines: &[Line]) -> usize {
     let fences = lines.iter().filter(|l| bare(&l.comment).starts_with("```"));
     fences.count() / 2
