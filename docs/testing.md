@@ -69,9 +69,6 @@ things follow:
   Only the file access is shared: the scenario VM's `print` is Lua's own and
   writes to the `play` process's stdout, not to the console log a gameplay
   script's `print` reaches.
-- A scenario is a test, so the paid provider verbs (`Sfx.Generate`, `Speech.*`)
-  are refused for the whole run, before its first `Harness.Step` too (CLAUDE.md,
-  *Provider calls are authoring, never gameplay*).
 
 **Asserting a clean run** (#2054). `Harness.Expect(cond, message)` records a
 pass or fail in `results.json`; `Harness.Warnings([after])` returns the run's
@@ -435,17 +432,8 @@ CI for a leak that only breaks the informational mutation runs (#1338).
 To check a branch before it merges: `make test-one-process` runs the `dev` suite that
 way locally (quiet, every binary, the failing tests named at the end), and
 `gh workflow run cargo-test.yml --ref <branch>` runs the whole signal on GitHub.
-**A test never holds a provider key** (#974), under any runner:
-`dev::providers::environment()` drops every `*_API_KEY` and skips the `.env` unless
-the binary opted in at startup (`dev::providers::read_keys`, which only the editor,
-`session` and `session-mcp` call), and no test binary does. A test starts an engine
-binary only through `tests/spawn.rs` (`crate::spawn::engine_bin!("session")`), which
-sets `RUSTY_NO_PROVIDER_KEYS`, so a spawned binary holds no key either, under nextest
-or a bare `cargo test` alike; the `engine-spawn` lint fails a `CARGO_BIN_EXE_` named
-anywhere else. That lint is the primary guard; the backstop is nextest's `NEXTEST`
-variable, which every test process and every child it starts inherits, and which
-blanks the keys too, so a spawn the lint cannot see (`cargo run --bin`, a built path)
-holds none under nextest. Doctests stay on `cargo test --doc`, which nextest
+A test starts an engine binary with `tests/spawn.rs`'
+`crate::spawn::engine_bin!("session")`. Doctests stay on `cargo test --doc`, which nextest
 cannot run. CI's `ci` profile additionally writes JUnit, rendered as each
 `build-test` job's summary.
 
@@ -516,9 +504,8 @@ dev-dependency switches on a feature that the normal build leaves off, `cargo te
 compiles its own copy of that crate, of everything above it, and of rusty. proptest
 did this to `getrandom`'s `std` feature, and that doubled ahash, hecs, wgpu and egui
 (#552). #1334 builds proptest without its default features to close that gap. Where
-a normal dependency brings in a crate a test-only one widens (`scorsese-providers`'
-`zip` and getrandom 0.4, under `dev`), `Cargo.toml` names that crate with the test
-build's features, as a `dev`-gated pin no code uses (listed `unscoped`, with its
+a normal dependency brings in a crate a test-only one widens, `Cargo.toml` names that
+crate with the test build's features, as a pin no code uses (listed `unscoped`, with its
 reason, in `tools/lint/src/layers/externs/policy.rs`).
 **Don't let a dev-dependency turn on a feature the normal build lacks.** The
 `feature-split` gate (`make feature-split`, `.github/scripts/feature_split.py`, #979)

@@ -34,8 +34,8 @@ not authoring tooling that calls an external service.
 ## Start here
 - **README.md** — what the engine is and what you can do with it.
 - **docs/** — `linting.md` (the gate), `testing.md`, `api/` (the Lua API, one file per
-  namespace), `ui.md` (in-game UI), `providers.md` (keys, budget), `mcp.md` (the
-  `session-mcp` bridge) and `game-agent.md` (the guide it serves a game project).
+  namespace), `ui.md` (in-game UI), `mcp.md` (the `session-mcp` bridge) and
+  `game-agent.md` (the guide it serves a game project).
 - **auxmd.md** *(gitignored)* — the operator's scratchpad; read it if pointed there.
 - **Nested CLAUDE.md files** carry one area's rules and load only when you read files
   there: `.github/scripts/CLAUDE.md` (merge and batch tooling), `tools/lint/CLAUDE.md`,
@@ -262,9 +262,6 @@ adapts it.
   reads, unseeded RNG or `std`'s `HashMap`/`HashSet` in sim modules (use
   `core::collections`). The gameplay Lua VM has no `os`/`io`; `math.random` uses the
   seeded `Random` resource (`core::random`); a `require` outside the project warns.
-- **Provider calls are authoring, never gameplay.** Paid, networked calls live behind
-  `crates/dev/src/providers/`: `dev` only, refused during Play, held to the project's `budget`,
-  never made by a test (traits and mocks). `docs/providers.md`.
 - **Use `glam`** for all math (`deny.toml` bans `cgmath`, and `nalgebra` outside
   physics); keep egui / wgpu / mlua decoupled. **A workspace of one crate per module**
   (`crates/<module>/`; the root keeps the binaries and `tests/`): `crates/CLAUDE.md`.

@@ -36,7 +36,7 @@ hears nothing and returns `0`, and a hit is not sensed.
   `hearing_range × loudness` of the point hears it. **Walls do not block hearing**, as in
   Unreal. The engine never reports a noise itself: playing a sound is not a noise,
   because the game decides what an enemy reacts to. A gun script calls `ReportNoise`
-  beside its `Sfx` call. The instigator's own hierarchy (the bot that fired, its body,
+  beside its `Audio.PlayAt` call. The instigator's own hierarchy (the bot that fired, its body,
   its gun) does not hear its noise. Its last-known position is the noise's point (a
   grenade is heard where it lands, not where its thrower stands), as in Unreal.
 - **Damage**: every [`Damage`](Damage.md) `Apply` / `ApplyPoint` / `ApplyRadial` hit

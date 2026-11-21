@@ -32,7 +32,7 @@ fn project(root: &Path) {
         ("assets/models/crate.blend@", "Blender's temp file".into()),
         ("assets/models/barrel.glb", "glb".into()),
         ("assets/models/rock.obj", "obj".into()),
-        ("assets/generated/voice.wav", "provider output".into()),
+        ("assets/generated/voice.wav", "generated asset".into()),
         ("assets/generated/theme.mp3", "audio's source".into()),
         (&cached("soldier.fbx.glb"), "cache".into()),
         (&cached("soldier.fbx.glb.source"), "stamp".into()),

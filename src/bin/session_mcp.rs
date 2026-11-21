@@ -50,8 +50,6 @@ fn main() {
     rusty::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::answer_help(&args, USAGE);
-    // An authoring binary: it may spend on a provider (docs/providers.md).
-    rusty::dev::providers::read_keys();
 
     // Pick the backend: `--attach [<addr>]` forwards to a running window's socket;
     // otherwise boot an in-process headless world (honouring `--project` / scene args).

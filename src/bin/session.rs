@@ -35,8 +35,6 @@ fn main() {
     rusty::init();
     let args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::answer_help(&args, USAGE);
-    // An authoring binary: it may spend on a provider (docs/providers.md).
-    rusty::dev::providers::read_keys();
 
     // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
     // boots that scene, and no argument boots the project's boot scene

@@ -70,7 +70,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One logger a test binary | `tools/lint -- --rules` (`one-logger`) | **hard gate**: a package whose manifest names `rusty-logging` never names `rusty_test_support::logs`; its tests read warnings through `rusty_logging::init_for_tests` and `rusty_logging::forward` |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
-| One player tree | `make player-tree` (`.github/scripts/player_tree.py`) | **hard gate**: the shipped player's resolution (`cargo tree -p rusty --no-default-features -e normal`) reaches no `egui*`, no `rusty-editor`, no `rusty-dev`, no `scorsese-providers` and no `ureq`; clippy on that feature set only proves the code never names them, while a manifest can still link one (a member's dependency without `optional`, `crates/CLAUDE.md`) |
+| One player tree | `make player-tree` (`.github/scripts/player_tree.py`) | **hard gate**: the shipped player's resolution (`cargo tree -p rusty --no-default-features -e normal`) reaches no `egui*`, no `rusty-editor`, and no `rusty-dev`; clippy on that feature set only proves the code never names them, while a manifest can still link one (a member's dependency without `optional`, `crates/CLAUDE.md`) |
 | One world space | `tools/lint -- --rules` (`world-space`) | **hard gate**: outside `ecs::world_space` and `components::transform`, no engine code line decomposes a matrix (`to_scale_rotation_translation`), names the retired `compute_world_matrix` / `world_matrix(` / `parent_world_matrix`, or folds a Transform over `ancestors(` — world space is read from `ecs::World`'s world API; test code is not scanned, and converting file data takes `// lint: allow(world-space) <why>` (#1196) |
 | Order-free lists stay sorted | `tools/lint -- --rules` (`sorted`) | **hard gate**: a list under a `// sorted: <why>` (or `<!-- sorted: <why> -->`) marker stays in order up to its first blank line, so two branches adding entries touch different lines (#911) |
 | Physics body changes are counted | `tools/lint -- --rules` (`body-table`) | **hard gate**: a non-test line of `crates/physics/src/` that calls `.set_body_type(`, or `.insert(` / `.remove(` on `bodies`, fails, since the character controller sweeps a cached copy of the body table remade only when its change counter moves; go through `PhysicsWorld::insert_body` / `remove_body` / `ControllerBodies::retype`, which bump it and carry `// lint: allow(body-table) <why>` (#2061) |
@@ -78,7 +78,6 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Post effect completeness | `cargo test` (`render::postfx::effects::completeness`, #1467) | **hard gate**: every effect in `render::postfx::effects::POST_EFFECTS` has its settings (a `PostProcessingComponent` field, or a `CameraComponent` field named after it for a camera effect), its authoring row, its `Graphics.*` registrar, its Inspector section, a `<!-- effect: <name> -->` section in `docs/api/Graphics.md` naming each knob's tween path, and, when player-facing, a `GraphicsOption` of its name with a row in the doc's *Player options*; each composite texture it declares is bound in the assembled composite, at its place (#1473); and no layer lists an effect the renderer lacks. A must-flag test removes each part in turn |
 | Proptest seed | `make scripts` (`test_workflow_hygiene.py`, `ProptestSeed`) | **hard gate**: `ci.yml`'s gates pin `PROPTEST_RNG_SEED` and its nightly leaves it random (#1800), and `make test` and `make test-one-process` run on that same number, read from `ci.yml`, never copied (#1852): a probe made a prerequisite of each verb reads the seed its recipe sees, and a Makefile that drops the export or copies another number must flag; `make test-explore` is the local **signal** that draws fresh seeds |
 | Proptest seeds replay | `tools/lint -- --rules` (`orphan-seeds`) | **hard gate**: every `proptest-regressions/<path>.txt` under the root or a `crates/<name>/` has its `<path>.rs` in a sibling folder holding a `lib.rs` or `main.rs`, the only place proptest reads it from; a seed left behind by a module's move to its crate, or by a renamed or deleted test, fails and the message names where it goes; no allow |
-| Provider keys stay out of tests | `tools/lint -- --rules` (`read-keys`, `engine-spawn`, `key-guard`) | **hard gate**: `dev::providers::read_keys()` is called only by the editor, `session` and `session-mcp`, each still calls it, and `KEY_READERS` names the same three; a test starts an engine binary only through `tests/spawn.rs`, which tells it to read no key; every package whose manifest names `rusty-dev` expands `rusty_dev::no_provider_keys!()` once, a sample of one test binary per package (#974) |
 | Pushed = built | `tools/lint -- --rules` (`ignored`) | **hard gate**: no scanned `.rs` file may match a `.gitignore` pattern, tracked or not; no allow (#935) |
 | Ranged editor drags | `tools/lint -- --rules` (`drag-range`) | **hard gate**: a `DragValue` under `crates/editor/src` bounds its range with `.ranged(..)` (`editor::widgets::DragRange`), never egui's `.range(..)`, which also rewrites an out-of-range value just by selecting the entity (#1158); an editor slider is built by `editor::widgets::slider`, never a bare `egui::Slider::new(`, whose default clamping does the same (#1444); a real need takes `// lint: allow(drag-range) <why>` |
 | Root targets build no test harness | `tools/lint -- --rules` (`root-tests`) | **hard gate**: the root `Cargo.toml`'s `[lib]` and every `[[bin]]` say `test = false` and its `[package]` says `autobins = false` (a binary cargo found under `src/bin/` on its own would get a harness; undeclared, `orphan-module` names it), and no root `src/` file holds a test gate (`#[cfg(test)]`, `#[test]`), since no harness would build it; each harness was one more rustc run and link against the whole engine on every `cargo test`, running nothing; the root's tests are `tests/`; no allow (#2202) |
@@ -687,30 +686,6 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   exempts (`crates/script/src/api/`, one file per Lua namespace) is listed in `rules/prefix.rs`
   with the reason, and the exemption covers that directory only, not its
   subfolders.
-- **`read-keys`** and **`engine-spawn`** (#974) — a test never holds a provider key,
-  under any runner. A process reads `*_API_KEY` and the `.env` only after it calls
-  `dev::providers::read_keys()`, so `read-keys` fails a call anywhere but the
-  binaries an author spends from (`MUST_CALL`: the editor's `src/main.rs`,
-  `session`, `session-mcp`; only code counts, not a comment, a string literal or its
-  definition), fails each of them that no longer calls it, since every provider verb
-  there would be refused, and fails `KEY_READERS` in
-  `crates/dev/src/providers/credentials.rs` (the names the refusal prints) when it
-  no longer lists the same binaries. A binary a test spawns opted in, so `engine-spawn` fails a code line
-  naming `CARGO_BIN_EXE_` outside `tests/spawn.rs`, whose `engine_bin!` sets
-  `RUSTY_NO_PROVIDER_KEYS` on the child. Both are the primary guard; nextest's
-  `NEXTEST` variable, which blanks the keys in every process under it, is the
-  backstop for a spawn neither can see. `tools/` is not scanned by either
-  (`rules/read_keys.rs`, `rules/engine_spawn.rs`).
-  **`key-guard`** samples the tripwire: each package whose `[dependencies]` or
-  `[dev-dependencies]` (per-target ones too) name `rusty-dev` directly (the root,
-  `rusty-shell`, `rusty-editor`) expands `rusty_dev::no_provider_keys!()` once in its
-  `src/` or `tests/`, two tests asserting their binary never opted in and no key
-  resolves in it. It is a sample, not a check of every binary: cargo builds one test
-  binary per lib, per bin and per `tests/*.rs`, the guard sits in one of them, and a
-  package linking `rusty-dev` only through a sibling is not read. `read-keys` and the
-  `NEXTEST` backstop are what keep every test process keyless; the sample proves they
-  hold inside a binary that links the provider layer. Nothing excuses it
-  (`Allow::Never`: its finding sits on a manifest, `rules/key_guard.rs`).
 - **`root-tests`** (#2202) — the root package (the binaries and the integration
   suite; its lib only re-exports the members) builds no unit-test harness of its
   own. Cargo would otherwise build one per target on every `cargo test` and
@@ -997,12 +972,11 @@ What is not one row's lives in `tools/lint/src/layers/externs/policy.rs`:
 - **`common`** — the vocabulary any module may depend on unlisted: `glam`, `serde`,
   `serde_json`, `log`.
 - **`unscoped`** — dependencies no module names, each with why it is in
-  `Cargo.toml`. One today: `getrandom`, the root's feature pin that keeps the `dev`
-  build and its tests on one dependency graph (`Cargo.toml` says why); it is never
-  `use`d.
+  `Cargo.toml` (a feature pin that keeps a build and its tests on one dependency
+  graph, never `use`d). None today.
 - **`confined`** — crates only some subtrees may name, finer than a crate: the
   `egui` crates only under `crates/editor/src` and `crates/shell/src/editor` (the `editor`
-  feature, #431), the provider crates only under `crates/dev/src/providers` (#383).
+  feature, #431).
 - **`display`** — the crate families no sim member may take (above).
 
 Beside the per-member equality, the lint reads the `[dependencies]` of the root

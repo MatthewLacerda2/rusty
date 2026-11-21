@@ -6,7 +6,7 @@ publish.workspace = true
 license.workspace = true
 
 [features]
-dev = ["dep:libloading", "dep:scorsese-core", "dep:scorsese-providers", "rusty-ai/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-render/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
+dev = ["dep:libloading", "rusty-ai/dev", "rusty-app/dev", "rusty-asset/dev", "rusty-core/dev", "rusty-lighting/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-render/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-script/dev", "rusty-shadergen/dev"]
 
 [lints]
 workspace = true
@@ -34,8 +34,6 @@ libloading = { workspace = true, optional = true }
 log = { workspace = true }
 mlua = { workspace = true }
 pollster = { workspace = true }
-scorsese-core = { workspace = true, optional = true }
-scorsese-providers = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 

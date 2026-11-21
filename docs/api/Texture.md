@@ -898,7 +898,7 @@ local stats = Texture.Stats(damaged)  -- `mask` is listed with the rest
 
 `{ op = "image", path = "textures/crate.png", encoding = "srgb" }` starts a graph from
 an existing map, like Blender's *Image Texture* node: a texture extracted from an
-imported model, a provider-generated image, an earlier bake, a hand-made mask or logo
+imported model, an earlier bake, a hand-made mask or logo
 — to recolour, weather, turn into a normal map, or use as a mask.
 
 - `path` is taken from the **project root**, as `require` takes its scripts. A file

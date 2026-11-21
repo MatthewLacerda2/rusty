@@ -15,10 +15,13 @@ fn tone(i: usize) -> f32 {
     0.5 * (TAU * 440.0 * i as f32 / RATE as f32).sin()
 }
 
+/// The fixture copied into a fresh folder of its own and converted by [`refresh`].
 fn converted(name: &str) -> DecodedAudio {
-    let dest = rusty_test_support::temp::dir().join(name);
-    import_mp3_bytes(std::fs::read(FIXTURE).unwrap(), &dest).expect("the MP3 converts");
-    decode_file(dest.to_str().unwrap()).expect("the WAV decodes")
+    let dir = rusty_test_support::temp::dir().join(name);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(FIXTURE, dir.join("tone.mp3")).unwrap();
+    assert_eq!(refresh(&dir).converted.len(), 1, "the MP3 converts");
+    decode_file(dir.join("tone.wav").to_str().unwrap()).expect("the WAV decodes")
 }
 
 /// Without the trim the decode is 22050 + encoder delay (~1105) + padding frames.

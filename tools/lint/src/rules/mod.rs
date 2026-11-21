@@ -23,7 +23,6 @@ mod converter_log;
 mod dir_size;
 mod drag_range;
 mod ecs_write;
-mod engine_spawn;
 mod entity_arg;
 mod fold_names;
 mod full_literal;
@@ -32,7 +31,6 @@ mod gpu_default_only;
 mod gpu_ops;
 mod held_warn;
 mod ignored;
-mod key_guard;
 mod log_tag;
 mod markers;
 mod mesh_buffer_write;
@@ -43,7 +41,6 @@ mod orphan_seeds;
 mod physics_borrow;
 mod platform_cfg;
 mod prefix;
-mod read_keys;
 mod root_tests;
 mod sanitize;
 mod sanitize_rules;
@@ -70,8 +67,7 @@ use std::path::Path;
 enum Allow {
     Inline,
     /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
-    /// `.gitignore` pattern and a moved file, `key-guard`, whose finding sits on a
-    /// manifest, where no inline allow can go, `root-tests`, whose fix is the
+    /// `.gitignore` pattern and a moved file, `root-tests`, whose fix is the
     /// manifest key or a moved test, and `fold-names`, which an allow would not
     /// make fold.
     Never,
@@ -102,7 +98,6 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (dir_size::RULE, dir_size::run, Allow::Own),
     (drag_range::RULE, drag_range::run, Allow::Inline),
     (ecs_write::RULE, ecs_write::run, Allow::Inline),
-    (engine_spawn::RULE, engine_spawn::run, Allow::Inline),
     (entity_arg::RULE, entity_arg::run, Allow::Inline),
     (fold_names::RULE, fold_names::run, Allow::Never),
     (full_literal::RULE, full_literal::run, Allow::Inline),
@@ -115,7 +110,6 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (gpu_ops::RULE, gpu_ops::run, Allow::Inline),
     (held_warn::RULE, held_warn::run, Allow::Inline),
     (ignored::RULE, ignored::run, Allow::Never),
-    (key_guard::RULE, key_guard::run, Allow::Never),
     (log_tag::RULE, log_tag::run, Allow::Inline),
     (markers::RULE, markers::run, Allow::Inline),
     (
@@ -130,7 +124,6 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (physics_borrow::RULE, physics_borrow::run, Allow::Inline),
     (platform_cfg::RULE, platform_cfg::run, Allow::Inline),
     (prefix::RULE, prefix::run, Allow::Inline),
-    (read_keys::RULE, read_keys::run, Allow::Inline),
     (root_tests::RULE, root_tests::run, Allow::Never),
     (sanitize::RULE, sanitize::run, Allow::Inline),
     (self_path::RULE, self_path::run, Allow::Inline),
