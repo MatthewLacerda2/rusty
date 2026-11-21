@@ -7,6 +7,7 @@
 //! records a pass into the HDR scene target (after solids/skybox/transparents,
 //! before post-FX). Mesh emitters are skipped here — they draw with the solids.
 
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use std::rc::Rc;
 
@@ -209,7 +210,7 @@ impl Renderer {
                 label: Some("Particle Pass"),
                 color_attachments: &taa::reactive::hdr_attachments(view),
                 // `depth_ops: None` makes the attachment read-only, which is what lets
-                // the same texture be sampled (group 2) in this pass.
+                // the same texture be sampled (the scene group) in this pass.
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
                     depth_ops: None,
@@ -219,22 +220,22 @@ impl Renderer {
                 occlusion_query_set: None,
             });
 
-            pass.set_bind_group(0, &pr.globals_bind_group, &[]);
-            pass.set_bind_group(2, depth_bg, &[]);
-            pass.set_bind_group(3, &self.global_bind_group, &[]);
+            pass.set_bind_group(groups::DRAW, &pr.globals_bind_group, &[]);
+            pass.set_bind_group(groups::SCENE, depth_bg, &[]);
+            pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
             pass.set_index_buffer(pr.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
             if let Some(instances) = instance_buffer {
                 pass.set_vertex_buffer(0, instances.slice(..));
             }
             for batch in batches {
-                pass.set_bind_group(1, &batch.texture.bind_group, &[]);
+                pass.set_bind_group(groups::MATERIAL, &batch.texture.bind_group, &[]);
                 let group = batch.gpu.and_then(|key| pr.gpu.emitters.get(&key));
                 match group.and_then(|e| e.groups.as_ref()) {
                     Some((_, draw)) => {
                         pass.set_pipeline(pr.gpu_pipeline_for(batch.blend, reactive));
-                        pass.set_bind_group(0, draw, &[]);
+                        pass.set_bind_group(groups::DRAW, draw, &[]);
                         pass.draw_indexed(0..6, 0, batch.instances.clone());
-                        pass.set_bind_group(0, &pr.globals_bind_group, &[]);
+                        pass.set_bind_group(groups::DRAW, &pr.globals_bind_group, &[]);
                     }
                     None if batch.gpu.is_some() => {}
                     None => {

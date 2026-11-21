@@ -42,6 +42,11 @@ use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 use rusty_core::settings::quality::SsrQuality;
 
+/// The trace and resolve passes' shared inputs.
+const INPUTS: u32 = 0;
+/// The resolve pass's traced hits and spread.
+const TRACED: u32 = 1;
+
 /// CPU mirror of `SsrParams` in `postfx/ssr.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
@@ -215,7 +220,7 @@ fn trace_and_resolve(
         let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());
-        pass.set_bind_group(0, group, &[]);
+        pass.set_bind_group(INPUTS, group, &[]);
         pass.draw(0..3, 0..1);
     }
     pyramids.build(encoder, &passes.pyramid, timer);
@@ -225,8 +230,8 @@ fn trace_and_resolve(
         let timed = timer.writes(GpuPass::SsrResolve);
         let mut pass = begin(encoder, "SSR Resolve", &targets, timed);
         pass.set_pipeline(passes.resolve.get());
-        pass.set_bind_group(0, group, &[]);
-        pass.set_bind_group(1, traced, &[]);
+        pass.set_bind_group(INPUTS, group, &[]);
+        pass.set_bind_group(TRACED, traced, &[]);
         pass.draw(0..3, 0..1);
     }
 }

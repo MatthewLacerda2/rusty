@@ -1,4 +1,4 @@
-//! The forward renderer's group(2) texture setup: the single-texture + expanded
+//! The forward renderer's texture setup: the single-texture and the material-group
 //! material bind-group layouts, the default checker texture, and the all-default
 //! material bind group. A cohesive unit ([`Textures`]) that `setup_build` builds and
 //! `Renderer::from_parts` flattens into the renderer.
@@ -13,7 +13,7 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::MipGenerator;
 use crate::{GpuTexture, Renderer};
 
-/// The group(2) texture layouts and the default texture/material bind group.
+/// The single-texture and material-group layouts and the default texture/material bind group.
 pub(crate) struct Textures {
     pub texture_layout: wgpu::BindGroupLayout,
     pub material_layout: wgpu::BindGroupLayout,
@@ -29,7 +29,7 @@ pub(crate) struct Textures {
     pub mip_generator: MipGenerator,
 }
 
-/// Build the single-texture + expanded-material group(2) layouts, the default
+/// Build the single-texture and material-group layouts, the default
 /// checker texture, and the all-default material bind group (#202).
 pub(crate) fn create_textures(
     device: &wgpu::Device,
@@ -71,10 +71,10 @@ pub(crate) fn create_textures(
     }
 }
 
-/// A group(2) material bind group with all ten map slots (albedo, metallic,
+/// A material bind group with all ten map slots (albedo, metallic,
 /// roughness, normal, emissive, detail, occlusion, specular, height, detail mask) pointing at the default texture and every extra
 /// shader texture slot at white (#400).
-/// Bound by passes that need group(2) but never sample the maps (the editor grid
+/// Bound by passes that need the material group but never sample the maps (the editor grid
 /// and gizmos) (#202, #207).
 fn create_default_material_bind_group(
     device: &wgpu::Device,

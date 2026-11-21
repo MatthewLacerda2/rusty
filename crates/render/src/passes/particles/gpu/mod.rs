@@ -29,6 +29,7 @@ pub(crate) mod record;
 #[cfg(test)]
 mod twin;
 
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use std::collections::{HashMap, HashSet};
 
@@ -52,7 +53,7 @@ const IDLE_RENDERS: u32 = 600;
 pub(crate) struct GpuParticles {
     /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
     step_layout: wgpu::BindGroupLayout,
-    /// The draw's group 0: the pass globals, the emitter, particles, curves.
+    /// The draw's per-draw group: the pass globals, the emitter, particles, curves.
     pub(crate) draw_layout: wgpu::BindGroupLayout,
     birth: LazyCompute,
     step: LazyCompute,
@@ -65,7 +66,9 @@ impl GpuParticles {
         let shader = registry.load(device, "particles_step.wgsl", "GPU Particle Step Shader");
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("GPU Particle Step Pipeline Layout"),
-            bind_group_layouts: &[Some(&step_layout)],
+            // At the per-draw index, where its draw binds the emitter's group too: the
+            // two share `particles::gpu`'s declarations.
+            bind_group_layouts: &groups::draw_only(&step_layout),
             immediate_size: 0,
         });
         let pipeline = |entry: &'static str| {
@@ -181,7 +184,7 @@ impl Renderer {
                 let Some((group, _)) = gpu.emitters.get(key).and_then(|e| e.groups.as_ref()) else {
                     continue;
                 };
-                pass.set_bind_group(0, group, &[]);
+                pass.set_bind_group(groups::DRAW, group, &[]);
                 if work.births > 0 {
                     pass.set_pipeline(gpu.birth.get());
                     pass.dispatch_workgroups(work.births.div_ceil(64), 1, 1);
@@ -196,8 +199,8 @@ impl Renderer {
     }
 }
 
-/// `e`'s step group (`layouts.0`) and draw group 0 (`layouts.1`, with the pass
-/// `globals`).
+/// `e`'s step group (`layouts.0`) and its per-draw group (`layouts.1`, with the
+/// pass `globals`), both bound at `groups::DRAW`.
 fn groups(
     device: &wgpu::Device,
     layouts: (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
@@ -227,8 +230,22 @@ fn groups(
 }
 
 /// The step's group layout (the emitter, particles read-write, curves, `dt`s,
-/// births) and the draw's group 0 (the pass globals, the emitter, particles, curves).
+/// births) and the draw's per-draw group (the pass globals, the emitter, particles,
+/// curves), both at `groups::DRAW`.
 fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
+    let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("GPU Particle Step Layout"),
+        entries: &step_layout_entries(),
+    });
+    let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("GPU Particle Draw Layout"),
+        entries: &draw_layout_entries(),
+    });
+    (step_layout, draw_layout)
+}
+
+/// The step group's entries: the emitter, particles read-write, curves, `dt`s, births.
+pub(crate) fn step_layout_entries() -> [wgpu::BindGroupLayoutEntry; 5] {
     let compute = wgpu::ShaderStages::COMPUTE;
     let rw = wgpu::BindGroupLayoutEntry {
         ty: wgpu::BindingType::Buffer {
@@ -238,27 +255,24 @@ fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayo
         },
         ..storage_entry(2, compute)
     };
-    let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("GPU Particle Step Layout"),
-        entries: &[
-            uniform_entry(1, compute),
-            rw,
-            storage_entry(3, compute),
-            storage_entry(4, compute),
-            storage_entry(5, compute),
-        ],
-    });
+    [
+        uniform_entry(1, compute),
+        rw,
+        storage_entry(3, compute),
+        storage_entry(4, compute),
+        storage_entry(5, compute),
+    ]
+}
+
+/// The draw group's entries: the pass globals, the emitter, particles, curves.
+pub(crate) fn draw_layout_entries() -> [wgpu::BindGroupLayoutEntry; 4] {
     let vertex = wgpu::ShaderStages::VERTEX;
-    let draw_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-        label: Some("GPU Particle Draw Layout"),
-        entries: &[
-            uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
-            uniform_entry(1, vertex),
-            storage_entry(2, vertex),
-            storage_entry(3, vertex),
-        ],
-    });
-    (step_layout, draw_layout)
+    [
+        uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT),
+        uniform_entry(1, vertex),
+        storage_entry(2, vertex),
+        storage_entry(3, vertex),
+    ]
 }
 
 /// Entity `id`'s emitter `e` as its uniform: its stored particles under the

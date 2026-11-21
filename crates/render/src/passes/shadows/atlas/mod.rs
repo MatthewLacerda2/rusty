@@ -130,7 +130,7 @@ impl ShadowAtlas {
             LIGHT_SPACE_STRIDE * MAX_TILES as u64,
             wgpu::BufferUsages::UNIFORM,
         );
-        let global = super::setup::global_group(device, global_layout, &light_space, time_buffer);
+        let global = super::layouts::global_group(device, global_layout, &light_space, time_buffer);
         Self {
             texture,
             view,

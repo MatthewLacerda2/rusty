@@ -122,7 +122,7 @@ pub struct Renderer {
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
     pub texture_layout: wgpu::BindGroupLayout,
-    /// Expanded group(2) layout (the material maps, their samplers and the shader
+    /// Expanded material-group layout (the material maps, their samplers and the shader
     /// slots, `gpu::bind_layouts`) each cached material bind group is built against (#202).
     pub material_layout: wgpu::BindGroupLayout,
 
@@ -130,24 +130,24 @@ pub struct Renderer {
     camera_buffer: wgpu::Buffer,
     lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
-    /// Rebuild the group-0 bind group only when something it binds changed (the sky
+    /// Rebuild the global bind group only when something it binds changed (the sky
     /// cube, the probe array, a regrown light/decal buffer, the lightmap pages), not every
     /// camera every frame — its camera/lighting buffers are persistent (#210).
     global_bind_group_dirty: bool,
-    /// Group 0 kept for the procedural sky slot not bound (#1620).
+    /// The global group kept for the procedural sky slot not bound (#1620).
     spare_global_group: ibl::sky_cube::SpareGroup<wgpu::BindGroup>,
-    /// The light-cluster buffers group 0 binds (#434), refilled per camera.
+    /// The light-cluster buffers the global group binds (#434), refilled per camera.
     clusters: clusters::ClusterBuffers,
-    /// The baked lightmap pages group 0 binds (#438), rebound when the scene's change.
+    /// The baked lightmap pages the global group binds (#438), rebound when the scene's change.
     pub(crate) lightmaps: gpu::lightmaps::Lightmaps,
-    /// What every solid draw binds as group 1 (#470): per-draw uniforms, palettes and
+    /// What every solid draw binds as its per-draw group (#470): per-draw uniforms, palettes and
     /// instances per camera, and the object and material tables (#1706).
     draw_buffers: gpu::draw_buffers::DrawBuffers,
     /// GPU occlusion culling's compute pipelines (#1963).
     hiz: passes::hiz::HiZ,
     /// Each Light Probe Proxy Volume's last grid samples (#1672).
     proxy_volumes: draw::proxy_volume::ProxyVolumes,
-    /// One group-2 material bind group per distinct set of resolved maps (#470).
+    /// One material bind group (`gpu::groups::MATERIAL`) per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
     /// The pipelines materials' authored surface shaders draw with, by name (#396).
     pub(crate) surface_shaders: gpu::pipelines::surface::SurfaceShaders,
@@ -177,7 +177,7 @@ pub struct Renderer {
     pub white_texture: Rc<GpuTexture>,
     /// Draws every uploaded image's mip chain (#1322).
     pub(crate) mip_generator: gpu::textures::MipGenerator,
-    /// A group(2) material bind group whose six map slots point at
+    /// A material bind group whose six map slots point at
     /// `default_texture` (its shader slots at `white_texture`) — used by the
     /// editor-grid and gizmo passes, which never sample the maps (they render unlit /
     /// use the default checker) but still must supply a bind group matching the
@@ -197,19 +197,19 @@ pub struct Renderer {
     pub skybox_texture: Option<Rc<GpuTexture>>,
     pub skybox_path: String,
     /// The reflection probes the frame shades with (#1206): the nearest baked probes'
-    /// cubes in one cube array at group-0 binding 4, and the slots each draw blends.
+    /// cubes in one cube array at the global group's binding 4, and the slots each draw blends.
     reflection_probes: reflection_probes::ProbeArray,
-    /// The sky's prefiltered reflection cubes at group-0 binding 2 (#1553).
+    /// The sky's prefiltered reflection cubes at the global group's binding 2 (#1553).
     sky_reflection: sky_cube::SkyReflection,
     /// The reflection-probe bake's GPU prefilter (#1602), built on the first bake.
     probe_prefilter: std::sync::OnceLock<ibl::reflection_prefilter::gpu::ProbePrefilter>,
     pub shadow_layout: wgpu::BindGroupLayout,
     pub shadow_uniform_buffer: wgpu::Buffer,
-    /// The forward pass's group 3 with the white no-AO fallback: every pass that
+    /// The forward pass's scene group with the white no-AO fallback: every pass that
     /// draws without SSAO (the transparent pass, SSAO off, a stacked DepthOnly camera)
     /// binds this.
     pub shadow_bind_group: wgpu::BindGroup,
-    /// The opaque copy's pass, stand-in and sampler (#1523): every group 3 binds the
+    /// The opaque copy's pass, stand-in and sampler (#1523): every scene group binds the
     /// stand-in but a transparent pass whose camera copied
     /// (`passes::transparent::opaque_copy`).
     pub(crate) opaque_copy: passes::transparent::OpaqueCopyPass,
@@ -242,12 +242,12 @@ pub struct Renderer {
     /// The in-game UI pass (#418), drawn over the finished frame after post-FX.
     ui_renderer: ui::UiRenderer,
 
-    /// The frame's decals and their atlas (#638), in group 0 and the forward material inputs.
+    /// The frame's decals and their atlas (#638), in the global group and the forward material inputs.
     decals: decals::DecalBuffers,
 
-    /// The volumetric fog (#1703) in group 0, filled by each base camera running it before it draws.
+    /// The volumetric fog (#1703) in the global group, filled by each base camera running it before it draws.
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
-    /// Group 0's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
+    /// The global group's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
     linear_clamp: wgpu::Sampler,
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,

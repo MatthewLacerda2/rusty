@@ -51,7 +51,7 @@ use std::fmt::Write as _;
 use emit::{chain, check_params, emit_helpers, emit_params, reflection_folds, Instance};
 
 use super::blocks::{find, Stage};
-use super::params::{ParamLayout, UNIFORM_DECL};
+use super::params::{uniform_decl, ParamLayout};
 use super::recipe::{PassKind, ShaderRecipe};
 use super::textures;
 
@@ -129,7 +129,7 @@ fn assemble_surface(
         recipe.name
     );
     if !layout.params.is_empty() {
-        additions.push_str(UNIFORM_DECL);
+        additions.push_str(&uniform_decl());
     }
     for slot in textures::SLOTS {
         if resolved

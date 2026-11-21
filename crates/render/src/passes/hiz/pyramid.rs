@@ -99,7 +99,7 @@ impl Pyramid {
         let mut size = base(self.depth.0, self.depth.1);
         for (level, group) in groups.iter().enumerate() {
             pass.set_pipeline(level_pipeline(hiz, level));
-            pass.set_bind_group(0, group, &[]);
+            pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
             pass.dispatch_workgroups(size.0.div_ceil(8), size.1.div_ceil(8), 1);
             size = (half(size.0), half(size.1));
         }

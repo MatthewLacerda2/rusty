@@ -51,7 +51,7 @@ impl TileBlit {
     /// Copy the static atlas into the pass's current viewport.
     pub(super) fn copy<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>) {
         pass.set_pipeline(&self.copy);
-        pass.set_bind_group(0, &self.source, &[]);
+        pass.set_bind_group(crate::gpu::ONLY_GROUP, &self.source, &[]);
         pass.draw(0..3, 0..1);
     }
 

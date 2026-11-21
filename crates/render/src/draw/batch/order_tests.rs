@@ -3,7 +3,7 @@
 //! key order. No GPU. Over a primed depth: `primed_order_tests`.
 
 use super::sort::depth_bucket;
-use super::tests::{at, batched, item, meshes, tags};
+use super::tests::{at, batched, item, meshes, name, tags};
 
 #[test]
 fn layered_walls_draw_nearest_first_whatever_the_given_order() {
@@ -44,6 +44,27 @@ fn near_equal_depths_keep_the_key_order() {
     let opaque = vec![at("B", 0.0, 10.0), at("A", 1.0, 10.5)];
     let draws = batched((opaque, Vec::new()), true);
     assert_eq!(meshes(&draws), ["A", "B"]);
+}
+
+#[test]
+fn the_material_never_reorders_meshes_inside_a_bucket() {
+    // Inside a depth bucket the mesh orders the draws, then the material: a key
+    // field moved ahead of the mesh (the material, to bind its group less often)
+    // changes which solid draws first in every bucket, and so what a forward pass
+    // that is not primed, or an unlit solid that writes its own depth, shades.
+    let with = |mesh, material, tag| {
+        let mut it = at(mesh, tag, 10.0);
+        it.key.material = material;
+        it
+    };
+    let opaque = vec![with("A", 1, 0.0), with("B", 0, 1.0), with("A", 0, 2.0)];
+    let draws = batched((opaque, Vec::new()), true);
+    let order: Vec<_> = draws
+        .opaque
+        .iter()
+        .map(|b| (name(b.key.mesh), b.key.material))
+        .collect();
+    assert_eq!(order, [("A", 0), ("A", 1), ("B", 0)]);
 }
 
 #[test]

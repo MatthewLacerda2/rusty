@@ -1,6 +1,6 @@
 //! crates/render/src/gpu/draw_buffers/pack.rs — the byte layouts the packed per-frame arrays
 //! take (#470): per-draw uniforms at their dynamic-offset stride, and the joint array
-//! with its shared identity at element 0, and the group-1 bind group over them.
+//! with its shared identity at element 0, and the per-draw bind group over them.
 
 use super::{IDENTITY_JOINT, UNIFORM_STRIDE};
 use crate::gpu::ops::CountedDevice as _;
@@ -42,10 +42,10 @@ pub(crate) fn push_palette(joints: &mut Vec<JointMatrix>, palette: &[glam::Mat4]
     base
 }
 
-/// A group-1 bind group over `[uniform, bones, instances, materials, proxies,
+/// A per-draw bind group over `[uniform, bones, instances, materials, proxies,
 /// objects]`. The uniform binds one element's width, so a dynamic offset can slide
 /// across the packed array; the other arrays bind whole, and the shader indexes them.
-pub(crate) fn group1(
+pub(crate) fn draw_group(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
     label: &str,

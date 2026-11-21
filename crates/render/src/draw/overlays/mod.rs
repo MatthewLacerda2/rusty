@@ -17,6 +17,7 @@ mod probe_ball;
 mod probes;
 mod wires;
 
+use crate::gpu::groups;
 use glam::{Mat4, Vec3};
 
 use crate::draw::resources::{GridResource, Overlays};
@@ -36,7 +37,7 @@ impl Renderer {
     }
 
     /// Draw the editor overlays (floor grid, the occlusion view's boxes, selected-entity
-    /// axis arrows, probe balls and gizmos) into the handles pass, each at its slot of `overlays`' one group 1.
+    /// axis arrows, probe balls and gizmos) into the handles pass, each at its slot of `overlays`' one per-draw group.
     /// Editor-mode only; called from `draw_handles`.
     pub(crate) fn draw_editor_overlays<'a>(
         &'a self,
@@ -55,7 +56,7 @@ impl Renderer {
         if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {
             render_pass.set_vertex_buffer(0, grid_buf.slice(..));
             bindings.bind(render_pass, slot);
-            render_pass.set_bind_group(2, &self.default_material_bind_group, &[]);
+            render_pass.set_bind_group(groups::MATERIAL, &self.default_material_bind_group, &[]);
             render_pass.draw(0..self.grid_count, 0..1);
         }
         // B. Box outlines: the selected camera's occlusion view (#1714)

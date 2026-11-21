@@ -14,7 +14,7 @@ use crate::{RenderView, Renderer};
 
 impl Renderer {
     /// Record `frame`'s gather and what follows it into `encoder`, ahead of the
-    /// forward pass, and build the group 3 that pass binds with the result
+    /// forward pass, and build the scene group that pass binds with the result
     /// ([`SsilTargets::forward_group`]). `prepassed`: SSAO ran this camera, so its
     /// prepass already holds the solids' depth and its AO goes in that group too;
     /// otherwise SSIL draws the prepass itself.
@@ -50,7 +50,7 @@ impl Renderer {
         }
 
         self.record_stages(encoder, &view.depth_view, t);
-        t.forward_group = Some(self.ssil_group3(view.ssao.as_ref().filter(|_| prepassed), t));
+        t.forward_group = Some(self.ssil_scene_group(view.ssao.as_ref().filter(|_| prepassed), t));
         let (w, h) = t.raw_size();
         let samples = u64::from(frame.plan.quality.samples);
         self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
@@ -91,9 +91,9 @@ impl Renderer {
         }
     }
 
-    /// The forward pass's group 3 with `t`'s result in the opaque copy's slot (the
+    /// The forward pass's scene group with `t`'s result in the opaque copy's slot (the
     /// opaque pass reads no copy) and `ssao`'s AO when it ran this camera.
-    fn ssil_group3(&self, ssao: Option<&SsaoTargets>, t: &SsilTargets) -> wgpu::BindGroup {
+    fn ssil_scene_group(&self, ssao: Option<&SsaoTargets>, t: &SsilTargets) -> wgpu::BindGroup {
         create_shadow_bind_group(
             &self.device,
             &self.shadow_layout,

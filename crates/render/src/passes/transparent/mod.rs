@@ -7,8 +7,8 @@
 //! composites correctly (nearer glass over farther glass over the opaque world, and a
 //! higher priority over a lower one whatever their depths).
 //!
-//! It reuses the camera's instanced draw data the opaque pass binds (group 1 frame
-//! buffers, group 2 shared material, #470) and the same shader; only the pipeline differs
+//! It reuses the camera's instanced draw data the opaque pass binds (the per-draw
+//! group's frame buffers, the shared material group, #470) and the same shader; only the pipeline differs
 //! (`transparent_pipelines`: one per blend state, #1523; depth test on / write off). It LOADs the
 //! existing HDR colour + depth — never clears — so it layers onto the opaque image and
 //! is occluded by opaque depth without writing depth itself (overlapping translucent
@@ -17,6 +17,7 @@
 mod depth_postpass;
 pub(crate) mod opaque_copy;
 
+use crate::gpu::groups;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};
 
@@ -61,26 +62,26 @@ impl Renderer {
                 timestamp_writes: self.gpu_timer.writes(GpuPass::Transparent),
                 occlusion_query_set: None,
             });
-            let group3 = self.transparent_group3(view);
-            self.record_transparent(&mut pass, group3, items, reactive.is_some());
+            let scene = self.transparent_scene_group(view);
+            self.record_transparent(&mut pass, scene, items, reactive.is_some());
         }
         self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Record the sorted (priority, then back-to-front) transparent draws into `pass`: the global bind group
-    /// and `group3` (the shadows, and the opaque copy when this camera made one,
+    /// and `scene` (the scene group: the shadows, and the opaque copy when this camera made one,
     /// #1523), then the same batch recording the opaque pass uses — each batch
     /// binding the transparent pipeline of its material's shader (#396) and blend,
     /// the one writing TAA's reactive mask too when `reactive` (#1845).
     fn record_transparent<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
-        group3: &'a wgpu::BindGroup,
+        scene: &'a wgpu::BindGroup,
         items: &'a [DrawBatch],
         reactive: bool,
     ) {
-        pass.set_bind_group(0, &self.global_bind_group, &[]);
-        pass.set_bind_group(3, group3, &[]);
+        pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        pass.set_bind_group(groups::SCENE, scene, &[]);
         self.draw_batches(
             pass,
             items,
