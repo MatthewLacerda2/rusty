@@ -71,8 +71,7 @@ impl Renderer {
         frame: &ScenePassFrame,
         solids: Solids,
     ) {
-        let screen_space = frame.ssao.is_some() || frame.ssil.is_some();
-        if !screen_space && self.primes(view, frame) {
+        if !frame.screen_space && self.primes(view, frame) {
             self.record_prepass(encoder, &view.depth_view, solids);
             self.count_prepass(solids);
         }

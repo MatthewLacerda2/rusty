@@ -2,9 +2,8 @@
 //! the instance and uniform slot it was packed into, wherever batching sorted it.
 //! No GPU.
 
-use super::tests::item;
-use super::{DrawItem, FrameDraws};
-use crate::scene::MaterialRecords;
+use super::tests::{batched, item};
+use super::DrawItem;
 
 /// `item`, marked for the outline.
 fn ringed(mut item: DrawItem) -> DrawItem {
@@ -20,7 +19,7 @@ fn an_outlined_item_names_its_own_instance_and_slot() {
         item("Barrel", 0, 1.0, 2.0),
     ];
     let transparent = vec![ringed(item("Glass", 0, 1.0, 3.0))];
-    let draws = FrameDraws::build((opaque, transparent), &MaterialRecords::default(), true);
+    let draws = batched((opaque, transparent), true);
     assert_eq!(draws.outline.len(), 2);
     for (outline, tag) in draws.outline.iter().zip([1.0, 3.0]) {
         let batch = draws

@@ -62,14 +62,9 @@ impl Renderer {
         self.update_reflection_probes(scene, camera.position);
         // The scene's baked lightmap pages (#438) and their direction pages (#810):
         // rebinding group 0 only on a change.
-        let set = &scene.lightmaps;
-        if self.lightmaps.bind(
-            &self.device,
-            (&self.queue, &self.staging),
-            &set.pages,
-            &set.directions,
-            &set.masks,
-        ) {
+        let [pages, directions, masks] = self.switches.lightmap_lists(&scene.lightmaps);
+        let gpu = (&self.queue, &self.staging);
+        if (self.lightmaps).bind(&self.device, gpu, pages, directions, masks) {
             self.global_bind_group_dirty = true;
         }
         self.note_scene_lightmaps(scene);

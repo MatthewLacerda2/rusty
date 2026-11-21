@@ -5,7 +5,7 @@
 //! render pass.
 
 use super::batch::sort::{transparent_order, TransparentOrder};
-use super::batch::{DrawItem, FrameDraws};
+use super::batch::{DrawItem, FrameDraws, OpaqueOrder};
 use super::overlays::{BallResource, ColliderScope, OverlayBindings, OverlayDraws};
 use super::visibility::{CameraCulls, ViewCull};
 use crate::gpu::draw_buffers::{FrameUpload, JointMatrix};
@@ -135,14 +135,14 @@ impl Renderer {
     /// instanced draws (#470), and upload the camera's packed draw data. `marks`:
     /// with `outline` (an editor camera), the solids the selection outline rings are
     /// marked, so it draws from their draws (#1175); with `history` (a view writing
-    /// motion vectors, #1435), each solid also carries its last-frame pose.
+    /// motion vectors, #1435), each solid also carries its last-frame pose. `order`
+    /// ranks the opaque runs for the pass's priming (`Self::opaque_order`, #2484).
     pub(crate) fn precreate_solid_resources(
         &mut self,
         scene: &Scene,
         cam: &rusty_scene::Camera,
-        frustum: &Frustum,
-        lod: &LodSelection,
-        (outline, history): (bool, Option<&mut MotionHistory>),
+        (frustum, lod): (&Frustum, &LodSelection),
+        (outline, history, order): (bool, Option<&mut MotionHistory>, OpaqueOrder),
     ) -> SolidResources {
         let eye = (cam.position, cam.forward());
         let (mut opaque, mut transparent, mut joints) = (Vec::new(), Vec::new(), Vec::new());
@@ -177,7 +177,7 @@ impl Renderer {
         let mesh_particles = self.push_mesh_particles(scene, cam, (&mut opaque, &mut transparent));
         let outline_bounds = self.outline_bounds(scene, &ringed);
         SolidResources {
-            draws: self.upload_solids(opaque, transparent, (&joints, &proxies.data)),
+            draws: self.upload_solids((opaque, transparent, order), (&joints, &proxies.data)),
             culls,
             visible,
             mesh_particles,
@@ -192,14 +192,17 @@ impl Renderer {
     /// draws (#470) and upload the camera's packed draw data.
     fn upload_solids(
         &mut self,
-        opaque: Vec<DrawItem>,
-        mut transparent: Vec<(DrawItem, TransparentOrder)>,
+        (opaque, mut transparent, order): (
+            Vec<DrawItem>,
+            Vec<(DrawItem, TransparentOrder)>,
+            OpaqueOrder,
+        ),
         (joints, proxies): (&[JointMatrix], &[[f32; 4]]),
     ) -> FrameDraws {
         transparent_order(&mut transparent);
         let transparent = transparent.into_iter().map(|(item, _)| item).collect();
         let records = &self.retained.records;
-        let draws = FrameDraws::build((opaque, transparent), records, self.instancing);
+        let draws = FrameDraws::build((opaque, transparent), records, (self.instancing, order));
         let uniforms = draws.pack();
         self.draw_buffers.upload(
             &self.device,

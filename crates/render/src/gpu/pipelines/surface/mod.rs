@@ -274,6 +274,9 @@ pub(crate) mod mask_tests;
 #[path = "../tests/params_tests.rs"]
 mod params_tests;
 #[cfg(test)]
+#[path = "../tests/priming/rank_tests.rs"]
+mod priming_rank_tests;
+#[cfg(test)]
 #[path = "../tests/priming/scroll_tests.rs"]
 mod priming_scroll_tests;
 #[cfg(test)]

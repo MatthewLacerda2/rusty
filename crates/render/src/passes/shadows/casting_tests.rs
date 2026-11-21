@@ -136,7 +136,8 @@ fn gpu_a_shadows_only_card_is_drawn_by_no_camera() {
         ground_halves(&mut r, &scene); // makes the meshes resident
         let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
         let lod = LodSelection::for_camera(&scene, &cam);
-        let solids = r.precreate_solid_resources(&scene, &cam, &frustum, &lod, (false, None));
+        let (culled, marks) = ((&frustum, &lod), (false, None, Default::default()));
+        let solids = r.precreate_solid_resources(&scene, &cam, culled, marks);
         solids.visible
     };
     let on = visible(ShadowCasting::On);
