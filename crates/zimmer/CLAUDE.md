@@ -17,8 +17,10 @@ the engine's own crate, not a vendor.
   `rusty_core::collections` for maps, never std's.
 - **Its public API is `Sound.*`'s contract.** The patch and song types are the stored
   document formats a game's recipes are written in, and their serde field names are
-  the vocabulary `docs/api/Sound.md` points at: a rename or removal there breaks every
-  recipe on disk, so the PR that does it says so and updates `docs/api/Sound.md`.
+  the vocabulary `docs/api/Sound.md` documents key by key: a rename or removal there
+  breaks every recipe on disk, so the PR that does it says so. A key or word added,
+  renamed or removed changes the page's tables in the same PR
+  (`crates/zimmer/tests/suite/vocabulary` fails until it does).
 
 ## `SYNTH_VERSION`
 - **A change to what a recipe renders to bumps `SYNTH_VERSION`** (`crates/zimmer/src/lib.rs`) in the
