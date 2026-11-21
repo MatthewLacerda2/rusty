@@ -145,6 +145,7 @@ The commit hook checks whatever `.rs`, `.py`, `.lua`, `.wgsl` and `.md` files ar
 ```
 make gates     # everything CI blocks on, fastest-failing first
 make quick-gates  # the seconds-long gates and self-checks (all but HEAVY_GATES)
+make round-gates  # a review round's: quick-gates plus what the diff can break
 make check     # the fast edit loop: formatting, size gate, dev-feature clippy
 make help      # every verb, and each gate on its own (make size, make clippy, …)
 ```
@@ -176,7 +177,10 @@ round, so the gate list cannot silently lose a gate. `GATES` is `QUICK_GATES` pl
   only when a pushed tip is `HEAD` and lets any other push through; `make resolved`
   runs the same two checks on the working tree unconditionally.
   `git push --no-verify` skips it.
-- **Before readying a PR:** `make gates`.
+- **Before readying a PR:** `make gates`; a review round (a `Round:` brief),
+  `make round-gates`: `quick-gates`, then the heavy gates and crate tests its diff
+  against `origin/main` can break, or `make gates` for a change it cannot place
+  (`.github/scripts/round_gates.py`). CI still runs everything.
 - **CI:** `.github/workflows/{ci,lint}.yml` — the durable layer; survives `--no-verify`.
 
 ## The lint policy lives in `Cargo.toml`

@@ -199,6 +199,12 @@ What cloud coders' run logs taught; each one cost a coder real time.
   rendered with `make editor-capture` (`ARGS="--select <entity>"` opens an
   inspector), the same way.
 - `make gates` (foreground, split as *The container* says) before readying.
+  **A `Round:` brief's session runs `make round-gates` instead**: `quick-gates`
+  plus only the heavy gates and crate tests its diff against `origin/main` can
+  break, or the full `make gates` for a change it cannot place (it says which).
+  One call, into a log (`make round-gates > target/round.log 2>&1; echo
+  exit=$?`; `ARGS=--plan` lists the commands, to split a cold run). The PR's CI
+  still runs everything, and a round that readies red comes back as any red PR.
 - **Prove the macOS leg on the draft** when a test asserts bytes or rests on
   driver behaviour (a pixel-identical frame, a bake's exact bits, depth
   invariance): `gh workflow run ci.yml --ref <branch>`, quoted in the PR.
@@ -230,7 +236,8 @@ Beyond what changed, why, the effect and the decisions:
 - **A `Gates` line:** what ran green, on which head commit, and what didn't run
   and why (no real GPU, a human check). After your own update from `main` it is
   re-run or marked stale; an update the merge queue pushes later dates it for
-  you.
+  you. A round's is `make round-gates`' last line, pasted under the round's
+  heading: what ran, on which commit, and what it left to CI.
 - **A `Looked at` line** on a branch that changes what is drawn (above): for
   each before/after pair, the scene, what was rendered and what you saw, in one
   or two sentences. Say what you did *not* check (motion, Metal, cost, taste):

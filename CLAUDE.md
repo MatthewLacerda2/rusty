@@ -101,8 +101,8 @@ wins.
 - **Pull requests — open early, draft until ready.** A branch's first commit gets a PR,
   unasked: **draft** while in progress or blocked (**say why**), **ready for review**
   when nothing more is needed. **A ready PR claims it passes; a draft makes no such
-  claim**, so run the gates before readying; a red ready PR stays ready and is fixed
-  forward. Branches are `{issue_number}-short-slug`, or a slug of the subject when
+  claim**, so run the gates before readying (a review round: `make round-gates`, the
+  gates its diff can break); a red ready PR stays ready and is fixed forward. Branches are `{issue_number}-short-slug`, or a slug of the subject when
   issue-less. The description, and how a PR flips: `ci-merge`, *Draft or ready*.
 - **Merging — serialized, one tested tree at a time:** one PR green on the latest
   `main`, or a **merge train** of up to four tested together; a branch is updated by

@@ -30,9 +30,9 @@ The steps and the traps. `CLAUDE.md` says why merging is serialized; this is how
 
 ## Before marking a pull request ready
 
-    make gates
+    make gates           # a review round's session: make round-gates
 
-All green, fastest-failing first. The `Makefile`'s `GATES` list mirrors
+All green, fastest-failing first; a round's run only what its diff can break. The `Makefile`'s `GATES` list mirrors
 `.github/workflows/{ci,lint}.yml` (`make scripts` fails when they drift), and
 `make help` names each gate.
 
