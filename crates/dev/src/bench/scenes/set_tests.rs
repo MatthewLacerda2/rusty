@@ -96,3 +96,40 @@ fn no_override_changes_nothing() {
     o.apply(&mut presets).unwrap();
     assert_eq!(presets, QualityPresets::default());
 }
+
+#[test]
+fn an_option_key_sets_the_project_default_and_a_render_key_its_switch() {
+    use rusty_core::settings::graphics_options::GraphicsOption;
+    use rusty_render::RenderSwitch;
+    let o = set(&["option.ssao=false", "render.shadows=false"]).unwrap();
+    let mut settings = rusty_core::project::ProjectSettings::default();
+    let quality = settings.quality.clone();
+    o.apply_settings(&mut settings).unwrap();
+    assert!(!settings.graphics_options.allows(GraphicsOption::Ssao));
+    assert!(settings.graphics_options.allows(GraphicsOption::Ssil));
+    assert_eq!(settings.quality, quality, "no quality field moved");
+    assert!(!o.switches().on(RenderSwitch::Shadows));
+    assert!(o.switches().on(RenderSwitch::Lightmaps));
+    assert!(set(&["gpu_occlusion_culling=true"])
+        .unwrap()
+        .switches()
+        .all_on());
+}
+
+#[test]
+fn an_unknown_option_or_switch_fails_listing_every_namespace() {
+    for key in [
+        "option.ssa=false",
+        "render.shadow=false",
+        "rendr.shadows=false",
+    ] {
+        let e = set(&[key]).unwrap_err();
+        assert!(e.contains("option.<name>: bloom"), "{key}: {e}");
+        assert!(
+            e.contains("render.<switch>: shadows, lightmaps"),
+            "{key}: {e}"
+        );
+    }
+    let e = set(&["render.shadows=0"]).unwrap_err();
+    assert!(e.contains("wants true or false"), "{e}");
+}

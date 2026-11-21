@@ -10,7 +10,7 @@
 //! lookup and sample count), and a GPU test holds the two within a written tolerance. At 512 texels
 //! the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
 
-use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _, Writes};
 use glam::Vec3;
 
 use super::source::{encode_face, source_chain};
@@ -47,7 +47,7 @@ impl ProbePrefilter {
     /// does: mip 0 is the capture itself, each rougher mip convolved from it.
     pub(crate) fn run(
         &self,
-        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        (device, writes): (&wgpu::Device, Writes),
         capture: &CubemapCapture,
     ) -> PrefilteredCubemap {
         let base = capture.resolution.max(1);
@@ -56,9 +56,9 @@ impl ProbePrefilter {
         let mut mips = vec![chain[0].each_ref().map(|face| encode_face(face))];
         if levels > 1 {
             let sizes: Vec<u32> = (1..levels).map(|level| (base >> level).max(1)).collect();
-            let rough = self.filter((device, queue), (&chain, base), &sizes);
+            let rough = self.filter((device, writes), (&chain, base), &sizes);
             let texel = TEXEL_BYTES as u32;
-            let read = crate::readback::read_cube_mips(device, queue, (&rough, texel), &sizes);
+            let read = crate::readback::read_cube_mips(device, writes.0, (&rough, texel), &sizes);
             mips.extend(read);
         }
         PrefilteredCubemap {
@@ -71,14 +71,16 @@ impl ProbePrefilter {
     /// its own, in one submitted compute pass.
     fn filter(
         &self,
-        (device, queue): (&wgpu::Device, &wgpu::Queue),
+        (device, writes): (&wgpu::Device, Writes),
         (chain, base): (&[[Vec<Vec3>; 6]], u32),
         sizes: &[u32],
     ) -> wgpu::Texture {
-        let source = upload(device, queue, chain, base).create_view(&wgpu::TextureViewDescriptor {
-            dimension: Some(wgpu::TextureViewDimension::D2Array),
-            ..Default::default()
-        });
+        let queue = writes.0;
+        let source =
+            upload(device, writes, chain, base).create_view(&wgpu::TextureViewDescriptor {
+                dimension: Some(wgpu::TextureViewDimension::D2Array),
+                ..Default::default()
+            });
         let rough = rough_texture(device, sizes);
         let projections = FaceProjections::new();
         let last = sizes.len() as u32;
@@ -163,7 +165,7 @@ fn params(p: [f32; 3], projections: &FaceProjections) -> Vec<f32> {
 /// `base` texels wide.
 fn upload(
     device: &wgpu::Device,
-    queue: &wgpu::Queue,
+    (queue, staging): Writes,
     chain: &[[Vec<Vec3>; 6]],
     base: u32,
 ) -> wgpu::Texture {
@@ -185,7 +187,8 @@ fn upload(
     for (mip_level, faces) in (0..).zip(chain) {
         let edge = (base >> mip_level).max(1);
         for (layer, face) in (0..).zip(faces) {
-            queue.write_texture(
+            queue.counted_write_texture(
+                staging,
                 wgpu::TexelCopyTextureInfo {
                     texture: &texture,
                     mip_level,

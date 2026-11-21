@@ -18,6 +18,7 @@ const OPTS: Options = Options {
     frames: 1,
     runs: 1,
     warm: false,
+    switches: rusty_render::RenderSwitches::ON,
 };
 
 /// A static wall between a camera and a box, the wall at `wall_x`.

@@ -45,8 +45,10 @@ impl Renderer {
                 ..Default::default()
             },
         };
+        // A measurement switch (`stats::switches`) reaches the Scene view too.
         GraphicsSettings {
             quality: self.quality,
+            options: self.switches.gate(player.options),
             ..player
         }
     }
@@ -106,5 +108,36 @@ impl Renderer {
         if let Some(surface) = &self.surface {
             surface.configure(&self.device, &self.config);
         }
+    }
+}
+
+/// Build the swapchain config for a window of `size` from the surface caps: prefer
+/// an sRGB format, and boot with vsync on (`Fifo`, supported on every backend).
+/// Vsync is toggled later via [`Renderer::set_vsync`] (issue #89).
+pub(super) fn surface_config(
+    caps: &wgpu::SurfaceCapabilities,
+    size: PixelSize,
+) -> wgpu::SurfaceConfiguration {
+    let format = caps
+        .formats
+        .iter()
+        .copied()
+        .find(|f| f.is_srgb())
+        .unwrap_or_else(|| {
+            // The target format owns the one linear→display encode (#415); without an
+            // sRGB surface the window shows linear colour, darker than a screenshot.
+            log::warn!("[Render] no sRGB surface format; the window will not match screenshots");
+            caps.formats[0]
+        });
+    wgpu::SurfaceConfiguration {
+        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+        format,
+        width: size.width,
+        height: size.height,
+        present_mode: wgpu::PresentMode::Fifo,
+        color_space: wgpu::SurfaceColorSpace::Auto,
+        alpha_mode: caps.alpha_modes[0],
+        view_formats: vec![],
+        desired_maximum_frame_latency: 2,
     }
 }

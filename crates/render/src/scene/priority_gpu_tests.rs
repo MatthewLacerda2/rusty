@@ -53,7 +53,12 @@ fn drawn(r: &mut Renderer, scene: &Scene) -> Vec<f32> {
     let cam = eye();
     let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
     let lod = LodSelection::for_camera(scene, &cam);
-    let solids = r.precreate_solid_resources(scene, &cam, &frustum, &lod, (false, None));
+    let solids = r.precreate_solid_resources(
+        scene,
+        &cam,
+        (&frustum, &lod),
+        (false, None, Default::default()),
+    );
     let table = r.retained.records.table();
     let red = |b: &crate::draw::batch::DrawBatch| table.get(b.key.record).color_tint[0];
     solids.draws.transparent.iter().map(red).collect()

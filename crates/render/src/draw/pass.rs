@@ -1,7 +1,7 @@
 //! Shadow depth passes, dynamic global bind-group update, and the main scene
 //! render pass. The per-camera stacking loop + post-FX live in `draw`.
 
-use crate::draw::batch::OpaqueBatches;
+use crate::draw::batch::{OpaqueBatches, OpaqueOrder};
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use crate::gpu::pipelines::surface::SolidPass;
@@ -62,6 +62,9 @@ pub(crate) struct ScenePassFrame {
     /// wrote and runs before any overlay draws (#1526), so an overlay binds no SSR
     /// surface target and draws with the plain velocity pipelines.
     pub base: bool,
+    /// Whether it runs SSAO or SSIL, and so their depth prepass
+    /// ([`CameraCtx::screen_space`](crate::draw::camera::CameraCtx::screen_space)).
+    pub screen_space: bool,
     /// The opaque draws GPU occlusion culling decided (#1963); `None` draws every
     /// batched instance.
     pub culled: Option<Culled>,
@@ -139,7 +142,10 @@ impl Renderer {
         self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
         self.frame_counters.velocity_passes += u32::from(velocity);
-        self.frame_counters.primed_passes += u32::from(self.primes(view, &frame));
+        let primed = self.primes(view, &frame);
+        self.frame_counters.primed_passes += u32::from(primed);
+        // Ranked before the cull ran; why the two agree: `Self::opaque_order`.
+        debug_assert!(solid_batches.ranked_for(primed), "opaque order != priming");
         self.frame_counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
 
         // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
@@ -230,10 +236,30 @@ impl Renderer {
     /// whose phase one left most of the depth, the prepass drawing only the late
     /// set (#2336, `record_screen_space`), or it would but is under the stage's
     /// instance floor, the prepass then drawing its few batches whole (#2338).
-    /// A camera with its cull off is not primed by it.
+    /// A camera with its cull off is not primed by it. `frame.screen_space` alone
+    /// stands for SSAO's prepass: whenever `frame.ssao` is set, `record_ssao` has
+    /// run before this is asked and left the view its SSAO targets.
     pub(crate) fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
-        let screen_space = (frame.ssao.is_some() && view.ssao.is_some()) || frame.ssil.is_some();
-        let prepass = screen_space || frame.culled.is_some() || frame.floored;
+        let prepass = frame.screen_space || frame.culled.is_some() || frame.floored;
+        self.primes_by(view, prepass)
+    }
+
+    /// How a camera's opaque runs are ranked (#2484), decided before they batch,
+    /// from whether it runs SSAO or SSIL (`screen_space`) and by [`Self::primes`]'
+    /// rule, the GPU cull counted as the camera culling (`Renderer::hiz_culls`),
+    /// which leaves it culled or floored whenever it has an opaque batch to order.
+    /// No batch suits either (`ranked_for`); the scene pass asserts the rest.
+    pub(crate) fn opaque_order(
+        &self,
+        view: &RenderView,
+        cam: &rusty_scene::Camera,
+        screen_space: bool,
+    ) -> OpaqueOrder {
+        OpaqueOrder::primed(self.primes_by(view, screen_space || self.hiz_culls(cam)))
+    }
+
+    /// [`Self::primes`] given whether a prepass runs under the forward pass.
+    fn primes_by(&self, view: &RenderView, prepass: bool) -> bool {
         let on = self.depth_priming && self.priming_recommended;
         on && prepass && !view.has_forward_override()
     }

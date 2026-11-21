@@ -8,10 +8,9 @@ mod shadow_system;
 pub(crate) mod textures;
 mod warm;
 
-use std::collections::HashMap;
-
 use self::build::GpuResources;
-use crate::{PixelSize, Renderer};
+use crate::{PixelSize, RenderSwitches, Renderer};
+use std::collections::HashMap;
 
 /// What [`Renderer::new`] presents to: a window wgpu can build a surface from, whose
 /// display handle also goes to the instance. `shell` hands in its `Arc` of the OS
@@ -70,7 +69,7 @@ impl Renderer {
 
         // 4. Configure surface swapchain.
         let surface_caps = surface.get_capabilities(&adapter);
-        let mut config = surface_config(&surface_caps, size);
+        let mut config = resize::surface_config(&surface_caps, size);
         // Let the UI pass view the sRGB swapchain as its non-sRGB twin, so a HUD
         // blends in display space on the player's window too (#418).
         let flags = adapter.get_downlevel_capabilities().flags;
@@ -112,10 +111,11 @@ impl Renderer {
         // bindings, shadow system, forward/billboard passes), then assemble the
         // flat renderer from those groups and seed the editor gizmo meshes. Per-view
         // targets (depth + post-FX) belong to each `RenderView`, not the renderer (#355).
-        let gpu = GpuResources::build(&device, &queue, config.format);
+        let staging = crate::gpu::ops::Staging::new(&device);
+        let gpu = GpuResources::build(&device, (&queue, &staging), config.format);
         let mut renderer = Self::assemble(
             device,
-            queue,
+            (queue, staging),
             surface,
             config,
             present_modes,
@@ -141,7 +141,7 @@ impl Renderer {
     )]
     fn assemble(
         device: wgpu::Device,
-        queue: wgpu::Queue,
+        (queue, staging): (wgpu::Queue, crate::gpu::ops::Staging),
         surface: Option<wgpu::Surface<'static>>,
         config: wgpu::SurfaceConfiguration,
         present_modes: Vec<wgpu::PresentMode>,
@@ -248,6 +248,7 @@ impl Renderer {
             texture_fallbacks: HashMap::new(),
             texture_kinds: Default::default(),
             texture_freshness: rusty_core::fs::freshness::Freshness::new(),
+            staging,
             grid_vertex_buffer: None,
             grid_count: 0,
             axis_x_buffer: None,
@@ -260,6 +261,7 @@ impl Renderer {
             sky_reflection: global.sky_reflection,
             probe_prefilter: Default::default(),
             capture: Default::default(),
+            switches: RenderSwitches::ON,
             retained: Default::default(),
             draw_poses: Default::default(),
             frame_counters: Default::default(),
@@ -268,33 +270,5 @@ impl Renderer {
             render_texture_ids: Default::default(),
             _gpu_permit: gpu_permit,
         }
-    }
-}
-
-/// Build the swapchain config for a window of `size` from the surface caps: prefer
-/// an sRGB format, and boot with vsync on (`Fifo`, supported on every backend).
-/// Vsync is toggled later via [`Renderer::set_vsync`] (issue #89).
-fn surface_config(caps: &wgpu::SurfaceCapabilities, size: PixelSize) -> wgpu::SurfaceConfiguration {
-    let format = caps
-        .formats
-        .iter()
-        .copied()
-        .find(|f| f.is_srgb())
-        .unwrap_or_else(|| {
-            // The target format owns the one linear→display encode (#415); without an
-            // sRGB surface the window shows linear colour, darker than a screenshot.
-            log::warn!("[Render] no sRGB surface format; the window will not match screenshots");
-            caps.formats[0]
-        });
-    wgpu::SurfaceConfiguration {
-        usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-        format,
-        width: size.width,
-        height: size.height,
-        present_mode: wgpu::PresentMode::Fifo,
-        color_space: wgpu::SurfaceColorSpace::Auto,
-        alpha_mode: caps.alpha_modes[0],
-        view_formats: vec![],
-        desired_maximum_frame_latency: 2,
     }
 }

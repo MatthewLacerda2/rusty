@@ -73,6 +73,9 @@ pub struct Options {
     /// inside the load or a warm-up frame; on lavapipe the warm-up is most of a
     /// small bench's time (#2350).
     pub warm: bool,
+    /// The renderer's measurement switches (`--set render.<switch>`, [`set`]),
+    /// given to every renderer the bench builds before its first frame.
+    pub switches: rusty_render::RenderSwitches,
 }
 
 impl Default for Options {
@@ -83,6 +86,7 @@ impl Default for Options {
             frames: FRAMES,
             runs: RUNS,
             warm: true,
+            switches: rusty_render::RenderSwitches::ON,
         }
     }
 }
@@ -100,18 +104,19 @@ pub struct Extra {
     /// The scene's loads before the bench's own, each in a process of its own
     /// (`--loads`), the first the cold one ([`load`](mod@load)).
     pub loads: Vec<Load>,
-    /// The run's `--set` overrides of the running quality preset, as given
-    /// (`set::Overrides::said`), which the report records.
+    /// The run's `--set` overrides, as given (`set::Overrides::said`), which the
+    /// report records.
     pub set: Vec<String>,
     /// The editor round's rows, measured in a process of its own (`--editor`,
     /// [`editor`]), when one ran.
     pub editor: Option<editor::EditorRound>,
 }
 
-/// The project at `path` opened to run, `set` written over its running preset.
+/// The project at `path` opened to run, `set` written over its running preset
+/// and its graphics option defaults (its `render.` switches go in [`Options`]).
 pub fn open(path: &Path, set: &set::Overrides) -> Result<rusty_core::project::Opened, String> {
     let mut opened = rusty_core::project::open(path, rusty_core::project::Access::Run)?;
-    set.apply(&mut opened.settings.quality)?;
+    set.apply_settings(&mut opened.settings)?;
     Ok(opened)
 }
 

@@ -10,9 +10,13 @@ mod debug_meshes;
 pub(crate) mod decals;
 mod draw;
 mod frustum;
+pub mod gpu;
+pub mod ibl;
 pub mod interpolate;
 pub(crate) mod lod;
 pub(crate) mod motion;
+pub(crate) mod passes;
+pub mod postfx;
 mod preview;
 pub mod readback;
 pub(crate) mod render_texture;
@@ -22,28 +26,23 @@ mod stats;
 #[doc(hidden)] // A test hook: the crates above reach it from their own tests.
 pub mod test_gpu;
 pub(crate) mod timing;
+pub mod ui;
 mod view;
 pub mod warm;
-
-pub mod gpu;
-pub mod ibl;
-pub(crate) mod passes;
-pub mod postfx;
-pub mod ui;
 
 // Moved submodules, pulled back under short names this module's body names them by.
 use ibl::{reflection_probes, sky_cube, skybox};
 use passes::{particles, shadows};
 
 use rusty_components::MeshRevision;
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::{collections::HashMap, rc::Rc};
 
 pub use camera::{build_camera_stack, texture_cameras, ScreenStack, TextureCamera};
 pub use draw::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 pub use frustum::{transform_aabb, Frustum, SkinBounds};
 pub(crate) use frustum::{SmallLimits, SmallObjectCull};
 pub use gpu::mesh::MeshId;
+pub use gpu::ops::STAGING_BUDGET;
 pub use gpu::textures::GpuTexture;
 pub use ibl::cubemap_capture::{CubemapCapture, CubemapFace};
 pub use ibl::probe::bake::{project_cubemap, project_light_probe, DEFAULT_BAKE_RESOLUTION};
@@ -52,6 +51,7 @@ pub use ibl::probe::capture::ProbeCapture;
 pub use setup::headless::{gpu_required, ADAPTER_ENV, OFFSCREEN_FORMAT, REQUIRE_GPU_ENV};
 pub use setup::SurfaceWindow;
 pub use stats::{gpu_memory, GpuMemory, OpCounts, RenderCounters, StaleOcclusion, Uploads};
+pub use stats::{RenderSwitch, RenderSwitches};
 pub use timing::{ClockProbe, FrameCost, GpuPart, GpuPass, GpuTimes};
 pub use view::{PixelSize, RenderView};
 
@@ -81,21 +81,6 @@ pub struct GpuMesh {
     /// Its rows of the shared cluster table and its indices in the pool (#1968,
     /// #2417), when its import split it (`passes::hiz::clusters`).
     pub(crate) clusters: Option<crate::passes::hiz::clusters::GpuClusters>,
-}
-
-impl GpuMesh {
-    /// The draws of `mesh` under `material` (#1285): each material slot with the
-    /// index run it draws ([`rusty_components::mesh::material_runs`]), clipped to this
-    /// geometry's indices so a mesh edited ahead of its upload never reads past the
-    /// buffer ([`rusty_components::mesh::clip_runs`]).
-    pub(crate) fn runs(
-        &self,
-        mesh: &rusty_scene::MeshComponent,
-        material: Option<&rusty_components::MaterialComponent>,
-    ) -> Vec<(usize, std::ops::Range<u32>)> {
-        let runs = rusty_components::mesh::clip_runs(mesh.index_ranges(), self.num_indices);
-        rusty_components::mesh::material_runs(runs, material.map(|m| m.materials.len()))
-    }
 }
 
 pub struct Renderer {
@@ -181,10 +166,12 @@ pub struct Renderer {
     /// An uncompressed copy of a cached upload whose block format a slot cannot
     /// read (a BC5 normal map drawn as albedo, #1574), by the same key.
     pub(crate) texture_fallbacks: HashMap<rusty_asset::MapRef, Rc<GpuTexture>>,
-    /// Which cached uploads went stale: re-written files and failed loads (#689).
     /// What each cached upload's mips were built for (#1416).
     pub(crate) texture_kinds: crate::gpu::textures::kind_watch::KindWatch,
+    /// Which cached uploads went stale: re-written files and failed loads (#689).
     pub(crate) texture_freshness: rusty_core::fs::freshness::Freshness,
+    /// What texture writes hold in staging, bounded (`gpu::ops::Staging`).
+    pub(crate) staging: gpu::ops::Staging,
     pub default_texture: Rc<GpuTexture>,
     /// What an extra shader texture slot samples with no texture of its own (#400).
     pub white_texture: Rc<GpuTexture>,
@@ -262,13 +249,14 @@ pub struct Renderer {
     fog_volume: postfx::effects::volumetric_fog::SharedVolume,
     /// Group 0's one sampler for its cubes, lightmaps and fog (`gpu::linear_clamp`).
     linear_clamp: wgpu::Sampler,
-
     /// The scene-depth layout the soft particles sample the depth target through.
     scene_depth_layout: wgpu::BindGroupLayout,
 
     /// How the frame renders while a static cubemap is captured (#243, #285, #1584):
     /// the default outside a capture. See [`ibl::cubemap_capture::CaptureMode`].
     capture: ibl::cubemap_capture::CaptureMode,
+    /// The measurement switches (`stats::switches`): all on unless a bench set one.
+    switches: RenderSwitches,
 
     /// The retained render scene (#1706): mesh handles and each drawn scene's objects.
     pub(crate) retained: scene::Retained,

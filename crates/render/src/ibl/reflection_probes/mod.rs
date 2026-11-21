@@ -285,4 +285,4 @@ fn distinct_cubes<'a>(kept: &[Resident<'a>]) -> Vec<Resident<'a>> {
 
 #[cfg(test)]
 #[path = "gpu_tests.rs"]
-mod gpu_tests;
+pub(crate) mod gpu_tests;

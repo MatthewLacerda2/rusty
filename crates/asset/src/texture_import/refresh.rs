@@ -11,6 +11,7 @@ use super::{cache, cache_file, fit, format_of, keeps_deep, open, reader, shrink,
 use crate::convert::texture_ref::extracted;
 use crate::convert::{self, Seen};
 use crate::lightmap_page::is_baked;
+use crate::sidecar::TextureSettings;
 use crate::{is_image_path, sidecar};
 use rusty_core::hash::content;
 
@@ -31,13 +32,50 @@ struct Due {
     size: (u32, u32),
 }
 
+/// Why an import makes no cache of an image ([`cached_as`]).
+pub(super) enum Uncached {
+    /// It is one an import leaves uncompressed: the reason.
+    Left(&'static str),
+    /// Its header cannot be read: the error, naming the file.
+    Unreadable(String),
+}
+
+/// What an import would cache an image as: its block format and its size on disk,
+/// before `max_size` fits it.
+pub(super) struct Cached {
+    pub format: encode::BlockFormat,
+    pub size: (u32, u32),
+}
+
+/// Whether an import with `settings` caches the image at `source`, found from its
+/// header without decoding it: the one check an encode ([`due`]) and the memory
+/// tests' blank cache (`cache::write_blank`) share, so neither makes a cache the
+/// other would not. An import leaves uncompressed an image with no block format,
+/// a normal map kept at 16 bits ([`keeps_deep`]) or a fitted size not a multiple
+/// of 4.
+pub(super) fn cached_as(source: &Path, settings: &TextureSettings) -> Result<Cached, Uncached> {
+    use image::ImageDecoder;
+    let format = format_of(settings).ok_or(Uncached::Left("compression is off"))?;
+    let header = open(source)
+        .and_then(|r| r.into_decoder())
+        .map_err(|e| Uncached::Unreadable(format!("{}: {e}", source.display())))?;
+    if keeps_deep(settings, header.color_type()) {
+        return Err(Uncached::Left("a 16-bit normal map is kept uncompressed"));
+    }
+    let size = header.dimensions();
+    let (w, h) = shrink::fitted_size(size.0, size.1, settings.max_size);
+    if w % 4 != 0 || h % 4 != 0 {
+        return Err(Uncached::Left("its fitted size is not a multiple of 4"));
+    }
+    Ok(Cached { format, size })
+}
+
 /// Whether the image at `source` is due an encode, from its sidecar, the cache's
 /// head and its own header (never decoded): `None` when the cache is current or
-/// the image is one left uncompressed (no block format, a deep normal map kept
-/// at 16 bits, a fitted size not a multiple of 4).
+/// [`cached_as`] says an import leaves it uncompressed.
 fn due(source: &Path) -> Result<Option<Due>, String> {
-    use image::ImageDecoder;
     let settings = sidecar::texture(source);
+    // The cheap refusal first: what follows reads the source.
     if format_of(&settings).is_none() {
         return Ok(None);
     }
@@ -51,22 +89,15 @@ fn due(source: &Path) -> Result<Option<Due>, String> {
     if cache::is_current(&out, cache::stamp(digest, &settings)) {
         return Ok(None);
     }
-    let header = open(source)
-        .and_then(|r| r.into_decoder())
-        .map_err(|e| named(&e))?;
-    if keeps_deep(&settings, header.color_type()) {
-        return Ok(None);
+    match cached_as(source, &settings) {
+        Ok(Cached { size, .. }) => Ok(Some(Due {
+            settings,
+            out,
+            size,
+        })),
+        Err(Uncached::Left(_)) => Ok(None),
+        Err(Uncached::Unreadable(e)) => Err(e),
     }
-    let size = header.dimensions();
-    let (w, h) = shrink::fitted_size(size.0, size.1, settings.max_size);
-    if w % 4 != 0 || h % 4 != 0 {
-        return Ok(None);
-    }
-    Ok(Some(Due {
-        settings,
-        out,
-        size,
-    }))
 }
 
 /// The images under `root` an import would encode now ([`images`] whose cache is

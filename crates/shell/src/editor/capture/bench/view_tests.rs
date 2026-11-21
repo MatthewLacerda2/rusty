@@ -20,6 +20,7 @@ fn gpu_the_scene_view_is_wider_with_the_hierarchy_closed() {
         frames: 1,
         runs: 1,
         warm: false,
+        switches: rusty_render::RenderSwitches::ON,
         save_dir: rusty_test_support::temp::dir().join("editor_view_unused"),
     };
     let mut game = editor_world(&scene, ProjectSettings::default()).unwrap();
