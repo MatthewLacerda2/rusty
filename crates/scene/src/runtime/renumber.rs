@@ -1,6 +1,6 @@
 //! A Play load's renumbering: survivors keep their ids, so an incoming entity
 //! whose id a survivor holds moves to a fresh one ([`Moves`]), and every field
-//! that names entities by id outside the World follows it ([`RENUMBERED`]).
+//! that names entities by id outside the World follows it (`RENUMBERED`).
 //!
 //! What the **document** carries by id (the selection, the lightmaps) is renamed in
 //! the load's document pass, with the entities (`rusty_edit::load::make_room`), so
@@ -66,7 +66,7 @@ impl Moves {
         self.next
     }
 
-    /// Rename what the document carries by id ([`Pass::Document`]) and drop the
+    /// Rename what the document carries by id (`Pass::Document`) and drop the
     /// survivors' ids from it: a survivor carries none of the level's id-keyed
     /// data across. No survivors, no change.
     pub fn rename_document(&self, data: &mut SceneData) {
@@ -82,7 +82,7 @@ impl Moves {
 }
 
 impl Scene {
-    /// Rename what the load's separate files carry by id ([`Pass::Sidecar`]),
+    /// Rename what the load's separate files carry by id (`Pass::Sidecar`),
     /// once they are in. No moves, no change.
     pub fn renumber_sidecars(&mut self, moves: &Moves) {
         if moves.is_empty() {
