@@ -4,7 +4,7 @@
 use glam::Vec3;
 
 use crate::Renderer;
-use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent, Ssr};
+use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
@@ -75,13 +75,8 @@ pub(in crate::postfx::effects) fn room() -> Scene {
     };
     s.world.set_camera(cam, Some(camera));
     let mut volume = default_post_processing();
-    // The satin ceiling (roughness 0.35) is SSR's flicker case: a minimum that
-    // reflects it, below the default's roughness 0.3.
-    volume.ssr = Ssr {
-        active: true,
-        min_smoothness: 0.3,
-        ..Default::default()
-    };
+    // A minimum that reflects the satin ceiling, rougher than the default's 0.3.
+    (volume.ssr.active, volume.ssr.min_smoothness) = (true, 0.3);
     (volume.bloom.active, volume.ssao.active) = (false, false);
     s.world.set_post_processing(cam, Some(volume));
     let bronze = MaterialAsset {
