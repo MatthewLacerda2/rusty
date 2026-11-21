@@ -127,7 +127,12 @@ fn rows_of(frame: &RenderedFrame) -> Vec<(String, f64)> {
         ..Speeds::default()
     };
     let mut samples = Samples::default();
-    sample(&mut samples, &FrameStats::default(), Some(frame), speed);
+    sample(
+        &mut samples,
+        &FrameStats::default(),
+        Some((frame, 1.0)),
+        speed,
+    );
     let rows = samples.report().metrics.into_iter();
     rows.map(|(m, s)| (m, s.avg)).collect()
 }

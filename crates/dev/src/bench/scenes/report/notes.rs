@@ -42,7 +42,8 @@ impl SceneReport {
                  render.other is what no stage timed)",
             ),
         ];
-        let notes = notes.into_iter().chain(self.part_notes());
+        let notes = notes.into_iter().chain(self.clock_notes());
+        let notes = notes.chain(self.part_notes());
         let notes = notes.chain(self.load_notes());
         let notes = notes.chain(self.editor_notes());
         let notes = notes.chain(self.comparison_notes(first));
@@ -63,6 +64,17 @@ impl SceneReport {
 }
 
 impl SceneReport {
+    /// What `wall_ms` is and is measured at.
+    fn clock_notes(&self) -> [(bool, &'static str); 1] {
+        [(
+            self.row("wall_ms").is_some(),
+            "(wall_ms: the frame end to end on the wall, its sim step and its draw until the \
+             GPU finished, before the bench's readbacks, as measured: it moves with \
+             cpu_clock_pct and gpu_clock_pct; not the windowed game's frame time, \
+             docs/testing.md)",
+        )]
+    }
+
     /// The notes on a stage timed in parts (#2401): the UI stage's CPU parts
     /// wherever a UI was prepared, the Hi-Z stage's CPU parts
     /// wherever it ran, its GPU parts only with GPU timing (an untimed frame
@@ -125,7 +137,8 @@ impl SceneReport {
                 "(editor.<row>: the editor round, in a process of its own: the Scene view with \
                  its default gizmos and the scene's first camera selected; editor.edit_ms the \
                  world's edit-mode frame and editor.ui_ms the editor's UI draw and egui's \
-                 tessellation, at the reference CPU clock, editor.render.<stage> and \
+                 tessellation, at the reference CPU clock, editor.wall_ms the whole editor \
+                 frame on the wall until the GPU finished, as measured, editor.render.<stage> and \
                  editor.gpu.<pass> its viewport frame; play_enter_ms edit mode to the first Play \
                  tick, without the texture refresh the editor runs before Play (it compresses \
                  into the project), play_stop_ms Stop to the first edit frame drawn, save_ms a \

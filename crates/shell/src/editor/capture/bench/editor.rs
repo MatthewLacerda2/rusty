@@ -65,19 +65,26 @@ impl Editor {
     }
 
     /// Draw one editor frame and wait for it: its edit-frame and UI times, the
-    /// viewport frame and the size it drew at when one rendered, and the GPU's
-    /// speed over the frame.
-    pub(super) fn frame(&mut self, game: &mut GameWorld) -> (UiTime, Option<Drawn>, Option<f64>) {
+    /// viewport frame and the size it drew at when one rendered, the GPU's
+    /// speed over the frame, and the frame's wall time in ms (the edit frame, the
+    /// UI and the draw until the GPU finished, before its readbacks; the probes
+    /// left out).
+    pub(super) fn frame(
+        &mut self,
+        game: &mut GameWorld,
+    ) -> (UiTime, Option<Drawn>, Option<f64>, f64) {
         let mut timer = UiTimer::start();
         game.edit_frame();
         timer.edit_done();
         let (output, jobs, drawn) = self.ui(game);
         let ui = timer.stop();
         let before = self.probed();
+        let drawing = rusty_dev::stats::now();
         let cost = self.render(game, output, &jobs, drawn);
         let (w, h) = self.size;
         let renderer = self.host.renderer(w, h).expect("built in new");
         renderer.wait_idle();
+        let wall_ms = ui.edit_ms + ui.ms + rusty_dev::stats::ms_since(drawing);
         let gpu = renderer.take_gpu_times();
         let frame = cost.map(|(cpu_ms, stages, counters, view)| Drawn {
             frame: RenderedFrame {
@@ -89,7 +96,7 @@ impl Editor {
             view,
         });
         let after = self.probed();
-        (ui, frame, gpu_speed(before, after))
+        (ui, frame, gpu_speed(before, after), wall_ms)
     }
 
     /// Draw one editor frame and wait for it, probing nothing: no clock probe, no

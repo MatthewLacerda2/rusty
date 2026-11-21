@@ -31,6 +31,7 @@
 //! attempted once; a box with no adapter does not retry per shot.
 
 use std::path::Path;
+use std::time::Instant;
 
 use rusty_core::settings::render_scale::RenderScale;
 use rusty_render::{
@@ -91,6 +92,10 @@ pub struct CaptureHost {
     /// The automatic exposure the last [`draw`](Self::draw) applied, read back exactly
     /// (#1444): what the harness publishes as `Scene::screen_exposure`.
     pub exposure: Option<f32>,
+    /// When the GPU finished the last [`draw`](Self::draw) (its `wait_idle`
+    /// returned), before the readbacks that follow: where the bench's `wall_ms`
+    /// ends a frame.
+    pub idle_at: Option<Instant>,
     /// Draw the colliders and the `Debug.Draw*` lines over the next frames (#1882),
     /// as the Game view's **Gizmos** toggle does: `Harness.Screenshot`'s `gizmos`.
     pub gizmos: bool,
@@ -180,6 +185,7 @@ impl CaptureHost {
         renderer.render(view, scene, camera, &target, false);
         let cpu_ms = renderer.frame_cost().cpu_ms;
         renderer.wait_idle();
+        let idle_at = crate::stats::now();
         let exposure = view.settled_exposure(&renderer.device);
         let frame = RenderedFrame {
             counters: renderer.frame_counters,
@@ -189,6 +195,7 @@ impl CaptureHost {
         };
         self.last_frame = Some(frame.clone());
         self.exposure = exposure;
+        self.idle_at = Some(idle_at);
         Ok(Some(frame))
     }
 

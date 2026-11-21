@@ -203,17 +203,19 @@ impl SceneReport {
 }
 
 /// The rows the run's summary shows for each scene, in order: `cpu_ms` is the
-/// tick's time at the reference CPU clock, `frame_ms` as measured.
-const SUMMARY: [&str; 6] = [
+/// tick's time at the reference CPU clock, `frame_ms` as measured, `wall_ms` the
+/// frame end to end.
+const SUMMARY: [&str; 7] = [
     "cpu_ms",
     "frame_ms",
+    "wall_ms",
     "gpu_ms",
     "load_ms",
     "rss_peak_mb",
     "gpu_mb",
 ];
 
-/// One line per scene: its CPU, frame, GPU and load times (averages) and its
+/// One line per scene: its CPU, frame, wall, GPU and load times (averages) and its
 /// memory; then the run's `import_ms` (`IMPORT=1`), the project's, once.
 pub fn summary(reports: &[SceneReport]) -> String {
     let mut out = format!("bench-scenes: {} scenes\n{:<20}", reports.len(), "scene");
@@ -286,3 +288,6 @@ mod quiet_tests;
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+#[cfg(test)]
+#[path = "wall_tests.rs"]
+mod wall_tests;

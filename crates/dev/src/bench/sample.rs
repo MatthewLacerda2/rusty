@@ -51,14 +51,15 @@ pub(super) struct Speeds {
 
 /// One frame's row values: the tick's CPU time, every system's share of it
 /// (`cpu.<system>`, `flush_bounds` among them), `taps_ms` and `probe_ms` beside it, what
-/// rendering cost and each stage's share (`render.<stage>`), its counters. Every GPU
+/// rendering cost and each stage's share (`render.<stage>`), the drawn frame's
+/// `wall_ms` (beside it, as measured), its counters. Every GPU
 /// pass is sampled every frame (zero when it did not run), so the rows are stable.
 /// CPU and GPU times are scaled by the frame's clock `speed`s; a frame a probe
 /// missed has no rows of that side's scaled times.
 pub(super) fn sample(
     samples: &mut Samples,
     stats: &FrameStats,
-    frame: Option<&RenderedFrame>,
+    frame: Option<(&RenderedFrame, f64)>,
     speed: Speeds,
 ) {
     if let Some(s) = stats.get("frame_ms") {
@@ -72,8 +73,8 @@ pub(super) fn sample(
             beside.for_each(|k| _ = stats.get(k).inspect(|t| samples.push(k, t.last * cpu)));
         }
     }
-    if let Some(frame) = frame {
-        sample_render(samples, frame, speed.gpu);
+    if let Some((frame, wall_ms)) = frame {
+        sample_render(samples, frame, wall_ms, speed.gpu);
     }
     if stats.get("frame_ms").is_some() {
         push_tick_counters(samples, stats);
@@ -110,12 +111,18 @@ fn push_counter(samples: &mut Samples, key: &str, value: f64) {
     }
 }
 
-/// A rendered frame's rows: the renderer's CPU time and each stage's share
-/// (`render.<stage>`), the GPU passes at the clock `gpu_speed` (none where its
+/// A rendered frame's rows: the renderer's CPU time, the frame's `wall_ms` (end to
+/// end, as measured) and each stage's share (`render.<stage>`), the GPU passes at the clock `gpu_speed` (none where its
 /// probe missed), every render counter. The editor round samples its frames with it
 /// (`scenes::editor`).
-pub(super) fn sample_render(samples: &mut Samples, frame: &RenderedFrame, gpu_speed: Option<f64>) {
+pub(super) fn sample_render(
+    samples: &mut Samples,
+    frame: &RenderedFrame,
+    wall_ms: f64,
+    gpu_speed: Option<f64>,
+) {
     samples.push("renderer_ms", frame.cpu_ms);
+    samples.push("wall_ms", wall_ms);
     let (stages, parts) = stage_rows(&frame.stages);
     push_parts(samples, "render", frame.cpu_ms, stages.iter().copied(), 1.0);
     for &(stage, _) in &stages {
