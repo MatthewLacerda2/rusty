@@ -138,16 +138,17 @@ fn authored() -> String {
 }
 
 #[test]
-fn the_indices_put_the_per_draw_group_last_and_the_material_below_it() {
+fn the_indices_put_the_per_draw_group_last_and_the_scene_group_off_set_one() {
     assert_eq!(DRAW as usize, COUNT - 1);
-    assert_eq!(MATERIAL + 1, DRAW);
+    // The scene group at set 1 costs a driver GPU time (`rusty_shadergen::groups`).
+    assert_eq!((MATERIAL, SCENE), (1, 2));
     let mut all = [GLOBAL, SCENE, MATERIAL, DRAW];
     all.sort_unstable();
     assert_eq!(all, [0, 1, 2, 3], "one index each");
 }
 
 #[test]
-fn every_solid_layout_puts_its_draw_group_last_and_its_material_below_it() {
+fn every_solid_layout_puts_its_draw_group_last_and_its_material_at_its_index() {
     let solid = [
         ("forward", four("global", "scene", "material", "draw")),
         ("particles", four("global", "depth", "material", "draw")),
@@ -156,7 +157,7 @@ fn every_solid_layout_puts_its_draw_group_last_and_its_material_below_it() {
     for (name, groups) in solid {
         let at = groups.ordered();
         assert_eq!(at[COUNT - 1], Some("draw"), "{name}: {at:?}");
-        assert_eq!(at[COUNT - 2], Some("material"), "{name}: {at:?}");
+        assert_eq!(at[MATERIAL as usize], Some("material"), "{name}: {at:?}");
     }
     let plain = caster("light", "draw", None).ordered();
     assert_eq!(plain, [Some("light"), None, None, Some("draw")]);

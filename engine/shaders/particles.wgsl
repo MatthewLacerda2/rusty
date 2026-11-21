@@ -37,10 +37,10 @@ struct ParticleGlobals {
 };
 
 @group(3) @binding(0) var<uniform> globals: ParticleGlobals;
-@group(2) @binding(0) var sprite_tex: texture_2d<f32>;
-@group(2) @binding(1) var sprite_sampler: sampler;
+@group(1) @binding(0) var sprite_tex: texture_2d<f32>;
+@group(1) @binding(1) var sprite_sampler: sampler;
 // The scene depth (read-only this pass) — soft particles fade against it.
-@group(1) @binding(0) var scene_depth: texture_depth_2d;
+@group(2) @binding(0) var scene_depth: texture_depth_2d;
 // The renderer's global group (camera + lighting + env + light clusters, #434); the
 // camera is read only to find a vertex's light cluster.
 @group(0) @binding(0) var<uniform> camera: CameraUniforms;

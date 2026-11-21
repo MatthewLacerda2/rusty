@@ -338,73 +338,73 @@ fn vertex_to_world_prev(model: VertexInput, instance: u32) -> mat4x4<f32> {
 // The material maps, each with its own sampler (#1323): wrap and filter are the
 // texture's import settings. A map's sampler sits 16 bindings past it
 // (`shadergen::textures::sampler_binding`); albedo's stays at 1.
-@group(2) @binding(0)
+@group(1) @binding(0)
 var t_diffuse: texture_2d<f32>;
-@group(2) @binding(1)
+@group(1) @binding(1)
 var s_diffuse: sampler;
-@group(2) @binding(2)
+@group(1) @binding(2)
 var t_metallic: texture_2d<f32>;
-@group(2) @binding(3)
+@group(1) @binding(3)
 var t_roughness: texture_2d<f32>;
-@group(2) @binding(4)
+@group(1) @binding(4)
 var t_normal: texture_2d<f32>;
-@group(2) @binding(5)
+@group(1) @binding(5)
 var t_emissive: texture_2d<f32>;
-@group(2) @binding(18)
+@group(1) @binding(18)
 var s_metallic: sampler;
-@group(2) @binding(19)
+@group(1) @binding(19)
 var s_roughness: sampler;
-@group(2) @binding(20)
+@group(1) @binding(20)
 var s_normal: sampler;
-@group(2) @binding(21)
+@group(1) @binding(21)
 var s_emissive: sampler;
 // The packed detail map (#1997): R albedo, G normal Y, B smoothness, A normal X,
 // raw (data) texels. At 15, the last texture binding below the samplers' offset,
 // so the surface shaders' extra slots keep the bindings after the param uniform.
-@group(2) @binding(15)
+@group(1) @binding(15)
 var t_detail: texture_2d<f32>;
-@group(2) @binding(31)
+@group(1) @binding(31)
 var s_detail: sampler;
 // The occlusion (#2151, glTF's `occlusionTexture`, R) and specular-level
 // (`KHR_materials_specular`'s `specularTexture`, A) maps, raw texels, counting down
 // from the detail map's binding, so the extra shader slots keep theirs.
-@group(2) @binding(14)
+@group(1) @binding(14)
 var t_occlusion: texture_2d<f32>;
-@group(2) @binding(30)
+@group(1) @binding(30)
 var s_occlusion: sampler;
-@group(2) @binding(13)
+@group(1) @binding(13)
 var t_specular: texture_2d<f32>;
-@group(2) @binding(29)
+@group(1) @binding(29)
 var s_specular: sampler;
 // The height map (#2191, HDRP's *Displacement Mode: Pixel*): R, white the surface,
 // black the deepest point, raw texels; marched by `forward::parallax`.
-@group(2) @binding(12)
+@group(1) @binding(12)
 var t_height: texture_2d<f32>;
-@group(2) @binding(28)
+@group(1) @binding(28)
 var s_height: sampler;
 // The detail mask (#2258, HDRP Lit's *Detail Mask*): R, white full detail, black
 // none, raw texels, read at the main maps' coordinates by `forward::detail`.
-@group(2) @binding(11)
+@group(1) @binding(11)
 var t_detail_mask: texture_2d<f32>;
-@group(2) @binding(27)
+@group(1) @binding(27)
 var s_detail_mask: sampler;
 
 // The sun's cascaded shadow maps (#435): `lighting::cascades`.
-@group(1) @binding(0)
+@group(2) @binding(0)
 var<uniform> shadow: ShadowCascades;
-@group(1) @binding(1)
+@group(2) @binding(1)
 var t_shadow: texture_depth_2d_array;
-@group(1) @binding(2)
+@group(2) @binding(2)
 var s_shadow: sampler_comparison;
 // Screen-space ambient occlusion (#436), one texel per pixel; a 1x1 white texture
 // wherever the SSAO pass did not run (off, a stacked DepthOnly camera, the
 // transparent pass).
-@group(1) @binding(3)
+@group(2) @binding(3)
 var t_ao: texture_2d<f32>;
 // The point/spot shadow atlas (#468) and its tiles; a light's `shadow` indexes them.
-@group(1) @binding(4)
+@group(2) @binding(4)
 var t_shadow_atlas: texture_depth_2d;
-@group(1) @binding(5)
+@group(2) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
 // The camera's opaque copy (#1523, `opaque_copy.wgsl`), Unity's *Opaque Texture*
 // and *Depth Texture* in one: rgb its colour after the opaque pass and SSR, alpha
@@ -413,7 +413,7 @@ var<storage, read> shadow_tiles: array<ShadowTile>;
 // In the opaque pass of a base camera running SSIL (`camera.ssil.x`, #1750), which
 // reads no opaque copy, it holds SSIL's bounce instead, one texel per pixel, so
 // the stage binds no texture more than `render::setup::limits` allows (23).
-@group(1) @binding(6)
+@group(2) @binding(6)
 var t_opaque: texture_2d<f32>;
-@group(1) @binding(7)
+@group(2) @binding(7)
 var s_opaque: sampler;

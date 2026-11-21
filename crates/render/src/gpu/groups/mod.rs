@@ -3,9 +3,10 @@
 //! layout is built through [`Groups::layout`], which places each group at its
 //! index, so the order is one edit there and no layout names a number.
 //!
-//! The order is by how often a group changes (the per-draw group, whose dynamic
-//! offset moves every batch, last; the material below it): wgpu re-flushes every
-//! group from the lowest one set up to the last at the next draw.
+//! The per-draw group, whose dynamic offset moves every batch, is last: wgpu
+//! re-flushes every group from the lowest one set up to the last at the next
+//! draw. The material sits at 1 and the scene group at 2, not the other way
+//! round, for a driver's sake (`rusty_shadergen::groups`).
 
 pub(crate) use rusty_shadergen::groups::{DRAW, GLOBAL, MATERIAL, SCENE};
 

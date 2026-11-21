@@ -47,7 +47,7 @@ fn runtime_params_read_the_uniform_and_baked_ones_stay_const() {
         !wgsl.contains("const hit_flash_1_"),
         "runtime params are not baked"
     );
-    assert!(wgsl.contains("@group(2) @binding(6) var<uniform> shader_params"));
+    assert!(wgsl.contains("@group(1) @binding(6) var<uniform> shader_params"));
     assert!(wgsl.contains("srf_hit_flash(srf_toon_ramp(lighting_color, in, toon_ramp_0_steps), in, shader_params.v[0].xyz, shader_params.v[1].x)"));
     validate(engine_shader_dir(), &wgsl).expect("a runtime-param variant composes");
     assert_eq!(layout.names(), ["hit_flash.color", "hit_flash.amount"]);

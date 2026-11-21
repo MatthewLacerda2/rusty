@@ -9,7 +9,7 @@ use super::recipe::{BlockSel, PassKind, ShaderRecipe};
 use super::validate::validate;
 use crate::engine_shader_dir;
 
-const MASK_DECL: &str = "@group(2) @binding(7) var t_mask: texture_2d<f32>;";
+const MASK_DECL: &str = "@group(1) @binding(7) var t_mask: texture_2d<f32>;";
 
 fn surface(ids: &[&str]) -> String {
     let recipe = ShaderRecipe {

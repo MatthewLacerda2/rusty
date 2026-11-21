@@ -86,8 +86,8 @@ mod tests {
     fn decl_names_the_texture_after_its_slot() {
         assert_eq!(
             decl(slot("mask").unwrap()),
-            "@group(2) @binding(7) var t_mask: texture_2d<f32>;\n\
-             @group(2) @binding(23) var s_mask: sampler;\n"
+            "@group(1) @binding(7) var t_mask: texture_2d<f32>;\n\
+             @group(1) @binding(23) var s_mask: sampler;\n"
         );
     }
 }

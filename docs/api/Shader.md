@@ -120,8 +120,8 @@ assembles byte-identical WGSL.
   and material record, the material group's maps, and `vs_main`/`fs_main` entry points); each colour block restyles
   the shaded color before the final write. The vertex stage is the standard one
   too, unless a **vertex-stage** block (`vertex_waves`, below) moves the vertices.
-  The bind groups sit by how often each changes: global 0, the pass's scene inputs
-  (shadows, AO, the opaque copy) 1, the material 2, the per-draw group 3. The
+  The bind groups: global 0, the material 1, the pass's scene inputs (shadows, AO,
+  the opaque copy) 2, the per-draw group 3 (last, as it changes every draw). The
   per-draw group is the instanced layout (#470): the small per-draw `draw` uniform (its
   transform, joint base and record index), the draw's material record read through
   `material()` (#1616: tint, PBR scalars, map flags, cutout, the transparent-surface
