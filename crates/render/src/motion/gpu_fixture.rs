@@ -31,7 +31,8 @@ pub(crate) fn view(r: &Renderer) -> RenderView {
 pub(crate) fn scene(blur: bool) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let cam = scene.add_entity("Camera".to_string());
     let component = CameraComponent {

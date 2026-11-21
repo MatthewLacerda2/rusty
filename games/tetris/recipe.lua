@@ -55,6 +55,7 @@ solid("Back", 0, h / 2, -0.75, w + 2, h + 2, 0.5, "well")
 solid("Ground", 0, -1.5, 6, 60, 1, 30, "well")
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live: the level is not baked
 Transform.SetRotation(sun, -40, 25, 0)
 Light.SetCastShadows(sun, true)
 
@@ -64,6 +65,7 @@ Transform.SetPosition(pulse, 0, h / 2, 4)
 Light.SetColor(pulse, 1.0, 0.9, 0.7)
 Light.SetRange(pulse, 30)
 Light.SetIntensity(pulse, 0)
+Light.SetMode(pulse, "Realtime") -- it pulses at runtime
 
 local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")

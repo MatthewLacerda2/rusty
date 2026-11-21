@@ -20,7 +20,8 @@ fn everything() -> Scene {
     volume.ssao.active = true;
     scene.world.set_post_processing(cam, Some(volume));
     scene.world.light_mut(lamp).unwrap().cast_shadows = true;
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     // A dynamic caster: the statics are drawn into the maps once, then cached.
     let crate_id = create_entity(&mut scene, "Crate", Some(Primitive::Box));

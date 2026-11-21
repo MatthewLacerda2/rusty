@@ -910,6 +910,9 @@ scene.lighting_settings.mixed_lighting_mode: enum BakedIndirect|Shadowmask
 scene.lighting_settings.reflections.budget_mb: u32
 scene.lighting_settings.reflections.max_probes: u32
 scene.lighting_settings.reflections.resolution: u32
+scene.lightmaps.baked_as: map
+scene.lightmaps.baked_as{key}: u32
+scene.lightmaps.baked_as{}: enum Realtime|Mixed|Baked
 scene.lightmaps.channels: map
 scene.lightmaps.channels{key}: u32
 scene.lightmaps.channels{}: u8

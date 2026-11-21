@@ -39,7 +39,7 @@ fn bake(dir: &str, name: &str, pass: PassKind, color: [f32; 3]) {
 fn sphere(shader: &str, mode: RenderMode) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = create_entity(&mut scene, "Ball", Some(Primitive::Sphere));
     // Diameter 2: the thresholds below were set on that size.
     scene.world.transform_mut(id).unwrap().scale = Vec3::splat(2.0);

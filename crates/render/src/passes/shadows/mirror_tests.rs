@@ -54,7 +54,7 @@ pub(super) fn spot_yard() -> Scene {
     let mut t = scene.world.transform_mut(ground).unwrap();
     (t.position, t.scale) = (Vec3::NEG_Y * 0.5, Vec3::new(40.0, 1.0, 40.0));
     drop(t);
-    let lamp = create_entity(&mut scene, "Lamp", Some(Primitive::SpotLight));
+    let lamp = rusty_scene::create::create_live_light(&mut scene, "Lamp", Primitive::SpotLight);
     let mut t = scene.world.transform_mut(lamp).unwrap();
     (t.position, t.rotation) = (Vec3::Y * 6.0, Quat::from_rotation_x(-1.5));
     drop(t);

@@ -6,7 +6,7 @@
 use super::{set_param, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// Pixels of one frame dominated by red and by blue.
@@ -33,7 +33,7 @@ fn gpu_two_slots_with_their_own_flash_colours_keep_them_under_one_override() {
     };
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = sphere(&mut scene, 0.0, &flash.0);
     // Two runs, two materials: the sphere's material flashes red, its copy blue.
     let red = scene.world.material(id).unwrap().first().to_string();

@@ -68,6 +68,7 @@ Physics.IgnoreLayerCollision(8, 8)
 Physics.IgnoreLayerCollision(8, 0)
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live: the level is not baked
 Transform.SetRotation(sun, -55, 20, 0)
 -- The flash a bomb sets off: dark until `fruit.lua` raises it.
 local flash = Scene.CreateEntity("Flash", "PointLight")
@@ -75,6 +76,7 @@ Transform.SetPosition(flash, 0, 2, 4)
 Light.SetColor(flash, 1.0, 0.6, 0.25)
 Light.SetRange(flash, 30)
 Light.SetIntensity(flash, 0)
+Light.SetMode(flash, "Realtime") -- it flashes at runtime
 
 local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")

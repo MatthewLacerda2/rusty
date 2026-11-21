@@ -44,7 +44,7 @@ pub(super) fn grey(albedo: f32) -> MaterialAsset {
 
 /// A point light `height` metres over the floor's centre.
 pub(super) fn lamp(scene: &mut Scene, height: f32) {
-    let id = create_entity(scene, "Lamp", Some(Primitive::PointLight));
+    let id = rusty_scene::create::create_live_light(scene, "Lamp", Primitive::PointLight);
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, height, 0.0);
     let mut light = scene.world.light(id).unwrap().clone();
     (light.range, light.intensity) = (12.0, 30.0);

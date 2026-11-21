@@ -8,7 +8,7 @@ use glam::Vec3;
 
 use super::params_tests::{sphere, RES};
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -45,7 +45,7 @@ impl Drop for Baked {
 fn checkered_sphere(shader: &str) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = sphere(&mut scene, 0.0, shader);
     let key = scene.ensure_material_key(id).unwrap();
     let mat = scene.materials.get_mut(&key).unwrap();

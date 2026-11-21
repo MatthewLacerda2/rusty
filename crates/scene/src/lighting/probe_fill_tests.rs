@@ -53,6 +53,7 @@ fn sun_from_above() -> Scene {
     let light = LightComponent {
         light_type: LightType::Directional,
         intensity: 5.0,
+        mode: rusty_components::LightMode::Mixed,
         ..crate::create::default_light()
     };
     scene.world.set_light(id, Some(light));

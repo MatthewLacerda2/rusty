@@ -267,7 +267,7 @@ impl Drop for LightmapBakeJob {
 }
 
 /// The lights a bake took in and its shadowmask channels, set on its pages.
-pub(super) type Taken = (std::collections::BTreeSet<u32>, MaskChannels);
+pub(super) type Taken = (rusty_lighting::lightmap::TakenLights, MaskChannels);
 
 /// `pages` with the lights and shadowmask channels the bake's input took in.
 pub(super) fn labelled(pages: EncodedPages, (lights, shadowmask): &Taken) -> EncodedPages {

@@ -19,7 +19,8 @@ const H: u32 = 64;
 fn prop_row(depths: &[f32], lod: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     for (n, &z) in depths.iter().enumerate() {
         let x = if n % 2 == 0 { -1.0 } else { 1.0 };

@@ -209,7 +209,7 @@ pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
         .filter(|&id| world.is_active_in_hierarchy(id))
         .filter(|&id| {
             world.light(id).is_some_and(|light| {
-                scene.light_mode(id, &light).renders_live(capture)
+                crate::clusters::drawn_mode(scene, id, &light).renders_live(capture)
                     && matches!(
                         light.light_type,
                         LightType::Point | LightType::Spotlight | LightType::Area
@@ -251,7 +251,7 @@ fn live_sun_id(scene: &Scene, capture: bool) -> Option<u32> {
             continue;
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
-        let live = scene.light_mode(id, &light).renders_live(capture);
+        let live = crate::clusters::drawn_mode(scene, id, &light).renders_live(capture);
         if light.light_type == LightType::Directional && live {
             sun = Some(id);
         }

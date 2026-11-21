@@ -28,7 +28,7 @@ fn a_bake_takes_lit_mixed_and_baked_lights_but_not_a_dark_or_realtime_one() {
     light(&mut scene, LightMode::Mixed, 0.0);
     assert_eq!(
         taken_lights(&scene).into_iter().collect::<Vec<_>>(),
-        vec![mixed, baked]
+        vec![(mixed, LightMode::Mixed), (baked, LightMode::Baked)]
     );
 }
 

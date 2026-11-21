@@ -56,11 +56,15 @@ pub struct BakeLight {
     pub mask_channel: Option<u8>,
 }
 
-/// The lights a bake of `scene` takes in, by entity (`LightmapSet::lights`,
-/// #1750): every active `Mixed` or `Baked` light [`BakeScene::gather`] keeps, but
-/// one at intensity 0, which the bake holds nothing of: a flash lamp placed dark
-/// and raised by a script still bounces through SSIL.
-pub fn taken_lights(scene: &Scene) -> std::collections::BTreeSet<u32> {
+/// The lights a bake takes in, by entity, each with the mode it bakes as.
+pub type TakenLights = std::collections::BTreeMap<u32, LightMode>;
+
+/// The lights a bake of `scene` takes in, by entity, each with the mode it bakes
+/// as (`LightmapSet::lights` and `LightmapSet::record_taken`, #1750, #2522):
+/// every active `Mixed` or `Baked` light [`BakeScene::gather`] keeps, but one at
+/// intensity 0, which the bake holds nothing of: a flash lamp placed dark and
+/// raised by a script still bounces through SSIL.
+pub fn taken_lights(scene: &Scene) -> TakenLights {
     let takes = |id: &u32| {
         let light = scene.world.light(*id);
         scene.world.is_active_in_hierarchy(*id)
@@ -75,6 +79,7 @@ pub fn taken_lights(scene: &Scene) -> std::collections::BTreeSet<u32> {
         .ids_with_light()
         .into_iter()
         .filter(takes)
+        .filter_map(|id| Some((id, scene.world.light(id)?.effective_mode())))
         .collect()
 }
 

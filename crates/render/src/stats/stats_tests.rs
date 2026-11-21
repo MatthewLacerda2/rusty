@@ -8,6 +8,7 @@ fn light(light_type: LightType) -> LightComponent {
         intensity: 1.0,
         inner_cone: 20.0,
         outer_cone: 30.0,
+        mode: rusty_components::LightMode::Mixed,
         ..rusty_scene::create::default_light()
     }
 }
@@ -42,6 +43,9 @@ fn baked_suns_take_no_slot_so_never_count_as_dropped() {
             ..light(LightType::Directional)
         };
         scene.world.set_light(id, Some(sun));
+        if mode == LightMode::Baked {
+            scene.lightmaps.took_in_baked(id); // a bake took it in
+        }
     }
     // Four live suns fill the four slots; the two baked ones never wanted one.
     assert_eq!(count_lights(&scene), (6, 0));

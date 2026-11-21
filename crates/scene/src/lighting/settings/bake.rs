@@ -110,7 +110,7 @@ impl Default for BakeSettings {
             texels_per_unit: 8.0,
             samples: Self::DEFAULT_SAMPLES,
             direct_samples: 0,
-            bounces: 3,
+            bounces: Self::DEFAULT_BOUNCES,
             seed: 0,
             max_lightmap_size: 1024,
             denoiser: Denoiser::Oidn,
@@ -163,6 +163,11 @@ impl BakeSettings {
         self.samples.max(1).div_ceil(self.samples_per_pass.max(1))
     }
 
+    /// The bounces a new scene's bake takes (#2522): five, where
+    /// Unity's *Max Bounces* starts at two, so a level lit only by its bake
+    /// carries light into rooms the sun never reaches. A scene file that names its
+    /// bounces keeps them.
+    pub const DEFAULT_BOUNCES: u32 = 5;
     /// The bounces a bake takes.
     pub const BOUNCES: RangeInclusive<u32> = 1..=16;
     /// The page edges a bake takes (Unity's 32–4096), each a power of two.

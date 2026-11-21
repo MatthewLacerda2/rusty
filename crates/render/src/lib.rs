@@ -147,6 +147,8 @@ pub struct Renderer {
     hiz: passes::hiz::HiZ,
     /// Each Light Probe Proxy Volume's last grid samples (#1672).
     proxy_volumes: draw::proxy_volume::ProxyVolumes,
+    /// The `Baked` lights the console has named as waiting for a bake (#2522).
+    unbaked: clusters::UnbakedNote,
     /// One material bind group (`gpu::groups::MATERIAL`) per distinct set of resolved maps (#470).
     materials: gpu::material_cache::MaterialCache,
     /// The pipelines materials' authored surface shaders draw with, by name (#396).

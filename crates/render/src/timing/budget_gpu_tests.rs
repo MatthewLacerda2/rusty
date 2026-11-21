@@ -47,7 +47,8 @@ fn deepest_stack() -> Scene {
         ..Default::default()
     };
     scene.world.set_camera(overlay, Some(lens));
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let floor = create_entity(&mut scene, "Floor", Some(Primitive::Plane));
     scene.world.transform_mut(floor).unwrap().scale = Vec3::splat(20.0);

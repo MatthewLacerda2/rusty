@@ -11,8 +11,9 @@ fn session() -> Session {
 fn settings_read_back_the_scenes_defaults() {
     let read = "local s = Lighting.GetSettings() \
         return table.concat({s.texelsPerUnit, s.samples, s.bounces, s.seed, tostring(s.directional), s.maxLightmapSize, s.denoiser}, ' ')";
-    let samples = rusty_scene::lighting::settings::BakeSettings::DEFAULT_SAMPLES;
-    let want = format!("8.0 {samples} 3 0 true 1024 OIDN");
+    use rusty_scene::lighting::settings::BakeSettings;
+    let (samples, bounces) = (BakeSettings::DEFAULT_SAMPLES, BakeSettings::DEFAULT_BOUNCES);
+    let want = format!("8.0 {samples} {bounces} 0 true 1024 OIDN");
     assert_eq!(session().eval(read).unwrap(), want);
 }
 
@@ -24,7 +25,8 @@ fn set_settings_changes_only_the_named_fields_and_clamps() {
     let settings = s.world().scene().borrow().lighting_settings.lightmaps;
     assert_eq!(settings.samples, 1, "clamped to one sample");
     assert!(!settings.directional && settings.max_lightmap_size == 1024);
-    assert_eq!(settings.bounces, 3, "unnamed fields keep their value");
+    let bounces = rusty_scene::lighting::settings::BakeSettings::DEFAULT_BOUNCES;
+    assert_eq!(settings.bounces, bounces, "unnamed fields keep their value");
 }
 
 #[test]

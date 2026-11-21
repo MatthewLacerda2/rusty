@@ -7,7 +7,7 @@
 
 use super::{halves, sphere, Flash, RES};
 use crate::gpu::material_cache::ParamOwner;
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Scene;
 
 /// A scene of one flashing sphere at the left whose material flashes `color`; its
@@ -15,7 +15,7 @@ use rusty_scene::Scene;
 fn flashing(shader: &str, color: [f32; 3]) -> (Scene, String) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = sphere(&mut scene, -1.2, shader);
     let key = scene.world.material(id).unwrap().first().to_string();
     let params = &mut scene.materials.get_mut(&key).unwrap().shader_params;
@@ -67,7 +67,7 @@ fn gpu_a_param_edit_rewrites_its_buffer_and_re_derives_only_the_overriding() {
     };
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let left = sphere(&mut scene, -1.2, &flash.0);
     let right = sphere(&mut scene, 1.2, &flash.0);
     let shared = scene.world.material(left).map(|m| m.clone());

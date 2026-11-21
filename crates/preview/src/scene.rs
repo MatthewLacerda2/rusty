@@ -18,7 +18,7 @@ use std::path::Path;
 
 use glam::Vec3;
 
-use rusty_components::{MaterialAsset, MaterialComponent};
+use rusty_components::{LightMode, MaterialAsset, MaterialComponent};
 use rusty_edit::authoring::{self, Primitive};
 use rusty_scene::{LightComponent, LightType, Scene};
 
@@ -140,7 +140,8 @@ fn add_key_light(scene: &mut Scene, shown: Option<PreviewMesh>) {
             inner_cone: 0.0,
             outer_cone: 0.0,
             cast_shadows: false,
-            mode: Default::default(),
+            // A preview is never baked: drawn live, as before `Baked` was the default.
+            mode: LightMode::Mixed,
             shadow_fade_distance: 0.0,
         }),
     );

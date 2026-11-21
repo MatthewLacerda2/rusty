@@ -19,10 +19,10 @@ entity has no light. A spotlight's cone half-angles have no verb here: write
 | `Light.GetColor` | `(id)` | `r, g, b` (linear) |
 | `Light.SetColor` | `(id, r, g, b)` | — (each channel floored at 0, HDR above 1 allowed; a NaN or infinite channel makes it black) |
 | `Light.GetIntensity` / `SetIntensity` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
-| `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0) |
+| `Light.GetRange` / `SetRange` | `(id)` / `(id, value)` | `number` (clamped ≥ 0; NaN or `math.huge` reads as 0); a shadow fade still at four times the old range, a runtime light's default, moves to four times the new one |
 | `Light.GetType` / `SetType` | `(id)` / `(id, name)` | `"Ambient"` / `"Directional"` / `"Point"` / `"Spot"` / `"Area"` (Unity's names) |
-| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
-| `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade; clamped ≥ 0; NaN or `math.huge` reads as 0) |
+| `Light.GetCastShadows` / `SetCastShadows` | `(id)` / `(id, on)` | `boolean` (default `false`, `true` for a light created during Play, *Mode*; point and spot lights, and an Area light's stand-in in a bake capture: the lightmap and probe bake shadow an Area light always) |
+| `Light.GetShadowFadeDistance` / `SetShadowFadeDistance` | `(id)` / `(id, metres)` | `number`: how far from the camera a point or spot light's shadow reaches (default `0`, no fade, or four times the range for a light created during Play; clamped ≥ 0; NaN or `math.huge` reads as 0) |
 | `Light.GetMode` / `SetMode` | `(id)` / `(id, name)` | `"Realtime"` / `"Mixed"` / `"Baked"` (an Area light reads `"Baked"` and refuses all but `"Baked"`, with a console warning) |
 | `Light.GetAreaSize` / `SetAreaSize` | `(id)` / `(id, width, height)` | `width, height` in world units (default `1, 1`; each side floored at `0.01`; a NaN or `math.huge` side refuses the whole size, keeping the current one; `0, 0` with no light) |
 
@@ -79,7 +79,7 @@ colour luminance) weighed by how close their range comes, so a bright lamp acros
 the room outranks a dim one beside the camera. Ties go to the earlier entity, so
 the same scene always drops the same lights. Camera drops are counted in
 `Debug.Stats().lights_dropped`, cluster drops in `cluster_lights_dropped` (non-zero
-means some corner of the view is over budget). `Baked` lights never take part. A
+means some corner of the view is over budget). `Baked` lights a bake took in never take part. A
 light outside the view costs nothing. One whose intensity or colour is zero (a
 blinking alarm in its off half: #1712) is listed in no cluster, so no pixel shades
 it; it still counts towards the camera's budget of 64 (by its range, as any light
@@ -92,12 +92,13 @@ shade at once; the last active one is the sun that casts the cascaded shadows. O
 the last active ambient light counts: it replaces the scene's ambient, a `Gradient`
 one included, with its single colour (`Lighting.md`, *Environment*).
 
-**Shadows.** The sun (slot 0 above) always casts its cascaded shadows. A `Baked`
-sun is not drawn live, so it is no sun here: outside a bake capture, which does draw
+**Shadows.** The sun (slot 0 above) always casts its cascaded shadows. A baked
+`Baked` sun is not drawn live, so it is no sun here: outside a bake capture, which does draw
 it live and shadow it, a scene with no live directional light fits, draws and samples
 no cascade at all (#1713). A point or
 spot light casts only when `SetCastShadows(id, true)` (off by default, as in Unity:
-each one costs a depth pass per tile). Shadowed point and spot lights share one
+each one costs a depth pass per tile), or when a script creates it while the game
+plays (*Mode*, below). Shadowed point and spot lights share one
 2048² **shadow atlas** (#468): a spotlight takes one tile, a point light six (one
 per cube face). Each frame the atlas goes to the most important lights the camera
 can see — screen coverage times intensity — at 512² down to 128² per tile, nearer
@@ -125,7 +126,9 @@ their shadow, skinned meshes cast in their animated pose. Lit particles are not
 shadowed. **Shadow fade distance** (`SetShadowFadeDistance`, HDRP's *Shadow Fade
 Distance*, #1712) stops a far light's shadow from being sampled: over the last tenth
 of that distance between the camera and the light the shadow fades out, and past it
-the light shades unshadowed. `0`, the default, never fades. The light keeps its
+the light shades unshadowed. `0`, the default, never fades; a light created
+during Play starts at four times its range, and `SetRange` keeps it there while it
+is still that default (a fade the script set stays). The light keeps its
 atlas tiles either way.
 
 ### Cast Shadows
@@ -168,8 +171,8 @@ whether it is drawn live:
 | Mode | Static, lightmapped surfaces | Dynamic objects (probe-lit) | Realtime shadows |
 |---|---|---|---|
 | `Realtime` | live direct light only, no bounce | live direct light only, no bounce | yes, if it casts shadows |
-| `Mixed` *(default)* | live direct light + baked bounce (+ its baked static shadow under `Shadowmask`) | live direct light + bounce from the probes (+ the probes' baked occlusion under `Shadowmask`) | yes, if it casts shadows |
-| `Baked` | direct light and bounce from the lightmap, and one specular highlight from a directional lightmap | direct light and bounce from the probes only, no highlight | no |
+| `Mixed` | live direct light + baked bounce (+ its baked static shadow under `Shadowmask`) | live direct light + bounce from the probes (+ the probes' baked occlusion under `Shadowmask`) | yes, if it casts shadows |
+| `Baked` *(default)* | direct light and bounce from the lightmap, and one specular highlight from a directional lightmap | direct light and bounce from the probes only, no highlight | no |
 
 - `Realtime` — direct light and shadows every frame; neither bake sees it, so it
   bounces nowhere (a muzzle flash, a flickering lamp).
@@ -184,7 +187,22 @@ whether it is drawn live:
   then hold at any distance, it still glints on glossy surfaces, and a dynamic
   enemy under it still casts a realtime shadow. The light that should cast sharp
   shadows on actors. Details below.
-- `Baked` — costs nothing at runtime: it is never drawn live, anywhere. Static
+- `Baked` — **the default** for a light made in edit mode any way that names no
+  mode (the Create menu, Add Component, `Scene.CreateEntity`, `Scene.AddComponent`,
+  a scene or prefab file whose light has no `mode`). A light created **while the
+  game plays** (`Scene.CreateEntity` or `Scene.AddComponent` during Play: a muzzle
+  flash) is `Realtime` instead, as in Unity: no bake can take in a light the
+  edit-mode scene never held. It also casts shadows, at the cheapest settings the
+  component has: `cast_shadows` on and a shadow fade distance of four times its
+  range (both off in edit mode), so its shadow is drawn while its pool can fill a
+  fair part of the screen and sampled no further (*Shadows*, below). To make it
+  cheaper still: a spot is one shadow view where a point is six, a short range
+  keeps its tiles small and its fade near, and a flash too brief to read a shadow
+  from takes `SetCastShadows(id, false)`. A prefab instantiated at runtime keeps
+  the mode and shadows its file says. Unity's default is `Realtime`; rusty's levels are lit by
+  their bake, so a light is `Baked` unless it must move, flash or switch at
+  runtime, and then it says `Realtime` (`SetMode`). Once baked it costs nothing at
+  runtime: it is never drawn live. Static
   surfaces get it from their lightmap; dynamic objects get its direct light and its
   bounce from the light probes, whose bake adds the light's own direct light per
   probe (shadowed by static geometry). So a dynamic object lights from it only once
@@ -192,6 +210,32 @@ whether it is drawn live:
   a lightmap (no second UV map) does not receive it at all, while a static mesh at
   Scale In Lightmap `0` ([`Lighting`](Lighting.md#generate-lighting)) takes it from the
   probes, as a dynamic object does.
+
+  **Before its bake.** A `Baked` lamp or sun whose direct light no bake holds (one
+  added since the last Generate Lighting, one in a scene never baked, or one baked
+  as `Mixed`, which holds only its bounce, and made `Baked` since) is **drawn live
+  as a preview** in the editor and in any dev build (the harness, a bench), as a
+  `Mixed` light draws before its bake: live direct light and shadows. A shipped
+  `player` draws what the bake holds, so there it lights nothing. Either way the
+  console names the waiting lights once per scene (`[Lighting] N Baked lights wait
+  for a bake (…)`), whatever their activity or intensity does after; a bake or
+  another scene names afresh what still waits. In the player the line says the
+  scene shipped without a bake that covers them. Unity, with *Auto Generate* off,
+  draws such a light not at all until a bake; rusty has no background auto-bake,
+  so it previews instead of going dark. Every lightmap bake (`Lighting.Generate()`,
+  `Lighting.BakeLightmaps()`) records what it made of each light it took in, even
+  a scene with no lightmapped mesh whose probes alone hold the light; a `Mixed`
+  light a `Shadowmask` bake found no channel for was baked direct, and is not
+  previewed. `Probe.Bake()` alone records no light, so a lamp only it holds is
+  still previewed, **over** its probe bake: the probes hold its direct light and
+  the preview draws it live too, so a probe-lit (dynamic) object under it reads
+  about twice as bright until Generate Lighting ends it (the console's line says
+  so when the scene has probes). The line's advice follows the case: a scene
+  never baked is told to run Generate Lighting; a baked scene whose record lacks
+  the light (added since, or inactive or at intensity 0 when it baked) to bake
+  again with it active and lit; a light spawned during Play (a prefab's) is in no
+  bake, so it should say `Realtime`.
+  An Area light (always `Baked`) is never previewed: a panel has no live path.
 
   **Its highlight** (#1695 step 1). A lightmap holds a `Baked` light's diffuse light only, so
   on its own a metal rail or a polished floor beside a `Baked` lamp shows no glint.

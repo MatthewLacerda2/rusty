@@ -75,6 +75,7 @@ impl Renderer {
         // Build + write the camera-independent lighting uniform once (it starts the
         // frame's counters).
         self.upload_lighting(scene);
+        self.note_unbaked(scene);
         self.lap("prepare");
         // The retained objects, brought up to date once every renderer-side input
         // their keys and instances read is settled (#1706).

@@ -94,7 +94,7 @@ fn gpu_a_hit_flash_set_on_the_asset_changes_the_next_frame_by_a_buffer_write() {
     };
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let left = sphere(&mut scene, -1.2, &flash.0);
     sphere(&mut scene, 1.2, &flash.0);
     let scene = std::rc::Rc::new(RefCell::new(scene));

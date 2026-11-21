@@ -67,6 +67,7 @@ mod proptest;
 mod ragdoll;
 mod reflection_probes;
 mod ribbons;
+mod runtime_lights;
 mod scene_format;
 mod scene_name_api;
 mod scene_roundtrip;

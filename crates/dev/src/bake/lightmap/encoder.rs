@@ -213,9 +213,10 @@ fn write_preview(
         scale_offset,
     };
     set.extend(layout.placements(maps).into_iter().map(entry));
-    set.lights = lights.clone();
+    set.lights = lights.keys().copied().collect();
     set.channels = shadowmask.channels.clone();
     set.fell_back = shadowmask.fell_back.clone();
+    set.record_taken(lights);
     Ok(set)
 }
 

@@ -84,6 +84,10 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/editor/src/a.rs",
             "fn f(ui: &mut Ui) {\n    ui.add(egui::Slider::new(&mut v, 0.0..=1.0));\n}\n",
         ),
+        "drawn-mode" => one(
+            "crates/render/src/passes/a.rs",
+            "fn f(s: &Scene, l: &L) {\n    s.light_mode(1, l);\n}\n",
+        ),
         "ecs-write" => one(
             "crates/ecs/src/a.rs",
             "fn f(w: &mut W) {\n    w.inner.spawn(());\n}\n",

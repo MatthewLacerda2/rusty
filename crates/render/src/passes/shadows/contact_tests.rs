@@ -25,7 +25,8 @@ pub(super) fn yard(elevation: f32, floor: Primitive, boxed: bool) -> Scene {
     let mut scene = Scene::new();
     crate::test_gpu::black_sky(&mut scene);
     scene.ambient_intensity = 0.0;
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let e = elevation.to_radians();
     let dir = Vec3::new(e.cos(), -e.sin(), 0.0);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_arc(Vec3::NEG_Z, dir);

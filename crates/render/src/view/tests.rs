@@ -7,7 +7,7 @@ use glam::Vec3;
 
 use super::RenderView;
 use crate::OFFSCREEN_FORMAT;
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Camera;
 use rusty_scene::{MeshComponent, Scene};
 
@@ -15,7 +15,7 @@ fn box_scene() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     // A live sun, so the scene has cascades whose static bake can clobber (#1713).
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = scene.add_entity("Box".to_string());
     let (vertices, indices) = rusty_components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
     scene

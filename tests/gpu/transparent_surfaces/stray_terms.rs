@@ -35,6 +35,7 @@ fn lamp_glass(alpha: Option<f32>) -> Scene {
         );
         let light = rusty::components::LightComponent {
             intensity: 0.0,
+            mode: rusty::components::LightMode::Mixed,
             ..rusty::edit::authoring::default_light()
         };
         scene.world.set_light(pane, Some(light));

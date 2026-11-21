@@ -20,7 +20,8 @@ const SHIFT: f32 = 10.0;
 fn yard(pose: Mat4) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty::scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.3);
     let ground = create_entity(&mut scene, "Ground", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(ground).unwrap();

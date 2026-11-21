@@ -10,6 +10,11 @@
 //! Authoring-time only: a probe bake is a dev action (the baked SH is saved into the
 //! `<scene>.lighting.json` sidecar and loaded by the runtime), so the whole path lives
 //! behind the `dev` feature with the rest of the agentic layer.
+//!
+//! It records no light as baked (`LightmapSet::baked_as` is the lightmap bake's), so
+//! a `Baked` light only the probes hold is still previewed live
+//! (`Scene::drawn_mode`): probe-lit objects under it read its direct light twice
+//! until Generate Lighting.
 
 use super::progress::{stage_progress, BakeLog};
 use super::report::{self, probes::Timeline};

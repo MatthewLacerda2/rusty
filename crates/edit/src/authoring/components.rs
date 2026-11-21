@@ -117,7 +117,12 @@ pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
     if kind == ComponentKind::Texture {
         return attach_default_material(scene, id);
     }
-    dependency::add_with_requirements(&mut scene.world, id, kind)
+    let added = dependency::add_with_requirements(&mut scene.world, id, kind);
+    if added && kind == ComponentKind::Light {
+        // A light added during Play is live: no bake can take it in (#2522).
+        rusty_scene::create::live_in_play(scene, id);
+    }
+    added
 }
 
 /// Detach a first-class component of `kind` from entity `id`, cascading to every

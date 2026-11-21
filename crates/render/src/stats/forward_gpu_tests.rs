@@ -13,7 +13,7 @@ const RES: u32 = 32;
 fn wall_and_panel() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let wall = create_entity(&mut scene, "Wall", Some(Primitive::Box));
     scene.world.transform_mut(wall).unwrap().position = Vec3::new(0.0, 0.0, -4.1);
     let panel = create_entity(&mut scene, "Panel", Some(Primitive::Plane));

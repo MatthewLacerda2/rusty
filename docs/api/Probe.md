@@ -38,7 +38,7 @@ without the flag loads as placed. `Clear` removes both kinds.
 | `Probe.Count` | `()` | probe count |
 | `Probe.FillGrid` | `(minX, minY, minZ, maxX, maxY, maxZ, spacing)` | — (regular grid of manual probes; replaces existing probes) |
 | `Probe.BakeAnalytic` | `()` | — (deterministic stand-in fill: projects the scene's ambient sky + first directional light to SH) |
-| `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran (or there are no probes, a no-op), `false` if no GPU/software adapter was available (skipped) — the real multi-bounce GI bake |
+| `Probe.Bake` *(dev-only)* | `()` | `true` if the bake ran (or there are no probes, a no-op), `false` if no GPU/software adapter was available (skipped) — the real multi-bounce GI bake. It records no light as baked, so a `Baked` light only it holds is still previewed live in the editor and dev builds, over the probes that already hold it: probe-lit objects under it read about twice as bright until Generate Lighting (`Light.md`, *Before its bake*) |
 | `Probe.SampleIrradiance` | `(x, y, z, nx, ny, nz)` | `r, g, b` — interpolated probe irradiance for a surface normal at a world position (linear RGB; black when there are no probes) |
 
 `SampleIrradiance` returns irradiance E (a uniform sky of radiance L reads πL). A

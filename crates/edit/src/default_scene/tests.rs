@@ -26,7 +26,14 @@ fn the_cast_keeps_its_names_and_ids() {
     for (name, id) in cast {
         assert_eq!(scene.find_entity_by_name(name), Some(id), "{name}");
     }
-    assert!(scene.world.light(6).is_some(), "the sun lights the scene");
+    let sun = scene
+        .world
+        .light(6)
+        .expect("the sun lights the scene")
+        .clone();
+    // A new project's sun is a level's: `Baked`, previewed until its first bake.
+    assert_eq!(sun.mode, rusty_components::LightMode::Baked);
+    assert_eq!(scene.lights_awaiting_bake(), vec![6]);
     assert_eq!(scene.world.nav_agent(5).unwrap().base_offset, 1.0, "#666");
 }
 

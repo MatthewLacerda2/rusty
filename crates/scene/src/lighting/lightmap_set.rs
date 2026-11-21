@@ -60,6 +60,12 @@ pub struct LightmapSet {
     /// Undo that takes a light's creation back gives its id back.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub lights: BTreeSet<u32>,
+    /// The mode each light it took in was baked as (#2522, Unity's
+    /// `Light.bakingOutput.lightmapBakeType`): `Baked` when it holds the direct
+    /// light, `Mixed` when only the bounce. Written by every lightmap bake, a page
+    /// made or none; `Scene::awaits_bake` reads it.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub baked_as: BTreeMap<u32, LightMode>,
     /// The shadowmask pages of a `Shadowmask` bake (#1695), one per colour page and
     /// packed the same: RGBA8 PNGs whose channel `c` holds, per texel, how much of
     /// the `Mixed` light on channel `c` reaches it past static occluders (1 lit,
@@ -150,26 +156,30 @@ impl LightmapSet {
             })
             .collect();
         let lights: BTreeSet<_> = self.lights.iter().map(|&id| to(id)).collect();
+        let baked_as: BTreeMap<_, _> = self.baked_as.iter().map(|(&id, &m)| (to(id), m)).collect();
         let channels: BTreeMap<_, _> = self.channels.iter().map(|(&id, &c)| (to(id), c)).collect();
         let fell_back: BTreeSet<_> = self.fell_back.iter().map(|&id| to(id)).collect();
         let whole = entries.len() == self.entries.len()
             && lights.len() == self.lights.len()
+            && baked_as.len() == self.baked_as.len()
             && channels.len() == self.channels.len()
             && fell_back.len() == self.fell_back.len();
         whole.then(|| Self {
             entries,
             lights,
+            baked_as,
             channels,
             fell_back,
             ..self.clone()
         })
     }
 
-    /// Drop `ids` from the four fields keyed by entity: a load's survivors carry
+    /// Drop `ids` from the five fields keyed by entity: a load's survivors carry
     /// none of the level's baked data (on the document's set: no preview).
     pub(crate) fn forget(&mut self, ids: &BTreeSet<u32>) {
         self.entries.retain(|id, _| !ids.contains(id));
         self.lights.retain(|id| !ids.contains(id));
+        self.baked_as.retain(|id, _| !ids.contains(id));
         self.channels.retain(|id, _| !ids.contains(id));
         self.fell_back.retain(|id| !ids.contains(id));
     }
@@ -182,6 +192,7 @@ impl LightmapSet {
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
             && self.lights.is_empty()
+            && self.baked_as.is_empty()
             && self.channels.is_empty()
             && self.fell_back.is_empty()
     }
@@ -196,6 +207,27 @@ impl LightmapSet {
     /// Whether the bake took light `entity` in ([`Self::lights`]).
     pub fn baked_light(&self, entity: u32) -> bool {
         self.lights.contains(&entity)
+    }
+
+    /// Record the lights the bake `taken` in as [`Self::baked_mode`] makes them
+    /// ([`Self::baked_as`]), so set `fell_back` first.
+    pub fn record_taken(&mut self, taken: &BTreeMap<u32, LightMode>) {
+        let baked = taken.iter().map(|(&id, &m)| (id, self.baked_mode(id, m)));
+        self.baked_as = baked.collect();
+    }
+
+    /// Record light `entity` as a bake that took it in as `Baked` leaves it. A test
+    /// hook (#2522): a fixture drawn "after its bake" says so through this.
+    #[doc(hidden)]
+    pub fn took_in_baked(&mut self, entity: u32) {
+        self.lights.insert(entity);
+        self.baked_as.insert(entity, LightMode::Baked);
+    }
+
+    /// Whether the last bake holds light `entity`'s direct light
+    /// ([`Self::baked_as`] is `Baked`).
+    pub fn bakes_direct(&self, entity: u32) -> bool {
+        self.baked_as.get(&entity) == Some(&LightMode::Baked)
     }
 
     /// The shadowmask channel the bake gave light `entity` ([`Self::channels`]).
@@ -222,6 +254,7 @@ impl LightmapSet {
         self.directions.clear();
         self.entries.clear();
         self.lights.clear();
+        self.baked_as.clear();
         self.masks.clear();
         self.channels.clear();
         self.fell_back.clear();
@@ -259,40 +292,5 @@ mod as_list {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn lookup_clear_and_round_trip() {
-        let entry = |entity, page| LightmapEntry {
-            entity,
-            page,
-            scale_offset: [0.5, 0.5, 0.0, 0.5],
-        };
-        let mut set = LightmapSet {
-            pages: vec!["a.png".into(), "b.png".into()],
-            directions: vec!["a_dir.png".into(), "b_dir.png".into()],
-            ..LightmapSet::default()
-        };
-        set.extend([entry(5, 1), entry(3, 0)]);
-        set.lights.insert(7);
-        assert!(set.baked_light(7) && !set.baked_light(5));
-        assert_eq!(set.get(5).map(|e| e.page), Some(1));
-        assert!(set.get(9).is_none());
-        let json = serde_json::to_string(&set).unwrap();
-        assert_eq!(serde_json::from_str::<LightmapSet>(&json).unwrap(), set);
-        assert!(
-            json.find("\"entity\":3") < json.find("\"entity\":5"),
-            "entity order"
-        );
-        let twice = r#"{"entries":[{"entity":3,"page":0,"scale_offset":[0,0,0,0]},
-            {"entity":3,"page":1,"scale_offset":[0,0,0,0]}]}"#;
-        let first = serde_json::from_str::<LightmapSet>(twice).unwrap();
-        assert_eq!(first.get(3).map(|e| e.page), Some(0), "the first one wins");
-        assert_eq!(set.remove(3).map(|e| e.page), Some(0));
-        assert!(set.get(3).is_none());
-        set.clear();
-        assert!(set.is_empty() && set.pages.is_empty() && set.directions.is_empty());
-        assert!(!set.baked_light(7), "a clear forgets the lights too");
-    }
-}
+#[path = "lightmap_set_tests.rs"]
+mod tests;

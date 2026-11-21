@@ -251,6 +251,7 @@ local player = fighter("Player", spawns[1])
 Scene.AddScript(player, "assets/scripts/shooter.lua")
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live before a bake; `bake = true` bakes its bounce
 Transform.SetRotation(sun, -55, 35, 0)
 local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")

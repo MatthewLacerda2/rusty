@@ -38,6 +38,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
         range: 30.0,
         inner_cone: 0.0,
         outer_cone: 0.0,
+        mode: rusty::components::LightMode::Mixed,
         ..rusty::edit::authoring::default_light()
     };
     s.world.set_light(lamp, Some(light));

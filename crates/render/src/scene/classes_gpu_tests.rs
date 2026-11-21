@@ -21,7 +21,7 @@ const GREY: [f32; 3] = [0.5, 0.5, 0.5];
 fn boxes(own: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     for i in 0..BOXES {
         let name = if own { format!("p{i}") } else { "grey".into() };
         let grey = MaterialAsset {
