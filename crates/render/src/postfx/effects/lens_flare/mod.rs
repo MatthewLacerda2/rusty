@@ -15,6 +15,7 @@ use super::{
     bloom, Composite, CompositeTexture, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect,
 };
 use crate::gpu::bind_entry as entry;
+use crate::gpu::commands::Commands;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{sampler_entry, texture_entry, uniform_entry};
 use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
@@ -188,7 +189,7 @@ pub(crate) fn flare_size((w, h): (u32, u32)) -> (u32, u32) {
 
 /// The flare (bloom's prefiltered mip -> its target), which the composite adds, when the view
 /// flares; its target dropped when it doesn't.
-fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let pfx = &mut view.post_fx;
     let Some(bloom) = pfx.targets.get::<bloom::BloomTargets>().map(|t| t.size) else {
         pfx.targets.remove::<FlareTargets>();
@@ -221,12 +222,8 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
             entry(2, wgpu::BindingResource::Sampler(&pfx.sampler)),
         ],
     });
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Lens Flare Encoder"),
-    });
     let flare = (passes.flare.get(), r.gpu_timer.writes(GpuPass::LensFlare));
-    PostFx::fullscreen(&mut encoder, flare, &[&group], &t.flare.view);
-    queue.counted_submit(std::iter::once(encoder.finish()));
+    PostFx::fullscreen(commands.encoder(), flare, &[&group], &t.flare.view);
 }
 
 #[cfg(test)]

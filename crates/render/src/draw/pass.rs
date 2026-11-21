@@ -4,7 +4,7 @@
 use crate::draw::batch::{OpaqueBatches, OpaqueOrder};
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::groups;
-use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::CountedEncoder as _;
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::gpu::pipelines::PrimedPipelines;
 use crate::ibl::skybox::SkyTargets;
@@ -121,26 +121,23 @@ fn scene_targets<'a>(
 }
 
 impl Renderer {
+    /// Record the camera's screen-space inputs and its scene pass into `encoder`,
+    /// the camera's (#2353).
     pub(crate) fn execute_scene_pass(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         frame: ScenePassFrame,
         solid_batches: &OpaqueBatches,
     ) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Scene Render Encoder"),
-            });
-
         // The shadow maps were rendered once for the frame (`run_shadow_passes`).
         // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
         // A. SSAO (#436) and SSIL (#1750): what the scene pass samples.
         let solids = (solid_batches, frame.culled.as_ref());
-        self.record_screen_space(view, &mut encoder, &frame, solids);
+        self.record_screen_space(view, encoder, &frame, solids);
         // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
-        self.record_scene_pass(view, &mut encoder, &frame, solid_batches);
+        self.record_scene_pass(view, encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
         let primed = self.primes(view, &frame);
         // Ranked before the cull ran; why the two agree: `Self::opaque_order`.
@@ -150,9 +147,6 @@ impl Renderer {
         counters.primed_passes += u32::from(primed);
         counters.count_forward(solid_batches.iter(), primed);
         counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
-        // 6. Submit the scene pass (it filled the HDR target + depth). Particles +
-        // post-FX run from the per-camera loop in `draw`.
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Record the main scene pass (solids, skybox) into `encoder`.
@@ -280,7 +274,7 @@ impl Renderer {
         let cube = &self.reflection_probes;
         let build = || {
             GlobalGroup {
-                camera: &self.camera_buffer,
+                camera: &self.camera_buffer.uniform,
                 lighting: &self.lighting_buffer,
                 skybox: sky.view(panorama),
                 cube: &cube.view,

@@ -5,6 +5,7 @@
 
 use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use super::DofParams;
+use crate::gpu::commands::Commands;
 use crate::postfx::params::Gate;
 use crate::postfx::params::{effect_runs, PostSource};
 use crate::{RenderView, Renderer};
@@ -26,14 +27,14 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }],
 };
 
-fn focus(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn focus(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let runs = cx.effect.full && !cx.stack.editor_mode;
     let (post, graphics) = (cx.effect.post, cx.effect.graphics);
     let params = dof_params(post, graphics, view.scene_size().height).filter(|_| runs);
     let gpu = (&r.device, &r.queue);
     let passes = &r.post_passes.depth_of_field;
     view.post_fx
-        .run_depth_of_field(gpu, passes, params, &r.gpu_timer);
+        .run_depth_of_field(gpu, commands.encoder(), passes, params, &r.gpu_timer);
 }
 
 /// The depth of field `post`'s volume runs this frame, for a view `height` pixels

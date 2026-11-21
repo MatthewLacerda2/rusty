@@ -17,8 +17,8 @@
 //! the kept texture is freed whenever nothing will read it (gizmos off, or
 //! upscaling).
 
+use crate::draw::camera::buffer::Slot;
 use crate::draw::camera::CameraCtx;
-use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::effects::taa;
 use crate::{RenderView, Renderer};
@@ -26,7 +26,7 @@ use crate::{RenderView, Renderer};
 impl Renderer {
     /// Keep the base camera's depth for the game gizmos, before a stacked camera
     /// clears it.
-    pub(crate) fn keep_gizmo_depth(&self, view: &mut RenderView) {
+    pub(crate) fn keep_gizmo_depth(&self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let size = view.depth_texture.size();
         let stale = view
             .gizmo_depth
@@ -49,14 +49,9 @@ impl Renderer {
         let Some((kept, _)) = &view.gizmo_depth else {
             return;
         };
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Game Gizmo Depth Copy"),
-            });
         let from = view.depth_texture.as_image_copy();
+        let encoder = ctx.commands.encoder();
         encoder.copy_texture_to_texture(from, kept.as_image_copy(), size);
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Whether TAA upscales this stack's view, where the game gizmos are not drawn
@@ -70,7 +65,7 @@ impl Renderer {
     }
 
     /// Draw the game gizmos onto the stack's output, on its last camera.
-    pub(crate) fn draw_game_gizmos(&self, view: &mut RenderView, ctx: &CameraCtx) {
+    pub(crate) fn draw_game_gizmos(&self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let stack = ctx.stack;
         if self.gizmos_upscaled(view, ctx) {
             if !view.gizmo_upscale_told {
@@ -93,14 +88,17 @@ impl Renderer {
         uniform.view_proj = ctx.base_view_proj.to_cols_array();
         uniform.inv_view_proj = ctx.base_view_proj.inverse().to_cols_array();
         uniform.camera_pos = base.position.to_array();
-        let camera = &self.camera_buffer;
-        self.queue
-            .counted_write_buffer(camera, 0, bytemuck::bytes_of(&uniform));
+        // Copies in the camera's encoder, around the gizmos' pass (`camera::buffer`).
+        let (camera, queue) = (&self.camera_buffer, &self.queue);
+        camera.record((queue, ctx.commands.encoder()), Slot::GizmoBase, &uniform);
         let overlays = self.precreate_game_overlays(ctx.scene, base.position);
-        self.draw_overlay_pass(&overlays, stack.output, depth);
+        self.draw_overlay_pass(ctx.commands.encoder(), &overlays, stack.output, depth);
         // Back to this camera's own, for anything after the stack that reads it.
-        self.queue
-            .counted_write_buffer(camera, 0, bytemuck::bytes_of(&ctx.uniform));
+        camera.record(
+            (queue, ctx.commands.encoder()),
+            Slot::GizmoBack,
+            &ctx.uniform,
+        );
     }
 }
 

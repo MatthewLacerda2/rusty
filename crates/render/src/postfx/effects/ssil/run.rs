@@ -4,6 +4,7 @@
 use super::pass::{Stage, StageInputs};
 use super::targets::{History, SsilTargets};
 use super::{Previous, SsilFrame};
+use crate::draw::camera::buffer::Slot;
 use crate::draw::camera::CameraCtx;
 use crate::draw::record::Solids;
 use crate::gpu::bind_layouts::create_shadow_bind_group;
@@ -117,11 +118,6 @@ impl Renderer {
             return;
         };
         if let Some(t) = view.post_fx.targets.get_mut::<SsilTargets>() {
-            let mut encoder = self
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("SSIL Source Encoder"),
-                });
             let scene = &view.post_fx.scene_hdr.view;
             let inputs = StageInputs {
                 uniform: &t.uniform,
@@ -130,10 +126,9 @@ impl Renderer {
                 prev: scene,
                 prev_normal: scene,
             };
-            let gpu = (&self.device, &mut encoder);
+            let gpu = (&self.device, ctx.commands.encoder());
             let target = (&[&t.source.view][..], &self.gpu_timer);
             (self.post_passes.ssil).record(gpu, Stage::Source, inputs, target);
-            self.queue.counted_submit(std::iter::once(encoder.finish()));
             let camera = Previous {
                 view_proj: frame.view_proj,
                 eye: frame.eye,
@@ -143,11 +138,10 @@ impl Renderer {
                 camera,
             });
         }
-        // After that submit: a write lands before the next one, so the opaque pass
-        // read the flag set and everything after it reads it clear.
+        // A copy in the camera's encoder, after the opaque pass and the source: they
+        // read the flag set, everything after it reads it clear.
         ctx.uniform.ssil[0] = 0.0;
-        let uniform = bytemuck::bytes_of(&ctx.uniform);
-        self.queue
-            .counted_write_buffer(&self.camera_buffer, 0, uniform);
+        let at = (&self.queue, ctx.commands.encoder());
+        (self.camera_buffer).record(at, Slot::SsilCleared, &ctx.uniform);
     }
 }

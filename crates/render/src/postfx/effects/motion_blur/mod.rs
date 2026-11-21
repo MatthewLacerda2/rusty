@@ -174,6 +174,7 @@ impl PostFx {
     pub(crate) fn run_motion_blur(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        encoder: &mut wgpu::CommandEncoder,
         passes: &MotionBlurPasses,
         params: Option<BlurParams>,
         timer: &GpuTimer,
@@ -206,14 +207,10 @@ impl PostFx {
             (&passes.neighbor_max, &tiles.tile_max, &tiles.neighbor_max),
             (&passes.gather, &tiles.neighbor_max, &targets.blurred),
         ];
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Motion Blur Encoder"),
-        });
         for (pipeline, input, target) in steps {
             let timed = (pipeline.get(), timer.writes(GpuPass::MotionBlur));
-            Self::fullscreen(&mut encoder, timed, &[&group(&input.view)], &target.view);
+            Self::fullscreen(encoder, timed, &[&group(&input.view)], &target.view);
         }
-        queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

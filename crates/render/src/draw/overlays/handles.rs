@@ -10,7 +10,7 @@
 
 use crate::draw::resources::Overlays;
 use crate::gpu::groups;
-use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::CountedEncoder as _;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 use rusty_scene::Scene;
@@ -21,28 +21,25 @@ impl Renderer {
     /// last, the editor's one camera, at `eye`). Group 0 still holds its uniform.
     pub(crate) fn draw_handles(
         &self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &RenderView,
         scene: &Scene,
         output: &wgpu::TextureView,
         eye: glam::Vec3,
     ) {
         let overlays = self.precreate_overlays(scene, &view.gizmos, eye);
-        self.draw_overlay_pass(&overlays, output, &view.depth_view);
+        self.draw_overlay_pass(encoder, &overlays, output, &view.depth_view);
     }
 
     /// Draw `overlays` onto `output`, tested against `depth` (never written), with
     /// the camera uniform group 0 holds now.
     pub(super) fn draw_overlay_pass(
         &self,
+        encoder: &mut wgpu::CommandEncoder,
         overlays: &Overlays,
         output: &wgpu::TextureView,
         depth: &wgpu::TextureView,
     ) {
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Editor Handles Encoder"),
-            });
         {
             let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
                 multiview_mask: None,
@@ -77,6 +74,5 @@ impl Renderer {
             pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
             self.draw_editor_overlays(&mut pass, overlays);
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }

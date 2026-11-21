@@ -1,5 +1,5 @@
 //! The `occlusion` stage (#1963, the [module docs](super)): one camera's two
-//! phases recorded into one encoder and one submit, and timed whole or, on a
+//! phases recorded into the camera's encoder (`CameraCtx::commands`), and timed whole or, on a
 //! timed frame, by part (#2401): the select, phase one's depth draw, the
 //! pyramid, the instance test and compaction, and the cluster cull, each its own
 //! GPU pair (`gpu.occlusion.<part>`) and CPU lap (`render.occlusion.<part>`); the
@@ -10,7 +10,7 @@ use super::clusters::ClusterDraws;
 use super::cull::{late_args, CameraCull, ARGS};
 use super::pyramid::Pyramid;
 use crate::draw::camera::CameraCtx;
-use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::CountedEncoder as _;
 use crate::timing::GpuPart;
 use crate::{RenderView, Renderer};
 
@@ -32,14 +32,14 @@ impl Renderer {
         let batches = opaque.len() as u32;
         // Before the timer lends out its pairs: phase one draws through this group.
         self.update_global_bind_group();
-        // The stage is one encoder and one submit. A timed frame records each part
+        // The stage records into the camera's encoder. A timed frame records each part
         // in a pass and pair of its own (#2401), since a pair cannot open and
         // close inside a pass; any other frame takes no pair, so it records the
         // parts after phase one in one pass (#2327).
         let (timer, split) = (&self.gpu_timer, self.gpu_timer.splits());
         let pair = |part| split.then(|| timer.part_compute_writes(part)).flatten();
         let open = pair(GpuPart::OcclusionSelect);
-        let mut encoder = self.device.create_command_encoder(&Default::default());
+        let encoder = ctx.commands.encoder();
         let mut select = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Hi-Z Select"),
             timestamp_writes: open,
@@ -51,23 +51,24 @@ impl Renderer {
         // Phase one clears the depth: the prepass then keeps it (#2336).
         let phase_one = ("Hi-Z Phase One", phase_one.flatten(), CLEAR);
         let solids = (opaque, Some(&first));
-        self.record_depth(&mut encoder, &view.depth_view, solids, phase_one);
+        self.record_depth(encoder, &view.depth_view, solids, phase_one);
         self.lap(lap_of(GpuPart::OcclusionPhaseOne));
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
-        last.clusters = self.record_cull(&mut encoder, cull, at, (n, batches, split));
-        cam.copy_counts(&self.device, &mut encoder, batches);
+        last.clusters = self.record_cull(encoder, cull, at, (n, batches, split));
+        cam.copy_counts(&self.device, encoder, batches);
         self.lap(lap_of(GpuPart::OcclusionTest));
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
-        cam.counter.request(n);
-        cam.clusters.counter.request(plan.tested);
+        // Mapped once the camera's commands are submitted (#2353).
+        cam.counter.request(n, &mut ctx.commands);
+        let tested = plan.tested;
+        cam.clusters.counter.request(tested, &mut ctx.commands);
         let counters = &mut self.frame_counters;
         counters.hiz_culled += cam.counter.culled;
         counters.hiz_late += cam.counter.late;
         counters.cluster_tested += plan.tested;
         counters.cluster_culled += cam.clusters.counter.while_active(!plan.runs.is_empty());
         ctx.solids.culled = Some(last);
-        self.lap("occlusion.submit");
+        self.lap("occlusion.record");
     }
 
     /// How many of camera `idx`'s instances its stage culls; `None` when it is

@@ -19,6 +19,7 @@
 mod effect;
 mod params;
 
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 pub(crate) use effect::EFFECT;
 pub use params::{Clock, ExposureParams, Step};
@@ -193,9 +194,10 @@ impl ExposureMeter {
     /// Meter `scene` (the view's HDR target, `size` pixels) and adapt, with
     /// `params` (timed under `post_fx`), then start reading the result back when no
     /// earlier read is in flight.
-    pub fn run(
+    pub(crate) fn run(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        commands: &mut Commands,
         (passes, timer): (&ExposurePasses, &GpuTimer),
         (scene, size): (&wgpu::TextureView, [u32; 2]),
         params: &ExposureParams,
@@ -203,9 +205,7 @@ impl ExposureMeter {
         self.collect();
         queue.counted_write_buffer(&self.params, 0, bytemuck::bytes_of(params));
         let bind_group = self.bind_group(device, passes, scene);
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Auto Exposure"),
-        });
+        let encoder = commands.encoder();
         {
             let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some("Auto Exposure"),
@@ -219,16 +219,15 @@ impl ExposureMeter {
             pass.set_pipeline(&passes.reduce);
             pass.dispatch_workgroups(1, 1, 1);
         }
-        let read = self.mapping.load(Ordering::Acquire) == IDLE;
-        if read {
+        if self.mapping.load(Ordering::Acquire) == IDLE {
             encoder.copy_buffer_to_buffer(&self.state, 0, &self.staging, 0, Some(STATE_BYTES));
-        }
-        queue.counted_submit(std::iter::once(encoder.finish()));
-        if read {
+            // Mapped once the copy is submitted: wgpu refuses a map while it waits.
             self.mapping.store(MAPPING, Ordering::Release);
-            let mapping = Arc::clone(&self.mapping);
-            self.staging.map_async(wgpu::MapMode::Read, .., move |res| {
-                mapping.store(if res.is_ok() { MAPPED } else { IDLE }, Ordering::Release);
+            let (mapping, staging) = (Arc::clone(&self.mapping), self.staging.clone());
+            commands.after_send(move || {
+                staging.map_async(wgpu::MapMode::Read, .., move |res| {
+                    mapping.store(if res.is_ok() { MAPPED } else { IDLE }, Ordering::Release);
+                });
             });
         }
     }

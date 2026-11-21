@@ -23,10 +23,14 @@
 //! with the rest); the copy, the pyramids, the params uniform and the two bind
 //! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
 //! timer's rows: `ssr` holds the trace, charged from its own start; the copy before
-//! it is a command, not a pass, so no row holds it (it heads SSR's submit, so it
-//! lands in `gpu_between_submits_ms`); `ssr_pyramids` and `ssr_resolve` hold the
+//! it is a command, not a pass, so no row holds it: it sits in the camera's
+//! encoder after the opaque pass and before the trace (#2353), at the head of the
+//! submit after the scene pass's early flush (`draw::camera::EARLY_FLUSHES`), so
+//! it is in `gpu_between_submits_ms` (in `gpu_other_ms` when no flush follows
+//! the scene pass); `ssr_pyramids` and `ssr_resolve` hold the
 //! other two.
 
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
 
@@ -155,6 +159,7 @@ impl PostFx {
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        commands: &mut Commands,
         passes: &SsrPasses,
         params: Option<SsrParams>,
         timer: &GpuTimer,
@@ -177,26 +182,16 @@ impl PostFx {
         let t = self.targets.get_mut::<SsrTargets>().expect("fitted above");
         queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
-        super::poison::write(t.poisoned, queue, &self.scene_hdr.texture);
+        super::poison::write(t.poisoned, (queue, commands), &self.scene_hdr.texture);
         // A cloned handle (reference-counted, no new group), so `t` stays borrowable.
         let group = t.group(device, passes, inputs).clone();
 
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("SSR Encoder"),
-        });
+        let encoder = commands.encoder();
         let extent = self.scene_hdr.texture.size();
         let (from, to) = (&self.scene_hdr.texture, &t.colour);
         encoder.copy_texture_to_texture(from.as_image_copy(), to.as_image_copy(), extent);
         let traced = (&t.traced, &t.resolve);
-        trace_and_resolve(
-            &mut encoder,
-            passes,
-            &group,
-            traced,
-            &self.scene_hdr.view,
-            timer,
-        );
-        queue.counted_submit(std::iter::once(encoder.finish()));
+        trace_and_resolve(encoder, passes, &group, traced, &self.scene_hdr.view, timer);
     }
 }
 
@@ -215,8 +210,8 @@ fn trace_and_resolve(
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
-        // The colour copy recorded just before is no pass, and heads this submit:
-        // no pass boundary can stamp it, so it is in `gpu_between_submits_ms`.
+        // The colour copy recorded just before is no pass: it heads the submit
+        // after the scene pass's early flush, so it is in `gpu_between_submits_ms`.
         let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());

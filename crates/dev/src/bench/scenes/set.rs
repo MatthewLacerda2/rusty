@@ -19,7 +19,10 @@
 //!   `render.ssil`), handed to every renderer the run builds, the editor round's
 //!   too, through `Options::switches`: what the forward pass reads is bound to its
 //!   stand-in, no pipeline or layout changing (`render::stats::switches` says what
-//!   each takes and what stays).
+//!   each takes and what stays);
+//! - **`render.flushes`**, where a camera's commands go out early
+//!   (`rusty_render::EarlyFlushes`: `none`, `occlusion`, `occlusion_scene`, the
+//!   default), handed in the same way: the same pixels, only the submits move.
 //!
 //! Everything is in memory: the project's `project.rusty` is never written. A
 //! key no namespace has fails before anything runs, listing every namespace's
@@ -28,7 +31,7 @@
 use rusty_core::project::ProjectSettings;
 use rusty_core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty_core::settings::quality::{QualityPresets, QualityValues};
-use rusty_render::{RenderSwitch, RenderSwitches};
+use rusty_render::{EarlyFlushes, RenderSwitch, RenderSwitches};
 use serde_json::{Map, Value};
 
 /// The run's overrides, in the order given.
@@ -58,6 +61,15 @@ impl Overrides {
                 Some(("option", name)) => {
                     let option = GraphicsOption::parse(name).ok_or_else(|| unknown_in(key))?;
                     out.options.push((option, flag(key, value)?));
+                }
+                Some(("render", "flushes")) => {
+                    let flushes = EarlyFlushes::parse(value.trim()).ok_or_else(|| {
+                        format!(
+                            "--set render.flushes wants {}, not '{value}'",
+                            EarlyFlushes::names()
+                        )
+                    })?;
+                    out.switches.set_flushes(flushes);
                 }
                 Some(("render", name)) => {
                     let switch = RenderSwitch::parse(name).ok_or_else(|| unknown_in(key))?;
@@ -136,9 +148,10 @@ fn unknown_in(key: &str) -> String {
 /// The keys of the two flat namespaces, for every refusal of an unknown key.
 fn namespaces() -> String {
     format!(
-        "option.<name>: {}; render.<switch>: {}",
+        "option.<name>: {}; render.<switch>: {}; render.flushes: {}",
         GraphicsOption::names(),
-        RenderSwitch::names()
+        RenderSwitch::names(),
+        EarlyFlushes::names()
     )
 }
 

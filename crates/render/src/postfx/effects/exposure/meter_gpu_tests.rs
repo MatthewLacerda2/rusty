@@ -8,6 +8,7 @@
 
 use super::params::Step;
 use super::{ExposureMeter, ExposureParams};
+use crate::gpu::commands::Commands;
 use crate::postfx::grade::gpu::f16;
 use crate::postfx::HDR_FORMAT;
 use crate::test_gpu::headless_or_skip;
@@ -81,7 +82,10 @@ fn spread(size: [u32; 2], ae: &AutoExposure, step: [f32; 2]) -> f32 {
                 scene.size(),
             );
             let passes = (&r.post_passes.exposure, &r.gpu_timer);
-            meter.run((&r.device, &r.queue), passes, (&view, size), &params);
+            let mut commands = Commands::new(&r.device, &r.queue, "Meter");
+            let gpu = (&r.device, &r.queue);
+            meter.run(gpu, &mut commands, passes, (&view, size), &params);
+            commands.send();
             meter.settle(&r.device);
             meter.readout().expect("the meter read back")
         })

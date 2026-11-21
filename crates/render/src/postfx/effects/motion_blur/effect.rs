@@ -5,6 +5,7 @@
 
 use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use super::BlurParams;
+use crate::gpu::commands::Commands;
 use crate::motion;
 use crate::postfx::params::Gate;
 use crate::postfx::params::{effect_runs, PostSource};
@@ -30,15 +31,16 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 
 /// Gated by [`motion::wanted`], so the editor's Scene view never blurs and a view
 /// that wrote velocity only for depth of field runs no motion blur.
-fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let (post, graphics, stack) = (cx.effect.post, cx.effect.graphics, cx.stack);
     let blurs = motion::wanted(post, graphics, cx.effect.full, stack.editor_mode);
     let blur = blur_params(post, graphics, view.post_fx.chain_size.1)
         .filter(|_| blurs)
         .map(|b| b.per_frames(stack.motion_frames));
     let gpu = (&r.device, &r.queue);
+    let passes = &r.post_passes.motion_blur;
     view.post_fx
-        .run_motion_blur(gpu, &r.post_passes.motion_blur, blur, &r.gpu_timer);
+        .run_motion_blur(gpu, commands.encoder(), passes, blur, &r.gpu_timer);
 }
 
 /// The motion blur `post`'s camera runs this frame, for a view `height` pixels tall;

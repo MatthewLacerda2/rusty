@@ -9,7 +9,8 @@
 //! group whose dynamic offset picks a batch's
 //! uniform. The per-camera arrays are written with a `write_buffer` each. Nothing is
 //! keyed by entity, so two scenes rendered in one frame (#355) cannot evict each
-//! other: each render simply rewrites the arrays before its own submit.
+//! other: each camera rewrites the arrays once, and its passes go out in its one
+//! submit (`gpu::commands`) before the next camera rewrites them.
 //!
 //! **The object array** (#1706) is not packed per camera: every kept
 //! object's [`ObjectData`] (world matrix, probe SH, lightmap) at its slot of the

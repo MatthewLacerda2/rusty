@@ -16,7 +16,7 @@ use crate::gpu::bind_entry as entry;
 use crate::gpu::bind_layouts::create_shadow_bind_group;
 use crate::gpu::fullscreen::{color_pass, Fullscreen};
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
-use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
+use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
@@ -122,6 +122,7 @@ impl Renderer {
     /// 3 its transparent pass binds; else leave the view's copy unbound for this camera.
     pub(crate) fn copy_opaque(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         translucents: &[DrawBatch],
         traces: bool,
@@ -149,7 +150,7 @@ impl Renderer {
             .targets
             .get::<OpaqueCopy>()
             .expect("fitted above");
-        self.draw_copy(view, &copy.target.view);
+        self.draw_copy(encoder, view, &copy.target.view);
         let views = OpaqueViews {
             texture: &copy.target.view,
             sampler: &self.opaque_copy.sampler,
@@ -171,32 +172,31 @@ impl Renderer {
     }
 
     /// Draw `view`'s opaque colour and eye distances into `target`.
-    fn draw_copy(&self, view: &RenderView, target: &wgpu::TextureView) {
+    fn draw_copy(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &RenderView,
+        target: &wgpu::TextureView,
+    ) {
         let pass = &self.opaque_copy;
         let view_of = |v| wgpu::BindingResource::TextureView(v);
         let inputs = self.device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Opaque Copy Inputs"),
             layout: &pass.layout,
             entries: &[
-                entry(0, self.camera_buffer.as_entire_binding()),
+                entry(0, self.camera_buffer.uniform.as_entire_binding()),
                 entry(1, view_of(&view.post_fx.scene_hdr.view)),
                 entry(2, view_of(&view.depth_view)),
             ],
         });
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Opaque Copy Encoder"),
-            });
         {
             let timed = ("Opaque Copy", &self.gpu_timer, GpuPass::Transparent);
             let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
-            let mut rp = color_pass(&mut encoder, timed, target, clear);
+            let mut rp = color_pass(encoder, timed, target, clear);
             rp.set_pipeline(pass.pipeline.get());
             rp.set_bind_group(crate::gpu::ONLY_GROUP, &inputs, &[]);
             rp.draw(0..3, 0..1);
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// The scene group `view`'s transparent pass binds: its copy's this camera, else the

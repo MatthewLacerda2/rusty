@@ -21,7 +21,7 @@
 
 mod slots;
 
-use crate::gpu::ops::CountedQueue as _;
+use crate::gpu::commands::Commands;
 use std::collections::HashSet;
 use std::rc::Rc;
 
@@ -81,9 +81,10 @@ impl Renderer {
         view: &mut RenderView,
         scene: &Scene,
         cameras: &[TextureCamera],
-    ) {
+        mut commands: Commands,
+    ) -> Commands {
         if cameras.is_empty() {
-            return;
+            return commands;
         }
         let shown = referenced_render_textures(scene);
         let frame = view.render_textures.frame;
@@ -116,29 +117,15 @@ impl Renderer {
                 full_post_fx: cam.target.post_fx,
                 motion_frames,
             };
-            self.draw_stack(&mut slot.view, scene, pass);
-            self.copy_to_front(&slot.view, &slot.front.texture);
+            let mut last = self.draw_stack(&mut slot.view, scene, (pass, commands));
+            copy_to_front(last.encoder(), &slot.view, &slot.front.texture);
+            // The next camera rewrites the camera uniform: this one's go out first.
+            last.flush();
+            commands = last;
             slot.drawn_on = Some(frame);
             self.frame_counters.render_texture_draws += 1;
         }
-    }
-
-    /// Copy a render-texture view's finished target into the texture consumers sample.
-    fn copy_to_front(&self, view: &RenderView, front: &wgpu::Texture) {
-        let Some(source) = view.color_target() else {
-            return;
-        };
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Texture Copy"),
-            });
-        encoder.copy_texture_to_texture(
-            source.as_image_copy(),
-            front.as_image_copy(),
-            front.size(),
-        );
-        self.queue.counted_submit(Some(encoder.finish()));
+        commands
     }
 
     /// The material-cache key of a render texture's path: the path plus its current
@@ -175,3 +162,13 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
 #[cfg(test)]
 #[path = "tests.rs"]
 mod tests;
+
+/// Record the copy of a render-texture view's finished target into the texture
+/// consumers sample.
+fn copy_to_front(encoder: &mut wgpu::CommandEncoder, view: &RenderView, front: &wgpu::Texture) {
+    let Some(source) = view.color_target() else {
+        return;
+    };
+    let to = front.as_image_copy();
+    encoder.copy_texture_to_texture(source.as_image_copy(), to, front.size());
+}

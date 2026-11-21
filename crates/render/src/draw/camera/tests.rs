@@ -108,3 +108,21 @@ fn only_the_base_camera_traces_transparent_ssr() {
     // A view running no SSR: the base camera traces nothing either.
     assert_eq!(ssr_march(true, [0.0; 4]), ([0.0; 4], false));
 }
+
+#[test]
+fn early_flushes_follow_their_stages_in_pass_order_and_each_shape_uses_a_prefix() {
+    use super::{flushes_after, EARLY_FLUSHES};
+    use crate::EarlyFlushes;
+    let at: Vec<usize> = EARLY_FLUSHES.iter().map(|n| position(n)).collect();
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "in pass order: {at:?}");
+    // The depth work goes first, then the opaque pass (`EARLY_FLUSHES`' why).
+    assert_eq!(EARLY_FLUSHES, ["occlusion", "scene"]);
+    let after = |f| -> Vec<&str> {
+        let names = CAMERA_PASSES.iter().map(|(name, _)| *name);
+        names.filter(|n| flushes_after(f, n)).collect()
+    };
+    assert!(after(EarlyFlushes::None).is_empty());
+    assert_eq!(after(EarlyFlushes::Occlusion), ["occlusion"]);
+    assert_eq!(after(EarlyFlushes::OcclusionScene), ["occlusion", "scene"]);
+    assert_eq!(EarlyFlushes::default(), EarlyFlushes::OcclusionScene);
+}

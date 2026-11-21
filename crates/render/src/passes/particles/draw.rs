@@ -61,6 +61,7 @@ impl Renderer {
     /// Draw every sprite emitter's live particles into the HDR scene target.
     pub(crate) fn draw_particles(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
@@ -108,7 +109,7 @@ impl Renderer {
                 })
         });
         self.ensure_scene_depth_bind_group(view);
-        self.encode_particle_pass(view, &batches, instance_buffer.as_ref());
+        self.encode_particle_pass(encoder, view, &batches, instance_buffer.as_ref());
         ParticleDraws {
             draw_calls: batches.len() as u32,
             instances: drawn,
@@ -189,6 +190,7 @@ impl Renderer {
     /// batch with its blend pipeline and sprite texture.
     fn encode_particle_pass(
         &self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &RenderView,
         batches: &[ParticleBatch],
         instance_buffer: Option<&wgpu::Buffer>,
@@ -198,11 +200,6 @@ impl Renderer {
             .scene_depth_bind_group
             .as_ref()
             .expect("scene depth bind group built");
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Particle Encoder"),
-            });
         let reactive = view.post_fx.taa_reactive().is_some();
         {
             let mut pass = encoder.counted_render_pass(&wgpu::RenderPassDescriptor {
@@ -245,7 +242,6 @@ impl Renderer {
                 }
             }
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 }
 

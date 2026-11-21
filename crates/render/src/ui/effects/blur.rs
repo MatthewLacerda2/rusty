@@ -18,7 +18,6 @@
 //! light; the UI pass samples a result through its non-sRGB view, getting the
 //! display-encoded values it blends in.
 
-use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use super::backdrop::blur_level;
@@ -175,7 +174,11 @@ fn wanted_levels(view: &RenderView, divisor: u32) -> Vec<u32> {
 impl Renderer {
     /// Blur the finished frame at every level the overlay canvases' backdrops use
     /// (see the module docs). A no-op when none is visible.
-    pub(crate) fn run_backdrop_blur(&mut self, view: &mut RenderView) {
+    pub(crate) fn run_backdrop_blur(
+        &mut self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &mut RenderView,
+    ) {
         view.ui.effects.blur_passes = 0;
         let divisor = self.quality.backdrop_divisor();
         let levels = wanted_levels(view, divisor);
@@ -197,11 +200,6 @@ impl Renderer {
         };
         targets.ensure(&self.device, deepest, &levels);
         self.ui_renderer.blur.ensure(&self.device, format);
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("UI Backdrop Encoder"),
-            });
         let sky = self.sky_panorama();
         let ctx = PostFxContext {
             depth_view: &view.depth_view,
@@ -210,9 +208,8 @@ impl Renderer {
             timer: &self.gpu_timer,
             passes: &self.post_passes,
         };
-        view.post_fx.composite_into(&self.device, &mut encoder, ctx);
-        let passes = self.encode_chain(&mut encoder, targets, deepest, &levels);
-        self.queue.counted_submit(Some(encoder.finish()));
+        view.post_fx.composite_into(&self.device, encoder, ctx);
+        let passes = self.encode_chain(encoder, targets, deepest, &levels);
         view.ui.effects.blur_passes = 1 + passes;
     }
 
