@@ -30,7 +30,8 @@ pub struct Ssr {
     /// smoothness, narrowed so it is whole by smoothness 0.9 (HDRP's default
     /// *Smoothness Fade Start*: 0.8 fades in over 0.1, SSR's look before this knob).
     /// From 0.96, the smoothest any surface gets, the view runs no SSR. The default
-    /// 0.3 reflects up to roughness 0.7, fully to 0.5.
+    /// 0.7 reflects up to roughness 0.3, fully to 0.1: a rougher surface's
+    /// reflection is the part of SSR the eye reads least for what it costs.
     pub min_smoothness: f32,
 }
 
@@ -48,14 +49,14 @@ impl Ssr {
 
 impl Default for Ssr {
     /// On, at the preset's `Medium` level; `Custom` starts at HDRP's Medium march,
-    /// 32 steps of 0.375 m; reflecting up to roughness 0.7.
+    /// 32 steps of 0.375 m; reflecting up to roughness 0.3.
     fn default() -> Self {
         Self {
             active: true,
             quality: EffectQuality::Medium,
             steps: 32,
             step_length: 0.375,
-            min_smoothness: 0.3,
+            min_smoothness: 0.7,
         }
     }
 }

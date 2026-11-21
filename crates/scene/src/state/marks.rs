@@ -127,6 +127,8 @@ pub const MARKS: &[Mark] = marks! {
     "history_cuts" => |s, b| s.history_cuts.cut(Some(b)), s.history_cuts.of(Some(b)) == 1;
     "shader_time" => |s, _| s.shader_time = 7.5, s.shader_time == 7.5;
     "ui_time" => |s, _| s.ui_time = 7.5, s.ui_time == 7.5;
+    "inspected_reflection_probe" => |s, _| s.inspected_reflection_probe = Some(7),
+        s.inspected_reflection_probe == Some(7);
     "meshes_read_at" => |s, _| s.meshes_read_at = u64::MAX - 1, s.meshes_read_at == u64::MAX - 1;
     "meshes_reimported" => |s, _| s.meshes_reimported.insert("marked.glb".into(), 7),
         s.meshes_reimported.contains_key("marked.glb");

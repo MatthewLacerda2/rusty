@@ -52,9 +52,10 @@ fn the_base_camera_marches_ssrs_quality_only_while_the_view_runs_ssr() {
 
 #[test]
 fn a_translucent_reflects_sharp_so_never_below_the_sharp_floor() {
-    // The volume's default reflects opaques to roughness 0.7; a translucent, whose
-    // hit is sharp, keeps the floor. A stricter volume is followed.
+    // A volume reflecting opaques to roughness 0.7: a translucent, whose hit is
+    // sharp, keeps the floor. A stricter volume is followed.
     let mut vc = volume(40, 0.3);
+    vc.ssr.min_smoothness = 0.3;
     assert!(vc.ssr.min_smoothness < SHARP_SMOOTHNESS);
     assert_eq!(march(&vc, true)[2], SHARP_SMOOTHNESS);
     vc.ssr.min_smoothness = 0.9;

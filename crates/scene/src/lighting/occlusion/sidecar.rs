@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::file::{decode, encode, occlusion_path, other_version, version_of, SUFFIX};
+use super::file::{decode, encode, is_unversioned, occlusion_path, version_of, SUFFIX};
 use super::{OcclusionData, OCCLUSION_VERSION};
 use crate::io::Saved;
 use crate::Scene;
@@ -43,8 +43,9 @@ enum Read {
     Missing,
     Unreadable(std::io::Error),
     Refused(Vec<u8>, String),
-    /// Another bake version's file, refused by its version alone.
-    OtherVersion(Vec<u8>, u32),
+    /// Another bake version's file, refused by its version alone, and why
+    /// (`file::other_version`: older, newer, or from before the version field).
+    OtherVersion(Vec<u8>, String),
     /// The file's bytes, what a save would write (encoded afresh: a file that does
     /// not round-trip byte for byte never reads as a bake since), and the PVS.
     Decoded(Vec<u8>, Vec<u8>, OcclusionData),
@@ -57,14 +58,19 @@ pub fn read_sidecar(scene_path: &str) -> OcclusionFile {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(e) => Read::Unreadable(e),
         Ok(bytes) => match decode(&bytes) {
-            Err(e) => match version_of(&bytes) {
-                Some(v) if v != OCCLUSION_VERSION => Read::OtherVersion(bytes, v),
-                _ => Read::Refused(bytes, e),
-            },
+            Err(e) if is_unversioned(&bytes) || other_version(&bytes) => {
+                Read::OtherVersion(bytes, e)
+            }
+            Err(e) => Read::Refused(bytes, e),
             Ok(data) => Read::Decoded(bytes, encode(&data), data),
         },
     };
     OcclusionFile { path, read }
+}
+
+/// Whether `bytes` are an occlusion file of another bake version.
+fn other_version(bytes: &[u8]) -> bool {
+    version_of(bytes).is_some_and(|v| v != OCCLUSION_VERSION)
 }
 
 /// Put what [`read_sidecar`] found on `scene` ([`load_sidecar`] says what each
@@ -90,8 +96,7 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
             );
             scene.bake_files.refused(&path, &bytes, &e)
         }
-        Read::OtherVersion(bytes, version) => {
-            let why = other_version(version);
+        Read::OtherVersion(bytes, why) => {
             log::warn!("[Occlusion] {} is {why}", path.display());
             scene.bake_files.refused(&path, &bytes, &why)
         }

@@ -81,21 +81,72 @@ pub fn version_of(bytes: &[u8]) -> Option<u32> {
 
 /// Why a file of bake `version` is refused by this build, which reads and writes
 /// [`OCCLUSION_VERSION`] alone.
-pub(super) fn other_version(version: u32) -> String {
+fn other_version(version: u32) -> String {
     let age = if version < OCCLUSION_VERSION {
         "an older"
     } else {
         "a newer"
     };
+    rebake(&format!(
+        "{age} occlusion bake (version {version}, this build writes {OCCLUSION_VERSION})"
+    ))
+}
+
+/// Why a file from before the version field is refused: its first `u32` is its
+/// object count, so read as a version it would tell an older file as "newer" (or,
+/// at a count of [`OCCLUSION_VERSION`], fail on a later field).
+fn unversioned() -> String {
+    rebake("an occlusion bake from an older engine, which wrote no version")
+}
+
+/// `what` was refused, and what clears it.
+fn rebake(what: &str) -> String {
     format!(
-        "{age} occlusion bake (version {version}, this build writes {OCCLUSION_VERSION}): \
-         nothing is occlusion-culled until it is re-baked (Generate Lighting or Bake Occlusion)"
+        "{what}: nothing is occlusion-culled until it is re-baked (Generate Lighting or \
+         Bake Occlusion)"
     )
 }
 
+/// Whether `bytes` are laid out as the occlusion file was before it held a version:
+/// `RPVS`, the objects (a `u32` count, 13 bytes each), the grid (28 bytes), the rows'
+/// words (a `u32` count, 8 bytes each) and the cells (a `u32` count, 4 bytes each),
+/// ending exactly at the file's end. Its counts say how long it is, so a versioned
+/// file matches it only by an exact coincidence of lengths.
+pub(super) fn is_unversioned(bytes: &[u8]) -> bool {
+    let count_at = |at: usize| -> Option<usize> {
+        let b = bytes.get(at..at.checked_add(4)?)?;
+        Some(u32::from_le_bytes(b.try_into().ok()?) as usize)
+    };
+    let walk = || -> Option<usize> {
+        let mut at: usize = 4;
+        at = at
+            .checked_add(4)?
+            .checked_add(count_at(at)?.checked_mul(13)?)?;
+        at = at.checked_add(28)?;
+        at = at
+            .checked_add(4)?
+            .checked_add(count_at(at)?.checked_mul(8)?)?;
+        at.checked_add(4)?
+            .checked_add(count_at(at)?.checked_mul(4)?)
+    };
+    bytes.starts_with(MAGIC) && walk() == Some(bytes.len())
+}
+
 /// The data `bytes` hold, or why they are refused. A file another bake version
-/// wrote is refused by its version before any other field is read.
+/// wrote is refused by its version before any other field is read, and one from
+/// before the version field (`is_unversioned`) as that, whatever its first `u32`.
 pub fn decode(bytes: &[u8]) -> Result<OcclusionData, String> {
+    decode_versioned(bytes).map_err(|e| {
+        if is_unversioned(bytes) {
+            unversioned()
+        } else {
+            e
+        }
+    })
+}
+
+/// [`decode`] for a file of the versioned layout.
+fn decode_versioned(bytes: &[u8]) -> Result<OcclusionData, String> {
     let mut r = Reader(bytes);
     if r.take(4)? != MAGIC {
         return Err("not an occlusion file".into());

@@ -808,7 +808,10 @@ no pixel: a mesh it skips is one no ray from the camera's cell reaches.
   occlusion-culled, and the next save removes or rewrites it. A file another
   version of the bake wrote is refused by its version, read first: `<file> is an
   older occlusion bake (version 1, this build writes 2): nothing is
-  occlusion-culled until it is re-baked (Generate Lighting or Bake Occlusion)`. One that is there but
+  occlusion-culled until it is re-baked (Generate Lighting or Bake Occlusion)`; a
+  file from before the version field (whose first number is its object count) is
+  told as `an occlusion bake from an older engine, which wrote no version`, however
+  many objects it holds. One that is there but
   cannot be read (a permission) also culls nothing, with a warning, and the next save
   leaves it in place.
 - **A bake older than the scene** never hides what is there: a static mesh moved,
