@@ -193,6 +193,13 @@ impl<'a> CameraCtx<'a> {
             commands,
         }
     }
+
+    /// Whether this camera runs SSAO or SSIL, and so their depth prepass under its
+    /// forward pass (#1750): the one test of it, read when its opaque runs are
+    /// ranked (#2484) and carried to its scene pass (`ScenePassFrame::screen_space`).
+    pub(crate) fn screen_space(&self) -> bool {
+        self.ssao.is_some() || self.ssil.is_some()
+    }
 }
 
 /// Whether a camera is an overlay: `DepthOnly` and stacked on another (a viewmodel,

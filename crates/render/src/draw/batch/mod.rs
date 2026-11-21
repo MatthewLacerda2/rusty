@@ -8,7 +8,8 @@
 //!
 //! Opaque items are sorted by key first, so every copy of a prop lands in one run,
 //! then the runs are ordered roughly front to back ([`sort::front_to_back`], #1499),
-//! so nearer solids fill the depth buffer before farther ones are shaded.
+//! so nearer solids fill the depth buffer before farther ones are shaded; over a
+//! primed depth the solids writing their own depth come first ([`OpaqueOrder`], #2484).
 //! Transparent items are not: their order (sorting priority, then back to front,
 //! [`sort::transparent_order`]) is what makes blending correct, so only *consecutive* equal keys merge there — "where order allows".
 //! The selection outline (#1175) is recorded here too: an item marked `outline` gets
@@ -22,6 +23,7 @@ pub(crate) mod sort;
 mod traits;
 
 pub(crate) use opaque::OpaqueBatches;
+pub(crate) use sort::OpaqueOrder;
 pub(crate) use traits::RecordTraits;
 
 use std::ops::Range;
@@ -137,9 +139,10 @@ pub(crate) struct FrameDraws {
 }
 
 impl FrameDraws {
-    /// Batch `opaque` (sorted by key, its runs nearest first) and `transparent` (order kept — the caller sorted
+    /// Batch `opaque` (sorted by key, its runs ranked by `order`, then nearest first) and `transparent` (order kept — the caller sorted
     /// it by priority, then back-to-front). With `instancing` off every item is its own draw, in the
-    /// order given: the pre-#470 path, kept for equivalence tests and measurement.
+    /// order given inside its rank: the pre-#470 path, kept for equivalence tests and measurement.
+    /// Either way the opaque draws are in `order`'s ranks, which [`OpaqueBatches`] records.
     ///
     /// Each item's record slot is first turned into its value class's representative
     /// ([`MaterialRecords::rep`]), so two draws whose records hold equal bytes batch
@@ -148,16 +151,18 @@ impl FrameDraws {
     pub(crate) fn build(
         (mut opaque, mut transparent): (Vec<DrawItem>, Vec<DrawItem>),
         records: &MaterialRecords,
-        instancing: bool,
+        (instancing, order): (bool, OpaqueOrder),
     ) -> Self {
         for item in opaque.iter_mut().chain(&mut transparent) {
             item.key.record = records.rep(item.key.record);
         }
-        if instancing {
-            opaque = sort::front_to_back(opaque);
+        match instancing {
+            true => opaque = sort::front_to_back(opaque, order),
+            // Stable: the given order holds inside a rank.
+            false => opaque.sort_by_key(|item| order.rank(&item.key)),
         }
         let mut out = Self::default();
-        out.opaque = OpaqueBatches::new(out.push_runs(opaque, instancing, 0));
+        out.opaque = OpaqueBatches::new(out.push_runs(opaque, instancing, 0), order);
         let base = out.opaque.len() as u32;
         out.transparent = out.push_runs(transparent, instancing, base);
         out
@@ -232,3 +237,6 @@ mod outline_tests;
 
 #[cfg(test)]
 mod order_tests;
+
+#[cfg(test)]
+mod primed_order_tests;
