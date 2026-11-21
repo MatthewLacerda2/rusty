@@ -164,6 +164,9 @@ manifest, the row, then the compiler names every path left to fix.
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
   crate keeps the edit-loop's opt-level 0.
+- One member gets its own table at the dependencies' level: `rusty-zimmer`, whose
+  DSP inner loops every bake, the harness and the sound tests run hot, and which is
+  edited rarely, so its slower rebuild is seldom paid.
 - A dependency no test or frame runs hot gets its own `[profile.dev.package.<name>]`
   table back at opt-level 0, under its group's reason: the window and clipboard
   protocol crates, and host-only proc macros and build
