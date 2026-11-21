@@ -42,7 +42,7 @@ impl SynthError {
                 "song: automation of `send` on track `{track}`, but the song's `fx` has no \
                  `reverb` or `delay` for a send to reach"
             ),
-            other => write!(f, "{other:?}"),
+            other => other.say_length(f),
         }
     }
 }

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::super::steps::GRID_EPSILON;
+use super::super::play::steps::GRID_EPSILON;
 use super::super::Note;
 use super::Chord;
 use crate::error::SynthError;

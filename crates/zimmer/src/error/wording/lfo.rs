@@ -27,7 +27,7 @@ impl SynthError {
                 f,
                 "patch: lfo `{field}` must be zero or more seconds, got {seconds}"
             ),
-            other => write!(f, "{other:?}"),
+            other => other.say_pulse(f),
         }
     }
 }

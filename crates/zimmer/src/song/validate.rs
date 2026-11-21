@@ -80,7 +80,7 @@ impl Song {
                 return Err(SynthError::DuplicateAutomation { track, param });
             }
             check_curve(curve)?;
-            if curve.param == Param::Send && !super::mix::has_a_room(&self.fx) {
+            if curve.param == Param::Send && !super::render::has_a_room(&self.fx) {
                 return Err(SynthError::AutomationWithoutRoom { track });
             }
         }

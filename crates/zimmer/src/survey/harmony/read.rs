@@ -79,9 +79,50 @@ fn whole(n: f32) -> i64 {
     (f64::from(n) * 1000.0).round() as i64
 }
 
+#[derive(Default)]
+struct Tally {
+    found: Vec<(Group, Clash)>,
+    at: Map<Group, usize>,
+}
+
+impl Tally {
+    fn record(&mut self, song: &Song, low: &Held, high: &Held, beats: f32, place: Place) {
+        let group = (
+            place.section.clone(),
+            whole(place.beat),
+            low.track,
+            whole(low.midi),
+            high.track,
+            whole(high.midi),
+        );
+        match self.at.get(&group) {
+            Some(&index) => {
+                let clash = &mut self.found[index].1;
+                clash.at.times += 1;
+                clash.beats = clash.beats.max(beats);
+            }
+            None => {
+                self.at.insert(group.clone(), self.found.len());
+                let voice = |note: &Held| Voice {
+                    track: song.tracks[note.track].name.clone(),
+                    midi: note.midi,
+                };
+                self.found.push((
+                    group,
+                    Clash {
+                        low: voice(low),
+                        high: voice(high),
+                        beats,
+                        at: place,
+                    },
+                ));
+            }
+        }
+    }
+}
+
 pub(super) fn clashes(song: &Song, notes: &[Held]) -> (usize, f32, Vec<Clash>) {
-    let mut found: Vec<(Group, Clash)> = Vec::new();
-    let mut at: Map<Group, usize> = Map::default();
+    let mut tally = Tally::default();
     let (mut count, mut total) = (0, 0.0);
     for (i, first) in notes.iter().enumerate() {
         for second in notes[i + 1..].iter().take_while(|it| it.start < first.end) {
@@ -103,41 +144,10 @@ pub(super) fn clashes(song: &Song, notes: &[Held]) -> (usize, f32, Vec<Clash>) {
             } else {
                 (second, first)
             };
-            let place = place(song, second);
-            let group = (
-                place.section.clone(),
-                whole(place.beat),
-                low.track,
-                whole(low.midi),
-                high.track,
-                whole(high.midi),
-            );
-            match at.get(&group) {
-                Some(&index) => {
-                    let clash = &mut found[index].1;
-                    clash.at.times += 1;
-                    clash.beats = clash.beats.max(beats);
-                }
-                None => {
-                    at.insert(group.clone(), found.len());
-                    let voice = |note: &Held| Voice {
-                        track: song.tracks[note.track].name.clone(),
-                        midi: note.midi,
-                    };
-                    found.push((
-                        group,
-                        Clash {
-                            low: voice(low),
-                            high: voice(high),
-                            beats,
-                            at: place,
-                        },
-                    ));
-                }
-            }
+            tally.record(song, low, high, beats, place(song, second));
         }
     }
-    let mut longest: Vec<Clash> = found.into_iter().map(|(_, clash)| clash).collect();
+    let mut longest: Vec<Clash> = tally.found.into_iter().map(|(_, clash)| clash).collect();
     // Stable, so a tie keeps the order the piece reaches them in.
     longest.sort_by(|a, b| {
         b.beats

@@ -16,7 +16,7 @@ impl SynthError {
                 f,
                 "patch: the lfo is aimed at `pulse_width`, and the source has no `square` oscillator for it to move"
             ),
-            other => write!(f, "{other:?}"),
+            other => other.say_timing(f),
         }
     }
 }

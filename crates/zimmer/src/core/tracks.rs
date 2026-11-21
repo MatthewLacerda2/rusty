@@ -49,8 +49,7 @@ pub(super) fn cutoff_track(
     lfos: &Lfos,
     gate: f32,
     n: usize,
-    velocity: f32,
-    midi: f32,
+    (velocity, midi): (f32, f32),
     base: Option<&[f32]>,
 ) -> Vec<f32> {
     let envelope = env::track(&f.adsr, gate, n, RATE);

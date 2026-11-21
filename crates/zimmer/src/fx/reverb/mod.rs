@@ -92,16 +92,8 @@ pub(crate) fn apply(buf: &mut Stereo, size: f32, damp: f32, predelay: f32, mix: 
     room(buf, None, [size, damp, predelay], mix, rate);
 }
 
-pub(crate) fn apply_sent(
-    buf: &mut Stereo,
-    sent: &Stereo,
-    size: f32,
-    damp: f32,
-    predelay: f32,
-    mix: f32,
-    rate: f32,
-) {
-    room(buf, Some(sent), [size, damp, predelay], mix, rate);
+pub(crate) fn apply_sent(buf: &mut Stereo, sent: &Stereo, shape: [f32; 3], mix: f32, rate: f32) {
+    room(buf, Some(sent), shape, mix, rate);
 }
 
 fn room(

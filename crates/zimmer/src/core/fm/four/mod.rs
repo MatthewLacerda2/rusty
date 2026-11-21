@@ -5,16 +5,9 @@ mod routing;
 
 use std::f32::consts::TAU;
 
-use super::{feedback, voicing};
+use super::{feedback, voicing, Note};
 use crate::core::{env, nyquist};
 use crate::patch::{Algorithm, Operator, FM_OPERATORS};
-
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct Note {
-    pub(crate) gate: f32,
-    pub(crate) seed: u64,
-    pub(crate) rate: f32,
-}
 
 pub(crate) fn render(
     out: &mut [f32],
@@ -28,9 +21,7 @@ pub(crate) fn render(
         phase::starts(note.seed),
         out,
         freqs,
-        algorithm,
-        operators,
-        levels,
+        (algorithm, operators, levels),
         note,
     );
 }
@@ -39,9 +30,7 @@ fn render_from(
     mut phase: [f32; FM_OPERATORS],
     out: &mut [f32],
     freqs: &[f32],
-    algorithm: Algorithm,
-    operators: &[Operator; FM_OPERATORS],
-    levels: &[f32; FM_OPERATORS],
+    (algorithm, operators, levels): (Algorithm, &[Operator; FM_OPERATORS], &[f32; FM_OPERATORS]),
     note: Note,
 ) {
     let Note { gate, rate, .. } = note;
@@ -144,9 +133,7 @@ mod tests {
             phase,
             &mut out,
             &vec![hz; n],
-            algorithm,
-            &operators,
-            &levels,
+            (algorithm, &operators, &levels),
             note,
         );
         out

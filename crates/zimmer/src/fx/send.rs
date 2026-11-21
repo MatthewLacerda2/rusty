@@ -19,7 +19,7 @@ pub(crate) fn apply_chain_sent(
                 mix,
                 predelay,
             } => {
-                reverb::apply_sent(buf, sent, *size, *damp, *predelay, *mix, rate);
+                reverb::apply_sent(buf, sent, [*size, *damp, *predelay], *mix, rate);
                 reverb::apply(sent, *size, *damp, *predelay, *mix, rate);
             }
             Fx::Delay {
@@ -27,23 +27,17 @@ pub(crate) fn apply_chain_sent(
                 beats,
                 feedback,
                 mix,
-                ping_pong: true,
+                ping_pong,
             } => {
                 let spacing = Spacing::new(*time, *beats, tempo);
-                delay::ping_pong_sent(buf, sent, spacing, *feedback, *mix, rate);
-                delay::ping_pong(sent, spacing, *feedback, *mix, rate);
-            }
-            Fx::Delay {
-                time,
-                beats,
-                feedback,
-                mix,
-                ping_pong: false,
-            } => {
-                let spacing = Spacing::new(*time, *beats, tempo);
-                delay::apply_sent(&mut buf.l, &sent.l, spacing, *feedback, *mix, rate);
-                delay::apply_sent(&mut buf.r, &sent.r, spacing, *feedback, *mix, rate);
-                sent.each(|channel| delay::apply(channel, spacing, *feedback, *mix, rate));
+                if *ping_pong {
+                    delay::ping_pong_sent(buf, sent, spacing, *feedback, *mix, rate);
+                    delay::ping_pong(sent, spacing, *feedback, *mix, rate);
+                } else {
+                    delay::apply_sent(&mut buf.l, &sent.l, spacing, *feedback, *mix, rate);
+                    delay::apply_sent(&mut buf.r, &sent.r, spacing, *feedback, *mix, rate);
+                    sent.each(|channel| delay::apply(channel, spacing, *feedback, *mix, rate));
+                }
             }
             Fx::Compress {
                 threshold,

@@ -2,12 +2,12 @@
 
 pub(crate) mod pulse;
 mod unison;
+mod wave;
 
-use std::f32::consts::TAU;
-
-use crate::patch::{Osc, Wave};
+use crate::patch::Osc;
 use crate::stereo::{pan_gains, Stereo};
 use unison::{start_phase, voice_detune, voice_gain, voice_pan, voices};
+use wave::sample;
 
 pub(crate) fn render(
     oscs: &[Osc],
@@ -47,33 +47,11 @@ fn pitch_ratio(osc: &Osc, offset: f32) -> f32 {
     (osc.octave as f32 + (osc.detune_cents + offset) / 1200.0).exp2()
 }
 
-fn sample(wave: Wave, phase: f32, dt: f32, width: f32) -> f32 {
-    match wave {
-        Wave::Sine => (TAU * phase).sin(),
-        Wave::Triangle => 4.0 * (phase - 0.5).abs() - 1.0,
-        Wave::Saw => 2.0 * phase - 1.0 - poly_blep(phase, dt),
-        Wave::Square => pulse::sample(phase, dt, width),
-    }
-}
-
-fn poly_blep(phase: f32, dt: f32) -> f32 {
-    if dt <= 0.0 {
-        return 0.0;
-    }
-    if phase < dt {
-        let t = phase / dt;
-        2.0 * t - t * t - 1.0
-    } else if phase > 1.0 - dt {
-        let t = (phase - 1.0) / dt;
-        t * t + 2.0 * t + 1.0
-    } else {
-        0.0
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use super::wave::poly_blep;
     use super::*;
+    use crate::patch::Wave;
     use crate::patch::MAX_VOICES;
 
     fn osc(wave: Wave, gain: f32, octave: i32, detune_cents: f32) -> Osc {

@@ -1,6 +1,6 @@
 //! zimmer: sound from a document. A recipe (a [`Patch`] for one note, a [`Song`] for music)
 //! renders to samples and a WAV, a pure function of the document and [`SYNTH_VERSION`]: no I/O,
-//! no clock, no unseeded randomness. The caller writes the files and resolves patch references.
+//! no clock, no unseeded randomness. The caller does the I/O.
 
 pub(crate) mod core;
 pub(crate) mod error;

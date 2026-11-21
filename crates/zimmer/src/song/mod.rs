@@ -2,21 +2,17 @@
 
 pub(crate) mod anchor;
 pub(crate) mod arrangement;
-pub(crate) mod articulation;
 pub(crate) mod automate;
 mod cap;
 pub(crate) mod chord;
 pub(crate) mod clock;
 pub(crate) mod excerpt;
-pub(crate) mod feel;
 mod forms;
-pub(crate) mod glide;
 pub(crate) mod key;
-mod mix;
+pub(crate) mod play;
 pub(crate) mod render;
 pub(crate) mod sections;
 pub(crate) mod shape;
-pub(crate) mod steps;
 pub(crate) mod tempo;
 pub(crate) mod timing;
 mod validate;
@@ -30,15 +26,15 @@ use crate::patch::{Fx, Patch};
 
 pub use anchor::Anchor;
 pub use arrangement::{ArrangementEntry, Layer, Layers, Play};
-pub use articulation::Articulation;
 pub use automate::{Automation, Easing, Param, Point};
 pub use cap::MAX_SONG_SECONDS;
 pub use chord::{Arp, Chord, Leading, Voicing};
 pub use excerpt::{Excerpt, Span, SpanError, Unit, Window};
-pub use feel::Humanize;
 pub use key::{Degree, DegreeNote, Key, Mode};
+pub use play::articulation::Articulation;
+pub use play::feel::Humanize;
+pub use play::steps::Steps;
 pub use render::{render_excerpt, render_song, InlineOnly, PatchResolver};
-pub use steps::Steps;
 pub use tempo::TempoChange;
 pub use timing::{Fade, Fit, FitMode, FitTo, Tail};
 

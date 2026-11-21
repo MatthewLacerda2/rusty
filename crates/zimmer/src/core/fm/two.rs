@@ -16,9 +16,9 @@ pub(crate) fn render(
     ratio: f32,
     index: f32,
     decay: f32,
-    seed: u64,
-    rate: f32,
+    note: super::Note,
 ) {
+    let super::Note { seed, rate, .. } = note;
     let mut carrier = start_phase(CARRIER, seed);
     let mut modulator = start_phase(MODULATOR, seed);
     for (i, s) in out.iter_mut().enumerate() {
@@ -58,8 +58,11 @@ mod tests {
             ratio,
             index,
             decay,
-            seed,
-            44_100.0,
+            crate::core::fm::Note {
+                gate: 0.0,
+                seed,
+                rate: 44_100.0,
+            },
         );
         out
     }

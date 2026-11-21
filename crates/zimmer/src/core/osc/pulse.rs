@@ -1,6 +1,6 @@
 //! pulse: a square at any duty cycle.
 
-use super::poly_blep;
+use super::wave::poly_blep;
 use crate::core::lfo::Lfos;
 use crate::patch::{LfoTarget, Osc, MAX_PULSE_WIDTH, MIN_PULSE_WIDTH};
 

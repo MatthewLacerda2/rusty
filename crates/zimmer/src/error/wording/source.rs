@@ -48,6 +48,12 @@ impl SynthError {
                 f,
                 "patch: `fm4` algorithm `{algorithm}` is heard through its carriers, and every one of them is at level zero"
             ),
+            other => other.say_layers(f),
+        }
+    }
+
+    pub(super) fn say_layers(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
             Self::TooManyLayers { found, limit, .. } => write!(
                 f,
                 "patch: `layers` takes at most {limit} layers, got {found}"
@@ -61,7 +67,7 @@ impl SynthError {
                 let said = said.strip_prefix("patch: ").unwrap_or(&said);
                 write!(f, "patch: `layers[{layer}]`: {said}")
             }
-            other => write!(f, "{other:?}"),
+            other => other.say_lfo(f),
         }
     }
 }

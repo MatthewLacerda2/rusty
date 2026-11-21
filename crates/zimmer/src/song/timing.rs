@@ -112,28 +112,7 @@ pub(super) fn check(song: &Song) -> Result<(), SynthError> {
     let Some(fit) = song.fit else {
         return Ok(());
     };
-    let seconds = match (fit.seconds, fit.to) {
-        (Some(seconds), None) => seconds,
-        (None, None) => {
-            return Err(SynthError::FitLength {
-                why: "needs a length: `seconds`, or `to: \"clip\"` for as long as the \
-                      clip that plays the song",
-            });
-        }
-        (Some(_), Some(_)) => {
-            return Err(SynthError::FitLength {
-                why: "takes `seconds` or `to`, not both — `to` says where the length \
-                      comes from, so a number beside it would be ignored",
-            });
-        }
-        (None, Some(_)) => {
-            return Err(SynthError::FitLength {
-                why: "is `to: \"clip\"`, and nothing has said how long that clip is — \
-                      it is resolved by whatever bakes the song from a project, which \
-                      reads the clip; rendering the recipe alone needs `seconds`",
-            });
-        }
-    };
+    let seconds = fit_seconds(fit)?;
     if !(seconds.is_finite() && seconds > 0.0) {
         return Err(SynthError::BadFitSeconds { seconds });
     }
@@ -150,4 +129,23 @@ pub(super) fn check(song: &Song) -> Result<(), SynthError> {
         });
     }
     Ok(())
+}
+
+fn fit_seconds(fit: Fit) -> Result<f32, SynthError> {
+    match (fit.seconds, fit.to) {
+        (Some(seconds), None) => Ok(seconds),
+        (None, None) => Err(SynthError::FitLength {
+            why: "needs a length: `seconds`, or `to: \"clip\"` for as long as the \
+                      clip that plays the song",
+        }),
+        (Some(_), Some(_)) => Err(SynthError::FitLength {
+            why: "takes `seconds` or `to`, not both — `to` says where the length \
+                      comes from, so a number beside it would be ignored",
+        }),
+        (None, Some(_)) => Err(SynthError::FitLength {
+            why: "is `to: \"clip\"`, and nothing has said how long that clip is — \
+                      it is resolved by whatever bakes the song from a project, which \
+                      reads the clip; rendering the recipe alone needs `seconds`",
+        }),
+    }
 }

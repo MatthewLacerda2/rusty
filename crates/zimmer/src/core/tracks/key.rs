@@ -23,8 +23,7 @@ fn at(key_track: f32, midi: f32) -> f32 {
         &Lfos::of([], 0, None, 4),
         0.5,
         4,
-        1.0,
-        midi,
+        (1.0, midi),
         None,
     )[3]
 }
@@ -67,8 +66,7 @@ fn it_follows_a_moved_base_cutoff() {
         &Lfos::of([], 0, None, 4),
         0.5,
         4,
-        1.0,
-        72.0,
+        (1.0, 72.0),
         Some(&base),
     );
     assert_eq!(track[3], 800.0);

@@ -3,7 +3,7 @@
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};
-use super::{env, filter, source, RATE};
+use super::{env, filter, fm, source, RATE};
 use crate::hash::hash3;
 use crate::note::{midi_to_freq, NoteOpts};
 use crate::patch::{Adsr, Filter, Layer, Patch, PitchEnv, Source};
@@ -63,9 +63,19 @@ impl Struck<'_> {
         let freq = midi_to_freq(self.midi);
         let freqs = pitch_track(&self.lfos, voice.pitch_env, glide, freq, gate, n);
         let pulse = self.pulse.as_deref();
-        let mut buf = source::render(voice.source, &freqs, pulse, seed, brightness, gate, RATE);
+        let mut buf = source::render(
+            voice.source,
+            &freqs,
+            pulse,
+            brightness,
+            fm::Note {
+                gate,
+                seed,
+                rate: RATE,
+            },
+        );
         if let Some(f) = voice.filter {
-            let cutoffs = cutoff_track(&f, &self.lfos, gate, n, brightness, self.midi, base);
+            let cutoffs = cutoff_track(&f, &self.lfos, gate, n, (brightness, self.midi), base);
             buf.each(|channel| filter::apply(channel, &f, &cutoffs, RATE));
         }
         apply_amp(&mut buf, voice.amp, &self.lfos, gate, velocity * voice.gain);
