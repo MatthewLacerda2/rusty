@@ -181,7 +181,6 @@ pub(crate) mod error;
 pub(crate) mod fx;
 pub(crate) mod hash;
 pub mod level;
-pub mod midi;
 pub(crate) mod note;
 pub mod patch;
 pub mod song;

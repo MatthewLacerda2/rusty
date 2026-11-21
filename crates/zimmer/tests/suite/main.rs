@@ -7,7 +7,6 @@ mod common;
 mod defaults;
 mod fingerprint;
 mod level;
-mod midi;
 mod notes;
 mod patch;
 mod promises;

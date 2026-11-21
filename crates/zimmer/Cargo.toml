@@ -12,8 +12,3 @@ workspace = true
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
-# Reading a Standard MIDI File into a song (`midi::import`). Parsing a byte
-# slice is not I/O, so it belongs beside the document it produces. Default
-# features off: they pull in `rayon` to parse tracks in parallel, which a file
-# of a few thousand events has no use for.
-midly = { version = "0.5.3", default-features = false, features = ["std"] }
