@@ -116,10 +116,8 @@ pub(crate) struct Grade {
 }
 
 pub(crate) enum Pass {
-    Scene {
-        order: u16,
-        run: ScenePass,
-    },
+    /// Over the HDR scene, before the composite.
+    Scene { order: u16, run: ScenePass },
     Ldr {
         order: u16,
         prepare: fn(&mut super::PostFx, &wgpu::Device, &EffectCx) -> bool,
