@@ -58,7 +58,8 @@
 //! **Stored** (`file`, `sidecar`) beside the scene as `<scene>.occlusion`, a small binary file
 //! the lighting save writes and the scene load reads; absent, the scene culls
 //! nothing by occlusion. A runtime level load that moves incoming ids out of a
-//! carried entity's way renames the baked objects with them ([`OcclusionData::remap`]).
+//! carried entity's way renames the baked objects with them ([`OcclusionData::remap`],
+//! through `Scene::renumber_sidecars`).
 //!
 //! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `gather`)
 
@@ -254,13 +255,13 @@ impl OcclusionData {
         Some(self.index[at].1)
     }
 
-    /// The same data with each baked entity renamed through `moved` (old id → new),
-    /// as a runtime level load moves incoming ids out of a carried entity's way
-    /// (`scene::runtime::load`). `None` when two objects would share an id.
-    pub fn remap(&self, moved: &std::collections::BTreeMap<u32, u32>) -> Option<Self> {
+    /// The same data with each baked entity renamed through `moves`, as a runtime
+    /// level load moves incoming ids out of a carried entity's way
+    /// (`scene::runtime::renumber`). `None` when two objects would share an id.
+    pub fn remap(&self, moves: &crate::runtime::renumber::Moves) -> Option<Self> {
         let mut objects = self.objects.clone();
         for o in &mut objects {
-            o.entity = moved.get(&o.entity).copied().unwrap_or(o.entity);
+            o.entity = moves.to(o.entity);
         }
         let data = Self::new(self.grid, objects, self.rows.clone(), self.cells.clone())?;
         Some(data.stamped(self.stamp))

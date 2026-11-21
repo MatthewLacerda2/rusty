@@ -12,8 +12,9 @@
 //! event system hold those ids. An incoming entity whose id a survivor already holds
 //! is moved to a fresh id instead (`make_room`), its references rewritten with it
 //! through the one id-field walk; a survivor's references to the entities left
-//! behind are cleared through the same walk, and the level's baked PVS renames its
-//! objects with the moves (#1714).
+//! behind are cleared through the same walk. What the scene keys by entity id
+//! outside the entities (the selection, the lightmaps, the baked PVS) follows the
+//! moves too ([`super::renumber`]).
 
 use std::collections::BTreeSet;
 

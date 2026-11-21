@@ -236,8 +236,11 @@ scene — additive loading is not supported.
   across loads — the music player, the game manager, the persistent HUD canvas.
   Survivors keep their **ids**, components and running scripts, timers and
   coroutines; their scripts do not re-run `Awake`. A new-scene entity whose id a
-  survivor already holds gets a fresh id instead; its saved navmesh (or the one
-  `Scene.LoadAsync` baked) is still used, since the navmesh holds no ids, unless a
+  survivor already holds gets a fresh id instead, and keeps its baked lighting
+  (its lightmap, a baked light's shadowmask channel) and its place in the baked
+  occlusion culling under it; a survivor never inherits the new scene's. Its
+  saved navmesh (or the one `Scene.LoadAsync` baked) is still used, since the
+  navmesh holds no ids, unless a
   survivor itself carries a navmesh input (a static collider, a carving
   `NavMeshObstacle`, a modifier volume or an `OffMeshLink`): then the level is no
   longer what was baked, and it bakes in full on the swap tick. A survivor whose parent does

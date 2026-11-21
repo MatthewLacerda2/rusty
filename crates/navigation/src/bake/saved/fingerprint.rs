@@ -12,7 +12,7 @@
 //! bytes before they are joined. What the bake reads is order-free (`heightfield`
 //! sorts the solids by content, `modifiers` resolves overlaps by area), so a scene
 //! whose ids were renumbered (a `DontDestroyOnLoad` survivor moving an incoming id,
-//! `scene::runtime::load::make_room`) still matches the file it was baked to. The
+//! `rusty_edit::load::make_room`) still matches the file it was baked to. The
 //! authored links need no id: they are re-snapped onto the restored spans.
 //!
 //! The same pass records the bake's inputs (`BakeInputs`) with the cells each

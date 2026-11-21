@@ -2,6 +2,7 @@
 //! designer's bone overrides and the entities hung on a bone survive by name.
 
 mod hitbox;
+mod moved;
 mod ragdoll;
 
 use glam::{Quat, Vec3};
