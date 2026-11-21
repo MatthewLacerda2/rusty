@@ -1,9 +1,5 @@
--- toggle.lua — the engine's Toggle widget (#422), Unity's `Toggle`.
---
--- A checkbox: `Background/Checkmark` fades in (on) and out (off) with a `Tween` on
--- unscaled time, so it animates under a paused game's menu. Under an ancestor
--- carrying `toggle_group.lua` it is a radio button: turning it on turns the
--- group's others off.
+-- Unity's `Toggle`. The checkmark fades on unscaled time, so it animates under a
+-- paused game's menu. Under an ancestor with `toggle_group.lua` it is a radio button.
 --
 -- Owner API (via `Scene.GetScript(id, "toggle")`):
 --   is_on                                   -- the state (read it; set it with set_is_on)
@@ -20,7 +16,6 @@ local Toggle = {
 
 local self_id, check, group
 
--- Show the checkmark for the current state, fading unless `instant`.
 local function show(instant)
     if not check then return end
     local r, g, b = Image.GetColor(check)
@@ -45,7 +40,6 @@ end
 function Toggle.set_is_on(on) set(on, true) end
 function Toggle.set_is_on_without_notify(on) set(on, false) end
 
--- The nearest ancestor's toggle group, if any.
 local function find_group(id)
     local at = Scene.GetParent(id)
     while at do

@@ -1,8 +1,8 @@
-// engine/shaders/postfx/depth_of_field.wgsl — depth of field (#1445), Unity URP's
+// engine/shaders/postfx/depth_of_field.wgsl — depth of field, Unity URP's
 // two modes. Fullscreen passes over the HDR scene, before motion blur:
 //   fs_coc       — full resolution: each pixel's signed circle of confusion (CoC), in
 //                  pixels of radius, from its depth along the view axis of the camera
-//                  that drew it (the velocity target's `.z`, #1436): the focus is a
+//                  that drew it (the velocity target's `.z`): the focus is a
 //                  plane, as in Unity, not a sphere. Negative is nearer than the
 //                  focus, positive beyond it. A pixel an overlay camera drew (`.w`,
 //                  its index in the stack, above 0: a viewmodel) has none.

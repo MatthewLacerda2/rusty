@@ -1,4 +1,4 @@
-// ui.wgsl — the in-game UI pass (#418), with SDF text (#419).
+// ui.wgsl — the in-game UI pass, with SDF text.
 //
 // Draws laid-out UI graphics onto the finished frame, after post-FX. Vertices
 // arrive in NDC with a straight-alpha tint in display (sRGB-encoded) space. The
@@ -8,19 +8,19 @@
 // re-encoded here before the tint multiplies them. Output is premultiplied
 // (blend: One, OneMinusSrcAlpha).
 //
-// World canvases (#429: `WorldSpace`, `ScreenSpaceCamera`) use `vs_world` /
+// World canvases (: `WorldSpace`, `ScreenSpaceCamera`) use `vs_world` /
 // `fs_world` instead: the same vertices, their NDC mapped onto the canvas plane in
 // the scene (`world_ui.to_world`) and projected by the camera, drawn into the HDR
 // scene target before post-FX, depth-tested against the world and fogged like it
-// (the shared `fog_factor`, #437). The HDR target is linear, so the display-space
+// (the shared `fog_factor`). The HDR target is linear, so the display-space
 // result is decoded before it fogs and blends.
 //
 // Every batch, overlay or world, is clipped here per fragment (`clip_coverage`):
-// its RectMask bounds arrive as canvas-NDC bounds (#619 — a scissor cannot follow
-// a plane in perspective), softened over each edge's feather (#428), times the
-// nearest Mask's coverage texture (#428), sampled at the fragment's canvas
+// its RectMask bounds arrive as canvas-NDC bounds (a scissor cannot follow
+// a plane in perspective), softened over each edge's feather, times the
+// nearest Mask's coverage texture, sampled at the fragment's canvas
 // position. Batches with nothing to clip bind a white mask and unbounded bounds.
-// `fs_mask` renders a Mask's graphic into that texture; `fs_backdrop` (#426) shows
+// `fs_mask` renders a Mask's graphic into that texture; `fs_backdrop` shows
 // the blurred, filtered frame through a graphic's shape on overlay canvases.
 //
 // Text vertices (`sdf.x` = 1) sample a single-channel signed distance field
@@ -28,7 +28,7 @@
 // side. Fill, outline and glow are all cut from that one distance, antialiased
 // over one screen pixel (fwidth), and composited glow < outline < fill.
 //
-// Shape vertices (`sdf.x` = 2, #425) evaluate an analytic distance field of the
+// Shape vertices (`sdf.x` = 2) evaluate an analytic distance field of the
 // shape at the fragment's rect-local position (`local.xy`, reference units from
 // the rect's centre; `local.zw` the half size): fill inside the border band,
 // `border` (in `outline`) across it. The same field draws the shape's shadow
@@ -193,7 +193,7 @@ fn shade(in: VertexOut) -> vec4<f32> {
     return select(text, sdf_shape(in, ds, aa_shape), in.sdf.x > 1.5);
 }
 
-// ---- Shapes (#425) --------------------------------------------------------
+// ---- Shapes --------------------------------------------------------
 
 // Distance from `p` to the segment `a`–`b`.
 fn segment_distance(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
@@ -328,7 +328,7 @@ fn clip_coverage(p: vec2<f32>) -> f32 {
 }
 
 // The colour a graphic draws with, on screen and world canvases alike. A baked
-// ui shader (#427, `Shader.Bake` pass "ui") replaces exactly this function with
+// ui shader (`Shader.Bake` pass "ui") replaces exactly this function with
 // its blocks folded over `shade(in)`; keep its text in step with
 // `shadergen::assemble::ui::GRAPHIC`. Clips and masks apply after it.
 fn graphic(in: VertexOut) -> vec4<f32> {
@@ -341,13 +341,13 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
 }
 
 // A Mask's graphic into its coverage texture (R8): the graphic's alpha, clipped by
-// the masks above it (#428).
+// the masks above it.
 @fragment
 fn fs_mask(in: VertexOut) -> @location(0) vec4<f32> {
     return vec4<f32>(shade(in).a * clip_coverage(in.canvas), 0.0, 0.0, 0.0);
 }
 
-// A backdrop (#426): the blurred frame (display-encoded, read through a non-sRGB
+// A backdrop: the blurred frame (display-encoded, read through a non-sRGB
 // view) through the graphic's shape — saturated, brightened, then tinted.
 @fragment
 fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {

@@ -1,18 +1,11 @@
--- input_field.lua — the engine's Input Field widget (#422), Unity's `InputField`.
---
--- Text entry while focused: typed characters (`Input.GetTextInput`), Backspace,
--- Delete, Left/Right (Up/Down between lines in MultiLine; to the start/end in
--- SingleLine), Home/End, Shift to select, Ctrl+A to select all, a click to place
--- the caret and a drag to select. Ctrl+C / Ctrl+X copy / cut the selection and
--- Ctrl+V pastes through the same filters as typing (`Input.GetClipboard`, #612);
--- Cmd works for Ctrl on macOS. A Password field never copies or cuts. Focusing it selects everything, as in Unity.
--- Enter submits a SingleLine field (`on_submit`); in MultiLine it breaks the line.
--- Escape restores the text it had when focused and lets go. `content_type`:
--- Standard, Integer, Decimal or Password (shown as `*`). `char_limit` 0 = none.
--- The caret blinks on unscaled time; the text scrolls to keep it in view.
+-- Unity's `InputField`. Enter submits a SingleLine field (`on_submit`) and
+-- breaks the line in MultiLine; Escape restores the text it had when focused.
+-- Cmd works for Ctrl on macOS; a Password field never copies or cuts.
+-- `content_type`: Standard, Integer, Decimal or Password (shown as `*`);
+-- `char_limit` 0 = none. The caret blinks on unscaled time.
 --
 -- Owner API (via `Scene.GetScript(id, "input_field")`):
---   text                                         -- the current text (read it)
+--   text
 --   on_value_changed = function(id, text) … end  -- every edit
 --   on_submit = function(id, text) … end         -- Enter (SingleLine)
 --   on_end_edit = function(id, text) … end       -- focus left it
@@ -30,7 +23,7 @@ local Field = {
 
 local SELECTION = { 0.659, 0.808, 1.0, 0.753 }
 local self_id, area, text_id, hint, caret, marks
-local chars = {}               -- the text, one UTF-8 character per entry
+local chars = {}               -- one UTF-8 character per entry
 local pos, anchor = 0, 0       -- caret and selection anchor, in characters
 local focused, original, blink = false, "", 0
 local scroll = { 0, 0 }
@@ -53,7 +46,6 @@ local function shown(i, j)
     return table.concat(out)
 end
 
--- (line, column) of character position `p` (0-based; line 0-based).
 local function locate(p)
     local line, start = 0, 0
     for k = 1, p do
@@ -63,7 +55,6 @@ local function locate(p)
 end
 
 local function line_start(p) local _, _, s = locate(p); return s end
--- The character position where line `n` (0-based) starts, and the lines walked.
 local function line_pos(n)
     local p, l = 0, 0
     while l < n and p < #chars do
@@ -82,7 +73,6 @@ local function width(i, j) return (Text.MeasureString(text_id, shown(i, j))) end
 local function line_h() local _, h = Text.MeasureString(text_id, "A"); return h end
 local function pitch() local _, h = Text.MeasureString(text_id, "A\nA"); return h - line_h() end
 
--- Where the caret at `p` sits, text-local reference units (x right, line down).
 local function caret_xy(p)
     local line, _, s = locate(p)
     return width(s + 1, p), line
@@ -110,7 +100,6 @@ local function delete_selection()
     return b > a
 end
 
--- Whether `c` may go in at `pos` (selection already removed).
 local function accepts(c)
     if Field.char_limit > 0 and #chars >= Field.char_limit then return false end
     local t = Field.content_type
@@ -122,8 +111,6 @@ local function accepts(c)
     return c == "\n" or c:byte() >= 32
 end
 
--- Paste `s` over the selection, one character at a time through `accepts`, so the
--- content type and char limit hold and SingleLine drops line breaks.
 local function paste(s)
     local changed = delete_selection()
     for _, code in utf8.codes(s) do
@@ -137,8 +124,6 @@ local function paste(s)
     return changed
 end
 
--- Typed text: Backspace deletes, Tab is ignored, and every other character is
--- pasted (SingleLine's Enter is not text: it submits).
 local function type_text(s)
     local changed = false
     for _, code in utf8.codes(s) do
@@ -156,7 +141,6 @@ local function type_text(s)
     return changed
 end
 
--- Ctrl/Cmd + C, X or V. Returns whether the text changed.
 local function clipboard_keys()
     local a, b = math.min(pos, anchor), math.max(pos, anchor)
     local cut = Input.GetKeyDown("X")
@@ -173,14 +157,12 @@ local function ctrl()
         or Input.IsKeyDown("LEFTSUPER") or Input.IsKeyDown("RIGHTSUPER")
 end
 
--- Move the caret to `p`, extending the selection when `extend`.
 local function move_to(p, extend)
     pos = math.max(0, math.min(#chars, p))
     if not extend then anchor = pos end
     blink = 0
 end
 
--- The character position nearest a pointer event.
 local function index_at(event)
     local r = UI.GetRect(text_id)
     local at = event.canvas_position
@@ -197,7 +179,6 @@ local function index_at(event)
     return best
 end
 
--- Keep the caret in view by scrolling the text inside the text area.
 local function follow()
     local a = UI.GetRect(area)
     if not a then return end
@@ -217,7 +198,6 @@ local function follow()
     end
 end
 
--- One highlight rect per selected line segment (a pool under `Selection`).
 local function draw_selection()
     local a, b = math.min(pos, anchor), math.max(pos, anchor)
     local n = 0
@@ -289,7 +269,6 @@ end
 
 function Field.OnSelect(id)
     if not text_id then return end
-    -- Select all; a click's OnPointerDown (which follows) then places the caret.
     focused, original = true, Field.text
     pos, anchor = #chars, 0
     refresh()
@@ -347,7 +326,6 @@ end
 function Field.Update(id)
     if not text_id or not focused then return end
     blink = blink + Time.unscaledDeltaTime()
-    -- With Ctrl / Cmd held the keys are shortcuts, not text.
     local changed = not ctrl() and type_text(Input.GetTextInput())
     if Input.GetKeyDown("DELETE") then
         if not delete_selection() and pos < #chars then table.remove(chars, pos + 1) end

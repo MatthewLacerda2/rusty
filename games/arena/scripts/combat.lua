@@ -1,7 +1,5 @@
--- combat.lua — what every arena fighter shares, the bots (snowman.lua) and the
--- player (shooter.lua): a raycast gun with spread, recoil and wallbangs, the
--- smoke grenade, and health with death and respawn. A plain module, required
--- by both: it defines no callback, so it is not a behaviour of its own.
+-- A plain module required by bots (snowman.lua) and the player (shooter.lua); it
+-- defines no callback, so it is not a behaviour of its own.
 
 local Combat = {}
 
@@ -29,9 +27,7 @@ function Combat.tick(gun, dt)
     gun.recoil = math.max(0, gun.recoil - gun.recover * dt)
 end
 
--- The level's named entities (the effects, the match, the spawns), looked up
--- once each and kept: `Combat.start` empties the cache from every fighter's
--- Start, so a reloaded level is looked up afresh.
+-- Looked up once and kept; `Combat.start` empties the cache so a reloaded level is looked up afresh.
 local found = {}
 
 function Combat.start()
@@ -51,10 +47,9 @@ local function burst(name, x, y, z, count)
     end
 end
 
--- Fire `gun` from `shooter`'s eye at `ox, oy, oz` along `dx, dy, dz` (unit).
--- The shot strays by the spread and the recoil built up so far, goes through
--- whatever is thin enough (power falls with each metre of solid), and damages
--- each fighter it reaches. `false` while the gun is cooling down.
+-- Fire `gun` from `shooter`'s eye along the unit vector `dx, dy, dz`. The shot
+-- goes through whatever is thin enough (power falls per metre of solid).
+-- `false` while the gun is cooling down.
 function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
     if gun.cooldown > 0 then return false end
     gun.cooldown = gun.rate
@@ -82,7 +77,6 @@ function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
     return true
 end
 
--- Throw a smoke grenade: a cloud lands at `x, y, z` (scripts/smoke.lua).
 function Combat.smoke(x, y, z)
     local cloud = Scene.CreateEntity("Smoke")
     Scene.AddComponent(cloud, "Collider")
@@ -102,12 +96,10 @@ function Combat.smoke(x, y, z)
     return cloud
 end
 
--- The match's score keeper (scripts/match.lua), or `nil` before it loads.
 function Combat.match()
     return Scene.GetScript(Combat.named("Match"), "match")
 end
 
--- The spawn point farthest from every other fighter: where a dead one comes back.
 local function spawn_point(self_id)
     local best, best_d = nil, -1
     local others = Combat.match() and Combat.match().fighters or {}
@@ -125,8 +117,6 @@ local function spawn_point(self_id)
     return Transform.GetPosition(best)
 end
 
--- `OnTakeDamage` for a fighter whose health is `self.health`: takes the hit,
--- and on the killing one scores it and starts the respawn wait.
 function Combat.hurt(self, id, amount, event)
     if self.health <= 0 then return 0 end
     self.health = self.health - amount
@@ -138,8 +128,7 @@ function Combat.hurt(self, id, amount, event)
     return amount
 end
 
--- Call from `Update`: while dead, count down, then come back at full health at
--- a spawn point (`warp` moves the body there). `true` while dead.
+-- Call from `Update`: `true` while dead.
 function Combat.dead(self, id, dt, warp)
     if self.health > 0 then return false end
     self.respawn_in = self.respawn_in - dt

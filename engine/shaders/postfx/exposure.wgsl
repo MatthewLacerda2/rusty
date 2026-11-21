@@ -1,4 +1,4 @@
-// engine/shaders/postfx/exposure.wgsl — automatic exposure (#1444), Unity HDRP's
+// engine/shaders/postfx/exposure.wgsl — automatic exposure, Unity HDRP's
 // *Automatic Histogram*: two compute passes over one view's HDR scene, run each
 // frame its volume is in Automatic mode (`ExposureMeter::run` in
 // `crates/render/src/postfx/effects/exposure/mod.rs`, with pipelines from `ExposurePasses`).
@@ -6,7 +6,7 @@
 //   cs_histogram — the scene downsampled to a quarter of its size (one invocation per
 //                  BLOCK × BLOCK box of pixels, their mean), each block's luminance
 //                  binned by log2 into BINS bins spanning [MIN_LOG, MIN_LOG + LOG_RANGE),
-//                  weighted towards the centre of the picture (#1701)
+//                  weighted towards the centre of the picture
 //   cs_reduce    — one workgroup: averages the bins between the low and high
 //                  percentiles, turns that into the EV that brings it to middle grey,
 //                  eases the adapted EV towards it and clears the histogram
@@ -23,7 +23,7 @@ const BINS: u32 = 64u;
 // downsample. Every pixel is metered, so a lamp a few pixels wide counts by its area
 // wherever it falls, where a point sample hit it or missed it as the camera moved.
 const BLOCK: u32 = 4u;
-// Centre weighting (#1701; HDRP's *Center Weighted* metering, UE's centre bias): a
+// Centre weighting (; HDRP's *Center Weighted* metering, UE's centre bias): a
 // block's weight is 1 - CENTRE_FALLOFF · d², d its distance from the centre of the
 // picture over the distance to a corner, so the centre counts 1 and a corner 0.25.
 const CENTRE_FALLOFF: f32 = 0.75;

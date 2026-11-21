@@ -1,4 +1,4 @@
-// engine/shaders/postfx/effects/lift_gamma_gain.wgsl — Lift / Gamma / Gain (#1440), on
+// engine/shaders/postfx/effects/lift_gamma_gain.wgsl — Lift / Gamma / Gain, on
 // the scene-linear colour after white balance. Slot 0: xyz lift (added after gain);
 // slot 1: xyz `1 / gamma`, the gamma wheel's per-channel power; slot 2: xyz gain.
 

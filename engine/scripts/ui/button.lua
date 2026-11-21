@@ -1,4 +1,4 @@
--- button.lua — the engine's Button widget (#422), Unity's `Button`.
+-- Unity's `Button`. A script component: fork it to change what a button does.
 --
 -- A script component, not a first-class component: fork it (copy it under another
 -- name) to change what a button does. The look — the colour per state — is the

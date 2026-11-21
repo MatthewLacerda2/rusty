@@ -37,11 +37,11 @@ fn fs_main(in: VertexOutput) -> SkyTargets {
     let dir = normalize(in.view_dir);
     // Level 0: the panorama shares its cached upload, mips and all, with any
     // material using the file, and `equirect_uv`'s atan2 seam would make the
-    // derivatives pick a coarse mip, a flat line down the sky (#1322).
+    // derivatives pick a coarse mip, a flat line down the sky.
     let sky = textureSampleLevel(t_skybox, s_skybox, equirect_uv(dir), 0.0);
-    // Blend toward the scene fog at the horizon (#437) so fogged geometry doesn't
+    // Blend toward the scene fog at the horizon so fogged geometry doesn't
     // silhouette against a clear sky.
-    // Then the volumetric fog's whole depth (#1703).
+    // Then the volumetric fog's whole depth.
     let fogged = sky_fog(camera.fog, sky.rgb, dir, camera.camera_pos);
     let color = vec4<f32>(through_air(fogged, camera.volumetric, in.clip), sky.a);
     return sky_targets(camera, color, dir);

@@ -1,4 +1,4 @@
-// engine/shaders/postfx/fxaa.wgsl — FXAA (#360), the post chain's finishing pass:
+// engine/shaders/postfx/fxaa.wgsl — FXAA, the post chain's finishing pass:
 // the composite's (or the authored effects') LDR image in, the anti-aliased output out
 // (`render::postfx::effects::fxaa`). It binds the chain's IO layout and reads only
 // the colour (binding 1) and its sampler (binding 2).
@@ -23,12 +23,12 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
 }
 
 // ---------------------------------------------------------------------------
-// FXAA (#360) — the final pass, run on the composite's output.
+// FXAA — the final pass, run on the composite's output.
 //
 // FXAA 3.11's luma-based edge blend. It is defined on *post-tonemap, gamma-encoded*
 // colour, which is why it runs after `fs_composite` rather than inside it: it needs
 // the finished LDR image, and the neighbourhood taps below are only meaningful once
-// every pixel has been tonemapped. The LDR target is sRGB (#415), so its taps come
+// every pixel has been tonemapped. The LDR target is sRGB, so its taps come
 // back *linear*; `fxaa_luma` takes the sqrt as the usual cheap re-encode, so the
 // edge thresholds still see perceptual luma while the blend itself runs in linear.
 //

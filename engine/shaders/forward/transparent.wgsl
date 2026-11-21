@@ -1,11 +1,11 @@
 // engine/shaders/forward/transparent.wgsl — the forward shader's transparent-surface
-// terms (#1523): how a surface's lit colour leaves it (the scene fog and the
-// volumetric fog, #1703, and for a
+// terms: how a surface's lit colour leaves it (the scene fog and the
+// volumetric fog, and for a
 // transparent surface the alpha its blend mode reads and, when it refracts or
 // absorbs, what is behind it), and thin translucency's back-lit light. Every colour
 // entry point returns through `composite`; an opaque surface leaves it exactly as
 // `fogged` would, at alpha 1. A transparent surface may also trace screen-space
-// reflections (`reflect_ssr`, #1570).
+// reflections (`reflect_ssr`).
 
 #define_import_path forward::transparent
 
@@ -16,7 +16,7 @@
 #import lighting::ssr_surface
 #import reactive
 
-// The volumetric fog between the eye and `world` (#1703): rgb the light it adds,
+// The volumetric fog between the eye and `world`: rgb the light it adds,
 // a what gets through. No fetch where the camera reads no volume.
 fn volumetric(world: vec3<f32>) -> vec4<f32> {
     return volumetric_fog(t_fog_volume, s_linear_clamp, camera.volumetric, camera.view_proj, camera.clusters.view_z, world);
@@ -33,7 +33,7 @@ fn fogged(lit: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
 // How much of a surface's own light the fogs take, as one factor: the distance
 // and height fog's, and with the volumetric fog `1 - (1 - fog) * transmittance`.
 // What SSR's record and SSIL's realtime share are dimmed by, so neither adds light
-// the fog took (#1703). Exactly `fog_factor` where the camera reads no volume.
+// the fog took. Exactly `fog_factor` where the camera reads no volume.
 fn surface_fog(world: vec3<f32>) -> f32 {
     let fog = fog_factor(camera.fog, world, camera.camera_pos);
     if (camera.volumetric.x < 0.5) {
@@ -95,7 +95,7 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
 }
 
-// The brightest a forward colour channel is written (#1699): below `Rgba16Float`'s
+// The brightest a forward colour channel is written: below `Rgba16Float`'s
 // 65504, with room for the rounding to f16.
 const MAX_HDR: f32 = 60000.0;
 
@@ -108,7 +108,7 @@ fn finite_hdr(c: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(clamp(c.rgb, vec3<f32>(-MAX_HDR), vec3<f32>(MAX_HDR)), c.a);
 }
 
-// HDRP's *Receive SSR Transparent* (#1570): the environment reflection `reflection`
+// HDRP's *Receive SSR Transparent*: the environment reflection `reflection`
 // (step 5's probe or sky term, added under `weight`) with what the reflected ray `R`
 // from `world` hits on screen in its place, as the SSR pass does for an opaque pixel
 // (`reflection + (weight × hit − reflection) × fade`), faded by the same smoothness
@@ -118,7 +118,7 @@ fn finite_hdr(c: vec4<f32>) -> vec4<f32> {
 // on a camera that marches (`camera.ssr.x`, the base camera of a view running SSR)
 // traces: both are uniform, so every other surface returns at once. `N` is the
 // shading normal, `roughness` the authored perceptual roughness (not specular AA's
-// widened one, #1702: a far busy pane keeps its SSR). The copy has no mip pyramid,
+// widened one,: a far busy pane keeps its SSR). The copy has no mip pyramid,
 // so the hit is sharp: the camera's *Minimum Smoothness* here is never below the
 // sharp floor (`render::postfx::effects::ssr::transparent::SHARP_SMOOTHNESS`).
 fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: vec3<f32>, R: vec3<f32>, roughness: f32) -> vec3<f32> {
@@ -137,7 +137,7 @@ fn reflect_ssr(reflection: vec3<f32>, weight: vec3<f32>, world: vec3<f32>, N: ve
 }
 
 // The diffuse light a thin translucent surface lets through from a light behind it
-// (#1523): HDRP's thin *Translucent* type, a back-face Lambert term scaled by the
+//: HDRP's thin *Translucent* type, a back-face Lambert term scaled by the
 // transmission colour times its amount. `N` faces the viewer, so a light behind the
 // surface has `dot(N, L) < 0`; `radiance` is the light shadowed at the back face;
 // `transmission` the material's colour times amount (`material().transmission.rgb`,
@@ -191,7 +191,7 @@ fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     return scene.rgb * exp(-m.absorption.rgb * depth);
 }
 
-// TAA's reactive texel for a transparent surface that drew `color` (#1845,
+// TAA's reactive texel for a transparent surface that drew `color` (
 // `reactive.wgsl`): over the pixel by its alpha (Alpha, Premultiply, and a surface
 // over the opaque copy, which writes alpha 1), adding its light (Additive: times
 // alpha unless premultiplied), or multiplying it (Multiply); a material's `Off` or

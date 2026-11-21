@@ -1,4 +1,4 @@
-// engine/shaders/sky/prefilter.wgsl — the sky's reflection cube (#1553): the sky
+// engine/shaders/sky/prefilter.wgsl — the sky's reflection cube: the sky
 // captured into a cube and GGX-prefiltered into a roughness mip chain, Unity's
 // skybox-as-default-reflection-probe. One dispatch per mip, one invocation per texel
 // of every face; mip 0 is the sky itself (roughness 0), each later mip the sky
@@ -12,7 +12,7 @@
 // - the panorama (`params.p.z == 1`): sampled at the mip whose texel matches the
 //   sample's solid angle (filtered importance sampling), so a few taps blur
 //   without sparkle;
-// - the procedural sky: for fixed sky settings (`params.sky`, #1620)
+// - the procedural sky: for fixed sky settings (`params.sky`)
 //   `common::procedural_sky` is affine in the ambient colour, so the cube stores its
 //   two terms (rgb: the sky at ambient 0, a: what ambient 1 adds) and the forward
 //   pass applies the ambient colour when it samples. The ambient colour (a scripted
@@ -26,7 +26,7 @@ struct Params {
     // w: the importance sample count, `render::ibl::reflection_prefilter`'s
     // `SAMPLE_COUNT`, so a probe and the sky blur rough metal alike.
     p: vec4<f32>,
-    // The procedural sky's settings (#1620), as the sky pass reads them.
+    // The procedural sky's settings, as the sky pass reads them.
     sky: ProceduralSky,
 };
 

@@ -1,5 +1,5 @@
 // engine/shaders/lighting/screen_space.wgsl — what the screen-space indirect passes
-// share: SSAO (`ssao.wgsl`, #436) and SSIL (`postfx/ssil.wgsl`, #1750) read the
+// share: SSAO (`ssao.wgsl`) and SSIL (`postfx/ssil.wgsl`) read the
 // view's depth the same way, rebuild a normal from it the same way, sample the same
 // cosine-weighted golden-angle hemisphere under the same per-pixel noise, take the
 // same slope-scaled bias, and blur and upsample by the same depth weight.

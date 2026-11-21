@@ -1,5 +1,5 @@
 // engine/shaders/postfx/taa/surface.wgsl — the surfaces TAA's resolve
-// (`postfx/taa.wgsl`) reprojects and tells a reveal by (#1846): each pixel's 3×3
+// (`postfx/taa.wgsl`) reprojects and tells a reveal by: each pixel's 3×3
 // frontmost surface, its distance from its camera, and how far a surface is a
 // reveal against last frame's.
 

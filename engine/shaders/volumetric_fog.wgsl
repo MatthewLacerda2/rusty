@@ -1,4 +1,4 @@
-// engine/shaders/volumetric_fog.wgsl — volumetric fog's froxels (#1703), Frostbite's
+// engine/shaders/volumetric_fog.wgsl — volumetric fog's froxels, Frostbite's
 // unified volumetrics (Hillaire 2015) as UE, HDRP and Godot 4 run them, in two
 // compute passes over the camera's froxel grid (`render::postfx::effects::
 // volumetric_fog`):

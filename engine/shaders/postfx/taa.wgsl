@@ -1,4 +1,4 @@
-// engine/shaders/postfx/taa.wgsl — temporal anti-aliasing's resolve (#1702), URP's
+// engine/shaders/postfx/taa.wgsl — temporal anti-aliasing's resolve, URP's
 // `TemporalAA.hlsl`; at its default quality (*High*: `DoTemporalAA(2, 2, 2, 0)`):
 //   - the neighbourhood: the current pixel's 3×3 in YCoCg, its min/max box tightened
 //     to mean ± `clamp scale` × the standard deviation (variance clamping);
@@ -9,23 +9,23 @@
 //   - the blend: history clamped into the box, then lerped toward the current pixel
 //     by the frame influence in URP's perceptual space (each colour over 1 + luma), so
 //     a bright highlight cannot dominate the average.
-// The other levels (#1847) run URP's other `DoTemporalAA` arguments, `taa.levels`
+// The other levels run URP's other `DoTemporalAA` arguments, `taa.levels`
 // (`params::levels`): a cross box, less or no motion dilation, a bilinear history,
 // clipping toward the box's centre and a re-filtered current pixel.
-// Beyond URP (#1846, `taa/params.rs`): the frame weighs more as the pixel moves, and
+// Beyond URP (`taa/params.rs`): the frame weighs more as the pixel moves, and
 // the history fades where this pixel's surface lies farther from its camera than
 // last frame's there, or a camera higher in the stack drew there and no longer does
-// (a reveal). Where a translucent drew this frame (#1845, its reactive mask, FSR2's)
+// (a reveal). Where a translucent drew this frame (its reactive mask, FSR2's)
 // the frame weighs more again, so a moving translucent, which writes no motion and
 // is reprojected with what is behind it, keeps its detail.
 // Its output is what the rest of the chain reads and next frame's history
 // (colour, and its own surface: distance and camera, `ResolveOut`).
 // The `_held` entry points are the same resolves with the camera's anti-flicker on
-// (#2228, HDRP's, `taa_flicker.wgsl`): a still pixel whose frame keeps blinking
+// (HDRP's, `taa_flicker.wgsl`): a still pixel whose frame keeps blinking
 // under the jitter holds its history's luma against the next blink, which a clamp
 // to this frame's own box would hand through, and each pixel's flicker is a third
 // output (`HeldOut`). The plain ones are URP's resolve, reading and writing none of it.
-// `fs_upscale` is the same resolve upscaling (TAAU, #1702 part 3,
+// `fs_upscale` is the same resolve upscaling (TAAU,
 // `render/postfx/effects/taa/upscale/`): a scaled view's scene-size frame into an
 // output-size history, at the same place in the chain, so what follows it runs at
 // the output's size. The current pixel is the jittered frame's own, not re-filtered
@@ -52,7 +52,7 @@ struct ResolveOut { // what the resolve writes: next frame's history, colour and
     @location(1) surface: vec2<f32>,
 };
 
-// What the resolve writes with the camera's anti-flicker on (#2228): `ResolveOut`'s,
+// What the resolve writes with the camera's anti-flicker on: `ResolveOut`'s,
 // and the pixel's flicker, its frame's luma, then its step, flicker and recurring
 // flicker (`taa_flicker`).
 struct HeldOut {
@@ -95,7 +95,7 @@ fn history_bicubic(uv: vec2<f32>) -> vec3<f32> {
     return (a * wa + b * wb + c * wc + d * wd + e * we) / (wa + wb + wc + wd + we);
 }
 
-// A re-filter of the current pixel (URP's central filtering, `VeryHigh`, #1847): the
+// A re-filter of the current pixel (URP's central filtering, `VeryHigh`): the
 // 3×3's samples weighted by where each landed under the jitter ([`sample_weight`]),
 // so the output pixel converges on the jittered average sooner. Lower levels take
 // the point sample.
@@ -126,7 +126,7 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     return blend(resolved(pos));
 }
 
-// `fs_resolve` with the camera's anti-flicker on (#2228).
+// `fs_resolve` with the camera's anti-flicker on.
 @fragment
 fn fs_resolve_held(@builtin(position) pos: vec4<f32>) -> HeldOut {
     return blend_held(resolved(pos));
@@ -178,7 +178,7 @@ fn resolved(pos: vec4<f32>) -> Pixel {
     return Pixel(frame, uv, front);
 }
 
-// The reactivity around scene pixel `p` (#1845): the most reactive texel of its
+// The reactivity around scene pixel `p`: the most reactive texel of its
 // 3×3, as the motion is its 3×3's frontmost (ours: a translucent's edge the jitter
 // moves by a pixel stays reactive), counting only translucents drawn by `camera`
 // (the pixel's own surface's) or a camera above it, so a world window behind a
@@ -204,7 +204,7 @@ fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
 
 // One pixel's current frame for [`blend`]: its colour, the box its history is
 // clamped into (YCoCg), how much its weight is trusted (1, or TAAU's nearest
-// sample's weight) and its reactivity ([`reactivity`], #1845).
+// sample's weight) and its reactivity ([`reactivity`]).
 struct Frame {
     here: vec4<f32>,
     lo: vec3<f32>,
@@ -213,7 +213,7 @@ struct Frame {
     reactive: f32,
 };
 
-// How far a pixel moves (`.x`) and is a reveal (`.y`), each 0 to 1 (#1846): moving
+// How far a pixel moves (`.x`) and is a reveal (`.y`), each 0 to 1: moving
 // as its motion goes from `knobs.w` to `rejection.y` history pixels, revealed as
 // surface `now` is farther than last frame's around `prev_uv` ([`depth_mismatch`]).
 fn change_of(motion: vec2<f32>, prev_uv: vec2<f32>, now: vec2<f32>) -> vec2<f32> {
@@ -237,7 +237,7 @@ fn frame_weight(frame: Frame, change: vec2<f32>) -> f32 {
     return select(weight, mix(weight, 1.0, frame.reactive), frame.reactive > 0.0);
 }
 
-// [`taa_flicker::Flicker`] at the pixel whose history is read at `prev_uv` (#2228):
+// [`taa_flicker::Flicker`] at the pixel whose history is read at `prev_uv`:
 // last frame's flicker texel there, the pixel's stillness and reactivity, its
 // frame's perceptual `luma`, and its history's luma before (`raw`) and after its
 // clamp (`boxed`).
@@ -308,7 +308,7 @@ fn blend(px: Pixel) -> ResolveOut {
     return ResolveOut(mixed(px.frame, history, past.weight), px.front.own);
 }
 
-// [`blend`] with the anti-flicker on (#2228): a blinking still pixel's history
+// [`blend`] with the anti-flicker on: a blinking still pixel's history
 // keeps its luma up to `flicker.y` times its recurring blinks outside the box,
 // along the line to where it was ([`flicker_of`]); its hue and saturation stay the
 // box's, so a hue change is clamped as URP's is.
@@ -362,7 +362,7 @@ fn fs_upscale(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     return blend(upscaled(pos));
 }
 
-// `fs_upscale` with the camera's anti-flicker on (#2228).
+// `fs_upscale` with the camera's anti-flicker on.
 @fragment
 fn fs_upscale_held(@builtin(position) pos: vec4<f32>) -> HeldOut {
     return blend_held(upscaled(pos));

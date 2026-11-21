@@ -1,4 +1,4 @@
-// engine/shaders/postfx/ssil.wgsl — screen-space indirect lighting (#1750), Godot 4's
+// engine/shaders/postfx/ssil.wgsl — screen-space indirect lighting, Godot 4's
 // SSIL: one bounce of last frame's realtime light off the surfaces on screen, for
 // the forward pass's indirect diffuse (`render::postfx::effects::ssil`).
 //

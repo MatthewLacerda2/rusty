@@ -1,7 +1,7 @@
-// Per-cluster occlusion culling (#1968): the culling half of UE5's Nanite. A mesh
+// Per-cluster occlusion culling: the culling half of UE5's Nanite. A mesh
 // split into clusters at import (`asset::clusters`) is drawn, per instance, as the
 // clusters this camera may see, with no mesh shaders. `render::passes::hiz`
-// dispatches each stage once for the whole frame (#2417): every clustered mesh's
+// dispatches each stage once for the whole frame: every clustered mesh's
 // table and indices are in one pool (group 1), so one dispatch reaches every
 // job. After `cs_test` has its instances' verdicts against this frame's pyramid:
 //   1. `cs_cluster_test`, a workgroup per chunk (64 clusters of one job): each

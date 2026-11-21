@@ -1,4 +1,4 @@
-// GPU occlusion culling (#1963): Unity 6's GPU occlusion culling, two-phase Hi-Z
+// GPU occlusion culling: Unity 6's GPU occlusion culling, two-phase Hi-Z
 // per instance. `render::hiz` drives it, once per camera:
 //   1. `cs_select`: each opaque batch keeps the instances visible last frame (by
 //      object slot, `history`), in order, and writes its indirect args, marking
@@ -9,9 +9,9 @@
 //      `visible` and next frame's `history`;
 //   5. `cs_compact`: each batch keeps its visible instances, in order, and writes
 //      the indirect args every opaque pass then draws with. A batch whose mesh is
-//      split into clusters (#1968) keeps every instance at its own place instead:
+//      split into clusters keeps every instance at its own place instead:
 //      `hiz_clusters.wgsl` then draws each instance's visible clusters on its own.
-//      The same loop writes the late set (#2336): the visible instances phase one
+//      The same loop writes the late set: the visible instances phase one
 //      did not draw, which is all the prepass adds to phase one's depth. Its kept
 //      instances follow the final ones (from `params.instances`), its args the
 //      final args (from batch `params.batches`); a clustered batch's late
@@ -43,7 +43,7 @@ struct Bounds {
 };
 
 // One opaque batch: its instance run and the indexed draw it makes, and 1 in
-// `clustered` when its final draws are per instance, by cluster (#1968).
+// `clustered` when its final draws are per instance, by cluster.
 struct Batch {
     first: u32,
     count: u32,

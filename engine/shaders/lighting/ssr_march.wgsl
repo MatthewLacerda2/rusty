@@ -1,6 +1,6 @@
-// engine/shaders/lighting/ssr_march.wgsl — the screen-space reflection march (#1521),
+// engine/shaders/lighting/ssr_march.wgsl — the screen-space reflection march,
 // shared by the SSR pass over the opaque image (`postfx/ssr.wgsl`) and a transparent
-// surface that traces its own (`forward/transparent.wgsl`'s `reflect_ssr`, #1570).
+// surface that traces its own (`forward/transparent.wgsl`'s `reflect_ssr`).
 // One march, two depth sources: the SSR pass reads each pixel's depth along the view
 // axis from the velocity target's `.z`; a transparent reads the eye distance in the
 // opaque copy's `.a` (`opaque_copy.wgsl`). A `Frame` says which.
@@ -84,7 +84,7 @@ fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f
 }
 
 // The longest a march step may move on screen, as a fraction of the screen's
-// shorter side (#2004): a step that would move further is shortened to it. A fixed
+// shorter side: a step that would move further is shortened to it. A fixed
 // world step near the camera jumps tens of texels between depth taps and steps past
 // a thin object (a bottle, a pole) or a grazing floor, drawing its reflection as
 // stair-steps and dashes; a step held to this sees anything wider than it. The
@@ -101,7 +101,7 @@ fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
     return max(SCREEN_STEP, 1.0 / f32(max(steps, 1))) * min(dim.x, dim.y);
 }
 
-// How far behind the scene's depth a refined hit may lie and still count (#2004):
+// How far behind the scene's depth a refined hit may lie and still count:
 // a ray that crosses a surface refines to within a texel of it, one that passes
 // behind an object refines onto the object's edge, still behind it by however far
 // it passed. The depth target holds only front faces, so a ray that meets an
@@ -114,9 +114,9 @@ const THICKNESS: f32 = 0.15;
 const DEPTH_SLACK: f32 = 0.02;
 
 // Where a hit's blur, the cone's on-screen radius as a fraction of the screen's
-// shorter side, is too wide for screen space (#2004): where a ray stops hitting (a
+// shorter side, is too wide for screen space: where a ray stops hitting (a
 // reflected silhouette) is decided per pixel, and only the SSR pass's resolve
-// (#2028) averages it over the blur, so a wide blur drawn inside a hard edge reads
+// averages it over the blur, so a wide blur drawn inside a hard edge reads
 // as a block here, and the resolve's average over so wide a disk only approximates
 // the lobe. From `BLUR_FADE_START` the hit fades out to the probe it replaces, gone
 // at `BLUR_FADE_END`. A contact reflection (a short ray) keeps a narrow blur and
@@ -182,7 +182,7 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
 // edge (`BLUR_FADE_START`).
 //
 // `cone` is the tangent of the half-angle of the surface's GGX lobe (0: a mirror,
-// #1736): the hit is read at the mip of `t_color` whose texels are the cone's
+// the hit is read at the mip of `t_color` whose texels are the cone's
 // on-screen width there, so a rough surface reflects a blur of what it sees (cone
 // tracing, as Frostbite and UE do). A `t_color` with one level reads sharp.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
@@ -191,7 +191,7 @@ fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: 
 
 // What `trace_hit` found: `trace`'s colour and weight, and `dist`, how far the ray
 // went from its origin to the hit (0 on a miss). The SSR pass's resolve
-// (`postfx/ssr.wgsl`) widens a rough hit by it (#2028).
+// (`postfx/ssr.wgsl`) widens a rough hit by it.
 struct Hit {
     colour: vec4<f32>,
     dist: f32,

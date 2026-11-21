@@ -1,5 +1,5 @@
 // engine/shaders/particles/gpu.wgsl — what a GPU-simulated emitter's step
-// (`particles_step.wgsl`) and draw (`particles.wgsl`'s `vs_gpu`) share (#2170):
+// (`particles_step.wgsl`) and draw (`particles.wgsl`'s `vs_gpu`) share:
 // the particle record, the emitter's uniform and its over-life lookup table.
 // The Rust twins are `render::passes::particles::gpu::record`'s, field for field.
 #define_import_path particles::gpu
