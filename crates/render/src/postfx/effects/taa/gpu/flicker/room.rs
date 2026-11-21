@@ -75,8 +75,11 @@ pub(in crate::postfx::effects) fn room() -> Scene {
     };
     s.world.set_camera(cam, Some(camera));
     let mut volume = default_post_processing();
+    // The satin ceiling (roughness 0.35) is SSR's flicker case: a minimum that
+    // reflects it, below the default's roughness 0.3.
     volume.ssr = Ssr {
         active: true,
+        min_smoothness: 0.3,
         ..Default::default()
     };
     (volume.bloom.active, volume.ssao.active) = (false, false);
