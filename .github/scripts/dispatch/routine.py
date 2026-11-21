@@ -25,6 +25,7 @@ A re-brief is the same launch again: a new routine whose prompt names the new
 
 from __future__ import annotations
 
+import re
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -73,14 +74,39 @@ def environment(routines: list[dict]) -> str | None:
     return None
 
 
-#: The model every coder runs on; nobody chooses one per issue (#1726). A new generation
-#: changes this line, nothing else.
+#: The model a coder runs on when its issue names none (#1726). A new generation
+#: changes this line and [`MODELS`], nothing else.
 MODEL = "claude-opus-5-5"
+
+#: What an issue's `Model:` line may ask for (#2490): the operator's decision for one
+#: job, written on the issue; an orchestrator never adds the line on its own.
+MODELS = {"opus": MODEL, "sonnet": "claude-sonnet-5-5"}
+
+#: A line of its own in the issue body, `Model: <name>`, ignoring case and spaces.
+MODEL_LINE = re.compile(r"^[ \t]*Model:[ \t]*(.*?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
+
+
+def model_for(issue_body: str | None) -> str:
+    """The model id the issue's `Model:` line asks for, or [`MODEL`] when it has none.
+
+    Raises `ValueError` naming the accepted values for a line that names no model
+    in [`MODELS`], or for two lines: a guess would launch the wrong coder."""
+    asked = MODEL_LINE.findall(issue_body or "")
+    if not asked:
+        return MODEL
+    accepted = ", ".join(sorted(MODELS))
+    if len(asked) > 1:
+        raise ValueError(f"the issue has {len(asked)} `Model:` lines; keep one, naming one of {accepted}")
+    name = asked[0].strip().lower()
+    if name not in MODELS:
+        raise ValueError(f"the issue's `Model: {asked[0].strip()}` names no model; write one of {accepted}, "
+                         "or drop the line for the default")
+    return MODELS[name]
 
 
 def body(number: int, title: str, brief_url: str, environment_id: str, repository: str,
-         now: datetime, event_id: str | None = None) -> dict:
-    """The `create` body for the coder of issue `number`, on [`MODEL`], pinned to `brief_url`."""
+         now: datetime, event_id: str | None = None, model: str = MODEL) -> dict:
+    """The `create` body for the coder of issue `number`, on `model`, pinned to `brief_url`."""
     if not brief_url.startswith(f"https://github.com/{repository}/issues/{number}#issuecomment-"):
         raise ValueError(f"{brief_url!r} is not a comment on #{number}")
     prompt = PROMPT.format(number=number, brief=brief_url)
@@ -91,7 +117,7 @@ def body(number: int, title: str, brief_url: str, environment_id: str, repositor
         "job_config": {"ccr": {
             "environment_id": environment_id,
             "session_context": {
-                "model": MODEL,
+                "model": model,
                 "sources": [{"git_repository": {"url": f"https://github.com/{repository}"}}],
                 "allowed_tools": ALLOWED_TOOLS,
             },

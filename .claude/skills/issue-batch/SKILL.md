@@ -40,7 +40,11 @@ The limits are CLAUDE.md's; the reasons are here, so they are kept, not re-argue
 - **Who runs on what.** The orchestrator runs on whatever model the operator
   picked; everything that writes or judges code runs on a model its definition
   pins, so the choice never follows the orchestrator's. `make coder` pins the
-  cloud coder's (`dispatch/routine.py`'s `MODEL`). The `Agent` tool's types are
+  cloud coder's (`dispatch/routine.py`'s `MODEL`), unless the issue body has a
+  `Model:` line of its own (`sonnet` or `opus`, `routine.MODELS`; anything else
+  is refused, and `ARGS=--dry-run` says which it would use). That line is the
+  operator's decision written on the issue: an orchestrator never adds one on
+  its own. The `Agent` tool's types are
   in `.claude/agents/`: `coder` (a local coder) and `reviewer` on the latest
   Opus, `merge-fixer` (a hand-back's mechanical fix) on Sonnet; `agent-docs`
   holds the pins (`agent_docs::agent::PINS`) and a concrete `model:` on every
