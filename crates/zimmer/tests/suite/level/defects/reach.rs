@@ -2,7 +2,7 @@
 //! ending at the end: a staircase anywhere in a file is in one of them, the first quarter-second
 //! and the last included.
 
-use super::{RATE, found, tone};
+use super::{found, tone, RATE};
 
 fn stepped(seconds: f64, from: f64, steps: f64) -> Vec<f32> {
     let period = 800.0 / f64::from(RATE);

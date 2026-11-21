@@ -1,7 +1,7 @@
 //! Where a click starts: each threshold met exactly by a jump built sample by sample, and missed
 //! just under it.
 
-use super::{RATE, found};
+use super::{found, RATE};
 
 fn step_out_of_silence(level: f32) -> Vec<f32> {
     let mut signal = vec![0.0; RATE as usize / 2];

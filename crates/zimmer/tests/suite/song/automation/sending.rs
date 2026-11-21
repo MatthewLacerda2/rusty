@@ -1,12 +1,12 @@
 //! A send that moves: how much of a part reaches the song's room, across the piece.
 
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{InlineOnly, Param, Song};
-use scorsese_zimmer::{SynthError, render_song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{InlineOnly, Param, Song};
+use rusty_zimmer::{render_song, SynthError};
 
-use super::setup::{BEATS, at, curve, frame, held, ramp, render, rms};
+use super::setup::{at, curve, frame, held, ramp, render, rms, BEATS};
 
-fn roomy(send: f32, moving: Option<scorsese_zimmer::song::Automation>) -> Song {
+fn roomy(send: f32, moving: Option<rusty_zimmer::song::Automation>) -> Song {
     let mut song = held(0.5);
     song.fx = vec![Fx::Reverb {
         size: 0.8,
@@ -106,7 +106,7 @@ fn a_send_curve_with_no_room_to_reach_is_refused() {
 #[test]
 fn send_is_spelled_the_way_the_document_writes_it() {
     assert_eq!(Param::Send.as_str(), "send");
-    let read: scorsese_zimmer::song::Automation =
+    let read: rusty_zimmer::song::Automation =
         serde_json::from_str(r#"{ "track": "pad", "param": "send", "points": [] }"#)
             .expect("`send` is a parameter");
     assert_eq!(read.param, Param::Send);

@@ -7,7 +7,7 @@ use std::f32::consts::TAU;
 
 use super::{feedback, voicing};
 use crate::core::{env, nyquist};
-use crate::patch::{Algorithm, FM_OPERATORS, Operator};
+use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Note {

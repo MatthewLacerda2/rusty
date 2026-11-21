@@ -2,8 +2,8 @@
 
 use crate::common::songs::{song, verse, voice};
 use crate::common::{channel, saw_patch};
-use scorsese_zimmer::song::{Humanize, InlineOnly, PatchRef};
-use scorsese_zimmer::{SAMPLE_RATE, Song, render_song};
+use rusty_zimmer::song::{Humanize, InlineOnly, PatchRef};
+use rusty_zimmer::{render_song, Song, SAMPLE_RATE};
 
 fn steady() -> Song {
     let mut steady = song();

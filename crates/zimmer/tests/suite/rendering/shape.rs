@@ -1,8 +1,8 @@
 //! How long a rendered note is, and why it is longer than the note.
 
 use crate::common::{opts, peak, refusal, render, saw_patch};
-use scorsese_zimmer::patch::{Fx, Source};
-use scorsese_zimmer::{SAMPLE_RATE, SynthError};
+use rusty_zimmer::patch::{Fx, Source};
+use rusty_zimmer::{SynthError, SAMPLE_RATE};
 
 fn samples(seconds: f32) -> usize {
     (seconds * SAMPLE_RATE as f32).ceil() as usize

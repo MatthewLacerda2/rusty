@@ -1,8 +1,8 @@
 //! A `fit` whose length comes from somewhere else: `to: "clip"`.
 
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::{Fit, FitMode, FitTo, InlineOnly};
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::song::{Fit, FitMode, FitTo, InlineOnly};
+use rusty_zimmer::SynthError;
+use rusty_zimmer::{render_song, Song};
 
 use super::setup::{fitted, render, samples};
 use crate::common::songs::song;

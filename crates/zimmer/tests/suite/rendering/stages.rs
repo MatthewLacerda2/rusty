@@ -2,7 +2,7 @@
 //! code ran.
 
 use crate::common::{adsr, brightness, opts, peak, render, rising_crossings, saw_patch};
-use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Lfo, LfoTarget, Slope};
+use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Lfo, LfoTarget, Slope};
 
 fn lowpass(cutoff: f32, resonance: f32) -> Filter {
     Filter {

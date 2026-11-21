@@ -3,11 +3,11 @@
 
 use crate::common::minimal;
 use crate::common::songs::{note, played, song, verse};
-use scorsese_zimmer::patch::Source;
-use scorsese_zimmer::song::{
+use rusty_zimmer::patch::Source;
+use rusty_zimmer::song::{
     ArrangementEntry, Degree, DegreeNote, InlineOnly, PatchRef, PatternEntry, Play,
 };
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::{render_song, Song};
 
 pub(crate) fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")

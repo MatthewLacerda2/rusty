@@ -1,9 +1,9 @@
 //! What a curve does when `fit` decides the length.
 
-use scorsese_zimmer::song::{Fit, FitMode, Param};
-use scorsese_zimmer::{SAMPLE_RATE, song::Song};
+use rusty_zimmer::song::{Fit, FitMode, Param};
+use rusty_zimmer::{song::Song, SAMPLE_RATE};
 
-use super::setup::{BEATS, at, curve, frame, held, render, rms};
+use super::setup::{at, curve, frame, held, render, rms, BEATS};
 
 fn fitted(seconds: f32, mode: FitMode, beats: f32, to: f32) -> Song {
     let mut song = held(0.5);

@@ -1,6 +1,6 @@
 //! The filter stage as a *document*: what a recipe may write in it, and what it is refused for.
 
-use scorsese_zimmer::patch::{Filter, FilterKind, Slope};
+use rusty_zimmer::patch::{Filter, FilterKind, Slope};
 
 #[test]
 fn the_kinds_are_spelled_as_one_word() {

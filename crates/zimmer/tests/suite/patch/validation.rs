@@ -1,10 +1,10 @@
 //! What a patch is refused for — and, as much as it matters, what it is not.
 
 use crate::common::{minimal, noise, osc};
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::patch::{
-    Adsr, Filter, FilterKind, Lfo, LfoTarget, MAX_OSCS, Partial, Slope, Source, Wave,
+use rusty_zimmer::patch::{
+    Adsr, Filter, FilterKind, Lfo, LfoTarget, Partial, Slope, Source, Wave, MAX_OSCS,
 };
+use rusty_zimmer::SynthError;
 
 #[test]
 fn every_source_kind_is_playable() {

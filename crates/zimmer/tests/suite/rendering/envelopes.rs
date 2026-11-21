@@ -2,7 +2,7 @@
 //! that changes what pitch it starts on.
 
 use crate::common::{adsr, opts, peak, render, rising_crossings, saw_patch};
-use scorsese_zimmer::patch::{Adsr, Lfo, LfoTarget, Patch, PitchEnv};
+use rusty_zimmer::patch::{Adsr, Lfo, LfoTarget, Patch, PitchEnv};
 
 const WINDOW: usize = 4_410;
 

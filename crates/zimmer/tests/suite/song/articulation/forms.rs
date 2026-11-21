@@ -1,12 +1,12 @@
 //! A mark survives every way an entry can be written, and the document says so.
 
-use super::setup::{TRACK, gate, note, playing, rendered};
+use super::setup::{gate, note, playing, rendered, TRACK};
 use crate::common::{peak, saw_patch};
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::Articulation::{Accent, Ghost, Staccato};
-use scorsese_zimmer::song::{
+use rusty_zimmer::song::Articulation::{Accent, Ghost, Staccato};
+use rusty_zimmer::song::{
     Articulation, Chord, Degree, DegreeNote, PatchRef, PatternEntry, Pitch, Song, Steps, Voicing,
 };
+use rusty_zimmer::SynthError;
 
 fn forms(mark: Option<Articulation>) -> Vec<(&'static str, PatternEntry)> {
     let track = || TRACK.to_owned();

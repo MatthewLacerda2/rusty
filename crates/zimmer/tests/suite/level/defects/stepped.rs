@@ -1,10 +1,10 @@
 //! Stepped gain: a level moving in flat steps instead of smoothly.
 
-use super::{RATE, found, tone};
+use super::{found, tone, RATE};
 
 #[test]
 fn a_fade_stepped_at_a_control_rate_is_zipper_with_its_period() {
-    let period = 800.0 / f64::from(RATE);  // 16.67 ms, a 60 Hz control rate
+    let period = 800.0 / f64::from(RATE); // 16.67 ms, a 60 Hz control rate
     let signal = tone(440.0, 0.5, 2.0, |t| {
         if !(0.5..1.5).contains(&t) {
             return if t < 0.5 { 0.0 } else { -30.0 };

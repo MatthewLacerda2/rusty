@@ -1,8 +1,8 @@
 //! Layered entries: several patterns in one slot, each written once.
 
 use crate::common::songs::{note, played, song};
-use scorsese_zimmer::Song;
-use scorsese_zimmer::song::{ArrangementEntry, Layer, Layers, Pattern, Play, Track};
+use rusty_zimmer::song::{ArrangementEntry, Layer, Layers, Pattern, Play, Track};
+use rusty_zimmer::Song;
 
 use super::setup::{play, render};
 

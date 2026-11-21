@@ -1,12 +1,12 @@
 //! Where things land once the tempo moves: notes, gates, sections, windows and faders, all off the
 //! one map.
 
-use scorsese_zimmer::song::{Automation, Easing, Param, Point, TempoChange};
-use scorsese_zimmer::{Excerpt, Span, Window, render_excerpt};
+use rusty_zimmer::song::{Automation, Easing, Param, Point, TempoChange};
+use rusty_zimmer::{render_excerpt, Excerpt, Span, Window};
 
-use super::setup::{RATE, close, ends, frame, left, onset, slowing};
+use super::setup::{close, ends, frame, left, onset, slowing, RATE};
 use crate::common::songs::{blip, song};
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Song};
+use rusty_zimmer::song::{InlineOnly, PatchRef, Song};
 
 #[test]
 fn a_note_after_a_jump_lands_at_the_new_tempo() {
@@ -84,9 +84,7 @@ fn a_fader_reads_its_curve_at_the_beat_the_map_says_it_is() {
     };
     let buf = left(&song);
     assert!(buf[..frame(1.9)].iter().all(|sample| *sample == 0.0));
-    assert!(
-        buf[frame(2.0)..frame(2.4)]
-            .iter()
-            .any(|sample| *sample != 0.0)
-    );
+    assert!(buf[frame(2.0)..frame(2.4)]
+        .iter()
+        .any(|sample| *sample != 0.0));
 }

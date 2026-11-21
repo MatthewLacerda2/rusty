@@ -132,9 +132,7 @@ fn a_repeated_clash_is_listed_once_and_counted_every_time() {
     assert_eq!(found.clash_beats, 6.0);
     assert_eq!(found.longest.len(), 1);
     assert_eq!(found.longest[0].at.times, 3);
-    assert!(
-        found.longest[0]
-            .to_string()
-            .ends_with("chorus beat 2, 3 times")
-    );
+    assert!(found.longest[0]
+        .to_string()
+        .ends_with("chorus beat 2, 3 times"));
 }

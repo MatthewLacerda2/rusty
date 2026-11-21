@@ -2,11 +2,11 @@
 
 use crate::common::saw_patch;
 use crate::common::songs::{blip, note, played, song, verse};
-use scorsese_zimmer::song::{
+use rusty_zimmer::song::{
     ArrangementEntry, Chord, Humanize, InlineOnly, Note, PatchRef, PatternEntry, Pitch, Play,
     Voicing,
 };
-use scorsese_zimmer::{Song, SynthError, render_song};
+use rusty_zimmer::{render_song, Song, SynthError};
 
 fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")

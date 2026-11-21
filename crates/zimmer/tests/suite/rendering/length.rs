@@ -2,8 +2,8 @@
 //! case allowance for its release and effects.
 
 use crate::common::{adsr, minimal, opts, osc, render};
-use scorsese_zimmer::patch::{Fx, Patch, PitchEnv, Source, Wave};
-use scorsese_zimmer::{SAMPLE_RATE, bake_note, wav};
+use rusty_zimmer::patch::{Fx, Patch, PitchEnv, Source, Wave};
+use rusty_zimmer::{bake_note, wav, SAMPLE_RATE};
 
 fn pop() -> Patch {
     let mut patch = minimal(Source::OscStack {

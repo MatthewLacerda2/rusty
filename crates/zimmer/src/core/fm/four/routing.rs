@@ -15,7 +15,7 @@ pub(crate) fn modulation(
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Note, render};
+    use super::super::{render, Note};
     use crate::patch::{Algorithm, Operator};
 
     const BASE: f32 = 100.0;

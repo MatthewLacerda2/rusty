@@ -16,9 +16,9 @@ pub mod wav;
 
 pub use core::SAMPLE_RATE;
 pub use error::{NoteAt, SynthError};
-pub use note::{Glide, NoteOpts, midi_to_freq, parse_note};
+pub use note::{midi_to_freq, parse_note, Glide, NoteOpts};
 pub use patch::Patch;
-pub use song::{Excerpt, PatchResolver, Song, Span, Window, render_excerpt, render_song};
+pub use song::{render_excerpt, render_song, Excerpt, PatchResolver, Song, Span, Window};
 
 // Bumped in the same change as anything that alters what a recipe renders to: a bake is cached
 // by the recipe's bytes and this number, and the fingerprint test fails when the sound moves.

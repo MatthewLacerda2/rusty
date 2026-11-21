@@ -1,8 +1,8 @@
 //! Every song document type refuses a key it does not know, and says which — including inside the
 //! forms a song writes more than one way.
 
-use scorsese_zimmer::Song;
-use scorsese_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Track};
+use rusty_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Track};
+use rusty_zimmer::Song;
 use serde::de::DeserializeOwned;
 
 fn refused<T: DeserializeOwned + std::fmt::Debug>(json: &str, key: &str) {

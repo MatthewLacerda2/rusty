@@ -218,10 +218,8 @@ mod tests {
     fn silence_stays_silent_rather_than_dividing_into_nothing() {
         let quiet = limited(Stereo::silence(512));
         assert!(quiet.l.iter().chain(&quiet.r).all(|s| *s == 0.0));
-        assert!(
-            required_gain(&mut Stereo::silence(512))
-                .iter()
-                .all(|g| *g == 1.0)
-        );
+        assert!(required_gain(&mut Stereo::silence(512))
+            .iter()
+            .all(|g| *g == 1.0));
     }
 }

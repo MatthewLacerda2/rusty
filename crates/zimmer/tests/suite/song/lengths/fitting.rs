@@ -2,8 +2,8 @@
 
 use super::setup::{fitted, render, samples};
 use crate::common::peak;
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::FitMode;
+use rusty_zimmer::song::FitMode;
+use rusty_zimmer::SynthError;
 
 #[test]
 fn looping_lands_on_the_target_to_the_sample() {

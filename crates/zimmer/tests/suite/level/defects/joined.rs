@@ -1,7 +1,7 @@
 //! The same defect in several channels is one defect, placed and sized by the worst of them;
 //! defects that do not overlap stay apart.
 
-use super::{RATE, found, interleaved};
+use super::{found, interleaved, RATE};
 
 fn impulses(at: usize, left: f32, late: usize, right: f32) -> Vec<f32> {
     let mut l = vec![0.0; RATE as usize];

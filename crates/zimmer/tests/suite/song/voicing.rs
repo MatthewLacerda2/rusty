@@ -2,8 +2,8 @@
 //! "near"` must render exactly as the pitches they choose, written out.
 
 use crate::common::songs::{note, played, song, verse};
-use scorsese_zimmer::song::{Chord, InlineOnly, Leading, Note, PatternEntry, Voicing};
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::song::{Chord, InlineOnly, Leading, Note, PatternEntry, Voicing};
+use rusty_zimmer::{render_song, Song};
 
 fn playing(entries: Vec<PatternEntry>) -> Song {
     let mut once = song();

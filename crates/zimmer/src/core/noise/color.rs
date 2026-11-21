@@ -4,12 +4,8 @@ use crate::patch::NoiseColor;
 
 pub(crate) enum Coloring {
     White,
-    Pink {
-        poles: [f32; PINK_POLES.len()],
-    },
-    Brown {
-        level: f32,
-    },
+    Pink { poles: [f32; PINK_POLES.len()] },
+    Brown { level: f32 },
 }
 
 const PINK_POLES: [(f32, f32); 3] = [

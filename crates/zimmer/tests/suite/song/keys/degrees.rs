@@ -2,7 +2,7 @@
 
 use super::setup::{degree, playing, render, triad};
 use crate::common::songs::{note, played};
-use scorsese_zimmer::song::Degree;
+use rusty_zimmer::song::Degree;
 
 #[test]
 fn a_degree_renders_as_the_note_it_names_in_the_key() {

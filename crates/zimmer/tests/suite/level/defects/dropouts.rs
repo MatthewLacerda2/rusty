@@ -1,7 +1,7 @@
 //! Where a dropout starts and how deep it reads: gaps built at a named depth, after sound of a
 //! named level, a named distance from the end.
 
-use super::{RATE, found, steady, tone};
+use super::{found, steady, tone, RATE};
 
 fn gapped(depth_db: f64) -> Vec<f32> {
     tone(440.0, 0.4, 1.0, |t| {
@@ -24,7 +24,11 @@ fn a_dropout_reads_as_deep_as_it_falls() {
 #[test]
 fn a_gap_after_quiet_sound_is_not_a_dropout() {
     let mut signal = tone(440.0, 0.4, 1.0, |t| {
-        if (0.4..0.5).contains(&t) { -40.0 } else { 0.0 }
+        if (0.4..0.5).contains(&t) {
+            -40.0
+        } else {
+            0.0
+        }
     });
     signal[RATE as usize / 2..RATE as usize / 2 + 480].fill(0.0);
     let defects = found(1, &signal);

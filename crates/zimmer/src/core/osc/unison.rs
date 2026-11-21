@@ -41,7 +41,7 @@ pub(super) fn start_phase(index: usize, voice: usize, seed: u64) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::patch::{MAX_VOICES, Wave};
+    use crate::patch::{Wave, MAX_VOICES};
 
     fn unison(voices: usize, spread: f32) -> Osc {
         Osc {

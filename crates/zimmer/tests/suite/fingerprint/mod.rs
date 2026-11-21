@@ -3,10 +3,10 @@
 mod probes;
 mod table;
 
-use scorsese_zimmer::level::BandMeter;
-use scorsese_zimmer::song::InlineOnly;
-use scorsese_zimmer::{NoteOpts, Patch, SAMPLE_RATE, SYNTH_VERSION, Song};
-use table::{RECORDED_AT, Row, TABLE};
+use rusty_zimmer::level::BandMeter;
+use rusty_zimmer::song::InlineOnly;
+use rusty_zimmer::{NoteOpts, Patch, Song, SAMPLE_RATE, SYNTH_VERSION};
+use table::{Row, RECORDED_AT, TABLE};
 
 const FRAMES: u64 = 44;
 const DB: f64 = 0.05;
@@ -67,12 +67,12 @@ fn measure_all() -> Vec<Row> {
                 glide: None,
                 seed: 7,
             };
-            let bake = scorsese_zimmer::bake_named_note(&patch, probe.note, &opts).expect("bakes");
+            let bake = rusty_zimmer::bake_named_note(&patch, probe.note, &opts).expect("bakes");
             measure(probe.name, &bake.wav)
         })
         .collect();
     let song = Song::from_json(probes::SONG).expect("the probe song parses");
-    let bake = scorsese_zimmer::bake_song(&song, &InlineOnly).expect("bakes");
+    let bake = rusty_zimmer::bake_song(&song, &InlineOnly).expect("bakes");
     rows.push(measure("song", &bake.wav));
     rows
 }

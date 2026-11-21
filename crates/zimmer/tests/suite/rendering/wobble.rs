@@ -2,8 +2,8 @@
 //! other buffer.
 
 use crate::common::{brightness, opts, render, saw_patch};
-use scorsese_zimmer::SAMPLE_RATE;
-use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Lfo, LfoTarget, Patch, Slope};
+use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Lfo, LfoTarget, Patch, Slope};
+use rusty_zimmer::SAMPLE_RATE;
 
 const RATE: f32 = 1.0;
 const WINDOW: usize = SAMPLE_RATE as usize / 20;

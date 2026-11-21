@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{Articulation, Note, Pitch, one};
+use super::{one, Articulation, Note, Pitch};
 use crate::error::SynthError;
 
 const HIT: char = 'x';

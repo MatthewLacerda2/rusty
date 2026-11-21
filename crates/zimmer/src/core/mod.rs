@@ -21,7 +21,7 @@ use super::note::NoteOpts;
 use super::patch::Patch;
 use super::stereo::Stereo;
 use lfo::{Lfos, Onset};
-use voice::{Struck, Voice, layer_seed};
+use voice::{layer_seed, Struck, Voice};
 
 pub const SAMPLE_RATE: u32 = 44_100;
 

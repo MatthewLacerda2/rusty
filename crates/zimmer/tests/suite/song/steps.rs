@@ -1,8 +1,8 @@
 //! A step string as one entry, held to the notes it replaced.
 
 use crate::common::songs::{blip, note, played, song, verse};
-use scorsese_zimmer::song::{Humanize, InlineOnly, Note, PatchRef, PatternEntry, Pitch, Steps};
-use scorsese_zimmer::{Song, SynthError, render_song};
+use rusty_zimmer::song::{Humanize, InlineOnly, Note, PatchRef, PatternEntry, Pitch, Steps};
+use rusty_zimmer::{render_song, Song, SynthError};
 
 const PLAIN: f32 = 0.4;
 
@@ -140,26 +140,22 @@ fn a_step_entry_writes_down_its_start_only_when_it_has_one() {
         "a string starting at the top of its pattern wrote a `start` it did not need:\n{json}"
     );
 
-    let late = playing(vec![
-        Steps {
-            start: 1.0,
-            ..steps("xX")
-        }
-        .into(),
-    ]);
+    let late = playing(vec![Steps {
+        start: 1.0,
+        ..steps("xX")
+    }
+    .into()]);
     let reloaded = Song::from_json(&late.to_json().expect("serialise")).expect("deserialise");
     assert_eq!(reloaded, late, "a `start` that was not the top was lost");
 }
 
 #[test]
 fn a_step_string_names_a_real_track() {
-    let elsewhere = playing(vec![
-        Steps {
-            track: "hat".to_owned(),
-            ..steps("x-xX")
-        }
-        .into(),
-    ]);
+    let elsewhere = playing(vec![Steps {
+        track: "hat".to_owned(),
+        ..steps("x-xX")
+    }
+    .into()]);
     assert!(matches!(
         elsewhere.validate(),
         Err(SynthError::UnknownTrack { track, .. }) if track == "hat"

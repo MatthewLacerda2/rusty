@@ -4,11 +4,11 @@
 use super::setup::{fitted, samples};
 use crate::common::peak;
 use crate::common::songs::{blip, song, verse, voice};
-use scorsese_zimmer::patch::{Adsr, Patch};
-use scorsese_zimmer::song::{
-    Excerpt, Fade, FitMode, InlineOnly, PatchRef, Pattern, Span, Tail, Window, render_excerpt,
+use rusty_zimmer::patch::{Adsr, Patch};
+use rusty_zimmer::song::{
+    render_excerpt, Excerpt, Fade, FitMode, InlineOnly, PatchRef, Pattern, Span, Tail, Window,
 };
-use scorsese_zimmer::{Song, SynthError, render_song};
+use rusty_zimmer::{render_song, Song, SynthError};
 
 fn stereo(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")

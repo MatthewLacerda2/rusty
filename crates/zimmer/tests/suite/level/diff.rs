@@ -1,11 +1,11 @@
 //! Two measurements, compared.
 
-use scorsese_zimmer::level::{Difference, Profiler};
-use scorsese_zimmer::{SAMPLE_RATE, bake_song, song::InlineOnly};
+use rusty_zimmer::level::{Difference, Profiler};
+use rusty_zimmer::{bake_song, song::InlineOnly, SAMPLE_RATE};
 
-use super::{SLACK, common::songs, square};
+use super::{common::songs, square, SLACK};
 
-fn profiled(samples: &[f32]) -> scorsese_zimmer::level::Profile {
+fn profiled(samples: &[f32]) -> rusty_zimmer::level::Profile {
     let mut profiler = Profiler::new(1, SAMPLE_RATE);
     profiler.feed(samples);
     profiler.finish()
@@ -114,18 +114,14 @@ fn a_move_of_exactly_the_threshold_is_still_a_move() {
         seconds: 0.0,
     };
     assert!(unmoved.is_nothing(), "nothing moved at all");
-    assert!(
-        !Difference {
-            mean_db: Some(0.01),
-            ..unmoved
-        }
-        .is_nothing()
-    );
-    assert!(
-        !Difference {
-            correlation: Some(0.005),
-            ..unmoved
-        }
-        .is_nothing()
-    );
+    assert!(!Difference {
+        mean_db: Some(0.01),
+        ..unmoved
+    }
+    .is_nothing());
+    assert!(!Difference {
+        correlation: Some(0.005),
+        ..unmoved
+    }
+    .is_nothing());
 }

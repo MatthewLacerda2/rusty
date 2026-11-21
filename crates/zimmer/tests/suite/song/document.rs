@@ -2,8 +2,8 @@
 //! before it starts.
 
 use crate::common::songs::{song, verse, voice};
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::{Humanize, Pitch, Song};
+use rusty_zimmer::song::{Humanize, Pitch, Song};
+use rusty_zimmer::SynthError;
 
 #[test]
 fn the_document_round_trips_through_json() {

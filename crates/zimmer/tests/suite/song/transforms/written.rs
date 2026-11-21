@@ -1,8 +1,8 @@
 //! Writing a layered entry down, and what it is refused for.
 
 use crate::common::songs::song;
-use scorsese_zimmer::song::{ArrangementEntry, Layers, Play};
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::{ArrangementEntry, Layers, Play};
+use rusty_zimmer::{Song, SynthError};
 
 use super::setup::play;
 
@@ -60,12 +60,10 @@ fn an_entry_with_no_layers_is_refused() {
 #[test]
 fn every_layer_is_checked_like_an_entry() {
     let mut typo = song();
-    typo.arrangement = vec![
-        Layers {
-            layers: vec!["verse".into(), "vrese".into()],
-        }
-        .into(),
-    ];
+    typo.arrangement = vec![Layers {
+        layers: vec!["verse".into(), "vrese".into()],
+    }
+    .into()];
     assert_eq!(
         typo.validate(),
         Err(SynthError::UnknownPattern {
@@ -74,19 +72,17 @@ fn every_layer_is_checked_like_an_entry() {
     );
 
     let mut nonsense = song();
-    nonsense.arrangement = vec![
-        Layers {
-            layers: vec![
-                "verse".into(),
-                Play {
-                    transpose: Some(f32::NAN),
-                    ..play("verse")
-                }
-                .into(),
-            ],
-        }
-        .into(),
-    ];
+    nonsense.arrangement = vec![Layers {
+        layers: vec![
+            "verse".into(),
+            Play {
+                transpose: Some(f32::NAN),
+                ..play("verse")
+            }
+            .into(),
+        ],
+    }
+    .into()];
     assert!(matches!(
         nonsense.validate(),
         Err(SynthError::BadTranspose { .. })

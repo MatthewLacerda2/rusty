@@ -1,9 +1,9 @@
 //! How a mark composes with everything else that decides a note.
 
-use super::setup::{TRACK, note, playing, rendered};
+use super::setup::{note, playing, rendered, TRACK};
 use crate::common::{brightness, peak, saw_patch};
-use scorsese_zimmer::song::Articulation::{Accent, Ghost};
-use scorsese_zimmer::song::{Automation, Easing, Humanize, Param, PatchRef, Play, Point};
+use rusty_zimmer::song::Articulation::{Accent, Ghost};
+use rusty_zimmer::song::{Automation, Easing, Humanize, Param, PatchRef, Play, Point};
 
 #[test]
 fn a_mark_multiplies_what_the_section_and_the_page_already_decided() {
@@ -17,16 +17,14 @@ fn a_mark_multiplies_what_the_section_and_the_page_already_decided() {
             timing: 0.01,
             timbre: 0.0,
         });
-        song.arrangement = vec![
-            Play {
-                pattern: "verse".to_owned(),
-                vel_scale: Some(0.5),
-                transpose: None,
-                transpose_degrees: None,
-                tracks: None,
-            }
-            .into(),
-        ];
+        song.arrangement = vec![Play {
+            pattern: "verse".to_owned(),
+            vel_scale: Some(0.5),
+            transpose: None,
+            transpose_degrees: None,
+            tracks: None,
+        }
+        .into()];
         rendered(&song)
     };
     let accented = played(0.5, Some(Accent));

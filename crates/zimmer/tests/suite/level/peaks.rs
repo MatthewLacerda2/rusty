@@ -1,6 +1,6 @@
 //! Each frame's true peak, as a limiter outside this crate reads it.
 
-use scorsese_zimmer::level::{FramePeaks, Meter};
+use rusty_zimmer::level::{FramePeaks, Meter};
 
 fn signal() -> Vec<f32> {
     (0..2_000)

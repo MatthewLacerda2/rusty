@@ -1,9 +1,9 @@
 //! How wide a signal is: how much of it is common to both channels.
 
 use crate::common::{adsr, osc};
-use scorsese_zimmer::level::{Meter, Profiler};
-use scorsese_zimmer::patch::{Fx, Patch, Source, Wave};
-use scorsese_zimmer::{NoteOpts, bake_named_note};
+use rusty_zimmer::level::{Meter, Profiler};
+use rusty_zimmer::patch::{Fx, Patch, Source, Wave};
+use rusty_zimmer::{bake_named_note, NoteOpts};
 
 const RATE: f64 = 48_000.0;
 

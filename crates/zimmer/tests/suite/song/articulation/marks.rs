@@ -2,8 +2,8 @@
 
 use super::setup::{gate, note, playing, rendered, samples, sounding};
 use crate::common::{brightness, peak};
-use scorsese_zimmer::song::Articulation;
-use scorsese_zimmer::song::Articulation::{Accent, Ghost, Staccato};
+use rusty_zimmer::song::Articulation;
+use rusty_zimmer::song::Articulation::{Accent, Ghost, Staccato};
 
 fn pair(name: &str, dur: f32, vel: f32, mark: Articulation) -> (Vec<f32>, Vec<f32>) {
     let of = |mark| rendered(&playing(vec![note(name, 1.0, dur, vel, mark).into()]));
@@ -22,7 +22,7 @@ fn an_accent_is_struck_harder_and_opens_the_instrument_up() {
 #[test]
 fn an_accent_is_more_than_the_same_note_written_louder() {
     let accented = rendered(&playing(vec![
-        note("E2", 1.0, 1.0, 0.5, Some(Accent)).into(),
+        note("E2", 1.0, 1.0, 0.5, Some(Accent)).into()
     ]));
     let louder = rendered(&playing(vec![note("E2", 1.0, 1.0, 0.65, None).into()]));
     let level = peak(&accented) / peak(&louder);
@@ -73,9 +73,9 @@ fn a_ghost_is_quiet_and_short_and_early_and_dead() {
         "{early} samples early, not {expected}"
     );
     let equally_quiet = rendered(&playing(vec![note("E2", 1.0, 1.0, 0.28, None).into()]));
-    let dead = rendered(&playing(vec![
-        note("E2", 1.0, 1.0, 0.8, Some(Ghost)).into(),
-    ]));
+    let dead = rendered(&playing(
+        vec![note("E2", 1.0, 1.0, 0.8, Some(Ghost)).into()],
+    ));
     assert!(
         brightness(&dead) < brightness(&equally_quiet) * 0.95,
         "a ghost at the same level is no duller than a quiet note"

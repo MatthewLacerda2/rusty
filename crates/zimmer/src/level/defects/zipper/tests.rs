@@ -2,7 +2,7 @@
 //! would blur the number under test: the step series' Hann weights and edges, the lags it proposes,
 //! a cut's spread and its fewest segments, and how far apart two fits may be and still be one.
 
-use super::{Cut, Fit, Levels, SILENT, candidates, refined, staircases, steps};
+use super::{candidates, refined, staircases, steps, Cut, Fit, Levels, SILENT};
 
 fn weights() -> [f64; 4] {
     let (outer, inner) = ((2.0 - 2f64.sqrt()) / 4.0, (2.0 + 2f64.sqrt()) / 4.0);

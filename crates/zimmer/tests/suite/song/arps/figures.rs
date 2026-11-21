@@ -1,7 +1,7 @@
 //! What each word plays, stated as the pitches it plays.
 
 use super::setup::{arped, playing, same, scattered, spelled};
-use scorsese_zimmer::song::{Arp, Chord, Humanize};
+use rusty_zimmer::song::{Arp, Chord, Humanize};
 
 #[test]
 fn an_arpeggio_equals_writing_its_notes_out_by_hand() {

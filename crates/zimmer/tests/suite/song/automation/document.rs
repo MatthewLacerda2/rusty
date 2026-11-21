@@ -1,7 +1,7 @@
 //! The document: what a curve looks like on the page, and what it costs a song that does not use
 //! one.
 
-use scorsese_zimmer::song::{Easing, Param, Song};
+use rusty_zimmer::song::{Easing, Param, Song};
 
 use super::setup::{at, curve, eased, held};
 use crate::common::songs::song;

@@ -10,7 +10,7 @@ pub use arp::Arp;
 pub use lead::Leading;
 pub(crate) use lead::Led;
 
-use super::{Articulation, Note, Pitch, one};
+use super::{one, Articulation, Note, Pitch};
 use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
 

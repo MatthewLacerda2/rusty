@@ -3,9 +3,9 @@
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};
-use super::{RATE, env, filter, source};
+use super::{env, filter, source, RATE};
 use crate::hash::hash3;
-use crate::note::{NoteOpts, midi_to_freq};
+use crate::note::{midi_to_freq, NoteOpts};
 use crate::patch::{Adsr, Filter, Layer, Patch, PitchEnv, Source};
 use crate::stereo::Stereo;
 

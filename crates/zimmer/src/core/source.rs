@@ -1,7 +1,7 @@
 //! the source stage: which generator makes the tone
 
 use super::{additive, fm, karplus, noise, osc};
-use crate::patch::{Algorithm, FM_OPERATORS, Operator, Source};
+use crate::patch::{Algorithm, Operator, Source, FM_OPERATORS};
 use crate::stereo::Stereo;
 
 pub(crate) fn render(

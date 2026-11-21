@@ -3,8 +3,8 @@
 pub(crate) mod songs;
 pub(crate) mod spectrum;
 
-use scorsese_zimmer::patch::{Adsr, NoiseColor, Osc, Patch, Source, Wave};
-use scorsese_zimmer::{NoteOpts, SynthError};
+use rusty_zimmer::patch::{Adsr, NoiseColor, Osc, Patch, Source, Wave};
+use rusty_zimmer::{NoteOpts, SynthError};
 
 pub(crate) fn saw_patch() -> Patch {
     Patch {
@@ -108,7 +108,11 @@ pub(crate) fn measured_hz(buf: &[f32], sample_rate: f32) -> f32 {
 pub(crate) fn brightness(buf: &[f32]) -> f32 {
     let signal: f32 = buf.iter().map(|sample| sample * sample).sum();
     let edges: f32 = buf.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
-    if signal > 0.0 { edges / signal } else { 0.0 }
+    if signal > 0.0 {
+        edges / signal
+    } else {
+        0.0
+    }
 }
 
 pub(crate) fn channel(buf: &[f32], index: usize) -> Vec<f32> {
@@ -120,9 +124,9 @@ pub(crate) fn render(patch: &Patch, midi: f32, opts: &NoteOpts) -> Vec<f32> {
 }
 
 pub(crate) fn render_stereo(patch: &Patch, midi: f32, opts: &NoteOpts) -> Vec<f32> {
-    scorsese_zimmer::render_note(patch, midi, opts).expect("the patch renders")
+    rusty_zimmer::render_note(patch, midi, opts).expect("the patch renders")
 }
 
 pub(crate) fn refusal(patch: &Patch, midi: f32, opts: &NoteOpts) -> SynthError {
-    scorsese_zimmer::render_note(patch, midi, opts).expect_err("the patch is refused")
+    rusty_zimmer::render_note(patch, midi, opts).expect_err("the patch is refused")
 }

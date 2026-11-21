@@ -1,8 +1,8 @@
 //! Writing a transformed entry down, and what it is refused for.
 
 use crate::common::songs::song;
-use scorsese_zimmer::song::{ArrangementEntry, Play};
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::{ArrangementEntry, Play};
+use rusty_zimmer::{Song, SynthError};
 
 use super::setup::play;
 

@@ -1,7 +1,7 @@
 //! Clicks that come in numbers: two close together, and one at every audio buffer — the "choppy,
 //! like Bluetooth" a broken capture sounds like.
 
-use super::{RATE, found, steady, tone};
+use super::{found, steady, tone, RATE};
 
 #[test]
 fn two_clicks_close_together_are_two_clicks() {

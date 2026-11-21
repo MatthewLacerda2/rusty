@@ -2,9 +2,9 @@
 
 use super::setup::{note, playing, rendered};
 use crate::common::{measured_hz, peak};
-use scorsese_zimmer::SAMPLE_RATE;
-use scorsese_zimmer::song::Articulation::Glide;
-use scorsese_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Play};
+use rusty_zimmer::song::Articulation::Glide;
+use rusty_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Play};
+use rusty_zimmer::SAMPLE_RATE;
 
 const ONSET: usize = SAMPLE_RATE as usize;
 

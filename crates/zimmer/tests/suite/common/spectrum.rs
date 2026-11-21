@@ -2,7 +2,7 @@
 
 use std::f64::consts::TAU;
 
-use scorsese_zimmer::SAMPLE_RATE;
+use rusty_zimmer::SAMPLE_RATE;
 
 const BLOCK: usize = 8192;
 
@@ -34,7 +34,11 @@ pub(crate) fn band_power(buf: &[f32], centre: f32) -> f64 {
             count += 1.0;
         }
     }
-    if count > 0.0 { total / count } else { 0.0 }
+    if count > 0.0 {
+        total / count
+    } else {
+        0.0
+    }
 }
 
 pub(crate) fn centres(lowest: f32, octaves: usize) -> Vec<f32> {

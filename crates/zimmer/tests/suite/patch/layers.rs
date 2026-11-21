@@ -2,8 +2,8 @@
 //! down, what is refused, and what they render to.
 
 use crate::common::{channel, peak, render_stereo};
-use scorsese_zimmer::patch::MAX_LAYERS;
-use scorsese_zimmer::{NoteOpts, Patch, SynthError};
+use rusty_zimmer::patch::MAX_LAYERS;
+use rusty_zimmer::{NoteOpts, Patch, SynthError};
 
 const SNARE: &str = r#"{
     "source": { "kind": "noise", "color": "pink" },

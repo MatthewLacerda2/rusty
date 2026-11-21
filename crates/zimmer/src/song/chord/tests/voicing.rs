@@ -2,8 +2,8 @@
 
 use super::{chord, voiced};
 use crate::error::SynthError;
-use crate::song::Pitch;
 use crate::song::chord::{Chord, Leading, Led, Voicing};
+use crate::song::Pitch;
 
 #[test]
 fn an_inversion_turns_the_voices_above_the_bass() {
@@ -62,9 +62,7 @@ fn near_leads_from_the_last_chord_on_its_track() {
         .collect();
     assert_eq!(
         midi,
-        [
-            50.0, 54.0, 57.0, 61.0, 59.0, 62.0, 66.0, 69.0, 50.0, 54.0, 57.0, 59.0
-        ]
+        [50.0, 54.0, 57.0, 61.0, 59.0, 62.0, 66.0, 69.0, 50.0, 54.0, 57.0, 59.0]
     );
 }
 

@@ -2,8 +2,8 @@
 //! settles before validation ever runs.
 
 use crate::common::minimal;
-use scorsese_zimmer::patch::{Adsr, Algorithm, FM_OPERATORS, Operator, Source};
-use scorsese_zimmer::{Patch, SynthError};
+use rusty_zimmer::patch::{Adsr, Algorithm, Operator, Source, FM_OPERATORS};
+use rusty_zimmer::{Patch, SynthError};
 
 fn op(ratio: f32) -> Operator {
     Operator {

@@ -1,14 +1,14 @@
 //! Where the notes are summed, and where an effect that belongs to the *mix* runs rather than to
 //! one instrument.
 
-use super::Song;
 use super::automate::{self, Param, Riding};
 use super::clock::Clock;
 use super::excerpt::Scope;
+use super::Song;
 use crate::core::{RATE, SAMPLE_RATE};
 use crate::fx;
 use crate::level::{Cut, Layer};
-use crate::patch::{Fx, sidechains};
+use crate::patch::{sidechains, Fx};
 use crate::stereo::{self, Stereo};
 
 pub(super) struct Mix<'a> {

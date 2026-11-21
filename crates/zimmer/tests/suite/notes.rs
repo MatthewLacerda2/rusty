@@ -1,6 +1,6 @@
 //! Note names, and the pitch they come out at.
 
-use scorsese_zimmer::{NoteOpts, SynthError, midi_to_freq, parse_note};
+use rusty_zimmer::{midi_to_freq, parse_note, NoteOpts, SynthError};
 
 fn midi(name: &str) -> f32 {
     parse_note(name).expect("a real note name")

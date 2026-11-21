@@ -1,7 +1,7 @@
 //! Where anchored sections land, and what the rest of the song does.
 
-use scorsese_zimmer::Song;
-use scorsese_zimmer::song::{Anchor, Fit, FitMode};
+use rusty_zimmer::song::{Anchor, Fit, FitMode};
+use rusty_zimmer::Song;
 
 use super::super::setup::{render, samples};
 use super::{ends, four_sections};
@@ -54,7 +54,7 @@ fn a_once_fit_keeps_the_written_tempo_after_the_last_anchor() {
 #[test]
 fn a_written_tempo_map_is_scaled_between_anchors() {
     let mut song = four_sections(vec![Anchor::at(3, 5.0)]);
-    song.tempo = vec![scorsese_zimmer::song::TempoChange::jump(4.0, 240.0)];
+    song.tempo = vec![rusty_zimmer::song::TempoChange::jump(4.0, 240.0)];
     // Written: 2 s, then three sections at 1 s each — section 3 at 4 s. Pinned at 5 s, the first
     // twelve beats play 4/5 as fast.
     song.validate().expect("within the bound");

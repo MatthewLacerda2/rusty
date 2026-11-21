@@ -2,9 +2,9 @@
 //! at — after a `stretch` fit has moved it.
 
 use crate::common::songs::song;
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{Fit, FitMode, InlineOnly, TempoChange};
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{Fit, FitMode, InlineOnly, TempoChange};
+use rusty_zimmer::{render_song, Song};
 
 fn echo(time: f32, beats: Option<f32>) -> Fx {
     Fx::Delay {

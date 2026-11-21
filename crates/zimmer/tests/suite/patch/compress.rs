@@ -1,6 +1,6 @@
 //! The compressor as a document: what a recipe may leave out.
 
-use scorsese_zimmer::patch::Fx;
+use rusty_zimmer::patch::Fx;
 
 #[test]
 fn a_compressor_carries_its_documented_defaults() {

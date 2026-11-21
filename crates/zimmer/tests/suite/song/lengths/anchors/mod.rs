@@ -4,8 +4,8 @@
 mod landing;
 mod refusals;
 
-use scorsese_zimmer::Song;
-use scorsese_zimmer::song::Anchor;
+use rusty_zimmer::song::Anchor;
+use rusty_zimmer::Song;
 
 pub(crate) fn four_sections(anchors: Vec<Anchor>) -> Song {
     let mut song = Song::from_json(

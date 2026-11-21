@@ -3,7 +3,7 @@
 
 use std::fmt;
 
-use crate::note::{DIATONIC, midi_to_name, pitch_class_name};
+use crate::note::{midi_to_name, pitch_class_name, DIATONIC};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Register {

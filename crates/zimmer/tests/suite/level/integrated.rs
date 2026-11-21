@@ -2,7 +2,7 @@
 
 use std::f32::consts::TAU;
 
-use scorsese_zimmer::level::Integrated;
+use rusty_zimmer::level::Integrated;
 
 const TOLERANCE: f64 = 0.1;
 

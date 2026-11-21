@@ -2,8 +2,8 @@
 
 use crate::common::spectrum::{octave_db, slope_db_per_octave};
 use crate::common::{channel, minimal, opts, peak, render_stereo};
-use scorsese_zimmer::Patch;
-use scorsese_zimmer::patch::{Adsr, NoiseColor, Source};
+use rusty_zimmer::patch::{Adsr, NoiseColor, Source};
+use rusty_zimmer::Patch;
 
 fn held(color: NoiseColor) -> Vec<f32> {
     let patch = Patch {

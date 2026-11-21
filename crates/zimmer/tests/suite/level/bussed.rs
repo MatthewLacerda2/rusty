@@ -1,8 +1,8 @@
 //! A track's row when it is summed through a bus of its own — one with a chain, or with a fader
 //! that moves — rather than added straight into the master.
 
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{Automation, Easing, Param, Point, Song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{Automation, Easing, Param, Point, Song};
 
 use super::tracks::{bake, duet, mean};
 

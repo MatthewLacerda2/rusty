@@ -1,8 +1,8 @@
 //! The per-sample curves a note follows: pitch, cutoff, and the tremolo gain.
 
-use super::RATE;
 use super::env;
 use super::lfo::Lfos;
+use super::RATE;
 use crate::note::Glide;
 use crate::patch::{Filter, LfoTarget, PitchEnv};
 

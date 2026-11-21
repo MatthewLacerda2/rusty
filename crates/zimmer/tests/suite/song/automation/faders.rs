@@ -1,10 +1,10 @@
 //! A fader that moves, read off the samples it produced.
 
-use scorsese_zimmer::song::{Param, Song};
+use rusty_zimmer::song::{Param, Song};
 
-use super::setup::{BEATS, at, curve, frame, held, ramp, render, rms, sides};
+use super::setup::{at, curve, frame, held, ramp, render, rms, sides, BEATS};
 
-fn riding(gain: f32, moving: scorsese_zimmer::song::Automation) -> Song {
+fn riding(gain: f32, moving: rusty_zimmer::song::Automation) -> Song {
     let mut song = held(gain);
     song.automation = vec![moving];
     song

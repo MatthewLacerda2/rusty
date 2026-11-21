@@ -1,7 +1,7 @@
 //! Shared setup for the arrangement-transform tests.
 
-use scorsese_zimmer::song::{InlineOnly, Note, Pattern, PatternEntry, Play};
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::song::{InlineOnly, Note, Pattern, PatternEntry, Play};
+use rusty_zimmer::{render_song, Song};
 
 use crate::common::channel;
 

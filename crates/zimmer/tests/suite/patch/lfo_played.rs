@@ -3,9 +3,9 @@
 
 use crate::common::songs::song;
 use crate::common::{opts, render, saw_patch};
-use scorsese_zimmer::patch::{Lfo, LfoShape, LfoTarget};
-use scorsese_zimmer::song::{InlineOnly, PatchRef};
-use scorsese_zimmer::{Patch, render_song};
+use rusty_zimmer::patch::{Lfo, LfoShape, LfoTarget};
+use rusty_zimmer::song::{InlineOnly, PatchRef};
+use rusty_zimmer::{render_song, Patch};
 
 fn vibrato() -> Lfo {
     Lfo::new(5.0, 0.5, LfoTarget::Pitch)

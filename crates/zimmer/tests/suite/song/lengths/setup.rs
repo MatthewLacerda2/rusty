@@ -1,7 +1,7 @@
 //! Shared setup for the length-and-level tests.
 
-use scorsese_zimmer::song::{Fit, FitMode, InlineOnly};
-use scorsese_zimmer::{SAMPLE_RATE, Song, render_song};
+use rusty_zimmer::song::{Fit, FitMode, InlineOnly};
+use rusty_zimmer::{render_song, Song, SAMPLE_RATE};
 
 use crate::common::channel;
 use crate::common::songs::song;

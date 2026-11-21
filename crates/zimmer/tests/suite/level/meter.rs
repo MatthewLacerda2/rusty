@@ -1,10 +1,10 @@
 //! Measuring how loud a signal is: peak, true peak, and mean.
 
-use scorsese_zimmer::level::Meter;
+use rusty_zimmer::level::Meter;
 
 use super::SLACK;
 
-fn measured(samples: &[f32], channels: usize) -> scorsese_zimmer::level::Loudness {
+fn measured(samples: &[f32], channels: usize) -> rusty_zimmer::level::Loudness {
     let mut meter = Meter::new(channels);
     meter.feed(samples);
     meter.finish()

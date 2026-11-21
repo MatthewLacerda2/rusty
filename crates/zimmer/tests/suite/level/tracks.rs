@@ -4,10 +4,10 @@ use std::collections::BTreeMap;
 
 use crate::common::songs::{note, played};
 use crate::common::{adsr, osc};
-use scorsese_zimmer::level::Layer;
-use scorsese_zimmer::patch::{Patch, Source, Wave};
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Pattern, Song, Track};
-use scorsese_zimmer::{Bake, bake_song};
+use rusty_zimmer::level::Layer;
+use rusty_zimmer::patch::{Patch, Source, Wave};
+use rusty_zimmer::song::{InlineOnly, PatchRef, Pattern, Song, Track};
+use rusty_zimmer::{bake_song, Bake};
 
 fn tone() -> Patch {
     Patch {
@@ -156,6 +156,6 @@ fn a_song_of_one_track_gets_no_rows() {
 #[test]
 fn a_patch_bake_has_no_rows() {
     let opts = crate::common::opts(0.2);
-    let bake = scorsese_zimmer::bake_note(&tone(), 60.0, &opts).expect("the patch bakes");
+    let bake = rusty_zimmer::bake_note(&tone(), 60.0, &opts).expect("the patch bakes");
     assert!(bake.tracks.is_empty());
 }

@@ -1,6 +1,6 @@
 //! The key section, and the one case a loop adds: a note ringing over the top of the next pass.
 
-use super::{RUB, harmony};
+use super::{harmony, RUB};
 
 #[test]
 fn a_note_held_over_a_loop_point_clashes_with_the_top_of_the_piece() {
@@ -47,12 +47,10 @@ fn a_note_outside_the_declared_key_is_reported_by_its_share_of_held_time() {
     assert_eq!(bass.track, "bass");
     assert_eq!(bass.share, 0.5, "F2 for two of the bass's four beats");
     assert_eq!(bass.longest[0].to_string(), "F2 for 2 beats, chorus beat 2");
-    assert!(
-        found
-            .headline()
-            .expect("something to say")
-            .ends_with("; out of E major: bass 50%")
-    );
+    assert!(found
+        .headline()
+        .expect("something to say")
+        .ends_with("; out of E major: bass 50%"));
 }
 
 #[test]

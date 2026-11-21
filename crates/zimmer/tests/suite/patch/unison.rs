@@ -1,8 +1,8 @@
 //! Unison: one oscillator written down, several sounding.
 
 use crate::common::{minimal, opts, osc, peak, render};
-use scorsese_zimmer::patch::{MAX_VOICES, Osc, Source, Wave};
-use scorsese_zimmer::{Patch, SynthError};
+use rusty_zimmer::patch::{Osc, Source, Wave, MAX_VOICES};
+use rusty_zimmer::{Patch, SynthError};
 
 fn stack(voices: usize, spread: f32) -> Patch {
     minimal(Source::OscStack {

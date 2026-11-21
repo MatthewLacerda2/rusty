@@ -7,7 +7,7 @@ use std::f32::consts::TAU;
 
 use crate::stereo::Stereo;
 use line::read;
-use voices::{MAX_VOICES, MIN_VOICES, ensemble};
+use voices::{ensemble, MAX_VOICES, MIN_VOICES};
 
 const BASE_SECONDS: f32 = 0.015;
 

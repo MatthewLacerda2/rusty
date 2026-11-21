@@ -1,7 +1,7 @@
 //! What a curve is refused for.
 
-use scorsese_zimmer::song::{Automation, InlineOnly, Param, Point};
-use scorsese_zimmer::{SynthError, render_song};
+use rusty_zimmer::song::{Automation, InlineOnly, Param, Point};
+use rusty_zimmer::{render_song, SynthError};
 
 use super::setup::{at, curve, filtered, held, voiced};
 

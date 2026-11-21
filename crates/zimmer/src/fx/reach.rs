@@ -1,6 +1,6 @@
 //! How far a chain reaches beyond the signal it was handed — forwards in time, and backwards.
 
-use super::{Spacing, Tempo, chorus, delay, reverb};
+use super::{chorus, delay, reverb, Spacing, Tempo};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 

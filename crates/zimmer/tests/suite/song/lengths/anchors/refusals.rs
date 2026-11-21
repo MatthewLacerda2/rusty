@@ -1,7 +1,7 @@
 //! What the clock cannot honour, refused before anything is rendered.
 
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::{Anchor, Fit, FitMode};
+use rusty_zimmer::song::{Anchor, Fit, FitMode};
+use rusty_zimmer::SynthError;
 
 use super::four_sections;
 

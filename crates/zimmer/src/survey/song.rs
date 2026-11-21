@@ -1,6 +1,8 @@
 //! Reading one song document into the facts a survey reports.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
+
+use rusty_core::collections::Map;
 
 use super::duty::Sounding;
 use super::walk::walk;
@@ -70,15 +72,15 @@ pub(super) fn source(patch: &Patch) -> &'static str {
 type Played = (
     Option<Register>,
     PitchClasses,
-    HashMap<String, Vec<f32>>,
-    HashMap<String, Sounding>,
+    Map<String, Vec<f32>>,
+    Map<String, Sounding>,
 );
 
 fn played(song: &Song) -> Played {
     let mut register: Option<Register> = None;
     let mut pitches = PitchClasses::default();
-    let mut by_track: HashMap<String, Vec<f32>> = HashMap::new();
-    let mut sounding: HashMap<String, Sounding> = HashMap::new();
+    let mut by_track: Map<String, Vec<f32>> = Map::default();
+    let mut sounding: Map<String, Sounding> = Map::default();
     walk(song, |note| {
         sounding
             .entry(note.track.clone())

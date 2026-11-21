@@ -3,9 +3,9 @@
 //! curves by the number.
 
 use crate::common::{minimal, opts, osc, refusal, saw_patch};
-use scorsese_zimmer::patch::{Lfo, LfoShape, LfoTarget, Source, Wave};
+use rusty_zimmer::patch::{Lfo, LfoShape, LfoTarget, Source, Wave};
 
-use scorsese_zimmer::{Patch, SynthError};
+use rusty_zimmer::{Patch, SynthError};
 
 fn vibrato() -> Lfo {
     Lfo::new(5.0, 0.5, LfoTarget::Pitch)

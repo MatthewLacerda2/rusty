@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use crate::common::songs::{note, played};
 use crate::common::{channel, peak, saw_patch};
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Pattern, Song, Track};
-use scorsese_zimmer::{bake_song, render_song};
+use rusty_zimmer::song::{InlineOnly, PatchRef, Pattern, Song, Track};
+use rusty_zimmer::{bake_song, render_song};
 
 fn duet(left: f32, right: f32) -> Song {
     let track = |name: &str, pan: f32| Track {

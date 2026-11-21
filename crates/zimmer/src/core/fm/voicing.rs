@@ -1,6 +1,6 @@
 //! which of the four operators a note actually renders, and what its carriers are divided by.
 
-use crate::patch::{Algorithm, FM_OPERATORS, Operator};
+use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
 pub(crate) fn sounding(operators: &[Operator; FM_OPERATORS], ceiling: f32) -> [bool; FM_OPERATORS] {
     std::array::from_fn(|i| operators[i].ratio > 0.0 && operators[i].ratio < ceiling)
@@ -15,7 +15,11 @@ pub(crate) fn normaliser(
         .filter(|op| sounding[*op] && algorithm.is_carrier(*op))
         .map(|op| levels[op].max(0.0))
         .sum();
-    if total > 0.0 { 1.0 / total } else { 0.0 }
+    if total > 0.0 {
+        1.0 / total
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]

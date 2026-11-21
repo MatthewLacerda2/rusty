@@ -2,8 +2,8 @@
 //! means, and how a partial's own decay meets the amp envelope above it.
 
 use crate::common::{adsr, minimal, opts, peak, render};
-use scorsese_zimmer::patch::{MAX_PARTIALS, Partial, Source};
-use scorsese_zimmer::{Patch, SynthError};
+use rusty_zimmer::patch::{Partial, Source, MAX_PARTIALS};
+use rusty_zimmer::{Patch, SynthError};
 
 fn partial(ratio: f32, gain: f32, decay: f32) -> Partial {
     Partial {

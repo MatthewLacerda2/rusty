@@ -2,11 +2,11 @@
 
 use std::collections::BTreeMap;
 
-use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope};
-use scorsese_zimmer::song::{
+use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope};
+use rusty_zimmer::song::{
     Automation, Easing, InlineOnly, Param, PatchRef, Pattern, Point, Song, Track,
 };
-use scorsese_zimmer::{SAMPLE_RATE, render_song};
+use rusty_zimmer::{render_song, SAMPLE_RATE};
 
 use crate::common::songs::{note, played};
 use crate::common::{channel, saw_patch};

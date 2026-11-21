@@ -1,10 +1,10 @@
 //! The longest a song may ask to be rendered: [`MAX_SONG_SECONDS`].
 
-use std::collections::HashMap;
+use rusty_core::collections::Map;
 
-use super::Song;
 use super::key::Key;
 use super::shape::{fitted, plan};
+use super::Song;
 use crate::error::SynthError;
 
 pub const MAX_SONG_SECONDS: f32 = 600.0;
@@ -24,7 +24,7 @@ pub(super) fn check(song: &Song, key: Option<&Key>) -> Result<(), SynthError> {
 }
 
 fn last_beat(song: &Song, key: Option<&Key>) -> Result<f32, SynthError> {
-    let mut reach = HashMap::with_capacity(song.patterns.len());
+    let mut reach = Map::with_capacity_and_hasher(song.patterns.len(), Default::default());
     for (name, pattern) in &song.patterns {
         let notes = pattern.voices(key)?;
         let end = notes

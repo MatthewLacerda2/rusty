@@ -1,6 +1,6 @@
 //! The arithmetic of a curve, by the number.
 
-use scorsese_zimmer::song::{Easing, Param};
+use rusty_zimmer::song::{Easing, Param};
 
 use super::setup::{at, curve, eased};
 

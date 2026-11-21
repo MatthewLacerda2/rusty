@@ -1,8 +1,8 @@
 //! Pulse width: a square narrowed into the chiptune duties, and an LFO that moves it.
 
 use crate::common::{minimal, opts, osc, refusal, render, spectrum::band_power};
-use scorsese_zimmer::patch::{Lfo, LfoTarget, Osc, Source, Wave};
-use scorsese_zimmer::{Patch, SynthError};
+use rusty_zimmer::patch::{Lfo, LfoTarget, Osc, Source, Wave};
+use rusty_zimmer::{Patch, SynthError};
 
 fn pulse(wave: Wave, pulse_width: f32) -> Patch {
     minimal(Source::OscStack {

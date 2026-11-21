@@ -1,8 +1,8 @@
 //! What a velocity does besides move the fader.
 
 use crate::common::{brightness, minimal, opts, peak, render, saw_patch};
-use scorsese_zimmer::NoteOpts;
-use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope, Source};
+use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope, Source};
+use rusty_zimmer::NoteOpts;
 
 fn struck(patch: &Patch, velocity: f32) -> Vec<f32> {
     render(

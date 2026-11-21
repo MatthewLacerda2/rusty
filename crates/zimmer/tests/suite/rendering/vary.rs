@@ -2,8 +2,8 @@
 //! in **envelope**, not merely in grain — and without `vary` they are still the same sound.
 
 use crate::common::{adsr, minimal, osc, render};
-use scorsese_zimmer::patch::{PitchEnv, Source, Wave};
-use scorsese_zimmer::{NoteOpts, Patch};
+use rusty_zimmer::patch::{PitchEnv, Source, Wave};
+use rusty_zimmer::{NoteOpts, Patch};
 
 fn pop() -> Patch {
     let mut amp = adsr(0.001, 0.07, 0.0, 0.02);

@@ -1,7 +1,7 @@
 //! What a jump's neighbours decide: a jump that has company in reach is not a click, and jumps
 //! within one click's few milliseconds are one click.
 
-use super::{RATE, found};
+use super::{found, RATE};
 
 const REACH: usize = 1_680;
 

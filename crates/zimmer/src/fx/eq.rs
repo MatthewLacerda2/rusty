@@ -125,7 +125,11 @@ impl Biquad {
 }
 
 fn finite(value: f32, fallback: f32) -> f32 {
-    if value.is_finite() { value } else { fallback }
+    if value.is_finite() {
+        value
+    } else {
+        fallback
+    }
 }
 
 #[cfg(test)]

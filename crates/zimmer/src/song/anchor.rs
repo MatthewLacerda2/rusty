@@ -2,9 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::Song;
 use super::clock::Clock;
 use super::timing::{FitMode, MAX_STRETCH};
+use super::Song;
 use crate::error::SynthError;
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -55,9 +55,10 @@ pub(crate) fn landings(song: &Song) -> Option<Vec<Landing>> {
             });
         }
     }
-    if let Some(fit) = song.fit
-        && fit.mode == FitMode::Stretch
-        && let Some(seconds) = fit.seconds
+    if let Some(seconds) = song
+        .fit
+        .filter(|fit| fit.mode == FitMode::Stretch)
+        .and_then(|fit| fit.seconds)
     {
         landings.push(Landing {
             beat: f64::from(song.arrangement_beats()),
@@ -113,12 +114,11 @@ pub(super) fn check(song: &Song) -> Result<(), SynthError> {
         }
         previous = Some((anchor.section, seconds));
     }
-    if let (Some(fit), Some((section, at))) = (song.fit, previous)
-        && fit.mode == FitMode::Stretch
-        && fit.seconds.is_some_and(|end| end <= at)
-    {
-        let why = format!("lands at {at:.3} s, not before the end `fit` stretches to");
-        return Err(refuse(section, why));
+    if let (Some(fit), Some((section, at))) = (song.fit, previous) {
+        if fit.mode == FitMode::Stretch && fit.seconds.is_some_and(|end| end <= at) {
+            let why = format!("lands at {at:.3} s, not before the end `fit` stretches to");
+            return Err(refuse(section, why));
+        }
     }
     check_tempo(song)
 }

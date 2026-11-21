@@ -37,7 +37,7 @@ pub use chord::{Arp, Chord, Leading, Voicing};
 pub use excerpt::{Excerpt, Span, SpanError, Unit, Window};
 pub use feel::Humanize;
 pub use key::{Degree, DegreeNote, Key, Mode};
-pub use render::{InlineOnly, PatchResolver, render_excerpt, render_song};
+pub use render::{render_excerpt, render_song, InlineOnly, PatchResolver};
 pub use steps::Steps;
 pub use tempo::TempoChange;
 pub use timing::{Fade, Fit, FitMode, FitTo, Tail};

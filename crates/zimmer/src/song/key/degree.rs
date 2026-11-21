@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::Key;
 use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
-use crate::song::{Articulation, Note, Pitch, one};
+use crate::song::{one, Articulation, Note, Pitch};
 
 const DEFAULT_OCT: i32 = 4;
 

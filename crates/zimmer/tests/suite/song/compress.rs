@@ -2,9 +2,9 @@
 
 use crate::common::songs::{note, song, verse};
 use crate::common::{channel, peak, saw_patch};
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Song, Track};
-use scorsese_zimmer::{SynthError, render_song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{InlineOnly, PatchRef, Song, Track};
+use rusty_zimmer::{render_song, SynthError};
 
 const RATE: f32 = 44_100.0;
 

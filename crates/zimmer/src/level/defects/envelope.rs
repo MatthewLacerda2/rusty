@@ -1,7 +1,7 @@
 //! Dropouts and stepped gain, both read off a channel's energy every half millisecond.
 
-use super::Found;
 use super::quadrature::Quadrature;
+use super::Found;
 
 const BLOCK: f64 = 0.0005;
 

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::fm::{Algorithm, FM_OPERATORS, Operator};
+use super::fm::{Algorithm, Operator, FM_OPERATORS};
 
 pub const MAX_OSCS: usize = 4;
 

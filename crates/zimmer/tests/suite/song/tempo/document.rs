@@ -1,7 +1,7 @@
 //! How a tempo map is written, and what is refused.
 
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::{Song, TempoChange};
+use rusty_zimmer::song::{Song, TempoChange};
+use rusty_zimmer::SynthError;
 
 use crate::common::songs::song;
 

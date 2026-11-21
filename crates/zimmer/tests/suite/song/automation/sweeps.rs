@@ -1,13 +1,13 @@
 //! A filter opening across the piece — the build, read at every moment of every note rather than
 //! once at its onset.
 
-use scorsese_zimmer::song::{Param, Song};
+use rusty_zimmer::song::{Param, Song};
 
-use super::setup::{BEATS, at, curve, filtered, frame, render, rms, voiced};
+use super::setup::{at, curve, filtered, frame, render, rms, voiced, BEATS};
 use crate::common::brightness;
 use crate::common::songs::voice;
 
-fn sweep() -> scorsese_zimmer::song::Automation {
+fn sweep() -> rusty_zimmer::song::Automation {
     curve(Param::Cutoff, vec![at(0.0, 300.0), at(BEATS, 8300.0)])
 }
 

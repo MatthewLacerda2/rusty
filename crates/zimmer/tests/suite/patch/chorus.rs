@@ -2,8 +2,8 @@
 //! — that it widens what it is given, and that it does so identically every time.
 
 use crate::common::{channel, opts, render_stereo, saw_patch};
-use scorsese_zimmer::patch::{Fx, Patch};
-use scorsese_zimmer::{Patch as PatchDoc, bake_note};
+use rusty_zimmer::patch::{Fx, Patch};
+use rusty_zimmer::{bake_note, Patch as PatchDoc};
 
 fn chorused(voices: usize) -> Patch {
     Patch {

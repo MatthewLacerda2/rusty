@@ -5,9 +5,9 @@ use crate::common;
 
 use common::songs::song;
 use common::{measured_hz, minimal, noise, opts, saw_patch};
-use scorsese_zimmer::patch::{Adsr, Osc, Patch, Source, Wave};
-use scorsese_zimmer::song::{Humanize, InlineOnly};
-use scorsese_zimmer::{NoteOpts, Song, bake_named_note, bake_note, bake_song};
+use rusty_zimmer::patch::{Adsr, Osc, Patch, Source, Wave};
+use rusty_zimmer::song::{Humanize, InlineOnly};
+use rusty_zimmer::{bake_named_note, bake_note, bake_song, NoteOpts, Song};
 
 fn sine() -> Patch {
     Patch {

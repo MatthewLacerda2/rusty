@@ -1,10 +1,10 @@
 //! The same statistics again, a stretch at a time.
 
-use scorsese_zimmer::level::{Cut, Profiler};
-use scorsese_zimmer::song::{Fit, FitMode, InlineOnly};
-use scorsese_zimmer::{SAMPLE_RATE, bake_song};
+use rusty_zimmer::level::{Cut, Profiler};
+use rusty_zimmer::song::{Fit, FitMode, InlineOnly};
+use rusty_zimmer::{bake_song, SAMPLE_RATE};
 
-use super::{SLACK, common::songs, square};
+use super::{common::songs, square, SLACK};
 use crate::common::songs::played;
 
 #[test]
@@ -133,7 +133,7 @@ fn each_track_is_cut_at_the_sections_the_sum_is() {
         .extend(played(vec![songs::note("lead", "E4", 0.0, 1.0)]));
     let bake = bake_song(&song, &InlineOnly).expect("the fixture song renders");
     assert_eq!(bake.tracks.len(), 2);
-    let bounds = |spans: &[scorsese_zimmer::level::Span]| -> Vec<(f64, f64)> {
+    let bounds = |spans: &[rusty_zimmer::level::Span]| -> Vec<(f64, f64)> {
         spans
             .iter()
             .map(|span| (span.from_seconds, span.to_seconds))

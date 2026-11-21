@@ -1,13 +1,13 @@
 //! What the page says an arpeggio is, and what it is refused for.
 
 use super::setup::{arped, playing, same};
-use scorsese_zimmer::song::{Arp, Chord};
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::{Arp, Chord};
+use rusty_zimmer::{Song, SynthError};
 
 #[test]
 fn an_arpeggio_round_trips_and_a_block_chord_says_nothing() {
     let figure = playing(vec![
-        arped("Dm7", Some(Arp::UpDown), Some(0.5), Some(0.4)).into(),
+        arped("Dm7", Some(Arp::UpDown), Some(0.5), Some(0.4)).into()
     ]);
     let json = figure.to_json().expect("the song serialises");
     assert!(json.contains("\"arp\": \"up_down\""), "{json}");

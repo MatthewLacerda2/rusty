@@ -2,7 +2,7 @@
 
 use super::poly_blep;
 use crate::core::lfo::Lfos;
-use crate::patch::{LfoTarget, MAX_PULSE_WIDTH, MIN_PULSE_WIDTH, Osc};
+use crate::patch::{LfoTarget, Osc, MAX_PULSE_WIDTH, MIN_PULSE_WIDTH};
 
 pub(crate) fn track(lfos: &Lfos, n: usize) -> Option<Vec<f32>> {
     if !lfos.aims_at(LfoTarget::PulseWidth) {

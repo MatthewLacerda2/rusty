@@ -1,6 +1,6 @@
 //! Which note a glide slides from.
 
-use std::collections::HashMap;
+use rusty_core::collections::Map;
 
 use super::{Key, Layer, Note};
 use crate::error::SynthError;
@@ -14,7 +14,7 @@ pub(crate) struct Slides {
 impl Slides {
     pub(crate) fn of(
         notes: &[Note],
-        track_of: &HashMap<&str, usize>,
+        track_of: &Map<&str, usize>,
         tracks: usize,
     ) -> Result<Self, SynthError> {
         let midi = notes
@@ -103,7 +103,7 @@ mod tests {
     }
 
     fn slides(notes: &[Note]) -> Slides {
-        let track_of = HashMap::from([("bass", 0), ("keys", 1)]);
+        let track_of = Map::from_iter([("bass", 0), ("keys", 1)]);
         Slides::of(notes, &track_of, 2).expect("the fixture's notes are named pitches")
     }
 

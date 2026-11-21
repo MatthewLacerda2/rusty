@@ -3,8 +3,8 @@
 use super::setup::{fitted, render, samples};
 use crate::common::peak;
 use crate::common::songs::{song, verse, voice};
-use scorsese_zimmer::song::{Fade, FitMode, Tail};
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::{Fade, FitMode, Tail};
+use rusty_zimmer::{Song, SynthError};
 
 #[test]
 fn an_exact_tail_ends_on_the_final_beat() {

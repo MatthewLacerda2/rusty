@@ -1,7 +1,7 @@
 //! Where the report's lines are drawn: what counts as one finding, and the exact edge of a passing
 //! note.
 
-use super::{RUB, harmony};
+use super::{harmony, RUB};
 use crate::survey::harmony::percent;
 
 #[test]

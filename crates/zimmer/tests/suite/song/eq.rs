@@ -1,9 +1,9 @@
 //! An EQ where a mix move actually belongs: on a track, or on the sum.
 
 use crate::common::songs::{note, song, verse};
-use scorsese_zimmer::patch::{Adsr, EqBand, EqKind, Fx, MAX_EQ_BANDS, Osc, Source, Wave};
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Song, Track};
-use scorsese_zimmer::{Patch, SynthError, render_song};
+use rusty_zimmer::patch::{Adsr, EqBand, EqKind, Fx, Osc, Source, Wave, MAX_EQ_BANDS};
+use rusty_zimmer::song::{InlineOnly, PatchRef, Song, Track};
+use rusty_zimmer::{render_song, Patch, SynthError};
 
 fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
@@ -113,7 +113,7 @@ fn the_report_s_own_rows_show_the_treated_track_moving_and_the_others_still() {
     }];
 
     let low = |song: &Song, track: &str| {
-        scorsese_zimmer::bake_song(song, &InlineOnly)
+        rusty_zimmer::bake_song(song, &InlineOnly)
             .expect("bakes")
             .tracks
             .iter()

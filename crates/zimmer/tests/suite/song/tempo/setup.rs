@@ -1,7 +1,7 @@
 //! Shared setup for the tempo map tests.
 
-use scorsese_zimmer::render_song;
-use scorsese_zimmer::song::{InlineOnly, Song, TempoChange};
+use rusty_zimmer::render_song;
+use rusty_zimmer::song::{InlineOnly, Song, TempoChange};
 
 use crate::common::songs::song;
 

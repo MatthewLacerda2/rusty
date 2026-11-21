@@ -2,7 +2,7 @@
 
 use std::f64::consts::TAU;
 
-use scorsese_zimmer::level::{DefectFinder, Defects, Tally};
+use rusty_zimmer::level::{DefectFinder, Defects, Tally};
 
 mod clicks;
 mod dropouts;

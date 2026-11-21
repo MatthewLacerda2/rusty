@@ -1,6 +1,6 @@
 //! A chain run beside a **send**: the whole mix, and the part of it that reaches the room.
 
-use super::{NoKeys, Spacing, Tempo, apply_one, compress, delay, reverb};
+use super::{apply_one, compress, delay, reverb, NoKeys, Spacing, Tempo};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 
@@ -71,7 +71,7 @@ pub(crate) fn apply_chain_sent(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fx::{NoTempo, apply_chain};
+    use crate::fx::{apply_chain, NoTempo};
 
     const RATE: f32 = 44_100.0;
 

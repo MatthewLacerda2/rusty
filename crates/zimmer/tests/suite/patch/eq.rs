@@ -2,9 +2,9 @@
 //! bands is too many.
 
 use crate::common::{minimal, noise};
-use scorsese_zimmer::Patch;
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::patch::{EqBand, EqKind, Fx, MAX_EQ_BANDS};
+use rusty_zimmer::patch::{EqBand, EqKind, Fx, MAX_EQ_BANDS};
+use rusty_zimmer::Patch;
+use rusty_zimmer::SynthError;
 
 fn band(kind: EqKind, freq: f32, gain_db: f32, q: f32) -> EqBand {
     EqBand {

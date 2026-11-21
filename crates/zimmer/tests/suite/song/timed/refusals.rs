@@ -2,13 +2,13 @@
 
 use crate::common::saw_patch;
 use crate::common::songs::song;
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::patch::{Fx, Patch};
-use scorsese_zimmer::song::Humanize;
+use rusty_zimmer::patch::{Fx, Patch};
+use rusty_zimmer::song::Humanize;
+use rusty_zimmer::SynthError;
 
 #[test]
 fn a_track_feel_that_is_not_one_is_refused_by_name() {
-    let refused = |edit: &dyn Fn(&mut scorsese_zimmer::Song)| {
+    let refused = |edit: &dyn Fn(&mut rusty_zimmer::Song)| {
         let mut song = song();
         edit(&mut song);
         song.validate().expect_err("refused")

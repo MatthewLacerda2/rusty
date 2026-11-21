@@ -96,12 +96,12 @@ pub(crate) fn check_wrap(fit: Option<Fit>, fade: Option<Fade>) -> Result<(), Syn
 }
 
 pub(super) fn check(song: &Song) -> Result<(), SynthError> {
-    if let Some(fade) = song.fade
-        && !(fade.in_seconds.is_finite()
+    if let Some(fade) = song.fade.filter(|fade| {
+        !(fade.in_seconds.is_finite()
             && fade.in_seconds >= 0.0
             && fade.out_seconds.is_finite()
             && fade.out_seconds >= 0.0)
-    {
+    }) {
         return Err(SynthError::BadFade {
             seconds: fade.in_seconds.max(fade.out_seconds),
         });
@@ -137,10 +137,12 @@ pub(super) fn check(song: &Song) -> Result<(), SynthError> {
     if !(seconds.is_finite() && seconds > 0.0) {
         return Err(SynthError::BadFitSeconds { seconds });
     }
-    if song.anchors.is_empty()
-        && let Some(ratio) = super::shape::stretch_ratio(song, fit, seconds)
-        && ratio.abs() > MAX_STRETCH
-    {
+    let stretch = song
+        .anchors
+        .is_empty()
+        .then(|| super::shape::stretch_ratio(song, fit, seconds))
+        .flatten();
+    if let Some(ratio) = stretch.filter(|ratio| ratio.abs() > MAX_STRETCH) {
         return Err(SynthError::StretchTooFar {
             bpm: song.bpm,
             needed: song.bpm * (1.0 + ratio),

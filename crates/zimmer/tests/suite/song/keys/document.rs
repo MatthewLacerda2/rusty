@@ -2,8 +2,8 @@
 
 use super::setup::{degree, playing, triad};
 use crate::common::songs::verse;
-use scorsese_zimmer::song::{Degree, DegreeNote, PatternEntry};
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::{Degree, DegreeNote, PatternEntry};
+use rusty_zimmer::{Song, SynthError};
 
 #[test]
 fn a_key_and_a_degree_round_trip_as_they_were_written() {

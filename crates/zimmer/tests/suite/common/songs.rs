@@ -2,8 +2,8 @@
 
 use std::collections::BTreeMap;
 
-use scorsese_zimmer::patch::{Adsr, NoiseColor, Patch, Source};
-use scorsese_zimmer::song::{Note, PatchRef, Pattern, PatternEntry, Pitch, Song, Track};
+use rusty_zimmer::patch::{Adsr, NoiseColor, Patch, Source};
+use rusty_zimmer::song::{Note, PatchRef, Pattern, PatternEntry, Pitch, Song, Track};
 
 pub(crate) fn blip() -> Patch {
     Patch {

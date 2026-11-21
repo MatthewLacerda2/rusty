@@ -118,7 +118,11 @@ impl Algorithm {
 }
 
 fn bit(index: usize) -> u8 {
-    if index < FM_OPERATORS { 1 << index } else { 0 }
+    if index < FM_OPERATORS {
+        1 << index
+    } else {
+        0
+    }
 }
 
 #[cfg(test)]

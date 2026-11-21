@@ -1,10 +1,10 @@
 //! Round-tripping, tag spelling, and the defaults an omitted field means.
 
 use crate::common::{adsr, osc};
-use scorsese_zimmer::Patch;
-use scorsese_zimmer::patch::{
+use rusty_zimmer::patch::{
     Adsr, Filter, FilterKind, Fx, Lfo, LfoTarget, PitchEnv, Slope, Source, Wave,
 };
+use rusty_zimmer::Patch;
 
 fn full_patch() -> Patch {
     Patch {

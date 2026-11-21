@@ -2,8 +2,8 @@
 
 use crate::common::peak;
 use crate::common::songs::{note, played, song, verse, voice};
-use scorsese_zimmer::SAMPLE_RATE;
-use scorsese_zimmer::song::{ArrangementEntry, Play, Track};
+use rusty_zimmer::song::{ArrangementEntry, Play, Track};
+use rusty_zimmer::SAMPLE_RATE;
 
 use super::setup::{play, render};
 

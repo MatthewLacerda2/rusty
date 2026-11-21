@@ -2,10 +2,10 @@
 
 use crate::common::peak;
 use crate::common::songs::song;
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::render_song;
-use scorsese_zimmer::song::InlineOnly;
-use scorsese_zimmer::song::{Song, Track};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::render_song;
+use rusty_zimmer::song::InlineOnly;
+use rusty_zimmer::song::{Song, Track};
 
 fn in_a_room(send: f32) -> Song {
     let mut song = song();

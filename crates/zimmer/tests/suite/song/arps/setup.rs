@@ -1,8 +1,8 @@
 //! The fixture every arpeggio test is written against.
 
 use crate::common::songs::{note, played, song, verse};
-use scorsese_zimmer::song::{Arp, Chord, InlineOnly, Note, PatternEntry, Voicing};
-use scorsese_zimmer::{Song, render_song};
+use rusty_zimmer::song::{Arp, Chord, InlineOnly, Note, PatternEntry, Voicing};
+use rusty_zimmer::{render_song, Song};
 
 pub(crate) fn playing(entries: Vec<PatternEntry>) -> Song {
     let mut once = song();
@@ -51,7 +51,7 @@ pub(crate) fn same(chord: Chord, pitches: &str, div: f32, gate: f32) {
     );
 }
 
-pub(crate) fn scattered(song: Song, feel: scorsese_zimmer::song::Humanize) -> Vec<f32> {
+pub(crate) fn scattered(song: Song, feel: rusty_zimmer::song::Humanize) -> Vec<f32> {
     render(&Song {
         humanize: Some(feel),
         swing: 0.3,

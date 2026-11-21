@@ -1,7 +1,7 @@
 //! Sounds that pulse on their own, which a staircase detector must not take for stepped gain: notes
 //! rich in harmonics, beats and a level that climbs within every frame, each with a fade under it.
 
-use super::{RATE, found, steady, tone};
+use super::{found, steady, tone, RATE};
 
 #[test]
 fn a_low_note_dying_away_is_not_a_staircase() {

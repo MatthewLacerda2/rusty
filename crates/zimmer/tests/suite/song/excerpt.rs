@@ -2,9 +2,9 @@
 
 use crate::common::saw_patch;
 use crate::common::songs::{note, song, verse};
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{Fit, FitMode, InlineOnly, PatchRef, Song, Track};
-use scorsese_zimmer::{Excerpt, Span, Window, render_excerpt, render_song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{Fit, FitMode, InlineOnly, PatchRef, Song, Track};
+use rusty_zimmer::{render_excerpt, render_song, Excerpt, Span, Window};
 
 const RATE: f32 = 44_100.0;
 const CHANNELS: usize = 2;

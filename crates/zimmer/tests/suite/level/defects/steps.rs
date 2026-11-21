@@ -2,7 +2,7 @@
 //! by one just outside: how large a step, how many, how regular — and how exactly what is found is
 //! measured.
 
-use super::{RATE, found, tone};
+use super::{found, tone, RATE};
 
 fn staircase(samples: f64, steps: impl Fn(f64) -> f64) -> Vec<f32> {
     let period = samples / f64::from(RATE);

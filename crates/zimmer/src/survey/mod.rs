@@ -8,7 +8,7 @@ mod walk;
 
 use std::collections::BTreeMap;
 
-pub use harmony::{Clash, Harmony, OutOfKey, PASSING, Place, Stray, Voice};
+pub use harmony::{Clash, Harmony, OutOfKey, Place, Stray, Voice, PASSING};
 pub use pitch::{PitchClasses, Register};
 
 #[derive(Debug, Clone, PartialEq)]

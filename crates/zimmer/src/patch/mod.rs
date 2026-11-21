@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::SynthError;
 
-pub use fm::{Algorithm, FM_OPERATORS, Operator};
+pub use fm::{Algorithm, Operator, FM_OPERATORS};
 pub use fx::{EqBand, EqKind, Fx, MAX_EQ_BANDS};
 pub use layer::{Layer, MAX_LAYERS};
 pub use lfo::{Lfo, LfoShape, LfoTarget, MAX_LFOS};
 pub use stages::{
-    Adsr, Filter, FilterKind, MAX_OSCS, MAX_PARTIALS, MAX_PULSE_WIDTH, MAX_VOICES, MIN_PULSE_WIDTH,
-    NoiseColor, Osc, Partial, PitchEnv, Slope, Source, Wave,
+    Adsr, Filter, FilterKind, NoiseColor, Osc, Partial, PitchEnv, Slope, Source, Wave, MAX_OSCS,
+    MAX_PARTIALS, MAX_PULSE_WIDTH, MAX_VOICES, MIN_PULSE_WIDTH,
 };
 
 pub(crate) fn check_chain(chain: &[Fx]) -> Result<(), SynthError> {

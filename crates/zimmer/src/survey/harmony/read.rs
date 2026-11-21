@@ -1,13 +1,13 @@
 //! The arithmetic behind a [`Harmony`](super::Harmony): which notes are read, which of them overlap
 //! a semitone apart, and which leave the key.
 
-use std::collections::HashMap;
+use rusty_core::collections::Map;
 
-use super::{CLASHES_LISTED, Clash, PASSING, Place, STRAYS_LISTED, Stray, Voice};
+use super::{Clash, Place, Stray, Voice, CLASHES_LISTED, PASSING, STRAYS_LISTED};
 use crate::song::shape::plan;
 use crate::song::{PatchResolver, Song};
 use crate::survey::song::{instrument, source};
-use crate::survey::walk::{Sounded, walk};
+use crate::survey::walk::{walk, Sounded};
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct Held {
@@ -81,7 +81,7 @@ fn whole(n: f32) -> i64 {
 
 pub(super) fn clashes(song: &Song, notes: &[Held]) -> (usize, f32, Vec<Clash>) {
     let mut found: Vec<(Group, Clash)> = Vec::new();
-    let mut at: HashMap<Group, usize> = HashMap::new();
+    let mut at: Map<Group, usize> = Map::default();
     let (mut count, mut total) = (0, 0.0);
     for (i, first) in notes.iter().enumerate() {
         for second in notes[i + 1..].iter().take_while(|it| it.start < first.end) {

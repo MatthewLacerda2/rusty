@@ -1,16 +1,16 @@
 //! Walk the arrangement, sum the notes, limit the result.
 
-use std::collections::HashMap;
+use rusty_core::collections::Map;
 
 use super::articulation::Stroke;
 use super::automate::{self, Automation};
 use super::clock::Clock;
 use super::excerpt::{Excerpt, Scope};
-use super::feel::{Played, swung};
+use super::feel::{swung, Played};
 use super::glide::{Slides, Trail};
 use super::mix::Mix;
 use super::shape::{limit, plan, shape};
-use super::{Articulation, Note, PatchRef, Song, sections};
+use super::{sections, Articulation, Note, PatchRef, Song};
 use crate::core::lfo::Onset;
 use crate::core::{self, RATE};
 use crate::error::{NoteAt, SynthError};
@@ -82,24 +82,24 @@ pub(crate) fn mix_song(
     let (clock, passes) = plan(song);
     let scope = Scope::of(song, excerpt, &clock)?;
     let key = song.key()?;
-    let voiced: HashMap<&str, Vec<Note>> = song
+    let voiced: Map<&str, Vec<Note>> = song
         .patterns
         .iter()
         .map(|(name, pattern)| Ok((name.as_str(), pattern.voices(key.as_ref())?)))
         .collect::<Result<_, SynthError>>()?;
-    let track_index: HashMap<&str, usize> = song
+    let track_index: Map<&str, usize> = song
         .tracks
         .iter()
         .enumerate()
         .map(|(index, track)| (track.name.as_str(), index))
         .collect();
-    let slides: HashMap<&str, Slides> = if glides(&voiced) {
+    let slides: Map<&str, Slides> = if glides(&voiced) {
         voiced
             .iter()
             .map(|(name, notes)| Ok((*name, Slides::of(notes, &track_index, song.tracks.len())?)))
             .collect::<Result<_, SynthError>>()?
     } else {
-        HashMap::new()
+        Map::default()
     };
     let mut trail = Trail::new(song.tracks.len());
 
@@ -245,7 +245,7 @@ fn sweep<'a>(
     }
 }
 
-fn glides(voiced: &HashMap<&str, Vec<Note>>) -> bool {
+fn glides(voiced: &Map<&str, Vec<Note>>) -> bool {
     voiced
         .values()
         .flatten()

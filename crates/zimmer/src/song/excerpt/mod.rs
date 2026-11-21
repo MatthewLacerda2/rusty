@@ -5,8 +5,8 @@ mod span;
 
 use std::fmt;
 
-use super::Song;
 use super::clock::Clock;
+use super::Song;
 use crate::core::RATE;
 
 pub(crate) use scope::Scope;

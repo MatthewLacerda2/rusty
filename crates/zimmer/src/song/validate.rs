@@ -20,9 +20,7 @@ impl Song {
         }
         let key = self.key()?;
         for entry in &self.arrangement {
-            if let ArrangementEntry::Layered(layered) = entry
-                && layered.layers.is_empty()
-            {
+            if matches!(entry, ArrangementEntry::Layered(layered) if layered.layers.is_empty()) {
                 return Err(SynthError::NoLayers);
             }
             for layer in entry.layers() {
@@ -106,8 +104,9 @@ impl Song {
             if !track.push.is_finite() {
                 return Err(refuse("push", track.push));
             }
-            if let Some(swing) = track.swing
-                && !(swing.is_finite() && (0.0..1.0).contains(&swing))
+            if let Some(swing) = track
+                .swing
+                .filter(|swing| !(swing.is_finite() && (0.0..1.0).contains(swing)))
             {
                 return Err(refuse("swing", swing));
             }
@@ -123,9 +122,7 @@ impl Song {
         let Layer::Transformed(play) = layer else {
             return Ok(());
         };
-        if let Some(transpose) = play.transpose
-            && !transpose.is_finite()
-        {
+        if let Some(transpose) = play.transpose.filter(|transpose| !transpose.is_finite()) {
             return Err(SynthError::BadTranspose {
                 pattern: play.pattern.clone(),
                 transpose,
@@ -143,8 +140,9 @@ impl Song {
                 });
             }
         }
-        if let Some(scale) = play.vel_scale
-            && !(scale.is_finite() && scale >= 0.0)
+        if let Some(scale) = play
+            .vel_scale
+            .filter(|scale| !(scale.is_finite() && *scale >= 0.0))
         {
             return Err(SynthError::BadVelocityScale {
                 pattern: play.pattern.clone(),

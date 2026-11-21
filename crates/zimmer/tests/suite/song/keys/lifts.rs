@@ -1,8 +1,8 @@
 //! The lift, and everything that is refused for want of a key.
 
 use super::setup::{degree, lifted, playing, render, triad};
-use scorsese_zimmer::song::Degree;
-use scorsese_zimmer::{Song, SynthError};
+use rusty_zimmer::song::Degree;
+use rusty_zimmer::{Song, SynthError};
 
 #[test]
 fn a_diatonic_transpose_moves_within_the_key() {

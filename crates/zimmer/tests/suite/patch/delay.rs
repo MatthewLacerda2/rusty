@@ -2,7 +2,7 @@
 //! writes it is still worth.
 
 use crate::common::{channel, opts, render_stereo, saw_patch};
-use scorsese_zimmer::patch::{Fx, Patch};
+use rusty_zimmer::patch::{Fx, Patch};
 
 fn delayed(ping_pong: bool) -> Patch {
     Patch {

@@ -1,7 +1,7 @@
 //! Every patch document type refuses a key it does not know, and says which.
 
-use scorsese_zimmer::Patch;
-use scorsese_zimmer::patch::{Adsr, EqBand, Fx, Lfo, Operator, Partial, PitchEnv, Source};
+use rusty_zimmer::patch::{Adsr, EqBand, Fx, Lfo, Operator, Partial, PitchEnv, Source};
+use rusty_zimmer::Patch;
 use serde::de::DeserializeOwned;
 
 fn refused<T: DeserializeOwned + std::fmt::Debug>(json: &str, key: &str) {

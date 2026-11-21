@@ -3,8 +3,8 @@
 //! index.
 
 use crate::common::render;
-use scorsese_zimmer::patch::{LfoTarget, Wave};
-use scorsese_zimmer::{NoteOpts, Patch, SynthError};
+use rusty_zimmer::patch::{LfoTarget, Wave};
+use rusty_zimmer::{NoteOpts, Patch, SynthError};
 
 const BUZZ: &str = r#"{
     "source": { "kind": "noise" },

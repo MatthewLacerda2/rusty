@@ -2,8 +2,8 @@
 //! rather than cut off at the ceiling with a click at sixty seconds.
 
 use crate::common::songs::{song, verse, voice};
-use scorsese_zimmer::song::{InlineOnly, render_song};
-use scorsese_zimmer::{NoteAt, SynthError};
+use rusty_zimmer::song::{render_song, InlineOnly};
+use rusty_zimmer::{NoteAt, SynthError};
 
 #[test]
 fn a_note_held_past_the_ceiling_is_refused_where_the_song_writes_it() {

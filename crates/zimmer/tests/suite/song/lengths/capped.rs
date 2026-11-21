@@ -2,8 +2,8 @@
 //! sample buffer is allocated. Every song here is checked, never rendered: a song at the cap is ten
 //! minutes of samples.
 
-use scorsese_zimmer::Song;
-use scorsese_zimmer::song::{Fit, FitMode};
+use rusty_zimmer::song::{Fit, FitMode};
+use rusty_zimmer::Song;
 
 use crate::common::songs::{note, played, song};
 

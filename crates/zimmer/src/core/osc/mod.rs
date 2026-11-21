@@ -6,7 +6,7 @@ mod unison;
 use std::f32::consts::TAU;
 
 use crate::patch::{Osc, Wave};
-use crate::stereo::{Stereo, pan_gains};
+use crate::stereo::{pan_gains, Stereo};
 use unison::{start_phase, voice_detune, voice_gain, voice_pan, voices};
 
 pub(crate) fn render(

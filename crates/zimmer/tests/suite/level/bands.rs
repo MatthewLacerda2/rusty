@@ -2,7 +2,7 @@
 
 use std::f32::consts::TAU;
 
-use scorsese_zimmer::level::BandMeter;
+use rusty_zimmer::level::BandMeter;
 
 const RATE: u32 = 48_000;
 

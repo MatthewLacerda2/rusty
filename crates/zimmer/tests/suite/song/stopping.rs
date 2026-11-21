@@ -3,8 +3,8 @@
 use std::cell::Cell;
 
 use crate::common::songs::song;
-use scorsese_zimmer::song::InlineOnly;
-use scorsese_zimmer::{Excerpt, bake_excerpt_unless, bake_song};
+use rusty_zimmer::song::InlineOnly;
+use rusty_zimmer::{bake_excerpt_unless, bake_song, Excerpt};
 
 #[test]
 fn a_stop_that_never_says_yes_bakes_the_song_bit_for_bit() {

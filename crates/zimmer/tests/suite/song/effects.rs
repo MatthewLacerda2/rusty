@@ -2,9 +2,9 @@
 
 use crate::common::songs::{note, played, song, verse};
 use crate::common::{channel, peak};
-use scorsese_zimmer::patch::Fx;
-use scorsese_zimmer::song::{InlineOnly, PatchRef, Song, Tail, Track};
-use scorsese_zimmer::{SAMPLE_RATE, render_song};
+use rusty_zimmer::patch::Fx;
+use rusty_zimmer::song::{InlineOnly, PatchRef, Song, Tail, Track};
+use rusty_zimmer::{render_song, SAMPLE_RATE};
 
 fn render(song: &Song) -> Vec<f32> {
     channel(

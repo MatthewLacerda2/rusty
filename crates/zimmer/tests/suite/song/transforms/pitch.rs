@@ -2,7 +2,7 @@
 
 use crate::common::peak;
 use crate::common::songs::{note, song, verse, voice};
-use scorsese_zimmer::song::{ArrangementEntry, Note, Pitch, Play};
+use rusty_zimmer::song::{ArrangementEntry, Note, Pitch, Play};
 
 use super::setup::{alongside, play, render};
 

@@ -3402,6 +3402,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "rusty-zimmer"
+version = "0.1.0"
+dependencies = [
+ "rusty-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "safe_arch"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

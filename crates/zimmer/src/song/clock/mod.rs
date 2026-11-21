@@ -3,8 +3,8 @@
 
 mod map;
 
-use super::Song;
 use super::anchor::Landing;
+use super::Song;
 use crate::core::RATE;
 use map::Map;
 

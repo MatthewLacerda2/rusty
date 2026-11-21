@@ -1,8 +1,8 @@
 //! Turning a rendered song into one of the length that was asked for.
 
-use super::Song;
 use super::clock::Clock;
 use super::timing::{Fade, Fit, FitMode, Tail};
+use super::Song;
 use crate::core::RATE;
 use crate::error::SynthError;
 use crate::fx::limiter;

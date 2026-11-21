@@ -1,7 +1,7 @@
 //! Where a song's sections fall in the piece it renders to.
 
-use super::Song;
 use super::shape::plan;
+use super::Song;
 use crate::level::Cut;
 
 fn whole(song: &Song) -> Vec<Cut> {

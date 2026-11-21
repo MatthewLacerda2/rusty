@@ -6,7 +6,7 @@
 #[path = "common/written.rs"]
 mod written;
 
-use scorsese_zimmer::{Patch, Song};
+use rusty_zimmer::{Patch, Song};
 
 const PATCH: &str = r#"{
     "source": { "kind": "noise" },

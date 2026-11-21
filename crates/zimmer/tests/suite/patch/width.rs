@@ -1,8 +1,8 @@
 //! Unison width: a widened oscillator's voices spread across the stereo field.
 
 use crate::common::{channel, minimal, opts, osc, render_stereo};
-use scorsese_zimmer::Patch;
-use scorsese_zimmer::patch::{Osc, Source, Wave};
+use rusty_zimmer::patch::{Osc, Source, Wave};
+use rusty_zimmer::Patch;
 
 fn stack(width: f32) -> Patch {
     minimal(Source::OscStack {

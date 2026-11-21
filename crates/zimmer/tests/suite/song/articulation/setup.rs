@@ -2,9 +2,9 @@
 
 use crate::common::songs::{song, verse};
 use crate::common::{channel, saw_patch};
-use scorsese_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope};
-use scorsese_zimmer::song::{Articulation, InlineOnly, Note, PatchRef, PatternEntry, Pitch};
-use scorsese_zimmer::{SAMPLE_RATE, Song, render_song};
+use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Patch, Slope};
+use rusty_zimmer::song::{Articulation, InlineOnly, Note, PatchRef, PatternEntry, Pitch};
+use rusty_zimmer::{render_song, Song, SAMPLE_RATE};
 
 pub(crate) const TRACK: &str = "bass";
 

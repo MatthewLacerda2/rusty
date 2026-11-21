@@ -24,7 +24,7 @@ pub(crate) fn encode(samples: &[f32]) -> Vec<u8> {
     out.extend_from_slice(&SAMPLE_RATE.to_le_bytes());
     out.extend_from_slice(&(SAMPLE_RATE * BYTES_PER_FRAME).to_le_bytes());
     out.extend_from_slice(&(BYTES_PER_FRAME as u16).to_le_bytes());
-    out.extend_from_slice(&16u16.to_le_bytes());  // bits per sample
+    out.extend_from_slice(&16u16.to_le_bytes()); // bits per sample
 
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());

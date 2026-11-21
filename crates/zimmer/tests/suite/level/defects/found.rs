@@ -1,8 +1,8 @@
 //! Clicks and dropouts, where they are, and how many.
 
-use scorsese_zimmer::level::DefectFinder;
+use rusty_zimmer::level::DefectFinder;
 
-use super::{RATE, found, interleaved, steady, tone};
+use super::{found, interleaved, steady, tone, RATE};
 
 #[test]
 fn a_jump_in_a_smooth_tone_is_a_click_at_its_moment() {

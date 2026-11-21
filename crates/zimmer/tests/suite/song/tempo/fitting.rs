@@ -1,8 +1,8 @@
 //! A tempo map under `fit`: each pass plays the map again, and a stretch moves every tempo in it by
 //! one factor.
 
-use scorsese_zimmer::SynthError;
-use scorsese_zimmer::song::{Fit, FitMode, Song};
+use rusty_zimmer::song::{Fit, FitMode, Song};
+use rusty_zimmer::SynthError;
 
 use super::setup::{close, ends, slowing};
 
