@@ -2,8 +2,8 @@
 //! own, before phase one's depth draw, then one for the pyramid, the test, the
 //! compaction and the cluster cull (one dispatch a stage for the frame, #2417),
 //! at one batch and at three; on a timed frame (#2401) one each for the pyramid,
-//! the test and each of the cluster cull's three stages (#2406). Timed or not, the cluster cull records
-//! the same dispatches in the same order, stage by stage.
+//! the test and each of the cluster cull's three stages (#2406). Timed or not,
+//! the cluster cull records the same dispatches in the same order.
 
 use glam::{Quat, Vec3};
 
@@ -132,7 +132,7 @@ fn occlusion_laps(r: &crate::Renderer) -> Vec<&'static str> {
 // the wall half hides, the GPU's own texel answer.
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
-    // Measured: lavapipe 2/86/4/12/12, the hidden panel drawn by neither pass.
+    // Measured: lavapipe and Metal (CI's macOS leg) 2/86/4/12/12.
     if let Some(decided) = stage_with(1) {
         assert_eq!(decided, (2, 86, 4, WALL, WALL));
     }
@@ -140,7 +140,7 @@ fn gpu_the_stage_records_two_compute_passes_with_one_clustered_batch() {
 
 #[test]
 fn gpu_the_stage_records_two_compute_passes_with_three_clustered_batches() {
-    // Measured: lavapipe 4/258/8/16396/12946 (phase one draws its set whole).
+    // Measured: lavapipe 4/258/8/16396/12946; Metal the same four, the rest bounded.
     if let Some((tested, clusters, draws, depth, rest)) = stage_with(3) {
         assert_eq!((tested, clusters, draws), (4, 258, 8));
         assert_eq!(depth, WALL + 2 * PANEL, "the wall and the visible panels");
