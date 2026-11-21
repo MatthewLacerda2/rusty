@@ -1,5 +1,5 @@
-// engine/shaders/postfx/effects/lens_flare.wgsl — the lens flare's add, in the
-// composite (#1443, #1473): the flare `postfx/lens_flare.wgsl` drew before the
+// the lens flare's add, in the
+// composite: the flare `postfx/lens_flare.wgsl` drew before the
 // composite, at a quarter of the view's size or less, upsampled onto the HDR image
 // after bloom's add, as URP's uber pass adds it with bloom. Added here rather than
 // onto the scene, SSR doesn't reflect it and the chromatic aberration doesn't split

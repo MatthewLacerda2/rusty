@@ -1,4 +1,4 @@
-// engine/shaders/postfx/effects/white_balance.wgsl — White Balance (#1440), the first
+// White Balance, the first
 // step of the grading bake, on the scene-linear colour. Slot 0: xyz the LMS
 // coefficients that move D65 to the chosen white point, w `1` when it runs.
 
