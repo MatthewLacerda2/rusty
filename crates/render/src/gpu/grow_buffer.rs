@@ -41,6 +41,7 @@ impl GrowBuffer {
     /// Write `bytes` at offset 0, first reallocating to the next power of two when they
     /// do not fit. Returns `true` when the buffer was replaced, so the caller must
     /// rebuild whatever bind group referenced it.
+    #[track_caller]
     pub(crate) fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -96,6 +97,7 @@ impl GrowBuffer {
     }
 
     /// Write `bytes` at `offset`, which [`Self::reserve`] made room for.
+    #[track_caller]
     pub(crate) fn write_at(&self, queue: &wgpu::Queue, offset: u64, bytes: &[u8]) {
         debug_assert!(offset + bytes.len() as u64 <= self.buffer.size());
         if !bytes.is_empty() {

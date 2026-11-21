@@ -3,6 +3,17 @@
 //! [`CameraCtx::new`]. The order is the table's order, reviewable in one place, the
 //! same way `app/registry.rs` orders the sim systems.
 //!
+//! **One encoder a camera** (#2353): every stage records into
+//! [`CameraCtx::commands`] and submits nothing itself; the camera's commands go
+//! out at its end, before the next camera rewrites the camera uniform and the draw
+//! buffers, and early at the [`EARLY_FLUSHES`] points, so the GPU starts while the
+//! CPU still records. The shadow sweep records into the frame's first camera's,
+//! the screen's last camera's takes the upscale and the UI. A stage never rewrites a
+//! buffer a pass it follows reads (`gpu::commands`): a mid-camera change of the
+//! camera uniform is a copy ([`buffer`]). Debug builds panic on a byte range
+//! written twice while the camera records (`gpu::commands::check_write`); a single
+//! write after a recorded read is not checked and is the stage author's to keep.
+//!
 //! **Adding a render stage:** write a `fn(&mut Renderer, &mut RenderView,
 //! &mut CameraCtx)` (usually a one-line call into the feature's own module, taking
 //! what it needs from the context) and add one `(name, fn)` row to [`CAMERA_PASSES`]
@@ -21,11 +32,13 @@
 //! base camera's screen-space work: no decals in its clusters, no SSAO (#1497),
 //! no transparent SSR ([`ssr_march`], #1570).
 
+pub(crate) mod buffer;
 mod stages;
 
 use super::resources::SolidResources;
 use super::stack::StackPass;
 use crate::clusters::ClusterGrid;
+use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::lod::LodSelection;
 use crate::passes::particles::ParticleDraws;
@@ -36,6 +49,32 @@ use crate::postfx::effects::volumetric_fog::{self, VolumetricPlan, VolumetricVie
 use crate::{CameraUniform, Frustum, RenderView, Renderer};
 use rusty_scene::{Camera, ClearFlags, Scene};
 use stages::*;
+
+/// The stages after which a camera sends what it recorded so far
+/// (`Commands::flush`, which keeps recording), in pass order; the renderer's
+/// [`crate::EarlyFlushes`] says how many of them, from the first, it uses (all by
+/// default; `--set render.flushes=` measures the others).
+///
+/// **Why they are there: the GPU's start, measured.** With one submit at the
+/// camera's end the GPU waits for the camera's whole recording: on the operator's
+/// desktop that made the same frames 25% (tower-bar) and 42% (cozy-coffee) longer
+/// on the wall while doing 2% fewer instructions. Each point is where the GPU has
+/// a stage's worth of work and the CPU still has one to record:
+/// - `occlusion`: the depth work (the shadow sweep, which heads the first
+///   camera's encoder, the fog and the Hi-Z stage) goes out while the CPU
+///   records the scene pass;
+/// - `scene`: the opaque pass (SSAO and SSIL in it) goes out while the CPU
+///   records SSR, the translucents, the effects and the post chain.
+///
+/// A flush only adds a submit: what a stage writes still lands before every
+/// command recorded after it, so the pixels are the same in every shape
+/// (`encoder_gpu_tests`).
+pub(crate) const EARLY_FLUSHES: [&str; 2] = ["occlusion", "scene"];
+
+/// Whether a camera drawn with `flushes` sends its commands after stage `name`.
+pub(crate) fn flushes_after(flushes: crate::EarlyFlushes, name: &str) -> bool {
+    EARLY_FLUSHES[..flushes.count()].contains(&name)
+}
 
 /// One stage of a camera's frame.
 pub(crate) type CameraPass = fn(&mut Renderer, &mut RenderView, &mut CameraCtx);
@@ -98,6 +137,8 @@ pub(crate) struct CameraCtx<'a> {
     pub solids: SolidResources,
     /// Filled by the `effects` stage, for the counters.
     pub effects: ParticleDraws,
+    /// What every stage records into, sent once at the camera's end (#2353).
+    pub commands: Commands,
 }
 
 /// The per-stack values every camera's context reads.
@@ -128,7 +169,7 @@ impl<'a> CameraCtx<'a> {
         scene: &'a Scene,
         stack: &'a StackPass<'a>,
         shared: &StackShared,
-        idx: usize,
+        (idx, commands): (usize, Commands),
     ) -> Self {
         let cam = &stack.stack[idx];
         // Drawn jittered (TAA, #1702); culled through the unjittered matrix.
@@ -178,6 +219,7 @@ impl<'a> CameraCtx<'a> {
             clusters,
             solids: SolidResources::default(),
             effects: ParticleDraws::default(),
+            commands,
         }
     }
 
@@ -208,3 +250,20 @@ pub(crate) fn ssr_march(is_first: bool, march: [f32; 4]) -> ([f32; 4], bool) {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "encoder_gpu_tests.rs"]
+mod encoder_gpu_tests;
+
+#[cfg(test)]
+thread_local! {
+    /// Test-only: submit after every stage, the way each stage submitted its own
+    /// encoder before a camera's frame was one (`encoder_gpu_tests`).
+    pub(crate) static SPLIT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
+/// Test-only: whether [`SPLIT`] is on.
+#[cfg(test)]
+pub(crate) fn split_stages() -> bool {
+    SPLIT.with(std::cell::Cell::get)
+}

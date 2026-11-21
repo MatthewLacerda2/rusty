@@ -4,7 +4,8 @@
 //! base camera's settings (#1434). The screen stack and every render-texture camera (#430)
 //! draw through here, so a picture-in-picture is the same frame as the screen's.
 
-use super::camera::{CameraCtx, StackShared, CAMERA_PASSES};
+use super::camera::{flushes_after, CameraCtx, StackShared, CAMERA_PASSES};
+use crate::gpu::commands::Commands;
 use crate::gpu::uniforms::FogUniform;
 use crate::motion::{self, HistoryKey, Velocity};
 use crate::passes::ssao::SsaoPlan;
@@ -72,8 +73,18 @@ pub(crate) struct StackPass<'a> {
 impl Renderer {
     /// Draw `pass.stack` into `view` and post-process it to `pass.output`. Shadows and
     /// the frame's shared uploads are the caller's (see `Renderer::render`). Each
-    /// camera runs the [`CAMERA_PASSES`] table in order.
-    pub(crate) fn draw_stack(&mut self, view: &mut RenderView, scene: &Scene, pass: StackPass) {
+    /// camera runs the [`CAMERA_PASSES`] table in order, recording into one encoder
+    /// (#2353): the first camera into `commands` (holding what the caller recorded
+    /// before it, the shadow sweep), each later one into its own, the one before it
+    /// sent first. Returns the last camera's, unsent: the caller records what
+    /// follows the stack into it (the upscale, the UI) and sends it before the next
+    /// stack's camera rewrites the camera uniform.
+    pub(crate) fn draw_stack(
+        &mut self,
+        view: &mut RenderView,
+        scene: &Scene,
+        (pass, commands): (StackPass, Commands),
+    ) -> Commands {
         let aspect = view.aspect();
         let (view_projs, cameras) = matrices(&pass, aspect);
         // Motion vectors (#1435): last frame's cameras, and the velocity target when
@@ -125,8 +136,9 @@ impl Renderer {
         };
         let history = reads_history(view, (&pass, graphics, taa_on), &shared);
         self.frame_counters.history_passes += u32::from(history);
-        self.draw_cameras(view, scene, &pass, &shared);
+        let commands = self.draw_cameras(view, scene, (&pass, &shared), commands);
         view.post_fx.motion.history.end();
+        commands
     }
 
     /// Run every camera of `pass` through [`CAMERA_PASSES`]. Each pass's CPU time
@@ -136,17 +148,35 @@ impl Renderer {
         &mut self,
         view: &mut RenderView,
         scene: &Scene,
-        pass: &StackPass,
-        shared: &StackShared,
-    ) {
+        (pass, shared): (&StackPass, &StackShared),
+        mut commands: Commands,
+    ) -> Commands {
         for idx in 0..pass.stack.len() {
-            let mut ctx = CameraCtx::new(scene, pass, shared, idx);
+            if idx > 0 {
+                // This camera rewrites the camera uniform and the draw buffers the
+                // last one's passes read: those go out first.
+                commands.flush();
+                self.lap("camera.submit");
+            }
+            let mut ctx = CameraCtx::new(scene, pass, shared, (idx, commands));
             self.lap("stack");
+            let flushes = self.switches.flushes();
             for (name, stage) in CAMERA_PASSES {
                 stage(self, view, &mut ctx);
+                #[cfg(test)]
+                if super::camera::split_stages() {
+                    ctx.commands.flush(); // each stage its own submit, as before #2353
+                }
                 self.lap(name);
+                if flushes_after(flushes, name) {
+                    // The GPU starts on what is recorded (`EARLY_FLUSHES`).
+                    ctx.commands.flush();
+                    self.lap("camera.flush");
+                }
             }
+            commands = ctx.commands;
         }
+        commands
     }
 
     /// Run the post-process chain over the view's composited HDR target: every
@@ -156,7 +186,7 @@ impl Renderer {
     /// `StackPass::output`. When TAA upscales the view (TAAU, #1702), everything
     /// after it runs at the output's size and `output` is the real output, so the
     /// caller has no scaled target to upscale.
-    pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &CameraCtx) {
+    pub(super) fn run_post_fx(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         use crate::postfx::PostFxContext;
 
         let (scene, stack) = (ctx.scene, ctx.stack);
@@ -170,8 +200,9 @@ impl Renderer {
             stack,
             effect,
         };
+        let commands = &mut ctx.commands;
         for run in effects::scene_passes() {
-            run(self, view, &pass);
+            run(self, view, &pass, commands);
         }
 
         // The grade + tonemap and the Color Lookup (#1440, #1441): rebaked only when
@@ -194,8 +225,12 @@ impl Renderer {
             timer: &self.gpu_timer,
             passes: &self.post_passes,
         };
-        view.post_fx
-            .run((&self.device, &self.queue), chain, &effect, params);
+        view.post_fx.run(
+            (&self.device, &self.queue),
+            commands,
+            chain,
+            (&effect, params),
+        );
     }
 }
 

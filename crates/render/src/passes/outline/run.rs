@@ -24,6 +24,7 @@ impl Renderer {
     /// slots and instances.
     pub(crate) fn draw_outline(
         &mut self,
+        encoder: &mut wgpu::CommandEncoder,
         view: &mut RenderView,
         solids: &SolidResources,
         view_proj: Mat4,
@@ -58,21 +59,15 @@ impl Renderer {
         };
         self.queue
             .counted_write_buffer(&mask.uniform, 0, bytemuck::bytes_of(&params));
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Selection Outline Encoder"),
-            });
-        self.record_mask(&mut encoder, &mask.mask, &solids.draws);
+        self.record_mask(encoder, &mask.mask, &solids.draws);
         let rect = [x, y, w, h];
         // Unwritten row distances read as "no mask pixel near".
         let rows = (&mask.rows, wgpu::LoadOp::Clear(wgpu::Color::WHITE));
         let dilate = (&self.outline.dilate, &mask.dilate_group);
-        self.scissored(&mut encoder, "Selection Dilate Pass", rows, dilate, rect);
+        self.scissored(encoder, "Selection Dilate Pass", rows, dilate, rect);
         let finished = (output, wgpu::LoadOp::Load);
         let edge = (&self.outline.edge, &mask.edge_group);
-        self.scissored(&mut encoder, "Selection Edge Pass", finished, edge, rect);
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
+        self.scissored(encoder, "Selection Edge Pass", finished, edge, rect);
     }
 
     /// The outlined draws into the cleared `mask`: each with the forward pass's own

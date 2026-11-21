@@ -43,6 +43,7 @@ pub(crate) fn linear_clamp(device: &wgpu::Device) -> wgpu::Sampler {
 }
 
 pub(crate) mod bind_layouts;
+pub(crate) mod commands;
 pub(crate) mod draw_buffers;
 pub(crate) mod fullscreen;
 pub(crate) mod global_group;

@@ -7,6 +7,7 @@ pub(crate) mod camera;
 mod detail;
 mod lighting;
 pub(crate) mod map_slots;
+pub(crate) use map_slots::material_map_paths;
 pub(crate) mod materials;
 mod overlays;
 pub(crate) mod pass;
@@ -28,12 +29,11 @@ pub(crate) use overlays::{ball_pipeline, NavMeshGizmo};
 pub use overlays::{NavMeshPatch, NavMeshRevision, NavMeshSource};
 
 use self::stack::StackPass;
-use crate::gpu::textures::TextureKind;
+use crate::gpu::commands::Commands;
 use crate::lod::LodSelection;
 use crate::postfx::effects::taa;
 use crate::postfx::params::borrow_post_source;
 use crate::{build_camera_stack, texture_cameras, GpuTexture, RenderView, Renderer};
-use rusty_asset::MapRef;
 use rusty_scene::{Camera, Scene};
 
 impl Renderer {
@@ -145,13 +145,17 @@ impl Renderer {
         // levels (#472): a shadow shows the level its caster shows in the main view.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
         self.lap("setup");
-        self.run_shadow_passes(scene, &stack[0], view.aspect(), &shadows, &base_lod);
+        // The frame's first camera records into the encoder the shadow sweep opens
+        // (#2353): a render texture's, else the screen's base camera.
+        let mut commands = Commands::new(&self.device, &self.queue, "Frame Encoder");
+        let lights = (&shadows, &base_lod);
+        self.run_shadow_passes(&mut commands, scene, (&stack[0], view.aspect()), lights);
         self.lap("shadows");
-        self.draw_render_textures(view, scene, &textures);
+        let mut commands = self.draw_render_textures(view, scene, &textures, commands);
         self.lap("render_textures");
         // Lay out and mesh the UI through the base camera (#418, #429): world
         // canvases draw inside each camera's pass below, screen canvases after it.
-        self.prepare_ui(view, scene, &stack[0], editor_mode);
+        self.prepare_ui(&mut commands, view, scene, &stack[0], editor_mode);
         self.lap("ui");
         // A scaled view composites into its own scene-sized target and upscales it to
         // `output` after post-FX, before the UI (#1498), bilinearly. A view running
@@ -170,21 +174,32 @@ impl Renderer {
             full_post_fx: true,
             motion_frames: 1,
         };
-        self.draw_stack(view, scene, pass);
-        if let Some(scaled) = scaled.as_ref() {
-            self.upscale_scene(view, scaled, output);
-            self.lap("upscale");
-        }
-
-        // The in-game UI over the finished frame (#418): after post-FX, so a HUD
-        // is never tonemapped, bloomed or FXAA-softened. Not in the Scene view
-        // unless its UI overlay is on (#423).
-        if !editor_mode || view.ui.screen_in_editor {
-            self.draw_ui(view);
-            self.lap("ui");
-        }
+        let commands = self.draw_stack(view, scene, (pass, commands));
+        self.finish_screen(commands, view, (scaled.as_ref(), output), editor_mode);
         self.finish_main_frame(view, scene);
         self.gpu_timer.end_frame(&self.device, &self.queue);
+    }
+
+    /// Into the screen's last camera's `commands`, then sent: a scaled view's upscale
+    /// onto `output`, then the in-game UI (#418), after post-FX so a HUD is never
+    /// tonemapped, bloomed or FXAA-softened; in the Scene view only with its UI overlay (#423).
+    fn finish_screen(
+        &mut self,
+        mut commands: Commands,
+        view: &mut RenderView,
+        (scaled, output): (Option<&wgpu::TextureView>, &wgpu::TextureView),
+        editor_mode: bool,
+    ) {
+        if let Some(scaled) = scaled {
+            self.upscale_scene(commands.encoder(), view, scaled, output);
+            self.lap("upscale");
+        }
+        if !editor_mode || view.ui.screen_in_editor {
+            self.draw_ui(&mut commands, view);
+            self.lap("ui");
+        }
+        commands.send();
+        self.lap("submit");
     }
 
     /// Render one face of a static cubemap capture (#243, #1615): `camera` alone,
@@ -208,7 +223,9 @@ impl Renderer {
             .map(|vc| vc.shadows)
             .unwrap_or_default();
         let lod = LodSelection::for_camera(scene, camera);
-        self.run_shadow_passes(scene, camera, view.aspect(), &shadows, &lod);
+        let mut commands = Commands::new(&self.device, &self.queue, "Capture Encoder");
+        let at = (camera, view.aspect());
+        self.run_shadow_passes(&mut commands, scene, at, (&shadows, &lod));
         let pass = StackPass {
             stack: std::slice::from_ref(camera),
             entities: &[None],
@@ -219,7 +236,7 @@ impl Renderer {
             full_post_fx: false,
             motion_frames: 1,
         };
-        self.draw_stack(view, scene, pass);
+        self.draw_stack(view, scene, (pass, commands)).send();
         self.finish_counters(view);
         self.gpu_timer.end_frame(&self.device, &self.queue);
     }
@@ -274,22 +291,4 @@ impl Renderer {
             .as_deref()
             .unwrap_or(&self.default_texture)
     }
-}
-
-/// The resolved material map paths (albedo, metallic, roughness, normal, emissive,
-/// then the extra shader texture slots, #400) the forward shader samples, of every
-/// entity `admit` passes, each with what its slot holds (#1322): which render
-/// textures a frame's materials name (`render_texture`).
-pub(crate) fn material_map_paths(
-    scene: &Scene,
-    admit: impl Fn(u32) -> bool,
-) -> Vec<(MapRef, TextureKind)> {
-    scene
-        .world
-        .ids_with_material()
-        .into_iter()
-        .filter(|&id| admit(id))
-        .flat_map(|id| scene.material_assets_of(id))
-        .flat_map(|m| map_slots::material_maps(Some(m)))
-        .collect()
 }

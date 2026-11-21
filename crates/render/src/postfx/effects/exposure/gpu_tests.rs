@@ -3,6 +3,7 @@
 
 use super::params::Step;
 use super::ExposureParams;
+use crate::gpu::commands::Commands;
 use crate::postfx::grade::gpu::{chain, exposure, Chain, W};
 use rusty_components::{AutoExposure, ExposureMode};
 
@@ -23,12 +24,15 @@ fn meter(chain: &mut Chain, ae: &AutoExposure, step: Step) -> f32 {
     let Chain { r, pfx, .. } = chain;
     let params = ExposureParams::new(ae, step);
     let gpu = (&r.device, &r.queue);
+    let mut commands = Commands::new(&r.device, &r.queue, "Meter");
     pfx.exposure.run(
         gpu,
+        &mut commands,
         (&r.post_passes.exposure, &r.gpu_timer),
         (&pfx.scene_hdr.view, [W, 1]),
         &params,
     );
+    commands.send();
     pfx.exposure.settle(&r.device);
     pfx.exposure.readout().expect("the meter read back")
 }
@@ -95,12 +99,15 @@ fn gpu_a_cut_snaps_and_darkening_runs_at_its_own_speed() {
     // A cut forgets the readout, and the read in flight across it.
     let Chain { r, pfx, .. } = &mut c;
     let params = ExposureParams::new(&ae, SNAP);
+    let mut commands = Commands::new(&r.device, &r.queue, "Meter");
     pfx.exposure.run(
         (&r.device, &r.queue),
+        &mut commands,
         (&r.post_passes.exposure, &r.gpu_timer),
         (&pfx.scene_hdr.view, [W, 1]),
         &params,
     );
+    commands.send();
     pfx.exposure.cut();
     pfx.exposure.settle(&r.device);
     assert_eq!(pfx.exposure.readout(), None);

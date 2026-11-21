@@ -24,6 +24,7 @@ mod targets;
 pub(crate) mod transparent;
 
 use super::{History, Owner, PostEffect};
+use crate::gpu::commands::Commands;
 use crate::postfx::params::{effect_runs, Gate, PostSource};
 use crate::{RenderView, Renderer};
 use rusty_components::Ssr;
@@ -100,7 +101,7 @@ pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bo
 /// state. `post` is the stack's base camera's settings, `full` its `full_post_fx`,
 /// and `view_proj` and `eye` the base camera's.
 pub(crate) fn run(
-    r: &Renderer,
+    (r, commands): (&Renderer, &mut Commands),
     view: &mut RenderView,
     (post, graphics, full): (PostSource, GraphicsSettings, bool),
     (view_proj, eye): (glam::Mat4, glam::Vec3),
@@ -114,7 +115,7 @@ pub(crate) fn run(
         });
     let gpu = (&r.device, &r.queue);
     view.post_fx
-        .run_ssr(gpu, &r.post_passes.ssr, params, &r.gpu_timer);
+        .run_ssr(gpu, commands, &r.post_passes.ssr, params, &r.gpu_timer);
 }
 
 #[cfg(test)]

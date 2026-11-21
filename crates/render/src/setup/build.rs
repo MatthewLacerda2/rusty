@@ -5,6 +5,7 @@
 
 use crate::clusters::ClusterBuffers;
 use crate::decals::DecalBuffers;
+use crate::draw::camera::buffer::CameraBuffer;
 use crate::draw::{ball_pipeline, NavMeshGizmo};
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::lightmaps::Lightmaps;
@@ -19,12 +20,12 @@ use crate::postfx::{effects::Passes, grade::GradeBake, HDR_FORMAT};
 use crate::setup::shadow_system::{create_shadow_system, ShadowSystem};
 use crate::setup::textures::{create_textures, Textures};
 use crate::{ibl::skybox, passes::ssao};
-use crate::{CameraUniform, LightingUniform, OFFSCREEN_FORMAT};
+use crate::{LightingUniform, OFFSCREEN_FORMAT};
 use rusty_core::settings::quality::QualityValues;
 
 /// Camera + lighting uniform buffers and the group(0) bind group.
 pub(crate) struct GlobalBindings {
-    pub camera_buffer: wgpu::Buffer,
+    pub camera_buffer: CameraBuffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
     /// The light-cluster buffers group 0 binds (#434).
@@ -195,12 +196,7 @@ fn create_global_bindings(
     camera_lighting_layout: &wgpu::BindGroupLayout,
     registry: &mut ShaderRegistry,
 ) -> GlobalBindings {
-    let camera_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-        label: Some("Camera Uniform Buffer"),
-        size: std::mem::size_of::<CameraUniform>() as u64,
-        usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        mapped_at_creation: false,
-    });
+    let camera_buffer = CameraBuffer::new(device);
 
     let lighting_buffer = device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("Lighting Uniform Buffer"),
@@ -219,7 +215,7 @@ fn create_global_bindings(
     let fog_volume = SharedVolume::new(device);
     let linear_clamp = crate::gpu::linear_clamp(device);
     let global_bind_group = GlobalGroup {
-        camera: &camera_buffer,
+        camera: &camera_buffer.uniform,
         lighting: &lighting_buffer,
         skybox: sky_reflection.view(None),
         cube: &reflection_probes.view,

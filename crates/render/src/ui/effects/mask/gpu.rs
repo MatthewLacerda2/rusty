@@ -22,7 +22,6 @@
 //! such key and is re-rendered every frame. With nothing to re-render, no encoder
 //! is made and nothing is submitted; `UiEffects::mask_passes` counts the passes run.
 
-use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 
 use super::key::{DrawnInputs, MaskInputs};
@@ -169,7 +168,7 @@ pub(crate) fn mask_pipeline(
 impl Renderer {
     /// Render the Mask textures whose inputs changed, parents before children (see
     /// the module docs). Needs the batch uniform written first.
-    pub(crate) fn render_masks(&self, view: &mut RenderView) {
+    pub(crate) fn render_masks(&self, encoder: &mut wgpu::CommandEncoder, view: &mut RenderView) {
         let cache = &mut view.ui;
         let wanted = mask_sizes(cache, self.device.limits().max_texture_dimension_2d);
         cache.effects.masks.sync(&self.device, &wanted);
@@ -188,11 +187,6 @@ impl Renderer {
         self.batch_groups(&mut cache.effects, keys);
         let cache = &*cache;
         let ui = &self.ui_renderer;
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("UI Mask Encoder"),
-            });
         for (i, m) in draws {
             let (canvas, draw) = (cache.canvas(i), draw_of(cache, (i, m)));
             let Some(target) = cache.effects.masks.view(draw.id) else {
@@ -200,7 +194,7 @@ impl Renderer {
             };
             let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
             let mut pass = color_pass(
-                &mut encoder,
+                encoder,
                 ("UI Mask Pass", &self.gpu_timer, GpuPass::Ui),
                 target,
                 clear,
@@ -212,10 +206,7 @@ impl Renderer {
             pass.set_bind_group(BATCH_GROUP, cache.effects.group(&key(draw)), &[slot]);
             pass.draw(draw.range.clone(), 0..1);
         }
-        let commands = encoder.finish();
         self.lap("ui.masks");
-        self.queue.counted_submit(Some(commands));
-        self.lap("ui.mask_submit");
     }
 
     /// Every `(canvas, mask draw)` whose inputs changed, in order, each recorded

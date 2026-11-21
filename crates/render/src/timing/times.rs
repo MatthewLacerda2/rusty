@@ -79,13 +79,14 @@ pub(crate) struct Pair {
     pub pass: GpuPass,
     /// The part of `pass` it times, when its stage is timed in parts.
     pub part: Option<GpuPart>,
-    /// The renderer's submit sequence when the pair was taken
-    /// (`gpu::ops::submit_seq`): pairs taken between the same two submits are
-    /// recorded into one command buffer, so a gap between them is GPU work no pair
-    /// holds, never a wait for the CPU. It is read when the pair is taken, not when
-    /// its buffer is submitted, so it assumes no counted submit goes out while an
-    /// encoder holding timed pairs is still open (another encoder submitted in
-    /// between would tag this one's pairs a submit early). No site does that today.
+    /// The submit the pair goes out in when it was taken (`gpu::commands::pair_tag`):
+    /// the open recording's tag while a `gpu::commands::Commands` records, else
+    /// the renderer's submit count. Pairs with one tag are recorded into one
+    /// command buffer, so a gap between them is GPU work no pair holds, never a
+    /// wait for the CPU. A submit of another encoder while a recording is open
+    /// (a buffer's growth copy) does not move the recording's tag. Outside a
+    /// recording it assumes no counted submit goes out while an encoder holding
+    /// timed pairs is still open.
     pub submit: u64,
 }
 
@@ -119,13 +120,16 @@ pub struct GpuTimes {
     /// left out, as a kind is.
     pub parts: Vec<(GpuPart, f64)>,
     /// Untimed GPU work, in ms: what of the span no row holds inside one submit,
-    /// where the GPU never waits for the CPU. A pass left untimed shows here. It
-    /// is GPU work, so it scales with the GPU's clock as the rows do.
+    /// where the GPU never waits for the CPU. A pass left untimed shows here, and
+    /// so does a copy between two timed passes of one submit; one at a camera's
+    /// early flush (`draw::camera::EARLY_FLUSHES`: SSR's copy of the opaque image
+    /// heads the submit after the scene pass's) is at a submit's edge, in
+    /// [`Self::between_submits_ms`]. It is GPU work, so it scales with the GPU's
+    /// clock as the rows do.
     pub other_ms: f64,
     /// The gaps from one submit's last timed work to the next's first, in ms:
     /// mostly the GPU waiting for the CPU to record and submit, plus any untimed
-    /// command at a submit's head or tail (SSR's copy of the opaque image, the
-    /// Hi-Z counters' copies). A wait does not follow the GPU's clock, so this is
+    /// command at a submit's head or tail. A wait does not follow the GPU's clock, so this is
     /// read as measured, never scaled.
     pub between_submits_ms: f64,
 }

@@ -63,7 +63,7 @@ impl GpuTimer {
             }
             return None;
         }
-        let submit = crate::gpu::ops::submit_seq();
+        let submit = crate::gpu::commands::pair_tag();
         frame.push(Pair { pass, part, submit });
         Some((&q.set, at))
     }

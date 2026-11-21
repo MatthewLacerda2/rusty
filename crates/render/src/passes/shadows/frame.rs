@@ -5,6 +5,7 @@
 //! uploads a count of 0, which the forward shader's `calculate_shadow` skips on
 //! (#1713): a `Baked` sun costs no shadow work, as in Unity.
 
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use glam::Vec3;
 
@@ -23,13 +24,13 @@ impl Renderer {
     /// maps — the dynamic casters at the LOD levels `lod` (the base camera's) shows
     /// (#472). `settings` are the screen's base camera's volume's (#1434), the
     /// defaults without one.
+    /// Recorded into `commands`, the frame's first camera's (#2353).
     pub(crate) fn run_shadow_passes(
         &mut self,
+        commands: &mut Commands,
         scene: &Scene,
-        camera: &Camera,
-        aspect: f32,
-        settings: &ShadowSettings,
-        lod: &LodSelection,
+        (camera, aspect): (&Camera, f32),
+        (settings, lod): (&ShadowSettings, &LodSelection),
     ) {
         let fitted = frame_cascades(scene, self.capture.static_only, camera, aspect, settings);
         // A probe captured without shadows (#1584) samples no cascade.
@@ -49,11 +50,7 @@ impl Renderer {
             .set_time(&self.queue, scene.shader_time);
         self.plan_shadow_atlas(scene, camera, aspect, masking);
 
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Shadow Encoder"),
-            });
+        let encoder = commands.encoder();
         // Measured from the base camera, never the light (#1714); a capture culls
         // nothing.
         let small = self.small_object_cull(camera);
@@ -79,11 +76,9 @@ impl Renderer {
         if self.casts_shadows() {
             // a probe captured without shadows samples no cascade, so draws none;
             // without a live sun there is no cascade to draw (#1713)
-            self.shadow_renderer
-                .render_cascades(&mut encoder, &frame, lod);
+            self.shadow_renderer.render_cascades(encoder, &frame, lod);
         }
-        let bake = self.shadow_renderer.render_atlas(&mut encoder, &frame, lod);
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
+        let bake = self.shadow_renderer.render_atlas(encoder, &frame, lod);
         self.frame_counters.shadow_atlas_cached = bake.cached;
         self.frame_counters.shadow_atlas_rebaked = bake.rebaked;
     }

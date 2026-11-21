@@ -272,6 +272,24 @@ fn height_applies(m: &MaterialAsset) -> bool {
     applies
 }
 
+/// The resolved material map paths (albedo, metallic, roughness, normal, emissive,
+/// then the extra shader texture slots, #400) the forward shader samples, of every
+/// entity `admit` passes, each with what its slot holds (#1322): which render
+/// textures a frame's materials name (`render_texture`).
+pub(crate) fn material_map_paths(
+    scene: &rusty_scene::Scene,
+    admit: impl Fn(u32) -> bool,
+) -> Vec<(MapRef, TextureKind)> {
+    scene
+        .world
+        .ids_with_material()
+        .into_iter()
+        .filter(|&id| admit(id))
+        .flat_map(|id| scene.material_assets_of(id))
+        .flat_map(|m| material_maps(Some(m)))
+        .collect()
+}
+
 #[cfg(test)]
 #[path = "map_slots_tests.rs"]
 mod tests;

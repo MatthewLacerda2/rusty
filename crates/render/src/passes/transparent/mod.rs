@@ -18,7 +18,7 @@ mod depth_postpass;
 pub(crate) mod opaque_copy;
 
 use crate::gpu::groups;
-use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
+use crate::gpu::ops::CountedEncoder as _;
 pub(crate) use opaque_copy::{OpaqueCopyPass, OpaqueViews};
 
 use crate::draw::batch::DrawBatch;
@@ -31,15 +31,15 @@ impl Renderer {
     /// Draw the camera's translucent solids into `view`'s HDR target. `items` is already
     /// in sorting priority order, then back-to-front (farthest first, #2039); only neighbouring copies were merged (#470). No-op when there is nothing translucent,
     /// so opaque-only scenes pay nothing (#242).
-    pub(crate) fn draw_transparent(&self, view: &RenderView, items: &[DrawBatch]) {
+    pub(crate) fn draw_transparent(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &RenderView,
+        items: &[DrawBatch],
+    ) {
         if items.is_empty() {
             return;
         }
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Transparent Encoder"),
-            });
         // TAA's reactive mask (#1845), where the view runs TAA.
         let reactive = view.post_fx.taa_reactive();
         let targets = taa::reactive::hdr_attachments(view);
@@ -65,7 +65,6 @@ impl Renderer {
             let scene = self.transparent_scene_group(view);
             self.record_transparent(&mut pass, scene, items, reactive.is_some());
         }
-        self.queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
     /// Record the sorted (priority, then back-to-front) transparent draws into `pass`: the global bind group

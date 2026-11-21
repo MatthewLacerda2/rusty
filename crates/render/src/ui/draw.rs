@@ -30,11 +30,13 @@
 //! **Laps.** Both halves cut their CPU time into `ui.<part>` laps (`Renderer::lap`),
 //! which the bench reports as `render.ui.<part>` inside `render.ui`: `layout`,
 //! `textures` (loading and binding the Images' textures), `mesh` (the canvases'
-//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms`, `masks` and `mask_submit`, then
+//! inputs compared, the changed ones meshed, and the glyph atlases), `sync`, `shades`, `uniforms` and `masks`, then
 //! `pipelines` (making the overlay's pipelines current), `blur` (the backdrop
-//! chain alone), `groups`, `encode` and `submit` for the overlay pass.
+//! chain alone), `groups` and `encode` for the overlay pass. The UI submits
+//! nothing: it records into the last camera's [`Commands`], sent (and lapped as
+//! the frame's top-level `submit`) after it.
 
-use crate::gpu::ops::CountedQueue as _;
+use crate::gpu::commands::Commands;
 use crate::ui::pipeline::{BATCH_GROUP, SOURCE_GROUP};
 use std::rc::Rc;
 
@@ -53,9 +55,11 @@ use rusty_ui::{CanvasSpace, UiLayout, UiView};
 
 impl Renderer {
     /// Lay out and mesh `scene`'s UI for `view` through `camera`, uploading only
-    /// what changed (see the module docs). Runs before the camera stack.
+    /// what changed (see the module docs). Runs before the camera stack; its masks
+    /// record into `commands`, the frame's open encoder (#2353).
     pub(crate) fn prepare_ui(
         &mut self,
+        commands: &mut Commands,
         view: &mut RenderView,
         scene: &Scene,
         camera: &Camera,
@@ -106,13 +110,14 @@ impl Renderer {
         self.lap("ui.shades");
         self.upload_batch_uniforms(&mut view.ui);
         self.lap("ui.uniforms");
-        self.render_masks(view);
+        self.render_masks(commands.encoder(), view);
     }
 
     /// Draw the screen canvases [`Renderer::prepare_ui`] synced over `view`'s
     /// finished frame. A no-op for a view with nowhere to draw them (a targetless
-    /// view given no `set_ui_output`: the cubemap capture).
-    pub(crate) fn draw_ui(&mut self, view: &mut RenderView) {
+    /// view given no `set_ui_output`: the cubemap capture). Recorded into
+    /// `commands`, the screen's last camera's (#2353).
+    pub(crate) fn draw_ui(&mut self, commands: &mut Commands, view: &mut RenderView) {
         let Some((target, format)) = view.take_ui_target() else {
             return;
         };
@@ -125,11 +130,12 @@ impl Renderer {
         self.ui_renderer.ensure_pipeline(&self.device, format);
         self.ui_renderer.shaders.ensure_screen(&self.device, format);
         self.lap("ui.pipelines");
-        self.run_backdrop_blur(view);
+        self.run_backdrop_blur(commands.encoder(), view);
         self.lap("ui.blur");
         self.screen_groups(&mut view.ui);
         self.lap("ui.groups");
-        self.encode_ui(&view.ui, &target, format, screen_box(view));
+        let pass = (&view.ui, &target, format);
+        self.encode_ui(commands.encoder(), pass, screen_box(view));
     }
 
     /// Make the batch group of every screen canvas's batch current.
@@ -145,23 +151,17 @@ impl Renderer {
         GroupKey::of(batch, Some(self.quality.backdrop_divisor()))
     }
 
-    /// Record and submit the UI pass over `target`.
+    /// Record the UI pass over `target`.
     fn encode_ui(
         &self,
-        cache: &UiViewCache,
-        target: &wgpu::TextureView,
-        format: wgpu::TextureFormat,
+        encoder: &mut wgpu::CommandEncoder,
+        (cache, target, format): (&UiViewCache, &wgpu::TextureView, wgpu::TextureFormat),
         (x, y, width, height): (u32, u32, u32, u32),
     ) {
         let ui = &self.ui_renderer;
-        let mut encoder = self
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("UI Encoder"),
-            });
         {
             let mut pass = color_pass(
-                &mut encoder,
+                encoder,
                 ("UI Pass", &self.gpu_timer, GpuPass::Ui),
                 target,
                 wgpu::LoadOp::Load,
@@ -191,10 +191,7 @@ impl Renderer {
                 }
             }
         }
-        let commands = encoder.finish();
         self.lap("ui.encode");
-        self.queue.counted_submit(Some(commands));
-        self.lap("ui.submit");
     }
 }
 

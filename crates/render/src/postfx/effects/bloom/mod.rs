@@ -22,6 +22,7 @@ mod passes;
 #[cfg(test)]
 mod prefilter_gpu_tests;
 
+use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use chain::BloomParams;
 pub(crate) use chain::BloomTargets;
@@ -81,7 +82,7 @@ fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
 /// it does, dropped when it stops): the prefilter (scene -> `down[0]`), each
 /// downsample, then each upsample from the bottom (`BloomPasses::encode`); with the
 /// lens dirt its volume names for the composite.
-fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
+fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let pfx = &mut view.post_fx;
     let Some(vc) = cx.effect.volume().filter(|_| blooms(&cx.effect)) else {
         pfx.bloom_dirt = None;
@@ -104,10 +105,6 @@ fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx) {
     let params = BloomParams::new(&vc.bloom, t);
     r.queue
         .counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
-    let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-        label: Some("Bloom Encoder"),
-    });
     let input = (pfx.scene_color(), &pfx.sampler);
-    passes.encode(device, &mut encoder, t, input, &r.gpu_timer);
-    r.queue.counted_submit(std::iter::once(encoder.finish()));
+    passes.encode(device, commands.encoder(), t, input, &r.gpu_timer);
 }

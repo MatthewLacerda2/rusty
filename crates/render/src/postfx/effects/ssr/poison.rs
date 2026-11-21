@@ -4,6 +4,7 @@
 //! rule that a non-finite hit is a miss.
 
 use super::pass::SsrTargets;
+use crate::gpu::commands::Commands;
 use crate::postfx::PostFx;
 
 impl PostFx {
@@ -14,11 +15,17 @@ impl PostFx {
 }
 
 /// When `poisoned`, write a half-float `inf` over `scene`'s upper half, queued
-/// ahead of the SSR pass's copy of it.
-pub(super) fn write(poisoned: bool, queue: &wgpu::Queue, scene: &wgpu::Texture) {
+/// ahead of the SSR pass's copy of it: `commands`, which hold the opaque pass, go
+/// out first, since a texture write lands ahead of everything they recorded.
+pub(super) fn write(
+    poisoned: bool,
+    (queue, commands): (&wgpu::Queue, &mut Commands),
+    scene: &wgpu::Texture,
+) {
     if !poisoned {
         return;
     }
+    commands.flush();
     let size = scene.size();
     let (w, h) = (size.width, size.height / 2);
     let inf = 0x7C00u16.to_le_bytes();

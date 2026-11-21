@@ -65,10 +65,10 @@ impl PostFx {
     pub(crate) fn run_taa(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
+        encoder: &mut wgpu::CommandEncoder,
         passes: &TaaPasses,
         timer: &GpuTimer,
-        tune: params::TaaTune,
-        lenses: [[f32; 4]; params::MAX_CAMERAS],
+        (tune, lenses): (params::TaaTune, [[f32; 4]; params::MAX_CAMERAS]),
     ) {
         if let Some(h) = self.targets.get_mut::<TaaHistory>() {
             h.hold_flickers(device, tune.anti_flicker > 0.0);
@@ -88,9 +88,6 @@ impl PostFx {
         queue.counted_write_buffer(&h.params, 0, bytemuck::bytes_of(&params));
         let current = self.focused_color();
         let group = passes.group(device, h, read, current, velocity);
-        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("TAA Encoder"),
-        });
         let pipeline = match (h.upscale, h.flickers.is_some()) {
             (false, false) => &passes.resolve,
             (true, false) => &passes.upscale,
@@ -100,16 +97,15 @@ impl PostFx {
         let timed = (pipeline.get(), timer.writes(GpuPass::Taa));
         let (colour, surface) = (&h.frames[write].view, &h.surfaces[write].view);
         match &h.flickers {
-            None => PostFx::fullscreen_into(&mut encoder, timed, &[&group], [colour, surface]),
+            None => PostFx::fullscreen_into(encoder, timed, &[&group], [colour, surface]),
             Some(flickers) => {
                 let into = [colour, surface, &flickers[write].view];
-                PostFx::fullscreen_into(&mut encoder, timed, &[&group], into);
+                PostFx::fullscreen_into(encoder, timed, &[&group], into);
             }
         }
         if drawn {
-            reactive::clear(&mut encoder, &h.reactive, timer.writes(GpuPass::Taa));
+            reactive::clear(encoder, &h.reactive, timer.writes(GpuPass::Taa));
         }
-        queue.counted_submit(std::iter::once(encoder.finish()));
         let h = self.targets.get_mut::<TaaHistory>().expect("held above");
         (h.latest, h.valid, h.ran) = (write, true, true);
     }

@@ -133,3 +133,15 @@ fn an_unknown_option_or_switch_fails_listing_every_namespace() {
     let e = set(&["render.shadows=0"]).unwrap_err();
     assert!(e.contains("wants true or false"), "{e}");
 }
+
+#[test]
+fn render_flushes_picks_a_shape_and_refuses_another_value() {
+    use rusty_render::EarlyFlushes;
+    for want in EarlyFlushes::ALL {
+        let o = set(&[&format!("render.flushes={want}")]).unwrap();
+        assert_eq!(o.switches().flushes(), want);
+    }
+    assert!(!set(&["render.flushes=none"]).unwrap().switches().all_on());
+    let e = set(&["render.flushes=false"]).unwrap_err();
+    assert!(e.contains("none, occlusion, occlusion_scene"), "{e}");
+}

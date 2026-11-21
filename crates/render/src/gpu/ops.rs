@@ -16,6 +16,12 @@
 //! window on the same renderer goes through `Renderer::aside`, which keeps the
 //! outer frame's counts ([`kept`]).
 //!
+//! While a [`super::commands::Commands`] records (a camera's frame, #2353), a
+//! `write_buffer` lands at its one submit, ahead of every command it recorded, so
+//! a range written twice in that window leaves the commands recorded between the
+//! two writes reading the second. In debug builds [`CountedQueue::counted_write_buffer`]
+//! panics on it (`gpu::commands::check_write`).
+//!
 //! A texture write is the one call counted into something else: its bytes go to
 //! the renderer's [`Staging`], which bounds what wgpu holds of them until a
 //! submit (#2372).
@@ -24,6 +30,7 @@
 //! this one calls the raw wgpu methods outside test code.
 
 use std::cell::Cell;
+use std::panic::Location;
 
 /// How many of each counted GPU call a frame made.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -137,7 +144,9 @@ pub(crate) trait CountedQueue {
         &self,
         buffers: I,
     ) -> wgpu::SubmissionIndex;
-    /// `write_buffer`, counted.
+    /// `write_buffer`, counted, and checked against the open recording's other
+    /// writes (`gpu::commands::check_write`).
+    #[track_caller]
     fn counted_write_buffer(&self, buffer: &wgpu::Buffer, offset: wgpu::BufferAddress, data: &[u8]);
     /// `write_texture`, its bytes counted into `staging`, the renderer's for
     /// this queue ([`Staging`]).
@@ -161,6 +170,7 @@ impl CountedQueue for wgpu::Queue {
         self.submit(buffers)
     }
 
+    #[track_caller]
     fn counted_write_buffer(
         &self,
         buffer: &wgpu::Buffer,
@@ -168,6 +178,11 @@ impl CountedQueue for wgpu::Queue {
         data: &[u8],
     ) {
         bump(|n| n.buffer_writes += 1);
+        super::commands::check_write(
+            buffer,
+            offset..offset + data.len() as u64,
+            Location::caller(),
+        );
         self.write_buffer(buffer, offset, data);
     }
 
