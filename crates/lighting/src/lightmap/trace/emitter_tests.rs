@@ -38,7 +38,10 @@ fn indirect(scene: &BakeScene, p: Vec3, n: Vec3, samples: u32, bounces: u32, see
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);
     let mut rng = Rng::new(seed, 0, 0);
-    tracer.texel(p, n, samples, bounces, &mut rng).indirect.x
+    tracer
+        .texel(p, n, (samples, samples), bounces, &mut rng)
+        .indirect
+        .x
 }
 
 #[test]

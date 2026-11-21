@@ -250,7 +250,7 @@ def main(argv) -> int:
                   f"- {said}"]
         header += [] if comparable else ["- **gpu_mb and the load rows are not comparable**: the two builds "
                                          "disagree on the texture cache, so one leg loaded textures uncompressed"]
-        header += [f"- quality preset overridden: {', '.join(a.sets)}"
+        header += [f"- overridden for the run (--set): {', '.join(a.sets)}"
                    + (" (the scenes only: the stress yard runs at its own)" if yard else "")] if a.sets else []
         header += [f"- FORCE=1 ran past: {o}" for o in gate.overridden]
         yard_lost = [leg for leg in yard if leg not in finished]

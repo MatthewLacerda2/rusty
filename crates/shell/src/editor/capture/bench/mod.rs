@@ -55,6 +55,9 @@ pub struct Round {
     /// Build every lazy pipeline (the editor's overlays too) first, off the
     /// clock, as the editor's window does.
     pub warm: bool,
+    /// The renderer's measurement switches, as the game rounds draw with
+    /// (`dev::bench::scenes::Options::switches`).
+    pub switches: rusty_render::RenderSwitches,
     /// The folder the save writes into, outside the project; removed after.
     pub save_dir: PathBuf,
 }

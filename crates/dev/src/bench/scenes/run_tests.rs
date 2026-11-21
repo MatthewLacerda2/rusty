@@ -7,7 +7,6 @@ use glam::Vec3;
 use rusty_components::CameraComponent;
 use rusty_navigation::test_support::add_floor;
 use rusty_scene::Scene;
-
 use std::path::Path;
 
 use super::*;
@@ -38,6 +37,7 @@ const OPTS: Options = Options {
     frames: 2,
     runs: 2,
     warm: false, // the views, rows and files are proved, not a frame's cost (#2350)
+    switches: rusty_render::RenderSwitches::ON,
 };
 
 fn labels(report: &SceneReport) -> Vec<&str> {

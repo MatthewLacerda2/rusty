@@ -65,7 +65,7 @@ fn texel(lights: Vec<BakeLight>) -> trace::TexelLight {
     scene.sky = Vec3::ONE.into();
     let rays = Rays::build(triangles(&scene));
     let tracer = Tracer::new(&scene, &rays);
-    tracer.texel(Vec3::ZERO, Vec3::Y, 64, 3, &mut Rng::new(5, 1, 2))
+    tracer.texel(Vec3::ZERO, Vec3::Y, (64, 64), 3, &mut Rng::new(5, 1, 2))
 }
 
 #[test]
