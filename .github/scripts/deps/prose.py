@@ -3,11 +3,10 @@
 
 The two answer different questions, on purpose (#2489). `stated` decides what to
 **record**: a grammar over prose, reading every list a person writes and saying
-when it met a reference it could not read. `named` decides what may be
-**deleted**: a grammar cannot prove a blocker absent (seven wordings slipped past
-one in the review of PR #2516: a CRLF list, a wrapped line, `owner/name#N`, a
-"not" on the line above, a reason, "e.g.", a loose list), so a recorded blocker
-is only removed when its number appears nowhere in the body.
+when it met a reference, or a clause, it could not read. `named` only sorts how a
+recorded blocker no body states is **reported** (named nowhere, or named in
+passing): a grammar cannot prove a blocker absent, so nothing here ever decides a
+deletion.
 
 Both read the body after `clean`: line ends normalised and struck-through text
 (`~~Blocked by #7~~`) dropped, which is how a dependency is lifted in prose.
@@ -38,7 +37,11 @@ NEW_LINE = re.compile(r"[ \t]*(?:[A-Z]|#{1,6}[ \t]|(?:[-*+]|\d+[.)])[ \t]|>|\||`
 STOP = re.compile(r";|[.!?](?=\s|$)|\n")
 ABBREVIATION = re.compile(r"\b(?:e\.g|i\.e|cf|etc|vs|viz|approx|incl|resp|fig|no)$", re.IGNORECASE)
 NEGATION = re.compile(r"\b(?:not|no longer|never)[ \t]*[*_]*[ \t]*$", re.IGNORECASE)
-STRUCK = re.compile(r"~~(?:(?!\n[ \t]*\n).)+?~~", re.DOTALL)
+#: What GitHub strikes through: `~~` before a non-space, closed by a non-space
+#: and `~~`, within one paragraph ("a ~~ b ~~" is not struck).
+#: What may come before a verb that starts its line: a bullet, a quote, bold.
+LINE_START = re.compile(r"[ \t>*_+\-]*(?:(?:\d+[.)]|\[[ xX]\])[ \t*_]*)*", re.IGNORECASE)
+STRUCK = re.compile(r"~~(?=\S)(?:(?!\n[ \t]*\n).)*?\S~~", re.DOTALL)
 VERBS = {
     "blocked by": re.compile(r"\bblocked[*_]*\s+by\b[*_:]*[ \t]*", re.IGNORECASE),
     "blocks": re.compile(r"\bblocks\b[*_:]*[ \t]*", re.IGNORECASE),
@@ -47,7 +50,8 @@ VERBS = {
 
 class Stated(NamedTuple):
     """The issue numbers of this repository a body states after a verb, in order,
-    and the references it met in those clauses and could not read."""
+    and what it met in those clauses and could not read: a reference, or a whole
+    clause that took none ("Blocked by the shader rewrite")."""
 
     numbers: list[int]
     unread: list[str]
@@ -75,15 +79,38 @@ def named(body: str | None, repo: str) -> set[int]:
 def stated(body: str | None, verb: str, repo: str) -> Stated:
     """Every issue `body` names after `verb` ("blocked by" or "blocks"), and the
     references in those clauses it could not read (a doubt, for the caller to
-    report: never read as "not stated")."""
-    text, found, unread = clean(body), [], []
+    report: never read as "not stated"). A blocker line that took no reference at
+    all ("Blocked by the shader rewrite.") is a doubt too, quoted; the verb in
+    running prose ("it was blocked by a dialog") or in a code span is not one."""
+    text, found, unread, empty = clean(body), [], [], []
     for match in VERBS[verb].finditer(text):
         line = text[text.rfind("\n", 0, match.start()) + 1:match.start()]
-        if not NEGATION.search(line):
-            scan(text, match.end(), repo, found, unread, sibling(line))
+        if NEGATION.search(line):
+            continue
+        before = len(unread)
+        taken = scan(text, match.end(), repo, found, unread, sibling(line))
+        if not taken and len(unread) == before and heads(line):
+            empty.append(quote(text, match))
     # A number read elsewhere as a blocker is not lost where it was not.
-    lost = [ref for ref in unread if number(ref, repo) not in found]
-    return Stated(found, list(dict.fromkeys(ref.group(0).strip("*_") for ref in lost)))
+    lost = [ref.group(0).strip("*_") for ref in unread if number(ref, repo) not in found]
+    return Stated(found, list(dict.fromkeys(lost + empty)))
+
+
+def heads(line: str) -> bool:
+    """Whether a verb after `line` (its line up to the verb) starts a blocker line:
+    nothing but markup before it, and not inside a code span."""
+    return LINE_START.fullmatch(line) is not None and line.count("`") % 2 == 0
+
+
+def quote(text: str, verb: re.Match, width: int = 60) -> str:
+    """The clause that starts at `verb`, on one line and cut to `width`, quoted; a
+    bare "Blocked by:" takes the line below it."""
+    end = ends(text, verb.end())
+    if not text[verb.end():end].strip():
+        below = text.find("\n", end + 1)
+        end = len(text) if below < 0 else below
+    clause = " ".join(text[verb.start():end].split()).strip("*_ ")
+    return f'"{clause if len(clause) <= width else clause[:width - 1] + "…"}"'
 
 
 def sibling(line: str) -> int | None:
@@ -93,19 +120,20 @@ def sibling(line: str) -> int | None:
 
 
 def scan(text: str, pos: int, repo: str, found: list[int], unread: list[re.Match],
-         nested: int | None = None) -> None:
+         nested: int | None = None) -> int:
     """Read the items after a verb at `pos`: an inline list, one wrapped over lines,
     or a bulleted one below (loose or not), into `found`; what it meets and cannot
-    read, into `unread`. With `nested`, the verb is in a bullet (`sibling`), and
-    only a bullet deeper than it is its list's: "- #401 — blocked by #398\n- #402"
-    is one blocker, the next bullet another issue's line."""
+    read, into `unread`; return how many references it took. With `nested`, the
+    verb is in a bullet (`sibling`), and only a bullet deeper than it is its
+    list's: "- #401 — blocked by #398\n- #402" is one blocker, the next bullet
+    another issue's line."""
     taken, in_list = 0, False
     while True:
         pos = SEP.match(text, pos).end()
         if text.startswith("\n", pos):
             pos, in_list = below(text, pos, taken, in_list, nested)
             if pos is None:
-                return
+                return taken
             continue
         if ref := REF.match(text, pos):
             if (n := number(ref, repo)) is not None and n not in found:
@@ -116,13 +144,13 @@ def scan(text: str, pos: int, repo: str, found: list[int], unread: list[re.Match
             continue
         if not in_list:
             unread.extend(REF.finditer(text, pos, ends(text, pos)))
-            return
+            return taken
         eol = text.find("\n", pos)
         eol = len(text) if eol < 0 else eol
         unread.extend(REF.finditer(text, pos, eol))
         pos = eol
         if pos == len(text):
-            return
+            return taken
 
 
 def below(text: str, pos: int, taken: int, in_list: bool,
@@ -134,9 +162,9 @@ def below(text: str, pos: int, taken: int, in_list: bool,
     if bullet := BULLET.match(text, start):
         if nested is not None and len(LEAD.match(text, start).group()) <= nested:
             return None, in_list
-        # A bullet right below an item, or any bullet under a bare "Blocked by:",
-        # continues it; one after a blank line continues only a bulleted list.
-        if not blank or in_list or not taken:
+        # A bullet continues a bare "Blocked by:", a bulleted list, or a line that
+        # ends open ("#7 and"); below a closed one ("Blocked by #7") it is new.
+        if not taken or in_list or OPEN_END.search(text[text.rfind("\n", 0, pos) + 1:pos]):
             return bullet.end(), True
         return None, in_list
     if REF.match(text, LEAD.match(text, start).end()):

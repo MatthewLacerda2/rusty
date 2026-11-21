@@ -47,8 +47,9 @@ coder *changing* it must know.
   builds or benches: the legs take a stub runner.
 - **`.github/scripts/deps/` reads what an issue body says about its dependencies**
   for `make blockers` (`blockers.py`, the command line and the audit): `prose.stated`
-  decides what to record, and `prose.named`, a token search, what may be deleted.
-  Never let a deletion rest on the grammar.
+  decides what to record, and `prose.named`, a token search, how a recorded
+  blocker no body states is reported. Prose never deletes: `--lift`, with both
+  numbers given, is the only removal.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an

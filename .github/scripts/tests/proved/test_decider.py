@@ -80,8 +80,9 @@ class Decider(unittest.TestCase):
 
     def test_a_new_sibling_import_is_flagged(self):
         source = "import ghrest\nimport blockers\nfrom merging.verdict.runlist import base\nimport json\n"
-        # blockers.py brings what it imports too (deps/), so only its own row is asserted.
-        self.assertIn(".github/scripts/blockers.py", missing(imported(source)))
+        self.assertEqual(missing(imported(source)), {".github/scripts/blockers.py",
+                                                     ".github/scripts/deps/__init__.py",
+                                                     ".github/scripts/deps/prose.py"})
 
     def test_a_package_import_brings_its_init_files(self):
         got = {p.relative_to(SCRIPTS).as_posix() for p in imported("from merging.verdict.runlist import base")}

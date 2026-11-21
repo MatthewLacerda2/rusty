@@ -1,6 +1,6 @@
 """What `deps.prose.stated` reads as a stated blocker, and what it reports it could
 not read (#2489). Recording rests on it, so it reads at least every wording the
-old one-regex parser did, and every input of both reviews of PR #2516."""
+old one-regex parser did, and every input of the reviews of PR #2516."""
 
 from __future__ import annotations
 
@@ -41,7 +41,8 @@ class Mentions(unittest.TestCase):
             "Blocked by:\n- #7 (the bake must\n  land first)\n- #8": [7, 8],  # a wrapped bullet
             "Blocked by:\n- #7 and\n  #8": [7, 8],
             "Blocked by:\n\n\n- #7\n\n- #8": [7, 8],  # a loose list after blank lines
-            "Blocked by: #7\n- #8": [7, 8],  # mixed
+            "Blocked by #7 and\n- #8": [7, 8],  # a line that ends open goes on below
+            "Blocked by #7,\n- #8": [7, 8],
             f"Blocked by {REPO}#7 and {REPO.upper()}#8": [7, 8],  # this repository's own form
             "Not yet.\nBlocked by #7": [7],  # a negation on the line above
             "## Never\nBlocked by #7": [7],
@@ -49,6 +50,31 @@ class Mentions(unittest.TestCase):
         for body, want in cases.items():
             with self.subTest(body=body):
                 self.assertEqual(read(body), (want, []))
+
+    def test_a_bullet_below_a_closed_line_is_not_its_list(self):
+        for body in ("Blocked by #7\n- #8 the follow-up", "Blocked by: #7\n- #8"):
+            with self.subTest(body=body):
+                self.assertEqual(read(body), ([7], []))
+
+    def test_a_clause_that_took_no_reference_is_reported(self):
+        cases = {
+            "Blocked by issue 7": '"Blocked by issue 7"',
+            "Blocked by the shader rewrite.": '"Blocked by the shader rewrite"',
+            "Blocked by github.com/o/r/issues/7": '"Blocked by github.com/o/r/issues/7"',
+            "Blocked by [the cull](../issues/7)": '"Blocked by [the cull](../issues/7)"',
+            "**Blocked by:**\n- the shader rewrite": '"Blocked by:** - the shader rewrite"',
+        }
+        for body, want in cases.items():
+            with self.subTest(body=body):
+                self.assertEqual(read(body), ([], [want]))
+        self.assertEqual(read("Blocked by " + "x" * 80)[1], ['"Blocked by ' + "x" * 48 + '…"'])
+
+    def test_the_verb_in_running_prose_or_code_is_not_a_blocker_line(self):
+        for body in ("it was blocked by a dialog", "a `Blocked by` link records it",
+                     "- the queue is blocked by the merge"):
+            with self.subTest(body=body):
+                self.assertEqual(read(body), ([], []))
+        self.assertEqual(read("> - [ ] **Blocked by** the bake")[1], ['"Blocked by** the bake"'])
 
     def test_a_number_in_a_reason_is_not_a_blocker(self):
         self.assertEqual(read("Blocked by #7 (see #3)"), ([7], []))
@@ -98,6 +124,14 @@ class Named(unittest.TestCase):
                 "~~#11~~ #120")
         self.assertEqual(prose.named(body, REPO), {7, 8, 9, 120})
         self.assertEqual(prose.named(None, REPO), set())
+
+    def test_strikes_only_what_github_strikes(self):
+        for body in ("a ~~ #7 ~~ b", "~~ #7~~", "~~#7 ~~", "~~#7\n\n~~", "~~~~ #7"):
+            with self.subTest(body=body):
+                self.assertEqual(prose.named(body, REPO), {7})
+        for body in ("~~#7~~", "~~see #7 here~~", "~~a\n#7 b~~"):
+            with self.subTest(body=body):
+                self.assertEqual(prose.named(body, REPO), set())
 
 
 if __name__ == "__main__":

@@ -336,12 +336,11 @@ queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, cod
 # directions: a prose-only blocker is invisible to everything that plans from the
 # graph (#624), and a recorded open blocker no body states (neither the issue's
 # "Blocked by" nor the blocker's "Blocks") still stops the merge queue (#2489).
-# Lists both and exits 1; ARGS=--fix records the first, and removes the second only
-# when neither body names the other at all. One named but not as a blocker, or a
-# "Blocked by" it could not read, is reported (exit 1) and never removed;
-# ARGS='--lift <issue> <blocker>' removes one relationship on purpose.
+# Lists both, and any "Blocked by" it could not read, and exits 1. ARGS=--fix
+# records the first and deletes nothing: each recorded blocker no body states is
+# reported with its ARGS='--lift <issue> <blocker>', the only way one is removed.
 # Run at the start of a batch.
-blockers: ## Diff body "Blocked by #N" against GitHub: ARGS=--fix records/removes, ARGS='--lift I B' lifts one
+blockers: ## Diff body "Blocked by #N" against GitHub, both ways: ARGS=--fix records, ARGS='--lift I B' lifts one
 	@python3 .github/scripts/blockers.py $(ARGS)
 
 # The PR-on-first-commit rule exists so nothing goes stale unnoticed; this is

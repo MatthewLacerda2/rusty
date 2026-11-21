@@ -12,19 +12,19 @@ blockers, pull requests and self-references are skipped: none blocks anything.
 
 The other way, a recorded open blocker the body no longer states (#2489): the
 merge queue reads the relationship, not the prose, so a dependency lifted by
-editing the body still handed back the PR that closed the issue. **A grammar
-can decide what to record; it cannot prove what to delete** (the reviews of PR
-#2516 found a dozen wordings one missed), so each such blocker `#B` of issue `#I`
-is one of:
+editing the body still handed back the PR that closed the issue. **Prose can
+decide what to record; it never decides what to delete** (each review of PR
+#2516 found another wording that cost a deletion), so such a blocker `#B` of
+issue `#I` is reported, exit 1, as one of:
 
 - **stale**, when `#B` is named nowhere in `#I`'s body and `#I` nowhere in
-  `#B`'s (a token search, `deps.prose.named`; struck-through text is not
-  named): `--fix` removes it.
+  `#B`'s (a token search, `deps.prose.named`; struck-through text is not named);
 - **mentioned**, when either body names the other but not as a blocker (a
-  reason, "see #B", a wording the parser misses): reported, exit 1, never
-  removed by `--fix`. `--lift I B` removes that one relationship whatever the
-  bodies say: the verb for a dependency lifted on purpose.
-- **agreed**, when `#B`'s body says `Blocks #I`.
+  reason, "see #B", a wording the parser misses);
+
+and is silent when **agreed** (`#B`'s body says `Blocks #I`). Each report line
+ends with the command that lifts it: `--lift I B` removes that one relationship,
+the caller naming both numbers, and is the only deletion; `--fix` only records.
 
 A `Blocked by` clause holding a reference the parser could not read is a
 **doubt**: always reported and exit 1, whatever the record holds, so the
@@ -36,11 +36,15 @@ Only issues whose listing reports an open recorded blocker
 for their record, so a board of unblocked issues costs one listing. Every call
 is REST, so it runs from a cloud session too (#970).
 
-Recording and removing touch `planning` issues too, deliberately: making the
+A `Blocked by` that took no reference at all ("Blocked by the shader rewrite")
+is a doubt too, so every clause is either read or reported.
+
+Recording and lifting touch `planning` issues too, deliberately: making the
 record match what the prose already states changes nobody's scope.
 
-Exits 0 when prose and record agree (or `--fix` made them agree, and nothing is
-in doubt), 1 otherwise, so `make blockers` reads as a check.
+Exits 0 when prose and record agree (or `--fix` recorded every gap, and nothing
+is stale, mentioned or in doubt), 1 otherwise, so `make blockers` reads as a
+check.
 """
 
 from __future__ import annotations
@@ -191,17 +195,14 @@ def main(argv: list[str], gh: Gh | None = None) -> int:
         verb = "recorded" if fix else "in the body, not recorded on GitHub"
         print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): {verb}")
     for issue, blocker in report.stale:
-        if fix:
-            remove(gh, repo, issue, blocker)
-        verb = "removed" if fix else "recorded on GitHub, named in neither body"
-        print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): {verb}")
+        print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): recorded on "
+              f"GitHub, named in neither body: lift it with {lift_command(issue, blocker)}")
     for issue, blocker, where in report.mentioned:
         print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): recorded, and "
-              f"mentioned in #{where}'s body but not as a blocker: lift it with "
-              f"`make blockers ARGS='--lift {issue} {blocker['number']}'`, or say "
-              f"`Blocked by #{blocker['number']}`")
+              f"mentioned in #{where}'s body but not as a blocker: say "
+              f"`Blocked by #{blocker['number']}`, or lift it with {lift_command(issue, blocker)}")
     for issue, refs in report.doubts:
-        print(f"#{issue}: a \"Blocked by\" names {', '.join(refs)} in words it could not read: "
+        print(f"#{issue}: a \"Blocked by\" holds {', '.join(refs)} in words it could not read: "
               "write each blocker as `#N` (a list, a bullet each, or an issue URL)")
     for issue, blocker in report.foreign:
         where = blocker.get("repository_url", "").rsplit("/repos/", 1)[-1]
@@ -209,12 +210,18 @@ def main(argv: list[str], gh: Gh | None = None) -> int:
     if not (report.gaps or report.stale or report.mentioned or report.doubts):
         print("blockers: every open blocker in a body is recorded, and every recorded one is in a body")
         return 0
-    if fix:
-        return 1 if report.mentioned or report.doubts else 0
+    if fix and not (report.stale or report.mentioned or report.doubts):
+        return 0
     print(f"blockers: {len(report.gaps)} prose-only, {len(report.stale)} stale, "
           f"{len(report.mentioned)} mentioned, {len(report.doubts)} unread; "
-          "`make blockers ARGS=--fix` records the first and removes the second, never the others")
+          "`make blockers ARGS=--fix` records the first; a stale or mentioned one is lifted "
+          "with its line's `--lift`, an unread one by rewriting the body")
     return 1
+
+
+def lift_command(issue: int, blocker: dict) -> str:
+    """The command that removes the one relationship "`issue` blocked by `blocker`"."""
+    return f"`make blockers ARGS='--lift {issue} {blocker['number']}'`"
 
 
 if __name__ == "__main__":

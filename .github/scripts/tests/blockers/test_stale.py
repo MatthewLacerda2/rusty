@@ -1,5 +1,5 @@
-"""#2489: a recorded open blocker named in neither body is stale, and `--fix`
-removes it; one named anywhere is kept and reported, never removed."""
+"""#2489: a recorded open blocker no body states is reported (stale, or mentioned
+but not as a blocker) with the `--lift` that removes it; `--fix` never deletes."""
 
 from __future__ import annotations
 
@@ -8,7 +8,6 @@ import unittest
 from tests.blockers.fakes import REPO, FakeGh, issue, run
 
 FOREIGN = "https://api.github.com/repos/x/y"
-DELETE_7 = f"repos/{REPO}/issues/5/dependencies/blocked_by/9007"
 
 
 class Stale(unittest.TestCase):
@@ -16,18 +15,26 @@ class Stale(unittest.TestCase):
         fake = FakeGh({5: "Was waiting on the cull; lifted, see the comment."}, [], {5: [issue(7)]})
         code, out = run(fake)
         self.assertEqual(code, 1)
-        self.assertIn("#5 blocked by #7 (t7): recorded on GitHub, named in neither body", out)
+        self.assertIn("#5 blocked by #7 (t7): recorded on GitHub, named in neither body: "
+                      "lift it with `make blockers ARGS='--lift 5 7'`", out)
         self.assertIn("1 stale", out)
         self.assertEqual((fake.posts, fake.deletes), ([], []), "an audit writes nothing")
 
-    def test_fix_removes_it_by_database_id(self):
+    def test_fix_reports_it_and_sends_no_delete(self):
         for body in ("Was waiting on the cull.", "~~Blocked by #7~~ (the cull landed)",
                      "~~Blocked by\r\n#7~~", "Waits on #70 and x/y#7"):
             with self.subTest(body=body):
                 fake = FakeGh({5: body}, [], {5: [issue(7)]})
                 code, out = run(fake, "--fix")
-                self.assertEqual((code, fake.deletes), (0, [DELETE_7]))
-                self.assertIn("#5 blocked by #7 (t7): removed", out)
+                self.assertEqual((code, fake.deletes), (1, []))
+                self.assertIn("#5 blocked by #7 (t7): recorded on GitHub, named in neither body", out)
+                self.assertIn("ARGS='--lift 5 7'", out)
+
+    def test_fix_records_the_gaps_beside_a_stale_one_and_still_fails(self):
+        fake = FakeGh({5: "Blocked by #6"}, [issue(6)], {5: [issue(7)]})
+        code, out = run(fake, "--fix")
+        self.assertEqual((code, len(fake.posts), fake.deletes), (1, 1, []))
+        self.assertIn("#5 blocked by #6 (t6): recorded", out)
 
     def test_a_blocker_named_anywhere_is_never_removed(self):
         cases = {
@@ -74,8 +81,22 @@ class Stale(unittest.TestCase):
                               summary={5: len(recorded)})
                 code, out = run(fake, "--fix")
                 self.assertEqual((code, fake.deletes), (1, []))
-                self.assertIn("#5: a \"Blocked by\" names #8 in words it could not read", out)
+                self.assertIn("#5: a \"Blocked by\" holds #8 in words it could not read", out)
                 self.assertNotIn("every recorded one", out)
+
+    def test_the_third_reviews_wordings_cost_no_deletion(self):
+        cases = {  # body -> exit code; each fails but "a ~~ b ~~", which is not struck
+            "Blocked by issue 7": 1, "Blocked by the shader rewrite.": 1,
+            "Blocked by github.com/o/r/issues/7": 1, "Blocked by [the cull](../issues/7)": 1,
+            "Blocked by #6\n- #7 the follow-up": 1, "a ~~ b ~~ Blocked by #7": 0,
+        }
+        for body, want in cases.items():
+            with self.subTest(body=body):
+                fake = FakeGh({5: body}, [issue(6)], {5: [issue(7)]})
+                code, out = run(fake, "--fix")
+                self.assertEqual((code, fake.deletes), (want, []))
+                if want:
+                    self.assertIn("ARGS='--lift 5 7'", out)
 
     def test_a_blocker_in_another_repository_is_left_alone(self):
         foreign = issue(7, repository_url=FOREIGN)
