@@ -160,7 +160,7 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
         .filter(|&id| scene.world.is_active_in_hierarchy(id))
         .filter_map(|id| {
             let light = scene.world.light(id)?;
-            let mode = scene.light_mode(id, &light);
+            let mode = crate::clusters::drawn_mode(scene, id, &light);
             if !mode.renders_live(capture) {
                 return None;
             }

@@ -177,6 +177,7 @@ local function level(n, balls, eye, build)
     build()
 
     local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+    Light.SetMode(sun, "Mixed") -- live: the level is not baked
     Transform.SetRotation(sun, -55, 35, 0)
     local camera = Scene.CreateEntity("Player")
     Scene.AddComponent(camera, "Camera")

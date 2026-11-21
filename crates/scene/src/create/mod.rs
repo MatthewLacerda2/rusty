@@ -51,6 +51,19 @@ pub fn create_drawn_entity(scene: &mut Scene, name: &str, primitive: Option<Prim
     id
 }
 
+/// A light primitive's entity that is drawn live with no bake: [`create_entity`]
+/// with its mode set to `Mixed`, as a light was before `Baked` became the default
+/// (#2522). A test hook: a fixture that renders without baking names its light
+/// live through this, never by leaning on the default.
+#[doc(hidden)]
+pub fn create_live_light(scene: &mut Scene, name: &str, primitive: Primitive) -> u32 {
+    let id = create_entity(scene, name, Some(primitive));
+    if let Some(mut light) = scene.world.light_mut(id) {
+        light.mode = rusty_components::LightMode::Mixed;
+    }
+    id
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

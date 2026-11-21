@@ -43,6 +43,7 @@ Scene.AddComponent(crate, "AudioSource")
 Component.Set(crate, "AudioSource", { clip = blip, loop = true, play_on_start = true })
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live: the level is not baked
 Transform.SetRotation(sun, -50, 30, 0)
 
 local camera = Scene.CreateEntity("Camera")

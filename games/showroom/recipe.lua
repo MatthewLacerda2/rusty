@@ -133,6 +133,7 @@ Scene.AddScript(ball, "assets/scripts/roll.lua", { speed = 1.5, radius = 0.3,
 
 -- Daylight through the window, falling westward onto the floor.
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live before a bake; `bake = true` bakes its bounce
 Transform.SetRotation(sun, -35, 90, 0) -- a light shines along its -Z
 Light.SetIntensity(sun, 3.0)
 

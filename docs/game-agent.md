@@ -171,6 +171,16 @@ see it tile; leave it out to see its real scale (a world-mapped material at its 
 `world_size`). `Debug.Preview`
 does the same for a texture, model or shader file.
 
+## Lights are baked unless they must change
+
+A new light is `Baked` (`docs/api/Light.md`, *Mode*): a level is lit by its bake
+(`Lighting.Generate()`), and a baked light costs nothing at runtime. Give a light
+`Light.SetMode(id, "Realtime")` only when it must move, flash or switch while the game
+runs (a muzzle flash, a flashlight, an alarm), and `"Mixed"` when a live light should
+also bounce from the bake. Until a bake takes a `Baked` light in, the editor and the
+harness preview it live and the console names it; a shipped game draws it dark. So
+bake before you judge a level's look, and read the console for lights waiting on one.
+
 ## Play-testing headlessly
 
 A scenario is a Lua file under `scenarios/` that drives the game through the same

@@ -104,7 +104,7 @@ fn gpu_an_upscaled_frame_is_the_native_frame_softened() {
     };
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     create_entity(&mut scene, "Box", Some(Primitive::Box));
     let native = frame(&mut r, &scene, 1.0);
     for scale in [0.5, 2.0] {

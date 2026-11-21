@@ -25,7 +25,7 @@ pub(super) fn png(name: &str, rgb: [u8; 3]) -> MapRef {
 pub(super) fn textured(maps: &[&MapRef]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     for (i, &map) in maps.iter().enumerate() {
         let id = create_entity(&mut scene, &format!("Box_{i}"), Some(Primitive::Box));
         scene.world.transform_mut(id).unwrap().position = Vec3::new(i as f32 - 1.0, 0.0, -4.0);

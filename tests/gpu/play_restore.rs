@@ -19,7 +19,7 @@ const PROPS: u32 = 6;
 fn yard() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty::scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let red = MaterialAsset {
         base_color: [0.9, 0.1, 0.1],
         ..MaterialAsset::default()

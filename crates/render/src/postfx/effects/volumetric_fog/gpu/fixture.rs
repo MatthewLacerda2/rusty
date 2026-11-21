@@ -117,6 +117,10 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, intensity: f32, mode: LightMode)
         ..default_light()
     };
     scene.world.set_light(id, Some(light));
+    if mode == LightMode::Baked {
+        // A bake took it in: one none has is previewed live (#2522).
+        scene.lightmaps.lights.insert(id);
+    }
     id
 }
 

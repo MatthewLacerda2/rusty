@@ -84,7 +84,9 @@ pub(crate) fn apply_scene_lights(
         }
         let light = scene.world.light(id).expect("id came from ids_with_light");
         match light.light_type {
-            LightType::Directional if scene.light_mode(id, &light).renders_live(capture) => {
+            LightType::Directional
+                if crate::clusters::drawn_mode(scene, id, &light).renders_live(capture) =>
+            {
                 dirs.push(DirectionalLightUniform {
                     direction: scene.world.transform_direction(id, Vec3::NEG_Z).to_array(),
                     _pad1: 0.0,
@@ -92,7 +94,9 @@ pub(crate) fn apply_scene_lights(
                     intensity: light.intensity,
                     // `Baked` (#438), only ever uploaded in a bake capture: a
                     // lightmapped surface skips it, its lightmap holds it.
-                    baked: f32::from(u8::from(scene.light_mode(id, &light).bakes_direct())),
+                    baked: f32::from(u8::from(
+                        crate::clusters::drawn_mode(scene, id, &light).bakes_direct(),
+                    )),
                     bounce_baked: f32::from(u8::from(scene.lightmaps.baked_light(id))),
                     mask_channel: scene.mask_channel(id).map_or(-1.0, f32::from),
                     _pad2: 0.0,

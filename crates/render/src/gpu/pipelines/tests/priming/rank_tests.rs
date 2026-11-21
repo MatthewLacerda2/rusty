@@ -22,7 +22,7 @@ const RES: u32 = 64;
 fn panel_on_a_wall(wall: Primitive, panel: Primitive) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let facing_the_camera = glam::Quat::from_rotation_x(std::f32::consts::FRAC_PI_2);
     for (name, kind, z) in [("Wall", wall, -6.0), ("Panel", panel, -5.8)] {
         let id = create_entity(&mut scene, name, Some(kind));
@@ -35,6 +35,7 @@ fn panel_on_a_wall(wall: Primitive, panel: Primitive) -> Scene {
         if name == "Panel" {
             let light = LightComponent {
                 intensity: 0.0,
+                mode: rusty_components::LightMode::Mixed,
                 ..default_light()
             };
             scene.world.set_light(id, Some(light));

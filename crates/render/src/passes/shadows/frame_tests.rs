@@ -25,8 +25,10 @@ fn the_shadow_sun_follows_only_a_live_directional_light() {
     let sun_turn = Quat::from_rotation_x(-0.7) * Quat::from_rotation_y(0.4);
     let sun = rotated_light(&mut scene, Primitive::DirectionalLight, sun_turn);
     scene.world.light_mut(sun).unwrap().mode = LightMode::Baked;
+    scene.lightmaps.lights.insert(sun); // a bake took it in: it is drawn no more
     let lamp_turn = Quat::from_rotation_z(1.1);
-    rotated_light(&mut scene, Primitive::PointLight, lamp_turn);
+    let lamp = rotated_light(&mut scene, Primitive::PointLight, lamp_turn);
+    scene.world.light_mut(lamp).unwrap().mode = LightMode::Realtime;
 
     assert_eq!(
         live_sun(&scene, false),
@@ -51,6 +53,7 @@ fn a_baked_only_sun_fits_no_cascade_outside_a_capture() {
     let mut scene = Scene::new();
     let sun = rotated_light(&mut scene, Primitive::DirectionalLight, Quat::IDENTITY);
     scene.world.light_mut(sun).unwrap().mode = LightMode::Baked;
+    scene.lightmaps.lights.insert(sun); // a bake took it in: it is drawn no more
     let cam = Camera::new(Vec3::new(0.0, 1.0, 4.0), -90.0, -10.0);
     let settings = ShadowSettings::default();
     let fit = |scene: &Scene, capture| frame_cascades(scene, capture, &cam, 1.5, &settings).len();
@@ -88,7 +91,7 @@ fn gpu_the_cascades_follow_the_main_cameras_volume() {
     };
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 32, 32);
     let mut scene = Scene::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
     // Created first: a monitor camera that must not set the screen's shadows.
     camera_with_cascades(&mut scene, 1, Some(RenderTarget::new("monitor", 16, 16)));

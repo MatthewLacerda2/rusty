@@ -61,6 +61,7 @@ fn scene(ambient: f32) -> Scene {
             range: 20.0,
             inner_cone: 15.0,
             outer_cone: 20.0,
+            mode: rusty::components::LightMode::Mixed,
             ..rusty::edit::authoring::default_light()
         }),
     );

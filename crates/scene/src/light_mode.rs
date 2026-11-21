@@ -1,6 +1,7 @@
 //! The mode the frame draws a light as (#1695): its own, but `Baked` for a `Mixed`
 //! light the last `Shadowmask` bake found no channel for (`LightmapSet::fell_back`),
-//! and the shadowmask channel it masks a light by.
+//! and the shadowmask channel it masks a light by; and the `Baked` lights no bake
+//! has taken in yet, which the editor previews live (#2522).
 
 use crate::lighting::MixedLightingMode;
 use crate::Scene;
@@ -12,6 +13,43 @@ impl Scene {
     /// afresh from `effective_mode`, never from this.
     pub fn light_mode(&self, id: u32, light: &LightComponent) -> LightMode {
         self.lightmaps.baked_mode(id, light.effective_mode())
+    }
+
+    /// Whether light `id` is a `Baked` lamp or sun that no lightmap bake has taken
+    /// in yet (#2522, `LightmapSet::baked_light`): added since the last bake, made
+    /// `Baked` since, or in a scene never baked. It lights nothing until Generate
+    /// Lighting, unless the frame previews it ([`Self::drawn_mode`]). An Area light
+    /// is always `Baked` and never previewed (a panel has no live path), and an
+    /// Ambient one is the sky's.
+    pub fn awaits_bake(&self, id: u32, light: &LightComponent) -> bool {
+        !matches!(light.light_type, LightType::Area | LightType::Ambient)
+            && self.light_mode(id, light) == LightMode::Baked
+            && !self.lightmaps.baked_light(id)
+    }
+
+    /// The mode the frame draws light `id` as: [`Self::light_mode`], but with
+    /// `preview` a light that [awaits a bake](Self::awaits_bake) draws as `Mixed`
+    /// would before its bake (live direct light and shadows, its bounce left to
+    /// SSIL), so a new light is never silently dark in the editor. A bake decides
+    /// from `effective_mode`, never from this.
+    pub fn drawn_mode(&self, id: u32, light: &LightComponent, preview: bool) -> LightMode {
+        match preview && self.awaits_bake(id, light) {
+            true => LightMode::Mixed,
+            false => self.light_mode(id, light),
+        }
+    }
+
+    /// The active lights above intensity 0 that [await a
+    /// bake](Self::awaits_bake), in entity order: what the renderer's console note
+    /// names.
+    pub fn lights_awaiting_bake(&self) -> Vec<u32> {
+        let world = &self.world;
+        (world.ids_with_light().into_iter())
+            .filter(|&id| world.is_active_in_hierarchy(id))
+            .filter(|&id| {
+                (world.light(id)).is_some_and(|l| l.intensity > 0.0 && self.awaits_bake(id, &l))
+            })
+            .collect()
     }
 
     /// The shadowmask channel the frame masks light `id` by (#1695): its bake's

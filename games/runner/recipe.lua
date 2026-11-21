@@ -75,6 +75,7 @@ Trail.SetColors(body, 0.4, 0.8, 1.6, 0.8, 0.2, 0.4, 1.0, 0)
 Trail.SetBlend(body, "Additive")
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
+Light.SetMode(sun, "Mixed") -- live: the level is not baked
 Transform.SetRotation(sun, -50, 35, 0)
 Light.SetCastShadows(sun, true)
 

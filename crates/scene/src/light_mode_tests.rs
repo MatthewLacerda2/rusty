@@ -1,6 +1,7 @@
 //! A light changed after a `Shadowmask` bake (#1695) draws as its new mode next
 //! frame: a fallen-back lamp set to `Realtime` draws live, and a masked lamp set to
-//! `Realtime` (or its shadows turned off) is masked by no stale channel.
+//! `Realtime` (or its shadows turned off) is masked by no stale channel. A `Baked`
+//! light no bake took in waits for one (#2522).
 
 use crate::create::default_light;
 use crate::lighting::MixedLightingMode;
@@ -77,4 +78,46 @@ fn each_bake_verb_says_once_when_the_other_half_is_missing() {
     assert_eq!(scene.shadowmask_note(true), None);
     scene.lighting_settings.mixed_lighting_mode = MixedLightingMode::BakedIndirect;
     assert_eq!(scene.shadowmask_note(false), None, "off: no note");
+}
+
+/// A new light is `Baked` (#2522), and until a bake takes it in it waits for one:
+/// previewed as `Mixed` where the frame previews, drawn as `Baked` where it does not.
+#[test]
+fn a_new_light_is_baked_and_waits_for_a_bake_until_one_takes_it_in() {
+    use crate::create::{create_entity, Primitive};
+    let mut scene = Scene::default();
+    let lamp = create_entity(&mut scene, "Lamp", Some(Primitive::PointLight));
+    let light = scene.world.light(lamp).unwrap().clone();
+    assert_eq!(light.mode, LightMode::Baked, "the default");
+    assert!(scene.awaits_bake(lamp, &light));
+    assert_eq!(scene.drawn_mode(lamp, &light, true), LightMode::Mixed);
+    assert_eq!(scene.drawn_mode(lamp, &light, false), LightMode::Baked);
+    assert_eq!(scene.lights_awaiting_bake(), vec![lamp]);
+    scene.lightmaps.lights.insert(lamp);
+    assert!(!scene.awaits_bake(lamp, &light), "a bake took it in");
+    assert_eq!(scene.drawn_mode(lamp, &light, true), LightMode::Baked);
+    assert!(scene.lights_awaiting_bake().is_empty());
+}
+
+/// A light that says `Realtime` or `Mixed` is live before and after a bake, and an
+/// Area panel (always `Baked`) is never previewed.
+#[test]
+fn live_modes_and_area_panels_never_wait() {
+    let mut scene = Scene::default();
+    for (mode, light_type) in [
+        (LightMode::Realtime, LightType::Point),
+        (LightMode::Mixed, LightType::Directional),
+        (LightMode::Baked, LightType::Area),
+    ] {
+        let id = scene.add_entity(mode.name().to_string());
+        let light = LightComponent {
+            light_type,
+            mode,
+            ..default_light()
+        };
+        scene.world.set_light(id, Some(light.clone()));
+        assert!(!scene.awaits_bake(id, &light), "{mode:?} {light_type:?}");
+        assert_eq!(scene.drawn_mode(id, &light, true), light.effective_mode());
+    }
+    assert!(scene.lights_awaiting_bake().is_empty());
 }

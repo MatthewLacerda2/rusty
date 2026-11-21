@@ -101,6 +101,7 @@ fn ceiling(floor: MaterialAsset) -> f32 {
     scene.world.transform_mut(lamp).expect("an entity").position = Vec3::new(2.0, 0.5, 2.0);
     let light = LightComponent {
         intensity: 4.0,
+        mode: rusty_components::LightMode::Mixed,
         ..rusty_scene::create::default_light()
     };
     scene.world.set_light(lamp, Some(light));

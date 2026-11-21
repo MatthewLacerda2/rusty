@@ -1,5 +1,6 @@
 //! Which lights the realtime path uploads, by mode (#809): a frame drops `Baked`
-//! lights, a bake capture drops `Realtime` ones.
+//! lights a bake took in, a bake capture drops `Realtime` ones; a frame previews a
+//! `Baked` light no bake has taken in yet (#2522).
 
 use super::{apply_capture, apply_scene_lights, default_lighting_uniform};
 use crate::clusters::local_lights;
@@ -8,8 +9,19 @@ use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_scene::Scene;
 
 /// One light of `light_type` per mode, in `LightMode::ALL` order, each a different
-/// intensity (1, 2, 3) so the upload says which survived.
+/// intensity (1, 2, 3) so the upload says which survived, the `Baked` one taken in
+/// by a bake.
 fn one_per_mode(light_type: LightType) -> Scene {
+    let mut scene = unbaked_per_mode(light_type);
+    let baked = (scene.world.ids_with_light().into_iter())
+        .filter(|&id| scene.world.light(id).unwrap().mode == LightMode::Baked);
+    let baked: Vec<u32> = baked.collect();
+    scene.lightmaps.lights.extend(baked);
+    scene
+}
+
+/// [`one_per_mode`] before any bake.
+fn unbaked_per_mode(light_type: LightType) -> Scene {
     let mut scene = Scene::new();
     for (k, mode) in LightMode::ALL.into_iter().enumerate() {
         let id = scene.add_entity(mode.name().to_string());
@@ -55,6 +67,27 @@ fn a_frame_draws_realtime_and_mixed_lights_only() {
             vec![1.0, 2.0]
         );
     }
+}
+
+#[test]
+fn a_frame_previews_a_baked_light_no_bake_took_in() {
+    let suns = unbaked_per_mode(LightType::Directional);
+    assert_eq!(directional_intensities(&suns, false), vec![1.0, 2.0, 3.0]);
+    let points = unbaked_per_mode(LightType::Point);
+    let drawn: Vec<(f32, f32)> = (local_lights(&points, false).iter())
+        .map(|(l, _)| (l.intensity, l.baked))
+        .collect();
+    assert_eq!(
+        drawn,
+        vec![(1.0, 0.0), (2.0, 0.0), (3.0, 0.0)],
+        "previewed as Mixed: no lightmap holds it yet"
+    );
+    let area = unbaked_per_mode(LightType::Area);
+    assert_eq!(
+        local_intensities(&area, false),
+        Vec::<f32>::new(),
+        "no live panel"
+    );
 }
 
 #[test]

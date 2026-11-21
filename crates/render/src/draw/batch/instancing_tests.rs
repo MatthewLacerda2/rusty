@@ -24,7 +24,8 @@ fn material(scene: &mut Scene, id: u32, name: &str) {
 fn prop_yard() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let red = MaterialAsset {
         base_color: [0.9, 0.1, 0.1],

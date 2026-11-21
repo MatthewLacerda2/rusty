@@ -158,7 +158,7 @@ impl BakedLamps {
 fn is_baked_lamp(scene: &Scene, id: u32) -> bool {
     scene.world.light(id).is_some_and(|l| {
         matches!(l.light_type, LightType::Point | LightType::Spotlight)
-            && !scene.light_mode(id, &l).renders_live(false)
+            && !crate::clusters::drawn_mode(scene, id, &l).renders_live(false)
     })
 }
 

@@ -21,6 +21,7 @@ fn scene(material: MaterialAsset) -> Scene {
         intensity: 30.0,
         range: 30.0,
         cast_shadows: false,
+        mode: rusty::components::LightMode::Mixed,
         ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));

@@ -52,6 +52,7 @@ fn measured() -> Report {
     let light = LightComponent {
         light_type: LightType::Directional,
         cast_shadows: true,
+        mode: rusty_components::LightMode::Mixed,
         ..rusty_edit::authoring::default_light()
     };
     scene.world.set_light(sun, Some(light));

@@ -8,7 +8,7 @@ use std::rc::Rc;
 
 use super::params_tests::{halves, set_param, set_texture, sphere, RES};
 use crate::Renderer;
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
@@ -61,7 +61,7 @@ impl Drop for Dissolve {
 fn two_spheres(d: &Dissolve) -> (Rc<RefCell<Scene>>, u32, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let masked = sphere(&mut scene, -1.2, &d.shader);
     let plain = sphere(&mut scene, 1.2, &d.shader);
     let scene = Rc::new(RefCell::new(scene));

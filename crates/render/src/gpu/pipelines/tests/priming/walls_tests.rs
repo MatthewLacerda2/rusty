@@ -46,7 +46,8 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, rgb: [f32; 3]) -> u32 {
 fn walls(d: &Dissolve, blur: bool) -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let sun = create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    let sun =
+        rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
     let floor = (Vec3::new(0.0, -0.5, -8.0), Vec3::new(30.0, 1.0, 30.0));
     block(&mut scene, floor.0, floor.1, [0.3; 3]);
@@ -72,6 +73,7 @@ fn walls(d: &Dissolve, blur: bool) -> (Rc<RefCell<Scene>>, u32) {
     );
     let light = rusty_components::LightComponent {
         intensity: 0.0,
+        mode: rusty_components::LightMode::Mixed,
         ..default_light()
     };
     scene.world.set_light(unlit, Some(light));

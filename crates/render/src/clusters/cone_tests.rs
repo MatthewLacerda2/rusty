@@ -21,6 +21,7 @@ fn spot(at: Vec3, dir: Vec3, outer: f32, range: f32) -> LocalLight {
         range,
         inner_cone: outer * 0.5,
         outer_cone: outer,
+        mode: rusty_components::LightMode::Mixed,
         ..rusty_scene::create::default_light()
     };
     LocalLight::new(at, dir, &light).expect("a local light")

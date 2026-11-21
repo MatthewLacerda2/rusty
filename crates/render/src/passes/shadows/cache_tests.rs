@@ -16,7 +16,7 @@ use rusty_scene::{Camera, Scene};
 fn static_yard() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = create_entity(&mut scene, "Crate", Some(Primitive::Box));
     scene.world.set_static(id, true);
     scene

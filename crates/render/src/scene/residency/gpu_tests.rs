@@ -14,7 +14,7 @@ use rusty_scene::Scene;
 pub(super) fn level(prims: &[Primitive], (panel, n): (&str, u32)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     for (i, &kind) in prims.iter().enumerate() {
         let id = create_entity(&mut scene, &format!("Prop_{i}"), Some(kind));
         scene.world.transform_mut(id).unwrap().position = Vec3::new(i as f32 - 1.0, 0.0, -4.0);

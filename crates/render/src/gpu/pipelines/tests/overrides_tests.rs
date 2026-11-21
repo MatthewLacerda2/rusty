@@ -6,14 +6,14 @@
 
 use super::{clear_params, halves, set_param, sphere, Flash, RES};
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// A lit scene of `n` spheres in a row sharing one material named `shader`.
 fn shared(n: u32, shader: &str) -> (Scene, Vec<u32>) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    create_entity(&mut scene, "Sun", Some(Primitive::DirectionalLight));
+    create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let first = sphere(&mut scene, -1.2, shader);
     let material = scene.world.material(first).map(|m| m.clone());
     let mut ids = vec![first];

@@ -27,6 +27,7 @@ fn scene(map: &std::path::Path, roughness: f32, intensity: f32) -> Scene {
         intensity,
         range: 30.0,
         cast_shadows: false,
+        mode: rusty::components::LightMode::Mixed,
         ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));

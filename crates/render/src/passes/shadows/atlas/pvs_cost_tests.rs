@@ -14,7 +14,7 @@ use glam::Vec3;
 use super::static_tests::RES;
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_lighting::occlusion::{bake_occlusion, bench::level::rooms};
-use rusty_scene::create::{create_entity, Primitive};
+use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
 /// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each
@@ -29,7 +29,7 @@ pub(super) fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
             Vec3::new(5.0, 3.0, 8.0),
         ] {
             let at = Vec3::new(i as f32 * 10.0, 0.0, j as f32 * 10.0) + at;
-            let id = create_entity(&mut scene, "Lamp", Some(Primitive::PointLight));
+            let id = create_live_light(&mut scene, "Lamp", Primitive::PointLight);
             scene.world.transform_mut(id).unwrap().position = at;
             let mut light = scene.world.light(id).unwrap().clone();
             (light.cast_shadows, light.range, light.intensity) = (true, range, 20.0);
