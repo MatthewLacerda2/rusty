@@ -339,10 +339,15 @@ queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)
 queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, coders' issue comments; exits 1 once the supervisor is gone
 	@python3 .github/scripts/queue-view.py events
 
-# "Blocked by #N" written in an issue body but never recorded as a GitHub
-# relationship is invisible to everything that plans from the graph (#624).
-# Lists them and exits 1; ARGS=--fix records them. Run at the start of a batch.
-blockers: ## Prose-only "Blocked by #N" GitHub never recorded. ARGS=--fix records them
+# Diffs each issue body's "Blocked by #N" against GitHub's blocked_by record, both
+# directions: a prose-only blocker is invisible to everything that plans from the
+# graph (#624), and a recorded open blocker no body states (neither the issue's
+# "Blocked by" nor the blocker's "Blocks") still stops the merge queue (#2489).
+# Lists both, and any "Blocked by" it could not read, and exits 1. ARGS=--fix
+# records the first and deletes nothing: each recorded blocker no body states is
+# reported with its ARGS='--lift <issue> <blocker>', the only way one is removed.
+# Run at the start of a batch.
+blockers: ## Diff body "Blocked by #N" against GitHub, both ways: ARGS=--fix records, ARGS='--lift I B' lifts one
 	@python3 .github/scripts/blockers.py $(ARGS)
 
 # The PR-on-first-commit rule exists so nothing goes stale unnoticed; this is

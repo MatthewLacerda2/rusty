@@ -1,45 +1,63 @@
 #!/usr/bin/env python3
-"""`blockers.py [--fix]` — find "Blocked by #N" that GitHub never recorded (#624).
+"""`blockers.py [--fix | --lift <issue> <blocker>]` — diff prose "Blocked by #N"
+against GitHub's recorded relationships, both ways (#624, #2489).
 
 The dependency graph *is* the plan (CLAUDE.md), and every tool and agent that
 plans reads it through GitHub's native `blocked_by` relationships. A blocker
 written only in an issue's prose is invisible to all of them: on 2026-09-30 the
 batch started #399 while its body said "Blocked by #396" and #396 was open, and
-a sweep then found 21 such prose-only mentions across 13 open issues.
+a sweep then found 21 such prose-only mentions across 13 open issues. Each one
+whose blocker is an **open issue** is listed; `--fix` records it. Closed
+blockers, pull requests and self-references are skipped: none blocks anything.
 
-This lists every open issue whose body says `Blocked by #N` (any case, lists
-like "#396 and #397" included) where N is an **open issue** that the issue's
-recorded `dependencies/blocked_by` does not hold. Closed blockers, pull
-requests and self-references are skipped: none of them blocks anything now.
-With `--fix` it records each one through the REST API. Every call is REST, so
-it runs from a cloud session too (#970).
+The other way, a recorded open blocker the body no longer states (#2489): the
+merge queue reads the relationship, not the prose, so a dependency lifted by
+editing the body still handed back the PR that closed the issue. **Prose can
+decide what to record; it never decides what to delete** (each review of PR
+#2516 found another wording that cost a deletion), so such a blocker `#B` of
+issue `#I` is reported, exit 1, as one of:
 
-Recording touches `planning` issues too, deliberately: writing down a blocker
-the prose already states changes nobody's scope, it only makes it visible.
+- **stale**, when `#B` is named nowhere in `#I`'s body and `#I` nowhere in
+  `#B`'s (a token search, `deps.prose.named`; struck-through text is not named);
+- **mentioned**, when either body names the other but not as a blocker (a
+  reason, "see #B", a wording the parser misses);
 
-Exits 0 when nothing is missing (or `--fix` recorded all of it), 1 when an
-audit found gaps, so `make blockers` reads as a check.
+and is silent when **agreed** (`#B`'s body says `Blocks #I`). Each report line
+ends with the command that lifts it: `--lift I B` removes that one relationship,
+the caller naming both numbers, and is the only deletion; `--fix` only records.
+
+A `Blocked by` clause holding a reference the parser could not read is a
+**doubt**: always reported and exit 1, whatever the record holds, so the
+all-clear means every clause was read. A recorded blocker in another repository
+(`repository_url`) is named and left alone; a relationship to a closed issue is
+history; a sub-issue link is not a `blocked_by` relationship and is never read.
+Only issues whose listing reports an open recorded blocker
+(`issue_dependencies_summary.blocked_by`) or whose body states one are asked
+for their record, so a board of unblocked issues costs one listing. Every call
+is REST, so it runs from a cloud session too (#970).
+
+A `Blocked by` that took no reference at all ("Blocked by the shader rewrite")
+is a doubt too, so every clause is either read or reported.
+
+Recording and lifting touch `planning` issues too, deliberately: making the
+record match what the prose already states changes nobody's scope.
+
+Exits 0 when prose and record agree (or `--fix` recorded every gap, and nothing
+is stale, mentioned or in doubt), 1 otherwise, so `make blockers` reads as a
+check.
 """
 
 from __future__ import annotations
 
 import json
-import re
 import subprocess
 import sys
+from typing import NamedTuple
 
 import ghrest
+from deps.prose import named, stated
 
-# "Blocked by" (optionally bold, optionally with a colon) and the issue list
-# after it: "#396", "#396, #397", "#396 and #397", "#396 & #397", and items
-# bolded or followed by a reason, as #399 wrote it:
-# "**Blocked by #396** (materials must reference shaders first) and **#393**".
-ITEM = r"[*_]*#\d+[*_]*(?:\s*\([^)\n]*\))?"
-MENTION = re.compile(
-    rf"\bblocked[*_]*\s+by\b[*_:]*\s*((?:{ITEM}(?:\s*(?:,|&|\band\b)\s*|\s+)?)+)",
-    re.IGNORECASE,
-)
-NEGATION = re.compile(r"\b(?:not|no longer|never)\s*[*_]*$", re.IGNORECASE)
+USAGE = "usage: blockers.py [--fix | --lift <issue> <blocker>]"
 
 
 class Gh:
@@ -55,38 +73,71 @@ class Gh:
         return json.loads(done.stdout) if done.stdout.strip() else None
 
 
-def mentioned(body: str | None) -> list[int]:
-    """The issue numbers `body` says it is blocked by, in order, without repeats."""
-    found: list[int] = []
-    for match in MENTION.finditer(body or ""):
-        if NEGATION.search(body[: match.start()]):
-            continue
-        for number in re.findall(r"#(\d+)", match.group(1)):
-            if int(number) not in found:
-                found.append(int(number))
-    return found
+def has_record(issue: dict) -> bool:
+    """Whether the listing says `issue` has an open recorded blocker; asked when it
+    doesn't say. A closed blocker is history, never stale, so no reason to ask."""
+    summary = issue.get("issue_dependencies_summary")
+    return summary is None or bool(summary.get("blocked_by", summary.get("total_blocked_by")))
 
 
-def missing(gh: Gh, repo: str) -> list[tuple[int, dict]]:
-    """(issue, blocker) pairs the prose states and GitHub does not record."""
-    listed = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues?state=open") or []
-    issues = [i for i in listed if "pull_request" not in i]
-    blockers: dict[int, dict] = {}
-    gaps = []
-    for issue in sorted(issues, key=lambda i: i["number"]):
-        wanted = [n for n in mentioned(issue["body"]) if n != issue["number"]]
-        if not wanted:
+def ours(blocker: dict, repo: str) -> bool:
+    """Whether a recorded blocker is an issue of this repository."""
+    url = blocker.get("repository_url")
+    return url is None or url.lower().endswith(f"/repos/{repo}".lower())
+
+
+class Report(NamedTuple):
+    """(issue, blocker) pairs: prose-only, stale, recorded and mentioned but not
+    as a blocker (with whose body names it), recorded in another repository; and
+    (issue, references) for each `Blocked by` clause it could not read."""
+
+    gaps: list
+    stale: list
+    mentioned: list
+    foreign: list
+    doubts: list
+
+
+def audit(gh: Gh, repo: str) -> Report:
+    issues = ghrest.pages(lambda path: gh("api", path), f"repos/{repo}/issues?state=open") or []
+    cache: dict[int, dict] = {}
+
+    def fetch(number: int) -> dict:
+        if number not in cache:
+            cache[number] = gh("api", f"repos/{repo}/issues/{number}")
+        return cache[number]
+
+    report = Report([], [], [], [], [])
+    for issue in sorted((i for i in issues if "pull_request" not in i), key=lambda i: i["number"]):
+        number = issue["number"]
+        prose = stated(issue["body"], "blocked by", repo)
+        if prose.unread:
+            report.doubts.append((number, prose.unread))
+        wanted = [n for n in prose.numbers if n != number]
+        if not wanted and not has_record(issue):
             continue
-        recorded = {b["number"] for b in gh("api", ghrest.blocked_by(repo, issue["number"])) or []}
-        for number in wanted:
-            if number in recorded:
+        recorded = gh("api", ghrest.blocked_by(repo, number)) or []
+        report.foreign.extend((number, b) for b in recorded if not ours(b, repo))
+        local = [b for b in recorded if ours(b, repo)]
+        for blocker in local:
+            if blocker.get("state") != "open" or blocker["number"] in wanted:
                 continue
-            if number not in blockers:
-                blockers[number] = gh("api", f"repos/{repo}/issues/{number}")
-            blocker = blockers[number]
-            if blocker["state"] == "open" and "pull_request" not in blocker:
-                gaps.append((issue["number"], blocker))
-    return gaps
+            theirs = fetch(blocker["number"]).get("body")
+            if number in stated(theirs, "blocks", repo).numbers:
+                continue
+            if blocker["number"] in named(issue["body"], repo):
+                report.mentioned.append((number, blocker, number))
+            elif number in named(theirs, repo):
+                report.mentioned.append((number, blocker, blocker["number"]))
+            else:
+                report.stale.append((number, blocker))
+        held = {b["number"] for b in local}
+        for want in wanted:
+            if want not in held:
+                blocker = fetch(want)
+                if blocker["state"] == "open" and "pull_request" not in blocker:
+                    report.gaps.append((number, blocker))
+    return report
 
 
 def record(gh: Gh, repo: str, issue: int, blocker: dict) -> None:
@@ -94,26 +145,83 @@ def record(gh: Gh, repo: str, issue: int, blocker: dict) -> None:
        "-F", f"issue_id={blocker['id']}")
 
 
+def remove(gh: Gh, repo: str, issue: int, blocker: dict) -> None:
+    gh("api", "--method", "DELETE",
+       f"repos/{repo}/issues/{issue}/dependencies/blocked_by/{blocker['id']}")
+
+
+def lift(gh: Gh, repo: str, issue: int, number: int) -> int:
+    """Remove the one recorded relationship "`issue` blocked by `number`"."""
+    recorded = [b for b in gh("api", ghrest.blocked_by(repo, issue)) or []
+                if b["number"] == number and ours(b, repo)]
+    if not recorded:
+        print(f"#{issue} is not recorded as blocked by #{number}: nothing to lift")
+        return 0
+    remove(gh, repo, issue, recorded[0])
+    print(f"#{issue} blocked by #{number} ({recorded[0]['title']}): lifted")
+    body = gh("api", f"repos/{repo}/issues/{issue}").get("body")
+    if number in stated(body, "blocked by", repo).numbers:
+        print(f"#{issue}'s body still says it is blocked by #{number}: take that out, or "
+              "`make blockers ARGS=--fix` records it again")
+    elif number in named(body, repo):
+        print(f"#{issue}'s body still names #{number}, not as a blocker")
+    return 0
+
+
+def lift_args(argv: list[str]) -> tuple[int, int] | None:
+    """The (issue, blocker) of `--lift <issue> <blocker>`, or `None` without it."""
+    if argv[:1] != ["--lift"]:
+        return None
+    try:
+        issue, number = (int(a.lstrip("#")) for a in argv[1:])
+    except ValueError:
+        sys.exit(f"blockers: --lift takes two issue numbers; {USAGE}")
+    return issue, number
+
+
 def main(argv: list[str], gh: Gh | None = None) -> int:
     gh = gh or Gh()
-    fix = "--fix" in argv
-    unknown = [a for a in argv if a != "--fix"]
-    if unknown:
-        sys.exit(f"blockers: unknown argument(s) {' '.join(unknown)}; usage: blockers.py [--fix]")
+    lifting = lift_args(argv)
+    fix = argv == ["--fix"]
+    if argv and not fix and not lifting:
+        sys.exit(f"blockers: unknown argument(s) {' '.join(argv)}; {USAGE}")
     repo = ghrest.slug()
-    gaps = missing(gh, repo)
-    for issue, blocker in gaps:
+    if lifting:
+        return lift(gh, repo, *lifting)
+    report = audit(gh, repo)
+    for issue, blocker in report.gaps:
         if fix:
             record(gh, repo, issue, blocker)
-        verb = "recorded" if fix else "not recorded"
+        verb = "recorded" if fix else "in the body, not recorded on GitHub"
         print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): {verb}")
-    if not gaps:
-        print("blockers: every prose 'Blocked by' with an open blocker is recorded")
+    for issue, blocker in report.stale:
+        print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): recorded on "
+              f"GitHub, named in neither body: lift it with {lift_command(issue, blocker)}")
+    for issue, blocker, where in report.mentioned:
+        print(f"#{issue} blocked by #{blocker['number']} ({blocker['title']}): recorded, and "
+              f"mentioned in #{where}'s body but not as a blocker: say "
+              f"`Blocked by #{blocker['number']}`, or lift it with {lift_command(issue, blocker)}")
+    for issue, refs in report.doubts:
+        print(f"#{issue}: a \"Blocked by\" holds {', '.join(refs)} in words it could not read: "
+              "write each blocker as `#N` (a list, a bullet each, or an issue URL)")
+    for issue, blocker in report.foreign:
+        where = blocker.get("repository_url", "").rsplit("/repos/", 1)[-1]
+        print(f"#{issue} blocked by {where}#{blocker['number']}: in another repository, left alone")
+    if not (report.gaps or report.stale or report.mentioned or report.doubts):
+        print("blockers: every open blocker in a body is recorded, and every recorded one is in a body")
         return 0
-    if fix:
+    if fix and not (report.stale or report.mentioned or report.doubts):
         return 0
-    print(f"blockers: {len(gaps)} prose-only blocker(s); `make blockers ARGS=--fix` records them")
+    print(f"blockers: {len(report.gaps)} prose-only, {len(report.stale)} stale, "
+          f"{len(report.mentioned)} mentioned, {len(report.doubts)} unread; "
+          "`make blockers ARGS=--fix` records the first; a stale or mentioned one is lifted "
+          "with its line's `--lift`, an unread one by rewriting the body")
     return 1
+
+
+def lift_command(issue: int, blocker: dict) -> str:
+    """The command that removes the one relationship "`issue` blocked by `blocker`"."""
+    return f"`make blockers ARGS='--lift {issue} {blocker['number']}'`"
 
 
 if __name__ == "__main__":
