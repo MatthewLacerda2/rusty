@@ -28,35 +28,77 @@ pub fn check(source: &str) -> Vec<(usize, String)> {
         .collect()
 }
 
+/// Which references a scan flags: the agent docs flag every one; code comments
+/// ([`Refs::CODE`]) pass a short number and a pointer into another repository.
+#[derive(Clone, Copy)]
+pub(crate) struct Refs {
+    /// The fewest digits a flagged number has: a code comment's "cascade #2" is
+    /// no issue.
+    pub min_digits: usize,
+    /// Whether `owner/repo#123`, `wgpu#245` or a URL into a repository other than
+    /// [`OWN`] passes: a pointer to an upstream bug says when a workaround can go.
+    pub foreign_pass: bool,
+}
+
+impl Refs {
+    pub const AGENT_DOCS: Refs = Refs {
+        min_digits: 1,
+        foreign_pass: false,
+    };
+    pub const CODE: Refs = Refs {
+        min_digits: 3,
+        foreign_pass: true,
+    };
+}
+
+/// This repository's name, and the words that put a number in it (`PR#123`).
+const OWN: &[&str] = &["rusty", "pr", "prs", "issue", "issues", "pull"];
+
 /// The first issue or pull request reference on `line`.
 fn reference(line: &str) -> Option<String> {
+    reference_as(line, Refs::AGENT_DOCS)
+}
+
+/// The first issue or pull request reference on `line` that `refs` flags.
+pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     let b = line.as_bytes();
+    let number = |from: usize| {
+        let end = (from..b.len())
+            .find(|&j| !b[j].is_ascii_digit())
+            .unwrap_or(b.len());
+        let open = b.get(from).is_some_and(|c| (b'1'..=b'9').contains(c));
+        let closed = b
+            .get(end)
+            .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
+        (open && closed && end - from >= refs.min_digits).then_some(end)
+    };
+    let foreign = |repo: &str| {
+        let name = repo.rsplit('/').next().unwrap_or("").to_ascii_lowercase();
+        refs.foreign_pass && !name.is_empty() && !OWN.contains(&name.as_str())
+    };
     for i in 0..b.len() {
-        let number = |from: usize| {
-            let end = (from..b.len())
-                .find(|&j| !b[j].is_ascii_digit())
-                .unwrap_or(b.len());
-            let open = b.get(from).is_some_and(|c| (b'1'..=b'9').contains(c));
-            let closed = b
-                .get(end)
-                .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
-            (open && closed).then_some(end)
-        };
         let anchor = i >= 2 && &b[i - 2..i] == b"](";
         if b[i] == b'#' && (i == 0 || b[i - 1] != b'&') && !anchor {
-            if let Some(end) = number(i + 1) {
+            if let Some(end) = number(i + 1).filter(|_| !foreign(repo_before(&line[..i]))) {
                 return Some(line[i..end].to_string());
             }
         }
         for seg in ["/issues/", "/pull/"] {
             if b[i..].starts_with(seg.as_bytes()) {
-                if let Some(end) = number(i + seg.len()) {
+                if let Some(end) = number(i + seg.len()).filter(|_| !foreign(&line[..i])) {
                     return Some(line[i..end].to_string());
                 }
             }
         }
     }
     None
+}
+
+/// The `owner/repo` (or bare `repo`) glued to the end of `text`.
+fn repo_before(text: &str) -> &str {
+    let glued = |c: char| c.is_ascii_alphanumeric() || "_-./".contains(c);
+    let start = text.trim_end_matches(glued).len();
+    &text[start..]
 }
 
 /// The first `YYYY-MM-DD` calendar date on `line`, not part of a longer run.

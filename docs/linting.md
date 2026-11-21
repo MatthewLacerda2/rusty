@@ -35,6 +35,9 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | `cfg!(test)` is no switch | `tools/lint -- --rules` (`cfg-test-switch`) | **hard gate**: no production line of a crate's `src/` holds a `cfg!(…)` naming `test` — it is true only in the crate's own unit tests, so every other crate's tests and `tests/` silently get the shipped behaviour; a switch another crate's tests need is a test hook armed at run time (`crates/CLAUDE.md`, *Test hooks*), and one only the crate's own tests need takes `// lint: allow(cfg-test-switch) <why>` |
 | CI job headroom | `main-health.yml` (`.github/scripts/ci_headroom.py`) | **signal**, never a gate: after every `ci` run on `main`, a job that ran to an end in more than three quarters of its own `timeout-minutes` (read from `ci.yml` at the run's own commit; a matrix job by its slowest entry) files one `infrastructure` issue per job, and comments there when a later run's time moved by a minute or more; it never closes it, the PR that brings the job down does; a lost read files nothing, and no limit read fails its step (`continue-on-error`) (#2276) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
+| Comment cap | `tools/lint` (the size gate: `comment-cap`) | **signal** for now, never failing `make gates`: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200; the size gate prints the files over and the words over, and `make comments PATHS=<paths>` fails on each. No allow. *Comments*, below |
+| Comment history | `tools/lint` (the size gate: `comment-history`) | **signal** for now: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); the size gate prints the count, `make comments PATHS=<paths>` fails on each; an inline allow with a reason excuses one. *Comments*, below |
+| Comment-only diff | `make comment-only` (`tools/lint -- --comment-only`) | a tool mode, not a gate: fails when the branch changes more than comments since its merge base with `origin/main`. *Comments*, below |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
 | Coverage floors drop with a reason | `unittest` (`make scripts`, `.github/scripts/coverage_floors.py`) | **hard gate**: a floor in `coverage-baseline.txt` lowered from the merge base with `origin/main` needs an inline `# reason: <why>` on its line, and a removed floor passes only once its `crates/<module>/src/` is gone; the weekly coverage run stays a signal (#963) |
@@ -292,6 +295,54 @@ flagged line or in the comment lines right above it (a Markdown file reads only 
 form, and code only `//`, so neither counts the other's quoted in a string); a length cap belongs to no
 line, so an allow anywhere in the file excuses it. An allow without a reason is
 itself a finding (`[allow]`), as in Rust.
+
+## Comments (the size gate)
+Every agent that reads a file pays for its comments, so the comments in code are
+held too (`tools/lint/src/comments/`), over the `.rs`, `.lua` and `.wgsl` files the
+size gate measures. Python, the workflows, the `Makefile` and the manifests are not
+read.
+
+- **What a comment is**: in Rust `//`, `///`, `//!`, `/* */` and the string of a
+  `#[doc = …]` or `#![doc = …]` attribute; in WGSL `//` and `/* */`; in Lua `--` and
+  `--[[ ]]`. One at a line's end counts, and so does a fenced example inside a doc
+  comment. A marker inside a string literal is code.
+- **`comment-cap`**: the comments of one file hold at most **100 words** (`.rs`,
+  source and tests alike, and `.lua`) or **200** (`.wgsl`). A word is a
+  whitespace-separated run holding a letter or digit, so one long line buys nothing
+  and a comment's own markers are free. Free too: the line of a marker a tool reads
+  (a comment opening with `lint: allow(`, `sorted:`, `stored-format:` or
+  `comment-cut:`, the `MARKERS` table), and a `// SAFETY:` note directly above the
+  line holding its `unsafe`. No allow: a file that needs more words needs a name, a
+  type, a split, or a page in `docs/`. The finding sits on the line of the first
+  word past the cap.
+- **`comment-history`**: no comment names one of this repository's issues or pull
+  requests: `#` and three or more digits, `rusty#123`, `PR#123`, or this
+  repository's issue or pull URL. The code says what it does; `git blame` finds the
+  issue and the PR. A pointer into another repository passes (`wgpu#245`,
+  `owner/repo#123`, its URL), since it says when a workaround can go, and so do the
+  look-alikes the agent docs' `history` lets through (`#N`, a hex colour, `&#123;`,
+  an in-page link) and a short number (`cascade #2`). Dates and phrases are not
+  read. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
+  An inline allow with a reason excuses a line: `// lint: allow(comment-history)
+  <why>` (`-- lint: allow(…)` in Lua).
+
+**They are signals while the tree is cut down to them**: `make size` (and so `make
+gates`, the commit hook and CI) prints one line each under `signal (not a
+failure)` with the totals, files over the cap and words over, references and the
+files holding them, and stays green. **`make comments PATHS=<files or folders>`**
+(`tools/lint -- --strict-comments <paths>`) is the strict run: every finding under
+those paths as `path:line: [rule] message`, exit 1 on any, so a cleanup branch asks
+"is `crates/audio` clean?".
+
+**The comment-only proof**: `make comment-only` (`tools/lint -- --comment-only
+[<rev>]`, `BASE=` for another base than `origin/main`) compares each file changed
+between the merge base and `HEAD`, both versions with their comments cut by the same
+split the cap counts with (a doc attribute is a comment there too), as code with
+whitespace and blank lines laid aside (rustfmt may re-join a line once its trailing
+comment goes); a literal's spaces still count. It fails naming each file that
+differs and its first differing line, and every file added, deleted, renamed or of
+another language. It prints how many fenced doc examples the diff removes, so a
+pull request can name them. A tool mode, not a gate.
 
 ## Rules, findings and inline allows (`--rules`)
 `--rules` runs every check built on one shared shape (#934): a rule reports
