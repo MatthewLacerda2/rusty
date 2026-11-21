@@ -14,8 +14,6 @@ fn at(x: f32, bone_base: u32) -> CasterData {
     CasterData::new(Mat4::from_translation(Vec3::X * x), bone_base)
 }
 
-/// A plain caster key of mesh `m`, drawing indices `0..n`; the test meshes' handles
-/// follow their names' order.
 fn mesh(m: &str, n: u32) -> CasterKey {
     let names = ["Box", "Card", "Pillar", "Rig"];
     let handle = names
@@ -46,8 +44,6 @@ fn casters_of_one_mesh_become_one_instanced_draw() {
     assert_eq!(solo.len(), 3, "instancing off: one draw per caster");
 }
 
-/// The pose rides each instance (#599), so two skinned copies of one rig cost one
-/// shadow draw, each still reading its own palette.
 #[test]
 fn skinned_copies_of_one_mesh_share_a_draw_with_their_own_palettes() {
     let casters = vec![
@@ -61,8 +57,6 @@ fn skinned_copies_of_one_mesh_share_a_draw_with_their_own_palettes() {
     assert_eq!(bases, [1, 31]);
 }
 
-/// A clipped caster (#648) binds its material, so it never shares a draw with a plain
-/// copy of its mesh; plain runs sort first, so the clip pipelines bind last.
 #[test]
 fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
     let clip = Clip::of(1, 3);
@@ -81,8 +75,6 @@ fn a_clipped_caster_draws_apart_from_plain_copies_of_its_mesh() {
     assert_eq!(packed[1].alpha_cutoff, 0.5, "the cutout rides its instance");
 }
 
-/// A mirrored caster (#1134) draws with the winding flipped, so it never shares a
-/// draw with an unmirrored copy of its mesh.
 #[test]
 fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
     let flip = Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0));
@@ -103,8 +95,6 @@ fn a_mirrored_caster_draws_apart_from_unmirrored_copies() {
     assert_eq!(runs, [(Facing::Ccw, (36, 1)), (Facing::Cw, (36, 2))]);
 }
 
-/// Mirroring sorts before the clip's material, so one clip pipeline's plain and
-/// mirrored versions each bind once, not once per material.
 #[test]
 fn mirrored_runs_sort_before_the_clip_material() {
     let key = |mirrored: bool, material| CasterKey {
@@ -124,8 +114,6 @@ fn mirrored_runs_sort_before_the_clip_material() {
     assert_eq!(order, [(f, 3), (f, 4), (m, 3), (m, 4)]);
 }
 
-/// A two-sided caster (#1571) culls nothing, so it draws apart from its mesh's
-/// one-sided copies, mirrored or not: winding no longer matters to it.
 #[test]
 fn a_two_sided_caster_draws_apart_whatever_its_winding() {
     let flip = Mat4::from_scale(Vec3::new(-1.0, 1.0, 1.0));
@@ -136,7 +124,6 @@ fn a_two_sided_caster_draws_apart_whatever_its_winding() {
         Facing::Both
     );
     assert_eq!(super::caster_facing(flip, false, Front), Facing::Cw);
-    // Unity's ShadowCaster culls by the material's `_Cull` too (#1615).
     assert_eq!(
         super::caster_facing(Mat4::IDENTITY, false, Back),
         Facing::Cw

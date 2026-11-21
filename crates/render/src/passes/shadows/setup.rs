@@ -1,8 +1,3 @@
-//! Construction of the shadow pass's GPU resources: the static + active cascade depth
-//! arrays, the comparison sampler the forward shader reads them through, and the
-//! depth-only pipelines. Split out of `shadows/mod.rs` so each file stays under the size
-//! cap.
-
 use super::cascades::MAX_CASCADES;
 use super::layouts::{caster_entries, clip_layout, global_group, global_layout};
 use super::ShadowRenderer;
@@ -11,7 +6,6 @@ use crate::gpu::mesh::vertex_layout;
 use crate::gpu::pipelines::winding::Facing;
 use crate::gpu::pipelines::LazyPipeline;
 
-/// The two cascade depth arrays and their views.
 pub(super) struct DepthTextures {
     pub static_texture: wgpu::Texture,
     pub active_texture: wgpu::Texture,
@@ -21,8 +15,6 @@ pub(super) struct DepthTextures {
 }
 
 impl ShadowRenderer {
-    /// Allocate the static + active depth arrays, one layer per cascade, with a
-    /// render-target view per layer and the active array's sampled view.
     pub(super) fn create_depth_textures(device: &wgpu::Device) -> DepthTextures {
         let desc = wgpu::TextureDescriptor {
             label: Some("Shadow Cascade Depth Array"),
@@ -69,7 +61,6 @@ impl ShadowRenderer {
         }
     }
 
-    /// The comparison sampler the forward shader's PCF reads the cascades through.
     pub(super) fn create_sampler(device: &wgpu::Device) -> wgpu::Sampler {
         device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Shadow Sampler"),
@@ -84,10 +75,6 @@ impl ShadowRenderer {
         })
     }
 
-    /// Global (light-space) and per-entity layouts used by the depth-only pass. The
-    /// light-space binding takes a dynamic offset: one matrix per cascade; the time
-    /// buffer is a `CameraUniform` whose `time` alone is written. Binding numbers are
-    /// the ones `shader.wgsl`'s shadow stage declares beside the forward pass's (#648).
     pub(super) fn create_pass_layouts(
         device: &wgpu::Device,
         [light_space_buffer, time_buffer]: [&wgpu::Buffer; 2],
@@ -100,11 +87,6 @@ impl ShadowRenderer {
         let global_bind_group =
             global_group(device, &global_layout, light_space_buffer, time_buffer);
 
-        // Every caster as one storage array, indexed per instance (#470) — and read by
-        // the clip's fragment for its alpha test (#648) — the joint matrices its
-        // skinned casters are posed with (#599), and the material records a clipped
-        // draw reads through `material()` with the per-draw uniform naming its record
-        // (#1616), at the forward pass's own bindings.
         let entity_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Shadow Caster Layout"),
             entries: &caster_entries(),
@@ -113,10 +95,6 @@ impl ShadowRenderer {
         (global_layout, global_bind_group, entity_layout)
     }
 
-    /// The plain depth-only pipeline and the clipping one (#648), both from the
-    /// forward `shader`'s shadow stage, then their mirrored twins (#1134) and their
-    /// two-sided ones (#1571), built on first draw; the clip pipelines' layout adds
-    /// the forward pass's material layout to the two shadow groups ([`Groups`]).
     pub(super) fn create_pipelines(
         device: &wgpu::Device,
         [global, entity, material]: [&wgpu::BindGroupLayout; 3],
@@ -146,7 +124,6 @@ impl ShadowRenderer {
     }
 }
 
-/// [`depth_pipeline`], built on its first draw (#985).
 pub(crate) fn lazy_depth_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -160,21 +137,6 @@ pub(crate) fn lazy_depth_pipeline(
     })
 }
 
-/// A shadow-cascade depth pipeline over `shader`'s `vs_shadow`: depth only with no
-/// `fragment`, or clipped by one (`fs_shadow`, a cutting variant's `fs_shadow_cut`,
-/// #648). Shared by the sun's cascades and the spot/point atlas, so both bias alike.
-///
-/// It draws **front faces** (back faces culled), as Unity does, so the map holds each
-/// caster's lit side. Culling front faces instead stores the far side, whose bottom
-/// sits at the floor's own depth: any bias then lights a strip under every object's
-/// base (#665), and a single-sided `Plane` casts nothing. Acne on the lit faces now
-/// stored is held off by the sloped bias here plus the receiver's normal offset and
-/// depth bias (`sample_cascade` / `sample_local_shadow`).
-///
-/// A [`Facing::Cw`] pipeline draws casters whose world matrix has a negative
-/// determinant (#1134): mirroring reverses a mesh's winding, so it takes clockwise
-/// triangles as front and still stores the lit side. A [`Facing::Both`] one culls
-/// nothing, for a two-sided caster (#1571): both sides of a card or plane cast.
 pub(crate) fn depth_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -216,7 +178,7 @@ pub(crate) fn depth_pipeline(
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState {
-                constant: 2, // Sloped depth bias to prevent shadow acne
+                constant: 2,
                 slope_scale: 2.0,
                 clamp: 0.0,
             },

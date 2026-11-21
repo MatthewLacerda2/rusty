@@ -1,7 +1,3 @@
-//! The persistent active atlas on the GPU (#1711): a dynamic caster that enters a
-//! cached tile shows on its first frame and leaves no trace when it goes, and a
-//! light that blinks off and on re-bakes nothing. Skips with no adapter.
-
 use glam::Vec3;
 
 use super::static_tests::{bake, block, frame, lamp_room, RES};

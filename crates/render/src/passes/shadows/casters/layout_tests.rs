@@ -1,8 +1,5 @@
-//! The caster array's layout, pinned against the shadow stage's WGSL.
-
 use super::CasterData;
 
-/// `CasterData` against `shader.wgsl`'s `Caster`, its mapping terms included (#1594).
 #[test]
 fn the_caster_layout_matches_the_shadow_stage() {
     use crate::gpu::uniform_layout_tests::{assert_members, wgsl_struct_in};
@@ -22,8 +19,6 @@ fn the_caster_layout_matches_the_shadow_stage() {
     assert_members(found, "Caster", &pairs, size_of::<CasterData>());
 }
 
-/// `forward::mapping`'s `Mapping`, the caster's `terms`, against `MappingUniform`:
-/// a swapped member would pass every forward test and break only the shadow clip.
 #[test]
 fn the_caster_mapping_terms_match_the_mapping_uniform() {
     use crate::gpu::uniform_layout_tests::{assert_members, wgsl_struct_in};
