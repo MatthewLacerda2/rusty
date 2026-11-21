@@ -59,7 +59,7 @@ pub(crate) struct ForwardPasses {
     pub navmesh: NavMeshGizmo,
     /// The selection outline's mask and edge pipelines (#1175).
     pub outline: crate::passes::outline::OutlinePasses,
-    pub prepass_pipeline: pipelines::FacedPipeline,
+    pub prepass_pipeline: pipelines::PrepassPipelines,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 
@@ -277,6 +277,7 @@ fn create_forward_passes(
         &textures.material_layout,
         shadow_layout,
     );
+    pl.prepass.prime();
 
     ForwardPasses {
         render_pipeline: pl.forward,
