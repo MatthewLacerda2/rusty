@@ -21,6 +21,13 @@ import subprocess
 import sys
 
 TREE = ["cargo", "tree", "--locked", "--features", "dev", "-f", "{p} [{f}]", "--prefix", "none"]
+GUIDE = ("docs/testing.md", "## Build and test share one dependency graph")
+POLICY = ("tools/lint/src/layers/externs/policy.rs", "unscoped:")
+ADVICE = (
+    "  A dev-dependency turns on a feature the normal build lacks, so `cargo test`\n"
+    "  rebuilds the crate and everything above it. Name the feature on the normal\n"
+    "  dependency, as a pin no code uses listed in `unscoped` with its reason\n"
+    f"  ({POLICY[0]}); {GUIDE[0]}, *{GUIDE[1][3:]}*.")
 LINE = re.compile(r"^(\S+ v\S+)(?: \([^)]*\))? \[([^\]]*)\]")
 
 
@@ -52,9 +59,7 @@ def main() -> int:
     for crate, extra in found.items():
         print(f"feature-split: {crate}: the test build adds {', '.join(sorted(extra))}")
     if found:
-        print("  A dev-dependency turns on a feature the normal build lacks, so `cargo test`")
-        print("  rebuilds the crate and everything above it. Name the feature on the normal")
-        print("  dependency (see getrandom in Cargo.toml, #552) — docs/testing.md.")
+        print(ADVICE)
         return 1
     print("feature-split: ok")
     return 0

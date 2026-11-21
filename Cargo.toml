@@ -127,7 +127,7 @@ path = "tests/main.rs"
 [features]
 default = ["editor"]
 # The agentic dev layer: harness, scenario runner, console REPL, Debug.* Lua API.
-dev = ["rusty-shell/dev", "rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-lighting/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev", "dep:getrandom"]
+dev = ["rusty-shell/dev", "rusty-editor?/dev", "dep:rusty-dev", "rusty-dev/dev", "rusty-render/dev", "rusty-app/dev", "rusty-script/dev", "rusty-ai/dev", "rusty-navigation/dev", "rusty-physics/dev", "rusty-lighting/dev", "rusty-edit/dev", "rusty-scene/dev", "rusty-shadergen/dev", "rusty-asset/dev", "rusty-core/dev"]
 # The egui editor (#431): `rusty-editor` (`crates/editor/`) and the shell's editor frontend. Default-on so
 # `cargo run` opens the editor; a shipped player builds with `--no-default-features`.
 editor = ["rusty-shell/editor", "dep:rusty-editor", "rusty-editor/editor", "rusty-render/editor", "rusty-app/editor", "rusty-physics/editor", "rusty-shadergen/editor", "rusty-asset/editor", "rusty-core/editor"]
@@ -233,7 +233,11 @@ env_logger = { version = "0.11.3", default-features = false }
 log = "0.4.22"
 pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
-serde_json = "1.0.120"
+# `float_roundtrip`: a number written and read back is the same `f64`, bit for bit,
+# so a stored document (a scene, a bench report a later run compares with) reads
+# back what was saved. The default parser can land one ulp off. Named for every build,
+# so the player parses saved floats exactly as `dev` builds do.
+serde_json = { version = "1.0.120", features = ["float_roundtrip"] }
 # Font parsing, metrics and glyph outlines for UI `Text` (#419, #1328), and its shaping
 # (ligatures, marks, kerning). Direct, not through egui: egui is editor-only (#431) and
 # the player needs text. Both are already in the editor build through epaint: same
@@ -267,27 +271,11 @@ symphonia = { version = "0.6", default-features = false, features = ["mp3", "ogg
 # this pin on purpose. No I/O inside it: rusty writes the files and resolves patch
 # references. Bump the rev in its own PR and record the new SYNTH_VERSION there.
 zimmer = { package = "scorsese-zimmer", git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
-# The provider boundary (#383): scorsese's providers crate — the key resolver, the
-# budget ceiling, dated price tables and the vendors' HTTP client (`ureq` + `rustls`)
-# — behind `crates/dev/src/providers/`. Optional and enabled only by `dev`, so ship and
-# player builds carry no HTTP client. Same rev as zimmer, which it depends on:
-# move the two pins together, or the tree gains a second zimmer.
-scorsese-providers = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
-# Its core crate, named directly for one function: `hash_bytes` (sha256 → hex), the
-# hasher scorsese names its bakes and briefs with, so a generated asset's address
-# (#384) is the same answer in both trees. Already in the lockfile through the line
-# above; same rev, same `dev` gate. Nothing of its `Project` model is used.
-scorsese-core = { git = "https://github.com/MatthewLacerda2/scorsese", rev = "4bd8c840ef991cb124357bb60484fc40a74b8730" }
 # Open Image Denoise, opened at run time (#1884, `crates/dev/src/bake/denoise/`): the
 # lightmap bake's trained denoiser is a native library a machine may lack, so it is
 # `dlopen`ed, never linked, and a bake without it filters. Already in the tree
 # through wgpu; same version. `dev` only: a shipped game never bakes.
 libloading = { version = "0.8.9" }
-# Named only to close a feature split (docs/testing.md, *Build and test share one
-# dependency graph*): scorsese-providers' `zip` brings getrandom 0.4 into the `dev`
-# build without `std`/`sys_rng`, which a test-only crate (`rand`) turns on, so
-# `cargo test` would build its own copy of everything above it. Never `use`d.
-getrandom = { version = "0.4.3", features = ["std", "sys_rng"] }
 # The editor's Dock icon (#669): winit has no window icon on macOS, so it is set on
 # `NSApplication`. The same versions arboard already brings into the tree.
 objc2 = "0.6.4"
@@ -337,8 +325,6 @@ rusty-asset = { workspace = true }
 rusty-core = { workspace = true }
 rusty-font = { workspace = true }
 rusty-time = { workspace = true }
-# A feature pin, never `use`d: why is beside its version above.
-getrandom = { workspace = true, optional = true }
 
 [build-dependencies]
 xxhash-rust = { workspace = true }
@@ -377,21 +363,6 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 opt-level = 2
 debug = false
-
-# dev only: the authoring-time provider stack (`crates/dev/src/providers/`); tests
-# reach it on small inputs (voice ids, speech models, hashes), and no frame calls it.
-[profile.dev.package.scorsese-core]
-opt-level = 0
-[profile.dev.package.scorsese-providers]
-opt-level = 0
-[profile.dev.package.rustls]
-opt-level = 0
-[profile.dev.package.ureq]
-opt-level = 0
-[profile.dev.package.ureq-proto]
-opt-level = 0
-[profile.dev.package.zip]
-opt-level = 0
 
 # window and clipboard protocol: only `crates/shell` opens an event loop, which no
 # test does, and it marshals events; no draw runs through it.
@@ -436,8 +407,6 @@ opt-level = 0
 [profile.dev.package.wayland-scanner]  # host-only
 opt-level = 0
 [profile.dev.package.zerocopy-derive]  # host-only, via zerocopy
-opt-level = 0
-[profile.dev.package.zeroize_derive]  # host-only, via zeroize
 opt-level = 0
 
 # `make bench-scenes PROFILE=1`: a release build whose line tables let a sampling

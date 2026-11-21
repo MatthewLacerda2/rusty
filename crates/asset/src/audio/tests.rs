@@ -15,10 +15,14 @@ fn tone(i: usize) -> f32 {
     0.5 * (TAU * 440.0 * i as f32 / RATE as f32).sin()
 }
 
-fn converted(name: &str) -> DecodedAudio {
-    let dest = rusty_test_support::temp::dir().join(name);
-    import_mp3_bytes(std::fs::read(FIXTURE).unwrap(), &dest).expect("the MP3 converts");
-    decode_file(dest.to_str().unwrap()).expect("the WAV decodes")
+/// The fixture copied into `folder`, a fresh one of the temp dir, and converted by
+/// [`refresh`].
+fn converted(folder: &str) -> DecodedAudio {
+    let dir = rusty_test_support::temp::dir().join(folder);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::copy(FIXTURE, dir.join("tone.mp3")).unwrap();
+    assert_eq!(refresh(&dir).converted.len(), 1, "the MP3 converts");
+    decode_file(dir.join("tone.wav").to_str().unwrap()).expect("the WAV decodes")
 }
 
 /// Without the trim the decode is 22050 + encoder delay (~1105) + padding frames.
@@ -31,7 +35,7 @@ fn an_mp3_decodes_to_exactly_the_frames_that_were_encoded() {
 
 #[test]
 fn a_converted_mp3_is_a_wav_of_the_same_length_rate_and_signal() {
-    let audio = converted("rusty_import_tone.wav");
+    let audio = converted("rusty_import_tone");
     assert_eq!((audio.channels, audio.sample_rate), (1, RATE));
     assert_eq!(audio.frames(), FRAMES);
     // Aligned with the source sample for sample: the delay is gone, not shifted.
@@ -45,7 +49,7 @@ fn a_converted_mp3_is_a_wav_of_the_same_length_rate_and_signal() {
 /// ordinary step of the tone, and neither end is padded with silence.
 #[test]
 fn a_converted_loop_has_no_silence_at_the_seam() {
-    let audio = converted("rusty_import_loop.wav");
+    let audio = converted("rusty_import_loop");
     let s = &audio.samples;
     let max_step = (0.5 * TAU * 440.0 / RATE as f32) + 0.02;
     let seam = (s[0] - s[s.len() - 1]).abs();

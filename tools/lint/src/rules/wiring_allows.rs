@@ -16,19 +16,13 @@ fn kept(repo: &Repo, name: &str, path: &str) -> usize {
 
 /// The rules nothing may excuse, said here apart from `RULES`' `Allow` column so
 /// that switching a row's mode disagrees with it.
-const UNEXCUSABLE: &[&str] = &[
-    "fold-names",
-    "ignored",
-    "key-guard",
-    "orphan-seeds",
-    "root-tests",
-];
+const UNEXCUSABLE: &[&str] = &["fold-names", "ignored", "orphan-seeds", "root-tests"];
 
 /// Every row's `Allow` is the one meant: an inline allow above its must-flag
 /// finding excuses it (through the shared filter, or as an `Own` rule reads it)
 /// unless the rule is [`UNEXCUSABLE`], and only a `Never` row's survives it. A
 /// manifest's or a seed file's finding is one the shared filter cannot read, so
-/// `Inline` on `key-guard` fails the second half.
+/// `Inline` on `orphan-seeds` fails the second half.
 #[test]
 fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
     let mut broken = Vec::new();

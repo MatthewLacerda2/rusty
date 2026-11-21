@@ -7,6 +7,7 @@ Canned `cargo tree -f '{p} [{f}]' --prefix none` output, so these run offline.
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 import feature_split
 
@@ -37,6 +38,14 @@ class Splits(unittest.TestCase):
         crates = feature_split.resolution(NORMAL)
         self.assertEqual(crates["rusty v0.1.0"], {"default", "dev", "editor"})
         self.assertEqual(crates["getrandom v0.3.4"], set())
+
+
+class Advice(unittest.TestCase):
+    def test_the_failure_message_points_at_what_exists(self):
+        root = Path(__file__).resolve().parents[3]
+        for path, anchor in (feature_split.GUIDE, feature_split.POLICY):
+            self.assertIn(path, feature_split.ADVICE)
+            self.assertIn(anchor, (root / path).read_text(), path)
 
 
 if __name__ == "__main__":

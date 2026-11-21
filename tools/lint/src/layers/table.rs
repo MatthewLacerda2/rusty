@@ -195,7 +195,7 @@ pub const LAYERS: &[Layer] = &[
         "pollster",
         "wgpu",
     ]),
-    // The dev-only Lua namespaces (`Debug.*`, the provider ones) bind here because
+    // The dev-only Lua namespaces (`Debug.*`, the bake verbs) bind here because
     // `api` is sim and may not import `dev` (#737); the harness drives the VM too.
     platform(
         "dev",
@@ -225,8 +225,6 @@ pub const LAYERS: &[Layer] = &[
         "mach2",
         "mlua",
         "pollster",
-        "scorsese_core",
-        "scorsese_providers",
     ]),
     platform(
         "editor",

@@ -127,8 +127,6 @@ mod player_controller;
 #[cfg(feature = "dev")]
 mod project_open;
 #[cfg(feature = "dev")]
-mod provider_keys;
-#[cfg(feature = "dev")]
 mod reparent_bounds;
 #[cfg(feature = "dev")]
 mod scenario_api;

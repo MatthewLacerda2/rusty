@@ -142,10 +142,6 @@ manifest, the row, then the compiler names every path left to fix.
   script moves with the code that reads its variables (`crates/core/build.rs`).
 
 ## Features
-- **A crate whose manifest names `rusty-dev`** (a dependency or dev-dependency) expands
-  `rusty_dev::no_provider_keys!();` once in its tests, under `#[cfg(all(test,
-  feature = "dev"))]` (`key-guard` checks one expansion per such package, a sample:
-  the `read-keys` lint and the `NEXTEST` backstop are what keep a key out of a test).
 - A crate holding `cfg(feature = "dev")` or `"editor"` code declares that feature
   itself, and the root's feature turns it on directly (`dev = ["rusty-core/dev", …]`).
   A crate with none declares none, even beside a sibling that has one: the root
@@ -163,14 +159,14 @@ manifest, the row, then the compiler names every path left to fix.
   behind the same feature.
 - The player (`--no-default-features`) must still build without egui and without
   `dev`, and must not *link* them: `make player-tree` fails when its resolution
-  reaches `egui*`, `rusty-editor`, `rusty-dev` or the providers' HTTP client.
+  reaches `egui*`, `rusty-editor` or `rusty-dev`.
 
 ## Profiles
 - `[profile.dev.package."*"]` optimises dependencies only, never a member, so a
   crate keeps the edit-loop's opt-level 0.
 - A dependency no test or frame runs hot gets its own `[profile.dev.package.<name>]`
-  table back at opt-level 0, under its group's reason: the dev-only provider stack,
-  the window and clipboard protocol crates, and host-only proc macros and build
+  table back at opt-level 0, under its group's reason: the window and clipboard
+  protocol crates, and host-only proc macros and build
   helpers that only dependencies use. A host-only crate a member derives through
   stays optimised, since it runs on every rebuild of the edit loop; the comment above
   `[profile.dev]` in the root `Cargo.toml` lists them. `make scripts`

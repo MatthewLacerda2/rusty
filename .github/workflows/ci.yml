@@ -521,9 +521,8 @@ jobs:
       # Only the `dev` suite and the `dev` doctests run here (#1976, #2276),
       # where `build-test` runs both feature sets. What this leg proves is Metal
       # and the platform, and the `dev` build compiles and tests a superset of
-      # the default one: on 2026-11-09 the default list held one test the `dev`
-      # list did not (`a_ship_build_has_no_speech_namespace`, a Lua check with
-      # no platform code); no `cfg` pairs `target_os` with `not(feature =
+      # the default one: the default list holds no test the `dev` list lacks;
+      # no `cfg` pairs `target_os` with `not(feature =
       # "dev")`; and the runtime `cfg!(feature = "dev")` branches
       # (`core::project::prepare`, `core/project/agent_tests.rs`) write files,
       # with no platform code. So the default library, its test targets, its

@@ -71,12 +71,3 @@ fn load_entity_script_missing_file_returns_error() {
     assert!(result.is_err(), "missing file must error");
     assert!(result.unwrap_err().contains("Script file not found"));
 }
-
-// `Speech` and `Sfx` spend money, so they are `dev` extensions (#386, #388): a ship
-// build has neither table.
-#[cfg(not(feature = "dev"))]
-#[test]
-fn a_ship_build_has_no_speech_namespace() {
-    assert_eq!(live_manager().eval("type(Speech)").unwrap(), "nil");
-    assert_eq!(live_manager().eval("type(Sfx)").unwrap(), "nil");
-}

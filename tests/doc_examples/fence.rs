@@ -5,7 +5,7 @@
 pub enum Mode {
     /// Plain ```lua: compiled and run in a fresh headless session.
     Run,
-    /// ```lua no-run: compiled only (it writes files, calls a provider, or leans on
+    /// ```lua no-run: compiled only (it writes files or leans on
     /// game-side helpers the doc doesn't define).
     NoRun,
     /// ```lua ignore: not Lua at all (a shape sketch with `|` or `...`); skipped.

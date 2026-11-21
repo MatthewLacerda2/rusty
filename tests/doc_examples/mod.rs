@@ -6,7 +6,7 @@
 //! Each ```lua block runs in a fresh headless edit-mode session, the setup the drift
 //! gate uses. Its fence says how (see `docs/api/index.md`, *Examples run*):
 //! - ```lua — compiled and run; it must not raise.
-//! - ```lua no-run — compiled only: it writes files, calls a provider, or leans on
+//! - ```lua no-run — compiled only: it writes files or leans on
 //!   game-side helpers the doc leaves out.
 //! - ```lua ignore — not Lua (a shape sketch); skipped.
 //! - `with=a,b:Canvas+Image` — entities the block uses but doesn't create, made

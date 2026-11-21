@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""`player_tree.py` — the shipped player links no editor, no dev layer, no HTTP client.
+"""`player_tree.py` — the shipped player links no editor and no dev layer.
 
 A shipped game is the `player` binary built `--no-default-features` (CLAUDE.md,
 *The editor is a feature too* and *Dev-only build profile*). Clippy on that
@@ -25,8 +25,6 @@ BANNED = {
     "egui*": "the editor's UI (`editor` feature)",
     "rusty-editor": "the editor crate (`editor` feature)",
     "rusty-dev": "the agentic dev layer (`dev` feature)",
-    "scorsese-providers": "the provider boundary (`dev` feature, docs/providers.md)",
-    "ureq": "the providers' HTTP client (`dev` feature): a shipped game makes no network call",
 }
 NAME = re.compile(r"^(\S+) v\S+")
 

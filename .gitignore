@@ -23,7 +23,7 @@ ehthumbs.db
 
 #Project Specifics
 auxmd.md
-# Provider keys (#383): yours, never committed. `.env.example` names the variables.
+# A local secrets file: yours, never committed.
 .env
 # A developer's local game project: what every binary opens when no `--project`
 # is given (#829). Games live in their own folders and repos, never in this one.
