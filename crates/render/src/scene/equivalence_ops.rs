@@ -98,8 +98,11 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         }),
         R::Lightmap(i, l) => on(scene, pick(scene, i), |s, id| match l {
             0 => drop(s.lightmaps.remove(id)),
-            1 => drop(s.lightmaps.lights.insert(id)),
-            2 => drop(s.lightmaps.lights.remove(&id)),
+            1 => s.lightmaps.took_in_baked(id),
+            2 => {
+                s.lightmaps.lights.remove(&id);
+                s.lightmaps.baked_as.remove(&id);
+            }
             _ => s.lightmaps.insert(LightmapEntry {
                 entity: id,
                 page: 0,

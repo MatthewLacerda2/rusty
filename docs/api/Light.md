@@ -184,9 +184,13 @@ whether it is drawn live:
   then hold at any distance, it still glints on glossy surfaces, and a dynamic
   enemy under it still casts a realtime shadow. The light that should cast sharp
   shadows on actors. Details below.
-- `Baked` — **the default** for a light made any way that names no mode (the
-  Create menu, Add Component, `Scene.CreateEntity`, a scene or prefab file whose
-  light has no `mode`). Unity's default is `Realtime`; rusty's levels are lit by
+- `Baked` — **the default** for a light made in edit mode any way that names no
+  mode (the Create menu, Add Component, `Scene.CreateEntity`, `Scene.AddComponent`,
+  a scene or prefab file whose light has no `mode`). A light created **while the
+  game plays** (`Scene.CreateEntity` or `Scene.AddComponent` during Play: a muzzle
+  flash) is `Realtime` instead, as in Unity: no bake can take in a light the
+  edit-mode scene never held. A prefab instantiated at runtime keeps the mode its
+  file says. Unity's default is `Realtime`; rusty's levels are lit by
   their bake, so a light is `Baked` unless it must move, flash or switch at
   runtime, and then it says `Realtime` (`SetMode`). Once baked it costs nothing at
   runtime: it is never drawn live. Static
@@ -198,17 +202,23 @@ whether it is drawn live:
   Scale In Lightmap `0` ([`Lighting`](Lighting.md#generate-lighting)) takes it from the
   probes, as a dynamic object does.
 
-  **Before its bake.** A `Baked` lamp or sun no lightmap bake has taken in yet (one
-  added or made `Baked` since the last `Lighting.Generate()` or
-  `Lighting.BakeLightmaps()`, or any in a scene never baked) is **drawn live as a
-  preview** in the editor and in any dev build (the harness, a bench), as a `Mixed`
-  light draws before its bake: live direct light and shadows. A shipped `player`
-  draws what the bake holds, so there it lights nothing. Either way the console
-  names the waiting lights once (`[Lighting] N Baked lights wait for a bake (…)`),
-  and again whenever another one starts waiting. Unity, with *Auto Generate* off,
+  **Before its bake.** A `Baked` lamp or sun whose direct light no bake holds (one
+  added since the last Generate Lighting, one in a scene never baked, or one baked
+  as `Mixed`, which holds only its bounce, and made `Baked` since) is **drawn live
+  as a preview** in the editor and in any dev build (the harness, a bench), as a
+  `Mixed` light draws before its bake: live direct light and shadows. A shipped
+  `player` draws what the bake holds, so there it lights nothing. Either way the
+  console names the waiting lights once per scene (`[Lighting] N Baked lights wait
+  for a bake (…)`), whatever their activity or intensity does after; a bake or
+  another scene names afresh what still waits. In the player the line says the
+  scene shipped without a bake that covers them. Unity, with *Auto Generate* off,
   draws such a light not at all until a bake; rusty has no background auto-bake,
-  so it previews instead of going dark. `Probe.Bake()` alone records no light,
-  so a lamp only the probes hold is still previewed; Generate Lighting ends it.
+  so it previews instead of going dark. Every lightmap bake (`Lighting.Generate()`,
+  `Lighting.BakeLightmaps()`) records what it made of each light it took in, even
+  a scene with no lightmapped mesh whose probes alone hold the light; a `Mixed`
+  light a `Shadowmask` bake found no channel for was baked direct, and is not
+  previewed. `Probe.Bake()` alone records no light, so a lamp only it holds is
+  still previewed; Generate Lighting ends it.
   An Area light (always `Baked`) is never previewed: a panel has no live path.
 
   **Its highlight** (#1695 step 1). A lightmap holds a `Baked` light's diffuse light only, so

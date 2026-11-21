@@ -93,7 +93,7 @@ fn a_new_light_is_baked_and_waits_for_a_bake_until_one_takes_it_in() {
     assert_eq!(scene.drawn_mode(lamp, &light, true), LightMode::Mixed);
     assert_eq!(scene.drawn_mode(lamp, &light, false), LightMode::Baked);
     assert_eq!(scene.lights_awaiting_bake(), vec![lamp]);
-    scene.lightmaps.lights.insert(lamp);
+    scene.lightmaps.took_in_baked(lamp);
     assert!(!scene.awaits_bake(lamp, &light), "a bake took it in");
     assert_eq!(scene.drawn_mode(lamp, &light, true), LightMode::Baked);
     assert!(scene.lights_awaiting_bake().is_empty());

@@ -44,7 +44,7 @@ fn baked_suns_take_no_slot_so_never_count_as_dropped() {
         };
         scene.world.set_light(id, Some(sun));
         if mode == LightMode::Baked {
-            scene.lightmaps.lights.insert(id); // a bake took it in
+            scene.lightmaps.took_in_baked(id); // a bake took it in
         }
     }
     // Four live suns fill the four slots; the two baked ones never wanted one.

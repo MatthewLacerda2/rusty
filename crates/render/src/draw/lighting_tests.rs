@@ -16,7 +16,9 @@ fn one_per_mode(light_type: LightType) -> Scene {
     let baked = (scene.world.ids_with_light().into_iter())
         .filter(|&id| scene.world.light(id).unwrap().mode == LightMode::Baked);
     let baked: Vec<u32> = baked.collect();
-    scene.lightmaps.lights.extend(baked);
+    baked
+        .into_iter()
+        .for_each(|id| scene.lightmaps.took_in_baked(id));
     scene
 }
 

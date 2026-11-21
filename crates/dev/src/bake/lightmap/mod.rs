@@ -218,6 +218,8 @@ fn average_texels(texels: impl Iterator<Item = [u8; 3]>, encoding: MapEncoding) 
 }
 
 #[cfg(test)]
+mod covered_tests;
+#[cfg(test)]
 mod fits_tests;
 #[cfg(test)]
 mod job_tests;

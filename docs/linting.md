@@ -71,6 +71,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | One atomic write | `tools/lint -- --rules` (`atomic-write`) | **hard gate**: no line of `src/` outside `crates/core/src/fs/` names `fs::rename` — a file a reader may open is written through `core::fs::write_atomic` (or its unsynced twin `write_cache`, for a cache the engine re-makes); a rename that moves rather than writes takes `// lint: allow(atomic-write) <why>` (#1129) |
 | One counted GPU path | `tools/lint -- --rules` (`gpu-ops`) | **hard gate**: outside `crates/render/src/gpu/ops.rs` and test code, no line of `crates/render/src/` calls wgpu's `.begin_render_pass(`, `.begin_compute_pass(`, `.submit(`, `.create_bind_group(`, `.write_buffer(` or `.write_texture(` — the renderer goes through `CountedEncoder` / `CountedQueue` / `CountedDevice`'s `counted_*` helpers, which feed the frame's `render_passes`, `compute_passes`, `submits`, `bind_groups_created` and `buffer_writes` rows (#2341), and a texture write's bytes to the staging bound, `Staging` (#2372) |
 | One dependency graph | `make feature-split` (`.github/scripts/feature_split.py`) | **hard gate**: no dev-dependency turns on a feature the normal build lacks, so `cargo test` never rebuilds a shared crate (#552, #979; `docs/testing.md`) |
+| One drawn light mode | `tools/lint -- --rules` (`drawn-mode`) | **hard gate**: outside `crates/render/src/clusters/unbaked.rs` and test code, no line of `crates/render/src/` calls `light_mode(` — a pass reads what a light is drawn as from `clusters::drawn_mode`, which previews a `Baked` light no bake holds yet; the bake crates read the light's own mode (#2522) |
 | One fullscreen triangle | `tools/lint -- --rules` (`fullscreen-triangle`) | **hard gate**: no `.wgsl` under `engine/` but `fullscreen.wgsl` spells the triangle's `(i << 1u) & 2u`; `#import fullscreen` and call `fullscreen::triangle` / `uv` (#1370) |
 | One logger a test binary | `tools/lint -- --rules` (`one-logger`) | **hard gate**: a package whose manifest names `rusty-logging` never names `rusty_test_support::logs`; its tests read warnings through `rusty_logging::init_for_tests` and `rusty_logging::forward` |
 | One name table per enum | `tools/lint -- --rules` (`named-enum`) | **hard gate**: no file of `src/` hand-writes both a parse (`fn parse(_: &str) -> Option<Self>` in an `impl T`, or a free `fn parse_*(_: &str) -> Option<T>`) and a name (`fn name`/`fn as_str(self) -> &'static str`, or a free `fn *_name(_: T) -> &'static str`) for one type, nor a `const`/`static` table of `(T, &str)` pairs — a script-facing enum declares its names once with `core::named_enum!`, which writes `ALL`, `name`, a case-insensitive `parse`, `Display` and its serde (#1478); a parse that does more takes `// lint: allow(named-enum) <why>` (#1329) |
@@ -519,6 +520,14 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   `editor::widgets::slider`, which clamp only what the user edits. The helpers
   themselves carry the inline allow; any other need takes
   `// lint: allow(drag-range) <why>` (`rules/drag_range.rs`).
+- **`drawn-mode`** (#2522) — a `Baked` light no bake holds yet is previewed live
+  in the editor and dev builds and drawn from its bake in a shipped player, and
+  `Scene::light_mode` knows neither. A pass that read it would draw such a light
+  dark (or unshadowed) where every other pass draws it lit, so a non-test line of
+  `crates/render/src/` outside `clusters/unbaked.rs` that calls `light_mode(` fails,
+  naming `crate::clusters::drawn_mode` to read instead. The bake crates are out of
+  scope: a bake decides from a light's own mode. The match is lexical
+  (`rules/drawn_mode.rs`): a longer name ending in `light_mode(` passes.
 - **`ecs-write`** (#1705) — the change log (`ecs::changes`) reports a write only
   because the write funnel calls `World::touch` (or `touch_entity`) on its way in.
   `World::inner` is visible to all of `crates/ecs/src/`, so a raw `self.inner.get::<&mut T>`

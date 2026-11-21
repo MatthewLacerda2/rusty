@@ -27,7 +27,7 @@ fn gpu_a_sun_going_live_mid_play_shadows_on_its_first_frame() {
     scene.world.set_static(slab, true);
     // A bake took the sun in, so while Baked it is drawn no more (#2522).
     let sun = scene.world.find_by_name("Sun").expect("the sun");
-    scene.lightmaps.lights.insert(sun);
+    scene.lightmaps.took_in_baked(sun);
 
     let (_, cascades, drawn) = under_slab(&mut r, &mut scene, LightMode::Baked);
     assert_eq!(

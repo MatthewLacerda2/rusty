@@ -174,10 +174,13 @@ does the same for a texture, model or shader file.
 ## Lights are baked unless they must change
 
 A new light is `Baked` (`docs/api/Light.md`, *Mode*): a level is lit by its bake
-(`Lighting.Generate()`), and a baked light costs nothing at runtime. Give a light
+(`Lighting.Generate()`), and a baked light costs nothing at runtime. Give a level's light
 `Light.SetMode(id, "Realtime")` only when it must move, flash or switch while the game
-runs (a muzzle flash, a flashlight, an alarm), and `"Mixed"` when a live light should
-also bounce from the bake. Until a bake takes a `Baked` light in, the editor and the
+runs (a flashlight, an alarm), and `"Mixed"` when a live light should also bounce from
+the bake. A light a script creates while the game plays (a muzzle flash through
+`Scene.CreateEntity` or `Scene.AddComponent`) is `Realtime` already; a prefab
+instantiated at runtime keeps the mode its file says, so a prefab spawned in play
+names `Realtime` for its lights. Until a bake takes a `Baked` light in, the editor and the
 harness preview it live and the console names it; a shipped game draws it dark. So
 bake before you judge a level's look, and read the console for lights waiting on one.
 

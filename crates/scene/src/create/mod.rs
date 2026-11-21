@@ -38,8 +38,24 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
         scene.world.set_collider(id, collider);
     } else if let Some(light) = primitive::primitive_light(primitive) {
         scene.world.set_light(id, Some(light));
+        live_in_play(scene, id);
     }
     id
+}
+
+/// Make entity `id`'s light `Realtime` when it was created during Play (#2522):
+/// no bake can take in a light the edit-mode scene never held, so a `Baked` one
+/// made at runtime (a muzzle flash) would light nothing in a shipped game. As in
+/// Unity, a light made at runtime is live. In edit mode it keeps the default,
+/// `Baked`. `Scene.CreateEntity` and `Scene.AddComponent` both come through here;
+/// a prefab instantiated at runtime keeps what its file says.
+pub fn live_in_play(scene: &mut Scene, id: u32) {
+    if !scene.is_playing() {
+        return;
+    }
+    if let Some(mut light) = scene.world.light_mut(id) {
+        light.mode = rusty_components::LightMode::Realtime;
+    }
 }
 
 /// [`create_entity`] without the collider a mesh primitive comes with: a part the

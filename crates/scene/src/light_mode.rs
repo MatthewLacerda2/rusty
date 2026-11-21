@@ -15,16 +15,18 @@ impl Scene {
         self.lightmaps.baked_mode(id, light.effective_mode())
     }
 
-    /// Whether light `id` is a `Baked` lamp or sun that no lightmap bake has taken
-    /// in yet (#2522, `LightmapSet::baked_light`): added since the last bake, made
-    /// `Baked` since, or in a scene never baked. It lights nothing until Generate
-    /// Lighting, unless the frame previews it ([`Self::drawn_mode`]). An Area light
-    /// is always `Baked` and never previewed (a panel has no live path), and an
-    /// Ambient one is the sky's.
+    /// Whether light `id` is a `Baked` lamp or sun whose direct light no bake holds
+    /// (#2522, `LightmapSet::bakes_direct`): one added since the last bake, one in
+    /// a scene never baked, and one baked as `Mixed` (its bounce alone) and made
+    /// `Baked` since. It lights nothing until Generate Lighting, unless the frame
+    /// previews it ([`Self::drawn_mode`]). A `Mixed` light the shadowmask fell back
+    /// on was baked direct, so it does not wait. An Area light is always `Baked`
+    /// and never previewed (a panel has no live path), and an Ambient one is the
+    /// sky's.
     pub fn awaits_bake(&self, id: u32, light: &LightComponent) -> bool {
         !matches!(light.light_type, LightType::Area | LightType::Ambient)
             && self.light_mode(id, light) == LightMode::Baked
-            && !self.lightmaps.baked_light(id)
+            && !self.lightmaps.bakes_direct(id)
     }
 
     /// The mode the frame draws light `id` as: [`Self::light_mode`], but with
