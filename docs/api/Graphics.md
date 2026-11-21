@@ -112,7 +112,7 @@ set on that camera entity, in the inspector or the scene file.
 | `Graphics.GetSsilResolutionDivisor` / `SetSsilResolutionDivisor` | `()` / `(n)` | `number`: the `Custom` gather runs at the view's size over this (clamped 1–4, **default `2`**) |
 | `Graphics.GetSsilSamples` / `SetSsilSamples` | `()` / `(n)` | `number`: the `Custom` samples per texel (clamped 1–32, **default `8`**) |
 | `Graphics.GetSsrActive` / `SetSsrActive` | `()` / `(bool)` | `bool` |
-| `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.3`**: reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
+| `Graphics.GetSsrMinSmoothness` / `SetSsrMinSmoothness` | `()` / `(smoothness)` | `number`: HDRP's *Minimum Smoothness*, below which a surface keeps its probe or sky reflection (clamped 0–1, **default `0.7`**: reflects up to roughness 0.3, fully to 0.1; `0.3` reflects up to roughness 0.7, fully to 0.5; whole by smoothness 0.9 whatever the minimum; from `0.96` no surface reflects and SSR does not run) |
 | `Graphics.GetSsrQuality` / `SetSsrQuality` | `()` / `(name)` | which march it runs (**default `"Medium"`**; `"Low"` / `"Medium"` / `"High"` take the running preset's values, `"Custom"` the ones beside it; names are case-insensitive, an unknown one raises an error listing them; see *Quality presets*) |
 | `Graphics.GetSsrStepLength` / `SetSsrStepLength` | `()` / `(units)` | `number`: the `Custom` march's step, world units (clamped 0.05–2, **default `0.375`**) |
 | `Graphics.GetSsrSteps` / `SetSsrSteps` | `()` / `(n)` | `number`: the `Custom` march's step count (clamped 1–256, **default `32`**) |
@@ -460,8 +460,8 @@ Tween paths: `Graphics.volumetric_fog.mean_free_path`, `Graphics.volumetric_fog.
 **SSR** marches each smooth enough surface pixel's reflected ray against the scene and,
 where it hits something on screen, puts that in place of the sky or reflection probe
 the surface was reflecting. A surface reflects from its `min_smoothness` (HDRP's
-*Minimum Smoothness*, smoothness being 1 − roughness; default 0.3, so roughness 0.7)
-and all of it from 0.2 of smoothness above that (roughness 0.5 by default), or from
+*Minimum Smoothness*, smoothness being 1 − roughness; default 0.7, so roughness 0.3)
+and all of it from 0.2 of smoothness above that (roughness 0.1 by default), or from
 0.9 when that comes sooner (HDRP's default *Smoothness Fade Start*: a `min_smoothness`
 of 0.8 fades in over 0.1); from 0.96, the smoothest any surface gets (roughness is at
 least 0.04), no surface reflects and the view runs no SSR at all. It is weighted

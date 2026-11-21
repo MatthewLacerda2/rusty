@@ -59,24 +59,32 @@ fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
     changed
 }
 
-/// One collapsing card per probe, and Add; returns whether anything changed.
+/// One collapsing card per probe, and Add; returns whether anything changed. The
+/// open card is the inspected probe (`Scene::inspected_reflection_probe`, its
+/// selection: the Scene view draws its volume), so one is open at a time, and
+/// `Editor.InspectReflectionProbe` opens it as a click does.
 fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
     let default = scene.lighting_settings.reflections.resolution;
-    let mut changed = false;
-    let mut remove = None;
-    for i in 0..scene.reflection_probes.len() {
+    let (mut changed, mut remove) = (false, None);
+    let count = scene.reflection_probes.len();
+    let inspected = scene.inspected_reflection_probe.filter(|&i| i < count);
+    scene.inspected_reflection_probe = inspected; // an Undo may have shortened the set
+    for i in 0..count {
         let mut probe = scene.reflection_probes.probes[i].clone();
-        let title = format!("Probe {i}");
-        let edited = egui::CollapsingHeader::new(title)
+        let card = egui::CollapsingHeader::new(format!("Probe {i}"))
             .id_salt(("reflection_probe", i))
+            .open(Some(inspected == Some(i)))
             .show(ui, |ui| {
                 if ui.button(format!("{}  Remove", icon::TRASH)).clicked() {
                     remove = Some(i);
                 }
                 draw_probe(ui, i, &mut probe, default)
-            })
-            .body_returned
-            .unwrap_or(false);
+            });
+        if card.header_response.clicked() {
+            let opened = inspected != Some(i);
+            scene.inspected_reflection_probe = opened.then_some(i);
+        }
+        let edited = card.body_returned.unwrap_or(false);
         if edited {
             // A hand edit makes it manual (#1737), unless the edit was unticking it.
             let was = &scene.reflection_probes.probes[i];
@@ -91,7 +99,7 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
         }
     }
     if let Some(i) = remove {
-        scene.reflection_probes.remove(i);
+        scene.remove_reflection_probe(i);
         changed = true;
     }
     if ui.button(format!("{}  Add probe", icon::PLUS)).clicked() {
@@ -253,3 +261,7 @@ fn resolution_menu(
         });
     changed
 }
+
+#[cfg(test)]
+#[path = "reflections_tests.rs"]
+mod tests;

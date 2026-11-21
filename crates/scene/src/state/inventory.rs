@@ -135,6 +135,8 @@ authored_fields!(scene_state {
         history_cuts: Frame, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;
+        // The editor's selection of a probe; an index, no entity.
+        inspected_reflection_probe: EditRuntime, No;
         meshes_read_at: Follow, No;
         meshes_reimported: Follow, No;
         disk_text: DiskRecord, No;

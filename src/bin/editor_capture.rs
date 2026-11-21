@@ -34,6 +34,9 @@ options (all optional):
   --select <name>     select this entity first (the Inspector shows its cards)
   --select-asset <p>  an asset file in the project to select first (its card)
   --frame             frame the selection in the Scene view (the F key)
+  --inspect-reflection-probe <i>
+                      inspect reflection probe i (0-based) first, as
+                      `Editor.InspectReflectionProbe` does: its volume draws
   --play              draw the Play-mode chrome (the sim is not stepped)
   --game              show the Game tab instead of the Scene tab
   --size <W>x<H>      capture size (default 1600x900)
@@ -126,6 +129,12 @@ struct Source {
     tick: u64,
 }
 
+/// `--inspect-reflection-probe`'s value: a 0-based probe index.
+fn index(text: &str) -> Result<usize, String> {
+    text.parse()
+        .map_err(|e| format!("--inspect-reflection-probe wants an index, got {text:?}: {e}"))
+}
+
 fn parse(args: &[String]) -> Result<Parsed, String> {
     let mut out = "editor-capture.png".to_string();
     let (mut source, mut opts, mut picker) =
@@ -164,6 +173,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
+            "--inspect-reflection-probe" => opts.inspect_reflection_probe = Some(index(&value()?)?),
             "--play" => opts.playing = true,
             "--game" => opts.tab = ViewportTab::Game,
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,

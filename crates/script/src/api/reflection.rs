@@ -75,11 +75,8 @@ fn register_list(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
         table,
         "Remove",
         lua.create_function(move |lua, index: u32| {
-            scene
-                .get(lua)?
-                .borrow_mut()
-                .reflection_probes
-                .remove(index as usize);
+            let scene = scene.get(lua)?;
+            scene.borrow_mut().remove_reflection_probe(index as usize);
             Ok(())
         }),
     )?;
@@ -88,7 +85,7 @@ fn register_list(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
         table,
         "Clear",
         lua.create_function(move |lua, ()| {
-            scene.get(lua)?.borrow_mut().reflection_probes.clear();
+            scene.get(lua)?.borrow_mut().clear_reflection_probes();
             Ok(())
         }),
     )?;

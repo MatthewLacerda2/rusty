@@ -69,6 +69,8 @@ pub struct EditorCaptureOptions {
     pub select_asset: Option<String>,
     /// Frame the selection in the Scene view first, as the F key does (#745).
     pub frame_selected: bool,
+    /// Inspect this reflection probe first, as `Editor.InspectReflectionProbe` does.
+    pub inspect_reflection_probe: Option<usize>,
     /// Draw the chrome as in Play mode (accent tint, floating console). The sim is
     /// not entered or stepped: this is the look, not a playtest.
     pub playing: bool,
@@ -93,6 +95,7 @@ impl Default for EditorCaptureOptions {
             select: None,
             select_asset: None,
             frame_selected: false,
+            inspect_reflection_probe: None,
             playing: false,
             tab: ViewportTab::Scene,
             pointer: None,
@@ -125,7 +128,8 @@ pub fn default_world(project: ProjectSource) -> GameWorld {
 }
 
 /// Capture the editor over `game`'s scene to a PNG at `path`: `Ok(false)` on a box with
-/// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, a missing
+/// no GPU/software adapter, `Err` for a `select` name the scene doesn't hold, an
+/// `inspect_reflection_probe` past its probes, a missing
 /// `select_asset` path, both selections at once, a `preview` whose selection has no
 /// Preview tab or whose written frame shows no rendered image, or an I/O / encode failure.
 pub fn capture(
@@ -246,6 +250,9 @@ fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi,
     let bounds = framed.and_then(|id| selection_bounds(&game.scene().borrow(), id));
     if let Some((center, radius)) = bounds {
         ui.scene_view.camera.frame(center, radius);
+    }
+    if let Some(index) = opts.inspect_reflection_probe {
+        game.scene().borrow_mut().inspect_reflection_probe(index)?;
     }
     preview::open(&mut ui, &game.scene().borrow(), opts.preview)?;
     Ok(ui)

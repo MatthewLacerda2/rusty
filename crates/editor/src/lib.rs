@@ -291,3 +291,7 @@ mod selection_tests;
 #[cfg(test)]
 #[path = "undo_tests.rs"]
 mod undo_tests;
+
+#[cfg(test)]
+#[path = "play_shortcut_tests.rs"]
+mod play_shortcut_tests;

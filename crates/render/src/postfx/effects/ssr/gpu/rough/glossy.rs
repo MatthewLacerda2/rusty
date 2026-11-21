@@ -1,12 +1,13 @@
 //! Glossy SSR (#1736): a satin floor (roughness 0.4) shows a soft reflection of the
 //! cube on it, which goes where the cube goes; a near-mirror (0.05) stays sharp; a
-//! floor rougher than 0.7 is left alone; and the pyramid follows a resize.
+//! floor rougher than the minimum is left alone; and the pyramid follows a resize.
 
-use super::super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, Surface};
+use super::super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, tuned, Surface};
 use super::super::fixture::{RED, REFLECTING, W};
 use crate::postfx::effects::ssr::pyramid::{hit_levels, levels};
 use crate::readback;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
+use rusty_components::Ssr;
 use rusty_scene::Scene;
 
 /// A white metal floor of `roughness`.
@@ -81,7 +82,28 @@ fn gpu_a_floor_rougher_than_the_minimum_smoothness_is_left_alone() {
         frame(&mut r, &shifted(true, 0.75, 0.0)),
         frame(&mut r, &shifted(false, 0.75, 0.0)),
     );
-    assert!(on == off, "roughness 0.75 gets no SSR at the default 0.3");
+    assert!(on == off, "roughness 0.75 gets no SSR at the fixture's 0.3");
+}
+
+/// The default *Minimum Smoothness* (0.7) leaves a roughness-0.5 floor its sky
+/// reflection, exactly as with SSR off; an explicit 0.3 reflects the cube on it.
+#[test]
+fn gpu_a_roughness_half_floor_takes_ssr_only_under_an_explicit_lower_minimum() {
+    let Some(mut r) = renderer() else { return };
+    let default = Ssr::default().min_smoothness;
+    let (stock, _) = tuned(true, metal(0.5), RED, |v| v.ssr.min_smoothness = default);
+    let (stock, lower, off) = (
+        frame(&mut r, &stock),
+        frame(&mut r, &shifted(true, 0.5, 0.0)),
+        frame(&mut r, &shifted(false, 0.5, 0.0)),
+    );
+    assert!(stock == off, "the default leaves roughness 0.5 to its sky");
+    let at = pixel(REFLECTING);
+    let (lower, off) = (redness(rgb(&lower, at)), redness(rgb(&off, at)));
+    eprintln!("[ssr] roughness-0.5 floor at a minimum of 0.3: {lower}, SSR off {off}");
+    // Measured: lavapipe `lower` -10, `off` -21 (a margin of 11); an RTX 2060
+    // (Vulkan) -12 and -23 (11). Not measured on Metal. A margin of 6 holds both.
+    assert!(lower >= off + 6, "0.3 reflects the red cube on it");
 }
 
 #[test]

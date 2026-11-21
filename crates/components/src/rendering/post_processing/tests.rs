@@ -84,3 +84,15 @@ fn every_field_but_the_listed_settings_is_an_effect_object() {
         );
     }
 }
+
+#[test]
+fn ssr_reflects_up_to_roughness_point_three_unless_a_file_says_otherwise() {
+    assert_eq!(load("{}").ssr.min_smoothness, 0.7, "a volume with no value");
+    assert_eq!(load(r#"{"ssr": {"active": true}}"#).ssr.min_smoothness, 0.7);
+    let stored = load(r#"{"ssr": {"min_smoothness": 0.3}}"#);
+    assert_eq!(
+        round_trip(&stored).ssr.min_smoothness,
+        0.3,
+        "a stored value stays"
+    );
+}

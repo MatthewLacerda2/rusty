@@ -6,8 +6,8 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use super::file::{decode, encode, occlusion_path, other_version, version_of, SUFFIX};
-use super::{OcclusionData, OCCLUSION_VERSION};
+use super::file::{encode, occlusion_path, read, Refusal, SUFFIX};
+use super::OcclusionData;
 use crate::io::Saved;
 use crate::Scene;
 
@@ -43,8 +43,10 @@ enum Read {
     Missing,
     Unreadable(std::io::Error),
     Refused(Vec<u8>, String),
-    /// Another bake version's file, refused by its version alone.
-    OtherVersion(Vec<u8>, u32),
+    /// Another bake version's file, refused by its version alone, and why
+    /// (`file::Refusal::OtherVersion`: older, newer, or `file::unversioned`'s
+    /// from before the version field).
+    OtherVersion(Vec<u8>, String),
     /// The file's bytes, what a save would write (encoded afresh: a file that does
     /// not round-trip byte for byte never reads as a bake since), and the PVS.
     Decoded(Vec<u8>, Vec<u8>, OcclusionData),
@@ -56,11 +58,9 @@ pub fn read_sidecar(scene_path: &str) -> OcclusionFile {
     let read = match std::fs::read(&path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(e) => Read::Unreadable(e),
-        Ok(bytes) => match decode(&bytes) {
-            Err(e) => match version_of(&bytes) {
-                Some(v) if v != OCCLUSION_VERSION => Read::OtherVersion(bytes, v),
-                _ => Read::Refused(bytes, e),
-            },
+        Ok(bytes) => match read(&bytes) {
+            Err(Refusal::OtherVersion(why)) => Read::OtherVersion(bytes, why),
+            Err(Refusal::Malformed(why)) => Read::Refused(bytes, why),
             Ok(data) => Read::Decoded(bytes, encode(&data), data),
         },
     };
@@ -90,8 +90,7 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
             );
             scene.bake_files.refused(&path, &bytes, &e)
         }
-        Read::OtherVersion(bytes, version) => {
-            let why = other_version(version);
+        Read::OtherVersion(bytes, why) => {
             log::warn!("[Occlusion] {} is {why}", path.display());
             scene.bake_files.refused(&path, &bytes, &why)
         }

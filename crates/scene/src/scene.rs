@@ -128,6 +128,13 @@ pub struct Scene {
     /// it keeps running at time scale 0, so a paused menu still animates. Written by
     /// the tick; `0` outside Play. Never serialized.
     pub ui_time: f32,
+    /// The reflection probe whose card the editor's scene inspector has open, by
+    /// index into `reflection_probes`: probes are no entities, so this is their
+    /// selection, the one whose volume the Scene view draws (Unity draws a probe's
+    /// bounds on selection). Set by opening its card, `Editor.InspectReflectionProbe`
+    /// (`Scene::inspect_reflection_probe`) and cleared by closing it,
+    /// `Editor.ClearInspectedReflectionProbe` or removing probes. Never serialized.
+    pub inspected_reflection_probe: Option<usize>,
     /// The exposure the screen's view applied last, in EV (#1444): its automatic
     /// exposure's adapted value, read back from the GPU a frame or so late and
     /// written by the frontend that renders the screen. `None` before an automatic
@@ -202,6 +209,7 @@ impl Default for Scene {
             debug_lines: Default::default(),
             shader_time: 0.0,
             ui_time: 0.0,
+            inspected_reflection_probe: None,
             #[cfg(feature = "dev")]
             screen_exposure: None,
             #[cfg(feature = "dev")]

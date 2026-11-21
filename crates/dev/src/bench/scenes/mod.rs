@@ -7,16 +7,12 @@
 //! [`FRAMES`] by `bench::measure_posed`, at 1920x1080 unless told otherwise, and
 //! the whole round is run [`Options::runs`] times (`measure`). The report
 //! ([`report`]) folds the viewpoints' rows, then the runs', into one (`fold`),
-//! each row with its run-to-run spread, and adds `load_ms` (the scene's load to
-//! its first rendered frame, wall clock, the renderer's start-up off the clock,
-//! repeated in fresh processes with its spread, the run's first load apart as
-//! `load_cold_ms`, its steps as `load.<step>` and what it did as
-//! `load.count.<what>`: [`load`](mod@load)), `import_ms` (`IMPORT=1`, once a run, on its first scene: the
-//! same load of a copy of the project without its import cache, [`import`]), `rss_peak_mb` (the process's peak resident
-//! memory, [`crate::memory`]), `gpu_mb` (the renderer's GPU memory,
-//! `rusty_render::gpu_memory`, with `gpu_allocated_mb`, what live allocations use,
-//! where the allocator tells it) and `gpu_texture_mb`, `gpu_lightmap_mb` and
-//! `gpu_reflection_mb` (the renderer's own resident bytes by kind), each compared with that scene's last run or a
+//! each row with its run-to-run spread, and adds the rows `docs/testing.md`'s
+//! `bench-scenes` list names: `load_ms` and its parts ([`load`](mod@load)),
+//! `import_ms` (`IMPORT=1`, [`import`]), `rss_peak_mb` ([`crate::memory`]), the
+//! GPU memory rows (`rusty_render::gpu_memory`, the renderer's own bytes by kind)
+//! and `level_lights` / `level_lights_live` (`notes::lights`), each compared with that scene's
+//! last run or a
 //! kept baseline (`Extra::baseline`). A run with `PROFILE=1` adds a sampling
 //! profile of the measured frames ([`profile`]), in a run of its own. The editor
 //! round ([`editor`], on unless `EDITOR=0`) adds the `editor.` frame rows and
@@ -189,6 +185,7 @@ pub fn bench(
     // then moves or destroys is the game's doing, not a stale bake.
     let loaded = harness.world.borrow().scene().borrow().id();
     let stale = harness.renderer().and_then(|r| r.stale_occlusion(loaded));
+    let lights = notes::lights(&harness.world.borrow().scene().borrow());
 
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let mut report = measure::all(&mut harness, probe.as_ref(), opts);
@@ -207,6 +204,7 @@ pub fn bench(
     if let Some(r) = harness.renderer() {
         push_gpu_memory(&mut report, r);
     }
+    notes::push_lights(&mut report, lights);
     let own = root.join(format!("assets/scenes/{scene}.scene"));
     report
         .warnings

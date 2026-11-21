@@ -31,6 +31,8 @@ pub struct SceneSnapshot {
     /// The edit-mode decals (#1518): runtime state `SceneData` does not carry, put
     /// back on Stop so the ones stamped in edit mode survive Play and Play's don't.
     decals: rusty_scene::decal::DecalSet,
+    /// The probe the edit scene's inspector had open: the document apply clears it.
+    inspected_reflection_probe: Option<usize>,
     /// The scene's identity (#355): a play-mode `Scene.Load` mints a new one, and
     /// Stop gives back the one Play started in, so a bake waiting for Stop still
     /// recognises the scene (#1374).
@@ -58,6 +60,7 @@ impl SceneSnapshot {
             data: to_scene_data(scene),
             probes: scene.probes.clone(),
             decals: scene.decals.clone(),
+            inspected_reflection_probe: scene.inspected_reflection_probe,
             id: scene.id(),
             disk_text: scene.disk_text(),
             occlusion: (*scene.occlusion).clone(),
@@ -73,6 +76,7 @@ impl SceneSnapshot {
     pub fn restore(self, scene: &mut Scene) {
         apply_world_data(scene, self.data);
         scene.decals.restore(self.decals);
+        scene.inspected_reflection_probe = self.inspected_reflection_probe;
         // Re-apply the baked SH the document-level apply dropped (it only carries
         // probe positions). Positions are identical, so this overwrites cleanly.
         scene.probes = self.probes;

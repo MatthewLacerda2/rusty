@@ -68,8 +68,11 @@ pub(super) fn tuned(
     let cam = scene.add_entity("Camera".to_string());
     scene.world.set_camera(cam, Some(Default::default()));
     let mut volume: PostProcessingComponent = default_post_processing();
+    // The tests prove SSR on rough surfaces too: `0.3` reflects up to roughness
+    // 0.7, where the default stops at roughness 0.3.
     volume.ssr = Ssr {
         active: on,
+        min_smoothness: 0.3,
         ..Default::default()
     };
     (volume.bloom.active, volume.ssao.active) = (false, false);

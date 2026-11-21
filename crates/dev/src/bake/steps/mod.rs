@@ -220,7 +220,7 @@ impl LightingBake {
             prune_stale(&reflection_dir(path), self.staged.len())?;
         }
         scene.probes = light.clone();
-        scene.reflection_probes = reflections;
+        scene.replace_reflection_probes(reflections);
         self.times.note(Stage::Done);
         if let Some(path) = self.scene_path.as_deref() {
             super::report::probes::keep_both(scene, path, &self.times);
