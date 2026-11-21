@@ -233,7 +233,10 @@ env_logger = { version = "0.11.3", default-features = false }
 log = "0.4.22"
 pollster = "0.4.0"
 serde = { version = "1.0.203", features = ["derive"] }
-serde_json = "1.0.120"
+# `float_roundtrip`: a number written and read back is the same `f64`, bit for bit,
+# so a stored document (a scene, a bench report a later run compares with) reads
+# back what was saved. The default parser can land one ulp off.
+serde_json = { version = "1.0.120", features = ["float_roundtrip"] }
 # Font parsing, metrics and glyph outlines for UI `Text` (#419, #1328), and its shaping
 # (ligatures, marks, kerning). Direct, not through egui: egui is editor-only (#431) and
 # the player needs text. Both are already in the editor build through epaint: same
