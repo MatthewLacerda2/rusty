@@ -24,7 +24,7 @@ fn rust(rest: &str, prev: Option<char>) -> Option<usize> {
         [b'b' | b'c', b'r', ..] => (2, &rest[2..]),
         [b'r', ..] => (1, &rest[1..]),
         [b'b' | b'c', b'"' | b'\'', ..] => return Some(1 + rust(&rest[1..], None)?),
-        // A `'` that opens no char literal is a lifetime: code, not a literal.
+        // No char literal: a lifetime, which is code.
         [b'\'', ..] => return char_end(rest, 1),
         _ => return quoted(rest),
     };
@@ -64,19 +64,17 @@ pub(super) fn long_close(rest: &str, level: usize) -> Option<usize> {
     rest.find(&close).map(|at| at + close.len())
 }
 
-/// Characters that run together into one token (`&&`, `->`, `<<=`, `//`).
+/// Characters that join into one token (`&&`, `->`).
 const JOINING: &str = "!#$%&*+-./:<=>?@^|~";
 
-/// Whitespace between `prev` and `next` keeps one space when dropping it could
-/// make a different token: two word characters, two operator characters, or a
-/// word before a quote or `#` (`r "x"` is not `r"x"`).
+/// A gap whose loss would make another token (`r "x"` is not `r"x"`).
 fn keeps_gap(prev: char, next: char) -> bool {
     (is_ident(prev) && (is_ident(next) || "\"'#".contains(next)))
         || (JOINING.contains(prev) && JOINING.contains(next))
 }
 
-/// `code` with whitespace outside literals dropped, save where [`keeps_gap`];
-/// and for each byte of the result, the line (from 0) its token starts on.
+/// `code` without whitespace outside literals, bar [`keeps_gap`]'s; and each
+/// byte's line (from 0), the line its token starts on.
 pub(super) fn normalize(kind: Kind, code: &str) -> (String, Vec<usize>) {
     let (mut out, mut lines) = (String::new(), Vec::new());
     let (mut rest, mut prev, mut gap, mut line) = (code, None::<char>, false, 0);

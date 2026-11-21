@@ -79,9 +79,8 @@ fn opener(comment: &str) -> &str {
     &comment[..len]
 }
 
-/// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`
-/// block, impl or fn: the comment lines from `SAFETY:` on that share its
-/// opener, ending at a blank line or a comment of another opener.
+/// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`:
+/// the lines from `SAFETY:` on sharing its opener, up to a blank or another.
 fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     let mut free: Vec<bool> = lines
         .iter()
@@ -101,7 +100,7 @@ fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     free
 }
 
-/// `code` opens an `unsafe` block, impl or fn (`unsafe {`, `unsafe impl`, …).
+/// `unsafe {`, `unsafe impl`, `unsafe fn`, …
 fn opens_unsafe(code: &str) -> bool {
     let mut tokens = Vec::new();
     for piece in code.split(|c: char| c.is_whitespace() || !(crate::code::is_ident(c) || c == '{'))
