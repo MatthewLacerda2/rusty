@@ -45,6 +45,10 @@ coder *changing* it must know.
   tree is put back at its bare head) and the table, written from the legs that
   finished when a run stops (`legs.Stopped`). `bench-ab.py` and `pr-tree.py` are only the command lines. A test never
   builds or benches: the legs take a stub runner.
+- **`.github/scripts/deps/` reads what an issue body says about its dependencies**
+  for `make blockers` (`blockers.py`, the command line and the audit): `prose.stated`
+  decides what to record, and `prose.named`, a token search, what may be deleted.
+  Never let a deletion rest on the grammar.
 - **GitHub over REST, so the scripts run in cloud sessions.** There GraphQL answers
   403, and `gh pr view/list`, `gh issue list` and `gh repo view` with `--json` are
   GraphQL. New calls go through `gh api repos/{owner}/{repo}/…`, paging with an

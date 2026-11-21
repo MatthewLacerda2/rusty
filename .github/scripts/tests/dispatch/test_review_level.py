@@ -30,6 +30,7 @@ class Level(unittest.TestCase):
             "tests/scene_format/scene.fingerprint": "stored format",
             ".github/actions/install-tool/action.yml": "merge path",  # #1973
             ".github/scripts/blockers.py": "merge path",  # #2489: it writes what the queue reads
+            ".github/scripts/deps/prose.py": "merge path",
         }
         for path, why in cases_by_path.items():
             with self.subTest(path):

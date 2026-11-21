@@ -11,9 +11,11 @@ import json
 import subprocess
 from unittest import mock
 
+from deps import prose  # noqa: F401  (re-exported for the tests)
 from tests import load
 
 blockers = load("blockers.py")
+
 
 REPO = "o/r"
 

@@ -84,6 +84,7 @@ TABLE: dict[str, tuple[str, ...]] = {
         # writes the blocked_by relationships the verdict refuses a merge from: a
         # relationship deleted in error lets a PR merge before its blocker (#2489)
         ".github/scripts/blockers.py",
+        ".github/scripts/deps/",  # what blockers.py reads a body as
         ".github/workflows/",
         ".github/actions/",  # the workflows' shared steps (#1973)
     ),

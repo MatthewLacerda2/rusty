@@ -349,13 +349,15 @@ At the start: `make blockers ARGS=--fix` (records prose-only blockers, and remov
 recorded open blocker no body states any more) and
 `make board` (stray branches, stale assignments, unlabelled issues, bugs with
 no `Kind:` line); close out
-what it names. Unassign an issue that turns out never started. **A lifted
-dependency is lifted in the body, then with `make blockers ARGS=--fix`**: delete
-the `Blocked by #N` line or strike it through (`~~Blocked by #N~~`), and the
-blocker's `Blocks #M` line too if it has one, then run the verb. The merge queue
-reads the recorded relationship, not the prose, and the bodies are the source of
-truth for an open blocker. A recorded blocker in a "Blocked by" the verb could not
-read is kept and reported, never removed: rewrite it as `#N` items.
+what it names. Unassign an issue that turns out never started. **A dependency is
+lifted by taking its line out of the body and running `make blockers ARGS=--fix`,
+or with `make blockers ARGS='--lift <issue> <blocker>'`**. The merge queue reads
+the recorded relationship, not the prose. `--fix` removes a recorded open blocker
+only when neither body names the other anywhere (delete or strike through
+`~~Blocked by #N~~`, and the blocker's `Blocks #M`); one still named in passing
+(a reason, "see #N") is reported and kept, and `--lift` is the verb for it. A
+"Blocked by" the verb could not read is reported until it is rewritten as `#N`
+items.
 
 **After every merge, re-read the whole board**, not your list of it: coders and
 the operator file mid-batch, and what the merge unblocked is startable now. Count

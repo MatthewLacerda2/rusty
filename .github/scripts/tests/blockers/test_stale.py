@@ -1,9 +1,5 @@
-"""#2489: a recorded open blocker no body states is stale, and `--fix` removes it.
-
-A deletion needs proof the relationship is stated nowhere: a body the parser could
-not read, a "Blocks #N" in the blocker's own body, or a blocker in another
-repository keeps it.
-"""
+"""#2489: a recorded open blocker named in neither body is stale, and `--fix`
+removes it; one named anywhere is kept and reported, never removed."""
 
 from __future__ import annotations
 
@@ -12,65 +8,74 @@ import unittest
 from tests.blockers.fakes import REPO, FakeGh, issue, run
 
 FOREIGN = "https://api.github.com/repos/x/y"
+DELETE_7 = f"repos/{REPO}/issues/5/dependencies/blocked_by/9007"
 
 
 class Stale(unittest.TestCase):
-    def test_a_lifted_dependency_is_reported_and_fails(self):
-        fake = FakeGh({5: "Was waiting on the cull; lifted, see the comment."}, [],
-                      {5: [issue(7)]})
+    def test_a_blocker_named_nowhere_is_reported_and_fails(self):
+        fake = FakeGh({5: "Was waiting on the cull; lifted, see the comment."}, [], {5: [issue(7)]})
         code, out = run(fake)
         self.assertEqual(code, 1)
-        self.assertIn("#5 blocked by #7 (t7): recorded on GitHub, not in either body", out)
+        self.assertIn("#5 blocked by #7 (t7): recorded on GitHub, named in neither body", out)
         self.assertIn("1 stale", out)
         self.assertEqual((fake.posts, fake.deletes), ([], []), "an audit writes nothing")
 
     def test_fix_removes_it_by_database_id(self):
-        for body in ("No longer blocked by #7", "~~Blocked by #7~~ (the cull landed)"):
+        for body in ("Was waiting on the cull.", "~~Blocked by #7~~ (the cull landed)",
+                     "~~Blocked by\r\n#7~~", "Waits on #70 and x/y#7"):
             with self.subTest(body=body):
                 fake = FakeGh({5: body}, [], {5: [issue(7)]})
                 code, out = run(fake, "--fix")
-                self.assertEqual(code, 0)
-                self.assertEqual(fake.deletes, [f"repos/{REPO}/issues/5/dependencies/blocked_by/9007"])
+                self.assertEqual((code, fake.deletes), (0, [DELETE_7]))
                 self.assertIn("#5 blocked by #7 (t7): removed", out)
 
-    def test_agreeing_closed_or_reworded_blockers_pass(self):
-        fake = FakeGh(
-            bodies={
-                1: "Blocked by #2",  # body and relationship agree
-                3: "nothing",  # the recorded blocker is closed: history
-                4: "**Blocked by:** **#8** (needs the bake) and #9",  # other accepted wording
-                10: "Blocked by #11, #12, and #13",
-                14: "Blocked by #15 and by #16",
-                17: "Blocked by:\n- #18 (the bake)\n- #19",
-                20: f"Blocked by https://github.com/{REPO}/issues/21",
-                22: "Blocked by #23 (see #24)",
-            },
-            issues=[],
-            recorded={1: [issue(2)], 3: [issue(6, "closed")], 4: [issue(8), issue(9)],
-                      10: [issue(11), issue(12), issue(13)], 14: [issue(15), issue(16)],
-                      17: [issue(18), issue(19)], 20: [issue(21)], 22: [issue(23)]},
-        )
+    def test_a_blocker_named_anywhere_is_never_removed(self):
+        cases = {
+            "Blocked by #6 (after #7)": "a reason",
+            "Blocked by the bake and\nthe cull, #7": "a wrapped line",
+            "Blocked by:\r\n- #6, then\r\n  maybe #7": "a CRLF bulleted list",
+            f"Waits on {REPO}#7": "this repository's own form",
+            "Not any more:\nblocked by #7": "a \"not\" on the line above",
+            "Blocked by e.g. #7": "an abbreviation",
+            "No longer blocked by #7": "a negation that still names it",
+            "See #7": "a mention",
+        }
+        for body, why in cases.items():
+            with self.subTest(why):
+                fake = FakeGh({5: body}, [issue(6)], {5: [issue(7)]})
+                code, out = run(fake, "--fix")
+                self.assertEqual(fake.deletes, [], why)
+                if "#5 blocked by #7 (t7): recorded, and mentioned in #5's body" in out:
+                    self.assertEqual(code, 1, why)
+                    self.assertIn("make blockers ARGS='--lift 5 7'", out)
+                else:
+                    self.assertEqual(code, 0, f"{why}: read as a blocker, so it agrees")
+
+    def test_agreeing_or_closed_blockers_pass(self):
+        fake = FakeGh({1: "Blocked by #2", 3: "nothing", 4: "Blocked by:\r\n- #8\r\n- #9"}, [],
+                      {1: [issue(2)], 3: [issue(6, "closed")], 4: [issue(8), issue(9)]})
         code, out = run(fake, "--fix")
         self.assertEqual((code, fake.posts, fake.deletes), (0, [], []))
         self.assertIn("every recorded one is in a body", out)
 
-    def test_the_blockers_own_blocks_line_keeps_it(self):
+    def test_the_blockers_own_body_keeps_it(self):
         fake = FakeGh({5: "silent"}, [issue(7, body="Blocks #5 (the queue needs it)")], {5: [issue(7)]})
         code, _ = run(fake, "--fix")
         self.assertEqual((code, fake.deletes, fake.fetched), (0, [], [7]))
-
-    def test_a_body_it_could_not_read_keeps_every_recorded_blocker(self):
-        fake = FakeGh({5: "Blocked by #7 or #8"}, [], {5: [issue(7), issue(8)]})
-        code, out = run(fake, "--fix")
-        self.assertEqual((code, fake.deletes), (1, []))
-        self.assertIn("#5 blocked by #8 (t8): recorded on GitHub; a \"Blocked by\"", out)
-        self.assertNotIn("#5 blocked by #7", out, "#7 was read, so it is not in doubt")
-
-    def test_an_unreadable_blocks_line_keeps_it_too(self):
         fake = FakeGh({5: "silent"}, [issue(7, body="Blocks: the cull (#5)")], {5: [issue(7)]})
         code, out = run(fake, "--fix")
         self.assertEqual((code, fake.deletes), (1, []))
-        self.assertIn("could not be read", out)
+        self.assertIn("mentioned in #7's body but not as a blocker", out)
+
+    def test_an_unread_clause_is_reported_whatever_the_record_holds(self):
+        for recorded in ([], [issue(7), issue(8)]):
+            with self.subTest(recorded=recorded):
+                fake = FakeGh({5: "Blocked by #7 or #8"}, [issue(7), issue(8)], {5: recorded},
+                              summary={5: len(recorded)})
+                code, out = run(fake, "--fix")
+                self.assertEqual((code, fake.deletes), (1, []))
+                self.assertIn("#5: a \"Blocked by\" names #8 in words it could not read", out)
+                self.assertNotIn("every recorded one", out)
 
     def test_a_blocker_in_another_repository_is_left_alone(self):
         foreign = issue(7, repository_url=FOREIGN)
@@ -79,8 +84,7 @@ class Stale(unittest.TestCase):
         self.assertEqual((code, fake.posts, fake.deletes), (0, [], []))
         self.assertIn("#5 blocked by x/y#7: in another repository, left alone", out)
         fake = FakeGh({6: "silent"}, [], {6: [foreign]})
-        self.assertEqual(run(fake, "--fix")[0], 0)
-        self.assertEqual(fake.deletes, [])
+        self.assertEqual((run(fake, "--fix")[0], fake.deletes), (0, []))
 
     def test_a_bare_number_is_not_matched_against_another_repository(self):
         own = issue(7, repository_url=f"https://api.github.com/repos/{REPO}")
