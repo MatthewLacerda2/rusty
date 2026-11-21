@@ -1,17 +1,3 @@
-//! crates/shadergen/src/assemble/ui.rs — a ui recipe → a UI shader variant (#427).
-//!
-//! The base is the engine's own `ui.wgsl`, kept verbatim — both entry-point pairs
-//! (`vs_main`/`fs_main` for screen canvases, `vs_world`/`fs_world` for world ones),
-//! the sRGB handling, the SDF text and the world pass's RectMask clip — so a variant
-//! draws exactly like the standard UI shader, through the same vertex format and the
-//! same group-0 texture binding. Only `graphic()`, the one function both fragment
-//! entry points take a graphic's colour from, is replaced: the variant's version
-//! folds the block chain over `shade(in)`.
-//!
-//! A variant adds one binding, group 3: the per-graphic `UiShade` uniform
-//! ([`UI_UNIFORM_DECL`]) — the graphic's rect, the UI clock and the runtime-param
-//! slots — and the scaffold below, which turns it into the `UiFrag` the blocks read.
-
 use std::fmt::Write as _;
 
 use super::emit::{chain, emit_helpers, emit_params, Instance};
@@ -19,11 +5,9 @@ use crate::blocks::Stage;
 use crate::params::{ParamLayout, UI_UNIFORM_DECL};
 use crate::recipe::ShaderRecipe;
 
-/// The function in `ui.wgsl` a variant replaces (the splice point).
 pub(crate) const GRAPHIC: &str =
     "fn graphic(in: VertexOut) -> vec4<f32> {\n    return shade(in);\n}";
 
-/// Assemble a ui variant by replacing `base`'s [`GRAPHIC`] with the folded chain.
 pub(super) fn assemble(
     recipe: &ShaderRecipe,
     resolved: &[Instance],
@@ -55,13 +39,6 @@ pub(super) fn assemble(
     Ok(out)
 }
 
-/// What every ui variant declares besides its blocks: the `UiFrag` inputs, built
-/// from the `UiShade` uniform and the fragment, and the shared helpers.
-///
-/// `UiFrag.duv` maps a rect-uv offset to a texture-uv offset (from the screen
-/// derivatives of both), so `ui_tap` can re-shade the graphic — image texel, SDF
-/// glyph, or a Shape's field and a gradient through the rect-local `local` (#425) —
-/// at an offset. A tap off the rect draws nothing.
 const SCAFFOLD: &str = r#"
 struct UiFrag {
     uv: vec2<f32>,

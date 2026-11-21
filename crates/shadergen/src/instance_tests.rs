@@ -1,7 +1,3 @@
-//! crates/shadergen/src/instance_tests.rs — blocks as instances (#393) and strict params
-//! (#395): a repeated block composes with each instance keeping its own params, and
-//! an undeclared or mis-shaped param is an assemble error naming the culprit.
-
 use super::assemble::assemble;
 use super::blocks::catalog;
 use super::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
@@ -27,7 +23,6 @@ fn recipe(pass: PassKind, blocks: Vec<BlockSel>) -> ShaderRecipe {
     }
 }
 
-/// Assemble against the real surface base, so the output is what a bake validates.
 fn assemble_real(r: &ShaderRecipe) -> Result<String, String> {
     let base = std::fs::read_to_string(format!("{}/shader.wgsl", engine_shader_dir())).unwrap();
     assemble(r, &base)
@@ -57,7 +52,6 @@ fn a_repeated_block_keeps_per_instance_params_and_one_helper() {
 
 #[test]
 fn every_catalogued_block_twice_composes() {
-    // One recipe per block: the whole catalog twice outgrows the 16 runtime slots.
     for pass in [PassKind::Surface, PassKind::Postfx] {
         for b in catalog(pass) {
             let twice = vec![sel(b.id, &[]), sel(b.id, &[])];
@@ -100,9 +94,6 @@ fn a_param_of_the_wrong_arity_is_refused() {
 
 #[test]
 fn a_surface_variant_keeps_the_forward_environment_brdf() {
-    // A baked surface keeps the PBR lighting verbatim (docs/api/Shader.md), so it
-    // inherits URP's environment BRDF (#1543, `forward::reflection::environment_brdf`),
-    // not the old `1 - roughness` scale.
     let wgsl = assemble_real(&recipe(PassKind::Surface, vec![sel("desaturate", &[])])).unwrap();
     assert!(wgsl.contains("let env_brdf = environment_brdf("), "{wgsl}");
     assert!(!wgsl.contains("reflection_scale"), "{wgsl}");

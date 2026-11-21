@@ -1,21 +1,5 @@
-//! crates/shadergen/src/validate.rs — compose an assembled module through `naga_oil`
-//! (#272), the gate that stops a bad shader from shipping.
-//!
-//! Validation reuses the engine's own load path: it runs the assembled module
-//! string through [`super::compose`], the single composition path
-//! `ShaderRegistry::load` also calls when the engine *loads* the baked file
-//! (#722). So "validated at bake" means
-//! validated by exactly the code that would later compile it — GPU-free, so it
-//! runs in CI with no adapter. A module that references an undefined binding, has
-//! a syntax error, or drops a required import fails here and the bake is rejected.
-
 use super::compose;
 
-/// Validate an assembled WGSL `module` against `common` rooted at `base`.
-///
-/// Returns the entry-point names of the composed module on success (so callers
-/// can assert contract conformance, e.g. a postfx module exposes `fs_main`), or a
-/// message describing why it failed to compose.
 pub fn validate(base: &str, module: &str) -> Result<Vec<String>, String> {
     let mut composer = compose::composer_with_common(base)?;
     let naga = compose::compose(&mut composer, module, "authored.wgsl")?;
@@ -28,8 +12,6 @@ mod tests {
 
     #[test]
     fn a_trivial_postfx_module_composes() {
-        // A hand-written minimal postfx module: imports common, has the fullscreen
-        // entry points. Proves the validate path reaches a real composed module.
         let module = "#import common::{CameraUniforms}\n\
             @group(0) @binding(1) var t_color: texture_2d<f32>;\n\
             @group(0) @binding(2) var s_color: sampler;\n\
@@ -51,7 +33,6 @@ mod tests {
 
     #[test]
     fn an_undefined_binding_reference_fails_validation() {
-        // References `t_missing`, which is never declared — naga rejects it.
         let module = "@fragment fn fs_main() -> @location(0) vec4<f32> {\n\
             return textureSample(t_missing, s_missing, vec2<f32>(0.0));\n }";
         assert!(validate(crate::engine_shader_dir(), module).is_err());

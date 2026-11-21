@@ -1,13 +1,3 @@
-//! crates/shadergen/src/assemble/postfx.rs — the postfx module shape (#272): a
-//! self-contained fullscreen program over the tonemapped scene colour.
-//!
-//! `fs_main` folds the uv-stage blocks over the fragment's `uv` first (#1679,
-//! `barrel`), samples the frame there, then folds the colour blocks, which see the
-//! moved `uv` too: a scanline curves with the glass, and a sampling block's centre
-//! tap is the pixel the frame was sampled at. With a uv block, what lands off the
-//! frame draws black, after the colour blocks. A recipe with no uv block assembles
-//! exactly the text it did before uv blocks existed (`let uv = in.uv;`).
-
 use std::fmt::Write as _;
 
 use super::emit::{chain, emit_helpers, emit_params, Instance};
@@ -15,7 +5,6 @@ use crate::blocks::Stage;
 use crate::params::{ParamLayout, POSTFX_UNIFORM_DECL};
 use crate::recipe::ShaderRecipe;
 
-/// Assemble a self-contained postfx fullscreen module from the recipe.
 pub fn assemble(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamLayout) -> String {
     let mut out = String::new();
 
@@ -59,24 +48,12 @@ pub fn assemble(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamLayo
     out
 }
 
-/// Emitted when a uv-stage block warps the frame (#1679): 1 where the warped `uv`
-/// still lands on the frame, 0 off it, so what a warp pulls in from past the edge
-/// (and a block's off-frame sentinel, `barrel`'s rounded corners) draws black after
-/// every colour block, whatever they grade it to.
 const ON_SCREEN: &str = "fn on_screen(uv: vec2<f32>) -> f32 {
     let inside = all(uv >= vec2<f32>(0.0)) && all(uv <= vec2<f32>(1.0));
     return select(0.0, 1.0, inside);
 }
 ";
 
-/// The fixed postfx scaffolding: scene-color bindings and the fullscreen-triangle
-/// vertex stage (the `fullscreen` module's triangle, imported as the engine's
-/// composite does), matching the post chain's fullscreen contract
-/// (group(0) binding 0 = the post params, 1 = the colour so far, 2 = its sampler).
-/// `game_time()` is the sim's game time (#398), the surface blocks' `camera.time`.
-/// `source_tap(uv)` and `source_texel()` let a sampling block (#402) read this
-/// module's input at an offset and step by whole pixels; `textureSampleLevel` keeps
-/// a tap legal wherever a helper is called (no derivative uniformity rule).
 const POSTFX_SCAFFOLD: &str = r#"
 #import postfx::params::PostParams
 #import fullscreen

@@ -1,6 +1,3 @@
-//! Runtime shader params (#399): runtime block params become uniform slots instead
-//! of `const`s, the layout resolves script names strictly, and a bake writes it.
-
 use std::collections::BTreeMap;
 
 use super::assemble::assemble_with_params;
@@ -131,7 +128,6 @@ fn a_surface_bake_writes_the_layout_beside_the_module() {
     let path = bake_recipe(&r, engine_shader_dir(), out).unwrap();
     let layout = ParamLayout::read_beside(std::path::Path::new(&path)).unwrap();
     assert_eq!(layout.names(), ["hit_flash.color", "hit_flash.amount"]);
-    // A module with no sidecar (baked before #399) has no runtime params.
     let bare = dir.join("old.wgsl");
     std::fs::write(&bare, "").unwrap();
     assert_eq!(
