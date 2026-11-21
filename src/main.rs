@@ -30,9 +30,6 @@ fn main() {
     if let Some(unknown) = args.first() {
         usage(&format!("unknown argument {unknown}"));
     }
-    // The editor is an authoring binary: with `dev` it may spend on a provider.
-    #[cfg(feature = "dev")]
-    rusty::dev::providers::read_keys();
     match named {
         Some(dir) => {
             let opened = project::open(&dir, Access::Edit).unwrap_or_else(|e| fail(&e));

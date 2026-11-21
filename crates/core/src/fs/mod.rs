@@ -4,11 +4,11 @@
 //! that moment sees an empty or torn file. [`write_atomic`] writes beside the
 //! target and renames over it: a reader gets the whole old file or the whole new
 //! one, and [`write_cache`] does the same without syncing, for a cache the engine
-//! re-makes (the Blender version `asset` keeps). It is the one copy: the import sidecar, the import cache's stamp, the seed
-//! manifest, the authored UI widgets, imported audio, the bake files, and every
-//! authored document (scene, prefab, animation graph, project file, save data, the
-//! provider ledger, #1991) all write through it, and
-//! the `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
+//! re-makes (the Blender version `asset` keeps). It is the one copy: the import
+//! sidecar, the import cache's stamp, the seed manifest, the authored UI widgets,
+//! imported audio, the bake files, and every authored document (scene, prefab,
+//! animation graph, project file, save data, #1991) all write through it, and the
+//! `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
 //! [`written`] is the log of asset files the engine wrote, which path-keyed caches
 //! drain to drop what went stale (#1207), each through a [`freshness::Freshness`]
 //! that also keeps the files it could not read (#1241).

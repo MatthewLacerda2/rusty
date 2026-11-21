@@ -30,14 +30,13 @@
 //!   memory      — the process's peak resident memory and the machine's, for the bench and the bakes
 //!   export      — ship a project: runtime files and the import cache, no sources (#1267)
 //!   game        — test games: a Lua recipe builds a small game project headless (#2029)
-//!   providers   — the boundary paid, networked calls live behind: key, budget, edit-mode only (#383)
 //!
 //! Status: harness + scenario runner implemented (issue #3); offscreen screenshot
 //! implemented (issue #7); bot-player example implemented (issue #10).
 //!
 //! The crate is empty without its own `dev` feature: `cargo build --workspace` builds
 //! every member, and the root depends on it only behind `dev`, so a build without the
-//! feature compiles nothing here and links no provider client.
+//! feature compiles nothing here.
 
 #![cfg(feature = "dev")]
 #![allow(
@@ -62,7 +61,6 @@ pub mod lua_surface;
 pub mod mcp;
 pub mod memory;
 pub mod preview;
-pub mod providers;
 pub mod scenario;
 pub mod screenshot;
 pub mod session;

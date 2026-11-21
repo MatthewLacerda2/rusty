@@ -162,9 +162,9 @@ test-lint: ## [gate] tools/lint's own tests
 feature-split: ## [gate] No dev-dependency turns on a feature the normal build lacks (docs/testing.md)
 	python3 .github/scripts/feature_split.py
 
-# The shipped player (`--no-default-features`) resolves no egui, no editor or dev
-# crate and no provider HTTP client: clippy only proves the code never names them.
-player-tree: ## [gate] The player build links no editor, dev layer or HTTP client (docs/linting.md)
+# The shipped player (`--no-default-features`) resolves no egui, no editor and no
+# dev crate: clippy only proves the code never names them.
+player-tree: ## [gate] The player build links no editor or dev layer (docs/linting.md)
 	python3 .github/scripts/player_tree.py
 
 # A path, make verb or API namespace the docs name must exist (#973): agents drive

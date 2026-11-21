@@ -8,11 +8,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// One package of the workspace: its manifest and the scanned files under its
-/// `src/` and `tests/`, for a rule that holds a package's code to its manifest.
+/// One package of the workspace: its manifest's text and the scanned files under
+/// its `src/` and `tests/`, for a rule that holds a package's code to its manifest.
 pub struct Package<'a> {
-    /// The manifest's path, `Cargo.toml` for the root.
-    pub manifest: String,
     /// The manifest's text, empty when it cannot be read.
     pub text: String,
     /// The scanned files under the package's `src/` and `tests/`.
@@ -155,11 +153,7 @@ impl Scan {
                     .map(String::as_str)
                     .collect();
                 let text = fs::read_to_string(self.base.join(&manifest)).unwrap_or_default();
-                Package {
-                    manifest,
-                    text,
-                    files,
-                }
+                Package { text, files }
             })
             .collect()
     }

@@ -1,11 +1,10 @@
 //! crates/asset/src/audio/import.rs — MP3 arrives, WAV stays (#385).
 //!
-//! Two doors in: [`refresh`] sweeps a project tree for `.mp3` files (every authoring
-//! open runs it, `edit::seed_project`, and the editor again whenever its window
-//! regains focus, Unity's auto-refresh; the shipped player never does, #1653;
-//! scripts call it as `Assets.Refresh()`), and [`import_mp3_bytes`] takes a provider's
-//! response body straight to a `.wav`. Both trim encoder delay and padding through
-//! the shared decoder. A scene that still names `foo.mp3` keeps working:
+//! [`refresh`] sweeps a project tree for `.mp3` files (every authoring open runs it,
+//! `edit::seed_project`, and the editor again whenever its window regains focus,
+//! Unity's auto-refresh; the shipped player never does, #1653; scripts call it as
+//! `Assets.Refresh()`), trimming encoder delay and padding through the shared
+//! decoder. A scene that still names `foo.mp3` keeps working:
 //! [`resolve_clip_path`] sends it to the `foo.wav` that replaced it.
 
 use std::borrow::Cow;
@@ -61,15 +60,6 @@ pub fn refresh(root: &Path) -> Refresh {
     report
 }
 
-/// Decode encoded audio `bytes` (a provider's MP3) and write it to `dest` as WAV,
-/// replacing whatever is there. The write is atomic and noted (`core::fs::written`),
-/// so a reader never sees half a WAV and a clip cache drops the old one (#1207).
-pub fn import_mp3_bytes(bytes: Vec<u8>, dest: &Path) -> Result<(), String> {
-    let audio = decode_bytes(bytes)?;
-    let encoded = wav::encode(audio.channels, audio.sample_rate, &audio.samples);
-    rusty_core::fs::written::write(dest, &encoded).map_err(|e| e.to_string())
-}
-
 /// Where a clip reference actually plays from: `foo.mp3` that has been converted
 /// (gone, with `foo.wav` beside it) resolves to `foo.wav`; anything else is itself.
 pub fn resolve_clip_path(path: &str) -> Cow<'_, str> {
@@ -84,10 +74,14 @@ pub fn resolve_clip_path(path: &str) -> Cow<'_, str> {
     }
 }
 
-/// One MP3 file → its WAV, then the MP3 is removed.
+/// One MP3 file → its WAV, then the MP3 is removed. The write is atomic and noted
+/// (`core::fs::written`), so a reader never sees half a WAV and a clip cache drops
+/// the old one (#1207).
 fn convert(mp3: &Path, wav: &Path) -> Result<(), String> {
     let bytes = std::fs::read(mp3).map_err(|e| e.to_string())?;
-    import_mp3_bytes(bytes, wav)?;
+    let audio = decode_bytes(bytes)?;
+    let encoded = wav::encode(audio.channels, audio.sample_rate, &audio.samples);
+    rusty_core::fs::written::write(wav, &encoded).map_err(|e| e.to_string())?;
     std::fs::remove_file(mp3).map_err(|e| e.to_string())
 }
 

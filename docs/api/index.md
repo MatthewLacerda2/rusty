@@ -13,8 +13,7 @@ changes the copy only; an inherited field reads `nil`; no `==`, `#` or
 (`ref:Refill(30)`, arguments and returns copied the same way), and a callback a scenario hands `Timer` or `Tween` is refused,
 since the gameplay tick would never run it. A scenario's world enters Play on
 its first `Harness.Step`, so a timer, tween or `Random.SetSeed` before that is
-refused (Play would wipe it). A scenario is a test, so the
-provider verbs (`Sfx.Generate`, `Speech.*`) are refused in it too. See
+refused (Play would wipe it). See
 `docs/testing.md`, *What a scenario can call*.
 
 Entities are addressed by a numeric `id` (`u32`). `Vector3` values cross the
@@ -45,7 +44,7 @@ joint's connected body, `UI.SetSelected(nil)`, `Scene.SetParent(child, nil)`), t
 > **Examples run** (#937): every ```` ```lua ```` block in `docs/api/` is run by
 > `tests/doc_examples/` in a fresh headless edit-mode session and must not raise, so
 > what you copy from here works. Words after `lua` on the fence change that:
-> `no-run` compiles it without running it (it writes files, calls a provider, or
+> `no-run` compiles it without running it (it writes files or
 > uses game-side variables it doesn't define), `ignore` skips a shape sketch that
 > isn't Lua, and `with=door,arm:Joint` creates an entity per name, bound to that
 > global, with the components after `:` (joined by `+`), before the block runs.
@@ -346,8 +345,6 @@ where it reads best. -->
 - [`Texture`](Texture.md)
 - [`Shader`](Shader.md)
 - [`Sound`](Sound.md)
-- [`Speech`](Speech.md)
-- [`Sfx`](Sfx.md)
 - [`Navigation`](Navigation.md)
 - [`NavMeshAgent`](NavMeshAgent.md)
 - [`NavMeshObstacle`](NavMeshObstacle.md)

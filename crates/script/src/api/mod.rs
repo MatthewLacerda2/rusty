@@ -5,8 +5,8 @@
 //! `tests/api_doc_drift.rs` holds to the live surface) is registered from this tree
 //! onto a Lua VM once, when it starts; each function reaches engine state through
 //! the VM (`state`, #1709). Layers above the sim add their own through [`extend`]:
-//! `dev` installs `Debug`, `Editor`, the provider verbs and the GPU bake verbs that
-//! way (#737, `dev::lua_surface`), so the sim surface never imports the platform layer.
+//! `dev` installs `Debug`, `Editor` and the GPU bake verbs that way (#737,
+//! `dev::lua_surface`), so the sim surface never imports the platform layer.
 //! `scripting` owns the runtime and lifecycle; `api` owns the surface. One surface, three
 //! callers — they never drift apart.
 

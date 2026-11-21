@@ -35,25 +35,13 @@ pub const POLICY: Policy = Policy {
     // The math, the scene document's serde and logging: CLAUDE.md's "use glam for
     // all math", and every module saves or logs something.
     common: &["glam", "log", "serde", "serde_json"],
-    unscoped: &[(
-        "getrandom",
-        "a feature pin closing a build/test split under `dev` (docs/testing.md)",
-    )],
+    unscoped: &[],
     confined: &[
         // The editor is a Cargo feature (#431): egui lives only behind it.
         egui("egui"),
         egui("egui_phosphor"),
         egui("egui_wgpu"),
         egui("egui_winit"),
-        // Provider calls are authoring, never gameplay (#383).
-        Confined {
-            krate: "scorsese_providers",
-            within: &["src/dev/providers"],
-        },
-        Confined {
-            krate: "scorsese_core",
-            within: &["src/dev/providers"],
-        },
     ],
     // The sim runs headless, with no GPU and no UI (#494): the arrow is display →
     // sim, never back. Each entry is a crate family (`egui` covers `egui_wgpu`,

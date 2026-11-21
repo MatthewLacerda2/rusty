@@ -88,10 +88,6 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             "crates/ecs/src/a.rs",
             "fn f(w: &mut W) {\n    w.inner.spawn(());\n}\n",
         ),
-        "engine-spawn" => one(
-            "tests/a.rs",
-            "const B: &str = env!(\"CARGO_BIN_EXE_session\");\n",
-        ),
         "entity-arg" => one(
             "crates/script/src/api/a.rs",
             "fn f(lua: &Lua) {\n    lua.create_function(|_, id: u32| Ok(()));\n}\n",
@@ -141,7 +137,6 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],
             "crates/app/src/secret.rs",
         ),
-        "key-guard" => package("dev-dependencies", "rusty-dev", "", "Cargo.toml"),
         "log-tag" => one(app, "fn f() {\n    log::warn!(\"no tag\");\n}\n"),
         "markers" => one(app, concat!("// TO", "DO: later\n")),
         "mesh-buffer-write" => one(app, "fn f(m: &mut M) {\n    m.indices.edit();\n}\n"),
@@ -176,7 +171,6 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
             ],
             "crates/app/src/x/mod.rs",
         ),
-        "read-keys" => one(app, "fn f() {\n    dev::providers::read_keys();\n}\n"),
         "root-tests" => case(
             &[
                 (

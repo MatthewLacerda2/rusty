@@ -31,7 +31,7 @@ pub use extent::item_end;
 /// The use-tree flattener, shared with the `api-parity` rule.
 pub use externs::flatten as flatten_use;
 /// A manifest's `[dependencies]` and `[dev-dependencies]` crate names, shared with
-/// the `key-guard` rule.
+/// the rules' package scan.
 pub use externs::{manifest_dependencies, manifest_dev_dependencies};
 /// The lexical path folder, shared with the `orphan-module` rule.
 pub use gate::normalise;

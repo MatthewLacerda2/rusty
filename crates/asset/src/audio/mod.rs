@@ -1,7 +1,7 @@
 //! crates/asset/src/audio/ — audio import: one decoder, and MP3 → WAV on arrival (#385).
 //!
 //! **MP3 is a source format, never a shipped one.** Every `.mp3` that enters a
-//! project — dropped in by hand, or handed over as bytes by a provider — is decoded
+//! project — dropped in by hand or copied in by a tool — is decoded
 //! once, its encoder delay and padding trimmed, and written as a 16-bit PCM `.wav`
 //! beside it; the `.mp3` is then removed. A one-shot so converted fires on its first
 //! real sample and a loop has no silence at the seam, which an MP3 played directly
@@ -23,7 +23,7 @@
 mod import;
 pub mod wav;
 
-pub use import::{import_mp3_bytes, refresh, resolve_clip_path, Refresh};
+pub use import::{refresh, resolve_clip_path, Refresh};
 
 use std::fs::File;
 use std::io::Cursor;
@@ -55,8 +55,8 @@ pub fn decode_file(path: &str) -> Result<DecodedAudio, String> {
     decode_source(Box::new(file))
 }
 
-/// Decode an in-memory encoded file (a provider's response body, say).
-pub fn decode_bytes(bytes: Vec<u8>) -> Result<DecodedAudio, String> {
+/// Decode an in-memory encoded file (an MP3 read whole before it is converted).
+fn decode_bytes(bytes: Vec<u8>) -> Result<DecodedAudio, String> {
     decode_source(Box::new(Cursor::new(bytes)))
 }
 

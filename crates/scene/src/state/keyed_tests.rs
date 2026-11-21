@@ -10,11 +10,11 @@ use super::marks::{all, base, Mark};
 use super::Keyed;
 use crate::Despawn;
 
-/// Every keyed field's mark, with how it is keyed.
+/// Every field the despawn door drops from, its mark and how it is keyed.
 fn keyed() -> Vec<(&'static Mark, Keyed)> {
     let keyed: Vec<_> = fields()
         .into_iter()
-        .filter(|f| f.keyed != Keyed::No)
+        .filter(|f| matches!(f.keyed, Keyed::Dropped | Keyed::Restored))
         .collect();
     let marks = all().into_iter().filter(|m| m.part.is_none());
     let found: Vec<_> = marks

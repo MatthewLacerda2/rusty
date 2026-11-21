@@ -291,6 +291,3 @@ fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
         input::clipboard::capture(clipboard, &mut game.input().borrow_mut());
     }
 }
-
-#[cfg(all(test, feature = "dev"))] // the provider-key tripwire (`key-guard`)
-rusty_dev::no_provider_keys!();

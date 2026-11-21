@@ -3,7 +3,7 @@
 //!
 //! Unity reimports an asset when it is written; rusty's analog is that every asset
 //! file the engine writes (a PNG bake, a `Sound.*` WAV bake, a reflection cubemap,
-//! a provider's generated file…) is noted here, and each path-keyed cache (the
+//! a converted MP3…) is noted here, and each path-keyed cache (the
 //! renderer's textures, cubemaps and particle meshes, the audio `ClipCache`) drains
 //! the notes before it answers a lookup. The edit scene follows them too: an entity
 //! whose mesh names a re-written model re-reads it (`edit::model_writes`, #1242).
