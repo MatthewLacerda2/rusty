@@ -32,7 +32,7 @@ pub fn verdict(root: &Path, rev: &str) -> Verdict {
     let (mut findings, mut fences, mut files) = (Vec::new(), 0, 0);
     for entry in changed.lines() {
         let mut parts = entry.split('\t');
-        let (status, path) = (parts.next().unwrap_or(""), parts.last().unwrap_or(""));
+        let (status, path) = (parts.next().unwrap_or(""), parts.next_back().unwrap_or(""));
         files += 1;
         if status != "M" {
             findings.push(format!(
