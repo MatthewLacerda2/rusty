@@ -215,7 +215,8 @@ fn footnotes(report: &Report) -> String {
     if report.has("wall_ms") {
         text.push_str(
             "(wall_ms: the frame end to end on the wall, its sim step and its draw until the \
-             GPU finished, as measured: it moves with cpu_clock_pct and gpu_clock_pct)\n",
+             GPU finished, before the bench's readbacks, as measured: it moves with \
+             cpu_clock_pct and gpu_clock_pct)\n",
         );
     }
     text

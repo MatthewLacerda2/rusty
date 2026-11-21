@@ -17,8 +17,9 @@
 //!   (`bench::sample`), under the `editor.` prefix so they never mix with the game
 //!   rows of the same name;
 //! - `editor.wall_ms`: the whole editor frame on the wall (the edit frame, the UI
-//!   and the Scene view's draw until the GPU finished, the probes left out), as
-//!   measured, as a viewpoint's `wall_ms` is (`bench`'s module docs);
+//!   and the Scene view's draw until the GPU finished, before the readbacks, the
+//!   probes left out), as measured, for a frame with a viewport frame, as a
+//!   viewpoint's `wall_ms` is (`bench`'s module docs);
 //! - `editor.view_w` and `editor.view_h`: the size in pixels the Scene view was
 //!   drawn at ([`Drawn::view`], its colour target's): what is left of the window
 //!   after the panels, so a panel's width moves every per-pixel GPU row, and the
@@ -166,16 +167,16 @@ impl Meter {
     }
 
     /// One measured frame: its UI time, the viewport frame when one rendered,
-    /// with the GPU's speed over it, and the whole frame's `wall_ms`.
+    /// with the GPU's speed over it, and the whole frame's `wall_ms`, sampled only
+    /// with a viewport frame, as a viewpoint's is only for a drawn frame.
     pub fn frame(&mut self, ui: UiTime, drawn: Option<&Drawn>, gpu: Option<f64>, wall_ms: f64) {
-        self.samples.push("wall_ms", wall_ms);
         if let Some(cpu) = ui.speed {
             self.samples.push("edit_ms", ui.edit_ms * cpu);
             self.samples.push("ui_ms", ui.ms * cpu);
             self.samples.push("cpu_clock_pct", cpu * 100.0);
         }
         if let Some(drawn) = drawn {
-            sample_render(&mut self.samples, &drawn.frame, gpu);
+            sample_render(&mut self.samples, &drawn.frame, wall_ms, gpu);
             self.view = Some(drawn.view);
         }
         self.samples.end_frame();

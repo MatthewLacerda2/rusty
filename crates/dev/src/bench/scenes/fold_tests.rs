@@ -95,7 +95,7 @@ fn sampled(frames: &[&[(rusty_render::GpuPart, f64)]]) -> Report {
             ..Speeds::default()
         };
         let stats = rusty_core::frame_stats::FrameStats::default();
-        sample(&mut samples, &stats, Some(&frame), speed);
+        sample(&mut samples, &stats, Some((&frame, 1.0)), speed);
     }
     samples.report()
 }
@@ -137,7 +137,7 @@ fn cpu_parts_on_some_frames_only_still_sum_to_their_stage() {
                 ..Default::default()
             };
             let stats = rusty_core::frame_stats::FrameStats::default();
-            sample(&mut samples, &stats, Some(&frame), Speeds::default());
+            sample(&mut samples, &stats, Some((&frame, 1.0)), Speeds::default());
         }
         samples.report()
     };

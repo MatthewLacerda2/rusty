@@ -29,8 +29,8 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
         gpu: Some(0.5),
         ..Speeds::default()
     };
-    sample(&mut samples, &stats, Some(&frame), half);
-    sample(&mut samples, &stats, Some(&frame), Speeds::default());
+    sample(&mut samples, &stats, Some((&frame, 1.0)), half);
+    sample(&mut samples, &stats, Some((&frame, 1.0)), Speeds::default());
     let report = samples.report();
     let avg = |k: &str| report.metrics.iter().find(|(m, _)| m == k).unwrap().1.avg;
     assert_eq!(avg("gpu_ms"), 4.0);
@@ -48,7 +48,12 @@ fn gpu_rows_are_scaled_by_the_frame_clock_speed() {
     assert_eq!(avg("gpu_clock_pct"), 50.0);
     // Without timestamps (lavapipe) no GPU row, `gpu.other` included.
     let mut untimed = Samples::default();
-    sample(&mut untimed, &stats, Some(&RenderedFrame::default()), half);
+    sample(
+        &mut untimed,
+        &stats,
+        Some((&RenderedFrame::default(), 1.0)),
+        half,
+    );
     assert!(!untimed
         .report()
         .metrics
@@ -89,7 +94,7 @@ fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
     frame.counters.ui_meshed = 1;
     frame.counters.render_extract_us = 250;
     let mut samples = Samples::default();
-    sample(&mut samples, &stats, Some(&frame), Speeds::default());
+    sample(&mut samples, &stats, Some((&frame, 1.0)), Speeds::default());
     let report = samples.report();
     let row = |k: &str| report.metrics.iter().find(|(m, _)| m == k).map(|r| r.1);
     assert_eq!(

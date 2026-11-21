@@ -1122,9 +1122,13 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   entering Play, a load, is in no tick's time: the schedule and the tick's own work
   around it), `cpu_ms` (the same at a fixed reference CPU clock, below) and
   `cpu_clock_pct` (the CPU clock it ran at), `renderer_ms` (CPU time recording the
-  frame, as measured), `wall_ms` (the frame end to end on the wall: its sim step
-  and its draw, which waits for the GPU to finish, the clock probes and the
-  bench's pose left out; the one row that moves when a change shifts *when* the GPU
+  frame, as measured), `wall_ms` (the frame end to end on the wall: from its sim
+  step's start to the GPU going idle at the end of its draw. One definition for
+  every round, `editor.wall_ms` too: it ends at the GPU's idle, before the bench's
+  own readbacks (the settled exposure, the timestamps, the stats' recording), and
+  leaves out what `frame_ms` leaves out of the tick (`loads_ms`, `taps_ms`,
+  `probe_ms`), the clock probes and the bench's pose; sampled only for a frame
+  that was drawn. The one row that moves when a change shifts *when* the GPU
   starts or how long the CPU waits on it, which can leave `frame_ms`,
   `renderer_ms` and `gpu_ms` level; a raw time, so it moves with
   `cpu_clock_pct` and `gpu_clock_pct`, and the clock warnings name it beside
@@ -1334,8 +1338,9 @@ every binary's open makes them.
     and at a size whose Scene view the editor's panels leave no room (320x180 is
     one) it draws nothing and warns;
   - `editor.wall_ms`: the whole editor frame end to end on the wall (the edit
-    frame, the UI and the Scene view's draw until the GPU finished, the probes
-    left out), as measured, as a viewpoint's `wall_ms` is;
+    frame, the UI and the Scene view's draw until the GPU finished), as
+    measured, defined as a viewpoint's `wall_ms` is, for a frame that drew a
+    Scene view;
   - `editor.view_w` and `editor.view_h`: the size in pixels the Scene view was
     drawn at (its colour target's), what the panels leave of the window. Every
     per-pixel pass shades it, so a change to a panel's width (the Hierarchy, the

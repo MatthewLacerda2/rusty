@@ -38,13 +38,17 @@
 //! the window, or the clock moved since the last run.
 //!
 //! **`wall_ms` is the frame end to end** (#2494): its sim step and its draw on the
-//! wall, the draw waiting for the GPU to finish, so it is the one row that moves
-//! when a change shifts *when* the GPU starts or how long the CPU waits on it
-//! (`frame_ms`, `renderer_ms` and `gpu_ms` can stay level while it grows). A raw
-//! time: it moves with both clocks (`cpu_clock_pct`, `gpu_clock_pct`), and the
-//! clock warnings name it beside `frame_ms`. The probes and the bench's pose are
-//! left out of it. It is not the windowed game's frame time: the bench draws one
-//! frame after another offscreen, each finished before the next steps.
+//! wall, from the step's start to the GPU going idle, so it is the one row that
+//! moves when a change shifts *when* the GPU starts or how long the CPU waits on
+//! it (`frame_ms`, `renderer_ms` and `gpu_ms` can stay level while it grows). It
+//! leaves out what `frame_ms` leaves out of the tick (`loads_ms`, `taps_ms`,
+//! `probe_ms`), the bench's own readbacks after the GPU finished (the settled
+//! exposure, the timestamps, the stats' recording), the clock probes and the
+//! bench's pose, and is sampled only for a frame that was drawn. A raw time: it
+//! moves with both clocks (`cpu_clock_pct`, `gpu_clock_pct`), and the clock
+//! warnings name it beside `frame_ms`. It is not the windowed game's frame time:
+//! the bench draws one frame after another offscreen, each finished before the
+//! next steps.
 //!
 //! A signal, never a gate: timings are this machine's (a CI runner's software GPU
 //! makes them meaningless), only the counts portable. The scene is deterministic
@@ -70,16 +74,17 @@ pub use lua::register;
 pub(crate) use lua::spec_from_lua;
 pub use report::{Report, Samples, Summary};
 
-use std::time::Instant;
-
+use super::capture::RenderedFrame;
 use super::harness::Harness;
+use super::stats;
+use rusty_core::frame_stats::FrameStats;
 use rusty_render::ClockProbe;
 use sample::{sample, Speeds};
 
-/// Step and render `ticks` frames (fewer if the game quits), sampling each one.
-/// `wall_ms` is each frame on the wall: its sim step and its draw, which waits
-/// for the GPU to finish, the probes and the pose left out. The CPU probe runs right before and right after each sim step, the GPU probe
-/// right before and right after each frame's GPU work: both outside what they scale.
+/// Step and render `ticks` frames (fewer if the game quits), sampling each one,
+/// `wall_ms` among the rows (the module docs). The CPU probe runs right before
+/// and right after each sim step, the GPU probe right before and right after each
+/// frame's GPU work: both outside what they scale.
 pub fn measure(harness: &mut Harness, ticks: u32) -> Report {
     let probe = harness.renderer().and_then(|r| ClockProbe::new(r));
     let (mut report, samples) = measure_posed(harness, ticks, probe.as_ref(), &mut |_| {});
@@ -106,39 +111,57 @@ pub(crate) fn measure_posed(
         if harness.world.borrow().quit_requested() {
             break;
         }
-        let (frame, speed, wall_ms) = step_and_draw(harness, probe, pose);
-        samples.push("wall_ms", wall_ms);
-        sample(&mut samples, &harness.stats.borrow(), frame.as_ref(), speed);
+        let (frame, speed) = step_and_draw(harness, probe, pose);
+        let drawn = frame.as_ref().map(|(f, wall_ms)| (f, *wall_ms));
+        sample(&mut samples, &harness.stats.borrow(), drawn, speed);
         verbs.sample(&mut samples, &harness.stats.borrow(), speed.cpu);
         samples.end_frame();
     }
     (samples.report(), samples)
 }
 
-/// Step one frame, `pose`, draw it: the frame, its clock speeds, and its
-/// `wall_ms`, the step and the draw on the wall with the probes and the pose out.
+/// What `frame_ms` leaves out of the tick: its parts and the probe's own work.
+const BESIDE: [&str; 3] = ["loads_ms", "taps_ms", "probe_ms"];
+
+/// Step one frame, `pose`, draw it: the frame with its `wall_ms`, when one was
+/// drawn, and its clock speeds. `wall_ms` is the step less what `frame_ms` leaves
+/// out of the tick ([`BESIDE`]), plus the draw until the GPU finished, before the
+/// readbacks; the probes and the pose are out.
 fn step_and_draw(
     harness: &mut Harness,
     probe: Option<&ClockProbe>,
     pose: &mut dyn FnMut(&mut Harness),
-) -> (Option<crate::capture::RenderedFrame>, Speeds, f64) {
+) -> (Option<(RenderedFrame, f64)>, Speeds) {
     let cpu_before = clock::cpu_probe_ms();
-    let tick = Instant::now();
+    let recorded = beside_counts(&harness.stats.borrow());
+    let tick = stats::now();
     harness.step(1);
-    let mut wall_ms = ms_since(tick);
+    let step_ms = stats::ms_since(tick) - beside_ms(&harness.stats.borrow(), recorded);
     let cpu = clock::cpu_speed(cpu_before, clock::cpu_probe_ms());
     pose(harness);
     let before = time_probe(probe, harness);
-    let drawn = Instant::now();
+    let start = stats::now();
     let frame = harness.render_frame();
-    wall_ms += ms_since(drawn);
+    let idle = harness.idle_at().unwrap_or(start);
     let gpu = clock::speed(before, time_probe(probe, harness));
-    (frame, Speeds { cpu, gpu }, wall_ms)
+    let wall_ms = step_ms.max(0.0) + stats::ms_between(start, idle);
+    (frame.map(|f| (f, wall_ms)), Speeds { cpu, gpu })
 }
 
-/// Milliseconds on the wall since `start`.
-fn ms_since(start: Instant) -> f64 {
-    start.elapsed().as_secs_f64() * 1000.0
+/// The stats' frame count and each [`BESIDE`] row's sample count, before a tick.
+fn beside_counts(stats: &FrameStats) -> (u64, [u64; 3]) {
+    let samples = BESIDE.map(|k| stats.get(k).map_or(0, |s| s.samples));
+    (stats.frames, samples)
+}
+
+/// The [`BESIDE`] rows the tick just closed recorded, summed: a row counts when
+/// its sample count moved since `before`, or every row present when the tick
+/// restarted the stats (a Play session's first frame).
+fn beside_ms(stats: &FrameStats, (frames, before): (u64, [u64; 3])) -> f64 {
+    let restarted = stats.frames <= frames;
+    let rows = BESIDE.iter().zip(before);
+    let ran = rows.filter_map(|(k, n)| stats.get(k).filter(|s| restarted || s.samples != n));
+    ran.map(|s| s.last).sum()
 }
 
 fn time_probe(probe: Option<&ClockProbe>, harness: &mut Harness) -> Option<f64> {
