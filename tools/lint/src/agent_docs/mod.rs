@@ -27,7 +27,7 @@
 
 mod agent;
 mod frontmatter;
-mod history;
+pub(crate) mod history;
 #[cfg(test)]
 mod tests;
 

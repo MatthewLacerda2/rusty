@@ -16,6 +16,7 @@
 
 mod agent_docs;
 mod code;
+mod comments;
 mod components;
 mod dead_pub;
 mod determinism;
@@ -42,6 +43,15 @@ fn main() {
     // `gates::GATES`: it builds the workspace twice, and fails only when it cannot.
     if args.iter().any(|a| a == gates::DEAD_PUB) {
         dead_pub::run();
+        return;
+    }
+    // `--comment-only [<rev>]` proves the branch changes only comments: a tool
+    // mode a cleanup branch runs, not a gate, so not a row either.
+    if let Some(at) = args.iter().position(|a| a == comments::proof::FLAG) {
+        let rev = args
+            .get(at + 1)
+            .map_or(comments::proof::DEFAULT_BASE, String::as_str);
+        gates::report(&comments::proof::verdict(std::path::Path::new(""), rev));
         return;
     }
     gates::report(&check(std::path::Path::new(""), &args));
