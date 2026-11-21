@@ -183,7 +183,6 @@ impl Default for CameraComponent {
 pub enum Projection {
     #[default]
     Perspective,
-    Orthographic {
-        size: f32,
-    },
+    /// Half the vertical extent in world units.
+    Orthographic { size: f32 },
 }

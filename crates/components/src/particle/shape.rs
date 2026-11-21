@@ -7,22 +7,16 @@ use rusty_core::random::Random;
 pub enum EmitShape {
     #[default]
     Point,
-    Sphere {
-        radius: f32,
-    },
-    Hemisphere {
-        radius: f32,
-    },
-    Box {
-        size: Vec3,
-    },
-    Cone {
-        angle: f32,
-        radius: f32,
-    },
-    Circle {
-        radius: f32,
-    },
+    /// Radius in world units.
+    Sphere { radius: f32 },
+    /// Radius in world units.
+    Hemisphere { radius: f32 },
+    /// Full extents in world units.
+    Box { size: Vec3 },
+    /// Half-angle in degrees.
+    Cone { angle: f32, radius: f32 },
+    /// Radius in world units.
+    Circle { radius: f32 },
 }
 
 /// Emit from the whole shape, or only from its surface / edge.
