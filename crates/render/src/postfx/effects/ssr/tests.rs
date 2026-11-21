@@ -53,7 +53,7 @@ fn custom_marches_as_authored() {
     assert_eq!((m.steps, m.step_length), (40, 0.3));
 }
 
-/// The fade (#1736): 0.2 of smoothness at the default, whole by 0.9 above that, so
+/// The fade (#1736): 0.2 of smoothness at most, whole by 0.9 above that, so
 /// `min_smoothness` 0.8 is SSR before the knob (0.8 to 0.9), and never zero wide.
 #[test]
 fn ssr_fades_in_over_at_most_a_fifth_and_is_whole_by_point_nine() {
