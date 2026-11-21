@@ -74,10 +74,12 @@ impl<'s> Walk<'s> {
             .map(|(index, track)| (track.name.as_str(), index))
             .collect();
         let slides: Map<&str, Slides> = if glides(&voiced) {
-            voiced
-                .iter()
-                .map(|(name, notes)| {
-                    Ok((*name, Slides::of(notes, &track_index, song.tracks.len())?))
+            // In `patterns`' (name) order, so the refusal reported is the first one there.
+            song.patterns
+                .keys()
+                .map(|name| {
+                    let of = Slides::of(&voiced[name.as_str()], &track_index, song.tracks.len())?;
+                    Ok((name.as_str(), of))
                 })
                 .collect::<Result<_, SynthError>>()?
         } else {

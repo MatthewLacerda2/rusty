@@ -1,6 +1,6 @@
 //! the source stage: which generator makes the tone
 
-use super::{additive, fm, karplus, noise, osc};
+use super::{additive, fm, karplus, noise, osc, NoteContext};
 use crate::patch::{Algorithm, Operator, Source, FM_OPERATORS};
 use crate::stereo::Stereo;
 
@@ -9,9 +9,9 @@ pub(crate) fn render(
     freqs: &[f32],
     pulse: Option<&[f32]>,
     velocity: f32,
-    note: fm::Note,
+    note: NoteContext,
 ) -> Stereo {
-    let fm::Note { seed, rate, .. } = note;
+    let NoteContext { seed, rate, .. } = note;
     let frames = freqs.len();
     match source {
         Source::Noise { color } => {
@@ -31,8 +31,8 @@ pub(crate) fn render(
     Stereo::centred(mono)
 }
 
-fn one_waveform(source: &Source, freqs: &[f32], velocity: f32, note: fm::Note, out: &mut [f32]) {
-    let fm::Note { seed, rate, .. } = note;
+fn one_waveform(source: &Source, freqs: &[f32], velocity: f32, note: NoteContext, out: &mut [f32]) {
+    let NoteContext { seed, rate, .. } = note;
     match source {
         Source::Karplus {
             damping,
@@ -84,8 +84,8 @@ mod tests {
     use super::*;
     use crate::patch::{NoiseColor, Osc, Partial, Wave};
 
-    fn note(seed: u64) -> fm::Note {
-        fm::Note {
+    fn note(seed: u64) -> NoteContext {
+        NoteContext {
             gate: 1.0,
             seed,
             rate: 44_100.0,

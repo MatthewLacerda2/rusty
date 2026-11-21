@@ -25,14 +25,6 @@ pub struct Humanize {
 }
 
 impl Humanize {
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "no caller yet outside its own test")
-    )]
-    pub(crate) fn is_nothing(self) -> bool {
-        self.timing <= 0.0 && self.velocity <= 0.0 && self.timbre <= 0.0
-    }
-
     pub(crate) fn onset_seconds(self, track: usize, ordinal: u64, song_seed: u64) -> f32 {
         if self.timing <= 0.0 {
             return 0.0;
@@ -176,7 +168,6 @@ mod tests {
     #[test]
     fn nothing_is_drawn_when_nothing_was_asked_for() {
         let nothing = Humanize::default();
-        assert!(nothing.is_nothing());
         assert_eq!(nothing.onset_seconds(0, 7, 1), 0.0);
         assert_eq!(nothing.velocity(0.3, 0, 7, 1), 0.3);
         assert_eq!(nothing.timbre(0.9, 0, 7, 1), 0.0);
@@ -188,7 +179,6 @@ mod tests {
             timbre: 0.2,
             ..Humanize::default()
         };
-        assert!(!tone_only.is_nothing());
         assert_eq!(tone_only.onset_seconds(0, 7, 1), 0.0);
         assert_eq!(tone_only.velocity(0.3, 0, 7, 1), 0.3);
         assert_ne!(tone_only.timbre(1.0, 0, 7, 1), 0.0);

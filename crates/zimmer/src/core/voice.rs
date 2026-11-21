@@ -3,7 +3,7 @@
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};
-use super::{env, filter, fm, source, RATE};
+use super::{env, filter, source, NoteContext, RATE};
 use crate::hash::hash3;
 use crate::note::{midi_to_freq, NoteOpts};
 use crate::patch::{Adsr, Filter, Layer, Patch, PitchEnv, Source};
@@ -68,7 +68,7 @@ impl Struck<'_> {
             &freqs,
             pulse,
             brightness,
-            fm::Note {
+            NoteContext {
                 gate,
                 seed,
                 rate: RATE,

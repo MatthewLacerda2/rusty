@@ -5,8 +5,8 @@ mod routing;
 
 use std::f32::consts::TAU;
 
-use super::{feedback, voicing, Note};
-use crate::core::{env, nyquist};
+use super::{feedback, voicing};
+use crate::core::{env, nyquist, NoteContext};
 use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
 pub(crate) fn render(
@@ -15,7 +15,7 @@ pub(crate) fn render(
     algorithm: Algorithm,
     operators: &[Operator; FM_OPERATORS],
     levels: &[f32; FM_OPERATORS],
-    note: Note,
+    note: NoteContext,
 ) {
     render_from(
         phase::starts(note.seed),
@@ -31,9 +31,9 @@ fn render_from(
     out: &mut [f32],
     freqs: &[f32],
     (algorithm, operators, levels): (Algorithm, &[Operator; FM_OPERATORS], &[f32; FM_OPERATORS]),
-    note: Note,
+    note: NoteContext,
 ) {
-    let Note { gate, rate, .. } = note;
+    let NoteContext { gate, rate, .. } = note;
     let ceiling = nyquist::ratio_ceiling(freqs, rate);
     let sounding = voicing::sounding(operators, ceiling);
     let norm = voicing::normaliser(algorithm, levels, &sounding);
@@ -106,7 +106,7 @@ mod tests {
     ) -> Vec<f32> {
         let levels = std::array::from_fn(|i| operators[i].level);
         let mut out = vec![0.0; n];
-        let note = Note {
+        let note = NoteContext {
             gate: HELD,
             seed,
             rate: RATE,
@@ -124,7 +124,7 @@ mod tests {
     ) -> Vec<f32> {
         let levels = std::array::from_fn(|i| operators[i].level);
         let mut out = vec![0.0; n];
-        let note = Note {
+        let note = NoteContext {
             gate: HELD,
             seed: SEED,
             rate: RATE,

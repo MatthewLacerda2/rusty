@@ -32,7 +32,7 @@ impl SynthError {
                 f,
                 "fx: `delay` writes both `time` ({time} s) and `beats` ({beats}) — write one or the other"
             ),
-            other => other.say_automation(f),
+            _ => unreachable!("`say_timing` is handed only the refusals it words"),
         }
     }
 }

@@ -50,7 +50,7 @@ impl SynthError {
                 f,
                 "song: track `{track}`: a step string cannot be played `ghost` and also mark ghosts with `o` — ghost the whole run, or mark the hits"
             ),
-            other => write!(f, "{other:?}"),
+            _ => unreachable!("`say_steps` is handed only the refusals it words"),
         }
     }
 }

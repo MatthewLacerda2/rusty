@@ -29,7 +29,7 @@ impl SynthError {
                 f,
                 "song: arrangement entry for `{pattern}`: `transpose` is chromatic and `transpose_degrees` moves within the key — write one or the other"
             ),
-            other => other.say_pattern(f),
+            _ => unreachable!("`say_arrangement` is handed only the refusals it words"),
         }
     }
 }

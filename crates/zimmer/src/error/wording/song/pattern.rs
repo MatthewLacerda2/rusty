@@ -43,7 +43,7 @@ impl SynthError {
                 f,
                 "song: track `{track}`: cannot resolve patch `{reference}`: {reason}"
             ),
-            other => other.say_harmony(f),
+            _ => unreachable!("`say_pattern` is handed only the refusals it words"),
         }
     }
 }

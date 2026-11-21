@@ -22,8 +22,8 @@ pub use note::{midi_to_freq, parse_note, Glide, NoteOpts};
 pub use patch::Patch;
 pub use song::{render_excerpt, render_song, Excerpt, PatchResolver, Song, Span, Window};
 
-// Bumped in the same change as anything that alters what a recipe renders to: a bake is cached
-// by the recipe's bytes and this number, and the fingerprint test fails when the sound moves.
+// Bumped in the same change as anything that alters what a recipe renders to, so a change to the
+// sound is deliberate: the fingerprint test fails when the sound moves and this number did not.
 pub const SYNTH_VERSION: u32 = 10;
 
 pub fn bake_note(patch: &Patch, midi: f32, opts: &NoteOpts) -> Result<Bake, SynthError> {

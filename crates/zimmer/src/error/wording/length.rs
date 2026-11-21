@@ -39,7 +39,7 @@ impl SynthError {
             Self::BadAnchor { section, why, .. } => {
                 write!(f, "song: the anchor on section {section} {why}")
             }
-            other => other.say_ending(f),
+            _ => unreachable!("`say_length` is handed only the refusals it words"),
         }
     }
 
@@ -69,7 +69,7 @@ impl SynthError {
                 f,
                 "song: it would render {seconds:.0} s, and a song renders at most {limit} s (ten minutes) — shorten its arrangement or its `fit`, or bake it as two songs"
             ),
-            other => other.say_song(f),
+            _ => unreachable!("`say_ending` is handed only the refusals it words"),
         }
     }
 }

@@ -25,6 +25,15 @@ use voice::{layer_seed, Struck, Voice};
 
 pub const SAMPLE_RATE: u32 = 44_100;
 
+/// What a sound source is told of the note it renders: when it is let go, its seed and the
+/// sample rate.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NoteContext {
+    pub(crate) gate: f32,
+    pub(crate) seed: u64,
+    pub(crate) rate: f32,
+}
+
 pub(crate) const RATE: f32 = SAMPLE_RATE as f32;
 
 const MAX_SECONDS: f32 = 60.0;

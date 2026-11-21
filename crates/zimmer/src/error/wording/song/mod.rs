@@ -45,7 +45,7 @@ impl SynthError {
                 f,
                 "song: `tempo[{index}]` is at beat {beat}, not after the change before it at beat {previous} — tempo changes must ascend"
             ),
-            other => other.say_arrangement(f),
+            _ => unreachable!("`say_song` is handed only the refusals it words"),
         }
     }
 }

@@ -48,7 +48,7 @@ impl SynthError {
                 f,
                 "patch: `fm4` algorithm `{algorithm}` is heard through its carriers, and every one of them is at level zero"
             ),
-            other => other.say_layers(f),
+            _ => unreachable!("`say_source` is handed only the refusals it words"),
         }
     }
 
@@ -67,7 +67,7 @@ impl SynthError {
                 let said = said.strip_prefix("patch: ").unwrap_or(&said);
                 write!(f, "patch: `layers[{layer}]`: {said}")
             }
-            other => other.say_lfo(f),
+            _ => unreachable!("`say_layers` is handed only the refusals it words"),
         }
     }
 }

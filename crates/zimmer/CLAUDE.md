@@ -23,7 +23,7 @@ the engine's own crate, not a vendor.
 ## `SYNTH_VERSION`
 - **A change to what a recipe renders to bumps `SYNTH_VERSION`** (`crates/zimmer/src/lib.rs`) in the
   same change: the number is what makes a change to the sound deliberate, and a game's
-  baked `.wav` files no longer match their recipes once it moves. Touch a source,
+  baked `.wav` files no longer match their recipes once the sound moves. Touch a source,
   filter, envelope or effect and the samples move: bump it. Touch only prose, a name or
   a document type that defaults to the old behaviour: leave it.
 - **`crates/zimmer/tests/suite/fingerprint` holds it**: it bakes the probe corpus (`probes.rs`) and

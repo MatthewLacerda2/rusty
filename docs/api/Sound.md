@@ -14,9 +14,9 @@ line) is beyond synthesis: bring it as an audio file, which plays like any other
 **The synthesiser is zimmer**, the engine's own crate `rusty-zimmer` (`crates/zimmer/`).
 It does no I/O, so `Sound` is a thin adapter over it: rusty turns the Lua table into
 zimmer's document, zimmer renders, rusty writes the file. A bake changes only when
-zimmer's rendering changes, and `zimmer::SYNTH_VERSION` moves with every such change.
-**The full patch and song vocabulary is zimmer's document types**, `zimmer::patch` and
-`zimmer::song`, whose serde field names are the keys; this page carries worked
+zimmer's rendering changes, and `rusty_zimmer::SYNTH_VERSION` moves with every such change.
+**The full patch and song vocabulary is zimmer's document types**, `rusty_zimmer::patch` and
+`rusty_zimmer::song`, whose serde field names are the keys; this page carries worked
 examples and the fields you reach for first (`cargo doc -p rusty-zimmer --open` lists
 every type and field).
 

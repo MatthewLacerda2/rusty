@@ -36,9 +36,10 @@ fn the_sound_moves_only_with_the_version() {
         .collect();
     assert!(
         moved.is_empty(),
-        "the sound changed under SYNTH_VERSION {SYNTH_VERSION}:\n{}\n\nBump \
-         SYNTH_VERSION in crates/zimmer/src/lib.rs (its table, and an entry in \
-         crates/zimmer/SYNTH_VERSION.md), then re-record table.rs as:\n\n{reprint}",
+        "the sound changed under SYNTH_VERSION {SYNTH_VERSION}:\n{}\n\nIf the change is \
+         meant, bump SYNTH_VERSION in crates/zimmer/src/lib.rs, rerun this test and put \
+         the table it prints into table.rs, and say in the PR why the sound moved. If it \
+         is not meant, the change is a bug.",
         moved.join("\n")
     );
 }

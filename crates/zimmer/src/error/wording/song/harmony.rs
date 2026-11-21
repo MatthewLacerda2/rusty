@@ -46,7 +46,7 @@ impl SynthError {
                 f,
                 "song: degree `{degree}` with the tonic at octave {oct} reaches MIDI {midi}, outside 0..=127"
             ),
-            other => other.say_steps(f),
+            _ => unreachable!("`say_harmony` is handed only the refusals it words"),
         }
     }
 }

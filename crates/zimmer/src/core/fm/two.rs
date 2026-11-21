@@ -16,9 +16,9 @@ pub(crate) fn render(
     ratio: f32,
     index: f32,
     decay: f32,
-    note: super::Note,
+    note: crate::core::NoteContext,
 ) {
-    let super::Note { seed, rate, .. } = note;
+    let crate::core::NoteContext { seed, rate, .. } = note;
     let mut carrier = start_phase(CARRIER, seed);
     let mut modulator = start_phase(MODULATOR, seed);
     for (i, s) in out.iter_mut().enumerate() {
@@ -58,7 +58,7 @@ mod tests {
             ratio,
             index,
             decay,
-            crate::core::fm::Note {
+            crate::core::NoteContext {
                 gate: 0.0,
                 seed,
                 rate: 44_100.0,

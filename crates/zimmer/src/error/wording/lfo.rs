@@ -27,7 +27,7 @@ impl SynthError {
                 f,
                 "patch: lfo `{field}` must be zero or more seconds, got {seconds}"
             ),
-            other => other.say_pulse(f),
+            _ => unreachable!("`say_lfo` is handed only the refusals it words"),
         }
     }
 }
