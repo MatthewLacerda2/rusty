@@ -1,11 +1,6 @@
-//! What the exposure passes are told each frame (#1444): the volume's knobs, packed
-//! for `postfx/exposure.wgsl`, and how far adaptation may move ([`Step`]), decided
-//! by the view's [`Clock`].
-
 use crate::motion::HistoryKey;
 use rusty_components::AutoExposure;
 
-/// CPU mirror of `Params` in `postfx/exposure.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ExposureParams {
@@ -18,8 +13,6 @@ pub struct ExposureParams {
 }
 
 impl ExposureParams {
-    /// Pack `ae` for a frame that adapts by `step`. Held to the ops' ranges, since a
-    /// loaded file bypasses them.
     pub fn new(ae: &AutoExposure, step: Step) -> Self {
         let r = AutoExposure::EV_RANGE;
         // A NaN or infinite knob reads as 0, as the ops' `clamped` does.
@@ -42,36 +35,19 @@ impl ExposureParams {
     }
 }
 
-/// How far one frame's adaptation may move.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Step {
-    /// Game seconds since the view last adapted.
     pub dt: f32,
-    /// Go straight to the metered target, without easing.
     pub snap: bool,
-    /// The frame does not follow the last one this clock adapted (a cut, not just a
-    /// snap outside Play): what was read back before it no longer applies.
     pub cut: bool,
 }
 
-/// One view's adaptation clock: the game time it last adapted at, and what that
-/// was valid for. Adaptation runs on game time (`Scene::shader_time`), so a paused
-/// game (time scale 0) holds its exposure and a capture at tick N replays exactly.
 #[derive(Default)]
 pub struct Clock {
-    /// What the last adapted frame drew (its key, whether the editor's Scene view
-    /// drew it, its game time), `None` after a cut.
     last: Option<(HistoryKey, bool, f32)>,
 }
 
 impl Clock {
-    /// The step for a frame of `key` at game time `time`, drawn by the editor's
-    /// Scene view when `editor`. It cuts on the first frame, after [`Clock::cut`],
-    /// when the scene, the base camera or the play state changed (the motion
-    /// history's cuts, #1435), when the editor's Scene and Game tabs swap (they
-    /// share one view, so one meter) and when time ran backwards; it snaps on a cut
-    /// and outside Play (the editor shows the settled exposure); otherwise it eases
-    /// by the time passed.
     pub(crate) fn step(&mut self, key: HistoryKey, editor: bool, time: f32) -> Step {
         let last = self.last.replace((key, editor, time));
         let cut = !matches!(last, Some((k, e, t)) if k == key && e == editor && time >= t);
@@ -89,8 +65,6 @@ impl Clock {
         }
     }
 
-    /// Forget the last frame: the next one snaps. A resize, and a frame the view
-    /// did not meter (its volume in `Fixed` mode, or none), do this.
     pub fn cut(&mut self) {
         self.last = None;
     }

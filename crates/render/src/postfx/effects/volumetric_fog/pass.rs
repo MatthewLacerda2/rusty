@@ -1,7 +1,3 @@
-//! Volumetric fog's two compute pipelines (#1703), shared by every view and built
-//! on their first dispatch (warmed with the rest, `Renderer::lazy_computes`), their
-//! layouts, and the `Baked` lamps and probe grid the froxels light with.
-
 use super::probes::AirProbes;
 use super::volume::FROXEL_FORMAT;
 use crate::clusters::BakedLamps;
@@ -13,17 +9,14 @@ use crate::gpu::shaders::ShaderRegistry;
 
 pub(crate) struct VolumetricFogPasses {
     pub(super) scatter_layout: wgpu::BindGroupLayout,
-    /// `cs_integrate`'s groups: its uniforms, then the scatter grid and the volume.
     pub(super) integrate_layouts: [wgpu::BindGroupLayout; 2],
     pub(super) scatter: LazyCompute,
     pub(super) integrate: LazyCompute,
-    /// What the history is sampled through: linear, clamped.
     pub(super) sampler: wgpu::Sampler,
     pub(crate) baked: BakedLamps,
     pub(crate) probes: AirProbes,
 }
 
-/// `entry`, seen by the compute stage alone.
 fn compute(entry: wgpu::BindGroupLayoutEntry) -> wgpu::BindGroupLayoutEntry {
     wgpu::BindGroupLayoutEntry {
         visibility: wgpu::ShaderStages::COMPUTE,
@@ -31,7 +24,6 @@ fn compute(entry: wgpu::BindGroupLayoutEntry) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// A write-only froxel grid at `binding`.
 fn grid_out(binding: u32) -> wgpu::BindGroupLayoutEntry {
     compute(wgpu::BindGroupLayoutEntry {
         binding,
@@ -88,7 +80,6 @@ impl VolumetricFogPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_computes`).
     pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 2] {
         [&self.scatter, &self.integrate]
     }
@@ -105,7 +96,6 @@ fn layout(
     })
 }
 
-/// `cs_scatter`'s group, as `volumetric_fog.wgsl` declares it.
 fn scatter_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     use wgpu::TextureViewDimension::{D2Array, D2, D3};
     let uniform = |b| uniform_entry(b, wgpu::ShaderStages::COMPUTE);

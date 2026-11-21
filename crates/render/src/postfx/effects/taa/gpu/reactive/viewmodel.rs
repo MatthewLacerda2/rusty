@@ -1,9 +1,3 @@
-//! The reactive mask under a camera stack (#1845): a world window behind a
-//! viewmodel's gun makes the window reactive and leaves the gun's pixels as they
-//! were, since the resolve counts only translucents drawn by the pixel's own camera
-//! or one above it, and a viewmodel's muzzle flash over the gun, whose clear
-//! corners lie on the gun too, changes none of that.
-
 use glam::{Quat, Vec3};
 
 use super::super::fixture::{cube, diff, eye, frame, renderer, taa_scene, view};
@@ -16,13 +10,8 @@ use rusty_components::{
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{ClearFlags, Scene};
 
-/// The viewmodel's layer: only the overlay camera draws it, so the window lies
-/// under the gun in the world camera's image.
 const VIEWMODEL: u8 = 7;
 
-/// The world camera running TAA, a tinted window 4.5 m out of `reactive`, a cube
-/// behind it, and a `DepthOnly` overlay holding a noise-textured gun cube 3 m
-/// ahead.
 fn stack(reactive: TaaReactive) -> (Scene, u32) {
     let (mut scene, world) = taa_scene(true, false);
     scene.world.camera_mut(world).unwrap().culling_mask = !(1 << VIEWMODEL);
@@ -49,7 +38,6 @@ fn stack(reactive: TaaReactive) -> (Scene, u32) {
         ..Default::default()
     };
     scene.world.set_camera(overlay, Some(lens));
-    // Bright noise on the gun, so the weight shows in the jitter's sub-pixel shift.
     let lit = noise([1.0; 3], [0.25, 0.25]);
     let gun_look = MaterialAsset {
         emissive: [1.0; 3],
@@ -65,10 +53,6 @@ fn stack(reactive: TaaReactive) -> (Scene, u32) {
     (scene, overlay)
 }
 
-/// Eight frames of the stack turning 3° a frame, the gun's glow flickering, so
-/// its history and its frame differ where the weight matters; the last. With
-/// `muzzle`, a viewmodel sprite 2 m ahead, off the gun's centre, its clear corners
-/// over the gun.
 fn turned(reactive: TaaReactive, muzzle: bool) -> Option<Vec<u8>> {
     let mut r = renderer()?;
     let (mut scene, overlay) = stack(reactive);
@@ -93,7 +77,6 @@ fn turned(reactive: TaaReactive, muzzle: bool) -> Option<Vec<u8>> {
     Some(last)
 }
 
-/// The gun's pixels.
 fn gun() -> impl Iterator<Item = (u32, u32)> {
     (29..=35).flat_map(|x| (21..=27).map(move |y| (x, y)))
 }

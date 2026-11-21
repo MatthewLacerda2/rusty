@@ -1,7 +1,3 @@
-//! Resource construction for the post-process chain: bind-group layout, the
-//! composite (assembled from the effects, `effects::assemble`, with the effects'
-//! textures in a group of their own, `effects::textures`), FXAA and copy pipelines, the params and effect-slot buffers, sampler, and the render targets.
-
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, sampler_entry, texture_entry, uniform_entry};
 use crate::gpu::shaders::ShaderRegistry;
@@ -13,8 +9,6 @@ use super::effects::{assemble, composite_slots_len};
 use super::grade::GradeLut;
 use super::{PfxTarget, PostFx, PostParams, HDR_FORMAT};
 
-/// The chain's built-in pipelines, named rather than positional — a tuple of
-/// `RenderPipeline` is one chance per pass to wire the wrong one to the wrong pass.
 struct Pipelines {
     composite: wgpu::RenderPipeline,
     fxaa: wgpu::RenderPipeline,
@@ -22,8 +16,6 @@ struct Pipelines {
 }
 
 impl PostFx {
-    /// Build the whole post-FX resource set sized for `width` x `height`, writing
-    /// its final composite into `output_format` (the swapchain / screenshot format).
     pub fn new(
         device: &wgpu::Device,
         width: u32,
@@ -66,8 +58,6 @@ impl PostFx {
         }
     }
 
-    /// Build the built-in fullscreen passes (the assembled composite, FXAA, copy):
-    /// each reads the io group, the composite the effects' textures too.
     fn create_pipelines(
         device: &wgpu::Device,
         (io_layout, textures): (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
@@ -90,8 +80,6 @@ impl PostFx {
         let io = pipeline_layout("PostFX Pipeline Layout", &[Some(io_layout)]);
         let groups = [Some(io_layout), Some(textures)];
         let with_textures = pipeline_layout("PostFX Composite Pipeline Layout", &groups);
-        // Each writes LDR: the composite into `ldr` (or straight to the output when
-        // nothing follows it), FXAA and the copy always into the output.
         let pass = |shader: &wgpu::ShaderModule, fs: &str, layout: &wgpu::PipelineLayout| {
             let entries = ("vs_fullscreen", fs);
             Self::fullscreen_pipeline(device, shader, layout, entries, output_format)
@@ -104,7 +92,6 @@ impl PostFx {
         }
     }
 
-    /// Create the params and effect-slot uniform buffers and the linear-clamp sampler.
     fn create_params_and_sampler(
         device: &wgpu::Device,
     ) -> (wgpu::Buffer, wgpu::Buffer, wgpu::Sampler) {
@@ -133,32 +120,16 @@ impl PostFx {
         (params_buffer, fx_buffer, sampler)
     }
 
-    /// (Re)allocate the HDR target for a new framebuffer size; the LDR targets are
-    /// made at the chain's size by the next frame's `PostFx::fit_chain`, and the
-    /// effects' own (bloom's chain among them) the next frame they run.
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
         let (w, h) = (width.max(1), height.max(1));
         self.full_size = (w, h);
         self.scene_hdr = Self::target(device, w, h, "PostFX Scene HDR", HDR_FORMAT);
-        // Unfitted: no chain is 0 wide, so the next `fit_chain` remakes the LDR
-        // targets once, at their real size (the output's under TAAU).
         self.chain_size = (0, 0);
-        // A resize is a cut (#1435): no smear from last frame's framing, and the
-        // exposure snaps (#1444).
         self.motion.reset();
         self.exposure.cut();
-        // Every effect's own targets refit at the new size the next frame it runs.
         self.targets.clear();
     }
 
-    /// Run the chain after TAA at `size` from this frame on (#1702): the scene's
-    /// size, or the output's while TAA upscales the view; every frame calls it
-    /// (`draw_stack`) before any effect runs. Another size than the last frame's
-    /// (or the first frame after a resize) remakes the LDR targets and the custom
-    /// chain's history; the same size is a no-op. Each effect sized by the chain
-    /// refits its own targets when it sees the new size (bloom's `made_for`,
-    /// motion blur's `BlurTargets::fit`), so the scene-size ones (SSIL's history,
-    /// depth of field, SSR) survive TAA starting or stopping.
     pub(crate) fn fit_chain(&mut self, device: &wgpu::Device, size: (u32, u32)) {
         let size = (size.0.max(1), size.1.max(1));
         if size == self.chain_size {
@@ -178,8 +149,6 @@ impl PostFx {
         let w = width.max(1);
         let h = height.max(1);
         let scene_hdr = Self::target(device, w, h, "PostFX Scene HDR", HDR_FORMAT);
-        // Full resolution and in the *output* format: FXAA samples the finished frame
-        // exactly as it would have been presented.
         let ldr = Self::target(device, w, h, "PostFX LDR", output_format);
         ((w, h), scene_hdr, ldr)
     }
@@ -202,8 +171,6 @@ impl PostFx {
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format,
-            // COPY_*: the authored-effect chain keeps its result as next frame's
-            // history (#397) by copying one LDR target into another.
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_SRC
@@ -214,8 +181,6 @@ impl PostFx {
         PfxTarget { texture, view }
     }
 
-    /// A fullscreen-triangle pass: `(vs, fs)` entry points of `shader`, writing one
-    /// `format` target with no blending.
     pub(crate) fn fullscreen_pipeline(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -248,18 +213,11 @@ impl PostFx {
                 texture_entry(1, wgpu::TextureViewDimension::D2),
                 sampler_entry(2),
                 texture_entry(3, wgpu::TextureViewDimension::D2),
-                // Depth is read via textureLoad on a depth view of the
-                // Depth32Float target (point sampling — no sampler needed).
                 depth_entry(4, wgpu::TextureViewDimension::D2),
                 texture_entry(5, wgpu::TextureViewDimension::D2),
-                // The skybox's own sampler: the panorama wraps at its seam (#995).
                 sampler_entry(6),
-                // The grading LUT (#1440), sampled with the linear-clamp sampler.
                 texture_entry(7, wgpu::TextureViewDimension::D3),
-                // The adapted exposure (#1444), read in Automatic.
                 uniform_entry(8, wgpu::ShaderStages::FRAGMENT),
-                // The composite's effect slots (#1467). An effect's own textures
-                // are the composite's group 1 (`effects::textures`, #1473).
                 uniform_entry(9, wgpu::ShaderStages::FRAGMENT),
             ],
         })

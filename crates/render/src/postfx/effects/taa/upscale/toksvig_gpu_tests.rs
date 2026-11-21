@@ -1,10 +1,3 @@
-//! Toksvig's level takes TAAU's mip bias (#1702's review, item 3): at a render
-//! scale of 0.5 a scene pixel covers twice the texels, and the normal map is read
-//! a mip finer for it (`camera.lod.x`), so its spread must be counted at the level
-//! read, not the scene pixel's (`forward::mapping::normal_level`). A busy map read
-//! at its base level then widens nothing, and draws what its twin (the same x and
-//! y, blue pinned at 255: no spread) draws. Without the bias it widens.
-
 use glam::Vec3;
 
 use super::gpu_tests::{scaled, upscales};
@@ -13,10 +6,6 @@ use rusty_components::{LightComponent, MaterialAsset, MaterialComponent};
 use rusty_scene::create::{create_entity, default_light, Primitive};
 use rusty_scene::Scene;
 
-/// A 224² busy normal map (blue its z, or 255 for the twin): about 0.7 texels a
-/// native pixel on the wall below (`bias_gpu_tests`' 320² is one), so its
-/// footprint reads half a level under the base, and a scene pixel at 0.5 half a
-/// level over it.
 fn busy_map(twin: bool) -> String {
     let mut state = 0x2545_f491u32;
     let mut next = || {
@@ -36,8 +25,6 @@ fn busy_map(twin: bool) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A glossy metal wall filling the view with `map`, a lamp before it; its
-/// camera runs TAA when `taa`.
 fn wall(taa: bool, map: String) -> Scene {
     let (mut scene, _) = taa_scene(taa, false);
     let id = create_entity(&mut scene, "Wall", Some(Primitive::Box));
@@ -65,7 +52,6 @@ fn wall(taa: bool, map: String) -> Scene {
     scene
 }
 
-/// The largest per-channel difference between two frames.
 fn off(a: &[u8], b: &[u8]) -> u8 {
     a.iter().zip(b).map(|(x, y)| x.abs_diff(*y)).max().unwrap()
 }
@@ -79,9 +65,7 @@ fn gpu_an_upscaled_normal_map_counts_its_spread_at_the_biased_level() {
         let f = frame(&mut r, &mut v, &wall(taa, busy_map(twin)), &cam);
         (f, upscales(&v))
     };
-    // The first upscaled frame: the scene's own samples, before TAA averages them.
     let ((busy, up), (twin, _)) = (draw(true, false), draw(true, true));
-    // Without TAA no bias: the scene pixel's level, over the base, which widens.
     let ((plain_busy, _), (plain_twin, _)) = (draw(false, false), draw(false, true));
     let (biased, unbiased) = (off(&busy, &twin), off(&plain_busy, &plain_twin));
     eprintln!("[taau] busy vs twin at 0.5: biased {biased}, unbiased {unbiased}");

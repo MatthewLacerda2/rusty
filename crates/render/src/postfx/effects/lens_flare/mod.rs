@@ -1,16 +1,3 @@
-//! Lens flare (#1443), Unity URP's *Screen Space Lens Flare*: a scene pass after
-//! bloom's, built from bloom's prefiltered first mip (thresholded, before its chain
-//! spreads it, #1700), so every bright pixel flares with no per-light authoring
-//! (`postfx/lens_flare.wgsl`). It draws ghosts mirrored through the screen centre, a
-//! halo ring and anamorphic streaks at half the bloom buffer's size (a quarter of the view's). The composite adds them after bloom's add
-//! (`postfx/effects/lens_flare.wgsl`), reading the flare as its composite texture
-//! (#1473), so they go through the exposure and the grade like the scene, as URP's
-//! uber pass adds its flare with bloom, and SSR never reflects them.
-//!
-//! It runs only while bloom runs, since it reads bloom's chain, and is off on Low.
-//! While it doesn't run its target is dropped and the composite reads black; with
-//! no bright pixel the flare is exactly zero: either way the add changes nothing.
-
 use super::{
     bloom, Composite, CompositeTexture, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect,
 };
@@ -36,7 +23,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: Some("postfx/effects/lens_flare.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,
-        // After bloom's add (30), before the exposure (40).
         order: 35,
         function: "hdr",
         slots: 1,
@@ -50,16 +36,11 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[Pass::Scene { order: 50, run }],
 };
 
-/// w: `1` while the view flares, so the composite skips the fetch otherwise (the
-/// aspect doesn't decide whether it flares).
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let on = flare_params(cx, 1.0).is_some();
     slots[0] = [0.0, 0.0, 0.0, if on { 1.0 } else { 0.0 }];
 }
 
-/// The flare `cx`'s volume draws this frame: only while bloom runs, whose chain it
-/// reads, and while some part of it can add light (`None` costs no target and no
-/// pass).
 pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     let vc = cx.volume()?;
     let (b, f) = (&vc.bloom, &vc.lens_flare);
@@ -67,7 +48,6 @@ pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     if !blooms || !cx.runs(EFFECT.gate, f.active) {
         return None;
     }
-    // `max` takes a NaN from a hand-edited file to zero, which draws nothing.
     let strength = |s: f32| s.max(0.0);
     let intensity = strength(f.intensity);
     let tint = f.tint.map(|c| c.clamp(0.0, 1.0) * intensity);
@@ -98,19 +78,14 @@ pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     })
 }
 
-/// CPU mirror of `FlareParams` in `postfx/lens_flare.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct FlareParams {
-    /// rgb: the tint times the intensity, w: the ghost count.
     tint: [f32; 4],
-    /// The ghosts', the halo's and the streaks' strengths, and the aberration.
     strengths: [f32; 4],
-    /// x: the view's aspect, the rest unused.
     frame: [f32; 4],
 }
 
-/// The flare pass, shared by every view.
 pub(crate) struct FlarePasses {
     layout: wgpu::BindGroupLayout,
     flare: LazyPipeline,
@@ -150,16 +125,12 @@ impl FlarePasses {
         Self { flare, layout }
     }
 
-    /// The pipeline, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 1] {
         [&self.flare]
     }
 }
 
-/// One view's flare target, half the bloom buffer's size, and its params. Held only
-/// while the view flares.
 pub(crate) struct FlareTargets {
-    /// The bloom buffer's size these were made for.
     bloom: (u32, u32),
     pub(crate) flare: PfxTarget,
     params: wgpu::Buffer,
@@ -181,14 +152,10 @@ impl FlareTargets {
     }
 }
 
-/// The flare's size for a bloom buffer of `(w, h)`: half of it, so a quarter of
-/// the view's on Medium and High (bloom's tier divisor is 2 there).
 pub(crate) fn flare_size((w, h): (u32, u32)) -> (u32, u32) {
     ((w / 2).max(1), (h / 2).max(1))
 }
 
-/// The flare (bloom's prefiltered mip -> its target), which the composite adds, when the view
-/// flares; its target dropped when it doesn't.
 fn run(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let pfx = &mut view.post_fx;
     let Some(bloom) = pfx.targets.get::<bloom::BloomTargets>().map(|t| t.size) else {

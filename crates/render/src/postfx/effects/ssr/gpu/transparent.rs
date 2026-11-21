@@ -1,14 +1,8 @@
-//! Transparent SSR on lavapipe (#1570): a glossy Transparent floor with
-//! `receive_ssr` reflects the cube beside it, wherever the cube moves, and without
-//! it (or with SSR off) shows only the sky it reflected before, and makes no copy.
-
 use super::fixture::{frame, pixel, renderer, rgb, tuned, MIRROR, RED, REFLECTING};
 use crate::Renderer;
 use rusty_components::RenderMode;
 use rusty_scene::Scene;
 
-/// [`tuned`]'s scene, SSR `on`, its floor a half-clear glossy mirror that
-/// receives SSR when `receive`, and its cube moved `dz` along Z.
 fn pool(on: bool, receive: bool, dz: f32) -> Scene {
     let (mut scene, _) = tuned(on, MIRROR, RED, |_| {});
     let floor = scene.materials.get_mut("floor").unwrap();
@@ -19,7 +13,6 @@ fn pool(on: bool, receive: bool, dz: f32) -> Scene {
     scene
 }
 
-/// The frame at `at`, and how many opaque copies it made.
 fn shot(r: &mut Renderer, scene: &Scene, at: (u32, u32)) -> ([i32; 3], u32) {
     let image = frame(r, scene);
     (rgb(&image, at), r.frame_counters.opaque_copies)
@@ -41,7 +34,6 @@ fn gpu_a_transparent_floor_with_receive_ssr_reflects_the_cube_where_it_moved() {
         "the floor shows the red cube"
     );
     assert_eq!((copies, none), (1, 0), "only a tracing floor makes a copy");
-    // Moved 4 m back, the cube leaves the ray: the floor shows the sky again.
     let (moved, _) = shot(&mut r, &pool(true, true, -4.0), at);
     eprintln!("[ssr] cube moved back: {moved:?}");
     assert!(
@@ -59,7 +51,6 @@ fn gpu_receive_ssr_traces_nothing_where_ssr_is_off() {
     assert!(off == plain, "SSR off: receive_ssr changes no pixel");
 }
 
-/// A 128² busy normal map, each texel a whole normal tilted up to ~35° (#1702).
 fn busy_normal_map() -> String {
     let mut state = 0x2545_f491u32;
     let mut next = || {
@@ -79,9 +70,6 @@ fn busy_normal_map() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// Toksvig widens a far busy floor's lobe to about roughness 0.45, under the sharp
-/// floor transparent SSR fades from; its fade reads the authored roughness, so the
-/// glass still reflects the cube (#1702's review, item 2).
 #[test]
 fn gpu_a_busy_normal_mapped_transparent_floor_keeps_its_ssr() {
     let Some(mut r) = renderer() else { return };

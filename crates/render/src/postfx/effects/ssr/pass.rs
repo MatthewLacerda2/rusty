@@ -1,35 +1,3 @@
-//! The SSR pass (#1526): two fullscreen passes over the base camera's opaque image,
-//! run right after its opaque pass (`render::draw::camera`'s `ssr` stage), in
-//! `postfx/ssr.wgsl`, with the hit pyramids' passes between them. It copies the image
-//! ([`pyramid::colour_copy`](super::pyramid::colour_copy)). The trace (`fs_trace`)
-//! then marches each smooth enough pixel's ray and writes its hit into a target of
-//! its own, and into a second where it traced and, for a ray that found something,
-//! its hit's blur radius per unit cone and how much it counts (#2158); one pass
-//! per level builds both targets' pyramids ([`HitPyramids`]); and the resolve
-//! (`fs_resolve`, #2028) averages each pixel's hits over
-//! a disk whose radius is the pixel's own cone times the radius field those
-//! pyramids smooth (the mean of the hits' radii around it, smooth among hits as
-//! across a hit and a miss), and draws them over the image, so a rough surface's reflected
-//! silhouette fades across its blur instead of stepping at a pixel's hit or miss.
-//! The translucents, the overlay cameras and every post effect see the reflected
-//! scene, HDRP's order.
-//!
-//! A frame records the copy, the trace, the pyramids' passes and the resolve into
-//! one encoder: two render passes and one per hit-pyramid level below the first
-//! ([`hit_levels`](super::pyramid::hit_levels): eight at 1080p, four at 96×72,
-//! none at 8 px or less, where the pyramids are one level deep).
-//!
-//! The pipelines are the renderer's ([`SsrPasses`], built on first use and warmed
-//! with the rest); the copy, the pyramids, the params uniform and the two bind
-//! groups are each view's ([`SsrTargets`]), held only while it runs SSR. The GPU
-//! timer's rows: `ssr` holds the trace, charged from its own start; the copy before
-//! it is a command, not a pass, so no row holds it: it sits in the camera's
-//! encoder after the opaque pass and before the trace (#2353), at the head of the
-//! submit after the scene pass's early flush (`draw::camera::EARLY_FLUSHES`), so
-//! it is in `gpu_between_submits_ms` (in `gpu_other_ms` when no flush follows
-//! the scene pass); `ssr_pyramids` and `ssr_resolve` hold the
-//! other two.
-
 use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use glam::{Mat4, Vec3};
@@ -46,28 +14,20 @@ use crate::postfx::{PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 use rusty_core::settings::quality::SsrQuality;
 
-/// The trace and resolve passes' shared inputs.
 const INPUTS: u32 = 0;
-/// The resolve pass's traced hits and spread.
 const TRACED: u32 = 1;
 
-/// CPU mirror of `SsrParams` in `postfx/ssr.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct SsrParams {
     inv_view_proj: [f32; 16],
     view_proj: [f32; 16],
     camera_pos: [f32; 4],
-    /// x: step count, y: step length (world units).
     march: [f32; 4],
-    /// x: the *Minimum Smoothness* (#1736), y: the width it fades in over
-    /// ([`super::fade`]).
     surface: [f32; 4],
 }
 
 impl SsrParams {
-    /// The base camera's frame, marching as `m` ([`super::march`]) says, reflecting
-    /// surfaces down to `min_smoothness`.
     pub(crate) fn new(view_proj: Mat4, eye: Vec3, m: SsrQuality, min_smoothness: f32) -> Self {
         Self {
             inv_view_proj: view_proj.inverse().to_cols_array(),
@@ -82,16 +42,11 @@ impl SsrParams {
     }
 }
 
-/// The SSR pipelines and their pyramids', shared by every view.
 pub(crate) struct SsrPasses {
     pub(super) layout: wgpu::BindGroupLayout,
-    /// The resolve's second group: the trace's two pyramids.
     pub(super) traced: wgpu::BindGroupLayout,
     trace: LazyPipeline,
     resolve: LazyPipeline,
-    /// The downsample the trace's two pyramids are built by (`postfx/ssr.wgsl`'s
-    /// `Traced`: its hits, and where it traced, its hit's radius per unit cone times
-    /// how much it counts, and that count, #2158), both [`HDR_FORMAT`].
     pub(super) pyramid: PyramidPass,
 }
 
@@ -147,15 +102,12 @@ impl SsrPasses {
         }
     }
 
-    /// The render pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 3] {
         [&self.trace, &self.resolve, self.pyramid.lazy_pipeline()]
     }
 }
 
 impl PostFx {
-    /// Reflect this frame's opaque image with `params`, or drop the SSR state when
-    /// `params` is `None` or the view wrote no velocity or surface targets.
     pub(crate) fn run_ssr(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -183,7 +135,6 @@ impl PostFx {
         queue.counted_write_buffer(&t.params, 0, bytemuck::bytes_of(&params));
         #[cfg(test)]
         super::poison::write(t.poisoned, (queue, commands), &self.scene_hdr.texture);
-        // A cloned handle (reference-counted, no new group), so `t` stays borrowable.
         let group = t.group(device, passes, inputs).clone();
 
         let encoder = commands.encoder();
@@ -195,8 +146,6 @@ impl PostFx {
     }
 }
 
-/// Record the trace into the hit pyramids' first levels, the pyramids, and the
-/// resolve over `scene`, with the shared `group` and the resolve's own.
 fn trace_and_resolve(
     encoder: &mut wgpu::CommandEncoder,
     passes: &SsrPasses,
@@ -206,12 +155,9 @@ fn trace_and_resolve(
     timer: &GpuTimer,
 ) {
     {
-        // Cleared: a pixel that takes no SSR is discarded, so nothing traced.
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
-        // The colour copy recorded just before is no pass: it heads the submit
-        // after the scene pass's early flush, so it is in `gpu_between_submits_ms`.
         let timed = timer.writes(GpuPass::Ssr);
         let mut pass = begin(encoder, "SSR Trace", &targets, timed);
         pass.set_pipeline(passes.trace.get());
@@ -220,7 +166,6 @@ fn trace_and_resolve(
     }
     pyramids.build(encoder, &passes.pyramid, timer);
     {
-        // Loaded: a pixel that gets no SSR is discarded, left as it was.
         let targets = [(scene, wgpu::LoadOp::Load)];
         let timed = timer.writes(GpuPass::SsrResolve);
         let mut pass = begin(encoder, "SSR Resolve", &targets, timed);
@@ -233,13 +178,10 @@ fn trace_and_resolve(
 
 #[cfg(test)]
 impl PostFx {
-    /// Whether the view holds SSR's state (it ran this frame).
     pub(crate) fn holds_ssr(&self) -> bool {
         self.targets.get::<SsrTargets>().is_some()
     }
 
-    /// The size SSR ran at this frame, its colour copy's level count and its hit
-    /// pyramids', if it ran.
     pub(crate) fn ssr_pyramid(&self) -> Option<((u32, u32), u32, u32)> {
         let t = self.targets.get::<SsrTargets>()?;
         Some((t.size, t.colour.mip_level_count(), t.traced.levels()))

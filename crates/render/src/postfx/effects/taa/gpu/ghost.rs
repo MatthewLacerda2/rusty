@@ -1,7 +1,3 @@
-//! TAA's ghosts on lavapipe (#1702): a moving cube and a moving sprite particle
-//! (which writes no motion) leave no trail. A cut: `cut`; a viewmodel:
-//! `viewmodel`.
-
 use glam::Vec3;
 
 use super::fixture::{
@@ -9,12 +5,9 @@ use super::fixture::{
 };
 use rusty_components::particle::{Particle, ParticleEmitterComponent};
 
-/// Frames after the move a trail may take to fade, and how far off the unjittered
-/// sky a pixel may be then (the jittered sky's own gradient moves a sub-pixel).
 const AFTER: u32 = 4;
 const TRAIL: u8 = 4;
 
-/// Pixel at world point `p`'s projection.
 fn at(p: Vec3) -> (u32, u32) {
     pixel(project(&eye(0.0), p))
 }
@@ -41,7 +34,6 @@ fn gpu_a_moving_cube_leaves_no_trail() {
     assert!(diff(&last, &empty, was) <= TRAIL, "the cube left a trail");
 }
 
-/// A white sprite in the temp dir, so a particle shows its tint.
 fn white_sprite() -> String {
     let path = rusty_test_support::temp::dir().join("rusty_1702_taa_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))

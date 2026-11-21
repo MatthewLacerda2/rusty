@@ -1,6 +1,3 @@
-//! Transparent SSR's switches (#1570), off the GPU: the march the base camera
-//! hands its translucents, and which material traces.
-
 use super::transparent::{camera_march, traces, SHARP_SMOOTHNESS};
 use crate::draw::uniforms::surface_uniform;
 use crate::postfx::params::PostSource;
@@ -45,15 +42,12 @@ fn the_base_camera_marches_ssrs_quality_only_while_the_view_runs_ssr() {
         camera_march(none, GraphicsSettings::default(), true),
         [0.0; 4]
     );
-    // A preset written by hand is held to the march's range.
     let far = march(&volume(0, 99.0), true);
     assert_eq!([far[0], far[1]], [1.0, Ssr::MAX_STEP_LENGTH]);
 }
 
 #[test]
 fn a_translucent_reflects_sharp_so_never_below_the_sharp_floor() {
-    // A volume reflecting opaques to roughness 0.7: a translucent, whose hit is
-    // sharp, keeps the floor. A stricter volume is followed.
     let mut vc = volume(40, 0.3);
     vc.ssr.min_smoothness = 0.3;
     assert!(vc.ssr.min_smoothness < SHARP_SMOOTHNESS);
@@ -105,7 +99,6 @@ fn a_material_too_rough_to_ever_reflect_traces_nothing() {
         !traces(&glass(0.3)),
         "frosted glass: a fade of 0 everywhere"
     );
-    // A roughness map multiplies the factor down: some pixel may still reflect.
     let mapped = MaterialAsset {
         roughness_map: Some(MapRef::from("ripples.png")),
         ..glass(0.6)

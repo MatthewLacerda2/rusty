@@ -1,6 +1,3 @@
-//! The exposure as a post effect (#1444): the meter, a scene pass after motion blur,
-//! and the composite's pre-grade scale, the fixed EV or the adapted one.
-
 use super::super::{Composite, EffectCx, History, Owner, Pass, PassCx, Phase, PostEffect};
 use super::ExposureParams;
 use crate::gpu::commands::Commands;
@@ -41,18 +38,12 @@ fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     slots[0] = [vc.exposure.fixed_ev, if auto { 1.0 } else { 0.0 }, 0.0, 0.0];
 }
 
-/// `post`'s automatic-exposure knobs, when its volume meters the exposure.
 fn automatic<'a>(post: PostSource<'a>) -> Option<&'a AutoExposure> {
     post.volume
         .filter(|vc| vc.exposure.mode == ExposureMode::Automatic)
         .map(|vc| &vc.exposure.automatic)
 }
 
-/// Meter this view's scene, after depth of field, TAA and motion blur, and adapt, on the
-/// GPU, when its volume is `Automatic` and the view runs full post-FX; otherwise the
-/// next metered frame snaps. On a view TAA upscales (#1702) the meter reads the
-/// resolved image at the output's size (`PostFx::chain_size`), never the jittered
-/// scene.
 fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let (meter, scene) = view.post_fx.exposure_and_scene();
     let Some(ae) = automatic(cx.stack.post).filter(|_| cx.effect.full) else {
@@ -66,17 +57,11 @@ fn meter(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Comman
     meter.run(gpu, commands, passes, scene, &params);
 }
 
-/// The view's side of the readout: what a frontend publishes.
 impl crate::RenderView {
-    /// The automatic exposure this view last read back from the GPU, in EV (#1444):
-    /// `None` until an `Automatic` frame's readback has landed. A frontend publishes
-    /// the screen's as `Scene::screen_exposure`.
     pub fn exposure_readout(&self) -> Option<f32> {
         self.post_fx.exposure.readout()
     }
 
-    /// [`Self::exposure_readout`] after waiting for the read in flight: exact
-    /// for the frame just drawn, for a headless capture that has already waited.
     pub fn settled_exposure(&mut self, device: &wgpu::Device) -> Option<f32> {
         self.post_fx.exposure.settle(device);
         self.exposure_readout()

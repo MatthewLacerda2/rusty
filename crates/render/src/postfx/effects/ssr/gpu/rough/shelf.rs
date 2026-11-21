@@ -1,12 +1,3 @@
-//! A rough reflection is as smooth among its hits as across its outline (#2158):
-//! [`bar`]'s satin ceiling, cut into panels by ribs, reflecting the lit strip behind
-//! a row of dark bottles of varied height standing at two depths in front of the
-//! uprights. The rays that find a bottle are shorter than their neighbours' that find
-//! the strip behind it; a blur whose radius stepped with each pixel's own ray drew
-//! the bottles crisp inside a soft band, hard-edged blotches that changed shape as
-//! the camera moved. The radius every pixel blurs over follows the hits around it,
-//! so the reflection steps no harder between two hits than its blur allows.
-
 use glam::Vec3;
 
 use super::outline::{bar, block, channel};
@@ -14,9 +5,6 @@ use crate::Renderer;
 use rusty_components::MaterialAsset;
 use rusty_scene::Scene;
 
-/// [`bar`] at `roughness` with the bottles and the ribs; with the ceiling a flat
-/// matte green light instead when `mask`, and the ribs matte, so nothing reflects
-/// and the ceiling's pixels can be told from the rest.
 fn shelf(roughness: f32, mask: bool) -> Scene {
     let mut s = bar(roughness);
     for i in 0..18 {
@@ -45,9 +33,6 @@ fn shelf(roughness: f32, mask: bool) -> Scene {
     s
 }
 
-/// The largest step in red one pixel makes to its right or lower neighbour, as a
-/// share of the brightest red, over the ceiling's pixels at least `inset` from
-/// anything else (a rib, the wall): near 1 is a hard edge. With it, that red.
 fn steepest(red: &[f32], ceiling: &[bool], (w, h): (u32, u32), inset: u32) -> (f32, f32) {
     let open = |x: u32, y: u32| {
         let (x0, y0) = (x.saturating_sub(inset), y.saturating_sub(inset));
@@ -71,14 +56,8 @@ fn steepest(red: &[f32], ceiling: &[bool], (w, h): (u32, u32), inset: u32) -> (f
     (step / peak, peak)
 }
 
-/// The narrowest fade, as a share of the frame's height, any step inside the satin
-/// ceiling's reflection may imply: one pixel's step `s` of the peak is a fade
-/// `1 / (s × h)` wide. Here the steepest fades over about 0.035 of the height; a
-/// field pulled toward the nearest hits drew flares at the ribs and stepped over
-/// 0.012, and the hits' own radii (the teeth of #2158) over 0.011, on an RTX 2060.
 const SMOOTH: f32 = 0.025;
 
-/// The steepest step of the satin ceiling's reflection at `size`, as a fade width.
 fn fade(r: &mut Renderer, size: (u32, u32)) -> (f32, f32) {
     let mask = shelf(0.35, true);
     let (red, green) = (channel(r, &mask, size, 0), channel(r, &mask, size, 1));

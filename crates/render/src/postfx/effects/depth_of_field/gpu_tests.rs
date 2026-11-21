@@ -1,19 +1,10 @@
-//! Depth of field on lavapipe (#1445): focus on the near cube and the far one blurs,
-//! focus on the far one and the near one does, on the half-resolution and the
-//! full-resolution paths; Gaussian blurs only the background; mode `Off` is
-//! byte-identical to no depth of field and holds no targets; no quality preset turns
-//! it off (#1522).
-
 use super::gpu_fixture::{bokeh, change_around, frame, renderer, scene, shot, view, FAR, NEAR};
 use rusty_components::{DepthOfField, DofMode};
 use rusty_core::settings::quality::QualityPresets;
 
-/// How far around a cube's centre the tests look, in pixels: the cube and a few
-/// pixels of what lies beside it.
 const NEAR_REACH: i32 = 12;
 const FAR_REACH: i32 = 10;
 
-/// At or under this, a cube is untouched; at or over [`BLURRED`], it blurred.
 const SHARP: u8 = 4;
 const BLURRED: u8 = 16;
 

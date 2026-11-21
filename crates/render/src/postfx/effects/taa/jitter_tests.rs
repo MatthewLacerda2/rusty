@@ -24,7 +24,6 @@ fn offsets_stay_in_the_pixel_average_to_its_centre_and_repeat() {
     assert!(mean.abs().max_element() < 0.01, "centred: {mean}");
     assert_eq!(pixels(3, SEQUENCE), pixels(3 + SEQUENCE, SEQUENCE));
     assert_ne!(pixels(0, SEQUENCE), pixels(1, SEQUENCE));
-    // Plain TAA's sequence is URP's `frame & 1023`, bit for bit.
     let urp = |f: u32| {
         let i = (f & (SEQUENCE - 1)) + 1;
         Vec2::new(halton(i, 2) - 0.5, halton(i, 3) - 0.5)
@@ -44,15 +43,12 @@ fn upscaling_runs_fsr2s_phase_count_and_a_negative_mip_bias() {
         (phases(native, native), mip_bias(native, native)),
         (SEQUENCE, 0.0)
     );
-    // A supersampled scene (render scale 2) does not upscale either.
     assert!(!upscales(px(3840, 2160), native));
     assert_eq!(mip_bias(px(3840, 2160), native), 0.0);
-    // 0.67: 8 × 1.49² ≈ 17.8 → 18; 0.5: 32 phases and a bias of −1.
     assert_eq!(phases(px(1286, 724), native), 18);
     assert_eq!(phases(px(960, 540), native), 32);
     assert_eq!(mip_bias(px(960, 540), native), -1.0);
     assert!((mip_bias(px(1286, 724), native) - (0.67f32).log2()).abs() < 0.01);
-    // One side shorter by a pixel is enough to upscale; a tiny scale stays bounded.
     assert!(upscales(px(1920, 1079), native));
     assert_eq!(phases(px(1, 1), native), SEQUENCE);
     let wraps: Vec<Vec2> = (0..36).map(|f| pixels(f, 18)).collect();

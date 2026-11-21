@@ -1,21 +1,14 @@
-//! The air's ambient comes from the light probes where the scene has them (#1703):
-//! a sealed room baked dark under a bright sky has dark air, where the one
-//! scene-wide ambient would light every froxel. The probe grid is filled once and
-//! kept while nothing it reads changes.
-
 use glam::Vec3;
 
 use super::fixture::{draw, fog, glow, renderer, room, view, LAMP_AT};
 use rusty_scene::{ProbeVolume, Scene};
 
-/// The dark room under a bright ambient (the sky the sealed room never sees).
 fn sealed() -> Scene {
     let mut scene = room(fog());
     scene.ambient_color = Vec3::splat(2.0);
     scene
 }
 
-/// A probe grid over the room, every probe holding `l0` as its constant band.
 fn probes(l0: f32) -> ProbeVolume {
     let mut probes = ProbeVolume::new();
     probes.fill_grid(Vec3::new(-4.0, 0.0, -10.0), Vec3::new(4.0, 4.0, 0.0), 2.0);
@@ -43,7 +36,7 @@ fn gpu_a_sealed_room_s_air_is_as_dark_as_its_probes() {
     let (ambient, _) = read(&scene);
     scene.probes = probes(0.0);
     let (dark, fills) = read(&scene);
-    // L0 × Y00 is the probe's average radiance: 2.0 / 0.2821 reads as the ambient.
+    // L0 times Y00 is the average radiance.
     scene.probes = probes(2.0 / 0.282_094_8 * 0.625);
     let (bright, refilled) = read(&scene);
     eprintln!("[volumetric] air: scene ambient {ambient}, dark probes {dark}, bright {bright}");

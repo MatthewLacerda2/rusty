@@ -1,32 +1,19 @@
-//! One view's SSR state ([`SsrTargets`]): what the pass reads and writes besides
-//! the view's own image, velocity and surface targets, made at a size and remade
-//! at a new one (`super::pass`'s `run_ssr`).
-
 use super::pass::{SsrParams, SsrPasses};
 use super::pyramid::{colour_copy, HitPyramids};
 use crate::gpu::bind_entry as entry;
 use crate::gpu::kept::Kept;
 use crate::gpu::ops::CountedDevice as _;
 
-/// The views the shared group binds from outside the targets: the velocity target
-/// and the two SSR surface targets (weight, applied).
 pub(super) type Inputs = [wgpu::TextureView; 3];
 
-/// The copy of the opaque image the trace and the resolve read, the trace's two
-/// pyramids the resolve reads, the params uniform, and the two bind groups over
-/// them, kept while the view's size holds.
 pub(crate) struct SsrTargets {
     pub(super) size: (u32, u32),
     pub(super) colour: wgpu::Texture,
     colour_view: wgpu::TextureView,
     pub(super) traced: HitPyramids,
     pub(super) params: wgpu::Buffer,
-    /// The trace's and the resolve's shared group, kept while the [`Inputs`] it
-    /// binds are (wgpu compares views by identity, so a remade target rebuilds it).
     group: Kept<Inputs, wgpu::BindGroup>,
-    /// The resolve's group over the hit pyramids, all these targets' own.
     pub(super) resolve: wgpu::BindGroup,
-    /// Test-only: overwrite the image's upper half with `inf` before tracing.
     #[cfg(test)]
     pub(super) poisoned: bool,
 }
@@ -59,8 +46,6 @@ impl SsrTargets {
         }
     }
 
-    /// The trace's and the resolve's shared group over `inputs`, made only when one
-    /// of them was replaced since the last frame.
     pub(super) fn group(
         &mut self,
         device: &wgpu::Device,

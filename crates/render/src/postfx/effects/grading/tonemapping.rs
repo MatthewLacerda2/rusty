@@ -1,6 +1,3 @@
-//! Tonemapping (#1440): the operator, then, last in the grade before the Color Lookup,
-//! the display-gamma tweak.
-
 use super::super::{Grade, GradeCx, History, Owner, PostEffect};
 use crate::postfx::params::Gate;
 use rusty_components::Tonemap;
@@ -29,13 +26,11 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
-/// x: the operator's index; none (clamp only) without a volume.
 fn pack_tonemap(cx: &GradeCx, slots: &mut [[f32; 4]]) {
     let mode = cx.volume.map_or(Tonemap::None, |vc| vc.tonemapping.mode);
     slots[0][0] = mode.to_index() as f32;
 }
 
-/// x: the display gamma, floored as the op floors it; neutral `1`.
 fn pack_gamma(cx: &GradeCx, slots: &mut [[f32; 4]]) {
     slots[0][0] = cx
         .volume

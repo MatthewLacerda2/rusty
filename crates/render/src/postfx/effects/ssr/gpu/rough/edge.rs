@@ -1,8 +1,3 @@
-//! A rough metal floor's SSR fades out (#2004): the reflection of a cube on it
-//! thins away down the floor, where a hit drawn inside a hard silhouette made a
-//! block with a sharp edge; and its reflection of a cube lifted off it has soft
-//! sides (#2028), where a hit drawn at full weight or none stepped at one pixel.
-
 use glam::Vec3;
 
 use super::super::silhouette::{at, base, shot, BRONZE, H, W};
@@ -10,10 +5,6 @@ use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::color::f16_to_f32;
 use rusty_scene::{Camera, Scene};
 
-/// How hard the edge is where the cube's reflection on the floor ends: along the
-/// redness averaged over the cube's middle columns, from just under the cube to the
-/// frame's foot, the most one row's step exceeds both its neighbours'. A fade spreads
-/// its change over rows; an edge puts it in one.
 fn hardest_edge(on: &[u8], off: &[u8]) -> i32 {
     let red = |f: &[u8], y: u32| -> i32 {
         (W / 2 - 12..W / 2 + 12)
@@ -52,10 +43,6 @@ fn gpu_a_rough_metal_floor_fades_the_cubes_reflection_without_a_hard_edge() {
     assert!(lit <= plain + 3, "the reflection fades out, with no edge");
 }
 
-/// The largest share of the reflection's redness one pixel adds across its left
-/// side, in the row of the floor whose middle reflects the most: near 1 is a hard
-/// outline, a soft one spreads its rise over its blur. With it, the redness the
-/// reflection adds at that row's middle.
 pub(super) fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
     let red = |f: &[u8], x: u32, y: u32| at(f, x, y)[0] - at(f, x, y)[2];
     let added = |y: u32, x: u32| red(on, x, y) - red(off, x, y);
@@ -68,8 +55,6 @@ pub(super) fn side_step(on: &[u8], off: &[u8]) -> (f32, i32) {
     (step as f32 / peak as f32, peak)
 }
 
-/// The rough floor's scene, its cube lifted 0.6 m: a reflection a long ray away,
-/// as a shelf is from a soffit above it (#2028).
 pub(super) fn lifted(on: bool, roughness: f32) -> rusty_scene::Scene {
     let mut s = base(on, (BRONZE, 1.0, roughness));
     let cube = s.find_entity_by_name("Cube").unwrap();
@@ -77,7 +62,6 @@ pub(super) fn lifted(on: bool, roughness: f32) -> rusty_scene::Scene {
     s
 }
 
-/// The red of the HDR image the SSR pass resolved `scene` into, seen from `cam`.
 fn hdr_red(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<f32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -89,10 +73,6 @@ fn hdr_red(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<f32> {
         .collect()
 }
 
-/// [`side_step`] on the HDR image's red, with the red the reflection adds at that
-/// row's middle: the lifted cube's adds a few levels of 255 at roughness 0.35, so
-/// one level of rounding in the 8-bit frame is a sixth of it, and a real GPU's
-/// rounding read a soft side as a 0.33 step.
 fn hdr_side_step(on: &[f32], off: &[f32]) -> (f32, f32) {
     let added = |x: u32, y: u32| (on[(y * W + x) as usize] - off[(y * W + x) as usize]).abs();
     let row = (H / 2..H)
@@ -105,8 +85,6 @@ fn hdr_side_step(on: &[f32], off: &[f32]) -> (f32, f32) {
     (step / peak.max(1e-6), peak)
 }
 
-/// The least share of the mirror's red the satin floor's reflection adds at its
-/// middle (near 0.33 here; 0 with no reflection, which would pass the softness).
 const SATIN_RED: f32 = 0.1;
 
 #[test]

@@ -1,6 +1,3 @@
-//! Lift / Gamma / Gain (#1440): the bake's second function, after white balance,
-//! with the clamp into what the scene target holds.
-
 use crate::postfx::params::Gate;
 use glam::Vec3;
 
@@ -25,8 +22,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
-/// Slot 0: lift (xyz); slot 1: `1 / gamma`; slot 2: gain. The neutral wheels without
-/// a volume.
 fn pack(cx: &GradeCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume else {
         slots.copy_from_slice(&[[0.0; 4], [1.0, 1.0, 1.0, 0.0], [1.0, 1.0, 1.0, 0.0]]);
@@ -44,10 +39,6 @@ fn pack(cx: &GradeCx, slots: &mut [[f32; 4]]) {
     slots[2] = gain.extend(0.0).to_array();
 }
 
-/// Unity's `ColorUtils.PrepareLiftGammaGain`: each wheel's colour minus its own
-/// luminance (so a grey wheel tints nothing) plus its offset. Returns `(lift,
-/// 1 / gamma, gain)`; gamma and gain are centred on `1`. The luminance is
-/// `core::color`'s Rec. 709, Unity's weights, which `postfx/grade.wgsl` mirrors.
 pub(crate) fn prepare(lgg: &LiftGammaGain) -> (Vec3, Vec3, Vec3) {
     let centred = |w: &ColorWheel| {
         let c = Vec3::from_array(w.color);

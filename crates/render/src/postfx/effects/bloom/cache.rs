@@ -1,10 +1,3 @@
-//! The lens dirt textures the volumes name (#1442), cached by the path as written
-//! (the setting) and kept in step with the disk the way the Color Lookup's LUTs are
-//! (`grading::color_lookup::user`): a written file is read again, a missing one is
-//! retried once it appears, and one that exists but can't be decoded stays `None`
-//! until it is written again. A failure warns once per path, until it loads. The
-//! cache is its own, so a bad dirt never drops the materials' bind groups.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::rc::Rc;
 
@@ -15,11 +8,6 @@ use rusty_components::is_render_texture;
 use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 
-/// The file a dirt `setting` reads: an `engine/…` path,
-/// [`DEFAULT_DIRT_TEXTURE`](rusty_components::rendering::post_processing::DEFAULT_DIRT_TEXTURE)
-/// among them, is the engine's own, wherever `engine/` is
-/// ([`rusty_core::project::engine_relative`]); any other path as it is. Resolved
-/// only when it is read.
 pub(crate) fn file(setting: &str) -> MapRef {
     match rusty_core::project::engine_relative(setting) {
         Some(relative) => rusty_core::project::engine_path(&relative).into(),
@@ -27,14 +15,11 @@ pub(crate) fn file(setting: &str) -> MapRef {
     }
 }
 
-/// One setting's read: the file it resolved to, and its upload (`None`: failed).
 struct Slot<T> {
     file: MapRef,
     texture: Option<T>,
 }
 
-/// Every dirt texture a volume has named, by setting. `T` is the upload (a
-/// [`GpuTexture`]; tests use a plain value).
 pub(crate) struct DirtCache<T = Rc<GpuTexture>> {
     freshness: Freshness,
     loaded: BTreeMap<String, Slot<T>>,
@@ -52,8 +37,6 @@ impl<T> Default for DirtCache<T> {
 }
 
 impl<T: Clone> DirtCache<T> {
-    /// Read `setting` with `upload` unless it was read already. A render texture
-    /// (`rt:`) is never read here: the frame that draws it registers it.
     pub(crate) fn request(&mut self, setting: &str, upload: impl FnOnce(&MapRef) -> Option<T>) {
         if is_render_texture(setting) || self.loaded.contains_key(setting) {
             return;
@@ -80,13 +63,10 @@ impl<T: Clone> DirtCache<T> {
             .insert(setting.to_string(), Slot { file, texture });
     }
 
-    /// The upload `setting` names, when it loaded.
     pub(crate) fn get(&self, setting: &str) -> Option<T> {
         self.loaded.get(setting)?.texture.clone()
     }
 
-    /// Drop what was written, or has appeared, since the last look. Called once
-    /// per frame, before any request.
     pub(crate) fn refresh(&mut self) {
         let changes = self.freshness.poll_with(texture_ref::exists);
         if changes.stale.is_empty() {

@@ -1,16 +1,8 @@
-//! What SSIL adds (#1750): a dynamic light's bounce off a red wall tints the white
-//! floor and no metal one; a scene lit only by indirect light gains nothing; off
-//! draws as before.
-
 use crate::test_gpu::ssil::{energy, on, patch, renderer, scene, settled, FLOOR, LAMP};
 use rusty_components::Ssil;
 
-/// How far the floor's red over its green must rise with SSIL on: the issue's "a
-/// dynamic point light on a red wall visibly tints the white floor".
 const TINT: f32 = 1.15;
 
-/// How much brighter a scene lit only by indirect light may get with SSIL on, as a
-/// share of its light: the documented bound (`docs/api/Graphics.md`).
 const INDIRECT_GAIN: f32 = 0.005;
 
 #[test]
@@ -31,8 +23,6 @@ fn gpu_a_point_light_on_a_red_wall_tints_the_white_floor() {
 #[test]
 fn gpu_a_scene_lit_only_by_indirect_light_gains_nothing() {
     let Some(mut r) = renderer() else { return };
-    // The ambient (the lightmap's and the probes' term, `indirect` in the forward
-    // shader) is all that lights it: no light feeds the gather.
     let lit = |r: &mut _, ssil| energy(&settled(r, &scene(ssil, 0.0).0, 4));
     let (off, with) = (lit(&mut r, Ssil::default()), lit(&mut r, on(4.0)));
     eprintln!("[ssil] indirect-only energy: {off} off, {with} on");
@@ -61,7 +51,6 @@ fn gpu_off_holds_nothing_and_draws_as_never_on() {
 #[test]
 fn gpu_the_first_frame_with_ssil_adds_nothing() {
     let Some(mut r) = renderer() else { return };
-    // No history yet: the gather reads nothing, so the frame is the off one.
     let first = settled(&mut r, &scene(on(1.0), LAMP).0, 1);
     let off = settled(&mut r, &scene(Ssil::default(), LAMP).0, 1);
     assert!(first == off, "no smear before a history");
@@ -70,9 +59,7 @@ fn gpu_the_first_frame_with_ssil_adds_nothing() {
 #[test]
 fn gpu_a_metal_floor_takes_no_bounce() {
     let Some(mut r) = renderer() else { return };
-    // The bounce goes through the diffuse response, `(1 − metallic)`. Read a metre
-    // out from the wall, where the patch holds floor alone (at `FLOOR` it touches
-    // the wall's foot, which a metal floor's own lamp light lights).
+    // A metre out from the wall, where the patch holds floor alone.
     let at = glam::Vec3::new(1.5, 0.0, -5.0);
     let red = |r: &mut _, ssil, metallic| {
         let (mut scene, _) = scene(ssil, LAMP);
@@ -95,8 +82,7 @@ fn gpu_a_metal_floor_takes_no_bounce() {
 #[test]
 fn gpu_the_tint_holds_under_taas_jitter() {
     let Some(mut r) = renderer() else { return };
-    // TAA (#1702) draws each frame jittered: SSIL reprojects through the jittered
-    // cameras, so last frame's light is read where it was drawn.
+    // TAA jitters each frame: SSIL reprojects through the jittered cameras.
     let red_over_green = |r: &mut _, ssil| {
         let (mut scene, _) = scene(ssil, LAMP);
         for id in scene.world.ids_with_camera() {

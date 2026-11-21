@@ -1,24 +1,13 @@
-//! The chain-size rule as a check (#1702): every pass that runs after TAA (a
-//! `Pass::Scene` ordered after TAA's, and every `Pass::Ldr`) sizes by
-//! `PostFx::chain_size`, never the scene's size (`full_size`, `scene_size()`),
-//! which is the wrong one only while TAA upscales the view. A source scan of each
-//! such effect's own files, since every gate stays green until a view upscales.
-//! A line that must read the scene's size says so inline: `chain-size: scene <why>`.
-
 use super::{Pass, POST_EFFECTS};
 
-/// The names that mean the scene's size.
 const SCENE_SIZES: [&str; 2] = ["full_size", "scene_size("];
 
-/// The lines of `source` that size by the scene's size without saying why.
 fn scene_sized(source: &str) -> Vec<String> {
     let lines = source.lines().filter(|l| !l.contains("chain-size: scene "));
     let hits = lines.filter(|l| SCENE_SIZES.iter().any(|name| l.contains(name)));
     hits.map(|l| l.trim().to_string()).collect()
 }
 
-/// The effect's own non-test source files: `effects/<name>.rs`, the folder
-/// `effects/<name>/`, or either inside a family folder (`lens/`, `grading/`).
 fn sources(name: &str) -> Vec<std::path::PathBuf> {
     let root = rusty_core::project::checkout().join("crates/render/src/postfx/effects");
     let families = std::fs::read_dir(&root)
@@ -53,7 +42,6 @@ fn sources(name: &str) -> Vec<std::path::PathBuf> {
     files.into_iter().filter(own).collect()
 }
 
-/// Whether one of an effect's passes runs after TAA's resolve, at the chain's size.
 fn after_taa(passes: &[Pass], taa: u16) -> bool {
     passes.iter().any(|pass| match pass {
         Pass::Scene { order, .. } => *order > taa,

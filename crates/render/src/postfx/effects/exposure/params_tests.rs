@@ -1,5 +1,3 @@
-//! The exposure clock's snaps and steps, and the params' clamps, adapter-free.
-
 use super::{Clock, ExposureParams, Step};
 use crate::motion::HistoryKey;
 use rusty_components::AutoExposure;

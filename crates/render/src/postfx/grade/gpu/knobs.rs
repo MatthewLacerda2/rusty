@@ -1,7 +1,3 @@
-//! The grading LUT on lavapipe (#1440): neutral knobs reproduce the analytic
-//! tonemap the composite applied before the LUT, each knob moves the image the way
-//! its name says, and a still grade is baked once.
-
 use glam::Vec3;
 
 use super::analytic::analytic;
@@ -12,7 +8,6 @@ use rusty_core::color::linear_to_srgb;
 use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
-/// A grey ramp over the HDR range a frame holds: 0, then 0.001 to 40, log-spaced.
 fn ramp() -> Vec<f32> {
     (0..W)
         .map(|i| match i {
@@ -45,11 +40,9 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
                 })
                 .fold(0.0, f32::max);
             eprintln!("[grade] {tonemap:?} at {ev} EV: worst {worst:.2} levels");
-            // Black and display white sit on texels: only the curve between rounds.
             assert!(worst <= 2.0, "{tonemap:?} at {ev} EV is {worst} levels off");
         }
     }
-    // A view without a volume shows display white and black exactly.
     let mut row = vec![[1.0f32, 0.0, 0.0]; W as usize];
     row[1] = [4.0, 0.0, 0.0];
     let out = c.run(&row, 0.0, None);
@@ -60,7 +53,6 @@ fn gpu_neutral_knobs_through_the_lut_match_the_analytic_tonemap() {
 fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     let Some(mut c) = chain() else { return };
     let grey = |out: &[[u8; 4]]| Vec3::new(out[1][0].into(), out[1][1].into(), out[1][2].into());
-    // Pixel 0 black, pixel 1 a grey card, the rest a bright 0.6.
     let mut row = vec![[0.6f32; 3]; W as usize];
     (row[0], row[1]) = ([0.0; 3], [0.18; 3]);
     let mut vc = volume(Tonemap::None);
@@ -82,7 +74,6 @@ fn gpu_white_balance_lift_and_gain_move_the_image_as_named() {
     vc.lift_gamma_gain.wheel_mut(Wheel::Gain).offset = -0.5;
     let gained = c.run(&row, 0.0, Some(&vc));
     let (bright, dark) = (f32::from(neutral[9][1]), f32::from(gained[9][1]));
-    // Half the gain halves the linear whites: 0.6 → 0.3.
     assert!(
         (dark - 255.0 * linear_to_srgb(0.3)).abs() <= 2.0,
         "gain scales the whites: {bright} → {dark}"

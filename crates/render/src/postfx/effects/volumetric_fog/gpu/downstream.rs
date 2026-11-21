@@ -1,18 +1,11 @@
-//! What reads the fogged colour after the forward pass (#1703): SSIL's bounce off a
-//! fogged surface, and SSR's reflection on one, are dimmed by the same fog the
-//! surface got (`transparent::surface_fog`), so neither adds light the fog took.
-//! Black fog (albedo 0) only takes light, which keeps the measure clean.
-
 use glam::Vec3;
 
 use super::fixture::{channel, fog, glow, lamp, renderer, room, set_fog, settled, tinted};
 use rusty_components::{LightMode, MaterialAsset, VolumetricFog};
 use rusty_scene::Scene;
 
-/// The floor point beside the lamp's pool, half a metre in front of the red wall.
 const FLOOR: Vec3 = Vec3::new(1.5, 0.0, -5.5);
 
-/// Black fog thick enough to take a clear share of the floor's light.
 fn black() -> VolumetricFog {
     VolumetricFog {
         albedo: [0.0; 3],
@@ -21,8 +14,6 @@ fn black() -> VolumetricFog {
     }
 }
 
-/// The floor point's red and summed light, effect `on` or not, under `fog`
-/// (`None`: off): `set` turns the effect.
 fn read(
     r: &mut crate::Renderer,
     scene: &mut Scene,
@@ -35,15 +26,12 @@ fn read(
     (channel(&frame, FLOOR, 0), glow(&frame, FLOOR))
 }
 
-/// The red wall behind `FLOOR` and the lamp that lights it.
 fn wall_and_lamp(scene: &mut Scene) {
     let wall = (Vec3::new(0.0, 1.5, -6.0), Vec3::new(6.0, 3.0, 0.2));
     tinted(scene, "red", wall, [1.0, 0.05, 0.05]);
     lamp(scene, Vec3::new(0.0, 1.0, -5.3), 6.0, LightMode::Realtime);
 }
 
-/// The effect's gain at the floor clear and fogged, and how much of the floor's
-/// light the fog lets through, for `set`.
 fn gains(scene: &mut Scene, set: fn(&mut Scene, bool)) -> Option<(f32, f32, f32)> {
     let mut r = renderer()?;
     let (plain_off, plain) = read(&mut r, scene, (set, false), None);
@@ -98,13 +86,11 @@ fn gpu_ssr_reflects_no_light_the_fog_took() {
         ..MaterialAsset::default()
     };
     scene.materials.insert("mirror".into(), mirror);
-    // A black sky, so the mirror reflects nothing SSR's hit would replace: the
-    // whole change SSR makes is the wall it finds.
+    // A black sky: the whole change SSR makes is the wall it finds.
     (scene.sky.zenith, scene.sky.horizon, scene.sky.ground) =
         (Some(Vec3::ZERO), Some(Vec3::ZERO), Some(Vec3::ZERO));
     wall_and_lamp(&mut scene);
-    // A glowing wall, so the hit SSR finds is what changes the floor (dim
-    // enough that the 8-bit frame does not clip it).
+    // Dim enough that the 8-bit frame does not clip it.
     let glowing = MaterialAsset {
         base_color: [1.0, 0.05, 0.05],
         emissive: [0.6, 0.0, 0.0],

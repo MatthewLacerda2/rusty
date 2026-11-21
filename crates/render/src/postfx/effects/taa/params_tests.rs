@@ -1,14 +1,8 @@
-//! `TaaParams` against `postfx/taa.wgsl`, no adapter (#1846): the lanes are where
-//! the shader reads them, the spans it divides by are positive, and a lens turns a
-//! view depth into a distance the way `surface_of` expects.
-
 use glam::{Vec2, Vec3};
 
 use super::*;
 use rusty_scene::Camera;
 
-/// The resolve's source: `postfx/taa.wgsl` and the modules it reads its uniform
-/// and its surfaces from.
 fn shader() -> String {
     let dir = rusty_shadergen::engine_shader_dir();
     let read = |f: &str| std::fs::read_to_string(format!("{dir}/postfx/{f}")).unwrap();
@@ -21,8 +15,6 @@ fn camera() -> Camera {
     Camera::new(Vec3::ZERO, 0.0, 0.0)
 }
 
-/// A default camera's still frame influence: URP's `1 - 0.9`, which in `f32` sits a
-/// rounding off [`FRAME_INFLUENCE`].
 fn influence() -> f32 {
     let still = 1.0 - rusty_components::CameraComponent::default().taa_base_blend_factor;
     assert!((still - FRAME_INFLUENCE).abs() < 1e-6, "URP's 0.1: {still}");
@@ -52,10 +44,7 @@ fn the_lanes_are_where_the_shader_reads_them() {
         DISOCCLUSION_FULL,
     ];
     assert_eq!(p.rejection, rejection);
-    // The quality's steps ride `levels`: `High` (the default) is URP's (2, 2, 2, 0).
     assert_eq!(p.levels, [2.0, 2.0, 2.0, 0.0]);
-    // The anti-flicker starts at HDRP's 0.5 (#2228), and the camera's value scales
-    // the hold; at 0 its scale is 0.
     assert_eq!(p.flicker, [FLICKER_DECAY, 0.5 * FLICKER_HOLD, 0.0, 0.0]);
     let tuned = |value: f32| {
         let cam = rusty_components::CameraComponent {
@@ -117,7 +106,6 @@ fn the_struct_and_the_camera_count_match_the_shader() {
 
 #[test]
 fn the_ramps_the_shader_divides_by_are_positive() {
-    // The constants' own order is held at compile time, beside them (`params.rs`).
     let off = params().without(Rules {
         moving: false,
         reveal: false,
@@ -134,9 +122,7 @@ fn a_lens_is_the_offset_per_ndc_unit() {
     flat.projection = Projection::Orthographic { size: 2.0 };
     let [w, f, rest] = [0, 1, 2].map(|i| lenses(&[wide.clone(), flat.clone()], 1.5)[i]);
     let close = |a: [f32; 4], b: [f32; 4]| a.iter().zip(b).all(|(a, b)| (a - b).abs() < 1e-5);
-    // tan 45° × the aspect across, tan 45° up; perspective.
     assert!(close(w, [1.5, 1.0, 1.0, 0.0]), "{w:?}");
-    // The half extents, 2 × 1.5 across and 2 up; orthographic.
     assert!(close(f, [3.0, 2.0, 0.0, 0.0]), "{f:?}");
     assert_eq!(rest, [1.0, 1.0, 1.0, 0.0]);
 }

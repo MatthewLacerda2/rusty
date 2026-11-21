@@ -1,16 +1,9 @@
-//! The effects' shared pipelines, one set per renderer: every view's pass runs
-//! through them, so a new view or render-texture slot compiles nothing. An effect
-//! with a pass of its own adds its pipelines here, and its lazy ones to
-//! [`Passes::lazy_pipelines`] (`Renderer::lazy_pipelines` warms them), its lazy
-//! compute ones to [`Passes::lazy_computes`].
-
 use super::{
     bloom, depth_of_field, exposure, lens_flare, motion_blur, ssil, ssr, taa, volumetric_fog,
 };
 use crate::gpu::pipelines::{LazyCompute, LazyPipeline};
 use crate::gpu::shaders::ShaderRegistry;
 
-/// Every effect's shared pipelines.
 pub(crate) struct Passes {
     // sorted: one field per effect with a pass of its own
     pub bloom: bloom::BloomPasses,
@@ -25,8 +18,6 @@ pub(crate) struct Passes {
 }
 
 impl Passes {
-    /// Every effect's pipelines; an LDR pass's into each of `output_formats` (the
-    /// window's and the offscreen views').
     pub(crate) fn new(
         device: &wgpu::Device,
         registry: &mut ShaderRegistry,
@@ -45,7 +36,6 @@ impl Passes {
         }
     }
 
-    /// The pipelines built on first use, for warming.
     pub(crate) fn lazy_pipelines(&self) -> Vec<&LazyPipeline> {
         let mut all = Vec::new();
         all.extend(self.bloom.lazy_pipelines());
@@ -58,7 +48,6 @@ impl Passes {
         all
     }
 
-    /// The compute pipelines built on first dispatch, for warming.
     pub(crate) fn lazy_computes(&self) -> Vec<&LazyCompute> {
         self.volumetric_fog.lazy_computes().to_vec()
     }

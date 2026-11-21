@@ -1,7 +1,3 @@
-//! A cut on lavapipe (#1702): the first frame after a scene load is byte for byte a
-//! new view's first, with no ghost of the last scene. Which frames are cuts (Play,
-//! Stop, a camera switch, a reset) is `motion::cut_tests`'s, adapter-free.
-
 use glam::Vec3;
 
 use super::fixture::{cube, eye, frame, fresh_frame, renderer, settle, taa_scene, view};
@@ -11,9 +7,6 @@ use crate::motion::gpu_fixture::{H, W};
 fn gpu_a_scene_load_leaves_no_ghost_of_the_last_scene() {
     let Some(mut r) = renderer() else { return };
     let cam = eye(0.0);
-    // A white cube on the left, settled; then another scene (another id: a cut, as
-    // Play, Stop or a camera switch are) with its cube on the right, so the old
-    // history and the new frame disagree on both halves.
     let (mut before, _) = taa_scene(true, true);
     cube(&mut before, Vec3::new(-0.9, 0.0, -4.0));
     let mut v = view(&r);

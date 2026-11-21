@@ -1,103 +1,49 @@
-//! The post effects' completeness gate (#1467): every effect the renderer lists has
-//! every part another layer expects, and no layer lists an effect the renderer
-//! lacks. The four-axis component gate's counterpart for post effects.
-//!
-//! The parts, per effect: its settings (a volume field, or a camera field named
-//! after it for a camera effect), its authoring row (a volume effect), its
-//! `Graphics.*` registrar, its Inspector section, its section in
-//! `docs/api/Graphics.md` (`<!-- effect: <name> -->`) naming every knob's tween
-//! path, and, when it is player-facing, its `GraphicsOption` named after it with a
-//! row in the doc's *Player options* table. It declares whether it reads history
-//! (#2092), with a reason when it reads none. Each composite texture it declares
-//! is bound in the assembled composite and passed to its own function, at its
-//! place (#1473).
-//!
-//! Three of the layers sit above this crate's live code: the authoring layer (the
-//! component field tables, the volume's effect rows, the camera's knob tables:
-//! `edit::authoring`), the `Graphics.*` registrars (`api`) and the Inspector's
-//! sections (`editor`), so the root's test hands them in ([`problems`], the
-//! authoring layer as an [`Authored`]). The gate's own must-pass and must-flag
-//! cases sit in the integration suite too (`tests/post_effect_cases/`), since
-//! the authoring layer is above this crate: they build the layers with
-//! [`engine_from`], the other two with the renderer's names, and check them with
-//! [`check`]. A test hook, compiled into every build for that.
-
 use super::textures::{composite_textures, PlacedTexture, GROUP};
 pub use super::Owner;
 use super::{assemble, History, PostEffect, POST_EFFECTS};
 use rusty_components::PostProcessingComponent;
 use rusty_core::settings::graphics_options::GraphicsOption;
 
-/// What the authoring layer lists (`scene::authored`), built by
-/// `edit::authoring::rendering::post_processing::authored` and handed in.
 pub use rusty_scene::authored::Authored;
 
-/// What one layer of the engine lists, by effect name.
 #[derive(Clone, Default)]
 pub struct Layers {
-    /// The renderer's effects: name, owner, the name of the option that gates it.
     pub render: Vec<(String, Owner, Option<String>)>,
-    /// Each effect's history declaration (#2092): `None` when it reads one, else
-    /// its reason for reading none.
     pub history: Vec<(String, Option<&'static str>)>,
-    /// The volume's effect fields.
     pub settings: Vec<String>,
-    /// The camera's serialized fields.
     pub camera: Vec<String>,
-    /// The authoring registry's effects, each with its knob paths.
     pub ops: Vec<(String, Vec<String>)>,
-    /// The camera effects' knob tables (`camera::TAA_KNOBS`), each with its knob
-    /// paths: their tween paths need their doc line as a volume knob's do.
     pub camera_knobs: Vec<(String, Vec<String>)>,
-    /// The `Graphics.*` registrars.
     pub api: Vec<String>,
-    /// The Inspector's sections (both cards).
     pub sections: Vec<String>,
-    /// Every `GraphicsOption`.
     pub options: Vec<String>,
-    /// `docs/api/Graphics.md` (and the test-only effects' own sections).
     pub docs: String,
-    /// The composite textures the effects declare, in binding order.
     pub textures: Vec<TextureUse>,
-    /// The assembled composite's WGSL.
     pub composite: String,
 }
 
-/// One declared composite texture, as the gate expects the composite to use it.
 #[derive(Clone)]
 pub struct TextureUse {
     pub effect: String,
-    /// Its name in the composite.
     pub name: String,
-    /// The start of its function's call, up to the argument after `c`
-    /// (`assemble::call_head`).
     pub call: String,
-    /// Its place among the textures that call passes.
     pub position: usize,
 }
 
-/// Every part missing from the engine's layers, given the two that sit above this
-/// crate: the `Graphics.*` registrars' names and the Inspector's sections' (the
-/// effect each draws). Empty when every effect is whole. The root's test calls it.
 pub fn problems(authored: Authored, api: &[&str], sections: &[&str]) -> Vec<String> {
     let names = |list: &[&str]| list.iter().map(|n| n.to_string()).collect();
     check(&engine_with(authored, names(api), names(sections)))
 }
 
-/// The renderer's effect names: the root's test passes them for a layer its build lacks.
 pub fn effect_names() -> Vec<&'static str> {
     POST_EFFECTS.iter().map(|e| e.name).collect()
 }
 
-/// The layers, the authoring one as `authored`, the registrars and the Inspector's
-/// sections read as the renderer's own names: a test hook, the integration
-/// suite's must-flag cases build their layers with it (`tests/post_effect_cases/`).
 pub fn engine_from(authored: Authored) -> Layers {
     let own: Vec<String> = effect_names().into_iter().map(String::from).collect();
     engine_with(authored, own.clone(), own)
 }
 
-/// The layers as the engine has them, with the three above this crate as given.
 fn engine_with(authored: Authored, api: Vec<String>, sections: Vec<String>) -> Layers {
     let not_effect = |f: &String| !PostProcessingComponent::NOT_EFFECTS.contains(&f.as_str());
     let docs = rusty_core::project::checkout().join("docs/api/Graphics.md");
@@ -125,13 +71,11 @@ fn engine_with(authored: Authored, api: Vec<String>, sections: Vec<String>) -> L
     }
 }
 
-/// An effect as [`Layers::render`] holds it.
 fn rendered(e: &PostEffect) -> (String, Owner, Option<String>) {
     let option = e.gate.option.map(|o| o.name().into());
     (e.name.into(), e.owner, option)
 }
 
-/// An effect's history declaration, as [`Layers::history`] holds it.
 fn history(e: &PostEffect) -> (String, Option<&'static str>) {
     let why = match e.history {
         History::None(why) => Some(why),
@@ -140,7 +84,6 @@ fn history(e: &PostEffect) -> (String, Option<&'static str>) {
     (e.name.into(), why)
 }
 
-/// Every declared composite texture, as the composite should use it.
 fn texture_uses() -> Vec<TextureUse> {
     (composite_textures().iter())
         .map(|t| TextureUse {
@@ -158,7 +101,6 @@ fn has(list: &[String], name: &str) -> bool {
     list.iter().any(|n| n == name)
 }
 
-/// Every part missing, or listed for no effect, as one line each.
 pub fn check(l: &Layers) -> Vec<String> {
     let mut problems = Vec::new();
     for (name, owner, option) in &l.render {
@@ -184,8 +126,6 @@ pub fn check(l: &Layers) -> Vec<String> {
     problems
 }
 
-/// Each declared composite texture its binding in group 1 lacks, or its own
-/// function's call doesn't pass at its place (after `c, f`).
 fn unbound(l: &Layers) -> Vec<String> {
     let mut problems = Vec::new();
     for (binding, t) in l.textures.iter().enumerate() {
@@ -212,7 +152,6 @@ fn unbound(l: &Layers) -> Vec<String> {
     problems
 }
 
-/// The parts the effect `name` lacks.
 fn missing(l: &Layers, name: &str, owner: Owner, option: Option<&str>) -> Vec<&'static str> {
     let mut lacks = Vec::new();
     match owner {
@@ -252,9 +191,6 @@ fn missing(l: &Layers, name: &str, owner: Owner, option: Option<&str>) -> Vec<&'
     lacks
 }
 
-/// An effect a layer lists that the renderer doesn't. The volume's lighting
-/// settings (`shadows`, `ssao`: `PostProcessingComponent::NOT_EFFECTS`) have their
-/// own sections and are no effect.
 fn unknown(l: &Layers) -> Vec<String> {
     let rendered: Vec<String> = l.render.iter().map(|(n, ..)| n.clone()).collect();
     let ops = l.ops.iter().map(|(n, _)| n.clone()).collect();

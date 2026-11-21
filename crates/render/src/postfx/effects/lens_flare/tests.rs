@@ -1,5 +1,3 @@
-//! Lens flare's gate and params, adapter-free.
-
 use super::{flare_params, flare_size};
 use crate::postfx::effects::EffectCx;
 use crate::postfx::params::PostSource;
@@ -85,7 +83,6 @@ fn the_shader_draws_as_many_ghosts_as_the_component_allows() {
     let max = LensFlare::MAX_GHOSTS;
     let bound = format!("const MAX_GHOSTS: i32 = {max};");
     assert!(wgsl.contains(&bound), "the WGSL's bound is `{bound}`");
-    // `ghost_scale` and `ghost_tint`: one case per ghost but the last, the default's.
     let cases = wgsl.matches("case ").count() as u32;
     assert_eq!(cases, 2 * (max - 1), "each switch covers every ghost");
 }

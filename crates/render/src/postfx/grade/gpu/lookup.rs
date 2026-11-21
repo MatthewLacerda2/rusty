@@ -1,7 +1,3 @@
-//! The Color Lookup on lavapipe (#1441): an identity `.cube` leaves the image
-//! byte-identical, a channel-swap LUT swaps red and blue, a malformed one grades
-//! neutral, and the bake follows the path, the contribution and the file.
-
 use std::path::Path;
 
 use super::{chain, Chain, W};
@@ -12,7 +8,6 @@ use rusty_scene::create::default_post_processing;
 use rusty_test_support::luts::{cube_of, identity_cube};
 use rusty_test_support::rebakes::{follows_rebakes, Bake};
 
-/// A colour card: black, white, greys and saturated colours, in scene-linear HDR.
 fn card() -> Vec<[f32; 3]> {
     (0..W)
         .map(|i| {
@@ -22,7 +17,6 @@ fn card() -> Vec<[f32; 3]> {
         .collect()
 }
 
-/// The default volume with the Color Lookup `path` at `contribution`.
 fn lookup(path: &str, contribution: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
     vc.color_lookup.lut = Some(path.to_string());
@@ -55,7 +49,6 @@ fn gpu_an_identity_lut_is_byte_identical_and_a_swap_swaps_red_and_blue() {
         plain.iter().any(|p| p[0].abs_diff(p[2]) > 50),
         "the card has colour"
     );
-    // No contribution is no LUT.
     assert_eq!(c.run(&row, 0.0, Some(&lookup(&swap, 0.0))), plain);
 }
 

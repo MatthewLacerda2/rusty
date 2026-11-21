@@ -1,16 +1,10 @@
-//! A lamp in a dark room: with volumetric fog its air glows, a `Baked` lamp's too
-//! (it is in no frame light list, #1703), and with it off the frame is the same
-//! bytes whatever the renderer's volume held before.
-
 use super::fixture::{
     draw, fog, glow, lamp, renderer, room, set_fog, settled, view, BRIGHT, LAMP_AT,
 };
 use rusty_components::{LightMode, VolumetricFog};
 
-/// How much brighter the air around a lamp must read with the fog on than off.
 const HALO: f32 = 0.5;
 
-/// The glow around the lamp, fog off and on, for a lamp in `mode`.
 fn off_and_on(mode: LightMode) -> Option<(f32, f32)> {
     let mut r = renderer()?;
     let mut scene = room(VolumetricFog::default());

@@ -1,13 +1,9 @@
-//! The SSR quality's march (#1521, #1522), off the GPU.
-
 use super::{fade, march, ssr_enabled, SMOOTHEST};
 use crate::postfx::params::PostSource;
 use rusty_components::Ssr;
 use rusty_core::settings::quality::{EffectQuality, QualityPresets};
 use rusty_core::settings::GraphicsSettings;
 
-/// On every seeded preset, Low marches fewer steps than Medium and Medium than
-/// High, and each reaches at least as far as the one below it.
 #[test]
 fn each_level_marches_more_steps_and_reaches_further() {
     for preset in &QualityPresets::default().presets {
@@ -40,7 +36,6 @@ fn each_level_marches_more_steps_and_reaches_further() {
     }
 }
 
-/// `Custom` marches the volume's own steps and length, whatever the preset.
 #[test]
 fn custom_marches_as_authored() {
     let ssr = Ssr {
@@ -53,8 +48,6 @@ fn custom_marches_as_authored() {
     assert_eq!((m.steps, m.step_length), (40, 0.3));
 }
 
-/// The fade (#1736): 0.2 of smoothness at most, whole by 0.9 above that, so
-/// `min_smoothness` 0.8 is SSR before the knob (0.8 to 0.9), and never zero wide.
 #[test]
 fn ssr_fades_in_over_at_most_a_fifth_and_is_whole_by_point_nine() {
     assert_eq!(fade(0.3), [0.3, Ssr::SMOOTHNESS_FADE]);
@@ -64,8 +57,6 @@ fn ssr_fades_in_over_at_most_a_fifth_and_is_whole_by_point_nine() {
     assert_eq!(fade(-2.0), [0.0, Ssr::SMOOTHNESS_FADE]);
 }
 
-/// A minimum no surface reaches (the forward pass's roughness floor is 0.04) runs
-/// no SSR, so the view builds no pyramid for a pass that would discard every pixel.
 #[test]
 fn a_minimum_smoothness_nothing_reaches_runs_no_ssr() {
     let mut vc = rusty_scene::create::default_post_processing();

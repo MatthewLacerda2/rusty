@@ -1,30 +1,12 @@
-//! The view's colour-grading LUT (#1440): the grading effects (white balance, Lift /
-//! Gamma / Gain, the color adjustments, the tonemapper, the display-gamma tweak and the
-//! Color Lookup, `effects::grading`) baked into one 32³ `Rgba16Float` table the
-//! composite reads with a single fetch, the way Unity URP and Unreal apply a grade.
-//!
-//! The table is rebaked by a compute pass, assembled from the effects' grade functions
-//! (`effects::assemble::bake_source`), only when its inputs change:
-//! [`GradeLut::prepare`] compares this frame's packed slots with the ones it last
-//! baked, so a still grade costs a frame nothing but the fetch. Each `PostFx`, so each
-//! view, owns one table: two views with different grades never rebake each other's.
-//! The bake pipeline ([`GradeBake`]) is the renderer's, built once for all of them,
-//! with the user LUTs volumes name (`effects::grading::color_lookup`, #1441): one of
-//! those is folded into the bake last, so it costs a pixel nothing.
-
 use super::effects::grading::color_lookup::{self, Lookup, UserLuts};
 use super::effects::{assemble, grade_slots, grade_slots_len, GradeCx};
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::shaders::ShaderRegistry;
 use rusty_components::PostProcessingComponent;
 
-/// The bake's compute pipeline: built once, on the `Renderer`, and shared by every
-/// view's [`GradeLut`], so a new view or render-texture slot compiles no shader.
-/// It keeps the user LUTs too, so two views naming one file upload it once.
 pub struct GradeBake {
     pipeline: wgpu::ComputePipeline,
     pub luts: UserLuts,
-    /// Bound in a user LUT's place while none applies.
     neutral: wgpu::TextureView,
 }
 
@@ -49,25 +31,15 @@ impl GradeBake {
     }
 }
 
-/// One view's grading LUT: the table, the inputs it was baked from and the bind
-/// group the shared [`GradeBake`] writes it through.
 pub struct GradeLut {
-    /// The 3D view the composite samples (`t_lut`, binding 7); it keeps the table's
-    /// texture alive.
     pub view: wgpu::TextureView,
     params_buffer: wgpu::Buffer,
-    /// Made against the bake pipeline's layout, for the user LUT whose id it holds
-    /// (`0`: none), and made again when that changes.
     bind_group: Option<(u64, wgpu::BindGroup)>,
-    /// The packed slots the table holds now, with the user LUT's id; `None` before
-    /// the first bake.
     baked: Option<(Vec<[f32; 4]>, u64)>,
 }
 
 impl GradeLut {
-    /// Texels per side. Mirrors `LUT_SIZE` in `postfx/grade.wgsl`.
     pub const SIZE: u32 = 32;
-    /// The bake's workgroup edge (`@workgroup_size(4, 4, 4)`).
     const GROUP: u32 = 4;
 
     pub fn new(device: &wgpu::Device) -> Self {
@@ -85,7 +57,6 @@ impl GradeLut {
         }
     }
 
-    /// The empty 32³ table, written by the bake and sampled by the composite.
     fn table(device: &wgpu::Device) -> wgpu::TextureView {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
             label: Some("Grading LUT"),
@@ -104,10 +75,6 @@ impl GradeLut {
         texture.create_view(&wgpu::TextureViewDescriptor::default())
     }
 
-    /// Make the table hold `volume`'s grade (`None`: neutral, no tonemap), then its
-    /// Color Lookup when that loads, through `bake`, baking only when they differ
-    /// from what it holds: a changed knob, contribution, file or re-read file.
-    /// Returns whether it baked.
     pub(crate) fn prepare(
         &mut self,
         (device, writes): (&wgpu::Device, crate::gpu::ops::Writes),
@@ -150,7 +117,6 @@ impl GradeLut {
         true
     }
 
-    /// The bake's bind group: the params, this table, and `user` as the user LUT.
     fn bind_group(
         &self,
         device: &wgpu::Device,
@@ -177,7 +143,6 @@ impl GradeLut {
         })
     }
 
-    /// Run the bake over every texel and submit it.
     fn dispatch(
         (device, queue): (&wgpu::Device, &wgpu::Queue),
         pipeline: &wgpu::ComputePipeline,
@@ -200,8 +165,6 @@ impl GradeLut {
     }
 }
 
-/// Byte equality: a NaN knob compares equal to itself, so it never forces a rebake
-/// every frame.
 fn same(a: &[[f32; 4]], b: &[[f32; 4]]) -> bool {
     bytemuck::cast_slice::<_, u8>(a) == bytemuck::cast_slice::<_, u8>(b)
 }

@@ -1,8 +1,3 @@
-//! A fixed reactivity follows a sprite's coverage (#1845): a `Full` sprite's
-//! transparent corners leave the surface behind them as an `Off` one's do, and only
-//! where it shows does it make the pixel reactive. Also the muzzle flash the
-//! viewmodel's test draws over its gun (`viewmodel`).
-
 use glam::Vec3;
 
 use super::super::fixture::{diff, eye, frame, pixel, project, renderer, taa_scene, view};
@@ -10,8 +5,6 @@ use super::super::wall::noisy_wall;
 use rusty_components::particle::{Particle, ParticleEmitterComponent};
 use rusty_components::TaaReactive;
 
-/// A 16×16 white sprite in the temp dir, opaque in its middle 4×4 and clear
-/// around it, as a muzzle flash's texture is.
 fn cored_sprite() -> String {
     let path = rusty_test_support::temp::dir().join("rusty_1845_taa_cored.png");
     let core = 6..10;
@@ -23,7 +16,6 @@ fn cored_sprite() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// One still sprite `size` across at `at`, reactivity `reactive`, on a new entity.
 pub(super) fn flash(
     scene: &mut rusty_scene::Scene,
     at: Vec3,
@@ -44,8 +36,6 @@ pub(super) fn flash(
 
 const AT: Vec3 = Vec3::new(0.0, 0.0, -4.0);
 
-/// Eight frames of a still camera on a noise wall behind a cored sprite of
-/// `reactive`, so the jitter's sub-pixel shift shows the frame weight; the last.
 fn sprite_over_wall(reactive: TaaReactive) -> Option<Vec<u8>> {
     let mut r = renderer()?;
     let (mut scene, _) = taa_scene(true, false);
@@ -72,7 +62,6 @@ fn gpu_a_full_sprites_clear_corners_leave_the_wall_alone() {
         let span = move |c: u32| c.saturating_sub(d)..=c + d;
         span(cx).flat_map(move |x| span(cy).map(move |y| (x, y)))
     };
-    // The sprite's quad reaches about 10 pixels out; its core about 3.
     let ring = near(9).filter(|&(x, y)| x.abs_diff(cx).max(y.abs_diff(cy)) >= 7);
     let corners = ring.map(|p| diff(&full, &off, p)).max().unwrap();
     let core = near(2).map(|p| diff(&full, &off, p)).max().unwrap();

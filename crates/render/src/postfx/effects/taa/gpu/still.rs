@@ -1,9 +1,3 @@
-//! #1846 on lavapipe: a still frame converges exactly as URP's resolve does, its
-//! two rules on or off, at the scene's size and upscaling: a noise wall behind a
-//! cube, and a fence whose gaps, a third of a pixel, show the sky in some frames'
-//! jitter and not in others' (no reveal: the test reads the 3×3's nearest surface).
-//! And what the other tests compare a frame with one rule off by ([`run`]).
-
 use glam::Vec3;
 
 use super::super::params::Rules;
@@ -15,19 +9,15 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::settings::render_scale::RenderScale;
 use rusty_scene::{Camera, Scene};
 
-/// Both rules off: URP's resolve.
 pub(crate) const OFF: Rules = Rules {
     moving: false,
     reveal: false,
 };
-/// The reveal test off, the moving pixel's weight kept.
 pub(super) const NO_REVEAL: Rules = Rules {
     moving: true,
     reveal: false,
 };
 
-/// The last of `n` frames of `scene` in `v`, frame `f` through `cam(f)`, the
-/// resolve keeping only `rules` from the second frame (the first holds no history).
 pub(crate) fn run(
     r: &mut Renderer,
     v: &mut RenderView,
@@ -43,13 +33,11 @@ pub(crate) fn run(
     last
 }
 
-/// `v`'s resolve keeps only `rules` from its next frame on; TAA must have run.
 pub(super) fn keep(v: &mut RenderView, rules: Rules) {
     let h = v.post_fx.targets.get_mut::<TaaHistory>().expect("TAA ran");
     h.rules = rules;
 }
 
-/// How many bytes of two frames differ.
 pub(crate) fn differing(a: &[u8], b: &[u8]) -> usize {
     a.iter().zip(b).filter(|(a, b)| a != b).count()
 }
@@ -61,7 +49,6 @@ fn scaled(r: &Renderer, scale: f32) -> RenderView {
     v
 }
 
-/// A fence 5 m out of slats 0.46 m wide, 4 cm apart: a third of a pixel.
 fn fence(scene: &mut Scene) {
     for i in -6..6 {
         let id = cube(scene, Vec3::new(i as f32 * 0.5 + 0.25, 0.0, -5.0));

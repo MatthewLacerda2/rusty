@@ -1,28 +1,3 @@
-//! crates/render/src/postfx/effects/depth_of_field/ — depth of field (#1445), Unity URP's Gaussian
-//! and Bokeh modes, in `postfx/depth_of_field.wgsl`.
-//!
-//! Runs first in the chain, on the HDR scene, before motion blur (Unity's order):
-//! the **CoC** pass turns each pixel's view depth into a signed circle of confusion;
-//! the **prefilter** brings colour and CoC to the working resolution (half on Medium,
-//! full on High, off on Low); the **blur** is a separable Gaussian (two passes) or a
-//! Bokeh disc gather with near and far fields kept apart plus a tent filter. The
-//! gather spreads its taps over each pixel's own reach (its CoC, or the near blur a
-//! tile pass finds around it), so a 2 px blur is as dense as a 27 px one. The
-//! **composite** blends the sharp scene towards the blur by each pixel's CoC. Its
-//! output is what motion blur, bloom and the composite read
-//! ([`super::PostFx::scene_color`]).
-//!
-//! **The depth is each pixel's own camera's**, along its view axis, from the
-//! velocity target (#1435, #1436), never the depth buffer, which a `DepthOnly`
-//! overlay has cleared. Linear view depth, not the straight-line distance, so the
-//! focus is a plane: a wall at the focus distance is sharp to its corners. A pixel
-//! an overlay camera drew (a viewmodel's gun) has no CoC and is composited sharp:
-//! the world's focus never reaches it. So the velocity target is written whenever a
-//! view runs depth of field, not only motion blur (`motion::wanted`).
-//!
-//! The pipelines are the renderer's ([`DofPasses`], built on first use and warmed);
-//! the targets are each view's ([`DofTargets`]), held only while it runs.
-
 mod effect;
 mod params;
 
@@ -38,11 +13,8 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 
-/// The full-resolution CoC's format: a signed radius in pixels. The Bokeh tiles'
-/// near reach uses it too.
 const COC_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
 
-/// The depth-of-field pipelines, shared by every view.
 pub(crate) struct DofPasses {
     layout: wgpu::BindGroupLayout,
     coc: LazyPipeline,
@@ -109,7 +81,6 @@ impl DofPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 9] {
         [
             &self.coc,
@@ -125,21 +96,13 @@ impl DofPasses {
     }
 }
 
-/// One view's depth-of-field targets, kept while its size, working divisor and
-/// Bokeh tile size hold.
 pub(crate) struct DofTargets {
-    /// The full size, divisor and tile size (0: Gaussian, no tiles) these were made for.
     key: ((u32, u32), u32, u32),
-    /// The full-resolution CoC.
     coc: PfxTarget,
-    /// The prefiltered working image, kept for its reduced CoC.
     work: PfxTarget,
-    /// The working-resolution ping-pong pair; the blur ends in `a`.
     a: PfxTarget,
     b: PfxTarget,
-    /// Bokeh's tiles: each tile's near reach, then its 3×3 neighbourhood's.
     tiles: Option<(PfxTarget, PfxTarget)>,
-    /// The finished HDR scene motion blur, bloom and the composite read.
     pub(crate) focused: PfxTarget,
     params: wgpu::Buffer,
 }
@@ -172,15 +135,9 @@ impl DofTargets {
     }
 }
 
-/// One pass of the chain: its pipeline, the views it binds (input, CoC, blur,
-/// work) and the target it writes.
 type Step<'a> = (&'a LazyPipeline, [&'a wgpu::TextureView; 4], &'a PfxTarget);
 
 impl DofTargets {
-    /// The passes in order. Each binds no texture it writes, and every pass after
-    /// the prefilter reads its reduced CoC from `work`; the CoC pass reads the
-    /// view depths from the velocity target and the prefilter, which writes `work`,
-    /// binds the full CoC in its place.
     fn plan<'a>(
         &'a self,
         passes: &'a DofPasses,
@@ -210,10 +167,6 @@ impl DofTargets {
 }
 
 impl PostFx {
-    /// Blur this frame's scene by depth with `params`, or drop the targets when
-    /// `params` is `None` or the view wrote no velocity target this frame.
-    /// Afterwards [`PostFx::focused_color`] is the image TAA (or, without it, motion
-    /// blur) reads.
     pub(crate) fn run_depth_of_field(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -278,7 +231,6 @@ mod tile_gpu_tests;
 
 #[cfg(test)]
 impl PostFx {
-    /// Whether the view holds depth of field's targets (it ran this frame).
     pub(crate) fn holds_dof(&self) -> bool {
         self.targets.get::<DofTargets>().is_some()
     }

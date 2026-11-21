@@ -1,7 +1,3 @@
-//! What TAA's GPU tests share (#1702): the motion-vector fixture's renderer, scene
-//! and camera (`render::motion::gpu_fixture`), with the camera's TAA on or off, and
-//! a frame read back at any view size.
-
 use glam::{Vec3, Vec4};
 
 use super::super::TaaHistory;
@@ -11,11 +7,6 @@ use rusty_scene::{Camera, Scene};
 
 pub(crate) use crate::motion::gpu_fixture::{cube, eye, pixel, project, renderer, view};
 
-/// The fixture's scene, its camera running TAA when `taa` (FXAA on, its default)
-/// or neither anti-aliasing when `fxaa` is false too. Its anti-flicker is 0, URP's
-/// resolve, not a camera's default (HDRP's 0.5): these tests measure URP's resolve
-/// and the rules on it, and `still`'s byte comparisons with URP's hold only there.
-/// A test of the anti-flicker or its default sets it.
 pub(crate) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
     let (mut scene, cam) = scene(false);
     let mut c = scene.world.camera_mut(cam).unwrap();
@@ -24,7 +15,6 @@ pub(crate) fn taa_scene(taa: bool, fxaa: bool) -> (Scene, u32) {
     (scene, cam)
 }
 
-/// Render `scene` through `cam` into `view` and read the finished frame (RGBA8).
 pub(crate) fn frame(
     r: &mut Renderer,
     view: &mut RenderView,
@@ -38,13 +28,11 @@ pub(crate) fn frame(
     readback::read_texture_rgba8(&r.device, &r.queue, target, size.width, size.height)
 }
 
-/// One frame of `scene` in a fresh view (no history).
 pub(crate) fn fresh_frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let mut v = view(r);
     frame(r, &mut v, scene, cam)
 }
 
-/// `n` frames of a still `scene`; the last one.
 pub(crate) fn settle(
     r: &mut Renderer,
     view: &mut RenderView,
@@ -56,23 +44,19 @@ pub(crate) fn settle(
     frame(r, view, scene, cam)
 }
 
-/// A view `scale` times the fixture's size on each side.
 pub(crate) fn big_view(r: &Renderer, scale: u32) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W * scale, H * scale)
 }
 
-/// Whether `view` holds TAA's history (it ran this frame).
 pub(crate) fn holds(view: &RenderView) -> bool {
     view.post_fx.targets.get::<TaaHistory>().is_some()
 }
 
-/// The largest per-channel difference between two fixture-size frames at `(x, y)`.
 pub(crate) fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
     let i = ((y * W + x) * 4) as usize;
     (0..3).map(|c| a[i + c].abs_diff(b[i + c])).max().unwrap()
 }
 
-/// A unit cube at `at`, turned so its edges cross the pixel grid at an angle.
 pub(crate) fn tilted_cube(scene: &mut Scene, at: Vec3) -> u32 {
     let id = cube(scene, at);
     let turn = glam::Quat::from_rotation_z(0.5) * glam::Quat::from_rotation_y(0.4);
@@ -80,7 +64,6 @@ pub(crate) fn tilted_cube(scene: &mut Scene, at: Vec3) -> u32 {
     id
 }
 
-/// An sRGB byte's linear value, and back: averages of colour are taken in linear.
 pub(crate) fn to_linear(b: u8) -> f32 {
     let c = b as f32 / 255.0;
     if c <= 0.04045 {
@@ -99,8 +82,6 @@ pub(crate) fn to_srgb(l: f32) -> f32 {
     c * 255.0
 }
 
-/// A frame `scale` times the fixture's size, box-filtered (in linear) to the
-/// fixture's: the supersampled reference, as sRGB values.
 pub(crate) fn downsample(big: &[u8], scale: u32) -> Vec<Vec4> {
     let (w, n) = (W * scale, (scale * scale) as f32);
     let mut out = Vec::with_capacity((W * H) as usize);
@@ -129,7 +110,6 @@ pub(crate) fn downsample(big: &[u8], scale: u32) -> Vec<Vec4> {
     out
 }
 
-/// Each pixel's largest channel distance from `reference`.
 pub(crate) fn errors(frame: &[u8], reference: &[Vec4]) -> Vec<f32> {
     let px = |i: usize| {
         Vec4::new(

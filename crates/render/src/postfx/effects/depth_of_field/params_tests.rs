@@ -1,5 +1,3 @@
-//! The depth of field's params and circle of confusion (#1445), without an adapter.
-
 use super::*;
 
 fn dof(mode: DofMode) -> DepthOfField {
@@ -41,7 +39,6 @@ fn bokeh_blurs_both_sides_of_the_focus_and_grows_with_the_lens() {
         p.coc(1.0) < 0.0 && p.coc(8.0) > 0.0,
         "near negative, far positive"
     );
-    // A 50 mm lens at f/5.6 focused at 2 m: f² / (N (F − f)) on a 24 mm sensor.
     let infinity = 0.5 * 0.05 * 0.05 / (5.6 * 1.95) / SENSOR_HEIGHT * 1080.0;
     assert!(
         (p.coc(1e9) - infinity).abs() < 1e-2,
@@ -62,8 +59,6 @@ fn bokeh_blurs_both_sides_of_the_focus_and_grows_with_the_lens() {
 
 #[test]
 fn bokeh_tiles_span_the_largest_working_blur_and_gaussian_has_none() {
-    // 27 px at 1080p, 13.5 working px at half resolution: 14 px tiles, so a 3×3 of
-    // them holds every tap's reach.
     let half = DofParams::new(&dof(DofMode::Bokeh), 1080, 2).unwrap();
     assert_eq!(half.tile(), 14);
     let full = DofParams::new(&dof(DofMode::Bokeh), 1080, 1).unwrap();
@@ -77,7 +72,6 @@ fn bokeh_rings_stay_close_at_every_resolution_and_the_circle_caps_past_4k() {
     for (height, divisor) in [(1080, 1), (1440, 1), (2160, 1), (2160, 2), (4320, 1)] {
         let p = DofParams::new(&dof(DofMode::Bokeh), height, divisor).unwrap();
         let (max, spacing) = (p.shape[1] / divisor as f32, p.focus[2]);
-        // The shader's ring count: a ring per spacing, at least three.
         let rings = (max / spacing).ceil().max(3.0);
         assert!(rings <= BOKEH_MAX_RINGS, "{height}p: {rings} rings");
         assert!(
