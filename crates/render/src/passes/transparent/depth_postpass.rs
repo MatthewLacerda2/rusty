@@ -14,6 +14,7 @@
 //! field move them as solids. A view with no velocity target draws none of them.
 
 use crate::draw::batch::DrawBatch;
+use crate::gpu::groups;
 use crate::gpu::ops::CountedEncoder as _;
 use crate::gpu::pipelines::surface::SolidPass;
 use crate::timing::GpuPass;
@@ -89,8 +90,8 @@ impl Renderer {
                 timestamp_writes: self.gpu_timer.writes(GpuPass::Transparent),
                 occlusion_query_set: None,
             });
-            pass.set_bind_group(0, &self.global_bind_group, &[]);
-            pass.set_bind_group(3, &self.shadow_bind_group, &[]);
+            pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+            pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
             let pipelines = &self.depth_postpass_pipelines;
             let solid_pass = SolidPass::DepthPostpass(pipelines, velocity.is_some());
             self.draw_batches(&mut pass, &depth, solid_pass);

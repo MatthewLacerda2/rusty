@@ -23,6 +23,11 @@ use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle};
 use rusty_scene::{Camera, Scene};
 
+/// The blended passes' globals (`passes::blended::Globals`).
+const GLOBALS: u32 = 0;
+/// A ribbon's texture.
+const TEXTURE: u32 = 1;
+
 /// One ribbon's slice of the frame's index buffer and how to draw it.
 struct RibbonDraw {
     blend: ParticleBlend,
@@ -131,13 +136,13 @@ impl Renderer {
         {
             let reactive = view.post_fx.taa_reactive().is_some();
             let mut pass = effect_pass(encoder, view, self.gpu_timer.writes(GpuPass::Ribbons));
-            pass.set_bind_group(0, &rr.globals_bind_group, &[]);
+            pass.set_bind_group(GLOBALS, &rr.globals_bind_group, &[]);
             pass.set_vertex_buffer(0, vertices.slice(..));
             pass.set_index_buffer(indices.slice(..), wgpu::IndexFormat::Uint32);
             for (draw, texture) in ribbons.draws.iter().zip(textures) {
                 let tex = texture.as_deref().unwrap_or(&rr.white);
                 pass.set_pipeline(rr.pipeline_for(draw.blend, reactive));
-                pass.set_bind_group(1, &tex.bind_group, &[]);
+                pass.set_bind_group(TEXTURE, &tex.bind_group, &[]);
                 pass.draw_indexed(draw.first..draw.first + draw.count, 0, 0..1);
             }
         }

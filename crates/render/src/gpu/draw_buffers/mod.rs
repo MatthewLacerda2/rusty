@@ -1,5 +1,5 @@
 //! crates/render/src/gpu/draw_buffers/ — the forward pass's instancing buffers (#470), and
-//! the resources every group-1 bind group is built from.
+//! the resources every per-draw bind group is built from.
 //!
 //! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
 //! bind groups kept alive per entity). A camera's solids are four packed arrays —
@@ -36,7 +36,9 @@ use wgpu::util::DeviceExt;
 mod objects;
 mod pack;
 
-pub(crate) use pack::{group1, joint_array_bytes, push_palette, uniform_array_bytes, JointMatrix};
+pub(crate) use pack::{
+    draw_group, joint_array_bytes, push_palette, uniform_array_bytes, JointMatrix,
+};
 
 use super::grow_buffer::GrowBuffer;
 use super::uniforms::ObjectData;
@@ -48,8 +50,8 @@ use crate::{DrawUniform, InstanceData, MaterialData};
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 
-/// Where [`DrawBuffers::group1_buffers`] puts the instances it was given.
-pub(crate) const GROUP1_INSTANCES: usize = 2;
+/// Where [`DrawBuffers::draw_group_buffers`] puts the instances it was given.
+pub(crate) const DRAW_GROUP_INSTANCES: usize = 2;
 
 /// The shared identity joint: element 0 of the frame's joint array, and the whole of
 /// the array overlays bind.
@@ -115,7 +117,7 @@ impl DrawBuffers {
             bytemuck::bytes_of(&InstanceData::IDENTITY),
             U::STORAGE,
         );
-        let bind_group = group1(
+        let bind_group = draw_group(
             device,
             layout,
             "Frame Draw Bind Group",
@@ -193,7 +195,7 @@ impl DrawBuffers {
         std::mem::take(&mut self.written)
     }
 
-    /// The one group-1 bind group every solid draw binds, at [`Self::offsets`].
+    /// The one per-draw bind group every solid draw binds, at [`Self::offsets`].
     pub(crate) fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
@@ -208,7 +210,7 @@ impl DrawBuffers {
         self.instances.buffer()
     }
 
-    /// A group 1 over these buffers with `instances` in place of the camera's own:
+    /// A per-draw group over these buffers with `instances` in place of the camera's own:
     /// the instances GPU occlusion culling kept (#1963), at their batches' runs.
     pub(crate) fn group_with_instances(
         &self,
@@ -219,20 +221,20 @@ impl DrawBuffers {
         self.group_over(device, layout, ("Culled Draw Bind Group", instances))
     }
 
-    /// The group 1 over these buffers and `instances`, labelled.
+    /// The per-draw group over these buffers and `instances`, labelled.
     fn group_over(
         &self,
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
         (label, instances): (&str, &wgpu::Buffer),
     ) -> wgpu::BindGroup {
-        group1(device, layout, label, self.group1_buffers(instances))
+        draw_group(device, layout, label, self.draw_group_buffers(instances))
     }
 
-    /// The buffers a group 1 over `instances` binds, in [`group1`]'s order: what a
+    /// The buffers a per-draw group over `instances` binds, in [`draw_group`]'s order: what a
     /// kept group compares to know it still names them (#1963). `instances` is at
-    /// [`GROUP1_INSTANCES`].
-    pub(crate) fn group1_buffers<'a>(
+    /// [`DRAW_GROUP_INSTANCES`].
+    pub(crate) fn draw_group_buffers<'a>(
         &'a self,
         instances: &'a wgpu::Buffer,
     ) -> [&'a wgpu::Buffer; 6] {
@@ -244,7 +246,7 @@ impl DrawBuffers {
             self.proxies.buffer(),
             self.objects.buffer(),
         ];
-        debug_assert!(std::ptr::eq(buffers[GROUP1_INSTANCES], instances));
+        debug_assert!(std::ptr::eq(buffers[DRAW_GROUP_INSTANCES], instances));
         buffers
     }
 

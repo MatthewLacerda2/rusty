@@ -17,6 +17,10 @@ pub(crate) fn bind_entry(
     wgpu::BindGroupEntry { binding, resource }
 }
 
+/// The index of the one bind group a pass outside the solid path binds, when it
+/// binds only one (a blit, a compute step, a fullscreen pass).
+pub(crate) const ONLY_GROUP: u32 = 0;
+
 /// Group 0's one sampler for the engine-owned textures (binding 18): the sky's
 /// reflection cube, the reflection probes' cube array, the lightmap pages with their
 /// direction and shadowmask pages, and the volumetric fog volume. Linear min, mag
@@ -43,6 +47,7 @@ pub(crate) mod commands;
 pub(crate) mod draw_buffers;
 pub(crate) mod fullscreen;
 pub(crate) mod global_group;
+pub(crate) mod groups;
 pub(crate) mod grow_buffer;
 pub(crate) mod kept;
 pub(crate) mod layout_entries;

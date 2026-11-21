@@ -115,7 +115,7 @@ impl ProbePrefilter {
             });
             pass.set_pipeline(&self.pipeline);
             for (size, group) in &groups {
-                pass.set_bind_group(0, group, &[]);
+                pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
                 let n = size.div_ceil(GROUP);
                 pass.dispatch_workgroups(n, n, 6);
             }

@@ -37,6 +37,7 @@
 //! the frame's top-level `submit`) after it.
 
 use crate::gpu::commands::Commands;
+use crate::ui::pipeline::{BATCH_GROUP, SOURCE_GROUP};
 use std::rc::Rc;
 
 use glam::Vec2;
@@ -174,9 +175,13 @@ impl Renderer {
                     if !ui.bind_batch(&mut pass, at, UiPass::Screen(format), &mut bound) {
                         continue;
                     }
-                    pass.set_bind_group(0, ui.source_group(&batch.source), &[]);
+                    pass.set_bind_group(SOURCE_GROUP, ui.source_group(&batch.source), &[]);
                     let slot = cache.effects.batch_offset(i, b);
-                    pass.set_bind_group(1, cache.effects.group(&self.screen_key(batch)), &[slot]);
+                    pass.set_bind_group(
+                        BATCH_GROUP,
+                        cache.effects.group(&self.screen_key(batch)),
+                        &[slot],
+                    );
                     let s = batch
                         .clip
                         .rect

@@ -30,7 +30,7 @@ pub(crate) struct SsaoTargets {
     pub(super) blur_group: wgpu::BindGroup,
     /// The upsample's group, over `blurred`; `None` with it.
     pub(super) upsample_group: Option<wgpu::BindGroup>,
-    /// The forward pass's group 3 with this view's AO bound.
+    /// The forward pass's scene group with this view's AO bound.
     pub(crate) forward_group: wgpu::BindGroup,
 }
 
@@ -86,7 +86,7 @@ impl SsaoTargets {
         }
     }
 
-    /// The full-resolution occlusion the forward pass reads (SSIL's group 3 binds
+    /// The full-resolution occlusion the forward pass reads (SSIL's scene group binds
     /// it beside its own result, #1750).
     pub(crate) fn ao(&self) -> &wgpu::TextureView {
         &self.ao

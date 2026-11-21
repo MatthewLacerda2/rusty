@@ -54,6 +54,7 @@ use std::ops::Range;
 use super::clips::Clip;
 use super::ShadowRenderer;
 use crate::draw::batch::IndexRun;
+use crate::gpu::groups;
 use crate::gpu::material_cache::MaterialCache;
 use crate::gpu::pipelines::surface::SurfaceShaders;
 use crate::gpu::pipelines::winding::Facing;
@@ -231,7 +232,7 @@ impl ShadowRenderer {
             Sweep::AtlasDynamic => (&self.atlas.dynamic_casters, &self.atlas.global),
         };
         let offset = (volume as u64 * super::LIGHT_SPACE_STRIDE) as u32;
-        render_pass.set_bind_group(0, global, &[offset]);
+        render_pass.set_bind_group(groups::GLOBAL, global, &[offset]);
         let (mut bound, mut record) = (None, None);
         for batch in batches {
             let Some(gpu_mesh) = frame.gpu_mesh(batch.key.mesh) else {
@@ -245,11 +246,15 @@ impl ShadowRenderer {
             }
             if record != Some(batch.record) {
                 let offsets = CasterBuffer::offsets(batch.record);
-                render_pass.set_bind_group(1, &casters.bind_group, &offsets);
+                render_pass.set_bind_group(groups::DRAW, &casters.bind_group, &offsets);
                 record = Some(batch.record);
             }
             if let Some(clip) = clip {
-                render_pass.set_bind_group(2, frame.materials.group(clip.material), &[]);
+                render_pass.set_bind_group(
+                    groups::MATERIAL,
+                    frame.materials.group(clip.material),
+                    &[],
+                );
             }
             render_pass.set_vertex_buffer(0, gpu_mesh.vertex_buffer.slice(..));
             render_pass

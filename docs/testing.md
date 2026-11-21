@@ -1523,10 +1523,10 @@ every binary's open makes them.
 
     | switch | what goes (forward pass) | what is read instead |
     |---|---|---|
-    | `render.shadows` | the sun's cascades and the point/spot atlas tiles (group 3, bindings 0, 1, 4, 5): no shadow pass is drawn | a cascade count of 0 and no light's tile |
-    | `render.lightmaps` | only the bound colour, direction and shadowmask pages (group 0, bindings 14, 16, 19) | the 1x1 stand-ins; each object's `lightmap_page` 0. What stays: the bake's light modes (a `Baked` light still draws no realtime light, so what only its pages lit goes dark; a `Mixed` one keeps the mode the bake recorded), the shadowmask channels it assigned (with no mask bound, a masked light's static casters are drawn into its maps, as under Distance Shadowmask) and the light probes' SH and occlusion |
-    | `render.reflection_probes` | the resident probes' cube array (group 0, binding 4) | the 1-cube stand-in; every object reads the sky's cube |
-    | `render.clustered_lights` | the point, spot and area lights in the cluster lists (group 0, bindings 8, 9) | every cluster's light range empty (the lights stay at binding 7); the decal lists stay, and so do the lamps' shadow tiles in the atlas: `render.shadows` takes those |
+    | `render.shadows` | the sun's cascades and the point/spot atlas tiles (the scene group, `groups::SCENE`: bindings 0, 1, 4, 5): no shadow pass is drawn | a cascade count of 0 and no light's tile |
+    | `render.lightmaps` | only the bound colour, direction and shadowmask pages (the global group, bindings 14, 16, 19) | the 1x1 stand-ins; each object's `lightmap_page` 0. What stays: the bake's light modes (a `Baked` light still draws no realtime light, so what only its pages lit goes dark; a `Mixed` one keeps the mode the bake recorded), the shadowmask channels it assigned (with no mask bound, a masked light's static casters are drawn into its maps, as under Distance Shadowmask) and the light probes' SH and occlusion |
+    | `render.reflection_probes` | the resident probes' cube array (the global group, binding 4) | the 1-cube stand-in; every object reads the sky's cube |
+    | `render.clustered_lights` | the point, spot and area lights in the cluster lists (the global group, bindings 8, 9) | every cluster's light range empty (the lights stay at binding 7); the decal lists stay, and so do the lamps' shadow tiles in the atlas: `render.shadows` takes those |
     | `render.ssao` | the SSAO pass, in every view (the Scene view's too) | the 1x1 white AO, as with `option.ssao=false` |
     | `render.ssil` | the SSIL pass, in every view (the Scene view's too) | no indirect term, as with `option.ssil=false` |
 

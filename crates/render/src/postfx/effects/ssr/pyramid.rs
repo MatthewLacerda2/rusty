@@ -264,7 +264,7 @@ impl HitPyramids {
                 multiview_mask: None,
             });
             rp.set_pipeline(pass.downsample.get());
-            rp.set_bind_group(0, group, &[]);
+            rp.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
             rp.draw(0..3, 0..1);
         }
     }

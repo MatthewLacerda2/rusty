@@ -3,7 +3,7 @@
 //!
 //! A surface (or ui) block param marked [`Param::runtime`](super::blocks::Param) is not
 //! baked as a WGSL `const`: the assembler reads it from slot `n` of the material's
-//! param uniform (`@group(2) @binding(6)`, a fixed `array<vec4<f32>, 16>`), so a
+//! param uniform (the material group's binding [`PARAM_BINDING`], a fixed `array<vec4<f32>, 16>`), so a
 //! script changes it with a buffer write — no re-bake, no pipeline rebuild. The
 //! assembler records `param → slot` in a [`ParamLayout`], baked beside the module as
 //! `<name>.params.json`, so the API and the renderer resolve names without parsing
@@ -34,15 +34,22 @@ use super::{engine_shader_dir, DEFAULT_OUT_DIR};
 /// Runtime param slots per material: one `vec4` each, so 16 slots = 64 floats.
 pub const PARAM_SLOTS: usize = 16;
 
-/// The group-2 binding the param uniform sits at (after the main maps + albedo's
+/// The material group's binding the param uniform sits at (after the main maps + albedo's
 /// sampler; the detail map sits at 15, below the samplers, #1997).
 pub const PARAM_BINDING: u32 = 6;
 
 /// A material's param uniform, as the GPU reads it.
 pub type PackedParams = [[f32; 4]; PARAM_SLOTS];
 
-/// The WGSL a surface variant with runtime params declares (binding = [`PARAM_BINDING`]).
-pub const UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 16>,\n};\n@group(2) @binding(6) var<uniform> shader_params: ShaderParams;\n";
+/// The WGSL a surface variant with runtime params declares: the material group
+/// ([`groups::MATERIAL`](super::groups::MATERIAL)) at [`PARAM_BINDING`].
+pub fn uniform_decl() -> String {
+    format!(
+        "struct ShaderParams {{\n    v: array<vec4<f32>, 16>,\n}};\n\
+         @group({}) @binding({PARAM_BINDING}) var<uniform> shader_params: ShaderParams;\n",
+        super::groups::MATERIAL
+    )
+}
 
 /// The WGSL every ui variant declares (#427): its graphic's rect in canvas NDC
 /// (origin, x and y axes), the rect's size in target pixels, the clock, and the 16
@@ -50,7 +57,7 @@ pub const UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 1
 pub const UI_UNIFORM_DECL: &str = "struct UiShade {\n    origin_x: vec4<f32>,\n    axis_y_size: vec4<f32>,\n    time: vec4<f32>,\n    v: array<vec4<f32>, 16>,\n};\n@group(3) @binding(0) var<uniform> shader_params: UiShade;\n";
 
 /// The WGSL a postfx variant with runtime params declares (#671): the same slots as
-/// [`UNIFORM_DECL`], in the effect's own bind group after the chain's IO group.
+/// [`uniform_decl`], in the effect's own bind group after the chain's IO group.
 pub const POSTFX_UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 16>,\n};\n@group(1) @binding(0) var<uniform> shader_params: ShaderParams;\n";
 
 /// One runtime param: which block instance and param it is, its uniform slot, its

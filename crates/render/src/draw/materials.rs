@@ -1,6 +1,6 @@
 //! crates/render/src/draw/materials.rs — the material bind-group cache: a material's eight
 //! maps (`map_slots::MAP_SLOTS`, #1997, #2151) resolved to resident textures and
-//! folded into one shared group-2 bind group per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
+//! folded into one shared material bind group (`groups::MATERIAL`) per distinct signature (#202, #207, #470). Used by the entity solids and by mesh
 //! particles (#440), so the same material always binds the same group. A material
 //! whose surface shader has runtime params (#399) gets its own group over its own
 //! param buffer, rewritten here when its values change. The extra shader texture
@@ -170,7 +170,7 @@ impl Renderer {
         }
     }
 
-    /// Build a group(2) material bind group from the resolved textures (the ten
+    /// Build a material bind group (`groups::MATERIAL`) from the resolved textures (the ten
     /// maps in `MAP_SLOTS` order: albedo, metallic, roughness, normal, emissive,
     /// detail, occlusion, specular level, height, detail mask; then the extra slots), against
     /// `material_layout`. Each map binds at its row's binding (#202, #207, #1997,
@@ -197,7 +197,7 @@ impl Renderer {
     }
 }
 
-/// A group(2) bind group against `layout` over `maps` (in
+/// A material bind group against `layout` over `maps` (in
 /// [`material_texture_paths`] order) and the param uniform `params`: the layout
 /// [`Renderer::material_bind_group`] describes. The one builder of a material
 /// group, so the default group and every material's bind the same entries.

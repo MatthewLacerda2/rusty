@@ -266,6 +266,6 @@ fn dispatch(
     count: u32,
 ) {
     pass.set_pipeline(pipeline.get());
-    pass.set_bind_group(0, group, &[]);
+    pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
     pass.dispatch_workgroups(count.div_ceil(64), 1, 1);
 }

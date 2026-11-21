@@ -1,5 +1,5 @@
 //! The material's map slots (#202, #207, #1997, #2151, #2191, #2258): one table, [`MAP_SLOTS`],
-//! whose rows say which asset field each group-2 texture comes from, at which
+//! whose rows say which asset field each material-group texture comes from, at which
 //! binding, holding what, and which record flag goes off while it has no texture.
 //! `materials` builds the bind group from it; a new map is one [`Map`] and one row
 //! (PR #2151's *Seam*).
@@ -28,10 +28,10 @@ pub(crate) enum Map {
     DetailMask,
 }
 
-/// One group-2 material map: everything the renderer knows about it, in one row.
+/// One material map (the material group, `groups::MATERIAL`): everything the renderer knows about it, in one row.
 pub(crate) struct MapSlot {
     pub map: Map,
-    /// Its texture's group-2 binding; its sampler's is [`map_sampler_binding`].
+    /// Its texture's binding in the material group; its sampler's is [`map_sampler_binding`].
     pub binding: u32,
     /// What it holds, which decides its view (sRGB for `Colour`, raw otherwise,
     /// glTF 2.0, #647), how an uncompressed upload's mips average (#1322) and which
@@ -164,7 +164,7 @@ const _: () = {
         while j < MATERIAL_TEXTURES {
             assert!(
                 bindings[i] != bindings[j],
-                "two group-2 textures share a binding"
+                "two material-group textures share a binding"
             );
             j += 1;
         }
@@ -172,7 +172,7 @@ const _: () = {
     }
 };
 
-/// Every group-2 texture binding, in [`material_texture_paths`] order: the maps'
+/// Every material-group texture binding, in [`material_texture_paths`] order: the maps'
 /// rows, then each extra shader slot's (#400).
 pub(crate) const fn all_bindings() -> [u32; MATERIAL_TEXTURES] {
     let mut out = [0; MATERIAL_TEXTURES];
@@ -196,7 +196,7 @@ pub(crate) fn map_sampler_binding(binding: u32) -> u32 {
     }
 }
 
-/// What the group-2 texture at `index` (in [`material_texture_paths`] order) holds:
+/// What the material-group texture at `index` (in [`material_texture_paths`] order) holds:
 /// its row's kind, and data for an extra shader texture slot.
 pub(crate) fn map_kind(index: usize) -> TextureKind {
     MAP_SLOTS.get(index).map_or(TextureKind::Data, |s| s.kind)
@@ -214,7 +214,7 @@ pub(crate) fn material_maps(
         .filter_map(|(i, path)| Some((path?, map_kind(i))))
 }
 
-/// Every texture path `material`'s group 2 binds, in [`MapSignature`] order: the
+/// Every texture path `material`'s material group binds, in [`MapSignature`] order: the
 /// maps, in [`MAP_SLOTS`] order, then the texture each extra shader slot names
 /// (#400). Also the list of textures to upload before the group is built.
 ///

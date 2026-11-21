@@ -1,4 +1,4 @@
-//! The forward pass's group 3 at setup: the shadow renderer, its cascade uniform,
+//! The forward pass's scene group at setup: the shadow renderer, its cascade uniform,
 //! the no-AO bind group every pass without SSAO binds, and the opaque copy's pass
 //! and stand-in (#1523), which that group binds too.
 
@@ -14,7 +14,7 @@ pub(crate) struct ShadowSystem {
     pub renderer: shadows::ShadowRenderer,
     pub uniform_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
-    /// The opaque copy's pass, and its 1x1 stand-in every group 3 binds (#1523).
+    /// The opaque copy's pass, and its 1x1 stand-in every scene group binds (#1523).
     pub opaque_copy: OpaqueCopyPass,
 }
 

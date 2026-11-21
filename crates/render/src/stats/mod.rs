@@ -164,6 +164,16 @@ pub struct RenderCounters {
     /// then the late set alone), `0` with neither and no GPU cull. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
+    /// Opaque scene pass batches of lit solids (those `BatchKey::in_prepass` admits)
+    /// in a primed pass (#2334), summed over the stack: each shades only the pixels
+    /// its own prepass depth kept.
+    pub forward_lit_primed: u32,
+    /// Opaque scene pass batches of lit solids in a pass that is not primed: their
+    /// overdraw depends on what drew before them.
+    pub forward_lit_unprimed: u32,
+    /// Opaque scene pass batches of unlit solids (a light's own mesh, a gizmo
+    /// solid), primed or not: they are in no prepass and write their own depth.
+    pub forward_unlit: u32,
     /// Reasons this frame read history an earlier frame left (#2092), one per
     /// reason, not per view: each view (a render-texture camera's too) running an
     /// effect that keeps a history or motion vectors past a cut, each shown render
@@ -216,7 +226,7 @@ pub struct RenderCounters {
     pub render_posed: u32,
     /// CPU microseconds the extract took (#1706), inside `renderer_ms`. Wall-clock.
     pub render_extract_us: u64,
-    /// Bytes this frame wrote into the forward pass's group-1 arrays (#1706), every
+    /// Bytes this frame wrote into the forward pass's per-draw group's arrays (#1706), every
     /// camera summed: per-draw uniforms, joints, instances, proxy volumes, and the
     /// object and material records that changed.
     pub render_upload_bytes: u64,
@@ -249,6 +259,8 @@ pub struct StaleOcclusion {
 #[cfg(test)]
 use frame::{count_lights, draws_of};
 
+#[cfg(test)]
+mod forward_gpu_tests;
 #[cfg(test)]
 mod ops_gpu_tests;
 #[cfg(test)]
