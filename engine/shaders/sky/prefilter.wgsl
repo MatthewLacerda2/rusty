@@ -1,32 +1,19 @@
-// engine/shaders/sky/prefilter.wgsl — the sky's reflection cube: the sky
-// captured into a cube and GGX-prefiltered into a roughness mip chain, Unity's
-// skybox-as-default-reflection-probe. One dispatch per mip, one invocation per texel
-// of every face; mip 0 is the sky itself (roughness 0), each later mip the sky
-// convolved for roughness `mip / (mips - 1)`, read at
-// `roughness * (mips - 1)` by `forward::reflection::environment_reflection` exactly as a
-// probe cube is.
-//
-// The convolution is `render::ibl::reflection_prefilter`'s, on the GPU, through the
-// sampling the probe prefilter shares (`ibl::ggx`): each light direction weighted by
-// N·L. Two sources:
-// - the panorama (`params.p.z == 1`): sampled at the mip whose texel matches the
-//   sample's solid angle (filtered importance sampling), so a few taps blur
-//   without sparkle;
-// - the procedural sky: for fixed sky settings (`params.sky`)
-//   `common::procedural_sky` is affine in the ambient colour, so the cube stores its
-//   two terms (rgb: the sky at ambient 0, a: what ambient 1 adds) and the forward
-//   pass applies the ambient colour when it samples. The ambient colour (a scripted
-//   day cycle) never rebakes it; a change to the sky settings does, once.
+// The sky captured into a cube and GGX-prefiltered into a roughness mip chain (Unity's
+// skybox as default reflection probe): mip 0 is the sky, each later mip roughness `mip
+// / (mips - 1)`, read at `roughness * (mips - 1)`. Panorama (`params.p.z == 1`):
+// sampled at the mip whose texel matches the sample's solid angle (filtered importance
+// sampling), so a few taps blur without sparkle. Procedural sky:
+// `common::procedural_sky` is affine in the ambient colour, so the cube stores two
+// terms (rgb: ambient 0, a: what ambient 1 adds) and the forward pass applies the
+// ambient when sampling: an ambient change never rebakes it.
 
 #import common::{PI, ProceduralSky, equirect_uv, procedural_sky}
 #import ibl::ggx::{ggx_light, tangent_frame}
 
 struct Params {
-    // x: roughness, y: face size in texels, z: 1 for the panorama (0: procedural),
-    // w: the importance sample count, `render::ibl::reflection_prefilter`'s
-    // `SAMPLE_COUNT`, so a probe and the sky blur rough metal alike.
+    // w: the importance sample count, `reflection_prefilter`'s `SAMPLE_COUNT`, so a
+    // probe and the sky blur rough metal alike.
     p: vec4<f32>,
-    // The procedural sky's settings, as the sky pass reads them.
     sky: ProceduralSky,
 };
 
@@ -35,8 +22,7 @@ struct Params {
 @group(0) @binding(2) var s_panorama: sampler;
 @group(0) @binding(3) var out_face: texture_storage_2d_array<rgba16float, write>;
 
-// The world direction through texel centre `uv` (0..1, v down) of cube face `face`
-// (+X, -X, +Y, -Y, +Z, -Z): the cube-map convention a `texture_cube` sample follows.
+// Face order +X, -X, +Y, -Y, +Z, -Z: the cube-map convention.
 fn face_direction(face: u32, uv: vec2<f32>) -> vec3<f32> {
     let s = uv.x * 2.0 - 1.0;
     let t = uv.y * 2.0 - 1.0;
@@ -50,15 +36,12 @@ fn face_direction(face: u32, uv: vec2<f32>) -> vec3<f32> {
     }
 }
 
-// The procedural sky's two terms along `dir`: rgb at ambient 0, a the ambient's
-// weight.
 fn procedural_terms(dir: vec3<f32>) -> vec4<f32> {
     let base = procedural_sky(params.sky, vec3<f32>(0.0), dir);
     let full = procedural_sky(params.sky, vec3<f32>(1.0), dir);
     return vec4<f32>(base, full.x - base.x);
 }
 
-// The source along `dir`, read at panorama mip `lod`.
 fn source(dir: vec3<f32>, lod: f32) -> vec4<f32> {
     if (params.p.z > 0.5) {
         return vec4<f32>(textureSampleLevel(t_panorama, s_panorama, equirect_uv(dir), lod).rgb, 1.0);
@@ -66,22 +49,18 @@ fn source(dir: vec3<f32>, lod: f32) -> vec4<f32> {
     return procedural_terms(dir);
 }
 
-// The panorama's average texel solid angle at its base mip.
 fn panorama_texel() -> f32 {
     let dims = vec2<f32>(textureDimensions(t_panorama, 0));
     return 4.0 * PI / (dims.x * dims.y);
 }
 
-// The panorama mip whose texel covers what one texel of a `size`² cube face does
-// (≈ 4π / (6·size²)), so the mirror mip reads the sky prefiltered to its own
-// resolution and thin bright detail doesn't alias into the face.
+// So thin bright detail doesn't alias into the face.
 fn mirror_lod(size: f32) -> f32 {
     let cube_texel = 4.0 * PI / (6.0 * size * size);
     let last = f32(textureNumLevels(t_panorama) - 1u);
     return clamp(0.5 * log2(cube_texel / panorama_texel()), 0.0, last);
 }
 
-// GGX split-sum convolution around `n`, as `reflection_prefilter::cpu::convolve`.
 fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
     let frame = tangent_frame(n);
     let a = roughness * roughness;
@@ -97,7 +76,6 @@ fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
         let cos_theta = ggx.w;
         let ndotl = dot(n, l);
         if (ndotl > 0.0) {
-            // GGX D at this half-vector; with N = V its pdf over L is D / 4.
             let d = (a2 / (PI * pow(cos_theta * cos_theta * (a2 - 1.0) + 1.0, 2.0)));
             let sample_angle = 4.0 / (f32(samples) * max(d, 1e-4));
             let lod = clamp(0.5 * log2(sample_angle / texel) + 1.0, 0.0, last);

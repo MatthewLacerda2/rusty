@@ -1,40 +1,13 @@
-// ui.wgsl — the in-game UI pass, with SDF text.
-//
-// Draws laid-out UI graphics onto the finished frame, after post-FX. Vertices
-// arrive in NDC with a straight-alpha tint in display (sRGB-encoded) space. The
-// pass targets a NON-sRGB view of the frame, so blending happens on the encoded
-// values — the way designers author UI: a 50% alpha looks as it does in an image
-// editor. Textures are sRGB, so sampling decodes them to linear; they are
-// re-encoded here before the tint multiplies them. Output is premultiplied
-// (blend: One, OneMinusSrcAlpha).
-//
-// World canvases (: `WorldSpace`, `ScreenSpaceCamera`) use `vs_world` /
-// `fs_world` instead: the same vertices, their NDC mapped onto the canvas plane in
-// the scene (`world_ui.to_world`) and projected by the camera, drawn into the HDR
-// scene target before post-FX, depth-tested against the world and fogged like it
-// (the shared `fog_factor`). The HDR target is linear, so the display-space
-// result is decoded before it fogs and blends.
-//
-// Every batch, overlay or world, is clipped here per fragment (`clip_coverage`):
-// its RectMask bounds arrive as canvas-NDC bounds (a scissor cannot follow
-// a plane in perspective), softened over each edge's feather, times the
-// nearest Mask's coverage texture, sampled at the fragment's canvas
-// position. Batches with nothing to clip bind a white mask and unbounded bounds.
-// `fs_mask` renders a Mask's graphic into that texture; `fs_backdrop` shows
-// the blurred, filtered frame through a graphic's shape on overlay canvases.
-//
-// Text vertices (`sdf.x` = 1) sample a single-channel signed distance field
-// instead: 0.5 is the glyph edge and the field reaches SPREAD atlas pixels either
-// side. Fill, outline and glow are all cut from that one distance, antialiased
-// over one screen pixel (fwidth), and composited glow < outline < fill.
-//
-// Shape vertices (`sdf.x` = 2) evaluate an analytic distance field of the
-// shape at the fragment's rect-local position (`local.xy`, reference units from
-// the rect's centre; `local.zw` the half size): fill inside the border band,
-// `border` (in `outline`) across it. The same field draws the shape's shadow
-// (softened over `sdf.z`) and outer glow (fading over `sdf.w` past the edge) on
-// their own quads. Any graphic's tint may be a gradient (`grad.x` > 0): up to four
-// stops (`color`, `stop1..3` at `stop_t`) swept linearly or radially over the rect.
+// Vertices arrive in NDC with a straight-alpha tint in display (sRGB-encoded) space.
+// The pass targets a NON-sRGB view of the frame, so blending happens on encoded values,
+// as designers author UI. Textures are sRGB, so sampling decodes them; they are re-
+// encoded here before the tint. Output is premultiplied. World canvases use
+// `vs_world`/`fs_world`: drawn into the linear HDR scene target before post-FX, so the
+// display-space result is decoded before it fogs and blends. Clipping is per fragment
+// (`clip_coverage`): RectMask bounds arrive as canvas-NDC bounds (a scissor cannot
+// follow a plane in perspective). Text vertices (`sdf.x` = 1): 0.5 is the glyph edge,
+// the field reaches SPREAD atlas pixels either side. Shape vertices (`sdf.x` = 2):
+// `local.xy` in reference units from the rect's centre, `local.zw` the half size.
 
 #import common::{Fog, fog_factor}
 #import color::srgb::{decode_srgb, encode_srgb}
@@ -66,8 +39,6 @@ struct VertexOut {
     @location(2) outline: vec4<f32>,
     @location(3) glow: vec4<f32>,
     @location(4) sdf: vec4<f32>,
-    // World canvases only: the fragment's world position, for the fog, and its
-    // canvas NDC, for the RectMask clip.
     @location(5) world: vec3<f32>,
     @location(6) canvas: vec2<f32>,
     @location(7) local: vec4<f32>,
@@ -80,9 +51,6 @@ struct VertexOut {
     @location(14) stop_t: vec4<f32>,
 };
 
-// One batch's clip and backdrop: the RectMask bounds (canvas NDC: min.xy, max.xy),
-// each edge's feather (canvas NDC: left, bottom, right, top; 0 = hard), and a
-// backdrop's tint and [saturation, brightness].
 struct UiBatch {
     clip: vec4<f32>,
     feather: vec4<f32>,
@@ -90,8 +58,6 @@ struct UiBatch {
     grade: vec4<f32>,
 };
 
-// A world canvas's placement for one camera: canvas NDC → world, world → clip;
-// the camera position and the scene fog.
 struct WorldUi {
     view_proj: mat4x4<f32>,
     to_world: mat4x4<f32>,
@@ -139,14 +105,12 @@ fn vs_world(in: VertexIn) -> VertexOut {
     return pass_through(in, world_ui.view_proj * world, world.xyz);
 }
 
-// A straight-alpha colour at `coverage`, premultiplied.
 fn premul(c: vec4<f32>, coverage: f32) -> vec4<f32> {
     let a = c.a * coverage;
     return vec4<f32>(c.rgb * a, a);
 }
 
-// Fill over outline over glow, from the signed distance `d` (atlas pixels,
-// inside positive) with an antialiasing half-width `aa`.
+// `d` in atlas pixels, inside positive.
 fn sdf_text(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     let body = d + in.sdf.y;
     let edge = body + in.sdf.z;
@@ -159,12 +123,10 @@ fn sdf_text(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     return c + glow * (1.0 - c.a);
 }
 
-// The tint at this fragment: the flat colour, or the gradient's.
 fn tint(in: VertexOut) -> vec4<f32> {
     if in.grad.x < 0.5 {
         return in.color;
     }
-    // The rect as a unit square, (0, 0) bottom-left.
     let f = in.local.xy / max(in.local.zw, vec2<f32>(1e-4)) * 0.5 + 0.5;
     var t: f32;
     if in.grad.x < 1.5 {
@@ -179,7 +141,6 @@ fn tint(in: VertexOut) -> vec4<f32> {
     return mix(c, in.stop3, clamp((t - s.z) / max(s.w - s.z, 1e-5), 0.0, 1.0));
 }
 
-// The graphic's premultiplied display-space colour.
 fn shade(in: VertexOut) -> vec4<f32> {
     // Sampled and differentiated unconditionally: both stay in uniform control flow.
     let texel = textureSample(ui_texture, ui_sampler, in.uv);
@@ -193,17 +154,12 @@ fn shade(in: VertexOut) -> vec4<f32> {
     return select(text, sdf_shape(in, ds, aa_shape), in.sdf.x > 1.5);
 }
 
-// ---- Shapes --------------------------------------------------------
-
-// Distance from `p` to the segment `a`–`b`.
 fn segment_distance(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
     let ab = b - a;
     let h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1e-8), 0.0, 1.0);
     return length(p - a - ab * h);
 }
 
-// This quadrant's corner size from `r` (top-left, top-right, bottom-right,
-// bottom-left), kept within the half size `h`.
 fn corner(p: vec2<f32>, h: vec2<f32>, r: vec4<f32>) -> f32 {
     let left = p.x < 0.0;
     let c = select(select(r.z, r.w, left), select(r.y, r.x, left), p.y > 0.0);
@@ -222,7 +178,6 @@ fn chamfered_rect(p: vec2<f32>, h: vec2<f32>, c: f32) -> f32 {
     return select(box, max(box, cut), c > 0.0);
 }
 
-// Inigo Quilez's ellipse approximation: exact on the edge, close enough near it.
 fn ellipse(p: vec2<f32>, h: vec2<f32>) -> f32 {
     let r = max(h, vec2<f32>(1e-4));
     let k0 = length(p / r);
@@ -230,8 +185,6 @@ fn ellipse(p: vec2<f32>, h: vec2<f32>) -> f32 {
     return select(k0 * (k0 - 1.0) / k1, -min(r.x, r.y), k1 < 1e-6);
 }
 
-// A band from radius `inner` to the half size's smaller side, swept clockwise
-// from 12 o'clock between `start` and `end` degrees with flat ends.
 fn ring(p: vec2<f32>, h: vec2<f32>, params: vec3<f32>) -> f32 {
     let outer = min(h.x, h.y);
     let inner = clamp(params.x, 0.0, outer);
@@ -258,7 +211,6 @@ fn ring(p: vec2<f32>, h: vec2<f32>, params: vec3<f32>) -> f32 {
     return select(caps, max(band, -caps), rel <= span);
 }
 
-// A `thickness` line along x across the rect, dashed when `dash` > 0.
 fn line(p: vec2<f32>, h: vec2<f32>, params: vec3<f32>) -> f32 {
     let dy = abs(p.y) - params.x * 0.5;
     var dx = abs(p.x) - h.x;
@@ -272,7 +224,7 @@ fn line(p: vec2<f32>, h: vec2<f32>, params: vec3<f32>) -> f32 {
     return min(max(dx, dy), 0.0) + length(max(vec2<f32>(dx, dy), vec2<f32>(0.0)));
 }
 
-// The signed distance (negative inside, reference units) to this vertex's shape.
+// Negative inside, in reference units.
 fn shape_distance(in: VertexOut) -> f32 {
     let p = in.local.xy;
     let h = in.local.zw;
@@ -289,13 +241,10 @@ fn shape_distance(in: VertexOut) -> f32 {
     return line(p, h, in.shape.yzw);
 }
 
-// Coverage of the inside of an edge at distance `d`, antialiased over `aa`.
 fn inside(d: f32, aa: f32) -> f32 {
     return 1.0 - smoothstep(-aa, aa, d);
 }
 
-// A shape quad's premultiplied colour: the glow halo (`sdf.w` > 0), else the fill
-// inside the border band (softened over `sdf.z` for a shadow) and the border on it.
 fn sdf_shape(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     let reach = in.sdf.w;
     if reach > 0.0 {
@@ -309,13 +258,10 @@ fn sdf_shape(in: VertexOut, d: f32, aa: f32) -> vec4<f32> {
     return premul(tint(in), body) + premul(in.outline, max(edge - body, 0.0));
 }
 
-// A canvas-NDC point → the uv of a texture covering the canvas (mask, backdrop).
 fn canvas_uv(p: vec2<f32>) -> vec2<f32> {
     return vec2<f32>(p.x * 0.5 + 0.5, 0.5 - p.y * 0.5);
 }
 
-// How much of the batch shows at canvas-NDC `p`: inside the RectMask bounds (hard,
-// or faded over each edge's feather) times the Mask coverage there.
 fn clip_coverage(p: vec2<f32>) -> f32 {
     let r = batch.clip;
     let inside = vec4<f32>(p.x - r.x, p.y - r.y, r.z - p.x, r.w - p.y);
@@ -327,10 +273,8 @@ fn clip_coverage(p: vec2<f32>) -> f32 {
     return k.x * k.y * k.z * k.w * mask;
 }
 
-// The colour a graphic draws with, on screen and world canvases alike. A baked
-// ui shader (`Shader.Bake` pass "ui") replaces exactly this function with
-// its blocks folded over `shade(in)`; keep its text in step with
-// `shadergen::assemble::ui::GRAPHIC`. Clips and masks apply after it.
+// A baked ui shader (`Shader.Bake` pass "ui") replaces exactly this function; keep its
+// text in step with `shadergen::assemble::ui::GRAPHIC`.
 fn graphic(in: VertexOut) -> vec4<f32> {
     return shade(in);
 }
@@ -340,15 +284,11 @@ fn fs_main(in: VertexOut) -> @location(0) vec4<f32> {
     return graphic(in) * clip_coverage(in.canvas);
 }
 
-// A Mask's graphic into its coverage texture (R8): the graphic's alpha, clipped by
-// the masks above it.
 @fragment
 fn fs_mask(in: VertexOut) -> @location(0) vec4<f32> {
     return vec4<f32>(shade(in).a * clip_coverage(in.canvas), 0.0, 0.0, 0.0);
 }
 
-// A backdrop: the blurred frame (display-encoded, read through a non-sRGB
-// view) through the graphic's shape — saturated, brightened, then tinted.
 @fragment
 fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {
     let cover = shade(in).a * clip_coverage(in.canvas);
@@ -359,7 +299,6 @@ fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {
     return vec4<f32>(c * cover, cover);
 }
 
-// Into the linear HDR target: un-premultiply, decode, fog, premultiply again.
 @fragment
 fn fs_world(in: VertexOut) -> @location(0) vec4<f32> {
     let c = graphic(in) * clip_coverage(in.canvas);

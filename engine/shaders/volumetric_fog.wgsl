@@ -1,18 +1,9 @@
-// engine/shaders/volumetric_fog.wgsl — volumetric fog's froxels, Frostbite's
-// unified volumetrics (Hillaire 2015) as UE, HDRP and Godot 4 run them, in two
-// compute passes over the camera's froxel grid (`render::postfx::effects::
-// volumetric_fog`):
-//
-// - `cs_scatter`, one invocation per froxel: the medium at a jittered point inside
-//   it (the volume's extinction, falling with height), lit by the ambient, the live
-//   suns (the first through its cascades), the clustered point and spot lights
-//   through their shadow-atlas tiles, and the frame's `Baked` lamps unshadowed,
-//   each through Henyey-Greenstein's phase; blended with last frame's froxel
-//   reprojected to where it was. rgb the light scattered per metre, a the extinction.
-// - `cs_integrate`, one invocation per froxel column: front to back, the light
-//   reaching the eye from each slice and what the slices before it let through
-//   (Frostbite's energy-conserving step), so texel k holds the eye to slice k's far
-//   side. Surfaces read it through `fog::volumetric`.
+// Frostbite's unified volumetrics (Hillaire 2015). `cs_scatter`: per froxel, the medium
+// at a jittered point lit by ambient, suns, clustered lights through their shadow tiles
+// and `Baked` lamps unshadowed, through Henyey-Greenstein, blended with last frame's
+// froxel reprojected; rgb light per metre, a extinction. `cs_integrate`: per column,
+// front to back (Frostbite's energy-conserving step), so texel k holds the eye to slice
+// k's far side.
 
 #import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow, PI}
 #import fog::volumetric::{froxel_depth, froxel_slice}
@@ -20,25 +11,16 @@
 #import lighting::cascades::ShadowCascades
 #import numeric::{finite3, finite4}
 
-// Mirrors `VolumetricParams` (render::postfx::effects::volumetric_fog::params).
 struct Params {
-    // Last frame's view-projection of the grid the history was built in.
     prev_view_proj: mat4x4<f32>,
-    // Its view plane (depth = dot(xyz, p) + w) and its `volumetric` (x unused).
     prev_view_z: vec4<f32>,
     prev_volumetric: vec4<f32>,
-    // Froxels across, up and deep; w the frame's index.
     grid: vec4<u32>,
-    // This frame's sample point inside each froxel, in froxel units; w the weight of
-    // this frame's light against the history (1: no history).
     jitter: vec4<f32>,
-    // x extinction at the base height (1 / mean free path), y the base height, z
-    // the density's falloff per metre above it, w the anisotropy (g).
+    // x extinction at the base height (1 / mean free path), y base height, z falloff
+    // per metre above it, w anisotropy (g).
     medium: vec4<f32>,
-    // rgb the albedo, w how much of the ambient it scatters.
     albedo: vec4<f32>,
-    // The probe grid's box (`probes::AirProbes`): its corner, w 1 when the scene
-    // has probes (else the scene ambient); its size.
     probes_min: vec4<f32>,
     probes_size: vec4<f32>,
 };
@@ -49,9 +31,8 @@ struct Params {
 @group(0) @binding(3) var<storage, read> local_lights: array<LocalLight>;
 @group(0) @binding(4) var<storage, read> cluster_ranges: array<vec2<u32>>;
 @group(0) @binding(5) var<storage, read> cluster_lights: array<u32>;
-// The frame's `Baked` point and spot lamps (`clusters::BakedLamps`), binned into the
-// same clusters by the camera: they reach surfaces through the lightmaps, the air
-// only through here, unshadowed.
+// Baked lamps reach surfaces through the lightmaps, the air only through here,
+// unshadowed.
 @group(0) @binding(6) var<storage, read> baked_lights: array<LocalLight>;
 @group(0) @binding(7) var<storage, read> baked_ranges: array<vec2<u32>>;
 @group(0) @binding(8) var<storage, read> baked_indices: array<u32>;
@@ -63,22 +44,16 @@ struct Params {
 @group(0) @binding(14) var t_history: texture_3d<f32>;
 @group(0) @binding(15) var s_history: sampler;
 @group(0) @binding(16) var out_scatter: texture_storage_3d<rgba16float, write>;
-// The probe field's average radiance on a coarse grid around the camera, read
-// through `s_history` (linear, clamped to the nearest face).
 @group(0) @binding(17) var t_probes: texture_3d<f32>;
 
-// The most a froxel's light is stored as: below `Rgba16Float`'s 65504, as
-// `forward::transparent::MAX_HDR`, so every reader gets a finite value.
+// As `forward::transparent::MAX_HDR`, so every reader gets a finite value.
 const MAX_FROXEL: f32 = 60000.0;
 
-// Henyey-Greenstein's phase for scattering angle cosine `c`, per steradian.
 fn phase(g: f32, c: f32) -> f32 {
     let g2 = g * g;
     return (1.0 - g2) / (4.0 * PI * pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5));
 }
 
-// The froxel ray through screen `uv`: a point on it at view depth 0 and its
-// direction scaled so one unit along it is one unit of view depth.
 fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     let a4 = camera.inv_view_proj * vec4<f32>(ndc, 0.25, 1.0);
@@ -93,10 +68,8 @@ fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
     return array<vec3<f32>, 2>(origin, dir);
 }
 
-// How lit `world` is by the sun's cascades: one comparison tap (the fog averages
-// over a froxel and over frames), 1 past the shadow distance or with no cascade,
-// faded to 1 over the distance's last 10% as `calculate_shadow` fades surfaces, so
-// shadowed air never ends at a plane that moves with the camera.
+// Faded to 1 over the last 10% as `calculate_shadow` does, so shadowed air never ends
+// at a plane that moves with the camera.
 fn sun_lit(world: vec3<f32>) -> f32 {
     let count = i32(shadow.params.x);
     let depth = dot(world - shadow.view_pos.xyz, shadow.view_dir.xyz);
@@ -120,17 +93,13 @@ fn sun_lit(world: vec3<f32>) -> f32 {
     return mix(lit, 1.0, fade);
 }
 
-// The light `light` scatters at `world` toward `to_eye`, its inverse square floored
-// at `near` (half the froxel's depth): a froxel is a volume, and a sample landing on
-// the lamp itself would otherwise spike that froxel from frame to frame.
+// A froxel is a volume: a sample landing on the lamp itself would otherwise spike that
+// froxel from frame to frame.
 fn lamps(light: LocalLight, world: vec3<f32>, to_eye: vec3<f32>, g: f32, near: f32) -> vec3<f32> {
     let travel = normalize(world - light.position);
     return local_light_radiance(light, world, near) * phase(g, dot(travel, to_eye));
 }
 
-// The ambient light arriving at `world` from every direction, averaged: the probe
-// field's where the scene has probes (so a sealed room's air is as dark as its
-// probes), else the scene ambient.
 fn ambient(world: vec3<f32>) -> vec3<f32> {
     if (params.probes_min.w < 0.5) {
         return ambient_average(lighting.ambient);
@@ -139,8 +108,6 @@ fn ambient(world: vec3<f32>) -> vec3<f32> {
     return textureSampleLevel(t_probes, s_history, uvw, 0.0).rgb;
 }
 
-// The light scattered toward the eye at `world`, per unit of scattering coefficient;
-// `near` is half the froxel's depth.
 fn in_scatter(world: vec3<f32>, cluster: u32, near: f32) -> vec3<f32> {
     let g = params.medium.w;
     let to_eye = normalize(camera.camera_pos - world);
@@ -189,11 +156,9 @@ fn cs_scatter(@builtin(global_invocation_id) id: vec3<u32>) {
     if (!finite4(current)) {
         current = vec4<f32>(0.0, 0.0, 0.0, extinction);
     }
-    // Within half-float's range before it is stored: a thick medium at a bright
-    // lamp's core would otherwise store Inf, and the integration's `Inf - Inf`
-    // would leave a dark hole there.
+    // A thick medium at a bright lamp's core would store Inf, and the integration's
+    // `Inf - Inf` would leave a dark hole.
     current = vec4<f32>(min(current.rgb, vec3<f32>(MAX_FROXEL)), current.a);
-    // Last frame's froxel at this point, when it was in last frame's grid.
     var out = current;
     if (params.jitter.w < 1.0) {
         let clip = params.prev_view_proj * vec4<f32>(world, 1.0);
@@ -222,7 +187,6 @@ fn cs_integrate(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     let vol = camera.volumetric;
     let uv = (vec2<f32>(id.xy) + 0.5) / vec2<f32>(grid.xy);
-    // Metres of ray per metre of view depth through this column.
     let stretch = length(view_ray(uv)[1]);
     var scattered = vec3<f32>(0.0);
     var through = 1.0;
@@ -234,8 +198,8 @@ fn cs_integrate(@builtin(global_invocation_id) id: vec3<u32>) {
         let v = textureLoad(t_scatter, vec3<u32>(id.xy, z), 0);
         let sigma = max(v.a, 1e-7);
         let fade = exp(-sigma * step);
-        // Frostbite's integral of the slice's scattering over its length, so a
-        // thick slice neither loses nor invents light.
+        // Frostbite's integral of the slice's scattering over its length, so a thick
+        // slice neither loses nor invents light.
         var slice = (v.rgb - v.rgb * fade) / sigma;
         if (!finite3(slice)) {
             slice = vec3<f32>(0.0);
