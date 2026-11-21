@@ -9,3 +9,4 @@ mod patch;
 mod promises;
 mod rendering;
 mod song;
+mod vocabulary;
