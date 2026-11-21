@@ -1,27 +1,3 @@
-//! crates/render/src/ui/effects/mask/gpu.rs — each `Mask`'s coverage texture (#428).
-//!
-//! The mask-texture approach rather than stencil: a Mask's graphic is drawn into an
-//! R8 texture the size of its canvas's frame (the screen, or a world canvas's own
-//! rect), cleared to 0, through `ui.wgsl`'s `fs_mask` — the graphic's alpha times
-//! the clip of every mask above it, which that draw samples. So a mask's texture is
-//! already the product of its whole chain, a masked batch samples exactly one
-//! texture, and nesting works to any depth with no stencil bits to run out of.
-//! Coverage is continuous, which is what makes a soft-edged sprite a feathered
-//! mask; a stencil could only cut hard. The canvas-NDC addressing is shared with
-//! the batches that sample it, so the same texture serves an overlay and a world
-//! canvas. Prepared once per frame before the camera stack — a mask does not
-//! depend on the camera.
-//!
-//! **Change-driven.** A Mask's texture is re-rendered only when what its coverage
-//! depends on changed ([`MaskInputs`]): its own vertices (not its canvas's, so a
-//! minimap's turning map leaves its still frame alone), its slot of the batch
-//! uniform, its source texture, its target, and which draw of which parent Mask it
-//! sampled (a stamp no other draw of any Mask repeats, so a Mask added, removed or
-//! moved above it redraws it even when every Mask involved is still). A
-//! graphic whose source changes in place (a render texture, a glyph atlas) has no
-//! such key and is re-rendered every frame. With nothing to re-render, no encoder
-//! is made and nothing is submitted; `UiEffects::mask_passes` counts the passes run.
-
 use std::collections::HashMap;
 
 use super::key::{DrawnInputs, MaskInputs};
@@ -34,11 +10,8 @@ use crate::ui::mesh::UiSource;
 use crate::ui::pipeline::{BATCH_GROUP, SOURCE_GROUP};
 use crate::{RenderView, Renderer};
 
-/// The coverage textures' format: one 8-bit channel.
 pub(crate) const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
-/// One Mask's coverage texture, the inputs it was last drawn from (`None`: it
-/// holds no reusable draw) and the stamp of that draw.
 struct MaskTarget {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
@@ -46,23 +19,17 @@ struct MaskTarget {
     stamp: u64,
 }
 
-/// A view's Mask textures, by Mask entity.
 #[derive(Default)]
 pub(crate) struct MaskTargets {
     targets: HashMap<u32, MaskTarget>,
-    /// The last stamp given to a draw: it only goes up, so no two draws of any
-    /// Masks share one, and a child's key names which parent draw it sampled.
     stamps: u64,
 }
 
 impl MaskTargets {
-    /// Mask `id`'s coverage texture, if it is synced this frame.
     pub(crate) fn view(&self, id: u32) -> Option<&wgpu::TextureView> {
         self.targets.get(&id).map(|t| &t.view)
     }
 
-    /// Keep a target for exactly the `(id, size)`s in `wanted`, reallocating any
-    /// whose size changed (a new target holds no draw).
     fn sync(&mut self, device: &wgpu::Device, wanted: &[(u32, (u32, u32))]) {
         let mut old = std::mem::take(&mut self.targets);
         for &(id, (w, h)) in wanted {
@@ -74,9 +41,6 @@ impl MaskTargets {
         }
     }
 
-    /// Whether Mask `id` must be drawn from `inputs` (`None`: always), recording
-    /// the draw and stamping it when it must. Called parents first, so a child
-    /// sees its parent's stamp after this frame's draw.
     fn needs_draw(&mut self, id: u32, inputs: Option<MaskInputs>) -> bool {
         let Some(target) = self.targets.get_mut(&id) else {
             return false;
@@ -92,8 +56,6 @@ impl MaskTargets {
         true
     }
 
-    /// The stamp of Mask `id`'s last draw, for its children's inputs (0: never
-    /// drawn, which no draw is stamped).
     fn stamp(&self, id: u32) -> Option<u64> {
         self.targets.get(&id).map(|t| t.stamp)
     }
@@ -123,8 +85,6 @@ fn create(device: &wgpu::Device, w: u32, h: u32) -> MaskTarget {
     }
 }
 
-/// The pipeline drawing a Mask's graphic into its texture: the UI vertices,
-/// `fs_mask`, max-blended (a graphic's own triangles never lower its coverage).
 pub(crate) fn mask_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -166,8 +126,6 @@ pub(crate) fn mask_pipeline(
 }
 
 impl Renderer {
-    /// Render the Mask textures whose inputs changed, parents before children (see
-    /// the module docs). Needs the batch uniform written first.
     pub(crate) fn render_masks(&self, encoder: &mut wgpu::CommandEncoder, view: &mut RenderView) {
         let cache = &mut view.ui;
         let wanted = mask_sizes(cache, self.device.limits().max_texture_dimension_2d);
@@ -209,8 +167,6 @@ impl Renderer {
         self.lap("ui.masks");
     }
 
-    /// Every `(canvas, mask draw)` whose inputs changed, in order, each recorded
-    /// as drawn.
     fn masks_to_draw(&self, cache: &mut UiViewCache) -> Vec<(usize, usize)> {
         let mut draws = Vec::new();
         let (canvases, effects) = cache.canvases_and_effects();
@@ -225,8 +181,6 @@ impl Renderer {
         draws
     }
 
-    /// What `draw`'s coverage is drawn from, or `None` when its source can change
-    /// in place (a render texture, a glyph atlas) and it must be drawn each frame.
     fn mask_inputs<'a>(
         &'a self,
         masks: &MaskTargets,
@@ -254,13 +208,10 @@ impl Renderer {
     }
 }
 
-/// Canvas `i`'s mask draw `m`.
 fn draw_of(cache: &UiViewCache, (i, m): (usize, usize)) -> &super::MaskDraw {
     &cache.canvas(i).mesh.masks[m]
 }
 
-/// Every synced Mask and its texture size: its canvas's frame, clamped to the
-/// device's limit.
 fn mask_sizes(cache: &crate::ui::UiViewCache, limit: u32) -> Vec<(u32, (u32, u32))> {
     let size = |f: glam::Vec2| {
         let s = f

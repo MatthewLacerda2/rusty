@@ -1,6 +1,3 @@
-//! crates/render/src/ui/kept/meshes.rs — each view's canvas meshes and what each
-//! was built from (the module docs of `kept`). GPU-free.
-
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
@@ -16,21 +13,16 @@ use rusty_components::{
 use rusty_ecs::{Activity, Cursor, World};
 use rusty_ui::{UiLayout, UiRect};
 
-/// What one canvas's mesh was built from, besides its elements' components (the
-/// module docs).
 #[derive(Debug, PartialEq)]
 struct CanvasInputs {
     frame: Vec2,
     overlay: bool,
     rects: Vec<(u32, UiRect)>,
     atlases: u64,
-    /// Every texture the build looked up, and the size it read.
     textures: Vec<(String, Option<Vec2>)>,
 }
 
 impl CanvasInputs {
-    /// Whether a mesh built from these is the one `run` builds now (no component
-    /// under it written since).
     fn hold(&self, now: (Vec2, bool), run: &[(u32, &UiRect)], kept: Lookups) -> bool {
         let (tex_size, atlases) = kept;
         (self.frame, self.overlay) == now
@@ -45,11 +37,8 @@ impl CanvasInputs {
     }
 }
 
-/// The texture-size lookup and the atlases' generation.
 type Lookups<'a> = (TexSize<'a>, u64);
 
-/// One cursor per channel a canvas's mesh reads from the World (the Canvas
-/// component excepted: the module docs).
 struct Watch {
     image: Cursor<ImageComponent>,
     shape: Cursor<ShapeComponent>,
@@ -75,8 +64,6 @@ impl Watch {
         }
     }
 
-    /// Every id written on any channel since the last read, or `None` for a whole
-    /// rebuild. Reads every cursor, so each is current after; a quiet one collects nothing.
     fn read(&mut self, w: &World) -> Option<BTreeSet<u32>> {
         let all = [
             ids(w, &mut self.image),
@@ -96,22 +83,14 @@ impl Watch {
     }
 }
 
-/// A view's kept canvas meshes (the module docs).
 #[derive(Default)]
 pub(crate) struct KeptMeshes {
     watch: Option<Watch>,
     held: HashMap<u32, (CanvasInputs, Rc<CanvasMesh>)>,
-    /// The distinct canvases the last [`Self::update`] meshed (built rather than
-    /// kept), however many passes an atlas growth took.
     built: BTreeSet<u32>,
 }
 
 impl KeptMeshes {
-    /// This frame's mesh of every canvas `wanted` draws, in draw order, empty ones
-    /// left out: kept where nothing it is built from changed, else built. A glyph
-    /// atlas that grows while one canvas is meshed moves the uvs of every canvas
-    /// meshed before it, so a pass that grew one is run again (only the canvases
-    /// built before the growth are rebuilt; an atlas grows a bounded few times).
     pub(crate) fn update(
         &mut self,
         (world, layout): (&World, &UiLayout),
@@ -134,16 +113,14 @@ impl KeptMeshes {
             if atlases.generation == generation {
                 return meshes;
             }
-            dirty.clear(); // every written canvas was rebuilt and held by this pass
+            dirty.clear();
         }
     }
 
-    /// How many distinct canvases the last [`Self::update`] meshed.
     pub(crate) fn built(&self) -> usize {
         self.built.len()
     }
 
-    /// One pass of [`Self::update`] over the layout's `entries`.
     fn pass(
         &mut self,
         entries: &[(u32, &UiRect)],
@@ -180,8 +157,6 @@ impl KeptMeshes {
         meshes
     }
 
-    /// The canvases a write since the last frame touched; every canvas (the held
-    /// meshes dropped) on a whole rebuild.
     fn dirty(&mut self, world: &World, layout: &UiLayout) -> BTreeSet<u32> {
         let ids = match &mut self.watch {
             Some(watch) => watch.read(world),
@@ -199,7 +174,6 @@ impl KeptMeshes {
             .collect()
     }
 
-    /// Build `run`'s mesh and hold it with what it was built from.
     fn build(
         &mut self,
         world: &World,

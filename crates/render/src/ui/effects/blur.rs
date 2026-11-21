@@ -1,23 +1,3 @@
-//! crates/render/src/ui/effects/blur.rs — the backdrop's dual-filter blur (#426).
-//!
-//! **Where it reads the scene.** The overlay pass draws onto the finished frame —
-//! often a swapchain image, which can be neither copied nor sampled. So the blur
-//! does not copy the frame: after the camera stack's post-FX (the last stage of
-//! the per-camera table, #636), it re-runs the post-FX *composite* over the view's
-//! HDR scene colour straight into the chain's first level, at 1/`divisor` of the
-//! view's size (`QualityValues::backdrop_divisor`, the quality preset's). That is the graded,
-//! tonemapped, bloomed 3D frame — everything but FXAA and the authored effects,
-//! which a blur would erase anyway — and not UI drawn before it. A fullscreen pass
-//! at reduced resolution doubles as the first downsample.
-//!
-//! **The chain.** Down from level 0 to the deepest level any backdrop needs (shared
-//! by every level), then, per distinct level `n`, up from level `n` back to level
-//! 0's size into that level's own result (`ui_blur.wgsl`). One blur per distinct
-//! level per frame, across every canvas; none at all when no backdrop is visible.
-//! Every target is in the frame's own (sRGB) format, so blur taps filter in linear
-//! light; the UI pass samples a result through its non-sRGB view, getting the
-//! display-encoded values it blends in.
-
 use std::collections::HashMap;
 
 use super::backdrop::blur_level;
@@ -27,8 +7,6 @@ use crate::timing::{GpuPass, GpuTimer};
 use crate::{RenderView, Renderer};
 use rusty_ui::CanvasSpace;
 
-/// One blur target: the view passes render and sample through, and the non-sRGB
-/// view the UI pass reads (a view keeps its texture alive).
 struct Level {
     view: wgpu::TextureView,
     raw: wgpu::TextureView,
@@ -58,13 +36,10 @@ fn level(device: &wgpu::Device, format: wgpu::TextureFormat, (w, h): (u32, u32))
     Level { view, raw }
 }
 
-/// The size of chain level `k` when level 0 is `base`.
 fn size_at((w, h): (u32, u32), k: u32) -> (u32, u32) {
     ((w >> k).max(1), (h >> k).max(1))
 }
 
-/// A view's blur chain: the down levels (index = level), the up scratch levels
-/// (index = level − 1) and one result per blurred level.
 pub(crate) struct BlurTargets {
     format: wgpu::TextureFormat,
     base: (u32, u32),
@@ -84,7 +59,6 @@ impl BlurTargets {
         }
     }
 
-    /// The blurred frame at `level`, as the UI pass reads it.
     pub(crate) fn result(&self, level: u32) -> Option<&wgpu::TextureView> {
         match level {
             0 => self.downs.first().map(|l| &l.raw),
@@ -92,7 +66,6 @@ impl BlurTargets {
         }
     }
 
-    /// Grow the chain to `deepest` and keep a result for exactly `levels`.
     fn ensure(&mut self, device: &wgpu::Device, deepest: u32, levels: &[u32]) {
         let (format, base) = (self.format, self.base);
         while self.downs.len() <= deepest as usize {
@@ -112,12 +85,10 @@ impl BlurTargets {
     }
 }
 
-/// The blur's shared GPU state: its shader, layout and per-format pipelines.
 pub(crate) struct BlurPipelines {
     shader: wgpu::ShaderModule,
     layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
-    /// `(down, up)` per target format.
     pipelines: HashMap<wgpu::TextureFormat, (wgpu::RenderPipeline, wgpu::RenderPipeline)>,
 }
 
@@ -156,7 +127,6 @@ impl BlurPipelines {
     }
 }
 
-/// Every blur level the overlay canvases' backdrops need this frame, ascending.
 fn wanted_levels(view: &RenderView, divisor: u32) -> Vec<u32> {
     let mut levels: Vec<u32> = view
         .ui
@@ -172,8 +142,6 @@ fn wanted_levels(view: &RenderView, divisor: u32) -> Vec<u32> {
 }
 
 impl Renderer {
-    /// Blur the finished frame at every level the overlay canvases' backdrops use
-    /// (see the module docs). A no-op when none is visible.
     pub(crate) fn run_backdrop_blur(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -213,8 +181,6 @@ impl Renderer {
         view.ui.effects.blur_passes = 1 + passes;
     }
 
-    /// Record the down chain to `deepest` and each level's way back up; returns how
-    /// many passes that was.
     fn encode_chain(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -252,7 +218,6 @@ impl Renderer {
     }
 }
 
-/// One fullscreen-triangle pass of `pipeline` sampling `group` into `target`.
 fn fullscreen(
     encoder: &mut wgpu::CommandEncoder,
     (pipeline, timer): (&wgpu::RenderPipeline, &GpuTimer),

@@ -1,42 +1,20 @@
-//! crates/render/src/ui/pipeline.rs — the UI pass's two pipeline shapes, built in one place
-//! (#418, #429, #427).
-//!
-//! Every UI pipeline — the standard shader's and each custom ui shader's — is one of
-//! two shapes over the same vertex format, so only the module and layout vary:
-//!
-//! - [`UiPass::Screen`] — `vs_main` and a fragment entry (`fs_main`, or #426's
-//!   `fs_backdrop`) onto the finished frame (of the given format), no depth;
-//! - [`UiPass::World`] — `vs_world`/`fs_world` into the HDR scene target,
-//!   depth-tested (`LessEqual`) against the world but never writing depth.
-//!
-//! Each is built once per blend mode (#425, `blend`): the shader always outputs
-//! premultiplied colour and the mode is fixed-function blend state. Neither culls: a clockwise radial fill winds the other way, and a world canvas
-//! reads from both sides.
-
 use super::blend::blend_state;
 use super::vertex::vertex_layout;
 use crate::gpu::DEPTH_FORMAT;
 use crate::postfx::HDR_FORMAT;
 use rusty_components::UiBlend;
 
-/// The UI pipelines' bind groups by index: a batch's source texture,
-/// its effects record (a dynamic offset), a world canvas's uniform (an empty group
-/// on screen) and a custom shader's own uniform.
 pub(crate) const SOURCE_GROUP: u32 = 0;
 pub(crate) const BATCH_GROUP: u32 = 1;
 pub(crate) const CANVAS_GROUP: u32 = 2;
 pub(crate) const SHADE_GROUP: u32 = 3;
 
-/// Which UI pass a pipeline draws in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum UiPass {
-    /// Screen canvases, onto a frame of this format.
     Screen(wgpu::TextureFormat),
-    /// World canvases, into the HDR scene target.
     World,
 }
 
-/// The `pass` pipeline drawing `module` through `layout`, compositing with `mode`.
 pub(crate) fn build(
     device: &wgpu::Device,
     (label, module, layout): (&str, &wgpu::ShaderModule, &wgpu::PipelineLayout),
@@ -46,8 +24,6 @@ pub(crate) fn build(
     build_entry(device, (label, module, layout), pass, (mode, "fs_main"))
 }
 
-/// [`build`] through fragment entry `fs` on a screen pass (`fs_world` always in the
-/// world pass).
 pub(crate) fn build_entry(
     device: &wgpu::Device,
     (label, module, layout): (&str, &wgpu::ShaderModule, &wgpu::PipelineLayout),

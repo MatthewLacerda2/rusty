@@ -1,20 +1,5 @@
-//! crates/render/src/ui/blend.rs — a `UiBlend` mode as GPU blend state (#425).
-//!
-//! The shader outputs premultiplied colour `s` with alpha `a`; under it is `d`.
-//! Each mode is one fixed-function blend, so each is its own pipeline and a change
-//! of mode breaks a batch:
-//!
-//! - `Normal` — `s + d(1 − a)` (over);
-//! - `Additive` — `s + d`;
-//! - `Multiply` — `s·d + d(1 − a)`: an opaque source multiplies, transparency fades
-//!   it back to `d`;
-//! - `Screen` — `s + d(1 − s)`.
-//!
-//! Alpha always composites "over", so coverage accumulates the same in every mode.
-
 use rusty_components::UiBlend;
 
-/// The colour target blend for `mode`.
 pub(crate) fn blend_state(mode: UiBlend) -> wgpu::BlendState {
     use wgpu::{BlendComponent, BlendFactor as F, BlendOperation};
     let color = |src_factor, dst_factor| BlendComponent {
@@ -34,7 +19,6 @@ pub(crate) fn blend_state(mode: UiBlend) -> wgpu::BlendState {
     }
 }
 
-/// `mode`'s slot in a per-mode pipeline array (`UiBlend::ALL` order).
 pub(crate) fn index(mode: UiBlend) -> usize {
     UiBlend::ALL.iter().position(|&b| b == mode).unwrap_or(0)
 }

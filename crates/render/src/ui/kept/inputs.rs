@@ -1,6 +1,3 @@
-//! Each input of canvas A's mesh, changed in turn: A alone is rebuilt, to what a
-//! fresh build makes (`Rig::frame` compares), and is still on the next frame.
-
 use glam::{Vec2, Vec4};
 
 use super::{element, hud, Hud, Rig};
@@ -8,7 +5,6 @@ use rusty_components::{
     CanvasGroupComponent, ImageComponent, ImageType, TextAlignment, TextComponent, TextOverflow,
 };
 
-/// What each step changes, by name.
 const STEPS: [&str; 19] = [
     "a rect",
     "an image colour",
@@ -95,7 +91,6 @@ fn a_texture_size_the_screen_an_atlas_and_a_new_world_rebuild() {
     );
     rig.screen = Vec2::new(1280.0, 720.0);
     assert_eq!(rig.frame(&hud.scene), 2, "the screen size: every canvas");
-    // A text under B packs enough big glyphs to grow the atlas A's label is in.
     let big = element(&mut hud.scene, hud.bar, Vec2::ZERO);
     let glyphs: String = ('!'..='~').chain('À'..='ÿ').collect();
     let text = TextComponent {
@@ -115,7 +110,6 @@ fn a_texture_size_the_screen_an_atlas_and_a_new_world_rebuild() {
     assert_eq!(rig.frame(&hud.scene), 0);
     hud.scene.world.rewind_changes();
     assert_eq!(rig.frame(&hud.scene), 2, "an Undo: every canvas");
-    // A canvas the view stops drawing drops its mesh, so a write meanwhile is seen.
     rig.skip = Some(hud.a);
     assert_eq!(rig.frame(&hud.scene), 0);
     hud.scene.world.text_mut(hud.label).expect("text").text = "AMMO 1".into();

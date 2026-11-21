@@ -13,7 +13,6 @@ use rusty_ui::UiLayout;
 
 const SCREEN: Vec2 = Vec2::new(200.0, 100.0);
 
-/// A `size` Image at `pos` (bottom-left anchored) under `parent`.
 fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2) -> u32 {
     let id = scene.add_entity("E".to_string());
     let rt = RectTransformComponent {

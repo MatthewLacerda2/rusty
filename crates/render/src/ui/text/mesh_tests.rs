@@ -1,5 +1,3 @@
-//! Text in the UI mesh (#419): a label batches as one draw per font, beside images.
-
 use glam::Vec2;
 
 use crate::ui::mesh::{build_canvas_meshes, UiSource};

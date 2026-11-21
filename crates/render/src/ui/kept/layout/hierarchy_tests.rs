@@ -1,6 +1,3 @@
-//! What the hierarchy gives the layout besides its elements' columns: the order of
-//! siblings, which canvas is a root, and which `WorldAnchor` is a marker.
-
 use glam::Vec2;
 
 use super::{element, ui, Rig};

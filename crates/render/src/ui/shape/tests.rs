@@ -1,6 +1,3 @@
-//! Shape meshing (#425): the effect quads, batching with solid images and the
-//! blend-mode batch break.
-
 use glam::{Vec2, Vec4};
 
 use crate::ui::mesh::{build_canvas_meshes, CanvasMesh, UiSource};
@@ -15,7 +12,6 @@ use rusty_ui::UiLayout;
 
 const SCREEN: Vec2 = Vec2::new(800.0, 600.0);
 
-/// A canvas holding one 100×50 element per entry, side by side.
 fn hud(entries: &[(Option<ShapeComponent>, Option<ImageComponent>)]) -> Vec<CanvasMesh> {
     let mut scene = Scene::new();
     let root = scene.add_entity("Canvas".to_string());
@@ -94,7 +90,6 @@ fn shapes_batch_with_solid_images_until_the_blend_changes() {
     assert_eq!(same[0].batches.len(), 1);
     assert_eq!(same[0].batches[0].source, UiSource::Solid);
 
-    // A mixed HUD: normal, additive neon, normal again — three draws.
     let mixed = hud(&[
         (shape(UiBlend::Normal), None),
         (shape(UiBlend::Additive), None),
