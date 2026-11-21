@@ -104,7 +104,18 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
     };
 
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(base, p)).collect();
-    let (docs, note) = crate::agent_docs::gate(base, &args);
+    // A folder argument reaches the agent docs as the files it holds.
+    let listed: Vec<String> = files
+        .iter()
+        .map(|f| {
+            f.strip_prefix(base)
+                .unwrap_or(f)
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect();
+    let doc_args = if strict { &listed } else { &args };
+    let (docs, note) = crate::agent_docs::gate(base, doc_args);
     notes.extend(note);
     let (comment, tally) = comments::pass(base, &files, strict);
     let (over, unshaped, commented) = (violations.len(), docs.len(), comment.len());

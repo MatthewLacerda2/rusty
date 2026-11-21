@@ -11,7 +11,10 @@ const RUST: &str = "//! The module.\n#![doc = \"more\"]\n\n/// Adds.\n#[inline]\
 
 /// The findings of the proof over a repository whose `base` branch holds `files` and
 /// whose `HEAD` commit then writes `edits` (a `None` body deletes the file).
-fn prove(files: &[(&str, &str)], edits: &[(&str, Option<&str>)]) -> (Vec<String>, String) {
+pub(super) fn prove(
+    files: &[(&str, &str)],
+    edits: &[(&str, Option<&str>)],
+) -> (Vec<String>, String) {
     let repo = Repo::new(
         &format!("comment-only-{}", NEXT.fetch_add(1, Ordering::Relaxed)),
         true,
@@ -45,7 +48,7 @@ fn prove(files: &[(&str, &str)], edits: &[(&str, Option<&str>)]) -> (Vec<String>
     (found.findings, found.body)
 }
 
-fn passes(path: &str, old: &str, new: &str) -> bool {
+pub(super) fn passes(path: &str, old: &str, new: &str) -> bool {
     prove(&[(path, old)], &[(path, Some(new))]).0.is_empty()
 }
 

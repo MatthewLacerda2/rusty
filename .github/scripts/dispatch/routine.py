@@ -83,7 +83,20 @@ MODEL = "claude-opus-5-5"
 MODELS = {"opus": MODEL, "sonnet": "claude-sonnet-5-5"}
 
 #: A line of its own in the issue body, `Model: <name>`, ignoring case and spaces.
-MODEL_LINE = re.compile(r"^[ \t]*Model:[ \t]*(.*?)[ \t]*$", re.IGNORECASE | re.MULTILINE)
+MODEL_LINE = re.compile(r"[ \t]*Model:[ \t]*(\S*)[ \t]*", re.IGNORECASE)
+FENCE = re.compile(r"[ \t]*(```|~~~)")
+
+
+def model_lines(issue_body: str) -> list[str]:
+    """The word of each whole `Model: <word>` line outside a fenced block; a line
+    with more after the word is prose, not the line."""
+    asked, fenced = [], False
+    for line in issue_body.splitlines():
+        if FENCE.match(line):
+            fenced = not fenced
+        elif not fenced and (found := MODEL_LINE.fullmatch(line)):
+            asked.append(found.group(1))
+    return asked
 
 
 def model_for(issue_body: str | None) -> str:
@@ -91,7 +104,7 @@ def model_for(issue_body: str | None) -> str:
 
     Raises `ValueError` naming the accepted values for a line that names no model
     in [`MODELS`], or for two lines: a guess would launch the wrong coder."""
-    asked = MODEL_LINE.findall(issue_body or "")
+    asked = model_lines(issue_body or "")
     if not asked:
         return MODEL
     accepted = ", ".join(sorted(MODELS))

@@ -51,7 +51,7 @@ impl Refs {
     };
 }
 
-/// This repository's name, and the words that put a number in it (`PR#123`).
+/// This repository's name, and the words that put a number in it (`PR`, `issue`).
 const OWN: &[&str] = &["rusty", "pr", "prs", "issue", "issues", "pull"];
 
 /// The first issue or pull request reference on `line`.

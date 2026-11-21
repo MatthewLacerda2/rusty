@@ -106,6 +106,12 @@ class ModelLine(unittest.TestCase):
             with self.subTest(body):
                 self.assertEqual(routine.model_for(body), routine.MODEL)
 
+    def test_a_fenced_or_prose_line_is_not_the_line(self):
+        for body in ("```lua\nmodel: player.glb\n```", "Model: the mesh the importer reads",
+                     "~~~\nModel: gpt\n~~~\nafter"):
+            with self.subTest(body):
+                self.assertEqual(routine.model_for(body), routine.MODEL)
+
     def test_each_accepted_value_maps_to_its_id(self):
         for name, model in routine.MODELS.items():
             for line in (f"Model: {name}", f"model: {name.upper()} \r", f"  Model:{name}"):
@@ -115,7 +121,7 @@ class ModelLine(unittest.TestCase):
         self.assertEqual(made["job_config"]["ccr"]["session_context"]["model"], "claude-sonnet-5-5")
 
     def test_an_unknown_value_or_two_lines_is_refused_naming_the_accepted_ones(self):
-        for body in ("Model: gpt-9", "Model:", "Model: opus\nModel: sonnet"):
+        for body in ("Model: gpt", "Model: gpt-9", "Model:", "```\n```\nModel: gpt", "Model: opus\nModel: sonnet"):
             with self.subTest(body), self.assertRaises(ValueError) as raised:
                 routine.model_for(body)
             self.assertIn("opus, sonnet", str(raised.exception))

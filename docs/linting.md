@@ -311,8 +311,9 @@ read.
   whitespace-separated run holding a letter or digit, so one long line buys nothing
   and a comment's own markers are free. Free too: the line of a marker a tool reads
   (a comment opening with `lint: allow(`, `sorted:`, `stored-format:` or
-  `comment-cut:`, the `MARKERS` table), and a `// SAFETY:` note directly above the
-  line holding its `unsafe`. No allow: a file that needs more words needs a name, a
+  `comment-cut:`, the `MARKERS` table), and a `// SAFETY:` note directly above its
+  `unsafe` block, impl or fn: the comment lines from `SAFETY:` on that share its
+  opener (`//`, `///`), ending at a blank line or a comment of another opener. No allow: a file that needs more words needs a name, a
   type, a split, or a page in `docs/`. The finding sits on the line of the first
   word past the cap.
 - **`comment-history`**: no comment names one of this repository's issues or pull
@@ -324,7 +325,8 @@ read.
   an in-page link) and a short number (`cascade #2`). Dates and phrases are not
   read. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
   An inline allow with a reason excuses a line: `// lint: allow(comment-history)
-  <why>` (`-- lint: allow(…)` in Lua).
+  <why>` (`-- lint: allow(…)` in Lua). It reads every comment line, a marker's or
+  a `SAFETY` note's too, though the cap counts them free.
 
 **They are signals while the tree is cut down to them**: `make size` (and so `make
 gates`, the commit hook and CI) prints one line each under `signal (not a
@@ -333,15 +335,19 @@ issue or PR (each counted once, by its first reference) and the files holding
 them, and stays green. **`make comments PATHS=<files or folders>`**
 (`tools/lint -- --strict-comments <paths>`) is the strict run: every finding under
 those paths as `path:line: [rule] message`, exit 1 on any, so a cleanup branch asks
-"is `crates/audio` clean?".
+"is `crates/audio` clean?". It holds the size caps and the agent docs (a `CLAUDE.md`
+inside a named folder too) under the same paths.
 
 **The comment-only proof**: `make comment-only` (`tools/lint -- --comment-only
 [<rev>]`, `BASE=` for another base than `origin/main`) compares each file changed
 between the merge base and `HEAD`, both versions with their comments cut by the same
 split the cap counts with (a doc attribute is a comment there too), as code with
 whitespace and blank lines laid aside (rustfmt may re-join a line once its trailing
-comment goes); a literal's spaces still count. It fails naming each file that
-differs and its first differing line, and every file added, deleted, renamed or of
+comment goes); a literal's spaces still count, and a gap stays where closing it
+would make another token (two word characters, two operator characters such as
+`& &`, or a word before a quote or `#`). A `'` opening no char literal is a
+lifetime, code. It fails naming each file that differs and the line of its first
+differing token, and every file added, deleted, renamed or of
 another language. It prints how many fenced doc examples the diff removes, so a
 pull request can name them. A tool mode, not a gate.
 

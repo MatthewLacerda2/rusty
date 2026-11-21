@@ -4,6 +4,8 @@
 mod literals;
 mod lua;
 pub mod proof;
+#[cfg(test)]
+mod review_tests;
 mod rust;
 #[cfg(test)]
 mod tests;
@@ -70,27 +72,49 @@ fn bare(comment: &str) -> &str {
     comment.trim_start_matches(|c: char| c.is_whitespace() || "/!*-[=".contains(c))
 }
 
-/// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`.
+/// A comment's opener (`//`, `///`, `//!`, `/*`, `*`).
+fn opener(comment: &str) -> &str {
+    let comment = comment.trim_start();
+    let len = comment.len() - comment.trim_start_matches(['/', '!', '*']).len();
+    &comment[..len]
+}
+
+/// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`
+/// block, impl or fn: the comment lines from `SAFETY:` on that share its
+/// opener, ending at a blank line or a comment of another opener.
 fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     let mut free: Vec<bool> = lines
         .iter()
         .map(|l| MARKERS.iter().any(|m| bare(&l.comment).starts_with(m)))
         .collect();
-    let note = |l: &Line| l.code.trim().is_empty();
+    let note = |l: &Line| l.code.trim().is_empty() && !l.comment.trim().is_empty();
     for (i, line) in lines.iter().enumerate() {
         if kind != Kind::Rust || !note(line) || !bare(&line.comment).starts_with("SAFETY:") {
             continue;
         }
-        let run = lines[i..].iter().take_while(|l| note(l)).count();
-        let below = lines.get(i + run).map_or("", |l| l.code.as_str());
-        if below
-            .split(|c: char| !crate::code::is_ident(c))
-            .any(|w| w == "unsafe")
-        {
+        let same = |l: &&Line| note(l) && opener(&l.comment) == opener(&line.comment);
+        let run = lines[i..].iter().take_while(same).count();
+        if lines.get(i + run).is_some_and(|l| opens_unsafe(&l.code)) {
             free[i..i + run].iter_mut().for_each(|f| *f = true);
         }
     }
     free
+}
+
+/// `code` opens an `unsafe` block, impl or fn (`unsafe {`, `unsafe impl`, …).
+fn opens_unsafe(code: &str) -> bool {
+    let mut tokens = Vec::new();
+    for piece in code.split(|c: char| c.is_whitespace() || !(crate::code::is_ident(c) || c == '{'))
+    {
+        tokens.extend(piece.split_inclusive('{').flat_map(|t| {
+            let (word, brace) = t.split_at(t.len() - usize::from(t.ends_with('{')));
+            [word, brace]
+        }));
+    }
+    tokens.retain(|t| !t.is_empty());
+    tokens
+        .windows(2)
+        .any(|w| w[0] == "unsafe" && matches!(w[1], "{" | "impl" | "fn" | "extern" | "trait"))
 }
 
 /// `over`: the line of the first word past the cap, and the words in all.
@@ -105,16 +129,16 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
     let mut report = Report::default();
     let (mut total, mut past) = (0, None);
     for (i, (line, free)) in lines.iter().zip(free(kind, &lines)).enumerate() {
+        let what = reference_as(&line.comment, Refs::CODE);
+        if let Some(what) = what.filter(|_| !allowed_in(path, source, i + 1, HISTORY)) {
+            report.history.push((i + 1, what));
+        }
         if free {
             continue;
         }
         total += words(&line.comment);
         if total > kind.cap() && past.is_none() {
             past = Some(i + 1);
-        }
-        let what = reference_as(&line.comment, Refs::CODE);
-        if let Some(what) = what.filter(|_| !allowed_in(path, source, i + 1, HISTORY)) {
-            report.history.push((i + 1, what));
         }
     }
     report.over = past.map(|line| (line, total));

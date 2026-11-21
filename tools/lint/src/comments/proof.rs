@@ -69,13 +69,13 @@ pub fn verdict(root: &Path, rev: &str) -> Verdict {
     verdict
 }
 
-/// The first line of `new` whose code differs from `old`'s.
+/// The line of `new` holding the first token whose code differs from `old`'s.
 fn differs(kind: Kind, old: &[Line], new: &[Line]) -> Option<usize> {
     let code = |lines: &[Line]| {
         let code: Vec<&str> = lines.iter().map(|l| l.code.as_str()).collect();
         literals::normalize(kind, &code.join("\n"))
     };
-    let (was, now) = (code(old), code(new));
+    let ((was, _), (now, line_of)) = (code(old), code(new));
     if was == now {
         return None;
     }
@@ -84,14 +84,8 @@ fn differs(kind: Kind, old: &[Line], new: &[Line]) -> Option<usize> {
         .zip(now.bytes())
         .take_while(|(a, b)| a == b)
         .count();
-    let mut seen = 0;
-    for (i, line) in new.iter().enumerate() {
-        seen += literals::normalize(kind, &line.code).len();
-        if seen > common {
-            return Some(i + 1);
-        }
-    }
-    Some(new.len().max(1))
+    let last = line_of.last().copied().unwrap_or(0);
+    Some(line_of.get(common).copied().unwrap_or(last) + 1)
 }
 
 fn fenced(lines: &[Line]) -> usize {
@@ -110,6 +104,9 @@ fn run(root: &Path, args: &[&str]) -> Result<String, String> {
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
+#[cfg(test)]
+#[path = "proof_edge_tests.rs"]
+mod edge_tests;
 #[cfg(test)]
 #[path = "proof_tests.rs"]
 mod tests;

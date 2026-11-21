@@ -1,7 +1,7 @@
 //! Where literals start and end in code with its comments cut.
 
 use super::Kind;
-use crate::code::is_ident;
+use crate::code::{char_end, is_ident};
 use std::ops::Range;
 
 /// The length of the literal `rest` opens with; an unclosed one runs to its end.
@@ -24,7 +24,9 @@ fn rust(rest: &str, prev: Option<char>) -> Option<usize> {
         [b'b' | b'c', b'r', ..] => (2, &rest[2..]),
         [b'r', ..] => (1, &rest[1..]),
         [b'b' | b'c', b'"' | b'\'', ..] => return Some(1 + rust(&rest[1..], None)?),
-        _ => return quoted(rest).or_else(|| char_literal(rest)),
+        // A `'` that opens no char literal is a lifetime: code, not a literal.
+        [b'\'', ..] => return char_end(rest, 1),
+        _ => return quoted(rest),
     };
     let hashes = body.bytes().take_while(|&b| b == b'#').count();
     let inner = body[hashes..].strip_prefix('"')?;
@@ -48,19 +50,6 @@ pub(super) fn quoted(rest: &str) -> Option<usize> {
     Some(rest.len())
 }
 
-/// `None` for a lifetime.
-fn char_literal(rest: &str) -> Option<usize> {
-    let body = rest.strip_prefix('\'')?;
-    if let Some(escaped) = body.strip_prefix('\\') {
-        let skip = escaped.chars().next()?.len_utf8();
-        return escaped[skip..].find('\'').map(|at| 2 + skip + at + 1);
-    }
-    let c = body.chars().next()?;
-    body[c.len_utf8()..]
-        .starts_with('\'')
-        .then(|| 1 + c.len_utf8() + 1)
-}
-
 /// Lua's `[==[`: its level and length.
 pub(super) fn long_open(rest: &str) -> Option<(usize, usize)> {
     let after = rest.strip_prefix('[')?;
@@ -75,25 +64,41 @@ pub(super) fn long_close(rest: &str, level: usize) -> Option<usize> {
     rest.find(&close).map(|at| at + close.len())
 }
 
-/// Whitespace outside literals dropped, or one space between two word chars.
-pub(super) fn normalize(kind: Kind, code: &str) -> String {
-    let mut out = String::new();
-    let (mut rest, mut prev, mut gap) = (code, None::<char>, false);
+/// Characters that run together into one token (`&&`, `->`, `<<=`, `//`).
+const JOINING: &str = "!#$%&*+-./:<=>?@^|~";
+
+/// Whitespace between `prev` and `next` keeps one space when dropping it could
+/// make a different token: two word characters, two operator characters, or a
+/// word before a quote or `#` (`r "x"` is not `r"x"`).
+fn keeps_gap(prev: char, next: char) -> bool {
+    (is_ident(prev) && (is_ident(next) || "\"'#".contains(next)))
+        || (JOINING.contains(prev) && JOINING.contains(next))
+}
+
+/// `code` with whitespace outside literals dropped, save where [`keeps_gap`];
+/// and for each byte of the result, the line (from 0) its token starts on.
+pub(super) fn normalize(kind: Kind, code: &str) -> (String, Vec<usize>) {
+    let (mut out, mut lines) = (String::new(), Vec::new());
+    let (mut rest, mut prev, mut gap, mut line) = (code, None::<char>, false, 0);
     while let Some(c) = rest.chars().next() {
         if c.is_whitespace() {
             gap = true;
+            line += usize::from(c == '\n');
             rest = &rest[c.len_utf8()..];
             continue;
         }
         let len = literal(kind, rest, prev).unwrap_or(c.len_utf8());
         let piece = &rest[..len];
-        if gap && prev.is_some_and(is_ident) && piece.starts_with(is_ident) {
+        if gap && prev.is_some_and(|p| keeps_gap(p, c)) {
             out.push(' ');
+            lines.push(line);
         }
         out.push_str(piece);
+        lines.extend(std::iter::repeat_n(line, piece.len()));
+        line += piece.matches('\n').count();
         (prev, gap, rest) = (piece.chars().next_back(), false, &rest[len..]);
     }
-    out
+    (out, lines)
 }
 
 /// Each `#[doc = …]` attribute's range, and its strings' ranges.
