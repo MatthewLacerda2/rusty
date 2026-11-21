@@ -52,9 +52,10 @@ pub(crate) struct BatchKey {
     /// The material bind group (the resolved texture maps), by cache index. After
     /// the mesh: `sort::front_to_back` keeps key order inside a depth bucket, so a
     /// field moved ahead of the mesh changes which solid draws first there, and
-    /// with it how much a forward pass shades (`order_tests`). The material group,
-    /// bound below the per-draw one (`gpu::groups`), re-flushes only itself and
-    /// that group when it changes.
+    /// with it how much a forward pass shades (`order_tests`). A batch whose
+    /// material differs from the one before re-flushes the material, the scene and
+    /// the per-draw groups (every group from the material's up, `gpu::groups`); one
+    /// that keeps its material, the per-draw group alone.
     pub material: usize,
     /// The material record's slot in the renderer's material table (tint, PBR
     /// scalars, map and cutout flags, the surface and mapping terms, #1616): one per

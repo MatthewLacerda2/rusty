@@ -1,4 +1,4 @@
-//! crates/render/src/gpu/material_cache.rs — one group-2 material bind group per distinct set
+//! crates/render/src/gpu/material_cache.rs — one material bind group (`groups::MATERIAL`) per distinct set
 //! of resolved texture maps (#470), plus each material's runtime shader-param uniform
 //! (#399).
 //!
@@ -38,11 +38,11 @@ use std::collections::{BTreeSet, HashMap};
 use rusty_scene::SceneId;
 use rusty_shadergen::params::PackedParams;
 
-/// The material's own maps in group 2: albedo, metallic, roughness, normal,
+/// The material's own maps in the material group: albedo, metallic, roughness, normal,
 /// emissive, detail (#1997), occlusion and specular level (#2151), height (#2191), detail mask (#2258).
 pub(crate) const MATERIAL_MAPS: usize = 10;
 
-/// Group-2 textures: the ten maps plus one per extra shader texture slot (#400).
+/// The material group's textures: the ten maps plus one per extra shader texture slot (#400).
 pub(crate) const MATERIAL_TEXTURES: usize = MATERIAL_MAPS + rusty_shadergen::textures::SLOTS.len();
 
 /// Albedo, metallic, roughness, normal, emissive, detail, occlusion, specular, height and detail mask keys, then the

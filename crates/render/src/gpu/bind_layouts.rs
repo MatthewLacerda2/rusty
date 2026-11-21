@@ -93,7 +93,7 @@ pub(crate) fn scene_depth_entries() -> [wgpu::BindGroupLayoutEntry; 1] {
 ///
 /// The instances are the vertex stage's alone: it hands the fragment stage the
 /// object, reflection probe and proxy volume it needs as a flat varying, which keeps
-/// the fragment stage at `wgpu::Limits::default()`'s 8 storage buffers (4 in group 0,
+/// the fragment stage at `wgpu::Limits::default()`'s 8 storage buffers (4 in the global group,
 /// materials, proxies and objects here, the shadow tiles in the scene group), the limit the
 /// renderer requests on every backend. The vertex stage binds 7.
 pub(crate) fn create_entity_bones_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
@@ -170,7 +170,7 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
     }
 }
 
-/// Group 2 (one per distinct material map set, #470): the maps at their
+/// The material group, `groups::MATERIAL` (one per distinct material map set, #470): the maps at their
 /// `map_slots::MAP_SLOTS` rows' bindings (no two textures meet, a const assert there),
 /// albedo (0) and its sampler (1), metallic (2), roughness (3), normal (4) and
 /// emissive (5); the material's runtime shader params (6, #399), a fixed
@@ -179,7 +179,7 @@ fn material_sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 /// block sampling it reads; the detail map (15, #1997), the occlusion (14) and
 /// specular-level (13) maps (#2151) the height map (12, #2191) and the detail mask (11, #2258). Every texture but albedo has its own sampler at
 /// `textures::sampler_binding` (16 past it), its import settings' wrap and filter (#1323). This is the layout the forward pass's
-/// group(2) is built against (#202, #207).
+/// material group is built against (#202, #207).
 pub(crate) fn create_material_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("Material Layout"),

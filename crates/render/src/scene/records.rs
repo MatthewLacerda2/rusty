@@ -7,7 +7,7 @@
 //! specular, refraction and SSR terms that follow it), and a mesh particle never
 //! takes decals. Each is a fixed transform of the material, so each is its own record
 //! of it, and an edit rewrites every variant drawn. Nothing else a record holds reads
-//! the entity: a slot's per-object overrides live in its param buffer (group 2,
+//! the entity: a slot's per-object overrides live in its param buffer (the material group,
 //! `ParamOwner::Entity`), the world matrix, probe SH and lightmap in its object record.
 //!
 //! **Lifetime.** A slot is allocated the first time a draw names its record (an

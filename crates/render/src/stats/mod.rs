@@ -164,13 +164,14 @@ pub struct RenderCounters {
     /// then the late set alone), `0` with neither and no GPU cull. A camera shading with a forward
     /// override of its own (the shader preview) is never primed, nor is any on Metal.
     pub primed_passes: u32,
-    /// Opaque scene pass draw calls of lit solids in a primed pass (#2334), summed
-    /// over the stack: each shades only the pixels its own prepass depth kept.
+    /// Opaque scene pass batches of lit solids (those `BatchKey::in_prepass` admits)
+    /// in a primed pass (#2334), summed over the stack: each shades only the pixels
+    /// its own prepass depth kept.
     pub forward_lit_primed: u32,
-    /// Opaque scene pass draw calls of lit solids in a pass that is not primed: their
+    /// Opaque scene pass batches of lit solids in a pass that is not primed: their
     /// overdraw depends on what drew before them.
     pub forward_lit_unprimed: u32,
-    /// Opaque scene pass draw calls of unlit solids (a light's own mesh, a gizmo
+    /// Opaque scene pass batches of unlit solids (a light's own mesh, a gizmo
     /// solid), primed or not: they are in no prepass and write their own depth.
     pub forward_unlit: u32,
     /// Reasons this frame read history an earlier frame left (#2092), one per

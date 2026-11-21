@@ -2,7 +2,7 @@
 //!
 //! The plain depth pipeline has no fragment stage: every triangle of a caster lands in
 //! the cascade. Two kinds of caster need their fragments tested instead, and are drawn
-//! through a clipping pipeline that binds their material's group 2:
+//! through a clipping pipeline that binds their material's group (`groups::MATERIAL`):
 //!
 //! - a **Cutout** material (#242): its albedo's alpha below the cutoff casts nothing,
 //!   as it shows nothing — `shader.wgsl`'s `fs_shadow`;
