@@ -72,6 +72,12 @@ fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
     let _two = rusty_render::test_gpu::pair::headless_pair();
     let (mut scene, model, path) = floor_under_a_baked_sun();
     let mut editor = CaptureHost::new();
+    // As an earlier bake left it: the sun taken in (so not previewed live, #2522),
+    // the floor without a lightmap for want of a UV.
+    scene
+        .lightmaps
+        .lights
+        .insert(scene.world.find_by_name("Sun").unwrap());
     // The editor has drawn the floor as imported: no lightmap UV, no lightmap.
     let Some(dark) = brightness(&mut editor, &scene, "before") else {
         eprintln!("[1540] no GPU/software adapter — skipping");

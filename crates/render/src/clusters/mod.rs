@@ -42,7 +42,7 @@ pub(crate) use bin::{bin, shadow_requests};
 pub(crate) use gpu::ClusterBuffers;
 pub(crate) use grid::ClusterGrid;
 pub(crate) use lights::{local_lights, LocalLight};
-pub(crate) use unbaked::{drawn_mode, UnbakedNote, PREVIEWS_UNBAKED};
+pub(crate) use unbaked::{drawn_mode, UnbakedNote};
 
 /// Clusters across, up and deep. 16×9 tiles match a 16:9 screen with square-ish
 /// tiles; 24 exponential slices keep each slice's depth span proportional to its

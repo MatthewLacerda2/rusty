@@ -66,3 +66,17 @@ fn realtime_dark_and_inactive_lights_wait_for_nothing() {
     scene.world.set_active(off, false);
     assert_eq!(UnbakedNote::default().note(&scene, true), None);
 }
+
+#[test]
+fn another_scene_has_its_waiting_lights_named_afresh() {
+    let (mut a, mut b) = (Scene::default(), Scene::default());
+    lamp(&mut a, "Lamp");
+    lamp(&mut b, "Lamp");
+    let mut note = UnbakedNote::default();
+    assert!(note.note(&a, true).is_some());
+    assert!(
+        note.note(&b, true).is_some(),
+        "the same id in another scene"
+    );
+    assert!(note.note(&b, true).is_none());
+}

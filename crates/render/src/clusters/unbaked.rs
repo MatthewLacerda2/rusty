@@ -11,7 +11,7 @@
 use std::collections::BTreeSet;
 
 use rusty_components::{LightComponent, LightMode};
-use rusty_scene::Scene;
+use rusty_scene::{Scene, SceneId};
 
 /// Whether this build previews an unbaked `Baked` light live: one with the
 /// editor or the dev layer, never a shipped `player`.
@@ -25,9 +25,11 @@ pub(crate) fn drawn_mode(scene: &Scene, id: u32, light: &LightComponent) -> Ligh
 /// How many waiting lights the note names before it says "and N more".
 const NAMED: usize = 3;
 
-/// The lights the console has named as waiting for a bake, so each is named once.
+/// The lights the console has named as waiting for a bake, so each is named once,
+/// and the scene they are in: another scene's are named afresh.
 #[derive(Default)]
 pub(crate) struct UnbakedNote {
+    scene: Option<SceneId>,
     named: BTreeSet<u32>,
 }
 
@@ -35,8 +37,12 @@ impl UnbakedNote {
     /// The console line for `scene`'s waiting lights, when one of them has not
     /// been named yet (`preview`: whether they are drawn live meanwhile). A light
     /// a bake took in and that waits again later (made `Baked` again, its id
-    /// handed back by an Undo) is named again.
+    /// handed back by an Undo) is named again, and so is every one when another
+    /// scene is drawn.
     pub(crate) fn note(&mut self, scene: &Scene, preview: bool) -> Option<String> {
+        if self.scene != Some(scene.id()) {
+            (self.scene, self.named) = (Some(scene.id()), BTreeSet::new());
+        }
         let waiting = scene.lights_awaiting_bake();
         self.named.retain(|id| waiting.contains(id));
         let new = waiting.iter().any(|id| !self.named.contains(id));
