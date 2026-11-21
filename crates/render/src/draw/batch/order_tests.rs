@@ -1,13 +1,8 @@
-//! The opaque pass's draw order (#1499): runs of equal keys, nearest first by a
-//! quantized depth, so instancing (#470) survives and near-equal batches keep their
-//! key order. No GPU. Over a primed depth: `primed_order_tests`.
-
 use super::sort::depth_bucket;
 use super::tests::{at, batched, item, meshes, name, tags};
 
 #[test]
 fn layered_walls_draw_nearest_first_whatever_the_given_order() {
-    // Given back to front, as the worst case for overdraw.
     let opaque = vec![
         at("Far", 0.0, 40.0),
         at("Mid", 1.0, 20.0),
@@ -19,7 +14,6 @@ fn layered_walls_draw_nearest_first_whatever_the_given_order() {
 
 #[test]
 fn a_run_draws_at_its_nearest_instance_and_stays_one_draw() {
-    // Two crates far away and one at the camera: one draw, ahead of the wall.
     let opaque = vec![
         at("Crate", 0.0, 50.0),
         at("Wall", 1.0, 10.0),
@@ -29,7 +23,6 @@ fn a_run_draws_at_its_nearest_instance_and_stays_one_draw() {
     let draws = batched((opaque, Vec::new()), true);
     assert_eq!(meshes(&draws), ["Crate", "Wall"]);
     assert_eq!(draws.opaque[0].instances.len(), 3);
-    // Inside the run, the copies are nearest first too.
     let tags: Vec<_> = draws.instances.iter().map(super::tests::tag_of).collect();
     assert_eq!(tags, [3.0, 0.0, 2.0, 1.0]);
     // Uniform slots follow the draw order, so `pack()` still lines up.
@@ -48,10 +41,6 @@ fn near_equal_depths_keep_the_key_order() {
 
 #[test]
 fn the_material_never_reorders_meshes_inside_a_bucket() {
-    // Inside a depth bucket the mesh orders the draws, then the material: a key
-    // field moved ahead of the mesh (the material, to bind its group less often)
-    // changes which solid draws first in every bucket, and so what a forward pass
-    // that is not primed, or an unlit solid that writes its own depth, shades.
     let with = |mesh, material, tag| {
         let mut it = at(mesh, tag, 10.0);
         it.key.material = material;

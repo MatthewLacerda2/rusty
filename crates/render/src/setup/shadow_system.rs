@@ -1,27 +1,16 @@
-//! The forward pass's scene group at setup: the shadow renderer, its cascade uniform,
-//! the no-AO bind group every pass without SSAO binds, and the opaque copy's pass
-//! and stand-in (#1523), which that group binds too.
-
 use crate::gpu::bind_layouts;
 use crate::passes::shadows;
 use crate::passes::transparent::OpaqueCopyPass;
 use crate::setup::textures::Textures;
 
-/// Shadow renderer, its cascade uniform buffer, and the main-pass bind group that
-/// samples the active cascade array.
 pub(crate) struct ShadowSystem {
     pub layout: wgpu::BindGroupLayout,
     pub renderer: shadows::ShadowRenderer,
     pub uniform_buffer: wgpu::Buffer,
     pub bind_group: wgpu::BindGroup,
-    /// The opaque copy's pass, and its 1x1 stand-in every scene group binds (#1523).
     pub opaque_copy: OpaqueCopyPass,
 }
 
-/// Shadow renderer (over the forward shader and the atlas's blits, `shaders`), its
-/// cascade uniform buffer, and the main-pass bind group that samples the active
-/// cascade array — with `no_ao`, the white stand-in for SSAO, and the opaque copy's
-/// stand-in (#1523), whose pass the system then holds.
 pub(super) fn create_shadow_system(
     device: &wgpu::Device,
     shaders: [&wgpu::ShaderModule; 2],

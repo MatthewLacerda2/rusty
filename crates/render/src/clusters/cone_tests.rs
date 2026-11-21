@@ -1,8 +1,3 @@
-//! Cone-culled spot binning (#1712): over random spotlights, near the camera and
-//! straddling its near plane, a spot's clusters are a subset of its range
-//! sphere's and include every cluster its cone reaches, in a perspective and an
-//! orthographic view; a cone too wide to trim keeps its range sphere.
-
 use glam::Vec3;
 
 use super::bin::{bin_spheres, Budget};
@@ -13,7 +8,6 @@ use rusty_components::{LightComponent, Projection};
 use rusty_core::random::Random;
 use rusty_scene::{Camera, LightType};
 
-/// A spotlight at `at` along `dir`, its outer cone `outer` degrees.
 fn spot(at: Vec3, dir: Vec3, outer: f32, range: f32) -> LocalLight {
     let light = LightComponent {
         light_type: LightType::Spotlight,
@@ -27,13 +21,10 @@ fn spot(at: Vec3, dir: Vec3, outer: f32, range: f32) -> LocalLight {
     LocalLight::new(at, dir, &light).expect("a local light")
 }
 
-/// A float in `[lo, hi)` from `rng`.
 fn range(rng: &mut Random, lo: f32, hi: f32) -> f32 {
     rng.range_f64(lo.into(), hi.into()) as f32
 }
 
-/// Check one spot in `cam`'s view: subset of its sphere, and every sampled point
-/// of its range-capped cone inside the view finds it in its cluster.
 fn check(cam: &Camera, l: &LocalLight, rng: &mut Random) {
     let aspect = 16.0 / 9.0;
     let grid = ClusterGrid::new(cam, aspect);
@@ -69,7 +60,6 @@ fn a_spots_clusters_are_within_its_sphere_and_cover_its_cone() {
     ortho.projection = Projection::Orthographic { size: 8.0 };
     for cam in [Camera::new(Vec3::ZERO, -90.0, 0.0), ortho] {
         for case in 0..150 {
-            // Every fourth apex sits on the camera's near plane.
             let z = if case % 4 == 0 {
                 -cam.near
             } else {
@@ -115,5 +105,4 @@ fn a_cone_too_wide_to_trim_keeps_its_range_sphere() {
     }
 }
 
-/// Just past the widest cone the binner culls by.
 const WIDE_CONE: f32 = super::cone::WIDEST_CULLED_CONE + 1.0;

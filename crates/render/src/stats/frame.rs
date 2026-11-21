@@ -1,6 +1,3 @@
-//! crates/render/src/stats/frame.rs — filling a frame's [`RenderCounters`]: started per
-//! render, each camera's solids and particles added, the frame's totals at its end.
-
 use super::RenderCounters;
 use crate::draw::batch::DrawBatch;
 use crate::draw::resources::SolidResources;
@@ -11,9 +8,6 @@ use crate::{RenderView, Renderer};
 use rusty_scene::{LightType, Scene};
 
 impl Renderer {
-    /// Every texture upload the renderer holds: the cached uploads and their
-    /// uncompressed fallbacks (`texture_fallbacks`, a block format a slot cannot
-    /// read), the set `texture_bytes` sums.
     pub fn resident_textures(&self) -> impl Iterator<Item = &wgpu::Texture> {
         let fallbacks = self.texture_fallbacks.values();
         self.gpu_textures
@@ -22,15 +16,11 @@ impl Renderer {
             .map(|t| &t.texture)
     }
 
-    /// Start a render's clocks: the GPU timer's frame, and the GPU call counts
-    /// (`gpu::ops`) from zero, so what was counted before the render (setup, a
-    /// warm-up, the last frame's timer resolve) belongs to no frame.
     pub(crate) fn begin_frame_clocks(&mut self) {
         self.gpu_timer.begin_frame();
         crate::gpu::ops::take();
     }
 
-    /// Start a frame's counters: the light counts, and an empty shadow-draw log.
     pub(crate) fn begin_counters(&mut self, scene: &Scene) {
         let (lights, lights_dropped) = count_lights(scene);
         self.frame_counters = RenderCounters {
@@ -42,8 +32,6 @@ impl Renderer {
         self.shadow_renderer.culls = Default::default();
     }
 
-    /// Count one camera's solids (mesh particles among them) and sprite particle
-    /// batches.
     pub(crate) fn count_camera(&mut self, solids: &SolidResources, particles: ParticleDraws) {
         let c = &mut self.frame_counters;
         let culled = solids.culled.as_ref();
@@ -52,7 +40,6 @@ impl Renderer {
         c.add_draws(draws_of(solids.draws.transparent.iter(), &[]));
         let draws = draws_of(solids.draws.opaque.iter(), clustered);
         match culled {
-            // The GPU decided what each opaque draw drew: its last read back says (#2387).
             Some(culled) => {
                 c.add_read_draws(draws, culled.triangles.map(|t| t.last));
                 c.cluster_draws += clustered
@@ -73,8 +60,6 @@ impl Renderer {
         c.particles_drawn += particles.instances + solids.mesh_particles;
     }
 
-    /// Close the frame's counters: the shadow casters drawn and the UI batches and
-    /// effect passes.
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
         let texture_bytes = self.resident_textures().map(gpu_bytes).sum();
         let c = &mut self.frame_counters;
@@ -106,21 +91,15 @@ impl Renderer {
     }
 }
 
-/// A GPU mesh's vertex and index buffers' bytes.
 fn mesh_bytes(mesh: &crate::GpuMesh) -> u64 {
     mesh.vertex_buffer.size() + mesh.index_buffer.size()
 }
 
 impl RenderCounters {
-    /// Add a set of indexed draws — `(num_indices, instances)` per draw call — to the
-    /// counts. An instanced draw is one call but submits every instance's triangles.
     pub(crate) fn add_draws(&mut self, draws: impl IntoIterator<Item = (u32, u32)>) {
         self.add_read_draws(draws, None);
     }
 
-    /// Add a culled pass's `draws` (#2387): a call each, and the triangles its
-    /// GPU `read` back says they drew, or, before a read has come back, the
-    /// draws' own, every instance's (an upper bound). Returns the triangles added.
     pub(crate) fn add_read_draws(
         &mut self,
         draws: impl IntoIterator<Item = (u32, u32)>,
@@ -137,10 +116,6 @@ impl RenderCounters {
     }
 }
 
-/// `(active lights, lights with no uniform slot)` — mirrors `apply_scene_lights`,
-/// which keeps four of the directional lights a frame draws live (`Baked` ones
-/// never take a slot, #809) and the last ambient. Point and spot lights are
-/// clustered (#434); the binning stage counts the ones a camera drops.
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let mut per_type = [0u32; 5];
     for id in scene.world.ids_with_light() {
@@ -152,8 +127,6 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
         };
         per_type[match light.light_type {
             LightType::Point => 0,
-            // A `Baked` sun takes no slot (#809): counted, never dropped.
-            // Nor does an Area light, always `Baked` (#1674).
             LightType::Directional
                 if !crate::clusters::drawn_mode(scene, id, &light).renders_live(false) =>
             {
@@ -170,9 +143,6 @@ pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     (per_type.iter().sum(), dropped)
 }
 
-/// The draws `batches` make, `(indices, instances)` each: one instanced draw per
-/// batch, but one draw per instance for the batch `i` that `clustered[i]` says is
-/// drawn by cluster (#1968), whose kept clusters each instance draws on its own.
 pub(super) fn draws_of<'a>(
     batches: impl Iterator<Item = &'a DrawBatch> + 'a,
     clustered: &'a [Option<std::ops::Range<u32>>],
@@ -186,9 +156,6 @@ pub(super) fn draws_of<'a>(
 }
 
 impl RenderCounters {
-    /// Add one opaque scene pass's `batches` to the forward batch split (#2334):
-    /// out of the prepass (`BatchKey::in_prepass`: the unlit ones), or in it in a
-    /// pass `primed` or not.
     pub(crate) fn count_forward<'a>(
         &mut self,
         batches: impl Iterator<Item = &'a DrawBatch>,

@@ -1,9 +1,3 @@
-//! crates/render/src/scene/stack_gpu_tests.rs — a camera stack that draws (#1706): a
-//! `DepthOnly` viewmodel camera over a world camera running TAA. Each camera uploads
-//! its own instances and the object table's dirty records mid-render, so the gun's
-//! upload must not reach the world's draws: the world, a moving prop in it, draws
-//! the same pixels with the gun's camera stacked over it as without it.
-
 use glam::Vec3;
 
 use crate::motion::gpu_fixture::{cube, eye, renderer_pair, scene, view, H, W};
@@ -12,9 +6,6 @@ use crate::{readback, Renderer};
 use rusty_components::CameraComponent;
 use rusty_scene::{ClearFlags, Scene};
 
-/// A blue wall, a red prop at the left and, with `overlay`, a green gun low and
-/// right, drawn by a `DepthOnly` camera alone. The world camera runs TAA and skips
-/// the gun's layer. Returns the scene and the prop.
 pub(super) fn stack(overlay: bool) -> (Scene, u32) {
     let (mut scene, world) = scene(false);
     let mut lens = scene.world.camera_mut(world).unwrap();
@@ -43,7 +34,6 @@ pub(super) fn stack(overlay: bool) -> (Scene, u32) {
     (scene, prop)
 }
 
-/// Six frames with the prop rising each frame (a posed record each frame); the last.
 fn run(r: &mut Renderer, overlay: bool) -> Vec<u8> {
     let (mut scene, prop) = stack(overlay);
     let mut v = view(r);
@@ -58,7 +48,6 @@ fn run(r: &mut Renderer, overlay: bool) -> Vec<u8> {
     last
 }
 
-/// Pixels of the columns `xs` whose `channel` leads both others by 40.
 fn count(frame: &[u8], xs: std::ops::Range<u32>, channel: usize) -> usize {
     let at = |x: u32, y: u32| &frame[((y * W + x) * 4) as usize..][..3];
     let leads = |p: &[u8]| (0..3).all(|c| c == channel || p[channel] > p[c].saturating_add(40));

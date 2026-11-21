@@ -1,8 +1,3 @@
-//! Each input the layout reads, changed in turn, lays it out again; what it does not
-//! read (a plain label's string, a visor's sway, a world canvas carried around, the
-//! camera with no marker) never does; while a `WorldAnchor` marker exists the
-//! camera and its target do.
-
 use glam::{Vec2, Vec3};
 
 use std::rc::Rc;
@@ -11,7 +6,6 @@ use super::{element, ui, Rig, Ui, Why};
 use rusty_components::{CanvasComponent, CanvasRenderMode, WorldAnchor};
 use rusty_scene::Camera;
 
-/// Change input `i` of the layout; its name.
 fn change(i: usize, ui: &mut Ui, rig: &mut Rig) -> &'static str {
     let w = &mut ui.scene.world;
     match i {

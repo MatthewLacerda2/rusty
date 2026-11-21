@@ -1,7 +1,3 @@
-//! Each measurement switch and graphics option takes away its own counter on a
-//! primitive scene with every feature, and leaves the others' as they were. A fresh
-//! renderer a case: a page or cube one case loaded stays resident.
-
 use super::{RenderSwitch, RenderSwitches};
 use crate::test_gpu::ssil;
 use crate::RenderCounters;
@@ -11,8 +7,6 @@ use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// The SSIL test room with SSAO on, the lamp shadowing, a sun, the floor
-/// lightmapped and a reflection probe around it all.
 fn everything() -> Scene {
     let (mut scene, lamp) = ssil::scene(ssil::on(1.0), ssil::LAMP);
     let cam = scene.world.ids_with_camera()[0];
@@ -23,7 +17,6 @@ fn everything() -> Scene {
     let sun =
         rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_x(-1.0);
-    // A dynamic caster: the statics are drawn into the maps once, then cached.
     let crate_id = create_entity(&mut scene, "Crate", Some(Primitive::Box));
     scene.world.transform_mut(crate_id).unwrap().position = Vec3::new(0.5, 0.5, -4.0);
     let floor = scene.find_entity_by_name("floor").unwrap();
@@ -41,7 +34,6 @@ fn everything() -> Scene {
     scene
 }
 
-/// What each feature costs, as the counter its switch or option takes away.
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Costs {
     shadow_draws: u32,
@@ -65,15 +57,12 @@ impl From<RenderCounters> for Costs {
     }
 }
 
-/// [`costs`] with every switch on but `switch`, in the Scene view when `editor`.
 fn switched(switch: RenderSwitch, editor: bool) -> Costs {
     let mut s = RenderSwitches::ON;
     s.set(switch, false);
     costs(s, GraphicsOptions::default(), editor).unwrap()
 }
 
-/// The costs of [`everything`]'s second frame on a fresh renderer drawing with
-/// `switches` and `options`, in the Scene view (which ignores them) when `editor`.
 fn costs(switches: RenderSwitches, options: GraphicsOptions, editor: bool) -> Option<Costs> {
     let mut r = ssil::renderer()?;
     (r.switches, r.graphics_options) = (switches, options);
@@ -85,7 +74,6 @@ fn costs(switches: RenderSwitches, options: GraphicsOptions, editor: bool) -> Op
     Some(r.frame_counters.into())
 }
 
-/// The costs with everything on, each checked present; `None` with no adapter.
 fn baseline() -> Option<Costs> {
     let all = costs(RenderSwitches::ON, GraphicsOptions::default(), false)?;
     let counted = [all.ssao_samples, all.ssil_samples, all.lightmap_bytes];
@@ -95,7 +83,6 @@ fn baseline() -> Option<Costs> {
 }
 
 impl Costs {
-    /// These costs with one taken away by `zero`.
     fn without(mut self, zero: fn(&mut Costs)) -> Costs {
         zero(&mut self);
         self
@@ -113,7 +100,6 @@ fn gpu_each_switch_takes_away_its_own_counter_and_no_other() {
     assert_eq!(unbaked, all.without(|c| c.lightmap_bytes = 0));
     let unlit = switched(RenderSwitch::ClusteredLights, false);
     assert_eq!(unlit, all.without(|c| c.light_cluster_refs = 0));
-    // The array shrinks to its stand-in cube, which is not nothing.
     let probeless = switched(RenderSwitch::ReflectionProbes, false);
     let bytes = |c: Costs| c.reflection_bytes;
     assert!(bytes(probeless) < bytes(all), "{probeless:?} {all:?}");
@@ -135,7 +121,6 @@ fn gpu_the_ssao_and_ssil_options_and_switches_take_away_their_own_counter_and_no
     assert_eq!(no_ao, all.without(|c| c.ssao_samples = 0));
     let no_il = option_off(GraphicsOption::Ssil);
     assert_eq!(no_il, all.without(|c| c.ssil_samples = 0));
-    // The `ssao` and `ssil` switches take the same, in the Scene view too.
     assert_eq!(switched(RenderSwitch::Ssao, false), no_ao);
     assert_eq!(switched(RenderSwitch::Ssil, false), no_il);
     let editor = costs(RenderSwitches::ON, GraphicsOptions::default(), true).unwrap();

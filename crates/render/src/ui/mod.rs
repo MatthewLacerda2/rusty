@@ -1,35 +1,3 @@
-//! crates/render/src/ui/ — the in-game UI render pass (#418).
-//!
-//! The GPU half of the UI. The sim half (`crate::ui`) lays canvases out on the CPU;
-//! this module draws the result as **one batched 2D pass after the whole post-FX
-//! chain**, onto the frame the editor's Game view, headless screenshots and the
-//! player all present — so a HUD is never tonemapped, bloomed, motion-blurred or
-//! FXAA-softened. The arrow is render → sim: this reads the layout, never the
-//! reverse.
-//!
-//! - `geometry` — one `Image`'s triangles per image type (pure).
-//! - `clip` — what clips a graphic: RectMask bounds and feather, the nearest Mask.
-//! - `mesh` — the layout → one vertex list per canvas, split into batches on
-//!   texture / clip changes, with CanvasGroup alpha and the clips (pure).
-//! - `effects` — the batch group every batch binds: soft clips, Mask coverage
-//!   textures (#428) and the backdrop blur (#426).
-//! - `vertex` — the one vertex format every graphic shares, and fill/gradient encoding.
-//! - `shape` — a `Shape`'s SDF quads: shadow, glow, body (#425).
-//! - `blend` — the blend modes as GPU blend state (#425).
-//! - `pipeline` — the screen and world pipeline shapes, built in one place.
-//! - `custom` — custom ui shaders (#427): a graphic's shade as its batch carries it
-//!   (pure), the variant cache and the per-graphic uniforms.
-//! - `text` — SDF glyph generation, the per-font atlases and text quads.
-//! - `kept` — each view's canvas meshes, rebuilt only when their inputs change.
-//! - `cache` — the per-view vertex buffers (re-upload only changed geometry).
-//! - `draw` — preparing a view's UI and the screen pass itself.
-//! - `world` — world canvases (`WorldSpace`, `ScreenSpaceCamera`) drawn inside
-//!   each camera's pass (#429).
-//!
-//! **Colour space.** UI blends in display (sRGB-encoded) space with premultiplied
-//! alpha: the pass draws through a non-sRGB *view* of the frame's sRGB colour
-//! target (see `docs/ui.md` for why this beats an in-shader encode).
-
 pub(crate) mod blend;
 pub(crate) mod cache;
 pub(crate) mod clip;
@@ -58,49 +26,28 @@ use rusty_components::UiBlend;
 
 pub use cache::UiViewCache;
 
-/// Every shared GPU resource of the UI pass. One per `Renderer`; pipelines are
-/// built lazily per target format (the window's and the headless one differ).
 pub struct UiRenderer {
     shader: wgpu::ShaderModule,
     layout: wgpu::BindGroupLayout,
     pipeline_layout: wgpu::PipelineLayout,
-    /// One pipeline per (target format, blend mode).
     pipelines: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
-    /// The backdrop batches' pipeline (#426), per target format.
     backdrops: HashMap<wgpu::TextureFormat, wgpu::RenderPipeline>,
-    /// Linear, clamped, base-level-only: the white texture's, the glyph atlases'
-    /// and the backdrop's. An image samples with its own filter instead.
     sampler: wgpu::Sampler,
-    /// An image's sampler per import filter, always clamped (`ui_sampler`, #1397).
     image_samplers: HashMap<FilterMode, wgpu::Sampler>,
-    /// A 1×1 white texture, sampled by solid-colour graphics.
     white: wgpu::BindGroup,
-    /// Its view: the mask and backdrop of a batch that has neither.
     white_view: wgpu::TextureView,
-    /// Every batch's group 1: clip, mask and backdrop (`effects`).
     batch_layout: wgpu::BindGroupLayout,
-    /// Draws a Mask's graphic into its coverage texture (#428).
     mask_pipeline: wgpu::RenderPipeline,
-    /// The backdrop's blur chain (#426).
     blur: effects::blur::BlurPipelines,
-    /// Bind groups per texture path, kept with the texture they bind so a reloaded
-    /// texture rebinds.
     textures: HashMap<String, (Rc<GpuTexture>, wgpu::BindGroup)>,
-    /// Every font's glyph atlas (CPU side, shared by all views).
     atlases: text::atlas::FontAtlases,
-    /// Each atlas's GPU copy, by font path.
     fonts: HashMap<Option<String>, text::gpu::AtlasGpu>,
-    /// The world-canvas pipeline (#429).
     world: world::WorldUiPipeline,
-    /// Custom ui shaders' pipelines (#427).
     shaders: custom::UiShaders,
-    /// The texture sizes this pass lays out with: the sim's own table, handed
-    /// over by [`Renderer::set_ui_textures`] (#1221). Empty until then.
     texture_sizes: Rc<rusty_ui::TextureSizes>,
 }
 
 impl UiRenderer {
-    /// Load the UI shader and build the shared layout, sampler and white texture.
     pub(crate) fn new(
         device: &wgpu::Device,
         writes: Writes,
@@ -149,14 +96,10 @@ impl UiRenderer {
         }
     }
 
-    /// The world-canvas pipelines, one per blend mode, built or not (#985).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.world.lazy()
     }
 
-    /// Build the pipelines for `format` if absent, one per blend mode, plus the
-    /// backdrop's (#426, always "over"): premultiplied colour, no depth, no culling
-    /// (a clockwise radial fill winds the other way).
     fn ensure_pipeline(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
         for mode in UiBlend::ALL {
             if !self.pipelines.contains_key(&(format, mode)) {
@@ -170,7 +113,6 @@ impl UiRenderer {
         }
     }
 
-    /// The screen pipeline drawing into `format` with `mode` through `entry`.
     fn build_pipeline(
         &self,
         device: &wgpu::Device,
@@ -186,7 +128,6 @@ impl UiRenderer {
         )
     }
 
-    /// The bind group a batch drawing `source` samples (white when it is not loaded).
     fn source_group(&self, source: &mesh::UiSource) -> &wgpu::BindGroup {
         let group = match source {
             mesh::UiSource::Solid => None,
@@ -198,18 +139,10 @@ impl UiRenderer {
 }
 
 impl crate::Renderer {
-    /// Draw the UI with the sim's texture-size table (`ScreenSize::textures`, #1221),
-    /// so the drawn layout is the one the sim hit-tests. Set before each `render`
-    /// of a game's scene; a renderer never handed one lays Images out at zero.
     pub fn set_ui_textures(&mut self, textures: Rc<rusty_ui::TextureSizes>) {
         self.ui_renderer.texture_sizes = textures;
     }
 
-    /// The view of a swapchain frame the UI pass draws through, and its format: the
-    /// frame's non-sRGB twin when the surface was configured with one (display-space
-    /// blending), else the frame itself. Hand it to [`RenderView::set_ui_output`].
-    ///
-    /// [`RenderView::set_ui_output`]: crate::RenderView::set_ui_output
     pub fn surface_ui_view(
         &self,
         frame: &wgpu::Texture,
@@ -228,7 +161,6 @@ impl crate::Renderer {
     }
 }
 
-/// A texture + the UI's sampler or an image's clamped one, bound against `layout`.
 pub(crate) fn bind(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,
@@ -251,7 +183,6 @@ pub(crate) fn bind(
     })
 }
 
-/// A 1×1 opaque white sRGB texture's view.
 fn white_texture(device: &wgpu::Device, (queue, staging): Writes) -> wgpu::TextureView {
     let size = wgpu::Extent3d {
         width: 1,

@@ -1,9 +1,3 @@
-//! Custom ui shaders through the real UI pass (#427), how a shader is found and
-//! rebuilt: a missing or non-ui shader falls back to the standard one, a runtime
-//! param is a buffer write (no rebuild), and a re-bake is picked up next frame while
-//! another shader's bake rebuilds nothing (#794). How a shaded graphic draws is
-//! `gpu_draw_tests`. Skips with no adapter.
-
 use super::fixture::{scene, set_param, shot, Baked, RES};
 use crate::test_gpu::headless_or_skip;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -68,8 +62,6 @@ fn gpu_a_rebake_is_picked_up_next_frame() {
 
 #[test]
 fn gpu_a_bake_of_another_shader_rebuilds_no_variant() {
-    // #794: a bake re-reads every variant's module and drops only a changed one, so
-    // a neighbouring test's bake under one-process `cargo test` rebuilds nothing here.
     let Some(mut renderer) = headless_or_skip(RES, RES) else {
         return;
     };

@@ -1,5 +1,3 @@
-//! What re-reads the console note's lights, and what its line advises (#2522).
-
 use super::UnbakedNote;
 use rusty_scene::create::default_light;
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
@@ -12,9 +10,6 @@ fn lamp(scene: &mut Scene, name: &str) -> u32 {
     id
 }
 
-/// A despawn and an Undo's restore move the lightmaps' revision without
-/// touching the bake's record: the waiting light is not named again. A bake that
-/// changes the record names afresh what still waits.
 #[test]
 fn a_despawn_or_restore_names_nothing_and_a_new_record_names_again() {
     let mut scene = Scene::default();
@@ -43,8 +38,6 @@ fn a_despawn_or_restore_names_nothing_and_a_new_record_names_again() {
     assert!(scene.waits_for_bake(waits));
 }
 
-/// A waiting light that is off or dark is not named, and its writes do not
-/// make the note read every light again.
 #[test]
 fn an_off_or_dark_waiting_light_reads_nothing_on_its_writes() {
     let mut scene = Scene::default();

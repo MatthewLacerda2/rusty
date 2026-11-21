@@ -1,10 +1,6 @@
-//! The binner's last step (#434, #834): one camera's (cluster, item) pairs sorted
-//! into the per-cluster lists the shader reads, each cut to its budget.
-
 use super::bin::Binned;
 use super::CLUSTER_COUNT;
 
-/// One cluster's entry for one sphere, and how much it matters there.
 #[derive(Clone, Copy, Default)]
 pub(super) struct Pair {
     pub cluster: u32,
@@ -12,9 +8,6 @@ pub(super) struct Pair {
     pub score: f32,
 }
 
-/// Counting-sort the pairs into per-cluster lists, each in ascending index order;
-/// stable, so a run already is. A cluster with more than `cap` keeps the `cap`
-/// that score highest there, the index breaking ties ([`cut_lists`]).
 pub(super) fn fill_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
     for p in pairs {
         out.ranges[p.cluster as usize][1] += 1;
@@ -36,9 +29,6 @@ pub(super) fn fill_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
     }
 }
 
-/// [`fill_lists`] when some cluster is over `cap` (`ranges` holding the counts):
-/// sort the pairs by cluster, cut each list over `cap` to its top `cap` and count
-/// the rest in `cluster_dropped`.
 fn cut_lists(out: &mut Binned, pairs: &[Pair], cap: usize) {
     let mut cursor = Vec::with_capacity(CLUSTER_COUNT);
     let mut offset = 0;

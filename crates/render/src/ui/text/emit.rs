@@ -1,11 +1,3 @@
-//! crates/render/src/ui/text/emit.rs — a `Text` element's quads → the canvas mesh (#419).
-//!
-//! The text counterpart of the mesh builder's image emission: each glyph quad
-//! (rect-local) is mapped through the element's laid-out corners — so rotation and
-//! scale carry the text — and appended as two triangles, batched per font atlas
-//! under the element's inherited clip and custom shader (#427), with its CanvasGroup alpha folded into the
-//! fill, outline and glow colours.
-
 use bytemuck::Zeroable;
 use glam::{Vec2, Vec4};
 
@@ -17,7 +9,6 @@ use crate::ui::mesh::{
 };
 use rusty_ui::UiRect;
 
-/// Emit `id`'s Text (if any, visible and not fully clipped) into `mesh`.
 pub(in crate::ui) fn push_text(
     mesh: &mut CanvasMesh,
     frame: &Frame,
@@ -39,7 +30,6 @@ pub(in crate::ui) fn push_text(
         axis(br - bl, size.x, Vec2::X),
         axis(tl - bl, size.y, Vec2::Y),
     );
-    // A Selectable's ColorTint (#420) multiplies every colour, like the group alpha.
     let alpha = text.state_tint * Vec4::new(1.0, 1.0, 1.0, state.alpha);
     let shade = shade(&text.shader, rect, frame.screen);
     for quad in text_quads(&text, size, atlases) {

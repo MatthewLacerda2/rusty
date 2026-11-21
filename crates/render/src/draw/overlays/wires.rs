@@ -1,26 +1,3 @@
-//! The collider and debug-line gizmos (#1882): every collider's real shape
-//! (`physics::ShapeWire`) in Unity's green, a trigger's paler, and the
-//! `Debug.DrawLine` / `DrawRay` lines in their own colours. All of them are one
-//! vertex buffer and one draw: each vertex carries its colour (in its `tangent`,
-//! which the `vs_gizmo_vertex` line pipeline passes through), so a frame of rays
-//! in a hundred colours still costs one upload.
-//!
-//! **What draws.** In the Scene view, the selected object's colliders always, every
-//! collider under the `Colliders` gizmo, and the debug lines always, as Unity's
-//! Scene view does. Over a game frame (the `GameGizmos` toggle,
-//! `Harness.Screenshot`'s `gizmos` option), every collider and the debug lines.
-//!
-//! **Built once.** A collider's shape is kept in the renderer's
-//! [`WireCache`](rusty_physics::WireCache) and built again only when what physics
-//! builds it from changes; a frame only places it, at the pose the frame draws its
-//! entity at (`DrawPoses::pose`, blended between two ticks as its mesh is, #1877).
-//!
-//! **Bounded per frame.** Colliders draw nearest the camera first (the selection
-//! before any), until [`MAX_COLLIDER_SEGMENTS`] segments: past it the farther ones,
-//! or the rest of a level's collision mesh, are left out of that frame. Unity draws
-//! a mesh collider in full; at Dust2 scale that is hundreds of thousands of edges,
-//! uploaded every frame, so the cap keeps the gizmo a view and not a stall.
-
 use glam::{Mat4, Vec3};
 use wgpu::util::DeviceExt;
 
@@ -32,25 +9,16 @@ use rusty_components::mesh::Vertex;
 use rusty_physics::WireCache;
 use rusty_scene::Scene;
 
-/// Unity's collider gizmo green (145, 244, 139, 210).
 pub(crate) const COLLIDER: [f32; 4] = [0.569, 0.957, 0.545, 0.824];
-/// A trigger's: the same green, paler, so a solid wall and a trigger volume read apart.
 pub(crate) const TRIGGER: [f32; 4] = [0.569, 0.957, 0.545, 0.35];
-/// The most collider segments one frame draws (see the module docs).
 pub(crate) const MAX_COLLIDER_SEGMENTS: usize = rusty_physics::MAX_WIRE_SEGMENTS;
 
-/// Which colliders a gizmo pass draws.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ColliderScope {
-    /// The selected object's only (the Scene view with `Colliders` off).
     Selected,
-    /// Every one, the selection first.
     All,
 }
 
-/// The ids whose colliders draw, in draw order: the selection, then the rest
-/// nearest `eye` first (ties by id, so a frame is the same however the ECS iterates).
-/// Only the entities carrying a Collider or a CharacterController are walked.
 pub(crate) fn collider_order(scene: &Scene, scope: ColliderScope, eye: Vec3) -> Vec<u32> {
     let world = &scene.world;
     let selected = scene
@@ -73,7 +41,6 @@ pub(crate) fn collider_order(scene: &Scene, scope: ColliderScope, eye: Vec3) -> 
     ids
 }
 
-/// One coloured line end, as the vertex-colour line pipeline reads it.
 fn end(p: Vec3, color: [f32; 4]) -> Vertex {
     Vertex {
         tangent: color,
@@ -81,9 +48,6 @@ fn end(p: Vec3, color: [f32; 4]) -> Vertex {
     }
 }
 
-/// Every segment to draw, both ends in order, each end carrying its colour. The
-/// colliders keep their budget; the debug lines are bounded by their store
-/// (`scene::runtime::debug_lines`).
 pub(crate) fn wire_vertices(
     scene: &Scene,
     (cache, poses): (&mut WireCache, &DrawPoses),
@@ -116,8 +80,6 @@ pub(crate) fn wire_vertices(
 }
 
 impl Renderer {
-    /// The collider and debug-line gizmos' one draw, at its slot of `draws`; `None`
-    /// when there is nothing to draw.
     pub(crate) fn precreate_wires(
         &self,
         scene: &Scene,
@@ -129,9 +91,6 @@ impl Renderer {
         self.vertex_lines(draws, &verts, "Collider & Debug Line Gizmo Vertices")
     }
 
-    /// One vertex-coloured line list's draw (each vertex's colour in its `tangent`):
-    /// `verts` in one vertex buffer, at a slot of `draws` drawn white, so the colour
-    /// is each vertex's own. `None` when there is nothing to draw.
     pub(super) fn vertex_lines(
         &self,
         draws: &mut OverlayDraws,

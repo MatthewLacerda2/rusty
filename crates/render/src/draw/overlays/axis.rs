@@ -1,6 +1,3 @@
-//! Pre-creation of the selected entity's axis arrows. Extracted verbatim from
-//! `Renderer::render` (behavior unchanged).
-
 use glam::Mat4;
 
 use super::OverlayDraws;
@@ -25,9 +22,9 @@ impl Renderer {
         let arrow_model_matrix = Mat4::from_translation(world_pos);
 
         let colors = [
-            [1.0, 0.1, 0.1, 1.0], // X: Red
-            [0.1, 0.9, 0.1, 1.0], // Y: Green
-            [0.1, 0.4, 1.0, 1.0], // Z: Blue
+            [1.0, 0.1, 0.1, 1.0],
+            [0.1, 0.9, 0.1, 1.0],
+            [0.1, 0.4, 1.0, 1.0],
         ];
 
         for (i, color) in colors.into_iter().enumerate() {

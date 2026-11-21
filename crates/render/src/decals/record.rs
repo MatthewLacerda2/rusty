@@ -1,7 +1,3 @@
-//! One decal as the forward shader reads it (#638): the box, its frame, what it
-//! changes and by how much, and the atlas layers it samples. Pure CPU data, built
-//! from the sim's [`Decal`] and the material it names.
-
 use glam::Vec3;
 
 use crate::gpu::textures::TextureKind;
@@ -9,41 +5,25 @@ use rusty_asset::MapRef;
 use rusty_components::{DecalBlend, MaterialAsset};
 use rusty_scene::decal::{Decal, DecalPose};
 
-/// `GpuDecal::layers` for a map the decal does not have.
 pub(crate) const NO_LAYER: u32 = u32::MAX;
 
-/// How far past `angle_fade` a surface turns before the decal is gone, in degrees.
 const ANGLE_FADE_SPAN: f32 = 15.0;
 
-/// One decal, mirroring `Decal` in `common.wgsl` byte-for-byte.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuDecal {
-    /// World → box space, where the box is the unit cube `[-0.5, 0.5]³`.
     pub world_to_decal: [f32; 16],
-    /// The box's world-space right axis (texture `u`); `w` the albedo weight.
     pub right: [f32; 4],
-    /// The box's world-space up axis (texture `-v`); `w` the normal weight.
     pub up: [f32; 4],
-    /// The axis out of the surface (against the projection); `w` the cosine of the
-    /// angle where the angle fade starts.
     pub forward: [f32; 4],
-    /// Albedo tint (rgb) and coverage (a).
     pub color: [f32; 4],
-    /// Metallic, roughness, then their weights.
     pub surface: [f32; 4],
-    /// `x` the occlusion it adds, `y` the cosine where the angle fade ends.
     pub fade: [f32; 4],
-    /// Atlas layers of the albedo, normal, metallic and roughness maps, or
-    /// [`NO_LAYER`].
     pub layers: [u32; 4],
 }
 
-/// The maps one decal samples, by path: albedo, normal, metallic, roughness.
 pub(crate) type DecalMaps = [Option<MapRef>; 4];
 
-/// What each of [`DecalMaps`]' slots holds, which decides how its mips average
-/// (#1364): the albedo is colour, the rest data.
 const MAP_KINDS: [TextureKind; 4] = [
     TextureKind::Colour,
     TextureKind::Data,
@@ -51,15 +31,12 @@ const MAP_KINDS: [TextureKind; 4] = [
     TextureKind::Data,
 ];
 
-/// The maps of `maps` that are set, each with the kind its slot samples it as.
 pub(crate) fn kinded(maps: &DecalMaps) -> impl Iterator<Item = (&MapRef, TextureKind)> {
     maps.iter()
         .zip(MAP_KINDS)
         .filter_map(|(map, kind)| Some((map.as_ref()?, kind)))
 }
 
-/// The maps `decal` samples: its material's when it names one, else its own
-/// albedo `texture`.
 pub(crate) fn maps(decal: &Decal, material: Option<&MaterialAsset>) -> DecalMaps {
     match material {
         Some(m) => [
@@ -72,9 +49,6 @@ pub(crate) fn maps(decal: &Decal, material: Option<&MaterialAsset>) -> DecalMaps
     }
 }
 
-/// `decal`'s GPU record at `pose` (#639), dressed by `material` (the library
-/// material it names, if any) and sampling the atlas `layers` of its [`maps`]. The
-/// pose's fade scales the coverage (`color.a`), which scales every blend weight.
 pub(crate) fn record(
     decal: &Decal,
     pose: &DecalPose,
@@ -114,7 +88,6 @@ pub(crate) fn record(
     }
 }
 
-/// The sphere that bounds the box at `pose`, for cluster binning: centre and radius.
 pub(crate) fn bounds(pose: &DecalPose) -> (Vec3, f32) {
     (pose.centre(), pose.radius())
 }

@@ -1,18 +1,9 @@
-//! A material's detail layer as its record's [`DetailUniform`] (#1997): HDRP Lit's
-//! detail map, read by `engine/shaders/forward/detail.wgsl`.
-
 use std::ops::RangeInclusive;
 
 use crate::gpu::uniforms::DetailUniform;
 use rusty_components::{MaterialAsset, UvMapping};
 use rusty_scene::rules::material::{DETAIL_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 
-/// Where and how strongly material `c`'s detail layer applies (#1997): off (all
-/// zero) without a layer or its map, so a mask alone draws nothing (#2258); the mask
-/// flagged where one is named. Each value clamped to its authoring row's
-/// range, as `uniforms::mapping_uniform` does. Under UV0 its v lane is packed as the main
-/// one is (#1851), so a detail Tiling and Offset read Unity's way over the main
-/// maps' tiled UV; under a world mapping they apply to the projection as set.
 pub(crate) fn detail_uniform(c: &MaterialAsset) -> DetailUniform {
     let Some(d) = c.detail.as_ref().filter(|d| d.map.is_some()) else {
         return DetailUniform::default();

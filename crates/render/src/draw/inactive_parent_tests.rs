@@ -1,7 +1,3 @@
-//! An inactive parent hides its subtree from the renderer (#1363): the issue's
-//! holstered weapon, a pivot with two mesh children, draws nothing while the pivot is
-//! inactive, though each child's own flag stays on. Skips when no adapter is present.
-
 use glam::Vec3;
 
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -11,7 +7,6 @@ use rusty_scene::{Camera, Scene};
 const W: u32 = 64;
 const H: u32 = 48;
 
-/// A pivot holding two meshes in front of the camera; returns the scene and pivot.
 fn holstered() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();

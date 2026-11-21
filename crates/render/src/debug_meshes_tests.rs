@@ -1,6 +1,3 @@
-//! The re-upload rule (#1540): which geometry slots a renderer refreshes, and from
-//! which mesh. Pure, so it runs with no adapter.
-
 use super::{has_geometry, stale_uploads, UploadCandidate};
 use crate::MeshId;
 use rusty_components::mesh::Vertex;
@@ -15,7 +12,6 @@ fn floor(revision: MeshRevision, entity: u32) -> UploadCandidate {
     }
 }
 
-/// The entity each slot uploads from, given what is resident.
 fn picks(resident: Option<MeshRevision>, candidates: Vec<UploadCandidate>) -> Vec<u32> {
     let uploads = stale_uploads(candidates, |_: &MeshId| resident);
     uploads.values().map(|&(_, entity)| entity).collect()
@@ -49,8 +45,6 @@ fn the_newest_mesh_with_geometry_wins_a_slot() {
     ] {
         assert_eq!(picks(None, both), [2], "newest, whatever the order");
     }
-    // Meshes cloned from one share its revision: the first found keeps the slot,
-    // so the pick does not depend on how many share it.
     let tie = vec![floor(new, 4), floor(new, 5)];
     assert_eq!(picks(None, tie), [4], "a tie keeps the first");
     let empty = UploadCandidate {

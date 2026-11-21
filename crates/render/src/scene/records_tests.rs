@@ -1,5 +1,3 @@
-//! The material table's slots and the edit sort (#1706), adapter-free.
-
 use super::*;
 use rusty_components::{DetailLayer, RenderFace, RenderMode};
 
@@ -66,7 +64,7 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     }
     let keys: [fn(&mut MaterialAsset); 5] = [
         |m| m.render_mode = RenderMode::Transparent,
-        |m| m.sorting_priority = -1, // the slot's sort, kept on its object (#2039)
+        |m| m.sorting_priority = -1,
         |m| m.render_face = RenderFace::Both,
         |m| m.shader = Some("dissolve".into()),
         |m| m.base_color_map = Some("a.png".into()),
@@ -75,7 +73,6 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
         assert!(rekeys(&base, &with(f)), "{:?}", with(f));
     }
     assert!(params_moved(&base, &with(values[4])));
-    // A Cutout's test is a static bake's term: its cutoff and mapping re-key.
     let cutout = with(|m| m.render_mode = RenderMode::Cutout);
     let mut cut = cutout.clone();
     cut.alpha_cutoff = 0.9;
@@ -83,7 +80,6 @@ fn a_value_edit_rewrites_and_a_key_edit_rekeys() {
     cut = cutout.clone();
     cut.base_color = [0.0; 3];
     assert!(!rekeys(&cutout, &cut), "a cutout's colour does not");
-    // A glass's alpha is its record's; its blend mode picks a pipeline.
     let glass = with(|m| m.render_mode = RenderMode::Transparent);
     let mut faded = glass.clone();
     faded.alpha = 0.2;

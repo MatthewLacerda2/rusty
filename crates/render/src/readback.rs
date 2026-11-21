@@ -1,29 +1,6 @@
-//! crates/render/src/readback.rs — offscreen colour target → CPU bytes → PNG.
-//!
-//! The one place the engine copies a rendered texture back to the CPU. Its callers
-//! — the dev screenshot (`dev/screenshot.rs`), the cubemap capture
-//! (`render/ibl/cubemap_capture.rs`), the headless asset preview (`dev/preview.rs`,
-//! #353) and the reflection probes' GPU prefilter (`reflection_prefilter::gpu`,
-//! #1602) — had each grown (or were about to grow) a copy of the same fiddly
-//! alignment dance.
-//!
-//! That dance is the whole reason this deserves a home: `copy_texture_to_buffer`
-//! requires every row padded to [`wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`] (256), so a
-//! naive readback silently produces skewed images at any width that isn't a multiple
-//! of 64 pixels. Getting it right once, in one function, is worth more than three
-//! correct-looking copies.
-//!
-//! Reads no wall-clock and no RNG: output is a pure function of the rendered texture,
-//! so this is clean under the determinism guard (and `render` is exempt regardless).
-
 use crate::gpu::ops::CountedQueue as _;
 use std::path::Path;
 
-/// Copy `texture`'s top-left `width × height` region back to the CPU as tightly
-/// packed RGBA8 bytes (`width * height * 4`), row-major, top to bottom.
-///
-/// Blocks until the GPU signals the copy is complete. `texture` must have been
-/// created with [`wgpu::TextureUsages::COPY_SRC`] and an 8-bit RGBA format.
 pub fn read_texture_rgba8(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -34,8 +11,6 @@ pub fn read_texture_rgba8(
     read_texture_bytes(device, queue, texture, (width, height), 4)
 }
 
-/// [`read_texture_rgba8`] for any single-plane colour format of `texel_bytes` bytes
-/// per texel (8 for the HDR target's `Rgba16Float`): the raw texels, tightly packed.
 pub(crate) fn read_texture_bytes(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -46,9 +21,6 @@ pub(crate) fn read_texture_bytes(
     read_level(device, queue, (texture, 0, 0), size, texel_bytes)
 }
 
-/// [`read_texture_rgba8`] of mip level `mip` in array layer `layer` (0 for a plain
-/// texture; the decal atlas has many, #1364), `width × height` being that level's
-/// region (#1322).
 #[cfg(test)]
 pub(crate) fn read_mip_rgba8(
     device: &wgpu::Device,
@@ -59,8 +31,6 @@ pub(crate) fn read_mip_rgba8(
     read_level(device, queue, level, size, 4)
 }
 
-/// [`read_mip_rgba8`] for any single-plane colour format of `texel_bytes` bytes per
-/// texel (8 for the sky reflection cube's `Rgba16Float`, #1553).
 #[cfg(test)]
 pub(crate) fn read_mip_bytes(
     device: &wgpu::Device,
@@ -72,8 +42,6 @@ pub(crate) fn read_mip_bytes(
     read_level(device, queue, level, size, texel_bytes)
 }
 
-/// The texels of `size`'s top-left region of `texture`'s level `mip` in array
-/// layer `layer`, packed.
 fn read_level(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -107,7 +75,6 @@ fn read_level(
     )
 }
 
-/// Encode and submit the level → padded-buffer copy of `size`'s top-left region.
 fn submit_copy(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -143,7 +110,6 @@ fn submit_copy(
     queue.counted_submit(std::iter::once(encoder.finish()));
 }
 
-/// Map the readback buffer (blocking) and strip the per-row padding back out.
 fn map_and_unpad(
     device: &wgpu::Device,
     buffer: &wgpu::Buffer,
@@ -160,7 +126,6 @@ fn map_and_unpad(
     pixels
 }
 
-/// Map the readback buffer (blocking), hand its bytes to `read`, and unmap it.
 fn map(device: &wgpu::Device, buffer: &wgpu::Buffer, read: impl FnOnce(&[u8])) {
     let slice = buffer.slice(..);
     let (tx, rx) = std::sync::mpsc::channel();
@@ -170,7 +135,6 @@ fn map(device: &wgpu::Device, buffer: &wgpu::Buffer, read: impl FnOnce(&[u8])) {
     let _ = device.poll(wgpu::PollType::wait_indefinitely());
     let _ = rx.recv();
 
-    // The buffer was mapped just above, so this only fails on a wgpu bug.
     let mapped = slice
         .get_mapped_range()
         .expect("the readback buffer was just mapped");
@@ -179,10 +143,6 @@ fn map(device: &wgpu::Device, buffer: &wgpu::Buffer, read: impl FnOnce(&[u8])) {
     buffer.unmap();
 }
 
-/// Every mip of a six-layer `texture` (a cube's faces) of `texel` bytes per texel
-/// (8 for a baked cube's `Rgba16Float`, #1696), level `i` being `sizes[i]` square,
-/// in one copy and one map (#1602): `levels[i][layer]`, each tightly packed,
-/// row-major, top to bottom.
 pub(crate) fn read_cube_mips(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -223,9 +183,6 @@ pub(crate) fn read_cube_mips(
     levels
 }
 
-/// Encode and submit the copy of every level of a six-layer `texture` of `texel`
-/// bytes per texel into `buffer`, level `i` (`sizes[i]` square) at `offsets[i]`
-/// with padded rows.
 fn submit_cube_copy(
     device: &wgpu::Device,
     queue: &wgpu::Queue,
@@ -262,16 +219,11 @@ fn submit_cube_copy(
     queue.counted_submit(std::iter::once(encoder.finish()));
 }
 
-/// A row of `size` texels of `texel` bytes, padded to
-/// [`wgpu::COPY_BYTES_PER_ROW_ALIGNMENT`].
 fn padded_row(size: u32, texel: u32) -> u32 {
     let align = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
     (size * texel).div_ceil(align) * align
 }
 
-/// Write packed RGBA8 `pixels` to `path` as a PNG, creating the parent directory if
-/// it doesn't exist yet (an agent naming `out/preview.png` shouldn't have to `mkdir`
-/// first, #353).
 pub fn write_png(
     path: impl AsRef<Path>,
     width: u32,

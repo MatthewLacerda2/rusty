@@ -1,7 +1,3 @@
-//! One camera's cluster grid (#434): which view-space box each cluster covers, and
-//! the numbers a shader needs to find a point's cluster. The shader-side twin is
-//! `cluster_index` in `common.wgsl`; the two must agree on tiles and slices.
-
 use glam::{Mat4, Vec2, Vec3};
 
 use super::GRID;
@@ -9,14 +5,12 @@ use crate::gpu::uniforms::ClusterUniform;
 use rusty_components::Projection;
 use rusty_scene::Camera;
 
-/// A camera's view of the cluster grid. Depth is distance along the view axis.
 pub(crate) struct ClusterGrid {
     pub view: Mat4,
     proj: Mat4,
     inv_proj: Mat4,
     pub near: f32,
     pub far: f32,
-    /// Exponential depth slices (perspective) rather than linear (orthographic).
     log_slices: bool,
 }
 
@@ -33,8 +27,6 @@ impl ClusterGrid {
         }
     }
 
-    /// `(scale, bias)` with `slice = f(depth) * scale + bias`, where `f` is `log2`
-    /// for exponential slices and the identity for linear ones.
     fn slice_scale_bias(&self) -> (f32, f32) {
         let z = GRID[2] as f32;
         if self.log_slices {
@@ -46,7 +38,6 @@ impl ClusterGrid {
         }
     }
 
-    /// The depth slice (fractional, unclamped) a view depth falls in.
     pub(crate) fn slice_of(&self, depth: f32) -> f32 {
         let (scale, bias) = self.slice_scale_bias();
         let d = depth.max(self.near);
@@ -64,13 +55,10 @@ impl ClusterGrid {
         }
     }
 
-    /// The cache key of this grid's cluster boxes: they depend on the projection
-    /// alone (near, far, lens), not on where the camera stands.
     fn key(&self) -> [u32; 16] {
         self.proj.to_cols_array().map(f32::to_bits)
     }
 
-    /// What the shader needs to find a point's cluster.
     pub(crate) fn uniform(&self) -> ClusterUniform {
         let (scale, bias) = self.slice_scale_bias();
         ClusterUniform {
@@ -80,22 +68,17 @@ impl ClusterGrid {
         }
     }
 
-    /// A view-space point's NDC `xy`, with its depth clamped to the near plane so a
-    /// point behind the camera still bounds conservatively.
     pub(crate) fn ndc(&self, p: Vec3) -> Vec2 {
         let p = Vec3::new(p.x, p.y, p.z.min(-self.near));
         let clip = self.proj * p.extend(1.0);
         clip.truncate().truncate() / clip.w
     }
 
-    /// The view-space ray through NDC `xy`: its points on the near and far planes.
     fn ray(&self, ndc: Vec2) -> (Vec3, Vec3) {
         let near = self.inv_proj.project_point3(ndc.extend(0.0));
         (near, self.inv_proj.project_point3(ndc.extend(1.0)))
     }
 
-    /// Every cluster's view-space AABB, indexed `x + X * (y + Y * slice)`: the
-    /// bounds of its tile's four corner rays cut at the slice's two depths.
     pub(crate) fn cluster_aabbs(&self) -> Vec<Aabb> {
         let [gx, gy, gz] = GRID;
         // One ray per tile corner, row-major, shared by every slice.
@@ -106,7 +89,6 @@ impl ClusterGrid {
                 self.ray(uv * 2.0 - Vec2::ONE)
             })
             .collect();
-        // The point on ray `(a, b)` at view depth `d` (depth is -z in view space).
         let at = |(a, b): (Vec3, Vec3), d: f32| a + (b - a) * ((d + a.z) / (a.z - b.z));
         let mut out = Vec::with_capacity(super::CLUSTER_COUNT);
         for k in 0..gz {
@@ -129,14 +111,10 @@ impl ClusterGrid {
     }
 }
 
-/// How many projections' cluster boxes stay cached: a camera stack (world, a
-/// viewmodel, a render texture) rarely has more distinct lenses than this.
 const CACHED_LENSES: usize = 4;
 
-/// One cluster's view-space box, `(min, max)`.
 pub(crate) type Aabb = (Vec3, Vec3);
 
-/// Cluster boxes by projection, newest last, so an unchanged lens rebuilds nothing.
 #[derive(Default)]
 pub(crate) struct AabbCache {
     entries: Vec<([u32; 16], Vec<Aabb>)>,
@@ -164,8 +142,6 @@ impl AabbCache {
 
 #[cfg(test)]
 impl ClusterGrid {
-    /// The cluster a world point falls in: `cluster_index` in `common.wgsl`, line for
-    /// line, so the tests can check the binner against what the shader will read.
     pub(crate) fn cluster_at(&self, view_proj: Mat4, world: Vec3) -> u32 {
         let u = self.uniform();
         let clip = view_proj * world.extend(1.0);

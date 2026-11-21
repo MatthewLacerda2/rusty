@@ -1,35 +1,5 @@
-//! crates/render/src/test_gpu.rs — the one place a test asks for a GPU (#366).
-//!
-//! Every in-crate GPU test used to open with the same incantation:
-//!
-//! ```ignore
-//! let Some(mut renderer) = pollster::block_on(Renderer::new_headless(64, 64)) else {
-//!     return; // no adapter
-//! };
-//! ```
-//!
-//! Sixteen copies of one decision (*what counts as "no GPU here", and what a test
-//! does about it*) are sixteen chances to drift, so it lives here instead.
-//!
-//! Integration tests (`tests/*.rs`) do not use this: they reach the renderer through
-//! the dev layer (`screenshot::capture`, `Debug.Preview`, the probe bakes), which owns
-//! its own skip handling (`dev::capture::no_adapter`, failing under the same variable,
-//! #885). The budget in `setup::budget` covers both: it sits in the constructor.
-
 use crate::Renderer;
 
-/// A headless renderer, or `None` when this machine has no GPU or software adapter.
-///
-/// `None` means **skip, don't fail**, so a GPU-less machine still runs the rest of the
-/// suite. CI never relies on that path: every CI job has an adapter (Metal on macOS,
-/// Mesa's lavapipe on Linux, #489) and sets [`REQUIRE_GPU_ENV`](crate::REQUIRE_GPU_ENV), so
-/// the canary below fails if the driver ever goes missing instead of letting every GPU
-/// test quietly skip. A test that cannot tolerate being skipped locally does not belong
-/// on the GPU — pin the rule it cares about with an adapter-free unit test as well.
-///
-/// The returned renderer holds a slot in the headless budget until it is dropped, so
-/// callers should let it fall out of scope promptly rather than parking it in a
-/// long-lived static.
 pub fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }
@@ -41,10 +11,6 @@ pub mod pair;
 pub mod ssil;
 pub use pair::{headless_pair_or_skip, HeadlessPair};
 
-/// Give `scene` a black skybox panorama, so nothing but its own lights and emissives
-/// lights it. `ambient_intensity = 0` removes the ambient term only: the procedural
-/// sky still lights every surface through its environment reflection (#1543), as
-/// Unity's skybox does whatever its ambient multiplier says.
 #[cfg(test)]
 pub(crate) fn black_sky(scene: &mut rusty_scene::Scene) {
     let path = rusty_test_support::temp::dir().join("black_sky.png");
@@ -54,9 +20,6 @@ pub(crate) fn black_sky(scene: &mut rusty_scene::Scene) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
-/// A compute probe: dispatch `source`'s `main` over 64 × 2 invocations and read
-/// back the 256 `vec4`s it writes to its one binding, a storage array (#1524): how
-/// a test runs a WGSL helper as written on the GPU.
 #[cfg(test)]
 pub(crate) fn run_probe(
     device: &wgpu::Device,
@@ -112,12 +75,6 @@ pub(crate) fn run_probe(
 
 #[cfg(test)]
 mod tests {
-    /// The one GPU test that refuses to skip, and only where asked to. Without it, a
-    /// CI runner that lost its software driver would put every GPU test back on the
-    /// silent `None` path and still report green — the state #489 fixed. A name in
-    /// `WGPU_ADAPTER_NAME` that matches nothing fails it too, wherever it runs. It also
-    /// names the adapter the suite rendered on, which nextest prints at the end of
-    /// every run (`.config/nextest.toml`), so a log says which driver a result is from.
     #[test]
     fn gpu_adapter_present_when_required() {
         let renderer = super::headless_or_skip(4, 4);
@@ -129,7 +86,6 @@ mod tests {
                 info.name, info.backend
             );
         }
-        // An adapter asked for by name is required: a typo must not skip every test green.
         if let Some(name) = crate::setup::headless::wanted_adapter() {
             let env = crate::ADAPTER_ENV;
             assert!(

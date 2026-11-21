@@ -1,12 +1,3 @@
-//! Tests for the headless-renderer budget (#366).
-//!
-//! Every test drives its **own** `Budget` static, never the process-wide `HEADLESS`
-//! one — the real GPU tests hold permits on that while these run beside them, and
-//! sharing a counter with them would make any exact assertion race.
-//!
-//! Adapter-free by construction: the guard is pure synchronization, so these run on
-//! every machine, including a GPU-less one where the real GPU tests skip entirely.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Barrier;
 use std::time::Duration;
@@ -15,8 +6,6 @@ use super::Budget;
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
-/// No thread takes part in the nested-acquire check (that has its own tests,
-/// `holder_tests`).
 fn unchecked() -> Option<std::thread::ThreadId> {
     None
 }
@@ -35,9 +24,6 @@ fn a_permit_frees_its_slot_when_dropped() {
     assert_eq!(B.live(), 0, "and the budget returns to empty");
 }
 
-/// The invariant the whole issue exists for: however many threads pile in, the number
-/// alive at once never exceeds the cap. Fails against an unguarded constructor, which
-/// is the state #365 tripped over on a software adapter.
 #[test]
 fn concurrency_never_exceeds_the_cap() {
     static B: Budget = Budget::new(2, TIMEOUT, unchecked);
@@ -48,11 +34,10 @@ fn concurrency_never_exceeds_the_cap() {
     std::thread::scope(|s| {
         for _ in 0..8 {
             s.spawn(|| {
-                start.wait(); // maximize the overlap: all 8 rush the budget at once
+                start.wait();
                 let permit = B.acquire();
                 let now = live.fetch_add(1, Ordering::SeqCst) + 1;
                 peak.fetch_max(now, Ordering::SeqCst);
-                // Hold it long enough that an unbounded budget would visibly stack.
                 std::thread::sleep(Duration::from_millis(5));
                 live.fetch_sub(1, Ordering::SeqCst);
                 drop(permit);
@@ -68,9 +53,6 @@ fn concurrency_never_exceeds_the_cap() {
     assert_eq!(B.live(), 0, "every permit was returned");
 }
 
-/// A full budget genuinely blocks rather than over-issuing: the waiter only proceeds
-/// once a holder drops. Pins that `acquire` waits on the condvar instead of, say,
-/// returning an already-saturated permit.
 #[test]
 fn a_full_budget_blocks_until_a_slot_frees() {
     static B: Budget = Budget::new(1, TIMEOUT, unchecked);
@@ -86,14 +68,13 @@ fn a_full_budget_blocks_until_a_slot_frees() {
         });
 
         entered.wait();
-        // The waiter is now contending for the one held slot. It cannot have taken it.
         std::thread::sleep(Duration::from_millis(50));
         assert_eq!(
             acquired.load(Ordering::SeqCst),
             0,
             "the waiter took a slot while the budget was full"
         );
-        drop(held); // releasing lets it through, and the scope join proves it did
+        drop(held);
     });
 
     assert_eq!(

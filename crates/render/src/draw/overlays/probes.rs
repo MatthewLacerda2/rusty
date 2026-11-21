@@ -1,31 +1,3 @@
-//! Editor overlay gizmos for baked lighting probes (#284). Visualization only — a
-//! glance at the scene shows where light/reflection probes sit and what they captured,
-//! so you don't bake blind. Nothing here touches the bake, the SH/cubemap data, or the
-//! lit-scene shading; the gizmos draw through the SAME editor-overlay line path as the
-//! grid/AABB/axis overlays, in the handles pass an editor camera runs after post-FX
-//! (`overlays::handles`, #1224), never in a shipped game render.
-//!
-//! Two families of lines, drawn with the selected Area lights' (`lights`) as one
-//! vertex-coloured line list: one buffer and one draw for the whole family, each
-//! vertex carrying its gizmo's tint, as the collider wires are (`wires`):
-//!   * Light probes — a small 3-axis cross marker at each probe position, TINTED by the
-//!     probe's baked SH irradiance (sampled toward world-up), so dead/dark or
-//!     mis-bounced probes read at a glance.
-//!   * Reflection probes — a wireframe of the parallax volume, for the probe the
-//!     scene inspector has open alone (`Scene::inspected_reflection_probe`, its
-//!     selection: a probe is no entity), as Unity draws a probe's bounds on
-//!     selection: the box (`box_min`..`box_max`, via the shared `aabb_wireframe`
-//!     helper) turned by the probe's rotation, or three great circles of a sphere
-//!     probe (#1995). The capture position is not a line: it is
-//!     a mirror ball showing the probe's cube, or grey when the cube is not resident
-//!     (`probe_ball`, #1911), drawn before these lines through its own pipeline.
-//!
-//! The pure helpers (`sh_marker_tint`, `probe_marker_verts`) are GPU-free and unit
-//! tested, as is [`probe_lines`], the merged list; the GPU pre-creation uploads it
-//! into one vertex buffer per frame. Each family draws only while the Scene view's
-//! gizmo set has it on (`Gizmo::LightProbes`, `Gizmo::ReflectionProbes`, #1909).
-//! A selected Area light is not a probe and draws whatever the gizmos.
-
 use glam::{Quat, Vec3};
 
 use super::{aabb_wireframe, OverlayDraws};
@@ -36,18 +8,10 @@ use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 
-/// Half-length of a probe cross marker's arms, in world units.
 const MARKER_HALF: f32 = 0.15;
-/// Tint for the reflection-probe gizmo's parallax box: a warm amber, kept
-/// distinct from the SH-driven light-probe markers.
 const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 
 impl Renderer {
-    /// Pre-create the probe-family gizmos for one editor pass: the light-probe
-    /// lines, the inspected reflection probe's and the selected Area lights'
-    /// (`lights`, #1674), as one vertex-coloured line list in one buffer at one slot
-    /// of `draws`, drawn in one draw ([`probe_lines`]). `None` when none of them
-    /// draws.
     pub(crate) fn precreate_probes(
         &self,
         scene: &Scene,
@@ -59,53 +23,34 @@ impl Renderer {
     }
 }
 
-/// Every probe-family segment, both ends in order, each end carrying its gizmo's
-/// tint in its `tangent` (as the vertex-colour line pipeline reads it, `wires`):
-/// a cross per light probe in its baked SH tint, the inspected reflection probe's
-/// volume (`Scene::inspected_reflection_probe`) in [`REFLECTION_TINT`], then the
-/// selected Area lights (the selected entity's and its descendants'). Each probe
-/// family only while its gizmo is on; the Area lights whatever the gizmos.
 pub(crate) fn probe_lines(scene: &Scene, gizmos: &SceneGizmos) -> Vec<Vertex> {
     let mut out = Vec::new();
     let mut add = |verts: Vec<Vertex>, tint: [f32; 4]| {
         out.extend(verts.into_iter().map(|v| Vertex { tangent: tint, ..v }));
     };
-    // Light probes: a marker per probe, tinted by its baked SH irradiance.
     if gizmos.on(Gizmo::LightProbes) {
         for probe in scene.probes.probes() {
             let tint = sh_marker_tint(&probe.sh);
             add(probe_marker_verts(probe.position, MARKER_HALF), tint);
         }
     }
-    // The inspected reflection probe: its parallax-volume wireframe. Every probe's
-    // capture point is a mirror ball (`probe_ball`, #1911), which shows where it is.
     let inspected = scene.inspected_reflection_probe;
     let probe = inspected.and_then(|i| scene.reflection_probes.probes.get(i));
     if let Some(probe) = probe.filter(|_| gizmos.on(Gizmo::ReflectionProbes)) {
         add(reflection_volume_verts(probe), REFLECTION_TINT);
     }
-    // The selected Area lights (#1674), baked only, ride the same line list.
     for (verts, tint) in super::lights::area_light_gizmos(scene) {
         add(verts, tint);
     }
     out
 }
 
-/// The representative marker colour for a light probe, derived from its baked SH. We
-/// reconstruct diffuse irradiance toward world-up (`Sh9::eval(Vec3::Y)`) over π — what
-/// the shading path gives a white, upward-facing surface (#807) — so the tint reads as
-/// "what light is arriving from above" at the probe, on the scale the scene renders. A
-/// zero/unbaked probe → black; a bright probe → bright; a warm/cool bounce shows in the
-/// hue. The colour is tone-mapped (Reinhard) into `[0, 1]` so HDR
-/// irradiance stays a legible tint instead of clipping to flat white; alpha is fixed.
 pub(crate) fn sh_marker_tint(sh: &Sh9) -> [f32; 4] {
     let lambert = sh.eval(Vec3::Y).max(Vec3::ZERO) / std::f32::consts::PI;
     let mapped = lambert / (lambert + Vec3::ONE);
     [mapped.x, mapped.y, mapped.z, 1.0]
 }
 
-/// Line-list vertices for a 3-axis cross marker centred at `center`, each arm extending
-/// `half` along ±X, ±Y, ±Z. Three line segments → 6 vertices: a light probe's marker.
 pub(crate) fn probe_marker_verts(center: Vec3, half: f32) -> Vec<Vertex> {
     let normal = Vec3::Y;
     let uv = [0.0, 0.0];
@@ -118,8 +63,6 @@ pub(crate) fn probe_marker_verts(center: Vec3, half: f32) -> Vec<Vertex> {
     verts
 }
 
-/// Line-list vertices of a reflection probe's volume (#1995): its box's 12 edges
-/// turned by its rotation about its capture point, or a sphere's three great circles.
 pub(crate) fn reflection_volume_verts(probe: &ReflectionProbe) -> Vec<Vertex> {
     const SEGMENTS: usize = 32;
     if probe.shape == ProbeShape::Box {
@@ -151,19 +94,15 @@ pub(crate) fn reflection_volume_verts(probe: &ReflectionProbe) -> Vec<Vertex> {
 mod tests {
     use super::*;
 
-    /// A zero (unbaked) probe reconstructs no irradiance → a black marker.
     #[test]
     fn zero_sh_tints_black() {
         let tint = sh_marker_tint(&Sh9::zero());
         assert_eq!(tint, [0.0, 0.0, 0.0, 1.0]);
     }
 
-    /// A probe carrying positive DC (constant ambient) reconstructs a positive,
-    /// in-gamut grey marker — brighter than black, never above 1.0 after tone-mapping.
     #[test]
     fn bright_sh_tints_bright() {
         let mut sh = Sh9::zero();
-        // DC band: a large constant white radiance. eval applies the band-0 cosine lobe.
         sh.coeffs[0] = [10.0, 10.0, 10.0];
         let tint = sh_marker_tint(&sh);
         assert!(tint[0] > 0.5, "expected a bright marker, got {tint:?}");
@@ -173,21 +112,15 @@ mod tests {
         assert_eq!(tint[3], 1.0);
     }
 
-    /// The tint is on the scene's scale (#807): a probe of a uniform sky of radiance L
-    /// tints as a white floor under it renders, L, Reinhard-mapped to L / (L + 1) — not
-    /// the irradiance πL.
     #[test]
     fn a_uniform_sky_tints_by_its_radiance() {
         let mut sh = Sh9::zero();
-        // A uniform radiance L projects onto the DC band alone: c0 = L · Y00 · 4π.
         let l = 1.0;
         sh.coeffs[0] = [l * 0.282_094_8 * 4.0 * std::f32::consts::PI; 3];
         let tint = sh_marker_tint(&sh);
         assert!((tint[0] - l / (l + 1.0)).abs() < 1e-4, "tint {tint:?}");
     }
 
-    /// The hue survives: a probe that captured a warm (red-dominant) DC term reads
-    /// red-dominant in the marker tint, so a glance distinguishes warm from cool bounces.
     #[test]
     fn warm_sh_keeps_warm_hue() {
         let mut sh = Sh9::zero();
@@ -199,7 +132,6 @@ mod tests {
         );
     }
 
-    /// A turned box's wireframe ends at its turned corners; a sphere's sits on it.
     #[test]
     fn a_reflection_volume_wireframe_follows_its_rotation_and_shape() {
         let mut p = ReflectionProbe::new(Vec3::new(2.0, 0.0, 0.0), Vec3::ONE);
@@ -216,16 +148,12 @@ mod tests {
         }
     }
 
-    /// The cross marker is three segments (6 vertices) centred on the point, each arm
-    /// `half` long on its axis.
     #[test]
     fn marker_has_three_axis_segments() {
         let verts = probe_marker_verts(Vec3::new(1.0, 2.0, 3.0), 0.25);
         assert_eq!(verts.len(), 6);
-        // First segment spans ±X about the centre.
         assert_eq!(verts[0].position, [0.75, 2.0, 3.0]);
         assert_eq!(verts[1].position, [1.25, 2.0, 3.0]);
-        // Third segment spans ±Z about the centre.
         assert_eq!(verts[4].position, [1.0, 2.0, 2.75]);
         assert_eq!(verts[5].position, [1.0, 2.0, 3.25]);
     }

@@ -1,6 +1,3 @@
-//! Which entities read light probes (#240, #1704): dynamic ones, and a static mesh
-//! only at Scale In Lightmap 0, which the lightmap bake leaves to the probes.
-
 use glam::Vec3;
 
 use super::entity_probe_sh;

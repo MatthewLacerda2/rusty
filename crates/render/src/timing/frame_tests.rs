@@ -2,9 +2,6 @@ use crate::{RenderView, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A drawn frame moves the count and takes CPU time; a render inside `aside`
-/// or a cubemap capture leaves the count, the cost and the counters as the
-/// measured frame left them.
 #[test]
 fn gpu_a_frame_counts_and_an_aside_render_does_not() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(16, 16) else {
@@ -60,8 +57,6 @@ fn gpu_frame_stages_are_off_by_default_and_sum_to_the_frame_when_on() {
     assert!(sum <= whole && sum > whole * 0.97, "{sum} of {whole}");
 }
 
-/// An aside render inside an open frame window keeps what the frame had counted
-/// (`gpu::ops`) before it, and adds none of its own calls.
 #[test]
 fn gpu_an_aside_render_inside_a_frame_keeps_the_frames_gpu_call_counts() {
     use crate::gpu::ops::{self, CountedQueue as _};

@@ -1,7 +1,3 @@
-//! The motion-vector history and gate (#1435), adapter-free: what last frame a camera
-//! and an entity reproject from, when that history is a cut, and when a view writes
-//! velocity at all.
-
 use glam::{Mat4, Vec3};
 
 use super::{track, wanted, HistoryKey, MotionHistory};
@@ -21,7 +17,6 @@ pub(super) fn key(scene: SceneId, base: Option<u32>) -> HistoryKey {
     }
 }
 
-/// A one-camera stack: camera entity 1 through `m`.
 pub(super) fn one(m: Mat4) -> [(Option<u32>, Mat4); 1] {
     [(Some(1), m)]
 }
@@ -41,7 +36,6 @@ fn a_camera_reprojects_through_last_frame_and_a_cut_forgets_it() {
     h.end();
     assert_eq!(h.begin(key(scene, Some(1)), &one(at(2.0))), [at(1.0)]);
     h.end();
-    // A camera switch, then a scene load: no smear from the old matrix.
     assert_eq!(h.begin(key(scene, Some(2)), &one(at(3.0))), [at(3.0)]);
     h.end();
     assert_eq!(
@@ -91,7 +85,6 @@ fn track_gives_an_instance_its_last_pose_and_palette() {
     assert_eq!(joints[3..], [at(1.0), at(2.0)].map(|m| m.to_cols_array()));
     h.end();
 
-    // The skin changed size: this frame's palette under last frame's matrix.
     h.begin(k, &one(Mat4::IDENTITY));
     let (mut joints, mut third) = (Vec::new(), InstanceData::IDENTITY);
     track(&mut h, 3, (at(7.0), &rig[..1]), &mut joints, &mut third);
@@ -99,7 +92,6 @@ fn track_gives_an_instance_its_last_pose_and_palette() {
     assert_eq!(joints, [at(6.0), at(1.0)].map(|m| m.to_cols_array()));
     h.end();
 
-    // No skin: the matrix alone.
     h.begin(k, &one(Mat4::IDENTITY));
     let mut joints = Vec::new();
     track(&mut h, 3, (at(8.0), &[]), &mut joints, &mut third);

@@ -1,6 +1,3 @@
-//! Shadow depth passes, dynamic global bind-group update, and the main scene
-//! render pass. The per-camera stacking loop + post-FX live in `draw`.
-
 use crate::draw::batch::{OpaqueBatches, OpaqueOrder};
 use crate::gpu::global_group::GlobalGroup;
 use crate::gpu::groups;
@@ -16,19 +13,12 @@ use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 use rusty_scene::ClearFlags;
 
-/// The framebuffer clear behavior for one camera in the stack (#93). Derived from the
-/// camera's [`ClearFlags`] and whether it is the first (bottom) pass of the frame.
 #[derive(Clone, Copy)]
 pub(crate) struct PassClear {
-    /// `Some(backdrop)` clears color to that RGBA; `None` loads the existing color so
-    /// this camera composites on top of what is already drawn (`DepthOnly`).
     pub color: Option<wgpu::Color>,
-    /// The camera's clear flags, kept so the pass only redraws the skybox for a
-    /// `Skybox` camera (a `DepthOnly` overlay must not paint over the world).
     pub flags: ClearFlags,
 }
 
-/// The dark editor/world backdrop the base camera clears to.
 const BACKDROP: wgpu::Color = wgpu::Color {
     r: 0.06,
     g: 0.06,
@@ -37,14 +27,9 @@ const BACKDROP: wgpu::Color = wgpu::Color {
 };
 
 impl PassClear {
-    /// Resolve the clear ops for a pass. The bottom pass always clears color (nothing
-    /// is under it); `DepthOnly` preserves color so a viewmodel/UI camera layers on
-    /// top of the world. Every camera clears depth, so stacked geometry never clips
-    /// against the layer below — the FPS viewmodel fix.
     pub(crate) fn for_pass(is_first: bool, flags: ClearFlags) -> Self {
         let color = match flags {
             ClearFlags::Skybox | ClearFlags::SolidColor => Some(BACKDROP),
-            // A DepthOnly bottom pass has nothing to composite over, so clear anyway.
             ClearFlags::DepthOnly if is_first => Some(BACKDROP),
             ClearFlags::DepthOnly => None,
         };
@@ -52,42 +37,22 @@ impl PassClear {
     }
 }
 
-/// Per-camera inputs threaded into the scene pass.
 pub(crate) struct ScenePassFrame {
     pub clear: PassClear,
-    /// This camera's SSAO (#436), recorded ahead of the scene pass; `None` when off.
     pub ssao: Option<SsaoFrame>,
-    /// This camera's SSIL (#1750), recorded after SSAO; the base camera's alone.
     pub ssil: Option<crate::postfx::effects::ssil::SsilFrame>,
-    /// Whether this is the stack's base camera. SSR reads only what the base camera
-    /// wrote and runs before any overlay draws (#1526), so an overlay binds no SSR
-    /// surface target and draws with the plain velocity pipelines.
     pub base: bool,
-    /// Whether it runs SSAO or SSIL, and so their depth prepass
-    /// ([`CameraCtx::screen_space`](crate::draw::camera::CameraCtx::screen_space)).
     pub screen_space: bool,
-    /// The opaque draws GPU occlusion culling decided (#1963); `None` draws every
-    /// batched instance.
     pub culled: Option<Culled>,
-    /// The camera culls by Hi-Z but is under the stage's instance floor
-    /// (`SolidResources::floored`, #2338): drawn whole, still primed.
     pub floored: bool,
 }
 
 impl ScenePassFrame {
-    /// The SSR surface targets this camera's scene pass writes: the view's, on the
-    /// base camera only ([`Self::base`]).
     fn surface<'a>(&self, view: &'a RenderView) -> Option<[&'a wgpu::TextureView; 2]> {
         ssr::surface::views(&view.post_fx).filter(|_| self.base)
     }
 }
 
-/// The scene pass's colour attachments: the HDR target, a motion-blurred view's
-/// velocity target (#1435), and an SSR view's two surface targets (#1526), on its base
-/// camera only ([`ScenePassFrame::base`]). All clear where
-/// the camera clears colour (the backdrop; no motion, as far as the sky; no SSR) and
-/// keep the layer below where a `DepthOnly` camera composites over it (#93), so the
-/// nearest camera's velocity and distance win as its colour does.
 fn scene_targets<'a>(
     view: &'a RenderView,
     frame: &ScenePassFrame,
@@ -121,8 +86,6 @@ fn scene_targets<'a>(
 }
 
 impl Renderer {
-    /// Record the camera's screen-space inputs and its scene pass into `encoder`,
-    /// the camera's (#2353).
     pub(crate) fn execute_scene_pass(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -130,17 +93,12 @@ impl Renderer {
         frame: ScenePassFrame,
         solid_batches: &OpaqueBatches,
     ) {
-        // The shadow maps were rendered once for the frame (`run_shadow_passes`).
-        // Bind active skybox view & sampler into the global group for reflections.
         self.update_global_bind_group();
-        // A. SSAO (#436) and SSIL (#1750): what the scene pass samples.
         let solids = (solid_batches, frame.culled.as_ref());
         self.record_screen_space(view, encoder, &frame, solids);
-        // B. Main scene pass. The editor's gizmos draw after post-FX (`draw_handles`).
         self.record_scene_pass(view, encoder, &frame, solid_batches);
         let velocity = view.post_fx.motion.target_view().is_some();
         let primed = self.primes(view, &frame);
-        // Ranked before the cull ran; why the two agree: `Self::opaque_order`.
         debug_assert!(solid_batches.ranked_for(primed), "opaque order != priming");
         let counters = &mut self.frame_counters;
         counters.velocity_passes += u32::from(velocity);
@@ -149,7 +107,6 @@ impl Renderer {
         counters.ssr_surface_passes += u32::from(frame.surface(view).is_some());
     }
 
-    /// Record the main scene pass (solids, skybox) into `encoder`.
     fn record_scene_pass(
         &self,
         view: &RenderView,
@@ -167,9 +124,6 @@ impl Renderer {
             color_attachments: &targets,
             depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                 view: &view.depth_view,
-                // Every camera clears depth so its geometry sorts independently of the
-                // layer below — a viewmodel never clips through walls. A primed one
-                // starts from its own prepass's depth instead (#1499).
                 depth_ops: Some(wgpu::Operations {
                     load: match primed {
                         Some(_) => wgpu::LoadOp::Load,
@@ -189,16 +143,9 @@ impl Renderer {
         };
         render_pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
         render_pass.set_bind_group(groups::SCENE, self.scene_group(view, frame), &[]);
-        // Solid entities (each batch binds its shader's pipeline).
         let solids = (solid_batches, frame.culled.as_ref());
         self.draw_solids(&mut render_pass, solids, solid_pass);
 
-        // Render Skybox last (optimization). Only a Skybox camera paints it — a
-        // DepthOnly/SolidColor overlay must not overwrite the world below it. With a
-        // panorama bound we draw it; with none, a Skybox camera falls back to the
-        // procedural sky->horizon->ground gradient (#256) instead of the flat
-        // backdrop, so an empty scene reads as a lit environment (Unity's default-
-        // skybox fallback). Both paint only the far-plane pixels no geometry covered.
         if clear.flags == ClearFlags::Skybox {
             let (sky, globals) = (&self.skybox_renderer, &self.global_bind_group);
             let targets = SkyTargets {
@@ -212,37 +159,15 @@ impl Renderer {
         }
     }
 
-    /// Depth priming (#1499), Unity URP's *Auto* mode: when this camera ran the SSAO
-    /// prepass (or SSIL's, #1750, or the GPU cull's late one, #2336), which drew
-    /// straight into the view's depth (#1578), the forward pass
-    /// starts from it and shades each lit pixel once. The prepass is the forward
-    /// vertex stage at the view's size and format, clipping cutouts as `fs_main` does.
-    /// A view shading with a pipeline of its own (the shader preview) is not primed:
-    /// its override has no primed twin, and nor is any view on Metal
-    /// (`pipelines::priming`); those clear the prepass's depth and draw their own.
-    /// `Some` carries the pipelines the primed pass draws lit solids with.
     fn prime_depth(&self, view: &RenderView, frame: &ScenePassFrame) -> Option<&PrimedPipelines> {
         self.primes(view, frame).then_some(&self.primed_pipelines)
     }
 
-    /// Whether this camera's forward pass is primed ([`Self::prime_depth`]): it
-    /// ran SSAO's prepass, or SSIL's, the same one (#1750), or the GPU culls it,
-    /// whose phase one left most of the depth, the prepass drawing only the late
-    /// set (#2336, `record_screen_space`), or it would but is under the stage's
-    /// instance floor, the prepass then drawing its few batches whole (#2338).
-    /// A camera with its cull off is not primed by it. `frame.screen_space` alone
-    /// stands for SSAO's prepass: whenever `frame.ssao` is set, `record_ssao` has
-    /// run before this is asked and left the view its SSAO targets.
     pub(crate) fn primes(&self, view: &RenderView, frame: &ScenePassFrame) -> bool {
         let prepass = frame.screen_space || frame.culled.is_some() || frame.floored;
         self.primes_by(view, prepass)
     }
 
-    /// How a camera's opaque runs are ranked (#2484), decided before they batch,
-    /// from whether it runs SSAO or SSIL (`screen_space`) and by [`Self::primes`]'
-    /// rule, the GPU cull counted as the camera culling (`Renderer::hiz_culls`),
-    /// which leaves it culled or floored whenever it has an opaque batch to order.
-    /// No batch suits either (`ranked_for`); the scene pass asserts the rest.
     pub(crate) fn opaque_order(
         &self,
         view: &RenderView,
@@ -252,15 +177,11 @@ impl Renderer {
         OpaqueOrder::primed(self.primes_by(view, screen_space || self.hiz_culls(cam)))
     }
 
-    /// [`Self::primes`] given whether a prepass runs under the forward pass.
     fn primes_by(&self, view: &RenderView, prepass: bool) -> bool {
         let on = self.depth_priming && self.priming_recommended;
         on && prepass && !view.has_forward_override()
     }
 
-    /// Rebuild the group-0 bind group only when something it names changed (the list:
-    /// `GlobalGroup`'s module doc); its buffers otherwise persist (#210). When only the
-    /// procedural sky slot changed, that slot's kept group is swapped in (#1620).
     pub(crate) fn update_global_bind_group(&mut self) {
         let switched = self.spare_global_group.switched;
         if !self.global_bind_group_dirty && !switched {
@@ -270,7 +191,6 @@ impl Renderer {
         self.global_bind_group_dirty = false;
         let sky = &self.sky_reflection;
         let panorama = self.skybox_texture.as_deref();
-        // The resident reflection probes' cube array at binding 4 (#1206).
         let cube = &self.reflection_probes;
         let build = || {
             GlobalGroup {

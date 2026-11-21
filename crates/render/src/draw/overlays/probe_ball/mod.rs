@@ -1,17 +1,3 @@
-//! The reflection-probe gizmo's mirror ball (#1911): at each reflection probe's
-//! capture point, a sphere [`BALL_DIAMETER`] across reflecting the probe's own cube,
-//! Unity's reflection-probe preview sphere, so a glance shows what the probe puts on
-//! glossy surfaces. A probe whose cube is not resident (unbaked, failed to load, or
-//! past the resident count) shows a flat grey ball. It replaces the cross marker; the
-//! parallax box stays a wireframe (`overlays::probes`).
-//!
-//! The cube is the forward pass's own: the resident probe cube array at group 0
-//! (`render::ibl::reflection_probes`), sampled at the probe's layer, so the gizmo
-//! loads nothing. The ball is drawn by `engine/shaders/gizmos/probe_ball.wgsl` (a
-//! ray-cast sphere on a quad facing the view ray, writing its depth) through the
-//! forward pipeline layout, so it binds the handles pass's groups as the lines do: its
-//! placement rides an overlay draw slot, and its resident slot the instance index.
-
 use glam::{Mat4, Vec3};
 
 use super::{OverlayBindings, OverlayDraws};
@@ -22,16 +8,11 @@ use crate::Renderer;
 use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::Scene;
 
-/// The ball's diameter in world units, constant at any distance: Unity's
-/// reflection-probe preview sphere is about half a metre across.
 pub(crate) const BALL_DIAMETER: f32 = 0.5;
 
-/// One ball for the handles pass: its slot of the overlays' draws, and its probe's
-/// resident slot plus one (0: no resident cube), drawn as its instance index.
 pub(crate) type BallResource = (u32, u32);
 
 impl Renderer {
-    /// One ball per reflection probe of `scene`, while `gizmos` has them on.
     pub(crate) fn precreate_probe_balls(
         &self,
         scene: &Scene,
@@ -50,8 +31,6 @@ impl Renderer {
             .collect()
     }
 
-    /// Draw `balls` into the handles pass, then put the line pipeline back. The global,
-    /// scene and material groups are the ones the lines bound; each ball binds its slot of `bindings`.
     pub(super) fn draw_probe_balls<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,
@@ -70,8 +49,6 @@ impl Renderer {
     }
 }
 
-/// The ball's overlay placement: centred on the probe, scaled to its radius (the
-/// shader reads the centre from the translation and the radius from the first column).
 pub(crate) fn ball_placement(position: Vec3) -> Mat4 {
     Mat4::from_scale_rotation_translation(
         Vec3::splat(BALL_DIAMETER * 0.5),
@@ -80,15 +57,10 @@ pub(crate) fn ball_placement(position: Vec3) -> Mat4 {
     )
 }
 
-/// The instance index a ball draws with: its probe's resident slot plus one, 0 when
-/// its cube is not resident.
 pub(crate) fn resident_instance(slot: Option<usize>) -> u32 {
     slot.map_or(0, |s| s as u32 + 1)
 }
 
-/// The ball's pipeline, built on its first draw: the forward `layout` (the handles
-/// pass's groups), no vertex buffer, both faces, opaque into `output_format`, testing
-/// and writing the view's depth.
 pub(crate) fn ball_pipeline(
     device: &wgpu::Device,
     registry: &mut ShaderRegistry,

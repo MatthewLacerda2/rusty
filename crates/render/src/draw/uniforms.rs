@@ -1,9 +1,3 @@
-//! Per-entity forward-pass data builders: the tint/PBR/cutout `MaterialData` record a
-//! solid mesh's draw reads (#1616), and the `ObjectData` (world matrix, light-probe
-//! SH, lightmap) its kept object holds in the object table (#470, #1706).
-//! Split out of `draw_resources` to keep that file under the size cap; behaviour
-//! unchanged. Free functions (no GPU state), called from `sync_solid_resource`.
-
 use std::ops::RangeInclusive;
 
 use glam::{Mat4, Vec3};
@@ -17,10 +11,6 @@ use rusty_scene::lighting::lightmap_set::bakes_mesh;
 use rusty_scene::rules::material::{BLEND_SHARPNESS_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE};
 use rusty_scene::Scene;
 
-/// The material record (tint, lit flag, PBR params, cutout, surface and mapping
-/// terms) for `material`, lit or not. It carries no transform and reads no entity,
-/// so every draw of a material under one `render::scene::Variant` reads one record
-/// (#470, #1706). Tint is driven by components only — never by entity name.
 pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> MaterialData {
     let is_lit = u32::from(lit);
     let color_tint = material_color_tint(material);
@@ -33,21 +23,16 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
     let use_normal_map = u32::from(material.is_some_and(|m| m.normal_map.is_some()));
     let use_emissive_map = u32::from(material.is_some_and(|m| m.emissive_map.is_some()));
 
-    // Cutout alpha-test (#242): only a Cutout material discards; Opaque/Transparent
-    // leave the flag clear so the shader's discard branch is skipped.
     let use_cutout = u32::from(material.is_some_and(|m| m.render_mode == RenderMode::Cutout));
     let alpha_cutoff = material.map_or(0.5, |m| m.alpha_cutoff);
 
-    // Decals (#638) land on lit surfaces whose material takes them, never on glass.
     let receive_decals =
         u32::from(lit && material.is_none_or(|m| m.receive_decals && !m.is_transparent()));
 
-    // Flat emissive factor (#222), 4th lane unused. Defaults to black with no material.
     let emissive = material.map_or([0.0; 4], |m| {
         [m.emissive[0], m.emissive[1], m.emissive[2], 0.0]
     });
 
-    // A draw with no material reflects as the default one (#1998): F0 in rgb, F90 in w.
     let reflects = |m: &MaterialAsset| (m.dielectric_f0(), m.dielectric_f90());
     let (f0, f90) = material.map_or_else(|| reflects(&MaterialAsset::default()), reflects);
     MaterialData {
@@ -74,21 +59,6 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
     }
 }
 
-/// Where material `c` reads its maps (#1573): its tiling and offset as one
-/// scale/offset, its mapping by index, and its world size as repeats per metre.
-/// Each value is clamped to its authoring row's range, since a hand-written scene
-/// skips the row's own clamp and a sharpness past it overflows the shader's blend.
-///
-/// Tiling and Offset mean Unity's (#1851): Unity's `TRANSFORM_TEX` is
-/// `uv * _ST.xy + _ST.zw` with v = 0 at the image's bottom, and UV0 here has v = 0 at
-/// its top (glTF), so UV0's v lane is packed as `tiling.y * v + (1 - tiling.y -
-/// offset.y)`, UnityGLTF's conversion of `KHR_texture_transform`: +y moves the
-/// texture down the surface and Tiling scales from the image's bottom edge, as in
-/// Unity. Planar and Triplanar project world coordinates, which HDRP transforms with
-/// the plain `uv * _ST.xy + _ST.zw` (`ComputeLayerTexCoord`), so they are packed
-/// as set: an offset moves the texture along the same world axis as in HDRP.
-/// The material keeps the value set; only this packing converts it, and every
-/// reader of `uv_st` (the forward maps, the cutout shadow casters) reads it here.
 pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
     let within = |v: f32, r: &RangeInclusive<f32>| v.clamp(*r.start(), *r.end());
     let [sx, sy] = c.tiling.map(|v| within(v, &MAP_COORD_RANGE));
@@ -106,11 +76,6 @@ pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
     }
 }
 
-/// The transparent-surface terms of `material` (#1523). Blending and preserve
-/// specular apply to a `Transparent` material alone; a draw with no material
-/// receives shadows. An unlit draw (`lit` false: a light's own mesh) returns its
-/// colour before any lighting, so it neither premultiplies nor reads the opaque
-/// copy: it blends straight, as before #1523.
 pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> SurfaceUniform {
     let Some(m) = material else {
         return SurfaceUniform {
@@ -127,20 +92,16 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
         RefractionModel::Thin => (2, REFRACTION_THIN_DISTANCE),
     };
     SurfaceUniform {
-        // A leftover blend mode on an Opaque or Cutout material blends nothing.
         blend_mode: if glass { m.blend_mode as u32 } else { 0 },
         premultiply_diffuse: u32::from(lit && glass && preserves_specular(m)),
         receive_shadows: u32::from(m.receive_shadows),
         refraction_model: if reads_opaque { refraction_model } else { 0 },
-        // Never below 1 (a NaN reads as 1): the shader refracts by `1 / ior` (#1998).
         ior: m.ior.max(1.0),
         thickness,
         uses_opaque: u32::from(reads_opaque),
         depth_postpass: u32::from(glass && m.depth_postpass),
         transmission: transmission(m.transmission_color, m.transmission),
         absorption: absorption(m.transmittance_color, m.absorption_distance, m.thickness),
-        // A translucent's lane says it traces (#1570); an opaque one's that its
-        // pixels keep the SSR record, else take the probe only (#2004).
         receive_ssr: u32::from(
             lit && if glass {
                 ssr::transparent::traces(m)
@@ -154,38 +115,21 @@ pub(crate) fn surface_uniform(lit: bool, material: Option<&MaterialAsset>) -> Su
     }
 }
 
-/// Thin translucency's lane: the colour times the amount, then the amount.
 fn transmission([r, g, b]: [f32; 3], amount: f32) -> [f32; 4] {
     [r * amount, g * amount, b * amount, amount]
 }
 
-/// HDRP's thin refraction slab (`Lit.hlsl`, `REFRACTION_THIN_DISTANCE`): 5 mm.
 const REFRACTION_THIN_DISTANCE: f32 = 0.005;
 
-/// The absorption coefficient per metre that leaves `color` after `distance`
-/// metres, HDRP's `TransmittanceColorAtDistanceToAbsorption`:
-/// `-ln(color) / distance`, with its epsilon on both. The fourth lane is the
-/// surface's `thickness`, the depth it absorbs over where the sky is behind it, as
-/// HDRP's thickness drives its absorption.
 fn absorption(color: [f32; 3], distance: f32, thickness: f32) -> [f32; 4] {
     let k = |c: f32| -(c + 1e-4).ln().min(0.0) / distance.max(1e-4);
     [k(color[0]), k(color[1]), k(color[2]), thickness]
 }
 
-/// Whether URP's *Preserve Specular Lighting* is in effect for `m`: on, and under a
-/// blend mode that keeps it (`BlendMode::preserves_specular`).
 pub(crate) fn preserves_specular(m: &MaterialAsset) -> bool {
     m.preserve_specular && m.blend_mode.preserves_specular()
 }
 
-/// One solid's object record (#1706): its world matrix, the SH its ambient term reads when a light
-/// probe covers it (see [`entity_probe_sh`]) and its probe shadowmask occlusion, both
-/// sampled at `centre`, its world bounds' centre (#1994), and its baked lightmap when it has one
-/// and `lightmaps` has its pages bound (#438), directional when their direction
-/// pages are bound too (#810). `capture` is the renderer's [`CaptureMode`]: a bake
-/// capture's static surfaces read probes only on a probe bounce.
-///
-/// [`CaptureMode`]: crate::ibl::cubemap_capture::CaptureMode
 pub(crate) fn solid_object(
     scene: &Scene,
     id: u32,
@@ -207,10 +151,6 @@ pub(crate) fn solid_object(
     }
 }
 
-/// The RGBA tint lane for a solid mesh. RGB comes from the material's `base_color`
-/// (or white when the entity references no material). The alpha lane is 1.0 for
-/// Opaque/Cutout — keeping the opaque path byte-for-byte unchanged — and the
-/// material's `alpha` only for a Transparent material, where it is the blend factor.
 fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
     if let Some(mat) = material {
         let a = if mat.is_transparent() { mat.alpha } else { 1.0 };
@@ -219,22 +159,6 @@ fn material_color_tint(material: Option<&MaterialAsset>) -> [f32; 4] {
     [1.0, 1.0, 1.0, 1.0]
 }
 
-/// Resolve the light-probe SH for one entity (#240): the scene's probe field sampled
-/// (trilinear) at `centre`, its world bounds' centre (Unity's `Renderer.bounds.center`,
-/// #1994; never its origin, which a mesh modelled in world coordinates leaves in
-/// another room), flattened to the `vec4`-padded GPU
-/// layout. Only NON-STATIC objects opt in — static geometry keeps the flat ambient
-/// term (and is the bake's target, not its consumer) — and a static mesh at *Scale
-/// In Lightmap* 0 (#1704), which the lightmap bake skips: as in Unity, it reads
-/// light probes instead. Returns `(use_sh, coeffs)`; `use_sh == 0` with zeroed
-/// coeffs when the entity is static (and lightmapped) or no probe covers it.
-///
-/// `capture.probe_bounce` overrides the "static ⇒ no probe SH" rule (#285): the
-/// multi-bounce probe bake sets it so static surfaces *do* sample the in-progress
-/// probe field during a bounce-≥2 capture, feeding the previous bounce's indirect
-/// light back into the scene. It is off everywhere else (runtime shading, bounce 1).
-/// A bake capture (`static_only`) treats a Scale In Lightmap 0 mesh as any static
-/// one, so a bounce-1 capture never reads the probes it is baking.
 fn entity_probe_sh(
     scene: &Scene,
     id: u32,
@@ -249,8 +173,6 @@ fn entity_probe_sh(
     probe_sh_at(scene, centre)
 }
 
-/// The light-probe SH at `position` in the GPU layout, `(use_sh, coeffs)` — zeroed
-/// with `use_sh == 0` when no probe covers it (#240; mesh particles, #440).
 pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4]; 9]) {
     match scene.probes.sample(position) {
         Some(probe) => {
@@ -264,11 +186,6 @@ pub(crate) fn probe_sh_at(scene: &Scene, position: glam::Vec3) -> (u32, [[f32; 4
     }
 }
 
-/// The light probes' shadowmask occlusion at `position` (#1695), all ones when no
-/// probe covers it: what a `Mixed` light's static shadow is on a surface no
-/// shadowmask page covers (a dynamic object, a static one with no lightmap). A
-/// non-finite position reads all ones, never a NaN the shader would spread. A
-/// scene whose bake gave no light a channel samples nothing.
 pub(crate) fn probe_occlusion_at(scene: &Scene, position: glam::Vec3) -> [f32; 4] {
     if scene.lightmaps.channels.is_empty() {
         return [1.0; 4];

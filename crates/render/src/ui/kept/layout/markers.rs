@@ -1,21 +1,13 @@
-//! crates/render/src/ui/kept/layout/markers.rs — what a kept layout's `WorldAnchor` markers
-//! were placed from: their targets' positions and the camera (`layout`'s module docs).
-
 use glam::{Mat4, Vec2, Vec3};
 
 use rusty_ecs::World;
 use rusty_scene::Camera;
 use rusty_ui::UiLayout;
 
-/// What a marker reads of the camera: its view-projection on this screen, and the
-/// eye and forward axis its behind test reads.
 type Eye = (Mat4, Vec3, Vec3);
 
-/// The world position of each marker's target (`None`: it has no Transform, which
-/// hides the marker), sorted by target.
 type Targets = Vec<(u32, Option<Vec3>)>;
 
-/// What the placed markers were placed from.
 #[derive(PartialEq)]
 pub(super) struct Markers {
     targets: Targets,
@@ -23,13 +15,6 @@ pub(super) struct Markers {
 }
 
 impl Markers {
-    /// What `layout`'s markers are placed from through `cam`, or `None` when it places
-    /// none. `compute_in` places one only under a screen-space root seen through a
-    /// camera, so an anchor under a world canvas, or outside any canvas, is no marker.
-    /// One is found by its parent, which the layout laid out, so a marker hidden
-    /// this frame (left out with its subtree) still counts: a move can show it. One
-    /// not active in the hierarchy (a pooled damage number) draws nothing and does
-    /// not count: its rect may go stale, and activating it lays the UI out again.
     pub(super) fn read(
         world: &World,
         layout: &UiLayout,
@@ -67,21 +52,17 @@ impl Markers {
         })
     }
 
-    /// Whether every marker would land where it did: neither the camera nor a
-    /// target moved.
     pub(super) fn still(&self, world: &World, cam: &Camera, screen: Vec2) -> bool {
         let at = |&(t, p): &(u32, Option<Vec3>)| position(world, t) == p;
         self.eye == eye(cam, screen) && self.targets.iter().all(at)
     }
 }
 
-/// Where a marker reads its target: the origin of its world matrix.
 fn position(world: &World, target: u32) -> Option<Vec3> {
     world.transform(target)?;
     Some(world.local_to_world(target).transform_point3(Vec3::ZERO))
 }
 
-/// The camera as markers read it on a `screen`-pixel target.
 fn eye(cam: &Camera, screen: Vec2) -> Eye {
     let aspect = screen.x / screen.y;
     (

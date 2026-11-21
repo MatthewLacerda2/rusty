@@ -1,7 +1,3 @@
-//! One camera's batches as what the GPU reads (#1616): a per-draw uniform per batch,
-//! in `uniform_slot` order, each naming its material record's slot of the renderer's
-//! material table (`render::scene::MaterialRecords`, #1706).
-
 use crate::DrawUniform;
 
 use super::FrameDraws;

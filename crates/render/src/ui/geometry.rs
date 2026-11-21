@@ -1,28 +1,11 @@
-//! crates/render/src/ui/geometry.rs — an Image's triangles, per image type (#418).
-//!
-//! GPU-free and pure: [`image_triangles`] turns one `ImageComponent` on a rect of
-//! `size` reference units into a triangle list in the element's **unit square**
-//! (`(0, 0)` bottom-left, `(1, 1)` top-right) paired with texture coordinates in the
-//! same y-up orientation. The caller maps the unit square onto the element's final
-//! quad (rotation and scale included) and flips `v` for the GPU.
-//!
-//! One texel is one reference unit (see `components::ui::image`), so `Sliced`
-//! borders and `Tiled` tiles keep their authored size whatever the rect's size.
-
 use glam::{Vec2, Vec4};
 
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 
-/// One triangle-list vertex: a unit-square position and its texture coordinate.
 pub(crate) type UnitVertex = (Vec2, Vec2);
 
-/// The most tiles a `Tiled` image emits; past it the tile grows so the count fits,
-/// so a huge rect over a tiny texture can never flood the vertex buffer.
 pub(crate) const MAX_TILES: f32 = 1024.0;
 
-/// The triangles covering `image` on a rect of `size`, sampling a texture of `tex`
-/// texels (`None` when solid or not loaded — texture-dependent types then draw as
-/// `Simple`).
 pub(crate) fn image_triangles(
     image: &ImageComponent,
     size: Vec2,
@@ -45,8 +28,6 @@ pub(crate) fn image_triangles(
     out
 }
 
-/// Push the two triangles of the axis-aligned unit-space box `lo..hi` sampling
-/// `uv_lo..uv_hi`. Degenerate boxes push nothing.
 fn quad(out: &mut Vec<UnitVertex>, lo: Vec2, hi: Vec2, uv_lo: Vec2, uv_hi: Vec2) {
     if hi.x <= lo.x || hi.y <= lo.y {
         return;
@@ -59,8 +40,6 @@ fn quad(out: &mut Vec<UnitVertex>, lo: Vec2, hi: Vec2, uv_lo: Vec2, uv_hi: Vec2)
     out.extend([bl, tl, tr, bl, tr, br]);
 }
 
-/// The centred unit-space box a `tex`-shaped texture occupies inside a `size` rect
-/// when its aspect is preserved.
 fn fit_aspect(size: Vec2, tex: Vec2) -> (Vec2, Vec2) {
     let scale = (size / tex).min_element();
     let unit = (tex * scale) / size.max(Vec2::splat(f32::EPSILON));
@@ -68,8 +47,6 @@ fn fit_aspect(size: Vec2, tex: Vec2) -> (Vec2, Vec2) {
     (lo, lo + unit)
 }
 
-/// 9-slice: borders keep their texel size (shrunk together when the rect is smaller
-/// than both borders), the centre and edges stretch.
 fn sliced(out: &mut Vec<UnitVertex>, border: Vec4, size: Vec2, tex: Vec2) {
     let size = size.max(Vec2::splat(f32::EPSILON));
     let (lo_b, hi_b) = (Vec2::new(border.x, border.y), Vec2::new(border.z, border.w));
@@ -101,8 +78,6 @@ fn sliced(out: &mut Vec<UnitVertex>, border: Vec4, size: Vec2, tex: Vec2) {
     }
 }
 
-/// Repeat the texture at native size from the bottom-left; the last row / column
-/// is cropped (its texture coordinates too). Capped at [`MAX_TILES`].
 fn tiled(out: &mut Vec<UnitVertex>, size: Vec2, tex: Vec2) {
     let count = (size / tex).ceil().max(Vec2::ONE);
     let grow = ((count.x * count.y) / MAX_TILES).sqrt().max(1.0);
@@ -121,8 +96,6 @@ fn tiled(out: &mut Vec<UnitVertex>, size: Vec2, tex: Vec2) {
     }
 }
 
-/// `Filled`: a bar (horizontal / vertical) or a radial sweep showing
-/// `fill_amount` of the rect.
 fn filled(out: &mut Vec<UnitVertex>, image: &ImageComponent) {
     let a = image.fill_amount.clamp(0.0, 1.0);
     let (lo, hi) = match (image.fill_method, image.fill_origin) {
@@ -139,8 +112,6 @@ fn filled(out: &mut Vec<UnitVertex>, image: &ImageComponent) {
     quad(out, lo, hi, lo, hi);
 }
 
-/// A 360° sweep around the centre, starting at `origin`'s edge: a triangle fan whose
-/// rim follows the rect's border, with a vertex at every corner the sweep passes.
 fn radial(out: &mut Vec<UnitVertex>, amount: f32, origin: FillOrigin, clockwise: bool) {
     use std::f32::consts::{FRAC_PI_2, FRAC_PI_4, PI, TAU};
     if amount >= 1.0 {
@@ -157,7 +128,6 @@ fn radial(out: &mut Vec<UnitVertex>, amount: f32, origin: FillOrigin, clockwise:
         FillOrigin::Left => PI,
     };
     let dir = if clockwise { -1.0 } else { 1.0 };
-    // Offsets along the sweep: the start, every corner strictly inside it, the end.
     let mut offsets: Vec<f32> = (0..4)
         .map(|k| ((FRAC_PI_4 + k as f32 * FRAC_PI_2 - start) * dir).rem_euclid(TAU))
         .filter(|&d| d > 0.0 && d < sweep)
@@ -172,8 +142,6 @@ fn radial(out: &mut Vec<UnitVertex>, amount: f32, origin: FillOrigin, clockwise:
     }
 }
 
-/// Where the ray from the unit square's centre at `angle` (radians, y-up) meets its
-/// border.
 fn rim_point(angle: f32) -> Vec2 {
     let d = Vec2::new(angle.cos(), angle.sin());
     Vec2::splat(0.5) + d * (0.5 / d.abs().max_element())

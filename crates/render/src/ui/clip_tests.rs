@@ -12,12 +12,10 @@ fn soft(lo: [f32; 2], hi: [f32; 2], feather: f32) -> SoftRect {
 
 #[test]
 fn an_intersection_keeps_each_edges_own_feather() {
-    // A hard panel 0..100 around a soft list 10..200 that overflows it right/top.
     let panel = soft([0.0, 0.0], [100.0, 100.0], 0.0);
     let list = soft([10.0, 10.0], [200.0, 200.0], 8.0);
     let both = panel.intersect(list);
     assert_eq!((both.lo, both.hi), (Vec2::splat(10.0), Vec2::splat(100.0)));
-    // Left and bottom are the list's (soft), right and top the panel's (hard).
     assert_eq!(both.feather, Vec4::new(8.0, 8.0, 0.0, 0.0));
     assert_eq!(list.intersect(panel), both, "order does not matter");
 }
@@ -35,7 +33,6 @@ fn ndc_maps_bounds_and_feather_onto_the_frame() {
         mask: None,
     };
     let (rect, feather) = clip.ndc(Vec2::new(100.0, 200.0));
-    // Top-left origin: the scissor covers the left half, top half of the frame.
     assert_eq!(rect, [-1.0, 0.0, 0.0, 1.0]);
     let want = [0.2, 0.2, 0.0, 0.05];
     assert!(feather.iter().zip(want).all(|(a, b)| (a - b).abs() < 1e-6));

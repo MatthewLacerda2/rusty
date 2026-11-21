@@ -1,8 +1,3 @@
-//! GPU-resource construction for [`Renderer`]. Each builder returns one cohesive
-//! group (the camera/lighting bindings, the shadow system, the forward passes, the
-//! billboard passes), and `Renderer::from_parts` (`render::setup`) destructures the
-//! groups into the renderer, so the seams follow what depends on what (#211).
-
 use crate::clusters::ClusterBuffers;
 use crate::decals::DecalBuffers;
 use crate::draw::camera::buffer::CameraBuffer;
@@ -28,24 +23,16 @@ pub(crate) struct GlobalBindings {
     pub camera_buffer: CameraBuffer,
     pub lighting_buffer: wgpu::Buffer,
     pub global_bind_group: wgpu::BindGroup,
-    /// The light-cluster buffers group 0 binds (#434).
     pub clusters: ClusterBuffers,
-    /// The decal records and atlas group 0 binds (#638).
     pub decals: DecalBuffers,
-    /// The baked lightmap pages group 0 binds (#438).
     pub lightmaps: Lightmaps,
-    /// The reflection-probe cube array group 0 binds (#1206).
     pub reflection_probes: ProbeArray,
-    /// The sky's reflection cubes group 0 binds (#1553).
     pub sky_reflection: SkyReflection,
-    /// The integrated volumetric fog group 0 binds (#1703).
     pub fog_volume: SharedVolume,
     /// The sampler group 0 reads its cubes, lightmap pages and fog volume through.
     pub linear_clamp: wgpu::Sampler,
 }
 
-/// The forward-lit, line, outline and skybox passes — everything that draws into
-/// the HDR offscreen target.
 pub(crate) struct ForwardPasses {
     pub render_pipeline: pipelines::FacedPipeline,
     pub velocity_pipeline: pipelines::VelocityPipelines,
@@ -54,28 +41,19 @@ pub(crate) struct ForwardPasses {
     pub depth_postpass_pipelines: pipelines::DepthPostpassPipelines,
     pub line_pipeline: pipelines::LazyPipeline,
     pub vertex_line_pipeline: pipelines::LazyPipeline,
-    /// The reflection-probe ball gizmo (#1911), over post-FX like the lines.
     pub probe_ball_pipeline: pipelines::LazyPipeline,
-    /// The navmesh gizmo (#1910), over post-FX like the lines.
     pub navmesh: NavMeshGizmo,
-    /// The selection outline's mask and edge pipelines (#1175).
     pub outline: crate::passes::outline::OutlinePasses,
     pub prepass_pipeline: pipelines::PrepassPipelines,
     pub skybox_renderer: skybox::SkyboxRenderer,
 }
 
-/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
-/// `texture_layout`, and the particles sample the scene depth through
-/// `scene_depth_layout`.
 pub(crate) struct BillboardPasses {
     pub particle_renderer: crate::passes::particles::ParticleRenderer,
     pub ribbon_renderer: crate::passes::ribbons::RibbonRenderer,
     pub scene_depth_layout: wgpu::BindGroupLayout,
 }
 
-/// Every non-trivial GPU resource a [`Renderer`] needs, grouped by role. Built in
-/// dependency order (layouts → textures → bindings → passes) and consumed once by
-/// [`Renderer::from_parts`], which moves each group into the flat renderer.
 pub(crate) struct GpuResources {
     pub camera_lighting_layout: wgpu::BindGroupLayout,
     pub entity_bones_layout: wgpu::BindGroupLayout,
@@ -84,9 +62,7 @@ pub(crate) struct GpuResources {
     pub shadows: ShadowSystem,
     pub forward: ForwardPasses,
     pub billboards: BillboardPasses,
-    /// The in-game UI pass (#418).
     pub ui: crate::ui::UiRenderer,
-    /// The SSAO passes (#436).
     pub ssao: ssao::SsaoRenderer,
     pub grade_bake: GradeBake,
     pub post_passes: Passes,
@@ -94,10 +70,6 @@ pub(crate) struct GpuResources {
 }
 
 impl GpuResources {
-    /// Build every *shared* GPU resource from an already-created device/queue. The
-    /// per-view targets (depth + post-FX chain) are no longer built here — each
-    /// [`crate::RenderView`] owns its own (#355). `output_format` is what
-    /// post-FX writes, which the editor's outline ring and gizmos draw over (#1224).
     pub(crate) fn build(
         device: &wgpu::Device,
         gpu: Writes,
@@ -109,7 +81,6 @@ impl GpuResources {
         let textures = create_textures(device, gpu, &mut registry);
         let global = create_global_bindings(device, &camera_lighting_layout, &mut registry);
         let ssao = ssao::SsaoRenderer::new(device, gpu, &mut registry);
-        // One module draws the solids and their shadows (#648).
         let shader = registry.load(device, "shader.wgsl", "Forward Lit Shader");
         let atlas_shader = registry.load(device, "shadow_atlas.wgsl", "Shadow Atlas Shader");
         let shadow_shaders = [&shader, &atlas_shader];
@@ -151,17 +122,12 @@ impl GpuResources {
             ui,
             ssao,
             grade_bake: GradeBake::new(device, &mut registry),
-            // The window's format and the offscreen views' (render textures, the
-            // editor's panels, captures): the two an LDR pass writes.
             post_passes: Passes::new(device, &mut registry, &[output_format, OFFSCREEN_FORMAT]),
             quality: QualityValues::default(),
         }
     }
 }
 
-/// Billboard particle and ribbon (#441) passes; both reuse the renderer's
-/// `texture_layout`, and the particles also read the scene depth and the camera +
-/// lighting group 0 (#440), and own their default sprite (#2052).
 fn create_billboard_passes(
     device: &wgpu::Device,
     writes: crate::gpu::ops::Writes,
@@ -189,8 +155,6 @@ fn create_billboard_passes(
     }
 }
 
-/// Camera + lighting uniform buffers, the light clusters and the group-0 bind group
-/// (with the procedural sky's reflection cube, baked on the first frame).
 fn create_global_bindings(
     device: &wgpu::Device,
     camera_lighting_layout: &wgpu::BindGroupLayout,
@@ -241,11 +205,6 @@ fn create_global_bindings(
     }
 }
 
-/// Build the forward-lit, line, outline and skybox passes, the solids through the
-/// forward `shader`. Solids and sky draw into the HDR offscreen target; the editor's
-/// outline ring and line gizmos into `output_format`, over post-FX (#1224).
-/// `layouts` are the global, per-draw and scene groups (`groups::GLOBAL`, `DRAW`,
-/// `SCENE`): camera + lighting, entity + bones, shadows.
 fn create_forward_passes(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

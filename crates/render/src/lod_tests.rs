@@ -1,13 +1,8 @@
-//! LOD selection (#472): the level a view shows is picked by screen height, the other
-//! levels' renderers are hidden, and the static-bake selection is always LOD0.
-
 use glam::Vec3;
 
 use super::*;
 use rusty_components::LodLevel;
 
-/// A group at `z = -distance` (the camera looks down -Z from the origin) with one
-/// renderer per level: ids 101, 102, 103 for LOD0..2.
 fn scene_with_group(distance: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let group = scene.world.spawn("Crate".to_string());
@@ -25,8 +20,6 @@ fn scene_with_group(distance: f32) -> (Scene, u32) {
     (scene, group)
 }
 
-/// A camera at the origin looking down -Z with a 90° vertical fov, so the visible
-/// height at distance `d` is exactly `2d` and a 2 m group covers `1/d` of the screen.
 fn camera() -> Camera {
     let mut cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     cam.fov = 90.0;
@@ -48,7 +41,6 @@ fn screen_height_is_size_over_the_visible_height() {
 
 #[test]
 fn each_distance_shows_exactly_one_level() {
-    // 1/d: 1.0 → LOD0, 0.2 → LOD1, 0.04 → LOD2, 0.01 → culled.
     let cases = [
         (1.0, vec![102, 103]),
         (5.0, vec![101, 103]),
@@ -102,7 +94,6 @@ fn an_orthographic_view_uses_the_held_half_height() {
     rusty_scene::camera::apply_lens(&mut cam, &ortho(5.0));
     let h = screen_height(2.0, &cam, scene.world.local_to_world(group));
     assert!((h - 0.2).abs() < 1e-6, "2 m under a 5 m half-height: {h}");
-    // A zero size loaded from a file is held to the floor, not divided by.
     rusty_scene::camera::apply_lens(&mut cam, &ortho(0.0));
     let h = screen_height(2.0, &cam, scene.world.local_to_world(group));
     assert_eq!(h, 2.0 / (2.0 * MIN_ORTHO_SIZE));

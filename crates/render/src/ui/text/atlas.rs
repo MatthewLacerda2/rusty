@@ -1,11 +1,3 @@
-//! crates/render/src/ui/text/atlas.rs — the per-font dynamic SDF atlas (CPU side, #419).
-//!
-//! One single-channel atlas per font asset. A glyph's field is generated the first
-//! time a text draws it and shelf-packed into the atlas, which is marked dirty so
-//! the pass re-uploads it; the atlas starts [`WIDTH`]×[`START_HEIGHT`] and doubles
-//! its height as it fills, up to [`MAX_HEIGHT`] (past that a new glyph is skipped,
-//! with one warning). Placement is in texels, so growing never moves a glyph.
-
 use std::collections::HashMap;
 
 use glam::Vec2;
@@ -18,24 +10,17 @@ pub(crate) const WIDTH: u32 = 1024;
 pub(crate) const START_HEIGHT: u32 = 256;
 pub(crate) const MAX_HEIGHT: u32 = 4096;
 
-/// Where one glyph sits: its texel rect and its quad relative to the pen.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AtlasGlyph {
-    /// Texel rect `(x, y, w, h)`, top-left origin.
     pub(crate) texels: [u32; 4],
-    /// The quad's bottom-left relative to the pen, base pixels, y up.
     pub(crate) origin: Vec2,
 }
 
-/// One font's atlas.
 pub(crate) struct GlyphAtlas {
     pub(crate) height: u32,
-    /// `WIDTH × height` coverage, row-major, top row first.
     pub(crate) pixels: Vec<u8>,
-    /// Changed since the last upload.
     pub(crate) dirty: bool,
     glyphs: HashMap<GlyphId, Option<AtlasGlyph>>,
-    /// Shelf packer: the cursor and the current shelf's height.
     cursor: (u32, u32),
     shelf: u32,
     warned: bool,
@@ -56,8 +41,6 @@ impl Default for GlyphAtlas {
 }
 
 impl GlyphAtlas {
-    /// `glyph`'s place, generating and packing it on first use. `None` for an empty
-    /// glyph or a full atlas.
     pub(crate) fn glyph(
         &mut self,
         font: &rusty_font::FontData,
@@ -71,9 +54,8 @@ impl GlyphAtlas {
         placed
     }
 
-    /// Pack `field`, growing the atlas when needed.
     fn insert(&mut self, field: &GlyphField) -> Option<AtlasGlyph> {
-        let (w, h) = (field.width + 1, field.height + 1); // a gutter against bleeding
+        let (w, h) = (field.width + 1, field.height + 1);
         if w > WIDTH {
             return None;
         }
@@ -110,7 +92,6 @@ impl GlyphAtlas {
         })
     }
 
-    /// A glyph's texture coordinates `(min, max)` in the atlas's current size (v down).
     pub(crate) fn uv(&self, g: &AtlasGlyph) -> (Vec2, Vec2) {
         let size = Vec2::new(WIDTH as f32, self.height as f32);
         let [x, y, w, h] = g.texels.map(|v| v as f32);
@@ -118,17 +99,13 @@ impl GlyphAtlas {
     }
 }
 
-/// Every font's atlas, keyed by font path (`None`: the default font).
 #[derive(Default)]
 pub(crate) struct FontAtlases {
     pub(crate) atlases: HashMap<Option<String>, GlyphAtlas>,
-    /// Moves whenever an atlas grows: every glyph's uv rect in that font changed, so
-    /// a mesh built before it is stale (`ui::kept`).
     pub(crate) generation: u64,
 }
 
 impl FontAtlases {
-    /// `glyph` of the font at `path`: its place and its uv rect.
     pub(crate) fn glyph(
         &mut self,
         path: &Option<String>,

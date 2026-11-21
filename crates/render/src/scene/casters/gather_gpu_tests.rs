@@ -1,9 +1,3 @@
-//! The sweeps' gather through the caster BVH follows every edit (#1874): a static
-//! object moved far, one made dynamic, one added after the build and one that
-//! comes to cast per frame are gathered where they are now, not where the BVH last saw them; a stray reaches every
-//! volume until a rebuild, which past the strays' limit comes on its own.
-//! Skips with no adapter.
-
 use glam::camera::rh::proj::directx;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Vec3};
@@ -13,14 +7,11 @@ use crate::Renderer;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// A short point-light face at `x` along the yard's row, looking down.
 fn at(x: f32) -> Mat4 {
     let face = directx::perspective(std::f32::consts::FRAC_PI_2, 1.0, 0.05, 2.0);
     face * look_to_mat4(Vec3::new(x, 1.0, -4.0), -Vec3::Y, Vec3::Z)
 }
 
-/// The ids a static bake (`baked`) or a per-frame sweep gathers for the face at
-/// `x`, after an extract of `scene`.
 fn near(r: &mut Renderer, scene: &Scene, x: f32, baked: bool) -> Vec<u32> {
     r.extract_scene(scene);
     let kept = r.retained.scene(scene.id()).expect("extracted");
@@ -68,7 +59,6 @@ fn gpu_the_gather_follows_moved_flipped_and_new_casters() {
     scene.world.transform_mut(new).unwrap().position = Vec3::new(39.5, 0.0, -4.0);
     scene.world.set_static(new, true);
     assert_eq!(near(&mut r, &scene, 40.0, true), [ids[2], new], "added");
-    // A small-culled static casts per frame wherever it is (#1714).
     scene.world.mesh_mut(ids[4]).unwrap().max_draw_distance = 30.0;
     assert_eq!(
         near(&mut r, &scene, 90.0, false),
@@ -76,7 +66,6 @@ fn gpu_the_gather_follows_moved_flipped_and_new_casters() {
         "per frame"
     );
 
-    // A stray is handed to every volume until a rebuild.
     scene.world.transform_mut(ids[0]).unwrap().position.x = 60.0;
     assert_eq!(
         near(&mut r, &scene, 90.0, true),

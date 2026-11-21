@@ -1,7 +1,3 @@
-//! The stale-bake warning (#1714): said once per PVS, and again when a baked
-//! occluder changes after a warning that said only meshes did, since culling then
-//! stops and the console must not keep saying they are drawn.
-
 use super::warning_due;
 use rusty_scene::revision::Revision;
 

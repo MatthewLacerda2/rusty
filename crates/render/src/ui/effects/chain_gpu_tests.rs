@@ -1,8 +1,3 @@
-//! GPU tests for a Mask whose chain of Masks changes while every Mask in it is
-//! still (#2354): a Mask given to or taken from an element between two Masks, and
-//! a Mask moved between two sibling Masks. The child's kept coverage must equal a
-//! fresh draw's, never its old parent's cut.
-
 use glam::Vec4;
 use rusty_scene::Scene;
 
@@ -11,7 +6,6 @@ use crate::Renderer;
 
 const FULL: [f32; 4] = [0.0, 0.0, SIZE as f32, SIZE as f32];
 
-/// A full-size hidden Mask `C` under `parent`, holding a red full-size Image.
 fn child_mask(scene: &mut Scene, parent: u32) -> u32 {
     let child = element(scene, parent, FULL);
     hidden_mask(scene, child);
@@ -20,7 +14,6 @@ fn child_mask(scene: &mut Scene, parent: u32) -> u32 {
     child
 }
 
-/// The next frame of `frames` equals a fresh view's first draw of `scene`.
 fn equals_a_fresh_draw(renderer: &mut Renderer, frames: &mut Frames, scene: &Scene, why: &str) {
     let (_, kept) = frames.frame(renderer, scene);
     let (_, fresh) = Frames::new(renderer).frame(renderer, scene);
@@ -32,7 +25,6 @@ fn gpu_a_mask_added_or_removed_between_two_still_masks_redraws_the_child() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(SIZE, SIZE) else {
         return;
     };
-    // P (Mask) > M (an ellipse) > C (Mask) > red.
     let (mut scene, root) = canvas();
     let p = element(&mut scene, root, FULL);
     hidden_mask(&mut scene, p);
@@ -55,7 +47,6 @@ fn gpu_a_mask_moved_between_two_still_sibling_masks_redraws() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(SIZE, SIZE) else {
         return;
     };
-    // An ellipse Mask A and a square Mask B, side by side over the same rect.
     let (mut scene, root) = canvas();
     let a = element(&mut scene, root, FULL);
     ellipse(&mut scene, a);
