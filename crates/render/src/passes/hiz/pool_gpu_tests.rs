@@ -1,10 +1,3 @@
-//! The cluster pool across a session (#2417): a mesh re-cut mid-session gives
-//! its rows and indices back and leases new ones (the pool growing for a bigger
-//! one), the next re-cut reuses the hole without growing, and every frame
-//! between culls by cluster and draws what it draws with the cull off. The
-//! limit is the session's: a lease past it is refused with nothing kept, a
-//! smaller one still fits, and a mesh refused is drawn whole.
-
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::{cut, panel, panel_of};
@@ -35,7 +28,6 @@ fn gpu_a_mesh_re_cut_mid_session_frees_its_range_and_the_next_cut_reuses_it() {
     settles_culled(&mut r, &scene, &cam);
     let (first, bytes) = r.hiz.clusters.pool.held();
     assert_eq!(first, live(&scene), "both meshes leased");
-    // Bigger: a new upload, the old one's lease freed, the pool grown for it.
     cut(&mut scene, a, ("A", 96));
     settles_culled(&mut r, &scene, &cam);
     let (held, grown) = r.hiz.clusters.pool.held();
@@ -44,7 +36,6 @@ fn gpu_a_mesh_re_cut_mid_session_frees_its_range_and_the_next_cut_reuses_it() {
         grown.0 > bytes.0 && grown.1 > bytes.1,
         "{bytes:?} -> {grown:?}"
     );
-    // Back: written in place, the 96 cut's lease freed and the first hole reused.
     cut(&mut scene, a, ("A", 64));
     settles_culled(&mut r, &scene, &cam);
     assert_eq!(
@@ -71,7 +62,6 @@ fn gpu_a_lease_past_the_pool_limit_is_refused_and_a_smaller_one_still_fits() {
     };
     let ((bc, bi), (sc, si)) = (mesh(big), mesh(small));
     let mut pool = ClusterPool::new(&r.device, &r.hiz.clusters.pool_layout);
-    // Room for one big mesh's indices and one small one's, no more.
     pool.limit = 4 * (bi.len() + si.len()) as u64;
     let gpu = (&r.device, &r.queue);
     let layout = &r.hiz.clusters.pool_layout;
@@ -124,8 +114,6 @@ fn gpu_a_mesh_the_pool_refuses_is_drawn_whole() {
     assert!(on.iter().any(|&b| b != on[0]), "the panel is on screen");
 }
 
-/// A few frames of `scene` with the cull on, which must cull by cluster and
-/// draw what one with it off draws.
 fn settles_culled(r: &mut Renderer, scene: &Scene, cam: &Camera) {
     let mut view = offscreen(r);
     let frames = (0..6).map(|_| shot(r, &mut view, scene, cam));

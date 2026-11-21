@@ -23,7 +23,6 @@ fn width_colour_and_u_run_along_the_length() {
     let pts = [Vec3::ZERO, Vec3::X, Vec3::X * 4.0];
     let (v, i) = run(&pts, false, &style());
     assert_eq!((v.len(), i.len()), (6, 12), "two segments");
-    // Point 1 sits a quarter of the way along.
     assert_eq!(v[2].width, 0.75);
     assert_eq!(v[2].color, [0.75, 0.0, 0.25, 0.75]);
     assert_eq!((v[2].u, v[4].u), (0.25, 1.0));
@@ -57,7 +56,6 @@ fn a_loop_closes_and_its_seam_tangent_wraps() {
         (10, 24),
         "four segments, seam point repeated"
     );
-    // At the seam the tangent runs from the last corner to the second: (1,0,-1).
     let t = Vec3::from(v[0].tangent);
     assert!((t - Vec3::new(1.0, 0.0, -1.0).normalize()).length() < 1e-6);
     assert_eq!(v[0].tangent, v[8].tangent, "both ends of the seam agree");

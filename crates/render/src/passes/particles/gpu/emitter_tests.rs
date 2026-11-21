@@ -1,12 +1,8 @@
-//! The GPU emitter's buffers against the device limits (#2170).
+//! Every device uses wgpu's default limits, so the cap's buffers must fit them.
 
 use super::*;
 use rusty_components::particle::GPU_MAX_PARTICLES;
 
-/// Every device is created with wgpu's default limits
-/// (`setup::limits::device_limits`), so the cap's buffers must fit them: the
-/// particles at the cap, and the births buffer `grow_births` rounds up for an
-/// upload of one birth per slot.
 #[test]
 fn the_caps_buffers_fit_the_default_limits() {
     let limits = wgpu::Limits::default();

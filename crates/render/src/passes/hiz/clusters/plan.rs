@@ -1,26 +1,12 @@
-//! Which of a camera's opaque batches are drawn by cluster this frame (#1968),
-//! and the work `hiz_clusters.wgsl` runs for them: a job per instance, each with
-//! its room in the output index list, and a chunk per 64 clusters of a job, so
-//! the frame's test and copy are one dispatch each over the chunks and its scan
-//! one over the jobs, whatever the batches' meshes and counts (#2417). Pure CPU
-//! work over the frame's batches.
-
 use std::ops::Range;
 
 use crate::draw::batch::DrawBatch;
 use crate::gpu::pipelines::winding::Facing;
 use crate::InstanceData;
 
-/// The most output indices one camera's clustered draws may hold (32 MB): a
-/// batch that would pass it is drawn whole, by the per-instance test alone. The
-/// import splits no run longer than it, since one could never fit. It also
-/// bounds the jobs and chunks (a cluster is at least a triangle) far below
-/// what the dispatches' two dimensions reach ([`super::record::workgroups`]).
 pub(crate) const MAX_OUT_INDICES: u64 = rusty_asset::clusters::MAX_RUN_INDICES as u64;
-/// The clusters a chunk covers: the test's and the copy's workgroup size.
 pub(crate) const CHUNK: u32 = 64;
 
-/// `hiz_clusters.wgsl`'s `Job`.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct Job {
@@ -31,39 +17,26 @@ pub(crate) struct Job {
     pub cluster_first: u32,
     pub state_first: u32,
     pub cone: u32,
-    /// Its batch's clusters, from `cluster_first` in the shared table.
     pub clusters: u32,
 }
 
-/// One clustered batch: its place among the opaque batches and its jobs.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Run {
     pub batch: usize,
     pub jobs: Range<u32>,
 }
 
-/// A camera's clustered draws this frame.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct Plan {
     pub jobs: Vec<Job>,
     pub runs: Vec<Run>,
-    /// Per [`CHUNK`] clusters of a job, in job order: the job and its first
-    /// cluster there (`hiz_clusters.wgsl`'s `chunks`).
     pub chunks: Vec<[u32; 2]>,
-    /// Output indices and state words the jobs need: a job's region is
-    /// `1 + 2 * clusters` words (`hiz_clusters.wgsl`'s `state`).
     pub out_indices: u32,
     pub states: u32,
-    /// The clusters of instances the per-instance test judges: `Debug.Stats`'
-    /// `cluster_tested`.
     pub tested: u32,
 }
 
 impl Plan {
-    /// Plan `batches` over the camera's `instances`, `tested` saying which the
-    /// per-instance test judges, `clusters_of` naming the shared table's cluster range of a
-    /// batch whose mesh is split and whose run is whole clusters. A batch with no
-    /// instance, or none the instance test judges, keeps its one instanced draw.
     pub(crate) fn of<'a>(
         batches: impl Iterator<Item = &'a DrawBatch>,
         (instances, tested): (&[InstanceData], &dyn Fn(usize) -> bool),
@@ -77,9 +50,6 @@ impl Plan {
             let count = batch.instances.len() as u64;
             let room = count * u64::from(batch.key.indices.len());
             let fits = u64::from(plan.out_indices) + room <= MAX_OUT_INDICES;
-            // A batch none of whose instances is judged (mesh particles, a
-            // vertex-moving material) would cull nothing by cluster but the
-            // frustum and cones, at a draw per instance: one instanced draw wins.
             let judged = batch.instances.clone().any(|i| tested(i as usize));
             if !fits || !judged {
                 continue;
@@ -111,8 +81,6 @@ impl Plan {
         plan
     }
 
-    /// Per opaque batch (of `batches`), the jobs whose indirect draws stand for
-    /// it, or `None` for one drawn whole.
     pub(crate) fn draws(&self, batches: usize) -> Vec<Option<Range<u32>>> {
         let mut out = vec![None; batches];
         for run in &self.runs {

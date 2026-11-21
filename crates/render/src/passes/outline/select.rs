@@ -1,23 +1,15 @@
-//! Which entities the selection outline rings (#1160): the selection itself, or the
-//! LOD level the camera shows when the selection stands for a LOD group.
+//! As in Unity a shown renderer rings alone; a LOD group's root or a hidden renderer
+//! stands for the level the camera shows. ShadowsOnly meshes never ring.
 
 use crate::lod::LodSelection;
 use rusty_scene::Scene;
 
-/// The entities the selection outline rings as `lod` shows them; empty with nothing
-/// selected. The forward pass marks their draws (`DrawItem::outline`).
 pub(crate) fn outlined(scene: &Scene, lod: &LodSelection) -> Vec<u32> {
     scene
         .selected_entity_id
         .map_or_else(Vec::new, |selected| outline_targets(scene, selected, lod))
 }
 
-/// The entities whose outlines ring `selected`. A LOD group's root, or a renderer the
-/// current level hides, stands for the level `lod` shows (#1160): selecting LOD0 while
-/// LOD2 draws rings LOD2, and a culled group rings nothing. A group's own mesh rings
-/// with its level. A shown renderer, like anything else, is outlined alone, as Unity
-/// does: selecting Hat in a `[Body, Hat]` level rings Hat. Only active, shown meshes
-/// ring, and a `ShadowsOnly` one, which no camera draws, never does (#1571).
 pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) -> Vec<u32> {
     if !scene.world.is_active_in_hierarchy(selected) {
         return Vec::new();
@@ -46,8 +38,6 @@ pub(super) fn outline_targets(scene: &Scene, selected: u32, lod: &LodSelection) 
     ids
 }
 
-/// The active LOD group `id` is, or lists as a renderer. An inactive group hides
-/// nothing (`LodSelection`), so it owns nothing here either.
 fn owning_group(scene: &Scene, id: u32) -> Option<u32> {
     let world = &scene.world;
     if world.has_lod_group(id) {

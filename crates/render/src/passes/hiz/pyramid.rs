@@ -1,39 +1,25 @@
-//! The Hi-Z pyramid (#1963): a view's depth max-reduced level by level. Level 0 is
-//! half the depth's size rounded up to a power of two, and each level after it
-//! half the one below (a full mip chain), so level `l`'s texel `t` covers the depth
-//! pixels `t << (l + 1)` up to the next texel's; texels past the depth's edge
-//! repeat it. Kept per view and made again when the depth's size changes.
-
 use super::HiZ;
 use crate::gpu::kept::Kept;
 use crate::gpu::ops::CountedDevice as _;
 
-/// The pyramid's format: one float, written by a compute pass.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Float;
 
 pub(crate) struct Pyramid {
-    /// The depth size it was made for.
     pub(crate) depth: (u32, u32),
     texture: wgpu::Texture,
-    /// All its levels, as `cs_test` reads them.
     pub(crate) view: wgpu::TextureView,
-    /// One view per level, each reduced from the one below.
     levels: Vec<wgpu::TextureView>,
-    /// Each level's reduction group, kept while the depth it reads is.
     groups: Kept<wgpu::TextureView, Vec<wgpu::BindGroup>>,
 }
 
-/// Half of `n`, rounded up, never below one.
 fn half(n: u32) -> u32 {
     n.div_ceil(2).max(1)
 }
 
-/// Level 0's size over a depth of `w × h`.
 fn base(w: u32, h: u32) -> (u32, u32) {
     (half(w).next_power_of_two(), half(h).next_power_of_two())
 }
 
-/// The levels of a pyramid over a depth of `w × h`: from [`base`] to 1×1.
 pub(crate) fn level_count(w: u32, h: u32) -> u32 {
     let (w, h) = base(w, h);
     w.max(h).ilog2() + 1
@@ -81,8 +67,6 @@ impl Pyramid {
         self.texture.mip_level_count()
     }
 
-    /// Record the reduction of `depth` into every level, in `pass` (the stage's
-    /// one pass after phase one, #2327).
     pub(crate) fn build(
         &mut self,
         device: &wgpu::Device,
@@ -106,7 +90,6 @@ impl Pyramid {
     }
 }
 
-/// The reduction that writes `level`: from the depth, or from the level below.
 fn level_pipeline(hiz: &HiZ, level: usize) -> &wgpu::ComputePipeline {
     match level {
         0 => hiz.reduce_depth.get(),
@@ -114,8 +97,6 @@ fn level_pipeline(hiz: &HiZ, level: usize) -> &wgpu::ComputePipeline {
     }
 }
 
-/// The group that reduces into `level`: `depth` or the level below in, the
-/// level out.
 fn level_group(
     device: &wgpu::Device,
     hiz: &HiZ,
@@ -150,8 +131,8 @@ mod tests {
     fn levels_run_from_half_the_depth_to_one_texel() {
         assert_eq!(level_count(1, 1), 1);
         assert_eq!(level_count(2, 2), 1);
-        assert_eq!(level_count(3, 1), 2); // 2x1, then 1x1
-        assert_eq!(level_count(96, 64), 7); // 64x32 down to 1x1
-        assert_eq!(level_count(1920, 1080), 11); // 1024x1024 down to 1x1
+        assert_eq!(level_count(3, 1), 2);
+        assert_eq!(level_count(96, 64), 7);
+        assert_eq!(level_count(1920, 1080), 11);
     }
 }

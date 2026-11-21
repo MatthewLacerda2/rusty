@@ -1,9 +1,3 @@
-//! The ring is a fixed width around whatever the selection covers on screen
-//! (#1175): a box stretched (10,1,1), a primitive level's usual wall, rings as wide
-//! along its long sides as its short ones, and a glass box rings its silhouette
-//! instead of filling it. A resized view rebuilds its mask at the new size. Skips
-//! with no adapter.
-
 use glam::Vec3;
 
 use super::tests::{frame_from, is_outline, outline_stats, RES};
@@ -14,7 +8,6 @@ use rusty_components::{MaterialAsset, MaterialComponent};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A unit box at the origin, scaled by `scale`, selected.
 fn selected_box(scale: Vec3) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -24,8 +17,6 @@ fn selected_box(scale: Vec3) -> Scene {
     scene
 }
 
-/// Outline pixels on each side of the frame's centre along its middle row and
-/// column: `[left, right, above, below]`.
 fn ring_per_side(px: &[u8]) -> [usize; 4] {
     let half = (RES / 2) as usize;
     let hit = |x: usize, y: usize| is_outline(&px[(y * RES as usize + x) * 4..][..4]);
@@ -40,7 +31,6 @@ fn gpu_a_stretched_box_rings_evenly_on_all_four_sides() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    // About 48 px wide and 5 px tall from 16 m away.
     let scene = selected_box(Vec3::new(10.0, 1.0, 1.0));
     let sides = ring_per_side(&frame_from(&mut r, &scene, Vec3::ZERO, 16.0));
     eprintln!("[outline, stretched] left/right/above/below {sides:?} px");

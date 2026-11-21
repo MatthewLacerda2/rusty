@@ -1,7 +1,3 @@
-//! GPU occlusion culling on lavapipe (#1963): a wall leaves the box behind it
-//! undrawn, with no bake and with the camera outside every baked cell; and where
-//! nothing is hidden, a frame is the same image with it on and off.
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -14,7 +10,6 @@ use rusty_scene::{Camera, Scene};
 pub(super) const W: u32 = 96;
 pub(super) const H: u32 = 64;
 
-/// A wall across the view at z = 0 and a box 5 m behind it: the scene and the box.
 pub(super) fn walled() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -29,12 +24,10 @@ pub(super) fn walled() -> (Scene, u32) {
     (scene, boxed)
 }
 
-/// Eight metres in front of the wall, looking at it down -Z.
 pub(super) fn facing_the_wall() -> Camera {
     Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0)
 }
 
-/// One frame of `scene` through `cam` into `view`: its pixels and counters.
 pub(super) fn shot(
     r: &mut Renderer,
     view: &mut RenderView,
@@ -52,14 +45,12 @@ pub(super) fn offscreen(r: &Renderer) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)
 }
 
-/// The instances the base camera's last frame drew through the cull, per batch.
 pub(super) fn drawn(r: &Renderer, view: &RenderView) -> Vec<u32> {
     let words = words(r, view.hiz.cameras[0].final_args());
     let batches = view.hiz.cameras[0].drawn_batches as usize;
     words.chunks_exact(5).take(batches).map(|a| a[1]).collect()
 }
 
-/// `buffer`'s words, read back (it must allow `COPY_SRC`).
 pub(super) fn words(r: &Renderer, buffer: &wgpu::Buffer) -> Vec<u32> {
     let staging = r.device.create_buffer(&wgpu::BufferDescriptor {
         label: None,
@@ -87,7 +78,6 @@ fn gpu_a_wall_leaves_the_box_behind_it_undrawn_with_no_bake() {
     let (on, c) = shot(&mut r, &mut view, &scene, &cam);
     assert_eq!(c.hiz_tested, 2, "the wall and the box: {c:?}");
     assert_eq!(drawn(&r, &view).iter().sum::<u32>(), 1, "the wall alone");
-    // The count comes back without waiting: by a later frame it is in.
     let (_, c) = shot(&mut r, &mut view, &scene, &cam);
     let (_, c2) = shot(&mut r, &mut view, &scene, &cam);
     assert_eq!(c.hiz_culled.max(c2.hiz_culled), 1, "{c:?}");

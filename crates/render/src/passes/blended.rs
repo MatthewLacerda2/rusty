@@ -1,10 +1,3 @@
-//! crates/render/src/passes/blended.rs — the shape the particle and ribbon passes share
-//! (#939): a globals uniform (the ribbons bind it at their group 0, the particles
-//! at the solid path's `groups::DRAW`), and an alpha and an additive pipeline into
-//! the HDR target that test the scene depth without writing it (and into TAA's
-//! reactive mask beside it in a view running TAA, #1845; the pass opens with
-//! `taa::reactive::hdr_attachments`).
-
 use crate::gpu::layout_entries::uniform_entry;
 use crate::gpu::ops::CountedDevice as _;
 use crate::gpu::pipelines::LazyPipeline;
@@ -13,8 +6,6 @@ use crate::postfx::effects::taa;
 use crate::postfx::HDR_FORMAT;
 use rusty_components::ParticleBlend;
 
-/// A pass's globals group: one `size`-byte uniform, its layout and bind group,
-/// labelled `"{name} Globals …"`.
 pub(crate) struct Globals {
     pub(crate) layout: wgpu::BindGroupLayout,
     pub(crate) buffer: wgpu::Buffer,
@@ -22,7 +13,6 @@ pub(crate) struct Globals {
 }
 
 impl Globals {
-    /// The globals group's one entry: the uniform at binding 0.
     pub(crate) fn entries() -> [wgpu::BindGroupLayoutEntry; 1] {
         [uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT)]
     }
@@ -54,9 +44,6 @@ impl Globals {
     }
 }
 
-/// The alpha and additive pipelines of one blended pass, and their twins writing
-/// TAA's reactive mask for a view running TAA (#1845), each built the first time a
-/// frame draws with it (#985).
 pub(crate) struct BlendPipelines {
     alpha: LazyPipeline,
     additive: LazyPipeline,
@@ -65,13 +52,6 @@ pub(crate) struct BlendPipelines {
 }
 
 impl BlendPipelines {
-    /// Prepare both from `shader`'s vertex entry point `vertex.0` and its `fs_alpha` /
-    /// `fs_additive` (and the reactive twins from its `fs_alpha_reactive` /
-    /// `fs_additive_reactive`), drawing the `vertex.1` buffer, if any, into the HDR
-    /// target. Both faces are drawn, and the
-    /// scene depth is tested but never written: overlapping translucent sprites and
-    /// strips must all blend, not z-fight, and the same depth can also be bound as a
-    /// texture (soft particles).
     pub(crate) fn new(
         device: &wgpu::Device,
         label: &'static str,
@@ -110,6 +90,7 @@ impl BlendPipelines {
                     },
                     depth_stencil: Some(wgpu::DepthStencilState {
                         format: DEPTH_FORMAT,
+                        // Overlapping translucents must all blend, not z-fight.
                         depth_write_enabled: Some(false),
                         depth_compare: Some(wgpu::CompareFunction::LessEqual),
                         stencil: wgpu::StencilState::default(),
@@ -130,7 +111,6 @@ impl BlendPipelines {
         }
     }
 
-    /// The pipeline for `blend`, writing TAA's reactive mask too when `reactive`.
     pub(crate) fn pipeline_for(
         &self,
         blend: ParticleBlend,
@@ -144,7 +124,6 @@ impl BlendPipelines {
         }
     }
 
-    /// Every pipeline, built or not (#985).
     pub(crate) fn lazy(&self) -> [&LazyPipeline; 4] {
         [
             &self.alpha,
@@ -155,8 +134,6 @@ impl BlendPipelines {
     }
 }
 
-/// Additive blend (src + dst), keeping dst alpha. Sparks/fire brighten the HDR
-/// target so the bloom pass picks them up.
 pub(crate) fn additive_blend() -> wgpu::BlendState {
     wgpu::BlendState {
         color: wgpu::BlendComponent {

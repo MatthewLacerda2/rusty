@@ -1,28 +1,5 @@
-//! crates/render/src/passes/particles/gpu/ — GPU-simulated emitters (#2170):
-//! Niagara's *GPUCompute Sim* on the same emitter, with no node graph.
-//!
-//! A `Gpu` emitter's live particles are render state. The sim makes its births on
-//! the CPU and keeps its exact live count (`components::particle::GpuSim`); once
-//! per frame, never per camera, [`Renderer::step_gpu_particles`] uploads what is
-//! new of each emitter ([`emitter`]: the births into their slots, the `dt` of every
-//! step since the last upload) and runs `particles_step.wgsl`: `cs_birth` scatters
-//! the births, `cs_step` moves every particle step by step up to the sim's step.
-//! Every camera then draws the same buffer (`particles.wgsl`'s `vs_gpu`, one
-//! instance per slot, an empty slot culled), so nothing per particle is rebuilt,
-//! sorted or uploaded per camera, whether a stack's or a render texture's.
-//!
-//! **Not sorted inside an emitter.** Additive sprites sum the same in any order;
-//! alpha ones draw in slot order. Emitters still sort back to front among
-//! themselves, a `Gpu` one by where it stands (no centroid is known on the CPU).
-//!
-//! **Compute is a requirement**, not a choice made here: the renderer's other
-//! passes already bind storage buffers in the vertex stage and warm compute
-//! pipelines (the Hi-Z cull, the fog), so an adapter without them never builds a
-//! renderer. `twin` holds the CPU twins the tests hold its shaders to.
-//!
-//! **Capacity.** The sim caps a `Gpu` emitter at `GPU_MAX_PARTICLES` on every
-//! device, and that cap's buffers fit wgpu's default limits, which every device
-//! is created with (`setup::limits::device_limits`); `emitter`'s tests hold it.
+//! Not sorted inside an emitter: additive sums in any order, alpha draws in slot order.
+//! Compute and vertex-stage storage are required of the adapter; the cap's buffers fit wgpu's default limits.
 
 pub(crate) mod emitter;
 pub(crate) mod record;
@@ -45,15 +22,10 @@ use crate::Renderer;
 use rusty_components::particle::ParticleEmitterComponent;
 use rusty_scene::{Scene, SceneId};
 
-/// Renders without a draw after which an emitter's buffers are dropped: a scene
-/// nobody renders any more (a replaced one) frees its emitters.
 const IDLE_RENDERS: u32 = 600;
 
-/// Every GPU-simulated emitter's buffers, and the pipelines that step them.
 pub(crate) struct GpuParticles {
-    /// The step's group: the emitter, particles (read-write), curves, `dt`s, births.
     step_layout: wgpu::BindGroupLayout,
-    /// The draw's per-draw group: the pass globals, the emitter, particles, curves.
     pub(crate) draw_layout: wgpu::BindGroupLayout,
     birth: LazyCompute,
     step: LazyCompute,
@@ -66,8 +38,6 @@ impl GpuParticles {
         let shader = registry.load(device, "particles_step.wgsl", "GPU Particle Step Shader");
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("GPU Particle Step Pipeline Layout"),
-            // At the per-draw index, where its draw binds the emitter's group too: the
-            // two share `particles::gpu`'s declarations.
             bind_group_layouts: &groups::draw_only(&step_layout),
             immediate_size: 0,
         });
@@ -93,15 +63,12 @@ impl GpuParticles {
         }
     }
 
-    /// Both compute pipelines, built or not.
     pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 2] {
         [&self.birth, &self.step]
     }
 }
 
 impl Renderer {
-    /// Bring every visible `Gpu` emitter of `scene` to the sim, once per frame:
-    /// upload, then scatter the births and step (see the module docs).
     pub(crate) fn step_gpu_particles(&mut self, scene: &Scene) {
         let mut encoder = self
             .device
@@ -122,7 +89,6 @@ impl Renderer {
             kept.insert(id);
             let sim = &emitter.runtime.gpu;
             if !emitter.runtime.initialized {
-                // Not in Play (edit mode, or after Stop): nothing to keep.
                 gpu.emitters.remove(&key);
                 continue;
             }
@@ -140,17 +106,12 @@ impl Renderer {
             let work = buffers.upload((device, queue, &mut encoder), sim, uniform, wants);
             owed.push((key, work));
         }
-        // An emitter gone or back on the CPU frees its buffers now; another
-        // scene's after `IDLE_RENDERS` renders without it.
         let this = scene.id();
         gpu.emitters
             .retain(|k, e| (k.0 != this || kept.contains(&k.1)) && e.idle < IDLE_RENDERS);
         self.encode_gpu_steps(encoder, &owed);
     }
 
-    /// Record and submit the births' scatter and the step of each emitter in `owed`;
-    /// nothing at all when nothing is owed (a scene with no `Gpu` emitter, a
-    /// capture face, a frame whose emitters took no step and had no birth).
     fn encode_gpu_steps(
         &mut self,
         mut encoder: wgpu::CommandEncoder,
@@ -199,8 +160,6 @@ impl Renderer {
     }
 }
 
-/// `e`'s step group (`layouts.0`) and its per-draw group (`layouts.1`, with the
-/// pass `globals`), both bound at `groups::DRAW`.
 fn groups(
     device: &wgpu::Device,
     layouts: (&wgpu::BindGroupLayout, &wgpu::BindGroupLayout),
@@ -229,9 +188,6 @@ fn groups(
     (step, draw)
 }
 
-/// The step's group layout (the emitter, particles read-write, curves, `dt`s,
-/// births) and the draw's per-draw group (the pass globals, the emitter, particles,
-/// curves), both at `groups::DRAW`.
 fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayout) {
     let step_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("GPU Particle Step Layout"),
@@ -244,7 +200,6 @@ fn layouts(device: &wgpu::Device) -> (wgpu::BindGroupLayout, wgpu::BindGroupLayo
     (step_layout, draw_layout)
 }
 
-/// The step group's entries: the emitter, particles read-write, curves, `dt`s, births.
 pub(crate) fn step_layout_entries() -> [wgpu::BindGroupLayoutEntry; 5] {
     let compute = wgpu::ShaderStages::COMPUTE;
     let rw = wgpu::BindGroupLayoutEntry {
@@ -264,7 +219,6 @@ pub(crate) fn step_layout_entries() -> [wgpu::BindGroupLayoutEntry; 5] {
     ]
 }
 
-/// The draw group's entries: the pass globals, the emitter, particles, curves.
 pub(crate) fn draw_layout_entries() -> [wgpu::BindGroupLayoutEntry; 4] {
     let vertex = wgpu::ShaderStages::VERTEX;
     [
@@ -275,11 +229,6 @@ pub(crate) fn draw_layout_entries() -> [wgpu::BindGroupLayoutEntry; 4] {
     ]
 }
 
-/// Entity `id`'s emitter `e` as its uniform: its stored particles under the
-/// space they are stored in (`gpu_space`: identity for `World`, the change from
-/// its first frame with an inverse to its last for `Local`, so an emitter at
-/// scale 0 draws its particles where they last stood, as the `Cpu` path leaves
-/// them, and none collapses onto the emitter), lit where it stands.
 fn uniform_of(scene: &Scene, id: u32, e: &ParticleEmitterComponent) -> GpuEmitter {
     let frame = e.gpu_space();
     GpuEmitter::new(

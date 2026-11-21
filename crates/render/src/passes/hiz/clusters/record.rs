@@ -1,28 +1,14 @@
-//! Recording one camera's cluster cull (#2406, #2417): its three stages, one
-//! dispatch each for the whole frame, the test, then the scan, then the copy,
-//! the same whether the frame is timed (a stage a pass) or not (all three in
-//! one pass).
-
 use super::plan::Plan;
 use super::run::ClusterCull;
 use crate::timing::GpuPart;
 use crate::Renderer;
 
-/// A cluster step's own group (test, scan or copy).
 const STEP: u32 = 0;
-/// The cluster table and index pool every step shares.
 const POOL: u32 = 1;
 
-/// A dispatch dimension's limit, in workgroups (wgpu's default
-/// `max_compute_workgroups_per_dimension`).
 const MAX_DIMENSION: u32 = 65535;
 
 impl Renderer {
-    /// Record `plan`'s dispatches of `steps` (the cluster cull's sub-parts, in
-    /// order) into `pass`, each stage's group 0 and the pool's group 1;
-    /// `ready_clusters` ran first. An untimed frame passes all three steps, a
-    /// timed one a step a pass: the same dispatches, in the same order, the
-    /// timer adding only pass boundaries.
     pub(crate) fn record_clusters(
         &self,
         pass: &mut wgpu::ComputePass,
@@ -55,9 +41,6 @@ impl Renderer {
     }
 }
 
-/// `count` workgroups as a dispatch's (x, y): one row up to [`MAX_DIMENSION`],
-/// past it full rows and a second dimension, the shader flattening them back
-/// (`flat` in `hiz_clusters.wgsl`) and skipping the last row's overhang.
 pub(crate) fn workgroups(count: u32) -> (u32, u32) {
     let rows = count.div_ceil(MAX_DIMENSION).max(1);
     (count.div_ceil(rows), rows)

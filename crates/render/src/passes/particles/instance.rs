@@ -1,6 +1,6 @@
-//! crates/render/src/passes/particles/instance.rs — one emitter's particles as GPU
-//! instances (#440). Pure CPU (no GPU state), so the render-mode, flipbook, sorting
-//! and lighting rules are unit-tested without an adapter.
+//! Light lane w: 0 unlit, 1 flat ambient, 2 probe ambient. Probe irradiance is the SH DC band over π,
+//! the matte response the shader gives every light (Y00 × π is E; a matte puff reflects E/π).
+//! Alpha particles sort back to front; additive ones skip the sort.
 
 use glam::Vec3;
 
@@ -9,38 +9,31 @@ use crate::gpu::uniforms::FogUniform;
 use rusty_components::{ParticleBlend, ParticleEmitterComponent, ParticleRenderMode};
 use rusty_scene::Scene;
 
-/// Per-particle instance data uploaded to the GPU (matches `InstanceInput`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ParticleInstance {
     pub(crate) center: [f32; 3],
     pub(crate) size: f32,
-    /// Sprite rotation in the quad's plane, radians.
     pub(crate) rotation: f32,
     pub(crate) color: [f32; 4],
-    /// Stretched: unit velocity direction (xyz) and quad length (w).
     pub(crate) stretch: [f32; 4],
-    /// Lit: rgb = probe ambient; w = 0 unlit, 1 flat ambient, 2 probe ambient.
     pub(crate) light: [f32; 4],
-    /// Flipbook columns, rows, current frame; soft-fade distance.
     pub(crate) sheet: [f32; 4],
-    /// The sprite render mode (0 billboard, 1 stretched, 2 horizontal, 3 vertical).
     pub(crate) mode: u32,
-    /// TAA's reactivity (#1845): the emitter's `TaaReactive::gpu`, below 0 `Auto`.
     pub(crate) reactive: f32,
 }
 
 impl ParticleInstance {
     const ATTRIBS: [wgpu::VertexAttribute; 9] = wgpu::vertex_attr_array![
-        0 => Float32x3, // center
-        1 => Float32,   // size
-        2 => Float32,   // rotation
-        3 => Float32x4, // color
-        4 => Float32x4, // stretch
-        5 => Float32x4, // light
-        6 => Float32x4, // sheet
-        7 => Uint32,    // mode
-        8 => Float32,   // reactive
+        0 => Float32x3,
+        1 => Float32,
+        2 => Float32,
+        3 => Float32x4,
+        4 => Float32x4,
+        5 => Float32x4,
+        6 => Float32x4,
+        7 => Uint32,
+        8 => Float32,
     ];
 
     pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -52,9 +45,6 @@ impl ParticleInstance {
     }
 }
 
-/// Globals uniform: view-projection (and its inverse, to rebuild the scene surface
-/// from depth for soft particles), the camera basis for billboarding, and the camera
-/// position + scene fog (#437) the vertex stage fogs each corner with.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ParticleGlobals {
@@ -67,14 +57,12 @@ pub(crate) struct ParticleGlobals {
     pub(crate) fog: FogUniform,
 }
 
-/// Where the camera is and which way it looks — what sorting needs.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Eye {
     pub pos: Vec3,
     pub fwd: Vec3,
 }
 
-/// The shader's code for a sprite mode (`Mesh` never reaches the sprite pass).
 pub(crate) fn mode_code(mode: ParticleRenderMode) -> u32 {
     match mode {
         ParticleRenderMode::Billboard | ParticleRenderMode::Mesh => 0,
@@ -84,10 +72,6 @@ pub(crate) fn mode_code(mode: ParticleRenderMode) -> u32 {
     }
 }
 
-/// The `light` lane for an emitter: unlit, or lit by the probe field's average
-/// irradiance at `at` (the SH DC band — a puff has no normal) over π, the matte
-/// response the shader gives every other light (#807), when a probe covers it,
-/// else by the flat ambient the shader reads from the lighting uniform.
 pub(crate) fn emitter_light(
     scene: &Scene,
     emitter: &ParticleEmitterComponent,
@@ -97,8 +81,6 @@ pub(crate) fn emitter_light(
         return [0.0; 4];
     }
     match scene.probes.sample(at) {
-        // Y00 × its cosine-lobe factor π is the irradiance E every direction shares;
-        // a matte puff reflects E / π, so the two π cancel.
         Some(sh) => {
             let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8;
             [dc.x, dc.y, dc.z, 2.0]
@@ -107,9 +89,6 @@ pub(crate) fn emitter_light(
     }
 }
 
-/// One emitter's live particles as instances plus the emitter's own sort depth (its
-/// particles' centroid). Alpha-blended particles are ordered back to front; additive
-/// ones sum the same in any order, so they skip the sort.
 pub(crate) fn emitter_instances(
     emitter: &ParticleEmitterComponent,
     light: [f32; 4],

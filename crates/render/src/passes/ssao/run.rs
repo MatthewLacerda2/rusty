@@ -1,6 +1,3 @@
-//! Recording one camera's SSAO: the depth prepass, the occlusion pass, the blur and
-//! the upsample, ahead of the forward pass in the same encoder.
-
 use super::{SsaoFrame, SsaoTargets, Stage};
 use crate::draw::pass::ScenePassFrame;
 use crate::draw::record::Solids;
@@ -12,7 +9,6 @@ use crate::postfx::effects::ssil;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
-/// A depth pass's label, timestamps and depth load ([`Renderer::record_depth`]).
 pub(crate) type DepthPass<'a> = (
     &'a str,
     Option<wgpu::RenderPassTimestampWrites<'a>>,
@@ -20,8 +16,6 @@ pub(crate) type DepthPass<'a> = (
 );
 
 impl Renderer {
-    /// Record `frame`'s SSAO for `solids` into `encoder`, leaving the result in
-    /// `view.ssao` for the forward pass's scene group, and count its cost.
     pub(crate) fn record_ssao(
         &mut self,
         view: &mut RenderView,
@@ -58,12 +52,6 @@ impl Renderer {
         c.ssao_samples += u64::from(w) * u64::from(h) * u64::from(frame.plan.quality.samples);
     }
 
-    /// Record `frame`'s screen-space passes ahead of its forward pass: SSAO's
-    /// prepass, occlusion and blur, then SSIL's gather over that prepass's depth
-    /// (#1750; it draws its own without SSAO). With neither, a camera the GPU
-    /// culls whose forward pass primes still draws the prepass, which is then
-    /// only the late set over phase one's depth (#2336), and so does one under
-    /// the cull's instance floor, its few batches whole (#2338).
     pub(crate) fn record_screen_space(
         &mut self,
         view: &mut RenderView,
@@ -83,11 +71,6 @@ impl Renderer {
         }
     }
 
-    /// Count the prepass's draws of `solids`: a draw per batch it draws, with
-    /// every batched instance's triangles (as the forward pass's count), or,
-    /// when the GPU culls the camera, the late set's as its cull last read them
-    /// back (#2387; `hiz_late` counts its instances, #2336), the whole batches'
-    /// until a read has come back.
     pub(crate) fn count_prepass(&mut self, solids: Solids) {
         let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
         let draws = prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32));
@@ -95,9 +78,6 @@ impl Renderer {
         self.frame_counters.add_read_draws(draws, read.flatten());
     }
 
-    /// The forward pass's scene group for `view` under `frame`: SSIL's (with the AO
-    /// beside it) when SSIL ran this camera (#1750), else its AO when the SSAO
-    /// passes ran this camera, else the white no-AO group.
     pub(crate) fn scene_group<'a>(
         &'a self,
         view: &'a RenderView,
@@ -113,14 +93,6 @@ impl Renderer {
         }
     }
 
-    /// The solids' depth alone into `depth` (the view's, #1578), through the forward
-    /// vertex stage. A primed forward pass loads it; any other clears it. SSIL draws
-    /// it too, on a camera SSAO skips (#1750).
-    ///
-    /// A camera the GPU culls (`solids` carries its [`Culled`]) already holds its
-    /// phase one's depth there, last frame's visible set: the prepass keeps it and
-    /// draws only the late set over it ([`Culled::late`], #2336), which leaves the
-    /// depth the whole final set's would. Any other clears it and draws them all.
     pub(crate) fn record_prepass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -137,9 +109,6 @@ impl Renderer {
         self.record_depth(encoder, depth, solids, pass);
     }
 
-    /// The prepass's draw of `solids` into `depth`, loaded or cleared by `load`,
-    /// labelled and timed as given: the SSAO prepass, and GPU occlusion culling's
-    /// phase one (#1963), which draws last frame's visible instances through it.
     pub(crate) fn record_depth(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -163,7 +132,6 @@ impl Renderer {
             occlusion_query_set: None,
         });
         pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
-        // The prepass reads nothing from the scene group; the no-AO one satisfies the layout.
         pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         self.draw_solids(
             &mut pass,

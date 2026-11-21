@@ -1,7 +1,3 @@
-//! The selection outline rings what the forward pass drew (#1160): a skinned mesh in
-//! its pose, not its bind pose, and a LOD group at the level the camera shows, not
-//! LOD0. GPU tests skip with no adapter; the target choice is tested without one.
-
 use glam::{Mat4, Vec3};
 
 use super::select::outline_targets;
@@ -13,8 +9,6 @@ use rusty_components::{LodGroupComponent, LodLevel, MeshComponent, ShadowCasting
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A one-joint skinned sphere (radius 0.8) whose pose moves it by `pose`, selected
-/// at the origin.
 pub(super) fn posed_sphere(pose: Vec3) -> Scene {
     let (vertices, indices) = generate_sphere(0.8, 12, 16);
     let skin = SkinData {
@@ -40,9 +34,6 @@ pub(super) fn posed_sphere(pose: Vec3) -> Scene {
     scene
 }
 
-/// An empty group at the origin over a LOD0 box at -X and a LOD1 of two boxes at +X,
-/// a body and a hat above it. LOD0's threshold is never reached, so the camera always
-/// shows LOD1. Returns the scene and (group, LOD0, LOD1 body, LOD1 hat).
 pub(super) fn lod_switched() -> (Scene, [u32; 4]) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -67,7 +58,6 @@ pub(super) fn lod_switched() -> (Scene, [u32; 4]) {
     (scene, [group, lod0, body, hat])
 }
 
-/// The outline's horizontal centroid, in pixels right of the frame's centre.
 fn centroid_right(r: &mut crate::Renderer, scene: &Scene, tag: &str) -> f32 {
     let (count, centroid, filled) = outline_stats(&frame(r, scene, Vec3::ZERO));
     eprintln!("[outline, {tag}] {count} px, centroid {centroid:?}");
@@ -81,13 +71,11 @@ fn gpu_the_outline_follows_a_skinned_pose_and_the_shown_lod() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    // Posed 0.4 m right of its bind pose: about 10 px at this distance.
     let posed = centroid_right(&mut r, &posed_sphere(Vec3::X * 0.4), "posed");
     assert!(posed > 5.0, "the outline rings the pose, {posed} px right");
     let rest = centroid_right(&mut r, &posed_sphere(Vec3::ZERO), "rest");
     assert!(rest.abs() < 4.0, "an unposed skin rings its bind pose");
 
-    // LOD1 (+X) shows; selecting the group or the hidden LOD0 rings LOD1.
     let (mut scene, [group, lod0, ..]) = lod_switched();
     for (tag, selected) in [("group", group), ("hidden LOD0", lod0)] {
         scene.selected_entity_id = Some(selected);
@@ -104,13 +92,10 @@ fn a_lod_selection_outlines_the_level_the_camera_shows() {
     let (scene, [group, lod0, body, hat]) = lod_switched();
     let cam = Camera::new(Vec3::Z * 3.0, -90.0, 0.0);
     let lod = LodSelection::for_camera(&scene, &cam);
-    // The root and a hidden renderer stand for the whole shown level.
     assert_eq!(outline_targets(&scene, group, &lod), vec![body, hat]);
     assert_eq!(outline_targets(&scene, lod0, &lod), vec![body, hat]);
-    // A shown renderer outlines itself alone, as Unity does.
     assert_eq!(outline_targets(&scene, body, &lod), vec![body]);
     assert_eq!(outline_targets(&scene, hat, &lod), vec![hat]);
-    // The finest selection (what the static bake draws) shows LOD0 instead.
     let finest = LodSelection::finest(&scene);
     assert_eq!(outline_targets(&scene, hat, &finest), vec![lod0]);
     assert_eq!(outline_targets(&scene, lod0, &finest), vec![lod0]);
