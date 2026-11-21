@@ -11,12 +11,15 @@
 //!   as a plain string when it is not JSON (`DistanceShadowmask`);
 //! - **`option.<name>`, a player graphics option** as `Graphics.SetOption` names
 //!   it (`option.ssao=false`), written over the project's defaults, which the run
-//!   plays with no saved player choice;
+//!   plays with no saved player choice. It reaches the game rounds only: the
+//!   editor round's Scene view ignores the player's options, as Unity's does;
 //! - **`render.<switch>`, a renderer measurement switch**
 //!   (`rusty_render::RenderSwitch`: `render.shadows=false`, `render.lightmaps`,
-//!   `render.reflection_probes`, `render.clustered_lights`), handed to every
-//!   renderer the run builds through `Options::switches`: what the forward pass
-//!   reads is bound to its stand-in, no pipeline or layout changing.
+//!   `render.reflection_probes`, `render.clustered_lights`, `render.ssao`,
+//!   `render.ssil`), handed to every renderer the run builds, the editor round's
+//!   too, through `Options::switches`: what the forward pass reads is bound to its
+//!   stand-in, no pipeline or layout changing (`render::stats::switches` says what
+//!   each takes and what stays).
 //!
 //! Everything is in memory: the project's `project.rusty` is never written. A
 //! key no namespace has fails before anything runs, listing every namespace's

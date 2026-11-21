@@ -1,14 +1,11 @@
-//! Each measurement switch, and each graphics option the bench reaches beside
-//! them, takes away its own counter on a primitive scene that has every feature
-//! (a sun, a shadowing lamp, a dynamic caster, SSAO, SSIL, a lightmap page, a reflection probe) and
-//! leaves the others' as they were. A fresh renderer a case: a page or cube one
-//! case loaded stays resident, and would count in the next.
-
-use glam::{Quat, Vec3};
+//! Each measurement switch and graphics option takes away its own counter on a
+//! primitive scene with every feature, and leaves the others' as they were. A fresh
+//! renderer a case: a page or cube one case loaded stays resident.
 
 use super::{RenderSwitch, RenderSwitches};
 use crate::test_gpu::ssil;
 use crate::RenderCounters;
+use glam::{Quat, Vec3};
 use rusty_core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
@@ -38,9 +35,8 @@ fn everything() -> Scene {
         scale_offset: [1.0, 1.0, 0.0, 0.0],
     });
     let cube = crate::ibl::reflection_probes::gpu_tests::cube_file("switches.ktx2", 4, 90);
-    let probes = &mut scene.reflection_probes;
-    let probe = probes.add(Vec3::new(0.0, 1.0, -4.0), Vec3::splat(20.0));
-    probes.set_cubemap(probe, cube);
+    let probe = (scene.reflection_probes).add(Vec3::new(0.0, 1.0, -4.0), Vec3::splat(20.0));
+    scene.reflection_probes.set_cubemap(probe, cube);
     scene
 }
 
@@ -68,25 +64,32 @@ impl From<RenderCounters> for Costs {
     }
 }
 
+/// [`costs`] with every switch on but `switch`, in the Scene view when `editor`.
+fn switched(switch: RenderSwitch, editor: bool) -> Costs {
+    let mut s = RenderSwitches::ON;
+    s.set(switch, false);
+    costs(s, GraphicsOptions::default(), editor).unwrap()
+}
+
 /// The costs of [`everything`]'s second frame on a fresh renderer drawing with
-/// `switches` and `options`; `None` with no adapter.
-fn costs(switches: RenderSwitches, options: GraphicsOptions) -> Option<Costs> {
+/// `switches` and `options`, in the Scene view (which ignores them) when `editor`.
+fn costs(switches: RenderSwitches, options: GraphicsOptions, editor: bool) -> Option<Costs> {
     let mut r = ssil::renderer()?;
     (r.switches, r.graphics_options) = (switches, options);
     let (scene, mut view) = (everything(), ssil::view(&r));
     let out = view.color_target_view().unwrap();
     for _ in 0..2 {
-        r.render(&mut view, &scene, &ssil::eye(0.0), &out, false);
+        r.render(&mut view, &scene, &ssil::eye(0.0), &out, editor);
     }
     Some(r.frame_counters.into())
 }
 
 /// The costs with everything on, each checked present; `None` with no adapter.
 fn baseline() -> Option<Costs> {
-    let all = costs(RenderSwitches::ON, GraphicsOptions::default())?;
-    assert!(all.shadow_draws > 0 && all.ssao_samples > 0, "{all:?}");
-    assert!(all.ssil_samples > 0 && all.lightmap_bytes > 0, "{all:?}");
-    assert!(all.light_cluster_refs > 0, "{all:?}");
+    let all = costs(RenderSwitches::ON, GraphicsOptions::default(), false)?;
+    let counted = [all.ssao_samples, all.ssil_samples, all.lightmap_bytes];
+    let counted = counted.into_iter().chain([all.light_cluster_refs]);
+    assert!(all.shadow_draws > 0 && counted.min() > Some(0), "{all:?}");
     Some(all)
 }
 
@@ -103,45 +106,44 @@ fn gpu_each_switch_takes_away_its_own_counter_and_no_other() {
     let Some(all) = baseline() else {
         return;
     };
-    let switched = |switch| {
-        let mut s = RenderSwitches::ON;
-        s.set(switch, false);
-        costs(s, GraphicsOptions::default()).unwrap()
-    };
-    let shadowless = switched(RenderSwitch::Shadows);
+    let shadowless = switched(RenderSwitch::Shadows, false);
     assert_eq!(shadowless, all.without(|c| c.shadow_draws = 0));
-    let unbaked = switched(RenderSwitch::Lightmaps);
+    let unbaked = switched(RenderSwitch::Lightmaps, false);
     assert_eq!(unbaked, all.without(|c| c.lightmap_bytes = 0));
-    let unlit = switched(RenderSwitch::ClusteredLights);
+    let unlit = switched(RenderSwitch::ClusteredLights, false);
     assert_eq!(unlit, all.without(|c| c.light_cluster_refs = 0));
     // The array shrinks to its stand-in cube, which is not nothing.
-    let probeless = switched(RenderSwitch::ReflectionProbes);
-    let reflection_bytes = probeless.reflection_bytes;
-    assert!(
-        reflection_bytes < all.reflection_bytes,
-        "{probeless:?} {all:?}"
-    );
-    assert_eq!(
-        probeless,
-        Costs {
-            reflection_bytes,
-            ..all
-        }
-    );
+    let probeless = switched(RenderSwitch::ReflectionProbes, false);
+    let bytes = |c: Costs| c.reflection_bytes;
+    assert!(bytes(probeless) < bytes(all), "{probeless:?} {all:?}");
+    let rest = |c: Costs| c.without(|c| c.reflection_bytes = 0);
+    assert_eq!(rest(probeless), rest(all));
 }
 
 #[test]
-fn gpu_the_ssao_and_ssil_options_take_away_their_own_counter_and_no_other() {
+fn gpu_the_ssao_and_ssil_options_and_switches_take_away_their_own_counter_and_no_other() {
     let Some(all) = baseline() else {
         return;
     };
     let option_off = |option| {
         let mut o = GraphicsOptions::default();
         o.set(option, false);
-        costs(RenderSwitches::ON, o).unwrap()
+        costs(RenderSwitches::ON, o, false).unwrap()
     };
     let no_ao = option_off(GraphicsOption::Ssao);
     assert_eq!(no_ao, all.without(|c| c.ssao_samples = 0));
     let no_il = option_off(GraphicsOption::Ssil);
     assert_eq!(no_il, all.without(|c| c.ssil_samples = 0));
+    // The `ssao` and `ssil` switches take the same, in the Scene view too.
+    assert_eq!(switched(RenderSwitch::Ssao, false), no_ao);
+    assert_eq!(switched(RenderSwitch::Ssil, false), no_il);
+    let editor = costs(RenderSwitches::ON, GraphicsOptions::default(), true).unwrap();
+    assert!(
+        editor.ssao_samples > 0 && editor.ssil_samples > 0,
+        "{editor:?}"
+    );
+    let no_ao = switched(RenderSwitch::Ssao, true);
+    assert_eq!(no_ao, editor.without(|c| c.ssao_samples = 0));
+    let no_il = switched(RenderSwitch::Ssil, true);
+    assert_eq!(no_il, editor.without(|c| c.ssil_samples = 0));
 }

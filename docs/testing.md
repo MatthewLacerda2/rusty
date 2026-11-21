@@ -1499,7 +1499,9 @@ every binary's open makes them.
     `--set gpu_occlusion_culling=true` measures the GPU occlusion cull on;
   - **`option.<name>`**, a player graphics option as `Graphics.SetOption` names
     it (`option.ssao=false`, `option.ssil=false`), written over the project's
-    defaults (a bench has no saved player choice);
+    defaults (a bench has no saved player choice). It reaches **the game rounds
+    only**: the editor round's Scene view ignores the player's options, as
+    Unity's ignores PlayerPrefs, so its `editor.` rows do not move;
   - **`render.<switch>`**, a renderer measurement switch that turns off one input
     the forward pass reads by binding the stand-in it reads when the scene has
     none, so no pipeline or bind group layout changes and a build that renumbers
@@ -1508,12 +1510,15 @@ every binary's open makes them.
     | switch | what goes (forward pass) | what is read instead |
     |---|---|---|
     | `render.shadows` | the sun's cascades and the point/spot atlas tiles (group 3, bindings 0, 1, 4, 5): no shadow pass is drawn | a cascade count of 0 and no light's tile |
-    | `render.lightmaps` | the colour, direction and shadowmask pages (group 0, bindings 14, 16, 19) | the 1x1 stand-ins; each object's `lightmap_page` 0, so it is lit as unbaked, and a `Shadowmask` light's statics are drawn into its maps |
+    | `render.lightmaps` | only the bound colour, direction and shadowmask pages (group 0, bindings 14, 16, 19) | the 1x1 stand-ins; each object's `lightmap_page` 0. What stays: the bake's light modes (a `Baked` light still draws no realtime light, so what only its pages lit goes dark; a `Mixed` one keeps the mode the bake recorded), the shadowmask channels it assigned (with no mask bound, a masked light's static casters are drawn into its maps, as under Distance Shadowmask) and the light probes' SH and occlusion |
     | `render.reflection_probes` | the resident probes' cube array (group 0, binding 4) | the 1-cube stand-in; every object reads the sky's cube |
-    | `render.clustered_lights` | the point, spot and area lights in the cluster lists (group 0, bindings 8, 9) | every cluster's light range empty (the lights stay at binding 7); the decal lists stay |
+    | `render.clustered_lights` | the point, spot and area lights in the cluster lists (group 0, bindings 8, 9) | every cluster's light range empty (the lights stay at binding 7); the decal lists stay, and so do the lamps' shadow tiles in the atlas: `render.shadows` takes those |
+    | `render.ssao` | the SSAO pass, in every view (the Scene view's too) | the 1x1 white AO, as with `option.ssao=false` |
+    | `render.ssil` | the SSIL pass, in every view (the Scene view's too) | no indirect term, as with `option.ssil=false` |
 
-  Each takes `true` or `false`. The editor round takes the same overrides as the
-  game rounds. An unknown key fails before anything runs, listing every
+  Each takes `true` or `false`. The editor round takes the quality fields and
+  the switches as the game rounds do; for SSAO and SSIL in its rows, use the
+  `render.` switch. An unknown key fails before anything runs, listing every
   namespace's keys. The report prints the overrides under its title, and a
   comparison with a run of other overrides warns that the change is the
   settings' as well as the code's. `make bench-ab` takes them as `SET=`

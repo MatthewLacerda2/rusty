@@ -536,8 +536,9 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 # (up to 10 minutes, a formatter is seconds) and refused only if still there, and a run
 # that stops keeps the table of the legs that finished. SET=key=value (several, space-separated) overrides, in
 # every leg, a quality field (dotted keys with plain values), a graphics option
-# (option.<name>=false) or a renderer switch (render.shadows, render.lightmaps,
-# render.reflection_probes, render.clustered_lights =false), bisecting a GPU cost by
+# (option.<name>=false, the game rounds only) or a renderer switch (render.shadows,
+# render.lightmaps, render.reflection_probes, render.clustered_lights, render.ssao,
+# render.ssil =false; the editor round's too), bisecting a GPU cost by
 # feature (SET='a=true ssao.high.radius=1.5 render.shadows=false'), each passed quoted; a JSON object value
 # ({...}) is refused. STRESS=1 adds `make bench`'s stress yard in three legs of its own,
 # RUNS a leg (3 by default), on the same trees; with no PROJECT only the yard runs.

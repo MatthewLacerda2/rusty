@@ -142,7 +142,7 @@ impl Renderer {
     /// Whether the frame's lights cast shadows: not in a reflection probe captured
     /// without them (#1584), nor with the `shadows` measurement switch off.
     fn casts_shadows(&self) -> bool {
-        self.capture.shadows && self.switches.on(crate::RenderSwitch::Shadows)
+        self.switches.casts_shadows(self.capture.shadows)
     }
 
     /// Whether this frame's realtime shadows leave a masked light's static casters
