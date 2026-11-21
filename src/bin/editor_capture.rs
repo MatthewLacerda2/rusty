@@ -129,6 +129,12 @@ struct Source {
     tick: u64,
 }
 
+/// `--inspect-reflection-probe`'s value: a 0-based probe index.
+fn index(text: &str) -> Result<usize, String> {
+    text.parse()
+        .map_err(|e| format!("--inspect-reflection-probe wants an index, got {text:?}: {e}"))
+}
+
 fn parse(args: &[String]) -> Result<Parsed, String> {
     let mut out = "editor-capture.png".to_string();
     let (mut source, mut opts, mut picker) =
@@ -167,10 +173,7 @@ fn parse(args: &[String]) -> Result<Parsed, String> {
             "--select" => opts.select = Some(value()?),
             "--select-asset" => opts.select_asset = Some(value()?),
             "--frame" => opts.frame_selected = true,
-            "--inspect-reflection-probe" => {
-                let index = value()?.parse().map_err(|e| format!("{flag}: {e}"))?;
-                opts.inspect_reflection_probe = Some(index);
-            }
+            "--inspect-reflection-probe" => opts.inspect_reflection_probe = Some(index(&value()?)?),
             "--play" => opts.playing = true,
             "--game" => opts.tab = ViewportTab::Game,
             "--size" => (opts.width, opts.height) = parse_size(&value()?)?,

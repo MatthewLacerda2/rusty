@@ -82,7 +82,7 @@ fn a_reflection_probe_is_inspected_until_cleared_and_a_stray_index_errors() {
     assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "nil");
     run(&mut s, "Editor.InspectReflectionProbe(1)");
     assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "1");
-    let caught = "local ok, e = pcall(Editor.InspectReflectionProbe, 2); return e";
+    let caught = "local ok, e = pcall(Editor.InspectReflectionProbe, 2); return tostring(e)";
     let e = run(&mut s, caught);
     assert!(e.contains("no reflection probe 2: the scene has 2"), "{e}");
     assert_eq!(run(&mut s, "Editor.InspectedReflectionProbe()"), "1");
