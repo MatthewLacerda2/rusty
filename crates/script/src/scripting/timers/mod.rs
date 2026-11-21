@@ -22,13 +22,14 @@ pub(crate) enum Target {
 }
 
 pub(crate) enum Work {
+    /// `Invoke` / `InvokeRepeating`.
     Invoke {
         target: Target,
         interval: Option<f64>,
     },
-    Coroutine {
-        thread: RegistryKey,
-    },
+    /// A started coroutine: resume the Lua thread.
+    Coroutine { thread: RegistryKey },
+    /// A property tween.
     Tween(Box<tween::Tween>),
 }
 
