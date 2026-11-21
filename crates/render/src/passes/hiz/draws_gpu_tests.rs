@@ -16,7 +16,7 @@ use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
 /// A scene with its camera entity, AO on its volume when `ssao`.
-fn scene(ssao: bool) -> Scene {
+pub(super) fn scene(ssao: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let cam = scene.add_entity("Camera".to_string());
@@ -30,7 +30,7 @@ fn scene(ssao: bool) -> Scene {
 }
 
 /// Twelve crates, none in front of another: one batch.
-fn crates(scene: &mut Scene) {
+pub(super) fn crates(scene: &mut Scene) {
     for k in 0..12 {
         let at = Vec3::new(
             (k % 4) as f32 * 1.5 - 2.25,
@@ -48,14 +48,20 @@ fn panels(scene: &mut Scene) {
     }
 }
 
-/// The counters and pixels of a settled frame of `scene`, the cull `on` or off:
-/// enough frames that its read backs describe the view held still.
-fn settled(r: &mut Renderer, scene: &Scene, on: bool) -> (Vec<u8>, RenderCounters) {
+/// A frame's pixels and counters.
+pub(super) type Shot = (Vec<u8>, RenderCounters);
+
+/// The first `n` frames of `scene` in a new view, the cull `on` or off.
+pub(super) fn frames(r: &mut Renderer, scene: &Scene, on: bool, n: usize) -> Vec<Shot> {
     r.quality.gpu_occlusion_culling = on;
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let mut view = offscreen(r);
-    let frames = (0..6).map(|_| shot(r, &mut view, scene, &cam));
-    frames.last().expect("six frames")
+    (0..n).map(|_| shot(r, &mut view, scene, &cam)).collect()
+}
+
+/// A settled frame: enough that its read backs describe the view held still.
+pub(super) fn settled(r: &mut Renderer, scene: &Scene, on: bool) -> Shot {
+    frames(r, scene, on, 6).pop().expect("six frames")
 }
 
 /// The cull off, then on: the counters of each, asserting the pixels equal.
@@ -96,16 +102,9 @@ fn gpu_with_nothing_hidden_the_cull_draws_no_triangle_twice() {
         let late = if ssao { 0 } else { on.primed_passes };
         let split = on.cluster_draws.saturating_sub(1);
         assert_eq!(on.draw_calls, off.draw_calls + 1 + late + split, "{label}");
-        if ssao {
-            // Phase one stands in for the prepass, the late set adding nothing.
-            assert_eq!(on.triangles, off.triangles, "{label}: {off:?} {on:?}");
-        } else {
-            assert_eq!(
-                on.triangles - depth,
-                off.triangles,
-                "{label}: {off:?} {on:?}"
-            );
-        }
+        // Phase one stands in for the prepass where one runs, else adds its own.
+        let expected = off.triangles + if ssao { 0 } else { depth };
+        assert_eq!(on.triangles, expected, "{label}: {off:?} {on:?}");
     }
 }
 

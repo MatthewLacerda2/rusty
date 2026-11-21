@@ -15,7 +15,8 @@ pub struct RenderCounters {
     /// Triangles of the solid, transparent, shadow and prepass draws. A pass the
     /// GPU occlusion cull draws (its phase one, the late set, the final set, by
     /// cluster where it draws so) counts what its indirect args drew, read back
-    /// like `hiz_culled`, a frame or so late (#2387).
+    /// like `hiz_culled`, a frame or so late (#2387); every instance's, an upper
+    /// bound, until a read has come back.
     pub triangles: u64,
     /// Mesh entities drawn, summed over the camera stack.
     pub visible_entities: u32,

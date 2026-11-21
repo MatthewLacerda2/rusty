@@ -33,9 +33,10 @@ pub(crate) struct Counter {
     /// The second count the last read's words carried: the late set's drawn
     /// instances for an instance cull's (#2336), `0` for a cluster cull's.
     pub(crate) late: u32,
-    /// The triangles the last read's draws drew (#2387), by pass; none for a
+    /// The triangles the last read's draws drew (#2387), by pass; `None` until
+    /// a read has come back since the counter was made or forgotten, and for a
     /// cluster cull's.
-    pub(crate) triangles: Triangles,
+    pub(crate) triangles: Option<Triangles>,
 }
 
 /// What a read's words say: the items drawn, a second count beside them
@@ -95,7 +96,7 @@ impl Counter {
         if let Ok(read) = read {
             self.culled = tested.saturating_sub(read.drawn);
             (self.drawn, self.late) = (read.drawn, read.late);
-            self.triangles = read.triangles;
+            self.triangles = Some(read.triangles);
         }
         self.in_flight = None;
     }
@@ -111,7 +112,7 @@ impl Counter {
         }
         self.copied = false;
         (self.culled, self.drawn, self.late) = (0, 0, 0);
-        self.triangles = Triangles::default();
+        self.triangles = None;
     }
 
     /// Whether the read in flight is mapped and readable now. A refused map

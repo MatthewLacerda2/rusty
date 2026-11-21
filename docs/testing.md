@@ -1135,7 +1135,9 @@ and remove its `assets/scenes/default.scene` line from the fixture's `.seeded`
   `triangles`, `culled_entities`, `lights_dropped`, `cluster_lights_dropped`, `lights_culled`,
   `decals_visible`, `decal_cluster_refs`, the GPU occlusion counters `hiz_tested`,
   `hiz_culled`, `hiz_late`, `cluster_tested`, `cluster_culled` (all but the two tested
-  ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`), and
+  ones are read back without waiting, so they describe a frame or so earlier, `docs/api/Debug.md`;
+  so is `triangles` on a camera the cull draws: its culled passes' share is read from their
+  indirect draws), and
   the frame's GPU calls `render_passes`, `compute_passes`, `submits`,
   `bind_groups_created`, `buffer_writes` (counted through `render::gpu::ops`; a
   render-CPU fix whose timing moves inside the spread proves itself by these).
@@ -1249,7 +1251,8 @@ are a shipped game's. It is an **informational signal, never a gate**, and not i
 `make gates`: the timings are this machine's, and CI's software GPU has no timestamps
 and would make them meaningless anyway. The counts (`draw_calls`, `triangles`, …) are
 deterministic — same scene, same seeded scripts, fixed dt — so they match from run to
-run and machine to machine; the timings compare only on one machine. Without
+run and machine to machine, except the read-back ones above (`triangles` among them
+under `gpu_occlusion_culling`); the timings compare only on one machine. Without
 timestamp queries the GPU rows are absent and the report says so.
 
 `Harness.LoadStress([opts])` takes `enemies`, `lights`, `flickering`, `shadowed`,

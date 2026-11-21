@@ -125,6 +125,8 @@ mod draws_gpu_tests;
 #[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
+mod first_read_gpu_tests;
+#[cfg(test)]
 mod floor_gpu_tests;
 #[cfg(test)]
 mod floor_tests;

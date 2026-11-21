@@ -94,12 +94,13 @@ impl Layout {
 impl crate::Renderer {
     /// Count phase one's draws of `batches` (#2387): a call per batch the depth
     /// passes draw, and the `triangles` its last read back says it drew, which
-    /// `hiz_depth_triangles` keeps apart.
-    pub(super) fn count_phase_one(&mut self, batches: &OpaqueBatches, triangles: u64) {
+    /// `hiz_depth_triangles` keeps apart; until a read has come back (`None`),
+    /// the whole batches', an upper bound, so the count never dips to zero.
+    pub(super) fn count_phase_one(&mut self, batches: &OpaqueBatches, read: Option<u64>) {
+        let depth = batches.iter().filter(|b| b.key.in_prepass());
+        let draws = depth.map(|b| (b.key.indices.len(), b.instances.len() as u32));
         let c = &mut self.frame_counters;
-        c.draw_calls += batches.iter().filter(|b| b.key.in_prepass()).count() as u32;
-        c.triangles += triangles;
-        c.hiz_depth_triangles += triangles;
+        c.hiz_depth_triangles += c.add_read_draws(draws, read);
     }
 }
 

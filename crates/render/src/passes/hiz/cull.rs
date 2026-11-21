@@ -33,8 +33,9 @@ pub(crate) struct Culled {
     /// (#2336, [`Self::late`]).
     late: Option<u64>,
     /// The final draws' only: the triangles the camera's culled passes drew,
-    /// as last read back ([`drawn`](super::drawn), #2387), a frame or so late.
-    pub triangles: Triangles,
+    /// as last read back ([`drawn`](super::drawn), #2387), a frame or so late;
+    /// `None` before the first read, when the CPU's whole count stands in.
+    pub triangles: Option<Triangles>,
 }
 
 impl Culled {
@@ -237,7 +238,7 @@ impl Renderer {
             at: 0,
             clusters: None,
             late: None,
-            triangles: Triangles::default(),
+            triangles: None,
         };
         let mut culled = std::mem::take(&mut cam.culled);
         let mut draws = culled.get(key.clone(), || key.each_ref().map(make)).clone();

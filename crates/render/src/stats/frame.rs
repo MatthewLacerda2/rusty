@@ -54,8 +54,7 @@ impl Renderer {
         match culled {
             // The GPU decided what each opaque draw drew: its last read back says (#2387).
             Some(culled) => {
-                c.draw_calls += draws.count() as u32;
-                c.triangles += culled.triangles.last;
+                c.add_read_draws(draws, culled.triangles.map(|t| t.last));
                 c.cluster_draws += clustered
                     .iter()
                     .flatten()
@@ -116,10 +115,25 @@ impl RenderCounters {
     /// Add a set of indexed draws — `(num_indices, instances)` per draw call — to the
     /// counts. An instanced draw is one call but submits every instance's triangles.
     pub(crate) fn add_draws(&mut self, draws: impl IntoIterator<Item = (u32, u32)>) {
+        self.add_read_draws(draws, None);
+    }
+
+    /// Add a culled pass's `draws` (#2387): a call each, and the triangles its
+    /// GPU `read` back says they drew, or, before a read has come back, the
+    /// draws' own, every instance's (an upper bound). Returns the triangles added.
+    pub(crate) fn add_read_draws(
+        &mut self,
+        draws: impl IntoIterator<Item = (u32, u32)>,
+        read: Option<u64>,
+    ) -> u64 {
+        let mut whole = 0;
         for (indices, instances) in draws {
             self.draw_calls += 1;
-            self.triangles += u64::from(indices / 3) * u64::from(instances);
+            whole += u64::from(indices / 3) * u64::from(instances);
         }
+        let triangles = read.unwrap_or(whole);
+        self.triangles += triangles;
+        triangles
     }
 }
 

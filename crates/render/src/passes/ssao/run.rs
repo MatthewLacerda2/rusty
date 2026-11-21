@@ -86,17 +86,13 @@ impl Renderer {
     /// Count the prepass's draws of `solids`: a draw per batch it draws, with
     /// every batched instance's triangles (as the forward pass's count), or,
     /// when the GPU culls the camera, the late set's as its cull last read them
-    /// back (#2387; `hiz_late` counts its instances, #2336).
+    /// back (#2387; `hiz_late` counts its instances, #2336), the whole batches'
+    /// until a read has come back.
     pub(crate) fn count_prepass(&mut self, solids: Solids) {
         let prepass = solids.0.iter().filter(|b| b.key.in_prepass());
-        let c = &mut self.frame_counters;
-        match solids.1 {
-            Some(culled) => {
-                c.draw_calls += prepass.count() as u32;
-                c.triangles += culled.triangles.late;
-            }
-            None => c.add_draws(prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32))),
-        }
+        let draws = prepass.map(|b| (b.key.indices.len(), b.instances.len() as u32));
+        let read = solids.1.map(|culled| culled.triangles.map(|t| t.late));
+        self.frame_counters.add_read_draws(draws, read.flatten());
     }
 
     /// The forward pass's scene group for `view` under `frame`: SSIL's (with the AO
