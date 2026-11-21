@@ -1,23 +1,3 @@
-//! crates/scene/src/lighting/io.rs — the `<scene>.lighting.json` SH sidecar (and, after a
-//! `Shadowmask` bake, each probe's shadowmask occlusion beside its SH, #1695).
-//!
-//! Mirrors the scene ↔ sidecar split: the scene document stores probe POSITIONS +
-//! grid layout (human-diffable references/values); the heavy baked SH lives here, in
-//! a sidecar keyed by probe index. This keeps the `.scene` file small and readable
-//! while the regenerable SH stays out of git's way — the same rationale as not
-//! storing GPU buffers in the scene.
-//!
-//! Save writes the sidecar next to the scene (`foo.scene` → `foo.scene.lighting.json`)
-//! ONLY when probes carry baked SH, and removes it when none do; load merges it back
-//! onto the in-memory probes by index. It is half of the scene document, so a save
-//! writes it with the document, always, never by the bake files' keep-newer rule
-//! (`scene::io::BakeFiles`, #1982). The sidecar carries a key of the probe positions
-//! it was saved with ([`ProbeKey`]): one whose key disagrees with the document's
-//! probes (another process re-placed them and the document was saved over since) is
-//! refused on load with a warning, so SH never lands on the wrong probe. A missing
-//! sidecar is not an error — the probes simply load with zero SH (e.g. positions
-//! placed but never baked).
-//!
 //! stored-format: the `<scene>.lighting.json` SH sidecar
 
 use std::path::PathBuf;
@@ -27,29 +7,17 @@ use serde::{Deserialize, Serialize};
 use crate::lighting::sh::Sh9;
 use crate::Scene;
 
-/// Suffix appended to a scene path to locate its lighting sidecar.
 const LIGHTING_SIDECAR_SUFFIX: &str = ".lighting.json";
 
-/// The on-disk sidecar: the baked SH for each probe, index-aligned with the scene's
-/// `ProbeVolume::probes`. Deliberately minimal — just the coefficients.
 #[derive(Serialize, Deserialize, Default)]
 pub struct LightingData {
-    /// The probe positions this SH was baked for; `None` (a file without it) is
-    /// refused like a mismatch.
     #[serde(default)]
     pub probes: Option<ProbeKey>,
-    /// One `Sh9` per probe, in probe order. Length should match the scene's probe
-    /// count; a mismatch tolerates by merging up to the shorter length.
     pub probe_sh: Vec<Sh9>,
-    /// One shadowmask occlusion per probe (#1695, `Probe::occlusion`), in probe
-    /// order; left out when every probe is unoccluded (no `Shadowmask` bake), and
-    /// read as unoccluded when missing.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub probe_occlusion: Vec<[f32; 4]>,
 }
 
-/// What a sidecar's SH is index-aligned to: the probe count and a hash of every
-/// position's bits, in order.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProbeKey {
     pub count: usize,
@@ -57,7 +25,6 @@ pub struct ProbeKey {
 }
 
 impl ProbeKey {
-    /// The key of `scene`'s probes.
     pub fn of(scene: &Scene) -> Self {
         let probes = scene.probes.probes();
         let bits = probes.iter().flat_map(|p| p.position.to_array());
@@ -69,14 +36,12 @@ impl ProbeKey {
     }
 }
 
-/// The sidecar path for a scene path: `foo.scene` → `foo.scene.lighting.json`.
 pub fn sidecar_path(scene_path: &str) -> PathBuf {
     let mut s = scene_path.to_string();
     s.push_str(LIGHTING_SIDECAR_SUFFIX);
     PathBuf::from(s)
 }
 
-/// Pull the baked SH out of a scene's probes into a serializable sidecar.
 pub fn extract_lighting(scene: &Scene) -> LightingData {
     let probes = scene.probes.probes();
     let masked = probes.iter().any(|p| p.occlusion != glam::Vec4::ONE);
@@ -90,9 +55,6 @@ pub fn extract_lighting(scene: &Scene) -> LightingData {
     }
 }
 
-/// Apply a loaded sidecar's SH back onto the scene's probes, by index. Extra entries
-/// on either side are ignored (the shorter length wins) so a stale sidecar can't
-/// panic the load.
 pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
     for (probe, sh) in scene
         .probes
@@ -112,18 +74,11 @@ pub fn apply_lighting(scene: &mut Scene, data: &LightingData) {
     }
 }
 
-/// Write the baked PVS beside `scene_path` (`occlusion::save_sidecar`, #1714), by
-/// the bake files' rule (`scene::io::BakeFiles`, #1982), and the lighting sidecar
-/// next to it ([`save_sh_sidecar`]): a whole scene save. Errors are returned as
-/// strings, matching scene I/O.
 pub fn save_lighting_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     super::occlusion::save_sidecar(scene, scene_path)?;
     save_sh_sidecar(scene, scene_path)
 }
 
-/// Write the lighting sidecar beside `scene_path`, with the document: written when
-/// any probe is baked, removed when none is, so stale data can't linger. Generate
-/// Lighting's lighting save writes only this one; its PVS is written once baked.
 pub fn save_sh_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
     let path = sidecar_path(scene_path);
     let has_baked = (scene.probes.probes().iter())
@@ -141,26 +96,16 @@ pub fn save_sh_sidecar(scene: &Scene, scene_path: &str) -> Result<(), String> {
         .map_err(|e| format!("Failed to write lighting sidecar: {}", e))
 }
 
-/// Load the lighting sidecar for `scene_path` onto the scene's probes, if it exists
-/// and was saved for these probes, and the baked PVS beside it
-/// (`occlusion::load_sidecar`, #1714). A missing sidecar is a no-op (probes keep
-/// zero SH), and one saved for other probes is left unapplied with a warning.
-/// Returns an error only on a present-but-corrupt sidecar.
 pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), String> {
     apply_lighting_sidecar(scene, read_lighting_sidecar(scene_path))
 }
 
-/// What a load found in the lighting sidecar and the PVS beside a scene, read and
-/// parsed from the files alone ([`read_lighting_sidecar`]) and put on a scene later
-/// ([`apply_lighting_sidecar`]), so a load can do the work before it touches the
-/// live scene (#2123).
 pub struct LightingFile {
     occlusion: super::occlusion::OcclusionFile,
     path: std::path::PathBuf,
     read: Result<Option<LightingData>, String>,
 }
 
-/// Read and parse the lighting sidecar and the PVS beside `scene_path`.
 pub fn read_lighting_sidecar(scene_path: &str) -> LightingFile {
     let occlusion = super::occlusion::read_sidecar(scene_path);
     let path = sidecar_path(scene_path);
@@ -178,8 +123,6 @@ pub fn read_lighting_sidecar(scene_path: &str) -> LightingFile {
     }
 }
 
-/// Put what [`read_lighting_sidecar`] found on `scene` ([`load_lighting_sidecar`]
-/// says what each outcome loads).
 pub fn apply_lighting_sidecar(scene: &mut Scene, file: LightingFile) -> Result<(), String> {
     super::occlusion::apply_sidecar(scene, file.occlusion);
     let Some(data) = file.read? else {

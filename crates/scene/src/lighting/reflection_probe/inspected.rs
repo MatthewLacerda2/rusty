@@ -1,17 +1,7 @@
-//! The inspected reflection probe (`Scene::inspected_reflection_probe`): a probe is
-//! no entity, so the one whose card the scene inspector has open is its selection,
-//! the one whose volume the Scene view draws (Unity draws a probe's bounds on
-//! selection). The editor's card, `Editor.InspectReflectionProbe` and
-//! `editor-capture --inspect-reflection-probe` set it through [`Scene::inspect_reflection_probe`];
-//! it holds until cleared or the scene changes, and removing probes clears it, so
-//! another probe never takes the removed one's place.
-
 use super::ReflectionProbeSet;
 use crate::Scene;
 
 impl Scene {
-    /// Make probe `index` the inspected one, as opening its card does; an index
-    /// past the probes is refused, with why, and changes nothing.
     pub fn inspect_reflection_probe(&mut self, index: usize) -> Result<(), String> {
         let count = self.reflection_probes.len();
         if index >= count {
@@ -23,7 +13,6 @@ impl Scene {
         Ok(())
     }
 
-    /// Remove probe `index` (a no-op past the probes), clearing the inspected one.
     pub fn remove_reflection_probe(&mut self, index: usize) {
         if index < self.reflection_probes.len() {
             self.inspected_reflection_probe = None;
@@ -31,8 +20,6 @@ impl Scene {
         self.reflection_probes.remove(index);
     }
 
-    /// Put `set` in place of the probes (a bake's placement): the inspected one
-    /// stays so while `set` holds a probe where it was, at its index.
     pub fn replace_reflection_probes(&mut self, set: ReflectionProbeSet) {
         let at = |s: &ReflectionProbeSet, i: usize| s.probes.get(i).map(|p| p.position);
         let kept = |&i: &usize| at(&set, i) == at(&self.reflection_probes, i);
@@ -40,7 +27,6 @@ impl Scene {
         self.reflection_probes = set;
     }
 
-    /// Drop every probe, and with them the inspected one.
     pub fn clear_reflection_probes(&mut self) {
         self.reflection_probes.clear();
         self.inspected_reflection_probe = None;
@@ -89,7 +75,6 @@ mod tests {
         assert_eq!(scene.inspected_reflection_probe, None);
     }
 
-    /// A bake's placement keeps the inspected probe only where it kept the probe.
     #[test]
     fn a_new_placement_keeps_the_inspected_probe_only_where_it_stayed() {
         let mut scene = three();

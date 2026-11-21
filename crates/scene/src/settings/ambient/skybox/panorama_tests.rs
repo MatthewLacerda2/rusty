@@ -1,13 +1,9 @@
-//! A panorama past `ROWS` rows is summed in blocks (#1675), and lights as the same
-//! sky at `ROWS` rows projected texel by texel.
-
 use glam::Vec3;
 
 use super::{blocks, decodes, project, radiance, ROWS};
 use crate::AmbientRadiance;
 use rusty_core::fs::written;
 
-/// A smooth sky, red at the top fading toward the bottom, warmer to the east (+x).
 fn smooth(w: u32, h: u32) -> image::RgbaImage {
     image::RgbaImage::from_fn(w, h, |x, y| {
         let east = (std::f32::consts::TAU * x as f32 / w as f32).cos() * -40.0;
@@ -29,8 +25,6 @@ fn a_large_panorama_projects_in_blocks_as_a_small_one_does_texel_by_texel() {
     assert!(blocks.at(Vec3::X).x > blocks.at(Vec3::NEG_X).x + 0.02);
 }
 
-/// A panorama that fails to decode is decoded once, not on every frame, and a
-/// changed sidecar (Max Size) re-projects the same bytes (#1675).
 #[test]
 fn the_memo_keeps_failures_and_follows_the_sidecar() {
     use rusty_asset::sidecar::{self, ImportSettings};
@@ -54,8 +48,6 @@ fn the_memo_keeps_failures_and_follows_the_sidecar() {
     assert_eq!(decodes(), before + 3, "a new Max Size re-projects");
 }
 
-/// The per-row weight table sums the same bits as the weight evaluated per texel,
-/// on a panorama of many rows in many blocks.
 #[test]
 fn the_row_table_weighs_every_texel_as_its_own_cosines_do() {
     use std::f32::consts::PI;
@@ -81,13 +73,10 @@ fn the_row_table_weighs_every_texel_as_its_own_cosines_do() {
     assert_eq!(bits(&blocks(w, h, sky.as_raw(), side)), bits(&per_texel));
 }
 
-/// The SH's red DC term: what tells a red sky from a blue one.
 fn red(sh: Option<crate::Sh9>) -> Option<f32> {
     sh.map(|sh| sh.coeffs[0][0] - sh.coeffs[0][2])
 }
 
-/// A remembered panorama costs no file access: its file and sidecar can go
-/// unnoticed until the write log names one of them.
 #[test]
 fn a_remembered_panorama_reads_no_file_until_a_write_is_noted() {
     let sky = rusty_test_support::panorama::fixture("kept.png", [200, 0, 0], [200, 0, 0], 0);

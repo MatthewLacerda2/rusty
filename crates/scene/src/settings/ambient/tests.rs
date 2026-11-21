@@ -1,6 +1,3 @@
-//! The ambient source (#1647): the drawn rule and the radiance function. Its
-//! save and load is `rusty_edit`'s `base_tests::settings::ambient`.
-
 use glam::Vec3;
 
 use super::*;
@@ -70,8 +67,6 @@ fn the_hemisphere_fades_to_a_quarter_and_the_trilight_meets_each_colour() {
     assert_eq!(tri.scaled(2.0).at(Vec3::Y), sky * 2.0);
 }
 
-/// The gradient's default colours are the default hemisphere's top, middle and
-/// bottom, so switching the default scene to Gradient lights it the same.
 #[test]
 fn the_default_gradient_lights_as_the_default_colour() {
     let mut scene = Scene::new();
@@ -83,9 +78,6 @@ fn the_default_gradient_lights_as_the_default_colour() {
     }
 }
 
-/// `incoming`'s cosine average over the hemisphere around a normal is `at` (exactly
-/// for the hemisphere, up to L2 for the trilight), by a fine quadrature with no
-/// noise, so the trace's and the probe fill's own tests only add their sampling.
 #[test]
 fn the_incoming_radiance_cosine_averages_to_the_unbaked_ambient() {
     let average = |r: &AmbientRadiance, n: Vec3| {
@@ -113,6 +105,5 @@ fn the_incoming_radiance_cosine_averages_to_the_unbaked_ambient() {
         assert!(average(&tri, n).abs_diff_eq(tri.at_l2(n), 2e-3), "{n}");
         assert!(hemi.at_l2(n).abs_diff_eq(hemi.at(n), 1e-6), "{n}");
     }
-    // The L2 cut softens the trilight's horizon kink, and no more than that.
     assert!(tri.at_l2(Vec3::Y).abs_diff_eq(tri.at(Vec3::Y), 0.15));
 }

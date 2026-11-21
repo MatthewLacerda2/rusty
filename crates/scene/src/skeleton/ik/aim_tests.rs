@@ -1,11 +1,7 @@
-//! The aim-chain solver (#461): aims at the target, spreads the turn by weight,
-//! clamps at its limit, weight 0 is a no-op.
-
 use glam::{Quat, Vec3};
 
 use super::{solve_aim, AimSettings, BonePose};
 
-/// A three-bone spine up +Y (spine, neck, head), every bone looking +Z.
 fn spine() -> Vec<BonePose> {
     (0..3)
         .map(|i| BonePose {
@@ -25,7 +21,6 @@ fn settings(clamp_degrees: f32, weight: f32) -> AimSettings<'static> {
     }
 }
 
-/// The head's new aim and position after the chain takes `rots`.
 fn head(chain: &[BonePose], rots: &[Quat]) -> (Vec3, Vec3) {
     let mut pos = chain[0].pos;
     for i in 1..chain.len() {
@@ -79,7 +74,7 @@ fn the_aim_clamps_at_its_limit() {
 #[test]
 fn weight_scales_the_turn_and_zero_is_a_no_op() {
     let chain = spine();
-    let target = Vec3::new(5.0, 0.6, 0.0); // 90° to the side of the head
+    let target = Vec3::new(5.0, 0.6, 0.0);
     assert_eq!(solve_aim(&chain, target, settings(180.0, 0.0)), None);
     let rots = solve_aim(&chain, target, settings(40.0, 0.5)).unwrap();
     let turned = head(&chain, &rots).0.angle_between(Vec3::Z).to_degrees();

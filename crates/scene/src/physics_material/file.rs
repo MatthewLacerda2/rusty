@@ -1,28 +1,20 @@
-//! crates/scene/src/physics_material/file.rs — a physics material asset's file: plain
-//! JSON of `PhysicsMaterial`'s four fields, as the scene document stores the
-//! inline one. A missing field reads as its default; a value out of range is
-//! clamped, as `Physics.SetPhysicsMaterial` clamps it.
-//!
 //! stored-format: the `.physmat` physics material asset
 
 use std::path::Path;
 
 use rusty_components::PhysicsMaterial;
 
-/// Parse an asset file's text.
 pub fn parse(text: &str) -> Result<PhysicsMaterial, String> {
     let m: PhysicsMaterial = serde_json::from_str(text).map_err(|e| e.to_string())?;
     sanitized(m)
 }
 
-/// The asset file's text for `material`.
 pub fn to_json(material: &PhysicsMaterial) -> String {
     let mut text = serde_json::to_string_pretty(material).unwrap_or_default();
     text.push('\n');
     text
 }
 
-/// `m` with its coefficients clamped into range; an error on a non-finite one.
 pub(super) fn sanitized(m: PhysicsMaterial) -> Result<PhysicsMaterial, String> {
     if !m.friction.is_finite() || !m.bounciness.is_finite() {
         return Err("friction and bounciness must be finite".into());

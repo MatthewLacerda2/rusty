@@ -1,15 +1,7 @@
-//! A load that moves incoming ids out of the survivors' way renames them in every
-//! saved field keyed by entity (`runtime::renumber::RENUMBERED`), in the document
-//! pass or once its separate file is in: the inventory names which fields those
-//! are, so a new one the renumbering skips fails here. The renumbering itself is
-//! tested through the load (`rusty_edit::load::renumber_tests`).
-
 use super::inventory::fields;
 use super::{Class, Field, Keyed};
 use crate::runtime::renumber::{Pass, RENUMBERED};
 
-/// What disagrees between the fields a load reads entity ids into (saved and
-/// keyed by entity) and the ones `renumbered` follows.
 fn disagreements(fields: &[Field], renumbered: &[&str]) -> Vec<String> {
     let owed: Vec<&str> = fields
         .iter()

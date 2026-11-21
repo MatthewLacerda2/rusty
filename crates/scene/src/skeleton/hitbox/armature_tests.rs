@@ -1,9 +1,3 @@
-//! Hitboxes and a ragdoll on a Blender export (#1822): the mini humanoid's mesh
-//! moved under an `Armature` turned +90° about X and scaled 0.01, its own space
-//! Z-up centimetres, the world geometry unchanged. The hitboxes and the joints
-//! come out as they do on the plain rig: sizes are read in model units, and the
-//! ragdoll's front is the model's, not the mesh's own +Z (pointing down).
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Mat4, Quat, Vec3};
@@ -14,8 +8,6 @@ use crate::skeleton::RagdollOptions;
 use crate::Scene;
 use rusty_components::{MeshComponent, TransformComponent};
 
-/// The mini humanoid with its mesh under `armature`: mesh-local data is the
-/// plain rig's through `armature⁻¹`, so the world sees the same body.
 fn exported(scene: &mut Scene, armature: Mat4) -> u32 {
     let into = armature.inverse();
     let mut skin = skin(1.0);
@@ -40,8 +32,6 @@ fn exported(scene: &mut Scene, armature: Mat4) -> u32 {
     id
 }
 
-/// Per bone, in joint order: (name, hitbox shape, joint axis and swing axis
-/// in world space).
 fn ragdoll_of(scene: &mut Scene, owner: u32) -> Vec<(String, String, Vec3, Vec3)> {
     scene
         .generate_hitboxes(owner, &HitboxOptions::default())
