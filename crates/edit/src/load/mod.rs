@@ -8,14 +8,21 @@
 //! them. An incoming entity whose id a survivor already holds is moved to a fresh id
 //! instead (`make_room`), its references rewritten with it through the one id-field
 //! walk; a survivor's references to the entities left behind are cleared through the
-//! same walk, and the level's baked PVS renames its objects with the moves (#1714).
+//! same walk. What the document keys by entity id outside its entities (the
+//! selection, the lightmaps) is renamed in the same pass and forgets the survivors'
+//! ids; the baked PVS, a separate file, follows once it is in
+//! (`rusty_scene::runtime::renumber`).
 
 pub mod prepare;
 
 #[cfg(test)]
 mod load_tests;
 #[cfg(test)]
+mod renumber_tests;
+#[cfg(test)]
 mod repin_tests;
+#[cfg(test)]
+mod stale_ids_tests;
 #[cfg(test)]
 mod swap_refs_tests;
 
@@ -24,6 +31,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::serialize::apply_rehydrated;
 use prepare::PreparedScene;
 use rusty_components::EntityRefs;
+use rusty_scene::runtime::renumber::Moves;
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{Entity, MaterialAsset, Scene};
 
@@ -102,26 +110,8 @@ pub fn swap_in_prepared(
     scene.renew_id();
     rusty_scene::nav_settings::apply_navmesh(scene, sidecars.navmesh);
     let loaded = rusty_scene::lighting::io::apply_lighting_sidecar(scene, sidecars.lighting);
-    remap_occlusion(scene, &moved);
+    scene.renumber_sidecars(&moved);
     loaded
-}
-
-/// The baked PVS was baked against the file's ids: rename the objects
-/// `make_room` moved, so a carried entity never turns the level's culling off.
-fn remap_occlusion(scene: &mut Scene, moved: &BTreeMap<u32, u32>) {
-    if moved.is_empty() {
-        return;
-    }
-    let Some(data) = scene.occlusion.as_deref() else {
-        return;
-    };
-    let remapped = data.remap(moved);
-    if remapped.is_none() {
-        log::warn!(
-            "[Occlusion] the bake's ids collide after the load: nothing is occlusion-culled"
-        );
-    }
-    *scene.occlusion = remapped.map(std::sync::Arc::new);
 }
 
 /// The library meshes (#2059) `carried` use (a Mesh, or a Mesh collider's kept
@@ -137,35 +127,24 @@ fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_librar
 
 /// Move every incoming entity whose id is in `taken` to a fresh id past both the
 /// document's ids and `taken`, in document order (so the result is a pure function of
-/// the inputs), rewriting parent, child and component references to match. Returns
-/// the moves, old id → new.
-pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> BTreeMap<u32, u32> {
-    let mut next = data
-        .entities
-        .iter()
-        .map(|e| e.id + 1)
-        .chain(taken.iter().map(|&id| id + 1))
-        .fold(data.next_entity_id, u32::max);
-    let mut moved = BTreeMap::new();
-    for entity in &data.entities {
-        if taken.contains(&entity.id) {
-            moved.insert(entity.id, next);
-            next += 1;
+/// the inputs, `Moves::out_of_the_way`), rewriting parent, child and component
+/// references to match, and what else the document keys by entity id with them
+/// (`Moves::rename_document`), so the World and those fields agree throughout the
+/// apply. The PVS, read from its own file, follows after (`Scene::renumber_sidecars`).
+pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> Moves {
+    let moves = Moves::out_of_the_way(data, taken);
+    data.next_entity_id = moves.next_id();
+    if !moves.is_empty() {
+        let remap = |id: u32| moves.to(id);
+        for entity in &mut data.entities {
+            entity.id = remap(entity.id);
+            entity.parent_id = entity.parent_id.map(remap);
+            for child in &mut entity.children {
+                *child = remap(*child);
+            }
+            entity.remap_refs(&|r| Some(remap(r)));
         }
     }
-    data.next_entity_id = next;
-    if moved.is_empty() {
-        return moved;
-    }
-    let remap = |id: u32| moved.get(&id).copied().unwrap_or(id);
-    for entity in &mut data.entities {
-        entity.id = remap(entity.id);
-        entity.parent_id = entity.parent_id.map(remap);
-        for child in &mut entity.children {
-            *child = remap(*child);
-        }
-        entity.remap_refs(&|r| Some(remap(r)));
-    }
-    data.selected_entity_id = data.selected_entity_id.map(remap);
-    moved
+    moves.rename_document(data);
+    moves
 }
