@@ -25,12 +25,10 @@ fn a_list_is_handed_whole_while_its_switch_is_on_and_empty_once_it_is_off() {
 
 #[test]
 fn the_lightmaps_switch_takes_every_page_list_and_no_other_switch_does() {
-    let set = LightmapSet {
-        pages: vec!["c.ktx2".into()],
-        directions: vec!["d.ktx2".into()],
-        masks: vec!["m.ktx2".into()],
-        ..LightmapSet::default()
-    };
+    let mut set = LightmapSet::default();
+    set.pages = vec!["c.ktx2".into()];
+    set.directions = vec!["d.ktx2".into()];
+    set.masks = vec!["m.ktx2".into()];
     let whole = [&set.pages[..], &set.directions[..], &set.masks[..]];
     assert_eq!(RenderSwitches::ON.lightmap_lists(&set), whole);
     let none: [&[String]; 3] = [&[]; 3];
