@@ -86,6 +86,13 @@ gates: $(SELF_CHECKS) $(GATES) ## Everything CI blocks on, fastest-failing first
 quick-gates: $(SELF_CHECKS) $(QUICK_GATES) ## The seconds-long gates and self-checks (all but HEAVY_GATES)
 	@echo "quick-gates: all green"
 
+# A `Round:` session's gates (#2452): quick-gates, then only the heavy gates and
+# crate tests the branch's diff against origin/main can break; a change it cannot
+# place runs `make gates`. Its last line goes in the PR. ARGS=--plan runs nothing.
+.PHONY: round-gates
+round-gates: ## A review round's gates: quick-gates plus what the diff touches; ARGS=--plan prints the plan
+	@python3 .github/scripts/round_gates.py $(ARGS)
+
 check: target-dir fmt size ## Fast edit loop: formatting, size gate, dev-feature clippy
 	cargo clippy --all-targets --features dev
 
