@@ -45,10 +45,10 @@ impl PhysicsWorld {
         };
         self.sync_layers(scene, layer);
         self.sync_sensors(scene, collider);
-        // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &named.every);
         self.sync_mesh_shapes(scene, reshaped.as_ref());
         self.sync_fits(scene, &named.fits);
+        // After every pass that changes a volume it reads: a sensor, a capsule, a shape.
         self.sync_masses(scene, &named.every);
         let owners = match named.every {
             Owners::All => Owners::All,
@@ -82,7 +82,6 @@ impl PhysicsWorld {
             .collect()
     }
 
-    /// Static and kinematic bodies keep their transform (no world<->local round-trip drift).
     pub(super) fn sync_from_rapier(
         &self,
         scene: &mut Scene,
@@ -101,6 +100,7 @@ impl PhysicsWorld {
                 continue;
             }
             let below = scene.world.self_and_descendants(owner).skip(1);
+            // Only later owners: the full pass, ascending, never rewrites an earlier one.
             queue.extend(below.filter(|&d| d > owner && self.plan.contains_key(&d)));
         }
     }

@@ -1,7 +1,6 @@
 //! A zero-length step before the first real one must skip rapier's pipeline: its islands bootstrap
-//! on the first step with time in it. Only the sync, query placement and write-back run. In release
-//! builds a panic in the pipeline is caught and the world rebuilt from the scene; with
-//! `debug_assertions` it propagates.
+//! on the first step with time in it. A pipeline panic rebuilds the world from the scene, except
+//! with `debug_assertions`, where it propagates so a rebuild never hides a new case.
 
 use rapier3d::prelude::Collider;
 
@@ -68,6 +67,7 @@ impl PhysicsWorld {
         std::panic::catch_unwind(run).map_err(|payload| panic_message(payload.as_ref()))
     }
 
+    /// Keeps the joints' built frames and last tick's pairs, so no enter repeats.
     pub(super) fn recover(&mut self, scene: &Scene, message: String) -> PhysicsEvents {
         let mut fresh = Self::from_scene(scene);
         fresh.keep_joint_frames(&self.joints);
@@ -100,7 +100,7 @@ fn panic_message(payload: &(dyn std::any::Any + Send)) -> String {
 }
 
 impl PhysicsWorld {
-    /// Force a panic in the next step and catch it as a release build does.
+    /// Test hook for `app`'s play tests: the next step panics, caught as in a release build.
     #[doc(hidden)]
     pub fn force_caught_panic(&mut self) {
         self.recovery.catch = true;

@@ -27,9 +27,8 @@ pub(super) fn narrow_phase() -> NarrowPhase {
     NarrowPhase::with_query_dispatcher(Rolling::default().chain(DefaultQueryDispatcher))
 }
 
-/// A cylinder's collider. On a dynamic body it is the same cylinder as a
-/// `RoundCylinder` with no rounding, the mark [`Rolling`] gives a side hull; on
-/// a static or kinematic one it is the exact `Cylinder`.
+/// On a dynamic body a `RoundCylinder` with no rounding, [`Rolling`]'s mark for a side hull, which
+/// nothing else builds; else the exact `Cylinder`.
 pub(crate) fn cylinder(half_height: Real, radius: Real, dynamic: bool) -> ColliderBuilder {
     if dynamic {
         ColliderBuilder::round_cylinder(half_height, radius, 0.0)
@@ -38,9 +37,8 @@ pub(crate) fn cylinder(half_height: Real, radius: Real, dynamic: bool) -> Collid
     }
 }
 
-/// Recycled contacts (kept while shapes barely move) fed energy into rolling bodies: a rolling
-/// cylinder or capsule on a dynamic body asks for a solver-contact hook the world never acts on,
-/// which keeps its pairs out of recycling.
+/// Recycled contacts fed energy into rolling bodies: a cylinder or capsule on a dynamic body asks
+/// for a solver-contact hook the world never acts on, which keeps its pairs out of recycling.
 pub(crate) fn rolling(
     collider: ColliderBuilder,
     shape: &ColliderShape,
@@ -89,6 +87,7 @@ impl PersistentQueryDispatcher<ContactManifoldData, ContactData> for Rolling {
         );
         let s1: &dyn Shape = hull1.as_deref().map_or(g1, |h| h);
         let s2: &dyn Shape = hull2.as_deref().map_or(g2, |h| h);
+        // Fresh points every tick: a reused point lags a rolling body and spins it up.
         for manifold in manifolds.iter_mut() {
             manifold.mark_shapes_deformed();
         }

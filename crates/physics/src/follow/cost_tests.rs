@@ -90,6 +90,7 @@ fn a_rewound_world_and_a_new_hitbox_walk_again() {
     let rig = rig(&mut scene, true);
     let mut physics = PhysicsWorld::from_scene(&scene);
     tick(&mut physics, &mut scene);
+    // As an Undo, a scene load and Play's restore do.
     scene.world.rewind_changes();
     tick(&mut physics, &mut scene);
     assert_eq!(walks(&physics), 2, "a Rebuild walks");

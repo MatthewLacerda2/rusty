@@ -14,6 +14,7 @@ use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
+/// Kilograms: the lightest mass a body takes, so a zero never divides.
 const MIN_MASS: f32 = 1.0e-4;
 
 pub(super) fn body_type(snap: &EntityBodyState) -> RigidBodyType {
@@ -84,6 +85,7 @@ impl PhysicsWorld {
                 if !self.colliders.get(handle).is_some_and(differs) {
                     continue;
                 }
+                // A failed rebuild keeps the old shape but takes the new stamp, so it warns once.
                 let built = refit(scene, *id, dynamic);
                 if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {
                     if let Some(built) = built {
@@ -115,6 +117,7 @@ impl PhysicsWorld {
             }
             for (handle, volume) in parts {
                 let target = mass * volume / total;
+                // Relative slack: float noise in the share must not borrow the collider each step.
                 let differs =
                     |c: &Collider| (c.mass() - target).abs() > target.max(MIN_MASS) * 1.0e-4;
                 if let Some(c) = collider_to_write(&mut self.colliders, handle, differs) {

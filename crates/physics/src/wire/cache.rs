@@ -1,7 +1,8 @@
-//! CharacterController, the world scale (within a relative 1e-5, so a turning
-//! parent's float noise is no change) and whether its body is dynamic (a concave
-//! fell behind, another scene) forgets every wire. A mesh physics refuses is kept
-//! as refused, so its warning is logged once per change, not once per frame.
+//! A wire is built again when what physics builds its shape from moves: the Collider, the
+//! entity's Mesh or CharacterController, the world scale (within a relative 1e-5, so a turning
+//! parent's float noise is no change) and whether its body is dynamic (a concave mesh is
+//! decomposed on one). A log that cannot say (a load, an Undo, another scene) forgets every wire.
+//! A mesh physics refuses is kept as refused, so its warning is logged once per change.
 
 use std::collections::BTreeMap;
 
@@ -85,6 +86,7 @@ impl WireCache {
         self.wires.get(&id)?.1.as_ref()
     }
 
+    /// Test hook for this crate's cache tests: wires built since the cache was made.
     pub fn builds(&self) -> u64 {
         self.builds
     }
@@ -94,7 +96,7 @@ const SCALE_TOLERANCE: f32 = 1e-5;
 
 fn same_scale(a: Vec3, b: Vec3) -> bool {
     if a.to_array().map(f32::to_bits) == b.to_array().map(f32::to_bits) {
-        return true; // a NaN scale too: refused once, not every frame
+        return true; // a NaN scale too
     }
     let size = a.abs().max(b.abs()).max(Vec3::splat(f32::MIN_POSITIVE));
     ((a - b).abs()).cmple(size * SCALE_TOLERANCE).all()

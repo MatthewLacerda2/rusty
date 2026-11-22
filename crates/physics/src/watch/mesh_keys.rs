@@ -46,6 +46,7 @@ pub(crate) fn record(keys: &mut MeshKeys, scene: &Scene, ids: &[u32]) {
     }
 }
 
+/// 64-bit FNV-1a (its offset and prime) over the positions' bits, a separator, then the indices.
 fn fingerprint(positions: &[[f32; 3]], indices: &[u32]) -> u64 {
     let words = positions.iter().flatten().map(|x| x.to_bits());
     let words = words.chain([u32::MAX]).chain(indices.iter().copied());
@@ -93,6 +94,7 @@ impl PhysicsWorld {
         }
     }
 
+    /// Swaps the fit stamp too, so `sync_fits` after it finds the fit current.
     fn rebuild_mesh_shape(&mut self, scene: &Scene, owner: u32, id: u32) {
         let Some(&body) = self.id_to_body.get(&owner) else {
             return;

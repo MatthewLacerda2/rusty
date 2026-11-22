@@ -28,7 +28,6 @@ pub struct PhysicsWorld {
     pub(super) colliders: ColliderSet,
     pub(super) impulse_joints: ImpulseJointSet,
     pub(super) multibody_joints: MultibodyJointSet,
-    /// rapier's soft bodies; rusty has none, but the step takes the set.
     pub(super) soft_bodies: SoftBodySet,
     ccd_solver: CCDSolver,
     pub(super) plan: BodyPlan,
@@ -36,8 +35,7 @@ pub struct PhysicsWorld {
     pub(super) body_to_id: Map<RigidBodyHandle, u32>,
     pub(super) collider_to_id: Map<ColliderHandle, u32>,
     pub(super) id_to_collider: ColliderIds,
-    /// Last tick's trigger-overlap pairs. Starts empty, so a play session's first overlapping tick
-    /// is an "enter".
+    /// Starts empty, so a session's first overlapping tick is an enter.
     pub(super) prev_triggers: Vec<(u32, u32)>,
     pub(super) prev_collisions: Vec<(u32, u32)>,
     pub(super) joints: JointMap,
@@ -80,6 +78,7 @@ impl PhysicsWorld {
         world.build_bodies(scene);
         world.resync_joints(scene);
         world.sync_enabled(scene, &Owners::All);
+        // Primed so a raycast works before the first step.
         let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
         world.refresh_query_tree(&all);
         world
@@ -141,6 +140,7 @@ impl PhysicsWorld {
         }
         self.recovery.bootstrapped |= dt > 0.0;
         self.recovery.panics_in_a_row = 0;
+        // Awake before or after: rapier never moves a body asleep on both sides.
         let mut stepped = awake_before;
         stepped.extend(self.awake_owners());
         self.tracked.stepped.clone_from(&stepped);
@@ -190,7 +190,8 @@ impl PhysicsWorld {
         let Some(body) = body.filter(|_| self.plan.contains_key(&owner)) else {
             return false;
         };
-        // A kinematic body ended the step where its Transform put it.
+        // Only a dynamic pose is the solver's; writing a kinematic one back adds world↔local
+        // rounding.
         let mut moved = false;
         if body.is_dynamic() {
             let (pos, rot) = from_pose(body.position());

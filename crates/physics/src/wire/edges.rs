@@ -3,6 +3,7 @@ use glam::Vec3;
 use rusty_components::{CapsuleAxis, ScaledShape};
 use rusty_core::collections::Set;
 
+/// Segments in a full circle.
 const CIRCLE: usize = 32;
 
 pub(super) fn primitive(shape: ScaledShape) -> Vec<[Vec3; 2]> {
