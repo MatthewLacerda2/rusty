@@ -102,6 +102,7 @@ pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
     on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 
+/// Call after `motion.begin`: it reads this frame's cut from the motion history.
 pub(crate) fn begin(
     view: &mut RenderView,
     device: &wgpu::Device,

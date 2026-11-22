@@ -135,6 +135,7 @@ pub(crate) enum LdrRun {
     InPlace(
         fn(&mut super::PostFx, Gpu, &mut wgpu::CommandEncoder, &super::PostFxContext, &EffectCx),
     ),
+    /// Told whether it is last; true means it wrote `ctx.output` and the chain skips its copy.
     MayEnd(
         fn(
             &mut super::PostFx,
@@ -145,6 +146,7 @@ pub(crate) enum LdrRun {
             bool,
         ) -> bool,
     ),
+    /// Drawn after every other LDR pass, into `ctx.output`; a second one replaces the first.
     Finish(fn(&super::PostFx) -> &wgpu::RenderPipeline),
 }
 

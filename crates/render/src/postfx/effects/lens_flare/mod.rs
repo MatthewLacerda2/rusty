@@ -49,6 +49,7 @@ pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     if !blooms || !cx.runs(EFFECT.gate, f.active) {
         return None;
     }
+    // `f32::max` turns a hand-edited NaN into 0, where `clamp` would keep it.
     let strength = |s: f32| s.max(0.0);
     let intensity = strength(f.intensity);
     let tint = f.tint.map(|c| c.clamp(0.0, 1.0) * intensity);

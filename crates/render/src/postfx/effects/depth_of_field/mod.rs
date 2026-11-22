@@ -142,6 +142,7 @@ impl DofTargets {
 type Step<'a> = (&'a LazyPipeline, [&'a wgpu::TextureView; 4], &'a PfxTarget);
 
 impl DofTargets {
+    /// In order. A slot a pass does not read holds a texture it does not write, never its target.
     fn plan<'a>(
         &'a self,
         passes: &'a DofPasses,

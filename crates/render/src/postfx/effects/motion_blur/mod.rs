@@ -164,6 +164,7 @@ impl PostFx {
                 ],
             })
         };
+        // Each pass reads the one before at binding 3; the first binds a texture it does not write.
         let steps = [
             (&passes.tile_max_x, &tiles.neighbor_max, &tiles.rows),
             (&passes.tile_max_y, &tiles.rows, &tiles.tile_max),
