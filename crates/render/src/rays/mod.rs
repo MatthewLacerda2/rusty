@@ -27,8 +27,8 @@ use top::Placed;
 /// `rt::trace`'s bind group index.
 pub const GROUP: u32 = 3;
 
-/// One scene's tree, rebuilt after a static object's `touch` or a change of the active
-/// cameras' layers. A mesh's tree lives while its `GpuMesh` does, at its revision.
+/// Rebuilt after a static object's `touch` or the active cameras' layers change. A
+/// mesh's tree lives while its `GpuMesh` does, at its revision.
 #[derive(Default)]
 pub struct RayTree {
     meshes: BTreeMap<MeshHandle, (MeshRevision, MeshTree)>,
@@ -110,16 +110,7 @@ impl RayTree {
             let Some(p) = Placed::of(o) else {
                 continue;
             };
-            if let Entry::Vacant(slot) = self.meshes.entry(o.mesh) {
-                let Some(revision) = resident(o.mesh) else {
-                    continue;
-                };
-                let mesh = scene.world.mesh(id);
-                let Some(mesh) = mesh.filter(|m| has_geometry(&m.vertices, &m.indices)) else {
-                    continue;
-                };
-                let tree = MeshTree::build(&mesh.vertices, &mesh.indices, mesh.index_ranges());
-                slot.insert((revision, tree));
+            if self.keep_mesh((id, o.mesh), scene, resident) {
                 built.meshes += 1;
                 geometry = true;
             }
@@ -134,6 +125,29 @@ impl RayTree {
         } else {
             Changed::Top
         })
+    }
+}
+
+impl RayTree {
+    fn keep_mesh(
+        &mut self,
+        (id, mesh): (u32, MeshHandle),
+        scene: &Scene,
+        resident: Resident,
+    ) -> bool {
+        let (Entry::Vacant(slot), Some(revision)) = (self.meshes.entry(mesh), resident(mesh))
+        else {
+            return false;
+        };
+        let geometry = scene.world.mesh(id);
+        let Some(m) = geometry.filter(|m| has_geometry(&m.vertices, &m.indices)) else {
+            return false;
+        };
+        slot.insert((
+            revision,
+            MeshTree::build(&m.vertices, &m.indices, m.index_ranges()),
+        ));
+        true
     }
 }
 
@@ -203,7 +217,7 @@ impl Renderer {
             Err(refused) => {
                 if tree.refused.is_none() {
                     log::warn!(
-                        "the ray-traced tree of scene {id:?} is not uploaded: its {} buffer \
+                        "[Render] the ray-traced tree of scene {id:?} is not uploaded: its {} buffer \
                          would take {} bytes, past this GPU's limit of {}; rays miss \
                          everything in the scene until it fits",
                         refused.buffer,
