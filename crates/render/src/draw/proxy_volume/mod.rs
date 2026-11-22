@@ -6,8 +6,8 @@ use rusty_components::{LightProbeProxyVolumeComponent as Volume, ProxyGrid, Prox
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::Scene;
 
-/// In vec4s, as `forward/proxy_volume.wgsl`: the box matrix's 4 columns, the dims, then 4 L1 SH a
-/// point.
+/// Both count vec4s, as `forward/proxy_volume.wgsl` does: the box matrix's 4 columns and the
+/// dims, then 4 L1 SH a point.
 pub(crate) const HEADER: usize = 5;
 pub(crate) const COEFFS: usize = 4;
 

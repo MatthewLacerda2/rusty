@@ -126,8 +126,8 @@ pub(crate) fn mask_pipeline(
 }
 
 impl Renderer {
-    /// After `upload_batch_uniforms` (no buffer, no groups). Its `forget_groups` opens the frame's
-    /// groups.
+    /// Runs after `upload_batch_uniforms`, without which there is no buffer and no groups. Its
+    /// `forget_groups` opens the frame's groups.
     pub(crate) fn render_masks(&self, encoder: &mut wgpu::CommandEncoder, view: &mut RenderView) {
         let cache = &mut view.ui;
         let wanted = mask_sizes(cache, self.device.limits().max_texture_dimension_2d);
@@ -169,7 +169,8 @@ impl Renderer {
         self.lap("ui.masks");
     }
 
-    /// In `CanvasMesh::masks` order, parents first: a child's inputs read its parent's new stamp.
+    /// Called in `CanvasMesh::masks` order, parents first: a child's inputs read its parent's new
+    /// stamp.
     fn masks_to_draw(&self, cache: &mut UiViewCache) -> Vec<(usize, usize)> {
         let mut draws = Vec::new();
         let (canvases, effects) = cache.canvases_and_effects();

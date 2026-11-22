@@ -56,7 +56,7 @@ impl Renderer {
         self.upload_lighting(scene);
         self.note_unbaked(scene);
         self.lap("prepare");
-        // After every renderer-side input the objects read is settled: textures, shaders,
+        // Runs once every renderer-side input the objects read is settled: textures, shaders,
         // lightmaps.
         self.extract_scene(scene);
         self.lap("extract");

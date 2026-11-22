@@ -24,7 +24,7 @@ pub(crate) enum Why {
 }
 
 impl Why {
-    /// In the order of `stats::pairs::UI_RELAID`'s counter names: change both together.
+    /// Listed in the order of `stats::pairs::UI_RELAID`'s counter names: change both together.
     pub(crate) const ALL: [Why; 7] = [
         Why::Rebuild,
         Why::Screen,
