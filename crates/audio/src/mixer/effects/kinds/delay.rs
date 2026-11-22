@@ -1,17 +1,3 @@
-//! crates/audio/src/mixer/effects/kinds/delay.rs — an echo, with a low-pass on its
-//! feedback (#1748).
-//!
-//! Unity's mixer *Echo*: the input comes back `delay` ms later at `wet`, and each
-//! echo feeds the next at `decay` (`0..1`); the input itself plays at `dry`.
-//! Godot's feedback low-pass rides on top: `low_pass` Hz darkens every repeat
-//! (22 kHz is open), as a slapback off a far wall loses its top.
-//!
-//! The line is sized for the longest `delay` ([`MAX_SECONDS`]) at the device's
-//! rate when the effect is built, off the audio thread; nothing resizes it while
-//! playing, so a snapshot can glide the time anywhere in range. A device whose rate
-//! changes rebuilds it (`rack.rs`); until then a delay past the line's end is
-//! held at its end.
-
 use std::f32::consts::TAU;
 
 use kira::Frame;
@@ -20,7 +6,6 @@ use super::super::{Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
 /// The longest delay, in seconds (Unity's echo: 5000 ms).
 pub const MAX_SECONDS: f32 = 5.0;
-/// A feedback low-pass at or above this is open.
 const OPEN: f32 = 22_000.0;
 /// Below this a sample written to the line is silence (the device gate's −100 dB).
 const SILENT: f32 = 1e-5;
@@ -88,15 +73,11 @@ fn build(ctx: &DspContext) -> Box<dyn Dsp> {
 struct Delay {
     line: Vec<Frame>,
     write: usize,
-    /// The feedback low-pass's state.
     low: Frame,
-    /// Frames written since the last one above [`SILENT`]: once it reaches the
-    /// line's length, nothing in the line is left to echo.
     quiet: usize,
 }
 
 impl Delay {
-    /// The line `back` frames (fractional) behind the write head.
     fn read(&self, back: f32) -> Frame {
         let len = self.line.len();
         let whole = back as usize;

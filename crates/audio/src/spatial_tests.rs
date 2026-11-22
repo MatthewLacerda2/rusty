@@ -1,23 +1,18 @@
-//! Headless tests for the pure spatial math (#213) — no audio device needed.
-
 use super::{Listener, SpatialResult};
 use crate::{spatial, AudioMaestro};
 use glam::{Quat, Vec3};
 use rusty_components::AudioSourceComponent;
 
-/// Listener at the origin, identity rotation: right axis is world +X.
 fn at_origin() -> Listener {
     Listener::from_transform(Vec3::ZERO, Quat::IDENTITY)
 }
 
-/// Fully-3D resolve (`spatial_blend = 1`) with the given rolloff band.
 fn resolve_3d(pos: Vec3, vol: f32, initial: f32, final_d: f32) -> SpatialResult {
     spatial::resolve(&at_origin(), pos, vol, 1.0, initial, final_d)
 }
 
 #[test]
 fn rolloff_is_flat_within_initial_distance() {
-    // Anywhere up to `initial`, gain is the full source volume (no attenuation).
     let near = resolve_3d(Vec3::new(0.0, 0.0, 0.5), 1.0, 1.0, 5.0);
     let at_initial = resolve_3d(Vec3::new(0.0, 0.0, 1.0), 1.0, 1.0, 5.0);
     assert!((near.gain - 1.0).abs() < 1e-6, "got {near:?}");
@@ -51,7 +46,6 @@ fn rolloff_scales_with_source_volume() {
 
 #[test]
 fn source_on_the_right_pans_right() {
-    // Listener right is +X, so a source at +X pans fully right (+1).
     let r = resolve_3d(Vec3::new(3.0, 0.0, 0.0), 1.0, 100.0, 200.0);
     assert!((r.pan - 1.0).abs() < 1e-6, "got {r:?}");
 }
@@ -77,8 +71,6 @@ fn co_located_source_is_centred() {
 
 #[test]
 fn listener_rotation_rotates_the_pan_axis() {
-    // Rotate the listener 180° about Y: its right axis flips to -X, so a source at
-    // world +X now sits on the listener's left.
     let listener =
         Listener::from_transform(Vec3::ZERO, Quat::from_rotation_y(std::f32::consts::PI));
     let r = spatial::resolve(&listener, Vec3::new(3.0, 0.0, 0.0), 1.0, 1.0, 100.0, 200.0);
@@ -87,27 +79,21 @@ fn listener_rotation_rotates_the_pan_axis() {
 
 #[test]
 fn spatial_blend_lerps_2d_to_3d() {
-    // A right-placed, fully-attenuated-to-half source: 2D = (volume, centre),
-    // 3D = (volume*rolloff, +1). blend 0/0.5/1 lerps each axis linearly.
     let pos = Vec3::new(3.0, 0.0, 0.0); // distance 3 in a 1→5 band → rolloff 0.5
     let two_d = spatial::resolve(&at_origin(), pos, 1.0, 0.0, 1.0, 5.0);
     let half = spatial::resolve(&at_origin(), pos, 1.0, 0.5, 1.0, 5.0);
     let three_d = spatial::resolve(&at_origin(), pos, 1.0, 1.0, 1.0, 5.0);
 
-    // 2D endpoint: pure #212 behaviour.
     assert!((two_d.gain - 1.0).abs() < 1e-6, "got {two_d:?}");
     assert!(two_d.pan.abs() < 1e-6, "got {two_d:?}");
-    // 3D endpoint.
     assert!((three_d.gain - 0.5).abs() < 1e-6, "got {three_d:?}");
     assert!((three_d.pan - 1.0).abs() < 1e-6, "got {three_d:?}");
-    // Halfway: each axis is the midpoint of the two endpoints.
     assert!((half.gain - 0.75).abs() < 1e-6, "got {half:?}");
     assert!((half.pan - 0.5).abs() < 1e-6, "got {half:?}");
 }
 
 #[test]
 fn degenerate_band_is_a_hard_cutoff_at_initial() {
-    // final <= initial: full volume up to initial, silent immediately after.
     let inside = resolve_3d(Vec3::new(0.0, 0.0, 1.0), 1.0, 2.0, 2.0);
     let outside = resolve_3d(Vec3::new(0.0, 0.0, 3.0), 1.0, 2.0, 2.0);
     assert_eq!(inside.gain, 1.0);
@@ -116,7 +102,6 @@ fn degenerate_band_is_a_hard_cutoff_at_initial() {
 
 #[test]
 fn voice_info_reports_resolved_spatial_gain_and_pan() {
-    // Introspection surfaces the resolved (gain, pan) per source for the agent.
     let mut m = AudioMaestro::default();
     let s = AudioSourceComponent {
         clip: "shot.ogg".to_string(),

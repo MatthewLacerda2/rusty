@@ -1,11 +1,7 @@
-//! The EQ against sines (#1748): a peak band's gain at and away from its centre,
-//! a shelf, and an EQ with every band off.
-
 use super::super::super::param::{Fields, Value};
 use super::super::super::{EffectParams, KindId};
 use super::super::signal::{peak_db, run, sine, RATE};
 
-/// An EQ whose first band is `shape` at `hz`, `db` and `q`.
 fn one_band(shape: &str, hz: f64, db: f64, q: f64) -> [f32; 24] {
     let kind = KindId::named("eq").expect("eq");
     let n = |v| Value::Number(v);

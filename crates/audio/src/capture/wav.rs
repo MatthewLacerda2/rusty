@@ -1,10 +1,3 @@
-//! crates/audio/src/capture/wav.rs — the file a capture streams into (#1579).
-//!
-//! A capture can run for minutes, so the samples go to disk as they are drained and
-//! the RIFF header, whose sizes and rate are known only at the end, is written last
-//! over a placeholder. The format is **32-bit float** stereo: the mix is measured,
-//! not shipped, so nothing is quantised and a peak over full scale stays readable.
-
 use std::fs::File;
 use std::io::{self, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -13,7 +6,6 @@ use std::path::Path;
 const HEADER_LEN: usize = 44;
 /// Bytes per stereo frame of `f32` samples.
 const BYTES_PER_FRAME: u32 = 8;
-/// Format tag 3 = IEEE float.
 const FORMAT_FLOAT: u16 = 3;
 
 /// A float WAV being written a run of samples at a time.
@@ -21,12 +13,10 @@ pub struct WavStream {
     file: BufWriter<File>,
     /// Interleaved samples written so far.
     samples: u64,
-    /// The header is written (or the file given up on): nothing more to do.
     finished: bool,
 }
 
 impl WavStream {
-    /// Create (or truncate) `path`, creating its parent directory.
     pub fn create(path: &Path) -> io::Result<Self> {
         if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
             std::fs::create_dir_all(dir)?;
@@ -50,7 +40,6 @@ impl WavStream {
         Ok(())
     }
 
-    /// Write the header for `rate` over the placeholder and flush the file.
     pub fn finish(&mut self, rate: u32) -> io::Result<()> {
         self.finished = true;
         // The RIFF size field holds `36 + data_len`, so that sum must fit too.
@@ -63,18 +52,15 @@ impl WavStream {
         self.file.flush()
     }
 
-    /// Whether [`finish`](Self::finish) ran (or the file was abandoned).
     pub fn is_finished(&self) -> bool {
         self.finished
     }
 
-    /// Give up on the file: no header will be written over its placeholder.
     pub fn abandon(&mut self) {
         self.finished = true;
     }
 }
 
-/// The 44-byte RIFF header of a stereo float WAV at `rate` with `data_len` bytes.
 pub fn header(rate: u32, data_len: u32) -> [u8; HEADER_LEN] {
     let mut out = Vec::with_capacity(HEADER_LEN);
     out.extend_from_slice(b"RIFF");
@@ -82,10 +68,10 @@ pub fn header(rate: u32, data_len: u32) -> [u8; HEADER_LEN] {
     out.extend_from_slice(b"WAVEfmt ");
     out.extend_from_slice(&16u32.to_le_bytes());
     out.extend_from_slice(&FORMAT_FLOAT.to_le_bytes());
-    out.extend_from_slice(&2u16.to_le_bytes()); // channels
+    out.extend_from_slice(&2u16.to_le_bytes());
     out.extend_from_slice(&rate.to_le_bytes());
-    out.extend_from_slice(&(rate * BYTES_PER_FRAME).to_le_bytes()); // byte rate
-    out.extend_from_slice(&(BYTES_PER_FRAME as u16).to_le_bytes()); // block align
+    out.extend_from_slice(&(rate * BYTES_PER_FRAME).to_le_bytes());
+    out.extend_from_slice(&(BYTES_PER_FRAME as u16).to_le_bytes());
     out.extend_from_slice(&32u16.to_le_bytes()); // bits per sample
     out.extend_from_slice(b"data");
     out.extend_from_slice(&data_len.to_le_bytes());

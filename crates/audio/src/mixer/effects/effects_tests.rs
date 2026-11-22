@@ -1,6 +1,3 @@
-//! The mixer's effects (#1748): Master's default limiter, a script's tables checked
-//! and read back, a snapshot gliding a parameter, and sidechain cycles refused.
-
 use super::*;
 use crate::mixer::{GroupPatch, Mixer};
 

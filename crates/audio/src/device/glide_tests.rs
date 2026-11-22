@@ -1,23 +1,15 @@
-//! A voice's parameters glide per sample (#1693): a mix the game retunes once a
-//! frame never jumps sample to sample, through the whole kira graph, and a
-//! one-shot still starts on its targets with no fade-in.
-
 use super::*;
 use crate::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use crate::device::backend::backend_tests::{flat, rig};
 use crate::device::capture::RATE;
 use crate::device::decode::CachedClip;
 
-/// One game frame at 25 FPS, in device frames: how long a retune holds.
 const FRAME: usize = 1_920;
 
-/// Play the mono `clip` looping at mix `a`, retune it to `b` and back every
-/// [`FRAME`] for ten frames, and return everything the device rendered.
 fn toggled(clip: &[f32], a: VoiceMix, b: VoiceMix) -> Vec<(f32, f32)> {
     toggled_clip(CachedClip::new(1, RATE, clip.to_vec()), a, b)
 }
 
-/// [`toggled`], for any clip.
 fn toggled_clip(clip: CachedClip, a: VoiceMix, b: VoiceMix) -> Vec<(f32, f32)> {
     let mut backend = rig(&[]);
     backend.cache().insert("clip", clip);
@@ -68,7 +60,6 @@ fn a_pan_toggled_every_frame_never_jumps() {
 
 #[test]
 fn a_spatial_blend_toggled_every_frame_never_jumps() {
-    // A stereo clip, all left: blend 0 keeps (1, 0), blend 1 downmixes to (½, ½).
     let flat = VoiceMix::FLAT;
     let spatial = VoiceMix {
         spatial_blend: 1.0,

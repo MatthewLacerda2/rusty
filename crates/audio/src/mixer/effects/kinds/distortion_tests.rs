@@ -1,5 +1,3 @@
-//! The distortion's three modes against a sine (#1748).
-
 use super::super::signal::{run, sine, values};
 use super::shape;
 

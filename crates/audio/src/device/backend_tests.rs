@@ -1,6 +1,3 @@
-//! The kira backend, heard through the capture backend (#465): the pan law, master
-//! gain, rate, pause, one-shot reaping and groups, as the device renders them.
-
 use super::*;
 use crate::device::capture::{Capture, RATE};
 use crate::device::decode::CachedClip;
@@ -16,7 +13,6 @@ pub(crate) fn rig(samples: &[f32]) -> KiraBackend<Capture> {
     b
 }
 
-/// Play `clip` once, flat, through Master.
 pub(crate) fn flat(clip: &str) -> PlayParams {
     PlayParams {
         clip: clip.to_string(),
@@ -56,7 +52,7 @@ fn hard_left_silences_the_right_channel_and_retunes_in_place() {
     ));
     assert_eq!(b.device().render(2), vec![(0.5, 0.0); 2]);
     b.set_mix(VoiceId(1), &VoiceMix { pan: 1.0, ..left });
-    b.device().render(RATE as usize / 5); // the pan glides over (#1693)
+    b.device().render(RATE as usize / 5);
     assert_eq!(
         b.device().render(2),
         vec![(0.0, 0.5); 2],
@@ -117,8 +113,6 @@ fn rate_resamples_and_pause_holds_the_playhead() {
     assert_eq!(b.device().render(1)[0].0, 0.75, "resumes where it stopped");
 }
 
-/// Every effect asleep after a long silence, a sound still starts on its first sample
-/// through the whole graph (#1729).
 #[test]
 fn a_sound_after_a_long_silence_is_heard_from_its_first_sample() {
     let mut b = rig(&TONE);

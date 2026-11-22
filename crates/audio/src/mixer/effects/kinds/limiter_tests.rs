@@ -1,6 +1,3 @@
-//! The limiter against a sine (#1748): nothing past the ceiling, nothing touched
-//! under it (once recovered from a peak), and a NaN played as silence.
-
 use kira::Frame;
 
 use super::super::super::gain;

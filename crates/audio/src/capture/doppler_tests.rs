@@ -1,7 +1,3 @@
-//! Doppler through the mix capture (#1749): a 1 kHz tone flying past the listener
-//! at 50 m/s is heard at 343/293 of its pitch coming and 343/393 going, and a
-//! still one at exactly its pitch.
-
 use glam::{Quat, Vec3};
 
 use super::wav::WavStream;
@@ -13,7 +9,6 @@ use rusty_components::AudioSourceComponent;
 const TONE_HZ: f64 = 1_000.0;
 const DT: f32 = 0.01;
 
-/// One second of a stereo 1 kHz sine at `RATE`, which loops seamlessly.
 fn sine(name: &str) -> PathBuf {
     let path = rusty_test_support::temp::dir().join(name);
     let mut wav = WavStream::create(&path).unwrap();
@@ -28,8 +23,6 @@ fn sine(name: &str) -> PathBuf {
     path
 }
 
-/// Capture `ticks` ticks of a fully 3D looping tone at `at(t)`, against a listener
-/// at the origin; the capture's mono sum and the rate the voice ended at.
 fn capture(name: &str, ticks: u32, at: impl Fn(f32) -> Vec3) -> (Vec<f32>, f32) {
     let clip = sine(&format!("{name}.wav"));
     let source = AudioSourceComponent {

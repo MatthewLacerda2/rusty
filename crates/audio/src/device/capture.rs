@@ -1,11 +1,3 @@
-//! crates/audio/src/device/capture.rs — a kira backend that renders into memory (#1579).
-//!
-//! kira's own `MockBackend` renders but keeps its output to itself; this one hands
-//! the frames back, so the whole kira graph (voices, group tracks, filters, the
-//! output stage) runs with no sound card. Tests pull frames with
-//! [`Capture::render`]; a headless capture clocks it in step with the sim through
-//! [`Clocked::advance`], and the final-mix tap (`tap.rs`) catches what it renders.
-
 use kira::backend::{Backend, DefaultBackend, Renderer};
 
 /// The sample rate the captured graph runs at.
@@ -52,8 +44,6 @@ impl Capture {
     }
 }
 
-/// How a kira backend keeps time: a device runs on its own clock, an offline one
-/// renders only when the engine tells it time passed.
 pub trait Clocked {
     /// `seconds` of the engine's time went by.
     fn advance(&mut self, seconds: f64);

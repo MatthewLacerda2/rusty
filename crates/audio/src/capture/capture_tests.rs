@@ -1,6 +1,3 @@
-//! A capture (#1579): one at a time, a maestro with no mixer goes offline keeping
-//! its live voices, and the file it writes decodes back to the mix.
-
 use super::wav::WavStream;
 use super::*;
 use crate::device::decode::decode_file;
@@ -15,7 +12,6 @@ fn tone(name: &str, frames: usize) -> PathBuf {
     path
 }
 
-/// A 2D looping speaker playing `clip`.
 fn speaker(clip: &Path) -> AudioSourceComponent {
     AudioSourceComponent {
         clip: clip.to_string_lossy().into_owned(),

@@ -1,6 +1,3 @@
-//! Mixer groups as kira tracks (#465): a voice heard through its group's volume,
-//! mute, low-pass and reverb send (into a bus a reverb zone has tuned, #469).
-
 use crate::backend::{AudioBackend, PlayParams, VoiceId};
 use crate::device::backend::backend_tests::{flat, rig};
 use crate::mixer::{Filter, GroupId, GroupMix, GroupSettings};

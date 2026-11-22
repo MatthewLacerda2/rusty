@@ -1,6 +1,3 @@
-//! The doppler rate glides (#1749): a voice retuned from rate 1 to 2 speeds its
-//! playhead up over a few ms, never in one step, and a new voice starts on its rate.
-
 use super::*;
 use crate::backend::{AudioBackend, PlayParams, VoiceId, VoiceMix};
 use crate::device::backend::backend_tests::{flat, rig};

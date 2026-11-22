@@ -1,5 +1,3 @@
-//! An effect sleeps over silence and never misses a sound (#1729).
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -7,7 +5,6 @@ use super::*;
 
 const BUFFER: usize = 128;
 const DT: f64 = 1.0 / 48_000.0;
-/// Enough buffers of silence to outlast [`HANG`].
 const PAST_HANG: usize = (HANG / DT) as usize / BUFFER + 1;
 
 #[derive(Default)]
@@ -16,7 +13,6 @@ struct Counts {
     commands: AtomicUsize,
 }
 
-/// An effect that counts its calls and halves its input, plus a tail of `ring` buffers.
 struct Probe(Arc<Counts>, usize);
 
 impl Effect for Probe {
@@ -54,7 +50,6 @@ fn gate(ring: usize) -> (Box<dyn Effect>, Arc<Counts>) {
     (effect, counts)
 }
 
-/// Run `effect` over `buffers` buffers of a constant `level`; the last buffer out.
 fn run(effect: &mut Box<dyn Effect>, level: f32, buffers: usize) -> Vec<Frame> {
     let info = kira::info::MockInfoBuilder::new().build();
     let mut out = Vec::new();
