@@ -1,30 +1,3 @@
-//! crates/edit/src/lib.rs — Scene editing: the verbs that write a scene, and the
-//! paths that build one from files.
-//!
-//! The base (`rusty-scene`) holds the `Scene` and every type its fields hold; this
-//! crate sits above it so an authoring edit rebuilds only the crates that write or
-//! build a scene (`script`, `editor`, `dev`, `app`, `shell`, `preview`) and the root
-//! package, never AI or UI. `render`, `physics`, `navigation` and `lighting` name
-//! this crate from their tests only: their libraries do not rebuild, their test
-//! targets do.
-//!
-//! Submodules:
-//!   authoring — the shared edit verbs the editor, the API and loads all go through
-//!   serialize — World <-> SceneData: `to_scene_data` and the `apply_*` functions
-//!   io        — save, load into a live scene, the unsaved check, default-scene seeding
-//!   rehydrate — rebuild a written model's meshes (`reimport`, `model_writes`)
-//!   load      — a play-mode load's swap and the file-only half it takes (`prepare`)
-//!   mesh      — point an entity's Mesh at a shared mesh (`set_shared_mesh`)
-//!   prefab    — `.prefab` files: extract, instantiate, linked instances
-//!   asset_instance, lod_instance, model_instance — instantiate an imported model
-//!   default_scene — the default scene's builder, materials and seeded assets
-//!   snapshot  — edit-mode snapshot/restore around Play
-//!
-//! What this crate needs of the base is the base's public API (`SceneData`,
-//! `rusty_scene::io::read_scene_file`, `RehydratedScene`, the `runtime::load` marks).
-
-// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
-// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
 pub mod asset_instance;

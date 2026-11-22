@@ -1,4 +1,4 @@
-//! `rusty_scene::skeleton`: bones as GameObjects (#453) on a model instantiated from a
+//! `rusty_scene::skeleton`: bones as GameObjects on a model instantiated from a
 //! file, through a save and load, a re-import, a prefab and Play.
 
 mod bones;

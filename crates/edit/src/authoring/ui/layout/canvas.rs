@@ -1,54 +1,38 @@
-//! crates/edit/src/authoring/ui/layout/canvas.rs — Shared canvas-authoring ops (#417).
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `CanvasComponent` field by field. The editor's Canvas card and the Lua `Canvas.*`
-//! namespace both route every write through these, so validation lives once: the
-//! reference resolution is kept ≥ 1 per axis, the width/height match and the sway
-//! in `[0, 1]`, the world density > 0 and the camera plane ≥ 1 cm away (#429).
-//!
-//! Pure.
-
 use glam::Vec2;
 
 use rusty_components::{CanvasComponent, CanvasRenderMode};
 use rusty_scene::rules::sanitize::{at_least, finite2, finite2_or, unit, MIN_EXTENT};
 
-/// Set where the canvas draws.
 pub fn set_render_mode(c: &mut CanvasComponent, mode: CanvasRenderMode) {
     c.render_mode = mode;
 }
 
-/// Set the cross-canvas draw / hit-test order (higher is on top).
+/// Higher is on top.
 pub fn set_sort_order(c: &mut CanvasComponent, sort_order: i32) {
     c.sort_order = sort_order;
 }
 
-/// Set the authoring resolution, each axis clamped to at least 1.
 pub fn set_reference_resolution(c: &mut CanvasComponent, resolution: Vec2) {
     c.reference_resolution = finite2_or(resolution, c.reference_resolution).max(Vec2::ONE);
 }
 
-/// Set the width (0) ↔ height (1) scale match, clamped to `[0, 1]`.
+/// Width (0) to height (1) scale match.
 pub fn set_match_width_or_height(c: &mut CanvasComponent, value: f32) {
     c.match_width_or_height = unit(value);
 }
 
-/// Set the `WorldSpace` density (reference units per metre), kept above zero.
 pub fn set_pixels_per_unit(c: &mut CanvasComponent, value: f32) {
     c.pixels_per_unit = at_least(value, MIN_EXTENT);
 }
 
-/// Set the `ScreenSpaceCamera` plane's distance in metres, kept ≥ 0.01.
 pub fn set_plane_distance(c: &mut CanvasComponent, value: f32) {
     c.plane_distance = at_least(value, 0.01);
 }
 
-/// Set the `ScreenSpaceCamera` tilt in degrees, each axis clamped to ±89.
 pub fn set_tilt(c: &mut CanvasComponent, tilt: Vec2) {
     c.tilt = finite2(tilt).clamp(Vec2::splat(-89.0), Vec2::splat(89.0));
 }
 
-/// Set the `ScreenSpaceCamera` sway amount, clamped to `[0, 1]`.
 pub fn set_sway(c: &mut CanvasComponent, value: f32) {
     c.sway = unit(value);
 }

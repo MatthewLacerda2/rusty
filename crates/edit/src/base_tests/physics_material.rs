@@ -1,5 +1,5 @@
 //! `rusty_scene::physics_material`: a collider's asset path through
-//! every way in (#1878): a scene load that clamps an inline value, `Component.Set`,
+//! every way in: a scene load that clamps an inline value, `Component.Set`,
 //! and the path's stored form.
 
 use serde_json::{json, Map};

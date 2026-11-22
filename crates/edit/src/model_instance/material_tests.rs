@@ -1,8 +1,3 @@
-//! A material edited on a placed model is the scene's (#1637, Unity's extracted
-//! material): propagation reads it and never swaps it for the model's unedited
-//! copy, on Play→Stop, on load and on a Scale Factor change, and no `(n)` key
-//! appears.
-
 use glam::Vec3;
 
 use super::tests::{child, spawn_file, KIT};
@@ -13,7 +8,6 @@ use rusty_scene::Scene;
 
 const RED: [f32; 3] = [1.0, 0.0, 0.0];
 
-/// The kit with its `Wall` drawn with a glTF material named `Wood`.
 fn wood_kit() -> String {
     KIT.replace(
         r#"{ "name": "WallMesh", "primitives": [ { "attributes": { "POSITION": 0 } } ] }"#,
@@ -22,7 +16,6 @@ fn wood_kit() -> String {
     .replace(r#""meshes": ["#, r#""materials": [ { "name": "Wood" } ], "meshes": ["#)
 }
 
-/// The Wall's material key and colour, and every library key that copies it.
 fn wall_material(scene: &Scene, root: u32) -> (String, [f32; 3], Vec<String>) {
     let wall = child(scene, child(scene, root, "Kit"), "Wall");
     let key = scene.world.material(wall).unwrap().materials[0].clone();

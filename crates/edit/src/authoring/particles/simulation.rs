@@ -1,32 +1,19 @@
-//! crates/edit/src/authoring/particles/simulation.rs — the emitter's simulation
-//! target (#2170): the op the card's *Simulation* dropdown and
-//! `Particles.SetSimulation` both call, and what a `Gpu` emitter does not honour,
-//! which every op that sets one of those settings warns about.
-
 use rusty_components::particle::GPU_MAX_PARTICLES;
 use rusty_components::{
     CollisionResponse, ParticleEmitterComponent, ParticleRenderMode, ParticleSimulation,
     SimulationSpace, SubEmitTrigger,
 };
 
-/// Set the simulation target (#2170). A change forgets the live particles (the
-/// other target never held them), and a switch to `Gpu` warns for each setting
-/// a `Gpu` emitter does not honour ([`gpu_warnings`]).
 pub fn set_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
     let was = p.simulation;
     switch_simulation(p, simulation);
     warn_switch(was, p);
 }
 
-/// [`set_simulation`] without its warnings: `Component.Set`'s op, which runs on a
-/// [`draft`] before the write's later fields apply and before it is known to
-/// stand, so [`commit`] warns instead, once, for the emitter as written.
 pub fn switch_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
     retarget(p, simulation, p.simulation_space);
 }
 
-/// The warnings a switch from `was` to `p`'s target owes: every setting `p`
-/// does not honour, when it just went to `Gpu`.
 fn warn_switch(was: ParticleSimulation, p: &ParticleEmitterComponent) {
     if was != p.simulation {
         for line in gpu_warnings(p) {
@@ -35,13 +22,6 @@ fn warn_switch(was: ParticleSimulation, p: &ParticleEmitterComponent) {
     }
 }
 
-/// Move `p` to `simulation` in `space`, forgetting what of its live state the
-/// move makes stale: any change forgets where the live particles were last placed
-/// (`anchor`), so nothing is carried by a stale matrix; a change of target forgets
-/// the live particles (the other target never held them), and so does a change of
-/// space on a `Gpu` emitter, whose particles are stored in the old space on both
-/// sides with nothing to carry them. The one rule `set_simulation`,
-/// `set_simulation_space` and `Component.Set`'s commit ([`commit`]) share.
 pub(super) fn retarget(
     p: &mut ParticleEmitterComponent,
     simulation: ParticleSimulation,
@@ -61,16 +41,10 @@ pub(super) fn retarget(
     p.simulation_space = space;
 }
 
-/// `Component.Set`'s copy of an emitter to run its ops on: its configuration,
-/// without the live state, so an edit never copies the live particles (a `Gpu`
-/// emitter's births, up to one per live particle).
 pub fn draft(live: &ParticleEmitterComponent) -> ParticleEmitterComponent {
     live.config()
 }
 
-/// Put `Component.Set`'s finished [`draft`] in place of `live`, keeping `live`'s
-/// live state but for what the new target and space make stale (`retarget`),
-/// and warn for a switch to `Gpu` (`set_simulation`) now that every field is in.
 pub fn commit(live: &mut ParticleEmitterComponent, mut draft: ParticleEmitterComponent) {
     let (simulation, space) = (draft.simulation, draft.simulation_space);
     draft.simulation = live.simulation;
@@ -82,16 +56,12 @@ pub fn commit(live: &mut ParticleEmitterComponent, mut draft: ParticleEmitterCom
     warn_switch(was, live);
 }
 
-/// A setting a `Gpu` emitter does not honour.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Dishonoured {
-    /// A collision response: it behaves as `None`.
     Collision,
     /// The sub-emitter fired at this trigger (death or collision): it never fires.
     SubEmitter(SubEmitTrigger),
-    /// The `Mesh` render mode: it draws as a billboard.
     Mesh,
-    /// A `max_particles` above [`GPU_MAX_PARTICLES`]: it holds that many.
     Cap,
 }
 
@@ -104,8 +74,6 @@ impl Dishonoured {
         Self::Cap,
     ];
 
-    /// What `p` does not honour of this setting, or `None` when it honours it
-    /// (always, on a `Cpu` emitter).
     fn line(self, p: &ParticleEmitterComponent) -> Option<String> {
         if !p.on_gpu() {
             return None;
@@ -117,7 +85,6 @@ impl Dishonoured {
                     p.collision
                 )
             }),
-            // A birth sub-emitter fires: births happen on the CPU.
             Self::SubEmitter(SubEmitTrigger::Birth) => None,
             Self::SubEmitter(trigger) => p
                 .sub_emitters
@@ -135,8 +102,6 @@ impl Dishonoured {
         }
     }
 
-    /// Log this setting's line, if `p` does not honour it: what an op that just
-    /// set it says, and nothing about the others.
     pub(super) fn warn(self, p: &ParticleEmitterComponent) {
         if let Some(line) = self.line(p) {
             log_gpu(&line);
@@ -144,10 +109,6 @@ impl Dishonoured {
     }
 }
 
-/// What a `Gpu` emitter does not honour of `p`'s settings, one line each
-/// (`Dishonoured`): a collision response, the death and collision
-/// sub-emitters, the `Mesh` render mode and a `max_particles` above
-/// [`GPU_MAX_PARTICLES`]. Empty for a `Cpu` emitter.
 pub fn gpu_warnings(p: &ParticleEmitterComponent) -> Vec<String> {
     Dishonoured::ALL.iter().filter_map(|d| d.line(p)).collect()
 }

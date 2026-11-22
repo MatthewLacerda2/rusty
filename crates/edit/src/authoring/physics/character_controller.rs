@@ -1,42 +1,22 @@
-//! crates/edit/src/authoring/physics/character_controller.rs — Shared CharacterController
-//! authoring ops (#451).
-//!
-//! The ONE place the engine mutates an entity's `CharacterControllerComponent`'s
-//! authored fields. The editor's card and the Lua `CharacterController.*` setters
-//! both route every write through these, so the bounds live once: sizes stay
-//! positive, the slope limit stays within a half-turn and the skin never reaches
-//! zero (the collide-and-slide sweep needs a gap to keep). The runtime fields
-//! (`is_grounded`, the flags, the ground normal) are written only by `Move`.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::CharacterControllerComponent;
 use rusty_scene::rules::sanitize::{at_least, finite3_or, non_negative};
 
-/// The smallest radius / skin a capsule may have: a zero would make the sweep
-/// degenerate. Smaller than `sanitize::MIN_EXTENT` on purpose: it is the sweep's
-/// contact gap, not a visible extent.
 pub const MIN_SIZE: f32 = 1e-4;
 
-/// Set the capsule's full height, floored at 0 (under `2 * radius` it is a
-/// sphere).
 pub fn set_height(c: &mut CharacterControllerComponent, height: f32) {
     c.height = non_negative(height);
 }
 
-/// Set the capsule's radius, floored at [`MIN_SIZE`].
 pub fn set_radius(c: &mut CharacterControllerComponent, radius: f32) {
     c.radius = at_least(radius, MIN_SIZE);
 }
 
-/// Set the capsule's centre, in local space. A non-finite centre is ignored.
 pub fn set_center(c: &mut CharacterControllerComponent, center: Vec3) {
     c.center = finite3_or(center, c.center);
 }
 
-/// Set the tallest step a move climbs, floored at 0 (no stepping).
 pub fn set_step_offset(c: &mut CharacterControllerComponent, step: f32) {
     c.step_offset = non_negative(step);
 }
@@ -47,12 +27,10 @@ pub fn set_slope_limit(c: &mut CharacterControllerComponent, degrees: f32) {
     c.slope_limit = non_negative(degrees).min(180.0);
 }
 
-/// Set the contact gap, floored at [`MIN_SIZE`].
 pub fn set_skin_width(c: &mut CharacterControllerComponent, skin: f32) {
     c.skin_width = at_least(skin, MIN_SIZE);
 }
 
-/// Set the shortest move that does anything, floored at 0.
 pub fn set_min_move_distance(c: &mut CharacterControllerComponent, distance: f32) {
     c.min_move_distance = non_negative(distance);
 }

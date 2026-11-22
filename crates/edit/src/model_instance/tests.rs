@@ -1,15 +1,8 @@
-//! A whole model spawns as its node tree (#1083): a root named after the file,
-//! one child per node at its local transform, an empty node as an empty child,
-//! and a `_LOD<n>` set as one LODGroup where its first member sits.
-
 use glam::{Quat, Vec3};
 
 use super::instantiate_model;
 use rusty_scene::Scene;
 
-/// A kit: an empty `Kit` node moved 10 m along X, holding a `Wall` turned a
-/// quarter about Y and a crate at two levels of detail, each level's node at its
-/// own height. Every mesh is one shared triangle.
 pub(super) const KIT: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -40,7 +33,6 @@ fn spawn(position: Vec3) -> (Scene, u32) {
     spawn_file("rusty_1083_kit.gltf", KIT, position)
 }
 
-/// Write `gltf` as `file` in the test folder and spawn it whole at `position`.
 pub(super) fn spawn_file(file: &str, gltf: &str, position: Vec3) -> (Scene, u32) {
     let path = rusty_test_support::temp::dir().join(file);
     std::fs::write(&path, gltf).unwrap();

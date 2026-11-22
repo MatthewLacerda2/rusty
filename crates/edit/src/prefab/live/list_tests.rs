@@ -1,8 +1,3 @@
-//! Lists and the three override shapes through Play and a save/load (#1527): a list
-//! keeps a size entry and its new elements only, so its other elements keep
-//! following the source; and modifications, added and removed components round-trip
-//! together.
-
 use super::component_tests::{bare, play_stop};
 use super::tests::save_and_load;
 use crate::authoring::defaults::default_collider;
@@ -12,7 +7,6 @@ use glam::Vec3;
 use rusty_components::{CameraComponent, ScriptComponent, ScriptFieldValue};
 use rusty_scene::Scene;
 
-/// A script at `path`, its `speed` field set when given.
 pub(super) fn script(path: &str, speed: Option<f64>) -> ScriptComponent {
     let values = speed.map(|s| ("speed".to_string(), ScriptFieldValue::Number(s)));
     ScriptComponent {
@@ -22,7 +16,6 @@ pub(super) fn script(path: &str, speed: Option<f64>) -> ScriptComponent {
     }
 }
 
-/// `child`'s scripts as (path, speed).
 pub(super) fn scripts(scene: &Scene, child: u32) -> Vec<(String, Option<ScriptFieldValue>)> {
     let list = scene.world.scripts(child).unwrap();
     let speed = |s: &ScriptComponent| s.values.get("speed").cloned();
@@ -63,7 +56,6 @@ fn a_grown_list_keeps_following_the_source_on_its_untouched_element() {
     let grown = ["1:/scripts/#size", "1:/scripts/1"];
     assert_eq!(list_instance_overrides(&scene, root).unwrap(), grown);
 
-    // The source edits the element both lists hold; Stop re-propagates it.
     let path = rusty_test_support::temp::dir().join("rusty_1527_grown_follow.prefab");
     let path = path.to_string_lossy().into_owned();
     let mut source = read_prefab_file(&path).unwrap();

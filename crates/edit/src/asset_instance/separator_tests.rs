@@ -1,7 +1,3 @@
-//! References and `::` (#1295): a sub-object whose own name holds `::` instantiates,
-//! saves, reloads and keeps its mesh; a model under a folder whose name holds `::`
-//! is refused when instantiated, rather than spawned with a mesh that loads empty.
-
 use glam::Vec3;
 
 use super::instantiate_asset;
@@ -27,8 +23,6 @@ fn colon_named_sub_object_survives_save_and_reload() {
 
 #[test]
 fn model_under_a_colon_folder_is_refused_with_the_rule() {
-    // The refusal comes before any file access, so the folder is only named, never
-    // made.
     let real = write_gltf("rusty_1295_kit.gltf", NO_MATERIAL_GLTF);
     let asset = rusty_asset::imported(std::path::Path::new(&real)).unwrap();
     let path = "my::kit/crate.gltf".to_string();

@@ -1,14 +1,9 @@
-//! Tests for reading a recipe's graph files (#1744): nested ones followed, the
-//! extension required, the project's graphs found, and a material's rebake
-//! reading an edited graph.
-
 use serde_json::{json, Value};
 
 use super::*;
 use crate::authoring::material::{load_recipe, rebake_maps, MaterialLibrary};
 use rusty_scene::MaterialAsset;
 
-/// A graph whose output is a flat `color`.
 fn flat(color: [f32; 4]) -> Value {
     json!({ "resolution": 4, "nodes": [{ "id": "c", "op": "constant", "color": color }] })
 }
@@ -77,7 +72,6 @@ fn the_project_graphs_are_found_outside_hidden_and_build_folders() {
             ("levels/target/e.graph.json", doc),
         ],
     );
-    // Only the root's `target/` is a build's; a deeper one is the project's own.
     assert_eq!(
         project_graphs(&root),
         [
@@ -117,7 +111,6 @@ fn a_rebake_reads_the_edited_graph_and_the_asset_keeps_the_instance() {
     assert_eq!(materials["tint"].maps_recipe, Some(instancing(path)));
 }
 
-/// A project and an engine folder side by side under one temp folder, for #2185.
 fn with_engine(
     test: &str,
     project_files: &[(&str, Value)],
@@ -147,7 +140,6 @@ fn an_engine_graph_is_read_from_the_engine_folder_nested_ones_too_and_nothing_wa
         "nodes": [{ "id": "inner", "op": "graph", "path": "engine/textures/library/flat.graph.json" }] });
     let roots = with_engine(
         "rusty_graphs_engine_2185",
-        // A project folder named `engine/` is never what an `engine/…` path reads.
         &[(RUST, flat([1.0, 0.0, 0.0, 1.0]))],
         &[
             ("textures/library/rust.graph.json", outer),
@@ -168,7 +160,6 @@ fn an_engine_graph_is_read_from_the_engine_folder_nested_ones_too_and_nothing_wa
     let outside =
         |path: &str| crate::authoring::material::sources::warn_if_outside(&roots, "graph", path);
     assert!(!outside(RUST));
-    // A path that climbs out of the engine's folder is outside it, and warns.
     assert!(outside(
         "engine/../game/engine/textures/library/rust.graph.json"
     ));
@@ -229,7 +220,6 @@ fn the_engine_graphs_are_listed_after_the_projects_by_their_engine_path() {
         &[
             ("textures/library/rust.graph.json", doc.clone()),
             ("materials/b.graph.json", doc.clone()),
-            // The project root's `target/` skip is the project's, not the engine's.
             ("target/t.graph.json", doc),
         ],
     );

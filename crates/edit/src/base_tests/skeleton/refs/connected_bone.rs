@@ -1,5 +1,5 @@
-//! A ragdoll joint to a bone of its own skeleton keeps that bone by its chain
-//! (#1277), so a load and a live re-import send a joint to a dropped bone to the
+//! A ragdoll joint to a bone of its own skeleton keeps that bone by its chain,
+//! so a load and a live re-import send a joint to a dropped bone to the
 //! same place: the nearest surviving ancestor.
 
 use super::super::fixture::{
@@ -9,7 +9,6 @@ use crate::serialize::to_scene_data;
 use rusty_components::mesh::BoneBody;
 use rusty_scene::Scene;
 
-/// An armature rig whose `head` bone is jointed to `spine`.
 fn jointed_rig(scene: &mut Scene) -> u32 {
     let rig = armature_owner(scene);
     scene.sync_skeleton(rig);
@@ -90,8 +89,6 @@ fn a_loaded_joint_that_lands_on_its_own_bone_is_warned_inert() {
     assert!(about_head[0].contains("inert"), "{warned:?}");
 }
 
-/// What a loaded `head` joint to `spine` warns once the model keeps neither
-/// `spine` nor `hips`, so the chain lands on the skinned entity, given `rig_body`.
 fn landed_on_the_rig(rig_body: bool) -> (u32, Vec<String>) {
     let mut saved = Scene::new();
     let rig = jointed_rig(&mut saved);

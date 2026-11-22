@@ -1,5 +1,5 @@
 //! A reference from outside a skeleton to a bone survives a save, a load and a
-//! re-import by the bone's name (#1264).
+//! re-import by the bone's name.
 
 mod connected_bone;
 mod despawn;

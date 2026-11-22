@@ -1,7 +1,3 @@
-//! A material's baked maps ship at the size they were baked at (#2259): a rebake
-//! larger than a first, small bake raises every map's Max Size, the ones the slot
-//! fixes wrote default sidecars for included; one above 8192 is refused.
-
 use rusty_asset::sidecar::texture;
 use rusty_asset::MapRef;
 use rusty_procgen::catalog::Constant;
@@ -12,7 +8,6 @@ use super::*;
 
 const SLOTS: [&str; 5] = ["base_color", "normal", "roughness", "metallic", "occlusion"];
 
-/// A material whose one-constant recipe feeds every slot of [`SLOTS`], `[w, 4]`.
 fn panel(w: u32) -> MaterialAsset {
     let node = Node {
         id: "c".into(),
@@ -29,7 +24,6 @@ fn panel(w: u32) -> MaterialAsset {
     }
 }
 
-/// Each baked map's (width, Max Size), in a fixed order.
 fn sizes(m: &MaterialAsset) -> Vec<(u32, u32)> {
     let maps = [
         &m.base_color_map,

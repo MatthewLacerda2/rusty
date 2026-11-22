@@ -1,4 +1,4 @@
-//! The inventory against the lists it governs (#1649): the scene document's
+//! The inventory against the lists it governs: the scene document's
 //! fields, and the gates' own flag and pass cases.
 
 use super::check::{disagreements, mismatched, Observed};

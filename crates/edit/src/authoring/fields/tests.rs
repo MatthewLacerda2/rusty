@@ -1,6 +1,3 @@
-//! The field table can't fall behind (#1369): every first-class component's
-//! serialized fields are in its table, each mapped to an op or listed read-only.
-
 use std::collections::BTreeSet;
 
 use serde_json::Value;
@@ -14,19 +11,18 @@ use rusty_components::animator::Playback;
 use rusty_components::Entity;
 use rusty_scene::Scene;
 
-/// `Entity`'s saved fields that are not a component, each with why.
 const NOT_COMPONENTS: &[&str] = &[
     "id",
     "name",
     "active",
     "is_static",
-    "layer",       // the GameObject's own header
-    "scripts",     // many per entity, by path: Scene.AddScript / GetScript
-    "prefab_link", // the instance's link to its .prefab, not a component
+    "layer",
+    "scripts",
+    "prefab_link",
     "parent_id",
     "parent_bone",
     "bone_refs",
-    "children", // the hierarchy
+    "children",
 ];
 
 fn names(kind: &Kind) -> BTreeSet<&'static str> {
@@ -64,8 +60,6 @@ fn every_serialized_field_is_mapped_or_read_only() {
                 let saved: BTreeSet<&str> = saved.iter().copied().collect();
                 assert_eq!(table, saved, "{}: table vs serialized fields", kind.name);
             }
-            // Animator flattens its `Playback`, so serde reads it as a map: check
-            // the flattened fields and everything a default one saves.
             None => {
                 assert_eq!(kind.name, "Animator", "only Animator flattens");
                 let playback = serde_fields::<Playback>().expect("Playback is a struct");
@@ -76,7 +70,6 @@ fn every_serialized_field_is_mapped_or_read_only() {
     }
 }
 
-/// An entity carrying every component the Add Component menu can attach.
 pub(super) fn dressed() -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Dressed".to_string());
@@ -94,7 +87,6 @@ fn each_kind_reads_its_entity_key() {
     let doc = serde_json::to_value(scene.world.entity_document(id).unwrap()).unwrap();
     for kind in KINDS {
         let read = (kind.read)(&scene.world, id).expect(kind.name).unwrap();
-        // A `shown` hook may add a field the file leaves out at its default (#1714).
         let mut stored = read.clone();
         stored
             .as_object_mut()
@@ -117,8 +109,6 @@ fn each_kind_reads_its_entity_key() {
     }
 }
 
-/// Each op, driven with the field's own serialized value (no unchanged-key skip),
-/// leaves the component as it was: an op that can't decode what `Get` reads fails.
 #[test]
 fn every_writable_field_takes_back_what_get_reads() {
     let (mut scene, id) = dressed();

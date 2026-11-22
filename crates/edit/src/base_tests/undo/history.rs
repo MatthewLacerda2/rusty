@@ -1,4 +1,4 @@
-//! Undo by hand (#1631): what the inspector, the gizmo and a card do, as World
+//! Undo by hand: what the inspector, the gizmo and a card do, as World
 //! writes between `begin_edits` and a commit, the way the editor's frame runs them.
 
 use glam::Vec3;
@@ -17,7 +17,6 @@ fn scene_with_crate() -> (Scene, u32) {
     (scene, id)
 }
 
-/// One hand edit: `edit` between an opened and a committed step.
 fn edit(scene: &mut Scene, edit: impl FnOnce(&mut Scene)) {
     scene.begin_edits();
     edit(scene);

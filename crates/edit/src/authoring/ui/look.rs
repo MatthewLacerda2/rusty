@@ -1,20 +1,8 @@
-//! crates/edit/src/authoring/ui/look.rs — Shared UI-look ops: blend and gradient (#425).
-//!
-//! The ONE place the blend mode and gradient every UI graphic shares are named,
-//! parsed and validated. The Image, Text and Shape ops (and so their inspector
-//! cards and Lua namespaces) route through these: a gradient keeps 2–4 stops in
-//! ascending `t` within `[0, 1]`, colours in `[0, 1]`, and a positive radius.
-//!
-//! Pure.
-
 use glam::Vec2;
 
 use rusty_components::{UiGradient, MAX_GRADIENT_STOPS};
 use rusty_scene::rules::sanitize::{finite, unit_color, MIN_EXTENT};
 
-/// `g` made valid, or `None` when it has fewer than two stops: at most
-/// [`MAX_GRADIENT_STOPS`] stops (the first ones), sorted by `t`, `t` and colours
-/// clamped to `[0, 1]`, the radius kept positive and the angle finite.
 pub fn sanitize_gradient(mut g: UiGradient) -> Option<UiGradient> {
     g.stops.truncate(MAX_GRADIENT_STOPS);
     if g.stops.len() < 2 {

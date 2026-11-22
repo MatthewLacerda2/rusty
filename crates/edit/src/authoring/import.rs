@@ -1,26 +1,8 @@
-//! crates/edit/src/authoring/import.rs — an imported material as a library material.
-//!
-//! The model importer's material DTO becomes the scene's [`MaterialAsset`], held by
-//! the material ops' rows (`authoring::material`).
-
 use super::material::SurfaceValue;
 use rusty_components::RenderFace;
 use rusty_scene::MaterialAsset;
 
-/// Convert an imported [`rusty_asset::MaterialData`] (the asset-layer DTO) into a
-/// renderable [`MaterialAsset`] for the scene's material library. This is the bridge
-/// between the pure-data asset layer and the components layer; it lives in `scene`
-/// because only this layer may see both.
-///
-/// glTF packs metallic + roughness into ONE `metallicRoughnessTexture` (metallic in
-/// B, roughness in G), so the single `data.metallic_roughness_map` is mapped to BOTH
-/// `metallic_map` AND `roughness_map`; the shader samples `.b` / `.g` from each, so
-/// pointing both at the same image reads the correct channel. The base-color alpha is
-/// dropped (the renderer's base color is RGB).
 pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialAsset {
-    // Unity's model importer marks a bump map a material names as a Normal map,
-    // and its packed metallic/roughness map linear (#1574), so each compresses
-    // as what it holds.
     let mut asset = MaterialAsset {
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
@@ -31,22 +13,14 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         normal_map: data.normal_map.clone(),
         emissive: data.emissive,
         emissive_map: data.emissive_map.clone(),
-        // glTF's `occlusionTexture` and `KHR_materials_specular`'s `specularTexture`
-        // (#2151); an ORM file's occlusion is the metallic-roughness image itself.
         occlusion_map: data.occlusion_map.clone(),
         specular_map: data.specular_map.clone(),
-        // A double-sided glTF material draws both faces (#1615), as Unity's glTF
-        // importers set *Render Face* to Both.
         render_face: match data.double_sided {
             true => RenderFace::Both,
             false => RenderFace::Front,
         },
-        // Imported glTF/OBJ materials default to Opaque (#242): the importer does not
-        // yet read glTF `alphaMode`/`alphaCutoff`, so transparency is authored after
-        // import via the inspector or the `Material` API.
         ..MaterialAsset::default()
     };
-    // `KHR_materials_ior` and `KHR_materials_specular` (#1998), clamped by their rows.
     super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
     // Its strength through its row, clamped as an authored one is.
     let strength = SurfaceValue::Number(data.occlusion_strength);
@@ -89,12 +63,10 @@ mod tests {
         let face = material_asset_from_import(&both).render_face;
         assert_eq!(face, rusty_components::RenderFace::Both, "glTF doubleSided");
 
-        // Base-color alpha is dropped; rgb carried through.
         assert_eq!(mat.base_color, [0.8, 0.4, 0.2]);
         assert_eq!(mat.metallic, 0.25);
         assert_eq!(mat.roughness, 0.75);
         assert_eq!(mat.base_color_map, Some("albedo.png".into()));
-        // The single glTF MR texture fans out to BOTH engine maps (#203).
         assert_eq!(mat.metallic_map, Some("mr.png".into()));
         assert_eq!(mat.roughness_map, Some("mr.png".into()));
         assert_eq!(mat.normal_map, Some("n.png".into()));

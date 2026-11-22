@@ -1,8 +1,4 @@
-//! crates/edit/src/prefab/restamp.rs — rebuilding many linked instances at once: every
-//! one in a loaded scene, or every one of a model that was just re-imported
-//! (#1637, Unity's model prefab). Each source is read once per call, however many
-//! instances it has, so a Dust2-sized level holding hundreds of one model builds
-//! that model's prefab once.
+//! Each source is read once per call, so a Dust2-sized level holding hundreds of one model builds that model's prefab once.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -14,18 +10,7 @@ use crate::prefab::source::{is_model_source, node_paths, read_source};
 use rusty_scene::rehydrate::Imports;
 use rusty_scene::Scene;
 
-/// Run `refit` (a re-import of the models `names` accepts, #1637) as those models'
-/// change on every instance linked to one: each instance's edits are taken as
-/// overrides against the model as it was, then `refit` runs, then each instance is
-/// rebuilt from the model as it imports now with those overrides on top. So a
-/// part keeps a hand edit and takes everything else (a Scale Factor's offsets, a
-/// moved node) from the file. It writes entities but is no edit: unrecorded, as a
-/// bake is, when an instance is there to rebuild. The rebuild also gives each
-/// instance the model's node tree: a node the model gained is spawned, one it lost
-/// is destroyed (`structure`, #1665). `refit` is handed, for it to skip, the
-/// instances' static meshed parts, which the rebuild re-imports anyway, and every
-/// part whose node is gone, which the rebuild destroys; a skinned part still in the
-/// model is left to it, since its rig and bones are the refit's to move.
+/// Each instance's edits are taken as overrides against the model as it was, then `refit` runs, then each instance is rebuilt from the model as it imports now. `refit` skips static meshed parts (the rebuild re-imports them) and parts whose node is gone; a skinned part still in the model is left to it, since its rig and bones are the refit's to move.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,
@@ -43,9 +28,6 @@ pub fn restamp_models<R>(
                 continue;
             };
             sync_overrides(&mut scene.world, &ids);
-            // Only a part the rebuild will reach is skipped: a static one it
-            // rebuilds, or a gone one it destroys. Every part of a model that no
-            // longer reads is left to `refit`, or it would keep stale geometry.
             let Some(Some(kept)) = link_source(scene, root)
                 .ok()
                 .map(|s| nodes.entry(s).or_insert_with_key(|s| node_set(s)).as_ref())
@@ -68,15 +50,11 @@ pub fn restamp_models<R>(
     })
 }
 
-/// The node paths of the model at `source` as it imports now, `None` when it
-/// can't be read.
 fn node_set(source: &str) -> Option<BTreeSet<String>> {
     let prefab = read_source(source).ok()?;
     Some(node_paths(&prefab).into_values().collect())
 }
 
-/// The instance roots (a linked entity with `local_id == 0`) whose source `pick`
-/// accepts.
 pub(super) fn instance_roots(scene: &Scene, pick: impl Fn(&str) -> bool) -> Vec<u32> {
     let is_root = |id: u32| {
         let link = scene.world.prefab_link(id);
@@ -86,11 +64,6 @@ pub(super) fn instance_roots(scene: &Scene, pick: impl Fn(&str) -> bool) -> Vec<
     ids.filter(|&id| is_root(id)).collect()
 }
 
-/// Propagate each of `roots` in one [`Pass`]: each source read and its baselines
-/// built once, each model file looked up once through `imports`; a root whose
-/// source can't be read is skipped. The whole-scene passes run once, after the
-/// last instance. `applying` says a document is being applied
-/// (`structure::reshape`).
 pub(super) fn propagate_roots(
     scene: &mut Scene,
     roots: Vec<u32>,

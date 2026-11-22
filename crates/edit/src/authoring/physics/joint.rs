@@ -1,13 +1,3 @@
-//! crates/edit/src/authoring/physics/joint.rs — Shared Joint-authoring ops (#449).
-//!
-//! The ONE place the engine mutates an entity's first-class `JointComponent`. The
-//! editor's Joint card and the Lua `Joint.*` namespace both route every write
-//! through these, so the bounds live once: angles stay within a half-turn, the
-//! limit range is ordered, break thresholds are non-negative, and the axis is a
-//! unit vector (a zero axis is ignored).
-//!
-//! Pure.
-
 use glam::{Vec2, Vec3};
 
 use rusty_components::{JointComponent, JointKind};
@@ -18,33 +8,26 @@ use rusty_scene::rules::sanitize::{clamped, finite3, non_negative};
 /// a rotation's direction becomes ambiguous.
 pub const MAX_ANGLE: f32 = 179.0;
 
-/// Set which rotations the joint leaves free.
 pub fn set_kind(j: &mut JointComponent, kind: JointKind) {
     j.kind = kind;
 }
 
-/// Set the entity it joins to (`None`: the world).
 pub fn set_connected_body(j: &mut JointComponent, body: Option<u32>) {
     j.connected_body = body;
 }
 
-/// Set the pivot, in this entity's local space.
 pub fn set_anchor(j: &mut JointComponent, anchor: Vec3) {
     j.anchor = finite3(anchor);
 }
 
-/// Set the pivot on the connected body (world space with no connected body).
 pub fn set_connected_anchor(j: &mut JointComponent, anchor: Vec3) {
     j.connected_anchor = finite3(anchor);
 }
 
-/// Set whether the connected anchor is derived from `anchor` at build time.
 pub fn set_auto_configure_connected_anchor(j: &mut JointComponent, auto: bool) {
     j.auto_configure_connected_anchor = auto;
 }
 
-/// Set the hinge / twist axis, normalized. A zero (or non-finite) axis names no
-/// direction and is ignored.
 // lint: allow(sanitize) `unit` refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
     if let Some(unit) = unit(axis) {
@@ -52,8 +35,6 @@ pub fn set_axis(j: &mut JointComponent, axis: Vec3) {
     }
 }
 
-/// Set a Ball joint's swing-1 axis, normalized. A zero (or non-finite) axis
-/// names no direction and is ignored.
 // lint: allow(sanitize) `unit` refuses a NaN, infinite or zero axis; the old one stays
 pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
     if let Some(unit) = unit(axis) {
@@ -61,9 +42,6 @@ pub fn set_swing_axis(j: &mut JointComponent, axis: Vec3) {
     }
 }
 
-/// `axis` as a unit vector: as given when it already is one (to glam's
-/// tolerance), so a saved axis loads and writes back bit for bit instead of
-/// moving an ulp each time (#1418); else normalized; `None` for no direction.
 fn unit(axis: Vec3) -> Option<Vec3> {
     if axis.is_normalized() {
         Some(axis)
@@ -72,7 +50,6 @@ fn unit(axis: Vec3) -> Option<Vec3> {
     }
 }
 
-/// Set whether the angle limits apply.
 pub fn set_use_limits(j: &mut JointComponent, use_limits: bool) {
     j.use_limits = use_limits;
 }
@@ -99,27 +76,22 @@ pub fn set_swing2_limit(j: &mut JointComponent, degrees: f32) {
     j.swing2_limit = clamped(degrees, 0.0, MAX_ANGLE);
 }
 
-/// Set the breaking force, floored at 0 (unbreakable).
 pub fn set_break_force(j: &mut JointComponent, force: f32) {
     j.break_force = non_negative(force);
 }
 
-/// Set the breaking torque, floored at 0 (unbreakable).
 pub fn set_break_torque(j: &mut JointComponent, torque: f32) {
     j.break_torque = non_negative(torque);
 }
 
-/// Set the drive's strength (1/s²), floored at 0 (no motor).
 pub fn set_drive_strength(j: &mut JointComponent, strength: f32) {
     j.drive_strength = drive_value(strength);
 }
 
-/// Set the drive's damping (1/s), floored at 0.
 pub fn set_drive_damping(j: &mut JointComponent, damping: f32) {
     j.drive_damping = drive_value(damping);
 }
 
-/// Set whether the two joined bodies collide with each other.
 pub fn set_enable_collision(j: &mut JointComponent, enable: bool) {
     j.enable_collision = enable;
 }

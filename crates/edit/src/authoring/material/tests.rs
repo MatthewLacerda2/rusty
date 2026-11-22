@@ -1,8 +1,5 @@
-//! Tests for the shared material-authoring ops.
-
 use super::*;
 
-/// A library with one default material under `"k"`.
 fn one() -> MaterialLibrary {
     let mut materials = MaterialLibrary::new();
     materials.insert("k".to_string(), MaterialAsset::default());
@@ -43,7 +40,7 @@ fn factors_clamp_to_the_factor_range_and_refuse_non_finite() {
 fn map_ops_set_and_clear() {
     let mut materials = one();
     set_base_color_map(&mut materials, "k", "albedo.png".to_string());
-    set_base_color_map(&mut materials, "k", String::new()); // empty clears
+    set_base_color_map(&mut materials, "k", String::new());
     set_metallic_map(&mut materials, "k", Some("m.png".to_string()));
     set_normal_map(&mut materials, "k", None);
     let m = &materials["k"];
@@ -97,7 +94,6 @@ fn define_asset_inserts_and_overwrites_by_name() {
         },
     );
     assert_eq!(materials["brick"].metallic, 0.3);
-    // A second define under the same name overwrites (insert semantics).
     define_asset(
         &mut materials,
         "brick",
@@ -114,7 +110,6 @@ fn define_asset_inserts_and_overwrites_by_name() {
 fn ensure_named_creates_default_but_never_overwrites() {
     let mut materials = MaterialLibrary::new();
     ensure_named(&mut materials, "k");
-    // Mutate via a per-field op, then ensure again: the existing asset is kept.
     set_metallic(&mut materials, "k", 0.6);
     ensure_named(&mut materials, "k");
     assert_eq!(materials["k"].metallic, 0.6, "ensure does not reset");
@@ -129,7 +124,6 @@ fn ensure_material_key_resolves_then_creates() {
     assert_eq!(key, entity_material_key(id));
     assert!(scene.materials.contains_key(&key), "library entry created");
     assert!(scene.world.has_material(id), "ref attached");
-    // Idempotent: a second resolve returns the same key, no duplicate entry.
     assert_eq!(
         ensure_material_key(&mut scene, id).as_deref(),
         Some(key.as_str())
@@ -137,8 +131,6 @@ fn ensure_material_key_resolves_then_creates() {
     assert_eq!(scene.materials.len(), 1);
 }
 
-/// Removing a Material and adding it back keeps the library asset under the entity's
-/// key, whichever surface re-adds it: one rule (#997).
 #[test]
 fn re_adding_a_material_keeps_the_library_asset() {
     let mut scene = Scene::new();

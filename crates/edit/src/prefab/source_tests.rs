@@ -1,6 +1,3 @@
-//! A model instance's node paths (#1637): one per entity, a duplicate sibling name
-//! told apart by `[n]`, a node a bone holds by `<bone>>`.
-
 use std::collections::BTreeMap;
 
 use super::{is_model_source, node_paths};

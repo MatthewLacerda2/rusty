@@ -1,7 +1,3 @@
-//! The Scale Factor from the scene's side (#1398): setting it re-imports the model's
-//! meshes already in the scene, a skinned one with its bones moved to the scaled
-//! rest pose (its Lua side: `scripting::tests::assets`).
-
 use glam::Vec3;
 
 use super::{instantiate_asset, set_model_scale_factor};

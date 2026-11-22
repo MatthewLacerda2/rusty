@@ -1,5 +1,3 @@
-//! Tests for reading a recipe's image files (#1491).
-
 use super::*;
 use rusty_procgen::recipe::{ImageEncoding, ImageTexture, Node, OpKind};
 use std::path::Path;
@@ -74,7 +72,6 @@ fn a_file_beside_the_root_is_outside_it() {
     let file = base.join("shared.png");
     write_png(&file);
     assert!(outside_root(&file, &root).is_some());
-    // Read all the same: outside is allowed, it only warns.
     assert!(load_recipe(&image_recipe("../shared.png"), &ContentRoots::new(&root)).is_ok());
 }
 

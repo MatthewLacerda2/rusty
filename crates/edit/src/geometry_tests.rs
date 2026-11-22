@@ -1,6 +1,3 @@
-//! What the scene document copies of a mesh: no geometry, which no reader keeps,
-//! and the same saved text as a copy with it.
-
 use glam::Vec3;
 
 use crate::asset_instance::instantiate_asset;
@@ -9,7 +6,6 @@ use rusty_components::ColliderComponent;
 use rusty_scene::Scene;
 use rusty_test_support::models::quad_file;
 
-/// One quad instance with a Mesh-shaped collider whose collision mesh is the quad.
 fn level() -> Scene {
     let path = quad_file("rusty_document_geometry");
     let reference = format!("{path}::Quad");
@@ -48,8 +44,6 @@ fn a_document_carries_no_mesh_geometry() {
     assert!(collision.positions.is_empty() && collision.indices.is_empty());
 }
 
-/// The text a save writes is the one a full copy writes: the geometry is never
-/// written either way.
 #[test]
 fn a_saved_document_is_the_text_a_full_copy_writes() {
     let scene = level();

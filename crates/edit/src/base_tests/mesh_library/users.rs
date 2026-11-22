@@ -1,4 +1,4 @@
-//! The scene mesh library's users (#2059's review): a bad entry on load, many
+//! The scene mesh library's users: a bad entry on load, many
 //! entities sharing one build, a Mesh collider's kept copy, a prefab rebuild and
 //! `delete_mesh`.
 

@@ -31,7 +31,6 @@ fn the_cast_keeps_its_names_and_ids() {
         .light(6)
         .expect("the sun lights the scene")
         .clone();
-    // A new project's sun is a level's: `Baked`, previewed until its first bake.
     assert_eq!(sun.mode, rusty_components::LightMode::Baked);
     assert_eq!(scene.lights_awaiting_bake(), vec![6]);
     assert_eq!(scene.world.nav_agent(5).unwrap().base_offset, 1.0, "#666");
@@ -81,9 +80,6 @@ fn the_built_scene_survives_its_saved_document() {
     );
 }
 
-/// Enemy_1's agent is authored ready to chase, and stops where neither body
-/// overlaps the other even corner-on: half its box's diagonal plus the Player's
-/// capsule radius stays inside the stopping distance (#743).
 #[test]
 fn the_enemy_stops_clear_of_the_player() {
     let scene = built();
@@ -116,7 +112,6 @@ fn seeding_bakes_the_texture_and_shader_once() {
             "{ext}"
         );
     }
-    // Read as `api::recipe_from_json_str` (and a JSON string passed to Lua) reads it.
     let json = std::fs::read_to_string(shaders.join(format!("{SHADER_NAME}.recipe.json")));
     let json = serde_json::from_str(&json.unwrap()).unwrap();
     assert_eq!(
@@ -124,7 +119,6 @@ fn seeding_bakes_the_texture_and_shader_once() {
         Ok(shader_recipe())
     );
 
-    // An edited copy is the user's: a second seed leaves it alone.
     std::fs::write(&png, b"edited").unwrap();
     seed_default_assets_into(&tex, &shaders).expect("re-seeds");
     assert_eq!(std::fs::read(&png).unwrap(), b"edited");

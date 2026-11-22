@@ -1,8 +1,3 @@
-//! A component added to an instance is one *added component* holding its whole value
-//! (#1527), as Unity's; a script is a list element, a size entry plus the new
-//! element. A Light, a Collider or a script added to an instance child keeps its
-//! values through Play and a save/load.
-
 use super::tests::save_and_load;
 use crate::authoring::defaults::{default_collider, default_light};
 use crate::snapshot::SceneSnapshot;
@@ -11,8 +6,6 @@ use glam::Vec3;
 use rusty_components::{ColliderShape, ScriptComponent, ScriptFieldValue};
 use rusty_scene::Scene;
 
-/// A linked instance of `Root { Child }`, the child shaped by `dress` before the
-/// prefab is saved: (scene, root, child).
 pub(super) fn bare(tag: &str, dress: impl FnOnce(&mut Scene, u32)) -> (Scene, u32, u32) {
     let mut author = Scene::new();
     let root = author.add_entity("Root".into());
@@ -28,7 +21,6 @@ pub(super) fn bare(tag: &str, dress: impl FnOnce(&mut Scene, u32)) -> (Scene, u3
     (scene, root, child)
 }
 
-/// Enter Play and leave it: the edit-mode World captured and put back.
 pub(super) fn play_stop(scene: &mut Scene) {
     SceneSnapshot::capture(scene).restore(scene);
 }

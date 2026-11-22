@@ -1,4 +1,4 @@
-//! The bake files a save replaces (#1982's review): a new scene saved over a baked
+//! The bake files a save replaces: a new scene saved over a baked
 //! one drops that scene's bake files, a re-bake that gives the loaded bytes still
 //! wins over a newer file, and the SH sidecar always travels with its document, so
 //! SH never lands on probes it was not baked for.
@@ -23,7 +23,6 @@ fn pvs(cell: f32) -> OcclusionData {
     OcclusionData::new(grid, Vec::new(), Vec::new(), vec![0]).expect("one cell")
 }
 
-/// A saved scene at `<name>/level.scene` with every sidecar baked; its path.
 fn baked(name: &str) -> String {
     let dir = rusty_test_support::temp::dir()
         .join("bake_replace")
@@ -53,7 +52,6 @@ fn opened(path: &str) -> Scene {
 fn a_new_scene_saved_over_a_baked_one_drops_its_bake_files() {
     let path = baked("new_over");
     assert!(sidecars(&path).iter().all(|p| p.exists()));
-    // File ▸ New (and Reset Scene) clear the scene, its record included.
     let mut scene = opened(&path);
     scene.clear();
     crate::save_to_file(&scene, &path).unwrap();
@@ -72,7 +70,6 @@ fn a_rebake_of_the_loaded_bytes_wins_over_a_newer_file() {
     headless.put_baked_occlusion(Some(pvs(2.0)));
     headless.put_baked_navmesh(Arc::from(vec![2u8; 4]));
     crate::save_to_file(&headless, &path).unwrap();
-    // The editor re-bakes an unchanged scene: the bytes it loaded.
     editor.put_baked_occlusion(Some(pvs(1.0)));
     editor.put_baked_navmesh(Arc::from(vec![1u8; 4]));
     crate::save_to_file(&editor, &path).unwrap();
@@ -85,7 +82,6 @@ fn a_rebake_of_the_loaded_bytes_wins_over_a_newer_file() {
 fn sh_is_saved_with_its_probes_and_never_zipped_onto_others() {
     let path = baked("sh");
     let editor = opened(&path);
-    // Another world re-places the probes and bakes them (Generate Lighting).
     let mut headless = opened(&path);
     headless.probes.add_probe(Vec3::X);
     headless.probes.probes_mut()[1].sh.coeffs[0] = [2.0; 3];

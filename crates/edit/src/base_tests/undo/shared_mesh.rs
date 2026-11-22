@@ -1,4 +1,4 @@
-//! Undo records a Mesh-shaped collider's shared mesh (#1657) as its reference, like
+//! Undo records a Mesh-shaped collider's shared mesh as its reference, like
 //! a Mesh, and puts its geometry back: the live one's on an edit, rebuilt from the
 //! reference on an undone Destroy.
 

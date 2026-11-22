@@ -1,7 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/fx.rs — the animation, effects and audio components'
-//! field tables: `Animator`, `Particles`, `Audio`, `AudioReverbZone`, `Trail` and
-//! `Line`.
-
 use glam::Vec3;
 
 use super::super::table::{inspect, op, ro, with};
@@ -38,7 +34,6 @@ inspect! {
         op!("is_playing", animator::set_playing),
         op!("freeze", animator::set_freeze),
         ro!("parameters", "Animator.SetFloat / SetInt / SetBool / SetTrigger write them"),
-        // `""` is no graph, as `Animator.SetGraph` and the card read it.
         with!("graph", |a, v: Option<String>| {
             animator::set_graph(a, v.filter(|p| !p.is_empty()))
         }),
@@ -100,8 +95,6 @@ inspect! {
     ReverbZoneComponent => reverb_zone, reverb_zone_mut, &[
         op!("min_distance", reverb::set_min_distance),
         op!("max_distance", reverb::set_max_distance),
-        // `params` first: writing them makes the preset `Custom`, so a preset
-        // named beside them is applied after (and loads its own params).
         op!("params", reverb::set_params),
         op!("preset", reverb::set_preset),
     ];
@@ -119,7 +112,6 @@ inspect! {
     ];
 }
 
-/// An emitter's render settings, whole.
 fn set_render(p: &mut ParticleEmitterComponent, r: ParticleRender) {
     fx::set_render_mode(p, r.mode);
     fx::set_stretch(p, r.length_scale, r.speed_scale);
@@ -131,7 +123,6 @@ fn set_render(p: &mut ParticleEmitterComponent, r: ParticleRender) {
     fx::set_reactive(p, r.reactive);
 }
 
-/// A trail's or line's ribbon look, whole.
 fn set_style(s: &mut RibbonStyle, v: RibbonStyle) {
     ribbon::set_width(s, v.width);
     ribbon::set_color(s, v.color);

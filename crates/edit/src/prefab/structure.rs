@@ -1,18 +1,4 @@
-//! crates/edit/src/prefab/structure.rs — a model instance takes its model's new shape
-//! (#1665, Unity's model prefab).
-//!
-//! Propagation matches instance entities to source entities ([`rekey`] gives each
-//! its local id by node path), and for a model source this pass then makes the
-//! instance's node tree the model's: a node the model gained is stamped in under
-//! its parent node's entity, and a part whose node the model lost is destroyed.
-//! What the user added under a lost part (an entity of no link to this instance:
-//! a light, a nested instance of another model) is not lost with it: as Unity
-//! keeps an orphaned added object, it moves to the nearest surviving ancestor,
-//! keeping where it is in the world. A part the user removed is not a node the
-//! model gained: it is never stamped back (`removed`). A `.prefab` source stays
-//! flat (#216).
-//!
-//! [`rekey`]: crate::prefab::source::rekey
+//! What the user added under a lost part (a light, a nested instance of another model) moves to the nearest surviving ancestor keeping its world place, as Unity keeps an orphaned added object. A part the user removed is never stamped back.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -27,13 +13,6 @@ use rusty_scene::rehydrate::Imports;
 use rusty_scene::runtime::despawn::Despawn;
 use rusty_scene::{Entity, Scene};
 
-/// Give the instance at `root` (its members `ids`, already rekeyed against
-/// `prefab`, the model at `source` as it imports now) the model's node tree,
-/// within `pass`: when it is applying a document (a load, a Play snapshot), what
-/// it removes has no script instance yet and goes at once; otherwise it goes the
-/// way the mode allows (`Scene::destroy`). What it adds is rebuilt through the
-/// pass's lookups. Returns the instance's members
-/// afterwards: `ids` itself when the tree already matches.
 pub(super) fn reshape(
     scene: &mut Scene,
     root: u32,
@@ -70,16 +49,7 @@ pub(super) fn reshape(
     members
 }
 
-/// Destroy every member of `gone` (its node the model lost), re-homing first
-/// what else hangs under one. A node's path names its parent's, so a lost node's
-/// member children are lost too: only the topmost lost parts are destroyed, and
-/// their subtrees go with them, the bones of a skinned part and their generated
-/// hitboxes among them. Anything else reached (an entity the user added, a nested
-/// instance, a surviving member the user moved under the lost part) moves out
-/// whole to the nearest ancestor not lost, as Unity keeps an orphaned added
-/// object. The topmost are picked only after every move: a lost part under a
-/// surviving member under another lost part has moved out with that member, and
-/// is topmost there.
+/// Only the topmost lost parts are destroyed; their subtrees go with them. The topmost are picked after every move: a lost part under a surviving member under another lost part has moved out with that member.
 fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
     let bones = scene.bone_ids();
     let lost = |id: u32| gone.contains(&id) || bones.contains(&id);
@@ -89,7 +59,6 @@ fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
             .self_and_descendants_while(part, lost)
             .filter(|&id| !lost(id) && !scene.is_generated_hitbox(id))
             .collect();
-        // The root's node path is "": never gone, so a home exists.
         let Some(home) = scene.world.ancestors(part).find(|&a| !lost(a)) else {
             continue;
         };
@@ -113,7 +82,6 @@ fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
     }
 }
 
-/// Parent `id` under `home`, keeping its world transform.
 fn rehome(scene: &mut Scene, id: u32, home: u32) {
     let world = scene.world.local_to_world(id);
     let local = scene.world.local_to_world(home).inverse() * world;
@@ -124,12 +92,6 @@ fn rehome(scene: &mut Scene, id: u32, home: u32) {
     }
 }
 
-/// Stamp each of `missing` (entities of the model no member claims and the user
-/// did not remove, parents first: `prefab.entities` is in subtree order) under
-/// the instance entity of its parent, adding it to `members`. Its values are the
-/// source's as they stand; the rebuild that follows takes its baseline and merges
-/// the materials it names into the library (`Merge::KeepScene`, the model's), so
-/// nothing here touches the library.
 fn add_missing(
     scene: &mut Scene,
     members: &mut Vec<u32>,
@@ -155,11 +117,8 @@ fn add_missing(
             node: nodes.get(&entity.id).cloned(),
             ..Default::default()
         };
-        // A reference to a node not stamped yet has no id: the rebuild that
-        // follows sets every reference from the baseline anyway.
         let id_of = |l: u32| instance.get(&l).copied().unwrap_or(GONE);
         let mut stamped = stamp_entity(entity, id_of, &BTreeMap::new(), Some(link), imports);
-        // Linked through `set_parent`, so the parent's children list has it.
         (stamped.entity.parent_id, stamped.entity.children) = (None, Vec::new());
         hung.extend(stamped.hung);
         bone_refs.extend(stamped.bone_refs);
@@ -167,7 +126,6 @@ fn add_missing(
         let _ = scene.set_parent(id, Some(parent));
         members.push(id);
     }
-    // Hanging notes every skinned entity: only when a stamp brought something.
     if !hung.is_empty() || !bone_refs.is_empty() {
         scene.hang_on_skeletons(hung, bone_refs);
     }

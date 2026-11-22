@@ -1,48 +1,28 @@
-//! crates/edit/src/authoring/rendering/mesh.rs — the Mesh authoring op (#1524).
-//!
-//! A mesh's geometry comes from the model or primitive it was made from; the values
-//! authored on it are a `Plane`'s subdivisions, the grid a vertex block
-//! (`vertex_waves`) needs to move, how it casts shadows (#1571), its Scale In Lightmap
-//! (#1704), and when a camera culls it as too far or too small (#1714). The Inspector's
-//! Mesh card and `Component.Set` both write them here.
-//!
-//! Pure.
-
 use rusty_components::{MeshComponent, ShadowCasting};
 pub use rusty_scene::rules::mesh::{hold_scale_in_lightmap, hold_subdivisions, set_subdivisions};
 use rusty_scene::rules::sanitize::{self, clamped, non_negative};
 
-/// Set how the mesh casts shadows (#1571): every shadow path reads it on its next
-/// frame or bake, a static one's cached shadow included.
 pub fn set_cast_shadows(mesh: &mut MeshComponent, mode: ShadowCasting) {
     mesh.cast_shadows = mode;
 }
 
-/// Set the distance in metres past which a camera stops drawing the mesh (#1714,
-/// Unreal's *Max Draw Distance*); `0` is unlimited. Negative, NaN or infinite
-/// is `0`.
+/// Unreal's *Max Draw Distance*; `0` is unlimited.
 pub fn set_max_draw_distance(mesh: &mut MeshComponent, metres: f32) {
     mesh.max_draw_distance = non_negative(metres);
 }
 
-/// Set the screen-relative height (`0..1`, Unity `LODGroup`'s measure) under which a
-/// camera stops drawing the mesh (#1714); `0` is off. Held to `[0, 1]`; NaN or
-/// infinite is `0`.
+/// Unity `LODGroup`'s measure; `0` is off.
 pub fn set_min_screen_size(mesh: &mut MeshComponent, height: f32) {
     mesh.min_screen_size = clamped(height, 0.0, 1.0);
 }
 
-/// What `Component.Get(id, "Mesh")` reports beyond the stored value: the
-/// small-object cull's two settings, which the file leaves out while `0` (#1714),
-/// so a script reads `0` there as `Mesh.Get*` does, never `nil`.
+/// The small-object cull's two settings, which the file leaves out while `0`, so a script reads `0`
+/// there, never `nil`.
 pub fn shown(m: &MeshComponent, value: &mut serde_json::Value) {
     value["max_draw_distance"] = serde_json::json!(m.max_draw_distance);
     value["min_screen_size"] = serde_json::json!(m.min_screen_size);
 }
 
-/// Set the mesh's Scale In Lightmap (#1704), held in
-/// [`MeshComponent::SCALE_IN_LIGHTMAP`]; a non-finite value changes nothing. The
-/// next bake reads it.
 pub fn set_scale_in_lightmap(mesh: &mut MeshComponent, scale: f32) {
     let (lo, hi) = MeshComponent::SCALE_IN_LIGHTMAP.into_inner();
     mesh.scale_in_lightmap = sanitize::finite_or(scale, mesh.scale_in_lightmap).clamp(lo, hi);
@@ -83,7 +63,7 @@ mod tests {
             .unwrap_err()
             .contains("Plane"));
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()));
-        cube.subdivisions = 4; // a stray count, from a hand-edited file
+        cube.subdivisions = 4;
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()), "1 clears it");
         assert_eq!(cube.subdivisions, 1);
     }
@@ -136,7 +116,6 @@ mod tests {
     fn scale_in_lightmap_is_held_in_its_range() {
         let mut cube = primitive_mesh_component(Primitive::Box).unwrap();
         assert_eq!(cube.scale_in_lightmap, 1.0);
-        // A non-finite value changes nothing, so the 64 before it stands.
         let sets = [(2.5, 2.5), (-1.0, 0.0), (1e9, 64.0), (f32::NAN, 64.0)];
         for (set, held) in sets.into_iter().chain([(f32::INFINITY, 64.0)]) {
             set_scale_in_lightmap(&mut cube, set);

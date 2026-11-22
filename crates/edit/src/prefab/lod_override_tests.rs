@@ -1,7 +1,3 @@
-//! A `null` override leaf costs only itself (#1264): destroying the entity an
-//! instance's LOD renderer override names writes `null` into a list of ids, and the
-//! entity's other overrides still survive a save, a load and a propagation.
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use crate::prefab::{instantiate_prefab_linked, read_prefab_file};
@@ -9,7 +5,6 @@ use crate::{apply_scene_data, save_prefab, to_scene_data};
 use rusty_components::{LodGroupComponent, LodLevel};
 use rusty_scene::{MaterialAsset, MaterialComponent, SceneData};
 
-/// A Box root whose LOD group renders its Sphere child, saved as a prefab.
 fn write_lod_prefab() -> String {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -71,8 +66,6 @@ fn a_destroyed_lod_renderer_override_keeps_the_other_overrides() {
 
 #[test]
 fn an_instance_added_lod_level_applies_without_its_outside_renderer() {
-    // A dropped id inside a modification's whole value leaves its list of ids, as
-    // the typed walk drops it (#1527): the added level is not lost to a `null`.
     let path = write_lod_prefab();
     let mut scene = Scene::new();
     let post = scene.add_entity("Post".into());

@@ -1,8 +1,3 @@
-//! A survivor never inherits the level's stale baked-light ids: a light deleted
-//! since the bake keeps its id in the lightmaps (it reads as baked until the next
-//! bake), and that id names no incoming entity, so nothing moves off it. And a
-//! renumbering that would merge two of the set's ids is refused, not merged.
-
 use std::collections::BTreeSet;
 
 use super::make_room;
@@ -12,8 +7,6 @@ use rusty_scene::create::default_light;
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
 
-/// A Shadowmask level of six entities whose bake took in two lights deleted
-/// since: 7 on channel 1, and 8, which fell back.
 fn level_with_deleted_lights() -> Scene {
     let mut level = Scene::new();
     level.lighting_settings.mixed_lighting_mode = MixedLightingMode::Shadowmask;
@@ -65,7 +58,6 @@ fn a_renumbering_that_would_merge_two_baked_ids_is_refused() {
     let mut level = Scene::new();
     level.add_entity("Lamp".to_string());
     let mut data = to_scene_data(&level);
-    // Malformed: a baked id (2) at the document's next id, where 1 moves to.
     assert_eq!(data.next_entity_id, 2);
     data.lightmaps.lights.extend([1, 2]);
     make_room(&mut data, &BTreeSet::from([1]));

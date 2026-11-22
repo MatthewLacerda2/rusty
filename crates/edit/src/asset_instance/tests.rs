@@ -1,17 +1,9 @@
-//! Tests for `instantiate_asset` (#182): one entity from a `path::sub_object`
-//! reference — placed at the requested transform, carrying an "Asset" mesh that
-//! rehydrates from its reference (no inlined GPU buffers), its glTF material (deduped
-//! into the library) or the engine default, and a synced collider via the sidecar.
-
 use glam::Vec3;
 
 use super::instantiate_asset;
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
-/// A glTF with TWO meshes that both reference material 0 — proves sub-objects sharing
-/// one glTF material share ONE library key (dedup). One embedded buffer holds three
-/// shared positions (both meshes point at the same accessor).
 const SHARED_MATERIAL_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -35,7 +27,6 @@ const SHARED_MATERIAL_GLTF: &str = r#"{
 }
 "#;
 
-/// A glTF whose mesh names NO material — must be dressed with the engine default.
 pub(super) const NO_MATERIAL_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -73,12 +64,10 @@ fn instantiate_places_textured_entity_and_dedups_material() {
     )
     .unwrap();
 
-    // Placed at the requested transform; named from the sub-object when None.
     assert_eq!(scene.world.transform(a).unwrap().position, pos);
     assert_eq!(*scene.world.name(a).unwrap(), "PartA");
     assert_eq!(*scene.world.name(b).unwrap(), "Tower");
 
-    // Mesh is a reference-backed "Asset" with real geometry, not inlined.
     let mesh = scene.world.mesh(a).expect("asset mesh attached");
     assert_eq!(mesh.primitive_type, "Asset");
     assert_eq!(
@@ -87,7 +76,6 @@ fn instantiate_places_textured_entity_and_dedups_material() {
     );
     assert!(!mesh.vertices.is_empty());
 
-    // Both sub-objects share ONE library key (dedup).
     let key = format!("{path}::Shared");
     assert_eq!(scene.materials.len(), 1);
     assert_eq!(scene.world.material(a).unwrap().first(), key);
@@ -100,12 +88,10 @@ fn instantiated_asset_round_trips_as_a_reference() {
     let mut scene = Scene::new();
     let id = instantiate_asset(&mut scene, &format!("{path}::PartA"), None, Vec3::ZERO).unwrap();
 
-    // Save preserves the reference, never the vertices.
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     assert!(json.contains("\"primitive_type\":\"Asset\""));
     assert!(!json.contains("\"vertices\""));
 
-    // Reload re-imports geometry from the reference and keeps the material.
     let mut restored = Scene::new();
     apply_scene_data(&mut restored, to_scene_data(&scene));
     let mesh = restored.world.mesh(id).unwrap().clone();

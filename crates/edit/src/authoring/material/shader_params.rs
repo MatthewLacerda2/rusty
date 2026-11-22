@@ -1,21 +1,11 @@
-//! crates/edit/src/authoring/material/shader_params.rs — runtime shader params (#399) on a
-//! material, and per-entity overrides of them (#670, Unity's `MaterialPropertyBlock`).
-//!
-//! Both write paths validate the same way, once: a param the shader bakes, a typo,
-//! or a wrong number of values is an error naming it ([`ParamLayout::resolve`] /
-//! [`ParamLayout::coerce`]), and values are stored by canonical name so
-//! `"hit_flash.amount"` and `"hit_flash.0.amount"` are one value. The material's
-//! value saves with the scene; an entity's override is runtime-only
-//! ([`ShaderOverrides`](rusty_scene::shader_overrides::ShaderOverrides)).
+//! Values are stored by canonical name, so `"hit_flash.amount"` and `"hit_flash.0.amount"` are one
+//! value. The material's value saves with the scene; an entity's override is runtime-only.
 
 use super::{ensure_material_key, MaterialLibrary};
 use rusty_scene::rules::sanitize::finite_values;
 use rusty_scene::Scene;
 use rusty_shadergen::params::{self, ParamLayout};
 
-/// The runtime-param layout of material `key`'s shader (#399), read from the
-/// shader's `<name>.params.json` where the renderer resolves the module. Errors
-/// when the material is missing, names no shader, or the shader is not baked.
 pub fn shader_layout(materials: &MaterialLibrary, key: &str) -> Result<ParamLayout, String> {
     let shader = materials
         .get(key)
@@ -24,8 +14,6 @@ pub fn shader_layout(materials: &MaterialLibrary, key: &str) -> Result<ParamLayo
     params::load(shader)
 }
 
-/// `name` and `value` checked against `layout`: the canonical name, and the value
-/// fitted to the param's lanes (one number broadcasts to every lane).
 fn checked(
     layout: &ParamLayout,
     name: &str,
@@ -35,9 +23,6 @@ fn checked(
     Ok((layout.name(slot), layout.coerce(slot, value)?))
 }
 
-/// Set runtime shader param `name` (#399) on material `key`, checked against its
-/// shader's `layout`. Every entity sharing the material draws with it, unless it
-/// overrides the param itself.
 pub fn set_shader_param(
     materials: &mut MaterialLibrary,
     key: &str,
@@ -52,8 +37,6 @@ pub fn set_shader_param(
     Ok(())
 }
 
-/// The value runtime shader param `name` draws with on material `key`: the stored
-/// one, else the shader's baked default.
 pub fn shader_param(
     materials: &MaterialLibrary,
     key: &str,
@@ -67,17 +50,14 @@ pub fn shader_param(
     Ok(stored.cloned().unwrap_or_else(|| slot.default.clone()))
 }
 
-/// Entity `id`'s material key and its shader's layout. The material is created if
-/// the entity has none (like every `Material` setter), so the error is the missing
-/// shader's, not the missing material's.
+/// The material is created if the entity has none (like every `Material` setter), so the error is
+/// the missing shader's.
 fn entity_layout(scene: &mut Scene, id: u32) -> Result<(String, ParamLayout), String> {
     let key = ensure_material_key(scene, id).ok_or_else(|| format!("no entity {id}"))?;
     let layout = shader_layout(&scene.materials, &key)?;
     Ok((key, layout))
 }
 
-/// Override runtime shader param `name` on entity `id` alone (#670): its material
-/// stays shared and unchanged. Checked like [`set_shader_param`].
 pub fn set_entity_shader_param(
     scene: &mut Scene,
     id: u32,
@@ -88,8 +68,6 @@ pub fn set_entity_shader_param(
     set_entity_shader_param_with(scene, id, &layout, name, value)
 }
 
-/// [`set_entity_shader_param`] against an already-read `layout` — a tween (#661)
-/// resolves it once at start instead of reading the sidecar every tick.
 pub fn set_entity_shader_param_with(
     scene: &mut Scene,
     id: u32,
@@ -102,15 +80,11 @@ pub fn set_entity_shader_param_with(
     Ok(())
 }
 
-/// The value runtime shader param `name` draws with on entity `id`: its override,
-/// else its material's value, else the shader's baked default.
 pub fn entity_shader_param(scene: &mut Scene, id: u32, name: &str) -> Result<Vec<f32>, String> {
     let (_, layout) = entity_layout(scene, id)?;
     entity_shader_param_with(scene, id, &layout, name)
 }
 
-/// [`entity_shader_param`] against an already-read `layout`, without creating a
-/// material: an entity with none reads the baked default unless it overrides.
 pub fn entity_shader_param_with(
     scene: &Scene,
     id: u32,
@@ -129,9 +103,6 @@ pub fn entity_shader_param_with(
     shader_param(&scene.materials, &key.unwrap_or_default(), layout, name)
 }
 
-/// Drop entity `id`'s override of `name`, or all of its overrides when `name` is
-/// `None`; it draws with its material's values again. A `name` the shader does not
-/// expose at runtime is an error, as when setting it.
 pub fn clear_entity_shader_param(
     scene: &mut Scene,
     id: u32,
@@ -150,19 +121,16 @@ pub fn clear_entity_shader_param(
     Ok(())
 }
 
-/// Set the authored surface shader by module name (#396); an empty name clears it
-/// back to the standard forward shader. Whether the module exists is the renderer's
-/// call (it falls back, logging once), so a shader baked later still binds.
+/// Whether the module exists is the renderer's call (it falls back, logging once), so a shader
+/// baked later still binds.
 pub fn set_shader(materials: &mut MaterialLibrary, key: &str, name: String) {
     if let Some(m) = materials.get_mut(key) {
         m.shader = (!name.is_empty()).then_some(name);
     }
 }
 
-/// Point material `key`'s extra shader texture `slot` (#400) at `path`; `None` or
-/// `""` clears it back to white. An unknown slot is an error naming it and the
-/// slots there are (#395). The path is not checked: a missing file samples white,
-/// and a texture made later binds when it appears.
+/// The path is not checked: a missing file samples white, and a texture made later binds when it
+/// appears.
 pub fn set_shader_texture(
     materials: &mut MaterialLibrary,
     key: &str,

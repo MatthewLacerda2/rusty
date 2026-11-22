@@ -1,49 +1,37 @@
-//! Lens flare's ops (#1443): the switch, the strengths, the ghost count, the tint
-//! and the flare's own chromatic aberration.
-
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
 use rusty_components::rendering::post_processing::LensFlare;
 use rusty_components::PostProcessingComponent;
 use rusty_scene::rules::sanitize::{finite_array_or, non_negative, unit};
 
-/// Set whether the lens flare draws.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.lens_flare.active = active;
 }
 
-/// Set the whole flare's strength, clamped to `≥ 0`.
 pub fn set_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.lens_flare.intensity = non_negative(value);
 }
 
-/// Set how many ghosts the flare draws, clamped to `0..=8`.
 pub fn set_ghost_count(vc: &mut PostProcessingComponent, count: u32) {
     vc.lens_flare.ghost_count = count.min(LensFlare::MAX_GHOSTS);
 }
 
-/// Set the ghosts' strength, clamped to `≥ 0`.
 pub fn set_ghost_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.lens_flare.ghost_intensity = non_negative(value);
 }
 
-/// Set the halo's strength, clamped to `≥ 0`.
 pub fn set_halo_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.lens_flare.halo_intensity = non_negative(value);
 }
 
-/// Set the streaks' strength, clamped to `≥ 0`.
 pub fn set_streak_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.lens_flare.streak_intensity = non_negative(value);
 }
 
-/// Set the flare's tint, each channel clamped to `0..=1` (a colour with a NaN or
-/// infinite channel keeps the current one).
 pub fn set_tint(vc: &mut PostProcessingComponent, tint: [f32; 3]) {
     vc.lens_flare.tint = finite_array_or(tint, vc.lens_flare.tint).map(unit);
 }
 
-/// Set how far the flare's channels split, clamped to `0..=1`.
 pub fn set_chromatic_aberration(vc: &mut PostProcessingComponent, value: f32) {
     vc.lens_flare.chromatic_aberration = unit(value);
 }

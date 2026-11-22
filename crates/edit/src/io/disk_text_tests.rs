@@ -1,7 +1,6 @@
 use crate::{save_lighting, LightingSave, LIGHTING_IN_PLAY};
 use rusty_scene::Scene;
 
-/// A saved one-entity scene at a fresh path, loaded back as the editor loads it.
 fn loaded(tag: &str) -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join(format!("disk_text_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -26,7 +25,6 @@ fn a_load_and_a_save_are_the_engines_own_text() {
     assert!(scene.is_disk_text(&path, &text), "the save is recorded");
 }
 
-/// The editor copies its selection into the scene every frame: not an edit.
 #[test]
 fn the_selection_is_not_an_unsaved_edit() {
     let (mut scene, path) = loaded("selection");
@@ -36,8 +34,6 @@ fn the_selection_is_not_an_unsaved_edit() {
     assert!(crate::has_unsaved_edits(&scene, &path));
 }
 
-/// A script attached by absolute path inside the workspace is saved relative to
-/// it: the live scene still matches the file it wrote.
 #[test]
 fn a_workspace_script_by_absolute_path_is_no_unsaved_edit() {
     let (mut scene, path) = loaded("script");
@@ -62,8 +58,6 @@ fn a_workspace_script_by_absolute_path_is_no_unsaved_edit() {
     assert!(!crate::has_unsaved_edits(&scene, &path), "saved, relative");
 }
 
-/// Generate Lighting rewrites the file's lighting fields: the new text is the
-/// engine's own, and edits elsewhere stay unsaved (#832).
 #[test]
 fn a_lighting_save_is_recorded_and_keeps_edits_unsaved() {
     let (mut scene, path) = loaded("lighting");
@@ -92,8 +86,6 @@ fn a_lighting_save_is_refused_in_play() {
     );
 }
 
-/// Generate Lighting over an outside edit the follow has not applied yet: the merged
-/// text is not recorded, so the follow still reloads it (#1374).
 #[test]
 fn a_lighting_save_over_an_outside_edit_is_not_recorded() {
     let (scene, path) = loaded("outside");
@@ -106,8 +98,6 @@ fn a_lighting_save_over_an_outside_edit_is_not_recorded() {
     assert!(!scene.is_disk_text(&path, &text));
 }
 
-/// A load whose sidecar fails still replaced the World, so the document is "what
-/// the engine read": a `touch` or rescan is no change (#1374).
 #[test]
 fn a_load_with_a_broken_sidecar_is_recorded() {
     let (_, path) = loaded("sidecar");
@@ -121,9 +111,6 @@ fn a_load_with_a_broken_sidecar_is_recorded() {
     assert!(!crate::has_unsaved_edits(&fresh, &path));
 }
 
-/// Reset Scene: the record is the file's text whatever it holds, so a `touch` or
-/// the editor's own Generate Lighting is no change; the rebuilt World is unsaved
-/// against it (#1374).
 #[test]
 fn adopting_a_file_records_its_text() {
     let (mut scene, path) = loaded("adopt");

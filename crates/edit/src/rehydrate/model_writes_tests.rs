@@ -1,7 +1,3 @@
-//! A model the engine re-writes reloads into the entities that use it (#1242): the
-//! CPU mesh and its mesh collider's box follow the file, and a write of another file
-//! leaves them alone.
-
 use glam::Vec3;
 
 use super::ModelWrites;
@@ -10,9 +6,7 @@ use rusty_core::fs::written::write;
 use rusty_scene::{asset_mesh_component, Scene};
 use rusty_test_support::rebakes::Bake;
 
-/// A two-triangle unit quad (6 indices).
 const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n";
-/// One triangle twice the quad's size (3 indices), under the same object name.
 const TRIANGLE: &str = "o Model\nv 0 0 0\nv 2 0 0\nv 2 2 0\nf 1 2 3\n";
 
 fn model(dir: &str) -> String {
@@ -29,7 +23,6 @@ fn bake(path: &str, which: Bake) {
     write(std::path::Path::new(path), text.as_bytes()).unwrap();
 }
 
-/// An entity carrying the model's mesh and a mesh collider sized to it.
 fn spawn(scene: &mut Scene, path: &str) -> u32 {
     let id = scene.add_entity("Model".to_string());
     let mesh = asset_mesh_component(&format!("{path}::Model"));
@@ -111,5 +104,3 @@ fn a_scene_load_reads_every_note_made_before_it() {
         "the load already read the note"
     );
 }
-
-// An edit-mode tick follows rebakes too: `app::model_writes_tests`.

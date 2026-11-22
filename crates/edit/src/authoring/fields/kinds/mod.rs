@@ -1,9 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/mod.rs — every component `Component.*` reaches, by name.
-//!
-//! One [`Kind`] per first-class component (each row of `components::registry`)
-//! plus the mandatory `Transform`; the field tables live beside, grouped
-//! by area.
-
 mod ai;
 mod fx;
 mod graphic;
@@ -19,14 +13,10 @@ use rusty_components::animator::Playback;
 use rusty_components::registry::first_class;
 use rusty_components::*;
 
-/// The reason on a field no inspector op writes yet; #1368 gates them in.
 const NO_OP: &str = "no inspector op writes it yet (#1368)";
 
-/// Declares [`KINDS`]: `Transform`, then each registry row (`components::registry`)
-/// under the name `Component.*` gives it ([`FirstClass::NAME`]).
 macro_rules! kinds {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
-        /// Every component, by the name `Component.*` answers to first.
         pub const KINDS: &[Kind] = &[
             kind::<TransformComponent>("Transform", None, "transform"),
             $(kind::<$ty>(<$ty as FirstClass>::NAME, Some(K::$kind), stringify!($field)),)*
@@ -36,8 +26,6 @@ macro_rules! kinds {
 
 first_class!(kinds);
 
-/// An Animator field's type: its own derive's, else, for the fields it flattens
-/// from its `Playback` (which serde reads as a map, typeless), `Playback`'s.
 pub(super) fn animator_field_type(name: &'static str) -> (bool, Option<&'static str>) {
     match field_type::<AnimatorComponent>(name) {
         (false, None) => field_type::<Playback>(name),
@@ -45,8 +33,6 @@ pub(super) fn animator_field_type(name: &'static str) -> (bool, Option<&'static 
     }
 }
 
-/// The component `name` names: its own name in any case, else any name
-/// `Scene.AddComponent` takes. An unknown name is an error listing the names.
 pub fn find(name: &str) -> Result<&'static Kind, String> {
     let added = K::parse(name);
     KINDS
@@ -61,11 +47,6 @@ pub fn find(name: &str) -> Result<&'static Kind, String> {
         })
 }
 
-/// A UI graphic's shader, whole, through the `UI.SetShader` / `SetShaderParam`
-/// ops: `None` clears it; a name keeps the params when it is unchanged, and each
-/// param given is then written (checked against the baked shader's layout). A
-/// renamed shader drops the old one's params, so those still in the table at
-/// their old values (a `Get` table whose `name` alone was edited) are not written.
 fn set_ui_shader(slot: &mut Option<UiShader>, shader: Option<UiShader>) -> Result<(), String> {
     let Some(mut shader) = shader else {
         ui_shader::set_shader(slot, None);

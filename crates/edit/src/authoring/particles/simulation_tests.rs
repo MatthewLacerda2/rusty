@@ -1,6 +1,3 @@
-//! The simulation target's ops (#2170): the warnings, the cap, a change of space,
-//! and `Component.Set` leaving the live particles where they are.
-
 use super::*;
 use crate::authoring::fields::{find, Skip};
 use crate::authoring::particles::{
@@ -65,7 +62,6 @@ fn each_op_on_a_gpu_emitter_warns_only_of_its_own_setting() {
     );
 }
 
-/// `Component.Set` of `changes` on a fresh scene's emitter `id`.
 fn set(world: &mut rusty_ecs::World, id: u32, changes: Value) {
     let Value::Object(changes) = changes else {
         panic!("a table")
@@ -108,8 +104,6 @@ fn the_cap_is_stored_as_given_however_it_is_set_and_holds_again_on_cpu() {
     assert_eq!(scene.world.particles(id).unwrap().particle_cap(), 3_000_000);
 }
 
-/// Where a write would have to copy to: the first live particle's (or birth's)
-/// address, which a move keeps and a copy does not.
 fn held_at(p: &ParticleEmitterComponent) -> usize {
     match p.simulation {
         ParticleSimulation::Cpu => p.runtime.particles.as_ptr() as usize,

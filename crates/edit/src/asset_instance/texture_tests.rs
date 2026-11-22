@@ -1,6 +1,3 @@
-//! A saved scene names an imported model's extracted textures by reference
-//! (`model.fbx#tex/<identity>`), never by their path in the import cache (#1130).
-
 use glam::Vec3;
 
 use super::instantiate_asset;
@@ -10,9 +7,7 @@ use rusty_scene::{Scene, SceneData};
 
 const FIXTURE: &str = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
 
-/// A texture of the same file name as Red's (`skin.png`), on a material listed
-/// before Red, holding Blue's pixels: converted first, it takes `skin.png` and
-/// pushes Red's file to `skin.1.png`.
+/// A texture of the same file name as Red's (`skin.png`), on a material listed before Red, holding Blue's pixels: converted first, it takes `skin.png` and pushes Red's file to `skin.1.png`.
 const GREEN: &str = r#"	Material: 2900, "Material::Green", "" {
 		Version: 102
 		ShadingModel: "lambert"
@@ -32,7 +27,6 @@ const GREEN: &str = r#"	Material: 2900, "Material::Green", "" {
 	}
 "#;
 
-/// `dir/quad.fbx`, the fixture, with [`GREEN`] inserted before Red when asked.
 fn write_quad(dir: &std::path::Path, green: bool) -> String {
     let mut text = FIXTURE.to_string();
     if green {
@@ -47,7 +41,6 @@ fn write_quad(dir: &std::path::Path, green: bool) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A scene holding `node` of the model at `path`, and the key of its material.
 fn instanced(path: &str, node: &str) -> (Scene, String) {
     let mut scene = Scene::new();
     let id = instantiate_asset(&mut scene, &format!("{path}::{node}"), None, Vec3::ZERO).unwrap();
@@ -88,7 +81,6 @@ fn a_texture_on_disk_beside_the_fbx_is_saved_as_its_own_path() {
     let fixture = rusty_core::project::checkout().join("tests/fixtures/models/missing_texture.fbx");
     let path = dir.join("tri.fbx");
     std::fs::copy(fixture, &path).unwrap();
-    // The FBX names it `gone.png`, relative to itself.
     std::fs::write(dir.join("gone.png"), b"\x89PNG").unwrap();
     let (scene, key) = instanced(&path.to_string_lossy(), "Tri");
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
@@ -106,7 +98,6 @@ fn a_reconversion_inserting_a_same_named_texture_keeps_each_map_its_own() {
     let map = base_color_map(&scene, &key);
     let red = std::fs::read(texture_ref::file(&map).expect("resolves")).unwrap();
 
-    // The edit, then a scene load: the load re-imports the model.
     write_quad(&dir, true);
     let mut restored = Scene::new();
     apply_scene_data(&mut restored, to_scene_data(&scene));
