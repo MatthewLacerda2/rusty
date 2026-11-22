@@ -1,3 +1,14 @@
+//! Every input a retained object holds, by how it is held:
+//! - the ECS, by change cursor: mesh, material slots, light, `WorldPose`, `Activity`, `Layer`,
+//!   `StaticSet`;
+//! - the `Scene`, by revision: probe field, material library, lightmap set (shader overrides
+//!   compared whole);
+//! - the renderer, by value each frame (`RendererInputs`) or `Retained::touch` at the write.
+//!   Render textures keep their own revision, since a `touch` would rebuild on every
+//!   Scene/Game view switch;
+//! - between ticks, the drawn pose (`DrawPoses::repose`);
+//! - per camera, on purpose (`draw.rs`): LOD, mask, frustum, motion history, probe pick.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::records::{library_diff, params_moved, rekeys};

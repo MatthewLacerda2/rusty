@@ -1,3 +1,6 @@
+//! Not HDRP's Speed Rejection, which drops all history whenever a keyboard turn starts or
+//! stops; a depth test finds revealed surfaces instead.
+
 use glam::Vec2;
 
 use rusty_components::Projection;
@@ -6,8 +9,12 @@ use rusty_scene::Camera;
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
 pub(crate) const MOVING_FRAME_INFLUENCE: f32 = 0.25;
 pub(crate) const MAX_CAMERAS: usize = 8;
+/// Above the rounding a still camera's motion vectors carry (lavapipe moved still pixels
+/// without it).
 pub(crate) const STILL_PIXELS: f32 = 0.05;
 pub(crate) const MOVING_PIXELS: f32 = 2.0;
+/// Gaps in eye distance, not view depth: a turn changes view depth by a cosine ratio (about
+/// 18% at the edge), never distance.
 pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
 pub(crate) const FLICKER_DECAY: f32 = 0.9;
@@ -71,6 +78,8 @@ impl Default for TaaTune {
     }
 }
 
+/// `taa.wgsl` compares these as bare numbers: clamp 0 cross, 2 variance, 3 clip; motion 0 own,
+/// 1 cross, 2 3×3; history 2 bicubic; central 1 refilter.
 pub(crate) fn levels(quality: rusty_components::TaaQuality) -> [f32; 4] {
     use rusty_components::TaaQuality::*;
     match quality {

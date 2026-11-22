@@ -56,6 +56,7 @@ pub struct Scene {
     pub ui_time: f32,
     pub inspected_reflection_probe: Option<usize>,
     #[cfg(feature = "dev")]
+    /// GPU-metered, so it differs per GPU: never a sim input, only display and `Debug`.
     pub screen_exposure: Option<f32>,
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
@@ -160,6 +161,8 @@ impl Scene {
             }
         }
 
+        // Validate before touching a link: a half-applied reparent leaves a one-sided link the
+        // store never dirties again.
         if !self.world.contains(entity_id) {
             return Err("Entity not found.".to_string());
         }

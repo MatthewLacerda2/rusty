@@ -41,6 +41,7 @@ struct Frontier<'p> {
     pool: &'p mut NodePool,
 }
 
+/// Resumed only on the `NodePool` it began on, untouched by any other search meanwhile.
 pub(crate) struct Search {
     open_set: BinaryHeap<NodeState>,
     closest: (f32, f32, SpanRef),

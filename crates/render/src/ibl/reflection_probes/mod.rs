@@ -180,6 +180,7 @@ impl ProbeArray {
         for (i, (&(probe, cube, shift), &layer)) in kept.iter().zip(layers).enumerate() {
             self.uniforms[i] = ReflectionProbeUniform::of(probe, shift, cube.mips, layer);
         }
+        // No draw names these slots, but the shader reads slot 0's fallback flag on every draw.
         self.uniforms[kept.len()..].fill(ReflectionProbeUniform::default());
     }
 }

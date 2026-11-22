@@ -1,6 +1,6 @@
-// where a surface reads its material maps : Unity Lit's Tiling/Offset on UV0, or HDRP Lit's
-// Planar and Triplanar *Base UV Mapping*, projected from world space so a scaled primitive
-// keeps one texel density on every face.
+// Unity Lit's Tiling/Offset on UV0, or HDRP Lit's Planar and Triplanar *Base UV Mapping*.
+// TAA's mip bias (`camera.lod.x`) goes to material maps, decals and the Toksvig level; never
+// the lightmap, AO or the specular-AA derivatives.
 
 #define_import_path forward::mapping
 
@@ -91,6 +91,9 @@ fn lookup(t: texture_2d<f32>, s: sampler, uv: vec2<f32>) -> vec4<f32> {
     return textureSampleBias(t, s, uv, bias);
 }
 
+// Explicit gradients only where the bend is above 0: some GPUs drop anisotropy on them
+// (lavapipe) and shimmer at grazing angles. The bend is per pixel, so only `textureSampleGrad`
+// may sit in its branch.
 fn lookup_uv(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
     let implicit = lookup(t, s, c.uv);
     if (c.bend <= 0.0) {
@@ -109,9 +112,7 @@ fn sample(t: texture_2d<f32>, s: sampler, c: MapCoords) -> vec4<f32> {
         + lookup(t, s, c.z) * c.weights.z;
 }
 
-// The factor metallic or roughness map `t` at `c` multiplies its scalar by, under its per-draw
-// `use_*_map` flag `on` (`maps::map_factor`, `packed` its glTF channel): 1 without a map, which
-// is then never fetched.
+// `packed` is the glTF channel; 1 without a map, which is then never fetched.
 fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f32 {
     if (on == 0u) {
         return 1.0;
@@ -119,22 +120,20 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
     return map_factor(sample(t, s, c), on, packed);
 }
 
-// The occlusion map's factor at `c` (glTF's `occlusionTexture`): its red, lerped from 1 by the
-// material's strength (`1 + strength * (occlusion - 1)`); 1 without a map, which is then never
-// fetched.
+// glTF's `occlusionTexture`: its red, lerped from 1 by the material's strength.
 fn occlusion(c: MapCoords) -> f32 {
     let m = material();
     return 1.0 + m.occlusion_strength * (mask(m.use_occlusion_map, t_occlusion, s_occlusion, c, 0u) - 1.0);
 }
 
-// The dielectric's reflectance at `c`: its F0 in rgb and F90 in w, both scaled by the
-// specular-level map (`KHR_materials_specular`'s `specularTexture`: alpha, red at 2), as the
-// per-material `specular` scales them.
+// F0 in rgb and F90 in w, both scaled by the specular-level map (alpha, or red at 2).
 fn dielectric_reflectance(c: MapCoords) -> vec4<f32> {
     let m = material();
     return m.dielectric_reflectance * mask(m.use_specular_map, t_specular, s_specular, c, 3u);
 }
 
+// The footprint's area, not its minor axis: anisotropic filtering averages the whole
+// footprint's normals.
 fn level_at(size: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
     let a = dx * size;
     let b = dy * size;
@@ -158,13 +157,13 @@ struct NormalSample {
     length: f32,
 };
 
-// The length of the normal a texel stores, z from its blue: under 1 where a mip averaged
-// normals that disagreed.
+// Under 1 where a mip averaged normals that disagreed.
 fn stored_length(texel: vec4<f32>) -> f32 {
     let n = texel.xyz * 2.0 - 1.0;
     return select(length(n), 1.0, n.z < WHOLE_BELOW_Z);
 }
 
+// A z under this is no normal's z (an RG export, packed AO, a BC5 zero).
 const WHOLE_BELOW_Z: f32 = 0.25;
 
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> NormalSample {

@@ -37,6 +37,8 @@ pub(super) fn caster_facing(world: Mat4, two_sided: bool, face: RenderFace) -> F
     }
 }
 
+/// Field order is the derived sort order: facing first, so one clip pipeline's facings don't
+/// alternate per material.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(super) struct CasterKey {
     pub facing: Facing,

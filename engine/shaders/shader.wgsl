@@ -38,6 +38,8 @@ fn forward_vertex(model: VertexInput, instance: u32) -> VertexOutput {
     out.world_normal = moved.normal;
     out.tex_coords = model.tex_coords;
     out.world_tangent = vec4<f32>(moved.tangent, model.tangent.w);
+    // `w` as transformed and `@invariant`: every pass reproduces the prepass depth bit for bit,
+    // which primed passes test `LessEqual`.
     out.clip_position = camera.view_proj * vec4<f32>(moved.position, world_pos.w);
     let drawn = instances[instance];
     out.instance = vec3<u32>(drawn.object, drawn.reflection_probe, drawn.proxy_volume);
@@ -61,7 +63,6 @@ fn world_vertex(model: VertexInput, to_world: mat4x4<f32>, world_pos: vec4<f32>)
     return SurfaceVertex(world_pos.xyz, normal, tangent_to_world(to_world, model.tangent.xyz, normal));
 }
 
-// The SSAO depth prepass: depth only, so it writes no colour.
 fn prepass_clip(in: VertexOutput) {
     let m = material();
     var alpha = m.color_tint.a;
@@ -186,10 +187,8 @@ fn velocity_texel(in: VelocityVertex) -> vec4<f32> {
     return motion_texel(in.clip_now, in.clip_prev, in.world_position);
 }
 
-// ---- The transparent depth postpass ---- HDRP's *Transparent Depth Postpass*: after the
-// translucents drew, a surface that asks for it writes its depth, and in a view with a velocity
-// target its texel there (location 1; the pipeline has no colour target at 0), so depth of
-// field and motion blur see the surface, not what is behind it.
+// HDRP's Transparent Depth Postpass: after the translucents, a surface that asks writes its
+// depth and velocity, so depth of field and motion blur see it.
 struct DepthPostpassTargets {
     @location(1) velocity: vec4<f32>,
 };
@@ -226,6 +225,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         base_color *= mapping::sample(t_diffuse, s_diffuse, maps);
     }
 
+    // Before the unlit early-out, so an unlit cutout billboard clips too.
     if (m.use_cutout == 1u && base_color.a < m.alpha_cutoff) {
         discard;
     }
@@ -267,6 +267,8 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         N = faceForward(N, -V, N);
     }
     let metallic = surface.metallic;
+    // Only highlights take the widened roughness; the environment BRDF's weight, opacity and
+    // transparent SSR's fade read `surface.roughness`.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
     // F0: a dielectric's comes from its ior and `KHR_materials_specular`, computed once on the
@@ -287,13 +289,14 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         ambient_irradiance = baked.irradiance;
         lightmap_specular = baked.specular;
     } else if (objects[in.instance.x].use_sh == 1u) {
+        // It returns E; the lightmap and flat ambient already hold E / π.
         ambient_irradiance = probe_irradiance(in.world_position, N, in.instance) / PI;
     } else {
         ambient_irradiance = flat_ambient(N);
     }
     let ao = min(ambient_occlusion(in.clip_position.xy), mapping::occlusion(maps)) * surface.occlusion;
     // The diffuse share is URP's `albedo * oneMinusReflectivity`: what the environment
-    // reflection (step 5) takes, a dielectric's reflectivity, is not diffused too.
+    // reflection takes, a dielectric's reflectivity, is not diffused too.
     var lighting_color = (ambient_irradiance + indirect_bounce(in.clip_position.xy)) * diffuse_albedo * ((1.0 - dielectric_reflectivity) * (1.0 - metallic)) * ao;
     lighting_color += lightmap_specular * specular_occlusion(saturate(abs(dot(N, V))), ao, roughness);
 

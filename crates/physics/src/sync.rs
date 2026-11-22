@@ -1,4 +1,3 @@
-//! The solver rewrites the pose of every body in its active set, static included (rotation comes back an ulp off), so a static body is compared against `Tracked::static_poses`.
 //! A borrow alone makes rapier list a body as modified, and that order decides how the next step solves new contact pairs.
 
 use std::collections::BTreeSet;
@@ -34,6 +33,7 @@ impl PhysicsWorld {
         self.tracked.material_assets = Some(assets);
         #[cfg(test)]
         self.tracked.visits.record(&named, &self.plan);
+        // Before any character sweep, so no sweep sees a stale enabled flag.
         self.sync_enabled(scene, &named.activity);
         let collider = &named.collider;
         self.sync_materials(scene, if assets_moved { &Owners::All } else { collider });
@@ -160,7 +160,9 @@ impl PhysicsWorld {
         (named, Some(c.reshaped()))
     }
 
-    /// Only the ids that can re-home are checked (`Changed::homes`), so a tick where only poses moved re-derives no owner.
+    /// Only the ids that can re-home are checked (`Changed::homes`), so a tick where only poses
+    /// moved re-derives no owner. That holds while every reparent, `Collider` or carrier change
+    /// stamps `Activity` or its own column.
     fn plan_may_change(&self, scene: &Scene, changed: &Changed) -> bool {
         let t = &self.tracked;
         let w = &scene.world;

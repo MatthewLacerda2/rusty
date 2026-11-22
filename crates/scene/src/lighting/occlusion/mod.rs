@@ -25,6 +25,8 @@ pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
     perspective && near <= MAX_CULLING_NEAR
 }
 
+/// Bump when the bake would write other bytes for the same objects (sampling, seed, grid
+/// limits, reach); `version_tests` holds it for small levels only.
 pub const OCCLUSION_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

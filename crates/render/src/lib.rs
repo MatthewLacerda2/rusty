@@ -173,5 +173,7 @@ pub struct Renderer {
 
     render_texture_ids: (HashMap<String, u64>, u64),
 
+    // Declared last: fields drop in order, so the permit frees after the device and every
+    // GPU resource.
     _gpu_permit: Option<setup::budget::Permit>,
 }

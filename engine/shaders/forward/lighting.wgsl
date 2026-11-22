@@ -29,8 +29,8 @@ fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     return textureLoad(t_ao, min(vec2<u32>(frag), last), 0).r;
 }
 
-// Only the opaque pass of a base camera running SSIL reads it (`camera.ssil.x`); other
-// passes get none, so the branch is uniform.
+// E / π. Only the opaque pass of a base camera running SSIL reads it (`camera.ssil.x`);
+// other passes get none, so the branch is uniform.
 fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
     if (camera.ssil.x <= 0.5) {
         return vec3<f32>(0.0);
@@ -57,6 +57,8 @@ fn realtime_share(lit: vec3<f32>, realtime: vec3<f32>) -> f32 {
     return select(0.0, saturate(part / whole), whole > 0.0);
 }
 
+// `camera.ssil.x` is set for that opaque pass alone, so translucents after it keep their
+// blend alpha.
 fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
     if (camera.ssil.x <= 0.5) {
         return c;
@@ -80,13 +82,12 @@ fn lightmap_level(uv: vec2<f32>) -> f32 {
 fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
     let shaded = dot(N, dir) * 0.5 + 0.5;
     let baked = dot(Ng, dir) * 0.5 + 0.5;
-    // The decoded vector can be a hair longer than 1 (bytes round, `encode_direction`),
-    // so `shaded` can dip just under 0 behind a lamp: a response is never negative.
+    // Bytes round, so the decoded vector can be a hair over 1 and `shaded` dip under 0
+    // behind a lamp.
     return max(shaded, 0.0) / max(baked, 1e-3);
 }
 
-// Mirrors `decode_direction` in crates/lighting/src/lightmap/encode.rs: each component
-// stored as 128 + 127x.
+// Mirrors `scene::lighting::page::encode::decode_direction`: 128 + 127x per component.
 fn decode_lightmap_direction(texel: vec4<f32>) -> vec4<f32> {
     return vec4<f32>((texel.xyz * 255.0 - 128.0) / 127.0, texel.a);
 }

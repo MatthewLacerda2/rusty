@@ -108,12 +108,11 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
 // per unit of cone, measured at a typical satin cone (about roughness 0.4's), where the
 // projection is close to linear, so each pixel scales it by its own cone.
 const UNIT_CONE: f32 = 0.2;
+// Keeps a hit's radius times its count finite in the f16 spread pyramid.
 const UNIT_MAX: f32 = 16384.0;
 
-// What a hit's count is stored times, so the count of one hit in a coarse level of the spread
-// pyramid (a 4^-8 share of it at level 8) stays a normal f16, not a subnormal a GPU may flush
-// to 0 as it writes the level: the mean radius of a few hits in a wide window then holds, not
-// just a crowd's.
+// So one hit's count in a coarse pyramid level (a 4^-8 share at level 8) stays a normal
+// f16, not a subnormal a GPU may flush to 0: a few hits' mean radius then holds.
 const COUNT_SCALE: f32 = 64.0;
 
 const FOUND_FLOOR: f32 = 0.4;
@@ -123,8 +122,6 @@ struct Traced {
     @location(1) spread: vec4<f32>,
 };
 
-// Whether pixel `px` takes SSR at all: its surface reflects, is smooth enough (`fade` above 0)
-// and is not the sky.
 fn takes(s: ssr_surface::SsrSurface, fade: f32, depth: f32) -> bool {
     return ssr_surface::reflects(s) && fade > 0.0 && depth < ssr_march::SKY_DEPTH;
 }
@@ -144,6 +141,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let world = world_at(uv, v.z, fwd);
     let r = reflect(normalize(world - params.camera_pos.xyz), s.normal);
     let missed = Traced(vec4<f32>(0.0), vec4<f32>(1.0, 0.0, 0.0, 0.0));
+    // A normal map can aim the ray into its own surface: a miss, or the floor reflects itself.
     if (dot(r, geometric_normal(px, world, fwd, s.normal)) < 0.0) {
         return missed;
     }
@@ -193,6 +191,8 @@ const LONE: f32 = 0.02;
 const RADIUS_TRUST: f32 = 0.02;
 const REFINE: i32 = 2;
 
+// A plain mean on purpose: a harmonic or nearest-biased one collapsed radii at short rays
+// into hard blotches that moved with the camera.
 fn blur_radius(uv: vec2<f32>, world: vec3<f32>, roughness: f32, dim: vec2<f32>) -> f32 {
     let c = cone(roughness);
     let cap = spread(world, params.march.x * params.march.y, c, dim);

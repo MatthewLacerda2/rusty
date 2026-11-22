@@ -1,9 +1,8 @@
-//! **What a step changed without a write-back.** rapier's solver rewrites the pose
-//! of every body in its active set, not only a dynamic one: a body just turned
-//! static is still there, and its rotation comes back an ulp off the one pushed.
-//! against the pose last pushed to it (`Tracked::static_poses`), not rapier's, so
-//! neither path re-pushes it for the solver's rounding and both keep the solver's
-//! value: a re-push every step would wake whatever rests on it, for good.
+//! rapier's solver rewrites every active body's pose, a body just turned static included, an
+//! ulp off what was pushed, and no write-back stamps it. So the sync also visits every body
+//! awake around the last step (`Tracked::stepped`), comparing a static one against its last
+//! pushed pose (`Tracked::static_poses`), not rapier's: a re-push every step would wake
+//! whatever rests on it, for good.
 
 use std::collections::BTreeSet;
 
