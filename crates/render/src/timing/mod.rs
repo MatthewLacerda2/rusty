@@ -16,7 +16,7 @@ use readback::Ring;
 use times::Pair;
 pub use times::{GpuPart, GpuTimes};
 
-/// Names are `gpu_passes` keys: a new kind adds a row to `docs/api/Debug.md`.
+// Names are `gpu_passes` keys: a new kind adds a row to `docs/api/Debug.md`.
 rusty_core::named_enum! {
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
     pub enum GpuPass {
