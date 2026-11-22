@@ -15,7 +15,7 @@ use crate::{DrawUniform, MaterialData};
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(in crate::passes::shadows) struct CasterData {
     pub model: [f32; 16],
-    /// 0, the identity, for an unskinned mesh.
+    /// Where its joint palette starts in `bones`; 0, the shared identity joint, when unskinned.
     pub bone_base: u32,
     /// 0 clips nothing.
     pub alpha_cutoff: f32,

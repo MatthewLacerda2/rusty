@@ -63,6 +63,8 @@ pub struct ShadowRenderer {
     pub(crate) drawn: Vec<(u32, u32)>,
     pub(crate) culls: ShadowCulls,
     pub(crate) instancing: bool,
+    /// Whether light volumes find casters through the scene's caster index. A test hook: only
+    /// `index_gpu_tests` turns it off, to compare against testing every caster.
     pub(crate) index_casters: bool,
     pub(crate) atlas: ShadowAtlas,
 }

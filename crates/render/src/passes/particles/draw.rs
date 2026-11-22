@@ -21,7 +21,7 @@ use rusty_scene::{Scene, SceneId};
 
 fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
     let forward = camera.forward();
-    // Near straight up or down, Z is the reference axis.
+    // Within about 8° of straight up or down, Z is the reference axis.
     let reference = if forward.y.abs() > 0.99 {
         Vec3::Z
     } else {

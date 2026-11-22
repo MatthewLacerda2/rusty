@@ -4,10 +4,11 @@ use glam::{Mat4, Vec3};
 use crate::clusters::LocalLight;
 use crate::Frustum;
 
-/// Texels a side, as URP's additional-light atlas.
+/// Texels a side: URP's additional-light default.
 pub(crate) const ATLAS_SIZE: u32 = 2048;
-/// Texels a side of one face's tile; `MIN_TILE` is the packing grid's cell too.
+/// Texels a side of the largest tile.
 pub(crate) const MAX_TILE: u32 = 512;
+/// The smallest tile, and the packing grid's cell.
 pub(crate) const MIN_TILE: u32 = 128;
 pub(super) const CELLS: u32 = ATLAS_SIZE / MIN_TILE;
 pub(crate) const MAX_TILES: usize = (CELLS * CELLS) as usize;
@@ -20,7 +21,7 @@ const CUBE_FACES: [(Vec3, Vec3); 6] = [
     (Vec3::Z, Vec3::NEG_Y),
     (Vec3::NEG_Z, Vec3::NEG_Y),
 ];
-/// Degrees: a perspective view stops short of 180.
+/// Degrees; a perspective view stops before 180.
 const MAX_SPOT_FOV: f32 = 170.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -29,9 +30,9 @@ pub(crate) struct Tile {
     pub origin: [u32; 2],
     pub size: u32,
     pub texel: f32,
-    /// Picks the PVS row its casters are culled by.
+    /// The light's world position; picks its casters' PVS row.
     pub light: Vec3,
-    /// False for a shadowmasked tile; the static cache keys on it, so a mode change re-bakes.
+    /// False for a shadowmasked tile; keyed by the static cache, so a mode change re-bakes.
     pub statics: bool,
 }
 
@@ -56,7 +57,7 @@ pub(super) struct Candidate {
     pub want: f32,
 }
 
-/// With no tile kept from an earlier frame: a bake capture plans so, never moving the live tiles.
+/// Keeps no earlier tile, as a bake capture plans, so it never moves the live tiles.
 pub(crate) fn plan(lights: &[(LocalLight, bool)], view_proj: Mat4, eye: Vec3) -> AtlasPlan {
     let ids: Vec<u32> = (0..lights.len() as u32).collect();
     let frame = super::slots::Frame {
@@ -84,7 +85,7 @@ pub(super) fn candidates(
         })
         .map(|(i, (light, _))| candidate(i, light, eye))
         .collect();
-    // The light index breaks ties, so the plan is deterministic.
+    // Ties break by light index: a deterministic plan.
     candidates.sort_by(|a, b| (b.importance.total_cmp(&a.importance)).then(a.light.cmp(&b.light)));
     candidates
 }
@@ -117,7 +118,7 @@ pub(super) fn faces(light: &LocalLight) -> u32 {
     }
 }
 
-/// Metres, close enough for a light against a wall.
+/// Metres: near enough for a light by a wall, at most half its range.
 fn near_plane(light: &LocalLight) -> f32 {
     0.05_f32.min(light.range * 0.5)
 }

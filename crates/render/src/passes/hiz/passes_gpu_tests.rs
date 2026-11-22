@@ -6,6 +6,8 @@ use crate::timing::GpuPart;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
+/// The stage's compute passes at one clustered batch and at three. Measured on lavapipe and Metal
+/// (CI's macOS leg).
 const PASSES: u32 = 2;
 
 /// Measured on lavapipe with the split forced (it has no timestamps).

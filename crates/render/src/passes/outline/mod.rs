@@ -20,7 +20,7 @@ pub(crate) const OUTLINE_PX: f32 = 3.0;
 /// Linear RGBA orange.
 const OUTLINE_COLOR: [f32; 4] = [1.0, 0.5, 0.0, 1.0];
 
-/// One unorm channel for the mask and the row distances, so a ring stays under 255 px.
+/// One unorm channel for the mask and the row distances, which limits a ring to under 255 px.
 const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
 /// CPU mirror of `EdgeParams` in `outline/edge.wgsl`: change the two together.

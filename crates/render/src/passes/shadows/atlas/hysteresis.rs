@@ -1,6 +1,6 @@
 use super::plan::{MAX_TILE, MIN_TILE};
 
-/// Of a size step, how far a want may stray past either end of its band.
+/// Fraction of a size step a wanted size may stray past either end of `[size, 2 × size)`.
 pub(super) const BAND: f32 = 0.25;
 /// Rendered frames out of band in a row before the size changes.
 pub(super) const SETTLE_FRAMES: u32 = 15;

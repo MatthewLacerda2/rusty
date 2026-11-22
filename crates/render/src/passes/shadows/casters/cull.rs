@@ -11,7 +11,8 @@ pub(super) struct Candidate {
     pub caster: CasterData,
     pub bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub small: bool,
-    /// Its map takes the faces turned from the light, which the PVS bake never aims at.
+    /// Its map takes the faces turned from the light, which the PVS bake never aims at, so the
+    /// PVS never culls it.
     pub two_sided: bool,
 }
 

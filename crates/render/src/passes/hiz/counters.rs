@@ -49,6 +49,7 @@ impl Counter {
         let Some((tested, bytes)) = self.in_flight else {
             return;
         };
+        // Lets a pending map's callback run without waiting: `Wait` would stall the frame.
         let _ = device.poll(wgpu::PollType::Poll);
         if !self.settle() {
             return;

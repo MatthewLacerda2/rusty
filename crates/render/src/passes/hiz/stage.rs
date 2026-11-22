@@ -22,6 +22,7 @@ impl Renderer {
         let groups = cam.groups.value().expect("bound by prepare_cull");
         let opaque = &ctx.solids.draws.opaque;
         let batches = opaque.len() as u32;
+        // Before the select and the timer's pairs: phase one draws through the global group.
         self.update_global_bind_group();
         let (timer, split) = (&self.gpu_timer, self.gpu_timer.splits());
         let pair = |part| split.then(|| timer.part_compute_writes(part)).flatten();
