@@ -344,7 +344,8 @@ Markdown); the workflows, the `Makefile` and the scripts elsewhere are not read.
   shader's or Lua chunk's comment) is read as one, since it becomes a comment of the
   file it is written to; an allow above the literal's first line reaches its later
   lines too. A `#` and six or eight digits is a colour (`#202020`), no issue, unless
-  `issue` or `PR` names it. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
+  `issue` or `PR` names it; a three-digit one (`#333`) in a `.py`, `.toml` or `.md`
+  data line reads as a reference, so it takes an allow with its reason. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
   An inline allow with a reason excuses its own line and the comment block it heads,
   as every rule's allow does: `// lint: allow(comment-history) <why>` (`-- lint:
   allow(…)` in Lua). It reads every comment line, a marker's or
@@ -937,9 +938,11 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
 - **`test-hook-line`** — a comment calling an item a test hook (`crates/CLAUDE.md`,
   *Test hooks*) is true. The claim is a comment block saying the convention's own
   words, "test hook" or "test hooks" (not "the latest hook"), above an item; in a
-  `//!` header, the items its sentence names in backticks (``[`copies`] is a test
-  hook``), or else the module, when that sentence opens on the phrase ("A test hook:
-  …"). It fails when a crate other than the hook's, depending on it, calls it from a
+  `//!` header, the module when that sentence opens on the phrase ("Test hook: the
+  arena … reads its `PLAYER`"), whatever it backticks, and otherwise the items it
+  names in backticks (``[`copies`] is a test hook``). A `test_*.rs` file is a hook
+  module, claimed and read as live code; test code is a `tests/`, `benches/` or
+  `examples/` file, a `tests.rs` or `*_tests.rs`, or a `#[cfg(test)]` item. It fails when a crate other than the hook's, depending on it, calls it from a
   line that is not test code and not itself in a hook module; and when a crate the
   line names after the phrase (a backticked `app`, `rusty-dev`, `dev::bake`, or *the
   root's* / *root package* for `tests/`) never names a hook `fn`, `const`, `static`

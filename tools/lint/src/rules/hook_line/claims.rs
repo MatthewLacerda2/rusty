@@ -104,12 +104,18 @@ pub fn claims<'a>(file: &File<'a>) -> Vec<Claim<'a>> {
 
 type Found<'a> = (&'a str, &'a str, Option<&'a str>, Option<String>);
 
-/// The items a `//!` header's sentence names, else its module if the sentence opens on
-/// the phrase.
+/// A `//!` sentence opening on the phrase claims its module; else the items it backticks.
 fn header<'a>(file: &File<'a>, text: &str, at: usize, here: &str) -> Vec<Found<'a>> {
     let start = text[..at].rfind(". ").map_or(0, |dot| dot + 2);
     let end = text[at..].find(". ").map_or(text.len(), |dot| at + dot);
     let sentence = &text[start..end];
+    let opening = sentence.trim_start_matches(['/', '!', ' ']);
+    let opening = opening.strip_prefix("A ").unwrap_or(opening);
+    if phrase(opening) == Some(0) {
+        if let Some(name) = module_name(file.path) {
+            return vec![("mod", name, None, Some(here.to_string()))];
+        }
+    }
     let items: Vec<(&str, &str)> = file
         .source
         .lines()
@@ -118,20 +124,10 @@ fn header<'a>(file: &File<'a>, text: &str, at: usize, here: &str) -> Vec<Found<'
         .filter(|(kind, _)| *kind != "impl")
         .collect();
     let spans = sentence.split('`').skip(1).step_by(2);
-    let named: Vec<Found> = spans
+    spans
         .filter_map(|span| items.iter().find(|(_, name)| *name == span))
         .map(|&(kind, name)| (kind, name, None, None))
-        .collect();
-    if !named.is_empty() {
-        return named;
-    }
-    let opening = sentence.trim_start_matches(['/', '!', ' ']);
-    let opening = opening.strip_prefix("A ").unwrap_or(opening);
-    let module_is_one = phrase(opening) == Some(0);
-    match module_name(file.path).filter(|_| module_is_one) {
-        Some(name) => vec![("mod", name, None, Some(here.to_string()))],
-        None => Vec::new(),
-    }
+        .collect()
 }
 
 /// Keyword, name and `impl` type of the item below; none when `#[cfg(test)]`.

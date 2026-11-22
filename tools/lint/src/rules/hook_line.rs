@@ -2,12 +2,13 @@ use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{code_lines, has_word};
 use crate::modules::crate_module;
-use crate::size::is_test_file;
 use claims::{claims, module_path, named, Claim};
+use files::{package, test_file};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
 mod claims;
+mod files;
 mod paths;
 
 pub const RULE: &str = "test-hook-line";
@@ -16,15 +17,6 @@ pub struct File<'a> {
     pub path: &'a str,
     pub source: &'a str,
     pub test: &'a [bool],
-}
-
-/// A file's crate, `""` for the root package.
-fn package(path: &str) -> Option<&str> {
-    match crate_module(path) {
-        Some(m) => Some(m),
-        None if path.starts_with("src/") || path.starts_with("tests/") => Some(""),
-        None => None,
-    }
 }
 
 /// One file, read once for every claim: its code's lines and the paths its live code names.
@@ -41,7 +33,7 @@ pub fn check(
 ) -> Vec<Finding> {
     let claimed: Vec<(&File, &str, Vec<Claim>)> = files
         .iter()
-        .filter(|f| !is_test_file(f.path))
+        .filter(|f| !test_file(f.path))
         .filter_map(|f| Some((f, crate_module(f.path)?, claims(f))))
         .filter(|(_, _, c)| !c.is_empty())
         .collect();
@@ -60,7 +52,7 @@ pub fn check(
         .iter()
         .map(|file| {
             let code = code_lines(file.source);
-            let live = !is_test_file(file.path) && !hook(file);
+            let live = !test_file(file.path) && !hook(file);
             let paths = if live {
                 paths::resolved(&code, file.test)
             } else {

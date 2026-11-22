@@ -34,6 +34,9 @@ fn a_header_claims_its_module_only_when_it_says_the_module_is_one() {
     assert_eq!(claimed(path, module), [("mod".into(), "shared".into())]);
     let item = "//! Meshes shared between instances. [`copies`] is a test hook, compiled in\n//! every build.\npub struct Shared;\npub fn copies() {}\n";
     assert_eq!(claimed(path, item), [("fn".into(), "copies".into())]);
+    let world = "//! Test hook: the arena `bench` builds on;\n//! `rusty-dev`'s bench reads its `PLAYER`.\npub const PLAYER: u8 = 0;\n";
+    let at = "crates/ai/src/perception/test_world.rs";
+    assert_eq!(claimed(at, world), [("mod".into(), "test_world".into())]);
     let neither =
         "//! Meshes shared between instances; other crates hold a test hook.\npub struct Shared;\n";
     assert!(claimed(path, neither).is_empty());
