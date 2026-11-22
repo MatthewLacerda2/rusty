@@ -8,6 +8,7 @@ use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 
+/// Metres: half a light-probe cross marker's arm.
 const MARKER_HALF: f32 = 0.15;
 const REFLECTION_TINT: [f32; 4] = [1.0, 0.65, 0.1, 0.9];
 

@@ -6,7 +6,10 @@ use rusty_components::{LightProbeProxyVolumeComponent as Volume, ProxyGrid, Prox
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::Scene;
 
+// `forward/proxy_volume.wgsl` mirrors both constants: change them together.
+/// vec4s before a volume's points: the world-to-box matrix's 4 columns, then the grid's dims.
 pub(crate) const HEADER: usize = 5;
+/// vec4s per point: the L1 SH, one RGB coefficient each.
 pub(crate) const COEFFS: usize = 4;
 
 #[derive(Default)]
@@ -132,6 +135,8 @@ pub(crate) fn pack(
     Some(out)
 }
 
+/// Vec4s (16 bytes) in the largest power of two within `max_bytes`: the buffer grows by doubling,
+/// bound whole.
 pub(crate) fn room(max_bytes: u64) -> usize {
     let pow2 = if max_bytes == 0 {
         0

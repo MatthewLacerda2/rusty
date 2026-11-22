@@ -56,6 +56,8 @@ impl UnbakedNote {
     fn changed(&mut self, scene: &Scene) -> bool {
         let world = &scene.world;
         let (id, revision) = (scene.id(), scene.lightmaps.revision());
+        // The revision moves on any `&mut` access (a despawn, an Undo): only a new record names
+        // afresh.
         let kept = (self.seen.as_mut())
             .filter(|s| s.scene == id)
             .filter(|s| s.lightmaps == revision || same_record(scene, &s.record));

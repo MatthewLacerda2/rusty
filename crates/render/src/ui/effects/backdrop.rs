@@ -9,6 +9,7 @@ pub(crate) struct UiBackdrop {
     pub(crate) filter: [f32; 2],
 }
 
+/// Deepest blur level: level n reaches `2 · divisor · 2^n` px, so 6 reach 128 × divisor.
 pub(crate) const MAX_LEVEL: u32 = 6;
 
 pub(crate) fn blur_level(radius: f32, divisor: u32) -> u32 {

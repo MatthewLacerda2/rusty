@@ -127,6 +127,7 @@ fn push_quad(
     let axis = |v: Vec2, len: f32| if len > 1e-6 { v / len } else { Vec2::ZERO };
     let (ax, ay) = (axis(br - bl, size.x), axis(tl - bl, size.y));
     let centre = bl + (br - bl) * 0.5 + (tl - bl) * 0.5;
+    // Antialiasing margin: 1.5 screen pixels, in reference units.
     let aa = 1.5 / rect.scale_factor.max(1e-3);
     let (offset, grow, sdf) = match layer {
         Layer::Shadow { offset, blur } => (offset, blur + aa, [MODE_SHAPE, 0.0, blur, 0.0]),
@@ -159,6 +160,7 @@ fn push_quad(
     }));
 }
 
+/// Kind codes 0-4 are the branches of `ui.wgsl`'s `shape_distance`: change both together.
 fn kind_params(shape: &ShapeComponent) -> (f32, [f32; 3]) {
     match shape.kind {
         ShapeKind::Rect => match shape.corner {

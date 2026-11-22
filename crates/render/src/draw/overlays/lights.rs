@@ -5,6 +5,7 @@ use rusty_scene::lighting::area::AreaShape;
 use rusty_scene::{LightType, Scene};
 
 pub(super) const AREA_TINT: [f32; 4] = [1.0, 0.95, 0.5, 1.0];
+/// Metres: the facing arrow's length.
 const ARROW: f32 = 0.5;
 
 pub(super) fn area_light_gizmos(scene: &Scene) -> Vec<(Vec<Vertex>, [f32; 4])> {

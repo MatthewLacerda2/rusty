@@ -26,6 +26,7 @@ pub(crate) struct UiVertex {
     pub(crate) stop_t: [f32; 4],
 }
 
+/// Locations 0-13 are `UiVertex`'s fields in order, as `ui.wgsl`'s `VertexIn` reads them.
 pub(crate) fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
     const ATTRIBS: [wgpu::VertexAttribute; 14] = wgpu::vertex_attr_array![
         0 => Float32x2,

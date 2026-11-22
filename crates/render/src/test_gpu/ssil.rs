@@ -12,6 +12,7 @@ pub const H: u32 = 72;
 
 pub const FLOOR: Vec3 = Vec3::new(1.5, 0.0, -5.5);
 
+/// Bright enough to light the wall red, not so bright the floor under it clips white.
 pub const LAMP: f32 = 6.0;
 
 pub fn renderer() -> Option<Renderer> {

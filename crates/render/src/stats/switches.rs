@@ -90,6 +90,7 @@ impl RenderSwitches {
         options
     }
 
+    /// A test hook: `dev`'s `bench::scenes::set_tests`.
     pub fn all_on(self) -> bool {
         self == Self::ON
     }

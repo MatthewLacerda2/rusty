@@ -60,6 +60,8 @@ impl Renderer {
         self.global_bind_group_dirty |= d.atlas.prepare(gpu, &maps, misses);
 
         let mut dropped = 0;
+        // Oldest first, as the registry's ring holds them: the order `fold_decals` blends
+        // in, which the cluster lists keep.
         let records: Vec<GpuDecal> = drawn
             .iter()
             .map(|(decal, pose)| {

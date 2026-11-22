@@ -27,6 +27,7 @@ pub(crate) struct BakedLamps {
     ranges: GrowBuffer,
     indices: GrowBuffer,
     aabbs: AabbCache,
+    /// Rebuilds so far. A test hook: `volumetric_fog::gpu::kept` counts kept frames by it.
     pub(crate) rebuilds: u64,
 }
 

@@ -1,5 +1,6 @@
 use glam::{Mat4, Vec3};
 
+/// Degrees (outer half-angle); a wider spot bins by its range sphere, which its cone barely trims.
 pub(crate) const WIDEST_CULLED_CONE: f32 = 80.0;
 
 /// What the binner tests for one light: its range sphere, and for a spotlight

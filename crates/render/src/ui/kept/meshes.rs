@@ -101,6 +101,7 @@ impl KeptMeshes {
         self.built.clear();
         let mut dirty = self.dirty(world, layout);
         let entries: Vec<_> = layout.iter().collect();
+        // An atlas grown mid-pass moves the uvs of canvases meshed before it: run the pass again.
         loop {
             let generation = atlases.generation;
             let meshes = self.pass(

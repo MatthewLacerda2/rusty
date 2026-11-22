@@ -21,6 +21,7 @@ pub(crate) struct OcclusionBinding {
     silent: BTreeSet<u32>,
     layers: u32,
     reported: Option<(Revision, bool)>,
+    /// Fingerprints the last refresh computed: a test hook (`camera_gpu_tests`).
     pub(crate) rechecked: usize,
 }
 
