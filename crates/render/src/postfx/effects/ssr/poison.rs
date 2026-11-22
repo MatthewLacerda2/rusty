@@ -1,3 +1,6 @@
+//! Test-only: an `inf` in the image SSR reads, which the forward pass's `finite_hdr` never
+//! writes, to hold that a non-finite hit is a miss.
+
 use super::pass::SsrTargets;
 use crate::gpu::commands::Commands;
 use crate::postfx::PostFx;
@@ -16,6 +19,7 @@ pub(super) fn write(
     if !poisoned {
         return;
     }
+    // `write_texture` lands before unsubmitted commands, so the opaque pass would overwrite it.
     commands.flush();
     let size = scene.size();
     let (w, h) = (size.width, size.height / 2);

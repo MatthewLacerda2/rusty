@@ -62,6 +62,7 @@ impl crate::RenderView {
         self.post_fx.exposure.readout()
     }
 
+    /// Blocks on `device.poll`: for a capture or a test, never the frame's path.
     pub fn settled_exposure(&mut self, device: &wgpu::Device) -> Option<f32> {
         self.post_fx.exposure.settle(device);
         self.exposure_readout()

@@ -50,6 +50,7 @@ impl PostFx {
             None => (followed && !ended).then_some(&self.copy_pipeline),
         };
         if let Some(pipeline) = last {
+            // Neither pass reads bloom, depth or the skybox, but the shared io layout binds them.
             let bg = self.io_bind_group(
                 device,
                 &self.ldr.view,

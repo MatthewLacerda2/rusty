@@ -17,6 +17,7 @@ pub(crate) struct VolumetricTargets {
     pub(super) history: Option<History>,
 }
 
+/// Frames the jitter runs before it repeats.
 const PERIOD: u32 = 64;
 
 impl VolumetricTargets {

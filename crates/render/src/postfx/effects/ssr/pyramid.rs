@@ -14,6 +14,8 @@ pub(crate) fn levels((w, h): (u32, u32)) -> u32 {
 // Mirrors `BLUR_FADE_END` in `lighting/ssr_march.wgsl`.
 pub(crate) const BLUR_FADE_END: f32 = 0.12;
 
+/// Headroom over the shader's deepest lod, so a GPU's `log2` a few ulps above the CPU's never
+/// reads past the last level.
 const LOD_SLACK: f32 = 1.0 + 1.0 / 64.0;
 
 pub(crate) fn hit_levels((w, h): (u32, u32)) -> u32 {

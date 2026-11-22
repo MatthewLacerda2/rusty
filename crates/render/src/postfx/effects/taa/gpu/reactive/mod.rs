@@ -6,6 +6,7 @@ use scene::{ball_frame, Ball, Stats};
 
 use rusty_components::TaaReactive;
 
+/// Measured on lavapipe: 13 and 24 below without the mask, 5 and 11 above with it.
 const P95_TOLERANCE: f32 = 4.0;
 const MAX_TOLERANCE: f32 = 8.0;
 

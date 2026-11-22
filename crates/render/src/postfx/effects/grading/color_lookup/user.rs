@@ -62,6 +62,7 @@ impl UserLuts {
         self.loaded.get(path)?.as_ref()
     }
 
+    /// Called once per frame, before any view's bake.
     pub fn refresh(&mut self) {
         let changes = self
             .freshness
@@ -75,6 +76,8 @@ impl UserLuts {
     }
 }
 
+/// Read with `textureLoad` and filtered by the bake, so its values stay exact: an identity
+/// LUT stays identity.
 fn upload(device: &wgpu::Device, (queue, staging): Writes, lut: &Lut, id: u64) -> UserLut {
     let n = lut.size;
     let texture = texture(device, n);
