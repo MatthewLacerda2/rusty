@@ -2,6 +2,7 @@ use super::HiZ;
 use crate::gpu::kept::Kept;
 use crate::gpu::ops::CountedDevice as _;
 
+/// `hiz_pyramid.wgsl`'s `r32float` storage texture: change the two together.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R32Float;
 
 pub(crate) struct Pyramid {
@@ -84,6 +85,7 @@ impl Pyramid {
         for (level, group) in groups.iter().enumerate() {
             pass.set_pipeline(level_pipeline(hiz, level));
             pass.set_bind_group(crate::gpu::ONLY_GROUP, group, &[]);
+            // 8: `hiz_pyramid.wgsl`'s workgroup size.
             pass.dispatch_workgroups(size.0.div_ceil(8), size.1.div_ceil(8), 1);
             size = (half(size.0), half(size.1));
         }

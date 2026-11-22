@@ -60,6 +60,8 @@ impl Renderer {
                 let id = MeshId::from_mesh(&mesh);
                 if cached == Some(CachedMesh::Stale) || !self.gpu_meshes.contains_key(&id) {
                     self.update_gpu_mesh(id.clone(), mesh.revision, &mesh.vertices, &mesh.indices);
+                    // Scene meshes may share this upload; one without clusters would end
+                    // their cluster cull.
                     self.attach_clusters(&id, (mesh.clusters(), &mesh.indices));
                 }
                 let loaded = !mesh.indices.is_empty() && self.gpu_meshes.contains_key(&id);

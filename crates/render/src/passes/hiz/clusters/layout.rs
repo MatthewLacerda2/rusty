@@ -25,6 +25,8 @@ fn layout(
     })
 }
 
+/// Each stage's group-0 bindings past the params, in `run::bind_clusters`' buffer order. The
+/// test binds 6 storage buffers here and the pool's 2: wgpu's default limit of 8 a stage.
 pub(super) const TEST: [u32; 7] = [1, 2, 3, 4, 5, 7, 10];
 pub(super) const SCAN: [u32; 3] = [1, 4, 6];
 pub(super) const COPY: [u32; 4] = [1, 4, 9, 10];

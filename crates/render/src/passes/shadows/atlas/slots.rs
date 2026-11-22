@@ -1,3 +1,5 @@
+//! Frames are counted, never timed, so a replay plans the same atlas.
+
 use std::collections::BTreeMap;
 
 use glam::{Mat4, Vec3};
@@ -10,6 +12,7 @@ use super::plan::{
 use crate::clusters::LocalLight;
 use rusty_scene::SceneId;
 
+/// Rendered frames an idle light keeps its tiles.
 pub(super) const KEEP_FRAMES: u64 = 600;
 
 pub(crate) struct Frame<'a> {
@@ -23,6 +26,7 @@ pub(crate) struct Frame<'a> {
 struct Slot {
     origins: Vec<[u32; 2]>,
     size: u32,
+    /// The size the hysteresis settled on, before the budget halved it.
     settled: u32,
     seen: u64,
     off_band: u32,
@@ -162,6 +166,7 @@ impl ShadowSlots {
         Some(origins)
     }
 
+    /// Called once idle slots are evicted: largest first in Z-order leaves no gap, so all kept fit.
     fn repack(&mut self, frame: &Frame, kept: &[Kept], now: u64) {
         let mut order: Vec<&Kept> = kept.iter().collect();
         order.sort_by_key(|k| std::cmp::Reverse(k.size));

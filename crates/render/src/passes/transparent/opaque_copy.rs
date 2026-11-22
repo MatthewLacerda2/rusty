@@ -61,7 +61,7 @@ impl OpaqueCopyPass {
             fallback: PostFx::target(device, 1, 1, "Opaque Copy Stand-in", HDR_FORMAT),
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("Opaque Copy Sampler"),
-                // Clamped: a lookup bent off screen reads the edge.
+                // Clamped by the default address mode: a lookup bent off screen reads the edge.
                 mag_filter: wgpu::FilterMode::Linear,
                 min_filter: wgpu::FilterMode::Linear,
                 ..Default::default()

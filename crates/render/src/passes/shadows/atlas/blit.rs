@@ -1,3 +1,6 @@
+//! WebGPU copies and clears depth only as whole subresources, so a tile is copied or cleared by
+//! drawing its depth: `Always`, no bias, so a copy is bit-identical.
+
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::depth_entry;
 use crate::gpu::ops::CountedDevice as _;
@@ -27,6 +30,8 @@ impl TileBlit {
             }],
         });
         let copy = pipeline(device, shader, &[&layout], "fs_copy");
+        // The clear binds nothing: it draws into the static atlas the copy samples, and a pass may
+        // not do both to one texture.
         let clear = pipeline(device, shader, &[], "fs_clear");
         Self {
             copy,

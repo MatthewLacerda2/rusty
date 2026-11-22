@@ -7,6 +7,7 @@ use glam::Mat4;
 use crate::passes::particles::instance::mode_code;
 use rusty_components::particle::{Birth, ParticleEmitterComponent};
 
+/// The records, `EMPTY` and `LUT_SIZE` mirror `particles/gpu.wgsl`'s: change both together.
 pub(crate) const EMPTY: u32 = 0;
 pub(crate) const LUT_SIZE: usize = 64;
 
@@ -21,6 +22,7 @@ pub(crate) struct GpuParticle {
     pub(crate) size: f32,
     pub(crate) rotation: f32,
     pub(crate) start_frame: u32,
+    /// The first step it has yet to take: steps count from 1, so 0 is `EMPTY`.
     pub(crate) next: u32,
 }
 

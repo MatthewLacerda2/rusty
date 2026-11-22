@@ -1,6 +1,8 @@
 use super::plan::{MAX_TILE, MIN_TILE};
 
+/// Fraction of a size step a wanted size may stray past either end of `[size, 2 × size)`.
 pub(super) const BAND: f32 = 0.25;
+/// Rendered frames out of band in a row before the size changes.
 pub(super) const SETTLE_FRAMES: u32 = 15;
 
 pub(super) fn settle(settled: u32, off_band: &mut u32, want: f32, size: u32) -> u32 {
