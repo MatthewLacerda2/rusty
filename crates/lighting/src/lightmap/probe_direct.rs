@@ -1,4 +1,7 @@
-//! A `Baked` light never renders live and the probe capture sees surfaces, never a light, so each one reaching a probe unoccluded is added as an SH delta that `Sh9::eval` reads back as `radiance · max(cos, 0)` to L2 accuracy. `HalfLambert` rescales each band (`DiffuseModel::sh_band_scale`) so the read-back is the squared wrap exactly. Falloff and cones match `trace::arrival`.
+//! A `Baked` light never renders live and the probe capture sees surfaces, never a light, so each
+//! one reaching a probe unoccluded is added as an SH delta that `Sh9::eval` reads back as `radiance
+//! · max(cos, 0)` to L2 accuracy. `HalfLambert` rescales each band (`DiffuseModel::sh_band_scale`)
+//! so the read-back is the squared wrap exactly. Falloff and cones match `trace::arrival`.
 
 use glam::{Vec2, Vec3, Vec4};
 
@@ -51,7 +54,8 @@ pub fn baked_direct_sh(scene: &BakeScene, positions: &[Vec3]) -> Vec<Sh9> {
         .collect()
 }
 
-/// Per channel, 0 where one shadow ray to its `Mixed` light meets a static occluder, else 1. A NaN position stays unoccluded.
+/// Per channel, 0 where one shadow ray to its `Mixed` light meets a static occluder, else 1. A NaN
+/// position stays unoccluded.
 pub fn mixed_occlusion(scene: &BakeScene, positions: &[Vec3]) -> Vec<Vec4> {
     if !scene.lights.iter().any(|l| l.mask_channel.is_some()) {
         return vec![Vec4::ONE; positions.len()];

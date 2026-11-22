@@ -1,4 +1,5 @@
-//! What a bake records it took in: the lights whose bounce and the meshes whose emission it holds, which SSIL then leaves out.
+//! What a bake records it took in: the lights whose bounce and the meshes whose emission it holds,
+//! which SSIL then leaves out.
 
 use super::taken_lights;
 use crate::lightmap::BakeScene;

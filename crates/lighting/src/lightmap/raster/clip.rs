@@ -2,10 +2,12 @@ use glam::{Vec2, Vec3};
 
 use super::UvTri;
 
-/// A point on a triangle's edge sits on whatever surface meets the mesh there, so rays from it leak or start on its back: texels claimed by overlap are traced this far in (texels).
+/// A point on a triangle's edge sits on whatever surface meets the mesh there, so rays from it leak
+/// or start on its back: texels claimed by overlap are traced this far in (texels).
 pub(in super::super) const INSET: f32 = 0.125;
 
-/// For overlaps too thin for [`INSET`]: the share of the triangle's local width (two nearest edge distances, summed) kept off every edge.
+/// For overlaps too thin for [`INSET`]: the share of the triangle's local width (two nearest edge
+/// distances, summed) kept off every edge.
 const THIN_SHARE: f32 = 0.25;
 
 const MAX_VERTS: usize = 10;
@@ -50,7 +52,8 @@ impl Clipper {
         }
     }
 
-    /// Weights are carried through the clip, never recovered by dividing by the triangle's (maybe tiny) area.
+    /// Weights are carried through the clip, never recovered by dividing by the triangle's (maybe
+    /// tiny) area.
     pub(super) fn trace_weights(&self, lo: Vec2) -> Option<Vec3> {
         let mut poly = self.tri;
         for (axis, bound, sign) in [

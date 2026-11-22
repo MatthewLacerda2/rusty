@@ -1,6 +1,6 @@
 //! `radius_cells = ceil(agent_radius / spacing)` rounds up, so a partly covered cell still erodes.
-//! Distances come from the pre-erosion surface (one shrink, not iterated); `radius_cells == 0` is a no-op.
-//! Verdicts for a rectangle depend only on pre-erosion spans within [`reach`] cells of it.
+//! Distances come from the pre-erosion surface (one shrink, not iterated); `radius_cells == 0` is a
+//! no-op. Verdicts for a rectangle depend only on pre-erosion spans within [`reach`] cells of it.
 
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;

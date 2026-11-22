@@ -1,4 +1,8 @@
-//! Unity's baked-only area light: a one-sided `width × height` rectangle facing `forward` (local −Z) with `radiance` per unit area. A patch `dA` at distance `d`, angle `θ` off the normal sends `radiance · cos θ · dA · window(d_c, range) / d²`; the window ([`falloff_window`](rusty_components::falloff_window)) is taken once at the centre distance `d_c`, so every patch fades together and a floor's light is continuous where `range` ends it.
+//! Unity's baked-only area light: a one-sided `width × height` rectangle facing `forward` (local
+//! −Z) with `radiance` per unit area. A patch `dA` at distance `d`, angle `θ` off the normal sends
+//! `radiance · cos θ · dA · window(d_c, range) / d²`; the window
+//! ([`falloff_window`](rusty_components::falloff_window)) is taken once at the centre distance
+//! `d_c`, so every patch fades together and a floor's light is continuous where `range` ends it.
 
 use glam::Vec2;
 
@@ -6,7 +10,8 @@ pub const GRID: u32 = 8;
 
 pub use rusty_scene::lighting::area::{AreaShape, EMIT_OFFSET};
 
-/// The full set's `m × m` cells split into `PROBE × PROBE` blocks ([`block_span`]); the probe casts one cell per block plus one per corner, counted toward the set.
+/// The full set's `m × m` cells split into `PROBE × PROBE` blocks ([`block_span`]); the probe casts
+/// one cell per block plus one per corner, counted toward the set.
 pub const PROBE: u32 = 4;
 
 pub fn strata(n: u32) -> u32 {

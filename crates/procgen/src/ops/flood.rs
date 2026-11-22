@@ -1,5 +1,7 @@
-//! 8-connected, wrapping both axes. Each flooded pixel gets a *lifted* coordinate (its step from the first pixel, summed, never wrapped), so an island across an edge measures compact.
-//! An island that loops round the tile on an axis has no edge there: its box spans the tile, starting at 0, and its centre reads 0.5.
+//! 8-connected, wrapping both axes. Each flooded pixel gets a *lifted* coordinate (its step from
+//! the first pixel, summed, never wrapped), so an island across an edge measures compact. An island
+//! that loops round the tile on an axis has no edge there: its box spans the tile, starting at 0,
+//! and its centre reads 0.5.
 
 use std::collections::BTreeMap;
 

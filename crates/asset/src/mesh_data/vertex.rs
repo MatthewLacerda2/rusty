@@ -1,8 +1,10 @@
-//! Plain `#[repr(C)]` data the renderer uploads as-is; no wgpu here, so the sim holds meshes headless.
+//! Plain `#[repr(C)]` data the renderer uploads as-is; no wgpu here, so the sim holds meshes
+//! headless.
 
 use glam::Vec3;
 
-/// `joint_indices` index the sub-mesh's [`SkinData`](super::SkinData) joints; an unskinned vertex is bone 0, full weight.
+/// `joint_indices` index the sub-mesh's [`SkinData`](super::SkinData) joints; an unskinned vertex
+/// is bone 0, full weight.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct Vertex {

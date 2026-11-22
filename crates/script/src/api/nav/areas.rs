@@ -1,4 +1,6 @@
-//! `GetAreaFromName` is `-1` when undefined. A cost change writes the scene's table and the live graph at once; cached agent paths re-plan, nothing is rebaked. Area masks: bit `i` = area `i`, `-1` is every area.
+//! `GetAreaFromName` is `-1` when undefined. A cost change writes the scene's table and the live
+//! graph at once; cached agent paths re-plan, nothing is rebaked. Area masks: bit `i` = area `i`,
+//! `-1` is every area.
 
 use std::cell::RefCell;
 

@@ -9,7 +9,8 @@ use rusty_components::{MaterialAsset, MeshComponent, ShadowCasting};
 use rusty_core::collections::Map;
 use rusty_scene::Scene;
 
-/// As in Unity, `Off` is seen by bounce rays but blocks nothing; `ShadowsOnly` blocks light and is seen by nothing.
+/// As in Unity, `Off` is seen by bounce rays but blocks nothing; `ShadowsOnly` blocks light and is
+/// seen by nothing.
 #[derive(Clone, Debug)]
 pub struct BakeMesh {
     pub entity: u32,
@@ -124,7 +125,8 @@ impl BakeScene {
 }
 
 impl BakeScene {
-    /// Such a mesh occludes, bounces and emits even without a lightmap (SSIL skips its emission once a bake exists).
+    /// Such a mesh occludes, bounces and emits even without a lightmap (SSIL skips its emission
+    /// once a bake exists).
     pub fn takes_mesh(scene: &Scene, id: u32) -> bool {
         rusty_scene::lighting::lightmap_set::bakes_mesh(scene, id)
     }

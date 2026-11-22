@@ -1,4 +1,5 @@
-//! Assert signed world positions so a `+`->`-` or a dropped parent in the world<->local conversion is caught.
+//! Assert signed world positions so a `+`->`-` or a dropped parent in the world<->local conversion
+//! is caught.
 
 use glam::{Quat, Vec3};
 

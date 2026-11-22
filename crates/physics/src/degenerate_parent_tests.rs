@@ -1,4 +1,5 @@
-//! glam splits a zero axis into a NaN rotation; the pose physics and the stored AABB share must stay finite.
+//! glam splits a zero axis into a NaN rotation; the pose physics and the stored AABB share must
+//! stay finite.
 
 use std::f32::consts::FRAC_PI_2;
 

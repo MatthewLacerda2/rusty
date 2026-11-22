@@ -1,5 +1,6 @@
 //! Unity's `MeshCollider.sharedMesh` set to a low-poly copy, Unreal's `UCX_` mesh.
-//! A name the model lacks is warned once and kept with no geometry: the collider falls back to its entity's own mesh, as Unity's `MeshCollider` does.
+//! A name the model lacks is warned once and kept with no geometry: the collider falls back to its
+//! entity's own mesh, as Unity's `MeshCollider` does.
 
 use std::path::Path;
 
@@ -41,7 +42,8 @@ fn warn_unused(reference: &str, why: &str) {
     });
 }
 
-/// An entity without a collider is left alone, as for every other shape; one with nothing to build the shape from is an error, changing nothing.
+/// An entity without a collider is left alone, as for every other shape; one with nothing to build
+/// the shape from is an error, changing nothing.
 pub fn set_mesh_shape(
     scene: &mut Scene,
     id: u32,

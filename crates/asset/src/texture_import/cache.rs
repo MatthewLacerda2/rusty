@@ -1,6 +1,9 @@
-//! A compressed texture in the import cache (`.bctex`); a stale, unparseable or wrongly sized file is a miss, never an upload of the wrong length.
+//! A compressed texture in the import cache (`.bctex`); a stale, unparseable or wrongly sized file
+//! is a miss, never an upload of the wrong length.
 //!
-//! Layout, little-endian: `RBCT`, stamp (u64), format (u8, index in [`BlockFormat::ALL`]), width, height, level count (u32 each), [`VarianceTable`] (16 bytes), then per level its byte length (u32) and blocks.
+//! Layout, little-endian: `RBCT`, stamp (u64), format (u8, index in [`BlockFormat::ALL`]), width,
+//! height, level count (u32 each), [`VarianceTable`] (16 bytes), then per level its byte length
+//! (u32) and blocks.
 
 use std::path::Path;
 
@@ -57,7 +60,8 @@ pub(super) fn is_current(path: &Path, stamp: u64) -> bool {
     current().is_some()
 }
 
-/// Each level goes into its own buffer, so the file is never held twice; a malformed head allocates nothing.
+/// Each level goes into its own buffer, so the file is never held twice; a malformed head allocates
+/// nothing.
 pub(super) fn read(path: &Path, stamp: u64) -> Option<Compressed> {
     use std::io::Read;
     let file = std::fs::File::open(path).ok()?;

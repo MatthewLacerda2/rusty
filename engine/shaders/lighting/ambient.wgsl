@@ -14,8 +14,8 @@
 // drawn, `color` straight up fading to a quarter of it straight down; `Gradient` is
 // Unity's trilight, linear in `n.y` from the ground through the equator to the sky;
 // `Skybox` is the sky's L2 SH, uploaded already convolved. The CPU's
-// `scene::AmbientRadiance::at` is the same function (a GPU test holds the two equal); lightmaps and probes bake its
-// `incoming` radiance, whose cosine average over a hemisphere is this again.
+// `scene::AmbientRadiance::at` is the same function (a GPU test holds the two equal); lightmaps and
+// probes bake its `incoming` radiance, whose cosine average over a hemisphere is this again.
 fn ambient_radiance(ambient: AmbientLight, n: vec3<f32>) -> vec3<f32> {
     if (ambient.mode > 1.5) {
         return sky_sh(ambient, n);

@@ -13,11 +13,13 @@ pub struct Bloom {
     pub active: bool,
     /// `≥ 0`.
     pub intensity: f32,
-    /// The brightest channel above which a pixel blooms, `≥ 0`; soft knee half its width either side, as URP.
+    /// The brightest channel above which a pixel blooms, `≥ 0`; soft knee half its width either
+    /// side, as URP.
     pub threshold: f32,
     /// `0..=1`, URP's *Scatter*.
     pub scatter: f32,
-    /// A project-relative path (or [`DEFAULT_DIRT_TEXTURE`], or `rt:`), cropped to cover the screen.
+    /// A project-relative path (or [`DEFAULT_DIRT_TEXTURE`], or `rt:`), cropped to cover the
+    /// screen.
     pub dirt_texture: Option<String>,
     /// `≥ 0`.
     pub dirt_intensity: f32,

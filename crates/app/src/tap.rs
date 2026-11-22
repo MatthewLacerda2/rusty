@@ -6,7 +6,8 @@ use super::game::{GameWorld, PlayTransition};
 pub enum TapPoint {
     BeforeTick,
     Before(PlayTransition),
-    /// After the transition, before input is published: host acts replay and the `InputFrame` is read or written.
+    /// After the transition, before input is published: host acts replay and the `InputFrame` is
+    /// read or written.
     BeforeInput,
     AfterTick,
     Transition(PlayTransition),

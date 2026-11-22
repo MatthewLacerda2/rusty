@@ -1,4 +1,7 @@
-//! A sub-object's mesh-collider entry in a model's sidecar: a bare kind builds from its own mesh, an object (`{"kind": "TriMesh", "mesh": "Chair_col"}`) names another sub-object as the collision mesh (Unity's `MeshCollider.sharedMesh`), imported but never drawn, its vertices read in the render sub-object's local space.
+//! A sub-object's mesh-collider entry in a model's sidecar: a bare kind builds from its own mesh,
+//! an object (`{"kind": "TriMesh", "mesh": "Chair_col"}`) names another sub-object as the collision
+//! mesh (Unity's `MeshCollider.sharedMesh`), imported but never drawn, its vertices read in the
+//! render sub-object's local space.
 
 use std::collections::BTreeMap;
 
@@ -48,7 +51,8 @@ pub(super) fn read_map<'de, D: serde::Deserializer<'de>>(
     Ok(owned.collect())
 }
 
-/// Whether naming `mesh` as `owner`'s collision mesh closes a loop, which would leave a whole-model spawn drawing none of them.
+/// Whether naming `mesh` as `owner`'s collision mesh closes a loop, which would leave a whole-model
+/// spawn drawing none of them.
 pub fn closes_loop(map: &BTreeMap<String, SubObjectCollider>, owner: &str, mesh: &str) -> bool {
     let mut at = mesh;
     for _ in 0..=map.len() {

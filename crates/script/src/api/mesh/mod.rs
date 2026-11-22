@@ -1,5 +1,6 @@
-//! Max draw distance matches Unreal's *Max Draw Distance*; min screen size matches Unity `LODGroup`'s relative height.
-//! Getters return `0` (off) without a Mesh. Whether a camera culled the mesh this frame is the renderer's and not readable: the sim never depends on it.
+//! Max draw distance matches Unreal's *Max Draw Distance*; min screen size matches Unity
+//! `LODGroup`'s relative height. Getters return `0` (off) without a Mesh. Whether a camera culled
+//! the mesh this frame is the renderer's and not readable: the sim never depends on it.
 
 use mlua::{Lua, Table};
 

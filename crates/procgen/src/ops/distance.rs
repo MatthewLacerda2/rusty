@@ -1,6 +1,7 @@
 //! Exact: the separable squared Euclidean distance transform (Felzenszwalb & Huttenlocher, 2012).
-//! Periodic so the result tiles: each 1-D pass sees the row at `[-n, 2n)`, as no wrapped point is over `n / 2` away.
-//! Non-square: distance is in tile units, so each pass weighs squared offsets by its axis' step; the unit is a pixel of the longer side.
+//! Periodic so the result tiles: each 1-D pass sees the row at `[-n, 2n)`, as no wrapped point is
+//! over `n / 2` away. Non-square: distance is in tile units, so each pass weighs squared offsets by
+//! its axis' step; the unit is a pixel of the longer side.
 
 use super::super::image_buf::Image;
 use super::field::Field;

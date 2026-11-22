@@ -1,4 +1,5 @@
-//! An unoccluded texel bakes to the ambient the forward shader gives an unbaked surface facing the same way: exact in `Color`, up to the L2 cut in `Gradient`.
+//! An unoccluded texel bakes to the ambient the forward shader gives an unbaked surface facing the
+//! same way: exact in `Color`, up to the L2 cut in `Gradient`.
 
 use glam::Vec3;
 

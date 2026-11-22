@@ -8,7 +8,8 @@ use serde_json::Value;
 
 use rusty::dev::mcp::{self, attach::SocketClient};
 
-/// Replies to each command line with a framed JSON line echoing it as `result`; a line asking for progress (`ASK`) streams one progress line first and has the ask removed.
+/// Replies to each command line with a framed JSON line echoing it as `result`; a line asking for
+/// progress (`ASK`) streams one progress line first and has the ask removed.
 fn serve(stream: UnixStream) {
     let mut writer = match stream.try_clone() {
         Ok(w) => w,

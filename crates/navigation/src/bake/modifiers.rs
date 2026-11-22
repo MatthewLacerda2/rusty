@@ -1,4 +1,5 @@
-//! Where volumes overlap, `NotWalkable` wins, then the highest area id (Unity's rule), so the result never depends on visit order.
+//! Where volumes overlap, `NotWalkable` wins, then the highest area id (Unity's rule), so the
+//! result never depends on visit order.
 
 use glam::{Mat4, Vec3};
 

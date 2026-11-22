@@ -1,4 +1,5 @@
-//! A mesh with several materials imports as ONE sub-mesh split into material runs, from every format.
+//! A mesh with several materials imports as ONE sub-mesh split into material runs, from every
+//! format.
 
 use super::{import_file, ImportedAsset, SubMesh};
 

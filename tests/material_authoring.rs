@@ -1,4 +1,6 @@
-//! `Material.DefineAsset` authors a reusable `MaterialAsset` by name into the per-World library: it round-trips through `SceneData`, an entity can use it by name, validation is single-sourced, map slots land correctly.
+//! `Material.DefineAsset` authors a reusable `MaterialAsset` by name into the per-World library: it
+//! round-trips through `SceneData`, an entity can use it by name, validation is single-sourced, map
+//! slots land correctly.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -50,7 +52,8 @@ fn defined_asset_round_trips_through_scene_data() {
 
 #[test]
 fn validation_is_single_sourced_with_the_per_entity_path() {
-    // Out-of-range alpha/cutoff clamp to [0,1], unknown render_mode degrades to the default, as the per-entity setters (shared `authoring::material::set_*`).
+    // Out-of-range alpha/cutoff clamp to [0,1], unknown render_mode degrades to the default, as the
+    // per-entity setters (shared `authoring::material::set_*`).
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,
@@ -93,7 +96,8 @@ fn entity_uses_the_named_asset_by_reference() {
 
 #[test]
 fn packed_metallic_roughness_path_lands_in_both_map_slots() {
-    // A packed metallic-roughness PNG (metallic→B, roughness→G) on both slots: each must carry the path.
+    // A packed metallic-roughness PNG (metallic→B, roughness→G) on both slots: each must carry the
+    // path.
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,

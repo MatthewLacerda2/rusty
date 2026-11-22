@@ -1,4 +1,5 @@
-//! *sRGB (Color Texture)* off: a packed metallic/roughness map is marked linear, so its compressed mips average raw values, never in linear light.
+//! *sRGB (Color Texture)* off: a packed metallic/roughness map is marked linear, so its compressed
+//! mips average raw values, never in linear light.
 
 use block_compression::{decode::decompress_blocks_as_rgba8, BC7Settings, CompressionVariant};
 use image::{Rgba, RgbaImage};

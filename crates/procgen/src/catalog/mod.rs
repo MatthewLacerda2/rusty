@@ -28,7 +28,8 @@ macro_rules! catalog {
         pub enum OpKind {
             $($($pd)* $($pc)* $pv($pt),)*
             $($($ud)* $($uc)* $uv,)*
-            /// Not a row, so not in [`OPS`]: [`crate::graph::expand`] replaces it before anything runs.
+            /// Not a row, so not in [`OPS`]: [`crate::graph::expand`] replaces it before anything
+            /// runs.
             Graph(Instance),
         }
 

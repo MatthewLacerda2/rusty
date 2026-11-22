@@ -1,4 +1,6 @@
-//! Results come back in chart and item order whatever the thread count, every chart is finished once with all its items, a cancel stops the pool, and a whole bake is byte-identical on one worker or many.
+//! Results come back in chart and item order whatever the thread count, every chart is finished
+//! once with all its items, a cancel stops the pool, and a whole bake is byte-identical on one
+//! worker or many.
 
 use glam::Vec3;
 

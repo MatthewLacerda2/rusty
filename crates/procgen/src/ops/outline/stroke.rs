@@ -1,5 +1,6 @@
-//! Coverage is `clamp(r − d + ½)` in pixels from the distance to the polyline; overlapping parts take the nearest segment, never a sum.
-//! Distances are in pixels; on a non-square bake the width is measured along a pixel of the geometric mean of its sides.
+//! Coverage is `clamp(r − d + ½)` in pixels from the distance to the polyline; overlapping parts
+//! take the nearest segment, never a sum. Distances are in pixels; on a non-square bake the width
+//! is measured along a pixel of the geometric mean of its sides.
 
 use glam::Vec2;
 

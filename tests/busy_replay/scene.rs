@@ -1,4 +1,6 @@
-//! Busy scene for the replay tests: dynamic boxes landing on each other, NavMeshAgents crossing, Lua driving timers, tweens, UI and the seeded `Random`, so an iteration order leaking into behaviour shows.
+//! Busy scene for the replay tests: dynamic boxes landing on each other, NavMeshAgents crossing,
+//! Lua driving timers, tweens, UI and the seeded `Random`, so an iteration order leaking into
+//! behaviour shows.
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
@@ -29,7 +31,8 @@ function B.OnCollisionEnter(id, other) print(string.format("[busy] hit %d %d", i
 return B
 "#;
 
-/// Relative to the harness workspace root, as a scene stores script paths, so two scratch directories snapshot the same paths.
+/// Relative to the harness workspace root, as a scene stores script paths, so two scratch
+/// directories snapshot the same paths.
 const DIRECTOR_PATH: &str = "assets/scripts/busy_director.lua";
 const BOX_PATH: &str = "assets/scripts/busy_box.lua";
 

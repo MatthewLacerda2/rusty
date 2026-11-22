@@ -1,8 +1,10 @@
-//! Unity's `LODGroup`: `levels` finest first, each shown down to its **screen-relative height**, the
-//! fraction of the viewport the group's `size` covers. Below the last threshold the group is culled.
+//! Unity's `LODGroup`: `levels` finest first, each shown down to its **screen-relative height**,
+//! the fraction of the viewport the group's `size` covers. Below the last threshold the group is
+//! culled.
 //!
 //! Selection is **render-side only** (`render::lod`): the sim never reads the shown level, so
-//! determinism holds. Renderer entity ids follow the entity through prefab save / stamp (`EntityRefs`).
+//! determinism holds. Renderer entity ids follow the entity through prefab save / stamp
+//! (`EntityRefs`).
 
 use serde::{Deserialize, Serialize};
 
@@ -66,7 +68,8 @@ impl LodGroupComponent {
         self.levels.iter().flat_map(|l| l.renderers.iter().copied())
     }
 
-    /// Whether `pointer` is `/levels/<n>/renderers/<m>`, how prefab write-back finds entity-id leaves.
+    /// Whether `pointer` is `/levels/<n>/renderers/<m>`, how prefab write-back finds entity-id
+    /// leaves.
     pub fn is_ref_pointer(pointer: &str) -> bool {
         let parts: Vec<&str> = pointer.split('/').collect();
         let index = |s: &str| !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit());

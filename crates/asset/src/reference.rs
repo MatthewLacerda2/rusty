@@ -1,4 +1,5 @@
-//! Splits on the FIRST `::`: a sub-object name is taken verbatim from the model and may hold `::` (`hero.glb::Body::Mesh`), so the path may not. Refused at build time, never saved unparseable.
+//! Splits on the FIRST `::`: a sub-object name is taken verbatim from the model and may hold `::`
+//! (`hero.glb::Body::Mesh`), so the path may not. Refused at build time, never saved unparseable.
 
 use super::{is_model_path, ImportError};
 
@@ -12,7 +13,8 @@ pub struct AssetRef {
 }
 
 impl AssetRef {
-    /// The path must end in a model extension and hold no `::`, and neither part may be empty, so [`AssetRef::parse`] reads back what this builds.
+    /// The path must end in a model extension and hold no `::`, and neither part may be empty, so
+    /// [`AssetRef::parse`] reads back what this builds.
     pub fn new(path: &str, sub_object: &str) -> Result<AssetRef, ImportError> {
         let reference = AssetRef {
             path: path.to_string(),

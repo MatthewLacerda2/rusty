@@ -1,4 +1,5 @@
-//! A `Gpu` emitter's particles are the renderer's: reads see none, a write changes nothing and warns once ([`refuse`]).
+//! A `Gpu` emitter's particles are the renderer's: reads see none, a write changes nothing and
+//! warns once ([`refuse`]).
 
 use rusty_components::particle::ParticleEmitterComponent;
 

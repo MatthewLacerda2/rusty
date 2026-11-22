@@ -1,6 +1,7 @@
-//! Mesh particles draw as solid entities (forward shader, shadows received, fog), one DrawItem each,
-//! so a mesh and material batch into one instanced draw. Emitter colour and gradient do not apply;
-//! they cast no shadows and take no decal stamp. Placed unmirrored: the material's face picks the cull.
+//! Mesh particles draw as solid entities (forward shader, shadows received, fog), one DrawItem
+//! each, so a mesh and material batch into one instanced draw. Emitter colour and gradient do not
+//! apply; they cast no shadows and take no decal stamp. Placed unmirrored: the material's face
+//! picks the cull.
 
 use glam::{Mat4, Quat, Vec3};
 

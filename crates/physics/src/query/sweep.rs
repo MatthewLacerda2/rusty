@@ -40,7 +40,8 @@ impl Sweep {
         }
     }
 
-    /// A sphere's contact is exact (one radius from its impact center, against the normal): parry's witness point carries GJK slop.
+    /// A sphere's contact is exact (one radius from its impact center, against the normal): parry's
+    /// witness point carries GJK slop.
     fn contact(&self, hit: &ShapeCastHit, dir: Vec3) -> Vec3 {
         match *self {
             Sweep::Sphere { center, radius } => {
@@ -134,7 +135,8 @@ impl PhysicsWorld {
     }
 }
 
-/// Prunes like parry's composite shape cast: a ray from the box center against each tree node grown by the half-size.
+/// Prunes like parry's composite shape cast: a ray from the box center against each tree node grown
+/// by the half-size.
 pub(super) fn swept_candidates<'q>(
     queries: &'q QueryPipeline<'q>,
     start: Aabb,

@@ -1,6 +1,6 @@
-//! The covering modifier is the nearest active one on the entity or, with `apply_to_children`, on an
-//! ancestor (Unity: a child's own modifier wins whole). An inactive one covers nothing and does not
-//! shield what is below it from one further up.
+//! The covering modifier is the nearest active one on the entity or, with `apply_to_children`, on
+//! an ancestor (Unity: a child's own modifier wins whole). An inactive one covers nothing and does
+//! not shield what is below it from one further up.
 
 use super::areas::clamp_area;
 use rusty_components::NavMeshModifierComponent;

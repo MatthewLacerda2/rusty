@@ -1,4 +1,8 @@
--- Four automatic weapons' per-tick load through the game API: prefab instances spawned and destroyed (one under a soldier's hand bone), muzzle-flash meshes toggled, a decal stamped (oldest dropped at its cap), a pickup re-parented, a raycast a shot. Each instance lives a fixed number of ticks, so after LIFETIME and DECALS ticks live counts hold still: the window measures churn, not growth. Deterministic.
+-- Four automatic weapons' per-tick load through the game API: prefab instances spawned and
+-- destroyed (one under a soldier's hand bone), muzzle-flash meshes toggled, a decal stamped (oldest
+-- dropped at its cap), a pickup re-parented, a raycast a shot. Each instance lives a fixed number
+-- of ticks, so after LIFETIME and DECALS ticks live counts hold still: the window measures churn,
+-- not growth. Deterministic.
 
 local SHOOTERS = 4
 local SPAWNS = 4

@@ -84,7 +84,8 @@ fn median_ms(round: &Function) -> f64 {
     ms[ROUNDS / 2]
 }
 
-/// `cargo test --release --features dev --test integration -- --ignored --nocapture particles_round_trip`
+/// `cargo test --release --features dev --test integration -- --ignored --nocapture
+/// particles_round_trip`
 #[test]
 // lint: allow(skip) a timing measurement, meaningful only in release; run by hand
 #[ignore = "measurement for the PR record; run in release"]

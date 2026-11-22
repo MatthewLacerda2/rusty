@@ -1,4 +1,5 @@
-//! A stamp lands in at most 3 × 3 buckets of its level; a pixel meets about four times the stamps of its own size that could cover it, whatever the others' sizes.
+//! A stamp lands in at most 3 × 3 buckets of its level; a pixel meets about four times the stamps
+//! of its own size that could cover it, whatever the others' sizes.
 
 /// The finest grid is 256 buckets across; past it only memory grows.
 const LEVELS: usize = 9;

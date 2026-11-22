@@ -27,8 +27,8 @@ pub fn color_ramp(mut img: Image, stops: &[RampStop], interpolation: RampInterpo
 }
 
 /// The end clamp of `linear`, `constant` and `ease` must stay below the spline branch:
-/// `cardinal` and `b_spline` are not clamped to the ends, they run on toward copies of the end stops ([`spline::fill`]).
-/// `sorted` holds no NaN position: [`color_ramp`]
+/// `cardinal` and `b_spline` are not clamped to the ends, they run on toward copies of the end
+/// stops ([`spline::fill`]). `sorted` holds no NaN position: [`color_ramp`]
 /// sends such a ramp to [`scan_ramp`]'s linear walk.
 fn sample_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> Rgba {
     let above = |t| sorted.partition_point(|s| pos(s) <= t);

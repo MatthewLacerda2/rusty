@@ -1,4 +1,5 @@
-//! rapier resolves two colliders' combine rules the way Unity does (the higher-priority mode wins, `Average < Minimum < Multiply < Maximum`), so the mapping is one-to-one.
+//! rapier resolves two colliders' combine rules the way Unity does (the higher-priority mode wins,
+//! `Average < Minimum < Multiply < Maximum`), so the mapping is one-to-one.
 
 use rapier3d::prelude::*;
 

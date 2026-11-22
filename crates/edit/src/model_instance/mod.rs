@@ -1,4 +1,5 @@
-//! Unity's model prefab: a node placing a mesh the sidecar names as another's collision mesh is not spawned (spawned empty if nodes hang from it).
+//! Unity's model prefab: a node placing a mesh the sidecar names as another's collision mesh is not
+//! spawned (spawned empty if nodes hang from it).
 
 mod lod;
 
@@ -24,7 +25,8 @@ pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, positi
     instantiate_prefab_linked(scene, &prefab, None, path)
 }
 
-/// Keyed `<path>::#default`, never the scratch entity's own key (it would name another entity of the destination scene).
+/// Keyed `<path>::#default`, never the scratch entity's own key (it would name another entity of
+/// the destination scene).
 pub fn model_prefab(path: &str, asset: &Imported) -> PrefabData {
     let mut scratch = Scene::new();
     let root = spawn_tree(&mut scratch, path, asset);

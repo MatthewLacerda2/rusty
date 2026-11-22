@@ -1,4 +1,6 @@
-//! Every lightmap lands whole in one page, in a cell no other overlaps, with texels where its scale/offset says and its edge extended over its cell; the smallest fitting page is chosen; a map above half the page leaves the rest to smaller maps; pages fill before new ones open.
+//! Every lightmap lands whole in one page, in a cell no other overlaps, with texels where its
+//! scale/offset says and its edge extended over its cell; the smallest fitting page is chosen; a
+//! map above half the page leaves the rest to smaller maps; pages fill before new ones open.
 
 use glam::Vec3;
 

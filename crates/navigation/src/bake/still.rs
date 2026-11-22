@@ -1,4 +1,5 @@
-//! A stamp selects, a value decides: a changed `NavMeshModifier` counts wherever it is (it changes how its static children bake), but only if it now differs from the one kept at the last read.
+//! A stamp selects, a value decides: a changed `NavMeshModifier` counts wherever it is (it changes
+//! how its static children bake), but only if it now differs from the one kept at the last read.
 
 use super::super::NavigationGraph;
 use super::sync::Rebake;

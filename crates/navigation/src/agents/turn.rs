@@ -1,4 +1,5 @@
-//! Unity's `updateRotation`: yaw only, eased by `angular_acceleration` so it settles without overshoot.
+//! Unity's `updateRotation`: yaw only, eased by `angular_acceleration` so it settles without
+//! overshoot.
 
 use glam::{EulerRot, Quat, Vec2};
 

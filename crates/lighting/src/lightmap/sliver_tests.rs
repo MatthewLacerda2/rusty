@@ -1,4 +1,5 @@
-//! A hit on a 100 m × 1 cm triangle still lands at finite barycentrics on the point the ray crossed, so its bounce carries on from a real point and a shadow next to it stays dark.
+//! A hit on a 100 m × 1 cm triangle still lands at finite barycentrics on the point the ray
+//! crossed, so its bounce carries on from a real point and a shadow next to it stays dark.
 
 use glam::{Vec2, Vec3};
 

@@ -36,7 +36,8 @@ pub struct PhysicsWorld {
     pub(super) body_to_id: Map<RigidBodyHandle, u32>,
     pub(super) collider_to_id: Map<ColliderHandle, u32>,
     pub(super) id_to_collider: ColliderIds,
-    /// Last tick's trigger-overlap pairs. Starts empty, so a play session's first overlapping tick is an "enter".
+    /// Last tick's trigger-overlap pairs. Starts empty, so a play session's first overlapping tick
+    /// is an "enter".
     pub(super) prev_triggers: Vec<(u32, u32)>,
     pub(super) prev_collisions: Vec<(u32, u32)>,
     pub(super) joints: JointMap,

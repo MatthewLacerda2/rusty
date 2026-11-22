@@ -1,4 +1,5 @@
-//! Static meshes only: no skinning, no animation. `tobj` splits an object at each `usemtl`; the pieces are joined back into one sub-mesh, each a `MaterialRange`.
+//! Static meshes only: no skinning, no animation. `tobj` splits an object at each `usemtl`; the
+//! pieces are joined back into one sub-mesh, each a `MaterialRange`.
 
 use super::material_range::push_range;
 use super::mesh_data::{ImportedAsset, MaterialData, SubMesh, Vertex};

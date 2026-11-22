@@ -45,7 +45,8 @@ fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
     scene.world.self_and_descendants(root_id).collect()
 }
 
-/// Any `prefab_link` is dropped: extracting a linked instance bakes it into a flat prefab with no nested links.
+/// Any `prefab_link` is dropped: extracting a linked instance bakes it into a flat prefab with no
+/// nested links.
 fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
     entity.id = local[&entity.id];
     entity.prefab_link = None;

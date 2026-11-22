@@ -72,7 +72,8 @@ impl BakeScene {
         self.gather_lights_with(scene, assign_channels(scene));
     }
 
-    /// Takes the channels and fallbacks the last lightmap bake recorded, never fresh ones, so probes match the frame's masking.
+    /// Takes the channels and fallbacks the last lightmap bake recorded, never fresh ones, so
+    /// probes match the frame's masking.
     pub fn use_recorded_channels(&mut self, scene: &Scene) {
         let recorded = MaskChannels {
             channels: (scene.lightmaps.channels.keys())

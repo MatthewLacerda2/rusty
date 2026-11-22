@@ -1,4 +1,6 @@
-//! A settings change or a change of the grid's bounds or spacing is a full bake. Connectivity is computed on demand from the spans, so only off-mesh links, the agents' search in progress and the island map are carried.
+//! A settings change or a change of the grid's bounds or spacing is a full bake. Connectivity is
+//! computed on demand from the spans, so only off-mesh links, the agents' search in progress and
+//! the island map are carried.
 
 use super::super::NavigationGraph;
 use super::erosion;
@@ -24,7 +26,8 @@ pub enum Rebake {
 }
 
 impl NavigationGraph {
-    /// Area costs are not a bake input: a changed cost is adopted here without rebaking, and only makes cached agent paths stale.
+    /// Area costs are not a bake input: a changed cost is adopted here without rebaking, and only
+    /// makes cached agent paths stale.
     pub fn sync(&mut self, scene: &Scene) -> Rebake {
         self.sync_inner(scene, false)
     }

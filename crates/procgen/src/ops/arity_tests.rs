@@ -1,4 +1,5 @@
-//! Every catalog op runs with its fewest and its most inputs, panics with one fewer than its fewest, and reads its last optional input.
+//! Every catalog op runs with its fewest and its most inputs, panics with one fewer than its
+//! fewest, and reads its last optional input.
 
 use std::panic::{catch_unwind, AssertUnwindSafe};
 

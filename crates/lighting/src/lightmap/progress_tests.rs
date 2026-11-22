@@ -1,4 +1,5 @@
-//! Watching a bake never changes its bytes, the counter ends at the total, and a cancelled bake returns nothing.
+//! Watching a bake never changes its bytes, the counter ends at the total, and a cancelled bake
+//! returns nothing.
 
 use std::sync::{Arc, Mutex};
 

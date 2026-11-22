@@ -1,6 +1,8 @@
-//! Page levels as the GPU stores them: BC6H irradiance; direction and shadowmask pages stay RGBA8 because BC7 turned a direction up to 5° off (a sawtooth in glossy highlights).
-//! Levels are made after chart dilation (`raster::fill_rest`), so a mip never averages in the empty background; 2×2 box filter in linear light. Mixed directions average to a less directional texel.
-//! The RGBM PNG beside each KTX2 page is the fallback for GPUs without BC.
+//! Page levels as the GPU stores them: BC6H irradiance; direction and shadowmask pages stay RGBA8
+//! because BC7 turned a direction up to 5° off (a sawtooth in glossy highlights). Levels are made
+//! after chart dilation (`raster::fill_rest`), so a mip never averages in the empty background; 2×2
+//! box filter in linear light. Mixed directions average to a less directional texel. The RGBM PNG
+//! beside each KTX2 page is the fallback for GPUs without BC.
 
 use glam::{Vec3, Vec4};
 

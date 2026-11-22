@@ -1,4 +1,5 @@
-//! Unity URP's Color Adjustments, baked into the grading LUT on scene-linear colour before the tonemap.
+//! Unity URP's Color Adjustments, baked into the grading LUT on scene-linear colour before the
+//! tonemap.
 
 use serde::{Deserialize, Serialize};
 

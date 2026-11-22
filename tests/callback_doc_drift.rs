@@ -1,4 +1,6 @@
-//! The "Script lifecycle callbacks" section of `docs/api/index.md` must match `scripting::callbacks::LIFECYCLE_CALLBACKS`, the list dispatch and discovery read. Existence parity both directions; not `dev`-gated.
+//! The "Script lifecycle callbacks" section of `docs/api/index.md` must match
+//! `scripting::callbacks::LIFECYCLE_CALLBACKS`, the list dispatch and discovery read. Existence
+//! parity both directions; not `dev`-gated.
 
 use std::collections::BTreeSet;
 

@@ -24,7 +24,8 @@ pub struct TextureSettings {
     pub filter_mode: FilterMode,
     pub generate_mipmaps: bool,
     pub texture_type: TextureType,
-    /// *sRGB (Color Texture)*, `Default` only: off means data stored raw (a packed metallic/roughness map); `NormalMap` and `SingleChannel` are always data.
+    /// *sRGB (Color Texture)*, `Default` only: off means data stored raw (a packed
+    /// metallic/roughness map); `NormalMap` and `SingleChannel` are always data.
     pub srgb: bool,
     pub compression: Compression,
     pub max_size: u32,
@@ -70,7 +71,8 @@ pub fn texture(source: &Path) -> TextureSettings {
     read_texture(source).unwrap_or_default()
 }
 
-/// A *Max Size* outside [`MAX_SIZES`] (a hand edit) is warned of once per file and read as [`DEFAULT_MAX_SIZE`].
+/// A *Max Size* outside [`MAX_SIZES`] (a hand edit) is warned of once per file and read as
+/// [`DEFAULT_MAX_SIZE`].
 pub fn read_texture(source: &Path) -> Result<TextureSettings, ImportError> {
     let extracted = || crate::convert::texture_ref::extracted::settings(source);
     let mut settings = match super::stored(source)? {
@@ -96,7 +98,8 @@ fn warn_once(source: &Path, why: &str) {
     }
 }
 
-/// Refused for a texture a conversion extracted: its settings follow its model's slots ([`texture`]).
+/// Refused for a texture a conversion extracted: its settings follow its model's slots
+/// ([`texture`]).
 pub fn set_texture(source: &Path, settings: TextureSettings) -> Result<(), ImportError> {
     if let Some(glb) = crate::convert::texture_ref::extracted::glb_of(source) {
         return Err(ImportError::Sidecar(format!(

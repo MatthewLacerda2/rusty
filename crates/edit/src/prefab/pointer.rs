@@ -1,6 +1,7 @@
 use serde_json::Value;
 
-/// A `null` into an object removes the key. An out-of-range array index is a no-op: a list grows only by its size entry.
+/// A `null` into an object removes the key. An out-of-range array index is a no-op: a list grows
+/// only by its size entry.
 pub fn set_pointer(value: &mut Value, pointer: &str, leaf: Value) {
     let tokens: Vec<String> = pointer.split('/').skip(1).map(unescape).collect();
     let Some((last, parents)) = tokens.split_last() else {

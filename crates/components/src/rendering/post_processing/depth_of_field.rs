@@ -1,4 +1,5 @@
-//! Unity URP's Depth of Field: *Gaussian* blurs the background between two distances; *Bokeh* models a lens.
+//! Unity URP's Depth of Field: *Gaussian* blurs the background between two distances; *Bokeh*
+//! models a lens.
 
 use serde::{Deserialize, Serialize};
 
@@ -20,7 +21,8 @@ pub struct DepthOfField {
     pub mode: DofMode,
     /// Gaussian: metres from the camera where the blur starts.
     pub gaussian_start: f32,
-    /// Gaussian: where the blur reaches its full radius; nearer than `gaussian_start` it is drawn at the start.
+    /// Gaussian: where the blur reaches its full radius; nearer than `gaussian_start` it is drawn
+    /// at the start.
     pub gaussian_end: f32,
     pub gaussian_max_radius: f32,
     /// Bokeh: the distance in focus, in metres.
@@ -47,7 +49,8 @@ impl DepthOfField {
 }
 
 impl Default for DepthOfField {
-    /// Off, with URP's defaults, at the preset's `Medium` level (`Custom` starts at half resolution).
+    /// Off, with URP's defaults, at the preset's `Medium` level (`Custom` starts at half
+    /// resolution).
     fn default() -> Self {
         Self {
             mode: DofMode::Off,

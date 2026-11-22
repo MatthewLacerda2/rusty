@@ -28,7 +28,8 @@ pub enum Compression {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum TextureType {
-    /// Four channels: BC7, mips averaged in linear light (sRGB colour, or raw where its slot holds data).
+    /// Four channels: BC7, mips averaged in linear light (sRGB colour, or raw where its slot holds
+    /// data).
     #[default]
     Default,
     /// A tangent-space normal map: BC5 (x and y; the shader rebuilds z), linear.

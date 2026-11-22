@@ -1,4 +1,5 @@
-//! `Get` reads the override, else the material's value, else the baked default; an override is runtime-only.
+//! `Get` reads the override, else the material's value, else the baked default; an override is
+//! runtime-only.
 
 use mlua::{IntoLua, Lua, Value};
 

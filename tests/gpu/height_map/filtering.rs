@@ -1,7 +1,7 @@
 //! A height map whose shift is zero filters every other map as a material without one.
 //! Reading displaced maps at explicit derivatives lost the sampler's anisotropy on lavapipe (it
-//! filters an explicit-gradient read isotropically): far, grazing detail drew sharper and shimmered.
-//! Smallest case: a 0/1 stripe albedo, 32 periods a tile, seen at a grazing angle.
+//! filters an explicit-gradient read isotropically): far, grazing detail drew sharper and
+//! shimmered. Smallest case: a 0/1 stripe albedo, 32 periods a tile, seen at a grazing angle.
 
 use glam::Vec3;
 use rusty::components::MaterialAsset;

@@ -1,4 +1,5 @@
-//! Two tops level within [`TOP_EPS`] meet at a crease (a ramp's upper end on the deck): the steeper plane wins, because the span's top caps it where the flatter one takes over.
+//! Two tops level within [`TOP_EPS`] meet at a crease (a ramp's upper end on the deck): the steeper
+//! plane wins, because the span's top caps it where the flatter one takes over.
 
 use glam::{Vec2, Vec3};
 

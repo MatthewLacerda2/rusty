@@ -1,4 +1,5 @@
-//! World surface per unit of UV: sizes a lightmap and a mesh map's texel, of a whole mesh or of one UV island.
+//! World surface per unit of UV: sizes a lightmap and a mesh map's texel, of a whole mesh or of one
+//! UV island.
 
 use super::Surface;
 
@@ -12,7 +13,8 @@ pub(crate) fn world_per_uv(mesh: &Surface) -> Option<f32> {
     areas.world_per_uv()
 }
 
-/// Open to a part of a mesh (a UV island), so the part's measure is the same arithmetic as the whole's.
+/// Open to a part of a mesh (a UV island), so the part's measure is the same arithmetic as the
+/// whole's.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Areas {
     world: f32,

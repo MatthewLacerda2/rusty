@@ -1,4 +1,6 @@
-//! Marshaling goes Lua table or JSON string -> `serde_json::Value` -> `MaterialAsset`; the validation-bearing fields (`render_mode`, `alpha`, `alpha_cutoff`) are split off into [`Validated`] so the caller applies them through the shared `set_*` ops.
+//! Marshaling goes Lua table or JSON string -> `serde_json::Value` -> `MaterialAsset`; the
+//! validation-bearing fields (`render_mode`, `alpha`, `alpha_cutoff`) are split off into
+//! [`Validated`] so the caller applies them through the shared `set_*` ops.
 
 use mlua::Value;
 
@@ -28,7 +30,8 @@ pub fn asset_from_lua(value: &Value) -> Result<(MaterialAsset, Validated), Strin
     asset_from_json_value(recipe_json(value)?)
 }
 
-/// The validated keys are removed before `from_value` so serde never applies its own handling of them.
+/// The validated keys are removed before `from_value` so serde never applies its own handling of
+/// them.
 fn asset_from_json_value(
     mut value: serde_json::Value,
 ) -> Result<(MaterialAsset, Validated), String> {

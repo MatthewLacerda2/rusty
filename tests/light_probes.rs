@@ -1,4 +1,6 @@
-//! SH probe data model + analytic ambient sampling: positions round-trip through the scene document, baked SH through the `<scene>.lighting.json` sidecar, and a non-uniform analytic fill gives position-dependent ambient. No GPU.
+//! SH probe data model + analytic ambient sampling: positions round-trip through the scene
+//! document, baked SH through the `<scene>.lighting.json` sidecar, and a non-uniform analytic fill
+//! gives position-dependent ambient. No GPU.
 
 use crate::temp::path as tmp;
 use glam::Vec3;
@@ -75,7 +77,8 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
     assert_eq!(loaded.probes.probes()[probe_count - 1].sh, baked);
 }
 
-/// Placed-but-unbaked probes write no sidecar; load leaves them at zero SH, which the shader treats as no probe.
+/// Placed-but-unbaked probes write no sidecar; load leaves them at zero SH, which the shader treats
+/// as no probe.
 #[test]
 fn unbaked_probes_write_no_sidecar() {
     let mut scene = Scene::new();

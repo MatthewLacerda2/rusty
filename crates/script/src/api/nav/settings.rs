@@ -44,7 +44,8 @@ fn register_settings_getters(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
     )
 }
 
-/// The setters write `scene.nav_settings`, then re-bake the shared graph so the knob is consumed (the bake is the read-site).
+/// The setters write `scene.nav_settings`, then re-bake the shared graph so the knob is consumed
+/// (the bake is the read-site).
 fn register_settings_setters(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -133,7 +134,8 @@ fn register_bounds(
     )
 }
 
-/// The scene's mutable borrow is scoped to the write alone, so the bake's immutable borrow never overlaps it.
+/// The scene's mutable borrow is scoped to the write alone, so the bake's immutable borrow never
+/// overlaps it.
 pub(super) fn set_and_rebake(
     scene: &RefCell<Scene>,
     nav: &RefCell<NavigationGraph>,

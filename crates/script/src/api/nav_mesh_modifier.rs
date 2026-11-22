@@ -1,4 +1,5 @@
-//! `OverrideArea` bakes the colliders as an area (`1` = `NotWalkable`); `IgnoreFromBuild` leaves them out. Getters return a neutral default without a modifier; setters are then no-ops.
+//! `OverrideArea` bakes the colliders as an area (`1` = `NotWalkable`); `IgnoreFromBuild` leaves
+//! them out. Getters return a neutral default without a modifier; setters are then no-ops.
 
 use std::cell::RefCell;
 

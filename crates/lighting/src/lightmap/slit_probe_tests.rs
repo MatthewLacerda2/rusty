@@ -1,4 +1,6 @@
-//! How often the Area light's shadow probe's wrong verdicts survive the checks (`trace::check`): a slit showing none of the panel's corners, a thin rod hiding none; and a recess whose walls meet the panel's edges.
+//! How often the Area light's shadow probe's wrong verdicts survive the checks (`trace::check`): a
+//! slit showing none of the panel's corners, a thin rod hiding none; and a recess whose walls meet
+//! the panel's edges.
 
 use glam::Vec3;
 
@@ -42,7 +44,8 @@ fn miss_rate(scene: &Fixture, xs: &[f32], seeds: u64, samples: u32) -> f64 {
 
 #[test]
 fn seen_through_a_slit_a_texel_rarely_keeps_the_probes_dark_verdict() {
-    // Measured over 31 points and 1000 seeds: 1.8% at 256 samples; checks drawn at random left a third.
+    // Measured over 31 points and 1000 seeds: 1.8% at 256 samples; checks drawn at random left a
+    // third.
     let rate = miss_rate(&Fixture::new(slit(0.0625)), &[-0.1, 0.0, 0.2], 256, 256);
     assert!(rate < 0.03, "slit 1/16: {rate} of texels black");
 }
@@ -63,7 +66,8 @@ fn under_a_thin_rod_a_texel_rarely_loses_its_shadow() {
 
 #[test]
 fn a_panel_flush_in_a_recess_seen_whole_takes_the_probes_cheap_path() {
-    // A corner ray aimed at the panel's very edge grazes the walls, so the probe aims its corners inside.
+    // A corner ray aimed at the panel's very edge grazes the walls, so the probe aims its corners
+    // inside.
     let (hx, hz, top, bottom) = (0.6, 0.3, 3.0, 2.8);
     let wall = |a: (f32, f32), b: (f32, f32), entity| {
         let c = |(x, z): (f32, f32), y| Vec3::new(x, y, z);

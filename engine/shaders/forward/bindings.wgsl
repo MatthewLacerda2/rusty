@@ -169,7 +169,8 @@ fn material() -> MaterialData {
     return materials[draw.material];
 }
 
-// The vertex placed in the world: skinned by its bones, under the draw's transform (identity for instanced solids) over the instance's own.
+// The vertex placed in the world: skinned by its bones, under the draw's transform (identity for
+// instanced solids) over the instance's own.
 fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
     let joints = model.joint_indices + vec4<u32>(draw.bone_base);
     let bone_transform = blend_joints(

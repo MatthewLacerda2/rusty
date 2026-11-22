@@ -1,4 +1,5 @@
-//! A bake's atlas layout before any texel is drawn, and its pages composed one at a time from it, so a bake never holds them all.
+//! A bake's atlas layout before any texel is drawn, and its pages composed one at a time from it,
+//! so a bake never holds them all.
 
 use glam::{Vec3, Vec4};
 

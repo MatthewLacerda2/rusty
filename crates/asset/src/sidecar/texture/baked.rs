@@ -1,4 +1,6 @@
-//! A bake sets each image's Max Size to fit its size unless the developer chose it (`TextureSettings::max_size_chosen`); the sidecar is written before the PNG, so an import between the two never sees the new file at the old Max Size.
+//! A bake sets each image's Max Size to fit its size unless the developer chose it
+//! (`TextureSettings::max_size_chosen`); the sidecar is written before the PNG, so an import
+//! between the two never sees the new file at the old Max Size.
 
 use std::path::Path;
 
@@ -7,7 +9,8 @@ use crate::ImportError;
 
 const LARGEST: u32 = MAX_SIZES[MAX_SIZES.len() - 1];
 
-/// Refuses a bake whose longer side is above 8192, which no setting could keep. A sidecar that cannot be written is warned of, and the bake goes on.
+/// Refuses a bake whose longer side is above 8192, which no setting could keep. A sidecar that
+/// cannot be written is warned of, and the bake goes on.
 pub fn prepare_bake<'a>(
     verb: &str,
     (width, height): (u32, u32),
@@ -23,7 +26,8 @@ pub fn prepare_bake<'a>(
     Ok(())
 }
 
-/// Called first by a verb, before it makes any folder, so a refused bake leaves the project untouched.
+/// Called first by a verb, before it makes any folder, so a refused bake leaves the project
+/// untouched.
 pub fn check_bake_size((width, height): (u32, u32)) -> Result<(), String> {
     let longer = width.max(height);
     if longer <= LARGEST {

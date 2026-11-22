@@ -1,4 +1,5 @@
-//! The lightmap's UVs are packed apart, so its walk keeps a texel's first triangle; the mesh-map baker's UV0 shares texels, so it asks for every claimant.
+//! The lightmap's UVs are packed apart, so its walk keeps a texel's first triangle; the mesh-map
+//! baker's UV0 shares texels, so it asks for every claimant.
 
 use glam::Vec2;
 
@@ -95,7 +96,8 @@ fn uv_of(mesh: &Surface, first: usize, scale: Vec2) -> [Vec2; 3] {
     [0, 1, 2].map(|k| mesh.uvs[mesh.indices[first + k] as usize] * scale)
 }
 
-/// Separating-axis test, exact for convex shapes; sharing only an edge never overlaps. Runs about `a`'s first vertex so dot products carry the triangles' size.
+/// Separating-axis test, exact for convex shapes; sharing only an edge never overlaps. Runs about
+/// `a`'s first vertex so dot products carry the triangles' size.
 pub(super) fn in_uv(a: [Vec2; 3], b: [Vec2; 3]) -> bool {
     if across_a_shared_edge(&a, &b) {
         return false;

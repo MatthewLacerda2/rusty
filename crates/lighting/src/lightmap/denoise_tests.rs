@@ -1,4 +1,6 @@
-//! `None` leaves the bounce raw; an `Oidn` bake with no denoiser lent (or a failing one) equals the `Filter` bake to the byte; a lent denoiser's output is what the Gaussian smooths; any worker count is byte-identical.
+//! `None` leaves the bounce raw; an `Oidn` bake with no denoiser lent (or a failing one) equals the
+//! `Filter` bake to the byte; a lent denoiser's output is what the Gaussian smooths; any worker
+//! count is byte-identical.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

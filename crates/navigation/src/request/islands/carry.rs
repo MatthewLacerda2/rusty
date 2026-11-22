@@ -1,4 +1,7 @@
-//! Fresh cells (within one of a change) are joined anew by every step touching them; kept cells keep their old area. A split the change made is never seen (two old areas stay one), a join always is: merging too much only gives an unreachable-goal search the full cap, merging too little cannot happen.
+//! Fresh cells (within one of a change) are joined anew by every step touching them; kept cells
+//! keep their old area. A split the change made is never seen (two old areas stay one), a join
+//! always is: merging too much only gives an unreachable-goal search the full cap, merging too
+//! little cannot happen.
 
 use super::super::super::bake::CellRect;
 use super::super::super::{NavigationGraph, SpanRef};

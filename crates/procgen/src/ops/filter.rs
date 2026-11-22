@@ -1,4 +1,6 @@
-//! A Gaussian is three box passes per axis matching the variance of `σ = r / 3`, so it reaches about `r`; under about 2.5 px it is one exact 3-tap pass, since three boxes can't go that narrow.
+//! A Gaussian is three box passes per axis matching the variance of `σ = r / 3`, so it reaches
+//! about `r`; under about 2.5 px it is one exact 3-tap pass, since three boxes can't go that
+//! narrow.
 
 use super::super::image_buf::{Image, Rgba, Size};
 use super::super::recipe::BlurKind;
@@ -8,7 +10,8 @@ mod varying;
 
 pub use varying::blur_varying;
 
-/// `radius * pixels`, at most half the tile (a wider window just wraps). Negative or NaN reads as no blur.
+/// `radius * pixels`, at most half the tile (a wider window just wraps). Negative or NaN reads as
+/// no blur.
 pub fn pixel_radius(radius: f32, pixels: u32) -> f32 {
     let px = radius * pixels as f32;
     if px > 0.0 {

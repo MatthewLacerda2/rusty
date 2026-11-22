@@ -1,4 +1,6 @@
-//! Each texel records where its light comes from; the filter smooths it without letting it grow past a unit vector; off leaves the colour lightmaps untouched; the atlas packs it like the colour.
+//! Each texel records where its light comes from; the filter smooths it without letting it grow
+//! past a unit vector; off leaves the colour lightmaps untouched; the atlas packs it like the
+//! colour.
 
 use glam::{Vec3, Vec4};
 

@@ -1,4 +1,5 @@
-//! A model source is read-only: applying to it errors, as Unity cannot apply to a model prefab; reverting a field works as on any instance.
+//! A model source is read-only: applying to it errors, as Unity cannot apply to a model prefab;
+//! reverting a field works as on any instance.
 
 use std::collections::BTreeMap;
 
@@ -59,7 +60,8 @@ pub fn apply_instance_field_to_source(
     propagate(scene, root)
 }
 
-/// `Ok(false)` when there is no override at `path`. Errors leave everything unchanged: the source is read before the override goes. Unity's `PrefabUtility.RevertPropertyOverride`.
+/// `Ok(false)` when there is no override at `path`. Errors leave everything unchanged: the source
+/// is read before the override goes. Unity's `PrefabUtility.RevertPropertyOverride`.
 pub fn revert_instance_field(
     scene: &mut Scene,
     entity_id: u32,
@@ -101,7 +103,8 @@ fn write_onto_source(prefab: &mut PrefabData, local_id: u32, overrides: &LocalOv
     true
 }
 
-/// A reference outside the instance is dropped, as prefab extraction drops it. One naming a bone of the instance names its skinned entity, the bone kept by name.
+/// A reference outside the instance is dropped, as prefab extraction drops it. One naming a bone of
+/// the instance names its skinned entity, the bone kept by name.
 fn to_local_refs(scene: &Scene, root_id: u32, overrides: &PrefabOverrides) -> LocalOverrides {
     let local: BTreeMap<u32, u32> = instance_ids(scene, root_id)
         .unwrap_or_default()

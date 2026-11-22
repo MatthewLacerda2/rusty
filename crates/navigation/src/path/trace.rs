@@ -1,7 +1,7 @@
-//! The segment is stepped cell by cell in XZ (a grid DDA over the cell squares, whose edges sit half
-//! a cell from each centre). Where it passes exactly through a cell corner it is a diagonal move, and
-//! both cells beside the corner must be reachable too (no corner-cutting). A span failing the area
-//! filter stops the walk like a wall; the start span is exempt.
+//! The segment is stepped cell by cell in XZ (a grid DDA over the cell squares, whose edges sit
+//! half a cell from each centre). Where it passes exactly through a cell corner it is a diagonal
+//! move, and both cells beside the corner must be reachable too (no corner-cutting). A span failing
+//! the area filter stops the walk like a wall; the start span is exempt.
 
 use glam::Vec3;
 
@@ -17,7 +17,8 @@ pub struct NavRaycastHit {
 }
 
 impl NavigationGraph {
-    /// Off the navmesh the walk is blocked at once, at `from` (Unity reports a hit for a source off the mesh).
+    /// Off the navmesh the walk is blocked at once, at `from` (Unity reports a hit for a source off
+    /// the mesh).
     pub fn raycast_masked(&self, from: Vec3, to: Vec3, mask: u32) -> Option<NavRaycastHit> {
         match self.span_under(from) {
             Some(start) => Some(self.trace(start, from, to, |a| in_mask(mask, a))),

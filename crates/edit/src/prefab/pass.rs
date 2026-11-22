@@ -1,4 +1,5 @@
-//! The baselines are the same for every instance of one source, so a pass builds them once and hands each instance a copy without geometry.
+//! The baselines are the same for every instance of one source, so a pass builds them once and
+//! hands each instance a copy without geometry.
 
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -60,7 +61,9 @@ impl<'a> Pass<'a> {
     }
 }
 
-/// Instantiates into a SCRATCH scene that borrows `scene`'s material library (moved in and back, never cloned), so references resolve to the very library keys the instance uses. A reference to one of the scratch skeleton's bones keeps the bone by name in `bone_refs`.
+/// Instantiates into a SCRATCH scene that borrows `scene`'s material library (moved in and back,
+/// never cloned), so references resolve to the very library keys the instance uses. A reference to
+/// one of the scratch skeleton's bones keeps the bone by name in `bone_refs`.
 fn fresh_baselines(
     scene: &mut Scene,
     source: &str,

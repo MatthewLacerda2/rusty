@@ -1,4 +1,5 @@
-//! A field written back as NaN or infinity keeps its value; an added particle's is `ParticleEmitterComponent::placed`'s.
+//! A field written back as NaN or infinity keeps its value; an added particle's is
+//! `ParticleEmitterComponent::placed`'s.
 
 use mlua::{Function, Lua, Table};
 
@@ -113,7 +114,8 @@ fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     })
 }
 
-/// A `Local` emitter is carried to where it stands first, even inactive in the hierarchy: a particle added is placed under the current frame, and the carry is idempotent.
+/// A `Local` emitter is carried to where it stands first, even inactive in the hierarchy: a
+/// particle added is placed under the current frame, and the carry is idempotent.
 pub(super) fn with_carried<R>(
     scene: &mut Scene,
     id: u32,
@@ -218,7 +220,8 @@ fn edited(mut read: Vec<Particle>, edits: &[f64], kills: &[u32]) -> Result<Vec<P
     Ok(read)
 }
 
-/// Rotation is written only when it differs from `p`'s in degrees, so a round trip keeps the radians bit for bit.
+/// Rotation is written only when it differs from `p`'s in degrees, so a round trip keeps the
+/// radians bit for bit.
 pub(super) fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
     let mut now = fields(p);
     let degrees = now[9];

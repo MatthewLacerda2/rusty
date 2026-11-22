@@ -6,7 +6,8 @@ use rusty_core::settings::quality::EffectQuality;
 #[serde(default)]
 pub struct VolumetricFog {
     pub active: bool,
-    /// HDRP's *Fog Attenuation Distance*: metres at base height until all but `1/e` of light is gone, `1..=10000`.
+    /// HDRP's *Fog Attenuation Distance*: metres at base height until all but `1/e` of light is
+    /// gone, `1..=10000`.
     pub mean_free_path: f32,
     /// Each channel `0..=1`: white keeps every lamp's colour, black absorbs.
     pub albedo: [f32; 3],

@@ -11,7 +11,8 @@ pub struct MaterialRange {
     pub material: Option<usize>,
 }
 
-/// A run continuing the last with the same material extends it, so two primitives sharing a material stay one draw.
+/// A run continuing the last with the same material extends it, so two primitives sharing a
+/// material stay one draw.
 pub fn push_range(ranges: &mut Vec<MaterialRange>, indices: Range<u32>, material: Option<usize>) {
     if indices.is_empty() {
         return;

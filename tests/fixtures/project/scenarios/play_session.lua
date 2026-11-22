@@ -1,4 +1,6 @@
--- Drive a full bot-played session headless: attach the DEV-ONLY bot-player to the Player and let it play the demo match; the scenario is the referee, emitting a deterministic summary (won/lost, time, errors). Win condition: the bot is within ARRIVE_RANGE of the enemy.
+-- Drive a full bot-played session headless: attach the DEV-ONLY bot-player to the Player and let it
+-- play the demo match; the scenario is the referee, emitting a deterministic summary (won/lost,
+-- time, errors). Win condition: the bot is within ARRIVE_RANGE of the enemy.
 
 local MAX_FRAMES = 1800          -- 30 s @ 1/60 hard cap
 local ARRIVE_RANGE = 4.0

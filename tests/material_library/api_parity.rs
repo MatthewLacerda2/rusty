@@ -10,7 +10,10 @@ use rusty::script::api::bind;
 
 #[test]
 fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    // Lua `Material.*` and the editor card route through the same `authoring::material::*` ops: the same change either way must yield equal `MaterialAsset` state; the `SetAlpha`/`SetAlphaCutoff` clamp (2.0 / -1.0 -> 1.0 / 0.0) proves validation is single-sourced.
+    // Lua `Material.*` and the editor card route through the same `authoring::material::*` ops: the
+    // same change either way must yield equal `MaterialAsset` state; the
+    // `SetAlpha`/`SetAlphaCutoff` clamp (2.0 / -1.0 -> 1.0 / 0.0) proves validation is
+    // single-sourced.
     let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = scene.borrow_mut().add_entity("ViaLua".to_string());
     let via_op = scene.borrow_mut().add_entity("ViaOp".to_string());

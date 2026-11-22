@@ -42,7 +42,8 @@ fn gltf_imports_mesh_and_material() {
 
 #[test]
 fn gltf_reads_full_metallic_roughness_material() {
-    // Own dir so the resolved texture path is predictable; the importer never reads the file, so none is written.
+    // Own dir so the resolved texture path is predictable; the importer never reads the file, so
+    // none is written.
     let dir = rusty_test_support::temp::dir().join("rusty_textured_fixture");
     std::fs::create_dir_all(&dir).unwrap();
     let gltf_path = dir.join("model.gltf");

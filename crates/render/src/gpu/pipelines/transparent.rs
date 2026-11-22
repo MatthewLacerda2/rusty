@@ -24,7 +24,8 @@ impl TransparentBlend {
         Self::Multiply,
     ];
 
-    /// A surface over the opaque copy composites what is behind it itself and writes alpha 1, which the premultiplied state lays down whole.
+    /// A surface over the opaque copy composites what is behind it itself and writes alpha 1, which
+    /// the premultiplied state lays down whole.
     pub(crate) fn of(surface: &SurfaceUniform) -> Self {
         let premultiplied = surface.premultiply_diffuse == 1 || surface.uses_opaque == 1;
         match (surface.blend_mode, premultiplied) {

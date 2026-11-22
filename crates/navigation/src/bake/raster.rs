@@ -1,4 +1,7 @@
-//! A convex collider contributes one span per column (lowest to highest triangle): a vertical line crosses a convex solid in one interval, so a box's inside is solid. Its top is walkable when an up-facing triangle reaches it; winding is not needed. A non-convex mesh rasterises per triangle and trusts the winding (front faces out), as Recast does.
+//! A convex collider contributes one span per column (lowest to highest triangle): a vertical line
+//! crosses a convex solid in one interval, so a box's inside is solid. Its top is walkable when an
+//! up-facing triangle reaches it; winding is not needed. A non-convex mesh rasterises per triangle
+//! and trusts the winding (front faces out), as Recast does.
 
 use glam::{Vec2, Vec3};
 

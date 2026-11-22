@@ -1,4 +1,6 @@
-//! A model's local ids follow its node order, which a re-import may change (a node added in Blender shifts every later one), so each entity keeps its node path on its link and propagation re-derives the local ids from it. A model is read-only, as Unity's model prefab.
+//! A model's local ids follow its node order, which a re-import may change (a node added in Blender
+//! shifts every later one), so each entity keeps its node path on its link and propagation
+//! re-derives the local ids from it. A model is read-only, as Unity's model prefab.
 
 use std::collections::BTreeMap;
 
@@ -31,7 +33,8 @@ pub fn read_writable(path: &str) -> Result<PrefabData, String> {
     read_prefab_file(path)
 }
 
-/// A node a bone holds is `<bone>><name>`; the second sibling sharing a name takes `[1]`, the third `[2]`.
+/// A node a bone holds is `<bone>><name>`; the second sibling sharing a name takes `[1]`, the third
+/// `[2]`.
 pub fn node_paths(prefab: &PrefabData) -> BTreeMap<u32, String> {
     let mut paths: BTreeMap<u32, String> = BTreeMap::new();
     let mut seen: BTreeMap<String, u32> = BTreeMap::new();

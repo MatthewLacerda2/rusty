@@ -15,7 +15,8 @@ pub trait Op {
     /// node first, so a required input is read directly.
     fn run(&self, cx: &Cx) -> Image;
 
-    /// An op with a `seed` param returns it (`every_seed_param_reaches_the_runner` fails otherwise).
+    /// An op with a `seed` param returns it (`every_seed_param_reaches_the_runner` fails
+    /// otherwise).
     fn seed(&self) -> u32 {
         0
     }

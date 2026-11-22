@@ -1,5 +1,6 @@
 //! Scanline accumulation, as `font-rs` and stb_truetype.
-//! Tile units, `u` right, `v` down; a Shape over the tile edge wraps: each copy meeting the tile is drawn.
+//! Tile units, `u` right, `v` down; a Shape over the tile edge wraps: each copy meeting the tile is
+//! drawn.
 
 use glam::Vec2;
 

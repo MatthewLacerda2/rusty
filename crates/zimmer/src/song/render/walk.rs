@@ -132,8 +132,8 @@ impl<'s> Walk<'s> {
                     .flatten()
                     .enumerate()
                 {
-                    // A silenced track still consumes its ordinal, so muting one for eight bars does
-                    // not re-roll the noise of every note after it.
+                    // A silenced track still consumes its ordinal, so muting one for eight bars
+                    // does not re-roll the noise of every note after it.
                     let place = ordinal;
                     ordinal += 1;
                     let at = At {

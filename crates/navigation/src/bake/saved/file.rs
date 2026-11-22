@@ -1,5 +1,8 @@
-//! Little-endian: `RNAV`, format `u32`, fingerprint `u64`, grid (min/max x, min/max z, spacing `f32`; width, height `u32`), baked then pre-erosion spans (`u32` cell-start count and starts, `u32` span count; each span floor, ceiling `f32`, area `u8`, surface kind `u8` followed by a level plane's sign bits or [`PLANE`] and three `f32`s, floor `f32`), then the off-mesh links.
-//! A truncated, out-of-range, NaN or self-inconsistent file is refused whole.
+//! Little-endian: `RNAV`, format `u32`, fingerprint `u64`, grid (min/max x, min/max z, spacing
+//! `f32`; width, height `u32`), baked then pre-erosion spans (`u32` cell-start count and starts,
+//! `u32` span count; each span floor, ceiling `f32`, area `u8`, surface kind `u8` followed by a
+//! level plane's sign bits or [`PLANE`] and three `f32`s, floor `f32`), then the off-mesh links. A
+//! truncated, out-of-range, NaN or self-inconsistent file is refused whole.
 
 use glam::{Vec2, Vec3};
 

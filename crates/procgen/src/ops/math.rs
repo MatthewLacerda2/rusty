@@ -25,7 +25,8 @@ pub fn math(mut img: Image, rhs: Option<&Image>, op: MathOp, value: f32) -> Imag
 }
 
 /// Division by zero gives 0; a non-positive or NaN base to `power` or `sqrt` reads +0.
-/// Bits fixed across platforms: `f32::min`/`max` leave a zero's sign unspecified (x86, aarch64 differ), so the comparison is written out.
+/// Bits fixed across platforms: `f32::min`/`max` leave a zero's sign unspecified (x86, aarch64
+/// differ), so the comparison is written out.
 pub(crate) fn apply(op: MathOp, c: f32, v: f32) -> f32 {
     match op {
         MathOp::Add => c + v,
@@ -95,7 +96,8 @@ pub fn clamp(mut img: Image, min: f32, max: f32) -> Image {
     img
 }
 
-/// `c` clamped into `[min, max]`, bounds swapped when `min > max`; a NaN bound is no bound, not a panic.
+/// `c` clamped into `[min, max]`, bounds swapped when `min > max`; a NaN bound is no bound, not a
+/// panic.
 pub(crate) fn clamp_value(c: f32, min: f32, max: f32) -> f32 {
     let min = if min.is_nan() { f32::NEG_INFINITY } else { min };
     let max = if max.is_nan() { f32::INFINITY } else { max };

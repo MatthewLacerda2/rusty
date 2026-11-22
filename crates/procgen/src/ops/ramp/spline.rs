@@ -25,7 +25,8 @@ pub(super) fn fill(
 /// stop is `0.71` times the difference of its two neighbours.
 const TENSION: f32 = 0.71;
 
-/// Before the first stop it runs from a copy of it at position 0, after the last to a copy at 1; clamped to `[0, 1]` as Blender's (`clamp_v4`).
+/// Before the first stop it runs from a copy of it at position 0, after the last to a copy at 1;
+/// clamped to `[0, 1]` as Blender's (`clamp_v4`).
 fn sample(sorted: &[RampStop], above: usize, t: f32, kind: Spline) -> Rgba {
     let n = sorted.len();
     if n == 1 {

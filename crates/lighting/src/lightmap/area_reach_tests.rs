@@ -1,4 +1,5 @@
-//! A panel flush on a ceiling lights the floor evenly instead of shadowing itself; a panel that can't reach a texel takes nothing from its seeded stream.
+//! A panel flush on a ceiling lights the floor evenly instead of shadowing itself; a panel that
+//! can't reach a texel takes nothing from its seeded stream.
 
 use glam::Vec3;
 

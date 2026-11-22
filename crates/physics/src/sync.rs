@@ -1,5 +1,7 @@
-//! The solver rewrites the pose of every body in its active set, static included (rotation comes back an ulp off), so a static body is compared against `Tracked::static_poses`.
-//! A borrow alone makes rapier list a body as modified, and that order decides how the next step solves new contact pairs.
+//! The solver rewrites the pose of every body in its active set, static included (rotation comes
+//! back an ulp off), so a static body is compared against `Tracked::static_poses`. A borrow alone
+//! makes rapier list a body as modified, and that order decides how the next step solves new
+//! contact pairs.
 
 use std::collections::BTreeSet;
 
@@ -160,7 +162,8 @@ impl PhysicsWorld {
         (named, Some(c.reshaped()))
     }
 
-    /// Only the ids that can re-home are checked (`Changed::homes`), so a tick where only poses moved re-derives no owner.
+    /// Only the ids that can re-home are checked (`Changed::homes`), so a tick where only poses
+    /// moved re-derives no owner.
     fn plan_may_change(&self, scene: &Scene, changed: &Changed) -> bool {
         let t = &self.tracked;
         let w = &scene.world;

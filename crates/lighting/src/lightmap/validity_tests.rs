@@ -1,11 +1,13 @@
-//! Texels inside geometry are filled from their own chart, never a neighbour's, and judged the same whatever the sample count.
+//! Texels inside geometry are filled from their own chart, never a neighbour's, and judged the same
+//! whatever the sample count.
 
 use glam::{Vec2, Vec3};
 
 use super::tests::sun;
 use super::*;
 
-/// Floor on `u` 0.05–0.48, dark underside on 0.52–0.95; the floor's `+X` edge (`x = 2`) faces the dark chart.
+/// Floor on `u` 0.05–0.48, dark underside on 0.52–0.95; the floor's `+X` edge (`x = 2`) faces the
+/// dark chart.
 fn two_charts() -> BakeMesh {
     let floor = [(-2.0, 2.0), (2.0, 2.0), (2.0, -2.0), (-2.0, -2.0)];
     let under = [(-2.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-2.0, 2.0)];
@@ -113,7 +115,9 @@ fn an_invalid_texel_is_filled_from_its_own_chart() {
 
 #[test]
 fn validity_does_not_depend_on_the_sample_count() {
-    // Stand the crate's -X wall on a floor texel's centre so it sees half back faces; its light is the sun's or what it was filled with, so the map moves with the sample count only if validity does.
+    // Stand the crate's -X wall on a floor texel's centre so it sees half back faces; its light is
+    // the sun's or what it was filled with, so the map moves with the sample count only if validity
+    // does.
     let size = lightmap_size(&two_charts(), settings().texels_per_unit, 1024).expect("UVs");
     let u = 5.5 / size as f32;
     let wall = -2.0 + (u - 0.05) / 0.43 * 4.0;

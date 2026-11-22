@@ -12,8 +12,8 @@ pub enum Lit {
 #[derive(Clone, Copy, Debug)]
 pub struct OpParam {
     pub name: &'static str,
-    /// `number` | `integer` | `bool` | `color` | `vec2` | `enum` | `stops` | `path` (project-relative
-    /// file) | `text` (any string).
+    /// `number` | `integer` | `bool` | `color` | `vec2` | `enum` | `stops` | `path`
+    /// (project-relative file) | `text` (any string).
     pub ty: &'static str,
     pub values: &'static [&'static str],
     pub default: Option<Lit>,

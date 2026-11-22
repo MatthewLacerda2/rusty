@@ -55,7 +55,8 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     )
 }
 
-/// Validated fields (`render_mode`, the alpha clamps) go through the shared `authoring::material::set_*` ops, so validation lives once.
+/// Validated fields (`render_mode`, the alpha clamps) go through the shared
+/// `authoring::material::set_*` ops, so validation lives once.
 fn define(
     scene: &RefCell<Scene>,
     name: &str,

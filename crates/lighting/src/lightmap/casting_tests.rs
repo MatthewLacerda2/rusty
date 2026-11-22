@@ -1,4 +1,5 @@
-//! *Cast Shadows*, Unity's rule: an `Off` mesh blocks no light but is still seen; a `ShadowsOnly` one blocks light but is seen by nothing and gets no lightmap. Probe shadow rays agree.
+//! *Cast Shadows*, Unity's rule: an `Off` mesh blocks no light but is still seen; a `ShadowsOnly`
+//! one blocks light but is seen by nothing and gets no lightmap. Probe shadow rays agree.
 
 use glam::Vec3;
 

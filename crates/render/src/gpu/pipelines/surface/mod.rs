@@ -1,8 +1,10 @@
 //! `<name>.wgsl` resolves in `assets/shaders`, else `engine/shaders`.
 //! [`STANDARD`] (0) is the renderer's own pair; `n > 0` is cache slot `n - 1`.
-//! A module that is missing, lacks entries or fails validation is logged once and draws with the standard pipeline.
-//! [`SurfaceShaders::refresh`] drains the write log once per render; a written slot goes stale and rebuilds on its next draw.
-//! A variant that discards, moves UVs or vertices builds [`CutPipelines`] reading the same params, so a dissolved fragment casts no shadow and fills no SSAO depth.
+//! A module that is missing, lacks entries or fails validation is logged once and draws with the
+//! standard pipeline. [`SurfaceShaders::refresh`] drains the write log once per render; a written
+//! slot goes stale and rebuilds on its next draw. A variant that discards, moves UVs or vertices
+//! builds [`CutPipelines`] reading the same params, so a dissolved fragment casts no shadow and
+//! fills no SSAO depth.
 
 mod pass;
 mod upkeep;

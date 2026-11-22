@@ -1,4 +1,5 @@
-//! The outline fill at the tile's edge: wrap, `evenodd` on shapes wider than the tile, and flat edges.
+//! The outline fill at the tile's edge: wrap, `evenodd` on shapes wider than the tile, and flat
+//! edges.
 
 use glam::Vec2;
 

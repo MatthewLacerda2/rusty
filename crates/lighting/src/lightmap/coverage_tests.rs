@@ -8,7 +8,8 @@ use super::*;
 
 const S: u32 = 16;
 
-/// Strip `k` spans v ∈ [2k + 0.6, 2k + 0.9] texels, between two rows of texel centres, so no centre lies in any.
+/// Strip `k` spans v ∈ [2k + 0.6, 2k + 0.9] texels, between two rows of texel centres, so no centre
+/// lies in any.
 const STRIPS: u32 = 8;
 
 fn strips() -> BakeMesh {

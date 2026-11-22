@@ -1,5 +1,7 @@
-//! Mass: a Rigidbody's `mass` is spread over its body's solid colliders by volume (Unity's `Rigidbody.mass` is the whole body's).
-//! Fit: a concave mesh is the exact trimesh on static/kinematic bodies, convex pieces on dynamic ones; cylinders and capsules roll only on dynamic ones.
+//! Mass: a Rigidbody's `mass` is spread over its body's solid colliders by volume (Unity's
+//! `Rigidbody.mass` is the whole body's). Fit: a concave mesh is the exact trimesh on
+//! static/kinematic bodies, convex pieces on dynamic ones; cylinders and capsules roll only on
+//! dynamic ones.
 
 use rapier3d::prelude::*;
 

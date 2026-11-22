@@ -1,4 +1,5 @@
-//! Angular speed is degrees/second, angular acceleration degrees/second². Getters without an agent return `false` / `0`.
+//! Angular speed is degrees/second, angular acceleration degrees/second². Getters without an agent
+//! return `false` / `0`.
 
 use mlua::{FromLua, IntoLua, Table};
 

@@ -1,5 +1,5 @@
-//! The entity/component store of record. Scene-level state lives in the root's `scene::Scene`, which owns a `World`.
-//! Consumers go through the accessors, never the hecs storage.
+//! The entity/component store of record. Scene-level state lives in the root's `scene::Scene`,
+//! which owns a `World`. Consumers go through the accessors, never the hecs storage.
 
 #![deny(clippy::unwrap_used)]
 

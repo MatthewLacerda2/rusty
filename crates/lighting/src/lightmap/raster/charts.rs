@@ -1,4 +1,5 @@
-//! A chart is an island of a mesh's lightmap UV. An invalid texel is filled only from valid texels of its own chart, so a floor's edge never takes the dark chart beside it.
+//! A chart is an island of a mesh's lightmap UV. An invalid texel is filled only from valid texels
+//! of its own chart, so a floor's edge never takes the dark chart beside it.
 
 use std::collections::BTreeMap;
 
@@ -59,7 +60,8 @@ pub(in crate::lightmap) fn texel_charts(
     labels
 }
 
-/// A texel no ring reaches gets the chart's mean; a chart with no filled texel is left for dilation.
+/// A texel no ring reaches gets the chart's mean; a chart with no filled texel is left for
+/// dilation.
 pub(in crate::lightmap) fn fill_within<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],
@@ -89,7 +91,8 @@ pub(in crate::lightmap) fn fill_within<T: Texel>(
     means.values().filter(|(_, n)| *n == 0.0).count()
 }
 
-/// Linear in `pending` however many rings a buried region takes; rings sum in `NEIGHBOURS` order so no visiting order shows in the bytes.
+/// Linear in `pending` however many rings a buried region takes; rings sum in `NEIGHBOURS` order so
+/// no visiting order shows in the bytes.
 fn fill_rings<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],

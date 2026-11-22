@@ -1,4 +1,5 @@
-//! A texel whose centre a triangle covers is traced there; one it only overlaps, inside both triangle and texel ([`clip`]). Dilation and [`fill_rest`] fill the rest.
+//! A texel whose centre a triangle covers is traced there; one it only overlaps, inside both
+//! triangle and texel ([`clip`]). Dilation and [`fill_rest`] fill the rest.
 
 use glam::{Vec2, Vec3};
 
@@ -76,7 +77,8 @@ struct UvTri {
     area: f32,
 }
 
-/// A texel two triangles share goes to the first in index order; the second pass never takes a texel from the first.
+/// A texel two triangles share goes to the first in index order; the second pass never takes a
+/// texel from the first.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }

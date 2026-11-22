@@ -6,9 +6,12 @@ use rusty_scene::Scene;
 
 #[derive(Clone, Copy)]
 pub(super) enum Merge {
-    /// A key the scene holds with other data is copied in as `"{key} (n)"`: a `.prefab`'s bare names (`Wood`) can collide.
+    /// A key the scene holds with other data is copied in as `"{key} (n)"`: a `.prefab`'s bare
+    /// names (`Wood`) can collide.
     Uniquify,
-    /// A model's keys are namespaced by its path (`kit.glb::Wood`), so the scene's entry under one is that model's material, edited or not: a re-import never overwrites Unity's extracted material.
+    /// A model's keys are namespaced by its path (`kit.glb::Wood`), so the scene's entry under one
+    /// is that model's material, edited or not: a re-import never overwrites Unity's extracted
+    /// material.
     KeepScene,
 }
 

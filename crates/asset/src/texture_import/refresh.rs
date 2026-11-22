@@ -1,4 +1,6 @@
-//! Making an image's compressed cache current at import, never at a draw. Each encode holds the cache's lock (`convert::lock_cache`), so the worker and a Play refresh never make one cache twice.
+//! Making an image's compressed cache current at import, never at a draw. Each encode holds the
+//! cache's lock (`convert::lock_cache`), so the worker and a Play refresh never make one cache
+//! twice.
 
 use std::path::{Path, PathBuf};
 
@@ -31,7 +33,8 @@ pub(super) struct Cached {
     pub size: (u32, u32),
 }
 
-/// Shared by an encode ([`due`]) and the memory tests' blank cache (`cache::write_blank`), so neither makes a cache the other would not.
+/// Shared by an encode ([`due`]) and the memory tests' blank cache (`cache::write_blank`), so
+/// neither makes a cache the other would not.
 pub(super) fn cached_as(source: &Path, settings: &TextureSettings) -> Result<Cached, Uncached> {
     use image::ImageDecoder;
     let format = format_of(settings).ok_or(Uncached::Left("compression is off"))?;
@@ -75,7 +78,8 @@ fn due(source: &Path) -> Result<Option<Due>, String> {
     }
 }
 
-/// What a timed bench refuses to start with (`make bench-ab`): decoded uploads would skew its memory and load.
+/// What a timed bench refuses to start with (`make bench-ab`): decoded uploads would skew its
+/// memory and load.
 pub fn pending(root: &Path) -> Vec<PathBuf> {
     let due = |image: &PathBuf| due(image).is_ok_and(|d| d.is_some());
     images(root).into_iter().filter(due).collect()

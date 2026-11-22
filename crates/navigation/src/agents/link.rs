@@ -29,7 +29,8 @@ pub(super) fn auto_traverse(agent: &mut NavMeshAgentComponent, pos: Vec3, dt: f3
     pos + to_end.normalize_or_zero() * step
 }
 
-/// Unity's `CompleteOffMeshLink`: the agent leaves the link at rest; returns the Transform position.
+/// Unity's `CompleteOffMeshLink`: the agent leaves the link at rest; returns the Transform
+/// position.
 pub fn complete_off_mesh_link(agent: &mut NavMeshAgentComponent) -> Option<Vec3> {
     let link = agent.off_mesh_link.take()?;
     agent.velocity = Vec3::ZERO;

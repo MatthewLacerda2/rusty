@@ -1,4 +1,5 @@
-//! A normal map kept at 16 bits is never block-compressed (BC5 would round it to 8 bits), and a compressed copy made before it was 16-bit is an orphan.
+//! A normal map kept at 16 bits is never block-compressed (BC5 would round it to 8 bits), and a
+//! compressed copy made before it was 16-bit is an orphan.
 
 use std::path::Path;
 

@@ -1,4 +1,5 @@
-//! Area lights: intensity × area far away, one-sided, faded to zero at `range`, penumbrae widening with the panel.
+//! Area lights: intensity × area far away, one-sided, faded to zero at `range`, penumbrae widening
+//! with the panel.
 
 use glam::Vec3;
 

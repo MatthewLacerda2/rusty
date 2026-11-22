@@ -1,4 +1,7 @@
-//! An instance's overrides are its diff from its baseline (the source as it last took it), taken on the entity's serde JSON with identity fields masked out (`STRIPPED_KEYS`). Unity's three shapes: added component, removed component, property modification; a list whose length changed carries a size entry and its new elements whole.
+//! An instance's overrides are its diff from its baseline (the source as it last took it), taken on
+//! the entity's serde JSON with identity fields masked out (`STRIPPED_KEYS`). Unity's three shapes:
+//! added component, removed component, property modification; a list whose length changed carries a
+//! size entry and its new elements whole.
 
 use std::collections::{BTreeMap, BTreeSet};
 

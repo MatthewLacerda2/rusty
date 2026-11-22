@@ -1,4 +1,5 @@
-//! The Area light's shadow probe: a fully seen or hidden texel casts 20 probe rays and 4 or 32 checks, a penumbra the full set plus the corners.
+//! The Area light's shadow probe: a fully seen or hidden texel casts 20 probe rays and 4 or 32
+//! checks, a penumbra the full set plus the corners.
 
 use std::sync::atomic::Ordering;
 
@@ -71,7 +72,8 @@ pub(super) fn mean_rays(f: &Fixture, x: f32, samples: u32) -> f32 {
 
 #[test]
 fn the_probe_runs_only_where_a_unanimous_texel_casts_fewer_rays_than_the_set() {
-    // Rays a texel casts: up to 49 samples the set is cast whole; from 64 on, a hidden texel casts 20 + 32 on average, a lit one 20 + 4, a penumbra the set and four corners.
+    // Rays a texel casts: up to 49 samples the set is cast whole; from 64 on, a hidden texel casts
+    // 20 + 32 on average, a lit one 20 + 4, a penumbra the set and four corners.
     let scene = shadowed();
     let table = [
         (17, 25.0, 25.0, 25.0),
@@ -119,7 +121,8 @@ fn a_penumbra_texel_casts_the_full_set_and_the_corners_and_stays_within_the_exha
 
 #[test]
 fn where_the_full_set_follows_the_probe_costs_only_its_corners() {
-    // Block points count toward the set, so a penumbra texel casts at most four corners more than the exhaustive estimate.
+    // Block points count toward the set, so a penumbra texel casts at most four corners more than
+    // the exhaustive estimate.
     let scene = shadowed();
     for samples in [64, 100, 256] {
         for seed in 0..8 {

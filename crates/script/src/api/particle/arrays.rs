@@ -1,4 +1,7 @@
-//! Arrays are index-aligned with the live particles, oldest first. They are tied to the read: a write after anything bumped the emitter's revision is an error that changes nothing. A `Gpu` emitter's particles are the renderer's: `GetArrays` reads empty, `SetArrays` changes nothing and warns once.
+//! Arrays are index-aligned with the live particles, oldest first. They are tied to the read: a
+//! write after anything bumped the emitter's revision is an error that changes nothing. A `Gpu`
+//! emitter's particles are the renderer's: `GetArrays` reads empty, `SetArrays` changes nothing and
+//! warns once.
 
 use mlua::{AnyUserData, Lua, Table, Value};
 

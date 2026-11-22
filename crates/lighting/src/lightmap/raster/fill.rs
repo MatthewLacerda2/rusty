@@ -38,7 +38,9 @@ pub(in crate::lightmap) fn dilate<T: Texel>(
     }
 }
 
-/// Nearest in four-neighbour steps, ties to the first in row-major order, so a mip averaging a chart's border with the empty background reads the chart's light, not black. A map with no filled texel stays as it is.
+/// Nearest in four-neighbour steps, ties to the first in row-major order, so a mip averaging a
+/// chart's border with the empty background reads the chart's light, not black. A map with no
+/// filled texel stays as it is.
 pub(in crate::lightmap) fn fill_rest<T: Texel>(texels: &mut [T], filled: &[bool], size: u32) {
     let size = size as usize;
     let mut done = filled.to_vec();

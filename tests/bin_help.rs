@@ -1,4 +1,5 @@
-//! Every engine binary answers `--help`/`-h` with usage and exits 0 before opening a project, window or session. The table is held equal to `Cargo.toml`'s `[[bin]]` names. Gated on `dev`.
+//! Every engine binary answers `--help`/`-h` with usage and exits 0 before opening a project,
+//! window or session. The table is held equal to `Cargo.toml`'s `[[bin]]` names. Gated on `dev`.
 
 use std::process::{Command, Output, Stdio};
 use std::time::Duration;

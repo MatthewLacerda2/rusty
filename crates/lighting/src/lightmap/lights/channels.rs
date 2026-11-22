@@ -1,4 +1,8 @@
-//! Which of a `Shadowmask` bake's four mask channels each `Mixed` light's static occlusion goes in (Unity's `Light.bakingOutput.occlusionMaskChannel`). Channels are an overlap colouring of the lights' reach (directional: everywhere; point and spot: their range's sphere), taken in a fixed order (directional first, then entity), lowest free channel first; a light with none falls back to `Baked`, as in Unity.
+//! Which of a `Shadowmask` bake's four mask channels each `Mixed` light's static occlusion goes in
+//! (Unity's `Light.bakingOutput.occlusionMaskChannel`). Channels are an overlap colouring of the
+//! lights' reach (directional: everywhere; point and spot: their range's sphere), taken in a fixed
+//! order (directional first, then entity), lowest free channel first; a light with none falls back
+//! to `Baked`, as in Unity.
 
 use std::collections::{BTreeMap, BTreeSet};
 

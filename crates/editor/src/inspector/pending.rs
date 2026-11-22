@@ -21,7 +21,8 @@ pub(super) struct PendingEdits {
 
 impl PendingEdits {
     /// Apply the deferred edits once the entity guard has dropped: re-parent, run a
-    /// prefab verb, delete or restore a material, run a skin tool, and mark the scene dirty for each that did.
+    /// prefab verb, delete or restore a material, run a skin tool, and mark the scene dirty for
+    /// each that did.
     pub(super) fn apply(self, editor: &mut EditorUi, scene: &mut Scene, id: u32) {
         if let Some(action) = self.prefab_action {
             if prefab::dispatch(scene, action) {

@@ -44,7 +44,8 @@ fn zero_duration_crossfade_is_a_plain_play() {
 
 #[test]
 fn graph_reference_defaults_to_none_and_round_trips_by_path() {
-    // The path reference: absent it stays out of the JSON; set, it round-trips — the path, never the graph contents.
+    // The path reference: absent it stays out of the JSON; set, it round-trips — the path, never
+    // the graph contents.
     let anim = AnimatorComponent::default();
     assert_eq!(anim.graph, None);
     assert!(!serde_json::to_string(&anim).unwrap().contains("graph"));

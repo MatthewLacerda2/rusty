@@ -1,5 +1,5 @@
-//! A port of the three programs in RVO2 (`Agent.cpp`, Apache-2.0). `lp2` adds the half-planes in the
-//! caller's stable order, so the result is deterministic; `lp3` is the infeasible fallback and
+//! A port of the three programs in RVO2 (`Agent.cpp`, Apache-2.0). `lp2` adds the half-planes in
+//! the caller's stable order, so the result is deterministic; `lp3` is the infeasible fallback and
 //! minimises the largest penetration into any half-plane.
 
 use glam::Vec2;

@@ -1,4 +1,6 @@
-//! A link end snaps to the walkable point nearest it within [`LINK_SNAP_DISTANCE`] (Unity connects a link end to the navmesh near it); a link with an end that finds none connects nothing until the navmesh or the link moves.
+//! A link end snaps to the walkable point nearest it within [`LINK_SNAP_DISTANCE`] (Unity connects
+//! a link end to the navmesh near it); a link with an end that finds none connects nothing until
+//! the navmesh or the link moves.
 
 use glam::Vec3;
 

@@ -1,5 +1,7 @@
-//! propagate(instance) = rebuild every entity from a FRESH source baseline, then re-apply that entity's override map on top.
-//! A `.prefab` instance is flat: entities match by the link's `local_id` only. Nested prefabs are out of scope: an instance's walk stops at another instance's root.
+//! propagate(instance) = rebuild every entity from a FRESH source baseline, then re-apply that
+//! entity's override map on top. A `.prefab` instance is flat: entities match by the link's
+//! `local_id` only. Nested prefabs are out of scope: an instance's walk stops at another instance's
+//! root.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -109,7 +111,8 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
     for id in ids {
-        // A part whose node the model lost waits for Play's destroy phase, and has no local id to list it under.
+        // A part whose node the model lost waits for Play's destroy phase, and has no local id to
+        // list it under.
         let Some(link) = scene.world.prefab_link(id).filter(|l| l.local_id != GONE) else {
             continue;
         };
@@ -121,7 +124,8 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     Ok(out)
 }
 
-/// A source whose file is missing is skipped, so a deleted `.prefab` never aborts a scene load: the instance keeps its values and overrides, with no baseline until the source is back.
+/// A source whose file is missing is skipped, so a deleted `.prefab` never aborts a scene load: the
+/// instance keeps its values and overrides, with no baseline until the source is back.
 pub fn propagate_linked_instances_in(scene: &mut Scene, imports: &mut Imports) {
     let roots = instance_roots(scene, |_| true);
     propagate_roots(scene, roots, true, imports);

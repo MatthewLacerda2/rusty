@@ -1,4 +1,7 @@
-//! The probe bake's lights take the channels the last lightmap bake recorded (`BakeScene::use_recorded_channels`), never fresh ones: after a light is removed each kept light still writes its occlusion on the channel the frame masks it by, and a light the record gave none writes none.
+//! The probe bake's lights take the channels the last lightmap bake recorded
+//! (`BakeScene::use_recorded_channels`), never fresh ones: after a light is removed each kept light
+//! still writes its occlusion on the channel the frame masks it by, and a light the record gave
+//! none writes none.
 
 use glam::{Vec3, Vec4};
 

@@ -1,4 +1,6 @@
-//! Walking open ground in Play: a CharacterController moved ahead on a flat floor covers its whole stride every tick and stays grounded (Unity's `Move`); floors are built as a script builds them (primitive plus `AddComponent("Collider")`, kinematic, no Rigidbody).
+//! Walking open ground in Play: a CharacterController moved ahead on a flat floor covers its whole
+//! stride every tick and stays grounded (Unity's `Move`); floors are built as a script builds them
+//! (primitive plus `AddComponent("Collider")`, kinematic, no Rigidbody).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,7 +25,8 @@ const STICKS: [f32; 2] = [0.0, -0.02];
 /// The share of a stride a tick may lose: the skin settling, never a stall.
 const SLACK: f32 = 0.01;
 
-/// A floor: name, primitive, scale, centre height (top face at y = 0), static flag, plane subdivisions.
+/// A floor: name, primitive, scale, centre height (top face at y = 0), static flag, plane
+/// subdivisions.
 pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool, u32);
 
 const BOXES: [Floor; 4] = [

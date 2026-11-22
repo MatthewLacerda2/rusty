@@ -65,7 +65,8 @@ pub struct PhysicsEvents {
     pub triggers: TriggerEvents,
     pub collisions: CollisionEvents,
     pub joint_breaks: Vec<JointBreak>,
-    /// rapier panicked during this step and its world was rebuilt from the scene (release builds only): the step surfaced no other event.
+    /// rapier panicked during this step and its world was rebuilt from the scene (release builds
+    /// only): the step surfaced no other event.
     pub rebuilt: Option<Rebuilt>,
 }
 
@@ -77,7 +78,8 @@ pub struct Rebuilt {
     pub in_a_row: u32,
 }
 
-/// The hitscan acceptance test shared by the engine hitscan and the Lua `Physics.Raycast`: an entity is hittable iff it exists.
+/// The hitscan acceptance test shared by the engine hitscan and the Lua `Physics.Raycast`: an
+/// entity is hittable iff it exists.
 pub fn is_hittable(scene: &Scene, id: u32) -> bool {
     scene.world.contains(id)
 }
