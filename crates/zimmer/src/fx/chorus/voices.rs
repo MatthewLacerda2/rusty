@@ -1,25 +1,28 @@
-//! Who the copies are: how many, where each one's sweep starts, how fast it runs, and where in the
-//! field it sits.
-
 use std::f32::consts::TAU;
 
 use crate::hash::unit2;
 use crate::stereo::pan_gains;
 
+/// One copy has nowhere to be but beside the source.
 pub(super) const MIN_VOICES: usize = 2;
 
+/// Past four, each voice sits near one already there and costs a read per sample.
 pub(super) const MAX_VOICES: usize = 4;
 
+/// Fraction of the written rate the sweeps spread over: one shared rate breathes in unison.
 const RATE_SPREAD: f32 = 0.1;
 
+/// Not the note's seed: every note of a part is the same ensemble. `chorus` in ASCII.
 const SPREAD_SEED: u64 = 0x0000_6368_6f72_7573;
 
 const PHASE: u64 = 0;
 
+/// Its own channel: a voice's rate is uncorrelated with its phase.
 const DEVIATION: u64 = 1;
 
 pub(super) struct Voice {
     pub(super) phase: f32,
+    /// Radians per sample.
     pub(super) step: f32,
     pub(super) gains: (f32, f32),
 }
@@ -29,6 +32,7 @@ pub(super) fn ensemble(count: usize, lfo_rate: f32, rate: f32) -> Vec<Voice> {
     let mut voices: Vec<Voice> = (0..count)
         .map(|index| {
             let (ordinal, cell) = (index as f32, index as i64);
+            // Inside the v-th slice: a uniform draw can land two voices in phase, 6 dB louder.
             let phase = (ordinal + unit2(cell, 0, PHASE, SPREAD_SEED)) * slice;
             Voice {
                 phase,

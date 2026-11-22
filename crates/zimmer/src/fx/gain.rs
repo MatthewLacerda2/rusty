@@ -1,9 +1,12 @@
 //! gain — how a gain track moves: the ballistics [`super::compress`] and [`super::limiter`] share.
 
+/// Seconds: half a cycle of 25 Hz, so a kick's ripple is held and read as a level.
 pub(crate) const HOLD: f32 = 0.02;
 
+/// Deeper is an upstream bug; the cap keeps `reach_frames` finite.
 const FLOOR_DB: f32 = -120.0;
 
+/// A release this close to its target snaps to it, so unity comes back bit-identical.
 const SETTLE_DB: f32 = 0.001;
 
 #[derive(Clone, Copy, Debug)]
@@ -26,11 +29,13 @@ impl Ballistics {
         }
     }
 
+    /// Frames, either way, one target can move another frame's gain: what a looped render wraps.
     pub(crate) fn reach_frames(&self) -> usize {
         let settle = self.release_frames * (-FLOOR_DB / SETTLE_DB).ln();
         self.hold + 2 * self.attack + settle.ceil() as usize
     }
 
+    /// Linear gains in `0..=1`; each pass only lowers them, so no frame ends above its target.
     pub(crate) fn smooth(&self, target: &[f32]) -> Vec<f32> {
         let depth: Vec<f32> = target.iter().map(|gain| decibels(*gain)).collect();
         let held = deepest(&depth, self.hold, Side::Behind);

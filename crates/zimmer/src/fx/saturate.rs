@@ -1,5 +1,7 @@
-//! soft-clip drive — the one nonlinearity in the whole signal path.
+//! Runs at the output rate, unoversampled, so it stays memoryless with no tail; bright sources
+//! alias at high drive.
 
+/// At the floor the curve leaves the identity by 1.3e-5, under half a 16-bit step; below, skipped.
 const MIN_DRIVE: f32 = 0.01;
 
 const MAX_DRIVE: f32 = 8.0;
@@ -94,6 +96,7 @@ mod tests {
     fn the_documented_clean_range_really_is_clean() {
         let mut buf = sine(1000.0);
         apply(&mut buf, 4.0, 1.0);
+        // The 23rd harmonic, 23 kHz, is the first to fold: onto 21.1 kHz.
         let folded = magnitude_at(&buf, 21_100.0) / magnitude_at(&buf, 1000.0);
         assert!(folded < 1e-3, "folded harmonic at {folded} of the tone");
     }

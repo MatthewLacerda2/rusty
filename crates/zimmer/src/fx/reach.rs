@@ -1,13 +1,14 @@
-//! How far a chain reaches beyond the signal it was handed — forwards in time, and backwards.
-
 use super::{chorus, delay, reverb, Spacing, Tempo};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 
+/// Seconds; above the 12.75 s a full-size room rings, so one room is never cut short.
 const MAX_TAIL: f32 = 15.0;
 
+/// Seconds: a ring-out sized to −60 dB, or cut by `MAX_TAIL`, ends on a step this fades out.
 const FADE: f32 = 0.01;
 
+/// Seconds of input a sample depends on ahead of it; summed, as a chain runs in series.
 pub(crate) fn lookahead_seconds(chain: &[Fx]) -> f32 {
     chain
         .iter()
@@ -22,6 +23,7 @@ pub(crate) fn tail_seconds(chain: &[Fx], tempo: &dyn Tempo) -> f32 {
     let total: f32 = chain
         .iter()
         .map(|fx| match fx {
+            // `ping_pong` moves where a repeat lands, not how long the repeats last.
             Fx::Delay {
                 time,
                 beats,
@@ -39,12 +41,14 @@ pub(crate) fn tail_seconds(chain: &[Fx], tempo: &dyn Tempo) -> f32 {
                 ..
             } if *mix > 0.0 => reverb::tail_seconds(*size) + reverb::predelay_seconds(*predelay),
             Fx::Chorus { depth, mix, .. } if *mix > 0.0 => chorus::tail_seconds(*depth),
+            // Saturate, EQ and compress neither delay nor repeat: silence stays silent.
             _ => 0.0,
         })
         .sum();
     total.min(MAX_TAIL)
 }
 
+/// After the chain ran, on the buffer `tail_seconds` grew, whose end is a cut ring-out.
 pub(crate) fn close_tail(buf: &mut Stereo, chain: &[Fx], rate: f32, tempo: &dyn Tempo) {
     if tail_seconds(chain, tempo) <= 0.0 {
         return;

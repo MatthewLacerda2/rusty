@@ -1,5 +1,3 @@
-//! feedback echo.
-
 use super::Tempo;
 use crate::stereo::Stereo;
 
@@ -10,6 +8,7 @@ pub(crate) enum Spacing<'a> {
 }
 
 impl<'a> Spacing<'a> {
+    /// Beats win when given; validation refuses `time` and `beats` together.
     pub(crate) fn new(time: f32, beats: Option<f32>, tempo: &'a dyn Tempo) -> Self {
         match beats {
             Some(beats) => Self::Beats(beats, tempo),
@@ -17,6 +16,7 @@ impl<'a> Spacing<'a> {
         }
     }
 
+    /// Seconds: sizes the line, so a slowing tempo never reads past what was kept.
     pub(crate) fn longest(self) -> f32 {
         match self {
             Self::Seconds(time) => time,
@@ -61,6 +61,7 @@ fn line(
     let Some(cap) = line_length(spacing.longest(), buf.len(), rate) else {
         return;
     };
+    // Under 1 so the tail dies; `crossed` and `tail_seconds` take the same 0.95.
     let feedback = feedback.clamp(0.0, 0.95);
     let mix = mix.clamp(0.0, 1.0);
     let mut line = vec![0.0f32; cap];
@@ -115,6 +116,7 @@ fn crossed(
         let write = i % cap;
         let read = (write + cap - spacing.at(i, cap, rate)) % cap;
         let (echo_l, echo_r) = (left[read], right[read]);
+        // The mono send enters the left line only, so the first repeat lands left.
         left[write] = (in_l + in_r) * 0.5 + echo_r * feedback;
         right[write] = echo_l * feedback;
         buf.l[i] = dry_l * (1.0 - mix) + echo_l * mix;
@@ -122,6 +124,7 @@ fn crossed(
     }
 }
 
+/// `None` past eight times the signal's length: an echo that far is never heard.
 fn line_length(time: f32, frames: usize, rate: f32) -> Option<usize> {
     if !time.is_finite() || time <= 0.0 {
         return None;

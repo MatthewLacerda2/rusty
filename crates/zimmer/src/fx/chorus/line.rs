@@ -1,9 +1,11 @@
 //! One delay line, read at a fractional position.
 
+/// `far` is one sample further back, so `frac` weights backwards in time, the way a delay grows.
 pub(super) fn read(line: &[f32], write: usize, delay: f32) -> f32 {
     let len = line.len();
     let whole = delay.floor();
     let frac = delay - whole;
+    // At least one back and two short of a lap: both taps stay off the frame being written.
     let back = (whole as usize).clamp(1, len - 2);
     let near = (write + len - back) % len;
     let far = (near + len - 1) % len;

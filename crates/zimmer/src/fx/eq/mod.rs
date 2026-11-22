@@ -7,12 +7,14 @@ use crate::patch::EqBand;
 
 const MIN_Q: f32 = 0.1;
 
+/// 30 at 250 Hz is 8 Hz wide: narrower rings on its own, a resonator.
 const MAX_Q: f32 = 30.0;
 
 const MAX_GAIN_DB: f32 = 24.0;
 
 const MIN_HZ: f32 = 10.0;
 
+/// Fraction of the rate the top corner may reach: the bilinear warp bends corners near Nyquist.
 const NYQUIST_MARGIN: f32 = 0.45;
 
 pub(crate) fn apply(buf: &mut [f32], bands: &[EqBand], rate: f32) {
@@ -71,6 +73,7 @@ impl Biquad {
             .all(|c| c.is_finite())
     }
 
+    /// Transposed direct form II: two states, and better conditioned in `f32` on low bands.
     fn run(self, buf: &mut [f32]) {
         let (mut z1, mut z2) = (0.0f32, 0.0f32);
         for sample in buf.iter_mut() {
@@ -137,7 +140,6 @@ mod tests {
 
     #[test]
     fn a_cut_removes_the_decibels_it_asked_for_and_leaves_the_rest_alone() {
-        // The move the issue is about: 250 Hz out of the pad, the pad kept.
         let cut = band(EqKind::Peak, 250.0, -9.0, 2.0);
         assert!(
             (response_db(cut, 250.0) + 9.0).abs() < 0.5,
