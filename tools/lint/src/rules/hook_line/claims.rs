@@ -1,23 +1,12 @@
 use super::File;
-use crate::code::is_ident;
-use crate::comments::{split, Kind, Line};
+use crate::code::{is_ident, ITEMS};
+use crate::comments::{declared, split, Kind, Line};
 
-const ITEMS: &[&str] = &[
-    "fn",
-    "struct",
-    "enum",
-    "trait",
-    "mod",
-    "const",
-    "static",
-    "type",
-    "macro_rules",
-];
 const QUALIFIERS: &[&str] = &["unsafe", "async", "extern", "pub", "crate", "in", "super"];
 
 pub struct Claim<'a> {
     pub name: &'a str,
-    /// `mod` for a module of hooks.
+    /// `mod` for a hook module.
     pub kind: &'a str,
     pub parent: String,
     /// The type of the `impl` an associated item sits in.
@@ -55,46 +44,94 @@ fn join(parent: &str, name: &str) -> String {
     }
 }
 
+/// Where `text` says "test hook(s)" as words (`crates/CLAUDE.md`, *Test hooks*).
+pub fn phrase(text: &str) -> Option<usize> {
+    let lower = text.to_ascii_lowercase();
+    let touches = |c: Option<char>| c.is_some_and(is_ident);
+    lower
+        .match_indices("test hook")
+        .map(|(at, _)| at)
+        .find(|&at| {
+            let after = lower[at + "test hook".len()..].trim_start_matches('s');
+            !touches(lower[..at].chars().next_back()) && !touches(after.chars().next())
+        })
+}
+
 pub fn claims<'a>(file: &File<'a>) -> Vec<Claim<'a>> {
     let lines = split(Kind::Rust, file.source);
     let note = |l: &Line| l.code.trim().is_empty() && !l.comment.trim().is_empty();
     let here = module_path(file.path).unwrap_or_default();
     let mut out = Vec::new();
-    let mut i = 0;
-    while i < lines.len() {
-        let run = lines[i..].iter().take_while(|l| note(l)).count();
+    let mut rest = &lines[..];
+    while let Some(first) = rest.first() {
+        let i = lines.len() - rest.len();
+        let run = rest.iter().take_while(|l| note(l)).count();
         if run == 0 {
-            i += 1;
+            rest = &rest[1..];
             continue;
         }
-        let block = &lines[i..i + run];
+        let (block, after) = rest.split_at(run);
+        rest = after;
         let text: Vec<&str> = block.iter().map(|l| l.comment.as_str()).collect();
         let text = text.join(" ");
         let tested = file.test.get(i).copied().unwrap_or(false);
-        if !tested && text.to_ascii_lowercase().contains("test hook") {
-            let header = block[0].comment.trim_start().starts_with("//!");
-            let claim = if header {
-                let name = module_name(file.path);
-                name.map(|name| ("mod", name, None, Some(here.clone())))
-            } else {
-                item_after(file.source, i + run).map(|(kind, name, owner)| {
+        let Some(at) = phrase(&text).filter(|_| !tested) else {
+            continue;
+        };
+        let found = if first.comment.trim_start().starts_with("//!") {
+            header(file, &text, at, &here)
+        } else {
+            let item = item_after(file.source, i + run);
+            item.into_iter()
+                .map(|(kind, name, owner)| {
                     let module = (kind == "mod").then(|| join(&here, name));
                     (kind, name, owner, module)
                 })
-            };
-            out.extend(claim.map(|(kind, name, owner, module)| Claim {
-                name,
-                kind,
-                parent: here.clone(),
-                owner,
-                module,
-                line: i + 1,
-                text,
-            }));
-        }
-        i += run;
+                .collect()
+        };
+        out.extend(found.into_iter().map(|(kind, name, owner, module)| Claim {
+            name,
+            kind,
+            parent: here.clone(),
+            owner,
+            module,
+            line: i + 1,
+            text: text.clone(),
+        }));
     }
     out
+}
+
+type Found<'a> = (&'a str, &'a str, Option<&'a str>, Option<String>);
+
+/// The items a `//!` header's sentence names, else its module if the sentence opens on
+/// the phrase.
+fn header<'a>(file: &File<'a>, text: &str, at: usize, here: &str) -> Vec<Found<'a>> {
+    let start = text[..at].rfind(". ").map_or(0, |dot| dot + 2);
+    let end = text[at..].find(". ").map_or(text.len(), |dot| at + dot);
+    let sentence = &text[start..end];
+    let items: Vec<(&str, &str)> = file
+        .source
+        .lines()
+        .filter(|l| !l.trim_start().starts_with("//"))
+        .flat_map(declared)
+        .filter(|(kind, _)| *kind != "impl")
+        .collect();
+    let spans = sentence.split('`').skip(1).step_by(2);
+    let named: Vec<Found> = spans
+        .filter_map(|span| items.iter().find(|(_, name)| *name == span))
+        .map(|&(kind, name)| (kind, name, None, None))
+        .collect();
+    if !named.is_empty() {
+        return named;
+    }
+    let opening = sentence.trim_start_matches(|c: char| c == '/' || c == '!' || c == ' ');
+    let opening = opening.strip_prefix("A ").unwrap_or(opening);
+    let module_is_one = phrase(opening) == Some(0);
+    match module_name(file.path).filter(|_| module_is_one) {
+        Some(name) => vec![("mod", name, None, Some(here.to_string()))],
+        None => Vec::new(),
+    }
 }
 
 /// Keyword, name and `impl` type of the item below; none when `#[cfg(test)]`.
@@ -110,7 +147,9 @@ fn item_after(source: &str, from: usize) -> Option<(&str, &str, Option<&str>)> {
     let mut tokens = lines[at]
         .split(|c: char| !is_ident(c))
         .filter(|t| !t.is_empty());
-    let kind = tokens.find(|t| ITEMS.contains(t))?;
+    let kind = tokens
+        .find(|t| ITEMS.contains(t))
+        .filter(|k| *k != "impl")?;
     let name = tokens.find(|t| !ITEMS.contains(t) && !QUALIFIERS.contains(t))?;
     let indented = lines[at].starts_with(char::is_whitespace);
     let owner = lines[..at]
@@ -122,7 +161,7 @@ fn item_after(source: &str, from: usize) -> Option<(&str, &str, Option<&str>)> {
     Some((kind, name, owner))
 }
 
-/// `Type` of `impl<T> Trait for Type<T> {`.
+/// `Type` of `impl<T> Trait for Type<T>`.
 fn impl_type(line: &str) -> Option<&str> {
     let line = line.strip_prefix("impl")?;
     let line = line.rsplit_once(" for ").map_or(line, |(_, t)| t);
@@ -147,8 +186,7 @@ pub fn named<'a>(
     crates: &'a [String],
     own_module: &dyn Fn(&str) -> bool,
 ) -> Vec<&'a str> {
-    let lower = text.to_ascii_lowercase();
-    let text = lower.find("test hook").map_or(text, |at| &text[at..]);
+    let text = phrase(text).map_or(text, |at| &text[at..]);
     let mut out: Vec<&str> = Vec::new();
     for span in text.split('`').skip(1).step_by(2) {
         let bare = span.strip_prefix("rusty-").or(span.strip_prefix("rusty_"));
@@ -167,3 +205,7 @@ pub fn named<'a>(
     out.dedup();
     out
 }
+
+#[cfg(test)]
+#[path = "claims_tests.rs"]
+mod tests;

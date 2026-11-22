@@ -104,7 +104,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
-| Test hook lines are true | `tools/lint -- --rules` (`test-hook-line`) | **hard gate**: an item or module a comment calls a test hook is called outside tests by no other crate, and the crates its line names after the phrase do name it, as far as a name grep can tell; `rules/hook_line.rs` says what it cannot see |
+| Test hook lines are true | `tools/lint -- --rules` (`test-hook-line`) | **hard gate**: an item or module a comment calls a test hook is called outside tests by no other crate, and the crates its line names after the phrase do name it, a call counted only when its path resolves into the hook's crate through the file's `use`s; *Rules*, below, says what it cannot see |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
 | Tests write no process-wide static | `tools/lint -- --rules` (`test-static-write`) | **hard gate**: a test line, or a production line inside a `fn` documented as a test hook, never writes a `static` declared outside a `thread_local!` (`.store(`, `.swap(`, `.fetch_*(`, `.compare_exchange*(`, `.set(`, `.get_or_init(`, `.write()`, or a `.lock()` guard written through, a rustfmt-split chain included): the one-process run shares it between every test of the binary; keep the state on the value, in a `thread_local!` or in a child process, or take `// lint: allow(test-static-write) <why>` (#2422) |
@@ -342,7 +342,9 @@ Markdown); the workflows, the `Makefile` and the scripts elsewhere are not read.
   it (`issue #3` fails). Dates and other phrases are not read. A Rust string's line
   that opens as a comment (`# `, `// `, `-- `: a table's header, a generated
   shader's or Lua chunk's comment) is read as one, since it becomes a comment of the
-  file it is written to. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
+  file it is written to; an allow above the literal's first line reaches its later
+  lines too. A `#` and six or eight digits is a colour (`#202020`), no issue, unless
+  `issue` or `PR` names it. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
   An inline allow with a reason excuses its own line and the comment block it heads,
   as every rule's allow does: `// lint: allow(comment-history) <why>` (`-- lint:
   allow(…)` in Lua). It reads every comment line, a marker's or
@@ -933,19 +935,24 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
   `clippy.toml`) is Clippy's own and classifies its own way.
 - **`test-hook-line`** — a comment calling an item a test hook (`crates/CLAUDE.md`,
-  *Test hooks*) is true. The claim is a comment block saying "test hook" above an
-  item, or a `//!` header saying it for its module. It fails when a crate other
-  than the hook's, depending on it, calls it from a line that is not test code and
-  not itself in a hook module; and when a crate the line names after "test hook"
-  (a backticked `app`, `rusty-dev`, `dev::bake`, or *the root's* / *root package*
-  for `tests/`) never names a hook `fn`, `const`, `static` or macro. A call is
-  seen as far as names show it, in a file naming the hook's crate: a module by its
-  whole path (`rusty_lighting::occlusion::test_gap`), an associated item as
-  `Type::name`, a free one as `<a module it is in>::name` or through a `use` of
-  the crate. It does not see a method called as `.name(` (one name, many types),
-  a re-export (`pub use`), a type used without its name, or a `#[cfg(test)]` item
-  (no other crate sees it); a backticked name that is also one of the hook crate's
-  own modules (`ui` in `render`) is no crate. `rules/hook_line.rs`.
+  *Test hooks*) is true. The claim is a comment block saying the convention's own
+  words, "test hook" or "test hooks" (not "the latest hook"), above an item; in a
+  `//!` header, the items its sentence names in backticks (``[`copies`] is a test
+  hook``), or else the module, when that sentence opens on the phrase ("A test hook:
+  …"). It fails when a crate other than the hook's, depending on it, calls it from a
+  line that is not test code and not itself in a hook module; and when a crate the
+  line names after the phrase (a backticked `app`, `rusty-dev`, `dev::bake`, or *the
+  root's* / *root package* for `tests/`) never names a hook `fn`, `const`, `static`
+  or macro. A call counts only when its path resolves into the hook's crate: each
+  path's first segment is read through the file's `use`s (a `use` read whole, however
+  rustfmt wrapped it, its braces and `as` expanded; `rusty::lighting` is
+  `rusty_lighting`), and `crate::`, `self::` and `super::` paths are the caller's own.
+  It then sees a module by its path, an associated item as `Type::name`, and a free
+  one from its module or a module above it. It does not see a method called as
+  `.name(` (one name, many types), a re-export (`pub use`), a glob import (`::*`), a
+  type used without its name, or a `#[cfg(test)]` item (no other crate sees it); a
+  backticked name that is also one of the hook crate's own modules (`ui` in `render`)
+  is no crate. `rules/hook_line.rs`.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`

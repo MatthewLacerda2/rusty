@@ -1,5 +1,6 @@
 use super::finding::Finding;
 use super::scan::Scan;
+use crate::code::has_word;
 
 pub const RULE: &str = "markers";
 /// Spelled in halves so this file does not flag itself.
@@ -24,13 +25,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
             })
         })
         .collect()
-}
-
-fn has_word(line: &str, word: &str) -> bool {
-    let ident = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
-    line.match_indices(word).any(|(at, _)| {
-        !ident(line[..at].chars().next_back()) && !ident(line[at + word.len()..].chars().next())
-    })
 }
 
 pub fn run(scan: &Scan) -> Vec<Finding> {

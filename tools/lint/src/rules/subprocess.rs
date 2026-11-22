@@ -1,6 +1,6 @@
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::code_lines;
+use crate::code::{code_lines, has_word};
 
 pub const RULE: &str = "subprocess";
 
@@ -22,13 +22,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
                     .to_string(),
         })
         .collect()
-}
-
-fn has_word(code: &str, word: &str) -> bool {
-    let ident = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
-    code.match_indices(word).any(|(at, _)| {
-        !ident(code[..at].chars().next_back()) && !ident(code[at + word.len()..].chars().next())
-    })
 }
 
 pub fn run(scan: &Scan) -> Vec<Finding> {

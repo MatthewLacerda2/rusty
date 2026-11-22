@@ -37,11 +37,23 @@ fn a_hook_another_crate_calls_outside_tests_is_flagged() {
         assert!(found[0].1.contains("crates/dev/src/a.rs:"), "{found:?}");
     }
     let method = "impl Bake {\n    /// A test hook.\n    pub fn sampler(&self) {}\n}\n";
-    let caller = "fn f(b: &rusty_lighting::Bake) {\n    Bake::sampler(b);\n}\n";
+    let caller = "use rusty_lighting::Bake;\nfn f(b: &Bake) {\n    Bake::sampler(b);\n}\n";
     assert_eq!(flagged(method, &[("crates/dev/src/a.rs", caller)]).len(), 1);
     let module = "//! Test hooks: the levels other crates bake.\npub fn level() {}\n";
     let caller = "use rusty_lighting::occlusion::x::level;\n";
     assert_eq!(flagged(module, &[("src/main.rs", caller)]).len(), 1);
+    let wrapped = "use rusty_lighting::{\n    occlusion::x::probe,\n    Bake,\n};\nfn f() {\n    probe();\n}\n";
+    let found = flagged(FREE, &[("crates/dev/src/a.rs", wrapped)]);
+    assert_eq!(found.len(), 1, "an import rustfmt wrapped is read whole");
+}
+
+#[test]
+fn a_call_to_the_caller_s_own_path_of_the_same_name_passes() {
+    let hook = "/// A test hook: `dev`'s cost tests time it.\npub fn run() {}\n";
+    let own = "use rusty_lighting::Bake;\nfn f() {\n    crate::occlusion::run();\n    occlusion::x::run();\n}\n";
+    let dev_test = ("crates/dev/src/z_tests.rs", "fn t() { x::run(); }\n");
+    let found = flagged(hook, &[("crates/dev/src/a.rs", own), dev_test]);
+    assert!(found.is_empty(), "{found:?}");
 }
 
 #[test]

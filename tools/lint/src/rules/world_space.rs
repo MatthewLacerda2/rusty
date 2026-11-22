@@ -1,6 +1,6 @@
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::code_lines;
+use crate::code::{code_lines, has_word};
 
 pub const RULE: &str = "world-space";
 
@@ -57,12 +57,6 @@ fn why(code: &[&str], i: usize) -> Option<&'static str> {
 
 fn ident(c: Option<char>) -> bool {
     c.is_some_and(|c| c.is_alphanumeric() || c == '_')
-}
-
-fn has_word(code: &str, word: &str) -> bool {
-    code.match_indices(word).any(|(at, _)| {
-        !ident(code[..at].chars().next_back()) && !ident(code[at + word.len()..].chars().next())
-    })
 }
 
 pub fn run(scan: &Scan) -> Vec<Finding> {

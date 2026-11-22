@@ -63,6 +63,33 @@ pub fn is_ident(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
+/// The keywords that declare a Rust item, the name after them its own.
+pub const ITEMS: &[&str] = &[
+    "fn",
+    "struct",
+    "enum",
+    "trait",
+    "mod",
+    "const",
+    "static",
+    "type",
+    "union",
+    "impl",
+    "macro_rules",
+];
+
+/// `word` in `text`, no identifier character touching an end of it that is one.
+pub fn has_word(text: &str, word: &str) -> bool {
+    let first = word.chars().next().is_some_and(is_ident);
+    let last = word.chars().next_back().is_some_and(is_ident);
+    let touches = |c: Option<char>| c.is_some_and(is_ident);
+    text.match_indices(word).any(|(at, _)| {
+        let before = text[..at].chars().next_back();
+        let after = text[at + word.len()..].chars().next();
+        !(first && touches(before) || last && touches(after))
+    })
+}
+
 pub fn scan(
     line: &str,
     open: &mut Open,

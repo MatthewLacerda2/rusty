@@ -66,6 +66,20 @@ fn a_one_line_module_doc_that_only_names_its_module_is_flagged() {
     );
     let plural = "//! Progress bars.\nstruct Bar;\n";
     assert_eq!(rules(path, plural), [ECHO], "a plural is its name");
+    for (path, doc) in [
+        (
+            "crates/render/src/draw/camera/stages.rs",
+            "//! The camera's draw stages.\nfn stage() {}\n",
+        ),
+        ("crates/ui/src/boxes.rs", "//! Boxes.\nstruct Box;\n"),
+        ("crates/physics/src/body.rs", "//! The bodies.\nfn f() {}\n"),
+    ] {
+        assert_eq!(
+            rules(path, doc),
+            [ECHO],
+            "{doc}: a plural folded on `es` and `ies`"
+        );
+    }
     let below = "// SPDX-free.\n//! Progress.\nfn f() {}\n";
     assert_eq!(rules(path, below), [ECHO], "below a plain comment");
 }
@@ -81,6 +95,7 @@ fn a_module_doc_stating_more_than_its_names_passes() {
         "// lint: allow(comment-echo) the crate root's one line\n//! Progress.\nfn f() {}\n",
         "fn f() {}\n//! Progress.\n",
         "//! A bake stops part way.\nfn a_bake_stops_part_way() {}\n",
+        "//! The bake's stags.\nstruct Stage;\n",
     ] {
         assert!(rules(path, source).is_empty(), "{source}");
     }

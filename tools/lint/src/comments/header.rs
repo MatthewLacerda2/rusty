@@ -77,7 +77,7 @@ fn echoes(path: &str, lines: &[Line]) -> Option<usize> {
     }
     let mut known = words(path);
     for line in lines {
-        let names = declared(&line.code).map(words);
+        let names = declared(&line.code).map(|(_, name)| words(name));
         known.extend(names.filter(|w| w.len() <= NAME_WORDS).flatten());
     }
     let echo = content.iter().all(|w| known.iter().any(|k| same(w, k)));
@@ -109,35 +109,33 @@ pub(super) fn words(text: &str) -> Vec<String> {
     out
 }
 
+/// One word, or the same word in the plural: `stage`/`stages`, `box`/`boxes`, `body`/`bodies`.
 fn same(word: &str, known: &str) -> bool {
-    let stem = |w: &'_ str| -> String {
-        let w = w.strip_suffix("es").filter(|s| s.len() > 2).unwrap_or(w);
-        w.strip_suffix('s')
-            .filter(|s| s.len() > 2)
-            .unwrap_or(w)
-            .to_string()
+    let plural_of = |p: &str, s: &str| {
+        let sibilant = ["s", "x", "z", "ch", "sh"].iter().any(|e| s.ends_with(e));
+        let y = s.strip_suffix('y').map(|stem| format!("{stem}ies"));
+        p.strip_suffix('s') == Some(s)
+            || sibilant && p.strip_suffix("es") == Some(s)
+            || y.is_some_and(|y| p == y)
     };
-    word == known || stem(word) == stem(known)
+    word == known || plural_of(word, known) || plural_of(known, word)
 }
 
 /// A longer name is a sentence (a test's), which would let any line echo it.
 const NAME_WORDS: usize = 3;
 
-const ITEMS: &[&str] = &[
-    "fn", "struct", "enum", "trait", "mod", "const", "static", "type", "union", "impl",
-];
-
-fn declared(code: &str) -> impl Iterator<Item = &str> {
+/// The names `code` declares, each with the keyword that declares it.
+pub(crate) fn declared(code: &str) -> impl Iterator<Item = (&str, &str)> {
     let tokens: Vec<&str> = code
-        .split(|c: char| !(crate::code::is_ident(c) || c == '!'))
+        .split(|c: char| !crate::code::is_ident(c))
         .filter(|t| !t.is_empty())
         .collect();
-    let names: Vec<&str> = tokens
+    let named: Vec<(&str, &str)> = tokens
         .windows(2)
-        .filter(|w| ITEMS.contains(&w[0]) || w[0] == "macro_rules!")
-        .map(|w| w[1])
+        .filter(|w| crate::code::ITEMS.contains(&w[0]))
+        .map(|w| (w[0], w[1]))
         .collect();
-    names.into_iter()
+    named.into_iter()
 }
 
 #[cfg(test)]

@@ -1,12 +1,14 @@
 use super::finding::Finding;
 use super::scan::Scan;
-use crate::code::{code_lines, is_ident};
+use crate::code::{code_lines, has_word};
 use crate::modules::crate_module;
+use crate::size::is_test_file;
 use claims::{claims, module_path, named, Claim};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
 mod claims;
+mod paths;
 
 pub const RULE: &str = "test-hook-line";
 
@@ -25,12 +27,11 @@ fn package(path: &str) -> Option<&str> {
     }
 }
 
-fn test_file(path: &str) -> bool {
-    let name = path.rsplit('/').next().unwrap_or(path);
-    path.split('/')
-        .any(|seg| matches!(seg, "tests" | "benches" | "examples"))
-        || name == "tests.rs"
-        || name.ends_with("_tests.rs")
+/// One file, read once for every claim: its code's lines and the paths its live code names.
+struct Read<'f, 'a> {
+    file: &'f File<'a>,
+    code: Vec<String>,
+    paths: Vec<(usize, String)>,
 }
 
 pub fn check(
@@ -40,9 +41,13 @@ pub fn check(
 ) -> Vec<Finding> {
     let claimed: Vec<(&File, &str, Vec<Claim>)> = files
         .iter()
-        .filter(|f| !test_file(f.path))
+        .filter(|f| !is_test_file(f.path))
         .filter_map(|f| Some((f, crate_module(f.path)?, claims(f))))
+        .filter(|(_, _, c)| !c.is_empty())
         .collect();
+    if claimed.is_empty() {
+        return Vec::new();
+    }
     let hook_modules: BTreeSet<(&str, &str)> = claimed
         .iter()
         .flat_map(|(_, m, cs)| cs.iter().filter_map(|c| Some((*m, c.module.as_deref()?))))
@@ -51,6 +56,20 @@ pub fn check(
         let at = crate_module(f.path).zip(module_path(f.path));
         at.is_some_and(|(m, p)| hook_modules.contains(&(m, p.as_str())))
     };
+    let read: Vec<Read> = files
+        .iter()
+        .map(|file| {
+            let code = code_lines(file.source);
+            let live = !is_test_file(file.path) && !hook(file);
+            let paths = if live {
+                paths::resolved(&code, file.test)
+            } else {
+                Vec::new()
+            };
+            let code = code.into_iter().map(|l| l.into_owned()).collect();
+            Read { file, code, paths }
+        })
+        .collect();
     let mut found = Vec::new();
     for (file, own, file_claims) in &claimed {
         for claim in file_claims {
@@ -60,11 +79,10 @@ pub fn check(
                 rule: RULE,
                 message,
             };
-            let caller = files.iter().find_map(|f| {
-                package(f.path).filter(|p| p != own && depends(p, own))?;
-                (!test_file(f.path) && !hook(f)).then_some(())?;
-                let line = live_call(f, claim, own)?;
-                Some(format!("{}:{line}", f.path))
+            let caller = read.iter().find_map(|r| {
+                package(r.file.path).filter(|p| p != own && depends(p, own))?;
+                let line = live_call(&r.paths, claim, own)?;
+                Some(format!("{}:{line}", r.file.path))
             });
             if let Some(caller) = caller {
                 found.push(at(format!(
@@ -86,12 +104,12 @@ pub fn check(
                 Vec::new()
             };
             for named in named {
-                let scope = |f: &&File| match named {
-                    "" => f.path.starts_with("tests/"),
-                    m => crate_module(f.path) == Some(m),
+                let scope = |r: &&Read| match named {
+                    "" => r.file.path.starts_with("tests/"),
+                    m => crate_module(r.file.path) == Some(m),
                 };
-                let code = |f: &File| code_lines(f.source).iter().any(|l| word(l, claim.name));
-                if !files.iter().filter(scope).any(code) {
+                let code = |r: &Read| r.code.iter().any(|l| has_word(l, claim.name));
+                if !read.iter().filter(scope).any(code) {
                     let who = if named.is_empty() {
                         "the root's `tests/`"
                     } else {
@@ -109,58 +127,31 @@ pub fn check(
     found
 }
 
-/// A call outside tests, as far as names show it: a module by its whole path, an
-/// associated item as `Type::name`, a free one as `<module>::name` or by a `use`; a
-/// re-export is none, and `.name(` is not seen.
-fn live_call(file: &File, claim: &Claim, own: &str) -> Option<usize> {
-    let code = code_lines(file.source);
-    let roots = [format!("rusty_{own}"), format!("rusty::{own}")];
-    let crate_named = code.iter().any(|l| roots.iter().any(|r| word(l, r)));
-    let owner_named = claim.owner.is_none_or(|o| code.iter().any(|l| word(l, o)));
-    if !crate_named || !owner_named {
-        return None;
-    }
-    let name = claim.name;
-    code.iter().enumerate().find_map(|(i, line)| {
-        let tested = file.test.get(i).copied().unwrap_or(false);
-        if tested || line.trim_start().starts_with("pub use") {
-            return None;
-        }
-        let hit = match (&claim.module, claim.owner) {
-            (Some(path), _) => roots.iter().any(|r| word(line, &format!("{r}::{path}"))),
-            (None, Some(owner)) => word(line, &format!("{owner}::{name}")),
-            (None, None) => {
-                let mut heads = claim.parent.split("::").filter(|h| !h.is_empty());
-                let qualified = heads.any(|h| last(line, &format!("{h}::{name}")))
-                    || roots.iter().any(|r| last(line, &format!("{r}::{name}")));
-                let listed = line.rsplit_once('{').map_or("", |(_, l)| l);
-                let imported = line.trim_start().starts_with("use ")
-                    && roots.iter().any(|r| line.contains(r.as_str()))
-                    && (last(line, &format!("::{name}")) || last(listed, name));
-                qualified || imported
-            }
+/// The first line whose path resolves into the hook's crate and reaches it: a module by
+/// its path, an associated item as `Type::name`, a free item from its module or one above
+/// it (a re-export up the tree). `.name(` is not seen.
+fn live_call(paths: &[(usize, String)], claim: &Claim, own: &str) -> Option<usize> {
+    let root = format!("rusty_{own}::");
+    let reaches = |path: &str| {
+        let Some(rest) = path.strip_prefix(&root) else {
+            return false;
         };
-        hit.then_some(i + 1)
-    })
-}
-
-fn last(line: &str, path: &str) -> bool {
-    line.match_indices(path).any(|(at, _)| {
-        let (before, after) = (&line[..at], &line[at + path.len()..]);
-        let open = !(path.starts_with(is_ident) && before.ends_with(is_ident));
-        open && !after.starts_with(is_ident) && !after.starts_with("::")
-    })
-}
-
-fn word(line: &str, name: &str) -> bool {
-    let first = name.chars().next().is_some_and(is_ident);
-    let last = name.chars().next_back().is_some_and(is_ident);
-    line.match_indices(name).any(|(at, _)| {
-        let before = line[..at].chars().next_back();
-        let after = line[at + name.len()..].chars().next();
-        let touches = |c: Option<char>| c.is_some_and(is_ident);
-        !(first && touches(before) || last && touches(after))
-    })
+        let (module, name) = rest.rsplit_once("::").unwrap_or(("", rest));
+        match (&claim.module, claim.owner) {
+            (Some(m), _) => rest == m || rest.starts_with(&format!("{m}::")),
+            (None, Some(owner)) => name == claim.name && module.rsplit("::").next() == Some(owner),
+            (None, None) => {
+                let above = claim.parent == module
+                    || module.is_empty()
+                    || claim.parent.starts_with(&format!("{module}::"));
+                name == claim.name && above
+            }
+        }
+    };
+    paths
+        .iter()
+        .find(|(_, p)| reaches(p))
+        .map(|(line, _)| *line)
 }
 
 pub fn run(scan: &Scan) -> Vec<Finding> {
@@ -174,22 +165,22 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
         })
         .collect();
     let crates = crate::modules::all(scan.root());
-    let manifests: BTreeMap<&str, String> = std::iter::once("")
+    let deps: BTreeMap<&str, BTreeSet<String>> = std::iter::once("")
         .chain(crates.iter().map(String::as_str))
         .map(|m| {
             let at = match m {
                 "" => "Cargo.toml".to_string(),
                 m => format!("crates/{m}/Cargo.toml"),
             };
-            (
-                m,
-                fs::read_to_string(scan.base.join(at)).unwrap_or_default(),
-            )
+            let text = fs::read_to_string(scan.base.join(at)).unwrap_or_default();
+            let mut named = crate::layers::manifest_dependencies(&text);
+            named.extend(crate::layers::manifest_dev_dependencies(&text));
+            (m, named.into_iter().collect())
         })
         .collect();
     let depends = |caller: &str, on: &str| {
-        let text = manifests.get(caller).map_or("", String::as_str);
-        super::scan::names(text, &format!("rusty-{on}"))
+        let key = format!("rusty_{}", on.replace('-', "_"));
+        deps.get(caller).is_some_and(|d| d.contains(&key))
     };
     check(&files, &crates, &depends)
 }

@@ -19,16 +19,20 @@ pub fn check(source: &str) -> Vec<(usize, String)> {
 pub(crate) struct Refs {
     pub min_digits: usize,
     pub foreign_pass: bool,
+    /// `#` and six or eight digits is a colour (`#202020`), no issue.
+    pub digit_colours: bool,
 }
 
 impl Refs {
     pub const AGENT_DOCS: Refs = Refs {
         min_digits: 1,
         foreign_pass: false,
+        digit_colours: false,
     };
     pub const CODE: Refs = Refs {
         min_digits: 3,
         foreign_pass: true,
+        digit_colours: true,
     };
 }
 
@@ -57,12 +61,11 @@ pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     for i in 0..b.len() {
         let anchor = i >= 2 && &b[i - 2..i] == b"](";
         if b[i] == b'#' && (i == 0 || b[i - 1] != b'&') && !anchor {
-            let min = if named(&line[..i]) {
-                1
-            } else {
-                refs.min_digits
-            };
-            if let Some(end) = number(i + 1, min).filter(|_| !foreign(repo_before(&line[..i]))) {
+            let named = named(&line[..i]);
+            let min = if named { 1 } else { refs.min_digits };
+            let colour = |end: usize| refs.digit_colours && !named && [7, 9].contains(&(end - i));
+            let found = number(i + 1, min).filter(|&end| !colour(end));
+            if let Some(end) = found.filter(|_| !foreign(repo_before(&line[..i]))) {
                 return Some(line[i..end].to_string());
             }
         }

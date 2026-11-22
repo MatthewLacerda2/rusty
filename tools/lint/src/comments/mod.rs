@@ -6,6 +6,7 @@ pub mod proof;
 mod prose;
 #[cfg(test)]
 mod reach_tests;
+pub(crate) use header::declared;
 pub(crate) use prose::read as reads_prose;
 #[cfg(test)]
 mod review_tests;
@@ -147,9 +148,10 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
     let embedded = embedded::lines(source)
         .into_iter()
         .filter(|_| kind == Kind::Rust);
-    for (i, text) in embedded {
+    for (i, opened, text) in embedded {
+        let allowed = |at: usize| allowed_in(path, source, at + 1, HISTORY);
         let what = reference_as(&text, Refs::CODE);
-        if let Some(what) = what.filter(|_| !allowed_in(path, source, i + 1, HISTORY)) {
+        if let Some(what) = what.filter(|_| !allowed(i) && !allowed(opened)) {
             report.history.push((i + 1, what));
         }
     }

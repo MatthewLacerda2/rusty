@@ -63,6 +63,26 @@ fn prose_elsewhere_an_agent_doc_and_an_allowed_line_pass() {
     assert!(prose_lines("crates/a/x.json", "\"@2381\"\n").is_empty());
     let allow = "# lint: allow(comment-history) upstream's numbering\nx = 1  # @2381\n";
     assert!(prose_lines("crates/a/b.py", allow).is_empty());
+    for (path, colour) in [
+        ("crates/a/README.md", "The sky is `@202020`.\n"),
+        ("crates/a/b.py", "BG = \"@20202080\"  # @202020 behind\n"),
+        ("games/g/game.toml", "clear = \"@808080\"\n"),
+    ] {
+        assert!(
+            prose_lines(path, colour).is_empty(),
+            "{colour}: a colour of only digits"
+        );
+    }
+    assert_eq!(prose_lines("crates/a/b.md", "issue @202020\n"), [1]);
+}
+
+#[test]
+fn an_allow_above_a_multi_line_string_excuses_its_later_lines() {
+    let table = "// lint: allow(comment-history) the upstream table's own header\n\
+                 const HEADER: &str = \"\\\nx\n# The table, pinned (@1286).\n\";\n";
+    assert!(history(table).is_empty(), "{table}");
+    let unallowed = "const A: &str = \"\\\nx\n# pinned (@1286).\n\";\n";
+    assert_eq!(history(unallowed), ["#1286"]);
 }
 
 #[test]
