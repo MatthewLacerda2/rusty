@@ -15,8 +15,8 @@ use staged::{ReflectionSnapshot, StagedCubemaps};
 
 mod staged;
 
-/// A light probe's 32-texel faces cost a sixteenth of a default 128-texel reflection probe's,
-/// the one probe a reflection step bakes.
+/// Four 32-texel light probes are still a fraction of the one default 128-texel reflection
+/// probe a reflection step bakes.
 const LIGHT_PROBES_PER_STEP: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

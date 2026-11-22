@@ -37,6 +37,8 @@ pub(super) fn tree(
         .map(|entry| entry.map(|e| e.file_name()))
         .collect::<Result<Vec<_>, _>>()
         .map_err(|e| format!("{}: {e}", dir.display()))?;
+    // Sorted, as `read_dir`'s order is the filesystem's: two exports of one project match byte
+    // for byte.
     names.sort();
     for name in names {
         let rel = rel.join(name);

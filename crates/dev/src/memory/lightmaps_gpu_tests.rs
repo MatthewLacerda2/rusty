@@ -10,6 +10,8 @@ const PAGES: usize = 4;
 /// Bytes of slack on the bound: the allocator's and the driver's.
 const MARGIN: u64 = 24 << 20;
 
+/// A nonzero byte touches every page, so each is resident before the measure: zeroed ones
+/// come lazily mapped from calloc on Linux.
 fn pages(n: usize) -> Vec<Vec<u8>> {
     (0..n)
         .map(|_| vec![0x3c; (EDGE * EDGE * 8) as usize])

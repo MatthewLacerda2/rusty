@@ -12,6 +12,8 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 impl Harness {
+    /// Seeds before building the scene, so the first run and every rerun see the same scripts
+    /// and replay byte for byte.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
         let samples = fixture_project().join(rusty_edit::DEFAULT_SCRIPTS_DEST_DIR);

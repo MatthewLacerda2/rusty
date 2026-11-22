@@ -17,6 +17,8 @@ pub(super) const N: usize = 8;
 /// Bytes of slack on the bound: the allocator's and the driver's.
 const MARGIN: u64 = 24 << 20;
 
+/// A cached image gets blank blocks (`write_blank`): a real encode would lift the peak before
+/// the loads are measured.
 pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<String> {
     let source = dir.join("source.png");
     if !source.exists() {

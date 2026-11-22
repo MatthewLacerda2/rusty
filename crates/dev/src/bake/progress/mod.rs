@@ -82,6 +82,7 @@ impl<'a> BakeLog<'a> {
         Self::new(
             move || start.elapsed(),
             move |line: Line| {
+                // stderr, never stdout: `session-mcp`'s stdout carries only JSON-RPC.
                 eprintln!("{}", line.text);
                 listen::tell(&line.text);
                 if line.milestone {

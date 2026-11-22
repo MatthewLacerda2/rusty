@@ -46,10 +46,12 @@ fn gpu_a_shadowmask_lamp_lights_a_static_floor_as_a_baked_one_and_its_shadow_hol
 #[test]
 fn gpu_a_shadowmask_lamp_glints_on_a_glossy_floor_and_its_baked_cover_blocks_the_glint() {
     let Some(mut r) = renderer() else { return };
+    // Where the eye's line to the lamp's mirror image meets the floor: z = -5 × 1.5 / 4.
     let glint = Vec3::new(0.0, 0.0, -1.875);
     let mut frame = |roughness, covered: bool, name: &str| {
         let (mut s, _) = scene(LightMode::Mixed, Shadowmask, roughness);
         if covered {
+            // On the lamp-to-glint line, beyond the glint, so the camera never sees it.
             let at = (Vec3::new(0.0, 1.06, -3.2), Vec3::new(1.5, 0.2, 0.6));
             block(&mut s, "cover", at, 1.0, true);
         }

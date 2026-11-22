@@ -12,12 +12,12 @@ pub const INSTALL: &str = "install Open Image Denoise 2 (macOS: `brew install \
 const OIDN_DEVICE_TYPE_CPU: c_int = 1;
 const OIDN_FORMAT_FLOAT3: c_int = 3;
 
-/// OIDN's `maxMemoryMB`: a larger image is cleaned in tiles. Fixed, never read from the
-/// machine, so where a chart is cut never depends on it.
+/// OIDN's `maxMemoryMB`, past which an image is cleaned in tiles: fixed, never the machine's,
+/// so where a chart is cut never varies.
 pub const SCRATCH_MB: c_int = 512;
 
-/// Texels of the largest image whose filter a device keeps: a filter keeps the scratch of the
-/// largest image it ran, so one for a larger image is released after.
+/// Texels of the largest image a device's filter is kept for: a filter keeps its largest
+/// image's scratch, so a larger one's is released after.
 pub const KEEP_TEXELS: usize = 128 * 128;
 
 type RawDevice = *mut c_void;
@@ -29,6 +29,7 @@ const NAMES: &[&str] = if cfg!(target_os = "macos") {
     &["libOpenImageDenoise.so.2", "libOpenImageDenoise.so"]
 };
 
+/// After the loader's search: Homebrew's (Apple silicon), then `/usr/local`'s.
 const FOLDERS: &[&str] = &["/opt/homebrew/lib", "/usr/local/lib"];
 
 pub struct Api {
@@ -57,7 +58,7 @@ pub struct Api {
     commit_filter: unsafe extern "C" fn(Filter),
     execute_filter: unsafe extern "C" fn(Filter),
     release_filter: unsafe extern "C" fn(Filter),
-    /// Kept open as long as the calls above are: they point into it.
+    /// Kept open while the calls above live: they point into it.
     _library: Library,
 }
 

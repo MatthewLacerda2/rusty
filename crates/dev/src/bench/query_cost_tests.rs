@@ -1,3 +1,6 @@
+//! Timed here because the sim may not read a clock; n = 5 and 20 rooms a side span a small
+//! level to a Dust2-sized one.
+
 use std::time::Instant;
 
 use rusty_ai::perception::bench::{level_with_perceivers, run};

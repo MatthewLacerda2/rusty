@@ -68,6 +68,8 @@ impl CaptureHost {
         if !self.probed {
             self.probed = true;
             let (width, height) = (width.max(1), height.max(1));
+            // Built at the first shot's size; later sizes work because the offscreen path reads
+            // no size off the renderer's `config`.
             self.renderer = pollster::block_on(Renderer::new_headless(width, height));
             if let Some(r) = self.renderer.as_mut() {
                 r.time_stages(true);

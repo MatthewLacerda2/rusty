@@ -38,6 +38,7 @@ fn a_cheap_then_expensive_step_settles_within_one_window() {
     let settled = 60 + WINDOW.as_secs();
     let truth = |t| (TOTAL - done_at(t)) / 10;
     let etas = etas();
+    // Before the window fills, the rate is the step's since its start.
     assert!(etas.contains(&(30, 90)), "{etas:?}");
     for &(t, left) in etas.iter().filter(|(t, _)| *t >= settled) {
         assert_eq!(left, truth(t), "at {t} s");

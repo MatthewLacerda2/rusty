@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use rusty_lighting::occlusion::OcclusionObserver;
 
 #[derive(Default)]
+/// One `u64` a cell, so at most 512 KiB under `MAX_GRID_CELLS`; a skipped cell stays untimed.
 pub struct CellClocks {
     cells: OnceLock<Vec<AtomicU64>>,
 }
