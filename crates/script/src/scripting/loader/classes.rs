@@ -53,12 +53,13 @@ impl ScriptClasses {
         lua: &Lua,
         script_path: &str,
         file: &std::path::Path,
+        workspace: &std::path::Path,
         warn: impl FnOnce(String),
     ) -> Result<Instantiate, String> {
         self.evict_written();
         let key = file.to_string_lossy().into_owned();
         if !self.classes.contains_key(&key) {
-            let class = self.read(lua, script_path, file, warn)?;
+            let class = self.read(lua, script_path, file, workspace, warn)?;
             self.classes.insert(key.clone(), class);
         }
         let class = &self.classes[&key];
@@ -85,6 +86,7 @@ impl ScriptClasses {
         lua: &Lua,
         script_path: &str,
         file: &std::path::Path,
+        workspace: &std::path::Path,
         warn: impl FnOnce(String),
     ) -> Result<Class, String> {
         if !file.exists() {
@@ -97,7 +99,7 @@ impl ScriptClasses {
             .map(|f| Rc::from(f.dump(false)))
             .map_err(|e| format!("Syntax error compiling {}: {}", script_path, e));
         let fields = match &chunk {
-            Ok(_) => read_fields(&code).unwrap_or_else(|e| {
+            Ok(_) => read_fields(workspace, script_path, &code).unwrap_or_else(|e| {
                 warn(format!(
                     "{script_path}: its `fields` could not be read, so the inspector \
                      shows none and none are set: {e}"

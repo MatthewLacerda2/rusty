@@ -1,4 +1,4 @@
--- scenarios/replay.lua — the same throws on the same seed, twice, end with
+-- The same throws on the same seed, twice, end with
 -- every body of level 2 (the plank tower and the jointed figure) in the same
 -- place and the same orientation, to the bit.
 

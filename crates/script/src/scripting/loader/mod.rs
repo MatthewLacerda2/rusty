@@ -30,9 +30,11 @@ impl ScriptManager {
         let lua = self.lua.as_ref().ok_or("Lua runtime not initialized")?;
         let file = self.resolve_script(script_path);
         let console = &self.cells.console;
-        let class = self.classes.get(lua, script_path, &file, |msg| {
-            console.borrow_mut().warn(msg);
-        })?;
+        let class = self
+            .classes
+            .get(lua, script_path, &file, &self.workspace, |msg| {
+                console.borrow_mut().warn(msg);
+            })?;
 
         let table: Table = class
             .run(lua)

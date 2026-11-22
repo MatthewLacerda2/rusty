@@ -1,4 +1,4 @@
--- scenarios/over.lua — no inputs until the well fills: the pieces stack in the
+-- No inputs until the well fills: the pieces stack in the
 -- middle, the stack tops out and game over is reached and shown. The level is
 -- raised so the pieces fall a row a tick and the run stays short.
 

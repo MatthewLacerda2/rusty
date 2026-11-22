@@ -468,6 +468,12 @@ BASE ?= origin/main
 comment-only: ## Prove the branch changes only comments since its merge base with BASE (default origin/main)
 	$(LINT) -- --comment-only $(BASE)
 
+# The comment signals over PATHS (docs/linting.md, *Comments*): a sentence said at two
+# sites of a crate, one a doc already says, a fragment opener. Prints; never fails.
+.PHONY: comments-signal
+comments-signal: ## Signal: duplicated, doc-restating and fragment comments under PATHS. make comments-signal PATHS=crates/ui
+	$(LINT) -- --comment-signals $(PATHS)
+
 # The whole editor, headless, to a PNG (#731): what an editor-visible PR attaches.
 # Needs a GPU or lavapipe. ARGS passes the binary's options (--select, --play, ...).
 OUT ?= editor-capture.png

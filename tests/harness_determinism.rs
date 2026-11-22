@@ -1,4 +1,4 @@
-//! Headless harness determinism + control-surface smoke (issue #3).
+//! Headless harness determinism + control-surface smoke.
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
 
 use rusty::dev::harness::Harness;

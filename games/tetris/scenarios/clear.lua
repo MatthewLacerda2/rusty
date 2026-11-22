@@ -1,4 +1,4 @@
--- scenarios/clear.lua — scripted inputs clear a line: the bottom row is staged
+-- Scripted inputs clear a line: the bottom row is staged
 -- full but for four cells one column right of where an I spawns, the I is moved
 -- right once and hard-dropped, and the row is gone and scored.
 

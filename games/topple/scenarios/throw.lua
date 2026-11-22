@@ -1,4 +1,4 @@
--- scenarios/throw.lua — the first level, played: one ball thrown at the tower
+-- The first level, played: one ball thrown at the tower
 -- topples it, its target falls off the platform, the level counts it cleared,
 -- and the second level loads.
 

@@ -1,5 +1,3 @@
-//! The `separate_rgb` op.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};

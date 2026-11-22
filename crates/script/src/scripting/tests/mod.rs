@@ -16,6 +16,7 @@ mod files;
 mod held_from;
 mod hook_errors;
 mod humanoid;
+mod inspection;
 mod late_update;
 mod lifecycle;
 mod manager;

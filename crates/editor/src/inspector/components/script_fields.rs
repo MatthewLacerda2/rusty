@@ -126,7 +126,7 @@ fn cached_schema(path: &str) -> Vec<ScriptField> {
         let Ok(code) = std::fs::read_to_string(path) else {
             return Vec::new();
         };
-        let fields = parse_fields(&code);
+        let fields = parse_fields(path, &code);
         cache.schemas.insert(path.to_string(), fields.clone());
         fields
     })

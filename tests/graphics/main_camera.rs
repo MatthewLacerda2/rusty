@@ -95,7 +95,7 @@ fn without_a_screen_camera_getters_are_neutral_and_setters_no_ops() {
         "Graphics.SetSaturation(0.25)
          assert(Graphics.GetSaturation() == 1.0 and Graphics.GetFxaaActive())
          assert(not Graphics.GetTaaActive())
-         -- Nothing blurs, and the whole motion-blur group says so (#1436).
+         -- Nothing blurs, and the whole motion-blur group says so.
          assert(not Graphics.GetMotionBlurActive() and Graphics.GetMotionBlurSamples() == 0)
          assert(Graphics.GetMotionBlurIntensity() == 0 and Graphics.GetMotionBlurMaxLength() == 0)",
     );
