@@ -66,6 +66,7 @@ impl Default for RenderScaleDefault {
 }
 
 impl RenderScaleDefault {
+    /// `display_scale` is physical pixels per point (2 on a Retina surface).
     pub fn resolve(self, display_scale: f32) -> RenderScale {
         match self {
             Self::Fixed(scale) => scale,
@@ -92,6 +93,7 @@ impl RenderScaleDefault {
 impl Serialize for RenderScaleDefault {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self {
+            // As `f32`, so a hand-edited file reads `0.7`, not `0.699999988079071`.
             Self::Fixed(scale) => serializer.serialize_f32(scale.get()),
             Self::MatchDisplay => serializer.serialize_str(MATCH_DISPLAY),
         }

@@ -3,6 +3,7 @@
 
 use serde::{Deserialize, Serialize};
 
+// In seconds: Unity's `decayTime` range and `reflectionsDelay` cap.
 pub const DECAY_RANGE: (f32, f32) = (0.1, 20.0);
 pub const MAX_PRE_DELAY: f32 = 0.3;
 

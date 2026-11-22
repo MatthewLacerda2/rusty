@@ -1,5 +1,5 @@
-//! The timeline is the editor window's, so a request waits here for the frame
-//! boundary, as `Editor.EnterPlay` waits for the play transition.
+//! The demo timeline's mailbox: the timeline is the editor window's, so a request waits
+//! here for the frame boundary, as `Editor.EnterPlay` waits for the play transition.
 
 use super::Application;
 

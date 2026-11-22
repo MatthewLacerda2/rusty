@@ -17,6 +17,8 @@ pub const QUALITY_KEY: &str = "quality";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct GraphicsSettings {
+    /// A copy of the running preset's values: whoever selects or edits a preset
+    /// writes them here too.
     pub quality: QualityValues,
     pub options: GraphicsOptions,
     pub render_scale: RenderScaleSetting,
@@ -35,6 +37,7 @@ impl GraphicsSettings {
         }
     }
 
+    /// The preset's name is not stored here: it goes through [`store_quality`].
     pub fn store(&self, storage: &mut Storage) {
         self.options.store(storage);
         self.render_scale.store(storage);

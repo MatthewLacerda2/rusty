@@ -18,6 +18,7 @@ pub fn engine_dir() -> &'static Path {
 
 pub fn checkout() -> &'static Path {
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
+    // The workspace root, two folders above `crates/core/`.
     manifest.ancestors().nth(2).unwrap_or(manifest)
 }
 

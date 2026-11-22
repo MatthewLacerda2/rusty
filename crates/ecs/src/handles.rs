@@ -1,3 +1,6 @@
+//! Stable id to hecs handle, a dense `Vec` rather than a hash map: ids are monotonic from 1, so a
+//! lookup is one bounds check. A dead id keeps its 8-byte slot until a `clear`.
+
 #[derive(Default)]
 pub(super) struct Handles(Vec<Option<hecs::Entity>>);
 

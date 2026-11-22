@@ -57,6 +57,7 @@ pub fn get(key: Key) -> Option<Pieces> {
     with(|s| s.pieces.get(&key).cloned())
 }
 
+/// Keeps without marking for a sidecar: pieces read from one, or a failed run's none.
 pub fn keep(key: Key, pieces: Pieces) {
     with(|s| s.insert(key, pieces));
 }
@@ -70,6 +71,7 @@ pub fn take_fresh() -> Vec<(Key, Pieces)> {
     with(Store::take_fresh)
 }
 
+/// A test hook: forgets `key`, as a fresh launch has.
 #[doc(hidden)]
 pub fn forget(key: Key) {
     with(|s| {

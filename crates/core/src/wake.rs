@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 
 static BELL: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
+/// Set once, as a process runs one event loop: a later call is ignored.
 pub fn install(bell: impl Fn() + Send + Sync + 'static) {
     let _ = BELL.set(Box::new(bell));
 }
@@ -20,7 +21,8 @@ pub fn frame() {
 
 static RINGS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-/// Tests run side by side: compare only as "it went up".
+/// A test hook: how many times [`frame`] rang. Tests run side by side, so compare it
+/// only as "it went up".
 #[doc(hidden)]
 pub fn rings() -> usize {
     RINGS.load(std::sync::atomic::Ordering::Relaxed)

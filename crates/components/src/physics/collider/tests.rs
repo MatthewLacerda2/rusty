@@ -98,6 +98,7 @@ fn axis_aligned_cylinder_bounds_are_unchanged() {
 
 #[test]
 fn stretched_cylinder_and_capsule_bounds_stay_round() {
+    // Physics sizes the radius by the larger cross scale, so the box does too: z 3 widens x.
     let s = at(Vec3::ZERO, Quat::IDENTITY, Vec3::new(1.0, 1.0, 3.0));
     let (min, max) = cylinder(0.5, 2.0).calculate_world_aabb(s);
     assert_vec(min, Vec3::new(-1.5, -1.0, -1.5));

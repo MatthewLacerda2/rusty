@@ -16,7 +16,7 @@ pub struct Bloom {
     /// The brightest channel above which a pixel blooms, `≥ 0`; soft knee half its width either
     /// side, as URP.
     pub threshold: f32,
-    /// `0..=1`, URP's *Scatter*.
+    /// `0..=1`, URP's *Scatter*: how much each mip takes of the wider one below it.
     pub scatter: f32,
     /// A project-relative path (or [`DEFAULT_DIRT_TEXTURE`], or `rt:`), cropped to cover the
     /// screen.

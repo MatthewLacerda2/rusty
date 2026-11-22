@@ -1,6 +1,7 @@
 use super::{default_drift, serde_drift, FirstClass};
 use serde::{Deserialize, Serialize};
 
+// The named rows' Add Component defaults are scene builders, checked in `scene::create::defaults`.
 macro_rules! drift_of {
     (collider, $ty:path) => {
         Vec::<String>::new()

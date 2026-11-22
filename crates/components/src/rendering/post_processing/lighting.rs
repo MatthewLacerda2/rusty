@@ -31,6 +31,7 @@ impl Default for ShadowSettings {
 #[serde(default)]
 pub struct SsaoSettings {
     pub active: bool,
+    /// Metres: how far from a surface another still shades it.
     pub radius: f32,
     /// `0` is none, `1` physically plausible, above `1` exaggerated.
     pub intensity: f32,

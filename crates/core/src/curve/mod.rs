@@ -1,3 +1,6 @@
+//! Keyframe data over a normalised `t` in `[0, 1]`: plain serde data, keys not closures,
+//! so a scene saves it and the inspector and the API edit it.
+
 mod gradient;
 mod range;
 

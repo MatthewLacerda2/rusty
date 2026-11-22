@@ -83,8 +83,8 @@ fn consume_trigger_on_missing_or_wrong_type_is_false() {
 
 #[test]
 fn iteration_order_is_name_sorted_regardless_of_insertion_order() {
-    // The future evaluator walks the store on the fixed step; a BTreeMap keeps that
-    // walk deterministic. Insert out of order, iterate sorted.
+    // A saved scene, the script snapshot and the inspector walk the store; a BTreeMap
+    // keeps that order stable. Insert out of order, iterate sorted.
     let mut anim = AnimatorComponent::default();
     anim.set_float("speed", 1.0);
     anim.set_bool("aiming", false);

@@ -1,3 +1,6 @@
+//! Stored paths: relative to the project root and `/`-separated, so every machine reads
+//! the same files.
+
 use std::path::{Path, PathBuf};
 
 /// Lexical: a symlinked spelling only matches itself ([`relativize`] resolves those).
@@ -27,7 +30,8 @@ pub fn relativize(path: &str, root: &Path) -> String {
         .unwrap_or_else(|| path.to_string())
 }
 
-/// An empty `root` is the working directory. Both sides are canonical.
+/// The rule `require` and a texture recipe's image share for an input the project doesn't
+/// hold. An empty `root` is the working directory. Both sides are canonical.
 pub fn outside_root(file: &Path, root: &Path) -> Option<PathBuf> {
     let real = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
     let root = if root.as_os_str().is_empty() {
@@ -65,6 +69,7 @@ pub fn extension(path: impl AsRef<Path>) -> String {
         .to_ascii_lowercase()
 }
 
+/// `ext` is lowercase, without the dot.
 pub fn has_extension(path: impl AsRef<Path>, ext: &str) -> bool {
     extension(path) == ext
 }

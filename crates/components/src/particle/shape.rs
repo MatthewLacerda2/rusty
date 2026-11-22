@@ -131,6 +131,7 @@ fn cone(angle_deg: f32, radius: f32, surface: bool, axis: Vec3, rng: &mut Random
     let (theta, phi) = if surface {
         (angle, d.y.atan2(d.x))
     } else {
+        // Volume: uniform over the spherical cap of half-angle `angle`.
         let cos = 1.0 - rng.value() as f32 * (1.0 - angle.cos());
         (
             cos.clamp(-1.0, 1.0).acos(),
@@ -141,6 +142,7 @@ fn cone(angle_deg: f32, radius: f32, surface: bool, axis: Vec3, rng: &mut Random
     (offset, dir)
 }
 
+/// Uniform in `[-1, 1)`.
 pub(super) fn signed(rng: &mut Random) -> f32 {
     rng.value() as f32 * 2.0 - 1.0
 }
