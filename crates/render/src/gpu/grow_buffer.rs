@@ -1,5 +1,6 @@
 use crate::gpu::ops::CountedQueue as _;
 
+/// Bytes: so a near-empty scene does not reallocate on its first props.
 const MIN_BYTES: u64 = 4096;
 
 pub(crate) struct GrowBuffer {
@@ -26,9 +27,8 @@ impl GrowBuffer {
         &self.buffer
     }
 
-    /// Write `bytes` at offset 0, first reallocating to the next power of two when they
-    /// do not fit. Returns `true` when the buffer was replaced, so the caller must
-    /// rebuild whatever bind group referenced it.
+    /// Write `bytes` at offset 0. Returns `true` when the buffer was replaced, so the
+    /// caller must rebuild whatever bind group referenced it.
     #[track_caller]
     pub(crate) fn upload(
         &mut self,
@@ -60,6 +60,8 @@ impl GrowBuffer {
         grown
     }
 
+    /// Grow, keeping the contents (copied in a submit of its own): `Some(old size)`, so
+    /// the caller writes past it and rebuilds bind groups.
     pub(crate) fn reserve_kept(
         &mut self,
         device: &wgpu::Device,

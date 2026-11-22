@@ -58,6 +58,7 @@ fn gpu_a_sky_change_bakes_once_and_a_still_sky_never() {
     assert_eq!(bakes(&mut r, &mut view, &scene), 1, "another panorama");
 }
 
+/// Normal and zero halves only: all a bake writes here.
 pub(super) fn half(bits: u16) -> f32 {
     let exp = i32::from((bits >> 10) & 0x1f);
     let mantissa = f32::from(bits & 0x3ff) / 1024.0;

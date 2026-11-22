@@ -1,3 +1,6 @@
+//! The probe cube array is the only copy of a resident cube, so the byte budget bounds all probe
+//! memory.
+
 mod admit;
 mod frame;
 mod gpu;
@@ -17,10 +20,13 @@ pub(crate) use self::uniform::ReflectionProbeUniform;
 use super::cubemap::{CubeShape, CubemapTexture, CUBE_FORMAT};
 use rusty_scene::{PreparedProbes, ReflectionProbe};
 
+/// In texels: the largest face a probe bakes at.
 pub(crate) const MAX_FACE: u32 = *ReflectionProbe::RESOLUTION.end();
 
+/// A probe, its cube's shape, and how many mips below the array's base the chain starts.
 type Resident<'a> = (&'a ReflectionProbe, CubeShape, u32);
 
+/// A cube to copy in: path, shape, slot, and mips down it lands.
 pub(super) type CubeCopy = (String, CubeShape, usize, u32);
 
 pub(crate) struct ProbeArray {
@@ -84,6 +90,8 @@ impl ProbeArray {
         self.format
     }
 
+    /// Holds cubes as `Rgba16Float`, as an adapter without BC would; lavapipe has BC.
+    /// Call before any cube is resident.
     #[cfg(test)]
     pub(crate) fn force_uncompressed(&mut self) {
         self.format = wgpu::TextureFormat::Rgba16Float;

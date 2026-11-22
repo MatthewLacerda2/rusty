@@ -92,6 +92,7 @@ fn gpu_dissolve_burns_away_where_the_mask_is_below_amount_and_no_mask_is_white()
     let backdrop = backdrop(&mut renderer, &scene, masked);
     assert_ne!(backdrop, l0, "the sphere shows against the backdrop");
 
+    // Gray 128 reads raw as ≈ 0.5; decoded as sRGB it would read ≈ 0.22 and burn here.
     set(masked, 0.4);
     let left = |r: &mut Renderer| halves(r, &scene.borrow())[0];
     assert_eq!(left(&mut renderer), l0, "above amount stays");

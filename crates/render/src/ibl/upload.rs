@@ -85,6 +85,7 @@ fn block_edge(format: wgpu::TextureFormat) -> u32 {
     format.block_dimensions().0
 }
 
+/// wgpu copies a BC mip under 4×4 at its physical size, rounded up to whole blocks.
 pub(crate) fn block_extent(format: wgpu::TextureFormat, size: u32) -> u32 {
     size.next_multiple_of(block_edge(format))
 }

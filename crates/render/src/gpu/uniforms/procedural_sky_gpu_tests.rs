@@ -58,6 +58,7 @@ fn gpu_the_cpus_procedural_sky_is_the_shaders() {
     let Some(r) = crate::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
+    // Clouds off: the CPU hashes its cloud noise unlike the shader, so only the gradient matches.
     let derived = SkySettings {
         cloud_opacity: 0.0,
         ..SkySettings::default()
