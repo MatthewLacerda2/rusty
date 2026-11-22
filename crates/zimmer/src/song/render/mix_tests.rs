@@ -1,7 +1,8 @@
-//! Tests for the mix: which sends build a sent sum, where parts land, and each side's gain.
+//! Pinned by the number: a whole-song peak or length cannot see a part's sign; these can.
 
 use super::*;
 
+/// Left is `value`, right its negative, so a swapped channel or a flipped sign shows.
 fn lopsided(frames: usize, value: f32) -> Stereo {
     Stereo {
         l: vec![value; frames],

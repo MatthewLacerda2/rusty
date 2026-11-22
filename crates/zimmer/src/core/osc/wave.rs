@@ -1,10 +1,13 @@
-//! One sample of a waveform at a phase, with the band-limiting step correction (polyBLEP).
+//! Sine and triangle are naive, band-limited enough by their own spectra; saw and square take
+//! polyBLEP.
 
 use std::f32::consts::TAU;
 
 use super::pulse;
 use crate::patch::Wave;
 
+/// `phase` in cycles (`0..1`); `dt` is the step per sample, sizing polyBLEP's window; only a
+/// square reads `width`.
 pub(super) fn sample(wave: Wave, phase: f32, dt: f32, width: f32) -> f32 {
     match wave {
         Wave::Sine => (TAU * phase).sin(),
@@ -14,6 +17,7 @@ pub(super) fn sample(wave: Wave, phase: f32, dt: f32, width: f32) -> f32 {
     }
 }
 
+/// The polyBLEP residual around the step at phase 0, within one `dt` either side; zero elsewhere.
 pub(super) fn poly_blep(phase: f32, dt: f32) -> f32 {
     if dt <= 0.0 {
         return 0.0;

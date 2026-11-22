@@ -1,5 +1,5 @@
-//! voice: one `source → filter → amp` path of a note, and how a patch's layers share the note they
-//! are summed into.
+//! One `source → filter → amp` path of a note, and how a patch's layers share the note they are
+//! summed into.
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};
@@ -9,6 +9,7 @@ use crate::note::{midi_to_freq, NoteOpts};
 use crate::patch::{Adsr, Filter, Layer, Patch, PitchEnv, Source};
 use crate::stereo::Stereo;
 
+/// Hash channel ("LY") for layer seeds, apart from every draw the seed itself feeds.
 const LAYER_CHANNEL: u64 = 0x4c59;
 
 pub(super) fn layer_seed(seed: u64, index: usize) -> u64 {
@@ -57,6 +58,7 @@ impl<'a> Voice<'a> {
 impl Struck<'_> {
     pub(super) fn voice(&self, voice: &Voice<'_>, seed: u64, base: Option<&[f32]>) -> Stereo {
         let (gate, n) = (self.gate, self.n);
+        // Velocity and brightness are clamped once, here: no stage reading them clamps its own way.
         let velocity = self.opts.velocity.clamp(0.0, 1.0);
         let brightness = (self.opts.velocity + self.opts.timbre).clamp(0.0, 1.0);
         let glide = self.opts.glide;
@@ -190,6 +192,7 @@ mod tests {
         };
         let part = render_note(&alone(&patch, layer), 60.0, &seeded).expect("renders");
         expected.resize(part.frames().max(expected.frames()));
+        // Summed by hand rather than with `Stereo::add`, which is under test.
         for (sample, added) in expected.l.iter_mut().zip(&part.l) {
             *sample += added * layer.gain;
         }

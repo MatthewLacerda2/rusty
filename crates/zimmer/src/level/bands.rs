@@ -1,9 +1,13 @@
 //! Where the energy sits: low, mid and high, as shares of the whole.
 
+/// The foot of the 250-500 Hz mud region, so a swollen `low` share is what an author calls muddy.
 pub(crate) const LOW_HZ: f32 = 250.0;
 
+/// Above it a mix reads bright, harsh or thin; below it sit nearly all fundamentals.
 pub(crate) const HIGH_HZ: f32 = 4_000.0;
 
+/// One-poles per edge, 12 dB per octave: one alone counts a quarter of a 440 Hz tone's energy
+/// as bass.
 const POLES: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -32,6 +36,7 @@ impl Bands {
 pub struct BandMeter {
     channels: usize,
     banks: Vec<Bank>,
+    // Kept across runs, so a run ending mid-frame cannot rotate the channels.
     next: usize,
     low: f64,
     mid: f64,

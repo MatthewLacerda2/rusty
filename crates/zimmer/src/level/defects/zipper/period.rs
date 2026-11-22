@@ -16,6 +16,7 @@ pub(super) fn candidates(steps: &[f64]) -> Vec<usize> {
                 .sum()
         })
         .collect();
+    // `REPEATS` is a share of the steps' own power, lag 0: noise repeats this strongly at no lag.
     let mut peaks: Vec<usize> = (SHORTEST..=longest)
         .filter(|&lag| {
             ac[lag] >= REPEATS * ac[0] && ac[lag] >= ac[lag - 1] && ac[lag] >= ac[lag + 1]

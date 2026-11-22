@@ -5,7 +5,9 @@
 pub(crate) struct Row {
     pub(crate) probe: &'static str,
     pub(crate) frames: u64,
+    /// The whole file's RMS level, in dBFS.
     pub(crate) rms_db: f64,
+    // Shares of the energy below 250 Hz, from 250 Hz to 4 kHz, and above 4 kHz.
     pub(crate) low: f64,
     pub(crate) mid: f64,
     pub(crate) high: f64,
@@ -13,6 +15,7 @@ pub(crate) struct Row {
 
 pub(crate) const RECORDED_AT: u32 = 10;
 
+// One row per line, as the failure prints it, so a re-record is a paste.
 #[rustfmt::skip]
 pub(crate) const TABLE: &[Row] = &[
     Row { probe: "saw_filtered", frames: 17614, rms_db: -13.433, low: 0.8468, mid: 0.1525, high: 0.0007 },

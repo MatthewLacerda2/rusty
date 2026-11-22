@@ -21,6 +21,8 @@ fn rung(n: usize, size: f32, damp: f32, mix: f32) -> Stereo {
     buf
 }
 
+// Exact, where a relative check sees neither level nor sign: a centred 1.0 folds down to 1.0, and
+// four allpasses on empty lines negate it back to `+FIXED_GAIN`.
 #[test]
 fn the_first_reflection_is_the_send_itself_the_same_way_up() {
     let buf = rung(44_100, 0.8, 0.5, 1.0);
@@ -87,6 +89,7 @@ fn a_bigger_room_rings_longer() {
 fn the_tail_ends_where_the_room_has_stopped_ringing() {
     for size in [0.0, 0.5, 0.85, 1.0] {
         let tail = (tail_seconds(size) * 44_100.0) as usize;
+        // 110 Hz: damping passes the low end, so the lows ring longest.
         let burst = 4410;
         let mut mono = vec![0.0; burst + tail];
         for (i, sample) in mono.iter_mut().take(burst).enumerate() {

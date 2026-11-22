@@ -56,8 +56,10 @@ fn a_pitch_lfo_bends_the_note() {
     );
 }
 
+/// Three quarters of a 6 Hz cycle, 44_100 × 3 / 24: where full-depth tremolo holds silence.
 const TROUGH: usize = 5_512;
 
+/// Samples either side: over a period of the 440 Hz note in all, not one sample near zero.
 const AROUND: usize = 60;
 
 #[test]

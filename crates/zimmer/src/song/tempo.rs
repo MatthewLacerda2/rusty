@@ -9,11 +9,13 @@ use crate::error::SynthError;
 pub struct TempoChange {
     pub beat: f32,
     pub bpm: f32,
+    /// Moves the tempo linearly per beat, not per second, from the previous point to this one.
     #[serde(default, skip_serializing_if = "is_false")]
     pub ramp: bool,
 }
 
 impl TempoChange {
+    /// Only zimmer's tests call it.
     pub const fn jump(beat: f32, bpm: f32) -> Self {
         Self {
             beat,
@@ -22,6 +24,7 @@ impl TempoChange {
         }
     }
 
+    /// Only zimmer's tests call it.
     pub const fn ramp(beat: f32, bpm: f32) -> Self {
         Self {
             beat,
@@ -31,6 +34,7 @@ impl TempoChange {
     }
 }
 
+/// The last change is not checked against the arrangement: a map may outlast a shortened piece.
 pub(super) fn check(changes: &[TempoChange]) -> Result<(), SynthError> {
     let mut previous = 0.0;
     for (index, change) in changes.iter().enumerate() {

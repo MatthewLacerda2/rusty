@@ -53,6 +53,7 @@ impl Easing {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Point {
+    /// Counted once from the piece's start, so a curve never restarts with a `loop` pass.
     pub beat: f32,
     pub value: f32,
     #[serde(default, skip_serializing_if = "is_linear")]
@@ -72,6 +73,7 @@ pub struct Automation {
 }
 
 impl Automation {
+    /// Assumes the strictly ascending beats validation enforces (`is_sorted`).
     pub fn value_at(&self, beat: f32) -> Option<f32> {
         let first = self.points.first()?;
         let last = self.points.last()?;
@@ -138,6 +140,8 @@ pub(super) fn riding(song: &Song) -> Vec<Riding<'_>> {
         .collect()
 }
 
+/// `clock` must be the one the piece renders at (stretched or anchored), so a build stays on its
+/// bars.
 pub(super) fn ride(bus: &mut Stereo, track: &Track, riding: Riding<'_>, clock: &Clock) {
     let fixed = stereo::pan_gains(track.pan);
     for frame in 0..bus.frames() {
@@ -155,6 +159,7 @@ pub(super) fn ride(bus: &mut Stereo, track: &Track, riding: Riding<'_>, clock: &
     }
 }
 
+/// `(left, right)` is the part's static placement, or unity once `ride` wrote a moving fader.
 pub(super) fn send_into(
     sent: &mut Stereo,
     part: &Stereo,
@@ -174,6 +179,7 @@ pub(super) fn send_into(
     }
 }
 
+// Bussing a track needlessly changes only a sum's rounding, so the predicate is asked directly.
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,7 +1,9 @@
-//! an operator bending its own phase, and why that is not a loop a recipe can break.
+//! Bounded: the fed-back value is an operator's output (±1), any amount but `NaN`
+//! clamps to `0..=1`, and it only offsets a phase, so no state can grow.
 
 use std::f32::consts::PI;
 
+/// Radians: half a cycle, the ceiling that makes `Operator::feedback` a `0..=1` knob.
 pub(crate) const MAX_FEEDBACK: f32 = PI;
 
 pub(crate) fn bend(amount: f32, last: [f32; 2]) -> f32 {

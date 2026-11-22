@@ -1,7 +1,9 @@
-//! how far an operator's own modulators bend it, per sample.
+//! How far an operator's own modulators bend it, per sample.
 
 use crate::patch::FM_OPERATORS;
 
+/// `mask` names only lower operators (`patch::fm`'s table), so each `shaped` read was written
+/// earlier this sample.
 pub(crate) fn modulation(
     mask: u8,
     levels: &[f32; FM_OPERATORS],
@@ -23,6 +25,7 @@ mod tests {
 
     const RATE: f32 = 44_100.0;
 
+    /// A tenth of a second: every harmonic of `BASE` completes whole cycles, landing on a bin.
     const WINDOW: usize = 4410;
 
     fn op(ratio: f32, level: f32) -> Operator {
@@ -90,6 +93,8 @@ mod tests {
 
     #[test]
     fn one_modulator_reaches_three_carriers_only_under_fan() {
+        // Sidebands on whole, half and quarter multiples never meet to cancel; the doubled window
+        // puts quarters on a bin.
         let operators = [op(1.0, 3.0), op(1.0, 1.0), op(5.5, 1.0), op(9.25, 1.0)];
         let fan = voice(Algorithm::Fan, operators, BASE, WINDOW * 2);
         assert!(
@@ -111,6 +116,7 @@ mod tests {
 
     #[test]
     fn the_same_operators_route_differently_under_branch_and_fork() {
+        // Carrier at 8×, so its sidebands stay clear of DC instead of folding onto their siblings.
         let operators = [op(3.0, 0.0), op(1.0, 3.0), op(7.0, 0.0), op(8.0, 1.0)];
         let branch = voice(Algorithm::Branch, operators, BASE, WINDOW);
         assert!(

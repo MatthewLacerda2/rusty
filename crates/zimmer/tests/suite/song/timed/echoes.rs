@@ -38,6 +38,7 @@ fn half_a_beat_at_120_is_a_quarter_second() {
     assert_eq!(render(&summed), render(&timed));
 }
 
+/// Stretched from 2 s to 2.5 s the fixture plays at 96 bpm: half a beat is 0.3125 s.
 #[test]
 fn a_stretched_song_moves_its_echoes_with_it() {
     let stretched = |fx| Song {

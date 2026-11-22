@@ -1,16 +1,21 @@
-//! Freeverb.
+//! Jezar's Freeverb, less its `width`: every setting but the default narrows the image.
 
 use crate::stereo::Stereo;
 
+// Delay-line lengths in samples at `TUNED_RATE`.
 const COMB_LENGTHS: [usize; 8] = [1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617];
 const ALLPASS_LENGTHS: [usize; 4] = [556, 441, 341, 225];
+/// The right bank's extra length (0.5 ms), so its comb resonances land apart from the left's.
 const STEREO_SPREAD: usize = 23;
+/// Kept apart from the render rate, so changing that does not retune the room.
 const TUNED_RATE: f32 = 44_100.0;
+/// Input scale, so eight summed combs stay in range.
 const FIXED_GAIN: f32 = 0.015;
 const ROOM_SCALE: f32 = 0.28;
 const ROOM_OFFSET: f32 = 0.7;
 const DAMP_SCALE: f32 = 0.4;
 const ALLPASS_FEEDBACK: f32 = 0.5;
+/// Seconds; longer and the room sounds like an echo, which is `delay`'s job.
 pub(crate) const MAX_PREDELAY: f32 = 0.5;
 
 struct Comb {
@@ -153,6 +158,7 @@ pub(crate) fn predelay_seconds(predelay: f32) -> f32 {
     }
 }
 
+/// Seconds: the slowest comb's RT60 plus one allpass pass; damping only shortens it.
 pub(crate) fn tail_seconds(size: f32) -> f32 {
     let feedback = size.clamp(0.0, 1.0) * ROOM_SCALE + ROOM_OFFSET;
     let samples = |lengths: &[usize]| lengths.iter().copied().max().unwrap_or(0) + STEREO_SPREAD;

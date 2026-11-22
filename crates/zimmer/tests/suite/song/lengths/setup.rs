@@ -17,6 +17,7 @@ pub(crate) fn samples(seconds: f32) -> usize {
     (seconds * SAMPLE_RATE as f32).round() as usize
 }
 
+/// The fixture is four beats at 120 bpm, two seconds: each target is a multiple of it or not.
 pub(crate) fn fitted(seconds: f32, mode: FitMode) -> Song {
     Song {
         fit: Some(Fit::lasting(seconds, mode)),

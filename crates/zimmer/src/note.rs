@@ -1,7 +1,8 @@
-//! Notes, pitch, and the per-note render options.
+//! Scientific pitch notation in equal temperament: A4 = 440 Hz = MIDI 69, and C4 (middle C) is 60.
 
 use crate::error::SynthError;
 
+/// MIDI note numbers, `C-1` to `G9`.
 pub(crate) const MIDI_RANGE: (f32, f32) = (0.0, 127.0);
 
 const A4_MIDI: f32 = 69.0;
@@ -17,6 +18,7 @@ const NATURALS: [(char, i32); 7] = [
     ('b', 11),
 ];
 
+/// Semitones above the major mode's root; `song::key` rotates it into the other modes.
 pub(crate) const DIATONIC: [i32; 7] = [0, 2, 4, 5, 7, 9, 11];
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -95,6 +97,7 @@ pub fn midi_to_freq(midi: f32) -> f32 {
     A4_HZ * ((midi - A4_MIDI) / 12.0).exp2()
 }
 
+/// Sharps only: a pitch class has no key signature, and one spelling keeps two reports agreeing.
 const SHARP_NAMES: [&str; 12] = [
     "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B",
 ];

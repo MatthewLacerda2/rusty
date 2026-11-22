@@ -23,6 +23,7 @@ fn one() -> f32 {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// Yamaha's eight four-operator algorithms (YM2151, YM2612), in the chips' order.
 #[serde(rename_all = "snake_case")]
 pub enum Algorithm {
     Chain,
@@ -35,6 +36,8 @@ pub enum Algorithm {
     Parallel,
 }
 
+/// `inputs[i]`: the operators modulating operator `i`; `carriers`: those heard. Bit `j` is
+/// operator `j + 1`.
 #[derive(Clone, Copy)]
 struct Routing {
     inputs: [u8; FM_OPERATORS],
@@ -105,6 +108,7 @@ impl Algorithm {
         &TABLE[self as usize]
     }
 
+    /// `index` counts from zero: the recipe's operator 1 is `0`.
     pub fn is_carrier(self, index: usize) -> bool {
         self.routing().carriers & bit(index) != 0
     }

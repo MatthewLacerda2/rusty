@@ -5,6 +5,8 @@ use rusty_zimmer::patch::{Adsr, Patch};
 
 use super::WINDOW;
 
+/// Two cycles of C4, 2 × 44_100 / 261.63 rounded up: a saw hits its extreme once a cycle, so this
+/// window's peak is amplitude, not phase. Two, since one rounded cycle can miss it.
 const STRIKE: usize = 338;
 
 fn decaying(curve: f32) -> Patch {
@@ -28,6 +30,7 @@ fn a_curved_decay_is_further_down_than_a_straight_one() {
         "halfway down: {line_mid} vs {bent_mid}"
     );
 
+    // A 3% slack against a halving: an order of magnitude apart, so the slack cannot swallow it.
     let (line_hit, bent_hit) = (peak(&line[..STRIKE]), peak(&bent[..STRIKE]));
     assert!(
         (bent_hit - line_hit).abs() < line_hit * 0.03,

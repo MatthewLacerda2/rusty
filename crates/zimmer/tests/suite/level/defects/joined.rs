@@ -11,6 +11,7 @@ fn impulses(at: usize, left: f32, late: usize, right: f32) -> Vec<f32> {
     interleaved(&l, &r)
 }
 
+/// Equal sizes: a tie keeps the earlier moment, so which channel is read last cannot decide it.
 #[test]
 fn a_click_in_both_channels_is_placed_at_the_first() {
     let at = RATE as usize / 2;
@@ -34,6 +35,7 @@ fn a_click_in_both_channels_is_the_larger_of_them() {
     }
 }
 
+/// A click occupies 5 ms either side: 480 samples apart, two only touch; at 479 they overlap.
 #[test]
 fn clicks_in_two_channels_that_only_touch_are_two() {
     let at = RATE as usize / 2;

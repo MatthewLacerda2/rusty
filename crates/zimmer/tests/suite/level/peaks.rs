@@ -2,6 +2,7 @@
 
 use rusty_zimmer::level::{FramePeaks, Meter};
 
+/// A quarter-rate tone sampled past its peak, the right side at half: it overshoots its samples.
 fn signal() -> Vec<f32> {
     (0..2_000)
         .flat_map(|i| {

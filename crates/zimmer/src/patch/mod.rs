@@ -20,6 +20,8 @@ pub use stages::{
     MAX_PARTIALS, MAX_PULSE_WIDTH, MAX_VOICES, MIN_PULSE_WIDTH,
 };
 
+/// What every fx chain is checked for: `Patch::check` runs it on the patch's own, `song::validate`
+/// on each track's and the song's.
 pub(crate) fn check_chain(chain: &[Fx]) -> Result<(), SynthError> {
     for fx in chain {
         match fx {
@@ -60,6 +62,7 @@ fn check_no_beats(chain: &[Fx]) -> Result<(), SynthError> {
     Ok(())
 }
 
+/// The keys `song::validate` checks and `song::render::mix` honours: both read them here.
 pub(crate) fn sidechains(chain: &[Fx]) -> impl Iterator<Item = &str> {
     chain.iter().filter_map(|fx| match fx {
         Fx::Compress { sidechain, .. } => sidechain.as_deref(),
@@ -195,6 +198,8 @@ fn check_source(source: &Source) -> Result<(), SynthError> {
     }
 }
 
+// Neither this nor `check_operators` refuses a ratio above Nyquist: that depends on the pitch
+// played, so `core` drops such a partial or operator per note.
 fn check_partials(partials: &[Partial]) -> Result<(), SynthError> {
     if partials.is_empty() {
         return Err(SynthError::EmptyPartials);
@@ -231,6 +236,8 @@ fn check_operators(
         .find(|(_, operator)| operator.ratio <= 0.0 || !operator.ratio.is_finite())
     {
         return Err(SynthError::BadOperatorRatio {
+            // From one, as the recipe and the algorithm table number operators; a partial's
+            // index is its place in a list, from zero.
             operator: index + 1,
             ratio: operator.ratio,
         });

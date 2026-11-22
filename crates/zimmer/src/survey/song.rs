@@ -13,6 +13,8 @@ use crate::song::shape::plan;
 use crate::song::{PatchRef, PatchResolver, Song};
 
 impl SongSurvey {
+    /// A patch reference that does not resolve leaves that track's source, cutoff and sustain
+    /// `None`, not an error.
     pub fn of(name: &str, song: &Song, resolve: &dyn PatchResolver) -> Self {
         let (clock, _) = plan(song);
         let (register, pitches, mut by_track, mut sounding) = played(song);
@@ -82,6 +84,8 @@ fn played(song: &Song) -> Played {
     let mut by_track: Map<String, Vec<f32>> = Map::default();
     let mut sounding: Map<String, Sounding> = Map::default();
     walk(song, |note| {
+        // Before the pitch: a note whose name does not parse still holds its track's time; the
+        // renderer refuses it.
         sounding
             .entry(note.track.clone())
             .or_default()
@@ -186,6 +190,7 @@ mod tests {
         )
         .expect("the fixture parses");
         let survey = SongSurvey::of("layered", &song, &InlineOnly);
+        // The layered slot sounds over beats 1 to 2.5, the groove after it over 5 to 6, of six.
         assert_eq!(survey.tracks[0].notes, 3);
         assert!(
             (survey.tracks[0].duty - 2.5 / 6.0).abs() < 1e-6,

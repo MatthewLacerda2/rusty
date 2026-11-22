@@ -1,13 +1,15 @@
-//! How much energy a signal has, octave by octave, and what line that traces.
-
 use std::f64::consts::TAU;
 
 use rusty_zimmer::SAMPLE_RATE;
 
+/// Samples per block: 0.19 s at 44.1 kHz, so bins sit 5.4 Hz apart.
 const BLOCK: usize = 8192;
 
+/// Frequencies per octave centre, ±6% around it: one noise bin alone is all error.
 const PROBES: usize = 12;
 
+/// Hann-windowed: brown noise spans 40 dB, and a rectangular window's leakage would flatten its
+/// slope.
 pub(crate) fn band_power(buf: &[f32], centre: f32) -> f64 {
     let mut total = 0.0;
     let mut count = 0.0;
@@ -52,6 +54,7 @@ pub(crate) fn octave_db(buf: &[f32], lowest: f32, octaves: usize) -> Vec<f64> {
         .collect()
 }
 
+/// A least-squares fit, not two bands: two bands cannot tell a straight slope from flat-then-cliff.
 pub(crate) fn slope_db_per_octave(buf: &[f32], lowest: f32, octaves: usize) -> f64 {
     let points: Vec<(f64, f64)> = octave_db(buf, lowest, octaves)
         .into_iter()

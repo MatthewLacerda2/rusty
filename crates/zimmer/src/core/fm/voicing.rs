@@ -1,11 +1,13 @@
-//! which of the four operators a note actually renders, and what its carriers are divided by.
+//! Which of the four operators a note actually renders, and what its carriers are divided by.
 
 use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
+/// Both bounds exclusive, as `core::nyquist` says; `NaN` fails both.
 pub(crate) fn sounding(operators: &[Operator; FM_OPERATORS], ceiling: f32) -> [bool; FM_OPERATORS] {
     std::array::from_fn(|i| operators[i].ratio > 0.0 && operators[i].ratio < ceiling)
 }
 
+/// Sums only the carriers that sound, or a note would quieten as it is played higher.
 pub(crate) fn normaliser(
     algorithm: Algorithm,
     levels: &[f32; FM_OPERATORS],

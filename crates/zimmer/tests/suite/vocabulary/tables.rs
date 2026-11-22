@@ -3,7 +3,8 @@
 
 use std::path::{Path, PathBuf};
 
-/// Document types with no keys of their own: each only chooses between other types.
+/// Document types with no keys of their own: each only chooses between other types, so the
+/// page covers it through the fields that hold it.
 pub(super) const KEYLESS: &[&str] = &[
     "PatchRef",
     "PatternEntry",

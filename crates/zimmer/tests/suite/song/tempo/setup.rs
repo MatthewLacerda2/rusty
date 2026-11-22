@@ -7,6 +7,7 @@ use crate::common::songs::song;
 
 pub(crate) const RATE: f32 = 44_100.0;
 
+/// The tempo halves on beat 2: the first verse lasts a second, the second two.
 pub(crate) fn slowing() -> Song {
     Song {
         tempo: vec![TempoChange::jump(2.0, 60.0)],

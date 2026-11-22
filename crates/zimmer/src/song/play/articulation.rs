@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Multiplies the written velocity; one at 1.0 clamps unaccented, not refused: `vel_scale` may
+/// leave headroom.
 const ACCENT_VELOCITY: f32 = 1.3;
 
 const ACCENT_BRIGHTNESS: f32 = 0.15;
@@ -14,10 +16,13 @@ const GHOST_GATE: f32 = 0.4;
 
 const GHOST_BRIGHTNESS: f32 = -0.4;
 
+/// Seconds, not beats: a hand arriving early is no earlier at a slow tempo.
 const GHOST_EARLY: f32 = -0.012;
 
+/// Seconds, as `GHOST_EARLY` is: a fast bass slide, heard as one note arriving.
 const GLIDE_SECONDS: f32 = 0.06;
 
+/// The slide's cap, as a fraction of the gate, so a short note still ends on its written pitch.
 const GLIDE_GATE: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +38,7 @@ pub enum Articulation {
 pub(crate) struct Stroke {
     pub(crate) velocity: f32,
     pub(crate) gate: f32,
+    /// A fraction of the played velocity, heard only through `vel_octaves` and `vel_index`.
     brightness: f32,
     pub(crate) onset_seconds: f32,
     slides: bool,

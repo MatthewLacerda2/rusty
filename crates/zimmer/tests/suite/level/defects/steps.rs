@@ -82,6 +82,7 @@ fn alternating_steps_are_found_at_their_own_period() {
     assert!((period - 800.0).abs() < 4.0, "{run:?}");
 }
 
+/// Blocks are half a millisecond, 24 samples, so an eighth of one is the 3-sample bound.
 #[test]
 fn a_period_between_blocks_is_read_to_an_eighth_of_one() {
     for samples in 792..=816 {

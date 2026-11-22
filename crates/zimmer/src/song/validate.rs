@@ -18,6 +18,7 @@ impl Song {
         if self.arrangement.is_empty() {
             return Err(SynthError::EmptyArrangement);
         }
+        // Parsed first, so a bad key is not reported as a degree or lift lacking one.
         let key = self.key()?;
         for entry in &self.arrangement {
             if matches!(entry, ArrangementEntry::Layered(layered) if layered.layers.is_empty()) {
@@ -47,6 +48,8 @@ impl Song {
         super::cap::check(self, key.as_ref())
     }
 
+    /// No cycle check: a sidechain key is its track's notes before any chain, so two tracks may
+    /// duck each other.
     fn check_sidechains(&self) -> Result<(), SynthError> {
         crate::patch::check_no_sidechain(&self.fx, "song")?;
         for track in &self.tracks {
@@ -205,6 +208,8 @@ impl PatternEntry {
                 start: self.start(),
             });
         }
+        // Expanded first: a step string's gate defaults to its `div`, so a bad `div` would read
+        // as a bad `dur`.
         self.voice_into(around, led, &mut Vec::new())?;
         if !(self.dur().is_finite() && self.dur() > 0.0) {
             return Err(SynthError::BadNoteDuration {

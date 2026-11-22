@@ -13,6 +13,8 @@ pub(crate) struct Clock {
     bpm: f32,
     beat: f32,
     per_frame: f32,
+    // `None` while the tempo is one number: its `f32` sums are kept, as `Map`'s `f64` could
+    // move samples.
     map: Option<Map>,
 }
 

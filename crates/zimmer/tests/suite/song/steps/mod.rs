@@ -6,6 +6,7 @@ use rusty_zimmer::{render_song, Song, SynthError};
 
 mod document;
 
+/// Velocity of a plain `x` here: below 1, so an accent has room above it.
 const PLAIN: f32 = 0.4;
 
 fn render(song: &Song) -> Vec<f32> {
@@ -44,6 +45,7 @@ fn playing(entries: Vec<PatternEntry>) -> Song {
     one_pass
 }
 
+/// The trailing note proves the string took three ordinals, not one.
 fn stepped() -> Song {
     playing(vec![
         steps("x-xX").into(),

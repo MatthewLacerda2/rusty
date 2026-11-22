@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::{Adsr, Filter, PitchEnv, Source};
 use crate::error::SynthError;
 
+/// With the patch's own, four sounds a note; each layer adds a source and a filter per note.
 pub const MAX_LAYERS: usize = 3;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

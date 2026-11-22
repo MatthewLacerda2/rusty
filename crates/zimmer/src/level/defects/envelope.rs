@@ -3,13 +3,14 @@
 use super::quadrature::Quadrature;
 use super::Found;
 
+// Times in seconds; `DEPTH_DB` is how far under the sound either side a dropout falls.
 const BLOCK: f64 = 0.0005;
 
 const DEPTH_DB: f64 = 40.0;
-const SOUNDING: f64 = 1e-4;
+const SOUNDING: f64 = 1e-4; // Mean square, -40 dBFS: a gap in faint room tone goes unheard.
 const AROUND: f64 = 0.02;
 const SHORTEST_DROPOUT: f64 = 0.001;
-const LONGEST_DROPOUT: f64 = 0.04;
+const LONGEST_DROPOUT: f64 = 0.04; // Longer is a pause, which speech and music make on purpose.
 
 #[derive(Debug, Clone)]
 pub(super) struct Envelope {
@@ -17,6 +18,8 @@ pub(super) struct Envelope {
     quadrature: Quadrature,
     energy: Vec<f64>,
     sum: f64,
+    // Stepped gain reads the envelope; dropouts read the waveform, since the all-pass chains ring
+    // on through a gap.
     envelope: Vec<f64>,
     envelope_sum: f64,
     filled: usize,

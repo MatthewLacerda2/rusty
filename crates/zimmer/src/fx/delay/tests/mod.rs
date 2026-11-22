@@ -51,6 +51,8 @@ fn a_degenerate_time_is_a_no_op_rather_than_a_panic() {
         assert_eq!(wide, Stereo::centred(original.clone()), "time {time}");
     }
     assert_eq!(line_length(0.1, 44_100, 44_100.0), Some(4410));
+    // 1000 frames at 8 kHz: eight times over is 8000 samples, one second, refused; 0.999875 s is
+    // 7999, a sample under.
     assert_eq!(line_length(1.0, 1000, 8000.0), None, "eight times over");
     assert_eq!(line_length(0.999_875, 1000, 8000.0), Some(7999));
 }
@@ -78,6 +80,7 @@ fn a_centred_signal_feeds_it_at_its_own_level() {
     assert!((buf.l[0] - 0.75).abs() < 1e-6, "dry is scaled by 1 - mix");
     assert!((buf.l[4410] - 0.25).abs() < 1e-6, "and the repeat by mix");
 
+    // The send enters the left line only, so the right side hears its dry and the crossed repeat.
     let mut both = Stereo::centred(impulse(22_050));
     ping_pong(&mut both, Spacing::Seconds(0.1), 0.5, 0.25, 44_100.0);
     assert!((both.r[0] - 0.75).abs() < 1e-6, "right dry: {}", both.r[0]);
@@ -86,6 +89,7 @@ fn a_centred_signal_feeds_it_at_its_own_level() {
         "right repeat: {}",
         both.r[8820]
     );
+    // Hard left in, half reaches the line: the mono fold-down.
     let mut side = Stereo {
         l: impulse(22_050),
         r: vec![0.0; 22_050],

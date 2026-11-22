@@ -8,6 +8,7 @@ use rusty_zimmer::{Song, SAMPLE_RATE};
 
 use super::render;
 
+/// A saw, not the stock noise: noise differs pass to pass by design and would hide what moved.
 fn steady() -> Song {
     let mut steady = song();
     steady.tracks[0].patch = PatchRef::Inline(Box::new(saw_patch()));
@@ -24,6 +25,7 @@ fn onset(pass: &[f32]) -> usize {
         .expect("the pass has a note in it")
 }
 
+/// Read where the note lands, not its samples: each note's oscillators start at a phase of its own.
 #[test]
 fn a_pattern_played_twice_is_humanised_differently_each_time() {
     let one = pass(&steady());

@@ -1,4 +1,5 @@
-//! the source stage: which generator makes the tone
+//! Every source but `noise` and a widened `osc` stack renders one waveform, identical in both
+//! channels.
 
 use super::{additive, fm, karplus, noise, osc, NoteContext};
 use crate::patch::{Algorithm, Operator, Source, FM_OPERATORS};
@@ -38,6 +39,7 @@ fn one_waveform(source: &Source, freqs: &[f32], velocity: f32, note: NoteContext
             damping,
             brightness,
         } => {
+            // The first frequency only: a string's delay line is fixed once it is plucked.
             let freq = freqs.first().copied().unwrap_or(0.0);
             karplus::render(out, freq, *damping, *brightness, seed, rate);
         }
@@ -63,6 +65,8 @@ fn one_waveform(source: &Source, freqs: &[f32], velocity: f32, note: NoteContext
     }
 }
 
+/// Velocity adds to modulators only: a carrier's level is its mix share, which the amp envelope
+/// already scales. Floored at zero: a negative index only mirrors the modulator, as bright.
 fn fm_levels(
     algorithm: Algorithm,
     operators: &[Operator; FM_OPERATORS],
@@ -170,6 +174,8 @@ mod tests {
         }
     }
 
+    /// 1 for a waveform, normalised to it; coloured noise is scaled to white's RMS, so its peaks
+    /// run higher.
     fn ceiling(source: &Source) -> f32 {
         match source {
             Source::Noise { color } if *color != NoiseColor::White => 3.0,

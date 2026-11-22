@@ -19,6 +19,7 @@ fn in_a_room(send: f32) -> Song {
     song
 }
 
+/// Past 1.9 s, interleaved stereo at 44.1 kHz; the fixture's last note is silent by about 1.8 s.
 fn after_the_notes(song: &Song) -> Vec<f32> {
     let mix = render_song(song, &InlineOnly).expect("the song renders");
     mix[(1.9 * 44_100.0) as usize * 2..].to_vec()

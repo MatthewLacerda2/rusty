@@ -4,15 +4,17 @@ use std::collections::VecDeque;
 
 use super::Found;
 
+/// Seconds either side: a full period down to 28.6 Hz, under C1 (32.7 Hz), so a bass saw finds
+/// its next reset.
 const REACH: f64 = 0.035;
 
 const SAME: f32 = 0.05;
 
 const OWN: usize = 2;
 
-const RATIO: f32 = 4.0;
+const RATIO: f32 = 4.0; // 12 dB
 
-const FLOOR: f32 = 0.01;
+const FLOOR: f32 = 0.01; // -40 dBFS
 
 const QUIET: f32 = 1e-4;
 

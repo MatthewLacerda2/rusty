@@ -16,6 +16,7 @@ fn stereo(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
+/// Turned down so the limiter never acts: under the ceiling the output is the fold itself.
 fn ringing(tail: Tail) -> Song {
     let mut rings_out = song();
     let sustains = Patch {

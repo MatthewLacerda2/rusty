@@ -6,6 +6,7 @@ use rusty_zimmer::song::Articulation::Glide;
 use rusty_zimmer::song::{ArrangementEntry, Pattern, PatternEntry, Play};
 use rusty_zimmer::SAMPLE_RATE;
 
+/// Samples to the note under test: two beats in at the fixture's 120 bpm.
 const ONSET: usize = SAMPLE_RATE as usize;
 
 fn hz(buf: &[f32], onset: usize, from: f32, long: f32) -> f32 {

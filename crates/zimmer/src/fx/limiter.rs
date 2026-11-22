@@ -1,10 +1,11 @@
-//! the peak limiter every bake passes through.
-
 use super::gain::Ballistics;
 use crate::level::intersample::{Channel, TAPS};
 use crate::stereo::Stereo;
 
+/// −1 dBTP, 10^(−1/20): a decibel of headroom for a lossy codec's reconstruction, which also
+/// absorbs an overshoot between frames that the per-frame gain misses.
 const CEILING: f32 = 0.891_251;
+/// Seconds; also how far a peak reaches back, which `song::excerpt` renders past a window.
 pub(crate) const LOOKAHEAD: f32 = 0.002;
 const RELEASE: f32 = 0.06;
 
@@ -46,12 +47,14 @@ fn required_gain(buf: &mut Stereo) -> Vec<f32> {
 
 fn frame_peaks(buf: &mut Stereo) -> Vec<f32> {
     sanitise(buf);
+    // Each side reconstructed alone: an overshoot on either is real.
     let (left, right) = (Channel::mono(&buf.l), Channel::mono(&buf.r));
     (0..buf.frames())
         .map(|frame| left.peak_from(frame).max(right.peak_from(frame)) as f32)
         .collect()
 }
 
+/// Runs first: reconstruction reads `TAPS` samples either side, so a NaN poisons its neighbours.
 fn sanitise(buf: &mut Stereo) {
     buf.each(|channel| {
         for sample in channel {
@@ -102,8 +105,7 @@ mod tests {
         assert!(!loud.is_clipping(), "the meter still calls this clipping");
         let true_peak = loud.true_peak_dbfs.expect("it is not silent");
         assert!(true_peak < -0.9, "true peak {true_peak} dBFS");
-        // Which cost it real level: the samples now sit well under the ceiling, because it is not
-        // the samples the ceiling is about.
+        // The samples sit well under the ceiling: it holds the waveform, not the samples.
         assert!(peak(&buf.l) < CEILING * 0.8, "peaked at {}", peak(&buf.l));
     }
 

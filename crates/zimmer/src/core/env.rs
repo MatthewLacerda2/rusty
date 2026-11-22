@@ -2,8 +2,10 @@
 
 use crate::patch::Adsr;
 
+/// Steepest bend either way. A guard: a steep negative curve overflows `exp` into `NaN`.
 const MAX_CURVE: f32 = 8.0;
 
+/// Level in `0..=1` at `t` seconds into a note held `gate` seconds.
 pub(crate) fn level_at(adsr: &Adsr, t: f32, gate: f32) -> f32 {
     if t <= 0.0 {
         return 0.0;
@@ -32,6 +34,7 @@ fn held_level(adsr: &Adsr, t: f32) -> f32 {
 
 fn approach(p: f32, curve: f32) -> f32 {
     let p = p.clamp(0.0, 1.0);
+    // The formula is 0/0 at zero; this branch keeps a straight segment's arithmetic exact.
     if curve == 0.0 {
         return p;
     }
@@ -97,6 +100,7 @@ mod tests {
 
     #[test]
     fn the_sustain_is_exactly_the_number_the_document_asked_for() {
+        // For 0.09 and 0.1, `1 - (1 - s)` is not `s`: the decay must hand over before its end.
         for s in [0.09, 0.1, 0.3, 0.7] {
             let e = adsr(0.0, 0.25, s, 0.1);
             assert_eq!(level_at(&e, 0.25, 1.0), s, "{s}, as the decay ends");

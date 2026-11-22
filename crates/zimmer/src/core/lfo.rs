@@ -1,4 +1,4 @@
-//! lfo: a patch's LFOs, worked out over one note.
+//! A patch's LFOs, worked out over one note.
 
 use std::f32::consts::TAU;
 
@@ -6,6 +6,7 @@ use super::RATE;
 use crate::hash::unit2;
 use crate::patch::{Lfo, LfoShape, LfoTarget};
 
+/// Hash channel ("LF") a `random` LFO draws on, apart from every other draw of the seed.
 const RANDOM_CHANNEL: u64 = 0x4c46;
 
 pub(crate) trait Grid {
@@ -89,11 +90,12 @@ fn wave(lfo: &Lfo, index: usize, seed: u64, onset: Option<&Onset<'_>>, n: usize)
                 let cycles = onset.grid.beat_at(onset.frame + i) / beats;
                 shape(lfo.shape, cycles, index, seed)
             }
+            // A note outside a song: `Patch::validate` refuses `beats` there, so this holds still.
             (Some(_), None) => 0.0,
             (None, _) => match i.checked_sub(start) {
                 None => 0.0,
-                // The angle in the order the one sine always worked it out, so a sine LFO with no
-                // delay renders the samples it did.
+                // The angle in this exact order: another rounds differently and moves a sine LFO's
+                // samples.
                 Some(k) => match lfo.shape {
                     LfoShape::Sine => (TAU * lfo.rate.max(0.0) * k as f32 / RATE).sin(),
                     other => shape(other, lfo.rate.max(0.0) * k as f32 / RATE, index, seed),
@@ -103,6 +105,7 @@ fn wave(lfo: &Lfo, index: usize, seed: u64, onset: Option<&Onset<'_>>, n: usize)
         .collect()
 }
 
+/// In `−1..=1`; `index` keeps two `random` LFOs drawing apart.
 fn shape(shape: LfoShape, cycles: f32, index: usize, seed: u64) -> f32 {
     let p = cycles.rem_euclid(1.0);
     match shape {

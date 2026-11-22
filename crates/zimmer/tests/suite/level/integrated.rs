@@ -4,6 +4,7 @@ use std::f32::consts::TAU;
 
 use rusty_zimmer::level::Integrated;
 
+/// LU either way: what EBU Tech 3341 allows.
 const TOLERANCE: f64 = 0.1;
 
 const RATE: u32 = 48_000;
@@ -36,6 +37,7 @@ fn a_reference_tone_reads_its_own_level() {
     }
 }
 
+/// Tech 3341 case 3: the −36 dBFS ends sit under the relative gate, so the loud middle decides.
 #[test]
 fn quiet_passages_either_side_are_gated_out() {
     let mut signal = tone(-36.0, 10.0);

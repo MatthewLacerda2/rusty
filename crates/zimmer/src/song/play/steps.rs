@@ -17,6 +17,7 @@ const ACCENT_VEL: f32 = 1.0;
 
 const DEFAULT_PITCH: f32 = 60.0;
 
+/// In beats, shared with `arp`'s step count; not zero, as a triplet grid misses by a hair in `f32`.
 pub(in crate::song) const GRID_EPSILON: f32 = 1e-3;
 
 fn at_the_top(start: &f32) -> bool {
@@ -84,6 +85,7 @@ impl Steps {
                 articulation,
             });
         }
+        // After every character is read, so a typo is reported before a misread of the marks.
         self.check_marks(plain, accented, ghosted)?;
         out.extend(hits);
         Ok(())
