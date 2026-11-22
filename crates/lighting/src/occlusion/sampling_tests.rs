@@ -7,6 +7,7 @@ use rusty_components::mesh::MeshRevision;
 use rusty_components::{MaterialComponent, Projection};
 use rusty_scene::lighting::occlusion::{culls_from, MAX_CULLING_NEAR};
 
+/// Off any regular spacing: a door at the wall's centre meets a lattice point whatever the spacing.
 const DOORS: [f32; 3] = [3.37, -6.91, 8.53];
 
 #[test]

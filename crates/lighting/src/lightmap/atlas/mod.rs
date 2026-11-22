@@ -14,6 +14,7 @@ use super::bake::Lightmap;
 use rusty_scene::lighting::page::MIP_LEVELS;
 use rusty_scene::lighting::settings::{page_edge, MIN_PAGE};
 
+/// One texture array's layers under `wgpu::Limits::default()`, which the renderer asks for.
 pub const MAX_PAGES: usize = 256;
 pub const PAD: u32 = 1 << (MIP_LEVELS - 1);
 

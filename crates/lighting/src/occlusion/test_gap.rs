@@ -1,3 +1,5 @@
+//! Test hooks: the gap scene other crates' occlusion tests bake.
+
 use super::test_level::{block, DOOR, HEIGHT, WALL};
 use rusty_scene::Scene;
 

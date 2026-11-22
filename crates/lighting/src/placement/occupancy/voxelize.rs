@@ -2,9 +2,10 @@ use glam::Vec3;
 
 use super::Occupancy;
 
-// Samples lean toward the solid's middle so a face on a cell boundary marks the cell inside it.
+// In cells: samples lean toward the solid's middle so a face on a cell boundary marks the
+// cell inside it.
 const LEAN: f32 = 1.0e-3;
-// A 2 km edge at a 0.5 m cell.
+// The most samples along a triangle's edge: a 2 km edge at a 0.5 m cell.
 const MAX_SAMPLES: usize = 8192;
 
 #[derive(Clone, Debug, PartialEq)]

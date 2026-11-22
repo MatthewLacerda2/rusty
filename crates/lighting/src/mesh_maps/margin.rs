@@ -4,6 +4,7 @@ use super::{Baked, MeshMap, MARGIN};
 use crate::lightmap::{run_pool, BakeProgress, TexelPoint};
 use rusty_procgen::image_buf::{Image, Rgba, Size};
 
+/// Points evaluated per block, 16 bytes each: what a map buffers before its image.
 pub(super) const BLOCK: usize = 1 << 18;
 
 fn background(map: MeshMap) -> Vec4 {
@@ -100,6 +101,7 @@ pub(super) fn grow(px: &mut [Rgba], filled: &mut [bool], size: Size, passes: u32
 }
 
 pub(super) fn id_colour(key: usize) -> Vec4 {
+    // The golden ratio's fraction spreads successive ids' hues far apart.
     const GOLDEN: f32 = 0.618_034;
     let hue = (key as f32 * GOLDEN).fract() * 6.0;
     let x = 1.0 - (hue % 2.0 - 1.0).abs();

@@ -4,6 +4,7 @@ use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_scene::create::{create_drawn_entity, Primitive};
 use rusty_scene::Scene;
 
+/// The tessellation's spacing, metres.
 const STEP: f32 = 1.0;
 
 pub fn mesh(scene: &mut Scene, name: &str, boxes: &[(Vec3, Vec3)]) -> u32 {

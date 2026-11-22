@@ -24,6 +24,7 @@ use lp::Line;
 pub const TIME_HORIZON: f32 = 2.0;
 /// Radius (world units, XZ) within which other agents are considered.
 pub const NEIGHBOR_DISTANCE: f32 = 10.0;
+/// Closest neighbours one agent's velocity heeds.
 pub const MAX_NEIGHBORS: usize = 10;
 
 #[derive(Clone, Copy, Debug)]

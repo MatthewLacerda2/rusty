@@ -1,8 +1,8 @@
-//! Solids whose tops lie within `max_step` of each other OR their walkable flags (Recast's
-//! flag-merge threshold). Past Recast: when the solid reaching the merged top carries a
-//! `NavMeshModifier` override, its flag and area decide alone, else a sofa overridden to
-//! `NotWalkable` whose seat is within `max_step` of the floor would inherit the floor's walkable
-//! flag.
+//! Each column's touching solids merge bottom-up. The merged top is walkable when a walkable
+//! solid's top lies within `max_step` of it (Recast's flag-merge threshold), so a low unwalkable
+//! lip does not spoil the floor it sits in. Past Recast, a `NavMeshModifier` override on the solid
+//! reaching the merged top decides its flag and area alone: a `NotWalkable` sofa seat within
+//! `max_step` of the floor stays unwalkable.
 
 use super::super::{NavSpan, NavigationGraph};
 use super::columns::Columns;
@@ -10,6 +10,7 @@ use super::plane::{top_plane, Plane, TOP_EPS};
 use super::raster::Solid;
 use super::region::CellRect;
 
+/// Metres: solids this close touch, so a crate resting on a floor merges into one solid.
 const TOUCH_EPS: f32 = 1e-3;
 
 impl NavigationGraph {
@@ -86,9 +87,7 @@ fn authors(s: &Solid, top: f32) -> bool {
     s.overridden && s.max >= top - TOP_EPS
 }
 
-/// The area of two merging solids' top: that of the walkable one reaching it, the
-/// higher one's when both do (the higher id when level, so the visit order never
-/// decides).
+/// Level walkable tops take the higher id, so the visit order never decides.
 fn merged_area((a, a_walks): (&Solid, bool), (b, b_walks): (&Solid, bool)) -> u8 {
     match (a_walks, b_walks) {
         (true, true) if a.max > b.max + TOP_EPS => a.area,

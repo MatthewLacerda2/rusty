@@ -18,6 +18,7 @@ impl Default for RoomParams {
     }
 }
 
+/// Chamfer weights: 3 along an axis, 4 along a diagonal (≈ 3√2).
 const AXIS: u32 = 3;
 const DIAGONAL: u32 = 4;
 

@@ -24,6 +24,7 @@ struct IslandMap {
     carried: bool,
 }
 
+/// A carried map depends on rebake history, not the bake alone: syncs counted, never timed.
 #[derive(Default)]
 pub(crate) struct Islands {
     map: RefCell<Option<IslandMap>>,

@@ -6,6 +6,7 @@ use super::rays::MeshRays;
 use super::Baked;
 use crate::lightmap::{rasterize_claims, Claim, TexelPoint};
 
+/// Covering faces per shared texel, on average, past which the log reports the stack's cost.
 const DEEP: f64 = 8.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
