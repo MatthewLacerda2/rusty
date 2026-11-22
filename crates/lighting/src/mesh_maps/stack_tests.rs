@@ -1,20 +1,14 @@
-//! Overlaps decided per pair of triangles (#2310): two mirrored halves, open
-//! alike, bake one half throughout, and a deep stack of faces is told.
-
 use glam::{Vec2, Vec3};
 
 use super::fixtures::quad;
 use super::overlap_tests::{bake, shared, square, UV};
 use super::{MeshMap, MeshSource, Settings};
 
-/// A floor of two halves facing +Y, the left one the right one mirrored in X and
-/// sharing its UVs, between two walls that shade both alike near them.
 fn mirrored_floor() -> MeshSource {
     let mut m = MeshSource::default();
     let v = Vec3::new;
     let right = [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)];
     quad(&mut m, right, UV, 0);
-    // Wound the other way to face +Y, so its UVs are listed from the far corner.
     let left = [v(0., 0., 1.), v(0., 0., 0.), v(-1., 0., 0.), v(-1., 0., 1.)];
     quad(
         &mut m,

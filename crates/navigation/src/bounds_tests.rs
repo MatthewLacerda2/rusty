@@ -1,7 +1,3 @@
-//! Tests for the scene-derived navmesh bounds (`bounds.rs`, #452): the derived extent
-//! and its margin, the authored override, the empty-scene default, spacing snapping,
-//! and a path to geometry far past the old hardcoded ±20 box.
-
 use super::bounds::resolve_bounds;
 use super::test_support::add_box_with as add_box;
 use super::*;
@@ -24,9 +20,6 @@ fn empty_scene_bakes_the_default_box() {
     assert_eq!((g.width, g.height), (161, 161), "0.25 m cells (#1887)");
 }
 
-/// Derived = geometry extent grown by `BOUNDS_MARGIN + agent_radius` (2.0 + 0.5), snapped
-/// outward to the unit lattice. Every side is asserted signed, so a flipped margin sign,
-/// a swapped min/max fold or a floor↔ceil swap each fail.
 #[test]
 fn derived_bounds_are_geometry_plus_margin_snapped() {
     let mut scene = Scene::new();
@@ -51,7 +44,6 @@ fn margin_grows_with_agent_radius() {
     let mut scene = Scene::new();
     add_box(&mut scene, Vec3::ZERO, Vec3::new(10.0, 1.0, 4.0), true);
     scene.nav_settings.agent_radius = 3.0;
-    // Margin 2.0 + 3.0 = 5.0 on every side.
     assert_eq!(resolve_bounds(&scene, 1.0), bounds(-5.0, 15.0, -5.0, 9.0));
 }
 
@@ -59,7 +51,6 @@ fn margin_grows_with_agent_radius() {
 fn snapping_follows_the_grid_spacing() {
     let mut scene = Scene::new();
     add_box(&mut scene, Vec3::ZERO, Vec3::new(10.0, 1.0, 10.0), true);
-    // [-2.5, 12.5] snapped outward to multiples of 2.0.
     assert_eq!(resolve_bounds(&scene, 2.0), bounds(-4.0, 14.0, -4.0, 14.0));
 }
 
@@ -100,9 +91,6 @@ fn is_valid_needs_finite_positive_extent_on_both_axes() {
     assert!(!bounds(f32::NEG_INFINITY, 1.0, 0.0, 1.0).is_valid());
 }
 
-/// The bug: past x = 20 there was no grid, so an agent there never got a path. With a
-/// floor at the origin and a platform at x = 60, the grid spans both and the path
-/// runs straight there: a grid clamped too small would end the path at its edge.
 #[test]
 fn geometry_at_x60_is_reachable_from_the_origin() {
     let mut scene = Scene::new();
@@ -119,8 +107,6 @@ fn geometry_at_x60_is_reachable_from_the_origin() {
     assert_eq!(g.get_next_path_step(Vec3::ZERO, target), target);
 }
 
-/// Re-baking after the geometry grows re-shapes the grid (same dimensions formula as
-/// `new`) and keeps the generation counter monotonic, so cached agent paths re-plan.
 #[test]
 fn rebake_reshapes_to_new_geometry() {
     let mut scene = Scene::new();

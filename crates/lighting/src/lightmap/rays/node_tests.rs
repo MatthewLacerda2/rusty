@@ -1,15 +1,3 @@
-//! The bake's BVH node test ([`NodeRay`], #2325) is parry's `BvhNode::cast_ray`
-//! with the reciprocal hoisted: the two agree on any box and ray, and a BVH walk
-//! driven by either tests the same nodes in the same order and finds the same
-//! triangle. A parry upgrade changing its box test fails here, not in the bake.
-//!
-//! Each walk is handed its node test and keeps its own log: no state is shared,
-//! so the tests hold under one process as under nextest.
-//!
-//! Results compare with ±0 equal: an origin on a face with a negative direction
-//! gives `tmin.max(-0.0)`, and which zero `f32::max` returns is unspecified. The
-//! walk only compares costs, so the sign of a zero never reaches the bake.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -24,13 +12,10 @@ use crate::lightmap::progressive_tests::lit;
 use crate::lightmap::{BakeScene, Rng};
 use crate::occlusion::test_level::corridors;
 
-/// A node test's answer, -0 read as +0 (`-0.0 + 0.0` is `+0.0`; the module doc).
 fn key(t: f32) -> u32 {
     (t + 0.0).to_bits()
 }
 
-/// A float from the cases that break a box test: ordinary, exact zeros, tiny
-/// and huge magnitudes, the infinities and NaN, and any bit pattern at all.
 fn component() -> impl Strategy<Value = f32> {
     prop_oneof![
         4 => -50.0f32..50.0,
@@ -45,8 +30,6 @@ fn component() -> impl Strategy<Value = f32> {
     ]
 }
 
-/// A box (possibly flat on any axis) and a ray whose origin, per axis, lies on
-/// its near face, its far face or anywhere, plus how far the ray reaches.
 fn case() -> impl Strategy<Value = (Vec3, Vec3, Ray, f32)> {
     let corner = || [-50.0f32..50.0, -50.0f32..50.0, -50.0f32..50.0];
     let sizes = [0, 1, 2].map(|_| prop_oneof![Just(0.0f32), 0.0f32..20.0]);
@@ -73,12 +56,8 @@ proptest! {
     }
 }
 
-/// What a walk did: every node test's answer in order, and the triangle the
-/// nearest-hit walk found and the one the blocker walk stopped at.
 type Walk = (Vec<u32>, Option<u32>, Option<u32>);
 
-/// `Rays::closest`'s and `Rays::blocker`'s walks over `rays`' BVH along `ray`,
-/// with `test` as the node test and every triangle seen and blocking.
 fn walk(rays: &Rays, ray: &Ray, reach: f32, test: impl Fn(&BvhNode, f32) -> f32) -> Walk {
     let mesh = rays.mesh.as_ref().expect("a level with triangles");
     let log = RefCell::new(Vec::new());
@@ -105,8 +84,6 @@ fn walk(rays: &Rays, ray: &Ray, reach: f32, test: impl Fn(&BvhNode, f32) -> f32)
     (log.into_inner(), nearest.map(|(i, _)| i), blocker)
 }
 
-/// Rays from just off every triangle (where a bake's start), down the six axes
-/// (two zero components) and seeded ways, short and long: parry's walk and ours.
 fn same_walks(rays: &Rays) {
     let axes = [Vec3::X, Vec3::Y, Vec3::Z]
         .into_iter()
@@ -134,14 +111,11 @@ fn same_walks(rays: &Rays) {
     );
 }
 
-/// The lit floor and wall: flat leaf boxes, and rays starting inside the root's.
 #[test]
 fn a_lightmap_level_walks_the_same_through_either_node_test() {
     same_walks(&Rays::build(triangles(&lit())));
 }
 
-/// The corridors level's axis-aligned walls and props, as the lightmap bake
-/// sees them (the occlusion bake walks the same BVH queries).
 #[test]
 fn the_corridors_walk_the_same_through_either_node_test() {
     let scene = BakeScene::gather(&corridors(), &|_, _| None);

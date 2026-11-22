@@ -10,8 +10,6 @@ fn cells(path: &[SpanRef]) -> Vec<(i32, i32)> {
     path.iter().map(|s| (s.gx, s.gz)).collect()
 }
 
-/// The next step is the path's next corner (#458): around a wall it is the corner
-/// past the wall, not the goal and not the adjacent cell.
 #[test]
 fn next_step_is_the_next_corner() {
     let mut g = open(10.0);
@@ -26,7 +24,6 @@ fn next_step_is_the_next_corner() {
     );
 }
 
-/// Priority-queue ordering mutations change the expansion and the path.
 #[test]
 fn find_path_exact_cardinal_sequence() {
     let g = open(5.0);
@@ -59,7 +56,6 @@ fn link_boundary_at_max_step() {
     );
 }
 
-/// Lazy-deletion and reconstruction mutations break the exact diagonal sequence.
 #[test]
 fn find_path_three_diagonal_steps_exact_sequence() {
     let g = open(5.0);
@@ -67,7 +63,6 @@ fn find_path_three_diagonal_steps_exact_sequence() {
     assert_eq!(cells(&path), vec![(0, 0), (1, 1), (2, 2), (3, 3)]);
 }
 
-/// A goal on a span nothing links to is unreachable.
 #[test]
 fn isolated_goal_has_no_path() {
     let mut g = open(5.0);

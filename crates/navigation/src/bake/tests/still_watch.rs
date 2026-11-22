@@ -1,8 +1,3 @@
-//! What `bake::still::StaticWatch` reads as a static change: a static collider moved
-//! through a non-static parent, a Collider edited, an ancestor toggled, and every
-//! way the World is replaced or rewound; a rig animating beside the floor is not
-//! one, and costs the watch no id list.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_box_with, add_floor};
@@ -10,8 +5,6 @@ use super::super::super::{NavBounds, NavigationGraph};
 use rusty_ecs::walks;
 use rusty_scene::Scene;
 
-/// A floor, a non-static `mover` holding a static crate, and a dynamic rig of a
-/// root and three nested bones: `(scene, graph, mover, crate, rig nodes)`.
 fn yard() -> (Scene, NavigationGraph, u32, u32, Vec<u32>) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;
@@ -52,8 +45,6 @@ fn a_static_collider_moved_by_its_non_static_parent_is_a_change() {
     assert!(still(&mut scene, &mut g), "and was read");
 }
 
-/// The skip that spares a subtree already stamped on `WorldPose` must not spare
-/// one the watch has not seen: a second move after the watch read is a change.
 #[test]
 fn a_static_moved_again_before_another_reader_reads_is_a_change() {
     let (mut scene, mut g, mover, ..) = yard();
@@ -92,8 +83,6 @@ fn a_collider_edited_on_a_static_entity_is_a_change() {
     assert!(!still(&mut scene, &mut g), "the crate lost its collider");
 }
 
-/// Activity reaches the watch through `StaticSet`: every Activity stamp also stamps
-/// each static entity it reaches.
 #[test]
 fn an_activity_toggle_above_a_static_collider_is_a_change() {
     let (mut scene, mut g, mover, _, rig) = yard();
@@ -105,8 +94,6 @@ fn an_activity_toggle_above_a_static_collider_is_a_change() {
     }
 }
 
-/// An Undo or Redo step, a scene load or Play's snapshot restore (both clear the
-/// World first), and a harness rewind (a snapshot restore) all read as a change.
 #[test]
 fn a_rewound_or_cleared_world_is_a_change() {
     let (mut scene, mut g, ..) = yard();
@@ -121,9 +108,6 @@ fn a_rewound_or_cleared_world_is_a_change() {
     assert!(still(&mut scene, &mut g), "and was read");
 }
 
-/// A World swapped in, built the same way (so its revisions match the old one's),
-/// reads as changed: the watch's cursors are another World's (the revision's own
-/// epoch check: `ecs`'s `a_watch_asked_of_another_world_reads_a_change`).
 #[test]
 fn a_replaced_world_is_a_change() {
     let (mut scene, mut g, ..) = yard();

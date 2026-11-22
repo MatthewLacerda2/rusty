@@ -1,56 +1,34 @@
-//! crates/navigation/src/surface.rs — the floor's shape inside a span's cell (#781).
-//!
-//! A span's `y` is its cell's **highest** walkable point: the right height for
-//! connectivity (`links.rs` compares tops), the wrong one to stand an agent on. On a
-//! ramp of grade `g` that top sits up to `g × spacing` above the surface under the
-//! agent, and it changes in steps from cell to cell.
-//!
-//! So the bake also keeps, per span, the plane of the triangle that forms its top
-//! (Unity's agents follow the detail mesh; this is its one-plane-per-cell form). An
-//! agent stands at that plane's height under its XZ, kept between two bounds:
-//!
-//! - never above the span's top `y`: past a ramp's upper edge the plane would climb
-//!   into the air, and the flat deck beyond is the top;
-//! - never below `floor`, the top of a lower walkable solid merged into the same one
-//!   (the pool floor a ramp's foot rests on): past a ramp's lower edge the plane would
-//!   dig under it.
-//!
-//! A flat span's plane is level with its top, so it reads back exactly `y`.
+//! A span's `y` is its cell's **highest** point, right for connectivity but wrong to stand on: on a
+//! ramp of grade `g` it sits up to `g × spacing` above the surface. The bake keeps the plane of the
+//! top triangle (Unity follows the detail mesh; this is one plane per cell). An agent stands at its
+//! height, never above the span's `y` and never below `floor`, the top of a lower solid merged into
+//! the span (the pool floor a ramp's foot rests on).
 
 use glam::Vec2;
 
 use super::{NavigationGraph, SpanRef};
 
-/// A span's floor plane relative to its top `y`, and how far below `y` it may dip.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Surface {
-    /// The plane's height at the cell centre, minus the span's `y`.
     pub centre: f32,
-    /// The plane's rise per metre along x and z.
     pub slope: Vec2,
-    /// How far below the span's `y` the surface reaches at most (`∞` with no floor
-    /// under it).
+    /// `∞` with no floor under it.
     pub floor: f32,
 }
 
 impl Surface {
-    /// A level floor at the span's top.
     pub const FLAT: Self = Self {
         centre: 0.0,
         slope: Vec2::ZERO,
         floor: 0.0,
     };
 
-    /// The surface's height, relative to the span's top, `offset` from the cell
-    /// centre in XZ.
     pub fn height(&self, offset: Vec2) -> f32 {
         (self.centre + self.slope.dot(offset)).clamp(-self.floor, 0.0)
     }
 }
 
 impl NavigationGraph {
-    /// The height of span `s`'s floor under world `(x, z)`: what an agent on it
-    /// stands on. A point outside the span's cell reads the cell's nearest edge.
     pub fn surface_y(&self, s: SpanRef, x: f32, z: f32) -> f32 {
         let span = &self.spans[s.index as usize];
         let centre = self.cell_center(s.gx, s.gz);
@@ -65,7 +43,6 @@ impl NavigationGraph {
 mod tests {
     use super::*;
 
-    /// A 0.3-grade ramp rising along +z whose cell top is at 0.15 (its uphill edge).
     fn ramp() -> Surface {
         Surface {
             centre: -0.15,
@@ -127,7 +104,6 @@ mod tests {
             gz: 1,
             index: r.start as u32,
         };
-        // Cell (1, 1) is centred at (2, 2) and reaches 1 m to each side.
         assert!((g.surface_y(s, 2.0, 1.1) + 0.42).abs() < 1e-6);
         assert!((g.surface_y(s, 2.0, -1.0) + 0.45).abs() < 1e-6, "clamped");
     }

@@ -1,6 +1,3 @@
-//! What a delivered path holds (#2087): nothing installed while the agent drops
-//! off a ledge, and no turning back to a corner it walked past while it waited.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_floor};
@@ -8,7 +5,6 @@ use super::super::super::{NavBounds, NavigationGraph};
 use super::{agent, level, spawn, DT};
 use rusty_scene::Scene;
 
-/// A 3 m platform over x 0..8 on a 60 m floor, drops generated off its edge.
 fn ledge() -> NavigationGraph {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
@@ -37,7 +33,6 @@ fn no_path_is_installed_while_the_agent_crosses_a_link() {
         !agent(&scene, id).path_links.is_empty(),
         "the path drops off the ledge"
     );
-    // A new target, answered one expansion a tick: still searching at the ledge.
     g.set_pathfinding_iterations_per_frame(1);
     scene.world.nav_agent_mut(id).expect("agent").target = Vec3::new(55.0, 0.0, 6.0);
     let mut ticks = 0;
@@ -72,14 +67,12 @@ fn no_path_is_installed_while_the_agent_crosses_a_link() {
 fn a_delivered_path_skips_the_corner_walked_past() {
     let g = level();
     let mut scene = Scene::new();
-    // First west along z = 3, under the block (x 10..20, z 5..25).
     let id = spawn(
         &mut scene,
         Vec3::new(12.0, 0.0, 3.0),
         Vec3::new(2.0, 0.0, 3.0),
     );
     g.tick_nav_agents(&mut scene, DT);
-    // Then north past the block's corner, answered while it walks on west.
     g.set_pathfinding_iterations_per_frame(1);
     let goal = Vec3::new(5.0, 0.0, 28.0);
     scene.world.nav_agent_mut(id).expect("agent").target = goal;

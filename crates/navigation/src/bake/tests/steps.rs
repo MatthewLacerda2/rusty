@@ -1,8 +1,3 @@
-//! Steps and stairs join at every grid (#2001): a step is held to `max_step` alone,
-//! Recast's `walkableClimb`, so a finer grid never disconnects what a coarser one
-//! joins. The scenes rebuild the tower-bar case on primitives: a 0.15 m platform
-//! with a nosing lip, and a 14-riser stair of 0.17 m risers on 0.27 m treads.
-
 use super::super::super::test_support::{add_box, add_floor, add_rotated_box, arrives};
 use super::super::super::{NavBounds, NavigationGraph};
 use glam::{Quat, Vec3};
@@ -22,9 +17,6 @@ fn bake(scene: &mut Scene, radius: f32, grid: f32) -> NavigationGraph {
     NavigationGraph::from_scene(scene)
 }
 
-/// The `(radius, grid)` pairs at which a walk from `from` to `to` does not arrive;
-/// empty when it arrives at every one. Both probe points must have a span under
-/// them at every bake, so a vanished floor fails instead of counting as refused.
 fn joins(scene: &mut Scene, from: Vec3, to: Vec3) -> Vec<(f32, f32)> {
     let mut refused = Vec::new();
     for r in RADII {
@@ -44,8 +36,6 @@ fn joins(scene: &mut Scene, from: Vec3, to: Vec3) -> Vec<(f32, f32)> {
     refused
 }
 
-/// A floor, and a platform `rise` up over x 3..6; `lip` adds a 5 cm nosing whose
-/// underside is 0.045 below the platform top.
 fn platform(rise: f32, lip: bool) -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 6.0, 0.0, 3.0);
@@ -77,13 +67,10 @@ fn a_platform_one_riser_up_joins_the_floor_at_every_grid() {
 fn a_step_over_max_step_stays_apart() {
     let mut scene = platform(0.6, false);
     let (up, down) = (Vec3::new(5.0, 0.6, 1.5), Vec3::new(1.0, 0.0, 1.5));
-    // Climbing: no drop link helps, and 0.6 is past `max_step` at every grid.
     let refused = joins(&mut scene, down, up);
     assert_eq!(refused.len(), RADII.len() * GRIDS.len(), "{refused:?}");
 }
 
-/// A straight stair down +x: riser `i` (1-based) tops at `i * RISER`, and the
-/// landing past the last tread is `STEPS * RISER` up.
 fn straight_stair() -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, -1.0, 7.0, 0.0, 1.5);
@@ -104,10 +91,6 @@ fn a_straight_stair_joins_top_to_bottom_at_every_grid() {
     assert_eq!(joins(&mut scene, bottom, top), [], "bottom -> top");
 }
 
-/// A curved stair: each tread a box turned about the y axis at (0, 0), a 1.2 m
-/// wide ring of radius 3 (treads `TREAD` deep on that line), rising from a floor;
-/// each box is as deep as the outer edge's arc, so no gap opens between treads,
-/// and a landing of six treads' length follows the last one.
 fn curved_stair() -> (Scene, Vec3) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -1.0, 7.0, -1.0, 7.0);

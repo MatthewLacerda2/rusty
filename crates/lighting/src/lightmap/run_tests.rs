@@ -1,5 +1,4 @@
-//! A multi-material mesh bakes each run with its own material (#1290), paired with
-//! its slots the way the renderer draws them.
+//! A multi-material mesh bakes each run with its own material, paired with its slots the way the renderer draws them.
 
 use std::cell::Cell;
 
@@ -11,8 +10,7 @@ use rusty_components::mesh::Vertex;
 use rusty_components::{MaterialAsset, MaterialComponent, MeshComponent, RenderMode};
 use rusty_scene::Scene;
 
-/// A static 4×4 panel at y = 1 facing down, as two runs: the half over x < 0, then
-/// the half over x > 0. No lightmap UV: it only occludes, bounces and emits.
+/// No lightmap UV: it only occludes, bounces and emits.
 pub(super) fn panel(scene: &mut Scene, slots: Option<&[&str]>) -> u32 {
     let half = |x0: f32, x1: f32| {
         let p = |x, z| Vertex::new(Vec3::new(x, 1.0, z), Vec3::NEG_Y, [0.0; 2]);
@@ -34,8 +32,6 @@ pub(super) fn panel(scene: &mut Scene, slots: Option<&[&str]>) -> u32 {
     id
 }
 
-/// A scene with a `black`, a `glow` (black, emitting white) and a `glass`
-/// (Transparent at alpha 0.5, glowing) material in its library.
 pub(super) fn library() -> Scene {
     let mut scene = Scene::new();
     let black = MaterialAsset {
@@ -57,8 +53,6 @@ pub(super) fn library() -> Scene {
     scene
 }
 
-/// The panel's gathered index count and each run's (end, albedo.x, emissive.x,
-/// occludes).
 fn gathered(slots: Option<&[&str]>) -> (usize, Vec<(u32, f32, f32, bool)>) {
     let mut scene = library();
     panel(&mut scene, slots);
@@ -99,8 +93,7 @@ fn each_run_bakes_with_its_own_slot() {
     );
 }
 
-/// A Transparent run stays drawn (it receives its lightmap) but lets light through;
-/// an extra slot over it is judged by its own material (#1290).
+/// A Transparent run stays drawn (it receives its lightmap) but lets light through; an extra slot over it is judged by its own material.
 #[test]
 fn a_transparent_run_receives_but_does_not_occlude() {
     let glass = |end| (end, 0.0, 0.5, false);
@@ -124,7 +117,6 @@ fn a_transparent_run_receives_but_does_not_occlude() {
     );
 }
 
-/// A texture several slots share is averaged once per gather.
 #[test]
 fn a_shared_map_is_averaged_once() {
     let mut scene = library();

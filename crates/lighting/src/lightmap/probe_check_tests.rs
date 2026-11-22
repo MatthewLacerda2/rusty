@@ -1,6 +1,4 @@
-//! The Area light probe's checks (#2355): a check that contradicts a unanimous
-//! verdict makes the texel cast the panel's whole set, so its light is the
-//! exhaustive estimate, never a weighted correction.
+//! A check that contradicts a unanimous probe verdict makes the texel cast the panel's whole set, so its light is the exhaustive estimate, never a weighted correction.
 
 use super::shadow_probe_tests::Fixture;
 use super::slit_probe_tests::under;

@@ -1,6 +1,4 @@
-//! A `Shadowmask` bake's masks (#1695): per channel, a `Mixed` light's static
-//! occlusion, in the lightmaps and at the probes, leaving the lightmap's own light
-//! as a `BakedIndirect` bake has it.
+//! A `Shadowmask` bake's per-channel masks of a `Mixed` light's static occlusion, in the lightmaps and at the probes; the lightmap's own light stays as in a `BakedIndirect` bake.
 
 use glam::{Vec3, Vec4};
 
@@ -8,7 +6,6 @@ use super::bake::bake_on;
 use super::tests::{floor, quad, settings};
 use super::*;
 
-/// The floor and, 1 unit over its `x < 0` half, a panel facing down onto it.
 fn half_covered(lights: Vec<BakeLight>) -> BakeScene {
     let p = |x, z| Vec3::new(x, 1.0, z);
     let panel = quad(
@@ -23,7 +20,6 @@ fn half_covered(lights: Vec<BakeLight>) -> BakeScene {
     }
 }
 
-/// A `Mixed` point light 3 units over the floor's centre, on `channel`.
 fn lamp(channel: Option<u8>) -> BakeLight {
     BakeLight {
         shape: LightShape::Point {
@@ -36,7 +32,6 @@ fn lamp(channel: Option<u8>) -> BakeLight {
     }
 }
 
-/// `scene` masking channel 0, as `BakeScene::gather` marks a masking bake.
 fn masking(mut scene: BakeScene) -> BakeScene {
     scene.shadowmask.channels.insert(9, 0);
     scene

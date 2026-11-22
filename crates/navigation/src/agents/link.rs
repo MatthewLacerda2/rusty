@@ -1,20 +1,11 @@
-//! Crossing an off-mesh link (#462): `Walking → OnLink → Walking`.
-//!
-//! When an agent reaches the start of a link on its path, it stops steering and is
-//! **on the link** (Unity's `isOnOffMeshLink`), exposing the link to its script.
-//! With auto-traverse on (the default, Unity's `autoTraverseOffMeshLink`) the
-//! engine carries it to the link's end in a straight line at its speed; with it
-//! off, the agent waits — the script plays the vault, jump or climb, moves the
-//! body, and calls `CompleteOffMeshLink`, which puts the agent on the link's end
-//! and resumes the path. Frame-count driven like the rest of the tick, so a
-//! traversal replays bit for bit.
+//! Unity's `isOnOffMeshLink` and `autoTraverseOffMeshLink` (on by default: the engine carries
+//! the agent to the link's end in a straight line at its speed); off, the script calls
+//! `CompleteOffMeshLink`.
 
 use glam::Vec3;
 
 use rusty_scene::NavMeshAgentComponent;
 
-/// Put the agent on the link whose leg leads into the waypoint its cursor just
-/// reached, if there is one. Returns whether it is now on a link.
 pub(super) fn enter_link(agent: &mut NavMeshAgentComponent) -> bool {
     let cursor = agent.path_cursor;
     let Some(&(_, link)) = agent.path_links.iter().find(|(w, _)| *w == cursor) else {
@@ -25,9 +16,6 @@ pub(super) fn enter_link(agent: &mut NavMeshAgentComponent) -> bool {
     true
 }
 
-/// One tick of the engine's own traversal: the Transform at `pos` moved toward the
-/// link's end (with the agent's base offset) by `speed · dt`. Arriving completes the
-/// link.
 pub(super) fn auto_traverse(agent: &mut NavMeshAgentComponent, pos: Vec3, dt: f32) -> Vec3 {
     let Some(link) = agent.off_mesh_link else {
         return pos;
@@ -41,9 +29,7 @@ pub(super) fn auto_traverse(agent: &mut NavMeshAgentComponent, pos: Vec3, dt: f3
     pos + to_end.normalize_or_zero() * step
 }
 
-/// Finish the link the agent is on (Unity's `CompleteOffMeshLink`): it leaves the
-/// link at rest and walks on from its end; where its Transform goes to stand there
-/// is returned for the caller to place the agent at. `None` when it is not on a link.
+/// Unity's `CompleteOffMeshLink`: the agent leaves the link at rest; returns the Transform position.
 pub fn complete_off_mesh_link(agent: &mut NavMeshAgentComponent) -> Option<Vec3> {
     let link = agent.off_mesh_link.take()?;
     agent.velocity = Vec3::ZERO;

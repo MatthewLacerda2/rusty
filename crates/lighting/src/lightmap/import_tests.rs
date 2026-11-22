@@ -1,7 +1,4 @@
-//! What the import hands the bake (#438, #831): a mesh without `TEXCOORD_1` bakes
-//! nothing until *Generate Lightmap UVs* is ticked, and the unwrap's pack margin
-//! is measured at the bake's default resolution. The import halves are
-//! `rusty-asset`'s own tests (`gltf`'s `uv2_tests`, `lightmap_uv`'s).
+//! A mesh without `TEXCOORD_1` bakes nothing until *Generate Lightmap UVs* is ticked; the unwrap's pack margin is measured at the bake's default resolution.
 
 use rusty_asset::lightmap_uv::REFERENCE_TEXELS_PER_UNIT;
 use rusty_asset::{import_file, SubMesh};
@@ -15,7 +12,6 @@ fn the_margin_is_measured_at_the_bakes_default_resolution() {
     );
 }
 
-/// Write a JSON + `<stem>.bin` pair into its own temp dir and import its one mesh.
 fn import_pair(dir: &str, stem: &str, (json, bin): (String, Vec<u8>)) -> SubMesh {
     let dir = rusty_test_support::temp::dir().join(dir);
     std::fs::create_dir_all(&dir).unwrap();
@@ -25,7 +21,6 @@ fn import_pair(dir: &str, stem: &str, (json, bin): (String, Vec<u8>)) -> SubMesh
     import_file(&path).unwrap().sub_meshes.remove(0)
 }
 
-/// The bake's input for one imported mesh, placed at the origin under a white sky.
 fn bake_input(mesh: &SubMesh) -> super::BakeScene {
     use super::{BakeMesh, BakeRun, BakeScene};
     let field = |f: fn(&rusty_asset::Vertex) -> glam::Vec3| mesh.vertices.iter().map(f).collect();

@@ -1,11 +1,6 @@
-//! The walking areas under A\*'s eight grid steps, and the union-find both the
-//! full build and the carry (`carry`) join them with.
-
 use super::super::super::{NavigationGraph, SpanRef};
 
 impl NavigationGraph {
-    /// Each span's walking area under A\*'s steps (see the module doc), numbered in
-    /// scan order, and how many there are.
     pub(super) fn step_areas(&self) -> (Vec<u32>, usize) {
         let mut roots = Roots::new(self.spans.len());
         let node = |s: SpanRef| s.index;
@@ -27,8 +22,6 @@ impl NavigationGraph {
         (area, count)
     }
 
-    /// Join `here` with the spans its four cardinal steps reach, `node` naming each
-    /// span's union-find node.
     pub(super) fn join_cardinals(
         &self,
         here: SpanRef,
@@ -69,9 +62,7 @@ impl NavigationGraph {
     }
 }
 
-/// A union-find, each set rooted at its lowest node. A node holds its parent
-/// plus one, 0 for a root, so a new one is a zeroed table: the carry (`carry`)
-/// makes one as long as the navmesh and touches a few hundred of its nodes.
+/// A union-find, each set rooted at its lowest node. A node holds its parent plus one, 0 for a root, so a new one is a zeroed table.
 pub(super) struct Roots(Vec<u32>);
 
 impl Roots {

@@ -1,11 +1,8 @@
-//! Tests for `NavigationGraph::reachable_spans` (#1737).
-
 use glam::Vec3;
 
 use crate::test_support::{add_box, add_floor, bake_pinned};
 use rusty_scene::Scene;
 
-/// A floor with a tall block on it: the block's top is walkable but unreachable.
 fn floor_and_block() -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
@@ -30,8 +27,6 @@ fn a_block_top_is_not_reachable_from_the_floor() {
     assert!(!reach[top.index as usize], "the block top is an island");
 }
 
-/// A sentry on the block is the only actor: its top is reached, and so is the
-/// main floor, which a script may spawn the player on.
 #[test]
 fn an_actor_start_adds_its_area_to_the_main_floor() {
     let mut scene = floor_and_block();
@@ -46,8 +41,6 @@ fn an_actor_start_adds_its_area_to_the_main_floor() {
     );
 }
 
-/// A floor over a 2 × 2 m sealed nook is not lifted by it: the floor, not the
-/// block top, is the main floor.
 #[test]
 fn a_small_pocket_below_does_not_make_the_floor_a_top() {
     let mut scene = floor_and_block();

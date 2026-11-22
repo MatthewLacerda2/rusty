@@ -1,6 +1,4 @@
-//! Texels claimed by overlap are traced strictly inside their triangle (#1687): a
-//! point on an edge sits on whatever surface meets the mesh there, so rays from a
-//! floor's border would leak through the wall it stops at.
+//! A point on a triangle's edge sits on whatever surface meets the mesh there, so overlap-claimed texels are traced strictly inside.
 
 use glam::{Vec2, Vec3};
 
@@ -8,14 +6,11 @@ use super::raster::{rasterize, world_per_uv};
 use super::tests::quad;
 use super::*;
 
-/// The lightmap edge.
 const S: u32 = 16;
 
 #[test]
 fn a_lone_needle_owns_every_texel_it_crosses_traced_inside_it_and_its_texel() {
-    // Off the row of texel centres, so every texel is claimed by overlap; the sharp
-    // end at u = 0.2. UV area ~1e-4 texels²: weights recovered by dividing by it
-    // would wander.
+    // Off the texel-centre row, so every texel is claimed by overlap. UV area ~1e-4 texels²: weights recovered by dividing by it would wander.
     let (v0, v1) = (0.6f32, 0.60001f32);
     let uv = [(0.2, v0), (15.8, v0), (15.8, v1)];
     let mesh = BakeMesh {
@@ -53,15 +48,10 @@ fn a_non_finite_uv_owns_nothing() {
     assert!(rasterize(&mesh, S).is_empty());
 }
 
-/// Texel `u` of the floor's lightmap at world `x` (and `v` at `z`): its edges at
-/// x = 0 and z = 0 cross the first column and row right of their centres, so those
-/// texels are claimed by overlap, not by a centre.
 fn texel(x: f32) -> f32 {
     0.7 + 3.6 * x
 }
 
-/// A 4 m floor at y = 0 whose border at x = 0 meets a 2 m single-sided wall facing
-/// it, the wall's back to a sun at 45° behind it, under an open sky.
 fn floor_at_wall() -> BakeScene {
     let p = |x, z| Vec3::new(x, 0.0, z);
     let mut floor = quad(
@@ -100,7 +90,6 @@ fn floor_at_wall() -> BakeScene {
 #[test]
 fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     let scene = floor_at_wall();
-    // A density that sizes the floor's map at exactly S.
     let settings = BakeSettings {
         texels_per_unit: (S as f32 - 0.5) / world_per_uv(&scene.meshes[0].surface()).unwrap(),
         samples: 64,
@@ -109,7 +98,6 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
     let map = &bake(&scene, &settings)[0];
     assert_eq!(map.size, S);
     let texels = map.texels();
-    // Mean of column `x` over the rows clear of the floor's other borders.
     let column = |x: usize| (2..12).map(|y| texels[y * S as usize + x].x).sum::<f32>() / 10.0;
     let (border, shade, sun) = (column(0), column(2), column(12));
     assert!(
@@ -128,6 +116,6 @@ fn a_floor_border_at_a_single_sided_wall_reads_its_shadow_not_the_sun_behind() {
 
 #[test]
 fn a_texel_point_stays_32_bytes() {
-    // Every covered texel of a bake holds one (#1849): 512 MiB at a full 4096² page.
+    // Every covered texel of a bake holds one: 512 MiB at a full 4096² page.
     assert_eq!(std::mem::size_of::<super::raster::TexelPoint>(), 32);
 }

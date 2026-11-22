@@ -1,18 +1,3 @@
-//! One reflection probe per room (#1584): its box fitted to the room's walls, floor
-//! and ceiling, its capture point at eye height over the room's middle.
-//!
-//! A room wider than its region is cut into a grid of tiles no larger than it, one
-//! probe each; the region narrows with the room's clutter (`enclosure.rs`, #1737).
-//! A tile's box spans its cells, grown by the grid's inset to meet the walls; its
-//! floor is the lowest under it, its ceiling the median underside over its cells
-//! (or `sky` when most of it is open), lowered to the first solid straight above
-//! the capture point. The capture point stands over the open cell nearest the
-//! tile's centroid that keeps clear of geometry, so it is never inside a wall, at
-//! [`EYE_HEIGHT`] (kept under that cell's own ceiling, and the box raised to hold
-//! it). A room most of whose tiles see the sky is open air: one probe over all of
-//! it, without box projection, at an importance under the room probes', since its
-//! box holds every room inside its footprint.
-
 use glam::{Vec2, Vec3};
 
 use super::enclosure::CAPTURE_CLEARANCE;
@@ -22,21 +7,15 @@ use super::{ReflectionPlan, MIN_REGION, OPEN_AIR_IMPORTANCE};
 use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::ReflectionProbe;
 
-/// How high over the floor a probe captures from: a standing actor's eyes.
 pub const EYE_HEIGHT: f32 = 1.6;
-/// The least room a capture point keeps under the ceiling.
 const CEILING_GAP: f32 = 0.1;
 
-/// The rooms `find_rooms` labelled, each with its cells and its clutter. The
-/// clutter never depends on the region, so a placement that re-tiles wider reads
-/// it once per room, not once per pass.
 pub struct Rooms {
     cells: Vec<Vec<usize>>,
     clutter: Vec<f32>,
 }
 
 impl Rooms {
-    /// The `count` rooms of `room` (each cell's room) on `site`.
     pub fn new(site: (&FloorGrid, &Occupancy), room: &[Option<u32>], count: u32) -> Self {
         let mut cells: Vec<Vec<usize>> = vec![Vec::new(); count as usize];
         for (i, r) in room.iter().enumerate() {
@@ -51,9 +30,6 @@ impl Rooms {
     }
 }
 
-/// The probes for `rooms`, in room order and then tile order, and whether every
-/// room is one tile (so a wider region places no fewer). `region` is the widest
-/// an empty room's probe box may be; `sky` is the height an open room's box reaches.
 pub fn plan_rooms(
     site: (&FloorGrid, &Occupancy),
     rooms: &Rooms,
@@ -85,8 +61,6 @@ pub fn plan_rooms(
     (plans, single)
 }
 
-/// `cells` cut into a grid of tiles at most `region` across, non-empty ones only,
-/// row-major.
 fn tiles(grid: &FloorGrid, cells: &[usize], region: f32) -> Vec<Vec<usize>> {
     let xz = |i: usize| (i % grid.width, i / grid.width);
     let (mut lo, mut hi) = ((usize::MAX, usize::MAX), (0, 0));
@@ -108,10 +82,6 @@ fn tiles(grid: &FloorGrid, cells: &[usize], region: f32) -> Vec<Vec<usize>> {
     out
 }
 
-/// The probe for one tile's `cells` (all open, at least one). An `open_air` probe
-/// captures from the first point near the centroid that is itself open to the sky
-/// and clear: a yard round a house has its centroid inside the house, and the
-/// nearest clear point to it, the doorway, would show the yard the room's walls.
 fn plan_tile(
     (grid, occ): (&FloorGrid, &Occupancy),
     cells: &[usize],
@@ -130,7 +100,6 @@ fn plan_tile(
         floor = floor.min(open(i).floor);
         sum += c;
     }
-    // Never past the plan: a room on the level's edge stops at it.
     let first = grid.origin - Vec2::splat(grid.cell * 0.5);
     let last = grid.centre(grid.width - 1, grid.depth - 1) + Vec2::splat(grid.cell * 0.5);
     (lo, hi) = (lo.max(first), hi.min(last));
@@ -139,8 +108,6 @@ fn plan_tile(
     by_centre.sort_by(|&a, &b| {
         (centre(a).distance_squared(centroid)).total_cmp(&centre(b).distance_squared(centroid))
     });
-    // Under the standing cell's own ceiling, not the tile's: on a stair the median
-    // can sit below the step it stands on.
     let eye = |i: usize| {
         let (own, at) = (open(i), centre(i));
         let y = (own.floor + EYE_HEIGHT).min(own.ceiling - CEILING_GAP);
@@ -154,7 +121,6 @@ fn plan_tile(
         .or_else(|| clearest(occ, &candidates))
         .expect("a tile has cells");
     let floor_plan = ceiling(cells.iter().map(|&i| open(i).ceiling), sky);
-    // The ray is good to a cell: it lowers the floor plan's ceiling only past that.
     let ray = ceiling_over(occ, position).filter(|&c| c < floor_plan - occ.cell);
     let ceiling = ray.unwrap_or(floor_plan).max(floor + EYE_HEIGHT);
     ReflectionPlan {
@@ -166,8 +132,6 @@ fn plan_tile(
     }
 }
 
-/// A tile's ceiling: the median underside over its cells, or `sky` when most of
-/// them are open to it.
 fn ceiling(undersides: impl Iterator<Item = f32>, sky: f32) -> f32 {
     let mut all: Vec<f32> = undersides.collect();
     let covered = all.iter().filter(|c| c.is_finite()).count();

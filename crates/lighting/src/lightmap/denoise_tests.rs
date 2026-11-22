@@ -1,8 +1,4 @@
-//! The bake's denoiser choice (#1884): `None` leaves the bounce raw, an `Oidn` bake
-//! with no denoiser lent (or one that fails) is the `Filter` bake to the byte, a lent
-//! denoiser's output is what the Gaussian then smooths (bad texels excepted), and a
-//! bake through one is byte-identical on one worker or many. The mocks stand in for OIDN;
-//! the real one is tested beside its binding (`dev::bake::denoise`).
+//! `None` leaves the bounce raw; an `Oidn` bake with no denoiser lent (or a failing one) equals the `Filter` bake to the byte; a lent denoiser's output is what the Gaussian smooths; any worker count is byte-identical.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -13,14 +9,10 @@ use super::bake::bake_on;
 use super::tests::{floor, settings, sun, wall};
 use super::*;
 
-/// What a mock does to each image it is handed.
 #[derive(Clone, Copy)]
 enum Mock {
-    /// Every texel set to the image's mean: a perfect flat denoise.
     Flatten,
-    /// Refuses.
     Fail,
-    /// Every texel NaN.
     Poison,
 }
 
@@ -59,8 +51,6 @@ fn with(denoiser: Denoiser, radius: u32) -> BakeSettings {
     }
 }
 
-/// A bake on `threads` workers, lent `mock` when there is one; and how many images
-/// it was handed.
 fn baked(s: &BakeSettings, mock: Option<Mock>, threads: usize) -> (Vec<Lightmap>, usize) {
     let lent = mock.map(|m| Arc::new(Lent(m, AtomicUsize::new(0))));
     let progress = match &lent {

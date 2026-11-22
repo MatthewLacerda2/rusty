@@ -1,5 +1,3 @@
-//! `NavMeshObstacle` volumes, carving bookkeeping and the avoidance hook (#456).
-
 use glam::{Mat4, Quat, Vec3};
 
 use super::*;

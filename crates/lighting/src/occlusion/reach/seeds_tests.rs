@@ -1,7 +1,3 @@
-//! What decides the sampled cells beyond the floor's own columns (#2328): the
-//! floor reaching the walls by its inset, the play height from the navmesh
-//! settings, and the scene's cameras, which seed their cells as shadow lights do.
-
 use glam::{Vec2, Vec3};
 
 use super::tests::{bake_reaching, floor, hangar, LAMP};
@@ -11,8 +7,6 @@ use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 use rusty_scene::nav_settings::NavMeshSettings;
 use rusty_scene::Scene;
 
-/// A room's floor from x 0 to 5.5 at y 0, its walkable surface stopping `inset`
-/// short of a wall face (x 5.5 plus the inset).
 fn room(inset: f32) -> FloorGrid {
     let open = FloorCell {
         floor: 0.0,
@@ -29,8 +23,6 @@ fn room(inset: f32) -> FloorGrid {
     }
 }
 
-/// Whether a camera can be at `at` over `floor`, on the grid over an 8 × 4 × 8 m
-/// box (2 m cells from x -2: edges at even metres).
 fn standable_at(scene: &Scene, floor: &FloorGrid, at: Vec3) -> bool {
     let reach = Reach::over(scene, floor);
     let cells = reach
@@ -43,7 +35,6 @@ fn standable_at(scene: &Scene, floor: &FloorGrid, at: Vec3) -> bool {
 #[test]
 fn the_strip_beside_a_wall_is_standable() {
     let scene = Scene::new();
-    // The cell from x 6 to 8: only the 0.75 m strip by a wall at x 6.25 reaches it.
     let strip = Vec3::new(7.0, 1.0, 4.0);
     assert!(standable_at(&scene, &room(0.75), strip));
     assert!(
@@ -97,10 +88,8 @@ fn the_play_height_joins_the_key() {
     assert_ne!(before.key, after.key, "a changed agent height re-bakes");
 }
 
-/// An eye high under the hangar's roof, far from the lamp, over the play height.
 const PERCH: Vec3 = Vec3::new(5.0, 8.5, 5.0);
 
-/// The hangar with a camera, switched off, at `at`.
 fn watched(at: Vec3) -> Scene {
     let mut scene = hangar(LAMP);
     let id = scene.add_entity("Overhead".into());

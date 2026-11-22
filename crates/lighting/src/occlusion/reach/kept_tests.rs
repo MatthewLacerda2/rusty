@@ -1,7 +1,3 @@
-//! A kept PVS must be seeded from the cells a re-bake would sample (#2328): a
-//! shadow-casting light moved within its cell keeps it, moved to another cell
-//! re-bakes, and a floor that changes which cells a camera can be in re-bakes.
-
 use glam::Vec3;
 
 use super::tests::{bake_reaching, floor, hangar, LAMP};

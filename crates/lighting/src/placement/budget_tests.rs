@@ -1,14 +1,9 @@
-//! Review fixes to reflection placement (#1737): a small manual probe leaves its
-//! room a probe, a corridor round a solid core is no cluttered room, and the probe
-//! ceiling holds with clutter and manual probes.
-
 use glam::Vec3;
 
 use super::test_level::{block, plan_static};
 use super::{plan_reflection_probes, ReflectionPlacement, Site};
 use rusty_scene::{ReflectionProbe, Scene};
 
-/// A closed `2r × 2r` room under a roof 4 m up.
 fn room(r: f32) -> Scene {
     let mut scene = Scene::new();
     block(&mut scene, Vec3::new(-r, -0.2, -r), Vec3::new(r, 0.0, r));
@@ -40,8 +35,6 @@ fn a_small_manual_probe_leaves_the_room_its_own() {
     );
 }
 
-/// A 3 m corridor round a 10 × 10 m solid core: the core is architecture, so the
-/// corridor is probed as an empty room is, not as a hangar of crates.
 #[test]
 fn a_corridor_round_a_solid_core_is_not_clutter() {
     let mut scene = room(8.0);
@@ -54,7 +47,6 @@ fn a_corridor_round_a_solid_core_is_not_clutter() {
     assert!((1..=4).contains(&plans.len()), "{} probes", plans.len());
 }
 
-/// A cluttered room under a tight ceiling, and manual probes already at it.
 #[test]
 fn the_probe_ceiling_holds_with_clutter_and_manual_probes() {
     let mut scene = room(6.0);

@@ -1,8 +1,4 @@
-//! A page's compressed levels (#1694): a BC6H block at mip level 2 covers 16
-//! base texels, so the atlas aligns its cells to 16 (`atlas::GRID`). On a 4-texel
-//! grid such a block held two maps, or a map and the page's empty black, and BC6H
-//! bent a dim map's light by up to 8.6%; on the 16-texel one every map, at every
-//! compressed level, reads its own light within BC6H's 5%.
+//! A BC6H block at mip level 2 covers 16 base texels, so the atlas aligns cells to 16 (`atlas::GRID`): on a 4-texel grid a block held two maps and bent a dim map's light by up to 8.6%; on 16 every map reads its own light within BC6H's 5%.
 
 use glam::Vec3;
 

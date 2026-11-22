@@ -1,6 +1,3 @@
-//! The island cap (#2087): a goal on a crate top nothing climbs costs a few
-//! thousand expansions, a goal on the floor the full cap, and no search more.
-
 mod carry;
 mod quiet;
 
@@ -13,7 +10,6 @@ use super::super::NodePool;
 use super::UNREACHABLE_SEARCH_NODES;
 use rusty_scene::Scene;
 
-/// A 40 × 40 floor at the 0.25 m default cell, and a 2 m crate no step climbs.
 fn level() -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, -1.0, 41.0, -1.0, 41.0);
@@ -49,7 +45,6 @@ fn a_goal_on_an_island_is_searched_briefly() {
 
 #[test]
 fn an_unreachable_goal_costs_at_most_the_node_cap() {
-    // 301² open spans; the goal's area is outside the mask, so A* floods them all.
     let mut g = NavigationGraph::new(0.0, 300.0, 0.0, 300.0, 1.0);
     let goal = g.span_refs().last().expect("spans");
     g.spans[goal.index as usize].area = 5;
@@ -69,9 +64,6 @@ fn an_unreachable_goal_costs_at_most_the_node_cap() {
     );
 }
 
-/// A cell only a diagonal step reaches (#2087): its two cardinal cells stand
-/// `max_step` up, it lies sunk below, its other neighbours are gone. A\* steps
-/// into it, so the island map must not call it unreachable.
 #[test]
 fn a_cell_reached_only_diagonally_is_reachable() {
     let mut g = NavigationGraph::new(0.0, 4.0, 0.0, 4.0, 1.0);

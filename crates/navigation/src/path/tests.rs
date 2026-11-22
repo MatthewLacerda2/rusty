@@ -1,12 +1,9 @@
-//! Path queries (#458) on baked primitive-box rooms.
-
 use super::super::test_support::{add_box, add_floor, bake_pinned};
 use super::super::{NavigationGraph, ALL_AREAS};
 use super::{path_length, NavPathStatus};
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// A floor over the whole grid, with a tall wall strip at x = 5 over `z0..z1`.
 fn room(wall_z: Option<(f32, f32)>, radius: f32) -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);

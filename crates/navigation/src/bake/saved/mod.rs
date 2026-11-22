@@ -1,17 +1,4 @@
-//! crates/navigation/src/bake/saved/ — a navmesh baked once and saved beside the scene
-//! (#1887, Unity's baked `NavMeshData`), so loading the scene need not bake it.
-//!
-//! [`NavigationGraph::bake_to_bytes`] bakes in full and returns the `<scene>.navmesh`
-//! bytes: the baked spans, the pre-erosion ones the incremental rebake splices
-//! (`BakeState::raw`), the generated off-mesh links, the grid, and a fingerprint of
-//! what the bake read (`fingerprint`). [`NavigationGraph::restore`] is the way back:
-//! it decodes the bytes, checks the grid and the fingerprint against the scene as it
-//! is now, and only then installs them, with the bake's input record rebuilt from the
-//! scene, so a later change rebakes only its cells. The authored links are not
-//! saved: they are re-snapped onto the restored spans, as after any bake.
-//!
-//! A refused file (unreadable, stale, another grid) changes nothing: the caller
-//! bakes in full, as with no file. Never a half-loaded navmesh.
+//! A refused file (unreadable, stale, another grid) changes nothing: the caller bakes in full. The authored links are not saved; they are re-snapped onto the restored spans.
 //!
 //! stored-format: the `<scene>.navmesh` bytes and their fingerprint
 
@@ -25,14 +12,11 @@ use super::BakeState;
 use file::{Layer, Saved, Shape};
 use rusty_scene::Scene;
 
-/// The fingerprint of what the bake that wrote `bytes` read (the bake report's
-/// input fingerprint, #1980); `None` when they do not decode.
 pub fn baked_fingerprint(bytes: &[u8]) -> Option<u64> {
     file::decode(bytes).ok().map(|saved| saved.fingerprint)
 }
 
 impl NavigationGraph {
-    /// Bake `scene` in full ([`Self::bake`]) and return the bytes that restore it.
     pub fn bake_to_bytes(&mut self, scene: &Scene) -> Vec<u8> {
         self.bake(scene);
         let st = self.bake_state.as_ref().expect("a bake keeps its state");
@@ -52,12 +36,8 @@ impl NavigationGraph {
         })
     }
 
-    /// Make this the navmesh `bytes` hold, when they decode and still match `scene`:
-    /// the same graph a full [`Self::bake`] of `scene` would give. On `Err` (why the
-    /// bytes were refused) the graph is unchanged.
     pub fn restore(&mut self, scene: &Scene, bytes: &[u8]) -> Result<(), String> {
         let saved = file::decode(bytes)?;
-        // The grid a bake of `scene` from this graph would shape.
         let (b, spacing) = self.target_shape(scene);
         let mut g = Self::new(b.min_x, b.max_x, b.min_z, b.max_z, spacing);
         if g.shape() != saved.shape {
@@ -78,7 +58,7 @@ impl NavigationGraph {
         g.bake_generation = self.bake_generation.wrapping_add(1);
         g.static_watch = self.static_watch.take();
         g.tracked_scene = self.tracked_scene.clone();
-        g.requests = std::mem::take(&mut self.requests); // the agents' waits (#2087)
+        g.requests = std::mem::take(&mut self.requests);
         let mut state = BakeState { raw, inputs, log };
         state.log.record(g.bake_generation, None);
         g.bake_state = Some(Box::new(state));

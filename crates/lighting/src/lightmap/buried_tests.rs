@@ -1,5 +1,4 @@
-//! A buried face is ordinary content (#1949's review): a wall standing on a floor
-//! bakes with no warning, though its foot's UV island has no valid texel.
+//! A wall standing on a floor bakes with no warning, though its foot's UV island has no valid texel.
 
 use glam::Vec3;
 

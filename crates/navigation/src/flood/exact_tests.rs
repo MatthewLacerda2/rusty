@@ -1,11 +1,4 @@
-//! The goal-directed flood (#2088) gives every goal the very `f32` the full
-//! Dijkstra flood does: reachable, unreachable (upstairs from the ground floor,
-//! which no link climbs) and past the bound alike, from several queriers to
-//! several targets on the Dust2-sized bench level. The level carries what the
-//! heuristic's argument rests on: off-mesh links (drops through the ceiling
-//! holes and off the crates, jumps, an authored ladder whose ends share a grid
-//! column and an authored shortcut costing less than the distance it spans), an
-//! area costlier than floor, and a mask.
+//! The goal-directed flood gives every goal the very `f32` the full Dijkstra flood does.
 
 use glam::Vec3;
 
@@ -15,13 +8,8 @@ use rusty_components::{ColliderShape, OffMeshLinkComponent};
 use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::ColliderComponent;
 
-/// The area of the mud strip across the ground floor.
 const MUD: u8 = 2;
 
-/// The bench level's `n × n` rooms on two storeys, a box collider on every
-/// block, baked at 0.25 m with drops and jumps, a strip of mud (cost 3)
-/// across the ground floor at x 32..38, and the two authored links: at
-/// `n = 10`, 100 × 100 m, about Dust2's size.
 fn level(n: usize) -> NavigationGraph {
     let mut scene = rooms(n);
     for id in scene.world.ids_with_mesh() {
@@ -70,8 +58,6 @@ fn level(n: usize) -> NavigationGraph {
     nav
 }
 
-/// A donut of `per_ring × 2` spots round `c`, on its storey, plus one on the
-/// storey above and one below.
 fn donut(c: Vec3, per_ring: usize) -> Vec<Vec3> {
     let mut points: Vec<Vec3> = (0..per_ring * 2)
         .map(|k| {
@@ -84,7 +70,6 @@ fn donut(c: Vec3, per_ring: usize) -> Vec<Vec3> {
     points
 }
 
-/// Each goal's length, as `f32` bits, from a flood.
 fn lengths(nav: &NavigationGraph, flood: &Flood<'_>, goals: &[Vec3]) -> Vec<Option<u32>> {
     let bits = |l: Option<f32>| l.map(f32::to_bits);
     goals
@@ -110,8 +95,6 @@ fn every_goal_costs_what_the_full_flood_gives_it_to_the_bit() {
     let goals = targets.map(|t| donut(t, 12));
     for from in queriers.map(at) {
         for bound in [40.0, 220.0] {
-            // The full flood does not depend on the goals: once per querier,
-            // bound and mask, against each target's goal-directed flood.
             let full = |mask| {
                 let flood = nav.flood(from, bound, mask).expect("on the navmesh");
                 goals.each_ref().map(|g| lengths(&nav, &flood, g))
@@ -129,13 +112,11 @@ fn every_goal_costs_what_the_full_flood_gives_it_to_the_bit() {
                 let (full, dry_full) = (&full[k], &dry_full[k]);
                 reached += full.iter().flatten().count();
                 unreached += full.iter().filter(|l| l.is_none()).count();
-                // Reached on another storey: only a link changes storeys.
                 across += goals
                     .iter()
                     .zip(full)
                     .filter(|(g, l)| l.is_some() && (g.y - from.y).abs() > 2.0)
                     .count();
-                // Dearer or cut off once the mud is masked: the mud was on the way.
                 muddy += full.iter().zip(dry_full).filter(|(a, b)| a != b).count();
             }
         }

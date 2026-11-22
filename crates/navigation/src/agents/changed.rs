@@ -1,11 +1,4 @@
-//! crates/navigation/src/agents/changed.rs — keep a path a rebake did not touch (#456).
-//!
-//! An incremental rebake changes a few rectangles of cells. An agent whose
-//! remaining path (from where it stands, corner to corner) crosses none of them
-//! keeps its path and is restamped to the new bake generation; one that crosses
-//! a changed rectangle re-plans as before. A partial path always re-plans: a
-//! change anywhere may have opened the way to its target. A full bake, or a change
-//! too old for the log, re-plans everyone.
+//! A partial path always re-plans: a change anywhere may have opened the way to its target.
 
 use glam::{Vec2, Vec3};
 
@@ -14,17 +7,12 @@ use rusty_components::NavPathStatus;
 use rusty_scene::NavMeshAgentComponent;
 
 impl NavigationGraph {
-    /// Restamp `agent`'s path to the current bake when no change since it was
-    /// planned touches what is left of it.
     pub(crate) fn keep_path_if_untouched(&self, agent: &mut NavMeshAgentComponent, at: Vec3) {
         if agent.path_generation != self.bake_generation && self.path_untouched(agent, at) {
             agent.path_generation = self.bake_generation;
         }
     }
 
-    /// Whether `agent`'s path, the agent standing at `at`, holds on the current
-    /// bake: planned on it, or no change since touches what is left of it. Read-only,
-    /// so `PathPending` asks it too (#2087).
     pub(crate) fn path_untouched(&self, agent: &NavMeshAgentComponent, at: Vec3) -> bool {
         if agent.path_generation == self.bake_generation {
             return true;

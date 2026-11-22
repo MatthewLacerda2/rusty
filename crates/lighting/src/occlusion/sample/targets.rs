@@ -1,45 +1,17 @@
-//! Where the occlusion bake aims its rays at an object (#1714): its extremes along
-//! the eight box diagonals (a corner peeking past a door frame), and a lattice laid
-//! on each of its triangles at most [`TARGET_SPACING`] apart, kept at one point per
-//! [`VOXEL`] cube of space, so the count follows the object's surface area, not its
-//! triangle count: a dense 1.5 m prop gets about the points a box of its size does.
-//! A gap that shows a patch of an object about [`TARGET_SPACING`] wide is seen
-//! through, however large the object is.
-//!
-//! Each point keeps the plane of its triangle's drawn side, so a cell wholly
-//! behind it skips it, and a ray from a cell point behind it is never cast: no
-//! camera there sees that side. A two-sided triangle, or a voxel whose points lie on
-//! planes that disagree (a thin prop's two faces, a curved surface), is never skipped.
-//!
-//! An object whose points would pass [`MAX_TARGETS`] (some 4000 m² of surface, a
-//! 600 m wall 3 m high), or that has a vertex that is not finite, has no targets:
-//! the bake keeps it visible from every cell. Conservative beats clever: a size the
-//! lattice could miss is never culled.
-
 use std::collections::btree_map::{BTreeMap, Entry};
 
 use glam::Vec3;
 
 use crate::occlusion::gather::Face;
 
-/// The lattice's spacing on a triangle, metres: under a doorway's width, so a
-/// doorway-sized patch always holds a point.
 pub const TARGET_SPACING: f32 = 1.0;
 
-/// The most target points one object gets; past it, it is never culled.
 pub const MAX_TARGETS: usize = 4096;
 
-/// The edge of the cubes of space that keep one target point each, metres: half
-/// the spacing, so a lattice on a wall keeps every point, and a fine mesh's corners
-/// fold into about one point per quarter square metre.
 pub const VOXEL: f32 = TARGET_SPACING / 2.0;
 
-/// How far a point is pulled toward its triangle's centre, so it lies inside it
-/// and a ray to it is not stopped by a neighbour sharing its edge.
 const INWARD: f32 = 0.01;
 
-/// One point a ray is aimed at, and the plane of its triangle's drawn side
-/// (normal and offset; `None` when both sides draw).
 #[derive(Clone, Copy, Debug)]
 pub(in crate::occlusion) struct Target {
     pub at: Vec3,
@@ -55,9 +27,6 @@ impl Target {
         }
     }
 
-    /// Fold `other`, a point in the same voxel, into this one: it keeps its plane
-    /// only when `other` lies on it and faces the same way, else it is seen from
-    /// both sides.
     fn absorb(&mut self, other: &Target) {
         let Some((n, d)) = self.front else {
             return;
@@ -71,26 +40,20 @@ impl Target {
         }
     }
 
-    /// Whether `point` is on its drawn side: a ray from behind reaches only its
-    /// undrawn back.
     pub(super) fn drawn_toward(&self, point: Vec3) -> bool {
         self.front
             .is_none_or(|(n, d)| n.dot(point) >= d - 1e-4 * n.length())
     }
 
-    /// Whether any point of the box `(min, max)` is on its drawn side.
     pub(super) fn faces(&self, (min, max): (Vec3, Vec3)) -> bool {
         let Some((n, d)) = self.front else {
             return true;
         };
         let (centre, half) = ((min + max) * 0.5, (max - min) * 0.5);
-        // The box's farthest reach along n, against the plane, with a margin.
         n.dot(centre) + n.abs().dot(half) >= d - 1e-4 * n.length()
     }
 }
 
-/// `tris`' target points, `None` when it has more than [`MAX_TARGETS`] or a corner
-/// that is not finite.
 pub(in crate::occlusion) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<Vec<Target>> {
     if !tris.iter().all(|t| t.0.iter().all(|p| p.is_finite())) {
         return None;
@@ -125,9 +88,6 @@ pub(in crate::occlusion) fn target_points(tris: &[([Vec3; 3], Face)]) -> Option<
     Some(points)
 }
 
-/// One triangle's lattice: from the corner opposite its longest edge (the widest
-/// angle, so a lattice cell's diagonal stays under twice the spacing), `n1` steps
-/// along one leg and `n2` along the other, keeping the points inside.
 struct Lattice {
     apex: Vec3,
     legs: (Vec3, Vec3),
@@ -144,8 +104,6 @@ impl Lattice {
         let legs = (b - a, c - a);
         let steps = |leg: Vec3| {
             let n = (leg.length() / TARGET_SPACING).ceil();
-            // A huge leg is clamped (its points then pass the cap anyway); `max`
-            // takes 1 over a NaN, so a step count is never 0.
             n.max(1.0).min(MAX_TARGETS as f32) as u32
         };
         Self {
@@ -155,14 +113,11 @@ impl Lattice {
         }
     }
 
-    /// Whether lattice point `(i, j)` lies on the triangle.
     fn inside(&self, i: u32, j: u32) -> bool {
         let (n1, n2) = self.steps;
-        // In integers: i/n1 + j/n2 <= 1.
         u64::from(i) * u64::from(n2) + u64::from(j) * u64::from(n1) <= u64::from(n1) * u64::from(n2)
     }
 
-    /// Hand each point to `out` while it returns true; whether it always did.
     fn points(&self, mut out: impl FnMut(Vec3) -> bool) -> bool {
         let (n1, n2) = self.steps;
         for i in 0..=n1 {
@@ -177,17 +132,13 @@ impl Lattice {
     }
 }
 
-/// The edge of the cubes of space an object's targets are grouped by, metres:
-/// one polygon that hides a chunk's box spares every ray to its targets.
 const CHUNK: f32 = 2.0;
 
-/// Some of an object's targets, near one another, and the box round them.
 pub(super) struct Chunk {
     pub bounds: (Vec3, Vec3),
     pub targets: Vec<Target>,
 }
 
-/// `points` grouped by the [`CHUNK`] cube each lies in, in the cubes' order.
 pub(super) fn chunks(points: Vec<Target>) -> Vec<Chunk> {
     let mut cubes: BTreeMap<[i32; 3], Vec<Target>> = BTreeMap::new();
     for t in points {

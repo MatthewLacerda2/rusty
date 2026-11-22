@@ -1,16 +1,10 @@
-//! The atlas packer (#438, #1694): every lightmap lands whole, inside one page, in
-//! a cell no other overlaps, with its texels where its scale/offset says and its
-//! edge extended over its cell; the smallest page that fits is chosen, up to the
-//! Max Lightmap Size; a map at the cap is its whole page, and one above half the
-//! page leaves the rest to smaller maps (#1704); and pages are filled before new
-//! ones open.
+//! Every lightmap lands whole in one page, in a cell no other overlaps, with texels where its scale/offset says and its edge extended over its cell; the smallest fitting page is chosen; a map above half the page leaves the rest to smaller maps; pages fill before new ones open.
 
 use glam::Vec3;
 
 use super::*;
 use rusty_scene::lighting::settings::MAX_PAGE;
 
-/// A `size`² lightmap for `entity`, every texel `value`.
 fn map(entity: u32, size: u32, value: f32) -> Lightmap {
     Lightmap::dense(
         entity,
@@ -21,7 +15,6 @@ fn map(entity: u32, size: u32, value: f32) -> Lightmap {
     )
 }
 
-/// A placement's cell on its page, in texels: `(page, x0, y0, x1, y1)`.
 fn cell(atlas: &LightmapAtlas, i: usize, size: u32) -> (u32, u32, u32, u32, u32) {
     let (_, page, st) = atlas.placements[i];
     let edge = atlas.page_size as f32;
@@ -49,7 +42,6 @@ fn small_bakes_share_the_smallest_page_that_fits() {
     }
 }
 
-/// Every placement's cell lies inside its page and overlaps no other.
 fn assert_apart(atlas: &LightmapAtlas, sizes: &[u32]) {
     let cells: Vec<_> = (0..sizes.len()).map(|i| cell(atlas, i, sizes[i])).collect();
     for (i, a) in cells.iter().enumerate() {
@@ -111,8 +103,7 @@ fn the_page_never_exceeds_the_max_lightmap_size() {
     }
 }
 
-/// A deterministic spread of map sizes like a game level's: 28 at the old 504
-/// cap and 400 small to mid ones.
+/// Sizes like a game level's: 28 at the old 504 cap and 400 small to mid ones.
 fn level_sizes() -> Vec<u32> {
     let mut state = 0x9e37_79b9_u32;
     let mut sizes = vec![max_map_edge(512); 28];

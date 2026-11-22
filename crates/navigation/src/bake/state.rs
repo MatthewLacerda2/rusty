@@ -1,11 +1,4 @@
-//! crates/navigation/src/bake/state.rs — what a baked graph keeps to rebake incrementally (#456).
-//!
-//! * `raw` — the **pre-erosion** spans (rasterised, headroom-filtered, carved). A
-//!   column's raw spans depend on that column alone, so a dirty rectangle's are
-//!   rebuilt and spliced in; erosion then re-reads its neighbourhood from here.
-//! * `inputs` — what the last bake read, for the per-tick diff.
-//! * `log` — which cells each recent bake generation changed, so an agent re-plans
-//!   only when its path crosses one.
+//! `raw` is the pre-erosion spans: a column's depend on that column alone, so a dirty rectangle's are rebuilt and spliced in.
 
 use std::collections::VecDeque;
 
@@ -23,7 +16,6 @@ pub struct BakeState {
     pub(super) log: ChangeLog,
 }
 
-/// Recent bake generations and the cells each changed (`None`: everything).
 #[derive(Default)]
 pub(super) struct ChangeLog(VecDeque<(u64, Option<Vec<CellRect>>)>);
 
@@ -35,8 +27,6 @@ impl ChangeLog {
         self.0.push_back((generation, changed));
     }
 
-    /// Every rectangle changed after `generation` up to now, or `None` when a full
-    /// bake happened since or the log no longer reaches back that far.
     fn since(&self, generation: u64) -> Option<Vec<CellRect>> {
         let first = self.0.front()?.0;
         if first > generation.wrapping_add(1) {
@@ -53,24 +43,18 @@ impl ChangeLog {
 }
 
 impl NavigationGraph {
-    /// Make every cached agent path stale without rebaking (#460: an area cost
-    /// changed): a new generation whose change log entry says "anything changed".
     pub(crate) fn invalidate_paths(&mut self) {
         self.bake_generation = self.bake_generation.wrapping_add(1);
-        self.islands.keep(self.bake_generation); // no span or link moved (#2111)
+        self.islands.keep(self.bake_generation);
         if let Some(st) = self.bake_state.as_mut() {
             st.log.record(self.bake_generation, None);
         }
     }
 
-    /// The cell rectangles every bake after `generation` changed, or `None` when
-    /// that is unknown (a full bake, or too long ago): then anything may have.
     pub fn changes_since(&self, generation: u64) -> Option<Vec<CellRect>> {
         self.bake_state.as_ref()?.log.since(generation)
     }
 
-    /// The settings the last bake read, `None` before any bake: what an
-    /// incremental rebake regenerated its links with (`request::carry`).
     pub(crate) fn baked_settings(&self) -> Option<&NavMeshSettings> {
         Some(&self.bake_state.as_ref()?.inputs.settings)
     }

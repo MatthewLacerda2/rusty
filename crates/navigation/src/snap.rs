@@ -1,35 +1,20 @@
-//! crates/navigation/src/snap.rs — which span a world point means (#454).
-//!
-//! A column can hold several floors, so a point's XZ no longer names one surface.
-//! The rule, used for path start and target alike, is **the nearest span below the
-//! point, favouring the floor under a character's feet**: the highest span whose
-//! floor is at most `max_step` above the point (a character mid-stair, or sunk a
-//! little into a ramp, still resolves to the surface it stands on), else the lowest
-//! span above it (a point under the whole level resolves to the bottom floor).
-//! A chest-height target therefore lands on the floor under it, never the one above.
-//!
-//! When the point's own column holds no span (a wall, a hole, the eroded edge), the
-//! search widens ring by ring up to [`SNAP_RINGS`] cells, nearest in XZ first, and
-//! applies the same height rule in the cell it finds.
+//! A point resolves to **the nearest span below it, favouring the floor under a character's feet**:
+//! the highest span whose floor is at most `max_step` above the point (mid-stair, or sunk into a
+//! ramp), else the lowest span above it. A chest-height target lands on the floor under it. With no
+//! span in the column the search widens ring by ring up to [`SNAP_RINGS`], nearest in XZ first.
 
 use glam::Vec3;
 
 use super::{NavigationGraph, SpanRef};
 
-/// How many rings of neighbouring cells a snap searches when the point's own column
-/// holds no walkable span.
 pub const SNAP_RINGS: i32 = 5;
 
 impl NavigationGraph {
-    /// The span of the point's own column the point stands on, by the height rule in
-    /// the module docs, or `None` when that column holds no span.
     pub fn span_under(&self, pos: Vec3) -> Option<SpanRef> {
         let (gx, gz) = self.world_to_grid(pos);
         self.span_in_cell(gx, gz, pos.y)
     }
 
-    /// The span a path to or from `pos` should use: [`Self::span_under`], else the
-    /// nearest cell with any span within [`SNAP_RINGS`] rings.
     pub fn snap(&self, pos: Vec3) -> Option<SpanRef> {
         let (gx, gz) = self.world_to_grid(pos);
         if let Some(s) = self.span_in_cell(gx, gz, pos.y) {
@@ -40,7 +25,7 @@ impl NavigationGraph {
             for dz in -r..=r {
                 for dx in -r..=r {
                     if dx.abs() != r && dz.abs() != r {
-                        continue; // interior of the ring: already searched
+                        continue;
                     }
                     let dist_sq = dx * dx + dz * dz;
                     if best.is_some_and(|(d, _)| d <= dist_sq) {
@@ -58,7 +43,6 @@ impl NavigationGraph {
         None
     }
 
-    /// Apply the height rule within one column.
     fn span_in_cell(&self, gx: i32, gz: i32, y: f32) -> Option<SpanRef> {
         let range = self.span_range(gx, gz);
         let spans = &self.spans[range.clone()];
@@ -79,7 +63,6 @@ mod tests {
     use super::super::NavSpan;
     use super::*;
 
-    /// One cell with floors at y = 0, 4 and 8.
     fn tower() -> NavigationGraph {
         let mut g = NavigationGraph::new(0.0, 0.0, 0.0, 0.0, 1.0);
         let floor = |y: f32, ceiling: f32| NavSpan {

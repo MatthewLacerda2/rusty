@@ -1,15 +1,9 @@
-//! The island check behind [`NavigationGraph::flood_to`] (#1892, #2088): a goal
-//! on a piece nothing walks into is dropped up front, and a one-way drop off it
-//! does not count as a way in.
-
 use glam::Vec3;
 
 use crate::test_support::{add_box, add_floor};
 use crate::{NavBounds, NavigationGraph, ALL_AREAS};
 use rusty_scene::Scene;
 
-/// A 60 × 60 m floor round the origin and a 2 m crate at x 3..5, z -1..1;
-/// `drop_height` lets the bake add drops off the crate.
 fn crate_level(drop_height: f32) -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, -30.0, 30.0, -30.0, 30.0);
@@ -25,7 +19,6 @@ fn crate_level(drop_height: f32) -> NavigationGraph {
     nav
 }
 
-/// The crate top is dropped without the flood running to its bound.
 fn assert_top_dropped_early(nav: &NavigationGraph) {
     let (from, near, top) = (
         Vec3::ZERO,

@@ -1,15 +1,9 @@
-//! The flood stepped on a budget (#2116): sliced as finely as one expansion a
-//! step, it settles every goal at the very cost the synchronous flood gives it,
-//! and a full rebake between two steps starts it over on the new navmesh (an
-//! incremental one that misses it carries it: `ai::query::carry_tests`).
-
 use glam::Vec3;
 
 use crate::test_support::{add_box, add_floor, move_to};
 use crate::{FloodSearch, NavBounds, NavigationGraph, ALL_AREAS};
 use rusty_scene::Scene;
 
-/// A 40 × 40 m floor, a wall with a doorway, and a box that can move.
 fn level() -> (Scene, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -20.0, 20.0, -20.0, 20.0);
@@ -51,7 +45,6 @@ fn goals() -> Vec<Vec3> {
     ]
 }
 
-/// Each goal's cost from the synchronous flood, as `f32` bits.
 fn synchronous(nav: &NavigationGraph, goals: &[Vec3]) -> Vec<Option<u32>> {
     let flood = nav
         .flood_to(FROM, goals, BOUND, ALL_AREAS)
@@ -62,7 +55,6 @@ fn synchronous(nav: &NavigationGraph, goals: &[Vec3]) -> Vec<Option<u32>> {
         .collect()
 }
 
-/// Step `search` `per_step` expansions at a time to its end: how many steps.
 fn run(nav: &NavigationGraph, search: &mut FloodSearch, per_step: u32) -> usize {
     let mut steps = 0;
     loop {
@@ -107,7 +99,7 @@ fn a_full_rebake_between_steps_starts_the_flood_over_on_the_new_navmesh() {
     nav.begin_flood(&mut search, FROM, &goals, BOUND, ALL_AREAS);
     let mut budget = 40;
     assert!(!nav.step_flood(&mut search, &mut budget), "unfinished");
-    move_to(&mut scene, block, Vec3::new(-4.0, 0.0, 0.0)); // in the way now
+    move_to(&mut scene, block, Vec3::new(-4.0, 0.0, 0.0));
     nav.bake(&scene);
     run(&nav, &mut search, 16);
     let got: Vec<_> = goals
@@ -125,7 +117,7 @@ fn a_full_rebake_between_steps_starts_the_flood_over_on_the_new_navmesh() {
 #[test]
 fn a_start_off_the_navmesh_finishes_at_once_reaching_nothing() {
     let mut scene = Scene::new();
-    add_floor(&mut scene, 10.0, 20.0, 10.0, 20.0); // a floor far from `FROM`
+    add_floor(&mut scene, 10.0, 20.0, 10.0, 20.0);
     let nav = bake(&scene);
     let mut search = FloodSearch::default();
     nav.begin_flood(&mut search, FROM, &goals(), BOUND, ALL_AREAS);

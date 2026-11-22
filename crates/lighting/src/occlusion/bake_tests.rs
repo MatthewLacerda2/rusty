@@ -1,6 +1,3 @@
-//! The occlusion bake (#1714): it culls behind walls, keeps what a doorway shows,
-//! and writes the same bytes at any worker count.
-
 use glam::Vec3;
 
 use crate::occlusion::test_level::{block, corridors};
@@ -14,7 +11,6 @@ fn baked(scene: &Scene, threads: usize) -> OcclusionData {
         .expect("the level has occluders")
 }
 
-/// Whether the entity named `name` nearest `near` may be seen from `from`.
 fn sees(data: &OcclusionData, scene: &Scene, from: Vec3, near: Vec3) -> bool {
     let row = data.row_at(from).expect("inside the grid");
     let ids = scene.world.ids_with_mesh().into_iter();
@@ -37,12 +33,9 @@ fn sees(data: &OcclusionData, scene: &Scene, from: Vec3, near: Vec3) -> bool {
 fn a_room_behind_a_wall_is_culled_and_one_through_a_door_is_not() {
     let scene = corridors();
     let data = baked(&scene, 4);
-    // In the first north room's corner: the far south room's props are behind two
-    // walls, the room's own props are in sight.
     let corner = Vec3::new(1.0, 1.6, 8.0);
     assert!(sees(&data, &scene, corner, Vec3::new(2.0, 0.5, 3.5)));
     assert!(!sees(&data, &scene, corner, Vec3::new(17.0, 0.5, -7.0)));
-    // Down the corridor, both crates are in sight.
     let hall = Vec3::new(1.0, 1.6, 0.0);
     assert!(sees(&data, &scene, hall, Vec3::new(14.0, 0.25, 0.4)));
     let culled =

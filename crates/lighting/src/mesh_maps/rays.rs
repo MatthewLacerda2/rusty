@@ -1,28 +1,17 @@
-//! The two ray-traced mesh maps (#1849), ambient occlusion and thickness, cast
-//! through the lightmapper's `Rays` against the model alone.
-
 use glam::{Vec3, Vec4};
 
 use super::{Baked, MeshSource};
 use crate::lightmap::{cosine_sample, Rays, Rng, TexelPoint, Tri};
 
-/// Rays per texel by default: Substance's default *Secondary Rays*
-/// (`Settings::ao_rays`, `Settings::thickness_rays`).
 pub const SAMPLES: u32 = 64;
 
-/// How far a ray looks for an occluder, as a share of the mesh's bounds diagonal:
-/// Substance's *Max Occluder Distance* relative to the bounding box.
 pub const MAX_DISTANCE: f32 = 1.0;
 
-/// The ray offset off the surface, as a share of the bounds diagonal, so a ray never
-/// hits the triangle it starts on whatever the model's scale.
 const OFFSET: f32 = 1e-4;
 
-/// A seed per map, so AO and thickness draw from different streams.
 const AO_STREAM: u64 = 1;
 const THICKNESS_STREAM: u64 = 2;
 
-/// The model's triangles, ready to trace.
 pub(super) struct MeshRays {
     rays: Rays,
 }
@@ -44,10 +33,6 @@ impl MeshRays {
         }
     }
 
-    /// Ambient occlusion of the texel at `p` (`i` its place in the bake): the share
-    /// of `Settings::ao_rays` cosine rays off the surface that meet no triangle within
-    /// [`MAX_DISTANCE`]. 1 is open, 0 enclosed; a texel whose every ray `rays_off`
-    /// dropped reads 1.
     pub(super) fn ao(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, AO_STREAM, i as u64);
@@ -57,8 +42,6 @@ impl MeshRays {
             cast += 1;
             open += u32::from(!self.rays.occluded_by(origin, dir, (0.0, reach), |_| true));
         }
-        // Every ray dropped (a normal leaning far off its face, few rays): no
-        // occlusion was seen, so the texel reads open, as the map's background.
         let open = if cast == 0 {
             1.0
         } else {
@@ -67,10 +50,6 @@ impl MeshRays {
         Vec3::splat(open).extend(1.0)
     }
 
-    /// Thickness of the texel at `p`: how far `Settings::thickness_rays` cosine rays cast into the
-    /// mesh (around the inverted normal) travel before they leave it, averaged, as a
-    /// share of [`MAX_DISTANCE`]; a ray that meets nothing counts the whole distance.
-    /// 1 is thick, towards 0 thin; a texel whose every ray was dropped reads 1.
     pub(super) fn thickness(&self, baked: &Baked, i: usize, p: &TexelPoint) -> Vec4 {
         let reach = MAX_DISTANCE * baked.diagonal;
         let mut rng = Rng::new(0, THICKNESS_STREAM, i as u64);
@@ -81,8 +60,6 @@ impl MeshRays {
             cast += 1;
             travelled += self.distance(origin, dir, reach);
         }
-        // Every ray dropped: nothing was measured, so the texel reads thick, the
-        // map's background, not 0 (as thin as a texel can read).
         let thick = if cast == 0 {
             1.0
         } else {
@@ -91,7 +68,6 @@ impl MeshRays {
         Vec3::splat(thick).extend(1.0)
     }
 
-    /// How far `origin + t * dir` goes before it meets a triangle, at most `reach`.
     fn distance(&self, origin: Vec3, dir: Vec3, reach: f32) -> f32 {
         let Some(hit) = self.rays.closest(origin, dir, 0.0, reach) else {
             return reach;
@@ -102,13 +78,6 @@ impl MeshRays {
     }
 }
 
-/// The origin and the `samples` cosine directions a texel casts, `side` 1 out of
-/// the surface, -1 into it. They are drawn around the interpolated normal, and a
-/// direction on the wrong side of the triangle's own face is dropped, so on a
-/// smooth low-poly mesh no ray starts under the face it leaves. A shading normal
-/// that points against the winding (a face wound the other way from its `vn`)
-/// would lose every ray that way, so there the rays are drawn around the face
-/// normal instead.
 fn rays_off<'r>(
     baked: &Baked,
     p: &TexelPoint,

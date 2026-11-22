@@ -1,5 +1,3 @@
-//! The single-floor surface: steps, walls, settings, determinism, what is baked.
-
 use super::super::super::test_support::{
     add_box, add_box_with, add_floor, bake_pinned, floors, ground,
 };
@@ -7,7 +5,6 @@ use super::super::super::NavigationGraph;
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// Floor at y = 0 plus a staircase rising 0.5 per step over cells x = 4..=6 at z = 2..6.
 fn stairs() -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
@@ -39,7 +36,6 @@ fn stairs_bake_one_rising_span_per_cell() {
 
 #[test]
 fn no_geometry_no_navmesh() {
-    // #666's invariant: no implicit ground past the colliders, none in an empty scene.
     let g = NavigationGraph::from_scene(&Scene::new());
     assert!(g.spans.is_empty());
     let mut scene = Scene::new();

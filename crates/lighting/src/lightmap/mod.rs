@@ -1,44 +1,6 @@
-//! crates/lighting/src/lightmap/ — baked lightmaps for static geometry (#438).
+//! Baked lightmaps for static meshes with a second UV: a CPU path tracer bakes bounce, sky, emission and `Baked` lights' direct light per texel; dynamic objects keep the light probes. `rays` and `raster` are shared with `lighting::mesh_maps`.
 //!
-//! Static meshes with a second UV map (glTF `TEXCOORD_1`) get a per-texel lightmap:
-//! bounce light, sky, emissive surfaces and the direct light of `Baked` lights, from
-//! a CPU path tracer. Dynamic objects keep the light probes, so the two stay one
-//! lighting. The pieces:
-//!
-//! * `input` — the static scene flattened for the bake ([`BakeScene::gather`]);
-//! * `lights` — the lights it bakes, each one's [`LightShape`], in `lights::area`
-//!   how an Area light's rectangle is sampled and falls off (#1674), and in
-//!   `lights::channels` which shadowmask channel each `Mixed` light gets (#1695);
-//! * `rays` / `raster` / `trace` — ray queries (parry's `TriMesh`), texel → surface
-//!   point, and the per-texel estimate (the units it stores are explained in `trace`).
-//!   `rays` and `raster` are shared with the mesh-map baker (`lighting::mesh_maps`,
-//!   #1849), which walks a model's UV0 the same way;
-//! * `filter` — the edge-aware Gaussian that smooths the baked bounce, and
-//!   `bake::denoise` the choice between it, OIDN and nothing (#1884), with the
-//!   [`LightmapDenoiser`] seam the platform lends OIDN through;
-//! * `bake` — the parallel, seeded driver ([`bake`]), watched and stopped through
-//!   `progress` ([`BakeProgress`], #808); its `pool` is the one work pool every
-//!   mesh's texels share, in fixed-size batches (#1656), and the mesh-map baker
-//!   runs its texels on too (`run_pool`, #1849); its `progressive` bake
-//!   ([`bake_progressive`], #1970) runs the trace in passes over every texel, each
-//!   pass shown, the camera's texels first (`view`, [`BakeView`]), to the same bytes;
-//! * `atlas` — packing the lightmaps into equal-size pages ([`pack`]), each map in
-//!   a cell its BC blocks and first [`MIP_LEVELS`](rusty_scene::lighting::page::MIP_LEVELS) mips never leave (#1694);
-//! * `pages` — a packed page as BC6H irradiance (#1694) with the RGBM PNG beside
-//!   it as the fallback, and a direction page's RGBA8 levels (never
-//!   block-compressed, #1996). How a page is stored and read back (RGBM, the RGBA8
-//!   direction page of a directional bake, #810, and the RGBA8 shadowmask page of a
-//!   `Shadowmask` bake, #1695, and every page's mip chain) is the scene's
-//!   (`rusty_scene::lighting::page`), so the renderer's loader reads it there;
-//! * the scene's pages and each entity's place in them are the scene's
-//!   (`rusty_scene::lighting::lightmap_set`), and so are the bake's knobs
-//!   (`rusty_scene::lighting::settings::BakeSettings`), which it stores;
-//! * `probe_direct` — the direct light of `Baked` lights at light probes, which the
-//!   probe bake adds analytically ([`baked_direct_sh`], #809), and the probes'
-//!   shadowmask occlusion ([`mixed_occlusion`], #1695).
-//!
-//! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG,
-//! and the result never depends on how many threads ran it.
+//! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG, any thread count.
 
 mod atlas;
 mod bake;

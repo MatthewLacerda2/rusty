@@ -1,5 +1,4 @@
-//! The lightmap bake, continued (#438): the sky level, meshes without a lightmap UV,
-//! texel density, and gathering a live [`Scene`]'s static geometry and lights.
+//! The sky level, meshes without a lightmap UV, texel density, and gathering a live scene's static geometry and lights.
 
 use glam::{Vec2, Vec3};
 
@@ -20,7 +19,7 @@ fn an_open_floor_bakes_to_the_sky_gradient() {
         samples: 256,
         ..settings()
     };
-    // The forward shader's flat ambient facing up: the full colour (#1647).
+    // The forward shader's flat ambient facing up: the full colour.
     let value = mean(&bake(&scene, &s), 1);
     assert!((value - 1.0).abs() < 0.03, "{value}");
 }
@@ -96,8 +95,6 @@ fn gather_takes_static_meshes_and_baked_in_lights_only() {
     );
 }
 
-/// The gather carries each static mesh's *Cast Shadows* (#1571) to the bake, which
-/// decides who sees and who blocks (`casting_tests`); every opaque run occludes.
 #[test]
 fn the_gather_carries_each_mesh_cast_shadows() {
     let mut scene = Scene::new();

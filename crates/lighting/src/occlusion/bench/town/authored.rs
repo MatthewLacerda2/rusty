@@ -1,18 +1,11 @@
-//! A town's meshes made as an imported level's are (#1981): one mesh of many
-//! boxes, each face tessellated at most `STEP` apart with a quad's two
-//! triangles never next to each other (so the bake's `Polygon::merge` pairs
-//! none, as with a mesh an exporter reordered), and bumpy ground.
-
 use glam::Vec3;
 
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_scene::create::{create_drawn_entity, Primitive};
 use rusty_scene::Scene;
 
-/// The tessellation's spacing, metres.
 const STEP: f32 = 1.0;
 
-/// A static mesh of `boxes` (world space), tessellated.
 pub fn mesh(scene: &mut Scene, name: &str, boxes: &[(Vec3, Vec3)]) -> u32 {
     let mut quads = Vec::new();
     for &(lo, hi) in boxes {
@@ -25,7 +18,6 @@ pub fn mesh(scene: &mut Scene, name: &str, boxes: &[(Vec3, Vec3)]) -> u32 {
     entity(scene, name, &quads)
 }
 
-/// The ground over the slab `(lo, hi)`: its top, a bumpy grid of `STEP`.
 pub fn ground(scene: &mut Scene, lo: Vec3, hi: Vec3) -> u32 {
     let n = ((hi.x - lo.x) / STEP).ceil() as usize;
     let m = ((hi.z - lo.z) / STEP).ceil() as usize;
@@ -43,8 +35,6 @@ pub fn ground(scene: &mut Scene, lo: Vec3, hi: Vec3) -> u32 {
     entity(scene, "Ground", &quads)
 }
 
-/// One side of the box `(lo, hi)`, normal along `axis` by `sign`, as quads of
-/// at most `STEP` wound outward.
 fn face(lo: Vec3, hi: Vec3, axis: usize, sign: f32) -> Vec<[Vec3; 4]> {
     let (u, v) = ((axis + 1) % 3, (axis + 2) % 3);
     let (u, v) = if sign > 0.0 { (u, v) } else { (v, u) };
@@ -70,8 +60,6 @@ fn cuts(lo: f32, hi: f32) -> usize {
     ((hi - lo) / STEP).ceil().max(1.0) as usize
 }
 
-/// A static entity at the origin whose mesh is `quads`: every quad's first
-/// triangle, then every quad's second.
 pub fn entity(scene: &mut Scene, name: &str, quads: &[[Vec3; 4]]) -> u32 {
     let mut vertices = Vec::with_capacity(quads.len() * 4);
     for q in quads {

@@ -1,6 +1,3 @@
-//! The path queue (#2087): a sliced search finds the synchronous path, a waiting
-//! agent follows its old one; `lifecycle` covers rebakes and determinism.
-
 mod anchored;
 mod lifecycle;
 mod links;
@@ -16,12 +13,10 @@ use rusty_scene::{NavMeshAgentComponent, Scene};
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// A 30 × 30 floor with a block in the middle, so paths bend around it.
 pub(super) fn level() -> NavigationGraph {
     NavigationGraph::from_scene(&level_scene(30.0))
 }
 
-/// [`level`]'s scene, its floor `width` long in x.
 pub(super) fn level_scene(width: f32) -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, -1.0, width + 1.0, -1.0, 31.0);
@@ -55,7 +50,6 @@ pub(super) fn agent(scene: &Scene, id: u32) -> NavMeshAgentComponent {
     scene.world.nav_agent(id).expect("agent").clone()
 }
 
-/// The path a synchronous plan from `from` toward `target` gives, start dropped.
 pub(super) fn sync_path(g: &NavigationGraph, from: Vec3, target: Vec3) -> Vec<Vec3> {
     let goal = g
         .sample_position(target, TARGET_SAMPLE_DISTANCE)

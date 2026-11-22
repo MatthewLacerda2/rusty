@@ -1,27 +1,5 @@
-//! crates/navigation/src/bake/heightfield.rs — solid spans → the compact walkable spans (#454).
-//!
-//! Recast's heightfield and compact-heightfield steps, with its low-height filter:
-//!
-//! 1. **Merge.** Each column's solids are sorted bottom-up and merged where they
-//!    overlap or touch, so a crate resting on a floor is one solid. The merged top
-//!    keeps the walkable flag of whichever solid reaches it; solids whose tops lie
-//!    within `max_step` of each other OR their flags (Recast's flag-merge threshold,
-//!    so a low unwalkable lip doesn't spoil the floor it sits in).
-//! 2. **Open space.** A walkable top becomes a span whose ceiling is the bottom of
-//!    the next solid up (`∞` with none).
-//! 3. **Headroom (#278).** A span with less than `agent_height` of open space is
-//!    dropped: nobody crawls under a low overhang.
-//!
-//! The merged top carries the area of the walkable solid that gives it its flag.
-//! **Past Recast:** when the solid that reaches the merged top carries a
-//! `NavMeshModifier`'s override (#1959), its flag and area decide alone and the
-//! flag merge is skipped. A sofa overridden to `NotWalkable` whose seat sits within
-//! `max_step` of the floor (a 0.45 m seat at a 0.5 `max_step`) would get the floor's
-//! walkable flag from Recast's merge; the developer placed the override to say the
-//! seat is not floor.
-//!
-//! Sorting uses a total order on `(cell, min, max, walkable, area, overridden)`, so the result is a
-//! pure function of the geometry, whatever order the colliders were visited in.
+//! Solids whose tops lie within `max_step` of each other OR their walkable flags (Recast's flag-merge threshold).
+//! Past Recast: when the solid reaching the merged top carries a `NavMeshModifier` override, its flag and area decide alone, else a sofa overridden to `NotWalkable` whose seat is within `max_step` of the floor would inherit the floor's walkable flag.
 
 use super::super::{NavSpan, NavigationGraph};
 use super::columns::Columns;
@@ -29,12 +7,9 @@ use super::plane::{top_plane, Plane, TOP_EPS};
 use super::raster::Solid;
 use super::region::CellRect;
 
-/// Solids closer than this vertically are touching, and merge.
 const TOUCH_EPS: f32 = 1e-3;
 
 impl NavigationGraph {
-    /// The walkable open space above `solids` for the cells of `region`, as
-    /// row-major columns of that rectangle. Every solid must lie in `region`.
     pub(super) fn build_columns(&self, mut solids: Vec<Solid>, region: CellRect) -> Columns {
         solids.sort_by(|a, b| {
             a.cell
@@ -63,7 +38,6 @@ impl NavigationGraph {
     }
 }
 
-/// The walkable spans above a merged column that clear `agent_height`.
 fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSpan> + '_ {
     column.iter().enumerate().filter_map(move |(i, s)| {
         let ceiling = column.get(i + 1).map_or(f32::INFINITY, |above| above.min);
@@ -76,7 +50,6 @@ fn open_spans(column: &[Solid], agent_height: f32) -> impl Iterator<Item = NavSp
     })
 }
 
-/// Merge one column's sorted solids into `out` (cleared first).
 fn merge_column(solids: &[Solid], flag_merge: f32, out: &mut Vec<Solid>) {
     out.clear();
     for &s in solids {
@@ -106,8 +79,6 @@ fn merge_column(solids: &[Solid], flag_merge: f32, out: &mut Vec<Solid>) {
     }
 }
 
-/// Whether `s` is an overridden solid reaching the merged `top`: then the flag
-/// merge is skipped and its own flag and area decide.
 fn authors(s: &Solid, top: f32) -> bool {
     s.overridden && s.max >= top - TOP_EPS
 }
@@ -125,8 +96,6 @@ fn merged_area((a, a_walks): (&Solid, bool), (b, b_walks): (&Solid, bool)) -> u8
     }
 }
 
-/// The lower of two merging tops when it is walkable and clearly below the other:
-/// the floor the higher one's plane may not dig under (`-∞` otherwise).
 fn lower_floor(a: &Solid, b: &Solid) -> f32 {
     let (low, high) = if a.max <= b.max { (a, b) } else { (b, a) };
     if low.walkable && low.plane.is_some() && low.max < high.max - TOP_EPS {

@@ -1,6 +1,4 @@
-//! The bake's work pool (#1656): results come back in chart and item order whatever
-//! the thread count, every chart is finished once with all its items, and a cancel
-//! stops it; a whole bake is byte-identical on one worker or many.
+//! Results come back in chart and item order whatever the thread count, every chart is finished once with all its items, a cancel stops the pool, and a whole bake is byte-identical on one worker or many.
 
 use glam::Vec3;
 
@@ -10,7 +8,6 @@ use super::raster::{lightmap_size, rasterize};
 use super::tests::{floor, quad, settings, sun, wall};
 use super::*;
 
-/// Charts of awkward sizes: empty, one item, a batch exactly, a batch and one more.
 fn charts() -> Vec<Vec<usize>> {
     [0, 1, BATCH, BATCH + 1, 3 * BATCH + 7, 5]
         .iter()

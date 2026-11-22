@@ -1,13 +1,8 @@
-//! `NavMeshModifierVolume`s (#460): a volume assigns its area to the floor inside
-//! it, `NotWalkable` removes it, overlaps resolve by Unity's rule, and every edit to
-//! a volume rebakes incrementally to exactly what a full bake gives.
-
 use super::super::super::test_support::{add_floor, add_modifier, assert_same_mesh, move_to};
 use super::super::super::{NavBounds, NavigationGraph, Rebake, NOT_WALKABLE_AREA};
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// A 20 × 10 floor on a pinned unit grid, no erosion.
 fn field() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;

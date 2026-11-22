@@ -1,13 +1,10 @@
-//! Directional lightmaps (#810): each texel records where its light comes from, the
-//! filter smooths it without letting it grow past a unit vector, turning it off leaves
-//! the colour lightmaps untouched, and the atlas packs it exactly like the colour.
+//! Each texel records where its light comes from; the filter smooths it without letting it grow past a unit vector; off leaves the colour lightmaps untouched; the atlas packs it like the colour.
 
 use glam::{Vec3, Vec4};
 
 use super::tests::{floor, settings, sun, wall};
 use super::*;
 
-/// The mean direction texel of `entity`'s lightmap.
 fn mean_dir(maps: &[Lightmap], entity: u32) -> Vec3 {
     let map = maps.iter().find(|m| m.entity == entity).expect("baked");
     let sum: Vec3 = map.directions().iter().map(|d| d.truncate()).sum();

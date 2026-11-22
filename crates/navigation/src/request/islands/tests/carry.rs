@@ -1,7 +1,3 @@
-//! The island map across a rebake (#2111): carried, never rebuilt, under a moving
-//! carving obstacle and an area-cost change, and never capping a goal a fresh map
-//! would not.
-
 use glam::Vec3;
 
 use super::super::super::super::astar::MAX_SEARCH_NODES;
@@ -11,9 +7,6 @@ use super::super::UNREACHABLE_SEARCH_NODES;
 use rusty_scene::nav_settings::default_areas;
 use rusty_scene::Scene;
 
-/// A 20 × 10 floor split by a wall at x = 10 with a doorway over z 3..8, a crate
-/// no step climbs, a ledge the drop links leave, and a door-sized carving
-/// obstacle standing at `door`.
 pub(super) fn level(door: Vec3) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
@@ -79,8 +72,6 @@ fn a_moving_obstacle_and_a_cost_change_never_rebuild_the_map() {
     assert_eq!(g.islands.builds.get(), 1, "built once, then carried");
 }
 
-/// After every rebake of an obstacle walking through the doorway and back, the
-/// carried map caps no goal a fresh one would reach: it may merge more, never less.
 #[test]
 fn a_carried_map_caps_no_goal_a_fresh_one_reaches() {
     let (mut scene, id) = level(OPEN);
@@ -104,7 +95,6 @@ fn a_carried_map_caps_no_goal_a_fresh_one_reaches() {
     }
 }
 
-/// From each span, the spans the cached map says it may reach.
 fn reach_sets(g: &NavigationGraph) -> Vec<Vec<SpanRef>> {
     let all: Vec<SpanRef> = g.span_refs().collect();
     let reach = |&start: &SpanRef| {

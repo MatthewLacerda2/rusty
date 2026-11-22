@@ -1,5 +1,3 @@
-//! Which links the bake generates, and where.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_floor};
@@ -81,8 +79,6 @@ fn walls_and_trimmed_floor_make_no_links() {
     scene.nav_settings.jump_height = 1.0;
     scene.nav_settings.drop_height = 4.0;
     add_floor(&mut scene, -1.0, 21.0, -1.0, 21.0);
-    // A 3 m wall ending mid-floor, and a tall pillar: the floor erodes around
-    // both, but it carries on, so nothing is a gap or a ledge to jump.
     add_box(
         &mut scene,
         Vec3::new(5.0, 0.0, 0.0),

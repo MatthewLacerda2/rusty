@@ -1,6 +1,3 @@
-//! An agent on a link (#462): it stops at the ladder's foot, waits for its script
-//! while auto-traverse is off, and walks on once the link is completed.
-
 use glam::Vec3;
 
 use super::*;
@@ -10,7 +7,6 @@ use rusty_components::NavMeshAgentComponent;
 const DT: f32 = 1.0 / 60.0;
 const DECK: Vec3 = Vec3::new(16.0, 4.0, 5.0);
 
-/// The ladder level with an agent on the ground heading for the deck.
 fn climber(auto: bool) -> (Scene, NavigationGraph, u32) {
     let (mut scene, _) = ladder();
     let g = baked(&scene);

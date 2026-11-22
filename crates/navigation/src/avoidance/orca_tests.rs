@@ -1,7 +1,3 @@
-//! Exact-value tests for the ORCA half-plane (`orca_line`), one per branch, plus
-//! the grid-cell and range boundaries. Expected values are the RVO2 formulas
-//! worked by hand (float64) on asymmetric inputs, so no x/y term can cancel out.
-
 use glam::Vec2;
 
 use super::*;

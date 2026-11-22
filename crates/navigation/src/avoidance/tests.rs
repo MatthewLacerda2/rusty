@@ -1,6 +1,3 @@
-//! Solver-level ORCA tests: signed velocities, not only distances, so the
-//! mutation run can tell a flipped sign from a working dodge.
-
 use glam::Vec2;
 
 use super::lp::{lp2, lp3, Line};

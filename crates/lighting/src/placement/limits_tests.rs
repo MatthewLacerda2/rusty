@@ -1,7 +1,3 @@
-//! What bounds reflection-probe placement (#1584): the region floor, the probe
-//! ceiling and the floor plan's cell cap; triggers are not walls; a capture point
-//! on a stair stands over its own step.
-
 use glam::{Vec2, Vec3};
 
 use super::occupancy::{Occupancy, Solid, CELL};
@@ -20,7 +16,6 @@ fn placed(scene: &Scene, region: f32, max_probes: usize) -> usize {
     plan_static(scene, &params).len()
 }
 
-/// A 20 × 20 m floor under a roof 4 m up.
 fn floor() -> Scene {
     let mut scene = Scene::new();
     block(
@@ -41,7 +36,6 @@ fn a_region_under_the_minimum_places_as_the_minimum_does() {
 
 #[test]
 fn the_probe_ceiling_widens_the_tiles() {
-    // The Dust2-sized grid: 400 probes at 12 m, under the default ceiling.
     let scene = grid_of_rooms(10, 20.0);
     assert_eq!(placed(&scene, 12.0, 512), 400);
     let capped = placed(&scene, 12.0, 150);
@@ -83,8 +77,6 @@ fn a_trigger_is_not_a_wall() {
 
 #[test]
 fn a_capture_point_on_a_stair_stands_over_its_own_step() {
-    // 9 × 3 cells of 1 m: low-ceilinged floor either side of a step 3 m up, open
-    // above. The tile's median ceiling (2 m) is under the step it stands on.
     let cells = (0..27)
         .map(|i| match i % 9 {
             4 => FloorCell {

@@ -1,10 +1,3 @@
-//! The bake samples only the cells a camera can be in (#2328): a hangar (a floor
-//! slab, a wall across it, a high roof, a ceiling lamp) keeps exactly the bits a
-//! full bake gives over its floor, its air under the roof sees everything and is
-//! never sampled, the lamp's cell is sampled, and a level with no floor, or a
-//! floor that marks no cell of its grid, samples every cell, as before. The floor
-//! stands in for a navmesh's: the hangar's floor plan from its colliders.
-
 use std::sync::{Arc, Mutex};
 
 use glam::Vec3;
@@ -18,12 +11,9 @@ use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::lighting::occlusion::{encode, FloorSource, OcclusionData};
 use rusty_scene::Scene;
 
-/// Where the lamp hangs, under the roof in a corner.
 pub(super) const LAMP: Vec3 = Vec3::new(-7.0, 8.5, -7.0);
-/// An eye in the air over the floor, above the play height, far from the lamp.
 const AIR: Vec3 = Vec3::new(5.0, 6.8, 5.0);
 
-/// The hangar, its lamp at `lamp`.
 pub(super) fn hangar(lamp: Vec3) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -61,12 +51,10 @@ pub(super) fn hangar(lamp: Vec3) -> Scene {
     scene
 }
 
-/// `scene`'s floor, as a navmesh hands it over: its floor plan from the colliders.
 pub(super) fn floor(scene: &Scene) -> FloorGrid {
     FloorGrid::from_static(scene, 0.5).expect("a floor")
 }
 
-/// The cells a bake started.
 #[derive(Default)]
 struct Started(Mutex<Vec<usize>>);
 
@@ -78,7 +66,6 @@ impl OcclusionObserver for Started {
     fn cell_finished(&self, _: usize) {}
 }
 
-/// `scene` baked over `reach`, and the cells it sampled.
 pub(super) fn bake_reaching(scene: &Scene, reach: Reach) -> (OcclusionData, Vec<usize>) {
     let started = Arc::new(Started::default());
     let progress = OcclusionProgress::observed(started.clone());
@@ -88,7 +75,6 @@ pub(super) fn bake_reaching(scene: &Scene, reach: Reach) -> (OcclusionData, Vec<
     (data.expect("occluders"), cells)
 }
 
-/// Every object's bit in the row at `eye`.
 fn bits(data: &OcclusionData, eye: Vec3) -> Vec<bool> {
     let row = data.row_at(eye).expect("in the grid");
     (0..data.objects.len() as u32)

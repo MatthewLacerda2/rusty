@@ -1,10 +1,6 @@
-//! Filling the texels no triangle owns (#1694): [`dilate`] the rings around a
-//! chart, [`fill_rest`] the rest of the map from its nearest chart.
-
 use super::Texel;
 
-/// Fill each empty texel bordering filled ones with their average, `passes` rings
-/// deep, so bilinear filtering at a chart's edge reads lit texels, not black.
+/// So bilinear filtering at a chart's edge reads lit texels, not black.
 pub(in crate::lightmap) fn dilate<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],
@@ -42,10 +38,7 @@ pub(in crate::lightmap) fn dilate<T: Texel>(
     }
 }
 
-/// Fill every texel still empty with the value of its nearest filled texel (in
-/// four-neighbour steps, ties to the texel found first in row-major order), so a
-/// mip level that averages a chart's border with the map's empty background reads
-/// the chart's light, not black (#1694). A map with no filled texel stays as it is.
+/// Nearest in four-neighbour steps, ties to the first in row-major order, so a mip averaging a chart's border with the empty background reads the chart's light, not black. A map with no filled texel stays as it is.
 pub(in crate::lightmap) fn fill_rest<T: Texel>(texels: &mut [T], filled: &[bool], size: u32) {
     let size = size as usize;
     let mut done = filled.to_vec();

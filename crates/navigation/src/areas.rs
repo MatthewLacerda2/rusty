@@ -1,25 +1,8 @@
-//! crates/navigation/src/areas.rs — navigation areas and their costs (#460).
-//!
-//! The table's data (rows, built-in ids, limits) is scene data in
-//! `scene::nav_settings`; this module is what the search does with it.
-//!
-//! Unity's NavMesh areas: every walkable span (and every off-mesh link) carries an
-//! **area id**, `0..MAX_AREAS`. The per-scene area table (`NavMeshSettings::areas`)
-//! names each area and gives it a **cost multiplier**: A\* charges a step
-//! `distance × cost`, so an agent prefers a cheap route and crosses an expensive
-//! one only when no cheaper way exists. An agent's **area mask** (bit `i` = area
-//! `i`) says which areas it may enter at all.
-//!
-//! * `Walkable` (0) is every span's area unless a `NavMeshModifier` on its object
-//!   (#1959) or a `NavMeshModifierVolume` around it says otherwise (the volume wins);
-//!   `NotWalkable` (1) removes the spans a volume covers, and leaves an object's tops
-//!   unwalkable while it still blocks what is under it.
-//! * Costs are clamped to at least 1, so the octile heuristic (one unit per cell)
-//!   stays admissible and A\* stays optimal.
-//! * Areas are assigned at bake time, but a cost is read at search time: changing a
-//!   cost needs no rebake. The graph keeps a copy of the cost table
-//!   ([`NavigationGraph::area_costs`]) that `sync` refreshes every tick, and a change
-//!   invalidates every cached agent path so agents re-plan on the next tick.
+//! Unity's NavMesh areas: A\* charges a step `distance × cost`; an agent's area mask (bit `i` =
+//! area `i`) says which areas it may enter. A `NavMeshModifierVolume` wins over an object's
+//! `NavMeshModifier`; `NotWalkable` removes the spans a volume covers and leaves an object's tops
+//! unwalkable while it still blocks what is under it. Costs are clamped to at least 1 so the octile
+//! heuristic stays admissible. A cost is read at search time: no rebake, but cached paths are invalidated.
 
 pub use rusty_scene::nav_settings::{
     area_index, clamp_cost, default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,
@@ -28,14 +11,11 @@ pub use rusty_scene::nav_settings::{
 
 use super::NavigationGraph;
 
-/// An authored area id as the bake reads it: one past the table's limit (a
-/// hand-edited scene file) is clamped to the last id, so it never indexes past it.
 pub(super) fn clamp_area(area: u8) -> u8 {
     area.min((MAX_AREAS - 1) as u8)
 }
 
-/// The cost of every area id, from a table: rows past the table (and a non-finite
-/// cost) read as [`MIN_AREA_COST`].
+/// Rows past the table (and a non-finite cost) read as [`MIN_AREA_COST`].
 pub fn cost_table(areas: &[NavArea]) -> [f32; MAX_AREAS] {
     let mut costs = [MIN_AREA_COST; MAX_AREAS];
     for (c, a) in costs.iter_mut().zip(areas) {
@@ -44,13 +24,11 @@ pub fn cost_table(areas: &[NavArea]) -> [f32; MAX_AREAS] {
     costs
 }
 
-/// Whether `mask` lets an agent into `area`.
 pub fn in_mask(mask: u32, area: u8) -> bool {
     (area as usize) < MAX_AREAS && mask & (1 << area) != 0
 }
 
 impl NavigationGraph {
-    /// The cost multiplier of `area`.
     pub fn area_cost(&self, area: u8) -> f32 {
         self.area_costs
             .get(area as usize)
@@ -58,9 +36,6 @@ impl NavigationGraph {
             .unwrap_or(MIN_AREA_COST)
     }
 
-    /// Adopt the cost table of `areas`. A change takes effect on the next search and
-    /// invalidates every cached agent path (agents re-plan on their next tick); no
-    /// span is rebaked. Returns whether any cost changed.
     pub fn set_area_costs(&mut self, areas: &[NavArea]) -> bool {
         let costs = cost_table(areas);
         if costs == self.area_costs {

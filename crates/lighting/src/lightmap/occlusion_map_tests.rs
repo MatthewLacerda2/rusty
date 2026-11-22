@@ -1,6 +1,4 @@
-//! A material's occlusion map darkens what its surface bounces (#2299): moving a
-//! recess's shade out of the albedo into the occlusion map, as `Material.md`
-//! advises, bakes the same bounce, and a material without one bakes as before.
+//! Moving a recess's shade from the albedo into the occlusion map bakes the same bounce; a material without one bakes as before.
 
 use glam::Vec3;
 
@@ -36,7 +34,6 @@ fn material(albedo: &str, occlusion: Option<&str>, strength: f32) -> MaterialAss
     }
 }
 
-/// The albedo the bake gathers for a panel of `m`.
 fn gathered(m: MaterialAsset) -> Vec3 {
     let mut scene = Scene::new();
     scene.materials.insert("m".to_string(), m);
@@ -64,9 +61,7 @@ fn the_occlusion_map_scales_the_albedo_by_its_strength() {
     assert!(close(over, 0.4), "a strength past 1 is held at 1: {over}");
 }
 
-/// A closed 4 × 3 × 4 m room whose floor wears `floor` and whose white walls and
-/// ceiling are lit only by what bounces from a Mixed lamp low over the floor
-/// (a Mixed light's direct part is not baked). The ceiling's mean lightmap value.
+/// Lit only by the bounce from a Mixed lamp (its direct part is not baked); returns the ceiling's mean lightmap value.
 fn ceiling(floor: MaterialAsset) -> f32 {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;

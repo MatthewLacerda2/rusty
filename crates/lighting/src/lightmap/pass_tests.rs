@@ -1,5 +1,4 @@
-//! What a progressive bake shows between passes (#1970): the whole scene every
-//! pass, converging on the finished bake.
+//! A progressive bake shows the whole scene every pass, converging on the finished bake.
 
 use super::bake::progressive::progressive_on;
 use super::progressive_tests::lit;
@@ -53,7 +52,6 @@ fn every_pass_shows_the_whole_scene_converging() {
     );
 }
 
-/// A sink that never wants a step's lightmaps, counting how often it is asked.
 struct Busy(std::cell::Cell<u32>);
 
 impl PassSink for Busy {

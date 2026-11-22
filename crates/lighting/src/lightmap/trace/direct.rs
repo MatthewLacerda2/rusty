@@ -1,7 +1,3 @@
-//! Direct light at a point: one importance-picked source per path vertex for
-//! the bounce ([`Tracer::next_event`], #1883), and the lamp and shadow-ray parts
-//! a receiving texel's own direct light (`own`) shares with it.
-
 use std::f32::consts::PI;
 
 use glam::{Vec2, Vec3};
@@ -13,20 +9,9 @@ use super::{Tracer, T_MIN};
 use rusty_components::{falloff, spot_cone};
 use rusty_core::color::luminance;
 
-/// Where a vertex's light came from, and the luminance-weighted direction: the
-/// shape `direct` and `next_event` both return.
 pub(super) type Lit = (Vec3, Vec3);
 
 impl Tracer<'_> {
-    /// One sample of the light reaching a path vertex at `point` facing `normal`
-    /// (next-event estimation, #1883): one source picked from the lamps in range
-    /// (when `lamps`) and the emitters near it (when `emitters`), with probability
-    /// `p` proportional to its weight (`sources::lamp_weight`, `Emitter::weight`),
-    /// one point on it, and its light over `p`. Unbiased, and its cost grows with
-    /// the sources in range, not the level's. An emitter's light is weighed
-    /// against the path's next bounce ray, which may land on the same point, by
-    /// the balance heuristic (`Tracer::path` takes the other share), so emitters
-    /// are only asked for where that ray follows. `picks` keeps the weights.
     pub(super) fn next_event(
         &self,
         point: Vec3,
@@ -78,8 +63,6 @@ impl Tracer<'_> {
         (lit / chance, dir / chance)
     }
 
-    /// Lamp `light`'s light at `point` facing `normal` through its point at `u`,
-    /// shadowed and times `weight`, with its luminance-weighted direction.
     pub(super) fn lamp(
         &self,
         light: &BakeLight,
@@ -91,8 +74,6 @@ impl Tracer<'_> {
         self.shadowed(point, self.received(light, point, normal, u, weight))
     }
 
-    /// Lamp `light`'s light arriving at `point` facing `normal` through its point
-    /// at `u`, unshadowed and times `weight`: direction, distance and irradiance.
     pub(super) fn received(
         &self,
         light: &BakeLight,
@@ -107,19 +88,10 @@ impl Tracer<'_> {
         })
     }
 
-    /// `arrived`'s light (direction, distance, irradiance) if it is positive and
-    /// no blocker stands between `point` and it: a lamp's shadow ray, stopped by
-    /// the triangles that cast (`Tri::blocks`).
     pub(super) fn shadowed(&self, point: Vec3, arrived: Option<(Vec3, f32, Vec3)>) -> Lit {
         self.visible(point, arrived, |i| self.rays.tris[i].blocks)
     }
 
-    /// `arrived`'s light if it is positive and nothing a bounce ray could land on
-    /// stands between `point` and it (`Tri::seen`): an emitter's shadow ray. Its
-    /// light is weighed by MIS against the bounce ray that may find the same point
-    /// (`Tracer::glow`), and the balance heuristic is only unbiased when the two
-    /// see the same thing, so a Cast Shadows `Off` pane hides an emitter here as
-    /// it does from a bounce ray, and a `ShadowsOnly` proxy hides it from neither.
     pub(super) fn unhidden(&self, point: Vec3, arrived: Option<(Vec3, f32, Vec3)>) -> Lit {
         self.visible(point, arrived, |i| self.rays.tris[i].seen)
     }
@@ -141,13 +113,10 @@ impl Tracer<'_> {
     }
 }
 
-/// Whether `arrived` light is worth a shadow ray: some arrives at all.
 pub(super) fn casts(arrived: &Option<(Vec3, f32, Vec3)>) -> bool {
     arrived.is_some_and(|(_, _, lit)| lit.max_element() > 0.0)
 }
 
-/// The balance heuristic's share for the strategy whose density is `this`, beside
-/// one of density `other` (Veach): the two shares of one path always sum to 1.
 pub(super) fn balance(this: f32, other: f32) -> f32 {
     match this + other > 0.0 {
         true => this / (this + other),
@@ -155,11 +124,6 @@ pub(super) fn balance(this: f32, other: f32) -> f32 {
     }
 }
 
-/// Unit direction to `light`, distance to it, and the radiance arriving at `point`
-/// (before the cosine), with the forward shader's falloff and cone (#1699):
-/// [`falloff`] inside `range`, and for a spot [`spot_cone`]. An Area light is
-/// asked about its point at `u` in `[0, 1]²` (`area`'s model); the rest ignore
-/// `u`. `None` out of reach.
 pub(in crate::lightmap) fn arrival(
     light: &BakeLight,
     point: Vec3,
@@ -193,7 +157,6 @@ pub(in crate::lightmap) fn arrival(
     }
 }
 
-/// Unit direction and distance from `point` to `position`, if within `range`.
 fn toward(position: Vec3, point: Vec3, range: f32) -> Option<(Vec3, f32)> {
     let offset = position - point;
     let d = offset.length();

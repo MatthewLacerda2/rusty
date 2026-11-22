@@ -1,6 +1,4 @@
-//! The ambient a ray escaping the bake sees (#1647): an unoccluded texel bakes to the
-//! ambient the forward shader gives an unbaked surface facing the same way, exactly
-//! in `Color` mode and up to the L2 cut in `Gradient` (`AmbientRadiance::incoming`).
+//! An unoccluded texel bakes to the ambient the forward shader gives an unbaked surface facing the same way: exact in `Color`, up to the L2 cut in `Gradient`.
 
 use glam::Vec3;
 
@@ -11,12 +9,10 @@ use super::trace::{TexelLight, Tracer};
 use rusty_core::color::luminance;
 use rusty_scene::AmbientRadiance;
 
-/// The indirect light of one texel at the origin facing `normal`, in an empty scene.
 pub(super) fn open_texel(sky: AmbientRadiance, normal: Vec3) -> Vec3 {
     open_light(sky, normal).indirect
 }
 
-/// Both parts of one texel at the origin facing `normal`, in an empty scene.
 fn open_light(sky: AmbientRadiance, normal: Vec3) -> TexelLight {
     let scene = BakeScene {
         sky,
@@ -63,7 +59,7 @@ fn an_open_texel_bakes_to_the_unbaked_ambient_in_both_modes() {
 #[test]
 fn a_horizon_glow_never_bakes_negative_light_or_direction() {
     // Dim poles, a bright equator: `incoming` rings to about -1.7 straight up, so
-    // unclamped rays would take bounce light away (#810's invariant with it).
+    // unclamped rays would take bounce light away.
     let glow = AmbientRadiance::Trilight {
         sky: Vec3::splat(0.1),
         equator: Vec3::ONE,

@@ -1,13 +1,3 @@
-//! Emissive surfaces as lights (#1883): every material run that emits and that a
-//! bounce ray could see becomes one [`Emitter`], its triangles an area light a
-//! path vertex aims shadow rays at, so a small bright panel is found on purpose
-//! rather than by a bounce ray's luck. A bounce ray that lands on an emitter
-//! still counts its glow (`Tracer::glow`), and the two strategies split the light
-//! by MIS, the balance heuristic: at any point of an emitter, the next-event
-//! share and the bounce share sum to one, so no emitted light is counted twice
-//! and none is lost. Both look past the same triangles (those a bounce ray sees,
-//! `Tracer::unhidden`), which that sum needs.
-
 use glam::Vec3;
 
 use super::super::input::BakeScene;
@@ -15,8 +5,6 @@ use super::super::lights::area::EMIT_OFFSET;
 use rusty_components::FALLOFF_EPSILON_SQ;
 use rusty_core::color::luminance;
 
-/// One triangle of an emitter: corner `a`, edges `e1`, `e2`, its unit facing, and
-/// the emitter's area up to and including it (for picking one by area).
 #[derive(Clone, Copy, Debug)]
 struct EmitTri {
     a: Vec3,
@@ -26,8 +14,6 @@ struct EmitTri {
     upto: f32,
 }
 
-/// One emitting material run: its radiance, its front-facing triangles and their
-/// bounds.
 #[derive(Clone, Debug)]
 pub(super) struct Emitter {
     radiance: Vec3,
@@ -37,21 +23,11 @@ pub(super) struct Emitter {
     hi: Vec3,
 }
 
-/// How far around an emitter, in multiples of its size (`√area`), vertices aim
-/// at it: there it fills about 1/(π · 16²) of the sky, so a bounce ray would find
-/// it one time in 800.
 const REACH: f32 = 16.0;
-/// The most that reach goes past an emitter's bounds, in world units: a whole
-/// glowing floor is found well enough by bounce rays from a room away.
 const MAX_REACH: f32 = 16.0;
 
-/// No emitter: [`emitters`]' mark for a run that emits nothing a ray can see.
 pub(super) const NONE: u32 = u32::MAX;
 
-/// Every emitter in `scene`, in mesh then run order: the runs that emit, occlude
-/// (are in the bake's BVH) and belong to a mesh bounce rays see (#1571), exactly
-/// the emission a bounce ray could land on. Beside them, per mesh and run, the
-/// emitter it is (or [`NONE`]).
 pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
     let mut out = Vec::new();
     let mut by_run = Vec::with_capacity(scene.meshes.len());
@@ -101,10 +77,6 @@ pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
 }
 
 impl Emitter {
-    /// How much this emitter is worth aiming at from `point` facing `normal`: its
-    /// power over the squared distance to its bounds, held to `π · L` (what a
-    /// surface wrapped in it would receive), and zero when its bounds lie wholly
-    /// behind the receiver. A bound, not the light: it only steers the pick.
     pub(super) fn weight(&self, point: Vec3, normal: Vec3) -> f32 {
         let corners = (0..8).map(|k| {
             let pick = |bit: u32, lo: f32, hi: f32| if k & bit == 0 { lo } else { hi };
@@ -121,24 +93,16 @@ impl Emitter {
         luminance(self.radiance) * self.area / d2.max(self.area / std::f32::consts::PI)
     }
 
-    /// The sphere a vertex aims shadow rays at it from (#1883): its bounds and
-    /// [`REACH`] times its size around them, at most [`MAX_REACH`] past them.
-    /// Farther off it is small in the sky and a bounce ray is the better way to
-    /// find it; the two are weighed by MIS, so leaving it out there is unbiased.
     pub(super) fn reach(&self) -> (Vec3, f32) {
         let centre = (self.lo + self.hi) * 0.5;
         let near = (REACH * self.area.sqrt()).min(MAX_REACH);
         (centre, (self.hi - self.lo).length() * 0.5 + near)
     }
 
-    /// Its emitted radiance.
     pub(super) fn radiance(&self) -> Vec3 {
         self.radiance
     }
 
-    /// The density, per steradian seen from a point, of picking by area the point
-    /// `d` away whose surface faces it at `cos_emit`: what a bounce ray landing
-    /// there is weighed against (`Tracer::path`'s MIS).
     pub(super) fn pdf(&self, d: f32, cos_emit: f32) -> f32 {
         match cos_emit > 0.0 {
             true => d * d / (cos_emit * self.area),
@@ -146,10 +110,6 @@ impl Emitter {
         }
     }
 
-    /// One point on the emitter, picked by area from the three values `u`: the
-    /// unit direction from `point` to it, its distance, the irradiance it stands
-    /// for at `point` facing `normal` (the whole area's, Lambertian at both ends,
-    /// before shadowing), and its [`pdf`](Self::pdf). `None` where it sends nothing.
     pub(super) fn arrival(
         &self,
         point: Vec3,
