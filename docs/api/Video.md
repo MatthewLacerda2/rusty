@@ -58,7 +58,9 @@ layout and `Camera.WorldToScreen` / `ScreenToWorldRay` read it inside `FixedUpda
 With a window it is the Game view's size, which the platform writes each frame;
 headless there is none, and the size is the resolution `SetResolution` last set
 (`play --size` gives the run a Game view instead). Neither ever comes from the
-machine's saved settings headless, and a demo records both: the Game view's size at
-each change, and the save data with its `video` namespace, so a replay lays its UI out
-on the recording's screen, not the one it plays on. Vsync and fullscreen are one-way
+machine's saved settings headless, and a demo records both: the live `Video` settings
+as recording starts (a `SetResolution` made before it included, saved or not) and the
+Game view's size at each change. A replay installs exactly that screen, headless, in a
+session or in the editor's Game view, so its UI lays out and its camera rays aim on the
+recording's screen, never on the host's settings or panel. Vsync and fullscreen are one-way
 into the platform and never read by the sim.

@@ -1,5 +1,5 @@
 //! The screen size is a sim input: headless it never comes from the machine's
-//! saved video settings, and a replay reads the size its demo recorded.
+//! saved video settings, and a replay reads the screen its recording's sim read.
 
 use rusty::core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
 use rusty::dev::demo::{self, Demo, Destination};
@@ -9,9 +9,7 @@ use rusty::dev::scenario;
 const SIZE: &str = "local w, h = UI.GetScreenSize() return w .. 'x' .. h";
 
 fn screen_size(harness: &Harness) -> String {
-    let world = harness.world.borrow();
-    let read = (world.resources.script_manager).eval(&format!("(function() {SIZE} end)()"));
-    read.unwrap()
+    read(harness, SIZE)
 }
 
 fn save_video(harness: &Harness, width: u32, height: u32) {
@@ -48,12 +46,36 @@ fn a_headless_run_reads_the_default_size_and_no_save_file() {
     );
 }
 
+/// Through the camera's reader: a ray's direction depends on the screen's aspect.
+const RAY: &str = "local _, _, _, x, y, z = Camera.ScreenToWorldRay(100, 100) \
+                   return string.format('%.4f %.4f %.4f', x, y, z)";
+
+fn read(harness: &Harness, code: &str) -> String {
+    let world = harness.world.borrow();
+    let read = (world.resources.script_manager).eval(&format!("(function() {code} end)()"));
+    read.unwrap()
+}
+
+/// As a script or the console does it in edit mode, before Play.
+fn set_resolution(harness: &Harness, width: u32, height: u32) {
+    let mut world = harness.world.borrow_mut();
+    world.init_edit_runtime().unwrap();
+    let line = format!("Video.SetResolution({width}, {height})");
+    world.resources.script_manager.eval(&line).unwrap();
+}
+
 #[test]
-fn a_headless_replay_reads_the_recorders_video_settings_not_its_hosts() {
+fn a_replay_reads_the_screen_its_recording_read_not_its_hosts() {
     let dir = crate::temp::dir().join("demo_screen_size");
     let path = dir.join("run.demo");
+    let expected = Harness::new(dir.join("expected"), "");
+    set_resolution(&expected, 800, 600);
+    expected.step(1);
+    let ray = read(&expected, RAY);
+
+    // A game's own write, never saved: the header holds the live settings.
     let harness = Harness::new(dir.join("record"), "");
-    save_video(&harness, 800, 600);
+    set_resolution(&harness, 800, 600);
     demo::record(
         &mut harness.world.borrow_mut(),
         Destination::File(path.clone()),
@@ -63,19 +85,14 @@ fn a_headless_replay_reads_the_recorders_video_settings_not_its_hosts() {
     let demo = Demo::read(&path).unwrap();
     assert_eq!(demo.header.size, None, "recorded headless: no Game view");
 
+    // Another machine's saved settings and live video, and an editor's panel size.
     let replay = Harness::new(dir.join("replay"), "");
     save_video(&replay, 333, 222);
-    *replay
-        .world
-        .borrow()
-        .script_manager()
-        .video_cell()
-        .borrow_mut() = VideoSettings {
-        width: 333,
-        height: 222,
-        ..VideoSettings::default()
-    };
+    set_resolution(&replay, 333, 222);
+    let panel = replay.world.borrow().resources.screen.clone();
+    panel.borrow_mut().set_game_view(640, 480);
     demo::prepare(&mut replay.world.borrow_mut(), demo).unwrap();
     replay.step(1);
-    assert_eq!(screen_size(&replay), "800.0x600.0");
+    assert_eq!(screen_size(&replay), "800.0x600.0", "UI.GetScreenSize");
+    assert_eq!(read(&replay, RAY), ray, "Camera.ScreenToWorldRay");
 }
