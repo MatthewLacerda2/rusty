@@ -1,15 +1,35 @@
-//! Every accessor the import reads has the shape glTF requires of its use. The `gltf`
-//! crate's readers assume it (a `JOINTS_0` of `VEC2` panics them), so a file breaking it
-//! is refused before anything is read.
+//! Every accessor the import reads exists and has the shape glTF requires of its use.
+//! The `gltf` crate assumes both (its validation indexes a `POSITION` accessor before
+//! checking it exists; its readers panic on a `JOINTS_0` of `VEC2`), so a file breaking
+//! either is refused before the crate looks.
 
+use crate::ImportError;
 use gltf::accessor::{Accessor, DataType, Dimensions};
 use gltf::animation::Property;
 use gltf::Semantic;
 
 use DataType::{F32, I16, I8, U16, U32, U8};
 
+pub(super) fn parse(bytes: &[u8]) -> Result<gltf::Gltf, ImportError> {
+    let error = |e: gltf::Error| ImportError::Parse(e.to_string());
+    let gltf::Gltf { document, blob } =
+        gltf::Gltf::from_slice_without_validation(bytes).map_err(error)?;
+    let json = document.into_json();
+    let count = json.accessors.len();
+    for (m, mesh) in json.meshes.iter().enumerate() {
+        let named = mesh.primitives.iter().flat_map(|p| p.attributes.values());
+        if let Some(missing) = named.map(|a| a.value()).find(|&a| a >= count) {
+            let why = format!("mesh {m} names accessor {missing} of {count}");
+            return Err(ImportError::Parse(why));
+        }
+    }
+    let document = gltf::Document::from_json(json).map_err(error)?;
+    check(&document).map_err(ImportError::Parse)?;
+    Ok(gltf::Gltf { document, blob })
+}
+
 /// The first accessor whose shape its use does not allow, named for that use.
-pub(super) fn check(document: &gltf::Document) -> Result<(), String> {
+fn check(document: &gltf::Document) -> Result<(), String> {
     for mesh in document.meshes() {
         for primitive in mesh.primitives() {
             let at = format!("mesh {} primitive {}", mesh.index(), primitive.index());

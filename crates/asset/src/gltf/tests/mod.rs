@@ -2,4 +2,5 @@
 
 mod corpus;
 mod import;
+mod malformed;
 mod uv2;

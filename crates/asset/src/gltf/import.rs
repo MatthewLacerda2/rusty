@@ -24,7 +24,8 @@ pub fn import_as(
     source: Option<&str>,
     missing: Missing,
 ) -> Result<ImportedAsset, ImportError> {
-    let gltf = gltf::Gltf::open(path).map_err(parse)?;
+    let bytes = std::fs::read(path).map_err(|e| ImportError::Parse(e.to_string()))?;
+    let gltf = accessors::parse(&bytes)?;
     let base_dir = path.parent().unwrap_or_else(|| Path::new(""));
     let name = path.display().to_string();
     import_gltf(gltf, &name, Some(base_dir), source, missing)
@@ -32,7 +33,7 @@ pub fn import_as(
 
 /// A buffer naming a file is an error.
 pub fn import_slice(bytes: &[u8]) -> Result<ImportedAsset, ImportError> {
-    let gltf = gltf::Gltf::from_slice(bytes).map_err(parse)?;
+    let gltf = accessors::parse(bytes)?;
     import_gltf(gltf, "<memory>", None, None, Missing::Generate)
 }
 
@@ -48,7 +49,6 @@ fn import_gltf(
     missing: Missing,
 ) -> Result<ImportedAsset, ImportError> {
     let gltf::Gltf { document, blob } = gltf;
-    accessors::check(&document).map_err(ImportError::Parse)?;
     let buffers = gltf::import_buffers(&document, base_dir, blob).map_err(parse)?;
     let images_dir = base_dir.unwrap_or_else(|| Path::new(""));
     let materials = document
