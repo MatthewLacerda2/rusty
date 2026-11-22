@@ -1,11 +1,3 @@
-//! crates/render/src/ui/cache.rs — a view's UI vertex buffers, one per canvas (#418).
-//!
-//! **Dirty strategy.** Each view keeps one vertex buffer per canvas plus the mesh it
-//! holds. A canvas's mesh is rebuilt only when what it is built from changed
-//! (`kept`); its buffer is re-uploaded only when a rebuilt mesh differs from last
-//! frame's (a layout or graphic change), and reallocated only when it outgrows its
-//! capacity. A still HUD therefore meshes nothing and uploads nothing per frame.
-
 use crate::gpu::ops::CountedQueue as _;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -19,46 +11,27 @@ use super::mesh::CanvasMesh;
 use super::world::WorldUniforms;
 use rusty_ui::CanvasSpace;
 
-/// One canvas's GPU copy of its mesh, and where it draws this frame.
 pub(super) struct CanvasGpu {
-    /// Shared with the view's [`KeptMeshes`] while the canvas is still.
     pub(super) mesh: Rc<CanvasMesh>,
     pub(super) buffer: wgpu::Buffer,
     pub(super) place: CanvasPlace,
 }
 
-/// A view's UI vertex buffers, one per drawn canvas in draw order (see the module
-/// docs for when they are re-uploaded).
 #[derive(Default)]
 pub struct UiViewCache {
     canvases: Vec<CanvasGpu>,
-    /// The UI layout and what it was computed from (`kept::layout`).
     pub(super) layout: KeptLayout,
-    /// Each canvas's mesh and what it was built from (`kept`).
     pub(super) kept: KeptMeshes,
-    /// How many canvas buffers the last frame (re-)uploaded — the dirty signal.
     pub(super) uploads: usize,
-    /// How many canvases the last frame drew (a world canvas once per camera).
     pub(super) drawn: usize,
-    /// The world canvases' per-camera uniforms (#429), made on first use.
     pub(super) world: Option<WorldUniforms>,
-    /// Draw the screen-space canvases in an editor-mode (Scene view) render too —
-    /// the Scene tab's UI overlay toggle (#423). Off: the Scene view shows only
-    /// world canvases.
     pub screen_in_editor: bool,
-    /// Where the screen canvases lay out and draw inside the view, in target
-    /// pixels: `(x, y, width, height)`, top-left origin. `None`: the whole view.
-    /// The Scene view's UI overlay boxes them at the Game view's own size, so it
-    /// shows the layout the game does (`rect_tool::OverlayFrame` maps the same box).
     pub screen_box: Option<(u32, u32, u32, u32)>,
-    /// Clip slots, Mask textures and the backdrop blur (#426, #428).
     pub(super) effects: UiEffects,
-    /// Custom-shaded batches' uniforms this frame (#427), made on first use.
     pub(super) shades: Option<ShadeUniforms>,
 }
 
 impl UiViewCache {
-    /// UI batches (draw calls) the last render of this view issued.
     pub fn last_batches(&self) -> usize {
         match self.drawn {
             0 => 0,
@@ -66,68 +39,53 @@ impl UiViewCache {
         }
     }
 
-    /// Canvases the last render of this view meshed, each once (a kept one is not).
     pub fn last_meshed(&self) -> usize {
         self.kept.built()
     }
 
-    /// Whether the last render of this view computed its UI layout (a kept one
-    /// was not).
     pub fn last_laid_out(&self) -> bool {
         self.layout.why().is_some()
     }
 
-    /// Why the last render of this view computed its UI layout, one flag per
-    /// reason in [`crate::RenderCounters::ui_relaid`]'s order; all `0` when it kept it.
     pub fn last_relaid(&self) -> [u32; 7] {
         let why = self.layout.why();
         super::kept::Why::ALL.map(|w| u32::from(why == Some(w)))
     }
 
-    /// Canvas buffers (re-)uploaded by the last render of this view.
     #[cfg(test)]
     pub fn last_uploads(&self) -> usize {
         self.uploads
     }
 
-    /// Canvases the last render of this view drew (0 when it had nowhere to draw).
     #[cfg(test)]
     pub fn last_drawn(&self) -> usize {
         self.drawn
     }
 
-    /// Mask textures the last render drew (#428).
     pub fn last_mask_passes(&self) -> u32 {
         self.effects.mask_passes
     }
 
-    /// Fullscreen backdrop-blur passes the last render ran (#426).
     pub fn last_blur_passes(&self) -> u32 {
         self.effects.blur_passes
     }
 
-    /// Every synced canvas, in draw order.
     pub(super) fn canvases(&self) -> &[CanvasGpu] {
         &self.canvases
     }
 
-    /// Every synced canvas beside the effect state, to update one reading the other.
     pub(super) fn canvases_and_effects(&mut self) -> (&[CanvasGpu], &mut UiEffects) {
         (&self.canvases, &mut self.effects)
     }
 
-    /// Synced canvas `i`, in draw order.
     pub(super) fn canvas(&self, i: usize) -> &CanvasGpu {
         &self.canvases[i]
     }
 
-    /// Every synced canvas's placement, in draw order.
     pub(super) fn places(&self) -> impl Iterator<Item = CanvasPlace> + '_ {
         self.canvases.iter().map(|c| c.place)
     }
 
-    /// Adopt this frame's `meshes`, uploading only the ones that changed: a kept
-    /// mesh is the one held (`Rc::ptr_eq`), a rebuilt one is compared.
     pub(super) fn sync(
         &mut self,
         device: &wgpu::Device,
@@ -142,7 +100,6 @@ impl UiViewCache {
         self.uploads = 0;
         for (mesh, place) in meshes {
             let gpu = match old.remove(&mesh.canvas) {
-                // Adopt the new `Rc` either way, so the next still frame is `ptr_eq`.
                 Some(c) if Rc::ptr_eq(&c.mesh, &mesh) || c.mesh == mesh => CanvasGpu {
                     mesh,
                     place,
@@ -168,12 +125,10 @@ impl UiViewCache {
     }
 }
 
-/// The bytes `mesh`'s vertices take.
 fn byte_len(mesh: &CanvasMesh) -> u64 {
     std::mem::size_of_val(mesh.vertices.as_slice()) as u64
 }
 
-/// A vertex buffer holding `bytes`, with room to grow (the next power of two).
 fn create_buffer(device: &wgpu::Device, bytes: &[u8]) -> wgpu::Buffer {
     use wgpu::util::DeviceExt;
     let mut contents = bytes.to_vec();
@@ -185,14 +140,9 @@ fn create_buffer(device: &wgpu::Device, bytes: &[u8]) -> wgpu::Buffer {
     })
 }
 
-/// Where a synced canvas draws this frame — refreshed every frame, never part of
-/// the re-upload check (a moving world canvas re-uploads nothing).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CanvasPlace {
-    /// Its reference units' space.
     pub(crate) space: CanvasSpace,
-    /// Its root rect's size, reference units.
     pub(crate) size: Vec2,
-    /// The canvas entity's layer (camera culling).
     pub(crate) layer: u8,
 }

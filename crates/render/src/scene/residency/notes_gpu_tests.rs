@@ -1,7 +1,3 @@
-//! crates/render/src/scene/residency/notes_gpu_tests.rs — a settled frame notes no
-//! map (#2458): the holders note what they bind on the render after a load, a Play
-//! entry or a new upload, and on their own change, never on any other.
-
 use glam::Vec3;
 
 use super::holders_gpu_tests::{image, sprites};
@@ -12,8 +8,6 @@ use rusty_components::ribbon::LineComponent;
 use rusty_scene::Scene;
 use rusty_test_support::panorama::fixture as panorama;
 
-/// A scene holding every kind of noted holder: a sky, a lightmap list, a UI image,
-/// a sprite emitter and a textured line; the image's id.
 fn every_holder(tag: &str) -> (Scene, u32) {
     let mut scene = textured(&[&png(&format!("{tag}_box"), [90; 3])]);
     scene.skybox_path = panorama(
@@ -35,14 +29,12 @@ fn every_holder(tag: &str) -> (Scene, u32) {
     (scene, ui)
 }
 
-/// The note calls one frame of `scene` made.
 fn noted(r: &mut Renderer, scene: &Scene) -> u64 {
     let before = notes();
     super::super::fixture::frame(r, scene);
     notes() - before
 }
 
-/// Draw `scene` until a frame uploads nothing new; the frames' note calls.
 fn settle(r: &mut Renderer, scene: &Scene) -> Vec<u64> {
     (0..3).map(|_| noted(r, scene)).collect()
 }
@@ -68,7 +60,6 @@ fn gpu_a_load_and_a_play_entry_note_once() {
     };
     let (mut a, _) = every_holder("a");
     settle(&mut r, &a);
-    // The same maps under a new scene: nothing uploads, so only the load is due.
     let (b, _) = every_holder("a");
     let loaded = settle(&mut r, &b);
     assert!(loaded[0] >= 5, "the load's frame notes them: {loaded:?}");
@@ -89,8 +80,6 @@ fn gpu_a_changed_ui_image_is_noted_on_its_frame() {
     let other = png("a_other", [0, 0, 200]);
     a.world.image_mut(ui).expect("image").texture = Some(other);
     let changed = settle(&mut r, &a);
-    // Its frame notes the image whose group it rebuilt, and that alone; the upload
-    // makes the next frame due, and the one after is settled.
     assert_eq!(
         changed[0], 1,
         "the rebuilt group notes the image: {changed:?}"

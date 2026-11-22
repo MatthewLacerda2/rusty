@@ -1,7 +1,3 @@
-//! Depth order under a `DepthOnly` overlay camera (#1436), the standard FPS stack:
-//! the overlay clears the depth buffer before the blur runs, so the blur orders
-//! world against world from the depth each camera writes beside its velocity.
-
 use glam::Vec3;
 
 use super::gpu_tests::{diff, frame, streaky};
@@ -9,7 +5,6 @@ use crate::motion::gpu_fixture::{cube, eye, pixel, project, renderer, view, H, W
 use rusty_components::{CameraComponent, MaterialAsset, MaterialComponent};
 use rusty_scene::{ClearFlags, Scene};
 
-/// Give `id` a flat `colour` material, so the enemy and the wall tell apart.
 pub(crate) fn paint(scene: &mut Scene, id: u32, name: &str, colour: [f32; 3]) {
     let asset = MaterialAsset {
         base_color: colour,
@@ -21,13 +16,8 @@ pub(crate) fn paint(scene: &mut Scene, id: u32, name: &str, colour: [f32; 3]) {
     scene.world.set_material(id, material);
 }
 
-/// The layer the gun is drawn on, and only by the gun camera.
 pub(crate) const VIEWMODEL: u8 = 1;
 
-/// A still wall 8.5 m out, an enemy cube 4.5 m out at `enemy_x`, and, with
-/// `overlay`, a `DepthOnly` gun camera drawing only the viewmodel layer, whose gun
-/// sits low and left, clear of the enemy; the world camera skips that layer. The
-/// usual FPS stack. Returns the scene and the enemy.
 fn arena(blur: bool, overlay: bool, enemy_x: f32) -> (Scene, u32) {
     let (mut scene, world) = streaky(blur);
     scene.world.camera_mut(world).unwrap().culling_mask = !(1 << VIEWMODEL);
@@ -53,7 +43,6 @@ fn arena(blur: bool, overlay: bool, enemy_x: f32) -> (Scene, u32) {
     (scene, enemy)
 }
 
-/// The enemy moving one metre right past the wall, blurred: the final frame.
 fn blurred(overlay: bool) -> Option<Vec<u8>> {
     let mut r = renderer()?;
     let cam = eye(0.0);
@@ -75,8 +64,6 @@ fn gpu_an_enemy_and_the_wall_blur_alike_with_and_without_a_gun_camera() {
     let mut v = view(&r);
     let sharp = frame(&mut r, &mut v, &still, &eye(0.0));
 
-    // The wall the enemy passes gets its full foreground smear: the four pixels
-    // past each side of its front face.
     for (edge, out) in [(1.0, 1), (0.0, -1)] {
         let (x, y) = pixel(project(&eye(0.0), Vec3::new(edge, 0.0, -4.5)));
         let past = (1..=4).map(|i| ((x as i32 + out * i) as u32, y));
@@ -84,8 +71,6 @@ fn gpu_an_enemy_and_the_wall_blur_alike_with_and_without_a_gun_camera() {
         eprintln!("[motion_blur] the wall past x = {x} smears by {smear}");
         assert!(smear >= 8, "the enemy smears onto the wall at x = {x}");
     }
-    // And the gun camera changes none of it: across the rows the enemy crosses
-    // (the gun sits well below them), world against world orders the same.
     let rows = H / 2 - 4..=H / 2 + 4;
     let band = rows.flat_map(|y| (0..W).map(move |x| (x, y)));
     let gap = band.map(|p| diff(&gunned, &alone, p)).max().unwrap();

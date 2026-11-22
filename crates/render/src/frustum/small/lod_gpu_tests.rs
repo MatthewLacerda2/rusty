@@ -1,7 +1,3 @@
-//! A static `LODGroup` with a small-object cull on one level (#1714): the whole group
-//! leaves the cached shadow bake, so the level shown casts from the per-frame sweep
-//! and no hidden level keeps a baked shadow. Skips when no adapter is present.
-
 use glam::{Quat, Vec3};
 
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -9,9 +5,6 @@ use rusty_components::{LodGroupComponent, LodLevel};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A sun and a static two-level group 10 m down -Z, where a 60° camera at the origin
-/// shows LOD1 (a 1 m group covers 0.087 of the view). `cull` gives LOD0's and
-/// LOD1's max draw distance.
 fn group(cull: [f32; 2]) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -42,7 +35,6 @@ fn group(cull: [f32; 2]) -> Scene {
     scene
 }
 
-/// Two frames of `scene` on one renderer: the first bakes, the second reads the bake.
 fn two_frames(scene: &Scene) -> Option<[RenderCounters; 2]> {
     let mut r: Renderer = crate::test_gpu::headless_or_skip(48, 32)?;
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, 48, 32);
@@ -57,13 +49,10 @@ fn two_frames(scene: &Scene) -> Option<[RenderCounters; 2]> {
 
 #[test]
 fn gpu_a_cull_on_any_level_takes_the_whole_group_out_of_the_bake() {
-    // On LOD0 (a distance that culls nothing), then on LOD1.
     for cull in [[1000.0, 0.0], [0.0, 1000.0]] {
         let Some([bake, cached]) = two_frames(&group(cull)) else {
             return;
         };
-        // LOD1 casts from the per-frame sweep: tested in both frames, and the bake
-        // drew no LOD0 beside it (the first frame tested nothing more).
         assert!(cached.shadow_cull_tested > 0, "{cull:?}: {cached:?}");
         assert_eq!(
             bake.shadow_cull_tested, cached.shadow_cull_tested,
@@ -71,7 +60,6 @@ fn gpu_a_cull_on_any_level_takes_the_whole_group_out_of_the_bake() {
         );
         assert_eq!(cached.shadow_size_culled, 0, "{cached:?}");
     }
-    // LOD1 culled past 5 m: no shadow left behind by a baked LOD0.
     let Some([bake, cached]) = two_frames(&group([0.0, 5.0])) else {
         return;
     };

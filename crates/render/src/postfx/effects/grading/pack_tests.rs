@@ -1,7 +1,3 @@
-//! What the grading effects pack for the bake (#1440, #1441): neutral without a
-//! volume, the ops' clamps held again for a loaded file, Unity's white balance and
-//! Lift / Gamma / Gain preparation.
-
 use glam::Vec3;
 
 use super::super::{grade_layout, grade_slots, GradeCx};
@@ -12,7 +8,6 @@ fn close(a: Vec3, b: Vec3) -> bool {
     (a - b).abs().max_element() < 1e-3
 }
 
-/// `effect`'s grade slots for `volume` (and a lookup).
 fn packed(
     volume: Option<&PostProcessingComponent>,
     lookup: Option<([[f32; 3]; 2], f32)>,

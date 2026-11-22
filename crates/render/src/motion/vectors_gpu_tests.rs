@@ -1,9 +1,3 @@
-//! `MotionVectors::begin` (#1601): which frames hold a velocity target, which record
-//! entity poses, and a resize making a target of the new size.
-//!
-//! Equivalent mutant: `create_target`'s `|` → `^` between `TextureUsages` flags.
-//! The flags are distinct bits, so XOR sets the same ones OR does.
-
 use glam::Mat4;
 
 use super::{MotionVectors, Velocity};

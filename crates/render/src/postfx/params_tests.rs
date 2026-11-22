@@ -1,5 +1,3 @@
-//! The frame every post pass shares, and the one gate every effect asks.
-
 use super::*;
 use rusty_core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty_core::settings::quality::QualityPresets;
@@ -12,7 +10,6 @@ fn game_time_rides_in_camera_pos_w() {
     assert_eq!(p.camera_pos, [1.0, 1.0, 1.0, 2.5]);
 }
 
-/// An option allows; it never turns on what the camera left off.
 #[test]
 fn effect_runs_needs_camera_and_option() {
     let ssr = crate::postfx::effects::ssr::EFFECT.gate;
@@ -28,8 +25,6 @@ fn effect_runs_needs_camera_and_option() {
     assert!(!effect_runs(off, ssr, true), "option off");
 }
 
-/// No quality preset gates an effect (#1522): every effect a camera has on runs on
-/// every seeded preset.
 #[test]
 fn every_effect_runs_on_every_preset() {
     use crate::postfx::effects::POST_EFFECTS;

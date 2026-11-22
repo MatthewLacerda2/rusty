@@ -1,15 +1,7 @@
-//! Each ui block on lavapipe (#427): a white 32×32 Image over black, drawn through a
-//! one-block ui shader, shows the block's signature — asserted by pixels rather
-//! than a byte-exact golden. Skips with no adapter.
-
 use super::fixture::{look, scene, shot, Baked, RECT, RES};
 
-/// The rect's centre pixel.
 const MID: (u32, u32) = (32, 32);
 
-/// #769: an unresolved shader is visible to the test (`built` is false) and still
-/// draws an opaque frame with the graphic in standard white — so an all-zero shot can
-/// never come from a missing or half-written bake.
 #[test]
 fn gpu_an_unresolved_ui_shader_draws_standard_and_is_reported() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {

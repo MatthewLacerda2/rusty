@@ -1,24 +1,3 @@
-//! crates/render/src/render_texture/ — render textures (#430): cameras that draw into a
-//! named texture instead of the screen, shown by UI `Image`s and material maps as
-//! `"rt:<name>"` (Unity's `Camera.targetTexture` + `RawImage`).
-//!
-//! **Frame order.** `Renderer::render` syncs the view's textures (allocating,
-//! resizing, dropping) and registers each in the by-path texture cache, so every
-//! consumer resolves `"rt:<name>"` through the path it already uses for files. The
-//! shadow cascades are fitted once, to the screen's base camera, and then each
-//! render-texture camera draws its own single-camera stack before the screen does —
-//! so the screen samples this frame's picture.
-//!
-//! **Shadows.** A render-texture camera samples the screen camera's cascades rather
-//! than fitting its own: one shadow pass per frame, and the places a minimap, scope
-//! or preview looks at are near the player, where those cascades already are.
-//! Beyond them its view is unshadowed, as the screen's is past `shadow_distance`.
-//!
-//! **Cost.** A camera draws only when a texture it targets is *referenced* by an
-//! active Image or material this frame, and at most every `update_every` frames;
-//! `RenderCounters::render_texture_draws` counts the draws, and their geometry is in
-//! the frame's `draw_calls` / `triangles` like any camera's.
-
 mod slots;
 
 use crate::gpu::commands::Commands;
@@ -36,10 +15,6 @@ pub(crate) use rusty_components::is_render_texture;
 use rusty_scene::Scene;
 
 impl Renderer {
-    /// Make `view`'s render textures match `cameras`' targets — allocate new ones,
-    /// reallocate resized ones, drop untargeted ones — and register exactly them in
-    /// the by-path texture cache (another view's are unregistered, so a scene never
-    /// shows a texture it has no camera for).
     pub(crate) fn sync_render_textures(
         &mut self,
         view: &mut RenderView,
@@ -67,15 +42,11 @@ impl Renderer {
                 .insert(MapRef::new(path.clone()), Rc::clone(&slot.front));
             self.render_texture_ids.0.insert(path.clone(), slot.id);
         }
-        // A material group binding an `rt:` map names its allocation: a new set
-        // re-keys the retained objects whose maps name one (#1706).
         if self.render_texture_ids.0 != before {
             self.retained.render_textures += 1;
         }
     }
 
-    /// Draw every due, referenced render-texture camera into its texture (see the
-    /// module docs). Runs after the shadow passes and before the screen stack.
     pub(crate) fn draw_render_textures(
         &mut self,
         view: &mut RenderView,
@@ -96,8 +67,6 @@ impl Renderer {
             if !shown.contains(&path) {
                 continue;
             }
-            // A shown picture is kept from a draw (#2092): between `update_every`
-            // draws an earlier one's, and a camera seeing a monitor reads last frame's.
             self.frame_counters.history_passes += 1;
             if !slot.is_due(frame, cam.target.update_every) {
                 continue;
@@ -119,7 +88,6 @@ impl Renderer {
             };
             let mut last = self.draw_stack(&mut slot.view, scene, (pass, commands));
             copy_to_front(last.encoder(), &slot.view, &slot.front.texture);
-            // The next camera rewrites the camera uniform: this one's go out first.
             last.flush();
             commands = last;
             slot.drawn_on = Some(frame);
@@ -128,17 +96,12 @@ impl Renderer {
         commands
     }
 
-    /// The material-cache key of a render texture's path: the path plus its current
-    /// allocation, so a resized texture gets a fresh bind group. `None` for a file.
     pub(crate) fn render_texture_key(&self, path: &str) -> Option<String> {
         let id = self.render_texture_ids.0.get(path)?;
         Some(format!("{path}#{id}"))
     }
 }
 
-/// Every `"rt:<name>"` path an active UI `Image` or an active entity's material
-/// maps (and extra shader texture slots, #400) or a volume's lens dirt reference this frame — the textures
-/// worth drawing.
 pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
     let images = scene
         .world
@@ -149,7 +112,6 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
     let maps = crate::draw::material_map_paths(scene, |id| scene.world.is_active_in_hierarchy(id))
         .into_iter()
         .map(|(path, _)| path);
-    // Bloom's lens dirt can be one too (#1442).
     let dirt = crate::postfx::effects::bloom::dirt::render_textures(scene);
     images
         .chain(maps)
@@ -163,8 +125,6 @@ pub(crate) fn referenced_render_textures(scene: &Scene) -> HashSet<String> {
 #[path = "tests.rs"]
 mod tests;
 
-/// Record the copy of a render-texture view's finished target into the texture
-/// consumers sample.
 fn copy_to_front(encoder: &mut wgpu::CommandEncoder, view: &RenderView, front: &wgpu::Texture) {
     let Some(source) = view.color_target() else {
         return;

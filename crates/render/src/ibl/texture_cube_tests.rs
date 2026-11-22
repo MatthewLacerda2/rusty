@@ -1,8 +1,3 @@
-//! A baked reflection cube read by a GPU `texture_cube` (#1615): each face lies as
-//! the hardware samples it, so a direction off a face's axis reads what the capture
-//! saw along it. A face mirrored in-plane or turned reads the dark wall beside the
-//! patch instead. Skips with no adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::ibl::cubemap::read_cube_shape;
@@ -13,8 +8,6 @@ const RES: u32 = 64;
 
 use super::super::tap_tests::sample;
 
-/// Off-axis directions, each with the colour of the patch placed along it: on a face
-/// edge, and inside each of the six faces off both of its in-plane axes.
 const PATCHES: [([f32; 3], [f32; 3]); 7] = [
     ([1.0, 0.0, 1.0], [9.0, 0.0, 0.0]),
     ([0.87, 0.22, 0.44], [0.0, 9.0, 0.0]),
@@ -25,7 +18,6 @@ const PATCHES: [([f32; 3], [f32; 3]); 7] = [
     ([-0.35, 0.3, 0.88], [9.0, 0.0, 0.0]),
 ];
 
-/// A static box at `pos`, scaled `scale`, glowing `emissive` (black when zero).
 fn add_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f32; 3]) {
     let (vertices, indices) = rusty_components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
     let material = MaterialAsset {
@@ -47,8 +39,6 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, scale: Vec3, emissive: [f32
     scene.world.set_material(id, Some(slot));
 }
 
-/// A closed black room, 16 units across, with a glowing patch along each of
-/// [`PATCHES`] five units out.
 pub(super) fn patched_room() -> Scene {
     let mut scene = Scene::new();
     for (i, axis) in [
@@ -78,9 +68,6 @@ pub(super) fn patched_room() -> Scene {
     scene
 }
 
-/// Baked, written and loaded as a frame loads it, the cube returns each patch's
-/// colour along its direction, at the sharp base level and the first rough mip
-/// (which the GPU prefilter writes through the same face matrices).
 #[test]
 fn gpu_a_baked_cube_reads_each_direction_as_the_capture_saw_it() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {

@@ -1,7 +1,3 @@
-//! The sky and a translucent surface read the volume too (#1703): seen through
-//! black fog (albedo 0, which only takes light) both are dimmed, and through
-//! white fog lit by a lamp both gain the air's light.
-
 use glam::Vec3;
 
 use super::fixture::{fog, glow, lamp, open, renderer, set_fog, settled, tinted};
@@ -9,13 +5,9 @@ use crate::Renderer;
 use rusty_components::{LightMode, MaterialAsset, RenderMode, VolumetricFog};
 use rusty_scene::Scene;
 
-/// A sky point above the horizon, past every froxel.
 const SKY: Vec3 = Vec3::new(0.0, 4.0, -10.0);
-/// Where the glass pane hangs, in front of the sky.
 const PANE: Vec3 = Vec3::new(1.5, 2.5, -5.0);
 
-/// The open room under a bright ambient (which tints the procedural sky), a
-/// half-transparent white pane and a lamp between the eye and both.
 fn scene() -> Scene {
     let mut scene = open(VolumetricFog::default());
     scene.ambient_color = Vec3::splat(0.6);
@@ -41,7 +33,6 @@ fn scene() -> Scene {
     scene
 }
 
-/// The sky's and the pane's glow under `fog`.
 fn read(r: &mut Renderer, scene: &mut Scene, fog: VolumetricFog) -> [f32; 2] {
     set_fog(scene, fog);
     let frame = settled(r, scene, 4);

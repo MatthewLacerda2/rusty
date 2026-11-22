@@ -1,6 +1,3 @@
-//! TAA's gate (#1702): which views run the resolve, adapter-free, since the GPU
-//! tests all draw a Game view (`editor_mode = false`) and a full post-FX chain.
-
 use super::super::taa::wanted;
 use super::*;
 
@@ -11,8 +8,6 @@ fn taa_cam(on: bool) -> CameraComponent {
     }
 }
 
-/// Whether `camera` runs TAA under `graphics`, drawn `full` (not a display-only
-/// render texture) and as the Scene view or not.
 fn runs(
     scene: &Scene,
     camera: Option<u32>,
@@ -28,9 +23,6 @@ fn runs(
     )
 }
 
-/// The camera's switch, then the player's option: TAA is off by default, runs when
-/// the camera asks and the player allows it, and needs no volume (a camera effect,
-/// like FXAA).
 #[test]
 fn taa_runs_when_the_camera_asks_and_the_player_allows() {
     let mut scene = Scene::new();
@@ -55,8 +47,6 @@ fn taa_runs_when_the_camera_asks_and_the_player_allows() {
     );
 }
 
-/// The views that never jitter, whatever the camera says: the editor's Scene view
-/// (it keeps FXAA) and a display-only render texture (`post_fx = false`).
 #[test]
 fn the_scene_view_and_a_display_only_view_never_run_taa() {
     let (scene, id) = scene_with_vc(vc(), Some(taa_cam(true)));

@@ -1,7 +1,3 @@
-//! Glossy SSR (#1736): a satin floor (roughness 0.4) shows a soft reflection of the
-//! cube on it, which goes where the cube goes; a near-mirror (0.05) stays sharp; a
-//! floor rougher than the minimum is left alone; and the pyramid follows a resize.
-
 use super::super::fixture::{draw, eye, frame, pixel, renderer, rgb, scene, tuned, Surface};
 use super::super::fixture::{RED, REFLECTING, W};
 use crate::postfx::effects::ssr::pyramid::{hit_levels, levels};
@@ -10,17 +6,14 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_components::Ssr;
 use rusty_scene::Scene;
 
-/// A white metal floor of `roughness`.
 fn metal(roughness: f32) -> Surface {
     ([0.9; 3], 1.0, roughness)
 }
 
-/// How much redder than blue a pixel is.
 fn redness(c: [i32; 3]) -> i32 {
     c[0] - c[2]
 }
 
-/// The red cube on a floor of `roughness`, SSR `on`, the cube `x` m to the side.
 fn shifted(on: bool, roughness: f32, x: f32) -> Scene {
     let (mut s, _) = scene(on, metal(roughness), RED);
     let cube = s.world.find_by_name("Cube").unwrap();
@@ -40,11 +33,6 @@ fn gpu_a_satin_floor_reflects_the_cube_softly_and_follows_it() {
     assert!(on >= moved + 15, "the reflection goes where the cube goes");
 }
 
-/// The sharpest step in redness along the row just above the bottom of a 720p
-/// frame of the cube on a floor of `roughness`: how hard the reflected cube's sides
-/// are where the reflected ray is longest. 720p, not the fixture's 96×72: a cone's
-/// width on screen grows with the resolution, so only a real one can show a
-/// near-mirror going soft (#1736's review: roughness 0.05 read level 2 at 1080p).
 fn sharpest_edge(r: &mut Renderer, roughness: f32) -> i32 {
     let (w, h) = (1280, 720);
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, w, h);
@@ -85,8 +73,6 @@ fn gpu_a_floor_rougher_than_the_minimum_smoothness_is_left_alone() {
     assert!(on == off, "roughness 0.75 gets no SSR at the fixture's 0.3");
 }
 
-/// The default *Minimum Smoothness* (0.7) leaves a roughness-0.5 floor its sky
-/// reflection, exactly as with SSR off; an explicit 0.3 reflects the cube on it.
 #[test]
 fn gpu_a_roughness_half_floor_takes_ssr_only_under_an_explicit_lower_minimum() {
     let Some(mut r) = renderer() else { return };
@@ -101,8 +87,6 @@ fn gpu_a_roughness_half_floor_takes_ssr_only_under_an_explicit_lower_minimum() {
     let at = pixel(REFLECTING);
     let (lower, off) = (redness(rgb(&lower, at)), redness(rgb(&off, at)));
     eprintln!("[ssr] roughness-0.5 floor at a minimum of 0.3: {lower}, SSR off {off}");
-    // Measured: lavapipe `lower` -10, `off` -21 (a margin of 11); an RTX 2060
-    // (Vulkan) -12 and -23 (11). Not measured on Metal. A margin of 6 holds both.
     assert!(lower >= off + 6, "0.3 reflects the red cube on it");
 }
 

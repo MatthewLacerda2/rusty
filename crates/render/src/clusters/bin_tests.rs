@@ -1,6 +1,3 @@
-//! CPU light binning (#434): lights land in the clusters the shader will look up,
-//! lights out of view cost nothing, and the per-camera budget is reported.
-
 use glam::Vec3;
 
 use super::bin::Binned;
@@ -27,13 +24,11 @@ fn light(kind: LightType, at: Vec3, range: f32) -> LocalLight {
     LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
-/// Bin `lights` for [`camera`] with a cold cache.
 fn bin_view(lights: &[LocalLight]) -> Binned {
     let grid = ClusterGrid::new(&camera(), 16.0 / 9.0);
     bin(&grid, lights, &mut AabbCache::default())
 }
 
-/// Cluster `cluster`'s list of light indices.
 pub(super) fn lists_of(binned: &Binned, cluster: u32) -> &[u32] {
     let [offset, count] = binned.ranges[cluster as usize];
     &binned.indices[offset as usize..(offset + count) as usize]
@@ -45,9 +40,6 @@ fn lights_at(l: &LocalLight, p: Vec3) -> bool {
     !l.one_frustum() || to.dot(Vec3::from(l.direction)) >= l.outer_cone
 }
 
-/// Every sampled point a light reaches (in range, in its cone) inside the view
-/// finds that light
-/// in the cluster the shader picks for it — the binning is conservative.
 fn assert_conservative(cam: &Camera, lights: &[LocalLight]) {
     let aspect = 16.0 / 9.0;
     let grid = ClusterGrid::new(cam, aspect);
@@ -81,7 +73,6 @@ fn lights_land_in_every_cluster_they_reach() {
     let lights = [
         light(LightType::Point, Vec3::new(0.0, 0.0, -5.0), 3.0),
         light(LightType::Point, Vec3::new(4.0, -1.0, -20.0), 6.0),
-        // Straddling the near plane and the left edge of the view.
         light(LightType::Spotlight, Vec3::new(-1.0, 0.5, 0.5), 2.0),
         light(LightType::Point, Vec3::new(-30.0, 10.0, -60.0), 25.0),
     ];
@@ -94,10 +85,10 @@ fn lights_land_in_every_cluster_they_reach() {
 #[test]
 fn lights_out_of_view_are_culled_and_cost_nothing() {
     let lights = [
-        light(LightType::Point, Vec3::new(0.0, 0.0, 10.0), 3.0), // behind
-        light(LightType::Point, Vec3::new(0.0, 0.0, -500.0), 3.0), // past far
-        light(LightType::Point, Vec3::new(60.0, 0.0, -10.0), 3.0), // off to the side
-        light(LightType::Point, Vec3::new(0.0, 0.0, -5.0), 0.0), // no reach
+        light(LightType::Point, Vec3::new(0.0, 0.0, 10.0), 3.0),
+        light(LightType::Point, Vec3::new(0.0, 0.0, -500.0), 3.0),
+        light(LightType::Point, Vec3::new(60.0, 0.0, -10.0), 3.0),
+        light(LightType::Point, Vec3::new(0.0, 0.0, -5.0), 0.0),
     ];
     let binned = bin_view(&lights);
     assert_eq!((binned.visible, binned.culled, binned.dropped), (0, 4, 0));

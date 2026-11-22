@@ -1,7 +1,3 @@
-//! crates/render/src/scene/object.rs — one mesh entity as the renderer keeps it (#1706):
-//! everything its draws read that does not change from frame to frame, derived once
-//! by [`Renderer::extract_object`] and re-derived only when an input changed.
-
 use glam::{Mat4, Vec3};
 
 use crate::draw::batch::sort::TransparentOrder;
@@ -20,75 +16,40 @@ use rusty_scene::Scene;
 
 use super::handles::MeshHandle;
 
-/// One material slot's draw (#1285): its batch key with `bone_base` 0 (a skinned
-/// object's palette is placed per camera), whether it is transparent and its
-/// sorting priority, the face
-/// its material renders, so a pose that mirrors the object re-picks its facing, and
-/// how it clips its shadow (#648; `None` casts plain depth).
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct SlotDraw {
     pub key: BatchKey,
     pub transparent: bool,
-    /// Its material's clamped Sorting Priority (#2039, `MaterialAsset::sort_priority`):
-    /// what a transparent slot sorts by before its depth.
     pub priority: i32,
     pub face: RenderFace,
     pub clip: Option<CasterClip>,
 }
 
-/// One mesh entity's retained draw state.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RenderObject {
-    /// Its insertion sequence: what orders it as `World::ids_with_mesh` does.
     pub seq: u64,
     pub mesh: MeshHandle,
-    /// Its mesh's buffers are resident: without them it draws nothing.
     pub resident: bool,
-    /// The resident geometry's local bounds.
     pub local_aabb: (Vec3, Vec3),
     pub world: Mat4,
-    /// Its world bounds, for a mesh with no palette; `None` when unknown (not resident).
     pub bounds: Option<(Vec3, Vec3)>,
-    /// It carries a bone palette, which animation writes every frame without a
-    /// change stamp (`World::set_pose_palette`): its palette and posed bounds are
-    /// read per frame.
     pub palette: bool,
-    /// Active in the hierarchy, and not shadows-only (#1571): a camera may draw it.
     pub shown: bool,
-    /// Active in the hierarchy: it may cast.
     pub active: bool,
-    /// Its mesh's `cast_shadows` (#1571).
     pub cast: ShadowCasting,
-    /// A surface variant whose cut moves at runtime draws one of its material slots
-    /// (#648): it casts from the per-frame sweeps, even when static.
     pub moving: bool,
-    /// What it adds to the static bake's key when static (`passes::shadows`).
     pub casting: ObjectCasting,
     pub is_static: bool,
     pub layer: u8,
     pub small: SmallLimits,
-    /// A material map names a render texture (#430): its group's key names that
-    /// texture's allocation, which the frame's views re-register.
     pub reads_render_texture: bool,
-    /// Its slot in the renderer's object table (`table.rs`), which holds its
-    /// `ObjectData` (world matrix, probe SH, lightmap): kept across re-derives,
-    /// freed when the object goes. A camera's instance names it.
     pub slot: u32,
     pub slots: Vec<SlotDraw>,
-    /// The library names its material slots reference, found or not, each once
-    /// (sorted): an edit to one of them re-derives it (`RenderScene::by_material`),
-    /// and no other does.
     pub materials: Vec<String>,
-    /// Its slots' depth draws, adjacent slots that cast alike joined
-    /// (`passes::shadows::shadow_runs`): derived with the slots, so a shadow sweep
-    /// allocates nothing per caster.
     pub shadow_runs: Vec<ShadowRun>,
 }
 
 impl SlotDraw {
-    /// Where this slot sorts among the translucents at view depth `depth`: every
-    /// slot of one object shares its bounds' centre depth, so only the priority
-    /// tells them apart, and at equal priority they keep their slot order.
     pub(crate) fn order(&self, depth: f32) -> TransparentOrder {
         let priority = self.priority;
         TransparentOrder { priority, depth }
@@ -96,10 +57,6 @@ impl SlotDraw {
 }
 
 impl RenderObject {
-    /// Whether any slot writes velocity: an opaque one (#1435), or a translucent
-    /// one writing its motion or its depth postpass (#1845, #1523). Only those need
-    /// a last-frame pose; without one a translucent's texel moved with the camera
-    /// alone.
     pub(crate) fn writes_velocity(&self) -> bool {
         self.slots.iter().any(|s| {
             let t = s.key.traits;
@@ -107,12 +64,6 @@ impl RenderObject {
         })
     }
 
-    /// Its world bounds' centre, Unity's `Renderer.bounds.center` (#1993, #1994):
-    /// where both sorts, the reflection-probe pick and the light-probe sample place
-    /// it, so a mesh modelled in world coordinates (its origin far from its geometry)
-    /// is placed where it stands. `bounds` is its world bounds now (a skinned one's
-    /// posed bound); without them, its local bounds' centre under its world matrix,
-    /// which is its origin while its mesh is not resident.
     pub(crate) fn centre(&self, bounds: Option<(Vec3, Vec3)>) -> Vec3 {
         let (min, max) = bounds.unwrap_or_else(|| {
             let (min, max) = self.local_aabb;
@@ -123,9 +74,6 @@ impl RenderObject {
     }
 }
 
-/// The names `materials` references, each once: two slots may name one material
-/// (`edit::authoring::material::set_slot` pads with its key), and `RenderScene::set` indexes
-/// each name once.
 fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
     let mut names = materials.map_or_else(Vec::new, |m| m.materials.clone());
     names.sort_unstable();
@@ -134,10 +82,6 @@ fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
 }
 
 impl Renderer {
-    /// Entity `id` as the renderer keeps it, `None` when it has no mesh. Reads every
-    /// input a draw of it takes but the per-camera ones; its mesh must already be
-    /// uploaded and its maps loaded, so the keys it builds bind what is resident. Its
-    /// record goes into object-table slot `slot` (a fresh one when `None`).
     pub(crate) fn extract_object(
         &mut self,
         scene: &Scene,
@@ -187,9 +131,6 @@ impl Renderer {
         Some(object)
     }
 
-    /// Add material slot `slot` (drawing `indices`) of entity `id` to `object`: its
-    /// key, whether it is transparent, its face and its shadow clip, and from that
-    /// clip whether the depth prepass draws it depth-only (#2347).
     fn push_slot(
         &mut self,
         scene: &Scene,
@@ -214,8 +155,6 @@ impl Renderer {
         });
     }
 
-    /// Whether a surface variant whose cut moves cuts any of entity `id`'s material
-    /// slots, drawn or not, as the per-frame sweeps have always read it.
     fn moves(&mut self, scene: &Scene, id: u32) -> bool {
         let count = scene.world.material(id).map_or(0, |m| m.materials.len());
         (0..count).any(|slot| {
@@ -228,12 +167,8 @@ impl Renderer {
         })
     }
 
-    /// Re-place `object` (entity `id`) under its world matrix now: its bounds, its
-    /// record in the object table (the probe SH it samples at its bounds' centre, its
-    /// lightmap) and each slot's facing. All a move changes; what else it changes is
-    /// a full extract's.
     pub(crate) fn pose_object(&mut self, scene: &Scene, id: u32, object: &mut RenderObject) {
-        let model = self.draw_poses.world(scene, id); // blended between ticks (#1877)
+        let model = self.draw_poses.world(scene, id);
         object.world = model;
         let (min, max) = object.local_aabb;
         let posed = object.resident && !object.palette;

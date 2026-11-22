@@ -1,7 +1,3 @@
-//! GPU tests for a still HUD's Masks (#2354): a Mask's coverage texture is drawn
-//! again only when an input it depends on changed, each input in turn, and its
-//! picture is the same whether it was drawn or kept.
-
 use glam::{Vec2, Vec4};
 
 use super::gpu_fixture::{element, hidden_mask, minimap, texture_file, Frames, SIZE};
@@ -21,13 +17,11 @@ fn gpu_a_still_mask_is_drawn_once_and_again_only_when_an_input_changes() {
     assert_eq!(still, first, "and shows what it drew");
     assert_eq!(frames.view.ui.effects.uniform_uploads, 0, "its slots too");
 
-    // The minimap's map turns under its still frame: the Mask stays.
     scene.world.image_mut(map).expect("map").color = Vec4::new(1.0, 0.0, 0.0, 1.0);
     let (passes, red) = frames.frame(&mut renderer, &scene);
     assert_eq!(passes, 0, "only the masked content changed");
     assert_ne!(red, first, "and it is drawn red");
 
-    // Each input of the Mask's draw, in turn.
     scene.world.shape_mut(mask).expect("shape").color.w = 0.5;
     assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "its graphic");
     let mut rt = scene.world.rect_transform_mut(mask).expect("rect");
@@ -52,8 +46,6 @@ fn gpu_a_still_mask_is_drawn_once_and_again_only_when_an_input_changes() {
     assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "the view's size");
     assert_eq!(frames.frame(&mut renderer, &scene).0, 0, "and still again");
 
-    // Its source alone: an Image Mask swapping one file for another of the same
-    // size draws the same vertices from another texture.
     let files = [[255, 255, 255, 255], [255, 255, 255, 64]];
     let [a, b] = [0, 1].map(|n| texture_file(&format!("{n}.png"), files[n]));
     hidden_mask(&mut scene, map);
@@ -88,7 +80,6 @@ fn gpu_a_redrawn_parent_mask_redraws_its_children_and_a_live_source_every_frame(
     scene.world.image_mut(map).expect("map").color.w = 0.5;
     assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "the child alone");
 
-    // A render texture changes in place: a Mask showing one is drawn each frame.
     scene.world.image_mut(map).expect("map").texture = Some("rt:live".into());
     for _ in 0..2 {
         assert_eq!(frames.frame(&mut renderer, &scene).0, 1, "the live source");

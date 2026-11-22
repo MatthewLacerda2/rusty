@@ -1,6 +1,3 @@
-//! A stamp selects, a value decides: a write that leaves what the layout read as it was
-//! lays nothing out, and a pooled marker that is not active reads no camera.
-
 use glam::Vec3;
 
 use super::{element, ui, Rig, Why};
@@ -12,7 +9,6 @@ fn a_write_of_the_same_value_lays_nothing_out() {
     rig.frame(&ui.scene.world);
     let group = ui.scene.world.parent_id(ui.sized).expect("in the group");
     let w = &mut ui.scene.world;
-    // Each borrow stamps its channel; none changes a value.
     drop(w.rect_transform_mut(ui.plain));
     drop(w.text_mut(ui.sized));
     drop(w.image_mut(ui.icon));

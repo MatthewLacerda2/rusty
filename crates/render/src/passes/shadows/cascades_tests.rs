@@ -11,7 +11,6 @@ fn fit_default(camera: &Camera) -> Vec<Cascade> {
     fit(camera, 16.0 / 9.0, SUN, &ShadowSettings::default(), SIZE)
 }
 
-/// The eight corners of the camera frustum between view depths `near` and `far`.
 fn slice_corners(camera: &Camera, aspect: f32, near: f32, far: f32) -> Vec<Vec3> {
     let fwd = camera.forward();
     let right = fwd.cross(Vec3::Y).normalize();
@@ -45,7 +44,6 @@ fn splits_grow_to_the_shadow_distance() {
 
 #[test]
 fn every_cascade_contains_its_slice_far_from_the_origin() {
-    // The #435 bug: nothing past ±30 units of the origin was ever in the shadow map.
     for position in [
         Vec3::ZERO,
         Vec3::new(100.0, 2.0, -40.0),

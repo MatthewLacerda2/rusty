@@ -1,5 +1,4 @@
-//! The matrix a mesh particle is drawn with (#440, #1529): at the particle, its
-//! size, turned by the `Local` emitter's turn on top of its own tumble.
+//! A size curve below zero draws at zero, never mirrored: a mirrored mesh would show its inside with back faces culled.
 
 use glam::{Quat, Vec3};
 
@@ -30,8 +29,6 @@ fn a_local_mesh_particle_is_drawn_at_its_size_turned_with_the_emitter() {
     }
 }
 
-/// A size curve that dips below zero draws the particle at zero, never mirrored
-/// (#1615): a mirrored mesh would show its inside with back faces culled.
 #[test]
 fn a_size_curve_below_zero_draws_a_mesh_particle_at_zero_not_mirrored() {
     let mut e = ParticleEmitterComponent {

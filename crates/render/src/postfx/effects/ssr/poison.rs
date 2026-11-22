@@ -1,22 +1,13 @@
-//! Test-only: an `inf` in the image SSR reads (#2028's review). The forward pass
-//! writes no colour past 60000 (`finite_hdr`, #1699), so no scene can put one
-//! there; this writes it straight in, after the opaque pass, to hold the trace's
-//! rule that a non-finite hit is a miss.
-
 use super::pass::SsrTargets;
 use crate::gpu::commands::Commands;
 use crate::postfx::PostFx;
 
 impl PostFx {
-    /// From the next frame on, SSR reads `inf` over the image's upper half.
     pub(crate) fn poison_ssr_source(&mut self) {
         self.targets.get_mut::<SsrTargets>().expect("ran").poisoned = true;
     }
 }
 
-/// When `poisoned`, write a half-float `inf` over `scene`'s upper half, queued
-/// ahead of the SSR pass's copy of it: `commands`, which hold the opaque pass, go
-/// out first, since a texture write lands ahead of everything they recorded.
 pub(super) fn write(
     poisoned: bool,
     (queue, commands): (&wgpu::Queue, &mut Commands),

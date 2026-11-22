@@ -6,13 +6,9 @@ use crate::postfx::effects::ssr::surface;
 use crate::GpuTexture;
 use wgpu::util::DeviceExt;
 
-/// The camera and lighting group.
 const CAMERA: u32 = 0;
-/// The sky's cube texture.
 const SKY: u32 = 1;
 
-/// One sky shader and its layout: what its pipelines, with and without the velocity
-/// target, are built from.
 struct SkyKind {
     label: &'static str,
     shader: wgpu::ShaderModule,
@@ -20,10 +16,6 @@ struct SkyKind {
 }
 
 impl SkyKind {
-    /// An interior-facing, depth-test-only far-plane box pipeline from the shader's
-    /// `vs_main`/`fs_main`, depth writes off; with `velocity`, into a view's velocity
-    /// target too (#1435), and with `surface` its two SSR surface targets (#1526), which
-    /// the sky leaves as cleared: no SSR.
     fn pipeline(
         &self,
         device: &wgpu::Device,
@@ -76,7 +68,6 @@ impl SkyKind {
     }
 }
 
-/// A sky pipeline layout over `groups`.
 fn box_layout(
     device: &wgpu::Device,
     label: &str,
@@ -89,8 +80,6 @@ fn box_layout(
     })
 }
 
-/// The colour targets a scene pass writes besides the HDR one: the velocity target
-/// (#1435), and with it the two SSR surface targets (#1526).
 #[derive(Clone, Copy)]
 pub(crate) struct SkyTargets {
     pub velocity: bool,
@@ -98,14 +87,8 @@ pub(crate) struct SkyTargets {
 }
 
 pub struct SkyboxRenderer {
-    /// Panorama pipeline: samples a bound 2D equirectangular texture (group 1).
     pipeline: wgpu::RenderPipeline,
-    /// Procedural fallback pipeline: a sky->horizon->ground gradient derived from the
-    /// ambient term, drawn when no panorama is bound (#256). Needs only group 0.
     gradient_pipeline: wgpu::RenderPipeline,
-    /// The same two writing a motion-blurred view's velocity target too (#1435): the
-    /// sky moves with the camera's rotation. Built the first time such a view draws.
-    /// The second pair also carries an SSR view's surface targets (#1526).
     velocity: [[LazyPipeline; 2]; 2],
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
@@ -120,8 +103,6 @@ impl SkyboxRenderer {
         texture_format: wgpu::TextureFormat,
         registry: &mut ShaderRegistry,
     ) -> Self {
-        // The panorama reads camera + lighting and its texture; the procedural
-        // gradient (#256) reads camera + ambient from group 0 only.
         let panorama = SkyKind {
             label: "Skybox Pipeline",
             shader: registry.load(device, "skybox.wgsl", "Skybox Shader"),
@@ -159,12 +140,10 @@ impl SkyboxRenderer {
         }
     }
 
-    /// The pipelines built on first draw (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.velocity.iter().flatten()
     }
 
-    /// Generate the unit box vertex/index buffers the skybox is drawn with.
     fn create_box_buffers(device: &wgpu::Device) -> (wgpu::Buffer, wgpu::Buffer, u32) {
         let (vertices, indices) = rusty_components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -180,7 +159,6 @@ impl SkyboxRenderer {
         (vertex_buffer, index_buffer, indices.len() as u32)
     }
 
-    /// Draw the panorama sky into a pass with `targets`.
     pub(crate) fn draw<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -195,8 +173,6 @@ impl SkyboxRenderer {
         self.draw_box(render_pass);
     }
 
-    /// Sky `kind`'s pipeline (0 the panorama, 1 the gradient) into `targets`;
-    /// `colour_only` when the pass writes only the HDR target.
     fn pick<'a>(
         &'a self,
         colour_only: &'a wgpu::RenderPipeline,
@@ -211,8 +187,6 @@ impl SkyboxRenderer {
         }
     }
 
-    /// Draw the procedural gradient backdrop (#256). Uses only group 0 (camera +
-    /// ambient); the same far-plane box fills just the pixels no geometry covered.
     pub(crate) fn draw_gradient<'a>(
         &'a self,
         render_pass: &mut wgpu::RenderPass<'a>,
@@ -225,7 +199,6 @@ impl SkyboxRenderer {
         self.draw_box(render_pass);
     }
 
-    /// Bind the shared box buffers and issue the indexed draw (panorama + gradient).
     fn draw_box<'a>(&'a self, render_pass: &mut wgpu::RenderPass<'a>) {
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);

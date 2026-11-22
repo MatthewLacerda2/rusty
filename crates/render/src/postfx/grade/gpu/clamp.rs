@@ -1,12 +1,7 @@
-//! The grade's clamp before the tonemap, on lavapipe (#1440): knobs that push the
-//! colour below zero or to infinity leave black black and highlights white,
-//! whichever tonemapper runs.
-
 use super::{chain, W};
 use rusty_components::{PostProcessingComponent, Tonemap, Wheel};
 use rusty_scene::create::default_post_processing;
 
-/// A volume with `tonemap` and the `which` wheel set to `color` and `offset`.
 fn wheel(tonemap: Tonemap, which: Wheel, color: [f32; 3], offset: f32) -> PostProcessingComponent {
     let mut vc = default_post_processing();
     vc.tonemapping.mode = tonemap;
@@ -20,7 +15,6 @@ fn gpu_a_negative_lift_keeps_black_black_under_every_tonemap() {
     let Some(mut c) = chain() else { return };
     let row = vec![[0.0f32; 3]; W as usize];
     for tonemap in Tonemap::ALL {
-        // Grey lifts below zero, and a cyan one whose red channel lands far below.
         for (color, offset) in [([1.0; 3], -0.1), ([1.0; 3], -0.3), ([0.0, 1.0, 1.0], -0.5)] {
             let out = c.run(&row, 0.0, Some(&wheel(tonemap, Wheel::Lift, color, offset)));
             assert_eq!(
@@ -35,11 +29,9 @@ fn gpu_a_negative_lift_keeps_black_black_under_every_tonemap() {
 #[test]
 fn gpu_a_gamma_wheel_at_its_floor_leaves_highlights_white_not_nan() {
     let Some(mut c) = chain() else { return };
-    // Black, then highlights well above display white.
     let mut row = vec![[10.0f32; 3]; W as usize];
     (row[0], row[1], row[2]) = ([0.0; 3], [4.0; 3], [40.0; 3]);
     for tonemap in Tonemap::ALL {
-        // Gamma offset −1: a per-channel power of 1000, which overflows any x > 1.
         let out = c.run(
             &row,
             0.0,

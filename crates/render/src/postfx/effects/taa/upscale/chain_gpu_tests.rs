@@ -1,7 +1,3 @@
-//! Where TAAU sits in the chain on lavapipe (#1702, part 3): the chain after it
-//! runs at the output's size and FXAA skips on an upscaling frame, and a view that
-//! stops upscaling runs the chain at the scene's size again.
-
 use glam::Vec3;
 
 use super::gpu_tests::{scaled, upscales};
@@ -38,8 +34,6 @@ fn gpu_an_upscaling_frame_runs_the_chain_at_the_output_size_and_skips_fxaa() {
         "FXAA on or off, an upscaling frame is TAA's alone"
     );
 
-    // TAA off: the bilinear path, the chain back at the scene's size. A scene-size
-    // target (SSIL's history, say) survives the change of the chain's size.
     struct SceneSized;
     a.post_fx.targets.get_or(|| SceneSized);
     let (mut off, _) = taa_scene(false, true);

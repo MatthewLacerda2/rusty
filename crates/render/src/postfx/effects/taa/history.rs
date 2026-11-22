@@ -1,99 +1,35 @@
-//! A view's TAA history ([`TaaHistory`]) and the frame's start ([`begin`]): which
-//! of TAA's two paths the view takes, and the jitter and mip bias it draws with.
-//!
-//! **Two paths, by the view's sizes** (#1702), both a scene pass after depth of
-//! field and before motion blur (URP's order):
-//! - **Resolve** (scene size equals output, or the scene is supersampled): the
-//!   history is at the scene size. What TAA always did.
-//! - **Upscale** (TAAU: the scene is smaller than the output, a render scale below
-//!   1): the history is at the **output** size and the resolve reconstructs it
-//!   from the scene-size frame (`fs_upscale`), as URP's STP and HDRP's FSR2 sit.
-//!   The rest of the chain then runs at the output's size ([`chain_size`]) and
-//!   writes the output itself, so no bilinear upscale follows. The jitter runs
-//!   FSR2's longer sequence and the material maps read with a negative mip bias.
-//!
-//! On either path the camera's *Mip Bias* (#1847) adds to the material maps' bias.
-
 use glam::Vec2;
 
 use super::jitter;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::RenderView;
 
-/// What a stack draws with this frame under TAA: zero for both without it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(crate) struct TaaFrame {
-    /// The projection's sub-pixel jitter, in NDC.
     pub jitter: Vec2,
-    /// The material maps' mip bias: TAAU's ([`jitter::mip_bias`], negative only
-    /// while the view upscales) plus the camera's *Mip Bias* (#1847), which applies
-    /// on every frame TAA runs.
     pub mip_bias: f32,
 }
 
-/// What [`TaaHistory::surfaces`] holds: two half floats a pixel, its own surface's
-/// distance from its camera (the sky's 65504 fits) and that camera's index in the
-/// stack (#1846).
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
-/// What [`TaaHistory::flickers`] holds: four half floats a pixel, what holds a
-/// flickering still pixel's history under the camera's anti-flicker (#2228,
-/// [`super::params::FLICKER_DECAY`]): its frame's perceptual luma, its last step,
-/// its flicker and how much of it recurs.
 pub(crate) const FLICKER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
-/// One view's TAA state while it runs: the two history targets, where the jitter
-/// sequence is and whether the history holds a resolved frame.
-///
-/// **Memory, per TAA camera** at the history's size (the output's when
-/// upscaling): two HDR colour frames (8 bytes a pixel each) and two surface
-/// frames (4 bytes each, #1846), 24 bytes a pixel: 50 MB at 1920×1080, 199 MB at
-/// 3840×2160; with the camera's anti-flicker on (its default), two flicker frames (8 bytes each,
-/// #2228) more, 40 bytes a pixel: 83 MB at 1920×1080; and at the scene's size the
-/// reactive mask (2 bytes a pixel, #1845): 4 MB at 1920×1080. The level's size (a
-/// Dust2-sized map or a room) changes none of it.
 pub(crate) struct TaaHistory {
-    /// The history's size: the scene's when resolving, the output's when upscaling.
     pub(super) size: (u32, u32),
-    /// Whether this view upscales (TAAU) rather than resolving at the scene size.
     pub(super) upscale: bool,
-    /// The jitter sequence's length ([`jitter::phases`]).
     pub(super) phases: u32,
-    /// This frame's jitter in scene pixels.
     pub(super) pixels: Vec2,
     pub(super) frames: [PfxTarget; 2],
-    /// Beside each of `frames`, each pixel's surface as that resolve saw it
-    /// ([`SURFACE_FORMAT`]): next frame drops the history where this frame's nearest
-    /// surface in the 3×3 (`Front::near`, not the pixel's own) lies farther than all
-    /// of last frame's around the reprojected place, a reveal (#1846). Made, dropped and reset with `frames`, so
-    /// it follows every cut, resize and render-scale change they do.
     pub(super) surfaces: [PfxTarget; 2],
-    /// Beside each of `frames`, each pixel's flicker as that resolve left it
-    /// ([`FLICKER_FORMAT`]): what lets a still pixel whose frame keeps blinking
-    /// under the jitter hold its history (#2228). Held only while the camera's
-    /// anti-flicker is on ([`TaaHistory::hold_flickers`]); dropped with `frames`,
-    /// and a cut resets it as it does them (the first resolve after writes none).
     pub(super) flickers: Option<[PfxTarget; 2]>,
-    /// The reactive mask the translucents write this frame, at the scene's size
-    /// ([`super::reactive`], #1845); cleared after each resolve.
     pub(super) reactive: PfxTarget,
-    /// The scene's size, which [`Self::reactive`] has.
     pub(super) scene: (u32, u32),
-    /// Whether a translucent pass bound [`Self::reactive`] since the last resolve
-    /// (`reactive::hdr_attachments` sets it): when not, the mask is all zero, and
-    /// the resolve skips reading it and clearing it.
     pub(super) reactive_drawn: std::sync::atomic::AtomicBool,
     pub(super) params: wgpu::Buffer,
-    /// Which of `frames` holds the latest resolve.
     pub(super) latest: usize,
-    /// Whether `frames[latest]` is a frame of this view (not a fresh target).
     pub(super) valid: bool,
-    /// The jitter sequence's frame counter.
     pub(super) frame: u32,
-    /// Whether the resolve ran this frame: its output is then the image the rest of
-    /// the chain reads, at the output's size when `upscale`.
     pub(super) ran: bool,
-    /// Which of #1846's rules the resolve keeps: both, unless a test turned one off.
     #[cfg(test)]
     pub(crate) rules: super::params::Rules,
 }
@@ -133,9 +69,6 @@ impl TaaHistory {
         }
     }
 
-    /// Hold the flicker frames when `on` (the camera's anti-flicker above 0), made
-    /// at the history's size and starting at zero (no flicker yet); drop them when
-    /// not, so a camera at 0 pays nothing for them.
     pub(super) fn hold_flickers(&mut self, device: &wgpu::Device, on: bool) {
         match (on, self.flickers.is_some()) {
             (true, false) => {
@@ -148,14 +81,11 @@ impl TaaHistory {
         }
     }
 
-    /// This frame's resolve, when it ran: what the rest of the chain reads.
     pub(crate) fn output(&self) -> Option<&PfxTarget> {
         self.ran.then(|| &self.frames[self.latest])
     }
 }
 
-/// The size the chain runs at after TAA this frame ([`PostFx::fit_chain`]): the
-/// output's when `on` and the view upscales through TAA, else the scene's.
 pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
     let size = match upscales(view, on) {
         true => view.size(),
@@ -164,24 +94,10 @@ pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
     (size.width, size.height)
 }
 
-/// Whether `view`, running TAA when `on` ([`super::runs`]), upscales through it this
-/// frame (TAAU): its scene is smaller than its output.
 pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
     on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 
-/// Start a stack's frame, after the motion history's `begin`: with `on`, fit the
-/// view's history to its path and size and return this frame's jitter and mip
-/// bias; without, drop the history and return zero for both. A view that runs no
-/// TAA draws with the unjittered projection, bit for bit. On a cut (the motion
-/// history starts over) the history is forgotten and the sequence restarts, so the
-/// frame is exactly a new view's first. A resize or a render-scale change drops the
-/// history with every post target (`PostFx::resize`): a cut too.
-///
-/// `knobs` is the base camera's `(jitter_scale, mip_bias)` (URP's *Jitter Scale* and
-/// *Mip Bias*, #1847): the first scales the sub-pixel offset (`1` its default, so a
-/// camera at its defaults jitters as before), the second adds the camera's negative
-/// mip bias to the bias TAAU already applies.
 pub(crate) fn begin(
     view: &mut RenderView,
     device: &wgpu::Device,

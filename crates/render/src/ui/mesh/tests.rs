@@ -9,7 +9,6 @@ use rusty_scene::Scene;
 
 const SCREEN: Vec2 = Vec2::new(1920.0, 1080.0);
 
-/// A canvas at scale 1 on [`SCREEN`].
 fn canvas(scene: &mut Scene) -> u32 {
     let root = scene.add_entity("Canvas".to_string());
     scene
@@ -18,7 +17,6 @@ fn canvas(scene: &mut Scene) -> u32 {
     root
 }
 
-/// A `size`-sized element at `pos` (bottom-left anchored) under `parent`.
 fn element(scene: &mut Scene, parent: u32, pos: Vec2, size: Vec2, texture: Option<&str>) -> u32 {
     let id = scene.add_entity("E".to_string());
     let rt = RectTransformComponent {
@@ -100,7 +98,6 @@ fn a_mask_breaks_the_batch_and_clips_its_subtree() {
     let batches = &build(&scene)[0].batches;
     assert_eq!(batches.len(), 2);
     let clip = batches[1].clip.rect.expect("masked");
-    // Top-left origin: y = 1080 - (200 + 40).
     assert_eq!((clip.x, clip.y, clip.w, clip.h), (100, 840, 50, 40));
     assert_eq!(batches[1].range.len(), 12, "the panel and its child");
 }

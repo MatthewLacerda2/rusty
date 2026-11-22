@@ -1,6 +1,3 @@
-//! The velocity target on lavapipe (#1435): an object moving past a still camera, a
-//! still scene under a turning camera, and the gate that keeps it off.
-
 use glam::Vec3;
 
 use super::gpu_fixture::{
@@ -25,18 +22,14 @@ fn gpu_a_cube_moving_past_a_still_camera_writes_velocity_on_its_pixels_only() {
     let to = Vec3::new(0.5, 0.0, -5.0);
     scene.world.transform_mut(id).unwrap().position = to;
     let moved = render(&mut r, &mut view, &scene, &cam).unwrap();
-    // The front face's centre moved by exactly its projected step.
     let face = to + Vec3::Z * 0.5;
     let expected = project(&cam, face) - project(&cam, face - Vec3::X);
     let got = moved.at_ndc(project(&cam, face));
     eprintln!("[motion] moving cube: got {got}, expected {expected}");
     assert!((got - expected).length() < 0.01, "{got} vs {expected}");
     assert!(got.x > 0.1, "it moved right: {got}");
-    // The sky behind it, and the camera, did not move.
     assert!(moved.at(1, 1).length() < 1e-4, "{}", moved.at(1, 1));
     assert!(moved.at(W - 2, H - 2).length() < 1e-4);
-    // Beside the motion, each pixel's depth along the camera's view axis (#1436,
-    // #1445): the camera looks down -Z from the origin.
     let (x, y) = pixel(project(&cam, face));
     assert!((moved.distance(x, y) - -face.z).abs() < 0.02);
     assert_eq!(moved.distance(1, 1), SKY_DISTANCE as f32, "the sky is far");
@@ -52,7 +45,6 @@ fn gpu_a_still_scene_under_a_turning_camera_matches_camera_reprojection() {
     render(&mut r, &mut view, &scene, &before).unwrap();
     let turned = render(&mut r, &mut view, &scene, &after).unwrap();
 
-    // A point on the cube: its camera-only reprojection.
     let face = Vec3::new(0.0, 0.0, -4.5);
     let expected = project(&after, face) - project(&before, face);
     let got = turned.at_ndc(project(&after, face));
@@ -60,7 +52,6 @@ fn gpu_a_still_scene_under_a_turning_camera_matches_camera_reprojection() {
     assert!((got - expected).length() < 0.01, "{got} vs {expected}");
     assert!(expected.length() > 0.05, "the turn moves the image");
 
-    // The sky at a corner pixel: its direction, reprojected through the rotation.
     let corner = pixel_centre((3, 3));
     let dir = unproject(&after, corner) * 100.0;
     let sky = corner - project(&before, dir);
@@ -100,9 +91,6 @@ fn gpu_a_surface_behind_the_camera_last_frame_writes_no_motion() {
     let Some(mut r) = renderer() else { return };
     let mut view = view(&r);
     let (mut scene, _) = scene(true);
-    // A long slab sliding forward past the player's shoulder, drawn both frames:
-    // the part of its side now 2 m ahead was 4 m behind the camera last frame, with
-    // no place on screen to move from (#1436).
     let id = cube(&mut scene, Vec3::new(1.0, 0.0, 1.0));
     scene.world.transform_mut(id).unwrap().scale = Vec3::new(1.0, 1.0, 10.0);
     let cam = eye(0.0);

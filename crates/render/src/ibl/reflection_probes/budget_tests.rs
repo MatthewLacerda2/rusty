@@ -1,7 +1,3 @@
-//! The byte budget (#1584): it bounds the resident set and the array, the one copy of
-//! a resident cube; a frame reads only what it copies; one big cube does not empty
-//! the set.
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, probes_at, renderer, uncompressed};
@@ -9,13 +5,10 @@ use super::array_bytes;
 use crate::Renderer;
 use rusty_scene::Scene;
 
-/// The packed blend of the object at `x`, from `r`'s resident probes.
 fn probe_at(r: &Renderer, x: f32) -> u32 {
     r.reflection_probes.probe_for(Vec3::new(x, 0.0, 0.0))
 }
 
-/// The resident set stops at the scene's byte budget, counted at the array's face;
-/// the nearest box is kept whatever its size.
 #[test]
 fn gpu_the_budget_keeps_the_nearest_probes() {
     let Some(mut renderer) = renderer() else {
@@ -36,8 +29,6 @@ fn gpu_the_budget_keeps_the_nearest_probes() {
     assert_eq!(probe_at(&renderer, 6.0), 0, "the next is past the budget");
 }
 
-/// A cube too big for the budget is passed over; the farther ones that fit are
-/// still taken.
 #[test]
 fn gpu_one_big_cube_does_not_empty_the_resident_set() {
     let Some(mut renderer) = renderer() else {
@@ -62,9 +53,6 @@ fn gpu_one_big_cube_does_not_empty_the_resident_set() {
     );
 }
 
-/// A line of `n` probes 4 m apart, each its own 64-texel cube, under a 2 MB budget:
-/// eight 64-texel half-float cubes, six shaded and two spare. The renderer that
-/// walks it holds half floats (`uncompressed`), so the counts hold on any adapter.
 fn level(n: usize, name: &str) -> Scene {
     let mut scene = Scene::new();
     for k in 0..n {
@@ -76,8 +64,6 @@ fn level(n: usize, name: &str) -> Scene {
     scene
 }
 
-/// The first frame of a level of many probes reads only the cubes it copies, not
-/// every cube whose size it doesn't know yet.
 #[test]
 fn gpu_the_first_frame_reads_only_what_the_array_holds() {
     let Some(mut renderer) = uncompressed() else {
@@ -94,9 +80,6 @@ fn gpu_the_first_frame_reads_only_what_the_array_holds() {
     );
 }
 
-/// A level of more probes than the budget, walked end to end: the array, the only
-/// copy of the cubes, never passes the budget, and the probe underfoot stays
-/// resident.
 #[test]
 fn gpu_a_walk_through_the_level_stays_within_the_budget() {
     let Some(mut renderer) = uncompressed() else {
@@ -117,8 +100,6 @@ fn gpu_a_walk_through_the_level_stays_within_the_budget() {
     assert_eq!(renderer.reflection_probes.loads, 40, "each cube read once");
 }
 
-/// Pacing across the budget's edge reads nothing from disk: the cube that left
-/// range waits in a spare slot.
 #[test]
 fn gpu_pacing_across_the_budget_edge_reads_nothing_again() {
     let Some(mut renderer) = uncompressed() else {

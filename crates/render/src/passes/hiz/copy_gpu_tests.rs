@@ -1,8 +1,3 @@
-//! The cluster cull's copy (#2406, #2417): on a panel half behind a wall, it
-//! starts a workgroup per 64-cluster chunk, not one per cluster tested, and the
-//! index stream it writes from the shared pool is the mesh's own triangles in
-//! order, the same on two frames of one view.
-
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::panel;
@@ -47,7 +42,6 @@ fn gpu_the_copy_starts_a_workgroup_per_chunk_and_writes_the_mesh_s_order() {
         first, again,
         "two frames of one view write one index stream"
     );
-    // Whole triangles of the mesh's own index list, in its order.
     let mesh = scene.world.mesh(id).unwrap().indices.clone();
     let mut tris = mesh.chunks_exact(3);
     for t in first.chunks_exact(3) {

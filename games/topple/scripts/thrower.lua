@@ -1,9 +1,3 @@
--- thrower.lua — the player: a fixed camera that throws balls.
---
---   * Left mouse throws a ball at what the cursor points at, on an arc that
---     lands there (the ball is fast, but gravity still pulls it).
---   * R restarts the level.
--- `ThrowAt(x, y, z)` is the same throw at a world point; the scenarios call it.
 
 local Thrower = {
     fields = {
@@ -18,14 +12,12 @@ local MASS = 2.0    -- kilograms
 
 function Thrower.Start(id)
     Thrower.left = Thrower.balls
-    -- Aimed with the cursor: free it and show it (Play starts it locked, hidden).
     Input.SetCursorLocked(false)
     Input.SetCursorVisible(true)
 end
 
--- Throw a ball from the camera so that it reaches `x, y, z`: aimed straight at
--- the point, plus the lift that gravity takes away over the flight. Returns
--- the ball, or nil when none are left.
+-- Aimed straight at the point, plus the lift gravity takes away over the flight.
+-- Returns the ball, or nil when none are left.
 function Thrower.ThrowAt(x, y, z)
     if Thrower.left <= 0 then return nil end
     Thrower.left = Thrower.left - 1

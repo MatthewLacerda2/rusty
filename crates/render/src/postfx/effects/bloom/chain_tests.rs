@@ -1,10 +1,7 @@
-//! The chain's shape (#1700): how many mips a start size gets, and their sizes.
-
 use super::{mip_count, mip_sizes, MAX_MIPS};
 
 #[test]
 fn a_view_gets_urps_count_capped_at_the_most() {
-    // 1080p at half, a third and a quarter: each quality level starts smaller.
     assert_eq!(mip_count((960, 540)), MAX_MIPS);
     assert_eq!(mip_count((640, 360)), 8);
     assert_eq!(mip_count((480, 270)), 7);

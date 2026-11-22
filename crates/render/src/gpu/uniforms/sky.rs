@@ -1,18 +1,11 @@
-//! The procedural sky's settings as the shaders read them (#1620): `ProceduralSky` in
-//! `common.wgsl`, carried by the lighting uniform (the sky pass) and by the sky
-//! cube's bake params (`sky/prefilter.wgsl`), so the two draw one sky.
-
 use rusty_scene::SkySettings;
 
-/// Mirrors WGSL `ProceduralSky` byte-for-byte. Each colour's `w` is 1 when the scene
-/// sets it, 0 when it follows the ambient colour (the shader derives it then).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ProceduralSkyUniform {
     pub zenith: [f32; 4],
     pub horizon: [f32; 4],
     pub ground: [f32; 4],
-    /// x: cloud coverage, y: cloud opacity.
     pub clouds: [f32; 4],
 }
 

@@ -1,9 +1,3 @@
-//! A rough reflection's outline is as soft as its inside (#2158): a satin bronze
-//! ceiling, seen from below, reflecting a lit strip on a wall behind a row of thin
-//! dark uprights. Where the ceiling's rays stop finding the strip (the band's
-//! edge, cut by the uprights' silhouettes) the reflection fades over the blur its
-//! roughness gives the band, at any resolution; a mirror keeps a sharp edge.
-
 use glam::Vec3;
 
 use super::super::fixture::{paint, place, Surface};
@@ -16,7 +10,6 @@ use rusty_scene::{Camera, Scene};
 
 const FOV: f32 = 40.0;
 
-/// A box named `name` centred at `at`, `size` across, painted `surface`.
 pub(super) fn block(s: &mut Scene, name: &str, at: Vec3, size: Vec3, surface: Surface) -> u32 {
     let id = create_entity(s, name, Some(Primitive::Box));
     place(s, id, at, size);
@@ -24,9 +17,6 @@ pub(super) fn block(s: &mut Scene, name: &str, at: Vec3, size: Vec3, surface: Su
     id
 }
 
-/// A room under a bronze metal ceiling of `roughness` 3.4 m up, SSR on and the
-/// sky black: an emissive strip 2.5 m up its back wall, 4 m out, and in front of
-/// it a row of thin dark uprights 0.18 m apart.
 pub(super) fn bar(roughness: f32) -> Scene {
     let mut s = Scene::new();
     crate::test_gpu::black_sky(&mut s);
@@ -69,20 +59,16 @@ pub(super) fn bar(roughness: f32) -> Scene {
     s
 }
 
-/// The eye: 1.6 m up, looking at the back wall, pitched up 30°.
 fn eye() -> Camera {
     let mut c = Camera::new(Vec3::new(0.0, 1.6, 0.0), -90.0, 30.0);
     c.fov = FOV;
     c
 }
 
-/// The red of the HDR image the SSR pass resolved into, row by row, `(w, h)`.
 fn red(r: &mut Renderer, scene: &Scene, size: (u32, u32)) -> Vec<f32> {
     channel(r, scene, size, 0)
 }
 
-/// Channel `c` (0 red, 1 green, 2 blue) of the HDR image the SSR pass resolved
-/// into, row by row, `(w, h)`.
 pub(super) fn channel(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32), c: usize) -> Vec<f32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, w, h);
     let out = view.color_target_view().unwrap();
@@ -100,10 +86,6 @@ pub(super) fn channel(r: &mut Renderer, scene: &Scene, (w, h): (u32, u32), c: us
         .collect()
 }
 
-/// Down every column of the frame's middle, over the ceiling (its top 60%), the
-/// largest share of the column's brightest red one row adds or takes: near 1 is a
-/// hard edge; a fade spreads it over its width, so it halves at twice the size.
-/// With it, the brightest red of any of those columns.
 fn steepest(red: &[f32], (w, h): (u32, u32)) -> (f32, f32) {
     let column = |x: u32| (0..h * 6 / 10).map(move |y| red[(y * w + x) as usize]);
     (w * 3 / 10..w * 7 / 10)
@@ -119,15 +101,8 @@ fn steepest(red: &[f32], (w, h): (u32, u32)) -> (f32, f32) {
         .fold((0.0, 0.0), |a, b| (a.0.max(b.0), a.1.max(b.1)))
 }
 
-/// The least width, as a share of the frame's height, over which the satin
-/// ceiling's reflection may rise: here the resolve blurs the band's inside over a
-/// radius near 0.06 of the height, and an outline drawn at the rays' hit or miss
-/// rose within 0.017 at 360 rows and 0.009 at 720.
 const SOFT: f32 = 0.025;
 
-/// The least share of the mirror's brightest red the satin band reaches (near
-/// 0.09 here, 0 with SSR off): its blur spreads the strip's light thin, but a
-/// band that is not there at all would pass `SOFT`.
 const BAND: f32 = 0.03;
 
 #[test]

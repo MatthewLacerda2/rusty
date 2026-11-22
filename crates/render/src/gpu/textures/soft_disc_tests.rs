@@ -1,6 +1,3 @@
-//! The default particle sprite's texels (#2052): white, opaque at the centre,
-//! falling monotonically to transparent at the rim and in the corners.
-
 use super::{soft_disc, SOFT_DISC_SIDE};
 
 #[test]

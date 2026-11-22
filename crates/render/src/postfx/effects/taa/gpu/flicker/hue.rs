@@ -1,31 +1,17 @@
-//! The anti-flicker (`super`) holds brightness only: a still ceiling of noise blinking
-//! under the jitter, its lamp turned from red to blue (the same YCoCg luma) for
-//! good, takes the new hue as fast as URP's resolve does, where a hold of the
-//! whole colour would ghost the old one while the blinks last.
-
 use super::change::lamp;
 use super::cost::noise_room;
 use super::measure::run_by;
 use super::room::{anti_flicker, renderer, ON, WARM};
 use rusty_scene::Scene;
 
-/// Frames measured, and the one (after [`WARM`]) the lamp turns blue.
 const FRAMES: u32 = 16;
 const AT: u32 = 4;
-/// How far a tile's hue ([`co`]) may sit from URP's on any frame, as a share of
-/// the turn's own swing: ours, the luma the hold keeps shifting the perceptual
-/// blend a little. Measured on lavapipe: 0.4 % (3.5 of a swing of 911), on an RTX
-/// 2060 0.4 % (3.4 of 919); a hold of
-/// the whole colour sits 89 % off (813).
 const SAME: f32 = 0.01;
 
-/// A pixel's hue toward orange (+) or blue (-): YCoCg's `co` over its luma, in
-/// 255ths (red is +2, blue -2), so a brightness the hold keeps is no hue change.
 fn co(ycocg: [f32; 3]) -> f32 {
     255.0 * ycocg[1] / ycocg[0].max(1e-3)
 }
 
-/// The lamp red, then from frame [`AT`] blue: `0.25 r + 0.5 g + 0.25 b` the same.
 fn turn(s: &mut Scene, f: u32) {
     let blue = f >= WARM + AT;
     let id = s.find_entity_by_name("Lamp").unwrap();

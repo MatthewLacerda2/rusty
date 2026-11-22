@@ -1,6 +1,3 @@
-//! The plan's ranges, the grid, the camera's slot and the history's weight (#1703),
-//! without a GPU.
-
 use super::params::{Built, VolumetricParams};
 use super::{grid, VolumetricPlan, GHOST_FRAMES, HISTORY_WEIGHT, VOLUME_NEAR};
 use crate::postfx::params::PostSource;

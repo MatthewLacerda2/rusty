@@ -1,4 +1,4 @@
-// engine/shaders/outline/edge.wgsl — the selection outline's ring (#1175).
+// the selection outline's ring.
 //
 // A pixel outside the selection mask (`outline/mask.wgsl`) with a mask pixel within
 // `radius` pixels is the ring. That disc test is split in two fullscreen passes,
@@ -10,7 +10,7 @@
 //    one-channel target cleared to "none".
 // 2. `fs_edge` walks its column: a row `dy` away whose row distance `dx` has
 //    dx² + dy² <= radius² is a mask pixel inside the disc. It draws over the
-//    post-FX output (#1224), as Unity's selection outline draws over the finished
+//    post-FX output, as Unity's selection outline draws over the finished
 //    scene: no tonemap, grade, bloom, SSR, motion blur or FXAA touches the ring.
 
 #import fullscreen

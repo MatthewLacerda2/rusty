@@ -1,7 +1,3 @@
-//! What counts as a cut in the motion-vector history (#1435), adapter-free: Play and
-//! Stop, and a camera swapped in at another's place in the stack; and the game time
-//! the history hands the vertex stage (#1524).
-
 use glam::{Mat4, Vec3};
 
 use super::tests::one;
@@ -27,7 +23,6 @@ fn play_and_stop_are_cuts_though_the_scene_keeps_its_id() {
     scene.set_playing(true);
     assert_eq!(frame(&scene, 3.0), (vec![at(3.0)], false), "Play is a cut");
     assert_eq!(frame(&scene, 4.0), (vec![at(3.0)], true));
-    // Stop restores the edit scene under the same `SceneId`: still a cut.
     scene.set_playing(false);
     assert_eq!(frame(&scene, 5.0), (vec![at(5.0)], false), "Stop is a cut");
 }
@@ -38,10 +33,8 @@ fn a_camera_swapped_in_at_the_same_place_has_no_last_frame() {
         super::tests::key(Scene::new().id(), Some(1)),
         MotionHistory::default(),
     );
-    // World camera 1, viewmodel camera 2 on top.
     h.begin(k, &[(Some(1), at(1.0)), (Some(2), at(10.0))]);
     h.end();
-    // A weapon switch: viewmodel camera 3 replaces 2 at the same place.
     let prev = h.begin(k, &[(Some(1), at(2.0)), (Some(3), at(30.0))]);
     assert_eq!(
         prev,
@@ -88,9 +81,6 @@ fn reset_is_a_cut_under_the_same_key() {
     assert!(mv.history.pose(7).is_none(), "the entity kept its pose");
 }
 
-/// `cut()`, what TAA forgets its history on (#1702): the view's first frame, a
-/// changed key (another scene, Play or Stop, another base camera, a camera's
-/// `Camera.ResetHistory`) and a reset (a resize), and nothing else.
 #[test]
 fn cut_names_every_frame_with_no_last_frame() {
     let (scene, mut h) = (Scene::new(), MotionHistory::default());

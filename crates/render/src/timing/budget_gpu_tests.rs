@@ -1,12 +1,3 @@
-//! The timer's 256 query pairs a frame ([`super::PAIRS`]) hold the deepest stack a
-//! test can build: a base camera running every pass that times (the sun's
-//! cascades, a full shadow atlas, Hi-Z, SSAO, SSIL, the fog, SSR, the
-//! translucents, depth of field, TAA, motion blur, bloom, the lens flare and the
-//! exposure meter) and an overlay camera, with the Hi-Z stage timed in parts
-//! (#2401: a pair per part, not one for the stage). Counted on any adapter: the
-//! timer counts the pairs it is asked for ([`super::GpuTimer::asked`]) even when
-//! it has no timestamps.
-
 use glam::{Quat, Vec3};
 
 use crate::{RenderView, OFFSCREEN_FORMAT};
@@ -14,7 +5,6 @@ use rusty_components::{CameraComponent, DofMode, ExposureMode, LightType};
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, ClearFlags, Scene};
 
-/// Shadowing point and spot lights: more than the atlas has room for.
 const LIGHTS: usize = 48;
 
 fn deepest_stack() -> Scene {

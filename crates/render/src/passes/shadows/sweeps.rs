@@ -1,7 +1,3 @@
-//! The cascades' depth sweeps (#435, #355): re-bake the static layers whose light
-//! volume moved, copy the static layers into the active array, then draw the dynamic
-//! casters over each cascade.
-
 use super::cascades::Cascade;
 use super::casters::{CasterFrame, LightVolume, Sweep};
 use super::ShadowRenderer;
@@ -10,9 +6,6 @@ use crate::lod::LodSelection;
 use crate::timing::GpuPass;
 
 impl ShadowRenderer {
-    /// Record the frame's shadow sweeps: re-bake the static layers whose light volume
-    /// moved, copy the static layers into the active array, and draw the dynamic
-    /// casters over each cascade — skipping the LOD levels `lod` hides (#472).
     pub(super) fn render_cascades(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -20,7 +13,7 @@ impl ShadowRenderer {
         lod: &LodSelection,
     ) {
         if self.cascades.is_empty() {
-            return; // no live sun (#1713): nothing to bake, copy or draw
+            return;
         }
         let scene = frame.scene;
         let statics = frame.statics;
@@ -30,14 +23,9 @@ impl ShadowRenderer {
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
         if !stale.is_empty() {
-            // The bake outlives the frame, so it cannot follow the camera's LOD
-            // choice: it bakes every group at LOD0 (#472).
             let finest = LodSelection::finest(scene);
-            // A shadowmasked sun keeps its statics out (#1695): its layers are
-            // cleared only, and no static caster is culled for them.
             let batches = match with_statics {
                 true => {
-                    // A sun is in no cell: its cascades cull nothing by the PVS.
                     let volumes: Vec<LightVolume> = stale
                         .iter()
                         .map(|&i| LightVolume::open(self.cascades[i].light_space))
@@ -71,7 +59,6 @@ impl ShadowRenderer {
         }
     }
 
-    /// Copy the frame's cascade layers from the static bake into the active array.
     fn copy_static_layers(&self, encoder: &mut wgpu::CommandEncoder) {
         let layer = |texture| wgpu::TexelCopyTextureInfo {
             texture,
@@ -91,8 +78,6 @@ impl ShadowRenderer {
     }
 }
 
-/// A depth-only pass over one cascade layer: cleared for a bake, loaded for the
-/// dynamic casters drawn over the copied statics. Timed as `shadows` (#835).
 pub(super) fn depth_pass<'a>(
     encoder: &'a mut wgpu::CommandEncoder,
     frame: &CasterFrame,

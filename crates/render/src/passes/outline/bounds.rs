@@ -1,14 +1,8 @@
-//! Where the selection sits on screen (#1175). The outline's dilation and ring are
-//! scissored to it, so their cost follows the selection's size on screen, not the
-//! view's.
-
 use glam::{Mat4, Vec2, Vec3};
 
 use crate::{MeshId, Renderer};
 use rusty_scene::Scene;
 
-/// The world space the outline can cover: the ringed solids' bounds, or everywhere
-/// when one of them has a pose that cannot be bounded.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum OutlineBounds {
     Box(Vec3, Vec3),
@@ -16,8 +10,6 @@ pub(crate) enum OutlineBounds {
 }
 
 impl Renderer {
-    /// The union of `ids`' world bounds, as the frustum cull bounds them (a skinned
-    /// mesh's posed bound, #833); `None` when none of them is resident.
     pub(crate) fn outline_bounds(&self, scene: &Scene, ids: &[u32]) -> Option<OutlineBounds> {
         ids.iter()
             .filter_map(|&id| {
@@ -41,10 +33,6 @@ impl OutlineBounds {
         }
     }
 
-    /// The pixel rectangle `[x, y, width, height]` these bounds cover in a `size`
-    /// view through `view_proj`, grown by `pad` pixels and clamped to the view;
-    /// `None` when it lies wholly outside. Bounds reaching behind the camera, or
-    /// `Everywhere`, cover the whole view.
     pub(crate) fn screen_rect(
         self,
         view_proj: Mat4,

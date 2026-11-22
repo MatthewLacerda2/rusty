@@ -1,33 +1,20 @@
-//! Two headless slots taken together (#1844): what a test keeping two renderers
-//! alive at once holds, so it never holds one slot while waiting for the other.
-//!
-//! Only tests take one (it is compiled in for the crates above, whose tests link
-//! the normal build): no engine path holds two headless renderers on purpose. A test
-//! reaches a pair through `render::test_gpu::headless_pair_or_skip`.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Weak};
 use std::thread::ThreadId;
 
 use super::{Budget, Grant, Holder, Permit, HEADLESS};
 
-/// Two slots of a [`Budget`]. Each [`Pair::permit`] is one renderer's share; the
-/// slots go back when the pair and every share are gone.
 pub(crate) struct Pair(Arc<PairSlots>);
 
 pub(super) struct PairSlots {
     budget: &'static Budget,
     holder: Option<ThreadId>,
-    /// Renderers alive on this pair's slots.
     renderers: AtomicUsize,
 }
 
-/// One renderer's share of a pair, held in its [`Permit`].
 pub(super) struct Share(Arc<PairSlots>);
 
 impl Budget {
-    /// Take two slots at once (panics: [`Budget::take`]). A checked thread's pair
-    /// then serves every single acquire on that thread ([`Budget::acquire`]).
     pub(crate) fn acquire_pair(&'static self) -> Pair {
         let holder = self.take(2);
         let slots = Arc::new(PairSlots {
@@ -43,7 +30,6 @@ impl Budget {
         Pair(slots)
     }
 
-    /// The pair the calling checked thread holds, if it holds one.
     pub(super) fn pair_of_this_thread(&self) -> Option<Pair> {
         let id = (self.holder)()?;
         let held = self.lock();
@@ -80,7 +66,6 @@ impl Drop for PairSlots {
     }
 }
 
-/// Take two slots in the process-wide budget at once.
 pub(crate) fn acquire_headless_pair() -> Pair {
     super::super::gpu_rule::check_current_thread();
     HEADLESS.acquire_pair()

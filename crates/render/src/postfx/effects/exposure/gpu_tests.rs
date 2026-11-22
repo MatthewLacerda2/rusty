@@ -1,17 +1,11 @@
-//! The exposure meter on lavapipe (#1444): a synthetic grey scene metered and
-//! adapted step by step, read back exactly after each.
-
 use super::params::Step;
 use super::ExposureParams;
 use crate::gpu::commands::Commands;
 use crate::postfx::grade::gpu::{chain, exposure, Chain, W};
 use rusty_components::{AutoExposure, ExposureMode};
 
-/// A grey scene of luminance 2^-6 meters bin 12 of 64, centred at -6.09375:
-/// exposing it to middle grey (0.18) takes log2(0.18) + 6.09375 EV.
 const DARK: f32 = 0.015625;
 const DARK_TARGET: f32 = 3.619_819;
-/// Luminance 4 meters bin 38, centred at 2.03125.
 const BRIGHT: f32 = 4.0;
 const BRIGHT_TARGET: f32 = -4.505_181;
 
@@ -19,7 +13,6 @@ fn scene(chain: &mut Chain, grey: f32) {
     chain.write_row(&[[grey; 3]; W as usize]);
 }
 
-/// Meter the chain's scene with `ae`, adapting by `step`, and read the EV back.
 fn meter(chain: &mut Chain, ae: &AutoExposure, step: Step) -> f32 {
     let Chain { r, pfx, .. } = chain;
     let params = ExposureParams::new(ae, step);
@@ -96,7 +89,6 @@ fn gpu_a_cut_snaps_and_darkening_runs_at_its_own_speed() {
     assert!(near(ev, DARK_TARGET - 0.25 * ae.speed_down), "{ev}");
     assert!(near(meter(&mut c, &ae, SNAP), BRIGHT_TARGET), "a cut snaps");
 
-    // A cut forgets the readout, and the read in flight across it.
     let Chain { r, pfx, .. } = &mut c;
     let params = ExposureParams::new(&ae, SNAP);
     let mut commands = Commands::new(&r.device, &r.queue, "Meter");
@@ -135,7 +127,6 @@ fn gpu_the_composite_applies_the_adapted_exposure() {
     let Some(mut c) = chain() else { return };
     scene(&mut c, DARK);
     let ev = meter(&mut c, &AutoExposure::default(), SNAP);
-    // The fixed run first: it bakes the grading LUT both draws read.
     let fixed = c.run(&[[DARK; 3]; W as usize], ev, None);
     let metered = c.composite(&exposure(0.0, ExposureMode::Automatic));
     assert_eq!(metered, fixed, "Automatic draws as Fixed at the adapted EV");

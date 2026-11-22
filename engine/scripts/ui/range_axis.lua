@@ -1,9 +1,4 @@
--- range_axis.lua — the axis a Slider or a Scrollbar runs along (#996).
---
--- A helper module, not a widget: it has no callbacks and is never attached to an
--- entity. Both widgets `require("ui.range_axis")`, so the maths they share — the
--- direction, where the pointer is along the track, anchoring a part over a span
--- of it, and arrow keys along it versus across it — exists once.
+-- Helper module, not a widget: the axis maths a Slider and a Scrollbar share.
 
 local RangeAxis = {}
 
@@ -30,7 +25,6 @@ function RangeAxis.track(id, event, vertical)
     return math.max(0, math.min(1, t))
 end
 
--- Anchor `id` over `lo..hi` of the track along the axis, filling it across.
 function RangeAxis.span(id, vertical, lo, hi)
     if vertical then
         RectTransform.SetAnchorMin(id, 0, lo)
@@ -41,9 +35,8 @@ function RangeAxis.span(id, vertical, lo, hi)
     end
 end
 
--- An `OnMove` on entity `id`: the arrows across the axis move the focus (and
--- this returns 0); along it, this returns the steps to take toward the value's
--- end, -1 or 1.
+-- An `OnMove` on entity `id`: arrows across the axis move the focus (returns 0);
+-- along it, returns the step toward the value's end, -1 or 1.
 function RangeAxis.move(id, event, vertical, reversed)
     local along = vertical and event.y or event.x
     if along == 0 then

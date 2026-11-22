@@ -1,9 +1,3 @@
-//! One camera's cluster cull (#1968): its buffers, kept per view and stack
-//! place like the instance cull's, readied before the stage's one pass after
-//! phase one (#2327) and read after it; `record` records its three stages
-//! between, one dispatch each for the frame (#2417): the test and the copy over
-//! the plan's chunks, the scan over its jobs.
-
 use crate::gpu::ops::CountedQueue as _;
 use std::sync::Arc;
 
@@ -18,7 +12,6 @@ use crate::passes::hiz::counters::Counter;
 use crate::passes::hiz::pyramid::Pyramid;
 use crate::Renderer;
 
-/// `hiz_clusters.wgsl`'s `Params`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Params {
@@ -32,17 +25,13 @@ struct Params {
     _pad: [u32; 2],
 }
 
-/// What a stage's group 0 binds besides the params, by binding (the test's
-/// pyramid aside): kept while none of them was replaced.
 type GroupKey<const N: usize> = ([wgpu::Buffer; N], Option<wgpu::TextureView>);
 
-/// One stacked camera's cluster buffers.
 pub(crate) struct ClusterCull {
     params: wgpu::Buffer,
     jobs: GrowBuffer,
     chunks: GrowBuffer,
     state: GrowBuffer,
-    /// The tested clusters kept, for `Debug.Stats`.
     pub(super) tally: GrowBuffer,
     out_indices: GrowBuffer,
     out_args: GrowBuffer,
@@ -50,17 +39,12 @@ pub(crate) struct ClusterCull {
     pub(super) test_group: Kept<GroupKey<6>, wgpu::BindGroup>,
     pub(super) scan_group: Kept<GroupKey<3>, wgpu::BindGroup>,
     pub(super) copy_group: Kept<GroupKey<4>, wgpu::BindGroup>,
-    /// The jobs its last cull ran.
     #[cfg(test)]
     pub(crate) ran: u32,
-    /// The clustered runs (batches) its last cull recorded.
     #[cfg(test)]
     pub(crate) runs_ran: u32,
-    /// The chunks its last cull's test and copy ran over.
     #[cfg(test)]
     pub(crate) chunks_ran: u32,
-    /// The stages its last cull dispatched, in order, with each dispatch's
-    /// workgroups (x, y).
     #[cfg(test)]
     pub(crate) dispatched: std::cell::RefCell<Vec<(crate::timing::GpuPart, (u32, u32))>>,
 }
@@ -104,18 +88,15 @@ impl ClusterCull {
         }
     }
 
-    /// The jobs' indirect args: the per-instance draws' (#2387's read back).
     pub(crate) fn args(&self) -> &wgpu::Buffer {
         self.out_args.buffer()
     }
 
-    /// The output index list, for a test's read back.
     #[cfg(test)]
     pub(crate) fn indices(&self) -> &wgpu::Buffer {
         self.out_indices.buffer()
     }
 
-    /// The tested clusters kept, for a test's read back.
     #[cfg(test)]
     pub(crate) fn tally(&self) -> &wgpu::Buffer {
         self.tally.buffer()
@@ -123,9 +104,6 @@ impl ClusterCull {
 }
 
 impl Renderer {
-    /// Ready `cull` for `plan` before the stage's merged pass opens: upload its
-    /// jobs, chunks, params and tally (a zero count), and bind its stages' groups
-    /// against `pyramid` and `visible` (this frame's instance verdicts).
     pub(crate) fn ready_clusters(
         &self,
         (cull, plan): (&mut ClusterCull, &Plan),
@@ -142,8 +120,6 @@ impl Renderer {
         }
     }
 
-    /// After the merged pass ends: copy `cull`'s count for its read back, and
-    /// return the draws that stand for `plan`'s batches among `batches`.
     pub(crate) fn clusters_drawn(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -159,8 +135,6 @@ impl Renderer {
         }
     }
 
-    /// Bind `cull`'s three group 0s, each rebuilt only when a buffer or the
-    /// pyramid it names was replaced.
     fn bind_clusters(&self, cull: &mut ClusterCull, (pyramid, visible): (&Pyramid, &wgpu::Buffer)) {
         use super::layout::{stage_group, COPY, SCAN, TEST};
         let pipes = &self.hiz.clusters;
@@ -195,7 +169,6 @@ impl Renderer {
         });
     }
 
-    /// Write `plan`'s jobs, chunks and the camera's params into `cull`'s buffers.
     fn upload_clusters(
         &self,
         cull: &mut ClusterCull,

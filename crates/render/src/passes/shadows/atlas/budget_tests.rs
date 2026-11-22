@@ -1,7 +1,3 @@
-//! The atlas follows the camera's light budget (#873): a light the per-camera cut
-//! drops is never shaded, so it never wins tiles, and never counts as dropped from
-//! the atlas either.
-
 use glam::Vec3;
 
 use super::plan::{plan, AtlasPlan};
@@ -10,9 +6,6 @@ use rusty_components::LightComponent;
 use rusty_scene::Camera;
 
 const ASPECT: f32 = 16.0 / 9.0;
-/// Lights past the camera budget: they lose its cut but, being intense, would
-/// outrank every kept light by atlas importance (which ignores colour). Every
-/// light is a point light (six tiles), so the kept ones alone overflow the atlas.
 const OVER: usize = 16;
 
 fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
@@ -30,8 +23,6 @@ fn point(i: usize, color: Vec3, intensity: f32) -> LocalLight {
     LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
-/// `MAX_VISIBLE_LIGHTS` white lights that the camera keeps (light 0 asks for no
-/// shadow), then [`OVER`] near-black, intense ones it drops.
 fn lights() -> Vec<(LocalLight, bool)> {
     let kept = (0..MAX_VISIBLE_LIGHTS).map(|i| (point(i, Vec3::ONE, 1.0), i != 0));
     let dark = Vec3::splat(0.01);

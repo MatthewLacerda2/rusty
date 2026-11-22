@@ -1,6 +1,3 @@
-//! The tiles and depth slices of the cluster grid a view-space sphere may touch
-//! (#434): what the binner visits for a light, a decal, or a spot's cone (#1712).
-
 use glam::Vec3;
 
 use super::{ClusterGrid, GRID};
@@ -8,8 +5,6 @@ use super::{ClusterGrid, GRID};
 /// A cluster range: the tiles across and up (`[first, last]` each) and the slices.
 pub(super) type Footprint = ([[u32; 2]; 2], [u32; 2]);
 
-/// The tiles and depth slices a view-space sphere may touch, or
-/// `None` when it lies wholly outside the frustum or has no reach.
 pub(super) fn footprint(grid: &ClusterGrid, center: Vec3, radius: f32) -> Option<Footprint> {
     if radius.is_nan() || radius <= 0.0 {
         return None;

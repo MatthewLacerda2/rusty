@@ -1,8 +1,3 @@
-//! A kept layout is never stale (#2412): every frame's equals a fresh
-//! `UiLayout::compute_in` (`Rig::frame` compares), an element joining or leaving
-//! the UI lays it out again, the inputs one by one (`inputs`) and the hierarchy's
-//! (`hierarchy`).
-
 use glam::{Vec2, Vec3};
 
 use super::*;
@@ -19,8 +14,6 @@ mod inputs;
 #[path = "same_tests.rs"]
 mod same;
 
-/// A canvas holding a group with a sized label, a plain label, and an Image fitted
-/// to its texture.
 pub(super) struct Ui {
     pub(super) scene: Scene,
     pub(super) canvas: u32,
@@ -79,7 +72,6 @@ pub(super) fn ui() -> Ui {
     }
 }
 
-/// One view's kept layout, laid out frame after frame.
 pub(super) struct Rig {
     kept: KeptLayout,
     pub(super) screen: Vec2,
@@ -99,8 +91,6 @@ impl Rig {
         }
     }
 
-    /// Lay `world` out, check it against a fresh layout, and say whether it was
-    /// computed.
     pub(super) fn frame(&mut self, world: &World) -> bool {
         let t = Rc::clone(&self.textures);
         let view = match &self.camera {
@@ -113,14 +103,11 @@ impl Rig {
         self.kept.why().is_some()
     }
 
-    /// Why the last frame computed, if it did.
     pub(super) fn why(&self) -> Option<Why> {
         self.kept.why()
     }
 }
 
-/// What the renderer draws of `layout`: every active element's rect, and the roots'
-/// spaces (an inactive marker's rect may lag: the module docs).
 fn drawn(world: &World, layout: &UiLayout) -> Vec<(u32, rusty_ui::UiRect, rusty_ui::CanvasSpace)> {
     let active = |(id, _): &(u32, &rusty_ui::UiRect)| world.is_active_in_hierarchy(*id);
     let row = |(id, r): (u32, &rusty_ui::UiRect)| (id, *r, layout.space(r.canvas));

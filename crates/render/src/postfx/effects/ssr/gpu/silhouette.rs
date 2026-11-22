@@ -1,7 +1,3 @@
-//! SSR's march refined below a step (#2004): a thin pole 0.3 m in front of a mirror
-//! reflects with a straight silhouette, every row, where a fixed step drew stairs
-//! and dashes. The scene and frame helpers the rough-edge test (`edge.rs`) shares.
-
 use glam::Vec3;
 
 use super::fixture::{paint, place, tuned, Surface, RED};
@@ -15,8 +11,6 @@ pub(super) const H: u32 = 240;
 pub(super) const BRONZE: [f32; 3] = [0.8, 0.55, 0.35];
 const GREEN: Surface = ([0.1, 0.9, 0.1], 0.0, 1.0);
 
-/// The fixture's scene, SSR `on` at the issue's march (64 steps of 0.3 m), the
-/// floor `floor`.
 pub(super) fn base(on: bool, floor: Surface) -> Scene {
     let (s, _) = tuned(on, floor, RED, |v| {
         v.ssr.quality = EffectQuality::Custom;
@@ -25,8 +19,6 @@ pub(super) fn base(on: bool, floor: Surface) -> Scene {
     s
 }
 
-/// A bronze mirror wall whose face is 0.3 m behind a thin green pole, the cube
-/// moved out of sight.
 fn mirror(on: bool) -> Scene {
     let mut s = base(on, ([0.5; 3], 0.0, 1.0));
     let cube = s.find_entity_by_name("Cube").unwrap();
@@ -67,8 +59,6 @@ fn green(c: [i32; 3]) -> bool {
     c[1] > c[0] + 30 && c[1] > c[2] + 30
 }
 
-/// Per row of the frame's middle band, the leftmost and rightmost pixel green in
-/// `on` but not in `off`: the pole's reflection.
 fn reflection_rows(on: &[u8], off: &[u8]) -> Vec<Option<(u32, u32)>> {
     (H / 2 - 40..H / 2 + 40)
         .map(|y| {
@@ -107,7 +97,6 @@ fn gpu_a_pole_close_to_a_mirror_reflects_with_a_straight_silhouette() {
     );
 }
 
-/// How far, at most, an edge strays from its least-squares line through the rows.
 fn wobble(rows: &[(f32, f32, f32)], edge: fn(&(f32, f32, f32)) -> f32) -> f32 {
     let n = rows.len().max(1) as f32;
     let (my, mx) = (

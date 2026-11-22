@@ -1,13 +1,6 @@
-//! The probe family's one line list: each probe's tint on both ends of each of its
-//! segments, each family only under its gizmo, a reflection probe's volume and an
-//! Area light's shape only when selected, and one buffer and one draw for a
-//! thousand probes on a GPU.
-
 use super::*;
 use crate::draw::overlays::OverlayDraws;
 
-/// A scene of `n` light probes, each with its own SH tint, and two reflection probes,
-/// the second inspected.
 fn probed(n: usize) -> Scene {
     let mut scene = Scene::new();
     for i in 0..n {
@@ -22,7 +15,6 @@ fn probed(n: usize) -> Scene {
     scene
 }
 
-/// Two Area lights at `x`, the second selected; returns their ids.
 fn lit(scene: &mut Scene) -> Vec<u32> {
     let mut ids = Vec::new();
     for x in [10.0, 20.0] {
@@ -40,7 +32,6 @@ fn lit(scene: &mut Scene) -> Vec<u32> {
     ids
 }
 
-/// Each run of `got` matches `want`'s positions, every vertex in `tint`.
 fn holds(got: &[Vertex], want: &[Vertex], tint: [f32; 4]) {
     assert_eq!(got.len(), want.len());
     for (v, a) in got.iter().zip(want) {
@@ -68,8 +59,6 @@ fn every_probe_segment_carries_its_probes_tint_on_both_ends() {
     holds(&lines[crosses + 24..], &panel, AREA_TINT);
 }
 
-/// An unselected Area light and an unselected reflection probe add no line; a
-/// selected one adds its shape, and an Area light no line out to its range.
 #[test]
 fn only_the_selected_area_light_and_inspected_probe_draw() {
     let mut scene = probed(0);
@@ -111,8 +100,6 @@ fn each_family_hides_under_its_own_gizmo() {
     assert!(probe_lines(&scene, &set).is_empty());
 }
 
-/// A thousand light probes and an inspected reflection probe: the whole family is one
-/// vertex buffer at one overlay slot, drawn once.
 #[test]
 fn gpu_a_thousand_probes_draw_in_one_draw_from_one_buffer() {
     let Some(r) = crate::test_gpu::headless_or_skip(16, 16) else {

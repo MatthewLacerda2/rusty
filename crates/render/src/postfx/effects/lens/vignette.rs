@@ -1,5 +1,3 @@
-//! The vignette (#1439): a composite function on the graded image.
-
 use super::super::{Composite, EffectCx, History, Owner, Phase, PostEffect};
 use crate::postfx::params::Gate;
 use rusty_components::Vignette;
@@ -23,9 +21,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
-/// Slot 0: intensity (`0` when it doesn't run), smoothness, centre; slot 1: the
-/// colour. Every knob is clamped to its range, since a loaded file bypasses the ops'
-/// clamps: a zero smoothness would make the shader's `pow(0, 0)` a NaN.
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let v = &vc.vignette;

@@ -1,24 +1,3 @@
-//! The point and spot light shadow atlas (#468), Unity URP's additional-lights way.
-//!
-//! One depth texture holds every shadowed local light's maps as square tiles: one
-//! perspective view for a spotlight, six cube faces for a point light. Each frame
-//! [`plan`] ranks the candidate lights and sizes their tiles, [`slots`] places
-//! them and keeps each light's tiles from frame to frame (#1711), every
-//! tile's casters are drawn into its viewport through the cascades' own depth
-//! pipelines — so cutout and dissolve casters clip (#648) and skinned ones are posed
-//! (#599) here too — and each light's first tile index rides its `LocalLight`
-//! record. The forward shader finds the tile through `local_shadow_tile` in
-//! `common.wgsl` and filters it with PCF.
-//!
-//! Static casters are cached per tile, as the cascades cache them per layer (#694,
-//! Unity URP's cached additional-light shadows): a second, static atlas keeps each
-//! tile's static casters, re-baked only when that tile goes stale ([`cache`]). The
-//! active atlas persists too: a tile whose bake moved or that a dynamic caster
-//! reaches (or reached last frame) is copied from the static atlas and the dynamic
-//! casters are drawn over it; any other tile already holds its statics and is left
-//! alone ([`sweep`]). WebGPU copies depth only as whole
-//! subresources, so the copy and a stale tile's clear are small draws ([`blit`]).
-
 mod alloc;
 mod blit;
 mod cache;
@@ -35,14 +14,11 @@ use super::LIGHT_SPACE_STRIDE;
 use blit::TileBlit;
 use cache::StaticTiles;
 
-/// One tile as the forward shader reads it: `ShadowTile` in `common.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ShadowTile {
     pub view_proj: [f32; 16],
-    /// The tile in atlas UVs: `xy` top-left corner, `zw` size.
     pub rect: [f32; 4],
-    /// `x` world texel size one metre from the light; `yzw` unused.
     pub params: [f32; 4],
 }
 
@@ -59,47 +35,29 @@ impl ShadowTile {
     }
 }
 
-/// The active and static atlases, the tile array the forward shader reads, and the
-/// depth passes' own light matrices and casters.
 pub(crate) struct ShadowAtlas {
-    /// The active atlas texture; only the tests read it back, everything else draws
-    /// and samples it through `view`.
     #[cfg_attr(
         not(test),
         expect(dead_code, reason = "only the tests read the atlas texture back")
     )]
     pub(super) texture: wgpu::Texture,
-    /// The whole active atlas: the frame's depth pass's target and the forward
-    /// shader's input.
     pub view: wgpu::TextureView,
     _static_texture: wgpu::Texture,
-    /// The static atlas: each baked tile's static casters (#694).
     static_view: wgpu::TextureView,
-    /// Which tiles the static atlas holds, for which scene.
     static_tiles: StaticTiles,
-    /// Which tiles of the active atlas hold only their static copy (#1711).
     clean_tiles: StaticTiles,
-    /// Whether the active atlas was never drawn: its first pass clears it.
     fresh: bool,
-    /// Where each light's tiles live, frame after frame (#1711).
     pub(crate) slots: ShadowSlots,
     blit: TileBlit,
-    /// [`MAX_TILES`] `ShadowTile`s, fixed-size so the forward group never rebuilds.
     pub tiles: wgpu::Buffer,
     light_space: wgpu::Buffer,
     pub(super) global: wgpu::BindGroup,
-    /// The static bake's and the dynamic pass's casters: both are recorded before
-    /// one submit, so each needs its own buffer.
     pub(super) static_casters: CasterBuffer,
     pub(super) dynamic_casters: CasterBuffer,
-    /// This frame's tiles, in the order their light-space matrices were uploaded.
     frame_tiles: Vec<Tile>,
 }
 
 impl ShadowAtlas {
-    /// The atlases, their buffers, the depth passes' group 0 over `global_layout`
-    /// (light matrix by dynamic offset, and the cuts' game time from `time_buffer`),
-    /// and the tile blits over `blit_shader` (`shadow_atlas.wgsl`).
     pub(super) fn new(
         device: &wgpu::Device,
         [global_layout, entity_layout]: [&wgpu::BindGroupLayout; 2],
@@ -150,8 +108,6 @@ impl ShadowAtlas {
         }
     }
 
-    /// Adopt this frame's tiles: upload what the depth pass and the shader read,
-    /// each buffer in one write.
     pub(crate) fn update(&mut self, queue: &wgpu::Queue, tiles: Vec<Tile>) {
         if !tiles.is_empty() {
             let gpu: Vec<ShadowTile> = tiles.iter().map(ShadowTile::new).collect();
@@ -161,15 +117,12 @@ impl ShadowAtlas {
         self.frame_tiles = tiles;
     }
 
-    /// Forget every tile's static bake, so each re-bakes on its next frame (and is
-    /// copied into the active atlas again).
     pub(super) fn invalidate(&mut self) {
         self.static_tiles.clear();
         self.clean_tiles.clear();
     }
 }
 
-/// Every tile's light matrix at its dynamic-offset stride, for one upload.
 fn light_space_bytes(tiles: &[Tile]) -> Vec<u8> {
     let stride = LIGHT_SPACE_STRIDE as usize;
     let mut bytes = vec![0u8; stride * tiles.len()];
@@ -180,7 +133,6 @@ fn light_space_bytes(tiles: &[Tile]) -> Vec<u8> {
     bytes
 }
 
-/// A 2048² depth atlas: drawn into, sampled, and copied out by the tests' readback.
 fn depth_texture(device: &wgpu::Device, label: &str) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some(label),

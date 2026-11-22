@@ -1,38 +1,19 @@
-//! crates/render/src/ui/text/sdf.rs — one glyph's signed distance field (#419).
-//!
-//! The glyph's flattened outline (`FontData::outline`) is filled at
-//! [`SUPERSAMPLE`]× the atlas base size — non-zero winding, sampled at each cell's
-//! centre, so a cell is inside or outside — and run through an exact Euclidean distance transform
-//! (Felzenszwalb–Huttenlocher) both ways; each base-size texel averages the signed
-//! distances of its supersampled block. Distances are stored as
-//! `0.5 + d / (2 · SPREAD)` (inside positive), so the edge is 0.5 and the field
-//! reaches [`SPREAD`] base pixels past it — the room outline, glow and faux bold
-//! have to grow into. Pure CPU.
-
 use glam::Vec2;
 
 use rusty_font::{FontData, GlyphId};
 
-/// The em size glyphs are generated at, in atlas pixels.
 pub(crate) const BASE_SIZE: f32 = 48.0;
-/// How far the field reaches past the edge, in atlas pixels (also each glyph's
-/// padding). An outline + glow + bold reach of up to `SPREAD / BASE_SIZE` ems fits.
 pub(crate) const SPREAD: f32 = 12.0;
-/// Supersampling factor of the coverage raster the field is measured on.
 const SUPERSAMPLE: usize = 4;
 
-/// One glyph's field.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct GlyphField {
     pub(crate) width: u32,
     pub(crate) height: u32,
-    /// Row-major, top row first.
     pub(crate) pixels: Vec<u8>,
-    /// The bitmap's bottom-left corner relative to the pen, base pixels, y up.
     pub(crate) origin: Vec2,
 }
 
-/// The field of `glyph` in `font`, or `None` for an empty glyph (a space).
 pub(crate) fn glyph_field(font: &FontData, glyph: GlyphId) -> Option<GlyphField> {
     let s = SUPERSAMPLE as f32;
     let segments = font.outline(glyph, BASE_SIZE * s)?;
@@ -44,7 +25,6 @@ pub(crate) fn glyph_field(font: &FontData, glyph: GlyphId) -> Option<GlyphField>
         return None;
     }
     let pad = SPREAD as i32;
-    // The base grid, y up: `(x0, y0)` is its bottom-left corner relative to the pen.
     let (x0, y0) = (
         (lo.x / s).floor() as i32 - pad,
         (lo.y / s).floor() as i32 - pad,
@@ -66,8 +46,6 @@ pub(crate) fn glyph_field(font: &FontData, glyph: GlyphId) -> Option<GlyphField>
     })
 }
 
-/// The non-zero-winding inside mask of `segments` over a `(w, h)` cell grid whose
-/// top-left corner is `corner` (y up; rows top first), sampled at cell centres.
 fn fill(segments: &[[Vec2; 2]], corner: Vec2, w: usize, h: usize) -> Vec<bool> {
     let mut inside = vec![false; w * h];
     let mut crossings: Vec<(f32, i32)> = Vec::new();
@@ -88,7 +66,6 @@ fn fill(segments: &[[Vec2; 2]], corner: Vec2, w: usize, h: usize) -> Vec<bool> {
             if winding == 0 {
                 continue;
             }
-            // Cells whose centre lies in [pair[0].x, pair[1].x).
             let from = (pair[0].0 - corner.x - 0.5).ceil().max(0.0) as usize;
             let to = ((pair[1].0 - corner.x - 0.5).ceil().max(0.0) as usize).min(w);
             for cell in &mut inside[row * w + from.min(w)..row * w + to] {
@@ -99,8 +76,6 @@ fn fill(segments: &[[Vec2; 2]], corner: Vec2, w: usize, h: usize) -> Vec<bool> {
     inside
 }
 
-/// Signed distance per supersampled cell, in supersampled cells: positive inside,
-/// the edge halfway between an inside and an outside cell centre.
 fn signed_distance(inside: &[bool], w: usize, h: usize) -> Vec<f32> {
     let to_inside = edt(inside, w, h, true);
     let to_outside = edt(inside, w, h, false);
@@ -117,7 +92,6 @@ fn signed_distance(inside: &[bool], w: usize, h: usize) -> Vec<f32> {
         .collect()
 }
 
-/// Average each base texel's supersampled block and encode it.
 fn downsample(signed: &[f32], w: usize, h: usize) -> Vec<u8> {
     let sw = w * SUPERSAMPLE;
     let n = (SUPERSAMPLE * SUPERSAMPLE) as f32;
@@ -137,7 +111,6 @@ fn downsample(signed: &[f32], w: usize, h: usize) -> Vec<u8> {
     out
 }
 
-/// Squared distance from each cell to the nearest cell whose mask equals `target`.
 fn edt(mask: &[bool], w: usize, h: usize, target: bool) -> Vec<f32> {
     const FAR: f32 = 1e20;
     let mut grid: Vec<f32> = mask
@@ -161,8 +134,6 @@ fn edt(mask: &[bool], w: usize, h: usize, target: bool) -> Vec<f32> {
     grid
 }
 
-/// The 1D squared distance transform of sampled function `f` (lower envelope of
-/// parabolas).
 fn edt_1d(f: &[f32]) -> Vec<f32> {
     let n = f.len();
     let mut d = vec![0.0; n];
@@ -177,7 +148,7 @@ fn edt_1d(f: &[f32]) -> Vec<f32> {
     for q in 1..n {
         let mut s = parabola(q, v[k]);
         while s <= z[k] {
-            k -= 1; // z[0] is -inf, so this stops at the first parabola
+            k -= 1;
             s = parabola(q, v[k]);
         }
         k += 1;

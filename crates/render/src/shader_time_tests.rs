@@ -1,7 +1,3 @@
-//! Shaders see the sim's game time (#398): a baked `uv_scroll_stripes` surface
-//! variant renders different pixels at two `Scene::shader_time` values, and the
-//! same pixels when the time repeats — so it scrolls, and only with game time.
-
 use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -12,8 +8,6 @@ use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 
 const RES: u32 = 32;
 
-/// A surface variant with strong, slow-to-alias stripes: a quarter game second moves
-/// them a quarter stripe, which changes every pixel's band brightness.
 fn stripes_shader() -> std::path::PathBuf {
     let params = [("frequency", 2.0), ("strength", 1.0), ("speed", 1.0)]
         .into_iter()
@@ -38,7 +32,6 @@ fn stripes_shader() -> std::path::PathBuf {
     path
 }
 
-/// An emissive box filling the view, so the stripes are the only variation.
 fn glowing_box() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();

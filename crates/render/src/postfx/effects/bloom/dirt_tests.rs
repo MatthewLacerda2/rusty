@@ -1,13 +1,8 @@
-//! The lens dirt's file (#1442) and the engine's own dirt texture, which is this
-//! generator's output: `RUSTY_BLESS_LENS_DIRT=1` writes it again.
-
 use super::cache::file;
 use rusty_components::rendering::post_processing::DEFAULT_DIRT_TEXTURE;
 
 const SIDE: u32 = 256;
 
-/// A neutral grey smudge texture: a faint film, soft blotches and small specks,
-/// placed by a fixed linear congruential sequence so it never changes.
 fn generate() -> image::RgbaImage {
     let mut seed = 0x1442_u64;
     let mut next = move || {
@@ -19,9 +14,9 @@ fn generate() -> image::RgbaImage {
     let mut spots = Vec::new();
     for i in 0..160 {
         let (radius, strength) = if i < 40 {
-            (8.0 + next() * 40.0, 0.12 + next() * 0.25) // blotches
+            (8.0 + next() * 40.0, 0.12 + next() * 0.25)
         } else {
-            (0.8 + next() * 2.5, 0.35 + next() * 0.6) // specks
+            (0.8 + next() * 2.5, 0.35 + next() * 0.6)
         };
         spots.push((next() * SIDE as f32, next() * SIDE as f32, radius, strength));
     }
@@ -49,7 +44,6 @@ fn the_engine_dirt_texture_is_the_generator_output() {
         .expect("engine/textures/lens_dirt.png")
         .to_rgba8();
     assert_eq!(shipped.dimensions(), made.dimensions());
-    // ±1 per channel: `f32::exp` may differ by an ulp between glibc and Apple's libm.
     let near = (shipped.as_raw().iter().zip(made.as_raw())).all(|(a, b)| a.abs_diff(*b) <= 1);
     assert!(near, "re-bless with RUSTY_BLESS_LENS_DIRT=1");
 }
@@ -59,7 +53,6 @@ fn the_default_dirt_reads_from_the_engine_folder_and_a_path_as_it_is() {
     let want = rusty_core::project::engine_path("textures/lens_dirt.png");
     assert_eq!(file(DEFAULT_DIRT_TEXTURE).as_str(), want);
     assert_eq!(file("assets/dirt.png").as_str(), "assets/dirt.png");
-    // Any `engine/…` path is the engine's, by the one rule texture recipes use too.
     let other = rusty_core::project::engine_path("textures/other.png");
     assert_eq!(file("engine/textures/other.png").as_str(), other);
 }

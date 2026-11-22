@@ -1,7 +1,3 @@
-//! GPU instancing's visual-equivalence guard (#470): a prop-heavy scene rendered with
-//! instanced draws must produce exactly the pixels of one draw per entity, while
-//! issuing far fewer draw calls. Skips when no adapter is present.
-
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -18,9 +14,6 @@ fn material(scene: &mut Scene, id: u32, name: &str) {
         .set_material(id, Some(MaterialComponent::new(name.to_string())));
 }
 
-/// A 6×6 yard of three prop meshes under a shadow-casting sun: most share the default
-/// material, every 4th is red (a second batch per mesh), every 7th is translucent
-/// glass (the sorted pass), so every grouping rule is on screen at once.
 fn prop_yard() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -61,7 +54,6 @@ fn prop_yard() -> Scene {
     scene
 }
 
-/// Render `scene` once with instancing on or off; the pixels and what was submitted.
 fn render(renderer: &mut Renderer, scene: &Scene, instancing: bool) -> (Vec<u8>, RenderCounters) {
     renderer.instancing = instancing;
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, W, H);
@@ -82,7 +74,6 @@ fn gpu_instanced_props_render_the_same_pixels_as_one_draw_each() {
     let (per_entity, before) = render(&mut renderer, &scene, false);
     let (instanced, after) = render(&mut renderer, &scene, true);
 
-    // The same work reached the GPU — every entity, every triangle — in fewer calls.
     assert!(
         before.visible_entities >= 30,
         "the yard is on screen: {before:?}"
@@ -93,14 +84,12 @@ fn gpu_instanced_props_render_the_same_pixels_as_one_draw_each() {
         after.draw_calls * 3 < before.draw_calls,
         "instancing should collapse the props: {before:?} -> {after:?}"
     );
-    // One caster draw per mesh per cascade (#435): each cascade is its own depth pass.
     let cascades = crate::passes::shadows::cascades::MAX_CASCADES as u32;
     assert!(
         after.shadow_draws <= 3 * cascades,
         "one caster draw per mesh per cascade: {after:?}"
     );
 
-    // And the image is identical, pixel for pixel.
     let distinct: std::collections::HashSet<_> = per_entity.chunks(4).collect();
     assert!(distinct.len() > 8, "the frame actually shows the props");
     let differing = per_entity

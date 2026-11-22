@@ -1,17 +1,8 @@
-//! One view's SSIL state (#1750), held in `PostFx::targets` while the view runs it:
-//! the source (last frame's realtime light), the gather and its blur, the two
-//! results the accumulate alternates between and the normals beside each, the
-//! full-resolution result the
-//! forward pass reads, and what the history was drawn from. Made at the view's
-//! size and the quality's divisor, rebuilt (history and all) when either changes;
-//! a resize drops it with every slot.
-
 use super::pass::NORMAL_FORMAT;
 use super::{Previous, SsilUniform};
 use crate::motion::HistoryKey;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 
-/// What last frame left: its source and result, drawn from this camera for this key.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct History {
     pub key: HistoryKey,
@@ -19,32 +10,22 @@ pub(super) struct History {
 }
 
 pub(crate) struct SsilTargets {
-    /// `(width, height, divisor)` these were made for.
     key: (u32, u32, u32),
     pub(super) source: PfxTarget,
     pub(super) raw: PfxTarget,
     pub(super) blurred: PfxTarget,
     pub(super) results: [PfxTarget; 2],
-    /// The normal of each result's texels, which next frame's accumulate rejects
-    /// a turned surface's history by.
     pub(super) normals: [PfxTarget; 2],
-    /// The full-resolution result; `None` at full resolution, where the forward
-    /// pass reads the current result itself.
+    /// `None` at full resolution, where the forward pass reads the result itself.
     pub(super) full: Option<PfxTarget>,
     pub(super) uniform: wgpu::Buffer,
-    /// Which of `results` this frame's accumulate writes.
     pub(super) current: usize,
-    /// Frames run, modulo 64: turns the gather's noise.
     pub(super) index: u32,
-    /// What the source and last result hold; `None` until the source is first kept,
-    /// and after anything that invalidates them.
     pub(super) history: Option<History>,
-    /// The forward pass's scene group with this frame's result, while it runs this frame.
     pub(crate) forward_group: Option<wgpu::BindGroup>,
 }
 
 impl SsilTargets {
-    /// Are these the targets for a `width` x `height` view at `divisor`?
     pub(super) fn matches(&self, (width, height): (u32, u32), divisor: u32) -> bool {
         self.key == (width, height, divisor)
     }
@@ -77,13 +58,11 @@ impl SsilTargets {
         }
     }
 
-    /// The gather's resolution.
     pub(super) fn raw_size(&self) -> (u32, u32) {
         let size = self.raw.texture.size();
         (size.width, size.height)
     }
 
-    /// What the forward pass reads: the full-resolution result, or the current one.
     pub(super) fn result(&self) -> &wgpu::TextureView {
         let current = &self.results[self.current].view;
         self.full.as_ref().map_or(current, |t| &t.view)
@@ -92,13 +71,10 @@ impl SsilTargets {
 
 #[cfg(test)]
 impl PostFx {
-    /// Whether the view holds SSIL's state (it ran this frame).
     pub(crate) fn holds_ssil(&self) -> bool {
         self.targets.get::<SsilTargets>().is_some()
     }
 
-    /// Write NaN over the source's middle 8x8 texels, as a broken frame's light
-    /// would leave them.
     pub(crate) fn poison_ssil_source(&self, queue: &wgpu::Queue) {
         let t = self.targets.get::<SsilTargets>().expect("ran");
         let size = t.source.texture.size();
@@ -123,8 +99,7 @@ impl PostFx {
         queue.write_texture(at, &bytes, layout, block);
     }
 
-    /// The result the forward pass read this frame, decoded as stored (a NaN stays
-    /// one).
+    /// Decoded as stored (a NaN stays one).
     pub(crate) fn ssil_result(
         &self,
         device: &wgpu::Device,
@@ -138,7 +113,6 @@ impl PostFx {
         )
     }
 
-    /// This frame's blur and accumulate, at the gather's resolution, and its width.
     pub(crate) fn ssil_accumulate(
         &self,
         device: &wgpu::Device,
@@ -151,7 +125,6 @@ impl PostFx {
     }
 }
 
-/// `target`'s `Rgba16Float` texels, their rgb as stored.
 #[cfg(test)]
 fn decode(device: &wgpu::Device, queue: &wgpu::Queue, target: &PfxTarget) -> Vec<glam::Vec3> {
     let size = target.texture.size();

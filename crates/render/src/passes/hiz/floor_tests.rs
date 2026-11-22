@@ -1,9 +1,5 @@
-//! Who culls by Hi-Z (#2338), with no adapter: the instance floor, and the
-//! preset, camera and capture rules beside it.
-
 use super::{culls, draws_enough, MIN_INSTANCES};
 
-/// No batch drawn by cluster, or one.
 fn no() -> bool {
     false
 }

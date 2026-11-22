@@ -1,35 +1,8 @@
-//! crates/render/src/setup/gpu_rule.rs — which tests are GPU tests, decided by name (#484).
-//!
-//! Under cargo-nextest every test runs in its own process, so the in-process
-//! [`budget`](super::budget) no longer bounds how many renderers exist at once. The
-//! nextest equivalent is the GPU test group in `.config/nextest.toml` (`gpu`, or
-//! `gpu-macos` on macOS, both chosen by the one filter), and a test group selects
-//! tests by **name** — it cannot see which tests build a renderer. So
-//! the name carries it:
-//!
-//! - an integration test that renders lives under `tests/gpu/` (path `gpu::…`);
-//! - an in-crate test that renders has a function name starting with `gpu_`.
-//!
-//! A rule a filter depends on drifts the moment someone forgets it, so it is checked
-//! where renderers are made: in debug builds, a test thread that builds a headless
-//! renderer without a GPU name panics and says why. libtest (and nextest, which
-//! runs it) names each test's thread after the test, which is what makes this work.
-
-/// Whether libtest's full test name (`module::path::test_fn`) marks a GPU test.
-///
-/// `integration` says the test runs in the integration binary (`tests/main.rs`),
-/// nextest's `kind(test)`: only there does a `gpu::` path count, since this crate's
-/// own unit tests sit under its `gpu` module and are named `gpu::…` too.
 pub(crate) fn is_gpu_test(name: &str, integration: bool) -> bool {
     let test_fn = name.rsplit("::").next().unwrap_or(name);
     (integration && name.starts_with("gpu::")) || test_fn.starts_with("gpu_")
 }
 
-/// Panic when a test thread builds a headless renderer without a GPU test name.
-///
-/// Test threads are recognised by a `::` in the thread name — every test in this
-/// crate sits in a module — and no engine thread is named that way. Debug builds
-/// only: tests always are, and a ship build has no tests to police.
 pub(crate) fn check_current_thread() {
     if !cfg!(debug_assertions) {
         return;
@@ -54,7 +27,6 @@ pub(crate) fn check_current_thread() {
 mod tests {
     use super::is_gpu_test;
 
-    /// The nextest filterset for [`is_gpu_test`], exactly as `.config/nextest.toml` has it.
     const NEXTEST_FILTER: &str = "(kind(test) & test(/^gpu::/)) | test(/(^|::)gpu_[^:]*$/)";
 
     #[test]
@@ -90,8 +62,6 @@ mod tests {
         assert!(!is_gpu_test("physics::tests::gpu", true));
     }
 
-    /// The Rust predicate and the nextest filter are one rule written twice; this pins
-    /// the second copy so editing either alone fails here.
     #[test]
     fn nextest_config_uses_the_same_filter() {
         let config = include_str!("../../../../.config/nextest.toml");

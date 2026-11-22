@@ -1,6 +1,3 @@
-//! The prefilter in HDR (#1696): nothing is clamped, and a small bright source
-//! blurs into a smooth lobe at high roughness rather than speckle.
-
 use glam::Vec3;
 
 use super::cpu::{convolve, prefilter, Taps};
@@ -10,8 +7,6 @@ use crate::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::ibl::reflection_prefilter::source::decode_face as texels;
 use crate::{CubemapCapture, CubemapFace};
 
-/// A black room with one small lamp of radiance `lamp`: a 2×2 patch at the centre
-/// of the +Z face.
 fn lamp_capture(res: u32, lamp: f32) -> CubemapCapture {
     let mut faces: [Vec<Vec3>; 6] = std::array::from_fn(|_| vec![Vec3::ZERO; (res * res) as usize]);
     for (x, y) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
@@ -24,8 +19,6 @@ fn lamp_capture(res: u32, lamp: f32) -> CubemapCapture {
     }
 }
 
-/// A lamp of radiance 10 is 10 in the stored mirror mip, and every rough mip keeps
-/// light above 1 around it: nothing in the chain clamps at display white.
 #[test]
 fn an_hdr_lamp_keeps_its_radiance_in_the_chain() {
     let cube = prefilter(&lamp_capture(16, 10.0));
@@ -43,9 +36,6 @@ fn an_hdr_lamp_keeps_its_radiance_in_the_chain() {
     );
 }
 
-/// The energy of a small bright source survives a rough lobe: summed over the face
-/// that sees it, the roughest mips hold about what the mirror mip does, so a lamp
-/// does not vanish from rough metal.
 #[test]
 fn a_rough_mip_keeps_a_small_lamps_energy() {
     let res = 32;
@@ -66,9 +56,6 @@ fn a_rough_mip_keeps_a_small_lamps_energy() {
     );
 }
 
-/// At high roughness one small bright source is a smooth glow: the bake's 128
-/// filtered taps land close to a 16384-tap ground truth over the face that sees it,
-/// where 128 taps of the base level alone leave a speckle of the few that hit it.
 #[test]
 fn a_high_roughness_mip_of_a_small_lamp_is_smooth() {
     let res = 64;
@@ -104,19 +91,12 @@ fn a_high_roughness_mip_of_a_small_lamp_is_smooth() {
     }
 }
 
-/// The ground truth's taps: enough that every one of the lamp's texels is hit often.
 const TRUTH: Taps = Taps {
     count: 16384,
     filtered: false,
 };
-/// The bake's tap count without the per-tap mip: the speckle filtering removes.
 const BASE_ONLY: Taps = Taps {
     count: SAMPLE_COUNT,
     filtered: false,
 };
-/// The bake's root-mean-square distance from the truth, as a part of the truth's peak.
-/// Measured: 0.014, 0.051 and 0.177 at mips 2–4, against 0.099, 0.50 and 0.63 for
-/// the base level alone. The roughest mips (5 and 6 here, two texels and one) stay
-/// about 0.4 off: their taps read the 1×1 and 2×2 source levels by nearest texel,
-/// which a bilinear lookup across face edges would smooth.
 const MAX_ERROR: f32 = 0.25;

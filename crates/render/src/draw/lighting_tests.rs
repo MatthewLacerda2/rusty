@@ -1,16 +1,9 @@
-//! Which lights the realtime path uploads, by mode (#809): a frame drops `Baked`
-//! lights a bake took in, a bake capture drops `Realtime` ones; a frame previews a
-//! `Baked` light no bake has taken in yet (#2522).
-
 use super::{apply_capture, apply_scene_lights, default_lighting_uniform};
 use crate::clusters::local_lights;
 use crate::ibl::cubemap_capture::CaptureMode;
 use rusty_components::{LightComponent, LightMode, LightType};
 use rusty_scene::Scene;
 
-/// One light of `light_type` per mode, in `LightMode::ALL` order, each a different
-/// intensity (1, 2, 3) so the upload says which survived, the `Baked` one taken in
-/// by a bake.
 fn one_per_mode(light_type: LightType) -> Scene {
     let mut scene = unbaked_per_mode(light_type);
     let baked = (scene.world.ids_with_light().into_iter())
@@ -22,7 +15,6 @@ fn one_per_mode(light_type: LightType) -> Scene {
     scene
 }
 
-/// [`one_per_mode`] before any bake.
 fn unbaked_per_mode(light_type: LightType) -> Scene {
     let mut scene = Scene::new();
     for (k, mode) in LightMode::ALL.into_iter().enumerate() {

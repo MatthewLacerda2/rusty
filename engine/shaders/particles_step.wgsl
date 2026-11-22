@@ -1,18 +1,3 @@
-// engine/shaders/particles_step.wgsl — a GPU-simulated emitter's update (#2170).
-//
-// `cs_birth` writes the births the CPU made since the last upload into their slots;
-// `cs_step` then moves every live particle up to the step the sim has reached. The
-// steps in the uploaded window (`dts`, at most the sim's `DT_HISTORY`) are taken
-// one at a time, each by the `dt` that step took, so on one adapter a run draws the
-// same particles whatever the frame rate; steps older than the window (a renderer
-// that drew nothing for longer, a long `Harness.Step`) are one closed-form `jump`,
-// aged by the time they took (a birth's own, or the emitter's for the particles
-// stepped at the last upload, from the sim's running time) and moved at their
-// mean `dt`, so the loop is bounded by the window. A step is the
-// CPU path's (`app::systems::particles::integrate_and_collide`) minus collision:
-// gravity, the drag curve, the spin curve, velocity, age; a particle whose age
-// reaches its lifetime is dead. The Rust mirror is
-// `render::passes::particles::gpu::twin::advance`.
 
 #import particles::gpu::{GpuParticle, GpuBirth, EMPTY, gpu_emitter, life_t, lut_at}
 
@@ -28,8 +13,8 @@ fn cs_birth(@builtin(global_invocation_id) id: vec3<u32>) {
     let b = births[id.x];
     var p = b.particle;
     let first = gpu_emitter.info.w;
-    // A birth older than the window jumps by its own time, so `cs_step`'s jump
-    // (the emitter's time) is only ever the particles stepped at the last upload.
+    // A birth older than the window jumps by its own time, so `cs_step`'s jump (the emitter's
+    // time) is only ever the particles stepped at the last upload.
     if (p.next != EMPTY && p.next < first) {
         jump(&p, first - p.next, gpu_emitter.gravity.xyz, b.jumped);
         p.next = select(first, EMPTY, is_dead(p));
@@ -42,10 +27,6 @@ fn is_dead(p: GpuParticle) -> bool {
     return !(p.age < p.lifetime);
 }
 
-// `n` steps that took `span` seconds at once, the curves held where `p` is in its
-// life: aged by `span`, moved by the sum of the step's geometric velocity series
-// (v <- (v + g dt) k, k the drag factor) at the mean `dt` and of the positions it
-// passes.
 fn jump(p: ptr<function, GpuParticle>, n: u32, g: vec3<f32>, span: f32) {
     let curves = lut_at(0u, life_t(*p));
     let nf = f32(n);

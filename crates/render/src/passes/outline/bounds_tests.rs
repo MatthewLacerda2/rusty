@@ -1,13 +1,8 @@
-//! The outline's scissor (#1175): the selection's bounds on screen, padded by the
-//! ring, clamped to the view, the whole view when they reach behind the camera, and
-//! nothing when they lie outside it. No GPU.
-
 use glam::{Mat4, Vec3};
 
 use super::bounds::OutlineBounds;
 use rusty_scene::Camera;
 
-/// A square view looking down -Z from 10 units away, through a 90° lens.
 fn view_proj() -> Mat4 {
     let mut cam = Camera::new(Vec3::Z * 10.0, -90.0, 0.0);
     cam.fov = 90.0;
@@ -16,7 +11,6 @@ fn view_proj() -> Mat4 {
 
 #[test]
 fn a_box_ahead_covers_its_projection_padded() {
-    // A flat 2 x 2 square at the origin spans 10 px of a 100 px view, centred.
     let square = OutlineBounds::Box(Vec3::new(-1.0, -1.0, 0.0), Vec3::new(1.0, 1.0, 0.0));
     assert_eq!(
         square.screen_rect(view_proj(), (100, 100), 0),

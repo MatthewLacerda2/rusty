@@ -1,9 +1,3 @@
-//! The gameplay surface blocks on the GPU (#401): each one, baked and named by a
-//! material, renders a lit, non-black sphere that differs from the plain shader;
-//! the animated ones change with game time and repeat when it does. The sphere's
-//! base map is missing, so it shows the checker — which `uv_scroll` visibly moves.
-//! Skips with no adapter.
-
 use glam::Vec3;
 
 use super::params_tests::{sphere, RES};
@@ -13,7 +7,6 @@ use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// One baked single-block surface shader, unique to this run; removed on drop.
 struct Baked(String);
 
 impl Baked {
@@ -40,8 +33,6 @@ impl Drop for Baked {
     }
 }
 
-/// A sun-lit, checkered sphere filling most of the view, drawn by `shader` ("" is
-/// the engine's plain forward shader).
 fn checkered_sphere(shader: &str) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -76,7 +67,6 @@ fn gpu_gameplay_blocks_render_differ_from_plain_and_animate_with_game_time() {
         return;
     };
     let plain = frame(&mut renderer, &mut checkered_sphere(""), 0.3);
-    // (block, animates with game time)
     for (block, animated) in [
         ("pulse_glow", true),
         ("uv_scroll", true),

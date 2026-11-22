@@ -14,7 +14,6 @@ fn tiles_cover_half_the_longest_streak_in_steps_of_eight() {
     assert_eq!(tile_size(0.0), 8, "a tile is never empty");
     assert_eq!(tile_size(16.0), 8);
     assert_eq!(tile_size(17.0), 16, "a 8.5 px reach needs the next step");
-    // 1080p at the default clamp: a 54 px streak, 27 px either side.
     assert_eq!(tile_size(0.05 * 1080.0), 32);
     assert_eq!((tiles(1920, 32), tiles(1080, 32), tiles(0, 8)), (60, 34, 1));
 }

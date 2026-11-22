@@ -11,7 +11,6 @@ fn add_box(scene: &mut Scene, x: f32, trigger: bool) -> u32 {
     id
 }
 
-/// The segments drawn in `tint`.
 fn count(verts: &[Vertex], tint: [f32; 4]) -> usize {
     verts.iter().filter(|v| v.tangent == tint).count() / 2
 }
@@ -24,8 +23,6 @@ fn segments(scene: &Scene, scope: ColliderScope) -> Vec<Vertex> {
     )
 }
 
-/// With `Colliders` off only the selection draws; on, every collider, the
-/// selection first and the rest nearest the eye first.
 #[test]
 fn the_selection_draws_alone_until_every_collider_is_asked_for() {
     let mut scene = Scene::new();
@@ -44,7 +41,6 @@ fn the_selection_draws_alone_until_every_collider_is_asked_for() {
     );
 }
 
-/// A trigger draws paler, a debug line in its own colour, all in one buffer.
 #[test]
 fn triggers_and_debug_lines_draw_in_their_own_tints() {
     let mut scene = Scene::new();
@@ -59,7 +55,6 @@ fn triggers_and_debug_lines_draw_in_their_own_tints() {
     assert_eq!(verts.len(), 2, "debug lines draw without any collider");
 }
 
-/// A frame never draws more collider segments than its cap, however many there are.
 #[test]
 fn the_cap_bounds_a_frame() {
     let mut scene = Scene::new();
@@ -71,9 +66,6 @@ fn the_cap_bounds_a_frame() {
     assert_eq!(count(&verts, COLLIDER), MAX_COLLIDER_SEGMENTS);
 }
 
-/// A collider with no mesh (a CharacterController's body, a trigger) is placed
-/// where the frame draws it, blended between its last two ticks as a mesh is
-/// (#1877), so its outline never runs a tick ahead.
 #[test]
 fn a_wire_is_drawn_between_ticks() {
     let mut scene = Scene::new();

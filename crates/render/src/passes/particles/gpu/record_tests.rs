@@ -1,6 +1,4 @@
-//! The GPU records on the CPU (#2170): the lookup-table bake, the step mirror
-//! against the closed form (one step at a time and the jump past the window),
-//! the sprite, and a birth older than the window aged by the time it took.
+//! Semi-implicit Euler closed form: x_n = n·dt·v0 + dt²·g·n(n+1)/2.
 
 use glam::{Mat4, Vec3};
 
@@ -68,7 +66,6 @@ fn a_step_under_gravity_lands_where_the_closed_form_says() {
     );
     let mut p = record(Vec3::ZERO, v0, 10.0);
     advance(&mut p, (n, 1), g, &lut, (&[dt; 30], 0.0));
-    // Semi-implicit Euler: x_n = n·dt·v0 + dt²·g·n(n+1)/2.
     let nf = n as f32;
     let want = v0 * nf * dt + g * dt * dt * nf * (nf + 1.0) / 2.0;
     assert!(
@@ -154,7 +151,6 @@ fn steps_older_than_the_window_jump_in_closed_form_where_stepping_would_land() {
         let lut = bake_lut(&lut_source);
         let (mut stepped, mut jumped) = (record(Vec3::ZERO, v0, 1e6), record(Vec3::ZERO, v0, 1e6));
         advance(&mut stepped, (1000, 1), g, &lut, (&[dt; 1000], 0.0));
-        // Only the last 10 steps in the window: the first 990 are one jump.
         advance(&mut jumped, (1000, 991), g, &lut, (&[dt; 10], 990.0 * dt));
         let (a, b) = (Vec3::from(stepped.position), Vec3::from(jumped.position));
         assert!(
@@ -177,8 +173,6 @@ fn steps_older_than_the_window_jump_in_closed_form_where_stepping_would_land() {
 fn a_jump_over_a_pause_ages_by_the_time_that_passed_not_the_windows_dt() {
     let lut = bake_lut(&ParticleEmitterComponent::default());
     let dt = 1.0 / 60.0;
-    // Born at step 0; steps 1..=300 took `dt`, steps 301..=600 nothing: the
-    // window is the last 256 (345..=600, all 0), so steps 1..=344 took 300 dt.
     let paused = [0.0; 256];
     let upload = |lifetime: f32| GpuBirth {
         particle: record(Vec3::ZERO, Vec3::X, lifetime),

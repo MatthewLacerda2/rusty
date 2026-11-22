@@ -1,6 +1,3 @@
-//! The post-process chain's uniform (`postfx/params.wgsl`) against its Rust mirror:
-//! every post pass binds it, the authored effects included (#397).
-
 use std::mem::{offset_of, size_of};
 
 use super::assert_layout;

@@ -1,8 +1,3 @@
-//! A normal map kept at 16 bits uploads at 16 (#2257): the issue's repro, a faint
-//! fbm ripple through `bump_to_normal {strength = 0.0005}`, baked as `normal16`,
-//! reads back from the GPU with many times the distinct slopes its 8-bit bake
-//! keeps, and makes no BC5 cache that would round it back to 8 bits.
-
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -19,8 +14,6 @@ use rusty_procgen::{bake::bake_to_png, evaluate, Slot, TextureRecipe};
 
 const SIDE: u32 = 128;
 
-/// The issue's repro at `SIDE`², baked for `slot` to a `NormalMap` PNG at a fresh
-/// path, with `compression`.
 fn ripple(name: &str, slot: Slot, compression: Compression) -> String {
     let noise = Noise {
         kind: NoiseKind::Fbm,
@@ -61,7 +54,6 @@ fn ripple(name: &str, slot: Slot, compression: Compression) -> String {
     path
 }
 
-/// How many distinct tangent-space (x, y) the base level holds: the facets.
 fn facets(texels: impl Iterator<Item = [u32; 2]>) -> usize {
     texels.collect::<BTreeSet<_>>().len()
 }

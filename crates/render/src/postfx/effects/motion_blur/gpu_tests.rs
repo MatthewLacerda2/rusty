@@ -1,7 +1,3 @@
-//! Per-object motion blur on lavapipe (#1436): a moving cube blurs past its
-//! silhouette, a still frame is untouched, and a viewmodel stays sharp while the
-//! world blurs under a turning camera.
-
 use glam::{Quat, Vec3};
 
 use crate::motion::gpu_fixture::{cube, eye, pixel, project, renderer, scene, view};
@@ -9,7 +5,6 @@ use crate::motion::gpu_fixture::{H, W};
 use crate::{readback, RenderView, Renderer};
 use rusty_scene::{Camera, ClearFlags, Scene};
 
-/// Render `scene` through `cam` into `view` and read the finished frame (RGBA8).
 pub(super) fn frame(
     r: &mut Renderer,
     view: &mut RenderView,
@@ -21,14 +16,11 @@ pub(super) fn frame(
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
-/// The largest per-channel difference between two frames at pixel `(x, y)`.
 pub(super) fn diff(a: &[u8], b: &[u8], (x, y): (u32, u32)) -> u8 {
     let i = ((y * W + x) * 4) as usize;
     (0..3).map(|c| a[i + c].abs_diff(b[i + c])).max().unwrap()
 }
 
-/// A scene whose camera blurs (`blur`) with the longest streaks it allows: the
-/// shutter open the whole frame, the clamp at its widest (9.6 px of 48).
 pub(super) fn streaky(blur: bool) -> (Scene, u32) {
     let (mut scene, cam) = scene(blur);
     let mut c = scene.world.camera_mut(cam).unwrap();
@@ -56,8 +48,6 @@ fn gpu_a_moving_cube_blurs_past_its_silhouette() {
     let mut sharp_view = view(&r);
     let sharp = frame(&mut r, &mut sharp_view, &still, &cam);
 
-    // The four pixels past each side of the front face, on the sky: the cube
-    // smears onto them both ways.
     for (edge, out) in [(1.0, 1), (0.0, -1)] {
         let (x, y) = pixel(project(&cam, Vec3::new(edge, 0.0, -4.5)));
         let past = (1..=4).map(|i| ((x as i32 + out * i) as u32, y));
@@ -88,8 +78,6 @@ fn gpu_a_still_frame_is_identical_to_motion_blur_off() {
     assert!(blurred == sharp, "a still frame must be pixel-identical");
 }
 
-/// The world camera's scene with a cube at (2, 0, -6), and a `DepthOnly` overlay
-/// camera holding a gun cube 3 m ahead. Returns it and the overlay camera.
 fn viewmodel(blur: bool) -> (Scene, u32) {
     let (mut scene, _) = streaky(blur);
     cube(&mut scene, Vec3::new(2.0, 0.0, -6.0));
@@ -105,7 +93,6 @@ fn viewmodel(blur: bool) -> (Scene, u32) {
     (scene, overlay)
 }
 
-/// Turn the eye and the overlay camera together, `degrees` from -Z.
 fn turn(scene: &mut Scene, overlay: u32, degrees: f32) -> Camera {
     let yaw = Quat::from_rotation_y(-degrees.to_radians());
     scene.world.transform_mut(overlay).unwrap().rotation = yaw;

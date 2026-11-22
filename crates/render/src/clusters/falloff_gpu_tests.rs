@@ -1,20 +1,11 @@
-//! The shader's light falloff is the CPU's (#1699): `lighting::falloff`'s
-//! `light_falloff` and `spot_cone`, run on the GPU over a table of distances and
-//! angles, against `components::falloff` and `components::spot_cone`, which the
-//! lightmap and probe bakes light with. A retune of one that left the other behind would bake a
-//! lamp's pool of light differently from how it is drawn.
-
 use rusty_components::{falloff, falloff_near, spot_cone};
 
 /// The range every falloff row uses, and the spot's cone cosines.
 const RANGE: f32 = 5.0;
 const COS_INNER: f32 = 0.9;
 const COS_OUTER: f32 = 0.6;
-/// The near floor the third column runs at.
 const NEAR: f32 = 0.5;
 
-/// Per invocation (128): distance `i / 20` (0 to past the range) through the falloff,
-/// and cosine `i / 127` through the cone.
 const PROBE: &str = "
 #import lighting::falloff::{light_falloff, light_falloff_near, spot_cone}
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;

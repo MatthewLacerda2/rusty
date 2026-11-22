@@ -1,28 +1,3 @@
-//! crates/render/src/ui/custom/ — custom ui shaders on the GPU (#427): Unity's
-//! `Graphic.material`.
-//!
-//! A graphic naming a baked ui shader (`Shader.Bake` with `pass = "ui"`) draws its
-//! batch with that variant's pipeline instead of the standard UI one. A variant is
-//! `ui.wgsl` with `graphic()` replaced (`shadergen::assemble::ui`), so it binds the
-//! standard groups unchanged — 0 the batch's texture, 1 its clip, feather and Mask
-//! coverage (#428), and on world canvases 2 the placement — and a custom-shaded
-//! graphic is clipped and masked exactly like any other. It adds group 3: the
-//! per-graphic `UiShade` uniform — its rect, the UI clock and its runtime params
-//! (#399's packing). The screen pass binds an empty group 2.
-//!
-//! **Cache, mirroring the surface one (#626).** Variants are keyed by shader name,
-//! built the first frame a graphic names one: composed against `common`, checked for
-//! all four UI entry points, then built under a validation error scope. A module
-//! that is missing, fails to compose, is not a ui module, or fails wgpu validation is
-//! logged **once** and its graphics draw with the standard shader — never a crash.
-//! After a shader file is written anywhere in the process (the write log,
-//! `core::fs::written`: `Shader.Bake` notes its module, the editor's file watch an
-//! outside edit, #1327) each variant re-reads its module and params sidecar, and only
-//! one whose files changed is dropped: a re-baked shader is picked up next frame,
-//! every other one stays built.
-//!
-//! The per-graphic uniforms each view packs every frame are in `uniforms`.
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -41,17 +16,13 @@ use rusty_shadergen::baked::{self, Baked};
 use rusty_shadergen::params::{self, ParamLayout};
 use rusty_shadergen::{compose, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// One built variant.
 struct Variant {
     module: wgpu::ShaderModule,
     params: ParamLayout,
-    /// One per blend mode (#425), in `UiBlend::ALL` order.
     world: Vec<wgpu::RenderPipeline>,
     screen: HashMap<(wgpu::TextureFormat, UiBlend), wgpu::RenderPipeline>,
 }
 
-/// What a variant was built from — its module's path, source and params sidecar,
-/// brought up to date when stale (#1638) — or `None` when no module answers to it.
 type Source = Option<(PathBuf, Baked)>;
 
 fn source(name: &str) -> Source {
@@ -60,25 +31,17 @@ fn source(name: &str) -> Source {
     Some((path, baked))
 }
 
-/// The variant cache and the layouts its pipelines share. One per `UiRenderer`.
 pub(crate) struct UiShaders {
     shade_layout: wgpu::BindGroupLayout,
-    /// Bound at group 1 by the screen pass, which has no world placement.
     empty: wgpu::BindGroup,
     screen_layout: wgpu::PipelineLayout,
     world_layout: wgpu::PipelineLayout,
-    /// The newest write-log generation already looked at.
     seen: u64,
-    /// Each with its [`Source`]; `None` records a failure, logged once until the
-    /// module changes.
     variants: HashMap<String, (Source, Option<Variant>)>,
-    /// Variant builds so far — a runtime param change must never add one.
     builds: usize,
 }
 
 impl UiShaders {
-    /// An empty cache whose variants bind `texture` at group 0 and, in the world
-    /// pass, `world` at group 1.
     pub(crate) fn new(
         device: &wgpu::Device,
         [texture, batch, world]: [&wgpu::BindGroupLayout; 3],
@@ -120,7 +83,6 @@ impl UiShaders {
         }
     }
 
-    /// The variant named `name`, building it on first use; `None` when it failed.
     fn variant(&mut self, device: &wgpu::Device, name: &str) -> Option<&Variant> {
         if !self.variants.contains_key(name) {
             self.builds += 1;
@@ -133,9 +95,6 @@ impl UiShaders {
         self.variants.get(name)?.1.as_ref()
     }
 
-    /// Compose `name`'s module from its `source`, check it is a ui module, and build
-    /// its world pipeline under a validation error scope, so wgpu refuses instead of
-    /// panicking.
     fn build(&self, device: &wgpu::Device, name: &str, source: &Source) -> Result<Variant, String> {
         let engine = engine_shader_dir();
         let (path, baked) = source
@@ -171,21 +130,16 @@ impl UiShaders {
         }
     }
 
-    /// Variant builds so far (each attempt, failed or not, counts one).
     #[cfg(test)]
     pub(crate) fn builds(&self) -> usize {
         self.builds
     }
 
-    /// Whether `name`'s variant is cached and built — `false` before its first frame
-    /// and after a failure, when its graphics fell back to the standard shader.
     #[cfg(test)]
     pub(crate) fn built(&self, name: &str) -> bool {
         self.variants.get(name).is_some_and(|(_, v)| v.is_some())
     }
 
-    /// After a shader file was written, drop every variant whose module or params
-    /// changed on disk (re-baked, appeared, vanished), so it rebuilds on next use.
     fn refresh(&mut self) {
         let (seen, paths) = written_since(self.seen);
         self.seen = seen;
@@ -195,8 +149,6 @@ impl UiShaders {
         }
     }
 
-    /// Build every loaded variant's screen pipelines for `format` if absent, one per
-    /// blend mode.
     pub(super) fn ensure_screen(&mut self, device: &wgpu::Device, format: wgpu::TextureFormat) {
         for variant in self.variants.values_mut().filter_map(|(_, v)| v.as_mut()) {
             for mode in UiBlend::ALL {
@@ -209,12 +161,6 @@ impl UiShaders {
         }
     }
 
-    /// Bind batch `b` of canvas `c`'s custom ui shader for `pass` — its pipeline (in
-    /// the batch's blend mode) and uniform — when it names one whose variant built,
-    /// returning whether it did; the caller binds the standard pipeline otherwise.
-    /// The screen pass binds an empty group 2; the world pass has bound its placement
-    /// there. Group 1 (the batch's clip and mask, #428) is the caller's, as for any
-    /// batch, so a custom-shaded graphic is clipped and masked like every other.
     pub(super) fn bind<'a>(
         &'a self,
         rp: &mut wgpu::RenderPass<'a>,
@@ -249,11 +195,6 @@ impl UiShaders {
 }
 
 impl super::UiRenderer {
-    /// Bind the pipeline batch `b` of canvas `c` draws with in `pass`: its custom ui
-    /// shader's when it has one that built, else the standard one — a backdrop's
-    /// (#426, always "over") or its blend mode's — skipped when `bound` (blend mode,
-    /// backdrop) says that one is bound already. Returns `false` when there is no
-    /// pipeline to draw with (a screen format not prepared).
     pub(super) fn bind_batch<'a>(
         &'a self,
         rp: &mut wgpu::RenderPass<'a>,

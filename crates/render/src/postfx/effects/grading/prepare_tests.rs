@@ -1,6 +1,3 @@
-//! Unity's white balance and Lift / Gamma / Gain preparation (#1440), as the grading
-//! effects pack them.
-
 use glam::Vec3;
 
 use super::lift_gamma_gain::prepare;
@@ -23,8 +20,6 @@ fn a_positive_temperature_scales_long_wavelengths_over_short() {
         tint: 0.0,
     });
     assert!(cool.z > cool.x, "S over L: {cool}");
-    // D65 sits on the locus formula: the neutral coefficients are ~1 even if the
-    // shortcut that skips them were removed.
     let d65 = coefficients(WhiteBalance {
         temperature: 1e-6,
         tint: 0.0,

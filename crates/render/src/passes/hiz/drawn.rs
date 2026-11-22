@@ -1,38 +1,18 @@
-//! What a camera's Hi-Z draws drew (#2387): the CPU records them as indirect
-//! draws whose instance and index counts the GPU writes, so the triangles they
-//! drew are read back from their args, a frame or so late as `hiz_culled` is,
-//! and counted in `Debug.Stats`' `triangles` where the pass that draws them is.
-//!
-//! One read back holds the final args and the late set's after them (#2336),
-//! phase one's, and the clustered batches' per-instance args (#1968), so every
-//! count it gives describes one frame. Which batches each pass drew is the
-//! CPU's: phase one and the late set draw the batches the depth prepass draws
-//! (`BatchKey::in_prepass`), whole; the final set every opaque batch, a
-//! clustered one by its kept clusters instead of its batch args.
-
 use super::counters::{Read, Triangles};
 use super::cull::ARGS;
 use crate::draw::batch::OpaqueBatches;
 use std::ops::Range;
 
-/// Words in one indirect draw's args.
 const WORDS: usize = (ARGS / 4) as usize;
 
-/// Which of a frame's opaque batches each of its culled passes drew, kept
-/// beside the read back of that frame's args until it is collected.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct Layout {
-    /// Per batch: whether the depth passes (phase one, the late set) draw it.
     prepass: Vec<bool>,
-    /// Per batch: whether the final set draws it by cluster.
     clustered: Vec<bool>,
-    /// The clustered draws' per-instance args.
     jobs: usize,
 }
 
 impl Layout {
-    /// The layout of a frame drawing `batches`, `clustered` naming the job
-    /// range of each batch drawn by cluster, over `jobs` jobs in all.
     pub(crate) fn of(
         batches: &OpaqueBatches,
         clustered: &[Option<Range<u32>>],
@@ -49,9 +29,6 @@ impl Layout {
         }
     }
 
-    /// The read back's segments, in the order [`Self::read`] reads them: the
-    /// final args and the late set's (`last`), phase one's (`first`), the
-    /// cluster jobs' (`jobs`).
     pub(crate) fn segments<'a>(
         &self,
         (first, last, jobs): (&'a wgpu::Buffer, &'a wgpu::Buffer, &'a wgpu::Buffer),
@@ -64,8 +41,6 @@ impl Layout {
         ]
     }
 
-    /// What the copied `words` say: the final set's and the late set's
-    /// instances (every batch's), and the triangles each pass drew.
     pub(crate) fn read(&self, words: &[u32]) -> Read {
         let n = self.prepass.len() * WORDS;
         let at = |k: usize| words.get(k * n..(k + 1) * n).unwrap_or(&[]);
@@ -92,10 +67,6 @@ impl Layout {
 }
 
 impl crate::Renderer {
-    /// Count phase one's draws of `batches` (#2387): a call per batch the depth
-    /// passes draw, and the `triangles` its last read back says it drew, which
-    /// `hiz_depth_triangles` keeps apart; until a read has come back (`None`),
-    /// the whole batches', an upper bound, so the count never dips to zero.
     pub(super) fn count_phase_one(&mut self, batches: &OpaqueBatches, read: Option<u64>) {
         let depth = batches.iter().filter(|b| b.key.in_prepass());
         let draws = depth.map(|b| (b.key.indices.len(), b.instances.len() as u32));
@@ -104,7 +75,6 @@ impl crate::Renderer {
     }
 }
 
-/// The triangles one indexed indirect draw's args draw.
 fn of(args: &[u32]) -> u64 {
     u64::from(args[0] / 3) * u64::from(args[1])
 }
@@ -123,13 +93,12 @@ mod tests {
 
     #[test]
     fn each_pass_counts_the_batches_it_draws() {
-        // Two batches, the second unlit (in no depth pass) and drawn by cluster.
         let l = layout(&[true, false], &[false, true], 2);
         let words = [
-            [6, 3, 0, 0, 0, 9, 4, 0, 0, 3], // final: 3 and 4 instances
-            [6, 1, 0, 0, 0, 9, 1, 0, 0, 7], // late: 1 and 1
-            [6, 2, 0, 0, 0, 9, 3, 0, 0, 3], // phase one: 2 and 3
-            [3, 1, 0, 0, 0, 0, 1, 0, 0, 0], // jobs: 3 indices kept, then none
+            [6, 3, 0, 0, 0, 9, 4, 0, 0, 3],
+            [6, 1, 0, 0, 0, 9, 1, 0, 0, 7],
+            [6, 2, 0, 0, 0, 9, 3, 0, 0, 3],
+            [3, 1, 0, 0, 0, 0, 1, 0, 0, 0],
         ]
         .concat();
         let read = l.read(&words);

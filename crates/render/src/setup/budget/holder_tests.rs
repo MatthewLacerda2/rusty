@@ -1,16 +1,9 @@
-//! Tests for the budget's nested-acquire check and its pairs (#1844).
-//!
-//! Each drives a private `Budget` whose checked holder is every thread, so a test
-//! thread here stands for any test's. Adapter-free: pure synchronization.
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::ThreadId;
 use std::time::Duration;
 
 use super::Budget;
 
-/// Long, so a test that wrongly waits fails by hanging, not by a timeout panic
-/// that `should_panic` would take for the nested-acquire one.
 const TIMEOUT: Duration = Duration::from_secs(600);
 
 fn every_thread() -> Option<ThreadId> {
@@ -33,7 +26,7 @@ fn a_second_permit_on_the_holding_thread_panics_at_once_naming_the_pair() {
     assert!(message.contains("headless_pair_or_skip"), "{message}");
     assert_eq!(B.live(), 1, "the refused acquire took no slot");
     drop(first);
-    drop(B.acquire()); // free again: one permit at a time is fine
+    drop(B.acquire());
     assert_eq!(B.live(), 0);
 }
 
@@ -57,8 +50,6 @@ fn a_permit_dropped_on_another_thread_frees_its_holder() {
     drop(again);
 }
 
-/// Two threads each holding one slot never wait on each other for a pair's
-/// second: the pair waits until both are free, then takes both.
 #[test]
 fn a_pair_takes_both_slots_at_once_and_returns_them_with_its_last_share() {
     static B: Budget = Budget::new(2, TIMEOUT, every_thread);
@@ -69,7 +60,7 @@ fn a_pair_takes_both_slots_at_once_and_returns_them_with_its_last_share() {
     let message = caught(std::panic::AssertUnwindSafe(|| drop(pair.permit())));
     assert!(message.contains("third"), "{message}");
     drop(fresh);
-    drop(pair.permit()); // the slot a dropped share left is reusable
+    drop(pair.permit());
     drop(pair);
     assert_eq!(B.live(), 2, "a live share keeps the pair's slots");
     drop(kept);
@@ -79,7 +70,7 @@ fn a_pair_takes_both_slots_at_once_and_returns_them_with_its_last_share() {
 #[test]
 fn a_pair_waits_for_two_free_slots_without_holding_one() {
     static B: Budget = Budget::new(2, TIMEOUT, every_thread);
-    let other = B.acquire(); // another test's slot, on this thread for brevity
+    let other = B.acquire();
     let got = AtomicBool::new(false);
     std::thread::scope(|s| {
         s.spawn(|| {
@@ -95,8 +86,6 @@ fn a_pair_waits_for_two_free_slots_without_holding_one() {
     assert_eq!(B.live(), 0);
 }
 
-/// While a test thread holds a pair, a renderer the engine builds on it (a bake
-/// beside a capture host) takes the pair's share instead of a third slot.
 #[test]
 fn a_single_acquire_on_a_pair_holding_thread_takes_a_share() {
     static B: Budget = Budget::new(2, TIMEOUT, every_thread);

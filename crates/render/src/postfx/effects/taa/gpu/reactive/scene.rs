@@ -1,5 +1,3 @@
-//! The plasma ball's scene (#1845) and its last frame's luma.
-
 use glam::Vec3;
 
 use super::super::fixture::{big_view, frame, renderer, taa_scene};
@@ -12,21 +10,15 @@ use rusty_core::settings::render_scale::RenderScale;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// The view is the fixture's this many times on a side (256×192), so the ball
-/// covers some 15 pixels across.
 const SCALE: u32 = 4;
-/// Frames, and the ball's step per frame: 9 m/s at 60 fps.
 const FRAMES: u32 = 30;
 const STEP: f32 = 0.15;
 
-/// One run of the scene.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Ball {
     pub taa: bool,
     pub reactive: TaaReactive,
     pub writes_motion: bool,
-    /// The view's render scale: below 1 TAA upscales (TAAU), FXAA's frame is
-    /// upscaled bilinearly.
     pub scale: f32,
 }
 
@@ -41,7 +33,6 @@ impl Default for Ball {
     }
 }
 
-/// The view at `ball`'s render scale.
 fn ball_view(r: &Renderer, ball: Ball) -> RenderView {
     let mut v = big_view(r, SCALE);
     v.set_render_scale(RenderScale::new(ball.scale));
@@ -49,16 +40,12 @@ fn ball_view(r: &Renderer, ball: Ball) -> RenderView {
     v
 }
 
-/// The ball's luma over its pixels in the last frame: the brightest and the 95th
-/// percentile.
 #[derive(Clone, Copy, Debug)]
 pub(super) struct Stats {
     pub max: f32,
     pub p95: f32,
 }
 
-/// A 16×16 swirl of bright and dark bands in the temp dir: the detail TAA must
-/// not average away.
 fn swirl() -> String {
     let img = image::RgbaImage::from_fn(16, 16, |x, y| {
         let v = if (x + 2 * y) % 6 < 3 { 255 } else { 40 };
@@ -69,8 +56,6 @@ fn swirl() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The infinity-shout plasma ball's material, as near as primitives get: a
-/// refracting transparent with a bright emissive swirl and URP's Fresnel rim.
 fn plasma(ball: Ball) -> MaterialAsset {
     MaterialAsset {
         render_mode: RenderMode::Transparent,
@@ -86,7 +71,6 @@ fn plasma(ball: Ball) -> MaterialAsset {
     }
 }
 
-/// An entity of primitive `shape` at `at`, `scale` big, drawn with `material`.
 fn place(scene: &mut Scene, shape: Primitive, (at, scale): (Vec3, Vec3), material: &str) -> u32 {
     let id = create_entity(scene, material, Some(shape));
     let mut t = scene.world.transform_mut(id).unwrap();
@@ -97,7 +81,6 @@ fn place(scene: &mut Scene, shape: Primitive, (at, scale): (Vec3, Vec3), materia
     id
 }
 
-/// The scene, its camera's TAA as `ball.taa` asks (FXAA otherwise), and the ball.
 fn build(ball: Ball) -> (Scene, u32) {
     let (mut scene, _) = taa_scene(ball.taa, true);
     let wall = MaterialAsset {
@@ -113,13 +96,10 @@ fn build(ball: Ball) -> (Scene, u32) {
     (scene, id)
 }
 
-/// Rec. 709 luma of an sRGB pixel, in bytes.
 fn luma(px: &[u8]) -> f32 {
     0.2126 * px[0] as f32 + 0.7152 * px[1] as f32 + 0.0722 * px[2] as f32
 }
 
-/// Run `ball` for [`FRAMES`] frames and measure the last: the ball's pixels are
-/// those the frame changed against the same frame without it.
 pub(super) fn ball_frame(ball: Ball) -> Option<Stats> {
     let mut r = renderer()?;
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);

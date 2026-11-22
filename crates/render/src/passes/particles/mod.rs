@@ -1,19 +1,7 @@
-//! crates/render/src/passes/particles/ — the particle pass (#13, #440): resources +
-//! pipelines here, per-frame orchestration in `draw`, instance building in
-//! `instance`, and mesh particles (which join the forward solids) in `mesh`, their
-//! loaded meshes cached in `mesh_cache`.
-//!
-//! Sprite particles draw into the HDR scene target BEFORE the post-FX chain — so
-//! bloom/tonemap apply to additive (emissive) sparks. Two pipelines share one
-//! shader: alpha-blended (smoke) and additive (sparks/fire). Both read the scene
-//! depth as a read-only attachment (occlusion) *and* a texture (soft particles),
-//! and bind the renderer's global group (`groups::GLOBAL`) so lit particles read
-//! the forward lighting uniform.
-//!
-//! The simulation owns particle *state*; this module only reads it — the invariant
-//! that keeps headless play renderer-free. A GPU-simulated emitter (`gpu`, #2170)
-//! is the one exception by design: its live particles are render state, kept and
-//! moved here from the births the sim makes, and the sim never reads them.
+//! Sprite particles draw into the HDR scene target before post-FX, so bloom and tonemap apply to
+//! additive sparks. Scene depth is a read-only attachment and a texture (soft particles).
+//! The sim owns particle state; the renderer only reads it, keeping headless play renderer-free.
+//! GPU emitters are the exception: their live particles are render state.
 
 mod draw;
 pub(crate) use draw::ParticleDraws;
@@ -37,40 +25,24 @@ use crate::GpuTexture;
 use instance::{ParticleGlobals, ParticleInstance};
 use rusty_components::particle::ParticleBlend;
 
-/// The layouts the particle pipelines share with other passes: the single-texture
-/// sprite layout, the scene-depth layout (the decal pass's), and the renderer's
-/// camera + lighting group (`groups::GLOBAL`).
 pub(crate) struct SharedLayouts<'a> {
     pub texture: &'a wgpu::BindGroupLayout,
     pub depth: &'a wgpu::BindGroupLayout,
     pub camera_lighting: &'a wgpu::BindGroupLayout,
 }
 
-/// Owns every GPU resource for the particle pass. One per `Renderer`.
 pub struct ParticleRenderer {
     pipelines: BlendPipelines,
-    /// The blend pipelines of a GPU-simulated emitter's draw (`vs_gpu`, #2170).
     gpu_pipelines: BlendPipelines,
-    /// The GPU-simulated emitters' buffers and step (`gpu`).
     pub(crate) gpu: gpu::GpuParticles,
     pub(crate) globals_buffer: wgpu::Buffer,
     pub(crate) globals_bind_group: wgpu::BindGroup,
     pub(crate) index_buffer: wgpu::Buffer,
-    /// Mesh-particle specs resolved to their GPU mesh, so a model is read from
-    /// disk once, not every frame, yet follows a re-import (`mesh_cache`).
     pub(crate) meshes: HashMap<String, CachedMesh>,
-    /// What an emitter naming no texture draws: Unity's soft white disc
-    /// (`Renderer::create_soft_disc_texture`, #2052). A texture that fails to
-    /// load still draws the renderer's checker.
     pub(crate) default_sprite: Rc<GpuTexture>,
 }
 
 impl ParticleRenderer {
-    /// Build the pass: a globals bind group + two blend-variant pipelines over
-    /// the solid path's group order ([`Groups`]): camera + lighting at
-    /// `GLOBAL`, scene depth at `SCENE`, the sprite at `MATERIAL` and the globals
-    /// at `DRAW`;
-    /// `default_sprite` is what an emitter with no texture binds as its sprite.
     pub(crate) fn new(
         device: &wgpu::Device,
         layouts: SharedLayouts,
@@ -97,7 +69,6 @@ impl ParticleRenderer {
             ("vs_gpu", None),
         );
 
-        // Two triangles (a quad) shared by every billboard instance.
         let indices: [u16; 6] = [0, 1, 2, 0, 2, 3];
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Particle Quad Indices"),
@@ -117,7 +88,6 @@ impl ParticleRenderer {
         }
     }
 
-    /// The pipeline for `blend`, into TAA's reactive mask too when `reactive` (#1845).
     pub(crate) fn pipeline_for(
         &self,
         blend: ParticleBlend,
@@ -126,7 +96,6 @@ impl ParticleRenderer {
         self.pipelines.pipeline_for(blend, reactive)
     }
 
-    /// The pipeline drawing a GPU-simulated emitter's buffer for `blend` (#2170).
     pub(crate) fn gpu_pipeline_for(
         &self,
         blend: ParticleBlend,
@@ -135,7 +104,6 @@ impl ParticleRenderer {
         self.gpu_pipelines.pipeline_for(blend, reactive)
     }
 
-    /// Every blend pipeline, built or not (#985).
     pub(crate) fn lazy_pipelines(&self) -> Vec<&LazyPipeline> {
         let mut all = self.pipelines.lazy().to_vec();
         all.extend(self.gpu_pipelines.lazy());
@@ -143,11 +111,6 @@ impl ParticleRenderer {
     }
 }
 
-/// The blend pipelines of `shader`'s vertex entry point `vertex.0` (drawing the
-/// `vertex.1` buffer, if any) with `draw` per draw. A particle draw's groups by role
-/// ([`Groups`]): the renderer's camera + lighting group, the scene depth, the
-/// sprite at the material's index, and `draw` (the pass globals, or a GPU
-/// emitter's own) per draw, last.
 fn blend_pipelines(
     device: &wgpu::Device,
     label: &'static str,

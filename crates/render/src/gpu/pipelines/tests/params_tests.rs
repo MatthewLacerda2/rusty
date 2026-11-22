@@ -1,8 +1,3 @@
-//! Runtime shader params on the GPU (#399): a hit-flash amount set on a
-//! material asset changes the pixel on the next frame, through a buffer write alone —
-//! no module rebuild, no new bind group — and each material keeps its own values.
-//! Skips with no adapter.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -20,8 +15,6 @@ mod material_ops;
 use material_ops::set_asset_param;
 pub(crate) use material_ops::{clear_params, set_param, set_texture};
 
-/// A red hit-flash surface shader baked where scripts and the renderer resolve it,
-/// under a name unique to this run; removed on drop.
 pub(super) struct Flash(pub(super) String);
 
 impl Flash {
@@ -29,7 +22,6 @@ impl Flash {
         Self::bake_as("")
     }
 
-    /// Baked under a name carrying `tag`, so tests sharing a process never share it.
     pub(super) fn bake_as(tag: &str) -> Self {
         let name = format!("test_hit_flash{tag}_{}", std::process::id());
         let params = [("color".to_string(), ParamValue::Vector(vec![1.0, 0.0, 0.0]))];
@@ -54,11 +46,9 @@ impl Drop for Flash {
     }
 }
 
-/// A lit white sphere at `x` whose own material names `shader`; returns its id.
 pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     let id = create_entity(scene, "Ball", Some(Primitive::Sphere));
     if let Some(mut t) = scene.world.transform_mut(id) {
-        // Diameter 2: the thresholds below were set on that size.
         (t.position, t.scale) = (Vec3::new(x, 0.0, 0.0), Vec3::splat(2.0));
     }
     let key = scene.ensure_material_key(id).unwrap();
@@ -67,7 +57,6 @@ pub(super) fn sphere(scene: &mut Scene, x: f32, shader: &str) -> u32 {
     id
 }
 
-/// The summed (red, blue) of the centre row's left and right halves.
 pub(super) fn halves(renderer: &mut Renderer, scene: &Scene) -> [(u32, u32); 2] {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();

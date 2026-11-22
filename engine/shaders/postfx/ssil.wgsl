@@ -1,32 +1,12 @@
-// engine/shaders/postfx/ssil.wgsl — screen-space indirect lighting (#1750), Godot 4's
-// SSIL: one bounce of last frame's realtime light off the surfaces on screen, for
-// the forward pass's indirect diffuse (`render::postfx::effects::ssil`).
-//
-// Fullscreen passes, at the gather's resolution unless named:
-//  * `fs_source`     — after the base camera's opaque pass: its HDR colour times the
-//                      share of it the gather may bounce (the alpha the opaque
-//                      pass wrote, `forward::lighting::with_ssil_share`), averaged over
-//                      each texel's block of pixels. The sky and a NaN add nothing.
-//                      This is next frame's source.
-//  * `fs_gather`     — before the forward pass, over the SSAO prepass's depth: a
-//                      cosine-weighted hemisphere of samples around each surface
-//                      point (SSAO's pattern, `lighting::screen_space`). Each lands
-//                      on the surface on screen there, is turned back into last
-//                      frame's screen through its view-projection and reads the
-//                      source: that light, where the two surfaces face each other
-//                      past SSAO's slope-scaled bias and nothing on screen stands
-//                      between them (`blocked`), fading out by distance. Nothing
-//                      before a history.
-//  * `fs_blur`       — a depth-aware 7x7 blur.
-//  * `fs_accumulate` — the temporal accumulate: last frame's result, reprojected
-//                      through the camera and rejected where the surface's distance
-//                      from the eye moved (a disocclusion) or its normal turned,
-//                      clamped to this frame's neighbourhood and blended in at 90%.
-//                      Its alpha holds the distance and its second target the
-//                      normal, for next frame's rejection.
-//  * `fs_upsample`   — below full resolution, a depth-aware bilinear upsample to it
-//                      (SSAO's), so the forward pass reads one texel per pixel.
-// Texel `t` stands for full-resolution pixel `t * step`, as in `ssao.wgsl`.
+// Godot 4's SSIL: one bounce of last frame's realtime light for the forward pass's
+// indirect diffuse. `fs_source` is next frame's source: HDR colour times the bounce
+// share the opaque pass wrote in alpha, block-averaged; the sky and a NaN add nothing.
+// `fs_gather` samples a cosine-weighted hemisphere (SSAO's pattern) and reads the
+// source through last frame's view-projection where the two surfaces face each other
+// and nothing on screen stands between (`blocked`). `fs_accumulate` reprojects the
+// history, rejects it on a disocclusion or a turned normal, clamps it to this frame's
+// neighbourhood and blends in at 90%. Texel `t` stands for full-resolution pixel `t *
+// step`.
 
 #import fullscreen
 #import numeric::finite3
@@ -35,15 +15,10 @@
 struct SsilParams {
     inv_view_proj: mat4x4<f32>,
     view_proj: mat4x4<f32>,
-    // The view-projection last frame's source and result were drawn with.
     prev_view_proj: mat4x4<f32>,
-    // w: the frame's index (0..64), which turns the noise each frame.
     camera_pos: vec4<f32>,
-    // w: 1 when the history holds last frame, 0 on a cut.
     camera_fwd: vec4<f32>,
-    // xyz: last frame's eye.
     prev_camera_pos: vec4<f32>,
-    // x radius (world units), y intensity, z sample count, w full-res pixels per texel
     params: vec4<f32>,
 };
 
@@ -51,27 +26,17 @@ struct SsilParams {
 var<uniform> p: SsilParams;
 @group(0) @binding(1)
 var t_depth: texture_depth_2d;
-// What a stage reads: the scene colour (`fs_source`), the source (`fs_gather`), the
-// gather (`fs_blur`), the blur (`fs_accumulate`), the result (`fs_upsample`).
 @group(0) @binding(2)
 var t_in: texture_2d<f32>;
-// Last frame's result, for `fs_accumulate`; the same as `t_in` for the others.
 @group(0) @binding(3)
 var t_prev: texture_2d<f32>;
-// The normals last frame's accumulate kept (`n * 0.5 + 0.5`), for `fs_accumulate`.
 @group(0) @binding(4)
 var t_prev_normal: texture_2d<f32>;
 
-// How fast the accumulate forgets: the history's weight where it is accepted.
 const HISTORY: f32 = 0.9;
-// How far, as a share of the distance from the eye, a reprojected surface may have
-// moved before the history there is rejected.
+// A share of the distance from the eye.
 const REJECT: f32 = 0.05;
-// The least cosine between a surface's normal now and the one its history was
-// gathered for (about 25 degrees): a surface turned further starts over.
 const REJECT_TURN: f32 = 0.9;
-// Where along the segment between a point and a sample's surface the gather looks
-// for something on screen in between (`blocked`).
 const OCCLUSION_TAPS: array<f32, 3> = array<f32, 3>(0.3, 0.5, 0.7);
 
 @vertex
@@ -79,18 +44,16 @@ fn vs_fullscreen(@builtin(vertex_index) i: u32) -> @builtin(position) vec4<f32> 
     return fullscreen::triangle(i);
 }
 
-// The camera this frame's depth is read through (`lighting::screen_space`).
 fn view() -> View {
     return View(p.inv_view_proj, p.view_proj, p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
-// `c`, or black when any channel is not finite (`numeric::finite3`) or past what
-// an `Rgba16Float` target holds: a NaN or an infinity never spreads.
+// Black when any channel is not finite or past what an `Rgba16Float` target holds: a
+// NaN or an infinity never spreads.
 fn finite(c: vec3<f32>) -> vec3<f32> {
     return select(vec3<f32>(0.0), c, finite3(c) && all(abs(c) <= vec3<f32>(65504.0)));
 }
 
-// Where world point `P` was in last frame's screen, in [0, 1]; x < 0 off it.
 fn prev_uv(P: vec3<f32>) -> vec2<f32> {
     let prev = View(p.inv_view_proj, p.prev_view_proj, p.prev_camera_pos.xyz, p.camera_fwd.xyz);
     return screen_uv(prev, P);
@@ -117,11 +80,8 @@ fn fs_source(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     return vec4<f32>(sum / max(count, 1.0), 1.0);
 }
 
-// Whether something on screen stands between surface point `P` and the surface
-// point `Q` a sample landed on: at each of `OCCLUSION_TAPS` along the segment, the
-// surface on screen there is nearer the eye than the segment by more than `bias`,
-// and by no more than `thickness` (a pillar metres in front of the segment hides
-// it from the eye, not from `P`).
+// A pillar metres in front of the segment hides it from the eye, not from `P`: hence
+// `thickness`.
 fn blocked(v: View, P: vec3<f32>, Q: vec3<f32>, dims: vec2<f32>, bias: f32, thickness: f32) -> bool {
     for (var k = 0; k < 3; k = k + 1) {
         let M = mix(P, Q, OCCLUSION_TAPS[k]);
@@ -154,19 +114,13 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let tb = tangents(N);
     let radius = p.params.x;
     let n = u32(p.params.z);
-    // IGN's temporal offset (Jimenez 2014): each frame turns the pattern, so the
-    // accumulate averages many frames' samples. A still pattern left blotches the
-    // 8 samples and the blur could not remove (seen on a capsule's shadowed side).
+    // A still pattern left blotches the blur could not remove.
     let turn = vec2<f32>(5.588238 * p.camera_pos.w);
     let rot = ign(frag.xy + turn) * 6.2831853;
     let jitter = ign(frag.yx + 17.0 + turn);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let source = vec2<f32>(textureDimensions(t_in));
-    // SSAO's slope-scaled bias: a sample's surface must stand off this point's
-    // plane by more than depth noise, so a flat floor never lights itself.
     let bias = slope_bias(v, P, N, radius, dims);
-    // What counts as standing in between: past one pixel's depth step at the
-    // reach (no grazing scale: the taps sit in the open, off any surface).
     let between = 0.02 * radius + radius / max(radius_in_pixels(v, P, radius, dims), 1e-3);
     var sum = vec3<f32>(0.0);
     for (var i = 0u; i < n; i = i + 1u) {
@@ -176,8 +130,6 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         if (uv.x < 0.0) {
             continue;
         }
-        // The surface on screen where the sample lands, and whether it and this
-        // point face each other.
         let q = vec2<i32>(uv * dims);
         let dq = load_depth(t_depth, q);
         if (dq >= 1.0) {
@@ -187,8 +139,6 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         let to_q = Q - P;
         let dist = length(to_q);
         let NQ = normal_at(t_depth, v, q, Q, 1);
-        // Its light reaches this point only where the two face each other, past
-        // the bias; it fades out over the last third of 1.5 radii.
         let facing = dot(N, to_q) > bias && dot(NQ, -to_q) > 0.0;
         let reach = saturate(3.0 - 2.0 * dist / radius);
         let was = prev_uv(Q);
@@ -215,9 +165,7 @@ fn fs_blur(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
 }
 
 struct Accumulated {
-    // rgb the bounce, a the surface's distance from the eye.
     @location(0) result: vec4<f32>,
-    // The surface's normal, as `n * 0.5 + 0.5`.
     @location(1) normal: vec4<f32>,
 };
 
@@ -247,8 +195,7 @@ fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> Accumulated {
     if (moved > REJECT * dist || turned) {
         return Accumulated(vec4<f32>(now, dist), normal);
     }
-    // This frame's 3x3 neighbourhood bounds the history: a light switched off, or a
-    // surface uncovered behind a mover, never lingers.
+    // A light switched off, or a surface uncovered behind a mover, never lingers.
     var lo = now;
     var hi = now;
     for (var y = -1; y <= 1; y = y + 1) {
@@ -262,7 +209,6 @@ fn fs_accumulate(@builtin(position) frag: vec4<f32>) -> Accumulated {
     return Accumulated(vec4<f32>(mix(now, kept, HISTORY), dist), normal);
 }
 
-// Full resolution from the result, SSAO's bilateral upsample on colour.
 @fragment
 fn fs_upsample(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let step = i32(p.params.w);

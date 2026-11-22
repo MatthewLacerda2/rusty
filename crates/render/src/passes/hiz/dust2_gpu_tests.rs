@@ -1,9 +1,3 @@
-//! GPU occlusion culling on the Dust2-sized bench level (#1963), measured by hand:
-//! `cargo nextest run --features dev --run-ignored only -E 'test(hiz_dust2)'
-//! --no-capture`. Each eye's drawn instances on and off, and the same pixels;
-//! then, with each room's statue an 8064-triangle clustered sphere (#1968), the
-//! triangles drawn with cluster culling on and off.
-
 use rusty_asset::mesh_data::Shared;
 use std::sync::Arc;
 
@@ -49,7 +43,6 @@ fn gpu_hiz_dust2_counts() {
         let mut view = offscreen(&r);
         shot(&mut r, &mut view, &scene, &cam);
         let (on, c) = shot(&mut r, &mut view, &scene, &cam);
-        // The statues' batch is drawn by cluster only when it fit the budget.
         let by_cluster = view.hiz.cameras[0].clusters.ran > 0;
         let skip = if by_cluster { statue } else { 0 };
         let with = triangles(&r, &view, skip) + cluster_indices(&r, &view) / 3;
@@ -69,7 +62,6 @@ fn gpu_hiz_dust2_counts() {
     }
 }
 
-/// The eyes, each a name, a position, and a yaw and pitch.
 const EYES: [(&str, Vec3, f32, f32); 4] = [
     (
         "in a room, at a doorway",
@@ -97,8 +89,6 @@ const EYES: [(&str, Vec3, f32, f32); 4] = [
     ),
 ];
 
-/// `scene` with every statue a 64×64-segment sphere split into clusters, one
-/// mesh shared by all: the scene and that mesh's index count.
 fn with_dense_statues(mut scene: Scene) -> (Scene, u32) {
     let (vertices, mut indices) = primitives::generate_sphere(0.5, 64, 64);
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
@@ -123,8 +113,6 @@ fn with_dense_statues(mut scene: Scene) -> (Scene, u32) {
     (scene, indices.len() as u32)
 }
 
-/// Triangles the base camera's last frame drew by instance, leaving out the
-/// batches drawn by cluster (their run is `clustered` indices; 0 for none).
 fn triangles(r: &Renderer, view: &RenderView, clustered: u32) -> u32 {
     let cam = &view.hiz.cameras[0];
     let args = words(r, cam.final_args());
@@ -135,8 +123,6 @@ fn triangles(r: &Renderer, view: &RenderView, clustered: u32) -> u32 {
         .sum()
 }
 
-/// The base camera's last cluster cull's dispatches (one a stage, #2417) and
-/// the chunks its test and copy ran over.
 fn dispatches(view: &RenderView) -> (usize, u32) {
     let cull = &view.hiz.cameras[0].clusters;
     (cull.dispatched.borrow().len(), cull.chunks_ran)

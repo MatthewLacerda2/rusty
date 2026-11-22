@@ -1,6 +1,3 @@
-//! The flicker case's scene (`super`): a dark room under a satin bronze ceiling
-//! with a small bright bulb, TAA and SSR on; how a run is measured: `measure`.
-
 use glam::Vec3;
 
 use crate::Renderer;
@@ -10,21 +7,14 @@ use rusty_scene::{Camera, Scene};
 
 pub(in crate::postfx::effects) const W: u32 = 320;
 pub(in crate::postfx::effects) const H: u32 = 240;
-/// Frames before the measure: one cycle of the jitter's vertical (base 3) part.
 pub(in crate::postfx::effects) const WARM: u32 = 27;
-/// The camera's anti-flicker the tests turn on: its full strength. The room's
-/// camera starts at 0, URP's resolve, so every comparison has URP's beside it; a
-/// camera's own default is HDRP's 0.5 (`CameraComponent::DEFAULT_TAA_ANTI_FLICKER`).
 pub(super) const ON: f32 = 1.0;
-/// A camera's anti-flicker unless a game sets it: HDRP's.
 pub(super) const DEFAULT: f32 = CameraComponent::DEFAULT_TAA_ANTI_FLICKER;
 
-/// A headless renderer of the case's size, or `None`.
 pub(super) fn renderer() -> Option<Renderer> {
     crate::test_gpu::headless_or_skip(W, H)
 }
 
-/// Seated, looking up at the ceiling.
 pub(in crate::postfx::effects) fn eye() -> Camera {
     Camera::new(Vec3::new(0.0, 1.6, 0.0), -90.0, 30.0)
 }
@@ -35,7 +25,6 @@ fn paint(s: &mut Scene, id: u32, name: &str, asset: MaterialAsset) {
         .set_material(id, Some(MaterialComponent::new(name.to_string())));
 }
 
-/// A box named `name` at `at`, sized `size`, of `asset`.
 pub(super) fn block(
     s: &mut Scene,
     name: &str,
@@ -50,7 +39,6 @@ pub(super) fn block(
     id
 }
 
-/// A matte surface of `grey`.
 pub(super) fn matte(grey: f32) -> MaterialAsset {
     let base_color = [grey; 3];
     MaterialAsset {
@@ -60,9 +48,6 @@ pub(super) fn matte(grey: f32) -> MaterialAsset {
     }
 }
 
-/// The room: a satin bronze ceiling 3 m up, dark walls and floor, no ambient,
-/// the bulb hanging 0.5 m under the ceiling on a cord; TAA on (URP's resolve: the
-/// anti-flicker at 0), SSR on, nothing else.
 pub(in crate::postfx::effects) fn room() -> Scene {
     let mut s = Scene::new();
     (s.skybox_path, s.ambient_intensity) = (String::new(), 0.0);
@@ -75,7 +60,6 @@ pub(in crate::postfx::effects) fn room() -> Scene {
     };
     s.world.set_camera(cam, Some(camera));
     let mut volume = default_post_processing();
-    // A minimum that reflects the satin ceiling, rougher than the default's 0.3.
     (volume.ssr.active, volume.ssr.min_smoothness) = (true, 0.3);
     (volume.bloom.active, volume.ssao.active) = (false, false);
     s.world.set_post_processing(cam, Some(volume));
@@ -114,7 +98,6 @@ pub(in crate::postfx::effects) fn room() -> Scene {
     s
 }
 
-/// `s` with its camera's anti-flicker at `value` (#2228).
 pub(super) fn anti_flicker(mut s: Scene, value: f32) -> Scene {
     let cam = s.find_entity_by_name("Camera").unwrap();
     s.world.camera_mut(cam).unwrap().taa_anti_flicker = value;

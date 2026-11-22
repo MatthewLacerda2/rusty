@@ -1,13 +1,8 @@
-//! The contact fix keeps enough bias (#665): lit surfaces never shadow themselves.
-//! With no ambient a self-shadowed texel reads near 0, so acne shows as a patch of
-//! one surface far darker than the rest of it. Skips with no adapter.
-
 use glam::Vec3;
 
 use super::{brightness, looking, yard};
 use rusty_scene::create::Primitive;
 
-/// A 5 x 5 grid of points around `centre`, spanning `u` and `v` either side.
 fn grid(centre: Vec3, u: Vec3, v: Vec3) -> Vec<Vec3> {
     let steps = [-1.0, -0.5, 0.0, 0.5, 1.0];
     steps
@@ -16,7 +11,6 @@ fn grid(centre: Vec3, u: Vec3, v: Vec3) -> Vec<Vec3> {
         .collect()
 }
 
-/// `(darkest, brightest)` of `points` as seen from `eye`.
 fn spread(
     r: &mut crate::Renderer,
     scene: &rusty_scene::Scene,

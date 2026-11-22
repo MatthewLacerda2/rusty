@@ -1,21 +1,3 @@
-//! Automatic exposure (#1444): eye adaptation metered from the view's own HDR
-//! scene, Unity HDRP's *Automatic Histogram*.
-//!
-//! Each frame a view's volume is in `Automatic` mode, two compute passes
-//! (`postfx/exposure.wgsl`) build a 64-bin log-luminance histogram of the scene
-//! downsampled to a quarter of its size (every pixel metered, by area) and weighted
-//! towards the centre (#1701), average the bins inside the volume's percentile window and
-//! ease the **adapted EV** towards the exposure that brings that average to middle
-//! grey, within the volume's limits. The adapted EV lives in a 16-byte buffer the
-//! composite reads as binding 8 ([`ExposureMeter::state`]), so the frame never waits
-//! on the CPU. A copy of it is read back asynchronously, a frame or so late, for
-//! `Graphics.GetExposure` ([`ExposureMeter::readout`]).
-//!
-//! Adaptation runs on game time, snapping outside Play and on a cut
-//! ([`params::Clock`]). Each `PostFx`, so each view, owns its meter: the window and
-//! a render texture never share an exposure. The pipelines ([`ExposurePasses`]) are
-//! the renderer's, built once for every view.
-
 mod effect;
 mod params;
 
@@ -30,18 +12,11 @@ use crate::timing::{GpuPass, GpuTimer};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
-/// Histogram bins. Mirrors `BINS` in `postfx/exposure.wgsl`, and equals the
-/// histogram pass's workgroup size (8 × 8), one bin per invocation.
 const BINS: u64 = 64;
-/// Pixels per side of the box one histogram sample averages. Mirrors `BLOCK`.
 const BLOCK: u32 = 4;
-/// The histogram pass's workgroup edge.
 const GROUP: u32 = 8;
-/// The adapted state's size: `vec4<f32>` (EV, target, held, unused).
 const STATE_BYTES: u64 = 16;
 
-/// The meter's two compute pipelines and their one layout: built once, on the
-/// `Renderer`, and shared by every view's [`ExposureMeter`].
 pub struct ExposurePasses {
     layout: wgpu::BindGroupLayout,
     histogram: wgpu::ComputePipeline,
@@ -102,22 +77,18 @@ impl ExposurePasses {
     }
 }
 
-/// The readback's state, set by the map callback from wgpu's thread.
 const IDLE: u8 = 0;
 const MAPPING: u8 = 1;
 const MAPPED: u8 = 2;
 
-/// One view's meter: its params, histogram, adapted state, clock and readback.
 pub struct ExposureMeter {
     params: wgpu::Buffer,
     histogram: wgpu::Buffer,
     state: wgpu::Buffer,
     staging: wgpu::Buffer,
     mapping: Arc<AtomicU8>,
-    /// The read in flight began before a cut: its value is dropped, not taken.
     stale: bool,
     readout: Option<f32>,
-    /// When the view last adapted; the passes are told how far to move from it.
     clock: Clock,
 }
 
@@ -139,7 +110,6 @@ impl ExposureMeter {
                 params_size,
                 U::UNIFORM | U::COPY_DST,
             ),
-            // Zeroed at creation: the first histogram starts empty.
             histogram: buffer("Auto Exposure Histogram", BINS * 4, U::STORAGE),
             state: buffer(
                 "Auto Exposure State",
@@ -158,7 +128,6 @@ impl ExposureMeter {
         }
     }
 
-    /// How far this frame adapts ([`Clock::step`]). A cut also forgets the readout.
     pub(crate) fn step(&mut self, key: HistoryKey, editor: bool, time: f32) -> Step {
         let step = self.clock.step(key, editor, time);
         if step.cut {
@@ -167,33 +136,24 @@ impl ExposureMeter {
         step
     }
 
-    /// Cut the clock (a resize, a frame the view did not meter): the next metered
-    /// frame snaps, and nothing read back before it is reported.
     pub fn cut(&mut self) {
         self.clock.cut();
         self.forget();
     }
 
-    /// Drop the readout, and the read in flight when it lands.
     fn forget(&mut self) {
         self.readout = None;
         self.stale = self.mapping.load(Ordering::Acquire) != IDLE;
     }
 
-    /// The adapted state the composite reads (binding 8): `x` is the EV.
     pub fn state(&self) -> &wgpu::Buffer {
         &self.state
     }
 
-    /// The adapted EV as last read back, a frame or so behind the GPU; `None` until
-    /// a metered frame's copy has landed.
     pub fn readout(&self) -> Option<f32> {
         self.readout
     }
 
-    /// Meter `scene` (the view's HDR target, `size` pixels) and adapt, with
-    /// `params` (timed under `post_fx`), then start reading the result back when no
-    /// earlier read is in flight.
     pub(crate) fn run(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -213,7 +173,6 @@ impl ExposureMeter {
             });
             pass.set_bind_group(crate::gpu::ONLY_GROUP, &bind_group, &[]);
             pass.set_pipeline(&passes.histogram);
-            // One invocation per block, rounded up at a ragged edge.
             let groups = size.map(|n| n.div_ceil(BLOCK).div_ceil(GROUP).max(1));
             pass.dispatch_workgroups(groups[0], groups[1], 1);
             pass.set_pipeline(&passes.reduce);
@@ -221,7 +180,6 @@ impl ExposureMeter {
         }
         if self.mapping.load(Ordering::Acquire) == IDLE {
             encoder.copy_buffer_to_buffer(&self.state, 0, &self.staging, 0, Some(STATE_BYTES));
-            // Mapped once the copy is submitted: wgpu refuses a map while it waits.
             self.mapping.store(MAPPING, Ordering::Release);
             let (mapping, staging) = (Arc::clone(&self.mapping), self.staging.clone());
             commands.after_send(move || {
@@ -232,7 +190,6 @@ impl ExposureMeter {
         }
     }
 
-    /// The passes' bind group over this meter's buffers and `scene`.
     fn bind_group(
         &self,
         device: &wgpu::Device,
@@ -263,7 +220,6 @@ impl ExposureMeter {
         })
     }
 
-    /// Take a finished readback into [`ExposureMeter::readout`], never waiting.
     fn collect(&mut self) {
         if self.mapping.load(Ordering::Acquire) != MAPPED {
             return;
@@ -279,8 +235,6 @@ impl ExposureMeter {
         self.mapping.store(IDLE, Ordering::Release);
     }
 
-    /// Wait for the read in flight and take it: a test's or a capture's exact
-    /// readout, never the frame's path.
     pub(crate) fn settle(&mut self, device: &wgpu::Device) {
         if self.mapping.load(Ordering::Acquire) == MAPPING {
             let _ = device.poll(wgpu::PollType::wait_indefinitely());

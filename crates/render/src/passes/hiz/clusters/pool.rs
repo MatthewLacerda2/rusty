@@ -1,33 +1,3 @@
-//! Every clustered mesh's cluster table and indices in one place (#2417), so one
-//! binding (`hiz_clusters.wgsl`'s group 1) reaches them all and a frame's
-//! cluster cull is one dispatch a stage whatever its meshes.
-//!
-//! - **Two buffers, shared by the renderer**: the table (a 64-byte `Cluster` row
-//!   each) and the index pool, a copy of each clustered mesh's reordered indices
-//!   for the copy stage to read (the draws keep reading the mesh's own index
-//!   buffer: a mesh's whole draws, its shadows and phase one bind it as before).
-//! - **A mesh takes a range of each** when its clusters are attached
-//!   ([`ClusterPool::lease`]): its rows carry their first index into the pool,
-//!   so the shader adds no base. The [`Lease`] gives both back when it is
-//!   dropped, with its `GpuClusters`: a re-upload, a mesh replaced by a bigger
-//!   one, clusters dropped by an edit. The next lease reuses the hole (first
-//!   fit, `ranges`); nothing is ever moved, so a range's offsets hold for life.
-//!   A load that replaced the World releases the meshes no kept scene uses
-//!   (`scene::residency`, #2440), and their leases with them.
-//! - **Growth** doubles a buffer and copies what it held on the GPU (one copy in
-//!   a submit of its own, no CPU wait), then rebuilds the one bind group: a
-//!   Dust2-sized level's first upload grows each buffer about log2(size / 4 KiB)
-//!   times, every later frame none.
-//! - **The limit is the session's, not a mesh's**: each buffer is bound whole,
-//!   so it stays within the device's `max_storage_buffer_binding_size` (128 MiB
-//!   by default: 33.5M pooled indices, 2M clusters), and that is the total over
-//!   every clustered mesh resident at once: the loaded scenes' meshes. A mesh
-//!   that would pass it gets no lease, logs `does not fit the cluster pool`, and
-//!   is drawn whole by the instance test until a release frees room and retries
-//!   it (`scene::residency`). Offsets are worked in `u64` and the limit
-//!   clamped to what a `u32` index reaches, so a raised device limit cannot wrap
-//!   a row onto another mesh's.
-
 use std::ops::Range;
 use std::sync::{Arc, Mutex, PoisonError};
 
@@ -37,28 +7,22 @@ use super::ranges::Ranges;
 use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::CountedDevice as _;
 
-/// A `Cluster` row's bytes.
 const ROW_BYTES: u64 = 64;
 
-/// What each buffer has handed out, shared with the leases that free it.
 #[derive(Default)]
 struct Ledger {
     table: Ranges,
     indices: Ranges,
 }
 
-/// The renderer's one cluster table and index pool, and the group binding both.
 pub(crate) struct ClusterPool {
     table: GrowBuffer,
     indices: GrowBuffer,
     ledger: Arc<Mutex<Ledger>>,
-    /// The bytes either buffer may reach: the device's binding limit, lowered
-    /// by a test to make a refusal cheap.
     pub(crate) limit: u64,
     pub(crate) group: wgpu::BindGroup,
 }
 
-/// A mesh's rows of the table and indices of the pool, given back on drop.
 pub(crate) struct Lease {
     pub(crate) table: Range<u32>,
     pub(crate) indices: Range<u32>,
@@ -66,8 +30,6 @@ pub(crate) struct Lease {
 }
 
 impl Ledger {
-    /// `rows` of the table and `words` of the pool, each within its capacity:
-    /// both or neither, so a table that refuses gives the pool's range back.
     fn take(
         &mut self,
         (rows, words): (u32, u32),
@@ -106,8 +68,6 @@ impl ClusterPool {
         }
     }
 
-    /// Rows and indices for `clusters` over the mesh's `indices`, written into
-    /// the pool: `None` when either would pass `limit`, with nothing taken.
     pub(crate) fn lease(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -148,13 +108,11 @@ impl ClusterPool {
         Some(lease)
     }
 
-    /// The bytes live leases hold of the table and the pool together.
     pub(crate) fn leased_bytes(&self) -> u64 {
         let ledger = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
         ROW_BYTES * u64::from(ledger.table.used()) + 4 * u64::from(ledger.indices.used())
     }
 
-    /// The rows and indices held by live leases, and the buffers' bytes.
     #[cfg(test)]
     pub(crate) fn held(&self) -> ((u32, u32), (u64, u64)) {
         let ledger = self.ledger.lock().unwrap_or_else(PoisonError::into_inner);
@@ -166,15 +124,11 @@ impl ClusterPool {
     }
 }
 
-/// The rows and pooled indices `limit` bytes hold, each clamped to what a `u32`
-/// offset addresses.
 fn capacity(limit: u64) -> (u32, u32) {
     let clamp = |n: u64| u32::try_from(n).unwrap_or(u32::MAX);
     (clamp(limit / ROW_BYTES), clamp(limit / 4))
 }
 
-/// Group 1 over the table and the pool, each bound up to the binding limit
-/// (a grown buffer is a power of two, which may pass a limit that is not).
 fn bind(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,

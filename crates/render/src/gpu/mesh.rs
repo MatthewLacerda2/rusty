@@ -1,22 +1,9 @@
-//! GPU vertex-buffer layout for the sim-side [`Vertex`] (#494), and the [`MeshId`]
-//! uploads are keyed by: the vertex data and the primitive builders live in
-//! `components::mesh`; the renderer only owns how that data is described to wgpu.
-
 use rusty_components::mesh::Vertex;
 
-/// Stable identity for a mesh's GPU geometry, derived from its *source*
-/// (`primitive_type` + `asset_ref`) rather than the entity referencing it (#127).
-/// Many entities sharing the same primitive or imported asset therefore map to a
-/// single `MeshId` and share one vertex/index buffer pair instead of allocating
-/// N copies. A mesh edited in place (`MeshComponent::own_geometry`) adds its own
-/// key, so its edit never replaces the slot its source's other meshes draw.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct MeshId(pub String);
 
 impl MeshId {
-    /// Geometry key: `"<primitive_type>|<asset_ref>"`, plus `"|<subdivisions>"` for a
-    /// Plane cut finer than one quad, so it never shares the 1-quad buffer (#1524),
-    /// plus `"|own<n>"` for geometry an edit in place made the mesh's own.
     pub fn from_mesh(mesh: &rusty_scene::MeshComponent) -> Self {
         let (kind, asset) = (&mesh.primitive_type, mesh.asset_ref.as_deref());
         let cuts = Some(mesh.subdivisions).filter(|&n| n != 1);
@@ -28,16 +15,15 @@ impl MeshId {
 }
 
 const ATTRIBS: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
-    0 => Float32x3,  // position
-    1 => Float32x3,  // normal
-    2 => Float32x2,  // tex_coords
-    3 => Uint32x4,   // joint_indices
-    4 => Float32x4,  // joint_weights
-    5 => Float32x4,  // tangent (xyz + handedness)
-    6 => Float32x2,  // lightmap_uv (#438)
+    0 => Float32x3,
+    1 => Float32x3,
+    2 => Float32x2,
+    3 => Uint32x4,
+    4 => Float32x4,
+    5 => Float32x4,
+    6 => Float32x2,
 ];
 
-/// The vertex-buffer layout every mesh pipeline binds at slot 0.
 pub fn vertex_layout() -> wgpu::VertexBufferLayout<'static> {
     wgpu::VertexBufferLayout {
         array_stride: std::mem::size_of::<Vertex>() as wgpu::BufferAddress,
@@ -63,10 +49,6 @@ impl crate::Renderer {
 }
 
 impl crate::GpuMesh {
-    /// The draws of `mesh` under `material` (#1285): each material slot with the
-    /// index run it draws ([`rusty_components::mesh::material_runs`]), clipped to this
-    /// geometry's indices so a mesh edited ahead of its upload never reads past the
-    /// buffer ([`rusty_components::mesh::clip_runs`]).
     pub(crate) fn runs(
         &self,
         mesh: &rusty_scene::MeshComponent,

@@ -1,6 +1,3 @@
-//! What a material packs for TAA (#1845), without a GPU: its reactivity and
-//! whether it writes its motion, on a `Transparent` surface only.
-
 use super::surface_uniform;
 use crate::draw::batch::RecordTraits;
 use crate::MaterialData;

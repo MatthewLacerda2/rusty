@@ -1,7 +1,4 @@
--- fruit/view.lua — the bodies the player cuts and what they see and hear of it:
--- thrown fruit and bombs as rigidbodies on the Fruit layer, the two halves a cut
--- leaves, the juice and the blast, the bomb's flash, the sounds and the HUD. It
--- never decides the game; `fruit.lua` does.
+-- Never decides the game; `fruit.lua` does.
 
 local View = {}
 
@@ -11,8 +8,6 @@ local FLASH_PEAK = 80.0 -- the flash light's intensity the tick a bomb goes off
 local FLASH_DECAY = 0.92
 local SOUND_AT = { 0, 2, 8 }
 
--- Every kind that can be thrown: its primitive, its size (the diameter, or the
--- capsule's scale) and what a cut makes of it. A bomb is never cut, only hit.
 View.KINDS = {
     apple = { shape = "Sphere", scale = { 0.8, 0.8, 0.8 }, juice = { 1.0, 0.9, 0.6 } },
     orange = { shape = "Sphere", scale = { 0.9, 0.9, 0.9 }, juice = { 1.0, 0.6, 0.1 } },
@@ -24,12 +19,11 @@ View.KINDS = {
 View.FRUIT = { "apple", "orange", "lime", "banana", "melon" }
 
 local function body(id)
-    Scene.AddComponent(id, "Collider") -- #2051: a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
     Scene.AddComponent(id, "RigidBody")
     Layers.SetLayer(id, View.LAYER)
 end
 
--- The radius a hit test gives `kind`: half its widest extent.
 function View.radius(kind)
     local s = View.KINDS[kind].scale
     local widest = math.max(s[1], s[3])
@@ -37,7 +31,6 @@ function View.radius(kind)
     return widest / 2
 end
 
--- Throw a new `kind` from (`x`, `y`, `z`) at velocity (`vx`, `vy`); returns its id.
 function View.throw(kind, x, y, z, vx, vy, spin)
     local k = View.KINDS[kind]
     local id = Scene.CreateEntity(kind, k.shape)
@@ -57,9 +50,8 @@ function View.throw(kind, x, y, z, vx, vy, spin)
     return id
 end
 
--- One half of a cut `kind`: its skin is the fruit squashed along the cut's normal
--- (a lens), its flesh a disc across the cut. A real hemisphere needs a mesh made
--- at runtime, which the API cannot do yet (#2059).
+-- A half's skin is the fruit squashed along the cut's normal (a lens), its flesh
+-- a disc across the cut: a real hemisphere needs a runtime mesh the API cannot make yet.
 local function half(kind, x, y, z, nx, ny, side, vx, vy)
     local k = View.KINDS[kind]
     local d = math.max(k.scale[1], k.scale[2])
@@ -80,8 +72,6 @@ local function half(kind, x, y, z, nx, ny, side, vx, vy)
     return id
 end
 
--- Cut `id` (a `kind`) along a swipe heading (`dx`, `dy`) on screen: it is replaced
--- by two halves parting across the swipe, and its juice sprays. Returns the halves.
 function View.split(id, kind, dx, dy, juice)
     local x, y, z = Transform.GetPosition(id)
     local vx, vy = Physics.GetVelocity(id)
@@ -97,7 +87,6 @@ function View.split(id, kind, dx, dy, juice)
     return { half(kind, x, y, z, nx, ny, 1, vx, vy), half(kind, x, y, z, nx, ny, -1, vx, vy) }
 end
 
--- Set bomb `id` off: it is gone in a blast and a flash.
 function View.explode(id, blast)
     local x, y, z = Transform.GetPosition(id)
     Scene.DestroyEntity(id)
@@ -108,7 +97,6 @@ function View.explode(id, blast)
     return FLASH_PEAK
 end
 
--- The flash light's intensity for the next tick, from this one's.
 function View.flash(light, intensity)
     Light.SetIntensity(light, intensity)
     return intensity * FLASH_DECAY
@@ -118,7 +106,6 @@ function View.sound(name, x, y)
     Audio.PlayAt("assets/sounds/" .. name .. ".wav", x or SOUND_AT[1], y or SOUND_AT[2], SOUND_AT[3], 0.8)
 end
 
--- The HUD's entities and the effects, found by name once Play starts.
 function View.find()
     return {
         score = Scene.FindEntityByName("ScoreText"),

@@ -1,9 +1,3 @@
-//! The per-cascade static-bake cache (#355, #435), on the GPU: a still camera re-draws
-//! no static caster, a nudge inside the snap grid re-draws none either, and a real
-//! move re-bakes the cascades it shifted. Skips when no adapter is present. The bake's
-//! key moves only with a casting mode that changes the shadow (#1571), or a static
-//! Cutout's clip terms (#1594).
-
 use glam::Vec3;
 
 use super::statics_key;
@@ -12,7 +6,6 @@ use rusty_components::ShadowCasting;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// One static box under the default sun, and nothing that moves.
 fn static_yard() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -22,7 +15,6 @@ fn static_yard() -> Scene {
     scene
 }
 
-/// Shadow draws submitted rendering `scene` from `position`.
 fn shadow_draws(r: &mut Renderer, view: &mut RenderView, scene: &Scene, position: Vec3) -> u32 {
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(position, -90.0, -10.0);
@@ -79,8 +71,6 @@ fn only_a_mode_that_changes_the_shadow_moves_the_bake_key() {
     assert_ne!(key_as(ShadowCasting::TwoSided), on);
 }
 
-/// A static Cutout caster's clip terms re-bake its shadow when edited (#1594); an
-/// Opaque one's mapping, which its shadow never reads, keeps the bake.
 #[test]
 fn a_static_cutouts_mapping_moves_the_bake_key() {
     use rusty_components::{RenderMode, UvMapping};
@@ -105,9 +95,6 @@ fn a_static_cutouts_mapping_moves_the_bake_key() {
     assert_ne!(key_with(&|m| m.alpha_cutoff = 0.25), sized);
 }
 
-/// The digest numbers a Cutout by its slot index, unresolved slots counted, so the
-/// slot it names is the one the shadow clips: moving the Cutout past an unresolved
-/// slot moves the key.
 #[test]
 fn a_cutouts_slot_index_counts_unresolved_slots() {
     use rusty_components::RenderMode;

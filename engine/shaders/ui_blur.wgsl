@@ -1,4 +1,4 @@
-// ui_blur.wgsl — the UI backdrop's dual-filter blur (#426).
+// ui_blur.wgsl — the UI backdrop's dual-filter blur.
 //
 // Marius Bjørge's dual filter ("Bandwidth-Efficient Rendering", SIGGRAPH 2015):
 // a chain of half-size downsamples (`fs_down`, 5 taps) then upsamples back

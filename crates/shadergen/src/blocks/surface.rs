@@ -1,37 +1,5 @@
-//! crates/shadergen/src/blocks/surface.rs — the surface building-block family (#272).
-//!
-//! Surface blocks vary the **look** of the forward pass while keeping the full PBR
-//! lighting verbatim (so the assembled module
-//! binds against the forward pipeline unchanged — same `VertexInput`, same
-//! `LightingUniforms`/`DrawUniforms`/`MaterialData`/material-group maps, same entry points).
-//! Each block's `helper` is a pure function
-//! `fn srf_<id>(c: vec3<f32>, in: VertexOutput, <params…>) -> vec3<f32>` that
-//! transforms the lit color; the assembler folds the chosen blocks (in recipe order) after the
-//! standard lighting and before the final write, so they restyle the shaded
-//! result rather than replace the lighting model.
-//!
-//! Blocks read only what the forward contract already exposes — the interpolated
-//! `VertexOutput` (`world_position`/`world_normal`/`tex_coords`) and the `camera`
-//! and `entity` uniforms. Animated blocks read `camera.time`, the sim's game time
-//! (#398): it freezes with the game and is 0 in edit mode. The one binding they
-//! add is the material's param uniform (#399): a param marked `runtime` is read from
-//! it, so gameplay drives it (`hit_flash.amount` from a script) with no re-bake.
-//! A block that needs a pattern samples an extra texture slot (#400): `t_mask`, the
-//! texture the material names under `mask` (white when it names none), through its
-//! own sampler `s_mask` (the texture's wrap and filter, #1323).
-//!
-//! A [`Stage::Uv`] block (`uv_scroll`, #401) is the exception to "transform the lit
-//! color": it rewrites `in.tex_coords` at the top of `surface_color`, before any map is
-//! sampled, so every lookup — and every later color block reading `in.tex_coords` —
-//! sees the moved UVs.
-//!
-//! A [`Stage::Vertex`] block (`vertex_waves`, #1524) moves the vertex instead: the
-//! world position, normal and tangent the base's `surface_vertex` hook hands it, in
-//! every vertex stage, at the game time that stage draws at (`time`).
-
 use super::{Block, Param, Reflection, Stage};
 
-/// The surface block catalog.
 pub const BLOCKS: &[Block] = &[
     Block {
         id: "toon_ramp",
@@ -241,7 +209,6 @@ pub const BLOCKS: &[Block] = &[
         textures: &[],
         stage: Stage::Vertex,
         cut: None,
-        // A vertex block never touches the colour, so the reflection stands.
         reflection: Reflection::Kept,
     },
 ];

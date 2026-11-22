@@ -1,6 +1,3 @@
-//! The decal record the forward shader reads (#638): what it changes, by how much,
-//! and the box and frame it projects through.
-
 use glam::{Mat4, Vec3, Vec4};
 
 use super::{bounds, maps, record, NO_LAYER};
@@ -13,7 +10,6 @@ fn wall_hit(spec: DecalSpec) -> Decal {
     Decal::from_hit(Vec3::new(1.0, 2.0, 0.0), Vec3::Z, spec)
 }
 
-/// The record of `decal` at its spawn box, whole.
 fn rec(decal: &Decal, material: Option<&MaterialAsset>, layers: [u32; 4]) -> super::GpuDecal {
     record(decal, &DecalPose::unowned(decal), material, layers)
 }

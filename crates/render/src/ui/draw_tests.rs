@@ -1,8 +1,3 @@
-//! GPU tests for the UI pass's per-view cache (#418): a canvas is re-uploaded only
-//! when its geometry changed, views that must not show UI never draw it (the Scene
-//! view only with its UI overlay on), and a
-//! targetless view draws it only onto an output its caller supplies.
-
 use glam::{Vec2, Vec3, Vec4};
 
 use crate::{RenderView, OFFSCREEN_FORMAT};
@@ -61,17 +56,13 @@ fn gpu_a_static_hud_uploads_once_and_a_change_reuploads() {
         "a layout change re-uploads"
     );
 
-    // The Scene view (editor mode) does not draw the game's screen UI.
     let mut scene_view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     let target = scene_view.color_target_view().expect("target");
     renderer.render(&mut scene_view, &scene, &cam, &target, true);
     assert_eq!(scene_view.ui.last_drawn(), 0);
-    // A targetless view (the cubemap capture's) has no frame of its own to draw on…
     let mut capture = RenderView::targetless(&renderer.device, OFFSCREEN_FORMAT, 32, 32);
     renderer.render(&mut capture, &scene, &cam, &target, false);
     assert_eq!(capture.ui.last_drawn(), 0);
-    // …unless its caller hands it one, as the player does with its swapchain frame;
-    // the output is used by that render only.
     let output = scene_view.color_target_view().expect("target");
     capture.set_ui_output(Some((output, OFFSCREEN_FORMAT)));
     renderer.render(&mut capture, &scene, &cam, &target, false);
@@ -94,8 +85,6 @@ fn gpu_the_scene_view_draws_the_screen_ui_with_its_overlay_on() {
     assert_eq!(view.ui.last_drawn(), 1, "the Scene tab's UI toggle (#423)");
 }
 
-/// A stretched white image with the screen boxed in the left half of a 32×16
-/// view: it covers that box and nothing right of it.
 #[test]
 fn gpu_a_screen_box_confines_the_screen_ui() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(32, 16) else {

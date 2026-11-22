@@ -1,22 +1,11 @@
-//! The material records one bind group's draws index (#1616): the editor overlays'
-//! (`OverlayDraws`), one per distinct tint. The solids and the shadow casters read
-//! the renderer's kept material table instead (`render::scene::MaterialRecords`,
-//! #1706).
-
 use super::{MaterialData, MATERIAL_DATA_WORDS};
 
-/// A record as its packed words: compared bit for bit, so a NaN tint matches itself
-/// and `-0.0` stays apart from `0.0`, as the GPU reads them.
 pub(crate) type RecordWords = [u32; MATERIAL_DATA_WORDS];
 
-/// Each distinct record once, sorted by its words: the array is the same whatever
-/// order the draws name their records in, so a camera that moves and reorders its
-/// draws uploads the same records while the materials it sees hold still.
 #[derive(Debug, Default, PartialEq)]
 pub(crate) struct RecordTable(Vec<RecordWords>);
 
 impl RecordTable {
-    /// The table of every record `words` names, duplicates folded.
     pub(crate) fn new(words: impl IntoIterator<Item = RecordWords>) -> Self {
         let mut words: Vec<_> = words.into_iter().collect();
         words.sort_unstable();
@@ -24,19 +13,16 @@ impl RecordTable {
         Self(words)
     }
 
-    /// Where `words` sits in the array; the table must hold it.
     pub(crate) fn index(&self, words: &RecordWords) -> u32 {
         let found = self.0.binary_search(words);
         found.expect("the table was built from every record its draws name") as u32
     }
 
-    /// How many records the array holds.
     #[cfg(test)]
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }
 
-    /// The array the bind group's material binding reads.
     pub(crate) fn records(&self) -> Vec<MaterialData> {
         self.0.iter().map(MaterialData::from_words).collect()
     }

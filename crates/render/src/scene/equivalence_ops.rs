@@ -1,7 +1,3 @@
-//! crates/render/src/scene/equivalence_ops.rs — the edits `equivalence_tests` draws its
-//! sequences from (#1706): the ECS write paths of `changes::ops`, the inputs the log
-//! does not cover, and the shadow ops.
-
 use proptest::prelude::*;
 
 use super::fixture::{on, probe};
@@ -17,7 +13,6 @@ use rusty_scene::Scene;
 pub(super) enum R {
     World(Op),
     Prop(u8),
-    /// Entity, material, and whether two slots name it (`set_slot` pads a list).
     Material(usize, Option<u8>, bool),
     Library(u8),
     Override(usize, bool),
@@ -29,10 +24,7 @@ pub(super) enum R {
     Reshape(usize),
     Rewind,
     Shadow(S),
-    /// An edit of the second scene's library, which holds the first's names.
     Other(u8),
-    /// A fixed tick recorded for drawing between ticks (#1877), a blend set (in
-    /// quarters of a tick), or the blend dropped.
     Tick,
     Blend(u8),
     Unblend,
@@ -64,7 +56,6 @@ pub(super) fn r_op() -> impl Strategy<Value = R> {
     ]
 }
 
-/// Apply `op` to `scene` (and, for a capture, to `r`).
 pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
     let pick = |s: &Scene, i: usize| s.world.ids().get(i).copied();
     let kinds = [Primitive::Box, Primitive::Sphere, Primitive::Plane];
@@ -99,7 +90,6 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
         R::Lightmap(i, l) => on(scene, pick(scene, i), |s, id| match l {
             0 => drop(s.lightmaps.remove(id)),
             1 => s.lightmaps.took_in_baked(id),
-            // Its bounce forgotten, its direct light still held: any record draws.
             2 => drop(s.lightmaps.lights.remove(&id)),
             _ => s.lightmaps.insert(LightmapEntry {
                 entity: id,
@@ -118,7 +108,6 @@ pub(super) fn edit(r: &mut Renderer, scene: &mut Scene, op: &R) {
     }
 }
 
-/// A tick recorded, a blend set or dropped (#1877).
 fn between_ticks(r: &mut Renderer, scene: &Scene, op: &R) {
     match *op {
         R::Tick => r.draw_poses.record(scene),
@@ -127,15 +116,12 @@ fn between_ticks(r: &mut Renderer, scene: &Scene, op: &R) {
     }
 }
 
-/// Edit the library: `red`'s colour or metallic, `glass`'s alpha (a record's
-/// alone) or sorting priority (a slot's), `red` turned Cutout or back or its cutoff (a key's), or add or remove
-/// `blue`, which objects may name while it is missing.
 pub(super) fn library(scene: &mut Scene, c: u8) {
     let m = &mut scene.materials;
     let Some(red) = m.get_mut("red").filter(|_| c <= 6 && c != 3) else {
         match c {
             3 => m.get_mut("glass").unwrap().alpha = 0.2,
-            9 => m.get_mut("glass").unwrap().sorting_priority ^= 1, // #2039
+            9 => m.get_mut("glass").unwrap().sorting_priority ^= 1,
             _ if m.remove("blue").is_some() => {}
             _ => drop(m.insert("blue".into(), Default::default())),
         }

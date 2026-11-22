@@ -1,6 +1,3 @@
-//! The transparent-surface terms a material packs into its draw's uniform (#1523),
-//! without a GPU: what the shader branches on and the blend picks.
-
 use super::{material_data, surface_uniform};
 use rusty_components::{BlendMode, MaterialAsset, RefractionModel, RenderMode, UvMapping};
 

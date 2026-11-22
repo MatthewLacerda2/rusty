@@ -1,6 +1,3 @@
-//! Film grain (#1439): the composite's last function, on the graded image, seeded by
-//! the game clock (`PostParams::camera_pos.w`).
-
 use super::super::{Composite, EffectCx, History, Owner, Phase, PostEffect};
 use crate::postfx::params::Gate;
 use rusty_core::settings::graphics_options::GraphicsOption;
@@ -23,7 +20,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
-/// x: the intensity (`0` when it doesn't run), y: the response, both clamped.
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let grain = &vc.film_grain;

@@ -1,8 +1,3 @@
-//! A texture a model's conversion extracted uploads block-compressed once an
-//! import made its copy (#2365): counted by `Renderer::uncached_textures` until
-//! then, swapped for the compressed copy when the import notes it, in the format
-//! its slot gave it.
-
 use std::path::Path;
 
 use super::compressed::FEATURE;

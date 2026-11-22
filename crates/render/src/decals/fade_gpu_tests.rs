@@ -1,8 +1,3 @@
-//! Where surface decals do not land (#638): a surface running along the projection
-//! axis fades the decal out instead of streaking it, a material that opts out
-//! keeps its own look, and a stacked `DepthOnly` camera (the viewmodel) bins none.
-//! Skips with no adapter.
-
 use glam::Vec3;
 
 use super::gpu_fixture::{centre, close, grey, red, stage, stamp};
@@ -10,7 +5,6 @@ use crate::test_gpu::headless_or_skip;
 use rusty_components::{CameraComponent, ClearFlags, MaterialAsset};
 use rusty_scene::Scene;
 
-/// The ambient-lit white floor, stamped red projected against `normal` when given.
 fn floor(material: MaterialAsset, normal: Option<Vec3>) -> Scene {
     let mut scene = stage(material, 1.0);
     if let Some(normal) = normal {
@@ -30,7 +24,6 @@ fn gpu_a_surface_along_the_projection_axis_is_not_streaked() {
         facing[0] > facing[1] + 40,
         "control: the stamp shows: {facing:?}"
     );
-    // A wall hit's box reaching into the floor: the floor runs along its axis.
     let (along, counters) = centre(&mut renderer, &floor(grey(0.8), Some(Vec3::Z)), false);
     assert_eq!(counters.decals_visible, 1, "{counters:?}");
     assert!(

@@ -1,9 +1,3 @@
-//! The frame's shadow inputs. Which light steers the realtime shadow sun (#809, #887):
-//! only a directional light the frame draws live; a Baked directional light, or a
-//! live light of another type, leaves no sun, and then no cascade is fitted (#1713)
-//! — except in a bake capture, which draws the Baked sun live. And whose volume sets
-//! the cascades (#1434): the screen's main camera's, never a render-texture camera's.
-
 use glam::{Quat, Vec3};
 
 use super::{frame_cascades, live_sun};
@@ -12,7 +6,6 @@ use rusty_components::{CameraComponent, LightMode, RenderTarget, ShadowSettings}
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// Spawn a light primitive turned by `rotation`; return its id.
 fn rotated_light(scene: &mut Scene, primitive: Primitive, rotation: Quat) -> u32 {
     let id = create_entity(scene, "Light", Some(primitive));
     scene.world.transform_mut(id).unwrap().rotation = rotation;
@@ -25,7 +18,7 @@ fn the_shadow_sun_follows_only_a_live_directional_light() {
     let sun_turn = Quat::from_rotation_x(-0.7) * Quat::from_rotation_y(0.4);
     let sun = rotated_light(&mut scene, Primitive::DirectionalLight, sun_turn);
     scene.world.light_mut(sun).unwrap().mode = LightMode::Baked;
-    scene.lightmaps.took_in_baked(sun); // a bake took it in: it is drawn no more
+    scene.lightmaps.took_in_baked(sun);
     let lamp_turn = Quat::from_rotation_z(1.1);
     let lamp = rotated_light(&mut scene, Primitive::PointLight, lamp_turn);
     scene.world.light_mut(lamp).unwrap().mode = LightMode::Realtime;
@@ -45,15 +38,12 @@ fn the_shadow_sun_follows_only_a_live_directional_light() {
     );
 }
 
-/// The issue's case (#1713): a scene whose only sun is Baked fits no cascade in a
-/// frame, so none is swept or sampled; a bake capture, which draws that sun live,
-/// keeps them, and so does a Realtime sun.
 #[test]
 fn a_baked_only_sun_fits_no_cascade_outside_a_capture() {
     let mut scene = Scene::new();
     let sun = rotated_light(&mut scene, Primitive::DirectionalLight, Quat::IDENTITY);
     scene.world.light_mut(sun).unwrap().mode = LightMode::Baked;
-    scene.lightmaps.took_in_baked(sun); // a bake took it in: it is drawn no more
+    scene.lightmaps.took_in_baked(sun);
     let cam = Camera::new(Vec3::new(0.0, 1.0, 4.0), -90.0, -10.0);
     let settings = ShadowSettings::default();
     let fit = |scene: &Scene, capture| frame_cascades(scene, capture, &cam, 1.5, &settings).len();
@@ -71,7 +61,6 @@ fn a_baked_only_sun_fits_no_cascade_outside_a_capture() {
     );
 }
 
-/// A camera entity whose volume asks for `cascades` shadow cascades.
 fn camera_with_cascades(scene: &mut Scene, cascades: u32, target: Option<RenderTarget>) {
     let id = create_entity(scene, "Camera", None);
     let mut vc = default_post_processing();
@@ -93,7 +82,6 @@ fn gpu_the_cascades_follow_the_main_cameras_volume() {
     let mut scene = Scene::new();
     rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     create_entity(&mut scene, "Crate", Some(Primitive::Box));
-    // Created first: a monitor camera that must not set the screen's shadows.
     camera_with_cascades(&mut scene, 1, Some(RenderTarget::new("monitor", 16, 16)));
     camera_with_cascades(&mut scene, 3, None);
     let out = view.color_target_view().unwrap();
@@ -102,8 +90,6 @@ fn gpu_the_cascades_follow_the_main_cameras_volume() {
     assert_eq!(r.shadow_renderer.cascades.len(), 3);
 }
 
-/// The atlas keys each light's tiles by the id `local_light_ids` gives it (#1711):
-/// one id per light `local_lights` stages, in its order, live or in a capture.
 #[test]
 fn every_staged_light_has_its_entity_id_in_order() {
     use crate::clusters::local_lights;

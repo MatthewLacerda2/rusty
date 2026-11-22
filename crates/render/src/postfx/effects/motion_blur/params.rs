@@ -1,10 +1,5 @@
-//! What one view's motion blur draws with (#1436), from its base camera: the
-//! `BlurParams` uniform `postfx/motion_blur.wgsl` reads, and the tile size its tile
-//! passes work at. Pure, so the arithmetic is tested without an adapter.
-
 use rusty_components::CameraComponent;
 
-/// CPU-side mirror of `BlurParams` in `postfx/motion_blur.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct BlurParams {
@@ -13,8 +8,6 @@ pub(crate) struct BlurParams {
 }
 
 impl BlurParams {
-    /// The params for `cam`'s motion blur at `samples` taps (its quality's) over a
-    /// view `height` pixels tall.
     pub(crate) fn new(cam: &CameraComponent, samples: u32, height: u32) -> Self {
         let samples = samples.clamp(
             CameraComponent::MIN_MOTION_BLUR_SAMPLES,
@@ -37,15 +30,11 @@ impl BlurParams {
         }
     }
 
-    /// The params for velocities that span `frames` frames (a render texture drawn
-    /// every N frames, #1436): the shutter shrinks by as much, so the streak is one
-    /// frame's. The clamp, and so the tile size, stay.
     pub(crate) fn per_frames(mut self, frames: u32) -> Self {
         self.shape[0] /= frames.max(1) as f32;
         self
     }
 
-    /// The tile size in pixels.
     pub(crate) fn tile(&self) -> u32 {
         self.shape[3] as u32
     }
@@ -60,7 +49,6 @@ pub(crate) fn tile_size(longest: f32) -> u32 {
     radius.div_ceil(8) * 8
 }
 
-/// How many tiles of `tile` pixels cover `pixels`.
 pub(crate) fn tiles(pixels: u32, tile: u32) -> u32 {
     pixels.div_ceil(tile).max(1)
 }

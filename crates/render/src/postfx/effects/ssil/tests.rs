@@ -1,6 +1,3 @@
-//! SSIL's plan and uniform (#1750), off the GPU: when it runs, what it is clamped
-//! to, and what a cut tells the shader.
-
 use glam::{Mat4, Vec3};
 
 use super::{Previous, SsilFrame, SsilPlan};
@@ -31,8 +28,6 @@ fn on() -> Ssil {
     }
 }
 
-/// Off by default, and off without a volume, at intensity 0, without full post-FX
-/// or with the player's option off; on otherwise.
 #[test]
 fn ssil_runs_only_when_turned_on_and_allowed() {
     let g = GraphicsSettings::default();
@@ -57,8 +52,6 @@ fn ssil_runs_only_when_turned_on_and_allowed() {
     assert!(SsilPlan::for_view(post, g, true).is_none());
 }
 
-/// Zero, huge and NaN values reach the GPU inside their range: a NaN intensity
-/// runs nothing, a NaN radius runs at the default, huge ones at the maximum.
 #[test]
 fn intensity_and_radius_are_bounded() {
     let g = GraphicsSettings::default();
@@ -93,8 +86,6 @@ fn intensity_and_radius_are_bounded() {
     assert_eq!((q.samples, q.resolution_divisor), (Ssil::MAX_SAMPLES, 1));
 }
 
-/// A level takes the running preset's row; every seeded level gathers at half
-/// resolution or finer, and more samples from Low to High.
 #[test]
 fn a_level_takes_the_presets_row() {
     for preset in &QualityPresets::default().presets {
@@ -132,8 +123,6 @@ fn frame() -> SsilFrame {
     }
 }
 
-/// A cut tells the shader it has no history (and reprojects through this frame's
-/// camera); with one, last frame's camera; the forward axis is normalised.
 #[test]
 fn the_uniform_says_whether_there_is_a_history() {
     let f = frame();

@@ -1,7 +1,6 @@
 use super::*;
 use rusty_components::DetailLayer;
 
-/// A material naming every map, each by its own field's name.
 fn every_map() -> MaterialAsset {
     MaterialAsset {
         base_color_map: Some("base_color_map".into()),

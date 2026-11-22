@@ -1,10 +1,3 @@
-//! A material's Render Face (#1615) in the forward passes. A closed, refracting
-//! transparent Sphere draws its front faces only, so the image no longer depends on
-//! which of its triangles the index order draws last (the issue's stripes: turning
-//! the ball half a turn about the view axis moved them). A one-sided `Plane` set to
-//! `Both` is drawn from behind and lit as its front is, its normal flipped toward
-//! the viewer; `Front` leaves it out. Skips with no adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -14,7 +7,6 @@ use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 48;
 
-/// The frame `cam` sees, as RGBA8.
 pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -23,26 +15,21 @@ pub(super) fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     readback::read_texture_rgba8(&r.device, &r.queue, target, RES, RES)
 }
 
-/// The mean of `px`'s colour channels.
 pub(super) fn mean(px: &[u8]) -> f32 {
     let rgb = px.chunks(4).flat_map(|p| &p[..3]);
     rgb.map(|&c| f32::from(c)).sum::<f32>() / (px.len() / 4 * 3) as f32
 }
 
-/// The mean per-channel difference of two frames.
 fn diff(a: &[u8], b: &[u8]) -> f32 {
     let d = a.iter().zip(b).map(|(x, y)| f32::from(x.abs_diff(*y)));
     d.sum::<f32>() / a.len() as f32
 }
 
-/// Entity `id`'s own material, to edit.
 pub(super) fn asset(scene: &mut Scene, id: u32) -> &mut MaterialAsset {
     let key = scene.ensure_material_key(id).unwrap();
     scene.materials.get_mut(&key).unwrap()
 }
 
-/// The issue's plasma ball: a refracting, absorbing transparent Sphere drawing
-/// `face`, turned `turn` radians about the view axis, before a lit wall.
 fn ball(face: RenderFace, turn: f32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -84,8 +71,6 @@ fn gpu_a_refracting_ball_shows_no_back_faces() {
     );
 }
 
-/// A `Plane` (its front faces +Y) under or over a sun shining `up` or down, seen
-/// from below or, with `above`, from above; drawing `face`.
 pub(super) fn card(face: RenderFace, above: bool, up: bool) -> (Scene, Camera) {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);

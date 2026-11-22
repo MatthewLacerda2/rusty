@@ -1,6 +1,3 @@
-//! A game frame's gizmos on lavapipe (#1882): drawn through the base camera of an
-//! FPS stack, against its depth; left out (without a crash) while TAA upscales.
-
 use glam::Vec3;
 
 use crate::motion::gpu_fixture::{cube, eye, renderer, scene, H, W};
@@ -12,8 +9,6 @@ use rusty_scene::{ClearFlags, Scene};
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 1.0];
 const MAGENTA: [f32; 4] = [1.0, 0.0, 1.0, 1.0];
 
-/// The fixture scene (TAA on when `taa`): a wide wall 6 m out, a red line in front
-/// of it and a magenta one behind it, both held for a second.
 fn lined(taa: bool) -> Scene {
     let (mut scene, cam) = scene(false);
     scene.world.camera_mut(cam).unwrap().taa_active = taa;
@@ -35,7 +30,6 @@ fn lined(taa: bool) -> Scene {
     scene
 }
 
-/// One fresh frame of `scene` at `scale`, its game gizmos on or off.
 fn shot(r: &mut Renderer, scene: &Scene, scale: f32, gizmos: bool) -> (Vec<u8>, RenderView) {
     let mut v = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     v.set_render_scale(RenderScale::new(scale));
@@ -48,7 +42,6 @@ fn shot(r: &mut Renderer, scene: &Scene, scale: f32, gizmos: bool) -> (Vec<u8>, 
     (img, v)
 }
 
-/// The pixels holding `color` (its strong channels high, the rest low).
 fn pixels_of(img: &[u8], color: [f32; 4]) -> Vec<usize> {
     let hit = |p: &[u8]| (0..3).all(|c| (p[c] > 180) == (color[c] > 0.5));
     img.chunks(4)
@@ -58,7 +51,6 @@ fn pixels_of(img: &[u8], color: [f32; 4]) -> Vec<usize> {
         .collect()
 }
 
-/// `scene` under a `DepthOnly` viewmodel camera with a narrow lens drawing nothing.
 fn with_viewmodel(mut scene: Scene) -> Scene {
     let overlay = scene.add_entity("ViewmodelCamera".to_string());
     let lens = CameraComponent {
@@ -73,9 +65,6 @@ fn with_viewmodel(mut scene: Scene) -> Scene {
     scene
 }
 
-/// Under a `DepthOnly` viewmodel camera with a narrow lens that draws nothing, the
-/// gizmos land where the world camera alone draws them, and the line behind the
-/// wall stays hidden though the viewmodel cleared the depth buffer.
 #[test]
 fn gpu_game_gizmos_follow_the_base_camera_under_a_viewmodel() {
     let Some(mut r) = renderer() else { return };
@@ -107,9 +96,6 @@ fn gpu_game_gizmos_follow_the_base_camera_under_a_viewmodel() {
     );
 }
 
-/// While TAA upscales the view (render scale 0.75) the gizmos are left out, the
-/// console told once, the frame is the plain one and no depth is copied for them;
-/// at a scale of 1 they draw.
 #[test]
 fn gpu_game_gizmos_under_taa_upscaling_are_skipped_not_a_crash() {
     let Some(mut r) = renderer() else { return };

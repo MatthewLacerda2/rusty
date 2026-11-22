@@ -1,8 +1,3 @@
-//! Per-object motion blur as a post effect (#1436): a **camera** effect, its knobs on
-//! the camera (Unity's camera property), its pass a scene pass over the velocity
-//! target the stack wrote, after depth of field: bloom, the exposure meter and the
-//! composite then read the blurred scene. Like FXAA it needs no volume.
-
 use super::super::{History, Owner, Pass, PassCx, PostEffect};
 use super::BlurParams;
 use crate::gpu::commands::Commands;
@@ -29,8 +24,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }],
 };
 
-/// Gated by [`motion::wanted`], so the editor's Scene view never blurs and a view
-/// that wrote velocity only for depth of field runs no motion blur.
 fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let (post, graphics, stack) = (cx.effect.post, cx.effect.graphics, cx.stack);
     let blurs = motion::wanted(post, graphics, cx.effect.full, stack.editor_mode);
@@ -43,8 +36,6 @@ fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Command
         .run_motion_blur(gpu, commands.encoder(), passes, blur, &r.gpu_timer);
 }
 
-/// The motion blur `post`'s camera runs this frame, for a view `height` pixels tall;
-/// `None` when [`motion_blur_enabled`] does not hold.
 pub(crate) fn blur_params(
     post: PostSource,
     graphics: GraphicsSettings,
@@ -60,11 +51,6 @@ pub(crate) fn blur_params(
     Some(BlurParams::new(cam, samples, height))
 }
 
-/// Whether `post`'s camera runs motion blur, through [`effect_runs`]: its component
-/// has it on and the player's option allows it. The velocity
-/// target is written when this, TAA or depth of field holds (`motion::target_wanted`,
-/// #1435, #1702, #1445), so a player who turned all three off pays for no velocity
-/// pass.
 pub(crate) fn motion_blur_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     post.camera
         .is_some_and(|cam| effect_runs(graphics, EFFECT.gate, cam.motion_blur_active))

@@ -1,6 +1,3 @@
-//! A resident probe's uniform (#1697): its flags, and the luminance SH the shader's
-//! `probe_normalisation` dots with the basis.
-
 use glam::Vec3;
 
 use super::{luminance_sh, ReflectionProbeUniform};
@@ -8,8 +5,6 @@ use rusty_core::color::luminance;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::ReflectionProbe;
 
-/// What the shader computes from the packed coefficients along `n`: their dot
-/// product with the basis, which is `eval_radiance` of an SH holding them.
 fn shader_dot(packed: [[f32; 4]; 3], n: Vec3) -> f32 {
     let flat = packed.as_flattened();
     let sh = Sh9 {
@@ -47,7 +42,6 @@ fn a_probe_without_stored_irradiance_is_not_normalised_and_the_fallback_is_flagg
     assert_eq!(baked.params[2..], [1.0, 1.0]);
 }
 
-/// The mirror's constants are the shader's.
 #[test]
 fn the_cpu_normalisation_mirrors_the_shaders_constants() {
     use super::{NORMALISE_BIAS, STORED_FLOOR};
@@ -61,9 +55,6 @@ fn the_cpu_normalisation_mirrors_the_shaders_constants() {
     }
 }
 
-/// One dominant lamp's L2 SH rings below zero for normals turned 104–145° from it:
-/// there the stored value is floored at a share of its mean, so a pixel of modest
-/// baked light is not saturated to 1 by the ringing (#1697).
 #[test]
 fn one_lamp_sh_ringing_does_not_saturate_the_scale() {
     let mut sh = Sh9::zero();
@@ -85,8 +76,6 @@ fn one_lamp_sh_ringing_does_not_saturate_the_scale() {
     );
 }
 
-/// The fallback is never box-projected (#1995), and the shape row carries the
-/// projection's fade: the blend distance, then the volume's half-diagonal.
 #[test]
 fn the_fallback_is_never_box_projected_and_the_fade_is_packed() {
     let mut probe = ReflectionProbe::new(Vec3::ZERO, Vec3::new(3.0, 4.0, 0.0));

@@ -1,37 +1,18 @@
-//! The SSR surface targets (#1526): two `Rgba16Float` textures at the view's scene
-//! size that the opaque forward pass writes as its third and fourth colour
-//! attachments, beside the velocity target, while the view runs SSR. Their texels are
-//! laid out in `engine/shaders/lighting/ssr_surface.wgsl`: the weight a hit gets and
-//! the environment reflection the forward pass applied, which a hit replaces, in
-//! their rgb, and in their alphas the shading normal and the roughness, packed as an
-//! integer in the bits of an `f16` (#1736). So the rgb are plain floats, but an alpha
-//! is not: neither target may be blended, filtered or resampled, only loaded. The
-//! eight halves fill both targets exactly, at 16 bytes a pixel. A view that runs no
-//! SSR holds none and writes none, so it pays nothing for them.
-
 use crate::postfx::effects::Targets;
 use crate::postfx::{PfxTarget, PostFx};
 use crate::PixelSize;
 
-/// The surface targets' format.
+// Alphas hold a packed integer in `f16` bits: never blend, filter or resample these targets.
 pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
-/// What it clears to: no weight, so no SSR (the sky, and a layer nothing drew).
 pub(crate) const CLEAR: wgpu::Color = wgpu::Color::TRANSPARENT;
 
-/// The view's surface targets, at the size they were made for.
 pub(crate) struct SurfaceTarget {
-    /// rgb: the weight a hit gets; a: the normal's octahedral x and the roughness's
-    /// high digit, packed (`ssr_surface.wgsl`'s `pack_lane`).
     pub weight: PfxTarget,
-    /// rgb: the environment reflection the forward pass applied; a: the normal's
-    /// octahedral y and the roughness's low digit, packed.
     pub applied: PfxTarget,
     size: PixelSize,
 }
 
-/// Start a frame: hold the targets at `size` when the view runs SSR (`on`), else drop
-/// them.
 pub(crate) fn begin(targets: &mut Targets, device: &wgpu::Device, size: PixelSize, on: bool) {
     if !on {
         targets.remove::<SurfaceTarget>();
@@ -50,20 +31,14 @@ pub(crate) fn begin(targets: &mut Targets, device: &wgpu::Device, size: PixelSiz
     });
 }
 
-/// The targets this frame's opaque pass writes and SSR reads, if the view runs SSR.
 pub(crate) fn target(pfx: &PostFx) -> Option<&SurfaceTarget> {
     pfx.targets.get::<SurfaceTarget>()
 }
 
-/// Both views, in attachment order (the weight, then the applied reflection), if
-/// the view runs SSR.
 pub(crate) fn views(pfx: &PostFx) -> Option<[&wgpu::TextureView; 2]> {
     target(pfx).map(|t| [&t.weight.view, &t.applied.view])
 }
 
-/// The colour target state of a pipeline drawing into either target, under
-/// `write_mask`: the opaque solids write them, the sky leaves them as cleared
-/// (`ColorWrites::empty()`).
 pub(crate) fn target_state(write_mask: wgpu::ColorWrites) -> wgpu::ColorTargetState {
     wgpu::ColorTargetState {
         format: FORMAT,
