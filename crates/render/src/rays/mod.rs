@@ -51,7 +51,12 @@ impl RayTree {
 
     #[cfg(any(test, feature = "dev"))]
     pub(crate) fn packed(&self) -> Packed {
-        top::pack(self.meshes.iter().map(|(&h, (_, t))| (h, t)), &self.placed).0
+        top::pack(
+            self.meshes.iter().map(|(&h, (_, t))| (h, t)),
+            &self.placed,
+            true,
+        )
+        .0
     }
 
     #[cfg(any(test, feature = "dev"))]
@@ -132,15 +137,16 @@ impl Renderer {
         let moved = tree.rebuild(rs, scene, &mut built);
         if moved || tree.gpu.is_none() {
             let layout = self.retained.ray_layout(&self.device);
-            let (packed, geometry) =
-                top::pack(tree.meshes.iter().map(|(&h, (_, t))| (h, t)), &tree.placed);
             let gpu = (&self.device, &self.queue, layout);
-            tree.gpu = Some(gpu::GpuTree::upload(
-                gpu,
-                &packed,
-                geometry,
-                tree.gpu.take(),
-            ));
+            let meshes = || tree.meshes.iter().map(|(&h, (_, t))| (h, t));
+            let kept = tree.gpu.take().and_then(|k| {
+                let (top, geometry) = top::pack(meshes(), &tree.placed, false);
+                k.top(gpu, &top, geometry)
+            });
+            tree.gpu = kept.or_else(|| {
+                let (whole, _) = top::pack(meshes(), &tree.placed, true);
+                Some(gpu::GpuTree::whole(gpu, &whole))
+            });
         }
         self.frame_counters.ray_tree_rebuilds += built.top;
         self.frame_counters.ray_mesh_builds += built.meshes;

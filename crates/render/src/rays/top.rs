@@ -81,45 +81,44 @@ fn slot_face(slot: &crate::scene::SlotDraw) -> u32 {
     }
 }
 
-/// Packs `meshes` (each with its root's node) and the top tree over `placed`.
+/// Packs `meshes` and the top tree over `placed`, and says how many nodes the meshes
+/// take; without `whole`, `nodes` holds only the top's and no triangle is copied.
 pub(crate) fn pack<'a>(
     meshes: impl Iterator<Item = (MeshHandle, &'a MeshTree)>,
     placed: &[Placed],
+    whole: bool,
 ) -> (Packed, u32) {
     let mut p = Packed::default();
     let mut roots = std::collections::BTreeMap::new();
+    let (mut node_base, mut tri_base) = (0, 0);
     for (handle, tree) in meshes {
-        let (node_base, tri_base) = (p.nodes.len() as u32, p.tris.len() as u32);
-        let rebased = tree.nodes.iter().map(|&n| Node {
-            first: n.first + if n.count == 0 { node_base } else { tri_base },
-            ..n
-        });
-        p.nodes.extend(rebased);
-        p.tris.extend_from_slice(&tree.tris);
-        p.uvs.extend_from_slice(&tree.uvs);
+        if whole {
+            let rebased = tree.nodes.iter().map(|&n| Node {
+                first: n.first + if n.count == 0 { node_base } else { tri_base },
+                ..n
+            });
+            p.nodes.extend(rebased);
+            p.tris.extend_from_slice(&tree.tris);
+            p.uvs.extend_from_slice(&tree.uvs);
+        }
         let root = tree.nodes.first().map(|n| (node_base, *n));
         roots.insert(handle, root);
+        node_base += tree.nodes.len() as u32;
+        tri_base += tree.tris.len() as u32;
     }
-    let geometry = p.nodes.len() as u32;
+    let geometry = node_base;
     let (mut instances, mut bounds) = (Vec::new(), Vec::new());
     for o in placed {
         let Some(&Some((root, node))) = roots.get(&o.mesh) else {
             continue;
         };
-        let (lo, hi) = (Vec3::from_array(node.lo), Vec3::from_array(node.hi));
-        bounds.push(transform_aabb(lo, hi, o.world));
-        let rows = o.world.inverse().transpose();
-        instances.push(Instance {
-            to_local: [rows.x_axis, rows.y_axis, rows.z_axis].map(|r| r.to_array()),
-            root,
-            slot: o.slot,
-            faces: p.faces.len() as u32,
-            runs: o.faces.len() as u32,
-        });
+        let (instance, bound) = instance(o, (root, node), p.faces.len() as u32);
+        instances.push(instance);
+        bounds.push(bound);
         p.faces.extend_from_slice(&o.faces);
     }
     let (top, order) = build(&bounds);
-    let base = p.nodes.len() as u32;
+    let base = geometry;
     let rebased = top.iter().map(|&n| Node {
         first: n.first + if n.count == 0 { base } else { 0 },
         ..n
@@ -133,4 +132,17 @@ pub(crate) fn pack<'a>(
         pad: [0; 2],
     };
     (p, geometry)
+}
+
+fn instance(o: &Placed, (root, node): (u32, Node), faces: u32) -> (Instance, (Vec3, Vec3)) {
+    let (lo, hi) = (Vec3::from_array(node.lo), Vec3::from_array(node.hi));
+    let rows = o.world.inverse().transpose();
+    let instance = Instance {
+        to_local: [rows.x_axis, rows.y_axis, rows.z_axis].map(|r| r.to_array()),
+        root,
+        slot: o.slot,
+        faces,
+        runs: o.faces.len() as u32,
+    };
+    (instance, transform_aabb(lo, hi, o.world))
 }

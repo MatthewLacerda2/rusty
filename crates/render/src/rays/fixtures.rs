@@ -113,7 +113,12 @@ impl Fixture {
             })
             .collect();
         let meshes = trees.iter().enumerate();
-        pack(meshes.map(|(i, t)| (MeshHandle(i as u32), t)), &placed).0
+        pack(
+            meshes.map(|(i, t)| (MeshHandle(i as u32), t)),
+            &placed,
+            true,
+        )
+        .0
     }
 
     pub(super) fn world_tris(&self) -> Vec<[Vec3; 3]> {

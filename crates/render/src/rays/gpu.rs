@@ -28,6 +28,7 @@ pub(super) struct GpuTree {
     pub(super) group: wgpu::BindGroup,
 }
 
+type Geometry = (wgpu::Buffer, wgpu::Buffer, wgpu::Buffer);
 type Gpu<'a> = (&'a wgpu::Device, &'a wgpu::Queue, &'a wgpu::BindGroupLayout);
 
 /// A buffer holding `items`, or one zeroed item when there are none.
@@ -44,14 +45,36 @@ fn buffer<T: bytemuck::Pod>(device: &wgpu::Device, label: &str, items: &[T]) -> 
 }
 
 impl GpuTree {
-    /// Uploads `p`; with `kept` (whose meshes are `p`'s first `geometry` nodes), writes
-    /// only the top tree and its instances.
-    pub(super) fn upload(
-        (device, queue, layout): Gpu,
-        p: &Packed,
-        geometry: u32,
-        kept: Option<Self>,
-    ) -> Self {
+    /// Uploads all of `p`, its node buffer with room for the top to grow.
+    pub(super) fn whole(gpu: Gpu, p: &Packed) -> Self {
+        let device = gpu.0;
+        let room = p.header.instances as usize * 2 + 64;
+        let nodes: Vec<Node> = p
+            .nodes
+            .iter()
+            .copied()
+            .chain((0..room).map(|_| Node::default()))
+            .collect();
+        let nodes = buffer(device, "Ray Tree Nodes", &nodes);
+        let tris = buffer(device, "Ray Tree Triangles", &p.tris);
+        let uvs = buffer(device, "Ray Tree UVs", &p.uvs);
+        Self::with(gpu, p, (nodes, tris, uvs))
+    }
+
+    /// Writes a top-only `top` (its meshes the first `geometry` nodes kept); `None` when
+    /// the node buffer has no room for it.
+    pub(super) fn top(self, gpu: Gpu, top: &Packed, geometry: u32) -> Option<Self> {
+        let end = u64::from(geometry) + top.nodes.len() as u64;
+        if self.nodes.size() < NODE * end {
+            return None;
+        }
+        let at = NODE * u64::from(geometry);
+        gpu.1
+            .counted_write_buffer(&self.nodes, at, bytemuck::cast_slice(&top.nodes));
+        Some(Self::with(gpu, top, (self.nodes, self.tris, self.uvs)))
+    }
+
+    fn with((device, _, layout): Gpu, p: &Packed, (nodes, tris, uvs): Geometry) -> Self {
         let header = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Ray Tree Header"),
             contents: bytemuck::bytes_of(&p.header),
@@ -59,20 +82,6 @@ impl GpuTree {
         });
         let instances = buffer(device, "Ray Tree Instances", &p.instances);
         let faces = buffer(device, "Ray Tree Faces", &p.faces);
-        let (nodes, tris, uvs) = match kept {
-            Some(k) if k.nodes.size() >= NODE * p.nodes.len() as u64 => {
-                let top = &p.nodes[geometry as usize..];
-                let at = NODE * u64::from(geometry);
-                queue.counted_write_buffer(&k.nodes, at, bytemuck::cast_slice(top));
-                (k.nodes, k.tris, k.uvs)
-            }
-            Some(k) => (buffer(device, "Ray Tree Nodes", &p.nodes), k.tris, k.uvs),
-            None => (
-                buffer(device, "Ray Tree Nodes", &p.nodes),
-                buffer(device, "Ray Tree Triangles", &p.tris),
-                buffer(device, "Ray Tree UVs", &p.uvs),
-            ),
-        };
         let all = [&header, &nodes, &tris, &uvs, &instances, &faces];
         let entries: Vec<wgpu::BindGroupEntry> = (0..)
             .zip(all)
