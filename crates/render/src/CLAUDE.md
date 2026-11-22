@@ -109,6 +109,19 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
   every opaque pass, so a new opaque pass gets it for free. Phase one still draws
   whole meshes. A cluster test reads the same pyramid through
   `hiz/hidden.wgsl`'s `hidden`, the module both cull shaders import.
+- **Rays trace the scene's static geometry through `render::rays`**: a two-level
+  tree (one per mesh, shared by its instances, and a top one over the static objects)
+  kept on `RenderScene::rays`, rebuilt only after `RayTree::touch` (the same hooks
+  that touch the casters) or an active camera's culling mask changed, and built the
+  first time `Renderer::ray_tree` is asked. A mesh's own tree lives as long as its
+  `GpuMesh`, at that mesh's revision. A tree whose buffers would pass the device's
+  limits is refused whole (an empty one is bound, `gpu_bytes` 0, said once). A
+  shader imports `rt::trace` (`trace_closest`, `trace_any`, `hit_uvs`) and binds `RayTree::bind_group` at `rays::GROUP`; a hit
+  names the object's slot, so the rest comes from `ObjectData`. Only what an opaque
+  material draws of a still, static, shown object is in it (`rays::traced`,
+  `top::Placed::of`); a new way to leave a static object out goes there, and a new
+  path that changes a static object without re-deriving it touches the tree.
+  `rays/walk.rs` is the shader's CPU twin, and the tests hold the two equal.
 
 ## Shaders
 - **Shared WGSL is a naga_oil composable module, never a copy.** WGSL has no
