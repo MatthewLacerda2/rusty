@@ -1,4 +1,6 @@
 //! Defects that live between samples: clicks, dropouts and stepped gain, each at a moment.
+//! Stepped gain errs toward silence: a sound whose envelope pulses on its own is not judged, so
+//! check a fix on a steady sound.
 
 mod clicks;
 mod envelope;
@@ -8,10 +10,13 @@ mod zipper;
 use clicks::Clicks;
 use envelope::Envelope;
 
+/// Kept per kind, worst first; the rest are only counted.
 pub const WORST: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Defect {
+    /// `None` when in every channel, as a mono file's always are; in some of more than two, the
+    /// lowest.
     pub channel: Option<usize>,
     pub at_seconds: f64,
     pub from_seconds: f64,
@@ -107,6 +112,8 @@ impl DefectFinder {
         for one in found {
             let channel = one.channel.unwrap_or(0);
             match joined.last_mut() {
+                // Only the same defect in another channel joins: a channel's finder kept its own
+                // apart.
                 Some((last, channels))
                     if one.from_seconds < last.to_seconds && !channels.contains(&channel) =>
                 {

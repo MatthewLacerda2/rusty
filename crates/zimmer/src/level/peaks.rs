@@ -1,4 +1,5 @@
-//! The true peak of each sample-frame, for a signal that arrives a run at a time.
+//! A frame is measured only once `TAPS` frames follow it: the zeros past a run's end would ring
+//! as a false peak.
 
 use super::intersample::{Channel, TAPS};
 
@@ -18,6 +19,8 @@ impl FramePeaks {
         }
     }
 
+    /// Hands `each` the louder channel's linear peak for every newly measurable frame, each
+    /// exactly once and in order.
     pub fn feed(&mut self, samples: &[f32], mut each: impl FnMut(f64)) {
         let mut joined = std::mem::take(&mut self.recent);
         joined.extend_from_slice(samples);
@@ -32,6 +35,7 @@ impl FramePeaks {
         self.recent = joined;
     }
 
+    /// Read, not consumed: a meter may ask twice, or ask and feed more.
     pub fn tail(&self, mut each: impl FnMut(f64)) {
         let frames = self.recent.len() / self.channels;
         self.measure(&self.recent, self.settled..frames, &mut each);

@@ -54,6 +54,7 @@ fn a_side_has_a_level_from_exactly_silent_up() {
 }
 
 #[test]
+// The echo 13 blocks on repeats under `REPEATS`; 80 and 120 lie past a sixth of 300 blocks.
 fn a_candidate_repeats_strongly_within_a_sixth_of_the_stretch() {
     let mut series = vec![0.0; 300];
     for k in (0..300).step_by(40) {
@@ -114,6 +115,7 @@ fn staircase(len: usize, first: usize, period: f64) -> Vec<f64> {
 }
 
 #[test]
+// Coarse phases are two blocks apart; steps at blocks 21, 41, ... fall between them.
 fn a_phase_between_coarse_ones_is_refined_to() {
     let level = Levels::of(&staircase(800, 21, 20.0));
     let fit = refined(&level, 0, 240, 20).expect("a staircase");

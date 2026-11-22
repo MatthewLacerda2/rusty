@@ -1,4 +1,5 @@
-//! Decibels and linear gain, the one conversion every level reading and every gain stage needs.
+//! The textbook expressions and nothing more, so moving inline arithmetic onto them keeps every
+//! sample's bits. The `f32` pair is the synthesis path's: going through `f64` rounds differently.
 
 pub fn db_to_gain(db: f64) -> f64 {
     10_f64.powf(db / 20.0)

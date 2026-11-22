@@ -1,6 +1,3 @@
-//! The arithmetic behind a [`Harmony`](super::Harmony): which notes are read, which of them overlap
-//! a semitone apart, and which leave the key.
-
 use rusty_core::collections::Map;
 
 use super::{Clash, Place, Stray, Voice, CLASHES_LISTED, PASSING, STRAYS_LISTED};
@@ -17,6 +14,7 @@ pub(super) struct Held {
     end: f32,
     entry: usize,
     slot: f32,
+    /// A loop's copy of a note ringing past the end, moved back one pass over the top of the next.
     wrapped: bool,
 }
 
@@ -45,6 +43,8 @@ pub(super) fn pitched(song: &Song, resolve: &dyn PatchResolver) -> Vec<Held> {
         .tracks
         .iter()
         .map(|track| {
+            // An unresolved patch reads as pitched: better too much about one instrument than
+            // nothing.
             instrument(&track.patch, resolve).is_some_and(|patch| source(&patch) == "noise")
         })
         .collect();
@@ -75,6 +75,7 @@ fn rub(a: f32, b: f32) -> bool {
 
 type Group = (String, i64, usize, i64, usize, i64);
 
+/// Thousandths, rounded, so a beat or a pitch can be a key.
 fn whole(n: f32) -> i64 {
     (f64::from(n) * 1000.0).round() as i64
 }
@@ -203,6 +204,8 @@ pub(super) fn strays(
     Some((outside / held, found))
 }
 
+/// Never given a wrapped copy: copies start before zero, so sort first, and a clash is placed at
+/// the later onset.
 fn place(song: &Song, note: &Held) -> Place {
     Place {
         section: song

@@ -5,6 +5,9 @@ use super::peaks::FramePeaks;
 
 const FULL_SCALE: f64 = 1.0;
 
+// Reaching full scale counts: a mix is clamped to exactly 1.0 on its way to a file.
+// Held against the true peak; `fx::limiter`'s `CEILING` sits 1 dB under it, read by the same
+// kernel.
 const CLIPPING: f64 = FULL_SCALE;
 
 const STEREO: usize = 2;
@@ -86,6 +89,7 @@ impl Meter {
         let mean_square = self.sum_of_squares / self.counted as f64;
         Loudness {
             peak_dbfs: Some(ratio_to_dbfs(self.peak)),
+            // Never under the sample peak: the reconstruction passes through every sample.
             true_peak_dbfs: Some(ratio_to_dbfs(self.true_peak().max(self.peak))),
             mean_dbfs: Some(ratio_to_dbfs(mean_square.sqrt())),
         }
@@ -99,6 +103,7 @@ impl Meter {
         if energy <= 0.0 {
             return None;
         }
+        // Clamped: two identical channels divide to 1.0 give or take an ulp.
         Some((self.sum_of_products / energy.sqrt()).clamp(-1.0, 1.0))
     }
 

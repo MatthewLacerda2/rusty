@@ -1,7 +1,11 @@
 //! The waveform *between* the samples, reconstructed.
+//! `fx::limiter` and the meter's true peak share this kernel, so a bake's limit and its reported
+//! peak agree.
 
+/// ITU-R BS.1770's true-peak oversampling.
 const OVERSAMPLE: usize = 4;
 
+/// Lanczos half-width, in frames: a caller fed in runs keeps this many either side of a seam.
 pub(crate) const TAPS: usize = 4;
 
 pub(crate) struct Channel<'a> {
@@ -35,6 +39,7 @@ impl<'a> Channel<'a> {
         Self::of(samples, 1, 0)
     }
 
+    /// Half-open, from `frame` up to the next, so walking every frame covers each stretch once.
     pub(crate) fn peak_from(&self, frame: usize) -> f64 {
         (0..OVERSAMPLE)
             .map(|step| self.between(frame, step).abs())
@@ -58,6 +63,8 @@ impl<'a> Channel<'a> {
     }
 }
 
+// A windowed sinc: linear interpolation never exceeds either sample, so it would re-report the
+// sample peak.
 fn lanczos(x: f64) -> f64 {
     if x.abs() >= TAPS as f64 {
         return 0.0;

@@ -17,6 +17,8 @@ pub struct TrackSurvey {
     pub source: Option<&'static str>,
     pub gain: f32,
     pub cutoff: Option<f32>,
+    /// The amp envelope's sustain, not the source's: a `karplus` or `fm2` patch reading 0.4 can
+    /// still decay.
     pub sustain: Option<f32>,
     pub notes: usize,
     pub median: Option<f32>,
@@ -40,6 +42,8 @@ pub struct SongSurvey {
 }
 
 impl SongSurvey {
+    /// By `gain × duty`, not gain: percussion is written loud because it is short. Ties go to the
+    /// first listed.
     pub fn loudest(&self) -> Option<&TrackSurvey> {
         self.tracks.iter().reduce(|loudest, track| {
             if room(track) > room(loudest) {
