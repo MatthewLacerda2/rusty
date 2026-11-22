@@ -62,6 +62,7 @@ impl Renderer {
 
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
         let texture_bytes = self.resident_textures().map(gpu_bytes).sum();
+        let ray_tree_bytes = self.ray_tree_bytes();
         let c = &mut self.frame_counters;
         c.shadow_draws = self.shadow_renderer.drawn.len() as u32;
         let culls = self.shadow_renderer.culls;
@@ -84,6 +85,7 @@ impl Renderer {
         c.mesh_count = self.gpu_meshes.len() as u32;
         c.mesh_bytes = self.gpu_meshes.values().map(mesh_bytes).sum();
         c.cluster_pool_bytes = self.hiz.clusters.pool.leased_bytes();
+        c.ray_tree_bytes = ray_tree_bytes;
         c.uploads = std::mem::take(&mut self.uploads);
         c.uploads
             .add_all(std::mem::take(&mut self.lightmaps.uploads));
