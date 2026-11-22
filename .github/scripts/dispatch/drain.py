@@ -30,7 +30,11 @@ an ordinary case:
 - **No free slot reads no more than that**: the issues in line are read only
   for an entry [`launched_since`] may match or, with a slot free, in line order
   until no entry left could take one ([`fill`]). The order is the one stored: a
-  brief that turns an entry into a round moves it up from the next pass.
+  brief that turns an entry into a round, or a label that changes its priority
+  (#2615), is written back by the pass that read it ([`forget`]) and moves it
+  from the next pass; an entry asked again on another brief during the pass
+  keeps what that ask wrote (the review of #2625: keyed on the issue alone,
+  the write-back put a round mid-pass back behind first launches).
 
 `launched_since` has two limits not closed here, which a reader deciding
 whether to trust the line needs:
@@ -49,7 +53,7 @@ whether to trust the line needs:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
@@ -97,6 +101,9 @@ class Pass:
     start: Callable[[int, dict, dict], int]
     say: Callable[[str], None]
     dry: bool
+    #: The brief, round and priority each entry read this pass has now, by its issue and the brief
+    #: it was loaded on: [`forget`] writes them only onto an entry still on that brief.
+    seen: dict[tuple[int, str], dict] = field(default_factory=dict)
 
 
 def run(go: Pass) -> int:
@@ -123,7 +130,7 @@ def launched(go: Pass, entries: list[dict], read: dict[int, tuple]) -> list[dict
         if not launched_since(go.listed, entry, {}):
             continue
         issue, comments = read.setdefault(entry["issue"], go.read(entry["issue"]))
-        found = waiting.refresh(entry, issue, comments, go.say, go.dry)
+        found = refreshed(go, entry, issue, comments)
         if found is None:
             gone.append(entry)
         elif found and (made := launched_since(go.listed, entry, found)):
@@ -142,7 +149,7 @@ def fill(go: Pass, entries: list[dict], read: dict[int, tuple], dropped: list[di
         if not room(go.holders, entry["issue"]):
             continue
         issue, comments = read[entry["issue"]] if entry["issue"] in read else go.read(entry["issue"])
-        found = waiting.refresh(entry, issue, comments, go.say, go.dry)
+        found = refreshed(go, entry, issue, comments)
         if found is None:
             dropped.append(entry)
         elif found and (status := launch(go, entry, issue, found, queued[entry["issue"]])):
@@ -150,15 +157,33 @@ def fill(go: Pass, entries: list[dict], read: dict[int, tuple], dropped: list[di
     return 0
 
 
+def refreshed(go: Pass, entry: dict, issue, comments) -> dict | None:
+    """[`waiting.refresh`], noting in `go.seen` the brief, round and priority it read, keyed on the
+    brief the entry was loaded on."""
+    loaded = entry["brief"]
+    found = waiting.refresh(entry, issue, comments, go.say, go.dry)
+    if found:
+        go.seen[(entry["issue"], loaded)] = {k: entry[k] for k in ("brief", "round", "priority")}
+    return found
+
+
 def forget(go: Pass, dropped: list[dict]) -> int:
-    """Write the line without `dropped`, under the lock; a re-ask on a newer brief stays. 0 or 2."""
-    if go.dry or not dropped:
+    """Write the line without `dropped` and with what `go.seen` read, under the lock; a re-ask on
+    a newer brief (saved during the pass) is neither dropped nor overwritten. 0 or 2."""
+    if go.dry or not (dropped or stale(go)):
         return 0
     with waiting.held(go.line, go.say):
         on_disk = waiting.load(go.line)
         gone = {(e["issue"], e["brief"]) for e in dropped}
-        failed = waiting.save(go.line, [e for e in on_disk if (e["issue"], e["brief"]) not in gone])
+        kept = waiting.relabel([e for e in on_disk if (e["issue"], e["brief"]) not in gone], go.seen)
+        failed = waiting.save(go.line, kept)
     return wrote(go, failed)
+
+
+def stale(go: Pass) -> bool:
+    """Whether an entry on disk holds a round or priority other than the one this pass read."""
+    on_disk = waiting.load(go.line)
+    return waiting.relabel(on_disk, go.seen) != on_disk
 
 
 def launch(go: Pass, entry: dict, issue: dict, found: dict, queued: str) -> int:

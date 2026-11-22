@@ -66,6 +66,7 @@ test(/(^|::)test_gpu::tests::gpu_adapter_present_when_required$/)
 | test(/(^|::)ssr::gpu::rough::jitter::gpu_a_still_rough_reflection_holds_under_taa_jitter$/)
 | test(/(^|::)ssr::gpu::rough::fading::gpu_a_lit_bands_fading_edge_draws_no_line$/)
 | test(/(^|::)ssr::gpu::rough::contact::dark::gpu_a_dark_cubes_contact_reflection_stays_tight_before_a_glowing_wall$/)
+| test(/(^|::)memory::decoded_gpu_tests::gpu_cached_textures_peak_at_most_a_staging_budget_past_the_same_decoded$/)
 | test(/^gpu::test_games::/)
 """
 success-output = "final"

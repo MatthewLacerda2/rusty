@@ -41,8 +41,8 @@ def show(places: list[tuple[dict, str, str]], entries: list[dict]) -> None:
             print(f"  not counted: {found.get('name', '?')}: {why}")
     say(f"waiting {len(entries)}" + (":" if entries else ""))
     for place, entry in enumerate(waiting.ordered(entries), 1):
-        kind = "round" if entry.get("round") else "first launch"
-        print(f"  {place}. #{entry['issue']} ({kind}, asked {entry['asked']}, brief {entry['brief']})")
+        print(f"  {place}. #{entry['issue']} ({waiting.described(entry)}, asked {entry['asked']}, "
+              f"brief {entry['brief']})")
 
 
 def main(argv: list[str], gh=gh_json, call=remote.call, now: datetime | None = None,
