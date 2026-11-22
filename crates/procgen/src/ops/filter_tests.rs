@@ -30,6 +30,7 @@ fn sliding_blur_matches_the_naive_reference() {
         let h = (u * 91.7 + v * 13.3).sin() * (v * 47.1).cos();
         [h, u * v, 1.0 - u, h * h]
     });
+    // Small, mid, half the 32-pixel tile, and past it, where the window wraps twice.
     for r in [1, 3, 8, 16, 40] {
         let (fast, slow) = (
             blur(&img, (r as f32, r as f32), BlurKind::Box),
