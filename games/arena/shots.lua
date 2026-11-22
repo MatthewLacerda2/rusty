@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the arena is screenshotted from (block 1).
+-- The fixed cameras the arena is screenshotted from (block 1).
 -- The mid-fight shot, a bot firing with a smoke behind it, is taken by
 -- scenarios/match.lua, since only Play has a fight in it.
 

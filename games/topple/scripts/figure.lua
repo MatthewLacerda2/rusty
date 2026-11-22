@@ -1,4 +1,4 @@
--- figure.lua — on every part of a jointed figure (games/topple/recipe.lua).
+-- On every part of a jointed figure (games/topple/recipe.lua).
 -- The joints' drives hold the figure standing; a hard hit on any part, or a
 -- blast, turns every drive off and the figure falls as a ragdoll.
 

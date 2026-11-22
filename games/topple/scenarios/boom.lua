@@ -1,4 +1,4 @@
--- scenarios/boom.lua — a ball into the barrel of level 3 sets it off: every
+-- A ball into the barrel of level 3 sets it off: every
 -- body within the blast's reach is knocked away, every body outside it stays
 -- where it was. The far stack stands 6 m from the barrel, the reach is 3.5 m.
 

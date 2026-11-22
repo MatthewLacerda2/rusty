@@ -1,3 +1,4 @@
+mod header;
 mod literals;
 mod lua;
 pub mod proof;
@@ -185,6 +186,7 @@ pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
             continue;
         };
         found.extend(check(rel, kind, &source).findings(rel, kind));
+        found.extend(header::check(rel, kind, &source, &split(kind, &source)));
         if let Some(max) = max {
             found.extend(width::check(rel, kind, &source, max));
         }

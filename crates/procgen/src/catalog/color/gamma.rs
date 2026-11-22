@@ -1,5 +1,3 @@
-//! The `gamma` op.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};

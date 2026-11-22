@@ -1,4 +1,4 @@
-//! crates/render/src/draw/camera/stages.rs — the stages [`super::CAMERA_PASSES`] lists, in
+//! The stages [`super::CAMERA_PASSES`] lists, in
 //! its order: each a thin call into the feature's own module.
 
 use super::CameraCtx;

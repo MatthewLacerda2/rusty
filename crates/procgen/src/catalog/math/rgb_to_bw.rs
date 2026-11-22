@@ -1,5 +1,3 @@
-//! The `rgb_to_bw` op.
-
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::ops::math;
