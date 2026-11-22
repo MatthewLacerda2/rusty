@@ -6,6 +6,8 @@ use rusty_components::{LightProbeProxyVolumeComponent as Volume, ProxyGrid, Prox
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::Scene;
 
+/// In vec4s, as `forward/proxy_volume.wgsl`: the box matrix's 4 columns, the dims, then 4 L1 SH a
+/// point.
 pub(crate) const HEADER: usize = 5;
 pub(crate) const COEFFS: usize = 4;
 
@@ -132,6 +134,8 @@ pub(crate) fn pack(
     Some(out)
 }
 
+/// Vec4s (16 bytes) in the largest power of two within `max_bytes`: the buffer grows by doubling,
+/// bound whole.
 pub(crate) fn room(max_bytes: u64) -> usize {
     let pow2 = if max_bytes == 0 {
         0

@@ -56,6 +56,8 @@ impl Renderer {
         self.upload_lighting(scene);
         self.note_unbaked(scene);
         self.lap("prepare");
+        // After every renderer-side input the objects read is settled: textures, shaders,
+        // lightmaps.
         self.extract_scene(scene);
         self.lap("extract");
         let gpu = (&self.device, &self.queue);
@@ -184,7 +186,7 @@ impl Renderer {
         self.grade_bake.luts.refresh();
         self.load_lens_dirt(scene);
         if self.surface_shaders.refresh() {
-            self.retained.touch();
+            self.retained.touch(); // a rebuilt shader slot may change its pipeline id
         }
         let overrides = &scene.shader_overrides;
         self.materials

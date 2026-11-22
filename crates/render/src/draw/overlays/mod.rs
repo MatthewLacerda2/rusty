@@ -35,6 +35,7 @@ impl Renderer {
         let Some(bindings) = &overlays.bindings else {
             return;
         };
+        // Balls first, writing depth, then the translucent navmesh, then the lines that test both.
         self.draw_probe_balls(render_pass, bindings, &overlays.balls);
         self.draw_navmesh(render_pass, bindings, overlays.navmesh);
         if let (Some(slot), Some(grid_buf)) = (overlays.grid, &self.grid_vertex_buffer) {

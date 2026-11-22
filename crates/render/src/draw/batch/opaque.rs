@@ -14,7 +14,8 @@ impl OpaqueBatches {
         self.0.is_empty() || self.1 == OpaqueOrder::primed(primed)
     }
 
-    /// The batches in draw order; an iterator, never a slice (see the type).
+    /// The batches in draw order, never a slice: `draw_batches` takes one and would draw what the
+    /// cull hid.
     pub(crate) fn iter(
         &self,
     ) -> impl ExactSizeIterator<Item = &DrawBatch> + DoubleEndedIterator + Clone + '_ {

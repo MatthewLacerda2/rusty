@@ -1,3 +1,6 @@
+//! A test hook, with its submodules: how a test here, in `dev` or in `shell` gets a GPU
+//! (`None`: skip).
+
 use crate::Renderer;
 
 pub fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
@@ -20,6 +23,7 @@ pub(crate) fn black_sky(scene: &mut rusty_scene::Scene) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
+/// Runs `source`'s `main` (`@workgroup_size(1)`) on a 64×2 grid; returns binding 0's 256 `vec4`s.
 #[cfg(test)]
 pub(crate) fn run_probe(
     device: &wgpu::Device,

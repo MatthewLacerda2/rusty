@@ -59,6 +59,8 @@ pub(crate) fn material_data(lit: bool, material: Option<&MaterialAsset>) -> Mate
     }
 }
 
+/// Unity's Tiling/Offset over glTF's top-down v (UnityGLTF's conversion); world mappings pack as
+/// HDRP's.
 pub(crate) fn mapping_uniform(c: &MaterialAsset) -> MappingUniform {
     let within = |v: f32, r: &RangeInclusive<f32>| v.clamp(*r.start(), *r.end());
     let [sx, sy] = c.tiling.map(|v| within(v, &MAP_COORD_RANGE));
@@ -119,8 +121,11 @@ fn transmission([r, g, b]: [f32; 3], amount: f32) -> [f32; 4] {
     [r * amount, g * amount, b * amount, amount]
 }
 
+/// Metres: HDRP's thin refraction slab (`Lit.hlsl`'s `REFRACTION_THIN_DISTANCE`, 5 mm).
 const REFRACTION_THIN_DISTANCE: f32 = 0.005;
 
+/// Per metre, HDRP's `TransmittanceColorAtDistanceToAbsorption` with its 1e-4 on both; w is
+/// `thickness`.
 fn absorption(color: [f32; 3], distance: f32, thickness: f32) -> [f32; 4] {
     let k = |c: f32| -(c + 1e-4).ln().min(0.0) / distance.max(1e-4);
     [k(color[0]), k(color[1]), k(color[2]), thickness]

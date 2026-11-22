@@ -81,6 +81,8 @@ impl Renderer {
         let Some(m) = material else {
             return record;
         };
+        // Flag 2: the shader reads red, where a one-channel upload keeps it (`maps.wgsl`'s
+        // `map_factor`).
         let single = |map: &Option<MapRef>| {
             let texture = map.as_ref().and_then(|p| self.gpu_textures.get(p));
             texture.is_some_and(|t| t.single_channel)

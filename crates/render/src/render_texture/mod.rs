@@ -88,6 +88,7 @@ impl Renderer {
             };
             let mut last = self.draw_stack(&mut slot.view, scene, (pass, commands));
             copy_to_front(last.encoder(), &slot.view, &slot.front.texture);
+            // The next camera rewrites the camera uniform: this one's draws go out first.
             last.flush();
             commands = last;
             slot.drawn_on = Some(frame);

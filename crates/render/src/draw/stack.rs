@@ -105,6 +105,8 @@ impl Renderer {
     ) -> Commands {
         for idx in 0..pass.stack.len() {
             if idx > 0 {
+                // This camera rewrites the camera uniform and draw buffers the last one's
+                // passes read.
                 commands.flush();
                 self.lap("camera.submit");
             }

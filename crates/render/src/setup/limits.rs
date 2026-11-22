@@ -1,3 +1,4 @@
+/// Features a device takes only where its adapter has them, so each needs a path without it.
 pub(crate) const OPTIONAL: wgpu::Features =
     crate::gpu::textures::compressed::FEATURE.union(crate::passes::hiz::FEATURE);
 

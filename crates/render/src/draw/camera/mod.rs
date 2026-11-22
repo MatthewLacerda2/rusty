@@ -16,7 +16,7 @@ use crate::{CameraUniform, Frustum, RenderView, Renderer};
 use rusty_scene::{Camera, ClearFlags, Scene};
 use stages::*;
 
-/// Measured: one submit at the camera's end cost 25–42% of the frame on the wall. A stage
+/// Measured: one submit at the camera's end made frames 25–42% longer on the wall. A stage
 /// never rewrites what an earlier pass read: `check_write` misses a single write after a read.
 pub(crate) const EARLY_FLUSHES: [&str; 2] = ["occlusion", "scene"];
 

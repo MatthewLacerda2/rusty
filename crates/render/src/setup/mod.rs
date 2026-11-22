@@ -23,6 +23,8 @@ impl<W> SurfaceWindow for W where
 
 impl Renderer {
     pub async fn new(window: impl SurfaceWindow, size: PixelSize) -> Result<Self, String> {
+        // 1. The instance takes the window's display handle: GL needs it to present (Wayland
+        // especially).
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
             ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
