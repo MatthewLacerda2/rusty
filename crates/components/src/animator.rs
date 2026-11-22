@@ -106,6 +106,7 @@ impl AnimatorComponent {
         self.run();
     }
 
+    // Test hooks for other crates' tests.
     #[doc(hidden)]
     pub fn crossfade_weight(&self) -> f32 {
         self.base.crossfade_weight()
@@ -125,6 +126,7 @@ impl AnimatorComponent {
         self.ik.iter_mut().find(|c| c.name == name)
     }
 
+    /// Keeps a same-named one's `applied`, so the next solve still undoes its writes.
     pub fn set_ik(&mut self, mut constraint: IkConstraint) {
         match self.ik_mut(&constraint.name) {
             Some(slot) => {

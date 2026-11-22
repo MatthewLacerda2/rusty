@@ -1,6 +1,6 @@
-//! Unity's Gizmos menu (`GizmoUtility.SetGizmoEnabled`) plus the Game view's Gizmos and
-//! Stats toggles. Per session: a new editor starts from the rows' defaults. A new gizmo
-//! adds a row to [`gizmos!`] and the draw it gates.
+//! The editor's gizmo flags: Unity's Gizmos menu (`GizmoUtility.SetGizmoEnabled`), plus
+//! the Game view's Gizmos and Stats toggles. Per session: a new editor starts from the
+//! rows' defaults. A new gizmo adds a row to [`gizmos!`] and the draw it gates.
 
 use super::Application;
 

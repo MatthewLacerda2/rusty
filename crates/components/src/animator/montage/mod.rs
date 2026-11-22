@@ -7,6 +7,7 @@ pub use resolve::MontageRefused;
 /// interrupted (Unreal's `OnMontageBlendingOut`).
 pub const MONTAGE_BLEND_OUT: &str = "MontageBlendOut";
 pub const MONTAGE_END: &str = "MontageEnd";
+/// The one section a montage declaring none plays.
 const DEFAULT_SECTION: &str = "Default";
 
 #[derive(Clone, Debug, PartialEq)]
@@ -18,7 +19,9 @@ pub struct MontageEvent {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Montages {
+    /// By slot-stack `order`, then start order (blending out before active): the pose stacks so.
     pub playing: Vec<ActiveMontage>,
+    /// `MONTAGE_BLEND_OUT`s a script call queued, fired on the next step.
     pub pending: Vec<MontageEvent>,
 }
 

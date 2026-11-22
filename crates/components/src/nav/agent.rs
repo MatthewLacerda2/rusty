@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::OffMeshLinkData;
 
+// Unity's defaults: mid-range priority (lower is more important), a yaw rate in degrees/s;
+// the ramp in degrees/s² is rusty's own (0 to 120°/s in 1/6 s).
 pub const DEFAULT_AVOIDANCE_PRIORITY: u8 = 50;
 const DEFAULT_ANGULAR_SPEED: f32 = 120.0;
 const DEFAULT_ANGULAR_ACCELERATION: f32 = 720.0;
@@ -44,6 +46,7 @@ pub struct NavMeshAgentComponent {
     #[serde(default = "default_angular_acceleration")]
     pub angular_acceleration: f32,
 
+    // Runtime-only path cache: re-derived each Play, re-planned only once invalidated.
     #[serde(skip)]
     pub cached_path: Vec<Vec3>,
     #[serde(skip)]
@@ -52,18 +55,23 @@ pub struct NavMeshAgentComponent {
     pub planned_target: Vec3,
     #[serde(skip)]
     pub path_generation: u64,
+    /// The queued request's ticket, 0 when none.
     #[serde(skip)]
     pub path_request: u32,
+    /// Set, an empty `cached_path` means no path can be planned, not one still to ask for.
     #[serde(skip)]
     pub path_planned: bool,
+    /// The feet position its answer holds only at (a search cut short, or a start off-mesh).
     #[serde(skip)]
     pub replan_from: Option<Vec3>,
     #[serde(skip)]
     pub path_status: NavPathStatus,
+    /// `(i, link)`: the leg into waypoint `i` crosses `link`.
     #[serde(skip)]
     pub path_links: Vec<(usize, OffMeshLinkData)>,
     #[serde(skip)]
     pub off_mesh_link: Option<OffMeshLinkData>,
+    /// Signed yaw rate in degrees/second, positive counter-clockwise seen from above.
     #[serde(skip)]
     pub angular_velocity: f32,
 }

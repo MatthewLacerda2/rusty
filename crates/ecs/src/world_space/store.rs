@@ -1,8 +1,8 @@
 //! The world-matrix store. Invariant: a dirty entity's descendants are all dirty, so a clean
 //! matrix was built from clean ancestors. A write only queues; the next read drains the queue,
 //! stopping at entities already dirty, so a rig written parents first is walked once. A change the
-//! downward walk cannot see (an insert an orphan names, an overwrite) bumps the
-//! generation. A child linked one side only can read stale, never NaN.
+//! downward walk cannot see (an insert an orphan names, an overwrite) bumps the generation. A
+//! child linked one side only can read stale, never NaN.
 
 use std::cell::RefCell;
 

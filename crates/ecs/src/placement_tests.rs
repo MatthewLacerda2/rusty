@@ -17,6 +17,7 @@ fn late_parent() -> World {
     w
 }
 
+/// The first `cc` case of `crates/ecs/proptest-regressions/activity_tests.txt`.
 #[test]
 fn an_overwrite_naming_a_future_id_follows_that_id_once_it_spawns() {
     let mut w = World::new();
@@ -95,6 +96,7 @@ fn a_document_naming_a_live_parent_is_listed_at_once() {
     assert!(!w.activity.is_unlisted());
 }
 
+/// Undo puts a step back in id order: a child can arrive before the parent listing it.
 #[test]
 fn a_parent_put_back_listing_its_child_lists_it_once() {
     let mut w = World::new();

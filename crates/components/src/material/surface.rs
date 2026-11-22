@@ -57,6 +57,8 @@ pub(super) fn white() -> [f32; 3] {
     [1.0; 3]
 }
 
+/// The one place F0 is computed; the shader reads it from the record. A hand-written scene
+/// skips the setters' clamps, so each input is clamped here, in `f64` so ior 1.5 is exactly 0.04.
 pub fn dielectric_f0(ior: f32, specular: f32, color: [f32; 3]) -> [f32; 3] {
     let n = within(ior, 1.0, f64::MAX);
     let reflectance = ((n - 1.0) / (n + 1.0)).powi(2);
@@ -85,6 +87,8 @@ impl super::MaterialAsset {
         dielectric_f90(self.specular)
     }
 
+    /// An `Additive` or `Multiply` surface adds to or tints what is behind: nothing to bend or
+    /// absorb.
     pub fn reads_opaque(&self) -> bool {
         let blends_over = matches!(self.blend_mode, BlendMode::Alpha | BlendMode::Premultiply);
         let refracts = self.refraction_model != RefractionModel::None;

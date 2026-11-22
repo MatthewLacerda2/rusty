@@ -95,6 +95,7 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
     ]
 }
 
+/// `asset`'s lightmap-UV tests copy this layout (`tests::sphere`): change them together.
 pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, Vec<u32>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();

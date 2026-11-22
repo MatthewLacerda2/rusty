@@ -5,6 +5,8 @@ use rusty_components::{ImageComponent, MeshComponent, PrefabLink};
 
 use super::world::{Ref, RefMut, World};
 
+// Newtypes, not aliases, and not `Clone`: hecs's guards are, so `guard.clone()` would re-borrow
+// instead of cloning the component through `Deref`.
 pub struct CompRef<'w, T: ?Sized>(Ref<'w, T>);
 
 impl<'w, T: ?Sized> CompRef<'w, T> {
@@ -41,6 +43,8 @@ impl<T: ?Sized> DerefMut for CompMut<'_, T> {
     }
 }
 
+// One uniform family per component on purpose: unused members (most `take_*`) stay. A `take`
+// moves the entity to another archetype: an edit-time call; a per-tick system uses `get_mut`.
 macro_rules! optional_component_accessors {
     ($($ty:ty => $get:ident, $get_mut:ident, $has:ident, $set:ident, $take:ident, $ids_with:ident;)*) => {
         impl World {
@@ -73,6 +77,7 @@ macro_rules! optional_component_accessors {
     };
 }
 
+// The Collider writes its own (`world_space::collider`, which keeps its AABB set) but for `take`.
 macro_rules! row_accessors {
     (collider: $ty:ty, $get_mut:ident $has:ident $set:ident $take:ident $ids_with:ident) => {
         impl World {
@@ -107,6 +112,7 @@ impl World {
         self.ids_with_component_where(keep)
     }
 
+    /// Derived every tick: no change stamp and no Undo note, so a Mesh cursor sees no write.
     pub fn set_pose_palette(&mut self, id: u32, palette: &[glam::Mat4]) {
         if let Some(mut mesh) = self.derived_mut::<MeshComponent>(id) {
             mesh.pose_palette.clear();
