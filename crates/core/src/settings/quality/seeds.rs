@@ -17,8 +17,7 @@ const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
     }
 }
 
-// The `Medium` preset's SSR rows are HDRP's Max Ray Steps (16, 32, 64), reaching at
-// most 8, 12, 16 m.
+// The `Medium` preset's SSR rows march 16, 32 and 64 steps, reaching at most 8, 12, 16 m.
 const fn march(steps: u32, step_length: f32) -> SsrQuality {
     SsrQuality { steps, step_length }
 }

@@ -25,6 +25,7 @@ impl Sense {
 pub struct Known {
     pub sense: Sense,
     pub position: Vec3,
+    /// Seconds since it was last sensed.
     pub age: f32,
     pub sensed: bool,
     /// The noise's tag, or the damage type; empty for sight.
