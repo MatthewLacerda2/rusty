@@ -87,6 +87,7 @@ fn hdr_side_step(on: &[f32], off: &[f32]) -> (f32, f32) {
     (step / peak.max(1e-6), peak)
 }
 
+/// Measured on lavapipe: 0.29 of the mirror's.
 const SATIN_RED: f32 = 0.1;
 
 #[test]

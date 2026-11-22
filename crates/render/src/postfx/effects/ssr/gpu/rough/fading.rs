@@ -25,7 +25,7 @@ fn sharpest_bend(red: &[f32], (w, h): (u32, u32)) -> f32 {
         .fold(0.0, f32::max)
 }
 
-/// Measured: 2.3 to 5.2 on lavapipe; 17 to 20 on an RTX 2060 with texels blended by brightness.
+/// Measured on lavapipe: 2.3 to 5.2.
 const BEND: f32 = 12.0;
 
 #[test]

@@ -101,10 +101,9 @@ fn steepest(red: &[f32], (w, h): (u32, u32)) -> (f32, f32) {
         .fold((0.0, 0.0), |a, b| (a.0.max(b.0), a.1.max(b.1)))
 }
 
-/// Measured: the band's inside blurs over about 0.06; an outline drawn at the rays' hit or
-/// miss rose within 0.017 at 360 rows.
+/// Measured on lavapipe: 0.036 at 360 rows, 0.035 at 720.
 const SOFT: f32 = 0.025;
-
+/// Measured on lavapipe: 0.09 of the mirror's.
 const BAND: f32 = 0.03;
 
 #[test]

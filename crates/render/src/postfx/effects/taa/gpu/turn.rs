@@ -9,7 +9,7 @@ use rusty_scene::{Camera, Scene};
 
 const STEP: f32 = 1.5;
 const FRAMES: u32 = 16;
-/// Measured on lavapipe: 0.93 with the moving weight, 0.76 with URP's fixed one.
+/// Measured on lavapipe: 0.93.
 const KEPT: f32 = 0.85;
 
 fn sharpness(rgba: &[u8]) -> f32 {
@@ -25,6 +25,8 @@ fn sharpness(rgba: &[u8]) -> f32 {
     sum / n
 }
 
+/// The fixture's anti-flicker 0: its hold sharpens a still textured frame, so the measure
+/// is the moving weight's alone.
 fn wall_scene() -> Scene {
     let (mut scene, _) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);

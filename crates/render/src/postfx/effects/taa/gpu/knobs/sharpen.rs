@@ -81,7 +81,7 @@ fn gpu_sharpen_raises_edge_contrast_without_ringing() {
                     continue;
                 }
                 let d = on[((y * W + x) * 4) as usize + c].abs_diff(at(x, y));
-                eprintln!("MEASURE sharpen_d {d}");
+                // Measured on lavapipe: at most 2; more would be a halo.
                 assert!(d <= 3, "flat ({x},{y}) channel {c} rang by {d}");
                 flat += 1;
             }
