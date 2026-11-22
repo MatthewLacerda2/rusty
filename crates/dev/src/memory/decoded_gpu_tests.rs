@@ -1,11 +1,15 @@
 //! A direction check only: on CI's adapters it does not fail for an unbounded cached
 //! upload, which `textures_gpu_tests`' four-times test catches.
 
-use super::textures_gpu_tests::{compresses, images, load, mb, set_up, N};
+use super::textures_gpu_tests::{compresses, images, load, set_up, N};
 use crate::memory::rss_peak_bytes;
+use rusty_render::STAGING_BUDGET;
+
+/// Bytes a cached load may hold past a decoded one: its one staging buffer in flight.
+const SLACK: u64 = STAGING_BUDGET;
 
 #[test]
-fn gpu_cached_textures_peak_no_higher_than_the_same_decoded() {
+fn gpu_cached_textures_peak_at_most_a_staging_budget_past_the_same_decoded() {
     rusty_test_support::alone!(|| {
         let Some((mut renderer, dir)) = set_up("cached_or_decoded") else {
             return;
@@ -23,22 +27,17 @@ fn gpu_cached_textures_peak_no_higher_than_the_same_decoded() {
         let cached_b = beside(after_cached - start, cached_gpu);
         let decoded_b = beside(after_decoded - after_cached, decoded_gpu);
         println!(
-            "{} textures, beside their GPU copies: cached +{} MB ({} MB on the GPU), \
-             decoded +{} MB ({} MB on the GPU)",
-            4 * N,
-            mb(cached_b),
-            mb(cached_gpu),
-            mb(decoded_b),
-            mb(decoded_gpu)
+            "{} textures, beside their GPU copies: cached +{cached_b} B ({cached_gpu} B on the \
+             GPU), decoded +{decoded_b} B ({decoded_gpu} B on the GPU)",
+            4 * N
         );
         assert!(
-            cached_b <= decoded_b,
-            "{} textures loaded from their caches peaked {} MB past their GPU copies, \
-             the same decoded from their PNGs {} MB: a cached load holds more beside \
-             the GPU than a decode (staging unbounded, or a CPU copy kept)",
-            4 * N,
-            mb(cached_b),
-            mb(decoded_b)
+            cached_b <= decoded_b + SLACK,
+            "{} textures loaded from their caches held {cached_b} B past their GPU copies, \
+             the same decoded from their PNGs {decoded_b} B, more than {SLACK} B of slack \
+             apart: a cached load holds more beside the GPU than a decode (staging \
+             unbounded, or a CPU copy kept)",
+            4 * N
         );
     });
 }
