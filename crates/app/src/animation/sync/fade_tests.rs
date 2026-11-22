@@ -5,6 +5,7 @@ use super::rig::*;
 fn walk_to_run_in_one_group_starts_run_at_walks_phase() {
     let (mesh, graph) = (rig_mesh(), locomotion(true));
     let mut anim = bound(&graph);
+    // Walk 60 % of the way from FootL (0) to FootR (0.5).
     anim.base.time = 0.3;
     anim.enter_node(graph.node("Run").unwrap(), 0.5);
     step(&mut anim, Some(&mesh), Some(&graph), 0.0);
@@ -58,6 +59,7 @@ fn nodes_in_no_group_crossfade_from_the_start_as_before() {
 fn a_hard_cut_into_the_group_still_lands_on_the_phase() {
     let (mesh, graph) = (rig_mesh(), locomotion(true));
     let mut anim = bound(&graph);
+    // Halfway from FootR (0.5) to the next FootL (1).
     anim.base.time = 0.75;
     anim.enter_node(graph.node("Run").unwrap(), 0.0);
     step(&mut anim, Some(&mesh), Some(&graph), 0.0);

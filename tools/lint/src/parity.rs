@@ -106,6 +106,7 @@ mod tests {
                       l.color = Vec3::new(r, g, b);";
         assert_eq!(classify("light", direct), Card::Direct);
 
+        // A member crate spells the ops through `rusty_edit`; the base's builders are no ops.
         let member = "use rusty_edit::authoring::light as light_ops;\n\
                       if let Some(mut c) = world.light_mut(id) { light_ops::set_color(&mut c, rgb); }";
         assert_eq!(classify("light", member), Card::Routed);

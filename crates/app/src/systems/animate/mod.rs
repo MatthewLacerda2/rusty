@@ -63,6 +63,7 @@ pub(crate) fn animate(world: &mut World, res: &mut Resources) {
 
 fn write_pose(s: &mut Scene, writes: Vec<(u32, rusty_components::TransformComponent)>) {
     for (bone, local) in writes {
+        // A partial ragdoll's bone: its animated pose is its drive's target and blend side.
         if !s.ragdolls.is_idle() {
             s.ragdolls
                 .note_animated(bone, (local.position, local.rotation));
@@ -90,6 +91,8 @@ fn measured(anim: &mut AnimatorComponent, motion: RootMotion, drives: bool) {
     }
 }
 
+/// An inactive animator measures nothing: `GetRootMotion` reports no step, and its states
+/// are forgotten, so a reactivation enters them afresh, as Unity's does.
 fn settle(s: &mut Scene, id: u32) {
     let idle = |a: &AnimatorComponent| {
         a.root_motion.last.is_zero() && a.root_motion.moved == Vec3::ZERO && a.states.is_empty()
@@ -112,7 +115,7 @@ fn states_of(
 ) -> Vec<StateCallback> {
     match hear {
         true => animation::state_callbacks(anim, mesh.map_or(&[][..], |m| &m.clips[..]), graph),
-        false => forget_states(anim),
+        false => forget_states(anim), // entered afresh once a script listens
     }
 }
 

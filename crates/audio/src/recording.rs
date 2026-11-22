@@ -1,3 +1,6 @@
+//! Test hooks: a backend recording every call, which `app`'s audio tests and this
+//! crate's assert on.
+
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -13,6 +16,7 @@ pub struct Recording {
     pub mixes: Vec<(VoiceId, VoiceMix)>,
     pub stops: Vec<VoiceId>,
     pub speaker_modes: Vec<SpeakerMode>,
+    /// Voices still sounding; a test removes one to finish it.
     pub live: BTreeSet<VoiceId>,
     pub groups_added: Vec<(GroupId, Option<GroupId>)>,
     pub group_mixes: Vec<(GroupId, GroupMix)>,

@@ -4,6 +4,8 @@ use rusty_scene::{game_camera_from_scene, sync_lens_from_scene, Camera};
 use crate::GameWorld;
 
 impl GameWorld {
+    /// The scene's main camera entity, else the free camera, as of now: the `Camera`
+    /// resource is synced only at the tick's end.
     pub fn main_view(&self) -> Camera {
         game_camera_from_scene(&self.resources.camera.borrow(), &self.world.scene.borrow())
     }
@@ -15,10 +17,11 @@ impl GameWorld {
         sync_lens_from_scene(&mut camera, &scene, scene.is_playing());
     }
 
+    /// Zero outside Play, so edit-mode and preview shots stay pixel-comparable.
     pub(crate) fn sync_shader_time(&mut self) {
         let (time, ui_time) = if self.world.scene.borrow().is_playing() {
             let t = self.resources.time.borrow();
-            (t.time as f32, t.unscaled_time as f32)
+            (t.time as f32, t.unscaled_time as f32) // UI time unscaled: a paused menu animates
         } else {
             (0.0, 0.0)
         };

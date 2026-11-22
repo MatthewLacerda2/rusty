@@ -1,5 +1,6 @@
 use std::path::Path;
 
+// Lines as `Lang::measure` counts them: every line of Rust, lines of code elsewhere.
 pub(super) const MAX_FILE_LINES: usize = 300;
 pub(super) const MAX_TEST_FILE_LINES: usize = 150;
 pub(super) fn limit_for(base: &Path, path: &Path) -> usize {
@@ -12,6 +13,7 @@ pub(super) fn limit_for(base: &Path, path: &Path) -> usize {
         dir.split('/')
             .any(|seg| seg == "tests" || seg == "fixtures")
     });
+    // `tests.rs` is its folder's own tests sibling, but only outside a test folder.
     if is_tests_sibling(path) || (name == "tests.rs" && !in_test_dir) {
         return MAX_FILE_LINES;
     }

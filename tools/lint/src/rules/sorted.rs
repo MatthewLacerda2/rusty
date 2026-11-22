@@ -1,6 +1,3 @@
-//! // sorted: <why order is free>          (Rust)
-//! <!-- sorted: <why order is free> -->    (Markdown)
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::repo::ls_files;
@@ -125,6 +122,7 @@ fn key(line: &str) -> Option<String> {
     }
 }
 
+/// Tracked only: a gitignored note never reaches CI, so it must not fail the gate locally.
 pub fn markdown(root: &Path) -> Result<Vec<PathBuf>, String> {
     let mut md = ls_files(root, &[], &["*.md"])?;
     md.retain(|p| p.components().count() == 1 || in_roots(p));

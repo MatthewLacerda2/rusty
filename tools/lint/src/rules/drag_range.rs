@@ -1,5 +1,3 @@
-//! is excused by `// lint: allow(drag-range) <why>`; `src/editor/widgets.rs`, the
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

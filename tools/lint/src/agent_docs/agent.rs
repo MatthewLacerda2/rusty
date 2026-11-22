@@ -1,5 +1,7 @@
 use super::frontmatter::{block, value};
 
+/// Claude Code's documented subagent keys (<https://code.claude.com/docs/en/sub-agents>,
+/// *Supported frontmatter fields*): a key added there is added here.
 pub const KEYS: &[&str] = &[
     "name",
     "description",

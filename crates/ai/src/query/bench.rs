@@ -72,6 +72,9 @@ pub fn query(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> us
     run(&world, bot, &spec(target)).len()
 }
 
+/// The worst case for `path`: the bot 40 m off, and a ninth point upstairs it
+/// cannot reach, so the flood runs to its bound. Bake at 0.25 m: at 1 m cells
+/// the 1.4 m doorways erode shut.
 pub fn query_far(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> Vec<super::Item> {
     let camera = Camera::new(Vec3::new(25.0, 1.5, 25.0), 0.0, 0.0);
     let world = QueryWorld {

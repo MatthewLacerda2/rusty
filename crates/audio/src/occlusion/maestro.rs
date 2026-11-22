@@ -11,6 +11,7 @@ pub fn eligible(source: &AudioSourceComponent) -> bool {
     source.occlusion_enabled && source.spatial_blend > 0.0
 }
 
+/// Voice, owning entity, position, and whether it is `eligible`.
 type Candidate = (VoiceId, Option<u32>, Vec3, bool);
 
 impl AudioMaestro {

@@ -57,6 +57,7 @@ pub(super) fn add_menu_src(base: &Path) -> String {
     files.iter().map(read).collect::<Vec<_>>().join("\n")
 }
 
+/// Every editor source but the Add menu's, so an Add entry alone never meets the inspector axis.
 pub(super) fn editor_blob(base: &Path) -> String {
     let mut files = Vec::new();
     walk(&crate::modules::real(base, EDITOR_DIR), &mut files);

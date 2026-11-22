@@ -25,6 +25,7 @@ pub fn parse(stderr: &str) -> (BTreeSet<Warning>, bool) {
             .filter(|m| is_dead(m) || is_import(m))
         {
             found.insert(Warning {
+                // A member's file, reached through the lib's `#[path]`, by its real path.
                 path: path.strip_prefix("src/../").unwrap_or(path).to_string(),
                 line: row,
                 message: message.to_string(),

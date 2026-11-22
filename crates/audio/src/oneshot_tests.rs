@@ -3,6 +3,7 @@ use glam::Vec3;
 use super::*;
 use crate::recording::RecordingBackend;
 
+/// The gain a shot `distance` m down +X reaches the backend with, then after one push.
 fn shot_gain(distance: f32, rolloff: Rolloff) -> (f32, f32) {
     let (backend, rec) = RecordingBackend::new();
     let mut m = AudioMaestro::with_backend(backend);

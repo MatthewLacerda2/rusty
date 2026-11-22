@@ -72,6 +72,7 @@ fn control_round_trips_every_mode() {
 fn a_mode_switch_during_silence_is_settled_before_the_next_sound() {
     let mut b = rig(&[0.5; 64]);
     b.set_speaker_mode(SpeakerMode::Tv);
+    // Past the gate's hang: the compressor sleeps fully wet.
     b.device().render(RATE as usize * 3);
     b.set_speaker_mode(SpeakerMode::HomeTheater);
     b.device().render(1024);

@@ -174,6 +174,7 @@ impl Mixer {
         self.ducks.clear();
     }
 
+    /// `playing(g)`: whether a voice routes into `g` itself; ducks read the subtree.
     pub fn advance(&mut self, now: f64, playing: impl Fn(GroupId) -> bool) {
         let dt = (now - self.now).max(0.0) as f32;
         self.now = now;

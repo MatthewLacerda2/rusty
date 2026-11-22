@@ -64,6 +64,7 @@ pub const TRIANGLE_GLTF: &str = r#"{
 }
 "#;
 
+/// The image is resolved, never read, so a test writes the `.gltf` alone.
 pub const TEXTURED_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -113,6 +114,8 @@ pub const TEXTURED_GLTF: &str = r#"{
 }
 "#;
 
+/// Its `model.bin` is [`skinned_buffer`]: the views and the 224 bytes follow its
+/// layout.
 pub const SKINNED_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -150,6 +153,8 @@ pub const SKINNED_GLTF: &str = r#"{
 }
 "#;
 
+/// Its normals keep the indices as written: the import flat-shades a normal-less
+/// primitive.
 pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
     let mut bin = Vec::new();
     let corners: [f32; 12] = [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 1.0, 0.0, 0.0, 1.0, 0.0];
@@ -159,8 +164,6 @@ pub fn quad_mode_gltf(mode: u32, indices: &[u16]) -> (String, Vec<u8>) {
     for i in indices {
         bin.extend_from_slice(&i.to_le_bytes());
     }
-    // The index accessor/bufferView (and the primitive's "indices" key) exist only
-    // for an indexed fixture.
     let (indices_key, index_accessor, index_view) = if indices.is_empty() {
         (String::new(), String::new(), String::new())
     } else {

@@ -5,16 +5,20 @@ use super::motion::MotionContext;
 
 pub const END_EVENT: &str = "End";
 
+/// Loops of one marker fired in a single step, at most, so an absurd speed on a short clip can't
+/// flood the scripts.
 const MAX_CROSSINGS: i64 = 16;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Crossed {
     pub name: String,
+    /// How far into the step it was crossed, in `[0, 1]`.
     pub at: f32,
     pub layer: usize,
     pub montage: Option<MontageEvent>,
 }
 
+/// A stable sort: events tied on time and layer keep the authored order they were found in.
 pub fn sort(events: &mut [Crossed]) {
     events.sort_by(|a, b| a.at.total_cmp(&b.at).then(a.layer.cmp(&b.layer)));
 }

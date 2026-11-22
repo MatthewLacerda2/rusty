@@ -1,5 +1,5 @@
 //! Which tick an operation becomes ready on is an **input**, like `InputFrame`: the tap
-//! may change what the loader reports (a replay hands back the recorded ticks).
+//! may change what the loader reports.
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 
 use rusty_edit::load::prepare::{staged, PreparedScene, SceneSidecars};
@@ -8,16 +8,18 @@ use rusty_scene::serialize::RehydratedScene;
 
 use super::super::game::GameWorld;
 
+/// `finished` is asked every tick head, so never waits; `take` may; `start` drops any
+/// earlier job.
 pub trait SceneLoader: std::any::Any {
     fn start(&mut self, op: u32, path: String);
     fn finished(&mut self, op: u32) -> bool;
     fn take(&mut self, op: u32) -> Result<PreparedScene, String>;
     fn cancel(&mut self);
-    /// From 0 to 1, read by a script as `progress` (x 0.9) before ready; 0 when unknown.
+    /// From 0 to 1, a script's `progress` (x 0.9) before ready; 0 when unknown.
     fn progress(&mut self, _op: u32) -> f32 {
         0.0
     }
-    /// Whether `take` prepares on the ticking thread (timed beside the tick).
+    /// Whether `take` prepares on the ticking thread.
     fn prepares_inline(&self) -> bool {
         false
     }
@@ -69,12 +71,11 @@ impl SceneLoader for Inline {
 
 pub const ABANDONED: &str = "the load was abandoned";
 
-/// The write-log stamp is taken before anything is read, so a model written meanwhile is followed.
+/// Stamps the write log first, so a model written meanwhile is still followed.
 pub fn prepare_in_background(path: &str, abandoned: &AtomicBool) -> Result<PreparedScene, String> {
     prepare_counted(path, abandoned, &PrepareSteps::default())
 }
 
-/// Three steps when a navmesh is saved beside the scene, else four.
 #[derive(Debug)]
 pub struct PrepareSteps {
     done: AtomicU8,
@@ -114,6 +115,7 @@ pub fn prepare_counted(
             Ok(())
         }
     };
+    // The conversion gate is per thread: a worker preparing this load takes its own hold.
     let _hold = rusty_asset::convert::PlayHold::take();
     let read_at = rusty_core::fs::written::written_since(u64::MAX).0;
     let data = rusty_scene::read_scene_file(path)?;

@@ -54,6 +54,7 @@ pub(super) fn apply_root_motion(
         Mover::Character(min) => {
             let step = carried + motion.position;
             if step.length() < min {
+                // Under `Move`'s minimum distance: carried into the next step, not dropped.
                 carry = step;
             } else {
                 let physics = res.physics.borrow();
@@ -68,7 +69,7 @@ pub(super) fn apply_root_motion(
             }
             true
         }
-        Mover::AutoLink => false,
+        Mover::AutoLink => false, // the link carries the agent; the clip's travel is dropped
         Mover::Body => {
             moved = Some(motion.position);
             drive_body(s, id, motion, dt);
@@ -94,6 +95,7 @@ pub(super) fn apply_root_motion(
     hits
 }
 
+/// Compared first: a mutable borrow stamps the animator as edited.
 fn record(s: &mut Scene, id: u32, moved: Vec3, carry: Vec3) {
     let unchanged = s
         .world
@@ -107,6 +109,8 @@ fn record(s: &mut Scene, id: u32, moved: Vec3, carry: Vec3) {
     }
 }
 
+/// Unity's `OnAnimatorMove` on a dynamic body: the step becomes horizontal velocity, the
+/// vertical is kept so gravity still pulls, and the turn becomes spin about +Y.
 fn drive_body(s: &mut Scene, id: u32, motion: RootMotion, dt: f32) {
     if dt <= 0.0 {
         return;

@@ -4,7 +4,9 @@ use std::borrow::Cow;
 pub enum Open {
     None,
     Escaped,
+    /// `r#"…`: closed by `"` and this many `#`s.
     Raw(usize),
+    /// `/*…`: this many comments deep, as Rust's block comments nest.
     Block(usize),
 }
 

@@ -16,6 +16,7 @@ fn line(mut rest: &str, depth: &mut usize) -> Line {
             *depth -= 1;
             out.comment.push_str("*/ ");
             if *depth == 0 {
+                // A space, so the tokens either side of a closed comment stay apart.
                 out.code.push(' ');
             }
             rest = &rest[2..];

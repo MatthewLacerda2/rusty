@@ -2,6 +2,7 @@ use super::verdict;
 use crate::repo::scaffold::Repo;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Each scratch repository's own name: the tests run in parallel.
 static NEXT: AtomicUsize = AtomicUsize::new(0);
 
 const RUST: &str = "//! The module.\n#![doc = \"more\"]\n\n/// Adds.\n#[inline]\n\

@@ -39,6 +39,7 @@ fn a_montage_stopped_before_a_marker_never_fires_it() {
     let (m, g) = (rig(), with_montages(UPPER, RELOAD));
     let mut anim = animator(Motion::Clip("Run"), None, 0.0);
     start(&mut anim, &g, &m, "Reload");
+    // 31 steps of 0.05 s: stopped at 1.55 s, short of `MagIn` at 1.6 s.
     let before = fire(&mut anim, &m, &g, 31);
     assert_eq!(names(&before), vec!["Start"]);
     assert!(anim.montages.stop(Some("UpperBody"), None));

@@ -4,8 +4,10 @@ use super::spec::Anchor;
 use super::QueryWorld;
 use rusty_navigation::{FloodSearch, NavigationGraph, ALL_AREAS};
 
+/// The flood's reach, as a factor of the farthest item's straight-line distance:
+/// a path around a wall is longer, but rarely twice.
 const SLACK: f32 = 2.0;
-/// And at least this much, metres, so an item next to the querier behind a short
+/// At least this much, metres, so an item next to the querier behind a short
 /// wall is still found.
 const MIN_REACH: f32 = 4.0;
 
@@ -44,7 +46,6 @@ impl FloodAsk {
         })
     }
 
-    /// Begin `search` on this ask ([`NavigationGraph::begin_flood`]).
     pub fn begin(&self, nav: &NavigationGraph, search: &mut FloodSearch) {
         nav.begin_flood(search, self.from, &self.items, self.bound, self.mask);
     }

@@ -91,5 +91,6 @@ fn an_empty_description_is_flagged() {
 fn an_unknown_key_is_reported_at_its_own_line() {
     let source = def("helper", "model: opus\nmodle: x\n");
     let at: Vec<usize> = check("helper", &source).iter().map(|(l, _)| *l).collect();
+    // `---` is line 1, so the frontmatter's fourth line is the file's fifth.
     assert_eq!(at, [5]);
 }

@@ -62,9 +62,9 @@ pub struct PlayParams {
 }
 
 pub trait AudioBackend {
+    /// `false`: the clip could not play; the maestro logs the attempt anyway.
     fn play(&mut self, id: VoiceId, params: &PlayParams) -> bool;
 
-    /// Stop the voice `id` if it is still live (no-op otherwise).
     fn stop(&mut self, id: VoiceId);
 
     fn set_mix(&mut self, id: VoiceId, mix: &VoiceMix);
@@ -75,6 +75,7 @@ pub trait AudioBackend {
 
     fn set_speaker_mode(&mut self, mode: SpeakerMode);
 
+    /// Replaces any group at `id`; `parent` must exist first, or the group plays silent.
     fn add_group(&mut self, id: GroupId, parent: Option<GroupId>);
 
     fn set_group(&mut self, id: GroupId, mix: &GroupMix);

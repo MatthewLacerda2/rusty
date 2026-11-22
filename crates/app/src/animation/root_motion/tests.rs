@@ -105,6 +105,8 @@ fn a_turning_clip_turns_the_mover_and_retraces_the_clip_path() {
     let steps = run(&mut anim, &mesh, 60);
     let done = total(&steps);
     assert!((done.yaw - FRAC_PI_2).abs() < 1e-3, "{done:?}");
+    // Each step is read in the frame the hips faced: chained onto the turning mover, the path is
+    // the clip's own, 1 m along +X.
     assert!(close(done.position, Vec3::X), "{done:?}");
     assert!(
         steps[50].position.z > 1e-4,

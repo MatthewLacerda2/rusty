@@ -50,6 +50,7 @@ fn walking_from_the_tunnel_into_the_room_blends_the_two() {
     let tunnel = ReverbPreset::Tunnel.params().unwrap();
     let room = ReverbPreset::Room.params().unwrap();
     assert_eq!(hear_at(&mut world, 0.0).params, tunnel);
+    // 5 m from both zones, inside each one's 4 to 8 m falloff: equal weights, an even blend.
     let door = hear_at(&mut world, 5.0);
     assert_eq!(door.zones, 2);
     let mid = (tunnel.decay_time + room.decay_time) / 2.0;

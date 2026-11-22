@@ -1,6 +1,9 @@
 use crate::code::{code_of, cut, scan, strip_comment, Open};
 use std::borrow::Cow;
 
+/// The last line of the item at `lines[from]`. An item (`fn`, `impl`, `mod`, …) ends
+/// where its brackets balance on `;` or `}`; a field, variant or arm may also end on
+/// `,`, or on the line before its parent closes.
 pub fn item_end(lines: &[&str], from: usize) -> usize {
     let item = head(lines, from).is_some_and(|h| is_item_head(&h));
     let ends: &[char] = if item { &[';', '}'] } else { &[';', '}', ','] };

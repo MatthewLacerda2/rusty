@@ -78,6 +78,7 @@ fn an_end_reached_exactly_fires_once() {
 fn a_huge_speed_keeps_the_playhead_finite() {
     let (graph, mut anim) = rig(false);
     anim.speed = 3e38;
+    // `A` doesn't resolve on this mesh, so nothing wraps or clamps it: only the finite guard holds.
     let unresolved = mesh(vec![slide("B", &[HIPS], 0.0, 1.0, 1.0)]);
     for _ in 0..200 {
         advance(&mut anim, Some(&unresolved), Some(&graph), DT);

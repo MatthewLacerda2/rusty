@@ -143,6 +143,7 @@ impl MotionContext<'_> {
         }
     }
 
+    /// Runs after [`rebase_leaders`](Self::rebase_leaders), which `before_step` calls first.
     pub fn advance(
         &self,
         playback: &mut Playback,

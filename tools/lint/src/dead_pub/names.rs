@@ -123,6 +123,7 @@ impl<'a> Renamer<'a> {
         }
         let rewrite = match spot {
             Spot::Head { .. } => true,
+            // In a macro's argument the lib's short name is likelier a local: left as written.
             Spot::Argument { macro_call } => !(macro_call && lib),
             Spot::Elsewhere => false,
         };

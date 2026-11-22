@@ -105,6 +105,7 @@ fn info_carries_the_tag_layer_and_unwrapped_time() {
     assert_eq!(reported.tag.as_deref(), Some("attack"));
     assert_eq!(reported.layer_name, BASE_LAYER);
     assert_eq!(reported.length, 1.0);
+    // 90 steps of a looping 1 s clip: 1.5 s, half way through its second cycle.
     assert!(
         (reported.normalized_time - 1.5).abs() < 1e-3,
         "{reported:?}"

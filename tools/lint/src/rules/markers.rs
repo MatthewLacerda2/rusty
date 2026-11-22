@@ -2,6 +2,7 @@ use super::finding::Finding;
 use super::scan::Scan;
 
 pub const RULE: &str = "markers";
+/// Spelled in halves so this file does not flag itself.
 pub const WORDS: [&str; 4] = [
     concat!("TO", "DO"),
     concat!("FIX", "ME"),

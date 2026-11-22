@@ -1,13 +1,14 @@
-//! // lint: allow(prefix-group) one file per Unity component, mirrored in the editor
-
 use std::fmt;
 
+/// The rule an allow that gives no reason is reported under.
 pub const ALLOW: &str = "allow";
 const MARKER: &str = "lint: allow(";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
+    /// Repo-relative, `/`-separated.
     pub path: String,
+    /// 1-based: the line an allow for this finding anchors to.
     pub line: usize,
     pub rule: &'static str,
     pub message: String,
@@ -25,6 +26,7 @@ impl fmt::Display for Finding {
 
 /// `// lint: allow(<rule>) <why>`, Lua's `-- lint: allow(<rule>) <why>`, or Markdown's
 /// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`. Each file
+/// type reads only its own form, so code quoting another form in a string is no allow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     Code,

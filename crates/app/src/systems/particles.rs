@@ -30,6 +30,7 @@ pub(crate) fn tick_particles(world: &mut World, res: &mut Resources) {
     dispatch_sub_emitters(world, &events);
 }
 
+/// After `LateUpdate` and the bone pass, so a gun moved there draws with its flash on it.
 pub(crate) fn carry_local_particles(world: &mut World, _res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     for id in scene.world.ids_with_particles() {
@@ -72,11 +73,14 @@ fn simulate_emitter(
 ) {
     emitter.ensure_initialized();
     emitter.carry_to(origin);
+    // Every particle ages, so a script's earlier read is stale.
     emitter.runtime.revision = emitter.runtime.revision.wrapping_add(1);
 
     if emitter.active {
         emit(emitter, origin, dt);
     }
+    // The renderer moves a `Gpu` emitter's particles: here only its tally ages, so it
+    // never collides or fires a death or collision sub-emitter.
     if emitter.on_gpu() {
         emitter.runtime.gpu.step(dt);
     } else {
@@ -183,7 +187,7 @@ fn resolve_collision(
     let survived = match response {
         CollisionResponse::Die => false,
         CollisionResponse::Bounce => {
-            *step = dir * (toi * 0.99);
+            *step = dir * (toi * 0.99); // 1% short of the hit: never inside the surface
             let n = normal.normalize_or_zero();
             let reflected = if n == Vec3::ZERO {
                 -p.velocity

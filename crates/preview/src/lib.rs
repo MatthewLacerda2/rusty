@@ -6,6 +6,8 @@ pub use orbit::{FramedOrbit, OrbitState};
 pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject};
 pub use stand_in::framing;
 
+/// The one extension dispatch: the editor tab and `Debug.Preview` both call it, so
+/// they accept the same files. A material has no file: it is picked directly.
 pub fn subject_for_path(path: &str) -> Option<PreviewSubject> {
     if rusty_asset::is_image_path(path) {
         Some(PreviewSubject::Texture(path.to_string()))

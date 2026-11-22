@@ -91,6 +91,7 @@ impl Dsp for Compressor {
             let level = key.unwrap_or_else(|| peak(f));
             // An infinite level would leave the reduction infinite (then NaN) for good.
             let level = if level.is_finite() { level } else { 0.0 };
+            // A −180 dB floor: silence reads far under any threshold, not as −∞.
             let target = reduction(20.0 * level.max(1e-9).log10(), threshold, ratio);
             let k = if target > self.reduction {
                 attack
