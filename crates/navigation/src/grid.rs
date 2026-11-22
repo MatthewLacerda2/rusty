@@ -20,8 +20,8 @@ pub struct SpanRef {
 }
 
 /// The compact-heightfield half of Recast; no polygon mesh. The spans of cell `i` are
-/// `spans[cell_start[i]..cell_start[i + 1]]`. A wall top is a span too, but no neighbour is
-/// within a step of it, so A\* never reaches it.
+/// `spans[cell_start[i]..cell_start[i + 1]]`, bottom-up. A wall top is a span too, but no
+/// neighbour is within a step of it, so A\* never reaches it.
 pub struct NavigationGraph {
     pub min_x: f32,
     pub max_x: f32,

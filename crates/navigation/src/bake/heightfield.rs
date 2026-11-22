@@ -1,4 +1,4 @@
-//! Solids whose tops lie within `max_step` of each other OR their walkable flags (Recast's
+//! Merged solids whose tops lie within `max_step` of each other OR their walkable flags (Recast's
 //! flag-merge threshold). Past Recast: when the solid reaching the merged top carries a
 //! `NavMeshModifier` override, its flag and area decide alone, else a sofa overridden to
 //! `NotWalkable` whose seat is within `max_step` of the floor would inherit the floor's walkable

@@ -1,7 +1,6 @@
-//! A convex collider contributes one span per column (lowest to highest triangle): a vertical line
-//! crosses a convex solid in one interval, so a box's inside is solid. Its top is walkable when an
-//! up-facing triangle reaches it; winding is not needed. A non-convex mesh rasterises per triangle
-//! and trusts the winding (front faces out), as Recast does.
+//! A convex collider gives one span per column (lowest to highest triangle): a vertical line
+//! crosses it in one interval, so its inside is solid and winding is not needed. A non-convex
+//! mesh rasterises per triangle and trusts the winding (front faces out), as Recast does.
 
 use glam::{Vec2, Vec3};
 
@@ -12,6 +11,7 @@ use super::region::CellRect;
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
+/// Of a cell, off each side: a collider only touching a cell's edge claims none of it.
 const EDGE_EPS: f32 = 1e-4;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

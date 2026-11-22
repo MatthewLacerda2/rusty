@@ -1,6 +1,5 @@
-//! Nodes are spans, not cells, so a path can climb onto the floor above where it started. Every
-//! cost is at least 1, so the octile heuristic stays admissible. The start span is exempt from the
-//! area mask, so an agent in a forbidden area can walk out.
+//! Nodes are spans, not cells. Every cost is at least 1, so the octile heuristic stays admissible.
+//! The start span is exempt from the area mask, so an agent in a forbidden area can walk out.
 
 use super::pool::NodePool;
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
@@ -168,6 +167,8 @@ impl NavigationGraph {
         Some((reconstruct_path(frontier.pool, search.closest.2), false))
     }
 
+    /// A diagonal pays its dearer cardinal's area cost, so no path shaves an area's corner;
+    /// `flood::moves` mirrors this step.
     fn expand(&self, current: NodeState, goal: SpanRef, mask: u32, frontier: &mut Frontier) {
         let here = current.node;
         let NavSpan { y, area, .. } = self.spans[here.index as usize];
