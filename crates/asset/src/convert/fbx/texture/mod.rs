@@ -1,6 +1,7 @@
 //! An embedded name is reserved even when a disk file is used, so the textures
 //! folder holds the same bytes whatever is on disk (`stage::move_in` relies on it).
-//! An unusable texture is a [`Skip`]; one that fails to extract fails the conversion.
+//! An unusable texture is a [`Skip`]; one that fails to extract, or that no URI reaches, fails
+//! the conversion.
 
 mod identity;
 
@@ -121,7 +122,8 @@ impl Textures {
                         return Ok(Disk::Found(path));
                     }
                     Usable::No(why) => Some(why),
-                    // A cached look can outlive the file's permissions.
+                    // A cached look can outlive the file's permissions: the stamp records what
+                    // opening it found.
                     Usable::Unopened => {
                         looked = Dependency::unopened(&path);
                         Some(unreadable(&path))

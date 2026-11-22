@@ -2,12 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use super::{AnimationEvent, SyncMarker};
 
-/// Max nesting of trees, the node's own included; validation refuses deeper.
+/// Max nesting of trees, the node's own included; validation refuses deeper, and the runtime
+/// stops descending there.
 pub const MAX_TREE_DEPTH: usize = 8;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BlendTree {
-    /// Thresholds ascending; past either end the end child plays alone.
+    /// Thresholds may come in any order: the runtime brackets the value by threshold.
     Simple1D {
         parameter: String,
         children: Vec<BlendChild1D>,

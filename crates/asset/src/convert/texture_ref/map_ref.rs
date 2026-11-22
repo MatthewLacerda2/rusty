@@ -29,7 +29,7 @@ impl MapRef {
         super::file(&self.0)
     }
 
-    /// Test hook, compiled in every build: the root's `ui` tests read it.
+    /// Test hook, compiled in every build: `ui`'s size-reader tests read it.
     #[doc(hidden)]
     pub fn source(&self) -> Option<&str> {
         super::source(&self.0)

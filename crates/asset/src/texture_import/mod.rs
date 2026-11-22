@@ -1,8 +1,3 @@
-//! Unity's texture importer: fitted to its *Max Size*, then block-compressed.
-//!
-//! A texture drawn in a slot its type cannot serve (a BC5 normal as albedo loses blue) uploads
-//! uncompressed ([`fits`]).
-//!
 //! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`), and an extracted texture's `<glb>.bctex/<image>.bctex` (`location`)
 //!
 //! A normal map kept at 16 bits is never compressed: BC5's 8 bits, one step per 0.45°, would bake a
@@ -35,8 +30,7 @@ pub use shrink::{fit, fitted_size};
 use super::convert::{source_digest, Seen};
 use super::sidecar::{Compression, TextureSettings, TextureType};
 
-/// Bump whenever `encode` writes other blocks for the same input: it re-makes every cached
-/// texture.
+/// Bump when `encode`'s blocks change for one input: it re-makes every cached texture.
 pub const ENCODER_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -91,6 +85,8 @@ pub fn format_of(settings: &TextureSettings) -> Option<BlockFormat> {
     })
 }
 
+/// BC4 fits only a mask, whose red `forward::maps::map_factor` reads. `render`'s
+/// `compressed::reads_as` is this table by GPU format: change both.
 pub fn fits(texture_type: TextureType, kind: TextureKind) -> bool {
     match texture_type {
         TextureType::Default => true,
@@ -102,6 +98,7 @@ pub fn fits(texture_type: TextureType, kind: TextureKind) -> bool {
 pub struct Loaded {
     pub texels: Texels,
     pub source_size: (u32, u32),
+    /// A 16-bit normal map source, whatever this read's slot.
     pub deep_normal: bool,
 }
 
@@ -131,6 +128,8 @@ pub fn load(
         return Some(Loaded {
             texels: Texels::Blocks(blocks),
             source_size,
+            // No cache is current for a 16-bit normal map: `refresh` writes none, and an older
+            // one was stamped from other bytes or settings.
             deep_normal: false,
         });
     }
@@ -145,8 +144,6 @@ pub fn load(
     })
 }
 
-/// The Texture Type is the import's word on what the file holds: a 16-bit `Default` image in a
-/// normal slot reads at 8 bits.
 pub fn keeps_deep(settings: &TextureSettings, color: image::ColorType) -> bool {
     settings.texture_type == TextureType::NormalMap && is_deep(color)
 }
@@ -170,6 +167,7 @@ fn current(source: &Path, settings: &TextureSettings) -> Option<Compressed> {
     cache::read(&cache_file(source).ok()?, cache::stamp(digest, settings))
 }
 
+/// By extension first, as `image::open` does: a TGA has no signature.
 fn reader<R: BufRead + Seek>(source: &Path, read: R) -> image::ImageResult<ImageReader<R>> {
     match image::ImageFormat::from_path(source) {
         Ok(format) => Ok(ImageReader::with_format(read, format)),

@@ -1,11 +1,9 @@
-//! A cooked model as a binary glTF (`.glb`): one mesh per sub-mesh, one primitive each.
-//!
-//! `asset.extras` holds the cooker version and stamp; `extras.parse` the digest of the
-//! parse; `extras.source` (only when the unwrap ran) the parsed vertex each vertex
-//! copies; `extras.clusters` the range and bounds accessors. Floats are stored as
-//! little-endian bits. A file with another stamp or a misfit accessor is refused whole
-//! and the model cooked again. Empty sub-meshes write count-0 accessors, the one place
-//! the file leaves strict glTF.
+//! A cooked model as a binary glTF (`.glb`): one mesh per sub-mesh, in document order,
+//! one primitive each; `extras` holds the stamp, parse digest, source map and clusters.
+//! Floats are stored as their bits, so a read gives back exactly what the cook made. A
+//! file with another stamp or a misfit accessor is refused whole and the model cooked
+//! again. Empty sub-meshes write count-0 accessors, the one place the file leaves
+//! strict glTF.
 
 use std::ops::Range;
 use std::sync::Arc;

@@ -1,5 +1,5 @@
-//! Like Unity's `AssetDatabase.Refresh`. Play's own refresh compresses no
-//! texture, so a project the editor never opened draws uncompressed until this runs.
+//! Play's own refresh compresses no texture, so a project the editor never opened draws
+//! uncompressed until this runs.
 
 use std::path::{Path, PathBuf};
 

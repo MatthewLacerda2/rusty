@@ -6,12 +6,11 @@ use std::path::Path;
 pub struct Converter {
     pub extension: &'static str,
     pub name: &'static str,
-    /// Bump when the output changes, so every cached file re-makes (`fingerprint` holds it).
+    /// Bump when the output changes, so every cache re-makes (`fingerprint` holds it).
     pub version: u32,
-    /// The program's reported version (`5.0.1`), stamped so a different one
-    /// re-converts; `None` inside the engine. An `Err` (missing) keeps the cache.
+    /// The program's reported version (`5.0.1`), stamped so another re-converts;
+    /// `None` inside the engine. An `Err` (missing) keeps the cache.
     pub tool: Option<fn() -> Result<String, ImportError>>,
-    /// Only what is left out on purpose goes in [`Converted`]; any failure is an `Err`.
     /// A conversion whose stamp was lost meets its own textures folder again
     /// (`record::folder_tag`), so a written file's name must hold the same bytes
     /// whatever is on disk: name every embedded file before looking at the disk.

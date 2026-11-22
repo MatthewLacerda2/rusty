@@ -1,9 +1,3 @@
-//! A converter's output can't change without a bump of its [`Converter::version`]:
-//! unbumped, every cache made before stays current. Each fixture is converted twice
-//! into fresh folders, outside the cache, and must match byte for byte before it is
-//! hashed. The hashes are Linux's (another platform's maths may round a float
-//! differently), so the check runs on Linux only.
-
 pub(super) mod table;
 
 use super::{Converter, Staging};
@@ -72,6 +66,8 @@ fn deterministic(converter: &Converter, source: &Path, name: &str) -> u64 {
 fn convert(converter: &Converter, source: &Path, name: &str, run: &str) -> Vec<u8> {
     let dir = rusty_test_support::temp::dir().join(format!("{name}.{run}"));
     std::fs::create_dir_all(&dir).expect("a conversion folder");
+    // Outside the cache (no stamp, no tagged folder), `out` beside the fixture: an
+    // on-disk texture's URI is then the same on every machine.
     let to = Staging {
         glb: dir.join(format!("{name}.glb")),
         textures: dir.join(format!("{name}.textures")),

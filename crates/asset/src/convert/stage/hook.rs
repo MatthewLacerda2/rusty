@@ -2,8 +2,10 @@
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Step {
+    /// The staging folder exists; the converter has not run.
     Staged,
     TexturesIn,
+    /// The new `.glb` is in place, not yet stamped.
     GlbIn,
     Stamped,
     ReadSource,

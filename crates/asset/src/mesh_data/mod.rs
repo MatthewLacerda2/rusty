@@ -44,6 +44,7 @@ impl Default for MaterialData {
         Self {
             name: String::new(),
             base_color: [1.0, 1.0, 1.0, 1.0],
+            // glTF: no factors means fully metallic and rough.
             metallic: 1.0,
             roughness: 1.0,
             base_color_map: None,
@@ -62,7 +63,7 @@ impl Default for MaterialData {
     }
 }
 
-/// E.g. `crates.glb::Barrel`. `id` is the source mesh's name, else `mesh_<n>`.
+/// `id` is the source mesh's name, else `mesh_<n>`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SubMesh {
     pub id: String,
@@ -71,10 +72,10 @@ pub struct SubMesh {
     /// Index order, covering every index: Unity's sub-meshes.
     pub ranges: Vec<MaterialRange>,
     pub skin: Option<SkinData>,
-    /// Tracks are keyed by the `skin`'s joint slots.
     pub clips: Vec<AnimationClip>,
     /// The Blender *object* name (`id` is the mesh-data name).
     pub node_name: Option<String>,
+    /// Building them reorders `indices` (`clusters::apply`): the two go together.
     pub clusters: Option<std::sync::Arc<super::clusters::Clusters>>,
 }
 

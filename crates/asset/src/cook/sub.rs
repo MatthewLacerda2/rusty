@@ -1,5 +1,3 @@
-//! One sub-mesh's cooked values, and how they are laid back onto a fresh parse.
-//!
 //! Kept per sub-mesh: tangents, lightmap UVs, the cluster-ordered indices and cluster
 //! table, and (only when the unwrap split vertices) the parsed vertex each copies.
 //! Everything else is read from the parse. A cooked sub-mesh also keeps the [`digest`]
@@ -89,6 +87,8 @@ impl Cooked {
     }
 }
 
+/// Leaves out tangents: a cooked load parses with placeholders, and the stamp's file
+/// digest holds a source's own.
 pub fn digest(sub: &SubMesh) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     let mut buf: Vec<u8> = Vec::with_capacity(VERTEX * BATCH);

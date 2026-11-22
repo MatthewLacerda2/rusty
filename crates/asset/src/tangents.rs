@@ -1,6 +1,7 @@
 //! MikkTSpace tangents (`bevy_mikktspace`): the basis Blender and other bakers write normal maps
 //! in, and the one glTF tells a loader to generate; any other basis shows seams. Output is
 //! glTF-convention `[x, y, z, w]`, `w` (±1) the handedness so the bitangent is `w * cross(N, T)`.
+//! The crate's fixed sort seed makes the output a function of the mesh alone.
 
 use bevy_mikktspace::Geometry;
 use glam::Vec3;

@@ -1,5 +1,4 @@
-//! A compressed texture in the import cache (`.bctex`); a stale, unparseable or wrongly sized file
-//! is a miss, never an upload of the wrong length.
+//! A stale, unparseable or wrongly sized `.bctex` is a miss, never an upload of the wrong length.
 //!
 //! Layout, little-endian: `RBCT`, stamp (u64), format (u8, index in [`BlockFormat::ALL`]), width,
 //! height, level count (u32 each), [`VarianceTable`] (16 bytes), then per level its byte length
@@ -16,7 +15,8 @@ use rusty_core::hash::content;
 
 const MAGIC: &[u8; 4] = b"RBCT";
 
-/// Digest of the source bytes, the shaping settings (not wrap or filter) and the encoder's version.
+/// Digest of the source bytes, the shaping settings (not wrap or filter, which only the sampler
+/// reads) and the encoder's version.
 pub(super) fn stamp(source: u64, settings: &TextureSettings) -> u64 {
     let made_by = format!(
         "{source:016x} v{ENCODER_VERSION} {} {} {} {} {}",
@@ -129,7 +129,7 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     rusty_core::fs::write_atomic(path, &out)
 }
 
-/// Test hook: every block zero, nothing encoded.
+/// Test hook for `dev`'s memory tests: every block zero, nothing encoded.
 #[doc(hidden)]
 pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
     let Seen::Read(digest) = source_digest(source) else {
