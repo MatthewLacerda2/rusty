@@ -1,29 +1,14 @@
-//! crates/procgen/src/ops/sample.rs — `sample_at`'s math (#2002): read a map at the
-//! coordinates other maps give, filtered by each pixel's footprint.
-//!
-//! One bilinear tap per pixel aliases the moment a remap shrinks the map (a
-//! perspective ground toward its horizon): neighbouring output pixels land texels
-//! apart and skip what lies between. So the map is first reduced to a mip chain
-//! (each level half the last, its pixel the mean of the 2 × 2 it covers), and each
-//! output pixel reads the level whose texel matches its footprint, blended between
-//! the two nearest levels (trilinear). The footprint is how far the coordinates move
-//! to the pixel's neighbours, taken on each axis as the smaller of the step forward
-//! and back, so a seam in the coordinates (a `fract` wrapping from 1 to 0) does not
-//! read as one huge footprint and blur the pixels along it.
+//! The footprint is how far the coordinates move to the pixel's neighbours, per axis the smaller of the step forward and back, so a seam (a `fract` wrapping 1 to 0) does not read as one huge footprint.
 
 use super::super::image_buf::{Image, Rgba};
 
-/// Where the coordinates come from.
 #[derive(Clone, Copy)]
 pub enum Coords<'a> {
-    /// One map: red is `u`, green is `v` (what `coordinates` writes).
     Packed(&'a Image),
-    /// Two maps: the first's red is `u`, the second's red is `v`.
     Split(&'a Image, &'a Image),
 }
 
 impl Coords<'_> {
-    /// The coordinates at pixel `(x, y)`, wrapped.
     fn at(self, x: i64, y: i64) -> (f32, f32) {
         match self {
             Coords::Packed(uv) => {
@@ -35,8 +20,6 @@ impl Coords<'_> {
     }
 }
 
-/// `src` read at each pixel's coordinates, footprint-filtered through its mip chain.
-/// The output has the coordinates' extent; coordinates are in tile units and wrap.
 pub fn sample_at(src: &Image, coords: Coords) -> Image {
     let size = match coords {
         Coords::Packed(uv) => uv.size(),
@@ -63,8 +46,6 @@ pub fn sample_at(src: &Image, coords: Coords) -> Image {
     out
 }
 
-/// The mip level whose texel spans `texels` level-0 texels: `log2`, at least 0, and
-/// 0 for a footprint that is not a finite number.
 fn lod(texels: f32) -> f32 {
     let lod = texels.max(1.0).log2();
     if lod.is_finite() {
@@ -74,9 +55,6 @@ fn lod(texels: f32) -> f32 {
     }
 }
 
-/// The mip chain read at `(u, v)` and level `lod`, blended between the two levels
-/// around it; past the last level it reads the last. Level 0 is `src` itself,
-/// borrowed, and `below` the levels under it.
 fn trilinear(src: &Image, below: &[Image], u: f32, v: f32, lod: f32) -> Rgba {
     let level = |l: usize| if l == 0 { src } else { &below[l - 1] };
     let last = below.len();
@@ -90,8 +68,6 @@ fn trilinear(src: &Image, below: &[Image], u: f32, v: f32, lod: f32) -> Rgba {
     std::array::from_fn(|c| a[c] + (b[c] - a[c]) * t)
 }
 
-/// Each half-size reduction of `img` down to one texel, `img` itself left out (the
-/// caller reads it as level 0), so the chain costs a third of `img` more. A level's
 /// texel is the mean of the four bilinear taps at the texel centres of the 2 × 2 it
 /// covers: exactly their box mean on an even side, and a wrapped blend on an odd one.
 pub fn mips(img: &Image) -> Vec<Image> {

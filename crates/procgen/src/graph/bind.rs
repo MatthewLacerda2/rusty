@@ -1,8 +1,3 @@
-//! crates/procgen/src/graph/bind.rs — [`TextureRecipe`]'s serde (#1744): a node value
-//! written `{ param = "age" }` is read at the param's default and remembered as a
-//! [`Bound`], and written back as the placeholder, so a graph survives a parse and
-//! a save (`Texture.ToJson`) with its interface intact.
-//!
 //! Only a node's own top-level values bind: a whole param (a colour, an enum, a
 //! number, a seed), never part of one. An instance's `params` map keeps its
 //! placeholders as written: they are values for the graph it instances, filled in
@@ -20,7 +15,6 @@ use super::params::ParamDecl;
 use super::placeholder;
 use crate::recipe::{power_of_two_sides, Node, TextureRecipe};
 
-/// One node value that is a placeholder: node `node`'s `key` takes param `param`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Bound {
     pub node: String,
@@ -28,12 +22,8 @@ pub struct Bound {
     pub param: String,
 }
 
-/// The keys of a node that are its wiring, never a param value.
 const WIRING: [&str; 3] = ["id", "op", "inputs"];
 
-/// [`TextureRecipe`] as read, field for field: its nodes stay JSON until their
-/// placeholders are bound. Typed fields (not one `Value` for the whole recipe), so
-/// the scene format's tracer still sees every field a stored recipe holds.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Doc {
@@ -91,8 +81,6 @@ impl Serialize for TextureRecipe {
     }
 }
 
-/// Swap every placeholder among the `nodes`' values for its param's default, and
-/// return where each one was. A placeholder naming no declared param is refused.
 fn bind(nodes: &mut [Value], params: &BTreeMap<String, ParamDecl>) -> Result<Vec<Bound>, String> {
     let mut bound = Vec::new();
     for node in nodes.iter_mut().filter_map(Value::as_object_mut) {
@@ -106,8 +94,6 @@ fn bind(nodes: &mut [Value], params: &BTreeMap<String, ParamDecl>) -> Result<Vec
             .iter_mut()
             .filter(|(k, _)| !WIRING.contains(&k.as_str()))
         {
-            // An instance's `params` map holds values for its graph (placeholders
-            // among them, filled at expansion), never one placeholder itself.
             if instance && key == "params" {
                 continue;
             }
@@ -142,7 +128,6 @@ fn bind(nodes: &mut [Value], params: &BTreeMap<String, ParamDecl>) -> Result<Vec
     Ok(bound)
 }
 
-/// Write each of `bound`'s placeholders back into the serialized `doc`.
 fn unbind(doc: &mut Value, bound: &[Bound]) {
     let Some(nodes) = doc.get_mut("nodes").and_then(Value::as_array_mut) else {
         return;
@@ -159,7 +144,6 @@ fn unbind(doc: &mut Value, bound: &[Bound]) {
     }
 }
 
-/// Refuse an input name a reference can't tell apart from a node or an output.
 fn check_inputs(recipe: &TextureRecipe) -> Result<(), String> {
     for (i, name) in recipe.inputs.iter().enumerate() {
         if name.is_empty() || name.contains(['/', '.']) {

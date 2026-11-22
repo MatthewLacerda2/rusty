@@ -1,9 +1,3 @@
-//! crates/physics/src/watch/ops_tests.rs — the ops the incremental sync's equivalence
-//! proptest runs (#1707, `tests.rs`): the World's own shared edit sequence
-//! (`ecs::changes::ops`), the physics edits (`edit_tests.rs`), a collision
-//! matrix change and steps: `Time.timeScale` 0 among them, and a run long
-//! enough for bodies to fall asleep.
-
 use proptest::prelude::*;
 
 pub use super::edit_tests::Phys;
@@ -19,15 +13,10 @@ pub enum Op {
     On(usize, Phys),
     Matrix(u8, bool),
     Step,
-    /// A step at `Time.timeScale` 0: `dt` is 0.
     Pause,
-    /// [`SETTLE_STEPS`] steps: long enough for the fixture's bodies to land and
-    /// fall asleep, so later edits and hits find sleeping bodies.
     Settle,
 }
 
-/// The fixture's highest body lands in about 50 steps; rapier puts a body still
-/// for 0.5 s (30 steps) to sleep.
 pub const SETTLE_STEPS: usize = 90;
 
 pub fn op() -> impl Strategy<Value = Op> {
@@ -41,7 +30,6 @@ pub fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
-/// Apply `op` to `scene`; a step steps `physics`.
 pub fn apply(scene: &mut Scene, physics: &mut PhysicsWorld, op: &Op) {
     let (e, edit) = match op {
         Op::World(op) => return world_op(&mut scene.world, op),

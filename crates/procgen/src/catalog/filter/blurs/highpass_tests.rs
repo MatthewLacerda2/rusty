@@ -1,5 +1,3 @@
-//! `highpass` keeps detail around mid-grey, drops a flat level, and wraps.
-
 use super::*;
 use crate::catalog::filter::test_probe::{assert_wraps, mean, relief, run};
 use crate::recipe::OpKind;

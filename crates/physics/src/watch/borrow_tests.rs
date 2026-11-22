@@ -1,15 +1,6 @@
-//! crates/physics/src/watch/borrow_tests.rs — the cases where the two syncs borrowed
-//! different rapier bodies or colliders and so stepped apart (#1798): rapier marks
-//! whatever is borrowed mutably as modified, and that order is the order the next
-//! step meets new contact pairs in.
-
 use super::ops_tests::{Op, Phys, SETTLE_STEPS};
 use super::tests::{agree, Twin};
 
-/// The sequence that drifted (#1798): a body's Rigidbody re-set, two spawns, a
-/// collider on the second, a body disabled, then that collider re-parented under
-/// the re-set body, which then settles. Its precondition holds too: some step
-/// meets two new contact pairs at once, whose order the twins must agree on.
 #[test]
 fn a_collider_reparented_under_a_body_steps_alike() {
     use rusty_ecs::changes::ops::{Edit, Op as W};
@@ -46,9 +37,6 @@ fn a_collider_reparented_under_a_body_steps_alike() {
     assert!(most_new >= 2, "no step met two new contact pairs at once");
 }
 
-/// A disabled kinematic body that moved keeps its old `position` (rapier copies
-/// `next_position` only for an active body): neither sync may borrow it for that
-/// on later steps, and re-enabled it steps alike again.
 #[test]
 fn a_disabled_kinematic_body_that_moved_steps_alike() {
     use rusty_ecs::changes::ops::{Edit, Op as W};

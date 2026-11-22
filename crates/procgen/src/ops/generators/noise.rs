@@ -1,25 +1,10 @@
-//! Gradient noise: one tiling Perlin octave and the fBM family built from it (#406).
-//!
-//! Every octave's lattice period is a whole count ([`count`]), so `lacunarity` may be
-//! fractional without opening a seam: octave `o` runs at `count(scale × lacunarity^o)`.
-//! With the defaults (`lacunarity = 2`, `gain = 0.5`) that is exactly the doubling
-//! fBM rusty always baked, so older recipes bake byte-identically.
-//!
-//! `distortion` (Blender's Noise Texture *Distortion*) is a domain warp built in:
-//! the point is pushed by two more tiling Perlin octaves at the base lattice, up to
-//! about `distortion` lattice cells, before the noise is read. Both the push and the
-//! noise repeat every tile, so the warped field still tiles; 0 skips the warp, so a
-//! recipe that doesn't set it bakes as before.
-
 use super::{count, finite, gray, Sampler};
 use crate::hash;
 use crate::ops::field::Field;
 use crate::recipe::NoiseKind;
 
-/// 2-D Perlin with unit gradients peaks at `√½`; this maps `|n|` onto `[0, 1]`.
 const UNIT: f32 = std::f32::consts::SQRT_2;
 
-/// How the fBM family stacks octaves.
 #[derive(Clone, Copy, Debug)]
 pub struct Octaves {
     count: u32,
@@ -28,8 +13,6 @@ pub struct Octaves {
 }
 
 impl Octaves {
-    /// At least one octave; a negative `gain` would cancel octaves out, so it floors
-    /// at 0 (a single octave's worth of detail).
     pub fn new(count: u32, lacunarity: f32, gain: f32) -> Self {
         Self {
             count: count.max(1),
@@ -39,18 +22,10 @@ impl Octaves {
     }
 }
 
-/// The largest `distortion`, in lattice cells, either way: past a few cells the
-/// warp is already white noise, and the cap keeps an infinite one finite.
 pub const MAX_DISTORTION: f32 = 1000.0;
 
-/// The seed salts of the warp's two push octaves, apart from every fBM octave's.
 const WARP_SALT: [u64; 2] = [0x5bd1_e995, 0x27d4_eb2f];
 
-/// The sampler for a [`NoiseKind`] at `scale` lattice cells per tile across and down
-/// (each rounded on its own, so a non-square map can extend the pattern), its octaves
-/// `(count, lacunarity, gain)`, the gain read at each pixel (#1494), and its
-/// `distortion` in lattice cells (NaN reads 0, the rest is capped at
-/// [`MAX_DISTORTION`]). `perlin` is a single octave whatever `octaves` says.
 pub fn sampler(
     kind: NoiseKind,
     scale: [f32; 2],
@@ -62,13 +37,10 @@ pub fn sampler(
     let push = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION);
     let warp = base.map(|b| push / b);
     Box::new(move |u, v| {
-        // The gain is read at the pixel, before the warp: a warped read would leave
-        // the tile and clamp, opening a seam a tiling link doesn't have.
         let gain = gain.at_pixel(u, v);
         let (u, v) = if push == 0.0 {
             (u, v)
         } else {
-            // `w × n × UNIT`, in that order: the bytes a square warp always baked.
             let push = |w: f32, salt: u64| w * perlin_tiling(u, v, base, seed ^ salt) * UNIT;
             (
                 u + push(warp[0], WARP_SALT[0]),
@@ -90,8 +62,6 @@ pub fn sampler(
     })
 }
 
-/// Sum `octaves` Perlin octaves, each passed through `shape`, normalized by the total
-/// amplitude. Octave 0's seed is the recipe seed unchanged.
 fn sum(u: f32, v: f32, base: [f32; 2], oct: Octaves, seed: u64, shape: impl Fn(f32) -> f32) -> f32 {
     let (mut total, mut amp, mut freq, mut norm) = (0.0, 1.0, 1.0, 0.0);
     for o in 0..oct.count {
@@ -110,8 +80,6 @@ fn sum(u: f32, v: f32, base: [f32; 2], oct: Octaves, seed: u64, shape: impl Fn(f
     total / norm
 }
 
-/// `octaves` doubling fBM octaves of signed Perlin at `period` cells per tile, about
-/// `[-1, 1]`: the noise `wave`'s `distortion` pushes its phase by.
 pub(super) fn signed_fbm(u: f32, v: f32, period: f32, octaves: u32, seed: u64) -> f32 {
     sum(
         u,
@@ -123,9 +91,6 @@ pub(super) fn signed_fbm(u: f32, v: f32, period: f32, octaves: u32, seed: u64) -
     ) * UNIT
 }
 
-/// A single octave of tiling gradient (Perlin) noise in `[-1, 1]`. `period` is a
-/// whole number per axis; the integer lattice is taken modulo it so the field is
-/// periodic.
 fn perlin_tiling(u: f32, v: f32, period: [f32; 2], seed: u64) -> f32 {
     let (x, y) = (u * period[0], v * period[1]);
     let (x0, y0) = (x.floor() as i64, y.floor() as i64);

@@ -1,9 +1,9 @@
 //! The separable blur against a naive reference, its handling of bad pixels, and
-//! the Gaussian's shape and pass widths (#1490, #1492).
+//! the Gaussian's shape and pass widths.
 
 use super::*;
 
-/// Today's blur before #1490: every pixel re-sums its whole wrapped window.
+/// The naive blur: every pixel re-sums its whole wrapped window.
 fn naive_blur(img: &Image, r: i64) -> Image {
     let res = img.width() as i64;
     let inv = 1.0 / (2 * r + 1) as f32;
@@ -30,7 +30,6 @@ fn sliding_blur_matches_the_naive_reference() {
         let h = (u * 91.7 + v * 13.3).sin() * (v * 47.1).cos();
         [h, u * v, 1.0 - u, h * h]
     });
-    // Small, mid, exactly half the tile, and past it (the window wraps twice).
     for r in [1, 3, 8, 16, 40] {
         let (fast, slow) = (
             blur(&img, (r as f32, r as f32), BlurKind::Box),
@@ -52,14 +51,12 @@ fn a_flat_image_blurs_to_itself_exactly() {
     }
 }
 
-/// A 32² mid-grey image with one `bad` pixel at (10, 20), blurred at radius 2.
 fn blur_around(bad: f32) -> Image {
     let mut img = Image::filled(32, [0.5; 4]);
     img.pixels_mut()[20 * 32 + 10] = [bad; 4];
     blur(&img, (2.0, 2.0), BlurKind::Box)
 }
 
-/// Whether `(x, y)` lies in the (2r+1)² window around (10, 20), r = 2.
 fn near(x: usize, y: usize) -> bool {
     x.abs_diff(10) <= 2 && y.abs_diff(20) <= 2
 }
@@ -101,8 +98,6 @@ fn a_gaussian_spreads_a_bright_pixel_symmetrically_within_its_radius() {
         assert!((on - off).abs() < 0.05 * peak, "{a:?} {on} vs {b:?} {off}");
     }
     assert_eq!(at(13, 0), 0.0, "reaches no further than its radius");
-    // Its spread along an axis is σ² = (12 / 3)² = 16. The image is the 1-D
-    // kernel g times itself, so a row through the centre is g(dx)·g(0).
     let row = (-32..32).map(|dx| (dx * dx) as f32 * at(dx, 0));
     let var = row.sum::<f32>() / peak.sqrt();
     assert!((var - 16.0).abs() < 2.0, "σ² = {var}");
@@ -119,9 +114,6 @@ fn a_gaussian_mixes_two_box_widths_and_a_box_rounds() {
     assert!(passes(0.0, BlurKind::Gaussian).is_empty());
 }
 
-/// Under ≈ 2.45 px three boxes can't match the variance (every width is 1 below
-/// ≈ 1.7 px, a no-op), so one 3-tap pass matches it exactly; at the switch it is
-/// the radius-1 box Kovesi's widths give there.
 #[test]
 fn a_narrow_gaussian_is_one_exact_three_tap_pass() {
     assert_eq!(passes(1.5, BlurKind::Gaussian), [Pass::Taps(0.125)]);
@@ -137,7 +129,6 @@ fn a_narrow_gaussian_is_one_exact_three_tap_pass() {
     let mut img = Image::filled(16, [0.0; 4]);
     img.pixels_mut()[8 * 16 + 8] = [1.0; 4];
     let out = blur(&img, (1.5, 1.5), BlurKind::Gaussian);
-    // A row through the centre is g(dx)·g(0), so its σ² is the kernel's.
     let row: Vec<(f32, f32)> = (-8..8)
         .map(|dx| ((dx * dx) as f32, out.get_wrapped(8 + dx, 8)[0]))
         .collect();

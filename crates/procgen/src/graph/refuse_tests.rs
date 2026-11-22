@@ -1,12 +1,8 @@
-//! Tests for what an instance refuses (#1744), each error naming what is wrong,
-//! and the parse refusals.
-
 use serde_json::{json, Value};
 
 use super::tests::{graphs, recipe, wear};
 use super::*;
 
-/// A one-node recipe instancing `path` with `params` and `inputs`.
 pub(super) fn instancing(path: &str, params: Value, inputs: &[&str]) -> Value {
     let mut nodes = vec![json!({ "id": "base", "op": "white_noise" })];
     nodes.push(
@@ -24,7 +20,6 @@ fn wear_err(params: Value, inputs: &[&str]) -> String {
     expand_err(doc, &[("wear.graph.json", wear())])
 }
 
-/// Instancing `graph` as `wear.graph.json`, wired to `base`.
 fn wear_err_in(params: Value, graph: Value) -> String {
     let doc = instancing("wear.graph.json", params, &["base"]);
     expand_err(doc, &[("wear.graph.json", graph)])

@@ -9,7 +9,6 @@ fn op(scale: f32, anisotropy: f32, angle: f32) -> AnisotropicNoise {
     }
 }
 
-/// Mean absolute change of the sampler over a small step along `(du, dv)`.
 fn roughness(f: &Sampler, (du, dv): (f32, f32)) -> f32 {
     let n = 64;
     let mut acc = 0.0;
@@ -73,9 +72,6 @@ fn the_snap_lands_within_its_documented_error() {
 
 #[test]
 fn it_repeats_once_per_tile_not_once_per_step() {
-    // At (2, 1) the rotated coordinates both move by whole units under a shift of
-    // (0.4, 0.2): a lattice wrapping per unit of them would repeat there, 5 times a
-    // tile. Reduced by the tile's own periods, it doesn't.
     assert_eq!(snap(0.07, 30.0), (2, 1));
     let f = sampler(&op(30.0, 1.0, 0.07), 4);
     let same = (0..200)

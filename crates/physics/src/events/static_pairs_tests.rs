@@ -1,8 +1,3 @@
-//! crates/physics/src/events/static_pairs_tests.rs — two static colliders never pair
-//! (#1779): a wall standing on a floor keeps no contact and raises no event, a
-//! static trigger ignores the static wall it overlaps but not a mover, and a body
-//! made dynamic in Play pairs again. Kinematic pairs: `kinematic_pairs_tests`.
-
 use glam::Vec3;
 
 use crate::PhysicsWorld;

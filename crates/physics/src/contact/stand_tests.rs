@@ -1,9 +1,3 @@
-//! crates/physics/src/contact/stand_tests.rs — a cylinder stood on its cap stays put,
-//! and a rolling one comes to rest (#2071).
-//!
-//! The side of a cylinder rolls as a hull (`contact::side`); its cap is still the
-//! true cylinder, so an upright one stands flat on any floor.
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{body, floor, floor_speed, run, Floor};
@@ -31,7 +25,7 @@ fn an_upright_cylinder_stands_flat_on_its_cap() {
             let up = (t.rotation * Vec3::Y).y;
             let label = format!("r {radius} h {height} on {ground:?}");
             assert!(up > 0.9999, "{label} tipped: up {up}");
-            // A tall thin one settles with a wobble of a centimetre a second, as before #2071.
+            // A tall thin one settles with a wobble of a centimetre a second.
             let drift = Vec3::new(t.position.x, 0.0, t.position.z).length();
             assert!(drift < 0.01, "{label} wandered {drift} m");
             assert!(floor_speed(&scene, id) < 1e-3, "{label} never settled");

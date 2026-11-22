@@ -23,7 +23,6 @@ fn reach(wire: &ColliderWire, centre: Vec3) -> (f32, f32) {
     (up, out)
 }
 
-/// A box draws its twelve edges at its pose, not a bigger axis-aligned box.
 #[test]
 fn a_box_is_twelve_edges_where_it_stands() {
     let size = Vec3::new(2.0, 1.0, 4.0);
@@ -39,8 +38,6 @@ fn a_box_is_twelve_edges_where_it_stands() {
     }
 }
 
-/// A capsule is its real shape: it reaches its full height over its caps, and no
-/// point of it sits outside its radius from its axis.
 #[test]
 fn a_capsule_reaches_its_caps_and_stays_round() {
     let shape = ColliderShape::Capsule {
@@ -60,7 +57,6 @@ fn a_capsule_reaches_its_caps_and_stays_round() {
     }
 }
 
-/// Every primitive closes its circles: each segment's end is another's start.
 #[test]
 fn spheres_and_cylinders_are_closed_outlines() {
     for shape in [
@@ -80,7 +76,6 @@ fn spheres_and_cylinders_are_closed_outlines() {
     }
 }
 
-/// No collider, no wire; an inactive one neither.
 #[test]
 fn no_active_collider_draws_nothing() {
     let mut scene = Scene::new();

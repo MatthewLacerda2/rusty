@@ -1,7 +1,3 @@
-//! The periodicity property behind "seamless by construction" (#392), tested on the
-//! samplers themselves: a lattice generator's value at `(u, v)` equals its value one
-//! whole tile away, for fractional params too (they round to whole counts).
-
 use super::*;
 use crate::ops::field::Links;
 use crate::recipe::VoronoiMetric::*;
@@ -10,7 +6,6 @@ use crate::recipe::{
 };
 use lattice::{distorted_ops, hard_surface_ops};
 
-/// The sampler [`super::super::eval_node`] paints for the generator `op`.
 fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler<'_> {
     let f = |p: &crate::recipe::Param| Links::default().field(p);
     match op {
@@ -28,7 +23,6 @@ fn sampler(op: &OpKind, resolution: u32, seed: u64) -> Sampler<'_> {
     }
 }
 
-/// A spread of sample points, deterministic and off every lattice line.
 fn points() -> impl Iterator<Item = (f32, f32)> {
     (0..97).map(|i| {
         (
@@ -42,7 +36,6 @@ fn close(a: Rgba, b: Rgba) -> bool {
     (0..4).all(|c| (a[c] - b[c]).abs() < 2e-3)
 }
 
-/// The noise family at `s`, its lacunarity and aspect fractional too.
 fn noise_ops(s: f32) -> Vec<OpKind> {
     let kinds = [
         NoiseKind::Perlin,
@@ -66,7 +59,6 @@ fn noise_ops(s: f32) -> Vec<OpKind> {
         .to_vec()
 }
 
-/// Every generator whose pattern is a whole-tile lattice, over fractional params.
 fn lattice_ops() -> Vec<OpKind> {
     let mut ops = vec![OpKind::WhiteNoise(WhiteNoise::default())];
     for s in [0.4, 1.0, 2.5, 4.5, 5.5, 7.3] {
@@ -152,7 +144,6 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
     assert_eq!(count(4.5), 5.0);
     assert_eq!(count(4.4), 4.0);
     assert_eq!(count(0.2), 1.0);
-    // An odd checker rounds up to even: 3 tiles paint as 4.
     let k = sampler(
         &OpKind::Checker(Checker {
             tiles: 3,
@@ -163,7 +154,6 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
         0,
     );
     assert_eq!(k(0.3, 0.1)[0], 1.0, "u = 0.3 is square 1 of 4, not 0 of 3");
-    // 3 rows round to 4, so the half-brick offset alternation closes at the wrap.
     let f = sampler(
         &OpKind::Brick(Brick {
             rows: 3.0,
@@ -175,7 +165,6 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
         64,
         0,
     );
-    // v = 0.3 is row 1 of 4 (odd, offset half a brick); with 3 rows it'd be row 0.
     assert_eq!(f(0.5, 0.3)[0], 1.0);
     assert_eq!(f(0.76, 0.2)[0], 1.0, "row 0 is not offset");
     assert_eq!(f(0.76, 0.3)[0], 0.0, "row 1 is offset half a brick");
@@ -212,9 +201,7 @@ fn voronoi_randomness_zero_is_a_regular_grid() {
 fn voronoi_edges_are_dark_on_cell_borders_and_bright_at_centres() {
     let edges = grid_voronoi(VoronoiOutput::Edges);
     let f2 = grid_voronoi(VoronoiOutput::F2);
-    // u = 0.25 is equidistant from the centres at 0.125 and 0.375: F1 = F2.
     assert!(edges(0.25, 0.125)[0] < 1e-5);
-    // At a centre F1 = 0 and the nearest other point is one cell away.
     assert!((f2(0.125, 0.125)[0] - 1.0).abs() < 1e-5);
     assert!((edges(0.125, 0.125)[0] - 1.0).abs() < 1e-5);
 }

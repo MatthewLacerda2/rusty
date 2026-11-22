@@ -1,6 +1,3 @@
-//! #1740's review cases: a count past any bake, a linked gain under a warp, an
-//! elongated dome, and fibres on an axis.
-
 use super::super::*;
 use crate::catalog::generators::shape::ShapeProfile;
 use crate::catalog::generators::wave::WaveProfile;
@@ -64,8 +61,6 @@ fn a_huge_or_malformed_count_is_capped_not_a_panic() {
 
 #[test]
 fn a_linked_gain_under_distortion_has_no_seam() {
-    // Red 0 on the two edge columns and 1 between: the same at both sides of the
-    // wrap, but a read pushed past an edge clamps onto a different column.
     let img = Image::fill_uv(64, |u, _| {
         let edge = !(1.0 / 64.0..63.0 / 64.0).contains(&u);
         [if edge { 0.0 } else { 1.0 }, 0.0, 0.0, 1.0]
@@ -120,7 +115,6 @@ fn fibres_on_an_axis_vary_along_their_length() {
                 seed: 0,
             };
             let f = anisotropic::sampler(&op, 2);
-            // Along the fibre is along `u` at angle 0, along `v` at 0.25.
             let along = |s: f32| {
                 if angle == 0.0 {
                     f(s, 0.3)[0]

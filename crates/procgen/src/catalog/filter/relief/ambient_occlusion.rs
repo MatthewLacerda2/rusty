@@ -1,26 +1,9 @@
-//! The `ambient_occlusion` op: occlusion from a height map by horizon search
-//! (Substance Designer's *Ambient Occlusion (HBAO)*, #1743).
-//!
-//! `cavity` darkens only what sits below a blur of itself: a narrow crevice. A
-//! horizon search also darkens the foot of a tall shape and the floor of a wide
-//! groove, because it asks how much sky each pixel sees. From every pixel it walks
-//! `quality` directions, [`STEPS`] samples each out to `radius`, and keeps the
-//! steepest rise it meets; the sky a direction loses is that horizon angle's sine.
-//! The directions and samples are fixed (no jitter), so the cost is
-//! `pixels × quality × STEPS` bilinear reads and a recipe bakes byte-identically.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::recipe::{op, opt, req, Lit, OpInfo, ONE};
 
-/// Height (red) → occlusion: white where a pixel sees the whole sky, darker the
-/// more of it the relief within `radius` (tiles) hides. `depth` is how tall white
-/// stands, in tiles; `quality` is how many directions are searched (1 to
-/// 64). Reads the input's red; writes grey with alpha 1. `radius` caps at half a
-/// tile. Wraps, so it tiles; samples land in tile units, so it looks the same at
-/// any resolution.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AmbientOcclusion {
     pub radius: f32,
@@ -43,9 +26,7 @@ impl Row for AmbientOcclusion {
     );
 }
 
-/// Samples along each direction, evenly out to the radius.
 const STEPS: u32 = 16;
-/// The most directions a node searches: bounds its cost.
 const MAX_QUALITY: u32 = 64;
 const DEPTH: f32 = 0.1;
 const QUALITY: u32 = 8;
@@ -56,10 +37,6 @@ impl Op for AmbientOcclusion {
     }
 }
 
-/// The occlusion of `img`'s red as a height `depth` tiles tall at 1, searched
-/// `radius` tiles out in `quality` directions. A radius or depth of 0 or less
-/// (or NaN) sees the whole sky: white. The radius caps at half a tile, as
-/// `blur`'s does: past it the search only wraps onto what it has read.
 pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
     if !(radius > 0.0 && depth > 0.0) {
         return Image::filled(img.size(), [1.0; 4]);
@@ -93,9 +70,6 @@ pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
     })
 }
 
-/// The input's red alone, sampled as [`Image::sample_bilinear_wrapped`] samples:
-/// the search reads it `quality × STEPS` times a pixel, and a quarter of the bytes
-/// keeps more of the reach in cache (about a quarter faster at 2048²).
 struct Heights {
     w: i64,
     h: i64,
@@ -113,7 +87,6 @@ impl Heights {
         self.red[(y.rem_euclid(self.h) * self.w + x.rem_euclid(self.w)) as usize]
     }
 
-    /// Bilinear between the four nearest pixel centres, wrapped.
     fn sample(&self, u: f32, v: f32) -> f32 {
         let (x, y) = (u * self.w as f32 - 0.5, v * self.h as f32 - 0.5);
         let (x0, y0) = (x.floor(), y.floor());

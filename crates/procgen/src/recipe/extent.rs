@@ -1,18 +1,11 @@
-//! crates/procgen/src/recipe/extent.rs — a recipe's pixel extent (#1493): the square
-//! `resolution` shorthand, or `size = [w, h]` for a non-square bake.
-//!
-//! The recipe's domain is the unit square in relative units whatever the extent
-//! (see [`crate::image_buf`]): a `[2048, 512]` trim sheet samples the same
-//! tile as a square bake with four times the pixels across, so its pattern
-//! stretches, and an author who wants square bricks on it sets `cols = 4 × rows`.
-//! Every periodic count stays whole, so the bake still tiles on both axes.
-
+//! The domain is the unit square whatever the extent: a `[2048, 512]` sheet samples the
+//! same tile as a square bake, so its pattern stretches (`cols = 4 × rows` for square bricks).
+//! Every periodic count stays whole, so the bake still tiles.
 use serde::{Deserialize, Deserializer};
 
 use super::TextureRecipe;
 use crate::image_buf::Size;
 
-/// Parse `size = [w, h]`, refusing a side that is not a positive power of two.
 pub(crate) fn power_of_two_sides<'de, D: Deserializer<'de>>(
     d: D,
 ) -> Result<Option<[u32; 2]>, D::Error> {
@@ -26,7 +19,6 @@ pub(crate) fn power_of_two_sides<'de, D: Deserializer<'de>>(
 }
 
 impl TextureRecipe {
-    /// The extent the recipe bakes at: `size` when set, else `resolution` squared.
     pub fn extent(&self) -> Size {
         match self.size {
             Some([w, h]) => Size::new(w, h),
@@ -34,12 +26,9 @@ impl TextureRecipe {
         }
     }
 
-    /// Bake at `resolution` from now on. A square recipe takes it as its side. A
-    /// `size` recipe keeps its aspect (#1493): both sides scale by one power of two
-    /// so the longer one equals `resolution`, `[2048, 512]` at 256 becoming
-    /// `[256, 64]`. That needs `resolution` to be a power of two and leaves the
-    /// shorter side at least one pixel; anything else is refused and the recipe is
-    /// unchanged.
+    /// Bake at `resolution`. A `size` recipe keeps its aspect: both sides scale by one
+    /// power of two so the longer equals `resolution`. Refused, recipe unchanged, if
+    /// `resolution` is not a power of two or the shorter side would fall below one pixel.
     pub fn set_resolution(&mut self, resolution: u32) -> Result<(), String> {
         let Some([w, h]) = self.size else {
             self.resolution = resolution;

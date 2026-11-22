@@ -30,7 +30,6 @@ fn each_kind_covers_its_centre_and_not_its_outside() {
 
 #[test]
 fn corners_tell_rect_rounded_rect_and_circle_apart() {
-    // Just inside the corner of a 0.6-square.
     let (u, v) = (0.79, 0.79);
     assert_eq!(at(ShapeKind::Rect, [0.6, 0.6], 0.0, u, v), 1.0);
     assert_eq!(at(ShapeKind::RoundedRect, [0.6, 0.6], 0.0, u, v), 0.0);
@@ -40,7 +39,6 @@ fn corners_tell_rect_rounded_rect_and_circle_apart() {
 
 #[test]
 fn softness_ramps_inward_from_the_edge() {
-    // Circle of radius 0.3: 0.05 inside the edge, with a 0.1 ramp, reads 0.5.
     let mid = at(ShapeKind::Circle, [0.6, 0.6], 0.1, 0.75, 0.5);
     assert!((mid - 0.5).abs() < 1e-4, "{mid}");
     assert_eq!(at(ShapeKind::Circle, [0.6, 0.6], 0.1, 0.5, 0.5), 1.0);
@@ -49,8 +47,6 @@ fn softness_ramps_inward_from_the_edge() {
 
 #[test]
 fn a_polygon_has_its_vertex_up_and_its_edge_down() {
-    // A triangle of circumradius 0.4: its top vertex at v = 0.1, its bottom edge at
-    // the apothem, 0.2 below the centre (v = 0.7).
     let mut tri = op(ShapeKind::Polygon, [0.8, 0.8], 0.0);
     tri.sides = 3;
     let f = sampler(&tri, Field::Const(0.0));
@@ -62,8 +58,6 @@ fn a_polygon_has_its_vertex_up_and_its_edge_down() {
 
 #[test]
 fn a_star_is_hollow_between_its_points() {
-    // Five points of radius 0.4, inner radius 0.2: a point straight up, and the gap
-    // between two points (36° off it) dips to 0.2 from the centre.
     let star = op(ShapeKind::Star, [0.8, 0.8], 0.0);
     let f = sampler(&star, Field::Const(0.0));
     let along = |deg: f32, r: f32| {
@@ -77,7 +71,6 @@ fn a_star_is_hollow_between_its_points() {
 
 #[test]
 fn profiles_read_the_circles_textbook_heights() {
-    // A circle of radius 0.4, read halfway out (r/R = 0.5).
     for (profile, want) in [
         (ShapeProfile::Cone, 0.5),
         (ShapeProfile::Paraboloid, 0.75),

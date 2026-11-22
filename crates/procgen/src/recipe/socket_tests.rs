@@ -1,5 +1,4 @@
-//! The `socket` flag (#1494) held to the parser and to [`OpKind::sockets`].
-
+//! The `socket` flag held to the parser and to [`OpKind::sockets`].
 use serde_json::{json, Value};
 
 use super::*;

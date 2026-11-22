@@ -1,28 +1,15 @@
-//! Bands and rings (#392) with Blender's Wave Texture profiles and distortion
-//! (#1740). The phase is in cycles, `frequency` whole ones across the tile, so every
-//! profile closes at the wrap; the distortion is a tiling fBM, so it does too.
-
 use std::f32::consts::TAU;
 
 use super::{count, finite, gray, noise, Sampler};
 use crate::catalog::generators::wave::WaveProfile;
 use crate::recipe::WaveKind;
 
-/// The largest `distortion`, in radians either way: far past the point where the
-/// bands are lost in noise, and finite.
 pub const MAX_DISTORTION: f32 = 1000.0;
 
-/// The distortion noise's seed salt, so it is not the `noise` op's field at the
-/// same seed and lattice.
 const DISTORTION_SALT: u64 = 0x85eb_ca6b;
 
-/// The most `detail` reads: Blender's Wave Texture caps it at 15 too.
 pub const MAX_DETAIL: u32 = 15;
 
-/// The wave sampler: `frequency` cycles of `profile` across the tile, as bands
-/// (along `u`) or rings (from the centre), the phase pushed by `distortion` radians
-/// of an fBM with `detail + 1` octaves at the wave's own lattice. NaN distortion
-/// reads 0 and 0 skips the noise, so a plain sine bakes as it always did.
 pub fn sampler(
     kind: WaveKind,
     frequency: f32,
@@ -44,8 +31,6 @@ pub fn sampler(
     })
 }
 
-/// One cycle of `profile` at `phase` (in cycles), in `[0, 1]`. The three agree at
-/// whole cycles (0.5, rising) and peak together a quarter in.
 fn shape(profile: WaveProfile, phase: f32) -> f32 {
     match profile {
         WaveProfile::Sine => 0.5 + 0.5 * (phase * TAU).sin(),

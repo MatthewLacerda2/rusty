@@ -1,9 +1,3 @@
-//! The kept bone list against the walk (#2345): over random edits to a rig with
-//! hitboxes (`edit_ops`), made before the step or after it, after every tick the
-//! kept list equals a fresh walk, a twin that walks every tick
-//! (`Tracked::always_walk`) holds bit-identical colliders, and every bone-hung
-//! collider sits at its entity's world pose.
-
 use proptest::prelude::*;
 
 use super::cost_tests::{rig, DT};
@@ -14,8 +8,6 @@ use crate::convert::to_pose;
 use crate::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// The kept list is the walk's, the twin's colliders are this one's to the bit,
-/// and every hung collider that is no body's own sits at its world pose.
 fn check(scene: &Scene, kept: &PhysicsWorld, walking: &PhysicsWorld) -> Result<(), TestCaseError> {
     let ids = kept.tracked.follow.as_ref().unwrap().ids();
     let walk = walked(scene, &kept.id_to_collider);
@@ -60,7 +52,6 @@ proptest! {
         let mut kept = PhysicsWorld::from_scene(&scenes[0]);
         let mut walking = PhysicsWorld::from_scene(&scenes[1]);
         walking.tracked.always_walk = true;
-        // A late edit lands after the step, as a `LateUpdate` script's does.
         for (op, late) in &ops {
             let [a, b] = &mut scenes;
             for (physics, scene) in [(&mut kept, a), (&mut walking, b)] {

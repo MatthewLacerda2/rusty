@@ -40,8 +40,6 @@ impl Op for Math {
         math::math(cx.own(), cx.optional(1), self.func, self.value)
     }
 
-    /// A unary func (`abs`, `fract`, `sqrt`, `sin`, `cos`) has no right-hand side to read a
-    /// second input into.
     fn arity(&self) -> Option<Arity> {
         self.func.is_unary().then_some(ONE)
     }

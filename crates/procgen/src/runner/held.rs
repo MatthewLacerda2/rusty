@@ -1,8 +1,4 @@
-//! What the runner keeps between nodes (#2002): each image waiting for its
-//! consumers, held as one channel when it is grayscale, and the lazily decoded
-//! files the `image` nodes still to run will read.
-//!
-//! Both change memory, never bytes. A grayscale image (every pixel's R, G and B the
+//! Packing and lazy loading change memory, never bytes. A grayscale image (every pixel's R, G and B the
 //! same bits, alpha exactly 1) is stored as its red channel, a quarter of the RGBA
 //! f32 buffer, and written back out bit for bit when a consumer reads it. A file a
 //! loader decodes is kept only from the first `image` node that reads it to the
@@ -15,15 +11,12 @@ use crate::recipe::{Fault, NodeError, OpKind, TextureRecipe};
 use crate::source::Sources;
 use rusty_core::collections::Map;
 
-/// One node's image while it waits for its consumers.
 pub(super) enum Held {
     Rgba(Image),
-    /// A grayscale image as its red channel.
     Gray(Size, Vec<f32>),
 }
 
 impl Held {
-    /// `img` packed to one channel when that loses no bit, else as it is.
     pub fn pack(img: Image) -> Held {
         let one = 1.0f32.to_bits();
         let gray = img.pixels().iter().all(|p| {
@@ -36,7 +29,6 @@ impl Held {
         Held::Gray(img.size(), img.pixels().iter().map(|p| p[0]).collect())
     }
 
-    /// The image, borrowed when held whole, rebuilt when held as one channel.
     pub fn view(&self) -> Cow<'_, Image> {
         match self {
             Held::Rgba(img) => Cow::Borrowed(img),
@@ -44,7 +36,6 @@ impl Held {
         }
     }
 
-    /// The bytes it holds.
     pub fn bytes(&self) -> usize {
         match self {
             Held::Rgba(img) => super::slots::image_bytes(img),
@@ -52,7 +43,6 @@ impl Held {
         }
     }
 
-    /// The image, rebuilt when held as one channel.
     pub fn into_image(self) -> Image {
         match self {
             Held::Rgba(img) => img,
@@ -67,15 +57,12 @@ fn gray_image(size: Size, red: &[f32]) -> Image {
     img
 }
 
-/// The files a loader decoded that `image` nodes still to run will read.
 pub(super) struct Resident {
     files: Sources,
-    /// How many planned `image` nodes still read each lazily loaded path.
     readers: Map<String, usize>,
 }
 
 impl Resident {
-    /// Count the readers in `order` of each path `sources` leaves to its loader.
     pub fn new(recipe: &TextureRecipe, order: &[usize], sources: &Sources) -> Self {
         let mut readers: Map<String, usize> = Map::default();
         for &i in order {
@@ -91,8 +78,6 @@ impl Resident {
         }
     }
 
-    /// The sources node `i` runs with: the caller's, or for a lazily loaded file,
-    /// the one decoded here (decoding it on its first reader).
     pub fn for_node<'s>(
         &'s mut self,
         recipe: &TextureRecipe,
@@ -120,7 +105,6 @@ impl Resident {
         Ok(&self.files)
     }
 
-    /// Node `i` has run: drop its file if no reader is left.
     pub fn done(&mut self, recipe: &TextureRecipe, i: usize) {
         let OpKind::Image(p) = &recipe.nodes[i].op else {
             return;

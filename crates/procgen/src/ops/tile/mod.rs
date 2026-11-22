@@ -1,23 +1,3 @@
-//! The `tile` op (#407): stamp the input once per cell of a whole-count grid,
-//! each cell nudged, turned and scaled by values hashed from its wrapped index and
-//! the recipe seed. Rivets are `shape circle` → `tile`. A linked jitter varies by
-//! cell (#1494): an ordered grid that grows chaotic over a damage mask. #1742 adds
-//! the rest of Substance Designer's *Tile Sampler* essentials: a seeded grey or an
-//! index per stamp, a value jitter, a fill probability, a mask and a size map read
-//! at each cell's centre, and the overlap blend.
-//!
-//! The input is read as **one stamp**: the unit square, nothing outside it (no
-//! wrap), so a stamp pushed across its cell's border is drawn in the neighbour cell
-//! too rather than cut off. Overlapping stamps keep the brighter value per channel
-//! by default — the right blend for masks and heights.
-//!
-//! **Draw order.** `over` composites the stamps at a pixel one on another,
-//! premultiplied, in row-major order of their wrapped cells (row 0 first, left to
-//! right); a stamp meeting its own copy across the wrap (a small `count`) breaks
-//! the tie by its unwrapped cell. The order is a property of the stamps alone, so
-//! neither the band split nor which pixel looks decides what covers what, and a
-//! stamp crossing the tile edge covers the same stamps on both sides of it.
-
 mod over;
 mod stamp;
 
@@ -34,32 +14,22 @@ use super::super::recipe::Tile;
 use super::field::{Field, Links, PerCell};
 use super::generators::clamp_or;
 
-/// Everything a `tile` bake reads besides its stamp image.
 #[derive(Clone, Copy, Debug)]
 pub struct Settings<'a> {
     pub count: f32,
-    /// `count` times this across and down, each rounded on its own.
     pub aspect: [f32; 2],
-    /// Every other row shifted by this share of a cell; 0–1.
     pub offset: f32,
     pub jitters: Jitters<'a>,
     pub output: TileOutput,
-    /// Each stamp's value is multiplied by `1 ± value_jitter / 2`; 0–2.
     pub value_jitter: f32,
-    /// The chance a cell gets a stamp; 0–1.
     pub probability: f32,
-    /// No stamp in a cell whose centre reads below 0.5 on the mask's red.
     pub mask: Option<&'a Image>,
-    /// The red at the cell's centre scales that cell's stamp, up to 2.
     pub size_map: Option<&'a Image>,
     pub blend: TileBlend,
     pub seed: u64,
 }
 
 impl<'a> Settings<'a> {
-    /// The `tile` op's settings: its params resolved against its `links`, its
-    /// optional mask and size map, and its node seed. A NaN `probability` or
-    /// `value_jitter` is ignored (the default); any other value is clamped.
     pub fn of(
         p: &Tile,
         links: &Links<'a>,
@@ -85,7 +55,6 @@ impl<'a> Settings<'a> {
         }
     }
 
-    /// A `cells`×`cells` grid under `jitters`, every other setting at its default.
     pub fn plain(cells: f32, jitters: Jitters<'a>, seed: u64) -> Self {
         Self {
             count: cells,
@@ -111,7 +80,6 @@ impl<'a> Settings<'a> {
     }
 }
 
-/// A mask or size map as a field of its red, or `fallback` everywhere without one.
 fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     img.map_or(Field::Const(fallback), |img| Field::Map {
         img,
@@ -120,8 +88,6 @@ fn red(img: Option<&Image>, fallback: f32) -> Field<'_> {
     })
 }
 
-/// Stamp `img` over `s`'s grid: `count × aspect` cells across and down (each
-/// rounded to a whole count ≥ 1), every odd row shifted by `offset`.
 pub fn tile(img: &Image, s: &Settings) -> Image {
     let grid = Grid::new(s.count, s.aspect, s.offset);
     let ((nx, ny), per) = (grid.n, grid.per);
@@ -138,11 +104,9 @@ pub fn tile(img: &Image, s: &Settings) -> Image {
         let (px, py) = (u * nx, v * ny);
         let gy = py.floor() as i64;
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
-        // Only `over` keeps the stamps it meets; `max` and `add` fold as they go.
         let mut hits = (s.blend == TileBlend::Over).then(Hits::default);
         for dy in -reach.1..=reach.1 {
             let cy = gy + dy;
-            // A staggered row's cells start `shift` along: the nearest is its own.
             let shift = grid.shift(cy);
             let gx = (px - shift).floor() as i64;
             for dx in -reach.0..=reach.0 {
@@ -171,8 +135,6 @@ pub fn tile(img: &Image, s: &Settings) -> Image {
     })
 }
 
-/// Cell `cell`'s stamp, or `None` where `mask` reads below 0.5 at its centre (or
-/// NaN) or its own draws leave it empty; `size` scales it.
 fn cell_stamp(
     s: &Settings,
     grid: &Grid,
@@ -189,8 +151,6 @@ fn cell_stamp(
     Stamp::of(cell, grid.per, j, size.at_uv(u, v), draws, s.seed)
 }
 
-/// Fold `colour` into `out` under `max` or `add` (`over` keeps its stamps in
-/// [`Hits`] instead): the brighter per channel, or the sum with alpha the larger.
 #[inline]
 pub(super) fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
     *out = match mode {
@@ -202,8 +162,6 @@ pub(super) fn fold(mode: TileBlend, out: &mut Rgba, colour: Rgba) {
     };
 }
 
-/// A stamp's colour: the input times `value`, or its red times `value` as a grey;
-/// alpha is the input's.
 pub(super) fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
     match grey {
         true => [p[0] * value, p[0] * value, p[0] * value, p[3]],
@@ -211,9 +169,6 @@ pub(super) fn fill(p: Rgba, value: f32, grey: bool) -> Rgba {
     }
 }
 
-/// How much of what is under a stamp sample `p` covers under `over`: its red in
-/// the grey outputs (the colour comes from red alone), its brightest channel in
-/// `output = "stamp"`, times its alpha, in 0–1.
 pub(super) fn coverage(p: Rgba, grey: bool) -> f32 {
     let bright = match grey {
         true => p[0],

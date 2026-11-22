@@ -1,7 +1,3 @@
-//! crates/physics/src/material_asset_tests.rs — a shared physics material asset on the
-//! solver (#1878): every collider naming it takes its values, and editing it
-//! mid-play re-applies them on the next step without rebuilding a collider.
-
 use glam::Vec3;
 
 use super::PhysicsWorld;
@@ -11,7 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// Three static boxes: two naming `asset`, one with inline values.
 fn boxes(asset: &str) -> (Scene, [u32; 3]) {
     let mut scene = Scene::new();
     let mut ids = [0; 3];

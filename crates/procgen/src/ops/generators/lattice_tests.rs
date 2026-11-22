@@ -1,11 +1,7 @@
-//! The lattice generators the periodicity test runs beyond noise and Voronoi's
-//! basics: #407's hard-surface stamps and #1740's fibres, profiles and distortions.
-
 use super::super::*;
 use crate::recipe::ShapeKind::*;
 use crate::recipe::{AnisotropicNoise, BrickOutput, NoiseKind, OpKind, Wave, WaveKind};
 
-/// #407's brick outputs and shapes at fractional `s`.
 pub(super) fn hard_surface_ops(s: f32) -> Vec<OpKind> {
     let mut ops = Vec::new();
     for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {
@@ -34,7 +30,6 @@ pub(super) fn hard_surface_ops(s: f32) -> Vec<OpKind> {
     ops
 }
 
-/// #1740's fibres, wave profiles and distortions at fractional `s`.
 pub(super) fn distorted_ops(s: f32) -> Vec<OpKind> {
     use crate::catalog::generators::wave::WaveProfile::*;
     let mut ops = vec![OpKind::AnisotropicNoise(AnisotropicNoise {

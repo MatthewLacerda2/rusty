@@ -1,6 +1,4 @@
-//! The `levels` op: `map_range` with a midtone gamma (Substance Designer's
-//! *Levels*, #1743).
-
+//! The `levels` op: `map_range` with a midtone gamma (Substance Designer's *Levels*).
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};

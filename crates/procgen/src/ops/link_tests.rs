@@ -1,4 +1,4 @@
-//! The catalog property behind linkable params (#1494): for every socketable param,
+//! The catalog property behind linkable params: for every socketable param,
 //! a link to a `constant` node of value v (min 0, max 1) bakes exactly like the
 //! number v, square and non-square.
 

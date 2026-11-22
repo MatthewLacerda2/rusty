@@ -1,5 +1,3 @@
-//! The `text` op: a string in a font, filled into a mask.
-
 use serde::{Deserialize, Serialize};
 
 use super::path::{mask, FillRule};
@@ -9,13 +7,10 @@ use crate::ops::generators::clamp_or;
 use crate::ops::outline::text::{glyphs, Layout};
 use crate::recipe::{choice, op, opt, req, Lit, OpInfo, OpParam, SOURCE};
 
-/// Longest text taken, bytes, and most lines.
 const MAX_BYTES: usize = 4096;
 const MAX_LINES: usize = 256;
-/// Largest em size, tiles.
 const MAX_SIZE: f32 = 4.0;
 
-/// How each line of a multi-line block sits in the block.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Align {
@@ -25,14 +20,6 @@ pub enum Align {
     Right,
 }
 
-/// Lettering, a mask: 1 inside the glyphs, 0 outside, the block centred in the
-/// tile, one stamp as `shape` is. `text` breaks lines at `\n` or `\r\n`; `size` is the
-/// font's em height in tiles, `tracking` extra advance between glyphs in ems,
-/// `line_spacing` the distance between baselines in ems, and `align` places each
-/// line in the block. Shaped as the UI's `Text` is: kerning and ligatures. `font`
-/// is a `.ttf` / `.otf` path from the project root (or an `engine/…` one), read by
-/// the caller (procgen reads no files); empty is the engine's default, Instrument Sans. A glyph that
-/// crosses the tile's edge wraps.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "Written")]
 pub struct Text {
@@ -44,7 +31,6 @@ pub struct Text {
     pub tracking: f32,
 }
 
-/// The params as the recipe writes them, before the text is checked.
 #[derive(Deserialize)]
 struct Written {
     text: String,

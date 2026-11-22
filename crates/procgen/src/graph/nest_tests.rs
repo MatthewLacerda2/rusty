@@ -1,6 +1,3 @@
-//! Tests for nested instances (#1744): ids prefixed at each level, params passed
-//! down, cycles named by their chain, and the depth cap.
-
 use serde_json::{json, Value};
 
 use super::refuse_tests::{expand_err, instancing};

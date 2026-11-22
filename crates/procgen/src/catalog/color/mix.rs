@@ -21,7 +21,7 @@ const BLEND: &[&str] = &[
 ];
 
 /// Blend inputs `a`, `b` by `factor` under a [`BlendMode`]; an optional third input
-/// is a per-pixel mask whose red multiplies `factor` (#405).
+/// is a per-pixel mask whose red multiplies `factor`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Mix {
     pub mode: BlendMode,

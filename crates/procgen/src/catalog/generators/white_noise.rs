@@ -1,5 +1,3 @@
-//! The `white_noise` op: per-pixel uniform noise.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,7 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::generators;
 use crate::recipe::{op, OpInfo, SEED, SOURCE};
 
-/// Per-pixel uniform white noise (grayscale).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct WhiteNoise {
     #[serde(default)]

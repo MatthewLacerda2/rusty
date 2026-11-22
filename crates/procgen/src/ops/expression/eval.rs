@@ -1,22 +1,15 @@
-//! Runs compiled formulas at every pixel.
-
 use super::super::field::Field;
 use super::super::math::{apply as math, clamp_value};
 use super::{Func, Instr, Load, Program};
 use crate::image_buf::{Image, Size};
 use crate::recipe::MathOp;
 
-/// What a formula reads besides its own numbers: the node's inputs (`a`–`d`), its
-/// socket params `k1`–`k4`, and the extent.
 pub struct Env<'a> {
     pub inputs: &'a [&'a Image],
     pub k: [Field<'a>; 4],
     pub size: Size,
 }
 
-/// The image `programs` paint: red, green and blue each the program `rgb` names,
-/// alpha the one `alpha` names, or 1. A program several channels share runs once
-/// per pixel.
 pub fn paint(programs: &[Program], rgb: [usize; 3], alpha: Option<usize>, env: &Env) -> Image {
     let mut img = Image::new(env.size);
     let (w, h) = (env.size.width as usize, env.size.height as usize);
@@ -41,8 +34,6 @@ pub fn paint(programs: &[Program], rgb: [usize; 3], alpha: Option<usize>, env: &
     img
 }
 
-/// The pixel a formula runs at: its centre, as `coordinates` writes it, and its
-/// row-major index.
 struct Point {
     u: f32,
     v: f32,
@@ -50,7 +41,6 @@ struct Point {
 }
 
 impl Program {
-    /// The formula's value at `at`, `values` its scratch stack.
     fn eval(&self, at: &Point, env: &Env, values: &mut Vec<f32>) -> f32 {
         values.clear();
         for instr in &self.code {
@@ -84,7 +74,6 @@ fn load(l: Load, at: &Point, env: &Env) -> f32 {
 }
 
 impl Func {
-    /// How many values the function pops.
     pub(super) fn arity(self) -> usize {
         use Func::*;
         match self {
@@ -96,8 +85,7 @@ impl Func {
     }
 }
 
-/// `f` of its arguments, `x` first. A function `math` also has is `math`'s
-/// ([`super::super::math::apply`]), its edges included: division by zero is 0, and
+/// A function `math` also has is `math`'s, edges included: division by zero is 0,
 /// `sqrt` or `^` of a negative base reads it as 0.
 fn call(f: Func, x: f32, y: f32, z: f32) -> f32 {
     let truth = |b: bool| if b { 1.0 } else { 0.0 };
@@ -151,7 +139,6 @@ fn floored_mod(x: f32, y: f32) -> f32 {
 }
 
 /// GLSL's `smoothstep(e0, e1, x)`: 0 below `e0`, 1 above `e1`, a cubic between.
-/// Equal edges are a `step` at `e0`.
 fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
     if (e1 - e0).abs() < 1e-9 {
         return if x >= e0 { 1.0 } else { 0.0 };

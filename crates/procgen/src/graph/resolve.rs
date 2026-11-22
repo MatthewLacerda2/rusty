@@ -1,6 +1,3 @@
-//! crates/procgen/src/graph/resolve.rs — one graph being pasted (#1744): where its ids go,
-//! what its references mean in the flat recipe, and the chain of files it sits in.
-
 use std::collections::BTreeMap;
 
 use serde_json::Value;
@@ -9,24 +6,17 @@ use super::expand::Graphs;
 use super::MAX_DEPTH;
 use crate::recipe::{Node, OpKind, TextureRecipe};
 
-/// A graph being pasted: the recipe itself at the top, or one instance's graph.
 pub(super) struct Scope<'a> {
     pub graph: &'a TextureRecipe,
     pub graphs: &'a Graphs,
-    /// What its node ids are prefixed with: `""` at the top, `brick/` inside `brick`.
     pub prefix: String,
-    /// Each declared param's value under this instance.
     pub values: BTreeMap<String, Value>,
-    /// What each of the graph's `inputs` reads, already in the flat recipe's ids.
     pub wired: Vec<String>,
-    /// The seed folded into every inner seed; 0 leaves them as written.
     pub fold: u32,
-    /// The graph files from the top down to this one.
     pub chain: Vec<String>,
 }
 
 impl<'a> Scope<'a> {
-    /// The recipe itself, at its params' defaults.
     pub fn top(recipe: &'a TextureRecipe, graphs: &'a Graphs) -> Self {
         let values = recipe.params.iter();
         Scope {
@@ -42,7 +32,6 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// Node `id`'s id in the flat recipe.
     pub fn id(&self, id: &str) -> String {
         format!("{}{id}", self.prefix)
     }
@@ -70,7 +59,6 @@ impl<'a> Scope<'a> {
         }
     }
 
-    /// `node` as JSON, its placeholders filled with this instance's values.
     pub fn bound_value(&self, node: &Node) -> Result<Value, String> {
         let mut value = serde_json::to_value(node).map_err(|e| self.in_file(e.to_string()))?;
         for b in self.graph.bound.iter().filter(|b| b.node == node.id) {
@@ -81,12 +69,10 @@ impl<'a> Scope<'a> {
         Ok(value)
     }
 
-    /// The graph at `path`, which the instance `node` names.
     pub fn graph_at(&self, path: &str, node: &str) -> Result<&'a TextureRecipe, String> {
         lookup(self.graphs, path).map_err(|e| self.in_file(format!("node {node:?}: {e}")))
     }
 
-    /// `error`, naming the graph file it came from when this is one.
     pub fn in_file(&self, error: String) -> String {
         match self.chain.last() {
             Some(file) => format!("{error} (in {file})"),
@@ -115,8 +101,6 @@ pub(super) fn enter(chain: &[String], path: &str) -> Result<Vec<String>, String>
     Ok(next)
 }
 
-/// The flat id of output `tail` (the default `output` when `None`) of the graph at
-/// `path`, instanced under the flat id `id`.
 fn output_of(
     graphs: &Graphs,
     path: &str,
@@ -158,7 +142,6 @@ fn lookup<'g>(graphs: &'g Graphs, path: &str) -> Result<&'g TextureRecipe, Strin
         .ok_or_else(|| format!("graph {path} was not loaded (its loader reads every graph)"))
 }
 
-/// `brick.height` as (`brick`, `height`); `brick` as (`brick`, none).
 fn split(r: &str) -> (&str, Option<&str>) {
     match r.split_once('.') {
         Some((head, tail)) => (head, Some(tail)),

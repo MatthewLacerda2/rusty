@@ -1,25 +1,14 @@
-//! crates/physics/src/shape/hull_tests.rs — a convex mesh collider's hull holds every point
-//! of its mesh at every scale (#1195).
-//!
-//! Measured against the hull's own face planes ([`super::hull::beyond_faces`]), not
-//! with `project_point`: parry's point projection can misreport a point on a convex
-//! polyhedron as far outside it, which is how #1195 took a sound hull for one
-//! missing a cap (#1211).
-
 use glam::Vec3;
 
 use super::fixture;
 use super::hull::beyond_faces;
 use super::mesh::{build_mesh_shape, MeshFit};
 
-/// The off-centre Cylinder's points.
 fn off_centre_cylinder() -> Vec<[f32; 3]> {
     let (vertices, _) = fixture::off_centre_cylinder();
     vertices.iter().map(|v| v.position).collect()
 }
 
-/// How far the worst of `points`, scaled, lies beyond a face plane of the hull built
-/// at `scale`: zero or less when the hull holds them all.
 fn worst_outside(points: &[[f32; 3]], scale: Vec3) -> f32 {
     let collider = build_mesh_shape(MeshFit::Hull, scale, (points, &[])).expect("a hull");
     let hull = collider
@@ -32,7 +21,6 @@ fn worst_outside(points: &[[f32; 3]], scale: Vec3) -> f32 {
         .fold(f32::MIN, f32::max)
 }
 
-/// The slack a hull may leave: rounding at the size of the scaled shape.
 fn slack(scale: Vec3) -> f32 {
     1e-5 * 2.0 * scale.abs().max_element()
 }

@@ -1,14 +1,3 @@
-//! Which mesh colliders' triangles changed since their shape was built (#2059).
-//!
-//! A mesh collider's triangles are read when its body is built, and a library
-//! mesh (`Mesh.Create`) can be replaced in Play under a body that stays. So each
-//! collider whose triangles come from one is remembered by a fingerprint of those
-//! triangles, taken when its shape was built ([`record`]); the sync compares it
-//! with the triangles it would build from now (`PhysicsWorld::sync_mesh_shapes`)
-//! and rebuilds the shape where they moved. A change shows up on the Collider
-//! (a kept copy, #1657) or the Mesh channel, so the incremental sync looks only at
-//! the ids stamped there; the full pass looks at every collider.
-//!
 //! A collider whose recorded triangles are gone (its library mesh deleted, its
 //! Mesh pointed at a primitive) is rebuilt from what its entity has now, and one
 //! whose rebuild fails (an empty mesh, nothing left to build from) loses its
@@ -26,13 +15,8 @@ use rusty_core::collections::Map;
 use rusty_scene::mesh_library::{kept_mesh_name, scene_mesh_name};
 use rusty_scene::Scene;
 
-/// Collider entity -> the fingerprint of the library-mesh triangles its shape was
-/// built from. Only colliders built from a library mesh are listed.
 pub(crate) type MeshKeys = Map<u32, u64>;
 
-/// The fingerprint of the library-mesh triangles collider `id` builds from now, or
-/// `None` when it builds from no library mesh (another shape, a collision mesh, a
-/// model's or a primitive's Mesh).
 pub(crate) fn key_of(scene: &Scene, id: u32) -> Option<u64> {
     let w = &scene.world;
     let collider = w.collider(id)?;
@@ -53,7 +37,6 @@ pub(crate) fn key_of(scene: &Scene, id: u32) -> Option<u64> {
     Some(fingerprint(&positions, &indices))
 }
 
-/// Remember the triangles each of `ids` was just built from.
 pub(crate) fn record(keys: &mut MeshKeys, scene: &Scene, ids: &[u32]) {
     for &id in ids {
         match key_of(scene, id) {
@@ -63,7 +46,6 @@ pub(crate) fn record(keys: &mut MeshKeys, scene: &Scene, ids: &[u32]) {
     }
 }
 
-/// FNV-1a over the positions' bits and the indices: equal triangles, equal key.
 fn fingerprint(positions: &[[f32; 3]], indices: &[u32]) -> u64 {
     let words = positions.iter().flatten().map(|x| x.to_bits());
     let words = words.chain([u32::MAX]).chain(indices.iter().copied());
@@ -73,7 +55,6 @@ fn fingerprint(positions: &[[f32; 3]], indices: &[u32]) -> u64 {
 }
 
 impl PhysicsWorld {
-    /// Remember the triangles the colliders of the `built` owners were built from.
     pub(crate) fn record_mesh_keys(&mut self, scene: &Scene, built: &[u32]) {
         let plan = &self.plan;
         let ids: Vec<u32> = built
@@ -85,9 +66,6 @@ impl PhysicsWorld {
         record(&mut self.tracked.mesh_keys, scene, &ids);
     }
 
-    /// Rebuild each mesh collider whose library-mesh triangles differ from the ones
-    /// its shape was built from: every collider in `only`, or every one when
-    /// `None`, in plan order. See the module docs.
     pub(crate) fn sync_mesh_shapes(&mut self, scene: &Scene, only: Option<&BTreeSet<u32>>) {
         let owners = match only {
             None => Owners::All,
@@ -115,11 +93,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// Build collider `id` again from what its entity has now: its shape, hooks and
-    /// fit stamp swapped onto the same rapier collider (so `sync_fits` after it
-    /// finds the fit current), a collider that cannot be built removed, and
-    /// one removed before attached again to its owner's body. An owner with no
-    /// body (none of its colliders built) waits for the next replan.
     fn rebuild_mesh_shape(&mut self, scene: &Scene, owner: u32, id: u32) {
         let Some(&body) = self.id_to_body.get(&owner) else {
             return;

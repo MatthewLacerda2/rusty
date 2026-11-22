@@ -1,10 +1,3 @@
-//! crates/physics/src/query/sweep_tests.rs — `shape_cast_all`'s candidates (#1881).
-//!
-//! On a field of boxes, an unlimited diagonal sweep visits only the colliders
-//! along its path (not every one in the box around the sweep, which with an
-//! unlimited distance is all of them ahead), and finds exactly the hits a cast
-//! against each collider alone finds.
-
 use glam::Vec3;
 use rapier3d::prelude::QueryFilter;
 

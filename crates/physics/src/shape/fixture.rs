@@ -1,6 +1,3 @@
-//! crates/physics/src/shape/fixture.rs — the shape-level test meshes, shared by the
-//! conformance suite, the hull tests and the point-query tests.
-
 use glam::Vec3;
 
 pub(crate) use crate::query::convex_fixture::off_centre_cylinder;
@@ -10,8 +7,6 @@ use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty_scene::create::{default_collider, default_rigidbody};
 use rusty_scene::Scene;
 
-/// One mesh made of closed boxes, each `(min, max)`, wound outward: a concave
-/// shape (an arch, an open box) as one mesh, the way an imported prop arrives.
 pub(crate) fn boxes(parts: &[(Vec3, Vec3)]) -> (Vec<[f32; 3]>, Vec<u32>) {
     #[rustfmt::skip]
     const FACES: [u32; 36] = [
@@ -63,7 +58,6 @@ pub(crate) fn bowl() -> (Vec<[f32; 3]>, Vec<u32>) {
     ])
 }
 
-/// A static floor whose top is at y = 0.
 pub(crate) fn floor(scene: &mut Scene) {
     let id = scene.add_entity("Floor".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, -0.5, 0.0);
@@ -78,7 +72,6 @@ pub(crate) fn floor(scene: &mut Scene) {
     scene.world.set_collider(id, Some(collider));
 }
 
-/// A body with `mesh` as its concave collider at `at`, kinematic or dynamic.
 pub(crate) fn prop(
     scene: &mut Scene,
     mesh: (Vec<[f32; 3]>, Vec<u32>),
@@ -106,7 +99,6 @@ pub(crate) fn prop(
     id
 }
 
-/// Step `world` `n` fixed ticks of 1/60 s.
 pub(crate) fn steps(scene: &mut Scene, world: &mut PhysicsWorld, n: usize) {
     for _ in 0..n {
         world.step(scene, 1.0 / 60.0);

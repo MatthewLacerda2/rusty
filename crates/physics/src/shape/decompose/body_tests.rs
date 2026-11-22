@@ -1,7 +1,3 @@
-//! crates/physics/src/shape/decompose/body_tests.rs — dynamic bodies with concave mesh
-//! colliders simulate as solids (#1886): an arch stands on both feet, a box stays
-//! in a bowl, and a ball driven inside the arch is pushed out, not let through.
-
 use glam::{Quat, Vec3};
 
 use crate::shape::fixture::{arch, bowl, floor, prop, steps};

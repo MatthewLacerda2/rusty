@@ -1,7 +1,3 @@
-//! crates/physics/src/shape/merge_skip_tests.rs — the trimesh flags merge duplicate vertices
-//! (#1880), yet a mesh that merges into nothing, or one with a NaN or infinite vertex,
-//! is still a [`Skip`] decided before parry sees it, never a panic inside parry.
-
 use glam::Vec3;
 
 use super::mesh::{build_mesh_shape, MeshFit, Skip};

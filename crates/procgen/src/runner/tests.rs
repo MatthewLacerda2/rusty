@@ -1,5 +1,3 @@
-//! Unit tests for the op-runner (`runner/mod.rs`, `runner/plan.rs`).
-
 use super::*;
 use crate::recipe::{Constant, Mix, Node, OpKind, WhiteNoise};
 
@@ -93,7 +91,6 @@ fn empty_and_bad_resolution_error() {
     assert_eq!(evaluate(&bad), Err(RunError::BadResolution));
 }
 
-/// A constant followed by `len` inverts, each reading the one before.
 pub(super) fn chain(len: usize) -> TextureRecipe {
     let mut nodes = vec![constant("n0", 0.25)];
     for i in 1..=len {
@@ -122,7 +119,6 @@ fn a_long_chain_holds_a_constant_number_of_images() {
 
 #[test]
 fn targets_are_kept_and_a_shared_input_is_freed_once() {
-    // `a` feeds `x` twice and is also a target; `y` reads `x`.
     let mix = OpKind::Mix(Mix {
         mode: crate::recipe::BlendMode::Add,
         factor: 1.0,

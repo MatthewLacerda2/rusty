@@ -1,15 +1,10 @@
-//! Splits a formula into tokens, each with its 1-based column.
-
 use super::{SyntaxError, MAX_LEN};
 
-/// One token of a formula.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) enum Tok<'a> {
     Num(f32),
     Name(&'a str),
-    /// An operator or punctuation: `+ - * / ^ ( ) , .` or a comparison.
     Sym(&'static str),
-    /// Past the last token.
     End,
 }
 
@@ -18,7 +13,6 @@ const SYMS: &[&str] = &[
     "<=", ">=", "==", "!=", "<", ">", "+", "-", "*", "/", "^", "(", ")", ",", ".",
 ];
 
-/// `src`'s tokens, each with its column, ending in [`Tok::End`].
 pub(super) fn tokens(src: &str) -> Result<Vec<(Tok<'_>, usize)>, SyntaxError> {
     let chars = src.chars().count();
     if chars > MAX_LEN {
@@ -69,8 +63,6 @@ fn next_is_digit(rest: &str) -> bool {
     rest[1..].starts_with(|c: char| c.is_ascii_digit())
 }
 
-/// How many bytes of `rest` the number at its start spans: digits, a fraction and
-/// an exponent (`1.5e-3`).
 fn number_len(rest: &str) -> usize {
     let b = rest.as_bytes();
     let digits = |mut i: usize| {
@@ -94,7 +86,6 @@ fn number_len(rest: &str) -> usize {
     i
 }
 
-/// The number `text` reads, refused when it does not fit an `f32`.
 fn number(text: &str, column: usize) -> Result<f32, SyntaxError> {
     match text.parse::<f32>() {
         Ok(n) if n.is_finite() => Ok(n),

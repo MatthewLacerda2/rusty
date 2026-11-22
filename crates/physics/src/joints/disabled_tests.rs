@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/disabled_tests.rs — a `Joint` whose body is disabled (its
-//! owner inactive) is inert, not a crash (#1775): rapier selects joints for its
-//! solver without checking `is_enabled`, and a fixed body jointed to one built
-//! disabled reaches `unreachable!()` in its solver grouping.
-
 use glam::Vec3;
 
 use super::super::world::PhysicsWorld;
@@ -11,7 +6,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// What a box's body is.
 #[derive(Clone, Copy, Debug)]
 enum Own {
     Fixed,
@@ -19,7 +13,6 @@ enum Own {
     Kinematic,
 }
 
-/// A unit box with a Rigidbody at `pos`.
 fn body(scene: &mut Scene, pos: Vec3, own: Own) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -43,10 +36,6 @@ fn step(scene: &mut Scene, world: &mut PhysicsWorld, n: usize) {
     }
 }
 
-/// An `own` box jointed to a dynamic box under a parent, the parent inactive
-/// before physics is built when `built_disabled` (so the connected body is built
-/// disabled) and deactivated after a step otherwise. Returns the scene, its
-/// physics and the parent.
 fn jointed(own: Own, built_disabled: bool) -> (Scene, PhysicsWorld, u32) {
     let mut scene = Scene::new();
     let a = body(&mut scene, Vec3::new(0.0, 5.0, 0.0), own);
@@ -85,8 +74,6 @@ fn a_joint_to_a_disabled_body_is_inert_and_comes_back_when_it_is_enabled() {
 
 #[test]
 fn a_joint_whose_body_turns_fixed_beside_a_disabled_one_steps() {
-    // The issue's order: the joint is built from a dynamic box, then the box
-    // turns static while its partner is disabled.
     let (mut scene, mut physics, _) = jointed(Own::Dynamic, true);
     step(&mut scene, &mut physics, 1);
     let a = scene.world.ids_with_joint()[0];
@@ -97,10 +84,6 @@ fn a_joint_whose_body_turns_fixed_beside_a_disabled_one_steps() {
 
 #[test]
 fn deactivating_the_owner_of_an_inactive_connected_part_drops_the_joint() {
-    // The connected entity is an inactive collider under the body's owner: the
-    // body is enabled, so the joint is built. Deactivating the owner leaves the
-    // part's own activeInHierarchy unchanged, yet disables the body. Nothing
-    // moves, so no pose stamp re-runs the joint sync by chance.
     let mut scene = Scene::new();
     let a = body(&mut scene, Vec3::new(0.0, 5.0, 0.0), Own::Fixed);
     let owner = body(&mut scene, Vec3::new(0.0, 7.0, 0.0), Own::Kinematic);

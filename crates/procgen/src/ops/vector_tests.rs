@@ -1,17 +1,15 @@
 //! `normal_blend` and `combine_rgb` against hand-built normals, and the upper-hemisphere
-//! floor a blend never tips under (#2306).
+//! floor a blend never tips under.
 
 use super::*;
 use crate::hash;
 
 const FLAT: Rgba = [0.5, 0.5, 1.0, 1.0];
 
-/// A field of tilted normals: the normal map of a noisy height.
 fn normals(seed: u64) -> Image {
     bumpy(seed, 0.2)
 }
 
-/// [`normals`] at another bump `strength`.
 fn bumpy(seed: u64, strength: f32) -> Image {
     let h = Image::fill_uv(16, |u, v| {
         let x = hash::unit2((u * 16.0) as i64, (v * 16.0) as i64, 0, seed);
@@ -63,7 +61,6 @@ fn the_blend_is_unit_length_and_tilts_further_than_the_base() {
     }
 }
 
-/// The packed blue a normal at `z` writes.
 fn blue(z: f32) -> f32 {
     z * 0.5 + 0.5
 }
@@ -129,7 +126,6 @@ fn a_steep_base_turned_the_same_way_stays_above_the_floor_at_unit_length() {
 
 #[test]
 fn a_blend_that_stays_above_the_floor_is_rnms_own_bit_for_bit() {
-    // Gentle enough that no texel of the pair reaches the floor.
     let (base, detail) = (bumpy(3, 0.05), bumpy(4, 0.05));
     let out = normal_blend(&base, &detail, Field::Const(1.0));
     for ((o, p), d) in out.pixels().iter().zip(base.pixels()).zip(detail.pixels()) {

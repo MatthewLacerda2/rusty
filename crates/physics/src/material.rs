@@ -1,14 +1,4 @@
-//! crates/physics/src/material.rs — the collider physics material on rapier (#447).
-//!
-//! Maps the engine's `PhysicsMaterial` onto a rapier collider's friction,
-//! restitution and their combine rules. rapier resolves two colliders' rules the
-//! way Unity does (the higher-priority mode wins, `Average < Minimum < Multiply <
-//! Maximum`), so the mapping is one-to-one and the solver does the combining.
-//! Applied at collider build and re-applied whenever the Collider changes, so a material edited
-//! mid-play (`Physics.SetPhysicsMaterial`) takes effect on the next step. A collider
-//! naming a shared asset (#1878) takes that asset's values
-//! (`scene::physics_material::effective`), and an asset edit re-applies every
-//! collider's material on the next step (`sync_to_rapier`).
+//! rapier resolves two colliders' combine rules the way Unity does (the higher-priority mode wins, `Average < Minimum < Multiply < Maximum`), so the mapping is one-to-one.
 
 use rapier3d::prelude::*;
 
@@ -18,7 +8,6 @@ use rusty_components::{CombineMode, PhysicsMaterial};
 use rusty_scene::physics_material::effective;
 use rusty_scene::Scene;
 
-/// rapier's rule for a combine mode.
 pub(super) fn combine_rule(mode: CombineMode) -> CoefficientCombineRule {
     match mode {
         CombineMode::Average => CoefficientCombineRule::Average,
@@ -28,7 +17,6 @@ pub(super) fn combine_rule(mode: CombineMode) -> CoefficientCombineRule {
     }
 }
 
-/// Whether `collider` holds anything but `material`.
 pub(super) fn material_differs(collider: &Collider, material: &PhysicsMaterial) -> bool {
     collider.friction() != material.friction
         || collider.restitution() != material.bounciness
@@ -36,8 +24,6 @@ pub(super) fn material_differs(collider: &Collider, material: &PhysicsMaterial) 
         || collider.restitution_combine_rule() != combine_rule(material.bounce_combine)
 }
 
-/// Write `material` onto `collider`, touching only what differs so an
-/// unchanged collider is left alone.
 pub(super) fn apply_material(collider: &mut Collider, material: &PhysicsMaterial) {
     if collider.friction() != material.friction {
         collider.set_friction(material.friction);
@@ -56,8 +42,6 @@ pub(super) fn apply_material(collider: &mut Collider, material: &PhysicsMaterial
 }
 
 impl PhysicsWorld {
-    /// Re-apply each built collider's material from its component, so a
-    /// material edited since the last tick reaches the solver.
     pub(super) fn sync_materials(&mut self, scene: &Scene, owners: &Owners) {
         for (_, ids) in owners.pick(&self.plan) {
             for id in ids {

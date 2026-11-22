@@ -1,13 +1,3 @@
-//! crates/physics/src/assemble.rs — turning the scene's body plan into rapier bodies.
-//!
-//! One rapier body per plan owner (see `compound`), carrying one collider per
-//! attached collider entity, each at its pose relative to the owner. The plan is
-//! re-derived whenever the change log names an id whose collider membership or
-//! body carrier may have moved (`sync`, `watch`); an owner whose collider set changed (reparent, a
-//! collider or Rigidbody added/removed, an entity spawned or destroyed) has its
-//! body rebuilt, the others are left untouched so their contacts and sleep state
-//! survive.
-
 use rapier3d::prelude::*;
 
 use super::character::upright_offset;
@@ -22,27 +12,14 @@ use super::watch::{carriers, Owners};
 use super::world::{body_to_write, collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
-/// The body-type pairs a collider generates contacts for: rapier's default, only
-/// pairs with a dynamic body in them. Nothing reads any other pair: a collision
-/// event needs the solver to have pushed on it (`CollisionEvents::from_contact_sets`,
-/// Unity's rule that a collision needs a dynamic body), triggers and the
-/// CharacterController's sweeps go through queries, and the world steps with no
-/// physics hooks. So a kinematic mover against the level, or against another
-/// kinematic, builds no manifold and joins no island; against a dynamic body it
-/// still pairs, so it wakes and pushes it. rapier's broad phase refuses to create a
-/// filtered pair, and a body type change forces its colliders back through it, so a
-/// body whose type changes in Play is filtered by what it is now (a pair whose
-/// dynamic side turns kinematic is dropped and exits). Setting this on a live
-/// collider alone would not do that. It equals `ActiveCollisionTypes::default()`,
-/// spelled out because that is not a `const fn` (`active_types_are_rapiers_default`).
+/// Only pairs with a dynamic body generate contacts: Unity's rule that a collision needs a dynamic body; kinematic and static
+/// colliders meet only through queries. Equals `ActiveCollisionTypes::default()` (not a `const fn`; see `active_types_are_rapiers_default`).
+/// rapier re-filters existing pairs only through its broad phase, so a body type change in Play re-pairs its colliders.
 pub(crate) const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNAMIC_DYNAMIC
     .union(ActiveCollisionTypes::DYNAMIC_KINEMATIC)
     .union(ActiveCollisionTypes::DYNAMIC_FIXED);
 
 impl PhysicsWorld {
-    /// Re-derive the body plan and rebuild exactly the owners whose collider set
-    /// changed since the last build; returns the owners built. Iterates the
-    /// sorted plans, so rebuild order is deterministic.
     pub(super) fn resync_topology(&mut self, scene: &Scene) -> Vec<u32> {
         let next = plan(scene);
         if next == self.plan {
@@ -66,19 +43,16 @@ impl PhysicsWorld {
         }
         self.tracked.remember_plan(&next);
         self.plan = next;
-        // What the library-mesh colliders were built from (#2059, `watch::mesh_keys`).
         self.record_mesh_keys(scene, &built);
         built
     }
 
-    /// Build every body the scene implies (the initial build on entering Play).
     pub(super) fn build_bodies(&mut self, scene: &Scene) {
         self.plan = BodyPlan::new();
         self.resync_topology(scene);
         self.tracked.carriers = carriers(scene);
     }
 
-    /// Drop `owner`'s body and every collider attached to it.
     fn remove_owner(&mut self, owner: u32) {
         let Some(handle) = self.id_to_body.remove(&owner) else {
             return;
@@ -95,8 +69,6 @@ impl PhysicsWorld {
         self.remove_body(handle);
     }
 
-    /// Build `owner`'s body with the colliders of `ids` attached. An owner none
-    /// of whose colliders can be built (degenerate mesh geometry) gets no body.
     fn build_owner(&mut self, scene: &Scene, owner: u32, ids: &[u32]) {
         let Some(owner_pose) = world_pose(scene, owner) else {
             return;
@@ -116,15 +88,10 @@ impl PhysicsWorld {
             BodyClass::Dynamic => RigidBodyBuilder::dynamic()
                 .linvel(inp.velocity)
                 .angvel(inp.angular_velocity)
-                // `use_gravity = false` exempts the body from world gravity (#209).
                 .gravity_scale(gravity_scale(inp.use_gravity))
-                // Unity's `drag` / `angularDrag` (#2062).
                 .linear_damping(inp.damping.linear)
                 .angular_damping(inp.damping.angular),
         }
-        // Continuous mode switches on rapier's CCD sweep (anti-tunnelling, #321);
-        // Discrete leaves it off. Honoured for every class — mainly dynamic, but a
-        // kinematic body may opt in to be swept against dynamic bodies.
         .ccd_enabled(ccd_enabled(inp.collision_detection))
         .pose(to_pose(owner_pose.pos, owner_pose.rot));
         let body_handle = self.insert_body(body_builder.build());
@@ -139,10 +106,6 @@ impl PhysicsWorld {
         self.body_to_id.insert(body_handle, owner);
     }
 
-    /// Build collider entity `id`'s rapier collider, positioned relative to its
-    /// owner's pose, for a body that is `dynamic` or not (a concave mesh is split
-    /// into convex pieces on a dynamic one, #1886). `None` for a dead entity or a
-    /// degenerate mesh.
     pub(super) fn build_collider(
         &self,
         scene: &Scene,
@@ -173,24 +136,13 @@ impl PhysicsWorld {
         collider.set_sensor(inp.is_trigger);
         apply_material(&mut collider, &inp.material);
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
-        // Only pairs with a dynamic body generate contacts (`ACTIVE_TYPES` says
-        // why): as in Unity, a kinematic or static collider meets another
-        // non-dynamic one only through queries (triggers, character sweeps).
         collider.set_active_collision_types(ACTIVE_TYPES);
-        // The collision matrix (#91) decides which layers interact: a collider
-        // is a member of its own layer and filters to the layers it may collide
-        // with. Set on both collision and solver groups so contact generation
-        // and the solver agree.
         let groups = interaction_groups(inp.layer, scene.collision_matrix.filter_mask(inp.layer));
         collider.set_collision_groups(groups);
         collider.set_solver_groups(groups);
         Some(collider)
     }
 
-    /// Mirror activation onto rapier's enabled flags: each body follows its
-    /// owner entity, each collider (the owner's own included) its own entity. A
-    /// disabled body or collider generates no contacts, and [`super::query::is_live`]
-    /// hides it from every query (#521).
     pub(super) fn sync_enabled(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
             let on = scene.world.is_active_in_hierarchy(owner);
@@ -213,9 +165,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// Keep each compound collider (one not on its owner entity) at its current
-    /// pose relative to the owner — so a script or the animator moving a child
-    /// hitbox moves the collider with it.
     pub(super) fn sync_compound_parts(&mut self, scene: &Scene, owner: u32, ids: &[u32]) {
         let Some(owner_pose) = world_pose(scene, owner) else {
             return;

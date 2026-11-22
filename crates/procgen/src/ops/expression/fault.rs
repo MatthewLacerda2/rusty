@@ -1,6 +1,3 @@
-//! The errors a formula's parse reports, each naming what is wrong, its column and
-//! the fix.
-
 use super::lex::Tok;
 use super::{SyntaxError, FUNCS};
 
@@ -41,7 +38,6 @@ pub(super) fn unknown_name(name: &str, column: usize) -> SyntaxError {
     }
 }
 
-/// The functions, as an error lists them.
 pub(super) fn func_names() -> String {
     let names: Vec<&str> = FUNCS.iter().map(|(n, _)| *n).collect();
     names.join(", ")
