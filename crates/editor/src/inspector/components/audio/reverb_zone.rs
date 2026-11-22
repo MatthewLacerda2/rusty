@@ -13,7 +13,7 @@ use rusty_components::audio::reverb_zone::{DECAY_RANGE, MAX_PRE_DELAY};
 use rusty_components::{ReverbParams, ReverbPreset, ReverbZoneComponent as Zone};
 use rusty_edit::authoring::audio::reverb_zone as ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Zone)) {
     if let Some(mut z) = world.reverb_zone_mut(id) {
         op(&mut z);

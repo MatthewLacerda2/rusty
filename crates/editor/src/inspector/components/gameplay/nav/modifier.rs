@@ -14,7 +14,7 @@ use rusty_components::NavMeshModifierVolumeComponent as Volume;
 use rusty_edit::authoring::nav::modifier as volume_ops;
 use rusty_navigation::MAX_AREAS;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = world.nav_modifier_mut(id) {
         op(&mut v);

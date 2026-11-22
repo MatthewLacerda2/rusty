@@ -13,7 +13,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::OffMeshLinkComponent as Link;
 use rusty_edit::authoring::nav::offmesh_link as link_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Link)) {
     if let Some(mut l) = world.offmesh_link_mut(id) {
         op(&mut l);

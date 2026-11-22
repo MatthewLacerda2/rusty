@@ -11,7 +11,7 @@ type Op = fn(&mut Perception, f32);
 /// A shared mask setter.
 type MaskOp = fn(&mut Perception, u32);
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Perception)) {
     if let Some(mut p) = world.ai_perception_mut(id) {
         op(&mut p);

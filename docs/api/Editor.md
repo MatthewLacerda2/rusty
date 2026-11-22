@@ -157,6 +157,10 @@ every API call from the console, a script line or an agent.
   Play `Undo` / `Redo` do nothing and return `nil`. A new edit clears Redo. The
   history keeps the last 200 steps.
 - An undo is an edit: the scene has unsaved changes after it, as after any other.
+- **The unsaved mark follows the history.** The editor's title shows `*` once a step
+  lands, whether a hand edit or an `eval` line made it; a line or an Inspector edit
+  that changes nothing a save writes (a value set to itself, a fold, a selection)
+  leaves it off, and so does any edit in Play.
 
 ```lua
 Scene.SetName(5, "Door")

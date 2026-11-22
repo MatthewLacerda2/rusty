@@ -12,7 +12,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_edit::authoring::nav::obstacle as obstacle_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Obstacle)) {
     if let Some(mut o) = world.nav_obstacle_mut(id) {
         op(&mut o);

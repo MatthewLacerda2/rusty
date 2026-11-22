@@ -8,7 +8,7 @@ use rusty_components::{LodGroupComponent, LodLevel};
 use rusty_ecs::World;
 use rusty_edit::authoring::rendering::lod_group as lod_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut World, id: u32, op: impl FnOnce(&mut LodGroupComponent)) {
     if let Some(mut g) = world.lod_group_mut(id) {
         op(&mut g);

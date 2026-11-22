@@ -12,7 +12,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::CharacterControllerComponent as Cc;
 use rusty_edit::authoring::physics::character_controller as cc_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Cc)) {
     if let Some(mut c) = world.character_controller_mut(id) {
         op(&mut c);

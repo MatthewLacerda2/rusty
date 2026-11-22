@@ -8,7 +8,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::{JointComponent, JointKind};
 use rusty_edit::authoring::physics::joint as joint_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut JointComponent)) {
     if let Some(mut j) = world.joint_mut(id) {
         op(&mut j);

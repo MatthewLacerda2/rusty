@@ -8,7 +8,7 @@ use crate::inspector::components::particles::widgets::vec3;
 use rusty_components::LineComponent;
 use rusty_edit::authoring::ribbon::line as line_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut LineComponent)) {
     if let Some(mut l) = world.line_mut(id) {
         op(&mut l);

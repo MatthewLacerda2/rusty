@@ -157,4 +157,32 @@ mod tests {
         let acts = journal.borrow_mut().take();
         assert!(matches!(&acts[..], [HostCall::Taint(what)] if what.contains("editor edit")));
     }
+
+    #[test]
+    fn an_api_edit_marks_the_scene_and_a_line_that_changes_nothing_does_not() {
+        let h = Harness::new(rusty_test_support::temp::dir(), "");
+        h.world
+            .borrow_mut()
+            .init_edit_runtime()
+            .expect("the editor's Lua");
+        let mut ui = EditorUi::new(Default::default());
+        let mut eval = |line: &str| {
+            let world = h.world.borrow();
+            world.script_manager().eval(line).expect("the line runs");
+            ui.is_dirty = false;
+            take_edits(&mut ui, &world);
+            ui.is_dirty
+        };
+        let set = |x| format!("local s = Scene.FindEntityByName('Subject') {x}");
+        assert!(eval("Scene.CreateEntity('Subject')"), "a new entity");
+        assert!(!eval("return 1"), "a line that writes nothing");
+        let same =
+            set("local x, y, z = Transform.GetPosition(s) Transform.SetPosition(s, x, y, z)");
+        assert!(!eval(&same), "a write of the value already there");
+        let moved = set("Transform.SetPosition(s, 5, 0, 0)");
+        assert!(eval(&moved), "a moved entity");
+        h.step(1); // enters Play
+        let in_play = set("Transform.SetPosition(s, 9, 0, 0)");
+        assert!(!eval(&in_play), "Stop drops it");
+    }
 }

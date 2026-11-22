@@ -106,7 +106,7 @@ pub(super) fn draw_target(
     });
 }
 
-/// Run `f` on `id`'s camera and mark the scene dirty.
+/// Run `f` on `id`'s camera.
 fn write(world: &mut rusty_ecs::World, id: u32, f: impl FnOnce(&mut CameraComponent)) {
     if let Some(mut c) = world.camera_mut(id) {
         f(&mut c);

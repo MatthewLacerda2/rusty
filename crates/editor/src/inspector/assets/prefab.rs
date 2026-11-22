@@ -59,8 +59,8 @@ fn counts(path: &str) -> Option<(usize, usize)> {
     Some((prefab.entities.len(), prefab.materials.len()))
 }
 
-/// Load + instantiate the prefab into the scene root, select the new root, and mark
-/// the editor dirty — the same effect as the model inspector's instantiate.
+/// Load + instantiate the prefab into the scene root and select the new root, the same
+/// effect as the model inspector's instantiate.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     if let Ok(root_id) = rusty_edit::load_and_instantiate(scene, path, None) {
         editor.selected_entity_id = Some(root_id);

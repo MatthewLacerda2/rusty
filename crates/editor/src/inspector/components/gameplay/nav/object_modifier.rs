@@ -13,7 +13,7 @@ use rusty_components::NavMeshModifierComponent as Modifier;
 use rusty_edit::authoring::nav::object_modifier as ops;
 use rusty_navigation::{MAX_AREAS, NOT_WALKABLE_AREA};
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Modifier)) {
     if let Some(mut m) = world.nav_mesh_modifier_mut(id) {
         op(&mut m);

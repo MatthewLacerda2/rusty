@@ -8,7 +8,7 @@ use crate::inspector::components::particles::widgets::clamped;
 use rusty_components::TrailComponent;
 use rusty_edit::authoring::ribbon::trail as trail_ops;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut TrailComponent)) {
     if let Some(mut t) = world.trail_mut(id) {
         op(&mut t);

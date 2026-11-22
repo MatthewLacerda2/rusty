@@ -11,7 +11,7 @@ use rusty_ecs::World;
 use rusty_edit::authoring::rendering::light_probe_proxy_volume as ops;
 use rusty_edit::authoring::ComponentKind;
 
-/// Route one edit through the shared ops and mark the scene dirty.
+/// Route one edit through the shared ops.
 fn write(world: &mut World, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = world.light_probe_proxy_volume_mut(id) {
         op(&mut v);

@@ -229,3 +229,7 @@ fn draw_components(
 
     add::draw(ui, world, id);
 }
+
+#[cfg(test)]
+#[path = "dirty_tests.rs"]
+mod dirty_tests;
