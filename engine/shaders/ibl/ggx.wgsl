@@ -1,8 +1,7 @@
-// engine/shaders/ibl/ggx.wgsl — the GGX importance sampling both cube prefilters
-// share: the sky's (`sky/prefilter.wgsl`) and the reflection probes'
-// (`ibl/probe_prefilter.wgsl`). It is `render::ibl::reflection_prefilter`'s on the
-// GPU: Hammersley points, half-vectors drawn toward the GGX lobe around `n`, each
-// reflected into a light direction under the split-sum N = V = R assumption.
+// The GGX importance sampling both cube prefilters share: the sky's (`sky/prefilter.wgsl`) and the
+// reflection probes' (`ibl/probe_prefilter.wgsl`). It is `render::ibl::reflection_prefilter`'s on
+// the GPU: Hammersley points, half-vectors drawn toward the GGX lobe around `n`, each reflected
+// into a light direction under the split-sum N = V = R assumption.
 
 #define_import_path ibl::ggx
 

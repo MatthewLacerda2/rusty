@@ -45,7 +45,9 @@ pub struct ReflectionProbe {
     pub box_projection: bool,
     pub blend_distance: f32,
     pub importance: i32,
+    /// Face size in texels; `None` bakes at `LightingSettings::reflections`.
     pub resolution: Option<u32>,
+    // The capture camera's clip planes, world units.
     pub near_clip: f32,
     pub far_clip: f32,
     /// Whether the capture renders shadows (Unity's *Shadow Distance* > 0).
@@ -68,6 +70,7 @@ impl Default for ReflectionProbe {
 
 impl ReflectionProbe {
     pub const RESOLUTION: RangeInclusive<u32> = 16..=2048;
+    /// Metres: keeps the capture's near plane off zero.
     pub const MIN_NEAR_CLIP: f32 = 0.01;
     pub const INTENSITY: RangeInclusive<f32> = 0.0..=8.0;
 
@@ -96,6 +99,7 @@ impl ReflectionProbe {
     }
 
     pub fn clamp_settings(&mut self) {
+        // A non-finite value takes `new`'s default.
         self.resolution = self.resolution.map(clamp_resolution);
         self.blend_distance = finite_or(self.blend_distance, 1.0).max(0.0);
         self.near_clip = finite_or(self.near_clip, 0.05).max(Self::MIN_NEAR_CLIP);
@@ -117,13 +121,16 @@ pub fn clamp_resolution(size: u32) -> u32 {
     );
     let size = size.clamp(lo, hi);
     let up = size.next_power_of_two();
+    // The nearer power: 300 → 256, 400 → 512.
     match up - size <= size - up / 2 {
         true => up.min(hi),
         false => up / 2,
     }
 }
 
+/// Metres: the `Default` box's half-extent, as a sphere.
 pub const DEFAULT_RADIUS: f32 = 5.0;
+/// Metres: the floor on a radius and on the fade span `past_influence` divides by.
 pub(super) const MIN_RADIUS: f32 = 0.01;
 
 fn is_identity(q: &Quat) -> bool {

@@ -22,6 +22,8 @@ impl Drop for Held {
     }
 }
 
+/// `None` while `id`'s hits dispatch further up the stack, so a handler's nested `Move`
+/// raises none rather than recursing without end.
 fn enter(lua: &Lua, id: u32) -> Option<Held> {
     let existing = lua.app_data_ref::<Dispatching>().map(|d| d.clone());
     let set = existing.unwrap_or_else(|| {

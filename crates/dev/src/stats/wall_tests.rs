@@ -56,6 +56,7 @@ fn a_spike_is_on_the_frame_that_took_it() {
 fn an_undrawn_frame_s_time_is_dropped() {
     let mut stats = FrameStats::default();
     run(&mut stats, &[], &starts(0.0, 0));
+    // The undrawn frame starts, giving frame 0 its 16 ms; its own 500 ms, ended next, is dropped.
     window_ended(&mut stats, 16.0);
     run(&mut stats, &[], &starts(500.0, 1));
     let wall = stats.get("wall_ms").unwrap();

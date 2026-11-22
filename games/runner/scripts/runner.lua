@@ -19,11 +19,11 @@ local GRAVITY = 40.0      -- m/s²
 local JUMP = 10.0         -- m/s: a 1.25 m apex, 0.5 s in the air
 local LATERAL = 18.0      -- m/s across while changing lane
 local SLIDE_TIME = 0.75   -- s (longer while there is no room to stand)
-local HEIGHT, SLIDE_HEIGHT = 1.8, 0.9
+local HEIGHT, SLIDE_HEIGHT = 1.8, 0.9 -- m
 local NEAR = 0.6          -- m of clearance that count as a near miss
-local REACH = 0.45        -- crash test half width
-local FOOT = 0.3          -- ground probe half width
-local OTHERS = 0xFFFFFFFF & ~(1 << 8)
+local REACH = 0.45        -- m, crash test half width: the body's radius and a little more
+local FOOT = 0.3          -- m, ground probe half width
+local OTHERS = 0xFFFFFFFF & ~(1 << 8) -- all but layer 8, the runner's own (the recipe sets it)
 
 local runner, body
 local track, fx

@@ -33,6 +33,7 @@ fn limbs_get_capsules_flat_parts_boxes_and_fingers_fold_into_the_hand() {
     };
     assert_eq!(axis, CapsuleAxis::Y);
     assert!((radius - 0.105).abs() < 1e-5 && (height - 0.26).abs() < 1e-5);
+    // The arm runs along X from its joint (x 0.25) to the finger tip (x 0.64).
     let Some(&ColliderShape::Capsule { height, axis, .. }) = shape_of(&fits, 3) else {
         panic!("the arm is a capsule");
     };
@@ -60,6 +61,7 @@ fn an_allowlist_hands_unlisted_bones_to_their_parent() {
     let Some(&ColliderShape::Box { size }) = shape_of(&fits, 1) else {
         panic!("the chest is a box");
     };
+    // The arm and finger folded into the chest, which now reaches x 0.64.
     assert!((size.x - 0.84).abs() < 1e-5, "{size:?}");
 }
 
@@ -69,6 +71,7 @@ fn min_size_is_in_model_units_under_a_scaled_skeleton() {
         min_size,
         ..HitboxOptions::default()
     };
+    // At 0.01 the joint frame measures the head as 26 units; the threshold reads model units.
     let small = fit_hitboxes(&vertices(), &skin(0.01), &opts(0.25));
     assert!(shape_of(&small, 2).is_some(), "the 0.26 head clears 0.25");
     let big = fit_hitboxes(&vertices(), &skin(0.01), &opts(0.3));

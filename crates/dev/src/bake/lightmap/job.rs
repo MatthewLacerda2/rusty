@@ -24,6 +24,7 @@ type Encoded = (
 
 #[derive(Debug, PartialEq)]
 pub enum BakeOutcome {
+    /// Live entities wearing a lightmap from the new pages; one deleted mid-bake is not counted.
     Baked(usize),
     Cancelled,
     Failed(String),
@@ -35,6 +36,8 @@ pub struct LightmapBakeJob {
     scene_path: String,
     static_meshes: usize,
     previews: Previews,
+    /// When the first pass was seen done, and the texels traced by then: the time left is
+    /// paced from there, past the first pass's validity probes.
     paced_from: Option<(Instant, u64)>,
     measure: Measure,
 }
@@ -68,6 +71,7 @@ impl LightmapBakeJob {
             .spawn(move || {
                 let started = Instant::now();
                 let baked = bake_progressive(&input, &settings, &watch, view, &mut encoder);
+                // Joins the preview writer, so no preview page lands after the bake.
                 drop(encoder);
                 let traced = Instant::now();
                 let encoded = match baked {

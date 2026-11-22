@@ -1,18 +1,19 @@
-// The sky captured into a cube and GGX-prefiltered into a roughness mip chain (Unity's
-// skybox as default reflection probe): mip 0 is the sky, each later mip roughness `mip
-// / (mips - 1)`, read at `roughness * (mips - 1)`. Panorama (`params.p.z == 1`):
-// sampled at the mip whose texel matches the sample's solid angle (filtered importance
-// sampling), so a few taps blur without sparkle. Procedural sky:
-// `common::procedural_sky` is affine in the ambient colour, so the cube stores two
-// terms (rgb: ambient 0, a: what ambient 1 adds) and the forward pass applies the
-// ambient when sampling: an ambient change never rebakes it.
+// The sky is captured into a cube and GGX-prefiltered into a roughness mip chain, Unity's skybox
+// as default reflection probe: mip 0 is the sky and each later mip roughness `mip / (mips - 1)`,
+// read at `roughness * (mips - 1)` by `forward::reflection::sky_reflection`. A panorama is
+// sampled at the mip whose texel matches each sample's solid angle (filtered importance
+// sampling), so a few taps blur without sparkle. `common::procedural_sky` is affine in the
+// ambient colour, so a procedural cube stores two terms (rgb: ambient 0, a: what ambient 1 adds)
+// and the forward pass applies the ambient: an ambient change never rebakes it, a sky-settings
+// change does.
 
 #import common::{PI, ProceduralSky, equirect_uv, procedural_sky}
 #import ibl::ggx::{ggx_light, tangent_frame}
 
 struct Params {
-    // w: the importance sample count, `reflection_prefilter`'s `SAMPLE_COUNT`, so a
-    // probe and the sky blur rough metal alike.
+    // x roughness, y face size in texels, z 1 for the panorama (0: procedural), w the importance
+    // sample count, `reflection_prefilter`'s `SAMPLE_COUNT`, so a probe and the sky blur rough
+    // metal alike.
     p: vec4<f32>,
     sky: ProceduralSky,
 };
@@ -22,7 +23,8 @@ struct Params {
 @group(0) @binding(2) var s_panorama: sampler;
 @group(0) @binding(3) var out_face: texture_storage_2d_array<rgba16float, write>;
 
-// Face order +X, -X, +Y, -Y, +Z, -Z: the cube-map convention.
+// Texel centre `uv` runs 0..1, v down; face order +X, -X, +Y, -Y, +Z, -Z: the cube-map
+// convention.
 fn face_direction(face: u32, uv: vec2<f32>) -> vec3<f32> {
     let s = uv.x * 2.0 - 1.0;
     let t = uv.y * 2.0 - 1.0;
@@ -54,7 +56,8 @@ fn panorama_texel() -> f32 {
     return 4.0 * PI / (dims.x * dims.y);
 }
 
-// So thin bright detail doesn't alias into the face.
+// The panorama mip whose texel covers a cube-face texel's solid angle, so thin bright detail
+// doesn't alias into the face.
 fn mirror_lod(size: f32) -> f32 {
     let cube_texel = 4.0 * PI / (6.0 * size * size);
     let last = f32(textureNumLevels(t_panorama) - 1u);
@@ -76,6 +79,7 @@ fn convolve(n: vec3<f32>, roughness: f32) -> vec4<f32> {
         let cos_theta = ggx.w;
         let ndotl = dot(n, l);
         if (ndotl > 0.0) {
+            // GGX D at this half-vector; with N = V its pdf over L is D / 4.
             let d = (a2 / (PI * pow(cos_theta * cos_theta * (a2 - 1.0) + 1.0, 2.0)));
             let sample_angle = 4.0 / (f32(samples) * max(d, 1e-4));
             let lod = clamp(0.5 * log2(sample_angle / texel) + 1.0, 0.0, last);

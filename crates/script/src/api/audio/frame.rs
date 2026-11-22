@@ -20,6 +20,7 @@ pub fn push_frame(
             listener: listener(camera, &scene),
             time_scale: time.time_scale,
             paused: time.paused,
+            // The scaled sim time doppler measures motion over; a push that ran no tick has none.
             dt: if seconds > 0.0 { time.delta_time } else { 0.0 },
         }
     };

@@ -1,3 +1,5 @@
+//! Empty without its own `dev` feature: `cargo build --workspace` builds every member,
+//! so the crate gates itself, not only the root's optional dependency on it.
 #![cfg(feature = "dev")]
 #![allow(
     clippy::disallowed_methods,

@@ -10,6 +10,7 @@ use crate::memory::rss_peak_bytes;
 use rusty_lighting::lightmap::{bake_on, BakeScene};
 use rusty_scene::lighting::settings::Denoiser;
 
+/// The share of its UV square's height each sliver's UVs cover.
 const BAND: f32 = 0.1;
 
 fn slivers(n: usize) -> BakeScene {

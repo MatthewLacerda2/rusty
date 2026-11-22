@@ -1,3 +1,6 @@
+//! A headless bake's progress as log lines, as Unity's batch-mode bake logs it. The clock
+//! is read here, platform side, never in the sim.
+
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
@@ -27,6 +30,7 @@ pub use mesh_clock::{MeshClocks, MeshTime};
 pub use step::{stage_progress, Step};
 pub use summary::MeshCost;
 
+/// The longest a running step goes without a line.
 pub const INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -61,6 +65,7 @@ pub struct BakeLog<'a> {
     steps: Vec<summary::StepRun>,
     meshes: Vec<MeshCost>,
     denoised: Option<(u64, Duration)>,
+    // The process's peak resident memory, in bytes.
     peak: Option<u64>,
 }
 
@@ -77,6 +82,7 @@ impl<'a> BakeLog<'a> {
         Self::new(
             move || start.elapsed(),
             move |line: Line| {
+                // stderr, never stdout: `session-mcp`'s stdout carries only JSON-RPC.
                 eprintln!("{}", line.text);
                 listen::tell(&line.text);
                 if line.milestone {
@@ -157,6 +163,7 @@ impl<'a> BakeLog<'a> {
             p.step == Step::LightmapPages && self.since.as_ref().is_some_and(|s| s.done != p.done);
         let milestone = changed && p.step == Step::Lightmaps;
         if changed {
+            // The first step owns the time since the bake began, so the steps add up.
             let from = if self.steps.is_empty() { started } else { now };
             self.steps.push(summary::StepRun::new(p.step, from));
             let rate = rate::Window::default();
@@ -171,6 +178,7 @@ impl<'a> BakeLog<'a> {
         };
         since.done = p.done;
         run.total = p.total;
+        // The rate starts once the total is known, so rasterizing never skews the ETA.
         if p.total > 0 {
             since.rate.note(now, p.done);
         }

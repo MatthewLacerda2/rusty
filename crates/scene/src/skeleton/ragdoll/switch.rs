@@ -23,6 +23,7 @@ impl Scene {
         } else {
             (ragdoll, hitbox)
         };
+        // The whole body: no running reaction or partial switch holds any of it now.
         self.ragdolls.forget(&bones);
         for &bone in &bones {
             let velocity = on.then(|| velocity(bone).unwrap_or_default());
@@ -45,6 +46,8 @@ impl Scene {
             .world
             .joint(bone)
             .is_some_and(|j| j.drive_strength > 0.0);
+        // A body at blend weight 1 with no drive never reads its animated pose, so a plain
+        // dead ragdoll costs the animate hook nothing.
         let needed = track || driven || self.ragdolls.has_weight(bone);
         match velocity {
             Some(_) if !needed => self.ragdolls.untrack(bone),
@@ -56,6 +59,8 @@ impl Scene {
         }
     }
 
+    /// Only a full switch puts hitboxes on the ragdoll layer, so a hit reaction or a
+    /// `SetSimulated` branch is not "on" (scripts read it as dead).
     pub fn ragdoll_enabled(&self, id: u32) -> bool {
         let Some(layer) = self.layers.index_of(RAGDOLL_LAYER) else {
             return false;

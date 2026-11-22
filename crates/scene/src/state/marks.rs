@@ -1,3 +1,5 @@
+//! A field made of two classes has a mark per part, `field.part`, held to its own class.
+
 use std::sync::OnceLock;
 
 use glam::Vec3;
@@ -24,6 +26,8 @@ impl Mark {
     }
 }
 
+/// One box (the base entity) and a probe of each kind, so a mark can change a probe and not
+/// the count.
 pub fn base() -> (Scene, u32) {
     let mut scene = Scene::new();
     let base = create_entity(&mut scene, "Base", Some(Primitive::Box));

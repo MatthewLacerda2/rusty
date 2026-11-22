@@ -74,7 +74,7 @@ fn the_aim_clamps_at_its_limit() {
 #[test]
 fn weight_scales_the_turn_and_zero_is_a_no_op() {
     let chain = spine();
-    let target = Vec3::new(5.0, 0.6, 0.0);
+    let target = Vec3::new(5.0, 0.6, 0.0); // 90° to the side of the head, which looks +Z
     assert_eq!(solve_aim(&chain, target, settings(180.0, 0.0)), None);
     let rots = solve_aim(&chain, target, settings(40.0, 0.5)).unwrap();
     let turned = head(&chain, &rots).0.angle_between(Vec3::Z).to_degrees();

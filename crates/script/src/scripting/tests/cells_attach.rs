@@ -6,6 +6,7 @@ use super::lifecycle::manager_with_entity;
 use crate::api::ApiCtx;
 use crate::scripting::shared::ApiCells;
 
+/// Both destructurings are exhaustive: a cell missing from this list fails to compile.
 macro_rules! every_cell_is_its_own {
     ($cells:expr, $lua:expr; $($f:ident),* $(,)?) => {{
         let ApiCtx { $($f),* } = ApiCtx::default();
@@ -28,6 +29,7 @@ fn every_api_handle_reaches_its_own_attached_cell() {
         queries);
 }
 
+/// A registrar that read a cell would capture that `Rc`, missing a cell handed over later.
 #[test]
 fn registering_the_surface_reads_no_cell() {
     let lua = Lua::new();

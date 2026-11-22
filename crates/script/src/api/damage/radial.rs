@@ -104,6 +104,7 @@ fn rows(
             })
         })
         .collect();
+    // Owner first: `groups` merges only adjacent rows; `group` takes the first reached as nearest.
     rows.sort_by(|a, b| {
         (a.owner, a.distance, a.id)
             .partial_cmp(&(b.owner, b.distance, b.id))
@@ -226,6 +227,7 @@ pub(super) fn function(
     })
 }
 
+/// The groups, found under the scene and physics borrows, which end before any handler runs.
 fn gather(
     lua: &Lua,
     scene: &RefCell<Scene>,

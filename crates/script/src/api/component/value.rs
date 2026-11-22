@@ -1,6 +1,7 @@
 use mlua::{Lua, LuaSerdeExt, Table};
 use serde_json::{Map, Number, Value};
 
+/// Table nesting `walk` allows, so a table holding itself is an error, not a stack overflow.
 const MAX_DEPTH: u32 = 32;
 
 pub fn to_lua(lua: &Lua, value: &Value) -> mlua::Result<mlua::Value> {
@@ -29,6 +30,7 @@ fn walk(lua: &Lua, value: &mlua::Value, depth: u32) -> Result<Value, String> {
 }
 
 fn number(n: f64) -> Result<Value, String> {
+    // 2^53: every whole float below it is an exact integer.
     if n.fract() == 0.0 && n.abs() < 9_007_199_254_740_992.0 {
         return Ok(Value::from(n as i64));
     }
@@ -38,6 +40,7 @@ fn number(n: f64) -> Result<Value, String> {
 }
 
 fn table(lua: &Lua, t: &Table, depth: u32) -> Result<Value, String> {
+    // `to_lua` marks every list (mlua's default), so an empty one `Get` returned stays a list.
     let marked = t
         .metatable()
         .is_some_and(|m| m.to_pointer() == lua.array_metatable().to_pointer());
@@ -55,6 +58,7 @@ fn table(lua: &Lua, t: &Table, depth: u32) -> Result<Value, String> {
             .filter_map(|(k, _)| index(k))
             .max()
             .unwrap_or(0);
+        // Refuses a list mostly holes, so one stray big index cannot allocate that many nulls.
         if len > 2 * pairs.len() + 16 {
             return Err(format!(
                 "a list of {} entries ends at index {len}",

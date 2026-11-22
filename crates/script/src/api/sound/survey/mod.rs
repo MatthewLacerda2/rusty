@@ -46,6 +46,7 @@ pub enum Origin {
     Inline,
 }
 
+/// A file reads in canonical spelling only, as a song bake's `load_patch` does; inline, any case.
 impl Origin {
     fn decode<T: DeserializeOwned>(self, json: Json) -> Result<T, String> {
         match self {

@@ -1,3 +1,7 @@
+//! Light probes are a scene-level dataset, not a component. Written only through
+//! `ProbeVolume`'s methods, which drop the stale index and move the revision the renderer
+//! reads.
+
 mod index;
 mod sample;
 
@@ -10,7 +14,9 @@ use crate::lighting::sh::Sh9;
 use crate::revision::Revision;
 use index::ProbeIndex;
 
+/// Probes a point outside any grid blends: four, as Unity's light-probe tetrahedra do.
 pub const BLEND_PROBES: usize = 4;
+/// Squared metres: a point this near a probe reads it unblended.
 const ON_PROBE: f32 = 1.0e-8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -20,6 +26,7 @@ pub struct Probe {
     pub manual: bool,
     #[serde(skip)]
     pub sh: Sh9,
+    /// Per shadowmask channel, how much `Mixed` light reaches it past static occluders: 1 lit.
     #[serde(skip, default = "unoccluded")]
     pub occlusion: Vec4,
 }

@@ -27,6 +27,8 @@ impl<T: 'static> ApiCell<T> {
         Self(PhantomData)
     }
 
+    /// Clones the `Rc` and drops the app-data borrow before returning: `set_app_data`
+    /// panics while one is held, and a callback may run it.
     pub fn get(self, lua: &Lua) -> mlua::Result<Rc<RefCell<T>>> {
         match lua.app_data_ref::<Rc<RefCell<T>>>() {
             Some(cell) => Ok(Rc::clone(&cell)),
@@ -65,6 +67,8 @@ pub fn bind<T: 'static>(lua: &Lua, cell: &Rc<RefCell<T>>) -> ApiCell<T> {
     ApiCell::new()
 }
 
+/// Every field has its own type: app data is keyed by type, so a second cell of one type
+/// replaces the first.
 #[derive(Clone, Copy, Default)]
 pub struct ApiCtx {
     pub scene: ApiCell<Scene>,

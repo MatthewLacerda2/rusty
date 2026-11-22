@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Metres: the half-extent of the box a scene with no static geometry bakes over.
 pub const EMPTY_SCENE_HALF_EXTENT: f32 = 20.0;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -11,6 +12,7 @@ pub struct NavBounds {
 }
 
 impl NavBounds {
+    /// A test hook: other crates' tests build their bounds with it.
     pub const fn new(min_x: f32, max_x: f32, min_z: f32, max_z: f32) -> Self {
         Self {
             min_x,
@@ -27,6 +29,7 @@ impl NavBounds {
         max_z: EMPTY_SCENE_HALF_EXTENT,
     };
 
+    /// The bake ignores an invalid override, falling back to the derived bounds.
     pub fn is_valid(&self) -> bool {
         let finite = [self.min_x, self.max_x, self.min_z, self.max_z]
             .iter()

@@ -4,9 +4,10 @@
 
 #import postfx::grade::luminance
 
+// `effects::exposure`'s `BINS` and `BLOCK` mirror these: change both.
 const BINS: u32 = 64u;
-// Every pixel is metered, so a lamp a few pixels wide counts by its area wherever it
-// falls.
+// Pixels per side of a metered box. Every pixel is metered, so a lamp a few pixels wide
+// counts by its area.
 const BLOCK: u32 = 4u;
 // HDRP's *Center Weighted* metering: weight 1 - CENTRE_FALLOFF · d², d the distance
 // from the centre over the distance to a corner.
@@ -14,10 +15,13 @@ const CENTRE_FALLOFF: f32 = 0.75;
 // Integer weights for exact, order-free atomics: a frame holds at most (8K / BLOCK)² ·
 // WEIGHT_ONE ≈ 1.3e8, inside a u32.
 const WEIGHT_ONE: f32 = 64.0;
+// Log2 luminance, spanning 2^-10 to 2^10.
 const MIN_LOG: f32 = -10.0;
 const LOG_RANGE: f32 = 20.0;
+// Middle grey, the metered average's target luminance.
 const KEY: f32 = 0.18;
 
+// Mirrors `ExposureParams`.
 struct Params {
     // x: min_ev, y: max_ev, z: compensation, w: unused
     limits: vec4<f32>,

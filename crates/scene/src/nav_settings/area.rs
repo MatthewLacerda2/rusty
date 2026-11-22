@@ -2,10 +2,12 @@ use serde::{Deserialize, Serialize};
 
 use super::NavMeshSettings;
 
+/// One bit each in a `u32` agent mask.
 pub const MAX_AREAS: usize = 32;
 pub const WALKABLE_AREA: u8 = 0;
 pub const NOT_WALKABLE_AREA: u8 = 1;
 pub const ALL_AREAS: u32 = u32::MAX;
+/// The lowest cost multiplier, which keeps the A* heuristic admissible.
 pub const MIN_AREA_COST: f32 = 1.0;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]

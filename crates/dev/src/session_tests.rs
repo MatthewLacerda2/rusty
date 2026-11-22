@@ -162,6 +162,7 @@ fn a_capture_in_the_session_hears_the_steps_it_ran() {
     s.command("Time.Step(120)").unwrap();
     s.command("Audio.StopCapture()").unwrap();
     let bytes = std::fs::read(dir.join("rusty_session_capture.wav")).unwrap();
+    // Past the 44-byte WAV header: 32-bit float stereo at 48 kHz.
     let samples: Vec<f32> = bytes[44..]
         .chunks(4)
         .map(|b| f32::from_le_bytes(b.try_into().unwrap()))

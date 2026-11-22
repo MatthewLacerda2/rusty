@@ -1,9 +1,11 @@
-// Reading the volumetric fog: the froxel grid is built by `volumetric_fog.wgsl`. Camera
-// `volumetric`: x 1 when this camera reads the volume (0: a uniform branch, no fetch),
-// y depth slices, z far end, w near end of the exponential slices.
+// The volumetric fog is read here. The grid's builder (`volumetric_fog.wgsl`) and every reader go
+// through its slice mapping, so they agree. Camera `volumetric`: x 1 when this camera reads the
+// volume (0: a uniform branch, no fetch), y the slice count, z the far end and w the near end of
+// the exponential slices, both view depths.
 
 #define_import_path fog::volumetric
 
+// No fog at all: in-scatter (rgb) 0 and transmittance (a) 1.
 const NO_VOLUMETRIC: vec4<f32> = vec4<f32>(0.0, 0.0, 0.0, 1.0);
 
 // Where view depth `depth` falls among the slices, in slice-boundary units: 0 at the
@@ -19,6 +21,7 @@ fn froxel_slice(vol: vec4<f32>, depth: f32) -> f32 {
     return n * log(depth / vol.w) / ratio;
 }
 
+// The view depth at slice coordinate `s`; it must stay `froxel_slice`'s inverse.
 fn froxel_depth(vol: vec4<f32>, s: f32) -> f32 {
     let n = vol.y;
     let ratio = log(vol.z / vol.w);
@@ -55,8 +58,8 @@ fn volumetric_fog(
     return volume_at(t, smp, vol, uv, froxel_slice(vol, depth));
 }
 
-// The fragment's screen position, not a point along its view direction, so an
-// orthographic camera's sky reads each column of the grid too.
+// The sky reads the whole volume at its fragment's screen position, not along its view
+// direction, so an orthographic camera's sky reads each column of the grid too.
 fn volumetric_sky(t: texture_3d<f32>, smp: sampler, vol: vec4<f32>, clip: vec4<f32>) -> vec4<f32> {
     if (vol.x < 0.5) {
         return NO_VOLUMETRIC;

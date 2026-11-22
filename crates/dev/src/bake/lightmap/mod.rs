@@ -110,6 +110,8 @@ pub fn lightmap_receivers(input: &BakeScene) -> usize {
         .count()
 }
 
+/// Each mesh with a usable lightmap UV bakes exactly one lightmap, so the difference is the
+/// meshes without one.
 pub fn missing_uv_report(static_meshes: usize, lightmaps: usize) -> Option<String> {
     let n = static_meshes.saturating_sub(lightmaps);
     let (noun, verb) = if n == 1 {

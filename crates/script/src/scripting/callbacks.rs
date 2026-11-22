@@ -42,6 +42,8 @@ pub const ON_CANCEL: &str = "OnCancel";
 /// stays put and the script moves it itself (`UI.FindSelectable`) if it wants.
 pub const ON_MOVE: &str = "OnMove";
 
+/// Every callback the engine dispatches: a new one joins it too, or discovery and the doc
+/// gate never see it.
 pub const LIFECYCLE_CALLBACKS: &[&str] = &[
     AWAKE,
     ON_ENABLE,

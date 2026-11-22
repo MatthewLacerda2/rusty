@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use rusty_lighting::lightmap::BakeObserver;
 
+/// `busy` is worker time summed over threads: the pool traces one mesh on every core at once.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeshTime {
     pub entity: u32,
@@ -17,6 +18,7 @@ pub struct MeshClocks {
     meshes: OnceLock<Vec<(u32, u64, AtomicU64)>>,
 }
 
+// Per thread: a batch starts and ends on one thread.
 thread_local! {
     static BATCH_STARTED: Cell<Option<Instant>> = const { Cell::new(None) };
 }

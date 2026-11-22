@@ -1,9 +1,13 @@
+//! An id leaf naming a bone is saved against the skinned entity, the bone kept by name
+//! (then its ancestors') in `Entity::bone_refs`, since bones take fresh ids each load.
+//! Once the skeleton is back, it re-binds to the first of those the skeleton still has.
 use std::collections::BTreeMap;
 
 use super::persist::bone_chain;
 use crate::Scene;
 use rusty_components::{Entity, EntityRefs};
 
+/// Bone id → its skinned entity and bone chain (its name, then its ancestors').
 pub(super) type BoneIndex = BTreeMap<u32, (u32, Vec<String>)>;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -22,6 +26,7 @@ pub(super) fn repoint_refs(entities: &mut [Entity], bone_of: &BoneIndex) {
             let Some((owner, chain)) = r.and_then(|b| bone_of.get(&b)) else {
                 return;
             };
+            // A bone naming a bone of its own skeleton is the ragdoll's (`persist`).
             if own != Some(*owner) {
                 *r = Some(*owner);
                 found.push((pointer.to_string(), chain.clone()));
@@ -81,6 +86,7 @@ impl Scene {
         repoint_refs(docs, &self.bone_index());
     }
 
+    /// Call before `removed` (bones a re-import dropped) are despawned.
     pub(super) fn park_bone_refs(
         &mut self,
         owner: u32,
@@ -111,6 +117,7 @@ impl Scene {
         for p in pending {
             let bone = self.resolve_bone(p.holder, p.owner, &p.chain);
             self.world.visit_refs(p.holder, &mut |pointer, r| {
+                // A leaf changed since it was parked is left alone.
                 if pointer == p.pointer && *r == Some(p.owner) {
                     *r = Some(bone);
                 }

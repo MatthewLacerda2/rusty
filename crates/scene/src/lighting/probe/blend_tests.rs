@@ -3,6 +3,8 @@ use glam::Vec3;
 use super::index::scan;
 use super::{ProbeVolume, BLEND_PROBES};
 
+/// Free probes zig-zagging off the x axis, probe `k`'s DC term `k`, so every swap of the
+/// nearest four changes what they blend.
 fn row() -> ProbeVolume {
     let mut vol = ProbeVolume::new();
     for k in 0..12 {

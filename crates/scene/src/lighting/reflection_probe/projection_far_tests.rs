@@ -52,6 +52,8 @@ fn the_fade_starts_past_the_influence_volume_and_is_continuous() {
         while x < start + span + 1.0 {
             x += 0.01;
             let now = at(x, r);
+            // A unit direction, per 1 cm step: the fade's lerp over the 6.9 m span moves it at
+            // most about 0.003 (a gap under 2), so a pop at either end of the fade fails.
             assert!((now - last).length() < 1e-2, "{r} at {x}: {last} -> {now}");
             assert!((now.length() - 1.0).abs() < 1e-5);
             last = now;

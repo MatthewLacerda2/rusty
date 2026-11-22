@@ -21,7 +21,9 @@ fn default_skybox_path() -> String {
     "".to_string()
 }
 
+/// Hemisphere ambient's sky (up) colour; the default gradient's other two scale it.
 pub const DEFAULT_AMBIENT_COLOR: Vec3 = Vec3::new(0.45, 0.55, 0.70);
+/// Unitless, on the ambient colour.
 pub const DEFAULT_AMBIENT_INTENSITY: f32 = 0.55;
 
 pub struct Scene {
@@ -53,6 +55,7 @@ pub struct Scene {
     pub persistent: std::collections::BTreeSet<u32>,
     pub debug_lines: crate::runtime::debug_lines::DebugLines,
     pub shader_time: f32,
+    /// `Time::unscaled_time`: runs at time scale 0 too.
     pub ui_time: f32,
     pub inspected_reflection_probe: Option<usize>,
     #[cfg(feature = "dev")]
@@ -61,13 +64,17 @@ pub struct Scene {
     #[cfg(feature = "dev")]
     pub lighting_bake_running: bool,
     #[cfg(feature = "dev")]
+    /// `Lighting.GenerateAsync()` waiting for the editor's next frame; Play refuses meanwhile.
     pub lighting_bake_requested: bool,
     #[cfg(feature = "dev")]
     pub lighting_bake_status: crate::lighting::bake_status::BakeStatus,
     pub history_cuts: crate::camera::HistoryCuts,
     pub shader_overrides: crate::shader_overrides::ShaderOverrides,
     pub ragdolls: crate::skeleton::RagdollRuntime,
+    /// The write-log generation (`core::fs::written`) the meshes hold every note up to.
     pub meshes_read_at: u64,
+    /// Model path → the generation of the scene's own re-import note, which
+    /// `ModelWrites::follow` skips.
     pub meshes_reimported: BTreeMap<String, u64>,
     pub(crate) disk_text: crate::io::DiskText,
     pub(crate) history: crate::undo::UndoStack,
@@ -151,7 +158,6 @@ impl Scene {
     }
 
     pub fn set_parent(&mut self, entity_id: u32, parent_id: Option<u32>) -> Result<(), String> {
-        // 1. Detect cycles
         if let Some(p_id) = parent_id {
             if entity_id == p_id {
                 return Err("An entity cannot be parented to itself.".to_string());
@@ -177,6 +183,7 @@ impl Scene {
             self.world.add_child(new_p, entity_id);
         }
 
+        // Keeps the local transform: the subtree moves in world space.
         self.world.set_parent_id(entity_id, parent_id);
 
         Ok(())

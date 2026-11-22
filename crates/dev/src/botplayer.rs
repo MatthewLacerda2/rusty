@@ -1,6 +1,7 @@
 use rusty_edit::authoring::add_script;
 use rusty_scene::Scene;
 
+/// A test hook: the bot `tests/bot_player_session.rs` attaches to the Player.
 pub const PLAYER_BOT_SCRIPT: &str = "assets/scripts/bot_player.lua";
 
 pub fn attach_player_bot(scene: &mut Scene, script_path: &str) -> bool {

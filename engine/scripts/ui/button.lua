@@ -1,4 +1,4 @@
--- Unity's `Button`. A script component: fork it to change what a button does.
+-- Unity's `Button`.
 --
 -- A script component, not a first-class component: fork it (copy it under another
 -- name) to change what a button does. The look — the colour per state — is the

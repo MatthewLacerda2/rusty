@@ -1,7 +1,5 @@
-//! - `Texture.Bake(recipe, path, slot)` — evaluate a recipe and write the PNG,
-//!   encoded for the named `slot` (base_color / emissive = sRGB; normal /
-//!   roughness / metallic / data = linear; `metallic_roughness` packs metallic→B,
-//!   roughness→G). Returns the written path.
+//! Each bake checks its size before it makes a folder or readies a sidecar, so a refused bake
+//! writes nothing.
 
 mod folder;
 mod from_lua;

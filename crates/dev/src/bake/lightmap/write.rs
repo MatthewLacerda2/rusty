@@ -11,8 +11,10 @@ use super::spill::Spilled;
 use super::{encode_pages, lightmap_dir, EncodedPages};
 
 pub(super) const FINAL: &str = "lightmap";
+/// Starts with `FINAL`'s `lightmap_`, so a finished bake's `clear_pages` removes previews too.
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
+/// A test hook: `limits_tests` writes maps past the page limit through it.
 pub fn apply_lightmaps(
     scene: &mut Scene,
     scene_path: &str,
@@ -30,6 +32,8 @@ pub fn apply_encoded(
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     if encoded.maps == 0 {
+        // No map, but the probes still mask by these channels and hold the Baked lights'
+        // direct light; no page holds their bounce, so `lights` stays empty for SSIL.
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
         set.fell_back = encoded.shadowmask.fell_back.clone();
@@ -149,6 +153,7 @@ fn warn_fell_back(set: &LightmapSet) {
     );
 }
 
+/// The name carries the content tag, so a file of that name and length is this page already.
 fn there(path: &Path, len: u64) -> bool {
     std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == len)
 }
@@ -161,6 +166,7 @@ pub(super) fn fold_tag(hash: u64) -> u32 {
     (hash ^ (hash >> 32)) as u32
 }
 
+/// Only `.png`: every preview page is one (`encoder::write_preview`).
 pub(super) fn remove_stems(dir: &Path, gone: &BTreeSet<String>) -> Result<(), String> {
     for stem in gone {
         let path = dir.join(format!("{stem}.png"));
@@ -188,6 +194,7 @@ pub(super) fn clear_pages(dir: &Path, prefix: &str, keep: &BTreeSet<String>) -> 
             .is_some_and(|s| keep.contains(&*s.to_string_lossy()));
         if name.starts_with(&format!("{prefix}_")) && page && !kept {
             std::fs::remove_file(&path).map_err(|e| format!("remove {name}: {e}"))?;
+            // Noted like a write, so the renderer drops the arrays holding it.
             rusty_core::fs::written::note_written(&path.to_string_lossy());
         }
     }

@@ -5,21 +5,25 @@ use crate::Scene;
 use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::{primitives, MeshRevision, Vertex};
 
+// Metres: a room's side, floor to floor, a wall's thickness and a doorway's width.
 const ROOM: f32 = 10.0;
 const STOREY: f32 = 4.0;
 const WALL: f32 = 0.2;
 const DOOR: f32 = 1.4;
 
+/// `n = 20` is the Dust2-sized level, 200 m a side; `n = 5` is about Kolvik's size.
 pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let extent = n as f32 * ROOM;
+    // One sphere for every statue: its build runs a lightmap unwrap, too dear once per room.
     let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
     let sphere = (vertices.into(), indices.into());
     for storey in 0..2 {
         let y = storey as f32 * STOREY;
         for (i, j) in (0..n).flat_map(|i| (0..n).map(move |j| (i, j))) {
             let lo = Vec3::new(i as f32 * ROOM, y - WALL, j as f32 * ROOM);
+            // Every seventh room has a hole down to the storey below.
             if storey == 0 || (i * n + j) % 7 != 3 {
                 block(&mut scene, "Floor", lo, lo + Vec3::new(ROOM, WALL, ROOM));
             }
@@ -94,5 +98,6 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
     (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
+    // The sphere gets a geometry slot of its own, so it is never drawn as the box it replaced.
     mesh.own_geometry = Some(mesh.revision);
 }

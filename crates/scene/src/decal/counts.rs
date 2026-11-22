@@ -1,9 +1,13 @@
+//! Running counts kept in step with every add, fade and drop, so a spawn checks its budgets
+//! without a pass over the ring.
+
 use std::collections::BTreeMap;
 
 use super::Decal;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Counts {
+    /// Whole decals per bucket; an empty bucket has no entry, so a destroyed owner leaves none.
     whole: BTreeMap<Option<u32>, u32>,
     pub total: u32,
     pub evicting: usize,

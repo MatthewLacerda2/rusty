@@ -1,6 +1,7 @@
 
 #import fullscreen
 
+// The chain's IO layout: FXAA reads only its colour and sampler, so it declares no binding 0.
 @group(0) @binding(1) var t_color: texture_2d<f32>;
 @group(0) @binding(2) var s_color: sampler;
 
@@ -17,7 +18,7 @@ fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VsOut {
     return out;
 }
 
-// FXAA 3.11's luma-based edge blend, defined on post-tonemap, gamma-encoded colour,
+// FXAA's luma-based edge blend (Lottes), defined on post-tonemap, gamma-encoded colour,
 // hence after `fs_composite`. The LDR target is sRGB so taps come back linear;
 // `fxaa_luma` takes the sqrt as a cheap re-encode, so thresholds see perceptual luma
 // while the blend runs in linear.
@@ -30,8 +31,8 @@ fn fxaa_luma(c: vec3<f32>) -> f32 {
 
 @fragment
 fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
-    // The floor stops near-flat regions from resolving a direction out of numerical
-    // noise.
+    // `span_max` is how far along an edge to search, in pixels;
+    // `reduce_min` stops near-flat regions resolving a direction out of numerical noise.
     let span_max = 8.0;
     let reduce_mul = 1.0 / 8.0;
     let reduce_min = 1.0 / 128.0;
@@ -73,6 +74,8 @@ fn fs_fxaa(in: VsOut) -> @location(0) vec4<f32> {
         + 0.25 * (textureSample(t_color, s_color, in.uv + dir * -0.5).rgb
             + textureSample(t_color, s_color, in.uv + dir * 0.5).rgb);
 
+    // Outside the neighbourhood's luma range the wide taps strayed off the edge and would
+    // smear, so the narrow average is kept.
     let l_b = fxaa_luma(rgb_b);
     if (l_b < luma_min || l_b > luma_max) {
         return vec4<f32>(rgb_a, 1.0);

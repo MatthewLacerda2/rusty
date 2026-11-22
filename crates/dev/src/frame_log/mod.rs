@@ -1,3 +1,4 @@
+//! Display-side: the wall clock the frame log writes never reaches the sim.
 //! stored-format: `saved/logs/frames-<n>.jsonl`, the rolling frame log
 
 use std::cell::OnceCell;
@@ -22,6 +23,7 @@ pub use read::{read, LogQuery, LogRead};
 
 pub const LOGS_DIR: &str = "saved/logs";
 
+/// Milliseconds of CPU over a frame's ticks.
 pub const SYSTEM_MS: f64 = 0.25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -33,6 +35,8 @@ pub enum LogHost {
 pub struct FrameLog {
     writer: writer::Writer,
     held: held::Shared,
+    /// Until the console feeds this log, what it logged before the first frame (a boot
+    /// scene's script error) comes from its buffer.
     fed: bool,
     audio_seq: u64,
 }
@@ -47,6 +51,7 @@ impl FrameLog {
             .flatten()
     }
 
+    /// Public as a test hook too: other crates' tests start a log in a temp folder.
     pub fn start(dir: &Path, settings: LogSettings) -> Option<Self> {
         if settings.budget_mb == 0 {
             return None;
@@ -67,6 +72,9 @@ impl FrameLog {
         }
     }
 
+    /// Call after the frame's stats were recorded, so their newest frame is this one.
+    /// `times_gpu` says the adapter takes timestamps: only then is a frame's line held for
+    /// its GPU times.
     pub fn frame(&mut self, game: &GameWorld, frame: &WindowFrame, times_gpu: bool) {
         let channels = game.resources.application.borrow().log_settings().channels;
         let place = OnceCell::new();

@@ -7,6 +7,7 @@ use rusty_components::RigidBodyComponent;
 use rusty_edit::authoring::{physics::collider as collider_ops, physics::rigidbody as rb_ops};
 use rusty_scene::Scene;
 
+/// `set` is the inspector's `rb_ops` setter, so a script's value is clamped as the card's is.
 fn number_pair(
     lua: &mlua::Lua,
     table: &Table,

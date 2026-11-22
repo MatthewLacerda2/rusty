@@ -2,6 +2,8 @@ use super::timers::{counted, rig, tick};
 use rusty_edit::authoring::defaults;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
+/// Baked into the shared shader folder: its tag keeps one run's tests apart, the process id
+/// two runs.
 pub(super) struct Baked(pub(super) String);
 
 impl Baked {
@@ -26,6 +28,7 @@ impl Drop for Baked {
     }
 }
 
+/// Rounded to 3 decimals: f32 steps sum inexactly.
 pub(super) fn eval(m: &crate::scripting::manager::ScriptManager, expr: &str) -> String {
     m.eval(&format!("math.floor(({expr}) * 1000 + 0.5) / 1000"))
         .unwrap()

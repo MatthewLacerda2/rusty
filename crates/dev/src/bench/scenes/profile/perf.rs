@@ -7,6 +7,7 @@ use super::folded::Folded;
 use super::trust::{self, Tally};
 use super::window::{self, Window};
 
+/// Samples a second `perf record -F` takes, and the rate a profile's expected count uses.
 pub const HZ: u32 = 499;
 const EVENTS: [&str; 2] = ["cycles:u", "cpu-clock:u"];
 
@@ -31,10 +32,12 @@ pub fn start(perf: &Path, data: &Path) -> Result<Recording, String> {
             .args(["-p", &pid, "-o"])
             .arg(data)
             .stdout(Stdio::null())
+            // A file, not a pipe: a pipe read only at the end could fill and stall perf.
             .stderr(stderr)
             .spawn()
             .map_err(|e| format!("cannot run {}: {e}", perf.display()))?;
         let mut child = child;
+        // Time for perf to attach, or to exit saying why it cannot.
         std::thread::sleep(Duration::from_millis(500));
         match child.try_wait() {
             Ok(None) => {
@@ -152,6 +155,7 @@ pub fn parse(text: &str, windows: &[Window], own: &str) -> (Folded, Tally) {
     (folded, tally)
 }
 
+/// A frame's `::` comes after its ip and a space, so a frame line never reads as a stamp.
 fn stamp(line: &str) -> Option<(u64, &str)> {
     let (head, rest) = line.split_once(':')?;
     let t = window::parse_stamp(head.trim())?;

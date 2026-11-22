@@ -1,7 +1,6 @@
-// engine/shaders/postfx/ycocg.wgsl — the colour spaces TAA's resolve works in
-// (`taa.wgsl`): YCoCg, where its neighbourhood box is built and its history
-// clamped, and URP's perceptual luma, what its flicker hold measures (
-// `taa_flicker.wgsl`).
+// The colour spaces TAA's resolve works in (`taa.wgsl`): YCoCg, where its neighbourhood box is
+// built and its history clamped, and URP's perceptual luma, what its flicker hold measures
+// (`taa_flicker.wgsl`).
 
 #define_import_path postfx::ycocg
 

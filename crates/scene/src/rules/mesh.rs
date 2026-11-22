@@ -1,3 +1,6 @@
+//! The Mesh fields a file can carry out of range, held on every load and prefab stamp: the
+//! field table leaves them `unheld!`, since its hold would copy the whole geometry for one.
+
 use super::sanitize;
 use crate::create::{primitive_revision, subdivided_geometry, Primitive};
 use rusty_components::mesh::primitives::MAX_PLANE_SUBDIVISIONS;
@@ -35,6 +38,7 @@ pub fn set_subdivisions(mesh: &mut MeshComponent, subdivisions: u32) -> Result<(
         ));
     }
     if mesh.primitive_type != "Plane" && subdivisions == 1 {
+        // Clears a stray count; the shape ignores it anyway.
         mesh.subdivisions = 1;
         return Ok(());
     }

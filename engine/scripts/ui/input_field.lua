@@ -1,8 +1,6 @@
 -- Unity's `InputField`. Enter submits a SingleLine field (`on_submit`) and
 -- breaks the line in MultiLine; Escape restores the text it had when focused.
--- Cmd works for Ctrl on macOS; a Password field never copies or cuts.
--- `content_type`: Standard, Integer, Decimal or Password (shown as `*`);
--- `char_limit` 0 = none. The caret blinks on unscaled time.
+-- Cmd works for Ctrl on macOS. The caret blinks on unscaled time.
 --
 -- Owner API (via `Scene.GetScript(id, "input_field")`):
 --   text
@@ -100,6 +98,8 @@ local function delete_selection()
     return b > a
 end
 
+-- Call with the selection already deleted: `char_limit` and the `-` and `.` checks
+-- read `chars` as they stand.
 local function accepts(c)
     if Field.char_limit > 0 and #chars >= Field.char_limit then return false end
     local t = Field.content_type
@@ -270,6 +270,7 @@ end
 function Field.OnSelect(id)
     if not text_id then return end
     focused, original = true, Field.text
+    -- This selects all; a click's `OnPointerDown`, delivered after it, places the caret.
     pos, anchor = #chars, 0
     refresh()
 end

@@ -117,7 +117,7 @@ fn centre_px(layout: &UiLayout, r: &UiRect, view: &UiView) -> Option<Vec2> {
     canvas_to_screen(layout.space(r.canvas), r.scale_factor, centre, view)
 }
 
-/// for every visible Selectable, in draw order; `rect` in screen pixels (absent for
+/// `UI.List`: every visible Selectable, in draw order; `rect` in screen pixels (absent for
 /// a world-canvas Selectable behind the camera).
 fn list(
     lua: &Lua,

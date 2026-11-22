@@ -86,6 +86,8 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
 
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
+        // A `/` or `..` part would let `Path::join` leave the scripts folder; an error, not a
+        // miss, so `package.path` is not tried either.
         let plain = |segment: &str| {
             let mut parts = Path::new(segment).components();
             matches!(parts.next(), Some(std::path::Component::Normal(_))) && parts.next().is_none()
@@ -119,6 +121,8 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     })
 }
 
+/// Calls `package.searchpath` through `package`, which `dev::demo::calls` must keep skipping,
+/// or a scenario's fall-through `require` is journalled as a game act.
 fn path_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
         let package: Table = lua.globals().get("package")?;
@@ -162,6 +166,8 @@ fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<
     lua.globals().set(name, wrapper)
 }
 
+/// Untouched: `\` is a filename character on macOS and Linux, so respelling it opens
+/// another file.
 fn opened_path(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }

@@ -23,6 +23,7 @@ fn cheap(mut level: Scene) -> Scene {
     let s = &mut level.lighting_settings.lightmaps;
     (s.texels_per_unit, s.samples, s.bounces, s.max_lightmap_size) = (0.5, 1, 1, 16);
     let r = &mut level.lighting_settings.reflections;
+    // Reflection probes are most of a Generate's time on lavapipe.
     (r.resolution, r.max_probes) = (16, 1);
     level
 }

@@ -149,6 +149,8 @@ pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
         .collect()
 }
 
+/// Scales the SSR record and SSIL's realtime light, both taken before the colour blocks
+/// run, as the blocks scale the colour.
 pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
     instances
         .iter()
@@ -160,6 +162,8 @@ pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<Str
                 Reflection::Scaled(factor) => factor.replace("{args}", &args(block, index, layout)),
                 Reflection::Dropped => "vec3<f32>(0.0)".to_string(),
             };
+            // Bound once: a factor may sample textures (`triplanar_detail` three times),
+            // and both records read it.
             Some(format!(
                 "let fold_factor_{index} = {factor};\n        \
                  ssr_texels = ssr_surface::scale(ssr_texels, fold_factor_{index});\n        \

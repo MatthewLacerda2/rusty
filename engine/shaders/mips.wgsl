@@ -1,4 +1,4 @@
-// engine/shaders/mips.wgsl — one mip level from the level above it.
+// One mip level from the level above it.
 //
 // A fullscreen triangle drawn into level N box-filters level N-1: each texel
 // averages the texels of the level above that its footprint covers. An even side

@@ -14,6 +14,7 @@ local Group = {
 
 local toggles = {}
 
+-- Each member toggle calls this from its Awake, so `Start` sees the whole group.
 function Group.register(t)
     toggles[#toggles + 1] = t
 end
@@ -24,6 +25,7 @@ function Group.active()
     end
 end
 
+-- True when `t` may not turn off: the group needs one on and no other is.
 function Group.is_locked(t)
     if Group.allow_switch_off then return false end
     for _, other in ipairs(toggles) do

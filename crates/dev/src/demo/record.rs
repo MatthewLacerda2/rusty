@@ -28,6 +28,8 @@ struct Session {
 pub struct Recorder {
     destination: Destination,
     session: Option<Session>,
+    /// Whether the scene was saved at install, until a tick passes: acts made before then
+    /// (a scenario's set-up) are replayed, so their edits count as no unsaved edit.
     clean_at_install: Option<bool>,
     written: Vec<PathBuf>,
 }
@@ -38,6 +40,8 @@ fn is_saved(world: &GameWorld) -> Option<bool> {
     Some(!rusty_edit::has_unsaved_edits(&scene.borrow(), &path))
 }
 
+/// Held while the file is open, so `files::prune` never deletes it; a filesystem without
+/// locks only loses that guard.
 fn lock(file: File) -> BufWriter<File> {
     if let Err(err) = file.try_lock() {
         log::debug!("[Demo] cannot lock the demo being written: {err}");
@@ -199,6 +203,7 @@ impl Session {
 impl TickTap for Recorder {
     fn at(&mut self, point: TapPoint, world: &mut GameWorld) {
         match point {
+            // This fires however Play is entered, so the header is read before `Awake` runs.
             TapPoint::Before(PlayTransition::Entered) if self.session.is_none() => {
                 self.start(world);
             }

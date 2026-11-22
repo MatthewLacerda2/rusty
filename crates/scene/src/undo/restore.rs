@@ -23,7 +23,9 @@ pub(super) fn apply(scene: &mut Scene, step: Step) -> Step {
     if let Some(level) = step.level {
         level.restore(scene);
     }
+    // After the level: a library mesh's users take its put-back data.
     scene.sync_scene_meshes();
+    // Once per step, not per entity: every change cursor rebuilds.
     scene.world.rewind_changes();
     inverse
 }
@@ -34,6 +36,7 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
         .filter(|(id, before)| before.is_none() && scene.world.contains(**id))
         .map(|(&id, _)| id)
         .collect();
+    // Through the one despawn door, so the selection, lightmap entries and owned decals go too.
     scene.despawn_batch(&created, Despawn::EditMode);
     let world = &mut scene.world;
     let mut rebuilt = Vec::new();
@@ -45,6 +48,7 @@ fn restore_entities(scene: &mut Scene, entities: BTreeMap<u32, Option<Recorded>>
         }
         world.restore_entity(doc, seq);
     }
+    // Once every entity is back, so each skeleton finds its restored bones.
     for owner in rebuilt {
         scene.sync_skeleton(owner);
     }

@@ -17,7 +17,7 @@ fn dispatch_fires_enter_stay_exit_in_order() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
 
     m.dispatch_trigger_events(TriggerEvents {
         entered: vec![(id, 9)],
@@ -49,7 +49,7 @@ fn missing_edge_callbacks_are_optional() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
     m.dispatch_trigger_events(TriggerEvents {
         entered: vec![(id, 7)],
         stayed: vec![(id, 7)],

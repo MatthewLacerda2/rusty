@@ -1,9 +1,8 @@
-// engine/shaders/postfx/ssr_pyramid.wgsl — one level of SSR's two hit pyramids
-// (`render::postfx::effects::ssr::pyramid`): the trace's hits and its spread, each
-// texel the average of the 2×2 texels above it in its own pyramid (an odd level's
-// last row or column has none below it and is left out). A non-finite texel is left
-// out of the average too, so one hot pixel never turns a whole block of a coarse
-// level, and every blur the resolve reads from it, into inf or NaN.
+// One level of SSR's two hit pyramids (`render::postfx::effects::ssr::pyramid`): the trace's hits
+// and its spread, each texel the average of the 2×2 texels above it in its own pyramid (an odd
+// level's last row or column has none below it and is left out). A non-finite texel is left out of
+// the average too, so one hot pixel never turns a whole block of a coarse level, and every blur the
+// resolve reads from it, into inf or NaN.
 //
 // One fullscreen pass per level writes both pyramids' level, as two colour
 // targets: the pyramids are render targets only, never storage, so a GPU keeps

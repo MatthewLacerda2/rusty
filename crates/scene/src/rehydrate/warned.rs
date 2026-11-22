@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+// Process-wide: a scene reloads often, on whichever thread, and once is enough.
 static WARNED: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
 fn warned() -> MutexGuard<'static, BTreeSet<String>> {
@@ -14,6 +15,7 @@ pub(super) fn warn_once(reference: &str, error: &rusty_asset::ImportError) {
 }
 
 pub fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
+    // A quiet stretch leaves the key unspent, for the apply that is heard.
     if rusty_core::quiet::is_quiet() {
         return;
     }
@@ -22,6 +24,7 @@ pub fn warn_once_of(key: &str, message: impl FnOnce() -> String) {
     }
 }
 
+/// A test hook: the edit side's tests read it.
 #[doc(hidden)]
 pub fn warned_of(key: &str) -> bool {
     warned().contains(key)

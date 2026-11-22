@@ -23,6 +23,8 @@ use lens::{chromatic_aberration, film_grain, vignette};
 
 pub type Registrar = fn(&mlua::Lua, &mlua::Table, ApiCell<Scene>) -> Reg;
 
+/// Every effect's registrar, by its name. A test hook: `tests/post_effect_layers.rs` checks
+/// each post effect has one.
 pub const REGISTRARS: &[(&str, Registrar)] = &[
     // sorted: one row per effect; each registers names no other does
     ("bloom", bloom::register),
