@@ -39,9 +39,9 @@ struct RtTriUv {
 };
 
 struct RtInstance {
-    r0: vec4<f32>,
-    r1: vec4<f32>,
-    r2: vec4<f32>,
+    row_x: vec4<f32>,
+    row_y: vec4<f32>,
+    row_z: vec4<f32>,
     root: u32,
     slot: u32,
     faces: u32,
@@ -101,8 +101,8 @@ fn rt_triangle(o: vec3<f32>, d: vec3<f32>, tri: RtTri, code: u32, reach: f32) ->
 
 fn rt_mesh(i: u32, wo: vec3<f32>, wd: vec3<f32>, best: Hit, any: bool) -> Hit {
     let inst = rt_instances[i];
-    let o = vec3<f32>(dot(inst.r0, vec4(wo, 1.0)), dot(inst.r1, vec4(wo, 1.0)), dot(inst.r2, vec4(wo, 1.0)));
-    let d = vec3<f32>(dot(inst.r0, vec4(wd, 0.0)), dot(inst.r1, vec4(wd, 0.0)), dot(inst.r2, vec4(wd, 0.0)));
+    let o = vec3<f32>(dot(inst.row_x, vec4(wo, 1.0)), dot(inst.row_y, vec4(wo, 1.0)), dot(inst.row_z, vec4(wo, 1.0)));
+    let d = vec3<f32>(dot(inst.row_x, vec4(wd, 0.0)), dot(inst.row_y, vec4(wd, 0.0)), dot(inst.row_z, vec4(wd, 0.0)));
     let inv = rt_inv(d);
     var hit = best;
     var nodes: array<u32, RT_STACK>;

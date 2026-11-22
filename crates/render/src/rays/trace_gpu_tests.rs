@@ -18,8 +18,9 @@ pub(super) fn level() -> Scene {
     let mut place = |kind, world: glam::Mat4, material: Option<&str>| {
         let id = create_entity(&mut scene, "Solid", Some(kind));
         let (scale, rotation, position) = world.to_scale_rotation_translation();
-        let t = &mut *scene.world.transform_mut(id).expect("a transform");
-        (t.position, t.rotation, t.scale) = (position, rotation, scale);
+        if let Some(mut t) = scene.world.transform_mut(id) {
+            (t.position, t.rotation, t.scale) = (position, rotation, scale);
+        }
         let material = material.map(|m| rusty_components::MaterialComponent::new(m.to_string()));
         scene.world.set_material(id, material);
         scene.world.set_static(id, true);

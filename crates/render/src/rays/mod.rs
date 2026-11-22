@@ -15,6 +15,7 @@ use std::collections::BTreeMap;
 pub(crate) use gpu::layout;
 pub(crate) use top::Packed;
 
+use crate::debug_meshes::has_geometry;
 use crate::scene::{MeshHandle, RenderObject, RenderScene};
 use crate::Renderer;
 use mesh::MeshTree;
@@ -76,7 +77,8 @@ impl RayTree {
             if kept.contains_key(&o.mesh) {
                 continue;
             }
-            let Some(mesh) = scene.world.mesh(id) else {
+            let mesh = scene.world.mesh(id);
+            let Some(mesh) = mesh.filter(|m| has_geometry(&m.vertices, &m.indices)) else {
                 continue;
             };
             let tree = match self.meshes.remove(&o.mesh) {
@@ -149,9 +151,13 @@ impl Renderer {
         let rs = self.retained.scene(scene.id()).ok_or("not extracted")?;
         let mut fresh = RayTree::default();
         fresh.rebuild(rs, scene, &mut Rebuilt::default());
-        match kept == fresh.packed() {
+        let fresh = fresh.packed();
+        match kept == fresh {
             true => Ok(()),
-            false => Err("the kept ray tree differs from a fresh one".into()),
+            false => Err(format!(
+                "the kept ray tree differs from a fresh one: {:?} vs {:?}",
+                kept.instances, fresh.instances
+            )),
         }
     }
 
@@ -160,6 +166,8 @@ impl Renderer {
     }
 }
 
+#[cfg(test)]
+mod dust2_gpu_tests;
 #[cfg(test)]
 mod fixtures;
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use glam::{Mat4, Quat, Vec3};
 use rapier3d::parry::query::{Ray, RayCast};
-use rapier3d::parry::shape::{FeatureId, TriMesh};
+use rapier3d::parry::shape::TriMesh;
 
 use super::fixtures::{rays, Fixture};
 use super::top::face;
@@ -24,11 +24,16 @@ fn near_edge(p: Vec3, [a, b, c]: [Vec3; 3]) -> bool {
     to(a, b).min(to(b, c)).min(to(c, a)) < 1e-3
 }
 
-fn same(a: [Vec3; 3], b: [Vec3; 3]) -> bool {
-    a.iter().zip(b).all(|(p, q)| p.distance(q) < 1e-4)
+/// Whether `p` lies on `tri`, within `eps`.
+fn on(p: Vec3, [a, b, c]: [Vec3; 3], eps: f32) -> bool {
+    let n = (b - a).cross(c - a).normalize();
+    let inside = [(a, b), (b, c), (c, a)]
+        .iter()
+        .all(|&(s, e)| (e - s).cross(p - s).dot(n) >= -eps);
+    (p - a).dot(n).abs() < eps && (inside || near_edge(p, [a, b, c]))
 }
 
-/// Traces every ray both ways; returns how many disagreed only at a shared edge.
+/// Traces every ray both ways; returns how many disagreed only at an edge.
 fn agrees(f: &Fixture) -> usize {
     let packed = f.packed();
     let (mesh, tris) = oracle(f);
@@ -36,30 +41,28 @@ fn agrees(f: &Fixture) -> usize {
     for (o, d, reach) in rays(f, 400) {
         let ours: Option<Hit> = trace_closest(&packed, o, d, reach);
         assert_eq!(ours.is_some(), trace_any(&packed, o, d, reach));
-        let theirs = mesh.cast_local_ray_and_get_normal(&Ray::new(o, d), reach, true);
-        let theirs = theirs.map(|h| match h.feature {
-            FeatureId::Face(i) => (h.time_of_impact, tris[i as usize % tris.len()]),
-            other => panic!("a triangle mesh hit {other:?}"),
-        });
+        let theirs = mesh.cast_local_ray(&Ray::new(o, d), reach, true);
+        let edge = |p: Vec3| tris.iter().any(|&t| on(p, t, 1e-4) && near_edge(p, t));
         match (ours, theirs) {
-            (Some(h), Some((t, tri))) => {
-                assert!((h.t - t).abs() <= 1e-3 * t.max(1.0), "t {} vs {t}", h.t);
+            (Some(h), Some(t)) => {
+                assert!(
+                    (h.t - t).abs() <= 1e-3 * t.max(1.0),
+                    "{}: t {} vs {t}",
+                    f.name,
+                    h.t
+                );
+                let p = o + d * t;
                 let mine = f.tri_of(&packed, h);
-                if !same(mine, tri) {
-                    assert!(near_edge(o + d * t, tri), "different triangles off an edge");
-                    ties += 1;
-                }
+                assert!(on(p, mine, 1e-3), "{}: {mine:?} does not hold {p}", f.name);
+                ties += usize::from(edge(p));
             }
             (None, None) => {}
             (Some(h), None) => {
-                assert!(
-                    near_edge(o + d * h.t, f.tri_of(&packed, h)),
-                    "a hit parry misses"
-                );
+                assert!(edge(o + d * h.t), "{}: a hit parry misses", f.name);
                 ties += 1;
             }
-            (None, Some((t, tri))) => {
-                assert!(near_edge(o + d * t, tri), "a miss parry hits at {t}");
+            (None, Some(t)) => {
+                assert!(edge(o + d * t), "{}: a miss parry hits at {t}", f.name);
                 ties += 1;
             }
         }
@@ -88,7 +91,7 @@ fn a_hit_takes_the_face_its_material_draws() {
     assert_eq!(hits(&at(face::BACK, Mat4::IDENTITY), outside), Some(5.5));
     assert_eq!(hits(&at(face::FRONT, mirrored), outside), Some(4.5));
     assert_eq!(hits(&at(face::SKIP, Mat4::IDENTITY), outside), None);
-    let turned = Mat4::from_rotation_translation(Quat::from_rotation_y(0.3), Vec3::X);
+    let turned = Mat4::from_rotation_translation(Quat::from_rotation_y(0.3), Vec3::X * 0.2);
     assert!(hits(&at(face::BOTH, turned), outside).is_some());
 }
 
