@@ -1,4 +1,4 @@
-//! Binary, little-endian, read whole. The version `u32` follows the magic in every layout,
+//! Little-endian, read whole. The version `u32` follows the magic in every layout,
 //! so a decoder reads it first and refuses another version's file as that.
 
 use std::path::PathBuf;
@@ -55,6 +55,7 @@ pub fn encoded_len(data: &OcclusionData) -> usize {
     92 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
 }
 
+/// `pub` as a test hook for another crate.
 pub fn version_of(bytes: &[u8]) -> Option<u32> {
     let head = bytes.get(..8).filter(|h| &h[..4] == MAGIC)?;
     Some(u32::from_le_bytes(
@@ -84,8 +85,8 @@ fn rebake(what: &str) -> String {
     )
 }
 
-/// The layout before the version field, whose first `u32` (its object count) would read as
-/// a version. Its counts give its length, so a versioned file matches only by coincidence.
+/// The layout before the version field, whose first `u32`, its object count, would read as
+/// a version. Its counts give its length: a versioned file matches by coincidence alone.
 fn is_unversioned(bytes: &[u8]) -> bool {
     let count_at = |at: usize| -> Option<usize> {
         let b = bytes.get(at..at.checked_add(4)?)?;

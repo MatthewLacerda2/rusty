@@ -17,7 +17,7 @@ pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     let extent = n as f32 * ROOM;
-    // One sphere for every statue: its build (a lightmap unwrap) would dominate per room.
+    // One sphere for every statue: its build runs a lightmap unwrap, too dear once per room.
     let (vertices, indices) = primitives::generate_sphere(0.5, 24, 24);
     let sphere = (vertices.into(), indices.into());
     for storey in 0..2 {
