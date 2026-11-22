@@ -74,10 +74,8 @@ pub struct GraphEdge {
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Condition {
-    Bool {
-        parameter: String,
-        value: bool,
-    },
+    /// Is-true / is-false.
+    Bool { parameter: String, value: bool },
     Float {
         parameter: String,
         op: NumericOp,
@@ -88,9 +86,8 @@ pub enum Condition {
         op: NumericOp,
         value: i32,
     },
-    Trigger {
-        parameter: String,
-    },
+    /// Latched; consumed when the transition fires.
+    Trigger { parameter: String },
 }
 
 impl Condition {
