@@ -1,4 +1,5 @@
-//! CPU twins of the shaders; the tests hold the shaders to them.
+//! `birth`, `advance`, `jump` and `sprite` are CPU twins of `cs_birth`, `cs_step` and `vs_gpu`,
+//! step for step: change them with the shaders.
 
 use glam::{Mat4, Vec3, Vec4};
 

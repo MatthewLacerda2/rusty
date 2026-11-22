@@ -21,6 +21,7 @@ use rusty_scene::{Scene, SceneId};
 
 fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
     let forward = camera.forward();
+    // Near straight up or down, Z is the reference axis.
     let reference = if forward.y.abs() > 0.99 {
         Vec3::Z
     } else {
@@ -77,6 +78,8 @@ impl Renderer {
             bytemuck::bytes_of(&globals),
         );
 
+        // Due renders only: an emitter has no change signal, and a map new to the cache makes the
+        // next render due.
         if self.notes_due() {
             for texture in runs.iter().filter_map(|r| r.texture.as_ref()) {
                 self.note_map(scene.id(), texture.as_str());
