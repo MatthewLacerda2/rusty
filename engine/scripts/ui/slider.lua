@@ -1,10 +1,5 @@
--- slider.lua — the engine's Slider widget (#422), Unity's `Slider`.
---
--- A value between `min` and `max`: `Fill Area/Fill` stretches from the start to
--- it and `Handle Slide Area/Handle` sits on it. Press or drag anywhere on the
--- slider to set it; while focused, the arrows along its axis step it (a tenth of
--- the range, or 1 with `whole_numbers`) and the arrows across it move the focus.
--- `direction` is LeftToRight, RightToLeft, BottomToTop or TopToBottom.
+-- Unity's `Slider`. While focused, the arrows along the axis step the value
+-- (a tenth of the range, or 1 with `whole_numbers`); across it they move the focus.
 --
 -- Owner API (via `Scene.GetScript(id, "slider")`):
 --   value, min, max                            -- read them
@@ -39,7 +34,6 @@ function Slider.normalized()
     return (Slider.value - Slider.min) / (Slider.max - Slider.min)
 end
 
--- Anchor the fill and the handle at the value, along the slider's axis.
 local function place()
     local n = Slider.normalized()
     if reversed then n = 1 - n end
@@ -73,7 +67,6 @@ end
 function Slider.set_value(v) set(v, true) end
 function Slider.set_value_without_notify(v) set(v, false) end
 
--- Set the value from the pointer along the slide area.
 local function from_pointer(event)
     local t = RangeAxis.track(area or self_id, event, vertical)
     if not t then return end
@@ -99,7 +92,6 @@ function Slider.OnDrag(id, event)
     if event.button == "Left" then from_pointer(event) end
 end
 
--- Arrows along the axis step the value; across it they navigate.
 function Slider.OnMove(id, event)
     local along = RangeAxis.move(id, event, vertical, reversed)
     if along == 0 then return end

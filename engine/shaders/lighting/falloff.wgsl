@@ -1,5 +1,5 @@
 // engine/shaders/lighting/falloff.wgsl — how a point, spot or Area light fades
-// (#1699): `common::local_light_radiance` is its caller, and the CPU's twins are
+//: `common::local_light_radiance` is its caller, and the CPU's twins are
 // `components::falloff` / `components::spot_cone`.
 
 #define_import_path lighting::falloff
@@ -7,7 +7,7 @@
 // URP's squared-distance floor: a surface touching a lamp stays finite.
 const FALLOFF_EPSILON_SQ: f32 = 0.0001;
 
-// How a local light fades at distance `d` within `range` (#1699): Unity URP's and
+// How a local light fades at distance `d` within `range`: Unity URP's and
 // Frostbite's windowed inverse-square, saturate(1 - (d/r)^4)^2 / max(d^2, eps^2),
 // exactly zero at and past `range`. The CPU's twin is `components::falloff`, held
 // equal by `render::clusters::falloff_gpu_tests`.

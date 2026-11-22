@@ -1,6 +1,3 @@
-//! A baked shader re-bakes from its recipe when the engine's shaders change (#1638),
-//! against a private copy of the engine shaders so a test can change one.
-
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
@@ -9,7 +6,6 @@ use crate::compose::MODULES;
 use crate::recipe::{BlockSel, PassKind, ShaderRecipe};
 use crate::{bake_recipe, validate::validate};
 
-/// A fresh `<tag>` dir holding a copy of the engine shaders a surface bake reads.
 pub(crate) fn engine_copy(tag: &str) -> (PathBuf, String) {
     let root =
         rusty_test_support::temp::dir().join(format!("rusty_1638_{tag}_{}", std::process::id()));
@@ -17,8 +13,6 @@ pub(crate) fn engine_copy(tag: &str) -> (PathBuf, String) {
     (root.clone(), copy_engine(&root.join("engine")))
 }
 
-/// A copy of the engine shaders at `engine` (its hash is cached per directory, so a
-/// changed engine is a second copy, not an edit of the first).
 pub(crate) fn copy_engine(engine: &Path) -> String {
     for name in MODULES.iter().chain(&["shader.wgsl"]) {
         let to = engine.join(name);
@@ -69,7 +63,6 @@ fn a_changed_engine_module_re_bakes_the_module_once() {
 
 #[test]
 fn a_module_that_no_longer_composes_is_re_baked_and_composes_again() {
-    // What #1616 did to every baked shader: the module imports a binding gone since.
     let (root, engine) = engine_copy("stranded");
     let out = root.join("out");
     let wgsl = PathBuf::from(bake_recipe(&rim(), &engine, out.to_str().unwrap()).unwrap());

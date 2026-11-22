@@ -1,22 +1,14 @@
--- runner/bot.lua — a bot that dodges: from what `game:View()` returns, the keys to
--- tap this tick. The scenarios press them with `Input.Press`, so the bot plays
--- through the same input the player does. It is not part of the game.
---
--- Per lane it finds the nearest hazard ahead; a bar can be slid under and a low
--- box jumped, anything else blocks. It keeps to its lane while that lane is clear
--- for about a second of running, heads for the lane clear the furthest otherwise,
--- and jumps or slides when the lane it holds needs it.
+-- Not part of the game: scenarios press its keys with `Input.Press`, the same
+-- input the player uses.
 
 local Track = require("runner.track")
 
 local Bot = {}
 
-local LANE_HALF = 0.6  -- how much of a lane's width the runner's body sweeps, and a margin
+local LANE_HALF = 0.6  -- share of a lane the body sweeps, with a margin
 
--- The nearest hazard ahead in `lane`: its distance in front of the runner and how
--- the bot can pass it (`slide`, `jump` or `block`), or nil when clear. Hazards
--- overlapping it along the track count with it, so two stacked crates, or a pile
--- too long to clear in one jump, block.
+-- The nearest hazard ahead in `lane`: its distance and how the bot passes it
+-- (`slide`, `jump` or `block`), or nil when clear. Hazards overlapping along the
 local function ahead(view, lane, past_bars)
     local x = Track.lane_x(lane)
     local near, lo, hi, kinds, back
@@ -36,8 +28,6 @@ local function ahead(view, lane, past_bars)
     if kinds == "bar" then how = "slide" -- a crate still falling is no bar
     elseif hi < 0.95 and back - near.min[3] < 1.6 then how = "jump" end
     local d = math.max(near.min[3] - (view.z + 0.5), 0)
-    -- A low hazard closer than the runner can take off for, counting the time
-    -- still to fall before it lands and to cross into its lane, blocks like a wall.
     if how == "jump" then
         local wait = math.abs(x - view.x) / view.lateral + 0.15
         if not view.grounded then
@@ -48,9 +38,6 @@ local function ahead(view, lane, past_bars)
     return d, how
 end
 
--- How good a lane is: clear lanes best, then the ones whose hazard can be passed,
--- then the ones blocked furthest away. A bar spans every lane, so lanes are
--- judged by what comes after it.
 local function score(view, lane)
     local d, how = ahead(view, lane, true)
     if not d then return 1e6 end
@@ -58,10 +45,8 @@ local function score(view, lane)
     return d
 end
 
--- Whether the body can cross from where it is to `lane` without running into
--- anything but a bar (it slides under those): nothing in the strip it sweeps
--- until it is across, except what is straight ahead of it now, which only has to
--- stay clear until the body is out of its way.
+-- Whether the body can cross to `lane` without running into anything but a bar:
+-- nothing in the strip it sweeps until across, except what is straight ahead.
 local function clear_across(view, lane)
     local to = Track.lane_x(lane)
     local across = view.speed * (math.abs(to - view.x) / view.lateral + 0.15) + 1.0
@@ -81,7 +66,6 @@ local function clear_across(view, lane)
     return true
 end
 
--- The keys to tap this tick (`LEFT`, `RIGHT`, `UP`, `DOWN`).
 function Bot.keys(view)
     local keys = {}
     local horizon = view.speed * 1.0 + 4
@@ -89,15 +73,11 @@ function Bot.keys(view)
     local d, how = ahead(view, lane)
     local d2 = ahead(view, lane, true)
     if d2 and d2 < horizon then
-        -- The best lane of the three, ties kept nearest; the runner steps toward it
-        -- one lane at a time, through the middle if it must.
         local best, best_score = lane, score(view, lane)
         for _, l in ipairs({ lane - 1, lane + 1, lane - 2, lane + 2 }) do
             if math.abs(l) <= 1 and score(view, l) > best_score then best, best_score = l, score(view, l) end
         end
         if best ~= lane then
-            -- Step only when the way across is clear: every lane from the one the
-            -- body is in to the next one, for as far as it runs while crossing.
             local step = best > lane and 1 or -1
             if clear_across(view, lane + step) then
                 keys[#keys + 1] = step > 0 and "RIGHT" or "LEFT"
@@ -113,8 +93,6 @@ function Bot.keys(view)
     return keys
 end
 
--- Step the game `ticks` ticks with the bot at the keys, tapping each key for one
--- tick; `each(view)` (optional) is called every tick with what the bot saw.
 function Bot.play(game, ticks, each)
     local held = {}
     for _ = 1, ticks do

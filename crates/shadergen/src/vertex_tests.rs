@@ -1,7 +1,3 @@
-//! crates/shadergen/src/vertex_tests.rs — the surface vertex stage (#1524): a vertex block
-//! replaces the forward base's identity `surface_vertex` hook, and its variant
-//! validates with every entry point a mesh is drawn through.
-
 use std::collections::BTreeMap;
 
 use super::assemble::{assemble_with_params, CUT_PREPASS, CUT_SHADOW};
@@ -33,7 +29,6 @@ fn baked(recipe: &ShaderRecipe) -> String {
 fn the_forward_base_hands_every_vertex_stage_the_identity_hook() {
     let base = base_source(PassKind::Surface, engine_shader_dir()).unwrap();
     assert!(base.contains(IDENTITY));
-    // forward_vertex, vs_velocity's last-frame pose and vs_shadow: three callers.
     assert_eq!(base.matches("surface_vertex(world_vertex(").count(), 3);
     assert!(
         baked(&surface(&["tint"])).contains(IDENTITY),

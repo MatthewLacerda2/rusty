@@ -1,18 +1,6 @@
-// engine/shaders/forward/proxy_volume.wgsl — Light Probe Proxy Volumes (#1672,
-// Unity's `LightProbeProxyVolume`): a dynamic object's probe light interpolated per
-// pixel over a grid of probe samples spanning its bounds, instead of the one sample
-// at its world bounds' centre (`eval_sh`).
-//
-// An instance's `proxy_volume` is 0 for none, else the first vec4 of its volume in
-// `proxy_volumes` plus one (`render::draw::proxy_volume::pack`). A volume is:
-//   4 vec4  the world -> box matrix's columns (the box is [0, 1]^3),
-//   1 vec4  its grid dimensions (1.0..32.0 in xyz, ordinary floats),
-//   then 4 vec4 per grid point (x fastest, then y, then z): its L1 SH, RGB in xyz
-//   (bands 1..3 zeroed at `Low` quality).
-// Points sit at cell centres, as a 3D texture's texels do, and a lookup clamps to
-// the outer ones the way a texture's clamp-to-edge does. A pixel outside the box
-// (an arm swung past the bind-pose bounds, a mesh larger than a Custom box) reads
-// the nearest face, as Unity's volume clamps, never a seam to the single sample.
+// Light Probe Proxy Volumes (Unity's `LightProbeProxyVolume`): a dynamic object's probe light
+// interpolated per pixel over a grid of probe samples spanning its bounds, instead of the one
+// sample at its world bounds' centre (`eval_sh`).
 
 #define_import_path forward::proxy_volume
 
@@ -23,8 +11,6 @@
 const HEADER: u32 = 5u;
 const COEFFS: u32 = 4u;
 
-// The L1 SH of point `p` of the volume whose header starts at `base`, scaled by `w`
-// into `acc`.
 fn add_point(acc: ptr<function, array<vec3<f32>, 4>>, base: u32, p: u32, w: f32) {
     let first = base + HEADER + p * COEFFS;
     for (var c = 0u; c < COEFFS; c = c + 1u) {
@@ -32,10 +18,9 @@ fn add_point(acc: ptr<function, array<vec3<f32>, 4>>, base: u32, p: u32, w: f32)
     }
 }
 
-// The irradiance E at `world_pos` for normal `N` from proxy volume `proxy` (an
-// instance's `proxy_volume`), in rgb, with a = 1; a = 0 when it has none, and the caller keeps the
-// single sample. The L1 terms are `eval_sh`'s first
-// four, so a one-point volume reads what `eval_sh` reads without its L2 bands.
+// The irradiance E at `world_pos` for normal `N` from proxy volume `proxy` (an instance's
+// `proxy_volume`), in rgb, with a = 1; a = 0 when it has none, and the caller keeps the single
+// sample.
 fn proxy_irradiance(world_pos: vec3<f32>, N: vec3<f32>, proxy: u32) -> vec4<f32> {
     if (proxy == 0u) {
         return vec4<f32>(0.0);

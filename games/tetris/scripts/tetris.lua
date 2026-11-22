@@ -1,16 +1,6 @@
--- tetris.lua — the falling-blocks game: input, the fall, locking, line clears and
--- game over, on the fixed tick. The grid rules are `tetris/rules.lua`; the cubes,
--- the burst, the light, the sounds and the HUD are `tetris/view.lua`.
---
--- Keys: Left/Right move (held, they repeat after a short delay), Up or X turns
--- clockwise, Z counter-clockwise, Down drops softly, Space drops hard, Enter
--- starts over after game over.
---
--- A scenario reads the state through `Scene.GetScript(id, "tetris")`: `board`
--- (`board[row][col]`, row 1 at the bottom, 0 empty), `score`, `lines`, `level`,
--- `over`, `kind` / `next` (piece kinds, `rules.NAMES`) and `pieces` (how many
--- have spawned). It may write `level`, and call `game:Restart()`,
--- `game:Stage(rows, kind)` and `game:CubeAt(row, col)`.
+-- Runs on the fixed tick. A scenario reads `board` (`board[row][col]`, row 1 at
+-- the bottom, 0 empty), `score`, `lines`, `level`, `over`, `kind` / `next` and
+-- `pieces` via `Scene.GetScript(id, "tetris")`; it may write `level`.
 
 local Rules = require("tetris.rules")
 local View = require("tetris.view")
@@ -24,20 +14,19 @@ local Tetris = {
     },
 }
 
-local DAS_TICKS = 10      -- how long Left/Right is held before it repeats
-local ARR_TICKS = 3       -- ticks between repeats once it does
-local SOFT_TICKS = 2      -- ticks per row while Down is held
-local HIDDEN_ROWS = 4     -- rows above the well a piece spawns into
+local DAS_TICKS = 10      -- ticks Left/Right is held before it repeats
+local ARR_TICKS = 3       -- ticks
+local SOFT_TICKS = 2      -- ticks
+local HIDDEN_ROWS = 4
 
-local piece = {}          -- the falling piece: kind, rot, col, row, ids
-local cells = {}          -- cells[row][col]: the cube entity of a locked cell
-local bag = {}            -- the kinds still to come in this bag
-local bursts = {}         -- cubes flying out of a cleared line
+local piece = {}
+local cells = {}          -- the cube entity of a locked cell
+local bag = {}
+local bursts = {}
 local hud, light
 local pulse = 0
 local fall_wait, held, held_for = 0, nil, 0
 
--- The next kind from the bag, refilled with a fresh shuffle when it runs out.
 local function draw_kind()
     if #bag == 0 then
         bag = Rules.bag(function(n) return Random.Range(1, n + 1) end)
@@ -53,7 +42,6 @@ local function place_piece()
     end
 end
 
--- Spawn `kind` (or the next kind) at the top; a spawn that collides ends the game.
 local function spawn(kind)
     piece.kind = kind or Tetris.next
     Tetris.next = draw_kind()
@@ -72,7 +60,6 @@ local function spawn(kind)
     end
 end
 
--- Clear the full rows: their cubes burst, the cubes above drop to fill the gap.
 local function clear_lines()
     local full = Rules.full_rows(Tetris.board)
     if #full == 0 then return 0 end
@@ -93,7 +80,6 @@ local function clear_lines()
     return #full
 end
 
--- Lock the falling piece into the board, clear what it filled, spawn the next.
 local function lock()
     local placed = Rules.lock(Tetris.board, piece.kind, piece.rot, piece.col, piece.row)
     for i, rc in ipairs(placed) do cells[rc[1]][rc[2]] = piece.ids[i] end
@@ -108,7 +94,6 @@ local function lock()
     return cleared
 end
 
--- Move the piece by (`dc`, `dr`) if it fits there.
 local function shift(dc, dr)
     if not Rules.fits(Tetris.board, piece.kind, piece.rot, piece.col + dc, piece.row + dr) then
         return false
@@ -126,7 +111,6 @@ local function turn(dir)
     View.sound("rotate")
 end
 
--- Left/Right: one step on the press, then a repeat every ARR_TICKS after DAS_TICKS.
 local function sideways()
     local dir = (Input.IsKeyDown("LEFT") and -1 or 0) + (Input.IsKeyDown("RIGHT") and 1 or 0)
     if Input.GetKeyDown("LEFT") then dir, held, held_for = -1, -1, 0; shift(-1, 0); return end
@@ -136,7 +120,6 @@ local function sideways()
     if held_for >= DAS_TICKS and (held_for - DAS_TICKS) % ARR_TICKS == 0 then shift(dir, 0) end
 end
 
--- One tick of play: input, then the fall. Returns the lines cleared this tick.
 local function play()
     sideways()
     if Input.GetKeyDown("UP") or Input.GetKeyDown("X") then turn(1) end
@@ -160,7 +143,6 @@ local function play()
     return lock()
 end
 
--- Destroy every cube, empty the board and start a new game from `seed`.
 function Tetris.Restart()
     for _, id in ipairs(piece.ids or {}) do Scene.DestroyEntity(id) end
     for r = 1, #cells do
@@ -180,8 +162,6 @@ function Tetris.Restart()
     spawn()
 end
 
--- Put a test position on the board: `rows` are strings bottom first, `X` a filled
--- cell and `.` an empty one; the falling piece becomes `kind` (a name) at the top.
 function Tetris.Stage(_, rows, kind)
     Tetris.Restart()
     for r, line in ipairs(rows) do
@@ -197,7 +177,6 @@ function Tetris.Stage(_, rows, kind)
     spawn(Rules.kind(kind))
 end
 
--- The cube entity drawing locked cell (`row`, `col`), or nil when it is empty.
 function Tetris.CubeAt(_, row, col)
     local id = cells[row] and cells[row][col]
     if id == 0 then return nil end

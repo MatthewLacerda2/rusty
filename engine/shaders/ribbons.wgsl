@@ -1,10 +1,10 @@
-// engine/shaders/ribbons.wgsl — camera-facing ribbons: trails and lines (#441).
+// engine/shaders/ribbons.wgsl — camera-facing ribbons: trails and lines.
 //
 // The CPU builds each ribbon as a strip of point pairs: both vertices of a pair
 // sit on the centre line with the line's tangent, the width and colour at that
 // point, and `side` = -1 / +1. The vertex stage pushes each one half the width
 // out along `cross(tangent, to_camera)`, so the strip always faces the camera.
-// Unlit, fogged like the particles (#437): alpha ribbons fade into the fog
+// Unlit, fogged like the particles: alpha ribbons fade into the fog
 // colour, additive ones fade out.
 
 #import common::{Fog, fog_factor}
@@ -12,7 +12,7 @@
 
 struct RibbonGlobals {
     view_proj: mat4x4<f32>,
-    cam_pos: vec4<f32>, // xyz the camera's position, w its index in its stack (#1845)
+    cam_pos: vec4<f32>, // xyz the camera's position, w its index in its stack
     fog: Fog,
 };
 
@@ -79,7 +79,7 @@ fn additive_color(in: VsOut) -> vec4<f32> {
     return vec4<f32>(c.rgb * (1.0 - in.fog), c.a);
 }
 
-// ---- TAA's reactive mask (#1845, `reactive.wgsl`) ----
+// ---- TAA's reactive mask (`reactive.wgsl`) ----
 // A view that runs TAA draws its ribbons through these twins: the same colour at
 // location 0, and at location 1 how much of the pixel the strip laid down (its
 // alpha, or what it added), always automatic; `globals.cam_pos.w` is the drawing

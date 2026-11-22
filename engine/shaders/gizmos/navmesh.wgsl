@@ -1,4 +1,4 @@
-// engine/shaders/gizmos/navmesh.wgsl — the NavMesh gizmo (#1910), Unity's baked
+// engine/shaders/gizmos/navmesh.wgsl — the NavMesh gizmo, Unity's baked
 // navmesh overlay: one translucent quad per walkable span, already in world space
 // (the shell builds the triangles from the navigation graph), flat in the overlay
 // draw's tint. `render::draw::overlays::navmesh` draws it in the editor's handles

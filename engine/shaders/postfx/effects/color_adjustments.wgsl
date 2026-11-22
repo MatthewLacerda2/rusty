@@ -1,9 +1,7 @@
-// engine/shaders/postfx/effects/color_adjustments.wgsl — Color Adjustments (#1440),
-// all on the scene-linear colour before the tonemap, where Unity URP's grading LUT
-// runs them (#1479): contrast in log space around mid-grey, right after white
-// balance (slot: x contrast, y the tonemapper), the hue shift (slot: x the shift in
-// turns), then saturation (slot: x saturation). Each leaves the colour exactly as it
-// was at its neutral.
+// Color Adjustments, all on the scene-linear colour before the tonemap, where Unity URP's
+// grading LUT runs them: contrast in log space around mid-grey, right after white balance
+// (slot: x contrast, y the tonemapper), the hue shift (slot: x the shift in turns), then
+// saturation (slot: x saturation).
 
 #define_import_path postfx::effects::color_adjustments
 
@@ -33,10 +31,8 @@ fn hue(c: vec3<f32>, p: vec4<f32>) -> vec3<f32> {
     return out;
 }
 
-// The log spaces URP's contrast works in (`LutBuilderHdr.shader`): ACEScc under the
-// ACES tonemapper, ARRI ALEXA LogC (EI 800) under any other. Parameters and toes are
-// URP's (`Color.hlsl`). URP converts to the ACES AP0 primaries before ACEScc; rusty's
-// ACES is a fit on linear sRGB, so the colour stays in sRGB primaries here.
+// The log spaces URP's contrast works in (`LutBuilderHdr.shader`): ACEScc under the ACES
+// tonemapper, ARRI ALEXA LogC (EI 800) under any other.
 const LOGC_CUT: f32 = 0.011361;
 const LOGC_A: f32 = 5.555556;
 const LOGC_B: f32 = 0.047996;
@@ -71,16 +67,13 @@ fn acescc_to_linear(t: vec3<f32>) -> vec3<f32> {
     return select(toe, min(lin, vec3<f32>(HALF_MAX)), t >= vec3<f32>((9.72 - 15.0) / 17.52));
 }
 
-// URP's pivot, ACEScc's code for the 0.18 grey card. Under ACES that is exactly
-// linear 0.18; in LogC, where URP applies the same code, it sits near 0.22.
+// URP's pivot, ACEScc's code for the 0.18 grey card.
 const MIDGREY: f32 = 0.4135884;
-// `Tonemap::Aces`'s index, as `tonemapping.wgsl` reads it.
 const TONEMAP_ACES: u32 = 2u;
 
-// Steepens (`> 1`) or flattens the curve around mid-grey in log space (slot: x the
-// contrast, y the tonemapper's index), so a moderate boost darkens the shadows
-// without clipping them to black, the way URP's does. Negative results clamp to
-// black, as URP's do.
+// Steepens (`> 1`) or flattens the curve around mid-grey in log space (slot: x the contrast, y
+// the tonemapper's index), so a moderate boost darkens the shadows without clipping them to
+// black, the way URP's does.
 fn contrast(c: vec3<f32>, p: vec4<f32>) -> vec3<f32> {
     if (p.x == 1.0) {
         return c;

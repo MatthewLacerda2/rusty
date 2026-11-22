@@ -1,11 +1,3 @@
--- scenarios/nav.lua — every spawn reaches every other room and both floors.
---
--- In each block: a `complete` path from every spawn to every other spawn (one
--- per room, one on the upper floor) and to the crate top; from the first spawn
--- to every other point of the map; the stairs alone reach the upper floor (the
--- ladder switched off); and the navmesh holds the ladder, a drop off the upper
--- floor and a jump onto the crate.
-
 Harness.Step(1) -- enter Play: the navmesh bakes
 
 local function points(group)
@@ -42,8 +34,7 @@ Harness.Log(string.format("%d paths, %d not complete", paths, #failed))
 for i = 1, math.min(#failed, 10) do Harness.Log("not complete: " .. failed[i]) end
 Harness.Expect(#failed == 0, "a complete path from every spawn to every room and both floors")
 
--- The navmesh's links: the ladder connected, a drop off the upper floor (3 m),
--- a jump up onto the crate (1 m).
+-- The navmesh's links: the ladder, a drop off the upper floor (3 m), a jump onto the crate (1 m).
 local drop, jump = false, false
 for _, link in ipairs(Navigation.GetOffMeshLinks()) do
     local rise = link.endPos.y - link.startPos.y
@@ -55,8 +46,7 @@ Harness.Expect(OffMeshLink.IsConnected(ladder), "the ladder joins the ground to 
 Harness.Expect(drop, "a drop leads off the upper floor")
 Harness.Expect(jump, "a jump leads onto the crate")
 
--- The stairs on their own: with the ladder off, the upper floor is still a
--- complete path away, up 12 steps under MaxStep.
+-- With the ladder off, the stairs alone (12 steps under MaxStep) reach the upper floor.
 OffMeshLink.SetActive(ladder, false)
 Harness.Step(1)
 local foot, top = spawns[2], spawns[5]

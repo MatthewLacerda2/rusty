@@ -1,22 +1,17 @@
--- runner/track.lua — the track past the recipe's start pad: chunks of floor and
--- rails built ahead of the runner and destroyed behind it, each holding rows of obstacles drawn from the
--- seeded `Random`, and the crates and barrels dropped onto it as rigidbodies when
--- the runner comes near. Every solid the runner must not touch is a *hazard*:
--- `track.hazards[id]` is its kind (`box`, `bar`, `wall` or `crate`).
+-- Every solid the runner must not touch is a *hazard*: `track.hazards[id]` is its
+-- kind (`box`, `bar`, `wall` or `crate`).
 
 local Track = {}
 
-Track.CHUNK = 20          -- metres of track per chunk
-Track.LANE = 2.5          -- metres between lane centres
-Track.START = 40          -- where the generated track begins: the recipe's start pad is before it
-local AHEAD = 120         -- metres of track kept built ahead of the runner
-local BEHIND = 15         -- metres of track kept behind it before it is destroyed
-local ROWS = { 10 }       -- where a chunk's obstacle rows sit, from its start: 0.8 s apart at top speed
-local DROP_LEAD = 2.6     -- seconds ahead of the runner a crate row is dropped
-local DROP_HEIGHT = 6.0   -- metres above the track a crate starts its fall
+Track.CHUNK = 20          -- m
+Track.LANE = 2.5          -- m
+Track.START = 40          -- m; the recipe's start pad is before it
+local AHEAD = 120         -- m kept built ahead
+local BEHIND = 15         -- m kept behind
+local ROWS = { 10 }       -- m from the chunk start: 0.8 s apart at top speed
+local DROP_LEAD = 2.6     -- s ahead of the runner
+local DROP_HEIGHT = 6.0   -- m
 
--- Lane -1, 0 or 1 (left to right as the camera sees it) to its world x. The
--- camera looks down +Z, so screen right is -X.
 function Track.lane_x(lane) return -lane * Track.LANE end
 
 function Track.new()
@@ -28,12 +23,11 @@ local function solid(name, parent, primitive, x, y, z, sx, sy, sz, material)
     Scene.SetParent(id, parent)
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- #2051: a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
     Material.Set(id, material)
     return id
 end
 
--- Pick `n` distinct lanes of the three.
 local function pick_lanes(n)
     local lanes = { -1, 0, 1 }
     for i = 3, 2, -1 do
@@ -43,8 +37,6 @@ local function pick_lanes(n)
     return { table.unpack(lanes, 1, n) }
 end
 
--- One row of obstacles at `z`: a jumpable box in one or two lanes, a bar across
--- every lane to slide under, walls in two lanes, or crates to be dropped.
 local function row(track, chunk, z)
     local kind = Random.Range(1, 5)
     local root = chunk.root
@@ -86,17 +78,13 @@ local function destroy(track, chunk)
     for i = #track.drops, 1, -1 do
         if track.drops[i].chunk == chunk then table.remove(track.drops, i) end
     end
-    -- The obstacles are the root's children and go with it.
     for id in pairs(track.hazards) do
         if Scene.GetParent(id) == chunk.root then track.hazards[id] = nil end
     end
     Scene.DestroyEntity(chunk.root)
 end
 
--- Drop a crate (or a barrel) on each of `lanes` at `z`, tumbling as it falls. A
--- single lane may get a second one above the first, to stack or knock it over;
--- two lanes get one each, so the pile rarely spills into the third. Returns the
--- new bodies' ids.
+-- Returns the new bodies' ids.
 function Track.drop(track, chunk, z, lanes)
     local ids = {}
     local most = #lanes == 1 and 2 or 1
@@ -111,7 +99,7 @@ function Track.drop(track, chunk, z, lanes)
                 Transform.SetLocalScale(id, 0.8, 0.5, 0.8)
                 Scene.AddComponent(id, "Collider")
                 -- A box, not a cylinder: a RigidBody has no drag to stop a
-                -- barrel rolling on its side for good (#2062).
+                -- barrel rolling on its side for good.
                 Physics.SetColliderShape(id, { kind = "Box", x = 1, y = 2, z = 1 })
             else
                 Transform.SetLocalScale(id, 0.9, 0.9, 0.9)
@@ -131,8 +119,6 @@ function Track.drop(track, chunk, z, lanes)
     return ids
 end
 
--- Keep the track built `AHEAD` of the runner at `z` and destroyed `BEHIND` it,
--- and drop the crate rows the runner, at `speed`, reaches in `DROP_LEAD` seconds.
 function Track.advance(track, z, speed)
     while track.next_index * Track.CHUNK < z + AHEAD do
         build(track, track.next_index)
@@ -150,7 +136,6 @@ function Track.advance(track, z, speed)
     end
 end
 
--- The crates that came to rest on something this tick, as `{x, y, z}` points.
 function Track.landings(track)
     local points = {}
     for id, crate in pairs(track.crates) do
@@ -167,7 +152,6 @@ function Track.landings(track)
     return points
 end
 
--- Every hazard's world bounds, nearest first: `{id, kind, min = {x,y,z}, max = {x,y,z}}`.
 function Track.bounds(track)
     local list = {}
     for id, kind in pairs(track.hazards) do
@@ -183,7 +167,6 @@ function Track.bounds(track)
     return list
 end
 
--- Destroy the whole track (a restart).
 function Track.clear(track)
     while #track.chunks > 0 do destroy(track, table.remove(track.chunks)) end
     track.next_index, track.drops, track.dropped = Track.START // Track.CHUNK, {}, 0

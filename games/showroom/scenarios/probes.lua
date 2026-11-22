@@ -1,6 +1,3 @@
--- scenarios/probes.lua — both reflection probes were baked, and their volumes
--- are drawn over a shot: the turned box over the west half, the sphere over the
--- east one (cache/test/probes/box.png and sphere.png).
 
 Harness.Expect(Reflection.Count() == 2, "the showroom has two reflection probes")
 for i = 0, Reflection.Count() - 1 do
@@ -12,12 +9,10 @@ for i = 0, Reflection.Count() - 1 do
     Harness.Expect(probe.cubemap:find("%.ktx2$") ~= nil, "probe " .. i .. " has a baked cubemap")
 end
 
--- A line from `a` to `b`, both {x, y, z}, held for the shot.
 local function line(a, b, r, g, bl)
     Debug.DrawLine(a[1], a[2], a[3], b[1], b[2], b[3], r, g, bl, 1, 1)
 end
 
--- The box: its eight corners turned about its position by its Y rotation.
 local box = Reflection.Get(0)
 local c, s = math.cos(math.rad(box.rotation.y)), math.sin(math.rad(box.rotation.y))
 local function corner(x, y, z)
@@ -34,7 +29,6 @@ for _, xz in ipairs({ { lo.x, lo.z }, { hi.x, lo.z }, { hi.x, hi.z }, { lo.x, hi
     line(corner(xz[1], lo.y, xz[2]), corner(xz[1], hi.y, xz[2]), 0.3, 0.6, 1)
 end
 
--- The sphere: three great circles round its position.
 local sphere = Reflection.Get(1)
 local o, rad = sphere.position, sphere.radius
 local function on_circle(axis, t)
@@ -49,7 +43,6 @@ for axis = 1, 3 do
     end
 end
 
--- Each volume seen from the far corner of the other half of the room.
 local views = {
     { name = "box", eye = { 5.6, 3.3, -3.7 }, at = { -3.0, 1.0, 0.0 } },
     { name = "sphere", eye = { -5.6, 3.3, -3.7 }, at = { 3.0, 1.0, 0.0 } },
@@ -62,7 +55,7 @@ for _, view in ipairs(views) do
     Camera.SetPitch(math.deg(math.atan(dy, math.sqrt(dx * dx + dz * dz))))
     Camera.ResetHistory()
     local path = "cache/test/probes/" .. view.name .. ".png"
-    -- No settle: the showroom runs no TAA, so a settled frame is this one (#2090).
+    -- No settle: the showroom runs no TAA.
     if not Harness.Screenshot(path, { gizmos = true }) then
         Harness.Log("shot skipped (no GPU adapter): " .. view.name)
     end

@@ -1,7 +1,3 @@
-// engine/shaders/forward/lighting.wgsl — the forward pass's lighting helpers (#1015):
-// decals, ambient occlusion, lightmaps, the PBR response, the sun's cascaded shadow,
-// probe SH and the flat ambient. `fs_main` in `shader.wgsl` sums them, with the
-// environment reflection of `forward::reflection`.
 
 #define_import_path forward::lighting
 
@@ -12,13 +8,9 @@
 #import forward::transparent
 #import forward::bindings::{camera, cluster_lights, cluster_ranges, decals, lighting, objects, s_decal, s_shadow, shadow, t_ao, t_decal_color, t_decal_data, t_lightmaps, t_opaque, t_shadow}
 
-// Fold the decals binned into `cluster` into `s`, oldest first (FIFO, #638): each
-// newer decal lands over the older ones. Derivatives are taken here, before the
-// cluster's own loop, so the walk may diverge per pixel.
+// Derivatives are taken here, before the cluster's own loop, so the walk may diverge
+// per pixel.
 fn fold_decals(s: DecalSurface, cluster: u32, world: vec3<f32>, facing: vec3<f32>) -> DecalSurface {
-    // The footprint the decal maps are read over: one pixel's, shrunk by the
-    // material maps' mip bias (TAA's: TAAU's, #1702, plus the camera's, #1847), so a decal keeps
-    // the mip of the wall it lies on. `exp2(0)` is exactly 1: no bias, no change.
     let footprint = exp2(camera.lod.x);
     let dx = dpdx(world) * footprint;
     let dy = dpdy(world) * footprint;
@@ -37,11 +29,8 @@ fn ambient_occlusion(frag: vec2<f32>) -> f32 {
     return textureLoad(t_ao, min(vec2<u32>(frag), last), 0).r;
 }
 
-// The screen-space bounce at pixel `frag` (#1750): irradiance as E / pi, as the
-// ambient term is, so the same diffuse response lights it. Only the opaque pass of
-// a base camera running SSIL reads it (`camera.ssil.x`), from `t_opaque`, which
-// holds it there; every other pass gets none, for a uniform branch and no texture
-// read (`textureLoad` takes no derivatives, so the branch is safe).
+// Only the opaque pass of a base camera running SSIL reads it (`camera.ssil.x`); other
+// passes get none, so the branch is uniform.
 fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
     if (camera.ssil.x <= 0.5) {
         return vec3<f32>(0.0);
@@ -50,18 +39,8 @@ fn indirect_bounce(frag: vec2<f32>) -> vec3<f32> {
     return textureLoad(t_opaque, min(vec2<u32>(frag), last), 0).rgb;
 }
 
-// The realtime light in the pixel's colour, which SSIL gathers next frame (#1750):
-// `surface_color` sums it at steps 2, 3 (`lamp`: the direct light of every light no
-// lightmap bake took in) and 6 (emission of a mesh no bake took in), takes the fog off it at
-// step 7 as the fog takes it off the colour, and an authored surface block scales
-// it as it scales the colour (`shadergen::assemble`'s folds; a block that is no
-// per-channel scale zeroes it). An unlit surface leaves it zero: it feeds nothing.
 var<private> ssil_realtime: vec3<f32>;
 
-// One lamp's light at a surface: its direct light under radiance `front`, and on a
-// translucent surface (`transmission.w`, #1523) what it transmits under `back`
-// (the light reaching the back face). SSIL (#1750) gathers it unless the lightmap
-// bake took the lamp in (`bounce_baked`).
 fn lamp(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, front: vec3<f32>, back: vec3<f32>, F0: vec3<f32>, F90: f32, metallic: f32, roughness: f32, albedo: vec3<f32>, transmission: vec4<f32>, bounce_baked: f32) -> vec3<f32> {
     var c = calculate_pbr(N, V, L, front, F0, F90, metallic, roughness, albedo);
     if (transmission.w > 0.0) {
@@ -71,19 +50,13 @@ fn lamp(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, front: vec3<f32>, back: vec3<f
     return c;
 }
 
-// The share of colour `lit` that is realtime light (`realtime`): by the brightest
-// channel, so a coloured light keeps its weight; 0 for a black pixel.
+// By the brightest channel, so a coloured light keeps its weight; 0 for a black pixel.
 fn realtime_share(lit: vec3<f32>, realtime: vec3<f32>) -> f32 {
     let whole = max(lit.r, max(lit.g, lit.b));
     let part = max(realtime.r, max(realtime.g, realtime.b));
     return select(0.0, saturate(part / whole), whole > 0.0);
 }
 
-// The opaque pass of a base camera running SSIL (`camera.ssil.x`, set for that
-// pass alone: the translucents after it draw with it cleared, so their alpha still
-// blends) writes in its alpha the share of the final colour `c` that is
-// `ssil_realtime`, which SSIL's source keeps (`postfx/ssil.wgsl`).
-// Every other pass skips the division on the uniform flag.
 fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
     if (camera.ssil.x <= 0.5) {
         return c;
@@ -91,11 +64,8 @@ fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
     return vec4<f32>(c.rgb, realtime_share(c.rgb, ssil_realtime));
 }
 
-// The mip level of the lightmap pages that `uv` reads (#1694): the larger screen
-// footprint of one pixel, in page texels, as a GPU's own implicit LOD picks it. The
-// derivatives are taken here, so call it before any per-pixel branch
-// (crates/render/src/CLAUDE.md); the sample itself then reads with `textureSampleLevel`,
-// which is safe in the per-instance branch that follows.
+// Call before any per-pixel branch (derivatives); the sample then reads with
+// `textureSampleLevel`.
 fn lightmap_level(uv: vec2<f32>) -> f32 {
     let edge = f32(textureDimensions(t_lightmaps).x);
     let levels = f32(textureNumLevels(t_lightmaps));
@@ -105,14 +75,8 @@ fn lightmap_level(uv: vec2<f32>) -> f32 {
     return clamp(0.5 * log2(max(footprint, 1e-8)), 0.0, levels - 1.0);
 }
 
-// Directional lightmaps (#810): reshape baked irradiance by how the shading normal `N`
-// faces the dominant incoming direction, relative to the geometric normal `Ng` the
-// bake saw (Unity's half-Lambert rebalance). `dir` is the decoded direction page
-// texel's vector: direction scaled by directionality, so a surface whose normal map
-// is flat (N == Ng) keeps its lightmap exactly at any direction, and a texel lit with
-// no dominant direction (0, which an open surface never quite reaches: an even sky
-// gives 2/3) keeps it too. Where `Baked` lamps light the texel, the direction is
-// theirs (`bake::direction`), so a normal map reshapes the bounce there by the lamp.
+// Unity's half-Lambert rebalance. A flat normal map (N == Ng) or a texel with no
+// dominant direction keeps its lightmap exactly.
 fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
     let shaded = dot(N, dir) * 0.5 + 0.5;
     let baked = dot(Ng, dir) * 0.5 + 0.5;
@@ -121,9 +85,8 @@ fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> 
     return max(shaded, 0.0) / max(baked, 1e-3);
 }
 
-// A direction page texel back to its vector (`xyz`, direction scaled by
-// directionality) and its lamp share (`w`, #1695); mirrors `decode_direction` in
-// crates/lighting/src/lightmap/encode.rs, which stores each component as 128 + 127x.
+// Mirrors `decode_direction` in crates/lighting/src/lightmap/encode.rs: each component
+// stored as 128 + 127x.
 fn decode_lightmap_direction(texel: vec4<f32>) -> vec4<f32> {
     return vec4<f32>((texel.xyz * 255.0 - 128.0) / 127.0, texel.a);
 }
@@ -158,17 +121,12 @@ fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f3
     return ggx2 * ggx1;
 }
 
-// Schlick's Fresnel from the head-on reflectance `F0` to the grazing one `F90`: 1
-// for a metal and a default dielectric, `KHR_materials_specular`'s `specular` for a
-// dielectric (#1998), so a dielectric at `specular` 0 reflects nothing at any angle.
+// `F90` is `KHR_materials_specular`'s `specular` for a dielectric, so one at `specular`
+// 0 reflects nothing at any angle.
 fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>, F90: f32) -> vec3<f32> {
     return F0 + (F90 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// The GGX specular BRDF (Cook-Torrance: D * G * F / (4 N·V N·L)) for light from `L`
-// seen from `V`, given its Fresnel `F` at the half vector. Shared by every live light
-// (`calculate_pbr`) and the directional lightmap's one baked lobe
-// (`forward::lightmap::baked_specular`, #1695), so the two highlights agree.
 fn ggx_specular(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, H: vec3<f32>, F: vec3<f32>, roughness: f32) -> vec3<f32> {
     let NdotL = max(dot(N, L), 0.0);
     let NdotV = max(dot(N, V), 0.0);
@@ -179,17 +137,12 @@ fn ggx_specular(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, H: vec3<f32>, F: vec3<
     return numerator / denominator;
 }
 
-// What a light of `radiance` arriving from `L` reflects specularly toward `V`: the
-// GGX lobe times N·L, with no diffuse term.
 fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> vec3<f32> {
     let H = normalize(L + V);
     let F = FresnelSchlick(max(dot(H, V), 0.0), F0, F90);
     return ggx_specular(N, V, L, H, F, roughness) * radiance * max(dot(N, L), 0.0);
 }
 
-// The share of a lamp's radiance a surface diffuses at `NdotL_raw` = N·L under the
-// scene's diffuse model (#1698), the one the lightmap and probe bakes use too
-// (`DiffuseModel::response`): Lambert, or the retro squared wrap.
 fn diffuse_response(NdotL_raw: f32) -> f32 {
     let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
     return select(max(NdotL_raw, 0.0), wrap * wrap, lighting.diffuse_wrap > 0.5);
@@ -208,8 +161,6 @@ fn calculate_pbr(
 ) -> vec3<f32> {
     let H = normalize(L + V);
     let NdotL = max(dot(N, L), 0.0);
-    // Diffuse follows the scene's model (`diffuse_response`); specular is always the
-    // physical N·L.
     let F = FresnelSchlick(max(dot(H, V), 0.0), F0, F90);
 
     let kS = F;
@@ -222,21 +173,13 @@ fn calculate_pbr(
     return diffuse * radiance * diffuse_response(dot(N, L)) + specular * radiance * NdotL;
 }
 
-// Percentage-closer filtering (PCF) kernel radius, in texels. The kernel is a
-// square of side (2 * PCF_RADIUS + 1): radius 1 -> 3x3 (9 taps), radius 2 -> 5x5
-// (25 taps). Raising it widens the penumbra and softens the shadow edge at a
-// linear cost in samples. This is the tunable "sample count" knob for the soft
-// shadow filter; bump it for softer edges, drop it for sharper/cheaper shadows.
+// PCF kernel radius in texels.
 const PCF_RADIUS: i32 = 2;
 
-// Bias against self-shadowing, in texels of the cascade sampled: the surface is
-// pushed off along its normal (more at grazing light) and its depth pulled toward
-// the light. In texels, so every cascade gets the same relative bias however much
-// ground its texels cover.
+// In texels of the cascade sampled, so every cascade gets the same relative bias.
 const NORMAL_OFFSET_TEXELS: f32 = 1.5;
 const DEPTH_BIAS_TEXELS: f32 = 1.0;
 
-// PCF over one cascade; 1.0 (lit) outside its volume.
 fn sample_cascade(c: i32, world_pos: vec3<f32>, N: vec3<f32>, NdotL: f32) -> f32 {
     let texel = shadow.texels[c];
     let offset_pos = world_pos + N * texel * NORMAL_OFFSET_TEXELS * (1.0 - NdotL);
@@ -251,11 +194,8 @@ fn sample_cascade(c: i32, world_pos: vec3<f32>, N: vec3<f32>, NdotL: f32) -> f32
     let size = textureDimensions(t_shadow);
     let texel_size = vec2<f32>(1.0 / f32(size.x), 1.0 / f32(size.y));
 
-    // NxN PCF: average the hardware depth comparisons over a square texel
-    // neighbourhood. Each tap is already bilinearly filtered by the comparison
-    // sampler, so this stacks a wider blur on top of hardware PCF for a soft,
-    // FEAR-era shadow edge instead of a single hard step. `Level` sampling: the
-    // cascade is picked per fragment, so this runs in non-uniform control flow.
+    // `Level` sampling: the cascade is picked per fragment, so this runs in non-uniform
+    // control flow.
     var lit = 0.0;
     var taps = 0.0;
     for (var x = -PCF_RADIUS; x <= PCF_RADIUS; x = x + 1) {
@@ -268,12 +208,8 @@ fn sample_cascade(c: i32, world_pos: vec3<f32>, N: vec3<f32>, NdotL: f32) -> f32
     return lit / taps;
 }
 
-// The sun's visibility at `world_pos`, in two parts: the cascade whose slice holds
-// the fragment's view depth, cross-faded into the next over the last `blend` of its
-// range (x), and how far it has faded out over the last tenth of the shadow
-// distance (y: 0 inside, 1 past it or with no cascade), so the edge never pops.
-// `forward::shadowmask::sun_shadow` fades x to lit by y, and under a shadowmask
-// into the baked shadow (#1695).
+// y: fade-out over the last tenth of the shadow distance (0 inside, 1 past it or with
+// no cascade).
 fn sun_shadow_parts(world_pos: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
     let count = i32(shadow.params.x);
     let distance = shadow.params.y;
@@ -297,11 +233,6 @@ fn sun_shadow_parts(world_pos: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(lit, fade);
 }
 
-// Reconstruct diffuse irradiance from the entity's L2 SH probe for a surface normal
-// (#240). Mirrors `Sh9::eval` in crates/scene/src/lighting/sh.rs: the same 9 real-SH
-// basis polynomials (`lighting::sh::sh_basis`) and the same cosine-lobe band factors
-// (pi, 2pi/3, pi/4), so the headless analytic path and the GPU agree. Result clamped
-// to non-negative.
 fn eval_sh(N: vec3<f32>, object: u32) -> vec3<f32> {
     let b = sh_basis(N);
     let a0 = PI;
@@ -318,17 +249,11 @@ fn eval_sh(N: vec3<f32>, object: u32) -> vec3<f32> {
     return max(out, vec3<f32>(0.0));
 }
 
-// The probe irradiance E at `world_pos` for normal `N`: the object's one SH sample
-// (`eval_sh`), or, with a Light Probe Proxy Volume, the volume's grid (#1672).
-// `instance` is the fragment's `VertexOutput::instance`: x the object, z the volume.
 fn probe_irradiance(world_pos: vec3<f32>, N: vec3<f32>, instance: vec3<u32>) -> vec3<f32> {
     let proxy = proxy_irradiance(world_pos, N, instance.z);
     return select(eval_sh(N, instance.x), proxy.rgb, proxy.w > 0.5);
 }
 
-// The scene's ambient at normal `N`, as irradiance E / pi (`lighting::ambient::ambient_radiance`:
-// the `Color` hemisphere or the `Gradient` trilight, #1647). What a surface no
-// lightmap or probe covers takes (`surface_color`'s step 1).
 fn flat_ambient(N: vec3<f32>) -> vec3<f32> {
     return ambient_radiance(lighting.ambient, N);
 }

@@ -1,7 +1,3 @@
-//! crates/shadergen/src/crt_tests.rs — the CRT postfx blocks (#1679): `barrel`'s uv stage
-//! warps where the frame is sampled, and `phosphor_mask`'s `kind` is a named choice.
-//! The pixels are pinned by `tests/gpu/postfx/crt_screenshot.rs`.
-
 use super::assemble::assemble;
 use super::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use super::validate::validate;
@@ -29,7 +25,6 @@ fn sel(id: &str, params: &[(&str, ParamValue)]) -> BlockSel {
 fn barrel_moves_the_sample_before_any_colour_block_and_blacks_out_the_rest() {
     let wgsl = assemble(&recipe(vec![sel("tint", &[]), sel("barrel", &[])]), "").unwrap();
     validate(engine_shader_dir(), &wgsl).expect("barrel + tint composes");
-    // Its place in the recipe doesn't matter: the uv chain runs before the sample.
     assert!(
         wgsl.contains("let uv = uv_barrel(in.uv, shader_params.v[0].x, barrel_1_corner_radius);")
     );

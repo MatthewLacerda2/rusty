@@ -1,7 +1,7 @@
-// engine/shaders/forward/motion.wgsl — the velocity target's texel (#1435): what
+// the velocity target's texel: what
 // `shader.wgsl`'s motion-vector entry points (`fs_velocity`, `fs_velocity_ssr`,
 // `fs_depth_postpass`) write at location 1. Moved out of `shader.wgsl` for its size
-// cap (#1702).
+// cap.
 
 #define_import_path forward::motion
 
@@ -15,12 +15,12 @@ fn motion_texel(clip_now: vec4<f32>, clip_prev: vec4<f32>, world: vec3<f32>) -> 
     // had no place on screen to move from: it writes no motion, not a huge streak.
     var velocity = vec2<f32>(0.0);
     if (clip_prev.w > 1e-4) {
-        // `clip_now` went through the jittered projection (`stack.zw`, TAA's, #1702):
+        // `clip_now` went through the jittered projection (`stack.zw`, TAA's):
         // the jitter comes back out, so a still surface reads 0.
         velocity = clip_now.xy / clip_now.w - camera.stack.zw - clip_prev.xy / clip_prev.w;
     }
     // Depth along this camera's view axis, not the straight-line distance: a plane
-    // facing the camera has one depth, so depth of field focuses on a plane (#1445).
+    // facing the camera has one depth, so depth of field focuses on a plane.
     let depth = dot(camera.clusters.view_z.xyz, world) + camera.clusters.view_z.w;
     return vec4<f32>(velocity, depth, camera.stack.x);
 }

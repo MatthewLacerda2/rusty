@@ -1,42 +1,23 @@
-// engine/shaders/postfx/exposure.wgsl — automatic exposure (#1444), Unity HDRP's
-// *Automatic Histogram*: two compute passes over one view's HDR scene, run each
-// frame its volume is in Automatic mode (`ExposureMeter::run` in
-// `crates/render/src/postfx/effects/exposure/mod.rs`, with pipelines from `ExposurePasses`).
-//
-//   cs_histogram — the scene downsampled to a quarter of its size (one invocation per
-//                  BLOCK × BLOCK box of pixels, their mean), each block's luminance
-//                  binned by log2 into BINS bins spanning [MIN_LOG, MIN_LOG + LOG_RANGE),
-//                  weighted towards the centre of the picture (#1701)
-//   cs_reduce    — one workgroup: averages the bins between the low and high
-//                  percentiles, turns that into the EV that brings it to middle grey,
-//                  eases the adapted EV towards it and clears the histogram
-//
-// The adapted EV stays on the GPU (`state.x`), where the composite reads it: no
-// readback on the frame's path. Integer atomics and a serial reduce keep it a pure
-// function of the scene and the params, so a capture replays exactly.
+// Unity HDRP's *Automatic Histogram*. The adapted EV stays on the GPU (`state.x`),
+// where the composite reads it: no readback. Integer atomics and a serial reduce keep
+// it a pure function of the scene and the params, so a capture replays exactly.
 
 #import postfx::grade::luminance
 
-// Mirrors the `BINS` / `BLOCK` consts in `crates/render/src/postfx/effects/exposure/mod.rs`.
 const BINS: u32 = 64u;
-// Pixels per side of the box each histogram sample averages: a ¼-resolution
-// downsample. Every pixel is metered, so a lamp a few pixels wide counts by its area
-// wherever it falls, where a point sample hit it or missed it as the camera moved.
+// Every pixel is metered, so a lamp a few pixels wide counts by its area wherever it
+// falls.
 const BLOCK: u32 = 4u;
-// Centre weighting (#1701; HDRP's *Center Weighted* metering, UE's centre bias): a
-// block's weight is 1 - CENTRE_FALLOFF · d², d its distance from the centre of the
-// picture over the distance to a corner, so the centre counts 1 and a corner 0.25.
+// HDRP's *Center Weighted* metering: weight 1 - CENTRE_FALLOFF · d², d the distance
+// from the centre over the distance to a corner.
 const CENTRE_FALLOFF: f32 = 0.75;
-// The weights are integer, for exact, order-free atomics: 1 is WEIGHT_ONE counts. A
-// frame holds at most (8K / BLOCK)² · WEIGHT_ONE ≈ 1.3e8, well inside a u32.
+// Integer weights for exact, order-free atomics: a frame holds at most (8K / BLOCK)² ·
+// WEIGHT_ONE ≈ 1.3e8, inside a u32.
 const WEIGHT_ONE: f32 = 64.0;
-// The log2-luminance span the histogram meters: 2^-10 to 2^10.
 const MIN_LOG: f32 = -10.0;
 const LOG_RANGE: f32 = 20.0;
-// Middle grey: the luminance the metered average is exposed to.
 const KEY: f32 = 0.18;
 
-// Mirrors `ExposureParams`.
 struct Params {
     // x: min_ev, y: max_ev, z: compensation, w: unused
     limits: vec4<f32>,
@@ -63,7 +44,6 @@ fn bin_of(l: f32) -> u32 {
     return u32(clamp(t * f32(BINS), 0.0, f32(BINS - 1u)));
 }
 
-// The weight of the block at `cell` of a `blocks`-sized grid (see CENTRE_FALLOFF).
 fn centre_weight(cell: vec2<u32>, blocks: vec2<u32>) -> u32 {
     let uv = (vec2<f32>(cell) + 0.5) / vec2<f32>(blocks) * 2.0 - 1.0;
     let d2 = dot(uv, uv) * 0.5;
@@ -77,7 +57,6 @@ fn cs_histogram(
 ) {
     atomicStore(&local_bins[li], 0u);
     workgroupBarrier();
-    // This invocation's block: the mean of its pixels (fewer at a ragged edge).
     let dims = textureDimensions(scene);
     let blocks = (dims + BLOCK - 1u) / BLOCK;
     if (all(id.xy < blocks)) {
@@ -112,9 +91,7 @@ fn cs_reduce(@builtin(local_invocation_index) li: u32) {
     for (var i = 0u; i < BINS; i++) {
         total += f32(counts[i]);
     }
-    // The (weighted) samples between the low and high percentiles, each bin weighted
-    // by how much of it falls inside that window. An empty window (low == high) meters the
-    // bin the percentile falls in.
+    // An empty window (low == high) meters the bin the percentile falls in.
     let lo = params.window.x * total;
     let hi = params.window.y * total;
     var below = 0.0;

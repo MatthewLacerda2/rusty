@@ -1,7 +1,3 @@
-//! crates/shadergen/src/gameplay_tests.rs — the gameplay surface blocks (#401): each one
-//! composes against the real forward base, and `uv_scroll` moves the UVs at the top
-//! of `fs_main` — before any map is sampled — only when a recipe holds it.
-
 use std::collections::BTreeMap;
 
 use super::assemble::assemble;
@@ -51,10 +47,8 @@ fn uv_scroll_moves_the_uvs_before_any_map_is_sampled() {
         !wgsl[at + 1..].contains("fn surface_color"),
         "only the surface colour function is opened"
     );
-    // Every map is read at the coordinates built from the moved UVs (#1573).
     assert!(wgsl[at..].contains("mapping::coords(in.tex_coords,"));
     assert!(wgsl[at..].contains("mapping::sample(t_diffuse, s_diffuse, maps)"));
-    // A UV block never joins the color chain.
     assert!(!wgsl.contains("uv_uv_scroll(srf_"));
     assert!(wgsl.contains("srf_toon_ramp(lighting_color, in, toon_ramp_0_steps)"));
 }

@@ -4,8 +4,6 @@ use super::super::recipe::{BlockSel, ParamValue};
 use super::*;
 
 fn surface_base() -> String {
-    // A minimal stand-in containing the splice point, so assembler unit tests
-    // don't read the real asset (the bake/validate tests do that end-to-end).
     format!("fn fs_main() -> vec4<f32> {{\n    var lighting_color = vec3<f32>(1.0);\n    var base_color = vec4<f32>(1.0);\n    {SURFACE_RETURN}\n}}")
 }
 
@@ -23,9 +21,7 @@ fn surface_folds_blocks_into_the_final_return() {
     assert!(wgsl.contains("const toon_ramp_0_steps: f32 = 4.0;"));
     assert!(wgsl.contains("fn srf_toon_ramp"));
     assert!(wgsl.contains("srf_toon_ramp(lighting_color, in, toon_ramp_0_steps)"));
-    // The original flat return is gone (rewritten to apply the chain).
     assert!(!wgsl.contains(SURFACE_RETURN));
-    // ...and the fog still wraps the folded chain, so authored looks are fogged.
     assert!(wgsl.contains("transparent::composite(srf_toon_ramp("));
 }
 
@@ -87,8 +83,6 @@ fn assembly_is_deterministic() {
 
 #[test]
 fn a_scaled_block_s_reflection_factor_runs_once() {
-    // `triplanar_detail`'s factor samples its mask three times: the SSR record and
-    // SSIL's realtime light both read one binding of it, never a second call.
     let recipe = ShaderRecipe {
         pass: PassKind::Surface,
         name: "t".into(),
