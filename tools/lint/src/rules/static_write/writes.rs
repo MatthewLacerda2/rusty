@@ -1,9 +1,3 @@
-//! What counts as writing a `static` on one line (`test-static-write`): the
-//! in-place calls, and a `.lock()` guard written through. The rule above decides
-//! which lines are asked and which names are process-wide.
-
-/// The calls that write a `static` in place: an atomic's, a `OnceLock`'s (a
-/// cache filled), an `RwLock`'s write guard.
 const WRITES: &[&str] = &[
     ".store(",
     ".swap(",
@@ -15,11 +9,8 @@ const WRITES: &[&str] = &[
     ".write()",
 ];
 
-/// What ends the `Result` a `.lock()` returns, leaving the guard.
 const GUARDS: &[&str] = &[".unwrap()", ".unwrap_or_else(", ".expect("];
 
-/// The first call on a guard that writes through it, as prefixes: `.push`
-/// covers `.push_str(` and `.push_back(`, `.pop` covers `.pop_front(`.
 const MUTATES: &[&str] = &[
     ".push",
     ".pop",
@@ -41,7 +32,6 @@ const MUTATES: &[&str] = &[
     ".take()",
 ];
 
-/// The identifiers on `line`, each with its byte offset.
 fn idents(line: &str) -> impl Iterator<Item = (usize, &str)> {
     let base = line.as_ptr() as usize;
     line.split(|c: char| !(c.is_alphanumeric() || c == '_'))
@@ -49,8 +39,6 @@ fn idents(line: &str) -> impl Iterator<Item = (usize, &str)> {
         .map(move |w| (w.as_ptr() as usize - base, w))
 }
 
-/// Does `line` write a `static` `is_process` names, by [`WRITES`], or through
-/// the guard of its `.lock()`? A path's last segment counts as the name.
 pub fn writes(line: &str, is_process: &dyn Fn(&str) -> bool) -> bool {
     idents(line).any(|(at, name)| {
         let upper = name
@@ -72,9 +60,6 @@ pub fn writes(line: &str, is_process: &dyn Fn(&str) -> bool) -> bool {
     })
 }
 
-/// What follows the guard in `rest` (just past a `.lock()`): past one
-/// [`GUARDS`] call, or `rest` itself when none follows. `None` when the call's
-/// argument runs past the line, so the guard cannot be seen.
 fn past_guard(rest: &str) -> Option<&str> {
     let Some(call) = GUARDS.iter().find(|g| rest.starts_with(**g)) else {
         return Some(rest);
@@ -85,7 +70,6 @@ fn past_guard(rest: &str) -> Option<&str> {
     Some(&rest[call.len() - 1 + closing(&rest[call.len() - 1..])?..])
 }
 
-/// The byte just past the `)` closing the `(` that `s` opens with.
 fn closing(s: &str) -> Option<usize> {
     let mut depth = 0i32;
     s.char_indices().find_map(|(i, c)| {
@@ -98,10 +82,6 @@ fn closing(s: &str) -> Option<usize> {
     })
 }
 
-/// Does `rest`, what follows a guard, write through it: a mutating first call
-/// ([`MUTATES`], a one-argument `.replace(`, which `str`'s two-argument one is
-/// not), a field or index assigned or mutated, or the guard itself assigned when `deref`
-/// (`*X.lock().unwrap() = …`)?
 fn through_guard(rest: &str, deref: bool) -> bool {
     if MUTATES.iter().any(|m| rest.starts_with(m)) {
         return true;
@@ -122,7 +102,6 @@ fn through_guard(rest: &str, deref: bool) -> bool {
     deref && assigns(rest)
 }
 
-/// Does `args` hold a comma outside any bracket: more than one argument?
 fn top_level_comma(args: &str) -> bool {
     let mut depth = 0i32;
     args.chars().any(|c| {
@@ -135,7 +114,6 @@ fn top_level_comma(args: &str) -> bool {
     })
 }
 
-/// Does `rest` open with an assignment (` = `, ` += `, …), not a comparison?
 fn assigns(rest: &str) -> bool {
     let rest = rest.trim_start();
     [

@@ -1,27 +1,4 @@
-//! `sanitize`: every authoring setter refuses a non-finite float (#1361).
-//!
-//! `scene::rules` holds the bounds the authoring setters store through: the float
-//! rules every setter shares (`rules::sanitize`: a value from Lua, the editor or a
-//! scene file is finite and in range before it is stored, and NaN or `±inf` takes
-//! the field's fallback) and the bounds the base holds a value to as well (a lens, a
-//! joint drive). Setters kept skipping them (#993, #1341, #1342), so a `set_*` under
-//! `src/edit/authoring/` with any `pub` visibility that takes a float-carrying
-//! parameter is a finding unless each such parameter is passed whole to a rule (a
-//! bare `pub fn` under `src/scene/rules/`) at a position that rule holds, or to
-//! another `set_*` of the same file, which this rule checks in turn. Which
-//! positions a rule holds, and the finding for a rule that holds a float nowhere,
-//! are `sanitize_rules`'. A parameter carries a float when its type, under `&`,
-//! `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`]. A value checked another
 //! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
-//!
-//! A line scan, not a parser, with known limits:
-//! - it checks that the parameter reaches a helper, not that the helper's result is
-//!   what gets stored;
-//! - `param.x` passed alone sanitizes one component, not the parameter, and does not
-//!   count, so a helper must take the parameter itself;
-//! - the signature runs from the name's `(` to its match and the body from the next
-//!   `{`, so a parameter type with `->` in it (a closure type) miscounts its `<>`s;
-//! - [`FLOATS`] names the float structs the setters take today: a new one joins it.
 
 use super::finding::Finding;
 use super::sanitize_rules::{resolved, unheld, Rule};
@@ -30,11 +7,8 @@ use crate::code::{code_lines, is_ident};
 
 pub const RULE: &str = "sanitize";
 
-/// Where the setters live.
 const DIR: &str = "src/edit/authoring/";
 
-/// Parameter types that can carry a NaN or an infinity: the float scalars, glam's
-/// vectors, and the float structs the setters take.
 const FLOATS: &[&str] = &[
     // sorted: a membership list
     "ColorRange",
@@ -55,8 +29,6 @@ const FLOATS: &[&str] = &[
     "Vec4",
 ];
 
-/// One `pub fn set_*`: its name, the line it starts on, its float parameters and
-/// its body.
 struct Setter {
     name: String,
     line: usize,
@@ -64,7 +36,6 @@ struct Setter {
     body: String,
 }
 
-/// Every setter of `source` that stores a float parameter unsanitized.
 pub fn check(path: &str, source: &str, test: &[bool], rules: &[Rule]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with(DIR) {
@@ -108,7 +79,6 @@ pub fn check(path: &str, source: &str, test: &[bool], rules: &[Rule]) -> Vec<Fin
     found
 }
 
-/// The setter whose `pub fn set_` is on line `i`, if one is.
 fn setter(code: &[&str], i: usize) -> Option<Setter> {
     let line = code[i].trim_start();
     if !line.starts_with("pub") {
@@ -129,7 +99,6 @@ fn setter(code: &[&str], i: usize) -> Option<Setter> {
     })
 }
 
-/// The names of the parameters in `params` whose type is a float or a glam vector.
 pub(super) fn float_params(params: &str) -> Vec<String> {
     split_top(params)
         .iter()
@@ -139,7 +108,6 @@ pub(super) fn float_params(params: &str) -> Vec<String> {
         .collect()
 }
 
-/// Whether `ty`, under `&`, `Option<…>`, `Vec<…>` and `[…; N]`, is one of [`FLOATS`].
 fn carries_float(ty: &str) -> bool {
     let ty = ty
         .trim()
@@ -157,7 +125,6 @@ fn carries_float(ty: &str) -> bool {
     FLOATS.contains(&ty.rsplit("::").next().unwrap_or(ty))
 }
 
-/// `s` split at its top-level commas.
 pub(super) fn split_top(s: &str) -> Vec<&str> {
     let (mut depth, mut from, mut parts) = (0i32, 0, Vec::new());
     for (at, c) in s.char_indices() {
@@ -175,7 +142,6 @@ pub(super) fn split_top(s: &str) -> Vec<&str> {
     parts
 }
 
-/// Byte offset of the bracket closing the one `s` starts with.
 pub(super) fn matching(s: &str, open: char, close: char) -> Option<usize> {
     let mut depth = 0;
     for (at, c) in s.char_indices() {
@@ -191,8 +157,6 @@ pub(super) fn matching(s: &str, open: char, close: char) -> Option<usize> {
     None
 }
 
-/// Does `body` call `callee` with `param` itself (not one of its fields) as an
-/// argument, at one of `positions` (any, for `None`)?
 pub(super) fn passes_at(
     body: &str,
     callee: &str,
@@ -217,7 +181,6 @@ pub(super) fn passes_at(
     })
 }
 
-/// The identifier right after the first `marker` in `line`.
 pub(super) fn ident_after(line: &str, marker: &str) -> Option<String> {
     let at = line.find(marker)?;
     if line[..at].chars().next_back().is_some_and(is_ident) {
@@ -230,7 +193,6 @@ pub(super) fn ident_after(line: &str, marker: &str) -> Option<String> {
     (!name.is_empty()).then_some(name)
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let rules = resolved(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
     let setters =

@@ -1,13 +1,3 @@
-//! Lines of code in a Lua script: what the size gate holds `.lua` to (#1015).
-//!
-//! Blank lines and comments are free, as for Python: the engine's script
-//! components explain themselves, and that prose is not what makes a file do too
-//! much. Lua's comments are `--` to the line's end, and a long comment `--[[ … ]]`
-//! (or `--[==[ … ]==]`, any level). A string is code, a long string `[[ … ]]` on
-//! every line it spans; a quoted string is skipped whole, so a `--` in one is not
-//! a comment.
-
-/// Lines of code in `source`: every line holding something outside a comment.
 pub(super) fn code_lines(source: &str) -> usize {
     let mut open: Option<Long> = None;
     source
@@ -16,16 +6,12 @@ pub(super) fn code_lines(source: &str) -> usize {
         .count()
 }
 
-/// A long bracket still open at the end of a line: its level (the `=` count) and
-/// whether it is a comment or a string.
 #[derive(Clone, Copy)]
 struct Long {
     level: usize,
     comment: bool,
 }
 
-/// Whether one line counts, given the long bracket open as it starts, and noting
-/// the one open as it ends.
 fn is_code(bytes: &[u8], open: &mut Option<Long>) -> bool {
     let mut code = false;
     let mut i = 0;
@@ -79,8 +65,6 @@ fn is_code(bytes: &[u8], open: &mut Option<Long>) -> bool {
     code
 }
 
-/// When a long bracket `[`, `=`×level, `[` opens at `i`: its level and the index
-/// past it.
 fn long_open(bytes: &[u8], i: usize) -> Option<(usize, usize)> {
     if bytes.get(i) != Some(&b'[') {
         return None;
@@ -89,8 +73,6 @@ fn long_open(bytes: &[u8], i: usize) -> Option<(usize, usize)> {
     (bytes.get(i + 1 + level) == Some(&b'[')).then_some((level, i + 2 + level))
 }
 
-/// Scan from `i` for the long bracket's close `]`, `=`×level, `]`: the index past
-/// it and `true`, or the line's end and `false`.
 fn close(bytes: &[u8], mut i: usize, level: usize) -> (usize, bool) {
     while i < bytes.len() {
         if bytes[i] == b']' {
@@ -104,7 +86,6 @@ fn close(bytes: &[u8], mut i: usize, level: usize) -> (usize, bool) {
     (bytes.len(), false)
 }
 
-/// The index past a quoted string's closing quote (or the line's end).
 fn skip_quoted(bytes: &[u8], mut i: usize, quote: u8) -> usize {
     while i < bytes.len() {
         match bytes[i] {
@@ -137,7 +118,6 @@ mod tests {
 
     #[test]
     fn a_long_string_is_code_on_every_line() {
-        // Its blank line is blank either way; its closing bracket line is code.
         let src = "local s = [[\n-- not a comment\n\n]]\nx = 1\n";
         assert_eq!(code_lines(src), 4);
     }

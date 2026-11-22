@@ -1,6 +1,3 @@
-//! The scanner's edges: lifetimes, references on free lines, the `SAFETY` run,
-//! and a strict run over a folder holding an agent doc.
-
 use super::{check, split, Kind, STRICT};
 use crate::repo::scaffold::Repo;
 

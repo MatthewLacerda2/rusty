@@ -84,7 +84,6 @@ fn declarations_read_in_memory_with_quoted_brackets_shared_lines_and_dotted_path
     ] {
         std::fs::write(src.join(format!("{name}.rs")), "").unwrap();
     }
-    // Never written to disk: `test_only_files` reads it through `source` only.
     let lib = "#[cfg(test)]\n#[doc = \"a (b\"]\nmod quoted;\n#[doc = \"a (b\"]\nmod documented;\n\
                #[cfg(test)] use super::X;\nmod production;\n#[cfg(test)] mod fixture;\n\
                #[cfg(test)]\n#[path = \"./dotted.rs\"]\nmod dotted;\n\

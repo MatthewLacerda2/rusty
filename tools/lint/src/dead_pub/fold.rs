@@ -1,36 +1,19 @@
-//! The rewrite that makes rustc's `dead_code` see the whole project (#1003, #940).
-//!
-//! An exported module's `pub` item is never dead to rustc. On a throwaway copy: a
-//! lib's `pub mod`s go `pub(crate)` (the workspace's members are mounted the same
-//! way by `super::workspace`), and every real caller is folded
-//! into the lib as a module, so its uses still count — each `[[bin]]` as
-//! `__bin_<name>` (behind its `required-features`), and `tests/main.rs` as
-//! `#[cfg(test)] __itests`. Their sources then name the lib as `crate::` and their
-//! own root as `crate::<module>::`. A workspace member is folded the same way
-//! (`super::workspace`): its sources are a caller whose module is the member's, and
-//! every member's `rusty_<m>::` is `crate::<m>::` in every folded file, and so is
-//! a member named bare (`use rusty_<m> as x;`, [`super::names`]).
-
 use super::names::{Left, Names, Renamer};
 use crate::code::{code_of, Open};
 
-/// One `[[bin]]` target of `Cargo.toml`.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bin {
     pub name: String,
-    /// Package-relative, e.g. `src/bin/play.rs`.
     pub path: String,
     pub features: Vec<String>,
 }
 
 impl Bin {
-    /// The module the bin becomes inside the lib.
     pub fn module(&self) -> String {
         format!("__bin_{}", self.name.replace('-', "_"))
     }
 }
 
-/// The `[[bin]]` targets of a `Cargo.toml` (the simple one-key-per-line form).
 pub fn bins(cargo_toml: &str) -> Vec<Bin> {
     let mut out: Vec<Bin> = Vec::new();
     let mut in_bin = false;
@@ -62,8 +45,6 @@ pub fn bins(cargo_toml: &str) -> Vec<Bin> {
     out
 }
 
-/// `lib.rs` with its modules crate-private and every caller folded in, and how
-/// many `pub mod`s it made crate-private.
 pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> (String, usize) {
     let mut private = 0;
     let mut out: String = source
@@ -102,13 +83,6 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> (String, usi
     (out, private)
 }
 
-/// One source file of a folded caller, now the lib's module `module`: its own
-/// root is `crate::<module>::`, the lib (`lib_name::`) is `crate::`, `main` is
-/// callable, and, in the caller's `root` file only (a bin, `tests/main.rs`), the
-/// inner attributes at its head are blanked, keeping every line number: only a
-/// module's root can't carry them, and a submodule's own (`#![cfg(..)]`) belong to
-/// it. One inside a macro body, such as `proptest!`'s `#![proptest_config(..)]`,
-/// is the macro's input and stays (#1205). Brackets are counted outside literals.
 pub fn caller(
     source: &str,
     module: &str,
@@ -119,9 +93,6 @@ pub fn caller(
     fold_file(source, module, lib_name, root, members).0
 }
 
-/// Every name of a sibling crate or the lib in `source`, folded as
-/// [`caller`] folds it, that the fold must leave: (line, what was left). A
-/// folded copy holding one does not compile.
 pub fn unfoldable(
     source: &str,
     module: &str,

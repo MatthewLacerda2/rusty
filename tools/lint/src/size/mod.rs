@@ -1,20 +1,3 @@
-//! The size gate: per-file caps over [`SIZE_ROOTS`] (or an explicit file list).
-//! Result to stdout and `.lint/report.txt`.
-//!
-//! It measures Rust (`.rs`, every line) and, by lines of code (comments, docstrings
-//! and blank lines free), Python (`.py`, [`python::code_lines`]), the engine's Lua
-//! (`.lua`, [`lua::code_lines`]) and its shaders (`.wgsl`, [`wgsl::code_lines`]).
-//! The merge path in `.github/scripts/` is the most agent-edited code outside
-//! `src/`, and until #926 the gate could not see it: `merge-queue.py` had reached
-//! 1,074 lines unseen. The shaders and the engine's script components had reached
-//! twice the cap the same way before #1015.
-//!
-//! The full scan measures what can be committed ([`listing`], #1373): a file the
-//! engine seeds into a gitignored folder is never pushed, so it never counts.
-//!
-//! **Nothing is grandfathered** (#926). A file over its cap is split, never excused;
-//! the burn-down list this gate once read emptied and was retired.
-
 use crate::comments;
 use crate::gates::Verdict;
 pub(crate) use caps::is_test_file;
@@ -32,21 +15,11 @@ mod python;
 mod tests;
 mod wgsl;
 
-/// The directories the `.rs` scans walk: the engine (`src/` and the member crates
-/// under `crates/`), its integration suite, the fuzz
-/// targets (#535), and the dev-tool crates under `tools/` (#541). The rules gate
-/// walks these too.
 pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tools"];
-/// What the size gate walks: [`SCAN_ROOTS`] plus `.github`, where the merge and
-/// mutation scripts live (#926), and `engine`, the shipped shaders and script
-/// components (#1015). `assets/` is not one: it is gitignored, the open project's
-/// seeded and baked copies, so nothing in it is ever pushed; nor is a gitignored
-/// path inside a root ([`full_scan`]).
 const SIZE_ROOTS: &[&str] = &[
     "src", "crates", "tests", "fuzz", "tools", ".github", "engine",
 ];
 
-/// The languages the size gate measures.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Lang {
     Rust,
@@ -66,8 +39,6 @@ impl Lang {
         }
     }
 
-    /// The length the cap is held against: every line of Rust (#926 leaves Rust's
-    /// counting as it was), the lines of code of the rest.
     fn measure(self, content: &str) -> usize {
         match self {
             Lang::Rust => content.lines().count(),
@@ -78,11 +49,6 @@ impl Lang {
     }
 }
 
-/// The gate over the repository at `base`: `args` (explicit files, relative to it)
-/// or, when empty, every size root; and the agent docs among them. Each file is
-/// judged and named by its path relative to `base`. Where git can't list the tree,
-/// the body says so. The comment checks print their signal over the same files,
-/// and fail only under [`comments::STRICT`]'s paths (files or folders).
 pub fn verdict(base: &Path, args: &[String]) -> Verdict {
     let strict = args.iter().any(|a| a == comments::STRICT);
     let args: Vec<String> = args
@@ -104,7 +70,6 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
     };
 
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(base, p)).collect();
-    // A folder argument reaches the agent docs as the files it holds.
     let listed: Vec<String> = files
         .iter()
         .map(|f| {
@@ -151,9 +116,6 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
     verdict
 }
 
-/// Every measured file under [`SIZE_ROOTS`] in the repository at `base`: the
-/// committable ones git lists, or, where git can't list them (a tarball with no
-/// `.git`), every file on disk, build output aside, with a note saying so.
 fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
     match listing::committable(base, SIZE_ROOTS) {
         Ok(files) => {
@@ -170,8 +132,6 @@ fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
     }
 }
 
-/// The note for the disk walk: one line saying so, then git's own message
-/// (several lines for "dubious ownership") on lines of its own.
 fn fallback_note(why: &str) -> String {
     format!(
         "lint: git can't list the committable files here; measuring every file on disk, \
@@ -179,21 +139,18 @@ fn fallback_note(why: &str) -> String {
     )
 }
 
-/// Every `.rs` file under `dir`, build output aside: what the rules gate scans.
 pub(crate) fn scan_dir(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk(dir, &mut out, &|p| Lang::of(p) == Some(Lang::Rust));
     out
 }
 
-/// Every `.wgsl` shader under `dir`, build output aside: what the shader rules read.
 pub(crate) fn shaders_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk(dir, &mut out, &|p| Lang::of(p) == Some(Lang::Wgsl));
     out
 }
 
-/// Every file under `dir` the size gate measures, build output aside.
 fn measured_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk(dir, &mut out, &|p| Lang::of(p).is_some());
@@ -208,8 +165,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            // Build output (e.g. `fuzz/target/` after `cargo fuzz`) holds generated
-            // code, and `__pycache__` holds compiled Python.
             if path
                 .file_name()
                 .is_some_and(|n| n == "target" || n == "__pycache__")
@@ -223,8 +178,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
     }
 }
 
-/// The violation line for `path` (on disk, under `base`), or `None` when it fits
-/// (or is not measured).
 fn check_file(base: &Path, path: &Path) -> Option<String> {
     let lang = Lang::of(path)?;
     let content = fs::read_to_string(path).ok()?;
@@ -233,7 +186,6 @@ fn check_file(base: &Path, path: &Path) -> Option<String> {
     if lines <= limit {
         return None;
     }
-    // A lines-of-code count is not `wc -l`'s, so the line says which it is.
     let unit = if lang != Lang::Rust {
         " (lines of code)"
     } else {
@@ -245,7 +197,6 @@ fn check_file(base: &Path, path: &Path) -> Option<String> {
     ))
 }
 
-/// `path` with `base` stripped: what the repository at `base` calls it.
 fn relative<'a>(base: &Path, path: &'a Path) -> &'a Path {
     path.strip_prefix(base).unwrap_or(path)
 }

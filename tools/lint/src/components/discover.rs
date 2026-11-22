@@ -1,28 +1,11 @@
-//! Component discovery: first-class components are the rows of the registry
-//! (`crates/components/src/registry.rs`'s `first_class!`, #2023), from which
-//! `Entity`'s fields are generated, so a new component can't dodge the gates that
-//! enumerate them.
-//!
-//! The registry is *located* (the file under the `components` module's folder
-//! declaring `macro_rules! first_class`), never read from a fixed path: when
-//! `Entity` moved from `entity.rs` to `entity/mod.rs` the old constant read an empty
-//! string and both gates checked zero components for weeks (#959). Not finding it,
-//! or finding no rows in it, fails loudly.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use super::axes::read;
 
-/// Where the registry lives (searched recursively), as a module path:
-/// `modules::real` finds the folder, `src/` or `crates/`.
 pub(super) const COMPONENTS_DIR: &str = "src/components";
 const DECL: &str = "macro_rules! first_class {";
 
-/// Discover components from the registry's `<field>: <path> => <Kind> [...];` rows
-/// of the repo at `root`. Shared with the parity gate (`parity.rs`), so both gates
-/// enumerate first-class components from the same source. `Err` (`NO_REGISTRY` /
-/// `NO_COMPONENTS`), the gate's finding, rather than ever an empty list.
 pub(crate) fn discover_in(root: &Path) -> Result<Vec<String>, String> {
     let dir = crate::modules::real(root, COMPONENTS_DIR);
     let Some(src) = registry_source(&dir) else {
@@ -41,7 +24,6 @@ pub(crate) fn discover_in(root: &Path) -> Result<Vec<String>, String> {
     Ok(fields)
 }
 
-/// The text of the first `.rs` file under `dir` declaring the registry.
 pub(super) fn registry_source(dir: &Path) -> Option<String> {
     let mut files = Vec::new();
     walk(dir, &mut files);
@@ -62,7 +44,6 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
-/// Pure core of [`discover`]: the `(field, Kind)` of each registry row in `src`.
 pub(super) fn rows(src: &str) -> Vec<(String, String)> {
     let body = src.split_once(DECL).map_or("", |(_, rest)| rest);
     body.lines()
@@ -78,7 +59,6 @@ pub(super) fn rows(src: &str) -> Vec<(String, String)> {
         .collect()
 }
 
-/// The component fields of the registry in `src`.
 fn discover_from(src: &str) -> Vec<String> {
     rows(src).into_iter().map(|(field, _)| field).collect()
 }

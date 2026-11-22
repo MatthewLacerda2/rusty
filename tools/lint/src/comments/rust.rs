@@ -1,12 +1,6 @@
-//! A Rust file split into code and comment, read by the one comment stripper
-//! (`crate::code::scan`): `//`, `///`, `//!` and `/* */` (which nest), and the
-//! string of a `#[doc = …]` or `#![doc = …]` attribute, which is a doc comment
-//! written another way. A marker inside a string or char literal is code.
-
 use super::{literals, Line};
 use crate::code::{cut, scan, Open};
 
-/// Every line of `source`, its comment apart from its code.
 pub(super) fn split(source: &str) -> Vec<Line> {
     let mut open = Open::None;
     let mut lines: Vec<Line> = source
@@ -27,9 +21,6 @@ pub(super) fn split(source: &str) -> Vec<Line> {
     lines
 }
 
-/// Moves every doc attribute out of the code: its strings join the comment of
-/// the line each sits on, and the attribute leaves nothing in the code but its
-/// line breaks.
 fn doc_attributes(lines: &mut [Line]) {
     let code: Vec<&str> = lines.iter().map(|l| l.code.as_str()).collect();
     let code = code.join("\n");

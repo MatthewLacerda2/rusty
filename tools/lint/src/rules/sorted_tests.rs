@@ -102,7 +102,6 @@ fn fails_on_a_listed_file_it_cannot_read() {
     assert!(found[0].message.contains("could not read"), "{found:?}");
 }
 
-// Linux only: APFS refuses a file name that isn't UTF-8.
 #[cfg(target_os = "linux")]
 #[test]
 fn checks_a_markdown_file_whose_name_is_not_utf8() {
@@ -118,16 +117,12 @@ fn checks_a_markdown_file_whose_name_is_not_utf8() {
 
 #[test]
 fn reads_a_hyphenated_keyword_word_as_a_name() {
-    // `self-path` sorts under `s`, not as `path` after the keyword `self` (#1654).
     let ok = "<!-- sorted: rules -->\n- **`sanitize`**\n- **`self-path`**\n- **`skip`**\n";
     assert!(check("docs/x.md", ok).is_empty());
     let bad = "<!-- sorted: rules -->\n- **`self-path`**\n- **`sanitize`**\n";
     assert_eq!(lines(&check("docs/x.md", bad)), [(3, RULE)]);
 }
 
-/// The table the merge queue's Python mirror of [`super::key`] reads too (#1723):
-/// a change to the key that leaves the table behind fails here, one that leaves
-/// the mirror behind fails in `make scripts`.
 #[test]
 fn reads_the_shared_key_table_as_the_queue_does() {
     let table = include_str!("sorted_keys.tsv");

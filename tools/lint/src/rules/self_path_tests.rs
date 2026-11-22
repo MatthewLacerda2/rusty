@@ -1,8 +1,6 @@
 use super::{check, dirs_of, scanned_dirs, RULE};
 use std::collections::BTreeSet;
 
-/// The directories of a small tree: `src/a/b/`, the tool `tools/lint`, and `core`
-/// moved to its crate.
 fn tree() -> BTreeSet<String> {
     let files = [
         "src/a/b/mod.rs",
@@ -23,10 +21,8 @@ fn flags_a_header_naming_another_file() {
     assert_eq!(found.len(), 1);
     assert_eq!((found[0].line, found[0].rule), (1, RULE));
     assert!(found[0].message.contains("src/scene/prefab/link.rs"));
-    // A mod.rs naming a different directory, and a backticked path.
     assert_eq!(flagged("src/a/b/mod.rs", "//! src/a/old/ — x.\n"), 1);
     assert_eq!(flagged("src/a/b.rs", "//! `src/a/c.rs`: x.\n"), 1);
-    // The header after an inner attribute, and a stale shader header.
     assert_eq!(flagged("src/a.rs", "#![deny(x)]\n//! src/b.rs — x.\n"), 1);
     let sh = "// engine/shaders/old.wgsl — x\n";
     assert_eq!(flagged("engine/shaders/new/a.wgsl", sh), 1);
@@ -46,19 +42,15 @@ fn passes_its_own_path_a_directory_and_no_path() {
     );
     assert_eq!(flagged("src/a.rs", "fn f() {}\n"), 0);
     assert_eq!(flagged("src/a.rs", "//! The scene/ folder.\n"), 0);
-    // A bare word naming no directory of the tree is prose.
     assert_eq!(flagged("src/a.rs", "//! tools/fmt — no such folder.\n"), 0);
     let sh = "// engine/shaders/a.wgsl — x\nfn f() {}\n";
     assert_eq!(flagged("engine/shaders/a.wgsl", sh), 0);
-    // A plain `//` comment further down a shader is no header.
     let low = "fn f() {}\n// src/other.rs is elsewhere\n";
     assert_eq!(flagged("engine/shaders/a.wgsl", low), 0);
 }
 
 #[test]
 fn a_bare_directory_header_is_a_path_when_the_directory_exists() {
-    // Its real path and its module path both count, so a moved `lib.rs` still
-    // naming `src/<m>` is stale, and so is a bare directory of another file.
     assert_eq!(flagged("crates/core/src/lib.rs", "//! src/core — x.\n"), 1);
     assert_eq!(
         flagged("crates/core/src/x.rs", "//! crates/core/src — x.\n"),
@@ -66,7 +58,6 @@ fn a_bare_directory_header_is_a_path_when_the_directory_exists() {
     );
     assert_eq!(flagged("src/a.rs", "//! tools/lint — x.\n"), 1);
     assert_eq!(flagged("src/a/c/mod.rs", "//! `src/a/b`: x.\n"), 1);
-    // Its own directory passes, as with a trailing `/`.
     assert_eq!(flagged("src/a/b/mod.rs", "//! src/a/b — x.\n"), 0);
     assert!(tree().contains("src/core") && tree().contains("crates/core/src"));
 }
@@ -78,7 +69,6 @@ fn a_bare_shader_directory_header_is_a_path() {
     let dirs = scanned_dirs(&files, &wgsl);
     let src = "//! engine/shaders/postfx — x.\n";
     assert_eq!(check("src/a.rs", src, &dirs).len(), 1);
-    // Without the shaders the word names no directory, so it is prose.
     assert!(check("src/a.rs", src, &scanned_dirs(&files, &[])).is_empty());
     let sh = "// engine/shaders/postfx — x\n";
     assert!(check("engine/shaders/postfx/a.wgsl", sh, &dirs).len() == 1);

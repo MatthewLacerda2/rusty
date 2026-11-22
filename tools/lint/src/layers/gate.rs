@@ -1,25 +1,13 @@
-//! What test code is, for the layering lint and the rules alike (#1122, #1120): an
-//! attribute that compiles its item only under test, and the files that only
-//! compile under test because a gated `mod x;` declares them. One definition, so
-//! `make layers` and `make rules` never disagree about a line.
-//!
-//! A gate is `#[cfg(test)]` or `#[cfg(all(…, test, …))]` (`test` anywhere among
-//! `all`'s arguments, nested `all` included), however rustfmt wraps it. `any(…)`
-//! and `not(…)` are never test-only: `any(test, x)` also compiles outside tests.
-
 use super::extent::attributes;
 use crate::code::{strip_comment, Open};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 
-/// Does an attribute leading the item at `lines[0]` gate it to test builds? An
-/// attribute and its item may share the line: `#[cfg(test)] use a::B;`.
 pub fn is_test_gate(lines: &[&str]) -> bool {
     attributes(lines).attrs.iter().any(|attr| gates(attr))
 }
 
-/// Is the attribute `attr` a test gate?
 fn gates(attr: &str) -> bool {
     let attr: String = attr.chars().filter(|c| !c.is_whitespace()).collect();
     attr.strip_prefix("#[cfg(")
@@ -27,7 +15,6 @@ fn gates(attr: &str) -> bool {
         .is_some_and(test_only)
 }
 
-/// `#[path = "x.rs"]` → `x.rs`.
 fn path_of(attr: &str) -> Option<&str> {
     let rest = attr
         .strip_prefix("#[path")?
@@ -36,6 +23,7 @@ fn path_of(attr: &str) -> Option<&str> {
     rest.trim_start().strip_prefix('"')?.split('"').next()
 }
 
+/// `any(..)` and `not(..)` are never test-only: `any(test, x)` also compiles outside tests.
 fn test_only(predicate: &str) -> bool {
     if predicate == "test" {
         return true;
@@ -63,10 +51,6 @@ fn test_only(predicate: &str) -> bool {
     parts.into_iter().any(test_only)
 }
 
-/// The files among `files` that only compile under `cfg(test)`: declared by a
-/// test-gated `mod x;` (with or without `#[path]`), or declared (at any depth) by
-/// such a file. `source` gives a file's text where the caller already read it; any
-/// other file is read here. Paths come back [`normalise`]d.
 pub fn test_only_files<'a>(
     files: &[PathBuf],
     source: impl Fn(&Path) -> Option<&'a str>,
@@ -94,10 +78,6 @@ pub fn test_only_files<'a>(
     test_only
 }
 
-/// The out-of-line modules `content` (the text of `file`) declares, each with
-/// whether its declaration is test-gated. A gate or `#[path]` holds across the
-/// comment, doc-comment and blank lines before its item, as in `extent::head`.
-/// Unresolvable declarations are skipped.
 fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
@@ -126,7 +106,6 @@ fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
     out
 }
 
-/// `mod x;` / `pub(crate) mod x;` → `x`; anything else → `None`.
 fn outline_mod_name(line: &str) -> Option<&str> {
     let rest = line.strip_suffix(';')?;
     let at = rest.find("mod ")?;
@@ -159,9 +138,6 @@ fn resolve(file: &Path, name: &str, path_attr: Option<&str>) -> Option<PathBuf> 
     .find(|p| p.is_file())
 }
 
-/// `path` with its `.` segments dropped and each `..` folding the segment before
-/// it, so a `#[path = "./x.rs"]` names the same file the directory walk found
-/// (#1136). Lexical: symlinks are not followed.
 pub fn normalise(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for part in path.components() {

@@ -1,24 +1,9 @@
-//! `platform-cfg`: rusty ships for macOS and Linux, and nothing else.
-//!
-//! Windows is not a target (CLAUDE.md, *Ships for macOS and Linux*), so a `cfg`
-//! naming it is code nobody builds, and a `unix` one is true on every target rusty
-//! has. A `cfg(…)`, `cfg!(…)` or `cfg_attr(…)` starting in code of a scanned `.rs`
-//! file fails when its predicate names `windows` or `unix` bare, `target_os =
-//! "windows"`, or `target_family = "windows"` / `"unix"`: write the code
-//! unconditionally, and split a real macOS / Linux difference with `target_os =
-//! "macos"` / `"linux"`. A predicate wrapped over several lines is read to its
-//! balancing `)`, and the finding names the line its `cfg` starts on. Other keys'
-//! string values (`feature = "windows"`, `doc = "…"`), a `cfg` in a comment or a
-//! string literal, and `cfg_attr`'s attributes are not judged.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{code_of, is_ident, Open};
 
 pub const RULE: &str = "platform-cfg";
 
-/// Every line of `source` where a `cfg` naming a platform rusty never ships for,
-/// or a family true of every platform it does, starts.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let mut open = Open::None;
     let mut found = Vec::new();
@@ -44,8 +29,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     found
 }
 
-/// Where each `cfg(`, `cfg!(` or `cfg_attr(` starting in code puts its predicate
-/// (the offset just past its `(`), and whether it is a `cfg_attr`.
 fn cfg_starts<'a>(line: &'a str, code: &'a [bool]) -> impl Iterator<Item = (usize, bool)> + 'a {
     line.match_indices("cfg").filter_map(move |(at, _)| {
         let before = line[..at].chars().next_back();
@@ -62,16 +45,12 @@ fn cfg_starts<'a>(line: &'a str, code: &'a [bool]) -> impl Iterator<Item = (usiz
     })
 }
 
-/// One piece of a predicate.
 enum Token {
     Ident(String),
     Str(String),
     Punct(char),
 }
 
-/// Does the predicate starting at `text` (past its `(`, running on to its
-/// balancing `)` over as many lines as it takes) name an unshipped platform?
-/// A `cfg_attr`'s predicate ends at its first top-level `,`.
 fn names_unshipped(text: &str, attr: bool) -> bool {
     let tokens = predicate(text, attr);
     tokens.iter().enumerate().any(|(i, token)| {
@@ -91,8 +70,6 @@ fn names_unshipped(text: &str, attr: bool) -> bool {
     })
 }
 
-/// The predicate's tokens: identifiers, string literals (their value) and
-/// punctuation, comments skipped, up to where it closes.
 fn predicate(text: &str, attr: bool) -> Vec<Token> {
     let mut tokens = Vec::new();
     let mut chars = text.chars().peekable();
@@ -145,7 +122,6 @@ fn predicate(text: &str, attr: bool) -> Vec<Token> {
     tokens
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

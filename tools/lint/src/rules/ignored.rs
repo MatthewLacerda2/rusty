@@ -1,10 +1,3 @@
-//! `ignored`: what the lint walks is what gets pushed (#935).
-//!
-//! A scanned `.rs` file that `.gitignore` would exclude is a finding, tracked or
-//! not: on disk the build is green, but a pattern silently drops the file from the
-//! push and CI builds without it (MatthewLacerda2/scorsese#872). Not allowable: the
-//! fix is always the pattern (anchor it) or the path.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::repo::git;
@@ -14,7 +7,6 @@ use std::process::Stdio;
 
 pub const RULE: &str = "ignored";
 
-/// Run `git check-ignore` over `files` (repo-relative) in the repo at `dir`.
 pub fn check(dir: &str, files: &[String]) -> Vec<Finding> {
     match ignored_paths(dir, files) {
         Ok(paths) => paths.into_iter().map(finding).collect(),
@@ -38,8 +30,6 @@ fn finding(path: String) -> Finding {
     }
 }
 
-/// `--no-index` matches tracked files too: they were added before the pattern, and
-/// the next new file beside them is the one that goes missing.
 fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
     let mut child = git(Path::new(dir))
         .args(["check-ignore", "--no-index", "--stdin"])
@@ -54,7 +44,6 @@ fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
         .map_err(|e| e.to_string())?;
     drop(stdin);
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
-    // Exit 1 means "nothing ignored"; anything past that is a real failure.
     if out.status.code().is_none_or(|c| c > 1) {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }
@@ -64,7 +53,6 @@ fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// The rule over every scanned file, in the repo scanned.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     check(&scan.root().to_string_lossy(), &scan.files)
 }

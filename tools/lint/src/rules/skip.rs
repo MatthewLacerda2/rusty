@@ -1,7 +1,3 @@
-//! `skip`: a skipped test says why (#935).
-//!
-//! An ignored test reads as passing to anyone who only reads the summary, so
-//! `#[ignore]` and `#[cfg_attr(…, ignore)]` are findings unless an allow gives the
 //! reason: `// lint: allow(skip) <why>` on the line or right above it.
 
 use super::finding::Finding;
@@ -9,7 +5,6 @@ use super::scan::Scan;
 
 pub const RULE: &str = "skip";
 
-/// Every ignore attribute in `source`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     source
         .lines()
@@ -34,7 +29,6 @@ fn is_ignore(line: &str) -> bool {
     })
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

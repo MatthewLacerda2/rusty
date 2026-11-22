@@ -1,6 +1,3 @@
-//! The three checkable axes (2–4): Add Component entry, inspector card, and API
-//! namespace — coarse substring scans over the editor/API sources and the docs.
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -9,29 +6,15 @@ use super::ADD_MENU;
 const EDITOR_DIR: &str = "src/editor";
 const API_DIR: &str = "src/script/api";
 
-/// Axis 2: a standalone Add Component entry guards on absence via the #344
-/// accessor facade — `!world.has_<field>(id)`, or a table of entries each naming
-/// its `has_<field>` check (`|w, id| w.has_mask(id)`), or the menu generated from
-/// the registry (`first_class!(entries)`, whose `AddEntry` bound holds the axis at
-/// compile time), which `kinds::with_kind_guards` resolves to every row's check. A
-/// component only added as a side-effect of another has no such guard and is reported until it gets its
-/// own entry (#82).
 pub(super) fn has_add_menu(field: &str, add_src: &str) -> bool {
     add_src.contains(&format!(".has_{field}(id)"))
 }
 
-/// Axis 3: some editor file other than the Add menu edits the component in a
-/// card — through the facade, that is a mutable accessor (`.<field>_mut(`) or a
-/// detach/attach write (`.set_<field>(`).
 pub(super) fn has_inspector(field: &str, editor_blob: &str) -> bool {
     editor_blob.contains(&format!(".{field}_mut("))
         || editor_blob.contains(&format!(".set_{field}("))
 }
 
-/// Axis 4: an API namespace named after the component (its field, or the singular
-/// of a plural field) exists, is registered in `api/mod.rs`, and is documented —
-/// the docs name it as written or in its Lua spelling (`layout_group` is
-/// `LayoutGroup`, lowercased `layoutgroup`).
 pub(super) fn has_api(field: &str, api_stems: &[String], api_mod: &str, docs_lower: &str) -> bool {
     candidates(field).iter().any(|c| {
         api_stems.iter().any(|s| s == c)
@@ -40,8 +23,6 @@ pub(super) fn has_api(field: &str, api_stems: &[String], api_mod: &str, docs_low
     })
 }
 
-/// Namespace name candidates derived from a field: the field itself, plus its
-/// singular form (so `particles` matches the `particle` namespace).
 fn candidates(field: &str) -> Vec<String> {
     let mut v = vec![field.to_string()];
     if let Some(singular) = field.strip_suffix('s') {
@@ -50,10 +31,6 @@ fn candidates(field: &str) -> Vec<String> {
     v
 }
 
-/// Module stems under `src/script/api/` (the registered namespace module names), minus
-/// `mod`: plain `<x>.rs` files AND `<x>/mod.rs` directory modules — a namespace
-/// split into a subfolder to fit the size cap (e.g. `animator/`, `nav/`) is still
-/// one namespace unit.
 pub(super) fn api_stems(base: &Path) -> Vec<String> {
     let mut out = Vec::new();
     let Ok(entries) = fs::read_dir(crate::modules::real(base, API_DIR)) else {
@@ -74,15 +51,12 @@ pub(super) fn api_stems(base: &Path) -> Vec<String> {
     out
 }
 
-/// Concatenate every source of the Add menu module (`ADD_MENU/**/*.rs`).
 pub(super) fn add_menu_src(base: &Path) -> String {
     let mut files = Vec::new();
     walk(&crate::modules::real(base, ADD_MENU), &mut files);
     files.iter().map(read).collect::<Vec<_>>().join("\n")
 }
 
-/// Concatenate every `src/editor/` source EXCEPT the Add menu (so an add entry does
-/// not, by itself, satisfy the separate inspector-card axis).
 pub(super) fn editor_blob(base: &Path) -> String {
     let mut files = Vec::new();
     walk(&crate::modules::real(base, EDITOR_DIR), &mut files);
@@ -113,8 +87,6 @@ pub(super) fn read<P: AsRef<Path>>(path: P) -> String {
     fs::read_to_string(path).unwrap_or_default()
 }
 
-/// Every `.md` file directly in `dir`, concatenated — the scripting-API reference is
-/// one file per namespace under `docs/api/` (#569).
 pub(super) fn read_md_dir(dir: &Path) -> String {
     let Ok(entries) = fs::read_dir(dir) else {
         return String::new();

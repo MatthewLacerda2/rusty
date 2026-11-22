@@ -25,7 +25,6 @@ fn finds_use_paths_and_inline_paths() {
 
 #[test]
 fn ignores_what_is_not_the_crate() {
-    // A deeper segment, a nested group entry, a comment, test code.
     assert!(found("let x = crate::render::wgpu::f();").is_empty());
     assert!(found("use crate::scene::{image, wgpu::X};").is_empty());
     assert!(found("let a = 1; // wgpu::Device").is_empty());
@@ -154,7 +153,6 @@ fn only_use_of_the_crate_itself_keeps_its_name() {
         found("use image;\nfn f() { image::open(); }"),
         ["image", "image"]
     );
-    // a restricted or public re-export, and a restricted `mod`, still shadow it
     for code in [
         "pub(crate) use super::image;\nfn f() { image::draw(); }",
         "pub use super::image;\nfn f() { image::draw(); }",
@@ -176,7 +174,6 @@ fn a_use_tree_of_any_shape_flattens_to_its_end() {
     assert_eq!(flat("a::{b::{c}, d}"), ["a::b::c=c", "a::d=d"]);
     assert_eq!(flat("a::{self, b as c, d::*,}"), ["a=a", "a::b=c"]);
     assert_eq!(flat("a::{}"), Vec::<String>::new());
-    // malformed: an open group, a stray close, an `as` with nothing after it
     assert_eq!(flat("a::{b"), ["a::b=b"]);
     assert_eq!(flat("a::{b}}, c"), ["a::b=b"]);
     assert_eq!(flat("a as"), Vec::<String>::new());

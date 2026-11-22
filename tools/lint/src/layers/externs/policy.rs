@@ -1,26 +1,16 @@
-//! What the crate half of the table needs beyond one row per module.
-
-/// A crate only files under one of `within` may name (module paths: `crate::modules`).
 pub struct Confined {
     pub krate: &'static str,
     pub within: &'static [&'static str],
 }
 
 pub struct Policy {
-    /// The vocabulary every module may name without its row listing it.
     pub common: &'static [&'static str],
-    /// Dependencies no module names: each says why it is in `Cargo.toml` at all.
     pub unscoped: &'static [(&'static str, &'static str)],
     pub confined: &'static [Confined],
-    /// Crate families no sim member may depend on, tests included: the display
-    /// layer's. An entry bans the crate of that name and every `<name>_…` crate
-    /// ([`Policy::is_display`]), so `egui` bans `egui_extras` too.
     pub display: &'static [&'static str],
 }
 
 impl Policy {
-    /// Whether `krate` (as code writes it) is a display crate: an entry of
-    /// `display`, or one of its `<entry>_…` family.
     pub fn is_display(&self, krate: &str) -> bool {
         self.display.iter().any(|d| {
             krate == *d
@@ -32,21 +22,14 @@ impl Policy {
 }
 
 pub const POLICY: Policy = Policy {
-    // The math, the scene document's serde and logging: CLAUDE.md's "use glam for
-    // all math", and every module saves or logs something.
     common: &["glam", "log", "serde", "serde_json"],
     unscoped: &[],
     confined: &[
-        // The editor is a Cargo feature (#431): egui lives only behind it.
         egui("egui"),
         egui("egui_phosphor"),
         egui("egui_wgpu"),
         egui("egui_winit"),
     ],
-    // The sim runs headless, with no GPU and no UI (#494): the arrow is display →
-    // sim, never back. Each entry is a crate family (`egui` covers `egui_wgpu`,
-    // `egui_extras`, …). The engine's own display crates are platform rows, which
-    // `SIM_LEAK`, `STRAY_DEV_CRATE` and `PLATFORM_DEV_CRATE` keep out of a sim crate.
     display: &["egui", "wgpu"],
 };
 

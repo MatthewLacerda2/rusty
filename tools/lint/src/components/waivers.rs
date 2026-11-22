@@ -1,11 +1,3 @@
-//! Deliberate-waiver table (#82): axes intentionally served by a shared namespace
-//! or a content-driven workflow, each row carrying its written rationale.
-
-/// Deliberately-waived axes: `(component_field, axis, rationale)`. A waived axis
-/// is treated as satisfied. Each row is a documented decision (#82) NOT to add a
-/// per-component artifact, because the axis is already served another way and
-/// doing so standalone would fragment the one stable API surface or duplicate a
-/// content-driven workflow. Reviewable here, never a silent skip.
 pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     (
         "collider",
@@ -39,16 +31,10 @@ pub(super) const WAIVERS: &[(&str, &str, &str)] = &[
     ),
 ];
 
-/// True when `(field, axis)` is a documented [`WAIVERS`] decision — served by a
-/// shared namespace or a content-driven workflow, not to be implemented standalone.
 pub(super) fn waived(field: &str, axis: &str) -> bool {
     WAIVERS.iter().any(|(c, a, _)| *c == field && *a == axis)
 }
 
-/// `STALE_WAIVER` for each row that no longer waives anything: its component is
-/// not discovered (renamed or removed), or `present` says the axis is met after
-/// all — then the row hides nothing and must go, so the gate demands the axis
-/// again should it ever regress.
 pub(super) fn stale_waivers(
     components: &[String],
     present: impl Fn(&str, &str) -> bool,
@@ -74,28 +60,22 @@ mod tests {
 
     #[test]
     fn waivers_are_recognized_and_scoped() {
-        // Every waiver row is recognized for its own (component, axis)…
         for (c, a, rationale) in WAIVERS {
             assert!(waived(c, a), "{c}/{a} should be waived");
             assert!(!rationale.is_empty(), "{c}/{a} needs a rationale");
         }
-        // …and a waiver does not leak to a different axis of the same component.
         assert!(waived("collider", "api"));
         assert!(!waived("collider", "inspector"));
-        // A component with no waiver (e.g. particles) is never waived.
         assert!(!waived("particles", "api"));
     }
 
     #[test]
     fn stale_waivers_are_flagged() {
         let all: Vec<String> = WAIVERS.iter().map(|(c, _, _)| c.to_string()).collect();
-        // Every waived axis absent → nothing stale.
         assert!(stale_waivers(&all, |_, _| false).is_empty());
-        // A waived axis that is met after all is stale.
         let met = stale_waivers(&all, |c, a| c == "collider" && a == "api");
         assert_eq!(met.len(), 1);
         assert!(met[0].starts_with("STALE_WAIVER `collider` `api`"));
-        // A waiver for a component no longer discovered is stale.
         let gone: Vec<String> = all.iter().filter(|c| *c != "rigidbody").cloned().collect();
         let stale = stale_waivers(&gone, |_, _| false);
         assert_eq!(stale.len(), 1);
@@ -104,8 +84,6 @@ mod tests {
 
     #[test]
     fn light_api_is_not_waived_it_is_implemented() {
-        // `light` gets a real `src/script/api/light/` namespace (#82), so it must NOT be
-        // on the waiver list — removing the namespace must make the gate fail.
         assert!(!waived("light", "api"));
     }
 }

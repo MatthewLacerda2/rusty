@@ -1,10 +1,7 @@
-//! Where literals start and end in code with its comments cut.
-
 use super::Kind;
 use crate::code::{char_end, is_ident};
 use std::ops::Range;
 
-/// The length of the literal `rest` opens with; an unclosed one runs to its end.
 pub(super) fn literal(kind: Kind, rest: &str, prev: Option<char>) -> Option<usize> {
     match kind {
         Kind::Rust => rust(rest, prev),
@@ -24,7 +21,6 @@ fn rust(rest: &str, prev: Option<char>) -> Option<usize> {
         [b'b' | b'c', b'r', ..] => (2, &rest[2..]),
         [b'r', ..] => (1, &rest[1..]),
         [b'b' | b'c', b'"' | b'\'', ..] => return Some(1 + rust(&rest[1..], None)?),
-        // No char literal: a lifetime, which is code.
         [b'\'', ..] => return char_end(rest, 1),
         _ => return quoted(rest),
     };
@@ -50,7 +46,6 @@ pub(super) fn quoted(rest: &str) -> Option<usize> {
     Some(rest.len())
 }
 
-/// Lua's `[==[`: its level and length.
 pub(super) fn long_open(rest: &str) -> Option<(usize, usize)> {
     let after = rest.strip_prefix('[')?;
     let level = after.bytes().take_while(|&b| b == b'=').count();
@@ -64,17 +59,13 @@ pub(super) fn long_close(rest: &str, level: usize) -> Option<usize> {
     rest.find(&close).map(|at| at + close.len())
 }
 
-/// Characters that join into one token (`&&`, `->`).
 const JOINING: &str = "!#$%&*+-./:<=>?@^|~";
 
-/// A gap whose loss would make another token (`r "x"` is not `r"x"`).
 fn keeps_gap(prev: char, next: char) -> bool {
     (is_ident(prev) && (is_ident(next) || "\"'#".contains(next)))
         || (JOINING.contains(prev) && JOINING.contains(next))
 }
 
-/// `code` without whitespace outside literals, bar [`keeps_gap`]'s; and each
-/// byte's line (from 0), the line its token starts on.
 pub(super) fn normalize(kind: Kind, code: &str) -> (String, Vec<usize>) {
     let (mut out, mut lines) = (String::new(), Vec::new());
     let (mut rest, mut prev, mut gap, mut line) = (code, None::<char>, false, 0);
@@ -99,7 +90,6 @@ pub(super) fn normalize(kind: Kind, code: &str) -> (String, Vec<usize>) {
     (out, lines)
 }
 
-/// Each `#[doc = …]` attribute's range, and its strings' ranges.
 pub(super) fn doc_attributes(code: &str) -> Vec<(Range<usize>, Vec<Range<usize>>)> {
     let at = |rest: &str| code.len() - rest.len();
     let mut found = Vec::new();

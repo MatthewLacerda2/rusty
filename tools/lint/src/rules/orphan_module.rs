@@ -1,20 +1,4 @@
-//! `orphan-module`: every scanned `.rs` file is one cargo compiles.
-//!
-//! rustc builds what a crate root reaches through `mod` and nothing else. A file
-//! no `mod` names is silently left out: no error, clippy and rustfmt skip it, and
-//! its tests stop running while a count of `#[test]` lines still finds them. So
-//! every scanned `.rs` file must be one of:
-//! - a crate root: a target's `src_path` in `cargo metadata --no-deps` of each
-//!   workspace (the root, and every scanned folder whose `Cargo.toml` holds its own
-//!   `[workspace]`: `fuzz/`, `tools/lint/`), so a manifest's `path =` counts;
-//! - reached from one by `mod`, resolved as rustc does (`module_tree.rs`),
-//!   a `mod` under `#[cfg(...)]` included, since some build compiles it;
-//! - named by `include!` or `include_str!`.
-//!
-//! A file meant to be built some other way (a script run with `rustc`) says why on
 //! its first line: `// lint: allow(orphan-module) <why>`, which this rule reads
-//! itself (`Allow::Own`). A workspace cargo cannot read is reported on its
-//! manifest, since nothing under it can be checked, and nothing excuses that.
 
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
@@ -29,12 +13,10 @@ use tree::{normal, Reach};
 
 pub const RULE: &str = "orphan-module";
 
-/// The rule over the repository at the working directory.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     check(scan.root(), scan)
 }
 
-/// The rule over `scan`, the files of the repository at `base`.
 pub fn check(base: &Path, scan: &Scan) -> Vec<Finding> {
     let mut findings = Vec::new();
     let mut roots = BTreeSet::new();
@@ -70,8 +52,6 @@ pub fn check(base: &Path, scan: &Scan) -> Vec<Finding> {
     findings
 }
 
-/// Each workspace's folder (`""` for the root, else `dir/`): the root when it has a
-/// manifest, and every folder above a scanned file whose manifest has `[workspace]`.
 fn workspaces(base: &Path, files: &[String]) -> Vec<String> {
     let mut dirs = BTreeSet::new();
     for f in files {
@@ -90,15 +70,12 @@ fn workspaces(base: &Path, files: &[String]) -> Vec<String> {
     out
 }
 
-/// Is this manifest line the `[workspace]` table's header, a comment after it
-/// included?
 fn opens_workspace(line: &str) -> bool {
     line.split('#')
         .next()
         .is_some_and(|l| l.trim() == "[workspace]")
 }
 
-/// Every target's source file in the workspace at `dir`, relative to `base`.
 fn crate_roots(base: &Path, dir: &str) -> Result<Vec<String>, String> {
     let manifest = base.join(dir).join("Cargo.toml");
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| "cargo".into());
@@ -130,7 +107,6 @@ fn crate_roots(base: &Path, dir: &str) -> Result<Vec<String>, String> {
         .collect())
 }
 
-/// Every `"src_path"` value in `cargo metadata`'s JSON.
 pub fn src_paths(json: &str) -> Vec<String> {
     const KEY: &str = "\"src_path\":\"";
     json.match_indices(KEY)
@@ -138,7 +114,6 @@ pub fn src_paths(json: &str) -> Vec<String> {
         .collect()
 }
 
-/// A JSON string's value, from just past its opening quote.
 fn json_string(s: &str) -> Option<String> {
     let mut out = String::new();
     let mut chars = s.chars();
@@ -160,8 +135,6 @@ fn json_string(s: &str) -> Option<String> {
     None
 }
 
-/// Every file the crate roots reach, the roots included. A file is parsed once
-/// per way it is loaded (owning its folder or not), as each resolves differently.
 fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> {
     let (mut parsed, mut reached) = (BTreeSet::new(), BTreeSet::new());
     let mut queue: Vec<(String, bool)> = roots.into_iter().map(|r| (r, true)).collect();
@@ -177,7 +150,6 @@ fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> 
         for r in tree::reached(&path, mod_rs, &text, |p| base.join(p).is_file()) {
             match r {
                 Reach::Module { path, mod_rs } => queue.push((path, mod_rs)),
-                // Read as text, not parsed: a module it also is still is, by its `mod`.
                 Reach::Included(path) => {
                     reached.insert(path);
                 }
@@ -187,13 +159,10 @@ fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> 
     reached
 }
 
-/// The folder `path` sits in, `""` at the top.
 fn parent(path: &str) -> String {
     Path::new(path).parent().map_or(String::new(), normal)
 }
 
-/// The finding for `path`, which nothing reaches; `homes` are the crate roots'
-/// folders, so a file under none of them is told no `mod` can reach it.
 fn orphan(path: &str, homes: &BTreeSet<String>) -> Finding {
     let p = Path::new(path);
     let (name, owned) = match p.file_name().and_then(|n| n.to_str()) {

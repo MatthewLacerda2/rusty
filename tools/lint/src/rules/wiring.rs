@@ -1,17 +1,7 @@
-//! Every row of [`super::RULES`] is wired: its entry point, run over a fixture it
-//! must flag, reports that fixture's planted file. A rule's own tests hold its
-//! judgement on a line; this holds that the row the gate runs still reaches it, so a
-//! `run` emptied to `vec![]`, or reading somewhere other than the scan, fails here.
-//!
-//! The cases are keyed by the row's name, so a new row with no case fails the test
-//! naming the rule.
-
 use super::scan::Scan;
 use super::RULES;
 use crate::repo::scaffold::Repo;
 
-/// A rule's must-flag case: the files of a scratch repository, and the one file
-/// the rule must report.
 pub struct Case {
     pub files: Vec<(String, String)>,
     pub flags: &'static str,
@@ -27,18 +17,15 @@ fn case(files: &[(&str, &str)], flags: &'static str) -> Case {
     }
 }
 
-/// One planted file, the one the rule must report.
 fn one(path: &'static str, body: &str) -> Case {
     case(&[(path, body)], path)
 }
 
-/// A root package naming `dep` under `[section]`, `lib` its `src/lib.rs`.
 fn package(section: &str, dep: &str, lib: &str, flags: &'static str) -> Case {
     let manifest = format!("[package]\nname = \"t\"\n\n[{section}]\n{dep} = {{ path = \"d\" }}\n");
     case(&[("Cargo.toml", &manifest), ("src/lib.rs", lib)], flags)
 }
 
-/// The must-flag case of the rule named `rule`, `None` when it has none.
 pub(super) fn case_for(rule: &str) -> Option<Case> {
     let app = "crates/app/src/a.rs";
     Some(match rule {

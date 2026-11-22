@@ -1,6 +1,3 @@
-//! `comment-cap` and `comment-history` (docs/linting.md, *Comments*), riding the
-//! size gate as a signal; `--strict-comments` makes them fail.
-
 mod literals;
 mod lua;
 pub mod proof;
@@ -20,7 +17,6 @@ pub const CAP: &str = "comment-cap";
 pub const HISTORY: &str = "comment-history";
 pub const STRICT: &str = "--strict-comments";
 
-/// A comment opening with one of these costs no words.
 const MARKERS: &[&str] = &["lint: allow(", "sorted:", "stored-format:", "comment-cut:"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -72,7 +68,6 @@ fn bare(comment: &str) -> &str {
     comment.trim_start_matches(|c: char| c.is_whitespace() || "/!*-[=".contains(c))
 }
 
-/// A comment's opener (`//`, `///`, `//!`, `/*`, `*`).
 fn opener(comment: &str) -> &str {
     let comment = comment.trim_start();
     let len = comment.len() - comment.trim_start_matches(['/', '!', '*']).len();
@@ -100,7 +95,6 @@ fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
     free
 }
 
-/// `unsafe {`, `unsafe impl`, `unsafe fn`, …
 fn opens_unsafe(code: &str) -> bool {
     let mut tokens = Vec::new();
     for piece in code.split(|c: char| c.is_whitespace() || !(crate::code::is_ident(c) || c == '{'))
@@ -116,7 +110,6 @@ fn opens_unsafe(code: &str) -> bool {
         .any(|w| w[0] == "unsafe" && matches!(w[1], "{" | "impl" | "fn" | "extern" | "trait"))
 }
 
-/// `over`: the line of the first word past the cap, and the words in all.
 #[derive(Debug, Default, PartialEq)]
 pub struct Report {
     pub over: Option<(usize, usize)>,
@@ -202,7 +195,6 @@ impl Tally {
     }
 }
 
-/// The findings (only when `strict`) and the tally over `files`.
 pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tally) {
     let mut tally = Tally::default();
     let mut found = Vec::new();

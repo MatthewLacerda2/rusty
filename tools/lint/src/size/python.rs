@@ -1,18 +1,4 @@
-//! Lines of code in a Python file: what the size gate holds `.py` to (#926).
-//!
-//! Blank lines, `#` comments and docstrings are free, as scorsese's gate counts
-//! them: what grows when a file does too much is its code, while its prose grows
-//! with how carefully each part is explained, which the merge scripts do on
-//! purpose. A string literal that is data (`X = """…"""`) is code.
-//!
-//! A docstring is told from data by where it starts: a triple-quoted string that
-//! opens a line is a string statement, the shape of every docstring. One limit, by
-//! design: a triple-quoted *argument* that opens a line inside a call
-//! (`f(\n    """text""")`) reads as free too. Telling the two apart would need the
-//! parser; the scripts write no such call.
-
-/// Lines of code in `source`: every line that is not blank, a comment, or inside a
-/// docstring. Code after a docstring closes on the same line still counts.
+/// A triple-quoted argument opening a line inside a call (`f(\n    """text""")`) reads as a docstring, hence free: telling them apart needs a parser.
 pub(super) fn code_lines(source: &str) -> usize {
     let mut open: Option<Str> = None;
     source
@@ -21,15 +7,12 @@ pub(super) fn code_lines(source: &str) -> usize {
         .count()
 }
 
-/// A triple-quoted string still open at the end of a line.
 #[derive(Clone, Copy)]
 struct Str {
     quote: &'static str,
     doc: bool,
 }
 
-/// Whether one line counts, given the string open as it starts, and noting the one
-/// open as it ends.
 fn is_code(line: &str, open: &mut Option<Str>) -> bool {
     let trimmed = line.trim();
     let mut rest = trimmed;
@@ -62,17 +45,11 @@ fn is_code(line: &str, open: &mut Option<Str>) -> bool {
     }
 }
 
-/// What scanning a stretch of code found.
 enum Scan<'a> {
-    /// The line ended (or a comment began); whether anything was code.
     End(bool),
-    /// A triple-quoted data string opened; what follows its quotes.
     Opens(bool, &'static str, &'a str),
 }
 
-/// Scan code up to a comment, the line's end, or a triple quote that opens a
-/// string. Single-quoted strings are skipped whole, so a `#` or a quote in one is
-/// not mistaken for anything.
 fn scan_code(text: &str) -> Scan<'_> {
     let bytes = text.as_bytes();
     let mut i = 0;
@@ -97,7 +74,6 @@ fn scan_code(text: &str) -> Scan<'_> {
     Scan::End(seen)
 }
 
-/// The index past a single-quoted string's closing quote (or the line's end).
 fn skip_single(bytes: &[u8], mut i: usize, quote: u8) -> usize {
     while i < bytes.len() {
         match bytes[i] {
@@ -109,8 +85,6 @@ fn skip_single(bytes: &[u8], mut i: usize, quote: u8) -> usize {
     i
 }
 
-/// When `line` opens with a triple-quoted string (prefix letters allowed: `r"""`),
-/// its quote and what follows the quotes.
 fn opens_triple(line: &str) -> Option<(&'static str, &str)> {
     let body = line.trim_start_matches(|c: char| "rRuUbBfF".contains(c));
     if body.len() + 2 < line.len() {
@@ -122,8 +96,6 @@ fn opens_triple(line: &str) -> Option<(&'static str, &str)> {
         .map(|q| (q, &body[3..]))
 }
 
-/// What follows the closing `quote` in `text`, skipping escaped characters; `None`
-/// when the string stays open past this line.
 fn close<'a>(text: &'a str, quote: &str) -> Option<&'a str> {
     let bytes = text.as_bytes();
     let mut i = 0;
@@ -160,8 +132,6 @@ mod tests {
 
     #[test]
     fn a_string_that_is_data_is_code() {
-        // Every line of the assigned string counts; its closing quote is not taken
-        // for a docstring opening, which would swallow the code after it.
         let src = "X = \"\"\"\na\nb\n\"\"\"\ny = 2\nz = 3\n";
         assert_eq!(code_lines(src), 6);
     }
@@ -182,7 +152,6 @@ mod tests {
 
     #[test]
     fn text_beyond_ascii_is_read_whole() {
-        // A byte index inside `—` once panicked the scan: quotes are matched on bytes.
         assert_eq!(code_lines("\"\"\"a — b\n— c \\\" —\"\"\"\nx = '—'\n"), 1);
     }
 
