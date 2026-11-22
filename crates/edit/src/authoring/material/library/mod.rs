@@ -1,56 +1,25 @@
-//! Deleting a material from the scene's library (#1576), Unity's deleting a material
-//! asset. The one place the engine knows what names a library material by its key
-//! (an entity's material slots, its mesh particles, a live decal), shared by
-//! `Material.DeleteAsset` and the editor's Material card.
-//!
-//! A material still in use is refused, naming its users; with `force` each user
-//! falls back to the engine's default material: a slot to its entity's own
-//! default (`entity_{id}_material`, created as [`MaterialAsset::default`] when the
-//! library has none, the material *Add Component* attaches), mesh particles and a
-//! decal to no material, which draw the engine default and the decal's texture.
-//! The [`DeletedMaterial`] a delete returns is one undo step ([`restore_asset`]):
-//! it puts back the asset as it was deleted, so a material defined under the same
-//! key since is overwritten by the undo, and a user it can no longer point back
-//! (a slot gone since) is skipped with a console warning.
-//!
-//! A `.prefab` file is never a user: it carries its own copy of every material its
-//! entities name ([`entity_keys`], `PrefabData::materials`), and instancing it
-//! merges that copy back in. An instance in the scene is a user through its
-//! entities' slots and particles; propagating it from its source keeps only the
-//! merged materials something still names, so a deleted one stays deleted.
-//!
-//! Pure: no wall-clock, no RNG; users are listed in entity-id order.
+//! A `.prefab` file is never a user: it carries its own copy of every material its entities name.
 
 use super::{entity_material_key, set_slot, MaterialLibrary};
 use rusty_components::{Entity, MaterialComponent, ParticleEmitterComponent};
 use rusty_scene::{MaterialAsset, Scene, SceneId};
 
-/// One place that names a library material by its key.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MaterialUser {
-    /// Material slot `slot` of entity `id`.
     Slot { id: u32, slot: usize },
-    /// Entity `id`'s mesh particles (`render.material`).
     Particles { id: u32 },
-    /// Live decal `id` (`Decals.Spawn`'s handle).
     Decal { id: u32 },
 }
 
-/// What a delete took out and moved, so [`restore_asset`] can put it back.
 #[derive(Clone, Debug)]
 pub struct DeletedMaterial {
-    /// The scene it was deleted from; a restore into another one is refused.
     pub scene: SceneId,
     pub key: String,
     pub asset: MaterialAsset,
-    /// The users moved off it, as they were.
     pub moved: Vec<MaterialUser>,
-    /// The entity default materials the delete had to create for a moved slot.
     pub created: Vec<String>,
 }
 
-/// Every user of library material `key`, entities in id order (slots, then
-/// particles), then live decals oldest first.
 pub fn users(scene: &Scene, key: &str) -> Vec<MaterialUser> {
     let mut ids = scene.world.ids().to_vec();
     ids.sort_unstable();
@@ -68,8 +37,6 @@ pub fn users(scene: &Scene, key: &str) -> Vec<MaterialUser> {
     found
 }
 
-/// Every library key entity document `entity` names (slots, then particles), the
-/// set a `.prefab` carries a copy of.
 pub fn entity_keys(entity: &Entity) -> Vec<String> {
     let named = entity_users(
         entity.id,
@@ -79,8 +46,6 @@ pub fn entity_keys(entity: &Entity) -> Vec<String> {
     named.into_iter().map(|(_, key)| key).collect()
 }
 
-/// The one walk of what on entity `id` names a library material: each slot, then
-/// its particles, with the key it names.
 fn entity_users(
     id: u32,
     material: Option<&MaterialComponent>,
@@ -96,8 +61,6 @@ fn entity_users(
     found
 }
 
-/// Remove each of `keys` from the library when nothing [`users`] it, the merged
-/// materials a prefab propagation brought in that no slot names after overrides.
 pub fn drop_unused(scene: &mut Scene, keys: &[String]) {
     for key in keys {
         if users(scene, key).is_empty() {
@@ -106,8 +69,6 @@ pub fn drop_unused(scene: &mut Scene, keys: &[String]) {
     }
 }
 
-/// A user as a person reads it: `entity 3 "Crate" slot 0`, with the prefab an
-/// instance's entity comes from.
 pub fn describe(scene: &Scene, user: &MaterialUser) -> String {
     let entity = |id: u32| {
         let name = scene.world.name(id).map(|n| n.clone()).unwrap_or_default();
@@ -124,15 +85,11 @@ pub fn describe(scene: &Scene, user: &MaterialUser) -> String {
     }
 }
 
-/// [`describe`] each of `users`, joined by `"; "`.
 pub fn describe_all(scene: &Scene, users: &[MaterialUser]) -> String {
     let each = users.iter().map(|u| describe(scene, u));
     each.collect::<Vec<_>>().join("; ")
 }
 
-/// Delete library material `key`. One still in use is refused with its users
-/// named, unless `force`, which moves each to the engine's default material (the
-/// module docs) and warns in the console which. An absent key is an error.
 pub fn delete_asset(scene: &mut Scene, key: &str, force: bool) -> Result<DeletedMaterial, String> {
     if !scene.materials.contains_key(key) {
         return Err(format!("no material asset {key:?}"));
@@ -163,10 +120,6 @@ pub fn delete_asset(scene: &mut Scene, key: &str, force: bool) -> Result<Deleted
     })
 }
 
-/// Undo a delete: put the asset back under its key, point every user it moved at
-/// it again (one that is gone since is skipped), and drop the default materials it
-/// created that nothing uses now. Refused for a scene other than the one it came
-/// from.
 pub fn restore_asset(scene: &mut Scene, deleted: DeletedMaterial) -> Result<(), String> {
     if deleted.scene != scene.id() {
         return Err(format!(
@@ -187,7 +140,6 @@ pub fn restore_asset(scene: &mut Scene, deleted: DeletedMaterial) -> Result<(), 
     Ok(())
 }
 
-/// Move `user` to its default material, noting any entity default it creates.
 fn move_off(scene: &mut Scene, user: &MaterialUser, created: &mut Vec<String>) {
     let MaterialUser::Slot { id, .. } = *user else {
         let _always = point(scene, user, None);
@@ -206,8 +158,6 @@ fn move_off(scene: &mut Scene, user: &MaterialUser, created: &mut Vec<String>) {
     }
 }
 
-/// Point `user` at `key`; `None` (particles and decals only) leaves it on none.
-/// A slot that is gone, or out of range now, is an error.
 fn point(scene: &mut Scene, user: &MaterialUser, key: Option<&str>) -> Result<(), String> {
     let key = key.map(str::to_string);
     match *user {

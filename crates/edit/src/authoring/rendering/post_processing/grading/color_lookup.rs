@@ -1,18 +1,13 @@
-//! The Color Lookup's ops (#1441): the LUT file and its contribution.
-
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
 use rusty_components::{ColorLookup, PostProcessingComponent};
 use rusty_core::paths::stored;
 use rusty_scene::rules::sanitize::unit;
 
-/// Set the LUT file as a [`stored`] path; `None` or a blank one clears it. The
-/// renderer logs once and grades neutral when it is missing or malformed.
 pub fn set_lut(vc: &mut PostProcessingComponent, path: Option<String>) {
     vc.color_lookup.lut = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
 }
 
-/// Set how much of the LUT applies, clamped to `0..=1`.
 pub fn set_contribution(vc: &mut PostProcessingComponent, value: f32) {
     vc.color_lookup.contribution = unit(value);
 }

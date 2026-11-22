@@ -1,29 +1,17 @@
-//! crates/edit/src/authoring/ui/rect_mask.rs — Shared RectMask-authoring ops (#418).
-//!
-//! The ONE place the engine mutates an entity's first-class `RectMaskComponent`
-//! (and, #428, its graphic-shaped sibling `MaskComponent`).
-//! The editor's Rect Mask and Mask cards and the Lua `RectMask.*` / `Mask.*`
-//! namespaces route every write through this.
-//!
-//! Pure.
-
 use glam::Vec4;
 
 use rusty_components::{MaskComponent, RectMaskComponent};
 use rusty_scene::rules::sanitize::{finite4, non_negative};
 
-/// Set the clip's inset from the element's bounds (left, bottom, right, top), in
-/// reference units. Negative values grow the clip past the rect.
+/// Negative values grow the clip past the rect.
 pub fn set_padding(m: &mut RectMaskComponent, padding: Vec4) {
     m.padding = finite4(padding);
 }
 
-/// Set the soft edge's width in reference units, clamped to `>= 0` (`0`: hard).
 pub fn set_feather(m: &mut RectMaskComponent, feather: f32) {
     m.feather = non_negative(feather);
 }
 
-/// Set whether a Mask also draws its own graphic.
 pub fn set_show_mask_graphic(m: &mut MaskComponent, show: bool) {
     m.show_mask_graphic = show;
 }

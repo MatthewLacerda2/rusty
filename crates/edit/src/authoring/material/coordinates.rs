@@ -1,12 +1,3 @@
-//! The map-coordinate fields of a material (#1573): Unity Lit's *Tiling* and
-//! *Offset*, HDRP Lit's *Base UV Mapping* with its world size and triplanar blend,
-//! and the height map's depth (#2191), whose parallax shifts where the maps are
-//! read, as rows of the same table the transparent-surface fields use
-//! (`surface.rs`), so the Lua adapter, `DefineAsset`'s recipe and the Inspector take
-//! them with no code of their own.
-//!
-//! Pure.
-
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use super::surface::{choice, number};
 use rusty_components::{MaterialAsset, UvMapping};
@@ -15,7 +6,6 @@ pub use rusty_scene::rules::material::{
     BLEND_SHARPNESS_RANGE, HEIGHT_SCALE_RANGE, MAP_COORD_RANGE, WORLD_SIZE_RANGE,
 };
 
-/// A pair the row's `check` clamped.
 fn pair(value: SurfaceValue) -> [f32; 2] {
     match value {
         SurfaceValue::Vec2(v) => v,
@@ -23,9 +13,7 @@ fn pair(value: SurfaceValue) -> [f32; 2] {
     }
 }
 
-/// Tiling's hover text for this material's mapping (#1851): under `UV0` it scales
-/// from the image's bottom edge, as Unity's does; under a world mapping it counts
-/// repeats per `world_size` metres.
+/// Tiling's hover text: under `UV0` it scales from the image's bottom edge, as Unity's does.
 fn tiling_hint(m: &MaterialAsset) -> Option<&'static str> {
     Some(match m.uv_mapping {
         UvMapping::Uv0 => {
@@ -37,8 +25,7 @@ fn tiling_hint(m: &MaterialAsset) -> Option<&'static str> {
     })
 }
 
-/// Offset's hover text for this material's mapping (#1851): Unity's sign under
-/// `UV0`, HDRP's on a world projection.
+/// Offset's sign under `UV0` is Unity's, on a world projection HDRP's.
 fn offset_hint(m: &MaterialAsset) -> Option<&'static str> {
     Some(match m.uv_mapping {
         UvMapping::Uv0 => {
@@ -56,7 +43,6 @@ fn world_mapped(m: &MaterialAsset) -> bool {
     m.uv_mapping != UvMapping::Uv0
 }
 
-/// Every map-coordinate field, in Inspector order.
 pub static COORDINATE_FIELDS: &[SurfaceField] = &[
     SurfaceField {
         key: "uv_mapping",
@@ -112,7 +98,7 @@ pub static COORDINATE_FIELDS: &[SurfaceField] = &[
         key: "height_scale",
         api: "HeightScale",
         label: "Height Scale",
-        // HDRP's *Amplitude*, as a fraction of one repeat's width (#2191).
+        // HDRP's *Amplitude*, as a fraction of one repeat's width.
         kind: SurfaceKind::Number(HEIGHT_SCALE_RANGE),
         shown: |m| m.height_map.is_some(),
         get: |m| SurfaceValue::Number(m.height_scale),

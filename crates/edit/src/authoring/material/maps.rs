@@ -1,20 +1,4 @@
-//! crates/edit/src/authoring/material/maps.rs — bake a material's own texture recipe (#409).
-//!
-//! A material may carry the multi-output texture recipe its maps come from
-//! (`MaterialAsset.maps_recipe`, the `maps` key of its document). The recipe is the
-//! source of truth; the PNGs are a regenerable cache written to
-//! `<dir>/<material>_<slot>.png` by [`procgen::bake_set`](rusty_procgen::bake_set),
-//! one evaluation for the whole set.
-//!
-//! Each baked slot fills the map fields it feeds ([`Slot::material_maps`]) **only
-//! where the field is empty**: a path the author set by hand wins over the bake. A
-//! rebake writes to the same paths, so the fields it filled before already point at
-//! them, and a hand-set path stays put — one rule serves define and rebake alike.
-//! A recipe's graph instances and `image` nodes read their files from the project
-//! root (an `engine/…` path from the engine's content folder) on every bake
-//! ([`super::load_recipe`], #1491, #1744), so a rebake picks up an edited graph or
-//! source. The asset keeps the recipe as written, instances and
-//! all, never its expansion.
+//! A baked slot fills a map field only where it is empty: a path set by hand wins over the bake.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -27,16 +11,8 @@ use rusty_core::project::ContentRoots;
 use rusty_procgen::{bake_set, check_set, set_paths, Slot};
 use rusty_scene::MaterialAsset;
 
-/// Where `Material.DefineAsset` / `Material.Rebake` write baked maps: the project's
-/// texture workspace, beside hand-made textures.
 pub const MAPS_DIR: &str = rusty_core::project::TEXTURES_DIR;
 
-/// Bake `asset`'s maps recipe (named `name`) into `dir` and fill its empty map
-/// fields with the written paths, its `image` nodes reading their files from
-/// `root` (the open project's, [`rusty_core::project::root`]) and an `engine/…`
-/// path from the engine's ([`rusty_core::project::ContentRoots`]). A material with no
-/// recipe is left as is. On error nothing is filled, and the recipe is checked
-/// before any file is read or written.
 pub fn bake_maps(
     asset: &mut MaterialAsset,
     name: &str,
@@ -54,15 +30,13 @@ pub fn bake_maps(
     let in_error = |e: String| format!("material {name:?} maps: {e}");
     check_set(recipe).map_err(in_error)?;
     let loaded = super::load_recipe(recipe, &ContentRoots::new(root)).map_err(in_error)?;
-    // `/`-spelled, `dir` included: the paths land in the scene file, which stores
-    // `/` (`core::paths::to_slash`).
+    // `/`-spelled, `dir` included: the scene file stores `/`.
     let prefix = format!("{}/{name}", to_slash(dir).trim_end_matches('/'));
     let size = loaded.recipe.extent();
     let paths = set_paths(&loaded.recipe, &prefix).map_err(in_error)?;
     let paths = paths.iter().map(String::as_str);
     let extent = (size.width, size.height);
-    // The size check comes before the folder, so a refused bake makes none; the
-    // folder before the sidecars, which need it.
+    // The size check precedes the folder, so a refused bake makes none.
     check_bake_size(extent).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     prepare_bake("Material maps", extent, paths).map_err(in_error)?;
@@ -71,11 +45,7 @@ pub fn bake_maps(
     Ok(())
 }
 
-/// Re-bake material `key` from its stored recipe, optionally at a new `resolution`
-/// (which the recipe keeps, so the next rebake uses it too; a `size` recipe keeps
-/// its aspect with its longer side there, [`rusty_procgen::TextureRecipe::set_resolution`]). Unity's way of iterating
-/// a texture's import size: author at 256, ship at 2048. The library is unchanged
-/// when the bake fails. `root` and `dir` are [`bake_maps`]'s.
+/// Unity's way of iterating a texture's import size: author at 256, ship at 2048.
 pub fn rebake_maps(
     materials: &mut MaterialLibrary,
     key: &str,
@@ -100,14 +70,12 @@ pub fn rebake_maps(
     Ok(())
 }
 
-/// Point every empty map field a baked slot feeds at that slot's PNG.
 fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) {
     for (slot, path) in baked {
         let Ok(slot) = Slot::parse(slot) else {
             continue;
         };
         for field in slot.material_maps() {
-            // Every key a slot names is a field: `maps_tests` walks `Slot::ALL`.
             if let Some(target) = map_field(asset, field) {
                 target.get_or_insert_with(|| MapRef::from(path.clone()));
             }
@@ -116,8 +84,6 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
     super::fit_map_slots(asset);
 }
 
-/// The map field `MaterialAsset` keeps under the `DefineAsset` key `name`
-/// ([`Slot::material_maps`]' spelling), `None` for a key that is no map field.
 fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Option<MapRef>> {
     Some(match name {
         "base_color_map" => &mut asset.base_color_map,

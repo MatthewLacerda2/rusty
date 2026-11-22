@@ -1,11 +1,3 @@
-//! The surface fields of a material (#1523): URP Lit's blending and shadow toggles,
-//! glTF's `KHR_materials_ior` and `KHR_materials_specular` reflectance (#1998), the
-//! occlusion map's strength (#2151), and
-//! HDRP Lit's refraction, absorption, sorting priority (#2039), depth postpass, motion vectors,
-//! SSR (opaque and transparent, #2004) and thin translucency, and TAA's reactivity (#1845), as rows of the material field table (`field.rs`).
-//!
-//! Pure.
-
 use super::field::{no_hint, SurfaceField, SurfaceKind, SurfaceValue};
 use rusty_components::{
     BlendMode, MaterialAsset, RefractionModel, TaaReactive, SORTING_PRIORITY_RANGE,
@@ -19,7 +11,6 @@ pub(super) fn always(_: &MaterialAsset) -> bool {
     true
 }
 
-/// A choice the row's `check` parsed, back to its variant.
 pub(super) fn choice<T: Default>(value: SurfaceValue, parse: fn(&str) -> Option<T>) -> T {
     match value {
         SurfaceValue::Text(t) => parse(&t).unwrap_or_default(),
@@ -31,8 +22,6 @@ fn boolean(value: SurfaceValue) -> bool {
     matches!(value, SurfaceValue::Bool(true))
 }
 
-/// A number the row's `check` clamped (0 for a value of another kind, which
-/// `check` never passes).
 pub(super) fn number(value: SurfaceValue) -> f32 {
     match value {
         SurfaceValue::Number(n) => n,
@@ -40,7 +29,6 @@ pub(super) fn number(value: SurfaceValue) -> f32 {
     }
 }
 
-/// A colour the row's `check` clamped.
 fn color(value: SurfaceValue) -> [f32; 3] {
     match value {
         SurfaceValue::Color(c) => c,
@@ -52,12 +40,9 @@ fn color(value: SurfaceValue) -> [f32; 3] {
 /// `transmission_color`); `specular_color` can also raise, up to 25.
 const UNIT: std::ops::RangeInclusive<f32> = 0.0..=1.0;
 
-/// HDRP's *Sorting Priority* slider (#2039), an integer the write rounds to.
 const PRIORITY: std::ops::RangeInclusive<f32> =
     -(SORTING_PRIORITY_RANGE as f32)..=SORTING_PRIORITY_RANGE as f32;
 
-/// Every surface field (blending, reflectance, refraction, absorption, SSR,
-/// translucency, reactivity), in Inspector order.
 pub static SURFACE_FIELDS: &[SurfaceField] = &[
     SurfaceField {
         key: "blend_mode",
@@ -104,8 +89,6 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         api: "IndexOfRefraction",
         label: "Index of Refraction",
         kind: SurfaceKind::Number(1.0..=2.5),
-        // It bends a refracting surface and sets every dielectric's reflectance
-        // (#1998, `MaterialAsset::dielectric_f0`).
         shown: always,
         get: |m| SurfaceValue::Number(m.ior),
         hint: no_hint,
@@ -137,7 +120,6 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
         key: "occlusion_strength",
         api: "OcclusionStrength",
         label: "Occlusion Strength",
-        // glTF's `occlusionTexture.strength` (#2151): how much of the map applies.
         kind: SurfaceKind::Number(0.0..=1.0),
         shown: |m| m.occlusion_map.is_some(),
         get: |m| SurfaceValue::Number(m.occlusion_strength),
@@ -252,17 +234,10 @@ pub static SURFACE_FIELDS: &[SurfaceField] = &[
     },
 ];
 
-/// What an imported `KHR_materials_ior` `ior` of 0 becomes (#1998): the extension's
-/// infinite ior, whose dielectric F0 is `min(specular_color, 1) × specular`, a ior the
-/// table's range cannot hold. So it imports as glass's ior with its `specular_color`
-/// raised by this factor, `1 / 0.04`: the same F0 (`MaterialAsset::dielectric_f0`),
-/// and a refraction that stays defined.
+/// What an imported `KHR_materials_ior` of 0 (infinite ior) becomes: glass's ior with
+/// `specular_color` raised by `1 / 0.04`, the same F0 and a refraction that stays defined.
 const INFINITE_IOR_TINT: f32 = 25.0;
 
-/// Write an imported glTF's `ior`, `specular` and `specular_color` (#1998) into `m`
-/// through their rows, so an import lands in the ranges the Inspector and
-/// `Material.Get*` report, as an authored value does: a NaN or out-of-range value is
-/// clamped, and an `ior` of 0 is mapped first (to 1.5, its colour times 25).
 pub fn import_reflectance(m: &mut MaterialAsset, ior: f32, specular: f32, color: [f32; 3]) {
     let (ior, color) = if ior == 0.0 {
         (1.5, color.map(|c| c * INFINITE_IOR_TINT))
@@ -274,8 +249,6 @@ pub fn import_reflectance(m: &mut MaterialAsset, ior: f32, specular: f32, color:
     import_field(m, "specular_color", SurfaceValue::Color(color));
 }
 
-/// Write an imported value into `m` through the row `key` names, clamped as an
-/// authored one is; a value of the wrong kind is dropped.
 pub fn import_field(m: &mut MaterialAsset, key: &str, value: SurfaceValue) {
     let Some(field) = SURFACE_FIELDS.iter().find(|f| f.key == key) else {
         return;

@@ -1,10 +1,3 @@
-//! crates/edit/src/authoring/ui/widgets/scroll.rs — `Scroll View`.
-//!
-//! `Viewport` (a `RectMask`) over `Content` — pinned to the viewport's top-left,
-//! a vertical `LayoutGroup` whose `LayoutElement` fits its height to its items —
-//! plus a horizontal and a vertical `Scrollbar`. `scroll_view.lua` moves
-//! `Content`'s anchored position and keeps the bars in step.
-
 use glam::{Vec2, Vec4};
 
 use super::parts::{image, node, script, Place};
@@ -14,10 +7,8 @@ use rusty_components::{
 };
 use rusty_scene::Scene;
 
-/// The bar thickness, reference units.
 pub const BAR: f32 = 20.0;
 
-/// `Scroll View` — 400×400 by default.
 pub fn scroll_view(scene: &mut Scene, parent: Option<u32>) -> u32 {
     let id = node(
         scene,
@@ -31,9 +22,6 @@ pub fn scroll_view(scene: &mut Scene, parent: Option<u32>) -> u32 {
     id
 }
 
-/// Add the viewport, content, the vertical bar and (with `horizontal`) the
-/// horizontal one under `id` — the dropdown's list reuses this without it.
-/// Returns the `Content` id.
 pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
     let bottom_bar = if horizontal { BAR } else { 0.0 };
     let top_left = Vec2::new(0.0, 1.0);
@@ -70,7 +58,6 @@ pub fn build_into(scene: &mut Scene, id: u32, horizontal: bool) -> u32 {
     content
 }
 
-/// `Content` lists its children top to bottom and fits its height to them.
 fn fit_content(scene: &mut Scene, content: u32) {
     let group = LayoutGroupComponent {
         kind: LayoutKind::Vertical,
@@ -88,7 +75,6 @@ fn fit_content(scene: &mut Scene, content: u32) {
     scene.world.set_layout_element(content, Some(fit));
 }
 
-/// The vertical bar down the right and (with `horizontal`) one along the bottom.
 fn bars(scene: &mut Scene, id: u32, horizontal: bool) {
     let bottom_bar = if horizontal { BAR } else { 0.0 };
     if horizontal {

@@ -1,7 +1,3 @@
-//! Bloom's ops: the switch, the two strengths, the scatter (#1700) and the lens
-//! dirt (#1442), its texture and its strength, each strength `≥ 0`; and its
-//! quality level and `Custom` resolution divisor (#1522).
-
 use super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
 use rusty_components::{Bloom, PostProcessingComponent};
@@ -9,44 +5,34 @@ use rusty_core::paths::stored;
 use rusty_core::settings::quality::{EffectQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_scene::rules::sanitize::{non_negative, unit};
 
-/// Set whether bloom is active.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.bloom.active = active;
 }
 
-/// Set the bloom intensity, clamped to `≥ 0`.
 pub fn set_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom.intensity = non_negative(value);
 }
 
-/// Set the bloom threshold, clamped to `≥ 0`.
 pub fn set_threshold(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom.threshold = non_negative(value);
 }
 
-/// Set how far the glow spreads, clamped to `0..=1`.
 pub fn set_scatter(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom.scatter = unit(value);
 }
 
-/// Set the lens dirt texture as a [`stored`] path; `None` or a blank one clears
-/// it. The renderer logs once and draws no dirt when it is missing or unreadable.
 pub fn set_dirt_texture(vc: &mut PostProcessingComponent, path: Option<String>) {
     vc.bloom.dirt_texture = path.map(|p| stored(&p)).filter(|p| !p.is_empty());
 }
 
-/// Set how much of the bloom the lens dirt adds, clamped to `≥ 0`.
 pub fn set_dirt_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.bloom.dirt_intensity = non_negative(value);
 }
 
-/// Set which buffer size bloom runs at: a level of the active quality preset, or
-/// `Custom`.
 pub fn set_quality(vc: &mut PostProcessingComponent, quality: EffectQuality) {
     vc.bloom.quality = quality;
 }
 
-/// Set the `Custom` buffer's divisor of the view's size, clamped to `1..=4`.
 pub fn set_resolution_divisor(vc: &mut PostProcessingComponent, divisor: u32) {
     vc.bloom.resolution_divisor = divisor.clamp(1, MAX_RESOLUTION_DIVISOR);
 }

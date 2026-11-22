@@ -1,11 +1,7 @@
-//! Tests for deleting a library material (#1576).
-
 use super::*;
 use rusty_components::MaterialComponent;
 use rusty_scene::decal::DecalSpec;
 
-/// A scene with material `"tile"` on two slots of `a` and the particles of `b`, a
-/// live decal stamping it, and `"spare"` used by nothing.
 fn scene() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene

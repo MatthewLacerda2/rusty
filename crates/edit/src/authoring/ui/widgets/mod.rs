@@ -1,18 +1,7 @@
-//! crates/edit/src/authoring/ui/widgets/ — the standard UI widget kit (#422).
-//!
-//! Unity's **GameObject ▸ UI** menu: Canvas, Panel, Image, Text and the widgets —
-//! Button, Toggle (+ Toggle Group), Slider, Scrollbar, Scroll View, Dropdown and
-//! Input Field. Each widget is a small tree of first-class primitives
-//! (`RectTransform`, `Image`, `Text`, `Selectable`, `RectMask`, `LayoutGroup`, …)
-//! whose behaviour is an engine-shipped Lua **script component**
-//! (`engine/scripts/ui/*.lua`) — not a first-class component, so games restyle or
-//! fork it freely. The trees are built here, once: the editor's Create ▸ UI menu
-//! and `UI.Create` call [`create_ui`], and [`seed`] writes the same trees as
-//! `.prefab`s for `Scene.Instantiate`.
-//!
-//! **Engine-owned directories.** [`seed`] rewrites the project's
-//! `assets/scripts/ui/` and `assets/prefabs/ui/` from the engine on every boot, so they never go stale;
-//! a game that forks a widget copies its script (or prefab) to another path.
+//! Each widget is a tree of first-class primitives whose behaviour is an engine-shipped Lua script
+//! component, so games restyle or fork it freely.
+//! [`seed`] rewrites `assets/scripts/ui/` and `assets/prefabs/ui/` on every boot; a game that forks
+//! a widget copies it to another path.
 
 mod basic;
 mod dropdown;
@@ -27,10 +16,8 @@ use crate::prefab::extract_prefab;
 use crate::PREFAB_EXTENSION;
 use rusty_scene::Scene;
 
-/// Where [`seed`] writes the widget prefabs, relative to the project root.
 const PREFAB_DIR: &str = "assets/prefabs/ui";
 
-/// Every entry of the Create ▸ UI menu, in menu order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UiWidget {
     Canvas,
@@ -63,7 +50,6 @@ impl UiWidget {
         Self::InputField,
     ];
 
-    /// The menu label, which is also the new root's name and the prefab's file stem.
     pub fn label(self) -> &'static str {
         match self {
             Self::Canvas => "Canvas",
@@ -81,20 +67,17 @@ impl UiWidget {
         }
     }
 
-    /// Parse a label, case- and space-insensitively (`"scrollview"`, `"Input Field"`).
     pub fn parse(name: &str) -> Option<Self> {
         let squash = |s: &str| s.replace(' ', "").to_ascii_lowercase();
         let want = squash(name);
         Self::ALL.into_iter().find(|w| squash(w.label()) == want)
     }
 
-    /// The prefab [`seed`] writes for it (`None` for `Canvas`, a scene root).
     pub fn prefab_path(self) -> Option<String> {
         (self != Self::Canvas).then(|| format!("{PREFAB_DIR}/{}.{PREFAB_EXTENSION}", self.label()))
     }
 }
 
-/// Build `kind` under `parent` as is — no canvas lookup. Returns its root.
 fn build(scene: &mut Scene, kind: UiWidget, parent: Option<u32>) -> u32 {
     match kind {
         UiWidget::Canvas => basic::canvas(scene, parent),
@@ -112,9 +95,8 @@ fn build(scene: &mut Scene, kind: UiWidget, parent: Option<u32>) -> u32 {
     }
 }
 
-/// Create `kind` the way Unity's GameObject ▸ UI menu does: under `parent` when it
-/// is inside a canvas, else under the scene's first root canvas, else under a new
-/// `Canvas`. A `Canvas` itself is created at the root. Returns the new root.
+/// Unity's GameObject ▸ UI menu: under `parent` when inside a canvas, else the first root canvas,
+/// else a new `Canvas`.
 pub fn create_ui(scene: &mut Scene, kind: UiWidget, parent: Option<u32>) -> u32 {
     if kind == UiWidget::Canvas {
         return build(scene, kind, None);
@@ -126,13 +108,11 @@ pub fn create_ui(scene: &mut Scene, kind: UiWidget, parent: Option<u32>) -> u32 
     build(scene, kind, Some(host))
 }
 
-/// Whether `id` or an ancestor carries a `Canvas` (bounded against parent cycles).
 fn under_canvas(scene: &Scene, id: u32) -> bool {
     let world = &scene.world;
     world.self_and_ancestors(id).any(|c| world.has_canvas(c))
 }
 
-/// The first canvas (in scene order) with no canvas above it.
 fn first_root_canvas(scene: &Scene) -> Option<u32> {
     let world = &scene.world;
     world
@@ -141,9 +121,6 @@ fn first_root_canvas(scene: &Scene) -> Option<u32> {
         .find(|&c| world.parent_id(c).is_none_or(|p| !under_canvas(scene, p)))
 }
 
-/// Rewrite the engine-owned widget directories: the scripts embedded from
-/// `engine/scripts/ui/` (`edit::io::bundled`), and one prefab per widget built fresh. Called on boot
-/// (and by tests); failures are skipped, like the other seeders.
 pub fn seed() {
     let scripts = std::path::PathBuf::from(parts::SCRIPT_DIR);
     std::fs::create_dir_all(&scripts).ok();
@@ -164,10 +141,7 @@ pub fn seed() {
     }
 }
 
-/// Write `bytes` to `path` unless it already holds them — through a temp file and a
-/// rename, so a concurrent reader (another test process seeding the same
-/// workspace) never sees a half-written script — and note the write, so the
-/// script class cache drops a widget script it read before (`core::fs::written`).
+/// Through a temp file and a rename, so a concurrent reader never sees a half-written script.
 fn write_if_changed(path: &Path, bytes: &[u8]) {
     // lint: allow(stored-format) seeds scripts and `.prefab`s; the prefab format is `edit::prefab`'s
     if std::fs::read(path).is_ok_and(|old| old == bytes) {
