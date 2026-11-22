@@ -1,6 +1,8 @@
 use crate::gpu::ops::CountedQueue as _;
 use std::path::Path;
 
+/// Blocks until copied. `texture` is 8-bit RGBA with `COPY_SRC`; rows come back unpadded, top
+/// first.
 pub fn read_texture_rgba8(
     device: &wgpu::Device,
     queue: &wgpu::Queue,

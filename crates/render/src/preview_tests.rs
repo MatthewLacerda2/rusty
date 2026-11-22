@@ -78,6 +78,8 @@ fn gpu_shader_override_with_an_unreadable_path_falls_back_instead_of_panicking()
     );
 }
 
+/// One test, two views of one renderer: a renderer is a whole device, which lavapipe
+/// holds in system RAM.
 #[test]
 fn gpu_a_shader_override_renders_and_stays_on_its_own_view() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {

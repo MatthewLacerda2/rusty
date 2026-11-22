@@ -54,7 +54,8 @@ impl ClusterBuffers {
 }
 
 impl Renderer {
-    /// Upload the frame's staged point and spot lights, once per frame.
+    /// Upload the frame's staged lights once per frame, after the shadow atlas set their tiles
+    /// (`set_shadow`).
     pub(crate) fn upload_local_lights(&mut self) {
         let c = &mut self.clusters;
         let bytes = bytemuck::cast_slice(&c.frame_lights);
@@ -90,6 +91,8 @@ impl Renderer {
     }
 }
 
+/// What `forward/lighting.wgsl` reads: every cluster's light range, then its decal range past the
+/// lights'.
 pub(super) fn concat(lights: &Binned, decals: &Binned) -> (Vec<[u32; 2]>, Vec<u32>) {
     let base = lights.indices.len() as u32;
     let mut ranges = Vec::with_capacity(2 * CLUSTER_COUNT);

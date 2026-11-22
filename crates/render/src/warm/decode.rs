@@ -25,6 +25,8 @@ impl Decoding {
     pub(super) fn start(jobs: Vec<Job>, features: wgpu::Features) -> Self {
         let since = written_since(u64::MAX).0;
         let queued = jobs.iter().map(|(index, ..)| *index).collect();
+        // The thread reads at most two textures ahead of the uploads: a level's maps never all sit
+        // decoded.
         let (tx, rx) = sync_channel(2);
         let read = move || {
             for (index, map, kind) in jobs {

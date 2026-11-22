@@ -2,6 +2,8 @@ use glam::{Vec2, Vec4};
 
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType};
 
+/// A unit-square position ((0, 0) bottom-left) and its uv, both y-up:
+/// `mesh::graphic::push_image` flips v for the GPU, once.
 pub(crate) type UnitVertex = (Vec2, Vec2);
 
 pub(crate) const MAX_TILES: f32 = 1024.0;

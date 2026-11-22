@@ -40,6 +40,8 @@ impl Renderer {
         self.present_modes.contains(&wgpu::PresentMode::Immediate)
     }
 
+    /// Returns whether vsync is on now: off is refused, keeping `Fifo`, when the surface lacks
+    /// `Immediate`.
     pub fn set_vsync(&mut self, vsync: bool) -> bool {
         let want_off = !vsync && self.supports_no_vsync();
         let mode = if want_off {

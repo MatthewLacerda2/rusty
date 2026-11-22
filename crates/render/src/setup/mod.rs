@@ -23,7 +23,10 @@ impl<W> SurfaceWindow for W where
 
 impl Renderer {
     pub async fn new(window: impl SurfaceWindow, size: PixelSize) -> Result<Self, String> {
+        // 1. The instance takes the window's display handle: GL needs it to present (Wayland
+        // especially).
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            // GL too, for a machine with nothing else; only headless leaves it out.
             backends: wgpu::Backends::all(),
             ..wgpu::InstanceDescriptor::new_with_display_handle(Box::new(window.clone()))
         });
@@ -91,6 +94,7 @@ impl Renderer {
             gpu,
             gpu_permit,
         );
+        // Headless reads lightmap pages in line (a lit first frame); a window on a worker.
         renderer.lightmaps.read_in_line(renderer.surface.is_none());
         renderer.generate_grid_mesh();
         renderer.generate_axis_arrows();

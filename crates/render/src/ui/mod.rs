@@ -139,10 +139,14 @@ impl UiRenderer {
 }
 
 impl crate::Renderer {
+    /// The sim's `ScreenSize::textures`, set before each render, so what draws is what the sim
+    /// hit-tests.
     pub fn set_ui_textures(&mut self, textures: Rc<rusty_ui::TextureSizes>) {
         self.ui_renderer.texture_sizes = textures;
     }
 
+    /// The frame's non-sRGB twin if configured, else the frame; hand it to
+    /// `RenderView::set_ui_output`.
     pub fn surface_ui_view(
         &self,
         frame: &wgpu::Texture,

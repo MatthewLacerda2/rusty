@@ -1,4 +1,5 @@
-//! Not `cfg(test)`: integration tests link the normal build and reach renderers through it.
+//! The cap on live headless renderers. In every build, not `cfg(test)`: integration tests link
+//! the normal build and reach renderers through it.
 
 use std::sync::{Condvar, Mutex};
 use std::thread::ThreadId;
@@ -9,10 +10,14 @@ pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 3;
 #[cfg(not(target_os = "macos"))]
 pub(crate) const MAX_CONCURRENT_HEADLESS: usize = 2;
 
+/// Generous: a cold lavapipe renderer plus a bake is slow. It only turns a deadlock the holder
+/// check misses into a panic.
 const ACQUIRE_TIMEOUT: Duration = Duration::from_secs(180);
 
 static HEADLESS: Budget = Budget::new(MAX_CONCURRENT_HEADLESS, ACQUIRE_TIMEOUT, test_thread);
 
+/// libtest names a test's thread by its `::` path; no engine thread has a `::`
+/// (`gpu_rule::check_current_thread` reads it too).
 fn test_thread() -> Option<ThreadId> {
     let thread = std::thread::current();
     thread.name()?.contains("::").then(|| thread.id())

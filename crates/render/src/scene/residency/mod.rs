@@ -72,6 +72,7 @@ impl Renderer {
         residency.particles.entry(id).or_default().insert(handle);
     }
 
+    /// Residency settles before the frame's counters, so they read what is left resident.
     pub(crate) fn finish_main_frame(&mut self, view: &crate::RenderView, scene: &Scene) {
         self.settle_residency(scene);
         self.finish_counters(view);

@@ -148,6 +148,7 @@ fn edt_1d(f: &[f32]) -> Vec<f32> {
     for q in 1..n {
         let mut s = parabola(q, v[k]);
         while s <= z[k] {
+            // z[0] is -inf: k never drops below 0.
             k -= 1;
             s = parabola(q, v[k]);
         }

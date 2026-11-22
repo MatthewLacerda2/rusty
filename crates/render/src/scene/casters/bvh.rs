@@ -4,6 +4,7 @@ use glam::Vec3;
 
 use crate::Frustum;
 
+/// Entries a leaf holds at most.
 const LEAF: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

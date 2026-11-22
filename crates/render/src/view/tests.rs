@@ -33,6 +33,8 @@ fn gpu_offscreen_view_owns_a_target_targetless_does_not() {
     assert!(none.color_target_view().is_none());
 }
 
+/// One scenario on one `Renderer`, not three tests: each is a whole device,
+/// held in RAM on lavapipe.
 #[test]
 fn gpu_two_views_two_scenes_never_clobber_each_other() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(64, 64) else {
