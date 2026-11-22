@@ -79,6 +79,7 @@ fn instantiate_assigns_fresh_sequential_deterministic_ids() {
     // Two scenes seeded identically must yield identical ids.
     let make = || {
         let mut s = Scene::new();
+        // Takes id 1, so the prefab's three entities get 2, 3 and 4.
         create_entity(&mut s, "Existing", None);
         let id = instantiate_prefab(&mut s, &prefab, None);
         (s.entity_ids(), id)

@@ -10,6 +10,8 @@ pub const DEFAULT_SCENE_PATH: &str = "assets/scenes/default.scene";
 
 pub const DEFAULT_SCRIPTS_DEST_DIR: &str = rusty_core::project::SCRIPTS_DIR;
 
+/// File ▸ Reset Scene builds here, never from the seeded file, which may be an older
+/// default or the user's edit.
 pub fn build_default_scene(scene: &mut Scene) -> String {
     default_scene::seed_default_assets();
     scene.clear();
@@ -67,12 +69,15 @@ pub fn seed_project() -> rusty_asset::audio::Refresh {
     rusty_asset::audio::refresh(Path::new(rusty_core::project::ASSETS_DIR))
 }
 
+/// To stderr: the `session` bins' stdout is their protocol.
 pub fn print_refresh(report: &rusty_asset::audio::Refresh) {
     for (_, line) in report.lines() {
         eprintln!("{line}");
     }
 }
 
+/// Writes over whatever is there, without the manifest: the harness runs here and must
+/// never read a stale or edited copy.
 pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     use crate::authoring::ui::widgets::parts::SCRIPT_DIR;
     let scripts = root.join(DEFAULT_SCRIPTS_DEST_DIR);

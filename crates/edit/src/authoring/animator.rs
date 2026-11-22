@@ -7,6 +7,8 @@ pub fn set_clip(a: &mut AnimatorComponent, clip: String) {
     a.base.ended = false;
 }
 
+/// A non-finite speed keeps the old one, or it would poison the playhead; the guard sits here
+/// because the inspector's field parses `inf`.
 pub fn set_speed(a: &mut AnimatorComponent, speed: f32) {
     a.speed = finite_or(speed, a.speed);
 }
@@ -28,8 +30,10 @@ pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     a.base.current_node = None;
     a.base.states = Default::default();
     a.base.node_speed = 1.0;
+    // The old graph's sync group would otherwise match a new node's by name.
     a.base.sync = Default::default();
     a.layers.clear();
+    // A montage ran against the old graph's slots: it goes, firing nothing.
     a.montages.clear();
     a.states.clear();
 }

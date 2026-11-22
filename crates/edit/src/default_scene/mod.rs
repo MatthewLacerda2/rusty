@@ -18,10 +18,16 @@ pub use seed::{seed_default_assets, seed_default_assets_into};
 
 pub const PLAYER_CONTROLLER_SCRIPT: &str = "assets/scripts/player_controller.lua";
 pub const BOT_SCRIPT: &str = "assets/scripts/bot.lua";
+/// Centre to centre: the box's 0.92 m half-diagonal plus the Player's 0.5 m radius, with room
+/// to spare.
 const ENEMY_STOPPING_DISTANCE: f32 = 1.5;
+/// The bots' sight looks only for it, so 30 bots trace 30 pairs, not 870. Unity's first user
+/// layer.
 pub const PLAYER_LAYER: u8 = 8;
+/// Above the 2 m box's centre: 0.2 m under its top, 1.8 m off the ground.
 const ENEMY_EYE_HEIGHT: f32 = 0.8;
 
+/// The call order fixes the ids: Pool_Floor 1, Player 2, ramps 3 and 4, Enemy_1 5, Sun 6.
 pub fn build(scene: &mut Scene, bot_script: &str) {
     looks::define_all(&mut scene.materials);
     pool::add_floor(scene);
@@ -80,6 +86,7 @@ fn attach_script(scene: &mut Scene, id: u32, path: &str) {
     authoring::add_script(&mut scene.world, id, path, Default::default());
 }
 
+/// `height` and `radius` before the transform's scale.
 fn character(scene: &mut Scene, id: u32, height: f32, radius: f32) {
     add_component(scene, id, ComponentKind::CharacterController);
     let Some(mut c) = scene.world.character_controller_mut(id) else {
@@ -125,6 +132,7 @@ fn add_enemy(scene: &mut Scene, bot_script: &str) {
         nav_agent::set_speed(&mut a, 3.5);
         nav_agent::set_acceleration(&mut a, 8.0);
         nav_agent::set_stopping_distance(&mut a, ENEMY_STOPPING_DISTANCE);
+        // The box is centred on its origin, 1 m above its feet.
         nav_agent::set_base_offset(&mut a, 1.0);
         nav_agent::set_target(&mut a, Vec3::ZERO);
     }

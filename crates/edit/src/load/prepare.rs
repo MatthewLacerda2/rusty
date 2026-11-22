@@ -20,6 +20,7 @@ impl SceneSidecars {
     }
 }
 
+/// Read from the files alone, never a live scene: `Scene.LoadAsync` prepares it on its own thread.
 pub struct PreparedScene {
     pub(super) path: String,
     pub(super) document: RehydratedScene,
@@ -37,6 +38,7 @@ impl PreparedScene {
         }
     }
 
+    /// Test hook: only tests reach it, through `super::swap_in` and the root package's GPU tests.
     pub fn from_data(data: SceneData, path: &str) -> Self {
         let document = RehydratedScene::new(data);
         Self::new(path.to_string(), document, SceneSidecars::read(path))

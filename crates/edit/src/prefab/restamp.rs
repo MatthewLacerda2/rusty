@@ -32,6 +32,7 @@ pub fn restamp_models<R>(
                 continue;
             };
             sync_overrides(&mut scene.world, &ids);
+            // An unreadable model leaves every part to `refit`, or each would keep stale geometry.
             let Some(Some(kept)) = link_source(scene, root)
                 .ok()
                 .map(|s| nodes.entry(s).or_insert_with_key(|s| node_set(s)).as_ref())

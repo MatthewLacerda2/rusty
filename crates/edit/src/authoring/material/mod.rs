@@ -52,6 +52,7 @@ pub use rusty_scene::rules::material::FACTOR_RANGE;
 
 pub type MaterialLibrary = BTreeMap<String, MaterialAsset>;
 
+/// Stores `asset` unclamped: `Material.DefineAsset` runs its values through the `set_*` ops after.
 pub fn define_asset(materials: &mut MaterialLibrary, name: &str, asset: MaterialAsset) {
     fit_map_slots(&asset);
     materials.insert(name.to_string(), asset);
@@ -88,7 +89,6 @@ pub fn set_metallic(materials: &mut MaterialLibrary, key: &str, value: f32) {
     }
 }
 
-/// A `Default` image still marked sRGB turns it off: its texels are data.
 pub fn set_metallic_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.metallic_map = path.map(MapRef::from);
@@ -102,7 +102,6 @@ pub fn set_roughness(materials: &mut MaterialLibrary, key: &str, value: f32) {
     }
 }
 
-/// A `Default` image still marked sRGB turns it off: its texels are data.
 pub fn set_roughness_map(materials: &mut MaterialLibrary, key: &str, path: Option<String>) {
     if let Some(m) = materials.get_mut(key) {
         m.roughness_map = path.map(MapRef::from);
@@ -156,6 +155,8 @@ fn set_level_map(
     }
 }
 
+/// Call wherever a material gets its maps whole, as `define_asset`, a maps bake and a model's
+/// import do.
 pub fn fit_map_slots(asset: &MaterialAsset) {
     fit_normal_slot(asset.normal_map.as_ref());
     fit_data_slot(asset.metallic_map.as_ref());
@@ -182,6 +183,7 @@ pub fn fit_single_channel_slot(map: Option<&MapRef>, used: &str) {
     }
 }
 
+/// A `Default` image still marked sRGB turns it off: its texels are data.
 pub fn fit_data_slot(map: Option<&MapRef>) {
     if let Some(file) = map.and_then(MapRef::file) {
         rusty_asset::sidecar::fit_data_slot(&file);

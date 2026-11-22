@@ -36,7 +36,8 @@ pub fn bake_maps(
     let paths = set_paths(&loaded.recipe, &prefix).map_err(in_error)?;
     let paths = paths.iter().map(String::as_str);
     let extent = (size.width, size.height);
-    // The size check precedes the folder, so a refused bake makes none.
+    // The size check precedes the folder, so a refused bake makes none; the folder precedes the
+    // sidecars `prepare_bake` writes, which need it.
     check_bake_size(extent).map_err(in_error)?;
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     prepare_bake("Material maps", extent, paths).map_err(in_error)?;
@@ -84,6 +85,7 @@ fn fill_empty_maps(asset: &mut MaterialAsset, baked: &BTreeMap<String, String>) 
     super::fit_map_slots(asset);
 }
 
+/// Every key `Slot::material_maps` names needs an arm here: `maps_tests` walks `Slot::ALL`.
 fn map_field<'a>(asset: &'a mut MaterialAsset, name: &str) -> Option<&'a mut Option<MapRef>> {
     Some(match name {
         "base_color_map" => &mut asset.base_color_map,

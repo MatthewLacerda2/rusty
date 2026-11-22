@@ -3,6 +3,8 @@ use glam::Vec3;
 use rusty_components::CharacterControllerComponent;
 use rusty_scene::rules::sanitize::{at_least, finite3_or, non_negative};
 
+/// Metres: the smallest radius or skin, as a zero makes the sweep degenerate. Below
+/// `sanitize::MIN_EXTENT` on purpose: it is a contact gap, not a visible extent.
 pub const MIN_SIZE: f32 = 1e-4;
 
 pub fn set_height(c: &mut CharacterControllerComponent, height: f32) {

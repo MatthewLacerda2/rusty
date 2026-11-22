@@ -16,10 +16,13 @@ pub const ENEMY: &str = "enemy_red";
 pub const CRATE: &str = "crate";
 pub const WATER: &str = "water";
 
+/// Where `bake_maps` writes `FLOOR`'s map (`<MAPS_DIR>/<FLOOR>_base_color.png`): change them
+/// together.
 pub const CHECKER_MAP: &str = "assets/textures/checker_base_color.png";
 pub const SHADER_NAME: &str = "default_rim";
 
 pub fn checker_recipe() -> TextureRecipe {
+    // Two neutral greys, so each material's base colour tints the checker.
     let checker = Node {
         id: "checker".into(),
         op: OpKind::Checker(Checker {
@@ -95,6 +98,7 @@ pub(super) fn define_all(materials: &mut MaterialLibrary) {
         mat::set_base_color(materials, l.key, l.color);
         mat::set_metallic(materials, l.key, l.metallic);
         mat::set_roughness(materials, l.key, l.roughness);
+        // Set by hand, so building does no I/O; a bake fills only empty map fields and keeps it.
         if l.checker {
             mat::set_base_color_map(materials, l.key, CHECKER_MAP.to_string());
         }
@@ -102,5 +106,6 @@ pub(super) fn define_all(materials: &mut MaterialLibrary) {
     mat::set_shader(materials, ENEMY, SHADER_NAME.to_string());
     mat::set_render_mode(materials, WATER, RenderMode::Transparent);
     mat::set_alpha(materials, WATER, 0.45);
+    // A swimmer looks up at the surface too.
     mat::set_render_face(materials, WATER, RenderFace::Both);
 }

@@ -98,8 +98,8 @@ fn an_undo_that_keeps_the_live_mesh_keeps_it_shared() {
 #[test]
 fn play_then_stop_leaves_every_instance_on_the_caches_buffers() {
     let (mut scene, ids, path) = level("rusty_sharing_stop", 4);
-    let snapshot = crate::snapshot::SceneSnapshot::capture(&scene);
-    snapshot.restore(&mut scene);
+    let snapshot = crate::snapshot::SceneSnapshot::capture(&scene); // Play
+    snapshot.restore(&mut scene); // Stop
     let buffers = cached(&path);
     for &id in &ids {
         assert!(

@@ -3,6 +3,7 @@ use glam::Vec3;
 use rusty_components::LineComponent;
 use rusty_scene::rules::sanitize::finite3_or;
 
+/// Points: a guard against a runaway script loop.
 pub const MAX_POSITIONS: usize = 4096;
 
 // lint: allow(sanitize) the `is_finite` filter drops every non-finite point

@@ -56,6 +56,8 @@ struct Stamp {
     modified: Option<Duration>,
 }
 
+/// Kept for the process: each bake re-reads its recipe, and a re-read font would re-parse and
+/// start its shaper's memo empty.
 fn parsed() -> &'static Mutex<BTreeMap<PathBuf, (Stamp, FontHandle)>> {
     static PARSED: OnceLock<Mutex<BTreeMap<PathBuf, (Stamp, FontHandle)>>> = OnceLock::new();
     PARSED.get_or_init(Mutex::default)

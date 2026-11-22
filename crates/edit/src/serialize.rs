@@ -33,6 +33,7 @@ pub fn to_scene_data(scene: &Scene) -> SceneData {
     }
 }
 
+/// A bake landing after a delete can hold dead entities' entries; a file names only live ones.
 fn saved_lightmaps(scene: &Scene) -> LightmapSet {
     let mut set = scene.lightmaps.saved().clone();
     set.retain(|id| scene.world.contains(id));
@@ -68,9 +69,12 @@ fn drop_old_world(scene: &mut Scene) {
     scene.clear_undo();
     scene.shader_overrides.clear_all();
     scene.ragdolls = Default::default();
+    // Persistent decals too: a Play load took them out first (`load::swap_in_prepared`), and
+    // Stop's restore puts its own back.
     scene.clear_decals(false);
     #[cfg(feature = "dev")]
     scene.drop_bake_request("another scene was loaded");
+    // A Play load leaves the `Debug.Draw*` lines to age out; an edit-mode load drops them.
     if !scene.is_playing() {
         scene.debug_lines = Default::default();
     }
@@ -111,8 +115,11 @@ fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
     let lightmaps = &mut scene.lighting_settings.lightmaps;
     *lightmaps = lightmaps.sanitized();
 
+    // Before prefab propagation, which rebuilds a linked skinned entity from its source and
+    // would drop its bone overrides.
     scene.hang_on_skeletons(bone_parents, bone_refs);
 
+    // Before the collider AABBs, which read the held shapes.
     if from_disk {
         crate::authoring::fields::hold_world(&mut scene.world);
         scene.meshes = rusty_scene::mesh_library::checked(std::mem::take(&mut scene.meshes));

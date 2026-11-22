@@ -63,6 +63,7 @@ fn play_then_stop(mark: &Mark, before: bool) -> bool {
     if !before {
         (mark.set)(&mut scene, base);
     }
+    // In `GameWorld::exit_play`'s order: the play state first, then the restore.
     scene.set_playing(false);
     snapshot.restore(&mut scene);
     (mark.is_set)(&scene, base)

@@ -3,6 +3,7 @@ use glam::{Vec2, Vec4};
 use rusty_components::{TextAlignment, TextComponent, TextOverflow};
 use rusty_scene::rules::sanitize::{at_least, finite, finite2, non_negative, unit_color};
 
+/// The smallest em size, in reference units.
 pub const MIN_FONT_SIZE: f32 = 0.5;
 
 pub fn set_text(t: &mut TextComponent, text: String) {
@@ -51,7 +52,6 @@ pub fn set_line_spacing(t: &mut TextComponent, spacing: f32) {
     t.line_spacing = non_negative(spacing);
 }
 
-/// Ems; negative tightens.
 pub fn set_letter_spacing(t: &mut TextComponent, spacing: f32) {
     t.letter_spacing = finite(spacing);
 }

@@ -36,6 +36,7 @@ pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     }
 }
 
+/// Unchecked: moves a baseline by a change that is no override.
 pub fn apply_values(value: &mut Value, overrides: &PrefabOverrides) {
     let mut grown = Vec::new();
     for op in &ops(value, overrides) {

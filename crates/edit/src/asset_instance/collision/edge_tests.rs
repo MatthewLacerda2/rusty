@@ -78,7 +78,7 @@ fn collision_meshes_that_name_each_other_hide_nothing() {
         mesh: Some("Chair".into()),
     };
     settings.colliders.insert("Chair_col".into(), back);
-    sidecar::save(source, &settings).unwrap();
+    sidecar::save(source, &settings).unwrap(); // a hand edit: save checks nothing
     let read = sidecar::load(source).unwrap();
     assert!(read.colliders.values().all(|c| c.mesh.is_none()));
     let (scene, kids) = spawn(&path);

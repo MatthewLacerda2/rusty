@@ -7,12 +7,10 @@ pub fn set_blur_radius(b: &mut BackdropFilterComponent, radius: f32) {
     b.blur_radius = non_negative(radius);
 }
 
-/// Alpha is the mix.
 pub fn set_tint(b: &mut BackdropFilterComponent, tint: Vec4) {
     b.tint = unit_color(tint);
 }
 
-/// `1` unchanged, `0` greyscale.
 pub fn set_saturation(b: &mut BackdropFilterComponent, saturation: f32) {
     b.saturation = non_negative(saturation);
 }

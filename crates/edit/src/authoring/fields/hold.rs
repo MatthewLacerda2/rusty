@@ -7,6 +7,8 @@ use super::write::{named, run_ops, serialized};
 use rusty_components::Entity;
 use rusty_ecs::World;
 
+/// Runs every number a scene file loaded through its field's op, so the World never holds a value
+/// its setters would refuse.
 pub fn hold_world(world: &mut World) {
     for id in world.ids().to_vec() {
         hold_entity(world, id);
@@ -27,6 +29,7 @@ pub fn hold_entities(entities: &mut [Entity]) {
     for entity in entities.iter_mut() {
         hold_entity(&mut world, entity.id);
         if let Some(mut held) = world.entity_document(entity.id) {
+            // The World keeps no column for these, so `entity_document` returns them empty.
             held.parent_bone = std::mem::take(&mut entity.parent_bone);
             held.bone_refs = std::mem::take(&mut entity.bone_refs);
             *entity = held;
@@ -52,6 +55,8 @@ pub(super) fn hold<C: Inspect>(world: &mut World, id: u32, kind: &str) {
     });
 }
 
+/// The ops run on a draft; only fields whose numbers moved are rewritten, so an op's side effect
+/// (a reverb's preset turning `Custom`) lands only when a value was out of bounds.
 fn hold_one<C: Inspect>(
     live: &mut C,
     refused: &mut dyn FnMut(&str, String) -> Result<(), String>,

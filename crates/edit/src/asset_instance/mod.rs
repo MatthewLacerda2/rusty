@@ -1,6 +1,3 @@
-//! Like every mesh, an instanced asset stores only its reference; the geometry is re-imported on
-//! load.
-
 use glam::Vec3;
 
 use crate::authoring::material_asset_from_import;
@@ -11,8 +8,8 @@ use rusty_components::{ColliderComponent, MaterialComponent};
 use rusty_scene::rehydrate;
 use rusty_scene::Scene;
 
-/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set
-/// as one LODGroup; its id is the group's.
+/// The base name of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set as one LODGroup;
+/// its id is the group's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,
@@ -148,6 +145,7 @@ fn sync_collider(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset, 
     scene.world.set_collider(id, Some(collider))
 }
 
+/// Sub-objects named as another's collision mesh: a whole-model spawn skips them.
 pub fn collision_sub_objects(path: &str) -> std::collections::BTreeSet<String> {
     let settings = rusty_asset::sidecar::load(std::path::Path::new(path)).unwrap_or_default();
     let named = settings.colliders.into_values().filter_map(|c| c.mesh);
@@ -198,6 +196,7 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
         crate::lod_instance::rescale_groups_over(scene, &ids, &before);
         ids.len() + skip.len()
     };
+    // The write log's match, so a link spelling the model another way is found too.
     let model = rusty_core::fs::written::Stale::new(vec![path.to_string()]);
     Ok(crate::prefab::restamp::restamp_models(
         scene,
