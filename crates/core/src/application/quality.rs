@@ -1,3 +1,6 @@
+//! The presets are project config, written into `project.rusty`; the player's choice
+//! among them is kept in `Storage` by the host (`settings::store_quality`), never in the file.
+
 use serde_json::Value;
 
 use super::Application;

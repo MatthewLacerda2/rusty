@@ -2,9 +2,6 @@
 //! back exactly what was recorded. Sets and maps are sorted so frames compare and encode
 //! in one order.
 
-//! The sets and maps are sorted vectors, so two frames compare and encode in one
-//! order whatever order the keys were pressed in.
-
 use super::gamepad::MAX_PADS;
 use super::{InputState, TickInput};
 

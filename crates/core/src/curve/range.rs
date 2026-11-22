@@ -1,3 +1,6 @@
+//! Sampled from the caller's unit draw `u` in `[0, 1)`, so a range owns no randomness:
+//! the caller's seeded stream does.
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]

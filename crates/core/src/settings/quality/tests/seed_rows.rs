@@ -1,11 +1,13 @@
 use crate::settings::quality::{Levels, QualityPresets, QualityValues};
 
+/// `(preset, row, why)`: a seeded row allowed three equal levels.
 const FLAT: &[(&str, &str, &str)] = &[];
 
 fn flat<T: PartialEq>(l: &Levels<T>) -> bool {
     l.low == l.medium && l.medium == l.high
 }
 
+/// Names every field, so a row added to [`QualityValues`] fails to compile until it is here.
 fn rows(values: &QualityValues) -> [(&'static str, bool); 7] {
     let QualityValues {
         ssao,

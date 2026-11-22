@@ -62,6 +62,7 @@ impl World {
         self.world_pose(id).map_or(Vec3::ONE, |p| p.scale)
     }
 
+    /// A test hook (`tests/proptest/world_space.rs`).
     pub fn is_mirrored(&self, id: u32) -> bool {
         self.local_to_world(id).determinant() < 0.0
     }

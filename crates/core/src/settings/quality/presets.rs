@@ -13,6 +13,8 @@ pub struct QualityPreset {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct QualityPresets {
+    /// The field's own `default`: a file that omits it reads as `None` (the middle
+    /// preset), not as the seeded `Medium`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     pub presets: Vec<QualityPreset>,
@@ -76,6 +78,7 @@ impl QualityPresets {
     }
 
     pub fn edited(&self, name: &str, patch: &Value) -> Result<QualityPreset, String> {
+        // A listed preset carries its `name`: it may come along, but only as `name`.
         let mut patch = patch.clone();
         let named = patch.as_object_mut().and_then(|o| o.remove("name"));
         if let Some(named) =

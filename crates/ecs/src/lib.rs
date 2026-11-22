@@ -1,5 +1,6 @@
 //! The entity/component store of record. Scene-level state lives in the root's `scene::Scene`,
-//! which owns a `World`. Consumers go through the accessors, never the hecs storage.
+//! which owns a `World`. Consumers go through the accessors, never the hecs storage. An owned
+//! `Entity` is only the document (the saved shape): build, serialize or diff one anywhere.
 
 #![deny(clippy::unwrap_used)]
 
@@ -50,4 +51,6 @@ pub use journal::{Journaled, Recorded};
 pub use world::World;
 pub use world_space::{ColliderMut, TransformMut};
 
+/// The id no entity has: ids start at 1 (`World::new`, `World::clear`). The script API reads a
+/// `nil` id as it.
 pub const NO_ENTITY: u32 = 0;

@@ -29,6 +29,7 @@ pub struct AutoExposure {
 }
 
 impl AutoExposure {
+    /// How far either limit reaches from 0 EV: the range the histogram meters.
     pub const EV_RANGE: f32 = 10.0;
     pub const MAX_SPEED: f32 = 100.0;
 }

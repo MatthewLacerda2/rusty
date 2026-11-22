@@ -24,6 +24,7 @@ pub struct Freshness {
 #[derive(Debug, Default, PartialEq)]
 pub struct Changes {
     pub stale: Vec<String>,
+    /// This poll re-checked the misses: a cache with misses of its own retries on this beat.
     pub retried: bool,
 }
 
@@ -47,6 +48,7 @@ impl Freshness {
         self.poll_with(|p| Path::new(p).exists())
     }
 
+    /// `appeared` says whether a missed key's file now exists, for keys not plain paths.
     pub fn poll_with(&mut self, appeared: impl Fn(&str) -> bool) -> Changes {
         let (seen, mut stale) = written_since(self.seen);
         self.seen = seen;

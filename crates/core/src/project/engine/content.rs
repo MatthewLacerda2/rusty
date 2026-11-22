@@ -61,6 +61,7 @@ pub fn on_disk() -> Option<&'static str> {
 pub fn stamp() -> EngineStamp {
     match BUILT.get() {
         Some(built) => EngineStamp::of(Some(built), on_disk()),
+        // Unstamped (a test, a release build): nothing to compare, so never hash the folder.
         None => EngineStamp::of(None, None),
     }
 }

@@ -18,7 +18,7 @@ fn a_cursor_reads_each_write_once_ascending_and_only_its_channel() {
     let mut moves = w.change_cursor::<TransformComponent>();
     w.set_joint(ids[3], Some(JointComponent::default()));
     w.set_joint(ids[1], Some(JointComponent::default()));
-    let _ = w.joint_mut(ids[3]);
+    let _ = w.joint_mut(ids[3]); // a borrow counts as a change
     w.set_joint(ids[1], None);
     assert_eq!(w.changes(&mut joints), Changes::Ids(vec![ids[1], ids[3]]));
     assert_eq!(w.changes(&mut joints), Changes::Ids(vec![]), "read once");

@@ -10,7 +10,7 @@ rusty_core::named_enum! {
     }
 }
 
-/// Degrees; Unity's `Camera.VerticalToHorizontalFieldOfView`.
+/// Degrees, at `aspect` (width / height); Unity's `Camera.VerticalToHorizontalFieldOfView`.
 pub fn vertical_to_horizontal_fov(vertical: f32, aspect: f32) -> f32 {
     let half = (vertical.to_radians() * 0.5).tan() * aspect;
     2.0 * half.atan().to_degrees()

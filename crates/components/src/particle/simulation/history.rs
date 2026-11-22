@@ -1,3 +1,6 @@
+//! A `Gpu` emitter's step history: the renderer replays the last `DT_HISTORY` `dt`s one by one
+//! and ages a jump past them by the running times.
+
 use std::collections::VecDeque;
 
 use super::DT_HISTORY;
@@ -6,6 +9,7 @@ use super::DT_HISTORY;
 pub(super) struct History {
     pub(super) steps: u64,
     dts: VecDeque<f32>,
+    /// The running time after each kept step and the one before them: one more than `dts`.
     times: VecDeque<f64>,
 }
 
@@ -39,6 +43,7 @@ impl History {
         self.dts.get(at as usize).or(self.dts.back()).copied()
     }
 
+    /// The `f64` sum of every `dt`, added in step order, so it is the same on every run.
     pub(super) fn time(&self) -> f64 {
         self.times.back().copied().unwrap_or(0.0)
     }

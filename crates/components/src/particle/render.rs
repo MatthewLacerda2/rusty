@@ -47,6 +47,7 @@ impl Flipbook {
         if frames == 1 {
             return 0;
         }
+        // Short of 1, so a dying particle still shows the last frame.
         let t = p.life_t().min(0.99999);
         let played = (t * self.cycles.max(0.0) * frames as f32).floor() as u64;
         let frame = played + u64::from(p.start_frame);
@@ -59,7 +60,7 @@ impl Flipbook {
 pub struct ParticleRender {
     pub mode: ParticleRenderMode,
     pub length_scale: f32,
-    /// …plus this many world units per unit of speed (faster sparks streak longer).
+    /// `Stretched`: world units the quad lengthens per unit of speed (faster sparks streak longer).
     pub speed_scale: f32,
     pub mesh: Option<String>,
     pub material: Option<String>,
