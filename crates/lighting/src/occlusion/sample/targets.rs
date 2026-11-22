@@ -4,12 +4,17 @@ use glam::Vec3;
 
 use crate::occlusion::gather::Face;
 
+/// Metres, under a doorway's width, so a doorway-sized patch always holds a point.
 pub const TARGET_SPACING: f32 = 1.0;
 
+/// Per object; an object past it is never culled.
 pub const MAX_TARGETS: usize = 4096;
 
+/// Metres, one kept point each: half the spacing, so a lattice on a wall keeps every point.
 pub const VOXEL: f32 = TARGET_SPACING / 2.0;
 
+/// A share of the way to the triangle's centroid, off the edge, so a neighbour sharing
+/// that edge never blocks a ray to the point.
 const INWARD: f32 = 0.01;
 
 #[derive(Clone, Copy, Debug)]

@@ -48,6 +48,7 @@ pub fn bake_with_progress(
     bake_on(scene, settings, progress, threads)
 }
 
+/// A test hook: `dev::bake::lightmap`'s memory test bakes on a fixed number of workers.
 pub fn bake_on(
     scene: &BakeScene,
     settings: &BakeSettings,

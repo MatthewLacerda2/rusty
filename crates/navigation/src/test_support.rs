@@ -1,3 +1,5 @@
+//! Test hooks: the box colliders and span lookups other crates' navigation tests bake with.
+
 use super::{NavBounds, NavigationGraph, SpanRef, ALL_AREAS};
 use glam::{Quat, Vec3};
 use rusty_scene::{ColliderComponent, ColliderShape, Scene};

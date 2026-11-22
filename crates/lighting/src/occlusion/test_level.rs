@@ -1,3 +1,5 @@
+//! Test hooks: the levels other crates' occlusion bake tests build.
+
 use glam::Vec3;
 
 use rusty_scene::create::{create_entity, Primitive};

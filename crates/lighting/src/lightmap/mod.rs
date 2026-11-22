@@ -46,7 +46,6 @@ pub(crate) use rays::{Rays, Tri};
 pub(crate) use rng::Rng;
 #[cfg(feature = "dev")]
 #[doc(hidden)]
-// A test hook: `dev::bake`'s per-texel cost bench.
 pub use trace::bench::{trace_texels, TraceCost};
 pub(crate) use trace::cosine_sample;
 // The knobs the bake reads, in the scope of the tests' `use super::*`.

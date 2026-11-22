@@ -1,3 +1,5 @@
+//! Test hooks: the probe-placement scenes other crates' tests build.
+
 use glam::Vec3;
 
 use super::test_level::block;

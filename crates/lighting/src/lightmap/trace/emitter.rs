@@ -77,6 +77,8 @@ pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
 }
 
 impl Emitter {
+    /// A bound that only steers the pick, not the light: never 0 where this emitter
+    /// can light `point`, or its light is lost.
     pub(super) fn weight(&self, point: Vec3, normal: Vec3) -> f32 {
         let corners = (0..8).map(|k| {
             let pick = |bit: u32, lo: f32, hi: f32| if k & bit == 0 { lo } else { hi };

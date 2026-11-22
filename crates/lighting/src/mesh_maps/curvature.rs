@@ -153,6 +153,8 @@ impl Grid {
     }
 
     fn near(&self, p: Vec3, radius: f32) -> Box<dyn Iterator<Item = u32> + '_> {
+        // The `+ 1` ring holds while `new` samples each crease every half cell: change both
+        // together.
         let n = ((radius / self.cell).ceil().min(1e3) as i32).saturating_add(1);
         let side = f64::from(2 * n + 1);
         if side * side * side >= f64::from(self.creases) {

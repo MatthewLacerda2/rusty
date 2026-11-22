@@ -13,7 +13,9 @@ use crate::occlusion::progress::OcclusionProgress;
 use crate::occlusion::OCCLUSION_SEED;
 use rusty_scene::lighting::occlusion::Grid;
 
+/// Per sampling cube of a cell: its centre, then seeded points.
 const CUBE_POINTS: usize = 6;
+/// Metres a ray stops short of its target, so a triangle touching the target never hides it.
 pub(super) const REACH_SLACK: f32 = 1e-3;
 
 pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);

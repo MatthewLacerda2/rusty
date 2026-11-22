@@ -56,6 +56,7 @@ pub(crate) struct Rays {
     mesh: Option<TriMesh>,
     pub cast: std::sync::atomic::AtomicU64,
     pub direct: std::sync::atomic::AtomicU64,
+    /// Off in a real bake: one atomic bumped per ray by every worker would contend.
     counting: bool,
 }
 

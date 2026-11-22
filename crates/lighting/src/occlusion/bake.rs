@@ -93,7 +93,7 @@ pub fn current_pvs<'a>(scene: &'a Scene, reach: &Reach) -> Result<&'a OcclusionD
 
 impl OcclusionInput {
     #[cfg(feature = "dev")]
-    /// A test hook, as `bake_sample` is: `dev::bake`'s cost measurements.
+    /// A test hook: the sampler `dev::bake`'s cost tests drive.
     #[doc(hidden)]
     pub fn sampler(&self) -> Option<Sampler> {
         let baking = Baking::of(&self.objects).counted();
@@ -108,6 +108,7 @@ impl OcclusionInput {
     }
 
     #[cfg(feature = "dev")]
+    /// A test hook: `dev::bake`'s cost tests sample `count` cells with it.
     #[doc(hidden)]
     pub fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
         let sampler = self.sampler()?;

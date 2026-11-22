@@ -1,5 +1,4 @@
-//! Nodes are spans, not cells. Every cost is at least 1, so the octile heuristic stays admissible.
-//! The start span is exempt from the area mask, so an agent in a forbidden area can walk out.
+//! Nodes are spans, not cells.
 
 use super::pool::NodePool;
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
@@ -85,6 +84,7 @@ impl NavigationGraph {
         path.corners.get(1).copied().unwrap_or(target)
     }
 
+    /// A test hook: the span path other crates' navigation tests assert.
     pub fn path_between(&self, start: Vec3, target: Vec3) -> Option<Vec<SpanRef>> {
         let (path, complete) =
             self.find_path_masked(self.snap(start)?, self.snap(target)?, ALL_AREAS);
@@ -106,6 +106,8 @@ impl NavigationGraph {
         })
     }
 
+    /// `pool` must be begun for the graph's spans first, or the last search's slots read as
+    /// reached.
     pub(crate) fn begin_search(
         &self,
         start: SpanRef,

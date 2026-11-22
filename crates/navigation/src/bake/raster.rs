@@ -1,6 +1,6 @@
-//! A convex collider gives one span per column (lowest to highest triangle): a vertical line
-//! crosses it in one interval, so its inside is solid and winding is not needed. A non-convex
-//! mesh rasterises per triangle and trusts the winding (front faces out), as Recast does.
+//! A convex collider gives one span per column, its lowest to highest triangle: a vertical line
+//! crosses a convex solid in one interval, so its inside is solid. A non-convex mesh rasterises
+//! per triangle and trusts the winding (front faces out), as Recast does.
 
 use glam::{Vec2, Vec3};
 
@@ -11,7 +11,8 @@ use super::region::CellRect;
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
-/// Of a cell, off each side: a collider only touching a cell's edge claims none of it.
+/// A fraction of the cell size, off each side: a collider only touching a cell's edge claims
+/// none of it.
 const EDGE_EPS: f32 = 1e-4;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -43,8 +44,6 @@ pub(super) fn rasterize(
             continue;
         };
         rects.push(footprint(g, &mesh.vertices));
-        // An object overridden to `NotWalkable` stays solid: it still blocks the
-        // floor beneath through clearance, but carries no surface of its own.
         let authored = bake_as(&scene.world, id).area;
         let area = authored.unwrap_or(WALKABLE_AREA);
         let surface = area != NOT_WALKABLE_AREA;
@@ -138,6 +137,7 @@ impl ColumnSink {
 
 fn faces_up(t: [Vec3; 3], max_slope: f32, convex: bool) -> bool {
     let n = (t[1] - t[0]).cross(t[2] - t[0]);
+    // Convex: only the upper surface reaches a column's top, so either winding counts.
     let up = if convex { n.y.abs() } else { n.y };
     up > 0.0 && (n.x * n.x + n.z * n.z).sqrt() <= max_slope * up
 }

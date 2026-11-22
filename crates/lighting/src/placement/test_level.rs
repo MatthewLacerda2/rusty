@@ -1,3 +1,5 @@
+//! Test hooks: the levels other crates' probe-placement tests build.
+
 use glam::Vec3;
 
 use rusty_components::{ColliderComponent, ColliderShape};

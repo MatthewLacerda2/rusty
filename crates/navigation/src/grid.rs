@@ -127,6 +127,7 @@ impl NavigationGraph {
         &self.spans[self.span_range(gx, gz)]
     }
 
+    /// A test hook: `test_support::ground` asserts with it.
     #[doc(hidden)]
     pub fn is_walkable(&self, gx: i32, gz: i32) -> bool {
         !self.span_range(gx, gz).is_empty()
