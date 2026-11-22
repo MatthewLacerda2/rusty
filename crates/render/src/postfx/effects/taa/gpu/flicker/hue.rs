@@ -6,6 +6,7 @@ use rusty_scene::Scene;
 
 const FRAMES: u32 = 16;
 const AT: u32 = 4;
+/// Measured: lavapipe 0.4 %, RTX 2060 0.4 %; a hold of the whole colour, 89 %.
 const SAME: f32 = 0.01;
 
 fn co(ycocg: [f32; 3]) -> f32 {

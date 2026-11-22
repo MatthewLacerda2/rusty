@@ -5,6 +5,7 @@ use crate::PixelSize;
 // Alphas hold a packed integer in `f16` bits: never blend, filter or resample these targets.
 pub(crate) const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
+/// No weight, so no SSR: the sky, and a layer nothing drew.
 pub(crate) const CLEAR: wgpu::Color = wgpu::Color::TRANSPARENT;
 
 pub(crate) struct SurfaceTarget {

@@ -39,6 +39,8 @@ fn pack(cx: &GradeCx, slots: &mut [[f32; 4]]) {
     slots[2] = gain.extend(0.0).to_array();
 }
 
+/// Unity's `ColorUtils.PrepareLiftGammaGain`; `postfx/grade.wgsl` mirrors its Rec. 709
+/// luminance.
 pub(crate) fn prepare(lgg: &LiftGammaGain) -> (Vec3, Vec3, Vec3) {
     let centred = |w: &ColorWheel| {
         let c = Vec3::from_array(w.color);

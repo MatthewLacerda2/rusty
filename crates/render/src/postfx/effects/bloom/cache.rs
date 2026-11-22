@@ -20,6 +20,7 @@ struct Slot<T> {
     texture: Option<T>,
 }
 
+/// Bloom's own, apart from the materials' textures, so a bad dirt never drops their bind groups.
 pub(crate) struct DirtCache<T = Rc<GpuTexture>> {
     freshness: Freshness,
     loaded: BTreeMap<String, Slot<T>>,
@@ -67,6 +68,7 @@ impl<T: Clone> DirtCache<T> {
         self.loaded.get(setting)?.texture.clone()
     }
 
+    /// Called once per frame, before any request.
     pub(crate) fn refresh(&mut self) {
         let changes = self.freshness.poll_with(texture_ref::exists);
         if changes.stale.is_empty() {

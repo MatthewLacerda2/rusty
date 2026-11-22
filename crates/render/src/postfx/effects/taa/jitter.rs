@@ -2,6 +2,7 @@ use glam::{Mat4, Vec2};
 
 use crate::PixelSize;
 
+/// URP's.
 pub(crate) const SEQUENCE: u32 = 1024;
 
 pub(crate) fn halton(mut index: u32, base: u32) -> f32 {
@@ -19,6 +20,7 @@ pub(crate) fn pixels(frame: u32, phases: u32) -> Vec2 {
     Vec2::new(halton(i, 2) - 0.5, halton(i, 3) - 0.5)
 }
 
+/// FSR2's `ffxFsr2GetJitterPhaseCount` when upscaling.
 pub(crate) fn phases(scene: PixelSize, output: PixelSize) -> u32 {
     if !upscales(scene, output) {
         return SEQUENCE;
@@ -47,6 +49,8 @@ pub(crate) fn ndc(pixels: Vec2, size: PixelSize) -> Vec2 {
     pixels * 2.0 / size
 }
 
+/// Every camera of a stack draws with it; culling, shadows, the UI and the motion vectors
+/// take the unjittered matrix.
 pub(crate) fn jittered(view_proj: Mat4, ndc: Vec2) -> Mat4 {
     if ndc == Vec2::ZERO {
         return view_proj;

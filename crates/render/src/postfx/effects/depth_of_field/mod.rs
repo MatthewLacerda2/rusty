@@ -1,3 +1,6 @@
+//! View depths come from the velocity target, never the depth buffer, which a `DepthOnly`
+//! overlay has cleared.
+
 mod effect;
 mod params;
 
@@ -13,6 +16,7 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 
+/// A signed radius in pixels; the Bokeh tiles' near reach uses it too.
 const COC_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
 
 pub(crate) struct DofPasses {

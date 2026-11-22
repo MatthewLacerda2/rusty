@@ -1,18 +1,20 @@
 use rusty_components::{DepthOfField, DofMode};
 use rusty_core::settings::quality::MAX_RESOLUTION_DIVISOR;
 
+/// Both radii are fractions of the view's height.
 pub(crate) const GAUSSIAN_RADIUS: f32 = 1.0 / 90.0;
 
 pub(crate) const MAX_BOKEH_RADIUS: f32 = 1.0 / 40.0;
 
+/// Full-resolution pixels; a gap wider than the tent smooths shows copies of a highlight.
 pub(crate) const BOKEH_RING_SPACING: f32 = 8.0;
 
 pub(crate) const BOKEH_MAX_RINGS: f32 = 7.0;
 
-/// The sensor height the Bokeh lens images onto, in metres: a 35 mm full frame's,
-/// Unity's physical camera default.
+/// Metres: a 35 mm full frame's, Unity's physical camera default.
 pub(crate) const SENSOR_HEIGHT: f32 = 0.024;
 
+/// Mirrors `DofParams` in `postfx/depth_of_field.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DofParams {
@@ -60,9 +62,8 @@ impl DofParams {
         self.shape[3] as u32
     }
 
-    /// The signed circle of confusion, in full-resolution pixels of radius, of a
-    /// surface `depth` metres along its camera's view axis: negative nearer than the focus,
-    /// positive beyond it, clamped to the largest. The shader's `coc_of`, for tests.
+    /// The signed CoC in full-resolution pixels (negative nearer than the focus) at `depth`
+    /// metres along the view axis: the shader's `coc_of`.
     #[cfg(test)]
     pub(crate) fn coc(&self, depth: f32) -> f32 {
         let max = self.shape[1];

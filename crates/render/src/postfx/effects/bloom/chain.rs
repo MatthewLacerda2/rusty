@@ -2,8 +2,10 @@ use super::passes::BloomPasses;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use rusty_components::Bloom;
 
+/// Past Jimenez's and UE's 6 mips and Godot's 7.
 pub(crate) const MAX_MIPS: usize = 8;
 
+/// URP's `CalcBloomMipCount`.
 pub(crate) fn mip_count((w, h): (u32, u32)) -> usize {
     let side = w.max(h).max(1);
     let log2 = side.ilog2() as usize;
@@ -20,8 +22,11 @@ pub(crate) fn mip_sizes(start: (u32, u32)) -> Vec<(u32, u32)> {
     sizes
 }
 
+/// Past `÷2` the 13 taps, a target texel apart, miss scene pixels: deeper divisors resample
+/// this half-size target (`prefilter_tests`).
 pub(crate) const PREFILTER_DIVISOR: u32 = 2;
 
+/// Mirrors `BloomParams` in `postfx/bloom.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct BloomParams {
@@ -122,6 +127,7 @@ impl BloomTargets {
         &top.view
     }
 
+    /// The unspread first mip: the lens flare reads it, so scatter never reshapes it.
     pub(crate) fn prefiltered(&self) -> &wgpu::TextureView {
         &self.down[0].view
     }

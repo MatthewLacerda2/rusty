@@ -56,6 +56,7 @@ pub(crate) fn wanted(
     full && !scene_view && taa_enabled(post, graphics)
 }
 
+/// The one predicate `draw_stack` and `Renderer::render` both ask.
 pub(crate) fn runs(
     view: &RenderView,
     post: PostSource,

@@ -10,8 +10,11 @@ pub(crate) struct TaaFrame {
     pub mip_bias: f32,
 }
 
+/// Per pixel: its surface's distance from its camera (the sky's 65504 fits) and that camera's
+/// index in the stack.
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
+/// Per pixel: its frame's perceptual luma, its last step, its flicker and how much recurs.
 pub(crate) const FLICKER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 pub(crate) struct TaaHistory {

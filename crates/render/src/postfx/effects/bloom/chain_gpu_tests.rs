@@ -92,6 +92,7 @@ fn gpu_nan_and_inf_never_reach_the_result() {
     let bad = halves.iter().filter(|&&h| !finite_non_negative(h)).count();
     assert_eq!(bad, 0, "every channel of the result is finite and ≥ 0");
     let lit = |(x, y): (u32, u32)| half(halves[((y * SIDE + x) * 4) as usize]);
+    // The driver decides an inf tap: lavapipe's 0 × inf is NaN, dropped; kept, it is clamped.
     let inf = lit((12, 3));
     eprintln!("[bloom] the inf's texel: {inf}");
     assert!(

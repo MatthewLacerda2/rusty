@@ -27,6 +27,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
+/// Clamped here: a preset in `project.rusty` is never clamped on the way in.
 pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
     let custom = SsrQuality {
         steps: ssr.steps,
@@ -44,17 +45,20 @@ pub(crate) fn march(ssr: &Ssr, graphics: GraphicsSettings) -> SsrQuality {
 // HDRP's default Smoothness Fade Start.
 const FADE_START: f32 = 0.9;
 
+/// The narrowest fade, for a minimum at or above `FADE_START`: never a division by zero.
 const HARD_FADE: f32 = 0.01;
 
 // The forward pass clamps roughness to 0.04; a minimum above this reflects nothing.
 pub(crate) const SMOOTHEST: f32 = 0.96;
 
+/// `[min, width]`: `ssr_surface.wgsl`'s `smoothness_fade` divides by the width.
 pub(crate) fn fade(min_smoothness: f32) -> [f32; 2] {
     let min = min_smoothness.clamp(0.0, 1.0);
     let width = (FADE_START - min).clamp(HARD_FADE, Ssr::SMOOTHNESS_FADE);
     [min, width]
 }
 
+/// The opaque pass writes the surface targets exactly when this holds.
 pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
     let on = post
         .volume

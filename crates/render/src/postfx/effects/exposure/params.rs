@@ -1,6 +1,7 @@
 use crate::motion::HistoryKey;
 use rusty_components::AutoExposure;
 
+/// Mirrors `Params` in `postfx/exposure.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ExposureParams {
@@ -42,6 +43,7 @@ pub struct Step {
     pub cut: bool,
 }
 
+/// On game time, so a paused game holds its exposure and a capture at tick N replays.
 #[derive(Default)]
 pub struct Clock {
     last: Option<(HistoryKey, bool, f32)>,

@@ -71,6 +71,8 @@ pub(crate) struct PostEffect {
     pub passes: &'static [Pass],
 }
 
+/// If no effect reads history, redrawing with no sim step gives the same image, so
+/// `Harness.Screenshot`'s settle draws no more.
 #[derive(Clone, Copy)]
 pub(crate) enum History {
     None(&'static str),
@@ -87,6 +89,7 @@ pub(crate) fn read_history(cx: &HistoryCx) -> bool {
     (POST_EFFECTS.iter()).any(|e| matches!(e.history, History::Reads(runs) if runs(cx)))
 }
 
+/// Public as a test hook: the completeness gate's layers name it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
     Volume,

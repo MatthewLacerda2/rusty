@@ -87,6 +87,7 @@ fn gpu_a_roughness_half_floor_takes_ssr_only_under_an_explicit_lower_minimum() {
     let at = pixel(REFLECTING);
     let (lower, off) = (redness(rgb(&lower, at)), redness(rgb(&off, at)));
     eprintln!("[ssr] roughness-0.5 floor at a minimum of 0.3: {lower}, SSR off {off}");
+    // Measured: lavapipe -10 and -21, an RTX 2060 -12 and -23; not on Metal.
     assert!(lower >= off + 6, "0.3 reflects the red cube on it");
 }
 

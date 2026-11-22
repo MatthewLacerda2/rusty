@@ -7,6 +7,7 @@ use crate::postfx::effects::taa::gpu::fixture::{
 };
 use rusty_core::settings::render_scale::RenderScale;
 
+/// Lavapipe measures 15, and 4 four frames on: slack for another driver's rounding.
 const FIRST: u8 = 24;
 const AFTER_4: u8 = 6;
 

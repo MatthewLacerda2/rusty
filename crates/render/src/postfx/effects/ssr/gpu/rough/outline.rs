@@ -101,6 +101,8 @@ fn steepest(red: &[f32], (w, h): (u32, u32)) -> (f32, f32) {
         .fold((0.0, 0.0), |a, b| (a.0.max(b.0), a.1.max(b.1)))
 }
 
+/// Measured: the band's inside blurs over about 0.06; an outline drawn at the rays' hit or
+/// miss rose within 0.017 at 360 rows.
 const SOFT: f32 = 0.025;
 
 const BAND: f32 = 0.03;

@@ -4,6 +4,7 @@ use super::room::{anti_flicker, renderer, room, DEFAULT, H, ON, W};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 
 const FRAMES: u32 = 54;
+/// Measured at 0, 0.5 and 1: lavapipe 26.2, 11.3, 8.8; Metal 26.1, 11.2, 8.7; RTX 2060 as lavapipe.
 const STILL: f32 = 12.0;
 
 #[test]

@@ -8,6 +8,7 @@ use rusty_scene::Scene;
 
 const WARM: u32 = 8;
 const MEASURED: u32 = 12;
+/// Measured: FXAA 0.0405, TAA 0.0170 on lavapipe and an RTX 2060; 0.0399, 0.0170 on Metal.
 const FACTOR: f64 = 1.5;
 const STEP: f32 = 1.0;
 

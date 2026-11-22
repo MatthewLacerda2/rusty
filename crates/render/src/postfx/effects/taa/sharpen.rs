@@ -8,12 +8,14 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, PostFxContext};
 use crate::timing::{GpuPass, GpuTimer};
 
+/// After the authored effects (10), before FXAA (20), as URP's final pass sharpens.
 pub(super) const PASS: Pass = Pass::Ldr {
     order: 15,
     prepare,
     run: LdrRun::MayEnd(run),
 };
 
+/// URP's `FSRUtils.SetRcasConstantsLinear`.
 pub(crate) fn rcas_sharpness(strength: f32) -> f32 {
     let stops = (1.0 - strength.clamp(0.0, 1.0)) * 2.5;
     (-stops).exp2()
@@ -133,6 +135,7 @@ impl Sharpen {
         self.pipelines.iter().map(|(_, p)| p)
     }
 
+    /// Panics on a format without a pipeline: ask `Self::pipeline` first.
     pub(crate) fn run(
         &self,
         (device, queue): Gpu,

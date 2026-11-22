@@ -53,6 +53,8 @@ fn survival(
 }
 
 const FIRST: f32 = 0.95;
+/// Measured on lavapipe and an RTX 2060 alike, flashes 4 and 5: at 1, every 6 and 10 frames,
+/// 9 % and 25 %; at 0.5, 12 % and 58 %.
 const HELD: [(f32, u32, f32); 4] = [
     (DEFAULT, 6, 0.12),
     (DEFAULT, 10, 0.58),
@@ -109,6 +111,7 @@ fn afterglow(r: &mut Renderer, scale: f32, value: f32) -> Vec<f32> {
         .collect()
 }
 
+/// Measured at render scale 1 and 0.67: lavapipe 32 and 39 frames, RTX 2060 30 and 38.
 const AFTERGLOW: usize = 44;
 
 fn lone_flash(scale: f32) {

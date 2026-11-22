@@ -4,8 +4,10 @@ use crate::{RenderView, OFFSCREEN_FORMAT};
 
 const FRAMES: u32 = 36;
 
+/// Measured: 44.5 (lavapipe, RTX 2060); 20.8 weighted by brightness (RTX 2060, lavapipe, Metal).
 const STILL: f32 = 30.0;
 
+/// Measured: 26.2 (lavapipe, RTX 2060); 7.5 weighted by brightness (RTX 2060, lavapipe, Metal).
 const TAA_STILL: f32 = 14.0;
 
 #[test]

@@ -3,6 +3,7 @@ use glam::{Mat4, Vec4};
 use super::{VolumetricPlan, HISTORY_WEIGHT};
 use crate::postfx::effects::taa::jitter::halton;
 
+/// Mirrors `Params` in `volumetric_fog.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct VolumetricParams {

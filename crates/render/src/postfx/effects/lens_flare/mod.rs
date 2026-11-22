@@ -23,6 +23,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     module: Some("postfx/effects/lens_flare.wgsl"),
     composite: &[Composite {
         phase: Phase::Hdr,
+        // After bloom's add (30), before the exposure (40).
         order: 35,
         function: "hdr",
         slots: 1,
@@ -78,6 +79,7 @@ pub(crate) fn flare_params(cx: &EffectCx, aspect: f32) -> Option<FlareParams> {
     })
 }
 
+/// Mirrors `FlareParams` in `postfx/lens_flare.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct FlareParams {

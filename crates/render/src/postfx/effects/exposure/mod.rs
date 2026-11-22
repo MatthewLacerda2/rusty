@@ -12,9 +12,13 @@ use crate::timing::{GpuPass, GpuTimer};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
+/// Mirrors `BINS` in `postfx/exposure.wgsl`: one bin per invocation of an 8 × 8 group.
 const BINS: u64 = 64;
+/// Pixels per side of the box one sample averages. Mirrors `BLOCK`.
 const BLOCK: u32 = 4;
+/// The histogram pass's `@workgroup_size` edge.
 const GROUP: u32 = 8;
+/// `vec4<f32>`: EV, target, held, unused.
 const STATE_BYTES: u64 = 16;
 
 pub struct ExposurePasses {
@@ -77,6 +81,7 @@ impl ExposurePasses {
     }
 }
 
+/// The readback's state, set from wgpu's thread by the map callback.
 const IDLE: u8 = 0;
 const MAPPING: u8 = 1;
 const MAPPED: u8 = 2;
@@ -180,6 +185,7 @@ impl ExposureMeter {
         }
         if self.mapping.load(Ordering::Acquire) == IDLE {
             encoder.copy_buffer_to_buffer(&self.state, 0, &self.staging, 0, Some(STATE_BYTES));
+            // Mapped once the copy is submitted: wgpu refuses a map while it waits.
             self.mapping.store(MAPPING, Ordering::Release);
             let (mapping, staging) = (Arc::clone(&self.mapping), self.staging.clone());
             commands.after_send(move || {
