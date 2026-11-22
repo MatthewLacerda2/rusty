@@ -24,6 +24,8 @@ pub struct SubEmitters {
 }
 
 impl SubEmitters {
+    /// The id fields' JSON pointers, matching their serde paths: `Entity::is_ref_pointer` reads
+    /// them.
     pub const REF_POINTERS: [&'static str; 3] = [
         "/sub_emitters/birth",
         "/sub_emitters/death",

@@ -26,6 +26,7 @@ pub fn root_chain(skin: &SkinData, name: &str) -> Option<Vec<usize>> {
 }
 
 impl AnimatorComponent {
+    /// Decided once here, so `animate` and the NavMeshAgent tick never disagree on who moves it.
     pub fn drives_root_motion(&self, skin: Option<&SkinData>) -> bool {
         self.apply_root_motion
             && self.is_running()
@@ -39,7 +40,9 @@ pub struct RootMotionState {
     /// The last step's root motion, world space (`Animator.GetRootMotion`).
     /// Measured whether or not it is applied.
     pub last: RootMotion,
+    /// What the entity really moved, world space, after walls and the navmesh (avoidance reads it).
     pub moved: Vec3,
+    /// A CharacterController step under `min_move_distance`, carried on so a slow creep creeps.
     pub carried: Vec3,
     pub warned_bone: Option<String>,
 }

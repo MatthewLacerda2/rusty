@@ -23,6 +23,8 @@ impl Ssr {
     pub const MAX_STEPS: u32 = 256;
     pub const MIN_STEP_LENGTH: f32 = 0.05;
     pub const MAX_STEP_LENGTH: f32 = 2.0;
+    /// The most smoothness above `min_smoothness` SSR takes to fade in; `ssr::fade` narrows it
+    /// to end by its `FADE_START`.
     pub const SMOOTHNESS_FADE: f32 = 0.2;
 }
 

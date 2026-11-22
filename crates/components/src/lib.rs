@@ -1,4 +1,5 @@
 //! stored-format: each component's serde shape and defaults, as scenes and prefabs store them
+//! First-class components, each its own hecs column attached only when present (`ecs::world`).
 
 #![deny(clippy::unwrap_used)]
 

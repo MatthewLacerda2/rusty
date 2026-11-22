@@ -1,3 +1,6 @@
+//! Unity's Volume and its overrides. A new effect adds its file, its `mod` line and one field
+//! below; the root's `post_effect_layers` test finds it there and checks every layer has its part.
+
 use serde::{Deserialize, Serialize};
 
 // sorted: one module per effect (or family of effects); none reads another
@@ -34,10 +37,12 @@ pub use ssil::Ssil;
 pub use ssr::Ssr;
 pub use volumetric_fog::VolumetricFog;
 
+/// Every field defaults when a file leaves it out, so a scene names only what it sets.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PostProcessingComponent {
     #[serde(default = "on")]
+    /// Off, the camera runs neutral.
     pub active: bool,
     // sorted: one field per post effect, named as every layer names the effect
     pub bloom: Bloom,
@@ -89,6 +94,7 @@ impl Default for PostProcessingComponent {
 }
 
 impl PostProcessingComponent {
+    /// The fields that are no post effect; every other field is one effect's settings.
     pub const NOT_EFFECTS: [&'static str; 3] = ["active", "shadows", "ssao"];
 }
 

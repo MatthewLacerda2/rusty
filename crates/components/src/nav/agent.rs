@@ -58,7 +58,7 @@ pub struct NavMeshAgentComponent {
     /// The queued request's ticket, 0 when none.
     #[serde(skip)]
     pub path_request: u32,
-    /// Set, an empty `cached_path` means no path can be planned, not one still to ask for.
+    /// When set, an empty `cached_path` means no path can be planned, not one still to ask for.
     #[serde(skip)]
     pub path_planned: bool,
     /// The feet position its answer holds only at (a search cut short, or a start off-mesh).

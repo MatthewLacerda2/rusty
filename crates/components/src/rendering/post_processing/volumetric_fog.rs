@@ -29,9 +29,11 @@ pub struct VolumetricFog {
 impl VolumetricFog {
     pub const MIN_MEAN_FREE_PATH: f32 = 1.0;
     pub const MAX_MEAN_FREE_PATH: f32 = 10000.0;
+    /// Henyey-Greenstein peaks to a point at 1.
     pub const MAX_ANISOTROPY: f32 = 0.95;
     pub const MIN_DEPTH_EXTENT: f32 = 4.0;
     pub const MAX_DEPTH_EXTENT: f32 = 1000.0;
+    /// Metres from the origin, either way.
     pub const MAX_HEIGHT: f32 = 100_000.0;
     pub const MIN_RESOLUTION: u32 = 16;
     pub const MAX_RESOLUTION: u32 = 256;
