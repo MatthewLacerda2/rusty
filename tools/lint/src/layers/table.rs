@@ -63,6 +63,7 @@ pub const LAYERS: &[Layer] = &[
             "shadergen",
         ],
     ),
+    // The lightmap bake traces rays through parry (via `rapier3d`); `physics` sits above.
     sim(
         "lighting",
         &["asset", "components", "core", "procgen", "scene"],
@@ -83,6 +84,7 @@ pub const LAYERS: &[Layer] = &[
         &["components", "core", "navigation", "physics", "scene"],
     ),
     sim("zimmer", &["core"]),
+    // `scripting` and `api` name each other, so they are one module.
     sim(
         "script",
         &[
