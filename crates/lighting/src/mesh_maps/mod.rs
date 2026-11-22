@@ -13,6 +13,7 @@ pub use floor::Raised;
 pub use overlap::Stacked;
 use rays::MeshRays;
 use rusty_procgen::image_buf::{Image, Size};
+use rusty_procgen::Slot;
 pub use settings::{Settings, MAX_RAYS};
 pub use source::MeshSource;
 
@@ -42,27 +43,60 @@ pub(super) struct Row {
     name: &'static str,
     pub(super) off: Vec4,
     pub(super) margin: Margin,
+    slot: Slot,
 }
 
 const GREY: Vec4 = Vec4::new(0.5, 0.5, 0.5, 1.0);
 
-/// One row per map, sorted by name: its value off the islands and how its margin fills.
+/// One row per map, sorted by name: its value off the islands, how its margin fills, and how its
+/// PNG is encoded.
+#[rustfmt::skip]
 const ROWS: [Row; 7] = [
-    row(MeshMap::Ao, "ao", Vec4::ONE, Margin::Average),
-    row(MeshMap::Coverage, "coverage", Vec4::W, Margin::None),
-    row(MeshMap::Curvature, "curvature", GREY, Margin::Average),
-    row(MeshMap::Id, "id", Vec4::W, Margin::Copy),
-    row(MeshMap::Position, "position", Vec4::W, Margin::Average),
-    row(MeshMap::Thickness, "thickness", Vec4::ONE, Margin::Average),
-    row(MeshMap::WorldNormal, "world_normal", GREY, Margin::Average),
+    row(MeshMap::Ao, "ao", Vec4::ONE, Margin::Average, Slot::Data),
+    row(MeshMap::Coverage, "coverage", Vec4::W, Margin::None, Slot::Data),
+    row(MeshMap::Curvature, "curvature", GREY, Margin::Average, Slot::Data),
+    row(MeshMap::Id, "id", Vec4::W, Margin::Copy, Slot::Normal),
+    row(MeshMap::Position, "position", Vec4::W, Margin::Average, Slot::Data),
+    row(MeshMap::Thickness, "thickness", Vec4::ONE, Margin::Average, Slot::Data),
+    row(MeshMap::WorldNormal, "world_normal", GREY, Margin::Average, Slot::Data),
 ];
 
-const fn row(map: MeshMap, name: &'static str, off: Vec4, margin: Margin) -> Row {
+/// How many variants `MeshMap` has. A new variant fails to compile in this `match` until it is
+/// named here, and the count beside the names is what `ROWS` is held to.
+const VARIANTS: usize = {
+    const fn count(m: MeshMap) -> usize {
+        match m {
+            MeshMap::Ao
+            | MeshMap::Coverage
+            | MeshMap::Curvature
+            | MeshMap::Id
+            | MeshMap::Position
+            | MeshMap::Thickness
+            | MeshMap::WorldNormal => 7,
+        }
+    }
+    count(MeshMap::Ao)
+};
+
+const _: () = {
+    assert!(ROWS.len() == VARIANTS, "every MeshMap has one row in ROWS");
+    let mut i = 0;
+    while i < ROWS.len() {
+        assert!(
+            ROWS[i].map as usize == i,
+            "ROWS lists the maps in the enum's order"
+        );
+        i += 1;
+    }
+};
+
+const fn row(map: MeshMap, name: &'static str, off: Vec4, margin: Margin, slot: Slot) -> Row {
     Row {
         map,
         name,
         off,
         margin,
+        slot,
     }
 }
 
@@ -71,10 +105,6 @@ impl MeshMap {
         let mut all = [MeshMap::Ao; ROWS.len()];
         let mut i = 0;
         while i < ROWS.len() {
-            assert!(
-                ROWS[i].map as usize == i,
-                "ROWS lists the maps in the enum's order"
-            );
             all[i] = ROWS[i].map;
             i += 1;
         }
@@ -87,6 +117,11 @@ impl MeshMap {
 
     pub fn name(self) -> &'static str {
         self.row().name
+    }
+
+    /// How the map's PNG is encoded.
+    pub fn slot(self) -> Slot {
+        self.row().slot
     }
 
     pub fn parse(name: &str) -> Result<MeshMap, String> {

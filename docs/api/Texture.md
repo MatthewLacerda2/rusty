@@ -198,7 +198,7 @@ behind them bake wider, and the console says so.
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
 | `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
-| `coverage` | 1 on a texel the bake writes from a triangle, 0 elsewhere, with **no margin** (Substance's UV-island mask): every texel a triangle covers at its centre, and those an edge cuts deeper than about an eighth of a texel; one an edge only grazes is margin | 0 |
+| `coverage` | 1 on a texel the bake writes from a triangle, 0 elsewhere, with **no margin** (Substance's UV-island mask): every texel a triangle covers at its centre, and those an edge cuts deeper than about an eighth of a texel; one an edge only grazes is margin. A triangle narrower than that eighth (a thin bevel strip) keeps the texels it crosses, so its mask is wider than the strip itself | 0 |
 
 A mask built from a map's changes (an edge detector on `world_normal`) also fires
 along every island's margin. Multiply it by `coverage` (a `mix` with

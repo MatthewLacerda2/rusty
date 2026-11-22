@@ -1,10 +1,19 @@
 use glam::Vec2;
 
 use super::fixtures::{bake_all, cell, cube, l_shape};
-use super::{MeshMap, MARGIN};
+use super::{MeshMap, MeshSource, MARGIN};
 use crate::lightmap::rasterize_claims;
 
 const S: u32 = 96;
+
+/// Which texels the rasteriser claims for `mesh`, indexed by texel.
+fn rasterised(mesh: &MeshSource) -> Vec<bool> {
+    let mut covered = vec![false; (S * S) as usize];
+    for p in rasterize_claims(&mesh.surface(), S, S, &mut |_| {}) {
+        covered[p.at()] = true;
+    }
+    covered
+}
 
 /// How much of texel `i` the cube's islands (its six cells) hold: `(centre inside, any overlap)`.
 fn on_a_cell(i: usize) -> (bool, bool) {
@@ -26,13 +35,10 @@ fn coverage_is_one_on_exactly_the_rasterised_texels_and_zero_on_the_margin() {
     let mesh = cube();
     let maps = bake_all(&mesh, &[MeshMap::Coverage, MeshMap::WorldNormal], S).unwrap();
     let (coverage, normal) = (maps[0].1.pixels(), maps[1].1.pixels());
-    let raster: Vec<usize> = rasterize_claims(&mesh.surface(), S, S, &mut |_| {})
-        .iter()
-        .map(|p| p.at())
-        .collect();
+    let raster = rasterised(&mesh);
     let mut margin = 0;
     for (i, px) in coverage.iter().enumerate() {
-        let covered = raster.contains(&i);
+        let covered = raster[i];
         let (centre, overlap) = on_a_cell(i);
         assert!(covered || !centre, "texel {i}: its centre is on an island");
         assert!(overlap || !covered, "texel {i} is off every island");
@@ -52,12 +58,19 @@ fn coverage_is_one_on_exactly_the_rasterised_texels_and_zero_on_the_margin() {
 
 #[test]
 fn coverage_has_no_margin_where_other_maps_grow_sixteen_texels() {
-    let maps = bake_all(&l_shape(), &[MeshMap::Coverage, MeshMap::Position], S).unwrap();
+    let mesh = l_shape();
+    let maps = bake_all(&mesh, &[MeshMap::Coverage, MeshMap::Position], S).unwrap();
     let (coverage, position) = (maps[0].1.pixels(), maps[1].1.pixels());
-    let (_, hi) = cell(1);
-    let y = (cell(1).0.y + hi.y) * 0.5 * S as f32;
-    let row = y as usize * S as usize;
-    let last = (hi.x * S as f32).floor() as usize - 1;
+    let raster = rasterised(&mesh);
+    let (lo, hi) = cell(1);
+    let mid = (lo + hi) * 0.5 * S as f32;
+    let row = mid.y as usize * S as usize;
+    // The wall's last texel on this row is the rasteriser's, wherever its edge cuts.
+    let mut last = mid.x as usize;
+    assert!(raster[row + last], "the wall's middle is rasterised");
+    while raster[row + last + 1] {
+        last += 1;
+    }
     assert_eq!(
         coverage[row + last][0],
         1.0,
