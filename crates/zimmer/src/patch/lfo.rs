@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::SynthError;
 
+/// The `lfo` and `lfo2` fields; a third would start a modulation matrix, which a patch is not.
 pub const MAX_LFOS: usize = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -45,6 +46,7 @@ pub struct Lfo {
 }
 
 impl Lfo {
+    /// Test hook: only rusty-zimmer's unit tests and its `tests/suite` call it.
     pub fn new(rate: f32, depth: f32, target: LfoTarget) -> Self {
         Self {
             rate,

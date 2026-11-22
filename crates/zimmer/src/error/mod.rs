@@ -38,10 +38,6 @@ pub enum SynthError {
     TooManyLayers { found: usize, limit: usize },
     SilentLayer,
     InLayer { layer: usize, error: Box<SynthError> },
-    // ────────────────────────────────────────────────────────────────────
-    // A note as it is written: how long it lasts, and what it is called.
-    // ────────────────────────────────────────────────────────────────────
-    /// A note with no length renders no samples.
     BadDuration { duration: f32 },
     NoteTooLong { at: Option<NoteAt>, held: f32, tail: f32, limit: f32 },
     EmptyNoteName,
