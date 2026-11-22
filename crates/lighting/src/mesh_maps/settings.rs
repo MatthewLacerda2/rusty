@@ -36,6 +36,16 @@ impl Faces {
     pub(super) fn every(&self) -> bool {
         self.materials.is_none() && self.ignore_occluders.is_empty()
     }
+
+    /// The error of a bake no face writes a texel of, naming what left them out.
+    pub(super) fn none_written(&self) -> String {
+        let which = match (&self.materials, self.ignore_occluders.is_empty()) {
+            (Some(_), _) => " of the asked materials",
+            (None, false) => " outside ignore_occluders' materials",
+            (None, true) => "",
+        };
+        format!("has no triangle{which} inside UV0's 0..1 square")
+    }
 }
 
 impl Settings {

@@ -60,7 +60,8 @@ fn names(field: &str, value: Option<serde_json::Value>) -> Result<Option<Vec<Str
         None => Ok(None),
         Some(J::String(name)) => Ok(Some(vec![name])),
         // An empty Lua table reaches JSON as an object.
-        Some(J::Object(o)) if o.is_empty() => Ok(Some(Vec::new())),
+        Some(J::Object(o)) if o.is_empty() => Err(empty(field)),
+        Some(J::Array(list)) if list.is_empty() => Err(empty(field)),
         Some(J::Array(list)) => list
             .into_iter()
             .map(|v| v.as_str().map(str::to_string).ok_or_else(bad))
@@ -68,6 +69,10 @@ fn names(field: &str, value: Option<serde_json::Value>) -> Result<Option<Vec<Str
             .map(Some),
         Some(_) => Err(bad()),
     }
+}
+
+fn empty(field: &str) -> String {
+    format!("settings: {field} is an empty list; name a material or leave {field} out")
 }
 
 pub(super) fn settings(options: &Value) -> Result<(Settings, FaceNames), String> {
@@ -174,10 +179,13 @@ fn resolve(names: &FaceNames, materials: &[(usize, String)]) -> Result<Faces, St
             out.extend(found);
             if out.len() == before {
                 let known: Vec<_> = materials.iter().map(|(_, n)| n.as_str()).collect();
-                return Err(format!(
-                    "has no material \"{name}\" (its materials: {})",
-                    known.join(", ")
-                ));
+                return Err(match known.is_empty() {
+                    true => format!("has no material \"{name}\" (it has no material slots)"),
+                    false => format!(
+                        "has no material \"{name}\" (its materials: {})",
+                        known.join(", ")
+                    ),
+                });
             }
         }
         Ok(out)

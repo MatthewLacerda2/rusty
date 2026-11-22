@@ -79,3 +79,41 @@ fn a_material_the_model_lacks_is_an_error_naming_its_materials() {
         "{e}"
     );
 }
+
+#[test]
+fn an_empty_list_is_a_settings_error_before_the_model_is_read() {
+    for field in ["material", "ignore_occluders"] {
+        let lua = Lua::new();
+        super::super::register(&lua).unwrap();
+        let call =
+            format!("Texture.BakeMeshMaps('missing.obj', {{ 'ao' }}, 'x_', {{ {field} = {{}} }})");
+        let e = lua.load(call).exec().unwrap_err().to_string();
+        assert!(
+            e.contains(&format!("settings: {field} is an empty list")),
+            "{e}"
+        );
+    }
+}
+
+#[test]
+fn a_model_without_material_slots_says_so() {
+    let dir = rusty_test_support::temp::dir().join("mesh_maps_faces_bare");
+    std::fs::remove_dir_all(&dir).ok();
+    std::fs::create_dir_all(&dir).unwrap();
+    let bare: String = OBJ
+        .lines()
+        .filter(|l| !l.starts_with("usemtl") && !l.starts_with("mtllib"))
+        .collect::<Vec<_>>()
+        .join("\n");
+    std::fs::write(dir.join("bare.obj"), bare).unwrap();
+    let lua = Lua::new();
+    super::super::register(&lua).unwrap();
+    let model = dir.join("bare.obj").to_str().unwrap().to_string();
+    lua.globals().set("MODEL", model).unwrap();
+    let call = "Texture.BakeMeshMaps(MODEL, { 'ao' }, 'x_', { material = 'Steel' })";
+    let e = lua.load(call).exec().unwrap_err().to_string();
+    assert!(
+        e.contains("has no material \"Steel\" (it has no material slots)"),
+        "{e}"
+    );
+}

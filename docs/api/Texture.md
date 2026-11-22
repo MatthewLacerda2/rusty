@@ -181,7 +181,7 @@ naming it.
 | `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
 | `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
 | `material` | every material | a material slot's name, or a list of them: only those materials' faces write texels (Substance's bake per *texture set*), so a model whose slots each fill UV0's unit square bakes one map per slot, one call each. Every other face still occludes them, and still shapes `curvature` across a shared edge. A face with no material is never named |
-| `ignore_occluders` | none | a list of material names (or one name) whose faces block no `ao` or `thickness` ray and pick no texel where triangles overlap (Substance's *Ignore* of a set among the occluders): glass, a decal sheet. They write no texel either, unless `material` names them too, which bakes their own atlas as if they were not there |
+| `ignore_occluders` | none | a list of material names (or one name) whose faces block no `ao` or `thickness` ray and pick no texel where triangles overlap (Substance's *Ignore* of a set among the occluders): glass, a decal sheet. They write no texel either, unless `material` names them too, which bakes their own atlas as if they were not there: a material in both lists blocks no ray of its own either, so a hollow glass bottle bakes `ao` and `thickness` flat |
 
 ```lua no-run
 Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
@@ -211,8 +211,9 @@ triangle uses; the masked node's `mean` in `Texture.Stats`, divided by
 
 A name in `material` or `ignore_occluders` that the mesh's slots do not hold is an
 error listing the ones it does (`has no material "Glas" (its materials: Steel,
-Glass)`), and a `material` none of whose faces lies inside UV0's unit square is an
-error too. A material's render mode is not read: a `Transparent` one occludes like
+Glass)`), and an empty list in either is refused before the model is read. A bake
+left with no face inside UV0's unit square is an error too: a `material` none of
+whose faces lies there, or an `ignore_occluders` that names every material. A material's render mode is not read: a `Transparent` one occludes like
 any other until `ignore_occluders` names it.
 
 ```lua no-run

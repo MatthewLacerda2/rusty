@@ -234,11 +234,7 @@ impl<'a> Baked<'a> {
         let mut rays = None;
         let (points, stacked) = overlap::points(&baked, &mut rays);
         if points.is_empty() {
-            return Err(match settings.faces.materials {
-                Some(_) => "has no triangle of the asked materials inside UV0's 0..1 square",
-                None => "has no triangle inside UV0's 0..1 square",
-            }
-            .into());
+            return Err(settings.faces.none_written());
         }
         baked.points = points;
         Ok((baked, rays, stacked))

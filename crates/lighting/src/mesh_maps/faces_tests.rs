@@ -105,3 +105,9 @@ fn a_material_without_faces_on_uv0_is_an_error() {
     let e = bake_with(&facing(), &[MeshMap::Ao], &faces(Some(&[7]), &[])).unwrap_err();
     assert!(e.contains("no triangle of the asked materials"), "{e}");
 }
+
+#[test]
+fn ignoring_every_material_is_an_error_naming_ignore_occluders() {
+    let e = bake_with(&facing(), &[MeshMap::Ao], &faces(None, &[0, 1])).unwrap_err();
+    assert!(e.contains("outside ignore_occluders' materials"), "{e}");
+}
