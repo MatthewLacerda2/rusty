@@ -12,6 +12,8 @@ use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
+    /// `items` must arrive sorted by priority, then back to front (`transparent_order`):
+    /// blending needs that order, and this pass keeps it.
     pub(crate) fn draw_transparent(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -30,6 +32,7 @@ impl Renderer {
                 color_attachments: &targets,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
+                    // Solids in front occlude glass; the transparent pipelines write no depth.
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,

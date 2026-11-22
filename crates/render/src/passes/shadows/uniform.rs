@@ -2,6 +2,7 @@ use glam::Vec3;
 
 use super::cascades::{Cascade, BLEND_FRACTION, MAX_CASCADES};
 
+/// Mirrors `lighting/cascades.wgsl`'s `ShadowCascades`, whose `vec4`s hold `MAX_CASCADES` (4).
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct CascadeUniform {

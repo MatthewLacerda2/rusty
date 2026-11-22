@@ -15,6 +15,7 @@ use rusty_core::settings::quality::{SsaoQuality, MAX_RESOLUTION_DIVISOR};
 use rusty_core::settings::GraphicsSettings;
 use rusty_scene::Camera;
 
+/// One unorm channel: 1 unoccluded, 0 fully occluded.
 pub(crate) const AO_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,6 +26,7 @@ pub(crate) enum Stage {
 }
 
 impl Stage {
+    /// In declaration order: `fullscreen` indexes `pipelines` by `stage as usize`.
     const ALL: [Self; 3] = [Self::Occlusion, Self::Blur, Self::Upsample];
 
     fn label(self) -> &'static str {
@@ -58,6 +60,7 @@ pub(crate) struct SsaoRenderer {
     pub(crate) no_ao: wgpu::TextureView,
 }
 
+/// CPU mirror of `SsaoParams` in `ssao.wgsl`: change the two together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct SsaoUniform {
@@ -65,6 +68,7 @@ pub(crate) struct SsaoUniform {
     view_proj: [f32; 16],
     camera_pos: [f32; 4],
     camera_fwd: [f32; 4],
+    /// Radius in world units, the exponent on the AO, samples, full-res pixels per AO texel.
     params: [f32; 4],
 }
 

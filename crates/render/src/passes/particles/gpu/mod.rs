@@ -1,4 +1,5 @@
-//! Not sorted inside an emitter: additive sums in any order, alpha draws in slot order.
+//! Particles inside an emitter are not sorted: additive ones sum in any order, alpha ones draw
+//! in slot order.
 //! Compute and vertex-stage storage are required of the adapter; the cap's buffers fit wgpu's
 //! default limits.
 
@@ -23,6 +24,7 @@ use crate::Renderer;
 use rusty_components::particle::ParticleEmitterComponent;
 use rusty_scene::{Scene, SceneId};
 
+/// Renders with no draw before an emitter's buffers drop.
 const IDLE_RENDERS: u32 = 600;
 
 pub(crate) struct GpuParticles {
@@ -70,6 +72,7 @@ impl GpuParticles {
 }
 
 impl Renderer {
+    /// Once a frame, before any camera draws: every camera draws the same buffers.
     pub(crate) fn step_gpu_particles(&mut self, scene: &Scene) {
         let mut encoder = self
             .device
@@ -89,6 +92,7 @@ impl Renderer {
             let key = (scene.id(), id);
             kept.insert(id);
             let sim = &emitter.runtime.gpu;
+            // Not in Play (edit mode, or after Stop): nothing to keep.
             if !emitter.runtime.initialized {
                 gpu.emitters.remove(&key);
                 continue;
@@ -149,6 +153,7 @@ impl Renderer {
                 pass.set_bind_group(groups::DRAW, group, &[]);
                 if work.births > 0 {
                     pass.set_pipeline(gpu.birth.get());
+                    // 64: `particles_step.wgsl`'s workgroup size, here and below.
                     pass.dispatch_workgroups(work.births.div_ceil(64), 1, 1);
                 }
                 if let Some(slots) = work.step {
@@ -172,6 +177,7 @@ fn groups(
         layout: layouts.0,
         entries: &e.step_entries(),
     });
+    // The step group's first three, bound again as the draw group's 1 to 3.
     let [emitter, particles, lut, ..] = e.step_entries();
     let draw = device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("GPU Particle Draw Group"),

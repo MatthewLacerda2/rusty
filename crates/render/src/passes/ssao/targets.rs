@@ -2,6 +2,8 @@ use super::{SsaoUniform, AO_FORMAT};
 use crate::gpu::bind_layouts::create_shadow_bind_group;
 use crate::Renderer;
 
+/// Its groups bind the view's depth, which `matches` never checks: whatever reallocates that
+/// depth drops `view.ssao`, as `RenderView::resize` does.
 pub(crate) struct SsaoTargets {
     key: (u32, u32, u32),
     pub(super) raw_size: (u32, u32),

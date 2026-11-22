@@ -1,3 +1,6 @@
+//! The index answers a candidate only while its bounds are those it was indexed with; the rest
+//! go to every volume, so a volume keeps what testing every caster keeps.
+
 use std::ops::Range;
 
 use glam::Mat4;
@@ -6,6 +9,7 @@ use super::cull::Candidate;
 use crate::scene::CasterIndex;
 use crate::Frustum;
 
+/// No candidate holds this index entry.
 const NONE: u32 = u32::MAX;
 
 pub(super) struct Reach<'a> {

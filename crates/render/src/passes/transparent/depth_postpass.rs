@@ -31,6 +31,7 @@ fn targets(
         })
     };
     match velocity {
+        // Location 0 stays empty: `fs_depth_postpass` writes velocity at location 1.
         Some(v) => vec![None, load(v)],
         None => Vec::new(),
     }

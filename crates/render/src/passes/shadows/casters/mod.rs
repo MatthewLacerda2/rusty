@@ -30,6 +30,7 @@ use rusty_components::RenderFace;
 use rusty_scene::Scene;
 pub(super) use sweep::Sweep;
 
+/// Its material's render face, as Unity's ShadowCaster pass culls by `_Cull`.
 pub(super) fn caster_facing(world: Mat4, two_sided: bool, face: RenderFace) -> Facing {
     match two_sided {
         true => Facing::Both,

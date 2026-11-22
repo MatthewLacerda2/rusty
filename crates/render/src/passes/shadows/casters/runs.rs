@@ -35,6 +35,7 @@ pub(super) fn batch_casters(
     mut casters: Vec<(CasterKey, CasterData)>,
     instancing: bool,
 ) -> (Vec<CasterData>, Vec<CasterBatch>) {
+    // Stable, so scene order holds within a run; with instancing off, one draw a caster.
     if instancing {
         casters.sort_by(|a, b| a.0.cmp(&b.0));
     }
