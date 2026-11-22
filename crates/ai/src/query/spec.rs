@@ -170,8 +170,6 @@ pub struct Score {
     pub weight: f32,
 }
 
-/// One test: what it measures, and whether it filters, scores, or both
-/// (Unreal's `TestPurpose`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Test {
     pub measure: Measure,
@@ -179,7 +177,6 @@ pub struct Test {
     pub score: Option<Score>,
 }
 
-/// A whole query.
 #[derive(Clone, Debug, PartialEq)]
 pub struct QuerySpec {
     pub generator: Generator,
@@ -190,7 +187,6 @@ pub struct QuerySpec {
 pub const DEFAULT_PROJECT: f32 = 2.0;
 
 rusty_core::named_enum! {
-    /// Which item a query hands back (Unreal's `EEnvQueryRunMode`).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum RunMode {
         #[default]
