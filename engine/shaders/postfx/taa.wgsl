@@ -240,23 +240,27 @@ fn blend_held(px: Pixel) -> HeldOut {
     return HeldOut(color, px.front.own, taa_flicker::texel(luma, f));
 }
 
+const FLAT_BOX_MIN_HALF_EXTENT: f32 = 6.1e-5;
+
 // URP's `ClipToAABBCenter` (Playdead's) keeps hue where a clamp would shift it.
 fn into_box(h: vec3<f32>, lo: vec3<f32>, hi: vec3<f32>) -> vec3<f32> {
     if (taa.levels.x < 3.0) {
         return clamp(h, lo, hi);
     }
     let center = 0.5 * (hi + lo);
-    let extents = max(0.5 * (hi - lo), vec3<f32>(6.1e-5));
+    let extents = max(0.5 * (hi - lo), vec3<f32>(FLAT_BOX_MIN_HALF_EXTENT));
     let offset = h - center;
     let unit = abs(offset / extents);
     let most = max(unit.x, max(unit.y, unit.z));
     return select(h, center + offset / most, most > 1.0);
 }
 
+const BLACKMAN_HARRIS_FIT_EXPONENT: f32 = -2.29;
+
 // URP's `CalculateFilterWeights`: a Gaussian fit of a radius-1 Blackman-Harris, positive
 // everywhere, so it never rings.
 fn sample_weight(d: vec2<f32>) -> f32 {
-    return exp(-2.29 * dot(d, d));
+    return exp(BLACKMAN_HARRIS_FIT_EXPONENT * dot(d, d));
 }
 
 @fragment

@@ -3,6 +3,7 @@
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::{cloud_shift, sky_fbm}
+#import sky::look::{SKY_HORIZON_TO_WHITE, SKY_GROUND_OF_ZENITH, SKY_ZENITH_EXPONENT, SKY_GROUND_EXPONENT, CLOUD_DOME_MIN_HEIGHT, CLOUD_CELLS_PER_UNIT, CLOUD_FBM_EDGE_START, CLOUD_FBM_EDGE_END, CLOUD_BAND_START, CLOUD_BAND_END, CLOUD_TO_WHITE}
 
 // Mirrors `FogUniform`. `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
 struct Fog {
@@ -335,20 +336,20 @@ struct ProceduralSky {
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let zenith = select(ambient, sky.zenith.rgb, sky.zenith.w > 0.5);
-    let horizon_color = select(mix(zenith, vec3<f32>(1.0), 0.6), sky.horizon.rgb, sky.horizon.w > 0.5);
-    let ground_color = select(zenith * 0.25, sky.ground.rgb, sky.ground.w > 0.5);
+    let horizon_color = select(mix(zenith, vec3<f32>(1.0), SKY_HORIZON_TO_WHITE), sky.horizon.rgb, sky.horizon.w > 0.5);
+    let ground_color = select(zenith * SKY_GROUND_OF_ZENITH, sky.ground.rgb, sky.ground.w > 0.5);
 
     let up = clamp(dir.y, 0.0, 1.0);
     let down = clamp(-dir.y, 0.0, 1.0);
-    var color = mix(horizon_color, zenith, pow(up, 0.5));
-    color = mix(color, ground_color, pow(down, 0.35));
+    var color = mix(horizon_color, zenith, pow(up, SKY_ZENITH_EXPONENT));
+    color = mix(color, ground_color, pow(down, SKY_GROUND_EXPONENT));
 
     if (dir.y > 0.0) {
-        let dome = dir.xz / max(dir.y, 0.15);
-        let fbm = sky_fbm(dome * 1.6) + cloud_shift(sky.clouds.x);
-        let coverage = smoothstep(0.45, 0.80, fbm);
-        let band = smoothstep(0.05, 0.35, up);
-        let cloud_color = mix(zenith, vec3<f32>(1.0), 0.85);
+        let dome = dir.xz / max(dir.y, CLOUD_DOME_MIN_HEIGHT);
+        let fbm = sky_fbm(dome * CLOUD_CELLS_PER_UNIT) + cloud_shift(sky.clouds.x);
+        let coverage = smoothstep(CLOUD_FBM_EDGE_START, CLOUD_FBM_EDGE_END, fbm);
+        let band = smoothstep(CLOUD_BAND_START, CLOUD_BAND_END, up);
+        let cloud_color = mix(zenith, vec3<f32>(1.0), CLOUD_TO_WHITE);
         color = mix(color, cloud_color, coverage * band * sky.clouds.y);
     }
     return color;
