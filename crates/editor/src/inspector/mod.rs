@@ -18,7 +18,6 @@ use rusty_scene::{MaterialAsset, Scene};
 use rusty_script::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
-/// RIGHT PANEL: Properties Inspector
 pub fn draw(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -129,7 +128,6 @@ fn draw_entity_inspector(
     pending.apply(editor, scene, selected_id);
 }
 
-/// The Unity-style object header card: name + active/static toggles + layer combo.
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::theme::Theme,

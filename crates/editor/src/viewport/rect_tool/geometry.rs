@@ -5,17 +5,14 @@ use glam::{Affine2, Mat2, Vec2};
 use rusty_components::RectTransformComponent;
 use rusty_ui::UiRect;
 
-/// A grabbable part of the selected rect.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Handle {
     /// Inside the rect: move it (`anchored_position`).
     Body,
+    /// The pivot.
     Pivot,
     /// An edge or corner: -1 = min, +1 = max.
-    Resize {
-        x: i8,
-        y: i8,
-    },
+    Resize { x: i8, y: i8 },
 }
 
 const RESIZE: [(i8, i8); 8] = [
@@ -71,7 +68,6 @@ pub fn hit(
     inside(&r.corners.map(to), p).then_some(Handle::Body)
 }
 
-/// Whether `p` is inside the convex quad `c` (either winding).
 fn inside(c: &[Vec2; 4], p: Vec2) -> bool {
     let sides = (0..4).map(|i| (c[(i + 1) % 4] - c[i]).perp_dot(p - c[i]));
     let (mut pos, mut neg) = (false, false);

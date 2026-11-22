@@ -12,17 +12,12 @@ pub enum PrefabAction {
     Revert(u32),
     /// Re-baseline from the source, re-applying overrides (`Scene.ReimportPrefab`).
     Reimport(u32),
+    /// Apply to source.
     ApplyToSource(u32),
-    /// Revert one overridden field.
-    RevertField {
-        entity: u32,
-        path: String,
-    },
-    /// Apply one overridden field to the source.
-    ApplyFieldToSource {
-        entity: u32,
-        path: String,
-    },
+    /// Revert a field.
+    RevertField { entity: u32, path: String },
+    /// Apply a field.
+    ApplyFieldToSource { entity: u32, path: String },
 }
 
 /// Draw the prefab-instance card for the entity `id`, if it is a linked instance.
@@ -50,10 +45,8 @@ pub fn draw(
 struct Apply(Option<&'static str>);
 
 impl Apply {
-    /// Why the buttons are off.
     const MODEL: &'static str = "A model is read-only: its instance's overrides can't be applied to the file (save it as a prefab first)";
 
-    /// The apply state for an instance of `source`.
     fn of(source: &str) -> Self {
         Apply(rusty_edit::prefab::source::is_model_source(source).then_some(Self::MODEL))
     }
@@ -96,7 +89,6 @@ fn draw_object_buttons(ui: &mut egui::Ui, root: u32, apply: Apply) -> Option<Pre
     action
 }
 
-/// A labelled button with an icon and a hover tooltip; returns whether it was clicked.
 fn labeled(ui: &mut egui::Ui, glyph: &str, label: &str, hover: &str) -> bool {
     ui.button(format!("{glyph}  {label}"))
         .on_hover_text(hover)
