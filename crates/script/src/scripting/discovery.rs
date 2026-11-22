@@ -1,12 +1,15 @@
 //! Finds the project scripts the Add Component menu offers: those returning a table with
 //! at least one lifecycle function, so a plain `require`d helper module is left out.
 //!
-//! Detection evaluates each chunk in `inspection_vm`: `Lua::new()`'s safe set with the API
-//! stubbed, not the gameplay sandbox, so a file's top level runs here with `io` and `os`.
+//! Each chunk runs in `inspection_vm`, without `io` and `os` as in Play. One that fails to
+//! load or run is not offered and the console says why once, as Unity leaves a script with
+//! compile errors out of *Add Component*.
 
+use std::cell::RefCell;
+use std::collections::BTreeSet;
 use std::path::Path;
 
-use mlua::{Table, Value};
+use mlua::Value;
 
 use super::callbacks::LIFECYCLE_CALLBACKS;
 
@@ -22,10 +25,14 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
                 return None;
             }
             let code = std::fs::read_to_string(&path).ok()?;
-            if exposes_lifecycle(&code) {
-                Some(path.to_string_lossy().into_owned())
-            } else {
-                None
+            let path = path.to_string_lossy().into_owned();
+            match offered(&path, &code) {
+                Ok(true) => Some(path),
+                Ok(false) => None,
+                Err(why) => {
+                    warn_once(&path, &why);
+                    None
+                }
             }
         })
         .collect();
@@ -33,14 +40,37 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
     found
 }
 
+#[cfg(test)]
 pub(crate) fn exposes_lifecycle(code: &str) -> bool {
-    let lua = super::sandbox::inspection_vm();
-    let Ok(table) = lua.load(code).eval::<Table>() else {
-        return false;
+    offered("test.lua", code).unwrap_or(false)
+}
+
+/// `Err` (the error's first line) when the chunk fails to load or run; `Ok(false)` for a helper.
+pub(super) fn offered(path: &str, code: &str) -> Result<bool, String> {
+    let first_line = |e: mlua::Error| e.to_string().lines().next().unwrap_or_default().to_owned();
+    let lua = super::sandbox::inspection_vm(Path::new("")).map_err(first_line)?;
+    let ran = lua.load(code).set_name(format!("@{path}")).eval::<Value>();
+    let table = match ran {
+        Ok(Value::Table(table)) => table,
+        Ok(_) => return Ok(false),
+        Err(e) => return Err(first_line(e)),
     };
-    LIFECYCLE_CALLBACKS
+    Ok(LIFECYCLE_CALLBACKS
         .iter()
-        .any(|m| matches!(table.get::<Value>(*m), Ok(Value::Function(_))))
+        .any(|m| matches!(table.get::<Value>(*m), Ok(Value::Function(_)))))
+}
+
+// The menu lists scripts every frame it is open; a changed error is said again.
+thread_local!(static WARNED: RefCell<BTreeSet<(String, String)>> = const { RefCell::new(BTreeSet::new()) });
+
+fn first_time(path: &str, why: &str) -> bool {
+    WARNED.with(|w| w.borrow_mut().insert((path.to_owned(), why.to_owned())))
+}
+
+fn warn_once(path: &str, why: &str) {
+    if first_time(path, why) {
+        log::warn!("[Script] {path} is not offered in Add Component: it fails to load: {why}");
+    }
 }
 
 pub fn script_label(path: &str) -> String {
@@ -72,6 +102,13 @@ mod tests {
         assert!(!exposes_lifecycle("return 42"));
         assert!(!exposes_lifecycle("return { Start = 7 }"));
         assert!(!exposes_lifecycle("this is not lua"));
+    }
+
+    #[test]
+    fn a_failing_script_is_warned_about_once_per_error() {
+        assert!(first_time("bad.lua", "e1"));
+        assert!(!first_time("bad.lua", "e1"));
+        assert!(first_time("bad.lua", "e2"));
     }
 
     #[test]

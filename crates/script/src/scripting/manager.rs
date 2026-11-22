@@ -39,7 +39,7 @@ pub struct ScriptManager {
     pub(super) cells: ApiCells,
     /// Empty, the working directory, for the editor and the player; the headless harness
     /// sets its own.
-    workspace: PathBuf,
+    pub(super) workspace: PathBuf,
     play_seed: u64,
     pub(super) journal: Rc<RefCell<HostJournal>>,
 }
