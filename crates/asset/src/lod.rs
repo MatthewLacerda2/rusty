@@ -1,10 +1,9 @@
-//! Unity's and Blender's `_LOD<n>` convention: `Crate_LOD0`, `Crate_LOD1` are one
-//! prop at decreasing detail. A sub-object belongs to a set when its glTF node
-//! name, or failing that its sub-object id, ends in `_LOD<n>` (case-insensitive).
+//! Unity's and Blender's `_LOD<n>` convention. Matches the glTF node name, else
+//! the sub-object id (case-insensitive).
 
 use super::ImportedAsset;
 
-/// Levels finest first; numbers need not be contiguous (`_LOD0` and `_LOD2` make two).
+/// Levels finest first; numbers need not be contiguous.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct LodSet {
     pub base: String,

@@ -13,7 +13,6 @@ use rusty_core::quiet::{holding, say};
 
 pub const SMALL: usize = 4096;
 
-/// Cores left free: the main thread's and one for the audio mixer and GPU driver.
 pub const KEPT_FOR_PLAY: usize = 2;
 
 thread_local! {
@@ -35,8 +34,6 @@ pub fn beside_play<R>(f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// Run `f` with every [`map`] on this thread using exactly `threads` threads: a
-/// determinism probe.
 pub fn with_threads<R>(threads: usize, f: impl FnOnce() -> R) -> R {
     struct Restore(Option<usize>);
     impl Drop for Restore {

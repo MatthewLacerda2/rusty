@@ -1,7 +1,3 @@
-//! Pure geometry and material values (glam only), never a wgpu buffer. A sub-mesh's
-//! vertex and index buffers are [`Shared`]: instances hold one allocation, copied
-//! only when one instance is edited.
-
 use super::anim_data::AnimationClip;
 use super::convert::texture_ref::MapRef;
 use super::material_range::MaterialRange;
@@ -15,14 +11,13 @@ pub use shared::Shared;
 pub use skin::{JointTransform, SkinData};
 pub use vertex::Vertex;
 
-/// glTF 2.0 metallic-roughness values with resolved texture paths. glTF packs
-/// metallic (B) and roughness (G) into one `metallicRoughnessTexture`, so
-/// [`MaterialData::metallic_roughness_map`] is a single path that the scene
-/// layer's conversion fans out. Embedded images (`Source::View`) are left `None`.
+/// glTF packs metallic (B) and roughness (G) into one `metallicRoughnessTexture`,
+/// so [`MaterialData::metallic_roughness_map`] is one path the scene layer fans
+/// out. Embedded images (`Source::View`) are left `None`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MaterialData {
     pub name: String,
-    /// Linear RGBA; OBJ `Kd` with alpha 1.0. Defaults to opaque white.
+    /// Linear RGBA.
     pub base_color: [f32; 4],
     pub metallic: f32,
     pub roughness: f32,
@@ -31,18 +26,16 @@ pub struct MaterialData {
     pub normal_map: Option<MapRef>,
     pub emissive_map: Option<MapRef>,
     pub emissive: [f32; 3],
-    /// Channel R. An ORM file names the metallic-roughness image here too: one upload.
+    /// Channel R. An ORM file names the metallic-roughness image here too.
     pub occlusion_map: Option<MapRef>,
     pub occlusion_strength: f32,
-    /// Always `false` for a `.blend`'s conversion (`gltf::material`, Unity's way).
     pub double_sided: bool,
     /// `KHR_materials_ior`; 1.5 when absent.
     pub ior: f32,
     /// `KHR_materials_specular`'s `specularFactor`; 1 when absent.
     pub specular: f32,
-    /// Channel A. `specularColorTexture` is not read: the material has no slot.
+    /// Channel A.
     pub specular_map: Option<MapRef>,
-    /// White when absent.
     pub specular_color: [f32; 3],
 }
 
@@ -51,7 +44,6 @@ impl Default for MaterialData {
         Self {
             name: String::new(),
             base_color: [1.0, 1.0, 1.0, 1.0],
-            // glTF defaults: fully metallic/rough.
             metallic: 1.0,
             roughness: 1.0,
             base_color_map: None,
@@ -81,9 +73,8 @@ pub struct SubMesh {
     pub skin: Option<SkinData>,
     /// Tracks are keyed by the `skin`'s joint slots.
     pub clips: Vec<AnimationClip>,
-    /// The Blender *object* name, where `id` is the mesh-data name (`asset::lod` reads it).
+    /// The Blender *object* name (`id` is the mesh-data name).
     pub node_name: Option<String>,
-    /// Built at import for a big static mesh, whose `indices` they reordered.
     pub clusters: Option<std::sync::Arc<super::clusters::Clusters>>,
 }
 
@@ -111,8 +102,7 @@ impl SubMesh {
 pub struct ImportedAsset {
     pub sub_meshes: Vec<SubMesh>,
     pub materials: Vec<MaterialData>,
-    /// Parents before children, skeleton joints left out (they spawn as bones).
-    /// Empty for `.obj`; [`node_tree`](Self::node_tree) fills the gap.
+    /// Parents before children, joints left out. Empty for `.obj`.
     pub nodes: Vec<super::model_node::ModelNode>,
 }
 

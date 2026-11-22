@@ -1,11 +1,7 @@
-//! Unity's *Lightmap* texture type: a bake's pages live in `<scene file>`
-//! [`DIR_SUFFIX`], and the texture importer leaves that folder alone ([`is_baked`]).
-//!
-//! Irradiance is BC6H unsigned float, HDR stored as is (no RGBM, so bilinear
-//! filtering is linear in the light). A direction page is plain RGBA8, never
-//! block-compressed: BC7 turned a lamp's direction up to 5° off a texel, which a
-//! glossy highlight showed as a sawtooth. Its mips are the bake's, so the loader
-//! uploads the levels as they are.
+//! Unity's *Lightmap* texture type. Irradiance is BC6H, HDR stored as is (no
+//! RGBM, so bilinear filtering is linear in the light). A direction page is
+//! RGBA8, never block-compressed: BC7 turned a lamp's direction up to 5° off a
+//! texel, a sawtooth in glossy highlights.
 //!
 //! stored-format: the baked lightmap pages in `<scene>.lightmaps/`
 
@@ -17,11 +13,10 @@ use std::path::Path;
 pub use blocks::{bc6h_level, bc6h_texels, decode_bc6h, encode_bc6h, to_rgba16f};
 pub use container::{read, write};
 
-/// `foo.scene` → `foo.scene.lightmaps/`.
+/// `foo.scene` → `foo.scene.lightmaps/`; the texture importer skips it.
 pub const DIR_SUFFIX: &str = ".lightmaps";
 
-/// Only the direct parent counts, so a project kept under a folder that happens
-/// to end in `.lightmaps` is still imported.
+/// Only the direct parent counts.
 pub fn is_baked(path: &Path) -> bool {
     path.parent()
         .and_then(Path::file_name)

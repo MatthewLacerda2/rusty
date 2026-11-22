@@ -1,8 +1,6 @@
 //! Scenes store a path-based reference (`path::sub_object`), never GPU buffers;
-//! the geometry is re-imported on load, as a primitive is rebuilt from its
-//! `primitive_type`. Paths, not GUIDs, keep references readable and diffable for
-//! an agent/PR-driven engine; the `.meta` sidecar carries import settings only,
-//! never identity. A sim module: re-imports are deterministic for the same file.
+//! paths, not GUIDs, keep references diffable for an agent. The `.meta` sidecar
+//! carries import settings only, never identity.
 
 #![deny(clippy::unwrap_used)]
 
@@ -73,23 +71,19 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
-/// Lowercase; the one list the editor reads. `fbx` and `blend` go through a cached
-/// glTF ([`convert`]).
+/// `fbx` and `blend` go through a cached glTF ([`convert`]).
 pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 
-/// Lowercase; matches the `image` features in `Cargo.toml`.
+/// Matches the `image` features in `Cargo.toml`.
 pub const IMAGE_EXTENSIONS: &[&str] = &["png", "tga", "jpg", "jpeg"];
 
-/// Lowercase. A `.png` is a LUT only as a strip (`N² × N` pixels); any other is
-/// refused, naming its size.
+/// A `.png` is a LUT only as a strip (`N² × N` pixels).
 pub const LUT_EXTENSIONS: &[&str] = &["cube", "png"];
 
-/// Case-insensitive.
 pub fn is_model_path(path: impl AsRef<Path>) -> bool {
     MODEL_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-/// Case-insensitive.
 pub fn is_image_path(path: impl AsRef<Path>) -> bool {
     IMAGE_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
@@ -132,7 +126,6 @@ pub(crate) fn import_own_file(path: &Path) -> Result<ImportedAsset, ImportError>
     import_own(path, &read_target(path)?, &settings_of(path))
 }
 
-/// [`import_with`] without borrowed clips.
 fn import_own(
     path: &Path,
     read: &Path,
@@ -143,7 +136,6 @@ fn import_own(
     })
 }
 
-/// Never includes the source's own borrowed clips.
 fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, ImportError> {
     let path = Path::new(from);
     let settings = settings_of(path);

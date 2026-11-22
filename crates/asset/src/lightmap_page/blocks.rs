@@ -1,6 +1,3 @@
-//! Blocks are the same whichever thread wrote them, so a bake's pages never
-//! depend on the machine.
-
 use block_compression::decode::decompress_blocks_as_rgba16f;
 use block_compression::encode::compress_rgba16;
 use block_compression::half::f16;
@@ -10,13 +7,11 @@ use glam::Vec3;
 use super::{Page, PageFormat};
 use crate::texture_import::banded;
 
-/// Lightmaps are smooth, so the very fast profile holds them within 5% (`tests`),
-/// and is much faster than `basic`, which held them no closer.
+/// Very fast holds smooth lightmaps within 5% (`tests`).
 const BC6H: CompressionVariant = CompressionVariant::BC6H(BC6HSettings::very_fast());
 pub const BC6H_MAX: f32 = 65504.0;
 
-/// Level `l` is `(edge >> l)`² texels, row-major. `None` when `stop` answers true
-/// before a level.
+/// Level `l` is `(edge >> l)`² texels, row-major. `None` when `stop` fires.
 pub fn encode_bc6h(
     edge: u32,
     levels: &[Vec<Vec3>],
@@ -37,10 +32,9 @@ pub fn encode_bc6h(
     })
 }
 
-/// Shared with baked reflection cubes. A level under a block (a cube's 2×2 and
-/// 1×1 mips) is padded to one 4×4 block by repeating its last row and column, as
-/// wgpu stores such a mip. Panics when `edge` is neither under 4 nor a multiple
-/// of 4.
+/// A level under a block (a cube's 2×2 and 1×1 mips) is padded to one 4×4 block
+/// by repeating its last row and column, as wgpu stores it. Panics when `edge` is
+/// neither under 4 nor a multiple of 4.
 pub fn bc6h_level(edge: u32, texels: &[Vec3], threads: usize) -> Vec<u8> {
     let w = edge.max(4);
     assert!(
@@ -66,9 +60,8 @@ pub fn decode_bc6h(page: &Page, level: usize) -> Vec<Vec3> {
     bc6h_texels(page.edge >> level, &page.levels[level])
 }
 
-/// `block_compression` 0.11.0's decoders lay BC6H out wrong: the `f32` one runs
-/// off the end of its destination, and the half-float one writes RGB (three
-/// halves a texel) into an RGBA-pitched buffer. Texel `(x, y)` is at
+/// `block_compression` 0.11.0 decodes BC6H wrong (the `f32` decoder overruns; the
+/// half-float one writes RGB into an RGBA-pitched buffer): texel `(x, y)` is at
 /// `y * 4w + (x / 4) * 16 + (x % 4) * 3`.
 pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     let w = edge.max(4);

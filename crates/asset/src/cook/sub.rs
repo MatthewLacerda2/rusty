@@ -16,7 +16,6 @@ pub struct Cooked {
     pub id: String,
     pub parse: u64,
     pub source: Option<Vec<u32>>,
-    /// Each final vertex's position, scaled: what a read checks the parse against.
     pub positions: Vec<[f32; 3]>,
     pub tangents: Vec<[f32; 4]>,
     pub lightmap_uvs: Vec<[f32; 2]>,
@@ -90,8 +89,6 @@ impl Cooked {
     }
 }
 
-/// The digest of what a parse gave `sub` (after the Scale Factor) that cooking reads.
-/// Not the tangents: a cooked parse never generates them.
 pub fn digest(sub: &SubMesh) -> u64 {
     let mut hash = rusty_core::hash::Content::default();
     let mut buf: Vec<u8> = Vec::with_capacity(VERTEX * BATCH);

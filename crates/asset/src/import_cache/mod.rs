@@ -1,8 +1,6 @@
-//! Each model is parsed once, as Unity keeps an imported model in memory. Keyed
-//! by path plus the geometry-changing settings. An entry records every file its
-//! parse read; the write log drops it, and size plus modified time catch another
-//! process's writes (never read by the sim). One cache per process; its lock is
-//! never held across a parse, so two threads may parse one file into the same value.
+//! Each model is parsed once, as Unity keeps an imported model in memory. Size and
+//! modified time catch another process's writes (never read by the sim). The lock
+//! is never held across a parse, so two threads may parse one file into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 mod counts;
@@ -31,7 +29,7 @@ use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 use rusty_core::project;
 
-/// A Dust2-sized level's whole model set fits (a few million vertices).
+/// Fits a Dust2-sized level's whole model set.
 pub const BUDGET_BYTES: usize = 512 << 20;
 
 #[derive(Clone, Debug)]
@@ -104,7 +102,6 @@ pub fn imported(path: &Path) -> Result<Imported, ImportError> {
         with_cache(|cache| cache.remove(&key));
     })?;
     let settings = super::settings_of(path);
-    // Borrowed-clip sources too, so their re-conversion drops this import.
     for from in &settings.humanoid.clips_from {
         let _ = super::read_target(Path::new(from));
     }
@@ -201,8 +198,7 @@ impl Cache {
         import
     }
 
-    /// Evicts least recently used until within `budget` beside the largest entry,
-    /// so a lone entry over budget is never evicted for a smaller one.
+    /// A lone entry over budget is never evicted for a smaller one.
     fn evict_past(&mut self, keep: &str, budget: usize) {
         let largest = |c: &Self| c.by_path.values().map(|e| e.bytes).max().unwrap_or(0);
         while self.bytes > budget.saturating_add(largest(self)) {

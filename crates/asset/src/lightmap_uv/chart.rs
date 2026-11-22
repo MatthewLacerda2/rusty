@@ -1,8 +1,7 @@
 //! A chart grows breadth-first from its seed (the lowest unassigned triangle)
-//! across shared edges, taking a neighbour when the edge is softer than the hard
-//! angle, it faces within [`CONE_DEGREES`] of the seed (bounding projection
-//! stretch to `1 / cos`), and its projection overlaps nothing. A zero-area
-//! triangle joins any neighbour's chart: it has no surface to light.
+//! across edges softer than the hard angle, taking neighbours within
+//! [`CONE_DEGREES`] of the seed (stretch at most `1 / cos`) whose projection
+//! overlaps nothing. A zero-area triangle joins any chart.
 
 use std::collections::VecDeque;
 
@@ -127,8 +126,7 @@ impl Chart {
     }
 }
 
-/// Walls get `v` straight up and floors `u` along `X`, so level geometry lands as
-/// axis-aligned rectangles that pack tightly.
+/// Walls get `v` straight up, floors `u` along `X`: axis-aligned rectangles pack tightly.
 fn plane_basis(axis: Vec3) -> (Vec3, Vec3) {
     let u = if axis.y.abs() < 0.999 {
         Vec3::Y.cross(axis).normalize()
@@ -159,8 +157,7 @@ fn mean_edge(mesh: &Mesh) -> f32 {
     }
 }
 
-/// Ascending. Edges match on welded positions, so a seam the exporter already
-/// split (a texture UV or a hard normal) still connects.
+/// Edges match on welded positions, so a seam the exporter split still connects.
 fn neighbours(positions: &[[f32; 3]], indices: &[u32]) -> Vec<Vec<u32>> {
     let weld = weld(positions);
     let mut edges: Vec<(u32, u32, u32)> = Vec::with_capacity(indices.len());

@@ -1,7 +1,6 @@
-//! User colour-lookup tables, as Unity's *Color Lookup* takes: `.cube` (a 3D
-//! table with `DOMAIN_MIN`/`DOMAIN_MAX`) or a strip `.png` (`N` slices of `N × N`
-//! side by side, `N² × N` pixels, e.g. `256×16`). A parse takes milliseconds even
-//! at 65³, so no converted copy is kept: the source is what loads.
+//! As Unity's *Color Lookup* takes: `.cube`, or a strip `.png` (`N` slices of
+//! `N × N` side by side, e.g. `256×16`). Parsing takes milliseconds even at 65³,
+//! so no converted copy is kept.
 
 mod cube;
 mod strip;

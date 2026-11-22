@@ -1,6 +1,5 @@
-//! The "see what I can place" half of authoring: every importable sub-object
-//! under an asset root as a `path::sub_object` reference plus its footprint
-//! (AABB) and material count, so an agent can pick "a sedan" and know its size.
+//! The "see what I can place" half of authoring: each sub-object's footprint
+//! (AABB) lets an agent pick "a sedan" and know its size.
 
 use std::path::Path;
 
@@ -15,7 +14,7 @@ pub struct SubObjectEntry {
     /// The part after `::`, e.g. `Sedan`.
     pub id: String,
     pub reference: String,
-    /// `(min, max)` in the source file's units; `None` for an empty mesh.
+    /// `None` for an empty mesh.
     pub bounds: Option<(Vec3, Vec3)>,
     /// Distinct materials its runs draw with; `0` when it names none.
     pub material_count: usize,
@@ -50,7 +49,6 @@ fn distinct_materials(sub: &SubMesh) -> usize {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AssetEntry {
-    /// The string the references embed, e.g. `assets/models/crates.glb`.
     pub path: String,
     pub sub_objects: Vec<SubObjectEntry>,
     pub material_count: usize,
@@ -68,8 +66,7 @@ impl AssetManifest {
     }
 }
 
-/// Files that fail to import are skipped, so one bad file doesn't blind the agent
-/// to the rest. Deterministic: paths are sorted, sub-objects keep file order.
+/// Files that fail to import are skipped. Paths are sorted.
 pub fn build_manifest(root: &Path) -> AssetManifest {
     let mut paths = Vec::new();
     collect_model_paths(root, &mut paths);
@@ -82,7 +79,6 @@ pub fn build_manifest(root: &Path) -> AssetManifest {
     AssetManifest { assets }
 }
 
-/// `None` if it can't be imported; an unreferenceable path is skipped with a warning.
 fn entry_for(path: &str) -> Option<AssetEntry> {
     // A plain import: listing the project must not fill the import cache.
     let asset = import_file(Path::new(path)).ok()?;

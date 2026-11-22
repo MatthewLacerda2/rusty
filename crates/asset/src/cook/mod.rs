@@ -1,13 +1,8 @@
-//! What an import derives from a parsed model, computed once and kept on disk:
-//! the unwrap for Generate Lightmap UVs, then clusters (last: they reorder indices),
-//! with the parse generating tangents. All are pure functions of the parsed files and
-//! geometry settings; sub-meshes run on threads ([`par`]) and join in document order,
-//! so the result is bit-identical to one thread.
-//!
-//! Kept as `<source>.cooked.glb` in the import cache ([`SUFFIX`]); a model outside an
-//! open project is cooked in memory ([`with_writes`] opts a test in). A missing, stale
-//! or malformed file is a miss. Only authoring builds write ([`WRITES`]), never Play
-//! or a standalone game.
+//! What an import derives from a parsed model, computed once and kept on disk: unwrap,
+//! clusters (last: they reorder indices) and tangents, pure functions of the parsed
+//! files and settings. Sub-meshes run on threads ([`par`]) and join in document order,
+//! bit-identical to one thread. A missing, stale or malformed file is a miss; only
+//! authoring builds write ([`WRITES`]), never Play or a standalone game.
 //!
 //! stored-format: the `<source>.cooked.glb` file of the import cache
 
@@ -49,9 +44,6 @@ pub fn cooked_path(source: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Whether `path` has a cooked file stamped with what it is now, told without parsing.
-/// Only the stamp is read, so a read may still refuse it (a parser change without a
-/// version bump).
 pub fn is_stamped(path: &Path) -> bool {
     let read = match convert::converter_for(path) {
         Some(_) => convert::cache_location(path).ok().filter(|r| r.is_file()),
@@ -189,8 +181,7 @@ fn write(file: &Path, bytes: &[u8]) -> bool {
     written.is_ok()
 }
 
-/// Run `f` with cooked files written (`true`) or not on this thread, whatever the
-/// build. A test hook: public only for the `dev` crate's tests.
+/// Test hook: public only for the `dev` crate's tests.
 #[doc(hidden)]
 pub fn with_writes<R>(on: bool, f: impl FnOnce() -> R) -> R {
     struct Restore(Option<bool>);

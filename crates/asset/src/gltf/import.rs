@@ -207,7 +207,6 @@ fn triangle_list(mode: Mode, indices: Option<Vec<u32>>, vertex_count: u32) -> Op
     }
 }
 
-/// Swapping the leading pair on odd triangles keeps the strip's front-face winding.
 fn strip_triangles(strip: &[u32]) -> Vec<u32> {
     strip
         .windows(3)

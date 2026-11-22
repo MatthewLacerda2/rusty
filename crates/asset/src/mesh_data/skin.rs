@@ -1,23 +1,19 @@
 use glam::{Mat4, Quat, Vec3};
 
-/// Per-joint data in `skin.joints` order, which the per-vertex `joint_indices`
-/// reference. At bind pose `bind_global * inverse_bind` is the identity; both
-/// halves are kept so the animation runtime can pose the rig.
+/// Per-joint data in `skin.joints` order, which `joint_indices` reference.
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct SkinData {
     pub inverse_bind: Vec<Mat4>,
-    /// At bind time, relative to the skinned mesh node so the palette is mesh-local.
+    /// Relative to the skinned mesh node, so the palette is mesh-local.
     pub bind_global: Vec<Mat4>,
-    /// The rest pose; channels the animation does not touch keep these.
     pub local_bind: Vec<JointTransform>,
     /// Parent joint slot, or `None` for a skeleton root.
     pub parents: Vec<Option<usize>>,
-    /// glTF node index of each joint: what animation channels target.
+    /// What animation channels target.
     pub joint_nodes: Vec<usize>,
-    /// Inverse of the skinned mesh node's global bind transform: left-multiplying a posed joint global by it gives mesh-local space.
+    /// Left-multiplying a posed joint global by it gives mesh-local space.
     pub mesh_inverse: Mat4,
-    /// `joint_{slot}` when unnamed. The key a bone GameObject is spawned and
-    /// re-bound under, so overrides survive a re-exported skeleton.
+    /// `joint_{slot}` when unnamed. Bones re-bind by it.
     pub names: Vec<String>,
 }
 
@@ -29,9 +25,8 @@ impl SkinData {
             .unwrap_or_else(|| format!("joint_{slot}"))
     }
 
-    /// What sits between the skinned node and the skeleton root (an `Armature`
-    /// node's rotation and scale): `bind_global * local_bind⁻¹`. Identity for a
-    /// joint that has a parent joint.
+    /// An `Armature` node's rotation and scale between the skinned node and the
+    /// root: `bind_global * local_bind⁻¹`. Identity for a non-root joint.
     pub fn root_offset(&self, slot: usize) -> Mat4 {
         if self.parents.get(slot).copied().flatten().is_some() {
             return Mat4::IDENTITY;
@@ -43,9 +38,8 @@ impl SkinData {
         *global * local.matrix().inverse()
     }
 
-    /// Undoes an `Armature` node above the mesh (a Blender export's Z-up turn and
-    /// centimetre scale) so up is +Y. Read a rig's up or facing here, never in
-    /// mesh-local space. Identity when `mesh_inverse` can't be inverted.
+    /// Undoes an `Armature` above the mesh (Blender's Z-up turn, centimetre
+    /// scale) so up is +Y. Read a rig's up or facing here, not mesh-local.
     pub fn mesh_to_model(&self) -> Mat4 {
         let m = self.mesh_inverse.inverse();
         if m.is_finite() {
@@ -55,14 +49,12 @@ impl SkinData {
         }
     }
 
-    /// `None` when the axes coincide (at most a translation), so a native Y-up
-    /// rig computes exactly as it would without the conversion.
+    /// `None` when the axes coincide, so a Y-up rig computes as without it.
     pub fn mesh_to_model_axes(&self) -> Option<Mat4> {
         let m = self.mesh_to_model();
         (glam::Mat3::from_mat4(m) != glam::Mat3::IDENTITY).then_some(m)
     }
 
-    /// A length mismatch is truncated to the shorter.
     pub fn bind_palette(&self) -> Vec<Mat4> {
         self.bind_global
             .iter()

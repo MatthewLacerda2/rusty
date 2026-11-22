@@ -1,6 +1,5 @@
-//! KTX2 as the spec lays it out (the `ktx2` crate only reads), so other tools open
-//! a page: the level index runs largest first, the images smallest first. A file
-//! with another format or size, or wrong level lengths, is refused with why.
+//! The `ktx2` crate only reads. Per spec the level index runs largest first, the
+//! images smallest first.
 
 use ktx2::Reader;
 
@@ -27,23 +26,16 @@ pub fn write(page: &Page) -> Vec<u8> {
     out[0..12].copy_from_slice(&MAGIC);
     let words = [
         page.format.vk_format(),
-        1, // typeSize: 1 for a block-compressed format and for 8-bit channels
+        1, // typeSize
         page.edge,
         page.edge,
-        0, // pixelDepth: 2D
-        0, // layerCount: not an array
-        1, // faceCount
         page.levels.len() as u32,
-        0, // supercompressionScheme: none
         dfd_at as u32,
         dfd.len() as u32,
-        0, // kvdByteOffset: no key/values
-        0, // kvdByteLength
     ];
     for (i, w) in words.iter().enumerate() {
         put(&mut out, 12 + 4 * i, &w.to_le_bytes());
     }
-    // sgdByteOffset and sgdByteLength stay 0.
     out[dfd_at..data_at].copy_from_slice(&dfd);
     for (i, level) in page.levels.iter().enumerate().rev() {
         out.resize(out.len().next_multiple_of(level_align(page.format)), 0);
@@ -109,13 +101,13 @@ fn dfd(format: PageFormat) -> Vec<u8> {
     };
     let block = 24 + 16 * samples.len() as u32;
     let mut words = vec![
-        4 + block,                    // dfdTotalSize
-        0,                            // vendorId 0 (Khronos), descriptorType 0 (basic)
+        4 + block,
+        0,
         2 | (block << 16),            // versionNumber 2, descriptorBlockSize
         model | (1 << 8) | (1 << 16), // model, primaries BT.709, transfer linear
-        block_dims,                   // texel block size, each dimension less one
-        plane0,                       // bytesPlane0: one block's (or texel's) bytes
-        0,                            // bytesPlane4..7
+        block_dims,                   // each dimension less one
+        plane0,                       // bytesPlane0
+        0,
     ];
     for &(offset, len, channel, upper) in samples {
         words.extend([offset | (len << 16) | (channel << 24), 0, 0, upper]);
