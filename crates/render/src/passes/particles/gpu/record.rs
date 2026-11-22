@@ -1,21 +1,15 @@
-//! crates/render/src/passes/particles/gpu/record.rs — a GPU-simulated emitter's
-//! records, the Rust twins of `engine/shaders/particles/gpu.wgsl`'s, and what they
-//! are made from: a birth's record, the over-life lookup table, the emitter's
-//! uniform. Their CPU twins of the step and the sprite (`twin`) are what the tests
-//! hold the shaders to. Pure CPU, so it is unit-tested without an adapter.
+//! `EMPTY` is zero so an all-zero buffer holds no particle. Gravity is a world acceleration; a
+//! `Local` emitter's particles are stored in its frame, so it is turned and scaled into that space.
+//! Curves: row 0 size, drag, spin (degrees/second); row 1 colour.
 
 use glam::Mat4;
 
 use crate::passes::particles::instance::mode_code;
 use rusty_components::particle::{Birth, ParticleEmitterComponent};
 
-/// A slot's `next` when nothing lives in it (`EMPTY` in the shader): zero, so an
-/// all-zero buffer (a new one, or one `clear_buffer` emptied) holds no particle.
 pub(crate) const EMPTY: u32 = 0;
-/// Samples per over-life curve (`LUT_SIZE` in the shader).
 pub(crate) const LUT_SIZE: usize = 64;
 
-/// One particle on the GPU (`GpuParticle`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuParticle {
@@ -27,12 +21,10 @@ pub(crate) struct GpuParticle {
     pub(crate) size: f32,
     pub(crate) rotation: f32,
     pub(crate) start_frame: u32,
-    /// The first step it has yet to take (steps count from 1), or [`EMPTY`].
     pub(crate) next: u32,
 }
 
 impl GpuParticle {
-    /// An empty slot.
     pub(crate) const EMPTY: Self = Self {
         position: [0.0; 3],
         lifetime: 0.0,
@@ -45,8 +37,6 @@ impl GpuParticle {
         next: EMPTY,
     };
 
-    /// `birth` as it starts on the GPU: at the step it was born, or an empty slot
-    /// when it died before it was uploaded.
     pub(crate) fn born(birth: &Birth) -> Self {
         if birth.dead {
             return Self::EMPTY;
@@ -66,8 +56,6 @@ impl GpuParticle {
     }
 }
 
-/// One birth upload (`GpuBirth`): the particle, its slot, and the time its steps
-/// older than the uploaded window took (0 when it has none).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuBirth {
@@ -77,31 +65,22 @@ pub(crate) struct GpuBirth {
     pub(crate) pad: [u32; 2],
 }
 
-/// One emitter's uniform (`GpuEmitter`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuEmitter {
     pub(crate) frame: [f32; 16],
-    /// Gravity in the stored space; the time the steps older than the window
-    /// took for a particle stepped at the last upload (0 when it has none).
     pub(crate) gravity: [f32; 4],
     pub(crate) light: [f32; 4],
     pub(crate) sheet: [f32; 4],
     pub(crate) stretch: [f32; 4],
-    /// Mode code, slots in use, the step to move to, the step of `dts[0]`.
     pub(crate) info: [u32; 4],
-    /// Births this upload, `dts` in use.
     pub(crate) counts: [u32; 4],
 }
 
 impl GpuEmitter {
-    /// `emitter`'s look and motion under `frame` (its `gpu_space`: identity for a
-    /// `World` emitter), lit by `light`; the counts are the caller's.
     pub(crate) fn new(emitter: &ParticleEmitterComponent, frame: Mat4, light: [f32; 4]) -> Self {
         let render = &emitter.render;
         let book = &render.flipbook;
-        // Gravity is a world acceleration: a `Local` emitter's particles are stored
-        // under `frame`, so it turns (and scales) into that space.
         let gravity = frame
             .inverse()
             .transform_vector3(emitter.gravity)
@@ -133,8 +112,6 @@ impl GpuEmitter {
     }
 }
 
-/// `emitter`'s over-life curves sampled `LUT_SIZE` times over life: row 0 the size
-/// multiplier, drag and spin (degrees/second), row 1 the colour gradient.
 pub(crate) fn bake_lut(emitter: &ParticleEmitterComponent) -> Vec<[f32; 4]> {
     let at = |i: usize| i as f32 / (LUT_SIZE - 1) as f32;
     let curves = (0..LUT_SIZE).map(|i| {

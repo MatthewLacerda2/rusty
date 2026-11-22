@@ -1,10 +1,3 @@
-//! The `occlusion` stage (#1963, the [module docs](super)): one camera's two
-//! phases recorded into the camera's encoder (`CameraCtx::commands`), and timed whole or, on a
-//! timed frame, by part (#2401): the select, phase one's depth draw, the
-//! pyramid, the instance test and compaction, and the cluster cull, each its own
-//! GPU pair (`gpu.occlusion.<part>`) and CPU lap (`render.occlusion.<part>`); the
-//! cluster cull's GPU pair is three, one per dispatch kind (#2406).
-
 use super::clusters::plan::Plan;
 use super::clusters::ClusterDraws;
 use super::cull::CameraCull;
@@ -16,8 +9,6 @@ use crate::timing::GpuPart;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
-    /// The `occlusion` stage: cull this camera's opaque instances by the GPU's
-    /// depth pyramid, leaving the draws its passes make in `ctx.solids.culled`.
     pub(crate) fn cull_by_hiz(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let idx = ctx.uniform.stack[0] as usize;
         let Some(n) = self.hiz_instances(view, ctx, idx) else {
@@ -31,12 +22,7 @@ impl Renderer {
         let groups = cam.groups.value().expect("bound by prepare_cull");
         let opaque = &ctx.solids.draws.opaque;
         let batches = opaque.len() as u32;
-        // Before the timer lends out its pairs: phase one draws through this group.
         self.update_global_bind_group();
-        // The stage records into the camera's encoder. A timed frame records each part
-        // in a pass and pair of its own (#2401), since a pair cannot open and
-        // close inside a pass; any other frame takes no pair, so it records the
-        // parts after phase one in one pass (#2327).
         let (timer, split) = (&self.gpu_timer, self.gpu_timer.splits());
         let pair = |part| split.then(|| timer.part_compute_writes(part)).flatten();
         let open = pair(GpuPart::OcclusionSelect);
@@ -49,7 +35,6 @@ impl Renderer {
         drop(select);
         self.lap(lap_of(GpuPart::OcclusionSelect));
         let phase_one = split.then(|| timer.part_writes(GpuPart::OcclusionPhaseOne));
-        // Phase one clears the depth: the prepass then keeps it (#2336).
         let phase_one = ("Hi-Z Phase One", phase_one.flatten(), CLEAR);
         let solids = (opaque, Some(&first));
         self.record_depth(encoder, &view.depth_view, solids, phase_one);
@@ -59,14 +44,12 @@ impl Renderer {
         let at = (&view.depth_view, ctx.view_proj);
         let cull = (&mut *cam, &mut *pyramid, &plan);
         last.clusters = self.record_cull(encoder, cull, at, (n, batches, split));
-        // Built only for a read that goes: one is copied while none is in flight.
         if cam.counter.idle() {
             let clustered = last.clusters.as_ref().map_or(&[][..], |c| &c.draws[..]);
             let reading = Layout::of(opaque, clustered, plan.jobs.len());
             cam.copy_counts(&self.device, encoder, reading);
         }
         self.lap(lap_of(GpuPart::OcclusionTest));
-        // Mapped once the camera's commands are submitted (#2353).
         cam.counter.request(n, &mut ctx.commands);
         let tested = plan.tested;
         cam.clusters.counter.request(tested, &mut ctx.commands);
@@ -79,12 +62,6 @@ impl Renderer {
         self.lap("occlusion.record");
     }
 
-    /// How many of camera `idx`'s instances its stage culls; `None` when it is
-    /// drawn whole, `ctx.solids.culled` left `None`. Under the instance floor,
-    /// or with its flag off, a camera holds nothing new here (#2338), and a
-    /// read it left in flight is dropped: its first frame back must not report
-    /// it. Under the floor it is [`floored`](crate::draw::resources::SolidResources::floored):
-    /// its forward pass is still primed, by a prepass of its few batches.
     fn hiz_instances(&self, view: &mut RenderView, ctx: &mut CameraCtx, idx: usize) -> Option<u32> {
         (ctx.solids.culled, ctx.solids.floored) = (None, false);
         let n = ctx.solids.draws.opaque.last().map(|b| b.instances.end);
@@ -99,12 +76,6 @@ impl Renderer {
         None
     }
 
-    /// Record everything after phase one: the pyramid over `depth`, the test,
-    /// the compaction and `plan`'s cluster cull. When `split` (the stage's one
-    /// read of `GpuTimer::splits`) in one pass per part, each its own pair (#2401);
-    /// otherwise in one compute pass (#2327), wgpu ordering the dispatches
-    /// inside it, each reading what the one before wrote.
-    /// Laps the CPU's parts. Returns the clustered batches' draws.
     fn record_cull(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -130,7 +101,6 @@ impl Renderer {
                 GpuPart::OcclusionSelect | GpuPart::OcclusionPhaseOne => {
                     unreachable!("recorded by `cull_by_hiz` before phase one ends")
                 }
-                // The cluster cull whole, or one of its dispatch kinds.
                 cluster @ (GpuPart::OcclusionClusters
                 | GpuPart::OcclusionClustersTest
                 | GpuPart::OcclusionClustersScan
@@ -163,16 +133,11 @@ impl Renderer {
 }
 
 impl CameraCull {
-    /// Drop both counters' reads in flight, for a frame this camera skips.
     fn forget_reads(&mut self) {
         self.counter.forget();
         self.clusters.counter.forget();
     }
 
-    /// Copy what its final draws, its late set (#2336), phase one and its
-    /// clustered draws drew, laid out as `reading` says, in one read back
-    /// ([`Layout::read`], #2387), kept with it while that read is in flight.
-    /// Called only while [`Counter::idle`](super::counters::Counter::idle).
     fn copy_counts(
         &mut self,
         device: &wgpu::Device,
@@ -189,10 +154,8 @@ impl CameraCull {
     }
 }
 
-/// Phase one's depth load: cleared to the far plane.
 const CLEAR: wgpu::LoadOp<f32> = wgpu::LoadOp::Clear(1.0);
 
-/// A compute pass of `encoder`, labelled, its pair's `writes` when timed.
 fn begin(
     encoder: &mut wgpu::CommandEncoder,
     label: &'static str,
@@ -205,16 +168,8 @@ fn begin(
     encoder.counted_compute_pass(&desc).forget_lifetime()
 }
 
-/// The stage's CPU lap before its parts: making room for the camera (and the
-/// pyramid's allocation on a resize) and collecting last frame's counters, kept
-/// apart so a resize spike is never read as a part's.
 pub(super) const HOLD_LAP: &str = "occlusion.hold";
 
-/// The CPU lap a part of the stage is timed in, and its pass's label when it
-/// is a pass of its own: `render.occlusion.<part>` in the bench (#2401). The
-/// CPU parts are the work for each: `test` holds packing the instances' bounds
-/// and copying the verdict count, `clusters` planning, uploading and copying
-/// the cluster cull's, and `select` the uploads and binds before its pass.
 pub(super) fn lap_of(part: GpuPart) -> &'static str {
     match part {
         GpuPart::OcclusionSelect => "occlusion.select",
@@ -228,17 +183,12 @@ pub(super) fn lap_of(part: GpuPart) -> &'static str {
     }
 }
 
-/// The cluster cull's three stages, in the order they run, each a sub-part of
-/// `gpu.occlusion.clusters` on a timed frame (#2406).
 pub(super) const CLUSTER_STEPS: [GpuPart; 3] = [
     GpuPart::OcclusionClustersTest,
     GpuPart::OcclusionClustersScan,
     GpuPart::OcclusionClustersCopy,
 ];
 
-/// The cluster cull's parts: none without a clustered batch; untimed, one, its
-/// three stages in turn; timed, a pass per stage. Either way one test, one scan
-/// and one copy dispatch for the frame (`clusters::record`, #2417).
 fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
     match (clustered, split) {
         (false, _) => &[],
@@ -247,8 +197,6 @@ fn cluster_parts(clustered: bool, split: bool) -> &'static [GpuPart] {
     }
 }
 
-/// The dispatch kinds the cluster cull's `part` records: all three for the
-/// part itself, else the one it names; none for a part outside the cull.
 fn steps_of(part: GpuPart) -> &'static [GpuPart] {
     match part {
         GpuPart::OcclusionClusters => &CLUSTER_STEPS,
@@ -262,7 +210,6 @@ fn steps_of(part: GpuPart) -> &'static [GpuPart] {
     }
 }
 
-/// A timed part's pass label: its lap's, but a cluster cull dispatch's own.
 fn label_of(part: GpuPart) -> &'static str {
     match part {
         GpuPart::OcclusionClustersTest => "occlusion.clusters_test",
@@ -272,7 +219,6 @@ fn label_of(part: GpuPart) -> &'static str {
     }
 }
 
-/// One dispatch of `pipeline` over `group` in `pass`, a thread per one of `count`.
 fn dispatch(
     pass: &mut wgpu::ComputePass,
     (pipeline, group): (&crate::gpu::pipelines::LazyCompute, &wgpu::BindGroup),

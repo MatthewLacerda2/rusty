@@ -1,8 +1,3 @@
-//! The light volume's PVS verdict (#1714, part 4), adapter-free: a baked caster its
-//! light's row hides is dropped and counted once per entity, a two-sided one and a
-//! volume with no row keep it, the frustum and size verdicts come first, and a
-//! non-resident occluder opens the volume.
-
 use glam::camera::rh::proj::directx;
 use glam::{Mat4, Vec3};
 
@@ -14,7 +9,6 @@ use crate::gpu::pipelines::winding::Facing;
 use crate::scene::occlusion_fixture::{baked, nearest, ROOM_1};
 use crate::scene::{MeshHandle, OcclusionBinding};
 
-/// Two runs of entity `id` at `at`, small or two-sided as said.
 fn runs(id: u32, at: Vec3, small: bool, two_sided: bool) -> [Candidate; 2] {
     [0, 36].map(|start| Candidate {
         id,
@@ -63,13 +57,10 @@ fn a_hidden_caster_is_dropped_once_per_entity_unless_two_sided_or_unrowed() {
     let (kept, culls) = take(&both, lit);
     assert_eq!(kept, 2, "only the near prop's two runs");
     assert_eq!((culls.tested, culls.occlusion), (2, 1), "{culls:?}");
-    // No row (a cascade, a shadowmasked tile): nothing culled by occlusion.
     let (kept, culls) = take(&both, LightVolume::open(everything));
     assert_eq!((kept, culls.occlusion), (4, 0));
-    // Two-sided: its back faces cast, which the bake never aims at.
     let (kept, culls) = take(&runs(far, far_at, false, true), lit);
     assert_eq!((kept, culls.occlusion), (2, 0));
-    // Already culled as small: counted there, not twice.
     let (kept, culls) = take(&runs(far, far_at, true, false), lit);
     assert_eq!((kept, culls.size, culls.occlusion), (0, 1, 0));
 }

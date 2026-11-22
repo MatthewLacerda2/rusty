@@ -1,8 +1,3 @@
-//! The selection outline is a ring around where the selection is drawn (#1142): it
-//! follows the entity's world matrix, so a child of a moved, turned parent is
-//! outlined in place, and a mirrored selection is ringed the same as a plain one
-//! (the mask culls no faces), never filled. Skips with no adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -11,8 +6,6 @@ use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 64;
 
-/// A box parented under a moved, turned pivot, selected, mirrored along X when
-/// `mirrored`. Returns the scene and the box's world centre.
 pub(super) fn selected_child(mirrored: bool) -> (Scene, Vec3) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -34,12 +27,10 @@ pub(super) fn selected_child(mirrored: bool) -> (Scene, Vec3) {
     (scene, centre)
 }
 
-/// The editor frame looking down -Z at `centre` from 3 units away, as RGBA8.
 pub(super) fn frame(r: &mut Renderer, scene: &Scene, centre: Vec3) -> Vec<u8> {
     frame_from(r, scene, centre, 3.0)
 }
 
-/// The editor frame looking down -Z at `centre` from `distance` away, as RGBA8.
 pub(super) fn frame_from(r: &mut Renderer, scene: &Scene, centre: Vec3, distance: f32) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -49,13 +40,10 @@ pub(super) fn frame_from(r: &mut Renderer, scene: &Scene, centre: Vec3, distance
     readback::read_texture_rgba8(&r.device, &r.queue, target, RES, RES)
 }
 
-/// The outline's orange: red high, green half, blue none.
 pub(super) fn is_outline(p: &[u8]) -> bool {
     p[0] > 180 && (60..200).contains(&p[1]) && p[2] < 80
 }
 
-/// (outline pixel count, their centroid, whether the pixel at that centroid is
-/// outline: inside a ring it is the selection, never the ring).
 pub(super) fn outline_stats(px: &[u8]) -> (usize, [f32; 2], bool) {
     let hits: Vec<[f32; 2]> = px
         .chunks(4)

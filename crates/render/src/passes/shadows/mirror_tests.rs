@@ -1,11 +1,3 @@
-//! A mirrored caster casts the shadow its unmirrored twin does (#1134). The depth
-//! pass culls back faces, and a negative world scale reverses a mesh's winding, so
-//! a mirrored caster used to store its far side, or nothing: a one-sided `Plane`
-//! turned inside-out by `scale.x < 0` cast no shadow at all. Checked for the sun's
-//! cascades and the spot/point atlas, which share the pipelines, and for a Cutout
-//! card, whose clipped caster has a mirrored pipeline of its own. Skips with no
-//! adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
@@ -14,8 +6,6 @@ use rusty_components::RenderMode;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// A 6 x 6 one-sided `Plane` at y = 3, mirrored along X when `mirrored`; with
-/// `cutout`, a solid Cutout material, so its shadow takes the clip pipeline (#648).
 fn card(scene: &mut Scene, mirrored: bool, cutout: bool) {
     let plane = create_entity(scene, "Card", Some(Primitive::Plane));
     let sign = if mirrored { -1.0 } else { 1.0 };
@@ -29,8 +19,6 @@ fn card(scene: &mut Scene, mirrored: bool, cutout: bool) {
     }
 }
 
-/// The ground's brightness under each half of [`card`] (none for `None`), lit by
-/// [`slab_yard`]'s sun or, with `spot`, by a spotlight overhead alone.
 fn shade(r: &mut Renderer, mirrored: Option<bool>, spot: bool, cutout: bool) -> [f32; 2] {
     let mut scene = if spot { spot_yard() } else { sun_yard() };
     if let Some(mirrored) = mirrored {
@@ -39,14 +27,12 @@ fn shade(r: &mut Renderer, mirrored: Option<bool>, spot: bool, cutout: bool) -> 
     ground_halves(r, &scene)
 }
 
-/// [`slab_yard`] without its slab: ground under a high sun.
 pub(super) fn sun_yard() -> Scene {
     let (mut scene, slab) = slab_yard(None);
     scene.world.set_active(slab, false);
     scene
 }
 
-/// Ground in the dark, under one shadowing spotlight pointing down from y = 6.
 pub(super) fn spot_yard() -> Scene {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);
@@ -65,7 +51,6 @@ pub(super) fn spot_yard() -> Scene {
     scene
 }
 
-/// The mirrored card shades the ground as the unmirrored one does.
 fn assert_twins(r: &mut Renderer, spot: bool, cutout: bool) {
     let open = shade(r, None, spot, cutout);
     let plain = shade(r, Some(false), spot, cutout);
@@ -97,7 +82,6 @@ fn gpu_a_mirrored_plane_casts_the_spot_shadow_its_twin_does() {
     assert_twins(&mut r, true, false);
 }
 
-/// The clipped arm: a Cutout card's mirrored shadow takes the mirrored clip pipeline.
 #[test]
 fn gpu_a_mirrored_cutout_plane_casts_the_shadow_its_twin_does() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {

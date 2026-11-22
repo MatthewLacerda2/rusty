@@ -1,11 +1,3 @@
-//! A sweep's caster data on the GPU: the per-caster array `shader.wgsl`'s shadow stage
-//! indexes by instance, the joint array its skinned casters' palettes live in (#599),
-//! and the material records its clipped draws read through `material()` (#1616), as
-//! Unity's ShadowCaster pass reads the material: a surface variant's vertex blocks
-//! and cut run in `vs_shadow` / `fs_shadow_cut` against the record their forward draw
-//! reads. Each record has a per-draw uniform of its own (`draw.material` its index,
-//! the rest unread by the shadow stage), picked by dynamic offset.
-
 use crate::gpu::draw_buffers::{
     joint_array_bytes, uniform_array_bytes, JointMatrix, UNIFORM_STRIDE,
 };
@@ -19,11 +11,6 @@ use crate::passes::shadows::layouts::{
 use crate::scene::SlotTable;
 use crate::{DrawUniform, MaterialData};
 
-/// One caster as `shader.wgsl`'s `Caster` reads it: world matrix, where its palette
-/// starts in the joint array (0 — the identity — for an unskinned mesh), and its
-/// cutout alpha test (#648; a cutoff of 0 clips nothing) at the texels its material's
-/// mapping terms (`terms`) read (#1594). The mapping rides the instance, as the cutoff does, so
-/// casters that differ only in it still share one draw and each clips by its own.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(in crate::passes::shadows) struct CasterData {
@@ -36,7 +23,6 @@ pub(in crate::passes::shadows) struct CasterData {
 }
 
 impl CasterData {
-    /// A caster whose shadow is not alpha-tested; [`Self::cutout`] adds the test.
     pub fn new(model: glam::Mat4, bone_base: u32) -> Self {
         Self {
             model: model.to_cols_array(),
@@ -48,9 +34,6 @@ impl CasterData {
         }
     }
 
-    /// This caster, its shadow clipped where its albedo's alpha (when textured) is
-    /// below the cutoff — a Cutout material's test (#242, #648), read through its
-    /// mapping (#1594).
     pub fn cutout(self, cut: Cutout) -> Self {
         Self {
             alpha_cutoff: cut.cutoff,
@@ -61,19 +44,12 @@ impl CasterData {
     }
 }
 
-/// A sweep's distinct material records: every variant clip's record, by its slot of
-/// the material table (#1706), and slot 0, the flat one that plain draws and a
-/// cutout's standard clip (which reads its test per caster) bind and never read.
-/// Each is read from the table as it is now, so a record-only edit's cut follows
-/// with no caster re-derived.
 pub(in crate::passes::shadows) struct CasterRecords {
-    /// The slots read, sorted, each once.
     slots: Vec<u32>,
     records: Vec<MaterialData>,
 }
 
 impl CasterRecords {
-    /// The records `clips` read, beside the flat one, as `table` holds them.
     pub(in crate::passes::shadows) fn new<'a>(
         clips: impl IntoIterator<Item = Option<&'a Clip>>,
         table: &SlotTable<MaterialData>,
@@ -86,14 +62,12 @@ impl CasterRecords {
         Self { slots, records }
     }
 
-    /// The index of the record `clip` reads (the flat one when it reads none).
     pub(in crate::passes::shadows) fn index(&self, clip: Option<&Clip>) -> u32 {
         let slot = clip.and_then(|c| c.record).unwrap_or(FLAT);
         let found = self.slots.binary_search(&slot);
         found.expect("built from every clip its draws name") as u32
     }
 
-    /// One per-draw uniform per record, naming it.
     fn draws(&self) -> Vec<DrawUniform> {
         let draw = |material| DrawUniform {
             model_matrix: glam::Mat4::IDENTITY.to_cols_array(),
@@ -105,11 +79,8 @@ impl CasterRecords {
     }
 }
 
-/// The material table's slot 0: the flat record a draw that reads none binds.
 const FLAT: u32 = 0;
 
-/// The caster, joint and record arrays and the bind group that exposes them to the
-/// shadow stage.
 pub(in crate::passes::shadows) struct CasterBuffer {
     casters: GrowBuffer,
     joints: GrowBuffer,
@@ -118,7 +89,6 @@ pub(in crate::passes::shadows) struct CasterBuffer {
     pub(super) bind_group: wgpu::BindGroup,
 }
 
-/// The sweep's packed data, as [`CasterBuffer::upload`] takes it.
 pub(in crate::passes::shadows) struct CasterUpload<'a> {
     pub casters: &'a [CasterData],
     pub joints: &'a [JointMatrix],
@@ -145,7 +115,6 @@ impl CasterBuffer {
         }
     }
 
-    /// Upload the sweep's data, rebuilding the bind group if a buffer had to grow.
     pub(super) fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -170,7 +139,6 @@ impl CasterBuffer {
         }
     }
 
-    /// The dynamic offset selecting record `record`'s per-draw uniform.
     pub(super) fn offsets(record: u32) -> [u32; 1] {
         [record * UNIFORM_STRIDE as u32]
     }
@@ -194,7 +162,6 @@ fn caster_group(
             whole(CASTERS_BINDING, casters),
             whole(JOINTS_BINDING, joints),
             whole(MATERIALS_BINDING, materials),
-            // One uniform's width, so the dynamic offset slides across the array.
             wgpu::BindGroupEntry {
                 binding: DRAW_BINDING,
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {

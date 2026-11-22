@@ -1,18 +1,11 @@
-//! A frame whose batch count grows past its args buffer's room while its instance
-//! count stays in its own (#2021): the cached draws must follow the grown args
-//! buffer, or the 205th indirect draw overruns the old 4096-byte one.
-
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
-/// The layer frame 1's camera leaves out.
 const LATER: u8 = 3;
 
-/// 400 boxes in front of the camera, of 250 colours: 300 in the first 200 on
-/// the default layer, then 100 in the last 50 on [`LATER`].
 fn boxes() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -47,9 +40,6 @@ fn gpu_more_batches_in_the_same_instance_room_draw_from_the_grown_args() {
     assert_eq!(view.hiz.cameras[0].drawn_batches, 200, "frame 1's batches");
     let args = view.hiz.cameras[0].final_args().size();
     assert_eq!(args, 8192, "frame 1's args, the final and late sets'");
-    // The same scene and tables: 250 batches outgrow 8192 bytes of args (two
-    // lists, #2336), while 400 instances stay in the 16384 bytes of kept
-    // instances (two lists) 300 took.
     cam.culling_mask = u32::MAX;
     let (_, c) = shot(&mut r, &mut view, &scene, &cam);
     assert_eq!(view.hiz.cameras[0].drawn_batches, 250, "frame 2's batches");

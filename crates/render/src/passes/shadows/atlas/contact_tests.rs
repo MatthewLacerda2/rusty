@@ -1,16 +1,9 @@
-//! The atlas's shadows stay attached to their casters too (#665): the spot and point
-//! tiles draw through the cascades' depth pipelines, so a unit box resting on the
-//! floor under a shadowing spot or point light darkens the floor right up to its
-//! base. Skips with no adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::passes::shadows::contact_tests::{brightness, looking, RES};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// A dark scene: the floor (top at y = 0), a unit box resting on it at the origin,
-/// and a shadowing `kind` light up and to its -X side, aimed past it.
 fn lamp_yard(kind: Primitive, floor: Primitive) -> Scene {
     let mut scene = Scene::new();
     crate::test_gpu::black_sky(&mut scene);

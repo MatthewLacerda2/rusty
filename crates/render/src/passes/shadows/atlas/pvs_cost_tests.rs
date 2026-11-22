@@ -1,12 +1,3 @@
-//! What a light's PVS mask saves (#1714, part 4), measured by hand in a release
-//! build: `cargo nextest run --release --features dev --run-ignored only -E
-//! 'test(gpu_shadow_pvs_cost)' --no-capture` (the Dust2-sized bake takes some
-//! twelve minutes on 4 threads: past nextest's five, so give the run a config with
-//! a longer `slow-timeout`). A measurement, never a gate. On the bench levels,
-//! three shadowed lamps a room, each swinging a little every frame so every tile
-//! re-bakes, then still: casters drawn per tile and the gather's CPU time, with the
-//! PVS and without it.
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -17,8 +8,6 @@ use rusty_lighting::occlusion::{bake_occlusion, bench::level::rooms};
 use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// The bench level, `n × n` rooms, with three shadowed lamps of `range` in each
-/// ground room.
 pub(super) fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
     let mut scene = rooms(n);
     let mut lamps = Vec::new();
@@ -40,8 +29,6 @@ pub(super) fn lit(n: usize, range: f32) -> (Scene, Vec<(u32, Vec3)>) {
     (scene, lamps)
 }
 
-/// `frames` frames of `scene` from a ground room's corner, the lamps swung by
-/// `swing` metres each frame; the counters summed.
 fn run(r: &mut Renderer, scene: &mut Scene, lamps: &[(u32, Vec3)], swing: f32) -> RenderCounters {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -80,7 +67,6 @@ fn gpu_shadow_pvs_cost() {
             .0
             .expect("the level occludes");
         let (bake, data) = (t.elapsed().as_secs_f64(), Arc::new(data));
-        // A lamp's range is no part of what the bake reads: one bake serves both.
         for range in [9.0, 18.0] {
             let ((mut culled, lamps), (mut open, _)) = (lit(n, range), lit(n, range));
             *culled.occlusion = Some(Arc::clone(&data));
@@ -97,8 +83,6 @@ fn gpu_shadow_pvs_cost() {
     }
 }
 
-/// One run's line: tiles a frame, and per re-baked tile the casters tested, drawn
-/// and PVS-culled, and the gather's CPU time a frame (ten frames summed in `c`).
 fn report(head: &str, c: &RenderCounters) {
     let rebaked = c.shadow_atlas_rebaked.max(1) as f32;
     let culled = c.shadow_frustum_culled + c.shadow_size_culled + c.shadow_occlusion_culled;

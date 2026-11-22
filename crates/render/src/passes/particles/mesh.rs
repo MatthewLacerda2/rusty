@@ -1,14 +1,6 @@
-//! crates/render/src/passes/particles/mesh.rs — mesh particles (#440): shell casings,
-//! debris, glass shards.
-//!
-//! A mesh particle is drawn exactly like a solid entity carrying that mesh and
-//! material — same forward shader, PBR, probe ambient, shadows received, fog — by
-//! handing the camera's solid list one [`DrawItem`] per particle. Particles of one
-//! emitter share a mesh + material, so the batcher folds them into one instanced
-//! draw. The particle's size scales the mesh uniformly and its `rotation` tumbles
-//! it about its own random axis. The emitter's colour and gradient do not apply:
-//! the look is the material's (a Transparent material sorts with the glass).
-//! Mesh particles cast no shadows.
+//! Mesh particles draw as solid entities (forward shader, shadows received, fog), one DrawItem each,
+//! so a mesh and material batch into one instanced draw. Emitter colour and gradient do not apply;
+//! they cast no shadows and take no decal stamp. Placed unmirrored: the material's face picks the cull.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -26,30 +18,22 @@ use rusty_scene::create::{primitive_mesh_component, Primitive};
 use rusty_scene::serialize::asset_mesh_component;
 use rusty_scene::{Camera, MeshComponent, Scene};
 
-/// The camera's opaque items and its (unsorted) translucent items with their
-/// priority and depth.
 type SolidLists<'a> = (
     &'a mut Vec<DrawItem>,
     &'a mut Vec<(DrawItem, TransparentOrder)>,
 );
 
-/// A mesh named by one string: a primitive (`"Box"`) or a model reference.
 pub(super) fn mesh_for_spec(spec: &str) -> MeshComponent {
     Primitive::parse(spec)
         .and_then(primitive_mesh_component)
         .unwrap_or_else(|| asset_mesh_component(spec))
 }
 
-/// A mesh particle's world matrix: uniform `size`, turned by `orientation`
-/// ([`Particle::orientation`](rusty_components::Particle::orientation)).
 pub(crate) fn mesh_particle_matrix(position: Vec3, size: f32, orientation: Quat) -> Mat4 {
     Mat4::from_scale_rotation_translation(Vec3::splat(size), orientation, position)
 }
 
 impl Renderer {
-    /// Add every visible mesh emitter's particles to the camera's solid lists: opaque
-    /// casings batch with the opaque list, glass shards sort with the translucent one.
-    /// Returns how many were added (the frame counters' particles, not entities).
     pub(crate) fn push_mesh_particles(
         &mut self,
         scene: &Scene,
@@ -63,8 +47,6 @@ impl Renderer {
             if emitter.render.mode != ParticleRenderMode::Mesh {
                 continue;
             }
-            // Every mesh emitter's mesh is the scene's, drawn this frame or not, as
-            // an inactive entity's is: a load keeps it (`scene::residency`).
             self.note_emitter_mesh(scene, &emitter);
             if emitter.runtime.particles.is_empty()
                 || !scene.world.is_active_in_hierarchy(id)
@@ -78,7 +60,6 @@ impl Renderer {
             for p in &emitter.runtime.particles {
                 let model = mesh_particle_matrix(p.position, emitter.size_of(p), p.orientation());
                 let (use_sh, sh) = probe_sh_at(scene, p.position);
-                // A transient object-table slot for this camera's draws (#1706).
                 let object = self.retained.objects.push_transient(ObjectData {
                     model_matrix: model.to_cols_array(),
                     use_sh,
@@ -89,7 +70,6 @@ impl Renderer {
                 let item = DrawItem {
                     key,
                     instance: InstanceData {
-                        // Picked per particle like any object (#1206).
                         reflection_probe: self.reflection_probes.probe_for(p.position),
                         ..InstanceData::of(object)
                     },
@@ -108,7 +88,6 @@ impl Renderer {
         (opaque.len() + transparent.len() - before) as u32
     }
 
-    /// Load mesh `emitter`'s mesh, and note it as used by `scene`.
     fn note_emitter_mesh(&mut self, scene: &Scene, emitter: &ParticleEmitterComponent) {
         if let Some((mesh, _)) = self.particle_mesh(emitter) {
             let handle = self.retained.meshes.intern(&mesh);
@@ -116,11 +95,6 @@ impl Renderer {
         }
     }
 
-    /// What every particle of a mesh emitter shares: the batch key (pipeline — the
-    /// material's surface shader, #396 — mesh and its whole index run, material bind
-    /// group, per-draw uniform) and, when the material is translucent, its sorting
-    /// priority (#2039). `None` when
-    /// the mesh is unset or fails to load.
     fn mesh_emitter_key(
         &mut self,
         scene: &Scene,
@@ -143,14 +117,11 @@ impl Renderer {
         }
         let shader = material.and_then(|m| m.shader.as_deref());
         let pipeline = self.surface_shaders.pipeline_id(&self.device, shader);
-        // Debris flies through decal boxes; it never takes their stamp (#638).
         let (record, traits) = self.material_record(scene.id(), entry, Variant::Debris);
-        // Particles are placed unmirrored: the material's face alone picks the cull.
         let mut key = BatchKey {
             pipeline,
             facing: Facing::of_material(Mat4::IDENTITY, material),
             mesh: self.retained.meshes.intern(&mesh),
-            // The emitter names one material: the whole mesh is one run.
             indices: (0..num_indices).into(),
             material: self.material_index(scene.id(), entry, pipeline, None),
             record,

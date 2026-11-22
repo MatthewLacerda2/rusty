@@ -1,7 +1,3 @@
-//! A material that moves its vertices is never culled by its bounds (#1963): a
-//! `vertex_waves` plane's box is zero metres tall, so behind a low rim the box is
-//! hidden while the swells' crests rise above it, and the surface must still draw.
-
 use glam::Vec3;
 
 use super::gpu_tests::{drawn, offscreen, shot, H, W};
@@ -13,10 +9,8 @@ use rusty_scene::{Camera, Scene};
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// The variant's baked files, removed when the test ends, pass or fail.
 pub(super) struct Baked(pub(super) String);
 
-/// A `vertex_waves` variant swelling 6 m, baked under a name of `tag`'s.
 pub(super) fn waves(tag: &str) -> Baked {
     let name = format!("test_hiz_{tag}_{}", std::process::id());
     let params = [("amplitude".to_string(), ParamValue::Scalar(6.0))];
@@ -40,9 +34,6 @@ impl Drop for Baked {
     }
 }
 
-/// A rim 2 m tall at z = 0 and, 4 m behind it, a 2 m water plane at y = 0 drawn
-/// with `water` (its swells rise metres over the rim), or none when `None`. The
-/// plane is narrow, so its flat box is tested at a fine pyramid level, all rim.
 fn pool(water: Option<&str>) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -52,7 +43,7 @@ fn pool(water: Option<&str>) -> Scene {
         let id = create_entity(&mut scene, "Water", Some(Primitive::Plane));
         set_subdivisions(&mut scene.world.mesh_mut(id).unwrap(), 32).unwrap();
         let mut t = scene.world.transform_mut(id).unwrap();
-        (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(0.2, 1.0, 0.2)); // a 10 m Plane, made 2 m
+        (t.position, t.scale) = (Vec3::new(0.0, 0.0, -4.0), Vec3::new(0.2, 1.0, 0.2));
         drop(t);
         let key = scene.ensure_material_key(id).unwrap();
         scene.materials.get_mut(&key).unwrap().shader =
@@ -68,7 +59,6 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     let Some(mut r) = crate::test_gpu::culling::culling_or_skip(W, H) else {
         return;
     };
-    // Low, well under the rim's top: the flat box behind it is hidden.
     let cam = Camera::new(Vec3::new(0.0, 0.5, 6.0), -90.0, 0.0);
     let (water, dry) = (pool(Some(&name)), pool(None));
     let mut view = offscreen(&r);
@@ -79,7 +69,6 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     }
     let on_drawn = drawn(&r, &view);
     assert!(on != empty, "the crests show over the rim");
-    // The same plane drawn flat is hidden: the scene does test the cull.
     let flat = pool(Some(""));
     for _ in 0..2 {
         shot(&mut r, &mut view, &flat, &cam);
@@ -96,10 +85,6 @@ fn gpu_a_waved_plane_behind_a_rim_still_draws_its_crests() {
     );
 }
 
-/// What a mismatch of `on` and `off` (with `empty`, the rim alone) says: how many
-/// pixels differ and where, whose they are (the plane's where `on` reads the rim
-/// alone and `off` does not: crests the cull hid; else something that is not the
-/// cull), what each batch drew through the cull, and both frames' counters.
 fn mismatch(px: &[&Vec<u8>; 3], drawn: &[u32], counts: [&RenderCounters; 2]) -> String {
     let [empty, on, off] = px;
     fn pixel(v: &[u8], i: usize) -> &[u8] {

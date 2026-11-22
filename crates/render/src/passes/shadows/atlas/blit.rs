@@ -1,25 +1,14 @@
-//! Copying and clearing one atlas tile by drawing (#694), `shadow_atlas.wgsl`.
-//!
-//! WebGPU copies depth only as whole subresources and `LoadOp::Clear` clears the
-//! whole attachment, so neither works on a tile. Instead a fullscreen triangle is
-//! drawn into the tile's viewport and writes `frag_depth`: the static atlas's texel
-//! for a copy, the far plane for a clear. Depth passes straight through (`Always`,
-//! no bias), so a copied tile is bit-identical to the static atlas it came from.
-
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::depth_entry;
 use crate::gpu::ops::CountedDevice as _;
 
-/// The two tile blits and the static atlas the copy reads.
 pub(super) struct TileBlit {
     copy: wgpu::RenderPipeline,
     clear: wgpu::RenderPipeline,
-    /// The static atlas, as `fs_copy` reads it.
     source: wgpu::BindGroup,
 }
 
 impl TileBlit {
-    /// Both blits over `shader`, the copy reading `static_view`.
     pub(super) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -37,8 +26,6 @@ impl TileBlit {
                 resource: wgpu::BindingResource::TextureView(static_view),
             }],
         });
-        // The clear binds nothing: it draws into the static atlas, which the copy's
-        // group samples, and a pass may not do both to one texture.
         let copy = pipeline(device, shader, &[&layout], "fs_copy");
         let clear = pipeline(device, shader, &[], "fs_clear");
         Self {
@@ -48,21 +35,18 @@ impl TileBlit {
         }
     }
 
-    /// Copy the static atlas into the pass's current viewport.
     pub(super) fn copy<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>) {
         pass.set_pipeline(&self.copy);
         pass.set_bind_group(crate::gpu::ONLY_GROUP, &self.source, &[]);
         pass.draw(0..3, 0..1);
     }
 
-    /// Reset the pass's current viewport to the far plane.
     pub(super) fn clear<'a>(&'a self, pass: &mut wgpu::RenderPass<'a>) {
         pass.set_pipeline(&self.clear);
         pass.draw(0..3, 0..1);
     }
 }
 
-/// A depth-only fullscreen pipeline writing `fs_entry`'s `frag_depth` unconditionally.
 fn pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

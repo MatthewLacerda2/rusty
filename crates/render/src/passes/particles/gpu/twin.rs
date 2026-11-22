@@ -1,9 +1,4 @@
-//! crates/render/src/passes/particles/gpu/twin.rs — the CPU twins of a
-//! GPU-simulated emitter's shaders (#2170): `cs_birth` ([`birth`]), `cs_step`
-//! ([`advance`], with its closed-form [`jump`]) and `vs_gpu` ([`sprite`]), step
-//! for step. The renderer
-//! never runs them (it always runs the compute pass: its other passes already need
-//! compute and vertex-stage storage); they are what the tests hold the shaders to.
+//! CPU twins of the shaders; the tests hold the shaders to them.
 
 use glam::{Mat4, Vec3, Vec4};
 
@@ -11,7 +6,6 @@ use super::record::{GpuBirth, GpuEmitter, GpuParticle, EMPTY, LUT_SIZE};
 use crate::passes::particles::instance::ParticleInstance;
 
 impl GpuParticle {
-    /// Normalised life in `[0, 1]`, as `Particle::life_t`.
     fn life_t(&self) -> f32 {
         if self.lifetime <= 0.0 {
             1.0
@@ -20,13 +14,11 @@ impl GpuParticle {
         }
     }
 
-    /// Whether the slot holds a live particle.
     pub(crate) fn alive(&self) -> bool {
         self.next != EMPTY
     }
 }
 
-/// The lookup table at `t` for `row`, linear between samples (`lut_at`).
 pub(crate) fn lut_at(lut: &[[f32; 4]], row: usize, t: f32) -> Vec4 {
     let x = t.clamp(0.0, 1.0) * (LUT_SIZE - 1) as f32;
     let i = (x.floor() as usize).min(LUT_SIZE - 2);
@@ -34,8 +26,6 @@ pub(crate) fn lut_at(lut: &[[f32; 4]], row: usize, t: f32) -> Vec4 {
     Vec4::from(lut[base + i]).lerp(Vec4::from(lut[base + i + 1]), x - i as f32)
 }
 
-/// `b` as `cs_birth` writes it into its slot when the window starts at step
-/// `first`: jumped to `first` by its own time when it is older.
 pub(crate) fn birth(b: &GpuBirth, first: u32, gravity: Vec3, lut: &[[f32; 4]]) -> GpuParticle {
     let mut p = b.particle;
     if p.alive() && p.next < first {
@@ -46,10 +36,6 @@ pub(crate) fn birth(b: &GpuBirth, first: u32, gravity: Vec3, lut: &[[f32; 4]]) -
     p
 }
 
-/// Move `p` up to step `goal` by the window `dts`, whose first is step `first`'s
-/// `dt`: the shader's `cs_step`, step for step. The steps older than the window,
-/// which took `jumped` seconds, are one closed-form [`jump`]; the window's own
-/// are taken one at a time, so the loop never runs more than `dts.len()` times.
 pub(crate) fn advance(
     p: &mut GpuParticle,
     (goal, first): (u32, u32),
@@ -86,15 +72,10 @@ pub(crate) fn advance(
     p.velocity = velocity.to_array();
 }
 
-/// `age < lifetime` failing, a NaN lifetime included, as on the CPU.
 fn is_dead(p: &GpuParticle) -> bool {
     p.age.partial_cmp(&p.lifetime) != Some(std::cmp::Ordering::Less)
 }
 
-/// `n` steps that took `span` seconds at once, the curves held where `p` is in
-/// its life: aged by `span`, moved by the sum of the step's geometric velocity
-/// series (`v ← (v + g·dt)·k`, `k` the drag factor) at the mean `dt` and of the
-/// positions it passes (the shader's `jump`).
 pub(crate) fn jump(p: &mut GpuParticle, n: u32, gravity: Vec3, lut: &[[f32; 4]], span: f32) {
     let curves = lut_at(lut, 0, p.life_t());
     let nf = n as f32;
@@ -122,8 +103,6 @@ pub(crate) fn jump(p: &mut GpuParticle, n: u32, gravity: Vec3, lut: &[[f32; 4]],
     p.age += span;
 }
 
-/// The sprite `p` draws as under `e` with `lut`, or `None` for an empty slot: the
-/// shader's `vs_gpu`, as one instance of the CPU pass.
 pub(crate) fn sprite(
     p: &GpuParticle,
     e: &GpuEmitter,
@@ -160,7 +139,6 @@ pub(crate) fn sprite(
     })
 }
 
-/// The flipbook frame `p` shows, as `Flipbook::frame_of`.
 fn frame_of(p: &GpuParticle, columns: f32, rows: f32, cycles: f32) -> u32 {
     let frames = (columns * rows) as u32;
     if frames <= 1 {

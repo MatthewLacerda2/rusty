@@ -1,6 +1,3 @@
-//! Construction of the renderer-wide SSAO resources: the bind-group layout, the
-//! occlusion, blur and upsample pipelines, and the white no-AO fallback.
-
 use super::{SsaoRenderer, Stage, AO_FORMAT};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
@@ -22,7 +19,6 @@ impl SsaoRenderer {
             bind_group_layouts: &[Some(&layout)],
             immediate_size: 0,
         });
-        // Built on the first frame a view runs AO (#985): most renderers never do.
         let pipeline = |stage: Stage| {
             let (shader, layout) = (shader.clone(), pipeline_layout.clone());
             LazyPipeline::new(device, move |device| {
@@ -45,13 +41,10 @@ impl SsaoRenderer {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.pipelines.iter()
     }
 
-    /// Record one fullscreen pass of `stage` over `group` into `target`, timed under
-    /// the stage's own entry.
     pub(super) fn fullscreen(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -80,8 +73,6 @@ impl SsaoRenderer {
         pass.draw(0..3, 0..1);
     }
 
-    /// A bind group over the SSAO layout: the view's uniform, its depth, and `raw` —
-    /// the occlusion the stage reads (the white fallback for the AO pass).
     pub(super) fn group(
         &self,
         device: &wgpu::Device,
@@ -110,8 +101,7 @@ impl SsaoRenderer {
     }
 }
 
-/// Uniform (every stage's params), the view's depth, and the occlusion a stage reads — all read
-/// with `textureLoad`, so no sampler.
+/// All read with `textureLoad`, so no sampler.
 fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("SSAO Layout"),
@@ -123,7 +113,6 @@ fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     })
 }
 
-/// The 1x1 white AO texture: "nothing occluded".
 fn white_texture(
     device: &wgpu::Device,
     (queue, staging): crate::gpu::ops::Writes,

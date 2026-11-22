@@ -1,6 +1,3 @@
-//! Writing one camera's GPU occlusion cull (#1963) into its buffers, and the bind
-//! groups `hiz.wgsl` reads them through.
-
 use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 use std::ops::Range;
 
@@ -12,7 +9,6 @@ use crate::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
 use crate::{InstanceData, Renderer};
 
-/// `hiz.wgsl`'s `Params`.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct Params {
@@ -24,8 +20,6 @@ pub(super) struct Params {
     _pad: [u32; 3],
 }
 
-/// The batches' runs and draws, as `hiz.wgsl`'s `Batch`.
-/// `clustered` says, per batch, whether its final draws are by cluster (#1968).
 fn pack_batches(batches: &OpaqueBatches, clustered: &[Option<Range<u32>>]) -> Vec<[u32; 8]> {
     let run = |(b, by_cluster): (&DrawBatch, &Option<Range<u32>>)| {
         let (first, count) = (b.instances.start, b.instances.len() as u32);
@@ -44,10 +38,6 @@ fn pack_batches(batches: &OpaqueBatches, clustered: &[Option<Range<u32>>]) -> Ve
     batches.iter().zip(clustered).map(run).collect()
 }
 
-/// Fill `tables.bounds` with each of `instances`' bounds, as `hiz.wgsl`'s
-/// `Bounds`: tested (`min.w` 1) when its object is among `tested`, by slot, and
-/// `tables.slots` with their object slots. Returns how many are tested. Reuses
-/// the tables' room, so a frame allocates nothing once they fit the scene.
 pub(super) fn pack_bounds(
     tables: &mut Tables,
     instances: &[InstanceData],
@@ -77,9 +67,6 @@ pub(super) fn pack_bounds(
 }
 
 impl Renderer {
-    /// Write `frame` and `cam`'s packed bounds into its buffers, and bind them
-    /// (`cam.groups`: the phase-one group, then the test and final group), rebuilt
-    /// only when one of those buffers or the pyramid was replaced.
     pub(super) fn upload_cull(
         &self,
         cam: &mut CameraCull,
@@ -104,7 +91,6 @@ impl Renderer {
         cam.hold(device, queue, frame.slots);
         cam.visible.reserve(device, 4 * u64::from(n));
         let args = ARGS * frame.batches.len() as u64;
-        // The final draws' buffers hold the late set's after them (#2336).
         for (k, lists) in [1, 2].into_iter().enumerate() {
             cam.kept[k].reserve(device, lists * 16 * u64::from(n));
             cam.args[k].reserve(device, lists * args);
@@ -117,7 +103,6 @@ impl Renderer {
         cam.groups = groups;
     }
 
-    /// The buffers `hiz.wgsl`'s group 0 binds for phase `k`, by binding.
     fn cull_buffers<'a>(&'a self, cam: &'a CameraCull, k: usize) -> [&'a wgpu::Buffer; 8] {
         [
             &cam.params,
@@ -131,8 +116,6 @@ impl Renderer {
         ]
     }
 
-    /// `hiz.wgsl`'s group 0 over `cam`'s buffers, writing phase `k`'s kept
-    /// instances and args (0: phase one, 1: the final draws).
     fn cull_group(
         &self,
         cam: &CameraCull,
@@ -159,18 +142,15 @@ impl Renderer {
     }
 }
 
-/// What one camera's cull uploads.
 pub(super) struct Frame<'a> {
     pub(super) view_proj: Mat4,
     pub(super) depth: (u32, u32),
     pub(super) levels: u32,
     pub(super) batches: &'a OpaqueBatches,
-    /// Per batch, the cluster draws standing for it (#1968).
     pub(super) clustered: &'a [Option<Range<u32>>],
     pub(super) slots: u32,
 }
 
-/// `hiz.wgsl`'s group 0.
 pub(super) fn layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     let compute = wgpu::ShaderStages::COMPUTE;
     let storage = |binding, read_only| wgpu::BindGroupLayoutEntry {

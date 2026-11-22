@@ -1,19 +1,3 @@
-//! crates/render/src/passes/transparent/mod.rs — the alpha-blended transparent solids pass (#242).
-//!
-//! Drawn after opaque solids + decals, before particles/post-FX. The draw list is the
-//! Transparent-material entities for one camera, already sorted by the
-//! `precreate_solid_resources` split: by their material's Sorting Priority, then
-//! back-to-front (#2039, `draw::batch::sort::transparent_order`), so `ALPHA_BLENDING`
-//! composites correctly (nearer glass over farther glass over the opaque world, and a
-//! higher priority over a lower one whatever their depths).
-//!
-//! It reuses the camera's instanced draw data the opaque pass binds (the per-draw
-//! group's frame buffers, the shared material group, #470) and the same shader; only the pipeline differs
-//! (`transparent_pipelines`: one per blend state, #1523; depth test on / write off). It LOADs the
-//! existing HDR colour + depth — never clears — so it layers onto the opaque image and
-//! is occluded by opaque depth without writing depth itself (overlapping translucent
-//! surfaces all blend rather than z-cull each other).
-
 mod depth_postpass;
 pub(crate) mod opaque_copy;
 
@@ -28,9 +12,6 @@ use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
-    /// Draw the camera's translucent solids into `view`'s HDR target. `items` is already
-    /// in sorting priority order, then back-to-front (farthest first, #2039); only neighbouring copies were merged (#470). No-op when there is nothing translucent,
-    /// so opaque-only scenes pay nothing (#242).
     pub(crate) fn draw_transparent(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -40,7 +21,6 @@ impl Renderer {
         if items.is_empty() {
             return;
         }
-        // TAA's reactive mask (#1845), where the view runs TAA.
         let reactive = view.post_fx.taa_reactive();
         let targets = taa::reactive::hdr_attachments(view);
         {
@@ -50,9 +30,6 @@ impl Renderer {
                 color_attachments: &targets,
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
-                    // Load the opaque depth so glass is occluded by solids in front,
-                    // but the transparent pipeline writes no depth (store keeps it as-is
-                    // for any later pass that reads it).
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Load,
                         store: wgpu::StoreOp::Store,
@@ -67,11 +44,6 @@ impl Renderer {
         }
     }
 
-    /// Record the sorted (priority, then back-to-front) transparent draws into `pass`: the global bind group
-    /// and `scene` (the scene group: the shadows, and the opaque copy when this camera made one,
-    /// #1523), then the same batch recording the opaque pass uses — each batch
-    /// binding the transparent pipeline of its material's shader (#396) and blend,
-    /// the one writing TAA's reactive mask too when `reactive` (#1845).
     fn record_transparent<'a>(
         &'a self,
         pass: &mut wgpu::RenderPass<'a>,

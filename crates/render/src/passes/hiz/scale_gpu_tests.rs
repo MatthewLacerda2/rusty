@@ -1,6 +1,3 @@
-//! GPU occlusion culling at its edges (#1963): an empty scene, a lone box, and a
-//! history that grows past its room.
-
 use glam::Vec3;
 
 use super::cull::CameraCull;
@@ -32,11 +29,10 @@ fn gpu_a_growing_history_keeps_its_verdicts_and_marks_only_new_slots_drawn() {
     };
     let mut cam = CameraCull::new(&r.device);
     cam.hold(&r.device, &r.queue, 4);
-    // The cull hid slot 1 last frame.
     r.queue
         .write_buffer(cam.history.buffer(), 4, bytemuck::bytes_of(&0u32));
     let before = cam.history.buffer().clone();
-    cam.hold(&r.device, &r.queue, 3000); // past the buffer's 1024 words
+    cam.hold(&r.device, &r.queue, 3000);
     assert_ne!(cam.history.buffer(), &before, "it grew");
     let history = words(&r, cam.history.buffer());
     assert_eq!(cam.slots(), 4096);
