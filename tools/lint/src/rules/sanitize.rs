@@ -1,5 +1,3 @@
-//! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
-
 use super::finding::Finding;
 use super::sanitize_rules::{resolved, unheld, Rule};
 use super::scan::Scan;
@@ -36,6 +34,8 @@ struct Setter {
     body: String,
 }
 
+/// Proves each float parameter reaches a helper, not that the helper's result is what is
+/// stored: `let _ = finite(v); c.a = v;` passes.
 pub fn check(path: &str, source: &str, test: &[bool], rules: &[Rule]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with(DIR) {
@@ -125,6 +125,7 @@ fn carries_float(ty: &str) -> bool {
     FLOATS.contains(&ty.rsplit("::").next().unwrap_or(ty))
 }
 
+/// A `->` in a type (a closure's) closes a `<` it never opened, so such a list splits wrong.
 pub(super) fn split_top(s: &str) -> Vec<&str> {
     let (mut depth, mut from, mut parts) = (0i32, 0, Vec::new());
     for (at, c) in s.char_indices() {

@@ -1,5 +1,3 @@
-//! message that is not a literal says why with `// lint: allow(log-tag) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;
@@ -8,6 +6,7 @@ pub const RULE: &str = "log-tag";
 
 const MACROS: &[&str] = &["warn!", "error!", "log!"];
 
+/// Lines past the call's own that its arguments may spread over and still be read.
 const SPREAD: usize = 6;
 
 pub fn check(path: &str, source: &str) -> Vec<Finding> {

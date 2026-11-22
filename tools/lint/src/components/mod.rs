@@ -16,6 +16,7 @@ const ADD_MENU: &str = "src/editor/inspector/components/add";
 const API_MOD: &str = "src/script/api/mod.rs";
 const DOCS: &str = "docs/api";
 
+/// Axes 2 to 4: axis 1, the registry row, is where components are discovered.
 const AXES: &[&str] = &["add_menu", "inspector", "api"];
 
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {

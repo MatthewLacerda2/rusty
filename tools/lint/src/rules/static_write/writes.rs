@@ -9,8 +9,10 @@ const WRITES: &[&str] = &[
     ".write()",
 ];
 
+/// What ends the `Result` a `.lock()` returns, leaving its guard.
 const GUARDS: &[&str] = &[".unwrap()", ".unwrap_or_else(", ".expect("];
 
+/// Prefixes of a guard's first writing call: `.push` covers `.push_str(` and `.push_back(`.
 const MUTATES: &[&str] = &[
     ".push",
     ".pop",

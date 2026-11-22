@@ -1,5 +1,3 @@
-//! with `// lint: allow(world-space) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

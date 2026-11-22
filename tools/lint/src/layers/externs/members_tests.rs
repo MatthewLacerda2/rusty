@@ -131,6 +131,7 @@ fn test_support_naming_a_sibling_or_a_display_crate_is_flagged() {
     assert_eq!(found.lines().count(), 3, "{found}");
     let plain = "[dependencies]\nimage = { workspace = true }\nlog = { workspace = true }\n";
     assert!(support("test-support", plain).is_empty());
+    // A module of the table is its row's business, not this check's.
     assert!(support("physics", text).is_empty());
 }
 

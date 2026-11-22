@@ -15,6 +15,7 @@ mod python;
 mod tests;
 mod wgsl;
 
+/// The roots whose `.rs` files the rules gate reads (`Scan::at`).
 pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tools"];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

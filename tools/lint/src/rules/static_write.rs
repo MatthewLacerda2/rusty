@@ -1,4 +1,3 @@
-//! says why with `// lint: allow(test-static-write) <why>`.
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
@@ -168,6 +167,8 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
             local.get(dir(p)).unwrap_or(&none),
             local.get(dir(dir(p))).unwrap_or(&none),
         ];
+        // A name is what its own file declares; else process-wide where some file says so,
+        // unless a file here or a folder up makes it thread-local: modules reuse names.
         let is_process = |n: &str| {
             own.process.contains(n)
                 || (!own.local.contains(n)

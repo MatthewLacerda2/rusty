@@ -1,5 +1,3 @@
-//! An exception is inline, with a reason: `<!-- lint: allow(<rule>) <why> -->` on
-
 mod agent;
 mod frontmatter;
 pub(crate) mod history;

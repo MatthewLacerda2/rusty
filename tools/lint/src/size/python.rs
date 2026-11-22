@@ -133,6 +133,8 @@ mod tests {
 
     #[test]
     fn a_string_that_is_data_is_code() {
+        // Every line counts: the closing quote is no docstring's opening, or it would
+        // swallow the code after it.
         let src = "X = \"\"\"\na\nb\n\"\"\"\ny = 2\nz = 3\n";
         assert_eq!(code_lines(src), 6);
     }
@@ -153,6 +155,7 @@ mod tests {
 
     #[test]
     fn text_beyond_ascii_is_read_whole() {
+        // `—` is three bytes, so an index inside one panics: quotes are matched on bytes.
         assert_eq!(code_lines("\"\"\"a — b\n— c \\\" —\"\"\"\nx = '—'\n"), 1);
     }
 

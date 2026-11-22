@@ -1,5 +1,3 @@
-//! truly sits outside the sync, say why with `// lint: allow(physics-borrow) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

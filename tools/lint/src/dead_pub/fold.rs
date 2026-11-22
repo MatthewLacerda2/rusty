@@ -83,6 +83,9 @@ pub fn lib(source: &str, bins: &[Bin], tests_root: Option<&str>) -> (String, usi
     (out, private)
 }
 
+/// A folded caller's file. In its `root` file only, the inner attributes at its head
+/// are blanked, line numbers kept: a module cannot carry them. One in a macro body
+/// (`proptest!`'s `#![proptest_config(..)]`) is the macro's input and stays.
 pub fn caller(
     source: &str,
     module: &str,

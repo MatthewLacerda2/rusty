@@ -1,5 +1,3 @@
-//! reads says why with `// lint: allow(gpu-default-only) <why>`. A
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

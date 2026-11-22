@@ -1,5 +1,3 @@
-//! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, above
-
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
@@ -126,6 +124,7 @@ fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, u
 }
 
 /// Each `lint: allow(api-parity)` in `source`: its line, the line of the item it
+/// excuses (the next code line when it stands alone), and that `set_` op's name.
 fn allows(source: &str) -> Vec<(usize, usize, String)> {
     let lines: Vec<&str> = source.lines().collect();
     let code = code_lines(source);

@@ -1,5 +1,3 @@
-//! its first line: `// lint: allow(orphan-module) <why>`, which this rule reads
-
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use std::collections::BTreeSet;
@@ -139,6 +137,7 @@ fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> 
     let (mut parsed, mut reached) = (BTreeSet::new(), BTreeSet::new());
     let mut queue: Vec<(String, bool)> = roots.into_iter().map(|r| (r, true)).collect();
     while let Some((path, mod_rs)) = queue.pop() {
+        // Once per way it is loaded, owning its folder or not: each resolves differently.
         if !parsed.insert((path.clone(), mod_rs)) {
             continue;
         }
@@ -151,6 +150,7 @@ fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> 
             match r {
                 Reach::Module { path, mod_rs } => queue.push((path, mod_rs)),
                 Reach::Included(path) => {
+                    // Read, never parsed: if it is also a module, its own `mod` reaches it.
                     reached.insert(path);
                 }
             }
