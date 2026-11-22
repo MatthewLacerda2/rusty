@@ -23,6 +23,7 @@ struct MaterialData {
     roughness: f32,
     use_metallic_map: u32,
     use_roughness_map: u32,
+    // 0 none, 1 keeps z, 2 BC5 (`normal_variance`), 3 signed.
     use_normal_map: u32,
     use_emissive_map: u32,
     emissive: vec4<f32>,
