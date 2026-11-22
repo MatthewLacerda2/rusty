@@ -1,3 +1,5 @@
+//! A test hook: counts reads of a skeleton's bone list, so a test can pin a system that
+//! must not read one. It counts only on a thread that called `reads` once.
 use std::cell::Cell;
 
 thread_local! {

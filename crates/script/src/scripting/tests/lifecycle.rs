@@ -94,7 +94,7 @@ fn update_scripts_passes_delta_time_to_update() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // `Update` reaches only started instances.
     m.update_scripts(0.25);
     let got: f64 = m.eval("__update_dt").unwrap().parse().unwrap();
     assert!((got - 0.25).abs() < 1e-6, "dt should be 0.25, got {got}");
@@ -110,7 +110,7 @@ fn dispatch_trigger_events_calls_on_trigger() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts();
+    m.init_scripts(); // Callbacks reach only awoken instances.
     m.dispatch_trigger_events(rusty_physics::TriggerEvents {
         stayed: vec![(id, 99)],
         ..Default::default()

@@ -1,3 +1,6 @@
+//! A panorama's light in L2 SH, memoised by path, digest and import settings, a failed decode too.
+//! An answer holds, reading no file, until the write log names its file, sidecar or source.
+
 use std::f32::consts::PI;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -13,6 +16,7 @@ use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 use rusty_core::project;
 
+/// Enough to switch between a few skies in the editor.
 const KEPT: usize = 4;
 
 type Key = (PathBuf, u64, TextureSettings);
@@ -23,6 +27,7 @@ struct Remembered {
     answers: Vec<(String, String, String, Option<Sh9>)>,
 }
 
+/// Locked `remembered` first, then `projected`.
 struct Memo {
     projected: Mutex<Vec<(Key, Option<Sh9>)>>,
     remembered: Mutex<Option<Remembered>>,
@@ -134,6 +139,7 @@ fn projected(memo: &Memo, path: &str) -> Option<(PathBuf, Option<Sh9>)> {
 }
 
 fn decode(file: &Path, settings: &TextureSettings) -> Option<Sh9> {
+    // Uncompressed and taken raw (bytes over 255, no sRGB decode), as the sky pass samples it.
     let loaded = texture_import::load(file, settings, TextureKind::Colour, false)?;
     let Texels::Image(image) = loaded.texels else {
         return None;
@@ -147,6 +153,7 @@ pub(super) fn decodes() -> usize {
     with_memo(|memo| memo.decodes.load(std::sync::atomic::Ordering::Relaxed))
 }
 
+/// Rows kept at most: L2 needs far fewer, and a block sums cheaply where per-texel bases would not.
 const ROWS: u32 = 128;
 
 pub(super) fn project(w: u32, h: u32, rgba: &[u8]) -> Sh9 {
@@ -169,6 +176,7 @@ pub(super) fn project(w: u32, h: u32, rgba: &[u8]) -> Sh9 {
 
 fn blocks(w: u32, h: u32, rgba: &[u8], side: u32) -> Vec<(Vec3, f32)> {
     let (gw, gh) = (w.div_ceil(side), h.div_ceil(side));
+    // A texel's solid angle: 2π/w of its row's `cos θ` span; a constant image projects exactly.
     let band = |y: u32| (y as f32 / h as f32 * PI).cos();
     let rows: Vec<f32> = (0..h)
         .map(|y| (band(y) - band(y + 1)) * 2.0 * PI / w as f32)

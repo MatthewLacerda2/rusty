@@ -45,6 +45,8 @@ pub(crate) fn rebuild(
     shared.take_geometry(&mesh);
 }
 
+/// The box follows physics' order (`physics::shape::build::collider_inputs`): the collision
+/// mesh while it has triangles, else `own` (the entity's Mesh), else the kept copy.
 pub fn refit_collider(collider: &mut ColliderComponent, own: Option<(Vec3, Vec3)>) {
     let points = |m: &SharedMesh| bounds_of(m.positions.iter().copied());
     let collision = collider.built_collision_mesh().and_then(points);

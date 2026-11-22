@@ -1,3 +1,6 @@
+//! A tween is one more kind of timer job, so it keeps every timer rule with no second copy.
+//! Its `wait` is its delay; then it is due every tick, and `overshoot` is its clock.
+
 pub(crate) mod ease;
 mod field;
 pub(crate) mod property;

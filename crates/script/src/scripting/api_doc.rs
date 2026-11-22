@@ -1,7 +1,7 @@
-//! It reads the checkout at run time rather than embedding the text at build time,
-//! because an embedded doc is part of the crate's fingerprint: every doc edit would
-//! rebuild the whole crate once per feature set. Its callers are tests and
-//! `dev` tools, which always run from the engine checkout.
+//! The `docs/api/` reference is read from the checkout at run time, not embedded at build
+//! time: an embedded doc is part of the crate's fingerprint, so every doc edit would
+//! rebuild the whole crate once per feature set. Its callers are tests and `dev` tools,
+//! which always run from the engine checkout.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,6 +10,7 @@ pub fn api_doc_dir() -> PathBuf {
     rusty_core::project::checkout().join("docs").join("api")
 }
 
+/// A test hook: `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs` read it.
 pub fn api_reference() -> Result<String, String> {
     assemble(&api_doc_dir())
 }

@@ -6,7 +6,7 @@ local Thrower = {
     },
 }
 
-local GRAVITY = 9.81
+local GRAVITY = 9.81 -- m/s²: the physics world's, which the throw's lift assumes
 local RADIUS = 0.15 -- metres, a ball's radius
 local MASS = 2.0    -- kilograms
 

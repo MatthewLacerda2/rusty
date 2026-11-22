@@ -1,9 +1,7 @@
-// Frostbite's unified volumetrics (Hillaire 2015). `cs_scatter`: per froxel, the medium
-// at a jittered point lit by ambient, suns, clustered lights through their shadow tiles
-// and `Baked` lamps unshadowed, through Henyey-Greenstein, blended with last frame's
-// froxel reprojected; rgb light per metre, a extinction. `cs_integrate`: per column,
-// front to back (Frostbite's energy-conserving step), so texel k holds the eye to slice
-// k's far side.
+// Frostbite's unified volumetrics (Hillaire 2015). `cs_scatter`: per froxel, the medium at
+// a jittered point lit through Henyey-Greenstein, blended with last frame's reprojected
+// froxel; rgb light per metre, a extinction. `cs_integrate`: per column, front to back, so
+// texel k holds the eye to slice k's far side.
 
 #import common::{CameraUniforms, LightingUniforms, LocalLight, NO_SHADOW, ShadowTile, cluster_index, local_light_radiance, local_shadow_tile, sample_local_shadow, PI}
 #import fog::volumetric::{froxel_depth, froxel_slice}
@@ -11,6 +9,7 @@
 #import lighting::cascades::ShadowCascades
 #import numeric::{finite3, finite4}
 
+// Mirrors `volumetric_fog::params::VolumetricParams` byte for byte.
 struct Params {
     prev_view_proj: mat4x4<f32>,
     prev_view_z: vec4<f32>,
@@ -46,7 +45,7 @@ struct Params {
 @group(0) @binding(16) var out_scatter: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(17) var t_probes: texture_3d<f32>;
 
-// As `forward::transparent::MAX_HDR`, so every reader gets a finite value.
+// Below `Rgba16Float`'s 65504 (as `forward::transparent::MAX_HDR`), finite for every reader.
 const MAX_FROXEL: f32 = 60000.0;
 
 fn phase(g: f32, c: f32) -> f32 {
@@ -54,6 +53,7 @@ fn phase(g: f32, c: f32) -> f32 {
     return (1.0 - g2) / (4.0 * PI * pow(max(1.0 + g2 - 2.0 * g * c, 1e-4), 1.5));
 }
 
+// Origin at view depth 0; direction per unit of view depth.
 fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
     let ndc = vec2<f32>(uv.x * 2.0 - 1.0, 1.0 - uv.y * 2.0);
     let a4 = camera.inv_view_proj * vec4<f32>(ndc, 0.25, 1.0);
@@ -68,8 +68,9 @@ fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
     return array<vec3<f32>, 2>(origin, dir);
 }
 
-// Faded to 1 over the last 10% as `calculate_shadow` does, so shadowed air never ends
-// at a plane that moves with the camera.
+// One tap, not PCF: fog averages froxels and frames. Faded to 1 over the last 10%
+// as `sun_shadow_parts` fades surfaces, so shadowed air never ends at a plane moving with the
+// camera.
 fn sun_lit(world: vec3<f32>) -> f32 {
     let count = i32(shadow.params.x);
     let depth = dot(world - shadow.view_pos.xyz, shadow.view_dir.xyz);
@@ -93,8 +94,8 @@ fn sun_lit(world: vec3<f32>) -> f32 {
     return mix(lit, 1.0, fade);
 }
 
-// A froxel is a volume: a sample landing on the lamp itself would otherwise spike that
-// froxel from frame to frame.
+// `near` (half the froxel's depth) floors the inverse square: a froxel is a volume; a sample
+// on the lamp would spike it.
 fn lamps(light: LocalLight, world: vec3<f32>, to_eye: vec3<f32>, g: f32, near: f32) -> vec3<f32> {
     let travel = normalize(world - light.position);
     return local_light_radiance(light, world, near) * phase(g, dot(travel, to_eye));

@@ -127,6 +127,7 @@ function Rules.level(start, lines)
     return start + lines // 10
 end
 
+-- `draw(n)` returns an integer in [1, n].
 function Rules.bag(draw)
     local bag = { 1, 2, 3, 4, 5, 6, 7 }
     for i = 7, 2, -1 do

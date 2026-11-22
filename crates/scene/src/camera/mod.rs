@@ -21,15 +21,20 @@ use rusty_components::Projection;
 #[derive(Clone)]
 pub struct Camera {
     pub position: Vec3,
+    /// Degrees about Y; 0 looks down +X ([`Camera::forward`]).
     pub yaw: f32,
+    /// Degrees above the horizon.
     pub pitch: f32,
+    /// Vertical field of view, in degrees.
     pub fov: f32,
+    // Clip plane distances, in metres.
     pub near: f32,
     pub far: f32,
     pub culling_mask: u32,
     pub clear_flags: ClearFlags,
     pub projection: Projection,
     pub use_occlusion_culling: bool,
+    /// +Y, but a cube-capture face sets its own.
     pub up: Vec3,
     scene_lens: bool,
 }
@@ -37,6 +42,7 @@ pub struct Camera {
 pub use rusty_components::rendering::camera::DEFAULT_FOV;
 use rusty_components::rendering::camera::{DEFAULT_FAR, DEFAULT_NEAR};
 
+/// Degrees: short of straight up or down, where the look-at basis degenerates.
 pub const MAX_PITCH: f32 = 89.0;
 
 impl Camera {
@@ -109,6 +115,7 @@ pub fn sync_lens_from_scene(camera: &mut Camera, scene: &Scene, is_playing: bool
             camera.use_occlusion_culling = occlusion;
         }
         None => {
+            // Only once a scene camera stops driving it, so `Camera.SetFov` survives the sync.
             if had_scene_lens {
                 camera.fov = DEFAULT_FOV;
             }
@@ -137,6 +144,7 @@ pub fn camera_for_entity(base: &Camera, scene: &Scene, id: u32) -> Option<Camera
 
 pub fn pose_at(cam: &mut Camera, world: Mat4) {
     let (yaw, pitch) = yaw_pitch_from_matrix(world);
+    // An entity's camera is upright: a cube face's own `up` never reaches it.
     cam.up = Vec3::Y;
     cam.position = world.col(3).truncate();
     cam.yaw = yaw;
@@ -166,4 +174,5 @@ fn yaw_pitch_from_matrix(world: Mat4) -> (f32, f32) {
     (yaw, pitch)
 }
 
+/// A unit forward's horizontal length below which it counts as vertical: about 0.6°.
 const VERTICAL_EPSILON: f32 = 0.01;

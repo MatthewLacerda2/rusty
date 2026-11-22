@@ -1,6 +1,7 @@
 use crate::{MaterialAsset, MaterialComponent, Scene};
 
 impl Scene {
+    /// A library asset already under the key is kept, never overwritten: every attach path's rule.
     pub fn ensure_material_key(&mut self, id: u32) -> Option<String> {
         if !self.world.contains(id) {
             return None;

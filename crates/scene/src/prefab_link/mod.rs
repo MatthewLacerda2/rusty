@@ -14,6 +14,8 @@ pub fn is_prefab_path(path: &str) -> bool {
         .is_some_and(|e| e.eq_ignore_ascii_case(PREFAB_EXTENSION))
 }
 
+/// The local id of a model instance's entity whose node the model's current import
+/// lost: no source entity has it, so propagation destroys the entity.
 pub const GONE: u32 = u32::MAX;
 
 pub fn is_model_source(source: &str) -> bool {

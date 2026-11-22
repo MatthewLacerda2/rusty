@@ -4,9 +4,11 @@
 // HDRP Lit's `_SpecularAAScreenSpaceVariance` default: how much of the normal's change across a
 // pixel counts as spread inside it (at most 0.25, a Gaussian pixel of σ ½).
 const SCREEN_SPACE_VARIANCE: f32 = 0.1;
-// HDRP Lit's `_SpecularAAThreshold` default.
+// HDRP Lit's `_SpecularAAThreshold` default. Squared, it is the most each spread adds to α²
+// (`variance::KERNEL_MAX`).
 const THRESHOLD: f32 = 0.2;
 
+// Takes derivatives: call it before any per-pixel branch.
 fn kernel(n: vec3<f32>) -> f32 {
     let du = dpdx(n);
     let dv = dpdy(n);
@@ -27,7 +29,8 @@ const QUANTUM: f32 = 2.0 / 255.0;
 // level its footprint covers, `mapping::normal_level`): HDRP's `TextureNormalVariance` (κ = (3r
 // − r³)/(1 − r²), variance 1/(4κ)), doubled and capped as its `TextureNormalFiltering` does,
 // faded in over the first level, where trilinear filtering blends the base level (whole
-// normals, only rounding and magnification shorten them) into level 1.
+// normals, only rounding and magnification shorten them) into level 1. The same sum as
+// `asset::texture_import::variance::kernel`: change both together.
 fn texture_kernel(length: f32, level: f32) -> f32 {
     let r = min(length + QUANTUM, 1.0);
     let r2 = r * r;
@@ -35,9 +38,8 @@ fn texture_kernel(length: f32, level: f32) -> f32 {
     return k * saturate(level);
 }
 
-// What a normal map read at `level` adds to α², under its record's `use_normal_map` `flag`:
-// from the sample's `length` where the map keeps z (1, and 3 stored signed), from the record's
-// `table` for BC5 (2).
+// What a normal map read at `level` adds to α²: from the record's `table` for BC5, else from the
+// sample's `length`.
 fn map_kernel(flag: u32, table: vec4<u32>, length: f32, level: f32) -> f32 {
     if (flag == 2u) {
         return table_kernel(table, level);

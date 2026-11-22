@@ -34,7 +34,7 @@ local function slab(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider")
     Scene.SetStatic(id, true)
     Material.Set(id, material)
 end
@@ -42,9 +42,9 @@ slab("StartFloor", 0, -0.5, 10, 9.0, 1, 60, "track")
 slab("StartRailLeft", 4.3, 0.3, 10, 0.4, 0.6, 60, "rail")
 slab("StartRailRight", -4.3, 0.3, 10, 0.4, 0.6, 60, "rail")
 
--- The runner is a kinematic body `runner.lua` moves itself (a CharacterController
--- stalls on a flat floor in Play). The capsule child carries the collider, on
--- layer 8 so the runner's own ground probe and crash test skip it.
+-- The runner is a kinematic body `runner.lua` moves itself. The capsule child
+-- carries the collider, on layer 8 so the runner's own ground probe and crash
+-- test skip it.
 local runner = Scene.CreateEntity("Runner")
 Scene.AddComponent(runner, "RigidBody")
 Physics.SetKinematic(runner, true)

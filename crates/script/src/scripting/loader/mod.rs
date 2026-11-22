@@ -1,3 +1,7 @@
+//! Loading entity scripts. A spawn verb usually runs inside another script's callback, so
+//! loading there would run a chunk and `Awake` mid-loop over the instances: the slots wait
+//! for `load_new_scripts` at the head of the next script phase.
+
 mod classes;
 
 use mlua::Table;
@@ -13,6 +17,8 @@ use super::manager::{ScriptInstance, ScriptManager};
 type ScriptRow = (u32, usize, String, BTreeMap<String, ScriptFieldValue>);
 
 impl ScriptManager {
+    /// Records the attempt first, so the drain never retries a failed slot. A test hook
+    /// elsewhere: the shell's script-watch tests load a slot directly.
     pub fn load_entity_script(
         &mut self,
         entity_id: u32,
@@ -86,6 +92,7 @@ impl ScriptManager {
                 })
                 .collect()
         };
+        // Ordered so load order, and any top-level side effect, is deterministic.
         rows.sort_unstable_by_key(|&(id, index, ..)| (id, index));
         for (id, index, path, values) in rows {
             if let Err(e) = self.load_entity_script(id, index, &path, &values) {

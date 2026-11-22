@@ -2,6 +2,8 @@ use glam::{Quat, Vec3};
 
 use super::{finite_or, ProbeShape, ReflectionProbe, MIN_RADIUS};
 
+/// The shader's frame: a world point turned by `inverse` about the origin, where the box is
+/// axis-aligned. Unrotated, it is the world, bit for bit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProbeFrame {
     pub inverse: Quat,
@@ -56,6 +58,7 @@ impl ProbeFrame {
     }
 }
 
+/// The shader's `quat_rotate`, step for step: an identity adds an exact zero, changing no bits.
 pub(crate) fn rotate(q: Quat, v: Vec3) -> Vec3 {
     let u = Vec3::new(q.x, q.y, q.z);
     v + 2.0 * u.cross(u.cross(v) + q.w * v)
@@ -95,6 +98,7 @@ impl ReflectionProbe {
         self.position.distance_squared(point)
     }
 
+    /// Bit 0 of the index picks max x, bit 1 max y, bit 2 max z.
     pub fn corners(&self) -> [Vec3; 8] {
         let (lo, hi) = (self.box_min, self.box_max);
         std::array::from_fn(|i| {
@@ -123,6 +127,7 @@ impl ReflectionProbe {
     }
 }
 
+/// Points a side at which `share_of` samples a box an oriented volume covers.
 const SHARE_SAMPLES: usize = 16;
 
 impl ReflectionProbe {

@@ -23,6 +23,7 @@ fn register_mode_color(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
         table,
         "SetFogMode",
         lua.create_function(move |lua, name: String| {
+            // An unknown name keeps the current mode, as `SetTonemap` does, rather than erroring.
             if let Some(mode) = FogMode::parse(&name) {
                 fog_ops::set_mode(&mut scene.get(lua)?.borrow_mut().fog, mode);
             }

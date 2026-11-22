@@ -63,6 +63,7 @@ fn stats_reads_a_node_that_only_drives_a_param() {
         node.get::<Table>("mean").unwrap().get(1).unwrap()
     };
     assert_eq!(mean("k"), 0.5);
+    // The link maps 0.5 onto 0..2: gamma 1, which leaves the noise as it is.
     assert_eq!(mean("g"), mean("n"));
     assert!(!out.exists());
 }

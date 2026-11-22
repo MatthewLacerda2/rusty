@@ -87,6 +87,7 @@ fn coverage_and_overlap_use_the_real_volume() {
     };
     let room = (Vec3::new(-5.0, -2.0, -5.0), Vec3::new(5.0, 2.0, 5.0));
     let share = corridor.share_of(room.0, room.1);
+    // The turned box covers 26.3% of the room; the 16³ sampling lands within 0.04 of it.
     assert!((share - 0.263).abs() < 0.04, "{share}");
     let flat = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(5.0));
     assert_eq!(flat.share_of(Vec3::ZERO, Vec3::splat(10.0)), 0.125);

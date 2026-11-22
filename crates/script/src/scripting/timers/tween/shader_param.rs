@@ -30,6 +30,7 @@ enum Source {
 
 impl ShaderParam {
     pub(crate) fn parse(scene: &Scene, id: u32, path: &str) -> Option<Result<Self, String>> {
+        // No `Field` path starts with these three words, so a path is one or the other.
         let (prefix, name) = path.split_once('.')?;
         let source = match prefix {
             "Material" => material_source(scene, id),
@@ -137,6 +138,7 @@ fn ui_source(scene: &Scene, id: u32) -> Result<Source, String> {
 }
 
 fn post_source(scene: &Scene, id: u32, name: &str) -> Result<Source, String> {
+    // The camera's knob first: it needs no volume, since a scene can run TAA without one.
     if let Some(knob) = camera_ops::camera_knob(name) {
         return scene
             .world

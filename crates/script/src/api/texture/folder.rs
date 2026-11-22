@@ -24,6 +24,7 @@ fn inside(dir: &Path, root: &Path) -> bool {
     let mut existing = dir;
     while !existing.exists() {
         match (existing.components().next_back(), existing.parent()) {
+            // Only plain names may be missing: a `..` below what exists could climb out of `root`.
             (Some(Component::Normal(_)), Some(up)) => existing = up,
             _ => return false,
         }

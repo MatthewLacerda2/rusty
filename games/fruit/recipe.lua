@@ -23,6 +23,7 @@ local flesh = ramp("flesh", 24.0, { 0.85, 0.85, 0.8, 1 }, { 1, 1, 1, 1 })
 local wood = ramp("wood", 6.0, { 0.3, 0.17, 0.07, 1 }, { 0.6, 0.38, 0.18, 1 })
 local tile = ramp("tile", 3.0, { 0.55, 0.62, 0.66, 1 }, { 0.85, 0.9, 0.92, 1 })
 
+-- Skin and flesh colours per fruit: `fruit/view.lua` names each material by its `KINDS` key.
 local kinds = {
     apple = { { 0.8, 0.08, 0.06 }, { 0.98, 0.95, 0.75 } },
     orange = { { 1.0, 0.5, 0.05 }, { 1.0, 0.65, 0.2 } },
@@ -39,12 +40,13 @@ Material.DefineAsset("fuse", { base_color = { 1, 0.4, 0.1 }, emissive = { 6, 1.6
 Material.DefineAsset("wood", { base_color_map = wood, roughness = 0.7 })
 Material.DefineAsset("tile", { base_color_map = tile, roughness = 0.5 })
 
--- Fruit flies in front of both on its own layer, which collides with nothing.
+-- Fruit flies in front of the counter and the back wall on its own layer, which
+-- collides with nothing.
 local function solid(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider")
     Material.Set(id, material)
     return id
 end
@@ -68,7 +70,6 @@ local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")
 Transform.SetPosition(camera, 0, 2, 13) -- looking down -Z: +X is screen right, +Y up
 
--- A soft disc sprite: an emitter with no texture draws the renderer's checker.
 local puff = Texture.Bake({
     resolution = 64, seed = p.seed,
     nodes = {

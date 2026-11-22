@@ -6,6 +6,8 @@ pub fn instance_members(scene: &Scene, root_id: u32) -> Option<Vec<u32>> {
     instance_members_with(scene, root_id, &scene.bone_ids())
 }
 
+/// An instance is its root and every descendant linked to the root's source. A walk
+/// passes through bones (they carry no link) and ends at another root of that source.
 pub(super) fn instance_members_with(
     scene: &Scene,
     root_id: u32,

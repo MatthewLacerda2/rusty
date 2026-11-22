@@ -1,6 +1,9 @@
-//! Detection evaluates each chunk in a throwaway sandboxed `Lua` and inspects the
-//! returned table — the same eval the runtime does, so the menu can never offer a
-/// script the runtime would reject.
+//! Finds the project scripts the Add Component menu offers: those returning a table with
+//! at least one lifecycle function, so a plain `require`d helper module is left out.
+//!
+//! Detection evaluates each chunk in `inspection_vm`: `Lua::new()`'s safe set with the API
+//! stubbed, not the gameplay sandbox, so a file's top level runs here with `io` and `os`.
+
 use std::path::Path;
 
 use mlua::{Table, Value};

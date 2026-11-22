@@ -5,8 +5,10 @@ use rusty_physics::{is_hittable, PhysicsWorld};
 use rusty_scene::{layer_in_mask, Scene};
 use rusty_ui::events::is_under;
 
+/// Metres a cover ray may fall short and stay clear; an origin this near a collider is on it.
 pub(super) const SKIN: f32 = 1e-3;
 
+/// Metres probed each way along the ray from an origin on a blocker; a thinner wall leaks a blast.
 const STEP: f32 = 5e-3;
 
 pub(super) fn solid_on(scene: &Scene, id: u32, mask: Option<u32>) -> bool {

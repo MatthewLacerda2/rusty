@@ -11,7 +11,8 @@ struct Front {
 };
 
 // A higher camera of the stack (`.w`) is in front whatever the depths say, so a gun 0.6
-// m from its camera stays over a wall 0.35 m from the world camera.
+// m from its camera stays over a wall 0.35 m from the world camera. Motion blur's `behind`
+// (`motion_blur.wgsl`) keeps the same order: change the two together.
 fn in_front(a: vec4<f32>, b: vec4<f32>) -> bool {
     if (a.w != b.w) {
         return a.w > b.w;
@@ -21,7 +22,8 @@ fn in_front(a: vec4<f32>, b: vec4<f32>) -> bool {
 
 // The reveal test reads the frontmost, as FSR2's depth clip reads the dilated depth, so
 // a sub-pixel gap the jitter sees sky through in this frame and not the last is no
-// reveal; the history keeps the pixel's own.
+// reveal. The history keeps the pixel's own, so a sub-pixel wire the jitter misses this
+// frame leaves sky beside it there.
 fn frontmost(p: vec2<i32>) -> Front {
     let last = vec2<i32>(textureDimensions(t_velocity)) - 1;
     let here = textureLoad(t_velocity, clamp(p, vec2<i32>(0), last), 0);
@@ -65,7 +67,8 @@ fn reveal_gap(then: vec2<f32>, now: vec2<f32>) -> f32 {
 }
 
 // FSR2's depth clip: the least gap in its 3×3, so a sub-pixel wire the jitter moved
-// still finds its own surface. Under TAAU the 3×3 spans several history pixels.
+// still finds its own surface. Under TAAU the 3×3 steps a scene pixel, several history
+// pixels, so the wire is found at any render scale.
 fn depth_mismatch(at: vec2<f32>, now: vec2<f32>) -> f32 {
     let last = vec2<i32>(textureDimensions(t_surface_history)) - 1;
     let c = vec2<i32>(floor(at));

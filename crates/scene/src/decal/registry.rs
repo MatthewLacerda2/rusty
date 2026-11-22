@@ -8,13 +8,17 @@ use super::{Decal, DecalOwner, DecalSpec};
 use crate::Scene;
 use rusty_core::settings::decals::DecalLimits;
 
+/// Seconds an evicted decal fades over, so the cap never pops a mark in view.
 pub const EVICTION_FADE: f32 = 0.5;
 
+/// Spawn evictions fading at once (128 a second at `EVICTION_FADE`); past it the oldest is
+/// dropped outright.
 pub const EVICTION_HEADROOM: usize = 64;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DecalSet {
     ring: VecDeque<Decal>,
+    /// Reset only by a new scene (`Scene::clear`), so a stale id never names a newer decal.
     next_id: u32,
     limits: DecalLimits,
     counts: Counts,
@@ -136,6 +140,7 @@ impl DecalSet {
         taken
     }
 
+    /// Undoes the owners' Destroy: each back in its blend-order place, no budget applied.
     pub(crate) fn put_back(&mut self, decals: Vec<Decal>) {
         for decal in decals {
             if self.ring.iter().any(|d| d.id == decal.id) {
@@ -146,16 +151,19 @@ impl DecalSet {
             } else {
                 self.counts.add(decal.bucket());
             }
+            // The ring's spawn order is id order.
             let at = self.ring.iter().position(|d| d.id > decal.id);
             self.ring.insert(at.unwrap_or(self.ring.len()), decal);
         }
     }
 
+    /// Stop's snapshot restore: ids count on past every one handed out since.
     pub fn restore(&mut self, saved: DecalSet) {
         let next_id = self.next_id.max(saved.next_id);
         (self.ring, self.counts, self.next_id) = (saved.ring, saved.counts, next_id);
     }
 
+    /// `dt` in sim seconds.
     pub fn tick(&mut self, dt: f32, exists: impl Fn(u32) -> bool) {
         for decal in &mut self.ring {
             decal.age += dt;
@@ -173,6 +181,7 @@ impl Scene {
                 return None;
             }
             let world = self.world.local_to_world(entity);
+            // A zero-scale owner has no space for the box: it is stamped unowned.
             if world.determinant().abs() > f32::EPSILON {
                 let local = world.inverse() * decal.model_matrix();
                 decal.owner = Some(DecalOwner { entity, local });

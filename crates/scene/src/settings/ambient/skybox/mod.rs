@@ -1,3 +1,6 @@
+//! The `Skybox` source's light: the sky a scene draws, projected into L2 SH on the CPU (Unity's
+//! ambient probe) at intensity 1. Derived, never saved; each source is memoised.
+
 mod panorama;
 mod procedural;
 

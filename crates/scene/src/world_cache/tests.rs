@@ -64,6 +64,7 @@ fn an_id_reused_after_a_clear_reads_the_new_entity_not_the_old_one() {
     let (gp, _p, c) = nested_chain(&mut scene);
     assert_eq!(world_translation(&scene, c), Vec3::new(7.0, 0.0, 0.0));
 
+    // A scene load clears the world and restarts ids at 1, so the next spawns reuse ids.
     scene.world.clear();
     let a = scene.add_entity("new-a".into());
     let _b = scene.add_entity("new-b".into());

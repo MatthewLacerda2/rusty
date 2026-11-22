@@ -19,6 +19,7 @@ pub fn record_removed(scene: &mut Scene, id: u32) {
     let doomed = scene.destroy_set(id);
     let linked = |m: &&u32| scene.world.prefab_link(**m).is_some();
     if !doomed.iter().any(|m| linked(&m)) {
+        // No part among them: skip the scene-wide bone scan.
         return;
     }
     let bones = scene.bone_ids();

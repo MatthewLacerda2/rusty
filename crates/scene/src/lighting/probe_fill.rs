@@ -9,6 +9,8 @@ struct AnalyticEnv {
     pub sky: AmbientRadiance,
     pub sun_dir: Option<Vec3>,
     pub sun_radiance: Vec3,
+    /// The sun is a lamp, so its read-back follows the diffuse model, as `baked_direct_sh`'s
+    /// does; the ambient stays Lambert.
     pub diffuse: DiffuseModel,
 }
 
@@ -39,6 +41,7 @@ impl AnalyticEnv {
 
     pub fn project(&self) -> Sh9 {
         let mut sh = Sh9::zero();
+        // Near-equal-area directions, so each carries the same solid angle, `4π / n`.
         let dirs = fibonacci_sphere(512);
         let w = 4.0 * std::f32::consts::PI / dirs.len() as f32;
         for d in &dirs {
@@ -57,6 +60,7 @@ pub fn analytic_fill(scene: &mut Scene) {
     let env = AnalyticEnv::from_scene(scene);
     for probe in scene.probes.probes_mut() {
         let mut local = env;
+        // A stand-in height gradient, a quarter more sky per metre up, so the fill varies in space.
         let h = 1.0 + 0.25 * probe.position.y;
         local.sky = env.sky.scaled(h.max(0.0));
         probe.sh = local.project();
@@ -64,6 +68,7 @@ pub fn analytic_fill(scene: &mut Scene) {
 }
 
 pub fn fibonacci_sphere(n: usize) -> Vec<Vec3> {
+    // The golden angle, radians.
     let golden = std::f32::consts::PI * (3.0 - 5.0_f32.sqrt());
     let mut v = Vec::with_capacity(n);
     for i in 0..n {

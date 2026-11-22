@@ -55,8 +55,9 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     )
 }
 
-/// Validated fields (`render_mode`, the alpha clamps) go through the shared
-/// `authoring::material::set_*` ops, so validation lives once.
+/// Bakes the maps before inserting, so a failed bake defines nothing.
+/// The asset goes in first, so the shared `authoring::material` ops then have a target for each
+/// validated field and validation lives once.
 fn define(
     scene: &RefCell<Scene>,
     name: &str,

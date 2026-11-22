@@ -1,3 +1,6 @@
+//! Parallax correction against the oriented volume (Lagarde's, as HDRP's proxy); the
+//! shader's `parallax_correct` runs the same steps with the same guards.
+
 use glam::Vec3;
 
 use super::{ProbeFrame, ReflectionProbe, NO_HIT, PARALLEL_EPSILON};
@@ -48,12 +51,15 @@ fn box_exit(frame: &ProbeFrame, p: Vec3, d: Vec3) -> f32 {
         if d[axis].abs() > PARALLEL_EPSILON {
             let first = (frame.box_max[axis] - p[axis]) / d[axis];
             let second = (frame.box_min[axis] - p[axis]) / d[axis];
+            // A magnitude, not held at 0 as HDRP does: outside, a ray turning parallel to a face
+            // would jump from the fragment to the far wall.
             t = t.min(first.max(second).abs());
         }
     }
     t
 }
 
+/// The far root, or the nearest approach when it misses (HDRP's `SphereRayIntersectSimple`).
 fn sphere_exit(frame: &ProbeFrame, p: Vec3, d: Vec3, r: f32) -> f32 {
     if d.length_squared() <= 0.0 {
         return NO_HIT;

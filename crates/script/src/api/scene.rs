@@ -49,9 +49,6 @@ fn register_lookup_create(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<S
 
 /// `Deactivate` (Unity's deferred destroy) + `DestroyEntity` (real removal).
 fn register_destroy(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
-    // Soft delete — mirrors Unity's deferred `Object.Destroy`. The entity stays in
-    // the scene but inactive; this is the historical `DestroyEntity` behaviour,
-    // renamed so the destructive verb can own the `DestroyEntity` name.
     put(
         table,
         "Deactivate",

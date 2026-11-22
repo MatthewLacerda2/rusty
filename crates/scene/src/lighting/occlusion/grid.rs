@@ -1,11 +1,19 @@
+//! Cubes over the static bounds plus a cell of margin, so a camera at a wall's outer face
+//! is in one.
+
 use glam::{UVec3, Vec3};
 
+/// Metres, about a doorway: a cell rarely sees both sides of a wall it straddles.
 pub const CELL_SIZE: f32 = 2.0;
 
+/// Cells a bake samples at most, bounding its work (cells times objects).
 pub const MAX_CELLS: usize = 16_384;
 
+/// Cells a grid holds, sampled or not, bounding the file and the cell table.
 pub const MAX_GRID_CELLS: usize = 4 * MAX_CELLS;
 
+/// Largest cell edge, metres; sampled as `CELL_SIZE` cubes, a cell costs the cube of its
+/// ratio.
 pub const MAX_CELL: f32 = 4.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -59,6 +67,7 @@ impl Grid {
     }
 
     pub fn subdivisions(&self) -> u32 {
+        // A rounding over 2 m is still one cube.
         ((self.cell / CELL_SIZE) - 1e-3).ceil().max(1.0) as u32
     }
 

@@ -1,6 +1,4 @@
-//! crates/script/src/api/storage.rs — `Storage` namespace.
-//!
-//! The Lua/REPL/harness surface over `core::storage::Storage` (issue #86). Scripts
+//! The `Storage` namespace: the Lua/REPL/harness surface over `core::storage::Storage`. Scripts
 //! read/write namespaced values that survive across runs; a value may be a scalar
 //! or a whole structured table. Only the in-memory map is touched here — disk I/O
 //! happens at boundaries (Stop / quit), never from a script during a tick, which

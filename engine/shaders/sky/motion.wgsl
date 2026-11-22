@@ -1,5 +1,5 @@
-// engine/shaders/sky/motion.wgsl — what a sky pass writes into a motion-blurred
-// view's velocity target: `skybox.wgsl` and `sky_gradient.wgsl` import it.
+// What a sky pass writes into a motion-blurred view's velocity target: `skybox.wgsl` and
+// `sky_gradient.wgsl` import it.
 
 #define_import_path sky::motion
 

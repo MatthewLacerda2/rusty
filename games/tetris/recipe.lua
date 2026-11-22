@@ -17,6 +17,8 @@ local tile = Texture.Bake({
                     { pos = 1.0, color = { 1.0, 1.0, 1.0, 1 } } } },
     },
 }, "assets/textures/block_base_color.png", "base_color")
+-- One colour per kind, then a staged garbage cell's. `tetris/view.lua`'s `COLORS`
+-- repeats them for the HUD's preview: change both together.
 local colors = {
     { 0.1, 0.85, 0.9 }, { 0.95, 0.85, 0.1 }, { 0.65, 0.2, 0.85 }, { 0.2, 0.8, 0.25 },
     { 0.9, 0.2, 0.2 }, { 0.2, 0.35, 0.95 }, { 0.95, 0.55, 0.1 }, { 0.5, 0.5, 0.5 },
@@ -26,7 +28,6 @@ for kind, c in ipairs(colors) do
 end
 Material.DefineAsset("well", { base_color = { 0.35, 0.38, 0.45 }, roughness = 0.9 })
 
--- A box with a collider (a primitive gets none of its own yet).
 local function solid(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
@@ -53,7 +54,7 @@ Transform.SetPosition(pulse, 0, h / 2, 4)
 Light.SetColor(pulse, 1.0, 0.9, 0.7)
 Light.SetRange(pulse, 30)
 Light.SetIntensity(pulse, 0)
-Light.SetMode(pulse, "Realtime")
+Light.SetMode(pulse, "Realtime") -- it pulses at runtime, so it is never baked
 
 local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")
