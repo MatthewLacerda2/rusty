@@ -29,8 +29,6 @@ pub struct Item {
     /// Pen advance after this glyph (kerning, letter spacing and faux bold included).
     pub advance: f32,
     pub offset: Vec2,
-    /// `advance` without kerning against the next glyph: what it advances once a line is
-    /// cut after it.
     pub bare: f32,
     pub joins: bool,
     pub metrics: LineMetrics,

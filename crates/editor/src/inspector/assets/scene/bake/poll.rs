@@ -1,8 +1,3 @@
-//! Generate Lighting's per-frame drive: the lightmaps' worker polled
-//! and its lightmaps applied, then the probe step taken one step a frame and
-//! committed and the lighting written, then the occlusion culling's worker polled
-//! and its PVS written beside it. A bake dropped midway says what reached
-
 use std::time::{Duration, Instant};
 
 use super::outcome::{done, dropped, fail, fail_occlusion, verb};
@@ -20,7 +15,8 @@ use rusty_script::scripting::ConsoleLogs;
 
 const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 
-/// How long a frame the window cannot draw spends on probe steps ([`poll_undrawn`]).
+/// How long a frame the window cannot draw spends on probe steps ([`poll_undrawn`]):
+/// under the pacer's 100 ms retry (`shell::pace`).
 pub const UNDRAWN_PROBE_BUDGET: Duration = Duration::from_millis(80);
 
 pub fn poll(
@@ -78,9 +74,11 @@ fn drive(
         return;
     };
     if scene.is_playing() {
+        // The World holds the play state: wait for Stop's restore.
         return ctx.request_repaint_after(PROGRESS_REPAINT);
     }
     if active.scene != scene.id() || active.path != open {
+        // Its ids would name another scene's meshes, or its lighting land in the wrong file.
         let line = match active.scene != scene.id() {
             true => format!("{} dropped: the open scene changed", verb(&active.step)),
             false => dropped(&active.step, "the scene was saved elsewhere"),
@@ -108,6 +106,7 @@ fn drive(
     }
 }
 
+/// `Some` once the bake ended: whether the scene needs a full save.
 fn advance(
     step: &mut Step,
     scene: &mut Scene,

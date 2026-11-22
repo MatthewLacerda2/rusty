@@ -27,9 +27,7 @@ pub struct ActiveBake {
     path: Option<String>,
 }
 
-/// Which part of Generate Lighting is running.
 enum Step {
-    /// The lightmaps, on their worker.
     Lightmaps(LightmapBakeJob),
     Probes {
         job: Box<LightingBake>,
@@ -48,7 +46,6 @@ enum Step {
 }
 
 impl ActiveBake {
-    /// The scene file the bake writes.
     pub fn scene_path(&self) -> &str {
         match &self.step {
             Step::Lightmaps(job) => job.scene_path(),
@@ -71,6 +68,8 @@ pub fn draw(
     let open = is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
+    // The inspector follows the requested play state: the scene still plays the frame Stop
+    // is pressed.
     let live = idle && open && !scene.is_playing();
     let why = if open {
         "Stop Play first, or wait for the bake"
@@ -93,6 +92,8 @@ pub fn draw(
             (generate, occlusion)
         })
         .inner;
+    // Greyed out mid-bake: the lightmaps, then the probes, read the diffuse model, and an
+    // edit between them would bake two.
     let settings = &mut scene.lighting_settings;
     let changed = ui
         .add_enabled_ui(idle, |ui| {
@@ -111,7 +112,6 @@ pub fn draw(
     draw_progress(ui, editor);
 }
 
-/// Why a bake button is greyed out on a scene card that is not the open scene.
 pub(super) const NOT_OPEN: &str = "Open this scene to bake it";
 
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open

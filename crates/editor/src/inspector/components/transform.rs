@@ -106,8 +106,7 @@ fn draw_rotation(ui: &mut egui::Ui, trans: &mut rusty_components::TransformCompo
 
 /// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
 pub(crate) fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    // The Euler decomposition yields -0.0, which egui prints as "-0": this local copy
-    // is written back only when dragged.
+    // An Euler decomposition yields -0.0, which egui prints as "-0".
     if *value == 0.0 {
         *value = 0.0;
     }
