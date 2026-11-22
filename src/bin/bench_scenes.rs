@@ -1,43 +1,3 @@
-//! src/bin/bench_scenes.rs — bench a game project's own scenes (dev-only, `make bench-scenes`).
-//!
-//! ```text
-//! Usage:
-//!   cargo run --release --features dev --bin bench-scenes -- --project <dir> [--scenes <a,b>]
-//!       [--size <W>x<H>] [--runs <n>] [--load-runs <n>] [--before <dir>] [--set <k=v>]...
-//!       [--profile] [--import] [--script] [--no-editor]
-//!       <out_dir>  |  --project <dir> --pending-imports
-//! ```
-//!
-//! Benches each scene (`--scenes` names them by their path under
-//! `assets/scenes/` without the extension, `levels/a`; every `.scene` there,
-//! subfolders included, by default) from its deterministic viewpoints at
-//! 1920x1080 (or `--size`), `--runs` times (3 by default), keeps each report as
-//! `<out_dir>/<project>-<hash>/<scene>.json` (the project folder's name and a
-//! short hash of its canonical path, `scenes::out_key`) and prints it with its
-//! change against the scene's last run, or against the kept report in
-//! `--before`'s folder; then a one-table summary (`dev::bench::scenes`).
-//!
-//! Each scene runs in child processes of this binary (its own memory peak): first
-//! `--load-runs` less one (3 loads in all by default) only load it (`--load-out`,
-//! the first `load_cold_ms`), each in a fresh process, then one benches it
-//! (`--scene`, handed those loads with `--loads`, its own load the last of them:
-//! `scenes::load`), and with `--profile` one more samples its
-//! measured frames with the platform's profiler (`scenes::profile`), whose failure
-//! leaves the timings standing (a refused profile is listed at the end); the
-//! profiler is tried once before any scene, so a refusal ends the run. With
-//! `--import`, once a run, one more imports a copy of the project without its
-//! import cache and loads its first scene (`--import-out`, `scenes::import`),
-//! handing both's time to that scene's run as `--import-ms`. `--set` overrides a
-//! quality field, a graphics option (`option.<name>`) or a renderer switch
-//! (`render.<switch>`) in every child (`scenes::set`); the editor round's Scene
-//! view takes the quality fields and the switches, never an option, which only
-//! the game views honour (`render.ssao` and `render.ssil` reach both). `--script` times the
-//! scripts' engine verbs in the timed child (`bench::verbs`), and every child of
-//! the run writes under `<out_dir>/<project>-<hash>/script/`, so a plain run's
-//! history is never compared with one and a `--profile` beside it (played without
-//! the timers) is kept and checked there; `--pending-imports` lists
-//! the images an import would encode, exiting 1 if any. The project is not written.
-
 use std::path::{absolute, Path, PathBuf};
 use std::process::exit;
 
@@ -63,14 +23,11 @@ struct Run {
     /// The project's reports folder under it ([`reports_dir`]).
     out: PathBuf,
     opts: Options,
-    /// How many times each scene is loaded, each in a process of its own.
     load_runs: u32,
     before: Option<PathBuf>,
     profile: bool,
     /// `--import`: measure `import_ms` once this run.
     import: bool,
-    /// `--script`: time the scripts' engine verbs in the timed child; every
-    /// child writes under the `script/` folder.
     script: bool,
     /// Run the editor round on each scene (off with `--no-editor`).
     editor: bool,
@@ -122,7 +79,6 @@ fn main() {
     dispatch(&run, a, key);
 }
 
-/// Do what the invocation `a` asks of `run`: one child's job, or every scene.
 fn dispatch(run: &Run, a: scenes::args::Args, key: String) {
     if let (Some(scene), Some(file)) = (&a.one, &a.editor_out) {
         return editor_one(run, scene, file);
@@ -145,8 +101,6 @@ fn dispatch(run: &Run, a: scenes::args::Args, key: String) {
     }
 }
 
-/// The project's reports folder under the out dir `root`: `<root>/<key>`, and
-/// its `script/` for a `--script` run, so a plain run's history never meets one.
 fn reports_dir(root: &Path, key: &str, script: bool) -> PathBuf {
     let dir = root.join(key);
     if script {
@@ -156,9 +110,6 @@ fn reports_dir(root: &Path, key: &str, script: bool) -> PathBuf {
     }
 }
 
-/// The project at `path` opened to run, the run's `--set` quality fields over its
-/// running preset and its `option.` overrides over its graphics option defaults
-/// (`scenes::open`); the `render.` switches go to the renderer (`Options::switches`).
 fn open(run: &Run, path: &Path, what: &str) -> Opened {
     scenes::open(path, &run.set).unwrap_or_else(|e| fail(&format!("cannot open {what}: {e}")))
 }
@@ -172,10 +123,8 @@ struct Kept {
     editor: Option<PathBuf>,
 }
 
-/// Bench `scene` in this process, after the loads and the editor round `kept` names.
 fn bench_one(run: &Run, scene: &str, key: String, kept: Kept) {
     if run.script {
-        // Before the first VM: one started earlier keeps the surface it has.
         rusty::dev::stats::verbs::arm();
     }
     let opened = open(run, &run.project, "the project");
@@ -184,7 +133,6 @@ fn bench_one(run: &Run, scene: &str, key: String, kept: Kept) {
         .as_deref()
         .map(scenes::load::read_all)
         .transpose();
-    // A round that cannot be read is said, and the scene benched without it.
     let editor = kept.editor.as_deref().and_then(|file| {
         let read = scenes::editor::read(file);
         read.map_err(|e| eprintln!("bench-scenes: {scene}: no editor rows: {e}"))
@@ -212,10 +160,8 @@ fn bench_one(run: &Run, scene: &str, key: String, kept: Kept) {
     }
 }
 
-/// Bench each scene in child processes, then print the summary of those that ran.
 fn bench_all(run: &Run, list: Option<&str>) {
     if run.profile {
-        // Before anything is benched: a missing or refused profiler fails at once.
         let profiler = profile::find(std::env::var_os("PATH").as_deref());
         let profiler = profiler.unwrap_or_else(|e| fail(&e));
         let probed = profile::probe(&profiler, &run.out.join(".profile-probe"));

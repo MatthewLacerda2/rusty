@@ -1,4 +1,4 @@
-//! crates/ai/src/stand.rs — where an entity **stands** (#1892, #1900): its feet, not
+//! where an entity **stands**: its feet, not
 //! its Transform, which for a character is its middle. The environment query's
 //! contexts and every perception sense's last-known position read it, so a
 //! trace's eye height and a distance mean the same for every kind of body.

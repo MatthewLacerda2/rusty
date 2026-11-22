@@ -1,11 +1,3 @@
-//! Test hook: the Dust2-sized bench level perception is costed on (#1900): 30 perceivers
-//! spread over `rooms(20)` and one target. Every perceiver has a body, as a real
-//! bot does, on a `BOT` layer: looking for the target's layer only (the default
-//! scene's bots look for `Player`) it has 1 candidate; with `sight_mask = all`
-//! (the component default) it has the other 29 bots too. The gate run is `perception_cost_tests`; the
-//! timing, a release-build measurement run by hand, is the root's
-//! `dev::bench::query_cost_tests` (a sim module may not read a clock).
-
 use glam::Vec3;
 
 use super::{step, SightRays};

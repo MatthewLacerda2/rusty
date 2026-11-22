@@ -1,7 +1,3 @@
-//! The raw value each test reads off an item (#1892). The pure-maths tests are
-//! here and rays are `sight`'s; the navmesh's `path` tests run on their flood
-//! (`walk`, through `progress`).
-
 use glam::Vec3;
 
 use super::spec::{Anchor, Measure};
@@ -98,9 +94,6 @@ fn nearest(points: &[Vec3], p: Vec3) -> f32 {
         .fold(f32::INFINITY, f32::min)
 }
 
-/// Every other active agent's claim on the ground (decision 2): its target (where
-/// it is going) and its position (where it is), the querier's own left out. An
-/// agent's target already is its claim, so no registry has to be kept or freed.
 fn others(scene: &Scene, querier: Option<u32>) -> Vec<Vec3> {
     let world = &scene.world;
     let mut out = Vec::new();

@@ -1,7 +1,7 @@
-//! A panorama file for the `Skybox` tests (#1675): `scene`'s, and the bakes' and
+//! A panorama file for the `Skybox` tests: `scene`'s, and the bakes' and
 //! renderer's that read a sky.
 
-/// A panorama for tests (#1675): a `top` colour over a `bottom` one (the horizon
+/// A panorama for tests: a `top` colour over a `bottom` one (the horizon
 /// at the image's middle row), the eastern half's red lifted by `east`, written as
 /// a small PNG under the test's own temp dir. Returns its path, as `skybox_path`
 /// names it.

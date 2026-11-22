@@ -1,7 +1,3 @@
-//! Sight makes targets only on the layers some perceiver's `sight_mask` holds, and
-//! that changes nothing it sees: the engine's run matches the rules before the
-//! prefilter ([`Arena::step_reference`]) tick for tick.
-
 use glam::Vec3;
 
 use super::test_world::{perceiver, target, wall, Arena, PLAYER};
@@ -24,9 +20,6 @@ fn character(s: &mut Scene, at: Vec3, layer: u8) -> [u32; 3] {
     [body, hit[0], hit[1]]
 }
 
-/// A hidden character with a perceiver on its `Head`, four visible characters
-/// (one behind a wall) and a hidden soldier in plain view; returns the arena,
-/// the head, every entity it must never see, and the visible bodies.
 fn yard() -> (Arena, u32, Vec<u32>, Vec<u32>) {
     let (mut head, mut never, mut shown) = (0, Vec::new(), Vec::new());
     let mut a = Arena::new(|s| {
@@ -52,8 +45,6 @@ fn yard() -> (Arena, u32, Vec<u32>, Vec<u32>) {
     (a, head, never, shown)
 }
 
-/// Run `a` (the engine) and `b` (the reference) side by side, `drive` moving
-/// both before each tick; their memories and budgets match tick for tick.
 fn same_as_reference(a: &mut Arena, b: &mut Arena, head: u32, drive: impl Fn(&mut Arena, usize)) {
     for tick in 0..8 {
         drive(a, tick);

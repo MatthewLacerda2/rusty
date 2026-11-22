@@ -1,14 +1,3 @@
-//! The sight sense (#1900): range, view cone and one budgeted ray per pair.
-//!
-//! For each perceiver, every sight target (see the module docs) other than its
-//! own body (an ancestor or descendant of it), within
-//! `sight_range` (or `lose_sight_range` when it is already seen) and inside the
-//! cone around the entity's forward (+Z) needs a ray from the eye to the
-//! target's bounds centre. Those pairs, in (perceiver, target) id order, share
-//! [`SightRays::per_tick`] rays a tick, round-robin from the pair after the last
-//! one traced; an untraced pair keeps last tick's answer. Out of range or out of
-//! the cone needs no ray: the target is not seen.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use glam::Vec3;
@@ -18,8 +7,6 @@ use crate::{ray, stand};
 use rusty_physics::PhysicsWorld;
 use rusty_scene::{layer_in_mask, Scene};
 
-/// A sight target: where a ray aims at it and where it stands (its feet,
-/// [`stand::feet`]: the last-known position a script reads).
 pub(super) struct Target {
     pub(super) id: u32,
     layer: u8,
@@ -39,10 +26,6 @@ struct Pair {
     was_seen: bool,
 }
 
-/// Every perceiver's visible targets this tick (target → where it stands), in
-/// the order of `perceivers`. Only a body on a layer some perceiver's
-/// `sight_mask` holds becomes a target (one on none would fail every pair's mask
-/// test), and with no such layer at all no body is walked.
 pub(super) fn look(
     scene: &Scene,
     physics: Option<&PhysicsWorld>,
@@ -55,8 +38,6 @@ pub(super) fn look(
         .filter_map(|&p| w.ai_perception(p).map(|c| c.sight_mask))
         .fold(0, |a, m| a | m);
     if mask == 0 {
-        // Nobody looks (they only hear or take damage): no target, no ray, and
-        // `rays.last` stays, as with no perceiver at all.
         return vec![BTreeMap::new(); perceivers.len()];
     }
     let targets = targets(scene, mask);
@@ -65,8 +46,6 @@ pub(super) fn look(
     })
 }
 
-/// [`look`] over a given target list, each perceiver's own body from `body`:
-/// the seam a test feeds the pre-prefilter rules through to compare the two.
 pub(super) fn look_at(
     scene: &Scene,
     physics: Option<&PhysicsWorld>,
@@ -99,11 +78,6 @@ pub(super) fn look_at(
     seen
 }
 
-/// Every entity sight may target on a layer of `mask`, in id order (who
-/// qualifies: the module docs). "Not under another body" asks every moving body
-/// above it, whatever that body's layer: the mask only cuts the candidates. The
-/// climb is a binary search in the sorted list of every moving body, so a wide
-/// mask costs no more than a narrow one per ancestor.
 fn targets(scene: &Scene, mask: u32) -> Vec<Target> {
     let w = &scene.world;
     let all = w.moving_bodies();
@@ -127,9 +101,6 @@ impl Target {
     }
 }
 
-/// `p`'s own body: its outermost ancestor-or-self that is a moving body, else
-/// itself. The unfiltered rule (an active `p`'s ancestors are active), so a
-/// perceiver on a character whose layer no mask holds still ignores its capsule.
 fn body_of(scene: &Scene, p: u32) -> u32 {
     let w = &scene.world;
     w.self_and_ancestors(p)
@@ -138,8 +109,6 @@ fn body_of(scene: &Scene, p: u32) -> u32 {
         .unwrap_or(p)
 }
 
-/// Where a sight ray aims at `id`: its collider's world bounds centre, else its
-/// character capsule's centre, else its origin.
 fn aim(scene: &Scene, id: u32) -> Vec3 {
     let w = &scene.world;
     if let Some((lo, hi)) = w.collider_bounds(id) {
@@ -170,8 +139,6 @@ fn pairs(
         let lineage: BTreeSet<u32> = w.self_and_ancestors(p).collect();
         let body = body(p);
         for (ti, t) in targets.iter().enumerate() {
-            // Its own body: under the perceiver (its hitboxes) or above it (a
-            // perceiver on a `Head` child of the character).
             let own = lineage.contains(&t.id) || w.self_and_ancestors(t.id).any(|a| a == p);
             if own || !layer_in_mask(t.layer, c.sight_mask) {
                 continue;
@@ -210,8 +177,6 @@ fn in_cone(forward: Vec3, to: Vec3, half: f32) -> bool {
     }
 }
 
-/// Which pairs get a ray this tick: up to the budget, round-robin from the pair
-/// after the last one traced. Moves the round on.
 fn schedule(
     pairs: &[Pair],
     perceivers: &[u32],

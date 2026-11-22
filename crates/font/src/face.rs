@@ -1,12 +1,3 @@
-//! crates/font/src/face.rs — one parsed font: its bytes, metrics and glyphs, and the
-//! bundled default (#419, #1328).
-//!
-//! A font is parsed from bytes the caller read: this crate reads no files. The
-//! default is Instrument Sans (SIL OFL 1.1 — the license sits beside it in
-//! `engine/fonts/`), compiled in. Faces are read with `skrifa`; shaping
-//! ([`crate::shape`], with `harfrust`) and outlines ([`FontData::outline`]) are pure
-//! functions of the font bytes, so what they give is deterministic.
-
 use rusty_core::collections::Map;
 use std::ops::Range;
 use std::sync::{Arc, Mutex, OnceLock};
@@ -21,12 +12,9 @@ pub use skrifa::GlyphId;
 /// The bundled default font's bytes.
 const DEFAULT_FONT: &[u8] = include_bytes!("../../../engine/fonts/InstrumentSans-Regular.ttf");
 
-/// One loaded font: its bytes, the shaper's per-font tables and plans, and its metrics.
 pub struct FontData {
     bytes: Arc<[u8]>,
     pub(crate) shaper: harfrust::ShaperData,
-    /// Shape plans by (direction, script), built on first use: a plan compiles the
-    /// font's lookups, so building one per run would dominate a HUD's layout.
     pub(crate) plans: Mutex<Vec<PlanEntry>>,
     /// Shaped runs by (text, unligated ranges): `shape` memoises here.
     pub(crate) runs: Mutex<Map<RunKey, Arc<[Shaped]>>>,
@@ -35,7 +23,6 @@ pub struct FontData {
     vertical: [f32; 3],
 }
 
-/// A cached shape plan and the segment properties it was built for.
 pub(crate) type PlanEntry = (
     harfrust::Direction,
     harfrust::Script,
@@ -49,12 +36,8 @@ pub(crate) type RunKey = (String, Vec<Range<usize>>);
 pub type FontHandle = Arc<FontData>;
 
 impl FontData {
-    /// Parse a `.ttf` / `.otf` file's bytes; `None` when they are no font this reads
-    /// (truncated, another format, a zero em).
     pub fn parse(bytes: Arc<[u8]>) -> Option<Self> {
         let face = FontRef::new(&bytes).ok()?;
-        // The directory parses on its own: a truncated file still lists tables
-        // that run past its end, which would read as empty glyphs later.
         let fits = |r: &skrifa::raw::TableRecord| {
             (r.offset() as usize).saturating_add(r.length() as usize) <= bytes.len()
         };
@@ -103,8 +86,6 @@ impl FontData {
     }
 }
 
-/// The engine's default font, `engine/fonts/InstrumentSans-Regular.ttf`, compiled
-/// in, so a shipped game draws it with no file beside it. Parsed once per process.
 pub fn default_font() -> FontHandle {
     static DEFAULT: OnceLock<FontHandle> = OnceLock::new();
     Arc::clone(

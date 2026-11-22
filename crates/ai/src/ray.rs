@@ -1,4 +1,4 @@
-//! crates/ai/src/ray.rs — the line-of-sight ray every AI sense shares (#1892, #1900):
+//! the line-of-sight ray every AI sense shares:
 //! the environment query's `trace` test and perception's sight sense.
 
 use glam::Vec3;

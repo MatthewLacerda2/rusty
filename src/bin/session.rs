@@ -1,23 +1,3 @@
-//! src/bin/session.rs — headless EDIT-mode session (dev-only, `--features dev`).
-//!
-//! The keystone (#177): a long-lived engine process an external agent can talk to.
-//!
-//! Usage:
-//! ```text
-//!   cargo run --bin session --features dev               # the project's boot scene (#1618)
-//!   cargo run --bin session --features dev -- <scene>    # boot a specific scene
-//!   cargo run --bin session --features dev -- --empty    # start from empty scene
-//!   cargo run --bin session --features dev -- --project <dir> [<scene>|--empty]
-//!                                                        # chdir into a project first
-//! ```
-//!
-//! Holds a live `GameWorld` in **edit mode** (not forced play) and reads commands
-//! from stdin, one Lua line per command, evaluating each against the live world
-//! through the single existing evaluator and writing one JSON response line per
-//! command to stdout (`{"ok":true,"result":"…"}` / `{"ok":false,"error":"…"}`).
-//! State persists across commands for the life of the process; a bad command is
-//! reported and the session stays up. The loop ends at EOF.
-
 use std::io::{self, BufReader};
 use std::process::exit;
 
@@ -36,10 +16,6 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     rusty::core::project::answer_help(&args, USAGE);
 
-    // `--project <dir>` chdirs first; then `--empty` starts blank, an explicit path
-    // boots that scene, and no argument boots the project's boot scene
-    // (`core::project::boot_scene`: the editor's last scene, then the startup scene,
-    // then an empty one, #1618).
     let (boot_scene, project) = session::boot_from_args(&args);
 
     let mut sess = match Session::boot(&boot_scene, project) {
