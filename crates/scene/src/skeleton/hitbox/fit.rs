@@ -1,11 +1,10 @@
-//! A bone too small or not asked for hands its vertices to its parent.
 use glam::Vec3;
 
 use rusty_asset::SkinData;
 use rusty_components::mesh::Vertex;
 use rusty_components::{CapsuleAxis, ColliderShape};
 
-/// Above this ratio of the two cross-section extents a part is flat (a chest) and gets a box.
+/// Above this ratio of its cross-section extents a part is flat (a chest): a box.
 const FLAT_RATIO: f32 = 1.5;
 
 /// The thinnest box extent, in joint units, so a flat cluster never yields a zero one.
@@ -14,7 +13,7 @@ const MIN_THICKNESS: f32 = 1.0e-3;
 #[derive(Clone, Debug, PartialEq)]
 pub struct HitboxOptions {
     pub bones: Option<Vec<String>>,
-    /// The span a bone needs for a hitbox of its own, in model units before scaling.
+    /// A bone's least span for a hitbox, in model units before scaling.
     pub min_size: f32,
     pub layer: String,
 }
