@@ -1,4 +1,4 @@
-//! Persistent decals re-attached by hierarchy path (#1518) when names repeat or
+//! Persistent decals re-attached by hierarchy path when names repeat or
 //! hold a `/`: each owner gets its own marks back after a reload.
 
 use glam::Vec3;

@@ -1,12 +1,3 @@
-//! crates/edit/src/authoring/nav/offmesh_link.rs — Shared OffMeshLink authoring ops (#462).
-//!
-//! The ONE place the engine mutates an entity's `OffMeshLinkComponent`. The
-//! editor's card and the Lua `OffMeshLink.*` setters both route every write
-//! through these, so the rules live once: the ends stay finite, and a cost below
-//! zero (or NaN) means "use the link's length", stored as `-1`.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::OffMeshLinkComponent as Link;
@@ -17,12 +8,10 @@ pub fn set_active(l: &mut Link, active: bool) {
     l.active = active;
 }
 
-/// Set the start point, local to the entity. A non-finite point is ignored.
 pub fn set_start(l: &mut Link, start: Vec3) {
     l.start = finite3_or(start, l.start);
 }
 
-/// Set the end point, local to the entity. A non-finite point is ignored.
 pub fn set_end(l: &mut Link, end: Vec3) {
     l.end = finite3_or(end, l.end);
 }
@@ -42,8 +31,6 @@ pub fn set_cost_override(l: &mut Link, cost: f32) {
     };
 }
 
-/// Set the link's navigation area (#460). An id past the area table's limit is
-/// ignored.
 pub fn set_area(l: &mut Link, area: i64) {
     if (0..rusty_scene::nav_settings::MAX_AREAS as i64).contains(&area) {
         l.area = area as u8;

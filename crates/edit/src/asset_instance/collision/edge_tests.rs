@@ -1,7 +1,3 @@
-//! A collision mesh (#1960) at its edges, from the second review: it starts with
-//! one subdivision (no "held at" warning on any rebuild), an undo refits the box to
-//! it once every mesh is back, and collision meshes that name each other hide nothing.
-
 use super::chair::write as write_chair;
 use super::tests::{spawn, triangles};
 use crate::asset_instance::instantiate_asset;
@@ -11,7 +7,6 @@ use crate::serialize::to_scene_data;
 use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 use rusty_scene::Scene;
 
-/// Entity `id`'s collision mesh has one subdivision, so a rebuild warns of nothing.
 fn starts_at_one(scene: &Scene, id: u32) {
     let c = scene.world.collider(id).unwrap();
     let shared = c.collision_mesh.as_ref().expect("a collision mesh");
@@ -83,7 +78,7 @@ fn collision_meshes_that_name_each_other_hide_nothing() {
         mesh: Some("Chair".into()),
     };
     settings.colliders.insert("Chair_col".into(), back);
-    sidecar::save(source, &settings).unwrap(); // a hand edit: save checks nothing
+    sidecar::save(source, &settings).unwrap();
     let read = sidecar::load(source).unwrap();
     assert!(read.colliders.values().all(|c| c.mesh.is_none()));
     let (scene, kids) = spawn(&path);

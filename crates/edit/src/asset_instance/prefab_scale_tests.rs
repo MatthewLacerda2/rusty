@@ -1,7 +1,3 @@
-//! A model re-import refits a linked prefab instance's mesh collider (#1398) as the
-//! model's change, not the author's (#1527): it is no override, and the instance's
-//! own edits stay overrides.
-
 use glam::Vec3;
 
 use super::{instantiate_asset, set_model_scale_factor};

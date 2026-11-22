@@ -1,8 +1,6 @@
 use super::{save_to_file, scene_json, SAVE_IN_PLAY};
 use rusty_scene::{Scene, ScriptComponent};
 
-/// A script attached by absolute path inside the project saves relative to it,
-/// `/`-separated (#783), and one outside it saves as it was.
 #[test]
 fn a_saved_scene_names_workspace_scripts_relative_to_the_workspace() {
     let root = std::env::current_dir().unwrap();
@@ -22,8 +20,6 @@ fn a_saved_scene_names_workspace_scripts_relative_to_the_workspace() {
     assert!(!json.contains(&*root.to_string_lossy()), "{json}");
 }
 
-/// Save is refused in Play (#1340): the World holds the play state, and the file
-/// on disk is left byte for byte as it was.
 #[test]
 fn a_playing_scene_is_never_saved() {
     let path = rusty_test_support::temp::dir().join("authored.scene");
@@ -47,8 +43,6 @@ fn a_playing_scene_is_never_saved() {
     );
 }
 
-/// A save over an existing scene goes through a temp file renamed into place
-/// (#1991): the new bytes are there and nothing is left beside them.
 #[test]
 fn a_save_over_a_scene_leaves_the_new_bytes_and_no_temp_file() {
     let dir = rusty_test_support::temp::dir();
@@ -72,9 +66,6 @@ fn a_save_over_a_scene_leaves_the_new_bytes_and_no_temp_file() {
     );
 }
 
-/// A save that cannot write its temp file (the folder read-only) leaves the old
-/// scene whole: the save goes through a sibling file, never the scene in place
-/// (#1991).
 #[test]
 fn a_failed_save_leaves_the_old_scene_whole() {
     use std::os::unix::fs::PermissionsExt;
@@ -87,7 +78,6 @@ fn a_failed_save_leaves_the_old_scene_whole() {
     let before = std::fs::read(&path).unwrap();
     let mode = |m| std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(m));
     mode(0o555).unwrap();
-    // Root writes through any mode: then there is nothing to prove.
     let probe = dir.join("probe");
     if std::fs::write(&probe, "").is_ok() {
         let _ = std::fs::remove_file(probe);

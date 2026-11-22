@@ -1,5 +1,5 @@
-//! Undoing a Destroy brings the entity back as it was (#1631): lit by the last
-//! bake, wearing the decals it owned (#1649), and a skinned one bound to its
+//! Undoing a Destroy brings the entity back as it was: lit by the last
+//! bake, wearing the decals it owned, and a skinned one bound to its
 //! restored bones.
 
 use glam::Vec3;
@@ -67,8 +67,6 @@ fn an_undone_destroy_of_a_skinned_entity_binds_its_skeleton() {
     );
 }
 
-/// An owned decal goes with its owner, comes back with the Undo in its place in
-/// the blend order, and goes again with the Redo.
 #[test]
 fn an_undone_destroy_puts_its_decals_back_in_blend_order() {
     let mut scene = Scene::new();
@@ -96,7 +94,7 @@ fn an_undone_destroy_puts_its_decals_back_in_blend_order() {
 }
 
 /// The journal records the parent a destroy takes the child out of, so the Undo
-/// puts both links back, never only the child's (#1777): a one-sided link would
+/// puts both links back, never only the child's: a one-sided link would
 /// keep the child lit when its parent is switched off.
 #[test]
 fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
@@ -112,9 +110,6 @@ fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
     assert!(!scene.world.is_active_in_hierarchy(child));
 }
 
-/// Undo puts a step's entities back in id order (#1805): a child despawned out of
-/// its parent's list comes back listed once, and a child older than its parent
-/// comes back before it and waits for it.
 #[test]
 fn an_undone_destroy_puts_both_sides_of_a_parent_link_back() {
     for child_first in [false, true] {

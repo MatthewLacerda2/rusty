@@ -1,5 +1,5 @@
 //! A linked prefab instance keeps its references to a bone, and drops one to a
-//! destroyed entity, through a save and a load and an apply-to-source (#1264).
+//! destroyed entity, through a save and a load and an apply-to-source.
 
 use super::super::fixture::{connected, hero, reload};
 use crate::prefab::apply::apply_instance_to_source;

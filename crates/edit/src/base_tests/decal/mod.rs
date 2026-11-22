@@ -1,4 +1,4 @@
-//! `rusty_scene::decal`: persistent decals across a Play load (#1518).
+//! `rusty_scene::decal`: persistent decals across a Play load.
 
 mod load;
 mod persist;

@@ -1,4 +1,4 @@
-//! A re-import re-binds a skeleton's bones in place, by name (#1265): a bone the
+//! A re-import re-binds a skeleton's bones in place, by name: a bone the
 //! new rig still names keeps its entity, its flags and the selection.
 
 use std::path::Path;

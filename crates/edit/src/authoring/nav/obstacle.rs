@@ -1,19 +1,8 @@
-//! crates/edit/src/authoring/nav/obstacle.rs — Shared NavMeshObstacle authoring ops (#456).
-//!
-//! The ONE place the engine mutates an entity's `NavMeshObstacleComponent`'s
-//! authored fields. The editor's card and the Lua `NavMeshObstacle.*` setters both
-//! route every write through these, so the bounds live once: sizes stay positive
-//! and the carving thresholds never go negative. The runtime fields (the carve
-//! pose, stationary time, velocity) are written only by the play-mode tick.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_scene::rules::sanitize::{at_least, finite3_or, non_negative, MIN_EXTENT};
 
-/// The smallest extent a box side, radius or height may have.
 pub const MIN_SIZE: f32 = MIN_EXTENT;
 
 /// Enable or disable the obstacle (Unity's `enabled`).
@@ -21,27 +10,22 @@ pub fn set_active(o: &mut Obstacle, active: bool) {
     o.active = active;
 }
 
-/// Switch between a box and an upright capsule.
 pub fn set_shape(o: &mut Obstacle, shape: ObstacleShape) {
     o.shape = shape;
 }
 
-/// Set the shape's centre, in local space. A non-finite centre is ignored.
 pub fn set_center(o: &mut Obstacle, center: Vec3) {
     o.center = finite3_or(center, o.center);
 }
 
-/// Set the box's size, each side floored at [`MIN_SIZE`]. Non-finite is ignored.
 pub fn set_size(o: &mut Obstacle, size: Vec3) {
     o.size = finite3_or(size, o.size).max(Vec3::splat(MIN_SIZE));
 }
 
-/// Set the capsule's radius, floored at [`MIN_SIZE`].
 pub fn set_radius(o: &mut Obstacle, radius: f32) {
     o.radius = at_least(radius, MIN_SIZE);
 }
 
-/// Set the capsule's full height, floored at [`MIN_SIZE`].
 pub fn set_height(o: &mut Obstacle, height: f32) {
     o.height = at_least(height, MIN_SIZE);
 }
@@ -56,7 +40,6 @@ pub fn set_carve_only_stationary(o: &mut Obstacle, only: bool) {
     o.carve_only_stationary = only;
 }
 
-/// Set the distance that counts as moving, floored at 0.
 pub fn set_move_threshold(o: &mut Obstacle, metres: f32) {
     o.move_threshold = non_negative(metres);
 }

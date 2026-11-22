@@ -1,6 +1,3 @@
-//! A model's humanoid settings changed (#1747): the skinned meshes whose clips
-//! that changes take their new clips at once.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -8,12 +5,6 @@ use rusty_asset::{humanoid::HumanoidSettings, AssetRef};
 use rusty_core::fs::written::Stale;
 use rusty_scene::Scene;
 
-/// Write `settings` as the humanoid settings of the model at `path` and give
-/// every skinned mesh in `scene` whose clips it shapes (instanced from `path`,
-/// or from a model borrowing clips from it) its re-imported clips. Its rig,
-/// bones and geometry are left as they are: only clips change. A setting the
-/// sidecar already holds changes nothing. The one verb `Assets.SetHumanoid` runs.
-/// Returns how many meshes took new clips.
 pub fn set_humanoid(
     scene: &mut Scene,
     path: &str,

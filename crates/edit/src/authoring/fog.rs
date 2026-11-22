@@ -1,19 +1,8 @@
-//! crates/edit/src/authoring/fog.rs — Shared scene-fog ops (#437).
-//!
-//! The ONE place the engine mutates the scene's `FogSettings`, with the clamps
-//! each write owns. BOTH the editor's Scene Settings panel and the Lua
-//! `Graphics.SetFog*` setters route through these, so the panel and the binding
-//! share one write + one clamp. The `Graphics` adapter still parses the mode name
-//! into the typed value `set_mode` takes.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_scene::fog::{FogMode, FogSettings};
 use rusty_scene::rules::sanitize::{finite, finite3, non_negative};
 
-/// Set the fog mode (`Off` disables fog everywhere).
 pub fn set_mode(fog: &mut FogSettings, mode: FogMode) {
     fog.mode = mode;
 }
@@ -44,7 +33,6 @@ pub fn set_height_falloff(fog: &mut FogSettings, falloff: f32) {
     fog.height_falloff = non_negative(falloff);
 }
 
-/// Set the height below which fog is at full thickness.
 pub fn set_base_height(fog: &mut FogSettings, height: f32) {
     fog.base_height = finite(height);
 }

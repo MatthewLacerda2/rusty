@@ -1,11 +1,3 @@
-//! crates/edit/src/io/bundled.rs — the engine's seed content, embedded (#829).
-//!
-//! A project can live anywhere, nowhere near the engine checkout, so the files the
-//! engine seeds into it travel inside the binary instead of being read from
-//! `engine/` at run time. The sources stay in `engine/` (a unit test holds these
-//! lists to that folder's contents, so a new script can't be forgotten here).
-
-/// The bundled game scripts (`engine/scripts/*.lua`), by file name.
 pub const SCRIPTS: &[(&str, &str)] = &[
     (
         "bot.lua",
@@ -21,7 +13,6 @@ pub const SCRIPTS: &[(&str, &str)] = &[
     ),
 ];
 
-/// The UI widget kit's scripts (`engine/scripts/ui/*.lua`, #422), by file name.
 pub const UI_SCRIPTS: &[(&str, &str)] = &[
     (
         "button.lua",
@@ -65,14 +56,9 @@ pub const UI_SCRIPTS: &[(&str, &str)] = &[
     ),
 ];
 
-/// The starter material library (#173): glTF-PBR materials, no textures.
 pub const STARTER_MATERIALS: &[u8] = include_bytes!("../../../../engine/materials/starter.gltf");
-/// Where [`STARTER_MATERIALS`] is seeded, relative to the project root.
 pub const STARTER_MATERIALS_PATH: &str = "assets/materials/starter.gltf";
 
-/// The bundled script at `rel`, a path under `engine/scripts/` (`bot.lua`,
-/// `ui/range_axis.lua`): what `require` falls back to when the project has no copy
-/// (#1062).
 pub fn script(rel: &str) -> Option<&'static str> {
     let (list, name) = match rel.strip_prefix("ui/") {
         Some(name) => (UI_SCRIPTS, name),

@@ -1,7 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/render.rs — the rendering components' field tables:
-//! `Transform`, `Mesh`, `Material`, `Light`, `Camera`, `PostProcessing` and
-//! `LODGroup` and `LightProbeProxyVolume`.
-
 use super::super::table::{group, inspect, op, part, ro, unheld, with, Group};
 use super::super::value::Mask;
 use super::NO_OP;
@@ -107,7 +103,6 @@ inspect! {
     ];
 }
 
-/// A camera's render target, whole: `None` draws to the screen again.
 fn set_target(c: &mut CameraComponent, target: Option<RenderTarget>) {
     let Some(t) = target else {
         return camera::set_target_texture(c, "", 0, 0);
@@ -117,11 +112,6 @@ fn set_target(c: &mut CameraComponent, target: Option<RenderTarget>) {
     camera::set_target_update_every(c, t.update_every);
 }
 
-/// The LOD levels, whole: the count through add/remove, then each level's
-/// renderers and threshold. A threshold is clamped between its neighbours, so
-/// they are first dropped to zero, coarsest first, and then set finest first: each
-/// one is then clamped only by the finer threshold just set. Two passes, not one
-/// per level.
 fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
     while g.levels.len() > levels.len() {
         lod::remove_level(g, g.levels.len() - 1);

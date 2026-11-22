@@ -1,19 +1,13 @@
-//! What a joint holds hangs from the spawned bone (#1083, #453): a mesh on the
-//! joint itself and a non-joint child (a gun under the hand), so both follow it.
-
 use glam::Vec3;
 
 use super::tests::child;
 use rusty_scene::Scene;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 
-/// The animated rig with a `Prop` mesh on `Joint1` and a `Gun` under it 1 m
-/// along Z, spawned whole.
 fn rig() -> (Scene, u32) {
     rig_in("rusty_1083_rig")
 }
 
-/// [`rig`], its file in the test folder's `dir`.
 fn rig_in(dir: &str) -> (Scene, u32) {
     let path = write_rig(dir, false);
     let asset = rusty_asset::import_and_sync_sidecar(&path).unwrap();
@@ -23,8 +17,6 @@ fn rig_in(dir: &str) -> (Scene, u32) {
     (scene, root)
 }
 
-/// Write the rig's file into `dir`, with a `Scope` node under `Joint1` too when
-/// `scope`.
 fn write_rig(dir: &str, scope: bool) -> std::path::PathBuf {
     let mut gltf: serde_json::Value = serde_json::from_str(ANIMATED_GLTF).unwrap();
     let prop = serde_json::json!({

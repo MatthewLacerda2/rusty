@@ -1,19 +1,6 @@
-//! crates/edit/src/authoring/fields/introspect.rs — a component's serialized fields and their
-//! types, read from its serde derive.
-//!
-//! A derived `Deserialize` hands its struct's field list to
-//! `Deserializer::deserialize_struct`; [`serde_fields`] is a deserializer that
-//! records that list and stops. It is how the field-table test learns every field
-//! a component saves, with no instance to build and no list to keep by hand.
-//! `#[serde(skip)]` fields are not in the list, which is the point: runtime state
-//! is never exposed. [`field_type`] drives the derive the same way, one field at
-//! a time, for the type `Component.Fields` reports.
-
 use serde::de::{self, Deserialize, Visitor};
 
 #[cfg(test)]
-/// The field names `T`'s derived `Deserialize` declares, or `None` when `T` is not
-/// read as a struct (a hand-written impl, a map, a newtype).
 pub fn serde_fields<'de, T: Deserialize<'de>>() -> Option<&'static [&'static str]> {
     let mut found = None;
     let _ = T::deserialize(Probe(&mut found));
@@ -65,10 +52,6 @@ impl<'de> de::Deserializer<'de> for Probe<'_> {
     }
 }
 
-/// What `T`'s field `name` reads as, from the deserializer calls its derive makes:
-/// whether it is optional, and the Lua type of what it holds (`None` when the
-/// derive does not say: a field read through `deserialize_any`, or by a flattened
-/// struct).
 pub fn field_type<'de, T: Deserialize<'de>>(name: &'static str) -> (bool, Option<&'static str>) {
     let mut found = Shape::default();
     let _ = T::deserialize(FieldProbe {
@@ -84,7 +67,6 @@ struct Shape {
     lua: Option<&'static str>,
 }
 
-/// Opens `T` as a map holding only field `name`, and probes its value.
 struct FieldProbe<'a> {
     name: &'static str,
     out: &'a mut Shape,
@@ -132,7 +114,6 @@ impl<'de> de::MapAccess<'de> for OneField<'_> {
     }
 }
 
-/// Records the Lua type a value is read as, then stops.
 struct TypeProbe<'a>(&'a mut Shape);
 
 impl TypeProbe<'_> {
@@ -200,8 +181,6 @@ impl<'de> de::Deserializer<'de> for TypeProbe<'_> {
         self.found("table")
     }
 
-    // An enum is read by its name; one carrying data is a table, which the default
-    // value (when there is one) says instead.
     fn deserialize_enum<V: Visitor<'de>>(
         self,
         _: &'static str,

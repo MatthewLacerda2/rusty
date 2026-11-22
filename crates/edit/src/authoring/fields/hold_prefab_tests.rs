@@ -1,11 +1,7 @@
-//! A prefab file is held once, when it is read (#1418), as a scene file is, and
-//! an in-range one reads exactly as written.
-
 use super::tests::dressed;
 use crate::{load_and_instantiate, read_prefab_file, save_prefab, PrefabData};
 use rusty_scene::Scene;
 
-/// `dressed()` with `edit` applied, saved as a prefab under `tag`; its path.
 fn saved(tag: &str, edit: impl FnOnce(&mut Scene, u32)) -> String {
     let (mut scene, id) = dressed();
     edit(&mut scene, id);
@@ -27,8 +23,6 @@ fn a_prefab_is_held_when_read() {
     assert_eq!(scene.world.audio(root).unwrap().volume, 1.0);
 }
 
-/// The hold goes through a scratch World; what it has no column for (a bone
-/// attachment's `parent_bone`) comes back as written.
 #[test]
 fn an_in_range_prefab_reads_as_written() {
     let path = saved("as_written", |_, _| {});

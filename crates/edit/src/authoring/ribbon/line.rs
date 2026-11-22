@@ -1,44 +1,31 @@
-//! crates/edit/src/authoring/ribbon/line.rs — Shared Line-authoring ops (#441).
-//!
-//! The ONE place a `LineComponent`'s own fields are written; its look goes
-//! through `authoring::ribbon`. The editor's Line card and the Lua `Line.*`
-//! namespace both call these. A non-finite point is dropped (a NaN would poison
-//! the whole strip's geometry).
-
 use glam::Vec3;
 
 use rusty_components::LineComponent;
 use rusty_scene::rules::sanitize::finite3_or;
 
-/// The most points a line holds — a guard against a runaway script loop.
 pub const MAX_POSITIONS: usize = 4096;
 
-/// Replace every point (non-finite ones dropped, capped at [`MAX_POSITIONS`]).
 // lint: allow(sanitize) the `is_finite` filter drops every non-finite point
 pub fn set_positions(l: &mut LineComponent, positions: &[Vec3]) {
     let finite = positions.iter().copied().filter(|p| p.is_finite());
     l.positions = finite.take(MAX_POSITIONS).collect();
 }
 
-/// Move point `index` (0-based); out of range or non-finite is ignored.
 pub fn set_position(l: &mut LineComponent, index: usize, position: Vec3) {
     if let Some(p) = l.positions.get_mut(index) {
         *p = finite3_or(position, *p);
     }
 }
 
-/// Grow (new points repeat the last one, or the origin) or shrink to `count`.
 pub fn set_position_count(l: &mut LineComponent, count: usize) {
     let fill = l.positions.last().copied().unwrap_or(Vec3::ZERO);
     l.positions.resize(count.min(MAX_POSITIONS), fill);
 }
 
-/// Whether the points are world space (else the entity's local space).
 pub fn set_use_world_space(l: &mut LineComponent, world: bool) {
     l.use_world_space = world;
 }
 
-/// Whether the last point joins back to the first.
 pub fn set_looping(l: &mut LineComponent, looping: bool) {
     l.looping = looping;
 }

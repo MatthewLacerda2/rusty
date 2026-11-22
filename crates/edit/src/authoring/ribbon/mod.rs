@@ -1,13 +1,3 @@
-//! crates/edit/src/authoring/ribbon/mod.rs — Shared ribbon-style ops (#441).
-//!
-//! The ONE place a Trail's or a Line's [`RibbonStyle`] is written. The editor's
-//! Trail and Line cards and the Lua `Trail.*` / `Line.*` style verbs all route
-//! through these, so the bounds live once: widths are non-negative, curve and
-//! gradient keys sit in `t ∈ [0, 1]`, colours are non-negative (HDR is allowed,
-//! for additive tracers that bloom) and alpha stays in `[0, 1]`.
-//!
-//! Pure.
-
 pub mod line;
 pub mod trail;
 
@@ -42,17 +32,14 @@ pub fn set_color(s: &mut RibbonStyle, color: Gradient) {
     s.color = g;
 }
 
-/// Set (or, with an empty string, clear) the texture path.
 pub fn set_texture(s: &mut RibbonStyle, texture: String) {
     s.texture = (!texture.is_empty()).then(|| MapRef::from(texture));
 }
 
-/// Set how the texture maps along the length.
 pub fn set_texture_mode(s: &mut RibbonStyle, mode: TextureMode) {
     s.texture_mode = mode;
 }
 
-/// Set the blend (alpha or additive).
 pub fn set_blend(s: &mut RibbonStyle, blend: ParticleBlend) {
     s.blend = blend;
 }

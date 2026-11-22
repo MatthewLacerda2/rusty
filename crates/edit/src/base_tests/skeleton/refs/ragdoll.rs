@@ -1,5 +1,5 @@
 //! A ragdoll's saved bone joint (`BoneBinding::bodies`) follows its prefab like any
-//! other id leaf (#1264): each stamp's bone joins the bone or prop of its own copy.
+//! other id leaf: each stamp's bone joins the bone or prop of its own copy.
 
 use super::super::fixture::{connected, hero, joint_to};
 use crate::prefab::{extract_prefab, instantiate_prefab, PrefabData};

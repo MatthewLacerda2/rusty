@@ -1,8 +1,3 @@
-//! crates/edit/src/rehydrate/reimport/shared.rs — a live re-import reaches a Mesh-shaped
-//! collider's own meshes too: a part whose Mesh was removed (its kept `shared_mesh`,
-//! #1657) and a part built from a collision mesh (`collision_mesh`, #1960) collide
-//! with, and feed the navmesh, the model as it is now, not as it was at the last load.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -13,13 +8,6 @@ use rusty_components::ColliderShape;
 use rusty_scene::rehydrate::{bounds_of, install_sub_mesh, refit_collider, warn_once_of, Which};
 use rusty_scene::Scene;
 
-/// Rebuild every Mesh-shaped collider's kept shared mesh (on an entity without a
-/// Mesh) and collision mesh, outside `skip`, whose reference's file `names` accepts,
-/// from `imported` (each file imported once, shared with the Meshes' walk), and refit
-/// its collider's box. A kept mesh whose sub-object now imports empty keeps the old
-/// geometry, as a Mesh does, so the part never drops out of physics; a collision
-/// mesh whose sub-object is gone is emptied (warned once), so the collider falls
-/// back to its entity's Mesh rather than to triangles the model no longer has.
 pub(super) fn reimport_shared(
     scene: &mut Scene,
     skip: &BTreeSet<u32>,
@@ -37,7 +25,6 @@ pub(super) fn reimport_shared(
     }
 }
 
-/// [`reimport_shared`] for entity `id`'s `which` mesh.
 fn reimport_one(
     scene: &mut Scene,
     id: u32,
@@ -63,7 +50,6 @@ fn reimport_one(
     let asset = imported
         .entry(reference.path)
         .or_insert_with_key(|file| rusty_asset::imported(Path::new(file)).ok());
-    // A file that fails to import keeps every mesh as it was, as the Meshes' walk does.
     let Some(asset) = asset.as_ref() else {
         return;
     };
@@ -73,7 +59,6 @@ fn reimport_one(
         return;
     }
     let own = scene.world.mesh(id).and_then(|m| mesh_bounds(&m));
-    // A linked prefab entity's refit is the model's, never an override (#1527).
     let linked = scene.world.prefab_link(id).is_some();
     let before = linked.then(|| scene.world.reference_document(id)).flatten();
     let Some(mut collider) = scene.world.collider_mut(id) else {
@@ -95,12 +80,10 @@ fn reimport_one(
     }
 }
 
-/// The box around `mesh`'s rest-pose vertices.
 fn mesh_bounds(mesh: &rusty_components::MeshComponent) -> Option<(glam::Vec3, glam::Vec3)> {
     bounds_of(mesh.vertices.iter().map(|v| v.position))
 }
 
-/// Say once that the collision mesh `reference` is gone from its model.
 fn warn_gone(id: u32, reference: &str) {
     warn_once_of(reference, || {
         format!(

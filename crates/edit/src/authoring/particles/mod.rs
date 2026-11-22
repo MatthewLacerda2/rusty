@@ -1,23 +1,3 @@
-//! crates/edit/src/authoring/particles/ — Shared particle-emitter-authoring ops.
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `ParticleEmitterComponent` field by field: emission (`active` / `emit_mode` /
-//! `looping` / `simulation_space` / `simulation` / `rate` / `burst_count` / `max_particles`), rendering (`blend` /
-//! `texture`), shape + per-particle motion (`shape` / `emit_from` / `lifetime` /
-//! `speed` / `direction` / `spread` / `gravity`), start size / rotation / colour
-//! ranges, the over-life curves and gradient, collision (`collision` /
-//! `bounciness`), sub-emitters, and the deterministic `seed`. The #440 render
-//! settings (`render.*`: mode, stretch, mesh, flipbook, soft, lit) live in `render`.
-//!
-//! BOTH the editor's Particle System card and the Lua `Particles.*` field-setters
-//! route through these, so the egui panel and the binding share one write (#287). The
-//! `Particles` surface's `Emit`/`Burst`/`Clear` are emission *operations* (they call
-//! the component's seeded spawn path), not field writes, so they stay in the API; its
-//! setters (`SetActive`, `SetRate`, `SetShape`, `SetLifetime`, …) are field writes
-//! routed here.
-//!
-//! Pure.
-
 mod render;
 mod simulation;
 
@@ -38,25 +18,18 @@ use rusty_scene::rules::sanitize::{
     non_negative, range_or,
 };
 
-/// Set the emitter's `active` gate.
 pub fn set_active(p: &mut ParticleEmitterComponent, active: bool) {
     p.active = active;
 }
 
-/// Set the emission mode (continuous / burst).
 pub fn set_emit_mode(p: &mut ParticleEmitterComponent, mode: EmitMode) {
     p.emit_mode = mode;
 }
 
-/// Set whether the emitter loops.
 pub fn set_looping(p: &mut ParticleEmitterComponent, looping: bool) {
     p.looping = looping;
 }
 
-/// Set the simulation space (#1529). A change forgets where the live particles
-/// were last placed, so a switch never carries them by a stale matrix; a `Gpu`
-/// emitter's live particles are stored in the old space with nothing to carry
-/// them, so it forgets them too, as a change of target does (#2170).
 pub fn set_simulation_space(p: &mut ParticleEmitterComponent, space: SimulationSpace) {
     simulation::retarget(p, p.simulation, space);
 }
@@ -66,25 +39,19 @@ pub fn set_rate(p: &mut ParticleEmitterComponent, rate: f32) {
     p.rate = non_negative(rate);
 }
 
-/// Set the per-burst particle count.
 pub fn set_burst_count(p: &mut ParticleEmitterComponent, burst_count: u32) {
     p.burst_count = burst_count;
 }
 
-/// Set the live-particle cap, stored as given. A `Gpu` emitter holds at most
-/// `GPU_MAX_PARTICLES` whatever it is (`ParticleEmitterComponent::particle_cap`),
-/// and warns when it is above (#2170).
 pub fn set_max_particles(p: &mut ParticleEmitterComponent, max_particles: u32) {
     p.max_particles = max_particles;
     Dishonoured::Cap.warn(p);
 }
 
-/// Set the blend mode (alpha / additive).
 pub fn set_blend(p: &mut ParticleEmitterComponent, blend: ParticleBlend) {
     p.blend = blend;
 }
 
-/// Set (or, with an empty string, clear) the particle texture path.
 pub fn set_texture(p: &mut ParticleEmitterComponent, texture: String) {
     p.texture = (!texture.is_empty()).then(|| MapRef::from(texture));
 }
@@ -95,28 +62,22 @@ pub fn set_lifetime(p: &mut ParticleEmitterComponent, lifetime: Range) {
     p.lifetime = Range::new(non_negative(r.min), non_negative(r.max));
 }
 
-/// Set the per-particle launch speed range.
 pub fn set_speed(p: &mut ParticleEmitterComponent, speed: Range) {
     p.speed = range_or(speed, p.speed);
 }
 
-/// Set the emission direction (the shape's axis).
 pub fn set_direction(p: &mut ParticleEmitterComponent, direction: Vec3) {
     p.direction = finite3_or(direction, p.direction);
 }
 
-/// Set the emission spread.
 pub fn set_spread(p: &mut ParticleEmitterComponent, spread: f32) {
     p.spread = non_negative(spread);
 }
 
-/// Set the per-particle gravity.
 pub fn set_gravity(p: &mut ParticleEmitterComponent, gravity: Vec3) {
     p.gravity = finite3(gravity);
 }
 
-/// Set the emission shape: radii `≥ 0`, a box's size `≥ 0` (a non-finite size is
-/// zero), a cone's angle in `[0, 90]` degrees (Unity's shape module range).
 // lint: allow(sanitize) each variant's floats go through a helper in the match
 pub fn set_shape(p: &mut ParticleEmitterComponent, shape: EmitShape) {
     p.shape = match shape {
@@ -140,7 +101,6 @@ pub fn set_shape(p: &mut ParticleEmitterComponent, shape: EmitShape) {
     };
 }
 
-/// Set whether the shape emits from its volume or its surface / edge.
 pub fn set_emit_from(p: &mut ParticleEmitterComponent, from: EmitFrom) {
     p.emit_from = from;
 }
@@ -156,23 +116,18 @@ pub fn set_rotation(p: &mut ParticleEmitterComponent, rotation: Range) {
     p.rotation = range_or(rotation, p.rotation);
 }
 
-/// Set the start colour range (RGBA, unmultiplied).
 pub fn set_color(p: &mut ParticleEmitterComponent, color: ColorRange) {
     p.color = color_range_or(color, p.color);
 }
 
-/// Set the size-over-life multiplier curve (keys re-sorted by `t`, non-finite
-/// keys dropped).
 pub fn set_size_over_life(p: &mut ParticleEmitterComponent, curve: Curve) {
     p.size_over_life = finite_curve(curve);
 }
 
-/// Set the colour-over-life gradient (keys re-sorted by `t`).
 pub fn set_color_over_life(p: &mut ParticleEmitterComponent, gradient: Gradient) {
     p.color_over_life = finite_gradient(gradient);
 }
 
-/// Set the drag-over-life curve (fraction of velocity lost per second).
 pub fn set_drag(p: &mut ParticleEmitterComponent, curve: Curve) {
     p.drag = finite_curve(curve);
 }
@@ -182,7 +137,6 @@ pub fn set_rotation_speed(p: &mut ParticleEmitterComponent, curve: Curve) {
     p.rotation_speed = finite_curve(curve);
 }
 
-/// Set (or, with `None`, clear) the sub-emitter fired at `trigger`.
 pub fn set_sub_emitter(
     p: &mut ParticleEmitterComponent,
     trigger: SubEmitTrigger,
@@ -192,23 +146,19 @@ pub fn set_sub_emitter(
     Dishonoured::SubEmitter(trigger).warn(p);
 }
 
-/// Set the fraction of a parent particle's velocity sub-particles inherit.
 pub fn set_inherit_velocity(p: &mut ParticleEmitterComponent, fraction: f32) {
     p.sub_emitters.inherit_velocity = finite(fraction);
 }
 
-/// Set the collision response (none / die / bounce).
 pub fn set_collision(p: &mut ParticleEmitterComponent, collision: CollisionResponse) {
     p.collision = collision;
     Dishonoured::Collision.warn(p);
 }
 
-/// Set the collision bounciness (restitution).
 pub fn set_bounciness(p: &mut ParticleEmitterComponent, bounciness: f32) {
     p.bounciness = non_negative(bounciness);
 }
 
-/// Set the deterministic spawn seed.
 pub fn set_seed(p: &mut ParticleEmitterComponent, seed: u64) {
     p.seed = seed;
 }
@@ -249,7 +199,7 @@ mod tests {
             assert_eq!(p.size, Range::new(0.0, 2.0), "size clamps to 0");
             assert_eq!(p.seed, 42);
         }
-        set_texture(&mut e, String::new()); // empty clears
+        set_texture(&mut e, String::new());
         assert_eq!(e.texture, None);
     }
 }

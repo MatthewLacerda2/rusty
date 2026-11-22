@@ -1,5 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/nav.rs — the navigation components' field tables.
-
 use super::super::table::{inspect, op, ro, with};
 use super::super::value::Mask;
 use crate::authoring::nav::offmesh_link as link;

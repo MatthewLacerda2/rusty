@@ -1,76 +1,46 @@
-//! crates/edit/src/authoring/audio/source.rs — Shared audio-source-authoring ops.
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `AudioSourceComponent` field by field: the `clip` path, per-source `volume`, the
-//! playback flags (`looping` / `play_on_start` / `is_time_scaled`), and the spatial
-//! fields (`spatial_blend` / `initial_distance` / `final_distance`) and the mixer
-//! `output_group` (#465), the `occlusion_enabled` opt-out (#467), and the `doppler_level` (#1749).
-//!
-//! The editor's Audio Source card routes every field write through these (#287). The
-//! Lua `Audio.*` namespace mostly drives the live `AudioMaestro` voice (play / stop /
-//! live volume), NOT the persisted component fields; its three field writes,
-//! `Audio.SetOutputGroup`, `Audio.SetOcclusionEnabled` and `Audio.SetDopplerLevel`,
-//! share [`set_output_group`], [`set_occlusion_enabled`] and [`set_doppler_level`]
-//! with the card. They are plain
-//! sets; the card's drag-range clamps are a UI affordance applied to the widget
-//! local before the op is called.
-//!
-//! Pure.
-
 use rusty_components::AudioSourceComponent;
 use rusty_scene::rules::sanitize::{non_negative, unit};
 
-/// Set the source's clip path.
 pub fn set_clip(a: &mut AudioSourceComponent, clip: String) {
     a.clip = clip;
 }
 
-/// Set the source's per-source linear volume.
 pub fn set_volume(a: &mut AudioSourceComponent, volume: f32) {
     a.volume = unit(volume);
 }
 
-/// Set whether the source loops.
 pub fn set_looping(a: &mut AudioSourceComponent, looping: bool) {
     a.looping = looping;
 }
 
-/// Set whether the source plays automatically on Play.
 pub fn set_play_on_start(a: &mut AudioSourceComponent, play_on_start: bool) {
     a.play_on_start = play_on_start;
 }
 
-/// Set whether the source's rate follows `Time.timeScale`.
 pub fn set_time_scaled(a: &mut AudioSourceComponent, is_time_scaled: bool) {
     a.is_time_scaled = is_time_scaled;
 }
 
-/// Set the source's spatial blend (0 = 2D, 1 = fully 3D).
 pub fn set_spatial_blend(a: &mut AudioSourceComponent, spatial_blend: f32) {
     a.spatial_blend = unit(spatial_blend);
 }
 
-/// Set the rolloff's near (full-volume) distance.
 pub fn set_initial_distance(a: &mut AudioSourceComponent, initial_distance: f32) {
     a.initial_distance = non_negative(initial_distance);
 }
 
-/// Set the rolloff's far (silent) distance.
 pub fn set_final_distance(a: &mut AudioSourceComponent, final_distance: f32) {
     a.final_distance = non_negative(final_distance);
 }
 
-/// Set the mixer group the source plays through (`""` is Master, #465).
 pub fn set_output_group(a: &mut AudioSourceComponent, group: String) {
     a.output_group = group;
 }
 
-/// Set whether geometry muffles the source (#467).
 pub fn set_occlusion_enabled(a: &mut AudioSourceComponent, on: bool) {
     a.occlusion_enabled = on;
 }
 
-/// Set how strongly motion bends the source's pitch (#1749): `0` off, `1` physical.
 pub fn set_doppler_level(a: &mut AudioSourceComponent, level: f32) {
     a.doppler_level = non_negative(level);
 }

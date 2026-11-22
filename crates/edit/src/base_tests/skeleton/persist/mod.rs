@@ -1,4 +1,4 @@
-//! Saving a skeleton (#453): bones are rebuilt from the model, never saved; a
+//! Saving a skeleton: bones are rebuilt from the model, never saved; a
 //! designer's bone overrides and the entities hung on a bone survive by name.
 
 mod hitbox;
@@ -12,7 +12,6 @@ use crate::serialize::to_scene_data;
 use crate::SceneSnapshot;
 use rusty_scene::Scene;
 
-/// A hero whose `Joint1` the designer turned, holding a `Gun` under `Joint1`.
 fn armed_hero(tag: &str) -> (Scene, u32) {
     let mut scene = Scene::new();
     let hero = hero(&mut scene, tag);
@@ -65,7 +64,6 @@ fn save_and_load_restores_overrides_and_rehangs_attachments_by_name() {
     assert_eq!(loaded.world.parent_id(gun), Some(joint1));
     let held = loaded.world.transform(gun).unwrap().position;
     assert!(held.abs_diff_eq(Vec3::new(0.0, 0.25, 0.0), 1e-6));
-    // Saving the loaded scene again yields the same document.
     let again = serde_json::to_string(&to_scene_data(&loaded)).unwrap();
     assert_eq!(
         again,
@@ -133,9 +131,6 @@ fn a_prefab_of_a_character_keeps_its_bone_attachment() {
     assert_eq!(*scene.world.name(held[0]).unwrap(), "Gun");
 }
 
-/// A linked prefab instance is rebuilt from its source on every load; the bones a
-/// designer turned on the instance, and the gun its source hangs on a bone, must
-/// survive that propagation.
 #[test]
 fn a_linked_prefab_instance_keeps_its_bone_overrides_through_propagation() {
     let (source, hero) = armed_hero("linked");

@@ -1,5 +1,5 @@
 //! A bone a script moved out from under its skinned entity is an ordinary entity
-//! to the scene (#1273, #1277): destroying the character leaves it, and a save
+//! to the scene: destroying the character leaves it, and a save
 //! keeps it, so a load agrees with a live re-import.
 
 use super::super::fixture::{connected, hero, joint_to, reload};

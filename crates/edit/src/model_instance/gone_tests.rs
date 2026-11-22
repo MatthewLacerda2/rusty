@@ -1,8 +1,3 @@
-//! A model instance takes its model's node tree (#1665, Unity's model prefab): a
-//! node the model lost takes its entity (and its overrides) with it, what the user
-//! added under it moves up keeping its place in the world, and a node the model
-//! gained is spawned under its parent node's entity, in the open scene and on load.
-
 use glam::Vec3;
 
 use super::tests::{child, spawn_file, KIT};
@@ -12,9 +7,6 @@ use crate::serialize::{apply_scene_data, to_scene_data};
 use crate::{list_instance_overrides, reimport_instance};
 use rusty_scene::Scene;
 
-/// Spawn the kit as `file` and rename its `Wall` node to `Panel` in the file, so
-/// the placed `Wall` is gone from the model. Returns the scene, the root, the
-/// `Kit` entity, the Wall and the model's path.
 pub(super) fn spawn_then_rename(file: &str) -> (Scene, u32, u32, u32, String) {
     let (scene, root) = spawn_file(file, KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();
@@ -96,7 +88,6 @@ fn reverting_a_part_gone_since_the_last_reimport_says_so() {
 fn another_spelling_of_the_model_path_finds_its_instances() {
     let (mut scene, root) = spawn_file("rusty_1637_spelling.gltf", KIT, Vec3::ZERO);
     let path = scene.world.prefab_link(root).unwrap().source.clone();
-    // The same file through an extra `.` component.
     let path = std::path::Path::new(&path);
     let other = path
         .parent()

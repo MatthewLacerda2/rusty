@@ -1,7 +1,3 @@
-//! The lifecycles the inventory is checked against, as runners (#1649): each sets
-//! one mark on the base scene, runs its lifecycle, and reads what came back as an
-//! [`Outcome`] for `lifecycle` to hold to the mark's class.
-//!
 //! A runner proves its lifecycle ran: a save that fails, or an Undo that undid
 //! nothing, panics instead of passing for an outcome, unless the mark is one
 //! [`IN_PLAY`] names, which the lifecycle refuses by design.
@@ -20,8 +16,6 @@ use rusty_scene::{read_scene_file, Scene};
 /// them is judged by the Stop and Play-load runners instead.
 pub const IN_PLAY: &[&str] = &["playing"];
 
-/// Run `lifecycle` on `mark`: `None` when the lifecycle does not apply to it
-/// (an Undo of a mark in [`IN_PLAY`]).
 pub fn run(lifecycle: Lifecycle, mark: &Mark) -> Option<Outcome> {
     Some(match lifecycle {
         Lifecycle::Save => save(mark),
@@ -37,7 +31,6 @@ fn path(name: &str) -> String {
     file.to_string_lossy().into_owned()
 }
 
-/// An empty scene saved to disk, for a load to read.
 fn empty() -> String {
     let empty = path("empty");
     let saved = crate::save_to_file(&Scene::new(), &empty);
@@ -45,8 +38,6 @@ fn empty() -> String {
     empty
 }
 
-/// Save → load into a fresh scene. Only a mark that enters Play may be refused,
-/// and then the save wrote nothing of it.
 fn save(mark: &Mark) -> Outcome {
     let (mut scene, base) = base();
     (mark.set)(&mut scene, base);
@@ -62,7 +53,6 @@ fn save(mark: &Mark) -> Outcome {
     seen((mark.is_set)(&loaded, base), Outcome::Back)
 }
 
-/// Play → Stop, the mark set before Play (`before`) or during it.
 fn play_then_stop(mark: &Mark, before: bool) -> bool {
     let (mut scene, base) = base();
     if before {
@@ -73,7 +63,6 @@ fn play_then_stop(mark: &Mark, before: bool) -> bool {
     if !before {
         (mark.set)(&mut scene, base);
     }
-    // In `GameWorld::exit_play`'s order: the play state first, then the restore.
     scene.set_playing(false);
     snapshot.restore(&mut scene);
     (mark.is_set)(&scene, base)
@@ -87,8 +76,6 @@ fn stop(mark: &Mark) -> Outcome {
     }
 }
 
-/// One edit step holding a real edit (the base moved) and the mark, undone. The
-/// base's move must come back, so a step Undo refused can't pass for `Left`.
 fn undo(mark: &Mark) -> Option<Outcome> {
     let (mut scene, base) = base();
     scene.begin_edits();
@@ -108,14 +95,12 @@ fn undo(mark: &Mark) -> Option<Outcome> {
     assert!(scene.undo().is_some(), "{}: Undo undid a step", mark.name);
     let x = scene.world.transform(base).map(|t| t.position.x);
     assert_eq!(x, Some(0.0), "{}: the base's move came back", mark.name);
-    // A mark still there was left; one gone was taken back to before the step.
     Some(match (mark.is_set)(&scene, base) {
         true => Outcome::Left,
         false => Outcome::Back,
     })
 }
 
-/// An empty scene loaded over the marked one in edit mode.
 fn load(mark: &Mark) -> Outcome {
     let empty = empty();
     let (mut scene, base) = base();
@@ -124,9 +109,6 @@ fn load(mark: &Mark) -> Outcome {
     seen((mark.is_set)(&scene, base), Outcome::Left)
 }
 
-/// A Play-mode `Scene.Load` of an empty scene (`rusty_edit::load::swap_in`, the tick's
-/// scene-load phase), the mark set in Play and the base entity left behind, so
-/// nothing keyed by it may cross with its now stale id.
 fn play_load(mark: &Mark) -> Outcome {
     let empty = empty();
     let (mut scene, base) = base();
@@ -138,7 +120,6 @@ fn play_load(mark: &Mark) -> Outcome {
     seen((mark.is_set)(&scene, base), Outcome::Left)
 }
 
-/// `kept` (`Back` or `Left`) when the mark is still there, `Gone` when not.
 fn seen(there: bool, kept: Outcome) -> Outcome {
     if there {
         kept

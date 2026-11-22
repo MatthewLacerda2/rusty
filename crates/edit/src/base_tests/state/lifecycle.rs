@@ -1,4 +1,4 @@
-//! Every field through every lifecycle, against its promise (#1649). Each mark is
+//! Every field through every lifecycle, against its promise. Each mark is
 //! set on the base scene, the lifecycle runs (`runners`), and what came back is
 //! read as an [`Outcome`]; `check::disagreements` lists every one that breaks
 //! its promise. A field with no mark fails, so none is left out.

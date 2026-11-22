@@ -1,4 +1,4 @@
-//! Undo of a create (#1631): the entity leaves through the scene's one despawn
+//! Undo of a create: the entity leaves through the scene's one despawn
 //! door, and its id is retired for good, as Unity never hands an undone
 //! object's id out again.
 

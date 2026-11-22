@@ -1,14 +1,9 @@
-//! A sub-object's collider built from another sub-object, its collision mesh (#1960):
-//! the low-poly sibling builds it, is never drawn, survives a save and load, and a
-//! name the model lacks falls back to the own mesh with one warning.
-
 use super::chair::write as write_chair;
 use crate::model_instance::instantiate_model;
 use crate::serialize::{apply_scene_data, to_scene_data};
 use rusty_components::ColliderShape;
 use rusty_scene::Scene;
 
-/// The model at `path` spawned whole, and its child entities' names and ids.
 pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     let asset = rusty_asset::import_and_sync_sidecar(std::path::Path::new(path)).unwrap();
     let mut scene = Scene::new();
@@ -20,11 +15,6 @@ pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     (scene, named)
 }
 
-/// The triangles of the mesh `id`'s active Mesh collider is built from (0 for any
-/// other shape, which builds from no mesh): its collision mesh, else its entity's
-/// Mesh, else its kept `shared_mesh`. Scene's half of the
-/// collider physics builds (`physics::shape::build::collider_inputs` makes the same
-/// choice; the shape it builds from the mesh is physics' tests').
 pub(super) fn triangles(scene: &Scene, id: u32) -> usize {
     let collider = scene.world.collider(id);
     let built_from_mesh = |c: &_| matches!(c, ColliderShape::Mesh { .. });

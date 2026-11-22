@@ -1,16 +1,11 @@
-//! Scene-side tests for runtime scene loading (#432): which entities survive, how
-//! the incoming document makes room for them, and what the swap carries.
-
 use std::collections::BTreeSet;
 
 use super::make_room;
 use crate::to_scene_data;
 use rusty_scene::Scene;
 
-/// A path with no lighting sidecar beside it: the swap's sidecar merge is a no-op.
 const NO_SIDECAR: &str = "rusty_432_no_such_dir/level.scene";
 
-/// An incoming level whose ids (1, 2) collide with the outgoing scene's.
 fn level() -> Scene {
     let mut level = Scene::new();
     let floor = level.add_entity("Floor".to_string());
@@ -41,7 +36,7 @@ fn survivors_are_marked_entities_and_their_descendants() {
 
 #[test]
 fn make_room_moves_colliding_ids_and_rewrites_references() {
-    let mut data = to_scene_data(&level()); // Floor = 1, Lamp = 2 (child of 1)
+    let mut data = to_scene_data(&level());
     make_room(&mut data, &BTreeSet::from([1, 5]));
     let floor = &data.entities[0];
     let lamp = &data.entities[1];
@@ -59,9 +54,9 @@ fn make_room_moves_colliding_ids_and_rewrites_references() {
 #[test]
 fn swap_carries_survivors_with_their_ids() {
     let mut s = Scene::new();
-    let holder = s.add_entity("Holder".to_string()); // 1, does not survive
-    let music = s.add_entity("Music".to_string()); // 2
-    let speaker = s.add_entity("Speaker".to_string()); // 3
+    let holder = s.add_entity("Holder".to_string());
+    let music = s.add_entity("Music".to_string());
+    let speaker = s.add_entity("Speaker".to_string());
     s.set_parent(music, Some(holder)).unwrap();
     s.set_parent(speaker, Some(music)).unwrap();
     s.dont_destroy_on_load(music);
@@ -99,8 +94,6 @@ fn swap_carries_survivors_with_their_ids() {
 
 #[test]
 fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
-    // Under a holder 100 along X its box sat there; re-rooted by the load, it stands
-    // at its local pose, where Physics.GetBounds must see it.
     let mut s = Scene::new();
     let holder = s.add_entity("Holder".to_string());
     let crate_ = s.add_entity("Crate".to_string());
@@ -116,5 +109,4 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     crate::load::swap_in(&mut s, to_scene_data(&level()), NO_SIDECAR, &survivors).unwrap();
     let (min, max) = s.world.collider_bounds(crate_).unwrap();
     assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");
-    // The nav bake sees it there too: `tests/nav/load_bounds.rs`.
 }
