@@ -1,12 +1,9 @@
-//! crates/ui/src/text/lines.rs — measured items → lines: wrapping and overflow.
-
 use super::measure::{Item, LineMetrics, Measurer};
 use rusty_components::TextOverflow;
 
 /// Slack for float noise when comparing a measure against the rect.
 pub const EPS: f32 = 1e-3;
 
-/// One laid-out line.
 #[derive(Clone, Debug, Default)]
 pub struct Line {
     pub items: Vec<Item>,
@@ -48,7 +45,6 @@ impl Line {
     }
 }
 
-/// Break `items` into lines, wrapping at `max_width` when given.
 pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -> Vec<Line> {
     let mut out = Vec::new();
     for paragraph in items.split(|it| it.ch == '\n') {
@@ -75,6 +71,7 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
             let breakable = it.is_space() && !paragraph.get(i + 1).is_some_and(|n| n.joins);
             if breakable {
                 if line.is_empty() && soft {
+                    // A soft break swallows the space it lands on.
                     continue;
                 }
                 last_space = Some(line.len());
@@ -164,6 +161,7 @@ fn shorten(line: &mut Line, width: f32, mark: bool, measurer: &Measurer) {
         if items.is_empty() {
             break;
         }
+        // Pop a whole cluster: a mark never stays without its base.
         while items.pop().is_some_and(|it| it.joins) {}
     }
     line.metrics = height.max(line.metrics);

@@ -59,7 +59,7 @@ fn the_button_bakes_the_pvs_alone_and_writes_it() {
 #[test]
 fn a_pvs_it_could_not_write_marks_the_scene_unsaved() {
     let (mut editor, mut scene, path, mut console) = started("unwritable");
-    std::fs::create_dir_all(occlusion_path(&path)).unwrap();
+    std::fs::create_dir_all(occlusion_path(&path)).unwrap(); // a folder where the file goes
     run(&mut editor, &mut scene, &mut console);
     assert!(scene.occlusion.is_some(), "applied");
     assert!(editor.is_dirty, "the save that writes it is owed");

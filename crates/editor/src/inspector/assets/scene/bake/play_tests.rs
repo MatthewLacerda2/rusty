@@ -44,14 +44,14 @@ fn gpu_play_asked_after_a_request_in_the_same_line_is_refused() {
     run_out(&mut editor, &scene, &mut console);
 }
 
-/// Refused while the job runs, with the same line the Play button's tooltip
-/// shows; taken once it was cancelled.
 #[test]
 fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     let (s, mut editor) = open_editor_in("play_during_bake");
     s.eval("Lighting.GenerateAsync()").unwrap();
     let mut console = ConsoleLogs::new();
     let scene = s.world().scene().clone();
+    // Not a whole frame: on a fast GPU an empty scene's lightmaps can finish inside one,
+    // past the step a cancel applies to.
     take_request(&mut editor, &mut scene.borrow_mut(), &mut console);
     let why = scene.borrow().play_refusal().expect("a bake runs");
     assert!(why.starts_with("Baking lighting"), "{why}");

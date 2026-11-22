@@ -11,7 +11,7 @@ use super::{Action, ProjectPicker};
 use crate::theme::{chrome, fonts, Theme};
 use rusty_core::project::bench::recent::{ago, RecentProject};
 
-/// A recent project row's height.
+/// A recent project row's height, in points.
 const ROW_HEIGHT: f32 = 46.0;
 
 /// The Projects page: the title strip and the recent list.

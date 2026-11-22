@@ -65,10 +65,10 @@ fn loading(tag: &str) -> (GameWorld, u32, FixedTicks, DrawPoses) {
 fn the_tick_that_loads_ends_its_frame_and_the_load_is_not_owed() {
     let (mut game, _, mut ticks, mut poses) = loading("owe");
     let (before, frame) = (game.scene().borrow().id(), game.play_frame());
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.1);
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.1); // six ticks owed
     assert_ne!(game.scene().borrow().id(), before, "the level loaded");
     assert_eq!(game.play_frame(), frame + 1, "no tick after the load's");
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.3);
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.3); // the load's cost
     assert_eq!(game.play_frame(), frame + 1, "the load's time is not owed");
     advance_sim(
         &mut game,
