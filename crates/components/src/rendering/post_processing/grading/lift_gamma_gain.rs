@@ -38,6 +38,7 @@ pub enum Wheel {
 impl Wheel {
     pub const ALL: [Wheel; 3] = [Wheel::Lift, Wheel::Gamma, Wheel::Gain];
 
+    /// The one spelling, for the inspector and `Graphics.{Get,Set}<name>Wheel`.
     pub fn name(self) -> &'static str {
         match self {
             Wheel::Lift => "Lift",
