@@ -1,8 +1,3 @@
-//! The scene inspector's **Reflection Probes** section: the probes' scene
-//! defaults (resolution, memory budget, probe ceiling) and every probe's Unity Reflection Probe
-//! settings, the same fields `Reflection.Set` / `Reflection.Get` and
-//! `Lighting.SetSettings` write. Edits go through `ReflectionProbeSet::edit`, which
-
 use egui_phosphor::regular as icon;
 
 use crate::inspector::components::transform::drag_angle;
@@ -12,6 +7,7 @@ use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 
+/// Cube face edges in pixels: Unity's Reflection Probe resolution choices.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
@@ -61,7 +57,7 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
     let (mut changed, mut remove) = (false, None);
     let count = scene.reflection_probes.len();
     let inspected = scene.inspected_reflection_probe.filter(|&i| i < count);
-    scene.inspected_reflection_probe = inspected;
+    scene.inspected_reflection_probe = inspected; // an Undo may have shortened the set
     for i in 0..count {
         let mut probe = scene.reflection_probes.probes[i].clone();
         let card = egui::CollapsingHeader::new(format!("Probe {i}"))
@@ -79,11 +75,13 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
         }
         let edited = card.body_returned.unwrap_or(false);
         if edited {
+            // A hand edit makes it manual, unless the edit was unticking it.
             let was = &scene.reflection_probes.probes[i];
             probe.manual |= probe.manual == was.manual;
             let fallback = (probe.fallback != was.fallback).then_some(probe.fallback);
             scene.reflection_probes.edit(i, |p| *p = probe);
             if let Some(on) = fallback {
+                // `edit` leaves another probe's fallback ticked: at most one stays.
                 scene.reflection_probes.set_fallback(on.then_some(i));
             }
             changed = true;
@@ -156,14 +154,14 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
     changed
 }
 
-/// Probe `i`'s volume: its shape, then the box's corners and rotation or
-/// the sphere's radius; returns whether one changed.
+/// Probe `i`'s volume rows; returns whether one changed.
 fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
     let mut changed = shape_menu(ui, i, &mut p.shape);
     match p.shape {
         ProbeShape::Box => {
             changed |= vec_row(ui, "Box min", &mut p.box_min);
             changed |= vec_row(ui, "Box max", &mut p.box_max);
+            // Written back only when edited: an Euler round trip would nudge the rotation.
             let mut euler = euler_degrees(p.rotation);
             if angle_row(ui, &mut euler) {
                 p.rotation = from_euler_degrees(euler);

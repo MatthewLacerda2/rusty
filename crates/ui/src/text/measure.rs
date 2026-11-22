@@ -1,5 +1,3 @@
-//! crates/ui/src/text/measure.rs — styled characters → measured glyphs.
-
 use std::ops::Range;
 
 use glam::{Vec2, Vec4};
@@ -9,6 +7,7 @@ use super::rich::{self, Style};
 use rusty_components::TextComponent;
 use rusty_font::{shape, FontHandle, GlyphId};
 
+/// Ems a synthesized bold adds to a cluster's advance.
 const FAUX_BOLD_ADVANCE: f32 = 0.03;
 
 const REGULAR: usize = 0;
@@ -30,6 +29,8 @@ pub struct Item {
     /// Pen advance after this glyph (kerning, letter spacing and faux bold included).
     pub advance: f32,
     pub offset: Vec2,
+    /// `advance` without kerning against the next glyph: what it advances once a line is
+    /// cut after it.
     pub bare: f32,
     pub joins: bool,
     pub metrics: LineMetrics,
@@ -62,7 +63,6 @@ impl LineMetrics {
     }
 }
 
-/// Measures one text at one base size.
 pub struct Measurer<'a> {
     text: &'a TextComponent,
     faces: [FontHandle; 3],
@@ -117,7 +117,6 @@ impl<'a> Measurer<'a> {
         self.text.font_size.max(1e-3)
     }
 
-    /// The face slot and em size `style` draws in.
     fn slot(&self, style: &Style) -> (usize, f32) {
         let t = self.text;
         let face = match (style.bold && t.font_bold.is_some(), style.italic) {

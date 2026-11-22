@@ -30,7 +30,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     ui.separator();
     ui.add_space(5.0);
 
-    // Actions
     ui.heading("Instantiation");
     ui.add_space(5.0);
 
@@ -45,8 +44,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     }
 }
 
-/// File metadata card: path, on-disk size, and the asset type derived from the
-/// file extension.
 fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     let ext = Path::new(path)
         .extension()
@@ -58,7 +55,9 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     });
 }
 
-/// Scale Factor: Unity's model-import drag, kept in the `.meta` sidecar.
+/// Scale Factor: Unity's model-import drag, kept in the `.meta` sidecar. Mid-drag the
+/// value waits in egui's memory: the verb skips a factor the sidecar already holds, so
+/// the sidecar keeps the old one until release.
 fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let held = egui::Id::new(("model_scale_factor", path));
     let stored = rusty_asset::sidecar::load(Path::new(path))
@@ -86,6 +85,8 @@ fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene
     }
 }
 
+/// Mid-drag only the sidecar is written, so a knob dragged over a big level re-imports
+/// once, at release.
 fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     let source = Path::new(path);
     let stored = rusty_asset::sidecar::load(source)
@@ -113,10 +114,8 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     }
 }
 
-/// List the addressable sub-objects the source file exposes (`path::<id>`) and,
-/// per sub-object, a "Mesh Collider" toggle whose trimesh/convex choice and collision
-/// mesh persist in the `.meta` sidecar. Reads the sidecar's cached map when present, else
-/// imports the file once and writes the sidecar.
+/// The file's sub-objects (`path::<id>`), each with a Mesh Collider kept in the `.meta`
+/// sidecar.
 fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     let mut settings = match rusty_asset::sidecar::load(Path::new(path)) {
         Ok(s) if !s.sub_objects.is_empty() => s,

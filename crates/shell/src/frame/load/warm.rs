@@ -1,7 +1,8 @@
-//! crates/shell/src/frame/load/warm.rs — a `Scene.LoadAsync`'s GPU warm-up, a slice per frame
-//!: the renderer makes what the prepared scene draws with
-//! (`render::warm`) for up to the frame's budget, Unity's
-//! `Application.backgroundLoadingPriority`, while the scene before it still draws.
+//! crates/shell/src/frame/load/warm.rs — a `Scene.LoadAsync`'s GPU warm-up, a slice per frame:
+//! the renderer makes what the prepared scene draws with (`render::warm`) for up to the frame's
+//! budget, Unity's `Application.backgroundLoadingPriority`, while the scene before it still
+//! draws. The load reads finished only once all is made, so the new scene's first frame uploads
+//! nothing.
 
 use std::time::Instant;
 

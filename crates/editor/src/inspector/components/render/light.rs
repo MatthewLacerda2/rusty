@@ -8,7 +8,8 @@ use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::{LightComponent, LightMode, LightType};
 
 /// 3C. Light configuration. A THIN client: every widget reads the field into
-/// a local and, on change, routes the write through the shared `authoring::rendering::light::*`
+/// a local and, on change, routes the write through the shared
+/// `authoring::rendering::light::*` op.
 pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(light) = world.light(id).map(|l| l.clone()) else {
         return;
@@ -60,7 +61,6 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_d
     }
 }
 
-/// A point or spot light's reach and whether it casts shadows.
 fn draw_local_light(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -244,6 +244,7 @@ fn draw_spot_cones(
             .changed()
         {
             if let Some(mut l) = world.light_mut(id) {
+                // The op pulls the inner cone down to a shrunk outer one.
                 light_ops::set_cones(&mut l, light.inner_cone, outer);
             }
             *is_dirty = true;
