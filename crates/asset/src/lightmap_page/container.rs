@@ -29,9 +29,15 @@ pub fn write(page: &Page) -> Vec<u8> {
         1, // typeSize
         page.edge,
         page.edge,
+        0,
+        0,
+        1,
         page.levels.len() as u32,
+        0,
         dfd_at as u32,
         dfd.len() as u32,
+        0,
+        0,
     ];
     for (i, w) in words.iter().enumerate() {
         put(&mut out, 12 + 4 * i, &w.to_le_bytes());
