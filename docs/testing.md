@@ -244,7 +244,7 @@ seeks to the tick before `from`, steps the range on the recorded input, and ends
 with an assert stub to fill in:
 
 ```lua no-run
--- Ticks 130 to 250 of the demo /game/saved/demos/main-20261030-101500.demo (Harness.CutDemo, #1597).
+-- Ticks 130 to 250 of the demo /game/saved/demos/main-20261030-101500.demo (Harness.CutDemo).
 -- It runs on that demo, which must stay where it is:
 --   play --demo /game/saved/demos/main-20261030-101500.demo <this file> <out_dir>
 assert(Harness.DemoPath() == "/game/saved/demos/main-20261030-101500.demo", "not on its demo: play --demo " .. "/game/saved/demos/main-20261030-101500.demo")
