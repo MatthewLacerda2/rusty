@@ -56,6 +56,8 @@ impl ScriptRef {
         let noted: Vec<Value> = args.iter().skip(usize::from(with_self)).cloned().collect();
         let script = (self.id, self.name.as_str());
         self.with(|glua, t| {
+            // Noted once `with` found the instance live, before the call: a stale handle's call
+            // is never noted, so a replay cannot run it on a newer instance of that name.
             demo::note_script_call(&self.journal, script, (key, with_self), &noted);
             let func: Function = glua.registry_value(func)?;
             let mut into_game = Copier::new(glua);

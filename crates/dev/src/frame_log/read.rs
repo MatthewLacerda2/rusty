@@ -6,6 +6,8 @@ use super::head::Head;
 use super::held;
 use super::segments::numbered;
 
+/// Records a read with neither a `limit` nor a look-back returns: ten seconds of a 60 Hz
+/// window, a table Lua holds comfortably.
 pub const DEFAULT_LIMIT: usize = 600;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -67,6 +69,7 @@ struct Reader<'q> {
     out: LogRead,
     newest_first: Vec<Map<String, Value>>,
     drops: Vec<(u64, u64)>,
+    /// Bad lines not yet known to lie inside the look-back.
     unplaced: usize,
 }
 
@@ -146,6 +149,8 @@ fn head_of(line: &str) -> Option<(Head<'_>, Option<Record>)> {
     }
 }
 
+/// Splits as text, which finds line ends a word at a time, unless a cut inside a character
+/// left the segment not UTF-8.
 fn lines_newest_first(bytes: &[u8]) -> Box<dyn Iterator<Item = (&[u8], Option<&str>)> + '_> {
     match std::str::from_utf8(bytes) {
         Ok(text) => Box::new(text.rsplit('\n').map(|l| (l.as_bytes(), Some(l)))),

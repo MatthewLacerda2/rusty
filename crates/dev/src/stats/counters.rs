@@ -67,6 +67,8 @@ impl TimingProbe {
 
 #[cfg(test)]
 thread_local! {
+    // Ms that each `record_frame`, and each closing `end_tick` after its span, charges a
+    // test's driven clock: the probe's own work made visible (`probe_cost_tests`).
     pub(super) static RECORD_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
     pub(super) static END_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }

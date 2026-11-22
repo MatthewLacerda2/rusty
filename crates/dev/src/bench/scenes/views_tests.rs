@@ -32,6 +32,7 @@ fn cameras_then_the_spawn_then_navmesh_points_along_four_yaws() {
     let nav = NavigationGraph::from_scene(&scene);
     let views = pick(&scene, &nav);
     assert!(views.warnings.is_empty(), "{:?}", views.warnings);
+    // A camera and the spawn leave 6 of the 8 positions to navmesh points, 4 yaws each.
     assert_eq!(views.views.len(), 1 + 1 + 6 * YAWS.len());
     assert_eq!(views.views[0].label, "camera Main Camera");
     assert!(matches!(views.views[0].view, View::Camera(_)));
@@ -62,6 +63,7 @@ fn cameras_then_the_spawn_then_navmesh_points_along_four_yaws() {
         View::Pose { position, .. } => position,
         View::Camera(_) => unreachable!(),
     };
+    // Views 2 to 5 are one point's four yaws; view 6 is the next point.
     assert_eq!(at(2), at(5));
     assert_ne!(at(2), at(6));
 }

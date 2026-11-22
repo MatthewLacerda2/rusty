@@ -1,11 +1,16 @@
+//! Hashed straight from the world's fields, never a serialized snapshot: serializing a
+//! Dust2-sized scene at every digest would hitch a playtest.
+
 use rusty_app::GameWorld;
 
+/// Ticks between two digests: two seconds at 60 Hz.
 pub const EVERY: u64 = 120;
 
 pub fn due(t: u64) -> bool {
     (t + 1).is_multiple_of(EVERY)
 }
 
+/// Gathered into one buffer for one xxh3 pass, not hashed byte by byte at opt-level 0.
 #[derive(Default)]
 struct Fields(Vec<u8>);
 

@@ -1,3 +1,6 @@
+//! A Play request lands on `Application` and the host takes it at the next frame boundary,
+//! so a script never tears its own VM down mid-call.
+
 use std::cell::RefCell;
 
 use mlua::Lua;
@@ -16,6 +19,7 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         "EnterPlay",
         lua.create_function(move |lua, ()| {
             let (app, console) = (app.get(lua)?, console.get(lua)?);
+            // A no-op (standalone, or already heading to Play) answers `false`, never a refusal.
             let changes = !app.borrow().standalone() && !app.borrow().play_heading();
             let refusal = scene.get(lua)?.borrow().play_refusal();
             if let (true, Some(why)) = (changes, refusal) {

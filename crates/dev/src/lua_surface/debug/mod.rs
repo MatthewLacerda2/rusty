@@ -90,6 +90,8 @@ fn register_stats(
     )
 }
 
+/// Dev-only on purpose: a GPU readback is no sim input, so `Graphics.GetExposure` returns
+/// the configured EV.
 fn register_adapted_exposure(
     lua: &mlua::Lua,
     table: &Table,

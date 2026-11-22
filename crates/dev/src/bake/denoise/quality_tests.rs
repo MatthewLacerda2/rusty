@@ -11,6 +11,7 @@ use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::AmbientRadiance;
 
+/// Paths per texel of the converged bake every row is measured against.
 const REFERENCE: u32 = 4096;
 fn level(direct: bool) -> BakeScene {
     let mut scene = BakeScene::gather(&rooms(2), &|_, _| None);

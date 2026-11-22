@@ -42,6 +42,7 @@ fn a_missing_library_is_an_error_not_a_crash() {
 
 #[test]
 fn a_library_that_loads_without_oidns_calls_is_passed_over() {
+    // A library every machine of the OS opens (glibc's libm on Linux) with no OIDN call in it.
     let decoy = PathBuf::from(if cfg!(target_os = "macos") {
         "/usr/lib/libSystem.B.dylib"
     } else {

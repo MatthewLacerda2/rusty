@@ -1,3 +1,6 @@
+//! A VM installs the surface once, when it starts, so every dev entry point calls
+//! [`install_api`] before its first Lua VM: one started earlier never has these verbs.
+
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
 mod bake_report;

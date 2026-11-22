@@ -31,6 +31,7 @@ use crate::harness::Harness;
 use crate::scenario::{self, RunReport};
 use rusty_app::GameWorld;
 
+/// A test hook: the integration tests compare a world with the digest a demo stores.
 pub fn state_digest(world: &GameWorld) -> String {
     digest::of(world)
 }
@@ -45,6 +46,7 @@ pub fn record_project(world: &mut GameWorld) {
     record(world, Destination::Folder(DEMOS_DIR.into()));
 }
 
+/// `run.size` is never read: the Game view is the demo's size, which the sim lays the UI on.
 pub fn replay(
     demo_path: &Path,
     scenario_path: Option<&Path>,

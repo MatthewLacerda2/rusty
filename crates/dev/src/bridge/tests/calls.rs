@@ -78,6 +78,7 @@ fn a_game_error_carries_the_game_scripts_traceback() {
         err.contains("Boom failed") && err.contains("magazine jammed"),
         "{err}"
     );
+    // Line 7 of `GAME` is `Boom`: a frame only the gameplay side has.
     assert!(err.contains("game_calls:7: in "), "{err}");
 }
 

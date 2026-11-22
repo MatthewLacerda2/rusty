@@ -33,6 +33,8 @@ fn each_object_reports_the_probe_it_picks() {
 }
 
 #[test]
+/// The boxes meet at x = 2.3, between the vertices' world-box centre (1.77) and the
+/// renderer's turned local centre (2.83).
 fn a_turned_l_picks_the_probe_the_renderer_does() {
     use rusty_components::{mesh::Vertex, MeshComponent};
     let mut scene = Scene::new();

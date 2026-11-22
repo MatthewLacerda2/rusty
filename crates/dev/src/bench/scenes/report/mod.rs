@@ -85,6 +85,7 @@ impl SceneReport {
         self.rows
             .iter()
             .map(|r| r.metric.len())
+            // Characters: 30 at least, wider for a longer name (a `script.` verb's).
             .fold(30, usize::max)
     }
 

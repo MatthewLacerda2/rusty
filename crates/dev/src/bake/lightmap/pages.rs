@@ -113,6 +113,7 @@ fn put_page(
         encoded
             .masks
             .push(spill.put(&png(size, encode_masks(&mask))?)?);
+        // RGBA8, 4 bytes a texel, over every level: the loader makes a mask page's mips.
         let levels = rusty_lighting::lightmap::level_count(size);
         encoded.gpu_bytes += (0..levels)
             .map(|l| ((size >> l) as usize).pow(2) * 4)

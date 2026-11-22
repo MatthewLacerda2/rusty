@@ -31,6 +31,7 @@ fn report(lua: &Lua, scene_path: ApiCell<Option<String>>, kind: Kind) -> mlua::R
     let path = scene_path.get(lua)?.borrow().clone();
     match path.and_then(|p| read(&p, kind)) {
         Some(json) => {
+            // A JSON `null` (a field the bake could not measure) reads as `nil`, not mlua's null.
             let nil = SerializeOptions::new()
                 .serialize_none_to_null(false)
                 .serialize_unit_to_null(false);

@@ -1,5 +1,7 @@
 use std::time::Instant;
 
+/// The dev layer's clock: the wall clock, or the driven one of a test that called
+/// `verbs::drive`.
 pub fn now() -> Instant {
     super::verbs::now()
 }

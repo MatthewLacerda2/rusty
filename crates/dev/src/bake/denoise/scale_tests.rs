@@ -7,6 +7,8 @@ use rusty_lighting::lightmap::max_map_edge;
 use rusty_lighting::lightmap::{bake_with_progress, lightmap_size, BakeProgress};
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
+/// Lightmap texels per unit, below the default 8: the chart count a per-chart denoise pays
+/// for is the same at any density, and 8 bakes 16 times the texels.
 const DENSITY: f32 = 2.0;
 
 type Row = (&'static str, u32, Denoiser, usize);

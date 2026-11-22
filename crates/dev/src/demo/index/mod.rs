@@ -11,10 +11,13 @@ use rusty_app::GameWorld;
 use rusty_scene::{Scene, SceneId};
 use rusty_script::scripting::LogLevel;
 
+/// Ticks between two camera samples: four a second at 60 Hz.
 pub const CAMERA_EVERY: u64 = 15;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct IndexLine {
+    /// Declared first: `read::is_index` spots an index line by its opening `at`, a fast path
+    /// `parse_line` falls back from but `index_of` does not.
     pub at: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera: Option<[f32; 3]>,
@@ -105,6 +108,7 @@ impl Indexer {
         self.events.push(play("stopped"));
         world.console().borrow_mut().feed_demo(false);
         IndexLine {
+            // Stamped at the last tick: a search finds only ticks a seek can reach.
             at: ticks.saturating_sub(1),
             camera: None,
             events: std::mem::take(&mut self.events),
@@ -112,6 +116,7 @@ impl Indexer {
     }
 
     fn gather(&mut self, world: &GameWorld) {
+        // First, so the engine's own log lines land in the feed of the tick that raised them.
         rusty_logging::forward(world.console());
         let feed = world.console().borrow_mut().take_feed();
         for mark in feed.marks {

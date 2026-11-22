@@ -4,6 +4,8 @@ use super::stress::{self, StressSpec};
 use crate::harness::{fixture_project, Harness};
 use rusty_components::ScriptFieldValue;
 
+// Ticks: the warm-up reaches the firefight's steady counts, and a window outlasts
+// `firefight.lua`'s 30-tick `LIFETIME`, so every instance turns over.
 const WARMUP: u32 = 120;
 const WINDOW: u32 = 90;
 

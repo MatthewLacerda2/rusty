@@ -53,6 +53,7 @@ impl Place {
     }
 }
 
+/// The head goes first, in the order `head::Head::of` reads it without parsing the line.
 pub(super) fn line(
     ch: &str,
     t: u64,
@@ -204,6 +205,7 @@ fn total(s: &Series) -> f64 {
     s.avg * s.samples as f64
 }
 
+/// Three decimals (a ms field to the microsecond): the bytes go on history, not on digits.
 fn round3(value: Value) -> Value {
     match value {
         Value::Number(n) => n

@@ -37,6 +37,7 @@ fn pair(p: (f64, f64)) -> [Exact; 2] {
     [Exact(p.0), Exact(p.1)]
 }
 
+/// Floats compare by bits, as the file stores them: `-0.0` is a change, a NaN never one.
 fn pair_bits(p: (f64, f64)) -> (u64, u64) {
     (p.0.to_bits(), p.1.to_bits())
 }

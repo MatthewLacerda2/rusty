@@ -1,8 +1,13 @@
+//! One window frame into the frame stats: a frame runs zero or several sim ticks, so what
+//! it costs lands beside the per-tick timings, never inside them.
+
 use super::{record_render_into, RenderedFrame};
 use rusty_core::frame_stats::{FrameStats, RECENT};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct WindowFrame {
+    /// The previous frame's wall ms, start to start, not this one's: [`window_ended`]
+    /// records it on that frame.
     pub last_wall_ms: f64,
     pub fps: Option<f64>,
     pub render: Option<RenderedFrame>,

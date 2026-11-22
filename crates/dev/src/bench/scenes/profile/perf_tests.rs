@@ -48,6 +48,7 @@ fn only_the_samples_inside_a_window_are_kept() {
         "pthread_cond_timedwait",
         "/usr/lib/x86_64-linux-gnu/libc.so.6",
     )];
+    // Stamps either side of the windows' edges: both edges count, so 5.0 and 10.0 are kept.
     let text = [
         sample("4.999999", &own),
         sample("5.000000", &own),
