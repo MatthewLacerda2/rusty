@@ -1,7 +1,3 @@
-//! The `Baked` lamps' list (#1703) is kept: a frame that changed no `Baked` lamp's
-//! light, pose or activity rebuilds nothing, however a live light moves or
-//! flickers; moving a lamp, or switching its mode, does. An Area light is no lamp.
-
 use glam::Vec3;
 
 use super::fixture::{draw, fog, lamp, renderer, room, view, LAMP_AT};
@@ -35,7 +31,6 @@ fn gpu_the_baked_lamps_are_rebuilt_only_when_a_light_changes() {
         "the Baked lamp alone: no live light, no Area panel"
     );
     for i in 0..3 {
-        // A rotating beacon or a flickering lamp: a live light written every frame.
         scene.world.transform_mut(live).unwrap().position.x = i as f32;
         scene.world.light_mut(live).unwrap().intensity = 5.0 + i as f32;
         draw(&mut r, &mut v, &scene);

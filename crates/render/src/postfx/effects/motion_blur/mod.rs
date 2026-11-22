@@ -1,27 +1,3 @@
-//! crates/render/src/postfx/effects/motion_blur/ — per-object motion blur (#1436): the
-//! reconstruction filter over a view's velocity target (#1435), in
-//! `postfx/motion_blur.wgsl`.
-//!
-//! Four fullscreen passes, before bloom and the composite: **TileMax** keeps each
-//! tile's longest streak, in two steps (each tile row's, then the tile's) so a big
-//! tile is two short loops; **NeighborMax** spreads each tile's to its 3×3
-//! neighbourhood (so the blur reaches past a moving silhouette onto what is behind
-//! it); the **gather** blurs every pixel along its neighbourhood's streak, weighting
-//! each tap by its depth from the camera and by the tap's own streak. Its output,
-//! the blurred HDR scene, is what bloom and the composite read
-//! ([`super::PostFx::scene_color`]). A viewmodel's gun writes ~0 velocity and lies
-//! nearer than the world, so the world's streaks never smear over it and it stays
-//! sharp. The depth comes from the velocity target (each camera writes its own),
-//! not the depth buffer, which a `DepthOnly` overlay has cleared by now.
-//!
-//! **One path.** Camera motion is already in the velocity target (the sky carries
-//! the camera's rotation), so there is no separate camera-only blur. A view with no
-//! velocity target this frame (motion blur off, the player's option, a
-//! shader preview, the editor's Scene view) blurs nothing and holds no blur targets.
-//!
-//! The pipelines are the renderer's ([`MotionBlurPasses`], built on first use and
-//! warmed with the rest); the targets are each view's ([`BlurTargets`]).
-
 pub(crate) mod effect;
 mod params;
 
@@ -38,10 +14,8 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 
-/// The tile textures' format: a streak in pixels.
 const TILE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
-/// The motion-blur pipelines, shared by every view.
 pub(crate) struct MotionBlurPasses {
     layout: wgpu::BindGroupLayout,
     tile_max_x: LazyPipeline,
@@ -95,7 +69,6 @@ impl MotionBlurPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
         [
             &self.tile_max_x,
@@ -106,20 +79,13 @@ impl MotionBlurPasses {
     }
 }
 
-/// One view's motion-blur targets: the blurred scene and the params uniform, kept
-/// while the view's size holds, and the tile textures, kept while the tile size
-/// does too (a clamp ramp rebuilds only those). Held only while the view blurs.
 pub(crate) struct BlurTargets {
-    /// The full size these were made for.
     size: (u32, u32),
-    /// The blurred HDR scene bloom and the composite read.
     pub(crate) blurred: PfxTarget,
     params: wgpu::Buffer,
     tiles: TileTargets,
 }
 
-/// The tile textures at one tile size: TileMax's half-way rows (tile columns by
-/// pixel rows), TileMax and NeighborMax.
 struct TileTargets {
     tile: u32,
     rows: PfxTarget,
@@ -155,8 +121,6 @@ impl BlurTargets {
         }
     }
 
-    /// Fit these to a view of `size` at `tile`: remade at another size, only the
-    /// tiles remade at another tile size.
     fn fit(targets: &mut Targets, device: &wgpu::Device, size: (u32, u32), tile: u32) {
         let t = targets.get_or(|| Self::new(device, size, tile));
         if t.size != size {
@@ -168,9 +132,6 @@ impl BlurTargets {
 }
 
 impl PostFx {
-    /// Blur this frame's scene with `params`, or drop the blur targets when `params`
-    /// is `None` or the view wrote no velocity this frame. Afterwards
-    /// [`PostFx::scene_color`] is the image bloom and the composite read.
     pub(crate) fn run_motion_blur(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -199,8 +160,6 @@ impl PostFx {
                 ],
             })
         };
-        // Each pass reads the one before it as its tiles (binding 3); the first
-        // reads none, and binds a texture it does not write.
         let steps = [
             (&passes.tile_max_x, &tiles.neighbor_max, &tiles.rows),
             (&passes.tile_max_y, &tiles.rows, &tiles.tile_max),
@@ -225,7 +184,6 @@ pub(crate) mod stack_order_gpu_tests;
 
 #[cfg(test)]
 impl PostFx {
-    /// Whether the view holds motion blur's targets (it ran this frame).
     pub(crate) fn holds_blur(&self) -> bool {
         self.targets.get::<BlurTargets>().is_some()
     }

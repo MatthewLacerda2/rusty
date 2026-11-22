@@ -1,11 +1,3 @@
-//! The resolve's pipelines and what they write (`ResolveOut` and `HeldOut` in
-//! `postfx/taa.wgsl`): the history's colour and surface frames at once, so next
-//! frame reads both from the same resolve (#1846), and with the camera's
-//! anti-flicker on (#2228) each pixel's flicker as a third. `PostFx::fullscreen_into`
-//! draws into them. A camera at anti-flicker 0 resolves through the plain
-//! pipelines, whose layout has no flicker binding: URP's resolve, nothing of the
-//! hold read or written.
-
 use super::history::{TaaHistory, FLICKER_FORMAT, SURFACE_FORMAT};
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
@@ -15,9 +7,6 @@ use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
 
-/// The resolve's pipelines, shared by every view: the scene-size resolve and the
-/// upscaling one (TAAU), each plain and `held` (the anti-flicker on), all into an
-/// HDR history target.
 pub(crate) struct TaaPasses {
     layout: wgpu::BindGroupLayout,
     held_layout: wgpu::BindGroupLayout,
@@ -26,13 +15,9 @@ pub(crate) struct TaaPasses {
     pub(super) upscale: LazyPipeline,
     pub(super) resolve_held: LazyPipeline,
     pub(super) upscale_held: LazyPipeline,
-    /// The contrast-adaptive sharpen after the composite (#1847), into each output
-    /// format a view writes.
     pub(crate) sharpen: super::Sharpen,
 }
 
-/// What a resolve writes: the colour frame and its surfaces, then, `held`, its
-/// flickers.
 fn targets(held: bool) -> Vec<Option<wgpu::ColorTargetState>> {
     let target = |format| {
         Some(wgpu::ColorTargetState {
@@ -48,9 +33,6 @@ fn targets(held: bool) -> Vec<Option<wgpu::ColorTargetState>> {
     out
 }
 
-/// The resolve's bind group layout: the params, the current frame, the history's
-/// colour, the velocity, the sampler, the history's surfaces and the reactive mask,
-/// then, `held`, the history's flickers.
 fn layout(device: &wgpu::Device, held: bool) -> wgpu::BindGroupLayout {
     let mut entries = vec![
         uniform_entry(0, wgpu::ShaderStages::FRAGMENT),
@@ -75,7 +57,6 @@ fn layout(device: &wgpu::Device, held: bool) -> wgpu::BindGroupLayout {
 }
 
 impl TaaPasses {
-    /// The resolves, and the sharpen into each of `output_formats`.
     pub(crate) fn new(
         device: &wgpu::Device,
         registry: &mut ShaderRegistry,
@@ -124,9 +105,6 @@ impl TaaPasses {
         }
     }
 
-    /// The resolve's bind group: `h`'s params, this frame's `current` image, the
-    /// history frame `read` (its colour, its surfaces and, when `h` holds them, its
-    /// flickers: the held layout), the `velocity` target and the reactive mask (#1845).
     pub(super) fn group(
         &self,
         device: &wgpu::Device,
@@ -159,7 +137,6 @@ impl TaaPasses {
         })
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         let resolves = [&self.resolve, &self.upscale];
         resolves

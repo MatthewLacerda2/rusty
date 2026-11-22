@@ -1,11 +1,3 @@
-//! The composite and the grading bake, assembled from [`POST_EFFECTS`] (#1467): each is
-//! a fixed skeleton calling the effects' functions in their stage order, with each
-//! function's slots of one params array and, for the composite, the textures it
-//! declares, bound in group 1 (`effects::textures`, #1473). The source is composed through the same
-//! `shadergen::compose` path as every engine shader, after the effects' modules are
-//! registered ([`register_modules`]), so a broken module fails at startup, naming
-//! itself.
-
 use std::fmt::Write as _;
 
 use super::layout::span;
@@ -13,20 +5,15 @@ use super::textures::{composite_textures, PlacedTexture, GROUP};
 use super::{composite_layout, grade_layout, Phase, Placed, POST_EFFECTS};
 use crate::gpu::shaders::ShaderRegistry;
 
-/// The name the composite's source composes under (it labels errors).
 pub(crate) const COMPOSITE: &str = "postfx/composite (assembled)";
-/// The name the bake's source composes under.
 pub(crate) const BAKE: &str = "postfx/lut_bake (assembled)";
 
-/// Register every effect's WGSL module into `registry`, once.
 pub(crate) fn register_modules(registry: &mut ShaderRegistry) {
     for module in POST_EFFECTS.iter().filter_map(|e| e.module) {
         registry.add_module(module);
     }
 }
 
-/// The module `effect`'s functions live in. Panics on an effect that declares
-/// functions but no module: a registry mistake, caught by the first composite.
 pub(super) fn module_of(effect: &super::PostEffect) -> &'static str {
     let name = effect.name;
     effect
@@ -34,13 +21,10 @@ pub(super) fn module_of(effect: &super::PostEffect) -> &'static str {
         .unwrap_or_else(|| panic!("post effect `{name}` has functions but no module"))
 }
 
-/// The import path of the module at `file` (`postfx/effects/vignette.wgsl` →
-/// `postfx::effects::vignette`): what its `#define_import_path` must say.
 pub(crate) fn import_path(file: &str) -> String {
     file.trim_end_matches(".wgsl").replace('/', "::")
 }
 
-/// `#import` lines for the modules the `placed` functions live in, each once.
 fn imports<F>(placed: &[Placed<F>]) -> String {
     let mut seen: Vec<&str> = Vec::new();
     let mut out = String::new();
@@ -53,8 +37,6 @@ fn imports<F>(placed: &[Placed<F>]) -> String {
     out
 }
 
-/// `c = <module>::<function>(c, <args>, <array>[i], …);`, the call of one placed
-/// function: `args` before its slots.
 fn call(
     module: &str,
     function: &str,
@@ -67,16 +49,12 @@ fn call(
     format!("{}{});\n", call_head(module, function), args.join(", "))
 }
 
-/// The start of a call of `function` in the module at `module`, up to its first
-/// argument after `c`: `    c = <module>::<function>(c, `.
 pub(super) fn call_head(module: &str, function: &str) -> String {
     let short = import_path(module);
     let short = short.rsplit("::").next().unwrap_or_default();
     format!("    c = {short}::{function}(c, ")
 }
 
-/// The composite's WGSL: the fullscreen vertex stage, `fs_composite` (the scene,
-/// the HDR functions, the grading LUT, the display functions) and `fs_copy`.
 pub(crate) fn composite_source() -> String {
     let layout = composite_layout();
     let len = span(layout, |c| c.slots);
@@ -133,7 +111,6 @@ fn fs_composite(in: VsOut) -> @location(0) vec4<f32> {{
     )
 }
 
-/// The effects' own textures, one binding of group 1 each, in run order.
 fn declarations() -> String {
     let mut out = String::new();
     for (binding, t) in composite_textures().iter().enumerate() {
@@ -146,8 +123,6 @@ fn declarations() -> String {
     out
 }
 
-/// The bake's WGSL: `cs_bake`, one invocation per texel of the 32³ table, storing
-/// the grade functions' result for the HDR colour the texel's log code decodes to.
 pub(crate) fn bake_source() -> String {
     let layout = grade_layout();
     let len = span(layout, |g| g.slots);

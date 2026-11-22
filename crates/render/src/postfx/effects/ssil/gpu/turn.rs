@@ -1,15 +1,9 @@
-//! The accumulate rejects a surface's history when the surface turns in place
-//! (#1750): its distance from the eye holds, but its normal no longer does.
-
 use glam::{Quat, Vec3};
 
 use crate::test_gpu::ssil::{block, draw, eye, on, pixel_at, renderer, scene, view, LAMP, W};
 
-/// The panel's centre: beside the lamp's pool, facing the camera.
 const PANEL: Vec3 = Vec3::new(1.0, 0.8, -4.4);
 
-/// Whether, after six frames with the panel at `from` degrees of yaw and one at
-/// `to`, the panel's centre took no history: its result is this frame's blur.
 fn starts_over(from: f32, to: f32) -> bool {
     let Some(mut r) = renderer() else {
         return from != to;
@@ -46,7 +40,7 @@ fn starts_over(from: f32, to: f32) -> bool {
 
 #[test]
 fn gpu_a_surface_turning_in_place_starts_its_history_over() {
-    // 40 degrees: past the rejection's ~25, and the panel's centre stays put.
+    // Past the rejection's ~25 degrees.
     assert!(starts_over(20.0, -20.0), "a turned panel takes no history");
 }
 

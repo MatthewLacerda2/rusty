@@ -1,12 +1,7 @@
-//! The flare's composite texture on lavapipe (#1473): bound to the flare's target
-//! while the view flares, to the registry's black texel once it stops; bloom's dirt,
-//! which the scene never picks, always to the black texel.
-
 use super::gpu_tests::{eye, renderer, scene, H, W};
 use crate::postfx::effects::textures::{bound_views, composite_textures};
 use crate::{RenderView, OFFSCREEN_FORMAT};
 
-/// Where `effect`'s one texture sits in group 1.
 fn binding(effect: &str) -> usize {
     (composite_textures().iter())
         .position(|t| t.effect.name == effect)

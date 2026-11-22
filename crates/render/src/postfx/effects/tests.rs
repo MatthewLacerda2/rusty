@@ -1,7 +1,3 @@
-//! The registry's own shape (#1467): every effect's module says the import path
-//! its file does, the assembled composite and bake compose with no GPU, slots never
-//! overlap, and a finishing LDR pass runs last.
-
 use super::assemble::{bake_source, composite_source, import_path, BAKE, COMPOSITE};
 use super::*;
 use crate::gpu::shaders::ShaderRegistry;

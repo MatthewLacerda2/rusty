@@ -1,23 +1,16 @@
-//! The renderer's one integrated volume (#1703): what group 0 binds at 17 (read
-//! through its linear clamp sampler at 18, `gpu::linear_clamp`) and every fogging
-//! pass reads. Each base camera running volumetric fog writes it
-//! right before its own passes (the camera's work is submitted in order, as its
-//! camera uniform is), so one texture serves every view and render texture.
-//! While none runs it, it is one texel no pass reads; a grid of another size replaces it
-//! and the caller rebuilds group 0.
+//! One texel stands in while no camera runs the fog; a grid of another size
+//! replaces it and the caller rebuilds group 0.
 
 /// Renders without a camera running volumetric fog before the grid is let go.
 pub(crate) const IDLE_RENDERS: u32 = 4;
 
-/// The format of every froxel grid: rgb light, a extinction or transmittance.
+/// rgb light, a extinction or transmittance.
 pub(crate) const FROXEL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 pub(crate) struct SharedVolume {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
-    /// The grid it holds; `None` for the stand-in.
     grid: Option<[u32; 3]>,
-    /// Whether a camera wrote it since the last [`Self::tick`].
     used: bool,
     idle: u32,
 }
@@ -34,15 +27,11 @@ impl SharedVolume {
         }
     }
 
-    /// The volume as group 0 binds it.
     pub(crate) fn view(&self) -> &wgpu::TextureView {
         &self.view
     }
 
-    /// The volume sized for `grid`, made when it holds another; returns whether it
-    /// was replaced (group 0 names the old one). Two cameras running different
-    /// grids (a render texture's `Custom` one beside the screen's) reallocate it
-    /// twice a frame; `Graphics.md` says so.
+    /// Returns whether it was replaced (group 0 names the old one).
     pub(crate) fn fit(&mut self, device: &wgpu::Device, grid: [u32; 3]) -> bool {
         self.used = true;
         if self.grid == Some(grid) {
@@ -54,8 +43,7 @@ impl SharedVolume {
         true
     }
 
-    /// One render passed: after [`IDLE_RENDERS`] in which no camera wrote it, go
-    /// back to the stand-in. Returns whether it was replaced.
+    /// Returns whether it went back to the stand-in.
     pub(crate) fn tick(&mut self, device: &wgpu::Device) -> bool {
         self.idle = if std::mem::take(&mut self.used) {
             0
@@ -71,20 +59,17 @@ impl SharedVolume {
         true
     }
 
-    /// The texture, for a test to read back.
     #[cfg(test)]
     pub(crate) fn texture(&self) -> &wgpu::Texture {
         &self.texture
     }
 
-    /// The grid it holds, `None` for the stand-in.
     #[cfg(test)]
     pub(crate) fn grid(&self) -> Option<[u32; 3]> {
         self.grid
     }
 }
 
-/// A froxel grid of `grid` texels a compute pass writes and a pass samples.
 pub(crate) fn froxel_grid(
     device: &wgpu::Device,
     [w, h, d]: [u32; 3],
@@ -101,8 +86,6 @@ pub(crate) fn froxel_grid(
         sample_count: 1,
         dimension: wgpu::TextureDimension::D3,
         format: FROXEL_FORMAT,
-        // COPY_DST for the probe grid's upload, COPY_SRC so a test can read a
-        // grid back; neither costs memory.
         usage: wgpu::TextureUsages::STORAGE_BINDING
             | wgpu::TextureUsages::TEXTURE_BINDING
             | wgpu::TextureUsages::COPY_DST
@@ -111,8 +94,6 @@ pub(crate) fn froxel_grid(
     })
 }
 
-/// The stand-in while no camera runs volumetric fog: one texel, never read (every
-/// reader skips the fetch on the camera's `volumetric.x`, which is 0 then).
 fn stand_in(device: &wgpu::Device) -> wgpu::Texture {
     froxel_grid(device, [1, 1, 1], "Volumetric Fog Stand-in")
 }

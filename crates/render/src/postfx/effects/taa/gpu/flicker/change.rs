@@ -1,7 +1,3 @@
-//! What the anti-flicker (`super`) leaves alone: a lone flash on a calm still
-//! ceiling is clamped as URP's is, on and off, and a cube moving under the
-//! flickering ceiling leaves no more trail than under URP's resolve.
-
 use glam::Vec3;
 
 use super::measure::run;
@@ -9,17 +5,11 @@ use super::room::{anti_flicker, block, matte, renderer, room, ON, WARM};
 use rusty_scene::create::default_light;
 use rusty_scene::Scene;
 
-/// Frames measured, and the one (after [`WARM`]) a change comes on.
 const FRAMES: u32 = 16;
 const AT: u32 = 6;
-/// A tile's largest step before the flash, in 255ths, for it to count as calm.
 const CALM: f32 = 0.5;
-/// How far a calm tile under the hold may sit from URP's through a lone flash, in
-/// 255ths: a level, a calm pixel's own sub-level blinks (lighting's rounding)
-/// holding that little of the flash's end. Measured: lavapipe 0.5, RTX 2060 0.5.
 const SAME: f32 = 1.0;
 
-/// The largest difference between two runs' tiles, over every frame.
 pub(super) fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
     let pairs = a
         .iter()
@@ -28,9 +18,6 @@ pub(super) fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
     pairs.fold(0.0, f32::max)
 }
 
-/// The room with its bulb hidden under the floor and SSR off, so nothing in it
-/// blinks: a pixel that blinks already holds a lone change's end as far as its
-/// own flicker reaches (`params::FLICKER_HOLD`): `cost`'s noise ceiling.
 pub(super) fn dark_room() -> Scene {
     let mut s = room();
     let bulb = s.find_entity_by_name("Bulb").unwrap();
@@ -40,7 +27,6 @@ pub(super) fn dark_room() -> Scene {
     s
 }
 
-/// Point light `name` 0.6 m under the ceiling's middle, lit at `intensity` or off.
 pub(super) fn lamp(s: &mut Scene, name: &str, intensity: Option<f32>) {
     let id = s.find_entity_by_name(name).unwrap_or_else(|| {
         let id = s.add_entity(name.to_string());
@@ -71,7 +57,6 @@ fn gpu_a_lone_flash_on_a_still_ceiling_is_clamped_as_urps() {
         .zip(&held[AT as usize - 1])
         .map(|(a, b)| a - b);
     let rise = lit.fold(0.0, f32::max);
-    // The tiles nothing blinked in before the flash (an edge's aliasing does).
     let calm: Vec<usize> = (0..urp[0].len())
         .filter(|&t| {
             urp[..AT as usize]
@@ -95,7 +80,6 @@ fn gpu_a_lone_flash_on_a_still_ceiling_is_clamped_as_urps() {
     assert!(gap <= SAME, "a lone flash is held: {gap:.2} off URP's");
 }
 
-/// The cube's place on frame `f`: crossing under the bulb's reflection, then gone.
 fn slide(s: &mut Scene, f: u32) {
     let cube = s.find_entity_by_name("Mover").unwrap_or_else(|| {
         let place = (Vec3::ZERO, Vec3::splat(0.3));
@@ -106,8 +90,6 @@ fn slide(s: &mut Scene, f: u32) {
     s.world.transform_mut(cube).unwrap().position = Vec3::new(x, y, -3.2);
 }
 
-/// How much more trail the hold may leave than URP's, in 255ths: a level.
-/// Measured: lavapipe 3.1 held, 3.9 URP's; RTX 2060 the same.
 const TRAIL: f32 = 1.0;
 
 #[test]

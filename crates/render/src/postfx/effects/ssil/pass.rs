@@ -1,6 +1,3 @@
-//! SSIL's pipelines (#1750), one per [`Stage`] of `postfx/ssil.wgsl`, shared by every
-//! view, built on first use and warmed with the rest; and how one stage records.
-
 use crate::gpu::bind_entry as entry;
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::{depth_entry, texture_entry, uniform_entry};
@@ -10,8 +7,6 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::HDR_FORMAT;
 use crate::timing::{GpuPass, GpuTimer};
 
-/// One of SSIL's fullscreen passes, in the order a view records them over two
-/// frames: the source after the opaque pass, the rest before the next one.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Stage {
     Source,
@@ -40,7 +35,6 @@ impl Stage {
         }
     }
 
-    /// Its fragment entry point in `postfx/ssil.wgsl`.
     fn entry(self) -> &'static str {
         match self {
             Self::Source => "fs_source",
@@ -51,8 +45,6 @@ impl Stage {
         }
     }
 
-    /// The formats it writes: the accumulate keeps each texel's normal beside its
-    /// result, for next frame's rejection.
     fn targets(self) -> &'static [Option<wgpu::ColorTargetState>] {
         const fn plain(format: wgpu::TextureFormat) -> Option<wgpu::ColorTargetState> {
             Some(wgpu::ColorTargetState {
@@ -70,11 +62,9 @@ impl Stage {
     }
 }
 
-/// The format of the normals the accumulate keeps (`n * 0.5 + 0.5`).
+/// `n * 0.5 + 0.5`.
 pub(super) const NORMAL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
-/// What one stage reads: the view's uniform and depth, its input, last frame's
-/// result and its normals (its input again, for every stage but the accumulate).
 pub(super) struct StageInputs<'a> {
     pub uniform: &'a wgpu::Buffer,
     pub depth: &'a wgpu::TextureView,
@@ -83,7 +73,6 @@ pub(super) struct StageInputs<'a> {
     pub prev_normal: &'a wgpu::TextureView,
 }
 
-/// The renderer-wide half of SSIL: its layout and pipelines.
 pub(crate) struct SsilPasses {
     layout: wgpu::BindGroupLayout,
     pipelines: [LazyPipeline; 5],
@@ -127,13 +116,10 @@ impl SsilPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.pipelines.iter()
     }
 
-    /// Record `stage` over `inputs` into `targets` (the accumulate's two, every
-    /// other stage's one), timed under `ssil`.
     pub(super) fn record(
         &self,
         (device, encoder): (&wgpu::Device, &mut wgpu::CommandEncoder),

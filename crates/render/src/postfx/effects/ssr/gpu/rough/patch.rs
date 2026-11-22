@@ -1,7 +1,3 @@
-//! A rough reflection's blur follows the pixel's own roughness (#2158): a patch
-//! of a roughness map, or a smooth floor beside a rough one, is blurred by its own
-//! cone, not by its neighbours', though the radius field they share is smooth.
-
 use glam::Vec3;
 
 use super::super::fixture::{paint, place};
@@ -10,9 +6,6 @@ use super::edge::{lifted, side_step};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// #2028's lifted cube over a bronze floor of `floor` with a bronze tile of
-/// `tile` 5 mm proud of it, spanning `xs` (m) across, from 1.5 m to 5.5 m out;
-/// with a wall 16 m out where `far` holds, so the floor's long rays find it.
 fn tiled(on: bool, floor: f32, tile: f32, xs: (f32, f32), far: bool) -> Scene {
     let mut s = lifted(on, floor);
     if far {
@@ -25,7 +18,6 @@ fn tiled(on: bool, floor: f32, tile: f32, xs: (f32, f32), far: bool) -> Scene {
     s
 }
 
-/// A matte blue wall 16 m out.
 fn add_wall(s: &mut Scene) {
     let wall = create_entity(s, "Wall", Some(Primitive::Box));
     let far = (Vec3::new(0.0, 2.0, -16.0), Vec3::new(30.0, 4.0, 0.2));
@@ -33,9 +25,6 @@ fn add_wall(s: &mut Scene) {
     paint(s, wall, "wall", ([0.2, 0.4, 0.9], 0.0, 1.0));
 }
 
-/// The sharpest step of the lifted cube's reflected left side on `scene`'s floor,
-/// as a share of the redness it adds just inside that side (8 px left of the
-/// frame's middle), in the row where that is most: near 1 is a hard outline.
 fn step(r: &mut crate::Renderer, scene: impl Fn(bool) -> Scene) -> f32 {
     let down = Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0);
     let (on, off) = (shot(r, &scene(true), &down), shot(r, &scene(false), &down));
@@ -47,12 +36,9 @@ fn step(r: &mut crate::Renderer, scene: impl Fn(bool) -> Scene) -> f32 {
     rise.max().unwrap() as f32 / added(inside, row).max(1) as f32
 }
 
-/// Under the reflection's left half, whose side the test measures.
 const UNDER: (f32, f32) = (-2.0, -0.1);
-/// Left of it, 0.4 m off its side.
 const BESIDE: (f32, f32) = (-4.0, -0.7);
 
-/// The least share of its own sharpness a smooth surface keeps among rough ones.
 const KEPT: f32 = 0.9;
 
 #[test]

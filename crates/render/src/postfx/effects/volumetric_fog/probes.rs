@@ -1,17 +1,6 @@
-//! The light probes in the air (#1703): the ambient the froxels scatter, taken
-//! from the scene's baked probe field instead of the one scene-wide ambient, so a
-//! sealed room's air is as dark as its probes and a lit hall's as bright as its.
-//!
-//! A coarse grid of [`GRID`] cells around the camera, each the probe field's L0
-//! (its average radiance over every direction, which is exactly what an isotropic
-//! medium scatters) at the cell's centre, sampled as a Light Probe Proxy Volume's
-//! points are (`ProbeVolume::sample`, `render::draw::proxy_volume`). Its cells are
-//! `2 × depth_extent / 16` wide, so it spans the froxels' reach across and half of
-//! it up; it is snapped to whole cells, so it does not swim as the camera moves.
-//! It is filled on the CPU only when the probes change, the camera crosses into
-//! another cell or the extent changes (16 × 8 × 16 = 2048 samples, a 16 KB
-//! upload); every other frame it costs nothing. Beyond it the froxels read its
-//! nearest face. With no probes the froxels take the scene ambient as before.
+//! The grid holds the probe field's L0 (its average radiance, which is what an
+//! isotropic medium scatters), cells `2 * depth_extent / 16` wide, snapped to
+//! whole cells so it does not swim. Beyond it the froxels read its nearest face.
 
 use crate::gpu::ops::{CountedQueue as _, Writes};
 use glam::{IVec3, Vec3};
@@ -21,13 +10,11 @@ use rusty_core::color::f32_to_f16;
 use rusty_scene::revision::Revision;
 use rusty_scene::{Scene, SceneId};
 
-/// Cells across, up and deep.
 pub(crate) const GRID: [u32; 3] = [16, 8, 16];
 
 /// SH's constant basis: an L0 coefficient times it is the average radiance.
 const Y00: f32 = 0.282_094_8;
 
-/// What the grid was filled under.
 #[derive(Clone, Copy, PartialEq)]
 struct Key {
     scene: SceneId,
@@ -40,7 +27,6 @@ pub(crate) struct AirProbes {
     texture: wgpu::Texture,
     pub(crate) view: wgpu::TextureView,
     key: Option<Key>,
-    /// How many times the grid was filled: what a test counts a kept frame by.
     pub(crate) fills: u64,
 }
 
@@ -55,9 +41,8 @@ impl AirProbes {
         }
     }
 
-    /// The grid for a camera at `eye` reaching `extent` metres, filled when it
-    /// changed. Returns the uniform's two rows: the box's corner (w 1 when the
-    /// scene has probes, 0 when the froxels take the scene ambient) and its size.
+    /// Returns the uniform's two rows: the box's corner (w 1 when the scene has
+    /// probes, 0 when the froxels take the scene ambient) and its size.
     pub(crate) fn refresh(
         &mut self,
         scene: &Scene,
@@ -87,7 +72,6 @@ impl AirProbes {
         [min.extend(1.0).to_array(), size.extend(0.0).to_array()]
     }
 
-    /// Sample the probe field at every cell's centre and upload it.
     fn fill(&self, scene: &Scene, (min, cell): (Vec3, f32), (queue, staging): Writes) {
         let [w, h, d] = GRID;
         let mut texels = Vec::with_capacity((w * h * d * 4) as usize);

@@ -1,20 +1,11 @@
-//! A surface that adds onto or multiplies what is behind it takes no light from
-//! the air in front of it (#1703): what is behind already carries that air. In
-//! fog, a black Additive card and a white (emissive, so lit white) Multiply sheet
-//! stay invisible, where adding the air's in-scatter would draw a glowing
-//! rectangle, brighter the thicker the fog.
-
 use glam::Vec3;
 
 use super::fixture::{fog, glow, lamp, renderer, room, settled, tinted, LAMP_AT};
 use rusty_components::{BlendMode, LightMode, MaterialAsset, RenderMode, VolumetricFog};
 use rusty_scene::Scene;
 
-/// Where the sheet hangs: in the lamp-lit air, left of the lamp, facing the eye.
 const SHEET: Vec3 = Vec3::new(-1.0, 1.5, -3.0);
 
-/// The room with its lamp under `volumetric`, and with a sheet of `mode` when
-/// `sheet` holds its base colour and emission.
 fn scene(volumetric: VolumetricFog, sheet: Option<(BlendMode, [f32; 3], [f32; 3])>) -> Scene {
     let mut scene = room(volumetric);
     lamp(&mut scene, LAMP_AT, 3.0, LightMode::Realtime);
@@ -37,8 +28,6 @@ fn scene(volumetric: VolumetricFog, sheet: Option<(BlendMode, [f32; 3], [f32; 3]
     scene
 }
 
-/// What the sheet changes where it hangs, in clear air and in fog: the glow
-/// with it less the glow without it.
 fn changes(mode: BlendMode, base: [f32; 3], emissive: [f32; 3]) -> Option<(f32, f32, f32)> {
     let mut r = renderer()?;
     let sheet = Some((mode, base, emissive));

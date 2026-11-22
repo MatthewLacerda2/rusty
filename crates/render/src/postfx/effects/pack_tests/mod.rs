@@ -1,7 +1,3 @@
-//! What each effect packs for one view's camera (#1434, #1467): its composite slots
-//! from the volume and the camera, gated by the player's options, and
-//! the march SSR's pass runs (#1526).
-
 use super::fxaa::fxaa_enabled;
 use super::motion_blur::effect::blur_params;
 use super::ssr::{march, ssr_enabled};
@@ -16,7 +12,6 @@ use rusty_scene::Scene;
 mod lens;
 mod taa;
 
-/// One entity carrying `vc` (and `cam`), and its id.
 fn scene_with_vc(vc: PostProcessingComponent, cam: Option<CameraComponent>) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = add(&mut scene, Some(vc), cam);
@@ -34,7 +29,6 @@ fn add(
     id
 }
 
-/// `effect`'s composite slots for `camera`'s view under `graphics`.
 fn packed(
     scene: &Scene,
     camera: Option<u32>,
@@ -50,7 +44,6 @@ fn packed(
     slots_of(&cx, effect)
 }
 
-/// `effect`'s composite slots under `cx`.
 fn slots_of(cx: &EffectCx, effect: &str) -> Vec<[f32; 4]> {
     let all = composite_slots(cx);
     composite_layout()
@@ -60,13 +53,11 @@ fn slots_of(cx: &EffectCx, effect: &str) -> Vec<[f32; 4]> {
         .collect()
 }
 
-/// The motion blur `camera` runs under `graphics`, as its sample count.
 fn blur(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option<f32> {
     let post = borrow_post_source(scene, camera);
     blur_params(post.source(), graphics, 100).map(|b| b.shape[2])
 }
 
-/// The march steps SSR runs for `camera` under `graphics`, if it runs.
 fn ssr(scene: &Scene, camera: Option<u32>, graphics: GraphicsSettings) -> Option<u32> {
     let guards = borrow_post_source(scene, camera);
     let post = guards.source();
@@ -100,7 +91,6 @@ fn cam() -> CameraComponent {
     }
 }
 
-/// The engine's own quality values, every option allowed.
 fn high() -> GraphicsSettings {
     Default::default()
 }
@@ -119,9 +109,6 @@ fn the_volumes_knobs_reach_their_effects_slots() {
     );
 }
 
-/// No preset turns SSR or motion blur off (#1522): a `Low`-level SSR marches the
-/// preset's `Low` row, and a `Custom` motion blur takes its own samples, on every
-/// seeded preset.
 #[test]
 fn every_preset_runs_ssr_and_motion_blur() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
@@ -175,7 +162,6 @@ fn inactive_volume_no_camera_and_a_display_only_view_are_neutral() {
     assert_eq!(composite_slots(&display_only), neutral);
 }
 
-/// #1434: each view reads its own camera, never the scene's first volume or camera.
 #[test]
 fn each_view_reads_its_own_camera_whatever_the_entity_order() {
     let mut scene = Scene::new();
@@ -192,12 +178,10 @@ fn each_view_reads_its_own_camera_whatever_the_entity_order() {
     assert_eq!((ev(main), ev(first)), (-2.0, 1.5));
     assert!(!fxaa(&scene, Some(main)));
     assert!(fxaa(&scene, Some(first)));
-    // A camera with no volume is neutral even though others have one.
     assert_eq!(ev(bare), 0.0);
     assert!(fxaa(&scene, None), "no camera: FXAA stays default-on");
 }
 
-/// The player's `option` forbidden.
 fn forbidding(option: GraphicsOption) -> GraphicsSettings {
     let mut options = GraphicsOptions::default();
     options.set(option, false);
@@ -207,8 +191,6 @@ fn forbidding(option: GraphicsOption) -> GraphicsSettings {
     }
 }
 
-/// #1438: a player option off turns its effect off for a camera that has it on;
-/// allowed, the camera's choice stands.
 #[test]
 fn a_player_option_off_gates_the_cameras_effect() {
     let (scene, id) = scene_with_vc(vc(), Some(cam()));
@@ -230,7 +212,6 @@ fn a_player_option_off_gates_the_cameras_effect() {
     ));
 }
 
-/// #1436: motion blur is the camera's, like FXAA: it runs without a volume.
 #[test]
 fn motion_blur_needs_no_volume() {
     let mut scene = Scene::new();

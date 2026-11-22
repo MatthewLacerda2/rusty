@@ -1,23 +1,13 @@
-//! The viewmodel (#1445): a gun on a `DepthOnly` overlay camera, 0.7 m from it, stays
-//! sharp while the world focuses 12 m out. Its circle of confusion is its own
-//! camera's business, so the world's lens never reaches it, even though the overlay
-//! cleared the depth buffer the world drew.
-
 use glam::Vec3;
 
 use super::gpu_fixture::{bokeh, change_around, cube, renderer, scene, shot, NEAR};
 use rusty_components::{CameraComponent, DepthOfField};
 use rusty_scene::{ClearFlags, Scene};
 
-/// The layer only the gun camera draws.
 const VIEWMODEL: u8 = 1;
 
-/// Where the gun sits in front of its camera: low and right, clear of both cubes.
 const GUN: Vec3 = Vec3::new(0.4, -0.25, -0.7);
 
-/// The two-cube scene running `dof`, with the usual FPS stack: the world camera
-/// skips the viewmodel layer, and a `DepthOnly` gun camera above it draws only that
-/// layer, a small gun cube.
 fn armed(dof: DepthOfField) -> Scene {
     let (mut scene, world) = scene(dof);
     scene.world.camera_mut(world).unwrap().culling_mask = !(1 << VIEWMODEL);

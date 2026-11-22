@@ -1,10 +1,3 @@
-//! A dark object's contact reflection in front of a bright background (#2249): the
-//! cube a twelfth as bright, the far wall glowing. The radius field is a mean by
-//! count, so the cube's foot, many dark hits of its own, keeps its own blur
-//! whatever shines behind it; a field that weighed hits by their brightness let
-//! the wall's long rays loosen it. Measured: 0.95 on lavapipe with the field as
-//! it is, 0.69 with the field weighted by brightness.
-
 use super::{kept, Case, TIGHT};
 
 #[test]

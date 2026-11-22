@@ -1,11 +1,3 @@
-//! A contact reflection among long faded rays (#2158): a cube, or a thin post,
-//! standing on a satin metal floor, a far wall behind it. Most of the floor's rays
-//! run to the wall and fade out (their blur too wide to keep), but they still tell
-//! the resolve how wide a blur is around them. The rays that meet a cube's foot are
-//! enough of the mean around it to keep its reflection there tight; a thin post's
-//! are not, and its reflection fades with the long rays' (the radius field is a
-//! plain mean, smooth among hits: `docs/api/Graphics.md`).
-
 use glam::Vec3;
 
 use super::super::fixture::{paint, place};
@@ -17,9 +9,6 @@ use rusty_scene::{Camera, Scene};
 
 mod dark;
 
-/// What stands on the floor: the floor's roughness, a thin post in the cube's
-/// place, and a dark cube before a glowing wall in place of a red one before a
-/// lit wall.
 #[derive(Clone, Copy)]
 struct Case {
     roughness: f32,
@@ -27,10 +16,6 @@ struct Case {
     dark: bool,
 }
 
-/// [`base`]'s cube standing on a floor of the case's roughness, or a post 8 cm
-/// thick and 1.2 m tall in its place when `thin`, with or without a `wall` 16 m
-/// out; when `dark`, the cube a twelfth as bright, the wall glowing blue and
-/// the sky black, so the probe's reflection holds no red.
 fn standing(on: bool, wall: bool, case: Case) -> Scene {
     let Case {
         roughness,
@@ -69,7 +54,6 @@ fn standing(on: bool, wall: bool, case: Case) -> Scene {
     s
 }
 
-/// The frame's size: the long rays' blur spans tens of pixels.
 const W: u32 = 640;
 const H: u32 = 480;
 
@@ -80,17 +64,11 @@ fn shot(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
-/// Pixel `(x, y)`'s redness: red over blue.
 fn red(f: &[u8], x: u32, y: u32) -> i32 {
     let i = ((y * W + x) * 4) as usize;
     i32::from(f[i]) - i32::from(f[i + 2])
 }
 
-/// The redness the reflection adds under the cube's foot: over its width, in
-/// the rows down to a fortieth of the frame below it, the foot found in `bare`
-/// (the red cube with SSR off and no wall).
-/// When `dark`, the red channel alone: the wall's blue glow blurs over the foot
-/// as its rays do and would read as lost redness.
 fn under_the_foot(on: &[u8], off: &[u8], (bare, dark): (&[u8], bool)) -> i32 {
     let added = |x: u32, y: u32| {
         let i = ((y * W + x) * 4) as usize;
@@ -111,8 +89,6 @@ fn under_the_foot(on: &[u8], off: &[u8], (bare, dark): (&[u8], bool)) -> i32 {
         .sum()
 }
 
-/// The share of the redness the reflection under the foot of `case` keeps with
-/// the far wall's faded rays around it, against none; and the redness with none.
 fn kept(r: &mut Renderer, case: Case) -> (f32, i32) {
     let down = Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0);
     let bare = shot(
@@ -138,7 +114,6 @@ fn kept(r: &mut Renderer, case: Case) -> (f32, i32) {
     (walled as f32 / open.max(1) as f32, open)
 }
 
-/// The least share of its redness a cube's contact reflection keeps among faded rays.
 const TIGHT: f32 = 0.9;
 
 #[test]
@@ -162,10 +137,6 @@ fn gpu_a_satin_floor_keeps_a_standing_cubes_contact_reflection_tight() {
     );
 }
 
-/// What a thin post's contact reflection keeps on a rougher floor: on its own, a
-/// reflection under its foot; among a far wall's long rays, their blur, so it fades
-/// to the probe's reflection with theirs (near none of it here), never a patch
-/// brighter or darker than that reflection was.
 #[test]
 fn gpu_a_thin_posts_contact_reflection_fades_with_the_long_rays_around_it() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {

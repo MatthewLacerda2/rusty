@@ -1,25 +1,18 @@
-//! The chain on lavapipe, fed a scene by hand (#1700): NaN, +inf and −inf texels
-//! never reach the result, whatever a driver does when the forward pass overflows
-//! a half float, and an inf adds at most what the clamp lets through.
-
 use super::chain::{BloomParams, BloomTargets, CLAMP_MAX};
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::{readback, Renderer};
 use rusty_components::Bloom;
 
 const SIDE: u32 = 16;
-/// Half-float bits: +inf, a quiet NaN, −inf and 10.0.
 const INF: u16 = 0x7c00;
 const NAN: u16 = 0x7e00;
 const NEG_INF: u16 = 0xfc00;
 const TEN: u16 = 0x4900;
 
-/// Whether half-float `bits` is finite and not negative.
 fn finite_non_negative(bits: u16) -> bool {
     bits & 0x7c00 != 0x7c00 && (bits & 0x8000 == 0 || bits == 0x8000)
 }
 
-/// Half-float `bits` as an `f32` (finite values).
 pub(super) fn half(bits: u16) -> f32 {
     let (exp, man) = ((bits >> 10) & 0x1f, (bits & 0x3ff) as f32);
     let sign = if bits & 0x8000 != 0 { -1.0 } else { 1.0 };
@@ -30,7 +23,6 @@ pub(super) fn half(bits: u16) -> f32 {
     sign * magnitude
 }
 
-/// A black `side`² HDR scene with each `(pixel, half bits)` written to its rgb.
 pub(super) fn scene(r: &Renderer, side: u32, lit: &[((u32, u32), u16)]) -> PfxTarget {
     let scene = PostFx::target(&r.device, side, side, "Bloom Test Scene", HDR_FORMAT);
     let mut texels = vec![0u16; (side * side * 4) as usize];
@@ -52,8 +44,6 @@ pub(super) fn scene(r: &Renderer, side: u32, lit: &[((u32, u32), u16)]) -> PfxTa
     scene
 }
 
-/// `scene` (`side`²) through a chain at `divisor` with `bloom`'s knobs: the chain,
-/// its passes run.
 pub(super) fn bloom(
     r: &Renderer,
     scene: &PfxTarget,
@@ -79,7 +69,6 @@ pub(super) fn bloom(
     t
 }
 
-/// `target`'s texels (`size`), as half-float bits, four channels each.
 pub(super) fn halves(r: &Renderer, target: &PfxTarget, size: (u32, u32)) -> Vec<u16> {
     let bytes = readback::read_texture_bytes(&r.device, &r.queue, &target.texture, size, 8);
     bytemuck::pod_collect_to_vec(&bytes)
@@ -103,10 +92,6 @@ fn gpu_nan_and_inf_never_reach_the_result() {
     let bad = halves.iter().filter(|&&h| !finite_non_negative(h)).count();
     assert_eq!(bad, 0, "every channel of the result is finite and ≥ 0");
     let lit = |(x, y): (u32, u32)| half(halves[((y * SIDE + x) * 4) as usize]);
-    // What reaches the prefilter of an inf is the driver's: a bilinear tap that
-    // weighs it by 0 is NaN on lavapipe (0 × inf), and dropped; one that keeps it is
-    // clamped to 65472 and glows, the Karis average damping only the texels around
-    // it (every box holds the centre tap). Either way it stays under the clamp.
     let inf = lit((12, 3));
     eprintln!("[bloom] the inf's texel: {inf}");
     assert!(

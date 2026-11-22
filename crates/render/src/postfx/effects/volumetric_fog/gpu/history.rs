@@ -1,24 +1,14 @@
-//! The froxels' history (#1703): a light that moved leaves under 5 % of its old
-//! glow after the ghost frames, a cut starts over at once, a resize holds, and
-//! settings past their ranges (a file that skipped the ops) draw what their
-//! clamped values draw.
-
 use glam::Vec3;
 
 use super::super::GHOST_FRAMES;
 use super::fixture::{draw, fog, glow, lamp, renderer, room, settled, view, BRIGHT, LAMP_AT};
 use rusty_components::{LightMode, VolumetricFog};
 
-/// Where the lamp moves to: across the room, out of the old halo's reach.
 const MOVED: Vec3 = Vec3::new(3.0, 1.5, -4.0);
 
-/// How much of the old glow may stay, with room for the jitter's noise.
 const LEFT: f32 = 0.05;
 const NOISE: f32 = 0.05;
 
-/// The glow at the lamp's old place: settled there, then `frames` frames after it
-/// moved, `cut` renewing the scene's identity when it moves. Also the settled glow
-/// there with the lamp at its new place alone.
 fn trail(frames: u32, cut: bool) -> Option<(f32, f32, f32)> {
     let mut r = renderer()?;
     let mut scene = room(fog());

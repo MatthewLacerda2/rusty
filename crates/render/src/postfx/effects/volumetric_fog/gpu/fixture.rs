@@ -1,8 +1,3 @@
-//! What the volumetric fog GPU tests share: a dark room (black floor and back wall,
-//! no ambient, no sky) seen from 1.5 m up looking down -Z, its volume with no
-//! tonemap so a frame reads back linear, and volumetric fog thick enough to see in
-//! a 96×72 frame.
-
 use glam::{Vec2, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -16,10 +11,8 @@ use rusty_scene::{Camera, Scene};
 pub(super) const W: u32 = 96;
 pub(super) const H: u32 = 72;
 
-/// Where the tests hang a lamp: in the air, 4 m in front of the eye.
 pub(super) const LAMP_AT: Vec3 = Vec3::new(0.0, 1.5, -4.0);
 
-/// The lamp's intensity: a clear halo that doesn't clip white.
 pub(super) const BRIGHT: f32 = 3.0;
 
 pub(super) fn renderer() -> Option<Renderer> {
@@ -30,7 +23,6 @@ pub(super) fn eye() -> Camera {
     Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0, 0.0)
 }
 
-/// Thick fog (a 10 m mean free path), at a small `Custom` grid.
 pub(super) fn fog() -> VolumetricFog {
     VolumetricFog {
         active: true,
@@ -44,12 +36,10 @@ pub(super) fn fog() -> VolumetricFog {
     }
 }
 
-/// A static black box named `name` at `position`, `scale`.
 pub(super) fn block(scene: &mut Scene, name: &str, at: (Vec3, Vec3)) -> u32 {
     tinted(scene, name, at, [0.0; 3])
 }
 
-/// A static rough box of `color` named `name` at `position`, `scale`.
 pub(super) fn tinted(
     scene: &mut Scene,
     name: &str,
@@ -73,7 +63,6 @@ pub(super) fn tinted(
     id
 }
 
-/// The dark room with volumetric fog `fog` on its camera's volume.
 pub(super) fn room(fog: VolumetricFog) -> Scene {
     let mut scene = open(fog);
     block(
@@ -84,7 +73,6 @@ pub(super) fn room(fog: VolumetricFog) -> Scene {
     scene
 }
 
-/// [`room`] without its back wall: the sky shows above the floor.
 pub(super) fn open(fog: VolumetricFog) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -104,7 +92,6 @@ pub(super) fn open(fog: VolumetricFog) -> Scene {
     scene
 }
 
-/// A point lamp of `intensity` over 6 m at `at`, in `mode`.
 pub(super) fn lamp(scene: &mut Scene, at: Vec3, intensity: f32, mode: LightMode) -> u32 {
     let id = scene.add_entity("Lamp".to_string());
     scene.world.transform_mut(id).unwrap().position = at;
@@ -118,13 +105,11 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, intensity: f32, mode: LightMode)
     };
     scene.world.set_light(id, Some(light));
     if mode == LightMode::Baked {
-        // A bake took it in: one none has is previewed live (#2522).
         scene.lightmaps.took_in_baked(id);
     }
     id
 }
 
-/// Turn every volume in `scene` to `fog`.
 pub(super) fn set_fog(scene: &mut Scene, fog: VolumetricFog) {
     for id in scene.world.ids_with_post_processing() {
         scene.world.post_processing_mut(id).unwrap().volumetric_fog = fog;
@@ -135,7 +120,6 @@ pub(super) fn view(r: &Renderer) -> RenderView {
     RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H)
 }
 
-/// Render `scene` into `view` and read the frame (RGBA8).
 pub(super) fn draw(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     r.render(view, scene, &eye(), &out, false);
@@ -143,7 +127,6 @@ pub(super) fn draw(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Ve
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), w, h)
 }
 
-/// The last of `frames` frames of `scene` in one fresh view.
 pub(super) fn settled(r: &mut Renderer, scene: &Scene, frames: u32) -> Vec<u8> {
     let mut v = view(r);
     let mut last = Vec::new();
@@ -153,12 +136,10 @@ pub(super) fn settled(r: &mut Renderer, scene: &Scene, frames: u32) -> Vec<u8> {
     last
 }
 
-/// The summed linear RGB of the 5x5 patch around where `p` lands.
 pub(super) fn glow(frame: &[u8], p: Vec3) -> f32 {
     (0..3).map(|c| channel(frame, p, c)).sum()
 }
 
-/// [`glow`]'s channel `c` alone.
 pub(super) fn channel(frame: &[u8], p: Vec3, c: usize) -> f32 {
     let clip = eye().build_view_projection(W as f32 / H as f32) * p.extend(1.0);
     let ndc: Vec2 = clip.truncate().truncate() / clip.w;

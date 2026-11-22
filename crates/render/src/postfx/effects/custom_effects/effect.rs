@@ -1,7 +1,3 @@
-//! The authored effects as a post effect (#397): an in-place LDR pass after the
-//! composite and before FXAA, each effect one fullscreen pass ping-ponging between the
-//! chain's two LDR targets, the result kept as next frame's history.
-
 use crate::postfx::params::Gate;
 use std::collections::BTreeMap;
 
@@ -25,11 +21,8 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }],
 };
 
-/// No authored params: a view without a volume.
 static NO_PARAMS: BTreeMap<String, Vec<f32>> = BTreeMap::new();
 
-/// The volume's module names and their params (none without a volume, or on a view
-/// that runs no post-FX).
 fn chain<'a>(cx: &EffectCx<'a>) -> (&'a [String], &'a BTreeMap<String, Vec<f32>>) {
     match cx.volume() {
         Some(vc) => (&vc.custom_effects.names, &vc.custom_effects.params),
@@ -37,21 +30,16 @@ fn chain<'a>(cx: &EffectCx<'a>) -> (&'a [String], &'a BTreeMap<String, Vec<f32>>
     }
 }
 
-/// Whether the view runs authored effects, each of which may read last frame's
-/// result (their history) (#2092): the volume names any.
 fn reads_history(cx: &EffectCx) -> bool {
     !chain(cx).0.is_empty()
 }
 
-/// Compile any module not cached yet; whether one of them loaded.
 fn prepare(pfx: &mut PostFx, device: &wgpu::Device, cx: &EffectCx) -> bool {
     let (names, _) = chain(cx);
     pfx.custom.prepare(device, names);
     !pfx.custom.loaded(names).is_empty()
 }
 
-/// Run the loaded effects over [`PostFx::ldr`], keep the result as next frame's
-/// history, and leave it in `ldr`.
 fn run(
     pfx: &mut PostFx,
     (device, queue): Gpu,
@@ -81,7 +69,6 @@ fn run(
         src.texture.size(),
     );
     if effects.len() % 2 == 1 {
-        // The result is in the second target: make it the chain's `ldr`.
         std::mem::swap(&mut pfx.ldr, &mut pfx.custom.ldr_b);
     }
 }

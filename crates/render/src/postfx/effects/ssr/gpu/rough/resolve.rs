@@ -1,7 +1,3 @@
-//! The resolve's edges (#2028's review): a mirror's misses beside a satin strip's
-//! hits stay misses, so the mirror's reflected side stays sharp; and a hit
-//! that reads `inf` from the image is a miss, so no `inf` or NaN reaches the frame.
-
 use glam::Vec3;
 
 use super::super::fixture::{paint, place};
@@ -13,11 +9,6 @@ use rusty_core::color::f16_to_f32;
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// The lifted cube over a mirror floor; when `strip`, a satin (roughness 0.5)
-/// bronze strip set in the floor just right of the cube's reflection (its left
-/// side on the line from the eye's foot through a point `GAP` right of the
-/// cube's), with a blue cube standing on it: a contact reflection, so its hits
-/// keep their weight and their radius dominates the mirror's misses beside it.
 fn beside(on: bool, strip: bool) -> Scene {
     let mut s = lifted(on, 0.04);
     if strip {
@@ -41,12 +32,8 @@ fn beside(on: bool, strip: bool) -> Scene {
     s
 }
 
-/// How far right of the cube's side the strip begins, at the cube's depth.
 const GAP: f32 = 0.15;
 
-/// The redness SSR adds along the floor's row whose middle the cube's reflection
-/// reddens most (`row`, or that row of this frame when `None`): the row, and per
-/// column what `on` adds over `off`.
 fn added(on: &[u8], off: &[u8], row: Option<u32>) -> (u32, Vec<i32>) {
     let red = |f: &[u8], x: u32, y: u32| at(f, x, y)[0] - at(f, x, y)[2];
     let add = |y: u32, x: u32| red(on, x, y) - red(off, x, y);
@@ -66,8 +53,6 @@ fn gpu_a_mirror_beside_a_satin_strip_keeps_its_reflection_sharp() {
     let ((alone_on, bare), (on, off)) = (frames(false), frames(true));
     let (row, alone) = added(&alone_on, &bare, None);
     let (_, strip) = added(&on, &off, Some(row));
-    // Right of the reflection's middle, up to where the strip shows: the mirror's
-    // own pixels, the reflection's right side and the misses past it.
     let moved = |x: u32| {
         (0..3)
             .map(|c| (at(&off, x, row)[c] - at(&bare, x, row)[c]).abs())
@@ -90,13 +75,10 @@ fn gpu_a_mirror_beside_a_satin_strip_keeps_its_reflection_sharp() {
     );
 }
 
-/// The lifted cube's view, from above the floor.
 fn camera() -> Camera {
     Camera::new(Vec3::new(0.0, 1.0, 0.0), -90.0, -12.0)
 }
 
-/// The lower half of the HDR image the SSR pass resolved into, as RGBA floats,
-/// after a second frame of `scene` whose SSR read `inf` over the upper half.
 fn poisoned(r: &mut crate::Renderer, scene: &Scene) -> Vec<[f32; 4]> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -112,8 +94,6 @@ fn poisoned(r: &mut crate::Renderer, scene: &Scene) -> Vec<[f32; 4]> {
         .collect()
 }
 
-/// Whether texel `c` is spoilt: non-finite, or black, which is what a NaN
-/// becomes on a driver whose `max(NaN, 0)` gives 0 (lavapipe).
 fn spoilt(c: &[f32; 4]) -> bool {
     !c.iter().all(|v| v.is_finite()) || c[..3].iter().all(|v| *v == 0.0)
 }
@@ -123,9 +103,6 @@ fn gpu_an_inf_ssr_hits_reflects_nothing_non_finite() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(W, H) else {
         return;
     };
-    // The cube is in the upper half; the floor reflects it in the lower. A
-    // mirror and a near-mirror read their hits from the image's first level
-    // (rougher ones read mips, which the pyramid's filter already cleans).
     for roughness in [0.04, 0.1, 0.35] {
         let lower = poisoned(&mut r, &lifted(true, roughness));
         let n = lower.iter().filter(|c| spoilt(c)).count();

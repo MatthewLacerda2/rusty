@@ -1,9 +1,3 @@
-//! #1847 on lavapipe: every TAA quality level and every float knob at its extremes
-//! resolves a sane frame (lit, not black) under a turning camera, and each level
-//! whose URP steps differ from `High`'s draws a different frame (a still frame
-//! would hide most of them: with no motion the history reads at texel centres,
-//! where bilinear and bicubic agree).
-
 use glam::Vec3;
 
 use super::super::fixture::{eye, frame, renderer, taa_scene, tilted_cube, view};
@@ -14,11 +8,8 @@ use rusty_components::{CameraComponent, TaaQuality};
 use rusty_scene::rules::taa::TAA_KNOBS;
 use rusty_scene::Scene;
 
-/// Frames turned, 1.5° each, ending at yaw 0.
 const FRAMES: u32 = 12;
 
-/// The noise wall and a tilted cube, the camera running TAA (URP's resolve, the
-/// fixture's) tuned by `tune`.
 fn tuned(tune: impl FnOnce(&mut CameraComponent)) -> Scene {
     let (mut scene, cam) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);
@@ -27,7 +18,6 @@ fn tuned(tune: impl FnOnce(&mut CameraComponent)) -> Scene {
     scene
 }
 
-/// The last frame of a turn toward yaw 0, in a fresh view.
 fn turned(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     let mut v = view(r);
     let yaw = |f: u32| (f as f32 + 1.0 - FRAMES as f32) * 1.5;
@@ -35,13 +25,11 @@ fn turned(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     frame(r, &mut v, scene, &eye(0.0))
 }
 
-/// The frame's mean luma.
 fn mean_luma(rgba: &[u8]) -> f32 {
     let l = luma(rgba);
     l.iter().sum::<f32>() / l.len() as f32
 }
 
-/// That `got` is as lit as `reference`, within a quarter: no black or blown frame.
 fn assert_sane(got: &[u8], reference: &[u8], what: &str) {
     let (g, r) = (mean_luma(got), mean_luma(reference));
     assert!(
@@ -70,7 +58,6 @@ fn gpu_each_quality_level_resolves_and_differs_from_high() {
 #[test]
 fn gpu_each_float_knob_resolves_at_its_extremes() {
     let Some(mut r) = renderer() else { return };
-    // The fixture's own values: its anti-flicker is URP's 0, not a camera's 0.5.
     let mut fixture = CameraComponent::default();
     let default = turned(&mut r, &tuned(|c| fixture = c.clone()));
     for knob in TAA_KNOBS {
@@ -79,9 +66,6 @@ fn gpu_each_float_knob_resolves_at_its_extremes() {
             let got = turned(&mut r, &tuned(|c| (knob.set)(c, value)));
             let what = format!("{} at {value}", knob.field);
             assert_sane(&got, &default, &what);
-            // The mip bias moves only a mipped map's detail, which the wall's
-            // 32² texture under this view may not show; every other knob away from
-            // its default changes the frame.
             if value != at_default && knob.field != "mip_bias" {
                 assert!(differing(&got, &default) > 0, "{what} changed nothing");
             }

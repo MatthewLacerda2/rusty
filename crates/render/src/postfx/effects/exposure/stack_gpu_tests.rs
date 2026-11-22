@@ -1,8 +1,3 @@
-//! Automatic exposure through the whole frame (#1444): `Renderer::render` meters
-//! the main camera's view, eases on the scene's game time in Play, holds while it is
-//! paused and snaps outside Play. The limits pin each target, so the steps are exact
-//! whatever the empty scene meters.
-
 use glam::Vec3;
 
 use crate::{RenderView, OFFSCREEN_FORMAT};
@@ -10,7 +5,6 @@ use rusty_components::ExposureMode;
 use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
-/// Pin the volume's target at `ev`.
 fn target(scene: &mut Scene, id: u32, ev: f32) {
     let mut vc = scene.world.post_processing_mut(id).unwrap();
     (vc.exposure.automatic.min_ev, vc.exposure.automatic.max_ev) = (ev, ev);

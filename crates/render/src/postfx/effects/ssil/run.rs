@@ -1,6 +1,3 @@
-//! Recording a base camera's SSIL (#1750): the gather, blur, accumulate and upsample
-//! ahead of its forward pass, in the scene pass's encoder, and the source after it.
-
 use super::pass::{Stage, StageInputs};
 use super::targets::{History, SsilTargets};
 use super::{Previous, SsilFrame};
@@ -14,11 +11,7 @@ use crate::passes::transparent::OpaqueViews;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
-    /// Record `frame`'s gather and what follows it into `encoder`, ahead of the
-    /// forward pass, and build the scene group that pass binds with the result
-    /// ([`SsilTargets::forward_group`]). `prepassed`: SSAO ran this camera, so its
-    /// prepass already holds the solids' depth and its AO goes in that group too;
-    /// otherwise SSIL draws the prepass itself.
+    /// `prepassed`: SSAO already drew the depth prepass.
     pub(crate) fn record_ssil(
         &mut self,
         view: &mut RenderView,
@@ -57,8 +50,6 @@ impl Renderer {
         self.frame_counters.ssil_samples += u64::from(w) * u64::from(h) * samples;
     }
 
-    /// Record the gather, blur, accumulate and upsample over `depth` into `t`'s
-    /// targets: this frame's result and normals, from last frame's.
     fn record_stages(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -92,8 +83,6 @@ impl Renderer {
         }
     }
 
-    /// The forward pass's scene group with `t`'s result in the opaque copy's slot (the
-    /// opaque pass reads no copy) and `ssao`'s AO when it ran this camera.
     fn ssil_scene_group(&self, ssao: Option<&SsaoTargets>, t: &SsilTargets) -> wgpu::BindGroup {
         create_shadow_bind_group(
             &self.device,
@@ -108,11 +97,6 @@ impl Renderer {
         )
     }
 
-    /// Keep this frame's realtime light, after `ctx`'s opaque pass and before SSR
-    /// and anything that blends over it, as the source next frame's gather reads,
-    /// and remember the camera it was seen from. Then clear the camera's SSIL flag:
-    /// only its opaque pass reads the bounce and writes the share in its alpha, and
-    /// the translucents' alpha blends. Nothing on a camera that ran no SSIL.
     pub(crate) fn keep_ssil_source(&self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let Some(frame) = ctx.ssil else {
             return;
@@ -138,8 +122,7 @@ impl Renderer {
                 camera,
             });
         }
-        // A copy in the camera's encoder, after the opaque pass and the source: they
-        // read the flag set, everything after it reads it clear.
+        // Only the opaque pass reads the bounce and writes the share in alpha.
         ctx.uniform.ssil[0] = 0.0;
         let at = (&self.queue, ctx.commands.encoder());
         (self.camera_buffer).record(at, Slot::SsilCleared, &ctx.uniform);

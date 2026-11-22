@@ -1,14 +1,9 @@
-//! Bloom's dirt cache (#1442): each path is read once until it changes on disk, a
-//! missing one is retried once it appears, an undecodable one only once written.
-
 use std::cell::Cell;
 
 use super::DirtCache;
 use rusty_core::fs::freshness::MISS_RETRY_FRAMES;
 use rusty_core::fs::written::note_written;
 
-/// `frames` frames of `cache` asking for `setting`, counting the reads; a read
-/// succeeds when the file decodes as text `"ok"`.
 fn frames(cache: &mut DirtCache<u8>, setting: &str, frames: u64) -> u32 {
     let reads = Cell::new(0);
     for _ in 0..frames {

@@ -1,14 +1,3 @@
-//! #1846 on lavapipe: a camera turning at 90°/s (1.5° a frame at 60 fps) across a
-//! wall of noise keeps its detail. URP's fixed frame influence resamples 90 % of
-//! every pixel from the reprojected history each frame, and the image softens
-//! while turning; a moving pixel's higher weight keeps it near the still frame.
-//!
-//! And a flick is not a reveal. At 90° FOV a static wall pixel's view depth
-//! changes by cos θ_prev / cos θ_now under a turn, +10 % a frame at 360°/s and
-//! +19 % at 720°/s (60 fps) near the edge; its distance from the camera does not.
-//! So a static scene flicked across reads no pixel as revealed: each frame equals
-//! the one with the reveal test off.
-
 use glam::Vec3;
 
 use super::fixture::{eye, frame, renderer, settle, taa_scene, tilted_cube, view};
@@ -18,17 +7,10 @@ use crate::motion::gpu_fixture::{H, W};
 use crate::{RenderView, Renderer};
 use rusty_scene::{Camera, Scene};
 
-/// Degrees a frame: 90°/s at 60 fps.
 const STEP: f32 = 1.5;
-/// Frames turned, ending at yaw 0, and frames the still view settles.
 const FRAMES: u32 = 16;
-/// The turning frame's sharpness over the still one's must reach this. Measured
-/// on lavapipe: 0.93 with the moving weight, 0.76 with URP's fixed one (the
-/// moving weight set to URP's).
 const KEPT: f32 = 0.85;
 
-/// The mean luma step between neighbouring pixels across the frame's middle,
-/// away from its edges (where a turn brings in fresh pixels).
 fn sharpness(rgba: &[u8]) -> f32 {
     let l = luma(rgba);
     let at = |x: u32, y: u32| l[(y * W + x) as usize];
@@ -42,18 +24,12 @@ fn sharpness(rgba: &[u8]) -> f32 {
     sum / n
 }
 
-/// The noise wall under the fixture's URP resolve (the anti-flicker at 0): the
-/// anti-flicker holds a still textured view's blinking texels and so sharpens the
-/// still frame (lavapipe: 10.19 at 0, 12.17 at the default 0.5, 12.21 at 1) while
-/// a turn of this speed holds nothing (9.45 at each); the measure is the moving
-/// weight's alone.
 fn wall_scene() -> Scene {
     let (mut scene, _) = taa_scene(true, true);
     noisy_wall(&mut scene, -7.0);
     scene
 }
 
-/// The last frame of `FRAMES` turning toward yaw 0 in `v`.
 fn turned(r: &mut Renderer, v: &mut RenderView, scene: &Scene) -> Vec<u8> {
     let yaw = |f: u32| (f as f32 + 1.0 - FRAMES as f32) * STEP;
     (0..FRAMES - 1).for_each(|f| drop(frame(r, v, scene, &eye(yaw(f)))));
@@ -85,11 +61,9 @@ fn gpu_a_flick_across_a_static_scene_reveals_nothing() {
     let Some(mut r) = renderer() else { return };
     let (mut scene, lens) = taa_scene(true, true);
     scene.world.camera_mut(lens).unwrap().fov = 90.0;
-    // The wall fills the view: a cube's silhouette is the one edge.
     let wall = noisy_wall(&mut scene, -7.0);
     scene.world.transform_mut(wall).unwrap().scale = Vec3::new(60.0, 40.0, 0.2);
     tilted_cube(&mut scene, Vec3::new(1.0, 0.0, -3.0));
-    // 360°/s and 720°/s at 60 fps.
     for step in [6.0, 12.0] {
         let cam = move |f: u32| -> Camera {
             let mut c = eye(step * (f % 2) as f32 - step / 2.0);

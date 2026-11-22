@@ -1,9 +1,3 @@
-//! The grading LUT's GPU tests (`knobs`, `clamp`, #1440; `lookup`, #1441; `contrast`,
-//! `saturation`, #1479; `hue`, #1701) and what they share with the exposure meter's (#1444): the post-FX chain
-//! alone, fed a synthetic HDR row. The scene target is written
-//! directly, so a test chooses the exact HDR colour each pixel's grade starts from,
-//! and reads the display colour the composite wrote.
-
 mod analytic;
 mod clamp;
 mod contrast;
@@ -24,7 +18,6 @@ use rusty_components::{CameraComponent, ExposureMode, PostProcessingComponent};
 use rusty_core::settings::graphics_options::{GraphicsOption, GraphicsOptions};
 use rusty_core::settings::GraphicsSettings;
 
-/// Pixels in the row: one per input colour.
 pub(in crate::postfx) const W: u32 = 64;
 
 pub(in crate::postfx) struct Chain {
@@ -33,8 +26,6 @@ pub(in crate::postfx) struct Chain {
     out: wgpu::Texture,
 }
 
-/// The chain on a headless renderer, writing the sRGB format a window does, or
-/// `None` without an adapter.
 pub(in crate::postfx) fn chain() -> Option<Chain> {
     let r = crate::test_gpu::headless_or_skip(W, 1)?;
     let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());
@@ -43,8 +34,6 @@ pub(in crate::postfx) fn chain() -> Option<Chain> {
     Some(Chain { r, pfx, out })
 }
 
-/// A volume exposing the image by `ev` in `mode` (its grade is not what a run bakes:
-/// [`Chain::run`] bakes the grade it is given).
 pub(in crate::postfx) fn exposure(ev: f32, mode: ExposureMode) -> PostProcessingComponent {
     let mut vc = rusty_scene::create::default_post_processing();
     (vc.exposure.fixed_ev, vc.exposure.mode) = (ev, mode);
@@ -52,8 +41,6 @@ pub(in crate::postfx) fn exposure(ev: f32, mode: ExposureMode) -> PostProcessing
 }
 
 impl Chain {
-    /// Grade `row` (one scene-linear HDR colour per pixel) at `ev` EV under `grade`'s
-    /// volume (`None`: neutral, no tonemap), returning each pixel's 8-bit sRGB output.
     pub(in crate::postfx) fn run(
         &mut self,
         row: &[[f32; 3]],
@@ -67,7 +54,6 @@ impl Chain {
         self.composite(&exposure(ev, ExposureMode::Fixed))
     }
 
-    /// Make `row` (one scene-linear HDR colour per pixel) the scene the chain reads.
     pub(in crate::postfx) fn write_row(&mut self, row: &[[f32; 3]]) {
         assert_eq!(row.len(), W as usize);
         let texels: Vec<u16> = row
@@ -87,8 +73,6 @@ impl Chain {
         );
     }
 
-    /// Run the composite over the scene with `vc`'s exposure and the LUT the last
-    /// run baked, every other effect off, returning each pixel's 8-bit sRGB output.
     pub(in crate::postfx) fn composite(&mut self, vc: &PostProcessingComponent) -> Vec<[u8; 4]> {
         let (device, queue) = (&self.r.device, &self.r.queue);
         let depth = texture(device, DEPTH_FORMAT, wgpu::TextureUsages::empty());
@@ -132,7 +116,6 @@ impl Chain {
     }
 }
 
-/// A `W × 1` texture of `format`, sampled or rendered to, plus `usage`.
 fn texture(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
@@ -156,7 +139,6 @@ fn texture(
     })
 }
 
-/// `v` as the chain stores it: [`f16`] read back as an `f32`.
 fn f16_value(v: f32) -> f32 {
     if v == 0.0 {
         return 0.0;
@@ -166,8 +148,6 @@ fn f16_value(v: f32) -> f32 {
     (1.0 + mantissa) * (exp as f32).exp2()
 }
 
-/// `v` as an IEEE half float, for the zero and positive normal values the tests
-/// write (the mantissa truncated).
 pub(in crate::postfx) fn f16(v: f32) -> u16 {
     if v == 0.0 {
         return 0;

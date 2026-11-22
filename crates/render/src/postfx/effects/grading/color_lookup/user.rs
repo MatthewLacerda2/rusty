@@ -1,13 +1,3 @@
-//! The volume's Color Lookup (#1441): a user LUT (`asset::lut`, a `.cube` or a
-//! Unity strip `.png`) uploaded as a 3D texture the grading bake reads, so the
-//! composite still grades a pixel with one read of the grading LUT. Unity's *Color Lookup* override,
-//! applied as URP applies it: last, on the display colour, sRGB-encoded.
-//!
-//! Uploads are cached by path ([`UserLuts`]) and kept in step with the disk the way
-//! textures are (`core::fs::freshness`): a written file is read again, a missing
-//! one is retried once it appears, and a malformed one is logged once, naming the
-//! file and line, and grades neutral until it is written.
-
 use crate::gpu::ops::{CountedQueue as _, Writes};
 use std::collections::BTreeMap;
 
@@ -16,7 +6,6 @@ use rusty_components::PostProcessingComponent;
 use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 
-/// A volume's Color Lookup: the LUT file, and how much of it applies (`0..=1`).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Lookup<'a> {
     pub path: &'a str,
@@ -24,8 +13,6 @@ pub struct Lookup<'a> {
 }
 
 impl<'a> Lookup<'a> {
-    /// The lookup `volume` names, if it names a file and any of it applies: at a
-    /// contribution of `0` nothing is read, uploaded or logged.
     pub fn of(volume: Option<&'a PostProcessingComponent>) -> Option<Self> {
         let vc = volume.filter(|vc| vc.color_lookup.contribution > 0.0)?;
         let path = vc.color_lookup.lut.as_deref().filter(|p| !p.is_empty())?;
@@ -36,15 +23,12 @@ impl<'a> Lookup<'a> {
     }
 }
 
-/// One uploaded LUT.
 pub struct UserLut {
-    /// Unique per upload, so a view's bake follows a re-read file or a new path.
     pub(crate) id: u64,
     pub(crate) view: wgpu::TextureView,
     pub(crate) domain: [[f32; 3]; 2],
 }
 
-/// Every LUT a volume has named, by path; `None` records one that failed to load.
 #[derive(Default)]
 pub struct UserLuts {
     freshness: Freshness,
@@ -53,9 +37,6 @@ pub struct UserLuts {
 }
 
 impl UserLuts {
-    /// The upload of the LUT at `path`, reading it on first use or after it was
-    /// written ([`refresh`](Self::refresh)); `None` (logged once) when it is
-    /// missing or malformed.
     pub(crate) fn get(
         &mut self,
         device: &wgpu::Device,
@@ -81,8 +62,6 @@ impl UserLuts {
         self.loaded.get(path)?.as_ref()
     }
 
-    /// Drop what was written, or has appeared, since the last look. Called once
-    /// per frame, before any view's bake, like `Renderer::refresh_textures`.
     pub fn refresh(&mut self) {
         let changes = self
             .freshness
@@ -96,8 +75,6 @@ impl UserLuts {
     }
 }
 
-/// `lut` as an `Rgba32Float` 3D texture: read with `textureLoad` and filtered by
-/// the bake itself, so its values stay exact (an identity LUT stays identity).
 fn upload(device: &wgpu::Device, (queue, staging): Writes, lut: &Lut, id: u64) -> UserLut {
     let n = lut.size;
     let texture = texture(device, n);
@@ -119,7 +96,6 @@ fn upload(device: &wgpu::Device, (queue, staging): Writes, lut: &Lut, id: u64) -
     }
 }
 
-/// The 1³ texture bound while no LUT applies (the bake skips it).
 pub(crate) fn neutral(device: &wgpu::Device) -> wgpu::TextureView {
     texture(device, 1).create_view(&Default::default())
 }

@@ -1,7 +1,3 @@
-//! TAA on lavapipe (#1702): off means off, FXAA skips when it runs, a still view
-//! writes no motion through the jitter, a still frame converges toward a
-//! supersampled reference, and a NaN in the history does not stay.
-
 use glam::Vec3;
 
 use super::super::jitter_of;
@@ -27,7 +23,6 @@ fn gpu_off_means_off_no_history_no_velocity_no_jitter() {
     assert!(first == second, "no frame-to-frame change");
 }
 
-/// One anti-aliasing: on a frame the resolve ran, FXAA's switch changes nothing.
 #[test]
 fn gpu_fxaa_skips_on_a_frame_taa_resolved() {
     let Some(mut r) = renderer() else { return };
@@ -58,7 +53,6 @@ fn gpu_a_still_camera_on_a_still_scene_writes_no_motion_through_the_jitter() {
             .flat_map(|y| (0..W).map(move |x| (x, y)))
             .map(|(x, y)| velocity.at(x, y).abs().max_element())
             .fold(0.0f32, f32::max);
-        // One jitter step is ≥ 1/W of NDC; a half float holds 0 exactly.
         assert!(
             worst < 1e-4,
             "frame {n}: a still pixel moved {worst} in NDC"
@@ -66,7 +60,6 @@ fn gpu_a_still_camera_on_a_still_scene_writes_no_motion_through_the_jitter() {
     }
 }
 
-/// Supersampling factor of the reference, and frames TAA gets to converge.
 const SUPER: u32 = 8;
 const FRAMES: u32 = 48;
 
@@ -89,7 +82,6 @@ fn gpu_a_still_frame_converges_toward_the_supersampled_reference() {
     tilted_cube(&mut scene, at);
     let mut v = view(&r);
     let taa = errors(&settle(&mut r, &mut v, &scene, &cam, FRAMES), &reference);
-    // The edge pixels: where the aliased frame is off the reference.
     let edges: Vec<usize> = (0..aliased.len()).filter(|&i| aliased[i] > 16.0).collect();
     let mean = |e: &[f32]| edges.iter().map(|&i| e[i]).sum::<f32>() / edges.len() as f32;
     let (a, f, t) = (mean(&aliased), mean(&fxaa), mean(&taa));
@@ -121,7 +113,6 @@ fn gpu_a_nan_in_the_history_does_not_stay() {
     let mut v = view(&r);
     let cam = eye(0.0);
     let settled = settle(&mut r, &mut v, &scene, &cam, 8);
-    // Every texel of the history NaN (half float 0x7e00), as if one bad frame wrote it.
     let latest = v.post_fx.taa_latest().expect("TAA ran");
     let nan = 0x7e00u16.to_le_bytes().repeat((W * H * 4) as usize);
     let layout = wgpu::TexelCopyBufferLayout {

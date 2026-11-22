@@ -1,9 +1,3 @@
-//! TAAU's ghosts and cuts on lavapipe (#1702, part 3): a moving cube leaves no
-//! trail at 0.67, and a render-scale change (what `Video.GetDisplayScale`'s monitor
-//! move under `"match_display"`, `SetDefaultRenderScale`, `SetRenderScale` and a
-//! demo's lend and give-back all come down to: `RenderView::resize` at a new scale)
-//! is a cut, the next frame byte-equal to a fresh view's.
-
 use glam::Vec3;
 
 use super::gpu_tests::{fresh_at, scaled, upscales};
@@ -13,9 +7,6 @@ use crate::postfx::effects::taa::gpu::fixture::{
 };
 use rusty_core::settings::render_scale::RenderScale;
 
-/// How far off the settled sky where the cube was may be on the first frame after
-/// the move and 4 frames on (lavapipe measures 15 and 4), with slack for another
-/// driver's rounding: a trail fades, it never sticks.
 const FIRST: u8 = 24;
 const AFTER_4: u8 = 6;
 
@@ -30,7 +21,6 @@ fn gpu_a_moving_cube_leaves_no_trail_when_upscaled() {
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.6, 0.0, -5.0);
     let first = frame(&mut r, &mut v, &scene, &cam);
     let last = settle(&mut r, &mut v, &scene, &cam, 4);
-    // The empty sky, settled through TAAU too, so only the trail differs.
     let (sky, _) = taa_scene(true, true);
     let mut e = scaled(&r, 0.67);
     let empty = settle(&mut r, &mut e, &sky, &cam, 24);
@@ -50,7 +40,6 @@ fn gpu_a_render_scale_change_leaves_no_ghost() {
     let id = cube(&mut scene, Vec3::new(-0.8, 0.0, -5.0));
     let mut v = scaled(&r, 0.5);
     settle(&mut r, &mut v, &scene, &cam, 24);
-    // The scale changes and the cube moves: nothing of the 0.5 history may show.
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.8, 0.0, -5.0);
     v.set_render_scale(RenderScale::new(0.67));
     v.resize(&r.device, W, H);
@@ -61,7 +50,6 @@ fn gpu_a_render_scale_change_leaves_no_ghost() {
         after == fresh,
         "the frame after a scale change is a fresh view's"
     );
-    // And back to native: the plain TAA path, a fresh view's first frame too.
     cube(&mut scene, Vec3::new(0.0, 0.8, -5.0));
     v.set_render_scale(RenderScale::NATIVE);
     v.resize(&r.device, W, H);

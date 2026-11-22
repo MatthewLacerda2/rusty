@@ -1,15 +1,5 @@
-//! The SSR surface targets' alpha packing (#1736), run as written on the GPU:
-//! `ssr_surface.wgsl`'s `pack_lane` gives an exact normal `f16` (so a render target
-//! stores it unchanged), and `unpack_lane` returns the component, quantised, and
-//! the digit, over the whole range: both ends, the top level with the top digit,
-//! an exact 0, and the clear texel.
-
 use crate::test_gpu::{headless_or_skip, run_probe};
 
-/// Invocations 0..=126 pack component `-1 + 2i/126` (63: exactly 0, 126: 1, the
-/// top level) with digit `i % 15` (126: 14, the top digit); 127 unpacks the clear
-/// texel. Each writes (component, digit, 1 if the packed value is an exact normal
-/// `f16`, the packed value).
 const PROBE: &str = "
 #import lighting::ssr_surface::{pack_lane, unpack_lane}
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;
@@ -30,7 +20,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 ";
 
-/// What `unpack_lane` should return for component `e`: its level of 2046, back.
 fn quantised(e: f32) -> f32 {
     ((e * 0.5 + 0.5) * 2046.0).round() / 2046.0 * 2.0 - 1.0
 }

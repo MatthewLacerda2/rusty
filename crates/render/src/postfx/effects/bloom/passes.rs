@@ -1,7 +1,3 @@
-//! Bloom's three passes (#1700), shared by every view: the prefilter, the
-//! downsample and the upsample of `postfx/bloom.wgsl`, and how one view's chain
-//! is encoded with them.
-
 use super::cache;
 use super::chain::BloomTargets;
 use crate::gpu::bind_entry as entry;
@@ -13,8 +9,6 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 
-/// The chain's three passes, shared by every view, and the lens dirt textures the
-/// volumes name.
 pub(crate) struct BloomPasses {
     layout: wgpu::BindGroupLayout,
     prefilter: LazyPipeline,
@@ -70,7 +64,6 @@ impl BloomPasses {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 4] {
         [
             &self.prefilter,
@@ -80,8 +73,6 @@ impl BloomPasses {
         ]
     }
 
-    /// One pass's group: `low` its input, `high` the upsample's own mip (the other
-    /// passes bind their input there again, never the target they write).
     fn group(
         &self,
         device: &wgpu::Device,
@@ -101,10 +92,6 @@ impl BloomPasses {
         })
     }
 
-    /// The groups of a chain's resample (`pre` -> `down[0]`, when it has one), its
-    /// downsamples (`down[i - 1]` -> `down[i]`), then its upsamples from the bottom
-    /// (`up[i + 1]`, or the last down mip, over `down[i]` -> `up[i]`), made once with
-    /// the chain: none depends on the frame.
     pub(super) fn chain_groups(
         &self,
         device: &wgpu::Device,
@@ -127,9 +114,6 @@ impl BloomPasses {
         groups
     }
 
-    /// Encode `t`'s chain from `input` (the scene, and the sampler the prefilter
-    /// reads it with) into `encoder`, after `t.params` was written: the prefilter
-    /// (`input` -> `pre`, else `down[0]`), then the passes of `t.groups`.
     pub(super) fn encode(
         &self,
         device: &wgpu::Device,

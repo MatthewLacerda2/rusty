@@ -1,9 +1,5 @@
-//! The render-pass and pipeline pieces the SSR pass (`super::pass`) records with:
-//! its pipeline layouts and unblended targets, and a pass into several targets.
-
 use crate::gpu::ops::CountedEncoder as _;
 
-/// A pipeline layout of `groups`, in order.
 pub(super) fn pipeline_layout(
     device: &wgpu::Device,
     groups: &[&wgpu::BindGroupLayout],
@@ -16,7 +12,6 @@ pub(super) fn pipeline_layout(
     })
 }
 
-/// A colour target of `format` written whole, unblended.
 pub(super) fn opaque_target(format: wgpu::TextureFormat) -> wgpu::ColorTargetState {
     wgpu::ColorTargetState {
         format,
@@ -27,7 +22,6 @@ pub(super) fn opaque_target(format: wgpu::TextureFormat) -> wgpu::ColorTargetSta
 
 pub(super) type Stamps<'a> = Option<wgpu::RenderPassTimestampWrites<'a>>;
 
-/// A render pass `label` into `targets`, each loaded as it says, stored.
 pub(super) fn begin<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     label: &str,

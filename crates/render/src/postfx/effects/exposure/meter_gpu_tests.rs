@@ -1,11 +1,3 @@
-//! The meter's sampling on lavapipe (#1701): a frame with one tiny bright lamp,
-//! swept by sub-pixel steps across block edges as a turning camera sweeps it, meters
-//! a near-steady exposure, because every pixel is metered by area (a ¼-resolution box
-//! downsample), where the point-sampled grid before it hit the lamp or missed it.
-//! The lamp still moves the EV a little as it splits between blocks (their means
-//! land in different bins), and less the larger the frame: the bounds below are
-//! what the meter measures, not zero.
-
 use super::params::Step;
 use super::{ExposureMeter, ExposureParams};
 use crate::gpu::commands::Commands;
@@ -15,12 +7,8 @@ use crate::test_gpu::headless_or_skip;
 use rusty_components::AutoExposure;
 
 const BACKGROUND: f32 = 0.05;
-/// The lamp: 3 pixels across, at luminance 500 (10 000 times the background).
 const LAMP: (f32, f32) = (3.0, 500.0);
 
-/// The frame with the lamp's top-left corner at the centre plus `offset` pixels,
-/// each pixel holding the lamp by the area of it that covers the pixel, as a
-/// rasteriser's coverage does.
 fn frame([w, h]: [u32; 2], offset: [f32; 2]) -> Vec<u16> {
     let (size, lum) = LAMP;
     let origin = [w as f32 / 2.0 + offset[0], h as f32 / 2.0 + offset[1]];
@@ -36,7 +24,6 @@ fn frame([w, h]: [u32; 2], offset: [f32; 2]) -> Vec<u16> {
         .collect()
 }
 
-/// An HDR scene of `size` the test writes.
 fn texture(device: &wgpu::Device, [width, height]: [u32; 2]) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Meter test"),
@@ -54,8 +41,6 @@ fn texture(device: &wgpu::Device, [width, height]: [u32; 2]) -> wgpu::Texture {
     })
 }
 
-/// The EV spread (max − min) over a sweep of the lamp by `step` pixels a frame,
-/// across one whole block period (4 pixels), so it straddles a block edge.
 fn spread(size: [u32; 2], ae: &AutoExposure, step: [f32; 2]) -> f32 {
     let r = headless_or_skip(size[0], size[1]).expect("checked by the caller");
     let scene = texture(&r.device, size);
@@ -99,24 +84,17 @@ fn gpu_one_tiny_bright_lamp_meters_near_steady_across_block_edges() {
     if headless_or_skip(8, 8).is_none() {
         return;
     }
-    // The default window, and the window over the lit half (where the lamp sits
-    // inside it, so its samples count). Sweeps of ¼ pixel a frame: along x (one
-    // block edge crossed) and diagonally (two edges crossed at once).
     let window = |low, high| AutoExposure {
         low_percent: low,
         high_percent: high,
         ..Default::default()
     };
     let (along, diagonal) = ([0.25, 0.0], [0.25, 0.25]);
-    // (size, window, sweep, the bound the meter meets there, in EV)
     let cases = [
         ([128, 128], window(10.0, 90.0), along, 1e-3),
         ([128, 128], window(10.0, 90.0), diagonal, 1e-3),
-        // Measured on lavapipe: 0.048 and 0.075 EV, the lamp a big share of so
-        // small a frame's lit half.
         ([128, 128], window(50.0, 100.0), along, 0.06),
         ([128, 128], window(50.0, 100.0), diagonal, 0.1),
-        // Measured: 0.0006 EV, the same lamp a 500th of the share at 1080p.
         ([1920, 1080], window(50.0, 100.0), diagonal, 0.002),
     ];
     for (size, ae, step, bound) in cases {

@@ -1,19 +1,10 @@
-//! SSIL's history (#1750): a light switched off fades out within a few frames, a
-//! turning camera doesn't crawl, a cut starts over, and a NaN in last frame's light
-//! never spreads.
-
 use crate::test_gpu::ssil::{draw, eye, on, patch, patch_at, renderer, scene, view, FLOOR, LAMP};
 use rusty_components::Ssil;
 
-/// Frames after a light goes off by which its bounce is under a tenth of what it
-/// was.
 const FADE_FRAMES: u32 = 2;
 
-/// How much a floor point's bounce may change from one frame to the next while the
-/// camera turns, as a share of the bounce.
 const CRAWL: f32 = 0.1;
 
-/// The floor's red with SSIL on less with it off: the bounce alone.
 fn bounce(on_frame: &[u8], off_frame: &[u8]) -> f32 {
     patch(on_frame, FLOOR)[0] - patch(off_frame, FLOOR)[0]
 }
@@ -51,8 +42,6 @@ fn gpu_a_turning_camera_does_not_crawl() {
     let (lit, dark) = (scene(on(1.0), LAMP).0, scene(Ssil::default(), LAMP).0);
     let (mut v, mut plain) = (view(&r), view(&r));
     let mut seen = Vec::new();
-    // A steady turn, half a degree a frame: the floor point slides across the
-    // screen, and its bounce, read where it lands each frame, should hold still.
     for i in 0..24 {
         let yaw = i as f32 * 0.5;
         let cam = eye(yaw);
@@ -105,7 +94,6 @@ fn gpu_a_cut_starts_the_history_over() {
     for _ in 0..3 {
         draw(&mut r, &mut v, &lit, &cam);
     }
-    // Another scene is another history key: its first frame gathers nothing.
     let (other, _) = scene(on(1.0), LAMP);
     let first = draw(&mut r, &mut v, &other, &cam);
     let off = crate::test_gpu::ssil::settled(&mut r, &scene(Ssil::default(), LAMP).0, 1);

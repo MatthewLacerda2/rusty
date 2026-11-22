@@ -1,10 +1,5 @@
-//! The lens effects (#1439): what each packs, its clamps, and what a display-only
-//! view drops.
-
 use super::*;
 
-/// Each lens effect packs its knobs when on, and a zero intensity (which the
-/// composite skips) when off or forbidden by the player.
 #[test]
 fn lens_effects_pack_when_on_and_zero_when_off_or_forbidden() {
     let mut on = vc();
@@ -42,8 +37,6 @@ fn lens_effects_pack_when_on_and_zero_when_off_or_forbidden() {
     }
 }
 
-/// A loaded file bypasses the ops' clamps, so packing clamps every lens knob (a zero
-/// smoothness would make the vignette's `pow(0, 0)` a NaN).
 #[test]
 fn lens_knobs_are_clamped_when_packed() {
     let mut on = vc();
@@ -67,8 +60,6 @@ fn lens_knobs_are_clamped_when_packed() {
     );
 }
 
-/// A display-only view (a render texture with post-FX off) drops the lens effects
-/// with the grade.
 #[test]
 fn a_display_only_view_drops_the_lens_effects() {
     let mut on = vc();

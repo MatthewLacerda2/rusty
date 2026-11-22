@@ -1,7 +1,3 @@
-//! Lens flare on lavapipe (#1443): a bright dot left of the centre throws a ghost
-//! on the right, mirrored through the centre; a scene with nothing above bloom's
-//! threshold is byte-identical with the flare on and off; the Low preset flares too.
-
 use glam::Vec3;
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -13,9 +9,6 @@ use rusty_scene::{Camera, Scene};
 pub(super) const W: u32 = 128;
 pub(super) const H: u32 = 96;
 
-/// A black wall filling the view and a small box lit by its own `emissive`, a
-/// quarter of the width left of the centre; the camera's volume blooms, and
-/// flares when `flare` holds.
 pub(super) fn scene(emissive: f32, flare: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -33,7 +26,6 @@ pub(super) fn scene(emissive: f32, flare: bool) -> Scene {
     scene
 }
 
-/// The dot's centre: 3 m out, left of the centre.
 fn dot_position() -> Vec3 {
     Vec3::new(-1.0, 0.0, -3.0)
 }
@@ -61,7 +53,6 @@ pub(super) fn renderer() -> Option<Renderer> {
     crate::test_gpu::headless_or_skip(W, H)
 }
 
-/// One frame of `scene` through a fresh view (RGBA8).
 fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -69,7 +60,6 @@ fn shot(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     readback::read_texture_rgba8(&r.device, &r.queue, view.color_target().unwrap(), W, H)
 }
 
-/// The pixel the world point `p` lands on.
 fn pixel_of(p: Vec3) -> (i32, i32) {
     let clip = eye().build_view_projection(W as f32 / H as f32) * p.extend(1.0);
     let ndc = clip.truncate().truncate() / clip.w;
@@ -78,7 +68,6 @@ fn pixel_of(p: Vec3) -> (i32, i32) {
     (x, y)
 }
 
-/// The summed brightness of the pixels within `reach` of `(cx, cy)`.
 fn light_around(frame: &[u8], (cx, cy): (i32, i32), reach: i32) -> u32 {
     let mut sum = 0;
     for y in (cy - reach).max(0)..(cy + reach).min(H as i32) {
@@ -111,8 +100,6 @@ fn gpu_without_a_bright_pixel_the_flare_changes_nothing() {
     let Some(mut r) = renderer() else {
         return;
     };
-    // Below bloom's threshold (0.8) and its soft knee (0.4 wide): the prefilter, and
-    // so the flare, is zero.
     let off = shot(&mut r, &scene(0.3, false));
     let on = shot(&mut r, &scene(0.3, true));
     assert!(

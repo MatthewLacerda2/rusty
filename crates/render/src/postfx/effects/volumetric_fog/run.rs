@@ -1,7 +1,3 @@
-//! Running a base camera's volumetric fog (#1703): its `Baked` lamps binned, its
-//! froxels scattered and integrated into the renderer's volume, submitted before the
-//! camera draws anything.
-
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use glam::Vec4;
 
@@ -13,25 +9,19 @@ use crate::gpu::bind_entry as entry;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
-/// The scatter and integrate steps' own uniforms and inputs.
 const INPUTS: u32 = 0;
-/// The integrate step's froxel grids.
 const GRIDS: u32 = 1;
 
-/// Invocations per workgroup along each axis of `cs_scatter` and of `cs_integrate`.
 const SCATTER_GROUP: u32 = 4;
 const INTEGRATE_GROUP: u32 = 8;
 
 impl Renderer {
-    /// The `volumetric_fog` stage: on a camera whose context carries a plan (the
-    /// base camera of a view running it), fill the renderer's volume for it.
     pub(crate) fn run_volumetric_fog(&mut self, view: &mut RenderView, ctx: &mut CameraCtx) {
         let Some((plan, key)) = ctx.volumetric else {
             return;
         };
         let gpu = (&self.device, &self.queue);
         let baked = &mut self.post_passes.volumetric_fog.baked;
-        // A grown buffer needs no rebuild: the froxel groups are made per frame.
         baked.refresh(ctx.scene, gpu);
         baked.bin(&ctx.clusters, gpu);
         self.global_bind_group_dirty |= self.fog_volume.fit(&self.device, plan.grid);
@@ -73,8 +63,6 @@ impl Renderer {
         self.frame_counters.volumetric_froxels += plan.froxels();
     }
 
-    /// Record `t`'s scatter into this frame's grid and the integrate into the
-    /// renderer's volume, in the camera's encoder.
     fn dispatch_froxels(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -121,9 +109,6 @@ impl Renderer {
         }
     }
 
-    /// `cs_scatter`'s group: the uniforms, this camera's lights and the `Baked`
-    /// lamps' bins, the shadow maps, last frame's grid and this frame's, and the
-    /// probe grid.
     fn scatter_group(
         &self,
         t: &VolumetricTargets,
@@ -161,8 +146,6 @@ impl Renderer {
     }
 }
 
-/// The `volumetric_fog` stage's view of a camera: its plan when it is the stack's
-/// base camera and the view runs volumetric fog.
 pub(crate) fn for_camera(view: Option<VolumetricView>, is_first: bool) -> Option<VolumetricView> {
     view.filter(|_| is_first)
 }
