@@ -195,6 +195,8 @@ impl UiShaders {
 }
 
 impl super::UiRenderer {
+    /// `bound` holds the (blend, backdrop) of the standard pipeline last set, `None` after a
+    /// custom one. Returns `false` when no pipeline is prepared for the format: skip the batch.
     pub(super) fn bind_batch<'a>(
         &'a self,
         rp: &mut wgpu::RenderPass<'a>,

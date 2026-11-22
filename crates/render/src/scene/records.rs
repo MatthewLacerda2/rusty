@@ -16,6 +16,7 @@ impl Slotted for MaterialData {
     }
 }
 
+/// Lit: what a mesh entity draws; Unlit: a light's own mesh; Debris: a mesh particle (no decals).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum Variant {
     Lit,
@@ -151,6 +152,8 @@ impl MaterialRecords {
     }
 }
 
+/// Record-only fields are set aside, but what they feed on the CPU (`RecordTraits`, `Cutout`) still
+/// compares, so a value that flips a pass re-keys.
 pub(crate) fn rekeys(old: &MaterialAsset, new: &MaterialAsset) -> bool {
     let traits = |m| Variant::ALL.map(|v| RecordTraits::of(&v.record(Some(m))));
     record_free(old) != record_free(new)

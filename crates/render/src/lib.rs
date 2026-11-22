@@ -107,6 +107,8 @@ pub struct Renderer {
     unbaked: clusters::UnbakedNote,
     materials: gpu::material_cache::MaterialCache,
     pub(crate) surface_shaders: gpu::pipelines::surface::SurfaceShaders,
+    // Instancing and depth priming: always on in the engine; tests turn them off to
+    // compare against one draw per entity and the unprimed pass.
     pub(crate) instancing: bool,
     pub(crate) depth_priming: bool,
     pub(crate) priming_recommended: bool,

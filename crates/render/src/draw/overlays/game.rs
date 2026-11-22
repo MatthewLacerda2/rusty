@@ -36,6 +36,7 @@ impl Renderer {
         encoder.copy_texture_to_texture(from, kept.as_image_copy(), size);
     }
 
+    /// Under TAA upscaling the output and the scene depth differ in size: no pass attaches both.
     pub(crate) fn gizmos_upscaled(&self, view: &RenderView, ctx: &CameraCtx) -> bool {
         let stack = ctx.stack;
         let editor = stack.editor_mode;

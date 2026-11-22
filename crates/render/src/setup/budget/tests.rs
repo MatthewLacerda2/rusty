@@ -4,6 +4,9 @@ use std::time::Duration;
 
 use super::Budget;
 
+// Each test drives its own `Budget`, never `HEADLESS`: GPU tests hold permits on that
+// one beside these, so an exact count on it would race.
+
 const TIMEOUT: Duration = Duration::from_secs(30);
 
 fn unchecked() -> Option<std::thread::ThreadId> {

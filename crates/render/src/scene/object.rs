@@ -82,6 +82,8 @@ fn library_names(materials: Option<&MaterialComponent>) -> Vec<String> {
 }
 
 impl Renderer {
+    /// Its mesh must be uploaded and its maps loaded first, so the keys it builds bind what is
+    /// resident.
     pub(crate) fn extract_object(
         &mut self,
         scene: &Scene,

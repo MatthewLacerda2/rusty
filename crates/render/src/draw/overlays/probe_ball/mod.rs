@@ -8,6 +8,8 @@ use crate::Renderer;
 use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::Scene;
 
+/// Metres in the world, the same at any distance: Unity's reflection-probe preview sphere
+/// is about half a metre.
 pub(crate) const BALL_DIAMETER: f32 = 0.5;
 
 pub(crate) type BallResource = (u32, u32);
@@ -49,6 +51,7 @@ impl Renderer {
     }
 }
 
+/// `probe_ball.wgsl` reads the centre from the translation and the radius from column 0's length.
 pub(crate) fn ball_placement(position: Vec3) -> Mat4 {
     Mat4::from_scale_rotation_translation(
         Vec3::splat(BALL_DIAMETER * 0.5),

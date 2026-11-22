@@ -5,10 +5,13 @@ use rusty_asset::MapRef;
 use rusty_components::{DecalBlend, MaterialAsset};
 use rusty_scene::decal::{Decal, DecalPose};
 
+/// A `layers` entry for an absent map; mirrors `NO_LAYER` in `common.wgsl`.
 pub(crate) const NO_LAYER: u32 = u32::MAX;
 
+/// Degrees past `angle_fade` at which the decal is gone (capped at 90 in `record`).
 const ANGLE_FADE_SPAN: f32 = 15.0;
 
+/// Mirrors `Decal` in `common.wgsl`; `gpu::uniform_layout_tests` holds the layout.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct GpuDecal {

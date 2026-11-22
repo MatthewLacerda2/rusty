@@ -111,6 +111,7 @@ impl ClusterGrid {
     }
 }
 
+/// Projections kept: a camera stack (world, viewmodel, render texture) rarely has more lenses.
 const CACHED_LENSES: usize = 4;
 
 pub(crate) type Aabb = (Vec3, Vec3);
@@ -142,6 +143,8 @@ impl AabbCache {
 
 #[cfg(test)]
 impl ClusterGrid {
+    /// Mirrors `common.wgsl`'s `cluster_index` line for line, so tests check the binner against the
+    /// shader: change both together.
     pub(crate) fn cluster_at(&self, view_proj: Mat4, world: Vec3) -> u32 {
         let u = self.uniform();
         let clip = view_proj * world.extend(1.0);

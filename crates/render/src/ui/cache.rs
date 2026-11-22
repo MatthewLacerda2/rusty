@@ -26,6 +26,8 @@ pub struct UiViewCache {
     pub(super) drawn: usize,
     pub(super) world: Option<WorldUniforms>,
     pub screen_in_editor: bool,
+    /// Target pixels `(x, y, w, h)`, top-left; `None`: the whole view. `rect_tool::OverlayFrame`
+    /// maps the same box.
     pub screen_box: Option<(u32, u32, u32, u32)>,
     pub(super) effects: UiEffects,
     pub(super) shades: Option<ShadeUniforms>,
@@ -52,11 +54,13 @@ impl UiViewCache {
         super::kept::Why::ALL.map(|w| u32::from(why == Some(w)))
     }
 
+    /// Canvas buffers the last render (re-)uploaded. A test hook: `ui::draw_tests`.
     #[cfg(test)]
     pub fn last_uploads(&self) -> usize {
         self.uploads
     }
 
+    /// Canvases the last render drew (0 with nowhere to draw). A test hook: `ui::draw_tests`.
     #[cfg(test)]
     pub fn last_drawn(&self) -> usize {
         self.drawn
@@ -100,6 +104,7 @@ impl UiViewCache {
         self.uploads = 0;
         for (mesh, place) in meshes {
             let gpu = match old.remove(&mesh.canvas) {
+                // Adopt the new `Rc` even when equal, so the next still frame is `ptr_eq`.
                 Some(c) if Rc::ptr_eq(&c.mesh, &mesh) || c.mesh == mesh => CanvasGpu {
                     mesh,
                     place,

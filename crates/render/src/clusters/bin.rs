@@ -41,6 +41,8 @@ impl Budget<'_> {
         }
     }
 
+    /// Floored at the cluster's squared half-diagonal, so a dim lamp inside it can't outrank a
+    /// bright one near.
     fn cluster_score(&self, item: u32, d2: f32, radius: f32, size2: f32) -> f32 {
         self.brightness.map_or(0.0, |b| {
             b[item as usize] * falloff_window_sq(d2, radius) / d2.max(size2).max(FALLOFF_EPSILON_SQ)

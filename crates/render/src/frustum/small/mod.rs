@@ -41,6 +41,8 @@ impl SmallObjectCull {
         let Some((eye, fov, projection)) = self.lens else {
             return false;
         };
+        // Each limit culls only when set: one rule with `MeshComponent::culls_when_small`,
+        // which the shadow caches read. Change both together.
         let distance = centre.distance(eye);
         if limits.max_draw_distance > 0.0 && distance > limits.max_draw_distance {
             return true;
