@@ -33,6 +33,7 @@ pub(crate) struct Pose {
 #[derive(Default)]
 pub(crate) struct MotionHistory {
     key: Option<HistoryKey>,
+    /// By camera entity, not stack place: a camera swapped in there starts with no last frame.
     cameras: HashMap<Option<u32>, Mat4>,
     prev: HashMap<u32, Pose>,
     next: HashMap<u32, Pose>,
@@ -57,6 +58,7 @@ impl MotionHistory {
         prev
     }
 
+    /// Call after `begin`, which forgets the last frame's time on a cut.
     pub(crate) fn game_time(&mut self, now: f32) -> f32 {
         self.time.replace(now).unwrap_or(now)
     }
@@ -94,6 +96,8 @@ pub(crate) fn track(
     instance: &mut InstanceData,
 ) {
     if let Some(prev) = history.pose(id) {
+        // +1: the upload puts the identity at element 0;
+        // `vertex_to_world_prev` reads `bones[motion]`.
         instance.motion = joints.len() as u32 + 1;
         joints.push(prev.model.to_cols_array());
         if !palette.is_empty() {

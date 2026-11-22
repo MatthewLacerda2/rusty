@@ -10,6 +10,7 @@ use crate::passes::shadows::{casting_key, StaticsKey};
 use crate::Frustum;
 use rusty_scene::Scene;
 
+/// Strays past which, plus an eighth of the entries, the BVH is rebuilt.
 const STRAYS: usize = 64;
 
 #[derive(Default)]

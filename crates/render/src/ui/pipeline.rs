@@ -64,6 +64,8 @@ pub(crate) fn build_entry(
                 write_mask: wgpu::ColorWrites::ALL,
             })],
         }),
+        // No culling: a clockwise radial fill winds the other way, and a world canvas shows both
+        // sides.
         primitive: wgpu::PrimitiveState::default(),
         depth_stencil: depth,
         multisample: wgpu::MultisampleState::default(),

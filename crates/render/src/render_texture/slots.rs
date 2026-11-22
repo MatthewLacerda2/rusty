@@ -13,6 +13,8 @@ pub struct RenderTextures {
 
 pub(super) struct Slot {
     pub(super) view: RenderView,
+    /// What consumers sample, copied from `view` after each draw, so a camera seeing its own
+    /// monitor never reads the target it writes.
     pub(super) front: Rc<GpuTexture>,
     pub(super) id: u64,
     pub(super) size: (u32, u32),

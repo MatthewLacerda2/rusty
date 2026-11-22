@@ -24,6 +24,7 @@ pub(crate) enum Why {
 }
 
 impl Why {
+    /// Listed in the order of `stats::pairs::UI_RELAID`'s counter names: change both together.
     pub(crate) const ALL: [Why; 7] = [
         Why::Rebuild,
         Why::Screen,
@@ -70,6 +71,8 @@ impl KeptLayout {
         };
         match (&mut self.held, self.why) {
             (Some(held), None) => {
+                // Kept, so the new table is equal: hold it, and later frames compare pointers, not
+                // maps.
                 if !Rc::ptr_eq(&held.textures, &view.textures) {
                     held.textures = Rc::clone(&view.textures);
                 }
@@ -121,6 +124,8 @@ impl Held {
         if (w.canvas || canvas_moved) && self.canvases != canvas_keys(world, view.screen) {
             return Some(Why::Screen);
         }
+        // A RectTransform write or an activation may join a laid-out parent, so it counts
+        // there; a re-parent stamps the parent's `Children`, so the rest count only held.
         let joins = |&id: &u32| e.moved(world, id, true);
         let held_only = |&id: &u32| e.holds(id).then(|| e.moved(world, id, false)).flatten();
         let why = (w.rect.iter())

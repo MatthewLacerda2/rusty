@@ -105,6 +105,8 @@ impl Renderer {
             let overriding = rs.users_of_name(name);
             rederive.extend(overriding.filter(|&id| scene.shader_overrides.of(id).is_some()));
             let owner = ParamOwner::Material(scene.id(), name.clone());
+            // Only a param buffer something draws is rewritten: `pipeline_id` would compile a
+            // shader mid-extract.
             if !self.materials.holds_params(&owner) {
                 continue;
             }
@@ -205,6 +207,7 @@ impl Renderer {
         derived
     }
 
+    /// Loads inactive entities' maps too: re-enabling one must not stall on uploads and mips.
     fn load_maps_of(&mut self, scene: &Scene, entities: &[u32]) {
         for &id in entities {
             let maps = scene

@@ -34,6 +34,7 @@ pub(crate) fn transparent_order<T>(items: &mut [(T, TransparentOrder)]) {
 /// order is finer near the camera, where a surface covers the most pixels.
 const BUCKETS_PER_OCTAVE: f32 = 4.0;
 
+/// Metres: a solid nearer than this (beside or behind the camera) shares the first bucket.
 const NEAREST: f32 = 0.05;
 
 pub(crate) fn depth_bucket(depth: f32) -> i32 {

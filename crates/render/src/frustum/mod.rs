@@ -22,6 +22,8 @@ impl Frustum {
         }
     }
 
+    /// Monotone in the box (a box holding a passing box passes): the caster BVH
+    /// (`scene/casters`) relies on it.
     pub fn intersects_aabb(&self, min: Vec3, max: Vec3) -> bool {
         for plane in &self.planes {
             let n = plane.truncate();

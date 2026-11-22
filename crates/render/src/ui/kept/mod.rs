@@ -29,6 +29,8 @@ pub(crate) fn build_canvas_meshes(
     meshes.filter(|m| !m.batches.is_empty()).collect()
 }
 
+/// One run per canvas, merging only neighbours: the layout walks one root canvas at a
+/// time, so a canvas's elements are contiguous.
 fn canvas_runs(entries: &[(u32, &UiRect)]) -> Vec<std::ops::Range<usize>> {
     let mut runs: Vec<std::ops::Range<usize>> = Vec::new();
     for (i, (_, rect)) in entries.iter().enumerate() {

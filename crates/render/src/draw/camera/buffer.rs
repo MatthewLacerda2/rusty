@@ -42,7 +42,8 @@ impl CameraBuffer {
     }
 
     /// Make the uniform `uniform` from here on in `encoder`'s order: written into
-    /// `slot`, copied from there into the uniform.
+    /// `slot`, copied from there into the uniform. A plain `write_buffer` would land at the submit,
+    /// ahead of every pass recorded before it.
     #[track_caller]
     pub(crate) fn record(
         &self,

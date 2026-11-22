@@ -5,6 +5,7 @@ use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
+/// Pinned as measured on lavapipe: one call more shows, one fewer is a fix to re-pin.
 const STILL: OpCounts = OpCounts {
     render_passes: 7,
     compute_passes: 0,
@@ -13,6 +14,8 @@ const STILL: OpCounts = OpCounts {
     buffer_writes: 18,
 };
 
+/// [`STILL`] with the GPU cull on, unprimed; lavapipe primes, so it measures one more
+/// render pass ([`late_prepass`]).
 const STILL_CULLING: OpCounts = OpCounts {
     render_passes: 8,
     compute_passes: 2,
@@ -21,6 +24,8 @@ const STILL_CULLING: OpCounts = OpCounts {
     buffer_writes: 21,
 };
 
+/// A timed frame splits the pyramid from the test; lavapipe, with no timestamps, is
+/// forced through `split_override`.
 const STILL_CULLING_TIMED: OpCounts = OpCounts {
     compute_passes: 3,
     ..STILL_CULLING

@@ -51,6 +51,8 @@ impl GpuPart {
 pub(crate) struct Pair {
     pub pass: GpuPass,
     pub part: Option<GpuPart>,
+    /// From `commands::pair_tag`: outside a recording, no counted submit may go out while its
+    /// encoder is open.
     pub submit: u64,
 }
 
@@ -80,7 +82,8 @@ impl GpuTimes {
     }
 
     /// From the frame's earliest timed start to its latest timed end, in ms: the
-    /// rows, [`Self::other_ms`] and [`Self::between_submits_ms`] together.
+    /// rows, [`Self::other_ms`] and [`Self::between_submits_ms`] together. A test hook:
+    /// `times_tests` holds the partition by it.
     pub fn span_ms(&self) -> f64 {
         self.total_ms() + self.other_ms + self.between_submits_ms
     }

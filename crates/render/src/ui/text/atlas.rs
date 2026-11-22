@@ -12,7 +12,9 @@ pub(crate) const MAX_HEIGHT: u32 = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct AtlasGlyph {
+    /// Texel rect `(x, y, w, h)`, top-left origin.
     pub(crate) texels: [u32; 4],
+    /// The quad's bottom-left relative to the pen, base pixels, y up.
     pub(crate) origin: Vec2,
 }
 
@@ -55,7 +57,7 @@ impl GlyphAtlas {
     }
 
     fn insert(&mut self, field: &GlyphField) -> Option<AtlasGlyph> {
-        let (w, h) = (field.width + 1, field.height + 1);
+        let (w, h) = (field.width + 1, field.height + 1); // a gutter against bleeding
         if w > WIDTH {
             return None;
         }

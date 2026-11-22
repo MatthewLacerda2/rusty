@@ -15,6 +15,8 @@ pub struct ScreenStack {
     pub base_id: Option<u32>,
 }
 
+/// The base camera keeps `base`'s pose, which `Renderer::render` has already blended; the rest pose
+/// by `poses`.
 pub fn build_camera_stack(
     base: &Camera,
     scene: &Scene,

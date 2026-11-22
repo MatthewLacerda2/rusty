@@ -1,6 +1,7 @@
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::Renderer;
 
+/// The load `dev::bench::clock::REFERENCE_MS` was measured on: change it or WORKGROUPS, re-measure.
 const SHADER: &str = "
 @group(0) @binding(0) var<storage, read_write> sink: array<f32, 64>;
 
