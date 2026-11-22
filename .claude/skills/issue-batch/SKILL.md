@@ -305,8 +305,22 @@ stale, with its PID. `make queue-daemon` prints "supervisor started" only once
 the child was seen holding its lock; otherwise it prints the log's last lines and
 exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
 
-- **Watch it with `make queue-events`**, the one `Monitor` command, never a
-  hand-typed `tail | grep`: it replays the log from 30 lines back (a re-arm from
+- **Watch it with `make queue-quiet`**, the one `Monitor` command, never a
+  hand-typed `tail | grep` or a loop of your own. It follows the log
+  `make queue-events` does (below) and handles a batch's routine itself: on each
+  merge it fast-forwards the main checkout (only on `main`, only forward) and
+  runs `make reclaim`; once a minute it runs the drain pass (`make coders`;
+  `ARGS=--no-drain` leaves that to you). It says only what someone must act on,
+  each line beginning `QUIET:` or as the log said it: a PR turning ready with no
+  review decision (or reviewed with nothing that queues it, or owing a
+  `Needs:`), a hand-back, a held Dependabot bump, a stopped supervisor or watch,
+  a lost mutation request, a new `bug` issue, a red gating run on `main` (once
+  per head), a drain pass failing three times in a row, and a coder's comment on
+  its issue. A merge, a draft opening and a PR closing say nothing. What it told
+  of bugs and `main` is kept in `.git/merge-queue/quiet.json`, so a restart
+  after a reboot repeats neither, and it exits 1 when the supervisor is not
+  running. `make queue-events` is the unhandled stream,
+  for reading the whole board: it replays the log from 30 lines back (a re-arm from
   the end drops what the log said while no `Monitor` ran), passes hand-backs,
   merges, the supervisor's and the watch's stops, a held Dependabot PR, every PR
   turning ready, going back to draft or closing (one that turned ready or closed
@@ -335,14 +349,17 @@ exits non-zero, or says *unconfirmed*. Its exit statuses are in `ci-merge`.
 
 Per pull request:
 
-1. **Read the description and the diff, then add the `queue` label.**
-   Check its decisions against the issue. Engine mechanism, a stored format,
+1. **Read the description and the diff, then give the go-ahead**: the review
+   record's `Verdict: queue on <sha>` line takes it into the queue with no
+   label (`ci-merge`, *The merge, one tested tree at a time*); add the `queue`
+   label only to override a verdict, and `hold` to keep a PR out whatever it
+   says. Check its decisions against the issue. Engine mechanism, a stored format,
    determinism, CI or the merge path, or a refactor gets the
    `independent-review` skill first; any other code PR gets a `No review: <why>`
    comment (`independent-review`, *Answering the findings*, step 2, says which
-   PRs need neither); the queue hands back a PR without its record. What the read
-   turns up goes back to the coder unlabelled; removing the label pulls a PR out
-   of line. File its "follow-up" notes as issues now. If it asked for a scoped
+   PRs need neither), each with its `Verdict:` line; the queue hands back a PR
+   without its record. What the read turns up goes back to the coder under a
+   `Verdict: round on <sha>`; `hold` pulls a PR out of line. File its "follow-up" notes as issues now. If it asked for a scoped
    mutation run (a `Mutation:` line, which the queue dispatches after the merge),
    read the report when it lands on the merged PR (`ci-merge`, *Triaging a
    survivor*): each survivor is a question, so a follow-up names only the ones
@@ -351,11 +368,13 @@ Per pull request:
 2. **A hand-back** skips that PR and the watch carries on. A mechanical fix (a
    conflict where both sides are kept, a one-line red) goes to the `Agent`
    tool's `merge-fixer`, its prompt the PR, its branch and the hand-back line;
-   take `queue` off first and put it back after reading what it pushed. A
+   put `hold` on first and take it off after reading what it pushed (its merge
+   of `main` keeps a `queue` verdict; a commit of its own reads `round` until a
+   new verdict line is given on its head). A
    resolution that needs a compile to trust (a split, a dispatcher, system
    order, `Cargo.lock`), or one `merge-fixer` stopped on, goes to a fresh
    routine.
-3. **After a merge:** `make reclaim` (removes merged worktrees and deletes
+3. **After a merge:** `make reclaim`, which `make queue-quiet` runs itself (removes merged worktrees and deletes
    finished local branches; keeps unpushed work, a lock, and a worktree in use:
    a process standing in it or running a program from it, or a write in the
    last hour), then re-read the board. A helper's worktree survives it while

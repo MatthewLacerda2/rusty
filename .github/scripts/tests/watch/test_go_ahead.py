@@ -10,8 +10,11 @@ else), anything owed, a pull request with no standing read and no label.
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 
 from merging.watch import board, order
+
+MERGING = Path(__file__).resolve().parents[2] / "merging"
 
 
 def pull(number: int = 1, labels: tuple[str, ...] = (), verdict: str | None = None, owed: tuple[str, ...] = (),
@@ -54,6 +57,18 @@ class GoAhead(unittest.TestCase):
         before = board.heads([pull(verdict=None)])
         after = board.heads([pull(verdict="queue")])
         self.assertEqual(board.transitions(before, after, set()), ["watch: #1 queued."])
+
+
+class Rereads(unittest.TestCase):
+    """A re-read without its standing reads a verdict-queued pull request as unqueued."""
+
+    def test_every_reread_that_asks_the_go_ahead_carries_the_verdict(self):
+        bare = [f"{path.relative_to(MERGING)}: {line.strip()}" for path in sorted(MERGING.rglob("*.py"))
+                for line in path.read_text().splitlines() if "queued(pulls.look(" in line or "look=pulls.look," in line]
+        self.assertEqual(bare, [], "re-read with `queue.pulls.look_standing`, which attaches the verdict `board.queued` reads")
+
+    def test_the_check_finds_a_bare_reread(self):
+        self.assertIn("queued(pulls.look(", "if not board.queued(pulls.look(number)):")
 
 
 if __name__ == "__main__":

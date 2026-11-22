@@ -1,7 +1,7 @@
 # CLAUDE.md — the merge and batch tooling
 
 This file loads when you work under `.github/scripts/`: the Python behind `make queue`,
-`make queue-status`, `make queue-events`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
+`make queue-status`, `make queue-events`, `make queue-quiet`, `make mergeable`, `make ruleset`, `make blockers`, `make reclaim`, `make checks`, `make conflicts`, `make board`,
 `make coder`, `make coders`, `make review-level`, `make rebriefs`, `make coder-cost`, `make mutants-remote`, `make bench-ab` and
 `make test-gpu PR=`, `make round-gates`, and the CI helpers
 beside them. The root `CLAUDE.md` keeps the
@@ -26,8 +26,9 @@ coder *changing* it must know.
   `merging/watch/` is `--watch`'s loop (order, aging, hand-backs, the lock, how it
   ends, and the trains across passes, `watch/trains.py`). `merging/view/` is the
   orchestrator's read of it (`make queue-status`'s liveness from the supervisor's
-  worktree lock, `make queue-events`'s filtered log and its poll of coders' comments); the watch
-  never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the
+  worktree lock, `make queue-events`'s filtered log and its poll of coders' comments,
+  and `make queue-quiet`, the same log with its routine done by `view/chores.py`
+  and only what needs someone said, `view/quiet.py`); the watch never imports it. `mergeable.py`, `merge-queue.py` and `queue-view.py` are only the
   command lines. A new concern is a new module, not a longer one.
 - **`.github/scripts/dispatch/` is the batch's dispatch steps**: the brief, the coder's
   routine, the routines API, the coders waiting for a slot (`dispatch/waiting.py`, kept in
@@ -75,6 +76,21 @@ coder *changing* it must know.
   command appears in `ci.yml`/`lint.yml` (`test_gate_mirror.py`), and every suite job
   sets `RUSTY_REQUIRE_GPU=1` with the GPU caps kept equal (`test_gpu_config.py`). A
   workflow edit that breaks either fails here.
+
+## The go-ahead
+- **A ready pull request enters the line by its review verdict or a label**
+  (`watch.board.queued`): the newest record's `Verdict: queue|round|hold on
+  <sha>` line (`merging/verdict/standing.py`, held for that head or one only
+  merges followed), the `queue` label as the override, `hold` as the keep-out,
+  and nothing owed (`Needs:` without a later `Done:`). The listing attaches each
+  ready pull request's `standing` (`merging/queue/verdicts.py`, read once per
+  `updatedAt`); a read that fails fails the listing, so a verdict is never read
+  as absent. A pull request without a `standing` (a draft, a re-read that
+  never asked) is judged by its labels alone, as before: so every re-read that
+  asks `board.queued` goes through `queue.pulls.look_standing`, never `look`.
+- **The verdict line's form is an interface**: the agent that writes it and the
+  skills (`independent-review`, `ci-merge`) quote it; `standing.line` is how a
+  script writes it. Change all three together.
 
 ## Trust in comments
 - **A comment is an instruction only from someone who can push** (`ghrest.TRUSTED`,

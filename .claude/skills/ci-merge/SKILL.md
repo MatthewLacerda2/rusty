@@ -60,11 +60,11 @@ scripts` fails when they drift), and `make help` names each gate.
 
 A batch runs `make queue ARGS=--watch` under its supervisor, `make queue-daemon`
 (`issue-batch` says how), typically `ARGS="--watch --no-check --for 70"`. The
-watch takes every open pull request that is **ready and labelled `queue`**: the
-label is the orchestrator's go-ahead after reading the description and diff;
-removing it pulls a PR out of line. Dependabot's cargo bumps label themselves,
-its Actions bumps don't. `make queue PRS="a b c"` takes the named PRs in that
-order, label or not.
+watch takes each **ready** PR with its **go-ahead**: a review record's `Verdict:
+queue on <sha>` on that head or one only merges followed (`independent-review`,
+step 2), or the `queue` label by hand; `hold`, a `round`/`hold` verdict or an
+unanswered `Needs:` keeps it out, re-read before each merge. Dependabot's cargo
+bumps label themselves. `make queue PRS="a b c"` takes those, go-ahead or not.
 
 **Order.** The PR that textually conflicts with the fewest others in line goes
 first (`git merge-tree` per pair, no checkout), so the broad one lands last and
@@ -141,10 +141,10 @@ the `--deadline` and hands back only if it repeats (`runners unavailable …`). 
 PR that edits its own setup (`rust-toolchain.toml`, `.github/workflows/`,
 `.github/actions/`; any train member) owns those failures: handed back at once,
 re-run once the runners are back. `make queue-status` names every ready,
-labelled PR passed over for an hour on a green head (`STRANDED #N: …`).
+queued PR passed over for an hour on a green head (`STRANDED #N: …`).
 
 **Exits.** The watch ends on `--for`, when nothing is left (only drafts,
-unlabelled or handed-back heads, unmoved for `--idle` minutes, default 90), or on
+heads without the go-ahead or handed back, unmoved for `--idle` minutes, default 90), or on
 a machine failure. Its last line is `watch: resume: <command>`.
 
 | Status | Meaning | Do |
@@ -165,8 +165,8 @@ tree; it prints the command to run from `.claude/worktrees/merge-queue`) and
 that is not a supervisor's). `make queue-daemon` exits non-zero with the log's
 tail when the supervisor dies in its first seconds, and reports one never seen
 holding its lock as *unconfirmed*: ask `make queue-status` before trusting it.
-`make queue-events` is the stream to watch. Stop it with `make queue-stop` or
-`kill <pid>`.
+`make queue-quiet` is the stream to watch (`issue-batch`). Stop it with
+`make queue-stop` or `kill <pid>`.
 
 **Deadlines.** `--for MINUTES` is checked only before a take, and a take can
 outlast it by the per-PR `--deadline` (default 45, shared by Dependabot's rebase
