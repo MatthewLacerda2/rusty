@@ -1,3 +1,5 @@
+//! A Blender export: the mini humanoid's mesh under an `Armature` turned +90° about X and
+//! scaled 0.01. Hitboxes and joints come out as on the plain rig.
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Mat4, Quat, Vec3};

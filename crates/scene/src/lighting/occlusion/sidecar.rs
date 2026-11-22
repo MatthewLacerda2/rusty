@@ -16,6 +16,8 @@ pub fn load_sidecar(scene: &mut Scene, scene_path: &str) {
     apply_sidecar(scene, read_sidecar(scene_path));
 }
 
+/// Read and decoded from the file alone and put on a scene later, so a load does its work
+/// before it touches the live scene.
 pub struct OcclusionFile {
     path: PathBuf,
     read: Read,
@@ -26,6 +28,8 @@ enum Read {
     Unreadable(std::io::Error),
     Refused(Vec<u8>, String),
     OtherVersion(Vec<u8>, String),
+    /// The file's bytes, the bytes a save would write (encoded afresh: a file that does not
+    /// round-trip never reads as a bake since), and the PVS.
     Decoded(Vec<u8>, Vec<u8>, OcclusionData),
 }
 
@@ -76,11 +80,14 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
 }
 
 impl Scene {
+    /// The one place a bake's output lands, so its next save writes it, even over a newer
+    /// file another process baked.
     pub fn put_baked_occlusion(&mut self, data: Option<OcclusionData>) {
         self.bake_files.baked(SUFFIX);
         *self.occlusion = data.map(Arc::new);
     }
 
+    /// A kept PVS owns its file as a bake's output does: the next save writes it there.
     pub fn keep_baked_occlusion(&mut self) {
         self.bake_files.baked(SUFFIX);
     }

@@ -1,3 +1,6 @@
+//! Binary, little-endian, read whole. The version `u32` follows the magic in every layout,
+//! so a decoder reads it first and refuses another version's file as that.
+
 use std::path::PathBuf;
 
 use glam::{UVec3, Vec3};
@@ -46,6 +49,7 @@ pub fn encode(data: &OcclusionData) -> Vec<u8> {
     out
 }
 
+/// 92 bytes of header, stamp and counts, then 13 an object, 8 a row word, 4 a cell.
 pub fn encoded_len(data: &OcclusionData) -> usize {
     let (rows, cells) = data.parts();
     92 + data.objects.len() * 13 + rows.len() * 8 + cells.len() * 4
@@ -80,6 +84,8 @@ fn rebake(what: &str) -> String {
     )
 }
 
+/// The layout before the version field, whose first `u32` (its object count) would read as
+/// a version. Its counts give its length, so a versioned file matches only by coincidence.
 fn is_unversioned(bytes: &[u8]) -> bool {
     let count_at = |at: usize| -> Option<usize> {
         let b = bytes.get(at..at.checked_add(4)?)?;
@@ -90,6 +96,7 @@ fn is_unversioned(bytes: &[u8]) -> bool {
         at = at
             .checked_add(4)?
             .checked_add(count_at(at)?.checked_mul(13)?)?;
+        // The grid: origin, cell and dims.
         at = at.checked_add(28)?;
         at = at
             .checked_add(4)?
@@ -188,6 +195,7 @@ fn stamp_fits(stamp: &BakeStamp, all: u64) -> Result<(), String> {
 
 fn read_objects(r: &mut Reader, len: usize, stamp: BakeStamp) -> Result<Vec<BakedObject>, String> {
     let count = r.u32()? as usize;
+    // A bad count reserves no more than the file could hold.
     let mut objects = Vec::with_capacity(count.min(len / 13));
     for _ in 0..count {
         let entity = r.u32()?;

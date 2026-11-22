@@ -1,4 +1,5 @@
 //! stored-format: the fingerprint each baked object carries in the `<scene>.occlusion` file
+//! In the base, beside the file, because the renderer checks the prints every frame.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,6 +10,8 @@ use crate::Scene;
 use rusty_components::mesh::{clip_runs, material_runs, MeshRevision};
 use rusty_components::{MaterialAsset, MeshComponent, RenderFace, RenderMode};
 
+/// The side of a triangle that stops a view, by its world winding: the renderer's
+/// `Facing` picks the same, so change the two together.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Face {
     Ccw,
@@ -53,6 +56,8 @@ pub struct Object {
 #[derive(Default)]
 pub struct Fingerprints {
     grouped: BTreeSet<u32>,
+    /// Revision → (corners hash, last sweep). Keyed by revision but hashed by corners, so a
+    /// re-weld or re-import under a new revision keeps the print.
     geometry: RefCell<BTreeMap<MeshRevision, (u64, u64)>>,
     sweep: u64,
 }
@@ -106,9 +111,12 @@ impl Fingerprints {
             .iter()
             .map(|(slot, _)| slot_material(scene, id, *slot))
             .collect();
+        // A `LODGroup`'s renderers never occlude: the drawn level moves with the camera.
         let may_occlude =
             !mesh.culls_when_small() && !self.grouped.contains(&id) && !world.has_light(id);
         let occluder = may_occlude && materials.iter().any(|m| occludes(*m));
+        // Only what the bake reads: the triangles, not the buffer's layout; each run's side and
+        // whether it occludes, never the material's name.
         let mut bytes = Vec::with_capacity(128);
         let counts = [
             mesh.indices.len() as u32,

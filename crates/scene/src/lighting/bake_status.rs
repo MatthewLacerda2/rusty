@@ -52,12 +52,14 @@ impl BakeProgress {
 }
 
 impl Scene {
+    /// The mirror of the bakes' refusal during Play: whichever was asked for first wins.
     pub fn play_refusal(&self) -> Option<String> {
         if !self.bake_busy() {
             return None;
         }
         let progress = match &self.lighting_bake_status {
             BakeStatus::Running(progress) => progress.clone(),
+            // A `GenerateAsync` not started yet: no Cancel to point at, only the wait.
             _ => BakeProgress {
                 cancellable: false,
                 ..BakeProgress::starting("lighting")
@@ -78,6 +80,7 @@ impl Scene {
         self.lighting_bake_running || self.lighting_bake_requested
     }
 
+    /// A request belongs to the scene and mode it was made in, so it never bakes another.
     pub fn drop_bake_request(&mut self, why: &str) {
         if std::mem::take(&mut self.lighting_bake_requested) {
             self.lighting_bake_status = BakeStatus::Refused(format!(

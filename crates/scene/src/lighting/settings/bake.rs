@@ -1,5 +1,6 @@
 use std::ops::RangeInclusive;
 
+// Atlas page edges, texels: Unity's Max Lightmap Size range.
 pub const MAX_PAGE: u32 = 4096;
 pub const MIN_PAGE: u32 = 32;
 pub fn page_edge(edge: u32) -> u32 {
@@ -69,7 +70,10 @@ impl Default for BakeSettings {
 }
 
 impl BakeSettings {
+    /// Paths per texel: the fewest at which OIDN then the Gaussian matches the Gaussian alone
+    /// at 128 (`denoise::quality_tests`, run by hand).
     pub const DEFAULT_SAMPLES: u32 = 64;
+    /// Eight passes at the default samples: the first preview shows after an eighth of the trace.
     pub const DEFAULT_SAMPLES_PER_PASS: u32 = 8;
     pub const DEFAULT_BACKFACE_TOLERANCE: f32 = 0.9;
     pub const BACKFACE_TOLERANCE: RangeInclusive<f32> = 0.0..=1.0;
@@ -96,6 +100,7 @@ impl BakeSettings {
         page_edge(self.max_lightmap_size)
     }
 
+    /// The one range rule both `sanitized` and the bake's validity test apply.
     pub fn backface_tolerance_of(tolerance: f32) -> f32 {
         let (low, high) = Self::BACKFACE_TOLERANCE.into_inner();
         match tolerance.is_finite() {

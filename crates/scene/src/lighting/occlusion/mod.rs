@@ -18,6 +18,7 @@ mod unread_tests;
 
 pub type SceneOcclusion = crate::revision::Revisioned<Option<std::sync::Arc<OcclusionData>>>;
 
+/// Metres, half a cell: a nearer wall is clipped, so the camera sees what the PVS culls.
 pub const MAX_CULLING_NEAR: f32 = CELL_SIZE / 2.0;
 
 pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
@@ -25,8 +26,9 @@ pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
     perspective && near <= MAX_CULLING_NEAR
 }
 
-/// Bump when the bake would write other bytes for the same objects (sampling, seed, grid
-/// limits, reach); `version_tests` holds it for small levels only.
+/// Bump when the bake would write other bytes for the same objects (sampling, dilation,
+/// seed, grid limits and growth, sub-cubes, reach, targets) or the file's layout changes;
+/// `version_tests` pins small levels only.
 pub const OCCLUSION_VERSION: u32 = 2;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,7 +44,9 @@ pub struct BakeStamp {
     pub never_culled: u32,
     pub floor: FloorSource,
     pub baked: u32,
+    /// Hash of the seeded cells; 0 when all were sampled.
     pub reach: u64,
+    /// What `Grid::fitting` laid the grid over; a kept PVS lays it again.
     pub bounds: (glam::Vec3, glam::Vec3),
 }
 
@@ -76,11 +80,13 @@ impl FloorSource {
 pub struct OcclusionData {
     pub grid: Grid,
     pub stamp: BakeStamp,
+    /// Bit `i` of a row is `objects[i]`.
     pub objects: Vec<BakedObject>,
     index: Vec<(u32, u32)>,
     /// `u64` words per row.
     words: usize,
     rows: Vec<u64>,
+    /// Per cell, in `Grid::index` order, its row.
     cells: Vec<u32>,
 }
 
@@ -148,6 +154,7 @@ impl OcclusionData {
         self.rows.len().checked_div(self.words).unwrap_or(0)
     }
 
+    /// Near enough: 13 file bytes and 8 of index an object.
     pub fn byte_size(&self) -> usize {
         self.objects.len() * 21 + self.rows.len() * 8 + self.cells.len() * 4 + 72
     }

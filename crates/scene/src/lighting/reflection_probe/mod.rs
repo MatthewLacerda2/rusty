@@ -45,7 +45,9 @@ pub struct ReflectionProbe {
     pub box_projection: bool,
     pub blend_distance: f32,
     pub importance: i32,
+    /// Face size in texels; `None` bakes at `LightingSettings::reflections`.
     pub resolution: Option<u32>,
+    // The capture camera's clip planes, world units.
     pub near_clip: f32,
     pub far_clip: f32,
     /// Whether the capture renders shadows (Unity's *Shadow Distance* > 0).
@@ -85,6 +87,7 @@ impl ReflectionProbe {
             blend_distance: 1.0,
             importance: 1,
             resolution: None,
+            // Unity's defaults: a bake captures every static object.
             near_clip: 0.05,
             far_clip: 1000.0,
             shadows: true,
@@ -96,6 +99,7 @@ impl ReflectionProbe {
     }
 
     pub fn clamp_settings(&mut self) {
+        // A non-finite value takes `new`'s default.
         self.resolution = self.resolution.map(clamp_resolution);
         self.blend_distance = finite_or(self.blend_distance, 1.0).max(0.0);
         self.near_clip = finite_or(self.near_clip, 0.05).max(Self::MIN_NEAR_CLIP);
@@ -117,6 +121,7 @@ pub fn clamp_resolution(size: u32) -> u32 {
     );
     let size = size.clamp(lo, hi);
     let up = size.next_power_of_two();
+    // The nearer power: 300 → 256, 400 → 512.
     match up - size <= size - up / 2 {
         true => up.min(hi),
         false => up / 2,

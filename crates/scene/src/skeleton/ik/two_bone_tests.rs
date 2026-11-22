@@ -64,7 +64,7 @@ fn the_elbow_bends_toward_the_hint() {
 #[test]
 fn a_straight_limb_still_bends_toward_its_hint() {
     let (s, mut e, h) = arm();
-    e.pos.z = 0.0;
+    e.pos.z = 0.0; // animated perfectly straight: no plane of its own
     let hint = Vec3::new(1.0, 0.0, 2.0);
     let solved = solve_two_bone(s, e, h, Vec3::new(1.0, 0.0, 0.0), Some(hint), 1.0).unwrap();
     let (elbow, hand) = pose(s, e, h, solved);

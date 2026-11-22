@@ -1,3 +1,5 @@
+//! Which lightmap page each static mesh wears, and where (Unity's `lightmapScaleOffset`).
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -6,6 +8,8 @@ use rusty_components::LightMode;
 
 use crate::runtime::renumber::Moves;
 
+/// The one rule `BakeScene::takes_mesh` and the renderer's `in_bake` read: such a mesh
+/// occludes, bounces and emits in the bake, lightmapped or not.
 pub fn bakes_mesh(scene: &crate::Scene, id: u32) -> bool {
     scene.world.is_active_in_hierarchy(id)
         && scene.world.is_static(id)
@@ -17,6 +21,7 @@ pub fn bakes_mesh(scene: &crate::Scene, id: u32) -> bool {
 pub struct LightmapEntry {
     pub entity: u32,
     pub page: u32,
+    /// Maps the mesh's lightmap UV into the page: `uv * xy + zw`.
     pub scale_offset: [f32; 4],
 }
 
@@ -33,12 +38,14 @@ pub struct LightmapSet {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub baked_as: BTreeMap<u32, LightMode>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Channel `c` holds how much of channel `c`'s `Mixed` light passes static occluders (1 lit).
     pub masks: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub channels: BTreeMap<u32, u8>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub fell_back: BTreeSet<u32>,
     #[serde(skip)]
+    /// Under a preview, the scene's own lightmaps: what a save writes and a cancel restores.
     pub shown_over: Option<Box<LightmapSet>>,
 }
 
@@ -73,6 +80,8 @@ impl LightmapSet {
         }
     }
 
+    /// `None` when two ids collide, as `OcclusionData::remap` refuses: an entity would get
+    /// another's page.
     pub(crate) fn remap(&self, moves: &Moves) -> Option<Self> {
         let to = |id: u32| moves.to(id);
         let entries: BTreeMap<_, _> = self
@@ -140,6 +149,7 @@ impl LightmapSet {
         self.baked_as = baked.collect();
     }
 
+    /// Test hook: mark `entity` taken in as `Baked`, as a bake would.
     #[doc(hidden)]
     pub fn took_in_baked(&mut self, entity: u32) {
         self.lights.insert(entity);

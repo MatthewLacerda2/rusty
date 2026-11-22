@@ -1,4 +1,6 @@
 //! stored-format: the `<scene>.lighting.json` SH sidecar
+//! Written with the document, always, not by the bake files' keep-newer rule; refused on
+//! load when its `ProbeKey` disagrees, so SH never lands on the wrong probe.
 
 use std::path::PathBuf;
 
@@ -100,6 +102,8 @@ pub fn load_lighting_sidecar(scene: &mut Scene, scene_path: &str) -> Result<(), 
     apply_lighting_sidecar(scene, read_lighting_sidecar(scene_path))
 }
 
+/// Read from the files alone and put on a scene later, so a load does its work before
+/// it touches the live scene.
 pub struct LightingFile {
     occlusion: super::occlusion::OcclusionFile,
     path: std::path::PathBuf,

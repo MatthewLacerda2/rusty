@@ -1,12 +1,19 @@
+//! A walk out by shells of occupied cubes returns exactly what `scan` does, ties to the
+//! lower index.
+
 use glam::{IVec3, Vec3};
 
 use super::{Probe, BLEND_PROBES};
 
+/// The blended probes and the next, whose distance fades the farthest one out.
 pub const FOUND: usize = BLEND_PROBES + 1;
 use rusty_core::collections::Map;
 
+/// Below this many a scan is as fast.
 const SCAN_BELOW: usize = 32;
+/// Probes a cube holds on average.
 const PER_CELL: f32 = 2.0;
+/// Cubes along an axis past which a set is too spread to grid.
 const MAX_DIM: f32 = 1.0e6;
 
 pub type Nearest = [(f32, usize); FOUND];
@@ -84,6 +91,7 @@ impl ProbeIndex {
             if work > self.order.len() {
                 return (scan(probes, at), None);
             }
+            // A hair under `r` cubes, so rounding in the keys never stops the walk a shell early.
             let reach = (r as f32 - 1.0e-3).max(0.0) * self.cell;
             if near[FOUND - 1].0 < reach * reach {
                 break;
@@ -139,6 +147,8 @@ fn offer(near: &mut Nearest, d: f32, i: usize) {
     near[at] = (d, i);
 }
 
+/// About `PER_CELL` probes a cube over the axes the set spreads along; a flat set's zero
+/// cube would grid it in millimetres.
 fn cell_size(extent: Vec3, count: usize) -> f32 {
     let mut e = extent.to_array();
     e.sort_by(|a, b| b.total_cmp(a));

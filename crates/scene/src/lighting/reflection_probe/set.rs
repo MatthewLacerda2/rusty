@@ -44,6 +44,7 @@ impl ReflectionProbeSet {
         }
     }
 
+    /// A new cube drops the old one's irradiance: it is not normalised by another cube's light.
     pub fn set_cubemap(&mut self, index: usize, path: String) {
         if let Some(p) = self.probes.get_mut(index) {
             if p.cubemap_path != path {
@@ -53,6 +54,7 @@ impl ReflectionProbeSet {
         }
     }
 
+    /// The one path the Inspector and `Reflection.Set` write through.
     pub fn edit(&mut self, index: usize, f: impl FnOnce(&mut ReflectionProbe)) -> bool {
         let Some(p) = self.probes.get_mut(index) else {
             return false;
@@ -62,6 +64,8 @@ impl ReflectionProbeSet {
         true
     }
 
+    /// A loaded file goes through this once, so no reader clamps again; of several fallbacks
+    /// the first stays.
     pub fn hold(&mut self) {
         self.probes.iter_mut().for_each(hold);
         self.set_fallback(self.fallback());
@@ -99,6 +103,8 @@ impl ReflectionProbeSet {
     }
 }
 
+/// A non-finite stored irradiance (a damaged file) goes, so the probe scales by 1, not NaN.
+/// The fallback stays manual, so a bake's placement never deletes it.
 fn hold(p: &mut ReflectionProbe) {
     p.clamp_settings();
     p.manual |= p.fallback;

@@ -1,8 +1,12 @@
+//! An Area light's world rectangle: the one shape the lightmap bake samples.
+
 use glam::{Vec2, Vec3};
 
 use crate::Scene;
 use rusty_components::{falloff_window, LightComponent, FALLOFF_EPSILON_SQ};
 
+/// World units in front of the panel a sample sits, so its shadow ray stops short of the
+/// wall the panel is mounted on.
 pub const EMIT_OFFSET: f32 = 1e-3;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -39,6 +43,8 @@ impl AreaShape {
         self.right.length() * self.up.length()
     }
 
+    /// Unit direction to the point at `u`, its distance, and the radiance scale one sample
+    /// stands for (the whole area's, so the mean over samples is the integral).
     pub fn arrival(&self, receiver: Vec3, u: Vec2) -> Option<(Vec3, f32, f32)> {
         let window = falloff_window(receiver.distance(self.center), self.range);
         if window <= 0.0 {

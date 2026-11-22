@@ -1,5 +1,9 @@
+//! RGBM, Unity's lightmap encoding without float textures: a page's linear PNG fallback,
+//! decoded on the CPU when it loads.
+
 use glam::{Vec3, Vec4};
 
+/// The brightest linear value RGBM holds, per channel (Unity's range).
 pub const RGBM_RANGE: f32 = 8.0;
 
 pub fn encode_rgbm(c: Vec3) -> [u8; 4] {
@@ -21,6 +25,8 @@ pub fn encode_texels(texels: &[Vec3]) -> Vec<u8> {
     texels.iter().flat_map(|&c| encode_rgbm(c)).collect()
 }
 
+/// `xyz`: the dominant direction times its directionality (length 0..=1); `w`: the share of
+/// the texel's light that `Baked` lamps bring from that way.
 pub fn encode_direction(d: Vec4) -> [u8; 4] {
     let v = d.truncate().clamp_length_max(1.0);
     let byte = |x: f32| (128.0 + 127.0 * x).round().clamp(1.0, 255.0) as u8;
@@ -28,6 +34,7 @@ pub fn encode_direction(d: Vec4) -> [u8; 4] {
     [byte(v.x), byte(v.y), byte(v.z), share]
 }
 
+/// `forward/lighting.wgsl`'s `decode_lightmap_direction` mirrors this: change them together.
 pub fn decode_direction(px: [u8; 4]) -> Vec4 {
     let f = |b: u8| (b as f32 - 128.0) / 127.0;
     Vec4::new(f(px[0]), f(px[1]), f(px[2]), px[3] as f32 / 255.0)

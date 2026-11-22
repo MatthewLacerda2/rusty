@@ -3,6 +3,7 @@ use glam::Vec3;
 use super::volume::ProbeFrame;
 use super::{ReflectionProbe, ReflectionProbeSet};
 
+/// The sky takes the weight the two probes leave.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProbeBlend {
     pub first: usize,
@@ -17,6 +18,7 @@ impl ReflectionProbe {
     }
 }
 
+/// `outside` is the squared distance past the volume.
 fn falloff(outside: f32, blend_distance: f32) -> f32 {
     if outside <= 0.0 {
         return 1.0;
@@ -39,12 +41,15 @@ impl ReflectionProbeSet {
     }
 }
 
+/// The one rule both `ReflectionProbeSet::blend` and `PreparedProbes::blend` run, so they
+/// agree bit for bit.
 fn pick(
     probes: &[ReflectionProbe],
     point: Vec3,
     influence: impl Fn(usize) -> f32,
 ) -> Option<ProbeBlend> {
     let probe = |i: usize| &probes[i];
+    // `Less` when `a` ranks above `b`.
     let rank = |&(a, wa): &(usize, f32), &(b, wb): &(usize, f32)| {
         (probe(b).importance.cmp(&probe(a).importance))
             .then(wb.total_cmp(&wa))
@@ -72,6 +77,8 @@ fn pick(
             second_weight: 0.0,
         });
     };
+    // Equal: proportional, covering as much as the stronger (`w1 >= w2`). Else the first is
+    // drawn over the second, Unity's "higher importance wins".
     let (first_weight, second_weight) = match probe(first).importance == probe(second).importance {
         true => (w1 * w1 / (w1 + w2), w1 * w2 / (w1 + w2)),
         false => (w1, (1.0 - w1) * w2),
@@ -84,12 +91,16 @@ fn pick(
     })
 }
 
+/// Turns the point into each frame with `influence`'s arithmetic, so it equals
+/// `ReflectionProbeSet::blend` bit for bit.
 #[derive(Clone, Debug, Default)]
 pub struct PreparedProbes {
     probes: Vec<ReflectionProbe>,
     frames: Vec<(ProbeFrame, Option<(Vec3, Vec3)>)>,
 }
 
+/// Reach growth relative to the blend distance and the coordinates' size: far past the ulps
+/// the reject rounds by, so it stays conservative.
 const REACH_SLACK: f32 = 1e-5;
 
 impl PreparedProbes {
