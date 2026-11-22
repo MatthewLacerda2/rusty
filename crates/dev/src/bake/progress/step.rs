@@ -19,6 +19,7 @@ pub enum Step {
 }
 
 impl Step {
+    // `format::then` matches a step by kind, so this bounce and max are placeholders.
     pub const GENERATE: [Step; 5] = [
         Step::Lightmaps,
         Step::LightmapPages,

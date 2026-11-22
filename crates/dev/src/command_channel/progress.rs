@@ -1,3 +1,5 @@
+/// A Lua block comment, so a line whose prefix is not stripped still evaluates as the
+/// command alone.
 pub const ASK: &str = "--[[progress]] ";
 
 pub fn asks(line: &str) -> (bool, &str) {

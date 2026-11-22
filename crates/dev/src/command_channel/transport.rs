@@ -54,6 +54,7 @@ fn spawn_handler(stream: UnixStream, tx: Sender<Command>) {
             if tx.send((line, reply_tx)).is_err() {
                 break;
             }
+            // The editor may sleep outside Play, and only a frame drains the queue.
             rusty_core::wake::frame();
             if !write_replies(&mut writer, &reply_rx) {
                 break;

@@ -35,6 +35,7 @@ fn cpu_speed_is_the_cpu_reference_over_the_probes_mean() {
 fn the_cpu_probe_takes_well_under_a_millisecond() {
     cpu_probe_ms();
     let best = (0..5).map(|_| cpu_probe_ms()).fold(f64::MAX, f64::min);
+    // 20 ms, not 1: a debug build runs the chain far slower than the bench's release one.
     assert!(best > 0.0 && best < 20.0, "{best} ms");
 }
 

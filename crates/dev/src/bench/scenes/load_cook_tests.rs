@@ -40,6 +40,7 @@ fn gpu_a_load_cooks_in_memory_and_writes_nothing() {
 fn gpu_a_load_after_an_import_cooks_nothing() {
     let root = project_with_a_model();
     let (model, cooked) = quad();
+    // Before any harness: one marks this thread standalone, which writes no cooked file.
     let import = || rusty_asset::import::import_all(model.parent().unwrap());
     let imported = rusty_asset::cook::with_writes(true, import).unwrap();
     assert_eq!(imported.cooked, 1);

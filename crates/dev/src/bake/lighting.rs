@@ -106,6 +106,7 @@ pub(super) fn plan_probes(
 pub struct PlannedProbes {
     pub light: ProbeVolume,
     pub reflections: ReflectionProbeSet,
+    /// The scene index of each manual reflection probe kept: they lead `reflections`, in order.
     pub kept: Vec<usize>,
 }
 

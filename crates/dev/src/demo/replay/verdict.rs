@@ -19,6 +19,7 @@ impl std::fmt::Display for Divergence {
 #[derive(Clone, Debug, Default)]
 pub struct Verdict {
     pub ticks: u64,
+    /// The ticks the demo holds.
     pub of: u64,
     pub checked: u64,
     pub matched: Option<u64>,

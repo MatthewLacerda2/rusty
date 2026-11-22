@@ -4,6 +4,8 @@ use rusty_render::{GpuPart, GpuPass, RenderCounters};
 use super::Samples;
 use crate::capture::RenderedFrame;
 
+/// The counters every table prints; `docs/testing.md`'s *the report* lists them too,
+/// so change both together. Every other counter is quiet.
 pub(super) const SHOWN: [&str; 18] = [
     "draw_calls",
     "triangles",
@@ -104,6 +106,7 @@ pub(super) fn sample_render(
         }
         push_gpu_parts(samples, &gpu.parts, speed);
         samples.push("gpu.other", gpu.other_ms * speed);
+        // Unscaled: a wait for the CPU does not shorten as the GPU clock rises.
         samples.push("gpu_between_submits_ms", gpu.between_submits_ms);
         samples.push("gpu_raw_ms", gpu.total_ms());
         samples.push("gpu_clock_pct", speed * 100.0);

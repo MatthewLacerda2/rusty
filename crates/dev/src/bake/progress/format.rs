@@ -84,6 +84,7 @@ pub(in crate::bake) fn duration(d: Duration) -> String {
 pub(super) fn count(n: u64) -> String {
     match n {
         0..1_000 => n.to_string(),
+        // From 999,950 one decimal would round to `1000.0k`, so those read in M.
         1_000..999_950 => format!("{:.1}k", n as f64 / 1e3),
         _ => format!("{:.1}M", n as f64 / 1e6),
     }

@@ -64,6 +64,8 @@ fn the_shadow_probe_casts_a_fraction_of_the_full_sets_rays() {
         };
         trace_texels(&panels_over_floor(), &settings, 200, 1).direct
     };
+    // 16 samples are too few for the probe, so all 16 rays; at 64 the probe's 20 rays and its
+    // checks stay under twice that.
     let (sixteen, probed) = (direct(16), direct(64));
     println!("16 direct samples: {sixteen} rays; 64, probed: {probed}");
     assert!(

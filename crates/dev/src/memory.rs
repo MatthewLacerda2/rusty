@@ -6,9 +6,13 @@ pub fn rss_now_bytes() -> Option<u64> {
     now()
 }
 
+/// On glibc, freed chart buffers go back to the system, as `fits`' estimate counts on;
+/// elsewhere a no-op.
 pub fn return_large_frees() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
+        // `M_MMAP_THRESHOLD` in glibc's `malloc.h`; pinned at its default, 128 KiB, so glibc
+        // stops raising it as large blocks are freed.
         const M_MMAP_THRESHOLD: std::ffi::c_int = -3;
         unsafe extern "C" {
             fn mallopt(param: std::ffi::c_int, value: std::ffi::c_int) -> std::ffi::c_int;
@@ -135,6 +139,7 @@ fn machine_now() -> Option<Machine> {
     use mach2::message::mach_msg_type_number_t;
     use mach2::vm_statistics::vm_statistics64;
 
+    /// `HOST_VM_INFO64` in `mach/host_info.h`.
     const HOST_VM_INFO64: i32 = 4;
     unsafe extern "C" {
         fn host_statistics64(
@@ -185,6 +190,9 @@ fn machine_now() -> Option<Machine> {
     }
     // SAFETY: `vm_page_size` is set by the system before `main`, never written after.
     let page = unsafe { mach2::vm_page_size::vm_page_size } as u64;
+    // Free counts the speculative pages already and purgeable ones sit on these queues, so
+    // adding either counts a page twice. `vm_stat` prints free less speculative, hence
+    // `memory_floor.py`'s three: keep the two sums alike.
     let available = (u64::from(stats.free_count) + u64::from(stats.inactive_count)) * page;
     Some(Machine { available, total })
 }

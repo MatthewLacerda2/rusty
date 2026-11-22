@@ -45,11 +45,14 @@ impl Summary {
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Report {
     pub frames: u32,
+    /// In print order, kept stable so two reports diff.
     pub metrics: Vec<(String, Summary)>,
     #[serde(default)]
     pub warnings: Vec<String>,
     #[serde(default)]
     pub engine: Option<EngineStamp>,
+    /// The later windows the rows hold as `<window>.<row>`: what tells a window's rows
+    /// from a set's (`cpu.`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub windows: Vec<String>,
 }

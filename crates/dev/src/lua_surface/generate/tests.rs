@@ -61,6 +61,7 @@ fn the_diffuse_and_mixed_modes_read_back_set_and_refuse_an_unknown_name() {
     assert!(err.unwrap_err().contains("BakedIndirect, Shadowmask"));
     let err = s.eval("Lighting.SetSettings{ diffuseModel = 'Wrap', samples = 3 }");
     assert!(err.unwrap_err().contains("unknown diffuseModel"));
+    // The valid model is read first and the bad budget raises after it: still nothing changes.
     s.eval("Lighting.SetSettings{ diffuseModel = 'lambert', reflectionBudgetMB = 'x' }")
         .unwrap_err();
     assert_eq!(

@@ -101,6 +101,7 @@ fn cameras_and_the_spawn_leave_the_navmesh_what_is_left() {
     add_spawn(&mut scene);
     let nav = NavigationGraph::from_scene(&scene);
     let views = pick(&scene, &nav);
+    // 3 cameras and the spawn leave 4 of the 8 positions: exactly the cap, so no warning.
     assert_eq!(views.views.len(), 3 + 1 + 4 * YAWS.len());
     assert!(views.warnings.is_empty(), "{:?}", views.warnings);
 }

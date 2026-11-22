@@ -136,6 +136,7 @@ pub fn run(
     if let Some(refused) = refused {
         head = format!("{head}\n{refused}");
         write(&tables, format!("{head}\n"))?;
+        // A stale flame graph from an earlier run would read as this one's.
         let _ = std::fs::remove_file(&folded);
         println!("{head}\n  {}", tables.display());
         return Ok(tables);
@@ -163,6 +164,7 @@ pub fn refusals<'a>(out_dir: &Path, scenes: impl Iterator<Item = &'a String>) ->
     (!lines.is_empty()).then(|| format!("profile not to be trusted (see its .profile.txt):{lines}"))
 }
 
+/// Cargo puts a profile's binaries in a folder named after it.
 pub fn on_profiling_build() -> bool {
     let exe = std::env::current_exe().unwrap_or_default();
     exe.parent().and_then(Path::file_name) == Some(OsStr::new("profiling"))

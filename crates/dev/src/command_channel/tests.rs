@@ -129,11 +129,13 @@ fn drain_replies_once_per_queued_command_in_order() {
 
 #[test]
 fn start_binds_a_unix_socket_then_drops_cleanly() {
-    // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
+    // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is 104 bytes on macOS)
     let dir = std::env::temp_dir();
     let path = dir.join(format!("rusty-cmd-test-{}.sock", std::process::id()));
 
     let console = RefCell::new(ConsoleLogs::new());
+    // The path goes to the bind: setting `RUSTY_CMD_SOCK` would leak into every test of
+    // this process.
     let channel =
         CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
             .expect("bind the unix socket");
@@ -146,7 +148,7 @@ fn start_binds_a_unix_socket_then_drops_cleanly() {
 #[test]
 fn a_command_wakes_a_sleeping_window() {
     use std::io::Write;
-    // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
+    // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is 104 bytes on macOS)
     let dir = std::env::temp_dir();
     let path = dir.join(format!("rusty-cmd-wake-{}.sock", std::process::id()));
     let console = RefCell::new(ConsoleLogs::new());

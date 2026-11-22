@@ -13,6 +13,7 @@ use rusty_script::scripting::HostCall;
 pub struct Demo {
     pub header: Header,
     path: PathBuf,
+    /// The end line's count or, for a demo cut short by a crash, one past its last tick line.
     pub ticks: u64,
     pub end: End,
 }

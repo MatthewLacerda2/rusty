@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     fn connect_to_an_absent_address_is_an_io_error_not_a_panic() {
-        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is ~104 bytes)
+        // lint: allow(test-temp-dir) a Unix socket path must stay short (sun_path is 104 bytes on macOS)
         let absent = std::env::temp_dir()
             .join(format!("rusty-client-absent-{}.sock", std::process::id()))
             .display()

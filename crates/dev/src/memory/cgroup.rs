@@ -1,3 +1,6 @@
+//! The memory cgroup (v2) cap a process runs under; a v1 hierarchy is not read, so the
+//! host's figures stand there.
+
 use std::path::Path;
 
 use super::Machine;
@@ -48,6 +51,7 @@ mod tests {
 
     const GB: u64 = 1 << 30;
 
+    /// `levels`: (path under the root, `memory.max`, `memory.current`, `inactive_file`).
     fn tree(name: &str, levels: &[(&str, &str, u64, u64)]) -> std::path::PathBuf {
         let root = rusty_test_support::temp::dir().join(format!("rusty_cgroup_{name}"));
         let _ = std::fs::remove_dir_all(&root);

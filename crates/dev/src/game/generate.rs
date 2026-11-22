@@ -24,6 +24,7 @@ pub fn generate(game: &Game, out: &Path, params: &Params) -> Result<(), String> 
     std::fs::write(&marker, format!("{}\n", game.name))
         .map_err(|e| format!("{}: {e}", marker.display()))?;
 
+    // Leaves `out` the working directory, so a caller holds its paths absolute.
     let opened = rusty_core::project::open(out, Access::Edit)?;
     rusty_edit::print_refresh(&rusty_edit::seed_project());
     let mut session = Session::boot(&BootPlan::default(), ProjectSource::bound(&opened))?;

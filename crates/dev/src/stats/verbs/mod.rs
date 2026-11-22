@@ -40,8 +40,11 @@ pub(crate) fn advance(ms: u64) {
     });
 }
 
+/// The fn name of `app::play`'s script system, which names its row: rename both
+/// together, or `update_ms` and `overhead_ms` read 0.
 pub const UPDATE_SYSTEM: &str = "update_scripts";
 
+/// Arm before the thread's first VM: a running VM keeps the surface it started with.
 pub fn arm() {
     static INSTALL: Once = Once::new();
     INSTALL.call_once(|| {
@@ -177,6 +180,8 @@ impl Recorder {
         });
     }
 
+    /// A stretch ends at its opener's return, or at a call no deeper: an error unwound
+    /// the opener, and an unwound frame runs no return hook.
     fn lua_event(&mut self, depth: usize) -> bool {
         let Top::Lua(level) = self.top() else {
             return false;
