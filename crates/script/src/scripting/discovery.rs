@@ -40,6 +40,7 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
     found
 }
 
+#[cfg(test)]
 pub(crate) fn exposes_lifecycle(code: &str) -> bool {
     offered(code).unwrap_or(false)
 }
