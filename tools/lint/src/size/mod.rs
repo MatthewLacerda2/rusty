@@ -140,6 +140,7 @@ pub(crate) fn shaders_in(dir: &Path) -> Vec<PathBuf> {
     out
 }
 
+#[cfg(test)]
 fn measured_in(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk(dir, &mut out, &|p| Lang::of(p).is_some());
