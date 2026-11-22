@@ -50,6 +50,7 @@ fn showing_a_fully_dressed_entity_records_no_step() {
         None,
         "a frame that only shows edits nothing"
     );
+    // Nothing selected: the Inspector shows Scene Settings.
     editor.selected_entity_id = None;
     idle_frame(&mut editor, &mut scene);
     assert_eq!(scene.undo_name(), None);

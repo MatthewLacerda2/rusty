@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/ribbons/trail.rs — the Trail card.
-
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
 use rusty_edit::authoring::ComponentKind;
@@ -23,7 +21,7 @@ fn write(
     *dirty = true;
 }
 
-/// 3FT. Trail Renderer card: emitting, lifetime, min vertex distance, the live
+/// Trail Renderer card: emitting, lifetime, min vertex distance, the live
 /// point count (read-only), and the shared Style section.
 pub fn draw_trail(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, dirty: &mut bool) {
     let Some(t) = world.trail(id).map(|t| t.clone()) else {

@@ -70,6 +70,7 @@ fn trilinear(src: &Image, below: &[Image], u: f32, v: f32, lod: f32) -> Rgba {
     std::array::from_fn(|c| a[c] + (b[c] - a[c]) * t)
 }
 
+/// Each half-size reduction of `img` down to one texel, `img` itself left out (level 0). A level's
 /// texel is the mean of the four bilinear taps at the texel centres of the 2 × 2 it
 /// covers: exactly their box mean on an even side, and a wrapped blend on an odd one.
 pub fn mips(img: &Image) -> Vec<Image> {

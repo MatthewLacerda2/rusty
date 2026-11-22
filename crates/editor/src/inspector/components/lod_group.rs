@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/lod_group.rs — the LOD Group card.
-
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -18,7 +16,6 @@ fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut L
     *is_dirty = true;
 }
 
-/// 3EL. LOD Group Component
 pub fn draw_lod_group(ui: &mut egui::Ui, world: &mut World, id: u32, is_dirty: &mut bool) {
     let Some(g) = world.lod_group(id).map(|g| g.clone()) else {
         return;

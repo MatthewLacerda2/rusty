@@ -1,3 +1,5 @@
+//! Every node's wiring is checked, not only what the targets reach, before any node runs.
+
 use rusty_core::collections::Map;
 
 use super::RunError;
@@ -5,6 +7,7 @@ use crate::recipe::{Fault, Link, Node, OpKind, TextureRecipe};
 
 pub(super) struct Plan {
     pub order: Vec<usize>,
+    /// Inputs in node order, then links in `OpKind::links` order: `eval_one` splits there.
     pub inputs: Vec<Vec<usize>>,
     pub uses: Vec<usize>,
     pub targets: Vec<usize>,

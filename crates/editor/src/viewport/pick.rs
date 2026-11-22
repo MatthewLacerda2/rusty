@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/pick.rs — screen→world ray + click-to-select.
-
 use glam::Vec3;
 
 use rusty_scene::Camera;
@@ -11,6 +9,8 @@ pub struct Ray {
     pub dir: Vec3,
 }
 
+/// `aspect` must be the one the camera rendered the image at, or the ray misses
+/// what the image shows.
 pub fn ray_from_ndc(camera: &Camera, aspect: f32, ndc_x: f32, ndc_y: f32) -> Ray {
     let view_proj = camera.build_view_projection(aspect);
     let inv = view_proj.inverse();
@@ -22,9 +22,8 @@ pub fn ray_from_ndc(camera: &Camera, aspect: f32, ndc_x: f32, ndc_y: f32) -> Ray
     }
 }
 
-/// Convert a pointer offset inside the viewport image (points, top-left origin) to an
-/// NDC pair (y flipped to OpenGL/clip up). `size` is the image's size in the same
-/// units. Returns `None` for a degenerate (zero-area) image.
+/// A pointer offset in the image (points, top-left origin) as NDC, y up; `None` for a
+/// zero-area image.
 pub fn local_to_ndc(local_x: f32, local_y: f32, width: f32, height: f32) -> Option<(f32, f32)> {
     if width <= 0.0 || height <= 0.0 {
         return None;
@@ -43,6 +42,7 @@ pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
             continue;
         }
         let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
+        // Unity picks by what is drawn: a `ShadowsOnly` mesh is seen by no camera.
         if !mesh.cast_shadows.is_visible() {
             continue;
         }
@@ -76,8 +76,6 @@ fn ray_aabb(ray: Ray, min: Vec3, max: Vec3) -> Option<f32> {
     }
 }
 
-/// The world-space position of `entity_id`, used to
-/// anchor the move gizmo. `None` when the entity is gone.
 pub fn entity_world_position(scene: &Scene, entity_id: u32) -> Option<Vec3> {
     if !scene.world.contains(entity_id) {
         return None;

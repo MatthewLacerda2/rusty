@@ -18,6 +18,7 @@ type ColorRow = (
 /// The procedural sky section, collapsed by default like Fog.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let before = scene.sky;
+    // The drawn ambient, not `ambient_color`: an active Ambient light entity wins.
     let resolved = before.resolved(scene.drawn_ambient().color);
     let sky = &mut scene.sky;
     let mut changed = false;

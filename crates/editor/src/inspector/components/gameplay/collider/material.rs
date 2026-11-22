@@ -1,7 +1,6 @@
-//! crates/editor/src/inspector/components/gameplay/collider/material.rs — the Collider
-//! card's Physics Material section: the shared asset the collider names (a
-//! project path; empty for inline values), then the values. With an asset, an edit
-//! writes the asset, retuning every collider that uses it, as Unity's inspector
+//! The Collider card's Physics Material section. With an asset named, an edit writes
+//! the asset, retuning every collider that uses it, as Unity's inspector edits a
+//! `PhysicMaterial`; without one, it writes the collider's inline values.
 
 use crate::widgets::DragRange;
 use rusty_components::{ColliderComponent, CombineMode, PhysicsMaterial};
@@ -17,7 +16,8 @@ struct Draft {
     pass: u64,
 }
 
-/// Asset values edited under a drag, not yet written to `asset`.
+/// Asset values edited under a drag, written once it ends: a file write is an atomic
+/// write, a write-log note and a cache generation bump, too much for every frame.
 #[derive(Clone)]
 struct Pending {
     asset: String,
@@ -32,7 +32,6 @@ fn pending_key() -> egui::Id {
     egui::Id::new("collider_material_pending")
 }
 
-/// The section, for `id`'s `collider`.
 pub(super) fn draw(
     ui: &mut egui::Ui,
     world: &mut World,
@@ -185,7 +184,6 @@ fn draw_values(ui: &mut egui::Ui, mut m: PhysicsMaterial) -> Option<PhysicsMater
     changed.then_some(m)
 }
 
-/// A combine-mode combo box; returns whether the mode changed.
 fn combine_combo(ui: &mut egui::Ui, label: &str, mode: &mut CombineMode) -> bool {
     let before = *mode;
     egui::ComboBox::from_label(label)

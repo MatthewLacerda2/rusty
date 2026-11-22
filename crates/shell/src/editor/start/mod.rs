@@ -1,6 +1,3 @@
-//! crates/shell/src/editor/start/ — how the editor starts: on a named project, or on the
-//! project picker first.
-
 mod picker;
 
 #[cfg(feature = "dev")]
@@ -19,7 +16,7 @@ use rusty_editor::project_picker::ProjectPicker;
 const TITLE: &str = "Rusty 3D Game Engine & Editor";
 /// The window's title while the picker shows.
 const PICKER_TITLE: &str = "rusty — Projects";
-/// The editor window's desktop identity on Linux: the name of the `rusty.desktop`
+/// The `rusty.desktop` entry `make launcher` installs.
 const APP_ID: &str = "rusty";
 
 /// Boot the editor on the project `opened` and run until the window closes.
@@ -54,6 +51,7 @@ fn prepare(
     if let Err(err) = recent::record(&opened.root, unix_now()) {
         eprintln!("[Project] could not update the recent projects: {err}");
     }
+    // The player seeds nothing, so every authoring entry point does.
     rusty_edit::print_refresh(&rusty_edit::seed_project());
     let startup = &opened.settings.build.startup_scene;
     let plan = rusty_core::project::boot_scene(&opened.root, startup, Access::Edit);

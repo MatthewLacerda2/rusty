@@ -41,10 +41,11 @@ impl super::GameWorld {
         }
         if !stepped {
             transition = self.poll_transition();
+            // A pause outlives Stop: the edit frame runs on the scene the transition left.
             if !self.play_requested() {
                 self.edit_frame();
             }
-            self.push_audio(0.0);
+            self.push_audio(0.0); // as a tick would push it, with no time passed
         }
         transition
     }

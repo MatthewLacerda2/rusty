@@ -22,6 +22,7 @@ fn two_entries_before_a_step_sync_both_motions_to_the_first() {
     anim.enter_node(graph.node("Run").unwrap(), 0.5);
     anim.enter_node(graph.node("Walk").unwrap(), 0.5);
     step(&mut anim, Some(&mesh), Some(&graph), 0.0);
+    // Walk back at its own phase, and the Run it fades out (never placed) at that phase too: 0.27.
     assert!((anim.base.time - 0.3).abs() < 1e-5, "{}", anim.base.time);
     let run = anim.base.previous_time;
     assert!((run - 0.27).abs() < 1e-5, "Run placed at {run}");

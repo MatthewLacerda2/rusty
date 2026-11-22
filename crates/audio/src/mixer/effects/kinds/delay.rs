@@ -6,6 +6,7 @@ use super::super::{Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
 /// The longest delay, in seconds (Unity's echo: 5000 ms).
 pub const MAX_SECONDS: f32 = 5.0;
+/// A feedback low-pass at or above this, in Hz, is open.
 const OPEN: f32 = 22_000.0;
 /// Below this a sample written to the line is silence (the device gate's −100 dB).
 const SILENT: f32 = 1e-5;
@@ -74,6 +75,8 @@ struct Delay {
     line: Vec<Frame>,
     write: usize,
     low: Frame,
+    /// Frames since one above [`SILENT`] was written: at the line's length, nothing is
+    /// left to echo.
     quiet: usize,
 }
 

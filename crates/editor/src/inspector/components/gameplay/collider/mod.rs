@@ -1,7 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/collider/mod.rs — the Collider inspector
-//! card. Split out of the physics-card module (`physics.rs`) to keep both files
-//! under the size cap; the RigidBody and NavMesh Agent cards stay in `physics`.
-
 mod material;
 
 pub use material::commit_abandoned;

@@ -1,3 +1,7 @@
+//! Query work a `Move` does, counted per thread so `cost_tests` holds it on any machine,
+//! without a clock. Off until a test arms it with `take`; without `debug_assertions`,
+//! `count` compiles to nothing.
+
 use std::cell::Cell;
 
 #[derive(Clone, Copy)]

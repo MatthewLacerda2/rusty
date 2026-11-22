@@ -1,8 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/physics.rs — the physics-flavoured
-//! gameplay inspector card: RigidBody. The Collider and NavMesh Agent cards live in
-//! the sibling `collider` and `nav_agent` modules; all three were split out of the
-//! gameplay card module to stay under the size cap.
-
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -94,7 +89,6 @@ fn draw_rb_drags(
     draw_rb_drag(ui, world, id, ("Angular Drag:", angular), set, is_dirty);
 }
 
-/// 3EG. RigidBody Component
 pub fn draw_rigidbody(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

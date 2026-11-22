@@ -4,8 +4,7 @@ use rapier3d::prelude::*;
 
 use crate::world::PhysicsWorld;
 
-/// The body table's change counter, and the cached copy with the count it was
-/// made at.
+/// The table's change counter, and the cached copy with its count.
 #[derive(Default)]
 pub(crate) struct ControllerBodies {
     revision: u64,
@@ -13,8 +12,8 @@ pub(crate) struct ControllerBodies {
 }
 
 impl ControllerBodies {
-    /// The controller's copy of `bodies`, remade if a body was inserted,
-    /// removed or retyped since the last one.
+    /// The controller's copy of `bodies`, remade only on an insert, remove or retype:
+    /// read only its bodies' types, since their poses go stale.
     pub(super) fn of(&self, bodies: &RigidBodySet) -> Arc<RigidBodySet> {
         let mut cached = self.cached.lock().unwrap_or_else(PoisonError::into_inner);
         match cached.as_ref() {
@@ -37,15 +36,13 @@ impl ControllerBodies {
 }
 
 impl PhysicsWorld {
-    /// Insert `body` into the world, counting the change.
     pub(crate) fn insert_body(&mut self, body: RigidBody) -> RigidBodyHandle {
         self.controller_bodies.revision += 1;
         // lint: allow(body-table) the one insert: the revision moved above
         self.bodies.insert(body)
     }
 
-    /// Remove `handle`'s body and every collider and joint attached to it,
-    /// counting the change.
+    /// Remove `handle`'s body with its colliders and joints, counting the change.
     pub(crate) fn remove_body(&mut self, handle: RigidBodyHandle) {
         self.controller_bodies.revision += 1;
         // lint: allow(body-table) the one remove: the revision moved above
@@ -61,7 +58,9 @@ impl PhysicsWorld {
     }
 }
 
-/// `bodies` with every kinematic body made fixed.
+/// Kinematic bodies made fixed: rapier's controller rides one (a Collider alone is
+/// one), which stalled walks; Unity's rides nothing. Dynamic ones keep their type for
+/// autostep.
 fn without_kinematics(bodies: &RigidBodySet) -> RigidBodySet {
     let mut copy = bodies.clone();
     for (_, body) in copy.iter_mut() {

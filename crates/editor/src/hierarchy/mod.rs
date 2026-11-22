@@ -1,6 +1,6 @@
-//! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree,
-//! flattened into rows (`flat`) and drawn only where it is in view (`tree`). Object creation lives
-//! in the menu bar's GameObject menu; deleting is Unity's: Edit ▸ Delete, the Delete key
+//! The Scene Hierarchy: a collapsible tree flattened into rows (`flat`) and drawn
+//! only where it is in view (`tree`). Object creation lives in the menu bar's
+//! GameObject menu; deleting is Unity's: Edit ▸ Delete, the Delete key
 //! (Cmd+Backspace on macOS) and a row's right-click *Delete*, all through `delete`.
 
 use egui_phosphor::regular as icon;
@@ -25,7 +25,6 @@ const PANEL_ID: &str = "Hierarchy Panel";
 /// The panel's width, margins included, until the user drags its edge.
 const DEFAULT_WIDTH: f32 = 220.0;
 
-/// Draw the Hierarchy panel, or its collapsed rail.
 pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = editor.theme;
     if !editor.hierarchy_open {
@@ -44,6 +43,7 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
             }
+            // The walk's buffers live in egui's memory: a warm frame allocates none.
             let kept = egui::Id::new("hierarchy_flattener");
             let mut flat =
                 ui.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Flattener>(kept)));

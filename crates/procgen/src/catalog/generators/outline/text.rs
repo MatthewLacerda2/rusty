@@ -7,6 +7,8 @@ use crate::ops::generators::clamp_or;
 use crate::ops::outline::text::{glyphs, Layout};
 use crate::recipe::{choice, op, opt, req, Lit, OpInfo, OpParam, SOURCE};
 
+// The longest text in bytes, the most lines and the largest em in tiles: the figures
+// `docs/api/Texture.md`'s `text` bullet states.
 const MAX_BYTES: usize = 4096;
 const MAX_LINES: usize = 256;
 const MAX_SIZE: f32 = 4.0;

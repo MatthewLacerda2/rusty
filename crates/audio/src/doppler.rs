@@ -6,6 +6,7 @@ use super::mix::MixEnv;
 use rusty_components::AudioSourceComponent;
 
 pub use rusty_core::settings::audio::SPEED_OF_SOUND;
+// The playback-rate bounds a doppler shift is clamped to: an octave down and up.
 pub const RATE_MIN: f32 = 0.5;
 pub const RATE_MAX: f32 = 2.0;
 /// The speed, in m/s, past which one tick's move is a teleport and counts as still.
@@ -116,6 +117,7 @@ pub fn rate(listener: Body, source: Body, c: f32, level: f32) -> f32 {
     }
     let along = |v: Vec3| (v * level).dot(n);
     let (heard, sent) = (along(listener.velocity), along(source.velocity));
+    // Floored above 0: a source at or past the speed of sound would divide by zero or flip sign.
     let r = (c - heard) / (c - sent).max(c * 1e-3);
     if heard.is_finite() && sent.is_finite() {
         r.clamp(RATE_MIN, RATE_MAX)

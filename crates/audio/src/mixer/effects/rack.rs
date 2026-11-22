@@ -12,6 +12,7 @@ use super::{kinds, Dsp, DspContext, EffectChain, EffectParams, KeyLevel, KindId,
 use crate::device::voice::SMOOTHING;
 use crate::mixer::GroupId;
 
+/// Frames per glide step: an EQ re-derives its coefficients at most once a chunk.
 pub const CHUNK: usize = 16;
 /// How many slot changes can wait for the audio thread at once.
 const QUEUE: usize = 4 * MAX_EFFECTS;
@@ -123,8 +124,7 @@ impl RackHandle {
         self.writer.write(*chain);
     }
 
-    /// Once a frame: drop what the audio thread handed back, send what waited, and
-    /// rebuild every slot if the device's rate changed.
+    /// Once a frame: drop what came back, send what waited, rebuild on a rate change.
     pub fn maintain(&mut self, key: &dyn Fn(GroupId) -> Option<Arc<KeyLevel>>) {
         if self.shared.stale.swap(false, Ordering::Relaxed) {
             self.installed = [None; MAX_EFFECTS];
@@ -163,7 +163,8 @@ impl EffectBuilder for RackBuilder {
     }
 }
 
-/// The audio thread's side: see the module docs.
+/// The audio thread's side: never allocates or waits; a replaced DSP goes back for the
+/// game thread to drop.
 pub struct Rack {
     reader: CommandReader<EffectChain>,
     target: EffectChain,
@@ -197,8 +198,7 @@ impl Effect for Rack {
             let old = std::mem::replace(&mut self.slots[install.slot], install.dsp);
             self.current.0[install.slot] = None;
             if let Some((_, old)) = old {
-                // The channel holds as many as were ever sent, so this never
-                // fails while the handle lives; once it is gone, nothing waits.
+                // Never full while the handle lives: it collects before each send.
                 self.retire.try_send(old).ok();
             }
         }
@@ -212,6 +212,7 @@ impl Effect for Rack {
                 let (Some(target), Some((kind, dsp))) = (self.target.0[slot], dsp.as_mut()) else {
                     continue;
                 };
+                // A new kind's DSP can land after its values: skipped until they agree.
                 if target.kind != *kind {
                     continue;
                 }
@@ -231,6 +232,8 @@ impl Effect for Rack {
     }
 }
 
+/// A value lands within 1e-6 (relative) or on a stalled step: a settled effect plays
+/// exactly.
 fn glide(from: &EffectParams, to: &EffectParams, k: f32) -> EffectParams {
     let mut out = from.lerp(to, k);
     for ((v, t), was) in out.values.iter_mut().zip(to.values).zip(from.values) {

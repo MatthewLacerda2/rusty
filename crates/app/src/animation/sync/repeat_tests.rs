@@ -16,6 +16,7 @@ fn a_two_stride_follower_plays_on_without_jumping_a_stride() {
         graph(vec![tree(walk_marks(), run)], Vec::new()),
     );
     let mut anim = bound(&graph);
+    // Walk weighs 0.75 and leads; Run follows at 0.25.
     anim.parameters
         .insert("speed".to_string(), AnimatorParameter::Float(0.25));
     let (mut last, mut halves) = (None, [false; 2]);

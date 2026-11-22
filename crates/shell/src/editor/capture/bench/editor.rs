@@ -1,6 +1,3 @@
-//! The editor the round draws (`super`): its UI, egui and the renderer they
-//! share, one frame at a time, probed or not.
-
 use rusty_app::GameWorld;
 use rusty_dev::bench::scenes::editor::{gpu_speed, Drawn, UiTime, UiTimer};
 use rusty_dev::bench::scenes::views::View;
@@ -14,7 +11,6 @@ use rusty_scene::Camera;
 use super::super::paint::{paint_jobs, target, Painted};
 use super::Round;
 
-/// The editor the round draws: its UI, egui, and the renderer they share.
 pub(super) struct Editor {
     host: CaptureHost,
     egui: egui_wgpu::Renderer,
@@ -28,7 +24,7 @@ pub(super) struct Editor {
 }
 
 impl Editor {
-    /// The editor over `game`, posed and selected (see the module docs); `None`
+    /// The editor over `game`, posed and selected by `pose`; `None` with no adapter.
     pub(super) fn new(game: &GameWorld, opts: &Round) -> Option<Self> {
         let size = (opts.size.0.max(1), opts.size.1.max(1));
         let mut host = CaptureHost::new();
@@ -78,6 +74,7 @@ impl Editor {
         let (w, h) = self.size;
         let renderer = self.host.renderer(w, h).expect("built in new");
         renderer.wait_idle();
+        // The edit frame, UI and draw until the GPU finished: before the readbacks, no probe.
         let wall_ms = ui.edit_ms + ui.ms + rusty_dev::stats::ms_since(drawing);
         let gpu = renderer.take_gpu_times();
         let frame = cost.map(|(cpu_ms, stages, counters, view)| Drawn {
@@ -93,6 +90,7 @@ impl Editor {
         (ui, frame, gpu_speed(before, after), wall_ms)
     }
 
+    /// No probe and no GPU times read back: Stop's timed span ends on this frame.
     pub(super) fn draw(&mut self, game: &mut GameWorld) {
         game.edit_frame();
         let (output, jobs, drawn) = self.ui(game);
@@ -162,7 +160,7 @@ impl Editor {
         for id in &output.textures_delta.free {
             self.egui.free_texture(id);
         }
-        output.textures_delta.clear();
+        output.textures_delta.clear(); // egui debug-asserts every delta was handled
     }
 
     #[cfg(test)]

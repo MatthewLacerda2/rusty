@@ -9,6 +9,7 @@ fn full(size: u32) -> Image {
     Image::fill_uv(size, |_, _| [1.0; 4])
 }
 
+/// Radius 0.2 of a cell, so a jitter of 0.3 never makes two stamps overlap.
 fn dot(size: u32) -> Image {
     Image::fill_uv(size, |u, v| {
         let d = ((u - 0.5).powi(2) + (v - 0.5).powi(2)).sqrt();

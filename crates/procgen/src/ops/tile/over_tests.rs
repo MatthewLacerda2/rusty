@@ -40,6 +40,8 @@ fn overlapping_soft_stamps_leave_no_trench() {
     let over = bake(&soft(64), tile(TileBlend::Over), Some(&grown));
     let mut rim = 0;
     for (m, o) in max.pixels().iter().zip(over.pixels()) {
+        // Index greys are 0.25 to 1, so a dimmer stamp covering fully may sit below `max`; a
+        // trench is a pixel near 0 under a bright `max`.
         assert!(o[0] >= 0.2 * m[0], "trench: max {m:?} over {o:?}");
         rim += usize::from(o[0] > m[0]);
     }

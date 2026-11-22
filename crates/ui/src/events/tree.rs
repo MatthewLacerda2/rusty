@@ -26,6 +26,8 @@ pub fn is_interactable(world: &World, id: u32) -> bool {
             .any(|c| world.canvas_group(c).is_some_and(|g| !g.interactable))
 }
 
+/// The nearest ancestor-or-self of `id` passing `pred`: the walk UI bubbling and
+/// `Damage` delivery (`script::api::damage`) both take.
 pub fn nearest(world: &World, id: u32, pred: impl Fn(u32) -> bool) -> Option<u32> {
     ancestors_or_self(world, id).into_iter().find(|&c| pred(c))
 }

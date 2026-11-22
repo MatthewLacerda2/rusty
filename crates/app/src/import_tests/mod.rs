@@ -17,8 +17,10 @@ mod refresh;
 
 const DT: f32 = 1.0 / 60.0;
 
+/// A quad (6 indices) under the object name `Quad`.
 const QUAD: &str = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
 
+/// One triangle (3 indices) renamed `Quad`, so an edit of the source keeps its reference.
 fn triangle() -> String {
     include_str!("../../../../tests/fixtures/models/missing_texture.fbx").replace("Tri", "Quad")
 }

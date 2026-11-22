@@ -5,8 +5,10 @@ use crate::catalog::generators::shape::ShapeProfile;
 use crate::ops::field::Field;
 use crate::recipe::{Shape, ShapeKind};
 
+/// Past it a polygon is a circle to about a pixel at 2048², and the cap keeps a huge count cheap.
 pub const MAX_CORNERS: u32 = 64;
 
+/// Rings of neighbour tiles' copies unioned: a shape wider than 9 tiles keeps a seam.
 const MAX_SPILL: i32 = 4;
 
 #[derive(Clone, Copy)]
@@ -65,6 +67,8 @@ impl Sdf {
 pub fn sampler<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
     let (sdf, profile) = (Sdf::new(p), p.profile);
     let depth = -sdf.at(0.0, 0.0);
+    // An odd polygon or star is not symmetric top to bottom, so one past the tile is the
+    // union of its neighbours' copies, as a stamp under `tile` is.
     let k = sdf.spill();
     Box::new(move |u, v| {
         let (x, y) = (u.rem_euclid(1.0) - 0.5, v.rem_euclid(1.0) - 0.5);
@@ -83,6 +87,8 @@ pub fn sampler<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
 
 impl Sdf {
     fn inward(self, x: f32, y: f32, d: f32, depth: f32) -> f32 {
+        // An ellipse's distance is first-order inside, so `d / depth` would plateau along its
+        // major axis: its stretched radius gives one peak instead.
         let t = if self.kind == ShapeKind::Circle {
             let (rx, ry) = (self.half[0].max(1e-6), self.half[1].max(1e-6));
             1.0 - (x / rx).hypot(y / ry)

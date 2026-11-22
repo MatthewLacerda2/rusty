@@ -76,6 +76,8 @@ pub fn evaluate_each(
     Ok(())
 }
 
+/// Checks without evaluating: a caller runs it before reading image files, so a broken
+/// recipe is reported as itself.
 pub fn validate(recipe: &TextureRecipe) -> Result<(), RunError> {
     plan(recipe, &[], Scope::Every).map(|_| ())
 }

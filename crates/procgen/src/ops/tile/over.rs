@@ -1,6 +1,7 @@
 use super::super::super::image_buf::Rgba;
 use super::stamp::MAX_REACH;
 
+/// One per neighbour cell a pixel of a square grid visits; past it, hits spill to the heap.
 const SLOTS: usize = ((2 * MAX_REACH + 1) * (2 * MAX_REACH + 1)) as usize;
 
 #[derive(Clone, Copy, Default)]
@@ -50,6 +51,7 @@ impl Hits {
                 &mut self.spill[..]
             }
         };
+        // Unstable is safe: no two copies share an order.
         hits.sort_unstable_by_key(|h| h.order);
         for h in hits.iter() {
             over(out, h.colour, h.coverage);
@@ -57,6 +59,8 @@ impl Hits {
     }
 }
 
+/// `colour` already carries the stamp's mask, so a lerp by `coverage` would darken a soft
+/// edge twice.
 #[inline]
 pub(in crate::ops) fn over(out: &mut Rgba, colour: Rgba, coverage: f32) {
     let a = colour[3];

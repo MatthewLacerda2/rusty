@@ -72,7 +72,7 @@ fn an_unparseable_project_file_is_said_once_and_leaves_the_defaults() {
     std::fs::write(&path, "{ not json").unwrap();
     let game = world();
     game.open_project(ProjectSource::Bound(path));
-    game.apply_project_settings();
+    game.apply_project_settings(); // entering Play rereads the file
     assert_eq!(
         game.resources.application.borrow().build(),
         &Default::default()

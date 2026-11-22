@@ -31,22 +31,22 @@ pub fn load(shell: &mut Shell, game: &GameWorld, defaults: VideoSettings) {
     shell.applied_video = video;
 }
 
-/// Hand the shared graphics cell (preset values + player options + render scale) to the
-/// renderer: the one place either frontend does it, every frame, and [`load`] at boot
-///. The render scale resolves on the display scale the screen resource holds
-///, which each frontend reports first ([`report_display_scale`]).
+/// Hand the shared graphics cell (preset values, player options, render scale) to the
+/// renderer, every frame and at boot.
 pub fn apply_graphics(shell: &mut Shell, game: &GameWorld) {
     let display_scale = game.resources.screen.borrow().display_scale();
     let graphics = *game.script_manager().graphics_cell().borrow();
     shell.renderer.apply_graphics(graphics, display_scale);
 }
 
+/// A sim input (`Video.GetDisplayScale`): reported at boot before the first tick, and by the
+/// player each frame before the graphics reach the renderer, so a new monitor's first frame
+/// uses its scale.
 pub fn report_display_scale(shell: &Shell, game: &GameWorld) {
     let scale = shell.window.scale_factor() as f32;
     game.resources.screen.borrow_mut().set_display_scale(scale);
 }
 
-/// Apply any video-settings change a script wrote into the shared cell this frame.
 pub fn apply_pending(shell: &mut Shell, game: &GameWorld) {
     let requested = *game.script_manager().video_cell().borrow();
     let previous = shell.applied_video;
@@ -63,7 +63,7 @@ pub fn apply_pending(shell: &mut Shell, game: &GameWorld) {
     shell.applied_video = effective;
 }
 
-/// Reconfigure the renderer + window for `next`, doing only the work `next.diff`
+/// Reconfigure the renderer and window for only what `next` changed against `previous`.
 fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings) {
     let window = &shell.window;
     let change = next.diff(previous);
@@ -78,6 +78,8 @@ fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings)
     }
     if change.resolution {
         let (w, h) = next.resolution();
+        // Fullscreen ignores inner-size requests; windowed, the OS's `Resized` event
+        // reconfigures the surface.
         if next.fullscreen {
             shell.renderer.resize(rusty_render::PixelSize::new(w, h));
         } else {
@@ -86,8 +88,8 @@ fn apply_video(shell: &mut Shell, next: VideoSettings, previous: &VideoSettings)
     }
 }
 
-/// Write the live settings back into `Storage` at quit. The graphics settings are
-/// also written at Stop (`Resources::store_graphics`); the existing `flush_storage`
+/// Write the live settings into `Storage`'s in-memory map at quit (the graphics settings at
+/// Stop too, `Resources::store_graphics`); `flush_storage` writes them to disk.
 pub fn persist(game: &GameWorld) {
     game.resources.store_graphics();
     let video = *game.script_manager().video_cell().borrow();

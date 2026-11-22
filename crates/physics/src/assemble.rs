@@ -22,6 +22,8 @@ pub(crate) const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNA
     .union(ActiveCollisionTypes::DYNAMIC_FIXED);
 
 impl PhysicsWorld {
+    /// Rebuilds only the owners whose collider set changed, so the rest keep their contacts and
+    /// sleep; in ascending owner order, so rebuild order is deterministic. Returns those built.
     pub(super) fn resync_topology(&mut self, scene: &Scene) -> Vec<u32> {
         let next = plan(scene);
         if next == self.plan {
@@ -140,6 +142,7 @@ impl PhysicsWorld {
         collider.set_active_events(ActiveEvents::COLLISION_EVENTS);
         collider.set_active_collision_types(ACTIVE_TYPES);
         let groups = interaction_groups(inp.layer, scene.collision_matrix.filter_mask(inp.layer));
+        // Both groups alike, so contact generation and the solver agree.
         collider.set_collision_groups(groups);
         collider.set_solver_groups(groups);
         Some(collider)

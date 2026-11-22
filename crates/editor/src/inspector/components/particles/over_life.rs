@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/particles/over_life.rs — the over-life curves,
-//! the colour gradient and the sub-emitter pickers of the Particle System card.
-
 use super::widgets::{clamped, curve_editor, gradient_editor};
 use super::{apply, Cx};
 use rusty_components::{ParticleEmitterComponent, SubEmitTrigger};

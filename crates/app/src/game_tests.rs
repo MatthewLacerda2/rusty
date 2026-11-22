@@ -60,6 +60,7 @@ fn entering_play_resets_frame_and_time() {
     gw.set_playing(true);
     let t = gw.tick(DT);
     assert!(t == PlayTransition::Entered);
+    // Both reset on entry, then this tick's own step counts one.
     assert_eq!(gw.time().borrow().frame_count, 1);
     assert_eq!(gw.play_frame(), 1);
 }

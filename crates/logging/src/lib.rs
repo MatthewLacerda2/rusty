@@ -14,6 +14,8 @@ mod one_logger_tests;
 #[cfg(test)]
 mod tests;
 
+/// Records kept between drains; the oldest go past it, so an undrained binary
+/// stays bounded.
 const CAPACITY: usize = 100;
 
 /// One kept record: the thread that logged it, and how many times in a row it came.
@@ -45,6 +47,9 @@ pub fn init() {
     });
 }
 
+/// A test hook for `rusty-dev`'s and this crate's tests: arms `PER_THREAD`, so
+/// each drain takes only its own thread's records and tests sharing a process
+/// never drain each other's.
 #[doc(hidden)]
 pub fn init_for_tests() {
     // lint: allow(test-static-write) one-way and idempotent: every caller sets the same `true`, and per-thread drains are what every test in a shared process wants
@@ -107,7 +112,6 @@ fn take_mine(pending: &mut Vec<Kept>, per_thread: bool) -> Vec<Kept> {
     runs
 }
 
-/// `env_logger` for stderr, with a copy of engine warnings kept for [`forward`].
 struct Forward {
     stderr: env_logger::Logger,
 }

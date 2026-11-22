@@ -17,6 +17,7 @@ pub enum Op {
     Settle,
 }
 
+/// Steps for the fixture's bodies to land and fall asleep, so later ops find sleeping ones.
 pub const SETTLE_STEPS: usize = 90;
 
 pub fn op() -> impl Strategy<Value = Op> {

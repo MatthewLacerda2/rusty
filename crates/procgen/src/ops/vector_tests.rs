@@ -126,6 +126,7 @@ fn a_steep_base_turned_the_same_way_stays_above_the_floor_at_unit_length() {
 
 #[test]
 fn a_blend_that_stays_above_the_floor_is_rnms_own_bit_for_bit() {
+    // Gentle enough that no texel of the pair reaches the floor.
     let (base, detail) = (bumpy(3, 0.05), bumpy(4, 0.05));
     let out = normal_blend(&base, &detail, Field::Const(1.0));
     for ((o, p), d) in out.pixels().iter().zip(base.pixels()).zip(detail.pixels()) {

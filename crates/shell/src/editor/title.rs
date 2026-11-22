@@ -1,7 +1,7 @@
-//! crates/shell/src/editor/title.rs — the editor window's title, Unity's place for the
-//! open scene's name: `<project> - <scene>`, with a `*` while the edit scene
-//! has unsaved changes (`EditorUi::is_dirty`). The window is told only when the
-//! string changes. The player keeps its launch title.
+//! The editor window's title, Unity's place for the open scene's name:
+//! `<project> - <scene>`, with a `*` while the edit scene has unsaved changes
+//! (`EditorUi::is_dirty`). The window is told only when the string changes. The player
+//! keeps its launch title.
 
 use winit::window::Window;
 

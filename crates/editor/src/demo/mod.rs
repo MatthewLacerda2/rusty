@@ -1,11 +1,10 @@
-//! The demo timeline: a recorded Play session opened in the Game view,
-//! played, paused and scrubbed by tick, with the index's `Debug.Mark`s on the bar.
-
 use rusty_dev::demo::{Demo, Event, Lent, Origin};
 
 pub mod timeline;
 
+/// Most seconds of wall time one frame spends on ticks: a stall is no fast-forward.
 const MAX_FRAME_TIME: f32 = 0.1;
+/// Bounds a run of ticks recorded with a zero `dt`.
 const MAX_TICKS_PER_FRAME: u64 = 64;
 
 impl crate::EditorUi {
@@ -18,10 +17,8 @@ impl crate::EditorUi {
     }
 }
 
-/// A demo open in the Game view.
 pub struct DemoView {
     pub path: String,
-    /// How many ticks the demo holds.
     pub ticks: u64,
     /// The last tick the replay ran.
     pub current: u64,
@@ -30,7 +27,6 @@ pub struct DemoView {
     pub marks: Vec<(u64, String)>,
     pub seek: Option<u64>,
     pub target: Option<u64>,
-    /// The timeline's close button was pressed.
     pub close: bool,
     /// How fast it plays: at the speed it was recorded.
     pub pace: Pace,
@@ -81,6 +77,7 @@ impl DemoView {
         self.target.unwrap_or(self.current)
     }
 
+    /// A tick behind only shows until `release`, as going back restarts from tick 0.
     pub fn scrub(&mut self, tick: u64) {
         if tick > self.current {
             self.target = None;
@@ -108,7 +105,6 @@ pub struct Pace {
 }
 
 impl Pace {
-    /// The pace of ticks recorded with these `dts`, in tick order.
     pub fn new(dts: Vec<f32>) -> Self {
         Self { dts, budget: 0.0 }
     }
@@ -118,6 +114,7 @@ impl Pace {
         let mut owed = 0;
         while owed < MAX_TICKS_PER_FRAME {
             let next = current + 1 + owed;
+            // `max` turns a NaN into 0: a broken `dt` never stalls.
             let Some(dt) = self.dts.get(next as usize).map(|dt| dt.max(0.0)) else {
                 self.budget = 0.0;
                 break;

@@ -3,8 +3,8 @@ use glam::Vec2;
 use super::{Fault, Parser};
 
 /// Longest chord a curve or arc up to a tile long is cut into, tiles: half a
-/// pixel at 1024, two at 4096. A longer one takes [`MAX_CHORDS`] chords of its
-/// How far a chord strays from the curve is about length² × curvature / 8.
+/// pixel at 1024, two at 4096. A longer one takes [`MAX_CHORDS`] chords, each its
+/// length over that count. A chord strays from the curve by about length² × curvature / 8.
 const CHORD: f32 = 1.0 / 2048.0;
 const MAX_CHORDS: u32 = 2048;
 

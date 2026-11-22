@@ -14,11 +14,12 @@ use super::groups::decibels;
 use rusty_components::audio::reverb_zone::MAX_PRE_DELAY;
 use rusty_components::ReverbParams;
 
-/// The mean delay of Freeverb's comb filters at its 44.1 kHz reference (1116–1617
-/// samples), in seconds: one trip round the feedback loop.
+/// A middle comb's delay (1356 of Freeverb's 1116–1617 samples at 44.1 kHz), in
+/// seconds: one trip round the feedback loop.
 const COMB_LOOP: f32 = 1356.0 / 44_100.0;
 /// The highest feedback the decay maps to; 1 would ring forever.
 const MAX_FEEDBACK: f32 = 0.98;
+/// Smooths a teleport, yet a door still sounds immediate.
 const RETUNE: Duration = Duration::from_millis(50);
 
 /// The comb feedback whose tail falls 60 dB in `decay_time` seconds: `g` per loop,
@@ -76,6 +77,8 @@ impl ReverbBus {
     }
 }
 
+/// Ours: kira's delay fixes its time when built. Not [`Gated`]: asleep, a retune would
+/// bend the next sound; a silent line jumps instead.
 struct PreDelay {
     target: Arc<AtomicU32>,
     buffer: Vec<Frame>,
@@ -98,14 +101,12 @@ impl PreDelay {
         }
     }
 
-    /// The target delay in samples, inside the line.
     fn target_samples(&self) -> f32 {
         let seconds = f32::from_bits(self.target.load(Ordering::Relaxed));
         let max = (self.buffer.len() - 2) as f32;
         (seconds * self.sample_rate).clamp(0.0, max)
     }
 
-    /// The line `delay` samples behind the write head, linearly interpolated.
     fn read(&self, delay: f32) -> Frame {
         let len = self.buffer.len();
         let back = delay.floor() as usize;
@@ -141,6 +142,7 @@ impl Effect for PreDelay {
         self.quiet = if silent { self.quiet + input.len() } else { 0 };
         for frame in input {
             self.buffer[self.write] = *frame;
+            // Half a sample per sample: a retune bends the tail's pitch briefly, never clicks.
             self.delay += (target - self.delay).clamp(-0.5, 0.5);
             *frame = self.read(self.delay);
             self.write = (self.write + 1) % self.buffer.len();

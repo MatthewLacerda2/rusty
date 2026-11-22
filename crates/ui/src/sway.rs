@@ -1,5 +1,3 @@
-//! crates/ui/src/sway.rs — the `ScreenSpaceCamera` canvas lag.
-
 use glam::Vec2;
 
 use rusty_components::{CanvasRenderMode, CanvasSway};

@@ -3,7 +3,8 @@ pub mod stimulus;
 
 #[cfg(test)]
 mod budget_tests;
-// Test hook: the bench level the root's `dev::bench` times.
+// Test hook: the level this crate's and `rusty-dev`'s cost tests time; a sim crate
+// reads no clock.
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
@@ -31,11 +32,12 @@ use rusty_components::{AIPerceptionComponent, Known, PerceptionUpdate as Update,
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
+/// [`SightRays::per_tick`]'s default: rusty's value for Unreal's `MaxTracesPerTick`.
 pub const DEFAULT_SIGHT_RAYS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SightRays {
-    /// How many sight rays one tick may cast across all perceivers.
+    /// Sight rays per tick, across all perceivers.
     pub per_tick: usize,
     /// The last (perceiver, target) pair traced; the next tick starts after it.
     last: Option<(u32, u32)>,
@@ -51,7 +53,6 @@ impl Default for SightRays {
 }
 
 impl SightRays {
-    /// Start the round from the first pair again.
     pub fn reset(&mut self) {
         self.last = None;
     }
@@ -82,7 +83,7 @@ pub fn step(scene: &mut Scene, physics: Option<&PhysicsWorld>, rays: &mut SightR
     }
 }
 
-/// Fold one tick's sight into `c`'s memory, then age what was not sensed.
+/// Fold one tick's sight into `c`'s memory; age the rest.
 fn settle(c: &mut AIPerceptionComponent, visible: &BTreeMap<u32, Vec3>, dt: f32) {
     let (sight, hearing, damage) = (c.sight_max_age, c.hearing_max_age, c.damage_max_age);
     let limit_of = |sense| match sense {

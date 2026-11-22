@@ -32,8 +32,8 @@ fn input_reaches_the_first_tick_of_a_frame_and_waits_for_a_frame_with_none() {
     game.set_tap(Some(Box::new(Seen(Rc::clone(&log)))));
     game.input().borrow_mut().press("W");
     game.input().borrow_mut().add_mouse_delta(4.0, 0.0);
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.005);
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.005); // no tick owed
     assert!(log.borrow().is_empty(), "nothing ran");
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.05);
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.05); // three ticks
     assert_eq!(*log.borrow(), vec![(true, 4.0), (false, 0.0), (false, 0.0)]);
 }

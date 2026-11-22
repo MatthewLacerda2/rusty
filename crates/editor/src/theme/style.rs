@@ -68,7 +68,7 @@ fn visuals(t: &Theme, style: &mut Style) {
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;
     v.text_cursor.stroke = Stroke::new(1.5, t.accent);
-    v.text_cursor.blink = false;
+    v.text_cursor.blink = false; // a steady caret, not egui's blinking default
     v.slider_trailing_fill = true;
     v.indent_has_left_vline = true;
     v.collapsing_header_frame = false;

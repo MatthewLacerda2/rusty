@@ -38,6 +38,8 @@ pub type FontHandle = Arc<FontData>;
 impl FontData {
     pub fn parse(bytes: Arc<[u8]>) -> Option<Self> {
         let face = FontRef::new(&bytes).ok()?;
+        // A truncated file still lists tables past its end, which would read as
+        // empty glyphs later.
         let fits = |r: &skrifa::raw::TableRecord| {
             (r.offset() as usize).saturating_add(r.length() as usize) <= bytes.len()
         };

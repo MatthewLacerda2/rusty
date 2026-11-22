@@ -1,6 +1,3 @@
-//! crates/shell/src/editor/capture/preview.rs — the Inspector's Preview tab in a
-//! capture.
-
 use rusty_editor::inspector::preview::subject_for_path;
 use rusty_editor::{EditorUi, PreviewMesh};
 use rusty_render::RenderView;
@@ -81,6 +78,7 @@ impl PreviewTarget {
         ui.preview_texture_id = self.texture_id;
     }
 
+    /// Note what this frame's tab drew, then render its request: the image shows next frame.
     pub(super) fn render(
         &mut self,
         gpu: (&mut rusty_render::Renderer, &mut egui_wgpu::Renderer),
@@ -111,6 +109,7 @@ impl PreviewTarget {
                 )
             }
         };
+        // Drawn at 1 pixel per point: the rect is in pixels already.
         let shown = PreviewRect {
             x0: rect.min.x.ceil() as u32,
             y0: rect.min.y.ceil() as u32,
@@ -126,8 +125,6 @@ impl PreviewTarget {
     }
 }
 
-/// `--preview` over a selection whose card has no Preview tab: an error, never a
-/// capture without it.
 fn no_tab(why: &str) -> String {
     format!(
         "--preview: {why}, so its card has no Preview tab; select an entity with a \

@@ -82,6 +82,7 @@ fn the_weight_ramps_in_then_out_and_both_events_fire_once() {
     );
     let mut events = run(&mut anim, &m, &g, 2);
     assert!((anim.montages.playing[0].weight() - 1.0).abs() < 1e-4);
+    // Its 0.4 s blend out starts that long before the 2 s clip's end: at 1.6 s.
     while !events.iter().any(|e| e == MONTAGE_BLEND_OUT) {
         events.extend(run(&mut anim, &m, &g, 1));
     }
@@ -113,6 +114,7 @@ fn an_additive_slot_adds_the_change_from_the_clips_first_frame() {
     start(&mut anim, &g, &m, "Hit");
     anim.montages.playing[0].time = 1.0;
     let pose = sample_pose(&anim, &m, Some(&g)).unwrap().1;
+    // Run's +1 plus Reload's change from its first frame, -2.
     assert!(
         pose.iter().all(|j| j.unwrap().translation.x == -1.0),
         "{pose:?}"

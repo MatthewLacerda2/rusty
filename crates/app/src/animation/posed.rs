@@ -1,3 +1,6 @@
+//! Test hook: the palette a frame skins with while one clip plays, through `bone_writes`; only
+//! this crate's `animation::tests` call it.
+
 use glam::Mat4;
 
 use super::bone_writes;

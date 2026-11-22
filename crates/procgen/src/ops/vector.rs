@@ -50,7 +50,7 @@ fn quarter_turn(turns: f32) -> (f32, f32) {
 }
 
 /// Slope is in tile units of the longer side on both axes, as Substance's Normal node, so
-/// `strength` holds at any resolution.
+/// `strength` holds at any resolution. Packed as `n · ½ + ½`, the renderer's `2n − 1` decode.
 pub fn bump_to_normal(img: &Image, strength: Field) -> Image {
     let (w, hh) = (img.width() as f32, img.height() as f32);
     let h = |x: i64, y: i64| img.get_wrapped(x, y)[0];
@@ -71,8 +71,8 @@ pub fn bump_to_normal(img: &Image, strength: Field) -> Image {
     })
 }
 
-/// The lowest z [`normal_blend`] writes: below about 0.105 a BC5 copy, rebuilding z from 8-bit x
-/// and y, can rebuild a negative z. Blue byte 143.
+/// The lowest z [`normal_blend`] writes: below about 0.105, a BC5 copy rebuilding z from 8-bit
+/// x and y may find no positive z. Blue byte 143.
 pub const MIN_NORMAL_Z: f32 = 0.125;
 
 pub fn normal_blend(base: &Image, detail: &Image, strength: Field) -> Image {

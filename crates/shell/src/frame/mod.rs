@@ -1,8 +1,3 @@
-//! crates/shell/src/frame/mod.rs — the frame clock, the sim advance, quit semantics, and
-//! swapchain acquisition: the per-frame logic both frontends share, the command
-//! channel's drain, and a `Scene.LoadAsync`'s worker and GPU warm-up while frames go
-//! on.
-
 use std::time::{Duration, Instant};
 
 use rusty_app::{GameWorld, PlayTransition};
@@ -26,7 +21,6 @@ pub struct FrameClock {
 }
 
 impl FrameClock {
-    /// A clock whose first frame is measured from `now`.
     pub fn new(now: Instant) -> Self {
         Self {
             last_frame: now,
@@ -37,7 +31,7 @@ impl FrameClock {
         }
     }
 
-    /// Mark a new frame at `now`; returns the seconds since the previous one.
+    /// The seconds since the previous frame, marking one at `now`.
     pub fn tick(&mut self, now: Instant) -> f32 {
         self.last_delta = now.saturating_duration_since(self.last_frame).as_secs_f32();
         self.last_frame = now;
@@ -55,7 +49,7 @@ impl FrameClock {
         self.fps
     }
 
-    /// The last frame's duration in milliseconds.
+    /// In milliseconds.
     pub fn frame_ms(&self) -> f32 {
         self.last_delta * 1000.0
     }
@@ -77,7 +71,8 @@ impl<'a> Step<'a> {
     }
 }
 
-/// Advance the simulation for one rendered frame of `raw` wall-clock seconds.
+/// An edit-mode follower goes in `GameWorld::edit_frame`, which
+/// runs every frame outside Play, stepped or frozen, not here.
 pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTransition {
     if game.time().borrow().paused {
         step.clear();
@@ -97,6 +92,7 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
         let scene = game.scene().borrow().id();
         let transition = game.tick(FIXED_DELTA_TIME);
         if transition != PlayTransition::None {
+            // A tick left Play: the rest is edit mode.
             step.clear();
             return transition;
         }
@@ -110,6 +106,8 @@ pub fn advance_sim(game: &mut GameWorld, mut step: Step<'_>, raw: f32) -> PlayTr
     PlayTransition::None
 }
 
+/// A tick that swaps the scene ends its frame's ticks: the rest would run the new scene
+/// before a frame drew it, and blend the old scene's poses into its first frames.
 pub fn swapped_scene(game: &GameWorld, before: SceneId) -> bool {
     game.scene().borrow().id() != before
 }
@@ -127,7 +125,6 @@ pub enum QuitAction {
     Exit,
 }
 
-/// The quit semantics per host. A request raised in the editor outside Play (e.g.
 pub fn quit_action(host: Host, requested: bool, playing: bool) -> QuitAction {
     match (requested, host) {
         (false, _) => QuitAction::None,
@@ -137,7 +134,6 @@ pub fn quit_action(host: Host, requested: bool, playing: bool) -> QuitAction {
     }
 }
 
-/// Acquire the next swapchain frame, recovering from surface loss. Returns `None`
 pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
     let surface_frame = renderer
         .surface
@@ -146,6 +142,7 @@ pub fn acquire_frame(renderer: &mut Renderer) -> Option<wgpu::SurfaceTexture> {
         .get_current_texture();
     match surface_frame {
         CurrentSurfaceTexture::Success(f) | CurrentSurfaceTexture::Suboptimal(f) => Some(f),
+        // Only a reconfigure recovers these: without one here, a surface lost unresized stays lost.
         CurrentSurfaceTexture::Lost | CurrentSurfaceTexture::Outdated => {
             renderer.reconfigure_surface();
             None
@@ -162,6 +159,7 @@ pub(crate) fn drain_commands(shell: &mut crate::Shell, game: &GameWorld) {
         return;
     };
     let ran = channel.drain(game.script_manager(), &game.resources.console);
+    // A command outside Play may have moved static geometry: drop the static shadow bake.
     if ran > 0 && !game.scene().borrow().is_playing() {
         shell.renderer.shadow_renderer.invalidate_static_cache();
     }

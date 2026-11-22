@@ -2,7 +2,9 @@ use kira::Frame;
 
 use super::super::{gain, Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
+/// In `shape`'s match order: `mode` stores an index here.
 pub const MODES: [&str; 3] = ["soft", "hard", "bitcrush"];
+/// The gain `drive` 1 gives the soft shaper; the hard one runs at 1 + this.
 const DRIVE: f32 = 24.0;
 
 const PARAMS: [Param; 4] = [
