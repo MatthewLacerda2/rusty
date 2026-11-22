@@ -4,12 +4,15 @@ use std::f32::consts::TAU;
 
 use crate::hash::unit2;
 
+/// ASCII "FM": no other zimmer draw uses this hash channel.
 const PHASE_CHANNEL: u64 = 0x464d;
 
 const CARRIER: i64 = 0;
 
+/// Apart from `CARRIER`: their relative start phase is the timbre, so each draws its own.
 const MODULATOR: i64 = 1;
 
+// Unlike `four`, nothing past Nyquist is dropped: a high `ratio` on a high note folds back.
 pub(crate) fn render(
     out: &mut [f32],
     freqs: &[f32],
@@ -34,6 +37,7 @@ fn start_phase(operator: i64, seed: u64) -> f32 {
     unit2(operator, 0, PHASE_CHANNEL, seed)
 }
 
+/// `decay` in seconds from the note's start; zero or less is no modulation, a bare carrier.
 #[inline]
 fn mod_envelope(t: f32, decay: f32) -> f32 {
     if decay <= 0.0 {

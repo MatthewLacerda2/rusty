@@ -1,4 +1,5 @@
-//! the colour of noise: how a draw's energy is spread across the spectrum.
+//! Pink and brown match white's RMS, not its peak: theirs reach about 2.4, left to the bake's
+//! limiter.
 
 use crate::patch::NoiseColor;
 
@@ -8,6 +9,8 @@ pub(crate) enum Coloring {
     Brown { level: f32 },
 }
 
+/// Paul Kellett's economical pinking filter, `(decay, feed)` per pole; `PINK_DIRECT` is its
+/// raw-draw term.
 const PINK_POLES: [(f32, f32); 3] = [
     (0.99765, 0.099_046_0),
     (0.96300, 0.296_516_4),
@@ -16,12 +19,17 @@ const PINK_POLES: [(f32, f32); 3] = [
 
 const PINK_DIRECT: f32 = 0.1848;
 
+/// Empirical: lands the pink sum on white's RMS.
 const PINK_SCALE: f32 = 0.3372;
 
+/// The leak: the integrator's pole sits near 35 Hz, where its −6 dB/octave slope flattens.
 const BROWN_LEAK: f32 = 0.995;
 
+/// Empirical, like `PINK_SCALE`: lands brown on white's RMS.
 const BROWN_SCALE: f32 = 0.1009;
 
+/// Samples primed before the note: about 4.8 time constants (425 samples) of the slowest pink
+/// pole, leaving under 1%.
 pub(crate) const WARMUP: usize = 2048;
 
 impl Coloring {

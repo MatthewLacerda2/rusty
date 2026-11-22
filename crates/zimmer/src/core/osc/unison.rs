@@ -3,8 +3,10 @@
 use crate::hash::unit2;
 use crate::patch::Osc;
 
+/// ASCII "OS": no other zimmer draw uses this hash channel.
 const PHASE_CHANNEL: u64 = 0x4f53;
 
+/// Floored at one: `Patch::validate` refuses zero, but a direct call would divide by it.
 pub(super) fn voices(osc: &Osc) -> usize {
     osc.voices.max(1)
 }
@@ -21,6 +23,8 @@ pub(super) fn voice_detune(osc: &Osc, voice: usize) -> f32 {
     osc.spread * (voice as f32 / (voices - 1) as f32 - 0.5)
 }
 
+/// In [`voice_detune`]'s order, lowest pitch left. Centred is `0.0`, which `pan_gains` makes exact
+/// unity on both sides.
 pub(super) fn voice_pan(osc: &Osc, voice: usize) -> f32 {
     let voices = voices(osc);
     let width = if osc.width.is_finite() {

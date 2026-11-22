@@ -1,5 +1,3 @@
-//! the oscillator stack.
-
 pub(crate) mod pulse;
 mod unison;
 mod wave;
@@ -32,6 +30,7 @@ pub(crate) fn render(
             let mut phase = start_phase(index, voice, seed);
             let sides = out.l.iter_mut().zip(out.r.iter_mut());
             for (i, ((l, r), base)) in sides.zip(freqs).enumerate() {
+                // Phase step in cycles per sample, capped at Nyquist's half cycle.
                 let dt = (base * ratio / sample_rate).clamp(0.0, 0.5);
                 let swing = pulse.and_then(|p| p.get(i)).copied().unwrap_or(0.0);
                 let s = gain * sample(osc.wave, phase, dt, pulse::width(osc, swing));
@@ -107,6 +106,7 @@ mod tests {
 
     #[test]
     fn a_sine_completes_its_frequency_in_cycles() {
+        // 99 or 100: the drawn start phase decides whether the last crossing fits.
         let count = rising(&render_one(Wave::Sine, 100.0, 44_100));
         assert!((99..=100).contains(&count), "counted {count} cycles");
     }
@@ -135,7 +135,6 @@ mod tests {
 
     #[test]
     fn octave_and_detune_shift_the_pitch() {
-        // An octave-down oscillator crosses zero half as often.
         let n = 44_100;
         let base = render_stack(&[osc(Wave::Sine, 1.0, 0, 0.0)], 200.0, n, 3);
         let down = render_stack(&[osc(Wave::Sine, 1.0, -1, 0.0)], 200.0, n, 3);

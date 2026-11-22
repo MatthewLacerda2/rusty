@@ -1,5 +1,3 @@
-//! the one source of randomness in a bake.
-
 pub(crate) mod color;
 
 use crate::hash::unit2;
@@ -8,13 +6,16 @@ use crate::stereo::Stereo;
 use color::Coloring;
 
 const LEFT_CHANNEL: u64 = 0;
+/// ASCII "N2": a channel of its own, so the right side is uncorrelated with the left.
 const RIGHT_CHANNEL: u64 = 0x4e32;
 
+/// `i` is signed so a colour filter can be primed on draws before the note ([`color::WARMUP`]).
 #[inline]
 pub(crate) fn white(i: i64, channel: u64, seed: u64) -> f32 {
     unit2(i, 0, channel, seed) * 2.0 - 1.0
 }
 
+/// Each side is its own draw through its own filter: one draw coloured and copied would be mono.
 pub(crate) fn fill(out: &mut Stereo, color: NoiseColor, seed: u64) {
     color_into(&mut out.l, LEFT_CHANNEL, color, seed);
     color_into(&mut out.r, RIGHT_CHANNEL, color, seed);
@@ -82,6 +83,8 @@ mod tests {
             let dot: f32 = buf.l.iter().zip(&buf.r).map(|(l, r)| l * r).sum();
             let power = |c: &[f32]| c.iter().map(|s| s * s).sum::<f32>() / n;
             let correlation = (dot / n) / (power(&buf.l) * power(&buf.r)).sqrt();
+            // Looser for a colour: its energy bunches low, so the window holds fewer independent
+            // observations.
             let bound = if color == NoiseColor::White {
                 0.05
             } else {
