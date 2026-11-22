@@ -940,9 +940,11 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   words, "test hook" or "test hooks" (not "the latest hook"), above an item; in a
   `//!` header, the module when that sentence opens on the phrase ("Test hook: the
   arena … reads its `PLAYER`"), whatever it backticks, and otherwise the items it
-  names in backticks (``[`copies`] is a test hook``). A `test_*.rs` file is a hook
-  module, claimed and read as live code; test code is a `tests/`, `benches/` or
-  `examples/` file, a `tests.rs` or `*_tests.rs`, or a `#[cfg(test)]` item. It fails when a crate other than the hook's, depending on it, calls it from a
+  names in backticks (``[`copies`] is a test hook``). A file named `test_*.rs` is not
+  taken for a test file: it is claimed as a hook module when its header says so, and a
+  call into it from another crate's live code is flagged. Test code is a `tests/`,
+  `benches/` or `examples/` file, a `tests.rs` or `*_tests.rs`, or a `#[cfg(test)]`
+  item. It fails when a crate other than the hook's, depending on it, calls it from a
   line that is not test code and not itself in a hook module; and when a crate the
   line names after the phrase (a backticked `app`, `rusty-dev`, `dev::bake`, or *the
   root's* / *root package* for `tests/`) never names a hook `fn`, `const`, `static`
