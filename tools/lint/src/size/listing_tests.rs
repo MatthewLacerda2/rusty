@@ -51,6 +51,31 @@ fn without_a_repository_the_scan_walks_the_disk() {
 }
 
 #[test]
+fn the_full_scan_reads_the_whole_tree_with_git_and_without() {
+    let repo = Repo::new("2491-tree", true);
+    repo.file(".gitignore", ".claude/worktrees/\n");
+    let mut want = vec![
+        repo.file(".github/scripts/m.py", "x = 1\n"),
+        repo.file("build.rs", "fn main() {}\n"),
+        repo.file("games/smoke/main.lua", "x = 1\n"),
+    ];
+    repo.file(".claude/worktrees/b/src/a.rs", "//\n");
+    assert_eq!(full_scan(&repo.0).0, want);
+    let dir = Repo::new("2491-tree-disk", false);
+    want = vec![dir.file("build.rs", "fn main() {}\n")];
+    dir.file(".claude/worktrees/b/src/a.rs", "//\n");
+    dir.file(".git/hooks/x.py", "x = 1\n");
+    want.push(dir.file(".github/scripts/m.py", "x = 1\n"));
+    let mut found = full_scan(&dir.0).0;
+    found.sort();
+    want.sort();
+    assert_eq!(
+        found, want,
+        "the disk walk skips the hidden folders git would not list"
+    );
+}
+
+#[test]
 fn the_fallback_note_keeps_gits_message_on_its_own_lines() {
     let note = fallback_note("git exit status: 128: fatal: dubious\n  line two\n  line three");
     let mut lines = note.lines();

@@ -24,6 +24,17 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
                 files(&[("CLAUDE.md", "# CLAUDE.md\n\nFixed on 2026-01-02.\n")]),
                 "CLAUDE.md:3: [history]",
             ),
+            (
+                vec![(
+                    "build.rs",
+                    format!("// {}\nfn main() {{}}\n", "w ".repeat(101)),
+                )],
+                "build.rs:1: [comment-cap]",
+            ),
+            (
+                files(&[("games/a/main.lua", "x = 1 -- since #1234\n")]),
+                "games/a/main.lua:1: [comment-history]",
+            ),
         ],
         "--components" => vec![
             no_registry,

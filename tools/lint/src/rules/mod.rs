@@ -50,7 +50,7 @@ mod unwrap;
 mod world_space;
 
 use crate::gates::Verdict;
-pub use finding::{allowed, allowed_in, unexplained, Finding};
+pub use finding::{allowed, allowed_anywhere, allowed_in, unexplained, Finding};
 use scan::Scan;
 use std::collections::BTreeMap;
 use std::path::Path;

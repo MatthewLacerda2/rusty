@@ -1,4 +1,4 @@
-use super::{check, split, Kind, Line, CAP, HISTORY, STRICT};
+use super::{check, split, Kind, Line, CAP, HISTORY};
 use crate::repo::scaffold::Repo;
 
 fn comment(kind: Kind, n: usize) -> String {
@@ -163,34 +163,34 @@ fn the_messages_say_what_to_do() {
 }
 
 #[test]
-fn the_size_gate_prints_the_signal_and_a_strict_run_fails_under_its_paths() {
+fn the_size_gate_fails_on_each_and_passes_a_clean_path_and_a_cap_allow() {
     let repo = Repo::new("comments", true);
     repo.file("src/a.rs", &comment(Kind::Rust, 101));
     repo.file("src/b.rs", "// fixed in #1234\n");
     repo.file("other/c.wgsl", "// ok\n");
-    let all = ["src/a.rs", "src/b.rs", "other/c.wgsl"].map(String::from);
-    let signal = crate::size::verdict(&repo.0, &all);
-    assert!(
-        signal.findings.is_empty(),
-        "a signal never fails: {:?}",
-        signal.findings
+    let allow = "// lint: allow(comment-cap) the format's grammar, quoted whole\n";
+    repo.file(
+        "other/d.rs",
+        &format!("{allow}{}", comment(Kind::Rust, 150)),
     );
-    assert!(
-        signal
-            .body
-            .contains("comment-cap: 1 of 3 files over their cap, 1 words over"),
-        "{}",
-        signal.body
-    );
-    assert!(signal
-        .body
-        .contains("comment-history: 1 lines naming an issue or PR, in 1 files"));
-    let strict = |paths: &[&str]| {
-        let mut args = vec![STRICT.to_string()];
-        args.extend(paths.iter().map(ToString::to_string));
-        crate::size::verdict(&repo.0, &args).findings
+    let run = |paths: &[&str]| {
+        let args: Vec<String> = paths.iter().map(ToString::to_string).collect();
+        let found = crate::size::verdict(&repo.0, &args).findings;
+        found
+            .into_iter()
+            .filter(|f| f.contains("[comment-"))
+            .collect::<Vec<_>>()
     };
-    assert_eq!(strict(&["src"]).len(), 2);
-    assert!(strict(&["src/a.rs"])[0].starts_with("src/a.rs:11: [comment-cap]"));
-    assert!(strict(&["other"]).is_empty(), "a clean path passes");
+    let all = run(&[]);
+    assert!(all[0].starts_with("src/a.rs:11: [comment-cap]"), "{all:?}");
+    assert!(
+        all[1].starts_with("src/b.rs:1: [comment-history]"),
+        "{all:?}"
+    );
+    assert_eq!(all.len(), 2, "{all:?}");
+    assert_eq!(run(&["src/a.rs"]).len(), 1);
+    assert!(
+        run(&["other"]).is_empty(),
+        "a clean path and an allowed cap pass"
+    );
 }

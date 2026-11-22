@@ -35,8 +35,8 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | `cfg!(test)` is no switch | `tools/lint -- --rules` (`cfg-test-switch`) | **hard gate**: no production line of a crate's `src/` holds a `cfg!(…)` naming `test` — it is true only in the crate's own unit tests, so every other crate's tests and `tests/` silently get the shipped behaviour; a switch another crate's tests need is a test hook armed at run time (`crates/CLAUDE.md`, *Test hooks*), and one only the crate's own tests need takes `// lint: allow(cfg-test-switch) <why>` |
 | CI job headroom | `main-health.yml` (`.github/scripts/ci_headroom.py`) | **signal**, never a gate: after every `ci` run on `main`, a job that ran to an end in more than three quarters of its own `timeout-minutes` (read from `ci.yml` at the run's own commit; a matrix job by its slowest entry) files one `infrastructure` issue per job, and comments there when a later run's time moved by a minute or more; it never closes it, the PR that brings the job down does; a lost read files nothing, and no limit read fails its step (`continue-on-error`) (#2276) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
-| Comment cap | `tools/lint` (the size gate: `comment-cap`) | **signal** for now, never failing `make gates`: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200; the size gate prints the files over and the words over, and `make comments PATHS=<paths>` fails on each. No allow. *Comments*, below |
-| Comment history | `tools/lint` (the size gate: `comment-history`) | **signal** for now: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); the size gate prints the count, `make comments PATHS=<paths>` fails on each; an inline allow with a reason excuses one. *Comments*, below |
+| Comment cap | `tools/lint` (the size gate: `comment-cap`) | **hard gate**: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200, over every such file in the repository; an inline allow with a reason anywhere in the file excuses it. *Comments*, below |
+| Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); an inline allow with a reason excuses a line. *Comments*, below |
 | Comment-only diff | `make comment-only` (`tools/lint -- --comment-only`) | a tool mode, not a gate: fails when the branch changes more than comments since its merge base with `origin/main`. *Comments*, below |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
@@ -123,10 +123,11 @@ source's real sibling, give it a sibling (split the code it tests into `<x>.rs`)
 split it by responsibility.
 
 ## What the size gate scans
-The full scan (`make size`, CI's `lint` job) walks `src/`, `tests/`, `fuzz/`,
-`tools/`, `.github/` (the merge scripts, #926) and `engine/` (the shipped shaders and
-script components, #1015) — `SIZE_ROOTS` in `tools/lint/src/size/mod.rs`. `assets/` is
-not walked: it is gitignored, the open project's seeded and baked copies. Until #535 it walked only `src/`,
+The full scan (`make size`, CI's `lint` job) reads the whole repository: every
+`.rs`, `.py`, `.lua` and `.wgsl` file git can commit, the root `build.rs` and the test
+games under `games/` included, so the size caps and the comment checks read one file
+set. `assets/` is not read: it is gitignored, the open project's seeded and baked
+copies. Until #535 it walked only `src/`,
 so oversized integration-test files passed unseen, and until #541 it skipped `tools/`,
 so the lint crate itself could drift past the cap. Any `target/` directory (cargo
 <!-- docrefs: allow build output, never tracked -->
@@ -136,7 +137,8 @@ untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
 --exclude-standard`), so what the engine seeds into a gitignored folder (the UI
 kit's scripts and the default shader it copies into the fixture project's
 `assets/`) never counts, and a new file is measured before it is added. Where git
-can't list them (a tarball with no `.git`) it walks the disk and says so in its
+can't list them (a tarball with no `.git`) it walks the disk from the root, past
+`target/`, `__pycache__/` and every hidden folder but `.github/`, and says so in its
 report, as it does when the agent docs go unchecked for the same reason. Each file
 is judged and named by its path in the repository, so a checkout under a `tests/`
 folder gives no source file the test cap.
@@ -209,7 +211,7 @@ finding names the real file. The root package's own `src/` (`lib.rs`, `main.rs`,
 `bin/`) is no module's.
 
 ## What the size gate measures, and nothing grandfathered (#926)
-The size gate walks `src/`, `crates/`, `tests/`, `fuzz/`, `tools/`, `.github/` and `engine/`, and
+The size gate reads the whole tree (*What the size gate scans*, above), and
 measures four languages. A `.rs` file counts every line. A `.py` file counts its **lines of
 code**: blank lines, `#` comments and docstrings are free, as scorsese's gate counts
 them, because a Python file's prose grows with how carefully it explains itself and
@@ -318,9 +320,11 @@ read.
   (a comment opening with `lint: allow(`, `sorted:`, `stored-format:` or
   `comment-cut:`, the `MARKERS` table), and a `// SAFETY:` note directly above its
   `unsafe` block, impl or fn: the comment lines from `SAFETY:` on that share its
-  opener (`//`, `///`), ending at a blank line or a comment of another opener. No allow: a file that needs more words needs a name, a
-  type, a split, or a page in `docs/`. The finding sits on the line of the first
-  word past the cap.
+  opener (`//`, `///`), ending at a blank line or a comment of another opener. A
+  file that needs more words needs a name, a type, a split, or a page in `docs/`
+  first; one that still cannot say what it must takes `// lint: allow(comment-cap)
+  <why>` (`-- lint: allow(…)` in Lua) on any line, since the cap belongs to no line.
+  The finding sits on the line of the first word past the cap.
 - **`comment-history`**: no comment names one of this repository's issues or pull
   requests: `#` and three or more digits, `rusty#123`, `PR#123`, or this
   repository's issue or pull URL. The code says what it does; `git blame` finds the
@@ -333,15 +337,12 @@ read.
   <why>` (`-- lint: allow(…)` in Lua). It reads every comment line, a marker's or
   a `SAFETY` note's too, though the cap counts them free.
 
-**They are signals while the tree is cut down to them**: `make size` (and so `make
-gates`, the commit hook and CI) prints one line each under `signal (not a
-failure)` with the totals, files over the cap and words over, lines naming an
-issue or PR (each counted once, by its first reference) and the files holding
-them, and stays green. **`make comments PATHS=<files or folders>`**
-(`tools/lint -- --strict-comments <paths>`) is the strict run: every finding under
-those paths as `path:line: [rule] message`, exit 1 on any, so a cleanup branch asks
-"is `crates/audio` clean?". It holds the size caps and the agent docs (a `CLAUDE.md`
-inside a named folder too) under the same paths.
+**Both are hard gates**: `make size` (and so `make gates`, the commit hook on the
+staged files, and CI) fails on each as `path:line: [rule] message`. The lint tool
+given files or folders (`cargo run --manifest-path tools/lint/Cargo.toml --
+<paths>`, what the commit hook runs) checks only those, with the size caps and the
+agent docs under them (a `CLAUDE.md` inside a named folder too). The full scan is
+quick enough that no narrower `make` verb is kept.
 
 **The comment-only proof**: `make comment-only` (`tools/lint -- --comment-only
 [<rev>]`, `BASE=` for another base than `origin/main`) compares each file changed

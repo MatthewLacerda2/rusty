@@ -9,13 +9,12 @@ mod tests;
 mod wgsl;
 
 use crate::agent_docs::history::{reference_as, Refs};
-use crate::rules::{allowed_in, Finding};
+use crate::rules::{allowed_anywhere, allowed_in, Finding};
 use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const CAP: &str = "comment-cap";
 pub const HISTORY: &str = "comment-history";
-pub const STRICT: &str = "--strict-comments";
 
 const MARKERS: &[&str] = &["lint: allow(", "sorted:", "stored-format:", "comment-cut:"];
 
@@ -133,7 +132,9 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
             past = Some(i + 1);
         }
     }
-    report.over = past.map(|line| (line, total));
+    report.over = past
+        .filter(|_| !allowed_anywhere(path, source, CAP))
+        .map(|line| (line, total));
     report
 }
 
@@ -164,39 +165,7 @@ impl Report {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
-pub struct Tally {
-    pub files: usize,
-    pub over: usize,
-    pub words_over: usize,
-    pub refs: usize,
-    pub with_refs: usize,
-}
-
-impl Tally {
-    fn add(&mut self, kind: Kind, report: &Report) {
-        self.files += 1;
-        if let Some((_, words)) = report.over {
-            self.over += 1;
-            self.words_over += words - kind.cap();
-        }
-        self.refs += report.history.len();
-        self.with_refs += usize::from(!report.history.is_empty());
-    }
-
-    pub fn signal(&self) -> String {
-        format!(
-            "signal (not a failure): {CAP}: {} of {} files over their cap, {} words over; \
-             `make comments PATHS=<dir>` lists them\n\
-             signal (not a failure): {HISTORY}: {} lines naming an issue or PR, in {} files; \
-             `make comments PATHS=<dir>` lists them\n",
-            self.over, self.files, self.words_over, self.refs, self.with_refs
-        )
-    }
-}
-
-pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tally) {
-    let mut tally = Tally::default();
+pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
     let mut found = Vec::new();
     for file in files {
         let rel = file.strip_prefix(base).unwrap_or(file).to_string_lossy();
@@ -205,11 +174,7 @@ pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tall
         let Ok(source) = fs::read_to_string(file) else {
             continue;
         };
-        let report = check(rel, kind, &source);
-        tally.add(kind, &report);
-        if strict {
-            found.extend(report.findings(rel, kind));
-        }
+        found.extend(check(rel, kind, &source).findings(rel, kind));
     }
-    (found, tally)
+    found
 }

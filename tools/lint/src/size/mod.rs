@@ -16,9 +16,6 @@ mod tests;
 mod wgsl;
 
 pub(crate) const SCAN_ROOTS: &[&str] = &["src", "crates", "tests", "fuzz", "tools"];
-const SIZE_ROOTS: &[&str] = &[
-    "src", "crates", "tests", "fuzz", "tools", ".github", "engine",
-];
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Lang {
@@ -50,23 +47,15 @@ impl Lang {
 }
 
 pub fn verdict(base: &Path, args: &[String]) -> Verdict {
-    let strict = args.iter().any(|a| a == comments::STRICT);
-    let args: Vec<String> = args
-        .iter()
-        .filter(|a| *a != comments::STRICT)
-        .cloned()
-        .collect();
     let mut notes = Vec::new();
     let files: Vec<PathBuf> = if args.is_empty() {
         let (files, note) = full_scan(base);
         notes.extend(note);
         files
-    } else if strict {
+    } else {
         let paths: Vec<&str> = args.iter().map(String::as_str).collect();
         listing::committable(base, &paths)
             .unwrap_or_else(|_| args.iter().map(|a| base.join(a)).collect())
-    } else {
-        args.iter().map(|a| base.join(a)).collect()
     };
 
     let violations: Vec<String> = files.iter().filter_map(|p| check_file(base, p)).collect();
@@ -79,10 +68,10 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
                 .into_owned()
         })
         .collect();
-    let doc_args = if strict { &listed } else { &args };
+    let doc_args = if args.is_empty() { args } else { &listed };
     let (docs, note) = crate::agent_docs::gate(base, doc_args);
     notes.extend(note);
-    let (comment, tally) = comments::pass(base, &files, strict);
+    let comment = comments::pass(base, &files);
     let (over, unshaped, commented) = (violations.len(), docs.len(), comment.len());
     let comment = comment.iter().map(ToString::to_string);
     let findings: Vec<String> = violations.into_iter().chain(docs).chain(comment).collect();
@@ -102,8 +91,7 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
         }
         if commented > 0 {
             advice.push_str(&format!(
-                "\n{commented} comment finding(s) under the named paths (docs/linting.md, \
-                 *Comments*).\n"
+                "\n{commented} comment finding(s) (docs/linting.md, *Comments*).\n"
             ));
         }
         advice
@@ -112,22 +100,22 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
         verdict.body.push_str(&note);
         verdict.body.push('\n');
     }
-    verdict.body.push_str(&tally.signal());
     verdict
 }
 
 fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
-    match listing::committable(base, SIZE_ROOTS) {
+    match listing::committable(base, &[]) {
         Ok(files) => {
             let files = files.into_iter().filter(|p| Lang::of(p).is_some());
             (files.collect(), None)
         }
         Err(why) => {
-            let files = SIZE_ROOTS
-                .iter()
-                .flat_map(|root| measured_in(&base.join(root)))
-                .collect();
-            (files, Some(fallback_note(&why)))
+            let root = if base.as_os_str().is_empty() {
+                Path::new(".")
+            } else {
+                base
+            };
+            (measured_in(root), Some(fallback_note(&why)))
         }
     }
 }
@@ -167,7 +155,7 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
         if path.is_dir() {
             if path
                 .file_name()
-                .is_some_and(|n| n == "target" || n == "__pycache__")
+                .is_some_and(|n| skipped(&n.to_string_lossy()))
             {
                 continue;
             }
@@ -176,6 +164,12 @@ fn walk(dir: &Path, out: &mut Vec<PathBuf>, wanted: &dyn Fn(&Path) -> bool) {
             out.push(path);
         }
     }
+}
+
+/// Build output, and the hidden folders of tools other than `.github` (`.git`,
+/// `.claude/worktrees`), which git would not list either.
+fn skipped(dir: &str) -> bool {
+    dir == "target" || dir == "__pycache__" || (dir.starts_with('.') && dir != ".github")
 }
 
 fn check_file(base: &Path, path: &Path) -> Option<String> {

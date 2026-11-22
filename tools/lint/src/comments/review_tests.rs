@@ -1,4 +1,4 @@
-use super::{check, split, Kind, STRICT};
+use super::{check, split, Kind};
 use crate::repo::scaffold::Repo;
 
 fn w(n: usize) -> String {
@@ -65,11 +65,11 @@ fn the_safety_note_is_its_own_run_directly_above_unsafe() {
 }
 
 #[test]
-fn a_strict_run_over_a_folder_checks_the_agent_docs_inside_it() {
+fn a_run_over_a_folder_checks_the_agent_docs_inside_it() {
     let repo = Repo::new("comments-docs", true);
     repo.file("src/a.rs", "fn a() {}\n");
     repo.file("src/CLAUDE.md", "# Rules\n\nAs #12 decided.\n");
-    let args = [STRICT, "src"].map(String::from);
+    let args = ["src"].map(String::from);
     let found = crate::size::verdict(&repo.0, &args).findings;
     assert!(
         found.iter().any(|f| f.starts_with("src/CLAUDE.md")),

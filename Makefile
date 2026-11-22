@@ -143,7 +143,7 @@ fmt: ## [gate] rustfmt, engine and tools/lint
 	cargo fmt --all --check
 	cargo fmt --manifest-path tools/lint/Cargo.toml --check
 
-size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, and the agent docs' shape (CLAUDE.md, skills, subagents), full scan (tools/lint)
+size: ## [gate] File-length cap on .rs, .py, .lua and .wgsl, the comment checks, and the agent docs' shape (CLAUDE.md, skills, subagents), full scan (tools/lint)
 	$(LINT)
 
 rules: ## [gate] Finding-based rules with inline allows, one module each in tools/lint/src/rules (docs/linting.md lists them)
@@ -461,16 +461,10 @@ test-one-process: ## Signal: the dev suite under plain cargo test, one process p
 dead-pub: ## Signal: pub items nothing uses, and items only tests use (tools/lint --dead-pub)
 	$(LINT) -- --dead-pub
 
-# The comment checks' strict run: `comment-cap` and `comment-history` findings
-# under PATHS (files or folders), failing; the size gate only prints their totals.
 # `comment-only` proves the branch since its merge base with BASE changes only
 # comments (docs/linting.md, *Comments*).
-.PHONY: comments comment-only
+.PHONY: comment-only
 BASE ?= origin/main
-comments: ## The comment checks over PATHS, failing on any finding. make comments PATHS=crates/audio
-	@test -n "$(PATHS)" || { echo "comments: which paths? e.g. make comments PATHS=crates/audio" >&2; exit 1; }
-	$(LINT) -- --strict-comments $(PATHS)
-
 comment-only: ## Prove the branch changes only comments since its merge base with BASE (default origin/main)
 	$(LINT) -- --comment-only $(BASE)
 
