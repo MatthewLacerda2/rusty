@@ -5,6 +5,8 @@ use crate::postfx::{PfxTarget, PostFx};
 
 use super::TaaHistory;
 
+/// Packs the topmost drawing camera's stack index plus its reactivity (below 1), blended by
+/// max; a half float keeps a step under 1/256 to the eighth camera.
 pub(crate) const REACTIVE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R16Float;
 
 pub(crate) fn target_state() -> wgpu::ColorTargetState {
@@ -39,6 +41,7 @@ pub(crate) fn attachment(view: &wgpu::TextureView) -> wgpu::RenderPassColorAttac
     }
 }
 
+/// Every translucent pass begins with these, so its target count matches its pipelines'.
 pub(crate) fn hdr_attachments(
     view: &crate::RenderView,
 ) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {

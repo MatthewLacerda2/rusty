@@ -132,6 +132,7 @@ impl Renderer {
             occlusion_query_set: None,
         });
         pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        // The prepass reads nothing from the scene group; the no-AO one satisfies the layout.
         pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         self.draw_solids(
             &mut pass,

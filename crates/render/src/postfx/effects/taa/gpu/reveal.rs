@@ -6,6 +6,7 @@ use crate::motion::gpu_fixture::W;
 use rusty_scene::{Camera, Scene};
 
 const AFTER: u32 = 2;
+/// Measured on lavapipe: 2.25.
 const RESIDUAL: f32 = 3.0;
 
 fn revealed(cam: &Camera) -> Vec<usize> {

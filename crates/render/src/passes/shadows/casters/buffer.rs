@@ -15,7 +15,9 @@ use crate::{DrawUniform, MaterialData};
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(in crate::passes::shadows) struct CasterData {
     pub model: [f32; 16],
+    /// Where its joint palette starts in `bones`; 0, the shared identity joint, when unskinned.
     pub bone_base: u32,
+    /// 0 clips nothing.
     pub alpha_cutoff: f32,
     pub use_texture: u32,
     _pad: u32,
@@ -44,6 +46,7 @@ impl CasterData {
     }
 }
 
+/// Read from the table each sweep, so a record-only edit's cut follows.
 pub(in crate::passes::shadows) struct CasterRecords {
     slots: Vec<u32>,
     records: Vec<MaterialData>,
@@ -79,6 +82,7 @@ impl CasterRecords {
     }
 }
 
+/// The material table's slot 0: plain draws and a cutout's standard clip bind it, never read it.
 const FLAT: u32 = 0;
 
 /// One per sweep: every sweep records before one submit, so a shared buffer's later upload
@@ -169,6 +173,7 @@ fn caster_group(
                 resource: wgpu::BindingResource::Buffer(wgpu::BufferBinding {
                     buffer: draws.buffer(),
                     offset: 0,
+                    // One uniform's width, so the dynamic offset slides across the array.
                     size: wgpu::BufferSize::new(std::mem::size_of::<DrawUniform>() as u64),
                 }),
             },

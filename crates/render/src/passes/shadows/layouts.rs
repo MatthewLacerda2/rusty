@@ -2,7 +2,9 @@ use crate::gpu::groups::Groups;
 use crate::gpu::layout_entries::{dynamic_uniform_entry, storage_entry, uniform_entry};
 use crate::gpu::ops::CountedDevice as _;
 
+// These mirror `forward/shadow_caster.wgsl`'s bindings; the 64 bytes are its `ShadowLight` matrix.
 const LIGHT_BINDING: u32 = 6;
+/// The forward `camera` slot, holding only the game time for moving cuts.
 const TIME_BINDING: u32 = 0;
 pub(super) const CASTERS_BINDING: u32 = 3;
 pub(super) const JOINTS_BINDING: u32 = 1;

@@ -12,11 +12,13 @@ pub use inputs::PostFxContext;
 
 use glam::Mat4;
 
+/// Mirrors `PostParams` in `postfx/params.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct PostParams {
     pub inv_view_proj: [f32; 16],
     pub view_proj: [f32; 16],
+    /// w: the game time, which authored effects read as `game_time()`.
     pub camera_pos: [f32; 4],
 }
 
@@ -61,4 +63,5 @@ pub struct PostFx {
     pub(crate) targets: effects::Targets,
 }
 
+/// Float, so bright pixels survive for bloom and the tonemap.
 pub const HDR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;

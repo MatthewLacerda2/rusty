@@ -4,9 +4,11 @@
 /// Renders without a camera running volumetric fog before the grid is let go.
 pub(crate) const IDLE_RENDERS: u32 = 4;
 
-/// rgb light, a extinction or transmittance.
+/// rgb: light; a: extinction in the scatter grids, transmittance in the volume.
 pub(crate) const FROXEL_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
+/// Shared by every view: each camera refills it in its own commands before its passes,
+/// so none reads another's.
 pub(crate) struct SharedVolume {
     texture: wgpu::Texture,
     view: wgpu::TextureView,

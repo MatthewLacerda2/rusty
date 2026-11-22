@@ -30,6 +30,7 @@ pub(crate) use statics::statics_key;
 pub(crate) use statics::{casting_key, ObjectCasting, StaticsKey, UnbakedCasters};
 pub(crate) use uniform::CascadeUniform;
 
+/// Bytes between light-space matrices: the dynamic-offset alignment wgpu guarantees everywhere.
 const LIGHT_SPACE_STRIDE: u64 = 256;
 
 pub struct ShadowRenderer {
@@ -43,10 +44,13 @@ pub struct ShadowRenderer {
     pipeline: wgpu::RenderPipeline,
     time_buffer: wgpu::Buffer,
     clip_pipeline: wgpu::RenderPipeline,
+    /// `[Cw, Both]`, each `[plain, clip]`.
     twins: [[LazyPipeline; 2]; 2],
     light_space_buffer: wgpu::Buffer,
     pub(crate) cascades: Vec<Cascade>,
 
+    /// Per cascade, the statics key, light matrix and `sun_statics` it baked under; naming the
+    /// scene keeps the viewport and the Inspector preview from sampling each other's bakes.
     static_cache: [Option<(StaticsKey, Mat4, bool)>; MAX_CASCADES],
     pub(crate) sun_statics: bool,
 
@@ -59,11 +63,14 @@ pub struct ShadowRenderer {
     pub(crate) drawn: Vec<(u32, u32)>,
     pub(crate) culls: ShadowCulls,
     pub(crate) instancing: bool,
+    /// Whether light volumes find casters through the scene's caster index. A test hook: only
+    /// `index_gpu_tests` turns it off, to compare against testing every caster.
     pub(crate) index_casters: bool,
     pub(crate) atlas: ShadowAtlas,
 }
 
 impl ShadowRenderer {
+    /// Texels a side: four 1024² layers cost one 2048² map, as Unity's High tier splits it.
     pub const CASCADE_SIZE: u32 = 1024;
 
     pub fn new(

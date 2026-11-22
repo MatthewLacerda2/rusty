@@ -1,3 +1,6 @@
+//! A slice's sphere keeps its size as the camera turns; its coarse light-space snap lets a
+//! cascade's static bake be cached.
+
 use glam::camera::rh::{proj::directx, view::look_at_mat4};
 use glam::{Mat4, Vec3};
 
@@ -5,10 +8,15 @@ use rusty_components::ShadowSettings;
 use rusty_scene::Camera;
 
 pub const MAX_CASCADES: usize = ShadowSettings::MAX_CASCADES as usize;
+/// Blend of log (1) and uniform (0) splits; uniform widens the first slice.
 const SPLIT_LAMBDA: f32 = 0.75;
+/// Fraction of the far split cross-faded into the next cascade, which covers it.
 pub const BLEND_FRACTION: f32 = 0.1;
+/// Radius fraction padded around the sphere to absorb the coarse snap.
 const MARGIN: f32 = 0.25;
+/// Snap step per map width: whole texels when the size divides by 8; half a step fits `MARGIN`.
 const SNAP_FRACTION: f32 = 1.0 / 8.0;
+/// Metres toward the light past a slice where casters still shadow it.
 const PULLBACK: f32 = 250.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -63,6 +71,7 @@ fn slice_sphere(camera: &Camera, aspect: f32, near: f32, far: f32) -> (Vec3, f32
     let k = tan_v * tan_v * (1.0 + aspect * aspect);
     let along = (0.5 * (near + far) * (1.0 + k)).clamp(near, far);
     let corner = |d: f32| ((along - d).powi(2) + k * d * d).sqrt();
+    // Up to 1/16 m, so float noise never resizes a cascade.
     let radius = (corner(near).max(corner(far)) * 16.0).ceil() / 16.0;
     (camera.position + camera.forward() * along, radius)
 }

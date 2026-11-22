@@ -93,6 +93,7 @@ fn gpu_one_tiny_bright_lamp_meters_near_steady_across_block_edges() {
     let cases = [
         ([128, 128], window(10.0, 90.0), along, 1e-3),
         ([128, 128], window(10.0, 90.0), diagonal, 1e-3),
+        // Measured on lavapipe: 0.048 and 0.075 EV; at 1080p, 0.0006.
         ([128, 128], window(50.0, 100.0), along, 0.06),
         ([128, 128], window(50.0, 100.0), diagonal, 0.1),
         ([1920, 1080], window(50.0, 100.0), diagonal, 0.002),

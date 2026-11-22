@@ -1,5 +1,6 @@
 //! Light lane w: 0 unlit, 1 flat ambient, 2 probe ambient. Probe irradiance is the SH DC band over
-//! π, the matte response the shader gives every light (Y00 × π is E; a matte puff reflects E/π).
+//! π, the matte response the shader gives every light: the coefficient × Y00 × π is E, and a matte
+//! puff reflects E/π.
 //! Alpha particles sort back to front; additive ones skip the sort.
 
 use glam::Vec3;
@@ -9,17 +10,20 @@ use crate::gpu::uniforms::FogUniform;
 use rusty_components::{ParticleBlend, ParticleEmitterComponent, ParticleRenderMode};
 use rusty_scene::Scene;
 
+/// Fields and `ATTRIBS` match `particles.wgsl`'s `InstanceInput`: change the two together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ParticleInstance {
     pub(crate) center: [f32; 3],
     pub(crate) size: f32,
+    /// Radians, in the quad's plane.
     pub(crate) rotation: f32,
     pub(crate) color: [f32; 4],
     pub(crate) stretch: [f32; 4],
     pub(crate) light: [f32; 4],
     pub(crate) sheet: [f32; 4],
     pub(crate) mode: u32,
+    /// TAA's reactivity; below 0 is `Auto`.
     pub(crate) reactive: f32,
 }
 
@@ -82,7 +86,7 @@ pub(crate) fn emitter_light(
     }
     match scene.probes.sample(at) {
         Some(sh) => {
-            let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8;
+            let dc = Vec3::from(sh.coeffs[0]) * 0.282_094_8; // Y00, 1/(2√π).
             [dc.x, dc.y, dc.z, 2.0]
         }
         None => [0.0, 0.0, 0.0, 1.0],

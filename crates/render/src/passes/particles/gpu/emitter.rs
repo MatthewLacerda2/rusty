@@ -16,12 +16,14 @@ type Fresh = (GpuBirth, (u64, f64));
 pub(crate) struct Work {
     pub(crate) births: u32,
     pub(crate) step: Option<u32>,
+    /// A clear or copy was recorded: the frame must submit, dispatch or not.
     pub(crate) encoded: bool,
 }
 
 pub(crate) struct EmitterBuffers {
     epoch: u64,
     cursor: u64,
+    /// The step last moved to, the running seconds after it; `None` since a reset.
     done: Option<(u64, f64)>,
     emptied: u64,
     pub(crate) particles: wgpu::Buffer,
@@ -93,6 +95,7 @@ impl EmitterBuffers {
         if self.epoch != sim.epoch() {
             self.reset(encoder, sim.epoch());
             encoded = true;
+        // All died since the last upload: a birth born and dead unseen left a stale particle.
         } else if self.emptied != sim.emptied() {
             encoder.clear_buffer(&self.particles, 0, None);
             encoded = true;
@@ -180,6 +183,7 @@ impl EmitterBuffers {
             })
             .collect();
         self.cursor = sim.next_serial();
+        // Stable: a slot's births stay oldest first.
         records.sort_by_key(|r| r.0.slot);
         let mut kept: Vec<Fresh> = Vec::with_capacity(records.len());
         for r in records {

@@ -1,5 +1,5 @@
-//! Not HDRP's Speed Rejection, which drops all history whenever a keyboard turn starts or
-//! stops; a depth test finds revealed surfaces instead.
+//! A depth test finds reveals: HDRP's Speed Rejection drops all history whenever a keyboard
+//! turn starts or stops.
 
 use glam::Vec2;
 
@@ -7,16 +7,17 @@ use rusty_components::Projection;
 use rusty_scene::Camera;
 
 pub(crate) const FRAME_INFLUENCE: f32 = 0.1;
+/// The frame's weight from `MOVING_PIXELS` a frame of motion up: UE's TAA range.
 pub(crate) const MOVING_FRAME_INFLUENCE: f32 = 0.25;
 pub(crate) const MAX_CAMERAS: usize = 8;
-/// Above the rounding a still camera's motion vectors carry (lavapipe moved still pixels
-/// without it).
+/// History pixels a frame, over a still camera's motion-vector rounding.
 pub(crate) const STILL_PIXELS: f32 = 0.05;
 pub(crate) const MOVING_PIXELS: f32 = 2.0;
-/// Gaps in eye distance, not view depth: a turn changes view depth by a cosine ratio (about
-/// 18% at the edge), never distance.
+/// Relative eye-distance gaps: a turn moves view depth, never distance.
 pub(crate) const DISOCCLUSION_START: f32 = 0.1;
 pub(crate) const DISOCCLUSION_FULL: f32 = 0.25;
+/// Ours (`gpu/flicker/`): the share of a pixel's flicker kept a frame, and the hold, in
+/// times its recurring flicker at anti-flicker 1.
 pub(crate) const FLICKER_DECAY: f32 = 0.9;
 pub(crate) const FLICKER_HOLD: f32 = 4.0;
 

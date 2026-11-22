@@ -12,6 +12,7 @@ pub(crate) struct SsrTargets {
     colour_view: wgpu::TextureView,
     pub(super) traced: HitPyramids,
     pub(super) params: wgpu::Buffer,
+    /// Kept while its inputs are: wgpu compares views by identity, so a remade target rebuilds it.
     group: Kept<Inputs, wgpu::BindGroup>,
     pub(super) resolve: wgpu::BindGroup,
     #[cfg(test)]

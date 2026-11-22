@@ -49,6 +49,7 @@ impl Counter {
         let Some((tested, bytes)) = self.in_flight else {
             return;
         };
+        // Lets a pending map's callback run without waiting: `Wait` would stall the frame.
         let _ = device.poll(wgpu::PollType::Poll);
         if !self.settle() {
             return;
@@ -70,6 +71,7 @@ impl Counter {
         self.in_flight = None;
     }
 
+    /// The staging buffer goes too: a map still pending would refuse the next copy into it.
     pub(crate) fn forget(&mut self) {
         if self.in_flight.take().is_some() {
             self.staging = None;

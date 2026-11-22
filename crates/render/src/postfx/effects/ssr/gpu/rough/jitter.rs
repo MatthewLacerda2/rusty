@@ -4,8 +4,10 @@ use crate::{RenderView, OFFSCREEN_FORMAT};
 
 const FRAMES: u32 = 36;
 
+/// Measured on lavapipe: 44.5, which fails it (the allow above).
 const STILL: f32 = 30.0;
 
+/// Measured on lavapipe: 26.2, which fails it too.
 const TAA_STILL: f32 = 14.0;
 
 #[test]

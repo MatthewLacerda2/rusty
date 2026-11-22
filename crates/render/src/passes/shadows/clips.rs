@@ -1,3 +1,6 @@
+//! A variant whose cut moves draws in the dynamic sweep even when static: a cached bake would
+//! freeze it. The pipeline cannot tell a move from a cut, so a scroller that clips nothing pays.
+
 use crate::draw::batch::BatchKey;
 use crate::draw::uniforms::mapping_uniform;
 use crate::gpu::pipelines::surface::{SurfaceShaders, STANDARD};
@@ -5,6 +8,8 @@ use crate::gpu::uniforms::MappingUniform;
 use crate::scene::MaterialRecords;
 use rusty_components::{MaterialAsset, RenderMode};
 
+/// A cutout alone reads its test per caster, never the record, so it carries none: Cutouts sharing
+/// a map but not a tint stay one shadow draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Clip {
     pub pipeline: usize,
@@ -69,6 +74,8 @@ pub(crate) fn slot_clip(
     Some(CasterClip { clip, cutout })
 }
 
+/// The prepass reads the shadow pass's clip, not a rule of its own: a slot wrongly marked would
+/// prime depth where the forward pass discards.
 pub(crate) fn depth_only(pipeline: usize, clip: Option<&CasterClip>) -> bool {
     pipeline == STANDARD && clip.is_none()
 }

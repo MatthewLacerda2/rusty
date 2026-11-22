@@ -7,7 +7,9 @@ use crate::postfx::effects::taa::gpu::fixture::{
 };
 use rusty_core::settings::render_scale::RenderScale;
 
+/// The first frame after the move. Measured on lavapipe: 5.
 const FIRST: u8 = 24;
+/// Four frames on. Measured on lavapipe: 4.
 const AFTER_4: u8 = 6;
 
 #[test]

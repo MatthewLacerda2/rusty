@@ -24,6 +24,8 @@ fn prepare(pfx: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
     cx.full && fxaa_enabled(cx.post, cx.graphics) && !pfx.taa_ran()
 }
 
+/// The camera's, never the volume's: default-on, so a camera without a volume, or no camera,
+/// is anti-aliased.
 pub(crate) fn fxaa_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post.camera.is_none_or(|c| c.fxaa_active);
     effect_runs(graphics, EFFECT.gate, on)

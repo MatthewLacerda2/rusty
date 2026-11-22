@@ -11,6 +11,8 @@ pub(super) struct Candidate {
     pub caster: CasterData,
     pub bounds: Option<(glam::Vec3, glam::Vec3)>,
     pub small: bool,
+    /// Its map takes the faces turned from the light, which the PVS bake never aims at, so the
+    /// PVS never culls it.
     pub two_sided: bool,
 }
 
@@ -59,6 +61,8 @@ impl LightVolume {
     }
 }
 
+/// Culled by the light's volume, not the camera's: an off-screen caster still shadows. Only the
+/// size verdict is the camera's.
 pub(super) fn cull<'a>(
     candidates: impl IntoIterator<Item = &'a Candidate>,
     volume: LightVolume,

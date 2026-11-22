@@ -39,7 +39,9 @@ pub struct GradeLut {
 }
 
 impl GradeLut {
+    /// Mirrors `LUT_SIZE` in `postfx/grade.wgsl`.
     pub const SIZE: u32 = 32;
+    /// Mirrors the bake's `@workgroup_size`.
     const GROUP: u32 = 4;
 
     pub fn new(device: &wgpu::Device) -> Self {
@@ -165,6 +167,7 @@ impl GradeLut {
     }
 }
 
+/// Byte equality: a NaN knob equals itself, so it never forces a rebake every frame.
 fn same(a: &[[f32; 4]], b: &[[f32; 4]]) -> bool {
     bytemuck::cast_slice::<_, u8>(a) == bytemuck::cast_slice::<_, u8>(b)
 }

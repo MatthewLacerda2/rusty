@@ -67,3 +67,38 @@ pub fn profile_one(run: &Run, scene: &str) {
         exit(1);
     }
 }
+
+/// `make ray-scene`: each scene's ray-traced tree, measured.
+pub fn rays_all(run: &Run, names: &[String]) {
+    use rusty::render::rays::probe::{measure, Clock};
+    println!(
+        "scene | triangles | instances | meshes | GPU MiB | build ms | output | trace ms | Mrays/s | clock | hit px"
+    );
+    for scene in names {
+        let opened = open(run, &run.project, "the project");
+        let loaded = scenes::load(&run.out, &opened.root, scene, opened.settings, run.opts);
+        let (mut harness, _) =
+            loaded.unwrap_or_else(|e| fail(&format!("{scene}: load failed: {e}")));
+        let world = std::rc::Rc::clone(&harness.world);
+        let world = world.borrow();
+        let (camera, edit) = (world.main_view(), world.scene().borrow());
+        let Some(r) = harness.renderer() else {
+            fail("no GPU adapter")
+        };
+        let Some(m) = measure(r, &edit, &camera, (1920, 1080)) else {
+            fail(&format!("{scene}: the renderer holds no extract of it"))
+        };
+        let mib = m.gpu_bytes as f64 / f64::from(1 << 20);
+        let clock = match m.clock {
+            Clock::Gpu => "GPU timestamps",
+            Clock::Wall => "wall (no timestamps)",
+        };
+        for (output, ms) in [("lean 4 B/px", m.lean_ms), ("full hit 32 B/px", m.full_ms)] {
+            let mrays = m.rays_per_second(ms) / 1e6;
+            println!(
+                "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {output} | {ms:.2} | {mrays:.0} | {clock} | {}",
+                m.triangles, m.instances, m.meshes, m.build_ms, m.hit_pixels
+            );
+        }
+    }
+}

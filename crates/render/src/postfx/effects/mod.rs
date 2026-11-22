@@ -74,6 +74,7 @@ pub(crate) struct PostEffect {
 #[derive(Clone, Copy)]
 pub(crate) enum History {
     None(&'static str),
+    /// Whether it runs on this frame of the view.
     Reads(fn(&HistoryCx) -> bool),
 }
 
@@ -87,6 +88,7 @@ pub(crate) fn read_history(cx: &HistoryCx) -> bool {
     (POST_EFFECTS.iter()).any(|e| matches!(e.history, History::Reads(runs) if runs(cx)))
 }
 
+/// Public as a test hook: the completeness gate's layers name it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Owner {
     Volume,
@@ -120,6 +122,7 @@ pub(crate) enum Pass {
     Scene { order: u16, run: ScenePass },
     Ldr {
         order: u16,
+        /// Readies this frame (compile, upload) and says whether the pass runs.
         prepare: fn(&mut super::PostFx, &wgpu::Device, &EffectCx) -> bool,
         run: LdrRun,
     },
@@ -132,6 +135,7 @@ pub(crate) enum LdrRun {
     InPlace(
         fn(&mut super::PostFx, Gpu, &mut wgpu::CommandEncoder, &super::PostFxContext, &EffectCx),
     ),
+    /// Told whether it is last; true means it wrote `ctx.output` and the chain skips its copy.
     MayEnd(
         fn(
             &mut super::PostFx,
@@ -142,6 +146,7 @@ pub(crate) enum LdrRun {
             bool,
         ) -> bool,
     ),
+    /// Drawn after every other LDR pass, into `ctx.output`; a second one replaces the first.
     Finish(fn(&super::PostFx) -> &wgpu::RenderPipeline),
 }
 

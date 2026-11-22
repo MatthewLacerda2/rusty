@@ -1,3 +1,6 @@
+//! A tile of n² cells sits only at a Z-order index that is a multiple of n², an aligned square;
+//! the first free run wins, so placement is deterministic.
+
 use super::plan::{CELLS, MIN_TILE};
 
 #[derive(Clone, Debug)]
@@ -49,6 +52,7 @@ pub(super) fn cells(size: u32) -> u32 {
     (size / MIN_TILE).pow(2)
 }
 
+/// Its even bits are x, its odd bits y.
 fn cell_origin(index: u32) -> [u32; 2] {
     let compact = |mut v: u32| {
         let mut out = 0;
