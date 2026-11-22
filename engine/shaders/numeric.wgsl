@@ -1,4 +1,4 @@
-// whether a value is finite, for the passes that keep
+// These test whether a value is finite, for the passes that keep
 // an `inf` or NaN out of what they write (motion blur's streaks, SSR's colour
 // pyramid, TAA's history). WGSL has no generics: one function per width.
 //

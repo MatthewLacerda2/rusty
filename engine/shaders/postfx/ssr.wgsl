@@ -43,12 +43,13 @@ fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
     return a + (b - a) * ((depth - da) / (db - da));
 }
 
+// A roughness: up to it a hit reads sharp, since the lobe's cone would blur a near-mirror
+// wider at higher resolutions.
 const NEAR_MIRROR: f32 = 0.05;
 
-// The tangent of the half-angle of the cone a surface of perceptual `roughness` reflects into,
-// Uludag's (GPU Pro 5, *Hi-Z Screen-Space Cone-Traced Reflections*): GGX's `alpha = roughness²`
-// as a Blinn-Phong power `2 / alpha² − 2`, and the cone that holds its lobe down to 0.244 of
-// its peak, held to 0 up to `NEAR_MIRROR`.
+// The tangent of the half-angle of the cone `roughness` reflects into, after Uludag (GPU Pro
+// 5, *Hi-Z Screen-Space Cone-Traced Reflections*): GGX's lobe as a Blinn-Phong power, down to
+// 0.244 of its peak.
 fn cone(roughness: f32) -> f32 {
     let alpha = max(roughness * roughness, 1e-3);
     let power = 2.0 / (alpha * alpha) - 2.0;
@@ -104,17 +105,18 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     return length((b - a) * dim);
 }
 
-// The cone a hit's radius is measured with for the resolve's field: the trace stores [`spread`]
-// per unit of cone, measured at a typical satin cone (about roughness 0.4's), where the
-// projection is close to linear, so each pixel scales it by its own cone.
+// The trace stores [`spread`] per unit of this cone (about roughness 0.4's, where the
+// projection is near linear); each pixel scales it by its own.
 const UNIT_CONE: f32 = 0.2;
 // Keeps a hit's radius times its count finite in the f16 spread pyramid.
 const UNIT_MAX: f32 = 16384.0;
 
-// So one hit's count in a coarse pyramid level (a 4^-8 share at level 8) stays a normal
-// f16, not a subnormal a GPU may flush to 0: a few hits' mean radius then holds.
+// Counts are stored times this, so one hit at pyramid level 8 (a 4^-8 share) stays a normal
+// f16, not a subnormal a GPU may flush to 0.
 const COUNT_SCALE: f32 = 64.0;
 
+// A weightless found hit's count in the radius field (1 at full weight); lower, the mean
+// radius swings at a fading edge.
 const FOUND_FLOOR: f32 = 0.4;
 
 struct Traced {
@@ -152,6 +154,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     if (hit.dist <= 0.0) {
         return missed;
     }
+    // An emissive past f16's range reads `inf` in the copy; such a hit reflects nothing.
     let w = select(0.0, hit.colour.w, numeric::finite4(hit.colour));
     let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
     let k = max(w, FOUND_FLOOR);

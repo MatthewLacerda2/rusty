@@ -2,7 +2,8 @@
 // B smoothness, A normal X; 0.5 neutral). Albedo and smoothness follow HDRP's
 // `LitDataIndividualLayer.hlsl` (albedo in square-root space). The normal is HDRP's AG
 // unpack, reoriented onto the main shading normal in world space where HDRP blends with
-// RNM.
+// RNM. It changes the inputs before any light is summed, so specular and reflections are never
+// tinted.
 
 #define_import_path forward::detail
 
@@ -18,6 +19,8 @@ struct Detailed {
     normal: vec3<f32>,
 };
 
+// Takes derivatives (`coords_with`). Under UV0 it tiles the main maps' tiled UV (HDRP's *Link
+// Details with Base*); a world mapping projects at `detail_world_scale`.
 fn coords(main: MapCoords, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     let m = material();
     let terms = Mapping(m.detail_st, m.uv_mapping, m.detail_world_scale, m.blend_sharpness, 0u);

@@ -43,6 +43,7 @@ fn material_mapping() -> Mapping {
     return Mapping(m.uv_st, m.uv_mapping, m.world_scale, m.blend_sharpness, 0u);
 }
 
+// `draw::uniforms::mapping_uniform` flips UV0's v in `uv_st`, so this plain sum matches Unity's.
 fn tile_with(m: Mapping, uv: vec2<f32>) -> vec2<f32> {
     return uv * m.uv_st.xy + m.uv_st.zw;
 }
@@ -51,6 +52,8 @@ fn coords(uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     return coords_with(material_mapping(), uv, position, normal);
 }
 
+// Takes derivatives. `world_scale` is repeats per metre. Triplanar's projections (zy, xz, xy)
+// are Golus's, which `whiteout` expects; UV0 and Planar weigh Y alone.
 fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> MapCoords {
     var c: MapCoords;
     let p = position * m.world_scale;
@@ -72,6 +75,8 @@ fn coords_with(m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>
     return c;
 }
 
+// A per-instance mapping (a shadow caster's) takes its gradients first, so its branch samples
+// explicitly.
 fn sample_any(t: texture_2d<f32>, s: sampler, m: Mapping, uv: vec2<f32>, position: vec3<f32>, normal: vec3<f32>) -> vec4<f32> {
     let c = coords_with(m, uv, position, normal);
     let dx = mat3x2<f32>(dpdx(c.x), dpdx(c.y), dpdx(c.z));
@@ -122,7 +127,7 @@ fn mask(on: u32, t: texture_2d<f32>, s: sampler, c: MapCoords, packed: u32) -> f
     return map_factor(sample(t, s, c), on, packed);
 }
 
-// glTF's `occlusionTexture`: its red, lerped from 1 by the material's strength.
+// glTF's `occlusionTexture`.
 fn occlusion(c: MapCoords) -> f32 {
     let m = material();
     return 1.0 + m.occlusion_strength * (mask(m.use_occlusion_map, t_occlusion, s_occlusion, c, 0u) - 1.0);

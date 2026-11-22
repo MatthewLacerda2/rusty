@@ -1,13 +1,10 @@
 // URP's `TemporalAA.hlsl` at *High* (`DoTemporalAA(2, 2, 2, 0)`): variance-clamped 3×3
-// YCoCg box; the motion of the 3×3's frontmost surface (so an edge reprojects with what
-// is in front: a viewmodel's over the world's); a 5-tap bicubic history; blended in
-// URP's perceptual space (colour over 1 + luma) so a bright highlight cannot dominate.
-// Beyond URP: the frame weighs more as the pixel moves or a translucent drew (its
-// reactive mask, FSR2's), and the history fades on a reveal. The `_held` entry points
-// run HDRP's anti-flicker (`taa_flicker.wgsl`). Velocity target: `.xy` is `ndc_now -
-// ndc_prev` unjittered, `.z` the view depth (sky: 65504), `.w` the drawing camera's
-// index in its stack: the frontmost surface is the highest `.w`, then the smallest
-// `.z`.
+// YCoCg box; the motion of the 3×3's frontmost surface; a 5-tap bicubic history; blended
+// in URP's perceptual space (colour over 1 + luma) so a bright highlight cannot dominate.
+// Beyond URP: the frame weighs more as the pixel moves or a translucent drew (FSR2's
+// reactive mask), and the history fades on a reveal. Velocity target: `.xy` is
+// `ndc_now - ndc_prev` unjittered, `.z` the view depth (sky: 65504), `.w` the drawing
+// camera's index in its stack.
 
 #import fullscreen
 #import numeric
@@ -138,6 +135,8 @@ fn reactivity(p: vec2<i32>, camera: f32) -> f32 {
     for (var y = -1; y <= 1; y++) {
         for (var x = -1; x <= 1; x++) {
             let v = textureLoad(t_reactive, clamp(p + vec2<i32>(x, y), vec2<i32>(0), last), 0).r;
+            // Only translucents of the pixel's own camera or one above count, so a window
+            // behind a viewmodel's gun leaves the gun alone.
             let drawn_by = floor(v);
             if (v > 0.0 && drawn_by >= camera) {
                 r = max(r, v - drawn_by);
@@ -234,6 +233,8 @@ fn blend_held(px: Pixel) -> HeldOut {
     let boxed = into_box(past.raw, px.frame.lo, px.frame.hi);
     let f = flicker_of(past.prev_uv, luma, past.raw.x, boxed.x, past.change, px.frame.reactive);
     let held = mix(boxed.x, past.raw.x, f.hold);
+    // YCoCg's chroma is in light, not a ratio: scaled with the held luma, it keeps the
+    // clamp's hue.
     let history = vec3<f32>(held, boxed.yz * select(0.0, held / boxed.x, boxed.x > 1e-6));
     let color = mixed(px.frame, history, past.weight);
     return HeldOut(color, px.front.own, taa_flicker::texel(luma, f));
@@ -258,7 +259,6 @@ fn sample_weight(d: vec2<f32>) -> f32 {
     return exp(-2.29 * dot(d, d));
 }
 
-// The projection moved the image by `jitter`, y flipped into pixel rows.
 @fragment
 fn fs_upscale(@builtin(position) pos: vec4<f32>) -> ResolveOut {
     return blend(upscaled(pos));
@@ -273,6 +273,7 @@ fn upscaled(pos: vec4<f32>) -> Pixel {
     let uv = pos.xy * taa.size.zw;
     let at = uv * taa.scene.xy;
     let base = vec2<i32>(floor(at));
+    // The projection moved the image by `jitter`, y flipped into pixel rows.
     let shift = vec2<f32>(taa.jitter.x, -taa.jitter.y);
 
     var lo = vec3<f32>(1e9);
@@ -305,6 +306,7 @@ fn upscaled(pos: vec4<f32>) -> Pixel {
         hi = min(hi, mean + spread);
     }
     let front = frontmost(base);
+    // Trusted as far as its nearest sample's weight: a far sample only nudges it.
     let frame = Frame(here, lo, hi, nearest, reactivity(base, front.own.y));
     return Pixel(frame, uv, front);
 }

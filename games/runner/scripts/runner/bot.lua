@@ -1,5 +1,5 @@
--- Not part of the game: scenarios press its keys with `Input.Press`, the same
--- input the player uses.
+-- This bot is not part of the game: scenarios press its keys with `Input.Press`,
+-- the same input the player uses.
 
 local Track = require("runner.track")
 
@@ -8,7 +8,8 @@ local Bot = {}
 local LANE_HALF = 0.6  -- share of a lane the body sweeps, with a margin
 
 -- The nearest hazard ahead in `lane`: its distance and how the bot passes it
--- (`slide`, `jump` or `block`), or nil when clear. Hazards overlapping along the
+-- (`slide`, `jump` or `block`), or nil when clear. Hazards overlapping it along
+-- the track count with it, so stacked crates block.
 local function ahead(view, lane, past_bars)
     local x = Track.lane_x(lane)
     local near, lo, hi, kinds, back

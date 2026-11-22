@@ -5,6 +5,8 @@ use crate::blocks::Stage;
 use crate::params::{ParamLayout, UI_UNIFORM_DECL};
 use crate::recipe::ShaderRecipe;
 
+/// `ui.wgsl`'s `graphic`, character for character: both fragment entry points take a
+/// graphic's colour from it.
 pub(crate) const GRAPHIC: &str =
     "fn graphic(in: VertexOut) -> vec4<f32> {\n    return shade(in);\n}";
 

@@ -1,4 +1,4 @@
-// the fullscreen triangle every fullscreen pass
+// This is the fullscreen triangle every fullscreen pass
 // draws: three vertices with no vertex buffer, covering clip space. A pass
 // wraps `triangle` in its own `@vertex` entry point (naga_oil keeps an imported
 // module's entry points out of the importer). It is the only place the triangle is

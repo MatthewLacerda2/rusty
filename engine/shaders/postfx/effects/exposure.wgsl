@@ -1,4 +1,4 @@
-// the exposure, the one colour
+// The exposure, the one colour
 // knob outside the LUT: a pre-grade HDR scale, the volume's fixed EV or, in Automatic,
 // the adapted one the meter (`postfx/exposure.wgsl`) left. Slot 0: x the fixed EV, y
 // `1` in Automatic.

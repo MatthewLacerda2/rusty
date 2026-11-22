@@ -1,6 +1,5 @@
-// the sRGB transfer curves (IEC 61966-2-1), per
-// channel: the UI's sampled-texture and fog conversions, and the user LUT's
-// sRGB-encoded lookup in the grading bake.
+// This module holds the sRGB transfer curves (IEC 61966-2-1), per channel, for the UI's
+// sampled-texture and fog conversions and the grading bake's sRGB-encoded user-LUT lookup.
 
 #define_import_path color::srgb
 

@@ -1,7 +1,6 @@
 // engine/shaders/forward/local_shadow.wgsl — a point or spot light's shadow in the
-// forward pass: its atlas tile, PCF, and the per-light shadow fade distance
-//. `fs_main` in `shader.wgsl` multiplies each local light by it, through
-// `forward::shadowmask`.
+// forward pass: its atlas tile, PCF, and the per-light shadow fade distance. `fs_main` in
+// `shader.wgsl` multiplies each local light by it, through `forward::shadowmask`.
 
 #define_import_path forward::local_shadow
 

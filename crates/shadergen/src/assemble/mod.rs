@@ -16,9 +16,13 @@ use super::textures;
 
 pub use depth::{CUT_PREPASS, CUT_SHADOW};
 
+/// `shader.wgsl`'s last line of `surface_color`, character for character: it fogs and
+/// composites last, so an authored look is fogged and blended like any surface.
 const SURFACE_RETURN: &str =
     "return transparent::composite(lighting_color, base_color.a, env_brdf, in.world_position, N, in.clip_position.xy);";
 
+/// Shadows `in` with the facing-corrected normal the surface is shaded with, so a rim on
+/// a two-sided face seen from behind belongs to the face the viewer sees.
 const FACED_IN: &str = "{\n        var in = in;\n        in.world_normal = geometric;\n        ";
 
 pub fn assemble(recipe: &ShaderRecipe, surface_base: &str) -> Result<String, String> {

@@ -57,8 +57,8 @@ fn realtime_share(lit: vec3<f32>, realtime: vec3<f32>) -> f32 {
     return select(0.0, saturate(part / whole), whole > 0.0);
 }
 
-// `camera.ssil.x` is set for that opaque pass alone, so translucents after it keep their
-// blend alpha.
+// Only a base camera's opaque pass running SSIL sets `camera.ssil.x`: it writes the realtime
+// share in alpha for SSIL's source, and translucents keep their blend alpha.
 fn with_ssil_share(c: vec4<f32>) -> vec4<f32> {
     if (camera.ssil.x <= 0.5) {
         return c;
@@ -77,8 +77,7 @@ fn lightmap_level(uv: vec2<f32>) -> f32 {
     return clamp(0.5 * log2(max(footprint, 1e-8)), 0.0, levels - 1.0);
 }
 
-// Unity's half-Lambert rebalance. A flat normal map (N == Ng) or a texel with no
-// dominant direction keeps its lightmap exactly.
+// Unity's half-Lambert rebalance.
 fn lightmap_direction_rebalance(dir: vec3<f32>, N: vec3<f32>, Ng: vec3<f32>) -> f32 {
     let shaded = dot(N, dir) * 0.5 + 0.5;
     let baked = dot(Ng, dir) * 0.5 + 0.5;
@@ -122,8 +121,6 @@ fn GeometrySmith(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, roughness: f32) -> f3
     return ggx2 * ggx1;
 }
 
-// `F90` is `KHR_materials_specular`'s `specular` for a dielectric, so one at `specular`
-// 0 reflects nothing at any angle.
 fn FresnelSchlick(cosTheta: f32, F0: vec3<f32>, F90: f32) -> vec3<f32> {
     return F0 + (F90 - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
@@ -144,6 +141,7 @@ fn specular_response(N: vec3<f32>, V: vec3<f32>, L: vec3<f32>, radiance: vec3<f3
     return ggx_specular(N, V, L, H, F, roughness) * radiance * max(dot(N, L), 0.0);
 }
 
+// The bakes share this model (`DiffuseModel::response`): change both together.
 fn diffuse_response(NdotL_raw: f32) -> f32 {
     let wrap = clamp(NdotL_raw * 0.5 + 0.5, 0.0, 1.0);
     return select(max(NdotL_raw, 0.0), wrap * wrap, lighting.diffuse_wrap > 0.5);
@@ -234,6 +232,7 @@ fn sun_shadow_parts(world_pos: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
     return vec2<f32>(lit, fade);
 }
 
+// Mirrors `Sh9::eval`'s band factors (π, 2π/3, π/4), so the GPU and headless path agree.
 fn eval_sh(N: vec3<f32>, object: u32) -> vec3<f32> {
     let b = sh_basis(N);
     let a0 = PI;

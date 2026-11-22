@@ -32,7 +32,9 @@ fn hue(c: vec3<f32>, p: vec4<f32>) -> vec3<f32> {
 }
 
 // The log spaces URP's contrast works in (`LutBuilderHdr.shader`): ACEScc under the ACES
-// tonemapper, ARRI ALEXA LogC (EI 800) under any other.
+// tonemapper, ARRI ALEXA LogC (EI 800) under any other, with URP's parameters and toes
+// (`Color.hlsl`). URP converts to ACES AP0 before ACEScc; rusty's ACES is a fit on linear
+// sRGB, so the colour stays in sRGB primaries here.
 const LOGC_CUT: f32 = 0.011361;
 const LOGC_A: f32 = 5.555556;
 const LOGC_B: f32 = 0.047996;
@@ -67,8 +69,10 @@ fn acescc_to_linear(t: vec3<f32>) -> vec3<f32> {
     return select(toe, min(lin, vec3<f32>(HALF_MAX)), t >= vec3<f32>((9.72 - 15.0) / 17.52));
 }
 
-// URP's pivot, ACEScc's code for the 0.18 grey card.
+// URP's pivot, ACEScc's code for the 0.18 grey card: exactly linear 0.18 under ACES, near
+// 0.22 in LogC, where URP applies the same code.
 const MIDGREY: f32 = 0.4135884;
+// `Tonemap::to_index`'s ACES, as `tonemapping.wgsl` reads it.
 const TONEMAP_ACES: u32 = 2u;
 
 // Steepens (`> 1`) or flattens the curve around mid-grey in log space (slot: x the contrast, y

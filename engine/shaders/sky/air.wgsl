@@ -1,6 +1,5 @@
-// the volumetric fog in front of the sky:
-// `skybox.wgsl` and `sky_gradient.wgsl` import it, so both skies read the
-// integrated volume the same way.
+// This module holds the volumetric fog in front of the sky; `skybox.wgsl` and
+// `sky_gradient.wgsl` import it, so both skies read the integrated volume the same way.
 
 #define_import_path sky::air
 

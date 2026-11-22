@@ -10,8 +10,8 @@
 #import lighting::sh::sh_basis
 
 // The ambient a surface with unit normal `n` takes, intensity applied, as
-// irradiance / pi. `Color` mode is the hemisphere the forward pass has always
-// drawn, `color` straight up fading to a quarter of it straight down; `Gradient` is
+// irradiance / pi. `Color` mode is a hemisphere,
+// `color` straight up fading to a quarter of it straight down; `Gradient` is
 // Unity's trilight, linear in `n.y` from the ground through the equator to the sky;
 // `Skybox` is the sky's L2 SH, uploaded already convolved. The CPU's
 // `scene::AmbientRadiance::at` is the same function (a GPU test holds the two equal); lightmaps and

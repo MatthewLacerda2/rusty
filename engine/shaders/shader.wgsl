@@ -102,6 +102,7 @@ fn vs_shadow(model: VertexInput, @builtin(instance_index) instance: u32) -> Vert
 
 fn shadow_clip(in: VertexOutput) {
     let caster = casters[in.instance.x];
+    // Sampled whatever `use_texture` says: it is per instance, so a branch on it is not uniform.
     let texel = mapping::sample_any(t_diffuse, s_diffuse, caster.terms, in.tex_coords, in.world_position, normalize(in.world_normal)).a;
     if (select(1.0, texel, caster.use_texture == 1u) < caster.alpha_cutoff) {
         discard;
@@ -255,12 +256,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     }
     N = surface.normal;
     var albedo = surface.albedo;
+    // 3 is Multiply, URP's `ApplyAlphaModulate`.
     if (m.blend_mode == 3u) {
         albedo = mix(vec3<f32>(1.0), albedo, base_color.a);
     }
-    // Preserve specular (URP's `_ALPHAPREMULTIPLY_ON`): only the diffuse is multiplied by
-    // alpha here, and the pipeline blends premultiplied, so reflections and highlights are not
-    // faded with it.
+    // Preserve specular (URP's `_ALPHAPREMULTIPLY_ON`): the pipeline blends premultiplied, so
+    // only the diffuse takes alpha and reflections and highlights are not faded.
     let diffuse_albedo = albedo * select(1.0, base_color.a, m.premultiply_diffuse == 1u);
     let translucent = m.transmission.w > 0.0;
     if (translucent) {
@@ -271,13 +272,12 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
     // transparent SSR's fade read `surface.roughness`.
     let roughness = specular_aa::widen(surface.roughness, specular_kernel);
 
-    // F0: a dielectric's comes from its ior and `KHR_materials_specular`, computed once on the
-    // CPU (`MaterialAsset::dielectric_f0`; 0.04 for the default glass ior 1.5), a metal's is
-    // its albedo.
+    // A dielectric's F0 comes from its ior and `KHR_materials_specular`, computed once on the
+    // CPU (`MaterialAsset::dielectric_f0`; 0.04 for the default glass ior 1.5).
     let dielectric = mapping::dielectric_reflectance(maps);
     let F0 = mix(dielectric.rgb, albedo, metallic);
     // Written as `reflectivity` is below, not `mix`: at the default F90 of 1 it is exactly 1
-    // for any `metallic`, so a default material renders as before.
+    // for any `metallic`.
     let F90 = dielectric.w + (1.0 - dielectric.w) * metallic;
     let dielectric_reflectivity = max(dielectric.r, max(dielectric.g, dielectric.b));
 
@@ -289,7 +289,7 @@ fn surface_color(in: VertexOutput) -> vec4<f32> {
         ambient_irradiance = baked.irradiance;
         lightmap_specular = baked.specular;
     } else if (objects[in.instance.x].use_sh == 1u) {
-        // It returns E; the lightmap and flat ambient already hold E / π.
+        // `probe_irradiance` returns E; the lightmap and flat ambient already hold E / π.
         ambient_irradiance = probe_irradiance(in.world_position, N, in.instance) / PI;
     } else {
         ambient_irradiance = flat_ambient(N);

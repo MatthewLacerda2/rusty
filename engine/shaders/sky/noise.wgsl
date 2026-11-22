@@ -1,6 +1,6 @@
-// the value noise the procedural sky's clouds are
-// carved from, as fractal Brownian motion, and how far the clouds' coverage
-// shifts it: `common::procedural_sky` is their one caller.
+// This module holds the value noise the procedural sky's clouds are carved from, as fractal
+// Brownian motion, and how far the clouds' coverage shifts it; `common::procedural_sky` is
+// their one caller.
 
 #define_import_path sky::noise
 
@@ -36,7 +36,7 @@ fn sky_fbm(p: vec2<f32>) -> f32 {
 }
 
 // How far `coverage` shifts the FBM before the cloud mask's ramp (0.45..0.80) carves
-// it: exactly 0 at the default 0.5 (the layer the sky always drew), -0.55 at 0 so
+// it: exactly 0 at the default 0.5, -0.55 at 0 so
 // even the FBM's maximum (31/32) stays under the ramp and nothing is carved, +0.8 at
 // 1 so even its minimum (0) clears it and every direction is cloud.
 fn cloud_shift(coverage: f32) -> f32 {

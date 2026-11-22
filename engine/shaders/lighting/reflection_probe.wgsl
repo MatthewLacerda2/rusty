@@ -1,14 +1,15 @@
+// One resident reflection probe as the shader reads it, and its box- or sphere-projected
+// parallax correction (Lagarde's, against HDRP's oriented proxy volume): the WGSL side of
+// `scene::lighting::reflection_probe`, whose `projection.rs` runs the same steps.
 
 #define_import_path lighting::reflection_probe
 
-// One resident reflection probe: its capture point and its parallax box in its volume's frame
-// (: `rotation` turns a world vector into it, identity for a world-aligned box, `shape.x` is 1
-// for a sphere of radius `shape.y`, `shape.z` its blend distance and `shape.w` the projection's
-// fade span past it), the layer of the probe cube array its cube sits in (probes sharing a cube
-// share it), where that cube's prefiltered mip chain starts, its intensity (`params.x`) and
-// box-projection switch (`params.y`, 1 on), and the fallback flag (`params.z`, only ever slot
-// 0), the normalisation switch (`params.w`, 1 when `irradiance` is stored) and the luminance of
-// its stored irradiance as 9 L2 SH coefficients, convolved over pi.
+// Mirrors the Rust `ReflectionProbeUniform` byte for byte. `rotation` turns a world vector into
+// the volume's frame (identity for a world-aligned box); `shape.x` is 1 for a sphere of radius
+// `shape.y`, `shape.z` the blend distance and `shape.w` the fade span past it. Probes sharing a
+// cube share its `layer`; `mip_base` is where its prefiltered chain starts. `params`: x the
+// intensity, y box projection (1 on), z the fallback flag (only ever slot 0), w 1 when
+// `irradiance` holds the stored irradiance's luminance as 9 L2 SH coefficients, convolved over pi.
 struct ReflectionProbe {
     center: vec3<f32>,
     mip_base: f32,
@@ -27,8 +28,8 @@ fn quat_rotate(q: vec4<f32>, v: vec3<f32>) -> vec3<f32> {
     return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v);
 }
 
-// Box- or sphere-projected parallax correction, the standard Lagarde technique against the
-// probe's oriented volume (HDRP's proxy).
+// WGSL may assume no inf or NaN, so an axis the ray runs parallel to is never divided by: it
+// exits at `PARALLAX_NO_HIT`. The Rust twins are `PARALLEL_EPSILON` and `NO_HIT`.
 const PARALLAX_EPSILON: f32 = 1e-6;
 const PARALLAX_NO_HIT: f32 = 1e30;
 fn parallax_correct(probe: ReflectionProbe, world_pos: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
@@ -68,6 +69,8 @@ fn project_in_volume(probe: ReflectionProbe, p: vec3<f32>, dir: vec3<f32>) -> ve
         let safe_dir = select(vec3<f32>(1.0), d, crosses);
         let first = (probe.box_max - p) / safe_dir;
         let second = (probe.box_min - p) / safe_dir;
+        // Each exit is a magnitude, so an outside fragment projects continuously across every
+        // face, never stepping to infinite projection.
         let exits = select(vec3<f32>(PARALLAX_NO_HIT), abs(max(first, second)), crosses);
         t = min(min(exits.x, exits.y), exits.z);
     }

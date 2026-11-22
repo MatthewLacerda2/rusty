@@ -39,6 +39,7 @@ struct InstanceInput {
     @location(5) light: vec4<f32>,
     // Flipbook columns, rows and frame; soft-fade distance (0 = off).
     @location(6) sheet: vec4<f32>,
+    // 0 billboard, 1 along velocity, 2 flat in XZ, 3 upright.
     @location(7) mode: u32,
     @location(8) reactive: f32,
 };
@@ -50,8 +51,8 @@ struct VsOut {
     @location(2) fog: f32,
     @location(3) world: vec3<f32>,
     @location(4) soft: f32,
-    // The volumetric fog at this corner: rgb the air's light, a what gets through; (0, 0, 0, 1)
-    // where the camera reads no volume.
+    // The volumetric fog: rgb the air's light, a what gets through; (0, 0, 0, 1) where the
+    // camera reads no volume.
     @location(5) air: vec4<f32>,
     @location(6) @interpolate(flat) reactive: f32,
 };
@@ -65,7 +66,6 @@ fn corner_of(vid: u32) -> vec2<f32> {
     return vec2<f32>(x, y);
 }
 
-// `v` normalised, or `fallback` when it is (near) zero.
 fn unit_or(v: vec3<f32>, fallback: vec3<f32>) -> vec3<f32> {
     let len = length(v);
     return select(fallback, v / len, len > 1e-5);
@@ -172,6 +172,7 @@ fn expand(inst: InstanceInput, vid: u32) -> VsOut {
 
     var color = inst.color;
     if (inst.light.w > 0.5) {
+        // Half the sprite's size floors the lamp distance, so a grazed corner gets no spike.
         color = vec4<f32>(color.rgb * particle_light(world, inst.light, inst.size * 0.5), color.a);
     }
 

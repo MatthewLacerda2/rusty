@@ -1,7 +1,7 @@
 
 local Fx = {}
 
-local CAMERA_BACK, CAMERA_UP = 6.5, 3.2 -- the camera's place behind and above the runner
+local CAMERA_BACK, CAMERA_UP = 6.5, 3.2 -- m behind and above the runner
 local CAMERA_PITCH = -15                -- degrees, looking down at the track
 local CAMERA_FOLLOW_X = 0.6             -- how much of a lane change the camera follows
 

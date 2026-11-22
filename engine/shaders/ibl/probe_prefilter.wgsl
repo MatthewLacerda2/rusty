@@ -1,9 +1,17 @@
+// A reflection probe's GGX prefilter on the GPU: one dispatch per rough mip, one invocation
+// per texel of every face. It must match `reflection_prefilter::cpu::prefilter` texel for texel;
+// the CPU twins are `cube_sample`'s `face_uv`, `sample` and `sample_lod`, `source::sample_mip`
+// and `cpu::convolve`.
 
 #import common::PI
 #import ibl::ggx::{ggx_light, tangent_frame}
 
 struct Params {
+    // x roughness, y this mip's face size and z the capture's face size (texels), w the sample
+    // count (`reflection_prefilter::SAMPLE_COUNT`).
     p: vec4<f32>,
+    // Each face camera's view-projection and inverse (`cube_sample::FaceProjections`), the
+    // capture's own face convention, so no second one is needed.
     view_proj: array<mat4x4<f32>, 6>,
     inv_view_proj: array<mat4x4<f32>, 6>,
 };

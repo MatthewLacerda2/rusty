@@ -1,6 +1,5 @@
-// the shadow pass's own resources
-//: the cascade's matrix and the casters `shader.wgsl`'s `vs_shadow` and
-// `shadow_clip` read. Moved out of `shader.wgsl` for its size cap.
+// The shadow pass's own resources: the cascade's matrix and the casters `shader.wgsl`'s
+// `vs_shadow` and `shadow_clip` read. They sit apart from `shader.wgsl` for that file's size cap.
 
 #define_import_path forward::shadow_caster
 
@@ -14,11 +13,10 @@ struct ShadowLight {
 @group(0) @binding(6)
 var<uniform> shadow_light: ShadowLight;
 
-// One caster: its world matrix, where its joint palette starts in `bones`
-// (; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
-//: the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
-// always 1), read where its material's `mapping` puts it, clipped below
-// `alpha_cutoff` (0 for a material that does not clip).
+// One caster: its world matrix, where its joint palette starts in `bones` (0, the shared
+// identity, for a mesh with no skin), and its cutout alpha test: the albedo map's alpha when
+// `use_texture == 1` (a cutout's tint alpha is always 1), read where its material's `mapping`
+// puts it, clipped below `alpha_cutoff` (0 for a material that does not clip).
 // Mirrors `CasterData` (crates/render/src/passes/shadows/casters/buffer.rs) byte-for-byte.
 struct Caster {
     model: mat4x4<f32>,

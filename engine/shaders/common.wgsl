@@ -20,7 +20,7 @@ struct Fog {
 };
 
 struct Clusters {
-    // Depth along the view axis: dot(view_z.xyz, p) + view_z.w.
+    // Depth along the view axis.
     view_z: vec4<f32>,
     // x scale, y bias, z 1 = log2 slices (perspective) / 0 = linear, w near plane.
     slices: vec4<f32>,
@@ -50,13 +50,13 @@ struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
     gradient_sky: vec3<f32>,
-    // 0: `color`'s hemisphere, 1: the trilight, 2: the sky's SH (`Skybox`).
+    // 0: `color`'s hemisphere, 1: trilight, 2: sky's SH (`Skybox`).
     mode: f32,
     gradient_equator: vec3<f32>,
     _pad_equator: f32,
     gradient_ground: vec3<f32>,
     _pad_ground: f32,
-    // Intensity applied, convolved over π; `w` unused.
+    // Intensity applied, convolved over π.
     sky_sh: array<vec4<f32>, 9>,
 };
 
@@ -103,7 +103,7 @@ struct LocalLight {
     mask_channel: f32,
 };
 
-// x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
+// The CPU binner writes this same index order.
 fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     let clip = view_proj * vec4<f32>(world, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);
@@ -267,7 +267,6 @@ struct VertexInput {
     @location(6) lightmap_uv: vec2<f32>,
 };
 
-// Zero weights skin as identity.
 fn blend_joints(
     j0: mat4x4<f32>,
     j1: mat4x4<f32>,
@@ -281,6 +280,7 @@ fn blend_joints(
     return j0 * weights.x + j1 * weights.y + j2 * weights.z + j3 * weights.w;
 }
 
+// Metres, beyond any level's far wall, so the sky fogs no less than geometry.
 const FOG_SKY_DISTANCE: f32 = 1000.0;
 
 fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
@@ -324,8 +324,8 @@ struct ProceduralSky {
     clouds: vec4<f32>,
 };
 
-// Must stay affine in `ambient` for a fixed `sky` (`a * ambient + b`): the prefilter
-// bakes the two terms once.
+// `procedural_sky` must stay affine in `ambient` for a fixed `sky` (`a * ambient + b`, `a`
+// one scalar): `sky/prefilter.wgsl` bakes both terms once.
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let zenith = select(ambient, sky.zenith.rgb, sky.zenith.w > 0.5);

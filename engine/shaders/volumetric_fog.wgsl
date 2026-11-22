@@ -1,6 +1,6 @@
 // Frostbite's unified volumetrics (Hillaire 2015). `cs_scatter`: per froxel, the medium
-// at a jittered point lit by ambient, suns, clustered lights through their shadow tiles
-// and `Baked` lamps unshadowed, through Henyey-Greenstein, blended with last frame's
+// at a jittered point lit by ambient, suns, clustered lights and `Baked` lamps, through
+// Henyey-Greenstein, blended with last frame's
 // froxel reprojected; rgb light per metre, a extinction. `cs_integrate`: per column,
 // front to back (Frostbite's energy-conserving step), so texel k holds the eye to slice
 // k's far side.
@@ -11,6 +11,7 @@
 #import lighting::cascades::ShadowCascades
 #import numeric::{finite3, finite4}
 
+// Mirrors `volumetric_fog::params::VolumetricParams` byte for byte.
 struct Params {
     prev_view_proj: mat4x4<f32>,
     prev_view_z: vec4<f32>,
@@ -46,7 +47,8 @@ struct Params {
 @group(0) @binding(16) var out_scatter: texture_storage_3d<rgba16float, write>;
 @group(0) @binding(17) var t_probes: texture_3d<f32>;
 
-// As `forward::transparent::MAX_HDR`, so every reader gets a finite value.
+// Below `Rgba16Float`'s 65504, as `forward::transparent::MAX_HDR`, so every reader gets a
+// finite value.
 const MAX_FROXEL: f32 = 60000.0;
 
 fn phase(g: f32, c: f32) -> f32 {
@@ -68,8 +70,8 @@ fn view_ray(uv: vec2<f32>) -> array<vec3<f32>, 2> {
     return array<vec3<f32>, 2>(origin, dir);
 }
 
-// Faded to 1 over the last 10% as `calculate_shadow` does, so shadowed air never ends
-// at a plane that moves with the camera.
+// Faded to 1 over the last 10% as `forward::lighting::sun_shadow_parts` does, so shadowed
+// air never ends at a plane that moves with the camera.
 fn sun_lit(world: vec3<f32>) -> f32 {
     let count = i32(shadow.params.x);
     let depth = dot(world - shadow.view_pos.xyz, shadow.view_dir.xyz);
@@ -93,8 +95,8 @@ fn sun_lit(world: vec3<f32>) -> f32 {
     return mix(lit, 1.0, fade);
 }
 
-// A froxel is a volume: a sample landing on the lamp itself would otherwise spike that
-// froxel from frame to frame.
+// `near` (half the froxel's depth) floors the inverse square: a froxel is a volume, and a
+// sample on the lamp would spike it frame to frame.
 fn lamps(light: LocalLight, world: vec3<f32>, to_eye: vec3<f32>, g: f32, near: f32) -> vec3<f32> {
     let travel = normalize(world - light.position);
     return local_light_radiance(light, world, near) * phase(g, dot(travel, to_eye));

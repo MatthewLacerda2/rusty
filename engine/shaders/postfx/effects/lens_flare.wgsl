@@ -1,4 +1,4 @@
-// the lens flare's add, in the
+// The lens flare's add, in the
 // composite: the flare `postfx/lens_flare.wgsl` drew before the
 // composite, at a quarter of the view's size or less, upsampled onto the HDR image
 // after bloom's add, as URP's uber pass adds it with bloom. Added here rather than

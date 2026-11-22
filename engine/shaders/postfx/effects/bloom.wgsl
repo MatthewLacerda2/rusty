@@ -1,4 +1,4 @@
-// bloom's add, in the composite: the
+// Bloom's add, in the composite: the
 // top of its mip chain (`postfx/bloom.wgsl`, run before the composite) over the HDR
 // image, and the lens dirt it lights, as Unity's `UberPost` adds them:
 // `bloom *= intensity; color += bloom; color += dirt * dirt_intensity * bloom`.

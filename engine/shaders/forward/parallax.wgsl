@@ -1,26 +1,25 @@
 // HDRP Lit's *Displacement Mode: Pixel* (parallax occlusion mapping): `displace` shifts
 // the one `MapCoords` every map reads. The depth the surface writes is untouched, so
-// outline, shadows, decals, SSR, SSAO and motion vectors see the flat surface; the
-// lightmap is read at UV1, never shifted. The march is HDRP's
-// `ParallaxOcclusionMapping` (`PerPixelDisplacement.hlsl`): a linear search, then one
-// line intersection. Steps follow the view angle, `_PPDMinSamples` (5) to
-// `_PPDMaxSamples` (15); the shift fades over one mip past `_PPDLodThreshold` (5).
-// Where HDRP scales by the primitive's size, the depth here is a fraction of one
-// repeat's width (`height_scale`).
+// outline, shadows, decals, SSR, SSAO and motion vectors see the flat surface. The march is
+// HDRP's `ParallaxOcclusionMapping` (`PerPixelDisplacement.hlsl`): a linear search, then one
+// line intersection.
 
 #define_import_path forward::parallax
 
 #import forward::bindings::{camera, material, s_height, t_height}
 #import forward::mapping::{MapCoords, displaced, level_at}
 
+// HDRP Lit's `_PPDMinSamples`, `_PPDMaxSamples` and `_PPDLodThreshold` (a mip) defaults.
 const MIN_STEPS: f32 = 5.0;
 const MAX_STEPS: f32 = 15.0;
 const LOD_THRESHOLD: f32 = 5.0;
-// The least cosine between the view and the surface the march divides by: a ray
-// skimming the surface reads far along it, never infinitely far.
+// The least view cosine the march divides by, so a ray skimming the surface reads far along
+// it, never infinitely far.
 const MIN_COS: f32 = 0.01;
 const HALF_PI: f32 = 1.5707963;
 const UV0: u32 = 0u;
+// Cosines of a face's normal with world Y (Planar's axis) above which the shift is whole, and
+// below which it is none.
 const PLANAR_FULL: f32 = 0.7;
 const PLANAR_NONE: f32 = 0.3;
 const BEND_FROM: f32 = 0.5;
@@ -88,7 +87,8 @@ fn shift(c: MapCoords, position: vec3<f32>, n: vec3<f32>, dp1: vec3<f32>, dp2: v
     }
     let grad_u = (dp2perp * c.dx.x + dp1perp * c.dy.x) / det;
     let grad_v = (dp2perp * c.dx.y + dp1perp * c.dy.y) / det;
-    // A side the surface does not cross has no width; the narrower one stays finite.
+    // In metres: `height_scale` of one repeat's narrower side, finite where the surface does not
+    // cross the other.
     let width = 1.0 / max(max(length(grad_u), length(grad_v)), 1e-6);
     let depth = m.height_scale * width;
     let v = normalize(camera.camera_pos - position);
@@ -106,7 +106,8 @@ fn shift(c: MapCoords, position: vec3<f32>, n: vec3<f32>, dp1: vec3<f32>, dp2: v
 }
 
 // 0 where the shift changes under half as fast as the derivatives, 1 where as fast (a
-// ridge the ray crosses). Takes derivatives: call it in uniform control flow.
+// ridge the ray crosses). Coarse and fine both, since a GPU's implicit level may take either.
+// Takes derivatives: call it in uniform control flow.
 fn bend(offset: vec2<f32>, dx: vec2<f32>, dy: vec2<f32>) -> f32 {
     let along_x = max(length(dpdxCoarse(offset)), length(dpdxFine(offset)));
     let along_y = max(length(dpdyCoarse(offset)), length(dpdyFine(offset)));

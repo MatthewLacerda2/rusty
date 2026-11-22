@@ -1,4 +1,6 @@
-
+// The procedural sky, drawn when no panorama is bound. A colour its settings leave unset
+// follows `ambient.color`, whatever the ambient mode: a `Gradient` ambient lights surfaces
+// only and never tints the sky, as Unity's skybox.
 #import common::{AmbientLight, CameraUniforms, ProceduralSky, VertexInput, procedural_sky, sky_fog}
 #import sky::air::through_air
 #import sky::motion::{SkyTargets, sky_targets}

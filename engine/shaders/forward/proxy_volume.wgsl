@@ -8,6 +8,8 @@
 #import forward::bindings::proxy_volumes
 #import lighting::sh::sh_basis
 
+// `render::draw::proxy_volume::pack`'s layout, in vec4s: the world-to-box matrix's columns (box
+// [0, 1]^3) and the grid's dims, then each point's L1 SH, x fastest. Change both together.
 const HEADER: u32 = 5u;
 const COEFFS: u32 = 4u;
 

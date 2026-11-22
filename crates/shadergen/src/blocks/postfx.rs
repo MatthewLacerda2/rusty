@@ -110,6 +110,8 @@ pub const BLOCKS: &[Block] = &[
             Param::baked("scale", 1.0, 1),
             Param::live("strength", 0.3, 1),
         ],
+        // Gain 3 keeps each channel's mean with one lane in three lit; slot's gaps dark
+        // one row in four as well, so it takes 4.
         helper: "fn pfx_phosphor_mask(c: vec3<f32>, px: vec2<f32>, kind: f32, scale: f32, strength: f32) -> vec3<f32> {\n    let q = vec2<i32>(floor(px / max(scale, 0.001)));\n    let shadow = kind > 0.5 && kind < 1.5;\n    let slot = kind > 1.5;\n    let lane = (q.x + select(0, q.y, shadow)) % 3;\n    let gap = slot && (q.y + 2 * (q.x / 3)) % 4 == 0;\n    let gain = select(select(3.0, 4.0, slot), 0.0, gap);\n    let mask = select(vec3<f32>(0.0), vec3<f32>(gain), vec3<i32>(0, 1, 2) == vec3<i32>(lane));\n    return c * mix(vec3<f32>(1.0), mask, strength);\n}",
         call: "pfx_phosphor_mask({prev}, in.pos.xy{args})",
         textures: &[],

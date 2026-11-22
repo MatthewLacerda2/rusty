@@ -5,12 +5,11 @@
 #import lighting::reflection_probe::{ReflectionProbe, parallax_correct}
 #import forward::bindings::{lighting, s_linear_clamp, t_refl_cube, t_skybox}
 
-// Unity URP's analytic environment BRDF (`BRDF.hlsl` `EnvironmentBRDFSpecular`).
-// `surfaceReduction` = 1 / (alpha^2 + 1), alpha = roughness^2, is the energy a rough
-// lobe loses, so a rough metal reads blurry, not black. The angle is `|N.V|`: a normal
-// map can lean away from the camera on a face turned toward it, which would take the
-// grazing Fresnel. `fs_main` passes the authored roughness, not the widened one:
-// `specular_aa`'s spread would take `grazing` from 0.96 to 0.51.
+// Unity URP's analytic environment BRDF (`BRDF.hlsl` `EnvironmentBRDFSpecular`). Its
+// `surfaceReduction` is the energy a rough lobe loses, so a rough metal reads blurry, not
+// black. The angle is `|N.V|`: a normal map can lean away from the camera on a face turned
+// toward it, which would take the grazing Fresnel. `fs_main` passes the authored roughness, not
+// the widened one: `specular_aa`'s spread would take `grazing` from 0.96 to 0.51.
 fn environment_brdf(F0: vec3<f32>, F90: f32, dielectric_reflectivity: f32, metallic: f32, roughness: f32, N: vec3<f32>, V: vec3<f32>) -> vec3<f32> {
     let reflectivity = dielectric_reflectivity + (1.0 - dielectric_reflectivity) * metallic;
     let grazing = saturate(1.0 - roughness + reflectivity) * F90;
@@ -58,12 +57,12 @@ fn probe_reflection(p: ReflectionProbe, world_pos: vec3<f32>, R: vec3<f32>, b: a
     return cube * p.params.x * probe_normalisation(p, b, baked);
 }
 
-// Probe normalisation (UE's lightmap mixing, Frostbite's and Call of Duty's): a pixel
-// in a corner the lightmap holds dark would reflect the lit room at full strength, so
-// the reflection is scaled by baked diffuse over the irradiance the probe stored, held
-// to [0, 1]: it removes leaks, never brightens. `stored` is floored at STORED_FLOOR of
-// the probe's mean: an L2 SH of one dominant lamp rings below zero for normals turned
-// 104-145 degrees from it.
+// Probe normalisation (`docs/api/Reflection.md`): baked diffuse over the probe's stored
+// irradiance along N, both E / π luminance, held to [0, 1].
+// `ibl::reflection_probes::uniform::normalisation` mirrors it on the CPU for the tests,
+// constants included: change both together.
+// `stored` never drops below `STORED_FLOOR` of the probe's mean, where an L2 SH of one bright
+// lamp rings below zero; with `NORMALISE_BIAS` (E / π) on both sides, two zeros scale by 1.
 const STORED_FLOOR: f32 = 0.25;
 const NORMALISE_BIAS: f32 = 0.001;
 fn probe_normalisation(p: ReflectionProbe, b: array<f32, 9>, baked: vec2<f32>) -> f32 {

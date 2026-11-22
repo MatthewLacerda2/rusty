@@ -1,17 +1,16 @@
 // Unity URP's two modes. CoC is signed, in pixels of radius, from depth along the view
 // axis (velocity target `.z`): the focus is a plane, as in Unity, not a sphere;
 // negative is nearer than the focus. A pixel an overlay camera drew (`.w` above 0: a
-// viewmodel) has no CoC and stays sharp. Gaussian weights each tap by its own CoC so a
-// sharp foreground never bleeds into the blurred background. Bokeh finds per tile the
-// near field's reach, so a pixel knows how wide to gather; a 3×3 tent then smooths the
-// rings.
+// viewmodel) has no CoC and stays sharp.
 
 #import fullscreen
 
 struct DofParams {
-    // w: Bokeh's tile size in working pixels (at least the largest working CoC, so a
-    // 3×3 of tiles holds every tap's reach)
+    // x: mode (1 Gaussian, 2 Bokeh); y: the largest CoC in full-resolution pixels; z: the
+    // working-resolution divisor; w: Bokeh's tile size in working pixels (at least the
+    // largest working CoC, so a 3×3 of tiles holds every tap's reach)
     shape: vec4<f32>,
+    // See `DofParams::focus`.
     focus: vec4<f32>,
 };
 
@@ -25,6 +24,7 @@ struct DofParams {
 const TAU: f32 = 6.28318530718;
 // Ring k holds 8k taps.
 const MIN_RINGS: i32 = 3;
+// Working pixels a tap's reach fades over at its edge.
 const MARGIN: f32 = 1.0;
 
 @vertex
@@ -36,6 +36,7 @@ fn is_gaussian() -> bool {
     return dof.shape.x < 1.5;
 }
 
+// `DofParams::coc` mirrors this for tests: change both.
 fn coc_of(depth: f32) -> f32 {
     let max_coc = dof.shape.y;
     if (is_gaussian()) {
@@ -162,7 +163,7 @@ fn reach(radius: f32, dist: f32) -> f32 {
     return clamp((radius - dist + MARGIN) / MARGIN, 0.0, 1.0);
 }
 
-// On the texel it lands on, never between two: a bilinear tap would mix a sharp texel's
+// A tap sits on one texel, never between two: a bilinear tap would mix a sharp texel's
 // colour into its neighbour's blur (a halo).
 fn ring_tap(ring: i32, i: i32, rings: i32, radius: f32) -> vec2<f32> {
     let count = ring * 8;
@@ -204,6 +205,8 @@ fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
             for (var i = 0; i < ring * 8; i = i + 1) {
                 let offset = ring_tap(ring, i, rings, near);
                 let tap = textureLoad(t_color, clamp(p + vec2<i32>(offset), vec2<i32>(0), last), 0);
+                // Under a full-resolution pixel a CoC is in focus, eased in as the
+                // composite's far blend is.
                 let w = reach(-tap.a, length(offset)) * smoothstep(0.5, 1.5, -tap.a * dof.shape.z);
                 fg += vec4<f32>(tap.rgb, 1.0) * w;
                 taps += 1.0;
@@ -211,6 +214,7 @@ fn fs_bokeh(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
         }
     }
     let fg_rgb = fg.rgb / max(fg.a, 1e-4);
+    // Half the disc covered by the near field hides what lies behind it.
     let fg_alpha = clamp(2.0 * fg.a / taps, 0.0, 1.0);
     let rgb = mix(bg.rgb / bg.a, fg_rgb, fg_alpha);
     return vec4<f32>(rgb, fg_alpha);

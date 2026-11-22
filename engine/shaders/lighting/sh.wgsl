@@ -1,7 +1,5 @@
-// the real L2 spherical-harmonic basis,
-// `scene::Sh9`'s order and constants, shared by every shader that evaluates SH: the
-// probes' `forward::lighting::eval_sh` and the `Skybox` ambient's
-// `lighting::ambient::sky_sh`. One copy, so the two can never disagree.
+// This module holds the real L2 spherical-harmonic basis in `scene::Sh9`'s order and
+// constants. Every shader that evaluates SH imports this one copy, so none can disagree.
 
 #define_import_path lighting::sh
 

@@ -1,4 +1,4 @@
-// contrast-adaptive sharpening: AMD's
+// Contrast-adaptive sharpening: AMD's
 // FidelityFX RCAS (Robust Contrast-Adaptive Sharpening, MIT), the sharpen URP's TAA
 // *Contrast Adaptive Sharpening* and FSR run in its final post pass, after
 // tonemapping. One pass over the chain's LDR image at the chain's size

@@ -1,9 +1,8 @@
 // The culling half of UE5's Nanite: a mesh split into clusters at import is drawn, per
 // instance, as the clusters this camera may see. `cs_cluster_test` keeps each
 // (instance, cluster) unless its instance is hidden, it is outside the frustum, faces
-// wholly away (normal cone), or is behind the pyramid; a cluster crossing the near
-// plane is kept. `cs_cluster_scan` gives the kept clusters their place in the output by
-// a parallel prefix sum. `cs_cluster_copy` copies them. The output keeps the mesh's own
+// wholly away (normal cone), or is behind the pyramid. `cs_cluster_scan` gives the kept
+// clusters their place in the output by a parallel prefix sum. The output keeps the mesh's own
 // index order, so a frame that culls nothing draws exactly the unculled triangles.
 
 #import hiz::hidden::{hidden, Eye}
@@ -55,11 +54,12 @@ struct Cluster {
 @group(1) @binding(0) var<storage, read> clusters: array<Cluster>;
 @group(1) @binding(1) var<storage, read> mesh_indices: array<u32>;
 
-// Past 65,535 workgroups in one dimension.
+// A dispatch past 65,535 workgroups spills into `y`.
 fn flat(group: vec3<u32>, groups: vec3<u32>) -> u32 {
     return group.y * groups.x + group.x;
 }
 
+// Cosine past the cone's cutoff a view needs before its cluster faces away.
 const CONE_MARGIN: f32 = 1e-3;
 
 fn world_of(object: u32) -> mat4x4<f32> {
@@ -192,6 +192,7 @@ fn cs_cluster_scan(
             workgroupBarrier();
         }
         var at = before + sums[lane] - own;
+        // In place: the chunk's verdicts were read above, and kept cluster `m` has `m <= k`.
         for (var i = 0u; i < 4u; i++) {
             if keep[i] != 0u {
                 state[base + 1u + 2u * at.x] = chunk + lane * 4u + i;

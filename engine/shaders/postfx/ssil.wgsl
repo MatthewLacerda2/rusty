@@ -3,10 +3,8 @@
 // share the opaque pass wrote in alpha, block-averaged; the sky and a NaN add nothing.
 // `fs_gather` samples a cosine-weighted hemisphere (SSAO's pattern) and reads the
 // source through last frame's view-projection where the two surfaces face each other
-// and nothing on screen stands between (`blocked`). `fs_accumulate` reprojects the
-// history, rejects it on a disocclusion or a turned normal, clamps it to this frame's
-// neighbourhood and blends in at 90%. Texel `t` stands for full-resolution pixel `t *
-// step`.
+// and nothing on screen stands between (`blocked`). Texel `t` stands for full-resolution
+// pixel `t * step`.
 
 #import fullscreen
 #import numeric::finite3
@@ -19,6 +17,7 @@ struct SsilParams {
     camera_pos: vec4<f32>,
     camera_fwd: vec4<f32>,
     prev_camera_pos: vec4<f32>,
+    // `ssil::SsilUniform` says what each `w` and these hold; the radius is in world units.
     params: vec4<f32>,
 };
 
@@ -36,7 +35,9 @@ var t_prev_normal: texture_2d<f32>;
 const HISTORY: f32 = 0.9;
 // A share of the distance from the eye.
 const REJECT: f32 = 0.05;
+// The least cosine (about 25°) between a normal and its history's.
 const REJECT_TURN: f32 = 0.9;
+// Shares of the point-to-sample segment that `blocked` reads.
 const OCCLUSION_TAPS: array<f32, 3> = array<f32, 3>(0.3, 0.5, 0.7);
 
 @vertex
@@ -114,7 +115,8 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let tb = tangents(N);
     let radius = p.params.x;
     let n = u32(p.params.z);
-    // A still pattern left blotches the blur could not remove.
+    // IGN's temporal offset (Jimenez 2014): a still pattern left blotches the blur could not
+    // remove.
     let turn = vec2<f32>(5.588238 * p.camera_pos.w);
     let rot = ign(frag.xy + turn) * 6.2831853;
     let jitter = ign(frag.yx + 17.0 + turn);
@@ -140,6 +142,7 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         let dist = length(to_q);
         let NQ = normal_at(t_depth, v, q, Q, 1);
         let facing = dot(N, to_q) > bias && dot(NQ, -to_q) > 0.0;
+        // Fades out over the last third of 1.5 radii.
         let reach = saturate(3.0 - 2.0 * dist / radius);
         let was = prev_uv(Q);
         if (!facing || reach <= 0.0 || was.x < 0.0 || blocked(v, P, Q, dims, between, radius)) {

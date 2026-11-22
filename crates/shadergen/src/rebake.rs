@@ -42,6 +42,8 @@ pub fn engine_hash(engine_shaders: &str) -> Result<u64, String> {
     Ok(*hashes.entry(engine_shaders.to_owned()).or_insert(hash))
 }
 
+/// No shadergen version to bump: the assembled module holds the base shader and every
+/// block's WGSL, so a change to either moves the hash.
 pub fn fingerprint(module: &str, params: &str, engine: u64) -> u64 {
     let mut bytes = module.replace("\r\n", "\n").into_bytes();
     bytes.push(0);

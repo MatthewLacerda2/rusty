@@ -1,14 +1,15 @@
-// One march, two depth sources (a `Frame`): the velocity target's view-axis `.z`, or the
-// opaque copy's eye-distance `.a`. No derivatives, so it may run in a per-pixel branch.
+// `Frame.fwd` picks the depth source: the view axis for the velocity target's `.z`, or zero
+// for the opaque copy's eye distance (`.a`). No derivatives: a march may run in a per-pixel
+// branch.
 
 #define_import_path lighting::ssr_march
 
-// HDRP's *Screen Edge Fade Distance*.
+// The edge fade, as a screen fraction (HDRP's *Screen Edge Fade Distance*).
 const SCREEN_FADE: f32 = 0.1;
 const REFINE: i32 = 4;
+// Sky depths start here, under both targets' `SKY_DISTANCE` (65504).
 const SKY_DEPTH: f32 = 60000.0;
 
-// `fwd` is the view axis, or zero for the distance from the eye.
 struct Frame {
     view_proj: mat4x4<f32>,
     eye: vec3<f32>,
@@ -59,23 +60,22 @@ fn footprint(f: Frame, p: vec3<f32>, r: vec3<f32>, t: f32, cone: f32, uv: vec2<f
     return 2.0 * length((rim_uv - uv) * dim);
 }
 
-// A fixed world step near the camera steps past a thin object or a grazing floor; a
-// step held to this sees anything wider. A march of fewer than 64 steps is capped at `1
-// / steps` of that side (`step_cap`).
+// A step's longest move, as a fraction of the screen's shorter side (`1 / steps` under 64
+// steps, `step_cap`): a fixed world step near the camera skips thin objects and grazing floors.
 const SCREEN_STEP: f32 = 1.0 / 64.0;
 
 fn step_cap(steps: i32, dim: vec2<f32>) -> f32 {
     return max(SCREEN_STEP, 1.0 / f32(max(steps, 1))) * min(dim.x, dim.y);
 }
 
-// The depth target holds only front faces, so `THICKNESS` is how deep an object is
-// taken to be. `DEPTH_SLACK` is a texel's own depth on a surface seen near grazing: 2%
+// The depth target holds only front faces, so `THICKNESS` is how deep (m) an object
+// is taken to be. `DEPTH_SLACK` is a texel's own depth on a surface seen near grazing: 2%
 // holds a floor down to a few degrees at 1080p.
 const THICKNESS: f32 = 0.15;
 const DEPTH_SLACK: f32 = 0.02;
 
-// From `BLUR_FADE_START` the hit fades to the probe it replaces, gone at
-// `BLUR_FADE_END`: a wide blur inside a hard edge reads as a block.
+// A hit fades to the probe as its blur (on-screen cone radius over the shorter side) runs
+// between these: a wider blur reads as a block in a hard edge.
 const BLUR_FADE_START: f32 = 0.04;
 const BLUR_FADE_END: f32 = 0.12;
 

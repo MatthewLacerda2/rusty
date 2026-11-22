@@ -8,6 +8,7 @@
 #import fullscreen
 #import postfx::grade::luminance
 
+// `bloom::chain::BloomParams` mirrors this and says what `texel` holds.
 struct BloomParams {
     // x: threshold, y: knee (half the threshold, as URP fixes it), z: URP's `lerp(0.05,
     // 0.95, scatter)`, w: clamp on the input
@@ -44,8 +45,9 @@ fn is_nan(x: f32) -> bool {
     return (bitcast<u32>(x) & 0x7fffffffu) > 0x7f800000u;
 }
 
-// An inf a bilinear tap keeps is clamped and still glows; one it weighs by 0 is NaN on
-// some drivers, and dropped.
+// Only the prefilter reads the scene, through this, so no NaN or inf reaches the chain. An
+// inf a bilinear tap keeps is clamped and still glows; one it weighs by 0 is NaN on some
+// drivers, and dropped.
 fn safe_tap(uv: vec2<f32>) -> vec3<f32> {
     let c = tap(uv);
     let nan = is_nan(c.r) || is_nan(c.g) || is_nan(c.b);
@@ -87,6 +89,7 @@ fn boxes(uv: vec2<f32>, step: vec2<f32>, safe: bool) -> Boxes {
     return out;
 }
 
+// A lone bright texel counts as one bright box, not as all of its energy.
 fn karis(share: f32, c: vec3<f32>) -> f32 {
     return share / (1.0 + luminance(c));
 }

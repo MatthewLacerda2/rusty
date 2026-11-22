@@ -1,9 +1,11 @@
+//! The one `naga_oil` composition path: engine shaders, authored-shader loaders and the
+//! bake all compose here, so a bake validates with exactly the code that loads it.
+
 use naga_oil::compose::{ComposableModuleDescriptor, Composer, NagaModuleDescriptor};
 
 pub use naga::Module;
 
-/// `naga_oil 0.13` composes into `naga 0.19`, the version wgpu 0.19 links: upgrade all three
-/// together.
+/// In dependency order: a module is registered after the modules it imports.
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",
