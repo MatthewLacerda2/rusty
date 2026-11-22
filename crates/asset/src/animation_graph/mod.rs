@@ -59,8 +59,7 @@ pub struct GraphNode {
     pub tag: String,
 }
 
-/// Fires when all its conditions hold; with none it never fires from data alone (explicit jumps
-/// only).
+/// Fires when all its conditions hold; with none, only explicit jumps fire it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GraphEdge {
     pub from: String,
@@ -111,8 +110,7 @@ pub enum NumericOp {
     NotEqual,
 }
 
-/// `nodes` and `edges` are `Vec`s: authored order is priority order, the first satisfied
-/// outgoing edge wins.
+/// Authored order is priority: the first satisfied outgoing edge wins.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct StateMachine {
     pub nodes: Vec<GraphNode>,
