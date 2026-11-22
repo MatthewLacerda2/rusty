@@ -67,6 +67,16 @@ fn gpu_the_kept_tree_equals_a_fresh_one_after_each_edit() {
         (1, 1),
         "an edited mesh builds its own tree"
     );
+}
+
+#[test]
+fn gpu_what_no_camera_shows_opaque_is_left_out() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
+        return;
+    };
+    let mut scene = level();
+    let ids = scene.world.ids_with_mesh();
+    step(&mut r, &scene);
     scene.materials.get_mut("both").unwrap().render_mode = RenderMode::Transparent;
     step(&mut r, &scene);
     let none = r.ray_tree(&scene).unwrap().packed();
@@ -77,8 +87,10 @@ fn gpu_the_kept_tree_equals_a_fresh_one_after_each_edit() {
     let before = none.instances.len();
     scene.world.set_layer(ids[0], 3);
     let cam = rusty_scene::create::create_entity(&mut scene, "Eye", None);
-    let mut camera = CameraComponent::default();
-    camera.culling_mask = !(1 << 3);
+    let camera = CameraComponent {
+        culling_mask: !(1 << 3),
+        ..Default::default()
+    };
     scene.world.set_camera(cam, Some(camera));
     step(&mut r, &scene);
     let after = r.ray_tree(&scene).unwrap().packed().instances.len();

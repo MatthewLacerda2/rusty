@@ -13,6 +13,7 @@ pub(crate) mod walk;
 use std::collections::BTreeMap;
 
 pub(crate) use gpu::layout;
+#[cfg(any(test, feature = "dev"))]
 pub(crate) use top::Packed;
 
 use crate::debug_meshes::has_geometry;
@@ -24,12 +25,12 @@ use rusty_scene::{Scene, SceneId};
 use top::Placed;
 
 /// The bind group a pass importing `rt::trace` sets at this index.
-pub(crate) const GROUP: u32 = 3;
+pub const GROUP: u32 = 3;
 
 /// One scene's tree, kept from its retained objects: rebuilt only after a static
 /// object changed ([`touch`](Self::touch)) or the cameras' layers did.
 #[derive(Default)]
-pub(crate) struct RayTree {
+pub struct RayTree {
     meshes: BTreeMap<MeshHandle, (MeshRevision, MeshTree)>,
     placed: Vec<Placed>,
     layers: Option<u32>,
@@ -48,19 +49,21 @@ impl RayTree {
         self.stale = true;
     }
 
+    #[cfg(any(test, feature = "dev"))]
     pub(crate) fn packed(&self) -> Packed {
         top::pack(self.meshes.iter().map(|(&h, (_, t))| (h, t)), &self.placed).0
     }
 
+    #[cfg(any(test, feature = "dev"))]
     pub(crate) fn mesh_count(&self) -> u32 {
         self.meshes.len() as u32
     }
 
-    pub(crate) fn gpu_bytes(&self) -> u64 {
+    pub fn gpu_bytes(&self) -> u64 {
         self.gpu.as_ref().map_or(0, gpu::GpuTree::bytes)
     }
 
-    pub(crate) fn bind_group(&self) -> Option<&wgpu::BindGroup> {
+    pub fn bind_group(&self) -> Option<&wgpu::BindGroup> {
         self.gpu.as_ref().map(|g| &g.group)
     }
 
@@ -117,7 +120,7 @@ fn camera_layers(scene: &Scene) -> u32 {
 
 impl Renderer {
     /// `scene`'s ray-traced tree, built or refreshed now; `None` before its first extract.
-    pub(crate) fn ray_tree(&mut self, scene: &Scene) -> Option<&RayTree> {
+    pub fn ray_tree(&mut self, scene: &Scene) -> Option<&RayTree> {
         self.refresh_rays(scene.id(), scene)?;
         self.retained.scene(scene.id()).map(|rs| &rs.rays)
     }
@@ -166,7 +169,7 @@ impl Renderer {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "dev"))]
 mod dust2_gpu_tests;
 #[cfg(test)]
 mod fixtures;

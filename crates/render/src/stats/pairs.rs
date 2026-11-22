@@ -45,15 +45,9 @@ impl RenderCounters {
             ("grade_lut_bakes", self.grade_lut_bakes.into()),
             ("sky_reflection_bakes", self.sky_reflection_bakes.into()),
             ("opaque_copies", self.opaque_copies.into()),
-            ("texture_bytes", self.texture_bytes),
-            ("lightmap_bytes", self.lightmap_bytes),
-            ("reflection_bytes", self.reflection_bytes),
-            ("mesh_count", self.mesh_count.into()),
-            ("mesh_bytes", self.mesh_bytes),
-            ("cluster_pool_bytes", self.cluster_pool_bytes),
-            ("ray_tree_bytes", self.ray_tree_bytes),
-            ("ray_tree_rebuilds", self.ray_tree_rebuilds.into()),
-            ("ray_mesh_builds", self.ray_mesh_builds.into()),
+        ]);
+        pairs.extend(self.memory_pairs());
+        pairs.extend([
             ("render_extracted", self.render_extracted.into()),
             ("render_posed", self.render_posed.into()),
             ("render_extract_us", self.render_extract_us),
@@ -65,6 +59,20 @@ impl RenderCounters {
         pairs.extend(self.uploads.pairs());
         pairs.extend(self.ops.pairs());
         pairs
+    }
+
+    fn memory_pairs(&self) -> [(&'static str, u64); 9] {
+        [
+            ("texture_bytes", self.texture_bytes),
+            ("lightmap_bytes", self.lightmap_bytes),
+            ("reflection_bytes", self.reflection_bytes),
+            ("mesh_count", self.mesh_count.into()),
+            ("mesh_bytes", self.mesh_bytes),
+            ("cluster_pool_bytes", self.cluster_pool_bytes),
+            ("ray_tree_bytes", self.ray_tree_bytes),
+            ("ray_tree_rebuilds", self.ray_tree_rebuilds.into()),
+            ("ray_mesh_builds", self.ray_mesh_builds.into()),
+        ]
     }
 
     fn occlusion_pairs(&self) -> [(&'static str, u64); 8] {

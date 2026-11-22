@@ -3,7 +3,7 @@ use wgpu::util::DeviceExt;
 use super::build::Node;
 use super::top::Packed;
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
-use crate::gpu::ops::CountedQueue as _;
+use crate::gpu::ops::{CountedDevice as _, CountedQueue as _};
 
 const STAGES: wgpu::ShaderStages = wgpu::ShaderStages::COMPUTE.union(wgpu::ShaderStages::FRAGMENT);
 const NODE: u64 = std::mem::size_of::<Node>() as u64;
@@ -81,7 +81,7 @@ impl GpuTree {
                 resource: b.as_entire_binding(),
             })
             .collect();
-        let group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let group = device.counted_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("Ray Tree"),
             layout,
             entries: &entries,

@@ -10,7 +10,9 @@ use wgpu::util::DeviceExt;
 #[cfg(test)]
 use super::walk::Hit;
 use super::GROUP;
-use crate::gpu::ops::CountedQueue as _;
+use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
+
+const IO: u32 = 0;
 use crate::Renderer;
 use rusty_scene::{Camera, Scene};
 
@@ -78,7 +80,7 @@ fn probe(r: &Renderer, entry_point: &str, io: &[wgpu::BindGroupLayoutEntry]) -> 
     });
     let rays = r.retained.ray_layout(device);
     let mut groups = vec![None; GROUP as usize + 1];
-    (groups[0], groups[GROUP as usize]) = (Some(&io), Some(rays));
+    (groups[IO as usize], groups[GROUP as usize]) = (Some(&io), Some(rays));
     let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: Some("Ray Probe"),
         bind_group_layouts: &groups,
@@ -95,21 +97,21 @@ fn probe(r: &Renderer, entry_point: &str, io: &[wgpu::BindGroupLayoutEntry]) -> 
     Probe { io, pipeline }
 }
 
-#[cfg(test)]
 fn group(
     r: &Renderer,
     layout: &wgpu::BindGroupLayout,
+    first: u32,
     buffers: &[&wgpu::Buffer],
 ) -> wgpu::BindGroup {
     let entries: Vec<wgpu::BindGroupEntry> = buffers
         .iter()
         .enumerate()
         .map(|(i, b)| wgpu::BindGroupEntry {
-            binding: i as u32,
+            binding: first + i as u32,
             resource: b.as_entire_binding(),
         })
         .collect();
-    r.device.create_bind_group(&wgpu::BindGroupDescriptor {
+    r.device.counted_bind_group(&wgpu::BindGroupDescriptor {
         label: Some("Ray Probe"),
         layout,
         entries: &entries,
@@ -119,9 +121,9 @@ fn group(
 fn dispatch(r: &Renderer, p: &Probe, io: &wgpu::BindGroup, tree: &wgpu::BindGroup, n: (u32, u32)) {
     let mut encoder = r.device.create_command_encoder(&Default::default());
     {
-        let mut pass = encoder.begin_compute_pass(&Default::default());
+        let mut pass = encoder.counted_compute_pass(&Default::default());
         pass.set_pipeline(&p.pipeline);
-        pass.set_bind_group(0, io, &[]);
+        pass.set_bind_group(IO, io, &[]);
         pass.set_bind_group(GROUP, tree, &[]);
         pass.dispatch_workgroups(n.0, n.1, 1);
     }
@@ -183,7 +185,7 @@ pub(crate) fn trace(
         "Ray Probe Hits",
         (rays.len() * size_of::<ProbeHit>()) as u64,
     );
-    let io = group(r, &p.io, &[&input, &out]);
+    let io = group(r, &p.io, 0, &[&input, &out]);
     let tree = r
         .retained
         .scene(scene.id())
@@ -212,6 +214,21 @@ pub(crate) fn trace(
         .collect()
 }
 
+fn eye(r: &Renderer, camera: &Camera, size: (u32, u32)) -> wgpu::Buffer {
+    let view_proj = camera.build_view_projection(size.0 as f32 / size.1.max(1) as f32);
+    let eye = Eye {
+        inv_view_proj: view_proj.inverse().to_cols_array_2d(),
+        origin: camera.position.extend(1.0).to_array(),
+        size: [size.0, size.1, 0, 0],
+    };
+    r.device
+        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Ray Probe Eye"),
+            contents: bytemuck::bytes_of(&eye),
+            usage: wgpu::BufferUsages::UNIFORM,
+        })
+}
+
 /// Builds `scene`'s tree from scratch and traces one ray per pixel of `size` from
 /// `camera`, each timed on the wall clock; `None` before the scene's first extract.
 pub fn measure(
@@ -234,34 +251,9 @@ pub fn measure(
             entry(3, storage(false)),
         ],
     );
-    let view_proj = camera.build_view_projection(size.0 as f32 / size.1.max(1) as f32);
-    let eye = Eye {
-        inv_view_proj: view_proj.inverse().to_cols_array_2d(),
-        origin: camera.position.extend(1.0).to_array(),
-        size: [size.0, size.1, 0, 0],
-    };
-    let uniform = r
-        .device
-        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Ray Probe Eye"),
-            contents: bytemuck::bytes_of(&eye),
-            usage: wgpu::BufferUsages::UNIFORM,
-        });
+    let uniform = eye(r, camera, size);
     let out = rw(r, "Ray Probe Depths", u64::from(size.0 * size.1) * 4);
-    let io = r.device.create_bind_group(&wgpu::BindGroupDescriptor {
-        label: Some("Ray Probe"),
-        layout: &p.io,
-        entries: &[
-            wgpu::BindGroupEntry {
-                binding: 2,
-                resource: uniform.as_entire_binding(),
-            },
-            wgpu::BindGroupEntry {
-                binding: 3,
-                resource: out.as_entire_binding(),
-            },
-        ],
-    });
+    let io = group(r, &p.io, 2, &[&uniform, &out]);
     let groups = (size.0.div_ceil(8), size.1.div_ceil(8));
     dispatch(r, &p, &io, &group_tree, groups);
     let mut times: Vec<f64> = (0..5)

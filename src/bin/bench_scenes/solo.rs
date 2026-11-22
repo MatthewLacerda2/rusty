@@ -71,9 +71,9 @@ pub fn profile_one(run: &Run, scene: &str) {
 /// `make ray-scene`: each scene's ray-traced tree, measured.
 pub fn rays_all(run: &Run, names: &[String]) {
     use rusty::render::rays::probe::measure;
-    let opened = open(run, &run.project, "the project");
     println!("scene | triangles | instances | meshes | GPU MiB | build ms | trace ms | hit px");
     for scene in names {
+        let opened = open(run, &run.project, "the project");
         let loaded = scenes::load(&run.out, &opened.root, scene, opened.settings, run.opts);
         let (mut harness, _) =
             loaded.unwrap_or_else(|e| fail(&format!("{scene}: load failed: {e}")));

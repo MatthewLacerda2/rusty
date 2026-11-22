@@ -12,8 +12,10 @@ use rusty_scene::Scene;
 pub(super) fn level() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
-    let mut both = rusty_components::MaterialAsset::default();
-    both.render_face = RenderFace::Both;
+    let both = rusty_components::MaterialAsset {
+        render_face: RenderFace::Both,
+        ..Default::default()
+    };
     scene.materials.insert("both".into(), both);
     let mut place = |kind, world: glam::Mat4, material: Option<&str>| {
         let id = create_entity(&mut scene, "Solid", Some(kind));

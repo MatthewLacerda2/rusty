@@ -61,7 +61,7 @@ impl Placed {
         let faces: Vec<u32> = object.slots.iter().map(slot_face).collect();
         let traced = faces.iter().any(|&f| f != face::SKIP);
         let inverse = object.world.inverse();
-        (traced && inverse.is_finite()).then(|| Self {
+        (traced && inverse.is_finite()).then_some(Self {
             mesh: object.mesh,
             world: object.world,
             slot: object.slot,
