@@ -11,7 +11,6 @@ use rusty_asset::SubMesh;
 use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource, Settings, MAX_RESOLUTION};
 use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::image_buf::Size;
-use rusty_procgen::Slot;
 
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;
 
@@ -113,11 +112,7 @@ pub(super) fn bake_mesh_maps(
             prepare_bake("Texture.BakeMeshMaps", (width, height), all)?;
         }
         let path = path(&map);
-        let slot = match map {
-            MeshMap::Id => Slot::Normal,
-            _ => Slot::Data,
-        };
-        bake_to_png(&image, slot, &path)?;
+        bake_to_png(&image, map.slot(), &path)?;
         out.insert(map.name().to_string(), path);
         Ok(())
     })

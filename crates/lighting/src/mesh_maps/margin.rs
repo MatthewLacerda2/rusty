@@ -1,19 +1,11 @@
 use glam::Vec4;
 
-use super::{Baked, MeshMap, MARGIN};
+use super::{Baked, Margin, MeshMap, MARGIN};
 use crate::lightmap::{run_pool, BakeProgress, TexelPoint};
 use rusty_procgen::image_buf::{Image, Rgba, Size};
 
 /// Points evaluated per block, 16 bytes each: what a map buffers before its image.
 pub(super) const BLOCK: usize = 1 << 18;
-
-fn background(map: MeshMap) -> Vec4 {
-    match map {
-        MeshMap::Curvature | MeshMap::WorldNormal => Vec4::new(0.5, 0.5, 0.5, 1.0),
-        MeshMap::Ao | MeshMap::Thickness => Vec4::ONE,
-        MeshMap::Position | MeshMap::Id => Vec4::W,
-    }
-}
 
 pub(super) fn image(
     map: MeshMap,
@@ -21,7 +13,8 @@ pub(super) fn image(
     f: impl Fn(usize, &TexelPoint) -> Vec4 + Sync,
 ) -> Image {
     let size = baked.settings.size;
-    let mut out = Image::filled(size, background(map).to_array());
+    let row = map.row();
+    let mut out = Image::filled(size, row.off.to_array());
     let mut filled = vec![false; size.pixels()];
     let px = out.pixels_mut();
     for (b, block) in baked.points.chunks(BLOCK).enumerate() {
@@ -31,7 +24,11 @@ pub(super) fn image(
             filled[p.at()] = true;
         }
     }
-    grow(px, &mut filled, size, MARGIN, map != MeshMap::Id);
+    match row.margin {
+        Margin::Average => grow(px, &mut filled, size, MARGIN, true),
+        Margin::Copy => grow(px, &mut filled, size, MARGIN, false),
+        Margin::None => {}
+    }
     out
 }
 
