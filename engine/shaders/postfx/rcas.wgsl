@@ -1,8 +1,7 @@
-// contrast-adaptive sharpening: AMD's
-// FidelityFX RCAS (Robust Contrast-Adaptive Sharpening, MIT), the sharpen URP's TAA
-// *Contrast Adaptive Sharpening* and FSR run in its final post pass, after
-// tonemapping. One pass over the chain's LDR image at the chain's size
-// (`PostFx::chain_size`), so bloom and the exposure meter read the unsharpened scene.
+// AMD's FidelityFX RCAS (Robust Contrast-Adaptive Sharpening, MIT) sharpens as URP's TAA *Contrast
+// Adaptive Sharpening* and FSR do, in the final post pass after tonemapping: one pass over the
+// chain's LDR image at the chain's size (`PostFx::chain_size`), so bloom and the exposure meter
+// read the unsharpened scene.
 //
 // RCAS reads the 5-tap cross around each pixel, finds the sharpening lobe the local
 // contrast allows, and adds it, so an edge's contrast rises without ringing on a

@@ -1,12 +1,9 @@
 // Godot 4's SSIL: one bounce of last frame's realtime light for the forward pass's
 // indirect diffuse. `fs_source` is next frame's source: HDR colour times the bounce
 // share the opaque pass wrote in alpha, block-averaged; the sky and a NaN add nothing.
-// `fs_gather` samples a cosine-weighted hemisphere (SSAO's pattern) and reads the
-// source through last frame's view-projection where the two surfaces face each other
-// and nothing on screen stands between (`blocked`). `fs_accumulate` reprojects the
-// history, rejects it on a disocclusion or a turned normal, clamps it to this frame's
-// neighbourhood and blends in at 90%. Texel `t` stands for full-resolution pixel `t *
-// step`.
+// `fs_gather` reads the source through last frame's view-projection over a cosine-weighted
+// hemisphere (SSAO's), where the surfaces face each other and nothing on screen stands
+// between (`blocked`). Texel `t` is full-resolution pixel `t * step`.
 
 #import fullscreen
 #import numeric::finite3
@@ -19,6 +16,7 @@ struct SsilParams {
     camera_pos: vec4<f32>,
     camera_fwd: vec4<f32>,
     prev_camera_pos: vec4<f32>,
+    // `ssil::SsilUniform` says what each `w` and these hold; the radius is in world units.
     params: vec4<f32>,
 };
 
@@ -36,7 +34,9 @@ var t_prev_normal: texture_2d<f32>;
 const HISTORY: f32 = 0.9;
 // A share of the distance from the eye.
 const REJECT: f32 = 0.05;
+// The least cosine (about 25°) between a normal and its history's.
 const REJECT_TURN: f32 = 0.9;
+// Shares of the point-to-sample segment.
 const OCCLUSION_TAPS: array<f32, 3> = array<f32, 3>(0.3, 0.5, 0.7);
 
 @vertex
@@ -48,8 +48,8 @@ fn view() -> View {
     return View(p.inv_view_proj, p.view_proj, p.camera_pos.xyz, p.camera_fwd.xyz);
 }
 
-// Black when any channel is not finite or past what an `Rgba16Float` target holds: a
-// NaN or an infinity never spreads.
+// Black when a channel is not finite or past `Rgba16Float`'s range: no NaN or infinity
+// spreads.
 fn finite(c: vec3<f32>) -> vec3<f32> {
     return select(vec3<f32>(0.0), c, finite3(c) && all(abs(c) <= vec3<f32>(65504.0)));
 }
@@ -114,13 +114,15 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let tb = tangents(N);
     let radius = p.params.x;
     let n = u32(p.params.z);
-    // A still pattern left blotches the blur could not remove.
+    // IGN's temporal offset (Jimenez 2014): a still pattern left blotches the blur could not
+    // remove.
     let turn = vec2<f32>(5.588238 * p.camera_pos.w);
     let rot = ign(frag.xy + turn) * 6.2831853;
     let jitter = ign(frag.yx + 17.0 + turn);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let source = vec2<f32>(textureDimensions(t_in));
     let bias = slope_bias(v, P, N, radius, dims);
+    // One pixel's depth step at the reach, not `slope_bias`: the taps sit in the open.
     let between = 0.02 * radius + radius / max(radius_in_pixels(v, P, radius, dims), 1e-3);
     var sum = vec3<f32>(0.0);
     for (var i = 0u; i < n; i = i + 1u) {
@@ -140,6 +142,7 @@ fn fs_gather(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
         let dist = length(to_q);
         let NQ = normal_at(t_depth, v, q, Q, 1);
         let facing = dot(N, to_q) > bias && dot(NQ, -to_q) > 0.0;
+        // Fades out over the last third of 1.5 radii.
         let reach = saturate(3.0 - 2.0 * dist / radius);
         let was = prev_uv(Q);
         if (!facing || reach <= 0.0 || was.x < 0.0 || blocked(v, P, Q, dims, between, radius)) {

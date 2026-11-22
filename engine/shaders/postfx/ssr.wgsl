@@ -35,6 +35,7 @@ fn view_forward() -> vec3<f32> {
     return normalize(world_from_depth(vec2<f32>(0.5), 0.5) - near);
 }
 
+// View depth is affine along a pixel's ray.
 fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
     let a = world_from_depth(uv, 0.0);
     let b = world_from_depth(uv, 0.5);
@@ -43,12 +44,10 @@ fn world_at(uv: vec2<f32>, depth: f32, fwd: vec3<f32>) -> vec3<f32> {
     return a + (b - a) * ((depth - da) / (db - da));
 }
 
+// Up to this roughness a hit reads sharp: its lobe's blur would grow with resolution.
 const NEAR_MIRROR: f32 = 0.05;
 
-// The tangent of the half-angle of the cone a surface of perceptual `roughness` reflects into,
-// Uludag's (GPU Pro 5, *Hi-Z Screen-Space Cone-Traced Reflections*): GGX's `alpha = roughness²`
-// as a Blinn-Phong power `2 / alpha² − 2`, and the cone that holds its lobe down to 0.244 of
-// its peak, held to 0 up to `NEAR_MIRROR`.
+// Tangent of the lobe's half-angle (Uludag, GPU Pro 5): GGX as Blinn-Phong, to 0.244 of its peak.
 fn cone(roughness: f32) -> f32 {
     let alpha = max(roughness * roughness, 1e-3);
     let power = 2.0 / (alpha * alpha) - 2.0;
@@ -67,6 +66,7 @@ fn near(px: vec2<i32>, o: vec2<i32>, fwd: vec3<f32>) -> vec3<f32> {
     return world_px(clamp(px + o, vec2<i32>(0), top), fwd);
 }
 
+// The nearest `n` of four one-sided normals: at an edge, one crosses onto another surface.
 fn geometric_normal(px: vec2<i32>, world: vec3<f32>, fwd: vec3<f32>, n: vec3<f32>) -> vec3<f32> {
     var xs = array<vec3<f32>, 2>(near(px, vec2<i32>(1, 0), fwd) - world, world - near(px, vec2<i32>(-1, 0), fwd));
     var ys = array<vec3<f32>, 2>(near(px, vec2<i32>(0, 1), fwd) - world, world - near(px, vec2<i32>(0, -1), fwd));
@@ -91,6 +91,7 @@ fn spread(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     return min(across(world, t, c, dim), ssr_march::BLUR_FADE_END * min(dim.x, dim.y));
 }
 
+// [`spread`] uncapped.
 fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     let eye = params.camera_pos.xyz;
     let d0 = distance(world, eye);
@@ -104,17 +105,18 @@ fn across(world: vec3<f32>, t: f32, c: f32, dim: vec2<f32>) -> f32 {
     return length((b - a) * dim);
 }
 
-// The cone a hit's radius is measured with for the resolve's field: the trace stores [`spread`]
-// per unit of cone, measured at a typical satin cone (about roughness 0.4's), where the
-// projection is close to linear, so each pixel scales it by its own cone.
+// [`spread`] is stored per unit of this cone (roughness 0.4's, near linear); each pixel
+// scales by its own.
 const UNIT_CONE: f32 = 0.2;
-// Keeps a hit's radius times its count finite in the f16 spread pyramid.
+// Keeps radius × count finite in f16.
 const UNIT_MAX: f32 = 16384.0;
 
-// So one hit's count in a coarse pyramid level (a 4^-8 share at level 8) stays a normal
-// f16, not a subnormal a GPU may flush to 0: a few hits' mean radius then holds.
+// Counts are stored times this: one hit at level 8 (a 4^-8 share) stays a normal f16, not
+// flushed to 0.
 const COUNT_SCALE: f32 = 64.0;
 
+// A faded found hit's count (1 at full weight); lower, the mean radius swings at a fading
+// edge.
 const FOUND_FLOOR: f32 = 0.4;
 
 struct Traced {
@@ -148,10 +150,12 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
     let origin = world + s.normal * 0.02;
     let f = ssr_march::Frame(params.view_proj, params.camera_pos.xyz, fwd, vec4<f32>(0.0, 0.0, 1.0, 0.0));
     let c = cone(s.roughness);
+    // Sharp (`blur_scale` 0): the resolve blurs hits by the cone.
     let hit = ssr_march::trace_hit(f, t_velocity, t_color, s_color, origin, r, i32(params.march.x), params.march.y, c, 0.0);
     if (hit.dist <= 0.0) {
         return missed;
     }
+    // An emissive past f16 is `inf` in the copy: no reflection.
     let w = select(0.0, hit.colour.w, numeric::finite4(hit.colour));
     let unit = min(across(world, hit.dist, UNIT_CONE, dim) / UNIT_CONE, UNIT_MAX);
     let k = max(w, FOUND_FLOOR);
@@ -167,6 +171,7 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
 
 const TAPS: i32 = 12;
 const GOLDEN_ANGLE: f32 = 2.3999632;
+// Pixels; below it a hit reads where traced.
 const SHARP: f32 = 0.5;
 
 fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> bool {
@@ -186,13 +191,14 @@ fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
     return (s.y + trust * fallback) / max(count, LONE * exp2(-2.0 * lod));
 }
 
+// Share of one hit's pixel below which a window holds nothing.
 const LONE: f32 = 0.02;
 
 const RADIUS_TRUST: f32 = 0.02;
 const REFINE: i32 = 2;
 
-// A plain mean on purpose: a harmonic or nearest-biased one collapsed radii at short rays
-// into hard blotches that moved with the camera.
+// The hits' mean radius, not this ray's own; plain on purpose: a nearest-biased mean
+// collapsed short rays' radii into blotches.
 fn blur_radius(uv: vec2<f32>, world: vec3<f32>, roughness: f32, dim: vec2<f32>) -> f32 {
     let c = cone(roughness);
     let cap = spread(world, params.march.x * params.march.y, c, dim);

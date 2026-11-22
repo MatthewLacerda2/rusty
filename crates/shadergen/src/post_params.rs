@@ -50,6 +50,8 @@ impl PostChain {
     ) -> Result<(), String> {
         let (layout, slot) = self.resolve(name)?;
         let value = layout.coerce(slot, value)?;
+        // Under the name the script spelled, so `get` answers with what this set wrote; the
+        // renderer resolves each stored name per effect.
         values.insert(name.to_owned(), value);
         Ok(())
     }

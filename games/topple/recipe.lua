@@ -1,5 +1,4 @@
--- `...` is the command line's `--param` table. Levels (chained by scripts/level.lua): tower,
--- planks, barrels, pile.
+-- `...` is the command line's `--param` table; scripts/level.lua chains the levels.
 
 local p = { seed = 1, pile = 6, start = 1 }
 for key, value in pairs(... or {}) do
@@ -70,7 +69,7 @@ local function materials()
 end
 
 -- A primitive of full size `sx, sy, sz` centred at `x, y, z`, with a collider
--- that fits it (a primitive gets none of its own).
+-- that fits it (a Cylinder primitive's own is a capsule).
 local SHAPES = {
     Box = { kind = "Box", x = 1, y = 1, z = 1 },
     Sphere = { kind = "Sphere", radius = 0.5 },
@@ -178,7 +177,7 @@ local function level(n, balls, eye, build)
         Particles.SetSpeed(id, speed / 2, speed)
         Particles.SetSize(id, size / 2, size)
         Particles.SetColor(id, r, g, b, 1)
-        Component.Set(id, "Particles", { texture = puff }) -- no texture draws a checker
+        Component.Set(id, "Particles", { texture = puff })
     end
     emitter("Fire", 1.0, 0.6, 0.2, 0.9, 0.5, 6.0)
     emitter("Dust", 0.6, 0.55, 0.45, 0.3, 0.6, 1.5)
@@ -201,7 +200,8 @@ local function level(n, balls, eye, build)
     label(canvas, "Status", 1, -30, 28)
     label(canvas, "Banner", 0.5, 0, 56)
 
-    -- Drawn over the level while the next one prepares in the background.
+    -- Covers the level while the next one loads in the background. Saved
+    -- active: level.lua's Start finds it, then hides it.
     local loading = UI.Create("Canvas")
     Scene.SetName(loading, "Loading")
     local shade = UI.Create("Image", loading)
@@ -245,6 +245,7 @@ level(3, 4, { 0, 2.6, -9, 90, -6 }, function()
     stack(-1.3, 0, 2)
     stack(1.3, 0, 2)
     figure(0, 0.9)
+    -- Past barrel.lua's 3.5 m `OUTER` blast.
     platform(7, 0, 2, 2)
     stack(7, 0, 3)
 end)

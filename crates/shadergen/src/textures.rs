@@ -21,6 +21,8 @@ pub fn slot(name: &str) -> Result<&'static Slot, String> {
     })
 }
 
+/// Bindings from a material texture to its own sampler, which carries that map's wrap
+/// and filter; albedo's `s_diffuse` stays at 1.
 pub const SAMPLER_OFFSET: u32 = 16;
 
 pub const fn sampler_binding(texture_binding: u32) -> u32 {

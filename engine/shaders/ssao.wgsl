@@ -1,4 +1,5 @@
-
+// SSAO over the view's depth, before the forward pass. AO texel `t` stands for full-resolution
+// pixel `t * step`: every pass reads that pixel's depth for it.
 #import fullscreen
 #import lighting::screen_space::{bilateral_blur, bilateral_upsample, hemisphere, ign, load_depth, normal_at, radius_in_pixels, screen_uv, slope_bias, tangents, View, view_depth, world_at, world_px}
 
@@ -7,6 +8,8 @@ struct SsaoParams {
     view_proj: mat4x4<f32>,
     camera_pos: vec4<f32>,
     camera_fwd: vec4<f32>,
+    // x radius (world units), y intensity (an exponent), z sample count, w full-res pixels
+    // per AO texel.
     params: vec4<f32>,
 };
 
@@ -14,6 +17,8 @@ struct SsaoParams {
 var<uniform> p: SsaoParams;
 @group(0) @binding(1)
 var t_depth: texture_depth_2d;
+// The occlusion a stage reads: `fs_ao`'s for the blur, the blur's for the upsample; `fs_ao`
+// binds a placeholder.
 @group(0) @binding(2)
 var t_raw: texture_2d<f32>;
 
@@ -48,25 +53,28 @@ fn fs_ao(@builtin(position) frag: vec4<f32>) -> @location(0) vec4<f32> {
     let jitter = ign(frag.yx + 17.0);
     let dims = vec2<f32>(textureDimensions(t_depth));
     let depth_p = view_depth(v, P);
+    let r_px = radius_in_pixels(v, P, radius, dims);
     // Slope-scaled (`slope_bias`): one pixel's worth of depth change along the surface is not
     // an occluder.
-    let r_px = radius_in_pixels(v, P, radius, dims);
     let bias = slope_bias(v, P, N, radius, dims);
     var occlusion = 0.0;
     for (var i = 0u; i < n; i = i + 1u) {
         let dir = hemisphere(i, n, rot, N, tb);
         let s = fract(f32(i) * 0.7548777 + jitter);
+        // Reach biased short (`s * s`, at least a tenth), so contact detail gets most samples.
         let S = P + N * (0.02 * radius) + dir * (radius * mix(0.1, 1.0, s * s));
         let uv = screen_uv(v, S);
         if (uv.x < 0.0) {
             continue;
         }
         let scene_d = view_depth(v, world_px(t_depth, v, vec2<i32>(uv * dims)));
+        // Fades occluders far outside the radius (a wall metres behind a pillar).
         let range = smoothstep(0.0, 1.0, radius / max(abs(depth_p - scene_d), 1e-4));
         if (scene_d < view_depth(v, S) - bias) {
             occlusion += range;
         }
     }
+    // Under a few pixels of radius (the far floor), quantization alone reads as occlusion.
     let fade = smoothstep(1.0, 3.0, r_px);
     let ao = 1.0 - fade * occlusion / f32(max(n, 1u));
     return vec4<f32>(pow(ao, p.params.y), 0.0, 0.0, 1.0);

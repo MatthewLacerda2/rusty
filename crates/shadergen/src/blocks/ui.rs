@@ -1,4 +1,5 @@
-//! `c` is premultiplied, display space; `f.uv` is rect-local, (0,0) bottom-left to (1,1) top-right.
+//! A helper calls `ui_shift` unconditionally: it samples a texture and takes derivatives,
+//! which must stay in uniform control flow.
 
 use super::{Block, Param, Reflection, Stage};
 

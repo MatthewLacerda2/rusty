@@ -2,15 +2,15 @@
 
 local Combat = {}
 
-Combat.FIGHTER = 8   -- the layer fighters stand on
-Combat.SMOKE = 9     -- smoke cloud layer: blocks sight, not bullets
+Combat.FIGHTER = 8   -- the recipe sets these layers too: change both
+Combat.SMOKE = 9     -- blocks sight, not bullets
 Combat.EYE = 1.6     -- m, feet to eye
 Combat.HEALTH = 100
 
 local SHOT_MASK = 1 | (1 << Combat.FIGHTER)
 local RANGE = 60       -- m
-local DAMAGE = 20      -- five hits kill
-local RESIST = 4       -- shot power lost per metre of solid: a 10 cm wall keeps 60 %
+local DAMAGE = 20
+local RESIST = 4       -- shot power lost per metre of solid
 local RESPAWN = 1.0    -- s
 
 -- A gun's state: `rate` seconds between shots, `spread` radians of aim error,
@@ -27,6 +27,7 @@ end
 
 local found = {}
 
+-- Every fighter's Start calls this, so a reloaded level is looked up afresh.
 function Combat.start()
     found = {}
 end
@@ -63,7 +64,7 @@ function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
             Damage.ApplyPoint(crossing, DAMAGE * power, dx, dy, dz,
                 { type = "bullet", instigator = shooter })
             power = power - crossing.thickness * RESIST
-            if power <= 0.05 or not crossing.exit then break end
+            if power <= 0.05 or not crossing.exit then break end -- under 5 % left
         end
     end
     burst("Flash", ox + dx * 0.6, oy - 0.4, oz + dz * 0.6, 4)

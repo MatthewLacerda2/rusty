@@ -67,6 +67,7 @@ fn composite(lit: vec3<f32>, alpha: f32, env_brdf: vec3<f32>, world: vec3<f32>, 
     return vec4<f32>(color + (1.0 - opacity) * behind(world, N, pixel), 1.0);
 }
 
+// Under `Rgba16Float`'s largest finite 65504, with room for rounding to f16.
 const MAX_HDR: f32 = 60000.0;
 
 // Inverse-square light has no ceiling: an `Inf` would turn bloom's bright pass NaN and
@@ -94,13 +95,12 @@ fn transmitted(N: vec3<f32>, L: vec3<f32>, radiance: vec3<f32>, albedo: vec3<f32
     return transmission * albedo / PI * radiance * saturate(dot(-N, L));
 }
 
+// Under `opaque_copy.wgsl`'s `SKY_DISTANCE` (65504, the sky's eye distance), with room for
+// rounding.
 const SKY_DISTANCE: f32 = 60000.0;
 
-// Refraction is HDRP's `RefractionModelBox` (its UI's *Planar*; *Thin* is the same slab
-// 5 mm thick): the ray refracts into a slab `thickness` deep and leaves parallel to the
-// view ray. An exit point in front of the surface reads straight through. Absorption is
-// Beer-Lambert over the distance to the opaque surface behind; against the sky, over
-// `thickness` (`absorption.w`).
+// HDRP's `RefractionModelBox` refraction and Beer-Lambert absorption (`docs/api/Material.md`):
+// the ray leaves the slab parallel to the view ray.
 fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     let m = material();
     let size = vec2<f32>(textureDimensions(t_opaque));
@@ -127,6 +127,8 @@ fn behind(world: vec3<f32>, N: vec3<f32>, pixel: vec2<f32>) -> vec3<f32> {
     return scene.rgb * exp(-m.absorption.rgb * depth);
 }
 
+// A surface over the opaque copy is Alpha or Premultiply (`MaterialAsset::reads_opaque`), so
+// it is `over` too.
 fn reactive_texel(color: vec4<f32>) -> vec4<f32> {
     let m = material();
     var r = reactive::over(color.a);

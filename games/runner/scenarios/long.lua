@@ -1,6 +1,6 @@
 -- A bot that always dodges runs a minute of game time at twice the default
--- acceleration so it reaches top speed within it (a two-minute run cost about
--- 16 s of CPU for the same proof). The entity count must stay under a fixed
+-- acceleration so it reaches top speed within it, at half the CPU of a
+-- two-minute run at the default rate. The entity count must stay under a fixed
 -- bound as chunks are built ahead and destroyed behind.
 
 local Bot = require("runner.bot")

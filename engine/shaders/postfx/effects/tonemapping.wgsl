@@ -4,6 +4,8 @@
 
 #define_import_path postfx::effects::tonemapping
 
+// Narkowicz's fit of the ACES RRT + sRGB ODT. The fit is pre-exposed; his note's input
+// times 0.6 is the curve Unity's ACES mode draws.
 fn aces(x_in: vec3<f32>) -> vec3<f32> {
     let x = x_in * 0.6;
     let a = 2.51; let b = 0.03; let c = 2.43; let d = 0.59; let e = 0.14;
@@ -33,6 +35,7 @@ fn pbr_neutral(c_in: vec3<f32>) -> vec3<f32> {
 // AgX, Troy Sobotka's, as Blender 4 ships it, by way of Filament and three.js: into Rec.2020,
 // an inset gamut, a log2 encoding of [-12.47, 4.03] EV around middle grey (so the curve reaches
 // white near 16, well inside the LUT's ~50), a polynomial sigmoid, the outset, and back.
+// Matrices are column-major, as WGSL's constructor takes them.
 const SRGB_TO_REC2020 = mat3x3<f32>(
     vec3<f32>(0.6274, 0.0691, 0.0164),
     vec3<f32>(0.3293, 0.9195, 0.0880),
