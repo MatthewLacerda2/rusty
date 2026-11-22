@@ -1,5 +1,3 @@
-//! crates/shell/src/input/clipboard_source.rs — the real [`ClipboardSource`].
-
 use super::clipboard::ClipboardSource;
 
 /// The OS clipboard for this window.
@@ -27,7 +25,8 @@ impl OsClipboard {
     }
 }
 
-/// The Wayland clipboard, when the window is a Wayland one.
+/// The Wayland clipboard, when the window is a Wayland one: smithay on the window's own
+/// display works on every compositor; arboard's `wlr-data-control` is not on all of them.
 #[cfg(target_os = "linux")]
 fn wayland(window: &winit::window::Window) -> Option<smithay_clipboard::Clipboard> {
     use winit::raw_window_handle::{HasDisplayHandle, RawDisplayHandle};

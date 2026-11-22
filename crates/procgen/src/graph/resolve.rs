@@ -9,8 +9,10 @@ use crate::recipe::{Node, OpKind, TextureRecipe};
 pub(super) struct Scope<'a> {
     pub graph: &'a TextureRecipe,
     pub graphs: &'a Graphs,
+    /// `""` at the top, `brick/` inside `brick`.
     pub prefix: String,
     pub values: BTreeMap<String, Value>,
+    /// What each of the graph's `inputs` reads, in the flat recipe's ids.
     pub wired: Vec<String>,
     pub fold: u32,
     pub chain: Vec<String>,

@@ -74,6 +74,7 @@ pub(super) struct Buckets {
 }
 
 impl Buckets {
+    /// Each box is a stamp's centre and half-width (tiles, its square's
     /// reach either way on both axes). The half-width is padded by a hair, so a
     /// texel the stamp covers by a rounding of its own math is never in a bucket
     /// the stamp missed.
@@ -92,6 +93,7 @@ impl Buckets {
         Self { levels }
     }
 
+    /// Yields copies in stamp order, which `scatter` lays `over` in.
     #[inline]
     pub fn each(&self, u: f32, v: f32, mut f: impl FnMut(Entry)) {
         let mut lists: [&[Entry]; LEVELS] = [&[]; LEVELS];

@@ -1,4 +1,5 @@
-//! crates/shell/src/editor/icon.rs — the rusty logo as the editor's window and Dock icon.
+//! Wayland reads the icon from the `.desktop` entry `make launcher` installs, never the
+//! window, so there the window icon is a no-op.
 
 use winit::window::{Icon, Window};
 
@@ -34,7 +35,8 @@ mod macos {
     use objc2_app_kit::{NSApplication, NSImage};
     use objc2_foundation::NSData;
 
-    /// Set the Dock icon from PNG bytes. Off the main thread (never, in the editor)
+    /// Set the Dock icon from PNG bytes. Off the main thread (never, in the editor) or on
+    /// bytes AppKit can't read, the Dock keeps its default.
     pub(super) fn set_dock_icon(png: &[u8]) {
         let Some(mtm) = MainThreadMarker::new() else {
             return;

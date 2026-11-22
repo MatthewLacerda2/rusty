@@ -1,8 +1,3 @@
-//! crates/editor/src/inspector/components/camera/ — the Camera inspector card (this
-//! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
-//! effect). Both cards live on the same camera entity. The field of view and its
-//! axis are drawn by `fov`. The Camera card draws the
-
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
 
@@ -58,6 +53,9 @@ pub(crate) struct CameraSection {
     pub draw: fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &CameraComponent, &mut bool),
 }
 
+/// Every effect either card draws a section for, which
+/// `render::postfx::completeness` checks against the renderer. A test hook: the
+/// root crate's `tests/post_effect_layers.rs` calls it.
 #[doc(hidden)]
 pub fn drawn_effects() -> Vec<&'static str> {
     let volume = post_processing::SECTIONS.iter().map(|s| s.effect);
@@ -155,7 +153,8 @@ fn draw_projection(
 }
 
 /// The Unity-style culling-mask checklist: one checkbox per offered layer, plus
-/// Everything/Nothing shortcuts. Each toggle computes the next mask from `mask`
+/// Everything/Nothing shortcuts. Each toggle computes the next mask from the
+/// snapshot `mask`.
 fn draw_culling_mask(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

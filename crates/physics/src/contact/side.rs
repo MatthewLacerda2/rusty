@@ -6,12 +6,12 @@ use rapier3d::prelude::Vector;
 use super::Manifold;
 use rusty_core::collections::Map;
 
-/// Each facet a hull rolls over takes energy: a 64-facet barrel keeps ~81% of its speed per turn,
-/// 32 keeps 66%.
+/// Each facet rolled over takes energy: at 64 a barrel keeps ~81% of its speed a turn, at 32 66%.
 pub(super) const SIDES: usize = 64;
 
 /// A contact whose normal is within 60° of the cylinder's axis (|cos| at least this) is on a cap,
-/// which meets the world as the true cylinder, as parry's own cylinder does.
+/// which meets the world as the true cylinder: parry builds a hull face's contact from its first
+/// four corners only.
 const CAP_COS: f32 = 0.5;
 
 pub(super) fn rolling(shape: &dyn Shape) -> Option<&Cylinder> {
@@ -19,8 +19,8 @@ pub(super) fn rolling(shape: &dyn Shape) -> Option<&Cylinder> {
     (round.border_radius == 0.0).then_some(&round.inner_shape)
 }
 
-/// A pair with no points yet meets as the true cylinder, which stands right on a cap;
-/// one that lands on its side moves to the hull a tick later.
+/// A pair with no points yet meets the true cylinder, which stands on a cap; one landing on its
+/// side takes the hull a tick later.
 pub(super) fn on_side(manifolds: &[Manifold], second: bool) -> bool {
     let normal = |m: &Manifold| if second { m.local_n2 } else { m.local_n1 };
     let mut touching = manifolds.iter().filter(|m| !m.points.is_empty()).peekable();
@@ -35,6 +35,7 @@ pub(super) struct Hulls {
 type Size = (u32, u32);
 type Hull = Option<Arc<ConvexPolyhedron>>;
 
+/// Sizes kept; past it the store starts over, so it stays bounded.
 const KEPT: usize = 256;
 
 impl Hulls {
@@ -53,7 +54,6 @@ impl Hulls {
     }
 }
 
-/// Each facet is tangent to the cylinder: a hull lying on a facet sits at its radius.
 fn side_hull(cylinder: &Cylinder) -> Option<ConvexPolyhedron> {
     let (r, h) = (cylinder.radius, cylinder.half_height);
     if !(r > 0.0 && h > 0.0 && r.is_finite() && h.is_finite()) {

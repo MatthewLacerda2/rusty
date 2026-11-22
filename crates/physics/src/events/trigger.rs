@@ -8,8 +8,9 @@ impl PhysicsWorld {
     /// rapier's narrow phase runs at the *start* of a step, so its sensor pairs lag a tick;
     /// each live sensor instead asks the query tree what it overlaps now.
     /// A static trigger reports only colliders whose body is not fixed; unlike contacts, triggers
-    /// still pair kinematic with static and kinematic with kinematic, on purpose.
-    /// Do not align this with `assemble::ACTIVE_TYPES`.
+    /// still pair kinematic with static and kinematic with kinematic, so a static zone sees a
+    /// CharacterController or a kinematic enemy walk in. Do not align this with
+    /// `assemble::ACTIVE_TYPES`.
     pub(crate) fn overlap_pairs(&self) -> Vec<(u32, u32)> {
         let fixed = |c: &Collider| {
             let body = c.parent().and_then(|h| self.bodies.get(h));
@@ -55,6 +56,8 @@ pub struct TriggerEvents {
 }
 
 impl TriggerEvents {
+    /// Both sets sorted and deduped, as `overlap_pairs` returns them: membership is a binary
+    /// search.
     pub fn from_overlap_sets(prev: &[(u32, u32)], current: Vec<(u32, u32)>) -> Self {
         let entered = current
             .iter()

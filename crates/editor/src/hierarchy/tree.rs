@@ -1,7 +1,3 @@
-//! Scene-hierarchy tree rendering (VS Code Explorer style): a collapsible tree
-//! with per-entity expand state, type glyphs and full-row selection, drawn from
-//! `flat`'s rows so only the ones in view are laid out.
-
 use egui::collapsing_header::paint_default_icon;
 use egui_phosphor::regular as icon;
 
@@ -22,13 +18,17 @@ pub(super) struct Rows<'a> {
 
 impl Rows<'_> {
     pub(super) fn draw(&mut self, ui: &mut egui::Ui, scene: &Scene, flat: &[Row]) {
+        // Every row is one height, which `show_rows` needs.
         let row_h = ui.spacing().interact_size.y;
+        // As wide as the panel, not the rows: only the rows in view are laid out, so
+        // following their width would move the scroll bar while scrolling.
         let scroll = egui::ScrollArea::vertical()
             .id_salt(SCROLL_SALT)
             .auto_shrink([false, true]);
         scroll.show_rows(ui, row_h, flat.len(), |ui, range| {
             let pitch = row_h + ui.spacing().item_spacing.y;
             let indent = ui.spacing().indent;
+            // Where row 0 would sit: `show_rows` starts its ui at `range.start`.
             let origin = ui.max_rect().left_top() - egui::vec2(0.0, range.start as f32 * pitch);
             for (i, row) in flat.iter().enumerate().take(range.end).skip(range.start) {
                 let min = origin + egui::vec2(row.depth as f32 * indent, i as f32 * pitch);
@@ -103,9 +103,8 @@ fn full_name_on_hover(ui: &egui::Ui, label: egui::Response, name: &str) -> egui:
     }
 }
 
-/// Extract `entity_id`'s subtree to `assets/prefabs/{name}.prefab` via the shared
-/// `edit::save_prefab` verb (the same path `Scene.SavePrefab` takes). The folder is
-/// created on demand; the entity name is sanitised into a filesystem-safe stem.
+/// Extract `entity_id`'s subtree to `assets/prefabs/` through `edit::save_prefab`,
+/// the verb `Scene.SavePrefab` runs too.
 fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
     let dir = std::path::Path::new(rusty_core::project::ASSETS_DIR).join("prefabs");
     std::fs::create_dir_all(&dir).ok();

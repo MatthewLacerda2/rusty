@@ -96,7 +96,8 @@ impl<T: Copy, F: Fn((i64, i64)) -> T> PerCell<T, F> {
         Self { per, table, value }
     }
 
-    /// The quarter keeps the table well under the image's own size.
+    /// Tabled, link or not, when the cells are at most a quarter of `pixels`, so the table
+    /// stays well under the image's own size.
     pub fn for_pixels(per: (i64, i64), pixels: usize, value: F) -> Self {
         let fits = per
             .0
@@ -133,8 +134,8 @@ impl<'a> Links<'a> {
         Self { nodes }
     }
 
-    /// `param` as a [`Field`]. Panics on a link to a node not handed in: the runner
-    /// wires every link a node's params name before it evaluates the node.
+    /// Panics on a link to a node not handed in: the runner wires every link a node's
+    /// params name before it evaluates the node.
     pub fn field(&self, param: &Param) -> Field<'a> {
         match param {
             Param::Num(v) => Field::Const(*v),

@@ -1,5 +1,3 @@
-//! crates/shell/src/input/pad_source.rs — the real [`PadSource`]: gilrs.
-
 use std::collections::HashMap;
 
 use gilrs::ff::{BaseEffect, BaseEffectType, Effect, EffectBuilder, Repeat, Replay, Ticks};
@@ -8,7 +6,8 @@ use gilrs::{Axis, Button, Gamepad, GamepadId, Gilrs};
 use super::pads::{PadSnapshot, PadSource};
 use rusty_core::input::gamepad::Rumble;
 
-/// gilrs buttons in `core::input::gamepad::BUTTONS` order.
+/// gilrs buttons in `core::input::gamepad::BUTTONS` order: gilrs maps every brand to the Xbox
+/// layout, so `South` is `A`.
 const BUTTONS: [Button; 17] = [
     Button::South,
     Button::East,
@@ -87,6 +86,7 @@ fn magnitude(strength: f32) -> u16 {
 
 impl PadSource for GilrsSource {
     fn poll(&mut self) -> Vec<(usize, PadSnapshot)> {
+        // Draining the event queue is what keeps gilrs's cached per-pad state current.
         while self.gilrs.next_event().is_some() {}
         self.gilrs
             .gamepads()

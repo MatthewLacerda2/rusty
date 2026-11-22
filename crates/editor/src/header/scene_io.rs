@@ -13,14 +13,10 @@ impl EditorUi {
         self.scene_path.borrow().clone()
     }
 
-    /// [`current_scene_path`](Self::current_scene_path) lent to `f` without a copy,
-    /// for a read every frame.
     pub fn with_current_scene_path<R>(&self, f: impl FnOnce(Option<&str>) -> R) -> R {
         f(self.scene_path.borrow().as_deref())
     }
 
-    /// The open scene's file stem, or "Untitled" for a scene never saved: the window
-    /// title's scene name.
     pub fn scene_name(&self) -> String {
         self.with_current_scene_path(|path| {
             path.and_then(|p| Path::new(p).file_stem()).map_or_else(
@@ -79,6 +75,7 @@ impl EditorUi {
     }
 }
 
+/// A never-saved scene refuses: falling back to a real file would write an empty scene over it.
 fn current_path(editor: &EditorUi, console: &mut ConsoleLogs, verb: &str) -> Option<String> {
     let path = editor.current_scene_path();
     if path.is_none() {
@@ -106,6 +103,8 @@ pub(super) fn load_scene(
     }
 }
 
+/// New and Reset drop the World with no `OnDisable`/`OnDestroy`: in Play, script
+/// instances would leak.
 fn refuse_in_play(console: &mut ConsoleLogs, is_playing: bool, what: &str) -> bool {
     if is_playing {
         console.warn(format!("{what} is unavailable in Play: stop Play first"));

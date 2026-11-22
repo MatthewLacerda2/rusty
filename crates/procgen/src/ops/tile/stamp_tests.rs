@@ -13,6 +13,7 @@ fn reach_grows_with_the_jitter_and_the_size() {
 
 #[test]
 fn a_turned_stamp_in_a_flat_cell_reaches_more_rows() {
+    // Cells four times as wide as tall: up to a quarter turn stands a plank two rows up.
     assert_eq!(Jitter::new(0.0, 0.0, 0.0).reach(1.0, 0.25), (0, 0));
     assert_eq!(Jitter::new(0.0, 0.5, 0.0).reach(1.0, 0.25), (1, 2));
     assert_eq!(Jitter::new(0.0, 0.05, 0.0).reach(1.0, 0.25), (1, 1));

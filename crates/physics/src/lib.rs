@@ -78,8 +78,8 @@ pub struct Rebuilt {
     pub in_a_row: u32,
 }
 
-/// The hitscan acceptance test shared by the engine hitscan and the Lua `Physics.Raycast`: an
-/// entity is hittable iff it exists.
+/// Shared by AI sight, audio occlusion, the script casts and damage cover, so they agree on a hit:
+/// an entity is hittable iff it exists.
 pub fn is_hittable(scene: &Scene, id: u32) -> bool {
     scene.world.contains(id)
 }

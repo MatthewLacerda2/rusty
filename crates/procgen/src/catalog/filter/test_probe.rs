@@ -17,6 +17,7 @@ pub fn rolled(img: &Image, dx: i64, dy: i64) -> Image {
     out
 }
 
+/// A busy, tiling height in red: two whole sine periods across, three cosine periods down.
 pub fn relief(n: u32) -> Image {
     Image::fill_uv(n, |u, v| {
         let tau = std::f32::consts::TAU;
@@ -41,6 +42,7 @@ pub fn mean(img: &Image, c: usize) -> f32 {
     img.pixels().iter().map(|p: &Rgba| p[c]).sum::<f32>() / img.pixels().len() as f32
 }
 
+/// Ridged noise, 8 periods a tile: thin veins running every way, which a directional op lines up.
 pub fn ridged(n: u32) -> Image {
     let op: OpKind = serde_json::from_str(
         r#"{ "op": "noise", "kind": "ridged", "scale": 8, "octaves": 2, "seed": 3 }"#,

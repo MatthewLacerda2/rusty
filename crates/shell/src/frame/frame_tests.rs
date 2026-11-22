@@ -65,7 +65,7 @@ fn live_advance_enters_play_with_one_tick_then_runs_the_owed_ones() {
 #[test]
 fn paused_advance_runs_only_the_queued_fixed_steps() {
     let mut game = playing_world();
-    advance(&mut game, 0.02);
+    advance(&mut game, 0.02); // enter Play
     let before = game.play_frame();
     game.time().borrow_mut().pause();
     advance(&mut game, 0.5);
@@ -134,7 +134,7 @@ fn paused_steps_lay_out_with_texture_sizes_read_before_each_step() {
         scene.set_parent(id, Some(root)).expect("parent exists");
         id
     };
-    advance(&mut game, 0.02);
+    advance(&mut game, 0.02); // enter Play: the file is missing
     let size = |game: &GameWorld| game.resources.ui_layout.get(icon).map(|r| r.rect.1);
     assert_eq!(size(&game), Some(glam::Vec2::ZERO));
     game.time().borrow_mut().pause();

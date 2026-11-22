@@ -1,7 +1,3 @@
-//! A Gaussian is three box passes per axis matching the variance of `σ = r / 3`, so it reaches
-//! about `r`; under about 2.5 px it is one exact 3-tap pass, since three boxes can't go that
-//! narrow.
-
 use super::super::image_buf::{Image, Rgba, Size};
 use super::super::recipe::BlurKind;
 use super::field::Field;
@@ -102,9 +98,12 @@ fn taps(src: &[Rgba], a: f32, out: &mut [Rgba]) {
     }
 }
 
-/// A dropped pixel past this magnitude re-sums the window.
+/// A dropped pixel past this magnitude re-sums the window, so its rounding residue does not
+/// linger in the sum. Texture values sit near `[0, 1]`, so a real recipe seldom meets it;
+/// `varying::Table::of` reads it too.
 const LARGE: f32 = 1e3;
 
+/// The sum is `f64`, so a long row's adds and drops do not drift.
 fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
     let n = src.len() as i64;
     let at = |i: i64| src[i.rem_euclid(n) as usize];

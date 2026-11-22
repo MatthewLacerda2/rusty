@@ -26,7 +26,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, console: &mut ConsoleLogs)
         });
 }
 
-/// The header: the Console title plus the right-aligned collapse caret and Clear.
 fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut egui::Ui) {
     let t = editor.theme;
     ui.horizontal(|ui| {
@@ -46,7 +45,6 @@ fn draw_tab_header(editor: &mut EditorUi, console: &mut ConsoleLogs, ui: &mut eg
     });
 }
 
-/// Collapsed state: a short rail with a caret that reopens the bottom panel.
 fn draw_collapsed(ui: &mut egui::Ui, t: crate::theme::Theme, open: &mut bool) {
     let frame = chrome::rail_frame(&t);
     egui::Panel::bottom("Bottom Rail")
@@ -70,6 +68,7 @@ fn draw_collapsed(ui: &mut egui::Ui, t: crate::theme::Theme, open: &mut bool) {
 /// live Lua REPL input line, so you can call the API while the game runs.
 #[cfg(feature = "dev")]
 pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &mut ConsoleLogs) {
+    // `default_pos` places it once: an every-frame `anchor` would snap each drag back.
     let bottom_left = egui::pos2(8.0, ctx.content_rect().bottom() - 228.0);
     egui::Window::new(format!("{}  Developer Console", icon::TERMINAL_WINDOW))
         .resizable(true)
@@ -84,8 +83,6 @@ pub fn draw_play_console(editor: &mut EditorUi, ctx: &egui::Context, console: &m
         });
 }
 
-/// The REPL input line. On submit it stashes the text in `editor.dev.pending_repl`;
-/// the front-end drains that and runs it through the single `dev::console`
 #[cfg(feature = "dev")]
 fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
     ui.separator();
@@ -104,6 +101,7 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
                 )
                 .font(egui::TextStyle::Monospace),
         );
+        // Up/Down recall submitted lines while the field has focus.
         if resp.has_focus() {
             if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp)) {
                 editor.dev.repl_input.recall_prev();

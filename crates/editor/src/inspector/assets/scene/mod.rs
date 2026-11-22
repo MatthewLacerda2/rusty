@@ -197,7 +197,6 @@ fn draw_nav_bounds(ui: &mut egui::Ui, bounds: &mut Option<NavBounds>, baked: Nav
 /// File metadata card: path, on-disk size, plus the entity count and skybox
 /// peeked out of the scene's JSON without fully loading it.
 fn draw_metadata(ui: &mut egui::Ui, path: &str) {
-    // Attempt to inspect JSON content
     let mut entity_count = 0;
     let mut skybox_str = "None".to_string();
     // lint: allow(stored-format) peeks the scene document, whose format `scene::io` owns
@@ -230,7 +229,6 @@ fn draw_scene_operations(
     ui.heading("Scene Operations");
     ui.add_space(8.0);
 
-    // Button to load scene
     if ui
         .add(
             egui::Button::new(format!("{}  Load Scene", icon::FOLDER_OPEN))
@@ -238,12 +236,12 @@ fn draw_scene_operations(
         )
         .clicked()
     {
+        // `false`: the inspector is an edit-mode panel, never a play-mode load.
         editor.open_scene(scene, console, path, false);
     }
 
     ui.add_space(8.0);
 
-    // Button to save/overwrite scene
     if ui
         .add(
             egui::Button::new(format!("{}  Overwrite with Current", icon::FLOPPY_DISK))

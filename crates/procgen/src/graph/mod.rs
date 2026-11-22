@@ -28,6 +28,8 @@ use super::recipe::{arity, op, opt, req, Lit, OpKind, TextureRecipe};
 
 pub const EXTENSION: &str = ".graph.json";
 
+// Graphs deep and nodes per expansion, past which a recipe is refused: four instances a
+// level, 16 deep, would reach 4^16 nodes. `docs/api/Texture.md`'s *Graphs* states both.
 pub const MAX_DEPTH: usize = 16;
 
 pub const MAX_NODES: usize = 65_536;
@@ -52,6 +54,7 @@ impl Row for Instance {
 
 impl Op for Instance {
     fn run(&self, cx: &Cx) -> Image {
+        // Never reached: the runner refuses an unexpanded instance first.
         Image::new(cx.size)
     }
 }

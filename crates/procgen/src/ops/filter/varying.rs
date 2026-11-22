@@ -1,7 +1,7 @@
 //! A box of radius `r` is one unrounded window `2r + 1` wide: rounding would step visibly at each
 //! half pixel, so it matches the fixed box only at whole radii. A window with fractional ends adds
 //! more variance than the `(W² − 1) / 12` of a whole odd window, so each width is solved from its
-//! real variance ([`gaussian_width`]).
+//! real variance.
 
 use super::super::super::image_buf::{Image, Rgba};
 use super::super::super::recipe::BlurKind;
@@ -46,6 +46,7 @@ fn gaussian_width(var: f64) -> f64 {
         return 1.0;
     }
     let mut m = ((1.0 + 12.0 * var).sqrt() - 1.0).div_euclid(2.0);
+    // Rounding can put `m` one off the span holding `var`.
     if m * (m + 1.0) / 3.0 > var {
         m -= 1.0;
     } else if (m + 1.0) * (m + 2.0) / 3.0 <= var {
@@ -92,7 +93,7 @@ struct Table {
 impl Table {
     /// The row's table, or `None` when a pixel is non-finite or past [`LARGE`]: a
     /// difference of running sums would carry it into every later window, so such a
-    /// row sums each window directly instead.
+    /// row sums each window directly.
     fn of(line: &[Rgba]) -> Option<Self> {
         let bad = |v: &f32| !v.is_finite() || v.abs() > LARGE;
         if line.iter().flatten().any(bad) {

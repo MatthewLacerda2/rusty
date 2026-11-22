@@ -37,6 +37,7 @@ pub fn distance(img: &Image, radius: Field) -> Image {
     out
 }
 
+/// Per pixel: [0] squared distance, [1] offset to its site, [2] the site's [1].
 fn transform_rows(src: &Image, a: f64) -> Image {
     let mut out = Image::new(src.size());
     out.for_each_row(|y, row| {

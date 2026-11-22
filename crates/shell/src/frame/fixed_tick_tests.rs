@@ -44,7 +44,7 @@ fn uneven_frames_reach_the_state_the_harness_reaches_in_as_many_ticks() {
     let (mut window, id) = falling();
     let frames = [0.007, 0.033, 0.5, 0.007, 0.007, 0.007, 0.016, 0.1];
     windowed(&mut window, &mut DrawPoses::default(), &frames);
-    let (mut harness, same) = falling();
+    let (mut harness, same) = falling(); // `dev::harness`: one fixed tick per step
     for _ in 0..window.play_frame() {
         harness.tick(FIXED_DELTA_TIME);
     }
@@ -69,7 +69,7 @@ fn the_frame_after_entering_play_owes_no_tick() {
     let (mut ticks, mut poses) = Default::default();
     advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.016);
     let entered = game.play_frame();
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.5);
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.5); // a slow `Start`
     assert_eq!(game.play_frame(), entered, "the entry's cost is not owed");
     assert_eq!(ticks.alpha(), 0.0, "the accumulator starts empty");
     advance_sim(
@@ -129,7 +129,7 @@ fn a_body_is_drawn_between_its_last_two_tick_positions() {
         }
         ticked += 1;
         if ticked < 3 {
-            continue;
+            continue; // Play's own tick, then the first recorded: no tick before it
         }
         let after = height(&game, id);
         let drawn = poses.world(&game.scene().borrow(), id).w_axis.y;

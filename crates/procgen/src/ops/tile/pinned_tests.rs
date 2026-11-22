@@ -60,6 +60,8 @@ fn old_recipes_bake_the_bytes_they_always_did() {
     assert_eq!(got, PINNED);
 }
 
+/// FNV-1a of each bake at the default `aspect` and `offset`. No recipe turns a stamp, so no
+/// `sin` or `cos`, whose last bit is the platform libm's, reaches the bytes.
 const PINNED: [u64; 5] = [
     0xe840_5eea_0f28_c425,
     0xf9ab_b73c_2aea_d4f7,

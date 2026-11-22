@@ -44,6 +44,7 @@ pub struct Cx<'a> {
     pub links: &'a Links<'a>,
     pub size: Size,
     pub seed: u64,
+    /// The files `image` nodes read; the runner checks each is here before any node runs.
     pub sources: &'a Sources,
 }
 

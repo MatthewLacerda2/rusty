@@ -222,6 +222,7 @@ fn ball_fall(swing_axis: Vec3, swing1: f32, swing2: f32, ticks: usize) -> (f32, 
 
 #[test]
 fn ball_joint_stops_at_each_axis_own_swing_limit() {
+    // Gravity swings the cube about Z: swing 2 with a Y swing axis, swing 1 with Z.
     for (axis, s1, s2, limit) in [
         (Vec3::Y, 60.0, 20.0, 20.0),
         (Vec3::Y, 20.0, 60.0, 60.0),

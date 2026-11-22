@@ -1,7 +1,4 @@
-//! The editor round end to end, on a primitive project written to a temp
-//! dir: a floor with a baked navmesh, a camera and a light probe. Renders when an
-//! adapter is there (hence `gpu_`); without one the round answers `None` and makes
-//! no rows up.
+//! Without an adapter the round answers `None` and makes no rows up.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -14,7 +11,6 @@ use rusty_scene::create::{create_entity, Primitive};
 use super::*;
 use rusty_dev::bench::scenes::editor::EditorRound;
 
-/// The project's root and its one scene's path.
 pub(super) fn project() -> (PathBuf, String) {
     let root = rusty_test_support::temp::dir().join(format!("editor_round_{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&root);
@@ -35,7 +31,6 @@ pub(super) fn project() -> (PathBuf, String) {
     (root, path)
 }
 
-/// Every file under `dir`, by path, with its bytes.
 fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     let mut out = BTreeMap::new();
     let mut dirs = vec![dir.to_path_buf()];
@@ -52,6 +47,7 @@ fn files(dir: &Path) -> BTreeMap<PathBuf, Vec<u8>> {
     out
 }
 
+/// Big enough that the editor's panels leave the Scene view room, as on a desktop window.
 pub(super) const SIZE: (u32, u32) = (640, 360);
 
 #[test]
@@ -120,6 +116,7 @@ fn has_its_rows(round: &EditorRound) {
     assert!(enter.lo <= enter.avg && enter.avg <= enter.hi, "{enter:?}");
 }
 
+/// `write_atomic` renames a new file in, so a rewrite changes the inode.
 fn inode(path: &Path) -> Option<u64> {
     use std::os::unix::fs::MetadataExt;
     std::fs::metadata(path).ok().map(|m| m.ino())

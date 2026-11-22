@@ -40,8 +40,6 @@ pub(super) fn start(editor: &mut EditorUi, scene: &mut Scene, console: &mut Cons
     }
 }
 
-/// Say a bake never started because `line`, in the console and as the scene's
-/// status.
 fn not_started(scene: &mut Scene, console: &mut ConsoleLogs, line: String) {
     console.error(line.clone());
     scene.lighting_bake_status = BakeStatus::Refused(line);
@@ -64,6 +62,7 @@ fn scene_view(editor: &EditorUi) -> BakeView {
     let camera = editor.scene_view.camera.camera();
     BakeView {
         eye: camera.position,
+        // A 16:9 lens whatever the panel's shape: the view only orders which texels go first.
         view_proj: camera.projection_matrix(16.0 / 9.0) * camera.view_matrix(),
     }
 }

@@ -1,5 +1,3 @@
-//! crates/shell/src/editor/start/picker.rs — the project picker as a shell prelude.
-
 use std::sync::Arc;
 
 use winit::event::WindowEvent;

@@ -1,13 +1,13 @@
 //! The Camera card's field of view: the *FOV Axis* dropdown and the
 //! slider, labelled with its axis and editing in it, with the other axis's angle
 //! at the view's aspect beneath, as Unity's `CameraEditor` does. The stored `fov`
+//! stays vertical.
 
 use rusty_components::{CameraComponent, FovAxis};
 use rusty_edit::authoring::rendering::camera as camera_ops;
 
 /// The aspect (width / height) the card converts at: the camera's render
-/// texture's when it has one, else `view` (the editor viewport's, which the Scene
-/// and Game tabs share), else 16:9 (no viewport drawn yet).
+/// texture's when it has one, else `view` (the editor viewport's), else 16:9.
 pub(super) fn aspect(cam: &CameraComponent, view: f32) -> f32 {
     let target = cam.target_texture.as_ref();
     let aspect = target.map_or(view, |t| t.width as f32 / t.height.max(1) as f32);
@@ -18,7 +18,6 @@ pub(super) fn aspect(cam: &CameraComponent, view: f32) -> f32 {
     }
 }
 
-/// The *FOV Axis* dropdown and the field of view along it.
 pub(super) fn draw_fov(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -51,13 +50,14 @@ pub(super) fn draw_fov(
         FovAxis::Horizontal => ("horizontal", FovAxis::Vertical, "vertical"),
     };
     let range = axis.show(camera_ops::MIN_FOV, aspect)..=axis.show(camera_ops::MAX_FOV, aspect);
+    // Held to the renderer's range: a hand-edited scene's `fov` past 180° would convert
+    // to nonsense (the tangent of a half-angle past 90° is negative). A NaN stays NaN.
     let held = cam.fov.clamp(camera_ops::MIN_FOV, camera_ops::MAX_FOV);
     let mut fov = axis.show(held, aspect);
     ui.horizontal(|ui| {
         ui.label(format!("Field of View ({label}):"));
         if ui.add(crate::widgets::slider(&mut fov, range)).changed() {
             if let Some(mut c) = world.camera_mut(id) {
-                // Converted to the stored vertical angle, as `Camera.SetFieldOfView`
                 camera_ops::set_fov(&mut c, axis.store(fov, aspect));
             }
             *is_dirty = true;

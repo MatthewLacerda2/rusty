@@ -1,7 +1,3 @@
-//! The Hierarchy's tree flattened into the rows it would show: one pre-order walk
-//! of the expanded entities, so the panel can lay out only the rows in its scroll
-//! view (`tree`). A folded branch's subtree is not walked at all.
-
 use egui::collapsing_header::CollapsingState;
 use rusty_scene::Scene;
 
@@ -23,6 +19,8 @@ pub(super) fn node_id(entity_id: u32) -> egui::Id {
     egui::Id::new(("hierarchy_node", entity_id))
 }
 
+/// A new branch starts open unless it is a skeleton bone; the default is stored, as
+/// `is_bone` walks the ancestors each time.
 pub(super) fn node_state(ctx: &egui::Context, scene: &Scene, entity_id: u32) -> CollapsingState {
     let id = node_id(entity_id);
     CollapsingState::load(ctx, id).unwrap_or_else(|| {
@@ -57,6 +55,8 @@ impl Flattener {
         depth: usize,
         parent: Option<usize>,
     ) {
+        // Past one row per entity the `children` lists hold a cycle: end the walk,
+        // not the stack.
         if scene.world.name(id).is_none() || self.rows.len() >= scene.world.len() {
             return;
         }
