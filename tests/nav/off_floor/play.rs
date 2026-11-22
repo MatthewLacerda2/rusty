@@ -1,10 +1,3 @@
-//! The whole frame through `GameWorld` — a script, the CharacterController's physics
-//! body and the navigation tick together — so nothing downstream of the nav move
-//! (defect 5 in #666: physics overriding it) sinks or blocks the bot, on the deck or
-//! down the pool's ramps (#747). The chase there is a plain one (`CHASE`): the
-//! default `bot.lua` stops at a spot round the Player an `EnvironmentQuery` picks
-//! (#1892), and its own test holds that.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -19,7 +12,6 @@ use super::{
     pool_middle, reach, INNER, WALL_MARGIN,
 };
 
-/// A brain that heads straight for the Player every frame.
 const CHASE: &str = r#"
 local Chase = {}
 function Chase.Update(id, dt)
@@ -29,7 +21,6 @@ end
 return Chase
 "#;
 
-/// A `GameWorld` playing `scene`.
 fn world_of(scene: rusty::scene::Scene) -> GameWorld {
     let nav = NavigationGraph::from_scene(&scene);
     let mut world = GameWorld::new(
@@ -99,8 +90,6 @@ fn the_default_bot_holds_a_spot_round_the_player() {
     let (scene, enemy) = default_scene();
     let player_id = scene.find_entity_by_name("Player").expect("Player");
     let mut world = world_of(scene);
-    // Its query rings the Player 3–8 m out; the agent stops within its
-    // stopping distance of the spot.
     let at = play(&mut world, player_id, enemy, home(), 600);
     let d = planar(at, home());
     assert!((2.0..10.0).contains(&d), "{d} m from the Player: {at}");

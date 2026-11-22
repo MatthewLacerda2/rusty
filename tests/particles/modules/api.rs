@@ -1,4 +1,4 @@
-//! The #439 `Particles` setters write the component through the shared ops.
+//! The `Particles` setters write the component through the shared ops.
 
 use std::cell::RefCell;
 use std::rc::Rc;

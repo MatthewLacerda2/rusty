@@ -1,12 +1,8 @@
-//! The height map's parallax occlusion (#2191). A 16 m plane carries four repeats of a step: the
-//! first half of each repeat white and high, the second black and low (a black albedo where the
-//! height is black), so where the march lands shows as how much black is left in the frame:
-//!   - At a grazing angle the upper steps hide part of the lower ones, more as the angle lowers.
-//!   - Head-on, at `height_scale` 0, and with no map or a missing one, it is flat.
-//!   - Past the fade, where a repeat covers under a few pixels, it draws as flat.
-//!   - Along a ridge the maps keep the mip the flat surface reads there (`ridges`).
-//!
-//! No adapter: `frame` returns `None` and the test passes without asserting.
+//! The height map's parallax occlusion: a 16 m plane of four repeats of a step, white/high then
+//! black/low, so the black left in the frame shows where the march lands:
+//!   - Grazing, upper steps hide the lower ones, more as the angle lowers.
+//!   - Head-on, at `height_scale` 0, or with no map, it is flat.
+//!   - Past the fade it draws as flat; along a ridge the mip stays the flat one (`ridges`).
 
 mod filtering;
 mod mips;
@@ -23,7 +19,6 @@ use crate::gpu::normal_emissive_maps_screenshot::scene;
 
 const SIZE: u32 = 128;
 
-/// A 64-texel-wide stripe PNG: white for the first half of `u`, black after.
 fn stripes(name: &str) -> String {
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_fn(64, 64, |x, _| match x < 32 {
@@ -34,7 +29,6 @@ fn stripes(name: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The stepped material: the stripes as albedo and, with `scale`, as height.
 fn stepped(tiling: f32, height: Option<f32>) -> MaterialAsset {
     let map = stripes("rusty_2191_steps.png");
     MaterialAsset {
@@ -47,15 +41,12 @@ fn stepped(tiling: f32, height: Option<f32>) -> MaterialAsset {
     }
 }
 
-/// The camera on the plane's -X side, `degrees` above it, looking at its centre
-/// along +X, across the stripes.
 fn grazing(degrees: f32) -> Camera {
     let back = 7.0;
     let up = back * degrees.to_radians().tan();
     Camera::new(Vec3::new(-back, up, 0.0), 0.0, -degrees)
 }
 
-/// Render `material` from `camera`; `None` without an adapter.
 fn frame(material: MaterialAsset, camera: &Camera, name: &str) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(name);
     capture(&scene(material), camera, &path, SIZE, SIZE)
@@ -64,7 +55,6 @@ fn frame(material: MaterialAsset, camera: &Camera, name: &str) -> Option<image::
     Some(image::open(&path).expect("open").to_rgb8())
 }
 
-/// The share of the frame's plane pixels that read black (the lower step).
 fn black_share(img: &image::RgbImage) -> f64 {
     let luma = |p: &image::Rgb<u8>| p.0.iter().map(|&c| u32::from(c)).sum::<u32>();
     let bright = img.pixels().map(luma).max().unwrap_or(0);
@@ -89,7 +79,6 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
-    // Measured: drops of RTX 2060 0.057 and 0.147, lavapipe 0.057 and 0.134 (since #2301).
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"
@@ -122,7 +111,6 @@ fn head_on_at_zero_scale_and_without_a_map_it_draws_flat() {
     assert_eq!(diff(&f[3], &f[4]), 0.0, "so does a map with no texture");
 }
 
-/// The stepped albedo with a height map whose file does not exist.
 fn missing_map() -> MaterialAsset {
     let path = crate::temp::dir().join("rusty_2191_no_such_height.png");
     MaterialAsset {
@@ -134,8 +122,7 @@ fn missing_map() -> MaterialAsset {
 
 #[test]
 fn past_the_fade_distance_it_draws_flat() {
-    // 1024 repeats over 16 m: even the nearest row covers 64 texels a pixel, past HDRP's
-    // `_PPDLodThreshold` and its one-level fade, so nothing is marched.
+    // 1024 repeats over 16 m: even the nearest row is past HDRP's `_PPDLodThreshold`.
     let cam = grazing(15.0);
     let flat = frame(stepped(1024.0, None), &cam, "rusty_2191_far_flat.png");
     let marched = frame(stepped(1024.0, Some(0.2)), &cam, "rusty_2191_far_pom.png");

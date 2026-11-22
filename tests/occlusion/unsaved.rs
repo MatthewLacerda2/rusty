@@ -1,4 +1,4 @@
-//! A material the bake reads that its scene file lacks (#1958): the bake names
+//! A material the bake reads that its scene file lacks: the bake names
 //! it, a fresh load of the file reads the bake as stale, and a save that writes
 //! the material makes the next load match (the operator's second editor load).
 

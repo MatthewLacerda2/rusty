@@ -1,5 +1,5 @@
 //! Image-by-image math, the min/max/divide blends, `auto_levels` and sRGB hex
-//! colours (#1487).
+//! colours.
 
 use rusty::procgen::recipe::TextureRecipe;
 use rusty::procgen::{evaluate, Image};

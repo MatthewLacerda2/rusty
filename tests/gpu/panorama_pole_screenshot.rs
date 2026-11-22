@@ -1,11 +1,6 @@
-//! The skybox panorama does not wrap in V (#1037): v = θ/π runs zenith (0) to nadir
-//! (1), so its sampler clamps V while U still wraps at the φ = ±π seam.
-//!
-//! The panorama is 8x4: the top two rows red, the bottom two blue. At that size half
-//! a texel is 1/8 of V (22.5° of θ), so a repeating V would blend the zenith 50/50
-//! with the nadir across the whole view. Looking straight up must show pure red,
-//! straight down pure blue. Without an adapter the capture returns `Ok(false)` and
-//! the test skips.
+//! The skybox panorama clamps V (v = θ/π, zenith 0 to nadir 1) while U wraps at the
+//! φ = ±π seam. An 8x4 panorama, top rows red, bottom blue: a repeating V would
+//! blend zenith with nadir (half a texel is 22.5° of θ). Skips without an adapter.
 
 use glam::Vec3;
 use rusty::dev::capture::CaptureHost;
@@ -24,7 +19,6 @@ fn pole_scene() -> Scene {
     scene
 }
 
-/// The centre pixel's RGB looking along `pitch` degrees; `None` without an adapter.
 fn centre(label: &str, pitch: f32) -> Option<[f64; 3]> {
     let path = crate::temp::dir().join(format!("rusty_pole_{label}.png"));
     let cam = Camera::new(Vec3::ZERO, 0.0, pitch);

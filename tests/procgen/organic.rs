@@ -1,4 +1,4 @@
-//! #406's organic ops — domain warp, ridged / turbulence noise, Voronoi F2 / edges —
+//! The organic ops — domain warp, ridged / turbulence noise, Voronoi F2 / edges —
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 

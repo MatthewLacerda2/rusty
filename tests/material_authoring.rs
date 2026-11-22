@@ -1,7 +1,4 @@
-//! Material authoring (#271): author a reusable `MaterialAsset` into the per-World
-//! library by NAME (decoupled from any entity) via the `Material.DefineAsset` surface,
-//! and prove the issue's contract — the asset round-trips through `SceneData`, an entity
-//! can use it by name, validation is single-sourced, and map slots land correctly.
+//! `Material.DefineAsset` authors a reusable `MaterialAsset` by name into the per-World library: it round-trips through `SceneData`, an entity can use it by name, validation is single-sourced, map slots land correctly.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -11,7 +8,6 @@ use rusty::edit::{apply_scene_data, to_scene_data};
 use rusty::scene::{MaterialComponent, RenderMode, Scene};
 use rusty::script::api::bind;
 
-/// Register the `Material` namespace against `scene` and run `script`.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let lua = Lua::new();
     rusty::script::api::material::register(&lua, bind(&lua, scene)).unwrap();
@@ -20,9 +16,7 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
 
 #[test]
 fn defined_asset_round_trips_through_scene_data() {
-    // DefineAsset writes the asset into scene.materials by name; a save→load (the same
-    // to_scene_data → apply_scene_data document a `Scene.Save` writes) must preserve its
-    // factors, map slots, and render mode — the round-trip the issue requires.
+    // Survives a save→load (to_scene_data → apply_scene_data): factors, map slots, render mode.
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,
@@ -56,9 +50,7 @@ fn defined_asset_round_trips_through_scene_data() {
 
 #[test]
 fn validation_is_single_sourced_with_the_per_entity_path() {
-    // Out-of-range alpha/cutoff clamp to [0,1] and an unknown render_mode degrades to the
-    // safe default — identical to the per-entity setters, because DefineAsset routes the
-    // validated fields through the same shared `authoring::material::set_*` ops.
+    // Out-of-range alpha/cutoff clamp to [0,1], unknown render_mode degrades to the default, as the per-entity setters (shared `authoring::material::set_*`).
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,
@@ -75,8 +67,6 @@ fn validation_is_single_sourced_with_the_per_entity_path() {
 
 #[test]
 fn entity_uses_the_named_asset_by_reference() {
-    // The day-one consumer: define an asset standalone, then point an entity's
-    // MaterialComponent at the name. `material_of` must resolve to the authored asset.
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,
@@ -103,9 +93,7 @@ fn entity_uses_the_named_asset_by_reference() {
 
 #[test]
 fn packed_metallic_roughness_path_lands_in_both_map_slots() {
-    // A packed glTF metallic-roughness PNG (metallic→B, roughness→G) is pointed at both
-    // the metallic_map and roughness_map slots; each must carry the path so the renderer
-    // samples the right channel from each.
+    // A packed metallic-roughness PNG (metallic→B, roughness→G) on both slots: each must carry the path.
     let scene = Rc::new(RefCell::new(Scene::new()));
     run(
         &scene,

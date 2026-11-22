@@ -1,4 +1,4 @@
-//! Demos (#1597), the edges: what no index line may cost, a seek after the game
+//! Demos, the edges: what no index line may cost, a seek after the game
 //! quit or ran past the end, a restart whose demo is gone, a cut on another demo.
 
 use std::path::Path;

@@ -1,4 +1,4 @@
-//! `Scene.SetParent` / `ClearParent` move the subtree's collider bounds (#1067).
+//! `Scene.SetParent` / `ClearParent` move the subtree's collider bounds.
 //!
 //! A re-parent keeps the child's local transform, so the child and everything under
 //! it jump in world space. `Physics.GetBounds` reads the cached world AABB, so it is

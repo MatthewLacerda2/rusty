@@ -1,4 +1,4 @@
-//! `Transform`'s world-space surface (#1196) under a turned, scaled, mirrored parent:
+//! `Transform`'s world-space surface under a turned, scaled, mirrored parent:
 //! every getter and space map agrees with `ecs::World`'s answer, and each setter
 //! round-trips its getter in world space.
 

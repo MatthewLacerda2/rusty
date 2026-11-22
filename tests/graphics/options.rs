@@ -1,4 +1,4 @@
-//! The player graphics options (#1438): `Graphics.Get/SetOption` write the live
+//! The player graphics options: `Graphics.Get/SetOption` write the live
 //! cell the renderer reads, `ResetOptions` returns to the project's defaults
 //! (`Get/SetDefaultOption`, on `Application`), `GetOptionNames` lists every
 //! switch, and an unknown name is an error naming the valid ones.

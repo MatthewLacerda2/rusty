@@ -1,4 +1,4 @@
-//! The fallback reflection probe (#1697, Unity's default reflection probe): a metal
+//! The fallback reflection probe (Unity's default reflection probe): a metal
 //! sphere outside every probe box reflects the probe the scene names as its fallback
 //! (a green room far away), not the sky (black here). With none named it reflects
 //! the sky, as before.

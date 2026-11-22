@@ -1,6 +1,6 @@
-//! A mesh's `cast_shadows` (#1571): set from Lua through `Component.Set`, read back
+//! A mesh's `cast_shadows`: set from Lua through `Component.Set`, read back
 //! with `Component.Get`, refused for a name it doesn't know, and saved with the scene
-//! and its prefabs. Its neighbour `scale_in_lightmap` (#1704) the same way.
+//! and its prefabs. Its neighbour `scale_in_lightmap` the same way.
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,4 +1,4 @@
-//! Persistent decals through the `Decals` API (#1518): the `persist` opt, `Clear`
+//! Persistent decals through the `Decals` API: the `persist` opt, `Clear`
 //! keeping the trail, and Stop reverting to the edit-mode decals anyway. What a load carries is
 //! `scene::decal::persist`'s tests.
 

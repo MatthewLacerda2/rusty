@@ -1,13 +1,6 @@
-//! FXAA visual test (#360). Renders one aliased scene with the pass on and off and
-//! asserts (a) FXAA actually reaches the image and softens edges, and (b) with it off
-//! the chain is a byte-stable pass-through — the composite writes the output directly,
-//! exactly as it did before this pass existed.
-//!
-//! Its own file rather than an arm of `postfx/screenshot.rs` only because test files
-//! are capped at 150 lines; it is the same kind of test, pinning a different knob.
-//!
-//! When no adapter is available `capture` returns `Ok(false)` and the test passes
-//! without asserting — only a GPU-less machine; every CI job has an adapter (#489).
+//! FXAA visual test: one aliased scene with the pass on and off; FXAA reaches the image and
+//! softens edges, and off is a byte-stable pass-through. Separate file only because test files
+//! are capped at 150 lines.
 
 use crate::temp::file as tmp;
 use glam::Vec3;
@@ -16,9 +9,6 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene};
 
-/// A lit box plus a camera carrying the FXAA knob. No `PostProcessing` volume at
-/// all, which is itself part of the point: FXAA is read off the camera, so it must
-/// work in a scene that has never heard of the post-FX volume.
 fn scene_with_fxaa(on: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 1.0;
@@ -39,14 +29,8 @@ fn scene_with_fxaa(on: bool) -> Scene {
     scene
 }
 
-/// How many horizontally adjacent pixel pairs jump by more than `HARD_STEP` luma —
-/// i.e. how many *hard* edges the image still has.
-///
-/// A mean-gradient metric does not work here: the frame is mostly flat sky and flat
-/// box faces, so averaging over every pixel buries the handful FXAA actually touches
-/// (it moved the mean by ~1%, far too thin to assert across three GPU backends).
-/// Counting only the steep transitions measures exactly the staircase FXAA exists to
-/// ramp, and moves by a wide margin.
+/// Count of horizontally adjacent pixel pairs jumping by more than `HARD_STEP` luma. A
+/// mean-gradient metric fails: flat sky and box faces bury what FXAA touches (~1% of the mean).
 fn hard_steps(path: &std::path::Path) -> usize {
     const HARD_STEP: f64 = 24.0;
     let img = image::open(path).expect("png readable").to_rgb8();
@@ -65,8 +49,7 @@ fn hard_steps(path: &std::path::Path) -> usize {
 
 #[test]
 fn fxaa_softens_edges_and_is_a_pass_through_when_off() {
-    // Off-axis framing so the box's silhouette runs diagonally — the staircase FXAA
-    // exists to smooth. An axis-aligned view would have no aliased edges to measure.
+    // Off-axis, so the silhouette runs diagonally: an axis-aligned view has no aliased edges.
     let cam = Camera::new(Vec3::new(2.5, 1.5, 4.0), -125.0, -18.0);
     let (off, off_again, on) = (
         tmp("rusty_fxaa_off.png"),
@@ -88,7 +71,6 @@ fn fxaa_softens_edges_and_is_a_pass_through_when_off() {
         "with FXAA off the chain must be a byte-stable pass-through"
     );
 
-    // FXAA reaches the image at all — a binary check that no threshold can soften.
     assert_ne!(
         std::fs::read(&off).unwrap(),
         std::fs::read(&on).unwrap(),

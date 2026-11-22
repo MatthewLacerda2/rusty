@@ -1,4 +1,4 @@
-//! A camera's FOV axis (#2038, Unity's *FOV Axis*): display only, the stored fov
+//! A camera's FOV axis (Unity's *FOV Axis*): display only, the stored fov
 //! stays vertical; Unity's two conversions; the `Camera.*` round-trip and error.
 
 use std::cell::RefCell;

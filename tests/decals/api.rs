@@ -1,4 +1,4 @@
-//! Integration coverage for the `Decals` scripting namespace (issue #350):
+//! Integration coverage for the `Decals` scripting namespace:
 //! `Spawn` stamps a projector with the documented defaults and optional args,
 //! `Count`/`Clear` track the live list, the FIFO cap evicts the oldest, and
 //! malformed `Spawn` calls error instead of stamping garbage.

@@ -1,14 +1,8 @@
-//! The bar one material is held to: the interface its file declares, and what its
-//! bakes must show. Thresholds are the issue's (Substance's *PBR Validate* range for
-//! base colour); a material with a real reason to break one is excused in
-//! [`EXCUSED`], by name, with that reason, never by loosening a threshold for all.
-
 use serde_json::{json, Value};
 
 use super::maps::{maps_fail, seam};
 use super::{bake, doc, OUTPUTS, QUICK, RES};
 
-/// `(material, rule, why)`: a rule this material is excused from. Empty today.
 const EXCUSED: &[(&str, &str, &str)] = &[];
 
 fn excused(path: &str, rule: &str) -> bool {
@@ -20,7 +14,6 @@ fn excused(path: &str, rule: &str) -> bool {
     EXCUSED.iter().any(|(m, r, _)| *m == stem && *r == rule)
 }
 
-/// The outputs `d` declares to bake, and every way its interface is wrong.
 fn interface(d: &Value) -> (Vec<&'static str>, Vec<(&'static str, String)>) {
     let mut found = Vec::new();
     let wear = &d["params"]["wear"];
@@ -43,7 +36,6 @@ fn interface(d: &Value) -> (Vec<&'static str>, Vec<(&'static str, String)>) {
     (names, found)
 }
 
-/// Every way `path` misses the bar, each line naming it and the rule.
 pub fn material(path: &str) -> Vec<String> {
     let (names, mut found) = interface(&doc(path));
     if !found.is_empty() {
@@ -81,7 +73,6 @@ pub fn material(path: &str) -> Vec<String> {
     report(path, found)
 }
 
-/// `found`, less what [`EXCUSED`] excuses, one line each naming `path` and the rule.
 fn report(path: &str, found: Vec<(&str, String)>) -> Vec<String> {
     let kept = found.into_iter().filter(|(rule, _)| !excused(path, rule));
     kept.map(|(rule, what)| format!("{path}: [{rule}] {what}"))

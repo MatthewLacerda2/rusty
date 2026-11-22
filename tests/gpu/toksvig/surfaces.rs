@@ -1,4 +1,4 @@
-//! What the widening leaves alone (#1702's review, item 2): it spreads a highlight
+//! What the widening leaves alone: it spreads a highlight
 //! and blurs a reflection's mip, but a far glossy dielectric floor keeps its grazing
 //! reflection and a far normal-mapped pane its opacity. Under a blue sky with no
 //! lamp, a busy map's far floor reflects as much blue as its twin's, and a busy
@@ -9,11 +9,9 @@ use rusty::scene::Scene;
 
 use super::{floor, frames, glossy, normal_map, sky, Blue, FAR, H, W};
 
-/// How far the busy map's far floor may be off its twin's, in each channel's mean.
 const BOUND: f64 = 0.05;
 
-/// The scene of a floor of `material` under a blue sky; with a red glowing floor
-/// 0.2 m below it when `pane`.
+/// A floor of `material` under a blue sky; a red glowing floor 0.2 m below when `pane`.
 fn scene(material: MaterialAsset, pane: bool) -> Scene {
     let mut scene = Scene::new();
     sky(&mut scene, [0, 0, 255], "rusty_1702_blue_sky.png");
@@ -31,8 +29,6 @@ fn scene(material: MaterialAsset, pane: bool) -> Scene {
     scene
 }
 
-/// The mean red and blue of the lower half of the frame (the far floor), over
-/// four turning frames; `None` without an adapter.
 fn floor_rgb(scene: &Scene) -> Option<[f64; 2]> {
     let frames = frames(scene, FAR, 4)?;
     let lower = (W * H / 2) as usize..;
@@ -44,8 +40,6 @@ fn floor_rgb(scene: &Scene) -> Option<[f64; 2]> {
     Some(sum.map(|s| s / n))
 }
 
-/// A dielectric (opaque) or glass (`pane`) floor of roughness 0.08 with a busy map
-/// of `blue`.
 fn surface(name: &str, blue: Blue, pane: bool) -> MaterialAsset {
     let map = normal_map(name, true, blue);
     let mut m = glossy(&map, 0.0, 0.08);

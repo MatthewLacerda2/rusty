@@ -1,14 +1,10 @@
-//! Run a child and read what it cost: its own CPU time (user + system), which
-//! the test games' budget reads because other tests' load barely moves it, and
-//! its wall time, kept only as a hang guard (#2131). The test reaps the child
-//! itself with `wait4`, which hands back the child's rusage on Linux and macOS
-//! alike, so neither the `game` binary nor a new crate has to report it.
+//! Run a child and read its CPU time (user + system) and, as a hang guard, its wall time.
+//! The test reaps the child with `wait4`, which returns its rusage on Linux and macOS.
 
 use std::io::Read;
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
 use std::time::{Duration, Instant};
 
-/// What a finished child printed and cost; `killed` when it ran past the ceiling.
 pub(super) struct Measured {
     pub output: Output,
     pub cpu: Duration,
@@ -42,7 +38,6 @@ pub(super) fn run(command: &mut Command, ceiling: Duration) -> Measured {
     }
 }
 
-/// Read a pipe to its end on a thread of its own, so a chatty child never blocks.
 fn drain(pipe: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();

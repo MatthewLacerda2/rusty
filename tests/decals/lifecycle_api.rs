@@ -1,4 +1,4 @@
-//! Decals that stick and age (#639), through the `Decals` API and the real play
+//! Decals that stick and age, through the `Decals` API and the real play
 //! loop (`GameWorld::tick`): `Spawn` returns an id `Remove` takes, an owned decal
 //! follows its entity and goes with it, and a lifetime fades out on fixed-dt ticks.
 

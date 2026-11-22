@@ -1,4 +1,4 @@
-//! The suite's own layout guard (#483).
+//! The suite's own layout guard.
 //!
 //! `tests/` compiles as one binary rooted at `tests/main.rs` (`autotests = false`), so
 //! a file joins the suite only through a `mod` line in the file that owns its folder.

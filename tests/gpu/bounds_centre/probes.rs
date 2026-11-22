@@ -1,4 +1,4 @@
-//! #1994: a floor modelled in world coordinates, its origin 20 m away among another
+//! A floor modelled in world coordinates, its origin 20 m away among another
 //! room's (red) probes, its geometry under a green probe. It samples the probes at
 //! its bounds' centre, so it reads green; at its origin it read the other room's red.
 

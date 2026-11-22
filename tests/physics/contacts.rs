@@ -1,6 +1,6 @@
-//! Solid contacts are collisions, not triggers (#448).
+//! Solid contacts are collisions, not triggers.
 //!
-//! Before #448 a static collider counted as a trigger, so a body resting on a
+//! A static collider counted as a trigger, so a body resting on a
 //! solid floor fired `OnTrigger*`. The stand-in is retired: the resting contact
 //! must surface as a collision pair and never as a trigger pair.
 

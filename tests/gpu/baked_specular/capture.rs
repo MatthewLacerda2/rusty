@@ -1,8 +1,6 @@
-//! A bake capture never draws the lobe: a reflection probe sees a glossy, lightmapped
-//! plane from one place for every viewer of the probe, so a highlight frozen into its
-//! cube would be wrong. The probe baked over the plane reads the same, within a
-//! rounding step, whether or not its lightmap is directional: the directions'
-//! rebalance is 1 on a flat plane, which a GPU may round to a hair off it.
+//! A bake capture never draws the lobe: a reflection probe is seen from one place by every
+//! viewer, so a frozen highlight would be wrong. The probe reads the same, within a rounding
+//! step, with or without a directional lightmap (the rebalance is 1 on a flat plane).
 
 use glam::Vec3;
 use rusty::asset::lightmap_page::bc6h_texels;
@@ -12,7 +10,6 @@ use rusty::dev::bake::reflection::{bake_scene_reflections, reflection_dir};
 
 use super::{bake, scene};
 
-/// Every level's channels of the BC6H cube a reflection bake wrote (#1885), decoded.
 fn texels(bytes: &[u8]) -> Vec<f32> {
     let reader = ktx2::Reader::new(bytes).expect("a KTX2 cube");
     let size = reader.header().pixel_width;

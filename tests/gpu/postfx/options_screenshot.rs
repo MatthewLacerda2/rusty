@@ -1,4 +1,4 @@
-//! A capture honours the player graphics options (#1438): a harness screenshot of
+//! A capture honours the player graphics options: a harness screenshot of
 //! the bloom scene with `bloom` forbidden in the world's graphics cell is the frame
 //! without bloom, so a `play` scenario or an MCP shot shows what
 //! `Graphics.GetOption` says. Before, the capture renderer kept its own defaults.

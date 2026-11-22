@@ -1,5 +1,5 @@
-//! Shapes on a world canvas (#425): the SDF graphic draws in perspective through
-//! the world pass, respects a RectMask's per-fragment clip there (#619), and the
+//! Shapes on a world canvas: the SDF graphic draws in perspective through
+//! the world pass, respects a RectMask's per-fragment clip there, and the
 //! world pass has a pipeline per blend mode.
 
 use glam::{Vec2, Vec4};
@@ -11,7 +11,6 @@ use rusty::scene::Scene;
 use super::scene::{canvas, dark_scene, dominant, fill, image};
 use super::screenshot::shot;
 
-/// Put a shape of `color` and `blend`, glowing `glow` units, on `id`.
 fn skin(scene: &mut Scene, id: u32, color: Vec4, blend: UiBlend, glow: f32) {
     scene.world.set_image(id, None);
     let shape = ShapeComponent {
@@ -27,9 +26,6 @@ fn skin(scene: &mut Scene, id: u32, color: Vec4, blend: UiBlend, glow: f32) {
     scene.world.set_shape(id, Some(shape));
 }
 
-/// A 2×2 m, 400-unit sign 5 m ahead (pixels ~25..71 on both axes) on black: its
-/// left half masks a red shape twice its size (glow and all), its right half
-/// carries an additive green shape.
 fn scene() -> Scene {
     let mut scene = dark_scene();
     let sign = CanvasComponent {
@@ -39,7 +35,6 @@ fn scene() -> Scene {
         ..Default::default()
     };
     let sign = canvas(&mut scene, sign);
-    // A black backdrop, so the additive result is measured against a known colour.
     image(&mut scene, sign, fill(), Vec4::new(0.0, 0.0, 0.0, 1.0));
     // The left half masks a red shape twice its size (glow and all).
     let mut half = fill();

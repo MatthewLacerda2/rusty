@@ -1,7 +1,3 @@
-//! Non-square bakes (#1493): a `size = [w, h]` recipe samples the same unit tile
-//! with more pixels on one axis, tiles on both, and a square `size` is exactly the
-//! `resolution` it spells out.
-
 use rusty::procgen::bake::Slot;
 use rusty::procgen::recipe::{
     Blur, BlurKind, Brick, BrickOutput, BumpToNormal, Cavity, Curvature, Distance, Node, OpKind,
@@ -13,7 +9,6 @@ use super::node;
 use super::seams::{generators, seam_and_interior};
 use crate::temp::path as tmp;
 
-/// Every generator, plus a brick height through each op whose reach is in pixels.
 fn recipes() -> Vec<(String, Vec<Node>)> {
     let mut all: Vec<_> = generators()
         .into_iter()

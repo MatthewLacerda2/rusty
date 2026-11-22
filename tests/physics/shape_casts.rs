@@ -1,7 +1,3 @@
-//! The shape casts (#1881): `CapsuleCast`, `BoxCast` and `SphereCastAll`, each
-//! with a hit and a miss. The oriented volumes and the argument errors are in
-//! `shape_volumes`, over the same corridor.
-//!
 //! The corridor: two solid 2 m boxes on the +z axis, `near` centred at z = 10
 //! (faces 9 and 11, x and y within ±1) and `far` at z = 20 (faces 19 and 21).
 
@@ -16,7 +12,6 @@ use rusty::scene::Scene;
 
 use crate::play::{playing, run};
 
-/// A static 2 m box centred at `z` on the axis.
 fn static_box(scene: &mut Scene, z: f32) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 0.0, z);
@@ -31,7 +26,6 @@ fn static_box(scene: &mut Scene, z: f32) -> u32 {
     id
 }
 
-/// The corridor in Play, one tick in: (`game`, near, far).
 pub(super) fn corridor() -> (GameWorld, u32, u32) {
     let mut s = Scene::new();
     let near = static_box(&mut s, 10.0);
@@ -41,12 +35,10 @@ pub(super) fn corridor() -> (GameWorld, u32, u32) {
     (game, near, far)
 }
 
-/// Evaluate `line` in the game's script VM.
 pub(super) fn eval(game: &GameWorld, line: &str) -> String {
     game.script_manager().eval(line).expect("evaluates")
 }
 
-/// `hit, id, distance` (distance to 2 decimals) of a `Physics.<call>`.
 pub(super) fn first(game: &GameWorld, call: &str) -> String {
     let line = format!("local h, id, d = Physics.{call}; return h, id, string.format('%.2f', d)");
     eval(game, &line)

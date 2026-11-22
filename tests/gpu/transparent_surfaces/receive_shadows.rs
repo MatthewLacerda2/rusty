@@ -1,4 +1,4 @@
-//! Receive shadows (#1523, URP's *Receive Shadows*): a roof's shadow darkens a
+//! Receive shadows (URP's *Receive Shadows*): a roof's shadow darkens a
 //! transparent plane under it, unless the plane's material turns the toggle off.
 
 use glam::Vec3;

@@ -1,4 +1,4 @@
-//! Lua helpers the namespace API tests share (#939).
+//! Lua helpers the namespace API tests share.
 
 use mlua::Lua;
 
@@ -10,7 +10,7 @@ pub fn eval(lua: &Lua, code: &str) -> String {
     parts.join(", ")
 }
 
-/// Run `body`, so a test can use `?` on its Lua calls in one place (#1709).
+/// Run `body`, so a test can use `?` on its Lua calls in one place.
 pub fn attempt<R>(body: impl FnOnce() -> mlua::Result<R>) -> mlua::Result<R> {
     body()
 }

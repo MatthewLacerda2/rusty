@@ -1,12 +1,5 @@
-//! The row-band split is invisible (#1490): each recipe below touches ops that paint
-//! by rows, and bakes to the same bytes at 1 band and at N, with an uneven split.
-//!
-//! One row per op or family over a shared prefix (#1837), so a new op adds a row and
-//! two branches land on different lines.
-
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};
 
-/// What the rows read: a height, a noise, its blur, a stamp and a bevel.
 const PREFIX: &str = r#"
     { "id": "h", "op": "brick", "rows": 4, "cols": 2, "mortar": 0.06 },
     { "id": "chips", "op": "noise", "kind": "fbm", "scale": 8, "octaves": 4 },
@@ -44,7 +37,6 @@ voronoi_smooth_f1 sf { "id": "sf", "op": "voronoi", "scale": 6, "output": "smoot
 wave_distorted saw { "id": "saw", "op": "wave", "kind": "bands", "frequency": 5, "profile": "saw", "distortion": 4, "detail": 3 }
 "#;
 
-/// `row`'s name and recipe.
 fn recipe(row: &str) -> (&str, TextureRecipe) {
     let mut parts = row.splitn(3, ' ');
     let (name, output, nodes) = (
@@ -58,7 +50,6 @@ fn recipe(row: &str) -> (&str, TextureRecipe) {
     (name, serde_json::from_str(&json).expect("recipe parses"))
 }
 
-/// The output pixels' bit patterns, evaluated under `bands` bands.
 fn bits(recipe: &TextureRecipe, bands: usize) -> Vec<u32> {
     let img = with_bands(bands, || evaluate(recipe)).expect("recipe evaluates");
     img.pixels().iter().flatten().map(|c| c.to_bits()).collect()

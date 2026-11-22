@@ -1,4 +1,4 @@
-//! The occlusion verbs (#467): global settings, the per-source opt-out, and the
+//! The occlusion verbs: global settings, the per-source opt-out, and the
 //! factor `GetSpatial` reads back. The casts themselves are covered in-crate
 //! against the live physics world.
 

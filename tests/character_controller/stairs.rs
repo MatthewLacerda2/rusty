@@ -7,8 +7,6 @@ use rusty::scene::Scene;
 
 use super::{add_box, add_character, add_floor, feet_of, pos_of, walk_for};
 
-/// A floor with a block `height` tall spanning x in [2, 6], and a character at
-/// the origin.
 fn step_scene(height: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene);
@@ -23,8 +21,6 @@ fn step_scene(height: f32) -> (Scene, u32) {
     (scene, id)
 }
 
-/// A 0.2 m step is under the default 0.3 m step offset: the character walks up
-/// onto it and keeps going.
 #[test]
 fn climbs_a_step_under_the_step_offset() {
     let (mut scene, id) = step_scene(0.2);
@@ -40,7 +36,6 @@ fn climbs_a_step_under_the_step_offset() {
     assert!(last.grounded, "grounded on the step");
 }
 
-/// A 0.5 m step is over the offset: it blocks like a wall.
 #[test]
 fn is_blocked_by_a_step_over_the_step_offset() {
     let (mut scene, id) = step_scene(0.5);
@@ -55,8 +50,6 @@ fn is_blocked_by_a_step_over_the_step_offset() {
     assert!(feet_of(&scene, id).y < 0.2, "never climbed it");
 }
 
-/// A ramp rising along +x at `degrees`, its surface through the origin's
-/// ground line at x = 1.
 pub(super) fn ramp_scene(degrees: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene);
@@ -70,7 +63,6 @@ pub(super) fn ramp_scene(degrees: f32) -> (Scene, u32) {
     (scene, id)
 }
 
-/// A 30° ramp is under the 45° slope limit: the character walks up it.
 #[test]
 fn walks_up_a_slope_under_the_limit() {
     let (mut scene, id) = ramp_scene(30.0);
@@ -80,8 +72,6 @@ fn walks_up_a_slope_under_the_limit() {
     assert!(feet.y > 2.0, "climbed the ramp, got feet y={}", feet.y);
 }
 
-/// A 60° ramp is over the limit: walking into it never gets far up, and gravity
-/// slides the character back down off it.
 #[test]
 fn slides_off_a_slope_over_the_limit() {
     let (mut scene, id) = ramp_scene(60.0);

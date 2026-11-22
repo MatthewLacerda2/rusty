@@ -1,4 +1,4 @@
-//! Plain kinematic bodies are pure movers (#451, Unity's kinematic Rigidbody):
+//! Plain kinematic bodies are pure movers (Unity's kinematic Rigidbody):
 //! they go exactly where their Transform says — through walls, and never falling
 //! — because collide-and-slide belongs to the `CharacterController` alone.
 

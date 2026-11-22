@@ -1,4 +1,4 @@
-//! `Scene.GetName` / `Scene.SetName` (#1611): Unity's read/write `gameObject.name`,
+//! `Scene.GetName` / `Scene.SetName`: Unity's read/write `gameObject.name`,
 //! writing the same `World::set_name` the inspector's name field writes, so a
 //! rename is saved with the scene. The nil-id cases are `entity_arg_api`'s shared
 //! table.
@@ -62,7 +62,7 @@ fn get_name_reads_and_set_name_renames() {
     assert_eq!(eval("return Scene.GetName(99999) == nil"), "true");
 }
 
-/// In edit mode (the editor console's runtime, #1339) a rename sticks, so saving
+/// In edit mode (the editor console's runtime) a rename sticks, so saving
 /// the scene writes it.
 #[test]
 fn a_rename_is_saved_with_the_scene() {

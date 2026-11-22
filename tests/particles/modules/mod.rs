@@ -1,4 +1,4 @@
-//! Particle emitter modules (#439): shapes, start ranges, over-life curves and
+//! Particle emitter modules: shapes, start ranges, over-life curves and
 //! sub-emitters, driven through the real play loop (`GameWorld::tick`).
 
 mod api;

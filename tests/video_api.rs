@@ -1,12 +1,3 @@
-//! Integration coverage for the `Video` scripting namespace (issue #89) and the
-//! persistence of video settings through `Storage`. The `Video.*` setters write a
-//! shared `VideoSettings` cell that the platform layer reads each frame to
-//! reconfigure the surface/window; these are render-only, one-way writes — they
-//! never feed `FixedUpdate` — so the tests assert the cell + the storage blob, not
-//! sim evolution. GPU surface/window reconfiguration itself can't run headless, so
-//! the renderer-apply path is covered by the pure decision logic in
-//! `core::settings::video::VideoSettings::diff`, exercised here through the cell.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

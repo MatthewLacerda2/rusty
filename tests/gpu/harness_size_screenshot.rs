@@ -1,4 +1,4 @@
-//! The harness renders at a chosen size (#1583): the run's size (`play --size`,
+//! The harness renders at a chosen size: the run's size (`play --size`,
 //! `Harness::set_size`) and one `Screenshot`'s own (`{ width =, height = }`).
 
 use std::path::Path;
@@ -11,7 +11,7 @@ fn png_size(path: &Path) -> (u32, u32) {
 }
 
 /// Whether a shot that came back `false` is a real skip (no adapter) — only that
-/// may pass (#885).
+/// may pass.
 fn skipped(what: &str) -> bool {
     assert!(
         !rusty::render::gpu_required(),

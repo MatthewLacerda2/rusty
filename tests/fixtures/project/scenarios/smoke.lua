@@ -1,12 +1,4 @@
--- scenarios/smoke.lua — the canonical headless smoke test.
---
--- Run it with:
---   cargo run --bin play --features dev -- --project tests/fixtures/project \
---       tests/fixtures/project/scenarios/smoke.lua out/
---
--- It drives the demo world the editor shows (Player = 2, Enemy_1 = 5) entirely
--- headlessly: press a key, skip a couple seconds of ticks with one StepUntil, then
--- observe ONCE and assert. Deterministic — rerun it and results.json is identical.
+-- The canonical headless smoke test over the demo world (Player = 2, Enemy_1 = 5): press a key, skip ahead with one StepUntil, observe once and assert. Deterministic.
 
 local player = Scene.FindEntityByName("Player")
 local enemy = Scene.FindEntityByName("Enemy_1")
@@ -14,7 +6,6 @@ local enemy = Scene.FindEntityByName("Enemy_1")
 Harness.Expect(player ~= nil, "demo scene has a Player entity")
 Harness.Expect(enemy ~= nil, "demo scene has an Enemy_1 entity")
 
--- Record the starting position so we can prove the sim actually moved the player.
 local sx, sy, sz = Transform.GetPosition(player)
 Harness.Log(string.format("player start: %.2f, %.2f, %.2f", sx, sy, sz))
 
@@ -30,10 +21,7 @@ local moved = math.abs(ex - sx) + math.abs(ez - sz)
 Harness.Expect(moved > 0.1, "holding W moves the player")
 Harness.Expect(Harness.Frame() == 120, "exactly 120 ticks were simulated")
 
--- The player is now driven by the bundled player_controller.lua and the enemy by
--- bot.lua — pure script-driven gameplay (no engine control scheme). Skip ahead and
--- confirm the enemy's animator is being driven by its script the whole window (its
--- clip is always one of its real clips, never empty).
+-- The enemy's animator is script-driven the whole window: its clip is always one of its real clips.
 local broke = Harness.StepUntil(function()
     local clip = Animator.GetClip(enemy)
     return clip ~= "Walk" and clip ~= "Idle"

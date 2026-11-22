@@ -1,4 +1,4 @@
-//! The `image` op (#1491): a decoded file feeds a recipe like any generator.
+//! The `image` op: a decoded file feeds a recipe like any generator.
 
 use rusty::procgen::recipe::{ImageEncoding, ImageTexture, OpKind, TextureRecipe};
 use rusty::procgen::{evaluate, evaluate_with, Source, Sources};

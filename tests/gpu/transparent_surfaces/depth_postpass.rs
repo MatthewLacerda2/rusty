@@ -1,4 +1,4 @@
-//! Depth postpass (#1523, HDRP's *Transparent Depth Postpass*): a near, mostly
+//! Depth postpass (HDRP's *Transparent Depth Postpass*): a near, mostly
 //! opaque checkered pane in front of a far wall, a wide-open lens focused on the
 //! pane. Without the postpass the pane's pixels carry the wall's depth, so the pane
 //! blurs with it; with it, the pane reads as in focus and stays sharp.
@@ -9,10 +9,8 @@ use rusty::scene::Camera;
 
 use super::{checker, glass, shot_at, slab, stage_with};
 
-/// The capture size: large enough for the blur to span several pixels.
 const SIZE: u32 = 160;
 
-/// The pane 3 m from the eye over a grey wall at 25 m, its postpass `on`.
 fn pane(on: bool) -> rusty::scene::Scene {
     let mut scene = stage_with(glam::Quat::from_rotation_x(-0.8), |vc| {
         vc.depth_of_field = DepthOfField {
@@ -49,8 +47,7 @@ fn pane(on: bool) -> rusty::scene::Scene {
     scene
 }
 
-/// How much neighbouring pixels differ across the middle of `img`, squared: a fine
-/// sharp checker scores high, a blurred one (all grey) low.
+/// How much neighbouring pixels differ across the middle of `img`, squared: a sharp checker scores high.
 fn sharpness(img: &image::RgbImage) -> u64 {
     let lum = |x, y| {
         img.get_pixel(x, y)

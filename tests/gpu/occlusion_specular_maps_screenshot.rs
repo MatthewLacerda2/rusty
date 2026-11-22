@@ -1,12 +1,6 @@
-//! The occlusion and specular-level maps (#2151). Each check renders a plane with a
-//! map against the same plane without one (or with the scalar it stands for):
-//!   - Occlusion: a black map darkens the ambient-lit plane, a strength of 0 leaves
-//!     it as unmapped, and under a lamp alone (no ambient, no reflectance) it changes
-//!     nothing: direct light is never occluded by it.
-//!   - Specular level: a map whose alpha is 0 shades like `specular = 0`, and unlike
-//!     the unmapped plane, whose lamp highlight it takes away.
-//!   - A map with no texture (a missing file, an empty path) draws as unmapped.
-//!
+//! The occlusion and specular-level maps, each against the unmapped plane (or the
+//! scalar it stands for). Occlusion never dims direct light; a specular map with
+//! alpha 0 shades like `specular = 0`; a map with no texture draws as unmapped.
 //! No adapter: `frame` returns `None` and the test passes without asserting.
 
 use super::linear_data_maps_screenshot::{diff, frame, png, scene as lamp_scene, SAME};
@@ -14,7 +8,6 @@ use super::normal_emissive_maps_screenshot::scene as ambient_scene;
 use rusty::components::MaterialAsset;
 use rusty::scene::Scene;
 
-/// Render `scenes` and compare the first with each of the rest; `None` without a GPU.
 fn diffs(what: &str, scenes: Vec<Scene>) -> Option<Vec<f64>> {
     let frames: Option<Vec<_>> = (scenes.iter().enumerate())
         .map(|(i, s)| frame(s, &format!("rusty_2151_{what}_{i}.png")))
@@ -28,7 +21,6 @@ fn diffs(what: &str, scenes: Vec<Scene>) -> Option<Vec<f64>> {
     Some(out)
 }
 
-/// A rough grey dielectric, with `edit` applied.
 fn grey(edit: impl FnOnce(&mut MaterialAsset)) -> MaterialAsset {
     let mut m = MaterialAsset {
         base_color: [0.8, 0.8, 0.8],
@@ -54,8 +46,7 @@ fn a_black_occlusion_map_darkens_the_indirect_light_and_never_a_lamp() {
     };
     assert!(d[0] > 10.0, "a black map darkens the ambient: {:.3}", d[0]);
     assert!(d[1] < SAME, "strength 0 applies none of it: {:.3}", d[1]);
-    // A lamp alone: no ambient, and no reflectance (`specular` 0) for the
-    // occlusion's specular term to take.
+    // A lamp alone: no ambient, no reflectance (`specular` 0).
     let lit = |m: MaterialAsset| {
         let mut s = lamp_scene(MaterialAsset { specular: 0.0, ..m });
         s.ambient_intensity = 0.0;
@@ -76,8 +67,7 @@ fn a_zero_specular_level_map_shades_like_specular_zero() {
         .expect("write png");
     let glossy = |edit: fn(&mut MaterialAsset), map: Option<&std::path::Path>| {
         grey(|m| {
-            // Dark and glossy, so the lamp's highlight and the sky's reflection are
-            // most of the frame.
+            // Dark and glossy: highlight and sky reflection dominate.
             m.base_color = [0.02; 3];
             m.roughness = 0.15;
             m.specular_map = map.map(|p| p.to_string_lossy().into_owned().into());
@@ -98,8 +88,7 @@ fn a_zero_specular_level_map_shades_like_specular_zero() {
 
 #[test]
 fn a_map_with_no_texture_switches_itself_off() {
-    // A missing file and an empty path: the slots bind the checker meanwhile, which
-    // must never darken the surface or scale its reflectance.
+    // The unloaded slots bind a checker, which must not darken or scale reflectance.
     let missing = crate::temp::dir().join("rusty_2151_no_such_map.png");
     let unloaded = |occlusion: &str, specular: &str| {
         grey(|m| {

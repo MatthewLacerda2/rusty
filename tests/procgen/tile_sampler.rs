@@ -1,12 +1,7 @@
-//! #1742's Tile Sampler params keep `tile`'s promise to tile: each one, with
-//! stamps pushed across the tile's edge, bakes without a seam.
-
 use rusty::procgen::{evaluate, TextureRecipe};
 
 use crate::procgen::seams::assert_seamless;
 
-/// A soft disc baked at `res`², stamped over a `count`-cell grid at full jitter, so stamps cross
-/// the tile's edge, plus `extra` params on the `tile` node and its `inputs`.
 fn bake(res: u32, count: u32, extra: &str, inputs: &str) -> rusty::procgen::Image {
     let json = format!(
         r#"{{ "resolution": {res}, "seed": 7, "nodes": [

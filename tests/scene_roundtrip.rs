@@ -1,5 +1,3 @@
-//! Scene save/load round-trip + edit-mode snapshot/restore (issue #6).
-
 use glam::Vec3;
 use rusty::edit::SceneSnapshot;
 use rusty::scene::Scene;
@@ -51,7 +49,6 @@ fn save_load_preserves_layer_names_and_entity_layer() {
     assert_eq!(loaded.layers.name(3), "Enemy");
     assert_eq!(loaded.layers.index_of("Enemy"), Some(3));
     assert_eq!(loaded.world.layer(id), 3);
-    // Layer 0 stays the fixed Default and cannot be renamed.
     scene.layers.set_name(0, "NotDefault");
     assert_eq!(scene.layers.name(0), "Default");
 }
@@ -63,11 +60,9 @@ fn save_load_preserves_collision_matrix() {
     assert!(scene.collision_matrix.can_collide(1, 2));
     assert!(scene.collision_matrix.can_collide(0, 0));
 
-    // Unchecking a cell is symmetric.
     scene.collision_matrix.set_collision(1, 2, false);
     assert!(!scene.collision_matrix.can_collide(1, 2));
     assert!(!scene.collision_matrix.can_collide(2, 1));
-    // Other pairs are untouched.
     assert!(scene.collision_matrix.can_collide(1, 3));
 
     let path = tmp("rusty_collision_matrix_roundtrip.scene");

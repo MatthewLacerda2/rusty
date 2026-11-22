@@ -1,4 +1,4 @@
-//! The time-sliced `EnvironmentQuery` in the play loop (#2116): a query requested
+//! The time-sliced `EnvironmentQuery` in the play loop: a query requested
 //! in one `Update` is answered by a later one, with exactly what `Run` answered in
 //! that first `Update`; a fresh Play starts with the default budget, and two runs
 //! answer the same on the same tick.

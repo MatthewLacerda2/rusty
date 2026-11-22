@@ -1,4 +1,4 @@
-//! The IK surface's edges (#461): refusals, persistence, and physics winning
+//! The IK surface's edges: refusals, persistence, and physics winning
 //! over IK on a ragdolled bone.
 
 use glam::Vec3;

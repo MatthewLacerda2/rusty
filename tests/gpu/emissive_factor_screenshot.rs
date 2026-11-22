@@ -1,15 +1,7 @@
-//! Emissive-factor visual test (#222). Proves the renderer READS a material's flat
-//! `emissive` factor and adds it to the lit colour through the draw's material
-//! record (`MaterialData`, both sides), not just stores it on the CPU.
-//!
-//! The signal is light-independent by construction: the scene has **zero ambient and
-//! no lights**, so the only thing that can brighten the surface is the emissive term
-//! in `fs_main`. A black-base box with `emissive = 0` renders near-black; the same box
-//! with a bright emissive factor renders bright. A factor >1.0 additionally exercises
-//! the HDR target + bloom bright-pass, so its mean brightness clears the `< 1.0` one.
-//!
-//! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the test
-//! passes without asserting (matching `material_maps_screenshot.rs`).
+//! Emissive-factor visual test: the renderer reads a material's flat `emissive` factor and adds
+//! it to the lit colour through `MaterialData`. Zero ambient and no lights, so only the
+//! emissive term in `fs_main` can brighten a black-base box; a factor >1.0 also exercises the
+//! HDR target and bloom bright-pass.
 
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;
@@ -34,8 +26,6 @@ fn vc(bloom: bool) -> PostProcessingComponent {
     }
 }
 
-/// An unlit-by-construction box (ambient 0, no lights) whose only brightness source is
-/// the material's `emissive` factor. Base color is black so nothing else contributes.
 fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
@@ -49,7 +39,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
     scene.world.set_post_processing(id, Some(vc(bloom)));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));

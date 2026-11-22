@@ -58,7 +58,7 @@ fn spatial_state_tracks_play_and_stop() {
 }
 
 /// `SetVolume` is `AudioSource.volume`: it writes the component through the
-/// inspector's op (clamped to `[0, 1]`) and the live voice follows (#1368).
+/// inspector's op (clamped to `[0, 1]`) and the live voice follows.
 #[test]
 fn set_volume_writes_the_source_and_retunes_its_voice() {
     let lua = Lua::new();

@@ -1,5 +1,5 @@
 //! `Transform`'s rotations and local setters under the turned, scaled, mirrored
-//! parent of `world.rs` (#1196): world and local differ there, so a getter or
+//! parent of `world.rs`: world and local differ there, so a getter or
 //! setter bound to the other space's function fails here.
 
 use glam::{EulerRot, Quat, Vec3};

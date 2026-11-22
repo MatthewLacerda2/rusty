@@ -84,10 +84,8 @@ fn run_clip() -> AnimationClip {
     clip
 }
 
-/// A skinned `Rig` at `at`, skeleton spawned; its Animator plays `Run` when
-/// `running`.
 /// Arms the kept bone list's check: every follow on this thread from here on
-/// also walks the skeletons and fails the test if the list went stale (#2345).
+/// also walks the skeletons and fails the test if the list went stale.
 pub fn character(scene: &mut Scene, at: Vec3, running: bool) -> u32 {
     rusty::physics::check_kept_bones();
     let skin = skin();
@@ -111,7 +109,6 @@ pub fn character(scene: &mut Scene, at: Vec3, running: bool) -> u32 {
     id
 }
 
-/// A static 40 × 1 × 40 floor whose top is at y 0.
 pub fn floor(scene: &mut Scene) -> u32 {
     let id = scene.add_entity("Floor".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(0.0, -0.5, 0.0);
@@ -128,7 +125,6 @@ pub fn floor(scene: &mut Scene) -> u32 {
     id
 }
 
-/// `name`'s bone of `rig` (the `mixamorig:` namespace added).
 pub fn bone(scene: &Scene, rig: u32, name: &str) -> u32 {
     scene.find_bone(rig, &format!("mixamorig:{name}")).unwrap()
 }

@@ -1,4 +1,4 @@
-//! Replay of a busy scene (#764): the same inputs give the same world, run twice in
+//! Replay of a busy scene: the same inputs give the same world, run twice in
 //! one process and once in another. Std's `RandomState` keys every hash map from
 //! per-process entropy, so a sim map whose iteration order reaches behaviour shows
 //! up here as a mismatch — the empty-scene replay in `harness_determinism` can't.

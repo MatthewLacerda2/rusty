@@ -1,4 +1,4 @@
-//! A `Plane`'s subdivisions (#1524): the grid a vertex block (`vertex_waves`) moves,
+//! A `Plane`'s subdivisions: the grid a vertex block (`vertex_waves`) moves,
 //! set from Lua through `Component.Set`, refused out of range or on another shape,
 //! and saved with the mesh.
 

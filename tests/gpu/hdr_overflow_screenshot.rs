@@ -1,16 +1,8 @@
-//! A pixel too bright for half-float is stored finite (#1699). Inverse-square light
-//! has no ceiling: polished metal a hand's width under a lamp reflects past
-//! `Rgba16Float`'s 65504, and an `Inf` in the HDR target turns bloom's bright pass
-//! NaN, which its blur spreads into a black block around the highlight. Every forward
-//! colour entry point returns through `forward::transparent::finite_hdr`, so the highlight
-//! stays white and bloom stays finite. The floor is also emissive far past 65504,
-//! so the overflow does not hang on how bright a GGX peak gets.
-//!
-//! Lavapipe stores an overflowing `Rgba16Float` texel finite (with the clamp taken
-//! out, this frame still came out white there), so on Linux CI this test cannot
-//! fail; a GPU that rounds to `Inf`, as Metal does, is where it holds the clamp.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! A pixel too bright for half-float is stored finite. Polished metal under a lamp reflects past
+//! `Rgba16Float`'s 65504, and an `Inf` in the HDR target turns bloom's bright pass NaN, a black
+//! block around the highlight. Forward colour returns through `forward::transparent::finite_hdr`.
+//! Lavapipe stores an overflowing texel finite even without the clamp, so on Linux CI this
+//! cannot fail; a GPU that rounds to `Inf`, as Metal does, is where it holds the clamp.
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
@@ -20,8 +12,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
 
-/// A polished metal floor, emissive past half-float, under a black sky, an
-/// intensity-3.5 lamp 15 cm above it right under the camera, and bloom on.
 fn scene() -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -53,7 +43,7 @@ fn scene() -> Scene {
     let mut vc = default_post_processing();
     vc.bloom.active = true;
     scene.world.set_post_processing(volume, Some(vc));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(volume, Some(rusty::components::CameraComponent::default()));
@@ -69,8 +59,6 @@ fn a_highlight_past_half_float_stays_white_under_bloom() {
         return;
     }
     let img = image::open(&path).unwrap().to_rgb8();
-    // The floor fills the frame: every pixel white, none the black a NaN reads as
-    // once tonemapped.
     for (x, y, p) in img.enumerate_pixels() {
         assert!(p.0.iter().all(|&v| v > 200), "({x}, {y}) is {:?}", p.0);
     }

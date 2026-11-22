@@ -1,7 +1,5 @@
-//! Sampling postfx blocks (#402), pixel-tested on lavapipe: `radial_blur` taps the
-//! module's input at offsets, smearing a hard white/black edge into greys. (The
-//! lens effects these tests once covered as blocks are the volume's now, #1439:
-//! `lens_screenshot`.)
+//! Sampling postfx blocks, pixel-tested on lavapipe: `radial_blur` taps the module's
+//! input at offsets, smearing a hard white/black edge into greys.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};
@@ -11,7 +9,6 @@ use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT
 
 use super::super::fog::scene::{shot, wall_scene};
 
-/// Bake a one-block postfx module named `name`.
 fn bake(name: &str, block: &str) {
     let json = format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{block}]}}"#);
     bake_recipe(
@@ -59,7 +56,6 @@ fn edge_scene(effects: &[&str]) -> Scene {
     with_effects(scene, effects)
 }
 
-/// How many middle-row pixels are neither black nor white: the smeared edge.
 fn greys(img: &image::RgbImage) -> usize {
     let y = img.height() / 2;
     (0..img.width())
@@ -84,9 +80,7 @@ fn radial_blur_smears_a_hard_edge() {
     cleanup(name);
 }
 
-/// An authored effect reads the game clock through the scaffold (#398): a pulsing
-/// `damage_vignette` paints different corners half a pulse apart, and the same
-/// corners at the same time.
+/// A pulsing `damage_vignette` paints different corners half a pulse apart.
 #[test]
 fn an_authored_effect_reads_game_time() {
     let name = "t398_damage_pulse";

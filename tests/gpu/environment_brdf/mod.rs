@@ -1,13 +1,7 @@
-//! The environment reflection's weight is URP's environment BRDF (#1543), not a
-//! `1 - roughness` scale: a rough metal reflects a blurry, dimmer environment, never
-//! a black one, and a dielectric reflects its 4% F0 head-on, from either side.
-//!
-//! The sky is a uniform grey panorama and the scene has no lights, no ambient and no
-//! post-processing volume (so no tonemap): the only light on a surface is the
-//! environment reflection, and the frame is the reflection's weight times the sky.
-//! Both are read back as linear light (the sRGB encoding undone): the centre of the
-//! frame (the surface, at normal incidence) against a corner (the sky itself).
-//! Without an adapter the capture returns `Ok(false)` and the tests skip.
+//! The environment reflection's weight is URP's environment BRDF, not a `1 - roughness` scale:
+//! a rough metal reflects a blurry, dimmer environment, never black; a dielectric reflects its
+//! 4% F0 head-on, from either side. Uniform grey sky, no lights, ambient or tonemap; read back
+//! as linear light: the frame centre (surface) against a corner (sky).
 
 mod back_face_screenshot;
 mod grazing_screenshot;
@@ -22,8 +16,6 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// A uniform grey panorama, bright enough that a 4% reflection stays above the
-/// 8-bit floor and dark enough that a full one does not clip.
 fn grey_panorama() -> PathBuf {
     let img = image::RgbaImage::from_pixel(64, 32, image::Rgba([200, 200, 200, 255]));
     let path = crate::temp::dir().join("grey_panorama.png");
@@ -31,7 +23,6 @@ fn grey_panorama() -> PathBuf {
     path
 }
 
-/// One `shape` of `material` under the grey sky, no other light; returns its id.
 fn scene(shape: Primitive, material: MaterialAsset) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = grey_panorama().to_string_lossy().into_owned();
@@ -52,7 +43,6 @@ fn linear(srgb: u8) -> f64 {
     }
 }
 
-/// Mean linear green of the 8x8 block at `(x0, y0)`.
 fn block(img: &image::RgbImage, x0: u32, y0: u32) -> f64 {
     let mut sum = 0.0;
     for y in y0..y0 + 8 {
@@ -63,8 +53,6 @@ fn block(img: &image::RgbImage, x0: u32, y0: u32) -> f64 {
     sum / 64.0
 }
 
-/// The reflection weight at the frame's centre, seen from `(0, 0, 5)` down -Z:
-/// the centre over the sky, both linear. `None` when no adapter rendered it.
 fn reflectance(label: &str, scene: &Scene) -> Option<f64> {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_env_brdf_{label}.png"));
@@ -80,7 +68,6 @@ fn reflectance(label: &str, scene: &Scene) -> Option<f64> {
     Some(centre / sky)
 }
 
-/// A black dielectric: all it shows is its specular reflection.
 fn black_plastic(roughness: f32) -> MaterialAsset {
     MaterialAsset {
         base_color: [0.0, 0.0, 0.0],

@@ -1,4 +1,4 @@
-//! Integration coverage for the `Selectable` namespace (#420): every setter writes
+//! Integration coverage for the `Selectable` namespace: every setter writes
 //! through the shared ops (clamped, unknown names ignored), the getters read it
 //! back, and the whole component survives a scene save → load — while the runtime
 //! state tint on the Image is never saved.

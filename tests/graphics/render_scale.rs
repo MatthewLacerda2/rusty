@@ -1,4 +1,4 @@
-//! The render scale (#1498, #1715): `Graphics.Set/GetRenderScale` write the player's
+//! The render scale: `Graphics.Set/GetRenderScale` write the player's
 //! choice in the live graphics cell the renderer reads, clamped to URP's range;
 //! with none, the project's default runs (`Get/SetDefaultRenderScale`), resolved on
 //! the display scale `Video.GetDisplayScale` reads.

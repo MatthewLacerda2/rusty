@@ -1,4 +1,4 @@
-//! Scene builders for the world-space UI screenshots (#429): unlit emissive boxes
+//! Scene builders for the world-space UI screenshots: unlit emissive boxes
 //! (zero ambient, no lights, so a surface's colour is its emissive), canvases and
 //! solid UI elements, and a colour-centroid probe for locating what drew where.
 
@@ -8,7 +8,6 @@ use rusty::components::{
 };
 use rusty::scene::{MeshComponent, Scene};
 
-/// An empty scene with no ambient light.
 pub fn dark_scene() -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -16,7 +15,6 @@ pub fn dark_scene() -> Scene {
     scene
 }
 
-/// An opaque box of `size` at `pos` whose colour is exactly `emissive`.
 pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: [f32; 3]) {
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) =
@@ -36,14 +34,12 @@ pub fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissi
     scene.materials.insert(name.to_string(), asset);
 }
 
-/// A root canvas entity carrying `canvas`.
 pub fn canvas(scene: &mut Scene, canvas: CanvasComponent) -> u32 {
     let id = scene.add_entity("Canvas".to_string());
     scene.world.set_canvas(id, Some(canvas));
     id
 }
 
-/// A solid `color` image under `parent`: `rt` places it.
 pub fn image(scene: &mut Scene, parent: u32, rt: RectTransformComponent, color: Vec4) -> u32 {
     let id = scene.add_entity("Image".to_string());
     scene.world.set_rect_transform(id, Some(rt));
@@ -56,7 +52,6 @@ pub fn image(scene: &mut Scene, parent: u32, rt: RectTransformComponent, color: 
     id
 }
 
-/// Stretch anchors filling the parent.
 pub fn fill() -> RectTransformComponent {
     RectTransformComponent {
         anchor_min: Vec2::ZERO,
@@ -81,7 +76,6 @@ pub fn centroid(path: &std::path::Path, is: impl Fn([u8; 3]) -> bool) -> (Vec2, 
     (sum / n.max(1) as f32, n)
 }
 
-/// Whether channel `c` of `p` dominates the other two by a clear margin.
 pub fn dominant(p: [u8; 3], c: usize) -> bool {
     (0..3).all(|o| o == c || i32::from(p[c]) > i32::from(p[o]) + 40)
 }

@@ -1,4 +1,4 @@
-//! Absorption (#1523, HDRP's *Transmittance Color* at an *Absorption Distance*):
+//! Absorption (HDRP's *Transmittance Color* at an *Absorption Distance*):
 //! the same water over a deep floor reads darker and bluer than over a shallow one,
 //! while clear water (white transmittance) leaves both alike.
 

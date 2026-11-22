@@ -1,4 +1,4 @@
-//! The display scale (#1715) is a sim input a demo records, as it records the Game
+//! The display scale is a sim input a demo records, as it records the Game
 //! view's size: a replay reads the recording's, never the monitor it plays on.
 
 use rusty::dev::demo::{self, Demo, Destination};

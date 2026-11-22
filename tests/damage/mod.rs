@@ -1,4 +1,4 @@
-//! `Damage` and `OnTakeDamage` end to end (#1893): a shot bubbles from a hitbox
+//! `Damage` and `OnTakeDamage` end to end: a shot bubbles from a hitbox
 //! to the character's script, a handler's return is what `Apply` answers, a
 //! barrel's blast chains to the next and a self-feeding loop stops at depth 16
 //! (`chain`), the radial falloff, cover and grouping (`radial`, `cover`), and a
@@ -53,14 +53,12 @@ pub fn static_box(scene: &mut Scene, at: Vec3, size: Vec3, script: Option<&str>)
     id
 }
 
-/// `scene` in Play, one tick in (every script awake).
 pub fn play(scene: Scene) -> GameWorld {
     let mut game = playing(Rc::new(RefCell::new(scene)), 20.0);
     run(&mut game, 1);
     game
 }
 
-/// Evaluate `line` in `game`'s gameplay VM.
 pub fn eval(game: &GameWorld, line: &str) -> String {
     game.script_manager().eval(line).expect("evaluates")
 }

@@ -1,10 +1,3 @@
-//! Integration coverage for the `Sound` scripting namespace (#357): an agent
-//! authors a patch, bakes a one-shot to `.wav`, and fires that very path through
-//! `Audio.PlayAt` — the wired-up day-one consumer. The audio backend is the
-//! `NullBackend` here, exactly as on the headless harness, so the assertion is on
-//! the maestro's introspection log: *what* played, and that it was the file the
-//! agent had just invented.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -17,8 +10,6 @@ use rusty::scene::Scene;
 use rusty::script::api::bind;
 use rusty::time::Time;
 
-/// A gunshot: a noise burst through a fast, resonant lowpass sweep — the patch
-/// shape the north-star shooter fires thousands of times.
 const GUNSHOT: &str = r#"{
     source = { kind = "noise" },
     amp = { a = 0.0, d = 0.09, s = 0.0, r = 0.06 },
@@ -104,10 +95,6 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
     }
 }
 
-/// The song verbs end to end (#358): author a song in Lua, bake it, save it with
-/// `SongToJson`, and re-bake the saved JSON — the two WAVs must be identical. That
-/// exercises all three verbs and pins the promise a saved score is worth keeping:
-/// it re-renders the same asset, so a song can be committed instead of its audio.
 #[test]
 fn a_saved_song_re_bakes_the_identical_mix() {
     let lua = Lua::new();

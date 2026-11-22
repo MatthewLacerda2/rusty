@@ -1,4 +1,4 @@
-//! World-space canvases fog like the world (#429 over #437): a red sign and a red
+//! World-space canvases fog like the world: a red sign and a red
 //! box side by side at the same distance, under linear fog, come out the same.
 
 use glam::{Vec2, Vec3, Vec4};

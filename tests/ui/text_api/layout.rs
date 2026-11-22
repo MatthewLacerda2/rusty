@@ -1,4 +1,4 @@
-//! `Text.GetPreferredSize` / `GetLayout` answer from the element's rect (#419).
+//! `Text.GetPreferredSize` / `GetLayout` answer from the element's rect.
 
 use super::{label, with_api};
 use std::cell::RefCell;

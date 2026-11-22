@@ -1,4 +1,4 @@
-//! Integration coverage for the in-game UI surface (#417): the `Canvas`,
+//! Integration coverage for the in-game UI surface: the `Canvas`,
 //! `RectTransform` and `UI` namespaces drive the same components the layout reads,
 //! `UI.GetRect` follows a script's change immediately, and both components survive
 //! a scene save → load.

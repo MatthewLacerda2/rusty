@@ -1,4 +1,4 @@
-//! Local avoidance between NavMesh agents (#463), driven through the public
+//! Local avoidance between NavMesh agents, driven through the public
 //! `tick_nav_agents` tick on an open field: a head-on pair passes without
 //! overlapping, priority decides who yields, and a non-avoiding agent is steered
 //! around. Signed offsets, not only distances, so a flipped sign fails.

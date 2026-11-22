@@ -1,7 +1,5 @@
-//! Transparent surfaces à la Unity (#1523): one file per feature, over the shared
-//! pool fixture here. Every test renders the same primitive scene twice, the knob
-//! off and on, and compares pixels, so no golden is committed. Each skips without
-//! an adapter.
+//! Transparent surfaces à la Unity: one file per feature over the shared pool fixture. Each test
+//! renders one scene twice, the knob off and on, and compares pixels (no golden).
 
 mod absorption;
 mod depth_postpass;
@@ -20,7 +18,6 @@ use rusty::dev::screenshot::capture;
 use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, PostProcessingComponent, Scene};
 
-/// The capture size.
 pub const SIZE: u32 = 64;
 
 /// A scene with a sun at `sun_pitch` radians below the horizon and a view volume:
@@ -29,7 +26,6 @@ pub fn stage(sun_pitch: f32) -> Scene {
     stage_with(Quat::from_rotation_x(sun_pitch), |_| {})
 }
 
-/// [`stage`] with the sun turned by `sun`, the volume's settings changed by `tweak`.
 pub fn stage_with(sun: Quat, tweak: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -48,7 +44,6 @@ pub fn stage_with(sun: Quat, tweak: impl FnOnce(&mut PostProcessingComponent)) -
     scene
 }
 
-/// A box named `name` at `position` scaled by `scale`, drawn with `material`.
 pub fn slab(
     scene: &mut Scene,
     name: &str,
@@ -68,7 +63,6 @@ pub fn slab(
     id
 }
 
-/// A `Transparent` material of `base_color` at `alpha`, the rest default.
 pub fn glass(base_color: [f32; 3], alpha: f32) -> MaterialAsset {
     MaterialAsset {
         base_color,
@@ -78,12 +72,10 @@ pub fn glass(base_color: [f32; 3], alpha: f32) -> MaterialAsset {
     }
 }
 
-/// `scene` through `cam`, [`SIZE`] square, or `None` without an adapter.
 pub fn shot(scene: &Scene, cam: &Camera, name: &str) -> Option<image::RgbImage> {
     shot_at(scene, cam, name, SIZE)
 }
 
-/// [`shot`], `size` square.
 pub fn shot_at(scene: &Scene, cam: &Camera, name: &str, size: u32) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_1523_{name}_{}.png", std::process::id()));
     if !capture(scene, cam, &path, size, size).expect("capture") {
@@ -95,7 +87,6 @@ pub fn shot_at(scene: &Scene, cam: &Camera, name: &str, size: u32) -> Option<ima
     Some(img)
 }
 
-/// The mean of the RGB channels over the window `x0..x1, y0..y1`.
 pub fn mean_in(img: &image::RgbImage, (x0, x1): (u32, u32), (y0, y1): (u32, u32)) -> f64 {
     let mut sum = 0u64;
     for y in y0..y1 {
@@ -111,7 +102,6 @@ pub fn mean_in(img: &image::RgbImage, (x0, x1): (u32, u32), (y0, y1): (u32, u32)
     sum as f64 / f64::from((x1 - x0) * (y1 - y0) * 3)
 }
 
-/// How many pixels are clearly darker in `a` than in `b` (by more than 60 summed).
 pub fn darker(a: &image::RgbImage, b: &image::RgbImage) -> usize {
     let sum = |p: &image::Rgb<u8>| p.0.iter().map(|&c| i32::from(c)).sum::<i32>();
     a.pixels()
@@ -120,7 +110,6 @@ pub fn darker(a: &image::RgbImage, b: &image::RgbImage) -> usize {
         .count()
 }
 
-/// How many pixels differ between `a` and `b` by more than 30 summed.
 pub fn differing(a: &image::RgbImage, b: &image::RgbImage) -> usize {
     let sum = |p: &image::Rgb<u8>| p.0.iter().map(|&c| i32::from(c)).sum::<i32>();
     a.pixels()

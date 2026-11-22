@@ -1,9 +1,6 @@
-//! The height map under `Planar` (#2191's review): the projection runs along world
-//! Y, so on a vertical face one UV axis never changes and one repeat stretches
-//! across the face. That face must draw as `Planar` does without a height map
-//! (stretched), not as a march along the stretch (noise); a floor still marches.
-//! The box leans 10°, so its side is steep but not exactly vertical: the face
-//! the review saw draw as noise.
+//! The height map under `Planar`: the projection runs along world Y, so on a vertical face one
+//! UV axis never changes. That face must draw as `Planar` does without a height map (stretched),
+//! not as noise; a floor still marches. The box leans 10°: steep, not exactly vertical.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, UvMapping};
@@ -14,8 +11,6 @@ use super::{grazing, SIZE};
 use crate::gpu::linear_data_maps_screenshot::{diff, SAME};
 use crate::gpu::normal_emissive_maps_screenshot::scene;
 
-/// An 8×8 black-and-white checker PNG, so a projection reads stripes along
-/// either axis.
 fn checker() -> String {
     let path = crate::temp::dir().join("rusty_2191_checker.png");
     let img = image::RgbaImage::from_fn(64, 64, |x, y| match (x / 8 + y / 8) % 2 {
@@ -26,7 +21,6 @@ fn checker() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The checker as albedo under `Planar` (4 m a repeat), with `scale` as height.
 fn planar(scale: Option<f32>) -> MaterialAsset {
     let map = checker();
     MaterialAsset {
@@ -40,8 +34,6 @@ fn planar(scale: Option<f32>) -> MaterialAsset {
     }
 }
 
-/// `material` on the 16 m floor or, when `wall`, on an 8 m box in its place
-/// whose -X side faces the camera.
 fn frame(material: MaterialAsset, wall: bool, cam: &Camera, name: &str) -> Option<image::RgbImage> {
     let mut s = scene(material);
     if wall {

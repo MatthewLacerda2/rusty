@@ -1,4 +1,4 @@
-//! `Animator.Play` / `Crossfade` and the console (#1718): a successful call logs
+//! `Animator.Play` / `Crossfade` and the console: a successful call logs
 //! nothing, and a clip the entity's mesh lacks warns.
 
 use std::cell::RefCell;
@@ -38,7 +38,7 @@ fn give_walk_clip(scene: &RefCell<Scene>, id: u32) {
 fn a_successful_play_or_crossfade_logs_nothing() {
     let (scene, id) = scene_with_animator();
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
-    // No mesh yet: a Play issued before it arrives stays quiet (#1386).
+    // No mesh yet: a Play issued before it arrives stays quiet.
     run_with(&scene, &console, &format!("Animator.Play({id}, 'Walk')"));
     give_walk_clip(&scene, id);
     let mark = console.borrow().logged();

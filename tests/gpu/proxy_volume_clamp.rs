@@ -1,11 +1,7 @@
-//! A Light Probe Proxy Volume clamps to its box, as Unity's does (#1672): a pixel
-//! outside a `Custom` box reads the box's nearest face, never the object's single
-//! sample, so a mesh larger than its box (or an arm swung past its bind-pose
-//! bounds) has no seam where the box ends.
-//!
-//! Run as the second half of `proxy_volume_screenshot`'s test, on its baked room:
-//! the probe bake is nine tenths of either half's time, and one bake serves both
-//! (#2350).
+//! A Light Probe Proxy Volume clamps to its box, as Unity's does: a pixel outside a
+//! `Custom` box reads the box's nearest face, never the object's single sample, so
+//! no seam where the box ends. Runs as the second half of `proxy_volume_screenshot`'s
+//! test on its baked room (the bake is nine tenths of either half's time).
 
 use glam::Vec3;
 use rusty::components::{LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyResolutionMode};
@@ -14,10 +10,8 @@ use rusty::scene::Scene;
 
 use super::proxy_volume_screenshot::top_and_foot;
 
-/// With a `Custom` box over the top quarter of the `locker` in the baked room
-/// `scene`, its foot, outside the box, reads the lit box's bottom face, well over
-/// `single_foot`, the foot its one probe sample gives; drawn through the caller's
-/// `host`.
+/// The foot, outside the `Custom` box, reads the box's lit bottom face, well over
+/// `single_foot`.
 pub(super) fn a_foot_outside_a_custom_box_reads_the_box_s_face_not_the_single_sample(
     host: &mut CaptureHost,
     scene: &mut Scene,

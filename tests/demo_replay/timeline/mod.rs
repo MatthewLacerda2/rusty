@@ -1,4 +1,4 @@
-//! The editor's demo timeline (#1598): a demo opens on the editor's world, plays,
+//! The editor's demo timeline: a demo opens on the editor's world, plays,
 //! scrubs both ways bit for bit, shows its marks, and closing gives the editor its
 //! scene and recorder back.
 

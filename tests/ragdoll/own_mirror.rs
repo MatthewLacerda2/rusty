@@ -1,6 +1,6 @@
-//! A rig whose own scale mirrors it, `(1,1,−1)` as FBX import keeps (#1110):
+//! A rig whose own scale mirrors it, `(1,1,−1)` as FBX import keeps:
 //! its local +Z is drawn at world −Z, so that is where its front is. A knee
-//! bends backward, away from the drawn front; it once bent toward it (#1145).
+//! bends backward, away from the drawn front; it once bent toward it.
 
 use glam::Vec3;
 use rusty::physics::PhysicsWorld;

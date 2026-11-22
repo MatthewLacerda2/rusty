@@ -1,4 +1,4 @@
-//! The harness runs a workspace of its own (#782): a stale or edited copy of a
+//! The harness runs a workspace of its own: a stale or edited copy of a
 //! bundled script — what a developer's project keeps on purpose —
 //! never reaches a test.
 

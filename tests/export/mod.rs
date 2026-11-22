@@ -1,7 +1,4 @@
-//! `make export` end to end (#1267): the `export` binary on a scratch project, then
-//! the `play` binary on what it wrote. Both run as children, since opening a project
-//! moves the working directory (`core::project::open`), which every test of this
-//! binary shares.
+//! `make export` end to end: the `export` binary on a scratch project, then `play` on its output, both as children since opening a project moves the shared working directory (`core::project::open`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,7 +13,6 @@ mod scene;
 mod shaders;
 mod textures;
 
-/// The import cache, relative to a project (`asset::convert::IMPORT_CACHE_DIR`).
 const CACHE: &str = "assets/generated/imported";
 
 pub(super) fn fixture(name: &str) -> PathBuf {
@@ -27,9 +23,6 @@ pub(super) fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-/// `<test>/game`, a project holding each fixture model copied to
-/// `assets/models/<name>` and the game script [`SPAWN`] whose `Start` runs `start`.
-/// Never opened, so it has no `project.rusty` until the export opens it.
 fn project(models: &[&str], start: &str) -> PathBuf {
     let root = crate::temp::dir().join("game");
     let models_dir = root.join("assets").join("models");
@@ -44,11 +37,8 @@ fn project(models: &[&str], start: &str) -> PathBuf {
     root
 }
 
-/// The game script the scenario hands the player: it instantiates the models
-/// from inside Play, with the whole Lua surface.
 const SPAWN: &str = "assets/scripts/spawn.lua";
 
-/// The scenario: the player runs [`SPAWN`], a few frames pass.
 pub(super) const SCENARIO: &str = r#"
 Harness.Expect(Harness.AttachPlayerBot("assets/scripts/spawn.lua"), "the player runs the script")
 Harness.Step(3)
@@ -61,21 +51,17 @@ fn run(mut command: Command) -> Output {
     out
 }
 
-/// `export --project <game> --out <out>`.
 fn export(game: &Path, out: &Path) -> Output {
     let mut command = crate::spawn::engine_bin!("export");
     command.arg("--project").arg(game).arg("--out").arg(out);
     run(command)
 }
 
-/// `play --project <game>` on [`SCENARIO`] with `env` set, and its
-/// `results.json`.
 fn play(game: &Path, env: &[(&str, &Path)]) -> (Output, Value) {
     play_scenario(game, SCENARIO, env)
 }
 
-/// `play --project <game>` on the Lua `scenario` with `env` set, and its
-/// `results.json`; the run's folder is `<test>/run-<n>`, outside the project.
+/// The run's folder is `<test>/run-<n>`, outside the project.
 fn play_scenario(game: &Path, scenario: &str, env: &[(&str, &Path)]) -> (Output, Value) {
     let tmp = crate::temp::dir();
     let dir = (0..)
@@ -94,14 +80,12 @@ fn play_scenario(game: &Path, scenario: &str, env: &[(&str, &Path)]) -> (Output,
     (out, serde_json::from_str(&results).unwrap())
 }
 
-/// The entity named `name` in a run's final snapshot.
 fn entity<'a>(results: &'a Value, name: &str) -> &'a Value {
     let entities = results["final_snapshot"]["entities"].as_array().unwrap();
     let named = entities.iter().find(|e| e["name"] == name);
     named.unwrap_or_else(|| panic!("no {name} in the run's final snapshot"))
 }
 
-/// Every file under `dir`, by its `/`-separated relative path, with its bytes.
 fn tree(dir: &Path) -> BTreeMap<String, Vec<u8>> {
     let mut files = BTreeMap::new();
     collect(dir, dir, &mut files);
@@ -123,13 +107,11 @@ fn collect(root: &Path, dir: &Path, files: &mut BTreeMap<String, Vec<u8>>) {
     }
 }
 
-/// The files of `tree` with one of `extensions`.
 fn with_extension<'a>(tree: &'a BTreeMap<String, Vec<u8>>, extensions: &[&str]) -> Vec<&'a str> {
     let named = |p: &&String| extensions.iter().any(|e| p.ends_with(&format!(".{e}")));
     tree.keys().filter(named).map(String::as_str).collect()
 }
 
-/// The files of `tree` under the import cache.
 fn cache(tree: &BTreeMap<String, Vec<u8>>) -> BTreeMap<&str, &[u8]> {
     let cached = |(p, _): &(&String, &Vec<u8>)| p.starts_with(CACHE);
     tree.iter()

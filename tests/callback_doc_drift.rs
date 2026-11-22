@@ -1,26 +1,13 @@
-//! Callback-doc drift gate (#309): the "Script lifecycle callbacks" section of
-//! `docs/api/index.md` must agree with the callbacks the engine actually
-//! dispatches — the callback sibling of the #280 namespace gate
-//! (`tests/api_doc_drift.rs`). The ground truth is
-//! `scripting::callbacks::LIFECYCLE_CALLBACKS`, the one list dispatch and
-//! MonoBehaviour discovery both read, so a callback added (or removed) there
-//! cannot merge undocumented — and the doc cannot advertise a callback that
-//! silently never fires (the README once did). Existence parity both directions;
-//! signatures are out of scope, as in the namespace gate. Not `dev`-gated:
-//! callbacks are plain consts, so the gate runs under both CI feature sets.
+//! The "Script lifecycle callbacks" section of `docs/api/index.md` must match `scripting::callbacks::LIFECYCLE_CALLBACKS`, the list dispatch and discovery read. Existence parity both directions; not `dev`-gated.
 
 use std::collections::BTreeSet;
 
 use rusty::script::scripting::callbacks::LIFECYCLE_CALLBACKS;
 
-/// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
-/// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
     rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }
 
-/// The heading the callback table lives under. Deliberately not backticked, so
-/// the namespace gate's parser never mistakes the section for a namespace.
 const HEADING: &str = "## Script lifecycle callbacks";
 
 #[test]
@@ -44,10 +31,6 @@ fn doc_matches_dispatched_callbacks() {
     );
 }
 
-/// Parse the callback names documented under `HEADING`: each table row whose
-/// first cell is a backticked bare identifier (`` `Start` ``), up to the next
-/// `## ` heading. Mirrors the row convention of `tests/api_doc_drift.rs`, minus
-/// the namespace dot.
 fn parse_documented_callbacks(doc: &str) -> BTreeSet<&str> {
     let mut set = BTreeSet::new();
     let mut in_section = false;
@@ -66,7 +49,6 @@ fn parse_documented_callbacks(doc: &str) -> BTreeSet<&str> {
     set
 }
 
-/// If `cell` is exactly a backticked Lua identifier, return it.
 fn backticked_ident(cell: &str) -> Option<&str> {
     let body = cell.strip_prefix('`')?.strip_suffix('`')?;
     let mut chars = body.chars();

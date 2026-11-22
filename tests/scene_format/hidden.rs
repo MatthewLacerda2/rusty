@@ -1,5 +1,3 @@
-//! What serde hides from the tracer, listed by hand.
-//!
 //! Structs with a `#[serde(flatten)]` field. serde reads the flattened part from its
 //! own buffer, out of the tracer's reach, and never names the struct's fields; so
 //! each such struct is listed here: its own fields, traced as usual, and the
@@ -17,7 +15,6 @@ use super::trace::{trace, Error, Pass};
 
 type Inner = fn(&str) -> (BTreeSet<String>, Value);
 
-/// The struct's own fields (every one, defaulted or not) and its flattened type.
 pub fn registry(name: &str) -> Option<(&'static [&'static str], Inner)> {
     Some(match name {
         "AnimatorComponent" => (
@@ -42,7 +39,6 @@ thread_local! {
     static TRACED: RefCell<BTreeMap<String, (BTreeSet<String>, Value)>> = RefCell::default();
 }
 
-/// `T` traced at `path` (once per path), and its first built value as JSON.
 fn inner<T: serde::de::DeserializeOwned + serde::Serialize>(
     path: &str,
 ) -> (BTreeSet<String>, Value) {
@@ -86,7 +82,6 @@ enum Next {
     Flat(Value),
 }
 
-/// The struct's own fields from the tracer, then the flattened part's from JSON.
 struct Flat<'p, 's> {
     pass: &'p mut Pass<'s>,
     own: std::slice::Iter<'static, &'static str>,

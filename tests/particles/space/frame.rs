@@ -1,4 +1,4 @@
-//! The emitter frame (#1529): a mesh particle turns with a `Local` emitter, the
+//! The emitter frame: a mesh particle turns with a `Local` emitter, the
 //! shape is in the emitter's space in both spaces, parents' scale is ignored, a
 //! zero scale holds the particles, and a `LateUpdate` move is carried that tick.
 

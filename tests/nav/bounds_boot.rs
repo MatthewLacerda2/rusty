@@ -1,8 +1,8 @@
-//! The windowed boot and the headless harness bake the same navmesh (#452).
+//! The windowed boot and the headless harness bake the same navmesh.
 //!
 //! Both used to hardcode a ±20 grid; both now go through `NavigationGraph::from_scene`.
 //! The harness's graph must match a fresh `from_scene` bake of its scene — the default
-//! scene the windowed game boots (#667) — and that bake spans the scene's own bounds.
+//! scene the windowed game boots — and that bake spans the scene's own bounds.
 
 use rusty::dev::harness::Harness;
 use rusty::navigation::{NavBounds, NavigationGraph};
@@ -23,7 +23,7 @@ fn harness_graph_is_the_from_scene_bake_of_its_scene() {
     assert_eq!(nav.cell_start, fresh.cell_start);
     assert!(!nav.spans.is_empty(), "the yard is walkable");
     // The yard spans ±15 × ±22.5; + 2.0 margin + 0.5 radius, snapped outward to the
-    // 0.25 m cell (#1887).
+    // 0.25 m cell.
     assert_eq!(nav.bounds(), NavBounds::new(-17.5, 17.5, -25.0, 25.0));
 }
 

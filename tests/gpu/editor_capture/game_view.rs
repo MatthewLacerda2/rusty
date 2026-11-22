@@ -1,4 +1,4 @@
-//! The editor captured with the Game view at a size of its own (#2207): the image
+//! The editor captured with the Game view at a size of its own: the image
 //! letterboxed in the panel, and the UI's screen (`UI.GetScreenSize`) that size, on
 //! the Game tab and behind the Scene tab alike.
 
@@ -20,8 +20,6 @@ fn sized(tab: ViewportTab, size: GameViewSize) -> EditorCaptureOptions {
     }
 }
 
-/// A fixed 16:9 size in a tall panel: bars above and below, the view drawn, and
-/// the screen the UI lays out on is the fixed size, not the panel's.
 #[test]
 fn a_fixed_size_letterboxes_and_sizes_the_screen() {
     let game = capture::default_world(ProjectSource::defaults());
@@ -38,8 +36,6 @@ fn a_fixed_size_letterboxes_and_sizes_the_screen() {
     assert!(!black(450), "the view itself is drawn");
 }
 
-/// Behind the Scene tab the screen keeps the Game view's own size; with Free it is
-/// the panel, as before.
 #[test]
 fn the_scene_tab_keeps_the_game_views_screen() {
     let game = capture::default_world(ProjectSource::defaults());

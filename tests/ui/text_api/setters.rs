@@ -1,4 +1,4 @@
-//! `Text` setters write through the shared ops, validation included (#419).
+//! `Text` setters write through the shared ops, validation included.
 
 use glam::{Vec2, Vec4};
 

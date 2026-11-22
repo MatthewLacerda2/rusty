@@ -1,4 +1,4 @@
-//! A scene load re-roots a survivor (#432): the nav bake sees its collider where
+//! A scene load re-roots a survivor: the nav bake sees its collider where
 //! it stands now, not under the holder it left. `scene`'s own half (the collider's
 //! bounds) is `scene::runtime::load_tests`.
 

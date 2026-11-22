@@ -1,6 +1,6 @@
-//! Integration coverage for the `Scene` namespace's prefab verbs (issue #350):
+//! Integration coverage for the `Scene` namespace's prefab verbs:
 //! `SavePrefab` → `Instantiate` round-trips an entity through a `.prefab` file,
-//! a linked instance's edits are overrides at once (#1527) and revert, unpacked copies carry no link, and
+//! a linked instance's edits are overrides at once and revert, unpacked copies carry no link, and
 //! the error paths (bad root, missing file, bad parent arg) reject cleanly.
 
 mod instant;

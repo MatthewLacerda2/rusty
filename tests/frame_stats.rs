@@ -1,4 +1,4 @@
-//! Frame stats in the headless harness (#433): the timing probe records stages,
+//! Frame stats in the headless harness: the timing probe records stages,
 //! systems and world counters every tick; `results.json` keeps only the deterministic
 //! counts, `stats.json` everything; budgets become expectations; `Debug.Stats()` reads
 //! the same numbers. Gated on `dev`.

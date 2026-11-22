@@ -1,4 +1,4 @@
-//! Demos (#1581): a recorded run replays bit for bit, and a changed seed is
+//! Demos: a recorded run replays bit for bit, and a changed seed is
 //! reported as a divergence at its tick.
 
 use std::path::{Path, PathBuf};

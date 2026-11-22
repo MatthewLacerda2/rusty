@@ -1,5 +1,5 @@
 //! What entering Play would wipe is refused before the first `Harness.Step`
-//! (#1384): the harness enters Play on that step, which clears the timers and
+//!: the harness enters Play on that step, which clears the timers and
 //! restarts `Random`. After the step, the same calls take effect.
 
 use super::run;

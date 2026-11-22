@@ -1,6 +1,4 @@
-//! Skinning past joint 63 (#455). The bone palette used to be a fixed 64-matrix
-//! uniform: joint 99 of a 100-joint rig read out of bounds and skinned as identity,
-//! so a Mixamo-sized character tore silently.
+//! Skinning past joint 63: joint 99 of a 100-joint rig must skin, not read out of bounds.
 //!
 //! A glowing red box, every vertex weighted fully to joint 99, sits in the middle of
 //! the view. Joint 99's matrix moves it far off-screen, so a renderer that honours
@@ -16,7 +14,6 @@ use rusty::scene::{Camera, MeshComponent, Scene};
 const JOINTS: usize = 100;
 const LAST: u32 = JOINTS as u32 - 1;
 
-/// The box, skinned to joint 99 of a 100-joint palette whose joint 99 is `last`.
 fn scene(last: Mat4) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
@@ -46,7 +43,6 @@ fn scene(last: Mat4) -> Scene {
     scene
 }
 
-/// How red the centre pixel is (red minus blue): high on the box, negative on sky.
 fn centre_redness(path: &std::path::Path) -> i32 {
     let img = image::open(path).expect("png").to_rgb8();
     let p = img.get_pixel(img.width() / 2, img.height() / 2);

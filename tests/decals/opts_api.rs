@@ -1,4 +1,4 @@
-//! `Decals.Spawn`'s `opts` table form (#638): the positional values by name, plus
+//! `Decals.Spawn`'s `opts` table form: the positional values by name, plus
 //! `depth` and the decal `material`; unknown options and materials are errors.
 
 use std::cell::RefCell;

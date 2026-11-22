@@ -1,10 +1,4 @@
-//! Walking open ground in Play (#2061): a CharacterController moved straight
-//! ahead across a flat floor covers its whole stride every tick and stays
-//! grounded, whatever the floor, the speed or the capsule — Unity's `Move`.
-//! Floors are built the way a script or the editor builds them (a primitive
-//! plus `AddComponent("Collider")`: a kinematic body, no Rigidbody), one marked
-//! static, the plane a triangle mesh; every walk runs through the play-mode
-//! schedule, a script's `Update` calling `Move`.
+//! Walking open ground in Play: a CharacterController moved ahead on a flat floor covers its whole stride every tick and stays grounded (Unity's `Move`); floors are built as a script builds them (primitive plus `AddComponent("Collider")`, kinematic, no Rigidbody).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,18 +15,15 @@ mod build;
 use build::{add_floor, add_lane, capsules};
 
 const TICKS: usize = 300;
-/// The floors' length along the walk: 30 m/s for `TICKS`, with room to spare.
 pub(super) const LENGTH: f32 = 180.0;
 pub(super) const START_Z: f32 = -80.0;
 const SPEEDS: [f32; 4] = [1.0, 4.0, 10.0, 30.0];
-/// A script's ground stick per tick: none, and the issue's 0.02 m.
+/// A script's ground stick per tick (m).
 const STICKS: [f32; 2] = [0.0, -0.02];
 /// The share of a stride a tick may lose: the skin settling, never a stall.
 const SLACK: f32 = 0.01;
 
-/// A floor: its name, primitive, scale, centre height (every top face at
-/// y = 0), whether it is marked static, and a plane's subdivisions (its
-/// collider's triangle seams, #2075).
+/// A floor: name, primitive, scale, centre height (top face at y = 0), static flag, plane subdivisions.
 pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool, u32);
 
 const BOXES: [Floor; 4] = [
@@ -70,15 +61,11 @@ const BOXES: [Floor; 4] = [
     ),
 ];
 
-/// The primitive plane (15 m square) stretched over the lanes, cut into
-/// `subdivisions` × `subdivisions` quads.
 fn plane(name: &'static str, subdivisions: u32) -> Floor {
     let scale = Vec3::new(52.0 / 15.0, 1.0, LENGTH / 15.0);
     (name, Primitive::Plane, scale, 0.0, false, subdivisions)
 }
 
-/// Every lane, 3 m apart on `floor`, walks `TICKS` ticks, each covering its
-/// stride.
 fn walk_floor(floor: Floor) {
     let mut scene = Scene::new();
     add_floor(&mut scene, floor);

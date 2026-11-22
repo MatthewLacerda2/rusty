@@ -1,4 +1,4 @@
-//! `Audio.PlayAt`'s optional rolloff band (#575): both distances or neither, and a
+//! `Audio.PlayAt`'s optional rolloff band: both distances or neither, and a
 //! band that makes sense. (The gain it produces is asserted on the recording backend
 //! in `crates/audio/src/oneshot_tests.rs`.)
 

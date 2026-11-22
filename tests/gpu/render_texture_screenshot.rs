@@ -1,4 +1,4 @@
-//! Render textures (#430), headless: a UI Image shows what a second camera sees,
+//! Render textures, headless: a UI Image shows what a second camera sees,
 //! and the texture's cost controls (unreferenced / `update_every`) skip its draws.
 
 use rusty::components::RenderTarget;

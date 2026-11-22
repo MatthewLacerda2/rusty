@@ -1,4 +1,4 @@
-//! `Trail.*` / `Line.*` bindings vs `authoring::{ribbon::trail, ribbon::line, ribbon}` (#441).
+//! `Trail.*` / `Line.*` bindings vs `authoring::{ribbon::trail, ribbon::line, ribbon}`.
 
 use std::cell::RefCell;
 use std::rc::Rc;

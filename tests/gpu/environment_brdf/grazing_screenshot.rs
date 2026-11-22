@@ -1,4 +1,4 @@
-//! A dielectric's grazing reflection follows `KHR_materials_specular` (#1998): its
+//! A dielectric's grazing reflection follows `KHR_materials_specular`: its
 //! `specular` is the F90 the environment BRDF rises to, so at 0 a smooth dielectric
 //! shows no rim of sky at all, and at the default 1 it keeps Schlick's.
 

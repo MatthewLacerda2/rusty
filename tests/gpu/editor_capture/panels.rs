@@ -1,4 +1,4 @@
-//! The headless editor capture (#731): the default scene captures, the image isn't
+//! The headless editor capture: the default scene captures, the image isn't
 //! blank, and the docked panels are where the editor puts them. A smoke check, not a
 //! golden: fonts and anti-aliasing differ across platforms, so no pixel is pinned.
 
@@ -9,8 +9,6 @@ use rusty::shell::editor::capture::{self, EditorCaptureOptions};
 const W: u32 = 1280;
 const H: u32 = 720;
 
-/// The share of pixels in the column `x0..x1` (middle half of the height) painted in
-/// the editor's panel or card fill, give or take a little for the sRGB round trip.
 fn panel_share(img: &image::RgbaImage, x0: u32, x1: u32) -> f32 {
     let theme = Theme::dark();
     let fills = [theme.bg_tier1, theme.bg_tier2];
@@ -44,7 +42,6 @@ fn the_default_scene_captures_with_its_panels() {
     let img = image::open(&out).expect("a readable PNG").to_rgba8();
     assert_eq!(img.dimensions(), (W, H));
 
-    // Not blank: a rendered scene plus text has far more than a handful of colours.
     let mut colours: Vec<[u8; 4]> = img.pixels().map(|p| p.0).collect();
     colours.sort_unstable();
     colours.dedup();
@@ -82,7 +79,6 @@ fn an_unknown_selection_is_an_error_not_a_blank_inspector() {
     assert!(err.unwrap_err().contains("NoSuchEntity"));
 }
 
-/// The inspector column's pixels (right fifth, middle half of the height).
 fn inspector(img: &image::RgbaImage) -> Vec<[u8; 4]> {
     let (w, h) = img.dimensions();
     let rows = h / 4..h * 3 / 4;

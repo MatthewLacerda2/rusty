@@ -11,11 +11,9 @@ use super::{as_bc5, floor, frames, glossy, luma, mean, normal_map, Blue, FAR, NE
 use crate::gpu::specular_aa_screenshot::relative_temporal_variance;
 
 const FRAMES: u32 = 8;
-/// Far, relative temporal variance: the twin's sparkle, the busy map's at most.
 const TWIN_SHIMMERS: f64 = 0.4;
 const BOUND: f64 = 0.2;
 
-/// The floor, metal of `roughness` with `map`, under one lamp of `intensity`.
 fn scene(map: &std::path::Path, roughness: f32, intensity: f32) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -34,8 +32,7 @@ fn scene(map: &std::path::Path, roughness: f32, intensity: f32) -> Scene {
     scene
 }
 
-/// What one map draws: far variance and mean (glossy), the near frames' luma,
-/// and the far mean at roughness 0.3 under a dim lamp, where nothing clips.
+/// One map's draw: far variance and mean, near luma, and the far mean at roughness 0.3 under a dim lamp.
 struct Drawn {
     variance: f64,
     far: f64,

@@ -1,6 +1,4 @@
-//! Every test game under `games/` generates deterministically, passes its
-//! scenarios and takes its shots (#2029), each as its own test (#2070), so
-//! nextest runs them side by side and each gets its own [`BUDGET`]. Each runs the
+//! Every test game under `games/` as its own test with its own [`BUDGET`]. Each runs the
 //! `game` binary as a child, since opening a project moves the working directory.
 
 #![allow(
@@ -18,33 +16,15 @@ use std::path::Path;
 use std::process::{Command, Output};
 use std::time::Duration;
 
-/// How much CPU time (user + system) one game's `game --test` may use at its
-/// defaults, in yardsticks: the median CPU time of `calibrate`'s fixed slice of the
-/// engine's own sim work, sampled on a test thread throughout the game's run
-/// (#2070, #2131, #2243). Not wall time, which a busy machine stretches, nor bare
-/// CPU seconds, which a loaded machine inflates too (a shared SMT core, all-core
-/// clocks, a contended cache), as it does the yardstick sampled in the same window.
-/// A game past it fails by name, so the game whose defaults grew is the one fixed.
-/// The heaviest game is `showroom` since `runner`'s long run was halved (#2350):
-/// it reads 216 on CI's ubuntu lavapipe and 292 in a 4-vCPU lavapipe container
-/// (`runner` 154 and 219; one run each, run 44394886578), so 380 is 30% over the
-/// highest count and 12% under the ubuntu count doubled. On CI's macOS Metal the
-/// games wait on the GPU more than they compute (`showroom` 43, `runner` 159), so
-/// there the bar holds only a CPU-bound regression. Before, `runner` was the
-/// heaviest at 209 to 228 on ubuntu, 223 to 240 on macOS, 238 to 249 alone on an
-/// 8-core SMT desktop (RTX 2060) and 306 to 319 in the container, 1.97× with its
-/// work doubled. The yardstick cancels about four fifths of a machine's load, not
-/// all: beside a full-parallel cold `cargo build` the desktop read 277 to 284
-/// (1.15×) where CPU time rose 1.92×. So the bar catches a regression of about 1.6×
-/// on an idle machine and about 1.35× under heavy load (`docs/testing.md`, *Test
-/// games*, says how to re-measure).
+/// CPU budget of one game's `game --test`, in `calibrate` yardsticks. `showroom`, the
+/// heaviest, reads 216 on CI's ubuntu lavapipe and 292 in a 4-vCPU container; on macOS
+/// Metal games wait on the GPU, so there it only catches a CPU-bound regression
+/// (`docs/testing.md`, *Test games*, says how to re-measure).
 const BUDGET: f64 = 380.0;
 
 /// Wall time after which a game is killed as hung, whatever its budget.
 const HANG: Duration = Duration::from_secs(450);
 
-/// One `#[test]` per game, named after its folder, and a test that the list and
-/// `games/` hold the same names: a folder with no line fails, naming it.
 macro_rules! games {
     ($($name:ident,)*) => {
         $(
@@ -77,7 +57,6 @@ games! {
     topple,
 }
 
-/// The folders under `games/` with no line, and the lines with no folder, if any.
 fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
     let unlisted: Vec<_> = found
         .iter()
@@ -95,8 +74,6 @@ fn mismatch(found: &[String], listed: &[&str]) -> Option<String> {
     })
 }
 
-/// `game --test` on `name` passes, proves itself deterministic and stays inside
-/// [`BUDGET`].
 fn passes_within_budget(name: &str) {
     let sampler = calibrate::Sampler::start();
     let run = measure::run(&mut game_command(name, None), HANG);
@@ -125,8 +102,6 @@ fn passes_within_budget(name: &str) {
     );
 }
 
-/// `game --test` on `name`, generated under this test's temp dir, read from the
-/// `games` folder given (the checkout's when `None`).
 pub(super) fn game_test(name: &str, games: Option<&Path>) -> Output {
     game_command(name, games)
         .output()

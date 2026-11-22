@@ -1,4 +1,4 @@
-//! Integration coverage for the `Layers` scripting namespace (issue #350): an
+//! Integration coverage for the `Layers` scripting namespace: an
 //! entity's layer index reads/writes through the scene, and name resolution goes
 //! through the project's shared registry (layer 0 is always `"Default"`).
 

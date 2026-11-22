@@ -8,7 +8,7 @@ use rusty::scene::Scene;
 
 use super::play;
 
-/// Everything #439 added, turned on at once.
+/// Every module, turned on at once.
 fn full_emitter(seed: u64) -> ParticleEmitterComponent {
     ParticleEmitterComponent {
         emit_mode: EmitMode::Continuous,

@@ -1,8 +1,3 @@
-//! World-space UI through the Lua surface in a real Play session (#429):
-//! `Camera.WorldToScreen` / `ScreenToWorldRay` / `MouseRay`, a marker pinned with
-//! `RectTransform.SetWorldAnchor`, and a `WorldSpace` terminal clicked through the
-//! screen centre while the cursor is locked.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

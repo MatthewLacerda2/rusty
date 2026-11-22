@@ -6,11 +6,9 @@ use super::{
     cache, entity, export, play, play_scenario, project, tree, with_extension, CACHE, SCENARIO,
 };
 
-/// The fixture quad, its `Quad` textured by the embedded `Red`.
 pub(super) const QUAD: &str = "embedded_textures.fbx";
 pub(super) const SOURCE: &str = "assets/models/embedded_textures.fbx";
 
-/// Instantiate the quad by its source path, which the export leaves behind.
 pub(super) const START: &str =
     r#"Scene.Instantiate("assets/models/embedded_textures.fbx::Quad", "ExportedQuad")"#;
 
@@ -102,7 +100,7 @@ Camera.SetPitch(0)"#;
 #[test]
 fn gpu_the_exported_quad_renders_red_from_its_cache() {
     // Coloured only by its texture, the quad rendered black before the converter
-    // read a colour the file leaves out as white (#1280).
+    // read a colour the file leaves out as white.
     let game = project(&[QUAD], &format!("local quad = {START}\n{FRAME}"));
     let out = crate::temp::dir().join("out");
     assert!(export(&game, &out).status.success());
@@ -117,13 +115,12 @@ fn gpu_the_exported_quad_renders_red_from_its_cache() {
         "the scenario passes: {results}"
     );
     if !png.is_file() {
-        // Only a real skip may pass (#885).
         assert!(!rusty::render::gpu_required(), "no shot: {results}");
         eprintln!("no GPU adapter — skipping the pixels");
         return;
     }
     let image = image::open(&png).unwrap().to_rgb8();
-    // Red-dominant, not pure: a dielectric reflects ~4% of the sky head-on (#1543).
+    // Red-dominant, not pure: a dielectric reflects ~4% of the sky head-on.
     let red = image
         .pixels()
         .filter(|p| p[0] > 96 && p[0] > p[1].max(p[2]).saturating_add(48));
@@ -131,8 +128,6 @@ fn gpu_the_exported_quad_renders_red_from_its_cache() {
     assert!(share > 0.25, "{share:.3} of the frame is the red quad");
 }
 
-/// The file the cached `.glb` at `glb` names for the texture `identity`: where
-/// `texture_ref` resolves `<source>#tex/<identity>`, the source present or not.
 pub(super) fn extracted(glb: &Path, identity: &str) -> PathBuf {
     let uris = rusty::asset::convert::glb::image_uris(glb).expect("the cache reads");
     let (_, uri) = uris

@@ -1,8 +1,7 @@
-//! Trail and Line ribbons render (#441): a line across the view covers the centre
+//! Trail and Line ribbons render: a line across the view covers the centre
 //! pixel in its colour, alpha and additive; it is hidden behind a solid (depth
 //! tested); local points follow the entity; a recorded trail draws; and under
-//! fog that swallows the wall, the ribbon vanishes into the fog colour exactly as
-//! the wall behind it does (#437). Reuses the fog tests' flat black wall.
+//! fog that swallows the wall, the ribbon vanishes into the fog colour as the wall does.
 
 use glam::Vec3;
 use rusty::components::{LineComponent, ParticleBlend, RibbonStyle, TrailComponent};
@@ -75,7 +74,6 @@ fn a_line_covers_the_centre_in_its_colour_and_hides_behind_solids() {
 #[test]
 fn local_points_follow_the_entity_and_a_trail_draws() {
     let mut host = CaptureHost::new();
-    // Local space on an entity lifted 6 m: the line leaves the view axis.
     let mut lifted = with_line(front(), ParticleBlend::Alpha, |l| l.use_world_space = false);
     let id = lifted.world.ids_with_line()[0];
     lifted.world.transform_mut(id).unwrap().position = Vec3::new(0.0, 6.0, 0.0);

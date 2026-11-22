@@ -1,4 +1,4 @@
-//! `Application.Quit()` in the headless harness ends the run (#431): once the game
+//! `Application.Quit()` in the headless harness ends the run: once the game
 //! asks to quit, further steps are no-ops and `results.json` records it.
 
 use rusty::dev::harness::Harness;

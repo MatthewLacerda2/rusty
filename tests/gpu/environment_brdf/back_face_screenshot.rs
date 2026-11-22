@@ -1,4 +1,4 @@
-//! A plane whose material draws both faces (#1615) is shaded from the side it is seen,
+//! A plane whose material draws both faces is shaded from the side it is seen,
 //! its normal turned toward the camera, and the Fresnel angle is `|N.V|`: seen from
 //! behind, it reflects what its front does, not a grazing ~50% of the sky.
 

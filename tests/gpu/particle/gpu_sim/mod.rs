@@ -1,8 +1,6 @@
-//! GPU-simulated emitters on a real adapter (#2170): the compute step moves a
-//! particle where the closed form says, a `Gpu` and a `Cpu` emitter of one config
-//! and seed cover the same pixels, a `Local` one follows its emitter, and a dead
-//! particle is not drawn. Shared here: a play world over the particle wall scene,
-//! and the red pixels of a shot.
+//! GPU-simulated emitters on a real adapter: the compute step moves a particle where
+//! the closed form says, `Gpu` and `Cpu` twins cover the same pixels, a `Local` one
+//! follows its emitter, a dead one is not drawn.
 
 mod frames;
 mod motion;
@@ -22,7 +20,6 @@ use rusty::scene::Scene;
 use super::scene::{is_red, scene_with, RED};
 use crate::gpu::fog::scene::shot;
 
-/// One red, unfading, unlit emitter at the origin firing nothing by itself.
 pub fn emitter(simulation: ParticleSimulation) -> ParticleEmitterComponent {
     ParticleEmitterComponent {
         simulation,
@@ -39,7 +36,6 @@ pub fn emitter(simulation: ParticleSimulation) -> ParticleEmitterComponent {
     }
 }
 
-/// A playing world over the wall scene holding `e`; its emitter's id.
 pub fn world(e: ParticleEmitterComponent) -> (GameWorld, u32) {
     let (mut scene, id) = scene_with(Default::default(), Vec::new());
     let texture = scene.world.particles(id).and_then(|p| p.texture.clone());
@@ -51,7 +47,6 @@ pub fn world(e: ParticleEmitterComponent) -> (GameWorld, u32) {
     (game, id)
 }
 
-/// Emit `count` particles from `id` now, through the seeded path.
 pub fn emit(game: &GameWorld, id: u32, count: u32) -> u32 {
     let mut scene = game.scene().borrow_mut();
     let frame = scene.world.emitter_frame(id);
@@ -62,7 +57,6 @@ pub fn emit(game: &GameWorld, id: u32, count: u32) -> u32 {
     spawned.unwrap_or(0)
 }
 
-/// `id`'s live particle count.
 pub fn count(game: &GameWorld, id: u32) -> usize {
     game.scene()
         .borrow()
@@ -72,7 +66,6 @@ pub fn count(game: &GameWorld, id: u32) -> usize {
         .live_count()
 }
 
-/// Move `id` to `at`.
 pub fn place(game: &GameWorld, id: u32, at: Vec3) {
     game.scene()
         .borrow_mut()
@@ -82,13 +75,11 @@ pub fn place(game: &GameWorld, id: u32, at: Vec3) {
         .position = at;
 }
 
-/// The red pixels of `scene`'s 64 × 64 shot, row-major; `None` without an adapter.
 pub fn red(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<Vec<bool>> {
     let img = shot(host, scene, &format!("gpu_sim_{name}"))?;
     Some(img.pixels().map(|p| is_red(p.0)).collect())
 }
 
-/// The mean (x, y) of the set pixels of a 64-wide mask.
 pub fn centroid(mask: &[bool]) -> Option<(f32, f32)> {
     let set: Vec<(f32, f32)> = (0..mask.len())
         .filter(|&i| mask[i])
@@ -101,7 +92,6 @@ pub fn centroid(mask: &[bool]) -> Option<(f32, f32)> {
     })
 }
 
-/// The share of pixels two masks agree on.
 pub fn agreement(a: &[bool], b: &[bool]) -> f32 {
     a.iter().zip(b).filter(|(x, y)| x == y).count() as f32 / a.len() as f32
 }

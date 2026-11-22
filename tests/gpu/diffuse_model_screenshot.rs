@@ -1,9 +1,6 @@
-//! One diffuse model on every path (#1698): a lamp shades a static sphere the same
-//! whether it is `Realtime` (the forward shader's `calculate_pbr`) or `Baked` (the
-//! lightmap trace), under the scene's `Lambert` default and under `HalfLambert`, and
-//! the two models shade it visibly differently.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! One diffuse model on every path: a lamp shades a static sphere the same `Realtime`
+//! (`calculate_pbr`) or `Baked` (lightmap trace), under `Lambert` and `HalfLambert`,
+//! and the two models differ visibly.
 
 use glam::Vec3;
 use rusty::components::{LightComponent, LightMode};
@@ -16,9 +13,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
 
-/// A static unit sphere at the origin under a black sky, lit only by a point lamp
-/// above and to one side, so the camera above sees the whole falloff and the
-/// terminator.
 fn scene(model: DiffuseModel, mode: LightMode) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -42,7 +36,6 @@ fn scene(model: DiffuseModel, mode: LightMode) -> Scene {
     scene
 }
 
-/// The sphere seen from straight above; `None` without an adapter.
 fn shot(scene: &Scene, name: &str) -> Option<image::RgbImage> {
     let camera = Camera::new(Vec3::new(0.0, 1.8, 0.0), 0.0, -89.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1698_{name}.png"));
@@ -52,7 +45,6 @@ fn shot(scene: &Scene, name: &str) -> Option<image::RgbImage> {
     Some(image::open(&path).unwrap().to_rgb8())
 }
 
-/// The lamp `Baked` into the sphere's lightmap, then shot.
 fn baked_shot(model: DiffuseModel, name: &str) -> image::RgbImage {
     let mut scene = scene(model, LightMode::Baked);
     let dir = crate::temp::dir().join(format!("rusty_gpu_1698_{name}"));
@@ -74,12 +66,10 @@ fn baked_shot(model: DiffuseModel, name: &str) -> image::RgbImage {
     shot(&scene, name).unwrap()
 }
 
-/// Mean absolute difference per channel over the pixels `mask` lights clearly: the
-/// side facing the lamp, where Lambert is above zero, short of the terminator, whose
-/// last texels the lightmap's filtering blends with the shadowed side. Past the terminator the wrap's light
-/// reaches a live surface whose lamp casts no shadows but not a baked one, whose shadow
-/// ray its own mesh blocks (`Lighting.md`, *Baked vs Realtime*): that is a shadow, not
-/// the diffuse model.
+/// Mean absolute difference over the pixels `mask` lights clearly: the lamp-facing side short
+/// of the terminator, whose last texels the lightmap filtering blends. Past it the wrap light
+/// reaches a live surface but not a baked one, whose own mesh blocks the shadow ray
+/// (`Lighting.md`, *Baked vs Realtime*): that is a shadow, not the diffuse model.
 fn diff(a: &image::RgbImage, b: &image::RgbImage, mask: &image::RgbImage) -> f64 {
     let (mut sum, mut n) = (0.0, 0);
     for ((p, q), m) in a.pixels().zip(b.pixels()).zip(mask.pixels()) {

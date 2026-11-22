@@ -1,13 +1,6 @@
-//! Baked lightmaps on the GPU (#438). Two proofs:
-//!
-//! * **Bounce only.** A static floor and wall with zero ambient and one `Mixed` spot
-//!   aimed at the wall: no light reaches the floor directly (it is outside the cone),
-//!   so before the bake it renders black. After `bake_scene_lightmaps`, the floor's
-//!   lightmap carries the wall's bounce and the same view renders visibly lit.
-//! * **No lightmap UV, no change.** A Sphere stripped of its lightmap UV (an imported
-//!   mesh without one) gets no lightmap: its pixels render exactly as before the bake.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! Baked lightmaps on the GPU. Bounce only: a floor outside a `Mixed` spot's cone renders black
+//! before the bake and lit after, from the wall's bounce. No lightmap UV, no change: a sphere
+//! without one renders exactly as before.
 
 use crate::gpu::mean;
 use glam::{Quat, Vec3};
@@ -20,7 +13,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
 
-/// Add a static primitive at `position` scaled by `scale`; returns its id.
 fn add(scene: &mut Scene, primitive: Primitive, position: Vec3, scale: Vec3) -> u32 {
     let id = scene.add_entity(format!("{primitive:?}"));
     let mut mesh = primitive_mesh_component(primitive);
@@ -36,7 +28,6 @@ fn add(scene: &mut Scene, primitive: Primitive, position: Vec3, scale: Vec3) -> 
     id
 }
 
-/// Floor, wall (x = 3), sphere (x = -3), and a `Mixed` 20° spot aimed at the wall.
 fn scene(ambient: f32) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -72,7 +63,6 @@ fn scene(ambient: f32) -> Scene {
     scene
 }
 
-/// Bake `scene`'s lightmaps into a temp folder named `name`.
 fn bake(scene: &mut Scene, name: &str) {
     let dir = crate::temp::dir().join(format!("rusty_gpu_lightmap_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -94,7 +84,6 @@ fn bake(scene: &mut Scene, name: &str) {
     assert_eq!(baked, 2, "the floor and the wall, not the stripped sphere");
 }
 
-/// `scene` seen from `camera`; `None` without an adapter.
 fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_gpu_lightmap_{name}.png"));
     capture(scene, camera, &path, SIZE, SIZE)
@@ -105,8 +94,6 @@ fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<image::RgbImage> {
 
 #[test]
 fn a_lightmapped_floor_is_lit_where_only_bounce_reaches_it() {
-    // Down onto the floor by the wall, out of the spot's cone: under the black sky
-    // nothing lights it before the bake.
     let camera = Camera::new(Vec3::new(1.5, 2.5, 0.0), 0.0, -89.0);
     let mut lit = scene(0.0);
     let Some(before) = shot(&lit, &camera, "bounce_before") else {

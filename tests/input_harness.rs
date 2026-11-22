@@ -1,4 +1,4 @@
-//! Input through the real sim tick (#416): edges published by `GameWorld::tick`,
+//! Input through the real sim tick: edges published by `GameWorld::tick`,
 //! the Play cursor default, and injected input replaying identically headless.
 
 use rusty::dev::harness::Harness;

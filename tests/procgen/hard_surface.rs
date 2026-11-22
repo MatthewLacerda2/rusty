@@ -1,4 +1,4 @@
-//! #407's hard-surface ops — `shape`, `tile` scatter, brick `random` / `bevel` —
+//! The hard-surface ops — `shape`, `tile` scatter, brick `random` / `bevel` —
 //! keep the two procgen promises (seamless, resolution-independent) and bake
 //! byte-identically for a seed. The generators' seams are swept in `procgen_seams`.
 
@@ -44,7 +44,7 @@ fn brick(output: BrickOutput) -> Vec<Node> {
     vec![node("b", op, &[])]
 }
 
-/// #407's brick outputs and shapes, at sizes that clip at the tile edge.
+/// The brick outputs and shapes, at sizes that clip at the tile edge.
 fn hard_surface() -> Vec<(String, OpKind)> {
     let mut ops = Vec::new();
     for output in [BrickOutput::Mask, BrickOutput::Random, BrickOutput::Bevel] {

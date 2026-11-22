@@ -1,4 +1,4 @@
-//! The editor captured with a demo open (#1598): the timeline strip over a Game
+//! The editor captured with a demo open: the timeline strip over a Game
 //! view letterboxed to the size the demo plays on, and a demo that does not open is
 //! an error, not a capture of something else.
 

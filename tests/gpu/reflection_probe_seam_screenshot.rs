@@ -1,13 +1,8 @@
-//! #1995: an object between two blended box probes reflects them without a seam.
-//! A curved glossy floor (a flattened sphere) straddles two probe boxes that meet at
-//! x = 0, so half of it lies outside each of its two probes' boxes, the issue's
-//! wedge room on primitives. Both probes hold one smooth cube (its colour is its
-//! direction), so only a jump in how a probe is projected can draw a step. Before
-//! #1995 a fragment past a box face fell to infinite projection: a hard straight
-//! step down the floor at x = 0. Now it projects against the box, continuously, and
-//! so does a right box turned like a wedge's slice (an oriented box, #1995).
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! An object between two blended box probes reflects them without a seam: a flattened
+//! sphere straddles two boxes meeting at x = 0, both holding one smooth cube, so only
+//! a jump in projection draws a step. A fragment past a box face once fell to infinite
+//! projection (a hard step); it now projects against the box, oriented boxes too.
+//! Skips without an adapter.
 
 use crate::gpu::reflection_probe_per_object_screenshot::cube_ktx2;
 use glam::Vec3;
@@ -19,8 +14,7 @@ use rusty::scene::{Camera, Scene};
 
 const CUBE: u32 = 32;
 
-/// Face `f`'s texels: the linear colour `0.5 + 0.5 * dir` of each texel's
-/// direction (the Vulkan cube face layout), continuous across faces.
+/// Face `f`'s texels: linear `0.5 + 0.5 * dir`, continuous across faces.
 fn gradient_face(f: usize) -> Vec<Vec3> {
     let n = CUBE as f32;
     (0..CUBE * CUBE)
@@ -40,8 +34,6 @@ fn gradient_face(f: usize) -> Vec<Vec3> {
         .collect()
 }
 
-/// The floor and the two probes, left box x in [-8, 0] and right box [0, 8], the
-/// right one turned `turn` radians about Y.
 fn scene(turn: f32) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -75,8 +67,6 @@ fn scene(turn: f32) -> Scene {
     scene
 }
 
-/// The largest jump between two horizontally adjacent pixels (summed RGB) in the
-/// middle of the frame, where only the floor is seen.
 fn largest_step(img: &image::RgbImage) -> i32 {
     let (w, h) = (img.width(), img.height());
     let mut worst = 0;
@@ -94,8 +84,7 @@ fn largest_step(img: &image::RgbImage) -> i32 {
 fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
     let cam = Camera::new(Vec3::new(0.0, 3.0, 4.0), -90.0, -50.0);
     let mut host = CaptureHost::new();
-    // Before #1995 the world-aligned pair stepped by 84 at x = 0 on lavapipe; the
-    // smooth cube's own gradient and dither stay under 16.
+    // The cube's own gradient and dither stay under 16.
     for turn in [0.0, 0.5] {
         let path = crate::temp::dir().join(format!("rusty_gpu_1995_seam_{turn}.png"));
         if !capture_into(&mut host, &scene(turn), &cam, &path, 160, 96).expect("capture") {

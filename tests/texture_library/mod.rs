@@ -1,12 +1,3 @@
-//! The engine's material library (`engine/textures/library/`): every graph there is
-//! held to one interface and one bar, found by walking the folder, so a new material
-//! is covered with nothing added here. Parts (`parts/`) are building blocks with no
-//! fixed interface: each bakes, deterministically and seamlessly, and that is all.
-//!
-//! Cost: each material is baked three times at [`RES`] (wear 0, 0.3, 1), the bakes
-//! the bar measures, and three times at [`QUICK`] (wear 0.3 twice and another seed),
-//! the bakes it only compares; the materials side by side on their own threads.
-
 mod bar;
 mod maps;
 
@@ -23,14 +14,12 @@ use serde_json::{json, Value};
 pub const RES: u32 = 128;
 /// The size of a bake that is only compared with another (determinism, the seed).
 pub const QUICK: u32 = 32;
-/// Every material's named outputs; `metallic` is the one a material may add.
 pub const OUTPUTS: [&str; 5] = ["base_color", "normal", "roughness", "height", "occlusion"];
 
 pub fn library() -> PathBuf {
     engine_dir().join("textures/library")
 }
 
-/// The `.graph.json` files directly in `dir`, by `engine/…` path, sorted.
 pub fn graphs_in(dir: &std::path::Path) -> Vec<String> {
     let mut found: Vec<String> = std::fs::read_dir(dir)
         .expect("the library folder exists")
@@ -46,15 +35,12 @@ pub fn graphs_in(dir: &std::path::Path) -> Vec<String> {
     found
 }
 
-/// The graph file at an `engine/…` path, parsed as JSON.
 pub fn doc(path: &str) -> Value {
     let file = engine_dir().join(path.trim_start_matches("engine/"));
     let text = std::fs::read_to_string(&file).expect("the graph reads");
     serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: not JSON: {e}"))
 }
 
-/// `path` instanced once at `res`² with `params` and `seed`, each of `outputs` baked
-/// (the graph's own `output` for `""`).
 pub fn bake(path: &str, params: Value, seed: u64, outputs: &[&str], res: u32) -> Vec<Image> {
     // A declared input reads a tiling noise: a part's inputs are a height or a mask.
     let wired = doc(path)["inputs"].as_array().map_or(0, Vec::len);

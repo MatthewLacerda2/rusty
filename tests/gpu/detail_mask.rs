@@ -1,9 +1,7 @@
-//! A material's detail mask (#2258, HDRP Lit's *Detail Mask*), drawn: a lamp-lit
-//! 16 m plane carries a busy detail map and a mask whose red is black on one half
-//! of the main UV and white on the other. Head-on and at a grazing view, the black
-//! half draws as the plane without the detail does and the white half as the plane
-//! with it, unmasked; a mask without a detail map draws no detail, and a missing
-//! mask file applies the detail everywhere. No adapter: `frame` returns `None`.
+//! A material's detail mask (HDRP Lit's *Detail Mask*): a plane with a busy detail map and a mask
+//! black on one half of the main UV, white on the other. Head-on and grazing, the black half
+//! draws as the plane without detail, the white half with it; a mask without a detail map
+//! draws none, a missing mask file applies the detail everywhere.
 
 use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset};
@@ -13,10 +11,8 @@ use rusty::scene::Camera;
 use crate::gpu::linear_data_maps_screenshot::scene;
 
 const SIZE: u32 = 96;
-/// The lines either side of the centre left out: the mask's edge, blurred by its mip.
 const SEAM: u32 = 8;
 
-/// A 64² PNG at a fresh path `name`, each texel `texel(x, y)`.
 fn png(name: &str, texel: impl Fn(u32, u32) -> [u8; 4]) -> String {
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_fn(64, 64, |x, y| image::Rgba(texel(x, y)));
@@ -24,8 +20,6 @@ fn png(name: &str, texel: impl Fn(u32, u32) -> [u8; 4]) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The busy detail map: a checker of 8-texel cells pushing every channel far
-/// from 0.5 (albedo, smoothness and both normal axes).
 fn busy() -> String {
     png("rusty_2258_busy.png", |x, y| match (x / 8 + y / 8) % 2 {
         0 => [30, 40, 30, 220],
@@ -33,12 +27,10 @@ fn busy() -> String {
     })
 }
 
-/// The mask: red black for the first half of `u`, white after.
 fn half_mask() -> String {
     png("rusty_2258_mask.png", |x, _| [u8::from(x >= 32) * 255; 4])
 }
 
-/// A grey, fairly glossy material with `detail` (map, mask), or none.
 fn material(detail: Detail) -> MaterialAsset {
     MaterialAsset {
         base_color: [0.5, 0.5, 0.5],
@@ -53,9 +45,6 @@ fn material(detail: Detail) -> MaterialAsset {
     }
 }
 
-/// Head-on from 12 m up, or from the plane's +Z side 20° above it. The plane's u
-/// runs along world X, so the mask's edge crosses the head-on frame and splits
-/// the grazing one into left and right.
 fn camera(grazing: bool) -> Camera {
     match grazing {
         false => Camera::new(Vec3::new(0.0, 12.0, 0.0), 0.0, -90.0),
@@ -67,11 +56,8 @@ fn camera(grazing: bool) -> Camera {
     }
 }
 
-/// A detail layer's (map, mask), or none.
 type Detail = Option<(Option<String>, Option<String>)>;
 
-/// `material(d)` from `camera(grazing)` through `h`, one renderer for every shot (one
-/// each was most of the test's time on lavapipe, #2350); `None` without an adapter.
 fn frame(h: &mut CaptureHost, grazing: bool, d: Detail, name: &str) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_2258_{grazing}_{name}.png"));
     capture_into(h, &scene(material(d)), &camera(grazing), &path, SIZE, SIZE)
@@ -80,8 +66,6 @@ fn frame(h: &mut CaptureHost, grazing: bool, d: Detail, name: &str) -> Option<im
     Some(image::open(&path).expect("open").to_rgb8())
 }
 
-/// The mean absolute per-channel difference of `a` and `b` over the second half
-/// (`far`) or the first of the frame's rows (`rows`) or columns, the seam left out.
 fn half_diff(a: &image::RgbImage, b: &image::RgbImage, rows: bool, far: bool) -> f64 {
     let half = SIZE / 2;
     let lines = match far {
@@ -118,16 +102,14 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let masked = shot(Some((map.clone(), mask.clone())), "masked").expect("rendered");
         let lone = shot(Some((None, mask.clone())), "lone").expect("rendered");
         let unread = shot(Some((map.clone(), missing.clone())), "missing").expect("rendered");
-        // The mask's black half is the frame's first: the top rows head-on, the left
-        // columns at the grazing view.
         let half = |a, b, far| half_diff(a, b, !grazing, far);
         let whole = |a, b| half(a, b, false) + half(a, b, true);
         let (to_plain, to_full) = (half(&masked, &plain, false), half(&masked, &full, true));
         let shows = half(&full, &plain, false).min(half(&full, &plain, true));
         let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
-        // Measured: `shows` lavapipe 25.74 / 27.14 (head-on / grazing), Metal 26.30 /
-        // 25.92, RTX 2060 (Vulkan) 24.76 / 22.71; every `< 0.5` value 0.00 on all three.
+        // Measured `shows`: lavapipe 25.74 / 27.14, Metal 26.30 / 25.92, RTX 2060 24.76 / 22.71;
+        // every `< 0.5` value is 0.00 on all three.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         let near_zero = [
             (to_plain, "the black half draws no detail"),

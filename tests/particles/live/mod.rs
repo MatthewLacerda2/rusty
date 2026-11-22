@@ -1,4 +1,4 @@
-//! `Particles.GetParticles` / `SetParticles` (#2171): a script reads and rewrites
+//! `Particles.GetParticles` / `SetParticles`: a script reads and rewrites
 //! an emitter's live particles. This file and `edges` drive the pair over a bare
 //! scene; `play` runs it inside the real play loop.
 

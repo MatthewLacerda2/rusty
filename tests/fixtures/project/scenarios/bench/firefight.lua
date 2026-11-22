@@ -1,24 +1,14 @@
--- tests/fixtures/project/scenarios/bench/firefight.lua — the bench's firefight tick (#2448).
---
--- What about four automatic weapons firing ask of the engine every tick, through
--- the API a game uses: prefab instances spawned and destroyed (casings, one of
--- them under a soldier's hand bone: the gun-on-a-hand case), muzzle-flash meshes
--- toggled, a decal stamped (the oldest of its own dropped at its cap), a pickup
--- re-parented between two holders, and a raycast a shot. Every count is a
--- constant below; each instance lives a fixed number of ticks, so once LIFETIME
--- and DECALS ticks have passed the live entity and decal counts hold still: a
--- window measured after that measures churn, not growth. No randomness, no
--- clock: two runs do the same edits.
+-- Four automatic weapons' per-tick load through the game API: prefab instances spawned and destroyed (one under a soldier's hand bone), muzzle-flash meshes toggled, a decal stamped (oldest dropped at its cap), a pickup re-parented, a raycast a shot. Each instance lives a fixed number of ticks, so after LIFETIME and DECALS ticks live counts hold still: the window measures churn, not growth. Deterministic.
 
-local SHOOTERS = 4  -- the first soldiers, who "fire" (fewer if the scene has fewer)
-local SPAWNS = 4    -- prefab instances spawned a tick, and as many destroyed
-local LIFETIME = 30 -- ticks an instance lives: SPAWNS * LIFETIME live at once
-local MUZZLES = 8   -- muzzle-flash meshes, two under each shooter's hand
-local TOGGLES = 2   -- of them toggled a tick
-local DECALS = 64   -- this script's decals kept: one stamped a tick, the oldest dropped
-local RAYS = 4      -- raycasts a tick, one a shooter
-local RANGE = 60    -- a shot's reach, metres
-local CHEST = 1.0   -- where on the Player a shot aims, above its pivot
+local SHOOTERS = 4
+local SPAWNS = 4
+local LIFETIME = 30 -- ticks an instance lives
+local MUZZLES = 8
+local TOGGLES = 2
+local DECALS = 64
+local RAYS = 4
+local RANGE = 60    -- metres
+local CHEST = 1.0
 
 local Firefight = {
     fields = {
@@ -38,9 +28,8 @@ local Firefight = {
 local tick = 0
 local shooters, hands, muzzles = {}, {}, {}
 local holders, pickup = {}, nil
--- Queues, oldest first, read from `head` and written at `tail` (no holes for `#`).
-local live = { head = 1, tail = 0 }   -- spawned instances: { id, dies }
-local decals = { head = 1, tail = 0 } -- this script's decal ids
+local live = { head = 1, tail = 0 }
+local decals = { head = 1, tail = 0 }
 
 local function push(q, v)
     q.tail = q.tail + 1
@@ -56,7 +45,7 @@ end
 
 local function box(name, parent, x, y, z, sx, sy, sz)
     local id = Scene.CreateEntity(name, "Box")
-    Scene.RemoveComponent(id, "Collider") -- draw-only
+    Scene.RemoveComponent(id, "Collider")
     if parent then
         Scene.SetParent(id, parent)
         Transform.SetLocalPosition(id, x, y, z)
@@ -76,7 +65,6 @@ function Firefight.Start(id)
         shooters[i] = soldier
         hands[i] = Animator.GetBone(soldier, "hand_r")
     end
-    -- A smaller stress scene has fewer shooters; none is a scenario error.
     SHOOTERS = #shooters
     assert(SHOOTERS > 0, "firefight: no Soldier_0 in the scene (Harness.LoadStress first)")
     for i = 1, MUZZLES do
@@ -90,8 +78,6 @@ function Firefight.Start(id)
     pickup = box("Pickup", holders[1], 0, 0, 0, 0.3, 0.2, 0.5)
 end
 
--- Spawn this tick's instances: the first under a shooter's hand bone (a kinematic
--- body, carried by the walk), the rest ejected from the shooters as casings.
 local function spawn()
     for k = 1, SPAWNS do
         local s = (tick + k) % SHOOTERS + 1
@@ -113,10 +99,7 @@ local function spawn()
     end
 end
 
--- This tick's shots: a ray from each shooter's muzzle to the Player's chest, the
--- first hit not on the shooter's own rig taken (`root`, as a game's weapon does:
--- the shooter's hitboxes surround its muzzle), and one decal where the first
--- shot lands (on the deck below the muzzle when it hits nothing).
+-- First hit not on the shooter's own rig is taken (`root`: its hitboxes surround its muzzle).
 local hits = {} -- kept across ticks: RaycastAllNonAlloc refills it
 local function shoot()
     local player = Scene.FindEntityByName("Player")

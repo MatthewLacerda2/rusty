@@ -1,4 +1,4 @@
-//! Integration coverage for the `Particles` scripting namespace (issue #350):
+//! Integration coverage for the `Particles` scripting namespace:
 //! scripted emission goes through the component's seeded spawn path and respects
 //! the max-particle cap, `Burst` fires the configured count, tuning verbs write
 //! the component, and every verb is a safe no-op without an emitter.

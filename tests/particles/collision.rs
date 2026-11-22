@@ -1,7 +1,3 @@
-//! Particle collision response (issue #13): a particle fired into a static
-//! collider must either die on contact or bounce back off it. Exercised through the
-//! real play loop so the rapier world is built exactly as in-game.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,8 +8,6 @@ use rusty::core::curve::Range;
 use rusty::scene::{ColliderComponent, ColliderShape, Scene};
 use rusty::script::scripting::ConsoleLogs;
 
-/// Build a world: a static wall at x=+3 and an emitter at the origin firing one
-/// burst of particles straight at the wall along +X.
 fn scene_with_wall(response: CollisionResponse) -> (Scene, u32) {
     let mut scene = Scene::new();
 
@@ -59,8 +53,6 @@ fn build_world(scene: Scene) -> Rc<RefCell<GameWorld>> {
     Rc::new(RefCell::new(world))
 }
 
-/// Run `frames` ticks and return the emitter's live particles' max X reached and
-/// whether any are still moving in +X (positive vx).
 fn run(scene: Scene, emitter: u32, frames: u32) -> (usize, f32, bool) {
     let world = build_world(scene);
     {

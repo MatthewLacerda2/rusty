@@ -1,6 +1,4 @@
-//! Agent steering by its numbers, through `tick_nav_agents`: how far one tick from
-//! rest moves, that an agent inside its stopping distance holds still and slows, and
-//! that a waypoint already reached is passed, not chased.
+//! Agent steering by its numbers, through `tick_nav_agents`.
 
 use glam::Vec3;
 use rusty::navigation::NavigationGraph;
@@ -48,12 +46,10 @@ fn velocity_step_multiplies_not_divides() {
     );
 }
 
-/// An agent already inside its stopping distance decelerates in place: it does
-/// not steer on toward the destination.
 #[test]
 fn agent_within_stopping_distance_does_not_advance() {
     let target = Vec3::new(10.0, 0.0, 0.0);
-    let start = Vec3::new(9.95, 0.0, 0.0); // dist = 0.05 < stopping_distance = 0.1
+    let start = Vec3::new(9.95, 0.0, 0.0);
     let mut scene = Scene::new();
     let id = spawn(&mut scene, start, agent_toward(target));
     open_graph().tick_nav_agents(&mut scene, 1.0 / 60.0);
@@ -65,13 +61,11 @@ fn agent_within_stopping_distance_does_not_advance() {
     );
 }
 
-/// Inside the stopping distance the velocity shrinks by a share of itself each
-/// tick (`velocity -= velocity * factor`): it slows, keeping its sign, and never
-/// grows.
+/// Inside the stopping distance velocity shrinks by a share of itself each tick: it slows, keeps its sign, never grows.
 #[test]
 fn deceleration_reduces_not_amplifies_velocity() {
     let target = Vec3::new(5.0, 0.0, 0.0);
-    let start = Vec3::new(4.96, 0.0, 0.0); // dist ≈ 0.04 < stopping_distance = 0.1
+    let start = Vec3::new(4.96, 0.0, 0.0);
     let mut scene = Scene::new();
     let id = scene.add_entity("a".to_string());
     scene.world.transform_mut(id).unwrap().position = start;
@@ -92,8 +86,6 @@ fn deceleration_reduces_not_amplifies_velocity() {
     );
 }
 
-/// A waypoint the agent is already within reach of (XZ distance < 0.5), here behind
-/// it, is passed: the agent steers to the next one instead of turning back.
 #[test]
 fn waypoint_behind_agent_is_advanced_past() {
     let start = Vec3::new(5.0, 0.0, 5.0);
@@ -102,8 +94,6 @@ fn waypoint_behind_agent_is_advanced_past() {
     let id = scene.add_entity("a".to_string());
     scene.world.transform_mut(id).unwrap().position = start;
     let mut ag = agent_toward(target);
-    // Pre-load cache: waypoint[0] is 0.2 units behind (< 0.5 reached threshold),
-    // waypoint[1] is ahead. Cursor should advance to [1] and steer forward (+x).
     ag.cached_path = vec![
         Vec3::new(4.8, 0.0, 5.0), // behind the agent, within reached distance
         Vec3::new(10.0, 0.0, 5.0),

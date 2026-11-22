@@ -1,4 +1,4 @@
-//! The Lua `Material.*` surface and the shared `authoring::material` ops converge (#287).
+//! The Lua `Material.*` surface and the shared `authoring::material` ops converge.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,13 +10,7 @@ use rusty::script::api::bind;
 
 #[test]
 fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    // #287: the Lua `Material.*` bindings and the editor's Material card both route
-    // through the SAME `authoring::material::*` ops, so applying the same change either
-    // way must yield byte-identical `MaterialAsset` state. We pin convergence by
-    // driving the Lua surface against one entity and the shared op directly against a
-    // second, then asserting the two resolved materials are equal. The clamp on
-    // `SetAlpha`/`SetAlphaCutoff` is exercised (2.0 / -1.0 -> 1.0 / 0.0), proving the
-    // validation is single-sourced in the shared op the binding calls.
+    // Lua `Material.*` and the editor card route through the same `authoring::material::*` ops: the same change either way must yield equal `MaterialAsset` state; the `SetAlpha`/`SetAlphaCutoff` clamp (2.0 / -1.0 -> 1.0 / 0.0) proves validation is single-sourced.
     let scene = Rc::new(RefCell::new(Scene::new()));
     let via_lua = scene.borrow_mut().add_entity("ViaLua".to_string());
     let via_op = scene.borrow_mut().add_entity("ViaOp".to_string());
@@ -38,8 +32,6 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     .exec()
     .unwrap();
 
-    // The shared op path: resolve-or-create the key (same verb the API uses), then call
-    // the same ops the editor card calls, with the same inputs.
     {
         let mut sc = scene.borrow_mut();
         let key = mat_ops::ensure_material_key(&mut sc, via_op).unwrap();
@@ -64,7 +56,6 @@ fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::E
     assert_eq!(lua_mat.base_color, op_mat.base_color);
     assert_eq!(lua_mat.base_color_map, op_mat.base_color_map);
     assert_eq!(lua_mat.render_mode, op_mat.render_mode);
-    // Both clamped identically by the single shared op.
     assert_eq!(lua_mat.alpha, 1.0);
     assert_eq!(op_mat.alpha, 1.0);
     assert_eq!(lua_mat.alpha_cutoff, 0.0);

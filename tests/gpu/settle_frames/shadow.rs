@@ -1,15 +1,13 @@
-//! A shadow tile resize the atlas's hysteresis holds back (#1711) is history: each
+//! A shadow tile resize the atlas's hysteresis holds back is history: each
 //! frame drawn counts towards it, so a settled shot after a jump that takes a
 //! shadowed spot light out of its tile's band still draws every frame, and writes
-//! what the full settle wrote before #2092.
+//! what the full settle wrote.
 
 use super::{png, run};
 
-/// A shadow-casting spot light over the origin; the camera stands inside its range
-/// (it wants the largest tile) for long enough to settle there, then jumps forty
-/// metres off (it wants the smallest), cut, and takes a shot settled 16 frames
-/// both ways: one past the 15 frames in a row the atlas holds a resize back, so
-/// the resize lands inside the settle.
+/// A shadow-casting spot light; the camera settles inside its range (largest tile), then jumps
+/// forty metres off (smallest), cuts, and shoots settled 16 frames: one past the 15 the atlas
+/// holds a resize back, so the resize lands inside the settle.
 const JUMP: &str = r#"
 Graphics.SetTaaActive(false)
 local lamp = Scene.CreateEntity("Lamp")

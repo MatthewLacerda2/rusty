@@ -1,14 +1,7 @@
-//! Probe ambient and flat ambient agree (#807). A light probe stores radiance SH and
-//! `Sh9::eval` reads back irradiance E; a Lambert surface reflects albedo / π × E,
-//! which is what the flat ambient and a lightmap (E / π, #438) already give. So a
-//! dynamic floor under a probe projected from a uniform sky of radiance L renders
-//! like a static floor under the flat ambient of the same L. Before the fix the
-//! probe-lit one was π× brighter.
-//!
-//! The floor faces up because the flat ambient is a sky/ground gradient that equals
-//! the sky's L only at N = +Y; a sphere would compare the gradient's falloff too.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! Probe ambient and flat ambient agree: `Sh9::eval` reads back irradiance E and a
+//! Lambert surface reflects albedo / π × E, as the flat ambient and a lightmap
+//! already give; a probe-lit floor was once π× brighter. The floor faces up because
+//! the flat ambient equals the sky's L only at N = +Y. Skips without an adapter.
 
 use glam::Vec3;
 use rusty::dev::screenshot::capture;
@@ -16,10 +9,9 @@ use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene, Sh9};
 
 const SIZE: u32 = 32;
-/// Sky radiance: dim enough that π× it does not clip, so the old bug shows.
+/// Dim enough that π× it does not clip.
 const SKY: f32 = 0.25;
 
-/// A floor plane under a flat ambient of `SKY`, static or not.
 fn floor(is_static: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_color = Vec3::ONE;
@@ -32,8 +24,7 @@ fn floor(is_static: bool) -> Scene {
     scene
 }
 
-/// The SH a probe bakes from a uniform sky of radiance `l`: every direction of a
-/// Fibonacci sphere projected with its equal share of the 4π solid angle.
+/// The SH a probe bakes from a uniform sky of radiance `l` (Fibonacci sphere).
 fn uniform_sky_sh(l: f32) -> Sh9 {
     const N: usize = 4096;
     let mut sh = Sh9::zero();
@@ -48,7 +39,6 @@ fn uniform_sky_sh(l: f32) -> Sh9 {
     sh
 }
 
-/// Mean red level of the frame's centre block, `None` without an adapter.
 fn centre_level(scene: &Scene, name: &str) -> Option<f64> {
     let camera = Camera::new(Vec3::new(0.0, 2.0, 0.0), 0.0, -89.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_probe_ambient_{name}.png"));

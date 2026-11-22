@@ -1,7 +1,7 @@
 //! A model whose texture lies outside `assets/` fails the export, naming it; an
 //! image's compressed copy ships, and a play-test on the export never re-makes it; an image that
-//! does not decode ships uncompressed, never failing the export (#1574). A texture
-//! a model embeds ships its compressed copy too (#2365).
+//! does not decode ships uncompressed, never failing the export. A texture
+//! a model embeds ships its compressed copy too.
 
 use super::{export, fixture, play, project, tree, CACHE};
 use rusty_test_support::models::{embedded_fbx, png, Embedded};
@@ -44,11 +44,6 @@ fn an_images_compressed_copy_ships_and_a_play_test_writes_none() {
     );
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
-    // The export seeds the starter content (an image among it) and ships its
-    // compressed copy too (#1653). `play` is the headless play-test (the harness,
-    // which seeds as the editor does), not the read-only player
-    // (`shell::player::read_only_tests` holds that): a run on the export
-    // compresses no image anew and changes no shipped copy.
     let after = tree(&out);
     let compressed = |t: &std::collections::BTreeMap<String, Vec<u8>>| -> Vec<(String, Vec<u8>)> {
         let copies = t.iter().filter(|(k, _)| k.ends_with(".bctex"));

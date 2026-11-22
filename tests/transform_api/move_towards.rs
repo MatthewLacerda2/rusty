@@ -1,4 +1,4 @@
-//! `Transform.MoveTowards` steps, snaps and backs away (#350, #997).
+//! `Transform.MoveTowards` steps, snaps and backs away.
 
 use mlua::Lua;
 use rusty::script::api::bind;
@@ -56,7 +56,7 @@ fn move_towards_holds_position_when_already_at_target() {
             .unwrap()
     };
     assert_eq!(x(), 7.0, "zero-distance move must not drift");
-    // A negative step backs away, like Unity's `Vector3.MoveTowards` (#997).
+    // A negative step backs away, like Unity's `Vector3.MoveTowards`.
     lua.load(format!("Transform.MoveTowards({id}, 10, 0, 0, -1)"))
         .exec()
         .unwrap();

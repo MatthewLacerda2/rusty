@@ -1,4 +1,4 @@
-//! Graph v2 through the real tick (#457): a 1D locomotion tree on the base layer
+//! Graph v2 through the real tick: a 1D locomotion tree on the base layer
 //! and an upper-body layer masked to the spine pose two bone GameObjects — the
 //! legs follow the tree, the spine the layer — deterministically.
 
@@ -82,7 +82,6 @@ fn soldier() -> (Scene, u32) {
     (scene, hero)
 }
 
-/// The (spine, leg) bones' x after `ticks` fixed steps.
 fn bones_after(ticks: usize) -> (f32, f32) {
     let (scene, hero) = soldier();
     let (spine, leg) = (

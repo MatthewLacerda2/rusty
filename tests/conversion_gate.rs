@@ -1,4 +1,4 @@
-//! The conversion gate is per thread in this binary too (#1337). The library is
+//! The conversion gate is per thread in this binary too. The library is
 //! linked here without `cfg(test)`, and `cargo test` (cargo-mutants' runner) runs
 //! every test below in one process: a world playing in one test must not refuse
 //! another test's import.

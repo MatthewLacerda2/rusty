@@ -1,4 +1,4 @@
-//! Widgets on a world canvas (#429): the pointer's camera ray reaches them, and
+//! Widgets on a world canvas: the pointer's camera ray reaches them, and
 //! `event.canvas_position` maps it onto the widget — a slider is set by looking at
 //! it and clicking with the cursor locked, and a dropdown opens on its own canvas.
 

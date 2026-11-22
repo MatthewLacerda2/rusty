@@ -1,6 +1,5 @@
-//! A `Local` GPU emitter's particles follow it (through a scale of 0 as its `Cpu`
-//! twin does), and a dead particle's slot draws nothing while a live one keeps the
-//! slots in use.
+//! A `Local` GPU emitter's particles follow it (through a scale of 0, as its `Cpu`
+//! twin does); a dead particle's slot draws nothing while a live one keeps its slot.
 
 use glam::Vec3;
 use rusty::components::particle::{ParticleSimulation, SimulationSpace};
@@ -26,8 +25,6 @@ fn a_local_gpu_emitter_carries_its_particles_and_a_world_one_leaves_them() {
         };
         seen.push(centroid(&mask).expect("drawn").0);
     }
-    // Measured on lavapipe (Mesa, the container) and on an NVIDIA RTX 2060 (Vulkan): Local at
-    // x 60.5, World at 31.5.
     assert!(
         seen[0] > 40.0,
         "Local moved right with the emitter: {seen:?}"
@@ -89,9 +86,7 @@ fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
     };
     let (mut gpu, gpu_id) = world(config(ParticleSimulation::Gpu));
     let (mut cpu, cpu_id) = world(config(ParticleSimulation::Cpu));
-    // Off the origin, so a birth stored in world space but drawn under the frame
-    // lands twice as far (behind the wall), and a frame of scale 0 collapses
-    // what it draws onto the emitter.
+    // Off the origin: a world-space birth drawn under the frame lands twice as far.
     let at = Vec3::new(3.0, 0.0, -10.0);
     for (frame, scale) in [1.0, 0.0, 1.0].into_iter().enumerate() {
         for (game, id) in [(&mut gpu, gpu_id), (&mut cpu, cpu_id)] {
@@ -123,7 +118,6 @@ fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
             b.iter().filter(|&&x| x).count() > 30,
             "frame {frame}: drawn"
         );
-        // Measured: 1.0 at every frame on lavapipe (Mesa) and on an NVIDIA RTX 2060 (Vulkan).
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }

@@ -1,25 +1,14 @@
-//! API-doc drift gate (#280): the scripting-API reference (`docs/api/`) must agree with the **live Lua
-//! API surface** about *what exists*. The doc is served to the agent over MCP (#288),
-//! so a drifted doc lies to it. This enforces existence-parity both directions — every
-//! documented `Namespace.Function` is a registered binding, and every registered
-//! binding is documented. Signatures are out of scope (Lua closures are opaque at
-//! runtime; the deferred macro would be needed for types). Gated on `dev` (a `Session`
-//! is dev-only); the session boots an **empty** scene so only the `api::` namespaces
-//! populate `_G` (no entity scripts).
+//! Existence parity, both directions, between `docs/api/` and the live Lua API surface (signatures are out of scope). The session boots an empty scene so only `api::` namespaces populate `_G`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use rusty::dev::session::Session;
 
-/// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
-/// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
     rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }
 
-/// Live namespaces deliberately *not* in the user-facing scripting doc. Empty by
-/// design: every live namespace (including dev-only `Debug`) is documented, so any
-/// addition here must carry a justification comment.
+/// Live namespaces deliberately not in the doc; each entry needs a justification.
 const NAMESPACE_ALLOWLIST: &[&str] = &[];
 
 type Surface = BTreeMap<String, BTreeSet<String>>;
@@ -32,8 +21,6 @@ fn doc_matches_live_lua_surface() {
     let text = reference();
     let doc = parse_documented_surface(&text);
 
-    // Every namespace is a key in both maps (a documented namespace with no rows still
-    // gets an empty entry), so one walk over the union covers names and functions.
     let mut problems = Vec::new();
     let names: BTreeSet<&String> = live.keys().chain(doc.keys()).collect();
     for ns in names {
@@ -60,7 +47,6 @@ fn doc_matches_live_lua_surface() {
     );
 }
 
-/// Push one line per drifting function in `ns`, in both directions.
 fn diff_fns(ns: &str, live: &BTreeSet<String>, doc: &BTreeSet<String>, out: &mut Vec<String>) {
     let doc_only: Vec<&String> = doc.difference(live).collect();
     let live_only: Vec<&String> = live.difference(doc).collect();
@@ -76,12 +62,7 @@ fn diff_fns(ns: &str, live: &BTreeSet<String>, doc: &BTreeSet<String>, out: &mut
     }
 }
 
-/// Parse the doc into `namespace → {function names}`. A **namespace** is an `## `
-/// heading beginning with a backticked identifier (trailing prose ignored). A
-/// **function** is a table row's first cell beginning with a backticked dotted
-/// identifier `` `Namespace.Function` `` — optionally ` / `SecondName`` for a combined
-/// getter/setter row, or a trailing annotation like `*(dev-only)*`. Fences are skipped,
-/// so a `Material.DefineAsset(...)` inside one never counts.
+/// A namespace is an `## ` heading starting with a backticked identifier; a function is a table row whose first cell starts with a backticked `Namespace.Function` (fences skipped).
 fn parse_documented_surface(doc: &str) -> Surface {
     let mut surface: Surface = BTreeMap::new();
     let mut in_fence = false;
@@ -104,8 +85,6 @@ fn parse_documented_surface(doc: &str) -> Surface {
     surface
 }
 
-/// Record the documented function(s) named by a table row's first `cell`, if it
-/// begins with a backticked dotted identifier (plus an optional `/ `Second`` form).
 fn add_table_fn(cell: &str, surface: &mut Surface) {
     let Some(body) = cell.strip_prefix('`') else {
         return;
@@ -119,7 +98,6 @@ fn add_table_fn(cell: &str, surface: &mut Surface) {
     }
     let entry = surface.entry(ns.to_string()).or_default();
     entry.insert(first.to_string());
-    // Combined getter/setter row: `` `Ns.GetX` / `SetX` ``.
     if let Some(after) = cell[end + 2..].trim_start().strip_prefix("/ ") {
         if let Some(second) = backticked_ident(after.trim_start()) {
             entry.insert(second);
@@ -127,7 +105,6 @@ fn add_table_fn(cell: &str, surface: &mut Surface) {
     }
 }
 
-/// If `s` starts with a backticked identifier, return it (ignores trailing text).
 fn backticked_ident(s: &str) -> Option<String> {
     let body = s.strip_prefix('`')?;
     let end = body.find('`')?;
@@ -135,7 +112,6 @@ fn backticked_ident(s: &str) -> Option<String> {
     is_ident(ident).then(|| ident.to_string())
 }
 
-/// A Lua identifier: a non-empty `[A-Za-z0-9_]` run starting with a letter or `_`.
 fn is_ident(s: &str) -> bool {
     let mut chars = s.chars();
     matches!(chars.next(), Some(c) if c.is_ascii_alphabetic() || c == '_')

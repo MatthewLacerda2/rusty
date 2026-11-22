@@ -1,5 +1,3 @@
-//! A `NavMeshAgent` turns itself to face where it steers, at a limited rate (#744).
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{EulerRot, Quat, Vec3};
@@ -36,7 +34,6 @@ fn yaw_deg(scene: &Scene, id: u32) -> f32 {
     q.to_euler(EulerRot::YXZ).0.to_degrees()
 }
 
-/// An open 40 m strip along +X.
 fn graph() -> NavigationGraph {
     NavigationGraph::new(0.0, 40.0, 0.0, 2.0, 1.0)
 }
@@ -56,7 +53,6 @@ fn turns_to_its_heading_at_a_limited_rate() {
     assert!((yaw_deg(&scene, id) - 90.0).abs() < 1e-3);
 }
 
-/// With `update_rotation` off the engine never touches the rotation.
 #[test]
 fn update_rotation_off_leaves_rotation_to_scripts() {
     let (mut scene, graph) = (Scene::new(), graph());
@@ -94,7 +90,6 @@ fn faces_the_steering_direction_not_the_dodge() {
         if v.length() < 0.5 {
             continue;
         }
-        // Open floor: the path is one straight leg, so it steers at its target.
         let to = Vec3::new(36.0, 0.0, 1.0) - scene.world.transform(a).unwrap().position;
         let steer = to.x.atan2(to.z).to_degrees();
         dodge = dodge.max((v.x.atan2(v.z).to_degrees() - steer).abs());
@@ -107,8 +102,6 @@ fn faces_the_steering_direction_not_the_dodge() {
     );
 }
 
-/// A scene saved before #744 has no turning fields: they load as Unity's defaults
-/// (turning on, 120°/s) and the 720°/s² ramp.
 #[test]
 fn older_scenes_load_the_turning_defaults() {
     let mut json = serde_json::to_value(NavMeshAgentComponent {

@@ -1,4 +1,4 @@
-//! A `Scene.LoadAsync`'s progress is an input (#2123): what a script read while the
+//! A `Scene.LoadAsync`'s progress is an input: what a script read while the
 //! worker and the GPU warm-up ran is recorded where it moved, and a replay reads the
 //! same values on the same ticks with a loader running at another pace.
 

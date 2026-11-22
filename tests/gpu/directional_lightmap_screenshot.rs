@@ -1,13 +1,9 @@
-//! Directional lightmaps on the GPU (#810): a static, lightmapped floor whose normal
-//! map tilts one half one way and the other half the other, lit only by a slanted
-//! `Baked` sun, so every bit of its light comes from the lightmap.
-//!
+//! Directional lightmaps: a static floor whose normal map tilts each half opposite ways, lit
+//! only by a slanted `Baked` sun.
 //! * **Directional bake:** the halves read the baked light through their own normals,
 //!   so the half tilted toward the sun is visibly brighter than the other.
 //! * **Non-directional bake** (`directional: false`): the lightmap ignores the normal
-//!   map, so the two halves shade nearly alike, as before #810.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//!   map, so the two halves shade nearly alike, as before directional lightmaps.
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, LightMode, LightType, MaterialAsset, MaterialComponent};
@@ -19,7 +15,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
 
-/// A normal map whose left half (low U) tilts toward -tangent, right half +tangent.
 fn bumps(path: &std::path::Path) {
     let img = image::RgbaImage::from_fn(64, 64, |x, _| match x < 32 {
         true => image::Rgba([64, 128, 218, 255]),
@@ -28,7 +23,6 @@ fn bumps(path: &std::path::Path) {
     img.save(path).expect("write normal map");
 }
 
-/// The bumpy static floor and a `Baked` sun slanting along the floor's tangent (X).
 fn scene(dir: &std::path::Path) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
@@ -68,7 +62,6 @@ fn scene(dir: &std::path::Path) -> Scene {
     scene
 }
 
-/// The floor baked with `directional` and seen from above; `None` without an adapter.
 fn shot(directional: bool) -> Option<image::RgbImage> {
     let name = format!("rusty_gpu_dir_lightmap_{directional}");
     let dir = crate::temp::dir().join(&name);
@@ -101,9 +94,8 @@ fn shot(directional: bool) -> Option<image::RgbImage> {
     Some(image::open(&out).unwrap().to_rgb8())
 }
 
-/// Mean brightness of the image's top and bottom thirds (the seam stays out): the
-/// normal map's halves run along the floor's X, which the top-down view shows
-/// vertically.
+/// Mean brightness of the top and bottom thirds: the map's halves run along X, vertical
+/// in the top-down view.
 fn halves(img: &image::RgbImage) -> (f64, f64) {
     let band = |ys: std::ops::Range<u32>| {
         let px: Vec<u64> = ys

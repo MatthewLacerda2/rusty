@@ -1,4 +1,4 @@
-//! Per-op correctness: converter/math, vector/normal, and filter ops (#270). The
+//! Per-op correctness: converter/math, vector/normal, and filter ops. The
 //! generator + color ops are covered in `basic.rs`. Each op is exercised through
 //! the public runner (`evaluate`) so the test pins observable pixel behaviour.
 

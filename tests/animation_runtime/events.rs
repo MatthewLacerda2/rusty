@@ -1,4 +1,4 @@
-//! Animation events through the real tick (#459): a graph node's markers call the
+//! Animation events through the real tick: a graph node's markers call the
 //! character's `OnAnimationEvent` once per loop, before that tick's `LateUpdate`,
 //! and identically on every run.
 

@@ -1,4 +1,4 @@
-//! An inactive `Local` emitter (#1529) is not carried: its particles hold still
+//! An inactive `Local` emitter is not carried: its particles hold still
 //! while the entity is off, as Unity's deactivated Particle System does.
 
 use glam::Vec3;

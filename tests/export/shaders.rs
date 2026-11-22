@@ -1,6 +1,6 @@
 //! A baked shader stale against the engine's shaders is re-baked from its recipe
 //! by the export, so the game ships modules current with its engine and the
-//! player composes none (#1638).
+//! player composes none.
 
 use std::collections::BTreeMap;
 

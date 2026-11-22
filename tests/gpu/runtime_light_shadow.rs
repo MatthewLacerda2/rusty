@@ -1,4 +1,4 @@
-//! A light a script makes while the game plays casts a shadow (#2522): it is
+//! A light a script makes while the game plays casts a shadow: it is
 //! `Realtime` with `cast_shadows` on, so the frame's shadow atlas gives it tiles.
 //! The default scene holds no point or spot light of its own, so its atlas starts
 //! empty.

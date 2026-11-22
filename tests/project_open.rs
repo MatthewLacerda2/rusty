@@ -1,4 +1,4 @@
-//! Every entry point opens a project the same way (#1652): the headless session and
+//! Every entry point opens a project the same way: the headless session and
 //! `play` answer `project.rusty`'s startup scene and quality preset, not the
 //! engine's defaults, and the session writes a setter back into the file as the
 //! editor does. The binaries run as children, since opening a project moves the

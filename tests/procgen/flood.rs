@@ -1,7 +1,3 @@
-//! #1741's flood fill in a graph: thresholded Voronoi cells, each its own flat
-//! grey, one value across the tile's edge, mostly the same grey at 128² and
-//! 1024², and thousands of islands kept apart.
-
 use std::collections::BTreeMap;
 
 use rusty::procgen::recipe::TextureRecipe;
@@ -25,7 +21,6 @@ fn recipe(scale: u32, resolution: u32, output: &str) -> TextureRecipe {
     serde_json::from_str(&json).expect("recipe parses")
 }
 
-/// Per Voronoi cell (keyed by its colour's bits), the greys its island pixels read.
 fn greys_by_cell(scale: u32, resolution: u32) -> BTreeMap<u32, Vec<f32>> {
     let bake = |output| evaluate(&recipe(scale, resolution, output)).expect("bakes");
     let (cells, fill, grey): (Image, Image, Image) = (bake("cells"), bake("fill"), bake("grey"));
@@ -41,7 +36,6 @@ fn greys_by_cell(scale: u32, resolution: u32) -> BTreeMap<u32, Vec<f32>> {
     by_cell
 }
 
-/// How many cells read one flat grey, and how many distinct greys they read.
 fn flat_and_distinct(by_cell: &BTreeMap<u32, Vec<f32>>) -> (usize, usize) {
     let flat = by_cell.values().filter(|g| g.len() == 1).count();
     let mut greys: Vec<u32> = by_cell.values().map(|g| g[0].to_bits()).collect();

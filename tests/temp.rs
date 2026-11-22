@@ -1,4 +1,4 @@
-//! A scratch directory owned by one test (#629, #709): [`dir`] is
+//! A scratch directory owned by one test: [`dir`] is
 //! `rusty_test_support::temp`'s, the one helper every workspace member's tests and
 //! this suite share (its module doc says why a test never writes under a bare
 //! `std::env::temp_dir()`). The suite adds the spellings its tests pass around.

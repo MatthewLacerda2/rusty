@@ -1,23 +1,15 @@
-//! Integration coverage for `Debug.Preview` (#353) — the headless asset preview,
-//! driven through a real [`Session`] so the test exercises the *shipped* surface (the
-//! Lua verb an agent actually calls), not the Rust function behind it.
-//!
-//! The render half needs a GPU or software adapter, which CI boxes may not have. Every
-//! test here therefore treats "no adapter" as a skip, exactly as the verb does: it
-//! returns `nil` instead of raising, and the assertions that don't involve pixels
-//! (argument validation) run regardless.
+//! `Debug.Preview` (the headless asset preview) driven through a real [`Session`], so
+//! the shipped Lua verb is exercised. With no adapter the verb returns `nil`
+//! instead of raising; argument-validation tests run regardless.
 
 use rusty::dev::session::Session;
 
-/// A committed shader, so the arm that matters most for #353 (see what a baked `.wgsl`
-/// actually renders) is the one covered end to end.
 const SHADER: &str = "engine/shaders/shader.wgsl";
 
 fn session() -> Session {
     Session::new("").expect("session boots in edit mode")
 }
 
-/// Render `asset` to `name` under a scratch dir; `None` when the box has no adapter.
 fn preview(sess: &Session, asset: &str, name: &str, opts: &str) -> Option<std::path::PathBuf> {
     let out = crate::temp::dir().join("rusty-preview-api").join(name);
     let _ = std::fs::remove_file(&out);
@@ -28,7 +20,6 @@ fn preview(sess: &Session, asset: &str, name: &str, opts: &str) -> Option<std::p
         opts
     );
     let result = sess.eval(&call).expect("Debug.Preview is callable");
-    // The verb returns the written path on success and nil when no adapter exists.
     (result.trim() != "nil" && !result.trim().is_empty()).then_some(out)
 }
 
@@ -45,8 +36,7 @@ fn previewing_a_shader_writes_the_png_it_returns() {
 
 #[test]
 fn framing_is_deterministic_so_two_shots_are_comparable() {
-    // The whole point of fixed framing (#353): an agent diffs before/after captures of
-    // the same asset, so the same input must produce byte-identical output.
+    // Fixed framing: agents diff captures, so output must be byte-identical.
     let sess = session();
     let (Some(a), Some(b)) = (
         preview(&sess, SHADER, "det-a.png", ", { resolution = 64 }"),

@@ -1,4 +1,4 @@
-//! The UI look surface (#425): `docs/ui.md`'s "Cyberpunk panel" recipe runs as
+//! The UI look surface: `docs/ui.md`'s "Cyberpunk panel" recipe runs as
 //! written through `Scene`, `RectTransform` and `Shape`, the setters write through
 //! the shared ops (validation included), `Image` / `Text` take a blend and the
 //! gradient table round-trips, and the shapes survive a scene save → load.

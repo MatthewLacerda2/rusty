@@ -2,7 +2,7 @@
 //! in Unity: a game that wants a lift to carry its player adds the lift's
 //! motion to the `Move` itself. rapier's controller rode such a body, but only
 //! on the slides of a move that touched it, and its ride is what stalled a
-//! walk on a resting one (#2061).
+//! walk on a resting one.
 
 use glam::{Quat, Vec3};
 use rusty::edit::authoring::default_rigidbody;

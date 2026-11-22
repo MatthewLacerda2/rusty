@@ -1,4 +1,4 @@
-//! The `Animator` montage surface (#1894): a clip plays as a montage with no
+//! The `Animator` montage surface: a clip plays as a montage with no
 //! graph, the reads see it, an unknown name warns and returns `false`, a bad
 //! rate is a Lua error, and stopping an empty slot returns `false`.
 

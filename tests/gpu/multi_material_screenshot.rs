@@ -1,10 +1,6 @@
-//! A mesh with two materials draws each run with its own (#1285): the FBX fixture's
-//! quad is a `Red` triangle and a `Blue` one, and both show. Pointing slot 1 at a
-//! third material changes only the triangle that slot draws.
-//!
-//! Each material is made flat emissive over a black base in a scene with no ambient
-//! and no lights, so a pixel's colour can only come from the material its run drew
-//! with. Skips without an adapter, like every capture test.
+//! A mesh with two materials draws each run with its own; repointing slot 1 changes
+//! only its triangle. Materials are flat emissive in an unlit scene, so a pixel's
+//! colour comes only from its run's material. Skips without an adapter.
 
 use crate::temp::{dir, file as tmp};
 use glam::Vec3;

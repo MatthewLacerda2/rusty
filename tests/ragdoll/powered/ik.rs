@@ -1,4 +1,4 @@
-//! A hit reaction on an IK'd arm (#461 × #1895): IK keeps solving on the
+//! A hit reaction on an IK'd arm (): IK keeps solving on the
 //! animated side of the blend, so the aim holds through the reaction and the
 //! tick it ends doesn't move the hand by the IK correction.
 

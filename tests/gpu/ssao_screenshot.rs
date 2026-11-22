@@ -1,4 +1,4 @@
-//! SSAO (#436): where a crate meets the floor the ambient light darkens; an open,
+//! SSAO: where a crate meets the floor the ambient light darkens; an open,
 //! flat floor does not. Each scene renders twice — AO on and off — so the only
 //! difference between the frames is the occlusion. Skips without an adapter.
 
@@ -33,14 +33,13 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
     vc.ssr.active = false;
     vc.ssao.active = ssao;
     scene.world.set_post_processing(volume, Some(vc));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(volume, Some(rusty::components::CameraComponent::default()));
     scene
 }
 
-/// Pixels clearly darker in `on` than in `off`, or `None` when no adapter rendered.
 fn darkened(with_crate: bool, tag: &str) -> Option<usize> {
     let cam = Camera::new(Vec3::new(0.0, 2.5, 5.0), -90.0, -20.0);
     let dir = crate::temp::dir();
@@ -72,7 +71,6 @@ fn a_crate_darkens_the_floor_where_it_stands() {
         return;
     };
     eprintln!("[ssao] pixels darkened around the crate: {count}");
-    // The contact band and the crate's lower faces cover well over this of 96².
     assert!(count > 60, "the crate's foot should be occluded: {count}");
 }
 

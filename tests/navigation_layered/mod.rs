@@ -1,10 +1,5 @@
-//! Layered navigation (#454), end to end through the public `NavigationGraph`
-//! surface: stacked floors, a bridge over a walkway, real ramps, agents climbing
-//! between floors, and byte-identical replay. Levels are blocked out from primitive
-//! boxes only, as every engine test level is.
-
 // The bake-time measurements time the bake with the wall clock; the sim under test
-// never reads it. Integration tests sit outside the clock ban's gate (#757).
+// never reads it. Integration tests sit outside the clock ban's gate.
 #![allow(
     clippy::disallowed_methods,
     clippy::disallowed_types,
@@ -22,7 +17,6 @@ use glam::{Quat, Vec3};
 use rusty::navigation::{NavBounds, NavigationGraph, SpanRef};
 use rusty::scene::{ColliderComponent, ColliderShape, Scene};
 
-/// A static box of `size` centred at `center`, turned by `rot`.
 pub fn add_rotated_box(scene: &mut Scene, center: Vec3, size: Vec3, rot: Quat) -> u32 {
     let id = scene.add_entity("box".to_string());
     scene.world.set_static(id, true);
@@ -36,7 +30,6 @@ pub fn add_rotated_box(scene: &mut Scene, center: Vec3, size: Vec3, rot: Quat) -
     id
 }
 
-/// A static box filling the world AABB `min..max`.
 pub fn add_box(scene: &mut Scene, min: Vec3, max: Vec3) -> u32 {
     add_rotated_box(scene, (min + max) * 0.5, max - min, Quat::IDENTITY)
 }
@@ -53,13 +46,11 @@ pub fn add_ramp(scene: &mut Scene, (x0, y0): (f32, f32), (x1, y1): (f32, f32), z
     add_rotated_box(scene, center, size, rot);
 }
 
-/// Bake `scene` over `bounds` at its own settings.
 pub fn bake(scene: &mut Scene, bounds: NavBounds) -> NavigationGraph {
     scene.nav_settings.bounds = Some(bounds);
     NavigationGraph::from_scene(scene)
 }
 
-/// The floor heights along a span path.
 pub fn heights(g: &NavigationGraph, path: &[SpanRef]) -> Vec<f32> {
     path.iter().map(|s| g.spans[s.index as usize].y).collect()
 }

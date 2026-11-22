@@ -1,4 +1,4 @@
-//! API-doc layout gate (#569): `docs/api/` holds one file per Lua namespace, named
+//! API-doc layout gate: `docs/api/` holds one file per Lua namespace, named
 //! after it, and `index.md` links every one. The drift gates read the directory as
 //! one assembled document (`scripting::api_doc`), so a misfiled section would still pass them;
 //! this keeps the split itself honest — `docs/api/Physics.md` documents `Physics`,

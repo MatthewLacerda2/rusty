@@ -1,6 +1,5 @@
-//! Post-FX reads each view's own camera (#1434), Unity URP's camera-stack rule: the
-//! window uses its screen stack's base camera, a render texture its own camera, and
-//! neither depends on which camera entity was created first.
+//! Post-FX reads each view's own camera (Unity URP's camera-stack rule): the window
+//! its screen stack's base camera, a render texture its own, regardless of creation order.
 
 use crate::temp::dir;
 use glam::Vec3;
@@ -18,9 +17,7 @@ fn graded(saturation: f32) -> PostProcessingComponent {
     vc
 }
 
-/// The PiP scene with the screen's own camera carrying a grey grade and the
-/// render-texture camera a full-colour one; `main_first` creates the screen's camera
-/// before the render-texture camera rather than after.
+/// PiP scene: grey-graded screen camera, full-colour render-texture camera.
 fn grey_window_colour_pip(main_first: bool) -> Scene {
     let mut scene = pip_scene(None);
     let mut add = |name: &str, target: Option<RenderTarget>, saturation: f32| {

@@ -1,4 +1,4 @@
-//! A `nil` entity id across the API (#1383): every read answers what it answers
+//! A `nil` entity id across the API: every read answers what it answers
 //! for a missing entity, and every write raises an error naming its verb, never a
 //! `u32` conversion message. One `api::EntityArg` decides it for every binding.
 

@@ -1,5 +1,5 @@
 //! What `Scene::hit_react` hands the impulse to, how it cleans its options, and
-//! what a full-body ragdoll tracks (#1895).
+//! what a full-body ragdoll tracks.
 
 use glam::Vec3;
 use rusty::scene::skeleton::{Drive, HitReact};

@@ -1,4 +1,4 @@
-//! `Editor.*` in the headless harness (#1360): a standalone run has no edit mode, so
+//! `Editor.*` in the headless harness: a standalone run has no edit mode, so
 //! `Editor.ExitPlay()` is refused and the run keeps playing.
 
 use rusty::dev::harness::Harness;

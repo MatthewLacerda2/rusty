@@ -1,4 +1,4 @@
-//! `query_triggers = false` doesn't pass through a character (#1720): its capsule
+//! `query_triggers = false` doesn't pass through a character: its capsule
 //! replaces its Collider and stays solid, whatever that Collider's `is_trigger` says.
 
 use std::cell::RefCell;

@@ -1,8 +1,6 @@
-//! A polished surface under a `Baked` spot (#1996): the issue's black granite
-//! counter (roughness 0.06) a metre under a spot, baked at 8 texels a unit. Its
-//! baked highlight, seen close enough that one lightmap texel covers most of the
-//! frame, is the live lamp's: round and smooth, where a direction page off by a
-//! few degrees a texel (BC7's) drew it as a sawtooth blot of texel-sized steps.
+//! A polished black granite counter (roughness 0.06) a metre under a `Baked` spot, 8 texels a
+//! unit. Its baked highlight, with one texel covering most of the frame, is the live lamp's:
+//! round and smooth, where a direction page off by a few degrees a texel (BC7) drew a sawtooth.
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -12,7 +10,6 @@ use rusty::scene::{Camera, Scene};
 
 use super::{bake, lamp, mean_gap, most, plane, point, shot};
 
-/// A 3 m static counter of polished black granite a metre under a spot of `mode`.
 fn counter(mode: LightMode) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -42,8 +39,6 @@ fn counter(mode: LightMode) -> Scene {
     scene
 }
 
-/// `scene` baked at the issue's 8 texels a unit (`directional` or not), then shot
-/// through a long lens at the spot's mirror image, 0.53 m off its foot.
 fn baked(mut scene: Scene, name: &str, directional: bool) -> Option<Vec<f32>> {
     bake(&mut scene, name, directional, 8.0);
     let mut camera = Camera::new(Vec3::new(-1.0, 0.9, 0.0), 0.0, -62.2);

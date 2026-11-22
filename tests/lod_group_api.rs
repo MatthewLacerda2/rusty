@@ -1,4 +1,4 @@
-//! Integration coverage for the `LODGroup` namespace (#472): every setter writes
+//! Integration coverage for the `LODGroup` namespace: every setter writes
 //! through the shared ops (ordered, clamped, out-of-range levels ignored), the
 //! getters read it back, the component is addable by name and survives a scene
 //! save → load, and its renderer slots are recognised as entity references.

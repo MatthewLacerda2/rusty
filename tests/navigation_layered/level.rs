@@ -1,6 +1,3 @@
-//! A CS:GO-sized test level (#454): ~200 m square, three walkable levels, blocked out
-//! from primitive boxes, slabs and tilted-box ramps only (no detailed geometry).
-//!
 //! A 5 × 5 grid of two-storey blocks, 24 m square each, 40 m apart: a first floor at
 //! y = 4 over the whole footprint, a roof at y = 8 over its east half, four corner
 //! pillars, a ramp from the street to the first floor and one from the first floor
@@ -13,14 +10,12 @@ use rusty::scene::Scene;
 
 use super::{add_box, add_ramp};
 
-/// The level's XZ extent.
 pub const BOUNDS: NavBounds = NavBounds::new(0.0, 200.0, 0.0, 200.0);
 
-/// Build the level into a fresh scene.
 pub fn build() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
-    scene.nav_settings.max_step = 0.5; // built for a 0.5 m step (#2001 lowered the default)
+    scene.nav_settings.max_step = 0.5; // built for a 0.5 m step
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.5, 0.0),
@@ -35,7 +30,6 @@ pub fn build() -> Scene {
         let z = 37.0 + 40.0 * row as f32;
         for seg in 0..5 {
             let x = 40.0 * seg as f32;
-            // A 34 m wall, then a 6 m doorway.
             add_box(
                 &mut scene,
                 Vec3::new(x, 0.0, z),
@@ -58,7 +52,6 @@ pub fn build() -> Scene {
     scene
 }
 
-/// One two-storey block with its south-west corner at `(ox, oz)`.
 fn block(scene: &mut Scene, ox: f32, oz: f32) {
     let floor1 = (Vec3::new(ox, 3.8, oz), Vec3::new(ox + 24.0, 4.0, oz + 24.0));
     add_box(scene, floor1.0, floor1.1);

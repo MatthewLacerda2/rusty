@@ -1,4 +1,4 @@
-//! Integration coverage for the `Text` namespace (#419): setters write through the
+//! Integration coverage for the `Text` namespace: setters write through the
 //! shared ops (validation included), the layout reads answer from the CPU layout
 //! in the element's rect, and the component survives a scene save → load.
 

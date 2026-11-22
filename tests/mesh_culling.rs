@@ -1,4 +1,4 @@
-//! A mesh's small-object cull (#1714) read from Lua: `Component.Get` reports `0`
+//! A mesh's small-object cull read from Lua: `Component.Get` reports `0`
 //! for a setting the file leaves out, as `Mesh.Get*` does, so a script compares it
 //! without a nil check.
 

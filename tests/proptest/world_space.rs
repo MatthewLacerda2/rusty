@@ -1,4 +1,4 @@
-//! Property tests for the world-space store and API (#1170), over random hierarchies up
+//! Property tests for the world-space store and API, over random hierarchies up
 //! to depth 4 with uniform, non-uniform, one-mirrored-axis, one-zero-axis and Dust2-size
 //! scales. Seeded (`RngSeed::Fixed`), so every run draws the same cases.
 

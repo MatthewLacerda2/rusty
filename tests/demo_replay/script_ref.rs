@@ -1,6 +1,6 @@
 //! A scenario's `Scene.GetScript` handle writes a live script's field and calls
 //! its function in the gameplay VM; the demo notes both and its replay makes
-//! them again, bit for bit (#2120). Unrecorded, each one stops the bot chasing
+//! them again, bit for bit. Unrecorded, each one stops the bot chasing
 //! the player only on the recording, and the replay diverges.
 
 use rusty::dev::demo::{self, Demo, Destination, Replayer, Verdict};

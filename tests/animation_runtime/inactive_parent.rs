@@ -1,4 +1,4 @@
-//! The issue's holstered weapon (#1363): a pivot holding two skinned, animated,
+//! The issue's holstered weapon: a pivot holding two skinned, animated,
 //! scripted children. Deactivating the pivot stops both Animators and both scripts
 //! (each gets `OnDisable`) while the children's own flags stay on; reactivating it
 //! brings them back with `OnEnable`.

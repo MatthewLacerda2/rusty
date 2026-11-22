@@ -1,4 +1,4 @@
-//! Material library (#201): materials are reusable assets in the scene's library,
+//! Material library: materials are reusable assets in the scene's library,
 //! entities reference one by name. Covers sharing and round-trip.
 
 mod api_parity;

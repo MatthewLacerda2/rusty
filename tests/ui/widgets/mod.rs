@@ -1,7 +1,3 @@
-//! The widget kit (#422) end to end: widgets built by `create_ui` (the Create ▸ UI
-//! path), run as their engine Lua scripts in a real Play session, and driven only
-//! through the player's input path — `UI.Click`, injected keys, mouse and text.
-
 mod button_toggle;
 mod create;
 mod dropdown;
@@ -23,15 +19,12 @@ use rusty::script::scripting::ConsoleLogs;
 const DT: f32 = 1.0 / 60.0;
 const SCREEN_H: f32 = 1080.0;
 
-/// A 1920×1080 Play session over a scene `build` populated.
 pub struct Ui {
     pub game: GameWorld,
     console: Rc<RefCell<ConsoleLogs>>,
 }
 
 impl Ui {
-    /// Seed the widget scripts, build the scene, enter Play with a free cursor, and
-    /// run one tick so every widget has woken.
     pub fn new(build: impl FnOnce(&mut Scene)) -> Self {
         widgets::seed();
         let mut scene = Scene::new();
@@ -60,7 +53,6 @@ impl Ui {
         }
     }
 
-    /// `UI.Click(id)`, then a tick for it to land.
     pub fn click(&mut self, id: u32) {
         assert_eq!(
             self.eval(&format!("UI.Click({id})")),
@@ -70,7 +62,6 @@ impl Ui {
         self.tick(1);
     }
 
-    /// Press a key for one tick, then release it.
     pub fn key(&mut self, key: &str) {
         self.eval(&format!("Input.Press('{key}')"));
         self.tick(1);
@@ -83,7 +74,6 @@ impl Ui {
         self.eval(&format!("Input.MoveMouse({x}, {})", SCREEN_H - y));
     }
 
-    /// Drag with the left button from `from` to `to` in `steps` ticks.
     pub fn drag(&mut self, from: (f32, f32), to: (f32, f32), steps: usize) {
         self.pointer(from.0, from.1);
         self.tick(1);
@@ -107,14 +97,12 @@ impl Ui {
         (v[0], v[1], v[2], v[3])
     }
 
-    /// Lines the widgets' owner scripts printed, prefixed `[w]`.
     pub fn log(&self) -> Vec<String> {
         let c = self.console.borrow();
         let lines = c.messages.iter().map(|m| m.0.clone());
         lines.filter(|m| m.starts_with("[w]")).collect()
     }
 
-    /// Console errors, for a failing assertion's message.
     pub fn errors(&self) -> Vec<String> {
         let c = self.console.borrow();
         let lines = c.messages.iter().map(|m| m.0.clone());
@@ -122,12 +110,10 @@ impl Ui {
     }
 }
 
-/// Create `kind` under the scene's canvas (made on first use).
 pub fn widget(scene: &mut Scene, kind: UiWidget) -> u32 {
     create_ui(scene, kind, None)
 }
 
-/// The child of `id` at name path `path`.
 pub fn part(scene: &Scene, id: u32, path: &str) -> u32 {
     let mut at = id;
     for seg in path.split('/') {

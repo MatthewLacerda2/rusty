@@ -1,15 +1,7 @@
-//! Normal-map + emissive-map visual test (issue #207): proves the renderer SAMPLES a
-//! material's `normal_map`/`emissive_map` through the per-entity material bind group
-//! (the two map no-ops #178 guarded), building on the #202 path. Light-independent
-//! signals on an up-facing ambient-lit plane:
-//!   - Emissive: factor [1,1,1] modulated by a WHITE map (`*1`, glow kept) vs a BLACK
-//!     map (`*0`, glow cancelled) — white-mapped is brighter.
-//!   - Normal: flat map [128,128,255] (tangent +Z, N stays +Y) vs sideways map
-//!     [255,128,128] (tangent +X, N rotated into the plane, N.y drops) — the flat one
-//!     reads more of the ambient sky pole, so it is brighter. Proves TBN perturbation.
-//!
-//! No GPU/software adapter: `capture` returns `Ok(false)` and the test passes without
-//! asserting (matching `material_maps_screenshot.rs`).
+//! The renderer samples `normal_map`/`emissive_map`. Signals on an up-facing
+//! ambient-lit plane: a white emissive map out-glows a black one; a flat normal map
+//! reads more of the ambient sky pole than a sideways one (TBN perturbation).
+//! Skips without an adapter.
 
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;
@@ -19,7 +11,6 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, PostProcessingComponent, Scene};
 
-/// Write a 2x2 solid-RGB PNG (alpha 255).
 fn write_png(path: &std::path::Path, rgb: [u8; 3]) {
     let mut img = image::RgbaImage::new(2, 2);
     for px in img.pixels_mut() {
@@ -55,14 +46,13 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     s.world.set_mesh(id, Some(mesh));
     s.world.set_material(id, Some(mat));
     s.world.set_post_processing(id, Some(vc()));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     s.world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));
     s.materials.insert("mat".to_string(), material);
     s
 }
 
-/// Camera looking straight down at the plane from above.
 fn top_cam() -> Camera {
     Camera::new(Vec3::new(0.0, 12.0, 0.0), 0.0, -90.0)
 }

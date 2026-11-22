@@ -1,4 +1,4 @@
-//! Local avoidance through a choke (#463): eight agents funnel through a door two
+//! Local avoidance through a choke: eight agents funnel through a door two
 //! agents wide without overlapping, all arrive, and a replay is bit-identical.
 
 use glam::Vec3;

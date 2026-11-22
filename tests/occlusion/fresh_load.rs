@@ -1,4 +1,4 @@
-//! A fingerprint is what the bake reads and nothing else (#1958): a scene loaded
+//! A fingerprint is what the bake reads and nothing else: a scene loaded
 //! straight after its own bake matches it, however the bake's process differed
 //! from the one loading it.
 
@@ -13,7 +13,7 @@ use rusty::scene::{MaterialAsset, MaterialComponent, Scene};
 /// The case from the game: every static mesh draws with `"wood"`, which the
 /// scene file's library lacks (the game's script defines it). A headless run
 /// defines it in memory, bakes and writes the PVS; a fresh load, the editor's,
-/// never ran that script. Before #1958 every baked mesh read as changed.
+/// never ran that script.
 #[test]
 fn a_fresh_load_matches_a_bake_that_defined_a_material_in_memory() {
     let dir = crate::temp::dir().join("occlusion_fresh_load");

@@ -1,4 +1,4 @@
-//! The mixer verbs (#465), driven as a script drives them, read back headlessly.
+//! The mixer verbs, driven as a script drives them, read back headlessly.
 
 use super::{fixture, register};
 use mlua::Lua;

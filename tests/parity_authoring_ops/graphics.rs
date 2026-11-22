@@ -1,5 +1,3 @@
-//! `Graphics.*` bindings vs `authoring::{rendering::post_processing, rendering::camera}`.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +11,6 @@ use rusty::edit::authoring::{
 use rusty::scene::Scene;
 use rusty::script::api::bind;
 
-/// A scene with one active post-FX volume + active camera; returns `(scene_rc, id)`.
 fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("PostFx".to_string());
@@ -35,7 +32,6 @@ fn scene_with_volume_and_cam() -> (Rc<RefCell<Scene>>, u32) {
     (Rc::new(RefCell::new(scene)), id)
 }
 
-/// Apply the same writes the `Graphics.*` script does, via the shared ops directly.
 fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     let mut sc = scene.borrow_mut();
     {
@@ -70,7 +66,6 @@ fn apply_graphics_ops(scene: &Rc<RefCell<Scene>>, id: u32) {
     camera_ops::set_taa_active(&mut cam, true);
 }
 
-/// The `Graphics.*` writes the parity test drives, mirrored by `apply_graphics_ops`.
 const GRAPHICS_SCRIPT: &str = r#"
 Graphics.SetBloomActive(true)
 Graphics.SetBloomIntensity(-3.0)
@@ -105,9 +100,6 @@ assert(Graphics.GetTaaActive())
 
 #[test]
 fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    // `Graphics.*` drives the active entity's post-processing + camera-motion-blur
-    // through the SAME ops the editor cards call. We run the bindings against one
-    // scene and the ops against a second cloned scene, then compare the components.
     let (lua_scene, lua_id) = scene_with_volume_and_cam();
     let (op_scene, op_id) = scene_with_volume_and_cam();
     let quality = Rc::new(RefCell::new(GraphicsSettings::default()));
@@ -129,7 +121,6 @@ fn graphics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error
     let os = op_scene.borrow();
     let lvc = ls.world.post_processing(lua_id).unwrap().clone();
     let ovc = os.world.post_processing(op_id).unwrap().clone();
-    // Every field, through `Debug`: the two paths must leave identical components.
     assert_eq!(format!("{lvc:?}"), format!("{ovc:?}"));
     assert_eq!(lvc.bloom.intensity, 0.0, "single-sourced clamp");
     assert_eq!(lvc.tonemapping.display_gamma, 0.01, "single-sourced clamp");

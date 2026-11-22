@@ -1,4 +1,4 @@
-//! Soft, lit and mesh particles (#440): a soft sprite touching a wall fades into
+//! Soft, lit and mesh particles: a soft sprite touching a wall fades into
 //! it, a lit sprite is dark without light and brightens beside a point light, and
 //! a mesh particle draws its mesh with its material — counted as a particle.
 

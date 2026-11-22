@@ -1,4 +1,4 @@
-//! The gamepad half of `Input` (#471) against a bare `InputState`: injected axes and
+//! The gamepad half of `Input` against a bare `InputState`: injected axes and
 //! pad buttons reach Lua with per-tick edges, and the pad records (connection, dead
 //! zones, rumble) read back what was written.
 

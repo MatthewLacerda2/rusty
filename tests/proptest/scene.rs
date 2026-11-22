@@ -1,15 +1,6 @@
-//! Property-based scene round-trip tests (#123). Distinct from the example-based
-//! `scene_roundtrip.rs`: here proptest generates thousands of arbitrary scenes and
-//! asserts save -> load preserves their values, shrinking any counterexample to a
-//! minimal failing case. Generators are seeded by proptest (no wall-clock), so the
-//! determinism contract holds.
-
 use proptest::prelude::*;
 use rusty::scene::{LightComponent, Scene};
 
-/// One generated entity: a name, a position, and an optional Light component
-/// carrying a generated intensity. Kept small and finite (bounded coords/intensity)
-/// so the generated scenes are always valid documents the save/load path accepts.
 #[derive(Clone, Debug)]
 struct EntitySpec {
     name: String,
@@ -38,9 +29,6 @@ fn tmp(tag: u64) -> String {
 }
 
 proptest! {
-    /// For any generated scene, save -> load reproduces every entity's name,
-    /// position, and light intensity exactly (positions are finite, so bitwise-equal
-    /// after the JSON round-trip).
     #[test]
     fn save_load_preserves_generated_entities(
         specs in prop::collection::vec(entity_spec(), 0..12),

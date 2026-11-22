@@ -1,4 +1,4 @@
-//! Per-bone hitboxes end to end (#464): a ray names the bone it struck on a posed
+//! Per-bone hitboxes end to end: a ray names the bone it struck on a posed
 //! character, a shot fired in `Update` hits the arm where the animation put it
 //! that frame, and a CharacterController walks through hitboxes.
 
@@ -13,7 +13,6 @@ use rusty::components::CharacterControllerComponent;
 use rusty::physics::{self, PhysicsWorld};
 use rusty::scene::Scene;
 
-/// The bone a +Z ray at height `y`, offset `x` from the rig, strikes.
 fn bone_hit(scene: &Scene, physics: &PhysicsWorld, x: f32, y: f32) -> Option<(u32, u32)> {
     let hit = physics.raycast_hit(Vec3::new(x, y, -5.0), Vec3::Z, 20.0, |_| true)?;
     Some((scene.hit_bone(hit.id)?, scene.root_of(hit.id)))
@@ -73,7 +72,6 @@ fn a_shot_in_update_hits_the_arm_where_the_animation_put_it() {
     crate::play::attach_script(&mut scene, rig, "rusty_464_shooter.lua", SHOOTER);
     let scene = Rc::new(RefCell::new(scene));
     let mut gw = crate::play::playing(scene.clone(), 5.0);
-    // The arm moves 0.1 a tick, twice its hitbox radius.
     crate::play::run(&mut gw, 40);
     let s = scene.borrow();
     let tally = s
@@ -94,8 +92,6 @@ fn a_shot_in_update_hits_the_arm_where_the_animation_put_it() {
     );
 }
 
-/// Walk a CharacterController +X straight through the rig's torso; returns where
-/// it ended.
 fn walk_through(scene: &mut Scene) -> f32 {
     let cc = scene.add_entity("Walker".to_string());
     scene.world.transform_mut(cc).unwrap().position = Vec3::new(-2.0, 1.1, 0.0);

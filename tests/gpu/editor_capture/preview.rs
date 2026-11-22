@@ -1,4 +1,4 @@
-//! The Inspector's Preview tab in a capture (#2239): `--preview` opens it and the
+//! The Inspector's Preview tab in a capture: `--preview` opens it and the
 //! capture renders its image through the window's own call, so the tab shows a
 //! frame, not the neutral fill it shows before one exists.
 

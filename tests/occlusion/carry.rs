@@ -1,4 +1,4 @@
-//! A runtime level load that carries an entity (#1714): the incoming walls whose
+//! A runtime level load that carries an entity: the incoming walls whose
 //! ids the carried one holds move, and the level's PVS moves with them, so culling
 //! stays on for the level.
 

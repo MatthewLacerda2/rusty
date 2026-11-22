@@ -1,7 +1,5 @@
-//! A rough dielectric under a `Baked` spot (#1996): the issue's bar-stool seat
-//! (black leather, albedo 0.03, roughness 0.55) under a spot 1.35 m up. Its baked
-//! lobe is the live lamp's: the frame matches the same spot `Mixed`, and changing
-//! the seat's roughness or albedo changes the baked frame as it changes the live one.
+//! A rough dielectric (black leather, albedo 0.03, roughness 0.55) under a `Baked` spot 1.35 m up:
+//! the frame matches the same spot `Mixed`, and roughness or albedo change both alike.
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -11,7 +9,6 @@ use rusty::scene::{Camera, Scene};
 
 use super::{bake, lamp, mean_gap, most, plane, point, shot, DENSITY};
 
-/// A 3 m static seat of `albedo` and `roughness` under the issue's spot, of `mode`.
 pub(super) fn seat(mode: LightMode, albedo: f32, roughness: f32) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -35,13 +32,11 @@ pub(super) fn seat(mode: LightMode, albedo: f32, roughness: f32) -> Scene {
     scene
 }
 
-/// The seat from a standing guest's side, the spot's mirror image in view.
 fn camera() -> Camera {
     Camera::new(Vec3::new(-1.5, 1.0, 0.0), 0.0, -45.0)
 }
 
-/// The seat with its spot `Baked` (a directional bake: its lobe) and `Mixed` (a
-/// plain bake: the live lamp), as luminance.
+/// `Baked` (directional bake) and `Mixed` (plain bake: the live lamp), as luminance.
 fn pair(albedo: f32, roughness: f32, tag: &str) -> Option<[Vec<f32>; 2]> {
     let mut baked = seat(LightMode::Baked, albedo, roughness);
     bake(&mut baked, &format!("stool_{tag}_baked"), true, DENSITY);
@@ -54,7 +49,6 @@ fn pair(albedo: f32, roughness: f32, tag: &str) -> Option<[Vec<f32>; 2]> {
     ])
 }
 
-/// How much brighter `a` is than `b`, summed over the frame.
 fn gain(a: &[f32], b: &[f32]) -> f32 {
     a.iter().zip(b).map(|(a, b)| a - b).sum()
 }

@@ -1,4 +1,4 @@
-//! Scene builders for the soft/shaped mask and backdrop screenshots (#426, #428):
+//! Scene builders for the soft/shaped mask and backdrop screenshots:
 //! a 128-unit overlay canvas at one unit per pixel, placed UI elements, a soft
 //! circle sprite written to disk, and the minimap's render-texture camera.
 
@@ -12,7 +12,6 @@ use rusty::scene::{Camera, Scene};
 
 pub const SIZE: u32 = 128;
 
-/// An overlay canvas at one reference unit per pixel on a `SIZE` shot.
 pub fn overlay(scene: &mut Scene) -> u32 {
     let root = scene.add_entity("Canvas".to_string());
     let canvas = CanvasComponent {
@@ -23,8 +22,6 @@ pub fn overlay(scene: &mut Scene) -> u32 {
     root
 }
 
-/// A solid `color` Image under `parent` at `rect` = `[x, y, w, h]` (bottom-left
-/// anchored, reference units = pixels).
 pub fn element(scene: &mut Scene, parent: u32, rect: [f32; 4], color: Vec4) -> u32 {
     let id = scene.add_entity("E".to_string());
     let rt = RectTransformComponent {
@@ -45,8 +42,7 @@ pub fn element(scene: &mut Scene, parent: u32, rect: [f32; 4], color: Vec4) -> u
     id
 }
 
-/// A white disc filling a `size`² sprite whose alpha falls from 1 to 0 over its
-/// outer `soft` texels — written once per test process, returned as its path.
+/// A white disc sprite whose alpha falls from 1 to 0 over its outer `soft` texels.
 pub fn soft_circle(size: u32, soft: f32) -> String {
     let path = crate::temp::dir().join(format!("rusty_circle_{size}_{soft}.png"));
     let r = size as f32 / 2.0;
@@ -59,7 +55,6 @@ pub fn soft_circle(size: u32, soft: f32) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// Make `id` a Mask whose graphic only shapes the clip.
 pub fn hidden_mask(scene: &mut Scene, id: u32) {
     let mask = MaskComponent {
         show_mask_graphic: false,
@@ -67,9 +62,8 @@ pub fn hidden_mask(scene: &mut Scene, id: u32) {
     scene.world.set_mask(id, Some(mask));
 }
 
-/// A camera 0.5 m from a red box's face, so its whole `"rt:minimap"` is red,
-/// beside a screen camera looking away (`screen_camera`). Built on the
-/// render-texture screenshot's scene, with its own picture-in-picture removed.
+/// A camera 0.5 m from a red box's face, so `"rt:minimap"` is red, beside a screen camera
+/// looking away (`screen_camera`).
 pub fn minimap_world() -> Scene {
     use super::super::render_texture_scene::pip_scene;
     let mut scene = pip_scene(Some(RenderTarget::new("minimap", 64, 64)));
@@ -83,8 +77,6 @@ pub fn minimap_world() -> Scene {
     scene
 }
 
-/// Render `scene` from `cam` at `SIZE`²: the image (PNG rows top-down) and the
-/// frame's counters, or `None` without an adapter.
 pub fn shoot(
     scene: &Scene,
     cam: &Camera,
@@ -106,7 +98,6 @@ pub fn shoot(
     Some((img, counters))
 }
 
-/// Pixel `(x, y)` of a [`SIZE`]-square capture, `y` up from the bottom row.
 pub fn px(img: &image::RgbImage, x: u32, y: u32) -> [u8; 3] {
     img.get_pixel(x, SIZE - 1 - y).0
 }

@@ -1,4 +1,4 @@
-//! The cast options (#1720): `max_distance` and `query_triggers` on the single
+//! The cast options: `max_distance` and `query_triggers` on the single
 //! casts, `query_triggers` on the multi-hit and volume queries, and
 //! `RaycastAllNonAlloc` refilling the caller's table without allocating.
 //!

@@ -1,4 +1,4 @@
-//! Script timers and coroutines end to end (#444): through the real play schedule
+//! Script timers and coroutines end to end: through the real play schedule
 //! (the harness steps `GameWorld::tick`), an `Invoke`, an `InvokeRepeating` and a
 //! `WaitForSeconds` coroutine fire on fixed ticks, and two runs print the same
 //! lines. Gated on `dev`, like the harness itself.

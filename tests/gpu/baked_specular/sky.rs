@@ -1,8 +1,6 @@
-//! A sky in the bake (#1695's review). An even sky over a dark ground lights a wall
-//! from above more than from below: its texels are directional (about 0.79) with no
-//! lamp anywhere, and the lobe once took that for a light, putting a highlight near
-//! 14x the sky on a glossy metal wall. The lamp share makes the sky give none, and a
-//! lamp under the sky keeps its own.
+//! A sky in the bake: an even sky lights a wall more from above than below, so its texels are
+//! directional (about 0.79) with no lamp; the lobe once took that for a light, a highlight near
+//! 14x the sky on glossy metal. The lamp share makes the sky give none; a lamp keeps its own.
 
 use glam::{Quat, Vec3};
 use rusty::components::MaterialAsset;
@@ -11,13 +9,11 @@ use rusty::scene::{Camera, Scene};
 use super::highlight::{agree, highlights};
 use super::{bake, most, plane, scene, shot};
 
-/// `scene`'s ambient as an even sky of `radiance`, over its black skybox.
 pub(super) fn sky(scene: &mut Scene, radiance: f32) {
     scene.ambient_color = Vec3::ONE;
     scene.ambient_intensity = radiance;
 }
 
-/// A dark 15 m ground and a glossy metal wall facing -X, 3 m a side, under a sky.
 fn wall_under_sky() -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);

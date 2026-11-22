@@ -1,13 +1,8 @@
-//! The bundled Player controller (#748): Space jumps — grounded only, on the rising
-//! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press,
-//! delivering the shot through `Damage.ApplyPoint` (#1893).
-
 use rusty::dev::botplayer::attach_player_bot;
 use rusty::dev::harness::Harness;
 
 use crate::play::eval;
 
-/// The Player's height, read through the same API the scripts use.
 fn player_y(h: &Harness) -> f32 {
     let y = "local _, y = Transform.GetPosition(Scene.FindEntityByName('Player')); return y";
     eval(h, y).parse().expect("a number")
@@ -21,7 +16,6 @@ fn release(h: &Harness, key: &str) {
     h.world.borrow().input().borrow_mut().release(key);
 }
 
-/// A harness with no enemy brain, stepped until the Player rests on the floor.
 fn settled(name: &str) -> (Harness, f32) {
     let h = Harness::new(crate::temp::dir().join(name), "");
     h.step(60);
@@ -34,7 +28,6 @@ fn settled(name: &str) -> (Harness, f32) {
     (h, ground)
 }
 
-/// Step `ticks` frames, returning the highest the Player rose above `ground`.
 fn apex_over(h: &Harness, ground: f32, ticks: u32) -> f32 {
     let mut apex = f32::MIN;
     for _ in 0..ticks {
@@ -70,8 +63,8 @@ fn no_double_jump_mid_air() {
     assert!((player_y(&h) - ground).abs() < 0.05, "back on the floor");
 }
 
-/// Drives the bundled controller (the harness workspace's copy, #782), counting the
-/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life (#1709), so the
+/// Drives the bundled controller (the harness workspace's copy), counting the
+/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life, so the
 /// wrap is laid once, in `Start`.
 const SHOT_PROBE: &str = r#"
 local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")

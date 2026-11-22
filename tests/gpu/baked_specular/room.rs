@@ -1,8 +1,6 @@
-//! Light that bounces (#1695's review). A `Mixed` spot's bounce off the floor reaches
-//! a glossy ceiling from one small patch, directional (about 0.97) though no `Baked`
-//! lamp lights it: no lobe. A `Baked` lamp in a room of bright walls supplies only
-//! part of a texel's light, the walls the rest: its lobe still aims at the lamp, and
-//! its highlight sits where the live lamp's does.
+//! Light that bounces. A `Mixed` spot's floor bounce reaches a glossy ceiling directional
+//! (about 0.97) though no `Baked` lamp lights it: no lobe. A `Baked` lamp among bright walls
+//! supplies only part of a texel's light: its lobe still aims at the lamp.
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -29,8 +27,6 @@ fn glossy() -> MaterialAsset {
     }
 }
 
-/// A 4 x 4 m room 2.5 m high, every face inward, under a black sky: `floor` and
-/// `ceiling` of the given materials, the walls white.
 fn room(floor: MaterialAsset, ceiling: MaterialAsset) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -67,7 +63,6 @@ fn room(floor: MaterialAsset, ceiling: MaterialAsset) -> Scene {
     scene
 }
 
-/// `scene` baked (`directional` or not) under `name`, then shot from `camera`.
 fn baked(mut scene: Scene, camera: &Camera, name: &str, directional: bool) -> Option<Vec<f32>> {
     bake(&mut scene, name, directional, super::DENSITY);
     shot(&scene, camera, name)

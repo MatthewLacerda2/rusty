@@ -1,4 +1,4 @@
-//! Thin translucency (#1523, HDRP's thin *Translucent* type): an opaque leaf-green
+//! Thin translucency (HDRP's thin *Translucent* type): an opaque leaf-green
 //! card with the sun behind it is dark on the side the camera sees, until its
 //! transmission lets the sunlight through.
 

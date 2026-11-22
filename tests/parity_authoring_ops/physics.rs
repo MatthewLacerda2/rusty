@@ -58,7 +58,7 @@ fn physics_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>
 }
 
 /// `SetMass` clamps through the op the card uses; `SetUseGravity` / `SetTrigger`
-/// write through theirs and the getters read them back (#1365).
+/// write through theirs and the getters read them back.
 #[test]
 fn mass_gravity_and_trigger_reach_their_ops() -> Result<(), Box<dyn std::error::Error>> {
     let scene = Rc::new(RefCell::new(Scene::new()));

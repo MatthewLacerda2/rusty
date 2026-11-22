@@ -1,4 +1,4 @@
-//! A custom ui shader on a world canvas (#427): the graphic draws through the
+//! A custom ui shader on a world canvas: the graphic draws through the
 //! variant's world pipeline — a hologram recolours white to blue — and a RectMask
 //! still cuts it at the mask's edge, per fragment, like any other world graphic.
 

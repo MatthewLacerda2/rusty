@@ -1,9 +1,3 @@
-//! A ragdoll under a mirroring parent (#1119): the rig scaled −1 on X, the way a
-//! mirrored left/right rig is often built. When physics takes over every limb
-//! starts where the Animator left it, and a body physics turns turns its bone
-//! the same way. Before the fix the bone turned the mirror of the way its body
-//! did, and its hitbox drifted off its own collider.
-
 use glam::{Quat, Vec3};
 use rusty::physics::PhysicsWorld;
 use rusty::scene::skeleton::RagdollOptions;
@@ -11,7 +5,6 @@ use rusty::scene::Scene;
 
 use super::rig;
 
-/// The X mirror, as a scale.
 const MIRROR: Vec3 = Vec3::new(-1.0, 1.0, 1.0);
 
 /// The rig with a bent arm and leg (a bone with no rotation looks the same in
@@ -37,9 +30,6 @@ fn ragdolled(scale: Vec3) -> (Scene, Vec<u32>) {
     (scene, made.into_iter().map(|(_, bone)| bone).collect())
 }
 
-/// [`ragdolled`] mirrored, with gravity off; its left forearm and shin pushed
-/// along `push`, stepped for `frames`. The scene, its physics and every ragdoll
-/// bone's (name, hitbox).
 fn pushed(push: Vec3, frames: usize) -> (Scene, PhysicsWorld, Vec<(String, u32)>) {
     let (mut scene, bones) = ragdolled(MIRROR);
     let rig = scene.find_entity_by_name("Rig").unwrap();
@@ -91,15 +81,12 @@ fn the_first_physics_frame_keeps_a_mirrored_limbs_world_pose() {
     }
 }
 
-/// The world X axis of `bone`'s joint frame as physics built it.
 fn joint_world_x(world: &PhysicsWorld, bone: u32) -> Vec3 {
     world.joint_world_frame(bone).unwrap() * Vec3::X
 }
 
-/// Each mirrored joint's world X is `dir × bend` on the mirrored bones (#1125):
-/// the bone direction reflects and the bend (forward, +Z) doesn't, so it is the
-/// unmirrored joint's X seen as a pseudovector, `−F·x`. Before the fix, the axes
-/// came back reflected and every knee flexed about the wrong sense.
+/// Each mirrored joint's world X is `dir × bend` on the mirrored bones:
+/// the bone direction reflects and the bend (forward, +Z) does not.
 #[test]
 fn a_mirrored_ragdolls_joint_axes_are_the_mirror_image() {
     let (plain, plain_bones) = ragdolled(Vec3::ONE);

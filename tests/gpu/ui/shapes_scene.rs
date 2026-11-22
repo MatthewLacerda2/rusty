@@ -1,6 +1,5 @@
-//! The look scene the shape screenshot test renders (#425): SDF shapes, a
-//! gradient, effects and the blend modes on a canvas whose reference resolution
-//! equals the shot (one reference unit = one pixel), over a black backdrop.
+//! The look scene the shape screenshot test renders: SDF shapes, a gradient, effects and the
+//! blend modes on a canvas at one reference unit per pixel, over black.
 
 use glam::{Vec2, Vec4};
 use rusty::components::{
@@ -11,7 +10,6 @@ use rusty::scene::Scene;
 
 pub const SIZE: u32 = 256;
 
-/// A shape of `color` with the rest of its settings from `f`.
 fn shape(color: [f32; 4], f: impl FnOnce(&mut ShapeComponent)) -> ShapeComponent {
     let mut s = ShapeComponent {
         color: Vec4::from_array(color),
@@ -21,7 +19,6 @@ fn shape(color: [f32; 4], f: impl FnOnce(&mut ShapeComponent)) -> ShapeComponent
     s
 }
 
-/// A bottom-left-anchored element with rect `[x, y, width, height]` under `parent`.
 fn at(scene: &mut Scene, parent: u32, r: [f32; 4]) -> u32 {
     let id = scene.add_entity("E".to_string());
     let rt = RectTransformComponent {
@@ -42,7 +39,6 @@ fn put(scene: &mut Scene, root: u32, r: [f32; 4], s: ShapeComponent) {
     scene.world.set_shape(id, Some(s));
 }
 
-/// The scene: see `ui_shapes_screenshot` for what each element proves.
 pub fn shapes() -> Scene {
     let mut scene = Scene::new();
     let root = scene.add_entity("Canvas".to_string());
@@ -63,8 +59,6 @@ pub fn shapes() -> Scene {
     scene
 }
 
-/// Row 1: a chamfered red rect with a hard yellow shadow, a rounded green rect, a
-/// blue ring; row 2: a white quarter pie.
 fn add_primitives(scene: &mut Scene, root: u32) {
     let chamfer = shape([1.0, 0.0, 0.0, 1.0], |s| {
         s.corner = ShapeCorner::Chamfer;
@@ -90,7 +84,6 @@ fn add_primitives(scene: &mut Scene, root: u32) {
     put(scene, root, [16.0, 96.0, 64.0, 64.0], pie);
 }
 
-/// Row 2: a red → blue gradient bar, a dashed white line and a glowing white square.
 fn add_gradient_line_glow(scene: &mut Scene, root: u32) {
     let stop = |t, c: [f32; 4]| GradientStop {
         t,
@@ -121,7 +114,6 @@ fn add_gradient_line_glow(scene: &mut Scene, root: u32) {
     put(scene, root, [208.0, 112.0, 32.0, 32.0], glow);
 }
 
-/// Row 3: a mid-grey strip with an additive, a multiply and a screen square on it.
 fn add_blends(scene: &mut Scene, root: u32) {
     put(
         scene,

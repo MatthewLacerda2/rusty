@@ -1,4 +1,4 @@
-//! Tweens end to end (#424): through the real play schedule (the harness steps
+//! Tweens end to end: through the real play schedule (the harness steps
 //! `GameWorld::tick`), a UI fade, an overshooting slide and a yoyo light pulse
 //! write the same values on the same ticks in two runs, and land where they
 //! should. Gated on `dev`, like the harness itself.

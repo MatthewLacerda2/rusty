@@ -1,4 +1,4 @@
-//! World-anchored marker screenshot (#429): a marker lands where the GPU draws its
+//! World-anchored marker screenshot: a marker lands where the GPU draws its
 //! target — the CPU projection agrees with the renderer's — and hides (or clamps to
 //! the edge) once the target is behind the camera.
 

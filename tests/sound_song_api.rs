@@ -1,4 +1,4 @@
-//! `Sound.BakeSong` against zimmer (#413): the song leg's two edges that rusty
+//! `Sound.BakeSong` against zimmer: the song leg's two edges that rusty
 //! owns rather than the synthesiser — resolving a track's patch *by path* (zimmer
 //! does no I/O, so rusty supplies the resolver) and writing the mixed WAV.
 

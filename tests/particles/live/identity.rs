@@ -1,16 +1,8 @@
-//! A table `GetParticles` handed out keeps its particle's identity: removing or
-//! filtering entries leaves each survivor its own hidden fields (a mesh
-//! particle's tumble axis and turn, a flipbook particle's start frame), and a
-//! table from an older read, or read before any other write, is the script's
-//! own data.
-
 use glam::{Quat, Vec3};
 use rusty::components::particle::{Flipbook, ParticleRenderMode};
 
 use super::{dump, emitter, lua, scene_with};
 
-/// A mesh emitter on a random-start flipbook, `n` particles, each with a turn
-/// of its own, so every hidden field differs between particles.
 pub(super) fn hidden(n: u32) -> (std::rc::Rc<std::cell::RefCell<rusty::scene::Scene>>, u32) {
     let mut cfg = emitter(n);
     cfg.render.mode = ParticleRenderMode::Mesh;
@@ -37,7 +29,6 @@ pub(super) fn hidden(n: u32) -> (std::rc::Rc<std::cell::RefCell<rusty::scene::Sc
     (scene, id)
 }
 
-/// The live particles with the one at `gone` removed, printed as `dump` does.
 fn without(
     scene: &std::rc::Rc<std::cell::RefCell<rusty::scene::Scene>>,
     id: u32,

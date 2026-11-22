@@ -1,4 +1,4 @@
-//! `AIPerception` end to end (#1900): sight through the game loop raises
+//! `AIPerception` end to end: sight through the game loop raises
 //! `OnPerceptionUpdated` once on gain, a shot from behind is sensed at the
 //! instigator, noises are heard and counted, and the settings round-trip
 //! through the shared ops.

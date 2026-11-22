@@ -1,15 +1,7 @@
-//! Structural-authoring API end-to-end (issue #181).
-//!
-//! Drives the headless edit-mode session's command channel through the live Lua
-//! evaluator: create an entity, add + configure a component, parent it, and save —
-//! then reload the saved file into a fresh scene and assert it round-trips.
-//! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
-
 use rusty::components::ScriptFieldValue;
 use rusty::dev::session::Session;
 use rusty::scene::Scene;
 
-/// Unwrap a session eval, surfacing the Lua error on failure.
 fn ok(session: &Session, line: &str) -> String {
     session
         .eval(line)
@@ -20,14 +12,11 @@ fn ok(session: &Session, line: &str) -> String {
 fn create_configure_parent_save_round_trips() {
     let session = Session::new("").expect("session boots in edit mode");
 
-    // Create a parent (bare) and a child (a Box primitive) via the API.
     let parent_id = ok(&session, "Scene.CreateEntity(\"Parent\")");
     let child_id = ok(&session, "Scene.CreateEntity(\"Crate\", \"Box\")");
     assert_ne!(parent_id, "0");
     assert_ne!(child_id, "0");
 
-    // Add + configure a component on the child, then parent it. `Light.SetIntensity`
-    // writes the light's scalar intensity.
     ok(
         &session,
         &format!("Scene.AddComponent({child_id}, \"Light\")"),
@@ -38,14 +27,12 @@ fn create_configure_parent_save_round_trips() {
         &format!("Scene.SetParent({child_id}, {parent_id})"),
     );
 
-    // Save to a fresh temp file via the explicit-path form.
     let out = crate::temp::dir().join("rusty_structural_authoring.scene");
     let out_str = out.to_str().unwrap().to_string();
     let saved = ok(&session, &format!("Scene.Save(\"{out_str}\")"));
     assert_eq!(saved, out_str, "Save returns the written path");
     assert!(out.exists(), "scene file was written");
 
-    // Reload into a brand-new scene and assert the authored structure survived.
     let mut reloaded = Scene::new();
     rusty::edit::load_from_file(&mut reloaded, &out_str).expect("saved scene loads back");
 
@@ -108,7 +95,7 @@ fn remove_component_round_trips_through_api() {
 
 #[test]
 fn a_box_drops_its_mesh_and_keeps_its_collider() {
-    // #1657: a blockout box stays an invisible collider, same id.
+    // a blockout box stays an invisible collider, same id.
     let session = Session::new("").expect("session boots");
     let id = ok(&session, "Scene.CreateEntity(\"b\", \"Box\")");
     ok(&session, &format!("Scene.AddComponent({id}, \"Collider\")"));

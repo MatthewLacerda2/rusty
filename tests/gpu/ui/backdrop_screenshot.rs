@@ -1,4 +1,4 @@
-//! Frosted-glass backdrop (#426), headless: a BackdropFilter panel over a world
+//! Frosted-glass backdrop, headless: a BackdropFilter panel over a world
 //! split sharply into red and blue blurs the split under it and nowhere else,
 //! its filter greys and darkens what it shows, and no backdrop means no blur
 //! passes. `px` takes UI coordinates (bottom-left origin).
@@ -10,7 +10,6 @@ use rusty::scene::{Camera, Scene};
 use super::super::world_ui::scene::{dark_scene, emissive_box};
 use super::mask_scene::{element, overlay, px, shoot};
 
-/// Red left of x = 0, blue right of it, filling the view of [`camera`].
 fn split_world() -> Scene {
     let mut scene = dark_scene();
     let (size, red, blue) = (Vec3::new(10.0, 20.0, 0.2), [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]);
@@ -23,7 +22,6 @@ fn camera() -> Camera {
     Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0)
 }
 
-/// A glass panel over the canvas's top half (y 64..128), its own colour clear.
 fn glass(scene: &mut Scene, filter: BackdropFilterComponent) -> u32 {
     let root = overlay(scene);
     let panel = element(scene, root, [0.0, 64.0, 128.0, 64.0], Vec4::ZERO);
@@ -42,7 +40,6 @@ fn a_backdrop_blurs_the_frame_under_its_panel_only() {
     let Some((img, counters)) = shoot(&scene, &camera(), "rusty_ui_backdrop.png") else {
         return;
     };
-    // Below the panel the split is sharp: a few pixels left of it is pure red.
     let sharp = px(&img, 60, 32);
     assert!(sharp[0] > 200 && sharp[2] < 30, "unblurred: {sharp:?}");
     // Under the panel the same column has blue blurred into it, and vice versa.
@@ -55,7 +52,6 @@ fn a_backdrop_blurs_the_frame_under_its_panel_only() {
         right[0] > 60 && right[2] > 60,
         "blue side mixes in red: {right:?}"
     );
-    // Far from the split the blur keeps the colour.
     let far = px(&img, 8, 96);
     assert!(far[0] > 180 && far[2] < 60, "far left stays red: {far:?}");
     assert!(counters.ui_blur_passes >= 2, "{}", counters.ui_blur_passes);

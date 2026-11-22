@@ -1,6 +1,3 @@
-//! The tracer's driver: runs passes until every enum variant at every place in the
-//! format has been walked, and collects the fingerprint lines they record.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
@@ -10,25 +7,18 @@ use serde::de::DeserializeOwned;
 /// serde (an untagged enum, a `serde_json::Value`): the first a pass accepts sticks.
 pub const ANY_ANSWERS: usize = 3;
 
-/// One walk of the format: builds one value, every enum at the variant `script`
-/// names for its place (the first otherwise), and records what it saw.
 pub struct Pass<'s> {
     pub path: String,
     pub script: &'s BTreeMap<String, usize>,
     pub any: &'s BTreeMap<String, usize>,
-    /// Field places not to fill: aliases, which serde lists beside the field.
     pub aliases: &'s BTreeSet<String>,
     pub lines: BTreeSet<String>,
-    /// Every enum place this pass met, with its variant count.
     pub enums: Vec<(String, usize)>,
-    /// The last opaque place answered, blamed when the pass fails.
     pub last_any: Option<String>,
-    /// The last field place filled, blamed when serde reports it twice.
     pub last_field: Option<String>,
 }
 
 impl Pass<'_> {
-    /// Run `f` one path segment deeper.
     pub fn at<R>(&mut self, segment: &str, f: impl FnOnce(&mut Self) -> R) -> R {
         let len = self.path.len();
         self.path.push_str(segment);
@@ -42,7 +32,6 @@ impl Pass<'_> {
         out
     }
 
-    /// Record `kind` at the current place.
     pub fn line(&mut self, kind: &str) {
         self.lines.insert(format!("{}: {kind}", self.path));
     }
@@ -101,7 +90,6 @@ pub fn trace<T: DeserializeOwned>(root: &str) -> (BTreeSet<String>, T) {
     (lines, first.expect("the first pass always runs"))
 }
 
-/// The tracer's error: whatever serde reported, as text.
 #[derive(Debug)]
 pub struct Error(pub String);
 

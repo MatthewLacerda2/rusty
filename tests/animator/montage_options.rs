@@ -1,4 +1,4 @@
-//! `Animator.PlayMontage` (#1894): a graph that exists but fails to load warns
+//! `Animator.PlayMontage`: a graph that exists but fails to load warns
 //! with its error and returns `false` (never the clip of the same name), and
 //! the options' `blend_in` / `blend_out` override the montage's own.
 

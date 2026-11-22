@@ -1,5 +1,5 @@
 //! The `LayoutGroup` and `LayoutElement` namespaces write through the shared ops,
-//! validation included (#421).
+//! validation included.
 
 use std::cell::RefCell;
 use std::rc::Rc;

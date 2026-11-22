@@ -1,4 +1,4 @@
-//! Particle render modes (#440): a stretched spark streaks along its velocity, a
+//! Particle render modes: a stretched spark streaks along its velocity, a
 //! horizontal splash lies flat (edge-on at eye height), a vertical sprite stands
 //! up, and a flipbook shows the frame its life has reached.
 

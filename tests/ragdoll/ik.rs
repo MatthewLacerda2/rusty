@@ -1,7 +1,3 @@
-//! A ragdolled skeleton is never IK'd (#461 × #466): with an IK target set, an
-//! enabled ragdoll keeps exactly the pose physics gives it, while the same rig,
-//! still animated, is bent by IK.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -26,7 +22,6 @@ fn script(ik: bool, enable: bool) -> String {
     )
 }
 
-/// Every bone's world position after 60 ticks of the floored ragdoll rig.
 fn run(ik: bool, enable: bool) -> Vec<Vec3> {
     let (mut scene, id) = ragdolled();
     scene

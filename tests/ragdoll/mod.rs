@@ -1,10 +1,3 @@
-//! Ragdolls end to end (#466): the builder's bodies and joints, the joints bending
-//! the natural way, a fall that comes to rest, an impulse at the hit point, the
-//! Animator ↔ physics switch, IK leaving a ragdoll alone (#461), a resting one
-//! falling when its floor is switched off (#1707), determinism, and the powered
-//! partial ragdoll: one branch on physics, driven and blended (#1895). Saving is in-crate
-//! (`scene::skeleton::ragdoll::persist_tests`), over the glTF fixture.
-
 mod decapitated;
 mod fall;
 mod floor_off;
@@ -21,7 +14,6 @@ use rusty::physics::PhysicsWorld;
 use rusty::scene::skeleton::{RagdollOptions, RAGDOLL_LAYER};
 use rusty::scene::Scene;
 
-/// A scene with a floor and the rig at the origin, its ragdoll built.
 pub fn ragdolled() -> (Scene, u32) {
     let mut scene = Scene::new();
     rig::floor(&mut scene);
@@ -32,7 +24,6 @@ pub fn ragdolled() -> (Scene, u32) {
     (scene, rig)
 }
 
-/// The world centre of `bone`'s hitbox.
 pub fn hitbox_at(scene: &Scene, bone: u32) -> Vec3 {
     let hitbox = scene.hitbox_of(bone).expect("a hitbox bone");
     scene.world.world_position(hitbox)
@@ -85,8 +76,6 @@ fn build_puts_a_body_on_every_hitbox_bone_and_joins_it_to_its_parent() {
     assert_eq!(scene.world.joint(shin).unwrap().clone(), knee);
 }
 
-/// Push `name`'s body (gravity off, everything else held) along `push` for half a
-/// second, and return how far its hitbox moved along Z.
 fn bend(name: &str, push: Vec3) -> f32 {
     let (mut scene, rig) = ragdolled();
     let id = rig::bone(&scene, rig, name);

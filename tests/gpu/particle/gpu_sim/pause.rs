@@ -1,8 +1,6 @@
-//! A renderer that misses more steps than the GPU replays one by one: the older
-//! ones are one jump, aged by the time they really took. Here the replayed window
-//! is all paused (time scale 0) while the steps before it moved, so a jump aged by
-//! the window's `dt` would leave every particle young: drawn where it was born and
-//! alive past the sim's tally.
+//! A renderer missing more steps than the GPU replays one by one ages the older ones
+//! as one jump by the time they really took. Here the replayed window is paused: a
+//! jump aged by the window's `dt` would leave every particle young.
 
 use glam::Vec3;
 use rusty::components::particle::{EmitMode, EmitShape, ParticleSimulation};
@@ -61,7 +59,6 @@ fn a_jump_over_a_pause_ages_by_the_time_that_passed() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: drawn"
         );
-        // Measured: 1.0 at every frame on lavapipe (Mesa) and on an NVIDIA RTX 2060 (Vulkan).
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
