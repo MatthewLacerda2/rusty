@@ -1,3 +1,6 @@
+//! The Scene and its document, `SceneData`. One active scene: loading one replaces the World.
+//! Saving, loading and the authoring verbs are `rusty-edit`'s, a crate up; nothing here names it.
+
 #![deny(clippy::unwrap_used)]
 
 pub mod authored;
@@ -22,6 +25,7 @@ pub mod serialize;
 pub mod settings;
 pub mod skeleton;
 pub mod state;
+/// Test hook: the primitive levels other crates' tests and benches build.
 #[doc(hidden)]
 pub mod test_levels;
 pub mod undo;

@@ -1,3 +1,6 @@
+//! The sim's side of scene loading: plain state changed by the API, by the host at a tick head and
+//! by the load phase at the tail. Nothing here waits or polls.
+
 use std::collections::BTreeMap;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -23,6 +26,7 @@ impl LoadStatus {
     pub fn progress(self) -> f64 {
         match self {
             Self::Loading | Self::Failed | Self::Replaced => 0.0,
+            // Unity's `AsyncOperation.progress`: ready, held while activation waits.
             Self::Ready => 0.9,
             Self::Done => 1.0,
         }
@@ -58,6 +62,7 @@ pub struct SceneLoads {
     next_op: u32,
     pending: Option<Pending>,
     status: BTreeMap<u32, LoadStatus>,
+    /// The waiting operation's progress, 0 to 100 percent, as the host last published it.
     loaded: u8,
 }
 
@@ -147,6 +152,7 @@ impl SceneLoads {
         }
     }
 
+    /// `ok` false: preparing failed, and the operation is no longer pending.
     pub fn publish(&mut self, op: u32, ok: bool) {
         if self.waiting() != Some(op) {
             return;
@@ -178,6 +184,7 @@ impl SceneLoads {
         self.status.insert(op, status);
     }
 
+    /// Operations count from 1 again, so a demo's ids are its replay's. A queued load stays.
     pub fn enter_play(&mut self) {
         self.next_op = 0;
         self.status.clear();

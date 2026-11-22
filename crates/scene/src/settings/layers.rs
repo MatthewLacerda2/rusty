@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Unity's 32: an index fits a `u8`, a membership set a `u32` mask.
 pub const LAYER_COUNT: usize = 32;
 
 const DEFAULT_LAYER_NAME: &str = "Default";

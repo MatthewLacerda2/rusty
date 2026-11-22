@@ -7,6 +7,7 @@ use crate::Scene;
 pub struct DecalPose {
     /// Object→world matrix mapping the unit cube `[-0.5, 0.5]³` to the box.
     pub model: Mat4,
+    /// `1` whole to `0` gone; scales every blend weight.
     pub opacity: f32,
 }
 
@@ -22,6 +23,7 @@ impl DecalPose {
         self.model.w_axis.truncate()
     }
 
+    /// Half the box's longest diagonal, sheared or not: the sphere around `centre` holding it.
     pub fn radius(&self) -> f32 {
         let (x, y, z) = (
             self.model.x_axis.truncate(),

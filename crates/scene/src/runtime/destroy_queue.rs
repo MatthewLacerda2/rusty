@@ -1,7 +1,11 @@
+//! Play-mode `Scene.DestroyEntity` runs mid-dispatch, where the script runtime cannot be re-entered
+//! for teardown, so it queues the id and the tick's destroy phase drains it.
+
 use crate::Scene;
 
 impl Scene {
     pub fn destroy(&mut self, id: u32) {
+        // Recorded as removed from its model instance, so propagation never stamps it back.
         crate::prefab_link::removed::record_removed(self, id);
         if self.playing {
             self.request_destroy(id);
@@ -14,6 +18,8 @@ impl Scene {
         self.pending_destroy.push(id);
     }
 
+    /// Sorted and deduplicated: the dispatch order is deterministic, and a double destroy fires
+    /// `OnDestroy` once.
     pub fn take_pending_destroys(&mut self) -> Vec<u32> {
         let mut ids = std::mem::take(&mut self.pending_destroy);
         ids.sort_unstable();

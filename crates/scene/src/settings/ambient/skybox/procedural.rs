@@ -1,3 +1,7 @@
+//! The procedural sky's light: `common::procedural_sky` on the CPU, in L2 SH. Change it with the
+//! shader; the clouds hash with integers, not the shader's `fract(sin(·))`, whose bits differ by
+//! platform: the cells differ, their L2 statistics do not.
+
 use std::sync::Mutex;
 
 use glam::{Vec2, Vec3};
@@ -5,8 +9,11 @@ use glam::{Vec2, Vec3};
 use crate::lighting::probe_fill::fibonacci_sphere;
 use crate::{Sh9, SkySettings};
 
+/// Directions projected: the clouds' cells average out well past the L2 bands.
 const SAMPLES: usize = 4096;
 
+// The sky is affine in the ambient colour (`a·colour + b`), so projections under white and
+// black give any colour's SH: the last settings and their `(a, b)`.
 static PROJECTED: Mutex<Option<(SkySettings, Sh9, Sh9)>> = Mutex::new(None);
 
 pub(super) fn radiance(sky: &SkySettings, color: Vec3) -> Sh9 {
@@ -40,6 +47,7 @@ pub(super) fn project(sky: &SkySettings, color: Vec3) -> Sh9 {
     sh
 }
 
+/// `common::procedural_sky` before fog (a GPU test holds the gradient to it).
 pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     let [zenith, horizon, ground] = sky.resolved(ambient);
     let up = dir.y.clamp(0.0, 1.0);
@@ -57,6 +65,7 @@ pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     color
 }
 
+/// `sky/noise.wgsl`'s `cloud_shift`, `sky_fbm` and `sky_value_noise` below.
 fn cloud_shift(coverage: f32) -> f32 {
     let c = coverage - 0.5;
     c * if c > 0.0 { 1.6 } else { 1.1 }

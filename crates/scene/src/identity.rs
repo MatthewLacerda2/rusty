@@ -1,5 +1,9 @@
+//! A live `Scene`'s identity, the other half of the renderer's per-entity cache keys: entity
+//! ids count from 1 in every World. A load mints a new one; Play and Stop keep it.
+
 use std::sync::atomic::{AtomicU64, Ordering};
 
+// Starts at 1, so `SceneId(0)` is never minted.
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -20,6 +24,8 @@ impl crate::Scene {
         self.id = SceneId::next();
     }
 
+    /// Stop's restore after a play-mode `Scene.Load`: the restored World is that scene again, so
+    /// a Generate Lighting waiting for Stop still recognises it.
     pub fn restore_id(&mut self, id: SceneId) {
         self.id = id;
     }

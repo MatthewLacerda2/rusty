@@ -17,6 +17,8 @@ impl Scene {
         let mut path_to = |entity: u32| {
             let path = paths.entry(entity).or_insert_with(|| {
                 let path = world.path_of(entity)?;
+                // A path not reading back to its owner (a malformed hierarchy) carries nothing,
+                // rather than land on the wrong entity.
                 (world.find_path(&path) == Some(entity)).then_some(path)
             });
             path.clone()

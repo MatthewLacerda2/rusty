@@ -1,3 +1,6 @@
+//! A Play load's renumbering: survivors keep their ids, so an incoming entity holding one moves
+//! to a fresh id, and every field outside the World naming entities follows it.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::lighting::lightmap_set::LightmapSet;
@@ -12,6 +15,8 @@ pub struct Moves {
 }
 
 impl Moves {
+    /// The one place a moved id is chosen: past the document's next id, every incoming id and every
+    /// survivor's. In document order, so the result is a pure function of the inputs.
     pub fn out_of_the_way(data: &SceneData, survivors: &BTreeSet<u32>) -> Self {
         let ids = data.entities.iter().map(|e| e.id);
         let past = ids.chain(survivors.iter().copied()).map(|id| id + 1);
@@ -74,6 +79,7 @@ pub(crate) enum Pass {
     Sidecar(fn(&mut Scene, &Moves)),
 }
 
+/// `state::renumber_tests` fails a saved field keyed by entity that is missing here.
 pub(crate) const RENUMBERED: &[(&str, Pass)] = &[
     ("selected_entity_id", Pass::Document(renumber_selection)),
     ("lightmaps", Pass::Document(renumber_lightmaps)),
@@ -95,6 +101,8 @@ fn renumber_lightmaps(data: &mut SceneData, moves: &Moves) {
             LightmapSet::default()
         });
     }
+    // What is left under a survivor's id names an entity deleted since the bake, not the
+    // survivor.
     data.lightmaps.forget(&moves.survivors);
 }
 
