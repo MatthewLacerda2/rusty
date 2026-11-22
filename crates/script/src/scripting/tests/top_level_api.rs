@@ -13,7 +13,7 @@ const READS_API: &str = "local now = Time.time\nlocal step = Time.deltaTime() * 
 
 #[test]
 fn a_chunk_reading_the_api_at_load_keeps_its_fields_and_lifecycle() {
-    let names: Vec<_> = parse_fields(READS_API)
+    let names: Vec<_> = parse_fields("t.lua", READS_API)
         .into_iter()
         .map(|f| f.name)
         .collect();
