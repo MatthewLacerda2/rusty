@@ -55,6 +55,9 @@ fn reimport_one(
     };
     let sub = asset.sub_mesh(&reference.sub_object);
     let sub = sub.filter(|s| !s.indices.is_empty() && s.bounds().is_some());
+    // A kept mesh whose sub-object imports empty keeps its old geometry, so the part never
+    // drops out of physics; a collision mesh is emptied, so the collider falls back to its
+    // entity's Mesh.
     if sub.is_none() && which == Which::Kept {
         return;
     }

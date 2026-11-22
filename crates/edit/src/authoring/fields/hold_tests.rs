@@ -6,6 +6,7 @@ use super::{Skip, KINDS};
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
+/// Integers go to 250 or 0: the widest values that every integer type, `u8` too, still reads.
 fn push_out(v: &mut Value, up: bool) {
     match v {
         Value::Number(n) if n.is_f64() => {
@@ -82,6 +83,7 @@ fn an_in_range_scene_loads_unchanged() {
     let (mut scene, id) = dressed();
     let hall = rusty_components::ReverbPreset::Hall;
     reverb_zone::set_preset(&mut scene.world.reverb_zone_mut(id).unwrap(), hall);
+    // Diagonals: renormalizing a unit diagonal moves it an ulp, which a load must not do.
     let mut j = scene.world.joint_mut(id).unwrap();
     joint::set_axis(&mut j, glam::Vec3::new(1.0, 1.0, 0.0));
     joint::set_swing_axis(&mut j, glam::Vec3::new(0.0, 1.0, 1.0));

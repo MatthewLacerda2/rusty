@@ -112,6 +112,8 @@ fn set_target(c: &mut CameraComponent, target: Option<RenderTarget>) {
     camera::set_target_update_every(c, t.update_every);
 }
 
+/// A height is clamped between its neighbours, so all drop to zero coarsest first, then rise finest
+/// first: each is bound only by the finer one just set.
 fn set_levels(g: &mut LodGroupComponent, levels: Vec<LodLevel>) {
     while g.levels.len() > levels.len() {
         lod::remove_level(g, g.levels.len() - 1);

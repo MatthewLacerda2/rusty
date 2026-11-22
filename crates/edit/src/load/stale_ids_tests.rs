@@ -58,6 +58,7 @@ fn a_renumbering_that_would_merge_two_baked_ids_is_refused() {
     let mut level = Scene::new();
     level.add_entity("Lamp".to_string());
     let mut data = to_scene_data(&level);
+    // Malformed: a baked id (2) at the document's next id, where 1 moves to.
     assert_eq!(data.next_entity_id, 2);
     data.lightmaps.lights.extend([1, 2]);
     make_room(&mut data, &BTreeSet::from([1]));

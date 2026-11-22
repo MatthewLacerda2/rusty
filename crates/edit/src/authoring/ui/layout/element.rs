@@ -4,6 +4,7 @@ use rusty_components::{LayoutAxisFit, LayoutElementComponent};
 use rusty_scene::rules::sanitize::optional_non_negative;
 
 rusty_core::named_enum! {
+    /// In `LayoutElementComponent::overrides`' order, which `size` indexes by discriminant.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum SizeKind {
         Min = "Min",

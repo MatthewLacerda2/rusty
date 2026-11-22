@@ -9,6 +9,8 @@ pub trait Inspect: Clone + Serialize + DeserializeOwned + 'static {
     const FIELDS: &'static [Field<Self>];
     fn read(world: &World, id: u32) -> Option<Result<Value, String>>;
     fn update(world: &mut World, id: u32, f: &mut dyn FnMut(&mut Self)) -> bool;
+    /// Override with `commit`: a draft that leaves live state out (a particle emitter's) needs a
+    /// commit that keeps `live`'s.
     fn draft(live: &Self) -> Self {
         live.clone()
     }

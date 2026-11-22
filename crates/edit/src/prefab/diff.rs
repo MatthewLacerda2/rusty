@@ -61,6 +61,7 @@ fn walk(path: &str, base: Option<&Value>, inst: Option<&Value>, out: &mut BTreeM
                 walk(&p, present(b.get(key)), present(i.get(key)), out);
             }
         }
+        // A list one side lacks is an empty one, as `overrides`' `Op::Size` makes it.
         (Some(Value::Array(_)), None) => walk(path, base, Some(&empty), out),
         (None, Some(Value::Array(_))) => walk(path, Some(&empty), inst, out),
         (Some(Value::Array(b)), Some(Value::Array(i))) => {
