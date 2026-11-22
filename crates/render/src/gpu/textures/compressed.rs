@@ -75,7 +75,7 @@ pub(crate) fn reads_as(format: wgpu::TextureFormat, kind: TextureKind) -> bool {
     match format {
         F::Bc5RgUnorm => kind == TextureKind::Normal,
         F::Bc4RUnorm => kind == TextureKind::Mask,
-        super::deep::DEEP_FORMAT => !kind.is_colour(),
+        super::deep::DEEP_FORMAT => kind == TextureKind::Normal,
         _ => true,
     }
 }

@@ -56,8 +56,9 @@ channel at most (block-compressed below that once the import cache has made its
 copy, unless its `compression` is `"None"`; see `Assets.md`), so its extra precision
 serves what reads the file itself (an `image` node, a terrain or displacement bake).
 A `normal16` map in a material's normal slot keeps it on the GPU too: a 16-bit
-`"NormalMap"` is never block-compressed and uploads as half floats, at eight bytes
-a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
+`"NormalMap"` is never block-compressed and uploads as signed half floats, which keep
+every step of the file up to a tilt of about 3.5° and step 0.056° at 60°, at eight
+bytes a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
 `normal16` for the subtle relief that needs it and `normal` for the rest.
 A `height` map's parallax reads the file as uploaded, BC4 by default, which marches
 without visible terracing (`Material.md`, `SetHeightMap`).
@@ -198,12 +199,20 @@ behind them bake wider, and the console says so.
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
 | `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
+| `coverage` | 1 on a texel the bake writes from a triangle, 0 elsewhere, with **no margin** (Substance's UV-island mask): every texel a triangle covers at its centre, and those an edge cuts deeper than about an eighth of a texel; one an edge only grazes is margin. A triangle narrower than that eighth (a thin bevel strip) keeps the texels it crosses, so its mask is wider than the strip itself | 0 |
+
+A mask built from a map's changes (an edge detector on `world_normal`) also fires
+along every island's margin. Multiply it by `coverage` (a `mix` with
+`mode = "multiply"`) before anything reads it, so wear lands only on texels a
+triangle uses; the masked node's `mean` in `Texture.Stats`, divided by
+`coverage`'s own, is the mask's mean over the model's surface alone.
 
 The settings table sets the size, the curvature band and the ray counts; the
 rest is Substance's defaults and no argument changes it: an occluder distance of
 the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
-holds a colour between two materials). Rays are drawn around the interpolated
+holds a colour between two materials; `coverage` has none, and is the one map
+that tells an island's texels from its margin). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
 smooth low-poly mesh no ray starts under the face it leaves; a texel whose every
 ray is dropped (few rays, a normal leaning far off its face) reads the map's
