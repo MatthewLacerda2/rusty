@@ -1,9 +1,5 @@
-//! - **Albedo / base-color and emissive** are **sRGB-encoded** (the renderer uploads
-//!   them as `Rgba8UnormSrgb`, expecting sRGB bytes).
-//! - **Normal, roughness, metallic, height/data** are **linear** (no gamma) — they
-//!   carry data, not color.
-//! - **Metallic-roughness** packs **metallic → B**, **roughness → G** (the glTF ORM
-//!   convention), so one bake fills a packed MR map; R/A are passed through.
+//! Each slot's encoding and packing is the slot table in `docs/api/Texture.md`: change the
+//! two together.
 
 use image::{ImageBuffer, Rgba};
 
@@ -26,6 +22,7 @@ pub enum Slot {
 }
 
 impl Slot {
+    /// Every slot: a test hook for `edit`'s material-maps test.
     pub const ALL: [Slot; 11] = [
         Slot::BaseColor,
         Slot::Emissive,
@@ -133,6 +130,7 @@ fn encode_pixel(p: [f32; 4], slot: Slot) -> [u8; 4] {
     out
 }
 
+/// `[0, 1]` to a byte, rounded to nearest.
 #[inline]
 fn to_u8(v: f32) -> u8 {
     (v * 255.0 + 0.5).clamp(0.0, 255.0) as u8
@@ -173,6 +171,7 @@ pub fn bake_to_png(img: &Image, slot: Slot, path: &str) -> Result<String, String
         _ => encode(img, slot).save(path),
     }
     .map_err(|e| format!("cannot write {path}: {e}"))?;
+    // Noted so a renderer that already drew the old file re-reads it.
     rusty_core::fs::written::note_written(path);
     Ok(path.to_string())
 }

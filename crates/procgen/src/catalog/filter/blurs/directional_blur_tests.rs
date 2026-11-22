@@ -21,6 +21,7 @@ fn roughness(img: &Image, dx: i64, dy: i64) -> f32 {
 #[test]
 fn a_ridged_noise_at_an_eighth_turn_streaks_along_the_diagonal() {
     let out = run(&dblur(0.2, 0.125), &ridged(128));
+    // Smooth along the 45° line (down-right), rough across it (down-left).
     let (along, across) = (roughness(&out, 1, 1), roughness(&out, -1, 1));
     assert!(along * 4.0 < across, "along {along} vs across {across}");
 }
@@ -70,5 +71,6 @@ fn a_bad_length_passes_through_or_caps_at_a_tile() {
     }
     let still = run(&dblur(0.1, 0.0), &img);
     assert_eq!(run(&dblur(0.1, f32::NAN), &img), still);
+    // A huge angle folds to a whole number of turns, not `∞ × 0`.
     assert_eq!(run(&dblur(0.1, 1e38), &img), still);
 }

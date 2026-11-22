@@ -19,9 +19,8 @@ pub struct Source {
 }
 
 impl Source {
-    /// tga, …) from its bytes. The format comes from `path`'s extension when it
-    /// names one, since TGA has no magic bytes to guess from; otherwise from the
-    /// bytes.
+    /// Decodes any format the `image` crate reads: by `path`'s extension when it
+    /// names one, since TGA has no magic bytes to guess from; otherwise by the bytes.
     pub fn decode(path: &str, bytes: &[u8]) -> Result<Source, String> {
         let decoded = match image::ImageFormat::from_path(path) {
             Ok(format) => image::load_from_memory_with_format(bytes, format),
@@ -85,6 +84,7 @@ impl Sources {
         Self::default()
     }
 
+    /// Each decoded by `loader` only once a node reads it, and dropped after the last.
     pub fn lazy(paths: impl IntoIterator<Item = String>, loader: Loader) -> Self {
         Self {
             decoded: BTreeMap::new(),
@@ -189,7 +189,6 @@ mod tests {
 
     #[test]
     fn a_tga_decodes_by_its_extension() {
-        // TGA has no magic bytes: guessing from the bytes alone fails.
         let mut tga = image::RgbaImage::new(2, 1);
         tga.put_pixel(0, 0, image::Rgba([255, 0, 0, 255]));
         let mut bytes = std::io::Cursor::new(Vec::new());

@@ -14,6 +14,7 @@ fn only_a_lossless_gray_image_packs_to_one_channel() {
     let gray = Image::fill_uv(4, |u, _| [u, u, u, 1.0]);
     assert!(matches!(Held::pack(gray.clone()), Held::Gray(..)));
     assert_eq!(bits(&Held::pack(gray.clone()).into_image()), bits(&gray));
+    // -0.0 beside 0.0, alpha below 1 and colour each keep all four channels.
     for p in [
         [-0.0, 0.0, 0.0, 1.0],
         [0.5, 0.5, 0.5, 0.9],
@@ -97,6 +98,7 @@ fn a_file_no_requested_output_reads_is_never_decoded() {
     let lazy = Sources::lazy(["a.png".into()], counting_loader(calls.clone()));
     evaluate_with(&mixed().with_output("m"), &lazy).unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
+    // Two nodes reading one file decode it once.
     let mut recipe = mixed();
     let twin = json!({ "op": "image", "path": "a.png", "encoding": "srgb" });
     recipe.nodes.insert(3, node("j", twin, &[]));

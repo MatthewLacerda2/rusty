@@ -5,6 +5,7 @@
 //! reach in tile units turns it into pixels per axis (`radius × w` across,
 //! `radius × h` down).
 
+/// Unclamped: an op may overshoot `[0, 1]`; only the bake clamps.
 pub type Rgba = [f32; 4];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

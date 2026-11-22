@@ -11,6 +11,8 @@ use crate::source::Sources;
 
 const FILL: OpKind = OpKind::FloodFill(FloodFill { threshold: 0.5 });
 
+/// Squares on a 32² tile: one in the middle, one across the left/right edge, one across the
+/// corner.
 fn squares() -> Image {
     Image::fill_uv(32, |u, v| {
         let box_ = |a: f32, b: f32, x: f32| (a..b).contains(&x);
@@ -50,6 +52,7 @@ fn each_island_reads_one_flat_value_of_its_own() {
 
 #[test]
 fn a_value_comes_from_the_island_not_its_scan_number() {
+    // A speck in the top row is scanned first, renumbering every other island.
     let mut more = squares();
     more.pixels_mut()[20] = [1.0, 0.0, 0.0, 1.0];
     let (a, b) = (
@@ -101,6 +104,7 @@ fn a_gradient_ramps_across_each_box() {
     let row: Vec<f32> = (10..16).map(|x| at(&out, x, 12)).collect();
     assert!(row.windows(2).all(|p| p[0] < p[1]), "{row:?}");
     assert!(row[0] > 0.0 && row[5] < 1.0, "{row:?}");
+    // Across the edge: x = 29..31 then 0..2 rise in turn.
     let edge: Vec<f32> = (29..35).map(|x| at(&out, x, 22)).collect();
     assert!(edge.windows(2).all(|p| p[0] < p[1]), "{edge:?}");
 }

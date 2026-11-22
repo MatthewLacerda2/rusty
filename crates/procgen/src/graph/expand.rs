@@ -1,6 +1,5 @@
 //! Instance nodes are pasted under the instance id (`brick/mortar`, nested
-//! `brick/wear/blur_2`). A recipe without instances expands to itself, and an
-//! instance at seed 0 bakes exactly like its nodes pasted by hand.
+//! `brick/wear/blur_2`).
 
 use std::collections::BTreeMap;
 
@@ -111,6 +110,7 @@ fn paste(scope: &Scope, out: &mut Out) -> Result<(), String> {
     Ok(())
 }
 
+/// Here, not in the runner: an instance leaves no node of its own in the flat recipe.
 fn check_ids(scope: &Scope) -> Result<(), String> {
     let nodes = &scope.graph.nodes;
     for (i, node) in nodes.iter().enumerate() {
@@ -198,6 +198,7 @@ fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
         scope.in_file(e.replacen(&bare, &prefixed, 1))
     };
     let mut node: Node = decode(value).map_err(named)?;
+    // Prefixed after the parse, which refuses the `/` the prefix adds.
     node.id = scope.id(&node.id);
     Ok(node)
 }
