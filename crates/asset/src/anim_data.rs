@@ -8,8 +8,11 @@ pub enum Interpolation {
     Linear,
 }
 
-/// The glTF import cuts `values` to `times`' length but never pads it, so a short output
-/// accessor stays short. An empty track contributes nothing (the joint keeps its bind value).
+/// `values` holds one value per entry of `times`, which are finite and ascend: the glTF
+/// import drops a channel that breaks either ([`ImportedAsset::validate`] holds it). An
+/// empty track contributes nothing (the joint keeps its bind value).
+///
+/// [`ImportedAsset::validate`]: crate::ImportedAsset::validate
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Track<T> {
     pub times: Vec<f32>,
