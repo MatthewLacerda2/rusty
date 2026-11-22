@@ -1,3 +1,6 @@
+//! The renderer culls back faces by winding, so a primitive wound the other way draws
+//! inside-out.
+
 use glam::Vec3;
 
 use super::primitives::{

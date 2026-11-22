@@ -8,6 +8,7 @@ pub fn recipe_from_lua<T: DeserializeOwned>(value: &Value) -> Result<T, String> 
     decode(recipe_json(value)?)
 }
 
+/// A test hook: the root's `tests/` read a recipe as a script's JSON string is read.
 pub fn recipe_from_json_str<T: DeserializeOwned>(json: &str) -> Result<T, String> {
     decode(serde_json::from_str(json).map_err(|e| e.to_string())?)
 }
@@ -32,6 +33,8 @@ pub fn lua_to_json(value: &Value) -> Result<serde_json::Value, String> {
     Ok(json)
 }
 
+/// mlua reads an empty table as `[]`, rusty answers `{}`; only an empty table yields an empty
+/// array, so rewriting every `[]` is exact.
 fn empty_arrays_to_objects(json: &mut serde_json::Value) {
     match json {
         serde_json::Value::Array(items) if items.is_empty() => {

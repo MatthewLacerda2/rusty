@@ -1,3 +1,6 @@
+//! The scene's distance and height fog, applied by `common.wgsl`'s `fog_factor` to every
+//! world-space pass. Every write goes through `edit::authoring::fog`, where its clamps live.
+
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
@@ -9,11 +12,13 @@ rusty_core::named_enum! {
         Linear = "Linear",
         /// `1 - e^(-density·d)`: thick fog that never quite reaches full.
         Exponential = "Exponential",
+        /// `1 - e^(-(density·d)²)`: clear near the camera, then closes in fast.
         ExponentialSquared = "ExponentialSquared",
     }
 }
 
 impl FogMode {
+    /// `fog_factor`'s `mode`, `0` off: change the two together.
     pub fn to_index(self) -> u32 {
         match self {
             FogMode::Off => 0,
@@ -30,8 +35,10 @@ pub struct FogSettings {
     pub mode: FogMode,
     pub color: Vec3,
     pub density: f32,
+    /// World units from the camera where fog begins, in every mode.
     pub start: f32,
     pub end: f32,
+    /// Per world unit above `base_height`; `0` is uniform fog.
     pub height_falloff: f32,
     pub base_height: f32,
 }

@@ -30,6 +30,8 @@ pub(super) fn lookup(anim: &AnimatorComponent, layer: &Value) -> Option<usize> {
     (index <= anim.layers.len()).then_some(index)
 }
 
+/// A script's `Start` runs before the evaluator's first step binds the graph's layers, so a
+/// layer not bound yet is bound here from the asset, not refused.
 pub(super) fn resolve(anim: &mut AnimatorComponent, layer: &Value) -> Option<usize> {
     if let Some(index) = lookup(anim, layer) {
         return Some(index);

@@ -1,3 +1,6 @@
+//! A probe is no entity, so the one whose card is open is its selection, the one the Scene
+//! view draws. Removing probes clears it, so another never takes the removed one's place.
+
 use super::ReflectionProbeSet;
 use crate::Scene;
 

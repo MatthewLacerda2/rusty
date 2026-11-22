@@ -27,6 +27,7 @@ pub struct GradientStop {
     pub color: Vec4,
 }
 
+/// The UI vertex holds four stops (`render::ui::vertex::Fill`, `ui.wgsl`'s `stop_t`).
 pub const MAX_GRADIENT_STOPS: usize = 4;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -36,6 +37,7 @@ pub struct UiGradient {
     pub angle: f32,
     pub center: Vec2,
     pub radius: f32,
+    /// Ascending `t`, as the authoring ops keep them: the renderer takes the last as the end.
     pub stops: Vec<GradientStop>,
 }
 

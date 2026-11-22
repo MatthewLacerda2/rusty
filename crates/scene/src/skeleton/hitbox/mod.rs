@@ -42,6 +42,7 @@ impl Scene {
             let Some(bone) = *bone else { continue };
             if !fits.iter().any(|f| f.slot == slot) {
                 if let Some(stale) = self.hitbox_of(bone) {
+                    // Queued in Play, so a script under it is torn down first.
                     self.destroy(stale);
                 }
             }
@@ -53,6 +54,7 @@ impl Scene {
         self.world
             .children(bone)
             .into_iter()
+            // One queued for destruction is already gone to every lookup.
             .find(|&c| self.is_generated_hitbox(c) && !self.is_doomed(c))
     }
 

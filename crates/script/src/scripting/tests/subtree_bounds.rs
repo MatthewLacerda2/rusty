@@ -51,6 +51,7 @@ fn a_tween_on_a_parent_moves_the_childs_bounds() {
 
 #[test]
 fn a_collider_added_in_play_reports_its_bounds_at_once() {
+    // A static entity is never moved again, so only adding the collider can set its box.
     let (m, id) = rig("collider_added", &counted(""));
     {
         let mut scene = m.cells.scene.borrow_mut();

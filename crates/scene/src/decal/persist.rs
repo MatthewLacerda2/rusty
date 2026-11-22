@@ -11,12 +11,16 @@ pub struct CarriedDecal {
 }
 
 impl Scene {
+    /// Call while the outgoing World still stands, as owner paths are read from it; land the
+    /// result once the incoming entities and survivors are in.
     pub fn take_persistent_decals(&mut self, survivors: &BTreeSet<u32>) -> Vec<CarriedDecal> {
         let world = &self.world;
         let mut paths: BTreeMap<u32, Option<HierarchyPath>> = BTreeMap::new();
         let mut path_to = |entity: u32| {
             let path = paths.entry(entity).or_insert_with(|| {
                 let path = world.path_of(entity)?;
+                // A path not reading back to its owner (a malformed hierarchy) carries nothing,
+                // rather than land on the wrong entity.
                 (world.find_path(&path) == Some(entity)).then_some(path)
             });
             path.clone()

@@ -165,6 +165,7 @@ mod tests {
     fn ops_lists_the_projects_graphs_with_their_interface() {
         let base = rusty_test_support::temp::dir().join("rusty_texture_ops_graphs_1744");
         let root = base.join("game");
+        // An empty engine folder, or the engine's own graphs would follow the project's.
         let roots = ContentRoots::with_engine(&root, &base.join("engine"));
         std::fs::create_dir_all(root.join("textures")).unwrap();
         let graph = serde_json::json!({

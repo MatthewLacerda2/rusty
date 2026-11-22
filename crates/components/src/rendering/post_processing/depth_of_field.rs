@@ -43,6 +43,7 @@ impl DepthOfField {
     pub const MAX_APERTURE: f32 = 32.0;
     pub const MIN_FOCAL_LENGTH: f32 = 1.0;
     pub const MAX_FOCAL_LENGTH: f32 = 300.0;
+    /// Metres.
     pub const MIN_FOCUS_DISTANCE: f32 = 0.1;
     /// Metres: where `+inf` (focus at infinity) lands.
     pub const MAX_FOCUS_DISTANCE: f32 = 10_000.0;

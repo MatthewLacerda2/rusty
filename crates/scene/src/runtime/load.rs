@@ -7,6 +7,7 @@ impl Scene {
         self.loads.request(path);
     }
 
+    /// The mark lasts until the entity is destroyed or Play stops.
     pub fn dont_destroy_on_load(&mut self, id: u32) -> bool {
         let exists = self.world.contains(id);
         if exists {

@@ -1,6 +1,7 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+// The bits of `collision_flags`, Unity's `CollisionFlags`.
 pub const COLLIDED_BELOW: u8 = 1;
 pub const COLLIDED_SIDES: u8 = 2;
 pub const COLLIDED_ABOVE: u8 = 4;
@@ -27,6 +28,7 @@ fn up() -> Vec3 {
     Vec3::Y
 }
 
+// Unity's defaults: lengths in metres, `slope_limit` in degrees from flat.
 impl Default for CharacterControllerComponent {
     fn default() -> Self {
         Self {

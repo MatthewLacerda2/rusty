@@ -3,6 +3,8 @@ use glam::Vec3;
 use super::fill_tangents_unwrapped;
 use crate::mesh::Vertex;
 
+/// `height` is the full length, caps included, as `ColliderShape::Capsule`'s; under `2 * radius`
+/// the tube collapses to a sphere, as the collider's does.
 pub fn generate_capsule(
     radius: f32,
     height: f32,
@@ -39,6 +41,7 @@ pub fn generate_capsule(
         for s in 0..segments {
             let idx0 = r * (segments + 1) + s;
             let idx2 = idx0 + segments + 1;
+            // At a pole one of a band's two triangles has no area, so it is left out.
             if r != 0 {
                 indices.extend_from_slice(&[idx0, idx0 + 1, idx2 + 1]);
             }
@@ -51,6 +54,7 @@ pub fn generate_capsule(
     fill_tangents_unwrapped(vertices, indices)
 }
 
+/// The two equator rows share a normal, so the band between them is the tube wall.
 fn capsule_rows(rings: u32, half_tube: f32) -> Vec<(f32, f32)> {
     let step = std::f32::consts::FRAC_PI_2 / (rings as f32);
     let top = (0..=rings).map(|r| (r as f32 * step, half_tube));

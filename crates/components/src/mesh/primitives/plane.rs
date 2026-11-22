@@ -4,6 +4,7 @@ use glam::Vec3;
 /// The most quads per side a `Plane` takes: 257² vertices, a dense pool of water.
 pub const MAX_PLANE_SUBDIVISIONS: u32 = 256;
 
+/// Its texture UV over [0, 1]² is already a lightmap unwrap.
 pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     let w = width / 2.0;
     let d = depth / 2.0;
@@ -26,6 +27,7 @@ pub fn generate_plane(width: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     fill_tangents(vertices, indices)
 }
 
+/// Each quad wound as `generate_plane`'s; 1 is `generate_plane` itself, vertex for vertex.
 pub fn generate_plane_grid(width: f32, depth: f32, subdivisions: u32) -> (Vec<Vertex>, Vec<u32>) {
     let n = subdivisions.clamp(1, MAX_PLANE_SUBDIVISIONS);
     if n == 1 {

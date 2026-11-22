@@ -1,6 +1,7 @@
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NodeStates {
     pub previous_node: Option<String>,
+    /// Counts node entries, so re-entering the playing node reads as a new state.
     pub entry: u32,
     pub previous_entry: u32,
     pub travel: f32,

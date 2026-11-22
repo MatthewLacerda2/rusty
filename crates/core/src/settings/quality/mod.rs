@@ -28,6 +28,7 @@ impl EffectQuality {
     }
 }
 
+/// The coarsest working resolution a divisor may ask for: a quarter of the view's size.
 pub const MAX_RESOLUTION_DIVISOR: u32 = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -56,6 +57,8 @@ pub struct SsilQuality {
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SsrQuality {
     pub steps: u32,
+    /// The longest step in world units; `ssr_march.wgsl`'s `step_cap` also holds each
+    /// to `max(1/64, 1/steps)` of the screen's shorter side.
     pub step_length: f32,
 }
 

@@ -17,6 +17,7 @@ fn coroutine_runs_to_first_yield_then_resumes_on_schedule() {
                 coroutine.yield(Timer.WaitForFixedUpdate()) M.Beat(id)";
     let (mut m, _) = rig("co_sched", &co(body));
     tick(&mut m, 10);
+    // `Start` runs before tick 1's `Update`, so the first beat reads 0.
     assert_eq!(log(&m), "0,2,5,6,");
     assert!(
         m.cells.timers.borrow().is_empty(),

@@ -1,3 +1,6 @@
+//! Sealed: only real column types and the derived markers are channels, so `ScriptComponent`
+//! (whose column is `Vec<ScriptComponent>`) does not compile.
+
 use rusty_components::registry::first_class;
 use rusty_components::{MaterialAsset, PrefabLink, ScriptComponent, TransformComponent};
 
@@ -8,20 +11,26 @@ mod sealed {
 }
 
 pub trait Channel: sealed::Sealed + Send + Sync + 'static {
+    /// `false`: derived, stamped only where the code that knows its fact says so.
     const COLUMN: bool;
     const NAME: &'static str;
     const SLOT: usize;
+    /// A write on a static entity moves `World::static_geometry`'s revision (the Collider's).
     const STATIC_GEOMETRY: bool = false;
 }
 
+/// Static entities whose membership of the active static set may have moved (`static_revision`).
 pub struct StaticSet;
 
+/// Ids whose world matrix may have changed, descendants included: what physics re-poses from.
 pub struct WorldPose;
 
+/// Ids whose `activeInHierarchy` may have changed, descendants included.
 pub struct Activity;
 
 pub struct Layer;
 
+/// Ids whose own `children` list changed (both parents of a re-parent): UI sibling order.
 pub struct Children;
 
 macro_rules! channels {

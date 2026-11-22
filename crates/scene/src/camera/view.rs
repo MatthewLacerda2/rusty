@@ -32,6 +32,8 @@ pub fn set_view_fov(camera: &mut Camera, scene: &mut Scene, fov: f32) {
     }
 }
 
+/// The inverse of `yaw_pitch_from_matrix`: an entity looks down -Z, so yaw 0 (+X) is -90° about
+/// Y.
 pub fn look_rotation(yaw: f32, pitch: f32) -> Quat {
     Quat::from_rotation_y((-90.0 - yaw).to_radians()) * Quat::from_rotation_x(pitch.to_radians())
 }

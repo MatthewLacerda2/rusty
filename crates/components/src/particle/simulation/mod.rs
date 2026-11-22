@@ -15,8 +15,10 @@ rusty_core::named_enum! {
     }
 }
 
+/// How many step `dt`s the renderer replays one by one; it jumps older steps.
 pub const DT_HISTORY: usize = 256;
 
+/// Fixed (64 MB of particles): every device caps alike.
 pub const GPU_MAX_PARTICLES: u32 = 1_000_000;
 
 #[derive(Clone, Copy, Debug)]
@@ -158,6 +160,7 @@ impl GpuSim {
             cohort
                 .members
                 .sort_by(|a, b| b.0.total_cmp(&a.0).then(a.2.cmp(&b.2)));
+            // NaN sorts first; last, it dies on its first step, as on the CPU.
             let nan = cohort.members.iter().take_while(|m| m.0.is_nan()).count();
             cohort.members.rotate_left(nan);
             self.cohorts.push_back(cohort);

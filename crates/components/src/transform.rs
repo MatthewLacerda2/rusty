@@ -56,6 +56,7 @@ impl TransformComponent {
     }
 }
 
+/// Degrees `(pitch, yaw, roll)`, applied yaw, pitch, then roll.
 pub fn euler_degrees(rotation: Quat) -> Vec3 {
     let (yaw, pitch, roll) = rotation.to_euler(glam::EulerRot::YXZ);
     Vec3::new(pitch.to_degrees(), yaw.to_degrees(), roll.to_degrees())
@@ -89,6 +90,8 @@ impl Pose {
     }
 }
 
+/// glam splits a parent's reflection out as a negative X scale, so the child's rotation is seen
+/// through that mirror, never multiplied plainly.
 pub fn world_rotation(parent_world: Mat4, rotation: Quat) -> Quat {
     let parent_rot = parent_rotation(parent_world);
     (parent_rot * through_mirror(parent_world, rotation)).normalize()
@@ -99,11 +102,13 @@ pub fn local_rotation(parent_world: Mat4, world_rot: Quat) -> Quat {
     through_mirror(parent_world, parent_rot.inverse() * world_rot).normalize()
 }
 
+/// Relative tolerance (a few ulps) for a parent's axes to read equal-length and square.
 const UNIFORM: f32 = 4.0 * f32::EPSILON;
 
 fn lossy_scale(parent_world: Mat4, rotation: Quat, scale: Vec3) -> Vec3 {
     let split = parent_world.to_scale_rotation_translation().0;
     let parent = glam::Mat3::from_mat4(parent_world);
+    // A turn cannot change a uniform scale, and reading 1000 through the rotation gives 999.9999.
     if conformal(parent, split.abs()) {
         return split * scale;
     }
@@ -140,11 +145,14 @@ pub fn mirrored_direction(mirror: Vec3, dir: Vec3) -> Vec3 {
     mirror * dir
 }
 
+/// Only the X twist mirrors exactly: fine while swing limits are symmetric, as
+/// `physics::joints::frame::joint_builder` sets them.
 pub fn mirrored_frame_axes(mirror: Vec3, x: Vec3, y: Vec3) -> (Vec3, Vec3) {
     let sense = mirror.x * mirror.y * mirror.z;
     (sense * (mirror * x), mirror * y)
 }
 
+/// A zero scale axis makes glam's rotation NaN, which would poison every pose below.
 fn parent_rotation(parent_world: Mat4) -> Quat {
     let (_, rot, _) = parent_world.to_scale_rotation_translation();
     if rot.is_finite() {

@@ -9,6 +9,8 @@ use rusty_scene::Scene;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
+/// Baked into the shared shader folder: its tag keeps one run's tests apart, the process id
+/// two runs; `Drop` removes it.
 pub(super) struct Baked(pub(super) String);
 
 impl Baked {

@@ -4,8 +4,10 @@ use serde::{Deserialize, Serialize};
 use super::Vertex;
 use rusty_asset::tangents::generate_tangents;
 
+/// The `primitive_type` of a mesh from the scene's mesh library; `asset_ref` names the entry.
 pub const SCENE_KIND: &str = "Scene";
 
+/// Vertices one mesh takes: a runaway script loop fails with a message, not gigabytes of buffer.
 pub const MAX_VERTICES: usize = 1 << 20;
 
 /// The most indices one mesh takes: two triangles per vertex at the cap, about what
@@ -60,6 +62,7 @@ impl MeshData {
         finite("uv", self.uvs.iter().position(|p| !all_finite(p)))
     }
 
+    /// Call it on data that passed `validate`: it indexes the positions unchecked.
     pub fn geometry(&self) -> (Vec<Vertex>, Vec<u32>) {
         let normals: Vec<[f32; 3]> = match self.normals.is_empty() {
             true => area_weighted_normals(&self.positions, &self.indices),

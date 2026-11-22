@@ -53,6 +53,7 @@ impl World {
         self.component::<Core>(id).is_some_and(|c| c.is_static)
     }
 
+    /// Not [`World::body_carrier`]'s body: a non-static Collider alone is a moving body here.
     pub fn is_moving_body(&self, id: u32) -> bool {
         !self.is_static(id) && (self.has_collider(id) || self.has_character_controller(id))
     }
@@ -82,6 +83,8 @@ impl World {
         true
     }
 
+    /// Moves when the static set may have changed (a clear or rewind too), not on a static
+    /// entity's move: that is [`World::static_geometry`]'s.
     pub fn static_revision(&self) -> u64 {
         self.static_set_revision()
     }
@@ -108,6 +111,7 @@ impl World {
         self.component::<Core>(id).and_then(|c| c.parent_id)
     }
 
+    /// At most [`World::len`] steps, so a parent cycle ends the walk; a dead parent ends it too.
     pub fn ancestors(&self, id: u32) -> impl Iterator<Item = u32> + '_ {
         let live_parent = |id: u32| self.parent_id(id).filter(|&p| self.contains(p));
         std::iter::successors(live_parent(id), move |&p| live_parent(p)).take(self.len())
@@ -122,6 +126,8 @@ impl World {
             .find(|&c| self.has_rigidbody(c) || self.has_character_controller(c))
     }
 
+    /// ORDER: `add_child` first. A link its parent's `children` lacks makes every later activity
+    /// invalidation a whole-store bump until a `clear` (`ecs::activity`).
     pub fn set_parent_id(&mut self, id: u32, parent: Option<u32>) -> bool {
         let Some(mut core) = self.component_mut::<Core>(id) else {
             return false;
@@ -172,6 +178,7 @@ impl World {
         self.set_component(id, Some(asset))
     }
 
+    /// Stamps the animator alone: the palette it leads to is derived (`World::set_pose_palette`).
     pub fn with_animator_mut_and_mesh<R>(
         &mut self,
         id: u32,

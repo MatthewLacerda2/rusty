@@ -84,6 +84,8 @@ pub struct EmitterRuntime {
     pub pending: Vec<SubEmitEvent>,
     pub anchor: Option<EmitterFrame>,
     pub base: Option<EmitterFrame>,
+    /// Bumped by a tick, emit, clear or scripted write; a script's write checks the one its read
+    /// recorded. The sim never reads it.
     pub revision: u64,
 }
 

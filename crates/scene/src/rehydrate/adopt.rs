@@ -4,7 +4,9 @@ use rusty_ecs::World;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Keep {
+    /// Undo's: it runs on an edit frame, whose model follow catches a write.
     SameSource,
+    /// Stop's and the prefab propagation's: during Play a model can change on disk unwatched.
     Current,
 }
 
@@ -28,6 +30,7 @@ impl Keep {
 
 impl RehydratedScene {
     pub fn adopting(mut data: crate::serialize::SceneData, live: &mut World) -> Self {
+        // Stamped before the lookups, so a model written while they ran is still followed.
         let read_at = rusty_core::fs::written::written_since(u64::MAX).0;
         let mut imports = Imports::default();
         for doc in &mut data.entities {
@@ -48,6 +51,8 @@ fn unbind(doc: &mut Entity) {
     }
 }
 
+/// True when the Mesh was rebuilt, unbound from its bones: the caller then runs
+/// `Scene::sync_skeleton` on it.
 pub fn adopt_or_rehydrate(
     world: &mut World,
     doc: &mut Entity,
@@ -61,6 +66,7 @@ pub fn adopt_or_rehydrate(
         rehydrate_in(doc, imports);
         return true;
     }
+    // Undo's adopted mesh keeps its live bones and its recorded box.
     if keep == Keep::Current {
         settle(doc);
     }
@@ -105,6 +111,7 @@ fn restore_collider_meshes(world: &mut World, doc: &mut Entity, keep: Keep, impo
         rebuilt |= restore_collider_mesh(world, doc, Which::Kept, keep, imports);
     }
     rebuilt |= restore_collider_mesh(world, doc, Which::Collision, keep, imports);
+    // Once both are back: a refit between would size the box to the kept copy alone.
     if let Some(collider) = doc.collider.as_mut().filter(|_| rebuilt) {
         super::refit_collider(collider, own);
     }

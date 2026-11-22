@@ -26,6 +26,7 @@ fn op() -> impl Strategy<Value = Op> {
     ]
 }
 
+/// The oracle: every script slot in the World with no load attempt, as a full scan finds.
 fn unloaded(m: &ScriptManager) -> BTreeSet<(u32, usize)> {
     let scene = m.cells.scene.borrow();
     let w = &scene.world;

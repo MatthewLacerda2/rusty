@@ -1,4 +1,6 @@
 //! stored-format: the `.lightmaps` pages' bytes (their mip chain and 8-bit encodings)
+//! The bake writes pages with these and the renderer's loader reads them back, so a page
+//! decoded from its PNG has the chain the bake stored.
 
 use std::ops::{Add, Div, Mul};
 
@@ -10,6 +12,7 @@ pub mod encode;
 
 use encode::{encode_direction, encode_mask};
 
+/// The base and two halvings; the atlas keeps every level inside one map.
 pub const MIP_LEVELS: u32 = 3;
 
 pub trait Texel:

@@ -8,6 +8,7 @@ use super::transitions::{DT, LOGGER};
 
 #[test]
 fn destroying_one_entity_leaves_a_sibling_running() {
+    // The sibling's real script is loaded by the drain, so losing its load record reloads it.
     let (mut m, a) = manager_with_entity();
     let b = m.cells.scene.borrow_mut().add_entity("B".to_string());
     m.init_runtime().unwrap();

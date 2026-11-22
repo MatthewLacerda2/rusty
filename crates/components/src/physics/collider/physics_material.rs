@@ -21,6 +21,7 @@ pub struct PhysicsMaterial {
 }
 
 impl PhysicsMaterial {
+    /// rapier's own default, kept over Unity's 0.6: the physics tests and tuned scenes rest on it.
     const DEFAULT_FRICTION: f32 = 0.5;
 
     pub fn new(friction: f32, bounciness: f32) -> Self {

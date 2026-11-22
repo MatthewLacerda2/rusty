@@ -1,10 +1,18 @@
+//! A first-class component is its type, its [`FirstClass`] impl and one `first_class!` row, from
+//! which every per-component list is generated (`Entity`'s fields, `World`'s accessors).
+//! A new one also brings a `Default` (or an arm in `dispatch.rs`'s `added!`), its inspector card,
+//! API namespace and `docs/api/` page, and a new `scene.fingerprint`.
+
 pub trait FirstClass: 'static {
     const NAME: &'static str;
     const ALIASES: &'static [&'static str] = &[];
     const INVENTORY: &'static str = Self::NAME;
+    /// Key paths whose absence loads other than the default on purpose, each with why.
     const DEFAULT_EXCEPTIONS: &'static [(&'static str, &'static str)] = &[];
 }
 
+// A row: the `Entity` field (also scene key and getter), its type, its `ComponentKind`, then the
+// accessor names, since a macro cannot build an identifier.
 #[macro_export]
 macro_rules! first_class {
     ($callback:ident) => {
@@ -53,6 +61,7 @@ macro_rules! first_class {
 }
 pub use crate::first_class;
 
+/// Only this crate calls it.
 #[doc(hidden)]
 pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
     reference: &T,
@@ -72,6 +81,7 @@ pub fn serde_drift<T: serde::Serialize + serde::de::DeserializeOwned>(
         .collect()
 }
 
+/// Test hook for `scene::create::defaults`' tests.
 #[doc(hidden)]
 pub fn default_drift<T: FirstClass + serde::Serialize + serde::de::DeserializeOwned>(
     reference: &T,

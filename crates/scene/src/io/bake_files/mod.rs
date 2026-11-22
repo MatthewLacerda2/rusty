@@ -1,3 +1,5 @@
+//! Keyed by one spelling of each path; interior mutability because a save takes `&Scene`.
+
 mod disk;
 mod record;
 mod refusals;
@@ -62,6 +64,7 @@ impl BakeFiles {
         ours.for_each(|(_, s)| {
             s.mark = Mark::Baked;
             s.why = None;
+            // Holding the replaced buffer would only keep it alive.
             s.buffer = None;
         });
     }
@@ -174,10 +177,12 @@ impl BakeFiles {
         Some(text)
     }
 
+    /// A test hook: the dev and edit sides' tests read it.
     pub fn warned(&self, path: &Path) -> bool {
         self.warned.borrow().contains(&key(path))
     }
 
+    /// A test hook: the state inventory's marks read it.
     #[doc(hidden)]
     pub fn has(&self, path: &Path) -> bool {
         self.seen.borrow().contains_key(&key(path))

@@ -29,6 +29,8 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
+/// Pixels on a tile's longer side when `Preview` names no size, at most the recipe's own;
+/// `docs/api/Texture.md` states it.
 pub const PREVIEW_SIZE: u32 = 128;
 
 pub fn stats_table(

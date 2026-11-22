@@ -35,6 +35,7 @@ fn late_update_observes_post_physics_transform_same_tick() {
     m.init_scripts();
 
     m.update_scripts(1.0 / 60.0);
+    // A move stands in for physics; `app`'s `late_update_tests` prove the real schedule.
     m.cells
         .scene
         .borrow_mut()

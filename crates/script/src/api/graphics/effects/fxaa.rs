@@ -18,6 +18,7 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     put(
         table,
         "GetFxaaActive",
+        // `true` with no camera, as `postfx::effects::fxaa::fxaa_enabled` runs FXAA then.
         lua.create_function(move |lua, ()| {
             Ok(with_cam(&*scene.get(lua)?, |c| c.fxaa_active).unwrap_or(true))
         }),

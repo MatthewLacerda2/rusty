@@ -1,10 +1,15 @@
+//! A ragdoll's runtime state, never saved. Where reactions overlap a bone takes the
+//! largest weight: each eases continuously to 0, so their maximum does, with no jump.
 use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Quat, Vec3};
 
+/// A hit reaction's length when the call names none, in seconds.
 pub const REACT_DURATION: f32 = 0.4;
+/// A hit reaction's drive strength when the call names none, in 1/s².
 pub const REACT_STRENGTH: f32 = 5000.0;
 
+/// The damping, in 1/s, that settles a drive of `strength` fastest without overshoot.
 pub fn critical_damping(strength: f32) -> f32 {
     2.0 * strength.max(0.0).sqrt()
 }
@@ -67,6 +72,8 @@ impl RagdollRuntime {
         self.animated.entry(bone).or_insert(pose);
     }
 
+    /// Its blend weight stays, as Unreal's `PhysicsBlendWeight` stays on the body; it goes
+    /// only with the ragdoll (`retain`).
     pub fn untrack(&mut self, bone: u32) {
         self.animated.remove(&bone);
         self.reacting.remove(&bone);

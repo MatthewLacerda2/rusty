@@ -1,3 +1,8 @@
+//! `activeInHierarchy`, answered once per id and kept; a read cleans the chain above it. A flag or
+//! parent-link change dirties its subtree down `children`; an inserted, overwritten or restored
+//! document bumps the generation, since an orphan can name it from no `children` list. Stamps
+//! gate the cache, never an answer.
+
 use std::cell::RefCell;
 
 use super::bundle::Core;
@@ -5,11 +10,14 @@ use super::world::World;
 
 pub(crate) struct ActivityStore {
     inner: RefCell<Flags>,
+    /// A parent link was written without its `children` entry: subtree walks can miss a
+    /// descendant, so every invalidation bumps the whole store.
     unlisted: bool,
 }
 
 struct Flags {
     flags: Vec<(u32, bool)>,
+    /// Never `0`, so a fresh entry reads as dirty.
     generation: u32,
     chain: Vec<u32>,
 }
@@ -51,6 +59,7 @@ impl ActivityStore {
         let mut store = self.inner.borrow_mut();
         store.generation = store.generation.wrapping_add(1);
         if store.generation == 0 {
+            // Wrapped: an old stamp could alias the new generation.
             store.flags.clear();
             store.generation = 1;
         }

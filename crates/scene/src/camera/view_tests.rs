@@ -34,6 +34,7 @@ fn look_rotation_inverts_the_entity_pose() {
 #[test]
 fn setting_the_view_moves_the_main_camera_entity() {
     let (mut scene, id) = scene_with_camera();
+    // A parent at x = 10, so the entity's local pose differs from the world one the setters write.
     let rig = scene.add_entity("Rig".to_string());
     scene.world.transform_mut(rig).expect("t").position = Vec3::new(10.0, 0.0, 0.0);
     scene.set_parent(id, Some(rig)).expect("parent");

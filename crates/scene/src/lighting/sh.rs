@@ -1,3 +1,6 @@
+//! L2 real SH in (l, m) order: 0 is l=0, 1–3 l=1 (m −1..1), 4–8 l=2 (m −2..2), as
+//! `lighting/sh.wgsl`'s `sh_basis`: change the two together.
+
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
@@ -7,6 +10,7 @@ fn sh_basis(dir: Vec3) -> [f32; SH_COEFFS] {
     let d = dir.normalize_or_zero();
     let (x, y, z) = (d.x, d.y, d.z);
     [
+        // ½√(1/π), √(3/4π), √(15/4π), ½√(5/4π) and ¼√(15/π): the normalized polynomials.
         0.282_094_8,
         -0.488_602_5 * y,
         0.488_602_5 * z,
@@ -19,6 +23,8 @@ fn sh_basis(dir: Vec3) -> [f32; SH_COEFFS] {
     ]
 }
 
+/// Ramamoorthi & Hanrahan's per-band cosine convolution (π, 2π/3, π/4): stored radiance
+/// read back as irradiance.
 const COSINE_LOBE: [f32; SH_COEFFS] = {
     let a0 = std::f32::consts::PI;
     let a1 = 2.094_395_2;
@@ -61,6 +67,7 @@ impl Sh9 {
         }
     }
 
+    /// Clamped non-negative, since SH rings below zero; mirrors the shader's `eval_sh`.
     pub fn eval(&self, normal: Vec3) -> Vec3 {
         let basis = sh_basis(normal);
         let mut out = Vec3::ZERO;
@@ -71,6 +78,7 @@ impl Sh9 {
         out.max(Vec3::ZERO)
     }
 
+    /// No convolution and no clamp: what a ray escaping toward `dir` sees.
     pub fn eval_radiance(&self, dir: Vec3) -> Vec3 {
         let basis = sh_basis(dir);
         (0..SH_COEFFS).fold(Vec3::ZERO, |out, i| {
@@ -78,6 +86,7 @@ impl Sh9 {
         })
     }
 
+    /// The coefficients a shader shades `eval / π` with in one dot product.
     pub fn convolved_over_pi(&self) -> Sh9 {
         let mut out = *self;
         for (c, a) in out.coeffs.iter_mut().zip(COSINE_LOBE) {

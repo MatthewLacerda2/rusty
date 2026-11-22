@@ -1,3 +1,7 @@
+//! Collider world AABBs. Setting or reshaping a collider refreshes its box at once; a Transform
+//! write only queues the entity ([`World::moved`]), and [`World::flush_bounds`], run after every
+//! stage, refreshes each collider below once. Until then readers use [`World::collider_bounds`].
+
 use glam::Vec3;
 
 use crate::World;
@@ -42,6 +46,7 @@ impl World {
         self.stamp_pose_below(id);
     }
 
+    /// Never stale: the stored box, or one worked out now while an ancestor is queued.
     pub fn collider_bounds(&self, id: u32) -> Option<(Vec3, Vec3)> {
         let col = self.collider(id)?;
         let queued = !self.bounds.pending.is_empty()
@@ -62,6 +67,7 @@ impl World {
         let mut stack = std::mem::take(&mut self.bounds.stack);
         self.bounds.pass = self.bounds.pass.wrapping_add(1);
         if self.bounds.pass == 0 {
+            // Wrapped: an old stamp could alias the new pass.
             self.bounds.seen.clear();
             self.bounds.pass = 1;
         }
@@ -81,6 +87,7 @@ impl World {
         (self.bounds.pending, self.bounds.stack) = (pending, stack);
     }
 
+    /// The box is derived, so the Collider channel is not stamped: moves are `WorldPose`'s.
     pub fn refresh_collider_aabb(&mut self, id: u32) {
         if !self.has_collider(id) {
             return;

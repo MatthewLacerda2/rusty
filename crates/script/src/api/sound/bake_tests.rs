@@ -23,7 +23,7 @@ fn bake_writes_a_playable_wav_and_returns_its_path() {
     let clip = cache
         .get_or_decode(&path)
         .expect("the engine decodes the bake");
-    // zimmer bakes stereo (its SYNTH_VERSION 3); the old in-tree synth was mono.
+    // zimmer bakes stereo.
     assert_eq!(clip.channels(), 2, "stereo");
     assert_eq!(clip.sample_rate(), rusty_zimmer::SAMPLE_RATE);
     std::fs::remove_file(path).ok();

@@ -6,7 +6,7 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::post_processing::grading::color_adjustments;
 use rusty_scene::Scene;
 
-/// Its knobs; neutral without an active volume, as a new volume starts.
+/// The color adjustments' knobs; neutral without an active volume, as a new volume starts.
 pub(in crate::api::graphics) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,

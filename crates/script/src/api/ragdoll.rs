@@ -34,6 +34,7 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<Physic
             let id = id.live("Ragdoll", "Build")?;
             let mut options = RagdollOptions::default();
             if let Some(mass) = opts.map(|o| o.get::<Option<f32>>("mass")).transpose()? {
+                // Kilograms, floored above zero, since the bones' bodies share it.
                 options.mass = mass.unwrap_or(options.mass).max(0.001);
             }
             let made = scene

@@ -1,3 +1,5 @@
+//! The "Add Component" defaults: the editor and `Scene.AddComponent` both read
+//! these, so a component added either way is identical.
 use glam::Vec3;
 
 use crate::{
@@ -8,6 +10,7 @@ use crate::{
 use rusty_components::material::entity_material_key;
 use rusty_components::Playback;
 
+/// The inner and outer cone angles, in degrees, a new light carries.
 pub const DEFAULT_CONES: (f32, f32) = (30.0, 45.0);
 
 pub(crate) fn light(
@@ -78,6 +81,8 @@ pub fn default_material() -> MaterialAsset {
     MaterialAsset::default()
 }
 
+/// A library material already under the entity's key (perhaps shared) is kept,
+/// never reset, as adding a renderer in Unity leaves a material asset alone.
 pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
     if !scene
         .world
@@ -92,6 +97,7 @@ pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
     true
 }
 
+/// Radius and stopping distance in metres, speed in m/s, acceleration in m/s².
 pub fn default_nav_agent() -> NavMeshAgentComponent {
     NavMeshAgentComponent {
         active: true,

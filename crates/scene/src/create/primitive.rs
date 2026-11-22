@@ -8,6 +8,8 @@ use rusty_components::mesh::primitives;
 use rusty_components::mesh::{MeshRevision, Vertex};
 use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape};
 
+// The round primitives' radius and the Cylinder's and Capsule's full height, in metres
+// (Unity's): one value for the mesh and the collider it comes with.
 const RADIUS: f32 = 0.5;
 const HEIGHT: f32 = 2.0;
 
@@ -45,6 +47,8 @@ pub fn primitive_geometry(primitive: Primitive) -> Option<Geometry> {
 
 pub type Geometry = (Shared<Vertex>, Shared<u32>);
 
+/// Built once per process per shape and shared; a finer Plane cut is built afresh, so a
+/// cut tried once is not kept. A load rebuilds primitives from this too.
 pub fn subdivided_geometry(primitive: Primitive, subdivisions: u32) -> Option<Geometry> {
     if primitive == Primitive::Plane && subdivisions != 1 {
         return generated(primitive, subdivisions).map(|(v, i)| (v.into(), i.into()));
@@ -60,6 +64,7 @@ pub fn subdivided_geometry(primitive: Primitive, subdivisions: u32) -> Option<Ge
     geometry
 }
 
+/// One revision per shape and cut, so a renderer uploads a primitive once.
 pub fn primitive_revision(primitive: Primitive, subdivisions: u32) -> MeshRevision {
     let cut = if primitive == Primitive::Plane {
         subdivisions
@@ -128,6 +133,7 @@ pub(super) fn primitive_light(primitive: Primitive) -> Option<LightComponent> {
     }
 }
 
+/// As Unity's `CreatePrimitive`, a Cylinder gets a capsule collider.
 pub fn primitive_collider(primitive: Primitive, mesh: &MeshComponent) -> Option<ColliderComponent> {
     let shape = match primitive {
         Primitive::Box => ColliderShape::Box { size: Vec3::ONE },

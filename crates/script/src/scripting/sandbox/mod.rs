@@ -4,6 +4,7 @@ mod files;
 
 pub(super) use files::install as install_file_access;
 
+/// These run before the API registers `Random`, so each call looks `Random` up then.
 const MATH_SHIMS: &str = r#"
 local tointeger, maxinteger, mininteger = math.tointeger, math.maxinteger, math.mininteger
 math.random = function(m, n)
@@ -54,6 +55,8 @@ pub(crate) fn require_sim_vm(lua: &Lua, verb: &str) -> mlua::Result<()> {
     )))
 }
 
+/// Reads a script's returned table without the API: `require` gives an empty table and an
+/// unknown global a stub, so a chunk reading the API at load still yields its `fields`.
 pub(super) fn inspection_vm() -> Lua {
     let lua = Lua::new();
     let stub = lua.create_function(|lua, _: mlua::MultiValue| lua.create_table());

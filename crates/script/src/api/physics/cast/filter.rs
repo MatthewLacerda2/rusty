@@ -13,8 +13,7 @@ pub(in crate::api::physics) struct Filter {
 
 impl Filter {
     /// A filter from a verb's optional Lua arguments. `query_triggers` absent
-    /// (or nil) hits triggers: every query here always did, and it is Unity's
-    /// default (*Queries Hit Triggers* on).
+    /// (or nil) hits triggers, Unity's default (*Queries Hit Triggers* on).
     pub fn new(ignore: Option<u32>, mask: Option<u32>, query_triggers: Option<bool>) -> Self {
         Self {
             ignore,
@@ -28,6 +27,7 @@ impl Filter {
             return false;
         }
         let world = &scene.world;
+        // `physics::live` never makes a character's capsule a sensor, whatever `is_trigger` says.
         let trigger =
             world.collider(id).is_some_and(|c| c.is_trigger) && !world.has_character_controller(id);
         if !self.triggers && trigger {

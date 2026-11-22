@@ -70,6 +70,7 @@ impl Random {
     }
 
     pub fn on_unit_sphere(&mut self) -> Vec3 {
+        // Archimedes: uniform z and azimuth land uniformly on the sphere.
         let z = self.signed();
         let phi = self.value() as f32 * std::f32::consts::TAU;
         let r = (1.0 - z * z).max(0.0).sqrt();

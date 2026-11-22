@@ -16,11 +16,14 @@ impl MaterialComponent {
         Self::new(entity_material_key(id))
     }
 
+    /// `""` for an empty list, a key no library entry has.
     pub fn first(&self) -> &str {
         self.materials.first().map_or("", String::as_str)
     }
 }
 
+/// An entity's own material key, which every path creating one calls; `edit::model_instance`
+/// parses the same spelling back.
 pub fn entity_material_key(id: u32) -> String {
     format!("entity_{id}_material")
 }

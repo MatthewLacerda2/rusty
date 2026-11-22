@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use super::manager::ScriptManager;
 
+/// Characters of a console line kept as its Undo step's name (`Editor.UndoName`).
 const STEP_NAME_CHARS: usize = 60;
 
 impl ScriptManager {
@@ -34,6 +35,7 @@ impl ScriptManager {
         result
     }
 
+    /// A test hook: `tests/api_doc_drift.rs` and `dev`'s Lua-surface tests read it.
     pub fn api_surface(&self) -> BTreeMap<String, BTreeSet<String>> {
         let Some(lua) = self.lua.as_ref() else {
             return BTreeMap::new();
@@ -84,6 +86,7 @@ fn walk_surface(
     Ok(())
 }
 
+/// Lua 5.4's standard globals, left out of the surface walk so the
 /// drift gate compares only engine namespaces (capitalized `Debug` is the engine's,
 /// not the lowercase stdlib `debug`).
 const LUA_STDLIB_GLOBALS: &[&str] = &[

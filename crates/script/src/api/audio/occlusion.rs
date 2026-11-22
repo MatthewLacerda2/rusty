@@ -22,6 +22,7 @@ fn patched(mut settings: OcclusionSettings, patch: &Table) -> mlua::Result<Occlu
         };
         match key.as_str() {
             "strength" => settings.strength = number(value)? as f32,
+            // `as u32` keeps the low 32 bits, so Lua's negative `~(1 << 8)` is all but layer 8.
             "layer_mask" => match value {
                 Value::Integer(i) => settings.layer_mask = i as u32,
                 v => settings.layer_mask = number(v)? as u32,

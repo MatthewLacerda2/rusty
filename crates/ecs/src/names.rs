@@ -1,3 +1,7 @@
+//! The name index behind [`World::find_by_name`], derived from the name channel's cursor so no
+//! write site can forget it; opened by the first lookup. Activity is asked at lookup, so
+//! (de)activations and re-parents need no stamp here.
+
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -8,6 +12,7 @@ use super::world::World;
 #[derive(Default)]
 pub(super) struct NameIndex {
     cursor: Option<Cursor<String>>,
+    /// Ordered by `Core::seq`, the order `World::ids` yields.
     by_name: BTreeMap<String, BTreeSet<(u64, u32)>>,
     of_id: BTreeMap<u32, (String, u64)>,
 }

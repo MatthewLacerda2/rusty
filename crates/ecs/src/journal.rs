@@ -1,3 +1,7 @@
+//! The edit-mode change journal, Unity's `Undo.RecordObject`: while recording, an entity's first
+//! write records its state before it, once (geometry left out), `None` for one not yet alive.
+//! `scene::undo` turns it on around an edit and takes the step; off, a write pays one `bool` test.
+
 use std::collections::BTreeMap;
 
 use rusty_components::{ColliderComponent, Entity, MeshComponent};
@@ -6,6 +10,7 @@ use super::bundle::Core;
 use super::world::World;
 
 #[derive(Clone, Debug)]
+/// `seq` is the insertion-order stamp [`World::restore_entity`] puts it back at.
 pub struct Recorded {
     pub doc: Entity,
     pub seq: u64,
@@ -23,6 +28,7 @@ pub(super) struct Journal {
 }
 
 impl World {
+    /// What was recorded and not taken is kept.
     pub fn journal_resume(&mut self) {
         self.journal.recording = true;
     }

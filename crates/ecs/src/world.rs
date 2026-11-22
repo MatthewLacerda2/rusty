@@ -1,3 +1,5 @@
+//! Walks keep insertion order (`order`), which physics pair order relies on.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use rusty_components::Entity;
@@ -18,12 +20,14 @@ pub(crate) use hecs::{Ref, RefMut};
 pub struct World {
     pub(super) inner: hecs::World,
     pub(super) handles: Handles,
+    /// Sorted by `Core::seq`: `place` appends, `overwrite` keeps the slot.
     pub(super) order: Vec<u32>,
     pub(super) next_id: u32,
     pub(super) next_seq: u64,
     pub(super) world_space: WorldStore,
     pub(super) bounds: BoundsQueue,
     pub(super) activity: ActivityStore,
+    /// A `RefCell` so a reader holding `&World` (the renderer) can open and read a cursor.
     pub(super) changes: std::cell::RefCell<ChangeLogs>,
     pub(super) journal: Journal,
     pub(super) refs: Option<RefIndex>,
@@ -76,7 +80,7 @@ impl World {
 
     pub fn spawn(&mut self, name: String) -> u32 {
         let id = self.next_id;
-        self.note(id);
+        self.note(id); // before the allocator moves, so an Undo gives the id back
         self.next_id += 1;
         self.place(Entity::new(id, name));
         id
@@ -89,10 +93,11 @@ impl World {
         }
         let id = entity.id;
         self.place(entity);
-        self.invalidate_caches();
+        self.invalidate_caches(); // an orphan may already name this id as its parent
         self.stamp_hierarchy_below(id);
     }
 
+    /// `ids`' references were cleared first (`World::forget_references`).
     pub(super) fn remove_rows(&mut self, ids: &std::collections::BTreeSet<u32>) {
         let mut slots: Vec<usize> = ids.iter().filter_map(|&id| self.order_slot(id)).collect();
         for &id in ids {
@@ -143,6 +148,7 @@ impl World {
         &self.order
     }
 
+    /// A test hook for this and other crates' tests: engine code collects without geometry.
     #[doc(hidden)]
     pub fn collect_entities(&self) -> Vec<Entity> {
         self.order
@@ -157,6 +163,7 @@ impl World {
         self.inner.get::<&T>(handle).ok()
     }
 
+    /// In hecs archetype order, not insertion order.
     pub(crate) fn each_component<T: hecs::Component>(&self, mut visit: impl FnMut(&T)) {
         self.inner.query::<&T>().iter().for_each(|(_, v)| visit(v));
     }
@@ -168,6 +175,7 @@ impl World {
     pub(crate) fn ids_with_component<T: hecs::Component>(&self) -> Vec<u32> {
         let mut matches: Vec<(u64, u32)> = Vec::new();
         self.each_core_with::<T>(|core| matches.push((core.seq, core.id)));
+        // hecs yields per archetype; the sort restores insertion order.
         matches.sort_unstable_by_key(|&(seq, _)| seq);
         matches.into_iter().map(|(_, id)| id).collect()
     }
@@ -188,6 +196,7 @@ impl World {
         matches.into_iter().map(|(_, id)| id).collect()
     }
 
+    /// In hecs archetype order, not insertion order.
     pub(crate) fn each_core_with<T: hecs::Component>(&self, visit: impl FnMut(&Core)) {
         walks::count(std::any::type_name::<T>());
         let mut query = self.inner.query::<&Core>().with::<&T>();

@@ -1,4 +1,5 @@
-//! Unity's shape: colour keys and alpha keys are separate lists.
+//! Unity's shape: colour keys and alpha keys are separate lists, so an alpha fade needs no
+//! colour key at its `t`.
 
 use serde::{Deserialize, Serialize};
 
@@ -10,6 +11,7 @@ pub struct ColorKey {
     pub color: [f32; 3],
 }
 
+/// No colour keys is white; no alpha keys is opaque.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Gradient {
     #[serde(default)]
