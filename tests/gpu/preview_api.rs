@@ -4,6 +4,7 @@
 
 use rusty::dev::session::Session;
 
+/// A committed shader, so what a baked `.wgsl` renders is the arm covered end to end.
 const SHADER: &str = "engine/shaders/shader.wgsl";
 
 fn session() -> Session {

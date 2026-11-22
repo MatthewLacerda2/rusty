@@ -55,6 +55,7 @@ fn walls_hit_the_sides_and_ceilings_hit_above() {
     let wall = walk_for(&mut physics, &mut scene, id, Vec3::X * 4.0, 40);
     assert!(wall.flags & 2 != 0, "the wall is on the side: {wall:?}");
     assert!(pos_of(&scene, id).x < 1.5, "and it blocked the move");
+    // The ceiling's underside is at 2.5 and the head at about 2.08: a 1 m jump hits it.
     scene.world.transform_mut(id).unwrap().position.x = -3.0;
     physics.step(&mut scene, DT);
     let up = physics::move_character(Some(&physics), &mut scene, id, Vec3::Y).unwrap();

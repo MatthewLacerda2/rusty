@@ -1,5 +1,5 @@
-//! Slopes over the limit at every angle, and the ground normal of a move that never touched the
-//! floor (`physics::character::sweep`).
+//! Steep slopes and an untouched floor's normal: the cases rapier leaves to
+//! `physics::character::sweep`.
 
 use glam::Vec3;
 use rusty::physics::{self, PhysicsWorld};
@@ -15,6 +15,7 @@ fn on_ramp(degrees: f32, along: f32) -> (Scene, u32) {
     let r = degrees.to_radians();
     let surface = Vec3::new(1.0 + along * r.cos(), along * r.sin(), 0.0);
     let normal = Vec3::new(-r.sin(), r.cos(), 0.0);
+    // The lower cap's centre: its 0.5 m radius plus the 0.08 m skin off the slope.
     let center = surface + normal * 0.58 + Vec3::Y * 0.5;
     scene.world.transform_mut(id).unwrap().position = center;
     (scene, id)
@@ -68,6 +69,8 @@ fn a_move_that_never_hits_the_ramp_still_reads_its_normal() {
     }
 }
 
+/// The sweep reruns a steep push off the slope, keeping the first pass's contacts: a push
+/// script still pushes a steep face.
 #[test]
 fn walking_into_a_steep_slope_reports_it_as_hit() {
     for degrees in STEEP {

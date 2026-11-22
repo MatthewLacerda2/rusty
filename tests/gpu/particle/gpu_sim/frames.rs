@@ -48,6 +48,7 @@ fn a_gpu_emitter_matches_its_cpu_twin_frame_after_frame() {
             "frame {frame}: the cloud draws"
         );
         let agree = agreement(&a, &b);
+        eprintln!("[MEASURE] {} {agree}", file!());
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
 }

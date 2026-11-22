@@ -2,7 +2,6 @@
 //! reflection probe 1.2 m below a `Baked` lamp, one lit, one beyond its range
 //! (black lightmap). The lit floor keeps the probe's reflection whole (the lamp's
 //! direct light is not in the probe's irradiance), the dark one at most a tenth.
-//! Skips without an adapter.
 
 use crate::gpu::mean;
 use crate::gpu::reflection_probe_per_object_screenshot::solid_cube_ktx2;
@@ -17,6 +16,7 @@ use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 32;
+/// Metres: the dark floor's centre, past the lamp's 6 m range.
 const DARK_X: f32 = 20.0;
 
 fn scene(name: &str, normalised: bool) -> Scene {
@@ -35,6 +35,7 @@ fn scene(name: &str, normalised: bool) -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("white".to_string(), white);
+    // White ground and ceiling: the probe captures a room lit by the lamp.
     let middle = Vec3::new(DARK_X / 2.0, 0.0, 0.0);
     let (up, down) = (Quat::IDENTITY, Quat::from_rotation_x(std::f32::consts::PI));
     plane(&mut scene, "white", middle - Vec3::Y * 0.02, 3.0, up);
@@ -94,6 +95,8 @@ fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
     probes.set_box(i, corner, Vec3::new(DARK_X + 6.0, 6.0, 6.0));
     scene.lighting_settings.reflections.resolution = 32;
     bake_scene_reflections(scene, Some(&path), &mut BakeLog::off()).unwrap();
+    // Baked for real, so its stored irradiance is the capture's; then pointed at a solid cube so
+    // each floor's reflection is measurable.
     let stored = scene.reflection_probes.probes[i].irradiance;
     let probes = &mut scene.reflection_probes;
     probes.set_cubemap(i, cube.to_string_lossy().into_owned());

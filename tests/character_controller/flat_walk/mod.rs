@@ -1,6 +1,6 @@
-//! Walking open ground in Play: a CharacterController moved ahead on a flat floor covers its whole
-//! stride every tick and stays grounded (Unity's `Move`); floors are built as a script builds them
-//! (primitive plus `AddComponent("Collider")`, kinematic, no Rigidbody).
+//! In Play a CharacterController moved ahead on a flat floor covers its whole stride every tick
+//! and stays grounded (Unity's `Move`); floors are built as a script builds them (primitive plus
+//! `AddComponent("Collider")`, kinematic, no Rigidbody).
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -17,6 +17,7 @@ mod build;
 use build::{add_floor, add_lane, capsules};
 
 const TICKS: usize = 300;
+/// Metres along the walk: 30 m/s for `TICKS`, with room to spare.
 pub(super) const LENGTH: f32 = 180.0;
 pub(super) const START_Z: f32 = -80.0;
 const SPEEDS: [f32; 4] = [1.0, 4.0, 10.0, 30.0];

@@ -98,6 +98,7 @@ fn a_mid_grey_roughness_map_reads_one_half() {
     let map = png("rusty_647_rough.png", [128, 128, 128]);
     let mat = |roughness, roughness_map| MaterialAsset {
         base_color: [0.9, 0.9, 0.9],
+        // Metallic, so the lamp's highlight, which roughness spreads, is the picture.
         metallic: 1.0,
         roughness,
         roughness_map,

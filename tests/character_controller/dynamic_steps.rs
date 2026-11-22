@@ -33,6 +33,7 @@ fn never_climbs_a_dynamic_block() {
     walk_for(&mut physics, &mut scene, id, Vec3::X * 4.0, 75);
     let feet = feet_of(&scene, id);
     assert!(feet.y < 0.1, "climbed it: {feet}");
+    // Its face, wherever the walk nudged it: the rounded bottom stops on its edge, short of it.
     let face = pos_of(&scene, block).x - 2.0;
     let x = pos_of(&scene, id).x;
     assert!(x < face - 0.3, "on top of it, face at {face}: x={x}");

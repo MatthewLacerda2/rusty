@@ -12,6 +12,7 @@ fn seeded_project(name: &str) -> PathBuf {
     root
 }
 
+/// `(name, metallic, roughness, emits light)` per starter material.
 const EXPECTED: &[(&str, f32, f32, bool)] = &[
     ("Matte", 0.0, 0.9, false),
     ("Metal", 1.0, 0.25, false),

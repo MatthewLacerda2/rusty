@@ -1,6 +1,5 @@
 //! The Scene Settings panel's ops vs their bindings: `Graphics.{Get,Set}Fog*` vs
-//! `authoring::fog`, `Lighting`'s environment vs `authoring::environment`
-//!.
+//! `authoring::fog`, `Lighting`'s environment vs `authoring::environment`.
 
 use std::cell::RefCell;
 use std::rc::Rc;

@@ -1,6 +1,7 @@
 //! Cascaded sun shadows: a caster 100 units from the world origin — where the
 //! old fixed ±30 shadow box never reached — must still darken the ground under it.
-//! The same yard is rendered with the shadow distance cut to nothing for comparison.
+//! The same yard is rendered with the shadow distance cut to nothing, so the shadow is
+//! the only difference between the frames.
 
 use glam::{Quat, Vec3};
 use rusty::dev::screenshot::capture;

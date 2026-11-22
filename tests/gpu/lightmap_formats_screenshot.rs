@@ -13,6 +13,7 @@ use rusty::scene::{Camera, Scene};
 const SIZE: u32 = 64;
 const EDGE: u32 = 64;
 
+/// Warm HDR light on the left half (red past 1, under `RGBM_RANGE`'s 8), cool on the right.
 fn light() -> Vec<Vec3> {
     (0..EDGE * EDGE)
         .map(|i| match i % EDGE < EDGE / 2 {
@@ -80,7 +81,8 @@ fn the_bc6h_page_and_its_png_fallback_light_a_floor_alike() {
         .unwrap();
     eprintln!("[1694] worst channel difference {worst}");
     assert!(worst <= 8, "the two paths differ by {worst} levels");
-    // Warm stays warm and cool stays cool: no channel moved.
+    // Warm stays warm and cool stays cool: no channel moved. Which half is on top is the
+    // camera's business, so either order passes.
     let warm = |p: &image::Rgb<u8>| p[0] > p[1] && p[1] > p[2];
     let cool = |p: &image::Rgb<u8>| p[2] > p[1] && p[1] > p[0];
     for (img, what) in [(&fallback, "png"), (&compressed, "bc6h")] {

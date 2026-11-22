@@ -1,4 +1,4 @@
-//! Integration coverage for the `Graphics` scripting namespace (issue #87): the
+//! Integration coverage for the `Graphics` scripting namespace: the
 //! per-volume post-FX getters/setters write the active `PostProcessingComponent`
 //! / `CameraComponent` (the quality presets: `quality`). These are render-only, one-way writes —
 //! they never feed `FixedUpdate` — so the test only asserts the surface, not sim evolution.

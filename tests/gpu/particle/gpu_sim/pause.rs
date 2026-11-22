@@ -60,6 +60,7 @@ fn a_jump_over_a_pause_ages_by_the_time_that_passed() {
             "frame {frame}: drawn"
         );
         let agree = agreement(&a, &b);
+        eprintln!("[MEASURE] {} {agree}", file!());
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
 }

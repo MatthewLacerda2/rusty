@@ -8,6 +8,7 @@ struct EntitySpec {
     intensity: Option<f32>,
 }
 
+/// Finite values only: JSON holds no NaN or infinity, and a finite `f32` round-trips bitwise.
 fn entity_spec() -> impl Strategy<Value = EntitySpec> {
     (
         "[A-Za-z][A-Za-z0-9 ]{0,11}",

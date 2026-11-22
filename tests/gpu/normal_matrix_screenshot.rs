@@ -36,7 +36,7 @@ fn scene(scale: Vec3) -> Scene {
         ..default_light()
     };
     scene.world.set_light(sun, Some(light));
-    // A light shines down its -Z.
+    // A light shines down its -Z; turned about X, -Z points down -Y.
     scene.world.transform_mut(sun).unwrap().rotation =
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     scene

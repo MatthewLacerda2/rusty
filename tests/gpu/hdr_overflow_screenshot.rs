@@ -1,8 +1,8 @@
-//! A pixel too bright for half-float is stored finite. Polished metal under a lamp reflects past
-//! `Rgba16Float`'s 65504, and an `Inf` in the HDR target turns bloom's bright pass NaN, a black
-//! block around the highlight. Forward colour returns through `forward::transparent::finite_hdr`.
-//! Lavapipe stores an overflowing texel finite even without the clamp, so on Linux CI this
-//! cannot fail; a GPU that rounds to `Inf`, as Metal does, is where it holds the clamp.
+//! A pixel too bright for half-float is stored finite: metal under a lamp reflects
+//! past `Rgba16Float`'s 65504, and forward colour returns through `transparent::finite_hdr`,
+//! so the highlight stays white under bloom. Lavapipe stores an overflowing texel finite even
+//! without the clamp, so on Linux CI this cannot fail; a GPU that rounds to `Inf`, as Metal
+//! does, is where it holds the clamp.
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
@@ -25,6 +25,7 @@ fn scene() -> Scene {
         base_color: [1.0, 1.0, 1.0],
         metallic: 1.0,
         roughness: 0.05,
+        // Past half-float too, so the overflow never hangs on a GGX peak's brightness.
         emissive: [1e6, 1e6, 1e6],
         ..MaterialAsset::default()
     };
@@ -59,6 +60,7 @@ fn a_highlight_past_half_float_stays_white_under_bloom() {
         return;
     }
     let img = image::open(&path).unwrap().to_rgb8();
+    // The floor fills the frame: no pixel the black a NaN tonemaps to.
     for (x, y, p) in img.enumerate_pixels() {
         assert!(p.0.iter().all(|&v| v > 200), "({x}, {y}) is {:?}", p.0);
     }

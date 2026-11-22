@@ -1,8 +1,8 @@
 //! A collider under a zero-scaled ancestor across a save and a reload:
 //! glam splits a zero axis into a NaN rotation, and NaN serializes as `null`,
 //! which then fails to load, so the stored AABB must stay finite; a body's
-//! write-back under such a parent keeps the local position it cannot solve for
-//!. The pose and shape half is `physics::degenerate_parent_tests`.
+//! write-back under such a parent keeps the local position it cannot solve for.
+//! The pose and shape half is `physics::degenerate_parent_tests`.
 
 use std::f32::consts::FRAC_PI_2;
 

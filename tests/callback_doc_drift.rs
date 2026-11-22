@@ -10,6 +10,7 @@ fn reference() -> String {
     rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }
 
+/// Not backticked, so `api_doc_drift`'s parser never reads the section as a namespace.
 const HEADING: &str = "## Script lifecycle callbacks";
 
 #[test]

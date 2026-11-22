@@ -1,5 +1,3 @@
-//! Agent steering by its numbers, through `tick_nav_agents`.
-
 use glam::Vec3;
 use rusty::navigation::NavigationGraph;
 use rusty::scene::{NavMeshAgentComponent, Scene};
@@ -49,7 +47,7 @@ fn velocity_step_multiplies_not_divides() {
 #[test]
 fn agent_within_stopping_distance_does_not_advance() {
     let target = Vec3::new(10.0, 0.0, 0.0);
-    let start = Vec3::new(9.95, 0.0, 0.0);
+    let start = Vec3::new(9.95, 0.0, 0.0); // 0.05 m short: inside the 0.1 m stopping distance
     let mut scene = Scene::new();
     let id = spawn(&mut scene, start, agent_toward(target));
     open_graph().tick_nav_agents(&mut scene, 1.0 / 60.0);
@@ -66,7 +64,7 @@ fn agent_within_stopping_distance_does_not_advance() {
 #[test]
 fn deceleration_reduces_not_amplifies_velocity() {
     let target = Vec3::new(5.0, 0.0, 0.0);
-    let start = Vec3::new(4.96, 0.0, 0.0);
+    let start = Vec3::new(4.96, 0.0, 0.0); // 0.04 m short: inside the 0.1 m stopping distance
     let mut scene = Scene::new();
     let id = scene.add_entity("a".to_string());
     scene.world.transform_mut(id).unwrap().position = start;

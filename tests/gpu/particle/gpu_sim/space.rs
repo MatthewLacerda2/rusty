@@ -25,6 +25,7 @@ fn a_local_gpu_emitter_carries_its_particles_and_a_world_one_leaves_them() {
         };
         seen.push(centroid(&mask).expect("drawn").0);
     }
+    eprintln!("[MEASURE] seen {seen:?}");
     assert!(
         seen[0] > 40.0,
         "Local moved right with the emitter: {seen:?}"
@@ -119,6 +120,7 @@ fn a_local_gpu_emitter_scaling_through_0_while_emitting_matches_its_cpu_twin() {
             "frame {frame}: drawn"
         );
         let agree = agreement(&a, &b);
+        eprintln!("[MEASURE] {} {agree}", file!());
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
 }

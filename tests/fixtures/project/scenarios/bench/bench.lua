@@ -1,12 +1,12 @@
--- Shooter-shaped stress run behind `make bench`: 50 skinned soldiers with Lua brains, 32 realtime
--- lights, 256 decals and four smoke columns on the default yard. Measures FRAMES frames at 1280x720
+-- The stress run behind `make bench`, on the default yard. Measures FRAMES frames at 1280x720
 -- (quiet), then runs `firefight.lua` until its live counts hold still and measures FRAMES more
 -- (`firefight.<row>`), each against the last run (out/bench/bench.json). Fixed dt and seeded
 -- math.random; timings are this machine's, only counts compare across machines. A signal, never a
 -- gate.
 local HERE = "scenarios/bench/"
-local WARMUP = 60
+local WARMUP = 60    -- 1 s: scripts start, agents set off, shadow caches bake
 local FRAMES = 600   -- 10 s @ 1/60, a window
+-- Ticks past firefight.lua's LIFETIME and DECALS, so its live counts hold still before the window.
 local FIREFIGHT_WARMUP = 120
 
 local spawned = Harness.LoadStress{
