@@ -1,6 +1,7 @@
 use super::sample::Baking;
 use rusty_scene::lighting::occlusion::Grid;
 
+/// A test hook: one bake's sampling, which `dev::bake`'s cost tests time.
 #[doc(hidden)]
 pub struct Sampler {
     pub(super) baking: Baking,

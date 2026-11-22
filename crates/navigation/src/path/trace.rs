@@ -7,6 +7,7 @@ use glam::Vec3;
 
 use super::super::{in_mask, NavigationGraph, SpanRef};
 
+/// In segment parameter `t`: two crossings this close are one corner.
 const CORNER_EPSILON: f32 = 1e-5;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

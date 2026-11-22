@@ -9,9 +9,11 @@ use super::pool;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BakeView {
     pub eye: Vec3,
+    /// World to clip, depth 0 to 1 as wgpu's (not GL's -1 to 1).
     pub view_proj: Mat4,
 }
 
+/// World units off the texel, so its ray misses its own surface.
 const LIFT: f32 = 1e-3;
 
 impl BakeView {
@@ -32,6 +34,7 @@ impl BakeView {
     }
 
     fn toward(&self, p: Vec3, depth: f32) -> Option<(Vec3, f32)> {
+        // An orthographic projection leaves `w` at 1: no eye, so back along the view.
         if self.view_proj.row(3) != glam::Vec4::W {
             let to = self.eye - p;
             let distance = to.length();

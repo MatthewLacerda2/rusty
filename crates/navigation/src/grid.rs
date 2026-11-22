@@ -20,8 +20,8 @@ pub struct SpanRef {
 }
 
 /// The compact-heightfield half of Recast; no polygon mesh. The spans of cell `i` are
-/// `spans[cell_start[i]..cell_start[i + 1]]`. A wall top is a span too, but no neighbour is
-/// within a step of it, so A\* never reaches it.
+/// `spans[cell_start[i]..cell_start[i + 1]]`, bottom-up. A wall top is a span too, but no
+/// neighbour is within a step of it, so A\* never reaches it.
 pub struct NavigationGraph {
     pub min_x: f32,
     pub max_x: f32,
@@ -127,6 +127,7 @@ impl NavigationGraph {
         &self.spans[self.span_range(gx, gz)]
     }
 
+    /// A test hook: `test_support::ground` asserts with it.
     #[doc(hidden)]
     pub fn is_walkable(&self, gx: i32, gz: i32) -> bool {
         !self.span_range(gx, gz).is_empty()

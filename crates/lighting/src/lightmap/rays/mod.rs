@@ -1,3 +1,6 @@
+//! Deterministic without rapier's `enhanced-determinism`: parry's BVH build is a pure function
+//! of the triangles, walked on one thread in scalar `f32`.
+
 use glam::Vec3;
 use rapier3d::parry::partitioning::{BvhNode, TraversalAction};
 use rapier3d::parry::query::details::local_ray_intersection_with_triangle;
@@ -53,6 +56,7 @@ pub(crate) struct Rays {
     mesh: Option<TriMesh>,
     pub cast: std::sync::atomic::AtomicU64,
     pub direct: std::sync::atomic::AtomicU64,
+    /// Off in a real bake: one atomic bumped per ray by every worker would contend.
     counting: bool,
 }
 

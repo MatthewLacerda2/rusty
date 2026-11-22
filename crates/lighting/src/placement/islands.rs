@@ -2,7 +2,9 @@ use std::collections::VecDeque;
 
 use rusty_scene::lighting::floor::FloorGrid;
 
+/// Square metres (a 3 × 3 m platform): a smaller island reflects the room around it.
 pub const MIN_ISLAND_AREA: f32 = 9.0;
+/// World units an island looks for the room around it.
 const ISLAND_REACH: f32 = 2.0;
 
 pub fn absorb_islands(grid: &FloorGrid, room: &mut [Option<u32>], first: u32, count: u32) -> u32 {

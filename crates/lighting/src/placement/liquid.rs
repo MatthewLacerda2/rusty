@@ -4,7 +4,9 @@ use rusty_components::RenderMode;
 use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::Scene;
 
+/// World units a liquid's surface may rise across its bounds.
 const FLAT: f32 = 0.05;
+/// World units under the surface: a shallower floor is a puddle an actor stands on.
 pub const DEPTH: f32 = 0.3;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

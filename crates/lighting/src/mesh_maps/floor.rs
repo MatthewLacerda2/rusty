@@ -4,6 +4,7 @@ use super::Baked;
 use crate::lightmap::Areas;
 use rusty_core::collections::Map;
 
+/// The narrowest band, in the island's texels.
 pub(super) const MIN_TEXELS: f32 = 3.0;
 
 pub(super) struct Radii {

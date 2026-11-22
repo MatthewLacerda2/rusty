@@ -13,7 +13,9 @@ use crate::occlusion::progress::OcclusionProgress;
 use crate::occlusion::OCCLUSION_SEED;
 use rusty_scene::lighting::occlusion::Grid;
 
+/// Per sampling cube of a cell: its centre, then seeded points.
 const CUBE_POINTS: usize = 6;
+/// Metres a ray stops short of its target, so a triangle touching the target never hides it.
 pub(super) const REACH_SLACK: f32 = 1e-3;
 
 pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);
@@ -178,9 +180,12 @@ impl Baking {
     }
 
     fn hidden(&self, eye: &mut Eye, to: (Vec3, Vec3)) -> bool {
+        // No object excluded: a polygon of an object inside `to` lies inside the box, so it never
+        // separates it.
         self.proved(eye, eye.bounds, to, u32::MAX)
     }
 
+    // Unity's backface threshold: inside when most axis rays first meet a back face.
     fn inside(&self, point: Vec3) -> bool {
         let axes = [
             Vec3::X,

@@ -4,6 +4,7 @@ use super::super::raster::{dilate, fill_rest, Texel};
 
 pub(super) type Kept = (Vec<Vec3>, Option<Vec<Vec4>>, Option<Vec<Vec4>>);
 
+/// Rings of empty texels dilation fills around each chart.
 pub(super) const DILATE_PASSES: u32 = 3;
 
 #[derive(Clone, Debug, PartialEq)]

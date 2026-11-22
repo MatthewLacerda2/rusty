@@ -6,6 +6,7 @@ pub mod authored;
 use rusty_components::mesh::{primitives, MeshRevision};
 use rusty_scene::Scene;
 
+// Metres.
 const BLOCK: f32 = 10.0;
 const HEIGHT: f32 = 4.0;
 const WALL: f32 = 0.2;
