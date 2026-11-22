@@ -19,7 +19,7 @@ pub struct MontageEvent {
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Montages {
-    /// By slot-stack `order`, then start order (blending out before active): the pose stacks so.
+    /// Slot `order`, then start order (blending out before active): pose and root motion stack so.
     pub playing: Vec<ActiveMontage>,
     /// `MONTAGE_BLEND_OUT`s a script call queued, fired on the next step.
     pub pending: Vec<MontageEvent>,
