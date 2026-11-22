@@ -10,6 +10,8 @@ thread_local! {
     static NOTES: Cell<u64> = const { Cell::new(0) };
 }
 
+/// A test hook: arms this thread's count of note calls (`counted`) and reads it; the first call
+/// starts it.
 #[cfg(test)]
 pub(crate) fn notes() -> u64 {
     ARMED.with(|a| a.set(true));

@@ -24,6 +24,7 @@ pub(crate) enum Why {
 }
 
 impl Why {
+    /// In the order of `stats::pairs::UI_RELAID`'s counter names: change both together.
     pub(crate) const ALL: [Why; 7] = [
         Why::Rebuild,
         Why::Screen,
@@ -70,6 +71,8 @@ impl KeptLayout {
         };
         match (&mut self.held, self.why) {
             (Some(held), None) => {
+                // Kept, so the new table is equal: hold it, and later frames compare pointers, not
+                // maps.
                 if !Rc::ptr_eq(&held.textures, &view.textures) {
                     held.textures = Rc::clone(&view.textures);
                 }

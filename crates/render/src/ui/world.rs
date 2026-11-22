@@ -15,6 +15,8 @@ use rusty_components::UiBlend;
 use rusty_scene::Camera;
 use rusty_ui::CanvasSpace;
 
+/// One world canvas's placement for one camera; mirrors `ui.wgsl`'s `WorldUi`: change both
+/// together.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct WorldUiUniform {

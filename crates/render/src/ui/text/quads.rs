@@ -6,7 +6,9 @@ use crate::ui::vertex::MODE_TEXT;
 use rusty_components::TextComponent;
 use rusty_ui::text::{layout_text, PlacedGlyph};
 
+/// x per unit of height above the baseline (about 11°).
 const ITALIC_SHEAR: f32 = 0.2;
+/// Synthesized bold's dilation per side, in ems.
 const FAUX_BOLD_DILATE: f32 = 0.02;
 
 #[derive(Clone, Debug, PartialEq)]

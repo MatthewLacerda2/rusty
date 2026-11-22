@@ -7,7 +7,8 @@
 //!   Render textures keep their own revision, since a `touch` would rebuild on every
 //!   Scene/Game view switch;
 //! - between ticks, the drawn pose (`DrawPoses::repose`);
-//! - per camera, on purpose (`draw.rs`): LOD, mask, frustum, motion history, probe pick.
+//! - per camera, on purpose (`draw.rs`): LOD, mask, frustum, motion history, probe pick, the
+//!   skinned palette (`World::set_pose_palette` stamps no change).
 
 use std::collections::{BTreeMap, BTreeSet};
 

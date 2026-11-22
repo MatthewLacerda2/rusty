@@ -5,6 +5,7 @@ use crate::GpuMesh;
 use rusty_components::mesh::Vertex;
 use rusty_components::MeshComponent;
 
+/// Twice `blend_joints`' 0.01 (`common.wgsl`), so an edge vertex is boxed as both rest and skinned.
 const IDENTITY_BELOW: f32 = 0.02;
 
 type Aabb = (Vec3, Vec3);
@@ -62,6 +63,8 @@ fn grow(aabb: &mut Option<Aabb>, p: Vec3) {
 }
 
 impl GpuMesh {
+    /// `None` when the pose cannot be bounded (a negative weight, a joint past the
+    /// palette): never cull it.
     pub(crate) fn world_bounds(&self, mesh: &MeshComponent, world: Mat4) -> Option<Aabb> {
         let (min, max) = if mesh.is_skinned() {
             self.skin_bounds.posed(mesh.active_palette())?

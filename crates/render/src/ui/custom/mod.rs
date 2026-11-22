@@ -195,6 +195,8 @@ impl UiShaders {
 }
 
 impl super::UiRenderer {
+    /// `bound`: the standard (blend, backdrop) pipeline set. `false`: none for this format; skip
+    /// the batch.
     pub(super) fn bind_batch<'a>(
         &'a self,
         rp: &mut wgpu::RenderPass<'a>,

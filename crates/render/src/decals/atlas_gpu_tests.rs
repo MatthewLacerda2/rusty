@@ -48,6 +48,7 @@ fn gpu_an_albedo_layer_averages_in_linear_light_and_a_data_layer_its_bytes() {
         (atlas.layer(data.as_str()), atlas.layer(colour.as_str())),
         (0, 1)
     );
+    // A black-white checker's mips: half white's light is sRGB 188, the bytes' midpoint 128.
     for mip in [1, MIPS - 1] {
         let (c, d) = (
             level(&renderer, &atlas, 1, mip),

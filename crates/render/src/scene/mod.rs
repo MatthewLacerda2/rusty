@@ -52,6 +52,8 @@ use crate::passes::shadows::UnbakedCasters;
 use crate::{GpuMesh, Renderer};
 use rusty_scene::{Scene, SceneId};
 
+/// Scenes kept at once (the main one, a preview tab, a capture's); past it the least recently drawn
+/// goes.
 const MAX_SCENES: usize = 4;
 
 #[derive(Default)]

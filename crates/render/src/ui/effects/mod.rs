@@ -15,6 +15,7 @@ use crate::gpu::kept::Kept;
 use crate::gpu::layout_entries::{dynamic_uniform_entry, sampler_entry, texture_entry};
 use crate::Renderer;
 
+/// One batch's slot of the batch uniform; mirrors `ui.wgsl`'s `UiBatch`: change both together.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct BatchUniform {
@@ -138,6 +139,7 @@ impl Renderer {
                 push(BatchUniform::new(&m.clip, mesh.frame, None));
             }
         }
+        // An empty view still binds one slot: a zero-sized binding is invalid.
         bytes.resize(bytes.len().max(stride as usize), 0);
         let fx = &mut cache.effects;
         (fx.stride, fx.slots) = (stride, slots);
