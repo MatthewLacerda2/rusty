@@ -7,7 +7,7 @@ use crate::recipe::{arity, op, opt, req, Lit, OpInfo};
 
 /// Input 1 moved `strength × red` tiles along `angle` (turns from the horizontal, 0 pushing
 /// right, 0.25 down), the red read from input 2. Black moves nothing; a negative strength
-/// pushes the other way. Reads wrap, so tiling inputs tile. A NaN strength moves nothing; the
+/// pushes the other way. A NaN strength moves nothing; the
 /// push caps at ±16 tiles.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DirectionalWarp {
@@ -52,12 +52,13 @@ pub fn directional_warp(img: &Image, by: &Image, strength: f32, angle: f32) -> I
     let (sin, cos) = (turn * std::f32::consts::TAU).sin_cos();
     Image::fill_uv(img.size(), |u, v| {
         let d = strength * by.sample_bilinear_wrapped(u, v)[0];
-        // A red past 1 (or an infinite one) still caps; `0 × ∞` moves nothing.
+        // A red past 1 still caps; a non-finite push (`0 × ∞`) moves nothing.
         let d = if d.is_finite() {
             d.clamp(-MAX_STRENGTH, MAX_STRENGTH)
         } else {
             0.0
         };
+        // Content moves along the angle: each pixel reads from behind it.
         img.sample_bilinear_wrapped(u - cos * d, v - sin * d)
     })
 }

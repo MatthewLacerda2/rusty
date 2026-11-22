@@ -1,3 +1,6 @@
+// Changing any constant here changes what seeded ops bake.
+
+/// SplitMix64's finalizer.
 #[inline]
 fn mix64(mut z: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
@@ -37,6 +40,7 @@ fn hash3(x: i64, y: i64, channel: u64, seed: u64) -> u32 {
     hash2(x, y, seed ^ channel.wrapping_mul(0xd6e8_feb8_6659_fd93))
 }
 
+/// The top 24 bits, all an `f32` mantissa holds, so each value in `[0, 1)` is exact.
 #[inline]
 fn to_unit_f32(h: u32) -> f32 {
     (h >> 8) as f32 / (1u32 << 24) as f32

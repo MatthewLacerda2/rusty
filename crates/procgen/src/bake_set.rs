@@ -26,10 +26,13 @@ pub fn bake_set(
     Ok(written)
 }
 
+/// A caller runs this before reading the recipe's image files, so a recipe with no
+/// `outputs` is reported as that, not as a file it could not read.
 pub fn check_set(recipe: &TextureRecipe) -> Result<(), String> {
     set_slots(recipe).map(|_| ())
 }
 
+/// Checked as [`check_set`] does, so a caller can ready the paths' sidecars before the bake.
 pub fn set_paths(recipe: &TextureRecipe, prefix: &str) -> Result<Vec<String>, String> {
     let slots = set_slots(recipe)?;
     Ok(slots.keys().map(|name| set_path(prefix, name)).collect())

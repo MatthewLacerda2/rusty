@@ -29,7 +29,10 @@ impl Op for EdgeDetect {
     fn run(&self, cx: &Cx) -> Image {
         let img = cx.input(0);
         let unit = img.size().longer() as f32;
+        // The half-width in pixels, capped at a tile (NaN and ≤ 0 read no line).
         let half = (self.width / 2.0 * unit).max(0.0).min(unit);
+        // `distance` clamps at its radius, so it reads a pixel past the half-width: every
+        // pixel the line touches gets its true distance.
         let reach = (half + 1.0) / unit;
         let inside = distance::distance(img, Field::Const(reach));
         let outside = distance::distance(&complement(img), Field::Const(reach));

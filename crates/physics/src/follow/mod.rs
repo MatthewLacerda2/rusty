@@ -1,8 +1,7 @@
-//! Animator (and `LateUpdate`) moved afterwards would otherwise be queried where
-//! they stood a tick earlier — a headshot would hit last frame's head. After the
-//! Only query poses move here: bodies are untouched (the next step still drives
-//! them, kinematic velocities included), and a body's own collider — a
-//! Rigidbody's or a CharacterController's — is the step's to place.
+//! The step places colliders at its start, so bones the Animator, `LateUpdate` or IK move
+//! afterwards would be queried a tick late: a headshot would hit last frame's head.
+//! `follow_bones` re-places each bone-hung collider and refits the query tree. Bodies are
+//! untouched: a body's own collider is the step's to place.
 
 #[cfg(test)]
 mod cost_tests;
@@ -88,6 +87,7 @@ impl Kept {
         let kept =
             |a: u32| self.hung.binary_search(&a).is_ok() || self.bones.binary_search(&a).is_ok();
         let w = &scene.world;
+        // A removed id has no ancestors left: it mattered only if it was hung.
         if !w.contains(id) {
             return self.hung.binary_search(&id).is_ok();
         }
@@ -149,6 +149,8 @@ thread_local! {
     static CHECKED: Cell<bool> = const { Cell::new(false) };
 }
 
+/// Test hook for the root's hitbox and ragdoll suites: every follow on this thread also walks the
+/// skeletons and panics when the kept list differs. Read only with `debug_assertions`.
 #[doc(hidden)]
 pub fn check_kept_bones() {
     CHECKED.with(|c| c.set(true));

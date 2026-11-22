@@ -10,9 +10,13 @@ use rusty_scene::Scene;
 
 pub(crate) type MotorSet = ([f32; 3], Drive);
 
+/// The handle tells a joint `resync_joints` rebuilt (`Joint.SetLimits`, a body rebuilt),
+/// which rapier hands back motorless.
 pub(crate) type Driven = (ImpulseJointHandle, MotorSet);
 
 impl PhysicsWorld {
+    /// rapier's motors are acceleration-based: the two joined bodies' mass scales the
+    /// strength, not the chain below, so a joint carrying a limb is softer than its number.
     pub(crate) fn drive_joints(&mut self, scene: &mut Scene) -> usize {
         let mut driven = std::collections::BTreeMap::new();
         let mut touched = 0;
@@ -31,6 +35,8 @@ impl PhysicsWorld {
             let angle = |s: f32| 2.0 * s.clamp(-1.0, 1.0).asin();
             let set: MotorSet = ([angle(q.x), angle(q.y), angle(q.z)], drive);
             driven.insert(id, (built.handle, set));
+            // Touching a joint wakes both bodies: an unchanged one is left, so a driven
+            // body holding still can sleep.
             if self.driven.get(&id) == Some(&(built.handle, set)) {
                 continue;
             }

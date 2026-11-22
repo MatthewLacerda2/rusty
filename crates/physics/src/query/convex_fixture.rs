@@ -5,6 +5,8 @@ use rusty_components::{ColliderComponent, MeshComponent};
 use rusty_scene::create::{primitive_geometry, Primitive};
 use rusty_scene::Scene;
 
+/// A test hook for `script`'s point-query tests: the off-centre cylinder as a convex
+/// collider, turned and scaled, and its world-space vertices.
 #[doc(hidden)]
 pub fn turned_hull() -> (Scene, u32, Vec<Vec3>) {
     let (pos, rot) = (
@@ -28,7 +30,8 @@ pub(super) fn flat_hull() -> (Scene, u32) {
     (scene, id)
 }
 
-/// Rings of coplanar points, the classic quickhull degeneracy.
+/// The Cylinder primitive moved off its origin, so its local box is not centred. Its caps
+/// are rings of coplanar points, the classic quickhull degeneracy.
 pub(crate) fn off_centre_cylinder() -> (Vec<Vertex>, Vec<u32>) {
     let (vertices, indices) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
     let (mut vertices, indices) = (vertices.to_vec(), indices.to_vec());

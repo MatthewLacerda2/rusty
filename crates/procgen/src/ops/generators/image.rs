@@ -3,6 +3,7 @@ use super::super::super::recipe::ImageEncoding;
 use super::super::super::source::Source;
 use rusty_core::color::gamma_to_linear;
 
+/// sRGB decodes per tap, before the bilinear blend, so the blend is in linear light.
 pub fn image(source: &Source, encoding: ImageEncoding, size: Size) -> Image {
     let (w, h) = source.size();
     let texels = source.texels();
@@ -40,6 +41,8 @@ pub fn image(source: &Source, encoding: ImageEncoding, size: Size) -> Image {
     img
 }
 
+/// Texel `(i + ½)·source/out − ½` in integers, so a matching side lands on texel `i` with a
+/// fraction of exactly 0, where `f32` lands a hair short.
 fn tap(i: usize, source: u32, out: u32) -> (i64, f32) {
     let num = (2 * i as i64 + 1) * source as i64 - out as i64;
     let den = 2 * out as i64;

@@ -6,6 +6,7 @@ const METRICS: [VoronoiMetric; 3] = [Euclidean, Manhattan, Chebyshev];
 
 #[test]
 fn each_metric_gives_its_distance_on_a_regular_grid() {
+    // (0.2, 0.1) into cell (1, 2): the nearest centre (0.3, 0.4) away, the second (0.3, −0.6).
     let (u, v) = ((1.0 + 0.2) / 4.0, (2.0 + 0.1) / 4.0);
     let expected = [
         (Euclidean, 0.5, 0.45f32.sqrt()),
@@ -44,6 +45,7 @@ fn brute_force(
     (d[0].0, d[1].0, d[0].1)
 }
 
+/// Samples where one ring finds the wrong point, so a reach cut to 1 fails them.
 const SHORT_REACH_MISSES: [(VoronoiMetric, u64, f32, f32); 3] = [
     (Euclidean, 1167, 0.977_623_05, 0.400_408_63),
     (Euclidean, 1543, 0.622_436_46, 0.187_380_08),
@@ -82,6 +84,7 @@ fn the_search_reach_finds_the_nearest_two_points_under_every_metric() {
 #[test]
 fn smooth_min_matches_a_hand_worked_pair() {
     let s = SmoothMin::new(1.0);
+    // k = 0.5, t = 0.7, h = 0.784: 0.6 − 0.2·0.784 − 0.5·0.784·0.216.
     assert!((s.fold(0.6, 0.4) - 0.358_528).abs() < 1e-6);
     assert!((s.fold(0.4, 0.6) - 0.358_528).abs() < 1e-6, "symmetric");
     assert!((s.fold(0.9, 0.1) - 0.1).abs() < 1e-6);

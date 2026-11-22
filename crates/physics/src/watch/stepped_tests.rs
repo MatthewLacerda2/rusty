@@ -1,5 +1,3 @@
-//! named: rapier's solver rewrites the pose of every body in its active
-
 use glam::{Quat, Vec3};
 
 use super::fixture_tests::digest;
@@ -65,6 +63,7 @@ fn stack() -> (Scene, Vec<u32>) {
 
 #[test]
 fn a_body_resting_on_a_frozen_prop_sleeps() {
+    // A hair off unit length (its squares sum to 1 + 2e-7), so the solver has a rotation to round.
     let rot = Quat::from_xyzw(0.0, 0.92480135, 0.0, 0.3804506);
     let mut twins = [stack(), stack()].map(|(scene, ids)| {
         let mut physics = PhysicsWorld::from_scene(&scene);

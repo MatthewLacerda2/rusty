@@ -24,6 +24,7 @@ fn evaluate_each_sees_every_node_once_inputs_first() {
         vec![
             node("inv", OpKind::Invert, &["c"]),
             constant("c", 0.25),
+            // Feeds nothing the output reads, and is still evaluated.
             node("dead", OpKind::Invert, &["c"]),
         ],
     )

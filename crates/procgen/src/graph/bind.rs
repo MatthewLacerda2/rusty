@@ -24,6 +24,8 @@ pub struct Bound {
 
 const WIRING: [&str; 3] = ["id", "op", "inputs"];
 
+/// Typed fields, not one `Value`: the scene format's tracer (`tests/scene_format`) sees
+/// all but `nodes`.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Doc {

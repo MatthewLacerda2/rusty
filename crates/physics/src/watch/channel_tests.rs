@@ -6,6 +6,7 @@ use rusty_components::CharacterControllerComponent;
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
+/// Bones per soldier, each carrying a box hitbox.
 const BONES: usize = 16;
 
 fn yard(n: usize) -> (Scene, PhysicsWorld, Vec<(u32, Vec<u32>)>) {

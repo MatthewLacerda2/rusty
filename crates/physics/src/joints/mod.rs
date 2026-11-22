@@ -49,6 +49,8 @@ pub(super) struct JointKey {
 pub(super) struct BuiltJoint {
     pub(super) key: JointKey,
     pub(super) handle: ImpulseJointHandle,
+    /// Its rest pose, kept here rather than read from rapier so a world rebuilt after a
+    /// panic (`recover`) reuses it.
     pub(super) frames: [Pose; 2],
 }
 
@@ -87,10 +89,9 @@ impl PhysicsWorld {
         }
     }
 
-    ///: rapier picks joints for its solver without checking `is_enabled`,
-    /// so a body built disabled joins one as a second world-attached side and a
-    /// fixed partner panics its solver (`unreachable!()`), and one disabled later
-    /// keeps a stale solver slot.
+    /// Leaves out a joint whose body is disabled (its owner inactive): rapier picks joints
+    /// without checking `is_enabled`, so a body built disabled panics a fixed partner's
+    /// solver (`unreachable!()`), and one disabled later keeps a stale solver slot.
     fn wanted_joints(&self, scene: &Scene) -> BTreeMap<u32, JointKey> {
         let mut out = BTreeMap::new();
         for id in scene.world.ids_with_joint() {
@@ -139,8 +140,8 @@ impl PhysicsWorld {
                 p.pos + p.rot * (p.scale * j.connected_anchor)
             }
         };
-        // Both frames come from the scene's poses (the bodies' owners), not the
-        // rapier bodies, which lag a script's move of a kinematic body by a tick.
+        // Both frames from the owners' scene poses: the rapier bodies lag a script's
+        // kinematic move by a tick.
         let owner_pose = |e: u32| world_pose(scene, body_owner(scene, e)).map(|p| (p.pos, p.rot));
         let frame1 = local_frame(owner_pose(id)?, anchor, rot);
         let (body2, pose2) = match (key.body2, j.connected_body) {
@@ -206,6 +207,8 @@ impl PhysicsWorld {
             ) else {
                 continue;
             };
+            // rapier keeps the last substep's impulse, missing a blast absorbed in substep
+            // 0: the larger of it and the step's estimate counts.
             let [fx, fy, fz, ..] = live.impulses;
             let (lin, ang) = load::step_load(live, &self.bodies, pre, self.gravity, dt);
             let force = (Vec3::new(fx, fy, fz).length() / substep).max(lin.length() / dt);

@@ -9,6 +9,8 @@ use rusty_components::{ColliderComponent, ColliderShape, CollisionDetection, Rig
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
+/// The wall's centre on x, in metres. It is 0.2 m thick, far under the 5 m the sphere covers
+/// a tick, so no tick boundary finds the two overlapping.
 const WALL_X: f32 = 4.0;
 
 fn add_wall(scene: &mut Scene, moving: bool) {
