@@ -1,3 +1,6 @@
+//! A line's head is read without parsing it, in `record::line`'s order (`ch`, `t`, `tick`,
+//! then a frame's `frame`, `ms`, `cpu_ms`); a line written another way is parsed whole.
+
 use std::borrow::Cow;
 
 use serde_json::{Map, Value};

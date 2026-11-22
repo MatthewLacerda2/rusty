@@ -1,4 +1,4 @@
-// the selection outline's ring.
+// The selection outline's ring is drawn here.
 //
 // A pixel outside the selection mask (`outline/mask.wgsl`) with a mask pixel within
 // `radius` pixels is the ring. That disc test is split in two fullscreen passes,

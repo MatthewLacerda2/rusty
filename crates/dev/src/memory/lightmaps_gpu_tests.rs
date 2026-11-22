@@ -3,16 +3,23 @@ use rusty_render::{Renderer, STAGING_BUDGET};
 use super::textures_gpu_tests::{device_bytes, mb, set_up};
 use crate::memory::rss_peak_bytes;
 
+/// Texels on a page's edge: one `Rgba16Float` level is 8 MiB.
 const EDGE: u32 = 1024;
+/// Pages in the smaller list; the larger is four times it.
 const PAGES: usize = 4;
+/// Bytes of slack on the bound: the allocator's and the driver's.
 const MARGIN: u64 = 24 << 20;
 
+/// A nonzero byte touches every page, so each is resident before the measure: zeroed ones
+/// come lazily mapped from calloc on Linux.
 fn pages(n: usize) -> Vec<Vec<u8>> {
     (0..n)
         .map(|_| vec![0x3c; (EDGE * EDGE * 8) as usize])
         .collect()
 }
 
+/// Also returns the texture and pages, kept live: where GPU copies are host memory
+/// (lavapipe), a page freed before its copy ran would make room for it and hide staging.
 fn upload(renderer: &Renderer, pages: Vec<Vec<u8>>) -> (u64, u64, impl Sized) {
     let before = device_bytes(renderer);
     let texture = renderer.upload_lightmap_pages(EDGE, pages);

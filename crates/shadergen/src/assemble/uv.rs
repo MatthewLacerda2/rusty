@@ -2,6 +2,8 @@ use super::emit::{chain, Instance};
 use crate::blocks::Stage;
 use crate::params::ParamLayout;
 
+/// `shader.wgsl`'s signature, character for character. WGSL parameters are immutable, so
+/// the UV chain renames `in` to `in_raw` and opens with a mutable copy.
 const SURFACE_COLOR: &str = "fn surface_color(in: VertexOutput) -> vec4<f32> {";
 
 pub fn splice(body: &str, instances: &[Instance], layout: &ParamLayout) -> Result<String, String> {

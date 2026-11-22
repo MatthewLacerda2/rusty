@@ -7,19 +7,19 @@ local MOVE_SPEED = 5.0      -- units/second
 local GRAVITY = 20.0        -- units/second²
 local JUMP_HEIGHT = 1.1     -- metres
 local JUMP_SPEED = math.sqrt(2.0 * GRAVITY * JUMP_HEIGHT)
-local GROUND_STICK = -1.0
+local GROUND_STICK = -1.0   -- units/second while grounded, pressing it down
 local LOOK_SPEED = 90.0     -- degrees/second
 local PITCH_LIMIT = 80.0    -- degrees
-local FOLLOW_BACK = 4.5
-local FOLLOW_UP = 1.5
+local FOLLOW_BACK = 4.5     -- metres
+local FOLLOW_UP = 1.5       -- metres
 local SHOT_RANGE = 100.0    -- metres
 local SHOT_DAMAGE = 25.0    -- a bot has 100
 local JUMP_KEY = "SPACE"
 local SHOOT_KEY = "Mouse0"
-local START_YAW = 90.0
-local START_PITCH = -10.0
-local START_BACK = 4.5
-local START_UP = 1.5
+local START_YAW = 90.0      -- degrees
+local START_PITCH = -10.0   -- degrees
+local START_BACK = 4.5      -- metres
+local START_UP = 1.5        -- metres
 
 local function move(self, entity_id, dt)
     local fx, fy, fz = Camera.GetForward()
@@ -66,8 +66,7 @@ local function aim_camera(entity_id, dt)
     Camera.SetPosition(px - fx * FOLLOW_BACK, py - fy * FOLLOW_BACK + FOLLOW_UP, pz - fz * FOLLOW_BACK)
 end
 
--- Hits on the Player's own
--- hierarchy are skipped here, not by a name check in the engine.
+-- Hits on the Player's own hierarchy are skipped here, not by a name check in the engine.
 local function shoot(self, entity_id)
     local down = Input.IsKeyDown(SHOOT_KEY)
     if down and not self.shoot_was_down then
@@ -91,8 +90,7 @@ function PlayerController.drive(self, entity_id, dt)
     shoot(self, entity_id)
 end
 
--- Frame the follow-camera behind the Player when play starts. This is the demo's
--- choice, not the engine's: the engine never moves the camera on entering Play.
+-- Framing the camera is the demo's choice: the engine never moves the camera on entering Play.
 local function frame_camera(entity_id)
     local px, py, pz = Transform.GetPosition(entity_id)
     Camera.SetPosition(px, py + START_UP, pz - START_BACK)

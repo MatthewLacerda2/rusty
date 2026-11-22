@@ -165,6 +165,8 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     )
 }
 
+/// Most frames a `Screenshot` may settle: TAA's default blend keeps 0.9^64, about 0.1%, of
+/// an old view after 64 frames, so 1024 only catches a typo.
 const MAX_SETTLE: u32 = 1024;
 
 #[derive(Default)]

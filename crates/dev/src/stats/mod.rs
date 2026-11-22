@@ -1,3 +1,6 @@
+//! The clock side of `FrameStats`: the sim reads no clock, so the schedule hands each
+//! system to [`TimingProbe`], here in the dev layer, which times it.
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -29,6 +32,7 @@ fn stage_key(stage: Stage) -> &'static str {
 pub struct TimingProbe {
     stats: Rc<RefCell<FrameStats>>,
     stage_ms: [f64; 4],
+    /// Held until `end_tick`, after `end_frame` has reset the stats if a Play session began.
     system_ms: Vec<(&'static str, f64)>,
     part_ms: Vec<(&'static str, f64)>,
     logged: BTreeMap<&'static str, u64>,
@@ -38,6 +42,8 @@ pub struct TimingProbe {
     end_frame_ms: f64,
 }
 
+/// Recorded at the frame's end, not at once: a load in a Play session's first tick runs
+/// before `end_frame` resets the stats, which would wipe its samples.
 pub type LoadSamples = Rc<RefCell<Vec<(String, f64)>>>;
 
 impl TimingProbe {
@@ -91,6 +97,7 @@ impl SystemProbe for TimingProbe {
 
     fn end_tick(&mut self) {
         let start = self.tick_start.take();
+        // The tick's span closes here, so the recording below is in `probe_ms`, not `frame_ms`.
         let tick_end = verbs::now();
         let ran = std::mem::take(&mut self.frame_ran);
         let systems = summed(self.system_ms.drain(..));

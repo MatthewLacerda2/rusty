@@ -1,5 +1,5 @@
-// Shared by SSAO and SSIL. Full-resolution pixel `px` is a depth texel; a pass at a
-// lower resolution reads texel `t` as pixel `t * step`.
+// SSAO (`ssao.wgsl`) and SSIL (`postfx/ssil.wgsl`) share these helpers. Full-resolution pixel
+// `px` is a depth texel; a pass at a lower resolution reads texel `t` as pixel `t * step`.
 
 #define_import_path lighting::screen_space
 
@@ -55,8 +55,8 @@ fn screen_uv(v: View, S: vec3<f32>) -> vec2<f32> {
     return uv;
 }
 
-// The one-sided difference that stays on this surface (smaller depth step), so a
-// silhouette never bends the normal.
+// The one-sided difference that stays on this surface (smaller depth step along `forward`), so
+// a silhouette never bends the normal.
 fn flatter(back: vec3<f32>, fwd: vec3<f32>, forward: vec3<f32>) -> vec3<f32> {
     if (dot(back, back) < 1e-12 || (dot(fwd, fwd) > 1e-12 && abs(dot(fwd, forward)) < abs(dot(back, forward)))) {
         return fwd;
@@ -81,6 +81,7 @@ fn tangents(N: vec3<f32>) -> mat2x3<f32> {
     return mat2x3<f32>(T, cross(N, T));
 }
 
+// A cosine-weighted direction around `N` on a golden-angle spiral, turned by `rot` radians.
 fn hemisphere(i: u32, n: u32, rot: f32, N: vec3<f32>, tb: mat2x3<f32>) -> vec3<f32> {
     let t = (f32(i) + 0.5) / f32(n);
     let phi = f32(i) * 2.39996323 + rot;
@@ -98,14 +99,14 @@ fn radius_in_pixels(v: View, P: vec3<f32>, radius: f32, dims: vec2<f32>) -> f32 
 
 // A sample snaps to a pixel centre, and at a grazing angle one pixel spans a long
 // stretch of surface: allow one pixel's worth of depth change before calling anything
-// another surface.
+// another surface. The bias starts at 2% of `radius`; 0.1 floors the view cosine.
 fn slope_bias(v: View, P: vec3<f32>, N: vec3<f32>, radius: f32, dims: vec2<f32>) -> f32 {
     let r_px = radius_in_pixels(v, P, radius, dims);
     let grazing = max(abs(dot(N, normalize(v.eye - P))), 0.1);
     return 0.02 * radius + radius / max(r_px, 1e-3) / grazing;
 }
 
-// Taps differing by more than ~5% of the view distance fall away, so a blur never
+// Taps differing by more than ~5% of the view distance (at least 0.1 m) fall away, so a blur never
 // bleeds across a silhouette.
 fn depth_weight(d: f32, center: f32) -> f32 {
     return exp(-abs(d - center) / (0.05 * max(center, 0.1)));

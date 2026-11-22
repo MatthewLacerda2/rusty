@@ -116,6 +116,8 @@ fn an_older_engines_project_opens_only_when_confirmed() {
     );
 }
 
+/// Embed mode minus the move: the real `Embedded::switch` moves the working directory,
+/// so `tests/mcp_bench_embed.rs` proves it in a process of its own.
 #[derive(Default)]
 struct Mover(RefCell<Option<PathBuf>>);
 

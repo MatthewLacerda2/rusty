@@ -11,6 +11,7 @@ pub(super) struct ReflectionSnapshot {
     probes: Vec<(ReflectionProbe, u32)>,
 }
 
+// What a cube is baked from: a change to any, or to the count, stales the staged cubes.
 type BakeInputs = (Vec3, u32, f32, f32, bool, bool);
 
 impl ReflectionSnapshot {
@@ -60,6 +61,7 @@ fn inputs((p, resolution): &(ReflectionProbe, u32)) -> BakeInputs {
 #[derive(Default)]
 pub(super) struct StagedCubemaps {
     files: Vec<(PathBuf, PathBuf)>,
+    // A failed commit resumes at this file.
     moved: usize,
     irradiance: Vec<Sh9>,
 }
@@ -90,6 +92,7 @@ impl StagedCubemaps {
     pub(super) fn commit(&mut self, set: &mut ReflectionProbeSet) -> Result<(), String> {
         while let Some((staged, target)) = self.files.get(self.moved) {
             let path = target.to_string_lossy().into_owned();
+            // Noted before the rename, so the editor never reads its own write as an outside edit.
             rusty_core::fs::written::note_written(&path);
             // lint: allow(atomic-write) publishes a cube staged whole beside its name at bake time
             std::fs::rename(staged, target)

@@ -17,7 +17,8 @@ pub fn recipe_path(wgsl: &Path) -> PathBuf {
 }
 
 pub fn engine_hash(engine_shaders: &str) -> Result<u64, String> {
-    // A bake and a load must agree on it, or a module is re-baked at every load.
+    // Cached per directory: engine shaders do not change under a running engine. A bake and a
+    // load must agree on it, or a module is re-baked at every load.
     static HASHES: OnceLock<Mutex<Map<String, u64>>> = OnceLock::new();
     let hashes = HASHES.get_or_init(Mutex::default);
     if let Some(hash) = hashes
@@ -42,6 +43,8 @@ pub fn engine_hash(engine_shaders: &str) -> Result<u64, String> {
     Ok(*hashes.entry(engine_shaders.to_owned()).or_insert(hash))
 }
 
+/// No shadergen version to bump: the assembled module holds the base shader and every
+/// block's WGSL, so a change to either moves the hash.
 pub fn fingerprint(module: &str, params: &str, engine: u64) -> u64 {
     let mut bytes = module.replace("\r\n", "\n").into_bytes();
     bytes.push(0);

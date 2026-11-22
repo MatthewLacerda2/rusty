@@ -1,7 +1,6 @@
-// the velocity target's texel: what
-// `shader.wgsl`'s motion-vector entry points (`fs_velocity`, `fs_velocity_ssr`,
-// `fs_depth_postpass`) write at location 1. Moved out of `shader.wgsl` for its size
-// cap.
+// The velocity target's texel, which `shader.wgsl`'s motion-vector entry points
+// (`fs_velocity`, `fs_velocity_ssr`, `fs_depth_postpass`) write at location 1. It sits apart
+// from `shader.wgsl` for that file's size cap.
 
 #define_import_path forward::motion
 

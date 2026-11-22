@@ -84,6 +84,7 @@ pub(super) fn project_with_a_model() -> std::path::PathBuf {
 
 #[test]
 fn gpu_a_load_runs_every_step_once_in_order_and_they_sum_to_load_ms() {
+    // Checked before `alone!`, so a machine without an adapter starts no child.
     if rusty_render::test_gpu::headless_or_skip(8, 8).is_some() {
         rusty_test_support::alone!(a_load_in_steps);
     }

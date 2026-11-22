@@ -12,6 +12,7 @@ local ROWS = { 10 }       -- m from the chunk start: 0.8 s apart at top speed
 local DROP_LEAD = 2.6     -- s ahead of the runner
 local DROP_HEIGHT = 6.0   -- m
 
+-- Lane -1, 0 or 1, left to right on screen: the camera looks down +Z.
 function Track.lane_x(lane) return -lane * Track.LANE end
 
 function Track.new()
@@ -23,7 +24,7 @@ local function solid(name, parent, primitive, x, y, z, sx, sy, sz, material)
     Scene.SetParent(id, parent)
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider")
     Material.Set(id, material)
     return id
 end
@@ -98,8 +99,7 @@ function Track.drop(track, chunk, z, lanes)
             if barrel then
                 Transform.SetLocalScale(id, 0.8, 0.5, 0.8)
                 Scene.AddComponent(id, "Collider")
-                -- A box, not a cylinder: a RigidBody has no drag to stop a
-                -- barrel rolling on its side for good.
+                -- A box, not the cylinder's own capsule, so a barrel on its side never rolls.
                 Physics.SetColliderShape(id, { kind = "Box", x = 1, y = 2, z = 1 })
             else
                 Transform.SetLocalScale(id, 0.9, 0.9, 0.9)

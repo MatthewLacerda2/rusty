@@ -1,7 +1,10 @@
+// McGuire et al. 2012's reconstruction filter, weighted as Jimenez refined it (CoD: Advanced
+// Warfare, 2014).
 
 #import fullscreen
 #import numeric
 
+// `motion_blur::params::BlurParams` says what `shape` holds.
 struct BlurParams {
     shape: vec4<f32>,
 };
@@ -11,6 +14,7 @@ struct BlurParams {
 @group(0) @binding(2) var t_velocity: texture_2d<f32>;
 @group(0) @binding(3) var t_tiles: texture_2d<f32>;
 
+// World units within which two depths blend half in front, half behind.
 const SOFT_DISTANCE: f32 = 0.1;
 
 @vertex
@@ -93,6 +97,8 @@ fn depth_key(p: vec2<i32>) -> vec2<f32> {
     return vec2<f32>(texel.w, texel.z);
 }
 
+// Camera first, then depth, so the order holds under a `DepthOnly` overlay that cleared
+// the depth buffer.
 fn behind(center: vec2<f32>, tap: vec2<f32>) -> f32 {
     if (tap.x != center.x) {
         return select(0.0, 1.0, tap.x < center.x);

@@ -34,11 +34,14 @@ pub fn reporting<W: Write + 'static, R>(
     let notify = move |text: &str| {
         heard += 1;
         let mut out = output.borrow_mut();
+        // A failed write shows on the response's own write, which follows.
         let _ = writeln!(out, "{}", notification(&token, heard, text)).and_then(|()| out.flush());
     };
     listening(notify, body)
 }
 
+/// A test hook: `run` owns its output for the whole session, so a test hands it a clone
+/// and reads what was written from this one.
 #[derive(Clone, Default)]
 pub struct Captured(Rc<RefCell<Vec<u8>>>);
 

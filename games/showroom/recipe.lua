@@ -1,5 +1,4 @@
--- A lit showroom: sun through an east window, so the east half is bright and the
--- west dark. `...` is the command line's `--param` table.
+-- `...` is the command line's `--param` table.
 
 local p = { seed = 1, bake = false }
 for key, value in pairs(... or {}) do
@@ -9,7 +8,7 @@ end
 
 local SCENE = "assets/scenes/showroom.scene"
 local W, D, H = 6, 4, 3.5 -- half width (X), half depth (Z), height, m
-local BALL_Z, BALL_TO = -1.0, 3.5
+local BALL_Z, BALL_TO = -1.0, 3.5 -- m: the ball's z, and the x it rolls to in the sun
 
 Scene.New()
 Lighting.SetAmbientColor(0.02, 0.02, 0.025)
@@ -58,7 +57,7 @@ block("Ceiling", "wall", 0, H + 0.1, 0, 2 * W + 0.4, 0.2, 2 * D + 0.4)
 block("WallWest", "wall", -W - 0.1, H / 2, 0, 0.2, H, 2 * D)
 block("WallNorth", "wall", 0, H / 2, D + 0.1, 2 * W + 0.4, H, 0.2)
 block("WallSouth", "wall", 0, H / 2, -D - 0.1, 2 * W + 0.4, H, 0.2)
-local sill, lintel, half = 1.0, 2.8, 1.5 -- m
+local sill, lintel, half = 1.0, 2.8, 1.5 -- m: the window's bottom, top, half width
 block("WallEastLow", "wall", W + 0.1, sill / 2, 0, 0.2, sill, 2 * D)
 block("WallEastHigh", "wall", W + 0.1, (lintel + H) / 2, 0, 0.2, H - lintel, 2 * D)
 block("WallEastSouth", "wall", W + 0.1, (sill + lintel) / 2, -(D + half) / 2,
@@ -131,7 +130,7 @@ Reflection.Set(sphere, { shape = "Sphere", radius = 3.5 })
 Lighting.SetSettings({ reflectionResolution = 64 })
 
 if p.bake then
-    Scene.CreateEntity("BakeRequested")
+    Scene.CreateEntity("BakeRequested") -- `scenarios/bake.lua` checks for it
 end
 Scene.Save(SCENE)
 if p.bake then

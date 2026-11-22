@@ -13,6 +13,8 @@ pub(crate) fn engine_copy(tag: &str) -> (PathBuf, String) {
     (root.clone(), copy_engine(&root.join("engine")))
 }
 
+/// `engine_hash` caches per directory, so a changed engine is a second copy, never an
+/// edit of the first.
 pub(crate) fn copy_engine(engine: &Path) -> String {
     for name in MODULES.iter().chain(&["shader.wgsl"]) {
         let to = engine.join(name);

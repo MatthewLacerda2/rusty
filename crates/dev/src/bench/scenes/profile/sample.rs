@@ -11,6 +11,7 @@ pub struct Recording {
     report: PathBuf,
 }
 
+/// Samples a second: `start` asks `sample` for one every millisecond (its `1`).
 pub const HZ: u32 = 1000;
 
 pub fn start(sample: &Path, report: &Path) -> Result<Recording, String> {

@@ -27,6 +27,7 @@ function Level.Start(id)
     Level.banner = Scene.FindEntityByName("Banner")
     Level.loading = Scene.FindEntityByName("Loading")
     Level.loading_text = Scene.FindEntityByName("LoadingText")
+    -- The canvas is found while active (the recipe saves it so), then hidden.
     Scene.SetActive(Level.loading, false)
     Level.op = nil
 end

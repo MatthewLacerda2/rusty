@@ -1,4 +1,4 @@
-// a plain copy: lands the LDR result of the
+// A plain copy: it lands the LDR result of the
 // chain's in-place passes (the authored effects) in the output when no finishing pass
 // (FXAA) does. Those passes end in an internal target rather than the output so the
 // result can also be kept as next frame's history. Binds the chain's IO layout.

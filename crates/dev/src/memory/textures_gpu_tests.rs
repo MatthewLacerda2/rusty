@@ -1,3 +1,6 @@
+//! These tests bite only where GPU copies sit in resident memory (lavapipe, Apple silicon):
+//! on a discrete GPU they cannot fail.
+
 use std::path::Path;
 
 use rusty_asset::sidecar::{set_texture, Compression, TextureSettings};
@@ -7,10 +10,15 @@ use rusty_render::{gpu_memory, Renderer, STAGING_BUDGET};
 
 use crate::memory::rss_peak_bytes;
 
+/// Texels on each image's side, a level map's size.
 const SIDE: u32 = 2048;
+/// Textures in the smaller load; the larger is four times it.
 pub(super) const N: usize = 8;
+/// Bytes of slack on the bound: the allocator's and the driver's.
 const MARGIN: u64 = 24 << 20;
 
+/// A cached image gets blank blocks (`write_blank`): a real encode would lift the peak before
+/// the loads are measured.
 pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<String> {
     let source = dir.join("source.png");
     if !source.exists() {
@@ -37,9 +45,12 @@ pub(super) fn images(dir: &Path, name: &str, n: usize, cached: bool) -> Vec<Stri
         .collect()
 }
 
+/// The device's live allocations, read after an empty submit sends the queued uploads,
+/// which `gpu_memory`'s poll waits for.
 pub(super) fn device_bytes(renderer: &Renderer) -> u64 {
     renderer.queue.submit([]);
     let memory = gpu_memory(&renderer.device);
+    // Allocated, not reserved, bytes: Metal's `bytes` is allocated already.
     memory.map_or(0, |m| m.allocated.unwrap_or(m.bytes))
 }
 

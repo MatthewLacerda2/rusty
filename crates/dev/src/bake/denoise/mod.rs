@@ -27,6 +27,8 @@ fn library() -> Result<&'static ffi::Api, String> {
     Ok(api)
 }
 
+/// A test hook: OIDN's measurements `expect` it, and its memory tests skip where the library
+/// does not open.
 pub fn available() -> Result<(), String> {
     library()?.device(Some(1)).map(drop)
 }
@@ -86,6 +88,7 @@ impl Oidn {
         let api = library()?;
         let mut slot = self.slot();
         if slot.is_none() {
+            // One thread a device beside other devices; a lone device takes OIDN's every core.
             let threads = (self.devices.len() > 1).then_some(1);
             *slot = Some(api.device(threads)?);
         }
@@ -147,6 +150,7 @@ pub fn missing(why: &str, samples: u32) -> String {
     )
 }
 
+/// A test hook: where it is set, `oidn_is_present_where_ci_requires_it` fails without OIDN.
 pub const REQUIRE_OIDN_ENV: &str = "RUSTY_REQUIRE_OIDN";
 
 #[cfg(test)]

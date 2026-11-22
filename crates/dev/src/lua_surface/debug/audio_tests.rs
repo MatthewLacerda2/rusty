@@ -59,6 +59,7 @@ fn an_event_logged_after_a_poll_in_the_same_frame_is_not_lost() {
 #[test]
 fn the_oldest_seq_held_signals_events_that_rolled_off() {
     let s = session();
+    // 1030 plays overflow the 1024-event ring by six, so the oldest seq held is 7.
     s.eval("for i = 1, 1030 do Audio.PlayAt('a.ogg', 0, 0, 0) end")
         .unwrap();
     let read = "local ev, oldest = Debug.AudioEvents(0)

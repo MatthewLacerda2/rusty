@@ -22,6 +22,8 @@ pub fn capture_into(
     Ok(true)
 }
 
+/// A test hook: the GPU tests' one-shot, a renderer per call; several shots hold one
+/// [`CaptureHost`] instead.
 pub fn capture(
     scene: &Scene,
     camera: &Camera,

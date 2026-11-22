@@ -1,3 +1,6 @@
+//! Every renderer reads an authored module through [`load`] (surface, ui, postfx, the
+//! editor's preview), so a stale module is brought up to date in one place.
+
 use std::path::Path;
 
 use super::engine_shader_dir;

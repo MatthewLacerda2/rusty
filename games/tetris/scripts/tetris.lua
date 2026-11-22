@@ -15,9 +15,9 @@ local Tetris = {
 }
 
 local DAS_TICKS = 10      -- ticks Left/Right is held before it repeats
-local ARR_TICKS = 3       -- ticks
-local SOFT_TICKS = 2      -- ticks
-local HIDDEN_ROWS = 4
+local ARR_TICKS = 3       -- ticks between repeats once it does
+local SOFT_TICKS = 2      -- ticks per row while Down is held
+local HIDDEN_ROWS = 4     -- rows above the well a piece spawns into
 
 local piece = {}
 local cells = {}          -- the cube entity of a locked cell

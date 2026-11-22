@@ -1,11 +1,18 @@
+//! Bounds when a large chart's denoise starts, never what it gives, so the bake's bytes do not
+//! depend on it.
+
 use std::sync::{Condvar, Mutex, PoisonError};
 
 use super::ffi::{KEEP_TEXELS, SCRATCH_MB};
 
+/// Bytes the large denoises in flight may hold together; one alone always starts, however large.
 pub const BUDGET: u64 = 2 << 30;
 
+/// Bytes per texel a denoise holds besides its filter's scratch; `memory_tests` holds a chart
+/// to it.
 pub const PER_TEXEL: u64 = 256;
 
+/// Bytes of scratch per texel an untiled filter takes, until `SCRATCH_MB` tiles it.
 const SCRATCH_PER_TEXEL: u64 = 1200;
 
 pub fn cost(texels: usize) -> u64 {

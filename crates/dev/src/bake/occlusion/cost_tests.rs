@@ -7,6 +7,7 @@ use rusty_lighting::occlusion::test_level::block;
 use rusty_lighting::occlusion::{bake_occlusion, gather_occlusion};
 use rusty_scene::Scene;
 
+/// Peak resident MB from Linux's `/proc`; 0 elsewhere.
 fn peak_mb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let line = status.lines().find(|l| l.starts_with("VmHWM:"));
@@ -35,6 +36,7 @@ fn occlusion_bake_cost() {
     }
     let input = gather_occlusion(&rooms(20));
     let t = Instant::now();
+    // 40 cells over the grid, scaled up: a whole Dust2-sized bake outlasts nextest's 5-min kill.
     let (cells, edge, sheets) = input.bake_sample(40).expect("a grid");
     let per = t.elapsed().as_secs_f64() / 40.0;
     println!(

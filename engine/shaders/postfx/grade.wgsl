@@ -1,11 +1,15 @@
+// Where an HDR colour sits in the grading LUT: the bake runs the grading effects once per
+// texel of the table, and the composite grades each pixel with one `lut_sample`.
 
 #define_import_path postfx::grade
 
+// Texels per side: `GradeLut::SIZE` mirrors it, so change both.
 const LUT_SIZE: f32 = 32.0;
 
 // The table's log encoding: t = log2(1 + 64x) / LOG_SPAN, a LogC-shaped curve (linear-ish in
 // the darks, logarithmic above) whose span is chosen so black (t = 0) and display white (t =
-// 16/31) fall exactly on texels.
+// 16/31) fall exactly on texels; off one, interpolation would lift black and pull 1.0 down.
+// It reaches x ≈ 50.8 at t = 1; brighter colour reads the top texel.
 const LOG_SCALE: f32 = 64.0;
 // log2(1 + 64) · 31 / 16: places x = 1 on texel 16 of 0..31.
 const LOG_SPAN: f32 = 11.668338;
@@ -18,6 +22,9 @@ fn decode(t: vec3<f32>) -> vec3<f32> {
     return (exp2(t * LOG_SPAN) - 1.0) / LOG_SCALE;
 }
 
+// Tetrahedral: each of a cell's six tetrahedra has its grey diagonal as an edge, so a grey
+// reads only grey texels and a tonemapper coupling the channels stays exact on greys, where
+// trilinear bent a grey ramp.
 fn lut_sample(lut: texture_3d<f32>, c: vec3<f32>) -> vec3<f32> {
     let p = clamp(encode(c), vec3<f32>(0.0), vec3<f32>(1.0)) * (LUT_SIZE - 1.0);
     let base = min(floor(p), vec3<f32>(LUT_SIZE - 2.0));
@@ -56,6 +63,7 @@ fn lut_sample(lut: texture_3d<f32>, c: vec3<f32>) -> vec3<f32> {
     return (1.0 - w.x) * c0 + (w.x - w.y) * c1 + (w.y - w.z) * c2 + w.z * c3;
 }
 
+// Rec. 709, the weights Unity uses; `core::color::luminance` mirrors it.
 fn luminance(c: vec3<f32>) -> f32 {
     return dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
 }

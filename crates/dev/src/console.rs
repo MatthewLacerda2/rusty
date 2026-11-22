@@ -12,6 +12,8 @@ pub fn evaluate_line(
     }
 
     console.borrow_mut().info(format!("> {}", line));
+    // No borrow of `console` is held across `eval`: `print` and `Debug.*` borrow it
+    // mid-script, and a held one panics.
     match scripts.eval(line) {
         Ok(result) => {
             if !result.is_empty() {

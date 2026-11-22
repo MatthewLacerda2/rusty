@@ -293,6 +293,7 @@ fn fs_mask(in: VertexOut) -> @location(0) vec4<f32> {
 fn fs_backdrop(in: VertexOut) -> @location(0) vec4<f32> {
     let cover = shade(in).a * clip_coverage(in.canvas);
     var c = textureSample(backdrop_texture, effect_sampler, canvas_uv(in.canvas)).rgb;
+    // Rec. 709 luma.
     let luma = dot(c, vec3<f32>(0.2126, 0.7152, 0.0722));
     c = mix(vec3<f32>(luma), c, batch.grade.x) * batch.grade.y;
     c = clamp(mix(c, batch.tint.rgb, batch.tint.a), vec3<f32>(0.0), vec3<f32>(1.0));
