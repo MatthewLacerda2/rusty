@@ -1,4 +1,6 @@
-//! An emissive run lights only what is under it; a Transparent run receives its share of the entity's lightmap but neither shadows nor bounces, since the renderer samples the lightmap for glass too.
+//! An emissive run lights only what is under it; a Transparent run receives its share of the
+//! entity's lightmap but neither shadows nor bounces, since the renderer samples the lightmap for
+//! glass too.
 
 use glam::Vec3;
 

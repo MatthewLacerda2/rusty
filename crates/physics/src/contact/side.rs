@@ -6,7 +6,8 @@ use rapier3d::prelude::Vector;
 use super::Manifold;
 use rusty_core::collections::Map;
 
-/// Each facet a hull rolls over takes energy: a 64-facet barrel keeps ~81% of its speed per turn, 32 keeps 66%.
+/// Each facet a hull rolls over takes energy: a 64-facet barrel keeps ~81% of its speed per turn,
+/// 32 keeps 66%.
 pub(super) const SIDES: usize = 64;
 
 /// A contact whose normal is within 60° of the cylinder's axis (|cos| at least this) is on a cap,

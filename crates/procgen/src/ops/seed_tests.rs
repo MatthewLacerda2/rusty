@@ -22,7 +22,8 @@ fn bake_with(info: &OpInfo, set: &[(&str, Value)]) -> Vec<u32> {
     bits(&bake(op, wired, Vec::new(), [32, 32]))
 }
 
-/// The settings to try a seed under: the defaults, then each enum value and number moved off its default; a seed may matter only under one.
+/// The settings to try a seed under: the defaults, then each enum value and number moved off its
+/// default; a seed may matter only under one.
 fn settings(info: &OpInfo) -> Vec<Vec<(&'static str, Value)>> {
     let mut out = vec![Vec::new()];
     for p in info.params.iter().filter(|p| p.name != "seed") {

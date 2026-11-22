@@ -1,5 +1,7 @@
-//! A zero-length step before the first real one must skip rapier's pipeline: its islands bootstrap on the first step with time in it. Only the sync, query placement and write-back run.
-//! In release builds a panic in the pipeline is caught and the world rebuilt from the scene; with `debug_assertions` it propagates.
+//! A zero-length step before the first real one must skip rapier's pipeline: its islands bootstrap
+//! on the first step with time in it. Only the sync, query placement and write-back run. In release
+//! builds a panic in the pipeline is caught and the world rebuilt from the scene; with
+//! `debug_assertions` it propagates.
 
 use rapier3d::prelude::Collider;
 

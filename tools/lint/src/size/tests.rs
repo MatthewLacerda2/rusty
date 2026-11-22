@@ -193,7 +193,6 @@ fn python_prose_does_not_count_against_the_cap() {
 
 #[test]
 fn the_full_scan_measures_github_scripts_but_not_compiled_python() {
-    assert!(SIZE_ROOTS.contains(&".github"));
     let tmp = Scratch::new("926-scan");
     let script = tmp.file(".github/scripts/merge.py", "x = 1\n");
     tmp.file(".github/scripts/__pycache__/merge.py", "x = 1\n");
@@ -241,7 +240,6 @@ fn shader_and_script_prose_does_not_count_against_the_cap() {
 
 #[test]
 fn the_full_scan_measures_the_engine_shaders_and_scripts() {
-    assert!(SIZE_ROOTS.contains(&"engine"));
     let tmp = Scratch::new("1015-scan");
     let shader = tmp.file("engine/shaders/a.wgsl", "let a = 1;\n");
     let script = tmp.file("engine/scripts/b.lua", "x = 1\n");

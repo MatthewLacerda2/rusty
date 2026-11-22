@@ -1,4 +1,7 @@
-//! The integration suite: every file in `tests/` compiled into one binary, so the engine is linked once per feature set. **Adding a test file means adding its `mod` line below**; `layout` fails the suite naming a forgotten file. Modules share one process: scratch files go under `temp::dir()`, no `set_var`/`set_current_dir`.
+//! The integration suite: every file in `tests/` compiled into one binary, so the engine is linked
+//! once per feature set. **Adding a test file means adding its `mod` line below**; `layout` fails
+//! the suite naming a forgotten file. Modules share one process: scratch files go under
+//! `temp::dir()`, no `set_var`/`set_current_dir`.
 
 mod layout;
 mod lua;
@@ -124,6 +127,7 @@ mod time_scale;
 #[cfg(feature = "dev")]
 mod tweens;
 
-// Need a GPU or software adapter (skip without one); under one `gpu::` path so a runner tells them apart by name.
+// Need a GPU or software adapter (skip without one); under one `gpu::` path so a runner tells them
+// apart by name.
 #[cfg(feature = "dev")]
 mod gpu;

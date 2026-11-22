@@ -1,4 +1,6 @@
-//! A mesh node named `<base>_LOD<n>` joins the group of its siblings sharing its base and Blender's duplicate suffix: `Crate_LOD0` and `Crate_LOD1` are one prop, and an Alt+D copy `Crate_LOD0.001` / `Crate_LOD1.001` on the same meshes is a second one beside it.
+//! A mesh node named `<base>_LOD<n>` joins the group of its siblings sharing its base and Blender's
+//! duplicate suffix: `Crate_LOD0` and `Crate_LOD1` are one prop, and an Alt+D copy `Crate_LOD0.001`
+//! / `Crate_LOD1.001` on the same meshes is a second one beside it.
 
 use glam::Mat4;
 

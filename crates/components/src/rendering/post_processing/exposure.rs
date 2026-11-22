@@ -1,4 +1,5 @@
-//! Unity HDRP's *Exposure* override: a fixed EV, or automatic exposure from the view's luminance histogram.
+//! Unity HDRP's *Exposure* override: a fixed EV, or automatic exposure from the view's luminance
+//! histogram.
 
 use serde::{Deserialize, Serialize};
 
@@ -33,7 +34,8 @@ impl AutoExposure {
 }
 
 impl Default for AutoExposure {
-    /// Six stops either way, HDRP's adaptation speeds (light to dark 1, dark to light 3), 10% ignored at each end.
+    /// Six stops either way, HDRP's adaptation speeds (light to dark 1, dark to light 3), 10%
+    /// ignored at each end.
     fn default() -> Self {
         Self {
             min_ev: -6.0,

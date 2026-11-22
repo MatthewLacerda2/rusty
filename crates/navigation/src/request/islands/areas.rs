@@ -62,7 +62,8 @@ impl NavigationGraph {
     }
 }
 
-/// A union-find, each set rooted at its lowest node. A node holds its parent plus one, 0 for a root, so a new one is a zeroed table.
+/// A union-find, each set rooted at its lowest node. A node holds its parent plus one, 0 for a
+/// root, so a new one is a zeroed table.
 pub(super) struct Roots(Vec<u32>);
 
 impl Roots {

@@ -2,7 +2,8 @@
 //! area `i`) says which areas it may enter. A `NavMeshModifierVolume` wins over an object's
 //! `NavMeshModifier`; `NotWalkable` removes the spans a volume covers and leaves an object's tops
 //! unwalkable while it still blocks what is under it. Costs are clamped to at least 1 so the octile
-//! heuristic stays admissible. A cost is read at search time: no rebake, but cached paths are invalidated.
+//! heuristic stays admissible. A cost is read at search time: no rebake, but cached paths are
+//! invalidated.
 
 pub use rusty_scene::nav_settings::{
     area_index, clamp_cost, default_areas, NavArea, ALL_AREAS, MAX_AREAS, MIN_AREA_COST,

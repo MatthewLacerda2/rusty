@@ -1,4 +1,6 @@
-//! The footprint is how far the coordinates move to the pixel's neighbours, per axis the smaller of the step forward and back, so a seam (a `fract` wrapping 1 to 0) does not read as one huge footprint.
+//! The footprint is how far the coordinates move to the pixel's neighbours, per axis the smaller of
+//! the step forward and back, so a seam (a `fract` wrapping 1 to 0) does not read as one huge
+//! footprint.
 
 use super::super::image_buf::{Image, Rgba};
 

@@ -1,10 +1,12 @@
 //! Unity's texture importer: fitted to its *Max Size*, then block-compressed.
 //!
-//! A texture drawn in a slot its type cannot serve (a BC5 normal as albedo loses blue) uploads uncompressed ([`fits`]).
+//! A texture drawn in a slot its type cannot serve (a BC5 normal as albedo loses blue) uploads
+//! uncompressed ([`fits`]).
 //!
 //! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`), and an extracted texture's `<glb>.bctex/<image>.bctex` (`location`)
 //!
-//! A normal map kept at 16 bits is never compressed: BC5's 8 bits, one step per 0.45°, would bake a gentle slope as terraces.
+//! A normal map kept at 16 bits is never compressed: BC5's 8 bits, one step per 0.45°, would bake a
+//! gentle slope as terraces.
 
 pub(crate) mod background;
 mod cache;
@@ -143,7 +145,8 @@ pub fn load(
     })
 }
 
-/// The Texture Type is the import's word on what the file holds: a 16-bit `Default` image in a normal slot reads at 8 bits.
+/// The Texture Type is the import's word on what the file holds: a 16-bit `Default` image in a
+/// normal slot reads at 8 bits.
 pub fn keeps_deep(settings: &TextureSettings, color: image::ColorType) -> bool {
     settings.texture_type == TextureType::NormalMap && is_deep(color)
 }

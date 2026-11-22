@@ -165,7 +165,8 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     Ok(())
 }
 
-/// Rust halves of namespace functions written in Lua. The Lua half looks each up at call time, never keeping a copy, so a layer above can replace one.
+/// Rust halves of namespace functions written in Lua. The Lua half looks each up at call time,
+/// never keeping a copy, so a layer above can replace one.
 pub const RUST_HALVES: &str = "rusty.rust_halves";
 
 pub(crate) fn rust_halves<'f>(

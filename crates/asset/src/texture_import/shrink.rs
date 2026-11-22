@@ -1,4 +1,5 @@
-//! Colour averages in linear light, as the GPU mip pass does (`render::gpu::textures::mips`), so downscaling never darkens a high-contrast texture; every other kind averages raw values.
+//! Colour averages in linear light, as the GPU mip pass does (`render::gpu::textures::mips`), so
+//! downscaling never darkens a high-contrast texture; every other kind averages raw values.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -11,7 +12,8 @@ use super::TextureKind;
 use crate::sidecar::MAX_SIZES;
 use rusty_core::color::{linear_to_srgb, srgb_to_linear};
 
-/// An image of more than 8 bits a channel fitted for a normal slot stays 16-bit, so a normal map kept at 16 bits keeps its slopes; every other kind is fitted at 8 bits.
+/// An image of more than 8 bits a channel fitted for a normal slot stays 16-bit, so a normal map
+/// kept at 16 bits keeps its slopes; every other kind is fitted at 8 bits.
 pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImage {
     let (w, h) = fitted_size(image.width(), image.height(), max_size);
     if (w, h) == (image.width(), image.height()) {

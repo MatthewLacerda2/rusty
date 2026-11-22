@@ -22,7 +22,8 @@ mod through_edge_tests;
 #[cfg(test)]
 mod through_tests;
 
-/// rapier's query pipeline ignores the enabled flag: check the collider and its body (a deactivated owner disables its whole body).
+/// rapier's query pipeline ignores the enabled flag: check the collider and its body (a deactivated
+/// owner disables its whole body).
 pub(super) fn is_live(bodies: &RigidBodySet, collider: &Collider) -> bool {
     collider.is_enabled()
         && collider
@@ -76,7 +77,8 @@ impl PhysicsWorld {
             .map(|hit| (hit.distance, hit.normal))
     }
 
-    /// `accept` filters during traversal, so rejected colliders are passed through; a ray starting inside a collider hits it at distance 0.
+    /// `accept` filters during traversal, so rejected colliders are passed through; a ray starting
+    /// inside a collider hits it at distance 0.
     pub fn raycast_hit(
         &self,
         origin: Vec3,
@@ -111,7 +113,8 @@ impl PhysicsWorld {
         hits
     }
 
-    /// Sensors are passed through; a collider the origin starts inside is looked past, not hit at 0.
+    /// Sensors are passed through; a collider the origin starts inside is looked past, not hit
+    /// at 0.
     pub fn first_surface_ahead(&self, origin: Vec3, dir: Vec3, max_toi: f32) -> Option<RayHit> {
         let ray = Ray::new(origin, dir.normalize());
         let accept = |_: u32| true;

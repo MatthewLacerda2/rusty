@@ -76,7 +76,9 @@ fn edit_mode_moves_freely_and_tiny_moves_do_nothing() {
     assert!(none.is_none(), "no controller, no move");
 }
 
-/// Walking a flat floor covers nearly the full stride every tick: rapier 0.36 can read float noise in the downward move as a slip and drop the slide (the sweep reruns it flat); the 10% allowance is parry's contact-normal noise.
+/// Walking a flat floor covers nearly the full stride every tick: rapier 0.36 can read float noise
+/// in the downward move as a slip and drop the slide (the sweep reruns it flat); the 10% allowance
+/// is parry's contact-normal noise.
 #[test]
 fn walking_a_flat_floor_never_stalls() {
     for velocity in [

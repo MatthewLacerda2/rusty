@@ -1,4 +1,6 @@
-//! IK end to end through `GameWorld::tick` on the hitbox tests' five-bone rig: a script-set target is reached and skinned, the arm's hitbox follows, an aim chain clamps without drifting, weight 0 is a no-op, a ragdolled bone is left to physics, mirrored rigs work, deterministic.
+//! IK end to end through `GameWorld::tick` on the hitbox tests' five-bone rig: a script-set target
+//! is reached and skinned, the arm's hitbox follows, an aim chain clamps without drifting, weight 0
+//! is a no-op, a ragdolled bone is left to physics, mirrored rigs work, deterministic.
 
 mod aim;
 mod api;

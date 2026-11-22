@@ -7,7 +7,8 @@ pub struct CrateRef {
     pub krate: String,
 }
 
-/// A file that declares `mod image;` or imports `super::image` means its own `image::`, not the crate.
+/// A file that declares `mod image;` or imports `super::image` means its own `image::`, not the
+/// crate.
 pub fn crate_refs(content: &str, crates: &BTreeSet<String>) -> Vec<CrateRef> {
     let lines = live_lines(content);
     let uses = use_statements(&lines);

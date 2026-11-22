@@ -1,4 +1,6 @@
-//! A BC6H block at mip level 2 covers 16 base texels, so the atlas aligns cells to 16 (`atlas::GRID`): on a 4-texel grid a block held two maps and bent a dim map's light by up to 8.6%; on 16 every map reads its own light within BC6H's 5%.
+//! A BC6H block at mip level 2 covers 16 base texels, so the atlas aligns cells to 16
+//! (`atlas::GRID`): on a 4-texel grid a block held two maps and bent a dim map's light by up to
+//! 8.6%; on 16 every map reads its own light within BC6H's 5%.
 
 use glam::Vec3;
 

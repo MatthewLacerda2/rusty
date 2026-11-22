@@ -1,4 +1,5 @@
-//! `pool::run_made`: each chart is made once, by the first worker to reach it and never before the run does; results equal `pool::run`'s on any thread count.
+//! `pool::run_made`: each chart is made once, by the first worker to reach it and never before the
+//! run does; results equal `pool::run`'s on any thread count.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;

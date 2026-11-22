@@ -1,5 +1,7 @@
-//! Packs lightmaps into equal-size square pages: the smallest power-of-two edge, up to Max Lightmap Size.
-//! A map sits in a cell: itself plus a [`PAD`]-texel ring copied from its edge, rounded up to [`GRID`] (a BC6H block at mip 2; a 4-texel grid bent a dim map's light up to 8.6%), so no mip or bilinear read crosses two maps. Packed largest first.
+//! Packs lightmaps into equal-size square pages: the smallest power-of-two edge, up to Max Lightmap
+//! Size. A map sits in a cell: itself plus a [`PAD`]-texel ring copied from its edge, rounded up to
+//! [`GRID`] (a BC6H block at mip 2; a 4-texel grid bent a dim map's light up to 8.6%), so no mip or
+//! bilinear read crosses two maps. Packed largest first.
 
 mod packing;
 mod rects;

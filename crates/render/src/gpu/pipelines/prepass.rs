@@ -44,7 +44,8 @@ impl PrepassPipelines {
     }
 }
 
-/// Same vertex stage, primitive and depth state as [`prepass_set`]'s, so the depth is bit-identical.
+/// Same vertex stage, primitive and depth state as [`prepass_set`]'s, so the depth is
+/// bit-identical.
 fn depth_only_set(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

@@ -1,6 +1,7 @@
-//! World space has one store: a dirty-flagged matrix cache that a read cleans parents first, so it is never stale.
-//! A write is O(1): it dirties the subtree and marks its colliders' bounds due a refresh.
-//! A mirror stays in the scale; under a singular parent a world setter keeps the local value it cannot solve for, as Unity does.
+//! World space has one store: a dirty-flagged matrix cache that a read cleans parents first, so it
+//! is never stale. A write is O(1): it dirties the subtree and marks its colliders' bounds due a
+//! refresh. A mirror stays in the scale; under a singular parent a world setter keeps the local
+//! value it cannot solve for, as Unity does.
 
 mod bounds;
 mod collider;

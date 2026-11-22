@@ -1,4 +1,5 @@
-//! The sky level, meshes without a lightmap UV, texel density, and gathering a live scene's static geometry and lights.
+//! The sky level, meshes without a lightmap UV, texel density, and gathering a live scene's static
+//! geometry and lights.
 
 use glam::{Vec2, Vec3};
 

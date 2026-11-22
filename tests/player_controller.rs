@@ -64,8 +64,8 @@ fn no_double_jump_mid_air() {
 }
 
 /// Drives the bundled controller (the harness workspace's copy), counting the
-/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life, so the
-/// wrap is laid once, in `Start`.
+/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for
+/// its life, so the wrap is laid once, in `Start`.
 const SHOT_PROBE: &str = r#"
 local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")
 local Probe = {}

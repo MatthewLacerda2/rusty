@@ -1,4 +1,6 @@
-//! Only `Baked` lamps' direct light makes a texel's specular lobe: an even sky and a `Mixed` light's bounce leave a texel directional but lamp-free; one lamp gives a share of 1 toward itself; two opposed lamps weaken it.
+//! Only `Baked` lamps' direct light makes a texel's specular lobe: an even sky and a `Mixed`
+//! light's bounce leave a texel directional but lamp-free; one lamp gives a share of 1 toward
+//! itself; two opposed lamps weaken it.
 
 use glam::{Vec3, Vec4};
 

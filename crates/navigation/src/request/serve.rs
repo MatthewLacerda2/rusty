@@ -91,7 +91,9 @@ impl NavigationGraph {
         Some((path, a.target, a.from, capped))
     }
 
-    /// Begin a search from the agent's feet toward the walkable point nearest its target (within [`TARGET_SAMPLE_DISTANCE`]): exactly the ends a synchronous `calculate_path_masked` would snap.
+    /// Begin a search from the agent's feet toward the walkable point nearest its target (within
+    /// [`TARGET_SAMPLE_DISTANCE`]): exactly the ends a synchronous `calculate_path_masked` would
+    /// snap.
     fn begin_request(&self, pool: &mut super::NodePool, (from, target, mask): Ends) -> Begun {
         let goal = self.sample_position(target, TARGET_SAMPLE_DISTANCE);
         let start = self.snap(from);
@@ -111,7 +113,8 @@ impl NavigationGraph {
         })
     }
 
-    /// Skip the waypoints at the head of a just-delivered path that the agent walked past while it waited, so a chaser does not turn back to touch a corner.
+    /// Skip the waypoints at the head of a just-delivered path that the agent walked past while it
+    /// waited, so a chaser does not turn back to touch a corner.
     fn skip_passed(&self, agent: &mut NavMeshAgentComponent, from: Vec3, feet: Vec3) {
         let walked = from.distance(feet) + WAYPOINT_REACHED_DISTANCE;
         let (mut along, mut prev) = (0.0, from);

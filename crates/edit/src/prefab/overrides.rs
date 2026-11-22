@@ -1,4 +1,5 @@
-//! The order is Unity's: removed components, added components, list sizes (shallowest first), then property modifications.
+//! The order is Unity's: removed components, added components, list sizes (shallowest first), then
+//! property modifications.
 
 use serde_json::Value;
 
@@ -12,7 +13,9 @@ enum Op<'a> {
     Set(&'a str, &'a Value),
 }
 
-/// A path that no longer resolves is skipped. A `null` written into an array element the type can't hold (a dropped LOD renderer's id) drops that element. An override that still doesn't fit is skipped with a warning.
+/// A path that no longer resolves is skipped. A `null` written into an array element the type can't
+/// hold (a dropped LOD renderer's id) drops that element. An override that still doesn't fit is
+/// skipped with a warning.
 pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     if overrides.is_empty() {
         return;
@@ -81,7 +84,8 @@ fn apply_json(value: &mut Value, overrides: &PrefabOverrides, name: &str) {
     *value = finished(value, &grown, is_filled);
 }
 
-/// A `null` into an array element goes last, highest index first, so dropping one never shifts another's slot.
+/// A `null` into an array element goes last, highest index first, so dropping one never shifts
+/// another's slot.
 fn ops<'a>(value: &Value, overrides: &'a PrefabOverrides) -> Vec<Op<'a>> {
     let mut ops: Vec<Op> = overrides
         .removed_components

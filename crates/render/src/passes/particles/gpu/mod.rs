@@ -1,5 +1,6 @@
 //! Not sorted inside an emitter: additive sums in any order, alpha draws in slot order.
-//! Compute and vertex-stage storage are required of the adapter; the cap's buffers fit wgpu's default limits.
+//! Compute and vertex-stage storage are required of the adapter; the cap's buffers fit wgpu's
+//! default limits.
 
 pub(crate) mod emitter;
 pub(crate) mod record;

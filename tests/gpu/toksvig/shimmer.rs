@@ -32,7 +32,8 @@ fn scene(map: &std::path::Path, roughness: f32, intensity: f32) -> Scene {
     scene
 }
 
-/// One map's draw: far variance and mean, near luma, and the far mean at roughness 0.3 under a dim lamp.
+/// One map's draw: far variance and mean, near luma, and the far mean at roughness 0.3 under a dim
+/// lamp.
 struct Drawn {
     variance: f64,
     far: f64,

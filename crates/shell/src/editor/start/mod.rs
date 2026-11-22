@@ -85,7 +85,8 @@ fn world(plan: &BootPlan, project: ProjectSource) -> GameWorld {
     game
 }
 
-/// Now, in Unix seconds (the shell is platform layer, so it may read the clock): when a project was opened, and what the picker dates by.
+/// Now, in Unix seconds (the shell is platform layer, so it may read the clock): when a project was
+/// opened, and what the picker dates by.
 fn unix_now() -> u64 {
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH);
     now.map_or(0, |d| d.as_secs())

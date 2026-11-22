@@ -26,7 +26,8 @@ impl Ssil {
 }
 
 impl Default for Ssil {
-    /// Plain strength over two metres at the preset's `Medium` level (`Custom` starts at 8 samples, half resolution).
+    /// Plain strength over two metres at the preset's `Medium` level (`Custom` starts at 8 samples,
+    /// half resolution).
     fn default() -> Self {
         Self {
             active: false,

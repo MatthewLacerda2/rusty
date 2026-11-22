@@ -1,4 +1,5 @@
-//! Slopes over the limit at every angle, and the ground normal of a move that never touched the floor (`physics::character::sweep`).
+//! Slopes over the limit at every angle, and the ground normal of a move that never touched the
+//! floor (`physics::character::sweep`).
 
 use glam::Vec3;
 use rusty::physics::{self, PhysicsWorld};
@@ -19,7 +20,8 @@ fn on_ramp(degrees: f32, along: f32) -> (Scene, u32) {
     (scene, id)
 }
 
-/// Unity treats a slope over `slopeLimit` as a wall at every angle: walking into one from the floor never gets up it.
+/// Unity treats a slope over `slopeLimit` as a wall at every angle: walking into one from the floor
+/// never gets up it.
 #[test]
 fn every_slope_over_the_limit_blocks_like_a_wall() {
     for degrees in STEEP {
@@ -34,7 +36,8 @@ fn every_slope_over_the_limit_blocks_like_a_wall() {
     }
 }
 
-/// Pushing up a steep slope still slides down: the push blocks like a wall (rapier alone reads it as intent to climb and cancels the slide).
+/// Pushing up a steep slope still slides down: the push blocks like a wall (rapier alone reads it
+/// as intent to climb and cancels the slide).
 #[test]
 fn pushing_up_a_steep_slope_still_slides_down_it() {
     for degrees in STEEP {

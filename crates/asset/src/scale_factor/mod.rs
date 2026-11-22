@@ -1,6 +1,8 @@
-//! One uniform scale applied to the model's data at import, so colliders, nav bakes, the lightmap unwrap and bones all see the scaled model.
+//! One uniform scale applied to the model's data at import, so colliders, nav bakes, the lightmap
+//! unwrap and bones all see the scaled model.
 //!
-//! Scaling by `s` is `S · M · S⁻¹` for every transform: only each matrix's translation is multiplied; normals and tangents are directions and stay.
+//! Scaling by `s` is `S · M · S⁻¹` for every transform: only each matrix's translation is
+//! multiplied; normals and tangents are directions and stay.
 
 use glam::Mat4;
 

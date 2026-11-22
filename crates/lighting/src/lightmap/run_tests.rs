@@ -1,4 +1,5 @@
-//! A multi-material mesh bakes each run with its own material, paired with its slots the way the renderer draws them.
+//! A multi-material mesh bakes each run with its own material, paired with its slots the way the
+//! renderer draws them.
 
 use std::cell::Cell;
 
@@ -93,7 +94,8 @@ fn each_run_bakes_with_its_own_slot() {
     );
 }
 
-/// A Transparent run stays drawn (it receives its lightmap) but lets light through; an extra slot over it is judged by its own material.
+/// A Transparent run stays drawn (it receives its lightmap) but lets light through; an extra slot
+/// over it is judged by its own material.
 #[test]
 fn a_transparent_run_receives_but_does_not_occlude() {
     let glass = |end| (end, 0.0, 0.5, false);

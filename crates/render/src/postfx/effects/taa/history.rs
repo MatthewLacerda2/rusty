@@ -95,6 +95,7 @@ pub(crate) fn chain_size(view: &RenderView, on: bool) -> (u32, u32) {
 }
 
 pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
+    // lint: allow(comment-width) a `chain-size` marker sits on the line it excuses
     on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 

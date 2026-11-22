@@ -1,4 +1,7 @@
--- Behind `make library-previews OUT=<dir>`: every library material (found through Texture.Ops()) baked and rendered with Debug.PreviewMaterial at 1024², on the sphere and the plane (`repeats = 3`), at wear 0.3 and 1, written to <OUT>/<material>_wear<w>_<mesh>.png. ONLY, when set, names the one material; it raises when nothing would be rendered.
+-- Behind `make library-previews OUT=<dir>`: every library material (found through Texture.Ops())
+-- baked and rendered with Debug.PreviewMaterial at 1024², on the sphere and the plane (`repeats =
+-- 3`), at wear 0.3 and 1, written to <OUT>/<material>_wear<w>_<mesh>.png. ONLY, when set, names the
+-- one material; it raises when nothing would be rendered.
 
 local LIBRARY = "engine/textures/library/"
 -- Metres one repeat covers: the material's world_size (docs/api/Texture.md, *The library*).

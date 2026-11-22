@@ -1,4 +1,5 @@
-//! The ops with a reach in pixels, on a non-square image: each axis takes its own pixel count, checked against analytic values.
+//! The ops with a reach in pixels, on a non-square image: each axis takes its own pixel count,
+//! checked against analytic values.
 
 use std::f32::consts::TAU;
 
@@ -30,7 +31,8 @@ fn a_blur_radius_is_a_fraction_of_each_axis() {
 
 #[test]
 fn bump_to_normal_slopes_in_one_unit_on_both_axes() {
-    // The slope is in tiles of the longer side both ways; a central difference over n px reads it times sin(2π/n) / (2π/n).
+    // The slope is in tiles of the longer side both ways; a central difference over n px reads it
+    // times sin(2π/n) / (2π/n).
     let sinc = |n: f32| (TAU / n).sin() / (TAU / n);
     let (a, b, strength) = (0.05, 0.03, 1.0);
     let img = Image::fill_uv(WIDE, |u, v| gray(a * (TAU * u).sin() + b * (TAU * v).sin()));

@@ -1,4 +1,5 @@
-//! A link names its ends as `(cell, layer)`, not span indices: an incremental rebake splices the compact span array and shifts the indices of every cell after the change.
+//! A link names its ends as `(cell, layer)`, not span indices: an incremental rebake splices the
+//! compact span array and shifts the indices of every cell after the change.
 
 mod authored;
 mod generate;
@@ -114,7 +115,8 @@ impl NavigationGraph {
         self.offmesh.exits = exits;
     }
 
-    /// The link moves out of span `here`, in a fixed order. A move's cost is in A\*'s units, never below the octile distance it covers, so the search heuristic stays admissible.
+    /// The link moves out of span `here`, in a fixed order. A move's cost is in A\*'s units, never
+    /// below the octile distance it covers, so the search heuristic stays admissible.
     pub(super) fn link_moves(&self, here: SpanRef) -> impl Iterator<Item = LinkMove> + '_ {
         let key = (
             self.index(here.gx, here.gz) as u32,

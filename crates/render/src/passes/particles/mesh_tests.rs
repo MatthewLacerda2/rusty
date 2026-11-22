@@ -1,4 +1,5 @@
-//! A size curve below zero draws at zero, never mirrored: a mirrored mesh would show its inside with back faces culled.
+//! A size curve below zero draws at zero, never mirrored: a mirrored mesh would show its inside
+//! with back faces culled.
 
 use glam::{Quat, Vec3};
 

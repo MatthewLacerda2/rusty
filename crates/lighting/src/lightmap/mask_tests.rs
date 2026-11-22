@@ -1,4 +1,5 @@
-//! A `Shadowmask` bake's per-channel masks of a `Mixed` light's static occlusion, in the lightmaps and at the probes; the lightmap's own light stays as in a `BakedIndirect` bake.
+//! A `Shadowmask` bake's per-channel masks of a `Mixed` light's static occlusion, in the lightmaps
+//! and at the probes; the lightmap's own light stays as in a `BakedIndirect` bake.
 
 use glam::{Vec3, Vec4};
 

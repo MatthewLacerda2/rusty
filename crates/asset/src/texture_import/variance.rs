@@ -1,4 +1,7 @@
-//! What a normal map's mips lose (Toksvig 2005): a level's averaged normal is shorter than 1 where texels disagreed, a spread that narrow GGX lobes alias, so the forward shader widens the lobe by it (`forward::specular_aa::texture_kernel`). BC5 drops z and with it the length, so the importer measures it while it has z and stores each level's mean [`kernel`] in a [`VarianceTable`].
+//! What a normal map's mips lose (Toksvig 2005): a level's averaged normal is shorter than 1 where
+//! texels disagreed, a spread that narrow GGX lobes alias, so the forward shader widens the lobe by
+//! it (`forward::specular_aa::texture_kernel`). BC5 drops z and with it the length, so the importer
+//! measures it while it has z and stores each level's mean [`kernel`] in a [`VarianceTable`].
 
 use image::Rgba32FImage;
 
@@ -12,7 +15,8 @@ pub const KERNEL_MAX: f32 = 0.04;
 
 pub const QUANTUM: f32 = 2.0 / 255.0;
 
-/// HDRP's `TextureNormalVariance` (vMF fit, `κ = (3r − r³)/(1 − r²)`), doubled and capped as `TextureNormalFiltering`.
+/// HDRP's `TextureNormalVariance` (vMF fit, `κ = (3r − r³)/(1 − r²)`), doubled and capped as
+/// `TextureNormalFiltering`.
 pub fn kernel(length: f32) -> f32 {
     let r = (length + QUANTUM).min(1.0);
     let r2 = r * r;

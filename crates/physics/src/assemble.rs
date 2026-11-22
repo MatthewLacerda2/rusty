@@ -12,9 +12,11 @@ use super::watch::{carriers, Owners};
 use super::world::{body_to_write, collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
-/// Only pairs with a dynamic body generate contacts: Unity's rule that a collision needs a dynamic body; kinematic and static
-/// colliders meet only through queries. Equals `ActiveCollisionTypes::default()` (not a `const fn`; see `active_types_are_rapiers_default`).
-/// rapier re-filters existing pairs only through its broad phase, so a body type change in Play re-pairs its colliders.
+/// Only pairs with a dynamic body generate contacts: Unity's rule that a collision needs a dynamic
+/// body; kinematic and static colliders meet only through queries. Equals
+/// `ActiveCollisionTypes::default()` (not a `const fn`; see `active_types_are_rapiers_default`).
+/// rapier re-filters existing pairs only through its broad phase, so a body type change in Play
+/// re-pairs its colliders.
 pub(crate) const ACTIVE_TYPES: ActiveCollisionTypes = ActiveCollisionTypes::DYNAMIC_DYNAMIC
     .union(ActiveCollisionTypes::DYNAMIC_KINEMATIC)
     .union(ActiveCollisionTypes::DYNAMIC_FIXED);

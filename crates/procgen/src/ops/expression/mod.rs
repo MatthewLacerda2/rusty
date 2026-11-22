@@ -1,5 +1,6 @@
-//! A formula is untrusted text: [`compile`] refuses anything it cannot run, and nothing can make it panic, recurse past [`MAX_DEPTH`] or read past [`MAX_LEN`] characters.
-//! Functions shared with `math` are `math`'s own (`ops::math::apply`), so the two bake the same bytes.
+//! A formula is untrusted text: [`compile`] refuses anything it cannot run, and nothing can make it
+//! panic, recurse past [`MAX_DEPTH`] or read past [`MAX_LEN`] characters. Functions shared with
+//! `math` are `math`'s own (`ops::math::apply`), so the two bake the same bytes.
 
 mod eval;
 mod fault;

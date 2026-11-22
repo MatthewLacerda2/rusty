@@ -1,4 +1,7 @@
-//! The Lua examples in `docs/api/` run, so a renamed argument or changed return shape fails here, not in a wrong doc. Each ```lua block runs in a fresh headless edit-mode session; the fence markers (`no-run`, `ignore`, `with=a,b:Canvas+Image`) are in `docs/api/index.md`, *Examples run*.
+//! The Lua examples in `docs/api/` run, so a renamed argument or changed return shape fails here,
+//! not in a wrong doc. Each ```lua block runs in a fresh headless edit-mode session; the fence
+//! markers (`no-run`, `ignore`, `with=a,b:Canvas+Image`) are in `docs/api/index.md`, *Examples
+//! run*.
 
 mod checks;
 mod fence;

@@ -1,4 +1,5 @@
-//! Prioritize View: a progressive bake traces the batches the camera sees first, and only that order moves.
+//! Prioritize View: a progressive bake traces the batches the camera sees first, and only that
+//! order moves.
 
 use std::sync::{Arc, Mutex};
 

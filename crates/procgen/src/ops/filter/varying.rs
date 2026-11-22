@@ -1,5 +1,7 @@
-//! A box of radius `r` is one unrounded window `2r + 1` wide: rounding would step visibly at each half pixel, so it matches the fixed box only at whole radii.
-//! A window with fractional ends adds more variance than the `(W² − 1) / 12` of a whole odd window, so each width is solved from its real variance ([`gaussian_width`]).
+//! A box of radius `r` is one unrounded window `2r + 1` wide: rounding would step visibly at each
+//! half pixel, so it matches the fixed box only at whole radii. A window with fractional ends adds
+//! more variance than the `(W² − 1) / 12` of a whole odd window, so each width is solved from its
+//! real variance ([`gaussian_width`]).
 
 use super::super::super::image_buf::{Image, Rgba};
 use super::super::super::recipe::BlurKind;

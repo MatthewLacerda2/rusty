@@ -1,4 +1,5 @@
-//! At a shown step the camera's texels hold more paths than the rest; orthographic views work, and a `ShadowsOnly` mesh hides nothing.
+//! At a shown step the camera's texels hold more paths than the rest; orthographic views work, and
+//! a `ShadowsOnly` mesh hides nothing.
 
 use glam::Vec3;
 

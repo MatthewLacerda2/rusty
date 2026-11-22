@@ -1,4 +1,5 @@
-//! Unity's Color Lookup: a user LUT (`.cube` or a Unity strip `.png`) applied last, on the display colour.
+//! Unity's Color Lookup: a user LUT (`.cube` or a Unity strip `.png`) applied last, on the display
+//! colour.
 
 use serde::{Deserialize, Serialize};
 

@@ -1,4 +1,5 @@
-//! The last pass gives the one-shot bake's bytes whatever the pass size, view or thread count; a cancel returns nothing.
+//! The last pass gives the one-shot bake's bytes whatever the pass size, view or thread count; a
+//! cancel returns nothing.
 
 use glam::Vec3;
 

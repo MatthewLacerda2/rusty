@@ -1,4 +1,6 @@
-//! Since rapier 0.36 every fast dynamic body is swept against static geometry whatever its mode; `Continuous` adds the sweep against moving bodies (Unity's Continuous / ContinuousDynamic split).
+//! Since rapier 0.36 every fast dynamic body is swept against static geometry whatever its mode;
+//! `Continuous` adds the sweep against moving bodies (Unity's Continuous / ContinuousDynamic
+//! split).
 
 use glam::Vec3;
 

@@ -33,7 +33,8 @@ pub(crate) fn is_test_file(path: &str) -> bool {
         || name.starts_with("test_")
 }
 
-/// The suffix alone is not enough: a `_tests.rs` earns the source cap only with its source beside it.
+/// The suffix alone is not enough: a `_tests.rs` earns the source cap only with its source beside
+/// it.
 fn is_tests_sibling(path: &Path) -> bool {
     let Some(stem) = path
         .file_name()

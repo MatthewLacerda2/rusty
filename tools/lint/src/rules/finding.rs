@@ -77,6 +77,11 @@ pub fn allowed_in(path: &str, source: &str, line: usize, rule: &str) -> bool {
     allowed_as(Form::of(path), source, line, rule)
 }
 
+/// For a rule that belongs to no line (a length or word cap): an allow on any line.
+pub fn allowed_anywhere(path: &str, source: &str, rule: &str) -> bool {
+    source.lines().any(|line| allowed_in(path, line, 1, rule))
+}
+
 fn allowed_as(form: Form, source: &str, line: usize, rule: &str) -> bool {
     let lines: Vec<&str> = source.lines().collect();
     let Some(at) = line.checked_sub(1).filter(|&i| i < lines.len()) else {

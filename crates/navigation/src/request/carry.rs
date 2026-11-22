@@ -1,4 +1,6 @@
-//! A search in flight is carried across an incremental rebake unless something it reached (a span it costed, or the goal) lies near a changed cell; its spans are renumbered cell by cell. A search a change does reach, a full bake or an area-cost change restarts.
+//! A search in flight is carried across an incremental rebake unless something it reached (a span
+//! it costed, or the goal) lies near a changed cell; its spans are renumbered cell by cell. A
+//! search a change does reach, a full bake or an area-cost change restarts.
 
 use super::super::bake::CellRect;
 use super::super::offmesh::LinkParams;
@@ -39,7 +41,8 @@ impl NavigationGraph {
 }
 
 impl NavigationGraph {
-    /// A span index counted from `old_start`, renumbered onto the current spans: `None` for a span in a cell near enough a change that one of its moves may have changed.
+    /// A span index counted from `old_start`, renumbered onto the current spans: `None` for a span
+    /// in a cell near enough a change that one of its moves may have changed.
     pub(crate) fn spliced<'a>(
         &'a self,
         old_start: &'a [u32],

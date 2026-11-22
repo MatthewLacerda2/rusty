@@ -1,4 +1,5 @@
-//! Like every mesh, an instanced asset stores only its reference; the geometry is re-imported on load.
+//! Like every mesh, an instanced asset stores only its reference; the geometry is re-imported on
+//! load.
 
 use glam::Vec3;
 
@@ -10,7 +11,8 @@ use rusty_components::{ColliderComponent, MaterialComponent};
 use rusty_scene::rehydrate;
 use rusty_scene::Scene;
 
-/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set as one LODGroup; its id is the group's.
+/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set
+/// as one LODGroup; its id is the group's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,
@@ -106,7 +108,8 @@ fn apply_material(scene: &mut Scene, id: u32, path: &str, asset: &ImportedAsset,
         .set_material(id, Some(MaterialComponent { materials }));
 }
 
-/// Key `"{path}::{name}"` for a named glTF material, else `"{path}::material_{idx}"`, so sub-objects sharing one material share one entry.
+/// Key `"{path}::{name}"` for a named glTF material, else `"{path}::material_{idx}"`, so
+/// sub-objects sharing one material share one entry.
 fn import_material(
     scene: &mut Scene,
     path: &str,
@@ -119,7 +122,8 @@ fn import_material(
     } else {
         format!("{path}::{}", data.name)
     };
-    // A material already in the scene is the user's (a placed model's recolour): a later spawn of the same file must not reset it.
+    // A material already in the scene is the user's (a placed model's recolour): a later spawn of
+    // the same file must not reset it.
     scene
         .materials
         .entry(key.clone())

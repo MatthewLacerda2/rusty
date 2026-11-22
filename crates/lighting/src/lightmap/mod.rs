@@ -1,6 +1,9 @@
-//! Baked lightmaps for static meshes with a second UV: a CPU path tracer bakes bounce, sky, emission and `Baked` lights' direct light per texel; dynamic objects keep the light probes. `rays` and `raster` are shared with `lighting::mesh_maps`.
+//! Baked lightmaps for static meshes with a second UV: a CPU path tracer bakes bounce, sky,
+//! emission and `Baked` lights' direct light per texel; dynamic objects keep the light probes.
+//! `rays` and `raster` are shared with `lighting::mesh_maps`.
 //!
-//! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG, any thread count.
+//! The bake is a pure function of (scene, settings, seed): no clock, no unseeded RNG, any thread
+//! count.
 
 mod atlas;
 mod bake;

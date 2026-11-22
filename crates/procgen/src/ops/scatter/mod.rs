@@ -1,4 +1,6 @@
-//! Each stamp's place and draws come from its index and the node seed, each from its own hash stream, so raising `amount` adds stamps without moving the others and a param added later reshuffles nothing.
+//! Each stamp's place and draws come from its index and the node seed, each from its own hash
+//! stream, so raising `amount` adds stamps without moving the others and a param added later
+//! reshuffles nothing.
 
 mod buckets;
 mod place;

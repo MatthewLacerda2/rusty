@@ -1,8 +1,8 @@
 //! `h(n)` is the least octile distance to an unsettled goal; every move costs at least its octile
 //! distance, so `h` never overestimates. The flood's `f32` sums can round the cheapest path an ulp
-//! *under* the real `g + h`, so `h` is shrunk by [`Goals::slack`], `4 ε (bound + 4)`: each goal then
-//! settles at the very `f32` the full Dijkstra flood gives it. A settled goal raises `h`, but keys
-//! already in the heap are not re-keyed: they stay lower bounds.
+//! *under* the real `g + h`, so `h` is shrunk by [`Goals::slack`], `4 ε (bound + 4)`: each goal
+//! then settles at the very `f32` the full Dijkstra flood gives it. A settled goal raises `h`, but
+//! keys already in the heap are not re-keyed: they stay lower bounds.
 
 use crate::astar::heuristic;
 use glam::Vec3;

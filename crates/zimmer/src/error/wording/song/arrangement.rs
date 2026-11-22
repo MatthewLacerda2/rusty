@@ -1,4 +1,5 @@
-//! What an arrangement entry's transposition and velocity, and a pattern's length, are refused with.
+//! What an arrangement entry's transposition and velocity, and a pattern's length, are refused
+//! with.
 
 use std::fmt;
 

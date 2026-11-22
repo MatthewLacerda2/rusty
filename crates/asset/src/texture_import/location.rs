@@ -1,4 +1,5 @@
-//! Compressed copies live in the import cache, named source plus [`CACHE_SUFFIX`]; an extracted texture's beside its model's cache.
+//! Compressed copies live in the import cache, named source plus [`CACHE_SUFFIX`]; an extracted
+//! texture's beside its model's cache.
 
 use std::path::{Path, PathBuf};
 
@@ -18,7 +19,8 @@ pub fn cache_path_in(root: &Path, image: &Path) -> PathBuf {
     }
 }
 
-/// `<glb>.bctex/<image's name>.bctex`, not in the textures folder, whose name each conversion changes (`convert::stage`), so an unchanged image finds its copy current.
+/// `<glb>.bctex/<image's name>.bctex`, not in the textures folder, whose name each conversion
+/// changes (`convert::stage`), so an unchanged image finds its copy current.
 pub fn extracted_cache(glb: &Path, image: &Path) -> PathBuf {
     let mut folder = glb.as_os_str().to_owned();
     folder.push(CACHE_SUFFIX);

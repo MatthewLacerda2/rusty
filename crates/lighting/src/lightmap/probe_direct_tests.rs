@@ -1,4 +1,5 @@
-//! `baked_direct_sh`: only `Baked` lights, the forward shader's falloff, shadowed by static geometry; the scene's diffuse model reaches both the probes' read-back and a lightmap texel.
+//! `baked_direct_sh`: only `Baked` lights, the forward shader's falloff, shadowed by static
+//! geometry; the scene's diffuse model reaches both the probes' read-back and a lightmap texel.
 
 use glam::Vec3;
 

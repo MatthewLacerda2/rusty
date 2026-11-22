@@ -1,5 +1,7 @@
-//! A *prefab* is a saved GameObject subtree in a `.prefab` asset. Ids are local (0-based, root = 0) so the file is self-contained; on instantiate they become fresh sequential scene ids.
-//! Only values are saved, never GPU buffers: meshes rehydrate from their reference. An imported model is a source too (Unity's model prefab).
+//! A *prefab* is a saved GameObject subtree in a `.prefab` asset. Ids are local (0-based, root = 0)
+//! so the file is self-contained; on instantiate they become fresh sequential scene ids. Only
+//! values are saved, never GPU buffers: meshes rehydrate from their reference. An imported model is
+//! a source too (Unity's model prefab).
 //! stored-format: the `.prefab` asset (`PrefabData`, instances and overrides)
 //! stored-format: the `.prefab` asset (`PrefabData`, instances and overrides)
 
@@ -137,7 +139,8 @@ pub fn save_prefab(scene: &Scene, root_id: u32, path: &str) -> Result<(), String
     write_prefab_file(&prefab, path)
 }
 
-/// Refuses a prefab whose entities draw a library mesh: it lives in its scene only, so an instance elsewhere would draw nothing.
+/// Refuses a prefab whose entities draw a library mesh: it lives in its scene only, so an instance
+/// elsewhere would draw nothing.
 pub fn write_prefab_file(prefab: &PrefabData, path: &str) -> Result<(), String> {
     if let Some((entity, name)) = scene_mesh_user(prefab) {
         return Err(format!(

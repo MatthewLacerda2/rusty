@@ -4,7 +4,8 @@ use super::super::{
 };
 use super::SurfaceShaders;
 
-/// A batch the prepass leaves out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing pipeline.
+/// A batch the prepass leaves out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing
+/// pipeline.
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
     Prepass(&'a PrepassPipelines),

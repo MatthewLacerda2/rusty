@@ -1,4 +1,5 @@
-//! ORCA, following RVO2's construction. The walkable-cell slide has the last word on where an agent ends up.
+//! ORCA, following RVO2's construction. The walkable-cell slide has the last word on where an agent
+//! ends up.
 //!
 //! **Priority** follows Unity's `avoidancePriority` (lower = more important): an agent ignores
 //! higher numbers, splits the dodge 50/50 with equals, and takes the whole dodge against a more

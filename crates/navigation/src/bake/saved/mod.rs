@@ -1,4 +1,5 @@
-//! A refused file (unreadable, stale, another grid) changes nothing: the caller bakes in full. The authored links are not saved; they are re-snapped onto the restored spans.
+//! A refused file (unreadable, stale, another grid) changes nothing: the caller bakes in full. The
+//! authored links are not saved; they are re-snapped onto the restored spans.
 //!
 //! stored-format: the `<scene>.navmesh` bytes and their fingerprint
 

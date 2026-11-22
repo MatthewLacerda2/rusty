@@ -1,6 +1,7 @@
 //! Geometric specular anti-aliasing: a glossy, normal-mapped metal sphere, small on screen,
 //! turned a few degrees a frame under one lamp. Without the AA its highlight breaks into
-//! single-pixel sparkles; with it, frame-to-frame luma variance (relative to the signal) is far lower.
+//! single-pixel sparkles; with it, frame-to-frame luma variance (relative to the signal) is far
+//! lower.
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
@@ -106,7 +107,8 @@ pub(crate) fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
 
 /// lavapipe: 0.77 unwidened, 0.18 with the AA.
 const BOUND: f64 = 0.35;
-/// Peak-luma floor, so a `widen` that turned the metal matte fails. lavapipe: 239 with the AA, 156 matte.
+/// Peak-luma floor, so a `widen` that turned the metal matte fails. lavapipe: 239 with the AA, 156
+/// matte.
 const PEAK_FLOOR: f64 = 200.0;
 
 fn mean_peak(frames: &[Vec<f64>]) -> f64 {

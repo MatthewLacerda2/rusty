@@ -1,4 +1,7 @@
--- DEV-ONLY bot-player (won't ship): presses the keys a human would via the writable Input; the bundled player_controller does the movement, camera follow and hitscan. One script slot per entity, so the bot loads the shared controller and runs its drive() each frame after injecting input. Reads scene state + Time only: deterministic.
+-- DEV-ONLY bot-player (won't ship): presses the keys a human would via the writable Input; the
+-- bundled player_controller does the movement, camera follow and hitscan. One script slot per
+-- entity, so the bot loads the shared controller and runs its drive() each frame after injecting
+-- input. Reads scene state + Time only: deterministic.
 
 local Bot = {}
 
@@ -43,7 +46,8 @@ function Bot.Update(entity_id, delta_time)
         return
     end
 
-    -- Camera forward is (cos(yaw), _, sin(yaw)); the bearing to the enemy in that convention is atan2(dz, dx).
+    -- Camera forward is (cos(yaw), _, sin(yaw)); the bearing to the enemy in that convention is
+    -- atan2(dz, dx).
     local want_yaw = math.atan2(dz, dx) * 180.0 / math.pi
     local yaw_err = wrap_deg(want_yaw - Camera.GetYaw())
     Input.Release("LEFT")
@@ -56,7 +60,8 @@ function Bot.Update(entity_id, delta_time)
 
     Input.Press("W")
 
-    -- Mouse0 for one frame gives the controller a rising edge; release it for the rest of the cooldown.
+    -- Mouse0 for one frame gives the controller a rising edge; release it for the rest of the
+    -- cooldown.
     if Bot.cooldown > 0 then
         Bot.cooldown = Bot.cooldown - 1
         Input.Release(SHOOT_KEY)

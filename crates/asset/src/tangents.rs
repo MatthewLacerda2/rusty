@@ -1,4 +1,6 @@
-//! MikkTSpace tangents (`bevy_mikktspace`): the basis Blender and other bakers write normal maps in, and the one glTF tells a loader to generate; any other basis shows seams. Output is glTF-convention `[x, y, z, w]`, `w` (±1) the handedness so the bitangent is `w * cross(N, T)`.
+//! MikkTSpace tangents (`bevy_mikktspace`): the basis Blender and other bakers write normal maps
+//! in, and the one glTF tells a loader to generate; any other basis shows seams. Output is
+//! glTF-convention `[x, y, z, w]`, `w` (±1) the handedness so the bitangent is `w * cross(N, T)`.
 
 use bevy_mikktspace::Geometry;
 use glam::Vec3;
@@ -6,7 +8,8 @@ use glam::Vec3;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Missing {
     Generate,
-    /// The `+X` placeholder: a cooked import overwrites every tangent from its cooked file, so generating is wasted work.
+    /// The `+X` placeholder: a cooked import overwrites every tangent from its cooked file, so
+    /// generating is wasted work.
     Placeholder,
 }
 
@@ -23,7 +26,8 @@ pub fn fill(
     }
 }
 
-/// A vertex MikkTSpace can give no tangent (degenerate face, or unreferenced) falls back to an arbitrary unit tangent orthogonal to its normal.
+/// A vertex MikkTSpace can give no tangent (degenerate face, or unreferenced) falls back to an
+/// arbitrary unit tangent orthogonal to its normal.
 pub fn generate_tangents(
     positions: &[[f32; 3]],
     normals: &[[f32; 3]],

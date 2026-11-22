@@ -2,7 +2,8 @@ use naga_oil::compose::{ComposableModuleDescriptor, Composer, NagaModuleDescript
 
 pub use naga::Module;
 
-/// `naga_oil 0.13` composes into `naga 0.19`, the version wgpu 0.19 links: upgrade all three together.
+/// `naga_oil 0.13` composes into `naga 0.19`, the version wgpu 0.19 links: upgrade all three
+/// together.
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",

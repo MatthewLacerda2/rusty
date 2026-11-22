@@ -1,5 +1,5 @@
-//! A Mesh-shaped collider outlives its entity's Mesh: `Scene.RemoveComponent(id, "Mesh")` hands the Mesh to the
-//! collider (`ColliderComponent::shared_mesh`, Unity's `MeshCollider.sharedMesh`),
+//! A Mesh-shaped collider outlives its entity's Mesh: `Scene.RemoveComponent(id, "Mesh")` hands the
+//! Mesh to the collider (`ColliderComponent::shared_mesh`, Unity's `MeshCollider.sharedMesh`),
 //! so physics and the navmesh still read it, after a save and load too.
 
 use glam::Vec3;

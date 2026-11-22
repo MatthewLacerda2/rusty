@@ -1,4 +1,5 @@
-//! A borrow alone makes rapier list a body as modified, and that order decides how the next step solves new contact pairs.
+//! A borrow alone makes rapier list a body as modified, and that order decides how the next step
+//! solves new contact pairs.
 
 use std::collections::BTreeSet;
 

@@ -1,4 +1,6 @@
-//! A mirrored mesh's front faces and an unmirrored one's back faces are the same cull state, so every pass needs three pipelines, not six. Which side of a kept triangle is shaded is the fragment shader's.
+//! A mirrored mesh's front faces and an unmirrored one's back faces are the same cull state, so
+//! every pass needs three pipelines, not six. Which side of a kept triangle is shaded is the
+//! fragment shader's.
 
 use glam::Mat4;
 

@@ -1,4 +1,5 @@
--- The canonical headless smoke test over the demo world (Player = 2, Enemy_1 = 5): press a key, skip ahead with one StepUntil, observe once and assert. Deterministic.
+-- The canonical headless smoke test over the demo world (Player = 2, Enemy_1 = 5): press a key,
+-- skip ahead with one StepUntil, observe once and assert. Deterministic.
 
 local player = Scene.FindEntityByName("Player")
 local enemy = Scene.FindEntityByName("Enemy_1")

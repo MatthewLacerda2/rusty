@@ -7,7 +7,7 @@ pub(crate) mod history;
 mod tests;
 
 use crate::repo::ls_files;
-use crate::rules::{allowed_in, unexplained, Finding};
+use crate::rules::{allowed_anywhere, allowed_in, unexplained, Finding};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
@@ -101,7 +101,7 @@ pub fn file(path: &str, source: &str) -> Vec<Finding> {
         (_, Some(_)) => (AGENT, MAX_AGENT_LINES),
         _ => (CLAUDE_MD, MAX_CLAUDE_MD_LINES),
     };
-    if lines > cap.1 && !excused_anywhere(path, source, cap.0) {
+    if lines > cap.1 && !allowed_anywhere(path, source, cap.0) {
         let msg = format!(
             "{lines}/{} lines, every line counted; move a procedure into the skill or \
              doc that owns it",
@@ -131,10 +131,6 @@ pub fn file(path: &str, source: &str) -> Vec<Finding> {
     }
     found.extend(unexplained(path, source));
     found
-}
-
-fn excused_anywhere(path: &str, source: &str, rule: &str) -> bool {
-    source.lines().any(|line| allowed_in(path, line, 1, rule))
 }
 
 fn missing_skill_md(tracked: &[String]) -> Vec<Finding> {

@@ -1,4 +1,6 @@
-//! `make export` end to end: the `export` binary on a scratch project, then `play` on its output, both as children since opening a project moves the shared working directory (`core::project::open`).
+//! `make export` end to end: the `export` binary on a scratch project, then `play` on its output,
+//! both as children since opening a project moves the shared working directory
+//! (`core::project::open`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};

@@ -1,4 +1,7 @@
-//! A goal whose area no chain of links leads to from the start's is unreachable for any area mask (masks only remove moves), so its search is capped at [`UNREACHABLE_SEARCH_NODES`]. Areas join by A*'s own eight steps taken both ways, so a one-way diagonal only merges areas, erring toward the full cap.
+//! A goal whose area no chain of links leads to from the start's is unreachable for any area mask
+//! (masks only remove moves), so its search is capped at [`UNREACHABLE_SEARCH_NODES`]. Areas join
+//! by A*'s own eight steps taken both ways, so a one-way diagonal only merges areas, erring toward
+//! the full cap.
 
 use std::cell::{RefCell, RefMut};
 use std::collections::VecDeque;

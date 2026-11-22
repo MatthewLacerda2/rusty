@@ -4,7 +4,8 @@ use super::super::image_buf::{Image, Rgba, Size};
 use super::field::Field;
 use super::generators::count;
 
-/// With `tiling`, `scale` rounds to whole repeats and `rotation` snaps to quarter turns, the only transforms that map the unit tile's lattice onto itself.
+/// With `tiling`, `scale` rounds to whole repeats and `rotation` snaps to quarter turns, the only
+/// transforms that map the unit tile's lattice onto itself.
 pub fn mapping(
     img: &Image,
     scale: [f32; 2],
@@ -48,7 +49,8 @@ fn quarter_turn(turns: f32) -> (f32, f32) {
     }
 }
 
-/// Slope is in tile units of the longer side on both axes, as Substance's Normal node, so `strength` holds at any resolution.
+/// Slope is in tile units of the longer side on both axes, as Substance's Normal node, so
+/// `strength` holds at any resolution.
 pub fn bump_to_normal(img: &Image, strength: Field) -> Image {
     let (w, hh) = (img.width() as f32, img.height() as f32);
     let h = |x: i64, y: i64| img.get_wrapped(x, y)[0];
@@ -69,7 +71,8 @@ pub fn bump_to_normal(img: &Image, strength: Field) -> Image {
     })
 }
 
-/// The lowest z [`normal_blend`] writes: below about 0.105 a BC5 copy, rebuilding z from 8-bit x and y, can rebuild a negative z. Blue byte 143.
+/// The lowest z [`normal_blend`] writes: below about 0.105 a BC5 copy, rebuilding z from 8-bit x
+/// and y, can rebuild a negative z. Blue byte 143.
 pub const MIN_NORMAL_Z: f32 = 0.125;
 
 pub fn normal_blend(base: &Image, detail: &Image, strength: Field) -> Image {

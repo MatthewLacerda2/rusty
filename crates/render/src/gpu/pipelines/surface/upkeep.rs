@@ -13,7 +13,8 @@ impl SurfacePipelines {
 }
 
 impl SurfaceShaders {
-    /// Returns whether any slot went stale: a retained draw key naming its pipeline must be re-built, which re-builds the slot.
+    /// Returns whether any slot went stale: a retained draw key naming its pipeline must be
+    /// re-built, which re-builds the slot.
     pub(crate) fn refresh(&mut self) -> bool {
         let (seen, paths) = written_since(self.seen);
         self.seen = seen;

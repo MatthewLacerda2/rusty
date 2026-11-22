@@ -1,5 +1,6 @@
 //! No solid, no span: there is no implicit ground past the geometry.
-//! Steps 1-3 are per column and erosion reads a fixed neighbourhood, so a change re-runs 1-3 over the dirty cells and erosion over those grown by its reach, giving a full bake's result.
+//! Steps 1-3 are per column and erosion reads a fixed neighbourhood, so a change re-runs 1-3 over
+//! the dirty cells and erosion over those grown by its reach, giving a full bake's result.
 //! Deterministic: pure geometry, a total order on every sort, no RNG or clock.
 
 mod carve;

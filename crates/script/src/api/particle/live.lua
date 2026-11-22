@@ -1,4 +1,5 @@
--- `ORDER` must equal `names` (loading fails if not): the unpacking is written out by position for speed.
+-- `ORDER` must equal `names` (loading fails if not): the unpacking is written out by position for
+-- speed.
 local halves, PARTICLE, RECORD, names, SLOTS = ...
 local pack, unpack, concat, type, pcall, error = string.pack, string.unpack, table.concat,
     type, pcall, error
@@ -38,7 +39,8 @@ local function bad(verb, i, field, kind, level)
         :format(verb, i, field, kind), level)
 end
 
--- A field left out is sent as NaN, which `live.rs` keeps. The `< INF` comparisons are the type check: comparing a string, boolean or table raises (`pack` alone would take "2" for 2).
+-- A field left out is sent as NaN, which `live.rs` keeps. The `< INF` comparisons are the type
+-- check: comparing a string, boolean or table raises (`pack` alone would take "2" for 2).
 local function record(src, p)
     local x, y, z, vx, vy, vz = p.x, p.y, p.z, p.vx, p.vy, p.vz
     local age, life, size, rot = p.age, p.lifetime, p.size, p.rotation

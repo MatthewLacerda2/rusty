@@ -7,7 +7,8 @@ use rusty_scene::{Scene, SceneData};
 
 const FIXTURE: &str = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
 
-/// A texture of the same file name as Red's (`skin.png`), on a material listed before Red, holding Blue's pixels: converted first, it takes `skin.png` and pushes Red's file to `skin.1.png`.
+/// A texture of the same file name as Red's (`skin.png`), on a material listed before Red, holding
+/// Blue's pixels: converted first, it takes `skin.png` and pushes Red's file to `skin.1.png`.
 const GREEN: &str = r#"	Material: 2900, "Material::Green", "" {
 		Version: 102
 		ShadingModel: "lambert"

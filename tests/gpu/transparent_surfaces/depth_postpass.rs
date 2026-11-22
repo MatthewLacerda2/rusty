@@ -47,7 +47,8 @@ fn pane(on: bool) -> rusty::scene::Scene {
     scene
 }
 
-/// How much neighbouring pixels differ across the middle of `img`, squared: a sharp checker scores high.
+/// How much neighbouring pixels differ across the middle of `img`, squared: a sharp checker scores
+/// high.
 fn sharpness(img: &image::RgbImage) -> u64 {
     let lum = |x, y| {
         img.get_pixel(x, y)

@@ -3,7 +3,8 @@ use rusty_zimmer::level::Difference;
 
 use super::level::{band_table, measure_file};
 
-// `a` minus `b`: negative means `a` is quieter. A field is `nil` when a side has nothing to compare; `nil` is not zero.
+// `a` minus `b`: negative means `a` is quieter. A field is `nil` when a side has nothing to
+// compare; `nil` is not zero.
 pub fn diff(lua: &Lua, a: &str, b: &str) -> mlua::Result<Table> {
     let whole = |path: &str| {
         measure_file(path, None)

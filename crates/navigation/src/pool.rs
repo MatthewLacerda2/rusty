@@ -1,7 +1,7 @@
-//! Detour's `dtNodePool`. Each slot carries a **generation stamp**: a query bumps the generation and
-//! an older slot reads as unreached, so starting a query is O(1) instead of filling navmesh-sized
-//! arrays. A nested search finds the scratch borrowed and runs on a fresh pool. A stale slot reads
-//! exactly as a fresh one, so reuse keeps paths byte-identical.
+//! Detour's `dtNodePool`. Each slot carries a **generation stamp**: a query bumps the generation
+//! and an older slot reads as unreached, so starting a query is O(1) instead of filling
+//! navmesh-sized arrays. A nested search finds the scratch borrowed and runs on a fresh pool. A
+//! stale slot reads exactly as a fresh one, so reuse keeps paths byte-identical.
 
 use super::SpanRef;
 use std::cell::RefCell;

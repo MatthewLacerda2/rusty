@@ -1,4 +1,6 @@
-//! What the user added under a lost part (a light, a nested instance of another model) moves to the nearest surviving ancestor keeping its world place, as Unity keeps an orphaned added object. A part the user removed is never stamped back.
+//! What the user added under a lost part (a light, a nested instance of another model) moves to the
+//! nearest surviving ancestor keeping its world place, as Unity keeps an orphaned added object. A
+//! part the user removed is never stamped back.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -49,7 +51,9 @@ pub(super) fn reshape(
     members
 }
 
-/// Only the topmost lost parts are destroyed; their subtrees go with them. The topmost are picked after every move: a lost part under a surviving member under another lost part has moved out with that member.
+/// Only the topmost lost parts are destroyed; their subtrees go with them. The topmost are picked
+/// after every move: a lost part under a surviving member under another lost part has moved out
+/// with that member.
 fn remove_gone(scene: &mut Scene, gone: &BTreeSet<u32>, applying: bool) {
     let bones = scene.bone_ids();
     let lost = |id: u32| gone.contains(&id) || bones.contains(&id);

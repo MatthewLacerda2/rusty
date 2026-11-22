@@ -2,7 +2,8 @@ use crate::{in_mask, NavSpan, NavigationGraph, SpanRef, MIN_AREA_COST};
 
 pub(super) type Move = (SpanRef, f32);
 
-/// A key is never negative, so its bits order as the key does; the span index breaks ties as A\* does.
+/// A key is never negative, so its bits order as the key does; the span index breaks ties as A\*
+/// does.
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub(super) struct Open {
     key: u64,

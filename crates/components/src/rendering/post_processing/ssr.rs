@@ -1,5 +1,5 @@
-//! Unity HDRP's *Screen Space Reflection*, a pass right after the opaque pass. A rough surface reflects a
-//! blur of its hits across its GGX lobe.
+//! Unity HDRP's *Screen Space Reflection*, a pass right after the opaque pass. A rough surface
+//! reflects a blur of its hits across its GGX lobe.
 
 use serde::{Deserialize, Serialize};
 
@@ -11,9 +11,11 @@ pub struct Ssr {
     pub active: bool,
     pub quality: EffectQuality,
     pub steps: u32,
-    /// `Custom`: longest step, `0.05..=2` world units; also held to `max(1/64, 1/steps)` of the screen's shorter side.
+    /// `Custom`: longest step, `0.05..=2` world units; also held to `max(1/64, 1/steps)` of the
+    /// screen's shorter side.
     pub step_length: f32,
-    /// HDRP's *Minimum Smoothness*, `0..=1` (smoothness is `1 − roughness`): a rougher surface keeps its probe or sky reflection.
+    /// HDRP's *Minimum Smoothness*, `0..=1` (smoothness is `1 − roughness`): a rougher surface
+    /// keeps its probe or sky reflection.
     pub min_smoothness: f32,
 }
 

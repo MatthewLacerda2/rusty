@@ -1,4 +1,5 @@
-//! A point on a triangle's edge sits on whatever surface meets the mesh there, so overlap-claimed texels are traced strictly inside.
+//! A point on a triangle's edge sits on whatever surface meets the mesh there, so overlap-claimed
+//! texels are traced strictly inside.
 
 use glam::{Vec2, Vec3};
 
@@ -10,7 +11,8 @@ const S: u32 = 16;
 
 #[test]
 fn a_lone_needle_owns_every_texel_it_crosses_traced_inside_it_and_its_texel() {
-    // Off the texel-centre row, so every texel is claimed by overlap. UV area ~1e-4 texels²: weights recovered by dividing by it would wander.
+    // Off the texel-centre row, so every texel is claimed by overlap. UV area ~1e-4 texels²:
+    // weights recovered by dividing by it would wander.
     let (v0, v1) = (0.6f32, 0.60001f32);
     let uv = [(0.2, v0), (15.8, v0), (15.8, v1)];
     let mesh = BakeMesh {

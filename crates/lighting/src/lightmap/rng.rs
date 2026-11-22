@@ -1,4 +1,5 @@
-//! SplitMix64 seeded per texel from `(seed, mesh, texel)`: each texel draws from its own stream, so the result is a pure function of the inputs however texels are spread across threads.
+//! SplitMix64 seeded per texel from `(seed, mesh, texel)`: each texel draws from its own stream, so
+//! the result is a pure function of the inputs however texels are spread across threads.
 
 /// Not shared: one per texel; a progressive bake keeps each across passes, so it is `Clone`.
 #[derive(Clone, Debug)]
@@ -12,7 +13,8 @@ impl Rng {
         rng
     }
 
-    /// Apart from [`Self::new`]'s, so how many paths the texel traces never moves the validity probes.
+    /// Apart from [`Self::new`]'s, so how many paths the texel traces never moves the validity
+    /// probes.
     pub(crate) fn probes(seed: u64, mesh: u64, texel: u64) -> Self {
         Self::new(seed ^ 0x6a09_e667_f3bc_c909, mesh, texel)
     }

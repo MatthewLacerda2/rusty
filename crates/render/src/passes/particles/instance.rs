@@ -1,5 +1,5 @@
-//! Light lane w: 0 unlit, 1 flat ambient, 2 probe ambient. Probe irradiance is the SH DC band over π,
-//! the matte response the shader gives every light (Y00 × π is E; a matte puff reflects E/π).
+//! Light lane w: 0 unlit, 1 flat ambient, 2 probe ambient. Probe irradiance is the SH DC band over
+//! π, the matte response the shader gives every light (Y00 × π is E; a matte puff reflects E/π).
 //! Alpha particles sort back to front; additive ones skip the sort.
 
 use glam::Vec3;

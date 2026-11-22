@@ -1,4 +1,5 @@
--- `...` is the command line's `--param` table. Levels (chained by scripts/level.lua): tower, planks, barrels, pile.
+-- `...` is the command line's `--param` table. Levels (chained by scripts/level.lua): tower,
+-- planks, barrels, pile.
 
 local p = { seed = 1, pile = 6, start = 1 }
 for key, value in pairs(... or {}) do

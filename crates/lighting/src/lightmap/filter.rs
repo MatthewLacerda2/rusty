@@ -1,4 +1,6 @@
-//! Gaussian filter on the indirect term (Unity's lightmap filter). A neighbour counts only if it faces the same way and sits on the same stretch of surface, so the blur never crosses a crease or a gap. Baked direct light is never filtered.
+//! Gaussian filter on the indirect term (Unity's lightmap filter). A neighbour counts only if it
+//! faces the same way and sits on the same stretch of surface, so the blur never crosses a crease
+//! or a gap. Baked direct light is never filtered.
 
 use glam::Vec3;
 

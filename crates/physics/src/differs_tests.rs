@@ -1,4 +1,5 @@
-//! A field a hand-kept comparison forgets is a write that silently never happens, so each field alone must flip it.
+//! A field a hand-kept comparison forgets is a write that silently never happens, so each field
+//! alone must flip it.
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;

@@ -8,8 +8,9 @@ use rusty::edit::authoring::Primitive;
 
 use super::{black_plastic, reflectance, scene};
 
-/// A narrow, long slab seen at 80° from its normal: the frame's centre lands on it and its corners on the sky, so its
-/// reflection weight there is the grazing one. `None` when no adapter rendered it.
+/// A narrow, long slab seen at 80° from its normal: the frame's centre lands on it and its corners
+/// on the sky, so its reflection weight there is the grazing one. `None` when no adapter rendered
+/// it.
 fn grazing(label: &str, material: MaterialAsset) -> Option<f64> {
     let (mut scene, id) = scene(Primitive::Box, material);
     {

@@ -1,4 +1,5 @@
-//! HDRP's *Transparent Depth Postpass*, tested `LessEqual` so the forward vertex stage's invariant position lands on its own depth.
+//! HDRP's *Transparent Depth Postpass*, tested `LessEqual` so the forward vertex stage's invariant
+//! position lands on its own depth.
 
 use super::{velocity_target, FacedPipeline, Facing, LazyPipeline};
 use crate::gpu::mesh::vertex_layout;

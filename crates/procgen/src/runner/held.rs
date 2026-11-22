@@ -1,5 +1,5 @@
-//! Packing and lazy loading change memory, never bytes. A grayscale image (every pixel's R, G and B the
-//! same bits, alpha exactly 1) is stored as its red channel, a quarter of the RGBA
+//! Packing and lazy loading change memory, never bytes. A grayscale image (every pixel's R, G and B
+//! the same bits, alpha exactly 1) is stored as its red channel, a quarter of the RGBA
 //! f32 buffer, and written back out bit for bit when a consumer reads it. A file a
 //! loader decodes is kept only from the first `image` node that reads it to the
 //! last.

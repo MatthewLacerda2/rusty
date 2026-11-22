@@ -36,7 +36,8 @@ local function full(name, n)
 end
 "#;
 
-/// Run `body` after [`PRELUDE`] in a fresh harness; its output folder, or `None` without an adapter.
+/// Run `body` after [`PRELUDE`] in a fresh harness; its output folder, or `None` without an
+/// adapter.
 pub(super) fn run(tag: &str, body: &str, first: &str) -> Option<PathBuf> {
     let out = crate::temp::dir().join(format!("rusty_settle_{tag}_{}", std::process::id()));
     std::fs::create_dir_all(&out).unwrap();

@@ -1,4 +1,5 @@
-//! `raw` is the pre-erosion spans: a column's depend on that column alone, so a dirty rectangle's are rebuilt and spliced in.
+//! `raw` is the pre-erosion spans: a column's depend on that column alone, so a dirty rectangle's
+//! are rebuilt and spliced in.
 
 use std::collections::VecDeque;
 

@@ -1,4 +1,6 @@
-//! Max Lightmap Size and Scale In Lightmap, Unity's rules: a map follows its mesh's area × density up to the largest map a page holds; scale multiplies density; at 0 the mesh gets no lightmap but still blocks and bounces light.
+//! Max Lightmap Size and Scale In Lightmap, Unity's rules: a map follows its mesh's area × density
+//! up to the largest map a page holds; scale multiplies density; at 0 the mesh gets no lightmap but
+//! still blocks and bounces light.
 
 use glam::Vec3;
 

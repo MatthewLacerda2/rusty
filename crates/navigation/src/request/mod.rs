@@ -1,5 +1,7 @@
-//! A request names only the agent: when its search begins it reads where the agent stands, its target and area mask then, so a waiting request plans from where the agent is now.
-//! Determinism: the budget is a count of expansions, never a clock; a search resumes on the same heap and node pool, so it finds the path a synchronous search would.
+//! A request names only the agent: when its search begins it reads where the agent stands, its
+//! target and area mask then, so a waiting request plans from where the agent is now. Determinism:
+//! the budget is a count of expansions, never a clock; a search resumes on the same heap and node
+//! pool, so it finds the path a synchronous search would.
 
 mod carry;
 pub(crate) mod islands;
@@ -14,7 +16,9 @@ use glam::Vec3;
 use super::astar::Search;
 use super::pool::NodePool;
 
-/// The node expansions the queue spends each tick by default (Unity's `pathfindingIterationsPerFrame` counts polygons, 100 by default; rusty's nodes are grid spans, many to a polygon).
+/// The node expansions the queue spends each tick by default (Unity's
+/// `pathfindingIterationsPerFrame` counts polygons, 100 by default; rusty's nodes are grid spans,
+/// many to a polygon).
 pub const DEFAULT_ITERATIONS_PER_FRAME: u32 = 2_048;
 
 #[derive(Clone, Copy)]

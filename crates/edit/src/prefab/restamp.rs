@@ -1,4 +1,5 @@
-//! Each source is read once per call, so a Dust2-sized level holding hundreds of one model builds that model's prefab once.
+//! Each source is read once per call, so a Dust2-sized level holding hundreds of one model builds
+//! that model's prefab once.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -10,7 +11,10 @@ use crate::prefab::source::{is_model_source, node_paths, read_source};
 use rusty_scene::rehydrate::Imports;
 use rusty_scene::Scene;
 
-/// Each instance's edits are taken as overrides against the model as it was, then `refit` runs, then each instance is rebuilt from the model as it imports now. `refit` skips static meshed parts (the rebuild re-imports them) and parts whose node is gone; a skinned part still in the model is left to it, since its rig and bones are the refit's to move.
+/// Each instance's edits are taken as overrides against the model as it was, then `refit` runs,
+/// then each instance is rebuilt from the model as it imports now. `refit` skips static meshed
+/// parts (the rebuild re-imports them) and parts whose node is gone; a skinned part still in the
+/// model is left to it, since its rig and bones are the refit's to move.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,

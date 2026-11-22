@@ -1,4 +1,5 @@
-//! The editor's background import: a worker thread drains a queue of images so the editor stays responsive while it encodes.
+//! The editor's background import: a worker thread drains a queue of images so the editor stays
+//! responsive while it encodes.
 
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
@@ -15,7 +16,8 @@ thread_local! {
     static BACKGROUND: Cell<bool> = const { Cell::new(false) };
 }
 
-/// Queues this thread's conversions' extracted textures; elsewhere the caller runs `refresh_all`. The cache's lock stops Play's refresh and the worker making one copy twice.
+/// Queues this thread's conversions' extracted textures; elsewhere the caller runs `refresh_all`.
+/// The cache's lock stops Play's refresh and the worker making one copy twice.
 pub fn import_in_background() {
     BACKGROUND.set(true);
 }

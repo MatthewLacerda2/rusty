@@ -10,7 +10,8 @@ use super::memory::Memory;
 pub struct AIPerceptionComponent {
     /// Metres (`SightRadius`).
     pub sight_range: f32,
-    /// Metres; hysteresis so the sight edge does not flicker (`LoseSightRadius`). Never below `sight_range`.
+    /// Metres; hysteresis so the sight edge does not flicker (`LoseSightRadius`). Never below
+    /// `sight_range`.
     pub lose_sight_range: f32,
     /// Half-angle around forward (+Z), degrees, 0..=180 (`PeripheralVisionAngleDegrees`).
     pub sight_angle: f32,

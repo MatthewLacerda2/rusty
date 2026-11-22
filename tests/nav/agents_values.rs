@@ -61,7 +61,8 @@ fn agent_within_stopping_distance_does_not_advance() {
     );
 }
 
-/// Inside the stopping distance velocity shrinks by a share of itself each tick: it slows, keeps its sign, never grows.
+/// Inside the stopping distance velocity shrinks by a share of itself each tick: it slows, keeps
+/// its sign, never grows.
 #[test]
 fn deceleration_reduces_not_amplifies_velocity() {
     let target = Vec3::new(5.0, 0.0, 0.0);

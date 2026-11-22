@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-/// A grey colour (`r = g = b`, white by default) tints nothing; only the offset then acts, as Unity's trackball.
+/// A grey colour (`r = g = b`, white by default) tints nothing; only the offset then acts, as
+/// Unity's trackball.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColorWheel {

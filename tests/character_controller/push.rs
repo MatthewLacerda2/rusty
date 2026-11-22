@@ -14,7 +14,8 @@ use super::hits::attach_scripts;
 use super::{add_character, add_floor, pos_of};
 use crate::play::{playing, run};
 
-/// Walks +X at 5 m/s with its own gravity; a slow walk pressed down hard reads as pushing down (`moveDirection.y < -0.3`).
+/// Walks +X at 5 m/s with its own gravity; a slow walk pressed down hard reads as pushing down
+/// (`moveDirection.y < -0.3`).
 const WALKER: &str = r#"
 local W = { vy = 0 }
 function W.Update(id, dt)

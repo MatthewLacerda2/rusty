@@ -1,7 +1,7 @@
 //! The `Graphics` scripting namespace: its per-camera post-FX knobs (`api`), which
 //! camera they edit (`main_camera`), the colour grade (`grading`), the lens effects
-//! (`lens`), the lens flare (`lens_flare`), the depth of field (`depth_of_field`), the exposure (`exposure`), the
-//! player graphics options (`options`), the quality presets (`quality`, and with
+//! (`lens`), the lens flare (`lens_flare`), the depth of field (`depth_of_field`), the exposure
+//! (`exposure`), the player graphics options (`options`), the quality presets (`quality`, and with
 //! `project.rusty`, `quality_project`) and the render
 //! scale (`render_scale`).
 

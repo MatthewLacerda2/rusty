@@ -1,4 +1,5 @@
-/// A triple-quoted argument opening a line inside a call (`f(\n    """text""")`) reads as a docstring, hence free: telling them apart needs a parser.
+/// A triple-quoted argument opening a line inside a call (`f(\n    """text""")`) reads as a
+/// docstring, hence free: telling them apart needs a parser.
 pub(super) fn code_lines(source: &str) -> usize {
     let mut open: Option<Str> = None;
     source

@@ -41,7 +41,8 @@ fn an_area_lights_pool_fades_out_at_its_range_with_no_step() {
     fades_out(4.0, 2.0, 3.0, 4.0);
 }
 
-/// A 1400 × (1/d²) hot spot beside a lamp hung 5 cm under the ceiling: one path in 64 hitting it is a speckle unless the path is clamped.
+/// A 1400 × (1/d²) hot spot beside a lamp hung 5 cm under the ceiling: one path in 64 hitting it is
+/// a speckle unless the path is clamped.
 fn bounce_under_a_ceiling_lamp() -> Vec<f32> {
     use super::bake::triangles;
     use super::rays::Rays;

@@ -63,7 +63,8 @@ impl Default for LightProbeProxyVolumeComponent {
     }
 }
 
-/// `dims` points per axis, each at the centre of its cell of `[min, min + size]`; x fastest, then y, then z.
+/// `dims` points per axis, each at the centre of its cell of `[min, min + size]`; x fastest, then
+/// y, then z.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProxyGrid {
     pub min: Vec3,

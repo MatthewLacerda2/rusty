@@ -1,4 +1,5 @@
-//! A link reads its node's red channel, like every mask input; `separate_rgb` picks another channel.
+//! A link reads its node's red channel, like every mask input; `separate_rgb` picks another
+//! channel.
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;

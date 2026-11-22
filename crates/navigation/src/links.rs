@@ -36,7 +36,8 @@ impl NavigationGraph {
         dh <= self.max_step && gap >= self.agent_height
     }
 
-    /// A diagonal also needs both cardinal cells it cuts past, so an agent never slips around a corner.
+    /// A diagonal also needs both cardinal cells it cuts past, so an agent never slips around a
+    /// corner.
     pub fn neighbour(&self, from: SpanRef, dx: i32, dz: i32) -> Option<SpanRef> {
         if dx != 0 && dz != 0 {
             self.link_to(from, from.gx + dx, from.gz)?;
@@ -90,7 +91,8 @@ mod tests {
 
     #[test]
     fn only_max_step_limits_a_step() {
-        // A 0.15 m step on a 0.1 m grid: the slope limit is the rasteriser's, so the step still links.
+        // A 0.15 m step on a 0.1 m grid: the slope limit is the rasteriser's, so the step still
+        // links.
         let mut g = NavigationGraph::new(0.0, 0.1, 0.0, 0.0, 0.1);
         g.spans[1].y = 0.15;
         let from = at(0, 0);

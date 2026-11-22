@@ -1,5 +1,8 @@
-//! A **drop** lands on a floor more than `max_step` and at most `drop_height` lower; a **jump** up to `jump_height` higher, or across a gap of at most `jump_distance`. A level jump needs a real gap (a column with no floor at the ledge's height), so floor erosion merely trimmed is never jumped.
-//! Links are thinned to one per `link_spacing` run in grid-fixed buckets, so an incremental rebake regenerates whole buckets and matches a full bake.
+//! A **drop** lands on a floor more than `max_step` and at most `drop_height` lower; a **jump** up
+//! to `jump_height` higher, or across a gap of at most `jump_distance`. A level jump needs a real
+//! gap (a column with no floor at the ledge's height), so floor erosion merely trimmed is never
+//! jumped. Links are thinned to one per `link_spacing` run in grid-fixed buckets, so an incremental
+//! rebake regenerates whole buckets and matches a full bake.
 
 use super::super::bake::CellRect;
 use super::super::{NavMeshSettings, NavigationGraph, SpanRef};

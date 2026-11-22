@@ -1,9 +1,9 @@
-//! A moving carving obstacle rebakes every few ticks, so a flood restarted on each rebake would never
-//! finish. A flood no change reaches is renumbered onto the new spans, as the path queue's search is,
-//! and goes on where it was: every move between the spans it reached is unchanged, and its heap
-//! keeps each entry's key, so only ties may pop in another order, which never changes a settled cost.
-//! A change reaches it when it lies near a span it costed, its start or a goal, or when a goal snaps
-//! elsewhere now or the island map differs.
+//! A moving carving obstacle rebakes every few ticks, so a flood restarted on each rebake would
+//! never finish. A flood no change reaches is renumbered onto the new spans, as the path queue's
+//! search is, and goes on where it was: every move between the spans it reached is unchanged, and
+//! its heap keeps each entry's key, so only ties may pop in another order, which never changes a
+//! settled cost. A change reaches it when it lies near a span it costed, its start or a goal, or
+//! when a goal snaps elsewhere now or the island map differs.
 
 use super::FloodSearch;
 use crate::NavigationGraph;

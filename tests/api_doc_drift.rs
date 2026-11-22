@@ -1,4 +1,5 @@
-//! Existence parity, both directions, between `docs/api/` and the live Lua API surface (signatures are out of scope). The session boots an empty scene so only `api::` namespaces populate `_G`.
+//! Existence parity, both directions, between `docs/api/` and the live Lua API surface (signatures
+//! are out of scope). The session boots an empty scene so only `api::` namespaces populate `_G`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -62,7 +63,8 @@ fn diff_fns(ns: &str, live: &BTreeSet<String>, doc: &BTreeSet<String>, out: &mut
     }
 }
 
-/// A namespace is an `## ` heading starting with a backticked identifier; a function is a table row whose first cell starts with a backticked `Namespace.Function` (fences skipped).
+/// A namespace is an `## ` heading starting with a backticked identifier; a function is a table row
+/// whose first cell starts with a backticked `Namespace.Function` (fences skipped).
 fn parse_documented_surface(doc: &str) -> Surface {
     let mut surface: Surface = BTreeMap::new();
     let mut in_fence = false;

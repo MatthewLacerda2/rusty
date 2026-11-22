@@ -1,4 +1,6 @@
-//! MaxRects (Jylänki's *best short side fit*): free space is the maximal empty rectangles; a gap left by an earlier placement stays available to every later one. Integer arithmetic and a fixed visiting order give the same corners for the same inputs.
+//! MaxRects (Jylänki's *best short side fit*): free space is the maximal empty rectangles; a gap
+//! left by an earlier placement stays available to every later one. Integer arithmetic and a fixed
+//! visiting order give the same corners for the same inputs.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Rect {

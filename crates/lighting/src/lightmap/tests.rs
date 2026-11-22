@@ -1,4 +1,5 @@
-//! The bake's contract: deterministic per seed, bounce reaches what direct light cannot, the light modes decide what is baked, and the sky bakes to the flat ambient an open surface shows.
+//! The bake's contract: deterministic per seed, bounce reaches what direct light cannot, the light
+//! modes decide what is baked, and the sky bakes to the flat ambient an open surface shows.
 
 use glam::{Vec2, Vec3};
 

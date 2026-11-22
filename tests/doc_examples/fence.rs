@@ -19,7 +19,8 @@ pub struct Block {
     pub source: String,
 }
 
-/// A fence may be indented (a list item), its body losing the indentation; other fences are skipped whole.
+/// A fence may be indented (a list item), its body losing the indentation; other fences are skipped
+/// whole.
 pub fn lua_blocks(doc: &str) -> Result<Vec<Block>, String> {
     let mut blocks = Vec::new();
     let mut in_other = false;

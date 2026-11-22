@@ -1,4 +1,6 @@
-//! No entity id is hashed, nor the order inputs are visited in: each input is its own chunk and every kind's chunks are sorted by bytes before joining, so a scene whose ids were renumbered still matches the file it was baked to.
+//! No entity id is hashed, nor the order inputs are visited in: each input is its own chunk and
+//! every kind's chunks are sorted by bytes before joining, so a scene whose ids were renumbered
+//! still matches the file it was baked to.
 
 use super::super::super::NavigationGraph;
 use super::super::inputs::{collider_keys, obstacle_keys, BakeInputs, ColliderKey, Source};

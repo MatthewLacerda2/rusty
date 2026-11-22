@@ -1,4 +1,5 @@
-//! A collider without its own Rigidbody joins the nearest ancestor that has one; with none it is its own body (Unity).
+//! A collider without its own Rigidbody joins the nearest ancestor that has one; with none it is
+//! its own body (Unity).
 
 use std::collections::BTreeMap;
 
@@ -11,7 +12,8 @@ pub(super) type BodyPlan = BTreeMap<u32, Vec<u32>>;
 
 pub(super) use rusty_components::Pose as WorldPose;
 
-/// A CharacterController is a body of its own, so hitboxes parented under a character ride its body.
+/// A CharacterController is a body of its own, so hitboxes parented under a character ride its
+/// body.
 pub(super) fn body_owner(scene: &Scene, id: u32) -> u32 {
     scene.world.body_carrier(id).unwrap_or(id)
 }
@@ -41,7 +43,8 @@ pub(super) fn plan(scene: &Scene) -> BodyPlan {
     plan
 }
 
-/// `id`'s world pose. A mirroring parent's reflection stays in `scale`, so `rot` × `scale` is the world matrix; a root reads its `Transform` verbatim.
+/// `id`'s world pose. A mirroring parent's reflection stays in `scale`, so `rot` × `scale` is the
+/// world matrix; a root reads its `Transform` verbatim.
 pub(super) fn world_pose(scene: &Scene, id: u32) -> Option<WorldPose> {
     scene.world.world_pose(id)
 }

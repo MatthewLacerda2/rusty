@@ -1,4 +1,5 @@
-//! Unity-style `<file>.meta`: import settings only, never identity (references are path-based, so no GUID); the sub-object map is a regenerated cache.
+//! Unity-style `<file>.meta`: import settings only, never identity (references are path-based, so
+//! no GUID); the sub-object map is a regenerated cache.
 //! stored-format: the `<file>.meta` import-settings sidecar
 
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,8 @@ const META_EXTENSION: &str = "meta";
 /// The sub-object map is only a cache. `#[serde(default)]` so a sparse hand-written sidecar loads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ImportSettings {
-    /// Uniform scale applied to vertices, skeleton and animation translations (`asset::scale_factor`). Default 1.
+    /// Uniform scale applied to vertices, skeleton and animation translations
+    /// (`asset::scale_factor`). Default 1.
     #[serde(default = "default_scale")]
     pub scale: f32,
     #[serde(default)]
@@ -110,7 +112,8 @@ pub(crate) fn stored(source: &Path) -> Result<Option<ImportSettings>, ImportErro
     }
 }
 
-/// Atomic ([`fs::write_atomic`]): a plain write truncates first, so a concurrent reader sees a partial file and treats the asset as unavailable.
+/// Atomic ([`fs::write_atomic`]): a plain write truncates first, so a concurrent reader sees a
+/// partial file and treats the asset as unavailable.
 pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError> {
     let json =
         serde_json::to_string_pretty(settings).map_err(|e| ImportError::Sidecar(e.to_string()))?;

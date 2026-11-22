@@ -1,7 +1,7 @@
-//! The synchronous flood lends the search the graph's shared pool; a held search keeps a pool of its
-//! own, so a script's synchronous query in between never touches its slots. After an incremental
-//! rebake that reaches nothing it holds it is carried (`carry`); after any other rebake (a full bake,
-//! or an area-cost change) it starts over, since its costs may no longer hold.
+//! The synchronous flood lends the search the graph's shared pool; a held search keeps a pool of
+//! its own, so a script's synchronous query in between never touches its slots. After an
+//! incremental rebake that reaches nothing it holds it is carried (`carry`); after any other rebake
+//! (a full bake, or an area-cost change) it starts over, since its costs may no longer hold.
 
 use std::collections::BinaryHeap;
 

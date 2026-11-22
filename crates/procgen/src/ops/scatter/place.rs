@@ -9,8 +9,9 @@ const CANDIDATES: i64 = 32;
 
 const MAX_GRID: usize = 256;
 
-/// The closest two stamp centres may sit, in tiles: `spacing` times the smaller of the stamp's size and `√(0.5 / amount)`,
-/// the gap at which discs cover about 40% of the tile, where the dart throw still finds room for nearly every stamp.
+/// The closest two stamp centres may sit, in tiles: `spacing` times the smaller of the stamp's size
+/// and `√(0.5 / amount)`, the gap at which discs cover about 40% of the tile, where the dart throw
+/// still finds room for nearly every stamp.
 pub(super) fn gap(spacing: f32, amount: u32, size: f32) -> f32 {
     if spacing <= 0.0 || amount == 0 {
         return 0.0;

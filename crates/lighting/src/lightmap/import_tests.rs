@@ -1,4 +1,5 @@
-//! A mesh without `TEXCOORD_1` bakes nothing until *Generate Lightmap UVs* is ticked; the unwrap's pack margin is measured at the bake's default resolution.
+//! A mesh without `TEXCOORD_1` bakes nothing until *Generate Lightmap UVs* is ticked; the unwrap's
+//! pack margin is measured at the bake's default resolution.
 
 use rusty_asset::lightmap_uv::REFERENCE_TEXELS_PER_UNIT;
 use rusty_asset::{import_file, SubMesh};

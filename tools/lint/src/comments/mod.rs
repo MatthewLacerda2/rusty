@@ -7,6 +7,9 @@ mod rust;
 #[cfg(test)]
 mod tests;
 mod wgsl;
+mod width;
+#[cfg(test)]
+mod width_tests;
 
 use crate::agent_docs::history::{reference_as, Refs};
 use crate::rules::{allowed_in, Finding};
@@ -15,7 +18,6 @@ use std::path::{Path, PathBuf};
 
 pub const CAP: &str = "comment-cap";
 pub const HISTORY: &str = "comment-history";
-pub const STRICT: &str = "--strict-comments";
 
 const MARKERS: &[&str] = &["lint: allow(", "sorted:", "stored-format:", "comment-cut:"];
 
@@ -68,6 +70,11 @@ fn bare(comment: &str) -> &str {
     comment.trim_start_matches(|c: char| c.is_whitespace() || "/!*-[=".contains(c))
 }
 
+/// A marker's line (`lint: allow(`, `sorted:`): exempt from the cap and the width.
+fn marked(comment: &str) -> bool {
+    MARKERS.iter().any(|m| bare(comment).starts_with(m))
+}
+
 fn opener(comment: &str) -> &str {
     let comment = comment.trim_start();
     let len = comment.len() - comment.trim_start_matches(['/', '!', '*']).len();
@@ -77,10 +84,7 @@ fn opener(comment: &str) -> &str {
 /// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`:
 /// the lines from `SAFETY:` on sharing its opener, up to a blank or another.
 fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
-    let mut free: Vec<bool> = lines
-        .iter()
-        .map(|l| MARKERS.iter().any(|m| bare(&l.comment).starts_with(m)))
-        .collect();
+    let mut free: Vec<bool> = lines.iter().map(|l| marked(&l.comment)).collect();
     let note = |l: &Line| l.code.trim().is_empty() && !l.comment.trim().is_empty();
     for (i, line) in lines.iter().enumerate() {
         if kind != Kind::Rust || !note(line) || !bare(&line.comment).starts_with("SAFETY:") {
@@ -164,40 +168,15 @@ impl Report {
     }
 }
 
-#[derive(Debug, Default, PartialEq)]
-pub struct Tally {
-    pub files: usize,
-    pub over: usize,
-    pub words_over: usize,
-    pub refs: usize,
-    pub with_refs: usize,
-}
-
-impl Tally {
-    fn add(&mut self, kind: Kind, report: &Report) {
-        self.files += 1;
-        if let Some((_, words)) = report.over {
-            self.over += 1;
-            self.words_over += words - kind.cap();
-        }
-        self.refs += report.history.len();
-        self.with_refs += usize::from(!report.history.is_empty());
-    }
-
-    pub fn signal(&self) -> String {
-        format!(
-            "signal (not a failure): {CAP}: {} of {} files over their cap, {} words over; \
-             `make comments PATHS=<dir>` lists them\n\
-             signal (not a failure): {HISTORY}: {} lines naming an issue or PR, in {} files; \
-             `make comments PATHS=<dir>` lists them\n",
-            self.over, self.files, self.words_over, self.refs, self.with_refs
-        )
-    }
-}
-
-pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tally) {
-    let mut tally = Tally::default();
+pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
     let mut found = Vec::new();
+    let max = match width::max_width(base) {
+        Ok(max) => Some(max),
+        Err(finding) => {
+            found.push(finding);
+            None
+        }
+    };
     for file in files {
         let rel = file.strip_prefix(base).unwrap_or(file).to_string_lossy();
         let rel = rel.trim_start_matches("./");
@@ -205,11 +184,10 @@ pub fn pass(base: &Path, files: &[PathBuf], strict: bool) -> (Vec<Finding>, Tall
         let Ok(source) = fs::read_to_string(file) else {
             continue;
         };
-        let report = check(rel, kind, &source);
-        tally.add(kind, &report);
-        if strict {
-            found.extend(report.findings(rel, kind));
+        found.extend(check(rel, kind, &source).findings(rel, kind));
+        if let Some(max) = max {
+            found.extend(width::check(rel, kind, &source, max));
         }
     }
-    (found, tally)
+    found
 }

@@ -1,4 +1,6 @@
-//! During Play the collider diff runs only when the change log names a static entity: a new way to write a static entity's pose, Collider or flags must go through the World's write funnels (`ecs::changes`), or Play's navmesh misses it.
+//! During Play the collider diff runs only when the change log names a static entity: a new way to
+//! write a static entity's pose, Collider or flags must go through the World's write funnels
+//! (`ecs::changes`), or Play's navmesh misses it.
 
 use glam::Mat4;
 

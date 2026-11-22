@@ -1,4 +1,6 @@
-//! Precedence, loosest first: comparisons, `+ -`, `* /`, unary minus, `^`. Left-associative but `^`, which binds right (`2 ^ 3 ^ 2` is `2 ^ 9`) and tighter than unary minus (`-a ^ 2` is `-(a ^ 2)`).
+//! Precedence, loosest first: comparisons, `+ -`, `* /`, unary minus, `^`. Left-associative but
+//! `^`, which binds right (`2 ^ 3 ^ 2` is `2 ^ 9`) and tighter than unary minus (`-a ^ 2` is `-(a ^
+//! 2)`).
 
 use super::fault::show;
 use super::fault::{args_hint, func_names, unexpected, unknown_name};

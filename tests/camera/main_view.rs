@@ -1,4 +1,5 @@
-//! A scripted chase camera moves the main camera entity in `LateUpdate`; the harness, Game view and audio listener all look from it, and moving its Transform moves `Camera.*`.
+//! A scripted chase camera moves the main camera entity in `LateUpdate`; the harness, Game view and
+//! audio listener all look from it, and moving its Transform moves `Camera.*`.
 
 use std::cell::RefCell;
 use std::rc::Rc;
