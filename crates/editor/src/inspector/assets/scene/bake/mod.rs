@@ -28,6 +28,7 @@ pub struct ActiveBake {
 }
 
 enum Step {
+    /// The lightmaps, on their worker.
     Lightmaps(LightmapBakeJob),
     Probes {
         job: Box<LightingBake>,
@@ -42,10 +43,7 @@ enum Step {
         path: String,
     },
     /// Bake Occlusion: the PVS alone, on its worker, written to `path`.
-    OcclusionOnly {
-        job: OcclusionBakeJob,
-        path: String,
-    },
+    OcclusionOnly { job: OcclusionBakeJob, path: String },
 }
 
 impl ActiveBake {

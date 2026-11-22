@@ -45,15 +45,18 @@ pub fn draw(
                 editor.inspector_open = false;
             }
 
-            egui::ScrollArea::vertical().show(ui, |ui| match editor.inspector_target() {
-                InspectorTarget::Entity(selected_id) => {
-                    draw_entity_inspector(editor, ui, scene, selected_id);
-                }
-                InspectorTarget::Asset(asset_path) => {
-                    assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
-                }
-                InspectorTarget::SceneSettings => {
-                    settings::draw(editor, ui, scene);
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                // Dispatch on the explicit inspector target.
+                match editor.inspector_target() {
+                    InspectorTarget::Entity(selected_id) => {
+                        draw_entity_inspector(editor, ui, scene, selected_id);
+                    }
+                    InspectorTarget::Asset(asset_path) => {
+                        assets::draw_inspector(ui, editor, scene, console, nav, &asset_path);
+                    }
+                    InspectorTarget::SceneSettings => {
+                        settings::draw(editor, ui, scene);
+                    }
                 }
             });
         });
@@ -196,8 +199,7 @@ fn draw_layer_combo(
     });
 }
 
-/// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
-/// the Add Component menu, in the canonical inspector order.
+/// The per-component card chain plus the Add Component menu, in the canonical inspector order.
 #[expect(
     clippy::too_many_arguments,
     reason = "(world, id) replaced the single &mut Entity handle"
