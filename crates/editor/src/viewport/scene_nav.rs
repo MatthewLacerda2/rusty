@@ -59,9 +59,9 @@ pub fn gesture(b: Buttons) -> Option<Gesture> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NavFrame {
     pub gesture: Option<Gesture>,
-    /// Points, raw when the OS sends it: a locked cursor still turns.
+    /// Raw device counts when the OS sends them, else points: a locked cursor still turns.
     pub motion: Vec2,
-    /// Pointer movement in points, for pan to track the cursor exactly.
+    /// In points, for pan to track the cursor exactly.
     pub delta: Vec2,
     pub scroll: f32,
     /// Two-finger trackpad scroll in points while hovered (look).
