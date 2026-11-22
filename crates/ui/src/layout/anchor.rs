@@ -59,6 +59,7 @@ pub(super) fn clamp(anchor: &WorldAnchor, p: Vec2, behind: bool, size: Vec2) -> 
     let centre = size * 0.5;
     let mut dir = if behind { centre - p } else { p - centre };
     if dir.length_squared() < 1e-12 {
+        // Dead behind projects to the centre: point straight down, where "behind you" reads.
         dir = Vec2::NEG_Y;
     }
     let half = centre - pad;

@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/script_fields.rs — schema-driven script inspector (#84).
-
 use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 
@@ -21,8 +19,7 @@ thread_local! {
     });
 }
 
-/// Draw the field controls for one script. Scripts with no `fields` schema draw
-/// nothing, so this is a no-op for plain MonoBehaviour scripts.
+/// Draw the field controls for one script; none for a script without a `fields` schema.
 pub fn draw_script_fields(ui: &mut egui::Ui, script: &mut ScriptComponent, is_dirty: &mut bool) {
     let fields = cached_schema(&script.path);
     if fields.is_empty() {
@@ -130,6 +127,7 @@ fn cached_schema(path: &str) -> Vec<ScriptField> {
         if let Some(fields) = cache.schemas.get(path) {
             return fields.clone();
         }
+        // A failed read is a miss retried next frame, never a cached empty schema.
         let Ok(code) = std::fs::read_to_string(path) else {
             return Vec::new();
         };

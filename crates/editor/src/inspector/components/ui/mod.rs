@@ -1,7 +1,3 @@
-//! The in-game UI's inspector cards: the Canvas root, the
-//! RectTransform every UI element carries, the Image graphic, the Shape graphic
-//!, the Text label, the Canvas Group, the Rect Mask and Mask, the Backdrop
-//! Filter, the Selectable, and the Layout Group and Layout
 
 pub mod backdrop;
 pub mod image;

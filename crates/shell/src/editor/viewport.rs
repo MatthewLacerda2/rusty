@@ -1,6 +1,3 @@
-//! crates/shell/src/editor/viewport.rs — the editor's offscreen renders (the Scene/Game
-//! viewport and the Inspector preview) and the Scene-tab pointer interaction.
-
 use super::EditorFrontend;
 use crate::Shell;
 use rusty_app::GameWorld;
@@ -12,8 +9,7 @@ use rusty_editor::{EditorUi, ViewportInteraction, ViewportTab};
 use rusty_render::{RenderView, Renderer};
 use rusty_scene::Scene;
 
-/// (Re)bind a freshly-rendered offscreen `view` to a stable egui texture id so the
-/// `egui::Image` samples this frame's render — registering it lazily on first use.
+/// One stable egui id per slot, so the `egui::Image` samples this frame's render.
 pub(super) fn rebind_egui_texture(
     egui_renderer: &mut egui_wgpu::Renderer,
     device: &wgpu::Device,
@@ -48,7 +44,8 @@ pub(super) fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u3
     (px > 0 && py > 0).then_some((px, py))
 }
 
-/// Render the Inspector Preview tab's isolated scene into its own offscreen `view`
+/// Render the Inspector Preview tab's isolated scene into its own offscreen `view`, then
+/// rebind it: the window and the capture both call this.
 pub(super) fn render_preview_scene(
     (renderer, egui_renderer): (&mut Renderer, &mut egui_wgpu::Renderer),
     ui: &mut EditorUi,
@@ -137,7 +134,6 @@ impl EditorFrontend {
         );
     }
 
-    /// This frame's Inspector preview, through [`render_preview_scene`].
     pub(super) fn render_preview(&mut self, shell: &mut Shell, pixels_per_point: f32) {
         let gpu = (&mut shell.renderer, &mut self.egui_renderer);
         let target = (&mut self.preview_view, &mut self.preview_texture_id);
@@ -189,6 +185,7 @@ impl EditorFrontend {
                 return;
             };
             if interaction.drag_started {
+                // World units, grown with distance: far handles stay grabbable.
                 let radius = (origin - camera.position).length() * 0.06 + 0.15;
                 ui.gizmo_drag = gizmo::begin_drag(origin, ray, radius);
             }

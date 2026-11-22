@@ -24,7 +24,8 @@ use rusty_edit::authoring::material::{
 };
 use rusty_scene::{MaterialAsset, RenderMode};
 
-/// 3B2. Render the Material card for the entity `id`, editing the shared `MaterialAsset`
+/// 3B2. Render the Material card for the entity `id`, editing the shared library
+/// `MaterialAsset` it references.
 pub fn draw_material_card(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
@@ -150,7 +151,8 @@ fn draw_material_factors(
     });
 }
 
-/// The rendering-mode selector + its mode-specific knob: a `Transparent`
+/// The rendering-mode selector + its mode-specific knob. `Opaque` shows neither
+/// `Alpha` nor `Alpha Cutoff`: both would be inert.
 fn draw_material_transparency(
     ui: &mut egui::Ui,
     materials: &mut BTreeMap<String, MaterialAsset>,

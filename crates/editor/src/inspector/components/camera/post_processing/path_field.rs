@@ -1,7 +1,7 @@
-//! The card's file path fields: the Color Lookup's LUT and Bloom's lens
-//! dirt, one [`PathField`] each in [`FIELDS`]. A path is written when its
-//! field is left, not per keystroke, so the renderer never tries, and logs, every
-//! half-typed path. Left means any way: Enter, a click away, or the card no longer
+//! A path is written when its field is left, not per keystroke, so the renderer
+//! never tries, and logs, every half-typed path. Left means any way: Enter, a click
+//! away, or the card no longer drawn, which egui reports as no focus loss at all.
+//! Escape reverts.
 
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::{PostProcessingComponent, Scene};
@@ -24,7 +24,6 @@ pub(super) const LUT: PathField = PathField {
     set: vc_ops::grading::color_lookup::set_lut,
 };
 
-/// Bloom's lens dirt texture.
 pub(super) const DIRT: PathField = PathField {
     id: "bloom_dirt_draft",
     label: "    Dirt Texture:",
@@ -47,7 +46,6 @@ fn key(field: &PathField) -> egui::Id {
     egui::Id::new(field.id)
 }
 
-/// `field`, on `id`'s volume `vc`.
 pub(super) fn draw(
     ui: &mut egui::Ui,
     (world, id): (&mut rusty_ecs::World, u32),
@@ -88,6 +86,8 @@ pub(super) fn draw(
     }
 }
 
+/// Writes each draft whose field was not drawn last pass, so the inspector calls it
+/// every pass, collapsed or not.
 pub fn commit_abandoned(ctx: &egui::Context, scene: &mut Scene) -> bool {
     let mut changed = false;
     for field in FIELDS {

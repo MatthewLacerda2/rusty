@@ -1,7 +1,8 @@
 //! The RectTransform inspector card: anchors, pivot, anchored position and
 //! size delta. Every write routes through `edit::authoring::ui::layout::rect_transform`. The
 //! Transform card above it keeps rotation and scale; its position is ignored for a
-//! rect-laid-out entity. The *World Anchor* section makes the element a
+//! rect-laid-out entity. The *World Anchor* section makes the element a marker
+//! pinned to a world point.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
@@ -99,6 +100,7 @@ fn draw_placement(
 }
 
 /// The world anchor section over a snapshot. Returns the edited anchor (`None`
+/// inside: not a marker) when anything changed.
 fn draw_world_anchor(
     ui: &mut egui::Ui,
     anchor: Option<WorldAnchor>,

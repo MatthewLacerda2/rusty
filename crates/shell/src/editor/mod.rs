@@ -1,5 +1,3 @@
-//! crates/shell/src/editor/mod.rs — the editor frontend: the egui dashboard over the shell.
-
 #[cfg(feature = "dev")]
 pub mod capture;
 mod cursor_release;
@@ -35,17 +33,17 @@ use rusty_editor::{EditorUi, ViewportInteraction};
 use rusty_render::RenderView;
 use rusty_scene::SceneId;
 
-/// The editor's frontend state: egui, the editor UI, and its two offscreen views.
 pub struct EditorFrontend {
     egui_ctx: egui::Context,
     egui_winit: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
     editor_ui: EditorUi,
     viewport_texture_id: Option<egui::TextureId>,
+    /// `[Scene, Game]`: they render at different scales, so a shared view would resize,
+    /// cutting auto-exposure, on each tab switch.
     viewport_views: [Option<RenderView>; 2],
     preview_texture_id: Option<egui::TextureId>,
     preview_view: Option<RenderView>,
-    /// Whether the Game view has input focus.
     game_focused: bool,
     cursor_release: cursor_release::CursorRelease,
     game_view: Option<GameViewRect>,
@@ -128,6 +126,7 @@ impl EditorFrontend {
             shell.renderer.shadow_renderer.invalidate_static_cache();
         }
         if self.demo_size().is_none() {
+            // Before `sync_shared` resolves the render scale on it; a demo keeps its recorded one.
             let scale =
                 (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
             game.resources.screen.borrow_mut().set_display_scale(scale);
@@ -152,7 +151,6 @@ impl Frontend for EditorFrontend {
         self.egui_winit.on_mouse_motion(delta);
     }
 
-    /// The game hears input only while playing with the Game view focused.
     fn game_has_input(&self, game: &GameWorld) -> bool {
         #[cfg(feature = "dev")]
         if self.editor_ui.demo_open() {
@@ -235,6 +233,7 @@ impl Frontend for EditorFrontend {
         let ppp = shell.window.scale_factor() as f32;
         self.update_game_focus(game, &interaction);
         self.game_view = game_focus::game_view(&interaction, ppp);
+        // Now: the layout gave the panel rect, and egui samples this render when it paints.
         self.render_viewport_scene(shell, game, &interaction, ppp);
         self.recorded_viewport_interaction(game, &interaction, ppp);
         self.render_preview(shell, ppp);

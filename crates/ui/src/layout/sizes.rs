@@ -13,7 +13,7 @@ use rusty_ecs::World;
 /// recurse the size queries forever.
 pub(super) const MAX_DEPTH: u32 = 64;
 
-/// One axis's layout sizes. See the module docs.
+/// One axis's layout sizes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Sizes {
     pub min: f32,

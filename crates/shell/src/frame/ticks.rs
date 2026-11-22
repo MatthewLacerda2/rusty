@@ -1,12 +1,12 @@
-//! crates/shell/src/frame/ticks.rs — the fixed-tick accumulator.
-
 use rusty_time::{FIXED_DELTA_TIME, MAXIMUM_DELTA_TIME};
 
-/// How close to a whole tick counts as one, in ticks.
+/// How close to a whole tick counts as one, in ticks: f32 rounding makes 1/3 s over 1/60 s
+/// 19.9999996 ticks.
 const TICK_SLACK: f64 = 1e-6;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct FixedTicks {
+    /// `f64` so a long session's remainder never drifts off the tick.
     owed: f64,
     restart: bool,
 }
@@ -36,9 +36,8 @@ impl FixedTicks {
         (self.owed / f64::from(FIXED_DELTA_TIME)).clamp(0.0, 1.0) as f32
     }
 
-    /// Drop the remainder, and the next frame's time: the sim stopped running on the
-    /// tick (edit mode, a pause, a Play transition, a scene load), and the time since is not owed
-    /// to it, so the accumulator starts empty.
+    /// Drop the remainder and the next frame's time: the sim was off the tick (edit mode, a
+    /// pause, a Play transition, a scene load), and that time is not owed to it.
     pub fn clear(&mut self) {
         (self.owed, self.restart) = (0.0, true);
     }

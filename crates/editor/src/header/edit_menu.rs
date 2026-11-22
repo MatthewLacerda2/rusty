@@ -1,7 +1,3 @@
-//! The Edit menu and its shortcuts: Undo / Redo over the scene's history
-//! (`scene::undo`), Unity's Edit ▸ Undo and Ctrl+Z / Ctrl+Shift+Z (Cmd on macOS),
-//! and Edit ▸ Delete with the Delete key, Cmd+Backspace on macOS.
-
 use egui::{Key, KeyboardShortcut, Modifiers};
 use egui_phosphor::regular as icon;
 
@@ -14,6 +10,7 @@ const REDO: KeyboardShortcut =
 /// Ctrl+Y, Unity's Redo on Windows and Linux.
 const REDO_Y: KeyboardShortcut = KeyboardShortcut::new(Modifiers::COMMAND, Key::Y);
 const DELETE: KeyboardShortcut = KeyboardShortcut::new(Modifiers::NONE, Key::Delete);
+/// Unity's Delete on macOS. `MAC_CMD`, not `COMMAND`: Ctrl+Backspace elsewhere is no delete.
 const DELETE_MAC: KeyboardShortcut = KeyboardShortcut::new(Modifiers::MAC_CMD, Key::Backspace);
 
 /// The REPL line's widget id: its lines are Undo steps of their own.
@@ -29,6 +26,7 @@ pub(super) fn shortcuts(editor: &mut EditorUi, ctx: &egui::Context, scene: &mut 
     if scene.is_playing() || ctx.text_edit_focused() {
         return;
     }
+    // Redo first: its shortcut is Undo's plus Shift, and egui matches Undo's Shift or not.
     let redo = ctx.input_mut(|i| i.consume_shortcut(&REDO) || i.consume_shortcut(&REDO_Y));
     if redo {
         step(editor, scene, false);

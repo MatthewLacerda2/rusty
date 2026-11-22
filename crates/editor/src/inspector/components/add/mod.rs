@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/add/mod.rs — the Add Component menu: the
-//! project's script behaviours, then one table of first-class components.
-
 use egui_phosphor::regular as icon;
 
 use rusty_components::registry::first_class;
@@ -71,7 +68,7 @@ impl Category {
 }
 
 /// A first-class component's Add Component entry: its group, label and glyph
-/// (empty for none yet, the burn-down in #82). Implemented beside the component's
+/// (empty for none). Implemented beside the component's
 /// inspector card; the menu lists every registry row (`components::registry`), so a
 /// component without one does not compile.
 pub trait AddEntry {
@@ -118,6 +115,7 @@ fn add_script_menu(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) -> 
     let mut added = false;
     for path in scripts {
         let label = rusty_script::scripting::script_label(&path);
+        // Each pick appends: an entity may hold one script twice, as in Unity.
         if ui.button(format!("{}  {}", icon::MOON, label)).clicked() {
             added |= authoring::add_script(world, id, &path, Default::default());
             ui.close();

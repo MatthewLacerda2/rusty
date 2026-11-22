@@ -1,4 +1,3 @@
-//! crates/editor/src/lib.rs — the egui editor (the default-on `editor` feature).
 #![cfg(feature = "editor")]
 #![allow(
     clippy::disallowed_methods,
@@ -50,7 +49,6 @@ pub struct EditorUi {
 
     pub asset_script_content: String,
 
-    /// Whether the About dialog (File-bar → About) is currently open.
     pub show_about: bool,
     pub show_build_settings: bool,
     pub build_settings_draft: Option<rusty_core::application::BuildSettings>,
@@ -72,27 +70,23 @@ pub struct EditorUi {
     pub viewport_tab: ViewportTab,
     pub viewport_image_size: egui::Vec2,
     pub ui_textures: std::rc::Rc<rusty_ui::TextureSizes>,
-    /// Live move-gizmo drag, if an axis handle is currently grabbed.
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
-    /// Which gizmos the Scene tab draws, and the Game tab's `GameGizmos`
+    /// Which gizmos both tabs draw: their strips' toggles, and `Editor.SetGizmo`.
     pub gizmos: rusty_core::application::SceneGizmos,
     /// The Game view's size: its dropdown, and `Editor.SetGameViewSize`.
     pub game_view: rusty_core::application::GameViewSetting,
-    /// What the Game view's Stats overlay shows, while on.
     pub stats: Option<viewport::stats::Readout>,
-    /// Live rect-tool drag on a UI element's handle.
     pub rect_drag: Option<viewport::rect_tool::RectDrag>,
     pub scene_view: viewport::scene_nav::SceneView,
 
     pub preview_tab_active: bool,
-    /// The Preview tab's mesh toggle (sphere, cube, Suzanne or plane).
     pub preview_mesh: PreviewMesh,
     pub preview_orbit: FramedOrbit,
     pub preview_cache: Option<PreviewCache>,
     pub preview_request: Option<PreviewRequest>,
     pub preview_texture_id: Option<egui::TextureId>,
-    /// The Material card's delete confirm.
     pub material_delete: inspector::components::material::MaterialDelete,
+    /// An Undo or Redo was asked this frame: its writes are a step of their own.
     pub history_stepped: bool,
 
     #[cfg(feature = "dev")]
@@ -100,6 +94,8 @@ pub struct EditorUi {
 }
 
 impl EditorUi {
+    /// `scene_path` is the script runtime's own cell (`ScriptManager::scene_path_cell`),
+    /// so the editor and `Scene.Save()` share one value.
     pub fn new(scene_path: Rc<RefCell<Option<String>>>) -> Self {
         Self {
             selected_entity_id: None,
@@ -145,7 +141,6 @@ impl EditorUi {
         }
     }
 
-    /// The inspector's current target, derived from the (mutually exclusive)
     pub fn inspector_target(&self) -> InspectorTarget {
         if let Some(id) = self.selected_entity_id {
             InspectorTarget::Entity(id)
@@ -179,6 +174,8 @@ impl EditorUi {
         self.apply_theme(ctx, *is_playing);
         self.preview_request = None;
 
+        // A despawned id leaves the selection: ids are never reused, so a live one
+        // is that entity.
         self.selected_entity_id = self
             .selected_entity_id
             .filter(|&id| scene.world.contains(id));
@@ -186,6 +183,8 @@ impl EditorUi {
 
         let ui = &mut theme::chrome::root_ui(ctx);
         header::draw(self, ui, scene, console, is_playing);
+        // After the header, inside the pass: egui drops a delayed repaint asked
+        // before `begin_pass`, and the header reads a bake's refusal first.
         self.frame_work(ctx, scene, console, nav, *is_playing, Paint::Drawn);
 
         if *is_playing {

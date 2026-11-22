@@ -1,5 +1,3 @@
-//! crates/shell/src/prelude.rs — a stage on the window before any project is open.
-
 use std::sync::Arc;
 
 use winit::application::ApplicationHandler;
@@ -13,11 +11,11 @@ use super::{boot, frame, Frontend, Launch, Shell};
 use rusty_app::GameWorld;
 use rusty_render::Renderer;
 
-/// What runs on the window before the game exists (the editor's project picker).
+/// What runs on the window before the game exists (the editor's project picker). winit allows
+/// one event loop per process, so the stage and the game share it.
 pub trait Prelude {
     type Output;
 
-    /// See every window event (the picker feeds egui).
     fn on_window_event(&mut self, window: &Window, event: &WindowEvent);
 
     /// Draw one frame onto the swapchain `target`; `Some` once the stage is done.
@@ -76,13 +74,12 @@ enum Stage<P, K, B, F, M> {
         make: K,
         boot: B,
     },
-    /// The prelude drawing on the window.
     Prelude(Box<Open<P, B>>),
     Running(Box<App<F, M>>),
+    /// Only while moving from one stage to the next.
     Moving,
 }
 
-/// The window and renderer a prelude draws on, and what boots the game after it.
 struct Open<P, B> {
     window: Arc<Window>,
     renderer: Renderer,

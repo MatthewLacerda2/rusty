@@ -1,5 +1,3 @@
-//! crates/shell/src/editor/capture/ — the whole editor, offscreen, to a PNG.
-
 pub mod bench;
 mod demo;
 mod paint;
@@ -26,7 +24,9 @@ use rusty_script::scripting::ConsoleLogs;
 
 pub const DEFAULT_WIDTH: u32 = 1600;
 pub const DEFAULT_HEIGHT: u32 = 900;
+/// The last is painted: fonts land on frame 2, panel sizes settle by 3.
 pub const DEFAULT_FRAMES: u32 = 4;
+/// A second a frame, past every egui animation.
 const FRAME_SECONDS: f64 = 1.0;
 
 #[derive(Clone, Debug)]
@@ -39,9 +39,10 @@ pub struct EditorCaptureOptions {
     pub frame_selected: bool,
     /// Inspect this reflection probe first, as `Editor.InspectReflectionProbe` does.
     pub inspect_reflection_probe: Option<usize>,
+    /// The Play chrome only: the sim is not entered.
     pub playing: bool,
-    /// Which viewport tab is showing.
     pub tab: ViewportTab,
+    /// In window pixels.
     pub pointer: Option<(f32, f32)>,
     /// The Scene view's gizmos, as its toggles or `Editor.SetGizmo` set them.
     pub gizmos: SceneGizmos,
@@ -95,7 +96,6 @@ pub fn capture(
     capture_into(&mut CaptureHost::new(), game, path, opts)
 }
 
-/// [`capture`] through a caller-owned host, so several captures share one renderer.
 pub fn capture_into(
     host: &mut CaptureHost,
     game: &GameWorld,
@@ -111,7 +111,6 @@ pub struct Shot {
     pub preview: Option<PreviewRect>,
 }
 
-/// [`capture_into`], saying what it wrote: `Ok(None)` with no adapter.
 pub fn capture_shot(
     host: &mut CaptureHost,
     game: &GameWorld,
@@ -158,12 +157,13 @@ fn capture_with(
         output = Some(ctx.end_pass());
         let renderer = host.renderer(width, height).expect("probed above");
         let out: &mut egui::FullOutput = output.as_mut().expect("just set");
+        // Every frame: egui sends each texture delta only once.
         for (id, deltas) in &out.textures_delta.set {
             for delta in deltas {
                 egui_renderer.update_texture(&renderer.device, &renderer.queue, *id, delta);
             }
         }
-        out.textures_delta.clear();
+        out.textures_delta.clear(); // egui debug-asserts every delta was handled
     }
     let shown = opts
         .preview
@@ -178,7 +178,6 @@ fn capture_with(
     Ok(Some(Shot { preview: shown }))
 }
 
-/// A fresh editor with `opts`' tab, selection and framing applied.
 fn initial_ui(game: &GameWorld, opts: &EditorCaptureOptions) -> Result<EditorUi, String> {
     let mut ui = EditorUi::new(game.script_manager().scene_path_cell());
     game.refresh_ui_textures();

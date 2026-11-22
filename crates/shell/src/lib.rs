@@ -1,5 +1,3 @@
-//! crates/shell/src/lib.rs — the runtime shell: one window, one frame loop, two frontends.
-
 #![allow(
     clippy::disallowed_methods,
     clippy::disallowed_types,
@@ -35,26 +33,21 @@ pub use event_loop::{run, Launch};
 use frame::{FrameClock, Host, QuitAction, Step};
 pub use prelude::{run_after, Prelude};
 
-/// The frontend-independent window state threaded through the event loop.
 pub struct Shell {
     pub window: Arc<winit::window::Window>,
     pub renderer: Renderer,
     pub clock: FrameClock,
     pub ticks: frame::FixedTicks,
-    /// What the loop owes a trigger before it may sleep.
     pub pacer: pace::Pacer,
-    /// The physical→logical key remap, loaded once from `Storage` at boot.
     pub keymap: Keymap,
+    /// In effect on the surface and window, so the per-frame apply redoes only what changed.
     pub applied_video: VideoSettings,
-    /// What the OS cursor was last set to.
     pub cursor: input::CursorPolicy,
-    /// The OS gamepad backend; `None` where the platform has none.
     pub pad_source: Option<input::pad_source::GilrsSource>,
-    /// Pad slots and the pad state last written into the sim.
     pub pads: input::pads::PadPump,
-    /// The OS clipboard; `None` where there is none.
     pub clipboard: Option<input::clipboard_source::OsClipboard>,
     pub modifiers: winit::keyboard::ModifiersState,
+    /// Raw mouse motion and pads report without OS focus too; they reach the game only with it.
     pub window_focused: bool,
     #[cfg(feature = "dev")]
     pub cmd_channel: Option<rusty_dev::command_channel::CommandChannel>,
@@ -62,8 +55,8 @@ pub struct Shell {
     pub frame_log: Option<rusty_dev::frame_log::FrameLog>,
 }
 
+/// No plugin trait: one compile-time implementation per binary, so the loop is written once.
 pub trait Frontend {
-    /// Which host this is — decides what `Application.Quit()` means.
     const HOST: Host;
 
     fn on_window_event(&mut self, _shell: &Shell, _event: &WindowEvent) {}
@@ -87,6 +80,7 @@ pub trait Frontend {
         frame::advance_sim(game, step, raw)
     }
 
+    /// Runs before the quit boundary persists the store.
     fn before_exit(&mut self, _game: &mut GameWorld) {}
 
     fn on_play_transition(&mut self, _game: &mut GameWorld, _transition: PlayTransition) {}
@@ -97,6 +91,8 @@ pub trait Frontend {
 
     fn on_key(&mut self, _game: &mut GameWorld, _key: KeyCode, _pressed: bool) {}
 
+    /// The swapchain refused a frame: do `draw`'s work besides painting, so command-channel
+    /// work never waits on a redraw.
     fn undrawn(&mut self, _shell: &mut Shell, _game: &mut GameWorld) {}
 
     fn draw(
@@ -108,7 +104,6 @@ pub trait Frontend {
     );
 }
 
-/// Dispatch one window event for our window.
 pub(crate) fn handle_window_event<F: Frontend>(
     event: &WindowEvent,
     elwt: &ActiveEventLoop,
@@ -119,6 +114,7 @@ pub(crate) fn handle_window_event<F: Frontend>(
     match event {
         WindowEvent::CloseRequested => elwt.exit(),
         WindowEvent::Resized(size) => shell.renderer.resize(boot::pixel_size(*size)),
+        // A DPI change (onto a Retina monitor) can invalidate the swapchain at one size.
         WindowEvent::ScaleFactorChanged { .. } => {
             shell
                 .renderer
@@ -148,6 +144,7 @@ pub(crate) fn handle_window_event<F: Frontend>(
             }
             frontend.on_key(game, *key, pressed);
         }
+        // Unguarded by input, so the pointer is right the moment input arrives.
         WindowEvent::CursorMoved { position, .. } => {
             let view = frontend.game_view(shell);
             input::write_cursor_moved((position.x, position.y), &view, game);
@@ -228,7 +225,6 @@ fn pump_pads(shell: &mut Shell, game: &GameWorld, has_input: bool) {
     }
 }
 
-/// Snapshot the OS clipboard for the next tick.
 fn capture_clipboard(shell: &mut Shell, game: &GameWorld) {
     if let Some(clipboard) = shell.clipboard.as_mut() {
         input::clipboard::capture(clipboard, &mut game.input().borrow_mut());

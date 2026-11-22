@@ -1,6 +1,6 @@
 //! The Canvas inspector card: render mode, sort order and the *Scale With
-//! Screen Size* scaler, plus the world / camera canvas knobs of the chosen mode
-//!. Every write routes through `edit::authoring::ui::layout::canvas`.
+//! Screen Size* scaler, plus the world / camera canvas knobs of the chosen mode.
+//! Every write routes through `edit::authoring::ui::layout::canvas`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
