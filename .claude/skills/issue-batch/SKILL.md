@@ -162,8 +162,13 @@ script keeps, and why:
   someone who cannot push. A refused launch is never queued.
 - **A launch at CLAUDE.md's limit waits its turn**: it joins the waiting line
   (exit 0, "waiting for a slot, N ahead", naming every coder it counted), and a
-  second ask for the same issue keeps its place. A round (a `Round:` line in the
-  newest `Brief`) goes ahead of first launches, then the order asked. How a fired
+  second ask for the same issue keeps its place. The line is ordered by
+  priority: a round (a `Round:` line in the newest `Brief`) goes ahead of first
+  launches, then a red `main` (the issue `main-health.yml` filed), then
+  `documentation` (it never waits its turn), then CLAUDE.md's label order (an
+  issue's highest label, the table the merge queue ranks by), then the order
+  asked; `make coders` prints each entry's rank. A running coder is never
+  stopped for a higher one. How a fired
   routine is placed (a ready PR holds its slot until its review record exists, so
   its re-brief has one) is `dispatch/running.py`'s docstring; a re-brief is never
   counted against its own issue. While the line holds others, a free slot goes

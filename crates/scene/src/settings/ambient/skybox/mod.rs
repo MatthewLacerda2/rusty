@@ -18,6 +18,8 @@ pub(super) fn sky_radiance(scene: &Scene, color: Vec3) -> Sh9 {
 }
 
 #[cfg(test)]
+mod look_tests;
+#[cfg(test)]
 mod tests;
 
 pub use procedural::sky_color as procedural_sky_color;
