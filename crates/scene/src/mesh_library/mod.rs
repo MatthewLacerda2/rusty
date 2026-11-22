@@ -1,3 +1,4 @@
+//! The scene's meshes made from data (Unity's script-built `Mesh`); a prefab holds none.
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
 
@@ -11,6 +12,7 @@ use rusty_components::{ColliderComponent, MeshComponent};
 
 pub type Geometry = (Shared<Vertex>, Shared<u32>);
 
+/// Equal by data alone: the revision is not an edit (Undo compares the library).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(from = "MeshData", into = "MeshData")]
 pub struct SceneMesh {
@@ -20,6 +22,7 @@ pub struct SceneMesh {
 }
 
 impl SceneMesh {
+    /// Only for an entry that passed `MeshData::validate`.
     pub fn geometry(&self) -> &Geometry {
         self.built.get_or_init(|| {
             BUILDS.with(|n| n.set(n.get() + 1));
@@ -37,6 +40,7 @@ impl SceneMesh {
 }
 
 thread_local! {
+    /// A test hook: geometries built on this thread, read by the edit side's tests.
     #[doc(hidden)]
     pub static BUILDS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
@@ -116,10 +120,14 @@ pub fn checked(library: MeshLibrary) -> MeshLibrary {
     kept
 }
 
+/// One key whether `checked` dropped the entry or no file defined it, so a dropped
+/// entry is warned of once, with its cause.
 pub fn missing_key(name: &str) -> String {
     format!("{SCENE_KIND}::{name}")
 }
 
+/// Revisions only move forward: the renderer keeps a name's newest upload, so an older
+/// revision put back would draw the newer data.
 pub fn put_back(mut library: MeshLibrary, slot: &mut MeshLibrary) {
     for (name, entry) in &mut library {
         entry.revision = match slot.get(name) {

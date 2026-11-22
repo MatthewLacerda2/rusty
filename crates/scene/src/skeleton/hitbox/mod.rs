@@ -1,3 +1,6 @@
+//! Per-bone hitboxes, each on a child of its bone, not the bone: bones are rebuilt on
+//! load and never saved, while a bone's child is saved and re-bound by name. Their layer
+//! collides with nothing, so they never push or block; a cast's layer mask tests them.
 mod fit;
 
 pub use fit::{fit_hitboxes, HitboxFit, HitboxOptions};
@@ -42,6 +45,7 @@ impl Scene {
             let Some(bone) = *bone else { continue };
             if !fits.iter().any(|f| f.slot == slot) {
                 if let Some(stale) = self.hitbox_of(bone) {
+                    // Queued in Play, so a script under it is torn down first.
                     self.destroy(stale);
                 }
             }
@@ -53,6 +57,7 @@ impl Scene {
         self.world
             .children(bone)
             .into_iter()
+            // One queued for destruction is already gone to every lookup.
             .find(|&c| self.is_generated_hitbox(c) && !self.is_doomed(c))
     }
 
@@ -77,6 +82,7 @@ impl Scene {
             };
         }
         self.world.set_layer(id, layer);
+        // A refit keeps the hitbox's physics material (a "flesh" asset).
         let (material, material_asset) = self
             .world
             .collider(id)
@@ -99,6 +105,7 @@ impl Scene {
         id
     }
 
+    /// An existing layer keeps whatever collision matrix the project gave it.
     fn hitbox_layer(&mut self, name: &str) -> Result<u8, String> {
         if let Some(layer) = self.layers.index_of(name) {
             return Ok(layer);

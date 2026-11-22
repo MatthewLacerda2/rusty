@@ -1,3 +1,4 @@
+//! Bones are GameObjects, rebuilt from the model on every load and never saved.
 mod bone_refs;
 mod hang;
 mod hitbox;
@@ -24,6 +25,8 @@ pub use ragdoll::{
 
 use crate::Scene;
 
+/// The World's next id less the bones at its top: bones respawn with fresh ids on each
+/// load, so otherwise every load and save would grow the saved counter.
 pub fn saved_next_id(scene: &Scene) -> u32 {
     let bones = scene.bone_ids();
     let mut next = scene.world.next_id();
@@ -44,6 +47,8 @@ impl Scene {
             .ids_with_mesh_where(|m| !m.skeleton.bones.is_empty())
     }
 
+    /// Reaching a bone from its owner proves it is still under it; the step budget
+    /// ends a malformed child cycle.
     pub fn bone_subtrees(&self) -> BTreeSet<u32> {
         let mut out = BTreeSet::new();
         for owner in self.skinned_ids() {
@@ -115,6 +120,7 @@ impl Scene {
             .collect()
     }
 
+    /// Any present slot, as Unity keeps a bone a script moved away: `Animator.GetBone`.
     pub fn find_bone(&self, owner: u32, name: &str) -> Option<u32> {
         let bones = self.world.mesh(owner)?.skeleton.bones.clone();
         bones
@@ -123,6 +129,7 @@ impl Scene {
             .find(|&b| self.world.name(b).is_some_and(|n| *n == name))
     }
 
+    /// Only bones still under `owner`: a stamp never hangs or re-binds onto a moved one.
     pub(super) fn live_bone(&self, owner: u32, name: &str) -> Option<u32> {
         let slots = self.live_slots(owner).into_iter();
         slots

@@ -1,3 +1,7 @@
+//! Physics material assets (Unity's `PhysicMaterial`), named by project path from a
+//! collider. One cache per thread, keyed by `key`: `poll` drains the write log once
+//! per physics step (through `generation`) and inspector frame, never per lookup.
+//! A missing file is a miss, warned of once: the collider takes the default material.
 mod file;
 #[cfg(test)]
 mod tests;
@@ -13,6 +17,7 @@ use rusty_core::project;
 
 pub use file::{parse, to_json};
 
+/// Unity's is `.physicMaterial`.
 pub const EXTENSION: &str = "physmat";
 
 struct Cache {
@@ -94,6 +99,8 @@ pub fn poll() {
     CACHE.with(|c| c.borrow_mut().refresh());
 }
 
+/// Moves whenever an asset's values may have changed. Physics reads it only to decide
+/// whether to re-apply every collider's material, so the sim never depends on it.
 pub fn generation() -> u64 {
     CACHE.with(|c| {
         let mut cache = c.borrow_mut();

@@ -1,3 +1,5 @@
+//! A re-imported rig re-binds a live skeleton in place, by bone name, as Unity keeps a
+//! model's bone Transforms: a kept bone keeps its entity, children and any override.
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::bone_refs::BoneRef;
@@ -10,6 +12,7 @@ use rusty_components::TransformComponent;
 #[derive(Debug, Default)]
 pub struct Parked {
     bones: Vec<(u32, Vec<String>)>,
+    /// Keyed by entity, not name, so two joints of one name each keep their own.
     overrides: BTreeMap<u32, TransformComponent>,
 }
 
@@ -38,6 +41,7 @@ impl Scene {
         } = parked;
         let skin = self.world.mesh(owner).and_then(|m| m.skin.clone());
         let mut pool: BTreeMap<&str, Vec<u32>> = BTreeMap::new();
+        // Name → its old bones, last slot first, so `pop` takes the first.
         for (id, chain) in old.iter().rev() {
             pool.entry(chain[0].as_str()).or_default().push(*id);
         }
@@ -99,6 +103,7 @@ impl Scene {
         }
         let refs: Vec<BoneRef> = self.park_bone_refs(owner, removed);
         let doomed = self.subtrees(removed.keys().copied().collect());
+        // Edit mode only: in Play this despawn would skip script teardown.
         self.despawn_batch(&doomed, Despawn::EditMode);
         self.attach_to_bones(hung, Despawn::EditMode);
         self.bind_bone_refs(refs);

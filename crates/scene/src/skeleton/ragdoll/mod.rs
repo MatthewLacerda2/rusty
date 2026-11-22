@@ -1,3 +1,5 @@
+//! Unity's Ragdoll Wizard: a kinematic body on every bone with a hitbox, jointed to its
+//! nearest ragdolled ancestor, the mass split by hitbox volume. Joined bones never collide.
 mod partial;
 mod preset;
 mod runtime;
@@ -19,6 +21,7 @@ type Skeleton = (Vec<Option<u32>>, Vec<Option<usize>>, Vec<String>);
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RagdollOptions {
+    /// The whole body's mass, in kilograms.
     pub mass: f32,
 }
 
@@ -54,6 +57,7 @@ impl Scene {
             let Some(volume) = volumes[slot] else {
                 self.world.set_rigidbody(bone, None);
                 self.world.set_joint(bone, None);
+                // Its runtime state goes with its body.
                 self.ragdolls.retain(|b| b != bone);
                 continue;
             };
@@ -71,6 +75,7 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = bones[p];
+                // The exact inverse of how physics builds a joint's world frame.
                 (j.axis, j.swing_axis) =
                     self.world
                         .inverse_transform_frame(bone, j.axis, j.swing_axis);
@@ -130,6 +135,8 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
+    /// The model's +Z and +X as drawn, read in model space, so a mesh under a Blender
+    /// export's turned `Armature` still bends its knees forward.
     fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
         let w = &self.world;
         let model = w
@@ -179,6 +186,8 @@ fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointCo
     }
 }
 
+/// rapier measures a joint's angle as the parent's turn seen from the bone, so a bone
+/// flexing by `+a` reads `-a`.
 fn flex_limits((min, max): (f32, f32)) -> glam::Vec2 {
     glam::Vec2::new(-max, -min)
 }

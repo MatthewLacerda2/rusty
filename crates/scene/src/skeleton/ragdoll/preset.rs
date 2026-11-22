@@ -1,6 +1,9 @@
+//! The humanoid preset, by Mixamo bone name: a `Left`/`Right` prefix and a namespace
+//! before the last `:` are ignored. Angles are degrees, as Unity's Ragdoll Wizard limits.
 use rusty_components::JointKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Which way a bone flexes, in the character's own space (glTF: +Y up, facing +Z).
 pub(super) enum Bend {
     Forward,
     Backward,
@@ -10,9 +13,11 @@ pub(super) enum Bend {
 pub(super) struct JointPreset {
     pub kind: JointKind,
     pub bend: Bend,
+    /// The asymmetric range `(min, max)`, toward `bend`: the joint's twist range.
     pub flex: (f32, f32),
     /// Swing about the bend direction (Unity's swing 1).
     pub swing1: f32,
+    /// Swing about the bone itself.
     pub swing2: f32,
 }
 
@@ -36,6 +41,7 @@ const fn hinge(bend: Bend, max: f32) -> JointPreset {
     }
 }
 
+/// A bone the table doesn't name: a moderate ball joint, so any rig ragdolls.
 pub(super) const DEFAULT: JointPreset = ball((-30.0, 30.0), 30.0, 30.0);
 
 const HUMANOID: [(&str, JointPreset); 13] = [

@@ -1,3 +1,5 @@
+//! A new GameObject: the Create menu's primitives and the Add Component defaults. They
+//! sit below `edit::authoring`, which re-exports them, because the base builds with them.
 pub mod defaults;
 mod primitive;
 
@@ -12,6 +14,7 @@ pub use primitive::{
 
 use crate::Scene;
 
+/// Unity's `GameObject.CreatePrimitive`, for the Create menu and `Scene.CreateEntity` alike.
 pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>) -> u32 {
     let id = scene.add_entity(name.to_string());
     let Some(primitive) = primitive else {
@@ -28,8 +31,11 @@ pub fn create_entity(scene: &mut Scene, name: &str, primitive: Option<Primitive>
     id
 }
 
+/// Shadow fade distance of a light made in Play, in multiples of its range.
 pub const RUNTIME_SHADOW_FADE_RANGES: f32 = 4.0;
 
+/// A light made in Play is `Realtime` and shadowed, as in Unity: no bake ever saw it,
+/// so a `Baked` one would light nothing. A prefab instantiated in Play keeps its file's.
 pub fn live_in_play(scene: &mut Scene, id: u32) {
     if !scene.is_playing() {
         return;
@@ -47,6 +53,7 @@ pub fn create_drawn_entity(scene: &mut Scene, name: &str, primitive: Option<Prim
     id
 }
 
+/// A test hook: a light drawn with no bake, for a fixture that renders unbaked.
 #[doc(hidden)]
 pub fn create_live_light(scene: &mut Scene, name: &str, primitive: Primitive) -> u32 {
     let id = create_entity(scene, name, Some(primitive));

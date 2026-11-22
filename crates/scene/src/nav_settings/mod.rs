@@ -16,8 +16,13 @@ pub use saved::{
     SavedNavmesh,
 };
 
+// Lengths here are metres.
+/// The default `CharacterController::step_offset`, so the default navmesh never links
+/// a step the default walker cannot climb (Unity's agent, with no controller, uses 0.4).
 pub const DEFAULT_MAX_STEP: f32 = 0.3;
+/// Rise per unit of horizontal travel: 1.0 is 45°.
 pub const DEFAULT_MAX_SLOPE: f32 = 1.0;
+/// Half the default agent radius, inside Recast's radius/2 to radius/3 guidance.
 pub const DEFAULT_GRID_SPACING: f32 = 0.25;
 
 pub const DEFAULT_AGENT_RADIUS: f32 = 0.5;
@@ -38,6 +43,8 @@ pub struct NavMeshSettings {
     pub grid_spacing: f32,
     #[serde(default)]
     pub bounds: Option<NavBounds>,
+    // The generated links' reach (Unity's Drop Height, Jump Distance and Jump Height);
+    // 0 makes no link of that kind.
     #[serde(default)]
     pub drop_height: f32,
     #[serde(default)]
@@ -60,6 +67,7 @@ impl NavMeshSettings {
     }
 }
 
+/// Between generated links along one edge.
 pub const DEFAULT_LINK_SPACING: f32 = 2.0;
 
 fn default_link_spacing() -> f32 {

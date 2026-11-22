@@ -1,3 +1,5 @@
+//! Unity's `SolveTwoBoneIK`: bend the middle joint by the law of cosines, swing the root
+//! so the tip lands, then twist it so the middle joint lies on the hint's side.
 use glam::{Quat, Vec3};
 
 use super::BonePose;
@@ -25,6 +27,7 @@ pub fn solve_two_bone(
 
     let old = interior_angle((c - a).length(), l_ab, l_bc);
     let new = interior_angle(l_at, l_ab, l_bc);
+    // Turning `bc` about `ab × bc` by a positive angle closes the interior angle.
     let bend = Quat::from_axis_angle(bend_axis(ab, bc, at, hint, a), old - new);
     let bent_tip = b + bend * bc;
 
@@ -40,11 +43,13 @@ pub fn solve_two_bone(
     Some((root_rot.normalize(), mid_rot.normalize()))
 }
 
+/// Clamped, so an unreachable distance reads straight (π) and an over-close one folded.
 fn interior_angle(opposite: f32, l_ab: f32, l_bc: f32) -> f32 {
     let cos = (l_ab * l_ab + l_bc * l_bc - opposite * opposite) / (2.0 * l_ab * l_bc);
     cos.clamp(-1.0, 1.0).acos()
 }
 
+/// A limb animated straight has no plane: the hint's (else the target's) gives it a side.
 fn bend_axis(ab: Vec3, bc: Vec3, at: Vec3, hint: Option<Vec3>, a: Vec3) -> Vec3 {
     let candidates = [
         ab.cross(bc),

@@ -1,3 +1,5 @@
+//! IK runs after `LateUpdate` scripts set the targets and before `follow_bones`, so
+//! hitboxes follow the bent pose.
 mod aim;
 mod two_bone;
 
@@ -14,6 +16,7 @@ use rusty_components::{IkChain, IkConstraint, IkTarget};
 pub struct BonePose {
     pub pos: Vec3,
     pub rot: Quat,
+    /// `±1` per axis: a local direction `d` draws along `rot · mirror · d`.
     pub mirror: Vec3,
 }
 
@@ -40,6 +43,7 @@ impl Scene {
                 continue;
             }
             let mut order: Vec<usize> = (0..constraints.len()).collect();
+            // Aims before limbs (Unity's order): a support hand reaches where the aim put the gun.
             order.sort_by_key(|&i| !constraints[i].is_aim());
             for &i in order.iter().rev() {
                 self.undo_ik(&mut constraints[i]);
@@ -53,6 +57,8 @@ impl Scene {
         }
     }
 
+    /// Undone only where nothing rewrote the bone since, else IK would compound on bones
+    /// no clip keys.
     pub fn undo_ik(&mut self, c: &mut IkConstraint) {
         for (bone, written, before) in c.applied.drain(..).rev() {
             if self
@@ -121,6 +127,8 @@ impl Scene {
         }
     }
 
+    /// A dynamic bone drawn blended with its animation is still IK's: the blend is
+    /// redone over the bent pose.
     fn is_simulated(&self, bone: u32) -> bool {
         let dynamic = self
             .world

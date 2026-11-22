@@ -1,3 +1,4 @@
+//! A five-bone mini humanoid for the hitbox tests: `pelvis → spine → {head, arm → finger}`.
 use glam::{Mat4, Vec3};
 
 use crate::Scene;
@@ -5,6 +6,7 @@ use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::Vertex;
 use rusty_components::MeshComponent;
 
+/// Name, parent slot, bind position, vertex box centre and box size, in mesh space.
 pub(super) type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
 
 pub(super) const BONES: [Bone; 5] = [
@@ -81,6 +83,7 @@ pub(super) fn skin(scale: f32) -> SkinData {
     }
 }
 
+/// Eight corner vertices per bone box, weighted 0.8 to the bone and 0.2 to its parent.
 pub(super) fn vertices() -> Vec<Vertex> {
     let mut out = Vec::new();
     for (slot, b) in BONES.iter().enumerate() {

@@ -1,3 +1,4 @@
+//! What a document keeps of a skeleton, all re-bound by bone name on load.
 use std::collections::BTreeMap;
 
 use super::bone_refs::{repoint_refs, BoneIndex};
@@ -7,6 +8,7 @@ use rusty_asset::SkinData;
 use rusty_components::mesh::BoneBody;
 use rusty_components::{Entity, TransformComponent};
 
+/// How far a bone may drift from its rest pose before it counts as an override.
 pub(super) const OVERRIDE_EPS: f32 = 1.0e-5;
 
 pub fn strip_bones(entities: &mut Vec<Entity>) {
@@ -19,6 +21,7 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     if bone_of.is_empty() {
         return;
     }
+    // Before the bones are recorded, so a joint to another skeleton's bone saves it by name.
     repoint_refs(entities, &bone_of);
     for i in 0..entities.len() {
         let Some(mesh) = &entities[i].mesh else {
@@ -47,6 +50,7 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     }
 }
 
+/// A bone a script moved out from under its skinned entity saves as an ordinary entity.
 fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
     let mut bone_of = BoneIndex::new();
     for entity in entities {
@@ -101,6 +105,7 @@ impl SavedBones {
         {
             self.overrides.insert(name.clone(), doc.transform.clone());
         }
+        // A joint to a bone of this skeleton saves its chain; another skeleton's, its `bone_refs`.
         let chain_of = |id: u32| {
             let (of, chain) = bone_of.get(&id)?;
             (*of == owner).then(|| chain.clone())
@@ -120,6 +125,7 @@ impl SavedBones {
 pub(super) fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
     let mut chain = vec![skin.name(slot)];
     let mut at = slot;
+    // A parent link to no earlier slot ends the chain, as `bind_bones` makes such a joint a root.
     while let Some(p) = skin.parents.get(at).copied().flatten().filter(|&p| p < at) {
         chain.push(skin.name(p));
         at = p;
