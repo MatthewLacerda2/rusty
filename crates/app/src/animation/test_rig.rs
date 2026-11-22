@@ -1,6 +1,3 @@
-//! The #457 sampler tests' rig: `hips` (root) with `spine` and `leg` under it,
-//! `head` under `spine`, all binding at identity — plus clip and graph builders.
-
 use std::collections::BTreeMap;
 
 use glam::{Mat4, Quat, Vec3};
@@ -17,7 +14,6 @@ pub const SPINE: usize = 1;
 pub const LEG: usize = 2;
 pub const HEAD: usize = 3;
 
-/// A skinned mesh of the rig carrying `clips`.
 pub fn mesh(clips: Vec<AnimationClip>) -> MeshComponent {
     let skin = SkinData {
         inverse_bind: vec![Mat4::IDENTITY; 4],
@@ -35,7 +31,6 @@ pub fn mesh(clips: Vec<AnimationClip>) -> MeshComponent {
     }
 }
 
-/// A clip sliding `joints` along +X from `from` to `to` over `duration` seconds.
 pub fn slide(name: &str, joints: &[usize], from: f32, to: f32, duration: f32) -> AnimationClip {
     let mut tracks = vec![JointTrack::default(); 4];
     for &j in joints {
@@ -48,7 +43,6 @@ pub fn slide(name: &str, joints: &[usize], from: f32, to: f32, duration: f32) ->
     clip(name, tracks)
 }
 
-/// A clip turning `joint` about Z from 0 to `angle` over one second.
 pub fn turn(name: &str, joint: usize, angle: f32) -> AnimationClip {
     let mut tracks = vec![JointTrack::default(); 4];
     tracks[joint].rotation = Track {
@@ -112,7 +106,6 @@ pub fn graph(base: Vec<GraphNode>, layers: Vec<GraphLayer>) -> AnimationGraph {
     }
 }
 
-/// An animator playing `base` (and `layer` on layer 1), both at `time`.
 pub fn animator(base: Motion<'_>, layer: Option<Motion<'_>>, time: f32) -> AnimatorComponent {
     let playing = |motion| {
         let mut playback = Playback::default();

@@ -1,27 +1,3 @@
-//! crates/app/src/systems/particles.rs — the particle simulation tick (issue #13, #439).
-//!
-//! Pure CPU. Reads each entity's `ParticleEmitterComponent`, emits new particles
-//! (continuous stream or one burst), integrates position/velocity under gravity
-//! and the drag curve, spins them by the rotation-speed curve, ages + despawns
-//! them, and resolves point collisions against the rapier world by ray-casting
-//! each particle's motion segment. Births, deaths and collisions queue sub-emitter
-//! firings, dispatched once every emitter has run. It produces only particle
-//! *state*; the draw pass reads it. The sim never touches the GPU — that
-//! decoupling is what keeps headless play deterministic.
-//!
-//! A `Gpu` emitter (#2170) is emitted the same way, its births kept for the
-//! renderer, and only its exact live tally steps here: the renderer moves its
-//! particles, so it never collides or fires a death or collision sub-emitter.
-//!
-//! A `Local` emitter's particles are carried with it (`components::particle`'s
-//! `space`): at the head of its tick, on every spawn, and once more by
-//! [`carry_local_particles`] after `LateUpdate` and the bone pass, so a gun moved
-//! there draws with its flash still on it this frame.
-//!
-//! Determinism: all randomness comes from each emitter's seeded stream (reset from
-//! `seed` on the first tick of a Play session) and emitters run in entity order,
-//! so a fixed-timestep replay is bit-for-bit identical.
-
 use glam::Vec3;
 
 use crate::resources::Resources;
@@ -34,20 +10,15 @@ use rusty_physics::PhysicsWorld;
 
 type Physics = std::rc::Rc<std::cell::RefCell<Option<PhysicsWorld>>>;
 
-/// Advance every emitter in the scene by `res.frame_dt`. The one localised call wired
-/// into the play loop, a canonical `fn(&mut World, &mut Resources)` system.
 pub(crate) fn tick_particles(world: &mut World, res: &mut Resources) {
     let dt = res.frame_dt;
     let mut events = Vec::new();
     {
-        // Each emitter is edited where it sits, under one scene borrow: its
-        // ray-casts reach only the physics world (`res.physics`), never the scene.
         let mut scene = world.scene.borrow_mut();
         for id in scene.world.ids_with_particles() {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
-            // World space, as `render::passes::particles::draw` reads it (#1196).
             let origin = scene.world.emitter_frame(id);
             let Some(mut emitter) = scene.world.particles_mut(id) else {
                 continue;
@@ -59,9 +30,6 @@ pub(crate) fn tick_particles(world: &mut World, res: &mut Resources) {
     dispatch_sub_emitters(world, &events);
 }
 
-/// Bring every active `Local` emitter's live particles to where its entity stands
-/// now: the scripts' `LateUpdate` and the bone pass run after the tick, and what
-/// they move is what draws.
 pub(crate) fn carry_local_particles(world: &mut World, _res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     for id in scene.world.ids_with_particles() {
@@ -79,9 +47,6 @@ pub(crate) fn carry_local_particles(world: &mut World, _res: &mut Resources) {
     }
 }
 
-/// Fire each queued sub-emitter: the target emits its `burst_count` at the
-/// event's position. A target whose entity is gone, inactive or has no emitter is
-/// skipped. The new particles first move on the next tick.
 fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
     if events.is_empty() {
         return;
@@ -99,7 +64,6 @@ fn dispatch_sub_emitters(world: &mut World, events: &[SubEmitEvent]) {
     }
 }
 
-/// Run one emitter's spawn + integrate + collide + age pipeline for this frame.
 fn simulate_emitter(
     emitter: &mut ParticleEmitterComponent,
     origin: EmitterFrame,
@@ -108,23 +72,18 @@ fn simulate_emitter(
 ) {
     emitter.ensure_initialized();
     emitter.carry_to(origin);
-    // Every particle ages, so a script's earlier read is stale.
     emitter.runtime.revision = emitter.runtime.revision.wrapping_add(1);
 
     if emitter.active {
         emit(emitter, origin, dt);
     }
     if emitter.on_gpu() {
-        // The renderer moves a `Gpu` emitter's particles (#2170); the sim only ages
-        // its tally, which no collision, death sub-emitter or script reads past.
         emitter.runtime.gpu.step(dt);
     } else {
         integrate_and_collide(emitter, dt, physics);
     }
 }
 
-/// Spawn new particles for this frame per the emit mode (continuous rate or a
-/// one/looping burst), honouring the max-particle cap.
 fn emit(emitter: &mut ParticleEmitterComponent, origin: EmitterFrame, dt: f32) {
     let to_spawn = match emitter.emit_mode {
         EmitMode::Continuous => {
@@ -134,9 +93,6 @@ fn emit(emitter: &mut ParticleEmitterComponent, origin: EmitterFrame, dt: f32) {
             n as u32
         }
         EmitMode::Burst => {
-            // Fire the full burst once. A looping burst re-fires only after the
-            // previous batch has fully expired (periodic explosions); a one-shot
-            // burst never re-fires. This avoids the "burst every frame" firehose.
             let can_fire = if emitter.looping {
                 emitter.live_count() == 0
             } else {
@@ -151,18 +107,12 @@ fn emit(emitter: &mut ParticleEmitterComponent, origin: EmitterFrame, dt: f32) {
         }
     };
 
-    // Spawning (shape + ranges + cap) lives on the component so the scripting
-    // `Particles` namespace shares the exact same deterministic path.
     emitter.emit_at(origin, to_spawn);
 }
 
-/// Integrate each particle (gravity, drag, spin, velocity), resolve a collision
-/// against the physics world if any, age it, drop the dead, and queue the death /
-/// collision sub-emitters. Retains particle order.
 fn integrate_and_collide(emitter: &mut ParticleEmitterComponent, dt: f32, physics: &Physics) {
     let (gravity, response) = (emitter.gravity, emitter.collision);
     let (bounciness, subs) = (emitter.bounciness, emitter.sub_emitters);
-    // Disjoint field borrows: the curves are read while the runtime is mutated.
     let (drag, spin) = (&emitter.drag, &emitter.rotation_speed);
     let phys = physics.borrow();
     let runtime = &mut emitter.runtime;
@@ -208,16 +158,11 @@ fn integrate_and_collide(emitter: &mut ParticleEmitterComponent, dt: f32, physic
     });
 }
 
-/// A particle's contact this frame: where it hit and whether it lives on.
 struct Hit {
     point: Vec3,
     survived: bool,
 }
 
-/// Cast the particle's motion segment against the rapier world. On hit either
-/// despawn (`Die`) or reflect the velocity about the surface normal (`Bounce`).
-/// Returns the contact, or `None` for no hit. `step` is clamped to the hit point
-/// so the particle never tunnels through the collider.
 fn resolve_collision(
     p: &mut Particle,
     step: &mut Vec3,
@@ -238,13 +183,8 @@ fn resolve_collision(
     let survived = match response {
         CollisionResponse::Die => false,
         CollisionResponse::Bounce => {
-            // Advance to just shy of the surface, then reflect the velocity about
-            // the hit normal (v' = v - 2(v·n)n) scaled by restitution.
             *step = dir * (toi * 0.99);
             let n = normal.normalize_or_zero();
-            // Degenerate normal (no usable surface): nudge the particle back out
-            // along its travel and reverse, rather than reflect about a zero vector
-            // (which would leave the velocity unchanged and re-collide every frame).
             let reflected = if n == Vec3::ZERO {
                 -p.velocity
             } else {

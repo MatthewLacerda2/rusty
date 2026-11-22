@@ -1,9 +1,3 @@
-//! Root motion of a Blender export through the real play loop (#1822): the
-//! animated mesh sits under an `Armature` entity turned +90° about X and scaled
-//! 0.01, so its own space is Z-up centimetres. A clip that travels 2 m along
-//! model +Z moves it 2 m along world +Z with the hips held under it, and a turn
-//! keeps the model upright.
-
 use std::cell::RefCell;
 use std::f32::consts::FRAC_PI_2;
 use std::rc::Rc;
@@ -15,8 +9,6 @@ use rusty_asset::humanoid::rig_fixture::{blender_armature, lunge, rig, Shape};
 use rusty_components::{AnimatorComponent, MeshComponent, Playback, TransformComponent};
 use rusty_scene::Scene;
 
-/// The exported rig's body playing the lunge with root motion applied, under
-/// its `Armature` entity. Returns the scene and the body.
 fn exported(travel: Vec3, turn: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let armature = scene.add_entity("Armature".to_string());
@@ -48,7 +40,6 @@ fn exported(travel: Vec3, turn: f32) -> (Scene, u32) {
     (scene, body)
 }
 
-/// Play 1.5 s; each tick, the body's and the hips' world positions.
 fn play(scene: &Rc<RefCell<Scene>>, body: u32) -> Vec<(Vec3, Vec3)> {
     let mut gw = world_with(Rc::clone(scene));
     gw.set_playing(true);

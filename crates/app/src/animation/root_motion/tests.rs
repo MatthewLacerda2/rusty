@@ -1,7 +1,3 @@
-//! Root motion over one clip (#1745): the travel adds up to the clip's, a loop's
-//! wrap and a reversed or scaled playhead don't jump, a pause holds, a turn
-//! curves the path, and the applied pose holds the bone in place.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
@@ -14,19 +10,16 @@ use rusty_components::{AnimatorComponent, MeshComponent, Motion, RootMotion};
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// Step `anim` `n` times; every step's root motion, in order.
 pub(super) fn run(anim: &mut AnimatorComponent, mesh: &MeshComponent, n: usize) -> Vec<RootMotion> {
     (0..n)
         .map(|_| step(anim, Some(mesh), None, DT).root.unwrap_or_default())
         .collect()
 }
 
-/// The steps chained: where the mover ends up and which way it faces.
 pub(super) fn total(steps: &[RootMotion]) -> RootMotion {
     steps.iter().fold(RootMotion::ZERO, |acc, &m| acc.then(m))
 }
 
-/// The lunge: hips travel 2 m along +X over one second.
 fn lunge() -> MeshComponent {
     mesh(vec![slide("Lunge", &[HIPS], 0.0, 2.0, 1.0)])
 }
@@ -101,7 +94,6 @@ fn a_paused_animator_holds_and_resumes_without_a_jump() {
 
 #[test]
 fn a_turning_clip_turns_the_mover_and_retraces_the_clip_path() {
-    // The hips move 1 m along +X while turning a quarter about +Y.
     let mut clip = slide("Arc", &[HIPS], 0.0, 1.0, 1.0);
     clip.tracks[HIPS].rotation = Track {
         times: vec![0.0, 1.0],
@@ -113,8 +105,6 @@ fn a_turning_clip_turns_the_mover_and_retraces_the_clip_path() {
     let steps = run(&mut anim, &mesh, 60);
     let done = total(&steps);
     assert!((done.yaw - FRAC_PI_2).abs() < 1e-3, "{done:?}");
-    // Each step is measured in the frame the hips faced, so chained onto the
-    // turning mover the path is the clip's own: 1 m along +X.
     assert!(close(done.position, Vec3::X), "{done:?}");
     assert!(
         steps[50].position.z > 1e-4,

@@ -1,7 +1,3 @@
-//! The marker arithmetic (#1896) at its edges: a follower missing the pair
-//! falls back to normalized time, a repeated pair picks the one nearest, a
-//! non-looping clip has no pair outside its markers, and a lone marker loops.
-
 use super::markers::{place, position};
 use super::rig::marks;
 

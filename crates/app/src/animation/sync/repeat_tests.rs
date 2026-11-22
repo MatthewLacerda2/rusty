@@ -1,8 +1,3 @@
-//! A follower leaf with a repeated pair of markers (#1896): a two-stride Run
-//! under a one-stride Walk in a marker-synced tree stays on the stride it is
-//! on, one stride per Walk cycle, so neither its pose nor its root motion
-//! jumps a stride once a cycle.
-
 use super::super::test_rig::*;
 use super::super::{sample_pose, step};
 use super::rig::*;
@@ -21,7 +16,6 @@ fn a_two_stride_follower_plays_on_without_jumping_a_stride() {
         graph(vec![tree(walk_marks(), run)], Vec::new()),
     );
     let mut anim = bound(&graph);
-    // Walk weighs 0.75 and leads; Run follows at 0.25.
     anim.parameters
         .insert("speed".to_string(), AnimatorParameter::Float(0.25));
     let (mut last, mut halves) = (None, [false; 2]);

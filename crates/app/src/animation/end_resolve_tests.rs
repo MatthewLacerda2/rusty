@@ -1,8 +1,3 @@
-//! `End` and the markers around it stay single-shot across a clip's length
-//! coming and going (#1386): a clip that stops resolving for a step doesn't end
-//! again, the step a late clip resolves replays no marker, and a reverse push
-//! that can't leave a zero-length clip's end doesn't re-arm it.
-
 use super::advance;
 use super::end_tests::{clip_mesh, ends, rig, DT};
 use super::graph::step_graph;
@@ -10,7 +5,6 @@ use super::test_rig::{graph, node};
 use rusty_asset::animation_graph::{AnimationEvent, AnimationGraph, GraphNode};
 use rusty_components::AnimatorComponent;
 
-/// Non-looping clip `A` on a node with a `Tail` marker at `at` seconds.
 fn marked(at: f32) -> (AnimationGraph, AnimatorComponent) {
     let a = GraphNode {
         events: vec![AnimationEvent {
@@ -32,7 +26,6 @@ fn a_finished_clip_that_stops_resolving_for_a_step_does_not_end_again() {
     let resolved = clip_mesh("A", 1.0);
     assert_eq!(ends(&mut anim, &resolved, &graph, 15), 1);
     assert!(anim.base.ended);
-    // One step where `A` isn't on the mesh: its length is unknown.
     ends(&mut anim, &clip_mesh("B", 1.0), &graph, 1);
     assert!(anim.base.ended, "an unknown length leaves `ended` alone");
     let back = advance(&mut anim, Some(&resolved), Some(&graph), DT);
@@ -42,7 +35,6 @@ fn a_finished_clip_that_stops_resolving_for_a_step_does_not_end_again() {
 #[test]
 fn the_late_resolve_step_replays_no_marker_the_unresolved_run_crossed() {
     let (graph, mut anim) = marked(1.0);
-    // Unresolved, the playhead runs past 1.0 and fires `Tail` at its raw time.
     let early: Vec<_> = (0..15)
         .flat_map(|_| advance(&mut anim, Some(&clip_mesh("B", 1.0)), Some(&graph), DT))
         .map(|e| e.name)

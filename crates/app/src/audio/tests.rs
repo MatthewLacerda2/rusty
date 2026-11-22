@@ -1,5 +1,3 @@
-//! Tests for the audio play-mode system (#212): `play_on_start` auto-start.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,7 +10,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 use crate::GameWorld;
 
-/// Build a minimal play-ready world holding a single entity with an `AudioSource`.
 fn world_with_audio(play_on_start: bool) -> GameWorld {
     let mut scene = Scene::new();
     let id = scene.add_entity("Speaker".to_string());
@@ -41,7 +38,6 @@ fn play_on_start_sources_auto_start_on_entering_play() {
     world.tick(1.0 / 60.0); // enter_play runs the Startup stage
 
     let audio = world.resources.audio.borrow();
-    // Entity 1 is the only entity; its source should be live and logged.
     assert!(
         audio.is_source_playing(1),
         "play_on_start should auto-start"

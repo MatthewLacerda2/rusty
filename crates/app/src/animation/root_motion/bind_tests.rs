@@ -1,7 +1,3 @@
-//! Yaw measured from the bind facing (#1745): hips bound flipped 180° about a
-//! horizontal axis (a Z-up export) still turn the mover, and the applied pose
-//! holds them at that bind facing.
-
 use std::f32::consts::{FRAC_PI_2, PI};
 
 use glam::{Mat4, Quat};
@@ -13,8 +9,6 @@ use super::RootBone;
 use rusty_asset::anim_data::{Interpolation, Track};
 use rusty_components::{MeshComponent, Motion};
 
-/// The rig with its hips bound flipped about X, turning a quarter about the
-/// entity's +Y over one second.
 fn flipped() -> MeshComponent {
     let bind = Quat::from_rotation_x(PI);
     let mut clip = slide("Turn", &[], 0.0, 0.0, 1.0);

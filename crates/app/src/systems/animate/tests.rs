@@ -1,8 +1,3 @@
-//! crates/app/src/systems/animate/tests.rs — root motion through the real play loop
-//! (#1745): a lunge whose hips move 2 m moves the entity 2 m with the hips held under it, a wall stops a
-//! CharacterController's lunge, and a NavMeshAgent follows the lunge instead of
-//! its own speed.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,14 +11,10 @@ use rusty_components::{
 };
 use rusty_scene::Scene;
 
-/// A rig entity playing the lunge (hips +2 m along +X over 1 s, once), its
-/// skeleton spawned, with root motion applied.
 pub(super) fn lunging(scene: &mut Scene) -> u32 {
     playing(scene, 2.0)
 }
 
-/// A rig entity playing a one-second, once-through clip "Lunge" whose hips
-/// travel `metres` along +X, with root motion applied.
 pub(super) fn playing(scene: &mut Scene, metres: f32) -> u32 {
     let id = scene.add_entity("Guard".to_string());
     let rig = mesh(vec![slide("Lunge", &[HIPS], 0.0, metres, 1.0)]);
@@ -42,7 +33,6 @@ pub(super) fn playing(scene: &mut Scene, metres: f32) -> u32 {
     id
 }
 
-/// A static box of `size` centred on `at`; its id.
 pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.transform_mut(id).unwrap().position = at;
@@ -55,8 +45,6 @@ pub(super) fn add_box(scene: &mut Scene, at: Vec3, size: Vec3) -> u32 {
     id
 }
 
-/// Play `scene` for 1.5 s; the guard's world position each tick, and the
-/// hips' world position each tick.
 pub(super) fn play(scene: Scene, guard: u32) -> Vec<(Vec3, Vec3)> {
     let scene = Rc::new(RefCell::new(scene));
     let mut gw = world_with(Rc::clone(&scene));

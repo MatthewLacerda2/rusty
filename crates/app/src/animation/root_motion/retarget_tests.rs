@@ -1,7 +1,3 @@
-//! Root motion of a retargeted clip (#1747): a walk borrowed by a 20 % taller
-//! rig travels 20 % farther and turns as far, measured through the animator's
-//! own step, as Unity's Humanoid scales it.
-
 use glam::{Mat4, Quat};
 
 use super::super::test_rig::animator;

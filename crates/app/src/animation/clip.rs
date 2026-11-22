@@ -1,22 +1,13 @@
-//! crates/app/src/animation/clip.rs — sampling one clip (#80).
-//!
-//! The keyframe primitives: a clip's per-joint local TRS at a time (each untouched
-//! channel falling back to the bind pose) and which joints a clip keys at all.
-//! Pure functions of (skin, clip, time); the palette is built from the bones the
-//! pose is written onto (`Scene::build_skin_palettes`).
-
 use glam::{Quat, Vec3};
 use rusty_asset::anim_data::{AnimationClip, Interpolation, Track};
 use rusty_asset::mesh_data::{JointTransform, SkinData};
 
-/// Which joint slots `clip` has any keyframes for.
 pub(super) fn driven_slots(clip: &AnimationClip, joints: usize) -> Vec<bool> {
     let mut driven = vec![false; joints];
     mark_driven(clip, &mut driven);
     driven
 }
 
-/// Set every slot of `driven` that `clip` has any keyframes for.
 pub(super) fn mark_driven(clip: &AnimationClip, driven: &mut [bool]) {
     for (slot, d) in driven.iter_mut().enumerate() {
         *d |= clip.tracks.get(slot).is_some_and(|t| {
@@ -27,8 +18,6 @@ pub(super) fn mark_driven(clip: &AnimationClip, driven: &mut [bool]) {
     }
 }
 
-/// Sample each joint's local transform: the clip's track value at `time`, falling
-/// back to the joint's bind-pose local for any untouched T/R/S path.
 pub(super) fn sampled_locals(
     skin: &SkinData,
     clip: &AnimationClip,
@@ -39,7 +28,6 @@ pub(super) fn sampled_locals(
     out
 }
 
-/// [`sampled_locals`] into `out`, reusing its allocation.
 pub(super) fn sample_into(
     skin: &SkinData,
     clip: &AnimationClip,
@@ -50,8 +38,6 @@ pub(super) fn sample_into(
     out.extend((0..skin.local_bind.len()).map(|slot| sample_joint(skin, clip, slot, time)));
 }
 
-/// One joint's local transform at `time` (see [`sampled_locals`]); the identity
-/// for a slot the skin doesn't have.
 pub(super) fn sample_joint(
     skin: &SkinData,
     clip: &AnimationClip,
@@ -69,9 +55,6 @@ pub(super) fn sample_joint(
     }
 }
 
-/// Find the keyframe interval `[i, i+1]` bracketing `time` and the in-segment factor
-/// `u` in `[0, 1]`. Clamps to the ends; `None` for an empty track. For a single key
-/// the value is held (`(0, 0.0)`).
 fn locate(times: &[f32], time: f32) -> Option<(usize, f32)> {
     if times.is_empty() {
         return None;
@@ -82,7 +65,6 @@ fn locate(times: &[f32], time: f32) -> Option<(usize, f32)> {
     if time >= times[times.len() - 1] {
         return Some((times.len() - 1, 0.0));
     }
-    // `times` is ascending; find the first key strictly past `time`.
     let next = times
         .iter()
         .position(|&t| t > time)
@@ -110,8 +92,6 @@ fn sample_quat(track: &Track<Quat>, time: f32) -> Option<Quat> {
     let (i, u) = locate(&track.times, time)?;
     let a = track.values[i];
     match (track.interpolation, track.values.get(i + 1)) {
-        // `slerp` is the shortest-arc spherical interpolation glTF mandates for
-        // rotations; glam normalizes the result.
         (Interpolation::Linear, Some(&b)) => Some(a.slerp(b, u)),
         _ => Some(a),
     }

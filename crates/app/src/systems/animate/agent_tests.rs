@@ -1,8 +1,3 @@
-//! Root motion and who else moves the entity (#1745): an agent whose animator
-//! can't drive it moves itself (an unknown bone warns once), an off-mesh link
-//! decides where the clip's travel goes, scripts read the delta, and an
-//! inactive entity reports none.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +8,6 @@ use crate::game::game_tests::{world_with, DT};
 use rusty_components::{NavMeshAgentComponent, OffMeshLinkData, OffMeshLinkKind};
 use rusty_scene::Scene;
 
-/// A lunging guard on a floor, with an agent heading 8 m the other way.
 fn agent_scene(link: Option<bool>) -> (Scene, u32) {
     let mut scene = Scene::new();
     add_box(&mut scene, Vec3::Y * -0.5, Vec3::new(20.0, 1.0, 20.0));

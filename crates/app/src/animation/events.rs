@@ -1,61 +1,25 @@
-//! crates/app/src/animation/events.rs — finding the animation events a step crosses (#459).
-//!
-//! Each fixed step a layer's playhead travels from `from` to `to` (before any
-//! loop wrap). A marker at `mark` fires once for every position `mark + k × wrap`
-//! that travel passes, over the half-open span `[from, to)` (mirrored when
-//! playing backwards): so a loop wrap, a step large enough to skip a marker, and
-//! a marker right at the start each fire exactly once, and a playhead standing
-//! still (speed 0) fires nothing. Which markers count:
-//! - only the **current** motion's: a motion being faded out by a crossfade is
-//!   silent (the one coming in fires from its first frame);
-//! - in a blend tree, only the **dominant** leaf clip's: the heaviest child at
-//!   each level, down through nested trees (#1746), the first on a tie, among
-//!   children with a clip the mesh has beneath them — so a walk/run blend plays
-//!   one footstep, not two, and a direction split into walk and run still beats
-//!   a lighter direction;
-//! - on an extra layer, only while its weight is above 0;
-//! - plus the automatic [`END_EVENT`] when a non-looping motion reaches its end
-//!   playing forwards: once per pass, since its playhead clamps there (#1362),
-//!   and also on the step a clip's length becomes known with the playhead
-//!   already past it, and on a zero-length clip's first step ([`Step::end`],
-//!   #1386).
-//!
-//! Every step's events are ordered by when in the step they were crossed, then
-//! by layer, then authored order — deterministic, and true time order.
-
 use rusty_components::{Bounds, MontageEvent, Motion, Playback, Playhead, Step};
 
 use super::blend_tree::dominant_leaf;
 use super::motion::MotionContext;
 
-/// The automatic event a non-looping clip (or blend tree) fires when its playhead
-/// reaches the end.
 pub const END_EVENT: &str = "End";
 
-/// At most this many loops of one marker fire in a single step, so an absurd
-/// speed on a short clip can't flood the scripts.
 const MAX_CROSSINGS: i64 = 16;
 
-/// One event crossed this step: its name, how far into the step (`[0, 1)`) and the
-/// layer it came from.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Crossed {
     pub name: String,
     pub at: f32,
     pub layer: usize,
-    /// Whose it is, for a montage's engine events (#1894); `None` otherwise.
     pub montage: Option<MontageEvent>,
 }
 
-/// Sort a step's events into firing order: by when in the step, then layer, then
-/// the order they were found in (authored order), a stable sort.
 pub fn sort(events: &mut [Crossed]) {
     events.sort_by(|a, b| a.at.total_cmp(&b.at).then(a.layer.cmp(&b.layer)));
 }
 
 impl MotionContext<'_> {
-    /// The events `playback`'s current motion crossed on `step`. `playhead` is
-    /// the motion's rate and wrap.
     pub fn crossed(
         &self,
         playback: &Playback,
@@ -74,7 +38,6 @@ impl MotionContext<'_> {
             }
         }
         let mut out = Vec::new();
-        // How far into the step's whole travel a point of its firing part is.
         let (fired, travel) = (step.events, span.1 - span.0);
         let into = |at: f32| match travel != 0.0 && fired != span {
             true => ((fired.0 + at * (fired.1 - fired.0) - span.0) / travel).clamp(0.0, 1.0),
@@ -91,8 +54,6 @@ impl MotionContext<'_> {
             }
         }
         if let (Bounds::Clamp(end), true) = (bounds, step.end) {
-            // Partway through a step that travels onto the end; at its start when
-            // the playhead was already there (#1386).
             let at = if span.1 > span.0 {
                 ((end - span.0) / (span.1 - span.0)).clamp(0.0, 1.0)
             } else {
@@ -108,8 +69,6 @@ impl MotionContext<'_> {
         out
     }
 
-    /// The current motion's markers in playhead units: a clip node's events in
-    /// seconds; a blend tree's dominant leaf's, normalized by its clip length.
     fn marks(&self, playback: &Playback) -> Vec<(f32, &str)> {
         let Some(machine) = self.machine else {
             return Vec::new();
@@ -143,10 +102,6 @@ impl MotionContext<'_> {
     }
 }
 
-/// Where in `span` (as a fraction of it, `[0, 1]`) the playhead passes `mark`,
-/// repeated every wrap when looping. Forward travel covers `[from, to)`,
-/// backward `(to, from]`; a clamped playhead that reaches an end also covers the
-/// end itself, since it stops there and the next push against it travels nothing.
 fn crossings((from, to): (f32, f32), mark: f32, bounds: Bounds) -> Vec<f32> {
     let span = to - from;
     if span == 0.0 || !span.is_finite() {

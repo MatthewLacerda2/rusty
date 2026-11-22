@@ -1,7 +1,3 @@
-//! A non-looping outgoing motion following a looping incoming leader (#1896)
-//! goes on to its end and holds there, never snapping back as the leader
-//! wraps: neither its pose nor its root motion jumps.
-
 use super::super::{sample_pose, step};
 use super::rig::*;
 use rusty_asset::animation_graph::AnimationGraph;
@@ -9,8 +5,6 @@ use rusty_components::{AnimatorComponent, MeshComponent};
 
 use super::super::test_rig::LEG;
 
-/// Locomotion with Run a non-looping start (WalkStart's role) following by
-/// normalized time.
 fn start_graph() -> AnimationGraph {
     let mut graph = locomotion(true);
     graph.base.nodes[1].is_loop = false;
@@ -18,7 +12,6 @@ fn start_graph() -> AnimationGraph {
     graph
 }
 
-/// Run at half way, fading into Walk over `fade` seconds.
 fn run_into_walk(mesh: &MeshComponent, graph: &AnimationGraph, fade: f32) -> AnimatorComponent {
     let mut anim = bound(graph);
     anim.enter_node(graph.node("Run").unwrap(), 0.0);
@@ -42,7 +35,7 @@ fn the_outgoing_start_holds_its_end_while_walk_leads_and_wraps() {
             anim.base.previous_time
         );
         if anim.base.crossfade_weight() < 0.5 {
-            continue; // Run leads, playing on to its end
+            continue;
         }
         assert!(anim.base.previous_time >= RUN, "step {i}: Run snapped back");
         let leg = sample_pose(&anim, &mesh, Some(&graph)).unwrap().1[LEG];
@@ -56,7 +49,6 @@ fn the_outgoing_start_holds_its_end_while_walk_leads_and_wraps() {
 #[test]
 fn a_looping_walk_wraps_without_moving_the_held_start_back() {
     let (mesh, graph) = (hips_mesh(), start_graph());
-    // Walk leads for the last 1.5 s of a 3 s fade, wrapping once.
     let mut anim = run_into_walk(&mesh, &graph, 3.0);
     let mut wrapped = false;
     while anim.base.is_crossfading() {

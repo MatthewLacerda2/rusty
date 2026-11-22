@@ -1,7 +1,3 @@
-//! Doppler through the world's ticks (#1749): a source parented under a moving
-//! body is measured by its world position, a pause holds the rate, and a scene load
-//! forgets the listener's motion.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,8 +12,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 0.01;
 
-/// A playing world with a fully 3D speaker under a `Rocket` 100 m down -X of the
-/// listener at the origin: `(world, rocket, speaker)`.
 fn rocket() -> (GameWorld, u32, u32) {
     let mut scene = Scene::new();
     let rocket = scene.add_entity("Rocket".to_string());
@@ -46,7 +40,6 @@ fn rocket() -> (GameWorld, u32, u32) {
     (game, rocket, speaker)
 }
 
-/// Move the rocket `dx` along +X, then run one tick of `DT`.
 fn fly(game: &mut GameWorld, rocket: u32, dx: f32) {
     let scene = game.scene().clone();
     scene
@@ -92,13 +85,12 @@ fn a_scene_load_forgets_the_listener_motion() {
     let level = rusty_test_support::temp::dir().join("rusty_1749_level.scene");
     rusty_edit::save_to_file(&Scene::new(), &level.to_string_lossy()).unwrap();
     let scene = game.scene().clone();
-    scene.borrow_mut().dont_destroy_on_load(rocket); // the speaker rides along
+    scene.borrow_mut().dont_destroy_on_load(rocket);
     scene
         .borrow_mut()
         .request_load(level.to_string_lossy().into_owned());
-    // The camera lands 1 m closer with the load: 100 m/s if it were measured.
     game.resources.camera.borrow_mut().position = Vec3::new(-1.0, 0.0, 0.0);
-    game.tick(DT); // the load lands at the tick's tail, before the audio push
+    game.tick(DT);
     assert!(game.resources.audio.borrow().is_source_playing(speaker));
     assert_eq!(rate(&game, speaker), 1.0, "the load forgot the listener");
     game.resources.camera.borrow_mut().position = Vec3::new(-2.0, 0.0, 0.0);

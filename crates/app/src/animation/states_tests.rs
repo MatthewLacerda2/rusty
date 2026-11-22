@@ -1,7 +1,3 @@
-//! The graph-state callbacks (#1901): a crossfade enters its target as it
-//! starts and exits its source as it ends, both updating between; a hard cut
-//! exits and enters in one step; binding enters every layer's entry node.
-
 use super::super::graph::step_graph;
 use super::super::step;
 use super::super::test_rig::{graph, layer, mesh, node, slide};
@@ -13,8 +9,6 @@ use rusty_components::MeshComponent;
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// Base `A → B` on `go` (a 0.1 s crossfade), `C` reached only by a jump, with
-/// `A` and `C` tagged `"attack"`; a one-node layer `Aim`.
 pub(super) fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
     let tagged = |name: &str| GraphNode {
         tag: "attack".to_string(),
@@ -37,7 +31,6 @@ pub(super) fn rig() -> (AnimatorComponent, MeshComponent, AnimationGraph) {
     (AnimatorComponent::default(), mesh(clips.to_vec()), graph)
 }
 
-/// One fixed step — evaluate, advance, diff — as `Enter A@0`-style lines.
 pub(super) fn tick(
     anim: &mut AnimatorComponent,
     mesh: &MeshComponent,
@@ -112,7 +105,6 @@ fn info_carries_the_tag_layer_and_unwrapped_time() {
     assert_eq!(reported.tag.as_deref(), Some("attack"));
     assert_eq!(reported.layer_name, BASE_LAYER);
     assert_eq!(reported.length, 1.0);
-    // 90 steps of a looping 1 s clip: past 1 on its second cycle.
     assert!(
         (reported.normalized_time - 1.5).abs() < 1e-3,
         "{reported:?}"

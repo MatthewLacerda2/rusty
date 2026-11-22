@@ -1,8 +1,3 @@
-//! A non-looping motion's playhead clamps to `[0, length]` (#1362), the way
-//! Unity's sampled pose does: reversing from past either end moves back on the
-//! very next step, `End` fires once per forward pass, and no speed pushes the
-//! playhead out of `f32` range.
-
 use super::advance;
 use super::graph::step_graph;
 use super::test_rig::{graph, mesh, node, slide, HIPS};
@@ -11,7 +6,6 @@ use rusty_components::AnimatorComponent;
 
 const DT: f32 = 0.1;
 
-/// A one-second clip `A` on a node, looping or not, and an animator bound to it.
 fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
     let a = GraphNode {
         is_loop,
@@ -23,7 +17,6 @@ fn rig(is_loop: bool) -> (AnimationGraph, AnimatorComponent) {
     (graph, anim)
 }
 
-/// Run `steps` fixed steps at `speed`; return the `End` events they fired.
 fn run(graph: &AnimationGraph, anim: &mut AnimatorComponent, steps: usize, speed: f32) -> usize {
     anim.speed = speed;
     let mesh = mesh(vec![slide("A", &[HIPS], 0.0, 1.0, 1.0)]);
@@ -83,8 +76,6 @@ fn an_end_reached_exactly_fires_once() {
 
 #[test]
 fn a_huge_speed_keeps_the_playhead_finite() {
-    // The clip doesn't resolve, so nothing wraps or clamps it (`Bounds::Open`):
-    // only the finite guard holds it.
     let (graph, mut anim) = rig(false);
     anim.speed = 3e38;
     let unresolved = mesh(vec![slide("B", &[HIPS], 0.0, 1.0, 1.0)]);

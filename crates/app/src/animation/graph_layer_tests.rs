@@ -1,13 +1,7 @@
-//! The evaluator over layers (#457): every layer binds to its entry at its
-//! authored weight, steps its own machine over the shared parameters, and a
-//! trigger read by several layers fires in each before it is cleared.
-
 use super::super::test_rig::{graph, layer, node};
 use super::*;
 use rusty_asset::animation_graph::{LayerBlending, ParameterDeclaration};
 
-/// Base `Run → Stop` and layer `Aim → Shoot`, both on the trigger `Fire`; the
-/// layer also goes `Aim → Reload` when `ammo` drops to 0.
 fn armed_graph() -> AnimationGraph {
     let fire = || {
         vec![Condition::Trigger {
@@ -68,7 +62,6 @@ fn the_first_step_binds_every_layer_at_its_entry_and_weight() {
     assert_eq!(anim.layers[0].name, "Upper");
     assert_eq!(anim.layers[0].weight, 0.6);
     assert_eq!(anim.layer_index("Upper"), Some(1));
-    // A weight a script changed survives later steps.
     anim.layers[0].weight = 0.2;
     step_graph(&mut anim, &graph);
     assert_eq!(anim.layers[0].weight, 0.2);
