@@ -1,4 +1,4 @@
--- scenarios/waves.lua — left to itself the game throws bursts of fruit (and, now
+-- Left to itself the game throws bursts of fruit (and, now
 -- and then, a bomb) up into view, and every uncut fruit that falls costs a life.
 
 local id = Scene.FindEntityByName("Game")

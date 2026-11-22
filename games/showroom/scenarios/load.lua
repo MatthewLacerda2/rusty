@@ -1,4 +1,4 @@
--- scenarios/load.lua — the showroom loads from disk with everything the recipe
+-- The showroom loads from disk with everything the recipe
 -- built in it, and plays a few seconds.
 
 local names = { "Floor", "Mirror", "WindowPane", "TintedPane", "Glass", "Sign",

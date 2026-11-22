@@ -1,4 +1,4 @@
--- scenarios/miss.lua — fruit left alone rises, falls away and costs a life each;
+-- Fruit left alone rises, falls away and costs a life each;
 -- the last life lost ends the game.
 
 local Swipe = dofile("scenarios/lib/swipe.lua")

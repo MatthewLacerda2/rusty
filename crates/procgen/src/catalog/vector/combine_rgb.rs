@@ -1,5 +1,3 @@
-//! The `combine_rgb` op.
-
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::ops::vector;

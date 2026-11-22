@@ -1,9 +1,17 @@
+mod embedded;
+mod header;
 mod literals;
 mod lua;
 pub mod proof;
+mod prose;
+#[cfg(test)]
+mod reach_tests;
+pub(crate) use header::declared;
+pub(crate) use prose::read as reads_prose;
 #[cfg(test)]
 mod review_tests;
 mod rust;
+pub mod signals;
 #[cfg(test)]
 mod tests;
 mod wgsl;
@@ -137,6 +145,18 @@ pub fn check(path: &str, kind: Kind, source: &str) -> Report {
             past = Some(i + 1);
         }
     }
+    let embedded = embedded::lines(source)
+        .into_iter()
+        .filter(|_| kind == Kind::Rust);
+    for (i, opened, text) in embedded {
+        let allowed = |at: usize| allowed_in(path, source, at + 1, HISTORY);
+        let what = reference_as(&text, Refs::CODE);
+        if let Some(what) = what.filter(|_| !allowed(i) && !allowed(opened)) {
+            report.history.push((i + 1, what));
+        }
+    }
+    report.history.sort();
+    report.history.dedup_by_key(|(line, _)| *line);
     report.over = past.map(|line| (line, total));
     report
 }
@@ -180,11 +200,13 @@ pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
     for file in files {
         let rel = file.strip_prefix(base).unwrap_or(file).to_string_lossy();
         let rel = rel.trim_start_matches("./");
-        let Some(kind) = Kind::of(rel) else { continue };
         let Ok(source) = fs::read_to_string(file) else {
             continue;
         };
+        found.extend(prose::check(rel, &source));
+        let Some(kind) = Kind::of(rel) else { continue };
         found.extend(check(rel, kind, &source).findings(rel, kind));
+        found.extend(header::check(rel, kind, &source, &split(kind, &source)));
         if let Some(max) = max {
             found.extend(width::check(rel, kind, &source, max));
         }

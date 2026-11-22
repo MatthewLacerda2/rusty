@@ -72,7 +72,7 @@ pub(crate) fn composite_source() -> String {
         out
     };
     format!(
-        "// The post-FX composite, assembled by `render::postfx::effects::assemble` (#1467).
+        "// The post-FX composite, assembled by `render::postfx::effects::assemble`.
 
 #import fullscreen
 #import postfx::frame::{{Frag, fragment, t_color, s_color, t_lut}}
@@ -135,7 +135,7 @@ pub(crate) fn bake_source() -> String {
         })
         .collect();
     format!(
-        "// The grading LUT's bake, assembled by `render::postfx::effects::assemble` (#1467).
+        "// The grading LUT's bake, assembled by `render::postfx::effects::assemble`.
 
 #import postfx::grade::{{LUT_SIZE, decode}}
 {imports}

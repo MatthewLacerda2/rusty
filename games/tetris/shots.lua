@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the tetris game is screenshotted from, in edit
+-- The fixed cameras the tetris game is screenshotted from, in edit
 -- mode: the empty well and its HUD. The scenarios take the shots of play itself
 -- (the first piece, a line about to clear, game over) into their own folders.
 

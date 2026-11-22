@@ -10,7 +10,7 @@ pub fn assemble(recipe: &ShaderRecipe, resolved: &[Instance], layout: &ParamLayo
 
     let _ = writeln!(
         out,
-        "// {name}.wgsl — authored postfx variant (#272), assembled from {n} block(s).\n\
+        "// {name}.wgsl — authored postfx variant, assembled from {n} block(s).\n\
          // A fullscreen-triangle fragment program over the tonemapped scene color:\n\
          // samples group(0) binding(1) then folds the chosen blocks. Matches the postfx\n\
          // contract's fullscreen-fragment shape (vs_fullscreen + fs_main).",

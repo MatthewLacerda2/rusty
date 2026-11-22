@@ -107,7 +107,9 @@ pub fn verdict(base: &Path, args: &[String]) -> Verdict {
 fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
     match listing::committable(base, &[]) {
         Ok(files) => {
-            let files = files.into_iter().filter(|p| Lang::of(p).is_some());
+            let rel = |p: &Path| normalize(relative(base, p));
+            let read = |p: &PathBuf| Lang::of(p).is_some() || comments::reads_prose(&rel(p));
+            let files = files.into_iter().filter(read);
             (files.collect(), None)
         }
         Err(why) => {

@@ -1,4 +1,4 @@
--- mover.lua — slides its entity along +X at `speed` metres per second, so a
+-- Slides its entity along +X at `speed` metres per second, so a
 -- scenario can prove that a game script runs and moves something.
 
 local Mover = {

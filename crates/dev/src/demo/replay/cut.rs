@@ -20,7 +20,7 @@ pub fn scenario(demo: &Path, from: u64, to: u64) -> String {
     // lint: allow(markers) the stub is the generated scenario's, for its author to fill in
     let stub = format!("Harness.Expect(true, \"TODO: what should hold at tick {to}\")\n");
     format!(
-        "-- Ticks {from} to {to} of the demo {demo} (Harness.CutDemo, #1597).\n\
+        "-- Ticks {from} to {to} of the demo {demo} (Harness.CutDemo).\n\
          -- It runs on that demo, which must stay where it is:\n\
          --   play --demo {demo} <this file> <out_dir>\n\
          assert(Harness.DemoPath() == {named}, \"not on its demo: play --demo \" .. {named})\n\
