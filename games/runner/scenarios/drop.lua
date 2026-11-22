@@ -1,4 +1,4 @@
--- scenarios/drop.lua — crates and barrels dropped on the track tumble, settle
+-- Crates and barrels dropped on the track tumble, settle
 -- within a few seconds, stay on the track, and the same seed puts them in the
 -- same resting places: two runs, each on a freshly loaded scene, are compared
 -- crate by crate.

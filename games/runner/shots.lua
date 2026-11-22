@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the runner game is screenshotted from (the
+-- The fixed cameras the runner game is screenshotted from (the
 -- start; `dodge.lua` and `long.lua` take a lane change mid-air and a run at speed).
 
 return {

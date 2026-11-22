@@ -1,4 +1,4 @@
-# The converters' output, pinned (#1286): converter version fixture hash tool.
+# The converters' output, pinned: converter version fixture hash tool.
 # Written by `make bless-converters`, never by hand (docs/testing.md).
 blender 1 linked.blend 2861551bbbc062f3 5.2.3
 blender 1 linked_lib.blend ec83a2c2bbcd2b86 5.2.3

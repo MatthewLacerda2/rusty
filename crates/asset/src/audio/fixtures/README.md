@@ -1,4 +1,4 @@
-# Audio import fixtures (#385)
+# Audio import fixtures
 
 - `loop.mp3` — 0.5 s (22 050 frames) of `0.5 * sin(2π·440·t)` at 44.1 kHz, mono,
   64 kbps LAME with the LAME/Xing header that records encoder delay and padding.

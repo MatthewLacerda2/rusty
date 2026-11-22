@@ -1,4 +1,4 @@
--- scenarios/bomb.lua — a swipe across a bomb ends the game: the bomb is gone in a
+-- A swipe across a bomb ends the game: the bomb is gone in a
 -- blast, the game is over, its banner shows, and the bursts stop.
 
 local Swipe = dofile("scenarios/lib/swipe.lua")

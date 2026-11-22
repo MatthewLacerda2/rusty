@@ -19,7 +19,7 @@ pub fn entry_points(instances: &[Instance], layout: &ParamLayout) -> String {
         None => ("in", String::new()),
     };
     let body: String = cuts.iter().map(|c| format!("    _ = {c};\n")).collect();
-    let mut out = String::from("\n// ---- the blocks' cuts in the depth passes (#648) ----\n");
+    let mut out = String::from("\n// ---- the blocks' cuts in the depth passes ----\n");
     for (entry, clip) in [(CUT_PREPASS, "prepass_clip"), (CUT_SHADOW, "shadow_clip")] {
         let _ = write!(
             out,

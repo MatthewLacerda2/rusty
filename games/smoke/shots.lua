@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the smoke game is screenshotted from.
+-- The fixed cameras the smoke game is screenshotted from.
 -- Each shot: a name (the PNG's), the camera's world position, and the point it
 -- looks at.
 

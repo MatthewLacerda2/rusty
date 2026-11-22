@@ -63,6 +63,8 @@ pub struct Header {
     pub sources: Sources,
     pub settings: ProjectSettings,
     pub storage: Value,
+    /// The live `Video` settings, not the save file's: headless, the screen size.
+    pub video: Value,
     pub size: Option<(u32, u32)>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_scale: Option<f32>,
@@ -85,6 +87,7 @@ impl Header {
             sources: Sources::of(world),
             settings: world.resources.application.borrow().settings(),
             storage: world.resources.storage.borrow().data(),
+            video: world.script_manager().video_cell().borrow().to_json(),
             size: world.resources.screen.borrow().game_view(),
             display_scale: world.resources.screen.borrow().reported_display_scale(),
             time_scale: Exact(f64::from(time.time_scale)),

@@ -1,4 +1,4 @@
--- scenarios/shot.lua — a shot goes through the thin wooden wall and hurts the
+-- A shot goes through the thin wooden wall and hurts the
 -- bot behind it, weakened; the same shot into a 40 cm wall hurts no one.
 -- Fired with combat.lua's gun, its spread and recoil at zero.
 

@@ -13,7 +13,7 @@ use lend::Host;
 pub use lend::{lend, Lent};
 pub use origin::Origin;
 use rusty_app::{GameWorld, PlayTransition, TapPoint, TickTap};
-use rusty_core::settings::video::{VideoSettings, VIDEO_NAMESPACE};
+use rusty_core::settings::video::VideoSettings;
 use rusty_core::settings::{saved_quality, GraphicsSettings};
 use rusty_script::scripting::HostCall;
 use seek::Start;
@@ -123,10 +123,8 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     host.time.time_scale = header.time_scale.0 as f32;
     (host.time.paused, host.time.pending_steps) = (header.paused, header.pending_steps);
     host.storage.replace(header.storage.clone());
-    host.video = (host.storage.get_namespace(VIDEO_NAMESPACE))
-        .map_or_else(VideoSettings::default, |blob| {
-            VideoSettings::from_json(&blob)
-        });
+    // The screen the recording's sim read, whatever this host's settings or panel are.
+    host.video = VideoSettings::from_json(&header.video);
     host.quality = saved_quality(&host.storage);
     let app = world.resources.application.borrow();
     host.graphics = GraphicsSettings::load(
@@ -135,8 +133,8 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
         app.quality_presets(),
     );
     drop(app);
-    host.game_view = header.size.or(host.game_view);
-    host.display_scale = header.display_scale.or(host.display_scale);
+    host.game_view = header.size;
+    host.display_scale = header.display_scale;
     host.put(world);
     let before_play = header.before_play.iter().filter_map(host_call).collect();
     let verdict = Verdict {

@@ -36,7 +36,10 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | CI job headroom | `main-health.yml` (`.github/scripts/ci_headroom.py`) | **signal**, never a gate: after every `ci` run on `main`, a job that ran to an end in more than three quarters of its own `timeout-minutes` (read from `ci.yml` at the run's own commit; a matrix job by its slowest entry) files one `infrastructure` issue per job, and comments there when a later run's time moved by a minute or more; it never closes it, the PR that brings the job down does; a lost read files nothing, and no limit read fails its step (`continue-on-error`) (#2276) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Comment cap | `tools/lint` (the size gate: `comment-cap`) | **hard gate**: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200, over every such file in the repository; no allow excuses it. *Comments*, below |
-| Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); an inline allow with a reason excuses its line and the comment block it heads. *Comments*, below |
+| Comment echoes its module | `tools/lint` (the size gate: `comment-echo`) | **hard gate**: a `.rs` file's `//!` header of one line says more than the file's path and the names it declares, and is no bare pointer to a doc; an inline allow with a reason excuses it. *Comments*, below |
+| Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file, no comment line a Rust string carries for another file, and no line of a `.py`, `.md`, `.txt` or `.toml` file under `crates/`, `engine/` or `games/` names one of this repository's issues or pull requests (`#` and three or more digits, `issue #` or `PR #` and any number, or its issue URL); an inline allow with a reason excuses its line and the comment block it heads. *Comments*, below |
+| Comment path | `tools/lint` (the size gate: `comment-path`) | **hard gate**: a `.rs`, `.lua` or `.wgsl` file's first comment does not open with the file's own path; an inline allow with a reason excuses it. *Comments*, below |
+| Comment signals | `make comments-signal PATHS=…` (`tools/lint -- --comment-signals`) | **signal**, never a gate: under the paths named, a comment sentence said at two sites of one crate, one a page of `docs/` already says, and a block opening on a fragment. *Comments*, below |
 | Comment width | `tools/lint` (the size gate: `comment-width`) | **hard gate**: no comment line in a `.rs`, `.lua` or `.wgsl` file is longer than `rustfmt.toml`'s `max_width`, but for a marker's line and a line whose excess is one token too long for a comment line of its own; it flags the line, it does not wrap it; an inline allow with a reason excuses its line and the comment block it heads. *Comments*, below |
 | Comment-only diff | `make comment-only` (`tools/lint -- --comment-only`) | a tool mode, not a gate: fails when the branch changes more than comments since its merge base with `origin/main`. *Comments*, below |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
@@ -101,6 +104,7 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | Tagged engine warnings | `tools/lint -- --rules` (`log-tag`) | **hard gate**: every engine warning or error in `src/` (`log::warn!` / `log::error!`, an imported bare `warn!` / `error!`, `log!` at `Level::Warn`/`Level::Error`) opens its message with its module, `[Asset] …`, since those records reach the console and the session/MCP replies (#1139); a message that is not a literal takes `// lint: allow(log-tag) <why>` |
 | Test / fixture file length | `tools/lint` | <= 150 lines (every measured file under a `tests/` or `fixtures/` directory, whatever its language, a standalone `*_test.rs` or `test_*` file, and a `*_tests.rs` with no source beside it); a `<x>_tests.rs` **sibling** of `<x>.rs` (or of a `<x>/` module directory) shares the 300-line source cap |
 | Test files named for behaviour | `tools/lint -- --rules` (`tool-named-test`) | **hard gate**: a test file whose name starts with `survivor`, `mutant` or `mutation` is renamed for what its tests prove; a module whose subject carries the word takes `// lint: allow(tool-named-test) <why>` on its first line |
+| Test hook lines are true | `tools/lint -- --rules` (`test-hook-line`) | **hard gate**: an item or module a comment calls a test hook is called outside tests by no other crate, and the crates its line names after the phrase do name it, a call counted only when its path resolves into the hook's crate through the file's `use`s; *Rules*, below, says what it cannot see |
 | Test source shape | `tools/lint -- --rules` (`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`) | **hard gate**: no inner `#![cfg]` in `tests/`, no user workspace in tests, a GPU only through `headless_or_skip` (#980) |
 | Test temp dirs | `tools/lint -- --rules` | **hard gate** (`test-temp-dir`): test code writes under `rusty_test_support::temp::dir()` (in-crate) / `crate::temp::dir()` (`tests/`), never a bare `std::env::temp_dir()` (#999) |
 | Tests write no process-wide static | `tools/lint -- --rules` (`test-static-write`) | **hard gate**: a test line, or a production line inside a `fn` documented as a test hook, never writes a `static` declared outside a `thread_local!` (`.store(`, `.swap(`, `.fetch_*(`, `.compare_exchange*(`, `.set(`, `.get_or_init(`, `.write()`, or a `.lock()` guard written through, a rustfmt-split chain included): the one-process run shares it between every test of the binary; keep the state on the value, in a `thread_local!` or in a child process, or take `// lint: allow(test-static-write) <why>` (#2422) |
@@ -308,8 +312,10 @@ itself a finding (`[allow]`), as in Rust.
 ## Comments (the size gate)
 Every agent that reads a file pays for its comments, so the comments in code are
 held too (`tools/lint/src/comments/`), over the `.rs`, `.lua` and `.wgsl` files the
-size gate measures. Python, the workflows, the `Makefile` and the manifests are not
-read.
+size gate measures. `comment-history` also reads, line by line, the `.py`, `.md`,
+`.txt` and `.toml` files under `crates/`, `engine/` and `games/` (but `CLAUDE.md`,
+the agent docs' own), where an allow is `# lint: allow(…)` (`<!-- … -->` in
+Markdown); the workflows, the `Makefile` and the scripts elsewhere are not read.
 
 - **What a comment is**: in Rust `//`, `///`, `//!`, `/* */` and the string of a
   `#[doc = …]` or `#![doc = …]` attribute; in WGSL `//` and `/* */`; in Lua `--` and
@@ -332,8 +338,14 @@ read.
   issue and the PR. A pointer into another repository passes (`wgpu#245`,
   `owner/repo#123`, its URL), since it says when a workaround can go, and so do the
   look-alikes the agent docs' `history` lets through (`#N`, a hex colour, `&#123;`,
-  an in-page link) and a short number (`cascade #2`). Dates and phrases are not
-  read. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
+  an in-page link) and a short number (`cascade #2`), unless `issue` or `PR` names
+  it (`issue #3` fails). Dates and other phrases are not read. A Rust string's line
+  that opens as a comment (`# `, `// `, `-- `: a table's header, a generated
+  shader's or Lua chunk's comment) is read as one, since it becomes a comment of the
+  file it is written to; an allow above the literal's first line reaches its later
+  lines too. A `#` and six or eight digits is a colour (`#202020`), no issue, unless
+  `issue` or `PR` names it; a three-digit one (`#333`) in a `.py`, `.toml` or `.md`
+  data line reads as a reference, so it takes an allow with its reason. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
   An inline allow with a reason excuses its own line and the comment block it heads,
   as every rule's allow does: `// lint: allow(comment-history) <why>` (`-- lint:
   allow(…)` in Lua). It reads every comment line, a marker's or
@@ -352,7 +364,21 @@ read.
   line, such as `chain-size:`). A re-wrap changes no word, so `make comment-only`
   proves it.
 
-**All three are hard gates**: `make size` (and so `make gates`, the commit hook on the
+- **`comment-path`**: a file's first comment does not open with the file's own path
+  or a tail of it (`//! crates/a/src/b.rs — …`, `-- scenarios/x.lua: …`): the path
+  is already the file's, so the line starts with what the file holds. A path named
+  later in the line passes.
+- **`comment-echo`**: a `.rs` file whose `//!` header is one line says something
+  its path and its names do not. It fails when every word of the line but the
+  fillers (`the`, `a`, `of`, …) is a word of the path or of a name the file
+  declares (`fn`, `struct`, `mod` and the other items; a name of more than three
+  words, a test's sentence, does not count), plurals folded (`The bake command's
+  progress bar.` in `bake/progress.rs` beside a `Bar`), or when the line is only a
+  pointer to a doc (`See `docs/api/X.md`.`). It is strict by design: a line stating
+  an order, a unit or a rule passes on its first word not in the names, and a
+  misfire takes the inline allow with its reason.
+
+**All five are hard gates**: `make size` (and so `make gates`, the commit hook on the
 staged files, and CI) fails on each as `path:line: [rule] message`. The lint tool
 given files or folders (`cargo run --manifest-path tools/lint/Cargo.toml --
 <paths>`, what the commit hook runs) checks only those, with the size caps and the
@@ -371,6 +397,15 @@ lifetime, code. It fails naming each file that differs and the line of its first
 differing token, and every file added, deleted, renamed or of
 another language. It prints how many fenced doc examples the diff removes, so a
 pull request can name them. A tool mode, not a gate.
+
+**The comment signals**: `make comments-signal PATHS=<paths>` (`tools/lint --
+--comment-signals <paths>`) prints, under `signal (not a failure)`, for the files git
+lists under those paths: `comment-duplicate`, a sentence of six or more words whose
+words are at least 80% another's of the same crate (one point at two sites, keep
+one); `comment-doc`, one that alike a sentence of a page under `docs/` (point at
+the page); `comment-fragment`, a comment block whose first word is *So*, *On*,
+*In*, *Of*, *Not* or *Before* and whose first sentence has no verb (an auxiliary, a
+common verb, or a word ending in `s` or `ed`). It never fails and runs in no gate.
 
 ## Rules, findings and inline allows (`--rules`)
 `--rules` runs every check built on one shared shape (#934): a rule reports
@@ -900,6 +935,29 @@ must-flag case in `rules/wiring.rs`: no new flag, gate, CI step or baseline.
   gated field or `let` whose generic type wraps over lines can end early, at a `,`
   inside its `<…>`. Clippy's test exemption (`allow-unwrap-in-tests`, set in
   `clippy.toml`) is Clippy's own and classifies its own way.
+- **`test-hook-line`** — a comment calling an item a test hook (`crates/CLAUDE.md`,
+  *Test hooks*) is true. The claim is a comment block saying the convention's own
+  words, "test hook" or "test hooks" (not "the latest hook"), above an item; in a
+  `//!` header, the module when that sentence opens on the phrase ("Test hook: the
+  arena … reads its `PLAYER`"), whatever it backticks, and otherwise the items it
+  names in backticks (``[`copies`] is a test hook``). A file named `test_*.rs` is not
+  taken for a test file: it is claimed as a hook module when its header says so, and a
+  call into it from another crate's live code is flagged. Test code is a `tests/`,
+  `benches/` or `examples/` file, a `tests.rs` or `*_tests.rs`, or a `#[cfg(test)]`
+  item. It fails when a crate other than the hook's, depending on it, calls it from a
+  line that is not test code and not itself in a hook module; and when a crate the
+  line names after the phrase (a backticked `app`, `rusty-dev`, `dev::bake`, or *the
+  root's* / *root package* for `tests/`) never names a hook `fn`, `const`, `static`
+  or macro. A call counts only when its path resolves into the hook's crate: each
+  path's first segment is read through the file's `use`s (a `use` read whole, however
+  rustfmt wrapped it, its braces and `as` expanded; `rusty::lighting` is
+  `rusty_lighting`), and `crate::`, `self::` and `super::` paths are the caller's own.
+  It then sees a module by its path, an associated item as `Type::name`, and a free
+  one from its module or a module above it. It does not see a method called as
+  `.name(` (one name, many types), a re-export (`pub use`), a glob import (`::*`), a
+  type used without its name, or a `#[cfg(test)]` item (no other crate sees it); a
+  backticked name that is also one of the hook crate's own modules (`ui` in `render`)
+  is no crate. `rules/hook_line.rs`.
 - **`test-inner-cfg`, `test-user-workspace`, `test-gpu-entry`** (#980) — three
   `docs/testing.md` locks on test code; comment lines never count. A `tests/` file never gates itself with an inner `#![cfg(…)]` (gate
   its `mod` line); test code never calls `in_user_workspace` or `scenario::run(`

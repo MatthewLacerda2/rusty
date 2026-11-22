@@ -1,4 +1,4 @@
--- scenarios/click.lua — the first level, played with the mouse: the cursor is
+-- The first level, played with the mouse: the cursor is
 -- free and shown, a click on the tower's target throws at it through the input
 -- path (`Camera.MouseRay`), and the target falls off the platform.
 

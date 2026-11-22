@@ -1,4 +1,4 @@
-"""Regenerate tone.mp3, the MP3 decode fixture (#545).
+"""Regenerate tone.mp3, the MP3 decode fixture.
 
     pip install lameenc==1.8.4 && python3 crates/audio/src/device/fixtures/make_tone_mp3.py
 

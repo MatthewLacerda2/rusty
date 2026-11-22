@@ -12,6 +12,7 @@ fn header() -> Header {
         sources: Default::default(),
         settings: Default::default(),
         storage: Value::Null,
+        video: Value::Null,
         size: None,
         display_scale: None,
         time_scale: Exact(1.0),

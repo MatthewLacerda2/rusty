@@ -26,6 +26,9 @@ fn package(section: &str, dep: &str, lib: &str, flags: &'static str) -> Case {
     case(&[("Cargo.toml", &manifest), ("src/lib.rs", lib)], flags)
 }
 
+const DEV_ON_LIGHTING: &str =
+    "[package]\nname = \"rusty-dev\"\n\n[dependencies]\nrusty-lighting = { path = \"../lighting\" }\n";
+
 pub(super) fn case_for(rule: &str) -> Option<Case> {
     let app = "crates/app/src/a.rs";
     Some(match rule {
@@ -123,6 +126,14 @@ pub(super) fn case_for(rule: &str) -> Option<Case> {
         "held-warn" => one(
             "crates/asset/src/tangents.rs",
             "fn f() {\n    log::warn!(\"[Asset] x\");\n}\n",
+        ),
+        "test-hook-line" => case(
+            &[
+                ("crates/lighting/src/x.rs", "/// A test hook.\npub fn probe() {}\n"),
+                ("crates/dev/Cargo.toml", DEV_ON_LIGHTING),
+                ("crates/dev/src/lib.rs", "fn f() {\n    rusty_lighting::x::probe();\n}\n"),
+            ],
+            "crates/lighting/src/x.rs",
         ),
         "ignored" => case(
             &[(".gitignore", "secret.rs\n"), ("crates/app/src/secret.rs", "")],

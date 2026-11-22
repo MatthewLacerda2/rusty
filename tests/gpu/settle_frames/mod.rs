@@ -28,7 +28,7 @@ local function shot(name, opts, want)
   local drawn = renders() - before
   Harness.Expect(drawn == want, name .. " renders " .. want .. " (drew " .. drawn .. ")")
 end
--- What a settle drew before #2092: `n` frames, then the shot.
+-- A settle drawn the long way: `n` frames, then the shot.
 local function full(name, n)
   Camera.ResetHistory()
   for _ = 1, n do Harness.Render() end
