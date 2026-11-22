@@ -1,7 +1,3 @@
-//! crates/app/src/systems/animate/apply.rs — root motion moving its entity (#1745):
-//! which mover takes the step (see the module doc of `animate`), and what the
-//! entity really moved, kept on the animator for avoidance to read.
-
 use glam::{Mat4, Quat, Vec3};
 
 use crate::resources::Resources;
@@ -11,16 +7,10 @@ use rusty_scene::Scene;
 
 /// What takes entity `id`'s root motion, in Unity's order of preference.
 enum Mover {
-    /// A CharacterController's `Move`, with its minimum move distance.
     Character(f32),
-    /// An active NavMeshAgent off any link: the navmesh slide.
     Agent,
-    /// An agent on a link its engine traversal carries: the step is dropped.
     AutoLink,
-    /// A dynamic Rigidbody: velocity, since the solver owns its pose.
     Body,
-    /// The Transform outright (a link a script traverses, a kinematic body,
-    /// a bare entity).
     Transform,
 }
 
@@ -45,13 +35,6 @@ fn mover(s: &Scene, id: u32) -> Mover {
     }
 }
 
-/// Move entity `id` by the world-space root `motion` of a step of `dt`, and
-/// record on its animator what it really moved and any travel carried over.
-/// Returns what a CharacterController's `Move` touched, for
-/// `OnControllerColliderHit` (#1879); empty for every other mover.
-/// The turn is about the model's up axis: the entity's own +Y, or as `model`
-/// (model space in the entity's, when its mesh sits under a turned
-/// `Armature`, #1822) tips it.
 pub(super) fn apply_root_motion(
     s: &mut Scene,
     res: &Resources,
@@ -71,7 +54,7 @@ pub(super) fn apply_root_motion(
         Mover::Character(min) => {
             let step = carried + motion.position;
             if step.length() < min {
-                carry = step; // too short for `Move`: carried, not dropped
+                carry = step;
             } else {
                 let physics = res.physics.borrow();
                 let m = rusty_physics::move_character(physics.as_ref(), s, id, step);
@@ -111,8 +94,6 @@ pub(super) fn apply_root_motion(
     hits
 }
 
-/// Keep on `id`'s animator what it really `moved` and the travel `carry`
-/// still owed, compared first: a borrow stamps the animator as edited.
 fn record(s: &mut Scene, id: u32, moved: Vec3, carry: Vec3) {
     let unchanged = s
         .world
@@ -126,11 +107,6 @@ fn record(s: &mut Scene, id: u32, moved: Vec3, carry: Vec3) {
     }
 }
 
-/// A dynamic body's root motion, the way Unity's `OnAnimatorMove` drives one:
-/// the step becomes its horizontal velocity (taken by the next physics step,
-/// so walls stop it), its vertical velocity is kept so gravity still pulls,
-/// and the turn becomes its angular velocity about +Y. A zero step stops it
-/// horizontally, so a lunge ends where the clip does.
 fn drive_body(s: &mut Scene, id: u32, motion: RootMotion, dt: f32) {
     if dt <= 0.0 {
         return;
@@ -140,7 +116,7 @@ fn drive_body(s: &mut Scene, id: u32, motion: RootMotion, dt: f32) {
         rb.velocity.x == velocity.x && rb.velocity.z == velocity.z && rb.angular_velocity.y == spin
     });
     if same {
-        return; // compared first: a borrow stamps the body for the next sync
+        return;
     }
     if let Some(mut rb) = s.world.rigidbody_mut(id) {
         rb.velocity.x = velocity.x;

@@ -1,7 +1,3 @@
-//! An ASCII FBX quad whose one material embeds the images it is given (#2365):
-//! what an import of a model with embedded textures is tested on, at any size,
-//! without shipping a binary fixture.
-
 use std::fmt::Write;
 
 /// One embedded map: the texture's name, the material property it fills

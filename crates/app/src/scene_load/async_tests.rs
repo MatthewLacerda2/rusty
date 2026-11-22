@@ -1,8 +1,3 @@
-//! `Scene.LoadAsync` through the play loop on the default (inline) loader (#2123):
-//! an operation reads ready from the next tick's head and is swapped in at its tail,
-//! holds at 0.9 while its activation is not allowed, is replaced by a later load,
-//! fails on a bad file with the scene left running, and loads at once in edit mode.
-
 use super::fixture::{logs, world_at};
 use super::GameWorld;
 use rusty_core::paths;
@@ -10,7 +5,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// `start.scene` and `next.scene` (one entity each, `Start` / `Next`) in a temp dir.
 fn scenes(tag: &str) -> (String, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2123_async_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -28,7 +22,6 @@ fn eval(gw: &GameWorld, code: &str) -> String {
     gw.script_manager().eval(code).unwrap()
 }
 
-/// `(status, progress, isDone)` of `op`.
 fn state(gw: &GameWorld, op: &str) -> String {
     eval(
         gw,

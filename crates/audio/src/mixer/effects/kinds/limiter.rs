@@ -1,15 +1,3 @@
-//! crates/audio/src/mixer/effects/kinds/limiter.rs — a brickwall limiter (#1748).
-//!
-//! Godot's `AudioEffectHardLimiter`: `pre_gain` dB, then no sample past `ceiling`
-//! dB. The attack is instant — the gain drops on the very sample that would pass
-//! the ceiling, so nothing ever does — and recovers toward unity over `release`
-//! ms, landing on it exactly. Below the ceiling, once recovered, it is
-//! bit-transparent. A non-finite sample (a NaN out of
-//! an effect upstream) is played as silence rather than handed to the device.
-//! Master runs one at −0.3 dBFS by default ([`EffectChain::master`]).
-//!
-//! [`EffectChain::master`]: super::super::EffectChain::master
-
 use kira::Frame;
 
 use super::super::{gain, Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
@@ -54,7 +42,6 @@ fn build(_: &DspContext) -> Box<dyn Dsp> {
 }
 
 struct Limiter {
-    /// The gain applied now, in `(0, 1]`.
     gain: f32,
 }
 
@@ -78,9 +65,6 @@ impl Dsp for Limiter {
             if need < self.gain {
                 self.gain = need;
             } else {
-                // A step too small to move an `f32`, or within a hair of the
-                // target, lands on it (as `rack::glide` does): a recovered
-                // limiter is bit-transparent again.
                 let next = self.gain + release * (need - self.gain);
                 let settled = next == self.gain || (need - next).abs() <= 1e-6;
                 self.gain = if settled { need } else { next };

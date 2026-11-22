@@ -1,12 +1,9 @@
-//! The speaker-mode output stage (#546), rendered through kira (#465).
-
 use super::*;
 use crate::device::backend::backend_tests::{flat, rig};
 use crate::device::capture::RATE;
 use crate::AudioBackend;
 use crate::{PlayParams, VoiceId};
 
-/// The settled output peak of a constant `level` voice with the stage in `mode`.
 fn settled_peak(mode: SpeakerMode, level: f32) -> f32 {
     let mut b = rig(&[level]);
     b.set_speaker_mode(mode);
@@ -71,8 +68,6 @@ fn control_round_trips_every_mode() {
     }
 }
 
-/// A mode switch with nothing playing is settled before the next sound: the compressor
-/// sleeping at TV's fully wet +9 dB would otherwise clip that sound's start (#1729).
 #[test]
 fn a_mode_switch_during_silence_is_settled_before_the_next_sound() {
     let mut b = rig(&[0.5; 64]);

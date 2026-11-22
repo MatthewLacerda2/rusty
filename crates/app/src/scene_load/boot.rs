@@ -1,14 +1,3 @@
-//! crates/app/src/scene_load/boot.rs — what a boot opens: its scene and its project.
-//!
-//! * **The scene** (#1618): the editor, the player and the agent sessions try a
-//!   `core::project::BootPlan`'s scenes in order, so a remembered scene that no
-//!   longer loads falls back to the startup scene instead of leaving the editor
-//!   Untitled on every launch.
-//! * **The project** (#1652): every entry point (the editor, the player, the harness
-//!   and the headless session) takes `project.rusty`'s settings into its world
-//!   through [`GameWorld::open_project`], once, so no boot path answers the engine's
-//!   defaults where the others answer the project's.
-
 use std::path::PathBuf;
 
 use super::super::game::GameWorld;
@@ -16,44 +5,29 @@ use rusty_core::project::{BootPlan, Opened, ProjectSettings, PROJECT_FILE};
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// Where a world takes its project settings from ([`GameWorld::open_project`]).
 #[derive(Clone, Debug)]
 pub enum ProjectSource {
-    /// The project file at this path, bound: `Application`'s setters write it back
-    /// (the editor and the headless session, which author the project).
     Bound(PathBuf),
-    /// Settings already read, unbound: a setter changes only the running value
-    /// (the player, `play` and a demo replay, which run the game and never rewrite
-    /// it).
     ReadOnly(ProjectSettings),
 }
 
 impl ProjectSource {
-    /// `opened`'s `project.rusty`, bound by its absolute path, so the binding never
-    /// follows the working directory to another project.
+    /// `opened`'s `project.rusty`, bound by absolute path.
     pub fn bound(opened: &Opened) -> Self {
         Self::Bound(opened.root.join(PROJECT_FILE))
     }
 
-    /// The engine's default settings, unbound: a world with no project (tests).
     pub fn defaults() -> Self {
         Self::ReadOnly(ProjectSettings::default())
     }
 
-    /// The settings opening `opened` read, unbound.
     pub fn read_only(opened: &Opened) -> Self {
         Self::ReadOnly(opened.settings.clone())
     }
 }
 
 impl GameWorld {
-    /// Open the project's settings into this world: bind (or fill) `Application`
-    /// from `source`, start the graphics options from the project's defaults (a
-    /// player's saved choice, loaded later by the shell, still wins), and run on the
-    /// project's decal budgets and quality presets. A bound file that can't be read
-    /// or parsed leaves the defaults and is said once, as an engine error, so the
-    /// editor's console and a session's replies both carry it. Every entry point
-    /// calls it.
+    /// A player's saved graphics choice, loaded later by the shell, still wins.
     pub fn open_project(&self, source: ProjectSource) {
         let opened = {
             let mut app = self.resources.application.borrow_mut();
@@ -76,11 +50,6 @@ impl GameWorld {
 }
 
 impl GameWorld {
-    /// Run on the project file as it stands (#1517, #1522, #1749, #1715): its decal
-    /// budgets, quality presets' running values, render-scale default and speed of
-    /// sound, and an empty nav path queue (#2087). On entering Play, on Stop (Unity
-    /// reverts play-mode changes) and when the editor opens, so a hand edit to
-    /// `project.rusty` reaches the next Play.
     pub fn apply_project_settings(&self) {
         let mut app = self.resources.application.borrow_mut();
         let limits = app.decal_limits();
@@ -91,14 +60,13 @@ impl GameWorld {
         let mut live = graphics.borrow_mut();
         live.quality = app.quality_values();
         live.render_scale.default = app.render_scale_default();
-        self.resources.nav.borrow().reset_path_queue(); // and its budget (#2087)
+        self.resources.nav.borrow().reset_path_queue();
     }
 }
 
-/// Load the first of `plan`'s scenes that loads into `scene`, logging the plan's
-/// warnings and every failure to `console` (`announce` also logs each attempt).
-/// Returns the path loaded; `None` leaves `scene` empty, an Untitled scene. A scene
-/// whose lighting sidecar alone fails is loaded, with a warning.
+/// Load the first of `plan`'s scenes that loads, logging the plan's warnings and every
+/// failure (`announce` also logs each attempt). `None` leaves `scene` empty (Untitled);
+/// a scene whose lighting sidecar alone fails still loads, with a warning.
 pub fn load_boot_scene(
     scene: &mut Scene,
     console: &mut ConsoleLogs,

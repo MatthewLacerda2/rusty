@@ -1,4 +1,4 @@
-//! Scoring and picking (#1892): normalization over survivors, the equal-values
+//! Scoring and picking: normalization over survivors, the equal-values
 //! rule, curves and weights, tie order, and how the random modes draw.
 
 use glam::Vec3;

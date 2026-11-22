@@ -1,10 +1,3 @@
-//! crates/test-support/src/models/anim.rs — embedded animated-skin fixture for the clip-import
-//! tests (#80). Kept apart from `models` to stay under the test-file size cap.
-//!
-//! One mesh `Animated` with a 2-joint skin and one animation `Wave` that translates
-//! `Joint0` from the origin to +X=2 over [0, 1] s (two linear keys). Hand-written so
-//! the importer's clip tests need no binary blobs.
-
 /// A minimal animated, skinned glTF 2.0 file with one clip `Wave`. The geometry/skin
 /// mirror the `SKINNED_GLTF` fixture; the extra accessors (4, 5) carry the
 /// animation's input times and output translations, read from a sibling

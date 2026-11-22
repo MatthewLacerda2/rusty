@@ -1,22 +1,8 @@
-//! crates/audio/src/mixer/effects/kinds/distortion.rs — soft clip, hard clip, bitcrush
-//! (#1748).
-//!
-//! Godot's `AudioEffectDistortion` cut to three modes: `pre_gain` dB, then the
-//! shaper `drive` (`0..1`) pushes, then `post_gain` dB. At `drive` 0 every mode is
-//! a straight wire.
-//!
-//!   * **soft** — `tanh(g·x) / tanh(g)`, `g = 24·drive`: full scale stays full
-//!     scale, everything under it is pushed up and rounded off.
-//!   * **hard** — the signal times `1 + 24·drive`, clipped flat at full scale.
-//!   * **bitcrush** — quantised to `16 − 15·drive` bits (16 down to 1).
-
 use kira::Frame;
 
 use super::super::{gain, Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
-/// The modes, in the order `mode` stores them.
 pub const MODES: [&str; 3] = ["soft", "hard", "bitcrush"];
-/// How far `drive` 1 pushes the soft and hard shapers.
 const DRIVE: f32 = 24.0;
 
 const PARAMS: [Param; 4] = [

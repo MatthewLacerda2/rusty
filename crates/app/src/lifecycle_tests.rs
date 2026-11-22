@@ -1,12 +1,3 @@
-//! End-to-end proof of the #323 transition callbacks through the real
-//! `GameWorld` play loop (not the dispatch helper in isolation): a script that
-//! destroys its own entity during `Update` sees `OnDisable` then `OnDestroy`
-//! fire and the entity gone within the same tick, because `apply_destroys` is
-//! registered at the tick's tail; and Stop (play-exit) fires neither — the edit
-//! snapshot restore is a reset, not gameplay. Teardown callbacks `print` to the
-//! shared console, which survives the runtime shutdown Stop performs, so the
-//! log is where we read what fired.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -47,14 +38,12 @@ fn world_with_script(tag: &str, code: &str) -> (GameWorld, Rc<RefCell<ConsoleLog
     (gw, console, id)
 }
 
-/// Index of the first console message equal to `msg`, if logged.
 fn log_index(console: &Rc<RefCell<ConsoleLogs>>, msg: &str) -> Option<usize> {
     console.borrow().messages.iter().position(|(m, _)| m == msg)
 }
 
 #[test]
 fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
-    // The script destroys itself on its first Update; its teardown callbacks log.
     let (mut gw, console, id) = world_with_script(
         "destroy",
         "return {\n\
@@ -64,7 +53,7 @@ fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
          }",
     );
 
-    gw.tick(DT); // Awake/OnEnable/Start → Update (requests destroy) → apply_destroys
+    gw.tick(DT);
 
     let disable = log_index(&console, "disable");
     let destroy = log_index(&console, "destroy");
@@ -84,7 +73,6 @@ fn destroy_during_play_fires_disable_then_destroy_and_removes_entity() {
 
 #[test]
 fn stop_fires_no_teardown_callbacks() {
-    // Same teardown-logging script, but this time we Stop instead of destroying.
     let (mut gw, console, id) = world_with_script(
         "stop",
         "return {\n\
@@ -93,14 +81,14 @@ fn stop_fires_no_teardown_callbacks() {
          }",
     );
 
-    gw.tick(DT); // enter play + one tick: Awake/OnEnable/Start, no teardown
+    gw.tick(DT);
     assert!(
         log_index(&console, "disable").is_none() && log_index(&console, "destroy").is_none(),
         "no teardown callback fires during normal play"
     );
 
     gw.set_playing(false);
-    gw.poll_transition(); // exit_play: shutdown + restore the edit snapshot
+    gw.poll_transition();
 
     assert!(
         log_index(&console, "disable").is_none() && log_index(&console, "destroy").is_none(),

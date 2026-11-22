@@ -1,6 +1,3 @@
-//! Tests for the voice's stereo rule and balance pan law (#412, ported to kira by
-//! #465). The rendered behaviour — through kira's tracks — is `backend_tests.rs`.
-
 use super::*;
 use crate::backend::VoiceMix;
 
@@ -64,14 +61,12 @@ fn control_clamps_out_of_range_values_and_tracks_liveness() {
     assert!(!control.is_live());
 }
 
-/// A voice retuned while paused resumes on its new mix, not gliding from the old
-/// one (#1693): a muted pause menu never blips at full gain on unpause.
 #[test]
 fn a_voice_retuned_while_paused_resumes_on_its_new_mix() {
     use crate::backend::{AudioBackend, PlayParams, VoiceId};
     use crate::device::backend::backend_tests::{flat, rig};
     use crate::device::capture::RATE;
-    const BLOCK: usize = 128; // whole kira blocks, so no stale buffered frames
+    const BLOCK: usize = 128;
     let mut b = rig(&[0.5]);
     let params = PlayParams {
         looping: true,

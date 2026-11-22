@@ -1,7 +1,3 @@
-//! Which leaf of a nested blend tree fires its events (#1746): the heaviest
-//! child at each level, so a direction split into walk and run still beats a
-//! lighter direction, and a leaf whose clip the mesh lacks never silences them.
-
 use super::blend_tree::nested_tests::directional;
 use super::blend_tree::{child_weights, dominant_leaf};
 use super::nested_pose_tests::{nested, set, walk_run, CLIPS};
@@ -10,10 +6,8 @@ use super::*;
 use rusty_asset::animation_graph::{AnimationEvent, BlendTree, ChildMotion};
 use rusty_components::Motion;
 
-/// Forward mostly, a little right, halfway between walking and running.
 const FORWARD_RIGHT: [f32; 3] = [0.4, 0.6, 4.0];
 
-/// `graph`'s Right child, given a `rightStep` marker at its midpoint.
 fn with_right_steps(graph: &mut AnimationGraph) {
     let Some(BlendTree::FreeformDirectional2D { children, .. }) =
         &mut graph.base.nodes[0].blend_tree
@@ -43,8 +37,6 @@ fn the_heaviest_direction_fires_even_when_its_weight_is_split() {
     let top: Vec<f32> =
         child_weights(&directional(ChildMotion::clip("Walk")), &anim.parameters).collect();
     let inner: Vec<f32> = child_weights(&walk_run(), &anim.parameters).collect();
-    // The case the rule exists for: forward outweighs right, yet each of its
-    // leaves alone weighs less than right.
     assert!(top[0] > top[3], "{top:?}");
     assert!(top[0] * inner[0] < top[3] && top[0] * inner[1] < top[3]);
     let names = fired(&mesh, &graph, FORWARD_RIGHT);
@@ -61,7 +53,6 @@ fn a_leaf_the_mesh_lacks_is_passed_over_for_events() {
             .map(|&(n, x, d)| slide(n, &[HIPS], 0.0, x, d))
             .collect(),
     );
-    // Running forward: Run would dominate, but it doesn't resolve, so Walk steps.
     assert!(fired(&mesh, &graph, [0.0, 1.0, 5.5]).contains(&"walkStep".to_string()));
 }
 
@@ -72,7 +63,6 @@ fn the_walk_goes_down_one_child_per_level() {
     set(&mut anim, FORWARD_RIGHT);
     let all = |_: &str| true;
     let leaf = dominant_leaf(&tree, &anim.parameters, &all).unwrap();
-    // Walk and Run tie inside forward; the first wins.
     assert_eq!(leaf.clip, "Walk");
     let no_forward = |c: &str| c != "Walk" && c != "Run";
     let leaf = dominant_leaf(&tree, &anim.parameters, &no_forward).unwrap();

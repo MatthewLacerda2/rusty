@@ -1,6 +1,3 @@
-//! Doppler in the per-tick mix (#1749): which pushes measure motion and which keep
-//! the rate, and what counts as a jump.
-
 use glam::{Quat, Vec3};
 
 use crate::{AudioMaestro, Listener, MixEnv};
@@ -25,8 +22,6 @@ fn source(spatial_blend: f32) -> AudioSourceComponent {
     }
 }
 
-/// A maestro with entity 1 playing `src` at x = -100, then one push of it moved to
-/// `x`, the listener at the origin; the rate it plays at.
 fn pushed(src: &AudioSourceComponent, x: f32, dt: f32) -> (AudioMaestro, f32) {
     let mut maestro = AudioMaestro::default();
     maestro.play_source(1, src, [-100.0, 0.0, 0.0], 0);
@@ -60,7 +55,6 @@ fn a_push_with_no_sim_time_keeps_the_rate() {
     let at = Vec3::new(-99.5, 0.0, 0.0);
     maestro.apply_mix(&env(Vec3::ZERO, 0.0), |_| Some((src.clone(), at)));
     assert_eq!(maestro.source_doppler(1), rate, "held through the pause");
-    // Resumed: one tick of motion again, no jump from the time paused.
     let on = Vec3::new(-99.0, 0.0, 0.0);
     maestro.apply_mix(&env(Vec3::ZERO, 0.01), |_| Some((src.clone(), on)));
     assert!((maestro.source_doppler(1) - UP).abs() < 1e-4);
@@ -109,7 +103,6 @@ fn a_forgotten_listener_jump_is_no_shift() {
     let near = Vec3::new(-1.0, 0.0, 0.0);
     maestro.apply_mix(&env(near, 0.01), |_| Some((src.clone(), at)));
     assert_eq!(maestro.source_doppler(1), 1.0);
-    // Measured, the same jump shifts it.
     maestro.apply_mix(&env(near * 2.0, 0.01), |_| Some((src.clone(), at)));
     assert!(maestro.source_doppler(1) > 1.0);
 }

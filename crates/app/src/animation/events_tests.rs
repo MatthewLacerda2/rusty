@@ -1,7 +1,3 @@
-//! Animation events (#459): each crossing fires exactly once — across loop
-//! wraps, skipped-over markers and speed 0 — only from the current motion, the
-//! dominant blend-tree child and a weighted layer, in time order.
-
 use super::super::graph::step_graph;
 use super::super::test_rig::*;
 use super::super::tree_tests::tree_node;
@@ -16,7 +12,6 @@ fn marks(events: &[(&str, f32)]) -> Vec<AnimationEvent> {
     events.iter().map(event).collect()
 }
 
-/// A node playing `clip` with `events`, looping or not.
 fn marked(name: &str, clip: &str, is_loop: bool, events: &[(&str, f32)]) -> GraphNode {
     GraphNode {
         is_loop,
@@ -25,7 +20,6 @@ fn marked(name: &str, clip: &str, is_loop: bool, events: &[(&str, f32)]) -> Grap
     }
 }
 
-/// One-second clips A and B, and an animator bound to `graph`'s entry.
 fn rig(graph: &AnimationGraph) -> (MeshComponent, AnimatorComponent) {
     let mesh = mesh(vec![
         slide("A", &[HIPS], 0.0, 1.0, 1.0),
@@ -37,7 +31,6 @@ fn rig(graph: &AnimationGraph) -> (MeshComponent, AnimatorComponent) {
     (mesh, anim)
 }
 
-/// The event names `steps` fixed steps of `dt` fire, in order.
 fn run(graph: &AnimationGraph, anim: &mut AnimatorComponent, steps: usize, dt: f32) -> Vec<String> {
     let mesh = rig(graph).0;
     (0..steps)
@@ -108,7 +101,7 @@ fn a_clip_being_faded_out_is_silent_and_the_incoming_one_fires() {
     let graph = graph(vec![a, b.clone()], vec![]);
     let mut anim = rig(&graph).1;
     anim.base.time = 0.4;
-    anim.enter_node(&b, 0.5); // A fades out across its 0.5 marker
+    anim.enter_node(&b, 0.5);
     assert_eq!(run(&graph, &mut anim, 4, 0.1), ["in"]);
 }
 

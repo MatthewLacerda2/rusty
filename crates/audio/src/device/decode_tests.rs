@@ -1,5 +1,3 @@
-//! Decode tests (#212, #545, #465): every container the engine plays, and the cache.
-
 use super::*;
 
 const FIXTURES: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/device/fixtures");
@@ -18,7 +16,6 @@ fn a_missing_file_decodes_to_none_and_is_retried() {
     let path = path.to_str().unwrap();
     assert!(cache.get_or_decode(path).is_none());
     assert!(!cache.clips.contains_key(path), "a failure is not cached");
-    // Written outside the engine's log: only the retry can find it.
     std::fs::write(path, wav_bytes(1, 8_000, &[16_384])).unwrap();
     assert_eq!(cache.get_or_decode(path).unwrap().frames(), 1);
 }
@@ -33,15 +30,12 @@ fn a_failed_clip_is_retried_only_once_its_file_changes() {
     std::fs::write(&path, vec![0; valid.len()]).unwrap();
     let key = path.to_str().unwrap();
     assert!(cache.get_or_decode(key).is_none());
-    // Fixed outside the log at the same length: the retry has nothing to see.
     std::fs::write(&path, &valid).unwrap();
     assert!(cache.get_or_decode(key).is_none(), "no re-decode per play");
     written::note_written(key);
     assert_eq!(cache.get_or_decode(key).unwrap().frames(), 1);
 }
 
-/// A key naming an MP3 that an import replaced plays the WAV, and follows that
-/// WAV's re-writes.
 #[test]
 fn a_converted_mp3_key_follows_its_wav() {
     let mut cache = ClipCache::new();

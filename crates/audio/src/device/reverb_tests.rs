@@ -1,6 +1,3 @@
-//! The reverb bus (#469), heard through the capture backend: silent outside every
-//! zone, a longer decay rings longer, and the pre-delay holds the tail back.
-
 use super::feedback;
 use crate::backend::{AudioBackend, PlayParams, VoiceId};
 use crate::device::backend::backend_tests::{flat, rig};
@@ -8,7 +5,6 @@ use crate::device::capture::RATE;
 use crate::mixer::{GroupId, GroupMix, GroupSettings};
 use rusty_components::{ReverbParams, ReverbPreset};
 
-/// Long enough for the bus's retune tween and the pre-delay's glide to settle.
 const SETTLE: usize = RATE as usize / 4;
 
 /// The left channel of a 64-sample burst played through group `1` with the
@@ -30,7 +26,6 @@ fn hear(params: ReverbParams, send: f32, frames: usize) -> Vec<f32> {
     b.device().render(frames).iter().map(|f| f.0).collect()
 }
 
-/// The wet signal alone: the burst sent into the bus minus the burst kept dry.
 fn wet(params: ReverbParams, frames: usize) -> Vec<f32> {
     let dry = hear(params, 0.0, frames);
     let sent = hear(params, 1.0, frames);
@@ -86,8 +81,6 @@ fn the_pre_delay_holds_the_tail_back() {
     assert!((shift - expected).abs() <= 2, "shifted by {shift}");
 }
 
-/// Moving into a new zone with nothing playing bends nothing: the next sound's tail
-/// starts at the new pre-delay, not gliding towards it (#1729).
 #[test]
 fn a_retune_during_silence_takes_effect_on_the_next_sound() {
     let params = ReverbParams {

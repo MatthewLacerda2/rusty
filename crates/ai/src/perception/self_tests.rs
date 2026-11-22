@@ -1,4 +1,4 @@
-//! A perceiver never senses itself (#1900): not its own body in sight (a
+//! A perceiver never senses itself: not its own body in sight (a
 //! perceiver on a `Head` child), not a noise or hit from its own hierarchy, and
 //! a dead instigator is no known target. Nothing is sensed outside Play, and
 //! entering Play empties every memory.
@@ -50,8 +50,6 @@ fn its_own_noise_and_hits_are_not_recorded_and_the_dead_are_no_target() {
         assert_eq!(hit, None, "{own}");
     }
     assert!(a.updates().is_empty());
-    // Gone for good (an edit-mode despawn, so Play's teardown isn't asked for);
-    // re-entering Play empties the memory, which is empty here already.
     a.scene.set_playing(false);
     a.scene.destroy_entity(player);
     a.scene.set_playing(true);

@@ -1,7 +1,3 @@
-//! `bench-scenes`' children (`src/bin/bench_scenes.rs`): the processes one scene
-//! runs in, its earlier loads, its editor round, its timed bench and its profile,
-//! and the run's cold import, each this binary again.
-
 use std::ffi::OsString;
 use std::path::Path;
 // lint: allow(subprocess) each scene benches in children of this binary, so each load is a fresh process's and its memory peak its own
@@ -20,10 +16,6 @@ pub enum Benched {
     Unprofiled,
 }
 
-/// Bench `scene` in its children: its loads before the bench's own, the editor
-/// round unless `--no-editor` (a failed one said, and the scene benched without
-/// it), the timed run (given those loads, the round and the run's `import_ms`),
-/// then the profile when asked for, whose failure leaves the timings standing.
 pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
     let loads = run.out.join(".loads");
     let _ = std::fs::remove_dir_all(&loads);
@@ -64,9 +56,6 @@ pub fn bench_scene(run: &Run, scene: &str, import_ms: Option<f64>) -> Benched {
     }
 }
 
-/// The editor round on `scene`, in a child of its own, kept in `dir` (the
-/// scene's loads' folder, removed after its bench): the file, or `None` (said)
-/// when it failed or had no adapter, and the scene is benched without it.
 fn editor_round(run: &Run, scene: &str, dir: &Path) -> Option<std::path::PathBuf> {
     let file = dir.join("editor.json");
     let mut round = child(run, &run.project, scene);
@@ -80,8 +69,6 @@ fn editor_round(run: &Run, scene: &str, dir: &Path) -> Option<std::path::PathBuf
     file.exists().then_some(file)
 }
 
-/// `scene`'s loads before its bench's own, `run.load_runs` less one, each in a
-/// child of its own, kept in `dir` as `0.json`, `1.json`, …: whether all loaded.
 fn earlier_loads(run: &Run, scene: &str, dir: &Path) -> bool {
     if let Err(e) = std::fs::create_dir_all(dir) {
         eprintln!("bench-scenes: {}: {e}", dir.display());
@@ -105,8 +92,6 @@ fn earlier_loads(run: &Run, scene: &str, dir: &Path) -> bool {
     true
 }
 
-/// `import_ms`: `scene`'s load in a cache-less copy of the project, in a child;
-/// `None` (said) when the copy or the load failed, and the bench goes on.
 pub fn cold_import(run: &Run, scene: &str) -> Option<f64> {
     let copy = run.out.join(".import-copy");
     let file = copy.join(".import_ms");

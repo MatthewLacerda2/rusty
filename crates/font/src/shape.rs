@@ -1,10 +1,3 @@
-//! crates/font/src/shape.rs — one run of text → positioned glyphs, with `harfrust` (#1328).
-//!
-//! A run is text in one face at one size; shaping picks its glyphs (ligatures,
-//! contextual forms, combining marks) and positions them (GPOS kerning, mark
-//! attachment). Positions come back in font units, which the caller scales to the
-//! run's em size. A pure function of the font bytes and the string.
-
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -29,14 +22,8 @@ pub struct Shaped {
     pub offset: Vec2,
 }
 
-/// Shaped runs kept per font before the memo starts over (a bound, not a tuning:
-/// a HUD reshapes a few hundred strings, a counter adds one per new value).
 const MEMO_RUNS: usize = 4096;
 
-/// Shape `run` in `font`, glyphs in visual order. No ligature forms over a
-/// character in `unligated` (byte ranges), so one never spans a style change;
-/// kerning still does. Memoised per font: shaping is size-free, so auto-size's
-/// probes and every frame after the first reuse one result.
 pub fn shape(font: &FontData, run: &str, unligated: &[Range<usize>]) -> Arc<[Shaped]> {
     let key = (run.to_string(), unligated.to_vec());
     let mut memo = font.runs.lock().unwrap_or_else(|e| e.into_inner());

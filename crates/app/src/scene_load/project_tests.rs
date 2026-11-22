@@ -1,7 +1,3 @@
-//! Every entry point opens a project the same way (#1652): `GameWorld::open_project`
-//! takes `project.rusty`'s settings into `Application`, bound or read-only, and the
-//! world runs on its quality presets from the first frame.
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -71,27 +67,22 @@ fn a_read_only_project_is_never_written() {
 #[test]
 fn an_unparseable_project_file_is_said_once_and_leaves_the_defaults() {
     rusty_test_support::logs::init();
-    rusty_test_support::logs::take(); // what earlier code on this thread logged
+    rusty_test_support::logs::take();
     let path = rusty_test_support::temp::dir().join("project.rusty");
     std::fs::write(&path, "{ not json").unwrap();
     let game = world();
     game.open_project(ProjectSource::Bound(path));
-    game.apply_project_settings(); // entering Play rereads the file
+    game.apply_project_settings();
     assert_eq!(
         game.resources.application.borrow().build(),
         &Default::default()
     );
-    // Everything raised, as an error: `logging` forwards it to a session's reply
-    // and the console as one (its own tests hold that).
     let said = rusty_test_support::logs::take_leveled();
     assert_eq!(said.len(), 1, "one message, the parse error: {said:?}");
     assert_eq!(said[0].0, log::Level::Error, "{said:?}");
     assert!(!said[0].1.contains("last read"), "{said:?}");
 }
 
-/// A hand edit of the render-scale default (#1715) reaches the running scale at the
-/// next Play, as the presets' do: the value the renderer resolves, not only the
-/// one `Graphics.GetDefaultRenderScale` reads.
 #[test]
 fn a_hand_edited_render_scale_default_runs_at_the_next_play() {
     use rusty_core::settings::render_scale::RenderScaleDefault;
@@ -100,7 +91,7 @@ fn a_hand_edited_render_scale_default_runs_at_the_next_play() {
     game.open_project(ProjectSource::Bound(path.clone()));
     let edited = r#"{ "graphics": { "render_scale": "match_display" } }"#;
     std::fs::write(&path, edited).unwrap();
-    game.apply_project_settings(); // entering Play rereads the file
+    game.apply_project_settings();
     let running = game.script_manager().graphics_cell().borrow().render_scale;
     assert_eq!(running.default, RenderScaleDefault::MatchDisplay);
     let app = game.resources.application.borrow();

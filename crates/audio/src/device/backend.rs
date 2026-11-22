@@ -1,26 +1,3 @@
-//! crates/audio/src/device/backend.rs — the real audio device: kira's mixer (#212, #465).
-//!
-//! The platform-layer [`AudioBackend`] backed by [kira](https://docs.rs/kira): a
-//! cpal device, a mixer of tracks with effects, and tweened parameters. Opened by
-//! the windowed shell (`shell/boot.rs`) and injected into the `AudioMaestro` after
-//! `GameWorld::new`, so the sound card only ever opens in the windowed process; the
-//! harness keeps the `NullBackend` until a capture runs this mixer offline (#1579).
-//!
-//! The graph: each voice is a [`ClipSound`] playing into its mixer group's track
-//! (`groups.rs`), whose rack runs the group's effects (`mixer/effects/rack.rs`,
-//! #1748); group tracks nest as the group tree does and send to one reverb
-//! bus; everything sums into kira's main track, which runs Master's filters,
-//! volume and rack ([`MasterStrip`], #1855: after the reverb bus has summed in)
-//! and then the [`OutputStage`] that shapes the total for the speaker mode (#546). The maestro hands over a [`VoiceMix`] per
-//! voice each frame (#412) through the voice's shared [`VoiceControl`], and a
-//! [`GroupMix`] per group whenever the mixer moves. Decoding is path-cached
-//! ([`ClipCache`]), so the hundredth footstep costs no disk or decode until the
-//! engine re-writes its file.
-//!
-//! Generic over kira's `Backend`: the shell uses kira's cpal backend, and tests and
-//! a headless capture render the whole graph offline (`capture.rs`, #1579). The last
-//! effect on the main track is the [`Tap`] a capture reads the final mix from.
-
 use rusty_core::collections::Map;
 use std::sync::Arc;
 
@@ -39,8 +16,6 @@ use crate::mixer::{GroupId, GroupMix};
 use crate::SpeakerMode;
 use rusty_components::ReverbParams;
 
-/// kira-backed mixer. Owns the `AudioManager`, which holds the device open for the
-/// life of the backend — dropping it silences everything.
 pub struct KiraBackend<B: Backend = DefaultBackend> {
     manager: AudioManager<B>,
     groups: GroupTracks,
@@ -51,16 +26,12 @@ pub struct KiraBackend<B: Backend = DefaultBackend> {
 }
 
 impl KiraBackend {
-    /// Open the default output device. Returns `None` when no device is available
-    /// (a headless box, a CI runner) so the caller can fall back to the
-    /// `NullBackend` instead of failing the whole app.
     pub fn open() -> Option<Self> {
         Self::with_backend(Default::default())
     }
 }
 
 impl<B: Backend> KiraBackend<B> {
-    /// A mixer over kira backend `B` built with `settings`; `None` if it won't start.
     pub fn with_backend(settings: B::Settings) -> Option<Self> {
         let mut main = MainTrackBuilder::new().sound_capacity(VOICES_PER_GROUP);
         let master = MasterStrip::build(&mut main);
@@ -84,13 +55,11 @@ impl<B: Backend> KiraBackend<B> {
         })
     }
 
-    /// kira's backend, for a test to pump.
     #[cfg(test)]
     pub fn device(&mut self) -> &mut B {
         self.manager.backend_mut()
     }
 
-    /// The clip cache, for a test to seed with in-memory clips.
     #[cfg(test)]
     pub fn cache(&mut self) -> &mut ClipCache {
         &mut self.cache
@@ -112,7 +81,6 @@ impl<B: Backend + Clocked> AudioBackend for KiraBackend<B> {
         if track.play(ClipSoundData(sound)).is_err() {
             return false;
         }
-        // A previous voice on the same id (re-`Play`) is replaced and stopped.
         if let Some(old) = self.voices.insert(id, control) {
             old.stop();
         }

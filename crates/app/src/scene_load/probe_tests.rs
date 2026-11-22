@@ -1,7 +1,3 @@
-//! A play-mode `Scene.Load` runs prepare then activate, each step under the
-//! installed `LoadProbe` (#2123): every step once, in order, and one `finish` naming
-//! the scene swapped in, or none when the file could not be read.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,7 +7,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// What the probe saw: the steps it ran, then `finish:<path or ->` per load.
 #[derive(Clone, Default)]
 struct Seen(Rc<RefCell<Vec<String>>>);
 
@@ -34,7 +29,7 @@ fn a_load_runs_each_step_once_in_order_then_finishes() {
     let seen = Seen::default();
     gw.set_load_probe(Some(Box::new(seen.clone())));
     gw.set_playing(true);
-    gw.tick(DT); // the menu's first Update queues the load; the tail swaps it in
+    gw.tick(DT);
     let steps = [
         "read", "meshes", "sidecars", "teardown", "swap", "physics", "navmesh", "sources",
     ];
@@ -51,7 +46,7 @@ fn a_load_that_cannot_read_its_file_finishes_with_nothing_loaded() {
     let seen = Seen::default();
     gw.set_load_probe(Some(Box::new(seen.clone())));
     gw.set_playing(true);
-    gw.tick(DT); // the menu's own load swaps the level in
+    gw.tick(DT);
     gw.scene()
         .borrow_mut()
         .request_load("rusty_2123_no_such_dir/gone.scene".into());
@@ -62,7 +57,6 @@ fn a_load_that_cannot_read_its_file_finishes_with_nothing_loaded() {
     assert!(gw.scene().borrow().find_entity_by_name("Level").is_some());
 }
 
-/// A probe that breaks the once-only contract by calling each step twice.
 struct Twice;
 
 impl LoadProbe for Twice {

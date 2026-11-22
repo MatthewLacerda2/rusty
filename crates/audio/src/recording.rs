@@ -1,10 +1,3 @@
-//! crates/audio/src/recording.rs — a test backend that records what the maestro hands over.
-//!
-//! A test hook (`#[doc(hidden)]`, compiled in every build: `app`'s tests use it). The
-//! device is the one thing the headless suite cannot hear, so the maestro and shell
-//! tests assert on the exact [`PlayParams`] / [`VoiceMix`] values that would have
-//! reached it. The shared [`Recording`] outlives the boxed backend.
-
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -14,51 +7,40 @@ use super::mixer::{GroupId, GroupMix};
 use super::speaker::SpeakerMode;
 use rusty_components::ReverbParams;
 
-/// Everything a [`RecordingBackend`] was told, in order.
 #[derive(Default)]
 pub struct Recording {
     pub plays: Vec<(VoiceId, PlayParams)>,
     pub mixes: Vec<(VoiceId, VoiceMix)>,
     pub stops: Vec<VoiceId>,
-    /// Every speaker mode the output stage was set to, in order.
     pub speaker_modes: Vec<SpeakerMode>,
-    /// Voices still "sounding" — started voices join, a test removes one to finish it.
     pub live: BTreeSet<VoiceId>,
-    /// Every group created, with its parent, in order.
     pub groups_added: Vec<(GroupId, Option<GroupId>)>,
-    /// Every group mix applied, in order.
     pub group_mixes: Vec<(GroupId, GroupMix)>,
-    /// Every reverb the bus was set to, in order.
     pub reverbs: Vec<ReverbParams>,
     /// Every advance of the output, in seconds, in order: one per pushed frame.
     pub advances: Vec<f64>,
 }
 
 impl Recording {
-    /// The mix a voice is currently at: its last `set_mix`, else its play mix.
     pub fn current(&self, id: VoiceId) -> Option<VoiceMix> {
         let mixed = self.mixes.iter().rev().find(|(v, _)| *v == id);
         let played = self.plays.iter().rev().find(|(v, _)| *v == id);
         mixed.map(|m| m.1).or(played.map(|p| p.1.mix))
     }
 
-    /// The mix group `id` was last set to.
     pub fn group(&self, id: GroupId) -> Option<GroupMix> {
         let last = self.group_mixes.iter().rev().find(|(g, _)| *g == id);
         last.map(|(_, mix)| *mix)
     }
 
-    /// The voice id of the most recent play.
     pub fn last_voice(&self) -> VoiceId {
         self.plays.last().expect("nothing played").0
     }
 }
 
-/// An [`AudioBackend`] that accepts every voice and records every call.
 pub struct RecordingBackend(pub Rc<RefCell<Recording>>);
 
 impl RecordingBackend {
-    /// A backend plus the handle to read its recording back.
     pub fn new() -> (Box<Self>, Rc<RefCell<Recording>>) {
         let rec = Rc::new(RefCell::new(Recording::default()));
         (Box::new(Self(Rc::clone(&rec))), rec)

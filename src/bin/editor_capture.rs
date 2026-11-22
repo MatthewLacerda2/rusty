@@ -1,16 +1,3 @@
-//! src/bin/editor_capture.rs — the whole editor to a PNG, headless (dev-only, #731).
-//!
-//! ```text
-//! Usage:
-//!   cargo run --bin editor-capture --features dev -- [options]
-//!   make editor-capture OUT=before.png ARGS="--select Player"
-//!
-//! Options: `editor-capture --help` prints them (`USAGE`, below).
-//! ```
-//!
-//! Deterministic: a fixed size, scale and frame count. Exits 0 when written, 1 when the
-//! box has no GPU/software adapter (install lavapipe), 2 on bad arguments or errors.
-
 use std::process::exit;
 
 use rusty::app::ProjectSource;
@@ -75,7 +62,7 @@ fn main() {
     let opened = rusty::core::project::open(&rusty::core::project::locate(project), Access::Run);
     let opened = opened.unwrap_or_else(|e| fail(&e));
     // Read-only: a capture draws the project as its settings stand and never
-    // writes them (#1652). A demo then replays under its own header's settings.
+    // writes them. A demo then replays under its own header's settings.
     let project = ProjectSource::read_only(&opened);
     let written = match (source.demo, source.scene) {
         (Some(demo), _) => {
@@ -104,8 +91,6 @@ fn report(written: Result<bool, String>, out: &str) {
     }
 }
 
-/// Which engine drew it, as `results.json`'s `engine` says it: the commit, the
-/// `engine/` content read, and whether it is the content this binary was built with.
 fn engine_note() -> String {
     let stamp = rusty::core::project::engine_content::stamp();
     let found = stamp.content_found.as_deref().unwrap_or("unknown");

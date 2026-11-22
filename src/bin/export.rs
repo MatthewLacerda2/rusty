@@ -1,26 +1,3 @@
-//! src/bin/export.rs — ship a game project (dev-only, `--features dev`, #1267).
-//!
-//! ```text
-//! Usage:
-//!   cargo run --bin export --features dev -- --project <dir> --out <dir>
-//!   make export PROJECT=<dir> OUT=<dir>
-//!   cargo run --bin export --features dev -- --project <dir> --import-only
-//!   make import PROJECT=<dir>
-//! ```
-//!
-//! Brings every converted source of the project (`.fbx`, `.blend`) up to date,
-//! then copies its runtime files and import cache into `<out>`, leaving those
-//! sources behind (`rusty::dev::export`). The player runs the result
-//! (`player --project <out>`) without converting anything or needing Blender.
-//! A dev binary, not a player flag: exporting may run Blender, and a shipped
-//! player carries neither the converters' authoring path nor `dev`.
-//!
-//! `--import-only` stops after the first step: it brings the project's import
-//! cache up to date in place (every converted model and every image's compressed
-//! copy, `rusty::dev::export::import`) and copies nothing. A headless run (`play`,
-//! `bench-scenes`) never compresses a texture, so this is how it draws a project
-//! the editor never opened as the shipped game does (#2319).
-
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 

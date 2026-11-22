@@ -1,8 +1,3 @@
-//! Marker sync inside a blend tree (#1896): a run planting 0.15 later than
-//! the walk keeps both clips' feet together at every blend weight, a tree
-//! without markers keeps today's normalized sync, and a change of leader
-//! doesn't jump.
-
 use super::super::motion::MotionContext;
 use super::super::test_rig::*;
 use super::super::{sample_pose, step};
@@ -26,7 +21,6 @@ fn at_speed(graph: &AnimationGraph, speed: f32) -> AnimatorComponent {
     anim
 }
 
-/// Each leaf's sample time at the tree's current phase.
 fn leaf_times(graph: &AnimationGraph, anim: &AnimatorComponent) -> (f32, f32) {
     let mesh = rig_mesh();
     let ctx = MotionContext {
@@ -66,9 +60,8 @@ fn feet_stay_together_at_every_blend_weight() {
 fn the_pose_samples_each_leaf_at_its_matched_time() {
     let (mesh, graph) = (rig_mesh(), loco(true));
     let mut anim = at_speed(&graph, 0.5);
-    anim.base.time = 0.0; // Walk (the leader on a tie) on FootL
+    anim.base.time = 0.0;
     let (_, pose) = sample_pose(&anim, &mesh, Some(&graph)).unwrap();
-    // Each leaf keys its own joint, blended half-and-half with the bind pose.
     let run_x = pose[LEG].unwrap().translation.x * 2.0;
     assert!(
         (run_x * RUN - 0.09).abs() < 1e-4,
@@ -93,7 +86,7 @@ fn a_tree_without_markers_keeps_normalized_sync() {
 #[test]
 fn a_change_of_leader_carries_the_phase() {
     let (mesh, graph) = (rig_mesh(), loco(true));
-    let mut anim = at_speed(&graph, 0.4); // Walk leads
+    let mut anim = at_speed(&graph, 0.4);
     for _ in 0..13 {
         step(&mut anim, Some(&mesh), Some(&graph), DT);
     }

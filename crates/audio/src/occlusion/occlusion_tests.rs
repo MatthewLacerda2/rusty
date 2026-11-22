@@ -1,6 +1,3 @@
-//! Occlusion (#467): the effect curve, the ray fan, smoothing, and the maestro's
-//! casts and round-robin over a fake occluder (a wall across z = 5).
-
 use std::cell::Cell;
 use std::rc::Rc;
 
@@ -41,8 +38,6 @@ fn smoothing_is_linear_over_the_fade() {
     assert_eq!(v.value, 0.0, "lands, never overshoots");
 }
 
-/// A maestro whose occluder sees a wall across z = 5 for `|x| < half_width` while
-/// `wall` is up, counting the rays cast.
 fn rig(wall: Rc<Cell<bool>>, half_width: f32, rays: Rc<Cell<u32>>) -> AudioMaestro {
     let mut m = AudioMaestro::default();
     m.set_occluder(Box::new(move |from: Vec3, to: Vec3, _, _| {
@@ -139,7 +134,6 @@ fn the_budget_round_robins_every_voice() {
 }
 
 impl AudioMaestro {
-    /// Entity `id`'s latest cast, for the round-robin test.
     fn voice_target(&self, id: u32) -> f32 {
         let voice = self.entity_voices[&id].voice;
         self.occlusion.voices[&voice].target

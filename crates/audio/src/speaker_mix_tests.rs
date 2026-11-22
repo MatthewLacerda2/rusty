@@ -1,13 +1,9 @@
-//! The speaker mode through the maestro (#546), asserted on what a recording backend
-//! was handed — the per-voice half of the output shaping.
-
 use glam::Vec3;
 
 use super::*;
 use crate::recording::RecordingBackend;
 use crate::MixEnv;
 
-/// A fully-3D looping source hard left of a listener at the origin.
 fn hard_left() -> (AudioSourceComponent, [f32; 3]) {
     let src = AudioSourceComponent {
         clip: "loop.ogg".to_string(),

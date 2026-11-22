@@ -1,4 +1,4 @@
-//! The sight sense (#1900): range, cone, walls, the lose-sight edge, and the
+//! The sight sense: range, cone, walls, the lose-sight edge, and the
 //! updates a gain and a loss raise.
 
 use glam::Vec3;

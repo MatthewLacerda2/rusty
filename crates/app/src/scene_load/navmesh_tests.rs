@@ -1,8 +1,3 @@
-//! A play-mode load keeps the level's current navmesh when a `DontDestroyOnLoad`
-//! survivor moves one of its collider ids (#2127): the saved `<scene>.navmesh` on a
-//! `Scene.Load`, and the one `Scene.LoadAsync` baked in the background, are
-//! restored, so no bake runs on the swap tick.
-
 use std::sync::Arc;
 
 use glam::Vec3;
@@ -16,8 +11,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// `start.scene` (`Keeper` = 1, `Other` = 2) and `level.scene` (a floor collider = 1
-/// and a crate = 2) in a temp dir, the level's navmesh saved beside it when `saved`.
 fn scenes(tag: &str, saved: bool) -> (String, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_2127_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -41,7 +34,6 @@ fn scenes(tag: &str, saved: bool) -> (String, String) {
     (path("start.scene"), path("level.scene"))
 }
 
-/// Play `start`, keep `Keeper` (id 1, the level floor's id) across the next load.
 fn playing_with_a_survivor(start: &str) -> GameWorld {
     let (mut gw, _) = world_at(start);
     gw.set_playing(true);
@@ -54,7 +46,6 @@ fn playing_with_a_survivor(start: &str) -> GameWorld {
     gw
 }
 
-/// The level is in, its floor moved off id 1, and how the navmesh started.
 fn after_the_swap(gw: &GameWorld) -> Option<Start> {
     let scene = gw.scene().borrow();
     assert_eq!(scene.find_entity_by_name("Keeper"), Some(1));

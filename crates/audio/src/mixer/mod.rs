@@ -1,19 +1,3 @@
-//! crates/audio/src/mixer/ — the audio mixer: groups, snapshots and ducking (#465).
-//!
-//! Unity's `AudioMixer`, cut down. Every voice routes through one named **group**
-//! (a bus); groups form a tree under `Master`, and each has a volume, a mute, a
-//! low-pass and a high-pass filter, a reverb send and a chain of effects
-//! (`effects/`, #1748; Master starts with a limiter) ([`GroupSettings`]). A
-//! **snapshot** is a named partial set of group settings the game transitions to
-//! over a duration ("BulletTime", "Flashbanged", "PauseMenu"); a **duck** lowers one
-//! group while another plays.
-//!
-//! This is the sim-side half: pure data stepped by sim time (`Time.unscaledTime`, so
-//! a transition runs through slow-mo and a `timeScale` 0 pause menu), so headless
-//! runs and replays read back the same mix. The device renders it: every group is a
-//! kira track (`device/groups.rs`); the `NullBackend` simply keeps the resolved
-//! state for read-back.
-
 mod duck;
 pub mod effects;
 mod maestro;
@@ -27,28 +11,22 @@ pub use duck::Duck;
 pub use effects::EffectChain;
 pub use settings::{Filter, GroupMix, GroupPatch, GroupSettings, GroupState};
 
-/// A group's index in the mixer. Stable for the mixer's life; `Master` is `0`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct GroupId(pub u16);
 
 impl GroupId {
-    /// The root group every other one sums into.
     pub const MASTER: GroupId = GroupId(0);
 }
 
-/// The groups every mixer starts with: Master, and the five buses under it.
 pub const DEFAULT_GROUPS: [&str; 6] = ["Master", "Music", "SFX", "Voice", "World", "UI"];
 
-/// One group in the tree.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Group {
     pub name: String,
-    /// `None` only for Master.
     pub parent: Option<GroupId>,
     pub settings: GroupSettings,
 }
 
-/// A snapshot transition in flight: every group's settings at its start and end.
 #[derive(Clone, Debug, PartialEq)]
 struct Transition {
     from: Vec<GroupSettings>,
@@ -67,16 +45,13 @@ impl Transition {
     }
 }
 
-/// The whole mixer. See the module docs.
 #[derive(Clone, Debug)]
 pub struct Mixer {
     groups: Vec<Group>,
     snapshots: BTreeMap<String, Vec<(GroupId, GroupPatch)>>,
     transition: Option<Transition>,
-    /// The snapshot last transitioned to, for read-back.
     snapshot: Option<String>,
     ducks: Vec<Duck>,
-    /// The sim time of the last [`Mixer::advance`].
     now: f64,
 }
 
@@ -91,8 +66,6 @@ impl Default for Mixer {
             },
         }];
         for name in &DEFAULT_GROUPS[1..] {
-            // World sends fully into the reverb bus reverb zones tune (#469), as a
-            // Unity `AudioSource` takes part in reverb zones by default.
             let reverb_send = if *name == "World" { 1.0 } else { 0.0 };
             groups.push(Group {
                 name: name.to_string(),
@@ -115,18 +88,15 @@ impl Default for Mixer {
 }
 
 impl Mixer {
-    /// Every group, indexed by [`GroupId`]; parents always come before children.
     pub fn groups(&self) -> &[Group] {
         &self.groups
     }
 
-    /// The group called `name` (exact match).
     pub fn find(&self, name: &str) -> Option<GroupId> {
         let index = self.groups.iter().position(|g| g.name == name)?;
         Some(GroupId(index as u16))
     }
 
-    /// `name`'s group, or an error naming the groups that do exist.
     pub fn require(&self, name: &str) -> Result<GroupId, String> {
         self.find(name).ok_or_else(|| {
             let names: Vec<_> = self.groups.iter().map(|g| g.name.as_str()).collect();
@@ -134,7 +104,6 @@ impl Mixer {
         })
     }
 
-    /// Add a group called `name` under `parent`. Errs if the name is taken.
     pub fn create(&mut self, name: &str, parent: GroupId) -> Result<GroupId, String> {
         if name.is_empty() || self.find(name).is_some() {
             return Err(format!("mixer group name '{name}' is empty or taken"));
@@ -148,8 +117,6 @@ impl Mixer {
         Ok(id)
     }
 
-    /// Set the fields `patch` names on group `id`, now. A transition in flight keeps
-    /// them where they were put rather than blending them away.
     pub fn set(&mut self, id: GroupId, patch: &GroupPatch) {
         let i = usize::from(id.0);
         self.groups[i].settings = patch.apply(&self.groups[i].settings);
@@ -162,7 +129,6 @@ impl Mixer {
         }
     }
 
-    /// Store snapshot `name` (replacing one of the same name).
     pub fn define_snapshot(&mut self, name: &str, patches: Vec<(GroupId, GroupPatch)>) {
         self.snapshots.insert(name.to_string(), patches);
     }
@@ -192,7 +158,6 @@ impl Mixer {
         Ok(())
     }
 
-    /// The snapshot last transitioned to, and how far along that blend is.
     pub fn snapshot(&self) -> Option<(&str, f32)> {
         let progress = self
             .transition
@@ -201,18 +166,14 @@ impl Mixer {
         Some((self.snapshot.as_deref()?, progress))
     }
 
-    /// Add a duck rule.
     pub fn add_duck(&mut self, duck: Duck) {
         self.ducks.push(duck);
     }
 
-    /// Drop every duck rule (their targets recover at once).
     pub fn clear_ducks(&mut self) {
         self.ducks.clear();
     }
 
-    /// Step the mixer to sim time `now`: the snapshot blend, then every duck, with
-    /// `playing(group)` saying whether a live voice routes into that group itself.
     pub fn advance(&mut self, now: f64, playing: impl Fn(GroupId) -> bool) {
         let dt = (now - self.now).max(0.0) as f32;
         self.now = now;
@@ -236,14 +197,12 @@ impl Mixer {
         }
     }
 
-    /// Whether `id` or any group under it has a playing voice.
     fn subtree_playing(&self, id: GroupId, playing: &impl Fn(GroupId) -> bool) -> bool {
         (0..self.groups.len())
             .map(|i| GroupId(i as u16))
             .any(|g| playing(g) && self.is_within(g, id))
     }
 
-    /// Whether `g` is `ancestor` or sits under it.
     fn is_within(&self, mut g: GroupId, ancestor: GroupId) -> bool {
         loop {
             if g == ancestor {
@@ -256,7 +215,6 @@ impl Mixer {
         }
     }
 
-    /// The gain group `id`'s ducks apply right now.
     fn duck_gain(&self, id: GroupId) -> f32 {
         self.ducks
             .iter()
@@ -265,12 +223,10 @@ impl Mixer {
             .product()
     }
 
-    /// What the device applies to group `id`'s track.
     pub fn mix(&self, id: GroupId) -> GroupMix {
         GroupMix::new(&self.groups[usize::from(id.0)].settings, self.duck_gain(id))
     }
 
-    /// Group `id` as the agent reads it back.
     pub fn state(&self, id: GroupId) -> GroupState {
         let group = &self.groups[usize::from(id.0)];
         let mut effective = 1.0;

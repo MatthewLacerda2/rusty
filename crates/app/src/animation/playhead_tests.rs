@@ -1,8 +1,3 @@
-//! The playheads as the `animate` system moves them (#80, #316): [`advance`] scales
-//! by the animator's and the node's speed, holds while stopped or paused, wraps a
-//! looping clip byte-identically at its length, and resolves a crossfade while the
-//! outgoing playhead runs on unwrapped.
-
 use super::advance;
 use super::test_rig::{mesh, slide, HIPS};
 use rusty_components::{AnimatorComponent, Playback};
@@ -19,8 +14,6 @@ fn idle() -> AnimatorComponent {
     }
 }
 
-/// Step `anim` by `dt` over a mesh whose `Idle` and `Walk` clips last `length`
-/// seconds (0: no clips, so neither resolves and the playhead runs free).
 fn step(anim: &mut AnimatorComponent, dt: f32, length: f32) {
     let clips = ["Idle", "Walk"].map(|n| slide(n, &[HIPS], 0.0, 1.0, length));
     let clips = if length > 0.0 {
@@ -37,17 +30,16 @@ fn crossfade_blends_then_resolves_to_target() {
     anim.base.time = 2.0;
     anim.crossfade("Walk".to_string(), 0.4);
     assert!(anim.is_crossfading());
-    // The outgoing clip is captured with its playhead frozen.
     assert_eq!(anim.base.previous_clip.as_deref(), Some("Idle"));
     assert_eq!(anim.base.previous_time, 2.0);
     assert_eq!(
         (anim.base.current_clip.as_str(), anim.base.time),
         ("Walk", 0.0)
     );
-    step(&mut anim, 0.2, 0.0); // half-way through the 0.4 s fade
+    step(&mut anim, 0.2, 0.0);
     assert!((anim.crossfade_weight() - 0.5).abs() < 1e-6);
     assert!(anim.is_crossfading());
-    step(&mut anim, 0.2, 0.0); // reaches the end — crossfade resolves
+    step(&mut anim, 0.2, 0.0);
     assert!(!anim.is_crossfading());
     assert_eq!(anim.crossfade_weight(), 1.0);
     assert_eq!(anim.base.current_clip, "Walk");
@@ -60,11 +52,11 @@ fn speed_scales_the_playhead_and_stop_or_pause_holds_it() {
     anim.speed = 2.0;
     step(&mut anim, 0.5, 0.0);
     assert!((anim.base.time - 1.0).abs() < 1e-6);
-    anim.freeze = true; // Animator.Pause
+    anim.freeze = true;
     step(&mut anim, 0.5, 0.0);
     assert_eq!(anim.base.time, 1.0, "pause holds the playhead");
     assert!(anim.is_playing, "pause is a hold, not a stop");
-    anim.freeze = false; // Animator.Resume
+    anim.freeze = false;
     step(&mut anim, 0.25, 0.0);
     assert_eq!(
         anim.base.time, 1.5,
@@ -97,8 +89,6 @@ fn component_and_node_speed_stack() {
 fn looping_clip_wraps_byte_identically_across_periods() {
     let mut anim = idle();
     anim.base.loop_clip = true;
-    // Two full periods of a 1 s clip at dt = 0.25: the playhead sequence must be
-    // bit-for-bit the same each period (deterministic replay).
     let period = |anim: &mut AnimatorComponent| -> Vec<u32> {
         (0..4)
             .map(|_| {
@@ -135,8 +125,6 @@ fn loop_wrap_keeps_the_outgoing_crossfade_playhead_independent() {
     anim.base.time = 0.9;
     anim.base.loop_clip = true;
     anim.crossfade("Walk".to_string(), 1.0);
-    // The looping incoming clip (0.3 s long) wraps; the outgoing playhead just
-    // keeps advancing, so the fading-out pose cannot glitch.
     step(&mut anim, 0.5, 0.3);
     assert!(
         (anim.base.time - 0.2).abs() < 1e-6,

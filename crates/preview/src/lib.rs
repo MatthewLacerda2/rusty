@@ -1,16 +1,3 @@
-//! crates/preview/src/lib.rs — the asset-preview machinery, shared by the editor and the agent.
-//!
-//! One isolated preview scene (#352) with two front-ends: the Inspector's Preview tab
-//! (`crates/editor/src/inspector/preview.rs`, human-facing, with drag-to-orbit) and the headless
-//! `Debug.Preview` capture (`crates/dev/src/preview.rs`, agent-facing, fixed framing) — the same
-//! "one surface, three callers" rule the scripting API follows (#353).
-//!
-//! Nothing here touches egui, wgpu or the active editor World: [`scene`] builds a
-//! brand-new throwaway [`rusty_scene::Scene`] and [`orbit`] is pure camera math. That
-//! is the point of the module living outside `editor/` — the headless path must not
-//! reach into the UI tree to render a preview, or the two front-ends drift into two
-//! preview scenes.
-
 pub mod orbit;
 pub mod scene;
 pub mod stand_in;
@@ -19,16 +6,6 @@ pub use orbit::{FramedOrbit, OrbitState};
 pub use scene::{build_preview_scene, PreviewMesh, PreviewSubject};
 pub use stand_in::framing;
 
-/// The preview subject for a file extension, or `None` for a kind with no preview
-/// story (audio/scene/prefab/lua/unsupported). The single dispatch table both
-/// front-ends use, so the editor tab and `Debug.Preview` accept exactly the same set
-/// of assets — a new previewable extension is one arm here, not one per front-end.
-///
-/// `extension` is matched case-insensitively. [`PreviewSubject::Material`] is absent
-/// by construction: a material asset lives in `Scene::materials` and has no file on
-/// disk to dispatch on, so it is only ever selected directly (the Material component
-/// card builds it from the entity's `MaterialComponent`; `Debug.PreviewMaterial` from
-/// the library by name, #404).
 pub fn subject_for_path(path: &str) -> Option<PreviewSubject> {
     if rusty_asset::is_image_path(path) {
         Some(PreviewSubject::Texture(path.to_string()))

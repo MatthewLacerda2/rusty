@@ -1,5 +1,3 @@
-//! Tests for `AudioMaestro` over the `NullBackend` (no device needed).
-
 use super::*;
 use crate::introspection::AudioEventKind;
 use crate::mix::Shot;
@@ -15,7 +13,6 @@ fn source(clip: &str, volume: f32, looping: bool) -> AudioSourceComponent {
     }
 }
 
-/// A listener at the origin facing -Z (right axis = +X), the default test camera.
 fn listener() -> Listener {
     Listener::from_transform(Vec3::ZERO, Quat::IDENTITY)
 }
@@ -51,7 +48,6 @@ fn replaying_a_source_does_not_log_a_phantom_stop() {
     let mut m = AudioMaestro::default();
     m.play_source(1, &source("a.ogg", 1.0, false), [0.0; 3], 0);
     m.play_source(1, &source("b.ogg", 1.0, false), [0.0; 3], 1);
-    // Two Play events, no interleaved Stop (the internal replace suppresses it).
     let kinds: Vec<_> = m.events().iter().map(|e| e.kind).collect();
     assert_eq!(kinds, vec![AudioEventKind::Play, AudioEventKind::Play]);
 }
@@ -73,9 +69,7 @@ fn play_at_logs_a_oneshot_without_an_entity_voice() {
         ..Shot::new("boom.wav", [4.0, 0.0, -2.0])
     };
     m.play_at(&shot, 42, 11);
-    // One-shot leaves no live entity voice…
     assert!(!m.is_source_playing(42));
-    // …but its only trace is the event log.
     let ev = m.events().last().unwrap();
     assert_eq!(ev.kind, AudioEventKind::PlayAt);
     assert_eq!(ev.entity, 42);
@@ -88,11 +82,9 @@ fn play_at_logs_a_oneshot_without_an_entity_voice() {
 #[test]
 fn set_source_volume_only_affects_live_voices() {
     let mut m = AudioMaestro::default();
-    // No live voice yet — a no-op, no panic.
     m.set_source_volume(3, 0.5);
     m.play_source(3, &source("a.ogg", 1.0, true), [0.0; 3], 0);
     m.set_source_volume(3, 0.25);
-    // Still playing; volume change is reflected via the roster's source view.
     let info = m.voice_info(3, &source("a.ogg", 0.25, true), Vec3::ZERO, &listener());
     assert!(info.playing);
     assert_eq!(info.volume, 0.25);

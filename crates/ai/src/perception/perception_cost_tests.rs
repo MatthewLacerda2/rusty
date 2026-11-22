@@ -1,4 +1,4 @@
-//! What perception costs on the Dust2-sized bench level (#1900)
+//! What perception costs on the Dust2-sized bench level
 //! ([`super::bench`]): the gate run checks the step works at level scale under
 //! the ray budget.
 

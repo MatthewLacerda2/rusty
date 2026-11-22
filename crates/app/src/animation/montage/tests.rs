@@ -1,7 +1,3 @@
-//! Montages (#1894): a masked slot leaves the rest of the body to the layers,
-//! and weights ramp over the blends while markers and the two engine events
-//! fire once each. The helpers here serve every montage test.
-
 use super::super::test_rig::*;
 use super::super::*;
 use rusty_asset::animation_graph::{GraphSlot, Montage};
@@ -9,7 +5,6 @@ use rusty_components::{ActiveMontage, Motion, MONTAGE_BLEND_OUT, MONTAGE_END};
 
 pub(super) const DT: f32 = 0.05;
 
-/// The rig's graph with `slots` and `montages` declared as JSON.
 pub(super) fn with_montages(slots: &str, montages: &str) -> AnimationGraph {
     let mut g = graph(vec![node("Run", "Run")], Vec::new());
     g.slots = serde_json::from_str::<Vec<GraphSlot>>(slots).unwrap();
@@ -28,7 +23,6 @@ pub(super) fn start(
     anim.montages.play(montage);
 }
 
-/// Step `n` times; the montage engine events and markers fired, in order.
 pub(super) fn run(
     anim: &mut AnimatorComponent,
     m: &MeshComponent,
@@ -68,7 +62,6 @@ fn an_upper_body_montage_leaves_the_legs_to_the_base_layer() {
     anim.montages.playing[0].time = 1.0;
     let pose = sample_pose(&anim, &m, Some(&g)).unwrap().1;
     let xs: Vec<f32> = pose.iter().map(|j| j.unwrap().translation.x).collect();
-    // Run is at +1 everywhere, Reload at -2: the spine and head take Reload.
     assert_eq!(xs, vec![1.0, -2.0, 1.0, -2.0]);
 }
 
@@ -89,7 +82,6 @@ fn the_weight_ramps_in_then_out_and_both_events_fire_once() {
     );
     let mut events = run(&mut anim, &m, &g, 2);
     assert!((anim.montages.playing[0].weight() - 1.0).abs() < 1e-4);
-    // It starts blending out 0.4 s before the clip's 2 s end.
     while !events.iter().any(|e| e == MONTAGE_BLEND_OUT) {
         events.extend(run(&mut anim, &m, &g, 1));
     }
@@ -121,7 +113,6 @@ fn an_additive_slot_adds_the_change_from_the_clips_first_frame() {
     start(&mut anim, &g, &m, "Hit");
     anim.montages.playing[0].time = 1.0;
     let pose = sample_pose(&anim, &m, Some(&g)).unwrap().1;
-    // Run's +1 plus Reload's change from its first frame, -2.
     assert!(
         pose.iter().all(|j| j.unwrap().translation.x == -1.0),
         "{pose:?}"

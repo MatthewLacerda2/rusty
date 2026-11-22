@@ -1,7 +1,3 @@
-//! Play and the import cache (#1253): Play refreshes every converted source and the
-//! scene's instances first, then reads the cache and never converts, until Stop.
-//! Shared fixtures for `gate` (what Play serves) and `refresh` (what it does first).
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -21,10 +17,8 @@ mod refresh;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A quad (6 indices) under the object name `Quad`.
 const QUAD: &str = include_str!("../../../../tests/fixtures/models/embedded_textures.fbx");
 
-/// One triangle (3 indices) under the same object name.
 fn triangle() -> String {
     include_str!("../../../../tests/fixtures/models/missing_texture.fbx").replace("Tri", "Quad")
 }
@@ -40,7 +34,6 @@ fn world() -> GameWorld {
     )
 }
 
-/// `<test>/assets/enemies/enemy.fbx`, a quad, never imported; returns the root.
 fn assets() -> (PathBuf, PathBuf) {
     let root = rusty_test_support::temp::dir().join("assets");
     std::fs::create_dir_all(root.join("enemies")).unwrap();

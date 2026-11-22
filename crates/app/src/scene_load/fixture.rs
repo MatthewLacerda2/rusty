@@ -1,6 +1,3 @@
-//! Fixture for the `Scene.Load` tests (#432): a menu scene that loads a level on its
-//! first Update, with a `DontDestroyOnLoad` music entity, written to a temp dir.
-
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -13,9 +10,6 @@ use rusty_script::scripting::ConsoleLogs;
 
 use super::super::GameWorld;
 
-/// Two scene files in a per-test temp dir: `menu.scene` (a `Menu` whose first
-/// Update loads the level, and a `Music` that marks itself `DontDestroyOnLoad`) and
-/// `level.scene` (one `Level`). Returns `(menu path, level path)`.
 pub(super) fn write_scenes(tag: &str) -> (String, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_432_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -67,7 +61,6 @@ pub(super) fn write_scenes(tag: &str) -> (String, String) {
     (path("menu.scene"), level)
 }
 
-/// A world with `path` loaded as its scene file, and its console.
 pub(super) fn world_at(path: &str) -> (GameWorld, Rc<RefCell<ConsoleLogs>>) {
     let mut scene = Scene::new();
     rusty_edit::load_from_file(&mut scene, path).unwrap();

@@ -1,11 +1,7 @@
-//! The delay against an impulse (#1748): the echo's time, its level, each repeat's
-//! decay and the feedback low-pass.
-
 use kira::Frame;
 
 use super::super::signal::{run, values};
 
-/// An impulse, then silence, `frames` long.
 fn impulse(frames: usize) -> Vec<Frame> {
     let mut s = vec![Frame::ZERO; frames];
     s[0] = Frame::new(1.0, 0.5);

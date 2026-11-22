@@ -1,7 +1,3 @@
-//! Montages (#1894): an interrupted one blends out from its weight and ends
-//! once, a looping section holds until a jump, and a clip plays as a montage
-//! with no graph.
-
 use super::super::test_rig::*;
 use super::super::*;
 use super::tests::{count, rig, run, start, with_montages, UPPER};

@@ -1,7 +1,3 @@
-//! The #1896 sync tests' rig: a one-second Walk planting `FootL` at 0 and
-//! `FootR` at 0.5, a 0.6 s Run planting them 0.15 of the way later (0.09 and
-//! 0.39), both in the `Locomotion` group, on [`test_rig`](super::super::test_rig).
-
 use rusty_asset::animation_graph::{
     AnimationGraph, BlendChild1D, BlendTree, ChildMotion, GraphNode, SyncMarker,
 };
@@ -31,7 +27,6 @@ pub fn marks(list: &[(&str, f32)]) -> Vec<SyncMarker> {
         .collect()
 }
 
-/// Walk on the hips, Run on the leg, Idle on the spine.
 pub fn rig_mesh() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 1.0, WALK),
@@ -40,8 +35,6 @@ pub fn rig_mesh() -> MeshComponent {
     ])
 }
 
-/// Walk slides the hips 1 m a cycle; Run, the hips and the leg 1 m over its
-/// 0.6 s, so root motion reads both and the leg reads Run alone.
 pub fn hips_mesh() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 1.0, WALK),
@@ -50,7 +43,6 @@ pub fn hips_mesh() -> MeshComponent {
     ])
 }
 
-/// A looping node playing `clip` in `group` with `markers`.
 pub fn grouped(name: &str, group: Option<&str>, markers: Vec<SyncMarker>) -> GraphNode {
     GraphNode {
         sync_group: group.map(String::from),
@@ -59,7 +51,6 @@ pub fn grouped(name: &str, group: Option<&str>, markers: Vec<SyncMarker>) -> Gra
     }
 }
 
-/// Walk, Run and Idle nodes; Walk and Run in `Locomotion` when `grouped_in`.
 pub fn locomotion(grouped_in: bool) -> AnimationGraph {
     let group = grouped_in.then_some("Locomotion");
     graph(
@@ -72,7 +63,6 @@ pub fn locomotion(grouped_in: bool) -> AnimationGraph {
     )
 }
 
-/// A 1D tree over `speed`: Walk at 0, Run at 1, each with its markers.
 pub fn tree(walk: Vec<SyncMarker>, run: Vec<SyncMarker>) -> GraphNode {
     let child = |clip: &str, sync_markers, threshold| BlendChild1D {
         motion: ChildMotion {
@@ -91,7 +81,6 @@ pub fn tree(walk: Vec<SyncMarker>, run: Vec<SyncMarker>) -> GraphNode {
     }
 }
 
-/// An animator bound to `graph`'s entry.
 pub fn bound(graph: &AnimationGraph) -> AnimatorComponent {
     let mut anim = AnimatorComponent::default();
     super::super::graph::step_graph(&mut anim, graph);
@@ -106,7 +95,6 @@ pub fn run_at(t: f32) -> SyncPos<'static> {
     position(Box::leak(run_marks().into_boxed_slice()), RUN, t, true)
 }
 
-/// Two positions name the same pair and lie the same fraction along it.
 pub fn assert_same(a: SyncPos, b: SyncPos, what: &str) {
     let (Some((a0, a1, af)), Some((b0, b1, bf))) = (a.pair, b.pair) else {
         panic!("{what}: no marker pair in {a:?} / {b:?}");

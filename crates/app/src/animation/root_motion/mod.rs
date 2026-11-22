@@ -1,26 +1,3 @@
-//! crates/app/src/animation/root_motion/ — root motion (#1745), Unity's *Apply Root
-//! Motion*.
-//!
-//! One bone (the Animator's `root_bone`, else the skeleton's first root joint)
-//! carries the character's travel. Each step, its **horizontal** displacement
-//! and its **yaw** (the twist about the up axis), both measured in the model's
-//! Y-up space ([`SkinData::mesh_to_model`], #1822: a Blender export's Z-up,
-//! centimetre `Armature` above the mesh is undone, so its forward travel is not
-//! mistaken for vertical), are the step's [`RootMotion`] (the `animate` system
-//! carries it into the world through the skinned entity):
-//! - per clip, over the playhead's travel before any wrap: a loop's wrap splits
-//!   the travel at the seam and chains the pieces, so a looping walk keeps
-//!   walking instead of snapping back, and a clamped clip stops at its end;
-//! - each piece is measured in the frame the bone faced when it began, turned
-//!   to its bind facing, so a clip that turns as it walks curves the entity;
-//! - blend trees, crossfades and layers blend the deltas by the same weights
-//!   they blend poses by (`blend`).
-//!
-//! When the animator applies it, [`RootBone::strip`] holds the bone at its
-//! bind-pose horizontal position and yaw in the pose, so the travel shows up
-//! only once: on the entity. Vertical motion stays in the pose. Pure functions
-//! of (skin, clips, playheads): deterministic.
-
 mod blend;
 
 use std::f32::consts::{PI, TAU};
@@ -34,38 +11,24 @@ use rusty_components::{root_chain, Bounds, RootMotion};
 use super::clip::sample_joint;
 use super::motion::Pose;
 
-/// At most this many whole cycles of a loop count in a single step, so an
-/// absurd speed on a short clip can't spin the walk (the events' own cap).
 const MAX_CYCLES: usize = 16;
 
-/// Where the bone stands in model space and which way it faces.
 #[derive(Clone, Copy, Debug)]
 struct Frame {
     position: Vec3,
     yaw: f32,
 }
 
-/// The bone root motion is read from, resolved against one skin.
 #[derive(Clone, Debug)]
 pub struct RootBone {
     slot: usize,
-    /// The bone's joint chain from its skeleton root down to it.
     chain: Vec<usize>,
-    /// Mesh-local space into model space, `None` when their axes coincide (a
-    /// native Y-up rig), so such a rig's deltas are computed exactly as before
-    /// ([`SkinData::mesh_to_model_axes`]).
     model: Option<Mat4>,
-    /// Where the bone stands in the bind pose, in model space.
     bind_position: Vec3,
-    /// Its bind rotation there: yaw is measured relative to it, so a bone
-    /// bound flipped (a Z-up rig's hips) still has a twist to measure.
     bind_rotation: Quat,
 }
 
 impl RootBone {
-    /// The bone named `name` in `skin` (empty: the first root joint). `None`
-    /// when the skin has no such joint, or its parents loop
-    /// ([`root_chain`]).
     pub fn resolve(skin: &SkinData, name: &str) -> Option<Self> {
         let chain = root_chain(skin, name)?;
         let slot = *chain.last()?;
@@ -84,12 +47,10 @@ impl RootBone {
         Some(bone)
     }
 
-    /// The joint slot of the bone.
     pub fn slot(&self) -> usize {
         self.slot
     }
 
-    /// Whether `clip` keys any joint of the bone's chain.
     pub(in crate::animation) fn keyed_by(&self, clip: &AnimationClip) -> bool {
         self.chain.iter().any(|&s| {
             clip.tracks
@@ -98,8 +59,6 @@ impl RootBone {
         })
     }
 
-    /// The first `depth` joints of the chain composed in model space, each
-    /// joint's local from `local`.
     fn model_matrix(
         &self,
         skin: &SkinData,
@@ -113,14 +72,11 @@ impl RootBone {
             .fold(offset, |m, &s| m * local(s).matrix())
     }
 
-    /// The bone's frame in `clip` at clip time `time`.
     fn at(&self, skin: &SkinData, clip: &AnimationClip, time: f32) -> Frame {
         let depth = self.chain.len();
         self.frame(self.model_matrix(skin, depth, |s| sample_joint(skin, clip, s, time)))
     }
 
-    /// Where the bone stands under the model-space matrix `m`, and its yaw
-    /// away from its bind facing.
     fn frame(&self, m: Mat4) -> Frame {
         // lint: allow(world-space) a joint chain in model space, rig data, not the scene hierarchy
         let (_, rotation, position) = m.to_scale_rotation_translation();
@@ -130,14 +86,10 @@ impl RootBone {
         }
     }
 
-    /// The twist about +Y that turns the bone's bind rotation into `rotation`
-    /// (applied in model space, after the bind rotation).
     fn yaw(&self, rotation: Quat) -> f32 {
         yaw_of(rotation * self.bind_rotation.inverse())
     }
 
-    /// The root motion of `clip` from clip time `a` to `b`: the horizontal
-    /// travel in the frame the bone faced at `a`, turned to its bind facing.
     fn segment(&self, skin: &SkinData, clip: &AnimationClip, a: f32, b: f32) -> RootMotion {
         if a == b {
             return RootMotion::ZERO;
@@ -151,9 +103,6 @@ impl RootBone {
         }
     }
 
-    /// The root motion of `clip` over a playhead's travel `span` (before any
-    /// wrap) within `bounds`, where one playhead unit is `scale` clip seconds
-    /// (1 for a clip, its duration for a blend-tree leaf at a normalized phase).
     pub(super) fn travel(
         &self,
         skin: &SkinData,
@@ -170,10 +119,6 @@ impl RootBone {
         }
     }
 
-    /// Take the bone's horizontal travel and yaw out of `pose`: it stands at
-    /// its bind-pose horizontal position, facing its bind yaw, with its
-    /// height, tilt and scale as sampled. A pose that drives nothing on the
-    /// bone's chain is left alone.
     pub fn strip(&self, skin: &SkinData, pose: &mut Pose) {
         if !self
             .chain
@@ -203,9 +148,6 @@ impl RootBone {
     }
 }
 
-/// A looping playhead's travel over `span`, split at each wrap of `length`:
-/// to the seam, any whole cycles (at most [`MAX_CYCLES`]), then on from the
-/// other end, each piece chained onto the facing the last left.
 fn wrapped(span: (f32, f32), length: f32, piece: impl Fn(f32, f32) -> RootMotion) -> RootMotion {
     let (k0, k1) = ((span.0 / length).floor(), (span.1 / length).floor());
     let (a, b) = (span.0 - k0 * length, span.1 - k1 * length);
@@ -226,12 +168,10 @@ fn wrapped(span: (f32, f32), length: f32, piece: impl Fn(f32, f32) -> RootMotion
     out.then(piece(start, b))
 }
 
-/// The twist of `q` about +Y (its swing-twist split), radians in `(-π, π]`.
 fn yaw_of(q: Quat) -> f32 {
     wrap_angle(2.0 * q.y.atan2(q.w))
 }
 
-/// `angle` wrapped into `(-π, π]`.
 fn wrap_angle(angle: f32) -> f32 {
     let wrapped = (angle + PI).rem_euclid(TAU) - PI;
     if wrapped <= -PI {

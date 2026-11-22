@@ -1,8 +1,3 @@
-//! Root motion on a physics body (#1745): a dynamic Rigidbody takes the lunge
-//! as velocity (the solver owns its pose) and a wall stops it, and a
-//! CharacterController carries a creep shorter than its `min_move_distance`
-//! instead of dropping it.
-
 use glam::Vec3;
 
 use super::tests::{add_box, lunging, play, playing};
@@ -11,7 +6,6 @@ use rusty_components::{
 };
 use rusty_scene::Scene;
 
-/// Give `id` a dynamic, weightless, frictionless box body.
 fn dynamic(scene: &mut Scene, id: u32) {
     let rb = RigidBodyComponent {
         is_kinematic: false,
@@ -59,7 +53,6 @@ fn a_wall_stops_a_dynamic_bodys_lunge() {
 #[test]
 fn a_character_controller_carries_a_creep_below_its_min_move() {
     let mut scene = Scene::new();
-    // 0.2 m over a second: 3.3 mm a step, under a 1 cm minimum move.
     let guard = playing(&mut scene, 0.2);
     let cc = CharacterControllerComponent {
         min_move_distance: 0.01,

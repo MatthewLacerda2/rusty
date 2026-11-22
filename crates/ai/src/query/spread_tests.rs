@@ -1,7 +1,3 @@
-//! The spread and determinism tests (#1892, *Done when*): six agents asking the
-//! same `separation` query around one target end up apart, and the same seed
-//! always picks the same random spot.
-
 use glam::Vec3;
 
 use super::test_world::Arena;

@@ -1,8 +1,3 @@
-//! Play starts from the scene's saved navmesh (#1887): a scene saved with one and
-//! loaded back enters Play without a bake, a stale one is baked instead, and a
-//! play-mode `Scene.Load` and Stop restore it too, each once. A path budget set in
-//! Play ends with it (#2087).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -16,11 +11,8 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
-/// The floor a marked file gives its first span: no bake makes it.
 const MARK: f32 = 0.125;
 
-/// A floor and a crate saved to disk with their navmesh, its first span's floor
-/// overwritten by [`MARK`] (the fingerprint still matches), and loaded back.
 fn saved_and_loaded(name: &str, stale: bool) -> GameWorld {
     let path = saved(name, stale);
     let mut loaded = Scene::new();
@@ -28,7 +20,6 @@ fn saved_and_loaded(name: &str, stale: bool) -> GameWorld {
     world(loaded)
 }
 
-/// The path of a scene saved as [`saved_and_loaded`] describes.
 fn saved(name: &str, stale: bool) -> String {
     let mut scene = Scene::new();
     add_floor(&mut scene, -4.0, 4.0, -4.0, 4.0);
@@ -76,9 +67,6 @@ fn a_stale_saved_navmesh_is_baked_instead() {
     assert_ne!(nav.spans[0].y, MARK, "the crate moved: baked in full");
 }
 
-/// A play-mode `Scene.Load` makes the new scene's navmesh once, in the load step:
-/// restored from a matching file (one generation, no bake), and the next tick only
-/// syncs, where it used to bake a second time.
 #[test]
 fn a_play_mode_load_restores_the_saved_navmesh_once() {
     let target = saved("load_target.scene", false);
@@ -96,7 +84,6 @@ fn a_play_mode_load_restores_the_saved_navmesh_once() {
     assert_eq!(nav.bake_generation, before + 1, "made once");
 }
 
-/// Stop puts the edit scene back and restores its saved navmesh, not a bake.
 #[test]
 fn stop_restores_the_saved_navmesh() {
     let mut gw = saved_and_loaded("stop.scene", false);
@@ -109,8 +96,6 @@ fn stop_restores_the_saved_navmesh() {
     assert_eq!(gw.nav().borrow().spans[0].y, MARK, "restored on Stop");
 }
 
-/// Boot (`NavigationGraph::from_scene`, the player's and the harness's path)
-/// restores the saved navmesh too.
 #[test]
 fn boot_restores_the_saved_navmesh() {
     let path = saved("boot.scene", false);
@@ -128,7 +113,7 @@ fn a_play_mode_path_budget_ends_with_play() {
     let default = rusty_navigation::DEFAULT_ITERATIONS_PER_FRAME;
     gw.set_playing(true);
     gw.tick(DT);
-    set(&gw); // Play 1's script sets it
+    set(&gw);
     gw.set_playing(false);
     gw.tick(DT);
     assert_eq!(budget(&gw), default, "Stop reverts it");

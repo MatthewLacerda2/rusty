@@ -1,14 +1,3 @@
-//! crates/audio/src/mixer/effects/kinds/compressor.rs — a feed-forward compressor, with
-//! an optional sidechain (#1748).
-//!
-//! Above `threshold` dB the level is reduced by `ratio` (4:1 lets 1 dB of every 4
-//! through); the reduction moves toward its target with `attack` / `release`
-//! (ms), measured in dB, and `makeup` dB is added after. The detector is the
-//! louder channel's peak (stereo-linked), or with a `sidechain` the keyed group's
-//! peak over its last block (Godot's `AudioEffectCompressor.sidechain`): SFX can
-//! duck the music under every gunshot. Unity's mixer compressor's names and
-//! defaults (`threshold` 0 dB: it does nothing until set), with Godot's `ratio`.
-
 use std::sync::Arc;
 
 use kira::Frame;

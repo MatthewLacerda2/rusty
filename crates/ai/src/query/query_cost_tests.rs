@@ -1,4 +1,4 @@
-//! What one environment query costs on the Dust2-sized bench level (#1892)
+//! What one environment query costs on the Dust2-sized bench level
 //! ([`super::bench`]): the gate run (`n = 5`) checks the query works at level
 //! scale and that its one flood stays local.
 

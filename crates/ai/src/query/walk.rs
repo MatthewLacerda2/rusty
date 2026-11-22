@@ -1,29 +1,14 @@
-//! Reachability and path length (#1892, decision 3): one bounded search from the
-//! querier toward every item at once (`navigation::flood`, an A\* to many goals,
-//! #2088) answers them all, instead of an A\* per item.
-//!
-//! Split in two so the search can be time-sliced (#2116): [`FloodAsk::new`] reads
-//! what the search needs off the world when the test runs, and the search itself
-//! needs only the navmesh, synchronously ([`FloodAsk::lengths`]) or stepped across
-//! ticks by the query queue (`queue`), which hands its finished
-//! [`FloodSearch`] to [`FloodAsk::read`].
-
 use glam::Vec3;
 
 use super::spec::Anchor;
 use super::QueryWorld;
 use rusty_navigation::{FloodSearch, NavigationGraph, ALL_AREAS};
 
-/// How far past the farthest item the flood may wander, as a factor of that
-/// straight-line distance: a path around a wall or up a stair is longer than the
-/// crow flies, but rarely twice as long.
 const SLACK: f32 = 2.0;
 /// And at least this much, metres, so an item next to the querier behind a short
 /// wall is still found.
 const MIN_REACH: f32 = 4.0;
 
-/// The search a `path` test needs: from where, toward which items, how far, and
-/// over which areas. Never empty: a test with no items left asks no search.
 #[derive(Clone, Debug, PartialEq)]
 pub struct FloodAsk {
     pub from: Vec3,
@@ -77,8 +62,6 @@ impl FloodAsk {
         }
     }
 
-    /// Each item's travel cost from a finished `search` begun on this ask, metres,
-    /// or `None` for an item it cannot reach (or one past the bound).
     pub fn read(&self, nav: &NavigationGraph, search: &FloodSearch) -> Vec<Option<f32>> {
         self.items
             .iter()

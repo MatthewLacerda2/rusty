@@ -1,10 +1,3 @@
-//! Master's chain after the reverb bus (#1855): a volley inside a big zone at full
-//! wet stays under the limiter's ceiling, a mix under the ceiling is untouched,
-//! and the speaker-mode stage runs after the limiter. Home theater passes it bit
-//! for bit, headphones' crossfeed only averages the two channels so the ceiling
-//! holds, and TV's +9 dB makeup lifts it again into the mode's own soft limit,
-//! which stays under full scale.
-
 use super::loud_tests::{capture, ceiling, peak};
 use super::*;
 use crate::mixer::{EffectChain, GroupPatch};
@@ -12,7 +5,6 @@ use crate::reverb::ReverbState;
 use crate::SpeakerMode;
 use rusty_components::ReverbParams;
 
-/// SFX sending everything into a long zone at full wet, `master`'s effects on Master.
 pub(super) fn hall(maestro: &mut AudioMaestro, master: EffectChain) {
     let send = GroupPatch {
         reverb_send: Some(1.0),
@@ -34,7 +26,6 @@ pub(super) fn hall(maestro: &mut AudioMaestro, master: EffectChain) {
     });
 }
 
-/// `shots` gunshots at `volume` in the [`hall`].
 fn in_a_hall(name: &str, shots: u32, volume: f32, master: EffectChain) -> Vec<f32> {
     capture(name, shots, volume, |maestro| hall(maestro, master))
 }
@@ -70,7 +61,6 @@ fn a_mix_under_the_ceiling_in_a_zone_is_bit_identical_with_the_limiter_on() {
     );
 }
 
-/// A loud volley in the hall, Master's default limiter on, played in `mode`.
 fn volley_in(name: &str, mode: SpeakerMode) -> Vec<f32> {
     capture(name, 8, 0.5, |maestro| {
         maestro.set_speaker_mode(mode);

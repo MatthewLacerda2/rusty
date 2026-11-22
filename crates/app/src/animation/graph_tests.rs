@@ -1,8 +1,3 @@
-//! Unit tests for the graph runtime evaluator (#316): binding seeds defaults and
-//! enters the entry node, conditions gate transitions in authored priority order,
-//! a fired trigger is consumed exactly once, condition-less edges never auto-fire,
-//! and a fixed-dt replay is byte-identical.
-
 use std::collections::BTreeMap;
 
 use super::*;
@@ -41,7 +36,6 @@ fn float_cond(parameter: &str, op: NumericOp, value: f32) -> Condition {
     }
 }
 
-/// Idle ⇄ Run on the `speed` float, Idle → Jump on the `Jump` trigger.
 fn locomotion() -> AnimationGraph {
     AnimationGraph {
         parameters: BTreeMap::from([
@@ -100,7 +94,6 @@ fn first_step_binds_seeds_defaults_and_enters_entry() {
     assert_eq!(anim.base.current_clip, "IdleClip");
     assert!(anim.is_playing && anim.base.loop_clip);
     assert!(!anim.is_crossfading(), "entry is a hard cut");
-    // Declared defaults seeded; the trigger starts clear.
     assert_eq!(anim.get_float("speed"), Some(0.0));
     assert_eq!(anim.get_bool("armed"), Some(true));
     assert!(!anim.trigger_is_set("Jump"));
@@ -119,7 +112,7 @@ fn binding_never_overwrites_a_value_a_script_already_wrote() {
 fn satisfied_edge_crossfades_and_adopts_the_target_node() {
     let graph = locomotion();
     let mut anim = graph_animator();
-    step_graph(&mut anim, &graph); // bind → Idle
+    step_graph(&mut anim, &graph);
     anim.set_float("speed", 2.0);
     step_graph(&mut anim, &graph);
     assert_eq!(anim.base.current_node.as_deref(), Some("Run"));
@@ -130,7 +123,6 @@ fn satisfied_edge_crossfades_and_adopts_the_target_node() {
         "the edge's blend length"
     );
     assert_eq!(anim.base.node_speed, 2.0, "per-node speed adopted");
-    // Back below the threshold: the Run → Idle edge brings it home.
     anim.set_float("speed", 0.5);
     step_graph(&mut anim, &graph);
     assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
@@ -145,7 +137,7 @@ fn unsatisfied_edges_keep_the_current_node_playing() {
     let graph = locomotion();
     let mut anim = graph_animator();
     step_graph(&mut anim, &graph);
-    step_graph(&mut anim, &graph); // speed = 0.0, no trigger: nothing fires
+    step_graph(&mut anim, &graph);
     assert_eq!(anim.base.current_node.as_deref(), Some("Idle"));
     assert!(!anim.is_crossfading());
 }
@@ -154,7 +146,7 @@ fn unsatisfied_edges_keep_the_current_node_playing() {
 fn fired_trigger_is_consumed_exactly_once() {
     let graph = locomotion();
     let mut anim = graph_animator();
-    step_graph(&mut anim, &graph); // bind → Idle
+    step_graph(&mut anim, &graph);
     anim.set_trigger("Jump");
     step_graph(&mut anim, &graph);
     assert_eq!(anim.base.current_node.as_deref(), Some("Jump"));
@@ -171,7 +163,6 @@ fn fired_trigger_is_consumed_exactly_once() {
 #[test]
 fn first_authored_edge_wins_when_several_are_satisfiable() {
     let mut graph = locomotion();
-    // A second satisfiable Idle edge, authored after the Idle → Run one.
     graph.base.edges.push(edge(
         "Idle",
         "Jump",
@@ -234,8 +225,6 @@ fn bool_condition_requires_the_matching_value_and_type() {
     assert!(!condition_holds(&anim, &is_false));
 }
 
-/// Determinism: the same (graph, parameter writes, fixed dt) sequence yields a
-/// byte-identical animator — the property the headless replay depends on.
 #[test]
 fn replaying_the_same_inputs_is_byte_identical() {
     let clips = ["IdleClip", "RunClip", "JumpClip"].map(|n| slide(n, &[HIPS], 0.0, 1.0, 1.5));

@@ -1,6 +1,3 @@
-//! `progress` while preparing (#2123): the loader's report, published at a tick head
-//! in whole percent of the way to 0.9, as the tap leaves it; then 0.9 once ready.
-
 use super::fixture::world_at;
 use super::{GameWorld, Inline, SceneLoader};
 use crate::TickTap;
@@ -10,7 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A loader whose job is `step`% further at each ask, finished at 100%.
 struct Steps {
     inner: Inline,
     step: f32,
@@ -36,7 +32,6 @@ impl SceneLoader for Steps {
     }
 }
 
-/// A tap that hands back `forced` for every move of the progress, as a replay would.
 struct Forced(Option<u8>);
 
 impl TickTap for Forced {

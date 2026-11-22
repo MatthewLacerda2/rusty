@@ -1,7 +1,3 @@
-//! The filter tests (#1892, *Done when*): `trace` rejects points behind a wall,
-//! `path = "exists"` rejects an unreachable roof, `dot` keeps the points behind a
-//! target facing +Z, and `view` keeps the points outside the camera's frustum.
-
 use glam::Vec3;
 
 use super::test_world::{wall, Arena};

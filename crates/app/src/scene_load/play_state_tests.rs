@@ -1,13 +1,8 @@
-//! One play state (#1302): editor Play — the transport's `set_playing`, then a
-//! paused frame's `poll_transition` — is Play to the Lua API, and what a paused
-//! Play queued is dropped on Stop (#1298).
-
 use rusty_core::paths;
 use rusty_scene::Scene;
 
 use super::fixture::world_at;
 
-/// A scene file holding one entity `Keep`, under a per-test temp dir.
 fn write_scene(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_1302_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -56,8 +51,6 @@ fn a_destroy_queued_in_a_paused_play_does_not_outlive_stop() {
     );
 }
 
-/// `Scene.Save` in Play raises a Lua error naming the rule and leaves the scene
-/// file as it was (#1340).
 #[test]
 fn scene_save_is_refused_in_play() {
     let path = write_scene("save");

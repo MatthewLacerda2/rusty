@@ -1,7 +1,3 @@
-//! `Scene.New()` (#2000), the API face of File ▸ New: in edit mode the World becomes
-//! an empty, new scene with no current file; during Play it is refused and nothing
-//! changes.
-
 use super::fixture::{world_at, write_scenes};
 
 const DT: f32 = 1.0 / 60.0;

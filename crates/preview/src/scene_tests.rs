@@ -1,6 +1,3 @@
-//! Tests for `build_preview_scene` (#352): isolation, per-subject material wiring,
-//! and the mesh toggle — all GPU-free (`Scene` is plain data).
-
 use super::*;
 use rusty_asset::MapRef;
 
@@ -16,8 +13,6 @@ f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
 
-/// The same quad, authored 10 units from the origin — the situation the engine's own
-/// Suzanne (and most models exported from an authoring tool) are actually in.
 const OFFSET_QUAD_OBJ: &str = "\
 o Quad
 v 9.0 5.0 -1.0
@@ -41,8 +36,6 @@ f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
 
-/// Two named objects that together span `x[8,12]` — neither sits at the union centre
-/// `(10, 0, 0)`, so a per-object recentring would pull them on top of each other.
 const TWO_PART_OBJ: &str = "\
 o Left
 v 8.0 -1.0 -1.0
@@ -67,8 +60,6 @@ fn write_obj(name: &str, contents: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The entity the fit moves and scales for mesh `id`: its model's root (#1083),
-/// or the mesh itself when it was spawned alone.
 fn subject(scene: &Scene, id: u32) -> u32 {
     scene.world.ancestors(id).last().unwrap_or(id)
 }
@@ -163,13 +154,9 @@ fn model_subject_instantiates_every_sub_object_at_the_origin() {
 
 #[test]
 fn an_off_origin_model_is_recentred_where_the_camera_looks() {
-    // The orbit camera always targets the world origin, so a model authored elsewhere
-    // used to render as empty sky — present in the scene, never in shot (#353 found
-    // this by looking at the bundled Suzanne's preview).
     let path = write_obj("preview_scene_test_offset.obj", OFFSET_QUAD_OBJ);
     let scene =
         build_preview_scene(PreviewMesh::Sphere, None, &PreviewSubject::Model(path)).unwrap();
-    // The fixture's own bounds centre, scaled with the subject to fit the frame.
     let scale = fit_scale(Vec3::new(9.0, 5.0, -1.0), Vec3::new(11.0, 5.0, 1.0));
     let expected = -Vec3::new(10.0, 5.0, 0.0) * scale;
     assert!(
@@ -181,9 +168,6 @@ fn an_off_origin_model_is_recentred_where_the_camera_looks() {
 
 #[test]
 fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
-    // The model is moved by the *union* centre, not each part by its own: recentring
-    // each part independently would stack them all at the origin and silently
-    // rearrange the model. Also the only path that unions two sets of bounds together.
     let path = write_obj("preview_scene_test_two_part.obj", TWO_PART_OBJ);
     let scene =
         build_preview_scene(PreviewMesh::Sphere, None, &PreviewSubject::Model(path)).unwrap();
@@ -203,7 +187,7 @@ fn a_multi_part_model_shares_one_offset_so_its_layout_survives() {
 #[test]
 fn a_centimetre_model_is_scaled_up_to_fill_the_frame() {
     // An FBX in its default unit, the centimetre, imports a hundredth of a metre
-    // across: at the fixed camera distance it was a sub-pixel speck (#1280).
+    // across: at the fixed camera distance it was a sub-pixel speck.
     let path = write_obj("preview_scene_test_tiny.obj", TINY_QUAD_OBJ);
     let scene =
         build_preview_scene(PreviewMesh::Sphere, None, &PreviewSubject::Model(path)).unwrap();
@@ -228,8 +212,6 @@ fn a_point_keeps_its_size_and_a_flat_quad_is_fitted() {
 
 #[test]
 fn the_bundled_suzanne_is_pulled_into_frame() {
-    // Guards the shipped asset specifically: its vertices sit around (-2.5, 1.3, 4.1),
-    // far enough off-origin that spawning at `Vec3::ZERO` shows nothing at all.
     let scene = build_preview_scene(
         PreviewMesh::Suzanne,
         None,
@@ -245,8 +227,6 @@ fn the_bundled_suzanne_is_pulled_into_frame() {
 
 #[test]
 fn the_bundled_suzanne_is_fitted_like_a_model() {
-    // It used to only re-centre, so the Suzanne preview mesh and Suzanne previewed
-    // as a model showed at two sizes (#1287).
     let scene = build_preview_scene(
         PreviewMesh::Suzanne,
         None,
@@ -254,13 +234,12 @@ fn the_bundled_suzanne_is_fitted_like_a_model() {
     )
     .unwrap();
     let asset = rusty_asset::import_and_sync_sidecar(Path::new(&suzanne_path())).unwrap();
-    // Spawned as its one sub-object, so fitted by that sub-mesh's own bounds.
     let (min, max) = asset.sub_meshes[0].bounds().unwrap();
     let id = scene.world.ids_with_mesh()[0];
     let transform = scene.world.transform(id).unwrap();
     let scale = fit_scale(min, max);
     assert_eq!(transform.scale, Vec3::splat(scale));
-    // Centred after scaling: its bounds' centre lands on the world origin (#1293).
+    // Centred after scaling: its bounds' centre lands on the world origin.
     assert_eq!(transform.position, -(min + max) * 0.5 * scale);
 }
 

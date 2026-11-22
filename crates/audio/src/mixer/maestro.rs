@@ -1,17 +1,8 @@
-//! crates/audio/src/mixer/maestro.rs — the maestro's mixer verbs (#465).
-//!
-//! What the `Audio` group / snapshot / duck API calls: each change lands in the
-//! sim-side [`Mixer`] first, then the resolved [`GroupMix`] of every group it moved
-//! goes to the backend, so the device and the read-back never disagree. The
-//! per-frame [`AudioMaestro::advance_mixer`] runs as a `LateUpdate` system on sim
-//! time (`app/audio/`).
-
 use super::{Duck, EffectChain, GroupId, GroupPatch, Mixer};
 use crate::reverb::ReverbState;
 use crate::AudioMaestro;
 
 impl AudioMaestro {
-    /// The mixer, for read-back.
     pub fn mixer(&self) -> &Mixer {
         &self.mixer
     }
@@ -28,7 +19,6 @@ impl AudioMaestro {
         })
     }
 
-    /// Build every group on the backend (a fresh backend, or a reset mixer).
     pub(crate) fn sync_groups(&mut self) {
         for (i, group) in self.mixer.groups().iter().enumerate() {
             self.backend.add_group(GroupId(i as u16), group.parent);
@@ -36,7 +26,6 @@ impl AudioMaestro {
         self.push_groups();
     }
 
-    /// Send every group's resolved mix to the backend.
     fn push_groups(&mut self) {
         for i in 0..self.mixer.groups().len() {
             let id = GroupId(i as u16);
@@ -44,7 +33,6 @@ impl AudioMaestro {
         }
     }
 
-    /// Add group `name` under `parent` (Master when `None`).
     pub fn create_group(&mut self, name: &str, parent: Option<&str>) -> Result<(), String> {
         let parent = parent.map_or(Ok(GroupId::MASTER), |p| self.mixer.require(p))?;
         let id = self.mixer.create(name, parent)?;
@@ -53,7 +41,6 @@ impl AudioMaestro {
         Ok(())
     }
 
-    /// Set the fields `patch` names on group `name`, now.
     pub fn set_group(&mut self, name: &str, patch: &GroupPatch) -> Result<(), String> {
         let id = self.mixer.require(name)?;
         self.mixer.set(id, patch);
@@ -61,8 +48,6 @@ impl AudioMaestro {
         Ok(())
     }
 
-    /// Replace group `name`'s effects with `chain` (#1748); a sidechain that would
-    /// make a cycle is dropped with a warning (`effects/chain.rs`).
     pub fn set_group_effects(&mut self, name: &str, chain: EffectChain) -> Result<(), String> {
         let id = self.mixer.require(name)?;
         self.mixer.set_effects(id, chain);
@@ -70,7 +55,6 @@ impl AudioMaestro {
         Ok(())
     }
 
-    /// Store snapshot `name`: per group name, the fields it sets.
     pub fn define_snapshot(
         &mut self,
         name: &str,
@@ -96,7 +80,6 @@ impl AudioMaestro {
         Ok(())
     }
 
-    /// Duck group `target` to `volume` while group `trigger` plays.
     pub fn add_duck(
         &mut self,
         trigger: &str,
@@ -111,14 +94,11 @@ impl AudioMaestro {
         Ok(())
     }
 
-    /// Drop every duck rule.
     pub fn clear_ducks(&mut self) {
         self.mixer.clear_ducks();
         self.push_groups();
     }
 
-    /// Step the mixer to sim time `now` (snapshot blends, ducks) and send the groups
-    /// whose mix moved. A group "plays" while a live voice routes into it.
     pub fn advance_mixer(&mut self, now: f64) {
         let before: Vec<_> = (0..self.mixer.groups().len())
             .map(|i| self.mixer.mix(GroupId(i as u16)))
@@ -138,14 +118,11 @@ impl AudioMaestro {
         }
     }
 
-    /// Back to the default mixer.
     pub fn reset_mixer(&mut self) {
         self.mixer = Mixer::default();
         self.sync_groups();
     }
 
-    /// Leaving Play: silence every voice, discard play-mode mixer and occlusion
-    /// settings changes, as Stop discards the scene's, and dry the reverb (#469).
     pub fn exit_play(&mut self) {
         self.stop_all();
         self.reset_mixer();

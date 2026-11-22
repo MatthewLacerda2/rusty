@@ -1,22 +1,3 @@
-//! crates/app/src/systems/ui.rs — the UI systems: layout (#417) and events (#420).
-//!
-//! The layout pass is the first `LateUpdate` system: it recomputes every UI rect
-//! into [`Resources::ui_layout`] from the live scene and the screen size. `LateUpdate`
-//! runs after the whole `FixedUpdate` stage — scripts' `Update` and `LateUpdate`,
-//! physics, animation and the deferred destroys — so a script's RectTransform or
-//! Canvas change shows in the layout the same tick, and the next tick's pointer
-//! dispatch and this frame's UI draw (#418) read a settled layout. The pass is a
-//! pure function of (scene, screen size, camera); see `ui::layout`. Right before it
-//! the `ScreenSpaceCamera` canvases' sway lag advances (`ui::sway`, #429); right
-//! after it, every Selectable's state is shown on its graphic
-//! (`ui::events::transition`).
-//!
-//! [`dispatch_ui_events`] is a `FixedUpdate` system that `play::register` slots
-//! between the scripts' `Start` and `Update`: the event system turns this tick's
-//! input into UI callbacks, fired straight into the scripts. Its pointer ray (world
-//! canvases, #429) stops at the first solid collider, so a terminal behind a wall
-//! is not clicked through it.
-
 use glam::Vec3;
 
 use crate::game::PlayTransition;
@@ -28,10 +9,6 @@ use rusty_ui::events::{Frame, UiHook, WALL_RANGE, WALL_TOLERANCE};
 use rusty_ui::UiLayout;
 
 impl crate::GameWorld {
-    /// Read the texture sizes the UI lays out with into the screen resource
-    /// (`ui::TextureSizeReader`, #1221): before the schedule of every Play tick, and
-    /// in every edit frame. Public for a caller that draws without ticking
-    /// (the editor's capture).
     pub fn refresh_ui_textures(&self) {
         let scene = self.world.scene.borrow();
         let mut screen = self.resources.screen.borrow_mut();
@@ -42,9 +19,6 @@ impl crate::GameWorld {
             .refresh(&scene.world, textures);
     }
 
-    /// Re-read the texture sizes when a paused frame's Play swapped the scene in
-    /// (`poll_transition`), and hand `transition` back. A Stop needs nothing here:
-    /// the edit frame that follows it refreshes them (#1269).
     pub(crate) fn refreshed_after(&self, transition: PlayTransition) -> PlayTransition {
         if matches!(transition, PlayTransition::Entered) {
             self.refresh_ui_textures();
@@ -53,17 +27,12 @@ impl crate::GameWorld {
     }
 }
 
-/// Register the sway and layout passes: the first `LateUpdate` systems, after
-/// every `FixedUpdate` system of the tick.
 pub(crate) fn register(app: &mut App) {
     app.add_system(Stage::LateUpdate, sway_ui)
         .add_system(Stage::LateUpdate, layout_ui)
         .add_system(Stage::LateUpdate, show_selectable_states);
 }
 
-/// Turn this tick's input into UI callbacks and fire them (#420). Reads last tick's
-/// settled layout — or computes one on the first tick of Play, before this
-/// session's first `LateUpdate` ran.
 pub(crate) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
     let view = res.ui_view(&world.scene.borrow());
     if res.play_frame == 0 {
@@ -95,7 +64,6 @@ pub(crate) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
     res.script_manager.dispatch_ui_events(&deliveries);
 }
 
-/// Show every Selectable's state on its graphic, fading on unscaled time.
 fn show_selectable_states(world: &mut World, res: &mut Resources) {
     let dt = res.time.borrow().unscaled_delta_time;
     let mut scene = world.scene.borrow_mut();
@@ -104,7 +72,6 @@ fn show_selectable_states(world: &mut World, res: &mut Resources) {
         .apply_transitions(&mut scene.world, dt);
 }
 
-/// Advance every `ScreenSpaceCamera` canvas's sway lag by this tick's camera turn.
 fn sway_ui(world: &mut World, res: &mut Resources) {
     let dt = res.time.borrow().unscaled_delta_time;
     let mut scene = world.scene.borrow_mut();
@@ -112,7 +79,6 @@ fn sway_ui(world: &mut World, res: &mut Resources) {
     rusty_ui::sway::update_sway(&mut scene.world, &camera, dt);
 }
 
-/// Recompute every canvas's layout for this tick.
 fn layout_ui(world: &mut World, res: &mut Resources) {
     let scene = world.scene.borrow();
     let view = res.ui_view(&scene);
@@ -156,8 +122,6 @@ mod tests {
         game.tick(rusty_time::FIXED_DELTA_TIME);
         let layout = &game.resources.ui_layout;
         assert_eq!(layout.iter().count(), 2);
-        // Headless: the default 1280×720 video resolution, matching width → the
-        // canvas spans the 1920×1080 reference; the element sits centred.
         let r = layout.get(hud).expect("laid out");
         assert!((r.scale_factor - 1280.0 / 1920.0).abs() < 1e-5);
         assert!((r.rect.0 - Vec2::new(910.0, 490.0)).abs().max_element() < 1e-3);
@@ -165,9 +129,6 @@ mod tests {
 
     #[test]
     fn the_first_play_tick_hit_tests_before_any_late_update_ran() {
-        // A script frees the cursor in `Start`; the pointer already rests on a
-        // panel. The first tick's dispatch runs before its `LateUpdate` layout, so
-        // it must lay out on its own to see the panel.
         let script = rusty_test_support::temp::dir().join("rusty_420_first_tick.lua");
         std::fs::write(
             &script,

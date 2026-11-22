@@ -1,43 +1,3 @@
-//! crates/audio/src/device/voice.rs — one playing voice, as a kira `Sound` (#212, #412, #465).
-//!
-//! Each voice is a [`ClipSound`] playing a cached clip into its mixer group's kira
-//! track. It reads its live mix (gain, pan, `spatial_blend`, rate, doppler, pause,
-//! stop) from a shared [`VoiceControl`] of atomics (`device/control.rs`): the backend retunes the control each frame
-//! and the audio thread picks the values up on its next buffer (a few ms) and
-//! glides to them (below), so a moving source pans smoothly and the voice is
-//! never restarted.
-//!
-//! The stereo rule (Unity's practical behaviour):
-//!   * a **mono** clip is copied to both channels, then panned;
-//!   * a **stereo** clip is lerped toward its mono downmix `(l + r) / 2` by
-//!     `spatial_blend`, then panned — fully 3D (`1`) is downmixed then panned, pure
-//!     2D (`0`) keeps its stereo image untouched;
-//!   * a clip with more than two channels uses its first two as left/right.
-//!
-//! Occlusion (#467) closes the voice's own low-pass ([`LowPass`]) after the pan.
-//!
-//! **Parameters glide, per sample** (#1693). The game retunes a voice once per
-//! frame (every 25–40 ms at a low frame rate), so a gain, pan, blend, low-pass or
-//! doppler rate (#1749) applied flat would jump at that rate: zipper noise, or a
-//! chirp when a body's velocity steps. Each of the five instead
-//! follows its target through a one-pole smoother with a [`SMOOTHING`] time
-//! constant, as FMOD and Wwise ramp theirs. A voice's first sample plays at its
-//! targets, with no fade-in, so a one-shot keeps its attack; a value that holds
-//! still is played exactly, so an open filter stays bit-transparent and a voice
-//! faded to zero gain is exact silence an effect can sleep over (#1729). The
-//! time-scale rate, pause and stop apply at once, and a voice resumed from a pause starts on its
-//! targets, like a new one.
-//!
-//! Pan is a **balance** law: the far channel fades linearly to silence, the near one
-//! stays at unity (`pan = -1` ⇒ right silent). A centred voice plays at unity on both
-//! channels. kira's own sounds pan with a constant-power law and keep no channel
-//! count, which is why the voice is ours: kira does everything downstream of it
-//! (groups, filters, sends, the speaker-mode stage, the device).
-//!
-//! The playhead advances `rate × doppler × clip rate` frames per second of output,
-//! with linear interpolation between frames, so a clip at any sample rate plays at
-//! its pitch on any device, and `Time.timeScale` and doppler bend the pitch.
-
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
@@ -49,8 +9,6 @@ pub use super::control::VoiceControl;
 use super::decode::CachedClip;
 use super::lowpass::LowPass;
 
-/// Mix one input frame to a stereo `(left, right)` pair under the stereo rule and
-/// balance pan law described in the module docs.
 pub fn mix_frame(frame: &[f32], pan: f32, spatial_blend: f32) -> (f32, f32) {
     let (l, r) = match frame {
         [] => (0.0, 0.0),
@@ -68,28 +26,16 @@ pub fn mix_frame(frame: &[f32], pan: f32, spatial_blend: f32) -> (f32, f32) {
     (l * left_gain, r * right_gain)
 }
 
-/// The time constant, in seconds, a voice's gain, pan, blend and low-pass follow
-/// their targets with (#1693): ~99% of a change lands within 5 × this.
 pub const SMOOTHING: f64 = 0.010;
 
-/// Within this of its target, a gliding parameter lands on it exactly, so a
-/// settled voice plays its values bit for bit (−120 dB on a unit gain).
-/// A step too small to move an `f32` lands too: near `1.0` that stalls about
-/// `3e-5` short (−90 dB), and would never arrive otherwise. So does a step out
-/// of a NaN: a NaN target is played as long as the control holds it (about a game
-/// frame, until the next retune), and the glide recovers the sample its target
-/// does, never carrying the NaN for the voice's life.
 const SNAP: f32 = 1e-6;
 
-/// The parameters a voice glides (#1693, the doppler rate #1749). `low_pass` is the filter's one-pole
-/// coefficient; `1.0` is open (the filter bypassed).
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Glide {
     gain: f32,
     pan: f32,
     blend: f32,
     low_pass: f32,
-    /// The doppler rate (#1749): glided so a velocity step never clicks.
     doppler: f32,
 }
 
@@ -112,25 +58,19 @@ impl Glide {
         }
     }
 
-    /// The low-pass coefficient [`LowPass::process`] takes (`None`: open).
     fn filter(&self) -> Option<f32> {
         (self.low_pass < 1.0).then_some(self.low_pass)
     }
 }
 
-/// One voice playing `clip`, looping or once, under its [`VoiceControl`].
 pub struct ClipSound {
     clip: CachedClip,
     looping: bool,
     control: Arc<VoiceControl>,
-    /// The playhead, in (fractional) clip frames.
     position: f64,
     /// Scratch for the interpolated frame (one sample per clip channel).
     frame: Vec<f32>,
-    /// The voice's own low-pass, after the pan (#467).
     filter: LowPass,
-    /// Where the gliding parameters stand; `None` until the first buffer, which
-    /// starts them at their targets.
     glide: Option<Glide>,
 }
 
@@ -148,7 +88,6 @@ impl ClipSound {
         }
     }
 
-    /// The clip frame at `index`, wrapping for a looping voice; silence past the end.
     fn frame_at(&self, index: usize) -> &[f32] {
         let len = self.clip.frames();
         let index = if self.looping && len > 0 {
@@ -159,7 +98,6 @@ impl ClipSound {
         self.clip.frame(index)
     }
 
-    /// Interpolate the playhead's frame into `self.frame`.
     fn sample(&mut self) {
         let index = self.position as usize;
         let t = (self.position - index as f64) as f32;
@@ -222,8 +160,6 @@ impl Sound for ClipSound {
     }
 }
 
-/// The kira-side handle to start a [`ClipSound`]: the sound itself, no extra handle
-/// (the backend keeps the [`VoiceControl`]).
 pub struct ClipSoundData(pub ClipSound);
 
 impl SoundData for ClipSoundData {

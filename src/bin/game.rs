@@ -1,21 +1,3 @@
-//! src/bin/game.rs — generate and play-test a test game (dev-only, `--features dev`, #2029).
-//!
-//! ```text
-//! Usage:
-//!   cargo run --bin game --features dev -- <name> [--out <dir>] [--param key=value]... [--test] [--games <dir>]
-//!   cargo run --bin game --features dev -- --list [--games <dir>]
-//! ```
-//!
-//! Builds the game `games/<name>/` describes into a project folder (default the
-//! worktree's `target/games/<name>/`; `make game NAME=<name>`), by running its
-//! `recipe.lua` in edit mode with the `--param`s (`dev::game::generate`). With
-//! `--test` it also proves the generation deterministic, runs every scenario,
-//! replays the demo each one recorded, and takes the shots (`dev::game::check`; `make game-test NAME=<name>`), printing one
-//! line per step and exiting 1 when one failed. `--games <dir>` reads the games from
-//! another folder than the checkout's `games/`. `session` and `play` are the two
-//! halves of this, but neither runs a recipe file with parameters and reports its
-//! failure in an exit status, which a Makefile target and a test need.
-
 use std::path::PathBuf;
 use std::process::exit;
 

@@ -1,7 +1,3 @@
-//! What a query's places mean (#1892, the review of PR #1921): an entity
-//! context stands on its feet, a level grouped under one parent with the Player
-//! keeps its walls, and a scored yes/no test favours the answer it asks for.
-
 use glam::Vec3;
 
 use super::test_world::{wall, Arena};

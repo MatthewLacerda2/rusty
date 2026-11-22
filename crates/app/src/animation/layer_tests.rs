@@ -1,7 +1,3 @@
-//! Layers and avatar masks (#457): a masked upper-body layer leaves the legs to
-//! the base layer, weights blend, an additive layer adds only its change, and a
-//! layer never writes a joint it doesn't key.
-
 use glam::{Quat, Vec3};
 
 use super::layers::mask_slots;
@@ -10,7 +6,6 @@ use super::*;
 use rusty_asset::animation_graph::LayerBlending::{Additive, Override};
 use rusty_components::Motion;
 
-/// The x translation each joint is posed at (`None` where undriven).
 fn xs(pose: &Pose) -> Vec<Option<f32>> {
     pose.iter().map(|j| j.map(|t| t.translation.x)).collect()
 }
@@ -47,7 +42,6 @@ fn a_masked_upper_body_layer_leaves_the_legs_untouched() {
     let upper = layer(Override, &["spine"], vec![node("Aim", "Aim")]);
     let graph = graph(vec![node("Run", "Run")], vec![upper]);
     let mut anim = animator(Motion::Clip("Run"), Some(Motion::Clip("Aim")), 0.5);
-    // Run is at +1 everywhere, Aim at -2: the spine subtree takes Aim, the rest Run.
     assert_eq!(
         xs(&pose_of(&anim, &mesh, &graph)),
         vec![Some(1.0), Some(-2.0), Some(1.0), Some(-2.0)]
@@ -94,7 +88,6 @@ fn an_additive_layer_adds_its_change_scaled_by_weight() {
     anim.layers[0].weight = 0.5;
     let pose = pose_of(&anim, &mesh, &graph);
     let spine = pose[SPINE].unwrap();
-    // Half-way the flinch has turned 0.5 rad from its first frame; at half weight, 0.25.
     assert!(
         spine
             .rotation
@@ -124,12 +117,10 @@ fn a_layer_keying_a_joint_the_base_leaves_alone_starts_from_bind() {
     );
     let mut anim = animator(Motion::Clip("Legs"), Some(Motion::Clip("Aim")), 0.5);
     anim.layers[0].weight = 0.5;
-    // Only the keyed joints are written: hips and head stay undriven.
     assert_eq!(
         xs(&pose_of(&anim, &mesh, &graph)),
         vec![None, Some(-1.0), Some(1.0), None]
     );
-    // Without the graph, the layer state is ignored: the base alone.
     let alone = sample_pose(&anim, &mesh, None).unwrap().1;
     assert_eq!(xs(&alone), vec![None, None, Some(1.0), None]);
 }

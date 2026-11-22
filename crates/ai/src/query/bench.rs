@@ -1,9 +1,3 @@
-//! Test hook: the Dust2-sized bench level an environment query is costed on
-//! (#1892), a 64-point donut with `trace` and `path` tests, the dear pair. The
-//! gate run is `query_cost_tests`; the timing, a release-build measurement run by
-//! hand, is the root's `dev::bench::query_cost_tests` (a sim module may not read
-//! a clock).
-
 use glam::{Vec2, Vec3};
 
 use super::{run, Anchor, Filter, Generator, Measure, QuerySpec, QueryWorld, Test};
@@ -78,11 +72,6 @@ pub fn query(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> us
     run(&world, bot, &spec(target)).len()
 }
 
-/// The worst case for `path`: a bot 40 m from the target, and one survivor on
-/// the upper storey, which no stair reaches, so the flood runs to its bound.
-/// Eight spots on the ground round the target, then the one upstairs; the ones
-/// the bot can reach. (At 1 m cells the doorways erode shut, so this wants the
-/// 0.25 m navmesh.)
 pub fn query_far(scene: &Scene, nav: &NavigationGraph, physics: &PhysicsWorld) -> Vec<super::Item> {
     let camera = Camera::new(Vec3::new(25.0, 1.5, 25.0), 0.0, 0.0);
     let world = QueryWorld {

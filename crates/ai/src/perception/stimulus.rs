@@ -1,18 +1,3 @@
-//! The reported senses (#1900): hearing (`ReportNoise`) and damage.
-//!
-//! A stimulus is remembered under its instigator, the entity that made the noise
-//! or dealt the hit, sensed now; a target in sight right now keeps its sight
-//! entry (sight is the sharpest sense), but the update still fires, so a script
-//! hears every gunshot. A stimulus with no live instigator (none named, or
-//! destroyed since) is still sensed: it raises an update with no target and is
-//! stored under nobody, since a known target is an entity.
-//!
-//! **A perceiver never records itself**: an instigator that is the perceiver,
-//! or one of its ancestors or descendants (its own body, its own gun), is not
-//! heard and does not register a hit. **Only during Play**: outside it (a
-//! console call in edit mode) nothing is sensed, so no update waits for a
-//! dispatch that never runs.
-
 use glam::Vec3;
 
 use super::perceivers;
@@ -85,9 +70,6 @@ pub fn report_noise(
     heard
 }
 
-/// The perceiver a hit on `struck` reaches: the nearest ancestor-or-self of it
-/// with an `AIPerception` (a hitbox under a bone is the character's), when it is
-/// active.
 pub fn perceiver_of(scene: &Scene, struck: u32) -> Option<u32> {
     let w = &scene.world;
     w.self_and_ancestors(struck)
@@ -95,12 +77,6 @@ pub fn perceiver_of(scene: &Scene, struck: u32) -> Option<u32> {
         .filter(|&id| w.is_active_in_hierarchy(id))
 }
 
-/// A hit on `struck` (Unreal's `ReportDamageEvent`): its perceiver
-/// ([`perceiver_of`]) senses `amount` of damage of type `tag`, placed where the
-/// instigator stands ([`stand::feet`]) when it is alive, else at `at` (the hit
-/// point, the blast origin, or the struck entity). Returns the perceiver, if
-/// one sensed it: none outside Play or when the instigator is the perceiver's
-/// own hierarchy.
 pub fn report_damage(
     scene: &mut Scene,
     struck: u32,
@@ -125,8 +101,6 @@ pub fn report_damage(
     Some(perceiver)
 }
 
-/// Drop `target` from what `id` knows, or everything with no target. Raises no
-/// update (Unreal's `ForgetActor`); a target still in view is seen again next step.
 pub fn forget(scene: &mut Scene, id: u32, target: Option<u32>) {
     let Some(mut c) = scene.world.ai_perception_mut(id) else {
         return;

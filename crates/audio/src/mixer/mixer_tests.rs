@@ -1,5 +1,3 @@
-//! Mixer tests (#465): the default tree, snapshot blends, ducking.
-
 use super::*;
 
 fn world_muffled() -> Vec<(GroupId, GroupPatch)> {

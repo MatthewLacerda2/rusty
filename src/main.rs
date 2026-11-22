@@ -1,20 +1,3 @@
-//! src/main.rs — the `rusty` editor binary.
-//!
-//! A thin entry point: the runtime shell (`rusty::shell`) owns the window and frame
-//! loop, and its editor frontend adds the egui dashboard. The standalone player is
-//! `src/bin/player.rs`; both share the same shell (#431).
-//!
-//! ```text
-//! cargo run --bin rusty                     # the project picker: recent projects, New, Open
-//! cargo run --bin rusty -- --project <dir>  # open the game project at <dir> (created if missing)
-//! ```
-//!
-//! `-h` / `--help` prints the options and exits; an argument it does not know prints
-//! them and exits 2. Neither opens a window.
-//!
-//! Without `--project` the editor starts on the project picker (#854), as Unity starts
-//! on the Hub; with it the picker is skipped, as Unity skips it on `-projectPath`.
-
 use rusty::core::project::{self, Access};
 
 const USAGE: &str = "usage: rusty [--project <dir>]

@@ -1,32 +1,3 @@
-//! src/bin/play.rs — headless scenario runner (dev-only, `--features dev`).
-//!
-//! ```text
-//! Usage:
-//!   cargo run --bin play --features dev -- [--project <dir>] [--scene <path>] [--size <W>x<H>] [--record-audio <path>] <scenario.lua> <out_dir>
-//!   cargo run --bin play --features dev -- [--project <dir>] [--record-audio <path>] --demo <file> [scenario.lua] <out_dir>
-//! ```
-//!
-//! The scenario plays the game project at `<dir>` (default `./project`, #829); the
-//! two paths are read from where the command was run, before the project opens.
-//! The scene played is the project's startup scene (`project.rusty`'s
-//! `build.startup_scene`), as the standalone player boots, or `--scene <path>`,
-//! relative to the project like the startup scene (#1343). `--size <W>x<H>` is the
-//! run's render size, as a Game view resolution: every screenshot, post effect and
-//! UI layout is sized to it (default 1280x720, #1583).
-//! `--record-audio <path>` captures the whole run's final audio mix to a WAV
-//! (#1579), named from the launch directory like the other paths.
-//!
-//! Drives `app::GameWorld::tick` at a fixed 1/60 timestep (a `--demo` replay at each
-//! tick's recorded `dt`) with NO window/GPU, runs the given Lua scenario, and writes
-//! <out_dir>/results.json + <out_dir>/console.log.
-//! Deterministic: fixed dt + frame-count timers, so reruns are identical.
-//!
-//! Every run is recorded as a demo in the project's `saved/demos/` (#1581).
-//! `--demo <file>` replays one instead, on the scene and settings it recorded:
-//! the whole demo, or as far as the scenario given on top steps it. The replay
-//! compares the world against the demo's digests and fails the run at the first
-//! that differs (`dev::demo`).
-
 use std::path::{absolute, PathBuf};
 use std::process::exit;
 
@@ -98,8 +69,6 @@ fn open_project(project: Option<PathBuf>) -> rusty::core::project::Opened {
     })
 }
 
-/// The scene a run of the project boots (`boot_scene`, #1618); exits with status 2
-/// when the project names none.
 fn run_scene(opened: &rusty::core::project::Opened) -> String {
     let startup = &opened.settings.build.startup_scene;
     match boot_scene(&opened.root, startup, Access::Run) {

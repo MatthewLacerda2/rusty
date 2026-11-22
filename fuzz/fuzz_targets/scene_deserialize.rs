@@ -1,5 +1,5 @@
 #![no_main]
-//! Fuzz the scene-load path (#119): the "what happens when someone hands the
+//! Fuzz the scene-load path: the "what happens when someone hands the
 //! engine a corrupt save file" class of bug. Mirrors `edit::load_from_file` —
 //! arbitrary bytes -> UTF-8 -> `SceneData` (serde) -> `apply_scene_data` (the
 //! rehydration that rebuilds meshes/colliders/skeletons). Surfaces panics,

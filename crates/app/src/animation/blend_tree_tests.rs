@@ -1,6 +1,3 @@
-//! Blend-tree weights (#457): 1D at thresholds and midpoints, 2D weights summing
-//! to 1 and peaking at their own child; the helpers the nested-tree tests share.
-
 use std::collections::BTreeMap;
 
 use glam::Vec2;
@@ -8,18 +5,15 @@ use glam::Vec2;
 use super::*;
 use rusty_asset::animation_graph::{BlendChild1D, BlendChild2D, ChildMotion};
 
-/// A tree's direct child weights.
 pub(super) fn tree_weights(tree: &BlendTree, parameters: &AnimatorParameters) -> Vec<f32> {
     child_weights(tree, parameters).collect()
 }
 
-/// A 2D child playing clip `c` at `position`.
 pub(super) fn child_2d(position: [f32; 2]) -> BlendChild2D {
     let motion = ChildMotion::clip("c");
     BlendChild2D { motion, position }
 }
 
-/// A 1D tree over `x` with these thresholds.
 pub(super) fn tree_1d(thresholds: &[f32]) -> BlendTree {
     let children = thresholds.iter().map(|&threshold| BlendChild1D {
         motion: ChildMotion::clip("c"),
@@ -31,13 +25,11 @@ pub(super) fn tree_1d(thresholds: &[f32]) -> BlendTree {
     }
 }
 
-/// [`tree_1d`] weighed at `x`.
 fn weights_1d(thresholds: &[f32], x: f32) -> Vec<f32> {
     let x = BTreeMap::from([("x".to_string(), AnimatorParameter::Float(x))]);
     tree_weights(&tree_1d(thresholds), &x)
 }
 
-/// Every point's gradient-band influence at `at`, not normalized.
 fn gradient_band(points: &[Vec2], at: Vec2, polar: bool) -> Vec<f32> {
     let n = points.len();
     (0..n)
@@ -55,8 +47,6 @@ fn sum(w: &[f32]) -> f32 {
 
 #[test]
 fn one_d_plays_the_child_at_its_threshold_and_splits_midpoints() {
-    // idle 0, walk 2, run 6 — authored out of order: the weights still follow
-    // the thresholds, not the list.
     let t = [2.0, 0.0, 6.0];
     assert_eq!(weights_1d(&t, 0.0), vec![0.0, 1.0, 0.0]);
     assert_eq!(weights_1d(&t, 2.0), vec![1.0, 0.0, 0.0]);
@@ -67,12 +57,10 @@ fn one_d_plays_the_child_at_its_threshold_and_splits_midpoints() {
         "4 is half walk, half run"
     );
     assert_eq!(weights_1d(&t, 1.0), vec![0.5, 0.5, 0.0]);
-    // Past either end the end child plays alone.
     assert_eq!(weights_1d(&t, -3.0), vec![0.0, 1.0, 0.0]);
     assert_eq!(weights_1d(&t, 9.0), vec![0.0, 0.0, 1.0]);
 }
 
-/// Idle at the origin plus the eight directions of a walk ring.
 fn ring() -> Vec<Vec2> {
     let mut points = vec![Vec2::ZERO];
     for i in 0..8 {
@@ -94,7 +82,6 @@ fn two_d_weights_sum_to_one_and_peak_at_their_own_child() {
                 "only child {k} weighs (polar {polar})"
             );
         }
-        // Anywhere in between, the normalized weights sum to 1.
         let tree = BlendTree::FreeformDirectional2D {
             parameter_x: "x".into(),
             parameter_y: "y".into(),

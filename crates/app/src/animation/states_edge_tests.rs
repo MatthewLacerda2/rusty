@@ -1,7 +1,3 @@
-//! The graph-state callbacks' edges (#1901): states that start in one step
-//! enter in the order they became active, and a non-looping state holds at
-//! exactly its end.
-
 use super::states_tests::{rig, tick};
 use rusty_asset::animation_graph::{Condition, GraphEdge};
 use rusty_components::Motion;
@@ -21,8 +17,6 @@ fn a_cut_and_a_crossfade_in_one_step_enter_in_the_order_they_began() {
         transition_duration: 0.1,
     }];
     anim.set_bool("go", true);
-    // The layer binds its entry `Aim` and crossfades out of it at once: `Aim`
-    // entered first, so the last state entered is the current one.
     let first = tick(&mut anim, &mesh, &graph);
     assert_eq!(first, ["Enter A@0", "Enter Aim@1", "Enter Aim2@1"]);
     let next = tick(&mut anim, &mesh, &graph);

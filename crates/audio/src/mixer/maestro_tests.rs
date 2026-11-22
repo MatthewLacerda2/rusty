@@ -1,6 +1,3 @@
-//! The maestro's mixer verbs against the recording backend (#465): what reaches
-//! the device when scripts move groups, snapshots and ducks.
-
 use crate::mix::Shot;
 use crate::mixer::{Filter, GroupId, GroupPatch, DEFAULT_GROUPS};
 use crate::recording::RecordingBackend;
