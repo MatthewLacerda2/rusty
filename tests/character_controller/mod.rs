@@ -1,7 +1,4 @@
-//! CharacterController: collide-and-slide `Move` against static geometry —
-//! walls, stairs under and over the step offset, slopes under and over the slope
-//! limit, the grounded state and collision flags, crouching under an overhang —
-//! and determinism across two runs.
+//! CharacterController: collide-and-slide `Move` against static geometry.
 
 mod crouch;
 mod dynamic_steps;
@@ -23,7 +20,6 @@ const DT: f32 = 1.0 / 60.0;
 /// The scripted gravity the tests' "player" applies each tick (m/s²).
 const GRAVITY: f32 = 20.0;
 
-/// A static box of `size` centred at `pos`, turned by `rot`.
 fn add_box(scene: &mut Scene, pos: Vec3, size: Vec3, rot: Quat) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene.world.set_static(id, true);
@@ -39,13 +35,11 @@ fn add_box(scene: &mut Scene, pos: Vec3, size: Vec3, rot: Quat) -> u32 {
     id
 }
 
-/// A 40 m floor whose top face is y = 0.
 fn add_floor(scene: &mut Scene) -> u32 {
     let size = Vec3::new(40.0, 1.0, 40.0);
     add_box(scene, Vec3::new(0.0, -0.5, 0.0), size, Quat::IDENTITY)
 }
 
-/// A default (2 m tall, 0.5 m radius) character standing with its feet at `feet`.
 fn add_character(scene: &mut Scene, feet: Vec3) -> u32 {
     let id = scene.add_entity("Character".to_string());
     let cc = CharacterControllerComponent::default();
@@ -74,7 +68,6 @@ fn walk(
     hit
 }
 
-/// Walk `ticks` frames at `velocity`, returning the last move's result.
 fn walk_for(
     physics: &mut PhysicsWorld,
     scene: &mut Scene,
@@ -94,13 +87,11 @@ fn pos_of(scene: &Scene, id: u32) -> Vec3 {
     scene.world.transform(id).unwrap().position
 }
 
-/// The character's feet: its centre minus half its height.
 fn feet_of(scene: &Scene, id: u32) -> Vec3 {
     let h = scene.world.character_controller(id).unwrap().height;
     pos_of(scene, id) - Vec3::Y * h * 0.5
 }
 
-/// One scripted run: walk across a floor into stairs and a wall, then back.
 fn scripted_run() -> Vec3 {
     let mut scene = Scene::new();
     add_floor(&mut scene);
@@ -123,7 +114,6 @@ fn scripted_run() -> Vec3 {
     pos_of(&scene, id)
 }
 
-/// The same inputs land on the bit-identical pose, run after run.
 #[test]
 fn moves_are_deterministic_across_runs() {
     let (a, b) = (scripted_run(), scripted_run());

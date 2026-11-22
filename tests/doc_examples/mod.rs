@@ -1,16 +1,4 @@
-//! The Lua examples in `docs/api/` run. The drift gate proves every
-//! documented function *exists*; this proves the examples an agent copies *work*:
-//! a renamed argument or a changed return shape fails here instead of leaving the
-//! doc wrong and every gate green.
-//!
-//! Each ```lua block runs in a fresh headless edit-mode session, the setup the drift
-//! gate uses. Its fence says how (see `docs/api/index.md`, *Examples run*):
-//! - ```lua — compiled and run; it must not raise.
-//! - ```lua no-run — compiled only: it writes files or leans on
-//!   game-side helpers the doc leaves out.
-//! - ```lua ignore — not Lua (a shape sketch); skipped.
-//! - `with=a,b:Canvas+Image` — entities the block uses but doesn't create, made
-//!   fresh and bound to those globals first, with the listed components.
+//! The Lua examples in `docs/api/` run, so a renamed argument or changed return shape fails here, not in a wrong doc. Each ```lua block runs in a fresh headless edit-mode session; the fence markers (`no-run`, `ignore`, `with=a,b:Canvas+Image`) are in `docs/api/index.md`, *Examples run*.
 
 mod checks;
 mod fence;
@@ -54,12 +42,10 @@ fn every_lua_example_in_docs_api_runs() {
     );
 }
 
-/// Compile `block`, then run it unless its fence says not to.
 pub fn check(block: &Block) -> Result<(), String> {
     if block.mode == Mode::Ignore {
         return Ok(());
     }
-    // As the evaluator does: a block may be one expression (a table shape).
     let lua = mlua::Lua::new();
     let expr = format!("return {}", block.source);
     if lua.load(&expr).into_function().is_err() {

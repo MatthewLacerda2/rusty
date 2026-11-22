@@ -1,7 +1,5 @@
-//! A `Gpu` emitter drawn frame after frame, where the incremental upload and the
-//! slot reuse live: it matches its `Cpu` twin at every frame while particles are
-//! born and die between them, and a renderer that lags while every particle dies
-//! and time stops draws no ghost of the particles it last saw.
+//! A `Gpu` emitter drawn frame after frame (incremental upload, slot reuse) matches
+//! its `Cpu` twin, and a lagging renderer draws no ghost once every particle died.
 
 use glam::Vec3;
 use rusty::components::particle::{EmitMode, EmitShape, ParticleSimulation};
@@ -27,8 +25,7 @@ fn a_gpu_emitter_matches_its_cpu_twin_frame_after_frame() {
     };
     let (mut gpu, _) = world(config(ParticleSimulation::Gpu));
     let (mut cpu, _) = world(config(ParticleSimulation::Cpu));
-    // Every particle lives at most 24 ticks: between two frames 7 ticks apart, a
-    // share dies and its slot is reused by a birth the frame never saw alive.
+    // Lifetimes ≤ 24 ticks, frames 7 apart: slots are reused by unseen births.
     for frame in 0..8 {
         crate::play::run(&mut gpu, 7);
         crate::play::run(&mut cpu, 7);
@@ -50,8 +47,6 @@ fn a_gpu_emitter_matches_its_cpu_twin_frame_after_frame() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: the cloud draws"
         );
-        // Measured: 1.0 at every frame on lavapipe (Mesa, the container) and on
-        // an NVIDIA RTX 2060 (Vulkan).
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
@@ -67,7 +62,6 @@ fn a_lagging_renderer_draws_no_ghost_after_every_particle_died_and_time_stopped(
     };
     let left = |mask: &[bool]| (0..mask.len()).any(|i| mask[i] && i % 64 < 28);
     let right = |mask: &[bool]| (0..mask.len()).any(|i| mask[i] && i % 64 > 36);
-    // Ten particles on the left, drawn once.
     place(&game, id, Vec3::new(-2.0, 0.0, 0.0));
     set_lifetime(&game, 0.5);
     emit(&game, id, 10);
@@ -76,9 +70,8 @@ fn a_lagging_renderer_draws_no_ghost_after_every_particle_died_and_time_stopped(
         return;
     };
     assert!(left(&seen), "drawn where they were born");
-    // Unseen by the renderer: they all die, ten short-lived ones take their slots
-    // and die too, a long-lived one is born on the right, and time stops for longer
-    // than the renderer keeps steps.
+    // Unseen: all die, ten short-lived take their slots and die, one long-lived is
+    // born on the right, and time stops for longer than the renderer keeps steps.
     crate::play::run(&mut game, 40);
     place(&game, id, Vec3::new(2.0, 0.0, 0.0));
     set_lifetime(&game, 0.05);

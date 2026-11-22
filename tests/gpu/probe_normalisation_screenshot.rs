@@ -1,13 +1,8 @@
-//! Probe normalisation by the baked diffuse. Two static polished metal floors
-//! on a white diffuse ground, under one reflection probe 1.2 m below a `Baked` lamp:
-//! one floor under the lamp, one where no light reaches, so its lightmap is black.
-//! The probe is baked for real (its stored irradiance is the capture's), then pointed
-//! at a solid white cube so each floor's reflection is measurable. A metal has no
-//! diffuse term, so each floor shows only the probe's reflection: the lit floor keeps
-//! it whole (the lamp's direct light is not in the probe's stored irradiance, so
-//! its nearness does not darken the floor), the dark one keeps at most a tenth.
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! Probe normalisation by the baked diffuse: two static metal floors under one
+//! reflection probe 1.2 m below a `Baked` lamp, one lit, one beyond its range
+//! (black lightmap). The lit floor keeps the probe's reflection whole (the lamp's
+//! direct light is not in the probe's irradiance), the dark one at most a tenth.
+//! Skips without an adapter.
 
 use crate::gpu::mean;
 use crate::gpu::reflection_probe_per_object_screenshot::solid_cube_ktx2;
@@ -22,10 +17,8 @@ use rusty::scene::lighting::settings::BakeSettings;
 use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 32;
-/// The dark floor's centre: well past the lamp's range.
 const DARK_X: f32 = 20.0;
 
-/// Both floors, the lamp over the lit one, and the probe over both, baked.
 fn scene(name: &str, normalised: bool) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -42,8 +35,6 @@ fn scene(name: &str, normalised: bool) -> Scene {
         ..MaterialAsset::default()
     };
     scene.materials.insert("white".to_string(), white);
-    // A white ground and ceiling (a plane is 15 m across), and the two 2.25 m metal
-    // floors on the ground: the probe's capture sees the room lit around the lamp.
     let middle = Vec3::new(DARK_X / 2.0, 0.0, 0.0);
     let (up, down) = (Quat::IDENTITY, Quat::from_rotation_x(std::f32::consts::PI));
     plane(&mut scene, "white", middle - Vec3::Y * 0.02, 3.0, up);
@@ -65,7 +56,6 @@ fn scene(name: &str, normalised: bool) -> Scene {
     scene
 }
 
-/// A static plane of `material` at `at`, scaled by `scale` and turned by `rotation`.
 fn plane(scene: &mut Scene, material: &str, at: Vec3, scale: f32, rotation: Quat) {
     let id = scene.add_entity(format!("{material} {at}"));
     let mesh = primitive_mesh_component(Primitive::Plane);
@@ -78,8 +68,6 @@ fn plane(scene: &mut Scene, material: &str, at: Vec3, scale: f32, rotation: Quat
     }
 }
 
-/// The lightmap bake, then the probe 1.2 m under the lamp, baked; then pointed at a
-/// white cube, keeping the irradiance its bake stored when `normalised`.
 fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
     let dir = crate::temp::dir().join(format!("rusty_gpu_1697_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -112,7 +100,6 @@ fn probe_and_bake(scene: &mut Scene, name: &str, normalised: bool) {
     probes.set_irradiance(i, stored.filter(|_| normalised));
 }
 
-/// The mean of the floor at `x`, seen from above; `None` without an adapter.
 fn floor(scene: &Scene, x: f32, name: &str) -> Option<f64> {
     let camera = Camera::new(Vec3::new(x, 1.0, 0.0), 0.0, -89.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1697_{name}.png"));

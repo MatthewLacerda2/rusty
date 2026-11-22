@@ -1,13 +1,8 @@
-//! The bundled Player controller: Space jumps — grounded only, on the rising
-//! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press,
-//! delivering the shot through `Damage.ApplyPoint`.
-
 use rusty::dev::botplayer::attach_player_bot;
 use rusty::dev::harness::Harness;
 
 use crate::play::eval;
 
-/// The Player's height, read through the same API the scripts use.
 fn player_y(h: &Harness) -> f32 {
     let y = "local _, y = Transform.GetPosition(Scene.FindEntityByName('Player')); return y";
     eval(h, y).parse().expect("a number")
@@ -21,7 +16,6 @@ fn release(h: &Harness, key: &str) {
     h.world.borrow().input().borrow_mut().release(key);
 }
 
-/// A harness with no enemy brain, stepped until the Player rests on the floor.
 fn settled(name: &str) -> (Harness, f32) {
     let h = Harness::new(crate::temp::dir().join(name), "");
     h.step(60);
@@ -34,7 +28,6 @@ fn settled(name: &str) -> (Harness, f32) {
     (h, ground)
 }
 
-/// Step `ticks` frames, returning the highest the Player rose above `ground`.
 fn apex_over(h: &Harness, ground: f32, ticks: u32) -> f32 {
     let mut apex = f32::MIN;
     for _ in 0..ticks {

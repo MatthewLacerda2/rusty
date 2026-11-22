@@ -21,8 +21,6 @@ pub(super) fn level(dir: &std::path::Path) -> String {
     path
 }
 
-/// A loader that reports a job finished only `after` asks, and how far along it is
-/// meanwhile: a worker still running.
 pub(super) struct Late {
     inner: Inline,
     after: u32,
@@ -63,8 +61,6 @@ pub(super) fn eval(h: &Harness, code: &str) -> String {
     h.world.borrow().script_manager().eval(code).unwrap()
 }
 
-/// Step once into Play, call `verb(level)`, step 30 ticks: the active path after the
-/// first of them, and the digest after the last.
 fn load_with(dir: &std::path::Path, verb: &str, level: &str) -> (String, String) {
     let h = Harness::new(dir.join(verb), "");
     h.step(1);

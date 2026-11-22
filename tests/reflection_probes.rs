@@ -1,17 +1,7 @@
-//! Reflection probes: data model + parallax-corrected runtime sampling.
-//!
-//! Headless + deterministic, no GPU. Asserts (1) the reflection-probe set — positions,
-//! parallax boxes, settings and cubemap PATHS — round-trips through the scene
-//! document, and (2) the probe blend + box-projected parallax math behaves: a surface
-//! inside a probe's box reflects that probe (tracking the room as the camera moves),
-//! and points outside every box fall back (no probe → skybox).
-
 use crate::temp::path as tmp;
 use glam::Vec3;
 use rusty::scene::Scene;
 
-/// Positions, parallax boxes, and cubemap paths all live in the scene document and
-/// survive a save → load round-trip. No sidecar: the cubemap is a referenced file.
 #[test]
 fn reflection_probe_set_round_trips() {
     let mut scene = Scene::new();
@@ -31,7 +21,6 @@ fn reflection_probe_set_round_trips() {
     let path = tmp("rusty_reflection_probes.scene");
     rusty::edit::save_to_file(&scene, &path).unwrap();
 
-    // Positions + box corners + the cubemap PATH are in the human-diffable scene doc.
     let scene_json = std::fs::read_to_string(&path).unwrap();
     assert!(scene_json.contains("\"reflection_probes\""));
     assert!(scene_json.contains("reflections/room.ktx2"));
@@ -53,9 +42,6 @@ fn reflection_probe_set_round_trips() {
     );
 }
 
-/// The acceptance selection logic (Unity's *Blend Probes*): of two boxes
-/// covering a point, both share its reflection, the nearer capture point first; a
-/// point out of every probe's reach selects nothing (the caller reflects the skybox).
 #[test]
 fn covering_probes_blend_nearest_first() {
     let mut scene = Scene::new();
@@ -75,9 +61,6 @@ fn covering_probes_blend_nearest_first() {
         .is_none());
 }
 
-/// Box-projected parallax: as the SAME surface point is reflected from a probe, the
-/// corrected direction points at the box wall the ray actually hits — so moving the
-/// fragment within the room changes what is reflected, unlike an infinite skybox.
 #[test]
 fn parallax_tracks_the_room() {
     let mut scene = Scene::new();

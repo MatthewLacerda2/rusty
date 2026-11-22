@@ -1,7 +1,6 @@
-//! The CRT postfx blocks, pixel-tested on lavapipe: `barrel` warps where
-//! the frame is sampled, so a colour block after it still grades the picture inside
-//! the curve while the corners go black; `phosphor_mask` stripes a flat grey without
-//! changing its mean brightness (short of clipping).
+//! The CRT postfx blocks on lavapipe: `barrel` warps where the frame is sampled (a
+//! colour block after it grades the inside, corners go black); `phosphor_mask`
+//! stripes a flat grey without changing its mean (short of clipping).
 
 use rusty::dev::capture::CaptureHost;
 use rusty::scene::Scene;
@@ -9,7 +8,6 @@ use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT
 
 use super::super::fog::scene::{shot, wall_scene};
 
-/// Bake a postfx module named `name` from its JSON `blocks` list.
 fn bake(name: &str, blocks: &str) {
     let json = format!(r#"{{"pass":"postfx","name":"{name}","blocks":[{blocks}]}}"#);
     bake_recipe(
@@ -20,7 +18,6 @@ fn bake(name: &str, blocks: &str) {
     .expect("bake");
 }
 
-/// Removes a baked module's files when dropped, so they go even if an assertion fails.
 struct Cleanup(String);
 
 impl Drop for Cleanup {
@@ -45,8 +42,7 @@ fn grey(effects: &[&str]) -> Scene {
     scene
 }
 
-/// The mean display value of each channel over the whole image: the chain runs on
-/// display-referred colour, so that is the mean the mask keeps.
+/// Mean display-referred value per channel (the chain runs display-referred).
 fn mean(img: &image::RgbImage) -> [f64; 3] {
     let n = f64::from(img.width() * img.height());
     let mut sum = [0.0; 3];

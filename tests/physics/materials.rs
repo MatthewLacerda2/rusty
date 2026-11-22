@@ -1,8 +1,3 @@
-//! Physics material assets on hits: a shot through a wood box into a
-//! concrete box reads each crossing's `material` and `thickness`, and prices the
-//! damage left from a Lua table keyed by material, the engine storing no
-//! penetration value of its own.
-//!
 //! Along +z from the origin: 0.5 m of wood centred at z = 3, then 1 m of concrete
 //! centred at z = 10, and an inline-material box at z = 20.
 
@@ -32,9 +27,6 @@ fn slab(scene: &mut Scene, z: f32, depth: f32, asset: Option<&str>) -> u32 {
     id
 }
 
-/// The range in Play, its two assets written a tick after its colliders were
-/// built, then one more tick: (`game`, wood
-/// path, concrete path).
 fn range() -> (GameWorld, String, String) {
     let dir = crate::temp::dir();
     let path = |n: &str| dir.join(n).to_string_lossy().into_owned();

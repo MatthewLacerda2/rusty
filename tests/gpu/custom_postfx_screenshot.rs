@@ -1,11 +1,8 @@
-//! Authored post-FX pixel tests: a baked postfx module listed on the volume
-//! reaches the image, a missing or broken module in the list is skipped (the frame
-//! still renders, the rest of the list still runs), the FXAA-off path copies the
-//! result out, and binding 3 hands an effect the previous frame's result.
-//!
-//! The effects are baked into the renderer's authored-shader dir under `t397_*`
-//! names; each test writes only its own files. Built on the fog tests' flat,
-//! unlit wall so a pixel is exactly the surface colour.
+//! Authored post-FX: a baked postfx module on the volume reaches the image, a missing or
+//! broken one is skipped (the rest still runs), FXAA-off copies the result out, and
+//! binding 3 hands an effect the previous frame's result.
+//! Effects are baked into the authored-shader dir under `t397_*` names; each test writes
+//! only its own files.
 
 use rusty::components::CameraComponent;
 use rusty::dev::capture::CaptureHost;
@@ -14,7 +11,6 @@ use rusty::shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT
 
 use super::fog::scene::{centre, srgb8, wall_scene};
 
-/// Bake a postfx module that zeroes red and blue, keeping green.
 fn bake_green(name: &str) {
     let json = format!(
         r#"{{"pass":"postfx","name":"{name}","blocks":[{{"id":"tint","params":{{"color":[0,1,0]}}}}]}}"#
@@ -27,13 +23,11 @@ fn bake_green(name: &str) {
     .expect("bake");
 }
 
-/// Write a hand-authored module straight into the authored-shader dir.
 fn write_module(name: &str, source: &str) {
     std::fs::create_dir_all(DEFAULT_OUT_DIR).unwrap();
     std::fs::write(format!("{DEFAULT_OUT_DIR}/{name}.wgsl"), source).unwrap();
 }
 
-/// Remove this test's modules from the (gitignored) authored-shader dir.
 fn cleanup(names: &[&str]) {
     for name in names {
         std::fs::remove_file(format!("{DEFAULT_OUT_DIR}/{name}.wgsl")).ok();
@@ -58,7 +52,6 @@ struct VsOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
     return vec4<f32>(mix(now, textureSample(t_history, s_color, in.uv).rgb, 0.5), 1.0);
 }";
 
-/// A grey wall whose volume runs `effects`.
 fn scene(effects: &[&str]) -> Scene {
     let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
     let id = scene.world.ids_with_post_processing()[0];

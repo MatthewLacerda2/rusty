@@ -1,15 +1,9 @@
-//! The acceptance: a linked param varies across the map. A warp whose strength
-//! follows a half-black / half-white mask is the input on one half and the full
-//! warp on the other; a tile whose jitter follows a ramp is ordered at its dark end
-//! and still tiles.
-
 use rusty::procgen::recipe::Node;
 use rusty::procgen::{evaluate, Image, TextureRecipe};
 use serde_json::{json, Value};
 
 use super::seams::seam_and_interior;
 
-/// A node parsed from its JSON form, as a recipe file writes it.
 fn node(doc: Value) -> Node {
     serde_json::from_value(doc).unwrap()
 }
@@ -23,8 +17,6 @@ fn bake(nodes: Vec<Value>, output: &str, size: [u32; 2]) -> Image {
     evaluate(&recipe).unwrap()
 }
 
-/// A noise to warp, a displacement, and a mask black on the left half of the tile
-/// and white on the right.
 fn warp_inputs() -> Vec<Value> {
     vec![
         json!({ "id": "a", "op": "noise", "kind": "fbm", "scale": 6, "octaves": 3 }),
@@ -58,8 +50,6 @@ fn a_warp_linked_to_a_half_mask_is_the_input_then_the_full_warp() {
     }
 }
 
-/// Soft cones on a 4×4 grid, their jitter linked to `jitter`. A full jitter pushes
-/// a cone across its cell's border, and the last column's across the wrap.
 fn dots(jitter: Value) -> Image {
     let nodes = vec![
         json!({ "id": "dot", "op": "shape", "kind": "circle", "size": [0.8, 0.8], "softness": 0.4 }),
@@ -70,7 +60,6 @@ fn dots(jitter: Value) -> Image {
     bake(nodes, "t", [64, 64])
 }
 
-/// Mean absolute red difference between `a` and `b` over columns `xs`.
 fn diff(a: &Image, b: &Image, xs: std::ops::Range<i64>) -> f32 {
     let mut sum = 0.0;
     for y in 0..64 {

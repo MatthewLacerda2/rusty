@@ -1,7 +1,3 @@
-//! The navigation tick alone, on the default scene's bake: Enemy_1 retargeted to
-//! the Player's position every frame: the plainest chase (`bot.lua` now heads for a
-//! spot round the Player an `EnvironmentQuery` picks).
-
 use glam::Vec3;
 use rusty::navigation::{is_at_target, NavigationGraph};
 use rusty::scene::Scene;
@@ -10,8 +6,6 @@ use super::{assert_grounded, default_scene, home, planar, reach, BASE_OFFSET, IN
 
 const DT: f32 = 1.0 / 60.0;
 
-/// Chase `player` for `ticks` frames, checking the agent stands on the ground every
-/// frame and calling `each` with its position; returns where it ends.
 pub fn chase_with(
     scene: &mut Scene,
     graph: &NavigationGraph,
@@ -34,7 +28,6 @@ fn chase(scene: &mut Scene, graph: &NavigationGraph, enemy: u32, player: Vec3, t
     chase_with(scene, graph, (enemy, player), ticks, |_, _| {})
 }
 
-/// At rest, and arrived by the agent's own measure.
 pub fn assert_stopped(scene: &Scene, enemy: u32, pos: Vec3, when: &str) {
     let agent = scene.world.nav_agent(enemy).unwrap();
     assert_eq!(agent.velocity, Vec3::ZERO, "{when}: still pushing at {pos}");
@@ -46,7 +39,6 @@ fn bot_stops_at_the_wall_and_follows_the_player_back() {
     let (mut scene, enemy) = default_scene();
     let graph = NavigationGraph::from_scene(&scene);
 
-    // The Player flies 2 m past the +x wall, 1.5 m up.
     let off = chase(&mut scene, &graph, enemy, Vec3::new(17.0, 1.5, 8.0), 600);
     let reach = reach(&scene, enemy);
     assert!(
@@ -62,7 +54,6 @@ fn bot_stops_at_the_wall_and_follows_the_player_back() {
     );
     assert_stopped(&scene, enemy, off, "at the wall");
 
-    // Back over the yard: the bot follows and arrives under the flying Player.
     let back = chase(&mut scene, &graph, enemy, home(), 900);
     assert!(
         planar(back, home()) < reach + 0.1,

@@ -1,6 +1,3 @@
-//! Rigidbody drag: Unity's `Rigidbody.drag` / `angularDrag` reach
-//! rapier's linear and angular damping, at body build and on a change in Play.
-
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty::edit::authoring::{default_collider, default_rigidbody};
@@ -96,7 +93,6 @@ fn drag_set_in_play_gives_a_falling_body_a_terminal_speed() {
     );
 }
 
-/// A scene saved before drag existed loads with Unity's defaults.
 #[test]
 fn a_rigidbody_saved_without_drag_loads_unity_defaults() {
     let mut saved = serde_json::to_value(default_rigidbody()).unwrap();

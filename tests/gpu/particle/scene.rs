@@ -1,6 +1,5 @@
-//! Shared fixture for the particle render-mode pixel tests: the fog tests'
-//! black, light-free wall 20 m away, with one emitter holding hand-placed particles.
-//! A sprite then shows its tint alone, so a test can read coverage off a pixel.
+//! Fixture for the particle render-mode pixel tests: the fog tests' black, light-free
+//! wall 20 m away, so a sprite shows its tint alone.
 
 use glam::Vec3;
 use rusty::components::particle::{Particle, ParticleEmitterComponent};
@@ -12,8 +11,7 @@ use super::super::fog::scene::{shot, wall_scene};
 
 pub const RED: [f32; 4] = [1.0, 0.1, 0.1, 1.0];
 
-/// An 8 × 4 PNG in the temp dir, left half red and right half green: a two-frame
-/// (2 × 1) flipbook. Returns its path.
+/// An 8 × 4 PNG, left half red, right green: a 2 × 1 flipbook.
 pub fn sheet_sprite() -> String {
     let path = crate::temp::dir().join("rusty_particle_sheet.png");
     let img = image::RgbaImage::from_fn(8, 4, |x, _| {
@@ -27,7 +25,6 @@ pub fn sheet_sprite() -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A plain white sprite, so a particle's colour is its tint alone.
 pub fn white_sprite() -> String {
     let path = crate::temp::dir().join("rusty_particle_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))
@@ -55,13 +52,10 @@ pub fn one(at: Vec3, size: f32) -> Vec<Particle> {
     vec![Particle::at(at, size, RED, 10.0)]
 }
 
-/// Render `scene` and read pixel `(x, y)` of the 64 × 64 shot; `None` without an
-/// adapter.
 pub fn pixel(host: &mut CaptureHost, scene: &Scene, name: &str, x: u32, y: u32) -> Option<[u8; 3]> {
     Some(shot(host, scene, name)?.get_pixel(x, y).0)
 }
 
-/// Whether a pixel shows the red particle rather than the black wall.
 pub fn is_red(px: [u8; 3]) -> bool {
     px[0] > 120 && px[1] < 90
 }

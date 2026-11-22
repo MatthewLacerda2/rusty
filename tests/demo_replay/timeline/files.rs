@@ -17,8 +17,6 @@ const SAVED: &str = r#"{"game":{"coins":7}}"#;
 const QUALITY: &str = "Mine";
 const SCALE: f32 = 0.5;
 
-/// The editor's own state before the demo: a store bound to `file`, a seed, a
-/// time scale, a Game view size and a quality choice of its own.
 fn the_operators(game: &mut GameWorld, file: &Path) -> (u64, GraphicsSettings, VideoSettings) {
     std::fs::write(file, SAVED).unwrap();
     game.resources.storage.borrow_mut().open(file).unwrap();

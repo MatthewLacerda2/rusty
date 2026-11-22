@@ -14,8 +14,7 @@ use super::hits::attach_scripts;
 use super::{add_character, add_floor, pos_of};
 use crate::play::{playing, run};
 
-/// Walks +X at 5 m/s with its own gravity, as the bundled player does (a slow
-/// walk pressed down hard reads as pushing down: `moveDirection.y < -0.3`).
+/// Walks +X at 5 m/s with its own gravity; a slow walk pressed down hard reads as pushing down (`moveDirection.y < -0.3`).
 const WALKER: &str = r#"
 local W = { vy = 0 }
 function W.Update(id, dt)
@@ -26,7 +25,6 @@ end
 return W
 "#;
 
-/// A 1 m, 10 kg dynamic box resting on the floor at `x`; kinematic when asked.
 fn crate_at(scene: &mut Scene, x: f32, kinematic: bool) -> u32 {
     let id = scene.add_entity("Crate".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.5, 0.0);
@@ -44,7 +42,6 @@ fn crate_at(scene: &mut Scene, x: f32, kinematic: bool) -> u32 {
     id
 }
 
-/// How far a crate 2 m ahead of a walking controller moved in 2 s.
 fn crate_travel(push: bool) -> f32 {
     let mut scene = Scene::new();
     add_floor(&mut scene);

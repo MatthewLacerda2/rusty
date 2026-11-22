@@ -1,7 +1,3 @@
-//! Bake-level integration for procedural textures: the full recipe → runner →
-//! PNG path, the glTF channel conventions, tiling, determinism, and that a baked file
-//! loads back through the same `image` crate the renderer's `load_texture` uses.
-
 use crate::temp::path as tmp;
 use rusty::procgen::bake::{encode, Slot};
 use rusty::procgen::recipe::{Constant, Node, Noise, NoiseKind, OpKind, TextureRecipe};
@@ -45,7 +41,6 @@ fn baked_png_is_loadable_at_the_requested_resolution() {
     let recipe = noise_recipe(64, 1);
     let path = tmp("rusty_bake_loadable.png");
     bake_recipe(&recipe, &Sources::new(), Slot::Normal, &path).unwrap();
-    // The same decode path the renderer's `load_texture` takes.
     let img = image::open(&path).expect("baked PNG decodes");
     assert_eq!(image::GenericImageView::dimensions(&img), (64, 64));
     std::fs::remove_file(path).ok();
@@ -62,7 +57,6 @@ fn perlin_noise_wraps_left_to_right_and_top_to_bottom() {
         let top = (img.get_wrapped(y, 127)[1] - img.get_wrapped(y, -1)[1]).abs();
         max_diff = max_diff.max(edge).max(top);
     }
-    // get_wrapped(-1) == get_wrapped(127), so this is an identity check on the wrap.
     assert!(
         max_diff < 1e-6,
         "noise must tile seamlessly, max edge diff {max_diff}"

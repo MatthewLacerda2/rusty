@@ -9,7 +9,6 @@ use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
 const BOT: &str = "assets/scripts/bot.lua";
-/// The taint every harness demo carries: its scene is built, not loaded.
 const NO_FILE: &str = "Play started on a scene with no file";
 
 /// Kill the bot on the second tick: its `OnTakeDamage` marks it dead, and a dead
@@ -22,8 +21,6 @@ Harness.Expect(Scene.GetScript(bot, "bot").health <= 0, "its handler ran")
 Harness.Step(238)
 "#;
 
-/// Move the player before the first step: no gameplay VM yet, so the
-/// scenario's own `Move` runs, and the replay must make it the same way.
 const MOVE_FIRST: &str = r#"
 local player = Scene.FindEntityByName("Player")
 CharacterController.Move(player, 1, 0, 0)
@@ -72,8 +69,6 @@ fn a_forwarded_damage_call_replays_with_its_handler() {
         "the replayed handler killed the bot: {health}"
     );
     assert_eq!((verdict.diverged, verdict.checked), (None, 3));
-    // The harness's scene has no file; the handle that read the health is
-    // no taint (it notes its own writes and calls).
     assert_eq!(verdict.taints, [(0, NO_FILE.to_string())]);
 }
 

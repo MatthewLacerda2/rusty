@@ -10,9 +10,8 @@ use std::path::{Path, PathBuf};
 
 use rusty::dev::harness::Harness;
 
-/// The Lua every case's scenario starts with: `renders()` counts the frames drawn
-/// (`Harness.Stats()`'s `renderer_ms` samples) on a main camera with a volume, and `shot(name, opts, want)`
-/// screenshots after a cut and expects `want` renders.
+/// Lua prelude: `renders()` counts frames drawn; `shot(name, opts, want)` shoots after a cut
+/// and expects `want` renders.
 const PRELUDE: &str = r#"
 Harness.Step(1)
 local main = Scene.CreateEntity("ShotCam")
@@ -37,8 +36,7 @@ local function full(name, n)
 end
 "#;
 
-/// Run `body` after [`PRELUDE`] in a fresh harness; its output folder, or `None`
-/// when no adapter drew its first shot, `first`.
+/// Run `body` after [`PRELUDE`] in a fresh harness; its output folder, or `None` without an adapter.
 pub(super) fn run(tag: &str, body: &str, first: &str) -> Option<PathBuf> {
     let out = crate::temp::dir().join(format!("rusty_settle_{tag}_{}", std::process::id()));
     std::fs::create_dir_all(&out).unwrap();
@@ -58,7 +56,6 @@ pub(super) fn run(tag: &str, body: &str, first: &str) -> Option<PathBuf> {
     Some(out)
 }
 
-/// The decoded PNG `name` in `out`.
 pub(super) fn png(out: &Path, name: &str) -> image::RgbaImage {
     image::open(out.join(name)).expect("decodes").to_rgba8()
 }

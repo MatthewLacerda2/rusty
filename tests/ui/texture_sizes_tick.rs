@@ -1,6 +1,3 @@
-//! The UI's texture-size reader inside the tick: a bare tick fills the table, an idle
-//! one leaves it alone, and a Play or Stop measures the scene it swapped in.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -15,8 +12,6 @@ use rusty::navigation::NavigationGraph;
 use rusty::procgen::{bake::bake_to_png, Image, Slot};
 use rusty::scene::Scene;
 
-/// A scene of a canvas holding one Image of `texture`, fitted to its preferred size
-/// (the crate's own `size_reader` tests build the same).
 fn fitted_image(texture: &str) -> Scene {
     let mut scene = Scene::new();
     let root = scene.add_entity("Canvas".to_string());
@@ -42,7 +37,6 @@ fn fitted_image(texture: &str) -> Scene {
     scene
 }
 
-/// A fresh path for a baked PNG named `name`.
 fn temp_png(name: &str) -> String {
     let dir = crate::temp::dir().join("rusty_1221");
     std::fs::create_dir_all(&dir).expect("temp dir");
@@ -51,7 +45,6 @@ fn temp_png(name: &str) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A game of `scene`, not ticked yet.
 fn game(scene: Scene) -> GameWorld {
     let nav = NavigationGraph::new(-1.0, 1.0, -1.0, 1.0, 1.0);
     GameWorld::new(
@@ -62,7 +55,6 @@ fn game(scene: Scene) -> GameWorld {
     )
 }
 
-/// A game of one Image of a baked 4×4 PNG, and that PNG's path.
 fn game_of_baked(name: &str) -> (GameWorld, String) {
     let path = temp_png(name);
     bake_to_png(&Image::new(4), Slot::BaseColor, &path).expect("bake");

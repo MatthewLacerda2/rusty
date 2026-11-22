@@ -1,13 +1,6 @@
-//! Geometric specular anti-aliasing: a glossy, normal-mapped metal sphere
-//! small on screen, turned a few degrees a frame under one lamp. Without the AA its
-//! highlight breaks into single-pixel sparkles that jump from frame to frame; with
-//! it, the lobe is widened by the spread of normals each pixel covers, and every
-//! pixel's brightness changes far less from frame to frame.
-//!
-//! The measure is each pixel's variance in luma over the frames, relative to the
-//! signal (`relative_temporal_variance`). Each frame is its own deterministic render (no temporal
-//! filter), so the variance is the shimmer a moving camera would show. Without an
-//! adapter the capture returns `Ok(false)` and the test skips.
+//! Geometric specular anti-aliasing: a glossy, normal-mapped metal sphere, small on screen,
+//! turned a few degrees a frame under one lamp. Without the AA its highlight breaks into
+//! single-pixel sparkles; with it, frame-to-frame luma variance (relative to the signal) is far lower.
 
 use glam::{Quat, Vec3};
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
@@ -19,7 +12,6 @@ use rusty::scene::{Camera, Scene};
 const SIZE: u32 = 96;
 const FRAMES: u32 = 8;
 
-/// A 64x64 tangent-space normal map of seeded noise, every texel tilted up to ~35°.
 fn bumpy_normal_map() -> std::path::PathBuf {
     let mut state = 0x9e37_79b9u32;
     let mut next = || {
@@ -37,8 +29,6 @@ fn bumpy_normal_map() -> std::path::PathBuf {
     path
 }
 
-/// The sphere turned `degrees` about Y, smooth white metal with the bumpy normal map,
-/// lit by one lamp over a black sky.
 fn scene(degrees: f32, normal_map: &std::path::Path) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -71,10 +61,8 @@ fn scene(degrees: f32, normal_map: &std::path::Path) -> Scene {
     scene
 }
 
-/// Every frame's luma, row-major; `None` without an adapter.
 fn frames() -> Option<Vec<Vec<f64>>> {
     let map = bumpy_normal_map();
-    // From +Z down -Z, far enough that the unit sphere spans about a third of the frame.
     let camera = Camera::new(Vec3::new(0.0, 0.0, 3.5), -90.0, 0.0);
     let mut host = CaptureHost::new();
     let mut out = Vec::new();
@@ -101,9 +89,8 @@ fn frames() -> Option<Vec<Vec<f64>>> {
     Some(out)
 }
 
-/// Each pixel's variance over `frames`, summed, over the sum of each pixel's mean
-/// squared: the frame-to-frame flicker relative to the signal, so a highlight that
-/// grows broader and brighter is not scored as more shimmer. Also the summed mean.
+/// Summed per-pixel luma variance over summed squared means (so a broader, brighter
+/// highlight is not more shimmer), and the summed mean.
 pub(crate) fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
     let n = frames.len() as f64;
     let (mut variance, mut signal, mut total) = (0.0, 0.0, 0.0);
@@ -117,14 +104,11 @@ pub(crate) fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
     (variance / signal.max(1e-9), total)
 }
 
-/// Measured on lavapipe: 0.77 with the roughness left unwidened, 0.18 with the AA.
+/// lavapipe: 0.77 unwidened, 0.18 with the AA.
 const BOUND: f64 = 0.35;
-/// The brightest pixel's luma, averaged over the frames: the AA must keep a glossy
-/// highlight (and render one), so a `widen` that turned the metal matte fails. On
-/// lavapipe: 239 with the AA, 211 unwidened, 156 with `widen` returning 1.0.
+/// Peak-luma floor, so a `widen` that turned the metal matte fails. lavapipe: 239 with the AA, 156 matte.
 const PEAK_FLOOR: f64 = 200.0;
 
-/// Each frame's brightest luma, averaged over `frames`.
 fn mean_peak(frames: &[Vec<f64>]) -> f64 {
     let peaks = frames.iter().map(|f| f.iter().cloned().fold(0.0, f64::max));
     peaks.sum::<f64>() / frames.len() as f64

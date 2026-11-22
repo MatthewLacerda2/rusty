@@ -1,19 +1,12 @@
-//! Every engine binary answers `--help` (and `-h`) with its usage and exits 0,
-//! before it opens a project, a window or a session: an agent's usual first look
-//! at a binary must never start the editor or block its shell. The table below is
-//! held equal to `Cargo.toml`'s `[[bin]]` names, so a new binary joins it. Gated on
-//! `dev`, which every binary but `rusty` and `player` needs to be built.
+//! Every engine binary answers `--help`/`-h` with usage and exits 0 before opening a project, window or session. The table is held equal to `Cargo.toml`'s `[[bin]]` names. Gated on `dev`.
 
 use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
-/// How often a running binary is checked on, and how many checks it gets: about a
-/// minute, far more than printing its usage needs, far less than a window or a
-/// session that never returns. Counted, not timed: tests read no wall clock.
+/// Poll count for a running binary; counted, not timed: tests read no wall clock.
 const POLL: Duration = Duration::from_millis(50);
 const POLLS: u32 = 1200;
 
-/// Each binary by its Cargo target name, as `spawn::engine_bin!` starts it.
 fn binaries() -> Vec<(&'static str, Command)> {
     use crate::spawn::engine_bin;
     vec![
@@ -29,7 +22,6 @@ fn binaries() -> Vec<(&'static str, Command)> {
     ]
 }
 
-/// Run `command` with `args` and no stdin, killing it after [`POLLS`] checks.
 fn run(name: &str, mut command: Command, args: &[&str]) -> Output {
     let mut child = command
         .args(args)

@@ -82,7 +82,6 @@ fn soldier() -> (Scene, u32) {
     (scene, hero)
 }
 
-/// The (spine, leg) bones' x after `ticks` fixed steps.
 fn bones_after(ticks: usize) -> (f32, f32) {
     let (scene, hero) = soldier();
     let (spine, leg) = (

@@ -1,10 +1,3 @@
-//! Starter material library: the engine ships a small set of ready-to-go
-//! glTF-PBR materials under `assets/materials/starter.gltf`. They must be
-//! discoverable and referable from scenes the SAME way user/imported materials are
-//! — no engine special-casing. This test drives the ordinary asset path: the
-//! manifest discovers them, the importer reads their PBR factors, and they round-trip
-//! through `SceneData` as named library entries an entity references by key.
-
 use rusty::asset::{build_manifest, import_file};
 use rusty::edit::authoring::material_asset_from_import;
 use rusty::edit::{apply_scene_data, to_scene_data};
@@ -13,16 +6,12 @@ use std::path::PathBuf;
 
 use rusty::edit::bundled::STARTER_MATERIALS_PATH as STARTER;
 
-/// A project seeded the way every project is, so the starter file is where a game
-/// finds it.
 fn seeded_project(name: &str) -> PathBuf {
     let root = crate::temp::dir().join(name);
     rusty::edit::seed_workspace(&root, None);
     root
 }
 
-/// The four starter materials and the physically-plausible factors they ship with.
-/// (name, metallic, roughness, emits-light)
 const EXPECTED: &[(&str, f32, f32, bool)] = &[
     ("Matte", 0.0, 0.9, false),
     ("Metal", 1.0, 0.25, false),
@@ -56,9 +45,6 @@ fn starter_materials_are_discoverable_via_manifest() {
 
 #[test]
 fn starter_materials_resolve_as_library_references_round_trip() {
-    // Build library entries the SAME way the editor's glTF import does: key each by
-    // the deterministic `<path>::<name>`, convert via `material_asset_from_import`,
-    // and attach a thin `MaterialComponent` reference — the user-material path.
     let root = seeded_project("rusty_starter_roundtrip");
     let asset = import_file(&root.join(STARTER)).expect("starter.gltf imports");
     let mut scene = Scene::new();

@@ -1,7 +1,6 @@
 //! Cascaded sun shadows: a caster 100 units from the world origin — where the
 //! old fixed ±30 shadow box never reached — must still darken the ground under it.
-//! The same yard is rendered twice, once with the shadow distance cut to nothing, so
-//! the only difference between the frames is the shadow. Skips without an adapter.
+//! The same yard is rendered with the shadow distance cut to nothing for comparison.
 
 use glam::{Quat, Vec3};
 use rusty::dev::screenshot::capture;
@@ -10,7 +9,6 @@ use rusty::scene::{Camera, Scene};
 
 const FAR_OUT: Vec3 = Vec3::new(100.0, 0.0, -40.0);
 
-/// A ground slab with a floating roof over it at `FAR_OUT`, under a high sun.
 fn yard(shadow_distance: f32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -44,7 +42,6 @@ fn yard(shadow_distance: f32) -> Scene {
     scene
 }
 
-/// Pixels that are clearly darker in `shadowed` than in `unshadowed`.
 fn darkened_pixels(shadowed: &std::path::Path, unshadowed: &std::path::Path) -> usize {
     let on = image::open(shadowed).expect("png readable").to_rgb8();
     let off = image::open(unshadowed).expect("png readable").to_rgb8();

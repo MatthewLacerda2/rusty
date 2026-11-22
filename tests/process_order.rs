@@ -3,11 +3,6 @@
 //! Play sessions, a test binary or `make game-test` after other worlds. The
 //! same scene, played first in the process and again after a different world,
 //! walks to bit-identical poses.
-//!
-//! The scene: a static plane (a triangle-mesh floor) under
-//! script-walked CharacterControllers, with a dynamic Rigidbody box dropped
-//! beside them. The world between is another one: kinematic box floor, more
-//! walkers, other speeds.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,7 +16,6 @@ use crate::play::{attach_script, playing, run};
 
 const TICKS: usize = 120;
 
-/// A floor named `name`, its top face at y = 0, 60 m along +Z.
 fn add_floor(scene: &mut Scene, name: &str, primitive: Primitive, is_static: bool) {
     let floor = create_entity(scene, name, Some(primitive));
     let mut t = scene.world.transform_mut(floor).unwrap();
@@ -47,8 +41,6 @@ fn add_floor(scene: &mut Scene, name: &str, primitive: Primitive, is_static: boo
     }
 }
 
-/// `count` controllers 2 m apart whose scripts walk them +Z, the n-th at
-/// `speed * (n + 1)`, with a ground stick.
 fn add_walkers(scene: &mut Scene, count: usize, speed: f32) -> Vec<u32> {
     (0..count)
         .map(|n| {
@@ -69,7 +61,6 @@ fn add_walkers(scene: &mut Scene, count: usize, speed: f32) -> Vec<u32> {
         .collect()
 }
 
-/// Play `scene` for `TICKS`, returning `ids`' positions every tick, as bits.
 fn play(scene: Scene, ids: &[u32]) -> Vec<[u32; 3]> {
     let scene = Rc::new(RefCell::new(scene));
     let mut game = playing(scene.clone(), 100.0);
@@ -85,7 +76,6 @@ fn play(scene: Scene, ids: &[u32]) -> Vec<[u32; 3]> {
     poses
 }
 
-/// The scene under test: a static plane, walkers and a falling dynamic box.
 fn plane_scene() -> Vec<[u32; 3]> {
     let mut scene = Scene::new();
     add_floor(&mut scene, "Plane", Primitive::Plane, true);
@@ -99,7 +89,6 @@ fn plane_scene() -> Vec<[u32; 3]> {
     play(scene, &ids)
 }
 
-/// A different world: a kinematic box floor under more, faster walkers.
 fn walking_world() {
     let mut scene = Scene::new();
     add_floor(&mut scene, "Floor", Primitive::Box, false);

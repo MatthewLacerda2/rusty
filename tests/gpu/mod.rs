@@ -1,14 +1,7 @@
-//! Integration tests that render: they build a headless [`Renderer`] (directly, or
-//! through `screenshot::capture` / `Debug.Preview`) and skip when no adapter exists.
-//!
-//! Grouped under one `gpu::` module path so they can be identified by name: nextest
-//! runs each test in its own process, where the in-process headless budget
-//! (`render::setup::budget`) cannot bound them, so the `gpu` test group in
-//! `.config/nextest.toml` selects them by this path instead. A new test that renders
-//! belongs here — building a renderer from a test outside it panics in debug builds
+//! Integration tests that render, skipping when no adapter exists. Grouped under one
+//! `gpu::` path because nextest's `gpu` test group (`.config/nextest.toml`) selects
+//! them by it; a test that builds a renderer outside it panics in debug builds
 //! (`render::setup::gpu_rule`).
-//!
-//! [`Renderer`]: rusty::render::Renderer
 
 use std::path::Path;
 
@@ -24,9 +17,7 @@ pub fn mean(img: &image::RgbImage) -> f64 {
 }
 
 /// Give `scene` a black skybox panorama, so only its own lights and emissives light
-/// it. `ambient_intensity = 0` removes the ambient term only: the procedural sky
-/// still lights every surface, even a fully rough one, through its environment
-/// reflection, as Unity's skybox does.
+/// it: `ambient_intensity = 0` leaves the procedural sky lighting every surface.
 pub fn black_sky(scene: &mut rusty::scene::Scene) {
     let path = crate::temp::dir().join("black_sky.png");
     image::RgbaImage::from_pixel(2, 1, image::Rgba([0, 0, 0, 255]))

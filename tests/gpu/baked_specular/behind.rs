@@ -10,7 +10,6 @@ use rusty::scene::{Camera, Scene};
 
 use super::{bake, lamp, plane, point, shot, SIZE};
 
-/// A normal map whose low-U half tilts about 35° toward -tangent, the rest +tangent.
 fn bumps(path: &std::path::Path) {
     let img = image::RgbaImage::from_fn(64, 64, |x, _| match x < 32 {
         true => image::Rgba([64, 128, 218, 255]),
@@ -19,7 +18,6 @@ fn bumps(path: &std::path::Path) {
     img.save(path).expect("write normal map");
 }
 
-/// A two-sided, glossy, normal-mapped static plane with a lamp a metre over its front.
 fn scene(name: &str) -> Scene {
     let dir = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}_map"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -47,7 +45,6 @@ fn scene(name: &str) -> Scene {
     scene
 }
 
-/// The panel baked (`directional` or not) and seen from 2 m under it, looking up.
 fn from_behind(directional: bool) -> Option<Vec<f32>> {
     let name = format!("behind_{directional}");
     let mut scene = scene(&name);
@@ -59,8 +56,7 @@ fn from_behind(directional: bool) -> Option<Vec<f32>> {
     )
 }
 
-/// The mean of the image's top and bottom thirds: the normal map's halves run along
-/// the panel's X, which a view straight up shows vertically.
+/// Mean of the top and bottom thirds: the normal map's halves run along X, vertical looking up.
 fn halves(img: &[f32]) -> [f32; 2] {
     let band = |ys: std::ops::Range<u32>| {
         let rows = &img[(ys.start * SIZE) as usize..(ys.end * SIZE) as usize];

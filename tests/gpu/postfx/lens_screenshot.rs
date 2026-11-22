@@ -1,7 +1,6 @@
-//! The volume's lens effects, pixel-tested on lavapipe: the vignette darkens
-//! the corners and not the centre, chromatic aberration fringes a white edge near
-//! the border and not at the centre, film grain is the same at the same tick and
-//! new at the next, and each one at intensity 0 renders byte-identical to off.
+//! The volume's lens effects on lavapipe: vignette darkens corners only, chromatic
+//! aberration fringes an edge near the border only, grain repeats within a tick, and
+//! each at intensity 0 is byte-identical to off.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, PostProcessingComponent};
@@ -11,7 +10,6 @@ use rusty::scene::Scene;
 
 use super::super::fog::scene::{camera, wall_scene};
 
-/// Render `scene` at `size`², or `None` when no adapter exists.
 fn shot(host: &mut CaptureHost, scene: &Scene, name: &str, size: u32) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_lens_{name}.png"));
     if !capture_into(host, scene, &camera(), &path, size, size).expect("capture") {
@@ -21,7 +19,6 @@ fn shot(host: &mut CaptureHost, scene: &Scene, name: &str, size: u32) -> Option<
     Some(image::open(&path).expect("png").to_rgb8())
 }
 
-/// A mid-grey wall with `edit` applied to its volume.
 fn grey(edit: impl FnOnce(&mut PostProcessingComponent)) -> Scene {
     let mut scene = wall_scene(2.0, [0.5, 0.5, 0.5]);
     let id = scene.world.ids_with_post_processing()[0];
@@ -95,7 +92,6 @@ fn edge_scene(x: f32, aberration: f32) -> Scene {
     scene
 }
 
-/// Whether the middle row holds a red fringe pixel and a yellow fringe pixel.
 fn fringes(img: &image::RgbImage) -> (bool, bool) {
     let y = img.height() / 2;
     let row: Vec<[u8; 3]> = (0..img.width()).map(|x| img.get_pixel(x, y).0).collect();

@@ -1,8 +1,6 @@
-//! A lightmap page's two paths render alike: the BC6H KTX2 page (the GPU's
-//! own BC decoder, lavapipe's in CI) and its RGBM PNG fallback, decoded on the CPU
-//! to `Rgba16Float`, light a floor to within a few levels of each other, colour for
-//! colour: a channel swapped or a range clipped in the encoder shows here, where a
-//! grey scene would hide it. Skips when no GPU / software adapter is present.
+//! A lightmap page's two paths render alike: BC6H KTX2 and its RGBM PNG fallback, light a
+//! floor within a few levels, colour for colour: a swapped channel or clipped range shows here,
+//! where a grey scene would hide it.
 
 use glam::Vec3;
 use rusty::asset::lightmap_page;
@@ -15,7 +13,6 @@ use rusty::scene::{Camera, Scene};
 const SIZE: u32 = 64;
 const EDGE: u32 = 64;
 
-/// Warm HDR light on the left half (past 1, under RGBM's 8), cool on the right.
 fn light() -> Vec<Vec3> {
     (0..EDGE * EDGE)
         .map(|i| match i % EDGE < EDGE / 2 {
@@ -25,7 +22,6 @@ fn light() -> Vec<Vec3> {
         .collect()
 }
 
-/// A floor wearing `page` as its lightmap, under a black sky and no lights.
 fn scene(page: String) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -84,8 +80,7 @@ fn the_bc6h_page_and_its_png_fallback_light_a_floor_alike() {
         .unwrap();
     eprintln!("[1694] worst channel difference {worst}");
     assert!(worst <= 8, "the two paths differ by {worst} levels");
-    // Warm stays warm and cool stays cool, in both: no channel moved. The halves
-    // meet across the frame's middle; which half is up is the camera's business.
+    // Warm stays warm and cool stays cool: no channel moved.
     let warm = |p: &image::Rgb<u8>| p[0] > p[1] && p[1] > p[2];
     let cool = |p: &image::Rgb<u8>| p[2] > p[1] && p[1] > p[0];
     for (img, what) in [(&fallback, "png"), (&compressed, "bc6h")] {

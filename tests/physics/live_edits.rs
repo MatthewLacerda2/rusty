@@ -1,9 +1,3 @@
-//! Scene edits during Play that change what physics carries, run through the
-//! real play loop: physics syncs only what the change log names, so these
-//! are the moves it must still see. A compound body loses a part, a body is
-//! re-parented onto a moving one, and a parent's `SetActive` switches off the wall
-//! under it. A ragdoll at rest losing its floor the same way: `ragdoll::floor_off`.
-
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape};
 use rusty::edit::authoring::{default_collider, default_rigidbody};
@@ -11,7 +5,6 @@ use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};
 
-/// An entity named `name` at `at` with a `size` box collider.
 fn boxed(scene: &mut Scene, name: &str, at: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity(name.to_string());
     scene.world.transform_mut(id).unwrap().position = at;
@@ -46,8 +39,6 @@ return { Update = function(id)\n\
   end\n\
 end }";
 
-/// The yard: a floor, a dynamic cart with a mast part, a hat floating above it,
-/// a wall under a `Gate` parent, and the director. Returns cart, hat, director.
 fn yard(scene: &mut Scene) -> (u32, u32, u32) {
     let v = Vec3::new;
     let floor = boxed(scene, "Floor", v(0.0, -0.5, 0.0), v(40.0, 1.0, 40.0));

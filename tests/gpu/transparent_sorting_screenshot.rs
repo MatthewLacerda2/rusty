@@ -1,16 +1,7 @@
-//! Transparent back-to-front compositing test. Proves the alpha-blended
-//! transparent pass sorts its draws by view-space depth, so two overlapping
-//! translucent quads composite the SAME way regardless of the order they were
-//! inserted into the scene — the issue's core acceptance.
-//!
-//! Colours are light-independent by construction: zero ambient + no lights, so a
-//! surface's lit colour is exactly its `emissive` factor. Each quad is `Transparent`
-//! with a strong emissive tint and alpha < 1, so the rendered pixel is a pure blend.
-//! A near GREEN quad in front of a far RED quad must read green-dominant; and flipping
-//! the insertion order must not change the pixel (the sort, not draw order, decides).
-//!
-//! No GPU/software adapter -> `capture` returns `Ok(false)` and the test passes
-//! without asserting (matching `material_maps_screenshot.rs`).
+//! Transparent back-to-front compositing: two overlapping translucent quads composite the
+//! same way whatever order they were inserted in, because the pass sorts by view-space depth.
+//! Zero ambient and no lights make a surface's colour its `emissive`; a near green quad
+//! over a far red one must read green-dominant.
 
 use crate::temp::file as tmp;
 use glam::Vec3;
@@ -34,8 +25,6 @@ fn vc() -> PostProcessingComponent {
     }
 }
 
-/// Add a screen-filling translucent quad (a thin box) at world `z`, emissive-tinted
-/// `color` with `alpha`. Returns nothing; the entity is appended to the scene.
 fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) {
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 0.1);
@@ -61,12 +50,9 @@ fn add_quad(scene: &mut Scene, name: &str, z: f32, color: [f32; 3], alpha: f32) 
 const RED: [f32; 3] = [1.0, 0.0, 0.0];
 const GREEN: [f32; 3] = [0.0, 1.0, 0.0];
 
-/// A scene with a far red quad and a near green quad; `near_first` flips the order the
-/// two are inserted (geometry/depth identical, only insertion order differs).
 fn scene(near_first: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
-    // One volume, on the view's camera.
     let volume = scene.add_entity("Volume".to_string());
     scene.world.set_post_processing(volume, Some(vc()));
     let camera = rusty::components::CameraComponent::default();

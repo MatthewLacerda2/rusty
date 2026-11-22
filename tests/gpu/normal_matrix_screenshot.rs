@@ -12,7 +12,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 128;
 
-/// A matte grey unit sphere scaled by `scale`, lit only by a sun pointing down -Y.
 fn scene(scale: Vec3) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -37,13 +36,12 @@ fn scene(scale: Vec3) -> Scene {
         ..default_light()
     };
     scene.world.set_light(sun, Some(light));
-    // A light shines down its -Z; turned about X, -Z points down -Y.
+    // A light shines down its -Z.
     scene.world.transform_mut(sun).unwrap().rotation =
         Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     scene
 }
 
-/// Mean green of the 3x3 block around where `world` lands in `img`.
 fn at(img: &image::RgbImage, cam: &Camera, world: Vec3) -> f64 {
     let clip = cam.build_view_projection(1.0) * world.extend(1.0);
     let ndc = clip.truncate() / clip.w;
@@ -58,8 +56,6 @@ fn at(img: &image::RgbImage, cam: &Camera, world: Vec3) -> f64 {
     sum / 9.0
 }
 
-/// The shade on the centre column against halfway out to each side, at the same
-/// height up the ellipsoid. `None` when no adapter rendered.
 fn shades(label: &str, scale: Vec3) -> Option<(f64, f64, f64)> {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_normal_matrix_{label}.png"));
@@ -68,8 +64,6 @@ fn shades(label: &str, scale: Vec3) -> Option<(f64, f64, f64)> {
         return None;
     }
     let img = image::open(&path).expect("png").to_rgb8();
-    // Points on the unit-radius-0.5 sphere, scaled: the centre column at local
-    // (0, 0.6, 0.8) and halfway out at local (±0.5, 0.6, 0.62), both radius 0.5.
     let (sx, sy, sz) = (scale.x.abs() * 0.5, scale.y * 0.5, scale.z * 0.5);
     let centre = at(&img, &cam, Vec3::new(0.0, 0.6 * sy, 0.8 * sz));
     let left = at(&img, &cam, Vec3::new(-0.5 * sx, 0.6 * sy, 0.62 * sz));

@@ -1,13 +1,7 @@
-//! Environment reflections on metal. A fully metallic surface has no diffuse
-//! term, so without the environment reflection it renders black. That term used to run
-//! only behind a camera's SSR toggle; now it always applies, Unity's way, and with no
-//! skybox panorama it reflects the procedural sky the sky pass draws.
-//!
-//! The scene has **no lights** and a blue ambient tint, so the only thing that can
-//! light a white metal sphere is the reflected sky: its centre must be well above
-//! black and blue-dominant like that sky. With SSR on, the same must still hold; SSR
-//! runs only on the High tier, so that shot sets it (the default tier would leave the
-//! pass off and the test vacuous). Without an adapter the test skips.
+//! A fully metallic surface has no diffuse term, so it renders black unless the
+//! environment reflection applies (always, as in Unity; with no panorama it reflects
+//! the procedural sky). No lights: a white metal sphere's centre must be blue-dominant.
+//! SSR runs only on the High tier, so that shot sets it. Skips without an adapter.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent};

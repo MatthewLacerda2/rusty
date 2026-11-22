@@ -1,8 +1,6 @@
-//! A surface block's lookup under a height map reads as it does without one:
-//! the `emissive_boost` block builds its coordinates with `coords_with`,
-//! outside `parallax::displace`, so they are neither shifted nor bent (`bend` 0) and
-//! are read at their own implicit derivatives, the mip a far surface needs. A far,
-//! fine checker shows any other mip as a different frame.
+//! A surface block's lookup under a height map reads as without one: `emissive_boost` builds
+//! its coordinates with `coords_with`, outside `parallax::displace`, so they are unshifted
+//! (`bend` 0) and read at their own implicit derivatives, the mip a far surface needs.
 
 use rusty::components::MaterialAsset;
 use rusty::shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
@@ -11,7 +9,6 @@ use rusty::shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 use super::{frame, grazing};
 use crate::gpu::linear_data_maps_screenshot::{diff, SAME};
 
-/// A surface variant of the one `emissive_boost` block; removed on drop.
 struct Boost(String);
 
 impl Boost {
@@ -38,7 +35,6 @@ impl Drop for Boost {
     }
 }
 
-/// A 64-texel PNG: a 1-texel checker when `fine`, else all white.
 fn png(name: &str, fine: bool) -> String {
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_fn(64, 64, |x, y| match fine && (x + y) % 2 == 1 {
@@ -49,8 +45,6 @@ fn png(name: &str, fine: bool) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A black, Opaque plane glowing only by the boost of a fine checker, 1024
-/// repeats over 16 m; with a flat (all-white, so unshifted) height map at `scale`.
 fn boosted(shader: &str, scale: f32) -> MaterialAsset {
     MaterialAsset {
         base_color: [0.0, 0.0, 0.0],
@@ -77,8 +71,7 @@ fn a_surface_blocks_lookup_under_a_height_map_reads_its_mip() {
     };
     let d = diff(&mipped, &marched);
     eprintln!("[height-map] the boost, far, under the height map: {d:.3}");
-    // Measured: RTX 2060 0.000, lavapipe 0.000 (8.331 before `coords_with` filled
-    // the derivatives).
+    // Measured: RTX 2060 0.000, lavapipe 0.000 (8.331 before `coords_with` filled derivatives).
     assert!(
         d < SAME,
         "the boost reads the mip it reads without the map: {d:.3}"

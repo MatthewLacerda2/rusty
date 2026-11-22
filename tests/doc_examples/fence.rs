@@ -1,21 +1,15 @@
 //! Find the ```lua blocks in a Markdown document and read their fence markers.
 
-/// What a block's fence asks of the test.
 #[derive(Debug, PartialEq)]
 pub enum Mode {
-    /// Plain ```lua: compiled and run in a fresh headless session.
     Run,
-    /// ```lua no-run: compiled only (it writes files or leans on
-    /// game-side helpers the doc doesn't define).
+    /// ```lua no-run: compiled only (writes files or needs game-side helpers).
     NoRun,
-    /// ```lua ignore: not Lua at all (a shape sketch with `|` or `...`); skipped.
     Ignore,
 }
 
-/// One ```lua block: where it starts, how to treat it, and its source.
 #[derive(Debug)]
 pub struct Block {
-    /// 1-based line of the opening fence.
     pub line: usize,
     pub mode: Mode,
     /// `with=name,name:Component+Component`: entities the block names but doesn't
@@ -25,9 +19,7 @@ pub struct Block {
     pub source: String,
 }
 
-/// Every ```lua block in `doc`, in order. A fence may be indented (a block inside
-/// a list item); its body loses the fence's indentation. Other fences are stepped
-/// over whole, so a ```lua quoted inside one is not a block.
+/// A fence may be indented (a list item), its body losing the indentation; other fences are skipped whole.
 pub fn lua_blocks(doc: &str) -> Result<Vec<Block>, String> {
     let mut blocks = Vec::new();
     let mut in_other = false;
@@ -61,7 +53,6 @@ pub fn lua_blocks(doc: &str) -> Result<Vec<Block>, String> {
     Ok(blocks)
 }
 
-/// Parse the words after ```lua into a block header, refusing unknown markers.
 fn header<'a>(line: usize, words: impl Iterator<Item = &'a str>) -> Result<Block, String> {
     let mut block = Block {
         line,

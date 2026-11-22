@@ -1,8 +1,5 @@
-//! Runtime postfx params pixel test: a script's `Graphics.SetPostParam`
-//! drives a baked damage vignette's intensity, and the corner of the frame follows
-//! it with no re-bake — the module's files stay untouched; only the volume's value
-//! (a uniform write) changes between frames. Its own files, not the process-wide
-//! bake generation, which a neighbouring test's bake moves.
+//! A script's `Graphics.SetPostParam` drives a baked damage vignette's intensity with
+//! no re-bake: only the volume's value (a uniform write) changes between frames.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -18,7 +15,6 @@ use super::super::fog::scene::{shot, srgb8, wall_scene};
 
 const NAME: &str = "t671_hurt";
 
-/// A grey wall whose volume runs a red damage vignette that does not pulse.
 fn scene() -> Rc<RefCell<Scene>> {
     let json = format!(
         r#"{{"pass":"postfx","name":"{NAME}","blocks":[{{"id":"damage_vignette","params":{{"color":[1,0,0]}}}}]}}"#
@@ -48,7 +44,6 @@ fn written() -> impl PartialEq + std::fmt::Debug {
     })
 }
 
-/// Run `script` against the `Graphics` namespace.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     let (lua, quality) = (
         Lua::new(),
@@ -68,7 +63,6 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
     .expect("script");
 }
 
-/// Set the intensity from a script, render, and return the top-left corner pixel.
 fn corner_at(
     host: &mut CaptureHost,
     scene: &Rc<RefCell<Scene>>,

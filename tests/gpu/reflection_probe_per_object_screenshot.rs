@@ -1,8 +1,6 @@
-//! Reflection probes are picked per object, Unity's way: two adjacent probe
-//! boxes, a red cube in the left one and a green cube in the right, a metal sphere in
-//! each, and the camera inside the left box. Each sphere must reflect its own probe.
-//! When the probe was picked once per camera, both spheres reflected the left (red)
-//! one. No lights and no panorama, so the probes are all that colour the spheres.
+//! Reflection probes are picked per object, Unity's way: a metal sphere in each of
+//! two adjacent probe boxes (red cube left, green right), camera in the left box; each
+//! sphere must reflect its own probe. No lights, no panorama.
 
 use glam::Vec3;
 use rusty::asset::lightmap_page::bc6h_level;
@@ -12,15 +10,13 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// A one-mip `size`² BC6H KTX2 cubemap (what the bake writes), every face
-/// the solid linear `rgb`. `size` is a multiple of 4.
 pub(crate) fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
     let texels = vec![Vec3::from(rgb); (size * size) as usize];
     cube_ktx2(size, |_| texels.clone())
 }
 
-/// A one-mip `size`² BC6H KTX2 cubemap whose face `f` (+X, -X, +Y, -Y, +Z, -Z)
-/// holds the row-major linear texels `face(f)`. `size` is a multiple of 4.
+/// A one-mip BC6H KTX2 cubemap; face `f` (+X, -X, +Y, -Y, +Z, -Z) holds `face(f)`.
+/// `size` is a multiple of 4.
 pub(crate) fn cube_ktx2(size: u32, face: impl Fn(usize) -> Vec<Vec3>) -> Vec<u8> {
     const MAGIC: [u8; 12] = [
         0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
@@ -47,7 +43,6 @@ pub(crate) fn cube_ktx2(size: u32, face: impl Fn(usize) -> Vec<Vec3>) -> Vec<u8>
     buf
 }
 
-/// Two probe boxes meeting at x = 0, each with a polished metal sphere at its centre.
 fn scene() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -83,7 +78,6 @@ fn scene() -> Scene {
     scene
 }
 
-/// Mean (red, green) of the 12x12 pixels around `(x, y)`.
 fn red_green(img: &image::RgbImage, x: u32, y: u32) -> (f64, f64) {
     let (mut r, mut g) = (0.0, 0.0);
     for py in y - 6..y + 6 {
@@ -97,7 +91,6 @@ fn red_green(img: &image::RgbImage, x: u32, y: u32) -> (f64, f64) {
 
 #[test]
 fn each_object_reflects_the_probe_whose_box_holds_it() {
-    // Inside the left box, looking down -Z at both spheres.
     let cam = Camera::new(Vec3::new(-0.5, 0.0, 8.0), -90.0, 0.0);
     let path = crate::temp::dir().join("rusty_probe_per_object.png");
     let mut host = CaptureHost::new();
@@ -106,8 +99,6 @@ fn each_object_reflects_the_probe_whose_box_holds_it() {
         return;
     }
     let img = image::open(&path).expect("png").to_rgb8();
-    // The camera is 1.5 right of the red sphere and 2.5 left of the green one, so
-    // the red sphere lands left of the image centre and the green one right of it.
     let (w, h) = (img.width(), img.height());
     let left = red_green(&img, w / 2 - w / 6, h / 2);
     let right = red_green(&img, w / 2 + w / 4, h / 2);

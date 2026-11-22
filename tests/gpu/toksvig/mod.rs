@@ -20,12 +20,10 @@ use rusty::scene::{Camera, Scene};
 pub(super) const W: u32 = 128;
 pub(super) const H: u32 = 96;
 
-/// Eye and pitch: far, 0.6 m up looking just below the horizon; near, 0.25 m up
-/// looking down at the map's base level.
+/// Eye and pitch: far, 0.6 m up just below the horizon; near, 0.25 m up looking down.
 pub(super) const FAR: (Vec3, f32) = (Vec3::new(0.0, 0.6, 6.5), -4.0);
 pub(super) const NEAR: (Vec3, f32) = (Vec3::new(0.0, 0.25, -2.5), -60.0);
 
-/// What a map's blue holds: its normal's z (`Z`), or a fixed byte.
 #[derive(Clone, Copy)]
 pub(super) enum Blue {
     Z,
@@ -61,8 +59,7 @@ pub(super) fn normal_map(name: &str, busy: bool, blue: Blue) -> PathBuf {
     path
 }
 
-/// `map` typed `NormalMap` and imported: BC5, with its table, where the GPU has
-/// BC; the route `Material.SetNormalMap` and a glTF import take.
+/// `map` typed `NormalMap` and imported (BC5 where the GPU has it), as `Material.SetNormalMap` does.
 pub(super) fn as_bc5(map: &Path) {
     let settings = TextureSettings {
         texture_type: TextureType::NormalMap,
@@ -72,7 +69,6 @@ pub(super) fn as_bc5(map: &Path) {
     rusty::asset::texture_import::refresh(map, "").expect("encode BC5");
 }
 
-/// A sky of one colour, `rgb`.
 pub(super) fn sky(scene: &mut Scene, rgb: [u8; 3], name: &str) {
     let path = crate::temp::dir().join(name);
     let [r, g, b] = rgb;
@@ -98,7 +94,6 @@ pub(super) fn floor(scene: &mut Scene, name: &str, y: f32, material: MaterialAss
     id
 }
 
-/// A glossy material of `metallic` and `roughness` with normal map `map`.
 pub(super) fn glossy(map: &Path, metallic: f32, roughness: f32) -> MaterialAsset {
     MaterialAsset {
         metallic,
@@ -108,8 +103,7 @@ pub(super) fn glossy(map: &Path, metallic: f32, roughness: f32) -> MaterialAsset
     }
 }
 
-/// Each of `frames` frames of `scene` from `view`, turning 0.4° a frame, as RGB
-/// floats; `None` without an adapter.
+/// Each of `frames` frames of `scene` from `view`, turning 0.4° a frame.
 pub(super) fn frames(scene: &Scene, view: (Vec3, f32), frames: u32) -> Option<Vec<Vec<[f64; 3]>>> {
     let mut host = CaptureHost::new();
     let mut out = Vec::new();
@@ -126,13 +120,11 @@ pub(super) fn frames(scene: &Scene, view: (Vec3, f32), frames: u32) -> Option<Ve
     Some(out)
 }
 
-/// Each frame's luma.
 pub(super) fn luma(frames: &[Vec<[f64; 3]>]) -> Vec<Vec<f64>> {
     let l = |p: &[f64; 3]| 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2];
     frames.iter().map(|f| f.iter().map(l).collect()).collect()
 }
 
-/// The mean of every value.
 pub(super) fn mean(values: &[Vec<f64>]) -> f64 {
     let n = values.iter().map(Vec::len).sum::<usize>() as f64;
     values.iter().flatten().sum::<f64>() / n

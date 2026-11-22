@@ -1,10 +1,5 @@
-//! Bloom visual test. A small, very bright emissive box on a black
-//! background: bloom spreads a glow onto the dark pixels around it, so the frame
-//! with bloom on is brighter than the same frame with bloom off. Before this, no
-//! visual test noticed the bloom pass being skipped entirely (mutation run:
-//! `PostFx::run_bloom → ()` survived).
-//!
-//! Skips without a GPU/software adapter, unless one is required.
+//! Bloom visual test: a small, very bright emissive box on black; bloom spreads a glow
+//! onto the dark pixels around it, so the frame is brighter with bloom on than off.
 
 use crate::gpu::mean_brightness;
 use glam::Vec3;
@@ -34,8 +29,6 @@ fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: 
     scene.materials.insert(name.to_string(), asset);
 }
 
-/// A small, very bright box in front of a black wall that hides the sky, with
-/// bloom on or off.
 pub(crate) fn scene(bloom: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;

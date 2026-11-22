@@ -6,8 +6,6 @@
 //!
 //! Two quads of one `.obj` side by side, shot before and after the left one's
 //! vertices are lifted: the right half's pixels are byte-identical, the left's moved.
-//! The same capture host takes both shots, so its renderer keeps the slots between
-//! them, as a running game's does.
 
 use crate::temp::{dir, file as tmp};
 use glam::Vec3;
@@ -15,11 +13,9 @@ use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 use rusty::scene::{asset_mesh_component, Camera, Scene};
 
-/// A one-metre quad facing +Z, one object named `Model`.
 const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n";
 const SIZE: u32 = 64;
 
-/// The `(left, right)` halves of the capture at `path`, as RGB bytes.
 fn halves(path: &std::path::Path) -> (Vec<u8>, Vec<u8>) {
     let img = image::open(path).expect("open the capture").to_rgb8();
     let (mut left, mut right) = (Vec::new(), Vec::new());
@@ -44,7 +40,6 @@ fn an_edited_instance_draws_its_edit_and_its_sibling_keeps_the_import() {
         scene.world.transform_mut(id).unwrap().position = Vec3::new(x, -0.5, 0.0);
         id
     });
-    // Facing -Z from three metres out, both quads in view.
     let camera = Camera::new(Vec3::new(0.0, 0.0, 3.0), -90.0, 0.0);
     let mut host = CaptureHost::new();
     let (before, after) = (

@@ -14,8 +14,6 @@ use rusty::scene::camera::set_view_fov;
 use rusty::scene::Scene;
 use rusty::script::scripting::ConsoleLogs;
 
-/// A 1280×720 session: a `MainCamera` at the origin looking down -Z and a HUD
-/// marker pinned to the world point (1, 0, -10). Returns the world and the ids.
 fn session() -> (GameWorld, [u32; 3]) {
     let mut s = Scene::new();
     let cam = s.add_entity("MainCamera".to_string());
@@ -38,8 +36,6 @@ fn session() -> (GameWorld, [u32; 3]) {
     (game, [cam, hud, marker])
 }
 
-/// The marker's centre and where `Camera.WorldToScreen` puts its point, both in the
-/// HUD's reference units.
 fn read(game: &GameWorld, [_, hud, marker]: [u32; 3]) -> (String, String) {
     let eval = |line: &str| game.script_manager().eval(line).expect("evaluates");
     let rect = eval(&format!(

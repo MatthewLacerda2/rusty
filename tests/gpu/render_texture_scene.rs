@@ -1,8 +1,6 @@
-//! The scene the render-texture screenshot renders: an emissive red box at
-//! the origin, a second camera looking at it into `"rt:pip"`, and a full-height UI
-//! Image over the screen's left half showing that texture. The screen's own camera
-//! (the capture's base) looks away from the box, so red on screen can only have come
-//! through the texture.
+//! The render-texture screenshot's scene: a red emissive box, a second camera
+//! rendering it into `"rt:pip"`, and a UI Image over the left half showing that
+//! texture. The screen camera looks away, so red on screen came through the texture.
 
 use glam::{Vec2, Vec3, Vec4};
 use rusty::components::{
@@ -13,17 +11,14 @@ use rusty::scene::{Camera, MeshComponent, Scene};
 
 pub const SIZE: u32 = 128;
 
-/// The screen camera: beside the texture camera, looking the other way (+Z).
 pub fn screen_camera() -> Camera {
     Camera::new(Vec3::new(0.0, 0.0, 6.0), 90.0, 0.0)
 }
 
-/// The scene; `target` is the texture camera's target (`None`: no such camera).
 pub fn pip_scene(target: Option<RenderTarget>) -> Scene {
     let mut scene = Scene::new();
     add_red_box(&mut scene);
     if let Some(target) = target {
-        // Identity rotation: looks down -Z, at the box.
         let cam = scene.add_entity("PipCamera".to_string());
         let comp = CameraComponent {
             fov: 60.0,
@@ -37,9 +32,7 @@ pub fn pip_scene(target: Option<RenderTarget>) -> Scene {
     scene
 }
 
-/// No UI: a big monitor box 14 m in front of the screen camera whose emissive map is
-/// `"rt:pip"`, and a texture camera that looks at the red box — and whose texture
-/// is on a surface it is itself drawn with (the feedback case).
+/// The feedback case: the texture camera's own texture is on a surface it draws.
 pub fn monitor_scene() -> Scene {
     let mut scene = pip_scene(Some(RenderTarget::new("pip", 64, 64)));
     let ui: Vec<u32> = ["Canvas", "Pip"]
@@ -78,7 +71,6 @@ fn add_red_box(scene: &mut Scene) {
     scene.materials.insert("red".to_string(), red);
 }
 
-/// A 2 m box wearing `material`.
 fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
     let id = scene.add_entity(name.to_string());
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(2.0, 2.0, 2.0);
@@ -89,7 +81,6 @@ fn add_box(scene: &mut Scene, name: &str, material: &str) -> u32 {
     id
 }
 
-/// A canvas one reference unit per pixel, with the Image over the left half.
 fn add_pip_image(scene: &mut Scene) {
     let root = scene.add_entity("Canvas".to_string());
     let canvas = CanvasComponent {

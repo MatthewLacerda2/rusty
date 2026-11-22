@@ -1,20 +1,7 @@
-//! Material-map visual test. Proves the renderer SAMPLES a
-//! material's map textures (not just its scalar factors) through the per-entity
-//! material bind group.
-//!
-//! It drives the metallic map: the shader gates the ambient diffuse term by
-//! `(1 - metallic)` (see `shader.wgsl`), so under ambient light a fully-metallic
-//! surface is dark and a non-metallic one is bright — a strong, view- and
-//! light-geometry-independent signal. Three configs disambiguate where any failure
-//! lies (the prints land in the CI log):
-//!   `scalar 0` bright vs `scalar 1` dark proves the metallic SCALAR reaches the
-//!   shader (uniform layout OK); `scalar 1 + black map (.b=0)` bright proves the
-//!   MAP is sampled (1.0 * 0.0 = 0). The roughness map rides the identical path
-//!   (same bind group, same `select()` in the shader, `.g` channel); its WGSL
-//!   binding is validated GPU-free by `all_shaders_compose`.
-//!
-//! When no GPU/software adapter is present, `capture` returns `Ok(false)` and the
-//! test passes without asserting (matching `postfx/screenshot.rs`).
+//! Material-map visual test: the renderer samples a material's map textures, not
+//! just its scalar factors. The shader gates ambient diffuse by `(1 - metallic)`, so
+//! `scalar 1 + black map (.b=0)` bright proves the MAP is sampled (1.0 * 0.0 = 0).
+//! Skips without an adapter (`capture` returns `Ok(false)`).
 
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;
@@ -55,8 +42,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
     scene.ambient_intensity = 1.0;
 
     let id = scene.add_entity("Box".to_string());
-    // A large box so it fills the frame — the mean-brightness signal is dominated by
-    // the surface, not the background, making the metallic gating clearly visible.
+    // Large, so the mean brightness is the surface's, not the background's.
     let (vertices, indices) = rusty::components::mesh::primitives::generate_box(8.0, 8.0, 8.0);
     scene
         .world

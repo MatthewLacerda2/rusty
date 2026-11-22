@@ -1,14 +1,10 @@
-//! The busy scene the replay tests step: a pile of dynamic boxes that land on
-//! each other, NavMeshAgents crossing paths, and Lua driving timers, tweens, a UI
-//! layout and the seeded `Random` — every sim module that keeps a hash map gets
-//! work to do, so an iteration order that leaks into behaviour shows in the result.
+//! Busy scene for the replay tests: dynamic boxes landing on each other, NavMeshAgents crossing, Lua driving timers, tweens, UI and the seeded `Random`, so an iteration order leaking into behaviour shows.
 
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty::dev::harness::Harness;
 use rusty::scene::{NavMeshAgentComponent, Scene, ScriptComponent};
 
-/// The director: UI, timers, tweens and RNG, on the default scene's Enemy_1.
 const DIRECTOR: &str = r#"
 local D = {}
 function D.Start(id)
@@ -27,16 +23,13 @@ end
 return D
 "#;
 
-/// Every box reports the contacts it starts, so the order events fire is observed.
 const BOX: &str = r#"
 local B = {}
 function B.OnCollisionEnter(id, other) print(string.format("[busy] hit %d %d", id, other)) end
 return B
 "#;
 
-/// Where the busy scripts sit, relative to the harness's workspace root — the form
-/// a scene stores a script path in, so two runs in two scratch
-/// directories snapshot the same paths.
+/// Relative to the harness workspace root, as a scene stores script paths, so two scratch directories snapshot the same paths.
 const DIRECTOR_PATH: &str = "assets/scripts/busy_director.lua";
 const BOX_PATH: &str = "assets/scripts/busy_box.lua";
 
@@ -85,8 +78,6 @@ fn add_agent(scene: &mut Scene, from: Vec3, to: Vec3) {
     scene.world.set_nav_agent(id, Some(agent));
 }
 
-/// The harness on the default scene plus the busy additions, stepped `frames` ticks.
-/// Returns the world snapshot and the `[busy]` console lines, as one string.
 pub fn run(dir: &str, frames: u32) -> String {
     let out = crate::temp::dir().join(dir);
     let h = Harness::new(&out, DIRECTOR_PATH);
@@ -94,7 +85,6 @@ pub fn run(dir: &str, frames: u32) -> String {
     write(&workspace, DIRECTOR_PATH, DIRECTOR);
     write(&workspace, BOX_PATH, BOX);
     {
-        // Play is entered on the first tick, so these are in the scene it snapshots.
         let world = h.world.borrow();
         let mut scene = world.scene().borrow_mut();
         for i in 0..16 {

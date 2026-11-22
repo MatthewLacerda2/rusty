@@ -1,18 +1,6 @@
-//! Directional specular from a directional lightmap (step 1): a `Baked` lamp's
-//! highlight on a lightmapped surface, every bit of whose light is baked.
-//!
-//! * `highlight`: on a glossy plane the baked lobe's highlight sits where the same
-//!   lamp's `Realtime` one does, its peak within a stated factor; at roughness 1 it
-//!   changes nothing visible; under `HalfLambert` it still does.
-//! * `sky`: a sky makes a texel directional with no lamp, and gives no lobe; a lamp
-//!   under a sky keeps its highlight.
-//! * `room`: a `Mixed` spot's bounce gives a glossy ceiling no lobe; a lamp in a
-//!   bright-walled room aims its lobe at itself.
-//! * `capture`: a bake capture never draws it.
-//! * `behind`: a two-sided surface's back face reads its front's baked light.
-//! * `stool`, `polished`: the issue's seat and counter: a rough dielectric
-//!   and a mirror-polished one each look as under the same lamp live.
-//!
+//! Directional specular from a directional lightmap: a `Baked` lamp's highlight on a
+//! lightmapped surface lit only by the bake. Modules: `highlight`, `sky`, `room`, `capture`,
+//! `behind`, `stool`, `polished`.
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
 mod behind;
@@ -36,8 +24,6 @@ pub(super) use measure::{mean_gap, most, peak};
 
 pub(super) const SIZE: u32 = 96;
 
-/// A 6 x 6 static plane of `roughness` under a point lamp of `mode` a metre up,
-/// under a black sky.
 pub(super) fn scene(mode: LightMode, roughness: f32) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -59,7 +45,6 @@ pub(super) fn scene(mode: LightMode, roughness: f32) -> Scene {
     scene
 }
 
-/// A static plane (15 m a side at `scale` 1, facing +Y before `rotation`) of `material`.
 pub(super) fn plane(
     scene: &mut Scene,
     name: &str,
@@ -85,7 +70,6 @@ fn place(scene: &mut Scene, id: u32, at: Vec3, rotation: Quat) {
     (transform.position, transform.rotation) = (at, rotation);
 }
 
-/// A point lamp of `mode`, intensity 1 and range 8.
 pub(super) fn point(mode: LightMode) -> LightComponent {
     LightComponent {
         light_type: LightType::Point,
@@ -103,11 +87,8 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, rotation: Quat, light: LightComp
     place(scene, lamp, at, rotation);
 }
 
-/// The texels per unit most cases bake at.
 pub(super) const DENSITY: f32 = 10.0;
 
-/// Bake `scene`'s lightmaps at `density` texels a unit into a temp folder named
-/// `name`; returns its path.
 pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f32) -> String {
     let dir = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -129,8 +110,7 @@ pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f3
     path
 }
 
-/// `scene` from `camera`, as the luminance of every pixel (0..=255). `None` without
-/// an adapter.
+/// `scene` from `camera`, as pixel luminance (0..=255).
 pub(super) fn shot(scene: &Scene, camera: &Camera, name: &str) -> Option<Vec<f32>> {
     let path = crate::temp::dir().join(format!("rusty_gpu_baked_spec_{name}.png"));
     capture(scene, camera, &path, SIZE, SIZE)

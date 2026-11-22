@@ -1,11 +1,7 @@
-//! Light Probe Proxy Volume on the GPU: the issue's locker. A 2 m dynamic
-//! box stands against a wall beside a `Baked` lamp at 2.2 m, lit only by baked
-//! light probes (no ambient, black sky, and a `Baked` lamp is never drawn live).
-//! With its one probe sample it is one colour top to bottom; with a volume its top,
-//! by the lamp, is lit and its foot dark; with a `Custom` box over its top quarter,
-//! its foot reads the box's face (`proxy_volume_clamp`, on the same bake).
-//!
-//! Skips (passes without asserting) when no GPU / software adapter is present.
+//! Light Probe Proxy Volume on the GPU: a 2 m dynamic box beside a `Baked` lamp,
+//! lit only by baked probes. One probe sample gives one colour top to bottom; a volume
+//! lights its top and leaves its foot dark; a `Custom` box over the top quarter makes
+//! the foot read the box's face (`proxy_volume_clamp`). Skips without an adapter.
 
 use glam::Vec3;
 use rusty::components::{
@@ -19,7 +15,6 @@ use rusty::scene::{Camera, Scene};
 
 const SIZE: u32 = 64;
 
-/// A box primitive at `position` scaled by `scale`; returns its id.
 fn add(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
     let id = scene.add_entity("Box".to_string());
     scene
@@ -31,8 +26,6 @@ fn add(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
     id
 }
 
-/// The floor, the wall behind the locker, the lamp, the locker (its id), and a
-/// probe grid around it, baked.
 pub(super) fn baked_room() -> Option<(Scene, u32)> {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -58,8 +51,6 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
-    // As a lightmap bake would record it: a Baked light no bake took in is
-    // previewed live, and a probe bake records no light.
     scene.lightmaps.took_in_baked(lamp);
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.9, 2.2, -0.4);
     let locker = add(
@@ -75,9 +66,8 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         .then_some((scene, locker))
 }
 
-/// Mean red level of the locker's top and foot, seen from the lamp's side (+X):
-/// the face whose top looks at the lamp, drawn through `host` so the test's three
-/// shots share one renderer (one each was a third of its time on Metal).
+/// Mean red of the locker's top and foot from +X; `host` is shared so the shots
+/// reuse one renderer (one each cost a third of the time on Metal).
 pub(super) fn top_and_foot(host: &mut CaptureHost, scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));

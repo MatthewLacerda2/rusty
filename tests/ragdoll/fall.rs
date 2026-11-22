@@ -1,6 +1,3 @@
-//! A ragdoll in the real tick: it collapses onto the floor and comes to rest, a
-//! shot's impulse throws it the way the shot went, and two runs match bit for bit.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -22,8 +19,6 @@ return { Update = function(id)\n\
   Physics.AddImpulseAtPosition(bone, {J}, 0, 0, px, py, pz)\n\
 end }";
 
-/// Play the ragdolled rig for `ticks` with a shot of `impulse` N·s at the head on
-/// the second tick; return the scene and the rig.
 fn shot(impulse: f32, ticks: usize, tag: &str) -> (Rc<RefCell<Scene>>, u32) {
     let (mut scene, rig) = ragdolled();
     crate::play::attach_script(
@@ -38,7 +33,6 @@ fn shot(impulse: f32, ticks: usize, tag: &str) -> (Rc<RefCell<Scene>>, u32) {
     (scene, rig)
 }
 
-/// Every ragdoll bone's hitbox centre.
 fn parts(scene: &Scene, rig: u32) -> Vec<Vec3> {
     let bones = scene.ragdoll_bones(rig);
     bones.into_iter().map(|b| hitbox_at(scene, b)).collect()

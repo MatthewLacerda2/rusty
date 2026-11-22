@@ -53,14 +53,12 @@ pub fn static_box(scene: &mut Scene, at: Vec3, size: Vec3, script: Option<&str>)
     id
 }
 
-/// `scene` in Play, one tick in (every script awake).
 pub fn play(scene: Scene) -> GameWorld {
     let mut game = playing(Rc::new(RefCell::new(scene)), 20.0);
     run(&mut game, 1);
     game
 }
 
-/// Evaluate `line` in `game`'s gameplay VM.
 pub fn eval(game: &GameWorld, line: &str) -> String {
     game.script_manager().eval(line).expect("evaluates")
 }

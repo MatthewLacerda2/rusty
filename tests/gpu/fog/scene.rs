@@ -1,9 +1,6 @@
-//! Shared fixture for the scene-fog pixel tests: a flat, light-independent
-//! wall and a neutral post-FX volume, so a pixel's colour is exactly the fogged
-//! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo + a black
-//! sky (no environment reflection) leaves a
-//! surface's lit colour equal to its `emissive`; tonemap `None` and neutral grading
-//! pass it through, so a test can predict the pixel from the fog formula.
+//! Fixture for the scene-fog pixel tests: zero ambient, no lights, black albedo and sky leave
+//! a surface's lit colour equal to its `emissive`; tonemap `None` and neutral grading pass it
+//! through, so a pixel is predictable from the fog formula.
 
 use glam::Vec3;
 use rusty::components::{MaterialAsset, MaterialComponent, Tonemap};
@@ -11,13 +8,10 @@ use rusty::dev::capture::CaptureHost;
 use rusty::dev::screenshot::capture_into;
 use rusty::scene::{Camera, MeshComponent, PostProcessingComponent, Scene};
 
-/// The camera: at `z = 5`, looking down −Z.
 pub fn camera() -> Camera {
     Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0)
 }
 
-/// A scene with a big emissive `color` wall whose centre is `distance` in front of
-/// the camera, plus a neutral volume. Fog is left off.
 pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
     let mut scene = Scene::new();
     crate::gpu::black_sky(&mut scene);
@@ -76,7 +70,6 @@ fn neutral_volume() -> PostProcessingComponent {
     }
 }
 
-/// Render `scene`, or `None` when no adapter exists.
 pub fn shot(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_fog_{name}.png"));
     if !capture_into(host, scene, &camera(), &path, 64, 64).expect("capture") {
@@ -86,13 +79,11 @@ pub fn shot(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<image::
     Some(image::open(&path).expect("png").to_rgb8())
 }
 
-/// Render `scene` and return its centre pixel, or `None` when no adapter exists.
 pub fn centre(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<[u8; 3]> {
     let img = shot(host, scene, name)?;
     Some(img.get_pixel(img.width() / 2, img.height() / 2).0)
 }
 
-/// Linear `[0, 1]` → 8-bit sRGB, what the sRGB target stores.
 pub fn srgb8(linear: f32) -> i32 {
     let c = linear.clamp(0.0, 1.0);
     let s = if c <= 0.003_130_8 {
@@ -103,7 +94,6 @@ pub fn srgb8(linear: f32) -> i32 {
     (s * 255.0).round() as i32
 }
 
-/// Assert two pixels match within `tol` per channel.
 pub fn assert_close(got: [u8; 3], want: [i32; 3], tol: i32, what: &str) {
     for ch in 0..3 {
         let d = (got[ch] as i32 - want[ch]).abs();

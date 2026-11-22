@@ -1,14 +1,6 @@
-//! Data maps sample their texels raw, not sRGB-decoded. Each check renders
-//! a material driven by a mid-grey (128) map against the same material with the
-//! value as a scalar instead, and asserts the two frames match: decoded as sRGB,
-//! 128 reads ≈ 0.22, not ≈ 0.5, and the frames part visibly.
-//!   - Metallic: ambient diffuse is gated by `(1 - metallic)`, a strong signal.
-//!   - Roughness: a light grazing the plane makes the highlight's spread visible.
-//!   - Normal: the flat (128,128,255) map leaves N unperturbed — the frame matches
-//!     the unmapped one. Decoded, its XY bend N by ≈ 50°.
-//!
-//! No GPU/software adapter: `capture` returns `Ok(false)` and the test passes
-//! without asserting (matching `material_maps_screenshot.rs`).
+//! Data maps sample their texels raw, not sRGB-decoded: a mid-grey (128) map must
+//! shade like the same value as a scalar. Decoded it reads ≈ 0.22, not ≈ 0.5.
+//! Skips without an adapter (`capture` returns `Ok(false)`).
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset};
@@ -19,7 +11,6 @@ use rusty::scene::{Camera, Scene};
 /// still read as the same shading: the 128 → 0.502 quantisation, nothing more.
 pub(super) const SAME: f64 = 1.5;
 
-/// Write a 2x2 solid-RGB PNG (alpha 255) and return its path.
 pub(super) fn png(name: &str, rgb: [u8; 3]) -> String {
     let path = crate::temp::dir().join(name);
     let img = image::RgbaImage::from_pixel(2, 2, image::Rgba([rgb[0], rgb[1], rgb[2], 255]));
@@ -27,8 +18,6 @@ pub(super) fn png(name: &str, rgb: [u8; 3]) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// An ambient- and lamp-lit up-facing plane carrying `material`; the lamp's
-/// highlight is what roughness spreads.
 pub(super) fn scene(material: MaterialAsset) -> Scene {
     let mut s = super::normal_emissive_maps_screenshot::scene(material);
     let lamp = s.add_entity("Lamp".to_string());
@@ -55,7 +44,6 @@ pub(super) fn frame(scene: &Scene, name: &str) -> Option<image::RgbImage> {
     Some(image::open(&path).expect("open").to_rgb8())
 }
 
-/// Mean absolute per-channel difference between two frames.
 pub(super) fn diff(a: &image::RgbImage, b: &image::RgbImage) -> f64 {
     let sum: u64 = a
         .as_raw()
@@ -108,7 +96,6 @@ fn a_mid_grey_metallic_map_reads_one_half() {
 #[test]
 fn a_mid_grey_roughness_map_reads_one_half() {
     let map = png("rusty_647_rough.png", [128, 128, 128]);
-    // Metallic, so the lamp's highlight — what roughness spreads — is the picture.
     let mat = |roughness, roughness_map| MaterialAsset {
         base_color: [0.9, 0.9, 0.9],
         metallic: 1.0,

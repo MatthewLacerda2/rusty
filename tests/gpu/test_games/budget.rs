@@ -1,8 +1,7 @@
 //! The budget reads CPU time in yardsticks (`calibrate`), not wall time
 //! nor bare CPU seconds: a child that sleeps far past its budget passes,
-//! one that spins past it fails, one that hangs is killed at the wall-time
-//! ceiling, and one doing twice the work fails a bar its single dose meets. The
-//! children are `sleep` and `sh`, not games, so each proof costs a second or two.
+//! one that spins past it fails, one that hangs is killed at the wall-time ceiling, and one
+//! doing twice the work fails a bar its single dose meets.
 
 use std::process::Command;
 use std::time::Duration;
@@ -11,21 +10,18 @@ use super::calibrate;
 use super::measure;
 use super::measure::Measured;
 
-/// A budget of `units` yardsticks, each `unit` of CPU time as timed beside the run.
 pub(super) struct Budget {
     pub units: f64,
     pub unit: Duration,
 }
 
 impl Budget {
-    /// How many yardsticks `cpu` is.
     pub fn of(&self, cpu: Duration) -> f64 {
         cpu.as_secs_f64() / self.unit.as_secs_f64()
     }
 }
 
-/// Whether a run kept within `budget` and finished before the wall-time
-/// ceiling; the message names the game and says what to do when it did not.
+/// Whether a run kept within `budget` and finished before the wall-time ceiling.
 pub(super) fn verdict(name: &str, run: &Measured, budget: &Budget) -> Result<(), String> {
     let cpu = run.cpu.as_secs_f64();
     let used = budget.of(run.cpu);
@@ -54,7 +50,6 @@ fn sh(script: &str, ceiling: Duration) -> Measured {
     measure::run(Command::new("sh").arg("-c").arg(script), ceiling)
 }
 
-/// A budget of two yardsticks of 0.1 s each: 0.2 s of CPU.
 fn tenths() -> Budget {
     Budget {
         units: 2.0,
@@ -83,8 +78,6 @@ fn a_child_that_sleeps_past_its_budget_passes() {
 
 #[test]
 fn a_child_that_spins_past_its_budget_fails_naming_it() {
-    // A ceiling far past the budget, so the spinner collects its 0.2 s of CPU
-    // even with a fraction of a core beside two lavapipe games.
     let run = sh("while :; do :; done", Duration::from_secs(3));
     assert!(
         run.cpu > Duration::from_millis(200),

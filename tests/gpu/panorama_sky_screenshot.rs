@@ -1,12 +1,7 @@
-//! The skybox panorama: the sky pass, the forward reflection and post-FX's
-//! SSR fallback all map a direction onto the equirect image through one
-//! `equirect_uv` (common.wgsl) and sample it through the skybox's own sampler.
-//!
-//! The panorama is two-tone: red for u < 0.5 (the -z half of the sky), blue for
-//! u ≥ 0.5 (the +z half). Looking down -z must show red sky and down +z blue; a
-//! polished metal sphere seen from +z reflects the +z sky, blue, with SSR on as
-//! well as off. SSR runs only on the High tier, so the SSR shot sets it. Without an
-//! adapter the capture returns `Ok(false)` and the test skips.
+//! The sky pass, the forward reflection and post-FX's SSR fallback all map a
+//! direction through one `equirect_uv` (common.wgsl). The panorama is red for -z, blue
+//! for +z; a metal sphere seen from +z reflects blue, SSR on or off. SSR runs only on
+//! the High tier. Skips without an adapter.
 
 use std::path::{Path, PathBuf};
 
@@ -18,7 +13,6 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, default_post_processing, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// Write the two-tone panorama into the test's temp dir and return its path.
 fn panorama() -> PathBuf {
     let img = image::RgbaImage::from_fn(64, 32, |x, _| match x < 32 {
         true => image::Rgba([220, 30, 30, 255]),
@@ -66,7 +60,6 @@ fn metal_scene(ssr: bool) -> Scene {
     scene
 }
 
-/// Mean RGB (0..255) of the central 16x16 pixels.
 fn centre_rgb(path: &Path) -> [f64; 3] {
     let img = image::open(path).expect("png").to_rgb8();
     let (cx, cy) = (img.width() / 2, img.height() / 2);
@@ -80,7 +73,6 @@ fn centre_rgb(path: &Path) -> [f64; 3] {
     sum.map(|s| s / 256.0)
 }
 
-/// Capture `scene` from `cam` as `label`; `None` when there is no adapter.
 fn shoot(label: &str, scene: &Scene, cam: &Camera) -> Option<[f64; 3]> {
     let path = crate::temp::dir().join(format!("rusty_panorama_{label}.png"));
     let mut host = CaptureHost::new();

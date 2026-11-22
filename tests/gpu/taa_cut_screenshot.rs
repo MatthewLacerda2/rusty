@@ -42,7 +42,6 @@ Harness.Expect(not pcall(Harness.Screenshot, OUT .. "bad.png", { settle = -1 }),
 Harness.Expect(not pcall(Harness.Screenshot, OUT .. "bad.png", { settle = 1025 }), "past 1024")
 "#;
 
-/// The mean absolute difference of two shots, per channel, in 0..255.
 fn diff(x: &RgbaImage, y: &RgbaImage) -> f64 {
     let sum: u64 = x
         .as_raw()
@@ -63,7 +62,6 @@ fn a_cut_drops_the_view_before_a_jump_and_settle_converges() {
         rusty::core::paths::to_slash(&out) + "/"
     );
     std::fs::write(&scenario, prefix + SCENARIO).unwrap();
-    // A small run: every shot, render and settle draws at it, so none is a resize.
     let mut harness = Harness::new(&out, rusty::edit::default_scene::BOT_SCRIPT);
     harness.set_size(160, 90);
     let report = rusty::dev::scenario::run_file(harness, &scenario).expect("the scenario runs");

@@ -10,8 +10,6 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// An 8² detail map at a fresh path `name`: every texel `texel`, or seeded noise
-/// in every channel when `None`.
 fn detail_map(name: &str, texel: Option<[u8; 4]>) -> String {
     let mut state = 0x9e37_79b9u32;
     let img = image::RgbaImage::from_fn(8, 8, |_, _| {
@@ -29,8 +27,7 @@ fn detail_map(name: &str, texel: Option<[u8; 4]>) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// `base` with a detail layer of `map` at its defaults, one repeat per 2 m under a
-/// world mapping: coarse, so a 64×48 frame sees its texels.
+/// One repeat per 2 m under a world mapping: coarse, so a 64×48 frame sees its texels.
 fn with_detail(base: &MaterialAsset, map: Option<String>) -> MaterialAsset {
     let detail = DetailLayer {
         map: map.map(Into::into),
@@ -43,8 +40,6 @@ fn with_detail(base: &MaterialAsset, map: Option<String>) -> MaterialAsset {
     }
 }
 
-/// Each material's frame: a 6 m floor of it under the default sun and a grey sky,
-/// seen from 2 m up, as RGB bytes. `None` without an adapter.
 fn frames(materials: &[MaterialAsset]) -> Option<Vec<Vec<[u8; 3]>>> {
     let mut host = CaptureHost::new();
     let mut out = Vec::new();
@@ -73,7 +68,6 @@ fn frames(materials: &[MaterialAsset]) -> Option<Vec<Vec<[u8; 3]>>> {
     Some(out)
 }
 
-/// The mean absolute difference of two frames, per channel byte.
 fn difference(a: &[[u8; 3]], b: &[[u8; 3]]) -> f64 {
     let lanes = a.iter().flatten().zip(b.iter().flatten());
     lanes.map(|(p, q)| f64::from(p.abs_diff(*q))).sum::<f64>() / (a.len() * 3) as f64

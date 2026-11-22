@@ -40,7 +40,6 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
     scene
 }
 
-/// Pixels clearly darker in `on` than in `off`, or `None` when no adapter rendered.
 fn darkened(with_crate: bool, tag: &str) -> Option<usize> {
     let cam = Camera::new(Vec3::new(0.0, 2.5, 5.0), -90.0, -20.0);
     let dir = crate::temp::dir();
@@ -72,7 +71,6 @@ fn a_crate_darkens_the_floor_where_it_stands() {
         return;
     };
     eprintln!("[ssao] pixels darkened around the crate: {count}");
-    // The contact band and the crate's lower faces cover well over this of 96².
     assert!(count > 60, "the crate's foot should be occluded: {count}");
 }
 

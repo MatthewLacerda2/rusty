@@ -1,16 +1,10 @@
-//! GPU instancing's regression guard: a prop-heavy level — 600 copies of three
-//! meshes over the demo scene — must render in a handful of draw calls, not one per
-//! prop. The budget is a draw-call count, deterministic on every adapter; the CPU time
-//! is printed for measurement only (`--nocapture`). `RUSTY_BENCH_FRAMES` renders more
-//! frames for a steadier average.
-//!
-//! The props are also tinted one by one: `Material.SetColor` gives each its
-//! own library material, and equal records must still share a draw and a caster run.
+//! GPU instancing regression guard: 600 props over the demo scene must render in a handful of
+//! draw calls, not one per prop. The budget is a deterministic draw-call count; CPU time is
+//! printed only (`--nocapture`). Props are also tinted one by one via `Material.SetColor`:
+//! equal records must still share a draw and a caster run.
 
 use rusty::dev::harness::Harness;
 
-/// 600 props (crates, barrels, pillars) on a 20×30 grid, sharing the default material
-/// unless a global `tint` is set.
 const PROPS: &str = r#"
 local kinds = { "Box", "Cylinder", "Sphere" }
 local n = 0
@@ -25,12 +19,8 @@ for x = -10, 9 do
 end
 "#;
 
-/// Run before [`PROPS`]: each prop is then tinted one grey through its own material
-/// (`entity_<id>_material`).
 const TINTED: &str = "tint = { 0.5, 0.5, 0.5 }";
 
-/// Per-prop draws put this far out of reach: the visible props plus their casters
-/// alone are several hundred calls.
 const DRAW_CALL_BUDGET: f64 = 100.0;
 
 #[test]
@@ -43,8 +33,6 @@ fn props_tinted_one_colour_each_still_share_their_draws() {
     check_budget("tinted", &format!("{TINTED}\n{PROPS}"));
 }
 
-/// Spawn `script`'s props, render, and hold the camera's and the shadows' draw calls
-/// within [`DRAW_CALL_BUDGET`].
 fn check_budget(name: &str, script: &str) {
     let out = crate::temp::dir().join(format!("rusty_instancing_{name}_{}", std::process::id()));
     let mut h = Harness::new(&out, "");

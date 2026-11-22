@@ -1,10 +1,3 @@
-//! The default scene's NavMeshAgent bot on the fy_pool_day yard. Chasing
-//! a Player who flies past the perimeter wall, it must stay in the yard, stand on the
-//! ground (never half sunk), stop at the wall nearest the Player instead of pushing
-//! into it, and follow the Player back; chasing one in the pool, it must go down a
-//! ramp and back up one. `steering` runs the navigation tick alone; `play` runs the
-//! whole frame (scripts, physics, nav) through `GameWorld`.
-
 mod play;
 mod pool;
 mod steering;
@@ -14,7 +7,6 @@ use rusty::edit::default_scene::layout::{self, ground_at, RAMP_HALF_WIDTH, RAMP_
 use rusty::edit::{apply_scene_data, to_scene_data};
 use rusty::scene::Scene;
 
-/// The walls' inner faces: how far from the centre the yard is walkable (x, z).
 pub const INNER: (f32, f32) = (
     layout::YARD_HALF.0 - layout::WALL_THICK,
     layout::YARD_HALF.1 - layout::WALL_THICK,
@@ -28,13 +20,10 @@ pub const BASE_OFFSET: f32 = 1.0;
 /// not their cell's highest point.
 const GROUND_TOLERANCE: f32 = 0.02;
 
-/// The default scene as the editor boots it (built, then through its saved
-/// document), and Enemy_1's id in it.
 pub fn default_scene() -> (Scene, u32) {
     default_scene_with(rusty::edit::default_scene::BOT_SCRIPT)
 }
 
-/// [`default_scene`] with `bot_script` as Enemy_1's brain.
 pub fn default_scene_with(bot_script: &str) -> (Scene, u32) {
     let mut built = Scene::new();
     rusty::edit::default_scene::build(&mut built, bot_script);
@@ -44,7 +33,6 @@ pub fn default_scene_with(bot_script: &str) -> (Scene, u32) {
     (scene, enemy)
 }
 
-/// Enemy_1 stands on the ground the layout puts under it, inside the walls.
 pub fn assert_grounded(pos: Vec3, when: &str) {
     assert!(
         pos.x.abs() <= INNER.0 && pos.z.abs() <= INNER.1,
@@ -58,7 +46,6 @@ pub fn assert_grounded(pos: Vec3, when: &str) {
     );
 }
 
-/// Below the deck, Enemy_1 is in the pool, and where the pool slopes it is on a ramp.
 pub fn assert_in_pool_only_by_ramp(pos: Vec3, when: &str) {
     let (px, pz) = layout::POOL_HALF;
     if pos.y - BASE_OFFSET > layout::DECK_TOP - 0.05 {
@@ -73,7 +60,6 @@ pub fn assert_in_pool_only_by_ramp(pos: Vec3, when: &str) {
     }
 }
 
-/// Which ramp `pos` is on (−1 south, +1 north), if it is below the deck on one.
 pub fn ramp_under(pos: Vec3) -> Option<i8> {
     let (_, pz) = layout::POOL_HALF;
     let below = pos.y - BASE_OFFSET < layout::DECK_TOP - 0.2;
@@ -81,7 +67,6 @@ pub fn ramp_under(pos: Vec3) -> Option<i8> {
     (below && sloped).then_some(if pos.z < 0.0 { -1 } else { 1 })
 }
 
-/// The XZ distance between two points.
 pub fn planar(a: Vec3, b: Vec3) -> f32 {
     Vec3::new(a.x - b.x, 0.0, a.z - b.z).length()
 }
@@ -92,12 +77,10 @@ pub fn reach(scene: &rusty::scene::Scene, enemy: u32) -> f32 {
     scene.world.nav_agent(enemy).unwrap().stopping_distance
 }
 
-/// The Player's spawn, where every chase comes home to.
 pub fn home() -> Vec3 {
     Vec3::from(layout::PLAYER_SPAWN)
 }
 
-/// A point hovering 1.5 m over the middle of the pool floor.
 pub fn pool_middle() -> Vec3 {
     Vec3::new(0.0, layout::POOL_FLOOR + 1.5, 0.0)
 }

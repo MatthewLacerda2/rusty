@@ -1,9 +1,7 @@
-//! Scene fog is consistent across passes — the issue's key point. Behind
-//! fog that fully swallows a wall, a particle (alpha or additive) in front of that
-//! wall must vanish into the fog colour too, never glow through it. Each case is
-//! also rendered without fog, to prove the effect really covers the centre pixel.
-//! Decals are folded into the surface's own material before it is lit and fogged
-//!, so they share the wall's fog by construction and need no case here.
+//! Scene fog is consistent across passes: behind fog that swallows a wall, a particle (alpha or
+//! additive) in front of it must vanish into the fog colour too. Each case is also rendered
+//! without fog, to prove the effect covers the centre pixel. Decals fold into the surface's
+//! material before fogging, so they need no case.
 
 use glam::Vec3;
 use rusty::components::particle::{Particle, ParticleBlend, ParticleEmitterComponent};
@@ -15,8 +13,6 @@ use super::scene::{assert_close, centre, wall_scene};
 
 const DISTANCE: f32 = 20.0;
 
-/// A plain white sprite, so the effect's colour is its tint alone (the default
-/// checker would leave the centre pixel on whichever square it lands).
 fn white_sprite() -> Option<String> {
     let path = crate::temp::dir().join("rusty_fog_white.png");
     image::RgbaImage::from_pixel(4, 4, image::Rgba([255; 4]))
@@ -25,7 +21,6 @@ fn white_sprite() -> Option<String> {
     Some(path.to_string_lossy().into_owned())
 }
 
-/// The wall with one particle in front of it at the centre; `fog` fully fogs everything past 1 m.
 fn scene(effect: &str, fog: bool) -> Scene {
     let mut scene = wall_scene(DISTANCE, [0.0, 0.0, 0.0]);
     let at = Vec3::new(0.0, 0.0, 5.0 - DISTANCE + 0.5);

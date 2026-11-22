@@ -13,9 +13,6 @@ use rusty::scene::Scene;
 
 use crate::play::{attach_script, playing, run};
 
-/// The muzzle flash: a script's `Update` creates a lamp and adds a light to an
-/// empty, and both draw live whether or not the build previews unbaked lights
-/// (a harness or a `player`).
 #[test]
 fn a_light_created_in_update_is_realtime_and_drawn_live() {
     let scene = Rc::new(RefCell::new(Scene::new()));
@@ -48,7 +45,6 @@ fn a_light_created_in_update_is_realtime_and_drawn_live() {
     }
 }
 
-/// In edit mode both entry points give the defaults: `Baked`, no shadow.
 #[test]
 fn a_light_created_in_edit_mode_is_baked() {
     let mut scene = Scene::new();

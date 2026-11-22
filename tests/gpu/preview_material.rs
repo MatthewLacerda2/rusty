@@ -1,8 +1,6 @@
-//! `Debug.PreviewMaterial`: a named material asset renders headlessly, whole —
-//! its base colour, and its authored surface shader with the runtime param values
-//! stored on it. Driven through a real [`Session`], so this is the verb an agent calls.
-//! The render half skips without an adapter (the verb returns `nil`); the
-//! unknown-name check runs regardless.
+//! `Debug.PreviewMaterial` renders a named material whole: its base colour and its
+//! surface shader with the runtime param values stored on it. Skips without an
+//! adapter (the verb returns `nil`).
 
 use rusty::dev::session::Session;
 
@@ -10,8 +8,6 @@ fn session() -> Session {
     Session::new("").expect("session boots in edit mode")
 }
 
-/// Preview `name` at 64² on the sphere; the centre pixel's RGB, or `None` without
-/// an adapter.
 fn centre(sess: &Session, name: &str, file: &str) -> Option<[u8; 3]> {
     let out = crate::temp::dir().join("rusty-preview-material").join(file);
     let _ = std::fs::remove_file(&out);
@@ -56,9 +52,7 @@ fn a_defined_asset_previews_in_its_own_colour() {
 
 #[test]
 fn the_authored_shader_draws_with_its_stored_params() {
-    // A hit-flash shader at amount 1 replaces the lit colour with the flash colour:
-    // only a preview that uses both the shader *and* the values stored on the
-    // material turns the default white material green.
+    // Only a preview using both the shader and the stored values turns white green.
     let sess = session();
     let name = format!("test_preview_flash_{}", std::process::id());
     sess.eval(&format!(

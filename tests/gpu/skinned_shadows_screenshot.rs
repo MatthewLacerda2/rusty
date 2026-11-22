@@ -1,6 +1,4 @@
-//! Skinned casters cast their pose's shadow, not their bind pose's. The depth
-//! pass used to transform by the world matrix alone, so an animated character's
-//! shadow stayed in its T-pose.
+//! Skinned casters cast their pose's shadow, not their bind pose's.
 //!
 //! A skinned slab floats over the ground under a high sun; its one joint's pose moves
 //! it `SHIFT` sideways. Two cameras sit between slab and ground looking straight down,
@@ -16,7 +14,6 @@ use rusty::scene::{Camera, MeshComponent, Scene};
 
 const SHIFT: f32 = 10.0;
 
-/// Ground, sun and the slab skinned to joint 0, whose pose is `pose`.
 fn yard(pose: Mat4) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -53,7 +50,6 @@ fn yard(pose: Mat4) -> Scene {
     scene
 }
 
-/// Mean brightness of a downward look at the ground under `x`, from beneath the slab.
 fn ground_brightness(scene: &Scene, x: f32, name: &str) -> Option<f32> {
     // The sun leans the shadow ~0.8 units toward -Z; look where it lands.
     let cam = Camera::new(Vec3::new(x, 1.5, -0.8), -90.0, -89.0);
