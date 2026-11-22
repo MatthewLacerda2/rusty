@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/offmesh_link.rs — the Off-Mesh Link
-//! card.
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::offmesh_link` ops the `OffMeshLink.*` Lua setters call. A
 //! link is a navmesh input: the editor's per-frame nav sync picks an edit
@@ -56,7 +54,6 @@ fn draw_cost_and_area(
     }
 }
 
-/// 3EM. OffMeshLink Component
 pub fn draw_offmesh_link(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/render/light_probe_proxy_volume.rs — the Light
-//! Probe Proxy Volume card.
-
 use egui_phosphor::regular as icon;
 use glam::Vec3;
 
@@ -22,7 +19,6 @@ fn write(world: &mut World, id: u32, is_dirty: &mut bool, op: impl FnOnce(&mut V
     *is_dirty = true;
 }
 
-/// 3CP. Light Probe Proxy Volume card.
 pub fn draw_light_probe_proxy_volume(ui: &mut egui::Ui, world: &mut World, id: u32, d: &mut bool) {
     let Some(v) = world.light_probe_proxy_volume(id).map(|v| v.clone()) else {
         return;

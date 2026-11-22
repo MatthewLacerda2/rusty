@@ -36,7 +36,6 @@ enum MapKind {
 }
 
 impl MapKind {
-    /// Read this map's current path from the asset.
     fn get(self, m: &MaterialAsset) -> &Option<MapRef> {
         match self {
             MapKind::Metallic => &m.metallic_map,
@@ -49,7 +48,6 @@ impl MapKind {
         }
     }
 
-    /// Route a new path (or `None`) through the matching shared op.
     fn set(self, materials: &mut BTreeMap<String, MaterialAsset>, key: &str, path: Option<String>) {
         match self {
             MapKind::Metallic => mat_ops::set_metallic_map(materials, key, path),
@@ -63,7 +61,9 @@ impl MapKind {
     }
 }
 
-/// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field.
+/// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field. The
+/// occlusion, specular and height setters drop an empty path, so the tick is kept in
+/// egui's memory until one is typed.
 fn optional_map(
     ui: &mut egui::Ui,
     label: &str,

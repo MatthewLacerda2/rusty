@@ -1,4 +1,4 @@
-//! crates/shell/src/editor/cursor_release.rs — Esc in Play frees the cursor.
+//! Esc in Play frees the cursor.
 
 use winit::keyboard::KeyCode;
 

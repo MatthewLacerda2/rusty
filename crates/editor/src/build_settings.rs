@@ -1,5 +1,3 @@
-//! crates/editor/src/build_settings.rs — the File → Build Settings window.
-
 use egui_phosphor::regular as icon;
 
 use crate::widgets::DragRange;

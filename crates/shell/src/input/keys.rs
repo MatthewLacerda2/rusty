@@ -1,9 +1,8 @@
-//! crates/shell/src/input/keys.rs — the one physical-key name table.
-
 use winit::event::MouseButton;
 use winit::keyboard::KeyCode;
 
-/// Every forwarded key and its engine name.
+/// Every forwarded key and its engine name, listed again in `docs/api/Input.md`'s *Key
+/// names*: change both together.
 // lint: allow(named-enum) `KeyCode` is winit's enum, which `named_enum!` cannot declare
 const KEY_NAMES: &[(KeyCode, &str)] = &[
     (KeyCode::KeyA, "A"),

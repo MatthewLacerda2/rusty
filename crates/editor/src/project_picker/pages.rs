@@ -1,14 +1,12 @@
-//! crates/editor/src/project_picker/pages.rs — drawing the picker's pages.
-
 use egui::{Align, Layout, RichText, Ui};
 use egui_phosphor::regular as icon;
 
 use super::{list, Action, Page, ProjectPicker};
 use crate::theme::{self, chrome, fonts, Theme};
 
-/// The title strip's text size.
+/// The title strip's text size, in points.
 const TITLE_SIZE: f32 = 20.0;
-/// The folder list's height on the New and Open pages.
+/// The folder list's height on the New and Open pages, in points.
 const BROWSER_HEIGHT: f32 = 320.0;
 
 /// Draw the picker; `Some` when a click asked for something.

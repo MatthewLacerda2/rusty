@@ -9,7 +9,9 @@ use super::DemoView;
 use super::Pace;
 use crate::theme::Theme;
 
+/// The bar's height, in points.
 const HEIGHT: f32 = 26.0;
+/// How near a click must land to a mark to hit it, in points.
 const MARK_HIT: f32 = 4.0;
 
 /// The tick under a pointer at `x` on a bar spanning `left..right`, of `ticks`.
@@ -22,13 +24,11 @@ pub fn tick_at(x: f32, left: f32, right: f32, ticks: u64) -> u64 {
     ((t as f64 * last as f64).round() as u64).min(last)
 }
 
-/// Where `tick` sits on a bar spanning `left..right`, of `ticks`.
 pub fn x_of(tick: u64, left: f32, right: f32, ticks: u64) -> f32 {
     let last = ticks.saturating_sub(1).max(1);
     left + (right - left) * (tick.min(last) as f32 / last as f32)
 }
 
-/// The mark within a few pixels of `x`, if any.
 pub fn mark_near(
     marks: &[(u64, String)],
     x: f32,
@@ -42,7 +42,6 @@ pub fn mark_near(
         .map(|(_, label)| label.as_str())
 }
 
-/// Draw the strip and record what the pointer asked for in `view`.
 pub fn draw(ui: &mut Ui, view: &mut DemoView, t: &Theme) {
     ui.horizontal(|ui| {
         ui.set_height(HEIGHT);
@@ -97,6 +96,7 @@ fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
     painter.circle_filled(egui::pos2(head, rect.center().y), 5.0, Color32::WHITE);
     if let Some(pos) = response.hover_pos() {
         if let Some(label) = mark_near(&view.marks, pos.x, rect.left(), rect.right(), view.ticks) {
+            // Above the bar, outside `painter`'s clip rect: the window's painter.
             ui.painter().text(
                 egui::pos2(pos.x, rect.top()),
                 Align2::CENTER_BOTTOM,

@@ -1,8 +1,3 @@
-//! The Mesh card (Unity's *Mesh Filter* and *Mesh Renderer* together): the mesh's
-//! source, a `Plane`'s subdivisions, how it casts shadows, its
-//! Scale In Lightmap, when a camera culls it as too far or too small,
-//! and a skinned mesh's hitbox and ragdoll tools.
-
 use egui_phosphor::regular as icon;
 
 use super::card::{component_card, remove_component};
@@ -15,14 +10,10 @@ use rusty_edit::authoring::ComponentKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkinTool {
-    /// *Generate Hitboxes*.
     Hitboxes,
-    /// *Build Ragdoll*.
     Ragdoll,
 }
 
-/// What the card names as the mesh's source: a scene mesh by its library name
-///, anything else by its type.
 fn source_label(mesh: &rusty_components::MeshComponent) -> String {
     match rusty_scene::mesh_library::scene_mesh_name(mesh) {
         Some(name) => format!("Scene mesh: {name}"),
@@ -69,6 +60,7 @@ pub fn draw_mesh(
         }
     });
     if let (Some(n), Some(mut mesh)) = (subdivide, world.mesh_mut(id)) {
+        // The drag's range and the Plane-only row leave the op nothing to refuse.
         let _ = mesh_ops::set_subdivisions(&mut mesh, n);
         *is_dirty = true;
     }
@@ -89,6 +81,8 @@ pub fn draw_mesh(
     }
 }
 
+/// *Max Draw Distance* in metres, a metre a point; *Min Screen Size* as a fraction of
+/// screen height, a thousandth a point, since useful sizes sit near 0.01-0.02. 0 is off.
 fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32)> {
     let (mut d, mut s) = (distance, size);
     let changed = drag_row(ui, "Max Draw Distance", &mut d, 1.0, 0.0..=f32::MAX)
@@ -96,7 +90,6 @@ fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32
     changed.then_some((d, s))
 }
 
-/// A labelled `f32` drag row held to `range`, moving `speed` per point dragged.
 fn drag_row(
     ui: &mut egui::Ui,
     label: &str,
@@ -112,7 +105,6 @@ fn drag_row(
     .inner
 }
 
-/// Unity's *Scale In Lightmap*: the new value when it changed.
 fn draw_scale_in_lightmap(ui: &mut egui::Ui, current: f32) -> Option<f32> {
     let mut scale = current;
     let range = rusty_components::MeshComponent::SCALE_IN_LIGHTMAP;
@@ -128,7 +120,8 @@ fn draw_scale_in_lightmap(ui: &mut egui::Ui, current: f32) -> Option<f32> {
     (changed && scale != current).then_some(scale)
 }
 
-/// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`.
+/// *Generate Hitboxes* and *Build Ragdoll*, deferred into `skin_tool`: both need the
+/// Scene.
 fn draw_skin_tools(ui: &mut egui::Ui, skin_tool: &mut Option<SkinTool>) {
     ui.horizontal(|ui| {
         let hitboxes = ui
@@ -146,6 +139,8 @@ fn draw_skin_tools(ui: &mut egui::Ui, skin_tool: &mut Option<SkinTool>) {
     });
 }
 
+/// Mid-drag the count is held in egui's memory, so the grid is rebuilt and re-uploaded
+/// once, not every frame of the drag.
 fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
     let held = ui.id().with("mesh_subdivisions");
     let mut n = ui.data(|d| d.get_temp::<u32>(held)).unwrap_or(current);

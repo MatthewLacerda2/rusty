@@ -25,8 +25,7 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
-    // A post-processing path field
-    // typed and left by selecting something else.
+    // A post-processing path field typed and left by selecting something else.
     editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
     // The Collider's asset path left the same way, and an asset edit whose drag ended.
     editor.is_dirty |= components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
@@ -91,6 +90,8 @@ fn draw_entity_inspector(
     let materials = &mut scene.materials;
     let world = &mut scene.world;
     if world.contains(selected_id) {
+        // Drop a component whose requirement is gone (a Camera removed orphans its
+        // PostProcessing) before the cards draw.
         rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
@@ -198,8 +199,6 @@ fn draw_layer_combo(
     });
 }
 
-/// The per-component card chain (mesh, material, light, gameplay, camera, …) plus
-/// the Add Component menu, in the canonical inspector order.
 #[expect(
     clippy::too_many_arguments,
     reason = "(world, id) replaced the single &mut Entity handle"

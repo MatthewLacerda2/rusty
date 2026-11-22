@@ -1,7 +1,7 @@
-//! The editor's frame work that paints nothing: the one list both a drawn frame
-//! ([`EditorUi::draw`]) and a frame the window cannot draw (the screen locked, the
-//! window occluded or minimised) run. The shell still runs an undrawn frame (it
-//! ticks the sim and answers the attach bridge's commands) but skips the egui pass,
+//! The editor's frame work that paints nothing, run by a drawn frame
+//! ([`EditorUi::draw`]) and by one the window cannot draw (the screen locked, the
+//! window occluded or minimised), where the shell skips the egui pass. Background
+//! work a frame steps goes here, never in a panel's draw, or a locked screen stops it.
 
 use crate::EditorUi;
 use rusty_navigation::NavigationGraph;
@@ -31,6 +31,8 @@ impl EditorUi {
         playing: bool,
         paint: Paint,
     ) {
+        // A diff since the last sync catches every edit, whoever made it, rebaking
+        // only changed cells; play mode has `rebake_nav`.
         if !playing {
             nav.sync(scene);
         }

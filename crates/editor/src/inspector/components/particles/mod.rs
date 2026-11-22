@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/particles/ — the Particle System inspector card.
-
 mod over_life;
 mod render;
 mod start;
@@ -16,6 +14,8 @@ use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 
+/// The Rate (per second) and Max Particles ranges: gameplay counts on `Cpu`; on `Gpu`,
+/// its fixed cap, and a rate that fills it in a second.
 fn emission_ranges(
     simulation: ParticleSimulation,
 ) -> (std::ops::RangeInclusive<f32>, std::ops::RangeInclusive<u32>) {
@@ -32,9 +32,9 @@ fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
         f(&mut c);
     }
 }
-/// 3F-particles. Particle System component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     // The configuration only: the live particles are never copied (a `Gpu`
+    // emitter keeps a birth per live particle).
     let Some((p, live)) = world.particles(id).map(|p| (p.config(), p.live_count())) else {
         return;
     };
@@ -141,7 +141,6 @@ fn draw_counts(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent)
     changed
 }
 
-/// Collision response and bounciness controls.
 fn draw_collision(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut changed = false;
     let mut collision = p.collision;
@@ -166,7 +165,6 @@ fn draw_collision(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterCompone
     changed
 }
 
-/// The deterministic seed control.
 fn draw_determinism(ui: &mut egui::Ui, cx: &mut Cx<'_>, p: &ParticleEmitterComponent) -> bool {
     let mut seed = p.seed;
     let changed = ui

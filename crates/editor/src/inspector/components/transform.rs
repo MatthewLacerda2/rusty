@@ -62,7 +62,6 @@ fn draw_body(
     );
 }
 
-/// The Position row (x/y/z drag fields). Returns whether any axis changed.
 fn draw_position(ui: &mut egui::Ui, trans: &mut rusty_components::TransformComponent) -> bool {
     ui.label("Position:");
     ui.horizontal(|ui| {
@@ -107,6 +106,7 @@ fn draw_rotation(ui: &mut egui::Ui, trans: &mut rusty_components::TransformCompo
 
 /// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
 pub(crate) fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
+    // An Euler decomposition yields -0.0, which egui prints as "-0".
     if *value == 0.0 {
         *value = 0.0;
     }
@@ -118,7 +118,6 @@ pub(crate) fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
     .changed()
 }
 
-/// The Scale row (x/y/z drag fields). Returns whether any axis changed.
 fn draw_scale(ui: &mut egui::Ui, trans: &mut rusty_components::TransformComponent) -> bool {
     ui.label("Scale:");
     ui.horizontal(|ui| {

@@ -31,6 +31,7 @@ pub fn capture_demo(
             .borrow_mut()
             .request_demo(request);
         crate::editor::demo::advance(&mut ui, game, 0.0);
+        // The timeline's refusals only: a diverging replay or a script error is still a demo.
         let refused = (game.console().borrow().messages.iter())
             .skip(console_before)
             .find(|(text, level)| *level == LogLevel::Error && is_refusal(text))

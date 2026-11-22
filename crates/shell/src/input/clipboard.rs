@@ -1,6 +1,3 @@
-//! crates/shell/src/input/clipboard.rs — the clipboard pump: OS text in, the game's
-//! writes out.
-
 use winit::keyboard::ModifiersState;
 
 use rusty_core::input::InputState;
@@ -9,7 +6,6 @@ use rusty_core::input::InputState;
 pub trait ClipboardSource {
     /// The clipboard's text; `None` when it holds none (empty, or an image).
     fn read(&mut self) -> Option<String>;
-    /// Put `text` on the clipboard.
     fn write(&mut self, text: &str);
 }
 
@@ -19,7 +15,8 @@ pub fn is_shortcut(modifiers: ModifiersState) -> bool {
     modifiers.control_key() || modifiers.super_key()
 }
 
-/// Snapshot the OS clipboard into the sim; no text reads as `""`.
+/// Snapshot the OS clipboard into the sim; no text reads as `""`. Only where a paste can
+/// follow, never every frame: an OS read is a round trip to the display server.
 pub fn capture(source: &mut dyn ClipboardSource, input: &mut InputState) {
     let text = source.read().unwrap_or_default();
     input.clipboard.capture(text);

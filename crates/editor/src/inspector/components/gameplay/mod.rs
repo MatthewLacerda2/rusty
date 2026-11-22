@@ -1,8 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/ — the gameplay inspector cards. This
-//! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
-//! live apart to stay under the size cap: the Collider card in `collider`, the
-//! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
-
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
 use rusty_edit::authoring::ComponentKind;
