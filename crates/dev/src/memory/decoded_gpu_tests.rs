@@ -6,6 +6,8 @@ use crate::memory::rss_peak_bytes;
 use rusty_render::STAGING_BUDGET;
 
 /// Bytes a cached load may hold past a decoded one: its one staging buffer in flight.
+/// Measured, cached then decoded: lavapipe 34 then 294 MB, Metal 17 then 34 MB, once
+/// 16 and 16 MB.
 const SLACK: u64 = STAGING_BUDGET;
 
 #[test]
