@@ -1,3 +1,6 @@
+//! Streamed from disk, never held whole: an hour of play with a pasted clipboard would be
+//! gigabytes.
+
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
 use std::path::{Path, PathBuf};
@@ -13,6 +16,7 @@ use rusty_script::scripting::HostCall;
 pub struct Demo {
     pub header: Header,
     path: PathBuf,
+    /// The end line's count or, for a demo cut short by a crash, one past its last tick line.
     pub ticks: u64,
     pub end: End,
 }
@@ -37,6 +41,7 @@ enum Line {
     End(End),
 }
 
+/// Tells an index line apart without parsing it, since `IndexLine` serializes `at` first.
 fn is_index(line: &str) -> bool {
     line.starts_with("{\"at\":")
 }

@@ -16,6 +16,7 @@ pub const CAMERA_EVERY: u64 = 15;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct IndexLine {
+    /// Declared first: `read::is_index` tells an index line apart by its opening `at`.
     pub at: u64,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub camera: Option<[f32; 3]>,
