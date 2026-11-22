@@ -36,7 +36,8 @@ fn texture_kernel(length: f32, level: f32) -> f32 {
 }
 
 // What a normal map read at `level` adds to α², under its record's `use_normal_map` `flag`:
-// from the sample's `length` where the map keeps z (1), from the record's `table` for BC5 (2).
+// from the sample's `length` where the map keeps z (1, and 3 stored signed), from the record's
+// `table` for BC5 (2).
 fn map_kernel(flag: u32, table: vec4<u32>, length: f32, level: f32) -> f32 {
     if (flag == 2u) {
         return table_kernel(table, level);
