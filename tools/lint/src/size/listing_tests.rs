@@ -76,6 +76,29 @@ fn the_full_scan_reads_the_whole_tree_with_git_and_without() {
 }
 
 #[test]
+fn the_disk_walk_skips_the_root_folders_the_gitignore_anchors() {
+    let dir = Repo::new("2491-ignored-roots", false);
+    dir.file(
+        ".gitignore",
+        "/project/\n/out/\n/tests/fixtures/*/out/\ntarget/\n",
+    );
+    dir.file("project/assets/a.lua", "x = 1\n");
+    dir.file("out/gen.rs", "//\n");
+    let mut want = vec![
+        dir.file("crates/out/a.rs", "//\n"),
+        dir.file("tests/fixtures/f/out/b.rs", "//\n"),
+        dir.file("lib.rs", "//\n"),
+    ];
+    let mut found = full_scan(&dir.0).0;
+    found.sort();
+    want.sort();
+    assert_eq!(
+        found, want,
+        "only a root folder the rules anchor is left out"
+    );
+}
+
+#[test]
 fn the_fallback_note_keeps_gits_message_on_its_own_lines() {
     let note = fallback_note("git exit status: 128: fatal: dubious\n  line two\n  line three");
     let mut lines = note.lines();

@@ -12,7 +12,7 @@ file is what a coder changing the tool must keep.
   dependency is a decision with its own issue, not a drive-by.
 - **Clippy-gated like the engine**: `make clippy` and CI run it with
   `-D warnings`, and its own `[lints]` carries the nothing-temporary denies. The size
-  gate scans it too (`tools/` is a scan root).
+  gate reads its files too, as it reads every file git lists.
 - **A standalone crate** with its own `[workspace]`: never fold it into the engine.
 
 ## Gates are rows

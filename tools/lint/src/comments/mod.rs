@@ -70,6 +70,11 @@ fn bare(comment: &str) -> &str {
     comment.trim_start_matches(|c: char| c.is_whitespace() || "/!*-[=".contains(c))
 }
 
+/// A marker's line (`lint: allow(`, `sorted:`): exempt from the cap and the width.
+fn marked(comment: &str) -> bool {
+    MARKERS.iter().any(|m| bare(comment).starts_with(m))
+}
+
 fn opener(comment: &str) -> &str {
     let comment = comment.trim_start();
     let len = comment.len() - comment.trim_start_matches(['/', '!', '*']).len();
@@ -79,10 +84,7 @@ fn opener(comment: &str) -> &str {
 /// A marker's line, and a Rust `SAFETY:` note directly above its `unsafe`:
 /// the lines from `SAFETY:` on sharing its opener, up to a blank or another.
 fn free(kind: Kind, lines: &[Line]) -> Vec<bool> {
-    let mut free: Vec<bool> = lines
-        .iter()
-        .map(|l| MARKERS.iter().any(|m| bare(&l.comment).starts_with(m)))
-        .collect();
+    let mut free: Vec<bool> = lines.iter().map(|l| marked(&l.comment)).collect();
     let note = |l: &Line| l.code.trim().is_empty() && !l.comment.trim().is_empty();
     for (i, line) in lines.iter().enumerate() {
         if kind != Kind::Rust || !note(line) || !bare(&line.comment).starts_with("SAFETY:") {
@@ -167,8 +169,14 @@ impl Report {
 }
 
 pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
-    let max = width::max_width(base);
     let mut found = Vec::new();
+    let max = match width::max_width(base) {
+        Ok(max) => Some(max),
+        Err(finding) => {
+            found.push(finding);
+            None
+        }
+    };
     for file in files {
         let rel = file.strip_prefix(base).unwrap_or(file).to_string_lossy();
         let rel = rel.trim_start_matches("./");
@@ -177,7 +185,9 @@ pub fn pass(base: &Path, files: &[PathBuf]) -> Vec<Finding> {
             continue;
         };
         found.extend(check(rel, kind, &source).findings(rel, kind));
-        found.extend(width::check(rel, kind, &source, max));
+        if let Some(max) = max {
+            found.extend(width::check(rel, kind, &source, max));
+        }
     }
     found
 }

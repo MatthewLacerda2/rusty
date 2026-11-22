@@ -36,8 +36,8 @@ readying a PR. `make help` lists the verbs and `make check` is the fast edit loo
 | CI job headroom | `main-health.yml` (`.github/scripts/ci_headroom.py`) | **signal**, never a gate: after every `ci` run on `main`, a job that ran to an end in more than three quarters of its own `timeout-minutes` (read from `ci.yml` at the run's own commit; a matrix job by its slowest entry) files one `infrastructure` issue per job, and comments there when a later run's time moved by a minute or more; it never closes it, the PR that brings the job down does; a lost read files nothing, and no limit read fails its step (`continue-on-error`) (#2276) |
 | Code smells | clippy (`clippy.toml`) | **hard gate**: `cargo clippy --all-targets -- -D warnings` (default, `--features dev`, and `--no-default-features` — the editor-free player build), plus `tools/lint` itself (#935) |
 | Comment cap | `tools/lint` (the size gate: `comment-cap`) | **hard gate**: the comments of one `.rs` or `.lua` file hold at most 100 words, of a `.wgsl` file 200, over every such file in the repository; no allow excuses it. *Comments*, below |
-| Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); an inline allow with a reason excuses a line. *Comments*, below |
-| Comment width | `tools/lint` (the size gate: `comment-width`) | **hard gate**: no comment line in a `.rs`, `.lua` or `.wgsl` file is longer than `rustfmt.toml`'s `max_width`, but for a marker's line and a line whose excess is one token too long for a comment line of its own; an inline allow with a reason excuses a line. *Comments*, below |
+| Comment history | `tools/lint` (the size gate: `comment-history`) | **hard gate**: no comment in a `.rs`, `.lua` or `.wgsl` file names one of this repository's issues or pull requests (`#` and three or more digits, or its issue URL); an inline allow with a reason excuses its line and the comment block it heads. *Comments*, below |
+| Comment width | `tools/lint` (the size gate: `comment-width`) | **hard gate**: no comment line in a `.rs`, `.lua` or `.wgsl` file is longer than `rustfmt.toml`'s `max_width`, but for a marker's line and a line whose excess is one token too long for a comment line of its own; it flags the line, it does not wrap it; an inline allow with a reason excuses its line and the comment block it heads. *Comments*, below |
 | Comment-only diff | `make comment-only` (`tools/lint -- --comment-only`) | a tool mode, not a gate: fails when the branch changes more than comments since its merge base with `origin/main`. *Comments*, below |
 | Component completeness | `tools/lint -- --components` | every first-class component has all 4 axes (field, Add Component entry, inspector card, API namespace), or a written waiver (`WAIVERS`) |
 | Converters report, never log | `tools/lint -- --rules` (`converter-log`) | **hard gate**: no code line of a converter under `crates/asset/src/convert/` (every module, folder or single file, but the cache's own `mod`, `converter`, `depends`, `fingerprint`, `gate`, `lock`, `record`, `stage`, `stale`, `texture_ref` and `tests`) names `log::` or a bare logging macro — a converter returns what it skipped in `Converted` and fails on anything else, and `convert::refresh` alone warns; each converter's root carries `#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, clippy::print_stdout, clippy::print_stderr)]`, wrapped or not, so clippy refuses a dropped `Result` and a print there (#1172) |
@@ -139,8 +139,9 @@ untracked ones `.gitignore` doesn't exclude (`git ls-files --cached --others
 kit's scripts and the default shader it copies into the fixture project's
 `assets/`) never counts, and a new file is measured before it is added. Where git
 can't list them (a tarball with no `.git`) it walks the disk from the root, past
-`target/`, `__pycache__/` and every hidden folder but `.github/`, and says so in its
-report, as it does when the agent docs go unchecked for the same reason. Each file
+`target/`, `__pycache__/`, every hidden folder but `.github/` and each root folder
+the root `.gitignore` anchors whole (`/project/`, `/out/`: a `/<name>/` rule, read
+from the file, not a list), and says so in its report, as it does when the agent docs go unchecked for the same reason. Each file
 is judged and named by its path in the repository, so a checkout under a `tests/`
 folder gives no source file the test cap.
 The code gates (rules, layers, determinism, components, parity) keep
@@ -333,16 +334,20 @@ read.
   look-alikes the agent docs' `history` lets through (`#N`, a hex colour, `&#123;`,
   an in-page link) and a short number (`cascade #2`). Dates and phrases are not
   read. It shares that rule's reference scanner (`agent_docs::history::reference_as`).
-  An inline allow with a reason excuses a line: `// lint: allow(comment-history)
-  <why>` (`-- lint: allow(…)` in Lua). It reads every comment line, a marker's or
+  An inline allow with a reason excuses its own line and the comment block it heads,
+  as every rule's allow does: `// lint: allow(comment-history) <why>` (`-- lint:
+  allow(…)` in Lua). It reads every comment line, a marker's or
   a `SAFETY` note's too, though the cap counts them free.
 - **`comment-width`**: no comment line is longer than rustfmt's `max_width`, read
-  from `rustfmt.toml` (rustfmt's 100 without one), counted in characters over the
-  whole line, code before a trailing comment included. rustfmt does not wrap
-  comments, so this does: wrap the line at the width, the same words on more lines.
+  from `rustfmt.toml` (rustfmt's 100 without one; a value that is not a whole number
+  is a finding on `rustfmt.toml`'s line), counted in characters over the whole line,
+  code before a trailing comment included. rustfmt does not wrap comments and
+  neither does this: it flags the long line, and its author wraps it at the width,
+  the same words on more lines.
   It passes the line of a marker a tool reads (the `MARKERS` table) and a line whose
   excess is one token, a URL, a path or a long identifier, too long to fit even on
-  a comment line of its own. An inline allow with a reason excuses a line: `//
+  a comment line of its own. An inline allow with a reason excuses its own line and
+  the comment block it heads, as every rule's allow does: `//
   lint: allow(comment-width) <why>` (a marker of another tool that must share its
   line, such as `chain-size:`). A re-wrap changes no word, so `make comment-only`
   proves it.

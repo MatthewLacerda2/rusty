@@ -115,15 +115,16 @@ fn full_scan(base: &Path) -> (Vec<PathBuf>, Option<String>) {
             } else {
                 base
             };
-            (measured_in(root), Some(fallback_note(&why)))
+            (listing::on_disk(root), Some(fallback_note(&why)))
         }
     }
 }
 
 fn fallback_note(why: &str) -> String {
     format!(
-        "lint: git can't list the committable files here; measuring every file on disk, \
-         gitignored ones included\ngit said:\n{why}"
+        "lint: git can't list the committable files here; measuring every file on disk \
+         but the root `.gitignore`'s `/<folder>/` rules, other gitignored ones \
+         included\ngit said:\n{why}"
     )
 }
 
