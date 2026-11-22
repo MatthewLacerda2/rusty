@@ -1,3 +1,6 @@
+//! A scene load's GPU warm-up: what a prepared scene draws with, one whole resource a step, while
+//! the old scene still draws.
+
 mod decode;
 
 use std::collections::BTreeSet;
@@ -104,6 +107,8 @@ fn meshes(data: &SceneData) -> Vec<Item> {
 }
 
 impl Renderer {
+    /// Makes the next resource; returns whether it did: `false` when done, or while the next is
+    /// still read on a worker (retry next frame).
     pub fn warm_step(&mut self, data: &SceneData, warming: &mut Warming) -> bool {
         if warming.is_done() {
             return false;

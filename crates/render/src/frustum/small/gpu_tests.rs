@@ -6,6 +6,7 @@ use rusty_scene::{Camera, Scene};
 
 const W: u32 = 96;
 const H: u32 = 64;
+/// Metres down -Z from the camera at the origin, one 1 m prop at each.
 const DEPTHS: [f32; 4] = [4.0, 8.0, 16.0, 32.0];
 
 fn props(settings: (f32, f32), fixed: bool) -> Scene {
@@ -87,6 +88,7 @@ fn gpu_min_screen_size_culls_by_unitys_relative_height() {
     let Some((_, all)) = render(&props((0.0, 0.0), false)) else {
         return;
     };
+    // 1 m at d covers 0.866 / d of the 60° view: 0.108 at 8 m, 0.054 at 16 m, so 0.08 culls two.
     let (_, small) = render(&props((0.0, 0.08), false)).unwrap();
     assert_eq!(small.size_culled_entities, 2, "{small:?}");
     assert_eq!(small.visible_entities, all.visible_entities - 2);

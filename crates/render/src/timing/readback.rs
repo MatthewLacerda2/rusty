@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use super::Pair;
 
+/// Frames whose readback may be in flight at once; past that a frame goes untimed.
 const SLOTS: usize = 3;
 
 const FREE: u8 = 0;
@@ -19,6 +20,7 @@ struct Slot {
 }
 
 pub(super) struct Ring {
+    /// Queries resolve here, then copy to a slot: a resolve target cannot be mapped.
     resolve: wgpu::Buffer,
     slots: Vec<Slot>,
 }

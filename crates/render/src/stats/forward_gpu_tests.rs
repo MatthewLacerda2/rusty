@@ -50,6 +50,7 @@ fn gpu_a_primed_pass_counts_its_lit_draws_primed() {
         return;
     };
     let c = counters(&mut r);
+    // Metal never primes (`priming::recommended`): there the lit draw counts unprimed.
     let want = match c.primed_passes {
         0 => [0, 1, 1],
         _ => [1, 0, 1],

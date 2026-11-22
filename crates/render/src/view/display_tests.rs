@@ -2,6 +2,7 @@ use super::RenderView;
 use crate::{readback, OFFSCREEN_FORMAT};
 
 const SIZE: u32 = 4;
+/// Linear mid-grey, cleared through the sRGB view; the target stores it encoded, as `STORED`.
 const LINEAR: f64 = 0.5;
 const STORED: u8 = 188;
 

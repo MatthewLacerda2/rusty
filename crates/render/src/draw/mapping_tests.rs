@@ -21,8 +21,7 @@ fn uv0_reads_the_texel_unity_reads() {
     let st = mapped(UvMapping::Uv0, tiling, offset);
     assert_eq!((st[0], st[2]), (2.0, 0.25), "u is Unity's as set");
     for v in [0.0, 0.3, 0.5, 1.0] {
-        // Unity: its v runs up the image, so mesh v (down the image) is 1 - v there.
-        // Unity's v runs up the image; mesh v runs down it.
+        // Unity's v runs up the image, so mesh v (down it) is 1 - v there.
         let unity = (1.0 - v) * tiling[1] + offset[1];
         assert!((1.0 - read_at(st, v) - unity).abs() < 1e-5, "v {v}");
     }

@@ -1,3 +1,6 @@
+//! Clustered forward (Forward+, as Unity URP) lighting: each camera bins its lights and decals
+//! into [`GRID`]'s view clusters on the CPU.
+
 mod baked;
 mod bin;
 mod cone;
@@ -15,12 +18,16 @@ pub(crate) use grid::ClusterGrid;
 pub(crate) use lights::{local_lights, LocalLight};
 pub(crate) use unbaked::{drawn_mode, UnbakedNote};
 
+/// Tiles across, tiles up, depth slices: square-ish tiles on 16:9; slices exponential in
+/// perspective.
 pub(crate) const GRID: [u32; 3] = [16, 9, 24];
 
 pub(crate) const CLUSTER_COUNT: usize = (GRID[0] * GRID[1] * GRID[2]) as usize;
 
+/// Point/spot lights one camera shades; past it the least contributing drop (`lights_dropped`).
 pub(crate) const MAX_VISIBLE_LIGHTS: usize = 64;
 
+/// Lights one cluster lists: the bound on the per-pixel light loop (`cluster_lights_dropped`).
 pub(crate) const MAX_CLUSTER_LIGHTS: usize = 32;
 
 #[cfg(test)]

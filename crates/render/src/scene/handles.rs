@@ -1,3 +1,6 @@
+//! Mesh handles are shared by every scene and never freed: `residency` frees a mesh's
+//! buffers, not its handle.
+
 use std::collections::BTreeMap;
 
 use crate::MeshId;

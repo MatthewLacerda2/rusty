@@ -125,6 +125,7 @@ pub(super) fn shot(renderer: &mut Renderer, view: &mut Option<RenderView>, scene
     Shot(pixels)
 }
 
+/// wgpu's Metal backend counts a failed command buffer as completed and never reports it.
 const DROPPED: &str = "the GPU dropped the frame: no pixel has any alpha, not even the \
     opaque backdrop. Not a ui-shader or block bug: the device failed the command \
     buffers silently (#769)";

@@ -79,7 +79,7 @@ fn a_narrow_beam_lists_in_far_fewer_clusters_than_its_sphere() {
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let grid = ClusterGrid::new(&cam, 16.0 / 9.0);
     let mut cache = AabbCache::default();
-    // A 50 m beacon sweeping across the view, as the issue's lab measured.
+    // A 50 m beacon sweeping across the view.
     let l = spot(Vec3::new(-5.0, 3.0, -20.0), Vec3::X, 12.0, 50.0);
     let coned = bin(&grid, &[l], &mut cache).indices.len();
     let sphere = bin_spheres(&grid, &[l.sphere()], &Budget::nearest(1), &mut cache);

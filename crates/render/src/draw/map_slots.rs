@@ -28,6 +28,7 @@ pub(crate) struct MapSlot {
     pub off_while_missing: Option<fn(&mut MaterialData) -> &mut u32>,
 }
 
+/// Maps past emissive count down from 15, so a new one takes 10; the shader slots keep 7 up.
 pub(crate) const MAP_SLOTS: [MapSlot; MATERIAL_MAPS] = [
     MapSlot {
         map: Map::Albedo,

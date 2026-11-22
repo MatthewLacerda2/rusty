@@ -49,6 +49,8 @@ pub(super) fn create_color_target(
             | wgpu::TextureUsages::COPY_SRC,
         view_formats,
     };
+    // A device that rejects the non-sRGB view format gets a plain target;
+    // its UI then blends in linear.
     if alias != format {
         let scope = device.push_error_scope(wgpu::ErrorFilter::Validation);
         let texture = device.create_texture(&desc(&aliased));
