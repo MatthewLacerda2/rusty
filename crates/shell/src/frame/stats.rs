@@ -1,5 +1,3 @@
-//! Dev builds only: without the `dev` layer these calls record nothing.
-
 use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
 use rusty_dev::{capture::RenderedFrame, stats::WindowFrame};

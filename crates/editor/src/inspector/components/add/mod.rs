@@ -4,7 +4,7 @@ use rusty_components::registry::first_class;
 use rusty_edit::authoring::{self, ComponentKind};
 use rusty_edit::DEFAULT_SCRIPTS_DEST_DIR;
 
-/// 3F. Add Component — Unity-style full-width pill that opens the component menu.
+/// Add Component — Unity-style full-width pill that opens the component menu.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     ui.add_space(crate::theme::from_ui(ui).space_sm);
     ui.with_layout(

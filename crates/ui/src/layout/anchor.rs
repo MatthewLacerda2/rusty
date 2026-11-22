@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/anchor.rs — world-anchored markers.
-
 use glam::{Vec2, Vec3};
 
 use crate::UiView;

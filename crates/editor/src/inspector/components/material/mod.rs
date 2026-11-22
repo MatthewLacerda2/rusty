@@ -24,7 +24,7 @@ use rusty_edit::authoring::material::{
 };
 use rusty_scene::{MaterialAsset, RenderMode};
 
-/// 3B2. Render the Material card for the entity `id`, editing the shared library
+/// Render the Material card for the entity `id`, editing the shared library
 /// `MaterialAsset` it references.
 pub fn draw_material_card(
     ui: &mut egui::Ui,

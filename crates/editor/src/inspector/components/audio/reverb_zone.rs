@@ -1,4 +1,3 @@
-//! crates/editor/src/inspector/components/audio/reverb_zone.rs — the AudioReverbZone card
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::audio::reverb_zone` ops the `AudioReverbZone.*` Lua setters call, so
 //! picking a preset writes its params and editing a param makes the zone `Custom`
@@ -34,7 +33,6 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, range: (f32, f32)) -
     .inner
 }
 
-/// 3F-reverb. AudioReverbZone component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(z) = world.reverb_zone(id).map(|z| z.clone()) else {
         return;

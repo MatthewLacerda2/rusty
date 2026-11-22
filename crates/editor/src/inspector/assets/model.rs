@@ -114,8 +114,6 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     }
 }
 
-/// The file's sub-objects (`path::<id>`), each with a Mesh Collider kept in the `.meta`
-/// sidecar.
 fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     let mut settings = match rusty_asset::sidecar::load(Path::new(path)) {
         Ok(s) if !s.sub_objects.is_empty() => s,

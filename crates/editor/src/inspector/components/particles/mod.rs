@@ -32,7 +32,6 @@ fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
         f(&mut c);
     }
 }
-/// 3F-particles. Particle System component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     // The configuration only: the live particles are never copied (a `Gpu`
     // emitter keeps a birth per live particle).

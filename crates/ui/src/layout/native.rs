@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/native.rs — texture native sizes for layout.
-
 use std::collections::BTreeMap;
 
 use glam::Vec2;

@@ -219,6 +219,7 @@ pub(super) fn viewport_camera(
     }
 }
 
+/// Whether the rect tool owns the drag; the move gizmo then stays out of it.
 fn drive_rect_tool(
     ui: &mut EditorUi,
     world: &mut World,

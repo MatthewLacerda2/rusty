@@ -21,17 +21,18 @@ pub struct Round {
     pub warmup: u32,
     pub frames: u32,
     pub runs: u32,
-    /// Build every lazy pipeline first, off the clock, as the editor's window does.
+    /// Build every lazy pipeline (the editor's overlays too) first, off the clock, as the
+    /// editor's window does.
     pub warm: bool,
     /// The renderer's measurement switches, as the game rounds draw with
     /// (`dev::bench::scenes::Options::switches`).
     pub switches: rusty_render::RenderSwitches,
-    /// Outside the project; removed after.
+    /// The folder the save goes to, outside the project; removed after.
     pub save_dir: PathBuf,
 }
 
 /// The scene at `scene_path` (under the working directory, the project's root) in an
-/// edit-mode world, as the editor opens it.
+/// edit-mode world.
 pub fn editor_world(scene_path: &str, settings: ProjectSettings) -> Result<GameWorld, String> {
     // As the harness: Play's refresh compresses no texture into the project.
     rusty_asset::convert::mark_standalone();

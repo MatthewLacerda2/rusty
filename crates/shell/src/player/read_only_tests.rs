@@ -1,6 +1,3 @@
-//! An exported game, booted, run a few frames and focused, leaves its folder byte-identical
-//! but for `saved/`, and the export carries what the player no longer makes.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 

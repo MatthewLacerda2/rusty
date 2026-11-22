@@ -154,7 +154,6 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
     changed
 }
 
-/// Probe `i`'s volume rows; returns whether one changed.
 fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
     let mut changed = shape_menu(ui, i, &mut p.shape);
     match p.shape {

@@ -1,5 +1,5 @@
-//! The Material card's *Delete*, as deleting a material asset in Unity: a click asks
-//! for a confirm listing the users; confirming deletes it through the op
+//! The Material card's *Delete*: a click asks for a confirm listing the material's
+//! users (Unity's lists none); confirming deletes it through the op
 //! `Material.DeleteAsset` calls, forced, so each user falls back to its default material.
 //! Listing users and deleting need the whole `Scene`, so the card only emits a
 //! [`MaterialAction`], applied after the card pass.

@@ -1,5 +1,3 @@
-//! crates/ui/src/lib.rs — rusty's in-game UI.
-
 // Panic-free sim core: bare `.unwrap()` is denied here, as in the other
 // sim modules. See docs/linting.md.
 #![deny(clippy::unwrap_used)]

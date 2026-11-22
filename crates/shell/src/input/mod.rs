@@ -60,8 +60,7 @@ pub fn write_text(text: &str, game: &GameWorld) {
     }
 }
 
-/// Unity's `inputString` plus tab: `\r` reads as `\n`; backspace, `\n` and tab stay; any
-/// other control character drops.
+/// `\r` reads as `\n`.
 fn typed_text(text: &str) -> String {
     text.chars()
         .filter_map(|c| match c {

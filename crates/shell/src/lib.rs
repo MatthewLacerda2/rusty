@@ -114,7 +114,7 @@ pub(crate) fn handle_window_event<F: Frontend>(
     match event {
         WindowEvent::CloseRequested => elwt.exit(),
         WindowEvent::Resized(size) => shell.renderer.resize(boot::pixel_size(*size)),
-        // A DPI change (onto a Retina monitor) can invalidate the swapchain at one size.
+        // A DPI change (onto a Retina monitor) can come without a `Resized`.
         WindowEvent::ScaleFactorChanged { .. } => {
             shell
                 .renderer

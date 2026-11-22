@@ -45,7 +45,7 @@ pub fn begin_drag(origin: Vec3, ray: Ray, pick_radius: f32) -> Option<GizmoDrag>
 }
 
 /// Translate `entity_id` along the grabbed axis by the change in `t` since the last
-/// frame; whether it moved. The write queues the collider refresh.
+/// frame; returns whether it moved. The write queues the collider refresh.
 pub fn drag(
     scene: &mut Scene,
     entity_id: u32,
@@ -88,8 +88,7 @@ fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
     (ab * bc - bb * ac) / denom
 }
 
-/// Distance from `ray` to the axis *segment* `[origin, origin + len*axis]`, for the
-/// handle hit-test.
+/// Distance from `ray` to the axis *segment* `[origin, origin + len*axis]`.
 fn ray_segment_distance(ray: Ray, origin: Vec3, axis: Vec3, len: f32) -> f32 {
     let t = closest_t_on_axis(ray, origin, axis).clamp(0.0, len);
     let on_axis = origin + axis * t;

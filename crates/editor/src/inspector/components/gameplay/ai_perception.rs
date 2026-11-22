@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/ai_perception.rs — the AI Perception
-//! card.
-
 use crate::inspector::components::card::{component_card, remove_component};
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -27,7 +24,6 @@ fn write(
     *is_dirty = true;
 }
 
-/// 3EP. AIPerception Component
 pub fn draw_ai_perception(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

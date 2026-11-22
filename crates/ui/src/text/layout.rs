@@ -5,7 +5,7 @@ use super::measure::Measurer;
 use rusty_components::TextComponent;
 use rusty_font::GlyphId;
 
-/// Auto-size's binary-search steps, fixed so its pick is a pure function of the inputs.
+/// Auto-size's binary-search steps: the pick lands within 1/4096 of the size range.
 const AUTO_SIZE_STEPS: u32 = 12;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -20,9 +20,7 @@ pub struct PlacedGlyph {
     pub size: f32,
     /// Display-space fill, straight alpha (rich-text colour folded in).
     pub color: Vec4,
-    /// Synthesized bold.
     pub faux_bold: bool,
-    /// Synthesized italic.
     pub faux_italic: bool,
 }
 

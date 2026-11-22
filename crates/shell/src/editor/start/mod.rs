@@ -16,8 +16,7 @@ use rusty_editor::project_picker::ProjectPicker;
 const TITLE: &str = "Rusty 3D Game Engine & Editor";
 /// The window's title while the picker shows.
 const PICKER_TITLE: &str = "rusty — Projects";
-/// The editor window's desktop identity on Linux: the `rusty.desktop` entry `make launcher`
-/// installs.
+/// The `rusty.desktop` entry `make launcher` installs.
 const APP_ID: &str = "rusty";
 
 /// Boot the editor on the project `opened` and run until the window closes.

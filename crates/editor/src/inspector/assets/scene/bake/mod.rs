@@ -42,7 +42,7 @@ enum Step {
         saved: rusty_edit::LightingSave,
         path: String,
     },
-    /// Bake Occlusion: the PVS alone, on its worker, written to `path`.
+    /// Bake Occlusion: the PVS alone.
     OcclusionOnly { job: OcclusionBakeJob, path: String },
 }
 
@@ -69,8 +69,8 @@ pub fn draw(
     let open = is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
-    // The inspector follows the requested play state: the scene still plays the frame Stop
-    // is pressed.
+    // It writes the scene file, so Play greys it out as Save. It reads the requested
+    // play state: it is drawn on the frame Play starts or stops.
     let live = idle && open && !scene.is_playing();
     let why = if open {
         "Stop Play first, or wait for the bake"
@@ -93,8 +93,8 @@ pub fn draw(
             (generate, occlusion)
         })
         .inner;
-    // Greyed out mid-bake: the lightmaps, then the probes, read the diffuse model, and an
-    // edit between them would bake two.
+    // The diffuse model is greyed out with the knobs: the lightmaps, then the probes,
+    // read it, and an edit between them would bake two.
     let settings = &mut scene.lighting_settings;
     let changed = ui
         .add_enabled_ui(idle, |ui| {
@@ -115,8 +115,7 @@ pub fn draw(
 
 pub(super) const NOT_OPEN: &str = "Open this scene to bake it";
 
-/// Whether the card's scene file is the editor's open scene. Unity bakes the open
-/// scene only, so the button is live on that card alone. Compared
+/// Unity bakes the open scene only, so the button is live on that card alone. Compared
 /// canonically: the same file spelled relative and absolute is one scene, while
 /// `DiskText` keys the engine's own writes by exact spelling.
 pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {

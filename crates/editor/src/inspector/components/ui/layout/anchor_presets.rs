@@ -1,7 +1,7 @@
 //! The RectTransform card's anchor-preset picker: Unity's 4×4 grid in a
-//! popup. A click re-anchors without moving the element; held **Shift** also
-//! sets the pivot, held **Alt** also snaps the element onto its anchors, through
-//! the op `RectTransform.SetAnchorPreset` calls.
+//! popup. Every click goes through the op `RectTransform.SetAnchorPreset` calls: it
+//! re-anchors without moving the element; held **Shift** also sets the pivot, held
+//! **Alt** also snaps the element onto its anchors.
 
 use egui::{Rect, Sense, Stroke, StrokeKind};
 use rusty_components::RectTransformComponent;

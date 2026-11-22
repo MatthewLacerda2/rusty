@@ -54,7 +54,6 @@ impl Apply {
         Apply(rusty_edit::prefab::source::is_model_source(source).then_some(Self::MODEL))
     }
 
-    /// Add `button`, enabled with `hover`, or greyed out with the reason it is off.
     fn button(self, ui: &mut egui::Ui, button: egui::Button<'_>, hover: &str) -> bool {
         let response = ui.add_enabled(self.0.is_none(), button);
         match self.0 {

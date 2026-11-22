@@ -101,7 +101,7 @@ fn draw_repl_input(editor: &mut EditorUi, ui: &mut egui::Ui) {
                 )
                 .font(egui::TextStyle::Monospace),
         );
-        // egui moves the cursor on Up/Down itself: consume them first so recall wins.
+        // Up/Down recall submitted lines while the field has focus.
         if resp.has_focus() {
             if ui.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowUp)) {
                 editor.dev.repl_input.recall_prev();

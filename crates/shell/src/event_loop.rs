@@ -13,8 +13,8 @@ use rusty_render::Renderer;
 /// Everything a frontend decides before the window exists.
 pub struct Launch<M> {
     pub title: String,
-    /// Linux's desktop identity (Wayland's `app_id`, X11's `WM_CLASS`): the desktop matches it
-    /// to a `.desktop` entry for the dock icon.
+    /// Linux's desktop identity: the desktop matches it to a `.desktop` entry for the dock
+    /// icon.
     pub app_id: Option<&'static str>,
     /// Whether the window opens filling the screen (the editor) or at its size.
     pub maximized: bool,

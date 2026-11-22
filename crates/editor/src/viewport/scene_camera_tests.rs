@@ -1,6 +1,3 @@
-//! The Scene view camera's math: orbit keeps the pivot, look
-//! keeps the eye, pan and zoom scale with distance, frame fits the bounds.
-
 use super::*;
 
 fn near(a: Vec3, b: Vec3) -> bool {

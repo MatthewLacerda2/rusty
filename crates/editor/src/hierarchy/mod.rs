@@ -1,6 +1,6 @@
-//! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree,
-//! flattened into rows (`flat`) and drawn only where it is in view (`tree`). Object creation lives
-//! in the menu bar's GameObject menu; deleting is Unity's: Edit ▸ Delete, the Delete key
+//! The Scene Hierarchy: a collapsible tree flattened into rows (`flat`) and drawn
+//! only where it is in view (`tree`). Object creation lives in the menu bar's
+//! GameObject menu; deleting is Unity's: Edit ▸ Delete, the Delete key
 //! (Cmd+Backspace on macOS) and a row's right-click *Delete*, all through `delete`.
 
 use egui_phosphor::regular as icon;

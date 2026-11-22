@@ -1,8 +1,3 @@
-//! The Game view's size dropdown, Unity's Game view resolution menu: the presets, a
-//! size a script set (`Editor.SetGameViewSize`) and "1x on HiDPI" (Unity's *Low
-//! Resolution Aspect Ratios*). The setting and how it resolves are
-//! `core::application::game_view`'s.
-
 use rusty_core::application::{GameViewSetting, GameViewSize};
 
 /// The dropdown on the Game tab's strip. `enabled` is false while a demo replays
@@ -43,8 +38,8 @@ pub fn letterbox(panel: egui::Vec2, size: (u32, u32)) -> egui::Vec2 {
     egui::vec2(w, h)
 }
 
-/// The renderer's `screen_box`, `(x, y, width, height)` in Scene-image pixels: the
-/// letterbox `OverlayFrame` maps clicks through, in points.
+/// The renderer's `screen_box`: where the Scene tab's UI overlay draws, `(x, y, width,
+/// height)` in the image's `panel` pixels, the box `OverlayFrame` maps clicks through.
 pub fn overlay_box(
     interaction: &super::ViewportInteraction,
     panel: (u32, u32),

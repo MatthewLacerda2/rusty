@@ -81,8 +81,6 @@ fn draw_code_editor(
     }
 }
 
-/// Entity picker that appends this script as a new `ScriptComponent` on the
-/// chosen scene entity.
 fn draw_attach_to_entity(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,

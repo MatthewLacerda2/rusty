@@ -199,7 +199,6 @@ fn draw_layer_combo(
     });
 }
 
-/// The per-component card chain plus the Add Component menu, in the canonical inspector order.
 #[expect(
     clippy::too_many_arguments,
     reason = "(world, id) replaced the single &mut Entity handle"

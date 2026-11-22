@@ -50,15 +50,14 @@ pub(super) fn draw_fov(
         FovAxis::Horizontal => ("horizontal", FovAxis::Vertical, "vertical"),
     };
     let range = axis.show(camera_ops::MIN_FOV, aspect)..=axis.show(camera_ops::MAX_FOV, aspect);
-    // Held as the renderer holds it: a hand-edited scene's out-of-range `fov`
-    // would convert to nonsense (tan past 90° is negative).
+    // Held to the renderer's range: a hand-edited scene's `fov` past 180° would convert
+    // to nonsense (the tangent of a half-angle past 90° is negative). A NaN stays NaN.
     let held = cam.fov.clamp(camera_ops::MIN_FOV, camera_ops::MAX_FOV);
     let mut fov = axis.show(held, aspect);
     ui.horizontal(|ui| {
         ui.label(format!("Field of View ({label}):"));
         if ui.add(crate::widgets::slider(&mut fov, range)).changed() {
             if let Some(mut c) = world.camera_mut(id) {
-                // Converted to the stored vertical angle, as `Camera.SetFieldOfView` takes it.
                 camera_ops::set_fov(&mut c, axis.store(fov, aspect));
             }
             *is_dirty = true;

@@ -7,7 +7,7 @@ use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::{LightComponent, LightMode, LightType};
 
-/// 3C. Light configuration. A THIN client: every widget reads the field into
+/// A THIN client: every widget reads the field into
 /// a local and, on change, routes the write through the shared
 /// `authoring::rendering::light::*` op.
 pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {

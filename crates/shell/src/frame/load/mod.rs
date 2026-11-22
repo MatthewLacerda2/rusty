@@ -1,6 +1,5 @@
-//! crates/shell/src/frame/load/ — a `Scene.LoadAsync` in a window: the worker that
-//! prepares it while frames go on (`worker`), and its GPU warm-up, a slice per frame
-//! (`warm`), before it reads ready.
+//! A `Scene.LoadAsync` in a window: the worker that prepares it while frames go on
+//! (`worker`), and its GPU warm-up, a slice per frame (`warm`), before it reads ready.
 
 pub mod warm;
 pub mod worker;

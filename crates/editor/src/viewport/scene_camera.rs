@@ -3,9 +3,9 @@ use glam::{Vec2, Vec3};
 use rusty_scene::camera::DEFAULT_FOV;
 pub use rusty_scene::camera::MAX_PITCH;
 use rusty_scene::Camera;
-/// World units; zooming in past it pushes the pivot ahead.
+/// The nearest the eye comes to the pivot, in world units; zooming in past it pushes the
+/// pivot ahead.
 pub const MIN_DISTANCE: f32 = 0.05;
-/// The farthest zoom-out.
 pub const MAX_DISTANCE: f32 = 5000.0;
 pub const DEFAULT_DISTANCE: f32 = 10.0;
 pub const DEFAULT_FLY_SPEED: f32 = 10.0;
@@ -20,7 +20,6 @@ pub const POINTS_PER_STEP: f32 = 50.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SceneCamera {
-    /// The point the camera looks at and orbits around.
     pub pivot: Vec3,
     pub distance: f32,
     /// Degrees around +Y, [`Camera`]'s convention.

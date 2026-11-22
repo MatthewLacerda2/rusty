@@ -1,5 +1,3 @@
-//! crates/ui/src/text/font.rs — the UI's fonts by path.
-
 use rusty_core::collections::Map;
 use std::sync::{Arc, Mutex, OnceLock};
 

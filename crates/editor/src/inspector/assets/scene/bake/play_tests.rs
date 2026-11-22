@@ -12,9 +12,9 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// One editor frame's bake drive; whether it asked for a repaint at once (not the
-/// progress bar's timed one). The header read Play's refusal before it, so the
-/// frame a bake stops must ask, or the window sleeps on a greyed-out Play.
+/// One editor frame's bake drive; whether it asked for a repaint at once. The header
+/// read Play's refusal before it, so the frame a bake stops must ask, or the window
+/// sleeps on a greyed-out Play.
 fn frame_repaints_now(editor: &mut EditorUi, scene: &mut Scene, console: &mut ConsoleLogs) -> bool {
     let ctx = egui::Context::default();
     let now = Arc::new(AtomicBool::new(false));
@@ -50,8 +50,8 @@ fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     s.eval("Lighting.GenerateAsync()").unwrap();
     let mut console = ConsoleLogs::new();
     let scene = s.world().scene().clone();
-    // A whole frame could finish an empty scene's lightmaps on a fast GPU, past the step a
-    // cancel applies to.
+    // Started by the frame's first half alone: a whole frame could finish an empty
+    // scene's lightmaps on a fast GPU, past the step a cancel applies to.
     take_request(&mut editor, &mut scene.borrow_mut(), &mut console);
     let why = scene.borrow().play_refusal().expect("a bake runs");
     assert!(why.starts_with("Baking lighting"), "{why}");

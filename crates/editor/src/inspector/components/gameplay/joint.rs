@@ -21,7 +21,6 @@ fn write(
     *is_dirty = true;
 }
 
-/// 3EJ. Joint Component
 pub fn draw_joint(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(j) = world.joint(id).map(|j| j.clone()) else {
         return;

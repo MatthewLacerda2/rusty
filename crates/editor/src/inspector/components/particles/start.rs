@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/particles/start.rs — the shape, motion and
-//! start-range sections of the Particle System card.
-
 use glam::Vec3;
 
 use super::widgets::{clamped, combo, range_row, vec3};

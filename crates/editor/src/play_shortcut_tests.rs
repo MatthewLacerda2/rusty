@@ -1,8 +1,8 @@
-//! Ctrl+P (Cmd+P on macOS) toggles Play from wherever the keyboard is, as Unity's
-//! does: through the whole editor frame, so no panel drawn before or after the header
-//! takes the key. During Play the Game view is clicked into, as when the game holds
-//! the cursor: the shell hands egui every window event whatever the capture
-//! (`EditorFrontend::on_window_event`).
+//! Ctrl+P (Cmd+P on macOS) toggles Play from wherever the keyboard is, as Unity's does:
+//! through the whole editor frame, not the header alone, so no panel drawn before or
+//! after it takes the key. During Play the Game view is showing and clicked into, as
+//! when the game holds the cursor: the shell hands egui every window event whatever the
+//! capture (`EditorFrontend::on_window_event`).
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 

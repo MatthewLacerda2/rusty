@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/context.rs — the inspector's read-only frame context.
-
 use crate::inspector::components::prefab;
 use rusty_scene::{Scene, LAYER_COUNT};
 

@@ -23,8 +23,8 @@ impl SceneFollow {
         }
     }
 
-    /// Once per edit-mode frame, after the watch noted its changes: reload `scene` when its
-    /// file changed outside the engine.
+    /// Each edit-mode frame, after the watch's notes: reload `scene` when its
+    /// file changed outside the engine. Returns whether it reloaded.
     pub fn apply(
         &mut self,
         scene: &mut Scene,

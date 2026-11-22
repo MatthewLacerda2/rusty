@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/sizes.rs — the min / preferred / flexible sizes layout reads.
-
 use glam::Vec2;
 
 use super::group;
@@ -13,7 +11,6 @@ use rusty_ecs::World;
 /// recurse the size queries forever.
 pub(super) const MAX_DEPTH: u32 = 64;
 
-/// One axis's layout sizes.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Sizes {
     pub min: f32,

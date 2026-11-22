@@ -63,6 +63,7 @@ fn spawn(
         .spawn(move || {
             let prepare = || prepare_counted(&path, &abandoned, &steps);
             let prepared = rusty_asset::cook::par::beside_play(prepare);
+            // Planned here too, so the tick thread never walks the scene document.
             let plan = |p: &PreparedScene| Warming::plan(p.data());
             let warm = prepared.as_ref().ok().filter(|_| warms).map(plan);
             drop(tx.send((prepared, warm)));
@@ -123,7 +124,7 @@ impl SceneLoader for Threaded {
         }
         match (warms, job.warming()) {
             (true, Some((_, warm))) => warm.is_done(),
-            // A failed job is finished: it has nothing to warm.
+            // A failed job, or one in a loader that does not warm: nothing to warm.
             _ => true,
         }
     }

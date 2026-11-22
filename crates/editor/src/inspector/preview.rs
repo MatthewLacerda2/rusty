@@ -25,7 +25,6 @@ pub struct PreviewRequest {
     pub shader_override: Option<String>,
 }
 
-/// The Details / Preview strip, shared with the Material card.
 pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.horizontal(|ui| {
         if chrome::tab(ui, &t, !*active, "Details").clicked() {

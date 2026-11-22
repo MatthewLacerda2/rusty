@@ -1,5 +1,5 @@
-//! Inter's files carry no Private Use Area codepoints, where Phosphor's icons sit:
-//! Inter leads the family and would draw over them. Phosphor cannot lead instead: it
+//! Phosphor's icons sit in the Private Use Area, where Inter's files carry no glyphs;
+//! Inter leads the family, so any it had would draw over them. Phosphor cannot lead instead: it
 //! maps `a`–`z` to the blanks its ligatures are built from.
 
 use egui::{Context, FontData, FontDefinitions, FontFamily, FontId};

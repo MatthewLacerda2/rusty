@@ -1,6 +1,3 @@
-//! The card's deferred-action `dispatch` and root resolution; the egui `draw` is left
-//! to manual checks.
-
 use super::*;
 use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_edit::{list_instance_overrides, load_and_instantiate_linked, save_prefab};

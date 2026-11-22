@@ -73,7 +73,6 @@ pub struct EditorUi {
     pub gizmo_drag: Option<viewport::gizmo::GizmoDrag>,
     /// Which gizmos both tabs draw: their strips' toggles, and `Editor.SetGizmo`.
     pub gizmos: rusty_core::application::SceneGizmos,
-    /// The Game view's size: its dropdown, and `Editor.SetGameViewSize`.
     pub game_view: rusty_core::application::GameViewSetting,
     pub stats: Option<viewport::stats::Readout>,
     pub rect_drag: Option<viewport::rect_tool::RectDrag>,
@@ -174,8 +173,8 @@ impl EditorUi {
         self.apply_theme(ctx, *is_playing);
         self.preview_request = None;
 
-        // A despawned id leaves the selection: ids are never reused, so a live one
-        // is that entity.
+        // A despawned id leaves the selection; ids are not reused within a scene, and a
+        // scene swap clears the selection.
         self.selected_entity_id = self
             .selected_entity_id
             .filter(|&id| scene.world.contains(id));

@@ -52,7 +52,7 @@ impl Frontend for PlayerFrontend {
         let scene = game.scene().borrow();
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);
-        // No debug overlays in a shipped game: editor mode off.
+        // Editor mode off: a shipped game draws none of the Scene view's handles.
         shell.renderer.render(view, &scene, &camera, target, false);
         drop(scene);
         #[cfg(feature = "dev")]

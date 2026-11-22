@@ -39,8 +39,8 @@ pub struct EditorFrontend {
     egui_renderer: egui_wgpu::Renderer,
     editor_ui: EditorUi,
     viewport_texture_id: Option<egui::TextureId>,
-    /// `[Scene, Game]`: they render at different scales, so a shared view would resize,
-    /// cutting auto-exposure, on each tab switch.
+    /// `[Scene, Game]`: they render at different scales, so a shared view would
+    /// reallocate, resetting auto-exposure, on each tab switch.
     viewport_views: [Option<RenderView>; 2],
     preview_texture_id: Option<egui::TextureId>,
     preview_view: Option<RenderView>,
@@ -94,7 +94,7 @@ impl EditorFrontend {
         }
     }
 
-    /// Run the editor UI for one frame and apply its post-FX quality selection.
+    /// Also applies the UI's post-FX quality selection.
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
         self.follow_scene_swap(game);
         let mut playing = game.play_requested();
@@ -126,7 +126,7 @@ impl EditorFrontend {
             shell.renderer.shadow_renderer.invalidate_static_cache();
         }
         if self.demo_size().is_none() {
-            // The display scale, before `sync_shared` resolves the render scale on it.
+            // The display scale, before `sync_shared` resolves the render scale.
             let scale =
                 (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
             game.resources.screen.borrow_mut().set_display_scale(scale);
@@ -176,6 +176,7 @@ impl Frontend for EditorFrontend {
             return Pace::Continuous;
         }
         let playing = game.play_requested() || game.scene().borrow().is_playing();
+        // Sound still playing keeps the loop drawing: its mix steps per frame.
         if playing || game.resources.audio.borrow().is_sounding() {
             return Pace::Continuous;
         }

@@ -9,7 +9,6 @@ use crate::theme::Theme;
 use crate::EditorUi;
 use rusty_scene::Scene;
 
-/// Esc does not stop Play: in the Game view it frees the cursor and reaches the game.
 const PLAY_SHORTCUT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::P);
 

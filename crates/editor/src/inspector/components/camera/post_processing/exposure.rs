@@ -1,7 +1,3 @@
-//! The exposure rows of the Post Processing card's Color Correction section:
-//! the mode, then the fixed EV or the automatic mode's limits,
-//! compensation, adaptation speeds and histogram window, each through its knob.
-
 use super::{knob, knob_row, Section, COLOR_CORRECTION};
 use rusty_components::{AutoExposure, ExposureMode};
 use rusty_edit::authoring::rendering::post_processing::exposure;

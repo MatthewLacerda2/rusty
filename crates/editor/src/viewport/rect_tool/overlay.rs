@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/rect_tool/overlay.rs — painting the rect tool.
-
 use egui::{Color32, Painter, Pos2, Shape, Stroke, StrokeKind};
 use glam::Vec2;
 

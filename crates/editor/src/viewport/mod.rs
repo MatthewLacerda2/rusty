@@ -22,12 +22,12 @@ pub struct ViewportInteraction {
     pub tab: ViewportTab,
     /// The image's top-left in window points, for the shell to map the OS pointer.
     pub origin: egui::Pos2,
-    /// The image rect's size in points (egui logical units).
+    /// In points.
     pub size: egui::Vec2,
     /// The Game tab's own pixel size, drawn letterboxed; `None` on the Scene tab or
     /// at the panel's own pixels.
     pub render: Option<(u32, u32)>,
-    /// That size behind either tab: what the UI lays out at.
+    /// The Game view's own pixel size behind either tab, which the UI lays out at.
     pub screen: Option<(u32, u32)>,
     /// Pointer position relative to the image's top-left, if hovering.
     pub hover_local: Option<egui::Vec2>,

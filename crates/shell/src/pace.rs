@@ -58,8 +58,8 @@ impl Pacer {
         self.settling = SETTLE_FRAMES;
     }
 
-    /// When `changed`: a scene swapped with no input (a game's `Application.Quit()` stopping
-    /// Play).
+    /// Settle as after input when `changed`: a scene swap with no input (a game's
+    /// `Application.Quit()` stopping Play).
     pub(super) fn settle_if(&mut self, changed: bool) {
         if changed {
             self.activity();
@@ -71,7 +71,7 @@ impl Pacer {
         self.retry_at = None;
     }
 
-    /// The swapchain refused the frame: it is still owed, a little later.
+    /// The swapchain refused the frame: still owed, a little later.
     pub(super) fn skipped(&mut self, now: Instant) {
         self.retry_at = Some(now + RETRY_AFTER);
     }

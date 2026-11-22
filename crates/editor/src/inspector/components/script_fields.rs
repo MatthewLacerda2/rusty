@@ -19,7 +19,6 @@ thread_local! {
     });
 }
 
-/// Draw the field controls for one script; none for a script without a `fields` schema.
 pub fn draw_script_fields(ui: &mut egui::Ui, script: &mut ScriptComponent, is_dirty: &mut bool) {
     let fields = cached_schema(&script.path);
     if fields.is_empty() {

@@ -30,7 +30,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     draw_apply_to_entity(ui, editor, scene, path);
 }
 
-/// Texture import settings, kept in the image's `.meta` sidecar.
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
     ui.add_space(5.0);

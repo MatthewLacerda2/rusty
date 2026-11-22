@@ -37,12 +37,11 @@ pub struct EditorCaptureOptions {
     pub select: Option<String>,
     pub select_asset: Option<String>,
     pub frame_selected: bool,
-    /// Inspect this reflection probe first, as `Editor.InspectReflectionProbe` does.
     pub inspect_reflection_probe: Option<usize>,
     /// The Play chrome only: the sim is not entered.
     pub playing: bool,
     pub tab: ViewportTab,
-    /// In window pixels.
+    /// Hold the pointer here, in window pixels, every frame: a hover shows.
     pub pointer: Option<(f32, f32)>,
     /// The Scene view's gizmos, as its toggles or `Editor.SetGizmo` set them.
     pub gizmos: SceneGizmos,

@@ -76,7 +76,6 @@ enum Stage<P, K, B, F, M> {
     },
     Prelude(Box<Open<P, B>>),
     Running(Box<App<F, M>>),
-    /// Only while moving from one stage to the next.
     Moving,
 }
 
