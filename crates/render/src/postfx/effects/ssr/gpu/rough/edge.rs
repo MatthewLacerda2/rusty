@@ -62,6 +62,8 @@ pub(super) fn lifted(on: bool, roughness: f32) -> rusty_scene::Scene {
     s
 }
 
+/// The HDR image, not the 8-bit frame: the reflection adds a few levels of 255, which the
+/// frame's rounding can read as a hard step.
 fn hdr_red(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<f32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();

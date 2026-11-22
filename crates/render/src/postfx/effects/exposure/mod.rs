@@ -241,6 +241,7 @@ impl ExposureMeter {
         self.mapping.store(IDLE, Ordering::Release);
     }
 
+    /// Blocks on `device.poll`: for a capture or a test, never the frame's path.
     pub(crate) fn settle(&mut self, device: &wgpu::Device) {
         if self.mapping.load(Ordering::Acquire) == MAPPING {
             let _ = device.poll(wgpu::PollType::wait_indefinitely());

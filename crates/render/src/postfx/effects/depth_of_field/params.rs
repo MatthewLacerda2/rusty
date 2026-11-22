@@ -1,7 +1,7 @@
 use rusty_components::{DepthOfField, DofMode};
 use rusty_core::settings::quality::MAX_RESOLUTION_DIVISOR;
 
-/// Both radii are fractions of the view's height.
+/// Both radii: shares of the view's height; this, URP's default Gaussian, 12 px at 1080p.
 pub(crate) const GAUSSIAN_RADIUS: f32 = 1.0 / 90.0;
 
 pub(crate) const MAX_BOKEH_RADIUS: f32 = 1.0 / 40.0;
@@ -9,6 +9,7 @@ pub(crate) const MAX_BOKEH_RADIUS: f32 = 1.0 / 40.0;
 /// Full-resolution pixels; a gap wider than the tent smooths shows copies of a highlight.
 pub(crate) const BOKEH_RING_SPACING: f32 = 8.0;
 
+/// 8k taps a ring, 224 in all; the cap binds only past a 4K view's height.
 pub(crate) const BOKEH_MAX_RINGS: f32 = 7.0;
 
 /// Metres: a 35 mm full frame's, Unity's physical camera default.
@@ -19,9 +20,8 @@ pub(crate) const SENSOR_HEIGHT: f32 = 0.024;
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DofParams {
     pub shape: [f32; 4],
-    /// Gaussian: start and end distance (m), then unused. Bokeh: focus distance (m),
-    /// the circle of confusion, in pixels, of a point at infinity, the most working
-    /// pixels between two rings of the gather, then unused.
+    /// Gaussian: start and end distance (m). Bokeh: focus distance (m), a point at
+    /// infinity's CoC (px), the most working pixels between rings.
     pub focus: [f32; 4],
 }
 
@@ -62,8 +62,8 @@ impl DofParams {
         self.shape[3] as u32
     }
 
-    /// The signed CoC in full-resolution pixels (negative nearer than the focus) at `depth`
-    /// metres along the view axis: the shader's `coc_of`.
+    /// The shader's `coc_of`: signed full-resolution pixels, negative nearer than the
+    /// focus, at `depth` m along the view axis.
     #[cfg(test)]
     pub(crate) fn coc(&self, depth: f32) -> f32 {
         let max = self.shape[1];

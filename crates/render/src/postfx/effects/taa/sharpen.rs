@@ -70,6 +70,7 @@ pub(super) fn run(
     false
 }
 
+/// Mirrors `RcasParams` in `postfx/rcas.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct RcasParams {
