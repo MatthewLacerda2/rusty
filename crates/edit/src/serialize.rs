@@ -1,15 +1,3 @@
-//! crates/edit/src/serialize.rs — World <-> SceneData
-//!
-//! Converts between the runtime hecs-backed `Scene` and the serde `SceneData`
-//! document (`rusty_scene::serialize`, the base's):
-//!   to_scene_data(&Scene)             -> SceneData   (read component VALUES out)
-//!   apply_scene_data(&mut Scene, ..)  -> ()          (rebuild the World, holding loaded values)
-//!   apply_world_data(&mut Scene, ..)  -> ()          (rebuild from a Play snapshot, not held again)
-//!
-//! A save writes each linked instance's overrides and strips the bones; a load
-//! holds every value through its authoring op and propagates prefab instances, so
-//! this half names `authoring` and `prefab` and sits on the edit side.
-//!
 //! stored-format: the scene document (`SceneData`), World <-> serde
 
 use crate::authoring::material::fold_pending;

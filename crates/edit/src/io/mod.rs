@@ -1,22 +1,3 @@
-//! crates/edit/src/io/mod.rs — Scene file I/O: save, load, seeding
-//!
-//! save_to_file / load_from_file. Single active scene: load REPLACES the current
-//! World (no multi-scene). Reading a document without a live scene, the extension
-//! and the bake files' record are the base's (`rusty_scene::io`).
-//!
-//! Editor integration:
-//!   - the current scene file (`EditorUi::current_scene_path`, one value with the
-//!     script runtime's `Scene.Save()` target, — Save writes back HERE
-//!     (not a hardcoded demo path); Load (incl. the scene asset's Load Scene button)
-//!     sets it.
-//!   - one standardised scene extension (`.scene`, JSON inside).
-//!
-//! Default scene (a deleted one stays deleted,:
-//!   - Built in Rust by `edit::default_scene::build`.
-//!   - Seeded into the project's `assets/scenes/` on boot with the bundled scripts
-//!     (`seed`, through the seed `manifest` so unedited files follow engine fixes,
-//!; the seeds are embedded in the binary, `bundled`,.
-//!
 //! stored-format: the scene file on disk as saved and loaded, and the default scene's seeding
 
 pub mod bundled;
@@ -51,6 +32,7 @@ pub fn save_to_file(scene: &Scene, path: &str) -> Result<(), String> {
     rusty_scene::nav_settings::save_navmesh(scene, path).map(|_| ())
 }
 
+/// Why [`save_to_file`] refused: the World holds the play state, not the scene.
 pub const SAVE_IN_PLAY: &str = "a scene cannot be saved during Play: stop Play first";
 
 pub const LIGHTING_IN_PLAY: &str = "lighting cannot be generated during Play: stop Play first";

@@ -1,6 +1,4 @@
-//! What Unity's model prefab is: one parent GameObject named after the file, one child per node with its local transform.
-//! A node placing a mesh the sidecar names as another's collision mesh is not spawned; if other nodes hang from it, it is spawned empty.
-//! A linked prefab instance keyed by node path: a re-import reaches every instance and a part moved by hand keeps its override.
+//! Unity's model prefab: a node placing a mesh the sidecar names as another's collision mesh is not spawned (spawned empty if nodes hang from it).
 
 mod lod;
 
@@ -18,7 +16,7 @@ use rusty_scene::Scene;
 
 pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, position: Vec3) -> u32 {
     let mut prefab = model_prefab(path, asset);
-    // Placed before the stamp, so its one collider refresh sees the parts where they land; a root's placement is its own, never an override.
+    // Placed before the stamp, so its one collider refresh sees the parts where they land.
     let root = prefab.root;
     if let Some(entity) = prefab.entities.iter_mut().find(|e| e.id == root) {
         entity.transform.position = position;
@@ -26,7 +24,7 @@ pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, positi
     instantiate_prefab_linked(scene, &prefab, None, path)
 }
 
-/// Keyed `<path>::#default`, never the scratch entity's own key, which would name another entity of the scene it is stamped into.
+/// Keyed `<path>::#default`, never the scratch entity's own key (it would name another entity of the destination scene).
 pub fn model_prefab(path: &str, asset: &Imported) -> PrefabData {
     let mut scratch = Scene::new();
     let root = spawn_tree(&mut scratch, path, asset);
@@ -133,7 +131,6 @@ fn spawn_node(
     id
 }
 
-/// `node`'s as authored when nothing sits before it, so a node's own TRS is never re-split.
 fn place(scene: &mut Scene, id: u32, before: Mat4, node: &ModelNode) {
     if before != Mat4::IDENTITY {
         return set_matrix(scene, id, before * node.local());

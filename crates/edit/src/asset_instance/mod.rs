@@ -1,4 +1,4 @@
-//! Editor and API both route through here. Like every mesh, an instanced asset stores only its reference; the geometry is re-imported on load.
+//! Like every mesh, an instanced asset stores only its reference; the geometry is re-imported on load.
 
 use glam::Vec3;
 
@@ -10,8 +10,7 @@ use rusty_components::{ColliderComponent, MaterialComponent};
 use rusty_scene::rehydrate;
 use rusty_scene::Scene;
 
-/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate` for `Crate_LOD0`, `Crate_LOD1`) spawns the whole set as one LODGroup; its id is the group's.
-/// Errors up front on a bad reference, so it never leaves an empty-geometry entity.
+/// A sub-object name that is the base of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set as one LODGroup; its id is the group's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,
@@ -179,7 +178,7 @@ pub fn set_lightmap_uv_settings(
     Ok(reimports::reimport_model(scene, path, Rig::Keep))
 }
 
-/// A NaN or unchanged factor changes nothing: no write, no re-import. The write log notes the model, so caches keyed by it re-read it.
+/// A NaN or unchanged factor changes nothing: no write, no re-import.
 pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Result<usize, String> {
     let source = std::path::Path::new(path);
     let stored = rusty_asset::sidecar::load(source)
@@ -189,14 +188,12 @@ pub fn set_model_scale_factor(scene: &mut Scene, path: &str, scale: f32) -> Resu
         return Ok(0);
     }
     rusty_asset::sidecar::set_scale(source, scale).map_err(|e| e.to_string())?;
-    // A whole-model instance is rebuilt from the scaled import, so the refit skips its static parts.
     let refit = |scene: &mut Scene, skip: &_| {
         let before = crate::lod_instance::lod0_extents(scene);
         let ids = reimports::model_writes::reimport_noted_except(scene, path, Rig::Rebuild, skip);
         crate::lod_instance::rescale_groups_over(scene, &ids, &before);
         ids.len() + skip.len()
     };
-    // The same match the write-log follow uses: a link naming the model by another spelling (absolute vs project-relative) is found too.
     let model = rusty_core::fs::written::Stale::new(vec![path.to_string()]);
     Ok(crate::prefab::restamp::restamp_models(
         scene,
