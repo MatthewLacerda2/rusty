@@ -1,22 +1,3 @@
-//! crates/scene/src/skeleton/ik/ — inverse kinematics over the bone GameObjects (#461).
-//!
-//! Each animator's IK constraints (`AnimatorComponent::ik`) are solved once per
-//! fixed step by [`Scene::solve_ik`], which the `solve_ik` play system runs
-//! **after `LateUpdate` scripts and before `follow_bones`**: the Animator poses the
-//! bones, `LateUpdate` sets this tick's targets (and may hand-pose bones), IK
-//! bends the result, hitboxes follow the IK'd pose, and the skin palette is built
-//! from it in `Render`. A bone carried by a dynamic `Rigidbody` (a ragdoll, #466)
-//! belongs to physics, so a constraint touching one is skipped: physics wins.
-//! A bone blended between physics and animation (a hit reaction, #1895) is the
-//! exception: it is put back on its animated pose, IK solves as usual, and the
-//! blend is redone over the result, so the aim holds through the reaction.
-//!
-//! Aim chains solve before limbs (Unity's order: look-at and body, then hands
-//! and feet), so a support hand reaching for a foregrip on a gun held by the
-//! aimed arm reaches where the aim put it. The solvers (`two_bone`, `aim`) are
-//! pure functions over world-space bone poses; this module reads the poses from
-//! the scene and writes the results back as bone-local rotations.
-
 mod aim;
 mod two_bone;
 
@@ -29,20 +10,14 @@ use crate::Scene;
 use rusty_components::transform::mirror;
 use rusty_components::{IkChain, IkConstraint, IkTarget};
 
-/// A bone's world position and rotation, and the reflection its world scale
-/// carries (the signs of its `World::lossy_scale`, worked out with
-/// `components::transform::mirror`): its world matrix draws a local direction `d`
-/// along `rot · mirror · d` (#1125).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BonePose {
     pub pos: Vec3,
     pub rot: Quat,
-    /// `±1` per axis; all `+1` for a bone nothing mirrors.
     pub mirror: Vec3,
 }
 
 impl Scene {
-    /// Solve every active animator's IK constraints, in id order (deterministic).
     pub fn solve_ik(&mut self) {
         let blended = self.unblend_ragdolls();
         self.solve_constraints();
@@ -78,9 +53,6 @@ impl Scene {
         }
     }
 
-    /// Put back what `c`'s last solve wrote on every bone nothing has rewritten
-    /// since (the Animator re-poses the bones its clips key; the rest would
-    /// otherwise keep compounding IK).
     pub fn undo_ik(&mut self, c: &mut IkConstraint) {
         for (bone, written, before) in c.applied.drain(..).rev() {
             if self
@@ -132,8 +104,6 @@ impl Scene {
                 solve_aim(&poses, target, settings)
             }
         };
-        // Root first: each bone's local rotation is taken against its parent's
-        // world pose as already re-solved.
         for (&bone, world_rot) in bones.iter().zip(solved.unwrap_or_default()) {
             if let Some(write) = self.set_world_rotation(bone, world_rot) {
                 c.applied.push(write);
@@ -141,7 +111,6 @@ impl Scene {
         }
     }
 
-    /// Where an IK target or hint is this step.
     fn ik_point(&self, target: IkTarget) -> Option<Vec3> {
         match target {
             IkTarget::Point(p) => Some(p),
@@ -152,9 +121,6 @@ impl Scene {
         }
     }
 
-    /// A bone driven by a dynamic body (a ragdolled limb) is physics' to pose,
-    /// unless it is drawn blended with its animation (a hit reaction, #1895):
-    /// then IK bends the animated side, and the blend is redone after.
     fn is_simulated(&self, bone: u32) -> bool {
         let dynamic = self
             .world
@@ -178,9 +144,6 @@ impl Scene {
         }
     }
 
-    /// Give `bone` the world rotation `rot` under its parent's current world pose
-    /// (seen through the mirror when the parent reflects, #1119); the `(bone,
-    /// written, before)` record.
     fn set_world_rotation(&mut self, bone: u32, rot: Quat) -> Option<(u32, Quat, Quat)> {
         let local = self.world.local_rotation_for(bone, rot);
         let mut t = self.world.transform_mut(bone)?;

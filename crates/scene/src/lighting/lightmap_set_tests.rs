@@ -1,5 +1,3 @@
-//! The lightmap set's lookups, records and stored shape.
-
 use super::*;
 
 #[test]
@@ -36,9 +34,6 @@ fn lookup_clear_and_round_trip() {
     assert!(!set.baked_light(7), "a clear forgets the lights too");
 }
 
-/// What a bake made of each light it took in (#2522): a `Mixed` light the
-/// shadowmask fell back on is recorded as baked direct, and the record survives
-/// the file.
 #[test]
 fn a_bake_records_the_mode_each_light_was_baked_as() {
     let mut set = LightmapSet::default();

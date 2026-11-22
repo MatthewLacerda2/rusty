@@ -1,6 +1,3 @@
-//! A five-bone mini humanoid for the hitbox tests: `pelvis → spine → {head,
-//! arm → finger}`, each bone with a box of skinned vertices around it.
-
 use glam::{Mat4, Vec3};
 
 use crate::Scene;
@@ -8,7 +5,6 @@ use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::Vertex;
 use rusty_components::MeshComponent;
 
-/// (name, parent slot, bind position, vertex box centre, box size), mesh space.
 pub(super) type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
 
 pub(super) const BONES: [Bone; 5] = [
@@ -49,7 +45,6 @@ pub(super) const BONES: [Bone; 5] = [
     ),
 ];
 
-/// The rig's skin, its bind pose scaled by `scale` (a centimetre skeleton is 0.01).
 pub(super) fn skin(scale: f32) -> SkinData {
     let bind_global: Vec<Mat4> = BONES
         .iter()
@@ -86,7 +81,6 @@ pub(super) fn skin(scale: f32) -> SkinData {
     }
 }
 
-/// Eight corner vertices per bone box, 0.8 on the bone and 0.2 on its parent.
 pub(super) fn vertices() -> Vec<Vertex> {
     let mut out = Vec::new();
     for (slot, b) in BONES.iter().enumerate() {
@@ -103,7 +97,6 @@ pub(super) fn vertices() -> Vec<Vertex> {
     out
 }
 
-/// A `Rig` entity carrying the skinned mini humanoid, skeleton spawned.
 pub(super) fn rig(scene: &mut Scene) -> u32 {
     let skin = skin(1.0);
     let id = scene.add_entity("Rig".to_string());

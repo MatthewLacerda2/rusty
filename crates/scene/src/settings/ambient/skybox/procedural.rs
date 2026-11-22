@@ -1,16 +1,3 @@
-//! The procedural sky's light (#1675): `common::procedural_sky` evaluated on the
-//! CPU and projected into L2 SH, memoised by its `SkySettings`.
-//!
-//! The gradient is the shader's term for term. The clouds are the same value-noise
-//! FBM, carved and banded the same way, but hashed with integers instead of the
-//! shader's `fract(sin(·))`, whose last bits differ by platform: the cells differ,
-//! their statistics do not, and an L2 projection keeps only those (the layer's
-//! brightness by height).
-//!
-//! The sky is affine in the ambient colour it tints from (`a·colour + b` per
-//! direction, `a` one scalar), so two projections, under a white and a black
-//! colour, give the SH under any colour without projecting again.
-
 use std::sync::Mutex;
 
 use glam::{Vec2, Vec3};
@@ -18,13 +5,10 @@ use glam::{Vec2, Vec3};
 use crate::lighting::probe_fill::fibonacci_sphere;
 use crate::{Sh9, SkySettings};
 
-/// Directions projected: the clouds' cells average out well past the L2 bands.
 const SAMPLES: usize = 4096;
 
-/// The last settings projected and their `(a, b)` terms.
 static PROJECTED: Mutex<Option<(SkySettings, Sh9, Sh9)>> = Mutex::new(None);
 
-/// The radiance SH of the procedural sky `sky` draws under ambient colour `color`.
 pub(super) fn radiance(sky: &SkySettings, color: Vec3) -> Sh9 {
     let mut kept = PROJECTED.lock().unwrap_or_else(|e| e.into_inner());
     let (a, b) = match &*kept {
@@ -56,8 +40,6 @@ pub(super) fn project(sky: &SkySettings, color: Vec3) -> Sh9 {
     sh
 }
 
-/// `common::procedural_sky` along unit `dir`, before fog (a GPU test,
-/// `render::gpu::uniforms::procedural_sky_gpu_tests`, holds the gradient to it).
 pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     let [zenith, horizon, ground] = sky.resolved(ambient);
     let up = dir.y.clamp(0.0, 1.0);
@@ -75,7 +57,6 @@ pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     color
 }
 
-/// `common::cloud_shift`.
 fn cloud_shift(coverage: f32) -> f32 {
     let c = coverage - 0.5;
     c * if c > 0.0 { 1.6 } else { 1.1 }
@@ -86,7 +67,6 @@ fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {
     t * t * (3.0 - 2.0 * t)
 }
 
-/// `sky::noise::sky_fbm`: five octaves of value noise.
 fn fbm(p: Vec2) -> f32 {
     let (mut sum, mut amp, mut freq) = (0.0, 0.5, p);
     for _ in 0..5 {
@@ -97,7 +77,6 @@ fn fbm(p: Vec2) -> f32 {
     sum
 }
 
-/// `sky::noise::sky_value_noise`, smoothstep-weighted between cell corners.
 fn value_noise(p: Vec2) -> f32 {
     let i = p.floor();
     let f = p - i;
@@ -108,7 +87,6 @@ fn value_noise(p: Vec2) -> f32 {
     bottom + (top - bottom) * u.y
 }
 
-/// A cell's value in `[0, 1)`, from its integer coordinates.
 fn hash(x: f32, y: f32) -> f32 {
     let (x, y) = (x as i32 as u32, y as i32 as u32);
     let mut h = x.wrapping_mul(0x8da6_b343) ^ y.wrapping_mul(0xd816_3841);

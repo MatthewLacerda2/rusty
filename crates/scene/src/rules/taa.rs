@@ -1,35 +1,14 @@
-//! crates/scene/src/rules/taa.rs — the camera's TAA ops (#1847) and its numeric
-//! knobs, below `edit::authoring` (which re-exports them from
-//! `authoring::rendering::camera`) so a renderer test reads the knob table without
-//! the authoring layer.
-//!
-//! The ONE place TAA's camera fields are mutated (#287): the editor's Camera card,
-//! the `Graphics.Set/GetTaa*` functions, a loaded file's hold and a
-//! `Graphics.taa.<knob>` tween all route through the ops here, so each clamp lives
-//! in one place. [`TAA_KNOBS`] names each float knob (the field inside `taa`, its
-//! `Graphics.<api>` pair, its get/set): the counterpart of the volume effects'
-//! `Knob` table, read for the Inspector sliders, the `Graphics.*` pairs and the
-//! tween paths. TAA is a camera effect, so its knobs live here rather than on the
-//! post-processing volume.
-//!
-//! Pure.
-
 use super::sanitize::saturated;
 use rusty_components::{CameraComponent, TaaQuality};
 
-/// Set the camera's TAA flag — temporal anti-aliasing (#1702), which replaces FXAA
-/// while it runs. Shared by the editor's Camera card and `Graphics.SetTaaActive`.
 pub fn set_taa_active(c: &mut CameraComponent, active: bool) {
     c.taa_active = active;
 }
 
-/// Set TAA's quality level (#1847, URP's): how much of the resolve runs.
 pub fn set_taa_quality(c: &mut CameraComponent, quality: TaaQuality) {
     c.taa_quality = quality;
 }
 
-/// Set URP's *Base Blend Factor* (#1847), clamped to URP's slider bounds; a NaN
-/// takes the low bound.
 pub fn set_taa_base_blend_factor(c: &mut CameraComponent, value: f32) {
     c.taa_base_blend_factor = saturated(
         value,
@@ -38,7 +17,6 @@ pub fn set_taa_base_blend_factor(c: &mut CameraComponent, value: f32) {
     );
 }
 
-/// Set URP's *Variance Clamp Scale* (#1847), clamped to URP's slider bounds.
 pub fn set_taa_variance_clamp_scale(c: &mut CameraComponent, value: f32) {
     c.taa_variance_clamp_scale = saturated(
         value,
@@ -47,33 +25,22 @@ pub fn set_taa_variance_clamp_scale(c: &mut CameraComponent, value: f32) {
     );
 }
 
-/// Set URP's *Jitter Scale* (#1847), clamped to `0..=1`.
 pub fn set_taa_jitter_scale(c: &mut CameraComponent, value: f32) {
     c.taa_jitter_scale = saturated(value, 0.0, 1.0);
 }
 
-/// Set URP's *Mip Bias* (#1847), clamped to `-1..=0`.
 pub fn set_taa_mip_bias(c: &mut CameraComponent, value: f32) {
     c.taa_mip_bias = saturated(value, CameraComponent::MIN_TAA_MIP_BIAS, 0.0);
 }
 
-/// Set URP's TAA *Contrast Adaptive Sharpening* (#1847) — RCAS strength — clamped to
-/// `0..=1`; `0` runs no sharpen.
 pub fn set_taa_contrast_adaptive_sharpening(c: &mut CameraComponent, value: f32) {
     c.taa_contrast_adaptive_sharpening = saturated(value, 0.0, 1.0);
 }
 
-/// Set TAA's *Anti-Flicker* (#2228, HDRP's), clamped to `0..=1`; `0` is URP's
-/// resolve, holding no history against a blink.
 pub fn set_taa_anti_flicker(c: &mut CameraComponent, value: f32) {
     c.taa_anti_flicker = saturated(value, 0.0, 1.0);
 }
 
-/// One numeric TAA knob (#1847): the counterpart of a volume effect's `Knob`, but
-/// over the camera component. `field` is the tween path's last part
-/// (`Graphics.taa.<field>`), `api` the `Graphics.Get/Set<api>` pair's name, `label`
-/// URP's display name and `range` the Inspector slider's bounds, the same ones its
-/// `set` clamps to.
 #[derive(Debug)]
 pub struct CameraKnob {
     pub field: &'static str,
@@ -84,12 +51,8 @@ pub struct CameraKnob {
     pub set: fn(&mut CameraComponent, f32),
 }
 
-/// The camera effect [`TAA_KNOBS`] belongs to, as its tween paths spell it.
 pub const TAA_EFFECT: &str = "taa";
 
-/// TAA's float knobs, in the Inspector's order. Each is an Inspector slider, a
-/// `Graphics.Get/Set<api>` pair and a `Graphics.taa.<field>` tween path, all through
-/// the same op.
 pub const TAA_KNOBS: &[CameraKnob] = &[
     CameraKnob {
         field: "base_blend_factor",
@@ -147,8 +110,6 @@ pub const TAA_KNOBS: &[CameraKnob] = &[
     },
 ];
 
-/// The TAA knob a `Graphics.<effect>.<knob>` tween path names (`effect` must be
-/// `taa`): `None` for any other effect or an unknown field.
 pub fn camera_knob(path: &str) -> Option<&'static CameraKnob> {
     let (effect, field) = path.split_once('.')?;
     (effect == TAA_EFFECT)
@@ -163,7 +124,6 @@ mod tests {
     #[test]
     fn knobs_round_trip_through_their_ops_with_clamps() {
         let mut c = CameraComponent::default();
-        // A value inside every knob's own range round-trips exactly.
         for (knob, value) in TAA_KNOBS.iter().zip([0.7, 0.9, 0.5, -0.5, 0.5, 0.3]) {
             (knob.set)(&mut c, value);
             assert_eq!(
@@ -173,7 +133,6 @@ mod tests {
                 knob.field
             );
         }
-        // Each clamp holds its own bound.
         set_taa_base_blend_factor(&mut c, 2.0);
         assert_eq!(
             c.taa_base_blend_factor,
@@ -196,7 +155,6 @@ mod tests {
 
     #[test]
     fn each_knob_clamps_to_its_own_range() {
-        // The slider's range and the op's clamp are one pair of bounds.
         for knob in TAA_KNOBS {
             let mut c = CameraComponent::default();
             (knob.set)(&mut c, -1e6);

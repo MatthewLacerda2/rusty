@@ -1,8 +1,3 @@
-//! The tables keyed by entity id follow their entities (#1649): the despawn door
-//! drops every keyed field's entry, and an Undo of the Destroy puts back exactly
-//! the ones classified `Keyed::Restored`. Each keyed field's mark is set on the
-//! base entity.
-
 use std::collections::BTreeSet;
 
 use super::inventory::fields;
@@ -10,7 +5,6 @@ use super::marks::{all, base, Mark};
 use super::Keyed;
 use crate::Despawn;
 
-/// Every field the despawn door drops from, its mark and how it is keyed.
 fn keyed() -> Vec<(&'static Mark, Keyed)> {
     let keyed: Vec<_> = fields()
         .into_iter()

@@ -1,13 +1,3 @@
-//! Saving and restoring what a designer authored on a skeleton (#453).
-//!
-//! Bones are never saved. A document keeps, per skinned entity, the bones whose
-//! transform differs from the model's rest pose (`BoneBinding::overrides`), and
-//! every entity parented under a bone, re-pointed at the skinned entity with the
-//! bone's name (then its ancestor bones') in `parent_bone`, and the `Rigidbody` /
-//! `Joint` a ragdoll put on a bone (`BoneBinding::bodies`, #466); any other id leaf
-//! naming a bone keeps the bone by name too (`bone_refs`, #1264). All re-bind by
-//! name on load.
-
 use std::collections::BTreeMap;
 
 use super::bone_refs::{repoint_refs, BoneIndex};
@@ -17,15 +7,8 @@ use rusty_asset::SkinData;
 use rusty_components::mesh::BoneBody;
 use rusty_components::{Entity, TransformComponent};
 
-/// How far a bone may drift from its rest pose before it counts as an override.
 pub(super) const OVERRIDE_EPS: f32 = 1.0e-5;
 
-/// Take every skeleton out of `entities` (a document about to be saved or
-/// extracted): record each skinned entity's bone overrides and bone bodies, move
-/// each bone's non-bone children under the skinned entity with `parent_bone` set,
-/// and drop the bone documents. A bone carrying any other component is warned
-/// about: only its transform and physics are kept, so a component belongs on a
-/// child of the bone.
 pub fn strip_bones(entities: &mut Vec<Entity>) {
     let index: BTreeMap<u32, usize> = entities
         .iter()
@@ -36,8 +19,6 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     if bone_of.is_empty() {
         return;
     }
-    // Before the bones are recorded, so one jointed to another skeleton's bone saves
-    // that bone by name too.
     repoint_refs(entities, &bone_of);
     for i in 0..entities.len() {
         let Some(mesh) = &entities[i].mesh else {
@@ -66,10 +47,6 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     }
 }
 
-/// Every bone document in `entities` (`index` finds them by id), with its skinned
-/// entity and bone chain. A slot's entity counts only while it is still under its
-/// skinned entity, as `Scene::is_under` holds live: one a script moved under a
-/// prop is saved as the ordinary entity it now is.
 fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
     let mut bone_of = BoneIndex::new();
     for entity in entities {
@@ -91,7 +68,6 @@ fn index_bones(entities: &[Entity], index: &BTreeMap<u32, usize>) -> BoneIndex {
     bone_of
 }
 
-/// Whether document `id` sits under document `owner`, walking `parent_id` up.
 fn doc_is_under(entities: &[Entity], index: &BTreeMap<u32, usize>, id: u32, owner: u32) -> bool {
     let mut at = index.get(&id).and_then(|&i| entities[i].parent_id);
     for _ in 0..entities.len() {
@@ -104,7 +80,6 @@ fn doc_is_under(entities: &[Entity], index: &BTreeMap<u32, usize>, id: u32, owne
     false
 }
 
-/// What one skeleton saves of its bones, by bone name.
 #[derive(Default)]
 struct SavedBones {
     overrides: BTreeMap<String, TransformComponent>,
@@ -112,11 +87,6 @@ struct SavedBones {
 }
 
 impl SavedBones {
-    /// Record bone `slot`'s document: its transform when it is off the rest
-    /// pose, its physics, and a warning for any other component. A joint is saved
-    /// by bone chain only to a bone `bone_of` lists for `owner`, still under it:
-    /// one to a bone a script moved away keeps that entity's id, as a live
-    /// re-import keeps the joint on it (#1277).
     fn record(
         &mut self,
         doc: &Entity,
@@ -147,10 +117,6 @@ impl SavedBones {
     }
 }
 
-/// `slot`'s joint name, then the names of its ancestor joints in `skin`, nearest
-/// first: what an attachment saves, so a bone the model later drops hands it to
-/// the nearest one left. A parent link that does not point to an earlier slot ends
-/// the chain, as `bind_bones` treats such a joint as a root.
 pub(super) fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
     let mut chain = vec![skin.name(slot)];
     let mut at = slot;
@@ -161,14 +127,12 @@ pub(super) fn bone_chain(skin: &SkinData, slot: usize) -> Vec<String> {
     chain
 }
 
-/// Point every non-bone child of a bone at the bone's skinned entity instead,
-/// remembering the bone by name.
 fn reparent_attachments(
     entities: &mut [Entity],
     index: &BTreeMap<u32, usize>,
     bone_of: &BoneIndex,
 ) {
-    let mut moved: Vec<(u32, u32)> = Vec::new(); // (attachment, skinned entity)
+    let mut moved: Vec<(u32, u32)> = Vec::new();
     for entity in entities.iter_mut() {
         if bone_of.contains_key(&entity.id) {
             continue;
@@ -187,10 +151,6 @@ fn reparent_attachments(
     }
 }
 
-/// A bone's `Rigidbody` and `Joint`, with a joint to another bone of the same
-/// skeleton (`chain_of` resolves it) saved by that bone's chain, and one to another
-/// skeleton's bone by its `bone_refs`. A joint to any other entity keeps its id.
-/// `None` for a bone with neither.
 fn bone_body(doc: &Entity, chain_of: impl Fn(u32) -> Option<Vec<String>>) -> Option<BoneBody> {
     if doc.rigidbody.is_none() && doc.joint.is_none() {
         return None;
@@ -218,9 +178,6 @@ fn bone_body(doc: &Entity, chain_of: impl Fn(u32) -> Option<Vec<String>>) -> Opt
     })
 }
 
-/// Whether a bone's document holds anything beyond what every bone has (name,
-/// transform, hierarchy, flags, and the physics `bone_body` keeps) — a component
-/// or a script.
 pub(super) fn carries_components(doc: &Entity) -> bool {
     let mut bare = Entity::new(doc.id, doc.name.clone());
     bare.rigidbody = doc.rigidbody.clone();
@@ -235,8 +192,6 @@ pub(super) fn carries_components(doc: &Entity) -> bool {
     serde_json::to_value(&bare).ok() != serde_json::to_value(doc).ok()
 }
 
-/// Take the `parent_bone` marks out of a document about to be inserted, for
-/// [`Scene::hang_on_skeletons`](crate::Scene::hang_on_skeletons) once the skeletons exist.
 pub fn take_bone_parents(entities: &mut [Entity]) -> Vec<Hung> {
     entities
         .iter_mut()

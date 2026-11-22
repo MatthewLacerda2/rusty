@@ -1,7 +1,3 @@
-//! A refused file and a path's spellings (#1982's second review): a file this world
-//! refused is rewritten or removed only while it is still that file, and a relative
-//! and an absolute spelling of one path find one record.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -30,7 +26,6 @@ fn a_valid_file_baked_over_a_refused_one_is_kept_without_a_false_overwrite() {
     let path = file("refused_then_baked.occlusion", b"trunc");
     let files = BakeFiles::default();
     files.refused(&path, b"trunc", "test");
-    // Another process bakes a valid PVS there.
     std::fs::write(&path, b"a valid bake").unwrap();
     let saved = files.store(&path, None, "T").unwrap();
     assert_eq!(saved.action, Action::Kept);
@@ -38,7 +33,6 @@ fn a_valid_file_baked_over_a_refused_one_is_kept_without_a_false_overwrite() {
     assert!(warning.contains("keeps that newer bake"), "{warning}");
     assert!(!warning.contains("overwrote"), "{warning}");
     assert_eq!(std::fs::read(&path).unwrap(), b"a valid bake");
-    // This world baking since does write over it.
     files.baked(".occlusion");
     let saved = files.store(&path, Some(b"mine"), "T").unwrap();
     assert_eq!(saved.action, Action::Written);
@@ -72,15 +66,12 @@ fn a_held_shared_buffer_is_kept_as_held() {
     files.loaded_shared(&path, Some(&held));
     let saved = files.store_shared(&path, Some(&held), "T").unwrap();
     assert_eq!((saved.action, saved.warning), (Action::Kept, None));
-    // Other bytes in a new buffer are hashed, and written.
     let other: Arc<[u8]> = Arc::from(&b"other"[..]);
     let saved = files.store_shared(&path, Some(&other), "T").unwrap();
     assert_eq!(saved.action, Action::Written);
     assert_eq!(std::fs::read(&path).unwrap(), b"other");
 }
 
-/// `path` relative to `base`, through `..` where it must: the spelling a scene
-/// opened as `scenes/level.scene` gives its sidecars.
 fn pathdiff(path: &Path, base: &Path) -> PathBuf {
     let (p, b): (Vec<_>, Vec<_>) = (path.components().collect(), base.components().collect());
     let shared = p.iter().zip(&b).take_while(|(x, y)| x == y).count();

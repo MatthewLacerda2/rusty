@@ -1,11 +1,7 @@
-//! Tests for `ReflectionProbeSet::blend` (#1584): Unity's *Blend Probes*.
-
 use glam::Vec3;
 
 use super::super::ReflectionProbeSet;
 
-/// Two rooms side by side along x, sharing the wall plane at x = 10: A over
-/// [0, 10], B over [10, 20], each with the default 1 m blend distance.
 fn two_rooms() -> ReflectionProbeSet {
     let mut set = ReflectionProbeSet::new();
     set.add(Vec3::new(5.0, 0.0, 0.0), Vec3::splat(5.0));
@@ -39,8 +35,6 @@ fn walking_through_the_doorway_fades_from_one_room_to_the_other() {
         );
         w_b
     };
-    // B's share climbs steadily from 0 a blend distance before the wall to 1 a blend
-    // distance past it: a fade, never a step.
     let mut last = 0.0;
     for step in 0..=40 {
         let x = 8.5 + step as f32 * 0.075;
@@ -74,14 +68,12 @@ fn a_zero_blend_distance_is_a_hard_edge() {
 #[test]
 fn a_higher_importance_box_is_drawn_over_the_room_around_it() {
     let mut set = ReflectionProbeSet::new();
-    set.add(Vec3::ZERO, Vec3::splat(20.0)); // the hall
+    set.add(Vec3::ZERO, Vec3::splat(20.0));
     let alcove = set.add(Vec3::new(5.0, 0.0, 0.0), Vec3::splat(2.0));
     set.probes[alcove].importance = 2;
-    // Inside the alcove it wins outright, though both boxes hold the point.
     let inside = set.blend(at(5.0)).unwrap();
     assert_eq!((inside.first, inside.first_weight), (alcove, 1.0));
     assert_eq!(inside.second_weight, 0.0);
-    // Half a blend distance out of it, the hall fills what the alcove leaves.
     let leaving = set.blend(at(7.5)).unwrap();
     assert_eq!((leaving.first, leaving.second), (alcove, Some(0)));
     assert!((leaving.first_weight - 0.5).abs() < 1e-6);

@@ -1,7 +1,3 @@
-//! The `<scene>.navmesh` sidecar (#1887): it loads back, a scene holding none removes
-//! a file at a path it has no record for, and a save that would write the bytes it last read or
-//! wrote there does not (#1982, `scene::io::BakeFiles`).
-
 use std::sync::Arc;
 
 use super::*;

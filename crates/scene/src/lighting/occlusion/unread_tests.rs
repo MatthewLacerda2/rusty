@@ -1,8 +1,3 @@
-//! A `<scene>.occlusion` file that is there but cannot be read (#1714): it loads
-//! no PVS, with a warning, and the next save keeps it rather than removing it as
-//! if absent; a refused (corrupt) one is removed by the next save, so the error
-//! clears itself (#1982). Only a missing file means none.
-
 use super::{load_sidecar, occlusion_path, save_sidecar};
 use crate::io::Action;
 use crate::Scene;
@@ -17,7 +12,6 @@ fn level(name: &str) -> String {
 fn an_unreadable_file_loads_nothing_and_a_save_keeps_it() {
     let scene_path = level("occlusion_unread");
     let path = occlusion_path(&scene_path);
-    // A directory where the file goes: reading it fails, and not as "not found".
     std::fs::create_dir_all(&path).unwrap();
     let mut scene = Scene::new();
     load_sidecar(&mut scene, &scene_path);
@@ -41,18 +35,14 @@ fn a_refused_file_is_removed_by_the_next_save() {
     assert!(!path.exists(), "the corrupt file is gone");
 }
 
-/// The layout before the version field (#2515): `RPVS`, `objects` objects, an empty
-/// grid, no row words and no cells.
 fn unversioned(objects: u32) -> Vec<u8> {
     let mut bytes = b"RPVS".to_vec();
     bytes.extend(objects.to_le_bytes());
     bytes.extend(std::iter::repeat_n(0u8, objects as usize * 13 + 28));
-    bytes.extend([0u8; 8]); // the rows' and the cells' counts
+    bytes.extend([0u8; 8]);
     bytes
 }
 
-/// Its object count is no version: neither a count above this build's version
-/// ("newer") nor one equal to it (a later field) is what the warning says.
 #[test]
 fn a_file_from_before_the_version_field_is_told_as_older_and_unversioned() {
     let scene_path = level("occlusion_unversioned");

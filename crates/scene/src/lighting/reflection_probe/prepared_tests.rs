@@ -1,13 +1,8 @@
-//! `PreparedProbes::blend` equals `ReflectionProbeSet::blend` bit for bit (#2324):
-//! its frames are built once and its reach only skips probes whose influence is 0.
-
 use glam::{Quat, Vec3};
 
 use super::super::{ProbeShape, ReflectionProbe, ReflectionProbeSet};
 use super::ProbeBlend;
 
-/// Turned and world-aligned boxes, spheres, overlaps of equal and of different
-/// importance, a zero blend distance, and a probe far from the origin.
 fn mixed() -> ReflectionProbeSet {
     let mut set = ReflectionProbeSet::new();
     set.add(Vec3::ZERO, Vec3::new(3.0, 2.0, 4.0));
@@ -29,7 +24,6 @@ fn mixed() -> ReflectionProbeSet {
     set
 }
 
-/// Every field compared by its bits: `-0.0` and `0.0` differ here.
 fn bits(b: Option<ProbeBlend>) -> Option<(usize, u32, Option<usize>, u32)> {
     b.map(|b| {
         (
@@ -64,8 +58,6 @@ fn the_prepared_blend_equals_the_blend_bit_for_bit() {
     agrees_over(&set, Vec3::new(900.0, 3.0, -700.0), 9.0, 10);
 }
 
-/// A point on a reach's very edge: the blend distance past a box face, where
-/// rounding decides whether the influence is a hair above 0.
 #[test]
 fn the_edge_of_the_blend_distance_agrees() {
     let set = mixed();
@@ -93,8 +85,6 @@ fn a_nan_point_and_an_empty_set_agree() {
     assert_eq!(ReflectionProbeSet::new().prepared().blend(Vec3::ZERO), None);
 }
 
-/// `update` re-prepares what changed and drops what left: after any edit the
-/// prepared set blends as the set it was last given.
 #[test]
 fn an_update_follows_the_set_it_is_given() {
     let mut set = mixed();
@@ -111,11 +101,6 @@ fn an_update_follows_the_set_it_is_given() {
     agrees_over(&set, Vec3::ZERO, 9.0, 12);
 }
 
-/// A rotation of norm a hair under 1, written straight to the field (`edit` would
-/// normalise it): the frame's rotation and glam's then turn points apart, so a
-/// reach built from the world bounds stops millimetres short of where the
-/// influence does, past the box's corners. The reach is tested in the frame, so
-/// the blend agrees there too.
 #[test]
 fn a_nearly_unit_rotation_agrees_past_the_corners() {
     let mut set = ReflectionProbeSet::new();
@@ -129,13 +114,11 @@ fn a_nearly_unit_rotation_agrees_past_the_corners() {
         let bit = |b: usize| Vec3::splat(f32::from(u8::from(corner & b != 0)));
         let mask = bit(1) * Vec3::X + bit(2) * Vec3::Y + bit(4) * Vec3::Z;
         let local = frame.box_min + (frame.box_max - frame.box_min) * mask;
-        // The world point the frame turns onto this corner.
         let mut at = q.normalize() * local;
         for _ in 0..50 {
             at += q.normalize() * (local - frame.to_frame(at));
         }
         for dir in [Vec3::X, Vec3::Y, Vec3::Z, -Vec3::X, -Vec3::Y, -Vec3::Z] {
-            // Out along `dir` in tenths of a millimetre, across the blend edge.
             for k in 19_800..20_200 {
                 let point = at + dir * (k as f32 * 1e-4);
                 let want = set.blend(point);

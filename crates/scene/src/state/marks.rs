@@ -1,11 +1,3 @@
-//! One mark per field of the inventory (#1649): a way to set a distinctive value
-//! on a scene and to see whether it is still there, which the lifecycle and keyed
-//! tests run through every lifecycle. A field with no mark fails
-//! `every_field_has_a_mark`, so a new field can't land without one.
-//!
-//! A field made of two classes (a probe set: placement and its baked payload) has
-//! a mark per part, the second named `field.part` and held to its own class.
-
 use std::sync::OnceLock;
 
 use glam::Vec3;
@@ -19,27 +11,19 @@ use crate::lighting::lightmap_set::LightmapEntry;
 use crate::lighting::reflection_probe::ReflectionProbe;
 use crate::{Scene, SceneId};
 
-/// One field's mark (or one part's).
 pub struct Mark {
-    /// `field`, or `field.part`.
     pub name: &'static str,
-    /// The class a part is held to, when not its field's.
     pub part: Option<Class>,
-    /// Set the mark on `scene`; `base` is the base entity.
     pub set: fn(&mut Scene, u32),
-    /// Whether `scene` holds the mark.
     pub is_set: fn(&Scene, u32) -> bool,
 }
 
 impl Mark {
-    /// The field the mark is on.
     pub fn field(&self) -> &'static str {
         self.name.split('.').next().unwrap_or(self.name)
     }
 }
 
-/// The scene every mark is set on: one box (the base entity), one light probe and
-/// one reflection probe, so a mark can change a probe without changing the count.
 pub fn base() -> (Scene, u32) {
     let mut scene = Scene::new();
     let base = create_entity(&mut scene, "Base", Some(Primitive::Box));
@@ -65,7 +49,6 @@ macro_rules! marks {
     };
 }
 
-/// Every mark, in the inventory's order.
 pub const MARKS: &[Mark] = marks! {
     "id" => |s, _| s.restore_id(mark_id()), s.id() == mark_id();
     "world" => |s, _| s.add_entity("Marked".into()), s.find_entity_by_name("Marked").is_some();
@@ -146,7 +129,6 @@ pub const MARKS: &[Mark] = marks! {
         s.undo_name() == Some("Marked") && s.world.contains(b);
 };
 
-/// The dev build's marks.
 #[cfg(feature = "dev")]
 pub const DEV_MARKS: &[Mark] = marks! {
     "screen_exposure" => |s, _| s.screen_exposure = Some(7.5), s.screen_exposure == Some(7.5);
@@ -156,7 +138,6 @@ pub const DEV_MARKS: &[Mark] = marks! {
         s.lighting_bake_status == BakeStatus::Done("x".into());
 };
 
-/// Every mark in this build.
 pub fn all() -> Vec<&'static Mark> {
     let marks = MARKS.iter();
     #[cfg(feature = "dev")]
@@ -164,7 +145,6 @@ pub fn all() -> Vec<&'static Mark> {
     marks.collect()
 }
 
-/// A one-cell PVS of no object, its cell 7 m: the `occlusion` mark.
 fn marked_occlusion() -> crate::lighting::occlusion::OcclusionData {
     let grid = crate::lighting::occlusion::Grid {
         origin: Vec3::ZERO,

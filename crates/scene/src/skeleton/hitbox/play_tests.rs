@@ -1,7 +1,3 @@
-//! In Play a stale hitbox is queued, not removed on the spot (#1298), so the
-//! destroy phase can tear down any script under it first, and every lookup
-//! already treats it as gone.
-
 use super::rig::rig;
 use super::*;
 use crate::skeleton::RagdollOptions;
@@ -67,7 +63,7 @@ fn a_ragdoll_built_after_a_limb_is_queued_skips_the_whole_limb() {
     let finger = scene.find_bone(owner, "finger").unwrap();
     assert!(scene.hitbox_of(finger).is_some(), "the finger has its own");
     scene.set_playing(true);
-    scene.destroy(arm); // `Scene.DestroyEntity(arm)`: queued with its subtree
+    scene.destroy(arm);
     assert_eq!(scene.hitbox_of(finger), None, "doomed with its bone");
     let opts = RagdollOptions::default();
     let made = scene.build_ragdoll(owner, &opts).unwrap();

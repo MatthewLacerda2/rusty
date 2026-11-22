@@ -1,9 +1,3 @@
-//! The world-matrix walks on a malformed hierarchy (#991): a parent cycle (which
-//! only a raw `set_parent_id`, e.g. a corrupt scene file, can write) ends the walk,
-//! and a dangling parent reads as a root, whatever order the store fills in. A raw link
-//! the parent's `children` lacks is the one case the store's downward walk cannot see
-//! (`ecs::world_space::store`).
-
 use glam::Vec3;
 
 use crate::Scene;
@@ -21,8 +15,6 @@ fn a_parent_cycle_neither_hangs_nor_overflows_the_store() {
 
 #[test]
 fn a_dangling_parent_reads_as_a_root() {
-    // A raw link to an id no longer in the world, as a corrupt file can write. (A
-    // despawn under a well-formed parent is `ecs::world_space::queue_tests`'.)
     let mut scene = Scene::new();
     let gone = scene.add_entity("gone".into());
     let leaf = scene.add_entity("leaf".into());
@@ -50,8 +42,6 @@ fn the_store_fills_parents_first_whatever_the_id_order() {
 
 #[test]
 fn a_failed_re_parent_keeps_the_child_under_its_old_parent() {
-    // `pcall(Scene.SetParent, child, destroyedId)`: the call fails and changes nothing,
-    // so moving the old parent still moves the child.
     let mut scene = Scene::new();
     let parent = scene.add_entity("parent".into());
     let child = scene.add_entity("child".into());
