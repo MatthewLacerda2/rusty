@@ -76,6 +76,7 @@ fn parse_documented_surface(doc: &str) -> Surface {
             continue;
         } else if let Some(rest) = s.strip_prefix("## ") {
             if let Some(ns) = backticked_ident(rest.trim()) {
+                // An entry even with no rows, so the union walk sees a documented namespace.
                 surface.entry(ns).or_default();
             }
         } else if s.starts_with('|') {

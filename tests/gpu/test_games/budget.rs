@@ -78,6 +78,7 @@ fn a_child_that_sleeps_past_its_budget_passes() {
 
 #[test]
 fn a_child_that_spins_past_its_budget_fails_naming_it() {
+    // 3 s, far past the 0.2 s budget: the spinner gets its CPU even on a fraction of a core.
     let run = sh("while :; do :; done", Duration::from_secs(3));
     assert!(
         run.cpu > Duration::from_millis(200),

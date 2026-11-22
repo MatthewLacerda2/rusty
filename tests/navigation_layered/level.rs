@@ -30,6 +30,7 @@ pub fn build() -> Scene {
         let z = 37.0 + 40.0 * row as f32;
         for seg in 0..5 {
             let x = 40.0 * seg as f32;
+            // A 34 m wall, then a 6 m doorway.
             add_box(
                 &mut scene,
                 Vec3::new(x, 0.0, z),

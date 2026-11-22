@@ -41,6 +41,8 @@ fn an_edited_instance_draws_its_edit_and_its_sibling_keeps_the_import() {
         id
     });
     let camera = Camera::new(Vec3::new(0.0, 0.0, 3.0), -90.0, 0.0);
+    // One host takes both shots, so its renderer keeps the mesh slots between them, as a
+    // running game's does.
     let mut host = CaptureHost::new();
     let (before, after) = (
         tmp("rusty_shared_edit_before.png"),

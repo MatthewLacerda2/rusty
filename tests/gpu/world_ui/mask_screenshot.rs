@@ -18,6 +18,7 @@ use super::screenshot::shot;
 
 const RED: Vec4 = Vec4::new(1.0, 0.0, 0.0, 1.0);
 
+/// A 2 m sign 5 m from `shot`'s camera: pixels ~25..71 both ways, its centre 48.
 fn sign(scene: &mut Scene) -> u32 {
     let sign = CanvasComponent {
         render_mode: CanvasRenderMode::WorldSpace,

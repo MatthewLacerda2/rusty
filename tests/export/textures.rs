@@ -42,6 +42,7 @@ fn an_images_compressed_copy_ships_and_a_play_test_writes_none() {
         shipped.contains_key("assets/textures/broken.png"),
         "as it is"
     );
+    // `play` is the headless play-test, which seeds as the editor does, not the read-only player.
     let (ran, _) = play(&out, &[]);
     assert!(ran.status.success());
     let after = tree(&out);
@@ -49,6 +50,7 @@ fn an_images_compressed_copy_ships_and_a_play_test_writes_none() {
         let copies = t.iter().filter(|(k, _)| k.ends_with(".bctex"));
         copies.map(|(k, b)| (k.clone(), b.clone())).collect()
     };
+    // More than `bricks.png`: the export seeds the starter content, an image among it.
     assert!(
         compressed(&shipped).len() > 1,
         "the seeded image ships compressed"

@@ -1,8 +1,5 @@
 //! The height map's parallax occlusion: a 16 m plane of four repeats of a step, white/high then
-//! black/low, so the black left in the frame shows where the march lands:
-//!   - Grazing, upper steps hide the lower ones, more as the angle lowers.
-//!   - Head-on, at `height_scale` 0, or with no map, it is flat.
-//!   - Past the fade it draws as flat; along a ridge the mip stays the flat one (`ridges`).
+//! black/low, so the black left in the frame shows where the march lands.
 
 mod filtering;
 mod mips;
@@ -79,6 +76,7 @@ fn the_upper_steps_hide_more_of_the_lower_as_the_view_grazes() {
         eprintln!("[height-map] {degrees}°: black share flat {a:.3}, marched {b:.3}");
         drops.push(a - b);
     }
+    // Drops in the plane's black share; lavapipe 0.057 at 30°, 0.134 at 15°.
     assert!(
         drops[0] > 0.02,
         "the lower steps are partly hidden: {drops:?}"
@@ -105,7 +103,7 @@ fn head_on_at_zero_scale_and_without_a_map_it_draws_flat() {
     };
     let (head_on, zero) = (diff(&f[0], &f[1]), diff(&f[2], &f[3]));
     eprintln!("[height-map] head-on {head_on:.3}, scale 0 {zero:.3}");
-    // Measured head-on: RTX 2060 0.808, lavapipe 1.014.
+    // Measured head-on on lavapipe: 0.882.
     assert!(head_on < SAME, "head-on it matches the flat: {head_on:.3}");
     assert_eq!(zero, 0.0, "a scale of 0 draws byte-identically");
     assert_eq!(diff(&f[3], &f[4]), 0.0, "so does a map with no texture");
@@ -122,7 +120,8 @@ fn missing_map() -> MaterialAsset {
 
 #[test]
 fn past_the_fade_distance_it_draws_flat() {
-    // 1024 repeats over 16 m: even the nearest row is past HDRP's `_PPDLodThreshold`.
+    // 1024 repeats over 16 m: even the nearest row reads past `LOD_THRESHOLD` (mip 5, HDRP's
+    // default) and its one-mip fade, so nothing marches.
     let cam = grazing(15.0);
     let flat = frame(stepped(1024.0, None), &cam, "rusty_2191_far_flat.png");
     let marched = frame(stepped(1024.0, Some(0.2)), &cam, "rusty_2191_far_pom.png");
@@ -132,6 +131,6 @@ fn past_the_fade_distance_it_draws_flat() {
     };
     let d = diff(&flat, &marched);
     eprintln!("[height-map] past the fade: {d:.3}");
-    // Measured: RTX 2060 0.000, lavapipe 0.000.
+    // Measured on lavapipe: 0.000.
     assert!(d < SAME, "a far surface is not displaced: {d:.3}");
 }

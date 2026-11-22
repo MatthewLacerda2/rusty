@@ -21,6 +21,7 @@ pub(super) fn level(dir: &std::path::Path) -> String {
     path
 }
 
+/// A loader whose job reports finished only after `after` asks: a worker still running.
 pub(super) struct Late {
     inner: Inline,
     after: u32,

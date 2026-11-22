@@ -1,7 +1,7 @@
 //! Emissive-factor visual test: the renderer reads a material's flat `emissive` factor and adds
-//! it to the lit colour through `MaterialData`. Zero ambient and no lights, so only the
-//! emissive term in `fs_main` can brighten a black-base box; a factor >1.0 also exercises the
-//! HDR target and bloom bright-pass.
+//! it to the lit colour through `MaterialData`. Zero ambient and no lights on a black-base
+//! box leave the emissive term the only light; the third shot, a factor >1.0, also turns
+//! bloom on to exercise the HDR target and its bright pass.
 
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;

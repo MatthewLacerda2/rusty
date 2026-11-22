@@ -1,8 +1,7 @@
 //! An object between two blended box probes reflects them without a seam: a flattened
 //! sphere straddles two boxes meeting at x = 0, both holding one smooth cube, so only
-//! a jump in projection draws a step. A fragment past a box face once fell to infinite
-//! projection (a hard step); it now projects against the box, oriented boxes too.
-//! Skips without an adapter.
+//! a jump in projection draws a step. A fragment just past a box face, oriented or not,
+//! still projects against the box, fading smoothly to infinite projection.
 
 use crate::gpu::reflection_probe_per_object_screenshot::cube_ktx2;
 use glam::Vec3;
@@ -14,7 +13,8 @@ use rusty::scene::{Camera, Scene};
 
 const CUBE: u32 = 32;
 
-/// Face `f`'s texels: linear `0.5 + 0.5 * dir`, continuous across faces.
+/// Face `f`'s texels: linear `0.5 + 0.5 * dir` in the Vulkan cube face layout, continuous
+/// across faces.
 fn gradient_face(f: usize) -> Vec<Vec3> {
     let n = CUBE as f32;
     (0..CUBE * CUBE)
@@ -84,7 +84,6 @@ fn largest_step(img: &image::RgbImage) -> i32 {
 fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
     let cam = Camera::new(Vec3::new(0.0, 3.0, 4.0), -90.0, -50.0);
     let mut host = CaptureHost::new();
-    // The cube's own gradient and dither stay under 16.
     for turn in [0.0, 0.5] {
         let path = crate::temp::dir().join(format!("rusty_gpu_1995_seam_{turn}.png"));
         if !capture_into(&mut host, &scene(turn), &cam, &path, 160, 96).expect("capture") {
@@ -96,6 +95,8 @@ fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
             "[probes] turn {turn}: largest step {step} ({})",
             path.display()
         );
+        // Summed RGB bytes: the cube's own gradient and dither (9 and 8 on lavapipe) stay
+        // under 36; a hard step down the boxes' shared face would not.
         assert!(
             step < 36,
             "turn {turn}: a seam across the floor, step {step}"

@@ -21,6 +21,7 @@ fn add_step(scene: &mut Scene, edge: f32) {
     add_box(scene, center, size, Quat::IDENTITY);
 }
 
+/// 0.2 m is under the 0.3 m step offset: a static block this tall would be climbed.
 #[test]
 fn never_climbs_a_dynamic_block() {
     let mut scene = Scene::new();
@@ -33,13 +34,13 @@ fn never_climbs_a_dynamic_block() {
     walk_for(&mut physics, &mut scene, id, Vec3::X * 4.0, 75);
     let feet = feet_of(&scene, id);
     assert!(feet.y < 0.1, "climbed it: {feet}");
+    // Its face, wherever the walk nudged it: the capsule's rounded bottom stops on the edge.
     let face = pos_of(&scene, block).x - 2.0;
     let x = pos_of(&scene, id).x;
     assert!(x < face - 0.3, "on top of it, face at {face}: x={x}");
 }
 
-/// A static step climbed while sliding along a dynamic crate's side is climbed
-/// as without the crate: the crate is beside the walk, not what it stepped onto.
+/// A static step is climbed while sliding along a dynamic crate's side.
 #[test]
 fn climbs_a_static_step_beside_a_dynamic_crate() {
     let mut scene = Scene::new();
@@ -50,6 +51,7 @@ fn climbs_a_static_step_beside_a_dynamic_crate() {
     make_dynamic(&mut scene, crate_);
     let id = add_character(&mut scene, Vec3::new(0.0, 0.0, -0.05));
     let mut physics = PhysicsWorld::from_scene(&scene);
+    // The 0.5 m/s of z leans into the crate, so every slide touches its side.
     let last = walk_for(&mut physics, &mut scene, id, Vec3::new(4.0, 0.0, 0.5), 75);
     let feet = feet_of(&scene, id);
     assert!(feet.x > 3.0, "walked onto the step: {feet}");
@@ -57,9 +59,8 @@ fn climbs_a_static_step_beside_a_dynamic_crate() {
     assert!(last.grounded, "grounded on the step");
 }
 
-/// A can on the tread, just past the step's edge, is in the way of autostep's
-/// room check but is a dynamic body, which that check ignores: the walk still
-/// steps up, and the can then stops it on the tread.
+/// A can just past the step's edge is in the way of autostep's room check, which ignores
+/// dynamic bodies: the walk still steps up, then the can stops it on the tread.
 #[test]
 fn a_can_on_the_tread_does_not_refuse_the_step() {
     let mut scene = Scene::new();

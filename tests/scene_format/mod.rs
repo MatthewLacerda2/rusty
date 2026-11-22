@@ -1,6 +1,7 @@
 //! Pins the scene file format: a change to what a `.scene` or `.prefab` file
 //! holds must update `scene.fingerprint` beside this file, so it is a decision
-//! someone saw, not a side effect.
+//! someone saw, not a side effect. A place read as `any` (an untagged enum, a
+//! `serde_json::Value`) hides what it holds: a change inside one passes.
 
 mod access;
 mod de;

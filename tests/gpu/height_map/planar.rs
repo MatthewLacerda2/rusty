@@ -89,8 +89,7 @@ fn a_planar_wall_draws_stretched_and_a_planar_floor_still_marches() {
     };
     let (wall, floor) = (diff(&wall_flat, &wall_pom), diff(&floor_flat, &floor_pom));
     eprintln!("[height-map] planar wall {wall:.3}, planar floor {floor:.3}");
-    // Measured: the wall RTX 2060 0.000, lavapipe 0.545 (37.4 when the march ran
-    // there); the floor RTX 2060 41.0, lavapipe 40.9.
+    // Measured on lavapipe: the wall 0.000 (37.4 when the march ran there), the floor 41.4.
     assert!(wall < SAME, "the wall draws as without the map: {wall:.3}");
     assert!(floor > SAME, "the floor is displaced: {floor:.3}");
 }

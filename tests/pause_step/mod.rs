@@ -4,6 +4,7 @@ mod step_pump;
 use rusty::dev::harness::Harness;
 use rusty::time::FIXED_DELTA_TIME;
 
+/// `GameWorld::paused_frame`'s step loop, copied: a change to that loop is made here too.
 fn drain_steps(h: &Harness) -> u32 {
     let mut ran = 0;
     loop {

@@ -88,6 +88,7 @@ pub fn run(dir: &str, frames: u32) -> String {
     write(&workspace, DIRECTOR_PATH, DIRECTOR);
     write(&workspace, BOX_PATH, BOX);
     {
+        // Before the first step: Play starts on the first tick, so its copy holds these.
         let world = h.world.borrow();
         let mut scene = world.scene().borrow_mut();
         for i in 0..16 {

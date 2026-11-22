@@ -99,6 +99,8 @@ fn each_object_reflects_the_probe_whose_box_holds_it() {
         return;
     }
     let img = image::open(&path).expect("png").to_rgb8();
+    // The camera is 1.5 m right of the red sphere and 2.5 m left of the green: red lands
+    // left of the centre, green right of it.
     let (w, h) = (img.width(), img.height());
     let left = red_green(&img, w / 2 - w / 6, h / 2);
     let right = red_green(&img, w / 2 + w / 4, h / 2);

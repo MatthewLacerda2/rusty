@@ -1,3 +1,5 @@
+//! Physics syncs only what the change log names: each test is a Play edit it must still see.
+
 use glam::Vec3;
 use rusty::components::{ColliderComponent, ColliderShape};
 use rusty::edit::authoring::{default_collider, default_rigidbody};

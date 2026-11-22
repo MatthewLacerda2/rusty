@@ -1,18 +1,16 @@
--- Four automatic weapons' per-tick load through the game API: prefab instances spawned and
--- destroyed (one under a soldier's hand bone), muzzle-flash meshes toggled, a decal stamped (oldest
--- dropped at its cap), a pickup re-parented, a raycast a shot. Each instance lives a fixed number
--- of ticks, so after LIFETIME and DECALS ticks live counts hold still: the window measures churn,
--- not growth. Deterministic.
+-- Four automatic weapons' per-tick load through the game API. Each instance lives LIFETIME ticks
+-- and the oldest decal drops past DECALS, so live counts then hold still: the window measures
+-- churn, not growth. Deterministic.
 
-local SHOOTERS = 4
-local SPAWNS = 4
+local SHOOTERS = 4  -- the first soldiers, or fewer
+local SPAWNS = 4    -- spawned a tick, as many destroyed
 local LIFETIME = 30 -- ticks an instance lives
-local MUZZLES = 8
-local TOGGLES = 2
-local DECALS = 64
-local RAYS = 4
+local MUZZLES = 8   -- two on each shooter's hand
+local TOGGLES = 2   -- muzzles toggled a tick
+local DECALS = 64   -- kept, one stamped a tick
+local RAYS = 4      -- raycasts a tick
 local RANGE = 60    -- metres
-local CHEST = 1.0
+local CHEST = 1.0   -- metres above the Player's pivot a shot aims
 
 local Firefight = {
     fields = {
@@ -49,7 +47,7 @@ end
 
 local function box(name, parent, x, y, z, sx, sy, sz)
     local id = Scene.CreateEntity(name, "Box")
-    Scene.RemoveComponent(id, "Collider")
+    Scene.RemoveComponent(id, "Collider") -- draw-only
     if parent then
         Scene.SetParent(id, parent)
         Transform.SetLocalPosition(id, x, y, z)

@@ -35,6 +35,7 @@ impl Ui {
         game.resources.screen.borrow_mut().set_game_view(1920, 1080);
         game.set_playing(true);
         let mut ui = Self { game, console };
+        // One tick, so every widget's script has woken before a test drives it.
         ui.tick(1);
         ui.eval("Input.SetCursorLocked(false)");
         ui

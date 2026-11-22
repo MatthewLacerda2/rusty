@@ -9,6 +9,7 @@ use rusty::dev::harness::Harness;
 use rusty::dev::scenario;
 
 const BOT: &str = "assets/scripts/bot.lua";
+/// The taint every harness demo carries: its scene is built, not loaded.
 const NO_FILE: &str = "Play started on a scene with no file";
 
 /// Kill the bot on the second tick: its `OnTakeDamage` marks it dead, and a dead
@@ -21,6 +22,8 @@ Harness.Expect(Scene.GetScript(bot, "bot").health <= 0, "its handler ran")
 Harness.Step(238)
 "#;
 
+/// Before the first step there is no gameplay VM, so the scenario's own `Move` runs: the
+/// replay must make it the same way.
 const MOVE_FIRST: &str = r#"
 local player = Scene.FindEntityByName("Player")
 CharacterController.Move(player, 1, 0, 0)

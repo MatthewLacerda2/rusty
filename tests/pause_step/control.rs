@@ -30,6 +30,7 @@ fn step_is_a_no_op_unless_paused() {
 fn pause_keeps_play_state_unlike_stop() {
     let h = Harness::new(crate::temp::dir().join("rusty_pause_not_stop"), "");
     let player = player_id(&h);
+    // Play starts on the first step, so the mutation below is the play copy's.
     h.step(1);
     {
         let world = h.world.borrow();

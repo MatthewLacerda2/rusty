@@ -21,6 +21,7 @@ end
 
 const TINTED: &str = "tint = { 0.5, 0.5, 0.5 }";
 
+/// Out of reach of per-prop draws: at least 300 props are on screen, as asserted below.
 const DRAW_CALL_BUDGET: f64 = 100.0;
 
 #[test]

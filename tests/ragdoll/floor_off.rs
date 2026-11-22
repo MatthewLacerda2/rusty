@@ -1,5 +1,4 @@
-//! A ragdoll at rest on a floor whose parent goes inactive during Play falls
-//!: physics syncs only what the change log names, and a parent's
+//! A ragdoll at rest on a floor whose parent goes inactive during Play falls: a parent's
 //! `SetActive` names the floor below it, which the ragdoll's bodies must feel.
 
 use rusty::scene::Scene;
