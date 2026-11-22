@@ -20,6 +20,13 @@ Code and moves with every new model, so this skill only says when to run it,
 how to dispatch it without bias, and what to do with what it finds; it never
 restates how to review.
 
+**The reviewer answers two questions: was the job done (does the PR deliver what
+its issue asks), and did it produce a new problem.** It does not propose
+improvements, and it does not look for defects in code the PR left alone: a
+finding there is reported only when this PR makes it reachable or worse. The
+prompt carries the steering lists below and nothing that sends it hunting
+further.
+
 ## When
 
 Before the `queue` label (`issue-batch`, the orchestrator's read), when the PR
@@ -132,6 +139,10 @@ branch (`pr<n>`, `pr<n>-review`) outlives your worktree in the shared
 repository. You are read-only: no edits, commits, pushes or comments,
 and no builds.
 
+Your job is two questions: does this PR deliver what its issue asks, and does
+it produce a new problem? Propose no improvement, and report a defect in code
+the PR left alone only when this PR makes it reachable or worse.
+
 Look especially for: <the steering lists for the PR's nature, pasted whole>.
 
 Start your answer with the level you ran at and why, in one line. Then answer
@@ -192,7 +203,9 @@ code first, then:
    a structural or tooling crack. A finding nobody would hit, a hypothetical edge,
    a test that could be stronger, a style nit: fold it in only when it costs a line,
    otherwise drop it, and don't file it. A reviewer told to look hard always finds
-   more; most of it is noise for this project.
+   more; most of it is noise for this project. A defect outside the PR gets an
+   issue only when it is a crash, data loss, an escape from the sandbox or a break
+   of determinism that someone can reach; anything else is dropped.
 1. **Must-fix** findings go back to the coder, never to the orchestrator's own
    hands: a local coder is resumed with `SendMessage`; a cloud coder gets a new
    `Brief` comment listing them and a fresh routine (`issue-batch`, *The brief
