@@ -4,9 +4,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Quat, Vec3};
 
-/// Seconds.
+/// A hit reaction's length when the call names none, in seconds.
 pub const REACT_DURATION: f32 = 0.4;
-/// 1/s².
+/// A hit reaction's drive strength when the call names none, in 1/s².
 pub const REACT_STRENGTH: f32 = 5000.0;
 
 /// The damping, in 1/s, that settles a drive of `strength` fastest without overshoot.

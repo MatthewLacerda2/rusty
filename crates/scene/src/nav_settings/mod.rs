@@ -67,7 +67,7 @@ impl NavMeshSettings {
     }
 }
 
-/// Between generated links along one edge.
+/// The spacing of generated links along one edge.
 pub const DEFAULT_LINK_SPACING: f32 = 2.0;
 
 fn default_link_spacing() -> f32 {

@@ -8,13 +8,13 @@ use rusty_components::{CapsuleAxis, ColliderShape};
 /// Above this ratio of the two cross-section extents a part is flat (a chest) and gets a box.
 const FLAT_RATIO: f32 = 1.5;
 
-/// Joint units, so a flat cluster never yields a zero-thickness box.
+/// The thinnest box extent, in joint units, so a flat cluster never yields a zero one.
 const MIN_THICKNESS: f32 = 1.0e-3;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct HitboxOptions {
     pub bones: Option<Vec<String>>,
-    /// In the model's own units, before the entity's scale.
+    /// The span a bone needs for a hitbox of its own, in model units before scaling.
     pub min_size: f32,
     pub layer: String,
 }

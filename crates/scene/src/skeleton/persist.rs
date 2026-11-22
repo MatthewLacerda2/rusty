@@ -21,7 +21,8 @@ pub fn strip_bones(entities: &mut Vec<Entity>) {
     if bone_of.is_empty() {
         return;
     }
-    // Before the bones are recorded, so a joint to another skeleton's bone saves it by name.
+    // Repointed before the bones are recorded, so a joint to another skeleton's bone saves
+    // that bone by name too.
     repoint_refs(entities, &bone_of);
     for i in 0..entities.len() {
         let Some(mesh) = &entities[i].mesh else {
