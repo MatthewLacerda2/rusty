@@ -1,9 +1,4 @@
-//! IK end to end, through the real `GameWorld::tick` on the hitbox tests'
-//! five-bone rig (`pelvis → spine → {head, arm → finger}`): a script-set target
-//! is reached and skinned, the arm's hitbox follows the IK'd pose, an aim chain
-//! clamps without drifting, weight 0 is an exact no-op, a ragdolled bone is left
-//! to physics, a mirrored rig reaches as well as a plain one, and the
-//! whole path is deterministic.
+//! IK end to end through `GameWorld::tick` on the hitbox tests' five-bone rig: a script-set target is reached and skinned, the arm's hitbox follows, an aim chain clamps without drifting, weight 0 is a no-op, a ragdolled bone is left to physics, mirrored rigs work, deterministic.
 
 mod aim;
 mod api;
@@ -22,13 +17,11 @@ use crate::hitboxes::rig;
 /// Within the arm's reach from the spine (0.39 + 0.35).
 pub const TARGET: Vec3 = Vec3::new(0.3, 1.7, 0.3);
 
-/// `Start` gives the rig a two-bone arm reaching for [`TARGET`].
 pub const REACH: &str = "return { Start = function(id)\n\
   Animator.AddTwoBoneIK(id, 'Arm', 'spine', 'arm', 'finger')\n\
   Animator.SetIKTarget(id, 'Arm', 0.3, 1.7, 0.3)\n\
   Animator.SetIKHint(id, 'Arm', 0.3, 3, 0)\nend }";
 
-/// The rig (with an idle Animator) running `script`, mutated by `setup`.
 pub fn rig_with(script: &str, setup: impl FnOnce(&mut Scene, u32)) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = rig::character(&mut scene, Vec3::ZERO, false);
@@ -51,7 +44,6 @@ fn hash(s: &str) -> u64 {
     })
 }
 
-/// Play `scene` for `ticks` fixed steps; the world is returned for its physics.
 pub fn play(scene: Scene, ticks: usize) -> GameWorld {
     let mut gw = crate::play::playing(Rc::new(RefCell::new(scene)), 5.0);
     crate::play::run(&mut gw, ticks);
@@ -81,7 +73,6 @@ fn a_script_set_target_is_reached_and_the_skin_follows() {
     assert!(skinned.abs_diff_eq(TARGET, 1e-4), "skinned at {skinned:?}");
 }
 
-/// [`REACH`], with `LateUpdate` sliding the target 0.2 along -Z every tick.
 const SLIDE: &str = "local z = 0.3\n\
 return { Start = function(id)\n\
   Animator.AddTwoBoneIK(id, 'Arm', 'spine', 'arm', 'finger')\nend,\n\
@@ -89,7 +80,6 @@ return { Start = function(id)\n\
   z = z - 0.2\n\
   Animator.SetIKTarget(id, 'Arm', 0.3, 1.7, z)\nend }";
 
-/// The bone a straight-down ray over `at` strikes.
 fn struck(gw: &GameWorld, at: Vec3) -> Option<u32> {
     let physics = gw.resources.physics.borrow();
     let hit = physics

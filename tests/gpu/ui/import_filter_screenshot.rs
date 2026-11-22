@@ -10,8 +10,7 @@ use rusty::scene::Scene;
 use super::super::render_texture_scene::screen_camera;
 use super::mask_scene::{element, overlay, px, shoot};
 
-/// A `cells`² black/white checker sprite written to disk with `filter` in its
-/// sidecar (the rest left at the defaults: Repeat, mips), returned as its path.
+/// A `cells`² checker sprite with `filter` in its sidecar, the rest default.
 fn checker(cells: u32, filter: FilterMode) -> String {
     let settings = TextureSettings {
         filter_mode: filter,
@@ -20,8 +19,6 @@ fn checker(cells: u32, filter: FilterMode) -> String {
     checker_with(cells, settings)
 }
 
-/// A `cells`² black/white checker sprite written to disk with `settings` in its
-/// sidecar, returned as its path.
 pub(super) fn checker_with(cells: u32, settings: TextureSettings) -> String {
     let (filter, mips) = (settings.filter_mode, settings.generate_mipmaps);
     let name = format!("rusty_ui_checker_{cells}_{filter:?}_{mips}.png");
@@ -35,8 +32,6 @@ pub(super) fn checker_with(cells: u32, settings: TextureSettings) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A 96-unit square at (16, 16) showing `texture`: each of a 4² checker's cells is
-/// 24 pixels wide.
 fn shot(texture: String, name: &str) -> Option<image::RgbImage> {
     let mut scene = Scene::new();
     let root = overlay(&mut scene);
@@ -45,8 +40,6 @@ fn shot(texture: String, name: &str) -> Option<image::RgbImage> {
     shoot(&scene, &screen_camera(), name).map(|(img, _)| img)
 }
 
-/// The pixels of row `y` across the image's 96 columns that are neither black nor
-/// white: the blend a linear filter draws at each cell edge.
 fn greys(img: &image::RgbImage, y: u32) -> usize {
     let row = (16..112).map(|x| px(img, x, y)[0]);
     row.filter(|&v| (24..232).contains(&v)).count()
@@ -58,7 +51,6 @@ fn a_point_filtered_ui_image_draws_crisp_texels() {
         return;
     };
     assert_eq!(greys(&img, 52), 0, "Point: no blended column");
-    // The bottom-left cell is (0, 3) in the image: black; its neighbour white.
     assert!(px(&img, 17, 17)[0] < 24, "{:?}", px(&img, 17, 17));
     assert!(px(&img, 41, 17)[0] > 232, "{:?}", px(&img, 41, 17));
 }

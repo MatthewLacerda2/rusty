@@ -1,8 +1,5 @@
-//! Soft and shaped UI masks, headless: the headline round minimap — a
-//! render texture shown through a circular soft Mask — a feathered scroll list,
-//! and two nested Masks multiplying. Asserted at known pixels (`px` takes UI
-//! coordinates: bottom-left origin). Child rects are placed relative to their
-//! parent's bottom-left corner.
+//! Soft and shaped UI masks, headless: a round minimap, a feathered scroll list, and two
+//! nested Masks multiplying. Asserted at known pixels.
 
 use glam::Vec4;
 use rusty::components::{ImageComponent, RectMaskComponent, ShapeComponent, ShapeKind};
@@ -15,7 +12,6 @@ use super::mask_scene::{element, hidden_mask, minimap_world, overlay, shoot, sof
 const WHITE: Vec4 = Vec4::ONE;
 const BLACK: Vec4 = Vec4::new(0.0, 0.0, 0.0, 1.0);
 
-/// A scene whose overlay canvas starts with an opaque black backdrop.
 fn black_canvas() -> (Scene, u32) {
     let mut scene = Scene::new();
     let root = overlay(&mut scene);
@@ -23,9 +19,8 @@ fn black_canvas() -> (Scene, u32) {
     (scene, root)
 }
 
-/// Red-dominant by a ratio, not pure: the red box's plastic reflects a little sky
-/// at an angle (red at least 4x its other channels on lavapipe and Metal),
-/// while the half-sky rim (about 2x) and the sky (about 1x) stay out.
+/// Red-dominant by a ratio, not pure (the plastic reflects a little sky): red at least 4x the
+/// other channels on lavapipe and Metal; the half-sky rim (~2x) and the sky (~1x) stay out.
 fn is_red(p: [u8; 3]) -> bool {
     let rest = u16::from(p[1].max(p[2]));
     p[0] > 150 && u16::from(p[0]) >= 3 * rest
@@ -35,7 +30,6 @@ fn is_red(p: [u8; 3]) -> bool {
 fn a_minimap_shows_its_render_texture_through_a_circular_soft_mask() {
     let mut scene = minimap_world();
     let root = overlay(&mut scene);
-    // A 96-unit circle frame at (16, 16), its edge fading over 8 texels; centre (64, 64).
     let frame = element(&mut scene, root, [16.0, 16.0, 96.0, 96.0], WHITE);
     let circle = ImageComponent {
         texture: Some(soft_circle(96, 8.0).into()),
@@ -54,10 +48,8 @@ fn a_minimap_shows_its_render_texture_through_a_circular_soft_mask() {
         "near the top edge: {:?}",
         px(&img, 64, 104)
     );
-    // The frame's corner is inside its square but outside the circle.
     let corner = px(&img, 20, 20);
     assert!(!is_red(corner), "masked-out corner (the sky): {corner:?}");
-    // The edge is soft: half a fade in from the rim is partly red.
     let (rim, inside) = (px(&img, 64, 16 + 4), px(&img, 64, 16 + 12));
     assert!(
         !is_red(rim) && is_red(inside),
@@ -72,7 +64,6 @@ fn a_minimap_shows_its_render_texture_through_a_circular_soft_mask() {
 #[test]
 fn a_feathered_rect_mask_fades_a_list_at_its_edges() {
     let (mut scene, root) = black_canvas();
-    // A viewport over y 32..96 feathered by 16; its content overflows it.
     let view = element(&mut scene, root, [0.0, 32.0, 128.0, 64.0], Vec4::ZERO);
     let soft = RectMaskComponent {
         feather: 16.0,
@@ -98,8 +89,6 @@ fn a_feathered_rect_mask_fades_a_list_at_its_edges() {
 #[test]
 fn nested_masks_multiply() {
     let (mut scene, root) = black_canvas();
-    // A circle of radius 48 around (64, 64), then a rect Mask (no Image) over the
-    // right half of the canvas inside it.
     let outer = element(&mut scene, root, [16.0, 16.0, 96.0, 96.0], WHITE);
     let circle = ImageComponent {
         texture: Some(soft_circle(96, 1.0).into()),

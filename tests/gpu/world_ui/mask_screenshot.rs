@@ -18,8 +18,6 @@ use super::screenshot::shot;
 
 const RED: Vec4 = Vec4::new(1.0, 0.0, 0.0, 1.0);
 
-/// A 2×2 m, 400-unit sign at the origin, 5 m in front of the camera: it spans
-/// pixels ~25..71 on both axes, its centre at 48.
 fn sign(scene: &mut Scene) -> u32 {
     let sign = CanvasComponent {
         render_mode: CanvasRenderMode::WorldSpace,
@@ -34,7 +32,6 @@ fn sign(scene: &mut Scene) -> u32 {
 fn a_child_overflowing_its_mask_is_cut_at_the_mask_edge() {
     let mut scene = dark_scene();
     let sign = sign(&mut scene);
-    // The mask is the sign's left half (fully transparent itself).
     let mut half = fill();
     half.anchor_max = Vec2::new(0.5, 1.0);
     let mask = image(&mut scene, sign, half, Vec4::ZERO);
@@ -60,7 +57,6 @@ fn a_world_space_scroll_view_clips_its_content_to_the_viewport() {
     let sign = sign(&mut scene);
     let view = create_ui(&mut scene, UiWidget::ScrollView, Some(sign));
     let content = part(&scene, view, "Viewport/Content");
-    // A 600-tall red item in a 380-tall viewport: 220 units hang below the sign.
     let item = image(&mut scene, content, fill(), RED);
     let tall = LayoutElementComponent {
         preferred_height: Some(600.0),

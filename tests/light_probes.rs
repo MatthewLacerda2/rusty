@@ -1,29 +1,19 @@
-//! Light probes: SH probe data model + analytic ambient sampling.
-//!
-//! Headless + deterministic. Asserts (1) probe POSITIONS round-trip through the
-//! scene document while the baked SH round-trips through the `<scene>.lighting.json`
-//! sidecar, and (2) a NON-UNIFORM analytic fill produces POSITION-DEPENDENT ambient
-//! irradiance — the directional bounced light that replaces the old flat ambient
-//! constant. No GPU; the analytic fill is pure scene-value math.
+//! SH probe data model + analytic ambient sampling: positions round-trip through the scene document, baked SH through the `<scene>.lighting.json` sidecar, and a non-uniform analytic fill gives position-dependent ambient. No GPU.
 
 use crate::temp::path as tmp;
 use glam::Vec3;
 use rusty::scene::{analytic_fill, sidecar_path, Scene};
 
-/// The whole-path acceptance: a height-varying analytic fill makes the sampled
-/// ambient depend on POSITION, unlike the old constant hemispherical term.
 #[test]
 fn analytic_fill_is_position_dependent() {
     let mut scene = Scene::new();
     scene.ambient_color = Vec3::new(0.2, 0.3, 0.4);
     scene.ambient_intensity = 1.0;
-    // A vertical column of probes so the fill varies with height.
     scene
         .probes
         .fill_grid(Vec3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 8.0, 0.0), 2.0);
     analytic_fill(&mut scene);
 
-    // Sample the interpolated irradiance (up-facing normal) low vs high.
     let low = scene
         .probes
         .sample(Vec3::new(0.0, 0.0, 0.0))
@@ -39,7 +29,6 @@ fn analytic_fill_is_position_dependent() {
         high.x > low.x + 1.0e-3,
         "ambient should vary with position: low={low} high={high}"
     );
-    // And the midpoint trilinearly interpolates between them.
     let mid = scene
         .probes
         .sample(Vec3::new(0.0, 4.0, 0.0))
@@ -48,8 +37,6 @@ fn analytic_fill_is_position_dependent() {
     assert!(mid.x > low.x && mid.x < high.x, "mid={mid} not between");
 }
 
-/// Probe positions live in the scene; baked SH lives in the sidecar. Both survive a
-/// save → load round-trip, and the SH is keyed by probe index.
 #[test]
 fn positions_in_scene_sh_in_sidecar_round_trip() {
     let mut scene = Scene::new();
@@ -67,7 +54,6 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
     let _ = std::fs::remove_file(&sidecar);
     rusty::edit::save_to_file(&scene, &path).unwrap();
 
-    // The scene doc carries positions but NOT the SH (sidecar holds it).
     let scene_json = std::fs::read_to_string(&path).unwrap();
     assert!(
         scene_json.contains("\"probes\""),
@@ -86,12 +72,10 @@ fn positions_in_scene_sh_in_sidecar_round_trip() {
         loaded.probes.probes()[0].position,
         scene.probes.probes()[0].position
     );
-    // SH merged back from the sidecar, index-aligned.
     assert_eq!(loaded.probes.probes()[probe_count - 1].sh, baked);
 }
 
-/// A scene with placed-but-unbaked probes writes no sidecar (zero SH); load leaves
-/// the probes at zero SH, which the shader treats as "no probe" fallback.
+/// Placed-but-unbaked probes write no sidecar; load leaves them at zero SH, which the shader treats as no probe.
 #[test]
 fn unbaked_probes_write_no_sidecar() {
     let mut scene = Scene::new();

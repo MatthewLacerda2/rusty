@@ -1,6 +1,4 @@
-//! Agent steering by its numbers, through `tick_nav_agents`: how far one tick from
-//! rest moves, that an agent inside its stopping distance holds still and slows, and
-//! that a waypoint already reached is passed, not chased.
+//! Agent steering by its numbers, through `tick_nav_agents`.
 
 use glam::Vec3;
 use rusty::navigation::NavigationGraph;
@@ -48,12 +46,10 @@ fn velocity_step_multiplies_not_divides() {
     );
 }
 
-/// An agent already inside its stopping distance decelerates in place: it does
-/// not steer on toward the destination.
 #[test]
 fn agent_within_stopping_distance_does_not_advance() {
     let target = Vec3::new(10.0, 0.0, 0.0);
-    let start = Vec3::new(9.95, 0.0, 0.0); // dist = 0.05 < stopping_distance = 0.1
+
     let mut scene = Scene::new();
     let id = spawn(&mut scene, start, agent_toward(target));
     open_graph().tick_nav_agents(&mut scene, 1.0 / 60.0);

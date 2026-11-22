@@ -24,7 +24,6 @@ pub(super) fn shot(scene: &rusty::scene::Scene, name: &str) -> Option<image::Rgb
 #[test]
 fn a_wall_occludes_a_world_canvas() {
     let mut scene = dark_scene();
-    // A 4×4 m red sign at the origin, facing the camera 5 m away.
     let sign = CanvasComponent {
         render_mode: CanvasRenderMode::WorldSpace,
         reference_resolution: Vec2::splat(400.0),
@@ -70,8 +69,6 @@ fn a_wall_occludes_a_world_canvas() {
     assert!(img.pixels().all(|p| !dominant(p.0, 0)), "nothing red");
 }
 
-/// A dark scene with a `ScreenSpaceCamera` canvas 1 m out whose middle quarter
-/// is green, and a blue wall filling the view 5 m out, behind the plane.
 fn visor_scene() -> rusty::scene::Scene {
     let mut scene = dark_scene();
     let visor = CanvasComponent {
@@ -96,7 +93,6 @@ fn a_camera_canvas_fills_the_view_in_front_of_the_world() {
     let Some(img) = shot(&scene, "rusty_world_ui_visor.png") else {
         return;
     };
-    // Pixel rows run top-down; `at` takes UI pixels (bottom-left, y-up).
     let at = |y: u32| img.get_pixel(SIZE / 2, SIZE - 1 - y).0;
     assert!(dominant(at(SIZE / 2), 1), "centre: {:?}", at(SIZE / 2));
     assert!(dominant(at(30), 1), "inside the quarter: {:?}", at(30));

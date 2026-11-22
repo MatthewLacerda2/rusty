@@ -8,10 +8,7 @@ use serde_json::Value;
 
 use rusty::dev::mcp::{self, attach::SocketClient};
 
-/// Per-connection: read each command line and reply with a framed JSON line that
-/// echoes the received line back as the `result`, so a test can assert the exact line
-/// crossed the socket. A line that asks for progress (`ASK`) streams one
-/// progress line first and has the ask taken off.
+/// Replies to each command line with a framed JSON line echoing it as `result`; a line asking for progress (`ASK`) streams one progress line first and has the ask removed.
 fn serve(stream: UnixStream) {
     let mut writer = match stream.try_clone() {
         Ok(w) => w,
@@ -22,7 +19,6 @@ fn serve(stream: UnixStream) {
         if line.trim().is_empty() {
             continue;
         }
-        // A line that asks hears a progress line first, as a window's bake tells.
         let (asked, line) = rusty::dev::command_channel::asks(&line);
         let line = line.to_string();
         if asked {
@@ -36,13 +32,10 @@ fn serve(stream: UnixStream) {
     }
 }
 
-/// Spawn a fake engine on a fresh address and return that address for
-/// `SocketClient::new`. The accept loop handles one connection at a time — all the
-/// per-call-connecting client needs.
+/// Spawn a fake engine on a fresh address; the accept loop handles one connection at a time.
 pub(super) fn fake_engine() -> String {
     use std::sync::atomic::{AtomicU32, Ordering};
-    // Cargo runs the tests in one process, so a process-id path would collide between
-    // tests; a per-bind counter keeps each fake engine's socket distinct.
+    // A per-bind counter, not the process id: tests share one process.
     static NEXT: AtomicU32 = AtomicU32::new(0);
     // lint: allow(test-static-write) a unique-name counter: no test reads its value back, so sharing it is the point
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -59,8 +52,6 @@ pub(super) fn fake_engine() -> String {
     path.display().to_string()
 }
 
-/// Drive JSON-RPC lines through the attach backend against `addr` and parse the
-/// response lines.
 pub(super) fn drive(addr: String, lines: &[&str]) -> Vec<Value> {
     let backend = SocketClient::new(Some(addr));
     let input = lines.join("\n").into_bytes();

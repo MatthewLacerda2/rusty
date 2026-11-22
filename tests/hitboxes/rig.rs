@@ -50,7 +50,6 @@ const BONES: [Bone; 5] = [
     ),
 ];
 
-/// The arm bone's local bind translation, under the spine.
 pub const ARM_LOCAL: Vec3 = Vec3::new(0.25, 0.3, 0.0);
 
 fn skin() -> SkinData {
@@ -94,7 +93,6 @@ fn vertices() -> Vec<Vertex> {
     out
 }
 
-/// `Swing`: the arm slides from its bind spot to +6 on Z over one second.
 fn swing() -> AnimationClip {
     let mut tracks = vec![JointTrack::default(); BONES.len()];
     tracks[3].translation = Track {
@@ -111,8 +109,6 @@ fn swing() -> AnimationClip {
     clip
 }
 
-/// A `Rig` at `at` with its skeleton spawned and its hitboxes generated; the
-/// Animator plays `Swing` when `swinging`.
 /// Arms the kept bone list's check: every follow on this thread from here on
 /// also walks the skeletons and fails the test if the list went stale.
 pub fn character(scene: &mut Scene, at: Vec3, swinging: bool) -> u32 {

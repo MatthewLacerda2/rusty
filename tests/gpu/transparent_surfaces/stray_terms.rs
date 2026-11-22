@@ -8,9 +8,8 @@ use rusty::scene::{Camera, Scene};
 
 use super::{differing, glass, half_alpha, mean_in, shot, slab, stage, SIZE};
 
-/// A black wall, and in front of it, when `alpha` is some, a grey unlit
-/// transparent pane at that alpha: unlit because it carries a light, as a lamp's
-/// mesh does (a light of no intensity, so it lights nothing).
+/// A black wall, and when `alpha` is some, a grey unlit pane at that alpha, unlit because it
+/// carries a zero-intensity light, as a lamp's mesh does.
 fn lamp_glass(alpha: Option<f32>) -> Scene {
     let mut scene = stage(-1.2);
     let wall = MaterialAsset {
@@ -67,7 +66,6 @@ fn an_unlit_transparent_blends_straight_over_what_is_behind() {
     );
 }
 
-/// A lit Opaque box under the sun whose albedo map has half alpha, with `blend`.
 fn opaque_box(blend: BlendMode) -> Scene {
     let mut scene = stage(-1.0);
     let material = MaterialAsset {

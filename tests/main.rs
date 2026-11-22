@@ -1,18 +1,4 @@
-//! The integration suite: every file in `tests/` compiled into **one** binary.
-//!
-//! Cargo's default builds each `tests/*.rs` as its own executable, and each of those
-//! links the whole engine — wgpu/naga, egui, rapier3d, vendored Lua. At 54 files and
-//! two feature sets that was 108 link steps per CI run, and most of the suite's time
-//! and `target/` size. `Cargo.toml` sets `autotests = false` and roots one `[[test]]`
-//! target here instead, so the engine is linked once per feature set.
-//!
-//! **Adding a test file means adding its `mod` line below** — Cargo no longer finds it
-//! on its own. `layout` fails the suite, naming the file, if one is forgotten.
-//!
-//! Every module now shares one process, so a test must not rely on having a process to
-//! itself: scratch files go under `temp::dir()` (one per test), no `set_var`/`set_current_dir`.
-//! Filter by module path: `cargo nextest run -E 'binary(integration)' physics_` runs the
-//! physics files (`cargo test --test integration physics_` works too).
+//! The integration suite: every file in `tests/` compiled into one binary, so the engine is linked once per feature set. **Adding a test file means adding its `mod` line below**; `layout` fails the suite naming a forgotten file. Modules share one process: scratch files go under `temp::dir()`, no `set_var`/`set_current_dir`.
 
 mod layout;
 mod lua;
@@ -21,7 +7,6 @@ mod play;
 mod spawn;
 mod temp;
 
-// ── Both feature sets ────────────────────────────────────────────────────────────
 mod animation_runtime;
 mod animator;
 mod api_doc_layout;
@@ -82,7 +67,6 @@ mod transform_api;
 mod ui;
 mod video_api;
 
-// ── Dev layer only (harness, session, MCP, `Debug.*`) ────────────────────────────
 #[cfg(feature = "dev")]
 mod api_doc_drift;
 #[cfg(feature = "dev")]
@@ -140,7 +124,6 @@ mod time_scale;
 #[cfg(feature = "dev")]
 mod tweens;
 
-// ── Needs a GPU or software adapter (skips without one); all dev-only ────────────
-// Kept under one `gpu::` path so a runner can tell them apart by name alone.
+// Need a GPU or software adapter (skip without one); under one `gpu::` path so a runner tells them apart by name.
 #[cfg(feature = "dev")]
 mod gpu;

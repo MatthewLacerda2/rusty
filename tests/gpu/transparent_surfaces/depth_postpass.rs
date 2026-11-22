@@ -9,10 +9,8 @@ use rusty::scene::Camera;
 
 use super::{checker, glass, shot_at, slab, stage_with};
 
-/// The capture size: large enough for the blur to span several pixels.
 const SIZE: u32 = 160;
 
-/// The pane 3 m from the eye over a grey wall at 25 m, its postpass `on`.
 fn pane(on: bool) -> rusty::scene::Scene {
     let mut scene = stage_with(glam::Quat::from_rotation_x(-0.8), |vc| {
         vc.depth_of_field = DepthOfField {
@@ -49,8 +47,7 @@ fn pane(on: bool) -> rusty::scene::Scene {
     scene
 }
 
-/// How much neighbouring pixels differ across the middle of `img`, squared: a fine
-/// sharp checker scores high, a blurred one (all grey) low.
+/// How much neighbouring pixels differ across the middle of `img`, squared: a sharp checker scores high.
 fn sharpness(img: &image::RgbImage) -> u64 {
     let lum = |x, y| {
         img.get_pixel(x, y)

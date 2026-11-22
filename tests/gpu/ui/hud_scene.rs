@@ -11,7 +11,6 @@ use rusty::scene::Scene;
 
 pub const SIZE: u32 = 256;
 
-/// A bottom-left-anchored element at `pos`, `size` reference units, under `parent`.
 fn element(
     scene: &mut Scene,
     parent: u32,
@@ -41,7 +40,6 @@ fn solid(r: f32, g: f32, b: f32) -> Option<ImageComponent> {
     })
 }
 
-/// A 32×32 texture: an 8-texel green frame around a blue centre.
 fn frame_texture() -> String {
     let path = crate::temp::dir().join("rusty_ui_frame.png");
     let img = image::RgbaImage::from_fn(32, 32, |x, y| {
@@ -65,7 +63,6 @@ pub fn hud() -> Scene {
         ..Default::default()
     };
     scene.world.set_canvas(root, Some(canvas));
-    // An opaque black backdrop, so every blend below is against a known colour.
     let full = SIZE as f32;
     at(
         &mut scene,
@@ -78,7 +75,6 @@ pub fn hud() -> Scene {
     scene
 }
 
-/// A red bar filled to 50% and a 9-sliced green-framed blue panel.
 fn add_bar_and_panel(scene: &mut Scene, root: u32) {
     let bar = ImageComponent {
         color: Vec4::new(1.0, 0.0, 0.0, 1.0),
@@ -97,7 +93,6 @@ fn add_bar_and_panel(scene: &mut Scene, root: u32) {
     at(scene, root, [128.0, 16.0, 112.0, 96.0], Some(panel));
 }
 
-/// A white square under a 50% CanvasGroup, and a yellow child overflowing a mask.
 fn add_group_and_mask(scene: &mut Scene, root: u32) {
     let group = at(scene, root, [16.0, 128.0, 96.0, 96.0], None);
     let faded = CanvasGroupComponent {
@@ -112,7 +107,6 @@ fn add_group_and_mask(scene: &mut Scene, root: u32) {
     at(scene, mask, [32.0, 32.0, 96.0, 96.0], solid(1.0, 1.0, 0.0));
 }
 
-/// [`element`] with its rect as `[x, y, width, height]`.
 fn at(scene: &mut Scene, parent: u32, r: [f32; 4], image: Option<ImageComponent>) -> u32 {
     element(
         scene,

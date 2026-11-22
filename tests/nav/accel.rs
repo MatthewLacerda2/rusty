@@ -19,7 +19,6 @@ fn agent(speed: f32, acceleration: f32, stopping_distance: f32) -> NavMeshAgentC
     }
 }
 
-/// An agent at x = 1 on an open 40 m floor, heading for x = 38.
 fn spawn(a: NavMeshAgentComponent) -> (Scene, u32, NavigationGraph) {
     let mut scene = Scene::new();
     let id = scene.add_entity("a".to_string());
@@ -32,7 +31,6 @@ fn speed(scene: &Scene, id: u32) -> f32 {
     scene.world.nav_agent(id).unwrap().velocity.length()
 }
 
-/// Ticks from rest until the agent reaches full speed.
 fn ticks_to_full_speed(speed_limit: f32, acceleration: f32) -> u32 {
     let (mut scene, id, graph) = spawn(agent(speed_limit, acceleration, 0.1));
     (1..=600)
@@ -43,9 +41,7 @@ fn ticks_to_full_speed(speed_limit: f32, acceleration: f32) -> u32 {
         .expect("never reached full speed")
 }
 
-/// Time to full speed is `speed / acceleration`, and the agent lands on `speed`
-/// exactly, where the old lerp took the same time for any speed and only
-/// approached it.
+/// Time to full speed is `speed / acceleration`, landing on `speed` exactly.
 #[test]
 fn time_to_full_speed_is_speed_over_acceleration() {
     // 3.5 / 8 = 0.4375 s = 26.25 ticks; 7 / 8 = 52.5 ticks.
@@ -59,7 +55,6 @@ fn time_to_full_speed_is_speed_over_acceleration() {
     assert!((v - 3.5).abs() < 1e-5, "lands on speed, no asymptote: {v}");
 }
 
-/// Zero acceleration never speeds up (Unity's meaning).
 #[test]
 fn zero_acceleration_never_moves() {
     let (mut scene, id, graph) = spawn(agent(3.5, 0.0, 0.1));
@@ -101,8 +96,6 @@ fn brakes_into_the_stopping_distance() {
     );
 }
 
-/// Inside the stopping distance an agent still moving keeps moving while it
-/// brakes, instead of freezing in place with a stale velocity.
 #[test]
 fn braking_inside_the_stopping_distance_still_moves() {
     let mut a = agent(3.5, 8.0, 1.5);

@@ -1,7 +1,6 @@
-//! Toksvig specular AA: a glossy floor with a busy normal map widens its
-//! lobe by what the map's mips lost, far off, and nothing else. Each test draws a
-//! busy map against its *twin*: the same x and y, blue pinned at 255, so the shader
-//! reads the same normals and no spread, as `main` did. No adapter: skip.
+//! Toksvig specular AA: a glossy floor with a busy normal map widens its lobe by what the
+//! map's mips lost, far off, and nothing else. Each test draws a busy map against its *twin*
+//! (same x and y, blue pinned at 255: no spread, as before).
 
 mod mapping;
 mod shimmer;
@@ -20,7 +19,6 @@ use rusty::scene::{Camera, Scene};
 pub(super) const W: u32 = 128;
 pub(super) const H: u32 = 96;
 
-/// Eye and pitch: far, 0.6 m up just below the horizon; near, 0.25 m up looking down.
 pub(super) const FAR: (Vec3, f32) = (Vec3::new(0.0, 0.6, 6.5), -4.0);
 pub(super) const NEAR: (Vec3, f32) = (Vec3::new(0.0, 0.25, -2.5), -60.0);
 
@@ -30,8 +28,7 @@ pub(super) enum Blue {
     Pinned(u8),
 }
 
-/// A 128² tangent-space normal map at a fresh path `name`: seeded noise, each
-/// texel a whole normal tilted up to ~35°, or flat (x = y = 128) when `!busy`.
+/// A 128² normal map: seeded noise tilted up to ~35°, or flat when `!busy`.
 pub(super) fn normal_map(name: &str, busy: bool, blue: Blue) -> PathBuf {
     let mut state = 0x2545_f491u32;
     let mut next = || {
@@ -59,7 +56,6 @@ pub(super) fn normal_map(name: &str, busy: bool, blue: Blue) -> PathBuf {
     path
 }
 
-/// `map` typed `NormalMap` and imported (BC5 where the GPU has it), as `Material.SetNormalMap` does.
 pub(super) fn as_bc5(map: &Path) {
     let settings = TextureSettings {
         texture_type: TextureType::NormalMap,
@@ -77,8 +73,7 @@ pub(super) fn sky(scene: &mut Scene, rgb: [u8; 3], name: &str) {
     scene.skybox_path = path.to_string_lossy().into_owned();
 }
 
-/// A black-sky scene with no ambient, and a 15 m floor of `material` (its map
-/// tiled 8×) at y = `y`; returns the floor.
+/// A black-sky scene, no ambient, with a 15 m floor of `material` (map tiled 8×) at `y`.
 pub(super) fn floor(scene: &mut Scene, name: &str, y: f32, material: MaterialAsset) -> u32 {
     let id = create_entity(scene, name, Some(Primitive::Plane));
     scene.world.transform_mut(id).unwrap().position.y = y;
@@ -103,7 +98,6 @@ pub(super) fn glossy(map: &Path, metallic: f32, roughness: f32) -> MaterialAsset
     }
 }
 
-/// Each of `frames` frames of `scene` from `view`, turning 0.4° a frame.
 pub(super) fn frames(scene: &Scene, view: (Vec3, f32), frames: u32) -> Option<Vec<Vec<[f64; 3]>>> {
     let mut host = CaptureHost::new();
     let mut out = Vec::new();
