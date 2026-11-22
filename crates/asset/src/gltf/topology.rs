@@ -60,7 +60,7 @@ pub(super) fn whole_triangles(
         );
         return None;
     }
-    if local.len() % 3 != 0 {
+    if !local.len().is_multiple_of(3) {
         rusty_core::warn_held!(
             "[Asset] {file}: glTF primitive {at}: {} indices are not whole triangles; the last are cut",
             local.len()

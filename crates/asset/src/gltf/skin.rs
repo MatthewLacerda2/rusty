@@ -71,6 +71,25 @@ pub(super) fn skins_by_mesh(file: &File) -> Map<usize, SkinData> {
     out
 }
 
+fn inverse_binds(skin: &gltf::Skin, file: &File, joints: usize) -> Vec<Mat4> {
+    let reader = skin.reader(|b| file.data(b));
+    let mut inverse_bind: Vec<Mat4> = match reader.read_inverse_bind_matrices() {
+        Some(matrices) => matrices.map(|m| Mat4::from_cols_array_2d(&m)).collect(),
+        None => Vec::new(),
+    };
+    if !inverse_bind.is_empty() && inverse_bind.len() != joints {
+        log::warn!(
+            "[Asset] {}: skin {}: {} inverse-bind matrices for {joints} joints; the missing are identity",
+            file.name,
+            skin.index(),
+            inverse_bind.len(),
+        );
+    }
+    // Omitted inverse-bind matrices are identity by the spec.
+    inverse_bind.resize(joints, Mat4::IDENTITY);
+    inverse_bind
+}
+
 fn build_skin(
     skin: &gltf::Skin,
     file: &File,
@@ -85,22 +104,7 @@ fn build_skin(
         .map(|(slot, &node)| (node, slot))
         .collect();
 
-    let reader = skin.reader(|b| file.data(b));
-    let mut inverse_bind: Vec<Mat4> = match reader.read_inverse_bind_matrices() {
-        Some(matrices) => matrices.map(|m| Mat4::from_cols_array_2d(&m)).collect(),
-        None => Vec::new(),
-    };
-    if !inverse_bind.is_empty() && inverse_bind.len() != joint_nodes.len() {
-        log::warn!(
-            "[Asset] {}: skin {}: {} inverse-bind matrices for {} joints; the missing are identity",
-            file.name,
-            skin.index(),
-            inverse_bind.len(),
-            joint_nodes.len()
-        );
-    }
-    // Omitted inverse-bind matrices are identity by the spec.
-    inverse_bind.resize(joint_nodes.len(), Mat4::IDENTITY);
+    let inverse_bind = inverse_binds(skin, file, joint_nodes.len());
     let bind_global = skin
         .joints()
         .map(|joint| {

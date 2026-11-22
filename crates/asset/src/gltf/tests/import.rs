@@ -1,7 +1,7 @@
 //! Topology normalization: every triangle mode imports as the same list; non-surface
 //! modes are skipped. A malformed file drops what its readers could not use.
 
-use super::import::import_slice;
+use crate::gltf::import::import_slice;
 use crate::import_file;
 use crate::mesh_data::SubMesh;
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
@@ -128,4 +128,15 @@ fn an_influence_on_a_joint_the_skin_lacks_is_dropped() {
     let v = &asset.sub_meshes[0].vertices[1];
     assert_eq!((v.joint_indices[0], v.joint_weights[0]), (0, 0.0));
     assert_eq!(asset.validate(), Ok(()));
+}
+
+#[test]
+fn an_accessor_of_the_wrong_shape_for_its_use_refuses_the_file() {
+    // The gltf crate's reader would take a VEC2 `JOINTS_0` as VEC4 and panic.
+    let bytes = animated_glb(|d| d["accessors"][1]["type"] = "VEC2".into());
+    let err = import_slice(&bytes).unwrap_err().to_string();
+    assert!(
+        err.contains("accessor 1") && err.contains("Joints"),
+        "{err}"
+    );
 }

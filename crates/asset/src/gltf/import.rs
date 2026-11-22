@@ -1,7 +1,7 @@
 //! Each glTF mesh is one `SubMesh`; its primitives merge into one stream, each primitive's
 //! indices a `MaterialRange`. Every triangle mode becomes a triangle list.
 
-use super::{anim, material, nodes, skin, topology};
+use super::{accessors, anim, material, nodes, skin, topology};
 use crate::material_range::push_range;
 use crate::mesh_data::{ImportedAsset, SkinData, SubMesh, Vertex};
 use crate::tangents::Missing;
@@ -48,6 +48,7 @@ fn import_gltf(
     missing: Missing,
 ) -> Result<ImportedAsset, ImportError> {
     let gltf::Gltf { document, blob } = gltf;
+    accessors::check(&document).map_err(ImportError::Parse)?;
     let buffers = gltf::import_buffers(&document, base_dir, blob).map_err(parse)?;
     let images_dir = base_dir.unwrap_or_else(|| Path::new(""));
     let materials = document

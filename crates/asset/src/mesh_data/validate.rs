@@ -25,7 +25,7 @@ impl ImportedAsset {
 
 fn sub_mesh(sub: &SubMesh, materials: usize) -> Result<(), String> {
     let vertices = sub.vertices.len();
-    if sub.indices.len() % 3 != 0 {
+    if !sub.indices.len().is_multiple_of(3) {
         return Err(format!(
             "{} indices are not whole triangles",
             sub.indices.len()
