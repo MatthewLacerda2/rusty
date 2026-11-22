@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use crate::lightmap_uv::LightmapUvSettings;
 
+/// Quads along the big grid's edge: 64² × 2 triangles, past `clusters::MIN_TRIANGLES`.
 const GRID: usize = 64;
 
 pub fn model(name: &str) -> PathBuf {
@@ -19,6 +20,7 @@ pub fn model(name: &str) -> PathBuf {
         ..LightmapUvSettings::default()
     };
     crate::sidecar::set_lightmap_uvs(&path, on).unwrap();
+    // An earlier run may have cooked it into the temp folder.
     let _ = std::fs::remove_file(cooked_file(&path));
     path
 }

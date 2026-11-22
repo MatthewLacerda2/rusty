@@ -36,6 +36,7 @@ fn the_cooked_output_holds_its_blessed_hash() {
     let skinned = dir.join("skinned.gltf");
     std::fs::write(&skinned, SKINNED_GLTF).unwrap();
     let quad = std::path::PathBuf::from(quad_file("rusty_cook_version_quad"));
+    // Both importers, a skinned mesh and every step: a cook path none reaches is unguarded.
     let mut hash = rusty_core::hash::Content::default();
     for model in [&obj, &flat, &skinned, &quad] {
         let file = super::fixture::cooked_file(model);

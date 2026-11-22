@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 
 use crate::convert::texture_ref::extracted;
 
+/// `pub` as a test hook: `render`'s upload tests find a copy by it.
 pub fn cache_file(source: &Path) -> Result<PathBuf, String> {
     if let Some(glb) = extracted::glb_of(source) {
         return Ok(extracted_cache(&glb, source));

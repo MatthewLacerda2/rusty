@@ -119,8 +119,7 @@ fn absolute(root: &Path, source: &str) -> String {
     parts.collect::<PathBuf>().to_string_lossy().into_owned()
 }
 
-/// The table of the source at the absolute path `source`, read from its cached
-/// `.glb` (held under `root` too).
+/// `source` is absolute; its cached `.glb`'s path is made absolute under `root` too.
 fn read(root: &Path, source: &Path) -> Option<Table> {
     #[cfg(test)]
     READS.set(READS.get() + 1);
@@ -128,6 +127,7 @@ fn read(root: &Path, source: &Path) -> Option<Table> {
         root,
         &cache_location(source).ok()?.to_string_lossy(),
     ));
+    // Where the glTF importer anchors these URIs, so both resolve one file.
     let base_dir = glb.parent().unwrap_or_else(|| Path::new(""));
     let files = glb::image_uris(&glb).map(|uris| {
         uris.into_iter()

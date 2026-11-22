@@ -1,6 +1,7 @@
 //! Each path's digest is remembered with its length and mtime and read again only
 //! when either changes, or when the engine wrote it (`core::fs::written`). Only a
-//! regular file is read: a folder, FIFO or `/dev/zero` is absent.
+//! regular file is read: a folder, FIFO or `/dev/zero` is absent. The digest decides,
+//! never the mtime: a fresh clone gives every file a new one.
 
 use super::ImportError;
 use crate::gltf::uri;

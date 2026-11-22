@@ -1,5 +1,5 @@
-//! Unity's and Blender's `_LOD<n>` convention. Matches the glTF node name, else
-//! the sub-object id (case-insensitive).
+//! As in Unity and Blender, `Crate_LOD0` and `Crate_LOD1` are one prop at falling detail.
+//! The `_LOD<n>` suffix, its `LOD` in either case, is read off the glTF node name, else the id.
 
 use super::ImportedAsset;
 

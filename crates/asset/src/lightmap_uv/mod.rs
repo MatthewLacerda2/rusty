@@ -1,10 +1,11 @@
-//! Unity's Generate Lightmap UVs. Charts are in world units; the margin converts
-//! at [`REFERENCE_TEXELS_PER_UNIT`]. Deterministic: ties break by index.
+//! Charts are in world units; the margin converts at [`REFERENCE_TEXELS_PER_UNIT`].
+//! Deterministic: ties break by index.
 
 mod chart;
 mod overlap;
 mod pack;
 
+/// Public for `components::mesh`'s primitive tests.
 pub use overlap::interiors_overlap;
 
 use serde::{Deserialize, Serialize};
@@ -21,7 +22,8 @@ pub struct LightmapUvSettings {
     pub generate: bool,
     /// Degrees (Unity's *Hard Angle*, 0–180).
     pub hard_angle: f32,
-    /// Unity's *Pack Margin*, 1–64, at the reference resolution.
+    /// Unity's *Pack Margin*, 1–64 texels at the reference resolution, so bilinear
+    /// filtering never reads a neighbouring chart.
     pub pack_margin: f32,
 }
 
