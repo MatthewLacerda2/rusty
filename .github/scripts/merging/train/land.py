@@ -57,7 +57,7 @@ def moved(pull: dict, car: build.Car) -> str | None:
     if pull.get("isDraft"):
         return "it went back to draft"
     if not board.queued(pull):
-        return f"it lost the `{board.QUEUE_LABEL}` label"
+        return f"it lost its go-ahead (the `{board.QUEUE_LABEL}` label or verdict)"
     if pull.get("headRefOid") != car.head:
         return f"its head moved to {str(pull.get('headRefOid'))[:7]} after the train tested {car.head[:7]}"
     # What it claims, re-read now: a stray `closes #N` added while the train ran

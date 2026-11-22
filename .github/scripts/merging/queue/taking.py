@@ -128,10 +128,11 @@ def take(repo: str, number: int, opts: argparse.Namespace, tick=None) -> tuple[i
         return number, outcomes.HANDED_BACK, lines[0]
     if opts.no_merge:
         return number, outcomes.GREEN, lines[0]
-    if opts.watch and not board.queued(pulls.look(number)):
-        # The label came off during the wait (a re-brief, #1799): the fix hasn't been
-        # pushed yet, so a green head must not merge. A named take needs no label.
-        return number, outcomes.REQUEUED, "it lost the `queue` label during its CI wait; not merged."
+    if opts.watch and not board.queued(pulls.look_standing(number)):
+        # The go-ahead came off during the wait (the label, a `hold`, a `round` verdict,
+        # a `Needs:`; a re-brief, #1799, #2628): the fix hasn't been pushed yet, so a
+        # green head must not merge. A named take needs no go-ahead.
+        return number, outcomes.REQUEUED, "it lost its go-ahead (the `queue` label or verdict) during its CI wait; not merged."
 
     state, why = landing.squash(repo, pull, fresh, opts.root, opts.poll)
     if state == landing.BASE_MOVED:  # no fault of the branch's: taken again, not handed back
