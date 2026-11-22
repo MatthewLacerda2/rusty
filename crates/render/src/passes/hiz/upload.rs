@@ -9,6 +9,7 @@ use crate::draw::batch::{DrawBatch, OpaqueBatches};
 use crate::gpu::layout_entries::{storage_entry, uniform_entry};
 use crate::{InstanceData, Renderer};
 
+/// Mirrors `hiz.wgsl`'s `Params`, padding included: change the two together.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct Params {
@@ -20,6 +21,7 @@ pub(super) struct Params {
     _pad: [u32; 3],
 }
 
+/// Rows of `hiz.wgsl`'s `Batch`.
 fn pack_batches(batches: &OpaqueBatches, clustered: &[Option<Range<u32>>]) -> Vec<[u32; 8]> {
     let run = |(b, by_cluster): (&DrawBatch, &Option<Range<u32>>)| {
         let (first, count) = (b.instances.start, b.instances.len() as u32);
@@ -38,6 +40,7 @@ fn pack_batches(batches: &OpaqueBatches, clustered: &[Option<Range<u32>>]) -> Ve
     batches.iter().zip(clustered).map(run).collect()
 }
 
+/// Rows of `hiz.wgsl`'s `Bounds`; `min.w` is 1 when tested, as `plan_clusters` reads it too.
 pub(super) fn pack_bounds(
     tables: &mut Tables,
     instances: &[InstanceData],
@@ -91,6 +94,7 @@ impl Renderer {
         cam.hold(device, queue, frame.slots);
         cam.visible.reserve(device, 4 * u64::from(n));
         let args = ARGS * frame.batches.len() as u64;
+        // The final lists hold the late set's after their own; an instance is 16 bytes.
         for (k, lists) in [1, 2].into_iter().enumerate() {
             cam.kept[k].reserve(device, lists * 16 * u64::from(n));
             cam.args[k].reserve(device, lists * args);

@@ -1,5 +1,7 @@
 use glam::{Mat4, Vec4};
 
+/// The centre of projection: a point (`w` 1) for a perspective camera, the view direction (`w` 0)
+/// for an orthographic one, whose `w` is tiny against `xyz`.
 pub(super) fn eye_of(view_proj: Mat4) -> Vec4 {
     let e = view_proj.inverse() * Vec4::new(0.0, 0.0, 1.0, 0.0);
     if e.w.abs() > 1e-6 * e.truncate().length().max(1e-30) {
