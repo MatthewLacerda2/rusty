@@ -1,11 +1,10 @@
 //! What the `gltf` crate assumes of a file but never checks, checked first so a file
-//! breaking it is refused, not a panic: each accessor the import reads exists and has
-//! the shape its use requires, an animation channel names a node and a property, the
-//! nodes form a forest, and a `.glb`'s declared length covers its 12-byte header.
+//! breaking it is refused, not a panic.
 
 use crate::ImportError;
 use gltf::accessor::{Accessor, DataType, Dimensions};
 use gltf::animation::Property;
+use gltf::buffer::View;
 use gltf::Semantic;
 
 use DataType::{F32, I16, I8, U16, U32, U8};
@@ -161,5 +160,60 @@ fn fits(accessor: &Accessor, dims: Dimensions, types: &[DataType], at: &str) -> 
             accessor.size()
         ));
     }
+    bounds(accessor, at)
+}
+
+/// glTF's bounds rule, which the crate computes unchecked; sparse views have no stride.
+fn bounds(accessor: &Accessor, at: &str) -> Result<(), String> {
+    let index = accessor.index();
+    let past = |what: &str| format!("accessor {index} ({at}): {what} runs past its buffer view");
+    if let Some(view) = accessor.view() {
+        within(&view, accessor.offset(), accessor.count(), accessor.size())
+            .ok_or_else(|| past("its last element"))?;
+    }
+    let Some(sparse) = accessor.sparse() else {
+        return Ok(());
+    };
+    let count = sparse.count();
+    if count == 0 || count > accessor.count() {
+        return Err(format!(
+            "accessor {index} ({at}): a sparse count of {count} is outside 1..={}",
+            accessor.count()
+        ));
+    }
+    let (indices, values) = (sparse.indices(), sparse.values());
+    let parts = [
+        (
+            "its sparse indices",
+            indices.view(),
+            indices.offset(),
+            indices.index_type().size(),
+        ),
+        (
+            "its sparse values",
+            values.view(),
+            values.offset(),
+            accessor.size(),
+        ),
+    ];
+    for (what, view, offset, size) in parts {
+        if view.stride().is_some() {
+            return Err(format!(
+                "accessor {index} ({at}): {what}' view has a byteStride"
+            ));
+        }
+        within(&view, offset, count, size).ok_or_else(|| past(what))?;
+    }
     Ok(())
+}
+
+/// `Some` when `count` (at least one) elements end inside the view, and it its buffer.
+fn within(view: &View, offset: usize, count: usize, size: usize) -> Option<()> {
+    let stride = view.stride().unwrap_or(size);
+    let end = stride
+        .checked_mul(count.checked_sub(1)?)?
+        .checked_add(offset)?
+        .checked_add(size)?;
+    let view_end = view.offset().checked_add(view.length())?;
+    (end <= view.length() && view_end <= view.buffer().length()).then_some(())
 }

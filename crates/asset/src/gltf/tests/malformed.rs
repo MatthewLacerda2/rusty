@@ -7,7 +7,7 @@ use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 use rusty_test_support::models::{glb, quad_mode_gltf};
 
 /// [`ANIMATED_GLTF`] as a `.glb`, edited first.
-fn animated_glb(edit: impl FnOnce(&mut serde_json::Value)) -> Vec<u8> {
+pub(super) fn animated_glb(edit: impl FnOnce(&mut serde_json::Value)) -> Vec<u8> {
     let mut doc: serde_json::Value = serde_json::from_str(ANIMATED_GLTF).unwrap();
     doc["buffers"][0].as_object_mut().unwrap().remove("uri");
     edit(&mut doc);
