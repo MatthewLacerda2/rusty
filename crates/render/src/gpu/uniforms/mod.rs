@@ -1,3 +1,6 @@
+//! Each `#[repr(C)]` struct mirrors its namesake in `engine/shaders/common.wgsl`: change both
+//! together.
+
 use crate::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTION_PROBES};
 
 mod instance;
@@ -100,11 +103,14 @@ pub(crate) struct DirectionalLightUniform {
     pub _pad2: f32,
 }
 
+/// Slot 0 is the sun, the cascaded-shadow caster; more are dropped. `common.wgsl`'s
+/// `array<DirectionalLight, 4>` must match.
 pub(crate) const MAX_DIRECTIONAL_LIGHTS: usize = 4;
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct LightingUniform {
+    // `ambient` then `sky` lead the struct: `sky_gradient.wgsl` binds that prefix alone.
     pub ambient: AmbientLightUniform,
     pub sky: ProceduralSkyUniform,
     pub dir_lights: [DirectionalLightUniform; MAX_DIRECTIONAL_LIGHTS],

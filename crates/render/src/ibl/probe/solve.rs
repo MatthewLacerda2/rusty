@@ -8,6 +8,7 @@ use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
 
+/// `commit`'s error when the scene's probes changed; the editor matches it.
 pub const PROBES_CHANGED: &str = "the probes changed during the bake, so nothing was applied";
 
 pub struct BounceSolve {
@@ -26,6 +27,8 @@ impl BounceSolve {
         Self::of(scene.probes.clone(), resolution, direct)
     }
 
+    /// A solve of a set the scene does not hold yet: `changed` and `commit` compare against the
+    /// scene's own set, so they are only for a solve made by `new`.
     pub fn of(volume: ProbeVolume, resolution: u32, direct: BakedDirect) -> Self {
         let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
         let report = positions.is_empty().then_some(BounceReport {
@@ -52,6 +55,7 @@ impl BounceSolve {
         let capture = match self.bounce {
             1 => renderer.capture_light_probe(scene, p, self.resolution, false),
             _ => {
+                // The lit capture reads the field off `scene.probes`, so the snapshot stands in.
                 std::mem::swap(&mut scene.probes, &mut self.volume);
                 let capture = renderer.capture_light_probe(scene, p, self.resolution, true);
                 std::mem::swap(&mut scene.probes, &mut self.volume);

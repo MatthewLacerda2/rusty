@@ -3,6 +3,7 @@ use glam::Vec3;
 use crate::draw::scene_ambient;
 use rusty_scene::{AmbientMode, Scene};
 
+/// `Color` mode's ambient before the gradient: a frozen reference, never edited to follow a change.
 const TODAY: &str = "
 fn today_ambient(color: vec3<f32>, intensity: f32, N: vec3<f32>) -> vec3<f32> {
     let sky_color = color;

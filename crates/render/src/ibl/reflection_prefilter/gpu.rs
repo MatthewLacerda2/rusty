@@ -7,6 +7,7 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::ibl::cube_sample::FaceProjections;
 use crate::CubemapCapture;
 
+/// Invocations per workgroup edge: `@workgroup_size(8, 8, 1)` in `ibl/probe_prefilter.wgsl`.
 const GROUP: u32 = 8;
 
 pub(crate) struct ProbePrefilter {
@@ -131,6 +132,7 @@ impl ProbePrefilter {
     }
 }
 
+/// Mirrors `Params` in `ibl/probe_prefilter.wgsl`: `p` is roughness, mip size, capture size.
 fn params(p: [f32; 3], projections: &FaceProjections) -> Vec<f32> {
     let (view_proj, inverse) = projections.matrices();
     let mut out = vec![p[0], p[1], p[2], SAMPLE_COUNT as f32];

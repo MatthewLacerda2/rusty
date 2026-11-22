@@ -6,12 +6,15 @@ use rusty_asset::sidecar::TextureSettings;
 use rusty_asset::texture_import::{keeps_deep, TextureKind};
 use rusty_core::color::f32_to_f16;
 
+/// Half floats, not `Rgba16Unorm`: that needs a device feature and filters only where the
+/// adapter allows; this is core, filterable and renderable.
 pub(crate) const DEEP_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 pub(crate) fn wanted(import: &TextureSettings, img: &DynamicImage, kind: TextureKind) -> bool {
     kind == TextureKind::Normal && keeps_deep(import, img.color())
 }
 
+/// A normal slot never takes an 8-bit upload of a 16-bit normal map: it gets its own copy.
 pub(crate) fn serves(tex: &GpuTexture, kind: TextureKind) -> bool {
     let format = tex.texture.format();
     let short = kind == TextureKind::Normal && tex.deep_normal && format != DEEP_FORMAT;
@@ -35,6 +38,7 @@ pub(super) fn upload(
         usage: super::usage(levels),
         view_formats: &[],
     });
+    // Each 16-bit unorm value as a half float in [0, 1]: eight bytes a texel.
     let bytes: Vec<u8> = image
         .as_raw()
         .iter()

@@ -62,6 +62,7 @@ impl MaterialCache {
             .expect("a released group is never drawn")
     }
 
+    /// Run before the frame resolves any index, so a freed slot is never one its batches name.
     pub(crate) fn release_entities(&mut self, scene: SceneId, overrides: impl Fn(u32) -> bool) {
         self.release(
             |o| matches!(o, ParamOwner::Entity(s, id, _) if *s == scene && !overrides(*id)),
@@ -122,6 +123,7 @@ impl MaterialCache {
         self.params.contains_key(owner)
     }
 
+    /// On a texture file rewrite, before any draw resolves an index; param buffers stay.
     pub(crate) fn forget_groups(&mut self) {
         self.index.clear();
         self.groups.clear();

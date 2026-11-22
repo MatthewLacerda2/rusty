@@ -8,6 +8,7 @@ use super::{Entry, Kind, Lightmaps};
 use crate::stats::Uploads;
 
 impl Lightmaps {
+    /// Whether none is still being read: a failed list counts as ready, as a bind leaves it out.
     pub(crate) fn warm(
         &mut self,
         device: &wgpu::Device,
@@ -37,6 +38,7 @@ impl Lightmaps {
             let result = match inbox.try_recv() {
                 Ok(result) => result,
                 Err(TryRecvError::Empty) => continue,
+                // The loader panicked before it answered.
                 Err(TryRecvError::Disconnected) => Err("the page loader stopped".into()),
             };
             let array = finish(device, writes, list, result);

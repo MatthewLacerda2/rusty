@@ -6,6 +6,7 @@ use rusty_asset::sidecar::TextureSettings;
 
 pub(crate) use rusty_asset::texture_import::TextureKind;
 
+/// Colour averages through the sRGB view, in linear light: averaging sRGB bytes darkens mips.
 pub(crate) fn view_format(kind: TextureKind) -> wgpu::TextureFormat {
     match kind.is_colour() {
         true => super::IMAGE_FORMAT,

@@ -4,6 +4,8 @@ use rusty_asset::sidecar::meta_path;
 use rusty_core::fs::written::Stale;
 
 impl Renderer {
+    /// Once per frame, before any texture is resolved: drops uploads whose file or `.meta`
+    /// was re-written, and retries misses whose file appeared.
     pub(crate) fn refresh_textures(&mut self) {
         let changes = self.texture_freshness.poll_with(texture_ref::exists);
         if changes.retried {

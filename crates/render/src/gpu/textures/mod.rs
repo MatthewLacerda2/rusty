@@ -19,7 +19,9 @@ use rusty_asset::texture_import::variance::VarianceTable;
 use rusty_asset::MapRef;
 pub(crate) use sampler::{sampler, ui_sampler};
 
+/// Colour is authored in sRGB, so the colour view decodes it on sample.
 const IMAGE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
+/// The same bytes undecoded: data maps store raw values (glTF 2.0), read through `data_view`.
 const DATA_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8Unorm;
 
 pub struct GpuTexture {
@@ -41,6 +43,7 @@ impl Renderer {
         layout: &wgpu::BindGroupLayout,
     ) -> GpuTexture {
         let label = "Default Checkerboard Texture";
+        // In texels: 32-texel cells keep the edges crisp under linear magnification.
         let checker = checkerboard(256, 32);
         let texture = upload(
             (device, writes),
@@ -194,12 +197,14 @@ fn extent(width: u32, height: u32) -> wgpu::Extent3d {
 }
 
 fn checkerboard(side: u32, cell: u32) -> image::RgbaImage {
+    // sRGB bytes of a dark violet checker, what a map that failed to load draws.
     image::RgbaImage::from_fn(side, side, |x, y| match (x / cell + y / cell) % 2 {
         0 => image::Rgba([28, 30, 42, 255]),
         _ => image::Rgba([52, 45, 78, 255]),
     })
 }
 
+/// In texels.
 const SOFT_DISC_SIDE: u32 = 64;
 
 pub(crate) fn soft_disc(side: u32) -> image::RgbaImage {

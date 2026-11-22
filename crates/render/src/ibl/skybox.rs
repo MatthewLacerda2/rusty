@@ -6,6 +6,7 @@ use crate::postfx::effects::ssr::surface;
 use crate::GpuTexture;
 use wgpu::util::DeviceExt;
 
+/// Bind group indices: camera + lighting, then the panorama texture.
 const CAMERA: u32 = 0;
 const SKY: u32 = 1;
 

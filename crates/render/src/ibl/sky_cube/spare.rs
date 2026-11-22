@@ -1,3 +1,4 @@
+/// Keeps group 0 for the unbound procedural slot, so alternating two skies swaps, not rebuilds.
 pub(crate) struct SpareGroup<G> {
     spare: Option<(usize, G)>,
     bound: Option<usize>,

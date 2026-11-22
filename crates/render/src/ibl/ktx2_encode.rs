@@ -1,3 +1,6 @@
+//! Hand-rolled, as the `ktx2` crate only parses; the bytes must round-trip through
+//! `cubemap::parse_ktx2_cubemap_mips`. A mip under 4×4 is one padded block per face.
+
 use glam::Vec3;
 
 use crate::ibl::reflection_prefilter::{PrefilteredCubemap, TEXEL_BYTES};
@@ -8,6 +11,7 @@ use rusty_core::color::f16_to_f32;
 const MAGIC: [u8; 12] = [
     0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
 ];
+/// Bytes: the KTX2 header and one level-index entry, as `cubemap`'s parse reads them.
 const HEADER_LEN: usize = 80;
 const LEVEL_INDEX_ENTRY_LEN: usize = 24;
 pub(crate) const VK_FORMAT_BC6H_UFLOAT_BLOCK: u32 = 143;
@@ -56,6 +60,7 @@ fn half_texels(bytes: &[u8]) -> Vec<Vec3> {
         .collect()
 }
 
+/// The blocks do not depend on the thread count, so a bake's cubes are the same on any machine.
 fn threads() -> usize {
     std::thread::available_parallelism().map_or(1, usize::from)
 }
@@ -88,6 +93,7 @@ fn write_level_index(buf: &mut [u8], index: &[(u64, u64)]) {
     }
 }
 
+/// A minimal basic DFD: enough for `ktx2::Reader`'s checks; the loader never reads it.
 fn build_dfd() -> Vec<u8> {
     let block_size: u32 = 24;
     let total: u32 = 4 + block_size;

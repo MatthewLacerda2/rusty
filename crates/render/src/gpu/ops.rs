@@ -1,3 +1,5 @@
+//! Counts are per thread, so two renderers on one thread must not nest their frames.
+
 use std::cell::Cell;
 use std::panic::Location;
 
@@ -98,8 +100,6 @@ pub(crate) trait CountedQueue {
     ) -> wgpu::SubmissionIndex;
     #[track_caller]
     fn counted_write_buffer(&self, buffer: &wgpu::Buffer, offset: wgpu::BufferAddress, data: &[u8]);
-    /// `write_texture`, its bytes counted into `staging`, the renderer's for
-    /// this queue ([`Staging`]).
     fn counted_write_texture(
         &self,
         staging: &Staging,
@@ -155,8 +155,11 @@ pub(crate) type Writes<'a> = (&'a wgpu::Queue, &'a Staging);
 
 /// The texture bytes written between two of `Staging`'s own submits: two 2048²
 /// BC7 textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
+/// A test hook: `dev`'s memory tests bound staging by it.
 pub const STAGING_BUDGET: u64 = 16 << 20;
 
+/// Bounds the host memory `write_texture`'s staging holds until a submit, waiting and
+/// submitting past the budget.
 pub(crate) struct Staging {
     device: wgpu::Device,
     since: Cell<u64>,

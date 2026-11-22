@@ -50,6 +50,7 @@ impl MipGenerator {
         [&self.data, &self.deep]
     }
 
+    /// `texture` needs `RENDER_ATTACHMENT` usage and `kind`'s view format, or [`DEEP_FORMAT`].
     pub(crate) fn generate(
         &self,
         device: &wgpu::Device,

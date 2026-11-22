@@ -20,6 +20,7 @@ pub struct BakedCube {
 
 pub const CUBE_PREFIX: &str = "reflection_probe_";
 
+/// The one name both the run-to-end bake and the editor's stepped bake write.
 pub fn cube_file(dir: &Path, i: usize) -> PathBuf {
     dir.join(format!("{CUBE_PREFIX}{i}.ktx2"))
 }
@@ -64,6 +65,7 @@ impl Renderer {
         filter.run((&self.device, (&self.queue, &self.staging)), capture)
     }
 
+    /// A test hook: the bake tests call it; the dev bake calls `bake_reflections_observed`.
     pub fn bake_reflections(&mut self, scene: &mut Scene, out_dir: &Path) -> Result<usize, String> {
         self.bake_reflections_observed(scene, out_dir, &mut |_, _| {})
     }
@@ -104,6 +106,8 @@ impl Renderer {
     }
 }
 
+/// Open (sky) texels take the ambient instead, as the lightmap and a light probe see them, so
+/// the forward pass's ratio of the two compares like with like.
 pub fn stored_irradiance(
     mut cube: CubemapCapture,
     open: [Vec<bool>; 6],

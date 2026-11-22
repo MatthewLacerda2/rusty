@@ -1,3 +1,6 @@
+//! A windowed renderer reads page lists on a worker, so a load never stalls a frame; a headless
+//! one reads them in line, so its first frame is lit.
+
 mod keep;
 mod load;
 mod upload;
@@ -25,10 +28,12 @@ pub(crate) struct Lightmaps {
     directions: Option<Rc<LightmapArray>>,
     masks: Option<Rc<LightmapArray>>,
     cache: HashMap<Vec<String>, Entry>,
+    /// 1×1 black and never written: a new texture is zeroed.
     fallback: LightmapArray,
     seen: u64,
     in_line: bool,
     pub(crate) uploads: crate::stats::Uploads,
+    /// A list landed since the last bind (`warm::land`): the bind looks again, lists unchanged.
     fresh: bool,
 }
 
@@ -128,6 +133,7 @@ impl Lightmaps {
         self.in_line = in_line;
     }
 
+    /// When false, instances must not read the lightmap array.
     pub(crate) fn resident(&self) -> bool {
         self.current.is_some()
     }

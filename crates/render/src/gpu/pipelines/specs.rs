@@ -86,6 +86,7 @@ fn primed(spec: PipelineSpec) -> PipelineSpec {
     }
 }
 
+/// Depth tested but not written, so overlapping translucents all blend instead of culling.
 pub(super) fn transparent_spec(blend: TransparentBlend, reactive: bool) -> PipelineSpec {
     PipelineSpec {
         blend: blend.state(),
@@ -131,6 +132,7 @@ pub(crate) fn velocity_target(write_mask: wgpu::ColorWrites) -> wgpu::ColorTarge
     }
 }
 
+/// Indexed as the fragment outputs' `@location`s: colour, then velocity, SSR surfaces or reactive.
 fn targets(
     format: wgpu::TextureFormat,
     spec: &PipelineSpec,

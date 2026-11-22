@@ -17,6 +17,7 @@ use crate::{DrawUniform, InstanceData, MaterialData};
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 
+/// The instances' index in `draw_group`'s buffer array.
 pub(crate) const DRAW_GROUP_INSTANCES: usize = 2;
 
 const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
@@ -30,6 +31,8 @@ pub(crate) struct FrameUpload<'a> {
     pub materials: &'a mut SlotTable<MaterialData>,
 }
 
+/// Each camera rewrites these arrays: its passes go out in its one submit before the next
+/// camera's rewrite.
 pub(crate) struct DrawBuffers {
     uniforms: GrowBuffer,
     bones: GrowBuffer,
