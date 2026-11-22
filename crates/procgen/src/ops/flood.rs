@@ -1,19 +1,18 @@
-//! 8-connected, wrapping both axes. Each flooded pixel gets a *lifted* coordinate (its step from
-//! the first pixel, summed, never wrapped), so an island across an edge measures compact. An island
-//! that loops round the tile on an axis has no edge there: its box spans the tile, starting at 0,
-//! and its centre reads 0.5.
+//! 8-connected, wrapping both axes. Each flooded pixel gets an unwrapped (*lifted*) coordinate, its
+//! steps from the first pixel summed, so an island across an edge measures compact. An island that
+//! loops round the tile on an axis has no edge there: its box spans the tile, starting at 0.
 
 use std::collections::BTreeMap;
 
 use crate::hash;
 use crate::image_buf::{Image, Rgba, Size};
 
-/// Coarse enough that the same island at another resolution mostly keeps its cell.
+/// Coarse, so the same island at another resolution mostly keeps its cell.
 const IDENTITY_GRID: f32 = 128.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Island {
-    /// The mean of its pixel centres, wrapped into `[0, 1)`; 0.5 on an axis it spans.
+    /// Wrapped into `[0, 1)`; 0.5 on an axis the island spans.
     pub centroid: [f32; 2],
     pub start: [f32; 2],
     pub size: [f32; 2],
@@ -27,7 +26,7 @@ impl Island {
 
     pub fn random(&self, channel: u64, seed: u64) -> f32 {
         let [x, y] = self.cell();
-        // Salted as `rank + 1`: the mixer maps 0 to 0, so an all-zero input is avoided.
+        // Salted as `rank + 1`, as the mixer maps 0 to 0.
         let salt = (channel << 32) ^ (u64::from(self.rank) + 1);
         hash::unit2(x, y, salt, seed)
     }
@@ -94,6 +93,8 @@ pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
     }
 }
 
+/// `flood_fill`'s output holds its islands in alpha, and two never touch: relabelling the
+/// alpha returns them.
 pub fn of_label_image(img: &Image) -> Islands {
     label(img, |p| p[3] > 0.5)
 }

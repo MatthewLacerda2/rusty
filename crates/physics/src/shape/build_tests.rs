@@ -95,6 +95,8 @@ fn cylinder_bakes_the_larger_cross_axis_radius_and_half_height_y() {
     assert!((h[2] - 6.0).abs() < 1e-4, "cylinder radius z {h:?}");
 }
 
+// Radius × the larger cross scale, `height` × the axial one; the segment's half is
+// half the length less the radius.
 fn capsule(radius: f32, height: f32, axis: CapsuleAxis, scale: Vec3) -> (f32, f32, [f32; 3]) {
     let shape = ColliderShape::Capsule {
         radius,

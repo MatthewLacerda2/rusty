@@ -8,6 +8,8 @@ use super::cost::{self, Work};
 #[derive(Clone, Copy)]
 pub(super) struct Parts<'a> {
     shape: &'a dyn CompositeShape,
+    /// A trimesh's triangles are read from it directly, so a triangle's normal
+    /// constraints are built only when asked for: parry's `map_part_at` builds them first.
     mesh: Option<&'a TriMesh>,
 }
 

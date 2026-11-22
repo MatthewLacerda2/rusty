@@ -6,6 +6,8 @@ use super::super::world::PhysicsWorld;
 use rusty_components::{JointComponent, JointKind};
 
 impl PhysicsWorld {
+    /// A test hook for the root's ragdoll tests: joint `id`'s frame in the world as physics
+    /// holds it, its X the hinge or twist axis, its Y the swing axis.
     pub fn joint_world_frame(&self, id: u32) -> Option<Quat> {
         let joint = self.impulse_joints.get(self.joints.get(&id)?.handle)?;
         let body = self.bodies.get(joint.body1())?;

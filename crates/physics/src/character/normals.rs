@@ -8,8 +8,9 @@ use rapier3d::prelude::*;
 use super::cost::{self, Work};
 use super::parts::cast_parts;
 
-/// A pair farther apart than this keeps the cast's own normal, not one taken from a pose
-/// the cast never reached.
+/// Metres past the cast's target distance the contact query looks: the cast stops within
+/// GJK's tolerance of it. A pair farther apart keeps the cast's own normal, not one taken
+/// from a pose the cast never reached.
 const CONTACT_MARGIN: Real = 0.01;
 
 pub(super) fn exact_normal(

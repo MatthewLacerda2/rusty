@@ -37,7 +37,6 @@ impl ControllerBodies {
 }
 
 impl PhysicsWorld {
-    /// Insert `body` into the world, counting the change.
     pub(crate) fn insert_body(&mut self, body: RigidBody) -> RigidBodyHandle {
         self.controller_bodies.revision += 1;
         // lint: allow(body-table) the one insert: the revision moved above
@@ -61,7 +60,9 @@ impl PhysicsWorld {
     }
 }
 
-/// `bodies` with every kinematic body made fixed.
+/// Kinematic bodies made fixed: rapier's controller rides one (a Collider alone is
+/// one), which stalled walks; Unity's rides nothing. Dynamic ones keep their type for
+/// autostep.
 fn without_kinematics(bodies: &RigidBodySet) -> RigidBodySet {
     let mut copy = bodies.clone();
     for (_, body) in copy.iter_mut() {

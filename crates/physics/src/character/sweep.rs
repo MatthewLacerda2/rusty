@@ -17,10 +17,12 @@ use rusty_components::CharacterControllerComponent;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 
+// `|n.y|` past this: a floor or ceiling, not a side. Metres past the skin a downward
+// probe reaches.
 const FLAG_EPS: f32 = 1e-3;
 const GROUND_PROBE: f32 = 0.02;
-/// Near-flat floor (within ~2.5° of up): rapier's slope split (`normal × up`) is
-/// ill-conditioned there, and parry's near-contact normals on a flat face scatter by a degree.
+/// `1 - n.y` under this (within ~2.5° of up) is near-flat: rapier's slope split
+/// (`normal × up`) is ill-conditioned there.
 const FLAT_FLOOR: f32 = 1e-3;
 
 /// `radius` is the capsule's: autostep needs that much room atop a step, else the

@@ -61,6 +61,7 @@ pub fn hue_sat_value(mut img: Image, hue: Field, sat: Field, value: Field) -> Im
 }
 
 /// With a `mask`, each pixel's factor is `factor × mask.red`, as Blender's Mix with a wired Factor.
+/// `b` and `mask` are read by `a`'s pixel index, so they must be `a`'s size.
 pub fn mix(a: Image, b: &Image, mask: Option<&Image>, mode: BlendMode, factor: f32) -> Image {
     let mut out = a;
     let w = out.width() as usize;

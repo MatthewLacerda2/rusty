@@ -7,6 +7,8 @@ use glam::Vec2;
 use super::svg::Subpath;
 use crate::image_buf::Size;
 
+/// A quadtree node at most this many pixels wide, or holding this few segments, is measured
+/// pixel by pixel.
 const LEAF_SIDE: f32 = 8.0;
 const LEAF_SEGMENTS: usize = 4;
 
@@ -20,6 +22,8 @@ pub fn coverage(subpaths: &[Subpath], width: f32, size: Size) -> Vec<f32> {
     }
     let segments = segments(subpaths, scale, r);
     let all: Vec<u32> = (0..segments.len() as u32).collect();
+    // Each node keeps only the segments whose least distance to it can beat the best
+    // greatest distance; an explicit stack, so a path from disk never recurses.
     let mut stack = vec![(Vec2::ZERO, scale, all)];
     while let Some((lo, hi, list)) = stack.pop() {
         let (c, half) = ((lo + hi) / 2.0, (hi - lo).length() / 2.0);

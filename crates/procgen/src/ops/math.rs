@@ -77,6 +77,7 @@ fn greatest(c: f32, v: f32) -> f32 {
     }
 }
 
+/// Unclamped, as Blender's Map Range by default.
 pub fn map_range(mut img: Image, from_min: f32, from_max: f32, to_min: f32, to_max: f32) -> Image {
     let span = from_max - from_min;
     let remap = |c: f32| {

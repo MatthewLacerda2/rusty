@@ -9,6 +9,8 @@ use rusty_components::{
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
+// N·m and N a weld feels stopping, in one tick, a unit cube (inertia 1/6 kg·m²)
+// spinning at 2 rad/s and a 1 kg one moving at 1 m/s.
 const SPIN_TORQUE: f32 = 2.0 / 6.0 / DT;
 const KICK_FORCE: f32 = 1.0 / DT;
 

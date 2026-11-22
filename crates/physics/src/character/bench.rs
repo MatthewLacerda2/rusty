@@ -1,3 +1,6 @@
+//! A test hook: the level `cost_tests` counts a `Move`'s work on and `dev`'s timed
+//! `bench::move_cost_tests` runs, since a sim crate may not read a clock.
+
 use glam::Vec3;
 
 use super::move_character;
@@ -41,14 +44,12 @@ pub fn level(cells: u32) -> (Scene, PhysicsWorld, u32) {
     (scene, physics, id)
 }
 
-/// `ticks` Moves of the ground stick alone: a player standing still.
 pub fn stand(physics: &PhysicsWorld, scene: &mut Scene, id: u32, ticks: usize) {
     for _ in 0..ticks {
         move_character(Some(physics), scene, id, Vec3::Y * STICK);
     }
 }
 
-/// `ticks` Moves of a 4 m/s stride with the ground stick: a player walking.
 pub fn walk(physics: &PhysicsWorld, scene: &mut Scene, id: u32, ticks: usize) {
     for _ in 0..ticks {
         move_character(Some(physics), scene, id, STRIDE + Vec3::Y * STICK);

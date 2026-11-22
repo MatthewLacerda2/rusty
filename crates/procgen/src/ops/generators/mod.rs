@@ -22,6 +22,7 @@ fn gray(v: f32) -> Rgba {
     [v, v, v, 1.0]
 }
 
+/// A malformed number reads `fallback`: a no-op, never a panic or a poisoned map.
 #[inline]
 pub fn finite(x: f32, fallback: f32) -> f32 {
     if x.is_finite() {
@@ -40,6 +41,8 @@ pub fn clamp_or(x: f32, default: f32, lo: f32, hi: f32) -> f32 {
     }
 }
 
+/// Periods per tile: far past a cell per pixel at the largest bake, and small enough that a
+/// lattice index and its neighbour stay in range (a saturated `i64` would overflow).
 pub const MAX_COUNT: f32 = 1_048_576.0;
 
 #[inline]
@@ -90,6 +93,7 @@ pub fn shape<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
     shape::sampler(p, softness)
 }
 
+/// One grain per pixel on each axis, so this generator alone reads `size`.
 pub fn white_noise(size: Size, seed: u64) -> Sampler<'static> {
     let (rx, ry) = (size.width.max(1) as i64, size.height.max(1) as i64);
     let (w, h) = (size.width as f32, size.height as f32);

@@ -1,8 +1,6 @@
-//! **Scale.** The mesh is decomposed once, at unit scale, and the body's scale is
-//! applied to the hulls, as PhysX cooks a convex mesh once and scales the
-//! cooked hulls (`PxMeshScale`). A linear map keeps every hull convex, so a
-//! stretched or mirrored prop gets the stretched hulls, not a fresh decomposition
-//! of the stretched shape, and a scaled copy costs no V-HACD run.
+//! A mesh is decomposed once, at unit scale, and the hulls are scaled after, as PhysX's
+//! `PxMeshScale` does: a linear map keeps a hull convex, so a scaled or mirrored copy
+//! costs no V-HACD run.
 
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +26,8 @@ mod sidecar_tests;
 #[cfg(test)]
 mod tests;
 
+/// Built shapes kept: every concave prop of a level at its scales. Past it the oldest
+/// is dropped.
 const KEPT: usize = 256;
 
 type Built = (Key, [u32; 3]);
@@ -69,6 +69,8 @@ fn run(mesh: Key, positions: &[[f32; 3]], indices: &[u32]) -> Pieces {
             pieces
         }
         Err(_) => {
+            // `keep`, not `keep_fresh`: no pieces never reach a sidecar, and this
+            // process never retries the mesh.
             let none = Pieces::default();
             hulls::keep(mesh, none.clone());
             none
@@ -76,6 +78,8 @@ fn run(mesh: Key, positions: &[[f32; 3]], indices: &[u32]) -> Pieces {
     }
 }
 
+/// V-HACD run here, not through parry's `SharedShape::convex_decomposition`, which panics
+/// on an empty compound.
 pub(crate) fn decompose(points: &[Vector], triangles: &[[u32; 3]]) -> Vec<Hull> {
     #[cfg(test)]
     {

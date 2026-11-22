@@ -1,10 +1,7 @@
-//! rapier's `ImpulseJoint::impulses` is not the joint's wrench. Its solver
-//! orthogonalizes a joint's rows (modified Gram-Schmidt, in the bodies'
-//! inverse-mass metric) with the angular locks first, so each linear row loses its
-//! angular part and pushes through an inertia-weighted point near body 1's centre
-//! of mass — for a joint to the world, exactly through it. The angular half is
-//! then the torque about *that* point: a weight welded a metre off its pivot reads
-//! zero, since gravity makes no torque about the weight's own centre.
+//! rapier's `ImpulseJoint::impulses` is not the joint's wrench: its solver orthogonalizes
+//! the rows (modified Gram-Schmidt, inverse-mass metric) angular locks first, so the
+//! angular half is torque about a point near body 1's centre of mass, and a weight
+//! welded a metre off its pivot reads zero.
 
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;
@@ -21,6 +18,7 @@ struct Row {
     impulse: f32,
 }
 
+// A sleeping body beside an awake partner is solved against as a wall: no mass.
 fn inv_mass(rb: &RigidBody, partner: &RigidBody) -> (Vec3, AngularInertia) {
     let walled = rb.is_sleeping() && !partner.is_sleeping();
     if !rb.is_dynamic_or_kinematic() || walled {
@@ -30,6 +28,8 @@ fn inv_mass(rb: &RigidBody, partner: &RigidBody) -> (Vec3, AngularInertia) {
     (m.effective_inv_mass, m.effective_world_inv_inertia)
 }
 
+/// Rebuilds the rows as rapier 0.36 does (`JointConstraintHelper`) and sums each one's
+/// torque about the anchor; an upgrade that changes the rows fails `load_tests`' pins.
 pub(super) fn anchor_torque(joint: &ImpulseJoint, bodies: &RigidBodySet) -> Vec3 {
     let (Some(b1), Some(b2)) = (bodies.get(joint.body1()), bodies.get(joint.body2())) else {
         return Vec3::ZERO;

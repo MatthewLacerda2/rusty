@@ -55,8 +55,11 @@ pub fn sampler(
     })
 }
 
+/// The cell rings that can hold the point `output` needs, under `metric`: a point `R + 1` rings
+/// out is over `R` cells away under every metric.
 fn reach(output: VoronoiOutput, metric: VoronoiMetric) -> i64 {
     match (output, metric) {
+        // Blender's reach: points two rings out still pull the smooth minimum.
         (VoronoiOutput::SmoothF1, _) => 2,
         (VoronoiOutput::Distance | VoronoiOutput::F2, _) | (_, VoronoiMetric::Chebyshev) => 1,
         (VoronoiOutput::Edges, VoronoiMetric::Manhattan) => 3,

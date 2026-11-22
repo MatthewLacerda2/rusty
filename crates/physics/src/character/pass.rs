@@ -17,9 +17,10 @@ impl Pass {
     }
 }
 
-/// rapier 0.36's controller can lose travel on a near-flat floor: its no-slipping rule reads
-/// float noise in the downward part as a slip and drops the whole slide. A wall that took
-/// the travel takes it again on the rerun.
+/// Whether a pass lost over 1% of its horizontal travel. rapier 0.36's controller can on a
+/// near-flat floor: its no-slipping rule reads float noise in the downward part as a slip
+/// and drops the whole slide. The rerun has no downward part, and snap-to-ground still
+/// holds the floor; a wall that took the travel takes it again on the rerun.
 pub(super) fn stalled(motion: Vec3, pass: &Pass) -> bool {
     let wanted = Vec3::new(motion.x, 0.0, motion.z).length();
     let got = Vec3::new(pass.translation.x, 0.0, pass.translation.z).length();

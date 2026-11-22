@@ -3,6 +3,7 @@ use crate::hash;
 use crate::ops::field::Field;
 use crate::recipe::NoiseKind;
 
+/// 2-D Perlin with unit gradients peaks at `√½`; times this, `|n|` spans `[0, 1]`.
 const UNIT: f32 = std::f32::consts::SQRT_2;
 
 #[derive(Clone, Copy, Debug)]
@@ -17,13 +18,17 @@ impl Octaves {
         Self {
             count: count.max(1),
             lacunarity,
+            // A negative gain would cancel octaves out.
             gain: gain.max(0.0),
         }
     }
 }
 
+/// Lattice cells either way: past a few the warp is already white noise, and the cap keeps an
+/// infinite one finite.
 pub const MAX_DISTORTION: f32 = 1000.0;
 
+/// Apart from the octaves' seeds, so the push is not the noise it warps.
 const WARP_SALT: [u64; 2] = [0x5bd1_e995, 0x27d4_eb2f];
 
 pub fn sampler(
@@ -37,6 +42,7 @@ pub fn sampler(
     let push = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION);
     let warp = base.map(|b| push / b);
     Box::new(move |u, v| {
+        // Before the warp: a warped read would leave the tile and clamp, opening a seam.
         let gain = gain.at_pixel(u, v);
         let (u, v) = if push == 0.0 {
             (u, v)

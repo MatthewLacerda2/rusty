@@ -8,6 +8,7 @@ use rusty_font::{FontData, GlyphId};
 use super::fill::Shape;
 use crate::catalog::generators::outline::text::Align;
 
+/// `size` is the em in tiles; `tracking` and `line_spacing` are in ems.
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
     pub size: f32,
@@ -29,7 +30,6 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     let pitch = layout.size * layout.line_spacing;
     let height = ascent + descent + pitch * (lines.len() - 1) as f32;
     let top = 0.5 - height / 2.0;
-    // Each distinct glyph is flattened once, however often the text draws it.
     let mut outlines: Map<GlyphId, Option<Vec<rusty_font::Segment>>> = Map::default();
     let mut shapes = Vec::new();
     for (i, (glyphs, w)) in lines.iter().enumerate() {
