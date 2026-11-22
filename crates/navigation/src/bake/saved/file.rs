@@ -12,6 +12,7 @@ use super::super::super::{
 
 const MAGIC: &[u8; 4] = b"RNAV";
 pub(super) const FORMAT: u32 = 1;
+/// The most a file may declare: 16k × 16k, a 4 km level at 0.25 m.
 const MAX_CELLS: u64 = 1 << 28;
 const PLANE: u8 = 8;
 

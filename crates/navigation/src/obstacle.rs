@@ -4,6 +4,7 @@ use super::avoidance::AvoidanceAgent;
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_scene::Scene;
 
+/// Around a capsule obstacle's footprint.
 const ROUND_SEGMENTS: usize = 16;
 
 #[derive(Clone, Debug, PartialEq)]

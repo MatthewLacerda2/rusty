@@ -16,6 +16,8 @@ pub(in crate::lightmap) struct Paths {
 pub(in crate::lightmap) struct Shown {
     pub direct: Vec3,
     pub direct_dir: Vec3,
+    /// Not a `Vec4`: one is held per texel between passes, and its alignment would grow
+    /// `Shown` from 40 bytes to 48.
     pub mask: [f32; 4],
 }
 

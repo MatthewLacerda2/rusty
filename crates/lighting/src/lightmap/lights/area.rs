@@ -6,6 +6,7 @@
 
 use glam::Vec2;
 
+/// Cells per side: `GRID²` shadow rays per probe.
 pub const GRID: u32 = 8;
 
 pub use rusty_scene::lighting::area::{AreaShape, EMIT_OFFSET};

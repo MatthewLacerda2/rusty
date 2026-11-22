@@ -66,6 +66,7 @@ impl MeshSource {
             .positions
             .iter()
             .map(|&p| {
+                // `+ ZERO` folds -0.0 into +0.0, so both zeros hash as one corner.
                 let p = p + Vec3::ZERO;
                 *map.entry(p.to_array().map(f32::to_bits))
                     .or_insert_with(|| {
@@ -88,6 +89,7 @@ impl MeshSource {
             .iter()
             .zip(&self.uvs)
             .map(|(&p, &u)| {
+                // -0.0 folded into +0.0, as `weld` does.
                 let (p, u) = (p + Vec3::ZERO, u + Vec2::ZERO);
                 let key = [p.x, p.y, p.z, u.x, u.y].map(f32::to_bits);
                 let next = map.len() as u32;

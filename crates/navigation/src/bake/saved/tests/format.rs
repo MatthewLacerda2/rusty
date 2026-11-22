@@ -5,6 +5,8 @@ const PINNED: (u32, u64) = (1, 0xa381c9902ddf3d1b);
 
 const HEADER: usize = 4 + 4 + 8;
 
+// Linux only: another platform may round a float differently, and one platform catches a
+// forgotten bump.
 #[cfg(target_os = "linux")]
 #[test]
 fn the_bakes_output_is_pinned_to_its_format() {

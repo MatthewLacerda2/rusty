@@ -125,8 +125,8 @@ impl BakeScene {
 }
 
 impl BakeScene {
-    /// Such a mesh occludes, bounces and emits even without a lightmap (SSIL skips its emission
-    /// once a bake exists).
+    /// A baked mesh occludes, bounces and emits even without a lightmap; SSIL skips its
+    /// emission once baked.
     pub fn takes_mesh(scene: &Scene, id: u32) -> bool {
         rusty_scene::lighting::lightmap_set::bakes_mesh(scene, id)
     }
@@ -184,6 +184,8 @@ fn drawn_runs(
     (indices, runs)
 }
 
+/// Mirrors the forward shader: no material is white, unlit, opaque; Transparent emission
+/// scales by alpha.
 fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> BakeRun {
     let Some(m) = material else {
         return BakeRun {
@@ -199,7 +201,7 @@ fn surface(material: Option<&MaterialAsset>, map_average: &MapAverage<'_>) -> Ba
             .unwrap_or(Vec3::ONE)
     };
     let colour = |map: &Option<MapRef>| average(map, MapEncoding::Colour);
-    // The forward shader's `mapping::occlusion` lerp on the map's average red, same strength.
+    // Its `mapping::occlusion` lerp, on the map's average red.
     let red = average(&m.occlusion_map, MapEncoding::Data).x;
     let occlusion = 1.0 + m.occlusion_amount() * (red - 1.0);
     let albedo = Vec3::from(m.base_color) * colour(&m.base_color_map) * occlusion;

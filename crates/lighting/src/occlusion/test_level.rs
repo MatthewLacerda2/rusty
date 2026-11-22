@@ -1,8 +1,11 @@
+//! Test hooks: the levels other crates' occlusion bake tests build.
+
 use glam::Vec3;
 
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
+// Metres.
 pub const HALF: f32 = 1.0;
 pub const DEPTH: f32 = 8.0;
 pub const LENGTH: f32 = 20.0;
