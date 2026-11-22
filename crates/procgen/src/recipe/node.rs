@@ -1,6 +1,5 @@
-//! `deny_unknown_fields` does not compose with `#[serde(flatten)]`, so strictness is checked
-//! after parsing: the op is serialized back and any key the author wrote that it does not
-//! produce is refused by name.
+//! `deny_unknown_fields` does not compose with `#[serde(flatten)]`: the op is serialized
+//! back after parsing and a key it does not produce is refused by name.
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
@@ -44,39 +43,37 @@ impl Node {
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeError {
     pub node: String,
-    /// The op's tag, or what the author wrote for it when that names no op.
+    /// The op's tag, or what was written when it names no op.
     pub op: String,
     pub fault: Fault,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Fault {
-    /// The node did not parse: a missing or mistyped param, an unknown key or op.
+    /// Unparsed node.
     Parse(String),
-    /// Wired with more or fewer inputs than its op accepts.
+    /// Wrong input count.
     Arity {
-        /// The `math` func, whose arity narrows the op's (a unary func takes one input).
+        /// The `math` func narrowing the op's arity.
         func: Option<String>,
-        /// What to do, when the node's params decide its inputs (`expression`).
+        /// Fix hint.
         fix: Option<String>,
         given: usize,
         accepts: Arity,
     },
-    /// An input id no node defines.
+    /// Undefined input id.
     UnknownInput(String),
-    /// A param linked to an id no node defines.
+    /// Link to an undefined id.
     UnknownLink { param: String, link: String },
-    /// The node is on a cycle (the graph is not a DAG).
+    /// On a cycle.
     Cycle,
-    /// An `image` node whose file was not handed in.
+    /// Image file not handed in.
     MissingSource(String),
-    /// A `text` node whose font file was not handed in.
+    /// Font file not handed in.
     MissingFont(String),
-    /// An `image` node whose file the caller's loader could not read or decode when
-    /// the node ran.
+    /// Image file unreadable.
     Unreadable { path: String, error: String },
-    /// A graph instance left in the recipe the runner was handed: its
-    /// caller skipped [`crate::graph::expand`].
+    /// Graph instance left unexpanded.
     Unexpanded(String),
 }
 
