@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/rect_tool/geometry.rs — the rect tool's pure maths.
-
 use glam::{Affine2, Mat2, Vec2};
 
 use rusty_components::RectTransformComponent;
@@ -9,12 +7,13 @@ use rusty_ui::UiRect;
 pub enum Handle {
     /// Inside the rect: move it (`anchored_position`).
     Body,
-    /// The pivot.
+    /// The pivot disc: moves the pivot, not the rect.
     Pivot,
-    /// An edge or corner: -1 = min, +1 = max.
+    /// An edge or corner: which sides move, -1 = min, +1 = max.
     Resize { x: i8, y: i8 },
 }
 
+/// Corners first, as `hit` takes the first handle in reach.
 const RESIZE: [(i8, i8); 8] = [
     (-1, -1),
     (-1, 1),
@@ -86,7 +85,7 @@ pub struct RectEdit {
 }
 
 /// The edit a drag of `delta` (canvas units) on `handle` makes to `rt`, laid out
-/// as `own` inside `parent`. `None` when either frame is degenerate.
+/// as `own` inside `parent`.
 pub fn drag(
     rt: &RectTransformComponent,
     handle: Handle,
@@ -118,7 +117,7 @@ pub fn drag(
                     _ => continue,
                 };
                 edit.size_delta[axis] += grow;
-                shift[axis] = d * share;
+                shift[axis] = d * share; // so the opposite side stays put
             }
             edit.anchored_position += to_parent * (own_frame * shift);
         }

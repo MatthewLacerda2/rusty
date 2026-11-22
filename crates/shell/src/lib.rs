@@ -40,7 +40,7 @@ pub struct Shell {
     pub ticks: frame::FixedTicks,
     pub pacer: pace::Pacer,
     pub keymap: Keymap,
-    /// In effect on the surface and window, so the per-frame apply redoes only what changed.
+    /// The video settings in effect, so the per-frame apply redoes only what changed.
     pub applied_video: VideoSettings,
     pub cursor: input::CursorPolicy,
     pub pad_source: Option<input::pad_source::GilrsSource>,

@@ -127,7 +127,7 @@ fn cached_schema(path: &str) -> Vec<ScriptField> {
         if let Some(fields) = cache.schemas.get(path) {
             return fields.clone();
         }
-        // A failed read is a miss retried next frame, never a cached empty schema.
+        // A failed read is retried next frame, never cached as an empty schema.
         let Ok(code) = std::fs::read_to_string(path) else {
             return Vec::new();
         };

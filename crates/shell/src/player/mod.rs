@@ -1,4 +1,5 @@
-//! crates/shell/src/player/ — the standalone player frontend: a game with no editor.
+//! The player boots read-only, as Unity's: no seeding, no asset refresh, and it writes only
+//! under `saved/` (Unity's `persistentDataPath`).
 
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
@@ -9,10 +10,8 @@ use rusty_core::settings::video::VideoSettings;
 use rusty_render::RenderView;
 use std::path::Path;
 
-/// The player's frontend state: the one full-window render view.
 #[derive(Default)]
 pub struct PlayerFrontend {
-    /// Sized to the swapchain every frame; created on the first frame.
     view: Option<RenderView>,
 }
 
@@ -53,6 +52,7 @@ impl Frontend for PlayerFrontend {
         let scene = game.scene().borrow();
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);
+        // No debug overlays in a shipped game: editor mode off.
         shell.renderer.render(view, &scene, &camera, target, false);
         drop(scene);
         #[cfg(feature = "dev")]
@@ -71,6 +71,8 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
 }
 
 fn world(plan: &rusty_core::project::BootPlan, settings: ProjectSettings) -> GameWorld {
+    // Standalone before the startup scene's import, so a player built with `dev` or `editor`
+    // writes no cooked model.
     rusty_asset::convert::mark_standalone();
     let mut game = boot::load_game(plan);
     game.open_project(ProjectSource::ReadOnly(settings));
@@ -78,8 +80,6 @@ fn world(plan: &rusty_core::project::BootPlan, settings: ProjectSettings) -> Gam
     game
 }
 
-/// The player's world on the open project's startup scene, read-only: everything
-/// [`launch`] does before it opens the window. Errs when no startup scene is set.
 fn boot(settings: ProjectSettings) -> Result<GameWorld, String> {
     // A run reads no editor record, so the root is moot.
     let startup = &settings.build.startup_scene;
@@ -87,8 +87,6 @@ fn boot(settings: ProjectSettings) -> Result<GameWorld, String> {
     Ok(world(&plan, settings))
 }
 
-/// Boot the standalone player on the open project's settings
-/// (`core::project::Opened`) and run until the game quits or the window closes.
 pub fn launch(settings: ProjectSettings) {
     let build = settings.build.clone();
     println!(
@@ -104,6 +102,7 @@ pub fn launch(settings: ProjectSettings) {
     let launch = Launch {
         video_defaults: video_defaults(&build),
         title: build.product_name,
+        // The game's own `.desktop` entry is its packager's to name.
         app_id: None,
         maximized: false,
         frontend: |_: &Shell, _: &GameWorld| PlayerFrontend::default(),

@@ -86,8 +86,8 @@ pub(super) fn draw(
     }
 }
 
-/// Writes each draft whose field was not drawn last pass, so the inspector calls it
-/// every pass, collapsed or not.
+/// Writes each draft whose field was not drawn last pass; the inspector calls it every
+/// pass, collapsed or not.
 pub fn commit_abandoned(ctx: &egui::Context, scene: &mut Scene) -> bool {
     let mut changed = false;
     for field in FIELDS {

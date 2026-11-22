@@ -65,7 +65,7 @@ pub fn run_after<P, K, B, F, M>(
 }
 
 enum Stage<P, K, B, F, M> {
-    /// Before the first `resumed`: nothing open yet.
+    /// Nothing open yet, before the first `resumed`.
     Waiting {
         title: String,
         app_id: Option<&'static str>,

@@ -40,7 +40,7 @@ fn survivor() -> (GameWorld, u32) {
     (game, id)
 }
 
-/// In Play, past the entry frame, with `Survivor` marked
+/// A world in Play, past the entry frame, with `Survivor` marked
 /// `DontDestroyOnLoad` and a load of `level` queued for the next tick.
 fn loading(tag: &str) -> (GameWorld, u32, FixedTicks, DrawPoses) {
     let level = write_level(tag);

@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/ — the Unity-style Scene/Game viewport panel.
-
 pub mod game_size;
 pub mod gizmo;
 pub mod pick;
@@ -22,25 +20,25 @@ pub enum ViewportTab {
 
 pub struct ViewportInteraction {
     pub tab: ViewportTab,
+    /// The image's top-left in window points, for the shell to map the OS pointer.
     pub origin: egui::Pos2,
     /// The image rect's size in points (egui logical units).
     pub size: egui::Vec2,
+    /// The Game tab's own pixel size, drawn letterboxed; `None` on the Scene tab or
+    /// at the panel's own pixels.
     pub render: Option<(u32, u32)>,
+    /// That size behind either tab: what the UI lays out at.
     pub screen: Option<(u32, u32)>,
     /// Pointer position relative to the image's top-left, if hovering.
     pub hover_local: Option<egui::Vec2>,
-    /// A click was released inside the image this frame (select / gizmo grab end).
     pub clicked: bool,
-    /// The primary button is held and dragging this frame.
     pub dragging: bool,
     /// Pointer drag delta this frame, in points.
     pub drag_delta: egui::Vec2,
-    /// The drag started this frame (pointer pressed inside the image).
     pub drag_started: bool,
     pub pointer_pressed: bool,
 }
 
-/// Draw the central viewport panel: the Scene/Game tab strip and the scene image.
 pub fn draw(
     editor: &mut crate::EditorUi,
     ui: &mut egui::Ui,
@@ -193,6 +191,7 @@ fn navigate(editor: &mut crate::EditorUi, response: &egui::Response, scene: &rus
         response.ctx.request_repaint();
     }
     if nav.gesture.is_some() {
+        // The Scene view takes the keyboard, so WASD never types into a field.
         response.request_focus();
     }
     scene_nav::apply(&mut editor.scene_view.camera, &nav);

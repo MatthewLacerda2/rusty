@@ -100,7 +100,7 @@ fn draw_placement(
 }
 
 /// The world anchor section over a snapshot. Returns the edited anchor (`None`
-/// inside: not a marker) when anything changed.
+/// inside: not a marker) if changed.
 fn draw_world_anchor(
     ui: &mut egui::Ui,
     anchor: Option<WorldAnchor>,

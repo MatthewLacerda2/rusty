@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/gizmo.rs — the draggable move gizmo.
-
 use glam::Vec3;
 
 use super::pick::Ray;
@@ -22,6 +20,8 @@ impl GizmoAxis {
     }
 }
 
+/// World units: `generate_axis_arrows` draws the arrows this long, so the hit-test
+/// spans what is seen.
 const AXIS_LENGTH: f32 = 2.0;
 
 #[derive(Clone, Copy, Debug)]
@@ -44,10 +44,8 @@ pub fn begin_drag(origin: Vec3, ray: Ray, pick_radius: f32) -> Option<GizmoDrag>
     })
 }
 
-/// Advance a drag for the current pick `ray`: translate `entity_id` along the grabbed
-/// axis by the change in the along-axis scalar, writing through the inspector's
-/// transform-mutation path (the write queues the collider refresh). Returns whether the
-/// entity moved, so the caller can flag the scene dirty.
+/// Translate `entity_id` along the grabbed axis by the change in `t` since the last
+/// frame; whether it moved. The write queues the collider refresh.
 pub fn drag(
     scene: &mut Scene,
     entity_id: u32,
@@ -65,12 +63,14 @@ pub fn drag(
     let Some(mut transform) = scene.world.transform_mut(entity_id) else {
         return false;
     };
+    // A world axis added to the local position: under a rotated parent it moves along
+    // the parent's axis.
     transform.position += axis * delta;
     true
 }
 
 /// The scalar `t` such that `origin + t * axis` is the point on the (infinite) axis
-/// line closest to `ray`. The drag tracks the delta of this between frames.
+/// line closest to `ray`.
 fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
     let a = axis;
     let b = ray.dir;
@@ -79,6 +79,7 @@ fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
     let bb = b.dot(b);
     let ab = a.dot(b);
     let denom = aa * bb - ab * ab;
+    // The axis is parallel to the ray: no stable projection.
     if denom.abs() < 1e-6 {
         return 0.0;
     }
