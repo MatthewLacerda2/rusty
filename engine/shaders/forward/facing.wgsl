@@ -5,13 +5,18 @@
 
 // Whether a material that draws back faces (`two_sided`: render face `Back` or `Both`) is seen
 // here from behind, so it shades with its normal flipped, as URP's *Mirror* double-sided normal
-// mode does (`facing_normal`, `facing_tangent`).
+// mode does (`facing_normal`, `facing_tangent`). The side is read off the triangle's plane, not
+// `@builtin(front_facing)`: pipelines share a winding (`gpu::pipelines::winding`), so for a
+// mirrored mesh that names the wrong side. It takes derivatives: call it before any per-pixel
+// branch.
 fn seen_from_behind(n: vec3<f32>, p: vec3<f32>, two_sided: bool) -> bool {
     let face = cross(dpdx(p), dpdy(p));
     let seen = select(-face, face, dot(face, toward_viewer(p)) >= 0.0);
     return two_sided && dot(n, seen) < 0.0;
 }
 
+// `view_proj`'s w row is zero only for an orthographic lens, whose rays are parallel along its
+// z row, the view's forward axis.
 fn toward_viewer(p: vec3<f32>) -> vec3<f32> {
     let vp = camera.view_proj;
     let w_row = vec3<f32>(vp[0].w, vp[1].w, vp[2].w);

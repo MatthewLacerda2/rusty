@@ -25,6 +25,7 @@ fn three_value_callers_are_undisturbed() {
 #[test]
 fn sphere_cast_appends_the_contact_point_and_normal() {
     let (m, _, b) = spatial_runtime();
+    // A shape cast's distance and point are not exact at the face, so they compare within 1e-4.
     let script = "local hit, id, d, px, py, pz, nx, ny, nz, bone, name, root = \
                   Physics.SphereCast(0,0,2, 0,0,1, 0.5) \
                   local function near(x, want) return math.abs(x - want) < 1e-4 end \

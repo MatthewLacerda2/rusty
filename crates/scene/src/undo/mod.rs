@@ -9,6 +9,8 @@ use rusty_ecs::Recorded;
 
 use level::{LevelDelta, SceneLevel};
 
+/// Steps kept: a step holds only what one edit touched, and an API call touching every entity
+/// of a Dust2-sized scene cannot pile up without bound.
 pub const DEPTH: usize = 200;
 
 #[derive(Debug)]
@@ -29,6 +31,8 @@ pub struct UndoStack {
 }
 
 impl Scene {
+    /// Records writes until `pause_edits` or `commit_edits`; a paused edit stays open and
+    /// this resumes it.
     pub fn begin_edits(&mut self) {
         if self.is_playing() {
             return;
@@ -53,6 +57,8 @@ impl Scene {
         true
     }
 
+    /// The open edit joins the last step, as Unity folds it into the current group, and
+    /// never clears Redo.
     pub fn commit_follow_up(&mut self) -> bool {
         let Some(step) = self.take_step(None) else {
             return false;
@@ -62,6 +68,7 @@ impl Scene {
             return true;
         };
         for (id, before) in step.entities {
+            // The last step's record is older, so it wins.
             last.entities.entry(id).or_insert(before);
         }
         match (&mut last.level, step.level) {
@@ -73,6 +80,7 @@ impl Scene {
         true
     }
 
+    /// An open edit closes first and reopens after, so a mid-drag bake joins neither step.
     pub fn unrecorded<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         let (open, recording) = (self.history.open, self.world.journal_recording());
         self.commit_edits(None);
@@ -203,6 +211,7 @@ impl Scene {
     }
 }
 
+/// By the saved form, so a runtime-only field (an animator's playhead) is no edit.
 fn changed(before: Option<&Recorded>, after: Option<&Recorded>) -> bool {
     match (before, after) {
         (None, None) => false,

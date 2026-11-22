@@ -3,13 +3,20 @@ use glam::{Quat, Vec3};
 use super::BonePose;
 use rusty_components::transform::mirrored_direction;
 
+/// Re-aim passes per solve: each re-measures from the tip, absorbing the parallax of turning
+/// lower bones. Fixed, so the result is deterministic.
 const PASSES: usize = 4;
+/// The zero below which a squared length, a weight sum or an angle (radians) leaves
+/// nothing to normalise or divide by.
 const EPS: f32 = 1e-6;
 
 #[derive(Clone, Copy, Debug)]
 pub struct AimSettings<'a> {
+    /// Each bone's share of the turn; one not matching the chain's length splits evenly.
     pub weights: &'a [f32],
+    /// The aim direction in the last bone's local space.
     pub axis: Vec3,
+    /// Radians the aim may leave the animated aim (Unity's `MultiAim` limit).
     pub clamp: f32,
     pub weight: f32,
 }

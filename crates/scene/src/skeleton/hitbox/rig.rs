@@ -5,6 +5,7 @@ use rusty_asset::{JointTransform, SkinData};
 use rusty_components::mesh::Vertex;
 use rusty_components::MeshComponent;
 
+/// Name, parent slot, bind position, vertex box centre and box size, in mesh space.
 pub(super) type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
 
 pub(super) const BONES: [Bone; 5] = [

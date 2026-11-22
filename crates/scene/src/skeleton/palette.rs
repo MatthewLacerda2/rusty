@@ -40,10 +40,13 @@ impl Scene {
             let m = match (parent, parent_slot) {
                 (Some(p), _) if p == owner => local,
                 (Some(p), Some(ps)) if ps < slot && bones[ps] == Some(p) => out[ps] * local,
+                // A bone a script re-parented elsewhere skins by its live world matrix.
                 _ => owner_inverse * self.world.local_to_world(bone),
             };
             out.push(m);
         }
+        // Inverse binds fold in only now: until here each child read its parent's bare matrix
+        // from `out`.
         for (g, ib) in out.iter_mut().zip(skin.inverse_bind.iter()) {
             *g *= *ib;
         }
@@ -51,6 +54,8 @@ impl Scene {
     }
 }
 
+/// A destroyed slot rides with its parent joint (no head floating at the bind pose
+/// after a decapitation); only a skeleton root falls back to its bind pose.
 fn missing_in_mesh(
     skin: &SkinData,
     slot: usize,

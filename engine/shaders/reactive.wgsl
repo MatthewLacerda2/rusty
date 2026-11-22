@@ -1,6 +1,8 @@
-
+// TAA's reactive mask, by FSR2's formulas. The `R16Float` target blends by max and packs the
+// camera's stack index plus a reactivity below 1, so a higher camera's write always wins.
 #define_import_path reactive
 
+// FSR2's recommended maximum, as `components::MAX_REACTIVE`; below 1, so the packing holds.
 const MAX_REACTIVE: f32 = 0.9;
 
 // The texel camera `camera` (its index in the stack) writes for reactivity `r`; `fixed` at or
@@ -19,6 +21,8 @@ fn over(alpha: f32) -> f32 {
     return alpha;
 }
 
+// FSR2 tonemaps the colour before and after compositing; a pass can't read what is under it,
+// so only the added light is tonemapped, by `x / (1 + x)`.
 fn added(delta: vec3<f32>) -> f32 {
     let m = max(max(delta.r, delta.g), max(delta.b, 0.0));
     return m / (1.0 + m);

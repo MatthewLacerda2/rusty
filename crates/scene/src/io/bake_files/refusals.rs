@@ -13,6 +13,8 @@ impl BakeFiles {
         self.record(path, Seen { mark, why, ..seen });
     }
 
+    /// Why this world's last read of `path` went unused, until a later read, write or bake
+    /// there.
     pub fn not_used(&self, path: &Path) -> Option<String> {
         let seen = self.seen.borrow();
         seen.get(&super::disk::key(path))?.why.clone()

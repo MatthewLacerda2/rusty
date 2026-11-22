@@ -1,8 +1,5 @@
--- `...` is the command line's `--param` table.
 -- A grid of 12 m rooms joined by doorways; `size = "dust2"` is a 5 × 5 grid of
--- blocks (120 m a side, Dust2's footprint), run on request.
--- `bake = true` also runs Generate Lighting at the showroom's lowest settings:
--- slow (about 90 s at the default size on a software adapter): off by default.
+-- blocks (120 m a side, Dust2's footprint).
 
 local p = { size = "default", seed = 1, bots = 4, kills = 10, time = 120, bake = false }
 for key, value in pairs(... or {}) do
@@ -87,6 +84,7 @@ end
 
 local function block(ox, oz, n)
     local tag = "_" .. n
+    -- Room A's 10 cm wall lets a shot through (combat.lua's `RESIST`).
     box("ThinWall" .. tag, ox + 6, 0, oz + 6, 0.1, 2.5, 3, "wood")
     local ux0, ux1 = ox + 18, ox + 24 - WALL_T / 2
     box("Upper" .. tag, (ux0 + ux1) / 2, UPPER - 0.2, oz + 6, ux1 - ux0, 0.2, ROOM - WALL_T, "wood")
@@ -126,6 +124,7 @@ end
 
 Navigation.SetAgentRadius(0.4)
 Navigation.SetAgentHeight(1.8)
+-- Metres: each limit clears what it links, the 3 m drop and the 1 m crate.
 Navigation.SetDropHeight(UPPER + 0.5)
 Navigation.SetJumpHeight(1.2)
 
@@ -217,6 +216,7 @@ Scene.AddComponent(camera, "Camera")
 Transform.SetPosition(camera, 3, 1.6, 3)
 
 local SCENE = "assets/scenes/arena.scene"
+-- The bakes write their files beside the saved scene.
 Scene.Save(SCENE)
 Navigation.Bake()
 if p.bake then

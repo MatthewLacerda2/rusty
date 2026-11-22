@@ -2,6 +2,8 @@ use super::emit::{chain, Instance};
 use crate::blocks::Stage;
 use crate::params::ParamLayout;
 
+/// `shader.wgsl`'s identity hook, character for character. Every vertex stage drawing a
+/// mesh calls it, so the replaced body moves the vertex in all of them.
 const SURFACE_VERTEX: &str =
     "fn surface_vertex(v: SurfaceVertex, time: f32) -> SurfaceVertex {\n    return v;\n}";
 

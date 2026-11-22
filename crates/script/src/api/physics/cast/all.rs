@@ -21,6 +21,8 @@ fn vec_into(lua: &mlua::Lua, t: &Table, key: &str, v: Vec3) -> mlua::Result<()> 
     t.raw_set(key, out)
 }
 
+/// Writes each owner field, nil too, so a reused `RaycastAllNonAlloc` entry drops the last hit's.
+/// `cast::cast_result` returns the same fields as values: a new field goes in both.
 pub(in crate::api::physics) fn set_owner(t: &Table, scene: &Scene, id: u32) -> mlua::Result<()> {
     let bone = scene.hit_bone(id);
     t.raw_set("id", id)?;

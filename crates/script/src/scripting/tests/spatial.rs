@@ -29,6 +29,7 @@ fn add_box(scene: &mut Scene, name: &str, pos: Vec3, layer: u8) -> u32 {
     id
 }
 
+/// `a` spans [-1,1]³ on layer 0; `b` spans z 9 to 11 on layer 3.
 pub(super) fn spatial_runtime() -> (ScriptManager, u32, u32) {
     let mut raw = Scene::new();
     let a = add_box(&mut raw, "A", Vec3::ZERO, 0);

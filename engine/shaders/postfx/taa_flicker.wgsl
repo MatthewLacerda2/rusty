@@ -1,8 +1,9 @@
 // TAA's flicker hold, what the camera's anti-flicker runs (`taa.wgsl`'s `_held` entry points),
 // after HDRP's anti-flicker and Unreal TSR's flickering luminance: a still pixel whose frame
-// keeps blinking under the jitter (an SSR or a specular outlier on some sub-pixel offsets)
-// keeps its history's luma against the next blink instead of being clamped to it; its hue and
-// saturation stay the clamp's.
+// keeps blinking under the jitter keeps its history's luma against the next blink instead of
+// being clamped to it; its hue and saturation stay the clamp's. A blink is a luma step
+// undone the next frame, so a lone change (a light switched on, one muzzle flash) is clamped
+// as URP's is.
 
 #define_import_path postfx::taa_flicker
 
@@ -13,7 +14,7 @@ struct Flicker {
     step: f32,
     flicker: f32,
     recurring: f32,
-    // how far (0 to 1) the history is kept from its clamp toward where it was
+    // How far (0 to 1) the history is kept from its clamp toward where it was
     hold: f32,
 };
 
@@ -32,11 +33,10 @@ fn reach(raw: f32, boxed: f32, room: f32) -> f32 {
     return clamp((p / (1.0 - p) - boxed) / (raw - boxed), 0.0, 1.0);
 }
 
-// The pixel's flicker this frame, from last frame's texel `then` (luma, step, flicker,
-// recurring), this frame's perceptual `luma`, how `still` it is (`.x`: unmoved and unrevealed;
-// `.y`: that, and not reactive), its history's luma before and after its clamp (`history`: raw,
-// boxed) and the knobs (`decay`, `scale`: how many times its recurring flicker the history may
-// sit outside).
+// The pixel's flicker this frame, from last frame's texel `then` (`texel`'s order), this
+// frame's perceptual `luma`, how `still` it is (`.x`: unmoved and unrevealed; `.y`: that, and
+// not reactive), its history's luma before and after its clamp (`history`: raw, boxed) and the
+// knobs (`decay`, `scale`: how many times its recurring flicker the history may sit outside).
 fn next(then: vec4<f32>, luma: f32, still: vec2<f32>, history: vec2<f32>, knobs: vec2<f32>) -> Flicker {
     let room = knobs.y * then.w;
     let hold = reach(history.x, history.y, room) * still.y;

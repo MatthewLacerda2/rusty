@@ -27,6 +27,7 @@ fn run<R: mlua::FromLuaMulti>(prep: impl FnOnce(&mut Scene, u32), chunk: &str) -
 
 #[test]
 fn a_paired_op_sees_both_new_values() {
+    // Each first value passes the other half's current one (outer cone 45, auto-size max 72).
     let (_, out) = run::<(f32, f32, f32, f32)>(
         |_, _| {},
         r#"

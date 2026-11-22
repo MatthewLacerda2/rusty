@@ -1,6 +1,5 @@
-// engine/shaders/postfx/effects/film_grain.wgsl — Film Grain, Unity URP's
-// response curve, the last thing the composite draws. Seeded by the pixel and the game
-// clock: new noise every tick while time runs, the same noise at the same tick (and
+// Film Grain, Unity URP's response curve, the last thing the composite draws. Seeded by the pixel
+// and the game clock: new noise every tick while time runs, the same noise at the same tick (and
 // frozen at time 0, in edit mode). Slot 0: x intensity (`0`: off), y response.
 
 #define_import_path postfx::effects::film_grain

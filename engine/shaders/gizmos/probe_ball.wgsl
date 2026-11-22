@@ -1,8 +1,11 @@
-// the reflection-probe gizmo's mirror ball , Unity's reflection-probe preview sphere: a perfect
-// mirror of the probe's raw capture, mip 0, no box projection, no lighting.
+// The reflection-probe gizmo's ball mirrors the probe's raw capture (mip 0, no box projection,
+// no lighting), as Unity's preview sphere does. Each fragment ray-casts a true sphere and writes
+// its depth, so the ball is round at any distance and depth-tests as a solid does. The instance
+// index is the probe's resident slot plus one, 0 for no resident cube (`resident_instance`).
 
 #import forward::bindings::{camera, draw, lighting, s_linear_clamp, t_refl_cube}
 
+// A probe with no resident cube draws flat neutral grey, so it reads as unbaked.
 const UNBAKED_GREY: vec3<f32> = vec3<f32>(0.5, 0.5, 0.5);
 
 struct BallVertex {
@@ -35,11 +38,15 @@ fn vs_ball(@builtin(vertex_index) corner: u32, @builtin(instance_index) resident
     let c_ndc = c_clip.xy / c_clip.w;
     let near = camera.inv_view_proj * vec4<f32>(c_ndc, 0.0, 1.0);
     let far = camera.inv_view_proj * vec4<f32>(c_ndc, 1.0, 1.0);
+    // The quad faces back along the ray through the centre: in orthographic, facing the eye
+    // instead would clip an off-axis ball's silhouette.
     let toward = select(to_eye / d, normalize(near.xyz / near.w - far.xyz / far.w), ortho);
     let helper = select(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), abs(toward.y) > 0.99);
     let right = normalize(cross(helper, toward));
     let up = cross(toward, right);
     let cone = radius * d / sqrt(max(d * d - radius * radius, 1e-8));
+    // An eye inside the ball collapses the quad to the centre, so the basis, NaN for an eye
+    // exactly on the probe, never reaches the position.
     let inside = !ortho && d <= radius;
     let c = corners[corner];
     let world = select(center + (right * c.x + up * c.y) * select(cone, radius, ortho), center, inside);

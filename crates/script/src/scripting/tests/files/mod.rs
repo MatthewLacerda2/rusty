@@ -21,6 +21,7 @@ pub(super) fn dir(name: &str) -> PathBuf {
     dir
 }
 
+/// `\` is a filename character on macOS and Linux: a test here proves no path respells it.
 pub(super) fn backslash_dir(name: &str) -> PathBuf {
     let dir = dir(name).join("a\\b");
     std::fs::create_dir_all(&dir).expect("backslash dir");

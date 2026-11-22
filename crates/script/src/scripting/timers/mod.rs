@@ -1,3 +1,6 @@
+//! The deterministic scheduler behind `Timer` (`docs/api/Timer.md`). A job armed this epoch
+//! gains no time until `end_phase`, so work never runs in the tick that scheduled it.
+
 mod run;
 pub(crate) mod tween;
 pub(crate) mod wait;
@@ -8,6 +11,7 @@ use mlua::RegistryKey;
 
 pub(crate) use wait::Wait;
 
+/// Seconds of float slack, so a delay that whole steps sum to fires on that step.
 const ELAPSED_EPSILON: f64 = 1e-6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -49,6 +53,7 @@ pub struct TimerScheduler {
 }
 
 impl TimerScheduler {
+    /// Handles never repeat, so a stale handle never cancels another job.
     pub(crate) fn alloc(&mut self) -> u64 {
         self.next_handle += 1;
         self.next_handle
@@ -66,6 +71,7 @@ impl TimerScheduler {
         self.jobs.insert(handle, job);
     }
 
+    /// `carry`: seconds already past the old deadline, kept so a repeating invoke never drifts.
     pub(crate) fn rearm(&mut self, handle: u64, wait: Wait, carry: f64) {
         let epoch = self.epoch;
         if let Some(job) = self.jobs.get_mut(&handle) {

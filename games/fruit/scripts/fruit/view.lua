@@ -19,7 +19,7 @@ View.KINDS = {
 View.FRUIT = { "apple", "orange", "lime", "banana", "melon" }
 
 local function body(id)
-    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider")
     Scene.AddComponent(id, "RigidBody")
     Layers.SetLayer(id, View.LAYER)
 end
@@ -51,7 +51,7 @@ function View.throw(kind, x, y, z, vx, vy, spin)
 end
 
 -- A half's skin is the fruit squashed along the cut's normal (a lens), its flesh
--- a disc across the cut: a real hemisphere needs a runtime mesh the API cannot make yet.
+-- a disc across the cut.
 local function half(kind, x, y, z, nx, ny, side, vx, vy)
     local k = View.KINDS[kind]
     local d = math.max(k.scale[1], k.scale[2])

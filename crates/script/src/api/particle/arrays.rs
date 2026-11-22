@@ -136,6 +136,7 @@ fn columns(lua: &Lua, live: &[Particle], slots: &[usize], stamp: Stamp) -> mlua:
     }
     let meta = lua.create_table()?;
     meta.raw_set(STAMP, lua.create_any_userdata(stamp)?)?;
+    // `__metatable` hides the stamp: a script can neither read nor replace it.
     meta.raw_set("__metatable", false)?;
     out.set_metatable(Some(meta))?;
     Ok(out)

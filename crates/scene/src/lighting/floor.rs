@@ -5,6 +5,7 @@ use crate::Scene;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct FloorCell {
     pub floor: f32,
+    /// World `y` of the next solid's underside, `f32::INFINITY` under the sky.
     pub ceiling: f32,
 }
 
@@ -15,12 +16,18 @@ pub struct FloorGrid {
     pub width: usize,
     pub depth: usize,
     pub cells: Vec<Option<FloorCell>>,
+    /// Floors above a cell's lowest, `(cell, y)` in cell order, which `placement::liquid`
+    /// binary-searches. Probes fill over them; rooms use the lowest floor alone.
     pub upper: Vec<(usize, f32)>,
+    /// How far open cells stop short of walls; a room's box grows by it.
     pub inset: f32,
 }
 
+// Metres above the floor an actor's body starts and ends: lower is stepped over, higher
+// is overhead.
 const STEP: f32 = 0.4;
 const HEAD: f32 = 1.8;
+/// A kilometre square at half a metre; larger levels get a coarser cell.
 pub const MAX_FLOOR_CELLS: usize = 4_000_000;
 
 impl FloorGrid {
@@ -72,6 +79,7 @@ impl FloorGrid {
         Some(grid)
     }
 
+    /// Every cell the footprint overlaps at all, so a wall thinner than a cell still blocks one.
     fn for_each_under(&self, lo: Vec3, hi: Vec3, mut f: impl FnMut(usize)) {
         let range = |a: f32, b: f32, o: f32, n: usize| {
             let first = ((a - o) / self.cell - 0.5).floor() + 1.0;

@@ -1,4 +1,6 @@
 //! stored-format: the `<scene>.navmesh` file beside the scene
+//!
+//! The scene holds the file's bytes; `navigation` checks them on use.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -40,6 +42,7 @@ impl NavmeshFile {
     }
 }
 
+/// Reads the file alone, so a load can read it before it touches the live scene.
 pub fn read_navmesh(scene_path: &str) -> NavmeshFile {
     let path = navmesh_path(scene_path);
     let read = match std::fs::read(&path) {
@@ -73,6 +76,8 @@ pub fn load_navmesh(scene: &mut Scene, scene_path: &str) {
 }
 
 impl Scene {
+    /// The one place a bake's output lands, so the next save writes it even over a
+    /// newer file another process baked.
     pub fn put_baked_navmesh(&mut self, bytes: Arc<[u8]>) {
         self.bake_files.baked(SUFFIX);
         self.navmesh = SavedNavmesh::new(Some(bytes));

@@ -7,9 +7,12 @@ use super::blocks::{find, Block};
 use super::recipe::{BlockSel, ParamValue, PassKind};
 use super::{engine_shader_dir, DEFAULT_OUT_DIR};
 
+/// One `vec4` per slot. The three WGSL declarations below spell 16 literally: change
+/// them together.
 pub const PARAM_SLOTS: usize = 16;
 
-/// The detail map sits at 15, below the samplers.
+/// The material group's binding of the param uniform, after the main maps and albedo's
+/// sampler; the detail map sits at 15, below the samplers.
 pub const PARAM_BINDING: u32 = 6;
 
 pub type PackedParams = [[f32; 4]; PARAM_SLOTS];
@@ -22,6 +25,7 @@ pub fn uniform_decl() -> String {
     )
 }
 
+/// Mirrors render's `UiShadeUniform`, one per graphic at a dynamic offset.
 pub const UI_UNIFORM_DECL: &str = "struct UiShade {\n    origin_x: vec4<f32>,\n    axis_y_size: vec4<f32>,\n    time: vec4<f32>,\n    v: array<vec4<f32>, 16>,\n};\n@group(3) @binding(0) var<uniform> shader_params: UiShade;\n";
 
 pub const POSTFX_UNIFORM_DECL: &str = "struct ShaderParams {\n    v: array<vec4<f32>, 16>,\n};\n@group(1) @binding(0) var<uniform> shader_params: ShaderParams;\n";
@@ -204,6 +208,7 @@ pub fn resolve_module(dirs: &[&str], name: &str) -> Option<PathBuf> {
 }
 
 pub fn load(name: &str) -> Result<ParamLayout, String> {
+    // The list, in order, render's `SurfaceShaders::new` and `ui::custom::source` search.
     let dirs = [DEFAULT_OUT_DIR, engine_shader_dir()];
     let path = resolve_module(&dirs, name)
         .ok_or_else(|| format!("no shader named {name:?} (bake it with Shader.Bake)"))?;

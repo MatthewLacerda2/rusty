@@ -26,6 +26,8 @@ impl From<Vec3> for AmbientRadiance {
 }
 
 impl AmbientRadiance {
+    /// The irradiance over π a surface with unit normal `n` takes: `lighting/ambient.wgsl`'s
+    /// `ambient_radiance` term for term (a GPU test holds the two equal).
     pub fn at(&self, n: Vec3) -> Vec3 {
         match *self {
             Self::Sky(sh) => sh.eval(n) / std::f32::consts::PI,
@@ -44,10 +46,14 @@ impl AmbientRadiance {
         }
     }
 
+    /// The radiance along unit `dir`, chosen so its cosine average over the hemisphere around a
+    /// normal is `at`: each Legendre band over the cosine kernel's 1, 2/3, 1/4. Unclamped; the
+    /// trace and `Sh9::eval` clamp.
     pub fn incoming(&self, dir: Vec3) -> Vec3 {
         if let Self::Sky(sh) = self {
             return sh.eval_radiance(dir);
         }
+        // f(y) = equator + odd·y + kink·|y|, with |y| ≈ ½ + ⅝·P₂; then L1 × 3/2 and L2 × 4.
         let (sky, equator, ground) = self.poles();
         let odd = (sky - ground) * 0.5;
         let kink = (sky + ground) * 0.5 - equator;
@@ -56,6 +62,8 @@ impl AmbientRadiance {
         equator + kink * 0.5 + odd * (1.5 * y) + kink * (2.5 * p2)
     }
 
+    /// Test hook: what a bake from `incoming` gives, `at` up to the L2 cut; the lightmapper's
+    /// tests hold their trace to it.
     #[doc(hidden)]
     pub fn at_l2(&self, n: Vec3) -> Vec3 {
         if let Self::Sky(sh) = self {

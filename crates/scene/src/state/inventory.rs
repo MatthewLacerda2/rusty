@@ -1,6 +1,8 @@
 use super::{Class, Field, Keyed};
 use crate::Scene;
 
+/// The authored fields, handed to `$then!`: `same` says whether a value is unchanged as an
+/// edit sees it, `put` puts a recorded one back (both in `undo::level`, which expands this).
 macro_rules! authored_fields {
     ($then:ident { $($rest:tt)* }) => {
         $then! {
@@ -17,6 +19,7 @@ macro_rules! authored_fields {
                 materials: crate::revision::Revisioned<std::collections::BTreeMap<String, crate::MaterialAsset>>
                     => eq_or_bytes, assign;
                 meshes: crate::mesh_library::MeshLibrary => eq, put_meshes;
+                // Placement only: compared and put back around the baked payload.
                 probes: crate::lighting::probe::ProbeVolume => same_probes, put_probes;
                 reflection_probes: crate::lighting::reflection_probe::ReflectionProbeSet
                     => same_reflections, put_reflections;
@@ -57,6 +60,7 @@ macro_rules! scene_state {
             saved_as: &[],
         }),*];
 
+        // No `..`: a field of `Scene` missing here, or listed and gone, fails to compile.
         const _: fn(&Scene) = |scene| {
             let Scene {
                 $($authored: _,)*
@@ -74,6 +78,7 @@ authored_fields!(scene_state {
         selected_entity_id: Selection, Dropped;
         decals: EditRuntime, Restored;
         lightmaps: BakeOutput, Restored;
+        // Files beside the scene, not document fields: each saves with the field it names.
         occlusion: BakeOutput, Checked as ["lightmaps"];
         navmesh: BakeOutput, No as ["nav_settings"];
         pending_destroy: Runtime, Dropped;
@@ -83,6 +88,7 @@ authored_fields!(scene_state {
         debug_lines: Runtime, No;
         shader_overrides: Runtime, Dropped;
         ragdolls: Runtime, Dropped;
+        // A stale count only cuts a view once more.
         history_cuts: Frame, Dropped;
         shader_time: Frame, No;
         ui_time: Frame, No;

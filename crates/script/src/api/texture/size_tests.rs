@@ -31,6 +31,7 @@ fn the_preview_keeps_the_aspect_and_stats_rescale_it() {
         .eval()
         .unwrap();
     assert_eq!(r.get::<u32>("columns").unwrap(), 2);
+    // Two 32×8 tiles side by side.
     assert_eq!(image::image_dimensions(&path).unwrap(), (64, 8));
     let stats: Table = lua
         .load(format!("return Texture.Stats({TRIM}, 128)"))

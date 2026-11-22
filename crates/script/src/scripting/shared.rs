@@ -1,3 +1,7 @@
+//! The cells every `api::` namespace borrows, owned in one bundle a second VM over the same
+//! world clones. A new cell joins `ApiCells`, `ApiCells::attach`, `api::ApiCtx` and the list
+//! in `tests::cells_attach`, which fails until it does.
+
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -39,6 +43,7 @@ pub struct ApiCells {
     pub(super) screen: Rc<RefCell<ScreenSize>>,
     pub(super) application: Rc<RefCell<Application>>,
     pub(super) stats: Rc<RefCell<FrameStats>>,
+    /// Cleared with every fresh VM: its jobs hold registry keys into the old one.
     pub(super) timers: Rc<RefCell<TimerScheduler>>,
     pub(super) event_system: Rc<RefCell<EventSystem>>,
     pub(super) queries: Rc<RefCell<QueryQueue>>,

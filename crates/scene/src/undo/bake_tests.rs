@@ -59,6 +59,7 @@ fn undoing_a_setting_or_a_probe_move_after_a_bake_keeps_the_bake() {
         Vec3::X,
         "the move is undone"
     );
+    // The bake lit probe 1 at Y: back at X, it keeps what it had there.
     assert_eq!(scene.probes.probes()[1].sh, Sh9::zero());
     scene.probes.probes_mut()[1].sh = scene.probes.probes()[0].sh;
     scene.undo();
@@ -77,8 +78,10 @@ fn a_change_landing_between_edits_never_joins_the_last_step() {
     scene.world.set_name(id, "Renamed".into());
     scene.commit_edits(None);
     bake(&mut scene, id);
+    // A scene-level write from outside the editor's edits.
     scene.skybox_path = "watched.hdr".into();
     scene.begin_edits();
+    // An idle frame with the crate selected: the Inspector borrows it mutably.
     drop(scene.world.transform_mut(id));
     scene.pause_edits();
     assert!(!scene.commit_follow_up(), "nothing was edited");

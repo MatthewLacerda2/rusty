@@ -1,4 +1,7 @@
-
+// A GPU emitter's update. Each step in the uploaded window takes its own `dt`, so on one adapter a
+// run draws the same particles whatever the frame rate; older steps are one closed-form `jump`. A
+// step is `app::systems::particles::integrate_and_collide` minus collision; its CPU twin, which
+// changes with it, is `render::passes::particles::gpu::twin`.
 #import particles::gpu::{GpuParticle, GpuBirth, EMPTY, gpu_emitter, life_t, lut_at}
 
 @group(3) @binding(2) var<storage, read_write> particles: array<GpuParticle>;
@@ -27,6 +30,8 @@ fn is_dead(p: GpuParticle) -> bool {
     return !(p.age < p.lifetime);
 }
 
+// `n` steps of `span` seconds at once, curves held: the sum of the series
+// v <- (v + g dt) k (k the drag factor) at the mean `dt`.
 fn jump(p: ptr<function, GpuParticle>, n: u32, g: vec3<f32>, span: f32) {
     let curves = lut_at(0u, life_t(*p));
     let nf = f32(n);

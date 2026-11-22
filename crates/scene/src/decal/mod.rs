@@ -1,3 +1,5 @@
+//! Records are kept in spawn order, which is their blend order.
+
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
 use rusty_asset::MapRef;
@@ -45,16 +47,21 @@ impl Default for DecalSpec {
 pub struct Decal {
     pub id: u32,
     pub position: Vec3,
+    /// Local −Z is the projection axis, into the surface.
     pub rotation: Quat,
+    /// Full extents in world units: the stamp's width and height, then the projector's depth.
     pub size: Vec3,
     pub color: [f32; 4],
     pub texture: Option<MapRef>,
     pub material: Option<String>,
     pub owner: Option<DecalOwner>,
+    // Sim seconds: `age` since stamped, `lifetime` the age it ends at, `fade` the span
+    // ending there.
     pub age: f32,
     pub lifetime: Option<f32>,
     pub fade: f32,
     pub retiring: bool,
+    /// Fading because a spawn pushed a budget, as `EVICTION_HEADROOM` counts.
     pub evicted: bool,
     pub persist: bool,
 }
@@ -62,6 +69,7 @@ pub struct Decal {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DecalOwner {
     pub entity: u32,
+    /// The unit cube's object→owner matrix.
     pub local: Mat4,
 }
 
@@ -83,6 +91,8 @@ impl Decal {
         let size = spec.size.max(1.0e-4);
         Self {
             id: 0,
+            // Centred on the hit, so the box straddles the surface: half in front for bumps, half
+            // behind for dents.
             position: point,
             rotation: rot,
             size: Vec3::new(size, size, depth),

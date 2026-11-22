@@ -1,6 +1,7 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+// Fractions `0..=1`: of the sky the clouds cover, and of a cloud's opacity.
 pub const DEFAULT_CLOUD_COVERAGE: f32 = 0.5;
 pub const DEFAULT_CLOUD_OPACITY: f32 = 0.6;
 
@@ -31,6 +32,7 @@ impl SkySettings {
         *self == Self::default()
     }
 
+    /// Unset colours derive as `common::procedural_sky` derives them: change the two together.
     pub fn resolved(&self, ambient: Vec3) -> [Vec3; 3] {
         let zenith = self.zenith.unwrap_or(ambient);
         let horizon = self.horizon.unwrap_or(zenith.lerp(Vec3::ONE, 0.6));

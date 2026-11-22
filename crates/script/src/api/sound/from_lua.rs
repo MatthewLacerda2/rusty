@@ -52,6 +52,7 @@ pub fn opts_from_table(opts: Option<&Table>) -> Result<NoteOpts, String> {
         out.timbre = timbre as f32;
     }
     if let Some(seed) = get_number(table, "seed")? {
+        // Through `i64`, so a negative seed wraps instead of saturating to 0.
         out.seed = seed as i64 as u64;
     }
     out.glide = glide_from_table(table)?;

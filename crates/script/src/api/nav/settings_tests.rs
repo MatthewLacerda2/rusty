@@ -10,11 +10,13 @@ use rusty_navigation::test_support::{add_box, add_floor, ground};
 use rusty_navigation::{NavBounds, NavigationGraph};
 use rusty_scene::Scene;
 
+// Cell centres sit on whole metres, so each test's [3.6, 4.4]² box holds only cell (4,4)'s.
 fn scene_and_nav(min: Vec3, max: Vec3) -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);
     add_box(&mut scene, min, max);
+    // Pinned bounds keep the asserted cell indices put; radius 0 keeps erosion off those cells.
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));
     scene.nav_settings.agent_radius = 0.0;
     let mut nav = NavigationGraph::new(0.0, 10.0, 0.0, 10.0, 1.0);
@@ -152,6 +154,7 @@ fn set_get_clear_bounds_round_trip_and_rebake() {
     assert_eq!(get().0, -61.0, "rejected write left the bounds alone");
 
     lua.load("Navigation.ClearBounds()").exec().unwrap();
+    // Derived: the floor's [0, 10] grown by `BOUNDS_MARGIN` (2 m) plus the 0 m radius.
     assert_eq!(get(), (-2.0, 12.0, -2.0, 12.0, false));
     assert_eq!(scene.borrow().nav_settings.bounds, None);
 }

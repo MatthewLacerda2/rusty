@@ -14,6 +14,8 @@ use crate::api::ApiCell;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
+/// How many `Damage.*` calls may nest before the next is a Lua error; `docs/api/Damage.md` says 16.
+/// A test hook outside this crate: `tests/damage/chain.rs` links it.
 pub const MAX_DEPTH: u32 = 16;
 
 /// The damage type when `opts.type` is absent (Unreal's `UDamageType` default).
@@ -154,6 +156,7 @@ fn apply_point(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<mlua::Function>
         let raw = Vec3::new(dx, dy, dz);
         finite("ApplyPoint", "the direction", raw.length() as f64)?;
         let direction = raw.normalize_or_zero();
+        // A copy, so a caller's reused `RaycastAllNonAlloc` entry is never written.
         let copy = lua.create_table()?;
         for pair in hit.pairs::<Value, Value>() {
             let (k, v) = pair?;

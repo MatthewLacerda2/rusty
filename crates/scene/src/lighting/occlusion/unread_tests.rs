@@ -12,6 +12,7 @@ fn level(name: &str) -> String {
 fn an_unreadable_file_loads_nothing_and_a_save_keeps_it() {
     let scene_path = level("occlusion_unread");
     let path = occlusion_path(&scene_path);
+    // A directory where the file goes: reading it fails, and not as "not found".
     std::fs::create_dir_all(&path).unwrap();
     let mut scene = Scene::new();
     load_sidecar(&mut scene, &scene_path);
@@ -35,6 +36,8 @@ fn a_refused_file_is_removed_by_the_next_save() {
     assert!(!path.exists(), "the corrupt file is gone");
 }
 
+/// The layout before the version field: `RPVS`, `objects` zeroed objects, an empty grid,
+/// no row words and no cells.
 fn unversioned(objects: u32) -> Vec<u8> {
     let mut bytes = b"RPVS".to_vec();
     bytes.extend(objects.to_le_bytes());
@@ -46,6 +49,7 @@ fn unversioned(objects: u32) -> Vec<u8> {
 #[test]
 fn a_file_from_before_the_version_field_is_told_as_older_and_unversioned() {
     let scene_path = level("occlusion_unversioned");
+    // A count above the version would read "newer", one equal to it would fail a later field.
     for objects in [137, super::OCCLUSION_VERSION] {
         std::fs::write(occlusion_path(&scene_path), unversioned(objects)).unwrap();
         let mut scene = Scene::new();

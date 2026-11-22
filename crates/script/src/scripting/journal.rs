@@ -6,9 +6,12 @@ pub enum Plain {
     Number(f64),
     Str(String),
     List(Vec<Plain>),
+    /// String keys, sorted by key.
     Map(Vec<(String, Plain)>),
 }
 
+/// A `Taint` names, in a few words, an act no replay can repeat; from its tick on, the
+/// replay warns it may differ.
 #[derive(Clone, Debug, PartialEq)]
 pub enum HostCall {
     Eval(String),

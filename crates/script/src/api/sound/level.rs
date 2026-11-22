@@ -3,6 +3,7 @@ use mlua::{Lua, Table};
 use rusty_audio::device::decode::decode_file;
 use rusty_zimmer::level::{Cut, Layer, Profile, Profiler, Span};
 
+/// The most rows a `sections` grid may cut a clip into; `docs/api/Sound.md` states it.
 pub const MAX_SECTIONS: f64 = 10_000.0;
 
 pub fn measure_file(path: &str, grid: Option<f64>) -> Result<Profile, String> {
