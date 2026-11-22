@@ -11,6 +11,7 @@ use rusty_script::scripting::ConsoleLogs;
 
 const DT: f32 = 1.0 / 60.0;
 
+/// A pivot (id 1) over two looping `play_on_start` children (ids 2 and 3).
 fn weapon() -> GameWorld {
     let mut scene = Scene::new();
     let pivot = scene.add_entity("Pivot".to_string());

@@ -11,13 +11,14 @@ const SILENCE: f32 = 1e-5;
 /// seconds: longer than a gap between a reverb's echoes.
 const HANG: f64 = 1.0;
 
-/// Whether every sample of `frames` is silence.
 pub(super) fn is_silent(frames: &[Frame]) -> bool {
     frames
         .iter()
         .all(|f| f.left.abs() < SILENCE && f.right.abs() < SILENCE)
 }
 
+/// Rung on a retune: kira moves a parameter only inside `process`, so one taken asleep
+/// would still glide when a sound woke it. A count, so every gate sharing it sees each ring.
 #[derive(Clone, Default)]
 pub(super) struct Wake(Arc<AtomicU64>);
 
@@ -51,8 +52,7 @@ impl<B: EffectBuilder> EffectBuilder for Gated<B> {
     }
 }
 
-/// An effect, what wakes it, the last ring it saw, what holds it, and how long it has
-/// been silent, in seconds.
+/// `quiet`: seconds of silent input and output with no tail held.
 struct Gate {
     inner: Box<dyn Effect>,
     wake: Wake,
@@ -71,6 +71,7 @@ impl Effect for Gate {
     }
 
     fn on_start_processing(&mut self) {
+        // Forwarded asleep too: kira's effects take their handle's commands here.
         self.inner.on_start_processing();
         let generation = self.wake.generation();
         if generation != self.seen {

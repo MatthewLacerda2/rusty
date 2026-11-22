@@ -1,7 +1,9 @@
 #![deny(clippy::unwrap_used)]
 
+/// Seconds per Play tick: 60 Hz.
 pub const FIXED_DELTA_TIME: f32 = 1.0 / 60.0;
 
+/// Seconds: the most wall clock one windowed or on-demand frame hands the sim.
 pub const MAXIMUM_DELTA_TIME: f32 = 1.0 / 3.0;
 
 #[derive(Clone, Debug)]
@@ -11,10 +13,10 @@ pub struct Time {
     pub fixed_delta_time: f32,
     /// Number of frames advanced since the clock started.
     pub frame_count: u64,
+    /// Scaled game seconds; `f64` stays sub-millisecond over hours of play.
     pub time: f64,
     pub unscaled_time: f64,
-    /// Global simulation time scale (Unity: `Time.timeScale`). `1.0` = realtime,
-    /// `0.0` = paused, `0.5` = slow-mo, `2.0` = fast. Never negative.
+    /// Global simulation time scale (Unity: `Time.timeScale`), never negative.
     pub time_scale: f32,
     pub paused: bool,
     pub pending_steps: u32,
@@ -119,7 +121,7 @@ mod tests {
         assert_eq!(t.unscaled_delta_time, 0.5);
         assert_eq!(t.time, 0.25);
 
-        // fixed step never scales.
+        // The fixed step never scales.
         assert_eq!(t.fixed_delta_time, FIXED_DELTA_TIME);
     }
 
@@ -167,7 +169,7 @@ mod tests {
     #[test]
     fn steps_only_enqueue_while_paused() {
         let mut t = Time::new();
-        // Not paused: Step is a no-op (stepping is only meaningful while frozen).
+        // Not paused: Step is a no-op.
         t.request_steps(5);
         assert_eq!(t.pending_steps, 0);
         // Paused: Step enqueues, and repeated calls accumulate.

@@ -1,10 +1,12 @@
 use super::super::resources::Resources;
 use super::super::world::World;
 
+/// Unity's: a source going inactive in the hierarchy stops its voice, and a play-on-awake
+/// one plays again on coming back.
 pub(super) fn follow_activity(world: &mut World, res: &mut Resources) {
     let scene = world.scene.borrow();
     let mut ids = scene.world.ids_with_audio();
-    ids.sort_unstable();
+    ids.sort_unstable(); // id order, and `binary_search` below needs it
     let tick = res.play_frame();
     let mut audio = res.audio.borrow_mut();
     audio.retain_sources(|id| ids.binary_search(&id).is_ok());

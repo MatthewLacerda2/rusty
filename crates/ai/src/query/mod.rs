@@ -15,7 +15,8 @@ mod context_tests;
 mod filter_tests;
 #[cfg(test)]
 mod generate_tests;
-// Test hook: the bench level the root's `dev::bench` times.
+// Test hook: the level `rusty-dev`'s `bench::query_cost_tests` times, and
+// `perception::bench` builds on.
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
@@ -27,9 +28,8 @@ mod queue_tests;
 mod rank_tests;
 #[cfg(test)]
 mod spread_tests;
-// Test hook: the arena this module's tests and `rusty-script`'s
-// `api::environment_query` tests build on. Ungated: a `dev` dev-dependency would
-// split the crate's features between its build and its tests.
+// Ungated: a `dev` dev-dependency would split the crate's features between its
+// build and its tests.
 #[doc(hidden)]
 pub mod test_world;
 

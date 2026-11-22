@@ -26,8 +26,10 @@ pub fn mix_frame(frame: &[f32], pan: f32, spatial_blend: f32) -> (f32, f32) {
     (l * left_gain, r * right_gain)
 }
 
+/// Seconds: the time constant a voice's glided parameters, and a rack's, follow with.
 pub const SMOOTHING: f64 = 0.010;
 
+/// Within this a glide lands, so a settled voice plays its values bit for bit (−120 dB).
 const SNAP: f32 = 1e-6;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -40,7 +42,6 @@ struct Glide {
 }
 
 impl Glide {
-    /// Move one sample toward `target`, by `k` of the remaining distance.
     fn toward(&mut self, target: &Glide, k: f32) {
         for (v, t) in [
             (&mut self.gain, target.gain),
@@ -50,6 +51,8 @@ impl Glide {
             (&mut self.doppler, target.doppler),
         ] {
             let next = *v + k * (t - *v);
+            // A step too small to move an `f32` lands too, or it never arrives; so does a
+            // non-finite one, so a NaN never sticks past its target.
             *v = if next == *v || !next.is_finite() || (t - next).abs() <= SNAP {
                 t
             } else {
@@ -63,12 +66,13 @@ impl Glide {
     }
 }
 
+/// Not a kira sound: those pan constant-power and keep no channel count, which the
+/// stereo rule needs.
 pub struct ClipSound {
     clip: CachedClip,
     looping: bool,
     control: Arc<VoiceControl>,
     position: f64,
-    /// Scratch for the interpolated frame (one sample per clip channel).
     frame: Vec<f32>,
     filter: LowPass,
     glide: Option<Glide>,
@@ -125,9 +129,8 @@ impl Sound for ClipSound {
         };
         let step = f64::from(c.speed.get()) * f64::from(self.clip.sample_rate()) * dt;
         if c.paused.load(Ordering::Relaxed) || c.stopped.load(Ordering::Relaxed) {
-            // The output resumes from silence anyway, so there is nothing to glide
-            // from: a voice retuned while paused resumes on its targets, as a new
-            // one starts, never from the values it was paused at.
+            // Nothing to glide from after silence: a voice retuned while paused resumes
+            // on its targets, like a new one.
             self.glide = None;
             out.fill(Frame::ZERO);
             return;

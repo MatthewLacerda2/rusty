@@ -38,6 +38,7 @@ fn flush_storage_logs_on_write_failure() {
     let res = resources();
     let dir = rusty_test_support::temp::dir();
     let blocker = dir.join(format!("rusty_flush_block_{}", std::process::id()));
+    // A regular file as the store's parent, so creating the folder and the write both fail.
     std::fs::write(&blocker, b"x").unwrap();
     let bad_path = blocker.join("nested").join("store.json");
     res.storage.borrow_mut().open(&bad_path).unwrap();

@@ -9,6 +9,8 @@ use kira::Frame;
 /// more than a frame drains, so only a stalled engine fills it.
 pub const RING_SAMPLES: usize = 1 << 19;
 
+/// A one-producer, one-consumer ring: the audio thread never waits or allocates, since a
+/// capture diagnoses dropouts and must not cause one.
 #[derive(Debug, Default)]
 pub struct Tap {
     on: AtomicBool,
@@ -21,9 +23,8 @@ pub struct Tap {
 }
 
 impl Tap {
-    /// Start copying the mix, dropping anything left from an earlier capture.
-    /// Called on the main thread, so the ring is allocated here, never on the
-    /// audio thread.
+    /// Called on the main thread, so the ring is allocated here, never on the audio
+    /// thread.
     pub fn start(&self) {
         self.ring
             .get_or_init(|| (0..RING_SAMPLES).map(|_| AtomicU32::new(0)).collect());
@@ -42,6 +43,8 @@ impl Tap {
         let Some(ring) = self.ring.get() else {
             return;
         };
+        // Before `written`: the producer writes nothing while a gap is pending, so the
+        // gap follows every sample read.
         let gap = self.gap.load(Ordering::Acquire);
         let written = self.written.load(Ordering::Acquire);
         let read = self.read.load(Ordering::Relaxed);
@@ -53,8 +56,6 @@ impl Tap {
         }
     }
 
-    /// Stereo frames dropped since the capture started, because the engine did not
-    /// drain the ring in time.
     pub fn dropped_frames(&self) -> u64 {
         self.dropped.load(Ordering::Relaxed)
     }
@@ -93,7 +94,6 @@ impl Tap {
     }
 }
 
-/// The ring slot sample `index` lives in.
 fn slot(ring: &[AtomicU32], index: usize) -> &AtomicU32 {
     &ring[index % RING_SAMPLES]
 }

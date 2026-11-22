@@ -1,3 +1,6 @@
+//! Test hook: the arena this module's tests and `bench` build on;
+//! `rusty-dev`'s bench reads its `PLAYER`.
+
 use glam::Vec3;
 
 use std::collections::BTreeSet;
@@ -16,7 +19,6 @@ pub const DT: f32 = 1.0 / 60.0;
 /// The layer targets stand on.
 pub const PLAYER: u8 = 3;
 
-/// The arena, its physics and the sight budget.
 pub struct Arena {
     pub scene: Scene,
     pub physics: PhysicsWorld,
@@ -37,13 +39,14 @@ impl Arena {
         }
     }
 
-    /// Run `ticks` perception steps.
     pub fn step(&mut self, ticks: usize) {
         for _ in 0..ticks {
             step(&mut self.scene, Some(&self.physics), &mut self.rays, DT);
         }
     }
 
+    /// One step on the rules before the mask prefilter: what the mask tests
+    /// compare the engine against.
     pub fn step_reference(&mut self) {
         let ids = perceivers(&self.scene);
         let targets = reference_targets(&self.scene);

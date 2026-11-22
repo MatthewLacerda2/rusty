@@ -7,6 +7,7 @@ use crate::mixer::{GroupId, GroupPatch, Mixer};
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EffectPatch {
     pub params: EffectParams,
+    /// Bit `i` writes `values[i]`, so `MAX_PARAMS` must stay at most 32.
     pub mask: u32,
 }
 
@@ -95,9 +96,10 @@ impl Mixer {
             .collect()
     }
 
-    /// Replace group `id`'s effects with `chain`. A sidechain that would make a
-    /// cycle (module docs) is dropped, with a warning naming it.
+    /// Replace group `id`'s effects with `chain`, dropping with a warning each sidechain
+    /// its own output reaches (itself, an ancestor, a loop of keys).
     pub fn set_effects(&mut self, id: GroupId, mut chain: EffectChain) {
+        // Cleared first, so the old chain's keys add no edges to the cycle check.
         self.groups[usize::from(id.0)].settings.effects = EffectChain::default();
         let mut keys = Vec::new();
         for effect in chain.0.iter_mut().flatten() {
@@ -121,6 +123,8 @@ impl Mixer {
         self.set(id, &patch);
     }
 
+    /// Children before parents, keys before the groups they key (`extra` holds
+    /// `(key, keyed)` pairs); `None` on a cycle.
     fn order_with(&self, extra: &[(GroupId, GroupId)]) -> Option<Vec<GroupId>> {
         let n = self.groups.len();
         let mut edges: Vec<(usize, usize)> = extra

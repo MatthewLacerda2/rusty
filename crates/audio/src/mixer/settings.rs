@@ -2,8 +2,9 @@ use serde::{Deserialize, Serialize};
 
 use super::effects::{ChainPatch, EffectChain};
 
+/// A low-pass cutoff, in Hz, at or above this is off: the top of Unity's range.
 pub const LOW_PASS_OFF: f32 = 22_000.0;
-/// A high-pass cutoff at or below this is "off" (Unity's default, 10 Hz).
+/// A high-pass cutoff, in Hz, at or below this is off: the bottom of Unity's range.
 pub const HIGH_PASS_OFF: f32 = 10.0;
 /// The cutoff range a filter accepts, in Hz.
 const CUTOFF_RANGE: (f32, f32) = (HIGH_PASS_OFF, LOW_PASS_OFF);
@@ -16,7 +17,6 @@ pub struct Filter {
 }
 
 impl Filter {
-    /// A filter clamped into range.
     pub fn new(cutoff: f32, resonance: f32) -> Self {
         Self {
             cutoff: cutoff.clamp(CUTOFF_RANGE.0, CUTOFF_RANGE.1),
@@ -121,6 +121,7 @@ impl GroupPatch {
     }
 }
 
+/// Parents' volumes are not folded in: each applies its own on its own track.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GroupMix {
     pub volume: f32,

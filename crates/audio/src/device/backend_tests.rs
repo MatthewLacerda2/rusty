@@ -52,6 +52,7 @@ fn hard_left_silences_the_right_channel_and_retunes_in_place() {
     ));
     assert_eq!(b.device().render(2), vec![(0.5, 0.0); 2]);
     b.set_mix(VoiceId(1), &VoiceMix { pan: 1.0, ..left });
+    // 200 ms: the pan's glide settles.
     b.device().render(RATE as usize / 5);
     assert_eq!(
         b.device().render(2),

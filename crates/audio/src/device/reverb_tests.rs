@@ -5,6 +5,7 @@ use crate::device::capture::RATE;
 use crate::mixer::{GroupId, GroupMix, GroupSettings};
 use rusty_components::{ReverbParams, ReverbPreset};
 
+/// A quarter second: the bus's 50 ms tween and a 0.1 s pre-delay's glide both settle.
 const SETTLE: usize = RATE as usize / 4;
 
 /// The left channel of a 64-sample burst played through group `1` with the

@@ -60,6 +60,8 @@ pub fn group(v: f32) -> Option<GroupId> {
     (v >= 0.0).then_some(GroupId(v as u16))
 }
 
+/// `fields` over `base`, checked against `kind`'s row; the `u32` sets bit `i` for each
+/// parameter named.
 pub fn parse(
     kind: KindId,
     fields: &Fields,
@@ -88,6 +90,8 @@ pub fn parse(
     Ok((out, mask))
 }
 
+/// A list kind names its entries' parameters `<list><n>_<field>`, `n` from 1, as this
+/// writes them (the EQ's `bands3_gain`).
 fn flatten(row: &EffectKind, fields: &Fields) -> Fields {
     let mut out = Fields::new();
     for (name, value) in fields {

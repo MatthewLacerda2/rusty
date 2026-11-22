@@ -4,6 +4,7 @@ use kira::Frame;
 
 use super::super::{Dsp, DspContext, EffectKind, Param, Range, MAX_PARAMS};
 
+/// In `coefficients`' match order; `shape` stores an index here, `off` is 0.
 pub const SHAPES: [&str; 4] = ["off", "peak", "low_shelf", "high_shelf"];
 pub const BANDS: usize = 6;
 
@@ -45,6 +46,7 @@ pub type Coefficients = [f32; 5];
 /// The RBJ coefficients for `shape` (an index of [`SHAPES`], not `off`) at
 /// `frequency` Hz, `gain` dB and `q`, at `rate` Hz.
 pub fn coefficients(shape: usize, frequency: f32, gain: f32, q: f32, rate: f32) -> Coefficients {
+    // Kept under Nyquist, where `w` would reach π.
     let w = 2.0 * PI * frequency.min(rate * 0.49) / rate;
     let (sin, cos) = w.sin_cos();
     let a = 10f32.powf(gain / 40.0);

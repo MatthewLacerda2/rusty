@@ -3,7 +3,8 @@ use kira::backend::{Backend, DefaultBackend, Renderer};
 /// The sample rate the captured graph runs at.
 pub const RATE: u32 = 48_000;
 
-/// A kira backend whose output is pulled, never pushed by a device callback.
+/// Not kira's `MockBackend`, which keeps what it renders: this hands the frames back,
+/// pulled, never pushed by a device callback.
 pub struct Capture {
     renderer: Option<Renderer>,
     /// Seconds asked for but not yet rendered: the fraction of a frame each

@@ -67,12 +67,12 @@ fn a_read_only_project_is_never_written() {
 #[test]
 fn an_unparseable_project_file_is_said_once_and_leaves_the_defaults() {
     rusty_test_support::logs::init();
-    rusty_test_support::logs::take();
+    rusty_test_support::logs::take(); // drop what earlier code on this thread logged
     let path = rusty_test_support::temp::dir().join("project.rusty");
     std::fs::write(&path, "{ not json").unwrap();
     let game = world();
     game.open_project(ProjectSource::Bound(path));
-    game.apply_project_settings();
+    game.apply_project_settings(); // entering Play rereads the file
     assert_eq!(
         game.resources.application.borrow().build(),
         &Default::default()
@@ -91,7 +91,7 @@ fn a_hand_edited_render_scale_default_runs_at_the_next_play() {
     game.open_project(ProjectSource::Bound(path.clone()));
     let edited = r#"{ "graphics": { "render_scale": "match_display" } }"#;
     std::fs::write(&path, edited).unwrap();
-    game.apply_project_settings();
+    game.apply_project_settings(); // entering Play rereads the file
     let running = game.script_manager().graphics_cell().borrow().render_scale;
     assert_eq!(running.default, RenderScaleDefault::MatchDisplay);
     let app = game.resources.application.borrow();

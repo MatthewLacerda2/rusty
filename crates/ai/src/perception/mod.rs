@@ -3,7 +3,7 @@ pub mod stimulus;
 
 #[cfg(test)]
 mod budget_tests;
-// Test hook: the bench level the root's `dev::bench` times.
+// Test hook: the level `rusty-dev`'s bench times; a sim crate reads no clock.
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;
@@ -31,6 +31,7 @@ use rusty_components::{AIPerceptionComponent, Known, PerceptionUpdate as Update,
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
+/// [`SightRays::per_tick`]'s default (Unreal's `MaxTracesPerTick`).
 pub const DEFAULT_SIGHT_RAYS: usize = 64;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -51,7 +52,6 @@ impl Default for SightRays {
 }
 
 impl SightRays {
-    /// Start the round from the first pair again.
     pub fn reset(&mut self) {
         self.last = None;
     }

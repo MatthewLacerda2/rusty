@@ -42,6 +42,7 @@ fn build(_: &DspContext) -> Box<dyn Dsp> {
 }
 
 struct Limiter {
+    /// The gain applied now, in `(0, 1]`.
     gain: f32,
 }
 
@@ -66,6 +67,8 @@ impl Dsp for Limiter {
                 self.gain = need;
             } else {
                 let next = self.gain + release * (need - self.gain);
+                // A stalled step, or one within a hair, lands: a recovered limiter is
+                // bit-transparent again.
                 let settled = next == self.gain || (need - next).abs() <= 1e-6;
                 self.gain = if settled { need } else { next };
             }

@@ -9,6 +9,7 @@ use rusty_ui::events::{Frame, UiHook, WALL_RANGE, WALL_TOLERANCE};
 use rusty_ui::UiLayout;
 
 impl crate::GameWorld {
+    /// Public for a caller that draws without ticking: `rusty-shell`'s editor capture.
     pub fn refresh_ui_textures(&self) {
         let scene = self.world.scene.borrow();
         let mut screen = self.resources.screen.borrow_mut();
@@ -35,6 +36,7 @@ pub(crate) fn register(app: &mut App) {
 
 pub(crate) fn dispatch_ui_events(world: &mut World, res: &mut Resources) {
     let view = res.ui_view(&world.scene.borrow());
+    // Play's first tick runs before any `LateUpdate` laid out; later ticks read the last.
     if res.play_frame == 0 {
         res.ui_layout = UiLayout::compute_in(&world.scene.borrow().world, &view);
     }
@@ -120,6 +122,7 @@ mod tests {
         );
         game.set_playing(true);
         game.tick(rusty_time::FIXED_DELTA_TIME);
+        // The 1280×720 default video resolution on the canvas's 1920×1080 reference.
         let layout = &game.resources.ui_layout;
         assert_eq!(layout.iter().count(), 2);
         let r = layout.get(hud).expect("laid out");

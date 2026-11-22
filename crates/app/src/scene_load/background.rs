@@ -17,7 +17,7 @@ pub trait SceneLoader: std::any::Any {
     fn progress(&mut self, _op: u32) -> f32 {
         0.0
     }
-    /// Whether `take` prepares on the ticking thread (timed beside the tick).
+    /// Whether `take` prepares on the ticking thread.
     fn prepares_inline(&self) -> bool {
         false
     }
@@ -69,12 +69,11 @@ impl SceneLoader for Inline {
 
 pub const ABANDONED: &str = "the load was abandoned";
 
-/// The write-log stamp is taken before anything is read, so a model written meanwhile is followed.
+/// Stamps the write log before reading, so a model written meanwhile is still followed.
 pub fn prepare_in_background(path: &str, abandoned: &AtomicBool) -> Result<PreparedScene, String> {
     prepare_counted(path, abandoned, &PrepareSteps::default())
 }
 
-/// Three steps when a navmesh is saved beside the scene, else four.
 #[derive(Debug)]
 pub struct PrepareSteps {
     done: AtomicU8,
@@ -114,6 +113,7 @@ pub fn prepare_counted(
             Ok(())
         }
     };
+    // The conversion gate is per thread: a worker preparing this load takes its own hold.
     let _hold = rusty_asset::convert::PlayHold::take();
     let read_at = rusty_core::fs::written::written_since(u64::MAX).0;
     let data = rusty_scene::read_scene_file(path)?;

@@ -16,6 +16,7 @@ use crate::mixer::{GroupId, GroupMix};
 use crate::SpeakerMode;
 use rusty_components::ReverbParams;
 
+/// Its `AudioManager` holds the device open: dropping the backend silences everything.
 pub struct KiraBackend<B: Backend = DefaultBackend> {
     manager: AudioManager<B>,
     groups: GroupTracks,
@@ -26,6 +27,7 @@ pub struct KiraBackend<B: Backend = DefaultBackend> {
 }
 
 impl KiraBackend {
+    /// `None` with no device (a headless box, CI): the caller keeps the `NullBackend`.
     pub fn open() -> Option<Self> {
         Self::with_backend(Default::default())
     }
@@ -41,6 +43,7 @@ impl<B: Backend> KiraBackend<B> {
         let mut manager = AudioManager::<B>::new(AudioManagerSettings {
             capacities: Capacities::default(),
             main_track_builder: main,
+            // Frames per kira block: 2.7 ms at 48 kHz.
             internal_buffer_size: 128,
             backend_settings: settings,
         })

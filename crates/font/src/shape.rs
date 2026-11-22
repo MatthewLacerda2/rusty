@@ -22,6 +22,8 @@ pub struct Shaped {
     pub offset: Vec2,
 }
 
+/// Runs memoised per font, then the memo restarts: a bound, since a counter adds
+/// one per value.
 const MEMO_RUNS: usize = 4096;
 
 pub fn shape(font: &FontData, run: &str, unligated: &[Range<usize>]) -> Arc<[Shaped]> {
