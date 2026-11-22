@@ -31,6 +31,10 @@ from merging.verdict import standing
 # How long a pull request's comments are trusted unchanged when its `updatedAt` has not moved.
 FRESH_SECONDS = 600
 
+# The standing of a pull request whose comments a re-read before a merge could
+# not get ([`Reader.again`]): no go-ahead, label or not ([`watch.board.queued`]).
+UNREAD = {"verdict": None, "said": None, "on": None, "current": None, "owed": [], "unread": True}
+
 
 class Reader:
     """`fetch(path)` is `gh api path`, parsed, or `None` when it failed."""
@@ -41,7 +45,6 @@ class Reader:
         self.comments: dict[int, tuple[str | None, float, list[dict]]] = {}
         self.compares: dict[tuple[str, str], bool] = {}
         self.unread: set[tuple[int, str]] = set()
-        self.last: dict[int, dict] = {}
 
     def read(self, pull: dict) -> dict | None:
         """[`standing.standing`] of `pull`, `None` when its comments could not be read."""
@@ -56,8 +59,7 @@ class Reader:
                 self.unread.add((number, head))
                 self.say(f"#{number}: GitHub did not show what followed its `{verdict[0]}` verdict on {verdict[1][:7]}"
                          " (the compare of main...head), so it is not queued by that verdict; asked again on the next listing.")
-        self.last[pull.get("number")] = read = standing.standing(comments, current)
-        return read
+        return standing.standing(comments, current)
 
     def said(self, pull: dict) -> list[dict] | None:
         number, updated, now = pull.get("number"), pull.get("updatedAt"), self.clock()
@@ -83,14 +85,13 @@ class Reader:
 
     def again(self, pull: dict) -> dict:
         """`pull` re-read before a merge, with its standing. When its comments
-        cannot be read, it is judged by its labels alone, unless the standing
-        last read still owed a `Needs:`: that one is kept, so it waits, since a
-        blip must not take a labelled pull request past what it owes."""
+        cannot be read, it carries [`UNREAD`], which no label overrides: a
+        `Needs:` posted since the last read would be missed, so it goes back in
+        line and is read again on the next pass, never merged on a doubt."""
         shaped = self.attach([pull])
         if shaped:
             return shaped[0]
-        last = self.last.get(pull.get("number"))
-        return {**pull, "standing": last} if last and last.get("owed") else pull
+        return {**pull, "standing": UNREAD}
 
     def attach(self, pulls: list[dict]) -> list[dict] | None:
         """`pulls` with each ready one based on `main` carrying its `standing`;

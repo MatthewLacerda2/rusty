@@ -4,7 +4,7 @@
 Must: attach a standing to a ready pull request based on `main`, ask GitHub's
 compare only for a verdict given on an older head, keep the comments while
 `updatedAt` stands and re-read them when it moves, fail the read when the
-comments fail, keep what a last read owed when a re-read fails. Must not: fail
+comments fail, mark a re-read that fails `UNREAD`. Must not: fail
 the listing on a compare it cannot read (that one is not queued by its verdict,
 and named once), nor read a draft or a pull request based elsewhere.
 """
@@ -93,16 +93,13 @@ class Reads(unittest.TestCase):
         self.assertIn("#1", said[0])
         self.assertEqual(len([p for p in fetch.asked if "/compare/" in p]), 2)  # asked again, not kept
 
-    def test_a_failed_re_read_keeps_what_the_last_read_owed(self):
-        owing = comment(REVIEW + "\nNeeds: a desktop look")
-        fetch = Fetch({1: [owing], 2: [comment(REVIEW)]})
+    def test_a_failed_re_read_is_unread_whatever_the_last_read_said(self):
+        fetch = Fetch({1: [comment(REVIEW)]})
         reader = verdicts.Reader(REPO, fetch, say=lambda line: None)
-        reader.attach([pull(1), pull(2)])
+        reader.attach([pull(1)])
         fetch.down = True
-        again = reader.again(pull(1, updated="t2", labels=[{"name": "queue"}]))
-        self.assertEqual(again["standing"]["owed"], ["a desktop look"])
-        self.assertNotIn("standing", reader.again(pull(2, updated="t2")))  # nothing owed: labels alone
-
+        self.assertIs(reader.again(pull(1, updated="t2", labels=[{"name": "queue"}]))["standing"], verdicts.UNREAD)
+        self.assertNotIn("standing", reader.again(pull(2, isDraft=True)))  # a draft is never read
 
 if __name__ == "__main__":
     unittest.main()

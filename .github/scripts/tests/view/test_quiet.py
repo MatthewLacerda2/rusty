@@ -1,6 +1,6 @@
 """#2628: `make queue-quiet` handles a batch's routine itself and says only what needs someone.
 
-Must say: a hand-back, a stopped supervisor, a ready pull request with no review
+Must say: a hand-back, a stopped supervisor (the `Reader`'s own lines prefixed), a ready pull request with no review
 decision (or reviewed with nothing that queues it, or owing a `Needs:`), a new
 bug, a red `main` once per head, a drain pass failing three times in a row.
 Must not: a merge (it fast-forwards and reclaims instead, once), a draft opening,
@@ -14,8 +14,10 @@ import argparse
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from merging.view import quiet
+from merging.queue import pulls, verdicts
+from merging.view import cli, quiet
 
 RECORD = {"body": "Independent review\nNo findings.", "author_association": "OWNER", "created_at": "t"}
 
@@ -73,6 +75,7 @@ class Lines(unittest.TestCase):
             (ready(verdict="round", said="queue", current=False), [RECORD], "past its `queue` verdict"),
             (ready(verdict="hold", current=False), [RECORD], "a round came back"),
             (None, None, "unknown"),
+            ({**ready(labels=("queue",)), "standing": verdicts.UNREAD}, [RECORD], "unknown"),  # its re-read failed
         ):
             with self.subTest(pull=pull, comments=comments):
                 said = self.stream(Effects(self.path, pull, comments), "queue: watch: #7 turned ready.")
@@ -86,6 +89,16 @@ class Lines(unittest.TestCase):
                      {**ready(), "isDraft": True}):
             with self.subTest(pull=pull):
                 self.assertEqual(self.stream(Effects(self.path, pull, [RECORD]), "queue: watch: #7 is ready and unqueued; x"), [])
+
+
+class Prefix(unittest.TestCase):
+    def test_the_readers_own_lines_carry_the_prefix(self):
+        said = []
+        with mock.patch.dict(pulls.READERS, {}), mock.patch("ghrest.slug", return_value="o/r"), \
+            mock.patch("merging.view.status.common_dir", return_value=Path("/nowhere")):
+            cli.quiet_effects("/nowhere", None, said.append, True)
+            pulls.reader("o/r").say("#7: GitHub did not show what followed its verdict")
+        self.assertEqual(said, [f"{quiet.PREFIX} #7: GitHub did not show what followed its verdict"])
 
 
 class Polls(unittest.TestCase):

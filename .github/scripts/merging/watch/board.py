@@ -90,12 +90,21 @@ def queued(pull: dict) -> bool:
     [`QUEUE_LABEL`] or a `queue` verdict that holds on its head. `standing` is
     [`verdict.standing.standing`], attached by the listing
     ([`queue.verdicts.Reader`]); a pull request without one is read by its
-    labels alone, as before #2628."""
+    labels alone, as before #2628, and one whose re-read before a merge failed
+    ([`queue.verdicts.UNREAD`]) has none, so it goes back in line."""
     labels = names(pull.get("labels"))
     standing = pull.get("standing") or {}
-    if HOLD_LABEL in labels or standing.get("owed"):
+    if HOLD_LABEL in labels or standing.get("owed") or standing.get("unread"):
         return False
     return QUEUE_LABEL in labels or standing.get("verdict") == "queue"
+
+
+def lost(pull: dict) -> str:
+    """Why a pull request [`queued`] refuses lost its go-ahead, for the line that
+    puts it back in line."""
+    if (pull.get("standing") or {}).get("unread"):
+        return "GitHub did not show its comments when its go-ahead was asked again, so it is read on the next pass"
+    return f"it lost its go-ahead (the `{QUEUE_LABEL}` label or verdict)"
 
 
 def fresh(when: str | None, since: datetime | None) -> bool:

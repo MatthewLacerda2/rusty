@@ -339,7 +339,7 @@ queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)
 queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, coders' issue comments; exits 1 once the supervisor is gone
 	@python3 .github/scripts/queue-view.py events
 
-queue-quiet: ## The quiet Monitor: reclaims after each merge and runs the coders' drain itself, says only what needs someone. ARGS=--no-drain
+queue-quiet: ## The quiet Monitor: after each merge fast-forwards the main checkout and runs `make reclaim`, runs the coders' drain itself, says only what needs someone. ARGS=--no-drain
 	@python3 .github/scripts/queue-view.py quiet $(ARGS)
 
 # Diffs each issue body's "Blocked by #N" against GitHub's blocked_by record, both

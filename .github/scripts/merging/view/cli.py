@@ -53,6 +53,8 @@ def quiet_effects(root: str, poll: standing.Poll, say, no_drain: bool) -> argpar
     common = status.common_dir(root)
     main = chores.main_checkout(common)
     repo = ghrest.slug()
+    # The `Reader`'s own lines (a compare it could not read) reach this output too, so they carry its prefix.
+    pulls.reader(repo).say = lambda line: say(f"{quiet.PREFIX} {line}")
 
     def ready(number: int) -> tuple[dict | None, list[dict] | None]:
         try:

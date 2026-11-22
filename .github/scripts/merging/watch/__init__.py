@@ -88,11 +88,12 @@ the record's machine line, `Verdict: queue on <sha>`, takes a ready pull request
 with no label, while its head is that sha or only merges followed it; `round`
 and `hold` keep it out. The label stays the override by hand: `queue` takes it
 whatever the verdict, `hold` keeps it out whatever else, and a `Needs:` no
-`Done:` answered keeps it out under either ([`verdict.standing`]). A record
-with no verdict line leaves the label to decide, as before. The listing reads
+`Done:` answered keeps it out under either ([`verdict.standing`]). When the
+newest record has no verdict line, the label decides, as before. The listing reads
 each ready pull request's comments for it ([`queue.verdicts.Reader`], kept
 while its `updatedAt` stands), and the go-ahead is asked again, with the
-verdict, before a merge ([`queue.pulls.look_standing`]).
+verdict, before a merge ([`queue.pulls.look_standing`]); when GitHub does not
+show the comments then, it is not merged but goes back in line.
 
 The tiebreak is the label, read from the pull request's own labels and the
 issues it closes (rusty labels issues, not pull requests): infrastructure →

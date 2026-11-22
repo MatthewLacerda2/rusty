@@ -70,7 +70,7 @@ def ready_line(number: int, pull: dict | None, comments: list[dict] | None) -> s
     """What a pull request turning ready asks of someone, or `None`. `pull` is
     read with its standing (`queue.pulls.look_standing`); `None` for either
     read is GitHub not answering."""
-    if pull is None or comments is None:
+    if pull is None or comments is None or (pull.get("standing") or {}).get("unread"):
         return f"{PREFIX} #{number} turned ready; GitHub did not show it or its comments, so whether it is reviewed is unknown."
     if pull.get("state") not in (None, "OPEN") or pull.get("isDraft") or board.queued(pull):
         return None

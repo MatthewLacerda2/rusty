@@ -89,10 +89,11 @@ coder *changing* it must know.
   `updatedAt`); a comment read that fails fails the listing, so a verdict is
   never read as absent, while a compare that fails reads that pull request as
   not queued by its verdict, named once in the log. A pull request without a
-  `standing` (a draft, a re-read that failed) is judged by its labels alone,
-  as before, unless the standing last read still owed a `Needs:`
-  (`verdicts.Reader.again`): so every re-read that asks `board.queued` goes
-  through `queue.pulls.look_standing`, never `look`.
+  `standing` (a draft) is judged by its labels alone, as before; a re-read
+  before a merge whose comments fail carries `verdicts.UNREAD`, which no label
+  overrides, so it goes back in line (`verdicts.Reader.again`): every re-read
+  that asks `board.queued` goes through `queue.pulls.look_standing`, never
+  `look`.
 - **The verdict line's form is an interface**: the agent that writes it and the
   skills (`independent-review`, `ci-merge`) quote it; `standing.line` is how a
   script writes it. Change all three together.

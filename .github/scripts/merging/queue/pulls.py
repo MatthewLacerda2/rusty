@@ -52,9 +52,9 @@ def reader(repo: str) -> verdicts.Reader:
 def look_standing(number: int) -> dict:
     """[`look`], with its review standing ([`verdicts.Reader`]) when it is
     ready: what [`watch.board.queued`] reads when the go-ahead is asked again
-    before a merge (#2628). A standing GitHub would not give is left off, so
-    only the labels decide: a verdict unread is no go-ahead, and a `Needs:`
-    the last read saw unanswered still keeps it out ([`verdicts.Reader.again`])."""
+    before a merge (#2628). Comments GitHub would not give attach
+    [`verdicts.UNREAD`], which is no go-ahead, label or not
+    ([`verdicts.Reader.again`])."""
     return reader(ghrest.slug()).again(look(number))
 
 
