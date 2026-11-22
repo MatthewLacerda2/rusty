@@ -69,3 +69,10 @@ fn coverage_has_no_margin_where_other_maps_grow_sixteen_texels() {
         assert!(position[row + x][3] == 1.0 && position[row + x][..3] != [0.0; 3]);
     }
 }
+
+#[test]
+fn the_map_table_is_sorted_by_name_so_a_new_map_is_one_row_in_its_place() {
+    let names = MeshMap::ALL.map(MeshMap::name);
+    assert!(names.is_sorted(), "{names:?}");
+    assert_eq!(MeshMap::parse("COVERAGE"), Ok(MeshMap::Coverage));
+}
