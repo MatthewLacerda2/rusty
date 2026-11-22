@@ -75,7 +75,7 @@ impl FrameLog {
     }
 
     /// Call after the frame's stats were recorded, so their newest frame is this one.
-    /// `times_gpu`: the adapter takes timestamps, so a frame waits on GPU times.
+    /// `times_gpu`: whether the adapter takes timestamps; only then does a frame wait on them.
     pub fn frame(&mut self, game: &GameWorld, frame: &WindowFrame, times_gpu: bool) {
         let channels = game.resources.application.borrow().log_settings().channels;
         let place = OnceCell::new();

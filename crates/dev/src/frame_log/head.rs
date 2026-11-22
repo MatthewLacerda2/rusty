@@ -1,3 +1,7 @@
+//! A line's head, read without parsing it. `record::line` opens every line with `ch`, `t`
+//! and `tick`, and a frame's with `frame`, `ms` and `cpu_ms`, in that order: change both
+//! together. A line written another way is parsed whole (`from_map`).
+
 use std::borrow::Cow;
 
 use serde_json::{Map, Value};

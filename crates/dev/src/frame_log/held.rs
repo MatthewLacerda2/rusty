@@ -1,3 +1,6 @@
+//! A frame is written only after every earlier one, so the files stay in time order:
+//! `read` stops at the first line older than its look-back.
+
 use std::collections::VecDeque;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, PoisonError, Weak};
@@ -6,6 +9,7 @@ use rusty_render::GpuTimes;
 
 use super::record::FrameRecord;
 
+/// Later frames a frame waits for its GPU times, past the frame or two they take to resolve.
 pub(super) const HOLD: u32 = 4;
 
 pub(super) struct Entry {
@@ -55,6 +59,7 @@ pub(super) struct Held {
 }
 
 impl Held {
+    /// A frame starts: `wall_ms` is the newest held frame's own wall time.
     pub(super) fn ended(&mut self, wall_ms: f64) {
         if let Some(newest) = self.entries.back_mut() {
             newest.ms.get_or_insert(wall_ms);
@@ -97,6 +102,7 @@ impl Held {
 
 pub(super) type Shared = Arc<Mutex<Held>>;
 
+/// The running logs' held frames by folder, so a read of a folder finds them.
 static RUNNING: Mutex<Vec<(PathBuf, Weak<Mutex<Held>>)>> = Mutex::new(Vec::new());
 
 pub(super) fn register(dir: &Path) -> Shared {
