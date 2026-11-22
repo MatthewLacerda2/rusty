@@ -24,6 +24,8 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }],
 };
 
+/// Gated by `motion::wanted`: the Scene view never blurs, nor a view that wrote velocity only
+/// for depth of field.
 fn blur(r: &Renderer, view: &mut RenderView, cx: &PassCx, commands: &mut Commands) {
     let (post, graphics, stack) = (cx.effect.post, cx.effect.graphics, cx.stack);
     let blurs = motion::wanted(post, graphics, cx.effect.full, stack.editor_mode);

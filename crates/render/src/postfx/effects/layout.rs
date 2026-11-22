@@ -51,6 +51,7 @@ fn place<F>(
         .collect()
 }
 
+/// At least one: WGSL has no empty array.
 pub(super) fn span<F>(layout: &[Placed<F>], slots: fn(&F) -> usize) -> usize {
     let end = layout.last().map_or(0, |p| p.offset + slots(p.function));
     end.max(1)

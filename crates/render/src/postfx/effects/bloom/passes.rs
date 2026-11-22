@@ -73,6 +73,7 @@ impl BloomPasses {
         ]
     }
 
+    /// `high` is the upsample's own mip; the other passes bind `low` there again, never a target.
     fn group(
         &self,
         device: &wgpu::Device,

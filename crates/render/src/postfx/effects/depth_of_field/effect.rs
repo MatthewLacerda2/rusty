@@ -42,6 +42,7 @@ fn dof_params(post: PostSource, graphics: GraphicsSettings, height: u32) -> Opti
     DofParams::new(dof, height, divisor)
 }
 
+/// `motion::target_wanted` asks it too: the velocity target holds the depths it reads.
 pub(crate) fn dof_enabled(post: PostSource, graphics: GraphicsSettings) -> bool {
     let on = post
         .volume

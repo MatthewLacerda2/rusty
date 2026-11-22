@@ -25,6 +25,7 @@ fn sharpest_bend(red: &[f32], (w, h): (u32, u32)) -> f32 {
         .fold(0.0, f32::max)
 }
 
+/// Measured on lavapipe: 2.3 to 5.2.
 const BEND: f32 = 12.0;
 
 #[test]
