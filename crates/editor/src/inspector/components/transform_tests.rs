@@ -1,6 +1,6 @@
-//! The rotation fields' drag helper (#333): it shows an angle as it is, except that the
+//! The rotation fields' drag helper: it shows an angle as it is, except that the
 //! Euler decomposition's -0 reads as 0. The scale fields show a mirrored scale
-//! without rewriting it (#1142).
+//! without rewriting it.
 
 /// Run `drag` over `value` for one headless egui pass; return the value it left.
 fn shown_by(drag: fn(&mut egui::Ui, &mut f32) -> bool, value: f32) -> f32 {

@@ -1,4 +1,4 @@
-//! When the window draws: on demand outside Play, flat out otherwise (#1721).
+//! When the window draws: on demand outside Play, flat out otherwise.
 
 use super::*;
 

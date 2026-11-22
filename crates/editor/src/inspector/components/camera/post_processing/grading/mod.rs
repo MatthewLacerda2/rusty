@@ -1,4 +1,4 @@
-//! The Color Correction sections of the Post Processing card (#1440, #1441), one
+//! The Color Correction sections of the Post Processing card, one
 //! per grading effect, all under the Color Correction heading.
 
 // sorted: one module per grading section; none reads another

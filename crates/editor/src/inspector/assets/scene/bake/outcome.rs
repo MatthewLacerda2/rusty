@@ -1,4 +1,4 @@
-//! How a background bake ended, said twice (#1999): in the console, and as the
+//! How a background bake ended, said twice: in the console, and as the
 //! scene's `lighting_bake_status`, which `Lighting.GetBakeStatus()` reads, since
 //! the console alone reaches no agent.
 
@@ -49,8 +49,6 @@ pub(super) fn fail(
     )
 }
 
-/// Say `line` in the console and as the scene's status, which a script polls
-/// (`Lighting.GetBakeStatus`, #1999): the console alone reaches no agent.
 pub(super) fn failed(
     scene: &mut Scene,
     log: &mut ConsoleLogs,

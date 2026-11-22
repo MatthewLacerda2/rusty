@@ -28,10 +28,10 @@ pub fn draw_inspector(
 ) {
     let extension = rusty_core::paths::extension(path);
 
-    // Model/texture/shader assets get a Preview tab (#352); everything else (audio,
+    // Model/texture/shader assets get a Preview tab; everything else (audio,
     // scenes, prefabs, scripts) keeps its single Details view — there's no isolated
     // scene rendering to preview for those. The dispatch table is shared with
-    // `Debug.Preview` (#353) so both front-ends accept exactly the same asset kinds.
+    // `Debug.Preview` so both front-ends accept exactly the same asset kinds.
     if let Some(subject) = rusty_preview::subject_for_path(path) {
         preview::draw_tab_strip(ui, &mut editor.preview_tab_active, editor.theme);
         if editor.preview_tab_active {
@@ -44,7 +44,7 @@ pub fn draw_inspector(
         e if IMAGE_EXTENSIONS.contains(&e) => {
             image::draw(ui, editor, scene, path);
         }
-        // After images: a strip `.png` keeps the image card (#1441).
+        // After images: a strip `.png` keeps the image card.
         e if LUT_EXTENSIONS.contains(&e) => {
             lut::draw(ui, path);
         }

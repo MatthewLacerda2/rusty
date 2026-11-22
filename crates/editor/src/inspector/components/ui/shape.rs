@@ -1,4 +1,4 @@
-//! The Shape inspector card (#425): the primitive and its per-kind fields, the
+//! The Shape inspector card: the primitive and its per-kind fields, the
 //! fill (colour or gradient), border, shadow, glow, blend mode and raycast target.
 //! Widgets edit a snapshot; every write routes through `edit::authoring::ui::shape`.
 
@@ -12,7 +12,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::{ShapeComponent, ShapeCorner, ShapeKind};
 use rusty_edit::authoring::ui::shape as ops;
 
-/// Shape card. A THIN client (#287): widgets edit a snapshot and the changed
+/// Shape card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.shape(id).map(|s| s.clone()) else {

@@ -1,9 +1,5 @@
 //! Tests for the model inspector's material wiring: `instantiate` populating
 //! `scene.materials` and the entity `MaterialComponent` with a shared (deduped)
-//! library entry (#203), a `SceneData` round-trip, and the engine-default fallback
-//! for a material-less glTF (#214). The per-sub-object spawn now routes through the
-//! shared `authoring::instantiate_asset` verb (#182); its unit-level dedup test
-//! lives alongside that verb in `edit::asset_instance`.
 
 use super::instantiate;
 use crate::EditorUi;
@@ -37,7 +33,7 @@ const SHARED_MATERIAL_GLTF: &str = r#"{
 "#;
 
 /// A glTF whose two meshes name NO material — the case the engine must dress with its
-/// default `Material` (#214). Same shared-position buffer as above, refs dropped.
+/// default `Material`. Same shared-position buffer as above, refs dropped.
 const NO_MATERIAL_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -119,8 +115,6 @@ fn instantiate_dresses_material_less_meshes_with_engine_default() {
     let mut scene = Scene::new();
     instantiate(&mut EditorUi::new(Default::default()), &mut scene, &path);
 
-    // Both created mesh entities carry a RESOLVABLE material (key present in the shared
-    // library) even though the glTF named none.
     let entities = scene.world.collect_entities();
     let meshed: Vec<_> = entities.iter().filter(|e| e.mesh.is_some()).collect();
     assert_eq!(meshed.len(), 2, "both sub-objects instantiated");

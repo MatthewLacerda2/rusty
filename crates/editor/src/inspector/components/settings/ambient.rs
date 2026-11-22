@@ -1,9 +1,3 @@
-//! The Scene Settings panel's Environment Lighting (#1647): Unity's *Source*
-//! dropdown, `Color`, `Gradient` or `Skybox` (#1675, the sky itself: nothing to
-//! pick but the sky), the ambient colour, and the gradient's sky,
-//! equator and ground colours, each written through its `authoring::environment`
-//! op, the one `Lighting.Set*` calls.
-
 use glam::Vec3;
 
 use crate::EditorUi;

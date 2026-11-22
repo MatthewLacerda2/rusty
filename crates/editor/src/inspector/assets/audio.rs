@@ -1,9 +1,6 @@
 use egui_phosphor::regular as icon;
 use std::path::Path;
 
-/// An audio clip's card: its file metadata. The clip has no import settings yet,
-/// and the editor cannot play it (#1323 removed a card of settings nothing read
-/// and a mock transport that played nothing).
 pub fn draw(ui: &mut egui::Ui, path: &str) {
     let filename = Path::new(path)
         .file_name()

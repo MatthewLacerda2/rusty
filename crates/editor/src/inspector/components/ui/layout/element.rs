@@ -1,4 +1,4 @@
-//! The Layout Element inspector card (#421): ignore-layout, the min / preferred /
+//! The Layout Element inspector card: ignore-layout, the min / preferred /
 //! flexible size overrides (each axis toggled on to override the content's
 //! size) and the content fitter per axis. Widgets edit a snapshot; every write
 //! routes through `edit::authoring::ui::layout::element`.
@@ -13,7 +13,7 @@ use crate::inspector::components::ui::combo;
 use rusty_components::{LayoutAxisFit, LayoutElementComponent};
 use rusty_edit::authoring::ui::layout::element::{self as ops, SizeKind};
 
-/// Layout Element card. A THIN client (#287): widgets edit a snapshot and the
+/// Layout Element card. A THIN client: widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.layout_element(id).map(|e| e.clone()) else {

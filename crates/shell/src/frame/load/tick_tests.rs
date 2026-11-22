@@ -1,4 +1,4 @@
-//! A play-mode `Scene.Load` in the windowed loop (#2122): the tick that swapped the
+//! A play-mode `Scene.Load` in the windowed loop: the tick that swapped the
 //! scene ends its frame, the load's time is not owed, and no pose blends across it.
 
 use super::frame_tests::playing_world;
@@ -65,10 +65,10 @@ fn loading(tag: &str) -> (GameWorld, u32, FixedTicks, DrawPoses) {
 fn the_tick_that_loads_ends_its_frame_and_the_load_is_not_owed() {
     let (mut game, _, mut ticks, mut poses) = loading("owe");
     let (before, frame) = (game.scene().borrow().id(), game.play_frame());
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.1); // six ticks owed
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.1);
     assert_ne!(game.scene().borrow().id(), before, "the level loaded");
     assert_eq!(game.play_frame(), frame + 1, "no tick after the load's");
-    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.3); // the load's cost
+    advance_sim(&mut game, Step::of(&mut ticks, &mut poses), 0.3);
     assert_eq!(game.play_frame(), frame + 1, "the load's time is not owed");
     advance_sim(
         &mut game,
@@ -81,8 +81,6 @@ fn the_tick_that_loads_ends_its_frame_and_the_load_is_not_owed() {
 #[test]
 fn a_survivor_the_new_scene_moves_is_never_blended_from_its_old_pose() {
     let (mut game, id, mut ticks, mut poses) = loading("pose");
-    // One tick a frame: the load's, then (on `main`) the level's `Start` in the next,
-    // blended from the pose the survivor had in the outgoing scene.
     let mut frames = vec![FIXED_DELTA_TIME; 3];
     frames.extend([0.007; 6]);
     for raw in frames {

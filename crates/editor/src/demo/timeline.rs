@@ -97,7 +97,6 @@ fn bar(ui: &mut Ui, view: &mut DemoView, t: &Theme, width: f32) {
     painter.circle_filled(egui::pos2(head, rect.center().y), 5.0, Color32::WHITE);
     if let Some(pos) = response.hover_pos() {
         if let Some(label) = mark_near(&view.marks, pos.x, rect.left(), rect.right(), view.ticks) {
-            // Above the bar, outside its clip rect: the window's painter.
             ui.painter().text(
                 egui::pos2(pos.x, rect.top()),
                 Align2::CENTER_BOTTOM,

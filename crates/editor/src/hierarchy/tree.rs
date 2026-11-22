@@ -13,9 +13,6 @@ use rusty_scene::Scene;
 /// The tree's scroll area, named so its offset is found again (and by tests).
 pub(super) const SCROLL_SALT: &str = "hierarchy_rows";
 
-/// What a row reads and writes besides the scene: the editor's selection fields
-/// (clicking a row updates them), the row a context-menu *Delete* asked for
-/// (`hierarchy::delete` applies it after the tree is drawn), and the theme.
 pub(super) struct Rows<'a> {
     pub sel_entity: &'a mut Option<u32>,
     pub sel_asset: &'a mut Option<String>,
@@ -24,20 +21,14 @@ pub(super) struct Rows<'a> {
 }
 
 impl Rows<'_> {
-    /// Draw the flattened tree in a vertical scroll area, laying out only the
-    /// rows in its view: one off screen costs its share of the scroll height and
-    /// nothing else. Every row is one height, which `show_rows` needs.
     pub(super) fn draw(&mut self, ui: &mut egui::Ui, scene: &Scene, flat: &[Row]) {
         let row_h = ui.spacing().interact_size.y;
-        // As wide as the panel, not as the rows: only the rows in view are laid
-        // out, so following their width would move the scroll bar while scrolling.
         let scroll = egui::ScrollArea::vertical()
             .id_salt(SCROLL_SALT)
             .auto_shrink([false, true]);
         scroll.show_rows(ui, row_h, flat.len(), |ui, range| {
             let pitch = row_h + ui.spacing().item_spacing.y;
             let indent = ui.spacing().indent;
-            // Where row 0 would sit: `show_rows` starts its ui at `range.start`.
             let origin = ui.max_rect().left_top() - egui::vec2(0.0, range.start as f32 * pitch);
             for (i, row) in flat.iter().enumerate().take(range.end).skip(range.start) {
                 let min = origin + egui::vec2(row.depth as f32 * indent, i as f32 * pitch);
@@ -49,13 +40,6 @@ impl Rows<'_> {
         });
     }
 
-    /// One row in `rect`, laid out as `ui.horizontal` lays it out: a branch's
-    /// twisty or a leaf's matching space, then the glyph and the name. The name
-    /// is borrowed from the World for the row's draw, never copied.
-    ///
-    /// The row is a child ui that never grows its parent, so no row (a long
-    /// name, a deep indent) widens the scroll area or the panel: what does not
-    /// fit is clipped to the panel's width.
     fn draw_row(&mut self, ui: &mut egui::Ui, scene: &Scene, row: &Row, rect: egui::Rect) {
         let Some(name) = scene.world.name(row.id) else {
             return;
@@ -74,10 +58,6 @@ impl Rows<'_> {
         self.row(ui, scene, row.id, &name);
     }
 
-    /// The clickable row: type glyph + name. Selecting toggles off to None (which
-    /// the inspector reads as "show scene settings"). Right-click offers "Save as
-    /// Prefab", which extracts this entity's subtree to a `.prefab` asset (#215),
-    /// and "Delete", which deletes it and its subtree (#1915).
     fn row(&mut self, ui: &mut egui::Ui, scene: &Scene, entity_id: u32, name: &str) {
         let (glyph, glyph_color) = node_glyph(scene, entity_id, self.theme);
         let is_selected = *self.sel_entity == Some(entity_id);
@@ -138,9 +118,6 @@ fn save_as_prefab(scene: &Scene, entity_id: u32, name: &str) {
     let _ = rusty_edit::save_prefab(scene, entity_id, &path.to_string_lossy());
 }
 
-/// A branch's expand toggle, as `CollapsingState::show_header` draws it: the full
-/// indent wide with no spacing after it. A click flips the stored state, and the
-/// next frame's walk shows or skips the subtree.
 fn twisty(ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {
     let mut state = node_state(ui.ctx(), scene, entity_id);
     let spacing = ui.spacing().item_spacing;
@@ -151,10 +128,6 @@ fn twisty(ui: &mut egui::Ui, scene: &Scene, entity_id: u32) {
     ui.spacing_mut().item_spacing = spacing;
 }
 
-/// The guide line down an open branch's body, as egui's indent draws it: half an
-/// indent in from the branch's row, from the first child's top to 2 px above the
-/// last descendant's bottom. Drawn for each open branch with a row in `range`,
-/// and for those above it whose body reaches into it (the first row's ancestors).
 fn guide_lines(
     ui: &egui::Ui,
     flat: &[Row],

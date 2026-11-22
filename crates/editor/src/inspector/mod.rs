@@ -18,7 +18,6 @@ use rusty_scene::{MaterialAsset, Scene};
 use rusty_script::scripting::ConsoleLogs;
 use std::collections::BTreeMap;
 
-/// RIGHT PANEL: Properties Inspector
 pub fn draw(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -26,7 +25,7 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
-    // A post-processing path field (the Color Lookup, the bloom dirt, #1441, #1442)
+    // A post-processing path field
     // typed and left by selecting something else.
     editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
     // The Collider's asset path left the same way, and an asset edit whose drag ended.
@@ -48,7 +47,7 @@ pub fn draw(
             }
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                // Dispatch on the explicit inspector target (mutually exclusive).
+                // Dispatch on the explicit inspector target.
                 match editor.inspector_target() {
                     InspectorTarget::Entity(selected_id) => {
                         draw_entity_inspector(editor, ui, scene, selected_id);
@@ -86,18 +85,12 @@ fn draw_entity_inspector(
 ) {
     let mut pending = PendingEdits::default();
     let cx = gather_context(scene, selected_id);
-    // A material delete's confirm belongs to the scene it came from (#1576).
+    // A material delete's confirm belongs to the scene it came from.
     editor.material_delete.keep_scene(scene.id());
 
-    // The cards borrow the world (`scene.world`) and the material library
-    // (`scene.materials`) as DISJOINT fields of `Scene`, so the material card can
-    // edit the shared library asset alongside the component accessors (#344).
     let materials = &mut scene.materials;
     let world = &mut scene.world;
     if world.contains(selected_id) {
-        // Reconcile declared component dependencies (#359): drop any component whose
-        // requirement was cleared out from under it (e.g. a Camera removed via its
-        // card, orphaning a PostProcessing). Declaration-driven, not hand-written.
         rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
@@ -109,8 +102,6 @@ fn draw_entity_inspector(
             &mut editor.is_dirty,
         );
 
-        // Linked-prefab override affordance, just under the header (a no-op for a plain
-        // entity). Emits a deferred action so the prefab verbs run outside the card pass.
         pending.prefab_action = prefab::draw(ui, world, selected_id, cx.prefab_root);
 
         transform::draw(
@@ -137,8 +128,6 @@ fn draw_entity_inspector(
     pending.apply(editor, scene, selected_id);
 }
 
-/// The Unity-style object header card: name + active/static toggles + layer combo.
-/// Widgets edit local snapshots and write back through the facade on change (#344).
 fn draw_object_header(
     ui: &mut egui::Ui,
     t: crate::theme::Theme,

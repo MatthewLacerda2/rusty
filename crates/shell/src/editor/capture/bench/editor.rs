@@ -29,7 +29,6 @@ pub(super) struct Editor {
 
 impl Editor {
     /// The editor over `game`, posed and selected (see the module docs); `None`
-    /// with no adapter.
     pub(super) fn new(game: &GameWorld, opts: &Round) -> Option<Self> {
         let size = (opts.size.0.max(1), opts.size.1.max(1));
         let mut host = CaptureHost::new();
@@ -64,11 +63,6 @@ impl Editor {
         })
     }
 
-    /// Draw one editor frame and wait for it: its edit-frame and UI times, the
-    /// viewport frame and the size it drew at when one rendered, the GPU's
-    /// speed over the frame, and the frame's wall time in ms (the edit frame, the
-    /// UI and the draw until the GPU finished, before its readbacks; the probes
-    /// left out).
     pub(super) fn frame(
         &mut self,
         game: &mut GameWorld,
@@ -99,8 +93,6 @@ impl Editor {
         (ui, frame, gpu_speed(before, after), wall_ms)
     }
 
-    /// Draw one editor frame and wait for it, probing nothing: no clock probe, no
-    /// GPU times read back. What Stop's time ends on.
     pub(super) fn draw(&mut self, game: &mut GameWorld) {
         game.edit_frame();
         let (output, jobs, drawn) = self.ui(game);
@@ -129,8 +121,6 @@ impl Editor {
         (output, jobs, drawn)
     }
 
-    /// Render the viewport and paint the UI over it: the renderer's CPU time,
-    /// stages and counters, and the size the view drew at, when it rendered.
     fn render(
         &mut self,
         game: &GameWorld,
@@ -172,10 +162,9 @@ impl Editor {
         for id in &output.textures_delta.free {
             self.egui.free_texture(id);
         }
-        output.textures_delta.clear(); // egui asserts every delta is consumed
+        output.textures_delta.clear();
     }
 
-    /// The editor's UI, for a test to change its layout (close a panel).
     #[cfg(test)]
     pub(super) fn editor_ui(&mut self) -> &mut EditorUi {
         &mut self.ui
@@ -189,7 +178,6 @@ impl Editor {
     }
 }
 
-/// A viewport frame's renderer CPU ms, stages and counters, and the view's size.
 type Cost = (
     f64,
     Vec<(&'static str, f64)>,
@@ -197,10 +185,6 @@ type Cost = (
     (u32, u32),
 );
 
-/// Select the scene's first screen camera, and pose the Scene view at the
-/// scene's first game viewpoint (its first camera, or the fallbacks after it):
-/// its position, yaw and pitch. The lens stays the Scene view's own, which the
-/// editor draws with whatever camera it is aligned to.
 pub(super) fn pose(ui: &mut EditorUi, game: &GameWorld) {
     let scene = game.scene().borrow();
     let views = rusty_dev::bench::scenes::views::pick(&scene, &game.resources.nav.borrow());

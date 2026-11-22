@@ -1,4 +1,4 @@
-//! A Generate Lighting dropped during its occlusion step (#1714) keeps the
+//! A Generate Lighting dropped during its occlusion step keeps the
 //! lighting: the lightmaps and probes were written into the scene file when the
 //! probes committed, before the PVS started baking, and only the PVS is lost.
 

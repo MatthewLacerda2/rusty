@@ -1,4 +1,4 @@
-//! Esc frees the cursor in the editor instead of stopping Play (#576), without a window.
+//! Esc frees the cursor in the editor instead of stopping Play, without a window.
 
 use std::cell::RefCell;
 use std::rc::Rc;

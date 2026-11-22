@@ -1,5 +1,5 @@
-//! What a refresh may skip (#1256): an idle one sweeps nothing, even while
-//! something else writes other files (the write log is the process's, #2442), a
+//! What a refresh may skip: an idle one sweeps nothing, even while
+//! something else writes other files, a
 //! hand edit is seen whatever it does to the count, and a file that cannot be
 //! read copies nothing when it is retried.
 

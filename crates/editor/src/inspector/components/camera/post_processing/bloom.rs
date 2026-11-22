@@ -1,5 +1,5 @@
 //! The Bloom section: the switch and, while on, its knobs, the lens dirt texture
-//! (#1442) and its quality level, with the `Custom` divisor (#1522).
+//! and its quality level, with the `Custom` divisor.
 
 use super::path_field::{self, DIRT};
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};

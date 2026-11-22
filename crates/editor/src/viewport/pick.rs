@@ -1,28 +1,16 @@
-//! crates/editor/src/viewport/pick.rs — screen→world ray + click-to-select (#183).
-//!
-//! Maps a pointer position inside the Scene viewport to a world-space ray using the
-//! editor camera's view-projection (the same matrix the renderer draws with), then
-//! picks the nearest entity whose mesh AABB the ray hits. Selection sets the editor's
-//! `selected_entity_id` exactly as a hierarchy click does, so the inspector and the
-//! selection overlay light up identically. Kept egui-free (pure glam) so the math is
-//! testable and the `wgpu`/`egui` layers stay decoupled.
+//! crates/editor/src/viewport/pick.rs — screen→world ray + click-to-select.
 
 use glam::Vec3;
 
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 
-/// A world-space ray: an origin on the near plane and a normalized direction.
 #[derive(Clone, Copy, Debug)]
 pub struct Ray {
     pub origin: Vec3,
     pub dir: Vec3,
 }
 
-/// Build a world ray from a normalized device coordinate (`ndc_x`/`ndc_y` in
-/// `[-1, 1]`, y up) by un-projecting the near and far plane points through the
-/// camera's inverse view-projection. `aspect` must match the viewport the camera was
-/// rendered at so the ray lines up with the displayed image.
 pub fn ray_from_ndc(camera: &Camera, aspect: f32, ndc_x: f32, ndc_y: f32) -> Ray {
     let view_proj = camera.build_view_projection(aspect);
     let inv = view_proj.inverse();
@@ -48,9 +36,6 @@ pub fn local_to_ndc(local_x: f32, local_y: f32, width: f32, height: f32) -> Opti
 
 /// Nearest entity hit by `ray`, picking against each active, drawn entity's mesh world
 /// AABB.
-/// Returns the entity id and the ray time-of-impact, or `None` when the ray misses
-/// every entity (the caller treats a miss as a deselect). Reused for both edit and
-/// play mode — it needs no rapier world, only the scene's geometry.
 pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
     let mut best: Option<(u32, f32)> = None;
     for id in scene.world.ids_with_mesh() {
@@ -58,7 +43,6 @@ pub fn pick_entity(scene: &Scene, ray: Ray) -> Option<(u32, f32)> {
             continue;
         }
         let mesh = scene.world.mesh(id).expect("id came from ids_with_mesh");
-        // Unity picks by what is drawn: a `ShadowsOnly` mesh is seen by no camera.
         if !mesh.cast_shadows.is_visible() {
             continue;
         }
@@ -110,7 +94,6 @@ mod tests {
 
     #[test]
     fn ndc_maps_corners() {
-        // Top-left of the image is NDC (-1, 1); bottom-right is (1, -1).
         assert_eq!(local_to_ndc(0.0, 0.0, 100.0, 50.0), Some((-1.0, 1.0)));
         assert_eq!(local_to_ndc(100.0, 50.0, 100.0, 50.0), Some((1.0, -1.0)));
         // Centre is the origin.
@@ -122,7 +105,6 @@ mod tests {
         let mut scene = Scene::new();
         let id = authoring::create_entity(&mut scene, "Box", Some(Primitive::Box));
         scene.update_all_colliders();
-        // A camera looking down -Z from +Z at the origin; the centre ray hits the box.
         let camera = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
         let ray = ray_from_ndc(&camera, 1.0, 0.0, 0.0);
         let hit = pick_entity(&scene, ray);
@@ -143,7 +125,6 @@ mod tests {
         let mut scene = Scene::new();
         authoring::create_entity(&mut scene, "Box", Some(Primitive::Box));
         let camera = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
-        // A corner ray points away from the box at the origin.
         let ray = ray_from_ndc(&camera, 1.0, -0.99, 0.99);
         assert!(pick_entity(&scene, ray).is_none());
     }

@@ -1,8 +1,4 @@
-//! crates/ui/src/layout/lookup.rs — one element's rect on demand, without the whole pass (#417).
-//!
-//! `UI.GetRect`, `Text.GetPreferredSize` and `Debug.Snapshot` ask for a single rect
-//! from the live scene (edit mode included): walk only its ancestor chain with the
-//! same maths [`UiLayout::compute_in`](super::UiLayout::compute_in) runs.
+//! crates/ui/src/layout/lookup.rs — one element's rect on demand, without the whole pass.
 
 use super::sizes::layout_children;
 use super::{child_node, group, root_canvas_of, root_node, UiRect};
@@ -11,8 +7,6 @@ use rusty_ecs::World;
 
 /// The rect of one entity against `view`, computed on demand by walking only its
 /// ancestor chain — identical to what [`UiLayout::compute_in`](super::UiLayout::compute_in)
-/// yields for it. `None` when the entity is not under a canvas, or a link of the
-/// chain lacks a `RectTransform`.
 pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
     let root = root_canvas_of(world, id)?;
     let mut chain = Vec::new();
@@ -34,7 +28,7 @@ pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
 }
 
 /// Whether the layout group on `id`'s parent places it — its anchors, position and
-/// size are then driven, and the editor shows them read-only, as Unity does (#423).
+/// size are then driven, and the editor shows them read-only, as Unity does.
 pub fn driven_by_group(world: &World, id: u32) -> bool {
     world
         .parent_id(id)

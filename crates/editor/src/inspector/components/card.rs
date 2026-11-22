@@ -22,7 +22,6 @@ pub fn component_card(
 ) {
     let t = theme::from_ui(ui);
     card_frame(&t).show(ui, |ui| {
-        // Every card spans the panel, whether or not its header has a remove button.
         ui.set_min_width(ui.available_width());
         let id = egui::Id::new(("component_card", title));
         CollapsingState::load_with_default_open(ui.ctx(), id, true)
@@ -52,10 +51,6 @@ pub fn card_frame(t: &theme::Theme) -> egui::Frame {
         .stroke(egui::Stroke::new(1.0, t.outline.linear_multiply(0.6)))
 }
 
-/// What a card's Remove button does once the card has drawn: the cascading verb
-/// behind `Scene.RemoveComponent` (#992), so the components that require `kind` (a
-/// Joint after its RigidBody, a Text after its RectTransform) go in the same frame,
-/// and the scene is marked unsaved.
 pub fn remove_component(world: &mut World, id: u32, kind: ComponentKind, is_dirty: &mut bool) {
     authoring::remove_with_cascade(world, id, kind);
     *is_dirty = true;

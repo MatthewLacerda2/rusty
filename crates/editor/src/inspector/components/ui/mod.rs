@@ -1,9 +1,7 @@
-//! The in-game UI's inspector cards (#417–#421): the Canvas root, the
+//! The in-game UI's inspector cards: the Canvas root, the
 //! RectTransform every UI element carries, the Image graphic, the Shape graphic
-//! (#425), the Text label, the Canvas Group, the Rect Mask and Mask, the Backdrop
+//!, the Text label, the Canvas Group, the Rect Mask and Mask, the Backdrop
 //! Filter, the Selectable, and the Layout Group and Layout
-//! Element. Each is a thin client over its shared
-//! `edit::authoring` ops, the same ones the matching Lua namespace calls.
 
 pub mod backdrop;
 pub mod image;
@@ -16,7 +14,6 @@ pub mod shape;
 pub mod text;
 
 /// Draw every UI card the entity carries, in the order Unity's inspector shows them.
-/// `view` is the game view the UI lays out on (its pixels and texture sizes).
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -52,8 +49,6 @@ fn vec2_row(ui: &mut egui::Ui, label: &str, value: glam::Vec2, speed: f32) -> Op
     changed.then(|| glam::Vec2::new(x, y))
 }
 
-/// A labelled `x, y, z, w` drag row (left, bottom, right, top for borders and
-/// padding). Returns the edited value when any component changed.
 fn vec4_row(ui: &mut egui::Ui, label: &str, value: glam::Vec4) -> Option<glam::Vec4> {
     let mut v = value.to_array();
     let changed = ui

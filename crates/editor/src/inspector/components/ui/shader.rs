@@ -1,4 +1,4 @@
-//! The custom-shader row the Image, Shape and Text cards share (#427): the name of the
+//! The custom-shader row the Image, Shape and Text cards share: the name of the
 //! baked ui shader the graphic draws with (empty: the standard UI shader). Edits go
 //! through `edit::authoring::ui::shader`, like `UI.SetShader`; runtime params are
 //! driven from scripts (`UI.SetShaderParam`).

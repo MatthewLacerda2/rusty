@@ -60,7 +60,6 @@ fn a_game_view_size_boxes_the_overlay() {
         ..frame()
     };
     assert_eq!(boxed.screen(), Vec2::new(640.0, 480.0));
-    // The box's bottom-left corner is the screen's origin, its centre the centre.
     assert_eq!(boxed.pixel(Vec2::new(120.0, 540.0)), Vec2::ZERO);
     assert_eq!(
         boxed.pixel(Vec2::new(480.0, 270.0)),
@@ -112,7 +111,6 @@ fn a_body_drag_in_points_moves_the_anchored_position() {
     assert!(apply(&mut s.world, &frame(), drag, Vec2::new(5.0, 10.0)));
     let rt = s.world.rect_transform(img).expect("rt").clone();
     assert_eq!(rt.anchored_position, Vec2::new(10.0, -20.0));
-    // The right edge, dragged 10 points right: 20 units wider, centre pivot follows.
     let edge = begin(&s.world, &frame(), img, Vec2::new(535.0, 280.0)).expect("grabbed");
     assert_eq!(edge.handle, Handle::Resize { x: 1, y: 0 });
     apply(&mut s.world, &frame(), edge, Vec2::new(10.0, 0.0));

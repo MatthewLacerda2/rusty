@@ -77,7 +77,7 @@ fn keymap_rebinding_covers_pad_buttons() {
 fn a_resting_pad_never_releases_a_shared_keyboard_key() {
     let (mut pump, mut input, mut keymap) = (PadPump::default(), InputState::new(), Keymap::new());
     keymap.bind("PADA", "SPACE");
-    input.press("SPACE"); // the keyboard holds it
+    input.press("SPACE");
     let mut src = FakePads::default();
     src.pads.push((0, PadSnapshot::default()));
     frame(&mut pump, &mut src, &mut input, &keymap);
@@ -128,7 +128,7 @@ fn rumble_reaches_the_device_behind_the_slot() {
     frame(&mut pump, &mut src, &mut input, &keymap);
     let rumble = Rumble::new(1.0, 0.25, 0.5);
     input.pads.request_rumble(0, rumble);
-    input.pads.request_rumble(1, rumble); // no pad there: dropped
+    input.pads.request_rumble(1, rumble);
     frame(&mut pump, &mut src, &mut input, &keymap);
     assert_eq!(src.rumbled, vec![(42, rumble)]);
 }

@@ -1,5 +1,5 @@
 //! A Generate Lighting dropped during its probe step says what reached the scene: the
-//! lightmaps did, the probes did not (#1602). The probe step bakes from a snapshot, so
+//! lightmaps did, the probes did not. The probe step bakes from a snapshot, so
 //! a probe removed midway, or the scene saved elsewhere, drops it with the probes'
 //! old lighting kept.
 
@@ -69,8 +69,6 @@ fn gpu_a_probe_removed_midway_drops_the_bake_and_says_what_was_applied() {
     assert!(scene.reflection_probes.probes[0].cubemap_path.is_empty());
 }
 
-/// A scene replaced mid-step (Open, a reload) took the applied lightmaps with it: the
-/// line says only that the bake was dropped.
 #[test]
 fn gpu_a_replaced_scene_drops_the_bake_without_claiming_lightmaps() {
     let (mut editor, _, _) = probing("replaced");

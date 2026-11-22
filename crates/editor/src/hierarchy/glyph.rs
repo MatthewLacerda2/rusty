@@ -17,7 +17,7 @@ enum Tint {
 
 type Has = fn(&rusty_ecs::World, u32) -> bool;
 
-/// The row glyph per kind of GameObject, most telling component first (#668): a
+/// The row glyph per kind of GameObject, most telling component first: a
 /// row says what the object *is* — camera, light, UI, audio, character — before
 /// falling back to the plain mesh cube, and an empty object gets a dashed circle.
 const KINDS: &[(Has, &str, Tint)] = &[

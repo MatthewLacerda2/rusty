@@ -1,12 +1,5 @@
 //! crates/shell/src/editor/undo.rs — where the editor's frame opens and closes its Undo
-//! steps (#1631, `scene::undo`).
-//!
-//! A frame records only while the editor itself runs (the dashboard, then the
-//! viewport's pointer edits); the watch, the frame's followers and the render
-//! are not edits. A step closes when the frame ends with no gesture held: no
-//! button down, no gizmo or rect-tool drag, no text field being typed into.
-//! A frame nobody touched folds what it changed into the last step instead;
-//! camera navigation (the wheel, a held fly key) is no touch.
+//! steps.
 
 use super::EditorFrontend;
 use crate::Shell;
@@ -67,9 +60,6 @@ impl EditorFrontend {
 }
 
 impl EditorFrontend {
-    /// Whether a gesture holds the step open: a button down, a gizmo or rect-tool
-    /// drag, a text field being typed into (not the console, not a widget that
-    /// only kept focus after its gesture: `editor::header::typing_holds_step`).
     fn held(&self) -> bool {
         self.egui_ctx.input(|i| i.pointer.any_down())
             || rusty_editor::header::typing_holds_step(&self.egui_ctx)
@@ -77,8 +67,6 @@ impl EditorFrontend {
             || self.editor_ui.rect_drag.is_some()
     }
 
-    /// Whether someone acted on the editor this frame (a press, a key, text, an
-    /// Undo or Redo, whose shortcut egui consumed). Reading it resets the latter.
     fn touched(&mut self) -> bool {
         let stepped = std::mem::take(&mut self.editor_ui.history_stepped);
         stepped || self.egui_ctx.input(|i| i.events.iter().any(is_user_input))

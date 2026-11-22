@@ -1,16 +1,4 @@
-//! crates/shell/src/player/ — the standalone player frontend (#431): a game with no editor.
-//!
-//! Boot: read the project's build settings, load the startup scene, enter Play at once
-//! (no edit snapshot — there is no edit mode to return to), apply the persisted video
-//! and keybinding settings, run. Each frame renders the active camera stack and the
-//! in-game UI straight onto the swapchain with no chrome, and the game gets all input. `Application.Quit()`
-//! closes the window; the loop's exit flushes `Storage` first.
-//!
-//! **The player boots read-only** (#1653), as Unity's player never writes into its
-//! data folder: no seeding and no asset refresh, which the editor's open
-//! (`edit::seed_project`) and the export (`dev::export`) do instead. What
-//! it writes goes under `saved/` (`Storage`, a dev build's demos), Unity's
-//! `persistentDataPath`; `read_only_tests` holds it on an export.
+//! crates/shell/src/player/ — the standalone player frontend: a game with no editor.
 
 use super::frame::Host;
 use super::{boot, Frontend, Launch, Shell};
@@ -39,13 +27,10 @@ impl Frontend for PlayerFrontend {
         target: &wgpu::TextureView,
     ) {
         super::settings::report_display_scale(shell, game);
-        // `Graphics.SetQuality` / `SetOption` reach the renderer here — there is no
-        // editor dropdown to reconcile with.
         super::settings::apply_graphics(shell, game);
 
         let device = &shell.renderer.device;
         let (width, height) = (shell.renderer.config.width, shell.renderer.config.height);
-        // The UI lays out on the game view's pixel size (#417): here, the whole window.
         game.resources
             .screen
             .borrow_mut()
@@ -59,23 +44,17 @@ impl Frontend for PlayerFrontend {
                 height,
             )),
         };
-        // The screen renders its scene at the player's render scale (#1498).
         view.set_render_scale(shell.renderer.render_scale(false));
         view.resize(device, width, height);
 
-        // The view is targetless (it renders straight onto the swapchain), so hand it
-        // the frame to draw the in-game UI on (#418).
         view.set_ui_output(Some(shell.renderer.surface_ui_view(frame)));
 
-        // The tick's main view; the renderer blends it between ticks (#1877).
         let camera = game.main_view();
         let scene = game.scene().borrow();
-        // No debug overlays in a shipped game: editor mode off.
         let textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
         shell.renderer.set_ui_textures(textures);
         shell.renderer.render(view, &scene, &camera, target, false);
         drop(scene);
-        // `Debug.GetAdaptedExposure` reads the screen's adapted exposure (#1444).
         #[cfg(feature = "dev")]
         {
             game.scene().borrow_mut().screen_exposure = view.exposure_readout();
@@ -84,7 +63,6 @@ impl Frontend for PlayerFrontend {
 }
 
 /// What a first launch opens with: the default resolution in the build's window mode.
-/// Saved `Video` settings, once a player changes them, win over this.
 pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
     VideoSettings {
         fullscreen: build.window_mode == WindowMode::Fullscreen,
@@ -92,12 +70,7 @@ pub fn video_defaults(build: &BuildSettings) -> VideoSettings {
     }
 }
 
-/// The player's world on `plan`'s scene: the project's settings taken unbound (a
-/// shipped game reads them but never rewrites them; the graphics defaults are what
-/// a first launch's options fall back to, #1438), then Play entered for good.
 fn world(plan: &rusty_core::project::BootPlan, settings: ProjectSettings) -> GameWorld {
-    // Standalone before the startup scene's import: a player built with `dev` or
-    // `editor` too reads the cooked models and writes none (`asset::cook`).
     rusty_asset::convert::mark_standalone();
     let mut game = boot::load_game(plan);
     game.open_project(ProjectSource::ReadOnly(settings));
@@ -108,7 +81,7 @@ fn world(plan: &rusty_core::project::BootPlan, settings: ProjectSettings) -> Gam
 /// The player's world on the open project's startup scene, read-only: everything
 /// [`launch`] does before it opens the window. Errs when no startup scene is set.
 fn boot(settings: ProjectSettings) -> Result<GameWorld, String> {
-    // A run reads no editor record, so the root is moot (`boot_scene`, #1618).
+    // A run reads no editor record, so the root is moot.
     let startup = &settings.build.startup_scene;
     let plan = rusty_core::project::boot_scene(Path::new(""), startup, Access::Run)?;
     Ok(world(&plan, settings))
@@ -131,7 +104,6 @@ pub fn launch(settings: ProjectSettings) {
     let launch = Launch {
         video_defaults: video_defaults(&build),
         title: build.product_name,
-        // The game's own `.desktop` entry is its packager's to name.
         app_id: None,
         maximized: false,
         frontend: |_: &Shell, _: &GameWorld| PlayerFrontend::default(),

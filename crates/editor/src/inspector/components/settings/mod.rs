@@ -1,13 +1,3 @@
-//! crates/editor/src/inspector/components/settings/ — the Scene Settings inspector panel.
-//!
-//! Shown when nothing is selected: the project-level scalars (skybox, ambient
-//! light, routed through `authoring::environment` like `Lighting.Set*`, #1612, and
-//! its Color / Gradient / Skybox source, #1647, #1675, `ambient`), the
-//! procedural sky (#1620, `sky`, through the same environment ops), the scene fog
-//! (#437, routed through `authoring::fog` like `Graphics.SetFog*`) plus the **Tags & Layers** surface that renames the shared Layers
-//! registry (#90). Layer 0 is the fixed `"Default"`; slots 1..31 are user-named
-//! and persist with the scene.
-
 mod ambient;
 mod sky;
 
@@ -27,22 +17,16 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     ui.separator();
     ui.add_space(5.0);
 
-    // 1–3. Skybox and ambient light, through the shared environment ops.
     draw_environment(editor, ui, scene);
 
-    // The procedural sky's look, drawn when no panorama is set.
     sky::draw(editor, ui, scene);
 
-    // 4. Fog — distance + height, applied to every world-space pass.
     draw_fog(editor, ui, scene);
     ui.add_space(8.0);
 
-    // 5. Tags & Layers — rename the project's shared layer slots, referenced by an
-    // entity's Layer dropdown in the entity inspector.
     draw_layers(editor, ui, scene);
     ui.add_space(8.0);
 
-    // 6. Layer Collision Matrix — which layer collides with which (#91).
     draw_collision_matrix(editor, ui, scene);
 
     ui.add_space(15.0);
@@ -55,7 +39,7 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 }
 
 /// The skybox path and the ambient colour and intensity, each written through its
-/// `authoring::environment` op, the one `Lighting.Set*` calls (#1612).
+/// `authoring::environment` op, the one `Lighting.Set*` calls.
 fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     // 1. Skybox Path
@@ -73,7 +57,6 @@ fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene)
     );
     ui.add_space(8.0);
 
-    // 2. Environment Lighting: the source, then its colour or gradient.
     ambient::draw(editor, ui, scene);
     ui.add_space(8.0);
 
@@ -99,8 +82,6 @@ fn draw_layers(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             ui.colored_label(t.text_secondary, scene.layers.label(0));
         });
         for i in 1..LAYER_COUNT as u8 {
-            // Seed an editable buffer from the model each frame; commit via
-            // `set_name` so layer 0 stays protected and names are trimmed.
             let mut name = scene.layers.name(i).to_string();
             ui.horizontal(|ui| {
                 ui.label(format!("{i}:"));
@@ -118,9 +99,6 @@ fn draw_layers(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     });
 }
 
-/// The Unity-style Layer Collision Matrix: a clickable grid over the named layers
-/// (layer 0 plus any named slots). Unchecking a cell stops those two layers from
-/// colliding; the matrix is symmetric and persists with the scene.
 fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     egui::CollapsingHeader::new(format!("{}  Layer Collision Matrix", icon::STACK)).show(
@@ -134,8 +112,6 @@ fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut S
             egui::Grid::new("collision_matrix_grid")
                 .striped(true)
                 .show(ui, |ui| {
-                    // Header row: a blank corner, then one column per layer (index label,
-                    // full name on hover, to keep the grid compact).
                     ui.label("");
                     for (j, name) in &layers {
                         ui.label(format!("{j}")).on_hover_text(name);
@@ -157,9 +133,8 @@ fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut S
     );
 }
 
-/// The scene fog section (#437). A thin client: each widget edits a snapshot and
+/// The scene fog section. A thin client: each widget edits a snapshot and
 /// routes the write through the shared `authoring::fog` op the `Graphics.SetFog*`
-/// bindings call, so panel and API share one write and one clamp.
 fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let f = scene.fog;
     let fog = &mut scene.fog;

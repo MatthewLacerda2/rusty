@@ -1,11 +1,5 @@
-//! crates/shell/src/editor/game_focus.rs — editor input routing (#416): the game gets input
+//! crates/shell/src/editor/game_focus.rs — editor input routing: the game gets input
 //! only while playing **and** the Game view has focus.
-//!
-//! Entering Play switches to the Game tab and focuses it (Unity's default). A click
-//! inside the Game view focuses it; a click anywhere else (Inspector, Hierarchy, the
-//! Scene tab) takes focus away and frees the cursor — except while the game holds the
-//! cursor locked, when the pointer is captured and a "click elsewhere" is really a
-//! click at the captured position (Esc frees the cursor first, the way out, #576).
 
 use super::EditorFrontend;
 use crate::input::GameViewRect;
@@ -28,9 +22,6 @@ pub fn next_focus(
     was_focused
 }
 
-/// Where the Game tab's image sits, for mapping the pointer: its rect in window
-/// pixels, rendered at the Game view's own size (a demo's or the dropdown's, #2207,
-/// letterboxed in the panel) or else the image's pixels. `None` on the Scene tab.
 pub fn game_view(interaction: &ViewportInteraction, ppp: f32) -> Option<GameViewRect> {
     let image = || super::viewport::target_size(interaction.size, ppp);
     let render = (interaction.tab == ViewportTab::Game).then(|| interaction.render.or_else(image));

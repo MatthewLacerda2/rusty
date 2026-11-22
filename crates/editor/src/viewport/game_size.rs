@@ -1,8 +1,7 @@
-//! The Game view's size dropdown (#2207), Unity's Game view resolution menu: *Free
+//! The Game view's size dropdown, Unity's Game view resolution menu: *Free
 //! Aspect*, 16:9, 16:10, 4:3, 1920x1080, 1280x720, a custom size a script set
 //! (`Editor.SetGameViewSize`), and "1x on HiDPI" (Unity's *Low Resolution Aspect
 //! Ratios*). The setting and how it resolves are `core::application::game_view`'s;
-//! this is the control on the Game tab's strip and the size it gives the image.
 
 use rusty_core::application::{GameViewSetting, GameViewSize};
 
@@ -30,8 +29,6 @@ pub fn dropdown(ui: &mut egui::Ui, setting: &mut GameViewSetting, enabled: bool)
     });
 }
 
-/// The pixel size the Game view renders at in a panel of `panel` points at
-/// `pixels_per_point`; `None` when it is the panel's own (drawn unboxed, as before).
 pub fn fit(
     setting: GameViewSetting,
     panel: egui::Vec2,
@@ -47,11 +44,6 @@ pub fn letterbox(panel: egui::Vec2, size: (u32, u32)) -> egui::Vec2 {
     egui::vec2(w, h)
 }
 
-/// Where the Scene tab's UI overlay draws the screen canvases in its image of
-/// `panel` pixels: the Game view's own size (`interaction.screen`) boxed at its
-/// aspect ratio, as the Game tab letterboxes it and `rect_tool::OverlayFrame` maps
-/// it, as `(x, y, width, height)`. `None` on the Game tab or with the panel's own
-/// size.
 pub fn overlay_box(
     interaction: &super::ViewportInteraction,
     panel: (u32, u32),

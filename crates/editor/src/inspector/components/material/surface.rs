@@ -1,9 +1,7 @@
-//! The Material card's table-driven rows: the map coordinates (#1573) and the
-//! transparent surface (#1523), one widget per row of a shared
+//! The Material card's table-driven rows: the map coordinates and the
+//! transparent surface, one widget per row of a shared
 //! `authoring::material` field table that its `shown` admits (a combo box, a
 //! checkbox, a slider, a colour button or a pair of drag values, by the row's kind).
-//! Every change goes through the shared `set_surface` op `Material.Set<Field>` calls
-//! too.
 
 use std::collections::BTreeMap;
 
@@ -25,7 +23,6 @@ pub(super) fn draw_fields(
             continue;
         }
         if let Some(value) = draw_field(ui, field, &materials[key]) {
-            // A widget only offers values of the row's own kind, so it is never refused.
             if mat_ops::set_surface(materials, key, field, value).is_ok() {
                 *is_dirty = true;
             }
@@ -70,7 +67,7 @@ fn draw_field(
                 .color_edit_button_rgb(&mut rgb)
                 .changed()
                 .then_some(SurfaceValue::Color(rgb)),
-            // A tint that can pass 1 (#1998) is three numbers: a picker stops at white.
+            // A tint that can pass 1 is three numbers: a picker stops at white.
             (SurfaceKind::Color(range), SurfaceValue::Color(mut rgb)) => {
                 drags(ui, &mut rgb, range).then_some(SurfaceValue::Color(rgb))
             }

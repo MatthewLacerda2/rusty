@@ -1,4 +1,4 @@
-//! Unit tests for the Scene view's input mapping (#745): Unity's button → gesture
+//! Unit tests for the Scene view's input mapping: Unity's button → gesture
 //! table, scroll's two meanings, and the bounds frame-selected fits.
 
 use super::*;

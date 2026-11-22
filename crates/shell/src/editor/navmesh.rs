@@ -1,21 +1,7 @@
-//! The NavMesh gizmo's shell half (#1910): `render` may not import `navigation`, so
+//! The NavMesh gizmo's shell half: `render` may not import `navigation`, so
 //! the shell, which holds the graph, turns it into world-space triangles and hands
 //! them to the renderer (`Renderer::set_navmesh`). Nothing is built while the gizmo
 //! is off, or while the Game tab is the one shown.
-//!
-//! The graph is a layered grid, not a triangle mesh, so the drawing is one quad per
-//! walkable span: the span's cell, its four corners on the span's floor plane
-//! (`NavigationGraph::surface_y`, so a ramp tilts), lifted [`LIFT`] off the floor
-//! against z-fighting. A span of the not-walkable area is skipped; every walkable
-//! area draws the same colour.
-//!
-//! **Patched, not rebuilt.** Edit mode syncs the graph every frame and Play every
-//! tick, so a dragged crate rebakes a few cells each frame. The grid is cut into
-//! [`TILE`]-cell square tiles, one GPU buffer each; a new generation re-uploads
-//! only the tiles its changed rectangles (`NavigationGraph::changes_since`) reach.
-//! Everything is rebuilt only when the change log can't answer (a full bake, an
-//! area-cost edit, a log that no longer reaches back) or the graph is another one
-//! (its address or grid shape differs: `NavMeshSource`).
 
 use glam::Vec3;
 
@@ -26,12 +12,8 @@ use rusty_render::{NavMeshPatch, NavMeshRevision, NavMeshSource, Renderer};
 /// How far above its floor a span's quad is drawn, in metres.
 pub(crate) const LIFT: f32 = 0.03;
 
-/// A tile's side, in cells: a moved crate dirties a few tiles, and a Dust2-sized
-/// grid (801 × 801 cells) is 26 × 26 of them, one draw each.
 pub(crate) const TILE: i32 = 32;
 
-/// Hand `nav` to `renderer` while `gizmos` draws the navmesh, patching only what
-/// changed since the last hand-off; returns the bytes uploaded.
 pub(super) fn hand(renderer: &mut Renderer, gizmos: &SceneGizmos, nav: &NavigationGraph) -> u64 {
     if !gizmos.on(Gizmo::NavMesh) {
         return 0;
@@ -47,14 +29,12 @@ pub(super) fn hand(renderer: &mut Renderer, gizmos: &SceneGizmos, nav: &Navigati
     })
 }
 
-/// Which tiles to rebuild, and whether to start over (`reset`: the tile count).
 pub(crate) struct Plan {
     pub revision: NavMeshRevision,
     pub reset: Option<usize>,
     pub tiles: Vec<usize>,
 }
 
-/// What brings a renderer showing `last` up to `nav`; `None` when it already is.
 pub(crate) fn plan(last: Option<NavMeshRevision>, nav: &NavigationGraph) -> Option<Plan> {
     let revision = NavMeshRevision {
         source: source(nav),
@@ -94,8 +74,6 @@ fn tiles_across(cells: i32) -> i32 {
     (cells.max(0) + TILE - 1) / TILE
 }
 
-/// The tiles every rebake after `generation` touched, sorted; `None` when the
-/// change log can't say (then anything may have changed).
 fn dirty_tiles(nav: &NavigationGraph, generation: u64) -> Option<Vec<usize>> {
     let across = tiles_across(nav.width);
     let clamp = |v: i32, cells: i32| v.min(cells - 1).max(0) / TILE;

@@ -1,4 +1,4 @@
-//! Content-fit tests (#421): a wrapping text box that grows downward, a label
+//! Content-fit tests: a wrapping text box that grows downward, a label
 //! sized to its string, an image at its native size, a list that grows with its
 //! items, and text sizing a group's child.
 
@@ -71,7 +71,7 @@ fn an_image_fits_its_native_texture_size() {
         ..ImageComponent::default()
     };
     f.scene.world.set_image(f.panel, Some(img));
-    // The layout reads the platform's table, never the file (#1221): unknown
+    // The layout reads the platform's table, never the file: unknown
     // until the table has it, then its size.
     assert_rect(f.rect(f.panel), [0.0, 0.0], [0.0, 0.0]);
     let mut sizes = TextureSizes::default();

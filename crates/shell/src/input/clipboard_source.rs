@@ -1,14 +1,4 @@
-//! crates/shell/src/input/clipboard_source.rs — the real [`ClipboardSource`] (#612).
-//!
-//! The only file naming the OS clipboard crates, the same pair egui uses:
-//!
-//! * **Wayland** — `smithay-clipboard` on the window's own `wl_display`. It works on
-//!   every compositor (it is the protocol a focused client uses), which arboard's
-//!   `wlr-data-control` path does not (GNOME lacks it).
-//! * **X11 and macOS** — `arboard` (X11 selections through x11rb; `NSPasteboard`).
-//!
-//! No clipboard at all (a headless X server without one) is logged and leaves the
-//! game's clipboard sim-only: its own copies still paste.
+//! crates/shell/src/input/clipboard_source.rs — the real [`ClipboardSource`].
 
 use super::clipboard::ClipboardSource;
 

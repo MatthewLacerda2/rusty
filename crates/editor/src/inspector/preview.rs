@@ -1,18 +1,4 @@
-//! crates/editor/src/inspector/preview.rs — the Inspector's "Preview" tab (#352).
-//!
-//! Unity/Unreal/Blender's material-preview pattern: an isolated offscreen scene
-//! (mesh toggle + procedural sky + a hardcoded light) shown inside the Inspector for
-//! models, textures, shaders and materials, with drag-to-orbit + wheel-to-zoom.
-//!
-//! This file is only the **egui surface** — the tab strip, mesh toggle, and the image
-//! widget that turns pointer input into orbit updates. The machinery it draws lives in
-//! [`rusty_preview`]: the isolated scene builder and the camera rig, shared verbatim
-//! with the headless `Debug.Preview` capture (#353) so the agent sees what the human
-//! sees. The actual GPU render happens in `shell::editor::viewport::render_preview_scene`
-//! (called by the window and by `editor-capture` alike), the same two-phase split the
-//! Scene/Game viewport uses (`editor/viewport/mod.rs`): this module only lays out the
-//! panel and records what to render next; the shell is the only place a `Renderer` is
-//! in scope.
+//! crates/editor/src/inspector/preview.rs — the Inspector's "Preview" tab.
 
 pub use rusty_preview::{
     build_preview_scene, framing, subject_for_path, FramedOrbit, OrbitState, PreviewMesh,
@@ -32,21 +18,16 @@ pub struct PreviewCache {
 
 /// What `shell::editor::viewport::render_preview_scene` needs to render this frame: the orbit
 /// camera and the image rect (its size sizes the offscreen target; `editor-capture`
-/// reads where it sits). Recomputed by
-/// [`draw`] every frame the Preview tab is visible; `None` otherwise, so the
-/// front-end skips the extra render when nobody's looking at it.
 pub struct PreviewRequest {
     pub camera: Camera,
     /// The image's rect, in points, as this frame laid it out.
     pub rect: egui::Rect,
     /// Set only for [`PreviewSubject::Shader`] — the `.wgsl` path the shell compiles
-    /// a one-off pipeline from for this render (#352's shader-preview arm).
+    /// a one-off pipeline from for this render.
     pub shader_override: Option<String>,
 }
 
 /// A "Details / Preview" tab strip, shared by the assets dispatch (`assets/mod.rs`)
-/// and the Material component card, since materials have no on-disk file to hang a
-/// dispatch arm on. Mirrors the Scene/Game strip in `editor/viewport/mod.rs`.
 pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.horizontal(|ui| {
         if chrome::tab(ui, &t, !*active, "Details").clicked() {
@@ -59,12 +40,6 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.add_space(t.space_xs);
 }
 
-/// Draw the Preview tab's body: the mesh toggle and the offscreen image, sensing
-/// drag (orbit) and scroll (zoom). Rebuilds the isolated scene when `subject`'s
-/// identity or the mesh choice changed since last frame; otherwise reuses the
-/// cached one. Reads `editor.preview_texture_id` — the previous frame's rendered
-/// preview (`None` before the first render), set by the shell before `EditorUi::draw`
-/// runs — same one-frame-behind contract as the main viewport's `viewport_texture`.
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;
@@ -78,7 +53,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     if stale {
         editor.preview_cache = Some(PreviewCache {
             key,
-            // As authored: the tab has no repeat count, so this never refuses.
             scene: build_preview_scene(editor.preview_mesh, None, &subject)
                 .unwrap_or_else(|_| rusty_scene::Scene::new()),
         });
@@ -106,9 +80,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     });
 }
 
-/// The mesh toggle row, one label per [`PreviewMesh`]. The orbit follows the framing
-/// of what is shown ([`FramedOrbit::frame`]), so a pick that changes it starts the
-/// orbit there: the plane's low view, or the default.
 fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.horizontal(|ui| {
         for mesh in PreviewMesh::ALL {
@@ -123,9 +94,6 @@ fn mesh_toggle(ui: &mut egui::Ui, editor: &mut EditorUi) {
     ui.add_space(4.0);
 }
 
-/// The offscreen preview image, filling the remaining space. Before the first
-/// render exists, a neutral fill stands in — identical contract to the main
-/// viewport's `draw_image` (`editor/viewport/mod.rs`).
 fn draw_image(ui: &mut egui::Ui, texture: Option<egui::TextureId>, t: Theme) -> egui::Response {
     let size = ui.available_size();
     match texture {

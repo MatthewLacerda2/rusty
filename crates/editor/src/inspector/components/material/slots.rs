@@ -1,8 +1,7 @@
-//! The Material card's slot list (#1285): one row per sub-mesh run of the entity's
+//! The Material card's slot list: one row per sub-mesh run of the entity's
 //! mesh (Unity's `Materials` list, `Element 0`, `Element 1`, …). Each row picks the
 //! library material that run draws with, through the shared
 //! `authoring::material::set_slot` op `Material.SetAt` calls too, and the selected
-//! row is the one the card below edits. A one-slot entity shows no list.
 
 use std::collections::BTreeMap;
 
@@ -30,7 +29,7 @@ pub(super) fn draw_slots(
     selected = selected.min(count - 1);
     ui.label("Materials:");
     for slot in 0..count {
-        // A sub-mesh past the end of the list draws nothing, as in Unity (#1285).
+        // A sub-mesh past the end of the list draws nothing, as in Unity.
         let key = keys.get(slot).map_or("(none)", String::as_str);
         ui.horizontal(|ui| {
             ui.radio_value(&mut selected, slot, format!("Element {slot}"));

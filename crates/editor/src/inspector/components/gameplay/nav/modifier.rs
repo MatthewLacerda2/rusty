@@ -1,10 +1,9 @@
 //! crates/editor/src/inspector/components/gameplay/nav/modifier.rs — the NavMesh Modifier
-//! Volume card (#460).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! Volume card.
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::modifier` ops the `NavMeshModifierVolume.*` Lua setters
 //! call. A volume assigns areas at bake time: the editor's per-frame nav sync
-//! (#992) rebakes only the volume's cells after an edit.
+//! rebakes only the volume's cells after an edit.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;

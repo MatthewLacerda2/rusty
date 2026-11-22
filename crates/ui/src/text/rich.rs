@@ -1,9 +1,4 @@
-//! crates/ui/src/text/rich.rs — the rich-text tag subset → styled characters (#419).
-//!
-//! `<color=#rrggbb>` / `<color=#rrggbbaa>`, `<b>`, `<i>` and `<size=n>`, each closed
-//! by its `</…>` tag, nesting freely (a close pops the innermost open one). A tag
-//! outside the subset, a malformed one, or a close with nothing open is kept as
-//! literal text — nothing the author typed silently disappears.
+//! crates/ui/src/text/rich.rs — the rich-text tag subset → styled characters.
 
 use glam::Vec4;
 

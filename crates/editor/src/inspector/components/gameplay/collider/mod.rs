@@ -1,13 +1,6 @@
 //! crates/editor/src/inspector/components/gameplay/collider/mod.rs — the Collider inspector
 //! card. Split out of the physics-card module (`physics.rs`) to keep both files
 //! under the size cap; the RigidBody and NavMesh Agent cards stay in `physics`.
-//!
-//! Its Physics Material section is `material`.
-//!
-//! A THIN client (#287): widgets read fields from a snapshot and route every write
-//! through a shared `authoring::physics::collider` op, never a mutable component borrow — the
-//! same ops the `Physics.*` Lua setters call, so the panel and the bindings share
-//! one write.
 
 mod material;
 
@@ -53,8 +46,6 @@ pub fn draw_collider(
                 }
                 *is_dirty = true;
             }
-            // The shape (variant + extents) is edited in a local clone, then routed
-            // through the shared op as a whole when any widget changes it.
             let mut shape = collider.shape.clone();
             let mut shape_changed = draw_shape_selector(ui, &mut shape);
             shape_changed |= draw_shape_fields(ui, &mut shape);
@@ -73,7 +64,6 @@ pub fn draw_collider(
 }
 
 /// The Shape combo box; switching to a new shape resets it to sensible defaults.
-/// Mutates the local `shape` clone; returns whether the shape changed.
 fn draw_shape_selector(ui: &mut egui::Ui, shape: &mut ColliderShape) -> bool {
     let mut shape_type = match shape {
         ColliderShape::Box { .. } => "Box",
@@ -138,8 +128,6 @@ fn draw_shape_fields(ui: &mut egui::Ui, shape: &mut ColliderShape) -> bool {
             axis,
         } => radius_height(ui, radius, height) | axis_combo(ui, axis),
         ColliderShape::Mesh { convex, .. } => {
-            // Baked from the imported mesh (#77): no editable extents, but
-            // the hull/trimesh choice can still be flipped here.
             ui.label("Baked from imported mesh");
             ui.checkbox(convex, "Convex hull").changed()
         }
@@ -172,7 +160,6 @@ fn axis_combo(ui: &mut egui::Ui, axis: &mut CapsuleAxis) -> bool {
 }
 
 /// A clamped collider-dimension drag field (shared between the shape variants).
-/// Returns whether the value changed.
 fn drag(ui: &mut egui::Ui, value: &mut f32) -> bool {
     ui.add(egui::DragValue::new(value).speed(0.05).ranged(0.01..=100.0))
         .changed()

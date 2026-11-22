@@ -53,20 +53,11 @@ pub fn draw(
     bake::draw(ui, editor, scene, console, (path, &*nav));
 }
 
-/// The per-scene Navmesh bake settings section (#276): edit agent radius, agent height,
-/// max slope, and max step (Unity's per-scene navmesh bake parameters), then re-bake the
-/// shared nav graph from the live scene so the edit takes effect at once (the editor's
-/// per-frame `nav.sync` would also see the changed settings and rebake in full, #992). `agent_radius` is live (#277): the re-bake erodes the
-/// walkable surface inward by the radius (clearance off walls, thin passages close).
-/// `agent_height` is live (#278): the re-bake drops spans whose open space is below the
-/// height (no pathing under a low overhang / through a crawlspace).
 fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new(format!("{}  Navmesh", icon::PATH))
         .default_open(false)
         .show(ui, |ui| {
-            // Edit the settings behind a scoped borrow so it has dropped before the
-            // re-bake (which needs `&Scene`) below.
             let baked = nav.bounds();
             let changed = {
                 let s = &mut scene.nav_settings;
@@ -101,8 +92,6 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
                 changed |= draw_link_generation(ui, s);
                 changed | draw_nav_bounds(ui, &mut s.bounds, baked)
             };
-            // Re-bake on apply through the shared bake path, so the knobs take effect
-            // immediately exactly like an entity's collider/static edit does.
             if changed {
                 nav.bake(scene);
             }
@@ -110,9 +99,6 @@ fn draw_navmesh(ui: &mut egui::Ui, scene: &mut Scene, nav: &mut NavigationGraph)
         });
 }
 
-/// *Bake Navigation* (#1887, Unity's Navigation window *Bake*): the same full bake
-/// and `<scene>.navmesh` write `Navigation.Bake()` runs, so Play starts from the
-/// saved navmesh. Generate Lighting does not run it: the two bakes are independent.
 #[cfg(feature = "dev")]
 fn draw_bake_navigation(
     ui: &mut egui::Ui,
@@ -122,9 +108,6 @@ fn draw_bake_navigation(
     nav: &mut NavigationGraph,
     path: &str,
 ) {
-    // The live scene is the open one: on another scene's card its navmesh would
-    // overwrite that scene's file, so the button is live on the open card alone, as
-    // Generate Lighting's is (#1394).
     let open = bake::is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Bake Navigation", icon::PATH));
     let hover = "Bake the navmesh in full and save it beside the scene";
@@ -143,9 +126,6 @@ fn draw_bake_navigation(
     }
 }
 
-/// The off-mesh link generation knobs (#462): drop height, jump distance and jump
-/// height (`0` turns each off), and the spacing between links along an edge — the
-/// same fields `Navigation.SetDropHeight` & co. write. Returns whether any changed.
 fn draw_link_generation(ui: &mut egui::Ui, s: &mut rusty_navigation::NavMeshSettings) -> bool {
     let rows = [
         (
@@ -183,7 +163,7 @@ fn draw_link_generation(ui: &mut egui::Ui, s: &mut rusty_navigation::NavMeshSett
     changed
 }
 
-/// The navmesh bounds (#452): the baked area read-out, plus an "Override Bounds" toggle
+/// The navmesh bounds: the baked area read-out, plus an "Override Bounds" toggle
 /// that authors `nav_settings.bounds` (seeded from the baked area) — the same field
 /// `Navigation.SetBounds`/`ClearBounds` write. Returns whether anything changed.
 fn draw_nav_bounds(ui: &mut egui::Ui, bounds: &mut Option<NavBounds>, baked: NavBounds) -> bool {
@@ -258,7 +238,6 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        // The inspector is an edit-mode panel, so its load is never a play-mode one.
         editor.open_scene(scene, console, path, false);
     }
 

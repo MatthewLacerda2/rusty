@@ -1,5 +1,5 @@
 //! The Screen Space Reflections section: the switch and, while on, the *Minimum
-//! Smoothness* (#1736), the quality level and, at `Custom`, the march's knobs (#1522).
+//! Smoothness*, the quality level and, at `Custom`, the march's knobs.
 
 use super::{count_row, knob, knob_row, quality_row, toggle, Section};
 use rusty_components::Ssr;

@@ -1,9 +1,7 @@
-//! The scene inspector's **Reflection Probes** section (#1584): the probes' scene
+//! The scene inspector's **Reflection Probes** section: the probes' scene
 //! defaults (resolution, memory budget, probe ceiling) and every probe's Unity Reflection Probe
 //! settings, the same fields `Reflection.Set` / `Reflection.Get` and
 //! `Lighting.SetSettings` write. Edits go through `ReflectionProbeSet::edit`, which
-//! clamps them as the API's do; *Fallback* goes through `set_fallback`, which keeps
-//! one (#1697), as `Reflection.SetFallback` does.
 
 use egui_phosphor::regular as icon;
 
@@ -14,7 +12,6 @@ use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 
-/// The face sizes the resolution menus offer: Unity's.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
@@ -59,16 +56,12 @@ fn draw_defaults(ui: &mut egui::Ui, r: &mut ReflectionSettings) -> bool {
     changed
 }
 
-/// One collapsing card per probe, and Add; returns whether anything changed. The
-/// open card is the inspected probe (`Scene::inspected_reflection_probe`, its
-/// selection: the Scene view draws its volume), so one is open at a time, and
-/// `Editor.InspectReflectionProbe` opens it as a click does.
 fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
     let default = scene.lighting_settings.reflections.resolution;
     let (mut changed, mut remove) = (false, None);
     let count = scene.reflection_probes.len();
     let inspected = scene.inspected_reflection_probe.filter(|&i| i < count);
-    scene.inspected_reflection_probe = inspected; // an Undo may have shortened the set
+    scene.inspected_reflection_probe = inspected;
     for i in 0..count {
         let mut probe = scene.reflection_probes.probes[i].clone();
         let card = egui::CollapsingHeader::new(format!("Probe {i}"))
@@ -86,13 +79,11 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
         }
         let edited = card.body_returned.unwrap_or(false);
         if edited {
-            // A hand edit makes it manual (#1737), unless the edit was unticking it.
             let was = &scene.reflection_probes.probes[i];
             probe.manual |= probe.manual == was.manual;
             let fallback = (probe.fallback != was.fallback).then_some(probe.fallback);
             scene.reflection_probes.edit(i, |p| *p = probe);
             if let Some(on) = fallback {
-                // At most one fallback: ticking it here unticks any other (#1697).
                 scene.reflection_probes.set_fallback(on.then_some(i));
             }
             changed = true;
@@ -103,7 +94,6 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
         changed = true;
     }
     if ui.button(format!("{}  Add probe", icon::PLUS)).clicked() {
-        // Placed by hand: Generate Lighting keeps it (#1737).
         scene.reflection_probes.probes.push(ReflectionProbe {
             manual: true,
             ..ReflectionProbe::default()
@@ -166,7 +156,7 @@ fn draw_probe(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe, default: u32
     changed
 }
 
-/// Probe `i`'s volume (#1995): its shape, then the box's corners and rotation or
+/// Probe `i`'s volume: its shape, then the box's corners and rotation or
 /// the sphere's radius; returns whether one changed.
 fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
     let mut changed = shape_menu(ui, i, &mut p.shape);
@@ -174,8 +164,6 @@ fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
         ProbeShape::Box => {
             changed |= vec_row(ui, "Box min", &mut p.box_min);
             changed |= vec_row(ui, "Box max", &mut p.box_max);
-            // Written back only when edited, so a round trip through Euler
-            // angles never nudges a stored rotation.
             let mut euler = euler_degrees(p.rotation);
             if angle_row(ui, &mut euler) {
                 p.rotation = from_euler_degrees(euler);
@@ -193,7 +181,7 @@ fn volume_rows(ui: &mut egui::Ui, i: usize, p: &mut ReflectionProbe) -> bool {
     changed
 }
 
-/// Probe `i`'s *Shape* menu (#1995); returns whether it changed.
+/// Probe `i`'s *Shape* menu; returns whether it changed.
 fn shape_menu(ui: &mut egui::Ui, i: usize, shape: &mut ProbeShape) -> bool {
     let before = *shape;
     ui.horizontal(|ui| {
@@ -222,8 +210,6 @@ fn vec_row(ui: &mut egui::Ui, label: &str, v: &mut glam::Vec3) -> bool {
     .inner
 }
 
-/// The *Rotation* row in degrees, with the Transform card's angle fields (speed 1,
-/// held to [-180, 180], no "-0"); returns whether one changed.
 fn angle_row(ui: &mut egui::Ui, euler: &mut glam::Vec3) -> bool {
     ui.horizontal(|ui| {
         let mut changed = false;

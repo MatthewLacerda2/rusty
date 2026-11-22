@@ -1,11 +1,6 @@
-//! The editor's typefaces (#668): Inter for the UI, JetBrains Mono for the console
+//! The editor's typefaces: Inter for the UI, JetBrains Mono for the console
 //! and code, Phosphor for icons. All three are embedded, so the editor looks the
 //! same on every machine. Licences sit next to the files in `engine/fonts/`.
-//!
-//! The Inter files carry no Private Use Area codepoints (#333): Inter maps hundreds,
-//! and since Phosphor 2.1 (egui-phosphor 0.6+) the icons sit in that same range, so
-//! Inter, which leads the family, drew its own glyphs in place of the icons. Phosphor
-//! cannot lead instead: it maps `a`–`z` to the blanks its ligatures are built from.
 
 use egui::{Context, FontData, FontDefinitions, FontFamily, FontId};
 
@@ -17,9 +12,6 @@ const JETBRAINS_MONO: &[u8] = include_bytes!("../../../../engine/fonts/JetBrains
 const SEMIBOLD: &str = "inter-semibold";
 
 /// A [`FontId`] in Inter SemiBold at `size` points — the editor's "strong" weight.
-/// (egui's `RichText::strong` only brightens the colour; this changes the weight.)
-/// Fonts registered by [`install`] load on the *next* frame, and egui panics on a
-/// family it does not know yet, so until then this is the regular weight.
 pub fn semibold(ctx: &Context, size: f32) -> FontId {
     let family = FontFamily::Name(SEMIBOLD.into());
     let loaded = ctx.fonts(|f| f.families().contains(&family));
@@ -48,8 +40,6 @@ pub fn install(ctx: &Context) {
         );
     }
 
-    // Each family leads with its face; egui's defaults stay behind it as fallback
-    // (emoji, the Phosphor glyphs, anything Inter does not cover).
     let fallback = fonts.families[&FontFamily::Proportional].clone();
     let lead = |first: &str| [vec![first.to_string()], fallback.clone()].concat();
     fonts
@@ -66,7 +56,6 @@ pub fn install(ctx: &Context) {
 
 #[cfg(test)]
 mod tests {
-    /// An updated Inter that maps the Private Use Area again would hide every icon.
     #[test]
     fn inter_leaves_the_icon_codepoints_to_phosphor() {
         let icon = egui_phosphor::regular::FOLDER.chars().next().unwrap();

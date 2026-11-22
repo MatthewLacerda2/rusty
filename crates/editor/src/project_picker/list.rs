@@ -1,5 +1,4 @@
-//! crates/editor/src/project_picker/list.rs — the Projects page: the recent list (#1320).
-//!
+//! crates/editor/src/project_picker/list.rs — the Projects page: the recent list.
 //! Keyboard first as well as mouse: each row is one Tab stop, Up / Down move between
 //! rows, and Enter opens the focused one. The ✕ is mouse-only (not a Tab stop), and a
 //! removal leaves an *Undo* line under the list until the next action.

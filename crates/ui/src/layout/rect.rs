@@ -1,4 +1,4 @@
-//! crates/ui/src/layout/rect.rs — [`UiRect`]: one laid-out element (#417).
+//! crates/ui/src/layout/rect.rs — [`UiRect`]: one laid-out element.
 
 use glam::Vec2;
 

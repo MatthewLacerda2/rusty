@@ -1,10 +1,9 @@
 //! crates/editor/src/inspector/components/gameplay/nav/object_modifier.rs — the NavMesh
-//! Modifier card (#1959).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! Modifier card.
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::object_modifier` ops `Component.Set` calls. A modifier
 //! changes how the bake reads the object's colliders: the editor's per-frame nav
-//! sync (#992) rebakes only those colliders' cells after an edit.
+//! sync rebakes only those colliders' cells after an edit.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;

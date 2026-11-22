@@ -1,10 +1,5 @@
 //! crates/editor/src/inspector/components/gameplay/ai_perception.rs — the AI Perception
-//! card (#1900).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::ai::perception` ops the `AIPerception.*` Lua setters call.
-//! In Play the card also lists what the agent knows, read-only: that memory is the
-//! senses' own.
+//! card.
 
 use crate::inspector::components::card::{component_card, remove_component};
 use crate::widgets::DragRange;
@@ -55,7 +50,6 @@ pub fn draw_ai_perception(
     }
 }
 
-/// One drag row: its label, value, range and shared setter.
 type Row<'a> = (&'a str, f32, RangeInclusive<f32>, Op);
 
 /// The ranges, the cone and the eye height, one drag row each.

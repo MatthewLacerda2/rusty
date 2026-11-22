@@ -1,4 +1,4 @@
-//! Tests for the UI raycast (#420): draw order, canvas sort order, raycast_target,
+//! Tests for the UI raycast: draw order, canvas sort order, raycast_target,
 //! active, CanvasGroup.blocks_raycasts, RectMask and Mask clipping and rotated rects.
 
 use glam::{Quat, Vec2};

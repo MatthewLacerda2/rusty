@@ -1,4 +1,4 @@
-//! Which focus takes Ctrl+Z from the scene (#1631): only a text field. The
+//! Which focus takes Ctrl+Z from the scene: only a text field. The
 //! viewport and a slider keep focus after their gesture, and the console after
 //! Enter; none of them may leave Undo dead or a step open.
 
@@ -7,10 +7,8 @@ use crate::EditorUi;
 use rusty_edit::authoring::create_entity;
 use rusty_scene::Scene;
 
-/// What widget has the keyboard when Ctrl+Z is pressed.
 #[derive(Clone, Copy)]
 enum Focus {
-    /// A plain widget (the viewport, a slider) kept focus after its gesture.
     Widget,
     /// A text field in the Inspector.
     TextField,

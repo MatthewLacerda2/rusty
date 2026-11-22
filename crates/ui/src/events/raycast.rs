@@ -1,25 +1,4 @@
-//! crates/ui/src/events/raycast.rs — which UI graphic is under a point (#420).
-//!
-//! Unity's `GraphicRaycaster`, CPU-only so a headless run hits exactly what a
-//! window would. A [`UiPointer`] is a point in **UI screen pixels** (bottom-left
-//! origin, y-up — the frame `UI.GetRect`'s `screen` box is in) and the camera ray
-//! through it (#429). Screen canvases are tried first — they draw over the world —
-//! top-most first: the layout is in draw order (canvas `sort_order`, then hierarchy
-//! pre-order), so it is walked backwards. Then the world canvases (`WorldSpace`,
-//! `ScreenSpaceCamera`) the ray crosses, nearest plane first, each hit-tested at the
-//! crossing point in its own reference units; `ray_limit` (the nearest wall, when
-//! the caller knows it) stops the ray. A graphic can be hit when:
-//!
-//! - it is an `Image`, `Shape` or `Text` with `raycast_target`;
-//! - it and every ancestor are active;
-//! - no `CanvasGroup` on it or above it has `blocks_raycasts = false`;
-//! - the point is inside every `RectMask` above it (and its own), padding applied —
-//!   the same axis-aligned screen clip drawing uses — and inside the rect of every
-//!   `Mask` above it (Unity's `Mask` filters by rect, not by its graphic's alpha:
-//!   a click in a round minimap's corner still reaches it);
-//! - the point is inside its final quad, rotation and scale included.
-//!
-//! A fully transparent graphic still blocks (Unity's default alpha threshold of 0).
+//! crates/ui/src/events/raycast.rs — which UI graphic is under a point.
 
 use glam::Vec2;
 
@@ -84,10 +63,6 @@ fn is_raycast_target(world: &World, id: u32) -> bool {
         || world.text(id).is_some_and(|t| t.raycast_target)
 }
 
-/// Whether `p` (reference units) is inside the rect's final quad. The corners wind
-/// consistently (bottom-left, top-left, top-right, bottom-right), mirrored or not, so
-/// the point is inside when every edge sees it on the same side. A degenerate
-/// (zero-area) quad is never hit.
 fn in_quad(rect: &UiRect, p: Vec2) -> bool {
     let c = rect.corners;
     let sides = (0..4).map(|i| {

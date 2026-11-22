@@ -1,9 +1,4 @@
-//! crates/editor/src/project_picker/pages.rs — drawing the picker's pages (#854).
-//!
-//! Laid out like Unity Hub's Projects page: a title strip with *Open* and *New
-//! Project* on the right, then one row per recent project (name, path, when it was
-//! last opened). Each page returns the [`Action`] a click asked for; the picker
-//! applies it after the frame.
+//! crates/editor/src/project_picker/pages.rs — drawing the picker's pages.
 
 use egui::{Align, Layout, RichText, Ui};
 use egui_phosphor::regular as icon;
@@ -108,7 +103,7 @@ fn footer(ui: &mut Ui, act: &mut Option<Action>, verb: &str, on_verb: Action) {
     });
 }
 
-/// The engine-mismatch prompt (#853), Unity Hub's "different editor version" one:
+/// The engine-mismatch prompt, Unity Hub's "different editor version" one:
 /// opening records this engine in the project, so it asks first.
 fn confirm(ctx: &egui::Context, t: &Theme, dir: &std::path::Path, warning: &str) -> Option<Action> {
     let mut act = None;

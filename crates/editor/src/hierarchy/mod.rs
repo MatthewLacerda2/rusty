@@ -1,6 +1,6 @@
 //! LEFT PANEL: Scene Hierarchy — a VS Code Explorer-style collapsible tree,
-//! flattened into rows (`flat`) and drawn only where it is in view (`tree`). Object creation lives in the menu bar's GameObject menu (#255);
-//! deleting is Unity's (#1915): Edit ▸ Delete, the Delete key (Cmd+Backspace on
+//! flattened into rows (`flat`) and drawn only where it is in view (`tree`). Object creation lives in the menu bar's GameObject menu;
+//! deleting is Unity's: Edit ▸ Delete, the Delete key (Cmd+Backspace on
 //! macOS) and a row's right-click *Delete*, all through `delete`.
 
 use egui_phosphor::regular as icon;
@@ -34,9 +34,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     }
     let mut doomed = None;
     let frame = chrome::panel_frame(&t);
-    // Unity's Hierarchy: as wide as the user dragged it, never as its content.
-    // Rows clip to it (`tree`), so a long name scrolling into view cannot widen
-    // the panel and resize the Scene view beside it.
     egui::Panel::left(PANEL_ID)
         .resizable(true)
         .size_range((154.0 + frame.inner_margin.sum().x)..=340.0)
@@ -47,8 +44,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
             }
-            // The walk's buffers live in egui's memory between frames, so a frame
-            // allocates nothing for them once warm.
             let kept = egui::Id::new("hierarchy_flattener");
             let mut flat =
                 ui.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Flattener>(kept)));
@@ -67,11 +62,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     }
 }
 
-/// Delete `id` and its whole subtree, as Unity's Edit ▸ Delete does: the one
-/// path behind the menu item, the Delete key and the row's context menu, so the
-/// three cannot drift. In edit mode it removes at once and the frame's Undo step
-/// records it (`shell::editor::undo`); the selection is cleared when it was in
-/// the subtree, and the scene has unsaved changes.
 pub(crate) fn delete(editor: &mut EditorUi, scene: &mut Scene, id: u32) {
     if !scene.world.contains(id) {
         return;

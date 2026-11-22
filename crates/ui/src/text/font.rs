@@ -1,11 +1,4 @@
-//! crates/ui/src/text/font.rs — the UI's fonts by path (#419, #1328).
-//!
-//! A `Text`'s font is a `.ttf` / `.otf` file referenced by path, like a texture;
-//! `None` is the engine's default ([`rusty_font::default_font`]). Parsed fonts are
-//! cached for the process by path, so the sim's layout and the renderer's atlas
-//! read the very same glyph ids. A path that does not load falls back to the
-//! default (with one warning), so a text never vanishes over a typo. Parsing,
-//! outlines and shaping are `rusty_font`'s.
+//! crates/ui/src/text/font.rs — the UI's fonts by path.
 
 use rusty_core::collections::Map;
 use std::sync::{Arc, Mutex, OnceLock};

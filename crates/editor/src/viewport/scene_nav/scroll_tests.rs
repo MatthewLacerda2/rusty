@@ -1,4 +1,4 @@
-//! Unit tests for splitting wheel events by device (#1344).
+//! Unit tests for splitting wheel events by device.
 
 use super::*;
 

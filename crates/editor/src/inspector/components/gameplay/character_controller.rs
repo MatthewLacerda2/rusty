@@ -1,7 +1,6 @@
 //! crates/editor/src/inspector/components/gameplay/character_controller.rs — the
-//! CharacterController card (#451).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! CharacterController card.
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::physics::character_controller` ops the `CharacterController.*` Lua
 //! setters call. The grounded state is what the last `Move` found, so it is shown
 //! read-only.

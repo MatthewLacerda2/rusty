@@ -1,6 +1,6 @@
 //! The Mesh card (Unity's *Mesh Filter* and *Mesh Renderer* together): the mesh's
-//! source, a `Plane`'s subdivisions (#1524), how it casts shadows (#1571), its
-//! Scale In Lightmap (#1704), when a camera culls it as too far or too small (#1714),
+//! source, a `Plane`'s subdivisions, how it casts shadows, its
+//! Scale In Lightmap, when a camera culls it as too far or too small,
 //! and a skinned mesh's hitbox and ragdoll tools.
 
 use egui_phosphor::regular as icon;
@@ -13,18 +13,16 @@ use rusty_components::ShadowCasting;
 use rusty_edit::authoring::rendering::mesh as mesh_ops;
 use rusty_edit::authoring::ComponentKind;
 
-/// The skinned-mesh tools a Mesh card button asks for, deferred because they need
-/// the Scene.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SkinTool {
-    /// *Generate Hitboxes* (#464).
+    /// *Generate Hitboxes*.
     Hitboxes,
-    /// *Build Ragdoll* (#466).
+    /// *Build Ragdoll*.
     Ragdoll,
 }
 
 /// What the card names as the mesh's source: a scene mesh by its library name
-/// (#2059), anything else by its type.
+///, anything else by its type.
 fn source_label(mesh: &rusty_components::MeshComponent) -> String {
     match rusty_scene::mesh_library::scene_mesh_name(mesh) {
         Some(name) => format!("Scene mesh: {name}"),
@@ -32,9 +30,6 @@ fn source_label(mesh: &rusty_components::MeshComponent) -> String {
     }
 }
 
-/// 3B. Mesh details. A skinned mesh also offers *Generate Hitboxes* (#464) and
-/// *Build Ragdoll* (#466): the click is deferred into `skin_tool`, since both
-/// need the Scene.
 pub fn draw_mesh(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -74,7 +69,6 @@ pub fn draw_mesh(
         }
     });
     if let (Some(n), Some(mut mesh)) = (subdivide, world.mesh_mut(id)) {
-        // The drag holds the range, so the op has nothing to refuse.
         let _ = mesh_ops::set_subdivisions(&mut mesh, n);
         *is_dirty = true;
     }
@@ -91,15 +85,10 @@ pub fn draw_mesh(
         *is_dirty = true;
     }
     if remove {
-        // The shared verb behind `Scene.RemoveComponent`: the Material goes too.
         remove_component(world, id, ComponentKind::Mesh, is_dirty);
     }
 }
 
-/// The small-object cull (#1714): *Max Draw Distance* (metres, 0 unlimited) and *Min
-/// Screen Size* (screen-relative height, 0 off). Both values when either changed.
-/// Each drags at its own speed: a metre a point, and a thousandth of the screen,
-/// since useful sizes sit around 0.01–0.02.
 fn draw_culling(ui: &mut egui::Ui, distance: f32, size: f32) -> Option<(f32, f32)> {
     let (mut d, mut s) = (distance, size);
     let changed = drag_row(ui, "Max Draw Distance", &mut d, 1.0, 0.0..=f32::MAX)
@@ -123,7 +112,7 @@ fn drag_row(
     .inner
 }
 
-/// Unity's *Scale In Lightmap* (#1704): the new value when it changed.
+/// Unity's *Scale In Lightmap*: the new value when it changed.
 fn draw_scale_in_lightmap(ui: &mut egui::Ui, current: f32) -> Option<f32> {
     let mut scale = current;
     let range = rusty_components::MeshComponent::SCALE_IN_LIGHTMAP;
@@ -157,9 +146,6 @@ fn draw_skin_tools(ui: &mut egui::Ui, skin_tool: &mut Option<SkinTool>) {
     });
 }
 
-/// A `Plane`'s quads per side (#1524): the new count once an edit finishes (a
-/// released drag or a typed value). Mid-drag the count is held in egui's memory, so
-/// the grid is rebuilt and re-uploaded once, not every frame of the drag.
 fn draw_subdivisions(ui: &mut egui::Ui, current: u32) -> Option<u32> {
     let held = ui.id().with("mesh_subdivisions");
     let mut n = ui.data(|d| d.get_temp::<u32>(held)).unwrap_or(current);

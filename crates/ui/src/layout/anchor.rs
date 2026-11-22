@@ -1,22 +1,4 @@
-//! crates/ui/src/layout/anchor.rs — world-anchored markers (#429).
-//!
-//! A RectTransform with a `WorldAnchor` is placed by the camera, not its anchors:
-//! each layout pass projects the target's world position (+ offset) to the screen
-//! and pins the element's pivot there — Unity's `WorldToScreenPoint` + a
-//! `RectTransform` write, done as a layout rule instead of per-frame script maths.
-//!
-//! Off-screen behaviour, in order:
-//! 1. **Behind the camera** with `hide_when_behind` → hidden (with its children).
-//! 2. **On screen** (in front, inside the edge padding) → at the projected point,
-//!    upright.
-//! 3. **Off screen or behind** with `clamp_to_screen_edge` → on the padded screen
-//!    edge, along the ray from the screen centre toward the target (a target behind
-//!    the camera projects mirrored, so its direction is flipped back); with
-//!    `rotate_toward_target` the element turns so its up points that way.
-//! 4. Otherwise → at the raw projected point (off the canvas, or mirrored).
-//!
-//! Needs a camera: a view without one leaves markers where their anchors put them.
-//! A target that no longer exists hides the marker.
+//! crates/ui/src/layout/anchor.rs — world-anchored markers.
 
 use glam::{Vec2, Vec3};
 
@@ -77,7 +59,7 @@ pub(super) fn clamp(anchor: &WorldAnchor, p: Vec2, behind: bool, size: Vec2) -> 
     let centre = size * 0.5;
     let mut dir = if behind { centre - p } else { p - centre };
     if dir.length_squared() < 1e-12 {
-        dir = Vec2::NEG_Y; // dead behind: straight down, where "behind you" reads
+        dir = Vec2::NEG_Y;
     }
     let half = centre - pad;
     let t = [0, 1]

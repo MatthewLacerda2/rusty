@@ -1,30 +1,25 @@
-//! The player boots read-only (#1653): an exported game, booted, run for a few
+//! The player boots read-only: an exported game, booted, run for a few
 //! frames and given the window focus, leaves its folder byte-identical but for
 //! `saved/` (no file or folder added, changed or removed), and the export carries
 //! what the player no longer makes (a seeded script, an `.mp3`'s `.wav`).
-//! Opening a project moves the working directory, so each half runs in a child
-//! process (`child`), as `tests/busy_replay` does.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use rusty_core::project::{open, Access};
 
-/// Set on the child: which half it runs (`export` or `play`).
 const STEP_VAR: &str = "RUSTY_PLAYER_READ_ONLY_STEP";
 /// Set on the child: the source project.
 const PROJECT_VAR: &str = "RUSTY_PLAYER_READ_ONLY_PROJECT";
 /// Set on the child: the export.
 const OUT_VAR: &str = "RUSTY_PLAYER_READ_ONLY_OUT";
 
-/// The one place the player may write, Unity's `persistentDataPath`.
 const SAVED: &str = "saved/";
 
 #[test]
 fn an_exported_game_boots_without_writing_into_its_install() {
     let dir = rusty_test_support::temp::dir();
     let (game, out) = (dir.join("game"), dir.join("out"));
-    // A fresh project: no bundled script and no default scene yet, and an MP3.
     let audio = game.join("assets").join("audio");
     std::fs::create_dir_all(&audio).unwrap();
     std::fs::copy(mp3(), audio.join("loop.mp3")).unwrap();
@@ -42,8 +37,6 @@ fn an_exported_game_boots_without_writing_into_its_install() {
     let mp3_shipped = shipped.contains_key("assets/audio/loop.mp3");
     assert!(!mp3_shipped, "no MP3 ships");
 
-    // What a seeding or a refresh would act on, were the player to run one: a
-    // bundled script the game left out, and an MP3 copied in by hand.
     std::fs::remove_file(out.join("assets/scripts/bot.lua")).unwrap();
     std::fs::copy(mp3(), out.join("assets/audio/extra.mp3")).unwrap();
     let shipped = tree(&out);
@@ -82,8 +75,6 @@ fn run_child(step: &str, game: &Path, out: &Path) {
     assert!(status.success(), "the {step} child failed");
 }
 
-/// The child half: export the project, or boot the player's world on the export
-/// and run it, as `launch` does short of the window. A no-op unless spawned.
 #[test]
 // lint: allow(skip) the child half: an_exported_game_boots_without_writing_into_its_install runs it
 #[ignore = "run by an_exported_game_boots_without_writing_into_its_install in a child process"]
@@ -94,7 +85,6 @@ fn child() {
         return;
     };
     if step == Path::new("export") {
-        // As the `export` binary does.
         open(&game, Access::Edit).expect("open the project");
         rusty_dev::export::export(&out).expect("export the project");
         return;
@@ -104,15 +94,10 @@ fn child() {
     for _ in 0..5 {
         world.tick(1.0 / 60.0);
     }
-    // What the window gaining focus refreshes, in the player's frontend: nothing,
-    // whatever features this binary was built with.
     crate::focus::refresh_assets(&world, crate::frame::Host::Player);
-    // What the loop's exit does.
     world.resources.flush_storage();
 }
 
-/// Files by their `/`-separated relative path, with their bytes; a folder by its
-/// path and a trailing `/`, with none.
 type Files = BTreeMap<String, Vec<u8>>;
 
 /// Every file and folder under `dir`.

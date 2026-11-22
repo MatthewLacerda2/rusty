@@ -1,6 +1,6 @@
 //! The inspector's deferred edits: the ones a card asks for during the draw but
 //! that need `&mut Scene`, applied once the card pass is done. The navmesh is not
-//! one of them: the editor syncs it once per edit-mode frame (#992).
+//! one of them: the editor syncs it once per edit-mode frame.
 
 use super::components::material::{self, MaterialAction};
 use super::components::mesh::SkinTool;
@@ -9,15 +9,13 @@ use crate::EditorUi;
 use rusty_scene::skeleton::{HitboxOptions, RagdollOptions};
 use rusty_scene::Scene;
 
-/// Edits the per-frame card draw defers until the mutable entity guard has dropped,
-/// because each needs `&mut Scene` that the guard's borrow would otherwise block. Collected during the draw, then applied by [`Self::apply`].
 #[derive(Default)]
 pub(super) struct PendingEdits {
     pub(super) parent_change: Option<Option<u32>>,
     pub(super) prefab_action: Option<prefab::PrefabAction>,
-    /// The Mesh card's *Generate Hitboxes* / *Build Ragdoll* buttons (#464, #466).
+    /// The Mesh card's *Generate Hitboxes* / *Build Ragdoll* buttons.
     pub(super) skin_tool: Option<SkinTool>,
-    /// The Material card's *Delete* (#1576).
+    /// The Material card's *Delete*.
     pub(super) material_action: Option<MaterialAction>,
 }
 
@@ -37,7 +35,7 @@ impl PendingEdits {
         }
         if let Some(new_parent) = self.parent_change {
             // A reparent moves the subtree in world space; the write queues its
-            // collider bounds itself (#992, `ecs::world_space::bounds`).
+            // collider bounds itself.
             if scene.reparent(id, new_parent).is_ok() {
                 editor.is_dirty = true;
             }

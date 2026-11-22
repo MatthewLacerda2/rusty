@@ -1,4 +1,4 @@
-//! Drawing the editor is no edit (#1631): the Inspector borrows a selected
+//! Drawing the editor is no edit: the Inspector borrows a selected
 //! entity's components mutably every frame to show them, and a frame that only
 //! shows must leave the Undo history as it was, whatever the entity carries.
 
@@ -13,7 +13,7 @@ fn idle_frame(editor: &mut EditorUi, scene: &mut Scene) {
     let ctx = egui::Context::default();
     let mut nav = NavigationGraph::from_scene(scene);
     let (mut console, mut playing) = (ConsoleLogs::new(), false);
-    scene.begin_edits(); // the strict path: the scene level is compared too
+    scene.begin_edits();
     ctx.begin_pass(egui::RawInput::default());
     editor.draw(&ctx, scene, &mut console, &mut nav, &mut playing, None);
     ctx.end_pass().textures_delta.clear();
@@ -50,7 +50,7 @@ fn showing_a_fully_dressed_entity_records_no_step() {
         None,
         "a frame that only shows edits nothing"
     );
-    editor.selected_entity_id = None; // the Scene Settings view
+    editor.selected_entity_id = None;
     idle_frame(&mut editor, &mut scene);
     assert_eq!(scene.undo_name(), None);
 }

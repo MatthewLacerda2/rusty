@@ -1,4 +1,4 @@
-//! The Layout Group inspector card (#421): the kind, padding, spacing and child
+//! The Layout Group inspector card: the kind, padding, spacing and child
 //! alignment; the row/column control and force-expand flags; the grid's cell
 //! size, constraint, start corner and axis. Widgets edit a snapshot; every write
 //! routes through `edit::authoring::ui::layout::group`.
@@ -15,7 +15,7 @@ use rusty_components::{
 };
 use rusty_edit::authoring::ui::layout::group as ops;
 
-/// Layout Group card. A THIN client (#287): widgets edit a snapshot and the
+/// Layout Group card. A THIN client: widgets edit a snapshot and the
 /// changed snapshot is written back through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.layout_group(id).map(|g| g.clone()) else {

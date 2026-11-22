@@ -1,6 +1,6 @@
 //! The card's slider rows show a value outside their range without rewriting it: a
 //! compensation a script set past the slider's reach survives the camera being
-//! selected (#1444).
+//! selected.
 
 use rusty_components::AutoExposure;
 use rusty_ecs::World;

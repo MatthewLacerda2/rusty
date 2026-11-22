@@ -1,8 +1,7 @@
 //! The transport at the menu bar's right end: one Play button that turns into Stop
-//! during Play, in the same place, so stopping never moves the cursor (#1914). Then,
+//! during Play, in the same place, so stopping never moves the cursor. Then,
 //! in dev builds, the Developer Console button. Play mode reads from the lit Stop
 //! button and the editor-wide tint ([`crate::theme::Theme::for_play_mode`]),
-//! not from a mode label.
 
 use egui::{Button, CornerRadius, RichText, Ui};
 use egui_phosphor::regular as icon;
@@ -11,14 +10,9 @@ use crate::theme::Theme;
 use crate::EditorUi;
 use rusty_scene::Scene;
 
-/// Ctrl+P (Cmd+P on macOS) toggles Play, as in Unity (#576). Esc does not stop Play:
-/// in the Game view it frees the cursor and reaches the game.
 const PLAY_SHORTCUT: egui::KeyboardShortcut =
     egui::KeyboardShortcut::new(egui::Modifiers::COMMAND, egui::Key::P);
 
-/// Ctrl+Shift+C (Cmd+Shift+C on macOS) shows or hides the Play-mode Developer Console,
-/// Unity's Console shortcut (#1544). Not a backtick: a game may bind that key to its
-/// own console, and during Play keys belong to the game.
 #[cfg(feature = "dev")]
 const CONSOLE_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
     egui::Modifiers::COMMAND.plus(egui::Modifiers::SHIFT),
@@ -27,9 +21,6 @@ const CONSOLE_SHORTCUT: egui::KeyboardShortcut = egui::KeyboardShortcut::new(
 
 const BUTTON: egui::Vec2 = egui::vec2(34.0, 22.0);
 
-/// Draw the transport, then the console button, left to right, in the menu bar's
-/// right-to-left tail (so the console button is drawn first), and apply their clicks
-/// and shortcuts.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut Ui, scene: &mut Scene, is_playing: &mut bool) {
     let t = editor.theme;
     #[cfg(feature = "dev")]
@@ -70,10 +61,6 @@ fn console_toggle(editor: &mut EditorUi, ui: &mut Ui, t: &Theme) {
     }
 }
 
-/// Play outside Play, Stop (lit in the accent) during it; a click or the shortcut
-/// toggles. Stop always leaves Play and drops the selection. Play is greyed out,
-/// its shortcut ignored, while a bake runs, the tooltip saying why (#2042), as the
-/// bake buttons are greyed out during Play.
 fn transport(
     editor: &mut EditorUi,
     ui: &mut Ui,
@@ -81,7 +68,6 @@ fn transport(
     is_playing: &mut bool,
     t: &Theme,
 ) {
-    // A running bake refuses Play (#2042); Stop is never refused.
     let refusal = (!*is_playing).then(|| play_refusal(scene)).flatten();
     let toggled = ui.input_mut(|i| i.consume_shortcut(&PLAY_SHORTCUT)) && refusal.is_none();
     let shortcut = ui.ctx().format_shortcut(&PLAY_SHORTCUT);
@@ -104,7 +90,7 @@ fn transport(
     }
 }
 
-/// Why Play is refused now (`Scene::play_refusal`, #2042): only the dev build
+/// Why Play is refused now: only the dev build
 /// bakes, so only it refuses.
 fn play_refusal(scene: &Scene) -> Option<String> {
     #[cfg(feature = "dev")]

@@ -1,4 +1,4 @@
-//! Test fixture for the layout-group tests (#421): a 1920×1080 canvas at scale 1
+//! Test fixture for the layout-group tests: a 1920×1080 canvas at scale 1
 //! holding one centred panel, with helpers to add a group and sized children.
 
 use glam::Vec2;

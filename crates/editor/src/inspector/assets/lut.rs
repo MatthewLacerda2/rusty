@@ -1,4 +1,4 @@
-//! crates/editor/src/inspector/assets/lut.rs — the `.cube` colour-lookup card (#1441):
+//! crates/editor/src/inspector/assets/lut.rs — the `.cube` colour-lookup card:
 //! what the file holds (its size and domain), or why it is refused, the same
 //! message the renderer logs. A strip `.png` is an image first and keeps the
 //! image card.

@@ -65,7 +65,7 @@ fn gpu_a_window_frame_carries_what_the_renderer_drew() {
     );
 }
 
-/// A drawn window frame reaches the frame log on disk (#2206) with what the
+/// A drawn window frame reaches the frame log on disk with what the
 /// renderer drew, beside the stats, as `measured` hands it over.
 #[test]
 fn gpu_a_window_frame_reaches_the_frame_log() {

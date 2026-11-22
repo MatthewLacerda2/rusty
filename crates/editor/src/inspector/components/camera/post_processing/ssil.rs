@@ -1,4 +1,4 @@
-//! The Screen Space Indirect Lighting section (#1750): the switch and, while on,
+//! The Screen Space Indirect Lighting section: the switch and, while on,
 //! its intensity and radius, its quality level and, at `Custom`, its sample count
 //! and resolution divisor. It sits beside SSAO, the other indirect-light section.
 

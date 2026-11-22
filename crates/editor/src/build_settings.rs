@@ -1,27 +1,4 @@
-//! crates/editor/src/build_settings.rs — the File → Build Settings window (#431).
-//!
-//! Edits a draft of the project's [`BuildSettings`] (startup scene, product name,
-//! window mode) and writes it to the project's tracked `project.rusty` on Save.
-//! The API twin is the `Application` namespace's setters — one operation, two callers.
-//!
-//! Below them, the project's default player graphics options (#1438): one checkbox
-//! per option, each written to `project.rusty` the moment it changes through
-//! `Application::set_default_option`, the op `Graphics.SetDefaultOption` calls; the
-//! live options follow it where the player hasn't chosen, to preview a fresh install.
-//!
-//! Then the project's render-scale default (#1715), a factor or *Match display*,
-//! through `Application::set_default_render_scale`, the op
-//! `Graphics.SetDefaultRenderScale` calls; it runs at once unless the player chose a
-//! scale.
-//!
-//! Last, the project's audio settings (#1749): the speed of sound doppler resolves
-//! with, written through `Application::set_speed_of_sound` (the op
-//! `Audio.SetDefaultSpeedOfSound` calls) once a drag or a typed edit ends, and
-//! applied to the audio on entering Play.
-//!
-//! In a dev build, the frame log's channels (#2206): one checkbox per channel of
-//! the rolling log under `saved/logs/`, written through
-//! `Application::set_log_channels`, the op `Debug.SetLogChannels` calls.
+//! crates/editor/src/build_settings.rs — the File → Build Settings window.
 
 use egui_phosphor::regular as icon;
 
@@ -113,9 +90,6 @@ fn fields(ui: &mut egui::Ui, draft: &mut BuildSettings, current_scene: Option<&s
         });
 }
 
-/// The project's default player graphics options: what a fresh install's options
-/// menu starts with. Each change is written at once (no draft), like the API's, and
-/// reaches the `live` options wherever the player hasn't set them.
 fn graphics_defaults(
     ui: &mut egui::Ui,
     app: &mut Application,
@@ -181,9 +155,6 @@ fn render_scale_default(
     }
 }
 
-/// The project's audio settings: the speed of sound (m/s). A drag or a typed edit
-/// is held as a draft in egui's memory and written once, when it ends, not on every
-/// frame it changes.
 fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
     let id = ui.id().with("speed_of_sound");
     let draft = ui.data(|d| d.get_temp::<f32>(id));
@@ -206,8 +177,6 @@ fn audio(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
     });
 }
 
-/// The rolling frame log's channels (dev builds): a checkbox each, written to
-/// `project.rusty` the moment it changes; the running log follows next frame.
 #[cfg(feature = "dev")]
 fn frame_log(ui: &mut egui::Ui, app: &mut Application, console: &mut ConsoleLogs) {
     use rusty_core::settings::logs::LogChannels;

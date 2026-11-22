@@ -1,12 +1,3 @@
-//! crates/ui/src/events/tree.rs — hierarchy questions the event system asks (#420).
-//!
-//! Every rule that depends on an entity's ancestors lives here, once (whether it is
-//! visible is `World::is_active_in_hierarchy`, #1363): whether a `CanvasGroup` above it stops
-//! the pointer or disables its selectables, and the ancestor-or-self walk event
-//! bubbling follows. The walk is `World::self_and_ancestors`, bounded by the entity
-//! count, so a malformed parent cycle cannot hang the sim; it stops at an id no
-//! longer in the world.
-
 use rusty_ecs::World;
 
 /// `id`, then its parent, grandparent, … up to the scene root.
@@ -35,9 +26,6 @@ pub fn is_interactable(world: &World, id: u32) -> bool {
             .any(|c| world.canvas_group(c).is_some_and(|g| !g.interactable))
 }
 
-/// The nearest ancestor-or-self of `id` passing `pred` — Unity's
-/// `ExecuteEvents.GetEventHandler`, the walk every bubbled event takes (the UI's
-/// and `Damage`'s, #1893).
 pub fn nearest(world: &World, id: u32, pred: impl Fn(u32) -> bool) -> Option<u32> {
     ancestors_or_self(world, id).into_iter().find(|&c| pred(c))
 }

@@ -1,5 +1,5 @@
 //! A script edited outside the engine during Play reaches the playing VM's next
-//! instance, while every other change still waits for Stop (#1710).
+//! instance, while every other change still waits for Stop.
 
 use super::{waits_for, POLL};
 use crate::editor::watch::Watch;

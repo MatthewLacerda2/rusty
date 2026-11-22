@@ -1,10 +1,4 @@
 //! crates/editor/src/inspector/components/context.rs — the inspector's read-only frame context.
-//!
-//! Everything the entity inspector needs that requires reading the WHOLE scene, gathered
-//! up front: the layer labels/mask set, the parenting matrix + name + valid-parent list,
-//! and the linked-prefab instance root. It is collected before `inspector/mod.rs` takes the
-//! mutable entity guard (which borrows the scene for the rest of the frame), so these
-//! whole-scene reads can't fight that borrow.
 
 use crate::inspector::components::prefab;
 use rusty_scene::{Scene, LAYER_COUNT};
@@ -16,9 +10,6 @@ pub(crate) struct InspectorContext {
     pub named_layers: Vec<(u8, String)>,
     pub selected_parent_name: String,
     pub valid_parents: Vec<(u32, String)>,
-    /// The root id of the linked-prefab instance the selection belongs to (the entity
-    /// itself when it is not a linked instance). Resolved here because walking up to it
-    /// needs read access to the whole scene, gathered before the entity guard is taken.
     pub prefab_root: u32,
 }
 
@@ -30,8 +21,6 @@ pub(crate) fn gather_context(scene: &Scene, selected_id: u32) -> InspectorContex
         .map(|i| scene.layers.label(i as u8))
         .collect();
 
-    // Layers offered in the camera culling-mask checklist: layer 0 plus any named
-    // user slots (unnamed slots are noise, mirroring Unity's mask dropdown).
     let named_layers: Vec<(u8, String)> = (0..LAYER_COUNT as u8)
         .filter(|&i| i == 0 || !scene.layers.name(i).is_empty())
         .map(|i| (i, scene.layers.label(i)))

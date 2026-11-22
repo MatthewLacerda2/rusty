@@ -58,13 +58,7 @@ fn draw_metadata(ui: &mut egui::Ui, path: &str) {
     });
 }
 
-/// Scale Factor (#1398): Unity's model-import drag, kept in the `.meta` sidecar.
-/// A finished edit goes through the verb `Assets.SetModelImportSettings` uses,
-/// re-importing the model's meshes (and rigs) in the scene. Mid-drag the value is
-/// held in egui's memory, not the sidecar: the verb changes nothing for a factor
-/// the sidecar already holds, so the sidecar must still hold the old one when the
-/// drag is released. A commit that re-imported a mesh marks the scene dirty: its
-/// mesh colliders' boxes and LODGroup sizes moved.
+/// Scale Factor: Unity's model-import drag, kept in the `.meta` sidecar.
 fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let held = egui::Id::new(("model_scale_factor", path));
     let stored = rusty_asset::sidecar::load(Path::new(path))
@@ -92,11 +86,6 @@ fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene
     }
 }
 
-/// Generate Lightmap UVs (#831): Unity's checkbox and its two knobs, kept in the
-/// `.meta` sidecar. A finished edit (a click, a released drag, a typed value) goes
-/// through the verb `Assets.SetLightmapUVSettings` uses, re-importing the model's
-/// meshes in the scene; mid-drag only the sidecar is written, so dragging a knob
-/// over a big level never re-imports it every frame.
 fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
     let source = Path::new(path);
     let stored = rusty_asset::sidecar::load(source)
@@ -126,7 +115,7 @@ fn draw_lightmap_uvs(ui: &mut egui::Ui, scene: &mut Scene, path: &str) {
 
 /// List the addressable sub-objects the source file exposes (`path::<id>`) and,
 /// per sub-object, a "Mesh Collider" toggle whose trimesh/convex choice and collision
-/// mesh persist in the `.meta` sidecar (#77, #1960). Reads the sidecar's cached map when present, else
+/// mesh persist in the `.meta` sidecar. Reads the sidecar's cached map when present, else
 /// imports the file once and writes the sidecar.
 fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     let mut settings = match rusty_asset::sidecar::load(Path::new(path)) {
@@ -159,9 +148,6 @@ fn draw_sub_objects(ui: &mut egui::Ui, path: &str) {
     ui.add_space(5.0);
 }
 
-/// One sub-object row: its `file::id` label plus the mesh-collider toggle, the
-/// trimesh/convex selector and the collision mesh it builds from (#1960: its own,
-/// or another sub-object of the file). Returns `true` if the collider choice changed.
 fn sub_object_row(
     ui: &mut egui::Ui,
     path: &str,
@@ -219,10 +205,6 @@ fn sub_object_row(
     true
 }
 
-/// The collision-mesh combo of `id`'s row (#1960): its own mesh, or another
-/// sub-object of the file, which a whole-model spawn then never draws. A sub-object
-/// whose own collision mesh leads back to `id` is not offered: the two would name
-/// each other and neither be drawn (`sidecar::closes_loop`).
 fn collision_mesh_combo(
     ui: &mut egui::Ui,
     mesh: &mut Option<String>,
@@ -248,13 +230,6 @@ fn collision_mesh_combo(
     }
 }
 
-/// Import the source file and instantiate it as Unity's model prefab (#1083): a
-/// root named after the file and one child per node, each mesh node carrying a
-/// path-based `"Asset"` mesh reference (`path::sub_object`) — a `_LOD<n>` set as one
-/// LODGroup entity (#472). Routes through the shared `authoring::instantiate_model`,
-/// the verb `Scene.Instantiate` of a bare model path drives too, so editor and
-/// API never drift. The
-/// geometry is re-imported on every scene load; no GPU buffers are persisted.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     let asset = match rusty_asset::import_and_sync_sidecar(Path::new(path)) {
         Ok(a) => a,

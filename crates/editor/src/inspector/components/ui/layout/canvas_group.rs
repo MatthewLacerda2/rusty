@@ -1,4 +1,4 @@
-//! The Canvas Group inspector card (#418): subtree alpha plus the interactable and
+//! The Canvas Group inspector card: subtree alpha plus the interactable and
 //! blocks-raycasts flags. Every write routes through `edit::authoring::ui::layout::canvas_group`.
 
 use crate::inspector::components::card::remove_component;
@@ -8,7 +8,7 @@ use rusty_edit::authoring::ComponentKind;
 use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::ui::layout::canvas_group as group_ops;
 
-/// Canvas Group card. A THIN client (#287): widgets read a snapshot and route each
+/// Canvas Group card. A THIN client: widgets read a snapshot and route each
 /// write through a shared op; remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(g) = world.canvas_group(id).map(|g| g.clone()) else {

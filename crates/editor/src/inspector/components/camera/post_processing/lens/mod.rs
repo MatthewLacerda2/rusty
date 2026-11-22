@@ -1,4 +1,4 @@
-//! The Lens Effects sections of the Post Processing card (#1439): Chromatic
+//! The Lens Effects sections of the Post Processing card: Chromatic
 //! Aberration, Vignette and Film Grain, each a checkbox and, when on, its knobs,
 //! in the order the composite runs them.
 

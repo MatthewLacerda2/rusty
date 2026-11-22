@@ -1,4 +1,4 @@
-//! The NavMesh gizmo's patching (#1910): a small rebake re-uploads only the tiles
+//! The NavMesh gizmo's patching: a small rebake re-uploads only the tiles
 //! it touched, and the patched tiles are what a full rebuild would give.
 
 use glam::Vec3;
@@ -26,9 +26,6 @@ fn all_tiles(g: &NavigationGraph) -> Vec<Vec<Vec3>> {
     plan.tiles.iter().map(|&t| tile_triangles(g, t)).collect()
 }
 
-/// Moving the crate one cell rebakes a few cells: only the tiles they reach are
-/// rebuilt, their bytes a sliver of the whole, and the patched set equals a full
-/// rebuild of the new graph.
 #[test]
 fn a_one_cell_rebake_rewrites_only_its_tiles() {
     let (mut scene, mut g, id) = dust2();

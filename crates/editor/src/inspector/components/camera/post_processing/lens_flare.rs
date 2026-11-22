@@ -1,4 +1,4 @@
-//! The Lens Flare section (#1443): its switch and, while on, its strengths, the
+//! The Lens Flare section: its switch and, while on, its strengths, the
 //! ghost count, the tint and the flare's chromatic aberration.
 
 use super::{knob, knob_row, toggle, Section};

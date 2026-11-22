@@ -10,9 +10,6 @@ use rusty_app::GameWorld;
 use rusty_editor::EditorUi;
 use rusty_render::Renderer;
 
-/// How egui paints, in the window and in the headless capture alike: no MSAA, and
-/// no dithering, which egui-wgpu turned on by default after 0.27. The editor kept its
-/// 0.27 look through the #333 upgrade, and an undithered capture stays byte-stable.
 pub(in crate::editor) const EGUI_RENDERER: egui_wgpu::RendererOptions =
     egui_wgpu::RendererOptions {
         msaa_samples: 1,
@@ -37,7 +34,7 @@ impl EditorFrontend {
 }
 
 /// End `ctx`'s pass and paint it as a load-pass over the swapchain `target`: the
-/// editor's dashboard and the project picker (#854) alike. Returns how soon egui wants
+/// editor's dashboard and the project picker alike. Returns how soon egui wants
 /// its next frame (a tooltip, an animation, a caret), [`Duration::MAX`] for never.
 pub(in crate::editor) fn paint_pass(
     ctx: &egui::Context,
@@ -98,9 +95,6 @@ pub(in crate::editor) fn paint_pass(
     repaint_after
 }
 
-/// Settle the frame's edits (the dashboard's, and the viewport's from the frame
-/// before): whether any was made, the flag cleared. An edit made by hand during
-/// Play is no call a demo can replay, so it taints the one recording (#1581).
 pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
     let edited = std::mem::take(&mut editor_ui.is_dirty);
     if edited && game.scene().borrow().is_playing() {
@@ -113,14 +107,9 @@ pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
     edited
 }
 
-/// Run a submitted REPL line through the single live evaluator. Dev builds only — the
-/// console input line and the harness share `evaluate_line`. A line outside Play may
-/// have moved static geometry, so it marks the scene dirty (#1339).
 #[cfg(feature = "dev")]
 pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
     if let Some(line) = editor_ui.dev.pending_repl.take() {
-        // Hand `evaluate_line` the shared console cell (not a held borrow) so a typed
-        // `print` / `Debug.*` can borrow it mid-eval without panicking (#208).
         let _ = rusty_dev::console::evaluate_line(
             game.script_manager(),
             &game.resources.console,
@@ -147,13 +136,13 @@ mod tests {
         let mut ui = EditorUi::new(Default::default());
         let journal = h.world.borrow().script_manager().journal();
         journal.borrow_mut().start();
-        ui.is_dirty = true; // what an Inspector field sets on a change
+        ui.is_dirty = true;
         assert!(take_edits(&mut ui, &h.world.borrow()) && !ui.is_dirty);
         assert!(
             journal.borrow_mut().take().is_empty(),
             "edit mode: no taint"
         );
-        h.step(1); // enters Play
+        h.step(1);
         ui.is_dirty = true;
         assert!(take_edits(&mut ui, &h.world.borrow()));
         let acts = journal.borrow_mut().take();

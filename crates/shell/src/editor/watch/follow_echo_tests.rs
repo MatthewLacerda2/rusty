@@ -1,4 +1,4 @@
-//! What is not an outside change, and a file that does not load yet (#1340).
+//! What is not an outside change, and a file that does not load yet.
 
 use super::SceneFollow;
 use rusty_core::fs::written::note_written;
@@ -48,8 +48,6 @@ fn a_selected_entity_is_not_an_unsaved_edit() {
     assert_eq!(*level, LogLevel::Info, "{line}");
 }
 
-/// A `touch`, a rescan or the same bytes rewritten: noted, but the text is the
-/// engine's own, so the working copy (and its unsaved edits) stays.
 #[test]
 fn the_same_bytes_noted_again_are_no_change() {
     let (path, mut scene, mut follow) = open("touch");
@@ -61,7 +59,7 @@ fn the_same_bytes_noted_again_are_no_change() {
     assert!(scene.find_entity_by_name("Unsaved").is_some());
 }
 
-/// Generate Lighting rewrites the file while edits are unsaved (#832): no reload,
+/// Generate Lighting rewrites the file while edits are unsaved: no reload,
 /// and the edits are still unsaved when a real outside change comes.
 #[test]
 fn a_lighting_save_is_not_an_outside_change() {
@@ -94,13 +92,11 @@ fn a_file_that_does_not_parse_yet_is_read_again() {
     );
     let mut done = Scene::new();
     done.add_entity("Kept".into());
-    rusty_edit::save_to_file(&done, &path).unwrap(); // finished writing; not noted again
+    rusty_edit::save_to_file(&done, &path).unwrap();
     assert!(frame(&mut follow, &mut scene, &path).0);
     assert!(scene.find_entity_by_name("Gone").is_none());
 }
 
-/// Generate Lighting lands before the follow applied an outside edit: the merged
-/// file (edit + lighting) is not the engine's own text, so it still reloads (#1374).
 #[test]
 fn a_lighting_save_over_an_unapplied_edit_still_reloads() {
     let (path, mut scene, mut follow) = open("lighting_race");

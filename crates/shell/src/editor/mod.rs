@@ -1,13 +1,5 @@
 //! crates/shell/src/editor/mod.rs — the editor frontend: the egui dashboard over the shell.
-//!
-//! The `rusty` binary. Each frame builds the egui UI (which lays out the viewport
-//! panel), renders the scene into the offscreen viewport target sized to that panel,
-//! applies click-to-select / gizmo drag, and paints the whole dashboard over the
-//! swapchain (#183). Built only with the `editor` Cargo feature, which is what keeps
-//! egui out of a shipped player.
 
-// The headless editor capture (#731) sits here, above `editor`, so the arrow runs
-// `editor → dev` only (#738).
 #[cfg(feature = "dev")]
 pub mod capture;
 mod cursor_release;
@@ -49,46 +41,23 @@ pub struct EditorFrontend {
     egui_winit: egui_winit::State,
     egui_renderer: egui_wgpu::Renderer,
     editor_ui: EditorUi,
-    /// Stable egui texture id for the offscreen scene target shown in the viewport
-    /// panel (#183). Registered lazily on the first frame a target exists, then
-    /// rebound to the resized view each frame so the `egui::Image` reference stays valid.
     viewport_texture_id: Option<egui::TextureId>,
-    /// The viewport's per-view render state (its own target, depth, post-FX), one per
-    /// tab, `[Scene, Game]`, as Unity keeps the two views apart: the Game view renders
-    /// at the render scale and the Scene view natively (#1498), so a shared one would
-    /// reallocate and reset its auto-exposure on every tab switch. Never shared with
-    /// the preview view (#355). `None` until that tab has rendered once.
     viewport_views: [Option<RenderView>; 2],
-    /// The Inspector Preview tab's texture id (#352) — same contract as the viewport's.
     preview_texture_id: Option<egui::TextureId>,
-    /// The Inspector preview's own render state, independent of the viewport's (#355).
     preview_view: Option<RenderView>,
-    /// Whether the Game view has input focus (#416; see `game_focus`).
+    /// Whether the Game view has input focus.
     game_focused: bool,
-    /// Whether Esc has freed the cursor over the game's lock (#576).
     cursor_release: cursor_release::CursorRelease,
-    /// Where the Game view sat last frame, for mapping the pointer; `None` while the
-    /// Scene tab is showing.
     game_view: Option<GameViewRect>,
-    /// The scene identity the editor last drew, so a scene swapped in under it — a
-    /// scripted `Scene.Load` (#432), Stop after one — drops the stale selection.
     scene_id: Option<SceneId>,
-    /// The watch on the project's files (#1327); `None` when nothing could be watched.
     watch: Option<watch::Watch>,
-    /// The open scene following its file on disk (#1340).
     follow: watch::follow::SceneFollow,
-    /// The scene path last remembered for the next launch (`last_scene`, #1618).
     last_scene: Option<String>,
-    /// When egui wants its next frame; `None` when it doesn't (#1721).
     repaint_at: Option<std::time::Instant>,
-    /// The window title: project, scene and its unsaved mark (#1914).
     title: title::Title,
 }
 
 impl EditorFrontend {
-    /// Set up egui on the shell's window and open the editor on the game's current
-    /// scene file: the boot set it only if the scene loaded, so a startup scene that
-    /// doesn't parse opens as Untitled (#1374).
     pub fn new(shell: &Shell, game: &GameWorld) -> Self {
         let egui_ctx = egui::Context::default();
         let egui_winit = egui_winit::State::new(
@@ -128,10 +97,8 @@ impl EditorFrontend {
     }
 
     /// Run the editor UI for one frame and apply its post-FX quality selection.
-    /// Returns the viewport panel's pointer interaction for picking/dragging (#183).
     fn draw_dashboard(&mut self, shell: &mut Shell, game: &mut GameWorld) -> ViewportInteraction {
         self.follow_scene_swap(game);
-        // The transport asks through `set_playing`, like every other host (#1302).
         let mut playing = game.play_requested();
         let clock = (shell.clock.fps(), shell.clock.frame_ms());
         let timestamps = shell.renderer.times_gpu();
@@ -161,9 +128,6 @@ impl EditorFrontend {
             shell.renderer.shadow_renderer.invalidate_static_cache();
         }
         if self.demo_size().is_none() {
-            // Before `sync_quality` resolves the render scale on it (#1715); an open
-            // demo replays the scale it recorded; a fixed size and "1x on HiDPI"
-            // report 1 (#2207), from the setting this frame drew with.
             let scale =
                 (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
             game.resources.screen.borrow_mut().set_display_scale(scale);
@@ -183,7 +147,7 @@ impl Frontend for EditorFrontend {
     }
 
     /// Raw mouse motion feeds egui too, so Scene-view look keeps turning while the
-    /// cursor is locked (#745).
+    /// cursor is locked.
     fn on_mouse_motion(&mut self, delta: (f64, f64)) {
         self.egui_winit.on_mouse_motion(delta);
     }
@@ -192,7 +156,7 @@ impl Frontend for EditorFrontend {
     fn game_has_input(&self, game: &GameWorld) -> bool {
         #[cfg(feature = "dev")]
         if self.editor_ui.demo_open() {
-            return false; // a demo plays read-only (#1598)
+            return false;
         }
         game.play_requested() && self.game_focused
     }
@@ -203,16 +167,11 @@ impl Frontend for EditorFrontend {
         demo.unwrap_or_else(|| super::frame::advance_sim(game, step, dt))
     }
 
-    /// A demo open at quit is closed first, so the quit flush writes the editor's
-    /// own store and settings, never the demo's (#1598).
     #[cfg(feature = "dev")]
     fn before_exit(&mut self, game: &mut GameWorld) {
         demo::close(&mut self.editor_ui, game);
     }
 
-    /// Outside Play nothing moves on its own, so the editor draws on demand, as Unity's
-    /// Scene and Game views do (#1721). Play, an open demo and sound still playing keep
-    /// it going: they move on per frame, with nothing else to ask for one.
     fn pace(&self, game: &GameWorld) -> Pace {
         #[cfg(feature = "dev")]
         if self.editor_ui.demo_open() {
@@ -238,8 +197,6 @@ impl Frontend for EditorFrontend {
         self.focus_on_transition(transition);
     }
 
-    /// The game's request, unless Esc freed the cursor (#576). RMB mouse look in the
-    /// Scene view hides and locks it, as Unity does (#745).
     fn cursor(&self, game: &GameWorld) -> CursorState {
         if self.editor_ui.scene_view.looking {
             return CursorState::PLAY;
@@ -249,8 +206,6 @@ impl Frontend for EditorFrontend {
             .effective(requested, self.game_has_input(game))
     }
 
-    /// Esc in Play frees the cursor and still reaches the game (Unity's behaviour);
-    /// Ctrl/Cmd+P or the menu bar's Stop button stops Play.
     fn on_key(&mut self, game: &mut GameWorld, key: KeyCode, pressed: bool) {
         let has_input = self.game_has_input(game);
         self.cursor_release.on_key(key, pressed, has_input);
@@ -277,22 +232,17 @@ impl Frontend for EditorFrontend {
         let interaction = self.recorded_dashboard(shell, game);
         paint::drain_repl(&mut self.editor_ui, game);
 
-        // Render the scene into the viewport target now (after the panel rect is
-        // known, before egui paints) so the `egui::Image` samples this frame's render.
         let ppp = shell.window.scale_factor() as f32;
         self.update_game_focus(game, &interaction);
         self.game_view = game_focus::game_view(&interaction, ppp);
         self.render_viewport_scene(shell, game, &interaction, ppp);
         self.recorded_viewport_interaction(game, &interaction, ppp);
-        // Only when the Inspector's Preview tab requested one this frame (#352).
         self.render_preview(shell, ppp);
 
         self.paint(shell, target);
     }
 }
 
-/// Hand the sim's texture-size table to the editor, so the overlay and the
-/// inspector lay the UI out with the very table the game does (#1221).
 pub(super) fn sync_ui_textures(ui: &mut EditorUi, game: &GameWorld) {
     ui.ui_textures = std::rc::Rc::clone(game.resources.screen.borrow().textures());
 }

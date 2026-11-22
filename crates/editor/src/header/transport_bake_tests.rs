@@ -1,4 +1,4 @@
-//! Play greyed out while a bake runs (#2042): neither a click nor the shortcut
+//! Play greyed out while a bake runs: neither a click nor the shortcut
 //! enters Play, and the bake ending gives Play back. Stop is never refused.
 
 use egui_phosphor::regular as icon;

@@ -1,11 +1,4 @@
-//! crates/ui/src/layout/grid.rs — the grid layout group (#421).
-//!
-//! Unity's `GridLayoutGroup`: every child becomes one `cell_size` cell. The column
-//! count is fixed (`FixedColumnCount`), derived from a fixed row count
-//! (`FixedRowCount`), or as many as fit the rect (`Flexible`). Cells fill rows
-//! first (or columns, with `start_vertical`) from `start_corner`, and the whole
-//! block is aligned by `child_alignment`. A grid is never flexible, and it ignores
-//! the row/column group's control and force-expand flags.
+//! crates/ui/src/layout/grid.rs — the grid layout group.
 
 use glam::Vec2;
 
