@@ -5,6 +5,7 @@ impl Application {
         self.quit_requested = true;
     }
 
+    /// Without clearing it: the harness keeps the run ended.
     pub fn quit_requested(&self) -> bool {
         self.quit_requested
     }
@@ -34,6 +35,7 @@ impl Application {
         self.play_request.take()
     }
 
+    /// No edit mode to return to, so a script's play request is refused.
     pub fn standalone(&self) -> bool {
         self.standalone
     }
@@ -46,6 +48,7 @@ impl Application {
         self.bake_host = true;
     }
 
+    /// Only the editor window steps a background bake (`Lighting.GenerateAsync()`).
     pub fn bake_host(&self) -> bool {
         self.bake_host
     }

@@ -1,3 +1,5 @@
+//! An instance entity's link to its source and its overrides, in Unity's shapes.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -6,18 +8,24 @@ use serde_json::Value;
 use super::override_refs::{each_override_ref, visit_override_refs};
 use super::refs::{escape_token, EntityRefs, RefVisit};
 
+/// Unity's `Array.size` entry, `/scripts/#size`; no index or field is `#size`.
 pub const SIZE_TOKEN: &str = "#size";
 
+/// A removed part's key, `-part/Kit/Wall`; no JSON pointer starts with `-`.
 pub const PART_KEY: &str = "-part/";
 
+/// On every entity of an instance, matched by `local_id`, not by order.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct PrefabLink {
     pub source: String,
     pub local_id: u32,
+    /// A model's node path, which propagation re-derives `local_id` from first.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
+    /// As last stored; the current set is `edit::prefab::live::live_overrides`.
     #[serde(default, skip_serializing_if = "PrefabOverrides::is_empty")]
     pub overrides: PrefabOverrides,
+    /// The source as last stamped or propagated, which live overrides diff; never saved.
     #[serde(skip)]
     pub baseline: Option<std::sync::Arc<Value>>,
 }
@@ -30,6 +38,7 @@ pub struct PrefabOverrides {
     pub added_components: BTreeMap<String, Value>,
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub removed_components: BTreeSet<String>,
+    /// On the instance root only; propagation never stamps them back.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub removed_parts: BTreeSet<String>,
 }
@@ -136,6 +145,7 @@ impl EntityRefs for PrefabLink {
         });
     }
 
+    /// Test hook: one id slot of each kind.
     #[doc(hidden)]
     fn every_ref() -> Self {
         let mut overrides = PrefabOverrides::default();

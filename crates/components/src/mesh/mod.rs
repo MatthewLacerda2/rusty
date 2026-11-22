@@ -12,6 +12,7 @@ mod skeleton;
 
 pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
 pub use runs::{clip_runs, material_runs};
+/// A test hook.
 #[doc(hidden)]
 pub use rusty_asset::mesh_data::shared::copies;
 pub use rusty_asset::Vertex;
@@ -35,6 +36,7 @@ pub struct MeshComponent {
     pub cast_shadows: ShadowCasting,
     #[serde(default = "one_f32")]
     pub scale_in_lightmap: f32,
+    /// Shared with other instances: edit in place only through `vertices_mut`.
     #[serde(skip)]
     pub vertices: Shared<Vertex>,
     #[serde(skip)]
@@ -85,12 +87,14 @@ fn is_zero(v: &f32) -> bool {
 }
 
 impl MeshComponent {
+    /// Unity has no upper bound; past a few, `max_map_edge` caps the map.
     pub const SCALE_IN_LIGHTMAP: std::ops::RangeInclusive<f32> = 0.0..=64.0;
 
     pub fn reads_probes(&self) -> bool {
         self.scale_in_lightmap <= 0.0
     }
 
+    /// A test hook: `edit`'s and `script`'s import tests ask it.
     #[doc(hidden)]
     pub fn has_lightmap_uv(&self) -> bool {
         self.vertices.iter().any(|v| v.lightmap_uv != [0.0, 0.0])

@@ -1,3 +1,6 @@
+//! A document to one hecs bundle, so a whole entity lands in one archetype placement (not one
+//! migration per `insert_one`), and a live entity's columns back into a document.
+
 use std::collections::BTreeMap;
 
 use rusty_components::registry::first_class;
@@ -7,6 +10,8 @@ use super::world::World;
 
 pub(crate) struct Core {
     pub id: u32,
+    /// Insertion sequence, kept across `overwrite`: narrow queries sort on it, as hecs iterates by
+    /// archetype.
     pub seq: u64,
     pub active: bool,
     pub is_static: bool,
@@ -36,6 +41,7 @@ macro_rules! bundle_rows {
         }
 
         impl Documented<'_> {
+            // One struct literal: a field added to `Entity` and not copied here fails to compile.
             fn entity(&self) -> Option<Entity> {
                 let (world, id) = (self.world, self.id);
                 let core = world.component::<Core>(id)?;
@@ -51,6 +57,7 @@ macro_rules! bundle_rows {
                     $($field: document_field!(self, $field),)*
                     prefab_link: world.prefab_link(id).map(|c| (*c).clone()),
                     parent_id: core.parent_id,
+                    // Document-only: a save fills them.
                     parent_bone: Vec::new(),
                     bone_refs: BTreeMap::new(),
                     children: core.children.clone(),
@@ -81,6 +88,7 @@ struct Documented<'w> {
 
 first_class!(bundle_rows);
 
+/// Keeps the skin: a save reads its joints to strip the bones a load rebuilds.
 fn saved_mesh(mesh: &MeshComponent) -> MeshComponent {
     MeshComponent {
         skin: mesh.skin.clone(),
@@ -113,6 +121,7 @@ impl World {
         self.document(id, saved_mesh, ColliderComponent::without_geometry)
     }
 
+    /// What a save reads (`edit::serialize`): no vertices, which a load rebuilds.
     pub fn collect_documents(&self) -> Vec<Entity> {
         let ids = self.ids().iter();
         ids.filter_map(|&id| self.saved_document(id)).collect()

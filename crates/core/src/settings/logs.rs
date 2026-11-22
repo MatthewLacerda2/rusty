@@ -62,6 +62,7 @@ impl Default for LogChannels {
 }
 
 impl LogChannels {
+    /// In the order `docs/api/Debug.md`'s channel table lists them.
     pub const NAMES: [&'static str; 6] = [
         "frames",
         "gpu_passes",

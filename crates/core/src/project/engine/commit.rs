@@ -1,3 +1,4 @@
+//! Std-only: `crates/core/build.rs` includes this file with `#[path]` to stamp a release.
 use std::path::Path;
 // lint: allow(subprocess) asks git which commit a debug build's checkout is; a release build is stamped and never runs it
 use std::process::Command;
@@ -28,6 +29,7 @@ pub fn engine_order() -> Option<u64> {
 }
 
 pub fn git_order(dir: &Path) -> Option<u64> {
+    // A shallow clone counts only its depth; a git too old to answer counts as one.
     let shallow = git(dir, &["rev-parse", "--is-shallow-repository"])?;
     if shallow != "false" {
         return None;
@@ -40,6 +42,8 @@ thread_local! {
         const { std::cell::Cell::new(None) };
 }
 
+/// A test hook (other crates' tests call it): this thread's running engine becomes
+/// `commit` at `order`, alike in a full clone, a shallow one and without git.
 #[doc(hidden)]
 pub fn pin(commit: &'static str, order: Option<u64>) {
     PINNED.set(Some((commit, order)));

@@ -1,9 +1,15 @@
+//! One channel's log. Bounded: an id no cursor has read past is not appended again; past [`cap`]
+//! the older half goes, and a cursor that had not read it answers "rebuild", always correct.
+//! `last` holds 8 bytes per id up to the highest stamped, until a `reset`.
+
 #[derive(Debug, Default)]
 pub(super) struct Log {
     pub revision: u64,
     pub recording: bool,
     entries: Vec<(u64, u32)>,
+    /// The revision before the oldest entry kept: a cursor that read less is behind.
     pub floor: u64,
+    /// The newest revision any cursor has read up to.
     high_water: u64,
     last: Vec<u64>,
     pub logged: u64,
@@ -12,6 +18,8 @@ pub(super) struct Log {
 
 pub(super) type Carried = fn(&hecs::EntityRef<'_>) -> bool;
 
+/// Entries kept: four stamps of every live entity, so a once-a-tick reader never falls behind a
+/// tick that wrote everything, plus 4096 for churn in a small world.
 pub(super) fn cap(live: usize) -> usize {
     4 * live + 4096
 }

@@ -1,3 +1,7 @@
+//! What a despawn clears so no dead id survives: the parent's `children`, each child's parent
+//! link (a root at its world pose, as Unity's `SetParent(null)`), and every component id leaf
+//! (its `None`), found by the reverse index. Scene-level references are `Scene::despawn_batch`'s.
+
 #[cfg(test)]
 mod cost_tests;
 mod index;
@@ -40,6 +44,7 @@ macro_rules! world_walk {
 with_ref_components!(world_walk);
 
 impl World {
+    /// A test hook: the engine despawns in batches ([`World::despawn_all`]).
     #[doc(hidden)]
     pub fn despawn(&mut self, id: u32) {
         self.despawn_all(&BTreeSet::from([id]));
@@ -50,6 +55,7 @@ impl World {
         self.remove_rows(ids);
     }
 
+    /// One pass for the batch: a child dying with its parent is not re-rooted.
     fn forget_references(&mut self, dead: &BTreeSet<u32>) {
         for &id in dead {
             if let Some(parent) = self.parent_id(id).filter(|p| !dead.contains(p)) {
@@ -93,6 +99,7 @@ impl World {
         out
     }
 
+    /// The full scan the index replaced: what `index_tests` holds it to.
     #[cfg(test)]
     pub(crate) fn naming_by_scan(&self, dead: &BTreeSet<u32>) -> Vec<u32> {
         let named = |e: &u32| self.held_by(*e).iter().any(|r| dead.contains(r));

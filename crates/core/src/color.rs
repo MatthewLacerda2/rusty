@@ -1,4 +1,5 @@
-//! The shaders keep their own WGSL copies of these.
+//! The shaders keep their own WGSL copies of these (`color/srgb.wgsl`, the luminance
+//! weights inline): change them together.
 
 pub fn srgb_to_linear(b: u8) -> f32 {
     gamma_to_linear(b as f32 / 255.0)
@@ -23,6 +24,7 @@ pub fn linear_to_srgb(c: f32) -> f32 {
     }
 }
 
+/// Rec. 709 luminance of a linear (not sRGB-encoded) colour.
 pub fn luminance(rgb: impl Into<[f32; 3]>) -> f32 {
     let [r, g, b] = rgb.into();
     0.2126 * r + 0.7152 * g + 0.0722 * b

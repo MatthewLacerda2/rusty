@@ -5,10 +5,12 @@ rusty_core::named_enum! {
     pub enum ShadowCasting {
         #[default]
         On = "On",
+        /// Casts nothing, realtime or baked; the bake still sees it and lightmaps it.
         Off = "Off",
         /// Casts from both faces (culling off in the shadow pass): a single-sided
         /// card or plane that must shadow whichever way it faces the light.
         TwoSided = "TwoSided",
+        /// Casts as `On`, but no camera draws it and no bake sees it: a shadow-only stand-in.
         ShadowsOnly = "ShadowsOnly",
     }
 }

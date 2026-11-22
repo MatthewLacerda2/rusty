@@ -1,3 +1,6 @@
+//! Every raw mutable access to one column of one entity. Each touches only once the entity holds
+//! the column: a write to a column it lacks changed nothing, so it names nothing.
+
 use super::changes::Channel;
 use super::world::{RefMut, World};
 
@@ -20,6 +23,8 @@ impl World {
         self.inner.get::<&mut T>(handle).ok() // lint: allow(ecs-write) the funnel: touched above
     }
 
+    /// For state derived from the other columns (a collider's world box): no journal note, no
+    /// stamp. Never for a value a consumer or an Undo must see.
     pub(crate) fn derived_mut<T: hecs::Component>(&mut self, id: u32) -> Option<RefMut<'_, T>> {
         let handle = self.handles.get(id)?;
         // lint: allow(ecs-write) derived state, rebuilt from stamped columns: nothing to report
@@ -57,6 +62,7 @@ impl World {
         self.inner.remove_one::<T>(handle).ok() // lint: allow(ecs-write) the funnel: touched above
     }
 
+    /// `A` borrowed mutably beside a different column `B` read; only `A` is stamped.
     pub(crate) fn with_mut_and_ref<A, B, R>(
         &mut self,
         id: u32,

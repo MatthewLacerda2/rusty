@@ -2,7 +2,7 @@
 //! is noted, and each path-keyed cache drains the notes before answering a lookup. An
 //! engine write of a file some cache reads by path goes through [`write()`] (or calls
 //! [`note_written`] after), and a cache treats a failed load as a retried miss, never a
-//! cached default.
+//! cached default. Every such cache runs `rusty_test_support::rebakes::follows_rebakes`.
 
 use std::collections::BTreeMap;
 use std::io;

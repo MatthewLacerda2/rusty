@@ -44,6 +44,8 @@ impl EngineCheck {
         if recorded == running {
             return Verdict::Same;
         }
+        // `main` is linear, so a later engine counts higher; a shallow build can't count,
+        // and a record with no count predates counts: an upgrade.
         let Some(running_order) = self.running_order else {
             return Verdict::Unknown;
         };

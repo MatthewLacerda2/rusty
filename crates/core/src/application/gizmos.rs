@@ -13,6 +13,7 @@ pub struct GizmoRow {
     /// Whether the tab strip shows its toggle: `false` while nothing draws it yet,
     /// the flag still set and read through the API.
     pub shown: bool,
+    /// Its toggle sits on the Game tab's strip, not the Scene tab's.
     pub game: bool,
 }
 
@@ -31,6 +32,7 @@ macro_rules! gizmos {
     };
 }
 
+// The tab strip's order, left to right.
 gizmos! {
     Ui => GizmoRow {
         name: "UI",

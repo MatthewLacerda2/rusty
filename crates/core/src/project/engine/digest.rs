@@ -1,3 +1,4 @@
+//! The root `build.rs` includes this file with `#[path]`: only std and `xxhash_rust`.
 use std::path::Path;
 
 pub fn digest(dir: &Path) -> Result<String, String> {

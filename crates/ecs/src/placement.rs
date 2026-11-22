@@ -1,9 +1,13 @@
+//! Whole-entity writes, `order` kept sorted by `Core::seq`. Every subtree walk follows `children`,
+//! so a placed link gets its missing side: a live parent lists the child, an absent one is awaited.
+
 use rusty_components::Entity;
 
 use super::bundle::{build_bundle, Core};
 use super::world::World;
 
 impl World {
+    /// The order every `ids_with_*` walk yields `id` in, for a cache kept in it.
     pub fn seq(&self, id: u32) -> Option<u64> {
         self.component::<Core>(id).map(|c| c.seq)
     }
@@ -25,7 +29,7 @@ impl World {
         self.order.insert(slot, id);
         self.list_in_parent(id, parent);
         self.adopt_waiting(id);
-        self.moved(id);
+        self.moved(id); // a carried document brings a stale box
     }
 
     fn list_in_parent(&mut self, id: u32, parent: Option<u32>) {
@@ -61,6 +65,8 @@ impl World {
         }
     }
 
+    /// Back at its old place in the insertion order, so a save after an Undo of a destroy writes
+    /// the same order.
     pub fn restore_entity(&mut self, entity: Entity, seq: u64) {
         if self.contains(entity.id) {
             self.overwrite(entity);
@@ -78,11 +84,12 @@ impl World {
         let Some(old_handle) = self.handles.get(id) else {
             return false;
         };
+        // Same slot in `order`, so the same stamp: a fresh one would sort it to the back.
         let seq = match self.inner.get::<&Core>(old_handle) {
             Ok(core) => core.seq,
             Err(_) => return false,
         };
-        self.stamp_hierarchy_below(id);
+        self.stamp_hierarchy_below(id); // and after: the flag and parent may differ
         self.touch_entity(id, entity.is_static);
         // lint: allow(ecs-write) the funnel: `touch_entity` stamped the overwrite above
         let _ = self.inner.despawn(old_handle);

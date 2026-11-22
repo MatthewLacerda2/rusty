@@ -20,6 +20,8 @@ pub const PROJECT_FILE: &str = "project.rusty";
 #[serde(default)]
 pub struct ProjectFile {
     pub engine_commit: String,
+    /// The field's own `default`: an omitted count reads as `None`, never the running
+    /// engine's, so a record from before counts is an upgrade.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine_order: Option<u64>,
     pub build: BuildSettings,
@@ -49,6 +51,8 @@ impl Default for ProjectFile {
     }
 }
 
+/// The file without its engine record: what a run plays under, and what a demo's
+/// header keeps so a replay plays under the settings it was recorded with.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProjectSettings {
@@ -101,6 +105,7 @@ impl ProjectFile {
         Ok(Self::read(&root.join(PROJECT_FILE))?.unwrap_or_default())
     }
 
+    /// Unchanged text is not rewritten: no git noise, no write into a read-only bundle.
     pub fn write(&self, path: &Path) -> Result<(), String> {
         let text = self.to_json();
         if std::fs::read_to_string(path).is_ok_and(|old| old == text) {
@@ -121,6 +126,8 @@ pub(super) fn record(root: &Path) -> Result<(EngineCheck, ProjectFile, Vec<Strin
     if let Some(name) = root.file_name().filter(|_| !existed) {
         file.build.product_name = name.to_string_lossy().into_owned();
     }
+    // An `unknown` build keeps the last known record; a shallow one, which can't count,
+    // keeps the record's count while the commit holds.
     if engine_commit() != UNKNOWN_COMMIT || file.engine_commit.is_empty() {
         if engine_order().is_some() || base(&file.engine_commit) != base(engine_commit()) {
             file.engine_order = engine_order();

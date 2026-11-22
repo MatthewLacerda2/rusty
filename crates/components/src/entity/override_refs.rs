@@ -1,3 +1,6 @@
+//! The one walk over every entity id a prefab instance's overrides hold: in a modification's
+//! leaf, inside its whole value, or through an added component's own typed walk.
+
 use serde::Deserialize;
 use serde_json::Value;
 
@@ -6,6 +9,8 @@ use super::refs::{escape_token, EntityRefs, RefVisit};
 use super::Entity;
 use crate::with_ref_components;
 
+/// A dropped id becomes `null`, the override of no reference, except in a list of ids, which it
+/// leaves, as the typed walk does.
 pub fn visit_override_refs(overrides: &mut PrefabOverrides, visit: &mut RefVisit<'_>) {
     for (path, value) in &mut overrides.modifications {
         visit_value_refs(path, value, visit);
@@ -86,6 +91,8 @@ fn id_of(leaf: &Value) -> Option<u32> {
 
 macro_rules! component_walks {
     ($($field:ident: $ty:ty,)*) => {
+        // `false`, `value` untouched, when `name`'s kind holds no ids or `value` doesn't read
+        // back as it.
         fn visit_component_refs(name: &str, value: &mut Value, visit: &mut RefVisit<'_>) -> bool {
             match name {
                 $(stringify!($field) => {

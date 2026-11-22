@@ -1,8 +1,7 @@
 //! A plain write truncates first, so a concurrent reader sees an empty or torn file.
 //! [`write_atomic`] writes beside the target and renames over it; [`write_cache`] skips
 //! the syncs for a cache the engine re-makes. The `atomic-write` rule (`make rules`)
-//! flags a `std::fs::rename` anywhere else. [`written`] is the log of asset files the
-//! engine wrote, which path-keyed caches drain through a [`freshness::Freshness`].
+//! flags a `std::fs::rename` anywhere else.
 
 pub mod freshness;
 pub mod written;
@@ -13,6 +12,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 pub const TEMP_SUFFIX: &str = "tmp";
 
+/// Syncs the temp file before the rename, which can reach the disk before its data.
 /// The rename replaces the file's folder entry, so it needs the folder writable,
 /// and a file read-only or linked there becomes a plain file of the default mode.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -45,6 +45,7 @@ fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()
 }
 
+/// A failure is ignored: some file systems refuse to sync a folder.
 pub fn sync_folder(path: &Path) {
     let folder = match path.parent() {
         Some(p) if !p.as_os_str().is_empty() => p,

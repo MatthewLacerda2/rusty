@@ -1,3 +1,5 @@
+//! Unity's Collider: its shape, its physics material and the meshes a `Mesh` shape builds from.
+
 mod physics_material;
 mod scaled;
 mod shared_mesh;
@@ -48,6 +50,8 @@ pub enum ColliderShape {
         height: f32,
         axis: CapsuleAxis,
     },
+    /// The local bounds cache the box for the world AABB; the rapier shape is rebuilt from the
+    /// live vertices, keeping geometry out of the scene.
     Mesh {
         convex: bool,
         local_min: Vec3,
@@ -64,6 +68,8 @@ pub struct ColliderComponent {
     pub material: PhysicsMaterial,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material_asset: Option<String>,
+    // `physics::shape::build` takes a built `collision_mesh`, else the entity's Mesh, else
+    // `shared_mesh`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -97,6 +103,7 @@ impl ColliderComponent {
         mesh.filter(|m| !m.indices.is_empty() && matches!(self.shape, ColliderShape::Mesh { .. }))
     }
 
+    /// The world AABB stays zeroed until [`Self::calculate_world_aabb`] runs on load.
     pub fn from_mesh_bounds(convex: bool, local_min: Vec3, local_max: Vec3) -> Self {
         Self {
             active: true,

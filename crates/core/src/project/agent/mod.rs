@@ -18,6 +18,8 @@ pub(super) fn write(root: &Path, mcp: bool) -> Vec<String> {
     write_for(root, mcp, &checkout())
 }
 
+/// Read from where `exe` sits, never `cfg!(debug_assertions)`, which a custom profile
+/// or a release build with assertions gets wrong.
 pub(super) fn session_binary(
     engine: &Path,
     exe: Option<&Path>,

@@ -94,6 +94,7 @@ fn a_failed_write_is_a_warning_never_a_failed_open() {
         lines.iter().all(|l| l.starts_with("warning: ")),
         "{lines:?}"
     );
+    // A directory where `.mcp.json` goes can't be written, even by root.
     std::fs::create_dir(root.join(MCP_FILE)).unwrap();
     let (opened, lines) = prepare(&root, Access::Edit).expect("the open succeeds");
     assert!(opened.root.join(CLAUDE_FILE).is_file());

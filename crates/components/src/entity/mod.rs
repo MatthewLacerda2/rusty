@@ -1,3 +1,6 @@
+//! A GameObject's document shape, which its hecs columns assemble into for a save, a prefab
+//! diff and the inspector; not live storage.
+
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -13,6 +16,7 @@ pub use override_refs::visit_override_refs;
 pub use prefab_link::{PrefabLink, PrefabOverrides, PART_KEY, SIZE_TOKEN};
 pub use refs::{escape_token, EntityRefs, RefVisit};
 
+// Field order is the key order a saved scene writes.
 macro_rules! entity {
     ($($field:ident: $ty:ty => $kind:ident [$($acc:ident)*];)*) => {
         #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -24,6 +28,8 @@ macro_rules! entity {
             #[serde(default)]
             pub layer: u8,
             pub transform: TransformComponent,
+            /// A default material the Add menu staged until the scene's library is reachable;
+            /// never saved.
             #[serde(skip)]
             pub pending_material: Option<MaterialAsset>,
             #[serde(default)]
@@ -36,8 +42,11 @@ macro_rules! entity {
             #[serde(default)]
             pub prefab_link: Option<PrefabLink>,
             pub parent_id: Option<u32>,
+            /// Document-only: the parent's bone it hangs from, then that bone's ancestors, nearest
+            /// first, re-bound by name on load; empty on a live entity.
             #[serde(default, skip_serializing_if = "Vec::is_empty")]
             pub parent_bone: Vec<String>,
+            /// Document-only: each id leaf naming a bone, kept by bone names as `parent_bone` is.
             #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
             pub bone_refs: BTreeMap<String, Vec<String>>,
             pub children: Vec<u32>,

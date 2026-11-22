@@ -33,6 +33,8 @@ pub const OPTIONS_KEY: &str = "options";
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct GraphicsOptions {
     allowed: [bool; GraphicsOption::ALL.len()],
+    /// What the player set: only these are saved, so the rest follow the project's
+    /// defaults, even ones changed later.
     chosen: [bool; GraphicsOption::ALL.len()],
 }
 
@@ -50,6 +52,7 @@ impl GraphicsOptions {
         self.allowed[option as usize]
     }
 
+    /// As a default, not the player's choice: [`choose`](Self::choose) marks it saved.
     pub fn set(&mut self, option: GraphicsOption, allowed: bool) {
         self.allowed[option as usize] = allowed;
     }
@@ -83,6 +86,7 @@ impl GraphicsOptions {
         Value::Object(map)
     }
 
+    /// `chosen` marks what `blob` sets as the player's choice, so it is saved again.
     fn read_json(blob: &Value, fallback: Self, chosen: bool) -> (Self, Vec<String>) {
         let mut options = fallback;
         let Some(map) = blob.as_object() else {
@@ -130,6 +134,7 @@ impl<'de> Deserialize<'de> for GraphicsOptions {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let blob = Value::deserialize(deserializer)?;
         let (options, ignored) = Self::read_json(&blob, Self::default(), false);
+        // The tracked file is the developer's to fix, so what it skips is warned about.
         for line in ignored {
             log::warn!("[Project] {PROJECT_FILE} graphics_options: {line}");
         }

@@ -1,3 +1,7 @@
+//! Who names whom, derived and never saved: opened by the first despawn, then kept by one cursor
+//! per reference-holding column. Exact, not a superset, since every write to a holding column or
+//! whole entity stamps its channel; `index_tests` holds it to the full scan.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Changes, Cursor, World};
@@ -47,6 +51,7 @@ pub(crate) struct RefIndex {
     cursors: Cursors,
     by_target: BTreeMap<u32, BTreeSet<u32>>,
     by_holder: BTreeMap<u32, Vec<u32>>,
+    /// Holders re-read or handed to a despawn: what the cost tests count.
     #[cfg(test)]
     pub(crate) touched: u64,
 }
@@ -110,6 +115,7 @@ impl RefIndex {
         };
     }
 
+    /// Read only: the despawn writes each holder, so the next refresh re-reads every one involved.
     pub(crate) fn naming(&self, dead: &BTreeSet<u32>) -> Vec<u32> {
         let holders = dead.iter().filter_map(|d| self.by_target.get(d)).flatten();
         let naming: BTreeSet<u32> = holders.filter(|h| !dead.contains(h)).copied().collect();

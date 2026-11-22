@@ -1,3 +1,8 @@
+//! Change detection, as Bevy's `Changed<T>`: one log per channel, read through cursors. A mutable
+//! borrow counts as a change (over-reporting is safe; a missed write is the bug). A read answers
+//! the ids stamped since, ascending, or `Rebuild` after a clear, restore, Undo step or a dropped
+//! tail.
+
 #[cfg(test)]
 mod carried_tests;
 mod channel;
@@ -52,12 +57,14 @@ impl Changes {
     }
 }
 
+// Only compared, never read as sim state: a cursor never reads a log it was not opened on.
 static NEXT_EPOCH: AtomicU64 = AtomicU64::new(1);
 
 fn fresh_epoch() -> u64 {
     NEXT_EPOCH.fetch_add(1, Ordering::Relaxed)
 }
 
+/// `StaticSet`'s index in `logs`: every World opens it first.
 const STATIC: usize = 0;
 
 const UNOPENED: u32 = u32::MAX;
@@ -140,6 +147,7 @@ impl World {
         self.changes.get_mut().new_epoch();
     }
 
+    /// A test hook: `scene::undo`'s tests count the rewinds a step costs.
     #[doc(hidden)]
     pub fn change_rewinds(&self) -> u64 {
         self.changes.borrow().rewinds
@@ -155,6 +163,7 @@ impl World {
         }
     }
 
+    /// One comparison; `false` does not promise an id the reader cares about.
     pub fn quiet<T: Channel>(&self, cursor: &Cursor<T>) -> bool {
         let changes = self.changes.borrow();
         let revision = changes.find::<T>().map(|at| changes.logs[at].revision);
