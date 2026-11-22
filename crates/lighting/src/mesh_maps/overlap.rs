@@ -42,11 +42,11 @@ pub(super) fn points(
     baked: &Baked,
     rays: &mut Option<MeshRays>,
 ) -> (Vec<TexelPoint>, Option<Stacked>) {
-    let surface = baked.source.surface();
+    let surface = baked.written();
     let size = baked.settings.size;
     let mut gather = Gather::default();
     let first = rasterize_claims(&surface, size.width, size.height, &mut |c| {
-        let rays = rays.get_or_insert_with(|| MeshRays::new(baked.source));
+        let rays = rays.get_or_insert_with(|| MeshRays::new(baked.source, &baked.settings.faces));
         gather.add(baked, rays, c);
     });
     let Some(rays) = rays.as_ref() else {

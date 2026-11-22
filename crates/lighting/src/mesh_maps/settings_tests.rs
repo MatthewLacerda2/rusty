@@ -118,25 +118,29 @@ fn a_setting_out_of_range_is_refused_naming_it() {
     let base = Settings::new(8);
     assert!(err(Settings {
         size: Size::new(8, 0),
-        ..base
+        ..base.clone()
     })
     .contains("size {8, 0}"));
-    assert!(err(Settings { ao_rays: 0, ..base }).contains("ao_rays 0"));
+    assert!(err(Settings {
+        ao_rays: 0,
+        ..base.clone()
+    })
+    .contains("ao_rays 0"));
     assert!(err(Settings {
         thickness_rays: 5000,
-        ..base
+        ..base.clone()
     })
     .contains("thickness_rays 5000"));
     for r in [0.0, -1.0, f32::NAN, f32::INFINITY] {
         let e = err(Settings {
             curvature_radius: Some(r),
-            ..base
+            ..base.clone()
         });
         assert!(e.contains("curvature_radius"), "{e}");
     }
     let wide = |r| Settings {
         curvature_radius: Some(r),
-        ..base
+        ..base.clone()
     };
     let e = bake_with(&cube(), &[MeshMap::Curvature], &wide(2.0)).unwrap_err();
     assert!(
@@ -157,16 +161,16 @@ fn sheet(w: f32, h: f32, normal: Vec3) -> MeshSource {
 #[test]
 fn a_texel_is_measured_by_its_area_so_a_strip_floors_at_three_real_texels() {
     let strip = sheet(64.0, 1.0, Vec3::Z);
-    let baked = Baked::new(&strip, &Settings::new(Size::new(4096, 64)))
-        .unwrap()
-        .0;
+    let settings = Settings::new(Size::new(4096, 64));
+    let baked = Baked::new(&strip, &settings).unwrap().0;
     assert!(
         (baked.texel_world() * 64.0 - 1.0).abs() < 1e-5,
         "{}",
         baked.texel_world()
     );
     let cube = cube();
-    let baked = Baked::new(&cube, &Settings::new(48)).unwrap().0;
+    let settings = Settings::new(48);
+    let baked = Baked::new(&cube, &settings).unwrap().0;
     let per_uv = crate::lightmap::world_per_uv(&cube.surface()).unwrap();
     assert_eq!(baked.texel_world(), per_uv / 48.0);
 }
@@ -180,7 +184,7 @@ fn a_texel_whose_every_ray_is_dropped_reads_the_neutral_value() {
         ..Settings::new(16)
     };
     for map in [MeshMap::Ao, MeshMap::Thickness] {
-        let img = one(&leaning, map, settings);
+        let img = one(&leaning, map, settings.clone());
         let low = img.pixels().iter().filter(|p| p[0] < 1.0).count();
         assert_eq!(low, 0, "{map:?}: {low} texels below 1");
     }

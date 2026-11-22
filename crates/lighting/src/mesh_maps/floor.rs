@@ -25,10 +25,10 @@ pub struct Raised {
 impl Radii {
     pub(super) fn new(baked: &Baked) -> Self {
         let source = baked.source;
-        let surface = source.surface();
+        let surface = baked.written();
         let islands = source.islands();
         let mut areas: Map<u32, Areas> = Map::default();
-        for (t, &island) in source.indices.chunks_exact(3).zip(&islands) {
+        for (t, &island) in surface.indices.chunks_exact(3).zip(&islands) {
             areas.entry(island).or_default().add(&surface, t);
         }
         let reach = baked.settings.curvature_reach(baked.diagonal);

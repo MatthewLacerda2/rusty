@@ -4,12 +4,38 @@ use rusty_procgen::image_buf::Size;
 /// Per texel per map: 16× the default, bounding a bake's time (rays cost time, not memory).
 pub const MAX_RAYS: u32 = 1024;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub size: Size,
     pub curvature_radius: Option<f32>,
     pub ao_rays: u32,
     pub thickness_rays: u32,
+    pub faces: Faces,
+}
+
+/// Material indices, as `MeshSource::runs` holds them: Substance's texture sets.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Faces {
+    /// `None` writes every face that occludes.
+    pub materials: Option<Vec<usize>>,
+    pub ignore_occluders: Vec<usize>,
+}
+
+impl Faces {
+    pub(super) fn occludes(&self, material: Option<usize>) -> bool {
+        !material.is_some_and(|m| self.ignore_occluders.contains(&m))
+    }
+
+    pub(super) fn writes(&self, material: Option<usize>) -> bool {
+        match &self.materials {
+            Some(only) => material.is_some_and(|m| only.contains(&m)),
+            None => self.occludes(material),
+        }
+    }
+
+    pub(super) fn every(&self) -> bool {
+        self.materials.is_none() && self.ignore_occluders.is_empty()
+    }
 }
 
 impl Settings {
@@ -19,6 +45,7 @@ impl Settings {
             curvature_radius: None,
             ao_rays: rays::SAMPLES,
             thickness_rays: rays::SAMPLES,
+            faces: Faces::default(),
         }
     }
 

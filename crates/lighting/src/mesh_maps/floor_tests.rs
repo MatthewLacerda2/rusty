@@ -90,7 +90,8 @@ fn a_radius_between_two_islands_floors_holds_on_the_roomy_one() {
 fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
     let mesh = packed_cube();
     let r = cell_floor(0.25) * 1.5;
-    let baked = Baked::new(&mesh, &settings(r)).unwrap().0;
+    let settings = settings(r);
+    let baked = Baked::new(&mesh, &settings).unwrap().0;
     assert!(MIN_TEXELS * baked.texel_world() < r);
     let radii = Radii::new(&baked);
     assert!(radii.per_tri.iter().all(|&x| x == r), "{:?}", radii.per_tri);
@@ -124,7 +125,8 @@ fn a_bake_naming_no_radius_reports_nothing_raised() {
 fn an_island_packed_to_nearly_nothing_keeps_the_grid_at_the_reach() {
     let mesh = packed(1e-3);
     let r = cell_floor(1.0) * 1.5;
-    let baked = Baked::new(&mesh, &settings(r)).unwrap().0;
+    let settings = settings(r);
+    let baked = Baked::new(&mesh, &settings).unwrap().0;
     let (c, raised) = Curvature::new(&baked);
     assert_eq!(c.cell(), r);
     let raised = raised.expect("the packed island was raised");

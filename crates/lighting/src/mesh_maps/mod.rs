@@ -8,13 +8,13 @@ mod source;
 
 use glam::{Vec3, Vec4};
 
-use super::lightmap::{world_per_uv, TexelPoint};
+use super::lightmap::{world_per_uv, Surface, TexelPoint};
 pub use floor::Raised;
 pub use overlap::Stacked;
 use rays::MeshRays;
 use rusty_procgen::image_buf::{Image, Size};
 use rusty_procgen::Slot;
-pub use settings::{Settings, MAX_RAYS};
+pub use settings::{Faces, Settings, MAX_RAYS};
 pub use source::MeshSource;
 
 /// In texels: Substance's 8K.
@@ -140,7 +140,9 @@ impl MeshMap {
 
 struct Baked<'a> {
     source: &'a MeshSource,
-    settings: Settings,
+    settings: &'a Settings,
+    /// `source.indices` with every face that writes no texel collapsed to a point.
+    written: Option<Vec<u32>>,
     points: Vec<TexelPoint>,
     min: Vec3,
     extent: Vec3,
@@ -181,7 +183,8 @@ pub fn bake(
                 image(&|_, p| c.texel(p))
             }
             MeshMap::Ao | MeshMap::Thickness => {
-                let t: &MeshRays = tracer.get_or_insert_with(|| MeshRays::new(source));
+                let t: &MeshRays =
+                    tracer.get_or_insert_with(|| MeshRays::new(source, &settings.faces));
                 match map {
                     MeshMap::Ao => image(&|i, p| t.ao(&baked, i, p)),
                     _ => image(&|i, p| t.thickness(&baked, i, p)),
@@ -200,7 +203,7 @@ pub fn bake(
 impl<'a> Baked<'a> {
     fn new(
         source: &'a MeshSource,
-        settings: &Settings,
+        settings: &'a Settings,
     ) -> Result<(Self, Option<MeshRays>, Option<Stacked>), String> {
         settings.check()?;
         source.check()?;
@@ -210,9 +213,19 @@ impl<'a> Baked<'a> {
         );
         let diagonal = (max - min).length();
         settings.check_reach(diagonal)?;
+        let faces = &settings.faces;
+        let written = (!faces.every()).then(|| {
+            let tris = source.indices.chunks_exact(3).enumerate();
+            tris.flat_map(|(k, t)| match faces.writes(source.material(3 * k)) {
+                true => [t[0], t[1], t[2]],
+                false => [t[0]; 3],
+            })
+            .collect()
+        });
         let mut baked = Baked {
             source,
-            settings: *settings,
+            settings,
+            written,
             points: Vec::new(),
             min,
             extent: max - min,
@@ -221,7 +234,11 @@ impl<'a> Baked<'a> {
         let mut rays = None;
         let (points, stacked) = overlap::points(&baked, &mut rays);
         if points.is_empty() {
-            return Err("has no triangle inside UV0's 0..1 square".into());
+            return Err(match settings.faces.materials {
+                Some(_) => "has no triangle of the asked materials inside UV0's 0..1 square",
+                None => "has no triangle inside UV0's 0..1 square",
+            }
+            .into());
         }
         baked.points = points;
         Ok((baked, rays, stacked))
@@ -237,8 +254,16 @@ impl<'a> Baked<'a> {
         )
     }
 
+    fn written(&self) -> Surface<'_> {
+        let mut surface = self.source.surface();
+        if let Some(indices) = &self.written {
+            surface.indices = indices;
+        }
+        surface
+    }
+
     fn texel_world(&self) -> f32 {
-        self.texel_world_of(world_per_uv(&self.source.surface()).unwrap_or(self.diagonal))
+        self.texel_world_of(world_per_uv(&self.written()).unwrap_or(self.diagonal))
     }
 
     fn texel_world_of(&self, per_uv: f32) -> f32 {
@@ -254,6 +279,8 @@ mod bevel_tests;
 mod coverage_tests;
 #[cfg(test)]
 mod edge_tests;
+#[cfg(test)]
+mod faces_tests;
 #[cfg(test)]
 mod fixtures;
 #[cfg(test)]
