@@ -25,7 +25,6 @@ impl Row for Sharpen {
     );
 }
 
-/// The default reach, a tile fraction: two pixels at 512², eight at 2048².
 const RADIUS: f32 = 0.004;
 
 impl Op for Sharpen {

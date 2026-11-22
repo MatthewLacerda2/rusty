@@ -22,7 +22,7 @@ fn gray(v: f32) -> Rgba {
     [v, v, v, 1.0]
 }
 
-/// A malformed number reads `fallback`: a no-op, never a panic or a poisoned map.
+/// A malformed number reads `fallback`, never a panic or a poisoned map.
 #[inline]
 pub fn finite(x: f32, fallback: f32) -> f32 {
     if x.is_finite() {
@@ -93,7 +93,7 @@ pub fn shape<'a>(p: &Shape, softness: Field<'a>) -> Sampler<'a> {
     shape::sampler(p, softness)
 }
 
-/// One grain per pixel on each axis, so this generator alone reads `size`.
+/// One grain per pixel on each axis, so it reads `size`, as `image`, `path` and `text` do.
 pub fn white_noise(size: Size, seed: u64) -> Sampler<'static> {
     let (rx, ry) = (size.width.max(1) as i64, size.height.max(1) as i64);
     let (w, h) = (size.width as f32, size.height as f32);

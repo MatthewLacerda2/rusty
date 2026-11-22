@@ -23,7 +23,7 @@ pub(crate) fn has_volume(hull: &ConvexPolyhedron) -> bool {
 }
 
 /// How far `point` lies past the farthest face plane, zero or less inside. Outside it
-/// is only a lower bound: near an edge or corner the true distance is up to √3 times larger.
+/// is only a lower bound: near an edge or corner the true distance is larger, unbounded.
 pub(crate) fn beyond_faces(hull: &ConvexPolyhedron, point: Vec3) -> f32 {
     planes(hull)
         .map(|(normal, on)| normal.dot(point - on))

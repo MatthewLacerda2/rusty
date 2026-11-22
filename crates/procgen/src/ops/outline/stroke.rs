@@ -7,8 +7,8 @@ use glam::Vec2;
 use super::svg::Subpath;
 use crate::image_buf::Size;
 
-/// A quadtree node at most this many pixels wide, or holding this few segments, is measured
-/// pixel by pixel.
+// A quadtree node at most this many pixels wide, or holding this few segments, is measured
+// pixel by pixel.
 const LEAF_SIDE: f32 = 8.0;
 const LEAF_SEGMENTS: usize = 4;
 

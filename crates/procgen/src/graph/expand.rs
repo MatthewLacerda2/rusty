@@ -1,6 +1,3 @@
-//! Instance nodes are pasted under the instance id (`brick/mortar`, nested
-//! `brick/wear/blur_2`).
-
 use std::collections::BTreeMap;
 
 use serde_json::{Map, Value};

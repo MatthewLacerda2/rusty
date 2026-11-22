@@ -64,7 +64,7 @@ fn an_explicit_connected_anchor_is_in_the_connected_body_s_space() {
     let mut scene = Scene::new();
     let base = cube(&mut scene, Vec3::new(0.0, 5.0, 0.0), false);
     let top = cube(&mut scene, Vec3::new(0.0, 6.0, 0.0), true);
-    // The pivot is the dynamic cube's bottom face and the static one's top: the frames
+    // The pivot is the dynamic cube's bottom face and the kinematic one's top: the frames
     // agree, so the weld holds it in place.
     let j = JointComponent {
         connected_body: Some(base),

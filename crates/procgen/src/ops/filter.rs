@@ -99,7 +99,8 @@ fn taps(src: &[Rgba], a: f32, out: &mut [Rgba]) {
 }
 
 /// A dropped pixel past this magnitude re-sums the window, so its rounding residue does not
-/// linger in the sum. Texture values sit near `[0, 1]`, so a real recipe never meets it.
+/// linger in the sum. Texture values sit near `[0, 1]`, so a real recipe seldom meets it;
+/// `varying::Table::of` reads it too.
 const LARGE: f32 = 1e3;
 
 /// The sum is `f64`, so a long row's adds and drops do not drift.

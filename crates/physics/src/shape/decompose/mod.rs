@@ -26,8 +26,8 @@ mod sidecar_tests;
 #[cfg(test)]
 mod tests;
 
-/// Built shapes kept: every concave prop of a level at its scales. Past it the oldest
-/// is dropped.
+/// Built shapes kept: a level's concave props at their scales. Past it the oldest is
+/// dropped.
 const KEPT: usize = 256;
 
 type Built = (Key, [u32; 3]);
@@ -69,7 +69,7 @@ fn run(mesh: Key, positions: &[[f32; 3]], indices: &[u32]) -> Pieces {
             pieces
         }
         Err(_) => {
-            // `keep`, not `keep_fresh`: no pieces never reach a sidecar, and this
+            // `keep`, not `keep_fresh`: a failed run reaches no sidecar, and this
             // process never retries the mesh.
             let none = Pieces::default();
             hulls::keep(mesh, none.clone());

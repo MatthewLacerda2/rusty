@@ -196,7 +196,8 @@ fn no_stamps_bake_black_and_bad_numbers_clamp() {
     };
     let s = settings(&huge);
     assert_eq!((s.amount, s.spacing), (65_536, 0.0));
-    // An infinite scale reads one tile, jittered to 1.5: the turned square's half-diagonal.
+    // An infinite scale reads one tile, so at the largest jitter (×1.5) a stamp reaches at most
+    // its turned square's half-diagonal.
     let one = Settings {
         amount: 1,
         scale_jitter: 1.0,

@@ -10,8 +10,8 @@ use rusty_scene::Scene;
 
 pub(crate) type MotorSet = ([f32; 3], Drive);
 
-/// The handle tells a joint rapier rebuilt (`Joint.SetLimits`, a body rebuilt), which
-/// comes back motorless.
+/// The handle tells a joint `resync_joints` rebuilt (`Joint.SetLimits`, a body rebuilt),
+/// which rapier hands back motorless.
 pub(crate) type Driven = (ImpulseJointHandle, MotorSet);
 
 impl PhysicsWorld {

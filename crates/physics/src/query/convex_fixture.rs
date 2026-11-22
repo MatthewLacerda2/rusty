@@ -30,8 +30,8 @@ pub(super) fn flat_hull() -> (Scene, u32) {
     (scene, id)
 }
 
-/// The Cylinder primitive moved off its origin, so its local box is not centred: rings
-/// of coplanar points, the classic quickhull degeneracy.
+/// The Cylinder primitive moved off its origin, so its local box is not centred. Its caps
+/// are rings of coplanar points, the classic quickhull degeneracy.
 pub(crate) fn off_centre_cylinder() -> (Vec<Vertex>, Vec<u32>) {
     let (vertices, indices) = primitive_geometry(Primitive::Cylinder).expect("a mesh");
     let (mut vertices, indices) = (vertices.to_vec(), indices.to_vec());

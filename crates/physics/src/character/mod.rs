@@ -34,8 +34,7 @@ pub struct CharacterMove {
 }
 
 /// `motion` is world space, metres; with no physics world (edit mode) it moves unobstructed.
-/// It pushes nothing: rapier's `solve_character_collision_impulses` stays uncalled, since a
-/// push is a script, as in Unity.
+/// It pushes nothing: rapier's `solve_character_collision_impulses` stays uncalled.
 pub fn move_character(
     physics: Option<&PhysicsWorld>,
     scene: &mut Scene,

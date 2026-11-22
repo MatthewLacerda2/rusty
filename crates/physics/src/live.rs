@@ -14,7 +14,7 @@ use super::watch::Owners;
 use super::world::{collider_to_write, PhysicsWorld};
 use rusty_scene::Scene;
 
-/// Kilograms: the lightest mass a body takes, so a zero never divides.
+/// Kilograms: a floor; a massless body has no inverse mass: no gravity, no contact push.
 const MIN_MASS: f32 = 1.0e-4;
 
 pub(super) fn body_type(snap: &EntityBodyState) -> RigidBodyType {

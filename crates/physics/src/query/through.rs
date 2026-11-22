@@ -7,8 +7,7 @@ use crate::world::PhysicsWorld;
 /// Faces a mesh walk visits at most: a bound on one query's cost.
 const MAX_FACES: usize = 256;
 
-/// Metres past a face the next probe starts, so it cannot strike that face twice; a
-/// thinner wall reads as one face and is skipped.
+/// Metres past a face the next probe starts, so it cannot strike that face twice.
 const SKIN: f32 = 1e-4;
 
 #[derive(Debug, Clone, Copy, PartialEq)]

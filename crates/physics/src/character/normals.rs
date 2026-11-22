@@ -32,6 +32,8 @@ pub(super) fn exact_normal(
     hit
 }
 
+/// Casts reporting the closest-points normal at impact: GJK's directional normal, which parry
+/// replaces only under 1e-4 m, leaned up to 6° on a flat face and hopped the capsule.
 pub(super) struct ExactNormals<'a>(pub(super) &'a dyn QueryDispatcher);
 
 impl QueryDispatcher for ExactNormals<'_> {

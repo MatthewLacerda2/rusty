@@ -19,8 +19,8 @@ pub struct Source {
 }
 
 impl Source {
-    /// Decodes any format the `image` crate reads: by `path`'s extension when it
-    /// names one, since TGA has no magic bytes to guess from; otherwise by the bytes.
+    /// Decodes PNG, JPEG or TGA, the `image` formats built in: by `path`'s extension when
+    /// it names one, since TGA has no magic bytes to guess from; otherwise by the bytes.
     pub fn decode(path: &str, bytes: &[u8]) -> Result<Source, String> {
         let decoded = match image::ImageFormat::from_path(path) {
             Ok(format) => image::load_from_memory_with_format(bytes, format),
@@ -84,7 +84,6 @@ impl Sources {
         Self::default()
     }
 
-    /// Each decoded by `loader` only once a node reads it, and dropped after the last.
     pub fn lazy(paths: impl IntoIterator<Item = String>, loader: Loader) -> Self {
         Self {
             decoded: BTreeMap::new(),

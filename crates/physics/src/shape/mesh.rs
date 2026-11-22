@@ -76,7 +76,6 @@ pub(crate) fn build_mesh_shape(
             .ok_or(Skip::NoHull);
     }
     let triangles = triangles(&points, indices, scale)?;
-    // Unscaled `positions`: one decomposition serves every scale, scaled after.
     let pieces = (fit == MeshFit::Decomposed)
         .then(|| super::decompose::decomposition(positions, indices, scale))
         .flatten();

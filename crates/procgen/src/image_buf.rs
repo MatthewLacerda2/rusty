@@ -1,11 +1,11 @@
 //! The domain is the **unit square in relative units** whatever the image's shape,
-//! the way Substance Designer works: pixel `(x, y)` of a `w × h` image sits
+//! as in Substance Designer: pixel `(x, y)` of a `w × h` image sits
 //! at `u = (x + ½) / w`, `v = (y + ½) / h`, so a non-square image samples the same
 //! tile with more pixels along one axis, and the pattern stretches. An op with a
 //! reach in tile units turns it into pixels per axis (`radius × w` across,
 //! `radius × h` down).
 
-/// Unclamped: an op may overshoot `[0, 1]`; only the bake clamps.
+/// Unclamped: an op may overshoot `[0, 1]`; only a bake or preview clamps.
 pub type Rgba = [f32; 4];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

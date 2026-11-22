@@ -46,7 +46,8 @@ pub(crate) fn record(keys: &mut MeshKeys, scene: &Scene, ids: &[u32]) {
     }
 }
 
-/// 64-bit FNV-1a (its offset and prime) over the positions' bits, a separator, then the indices.
+/// FNV-1a's 64-bit offset and prime, one 32-bit word a step: the positions' bits, a separator,
+/// then the indices.
 fn fingerprint(positions: &[[f32; 3]], indices: &[u32]) -> u64 {
     let words = positions.iter().flatten().map(|x| x.to_bits());
     let words = words.chain([u32::MAX]).chain(indices.iter().copied());

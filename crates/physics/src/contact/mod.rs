@@ -27,8 +27,8 @@ pub(super) fn narrow_phase() -> NarrowPhase {
     NarrowPhase::with_query_dispatcher(Rolling::default().chain(DefaultQueryDispatcher))
 }
 
-/// On a dynamic body a `RoundCylinder` with no rounding, [`Rolling`]'s mark for a side hull, which
-/// nothing else builds; else the exact `Cylinder`.
+/// Builds a `RoundCylinder` with no rounding on a dynamic body, [`Rolling`]'s mark for a side
+/// hull, which nothing else builds; else the exact `Cylinder`.
 pub(crate) fn cylinder(half_height: Real, radius: Real, dynamic: bool) -> ColliderBuilder {
     if dynamic {
         ColliderBuilder::round_cylinder(half_height, radius, 0.0)

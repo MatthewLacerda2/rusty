@@ -130,7 +130,6 @@ fn encode_pixel(p: [f32; 4], slot: Slot) -> [u8; 4] {
     out
 }
 
-/// `[0, 1]` to a byte, rounded to nearest.
 #[inline]
 fn to_u8(v: f32) -> u8 {
     (v * 255.0 + 0.5).clamp(0.0, 255.0) as u8

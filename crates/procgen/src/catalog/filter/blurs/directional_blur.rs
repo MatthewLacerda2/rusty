@@ -33,7 +33,7 @@ impl Op for DirectionalBlur {
 /// closes later (√2 tiles at 45°).
 const MAX_LENGTH: f32 = 1.0;
 /// The most samples one pass reads. Past it the box is a `len / k` box, then `k` copies of
-/// it end to end (`k ≈ √n`): about `n` evenly spaced points for `2√n` reads, not `n`.
+/// it end to end (`k ≈ √n`).
 const ONE_PASS: usize = 64;
 
 pub fn directional_blur(img: &Image, length: f32, angle: f32) -> Image {
@@ -48,7 +48,6 @@ pub fn directional_blur(img: &Image, length: f32, angle: f32) -> Image {
         0.0
     };
     let (sin, cos) = (turn * std::f32::consts::TAU).sin_cos();
-    // Samples about a pixel apart, two at least so a sub-pixel streak still acts.
     let n = ((len * img.size().longer() as f32).ceil() as usize).max(2);
     if n <= ONE_PASS {
         return smear(img, &line(n, len, (cos, sin)));

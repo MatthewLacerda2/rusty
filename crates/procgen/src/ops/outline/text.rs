@@ -8,7 +8,6 @@ use rusty_font::{FontData, GlyphId};
 use super::fill::Shape;
 use crate::catalog::generators::outline::text::Align;
 
-/// `size` is the em in tiles; `tracking` and `line_spacing` are in ems.
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
     pub size: f32,

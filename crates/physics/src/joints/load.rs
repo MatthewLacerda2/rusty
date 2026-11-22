@@ -1,7 +1,8 @@
 //! rapier's `ImpulseJoint::impulses` is not the joint's wrench: its solver orthogonalizes
 //! the rows (modified Gram-Schmidt, inverse-mass metric) angular locks first, so the
-//! angular half is torque about a point near body 1's centre of mass, and a weight
-//! welded a metre off its pivot reads zero.
+//! angular half is torque about a point near body 1's centre of mass (exactly
+//! it on a world joint): a weight welded a metre off its pivot reads zero, since gravity
+//! makes no torque about the weight's own centre.
 
 use glam::{Mat3, Quat, Vec3};
 use rapier3d::prelude::*;

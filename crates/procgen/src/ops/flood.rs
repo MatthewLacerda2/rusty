@@ -26,7 +26,7 @@ impl Island {
 
     pub fn random(&self, channel: u64, seed: u64) -> f32 {
         let [x, y] = self.cell();
-        // Salted as `rank + 1`, as the mixer maps 0 to 0.
+        // `rank + 1`: the mixer maps 0 to 0, so an all-zero input would hash 0.
         let salt = (channel << 32) ^ (u64::from(self.rank) + 1);
         hash::unit2(x, y, salt, seed)
     }
@@ -93,8 +93,8 @@ pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
     }
 }
 
-/// `flood_fill`'s output holds its islands in alpha, and two never touch: relabelling the
-/// alpha returns them.
+/// `flood_fill` keeps its islands in alpha, never touching: relabelling the alpha returns
+/// them.
 pub fn of_label_image(img: &Image) -> Islands {
     label(img, |p| p[3] > 0.5)
 }

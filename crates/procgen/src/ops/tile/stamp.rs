@@ -10,7 +10,8 @@ const GREY: u64 = CHANNEL + 4;
 const VALUE: u64 = CHANNEL + 5;
 const CHANCE: u64 = CHANNEL + 6;
 
-/// Past it a stamp would reach cells far enough away to multiply the neighbours a pixel visits.
+/// The largest a size map scales a stamp: past it a stamp would reach cells far enough away to
+/// multiply the neighbours a pixel visits.
 pub(super) const MAX_SIZE: f32 = 2.0;
 
 pub(super) const MAX_REACH: i64 = 3;

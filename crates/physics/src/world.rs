@@ -35,7 +35,7 @@ pub struct PhysicsWorld {
     pub(super) body_to_id: Map<RigidBodyHandle, u32>,
     pub(super) collider_to_id: Map<ColliderHandle, u32>,
     pub(super) id_to_collider: ColliderIds,
-    /// Starts empty, so a session's first overlapping tick is an enter.
+    /// Empty at first, so a session's first overlap is an enter.
     pub(super) prev_triggers: Vec<(u32, u32)>,
     pub(super) prev_collisions: Vec<(u32, u32)>,
     pub(super) joints: JointMap,
@@ -78,7 +78,7 @@ impl PhysicsWorld {
         world.build_bodies(scene);
         world.resync_joints(scene);
         world.sync_enabled(scene, &Owners::All);
-        // Primed so a raycast works before the first step.
+        // Primed: a raycast works before the first step.
         let all: Vec<ColliderHandle> = world.colliders.iter().map(|(h, _)| h).collect();
         world.refresh_query_tree(&all);
         world
@@ -98,13 +98,13 @@ impl PhysicsWorld {
             return;
         };
         if body.body_type() != class {
+            // In place: colliders, joints and contacts survive.
             self.controller_bodies.retype(body, class);
             body.set_position(pose, true);
         }
         body.enable_ccd(snap.ccd_enabled);
         if snap.kinematic {
-            // A pure mover (Unity's kinematic Rigidbody): it goes exactly where
-            // its Transform says, through anything in the way.
+            // Unity's kinematic Rigidbody: it goes through anything.
             body.set_next_kinematic_position(pose);
         } else if snap.is_static {
             body.set_position(pose, true);
@@ -113,12 +113,13 @@ impl PhysicsWorld {
             body.set_linvel(snap.vel, true);
             body.set_angvel(snap.angular_velocity, true);
             if !snap.damping.held_by(body) {
+                // No wake: damping only scales velocity.
                 body.set_linear_damping(snap.damping.linear);
                 body.set_angular_damping(snap.damping.angular);
             }
             if body.gravity_scale() != scale {
                 // A full wake: rapier's setter only clears the sleep flag, so a
-                // body that slept while weightless would doze straight off again.
+                // weightless sleeper would doze off again.
                 body.set_gravity_scale(scale, false);
                 body.wake_up(true);
             }
@@ -140,7 +141,7 @@ impl PhysicsWorld {
         }
         self.recovery.bootstrapped |= dt > 0.0;
         self.recovery.panics_in_a_row = 0;
-        // Awake before or after: rapier never moves a body asleep on both sides.
+        // Awake before or after: rapier moves no body asleep on both sides.
         let mut stepped = awake_before;
         stepped.extend(self.awake_owners());
         self.tracked.stepped.clone_from(&stepped);
@@ -191,7 +192,7 @@ impl PhysicsWorld {
             return false;
         };
         // Only a dynamic pose is the solver's; writing a kinematic one back adds world↔local
-        // rounding.
+        // rounding to every animated bone each tick.
         let mut moved = false;
         if body.is_dynamic() {
             let (pos, rot) = from_pose(body.position());
