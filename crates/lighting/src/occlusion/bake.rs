@@ -51,6 +51,7 @@ pub fn bake_occlusion(
         .expect("nobody cancels it")
 }
 
+/// Sound only while the fingerprint hashes all the bake reads of an object: a new input joins it.
 pub fn is_current(scene: &Scene, held: &OcclusionData, reach: &Reach) -> bool {
     matches(scene, held, &Fingerprints::of_scene(scene), reach)
 }
@@ -92,6 +93,7 @@ pub fn current_pvs<'a>(scene: &'a Scene, reach: &Reach) -> Result<&'a OcclusionD
 
 impl OcclusionInput {
     #[cfg(feature = "dev")]
+    /// A test hook, as `bake_sample` is: `dev::bake`'s cost measurements.
     #[doc(hidden)]
     pub fn sampler(&self) -> Option<Sampler> {
         let baking = Baking::of(&self.objects).counted();

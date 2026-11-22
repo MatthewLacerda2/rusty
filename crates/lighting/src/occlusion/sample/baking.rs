@@ -178,9 +178,12 @@ impl Baking {
     }
 
     fn hidden(&self, eye: &mut Eye, to: (Vec3, Vec3)) -> bool {
+        // No object excluded: a polygon of an object inside `to` lies inside the box, so it never
+        // separates it.
         self.proved(eye, eye.bounds, to, u32::MAX)
     }
 
+    // Unity's backface threshold: inside when most axis rays first meet a back face.
     fn inside(&self, point: Vec3) -> bool {
         let axes = [
             Vec3::X,

@@ -8,6 +8,7 @@ type Keyed = (([i64; 3], i64, u8), u32);
 
 pub(in super::super) fn sheets(faces: &[Member]) -> (Vec<Sheet>, Vec<u32>) {
     // Each face keyed by its plane and side, sorted: a plane's faces then run
+    // together, in face order.
     let key = |f: &Member| {
         let n = (f.normal * 1e6).round().as_i64vec3().to_array();
         (

@@ -7,6 +7,7 @@ mod occupancy;
 mod reflection;
 mod room_probes;
 mod rooms;
+/// Test hooks: levels other crates' probe-placement tests build.
 #[doc(hidden)]
 pub mod test_level;
 
@@ -80,5 +81,6 @@ mod light_tests;
 #[cfg(test)]
 #[path = "liquid_tests.rs"]
 mod liquid_tests;
+/// Test hooks, as `test_level`.
 #[doc(hidden)]
 pub mod test_sites;

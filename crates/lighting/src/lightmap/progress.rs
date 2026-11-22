@@ -1,5 +1,5 @@
 //! None of this touches a texel's sample stream, so a bake that ran to the end is byte-identical
-//! with or without a progress; observer calls return nothing.
+//! with or without a progress.
 
 use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -8,9 +8,10 @@ use std::sync::Arc;
 use super::bake::{LightmapDenoiser, Pass};
 
 pub trait BakeObserver: Send + Sync {
-    /// As (entity, texels), indexed by the `chart` the batch calls name; once, before the first
-    /// batch.
+    /// (entity, texels) per `chart`; once, before the first batch.
     fn meshes(&self, meshes: &[(u32, u64)]);
+    /// A batch starts and finishes on one thread, with no other batch between: observers time
+    /// batches per thread.
     fn batch_started(&self, chart: usize);
     fn batch_finished(&self, chart: usize, texels: usize);
     fn chart_finished(&self, _chart: usize) {}

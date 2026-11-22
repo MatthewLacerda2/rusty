@@ -33,6 +33,8 @@ fn spread(b: usize, m: u32, pick: u32, take: usize, rng: &mut Rng) -> [u32; 2] {
         block_span(b as u32 % PROBE, m),
         block_span(b as u32 / PROBE, m),
     );
+    // Not on a 2×2 block: there the rule only moves the second check off the diagonal, which
+    // measured worse on a slit.
     let wide = x1 - x0 > 2 && y1 - y0 > 2;
     let block = move || (y0..y1).flat_map(move |y| (x0..x1).map(move |x| y * m + x));
     let mut taken = [pick, u32::MAX, u32::MAX];

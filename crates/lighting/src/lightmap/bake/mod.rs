@@ -81,6 +81,7 @@ pub fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
+        // Before `mesh_done`, whose observer hands freed memory back to the system.
         drop(shape);
         progress.mesh_done(c);
         map
@@ -188,6 +189,8 @@ fn lightmap(
         size,
         texel_world: layout.texel_world,
     };
+    // Taken before the denoiser's budget (inside `LightmapDenoiser::denoise`), never while
+    // holding it, so the two cannot deadlock.
     let _alone = (u64::from(size) * u64::from(size) > ASSEMBLE_ALONE)
         .then(|| ASSEMBLING.lock().unwrap_or_else(PoisonError::into_inner));
     let maps = assemble(chart, &layout.labels, &light, settings, cleaner, masked);

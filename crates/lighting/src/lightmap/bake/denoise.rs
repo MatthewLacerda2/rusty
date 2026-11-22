@@ -8,6 +8,8 @@ use rusty_scene::lighting::settings::Denoiser;
 const PAD_PASSES: u32 = 4;
 
 pub trait LightmapDenoiser: Send + Sync {
+    /// `size`² row-major texels: linear HDR light, or direction vectors of length ≤ 1 when
+    /// `directional`. An `Err` says why, and the bake filters that chart instead.
     fn denoise(&self, image: &mut [Vec3], size: u32, directional: bool) -> Result<(), String>;
 }
 

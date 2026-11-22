@@ -83,6 +83,7 @@ pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
 
+/// Sized once: each doubling frees a block macOS's allocator keeps in the footprint.
 pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec<TexelPoint> {
     walk(
         &mesh.surface(),
