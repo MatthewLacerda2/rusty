@@ -198,12 +198,20 @@ behind them bake wider, and the console says so.
 | `position` | the surface point, normalised per axis to the model's bounds (a flat axis reads 0.5) | 0 |
 | `thickness` | how far `thickness_rays` (64) rays cast into the model (around the inverted normal) travel before they leave it, averaged, over the bounds' diagonal; a ray that never leaves counts the whole diagonal: 1 thick, towards 0 thin | 1 |
 | `id` | one fully saturated colour per material, hues a golden-ratio step apart (a triangle with no material red, then the model's materials in order); two runs drawn with one material share its colour | black |
+| `coverage` | 1 on a texel the bake writes from a triangle, 0 elsewhere, with **no margin** (Substance's UV-island mask): every texel a triangle covers at its centre, and those an edge cuts deeper than about an eighth of a texel; one an edge only grazes is margin | 0 |
+
+A mask built from a map's changes (an edge detector on `world_normal`) also fires
+along every island's margin. Multiply it by `coverage` (a `mix` with
+`mode = "multiply"`) before anything reads it, so wear lands only on texels a
+triangle uses; the masked node's `mean` in `Texture.Stats`, divided by
+`coverage`'s own, is the mask's mean over the model's surface alone.
 
 The settings table sets the size, the curvature band and the ray counts; the
 rest is Substance's defaults and no argument changes it: an occluder distance of
 the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
-holds a colour between two materials). Rays are drawn around the interpolated
+holds a colour between two materials; `coverage` has none, and is the one map
+that tells an island's texels from its margin). Rays are drawn around the interpolated
 normal, and one that would leave under the triangle's own face is dropped, so on a
 smooth low-poly mesh no ray starts under the face it leaves; a texel whose every
 ray is dropped (few rays, a normal leaning far off its face) reads the map's

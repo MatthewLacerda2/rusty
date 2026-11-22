@@ -22,16 +22,7 @@ fn project(name: &str) -> (PathBuf, String) {
 }
 
 fn all() -> Vec<String> {
-    [
-        "curvature",
-        "ao",
-        "world_normal",
-        "position",
-        "thickness",
-        "id",
-    ]
-    .map(String::from)
-    .to_vec()
+    MeshMap::ALL.map(|m| m.name().to_string()).to_vec()
 }
 
 #[test]
@@ -39,7 +30,7 @@ fn every_map_is_written_beside_the_prefix_in_a_new_folder() {
     let (dir, model) = project("mesh_maps_all");
     let prefix = format!("{}/maps/l_", dir.to_str().unwrap());
     let written = bake_mesh_maps(&model, &all(), &prefix, &Settings::new(16), &dir).unwrap();
-    assert_eq!(written.len(), 6);
+    assert_eq!(written.len(), MeshMap::ALL.len());
     for (map, path) in &written {
         assert_eq!(path, &format!("{prefix}{map}.png"));
         let img = image::open(path).expect("a map decodes");
