@@ -6,7 +6,8 @@ use rusty_script::api::{ApiCtx, Reg, RUST_HALVES};
 
 use super::{Event, Top, RECORDER};
 
-/// Wraps the capitalised globals, the engine's namespaces: Lua's own tables are lowercase.
+/// Only on a thread that armed: wraps the capitalised globals (Lua's own tables are lowercase)
+/// and the Rust halves under `RUST_HALVES`.
 pub(super) fn register(lua: &Lua, _ctx: &ApiCtx) -> Reg {
     if !super::armed() {
         return Ok(());

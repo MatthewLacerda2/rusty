@@ -1,6 +1,3 @@
-//! The probes that scale the bench's rows to a reference clock: `docs/testing.md`,
-//! *GPU time and the GPU clock* and the section after it.
-
 use std::hint::black_box;
 use std::time::Instant;
 
@@ -19,12 +16,12 @@ pub fn speed(before: Option<f64>, after: Option<f64>) -> Option<f64> {
     Some(REFERENCE_MS / probe_ms)
 }
 
-/// Steps in the CPU probe's chain; each (a shift, an xor, a multiply: ~5 cycles) waits
-/// on the last, so no core overlaps them.
+/// Steps in the CPU probe's chain; each (a shift, an xor, a multiply: ~5 cycles on x86_64
+/// and Apple silicon) waits on the last, so the time is steps × cycles ÷ clock.
 const CPU_STEPS: u32 = 100_000;
 
-/// Ms of [`CPU_STEPS`] steps at ~5 cycles and 4.4 GHz, derived, not measured: re-derive
-/// it when the chain changes.
+/// Ms of [`CPU_STEPS`] steps at ~5 cycles and 4.4 GHz, an M4 performance core's top clock;
+/// derived, not measured: re-derive it when the chain changes.
 pub const CPU_REFERENCE_MS: f64 = 0.114;
 
 pub fn cpu_probe_ms() -> f64 {

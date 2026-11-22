@@ -1,5 +1,5 @@
-//! Each bake's measurements, written beside the scene: the clock is read here, so the bakes
-//! stay pure.
+//! A report carries wall times, so it differs run to run: an export leaves the folder behind
+//! and a test game's determinism check skips it, both through [`in_report_dir`].
 //!
 //! stored-format: the bake reports, `<scene>.bake/<kind>.json`
 
@@ -22,7 +22,6 @@ mod tests;
 
 pub const DIR_SUFFIX: &str = ".bake";
 
-/// How many entries a heaviest-first list names.
 pub const TOP: usize = 20;
 
 rusty_core::named_enum! {

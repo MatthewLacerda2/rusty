@@ -7,8 +7,6 @@ use super::forwards;
 use rusty_scene::Scene;
 use rusty_script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
-/// The `Harness` verbs that change the world without a tick, so a demo must note them: every
-/// other verb reads the world or steps it.
 pub const HARNESS_VERBS: &[&str] = &["AttachPlayerBot", "LoadStress"];
 
 // Skips `math`: its `random` shims call `Random.*`, which is wrapped, so each draw is noted once.
@@ -44,7 +42,8 @@ for _, name in ipairs(harness_verbs) do
 end
 "#;
 
-/// Nesting a table argument may hold; deeper is taken for a cycle.
+/// Nesting a table argument may hold: nothing tracks tables seen, so a cycle ends here too,
+/// refused as nested too deep.
 const MAX_DEPTH: usize = 32;
 
 pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Result<()> {
@@ -59,7 +58,6 @@ pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Res
     })?;
     let checks = Rc::clone(journal);
     let check = lua.create_function(move |_, (function, returned): (String, MultiValue)| {
-        // Its handle notes its own field writes and calls (`script_ref`), so it is no taint.
         if function == "Scene.GetScript" {
             return Ok(());
         }

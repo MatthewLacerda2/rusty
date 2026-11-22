@@ -3,7 +3,6 @@ use std::time::Duration;
 use super::format::{count, duration};
 use super::Step;
 
-/// How many of the slowest lightmap meshes the log names.
 pub const SLOWEST: usize = 15;
 
 #[derive(Clone, Debug, PartialEq)]

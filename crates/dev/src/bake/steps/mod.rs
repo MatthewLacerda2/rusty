@@ -1,5 +1,6 @@
-//! Generate Lighting's probe step as a job stepped once a frame. It bakes planned copies
-//! and applies them only at `commit`, so a dropped or failed bake changes nothing.
+//! Generate Lighting's probe step, stepped once a frame by the editor and run to the end by
+//! a script. It bakes planned copies and applies them only at `commit`, so a dropped or
+//! failed bake changes nothing.
 
 use super::lighting::{LightingBakeReport, PlannedProbes};
 use super::reflection::{out_dir, prune_stale, reflection_dir, UNSAVED};

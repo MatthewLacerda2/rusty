@@ -1,6 +1,4 @@
 //! stored-format: the round a child hands the scene's bench, deleted after
-//! The editor round's rows: `rusty-shell` drives the round (`shell::editor::capture::bench`,
-//! above this crate) and hands each number to a [`Meter`].
 
 use std::path::Path;
 use std::time::Instant;

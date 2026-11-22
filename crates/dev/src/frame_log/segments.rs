@@ -5,7 +5,6 @@ use std::path::{Path, PathBuf};
 
 use super::now_ms;
 
-/// Segments a budget is cut into: deleting the oldest frees about a tenth of it.
 const SEGMENTS: u64 = 10;
 
 pub const LOCK: &str = ".lock";

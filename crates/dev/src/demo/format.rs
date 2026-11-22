@@ -100,7 +100,8 @@ impl Header {
 pub struct Entry {
     /// The tick, counted from the first after Play was entered (`0`).
     pub t: u64,
-    /// Seconds (an `f32`, widened), written only when it differs from the tick before.
+    /// Seconds (an `f32`, widened), written only when its bits differ from the last written;
+    /// the recorder starts from `FIXED_DT`, so a steady tick writes none.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dt: Option<Exact>,
     #[serde(skip_serializing_if = "InputDelta::is_empty")]

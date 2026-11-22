@@ -1,5 +1,3 @@
-//! `Debug`, dev-only like Unity's `Debug.*` under `[Conditional]`: a ship build has none.
-
 mod audio;
 mod draw;
 mod frame_log;

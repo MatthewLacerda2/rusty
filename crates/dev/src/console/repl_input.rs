@@ -1,4 +1,4 @@
-/// Lines the history keeps; past it the oldest is dropped.
+/// Lines the history keeps.
 const MAX_HISTORY: usize = 100;
 
 #[derive(Default)]

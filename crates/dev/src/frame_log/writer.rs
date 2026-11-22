@@ -1,6 +1,3 @@
-//! A thread owns the segment files, so a frame only hands its lines over and never waits
-//! on a disk.
-
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};

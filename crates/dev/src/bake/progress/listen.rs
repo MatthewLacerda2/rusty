@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 
-// Per thread: a bake's lines are made on the thread that evaluates the verb's line.
 type Listener = Box<dyn FnMut(&str)>;
 
+// Per thread: a bake's lines are made on the thread that evaluates the verb's line.
 thread_local! {
     static LISTENER: RefCell<Option<Listener>> = const { RefCell::new(None) };
 }
@@ -24,7 +24,7 @@ pub fn is_listening() -> bool {
     LISTENER.with(|l| l.try_borrow().map_or(true, |l| l.is_some()))
 }
 
-/// A listener that tells re-enters its own borrow, so that inner line is dropped.
+/// A line told from inside the listener finds its borrow taken, so it is dropped.
 pub fn tell(line: &str) {
     LISTENER.with(|l| {
         if let Ok(mut listener) = l.try_borrow_mut() {

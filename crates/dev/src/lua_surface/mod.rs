@@ -1,5 +1,5 @@
-//! The dev-only verbs of the one Lua surface: they render or record, so they live here and
-//! join it through `api::extend`, and the sim surface never compiles the renderer.
+//! A VM installs the surface once, when it starts, so every dev entry point calls
+//! [`install_api`] before its first Lua VM: one started earlier never has these verbs.
 
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;

@@ -59,7 +59,7 @@ pub(super) struct Held {
 }
 
 impl Held {
-    /// A frame starts: `wall_ms` is the newest held frame's own wall time.
+    /// A new frame began after `wall_ms`, which is the newest held frame's own wall time.
     pub(super) fn ended(&mut self, wall_ms: f64) {
         if let Some(newest) = self.entries.back_mut() {
             newest.ms.get_or_insert(wall_ms);

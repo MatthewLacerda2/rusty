@@ -32,7 +32,8 @@ pub fn apply_encoded(
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     if encoded.maps == 0 {
-        // No page holds a light's bounce, so `lights` stays empty; the channels still go in.
+        // No map, but the probes still mask by these channels and hold the Baked lights'
+        // direct light; no page holds their bounce, so `lights` stays empty for SSIL.
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
         set.fell_back = encoded.shadowmask.fell_back.clone();

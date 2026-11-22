@@ -138,6 +138,8 @@ fn charts_past_the_gate_count_one_assembly_and_smaller_ones_each_their_own() {
         let scene = crate::bake::lightmap::memory_tests::planes(2, 20.0);
         estimate(&scene, &s, false, threads).in_flight
     };
+    // 500² squares lie under `ASSEMBLE_ALONE` (512²), so two assemble at once; 1000² squares
+    // lie past it, so the second only traces beside the first's assembly.
     assert_eq!(flying(25.0, 2), 2 * flying(25.0, 1));
     let (one, two) = (flying(50.0, 1), flying(50.0, 2));
     assert!(two > one && two - one < one / 2, "{one} / {two}");

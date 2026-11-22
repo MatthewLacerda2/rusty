@@ -42,7 +42,7 @@ impl Host {
         }
     }
 
-    /// Destructures every field, so one added to `Host` is put back by construction.
+    /// Destructures every field, so one added to `Host` fails to compile until it is put back.
     pub(super) fn put(self, world: &mut GameWorld) {
         let Self {
             storage,

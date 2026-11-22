@@ -1,6 +1,3 @@
-//! `make bench`'s measure; what each row and window means: `docs/testing.md`,
-//! *Benchmark: `make bench`*.
-
 mod clock;
 mod engine;
 mod lua;

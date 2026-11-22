@@ -85,8 +85,7 @@ pub fn start_probes(
     start_lighting(scene, Some(path), nav, LightingBakeParams::default())
 }
 
-/// Called before the PVS bakes, so a PVS step that fails or never ends loses no lighting;
-/// the PVS file is [`finish`]'s alone.
+/// Called before the PVS bakes, so a PVS step that fails or never ends loses no lighting.
 pub fn write_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
     refuse_in_play(scene)?;
     save_lighting(scene, path)

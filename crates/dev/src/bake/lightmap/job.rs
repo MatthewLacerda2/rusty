@@ -36,6 +36,8 @@ pub struct LightmapBakeJob {
     scene_path: String,
     static_meshes: usize,
     previews: Previews,
+    /// When the first pass was seen done, and the texels traced by then: the time left is
+    /// paced from there, past the first pass's validity probes.
     paced_from: Option<(Instant, u64)>,
     measure: Measure,
 }
@@ -52,7 +54,6 @@ impl LightmapBakeJob {
         let started = Instant::now();
         let input = gather_bake_input(scene);
         super::fits::fits(&input, &settings, true)?;
-        // Freed chart buffers go back to the system, as `fits`' estimate counts on.
         crate::memory::return_large_frees();
         let (progress, measure) = Measure::start(&settings, started.elapsed());
         let lights = rusty_lighting::lightmap::taken_lights(scene);

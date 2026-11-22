@@ -25,6 +25,5 @@ pub struct Verdict {
     pub matched: Option<u64>,
     pub diverged: Option<Divergence>,
     pub taints: Vec<(u64, String)>,
-    /// A scenario on top steps the replay, so it may end before the demo's end on purpose.
     pub scenario: bool,
 }

@@ -28,6 +28,7 @@ impl PartialEq for Spilled {
     }
 }
 
+/// Always equal: pages compare by their [`Spilled`] files' bytes, never by the folder.
 impl PartialEq for Spill {
     fn eq(&self, _: &Self) -> bool {
         true

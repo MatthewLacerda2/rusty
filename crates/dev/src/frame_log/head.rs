@@ -1,6 +1,5 @@
-//! A line's head, read without parsing it. `record::line` opens every line with `ch`, `t`
-//! and `tick`, and a frame's with `frame`, `ms` and `cpu_ms`, in that order: change both
-//! together. A line written another way is parsed whole (`from_map`).
+//! A line's head is read without parsing it, in `record::line`'s order (`ch`, `t`, `tick`,
+//! then a frame's `frame`, `ms`, `cpu_ms`); a line written another way is parsed whole.
 
 use std::borrow::Cow;
 

@@ -27,7 +27,8 @@ fn library() -> Result<&'static ffi::Api, String> {
     Ok(api)
 }
 
-/// A test hook: OIDN's tests skip with it where the library does not open.
+/// A test hook: OIDN's measurements `expect` it, and its memory tests skip where the library
+/// does not open.
 pub fn available() -> Result<(), String> {
     library()?.device(Some(1)).map(drop)
 }

@@ -1,5 +1,3 @@
-//! `make bench-scenes`, as `docs/testing.md`, *A project's own scenes*, describes it.
-
 pub mod args;
 pub mod editor;
 mod fold;

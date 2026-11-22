@@ -1,6 +1,3 @@
-//! Streamed from disk, never held whole: an hour of play with a pasted clipboard would be
-//! gigabytes.
-
 use std::fs::File;
 use std::io::{BufRead, BufReader, Lines};
 use std::path::{Path, PathBuf};
@@ -41,7 +38,6 @@ enum Line {
     End(End),
 }
 
-/// Tells an index line apart without parsing it, since `IndexLine` serializes `at` first.
 fn is_index(line: &str) -> bool {
     line.starts_with("{\"at\":")
 }

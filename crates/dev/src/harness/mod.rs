@@ -12,7 +12,7 @@ pub mod audio;
 mod build;
 mod render;
 
-/// Seconds per sim tick: the fixed 60 Hz step every run replays on.
+/// Seconds per sim tick.
 pub const FIXED_DT: f32 = 1.0 / 60.0;
 
 #[derive(Clone)]

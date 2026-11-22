@@ -8,8 +8,9 @@ use crate::bake::denoise::budget;
 use crate::bake::progress::format::gb;
 use crate::memory::Machine;
 
-// Bytes per texel each stage holds: in flight and progressive per covered texel, the other
-// three per texel of their square.
+// Bytes per texel: in flight and progressive per covered texel, the rest per texel of their
+// square.
+/// A worker's chart: a texel's point (32 bytes) and its traced light (80).
 pub const IN_FLIGHT_PER_TEXEL: u64 = 112;
 
 pub const FINISH_PER_TEXEL: u64 = 256;
@@ -36,8 +37,8 @@ pub struct Estimate {
 
 impl Estimate {
     pub fn peak(&self) -> u64 {
-        // A chart is denoised while it is assembled: the larger stands for both, as measured.
-        // The pages come after that work, so the peak holds the larger again.
+        // A chart is denoised while assembled, so the larger stands for both; the pages come
+        // after, so the peak takes the larger again.
         let work = self.in_flight.max(self.oidn);
         self.maps + self.progressive + work.max(self.pages)
     }
@@ -107,7 +108,7 @@ pub fn estimate(
     let oidn = match settings.denoiser {
         Denoiser::Oidn => {
             let denoise: u64 = flying.iter().map(|c| budget::cost(c.0 as usize)).sum();
-            // Mirrors `budget::Budget::run`: past `BUDGET` one chart runs alone, and always starts.
+            // Mirrors `budget::Budget::run`: past `BUDGET` one runs alone, and always starts.
             denoise.min(budget::BUDGET.max(budget::cost(largest as usize)))
         }
         _ => 0,

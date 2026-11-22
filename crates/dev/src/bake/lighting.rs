@@ -1,6 +1,3 @@
-//! The probe bake behind `Lighting.Bake()` and Generate Lighting's probe step: re-place the
-//! placed probes around the manual ones, then bake both sets.
-
 use super::progress::{stage_progress, BakeLog};
 use super::steps::LightingBake;
 use glam::Vec3;
@@ -147,7 +144,6 @@ fn static_solids(scene: &Scene) -> Vec<Solid> {
             triangles: t.triangles,
             convex: t.convex,
         });
-    // Then the meshes with no solid collider: a ceiling that is a render mesh alone roofs too.
     let meshes = (BakeScene::gather(scene, &|_, _| None).meshes.into_iter())
         .filter(|m| !solid_collider(m.entity))
         .map(|m| Solid {

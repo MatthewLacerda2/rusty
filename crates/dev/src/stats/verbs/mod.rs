@@ -1,6 +1,3 @@
-//! Script time by engine verb, each verb's exclusive of the Lua it calls back:
-//! `docs/testing.md`, *script time by verb*.
-
 use std::cell::{Cell, RefCell};
 use std::sync::Once;
 #[cfg(test)]

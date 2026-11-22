@@ -1,5 +1,5 @@
-//! Cached texture loads hold staging only up to its bound. The test bites only where GPU copies
-//! sit in resident memory (lavapipe, Apple silicon): on a discrete GPU it cannot fail.
+//! These tests bite only where GPU copies sit in resident memory (lavapipe, Apple silicon):
+//! on a discrete GPU they cannot fail.
 
 use std::path::Path;
 

@@ -52,7 +52,6 @@ pub fn bake_scene_lightmaps_logged(
     spill::sweep(scene_path);
     let input = gather_bake_input(scene);
     fits::fits(&input, settings, false)?;
-    // Freed chart buffers go back to the system, as `fits`' estimate counts on.
     crate::memory::return_large_frees();
     stages.lap("gather");
     let run = logged::bake_logged(&input, settings, log, scene_path)?;
@@ -111,6 +110,8 @@ pub fn lightmap_receivers(input: &BakeScene) -> usize {
         .count()
 }
 
+/// Each mesh with a usable lightmap UV bakes exactly one lightmap, so the difference is the
+/// meshes without one.
 pub fn missing_uv_report(static_meshes: usize, lightmaps: usize) -> Option<String> {
     let n = static_meshes.saturating_sub(lightmaps);
     let (noun, verb) = if n == 1 {

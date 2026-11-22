@@ -1,6 +1,3 @@
-//! The process's and the machine's memory as Linux and macOS report it; what each figure
-//! counts: `docs/testing.md` (`rss_peak_mb`) and `docs/api/Lighting.md`.
-
 pub fn rss_peak_bytes() -> Option<u64> {
     peak()
 }
@@ -9,6 +6,8 @@ pub fn rss_now_bytes() -> Option<u64> {
     now()
 }
 
+/// On glibc, freed chart buffers go back to the system, as `fits`' estimate counts on;
+/// elsewhere a no-op.
 pub fn return_large_frees() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {

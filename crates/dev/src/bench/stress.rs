@@ -151,7 +151,8 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
 }
 
 fn decal_spot(i: u32) -> (Vec3, Vec3) {
-    // Metres; 13 is coprime with 400, so the first 400 decals never share a spot.
+    // Z in metres, 0.1 apart over 40: 13 is coprime with 400, so the first 400 decals never
+    // share a z.
     let along = -20.0 + (i * 13 % 400) as f32 * 0.1;
     if i % 3 == 2 {
         let x = alternate(i) * 14.75;

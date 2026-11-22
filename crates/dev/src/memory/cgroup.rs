@@ -5,7 +5,6 @@ use std::path::Path;
 
 use super::Machine;
 
-/// Where the cgroup v2 hierarchy is mounted.
 #[cfg_attr(
     all(test, not(target_os = "linux")),
     expect(dead_code, reason = "macOS tests read a fake tree")

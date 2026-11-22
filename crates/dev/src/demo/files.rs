@@ -31,6 +31,7 @@ impl Destination {
     }
 }
 
+/// Never removes a demo a recorder still writes: a paused Play's file can look oldest.
 fn prune(dir: &Path, keep: usize) {
     let demos = demos_in(dir);
     let excess = demos.len().saturating_sub(keep);

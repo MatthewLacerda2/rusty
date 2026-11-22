@@ -16,6 +16,8 @@ fn png(name: &str, pixels: &[[u8; 4]], rows: usize) -> String {
 
 #[test]
 fn texture_average_is_the_linear_mean_of_its_texels() {
+    // 188 lies past the sRGB toe (0.5029 linear), 10 inside it (10/255/12.92). Two rows, so
+    // `w * h` texels are told from `w / h`.
     let path = png("albedo", &[[188, 10, 0, 255], [188, 10, 255, 255]], 2);
     let average =
         texture_average(&path.as_str().into(), MapEncoding::Colour).expect("a readable PNG");
@@ -43,6 +45,7 @@ fn an_unreadable_texture_has_no_average() {
 
 #[test]
 fn the_content_tag_is_the_content_hash_folded_to_32_bits() {
+    // XXH3 of the empty input is 0x2d06_8005_38d3_94c2; this is its two halves xored.
     assert_eq!(content_tag(b""), 0x15d5_14c7);
     let fold = |h: u64| (h ^ (h >> 32)) as u32;
     assert_eq!(

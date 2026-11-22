@@ -55,7 +55,8 @@ pub fn over_runs(runs: &[Vec<Row>]) -> Vec<Row> {
     rows.into_iter()
         .map(|(mut row, n)| {
             if absent_is_zero(&row.metric) && n < all {
-                // A run without the verb called it for no time: its zero is the lowest.
+                // A run without the verb's row called it for no time: that run counts as
+                // zero, the lowest, and the mean divides by every run.
                 row.lo = row.lo.min(0.0);
                 row.avg /= f64::from(all);
             } else {
