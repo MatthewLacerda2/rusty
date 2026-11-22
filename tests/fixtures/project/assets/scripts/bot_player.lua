@@ -1,6 +1,5 @@
--- DEV-ONLY bot-player (won't ship): presses the keys a human would via the writable Input; the
--- bundled player_controller does the movement, camera follow and hitscan. One script slot per
--- entity, so the bot loads the shared controller and runs its drive() each frame after injecting
+-- DEV-ONLY bot-player: presses keys through the writable Input. Attaching it clears the Player's
+-- scripts, so it runs the bundled player_controller's drive() itself each frame, after injecting
 -- input. Reads scene state + Time only: deterministic.
 
 local Bot = {}
@@ -8,8 +7,8 @@ local Bot = {}
 local Controller = dofile("assets/scripts/player_controller.lua")
 
 local ENEMY = "Enemy_1"
-local SHOOT_RANGE = 14.0
-local ARRIVE_RANGE = 4.0
+local SHOOT_RANGE = 14.0    -- metres
+local ARRIVE_RANGE = 4.0    -- metres; play_session.lua wins at the same distance: change both
 local AIM_TOLERANCE = 6.0   -- degrees of yaw error we tolerate before shooting
 local SHOOT_KEY = "Mouse0"
 local SHOOT_COOLDOWN = 12   -- frames between shots

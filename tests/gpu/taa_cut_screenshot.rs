@@ -63,6 +63,7 @@ fn a_cut_drops_the_view_before_a_jump_and_settle_converges() {
     );
     std::fs::write(&scenario, prefix + SCENARIO).unwrap();
     let mut harness = Harness::new(&out, rusty::edit::default_scene::BOT_SCRIPT);
+    // Every shot, render and settle draws at this size, so none is a resize.
     harness.set_size(160, 90);
     let report = rusty::dev::scenario::run_file(harness, &scenario).expect("the scenario runs");
     assert!(report.passed, "see {}", report.results_path.display());

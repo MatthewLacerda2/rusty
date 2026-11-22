@@ -52,7 +52,8 @@ fn a_defined_asset_previews_in_its_own_colour() {
 
 #[test]
 fn the_authored_shader_draws_with_its_stored_params() {
-    // Only a preview using both the shader and the stored values turns white green.
+    // A hit flash at amount 1 replaces the lit colour with its own: only a preview using both
+    // the shader and the stored values turns the default white material green.
     let sess = session();
     let name = format!("test_preview_flash_{}", std::process::id());
     sess.eval(&format!(

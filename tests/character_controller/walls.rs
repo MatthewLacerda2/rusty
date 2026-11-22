@@ -10,7 +10,7 @@ use super::{add_box, add_character, add_floor, pos_of, walk_for, DT};
 /// Walking at an angle into a long wall slides along it at the full along-wall
 /// speed, Unity's collide-and-slide. rapier 0.36 reads the gravity in such a
 /// move as a slip off the floor, as it does on open ground, and drops part of
-/// the slide (~3% of it, once); the sweep's flat rerun recovers it here
+/// the slide (~3% of it); the sweep's flat rerun recovers it here
 /// too. The 1.5% allowance is the approach and the skin.
 #[test]
 fn a_wall_slide_keeps_its_along_wall_speed() {

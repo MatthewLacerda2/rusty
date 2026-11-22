@@ -1,7 +1,7 @@
 //! Light Probe Proxy Volume on the GPU: a 2 m dynamic box beside a `Baked` lamp,
 //! lit only by baked probes. One probe sample gives one colour top to bottom; a volume
 //! lights its top and leaves its foot dark; a `Custom` box over the top quarter makes
-//! the foot read the box's face (`proxy_volume_clamp`). Skips without an adapter.
+//! the foot read the box's face (`proxy_volume_clamp`).
 
 use glam::Vec3;
 use rusty::components::{
@@ -51,6 +51,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         ..rusty::edit::authoring::default_light()
     };
     scene.world.set_light(lamp, Some(light));
+    // A `Baked` light no bake took in is previewed live, and a probe bake records none: mark it.
     scene.lightmaps.took_in_baked(lamp);
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.9, 2.2, -0.4);
     let locker = add(
@@ -66,8 +67,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         .then_some((scene, locker))
 }
 
-/// Mean red of the locker's top and foot from +X; `host` is shared so the shots
-/// reuse one renderer (one each cost a third of the time on Metal).
+/// Mean red of the locker's top and foot from +X, the lamp's side.
 pub(super) fn top_and_foot(host: &mut CaptureHost, scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));

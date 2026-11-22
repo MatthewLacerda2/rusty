@@ -3,6 +3,7 @@ use serde_json::{json, Value};
 use super::maps::{maps_fail, seam};
 use super::{bake, doc, OUTPUTS, QUICK, RES};
 
+/// `(material, rule, why)`: excused by name with its reason, never by loosening a rule for all.
 const EXCUSED: &[(&str, &str, &str)] = &[];
 
 fn excused(path: &str, rule: &str) -> bool {

@@ -59,8 +59,6 @@ fn darkened(with_crate: bool, tag: &str) -> Option<usize> {
         .zip(b.pixels())
         .filter(|(on, off)| sum(off) - sum(on) > 15)
         .count();
-    //DBG let _ = std::fs::remove_file(on_path);
-    //DBG let _ = std::fs::remove_file(off_path);
     Some(count)
 }
 
@@ -71,6 +69,8 @@ fn a_crate_darkens_the_floor_where_it_stands() {
         return;
     };
     eprintln!("[ssao] pixels darkened around the crate: {count}");
+    // Pixels of the 96² frame: the contact band and the crate's lower faces darken 487 on
+    // lavapipe.
     assert!(count > 60, "the crate's foot should be occluded: {count}");
 }
 

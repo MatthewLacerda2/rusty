@@ -1,7 +1,6 @@
-//! A material's detail mask (HDRP Lit's *Detail Mask*): a plane with a busy detail map and a mask
-//! black on one half of the main UV, white on the other. Head-on and grazing, the black half
-//! draws as the plane without detail, the white half with it; a mask without a detail map
-//! draws none, a missing mask file applies the detail everywhere.
+//! A material's detail mask (HDRP Lit's *Detail Mask*): a mask black on one half of the
+//! main UV and white on the other hides the detail on the black half only, head-on and
+//! grazing; a mask without a map draws none, a missing one hides nothing.
 
 use glam::Vec3;
 use rusty::components::{DetailLayer, MaterialAsset};
@@ -11,6 +10,7 @@ use rusty::scene::Camera;
 use crate::gpu::linear_data_maps_screenshot::scene;
 
 const SIZE: u32 = 96;
+/// Rows or columns either side of the centre left out: the mask's edge, blurred by its mip.
 const SEAM: u32 = 8;
 
 fn png(name: &str, texel: impl Fn(u32, u32) -> [u8; 4]) -> String {
@@ -102,14 +102,15 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let masked = shot(Some((map.clone(), mask.clone())), "masked").expect("rendered");
         let lone = shot(Some((None, mask.clone())), "lone").expect("rendered");
         let unread = shot(Some((map.clone(), missing.clone())), "missing").expect("rendered");
+        // The plane's u runs along X: the black half is the top rows head-on, the left columns
+        // grazing.
         let half = |a, b, far| half_diff(a, b, !grazing, far);
         let whole = |a, b| half(a, b, false) + half(a, b, true);
         let (to_plain, to_full) = (half(&masked, &plain, false), half(&masked, &full, true));
         let shows = half(&full, &plain, false).min(half(&full, &plain, true));
         let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
-        // Measured `shows`: lavapipe 25.74 / 27.14, Metal 26.30 / 25.92, RTX 2060 24.76 / 22.71;
-        // every `< 0.5` value is 0.00 on all three.
+        // `shows`, head-on / grazing: lavapipe 25.74 / 27.14; every `< 0.5` value 0.00.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         let near_zero = [
             (to_plain, "the black half draws no detail"),

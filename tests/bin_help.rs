@@ -4,7 +4,8 @@
 use std::process::{Command, Output, Stdio};
 use std::time::Duration;
 
-/// Poll count for a running binary; counted, not timed: tests read no wall clock.
+// 1200 checks 50 ms apart, about a minute: far more than printing usage needs, far less than a
+// binary that never returns. Counted, not timed: tests read no wall clock.
 const POLL: Duration = Duration::from_millis(50);
 const POLLS: u32 = 1200;
 

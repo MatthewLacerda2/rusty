@@ -1,5 +1,4 @@
 //! Run a child and read its CPU time (user + system) and, as a hang guard, its wall time.
-//! The test reaps the child with `wait4`, which returns its rusage on Linux and macOS.
 
 use std::io::Read;
 use std::process::{Child, Command, ExitStatus, Output, Stdio};
@@ -38,6 +37,7 @@ pub(super) fn run(command: &mut Command, ceiling: Duration) -> Measured {
     }
 }
 
+/// Read on a thread of its own, so a chatty child never blocks on a full pipe.
 fn drain(pipe: Option<impl Read + Send + 'static>) -> std::thread::JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();

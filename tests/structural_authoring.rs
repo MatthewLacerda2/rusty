@@ -95,7 +95,7 @@ fn remove_component_round_trips_through_api() {
 
 #[test]
 fn a_box_drops_its_mesh_and_keeps_its_collider() {
-    // a blockout box stays an invisible collider, same id.
+    // A blockout box stays an invisible collider, same id.
     let session = Session::new("").expect("session boots");
     let id = ok(&session, "Scene.CreateEntity(\"b\", \"Box\")");
     ok(&session, &format!("Scene.AddComponent({id}, \"Collider\")"));

@@ -46,7 +46,8 @@ fn a_black_occlusion_map_darkens_the_indirect_light_and_never_a_lamp() {
     };
     assert!(d[0] > 10.0, "a black map darkens the ambient: {:.3}", d[0]);
     assert!(d[1] < SAME, "strength 0 applies none of it: {:.3}", d[1]);
-    // A lamp alone: no ambient, no reflectance (`specular` 0).
+    // A lamp alone: no ambient, and no reflectance (`specular` 0) for `specular_occlusion` to
+    // take.
     let lit = |m: MaterialAsset| {
         let mut s = lamp_scene(MaterialAsset { specular: 0.0, ..m });
         s.ambient_intensity = 0.0;

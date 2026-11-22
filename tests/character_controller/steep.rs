@@ -1,5 +1,4 @@
-//! Slopes over the limit at every angle, and the ground normal of a move that never touched the
-//! floor (`physics::character::sweep`).
+//! What rapier leaves to `physics::character::sweep`: steep slopes, an untouched floor's normal.
 
 use glam::Vec3;
 use rusty::physics::{self, PhysicsWorld};
@@ -8,6 +7,7 @@ use rusty::scene::Scene;
 use super::stairs::ramp_scene;
 use super::{feet_of, walk_for, DT};
 
+/// From 46°, past the default 45° slope limit.
 const STEEP: [f32; 8] = [46.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0];
 
 fn on_ramp(degrees: f32, along: f32) -> (Scene, u32) {
@@ -15,13 +15,13 @@ fn on_ramp(degrees: f32, along: f32) -> (Scene, u32) {
     let r = degrees.to_radians();
     let surface = Vec3::new(1.0 + along * r.cos(), along * r.sin(), 0.0);
     let normal = Vec3::new(-r.sin(), r.cos(), 0.0);
+    // The lower cap's centre: 0.5 m radius plus 0.08 m skin off the slope.
     let center = surface + normal * 0.58 + Vec3::Y * 0.5;
     scene.world.transform_mut(id).unwrap().position = center;
     (scene, id)
 }
 
-/// Unity treats a slope over `slopeLimit` as a wall at every angle: walking into one from the floor
-/// never gets up it.
+/// A slope over `slopeLimit` is a wall at every angle, as in Unity: walking in never gets up it.
 #[test]
 fn every_slope_over_the_limit_blocks_like_a_wall() {
     for degrees in STEEP {
@@ -37,7 +37,7 @@ fn every_slope_over_the_limit_blocks_like_a_wall() {
 }
 
 /// Pushing up a steep slope still slides down: the push blocks like a wall (rapier alone reads it
-/// as intent to climb and cancels the slide).
+/// as a climb and cancels the slide).
 #[test]
 fn pushing_up_a_steep_slope_still_slides_down_it() {
     for degrees in STEEP {
@@ -68,6 +68,8 @@ fn a_move_that_never_hits_the_ramp_still_reads_its_normal() {
     }
 }
 
+/// The sweep reruns a steep push off the slope, keeping the first pass's contacts: a push
+/// script still pushes a steep face.
 #[test]
 fn walking_into_a_steep_slope_reports_it_as_hit() {
     for degrees in STEEP {

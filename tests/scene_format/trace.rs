@@ -11,6 +11,7 @@ pub struct Pass<'s> {
     pub path: String,
     pub script: &'s BTreeMap<String, usize>,
     pub any: &'s BTreeMap<String, usize>,
+    /// Field places not filled: an alias, which serde lists beside its field as a duplicate.
     pub aliases: &'s BTreeSet<String>,
     pub lines: BTreeSet<String>,
     pub enums: Vec<(String, usize)>,

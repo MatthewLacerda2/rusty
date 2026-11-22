@@ -14,6 +14,7 @@ use serde_json::{json, Value};
 pub const RES: u32 = 128;
 /// The size of a bake that is only compared with another (determinism, the seed).
 pub const QUICK: u32 = 32;
+/// Every material's outputs; `metallic` is the one it may add.
 pub const OUTPUTS: [&str; 5] = ["base_color", "normal", "roughness", "height", "occlusion"];
 
 pub fn library() -> PathBuf {

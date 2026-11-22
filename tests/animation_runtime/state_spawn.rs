@@ -1,5 +1,5 @@
-//! Graph-state callbacks reach scripts that wake after their animator binds
-//!: a prefab instantiated from `Update` hears its entry state enter
+//! Graph-state callbacks reach scripts that wake after their animator binds:
+//! a prefab instantiated from `Update` hears its entry state enter
 //! once, and an entity deactivated and activated again hears its states
 //! enter afresh, with no exit while it was off (Unity's default,
 //! `keepAnimatorStateOnDisable` off).

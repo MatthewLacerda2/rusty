@@ -9,6 +9,7 @@ use rusty::scene::Scene;
 
 use super::{floor, frames, glossy, normal_map, sky, Blue, FAR, H, W};
 
+/// Relative gap allowed in each channel's far-floor mean, busy against twin; lavapipe 0.000.
 const BOUND: f64 = 0.05;
 
 /// A floor of `material` under a blue sky; a red glowing floor 0.2 m below when `pane`.

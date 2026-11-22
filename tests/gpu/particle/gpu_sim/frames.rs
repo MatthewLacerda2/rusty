@@ -47,6 +47,7 @@ fn a_gpu_emitter_matches_its_cpu_twin_frame_after_frame() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: the cloud draws"
         );
+        // Share of pixels the masks agree on; lavapipe measures 1.0 at every frame.
         let agree = agreement(&a, &b);
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }

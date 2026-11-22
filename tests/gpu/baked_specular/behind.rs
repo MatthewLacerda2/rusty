@@ -10,6 +10,7 @@ use rusty::scene::{Camera, Scene};
 
 use super::{bake, lamp, plane, point, shot, SIZE};
 
+/// A normal map whose low-U half tilts about 35° toward -tangent, the rest toward +tangent.
 fn bumps(path: &std::path::Path) {
     let img = image::RgbaImage::from_fn(64, 64, |x, _| match x < 32 {
         true => image::Rgba([64, 128, 218, 255]),

@@ -101,6 +101,7 @@ fn a_mirrored_ragdolls_joint_axes_are_the_mirror_image() {
             continue;
         }
         joints += 1;
+        // The plain joint's X seen as a pseudovector: mirrored, then negated.
         let want = -(joint_world_x(&plain_world, p) * MIRROR);
         let got = joint_world_x(&world, m);
         let name = mirrored

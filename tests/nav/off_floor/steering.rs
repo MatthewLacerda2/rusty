@@ -39,6 +39,7 @@ fn bot_stops_at_the_wall_and_follows_the_player_back() {
     let (mut scene, enemy) = default_scene();
     let graph = NavigationGraph::from_scene(&scene);
 
+    // The Player flies 2 m past the +x wall, 1.5 m up.
     let off = chase(&mut scene, &graph, enemy, Vec3::new(17.0, 1.5, 8.0), 600);
     let reach = reach(&scene, enemy);
     assert!(

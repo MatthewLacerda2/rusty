@@ -32,6 +32,7 @@ pub(super) fn seat(mode: LightMode, albedo: f32, roughness: f32) -> Scene {
     scene
 }
 
+/// From a standing guest's side, the spot's mirror image in view.
 fn camera() -> Camera {
     Camera::new(Vec3::new(-1.5, 1.0, 0.0), 0.0, -45.0)
 }

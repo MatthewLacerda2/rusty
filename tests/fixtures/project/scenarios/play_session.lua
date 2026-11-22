@@ -3,7 +3,7 @@
 -- time, errors). Win condition: the bot is within ARRIVE_RANGE of the enemy.
 
 local MAX_FRAMES = 1800          -- 30 s @ 1/60 hard cap
-local ARRIVE_RANGE = 4.0
+local ARRIVE_RANGE = 4.0          -- metres
 local PLAYER = "Player"
 local ENEMY = "Enemy_1"
 

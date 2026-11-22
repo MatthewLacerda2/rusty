@@ -1,5 +1,3 @@
-//! Particle system determinism (issue #13).
-//!
 //! A seeded emitter must produce bit-for-bit identical particle state across two
 //! independent runs — the contract that lets the headless harness reproduce
 //! particle behaviour. Driven through the real play loop (`GameWorld::tick`).
