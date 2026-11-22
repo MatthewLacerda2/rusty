@@ -10,6 +10,7 @@ pub(super) fn start(list: Vec<String>, kind: Kind, bc: bool) -> Receiver<Result<
     let spawned = std::thread::Builder::new()
         .name("lightmap-load".into())
         .spawn(move || {
+            // A renderer gone meanwhile has dropped the inbox: nothing to tell.
             let _ = outbox.send(load::load(&list, kind, bc));
             rusty_core::wake::frame();
         });

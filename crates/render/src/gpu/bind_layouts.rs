@@ -13,6 +13,8 @@ pub(crate) fn create_camera_lighting_layout(device: &wgpu::Device) -> wgpu::Bind
     })
 }
 
+/// Group 0 of `forward/bindings.wgsl`, `particles.wgsl`, `skybox.wgsl`, `sky_gradient.wgsl`
+/// and `sky/air.wgsl`: change them together; `groups::tests` holds only the first two.
 pub(crate) fn camera_lighting_entries() -> Vec<wgpu::BindGroupLayoutEntry> {
     use wgpu::TextureViewDimension::{Cube, CubeArray, D2Array, D3};
     vec![
@@ -103,6 +105,7 @@ pub(crate) fn texture_entries() -> [wgpu::BindGroupLayoutEntry; 2] {
     ]
 }
 
+/// Bytes: a material's runtime shader-param uniform.
 pub(crate) const PARAMS_SIZE: u64 =
     std::mem::size_of::<rusty_shadergen::params::PackedParams>() as u64;
 

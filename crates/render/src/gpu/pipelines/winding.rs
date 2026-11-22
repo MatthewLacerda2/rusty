@@ -20,6 +20,7 @@ pub(crate) enum Facing {
 }
 
 impl Facing {
+    /// In discriminant order: `FacedPipeline` indexes by `facing as usize`; `twins` skips `Ccw`.
     pub(crate) const ALL: [Self; 3] = [Self::Ccw, Self::Cw, Self::Both];
 
     pub(crate) fn of(world: Mat4, face: RenderFace) -> Self {

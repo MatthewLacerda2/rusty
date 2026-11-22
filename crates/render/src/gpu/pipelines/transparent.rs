@@ -16,6 +16,7 @@ pub(crate) enum TransparentBlend {
 }
 
 impl TransparentBlend {
+    /// In discriminant order: `TransparentPipelines` indexes by `blend as usize`.
     pub(crate) const ALL: [Self; 5] = [
         Self::Straight,
         Self::Premultiplied,
@@ -24,6 +25,8 @@ impl TransparentBlend {
         Self::Multiply,
     ];
 
+    /// URP's blend table; `blend_mode` is `BlendMode`'s index: Alpha, Premultiply, Additive,
+    /// Multiply.
     /// A surface over the opaque copy composites what is behind it itself and writes alpha 1, which
     /// the premultiplied state lays down whole.
     pub(crate) fn of(surface: &SurfaceUniform) -> Self {

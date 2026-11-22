@@ -1,6 +1,8 @@
 use super::MAX_REFLECTION_PROBES;
 use rusty_scene::lighting::reflection_probe::ProbeBlend;
 
+/// Unpacked by `environment_reflection` in `engine/shaders/forward/reflection.wgsl`: change
+/// both together. 0 is the sky alone.
 pub(crate) fn pack_blend(blend: Option<ProbeBlend>) -> u32 {
     let Some(b) = blend else {
         return 0;

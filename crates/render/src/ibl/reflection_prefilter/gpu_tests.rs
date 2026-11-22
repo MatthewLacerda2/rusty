@@ -6,11 +6,17 @@ use crate::ibl::cube_sample::{face_uv, FaceProjections};
 use crate::{CubemapCapture, CubemapFace};
 use rusty_core::color::{f16_to_f32, linear_to_srgb};
 
+// The hard capture's bright bar, past 1 so the GPU's HDR path is held too.
 const BAR: f32 = 20.0;
 
+// Bounds in sRGB steps of a channel over `BAR`. A GPU's rounding moves a few of 128 taps
+// onto their neighbour across a hard edge. Lavapipe: max 1 at every mip.
 const MAX_STEP: u8 = 16;
+// A face's mean, held from 4×4 up, where a stray tap moves it little. Lavapipe: 0.062.
 const MEAN_STEP: f32 = 0.25;
 const MEAN_MIN_SIZE: u32 = 4;
+// Any mip of the smooth capture: what the CPU reference moves from itself with normals
+// nudged 1e-7 to 1e-5. Lavapipe: 1.
 const SMOOTH_STEP: u8 = 2;
 
 fn steps(face: &[u8], scale: f32) -> Vec<u8> {

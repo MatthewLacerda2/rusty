@@ -1,8 +1,11 @@
+//! Both skies run in one probe on one adapter, so the drivers' differing `sin` rounding cancels.
+
 use glam::Vec3;
 
 use crate::gpu::uniforms::ProceduralSkyUniform;
 use rusty_scene::SkySettings;
 
+/// The frozen reference: never edit it to follow a change.
 const TODAY: &str = "
 fn today_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let ground_color = sky_color * 0.25;

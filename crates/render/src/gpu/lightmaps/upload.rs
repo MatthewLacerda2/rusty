@@ -8,8 +8,11 @@ pub(crate) struct LightmapArray {
     pub view: wgpu::TextureView,
 }
 
+/// Bytes (1 GiB): wgpu's limits name no texture-memory bound. A Dust2 directional bake stays
+/// under it at 8 texels a unit.
 pub(crate) const MAX_ARRAY_BYTES: u64 = 1 << 30;
 
+/// Past the limits, `create_texture` would panic in wgpu's default error handler on every load.
 pub(crate) fn fits(
     limits: &wgpu::Limits,
     edge: u32,
@@ -127,6 +130,7 @@ pub(crate) fn create(
 }
 
 impl crate::Renderer {
+    /// A test hook: `dev::memory`'s lightmap test measures what one upload holds.
     #[doc(hidden)]
     pub fn upload_lightmap_pages(
         &self,
