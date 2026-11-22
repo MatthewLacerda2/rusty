@@ -5,10 +5,12 @@
 #define_import_path forward::mapping
 
 #import forward::bindings::{camera, material, s_occlusion, s_specular, t_occlusion, t_specular}
-#import forward::maps::{map_factor, unpack_normal}
+#import forward::maps::{map_factor, stored_normal, unpack_normal}
 
 const UV0: u32 = 0u;
 const TRIPLANAR: u32 = 2u;
+// `render::gpu::textures::deep::SIGNED_NORMAL_MAP`.
+const SIGNED_NORMAL_MAP: u32 = 3u;
 
 struct MapCoords {
     uv: vec2<f32>,
@@ -158,8 +160,7 @@ struct NormalSample {
 };
 
 // Under 1 where a mip averaged normals that disagreed.
-fn stored_length(texel: vec4<f32>) -> f32 {
-    let n = texel.xyz * 2.0 - 1.0;
+fn stored_length(n: vec3<f32>) -> f32 {
     return select(length(n), 1.0, n.z < WHOLE_BELOW_Z);
 }
 
@@ -167,25 +168,27 @@ fn stored_length(texel: vec4<f32>) -> f32 {
 const WHOLE_BELOW_Z: f32 = 0.25;
 
 fn sample_normal(t: texture_2d<f32>, s: sampler, c: MapCoords, n: vec3<f32>, tangent: vec4<f32>) -> NormalSample {
-    let mapping = material().uv_mapping;
-    let texel_y = lookup_uv(t, s, c);
+    let m = material();
+    let mapping = m.uv_mapping;
+    let signed = m.use_normal_map == SIGNED_NORMAL_MAP;
+    let stored_y = stored_normal(lookup_uv(t, s, c), signed);
     if (mapping == UV0) {
         let T = normalize(tangent.xyz);
         let B = cross(n, T) * tangent.w;
-        let sampled = unpack_normal(texel_y);
-        return NormalSample(normalize(mat3x3<f32>(T, B, n) * sampled), stored_length(texel_y));
+        let sampled = unpack_normal(stored_y);
+        return NormalSample(normalize(mat3x3<f32>(T, B, n) * sampled), stored_length(stored_y));
     }
-    let ty = unpack_normal(texel_y);
+    let ty = unpack_normal(stored_y);
     var tx = vec3<f32>(0.0, 0.0, 1.0);
     var tz = vec3<f32>(0.0, 0.0, 1.0);
     var w = vec3<f32>(0.0, 1.0, 0.0);
-    var lengths = vec3<f32>(1.0, stored_length(texel_y), 1.0);
+    var lengths = vec3<f32>(1.0, stored_length(stored_y), 1.0);
     if (mapping == TRIPLANAR) {
-        let texel_x = lookup(t, s, c.x);
-        let texel_z = lookup(t, s, c.z);
-        tx = unpack_normal(texel_x);
-        tz = unpack_normal(texel_z);
-        lengths = vec3<f32>(stored_length(texel_x), lengths.y, stored_length(texel_z));
+        let stored_x = stored_normal(lookup(t, s, c.x), signed);
+        let stored_z = stored_normal(lookup(t, s, c.z), signed);
+        tx = unpack_normal(stored_x);
+        tz = unpack_normal(stored_z);
+        lengths = vec3<f32>(stored_length(stored_x), lengths.y, stored_length(stored_z));
         w = c.weights;
     }
     return NormalSample(whiteout(tx, ty, tz, w, n), dot(lengths, w));

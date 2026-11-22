@@ -5,6 +5,7 @@ use super::map_slots::{
     all_bindings, map_kind, map_sampler_binding, material_texture_paths, MAP_SLOTS,
 };
 use crate::gpu::material_cache::{ParamOwner, MATERIAL_MAPS, MATERIAL_TEXTURES};
+use crate::gpu::textures::deep::{DEEP_FORMAT, SIGNED_NORMAL_MAP};
 use crate::gpu::textures::TextureKind;
 use crate::{GpuTexture, MaterialData, Renderer};
 use rusty_asset::MapRef;
@@ -98,9 +99,18 @@ impl Renderer {
         }
         let normal = m.normal_map.as_ref();
         let bound = normal.and_then(|p| self.texture_for(p, TextureKind::Normal));
-        if let Some(table) = bound.and_then(|t| t.normal_variance) {
-            record.use_normal_map = 2;
-            record.normal_variance = pack_variance(table);
+        match bound.as_deref() {
+            Some(t) if t.texture.format() == DEEP_FORMAT => {
+                record.use_normal_map = SIGNED_NORMAL_MAP
+            }
+            Some(GpuTexture {
+                normal_variance: Some(table),
+                ..
+            }) => {
+                record.use_normal_map = 2;
+                record.normal_variance = pack_variance(*table);
+            }
+            _ => {}
         }
         for slot in &MAP_SLOTS {
             let Some(flag) = slot.off_while_missing else {
