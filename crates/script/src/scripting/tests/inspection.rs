@@ -87,12 +87,10 @@ fn what_really_cannot_load_still_fails() {
 
 #[test]
 fn dofile_and_loadfile_resolve_against_the_workspace_as_in_play() {
-    let root = std::env::temp_dir().join("rusty_inspection_dofile");
-    std::fs::create_dir_all(&root).unwrap();
+    let root = rusty_test_support::temp::dir();
     std::fs::write(root.join("speed.lua"), "return 7").unwrap();
     let code = "return { fields = { a = dofile('speed.lua'), b = loadfile('speed.lua')() } }";
     let fields = read_fields(&root, "w.lua", code).unwrap();
-    let _ = std::fs::remove_dir_all(&root);
     let defaults: Vec<_> = fields.into_iter().map(|f| f.default).collect();
     let seven = ScriptFieldValue::Number(7.0);
     assert_eq!(defaults, [seven.clone(), seven]);
