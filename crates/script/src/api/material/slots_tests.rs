@@ -1,6 +1,3 @@
-//! `Material.Get` / `Set` / `GetAll` / `SetAt` (#1285): one slot per material run of
-//! the entity's mesh; a bad slot or key is a Lua error, never a panic.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -10,7 +7,6 @@ use crate::api::bind;
 use rusty_components::{MaterialAsset, MaterialComponent, MeshComponent};
 use rusty_scene::Scene;
 
-/// Run `script` against `scene`, returning what it returns (or its error's text).
 fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<String, String> {
     let lua = Lua::new();
     crate::api::attempt(|| {
@@ -28,8 +24,6 @@ fn eval(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<String, String> {
     .map_err(|e| e.to_string())
 }
 
-/// An entity whose mesh is two runs drawn with `red` and `blue`, and a third
-/// library material `green`.
 fn two_run_quad() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Quad".into());

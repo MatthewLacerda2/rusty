@@ -1,8 +1,3 @@
-//! crates/components/src/rendering/light/mod.rs — Light component
-//!
-//! ambient/directional/point/spot/area. Unity: Light. Moved verbatim from the former
-//! `core/scene.rs`; the per-light [`LightMode`] (#438) is Unity's Light Mode.
-
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
@@ -12,38 +7,21 @@ pub use falloff::{
 };
 
 rusty_core::named_enum! {
-    /// What kind of light it is. Its names are the editor's, the API's and the scene
-    /// snapshot's: Unity's (`LightType.Spot`, #997).
     #[derive(Clone, Copy, Debug, PartialEq)]
     pub enum LightType {
         Ambient = "Ambient",
         Directional = "Directional",
         Point = "Point",
         Spotlight = "Spot",
-        /// A rectangle `area_size` wide and tall facing its local −Z (#1674),
-        /// Unity's Area (Rectangle) light. Baked only, as in Unity's built-in
-        /// pipeline: [`LightComponent::effective_mode`] is always `Baked`.
+        /// Unity's Area (Rectangle) light, baked only: `effective_mode` is always `Baked`.
         Area = "Area",
     }
 }
 
 rusty_core::named_enum! {
-    /// How a light takes part in baked lighting (#438) — Unity's Light Mode.
-    ///
-    /// * `Realtime` — direct light and shadows every frame; neither the lightmap bake nor
-    ///   the probe bake sees it, so it bounces nowhere.
-    /// * `Mixed` — realtime direct light and shadows, plus its bounce baked into
-    ///   lightmaps and light probes. What else it bakes is the scene's `MixedLightingMode` (#1695): nothing under
-    ///   `BakedIndirect` (Unity's *Baked Indirect*), its static occlusion under
-    ///   `Shadowmask`, where a light that finds no free mask channel bakes as `Baked`
-    ///   (`Scene::light_mode`).
-    /// * `Baked` — direct and bounce both baked, and never drawn live (#809): static
-    ///   surfaces get it from their lightmap, dynamic objects from the light probes (whose
-    ///   bake adds its direct light). It costs nothing at runtime and casts no realtime
-    ///   shadow. The default (#2522; Unity's is `Realtime`): a level is lit by its
-    ///   bake, and a light that must move, flash or switch at runtime says
-    ///   `Realtime`. One no bake has taken in yet is previewed live in the editor
-    ///   (`Scene::drawn_mode`).
+    /// Unity's Light Mode.
+    /// * `Realtime`: no bake sees it, so it bounces nowhere.
+    /// * `Baked`: never drawn live (Unity's default is `Realtime`).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum LightMode {
         Realtime = "Realtime",
@@ -54,20 +32,14 @@ rusty_core::named_enum! {
 }
 
 impl LightMode {
-    /// Whether the lightmap bake includes this light's direct light (`Baked` only).
     pub fn bakes_direct(self) -> bool {
         self == LightMode::Baked
     }
 
-    /// Whether the lightmap bake includes this light's bounce (`Mixed` and `Baked`).
     pub fn bakes_indirect(self) -> bool {
         self != LightMode::Realtime
     }
 
-    /// Whether the renderer's light loop draws this light (#809). In a frame,
-    /// `Realtime` and `Mixed`: a `Baked` light reaches surfaces only through lightmaps
-    /// and probes. In a bake `capture` (the light-probe and reflection captures over
-    /// `capture_static_cubemap`'s spine), the lights whose bounce is baked: `Mixed` and `Baked`.
     pub fn renders_live(self, capture: bool) -> bool {
         if capture {
             self.bakes_indirect()
@@ -85,26 +57,15 @@ pub struct LightComponent {
     pub range: f32,
     pub inner_cone: f32, // Degrees
     pub outer_cone: f32, // Degrees
-    /// Whether a point or spot light casts shadows, through the shadow atlas (#468).
-    /// Off by default, as in Unity: each shadowed light costs atlas space and a depth
-    /// pass per tile (six for a point light). The sun ignores it and always casts its
-    /// cascades. Under a `Shadowmask` scene it is also what gives a `Mixed` point or
-    /// spot light a mask channel (#1695), as in Unity.
+    /// Off by default, as in Unity (atlas space, a depth pass per tile). The sun ignores it.
     #[serde(default)]
     pub cast_shadows: bool,
-    /// Realtime / Mixed / Baked (#438); `Baked` when the file names none (#2522).
     #[serde(default)]
     pub mode: LightMode,
-    /// An Area light's width (local X) and height (local Y) in world units,
-    /// Unity's `areaSize` (#1674); other types ignore it. 1 × 1 when the file
-    /// names none, Unity's default.
+    /// World units; other types ignore it.
     #[serde(default = "unit_area")]
     pub area_size: Vec2,
-    /// How far from the camera (world units) a point or spot light's shadow
-    /// reaches, HDRP's *Shadow Fade Distance* (#1712): over its last tenth the
-    /// shadow fades out, and past it the light shades unshadowed, sampling no
-    /// shadow map. `0` (the default) means no fade, so the shadow reaches as far
-    /// as the light does.
+    /// HDRP's *Shadow Fade Distance*, world units; `0` means no fade.
     #[serde(default)]
     pub shadow_fade_distance: f32,
 }
@@ -114,9 +75,6 @@ fn unit_area() -> Vec2 {
 }
 
 impl LightComponent {
-    /// The mode the bake and the renderer act on: `mode`, except that an Area
-    /// light is always `Baked` (#1674; Unity's built-in pipeline bakes area lights
-    /// only), whatever a file or an older write left in `mode`.
     pub fn effective_mode(&self) -> LightMode {
         if self.light_type == LightType::Area {
             LightMode::Baked

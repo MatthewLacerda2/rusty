@@ -1,19 +1,3 @@
-//! crates/edit/src/authoring/nav/agent.rs — Shared nav-agent-authoring ops.
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `NavMeshAgentComponent` field by field: the `active` flag, the motion tuning
-//! (`speed` / `acceleration` / `stopping_distance`), the footprint `radius` and
-//! `base_offset`, the
-//! `target` destination, the local-avoidance settings (#463), and turning (#744).
-//!
-//! BOTH the editor's NavMesh Agent card and the Lua `NavMeshAgent.*` setters route
-//! through these, so the egui panel and the binding share one write (#287). The ops
-//! are plain field sets (no clamps) so the binding's behaviour is byte-identical to
-//! before; the card's drag-range clamps are a UI affordance applied to the widget's
-//! local value before the op is called, so the editor still bounds its inputs.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::{NavMeshAgentComponent, MAX_AVOIDANCE_PRIORITY};
@@ -21,28 +5,22 @@ use rusty_scene::rules::sanitize::{
     at_least, finite, finite3_or, finite_f64_or, non_negative, MIN_EXTENT,
 };
 
-/// Set the agent's `active` flag.
 pub fn set_active(a: &mut NavMeshAgentComponent, active: bool) {
     a.active = active;
 }
 
-/// Set the agent's max speed.
 pub fn set_speed(a: &mut NavMeshAgentComponent, speed: f32) {
     a.speed = non_negative(speed);
 }
 
-/// Set the agent's acceleration.
 pub fn set_acceleration(a: &mut NavMeshAgentComponent, acceleration: f32) {
     a.acceleration = non_negative(acceleration);
 }
 
-/// Set the agent's stopping distance.
 pub fn set_stopping_distance(a: &mut NavMeshAgentComponent, stopping_distance: f32) {
     a.stopping_distance = non_negative(stopping_distance);
 }
 
-/// Set whether the agent turns itself to face where it steers (#744, Unity's
-/// `updateRotation`).
 pub fn set_update_rotation(a: &mut NavMeshAgentComponent, update: bool) {
     a.update_rotation = update;
 }
@@ -57,45 +35,31 @@ pub fn set_angular_acceleration(a: &mut NavMeshAgentComponent, angular_accelerat
     a.angular_acceleration = non_negative(angular_acceleration);
 }
 
-/// Set the agent's footprint radius.
 pub fn set_radius(a: &mut NavMeshAgentComponent, radius: f32) {
     a.radius = at_least(radius, MIN_EXTENT);
 }
 
-/// Set how far the entity's origin sits above the agent's feet (#666, Unity's
-/// `baseOffset`).
 pub fn set_base_offset(a: &mut NavMeshAgentComponent, base_offset: f32) {
     a.base_offset = finite(base_offset);
 }
 
-/// Set the agent's destination target.
 pub fn set_target(a: &mut NavMeshAgentComponent, target: Vec3) {
     a.target = finite3_or(target, a.target);
 }
 
-/// Set the agent's avoidance priority (Unity's `avoidancePriority`: lower is more
-/// important). The one clamp among these ops: the field is `u8` and the range is
-/// 0–99, so anything outside lands on the nearest end (fractions truncate). NaN or
-/// infinity keeps the current priority: a bare `as u8` would make it 0, the most
-/// important.
 pub fn set_avoidance_priority(a: &mut NavMeshAgentComponent, priority: f64) {
     let priority = finite_f64_or(priority, f64::from(a.avoidance_priority));
     a.avoidance_priority = priority.clamp(0.0, f64::from(MAX_AVOIDANCE_PRIORITY)) as u8;
 }
 
-/// Set whether the agent steers around other agents.
 pub fn set_avoidance_enabled(a: &mut NavMeshAgentComponent, enabled: bool) {
     a.avoidance_enabled = enabled;
 }
 
-/// Set whether the engine moves the agent across off-mesh links itself (#462,
-/// Unity's `autoTraverseOffMeshLink`), or leaves it on the link for a script.
 pub fn set_auto_traverse_off_mesh_link(a: &mut NavMeshAgentComponent, auto: bool) {
     a.auto_traverse_off_mesh_link = auto;
 }
 
-/// Set the areas the agent may enter (#460, Unity's `areaMask`), dropping a path
-/// planned under the old mask: [`NavMeshAgentComponent::set_area_mask`].
 pub fn set_area_mask(a: &mut NavMeshAgentComponent, mask: u32) {
     a.set_area_mask(mask);
 }

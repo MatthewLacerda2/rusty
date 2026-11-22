@@ -1,5 +1,3 @@
-//! The recent-projects list (#854): order, cap, persistence and where it lives.
-
 use super::*;
 
 fn fresh(name: &str) -> PathBuf {

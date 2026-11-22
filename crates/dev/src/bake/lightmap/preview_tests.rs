@@ -1,14 +1,9 @@
-//! The editor's progressive bake on the live scene (#1970): each pass's preview is
-//! shown through preview pages, a save meanwhile writes the scene's own lightmaps,
-//! a cancel puts them back, and a finished bake leaves no preview page behind.
-
 use std::time::Duration;
 
 use super::tests::{quick, scene, scene_path};
 use super::*;
 use rusty_lighting::lightmap::Pass;
 
-/// The `lightmap_preview_*` pages beside `path`.
 pub(super) fn preview_pages(path: &str) -> usize {
     let Ok(entries) = std::fs::read_dir(lightmap_dir(path)) else {
         return 0;
@@ -19,8 +14,6 @@ pub(super) fn preview_pages(path: &str) -> usize {
     names.filter(|n| n.starts_with("lightmap_preview_")).count()
 }
 
-/// Poll `job` (showing each pass, as the editor does each frame) until it ends,
-/// with how many passes it showed.
 pub(super) fn run(job: &mut LightmapBakeJob, scene: &mut Scene) -> (BakeOutcome, usize) {
     let mut shown = 0;
     for _ in 0..12_000 {
@@ -33,8 +26,6 @@ pub(super) fn run(job: &mut LightmapBakeJob, scene: &mut Scene) -> (BakeOutcome,
     panic!("the bake never finished");
 }
 
-/// A bake of many one-path passes started on `scene`, still going once its first
-/// pass is shown, and that pass.
 pub(super) fn showing(scene: &mut Scene, path: &str) -> (LightmapBakeJob, Pass) {
     let slow = BakeSettings {
         samples: 4096,

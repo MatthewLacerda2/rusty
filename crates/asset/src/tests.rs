@@ -1,5 +1,3 @@
-//! crates/asset/src/tests.rs — importer unit tests over tiny embedded fixtures.
-
 use super::*;
 use rusty_test_support::models::{SKINNED_GLTF, TEXTURED_GLTF, TRIANGLE_GLTF, TRIANGLE_OBJ};
 use std::path::PathBuf;
@@ -20,7 +18,6 @@ fn obj_imports_named_sub_mesh() {
     let quad = asset.sub_mesh("Quad").unwrap();
     assert_eq!(quad.vertices.len(), 4);
     assert_eq!(quad.indices.len(), 6);
-    // Normal came through from the `.obj`.
     assert_eq!(quad.vertices[0].normal, [0.0, 1.0, 0.0]);
     let (min, max) = quad.bounds().unwrap();
     assert_eq!(min, glam::Vec3::new(-1.0, 0.0, -1.0));
@@ -38,7 +35,6 @@ fn gltf_imports_mesh_and_material() {
     assert_eq!(tri.vertices.len(), 3);
     assert_eq!(tri.indices.len(), 3);
     assert_eq!(tri.vertices[1].position, [1.0, 0.0, 0.0]);
-    // The base-color material round-tripped.
     assert_eq!(tri.first_material(), Some(0));
     assert_eq!(asset.materials[0].name, "Red");
     assert_eq!(asset.materials[0].base_color, [1.0, 0.0, 0.0, 1.0]);
@@ -46,8 +42,7 @@ fn gltf_imports_mesh_and_material() {
 
 #[test]
 fn gltf_reads_full_metallic_roughness_material() {
-    // The fixture lives in its own dir so the resolved texture path is predictable.
-    // The importer only resolves the texture's path, never reads the file, so none is written.
+    // Own dir so the resolved texture path is predictable; the importer never reads the file, so none is written.
     let dir = rusty_test_support::temp::dir().join("rusty_textured_fixture");
     std::fs::create_dir_all(&dir).unwrap();
     let gltf_path = dir.join("model.gltf");
@@ -60,14 +55,12 @@ fn gltf_reads_full_metallic_roughness_material() {
     assert_eq!(mat.metallic, 0.25);
     assert_eq!(mat.roughness, 0.75);
     assert_eq!(mat.emissive, [0.1, 0.2, 0.3]);
-    // The external base-color URI resolved against the glTF dir, with `%20` decoded.
     let expected = dir
         .join("tex")
         .join("brick wall.png")
         .to_string_lossy()
         .into_owned();
     assert_eq!(mat.base_color_map, Some(expected.into()));
-    // The fixture declares no other textures.
     assert!(mat.metallic_roughness_map.is_none());
     assert!(mat.normal_map.is_none());
     assert!(mat.emissive_map.is_none());
@@ -75,8 +68,7 @@ fn gltf_reads_full_metallic_roughness_material() {
 
 #[test]
 fn gltf_embedded_material_uses_spec_defaults() {
-    // TRIANGLE_GLTF gives only a baseColorFactor: metallic/roughness fall to the glTF
-    // spec defaults (1.0), all maps are absent.
+    // Only a baseColorFactor: metallic/roughness fall to the glTF defaults (1.0).
     let path = tmp("defaults.gltf");
     std::fs::write(&path, TRIANGLE_GLTF).unwrap();
     let mat = &import_file(&path).unwrap().materials[0];
@@ -88,7 +80,6 @@ fn gltf_embedded_material_uses_spec_defaults() {
 
 #[test]
 fn gltf_imports_skin_and_bind_pose_palette() {
-    // The skinned glTF references a sibling `model.bin`; write both, then import.
     let dir = rusty_test_support::temp::dir().join("rusty_skin_fixture");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
@@ -102,21 +93,17 @@ fn gltf_imports_skin_and_bind_pose_palette() {
     let asset = import_file(&gltf_path).unwrap();
     let sub = asset.sub_mesh("Skinned").unwrap();
 
-    // Per-vertex skin bindings flowed through into the mesh vertices.
     assert_eq!(sub.vertices.len(), 3);
     assert_eq!(sub.vertices[0].joint_indices, [0, 0, 0, 0]);
     assert_eq!(sub.vertices[1].joint_indices, [1, 0, 0, 0]);
     assert_eq!(sub.vertices[2].joint_indices, [0, 1, 0, 0]);
     assert_eq!(sub.vertices[2].joint_weights, [0.5, 0.5, 0.0, 0.0]);
 
-    // The skeleton parsed: two joints, one inverse-bind matrix each.
     let skin = sub.skin.as_ref().expect("skinned sub-mesh has a skeleton");
     assert_eq!(skin.inverse_bind.len(), 2);
     assert_eq!(skin.bind_global.len(), 2);
 
-    // The bind-pose palette is the identity by construction — this validates both
-    // the hierarchy walk (joint1 inherits joint0's transform) and the inverse-bind
-    // read, since each joint's global is exactly cancelled by its inverse-bind.
+    // Each joint's global is cancelled by its inverse bind, so the palette is identity.
     let palette = skin.bind_palette();
     assert_eq!(palette.len(), 2);
     for m in palette {
@@ -139,21 +126,16 @@ fn gltf_imports_named_animation_clip() {
     let asset = import_file(&gltf_path).unwrap();
     let sub = asset.sub_mesh("Animated").unwrap();
 
-    // The clip imported, named, attached to the skinned sub-mesh, with one track per
-    // joint slot.
     assert_eq!(sub.clips.len(), 1);
     let clip = &sub.clips[0];
     assert_eq!(clip.name, "Wave");
     assert_eq!(clip.tracks.len(), 2);
-    // Duration is the latest key time.
     assert!((clip.duration - 1.0).abs() < 1e-6);
 
-    // The channel targeting Joint0 (slot 0) populated its translation track; the
-    // keyframes are [0,1] s → [(0,0,0),(2,0,0)].
+    // Joint0 keyframes: [0,1] s -> [(0,0,0),(2,0,0)].
     let t = &clip.tracks[0].translation;
     assert_eq!(t.times, vec![0.0, 1.0]);
     assert_eq!(t.values[1], glam::Vec3::new(2.0, 0.0, 0.0));
-    // Joint1 (slot 1) is never targeted: its tracks stay empty.
     assert!(clip.tracks[1].is_empty());
 }
 
@@ -171,7 +153,6 @@ fn obj_has_no_skin() {
     std::fs::write(&path, TRIANGLE_OBJ).unwrap();
     let sub = import_file(&path).unwrap().sub_meshes.remove(0);
     assert!(sub.skin.is_none());
-    // Unskinned vertices keep the identity binding (bone 0, full weight).
     assert_eq!(sub.vertices[0].joint_indices, [0, 0, 0, 0]);
     assert_eq!(sub.vertices[0].joint_weights, [1.0, 0.0, 0.0, 0.0]);
 }
@@ -221,8 +202,7 @@ fn unsupported_format_errors() {
     assert!(is_model_path("a/b/c.GLB"));
     assert!(!is_model_path("a/b/c.png"));
     assert!(is_image_path("a/b/c.JPG") && !is_image_path("a/b/c.glb"));
-    // Every listed model format reaches an importer (a missing file is a parse
-    // error, not an unsupported one); `.max` has none and is not listed (#983).
+    // A missing file is a parse error, not an unsupported one.
     for ext in MODEL_EXTENSIONS.iter().chain(&["max"]) {
         let err = import_file(&std::path::Path::new("missing").with_extension(ext));
         let unsupported = matches!(err, Err(ImportError::UnsupportedFormat(_)));
@@ -242,7 +222,6 @@ fn sidecar_round_trips_and_caches_sub_objects() {
     let loaded = sidecar::load(&path).unwrap();
     assert_eq!(loaded.sub_objects, vec!["Quad".to_string()]);
     assert_eq!(loaded.scale, 1.0);
-    // A fresh sidecar requests no mesh colliders (#77).
     assert!(loaded.colliders.is_empty());
 }
 
@@ -268,15 +247,10 @@ fn sidecar_persists_mesh_collider_choice() {
 
 #[test]
 fn concurrent_imports_never_read_a_half_written_sidecar() {
-    // Two systems importing the same asset at once is ordinary — the editor
-    // refreshing a model while a preview builds its scene, or simply a parallel
-    // test binary. A non-atomic save truncates the file first, so a reader lands on
-    // an empty one, and every caller treats that as "asset unavailable" and
-    // degrades silently. Before the atomic rename this failed within a few rounds.
+    // A non-atomic save truncates first, so a concurrent reader sees an empty file.
     let path = tmp("concurrent_quad.obj");
     std::fs::write(&path, TRIANGLE_OBJ).unwrap();
-    // Start from no sidecar: the temp dir outlives the run, and a sidecar left
-    // behind by an earlier failure would otherwise decide this run's outcome.
+    // Start with no sidecar: a leftover would decide this run.
     std::fs::remove_file(sidecar::meta_path(&path)).ok();
     for round in 0..20 {
         let failures: Vec<String> = std::thread::scope(|s| {

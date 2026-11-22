@@ -1,25 +1,13 @@
-//! A synthetic skinned rig with no file behind it: a joint chain whose root sits
-//! under a rotated, scaled `Armature`, the offset a Blender export puts between
-//! the mesh and the skeleton, and the joint and re-import helpers the skeleton
-//! tests share. A test hook: compiled in every build, since the physics and render
-//! tests that build on it are other crates', and so are the edit side's skeleton
-//! tests (`rusty_edit`'s `base_tests::skeleton`).
-
 use glam::{Mat4, Quat, Vec3};
 
 use crate::Scene;
 use rusty_asset::{JointTransform, SkinData};
 use rusty_components::{JointComponent, MeshComponent};
 
-/// A three-joint chain (`hips → spine → head`, 1 unit apart on +Y) whose root
-/// hangs under an `Armature` rotated 90° about X and scaled 0.5 — the offset a
-/// Blender export puts between the mesh and the skeleton.
 pub fn armature_skin() -> SkinData {
     chain_skin(&["hips", "spine", "head"])
 }
 
-/// A chain of joints named `names`, each 1 unit up its parent, the root under
-/// [`armature_skin`]'s `Armature`: a rig to re-import an armature rig to.
 pub fn chain_skin(names: &[&str]) -> SkinData {
     let armature = Mat4::from_scale_rotation_translation(
         Vec3::splat(0.5),
@@ -56,7 +44,6 @@ pub fn chain_skin(names: &[&str]) -> SkinData {
     }
 }
 
-/// An entity carrying a skinned mesh of [`armature_skin`] (no file behind it).
 pub fn armature_owner(scene: &mut Scene) -> u32 {
     let skin = armature_skin();
     let id = scene.add_entity("Rig".to_string());
@@ -71,8 +58,6 @@ pub fn armature_owner(scene: &mut Scene) -> u32 {
     id
 }
 
-/// Re-import `rig` to `skin` in place, as a re-written model does. A missing Mesh
-/// panics: the test fails.
 pub fn reimport_to(scene: &mut Scene, rig: u32, skin: SkinData) {
     let parked = scene.take_skeleton(rig);
     let mut mesh = scene.world.mesh_mut(rig).expect("the rig has a Mesh");
@@ -81,7 +66,6 @@ pub fn reimport_to(scene: &mut Scene, rig: u32, skin: SkinData) {
     scene.restore_skeleton(rig, parked);
 }
 
-/// A `Rope` entity jointed to `owner`'s bone `bone`.
 pub fn rope_to(scene: &mut Scene, owner: u32, bone: &str) -> u32 {
     let rope = scene.add_entity("Rope".to_string());
     let body = scene.find_bone(owner, bone);
@@ -89,7 +73,6 @@ pub fn rope_to(scene: &mut Scene, owner: u32, bone: &str) -> u32 {
     rope
 }
 
-/// Give `id` a Joint connected to `body`.
 pub fn joint_to(scene: &mut Scene, id: u32, body: Option<u32>) {
     let joint = JointComponent {
         connected_body: body,
@@ -98,7 +81,6 @@ pub fn joint_to(scene: &mut Scene, id: u32, body: Option<u32>) {
     scene.world.set_joint(id, Some(joint));
 }
 
-/// The body `id`'s Joint is connected to. A missing Joint panics: the test fails.
 pub fn connected(scene: &Scene, id: u32) -> Option<u32> {
     let joint = scene.world.joint(id).expect("the entity has a Joint");
     joint.connected_body

@@ -1,9 +1,3 @@
-//! The time-sliced `EnvironmentQuery` (#2116): `Request` starts a query and hands
-//! back its ticket, `Poll` reads it (Unity's polled `pathPending`, as
-//! `NavMeshAgent.PathPending` is), `Cancel` drops it, and
-//! `Set`/`GetIterationsPerFrame` is the budget every waiting query shares
-//! (`ai::query::queue`). `Run` stays the synchronous form.
-
 use mlua::{IntoLuaMulti, Lua, MultiValue, Table};
 
 use super::{answer, read_mode, with_query};
@@ -12,7 +6,6 @@ use crate::api::{put, ApiCtx};
 use rusty_ai::query::queue::Status;
 use rusty_ai::query::Progress;
 
-/// Add the time-sliced verbs to the `EnvironmentQuery` table.
 pub(super) fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), String> {
     let c = *ctx;
     put(
@@ -53,7 +46,6 @@ pub(super) fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), Str
     register_cancel_and_budget(lua, table, ctx)
 }
 
-/// `Cancel`, and the budget's setter and getter.
 fn register_cancel_and_budget(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Result<(), String> {
     let c = *ctx;
     put(

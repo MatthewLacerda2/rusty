@@ -1,6 +1,3 @@
-//! The default scene seeds through the manifest (#746), which only works if building
-//! it twice gives the same bytes; and Reset Scene rebuilds it rather than reloading.
-
 use super::super::scene_json;
 use crate::default_scene;
 use rusty_scene::Scene;
@@ -17,7 +14,6 @@ fn the_default_scene_serializes_to_the_same_bytes_every_build() {
     assert_eq!(built_json(), built_json());
 }
 
-/// A new project's build settings start on the scene the engine seeds.
 #[test]
 fn the_default_startup_scene_is_the_seeded_scene() {
     let startup = rusty_core::application::DEFAULT_STARTUP_SCENE;
@@ -33,7 +29,6 @@ fn building_the_default_scene_replaces_what_was_there() {
     }
     let path = super::build_default_scene(&mut scene);
     assert_eq!(path, super::DEFAULT_SCENE_PATH);
-    // No stray entity, no shifted ids: exactly the freshly built default.
     assert_eq!(scene_json(&scene).unwrap(), built_json());
 }
 

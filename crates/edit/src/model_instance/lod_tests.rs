@@ -1,13 +1,7 @@
-//! LODGroups of a whole-model spawn are grouped per node (#1083): an Alt+D copy
-//! of a set on the same meshes is a group of its own, and a node that only
-//! shares an LOD mesh is a plain child.
-
 use glam::Vec3;
 
 use super::tests::{child, spawn_file};
 
-/// A shelf holding a crate at two levels, its Blender duplicate 5 m along X on
-/// the same two meshes, and a `Lid` reusing the LOD0 mesh 5 m the other way.
 const SHELF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,

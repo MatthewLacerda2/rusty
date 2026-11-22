@@ -1,5 +1,3 @@
-//! Hitbox fitting and generation (#464) over the mini humanoid in `rig`.
-
 use glam::Vec3;
 
 use super::rig::{rig, skin, vertices};
@@ -35,7 +33,6 @@ fn limbs_get_capsules_flat_parts_boxes_and_fingers_fold_into_the_hand() {
     };
     assert_eq!(axis, CapsuleAxis::Y);
     assert!((radius - 0.105).abs() < 1e-5 && (height - 0.26).abs() < 1e-5);
-    // The arm runs along X from its joint (x 0.25) to the finger tip (x 0.64).
     let Some(&ColliderShape::Capsule { height, axis, .. }) = shape_of(&fits, 3) else {
         panic!("the arm is a capsule");
     };
@@ -60,7 +57,6 @@ fn an_allowlist_hands_unlisted_bones_to_their_parent() {
     };
     let fits = fit_hitboxes(&vertices(), &skin(1.0), &opts);
     assert_eq!(fits.iter().map(|f| f.slot).collect::<Vec<_>>(), [1, 2]);
-    // The arm and finger folded into the chest, which now reaches x 0.64.
     let Some(&ColliderShape::Box { size }) = shape_of(&fits, 1) else {
         panic!("the chest is a box");
     };
@@ -69,8 +65,6 @@ fn an_allowlist_hands_unlisted_bones_to_their_parent() {
 
 #[test]
 fn min_size_is_in_model_units_under_a_scaled_skeleton() {
-    // At 0.01 the joint frame measures the 0.26 head as 26 units; the threshold
-    // still reads model units.
     let opts = |min_size| HitboxOptions {
         min_size,
         ..HitboxOptions::default()

@@ -1,14 +1,6 @@
-//! crates/edit/src/serialize_tests.rs — what applying a loaded document holds: a one-sided
-//! parent link (PR #1774's review, #1805): a child naming a parent whose `children`
-//! lacks it is listed there as it loads, so switching the parent off hides the child;
-//! a camera's TAA knobs survive a save, and one left out takes its default; and the
-//! bake settings are held to their ranges (#1704).
-
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
-/// A scene file giving `child` the parent `group` while `group` lists no children;
-/// `late` saves the group after the child, so the child waits for it.
 fn one_sided(late: bool) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let group = scene.add_entity("Group".to_string());
@@ -66,7 +58,6 @@ fn the_taa_camera_knobs_round_trip_through_save_and_load() {
         ..CameraComponent::default()
     };
     scene.world.set_camera(id, Some(cam.clone()));
-    // Through SceneData and a JSON round-trip (the stored format), as a save/load.
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     let data = serde_json::from_str(&json).unwrap();
     let mut loaded = Scene::new();
@@ -110,7 +101,6 @@ fn a_camera_saved_without_anti_flicker_loads_hdrps_default_and_a_saved_zero_stay
 
 #[test]
 fn a_hand_edited_taa_knob_out_of_range_is_held_on_load() {
-    // A file's value past URP's bounds is clamped by the op as it loads.
     let mut scene = Scene::new();
     let id = scene.add_entity("Cam".to_string());
     scene

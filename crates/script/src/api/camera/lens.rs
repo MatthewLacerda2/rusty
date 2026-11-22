@@ -1,13 +1,3 @@
-//! crates/script/src/api/camera/lens.rs — the per-entity lens and stacking functions (#1341):
-//! field of view (always vertical) and the axis it is shown along (#2038), clip
-//! planes, render order and clear flags, Unity's `fieldOfView`,
-//! `nearClipPlane` / `farClipPlane`, `depth` and `clearFlags`; plus Unity's two
-//! pure FOV conversions, `VerticalToHorizontalFov` / `HorizontalToVerticalFov`.
-//! Registered by `component::register`, with its `read` / `write` contract: getters
-//! return `nil` without a camera, setters are then no-ops. The lens getters return
-//! the held lens the camera draws with (`scene::camera::held_lens`, #1359), as
-//! Unity's do, so a value loaded out of bounds reads back within them.
-
 use super::component::{read, write};
 use crate::api::entity_arg::EntityArg;
 use crate::api::ApiCell;
@@ -19,9 +9,6 @@ use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::camera::held_lens;
 use rusty_scene::Scene;
 
-/// Register `Get/SetFieldOfView`, `Get/SetFovAxis`, the FOV conversions,
-/// `Get/SetClipPlanes`, `Get/SetRenderOrder` and `Get/SetClearFlags` onto the
-/// `Camera` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

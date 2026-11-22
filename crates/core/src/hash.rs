@@ -1,24 +1,11 @@
-//! crates/core/src/hash.rs — hashes stable across Rust releases and platforms (#939), which
-//! std's `DefaultHasher` is not.
-//!
-//! [`content`] fingerprints what the engine reads or writes: import-cache sources and
-//! keys, texture caches, lightmap file tags, demo digests. It is xxh3 (#1326): its
-//! long-input paths compile at opt-level 2 as a dependency, so hashing a file's bytes
-//! runs about 40 times faster than [`fnv1a64`] does in rusty's own opt-level-0 dev
-//! build, which the editor runs on every launch (inputs up to 128 bytes are inlined
-//! into the caller, so short keys get no such speed-up).
-//! [`fnv1a64`] stays where a stored digest is compared with a fresh one: the scene
-//! manifest's `.seeded` records (committed in game repos) and the converter output
-//! table `asset::convert::fingerprint` checks against `fingerprints.txt` (re-blessing
-//! every row would need Blender). Changing it there breaks what they hold.
+//! Stable across Rust releases and platforms, which std's `DefaultHasher` is not. [`content`]
+//! (xxh3) is far faster than [`fnv1a64`] in the opt-level-0 dev build, but fnv1a64 stays
+//! where a stored digest is compared with a fresh one; changing it breaks what they hold.
 
-/// xxh3, 64-bit, seed 0: the content hash.
 pub fn content(bytes: &[u8]) -> u64 {
     xxhash_rust::xxh3::xxh3_64(bytes)
 }
 
-/// [`content`] fed in pieces: the same digest as `content` of the pieces joined,
-/// with no buffer to join them in.
 #[derive(Default)]
 pub struct Content(xxhash_rust::xxh3::Xxh3);
 

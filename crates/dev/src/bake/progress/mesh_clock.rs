@@ -1,11 +1,3 @@
-//! The lightmap bake's batches timed on the platform's clock (#1891): the
-//! [`BakeObserver`] a logged bake lends the sim. The sim only says which mesh a batch
-//! belongs to as it starts and ends; this side reads the clock and adds each batch's
-//! time to its mesh, so no time value ever reaches the bake.
-//!
-//! The pool (#1656) traces one mesh's batches on every core at once, so a mesh's time
-//! is its worker time, summed over the threads, not a wall-clock span.
-
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -13,8 +5,6 @@ use std::time::{Duration, Instant};
 
 use rusty_lighting::lightmap::BakeObserver;
 
-/// One mesh's share of a timed bake: its entity, its texels, and the worker time its
-/// batches took, summed over every thread that traced one.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeshTime {
     pub entity: u32,
@@ -22,19 +12,16 @@ pub struct MeshTime {
     pub busy: Duration,
 }
 
-/// Each mesh's worker time so far, as (entity, texels, nanoseconds).
 #[derive(Default)]
 pub struct MeshClocks {
     meshes: OnceLock<Vec<(u32, u64, AtomicU64)>>,
 }
 
 thread_local! {
-    /// When this thread's batch began: a batch starts and ends on one thread.
     static BATCH_STARTED: Cell<Option<Instant>> = const { Cell::new(None) };
 }
 
 impl MeshClocks {
-    /// Each mesh's worker time, in bake order; empty before the bake named its meshes.
     pub fn times(&self) -> Vec<MeshTime> {
         let meshes = self.meshes.get().map_or(&[][..], Vec::as_slice);
         let time = |(entity, texels, nanos): &(u32, u64, AtomicU64)| MeshTime {
@@ -65,8 +52,6 @@ impl BakeObserver for MeshClocks {
         }
     }
 
-    /// The bake's working data for the chart is freed: hand it back (#2312,
-    /// `memory::relieve`), so the next chart's does not stack on it.
     fn chart_finished(&self, _chart: usize) {
         crate::memory::relieve();
     }

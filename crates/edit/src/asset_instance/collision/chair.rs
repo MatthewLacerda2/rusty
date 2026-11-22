@@ -1,15 +1,9 @@
-//! The collision-mesh model (#1960) the collision tests import: a bumpy `Chair` and
-//! its low-poly `Chair_col`. A test hook: compiled in every build, since the
-//! scripting tests that import it are another crate's.
+//! A test hook, compiled in every build: the scripting tests that import it are another crate's.
 
 use std::path::Path;
 
 use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 
-/// Write a bumpy `Chair` of `n`×`n` quads (2n² triangles, 0.1 high) and a
-/// two-triangle `Chair_col` as the `.obj` at `path`, its sidecar's `Chair`
-/// collider built from `mesh`; `path` slashed (`rusty_core::paths::to_slash`), so a
-/// test can put it in a Lua literal or a scene reference.
 pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<String, String> {
     let mut obj = String::from("o Chair\n");
     for z in 0..=n {

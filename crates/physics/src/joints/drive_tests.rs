@@ -1,6 +1,3 @@
-//! A driven joint is touched only when its target or drive changes (#1895):
-//! touching one wakes its bodies, so a driven body holding still can sleep.
-
 use glam::Vec3;
 
 use crate::PhysicsWorld;
@@ -9,8 +6,6 @@ use rusty_scene::skeleton::rig::armature_owner;
 use rusty_scene::skeleton::{Drive, RagdollOptions, HITBOX_NAME};
 use rusty_scene::Scene;
 
-/// A ragdolled rig with its spine branch simulated and driven: the scene, the
-/// physics world after a few steps, the spine and the rig.
 fn driven_spine() -> (Scene, PhysicsWorld, u32, u32) {
     let mut scene = Scene::new();
     let rig = armature_owner(&mut scene);
@@ -84,8 +79,6 @@ fn a_changed_target_or_drive_is_set_again() {
 
 #[test]
 fn a_drive_set_on_the_joint_after_enable_chases_the_animation() {
-    // `Joint.SetDriveStrength` (or the inspector) on a fully ragdolled bone,
-    // not `Ragdoll.SetDrive`: the drive still tracks its animated pose.
     let (mut scene, mut physics, spine, rig) = driven_spine();
     let head = scene.find_bone(rig, "head").unwrap();
     scene.world.joint_mut(head).unwrap().drive_strength = 0.0;
@@ -106,8 +99,6 @@ fn a_drive_set_on_the_joint_after_enable_chases_the_animation() {
 
 #[test]
 fn a_rebuilt_joint_gets_its_motors_back() {
-    // A powered door (a hinge to the world, driven to rest): `Joint.SetLimits`
-    // rebuilds it, rapier hands it back motorless, and its target is unchanged.
     let mut scene = Scene::new();
     let door = scene.add_entity("Door".to_string());
     let collider = ColliderComponent {

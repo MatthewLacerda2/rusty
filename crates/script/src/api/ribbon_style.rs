@@ -1,10 +1,3 @@
-//! crates/script/src/api/ribbon_style.rs — the style verbs `Trail` and `Line` share (#441).
-//!
-//! Both components carry one `RibbonStyle`, so their namespaces register the
-//! same width / colour / texture / blend verbs from here, each routed through the
-//! shared `edit::authoring::ribbon` ops the inspector cards call. Without the
-//! component, getters return a neutral default and setters are no-ops.
-
 use std::cell::RefCell;
 
 use mlua::Table;
@@ -19,12 +12,9 @@ use rusty_edit::authoring::ribbon as ops;
 use rusty_scene::Scene;
 
 type Rgba = (f32, f32, f32, f32);
-/// `(id, r, g, b, a?)`.
 type IdColor = (EntityArg, f32, f32, f32, Option<f32>);
-/// `(id, start rgba, end rgba)` flattened.
 type IdColors = (EntityArg, f32, f32, f32, f32, f32, f32, f32, f32);
 
-/// Which component's style a verb reaches.
 #[derive(Clone, Copy)]
 pub(super) enum Ribbon {
     Trail,
@@ -32,7 +22,6 @@ pub(super) enum Ribbon {
 }
 
 impl Ribbon {
-    /// The namespace its verbs live in.
     fn name(self) -> &'static str {
         match self {
             Self::Trail => "Trail",
@@ -40,7 +29,6 @@ impl Ribbon {
         }
     }
 
-    /// Read `id`'s style through `f`, or `None` without the component.
     fn read<T>(
         self,
         scene: &RefCell<Scene>,
@@ -54,7 +42,6 @@ impl Ribbon {
         }
     }
 
-    /// Apply `f` to `id`'s style, when it has the component.
     fn write(self, scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut RibbonStyle)) {
         let mut s = scene.borrow_mut();
         match self {
@@ -64,14 +51,12 @@ impl Ribbon {
     }
 }
 
-/// Register the shared style verbs onto `t` for `which` component.
 pub(super) fn register(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
     register_width(lua, t, scene, which)?;
     register_color(lua, t, scene, which)?;
     register_look(lua, t, scene, which)
 }
 
-/// `GetWidth(id, t?)`, `SetWidth(id, start, end?)`, `SetWidthCurve(id, {{t, w}, …})`.
 fn register_width(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
     let f = lua.create_function(move |lua, (id, at): (EntityArg, Option<f32>)| {
         Ok(which
@@ -101,8 +86,6 @@ fn register_width(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribb
     put(t, "SetWidthCurve", f)
 }
 
-/// `GetColor(id, t?)` → r, g, b, a; `SetColor(id, r, g, b, a?)`;
-/// `SetColors(id, start rgba, end rgba)`.
 fn register_color(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
     let f = lua.create_function(move |lua, (id, at): (EntityArg, Option<f32>)| {
         let c = which.read(&*scene.get(lua)?, id.read(), |s| {
@@ -128,8 +111,6 @@ fn register_color(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribb
     put(t, "SetColors", f)
 }
 
-/// `Get/SetTexture` (a path, `nil` clears), `Get/SetTextureMode` (`"Stretch"` /
-/// `"Tile"`), `Get/SetBlend` (`"Alpha"` / `"Additive"`). Unknown names are ignored.
 fn register_look(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>, which: Ribbon) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(which

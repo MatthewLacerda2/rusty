@@ -1,26 +1,9 @@
-//! crates/script/src/api/scene_load_async.rs — `Scene.LoadAsync` and its operation (#2123), Unity's
-//! `SceneManager.LoadSceneAsync` and `AsyncOperation`.
-//!
-//! Registered onto the `Scene` table with `api::scene_load`. rusty's namespaces hand
-//! out ids, not objects, so the operation is an integer polled through namespace
-//! verbs, as `EnvironmentQuery.Request`'s ticket is (`docs/api/Scene.md`):
-//!
-//!   - `LoadAsync(path)` — open an operation; in edit mode the scene loads at once.
-//!   - `GetLoadProgress(op)` / `IsLoadDone(op)` — `progress` and `isDone`.
-//!   - `GetLoadStatus(op)` — `"loading"`, `"ready"`, `"done"`, `"failed"`,
-//!     `"replaced"`, or `"gone"` for an id this Play session never opened.
-//!   - `SetAllowSceneActivation(op, allow)` — `allowSceneActivation`.
-//!
-//! The state they read is the scene's (`scene::runtime::loads`), moved only at a
-//! tick's head and tail, so a script reads the same values on every replay.
-
 use super::scene_load::{check_file, load_now};
 use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_scene::runtime::loads::LoadStatus;
 use rusty_scene::Scene;
 
-/// Register `LoadAsync` and its operation's verbs onto the `Scene` `table`.
 pub fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -65,8 +48,6 @@ pub fn register(
     )
 }
 
-/// `LoadAsync(path)`: an operation in Play; in edit mode the scene loads at once and
-/// the operation is born done.
 fn register_load_async(
     lua: &mlua::Lua,
     table: &mlua::Table,

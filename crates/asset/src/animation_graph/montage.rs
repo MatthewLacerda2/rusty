@@ -1,15 +1,5 @@
-//! crates/asset/src/animation_graph/montage.rs — slots and montages (#1894).
-//!
-//! Unreal's Animation Montages, declared on the graph. A **slot** is a named,
-//! masked layer that sits above every graph layer and shows only while a montage
-//! plays in it; every animator also has the implicit full-body
-//! [`DEFAULT_SLOT`]. A **montage** is a clip played once into a slot over the
-//! running state machine, with blend in/out times, optional **sections** (named
-//! times in the clip, each going on to its `next` when it ends: itself loops it,
-//! none ends the montage) and its own animation events. Playing one is the
-//! runtime's job (`app::animation::montage`, `Animator.PlayMontage`); this is
-//! the data and its load checks, each problem naming its path
-//! (`montages[1].sections[2].next: no section 'Hodl'`).
+//! Unreal's Animation Montages: a clip played once into a named, masked slot above every graph
+//! layer; sections chain by `next` (itself loops, none ends the montage).
 
 use std::collections::BTreeSet;
 
@@ -18,29 +8,22 @@ use serde::{Deserialize, Serialize};
 use super::event::check_events;
 use super::{AnimationEvent, AnimationGraph, LayerBlending};
 
-/// The full-body slot every animator has without declaring it (Unreal's name).
-/// Undeclared, it sits above the declared slots; declared, it takes its place
-/// and mask like any other slot.
+/// Full-body slot every animator has undeclared (Unreal's name); undeclared it sits above the
+/// declared slots.
 pub const DEFAULT_SLOT: &str = "DefaultSlot";
 
-/// The blend in and out time of a montage that does not say (and of a clip
-/// played as a montage), in seconds: Unreal's default.
+/// Default blend in/out time in seconds: Unreal's.
 pub const DEFAULT_MONTAGE_BLEND: f32 = 0.25;
 
-/// One slot a montage plays into: a name, a mask and a blend mode, with a
-/// layer's rules (`GraphLayer`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GraphSlot {
     pub name: String,
-    /// Bone names, each standing for its whole subtree; empty is the whole body.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mask: Vec<String>,
     #[serde(default)]
     pub blending: LayerBlending,
 }
 
-/// One section of a montage: a name, where it starts in the clip, and the
-/// section it goes on to when it ends (itself loops it; `None` ends the montage).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct MontageSection {
     pub name: String,
@@ -51,7 +34,6 @@ pub struct MontageSection {
     pub next: Option<String>,
 }
 
-/// One montage: a clip played once into a slot.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Montage {
     pub name: String,
@@ -65,13 +47,11 @@ pub struct Montage {
     /// In ascending time order. Empty is one section spanning the clip.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub sections: Vec<MontageSection>,
-    /// Clip-timed markers, fired like a node's (`OnAnimationEvent`).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub events: Vec<AnimationEvent>,
 }
 
 impl Montage {
-    /// A clip played as a one-section montage in `slot`, at the default blends.
     pub fn of_clip(clip: &str, slot: &str) -> Self {
         Self {
             name: clip.to_string(),
@@ -94,13 +74,10 @@ fn default_blend() -> f32 {
 }
 
 impl AnimationGraph {
-    /// The montage named `name`.
     pub fn montage(&self, name: &str) -> Option<&Montage> {
         self.montages.iter().find(|m| m.name == name)
     }
 
-    /// The slot named `name` and its place in the slot stack: a declared slot's
-    /// index, or the implicit full-body [`DEFAULT_SLOT`] above them all.
     pub fn slot(&self, name: &str) -> Option<(usize, GraphSlot)> {
         if let Some(i) = self.slots.iter().position(|s| s.name == name) {
             return Some((i, self.slots[i].clone()));
@@ -155,7 +132,6 @@ impl AnimationGraph {
     }
 }
 
-/// The implicit [`DEFAULT_SLOT`]: whole body, override.
 fn implicit_default_slot() -> GraphSlot {
     GraphSlot {
         name: DEFAULT_SLOT.to_string(),
@@ -164,8 +140,6 @@ fn implicit_default_slot() -> GraphSlot {
     }
 }
 
-/// Unique, named sections at finite, strictly ascending times, whose `next`
-/// names one of them.
 fn check_sections(label: &str, sections: &[MontageSection], problems: &mut Vec<String>) {
     let mut seen = BTreeSet::new();
     let mut last = f32::NEG_INFINITY;

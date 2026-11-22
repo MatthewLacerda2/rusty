@@ -1,21 +1,12 @@
-//! Flat normals for a mesh that brings none (#1217).
-//!
-//! The glTF 2.0 spec: "When normals are not specified, client implementations
-//! MUST calculate flat normals and the provided tangents (if present) MUST be
-//! ignored." Every importer takes its missing normals from here instead of
-//! defaulting to straight up, which lights every face as if it faced the sky and
-//! breaks anything that pushes vertices along their normals (an outline shell).
-//!
-//! A flat normal belongs to a face, not a vertex, so a vertex two faces share is
-//! split: [`flat_shaded`] gives every triangle corner its own copy.
+//! Flat normals for a mesh that brings none, as the glTF spec requires (it also says to
+//! ignore provided tangents). Defaulting to straight up would light every face as facing
+//! the sky. [`flat_shaded`] splits shared vertices: a flat normal belongs to a face.
 
 use super::mesh_data::Vertex;
 use super::tangents::Missing;
 use glam::Vec3;
 
-/// The unit normal of the triangle `a, b, c`, facing the side it winds
-/// counter-clockwise on (glTF's front face). A degenerate triangle has no plane;
-/// it covers no pixels, so it gets `+Y`, which only has to be finite.
+/// A degenerate triangle gets `+Y`: it covers no pixels, so it only has to be finite.
 pub fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     let [a, b, c] = [a, b, c].map(Vec3::from_array);
     (b - a)
@@ -25,11 +16,7 @@ pub fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
         .to_array()
 }
 
-/// `vertices` drawn by the triangle list `indices`, unwelded so each corner is
-/// its own vertex carrying its triangle's [`face_normal`] and a tangent generated
-/// against it (a source tangent is dropped, as the spec says). Returns the new
-/// vertices and their indices, `0..n`. A triangle naming a vertex past the end is
-/// dropped rather than read out of bounds.
+/// A triangle naming a vertex past the end is dropped, not read out of bounds.
 pub fn flat_shaded(
     vertices: &[Vertex],
     indices: &[u32],
@@ -86,7 +73,6 @@ mod tests {
 
     #[test]
     fn a_shared_vertex_splits_so_each_face_keeps_its_normal() {
-        // Two triangles folded along the shared edge 0-1, one in z=0, one in y=0.
         let vertices = [
             [0.0, 0.0, 0.0],
             [1.0, 0.0, 0.0],
@@ -100,7 +86,6 @@ mod tests {
         assert_eq!(normals[..3], [[0.0, 0.0, 1.0]; 3]);
         assert_eq!(normals[3..], [[0.0, 1.0, 0.0]; 3]);
         assert_eq!(out[4].position, [1.0, 0.0, 0.0]);
-        // The tangent is regenerated against the flat normal, so it lies in the face.
         for v in &out {
             let t = Vec3::from_slice(&v.tangent[..3]);
             assert!(t.dot(Vec3::from(v.normal)).abs() < 1e-5, "{v:?}");

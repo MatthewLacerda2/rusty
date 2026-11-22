@@ -1,8 +1,3 @@
-//! The built-in primitives' lightmap UVs (#438): a Box and a Plane are lightmappable
-//! out of the box (a Sphere, a Cylinder and a Capsule through the #831 unwrap), with
-//! every lightmap UV inside [0, 1] and no two faces sharing one. And the Capsule's
-//! shape (#1191).
-
 use glam::{Vec2, Vec3};
 
 use rusty_asset::lightmap_uv::interiors_overlap;
@@ -67,10 +62,6 @@ fn round_primitives_get_a_generated_lightmap_uv() {
     }
 }
 
-/// The Sphere's generated lightmap UV, as the primitive builds it, held to asset's
-/// `assert_valid`: no two triangles share lightmap texels, and every one with surface
-/// has UV area (asset's own sphere test runs a copy of this layout, since
-/// `components` sits above it).
 #[test]
 fn the_sphere_lightmap_uv_never_overlaps() {
     let (vertices, indices) = generate_sphere(1.0, 8, 8);
@@ -101,8 +92,6 @@ fn the_sphere_lightmap_uv_never_overlaps() {
     assert!(surfaced > 64, "the bands have surface");
 }
 
-/// Every capsule vertex lies `radius` off the inner segment, the ends reach the
-/// full height, and every triangle has area and faces away from the segment.
 #[test]
 fn capsule_is_a_closed_outward_capsule_of_full_height() {
     let (radius, height) = (0.5, 2.0);

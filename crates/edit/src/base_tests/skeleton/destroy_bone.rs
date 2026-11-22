@@ -1,4 +1,4 @@
-//! Destroying one bone takes its subtree, Unity's way (#1273): no bone of the rig
+//! Destroying one bone takes its subtree, Unity's way: no bone of the rig
 //! is left a root posed as a child, and the missing slots ride with their parent bone.
 
 use super::fixture::{armature_owner, armature_skin, hero, reload};

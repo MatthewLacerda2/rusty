@@ -1,21 +1,11 @@
-//! crates/procgen/src/recipe/node.rs — one recipe DAG node, parsed strictly (#395).
-//!
-//! A node flattens its [`OpKind`] params beside `id` and `inputs`, and serde's
-//! `deny_unknown_fields` does not compose with `#[serde(flatten)]` — so the check
-//! runs after parsing instead: the parsed op is serialized back, and any key the
-//! author wrote that it does not produce is refused by name. The op's own serde
-//! derive stays the single source of which params exist. A link on a param the
-//! catalog doesn't mark `socket` is refused first, naming the ones that take one.
-//! Every refusal is a [`NodeError`], which names the node's id and op (#1575).
-
+//! `deny_unknown_fields` does not compose with `#[serde(flatten)]`: the op is serialized
+//! back after parsing and a key it does not produce is refused by name.
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::Value;
 
 use super::{Arity, OpKind, OPS};
 
-/// One node in the recipe DAG: a stable `id`, the op to run, and the `id`s of the
-/// input nodes feeding it (in order).
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Node {
     pub id: String,
@@ -26,8 +16,7 @@ pub struct Node {
 }
 
 impl Node {
-    /// Refuse an `inputs` list its op does not accept: a missing input would bake a
-    /// black or flat map, a surplus one would be silently ignored.
+    /// A missing input would bake a black map; a surplus one would be ignored.
     pub fn check_arity(&self) -> Result<(), NodeError> {
         let accepts = self.op.arity();
         if accepts.accepts(self.inputs.len()) {
@@ -41,7 +30,6 @@ impl Node {
         }))
     }
 
-    /// `fault`, named by this node's id and op.
     pub fn error(&self, fault: Fault) -> NodeError {
         NodeError {
             node: self.id.clone(),
@@ -51,47 +39,41 @@ impl Node {
     }
 }
 
-/// Something wrong with one node, named by its id and op, as
-/// `node "m" (mapping): unknown key "scael"; …`. Every recipe error about a node,
-/// from parsing it or from wiring it into the graph, is one of these (#1575), so
-/// the prefix is written here once, never per op or per check.
+/// Rendered as `node "m" (mapping): unknown key "scael"; …`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct NodeError {
     pub node: String,
-    /// The op's tag, or what the author wrote for it when that names no op.
+    /// The op's tag, or what was written when it names no op.
     pub op: String,
     pub fault: Fault,
 }
 
-/// What is wrong with a [`NodeError`]'s node.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Fault {
-    /// The node did not parse: a missing or mistyped param, an unknown key or op.
+    /// Unparsed node.
     Parse(String),
-    /// Wired with more or fewer inputs than its op accepts.
+    /// Wrong input count.
     Arity {
-        /// The `math` func, whose arity narrows the op's (a unary func takes one input).
+        /// The `math` func narrowing the op's arity.
         func: Option<String>,
-        /// What to do, when the node's params decide its inputs (`expression`).
+        /// Fix hint.
         fix: Option<String>,
         given: usize,
         accepts: Arity,
     },
-    /// An input id no node defines.
+    /// Undefined input id.
     UnknownInput(String),
-    /// A param linked to an id no node defines (#1494).
+    /// Link to an undefined id.
     UnknownLink { param: String, link: String },
-    /// The node is on a cycle (the graph is not a DAG).
+    /// On a cycle.
     Cycle,
-    /// An `image` node whose file was not handed in (#1491).
+    /// Image file not handed in.
     MissingSource(String),
-    /// A `text` node whose font file was not handed in (#2190).
+    /// Font file not handed in.
     MissingFont(String),
-    /// An `image` node whose file the caller's loader could not read or decode when
-    /// the node ran (#2002).
+    /// Image file unreadable.
     Unreadable { path: String, error: String },
-    /// A graph instance (#1744) left in the recipe the runner was handed: its
-    /// caller skipped [`crate::graph::expand`].
+    /// Graph instance left unexpanded.
     Unexpanded(String),
 }
 
@@ -130,7 +112,6 @@ impl std::fmt::Display for NodeError {
     }
 }
 
-/// The lenient derive the strict [`Node`] deserializer starts from.
 #[derive(Deserialize)]
 struct RawNode {
     id: String,
@@ -147,7 +128,6 @@ impl<'de> Deserialize<'de> for Node {
     }
 }
 
-/// `given` as a [`Node`], every refusal named by the node's id and op as written.
 fn parse(given: &Value) -> Result<Node, NodeError> {
     let written = |key: &str| given.get(key).and_then(Value::as_str).unwrap_or("?");
     let at = |message: String| NodeError {
@@ -179,9 +159,6 @@ fn parse(given: &Value) -> Result<Node, NodeError> {
     Ok(node)
 }
 
-/// A link on a param that takes none (#1494), named with the params of its op that
-/// do: "param "scale" takes no link; noise links gain". Only
-/// a link is an object among a param's values, so any object counts as one.
 fn refused_link(given: &Value) -> Option<String> {
     let node = given.as_object()?;
     let op = node.get("op")?.as_str()?;
@@ -203,7 +180,6 @@ fn refused_link(given: &Value) -> Option<String> {
     Some(format!("param {key:?} takes no link; {links}"))
 }
 
-/// The first key in `given` that is neither a node field nor produced by the op.
 fn unknown_key<'a>(given: &'a Value, known: &Value) -> Option<&'a str> {
     let given = given.as_object()?;
     given
@@ -212,7 +188,6 @@ fn unknown_key<'a>(given: &'a Value, known: &Value) -> Option<&'a str> {
         .find(|k| !matches!(*k, "id" | "inputs") && known.get(k).is_none())
 }
 
-/// "unknown key "scael"; noise takes kind, octaves, scale".
 fn unknown_key_message(known: &Value, key: &str) -> String {
     let op = known.get("op").and_then(Value::as_str).unwrap_or("?");
     let params: Vec<&str> = known

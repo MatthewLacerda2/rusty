@@ -1,11 +1,5 @@
-//! crates/procgen/src/recipe/color.rs — a `color` param: a linear RGBA array, or sRGB hex
-//! (#1487).
-//!
-//! An array is taken as linear, the space the op chain works in. A `"#rrggbb"` /
-//! `"#rrggbbaa"` string is sRGB, the way colours are picked from a reference, and is
-//! decoded to linear on parse (alpha stays linear), like Blender's hex field. Either
-//! way the recipe holds the linear array, so `Texture.ToJson` writes that.
-
+//! A `color` param: a linear RGBA array, or sRGB hex (`#rrggbb[aa]`) decoded to linear
+//! on parse (alpha stays linear). The recipe holds the linear array.
 use serde::de::Error as _;
 use serde::{Deserialize, Deserializer};
 use serde_json::Value;

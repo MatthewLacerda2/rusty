@@ -1,7 +1,3 @@
-//! crates/physics/src/character/body.rs — the CharacterController's capsule as the
-//! entity's collider in the physics world: what it is built from, and keeping it
-//! sized and upright before each step that follows a change to it (#1707).
-
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;
 
@@ -14,8 +10,6 @@ use rusty_components::{capsule_dims, CapsuleAxis, ColliderShape, PhysicsMaterial
 use rusty_ecs::World;
 use rusty_scene::Scene;
 
-/// A CharacterController's collider inputs: its capsule, upright at its centre.
-/// `None` without one.
 pub(crate) fn character_collider_inputs(world: &World, id: u32) -> Option<ColliderInputs> {
     let cc = world.character_controller(id)?;
     Some(ColliderInputs {
@@ -33,9 +27,7 @@ pub(crate) fn character_collider_inputs(world: &World, id: u32) -> Option<Collid
     })
 }
 
-/// The offset of an upright shape on its owner's body: its centre sits at
-/// `center` (local to its entity, scaled) and it stays unrotated in the world,
-/// so its rotation on the body undoes the owner's.
+/// Unrotated in the world: its rotation on the body undoes the owner's.
 pub(crate) fn upright_offset(
     owner_rot: Quat,
     offset_pos: Vec3,
@@ -46,9 +38,6 @@ pub(crate) fn upright_offset(
 }
 
 impl PhysicsWorld {
-    /// Keep each CharacterController's collider the capsule its component
-    /// describes: resized when its height or radius changed (a crouch), and
-    /// upright at its centre however the entity has turned since the last tick.
     pub(crate) fn sync_characters(&mut self, scene: &Scene, owners: &Owners) {
         for (&owner, ids) in owners.pick(&self.plan) {
             for &id in ids {
@@ -93,9 +82,7 @@ impl PhysicsWorld {
 mod tests {
     use super::*;
 
-    /// A turned owner whose capsule sits on an offset, turned child: the capsule
-    /// rides at the child's offset plus its centre (turned with it), and its
-    /// rotation on the body undoes the owner's so it stays upright in the world.
+    /// The capsule rides at the child's offset plus its centre, upright in the world.
     #[test]
     fn the_capsule_rides_its_offset_and_stays_upright() {
         let owner = Quat::from_rotation_y(0.9);

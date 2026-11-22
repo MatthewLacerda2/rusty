@@ -1,7 +1,3 @@
-//! An edit of one instance of a shared model (#2351), in place or by pointing it
-//! at a library mesh (`Mesh.Create`'s path), copies or replaces that instance's
-//! geometry alone: its sibling and the import cache keep theirs.
-
 use super::sharing_tests::{cached, level, shares};
 use rusty_asset::mesh_data::Shared;
 use rusty_components::mesh::{copies, MeshData};
@@ -49,7 +45,7 @@ fn mesh_create_over_one_instance_leaves_its_sibling_and_the_cache_alone() {
         ..Default::default()
     };
     scene.define_mesh("Tri", triangle).unwrap();
-    scene.begin_edits(); // one Undo step, as the editor's frame opens one
+    scene.begin_edits();
     crate::mesh::set_shared_mesh(&mut scene, a, "Tri").unwrap();
     scene.commit_edits(None);
     let buffers = cached(&path);
@@ -69,8 +65,6 @@ fn mesh_create_over_one_instance_leaves_its_sibling_and_the_cache_alone() {
     assert!(shares(&scene, b, &buffers));
 }
 
-/// An edit of the vertices is no Undo step (no saved field moves), so an Undo of
-/// an earlier edit keeps it, and keeps it on its own GPU slot.
 #[test]
 fn an_undo_after_an_edit_in_place_keeps_the_edit_and_its_identity() {
     let (mut scene, ids, path) = level("rusty_sharing_edit_undo", 2);

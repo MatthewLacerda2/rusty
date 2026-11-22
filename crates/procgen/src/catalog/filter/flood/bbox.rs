@@ -1,6 +1,3 @@
-//! The `flood_bbox` op: each island's box, as a grey (Substance Designer's *Flood
-//! Fill to BBox Size / Position*, #1741).
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -8,23 +5,15 @@ use crate::image_buf::Image;
 use crate::ops::flood;
 use crate::recipe::{choice, op, Lit, OpInfo, OpParam, ONE};
 
-/// Which of an island's box numbers [`FloodBbox`] writes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum BboxOutput {
-    /// The box's longer side, in tiles (1 for an island that spans the tile).
     #[default]
     Size,
-    /// The box's centre across, in `[0, 1)`.
     CenterX,
-    /// The box's centre down, in `[0, 1)`.
     CenterY,
 }
 
-/// `flood_fill`'s islands → one flat grey per island from its bounding box, 0 off
-/// them: its size or where it sits, to select, scale or offset per piece. A box
-/// across a tile edge is measured as one box, its centre wrapped into the tile;
-/// on an axis an island spans (a band across the tile) its centre reads 0.5.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct FloodBbox {
     #[serde(default)]

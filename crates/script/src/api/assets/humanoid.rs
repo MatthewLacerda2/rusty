@@ -1,7 +1,3 @@
-//! `Assets.GetHumanoid` / `Assets.SetHumanoid` (#1747): a model's humanoid
-//! bone map and the models whose clips are retargeted onto it, as its sidecar
-//! keeps them (`asset::humanoid`).
-
 use std::path::Path;
 
 use mlua::{Lua, Table};
@@ -12,7 +8,6 @@ use rusty_asset::humanoid::{BoneMap, HumanoidSettings, CANONICAL};
 use rusty_asset::{imported, sidecar};
 use rusty_scene::Scene;
 
-/// `GetHumanoid(path)`: needs no scene.
 pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -21,7 +16,6 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// `SetHumanoid(path, { bones?, clipsFrom? })`: re-imports the scene's clips.
 pub(super) fn register_set(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -37,8 +31,6 @@ pub(super) fn register_set(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> R
     )
 }
 
-/// `stored` with `t`'s keys: each `bones` entry sets its canonical bone (`""`
-/// unmaps it, `false` goes back to the guess); `clipsFrom` replaces the list.
 fn merged(mut stored: HumanoidSettings, t: &Table) -> mlua::Result<HumanoidSettings> {
     if let Some(bones) = t.get::<Option<Table>>("bones")? {
         for pair in bones.pairs::<String, mlua::Value>() {
@@ -68,9 +60,6 @@ fn merged(mut stored: HumanoidSettings, t: &Table) -> mlua::Result<HumanoidSetti
     Ok(stored)
 }
 
-/// `{ bones = { Hips = name, ... }, clipsFrom = { path, ... }, problems = { ... } }`:
-/// the map as resolved on the model's first skinned sub-mesh (overrides and
-/// guesses together), the sources, and what resolving found wrong.
 fn humanoid_table(lua: &Lua, path: &str) -> mlua::Result<Table> {
     let settings = sidecar::load(Path::new(path)).map_err(runtime)?.humanoid;
     let import = imported(Path::new(path)).map_err(runtime)?;

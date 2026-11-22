@@ -1,8 +1,3 @@
-//! The stress scene's soldier: a procedural skinned humanoid, built in code so the
-//! bench needs no binary asset. Sixteen bones, each skinning one ellipsoid of
-//! ~770 triangles (~12k a body, the budget of a real shooter enemy), and a looping
-//! `Walk` clip that swings the limbs. Its origin is at the feet.
-
 use glam::{Mat4, Quat, Vec3};
 
 use rusty_asset::{AnimationClip, Interpolation, JointTrack, JointTransform, SkinData, Track};
@@ -10,12 +5,9 @@ use rusty_components::mesh::primitives::generate_sphere;
 use rusty_components::mesh::Vertex;
 use rusty_components::MeshComponent;
 
-/// The mesh-cache key every soldier shares: one GPU buffer pair for all of them.
 const PRIMITIVE: &str = "BenchSoldier";
-/// The clip every soldier plays.
 pub const WALK: &str = "Walk";
 
-/// (name, parent, bind position, limb centre, limb radii), mesh space, metres.
 type Bone = (&'static str, Option<usize>, [f32; 3], [f32; 3], [f32; 3]);
 
 #[rustfmt::skip]
@@ -38,7 +30,6 @@ const BONES: [Bone; 16] = [
     ("foot_r",    Some(14), [-0.1, 0.08, 0.0],  [-0.1, 0.04, 0.06], [0.05, 0.04, 0.12]),
 ];
 
-/// A soldier's mesh: skinned geometry, its skin and the `Walk` clip.
 pub fn soldier() -> MeshComponent {
     let skin = skin();
     let (vertices, indices) = body();
@@ -89,7 +80,6 @@ fn skin() -> SkinData {
     }
 }
 
-/// One ellipsoid per bone, fully weighted to it.
 fn body() -> (Vec<Vertex>, Vec<u32>) {
     let (unit, unit_indices) = generate_sphere(1.0, 16, 24);
     let mut vertices = Vec::new();
@@ -112,7 +102,6 @@ fn body() -> (Vec<Vertex>, Vec<u32>) {
     (vertices, indices)
 }
 
-/// A one-second walk cycle: legs and arms swing in opposition about X.
 fn walk() -> AnimationClip {
     let mut tracks = vec![JointTrack::default(); BONES.len()];
     let swing = |amplitude: f32| Track {

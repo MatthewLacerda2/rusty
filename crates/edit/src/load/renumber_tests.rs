@@ -1,18 +1,11 @@
-//! A load that moves incoming ids out of the survivors' way moves the level's
-//! baked lightmaps with them: the moved entity keeps its lightmap, its baked light
-//! and its shadowmask channel, and the survivor that kept the old id gains none.
-
 use std::collections::BTreeSet;
 
 use crate::to_scene_data;
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// A path with no lighting sidecar beside it: the swap's sidecar merge is a no-op.
 const NO_SIDECAR: &str = "rusty_2496_no_such_dir/level.scene";
 
-/// A level whose wall (1) is lightmapped and whose lamp (2) the bake took in,
-/// shadowmasked on channel 3; a second lamp (3) fell back for want of a channel.
 fn lit_level() -> Scene {
     let mut level = Scene::new();
     let wall = level.add_entity("Wall".to_string());
@@ -30,8 +23,6 @@ fn lit_level() -> Scene {
     level
 }
 
-/// A playing scene whose carried player (1) and its gun (2) and sight (3) hold
-/// every id of the level's.
 fn carrying_a_player() -> (Scene, BTreeSet<u32>) {
     let mut s = Scene::new();
     let player = s.add_entity("Player".to_string());

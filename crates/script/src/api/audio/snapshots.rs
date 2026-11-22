@@ -1,10 +1,3 @@
-//! crates/script/src/api/audio/snapshots.rs — the `Audio` snapshot and duck verbs (#465).
-//!
-//! Snapshots are named partial sets of group settings a script blends to over sim
-//! time (`Time.unscaledTime`, so a blend runs through slow-mo), effect parameters
-//! included (#1748); ducks lower one
-//! group while another plays. Unknown snapshot, group or field names are errors.
-
 use mlua::Table;
 
 use super::super::{put, Reg};
@@ -19,7 +12,6 @@ use rusty_time::Time;
 const DUCK_ATTACK: f32 = 0.1;
 const DUCK_RELEASE: f32 = 0.5;
 
-/// The fields a snapshot entry may name.
 const PATCH_FIELDS: [&str; 8] = [
     "effects",
     "volume",
@@ -85,7 +77,6 @@ pub(super) fn register_snapshots(
     register_ducks(lua, table, audio)
 }
 
-/// `AddDuck` / `ClearDucks`.
 fn register_ducks(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
@@ -115,8 +106,6 @@ fn register_ducks(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) 
     )
 }
 
-/// Group `group`'s snapshot entry as a patch, its `effects` list checked against
-/// the effects the group has now (#1748).
 fn group_patch(maestro: &AudioMaestro, group: &str, fields: &Table) -> mlua::Result<GroupPatch> {
     let mut patch = patch(fields)?;
     if let Some(list) = fields.get::<Option<Table>>("effects")? {
@@ -128,8 +117,6 @@ fn group_patch(maestro: &AudioMaestro, group: &str, fields: &Table) -> mlua::Res
     Ok(patch)
 }
 
-/// A snapshot entry `{ volume = 0.5, low_pass = 800, ... }` as a patch. Unknown
-/// fields, and a resonance without its cutoff, are errors.
 fn patch(fields: &Table) -> mlua::Result<GroupPatch> {
     for pair in fields.clone().pairs::<String, mlua::Value>() {
         let (key, _) = pair?;

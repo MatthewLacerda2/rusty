@@ -1,5 +1,3 @@
-//! Audio import tests (#385): the gapless trim, the WAV writer, and the refresh.
-
 use std::f32::consts::TAU;
 use std::path::Path;
 
@@ -15,8 +13,6 @@ fn tone(i: usize) -> f32 {
     0.5 * (TAU * 440.0 * i as f32 / RATE as f32).sin()
 }
 
-/// The fixture copied into `folder`, a fresh one of the temp dir, and converted by
-/// [`refresh`].
 fn converted(folder: &str) -> DecodedAudio {
     let dir = rusty_test_support::temp::dir().join(folder);
     std::fs::create_dir_all(&dir).unwrap();
@@ -38,15 +34,12 @@ fn a_converted_mp3_is_a_wav_of_the_same_length_rate_and_signal() {
     let audio = converted("rusty_import_tone");
     assert_eq!((audio.channels, audio.sample_rate), (1, RATE));
     assert_eq!(audio.frames(), FRAMES);
-    // Aligned with the source sample for sample: the delay is gone, not shifted.
     let worst = (0..FRAMES)
         .map(|i| (audio.samples[i] - tone(i)).abs())
         .fold(0.0, f32::max);
     assert!(worst < 0.05, "worst deviation from the source {worst}");
 }
 
-/// Looping the converted clip: the step from its last sample back to its first is an
-/// ordinary step of the tone, and neither end is padded with silence.
 #[test]
 fn a_converted_loop_has_no_silence_at_the_seam() {
     let audio = converted("rusty_import_loop");
@@ -55,7 +48,6 @@ fn a_converted_loop_has_no_silence_at_the_seam() {
     let seam = (s[0] - s[s.len() - 1]).abs();
     assert!(seam < max_step, "seam step {seam}");
     let rms = |w: &[f32]| (w.iter().map(|x| x * x).sum::<f32>() / w.len() as f32).sqrt();
-    // One period (≈100 samples) of the tone has RMS 0.5/√2 ≈ 0.35.
     assert!(rms(&s[..100]) > 0.3, "head is silent");
     assert!(rms(&s[s.len() - 100..]) > 0.3, "tail is silent");
 }
@@ -90,7 +82,6 @@ fn refresh_converts_dropped_mp3s_and_removes_them() {
     assert_eq!(report.converted, vec![(mp3.clone(), wav.clone())]);
     assert!(report.skipped.is_empty());
     assert!(!mp3.exists() && wav.exists());
-    // A scene that still names the MP3 plays the WAV that replaced it.
     assert_eq!(
         resolve_clip_path(mp3.to_str().unwrap()),
         wav.to_str().unwrap()
@@ -118,7 +109,6 @@ fn refresh_never_overwrites_a_wav_and_retries_an_mp3_that_fails() {
         kept.exists() && broken.exists(),
         "left for the runtime fallback"
     );
-    // An MP3 still on disk is itself.
     assert_eq!(
         resolve_clip_path(kept.to_str().unwrap()),
         kept.to_str().unwrap()

@@ -1,6 +1,3 @@
-//! `World::ids_with_component_where`: exactly `ids_with_component` filtered, in
-//! the same insertion order, from one walk of the column.
-
 use crate::world::walks;
 use crate::World;
 use rusty_components::{MeshComponent, ParticleEmitterComponent};
@@ -12,8 +9,6 @@ fn emitter(active: bool) -> ParticleEmitterComponent {
     }
 }
 
-/// Emitters spread over two archetypes (some carry a Mesh too), attached out of
-/// spawn order, with despawns that swap-remove inside an archetype.
 fn mixed_world() -> World {
     let mut w = World::new();
     let ids: Vec<u32> = (0..12).map(|i| w.spawn(format!("e{i}"))).collect();

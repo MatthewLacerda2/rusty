@@ -1,20 +1,10 @@
-//! crates/physics/src/convert.rs — engine <-> rapier pose conversions.
-//!
-//! rapier/parry speak glam through `glamx`, the same glam the engine uses, so
-//! rapier's `Vector` *is* `glam::Vec3` and its `Rotation` *is* `glam::Quat`: those
-//! cross the boundary as-is. The one type that still differs is rapier's `Pose`
-//! (a rigid transform), and the engine keeps its poses as a `(Vec3, Quat)` pair;
-//! these two helpers are that crossing, kept in one place.
-
 use glam::{Quat, Vec3};
 use rapier3d::math::Pose;
 
-/// Engine position + rotation -> rapier `Pose` (rigid-body pose).
 pub fn to_pose(pos: Vec3, rot: Quat) -> Pose {
     Pose::from_parts(pos, rot)
 }
 
-/// rapier `Pose` -> engine (position, rotation).
 pub fn from_pose(iso: &Pose) -> (Vec3, Quat) {
     (iso.translation, iso.rotation)
 }

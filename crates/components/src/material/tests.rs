@@ -1,5 +1,3 @@
-//! The material asset's defaults and serde shape.
-
 use super::*;
 
 #[test]
@@ -39,8 +37,6 @@ fn transparency_fields_round_trip_through_serde() {
 
 #[test]
 fn a_material_without_transparency_fields_loads_opaque() {
-    // A hand-written material that names no render_mode/alpha/alpha_cutoff loads
-    // through `#[serde(default)]` as a fully-opaque material.
     let json = r#"{ "base_color": [0.5, 0.5, 0.5], "metallic": 0.0, "roughness": 0.5 }"#;
     let m: MaterialAsset = serde_json::from_str(json).expect("a sparse material parses");
     assert_eq!(m.render_mode, RenderMode::Opaque);

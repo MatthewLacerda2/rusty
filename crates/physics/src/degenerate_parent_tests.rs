@@ -1,9 +1,4 @@
-//! crates/physics/src/degenerate_parent_tests.rs — a collider under a zero-scaled
-//! ancestor (#1140). glam splits a zero axis into a NaN rotation; the pose
-//! physics and the stored AABB share must stay finite. The scene that saves it
-//! (NaN serializes as `null`, which then fails to load) and a body's write-back
-//! under such a parent (#1164) are the integration suite's
-//! (`tests/physics/zero_scale.rs`): they save and reload.
+//! glam splits a zero axis into a NaN rotation; the pose physics and the stored AABB share must stay finite.
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -16,8 +11,6 @@ use super::PhysicsWorld;
 use rusty_components::{CapsuleAxis, ColliderComponent, ColliderShape};
 use rusty_scene::Scene;
 
-/// A capsule child, turned 90° about Z, under a parent scaled by `parent_scale`
-/// and turned about Y. Returns the child's id.
 fn child_under(scene: &mut Scene, parent_scale: Vec3) -> u32 {
     let parent = scene.add_entity("P".to_string());
     let mut t = scene.world.transform_mut(parent).unwrap();

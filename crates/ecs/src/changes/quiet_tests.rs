@@ -1,6 +1,3 @@
-//! crates/ecs/src/changes/quiet_tests.rs — `World::quiet`: a channel with no stamp since a
-//! cursor's read is quiet, and any stamp, recorded or not, or another World is not.
-
 use crate::World;
 use rusty_components::TransformComponent;
 

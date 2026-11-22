@@ -1,4 +1,4 @@
-//! A destroyed bone's slot is `None`, never a dead id (#1273): a later entity
+//! A destroyed bone's slot is `None`, never a dead id: a later entity
 //! given that id is not mistaken for the bone.
 
 use super::fixture::armature_owner;

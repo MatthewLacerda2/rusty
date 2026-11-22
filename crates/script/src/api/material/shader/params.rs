@@ -1,17 +1,4 @@
-//! crates/script/src/api/material/shader/params.rs — runtime shader params from Lua (#399, #670).
-//!
-//! - `SetShaderParam(id, name, v)` / `GetShaderParam(id, name)` /
-//!   `ClearShaderParam(id [, name])` — entity `id`'s **override** (#670, Unity's
-//!   `renderer.material` / `MaterialPropertyBlock`): it wins over the material's value
-//!   for that entity alone, and is runtime-only. `Get` reads the override, else the
-//!   material's value, else the baked default.
-//! - `SetAssetShaderParam(asset, name, v)` / `GetAssetShaderParam(asset, name)` — the
-//!   shared value on the library asset (Unity's `sharedMaterial.SetFloat`): every
-//!   entity using it that has no override sees it, and it saves with the scene.
-//!
-//! Thin adapters over `authoring::material`'s shader-param ops, which validate once:
-//! a param the shader does not expose at runtime, or a wrong number of values,
-//! raises an error naming it and listing the runtime params there are.
+//! `Get` reads the override, else the material's value, else the baked default; an override is runtime-only.
 
 use mlua::{IntoLua, Lua, Value};
 
@@ -21,7 +8,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
-/// Register the shader-param verbs onto the `Material` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -55,7 +41,6 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     register_asset(lua, table, scene)
 }
 
-/// The library asset's own values: `SetAssetShaderParam` / `GetAssetShaderParam`.
 fn register_asset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -82,7 +67,6 @@ fn register_asset(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// Library asset `asset`'s shader layout; an absent asset is an error naming it.
 fn asset_layout(scene: &Scene, asset: &str) -> mlua::Result<rusty_shadergen::params::ParamLayout> {
     if !scene.materials.contains_key(asset) {
         return Err(err(format!("no material asset {asset:?}")));
@@ -90,7 +74,6 @@ fn asset_layout(scene: &Scene, asset: &str) -> mlua::Result<rusty_shadergen::par
     mat_ops::shader_layout(&scene.materials, asset).map_err(err)
 }
 
-/// A param value as Lua sees it: a number for one lane, else an array.
 fn to_lua(lua: &Lua, v: Vec<f32>) -> mlua::Result<Value> {
     match v[..] {
         [x] => x.into_lua(lua),
@@ -98,7 +81,6 @@ fn to_lua(lua: &Lua, v: Vec<f32>) -> mlua::Result<Value> {
     }
 }
 
-/// A Lua number, or an array of numbers, as floats.
 pub(crate) fn floats(value: Value) -> mlua::Result<Vec<f32>> {
     match value {
         Value::Integer(i) => Ok(vec![i as f32]),

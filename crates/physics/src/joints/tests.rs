@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/tests.rs — `Joint` components in the rapier world (#449): a
-//! fixed joint holds and welds, a hinge swings within its limits, a ball joint is
-//! a pendulum whose two swing limits stop it per axis (#675), a joint breaks past
-//! its force, and a run replays identically.
-
 use glam::{Quat, Vec2, Vec3};
 
 use super::JointBreak;
@@ -14,7 +9,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A dynamic unit cube at `pos` (density 1: one kilogram).
 fn cube(scene: &mut Scene, pos: Vec3) -> u32 {
     let id = scene.add_entity("Cube".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -36,7 +30,6 @@ fn joint(scene: &mut Scene, id: u32, j: JointComponent) {
     scene.world.set_joint(id, Some(j));
 }
 
-/// Step `ticks` times, collecting every break.
 fn run(scene: &mut Scene, ticks: usize) -> Vec<JointBreak> {
     let mut world = PhysicsWorld::from_scene(scene);
     (0..ticks)
@@ -48,7 +41,6 @@ fn pos(scene: &Scene, id: u32) -> Vec3 {
     scene.world.transform(id).unwrap().position
 }
 
-/// A cube one unit right of a world pivot at the origin, hinged about Z.
 fn hinged(limits: Option<Vec2>) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = cube(&mut scene, Vec3::X);
@@ -64,7 +56,6 @@ fn hinged(limits: Option<Vec2>) -> (Scene, u32) {
     (scene, id)
 }
 
-/// The hinged cube's swing about Z, in degrees (negative: fallen clockwise).
 fn swing_deg(scene: &Scene, id: u32) -> f32 {
     let rot: Quat = scene.world.transform(id).unwrap().rotation;
     let (axis, angle) = rot.to_axis_angle();
@@ -204,9 +195,6 @@ fn play_mode_edits_rebuild_only_what_changed() {
     assert!(pos(&scene, id).y < 4.5, "a removed joint frees the body");
 }
 
-/// A cube one unit right of a world pivot, on a limited Ball joint with the given
-/// swing axis and swing 1 / swing 2 limits; after `ticks`, how far (degrees) it
-/// has fallen below the horizontal, with the deepest it ever got.
 fn ball_fall(swing_axis: Vec3, swing1: f32, swing2: f32, ticks: usize) -> (f32, f32) {
     let mut scene = Scene::new();
     let id = cube(&mut scene, Vec3::X);
@@ -234,7 +222,6 @@ fn ball_fall(swing_axis: Vec3, swing1: f32, swing2: f32, ticks: usize) -> (f32, 
 
 #[test]
 fn ball_joint_stops_at_each_axis_own_swing_limit() {
-    // Gravity swings the cube about Z: swing 2 with a Y swing axis, swing 1 with Z.
     for (axis, s1, s2, limit) in [
         (Vec3::Y, 60.0, 20.0, 20.0),
         (Vec3::Y, 20.0, 60.0, 60.0),

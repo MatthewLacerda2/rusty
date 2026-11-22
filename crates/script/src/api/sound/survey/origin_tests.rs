@@ -1,6 +1,3 @@
-//! `Sound.Survey` reads a file as a bake reads it and an inline document as a
-//! verb reads it (#1216): a miscased enum name is fine inline, an error in a file.
-
 use mlua::Table;
 
 use crate::api::sound::fixture::{lua_with_sound, tmp};

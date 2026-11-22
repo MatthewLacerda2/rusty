@@ -1,25 +1,3 @@
-//! The `.demo` file: JSON Lines, one header and then one line per tick that had
-//! anything to say (#1581).
-//!
-//! ```text
-//! {"scene":"assets/scenes/main.scene","engine_commit":"8f6ad5f…","seed":…,"sources":{…},"settings":{…},"storage":{…},"size":[1280,720],"time_scale":1.0,"before_play":[…]}
-//! {"t":0,"input":{"held":["W"]},"host":[{"eval":"Time.SetScale(0.5)"}]}
-//! {"t":1,"dt":0.0172}
-//! {"t":119,"digest":"9b1c…"}
-//! {"t":240,"input":{"mouse_delta":[1.0,-2.0]},"size":[1920,1080]}
-//! {"end":7200,"digest":"41d0…"}
-//! ```
-//!
-//! Beside the tick lines run the index's own (`{"at":t,…}`, `index`, #1597), read
-//! by a search and skipped by a replay.
-//!
-//! A tick no line names had the input and `dt` of the tick before and no host
-//! act; the first tick's `dt` is measured from the fixed step. No
-//! format version (CLAUDE.md, *Backward compatibility is not a concern*): the header's engine
-//! commit is what a replay checks, and it warns when it differs. A float is
-//! written as a JSON number when that number reads back to the same bits, and as
-//! its bits otherwise ([`Exact`]), so a replay is bit for bit.
-
 use serde::de::Deserializer;
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -31,7 +9,6 @@ use rusty_app::GameWorld;
 use rusty_core::project::ProjectSettings;
 use rusty_script::scripting::{HostCall, Plain};
 
-/// An `f64` that survives the file bit for bit.
 #[derive(Clone, Copy, Debug)]
 pub struct Exact(pub f64);
 
@@ -41,7 +18,6 @@ impl PartialEq for Exact {
     }
 }
 
-/// `x` as a JSON number when that reads back to the same bits, else `None`.
 fn as_number(x: f64) -> Option<Value> {
     let number = serde_json::Number::from_f64(x)?;
     let back: f64 = serde_json::from_str(&number.to_string()).ok()?;
@@ -76,45 +52,28 @@ impl<'de> Deserialize<'de> for Exact {
     }
 }
 
-/// What a replay needs before its first tick.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Header {
-    /// The scene Play started in, relative to the project.
     pub scene: String,
-    /// The engine build that recorded it.
     pub engine_commit: String,
-    /// Where `Random` started.
     pub seed: u64,
-    /// The scene file and the project's scripts as they were: a replay on a
-    /// changed project says so.
     #[serde(default)]
     pub sources: Sources,
-    /// The project settings the run played under.
     pub settings: ProjectSettings,
-    /// The save data (`Storage`) Play started from: the player's options with it.
     pub storage: Value,
-    /// The Game view's pixel size when Play started, if a platform had set one.
     pub size: Option<(u32, u32)>,
-    /// The display scale when Play started (`Video.GetDisplayScale`, #1715), if a
-    /// platform had set one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub display_scale: Option<f32>,
-    /// `Time.timeScale` as edit mode left it: entering Play keeps it.
     pub time_scale: Exact,
-    /// `Time.paused` and the queued `Time.Step`s as edit mode left them: entering
-    /// Play keeps both, as it keeps the time scale.
     #[serde(default)]
     pub paused: bool,
     #[serde(default)]
     pub pending_steps: u32,
-    /// Host acts made before the tick that entered Play, run before entering it
-    /// (a scenario's set-up, a taint on how Play started), as [`Entry::host`].
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub before_play: Vec<Value>,
 }
 
 impl Header {
-    /// The header of a demo of `world` starting now on `scene`.
     pub fn of(world: &GameWorld, scene: String, before_play: &[HostCall]) -> Self {
         let time = world.resources.time.borrow().clone();
         Self {
@@ -134,41 +93,29 @@ impl Header {
     }
 }
 
-/// One tick that had something to say.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Entry {
-    /// The tick, counted from the first after Play was entered (`0`).
     pub t: u64,
-    /// The tick's `dt` (an `f32`, widened), when it differs from the tick before.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dt: Option<Exact>,
     #[serde(skip_serializing_if = "InputDelta::is_empty")]
     pub input: InputDelta,
-    /// Host acts made before this tick, in order ([`host_json`]).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub host: Vec<Value>,
-    /// The Game view's new size, from this tick on.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub size: Option<(u32, u32)>,
-    /// The display's new scale, from this tick on (#1715).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub display_scale: Option<f32>,
-    /// The state digest after this tick (`digest::of`), in hex.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub digest: Option<String>,
-    /// The `Scene.LoadAsync` operations the loader had finished by this tick's head
-    /// (#2123): where a window's worker made one ready, an input like the rest.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loads: Vec<u32>,
-    /// The pending operation's progress before ready, in percent, when it moved at
-    /// this tick's head (#2123): how far a window's worker and GPU warm-up were.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_progress: Option<u8>,
 }
 
 impl Entry {
-    /// Whether the tick has nothing to write.
     pub fn is_empty(&self) -> bool {
         self.input.is_empty()
             && self.dt.is_none()
@@ -181,8 +128,6 @@ impl Entry {
     }
 }
 
-/// The last line, written on Stop: how many ticks the demo holds, the host acts
-/// made after the last of them, and the state digest Play ended on.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct End {
     pub end: u64,
@@ -192,8 +137,6 @@ pub struct End {
     pub digest: Option<String>,
 }
 
-/// A host act as a JSON value: `{"eval": line}`, `{"call": name, "args": […]}` or
-/// `{"taint": what}`.
 pub fn host_json(call: &HostCall) -> Value {
     match call {
         HostCall::Eval(line) => json!({ "eval": line }),
@@ -204,7 +147,6 @@ pub fn host_json(call: &HostCall) -> Value {
     }
 }
 
-/// A host act read back; `None` for a line this build does not know.
 pub fn host_call(value: &Value) -> Option<HostCall> {
     let text = |key: &str| value.get(key)?.as_str().map(str::to_string);
     if let Some(line) = text("eval") {
@@ -223,11 +165,8 @@ pub fn host_call(value: &Value) -> Option<HostCall> {
     Some(HostCall::Call { function, args })
 }
 
-/// The key a float that a JSON number would not carry exactly is written under.
 const FLOAT_BITS: &str = "__f64";
 
-/// A plain Lua value as JSON. A Lua float stays a float (`1.0`, not `1`), so
-/// `math.type` reads the same on replay.
 pub(super) fn plain_json(value: &Plain) -> Value {
     match value {
         Plain::Nil => Value::Null,

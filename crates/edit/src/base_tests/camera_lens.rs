@@ -1,6 +1,5 @@
 //! A lens that skipped the authoring ops (a scene file, a prefab) is held where the
-//! view camera copies it, by the ops' own bounds, and draws a finite projection
-//! (#1359).
+//! view camera copies it, by the ops' own bounds, and draws a finite projection.
 
 use glam::Vec3;
 
@@ -13,7 +12,6 @@ use rusty_scene::camera::{
 use rusty_scene::create::default_camera;
 use rusty_scene::Scene;
 
-/// The view camera synced from a scene whose one camera is `c`.
 fn synced(c: CameraComponent) -> (Camera, Scene) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Cam".to_string());

@@ -1,5 +1,4 @@
-//! Strict node parsing (#395) and the node-named errors (#1575).
-
+//! Strict node parsing and the node-named errors.
 use super::*;
 
 fn parse(json: &str) -> Result<Node, String> {

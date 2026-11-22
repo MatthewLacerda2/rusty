@@ -1,17 +1,3 @@
-//! crates/dev/src/lua_surface/debug/ — `Debug` namespace (DEV-ONLY).
-//!
-//! `Debug.Log/Warn/Error`, the demo index's `Debug.Mark` (#1597), the structured scene-read `Debug.Snapshot` /
-//! `Debug.SnapshotEntity` (#180), the headless `Debug.Preview` asset shot (#353) and its
-//! named-material twin `Debug.PreviewMaterial` (#404),
-//! the frame stats `Debug.Stats` (#433), and the audio reads `Debug.AudioEvents` /
-//! `Debug.AudioVoices` (`audio.rs`, #1247), and the GPU readback
-//! `Debug.GetAdaptedExposure` (#1444), and the debug lines `Debug.DrawLine` /
-//! `Debug.DrawRay` (`draw.rs`, #1882), and the rolling frame log's `Debug.FrameLog` /
-//! `Debug.SetLogChannels` / `Debug.GetLogChannels` (`frame_log.rs`, #2206) — the agent's observation channels:
-//! structured, visual, performance and aural. Registered
-//! only in dev builds — stripped from the shipped game, like Unity `Debug.*` under
-//! `[Conditional]`: it lives in `dev`, which installs it onto the surface (#737).
-
 mod audio;
 mod draw;
 mod frame_log;
@@ -24,7 +10,6 @@ use rusty_scene::game_camera_from_scene;
 use rusty_script::api::{put, snapshot, ApiCtx, Reg};
 use rusty_script::scripting::Mark;
 
-/// Register the `Debug` namespace onto `lua` (dev builds only).
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -41,7 +26,6 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     lua.globals().set("Debug", table).map_err(|e| e.to_string())
 }
 
-/// `Debug.Log/Warn/Error` — append to the shared console buffer.
 fn register_logging(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -71,8 +55,6 @@ fn register_logging(
             Ok(())
         }),
     )?;
-    // `Debug.Mark(label [, value])` — a game fact for the recording demo's index
-    // (#1597); a no-op while no demo records.
     put(
         table,
         "Mark",
@@ -90,11 +72,6 @@ fn register_logging(
     )
 }
 
-/// `Debug.Stats([opts])` — the frame stats (#433) as a table: `frames`, each metric's
-/// `{last, min, avg, max, samples}`, and `systems` (per-system CPU ms). Filled by the
-/// dev layer's schedule probe; empty (`frames = 0`) where none is installed. With
-/// `opts.window = n`, each metric over the samples it took within the newest `n`
-/// drawn frames and the newest `n` ticks only (#2205).
 fn register_stats(
     lua: &mlua::Lua,
     table: &Table,
@@ -113,10 +90,6 @@ fn register_stats(
     )
 }
 
-/// `Debug.GetAdaptedExposure()` — the automatic exposure the screen last applied, in
-/// EV, read back from the GPU (#1444); `nil` before an `Automatic` frame has metered.
-/// Dev-only on purpose: a GPU readback is no sim input, so gameplay's
-/// `Graphics.GetExposure` returns the configured EV instead.
 fn register_adapted_exposure(
     lua: &mlua::Lua,
     table: &Table,
@@ -129,15 +102,6 @@ fn register_adapted_exposure(
     )
 }
 
-/// `Debug.Preview(asset_path, out_png [, opts])` — render an asset's preview to a PNG
-/// headlessly and return the written path, so it chains straight off an authoring bake:
-/// `Debug.Preview(Shader.Bake(recipe), "out/preview.png")` (#353).
-///
-/// Returns the path on success and `nil` when the box has no GPU/software adapter (a
-/// skip, not a failure — the harness must still run on a GPU-less CI box). A bad asset
-/// path or an unpreviewable kind raises, so a typo can't masquerade as a blank render.
-/// Borrows no engine state — it builds its own isolated scene and its own headless
-/// renderer — so it registers as a plain static function like `Shader`/`Texture`.
 fn register_preview(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -153,11 +117,6 @@ fn register_preview(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// `Debug.PreviewMaterial(name, out_png [, opts])` — the material-asset arm of
-/// `Debug.Preview` (#404). Material assets live in the scene's library, not on disk,
-/// so this one borrows the scene to look `name` up (a name it doesn't hold raises),
-/// then renders the copy in the same isolated preview scene as the Inspector's
-/// Material card. Same options and the same `nil`-without-a-GPU return.
 fn register_preview_material(
     lua: &mlua::Lua,
     table: &Table,
@@ -182,14 +141,6 @@ fn register_preview_material(
     )
 }
 
-/// Read the optional `{ mesh = "sphere"|"cube"|"suzanne"|"plane", resolution = 512,
-/// repeats = n }` table, defaulting each field independently (`repeats` absent: the
-/// material as authored). An unknown mesh name raises rather than silently falling
-/// back, so a misspelled `"spere"` is caught at the call, not by the agent squinting
-/// at the wrong picture; so does a `repeats` below 1, and the capture raises on one
-/// past what the renderer can show (`rusty_preview::stand_in::repeated`). (`repeat`
-/// would be the natural name, but it is a Lua keyword, so `{ repeat = 3 }` does not
-/// parse.)
 fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     let defaults = PreviewOptions::default();
     let Some(opts) = opts else {
@@ -218,8 +169,6 @@ fn preview_options(opts: Option<&Table>) -> mlua::Result<PreviewOptions> {
     })
 }
 
-/// Map a Lua mesh name onto [`PreviewMesh`], case-insensitively, the editor toggle's
-/// choices.
 fn parse_mesh(name: &str) -> mlua::Result<PreviewMesh> {
     PreviewMesh::parse(name).ok_or_else(|| {
         let expected = PreviewMesh::ALL.map(|m| format!("{:?}", m.name().to_lowercase()));
@@ -231,14 +180,11 @@ fn parse_mesh(name: &str) -> mlua::Result<PreviewMesh> {
     })
 }
 
-/// `Debug.Snapshot([opts])` (whole world) and `Debug.SnapshotEntity(id)` (one entity) —
-/// the structured scene-read, returned as a pretty JSON string the agent parses.
 fn register_snapshot(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let scene = ctx.scene;
     let camera = ctx.camera;
     let time = ctx.time;
     let (screen, video) = (ctx.screen, ctx.video);
-    // The main view (#1619): the camera entity's pose and lens when the scene has one.
     let main = move |lua: &mlua::Lua| -> mlua::Result<_> {
         let (camera, scene) = (camera.get(lua)?, scene.get(lua)?);
         let main = game_camera_from_scene(&camera.borrow(), &scene.borrow());
@@ -254,7 +200,6 @@ fn register_snapshot(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg 
         "Snapshot",
         lua.create_function(move |lua, opts: Option<Table>| {
             let scene = &*scene.get(lua)?;
-            // `{ bones = true }` includes skeleton bones, left out by default (#453).
             let bones = opts.and_then(|o| o.get::<Option<bool>>("bones").ok().flatten());
             let value = snapshot::world_value_with(
                 &scene.borrow(),

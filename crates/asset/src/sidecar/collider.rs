@@ -1,22 +1,10 @@
-//! crates/asset/src/sidecar/collider.rs — one sub-object's mesh-collider entry in a model's
-//! sidecar (#77): its shape, and the sub-object whose geometry builds it (#1960).
-//!
-//! The entry is written as a bare kind when the collider builds from the sub-object's
-//! own mesh (`"Chair": "TriMesh"`), and as an object when another sub-object of the
-//! same file is its collision mesh (`"Chair": { "kind": "TriMesh", "mesh":
-//! "Chair_col" }`), Unity's `MeshCollider.sharedMesh` pointed at a low-poly copy.
-//! The collision sub-object is imported for its geometry and never drawn: a whole
-//! model spawns no entity for it (`edit::model_instance`). Its vertices are read in
-//! the render sub-object's local space, so it shares that object's origin, as a
-//! Blender duplicate with a Decimate modifier does.
+//! A sub-object's mesh-collider entry in a model's sidecar: a bare kind builds from its own mesh, an object (`{"kind": "TriMesh", "mesh": "Chair_col"}`) names another sub-object as the collision mesh (Unity's `MeshCollider.sharedMesh`), imported but never drawn, its vertices read in the render sub-object's local space.
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-/// How a sub-object's baked mesh collider is shaped (#77). `TriMesh` is an exact
-/// triangle mesh (static geometry); `Convex` is a convex hull (cheaper, usable on
-/// dynamic bodies). A sub-object absent from the sidecar map gets no collider.
+/// `TriMesh` is exact (static geometry); `Convex` is a hull (cheaper, usable on dynamic bodies).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MeshColliderKind {
     TriMesh,
@@ -24,14 +12,11 @@ pub enum MeshColliderKind {
 }
 
 impl MeshColliderKind {
-    /// `true` when this kind bakes a convex hull rather than a triangle mesh.
     pub fn is_convex(self) -> bool {
         matches!(self, MeshColliderKind::Convex)
     }
 }
 
-/// A sub-object's collider entry: its kind, and the sub-object of the same file
-/// whose geometry builds it (`None`: its own).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(from = "Written", into = "Written")]
 pub struct SubObjectCollider {
@@ -40,13 +25,10 @@ pub struct SubObjectCollider {
 }
 
 impl SubObjectCollider {
-    /// A collider built from the sub-object's own mesh.
     pub fn own(kind: MeshColliderKind) -> Self {
         Self { kind, mesh: None }
     }
 
-    /// This entry as the sub-object `owner` reads it: a `mesh` naming `owner` itself
-    /// means its own mesh, so it never names a collision sub-object that is hidden.
     pub fn for_owner(self, owner: &str) -> Self {
         Self {
             mesh: self.mesh.filter(|m| m != owner),
@@ -55,8 +37,6 @@ impl SubObjectCollider {
     }
 }
 
-/// Read a sidecar's `colliders` map, each entry [`SubObjectCollider::for_owner`] its
-/// key: `"Chair": {"kind": "TriMesh", "mesh": "Chair"}` is `"Chair": "TriMesh"`.
 pub(super) fn read_map<'de, D: serde::Deserializer<'de>>(
     d: D,
 ) -> Result<BTreeMap<String, SubObjectCollider>, D::Error> {
@@ -68,10 +48,7 @@ pub(super) fn read_map<'de, D: serde::Deserializer<'de>>(
     Ok(owned.collect())
 }
 
-/// Whether naming `mesh` as `owner`'s collision mesh closes a loop: following each
-/// entry's `mesh` from `mesh` leads back to `owner` (`"A": {mesh: "B"}, "B": {mesh:
-/// "A"}`). Every sub-object of a loop names another as its collision mesh, so a
-/// whole-model spawn would draw none of them.
+/// Whether naming `mesh` as `owner`'s collision mesh closes a loop, which would leave a whole-model spawn drawing none of them.
 pub fn closes_loop(map: &BTreeMap<String, SubObjectCollider>, owner: &str, mesh: &str) -> bool {
     let mut at = mesh;
     for _ in 0..=map.len() {
@@ -86,7 +63,6 @@ pub fn closes_loop(map: &BTreeMap<String, SubObjectCollider>, owner: &str, mesh:
     false
 }
 
-/// The sub-objects of `map` whose collision mesh closes a loop ([`closes_loop`]).
 pub fn looped(map: &BTreeMap<String, SubObjectCollider>) -> Vec<String> {
     let looping = |(k, c): (&String, &SubObjectCollider)| {
         let mesh = c.mesh.as_deref()?;
@@ -95,9 +71,6 @@ pub fn looped(map: &BTreeMap<String, SubObjectCollider>) -> Vec<String> {
     map.iter().filter_map(looping).collect()
 }
 
-/// Read every entry of a loop as its own mesh, so the loop hides nothing; returns
-/// the sub-objects it changed. What a hand-edited sidecar's loop reads as
-/// (`sidecar::load`, warned once).
 pub(super) fn break_loops(map: &mut BTreeMap<String, SubObjectCollider>) -> Vec<String> {
     let looped = looped(map);
     for k in &looped {
@@ -108,11 +81,9 @@ pub(super) fn break_loops(map: &mut BTreeMap<String, SubObjectCollider>) -> Vec<
     looped
 }
 
-/// Files whose collision-mesh loop has been warned of.
 static WARNED: std::sync::Mutex<std::collections::BTreeSet<std::path::PathBuf>> =
     std::sync::Mutex::new(std::collections::BTreeSet::new());
 
-/// Say once per file that its sidecar's collision meshes loop through `looped`.
 pub(super) fn warn_loop(source: &std::path::Path, looped: &[String]) {
     let mut warned = WARNED.lock().unwrap_or_else(|e| e.into_inner());
     if warned.insert(source.to_path_buf()) {
@@ -124,7 +95,6 @@ pub(super) fn warn_loop(source: &std::path::Path, looped: &[String]) {
     }
 }
 
-/// The two ways an entry is written: the bare kind, or the kind with its mesh.
 #[derive(Serialize, Deserialize)]
 #[serde(untagged)]
 enum Written {

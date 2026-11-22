@@ -1,22 +1,9 @@
-//! crates/physics/src/query/tests.rs — the queries in `query/mod.rs`.
-//!
-//! The two segment-shaped queries: the wall ray a world canvas finds
-//! (`first_surface_ahead`, #429) and audio occlusion (`segment_blocked`, #467).
-//! Both pass triggers and look past the collider the origin starts inside;
-//! occlusion reaches exactly to the segment's end.
-//!
-//! Then every query skipping inactive entities (#521): rapier's query pipeline
-//! ignores the enabled flag, so every query filters through `query::is_live`. Each
-//! of those tests runs both directions — deactivate → miss, reactivate → hit — so a
-//! filter that always rejects or never rejects is caught.
-
 use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;
 use rusty_components::{ColliderComponent, ColliderShape, RigidBodyComponent};
 use rusty_scene::Scene;
 
-/// A static unit-thick wall (or trigger) facing -x, its near face at `x - 0.5`.
 fn add_wall(scene: &mut Scene, x: f32, is_trigger: bool) -> u32 {
     let id = scene.add_entity("Wall".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(x, 0.0, 0.0);
@@ -32,8 +19,6 @@ fn add_wall(scene: &mut Scene, x: f32, is_trigger: bool) -> u32 {
     id
 }
 
-/// A player-sized sphere around the origin, a trigger at x = 2 and a solid wall
-/// at x = 5 (near face at 4.5). Returns the wall.
 fn corridor(scene: &mut Scene) -> u32 {
     let body = scene.add_entity("Body".to_string());
     scene.world.set_static(body, true);
@@ -78,7 +63,6 @@ fn a_segment_is_blocked_only_by_a_solid_on_it() {
 
 const DT: f32 = 1.0 / 60.0;
 
-/// An entity at local `pos` under `parent` with a `size` box collider.
 fn add_box(scene: &mut Scene, parent: Option<u32>, pos: Vec3, size: Vec3) -> u32 {
     let id = scene.add_entity("E".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -93,7 +77,6 @@ fn add_box(scene: &mut Scene, parent: Option<u32>, pos: Vec3, size: Vec3) -> u32
     id
 }
 
-/// Give `id` a gravity-free kinematic Rigidbody, making it a compound owner.
 fn kinematic(scene: &mut Scene, id: u32) {
     let rb = RigidBodyComponent {
         is_kinematic: true,
@@ -103,13 +86,11 @@ fn kinematic(scene: &mut Scene, id: u32) {
     scene.world.set_rigidbody(id, Some(rb));
 }
 
-/// Flip `id`'s activation and run the physics tick that pushes it to rapier.
 fn set_active(scene: &mut Scene, world: &mut PhysicsWorld, id: u32, active: bool) {
     scene.world.set_active(id, active);
     world.step(scene, DT);
 }
 
-/// The entity a straight-down ray from 5 m above `(x, _, 0)` hits, if any.
 fn hit_below(world: &PhysicsWorld, x: f32) -> Option<u32> {
     let origin = Vec3::new(x, 5.0, 0.0);
     world
@@ -117,8 +98,6 @@ fn hit_below(world: &PhysicsWorld, x: f32) -> Option<u32> {
         .map(|hit| hit.id)
 }
 
-/// Every query family's answer about a unit box `target` at the origin, as
-/// seen from outside it (casts from -z, volumes and points at its center).
 fn answers(world: &PhysicsWorld, target: u32) -> [bool; 11] {
     let from = Vec3::new(0.0, 0.0, -5.0);
     let sweep = crate::Sweep::Sphere {

@@ -1,7 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/ui.rs — the UI layout and container components' field
-//! tables: `Canvas`, `RectTransform`, `Image`, `CanvasGroup`, `RectMask`, `Mask`,
-//! `BackdropFilter`, `Selectable`, `LayoutGroup` and `LayoutElement`.
-
 use glam::Vec4;
 
 use super::super::table::{group, inspect, op, part, unheld, with, Group};
@@ -112,8 +108,6 @@ inspect! {
             }
         }),
         op!("fade_duration", selectable::set_fade_duration),
-        // A list of optional values may come back short: `Get` reads an empty
-        // entry as a `nil` hole, and a missing entry is `None`.
         with!("sprites", |s, v: Vec<Option<String>>| {
             for state in SelectionState::ALL {
                 selectable::set_sprite(s, state, v.get(state as usize).cloned().flatten());
@@ -154,7 +148,6 @@ inspect! {
     ];
 }
 
-/// A rect's world anchor, whole: `None` detaches it.
 fn set_world_anchor(r: &mut RectTransformComponent, anchor: Option<WorldAnchor>) {
     let Some(a) = anchor else {
         return rect::clear_world_anchor(r);

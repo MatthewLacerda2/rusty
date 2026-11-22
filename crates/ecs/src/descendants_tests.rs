@@ -1,7 +1,3 @@
-//! crates/ecs/src/descendants_tests.rs — `World::self_and_descendants` (#991): pre-order in
-//! declared order, and a malformed `children` list ends the walk; the change log's
-//! subtree stamps reach the same ids.
-
 use crate::{Changes, World, WorldPose};
 
 fn walk(w: &World, id: u32) -> Vec<u32> {
@@ -33,7 +29,7 @@ fn a_children_cycle_visits_each_id_once() {
     let b = w.spawn("b".into());
     w.add_child(a, b);
     w.add_child(b, a);
-    w.add_child(a, b); // listed twice
+    w.add_child(a, b);
     assert_eq!(walk(&w, a), vec![a, b]);
 }
 
@@ -67,8 +63,6 @@ fn a_hierarchy_path_reads_back_to_its_entity_among_same_names() {
     assert_eq!(w.path_of(99), None);
 }
 
-/// The walk as first written (#991): a cloned child list and a `BTreeSet` per walk.
-/// The kept reference the allocation-free walk must match id for id.
 fn reference(w: &World, id: u32, descend: impl Fn(u32) -> bool) -> Vec<u32> {
     let (mut stack, mut seen, mut out) = (vec![id], std::collections::BTreeSet::new(), vec![]);
     while let Some(id) = stack.pop() {
@@ -83,8 +77,6 @@ fn reference(w: &World, id: u32, descend: impl Fn(u32) -> bool) -> Vec<u32> {
     out
 }
 
-/// `n` entities, each given the listed children by index (cycles and repeats
-/// allowed, taken modulo `n + 3`); the last three are spawned then despawned.
 fn malformed(lists: &[Vec<usize>]) -> (World, Vec<u32>) {
     let mut w = World::new();
     let ids: Vec<u32> = (0..lists.len() + 3)
@@ -111,7 +103,6 @@ proptest::proptest! {
             proptest::prop_assert_eq!(walk(&w, id), reference(&w, id, |_| true));
             let pruned: Vec<u32> = w.self_and_descendants_while(id, |e| e % prune != 0).collect();
             proptest::prop_assert_eq!(pruned, reference(&w, id, |e| e % prune != 0));
-            // The stamps' kept walk (`changes::stamp`) reaches the same ids; the log reads them sorted.
             w.stamp_pose_below(id);
             let mut sorted = reference(&w, id, |_| true);
             sorted.sort_unstable();

@@ -1,7 +1,3 @@
-//! Emission over a lightmap bake (#1750): a static mesh the bake took in emits in
-//! it whether or not it receives a lightmap, so SSIL gathers none of its glow; a
-//! mesh that isn't static is in no bake, and its glow still bounces.
-
 use glam::Vec3;
 
 use super::baked::{bake, off_and_on, BAKED_GAIN};
@@ -9,8 +5,6 @@ use rusty_components::Ssil;
 use rusty_render::test_gpu::ssil::{block, floor, on, patch, renderer, set_ssil, settled, FLOOR};
 use rusty_scene::Scene;
 
-/// The fixture's floor and, where its red wall stands, a wall glowing red that
-/// gets no lightmap (Scale In Lightmap 0), baked. Returns the scene and the wall.
 fn glowing_wall_over_a_baked_floor() -> (Scene, u32) {
     let mut scene = floor(Ssil::default());
     let at = (Vec3::new(0.0, 1.5, -6.0), Vec3::new(6.0, 3.0, 0.2));
@@ -36,7 +30,6 @@ fn gpu_a_static_glow_with_no_lightmap_is_not_gathered_and_a_moving_one_is() {
         "its bounce is baked: {with} vs {off}"
     );
 
-    // The same wall, no longer static: a moving prop no bake holds.
     scene.world.set_static(wall, false);
     let red_over_green = |r: &mut _, scene: &mut Scene, ssil| {
         set_ssil(scene, ssil);

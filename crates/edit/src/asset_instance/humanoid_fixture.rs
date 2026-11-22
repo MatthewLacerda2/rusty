@@ -1,13 +1,7 @@
-//! A humanoid model borrowing clips (#1747), for the tests here and the scripting
-//! tests' `Assets.SetHumanoid`. A test hook: compiled in every build, since those
-//! tests are another crate's; the glTF it copies is the caller's (the test-support
-//! crate's animated fixture), which only tests link.
+//! A test hook, compiled in every build: the scripting tests that use it are another crate's.
 
 use std::path::{Path, PathBuf};
 
-/// `name`, a copy of the two-joint animated glTF `gltf` (its buffer `bin` beside it
-/// as `anim.bin`) whose one clip is `clip`, in `dir`, its sidecar mapping `Joint0`
-/// to the hips with `clips_from`.
 pub fn write(
     dir: &Path,
     name: &str,

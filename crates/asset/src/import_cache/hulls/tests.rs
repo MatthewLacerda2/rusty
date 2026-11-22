@@ -1,6 +1,3 @@
-//! crates/asset/src/import_cache/hulls/tests.rs — a hull sidecar keeps its hulls bit
-//! for bit, refuses a malformed file whole, and follows its model's meshes (#1940).
-
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -62,8 +59,7 @@ fn a_malformed_sidecar_is_refused_whole() {
     longer.push(0);
     assert!(parse(&longer).is_err(), "trailing bytes");
     assert!(parse(b"GLTF\0\0\0\0").is_err(), "another file");
-    // Past the header (magic, fingerprint, entry count), the first entry's 28
-    // bytes (its hull count last) and the first hull's point count.
+    // Past the header, the first entry's 28 bytes and the first hull's point count.
     let header = 4 + 4 + DECOMPOSER.len() + 4;
     let point = header + 28 + 4;
     let mut nan = good.clone();
@@ -81,8 +77,8 @@ fn a_malformed_sidecar_is_refused_whole() {
     assert!(parse(&other).unwrap_err().contains("another decomposer"));
 }
 
-/// A model of its own in a fresh folder: the quad `.obj` raised to `y`, so no
-/// other test shares its mesh (the stores are process-wide), and its quad's key.
+/// A quad `.obj` raised to `y`, so no other test shares its mesh (the stores are
+/// process-wide), and its key.
 fn quad_model(y: f32) -> (PathBuf, Key) {
     let dir = rusty_test_support::temp::dir();
     let path = dir.join("quad.obj");

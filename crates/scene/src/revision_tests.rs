@@ -1,5 +1,3 @@
-//! crates/scene/src/revision_tests.rs — a revision moves at a write and only then.
-
 use super::{Revision, Revisioned};
 
 #[test]

@@ -1,4 +1,4 @@
-//! What looking at a dependency's path finds (#1189): only a regular file is
+//! What looking at a dependency's path finds: only a regular file is
 //! read, and the stamp must be able to name it.
 
 use super::super::{Dependency, Seen};
@@ -40,7 +40,7 @@ fn a_file_the_engine_rewrites_is_read_again_at_the_same_length() {
         Dependency::look(&file).unwrap().seen(),
         Seen::Read(rusty_core::hash::content(b"red"))
     );
-    // Same length: only the write log tells the memo the file changed (#1219).
+    // Same length: only the write log tells the memo the file changed.
     rusty_core::fs::written::write(&file, b"tan").unwrap();
     let digest = rusty_core::hash::content(b"tan");
     assert_eq!(Dependency::look(&file).unwrap().seen(), Seen::Read(digest));

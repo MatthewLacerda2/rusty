@@ -1,7 +1,3 @@
-//! `ambient_occlusion` on primitives: flat ground and peaks see the sky, the foot
-//! of a wall and a wide groove's floor do not, and it wraps, holds across
-//! resolutions and bakes the same twice.
-
 use super::*;
 use crate::catalog::filter::test_probe::{assert_wraps, relief, run};
 use crate::recipe::OpKind;
@@ -14,8 +10,6 @@ fn ao(radius: f32) -> OpKind {
     })
 }
 
-/// A raised band across the middle third of an `n²` tile: a groove 2/3 wide
-/// between its walls, wrapped.
 fn band(n: u32) -> Image {
     Image::fill_uv(n, |u, _| {
         [f32::from(u8::from((1.0 / 3.0..2.0 / 3.0).contains(&u))); 4]
@@ -41,7 +35,6 @@ fn the_foot_of_a_wall_is_darker_than_open_floor_and_the_top() {
 
 #[test]
 fn a_wide_groove_is_occluded_where_cavity_would_not_reach() {
-    // At radius 0.3 the walls hide some sky from the middle of the floor.
     let out = run(&ao(0.3), &band(96));
     assert!(out.row(0)[80][0] < 0.99);
 }
@@ -49,7 +42,6 @@ fn a_wide_groove_is_occluded_where_cavity_would_not_reach() {
 #[test]
 fn it_reads_alike_at_any_resolution() {
     let (lo, hi) = (run(&ao(0.1), &band(96)), run(&ao(0.1), &band(192)));
-    // Pixel x at 96² covers pixels 2x and 2x + 1 at 192².
     for x in 0..96 {
         let a = lo.row(0)[x][0];
         let b = (hi.row(0)[2 * x][0] + hi.row(0)[2 * x + 1][0]) / 2.0;

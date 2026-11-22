@@ -1,11 +1,5 @@
-//! Lettering (#2190): a string shaped in a font and laid out as one centred block,
-//! each glyph's outline a [`Shape`] in tile units.
-//!
-//! Each line is shaped whole (`rusty_font::shape`: kerning, ligatures, marks, as
-//! the UI's `Text` draws them), its glyphs drawn at the em size `size` with
-//! `tracking` ems between them. Lines are `line_spacing` ems apart; the block runs
-//! from the first line's ascent to the last line's descent, its widest line sets
-//! its width, and it is centred in the tile, each line aligned within it.
+//! The block runs from the first line's ascent to the last line's descent, its widest line sets
+//! its width, and it is centred in the tile.
 
 use glam::Vec2;
 use rusty_core::collections::Map;
@@ -14,8 +8,6 @@ use rusty_font::{FontData, GlyphId};
 use super::fill::Shape;
 use crate::catalog::generators::outline::text::Align;
 
-/// How a block of text is laid out: the em size and tracking in tiles and ems,
-/// line spacing in ems, and the alignment of its lines.
 #[derive(Clone, Copy, Debug)]
 pub struct Layout {
     pub size: f32,
@@ -24,7 +16,6 @@ pub struct Layout {
     pub align: Align,
 }
 
-/// `text`'s glyphs in `font` under `layout`, one [`Shape`] per drawn glyph.
 pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     let upem = font.units_per_em();
     let s = layout.size / upem;
@@ -71,8 +62,6 @@ pub fn glyphs(font: &FontData, text: &str, layout: Layout) -> Vec<Shape> {
     shapes
 }
 
-/// One drawn line: each glyph and where it sits (font units, y up), and the line's
-/// advance width.
 type Line = (Vec<(GlyphId, Vec2)>, f32);
 
 /// `text` shaped as one line, `tracking` font units after each cluster but the

@@ -1,10 +1,3 @@
-//! `Graphics.*` per post effect (#1467): one registrar per effect, in its own file
-//! (grading and lens effects in their folders), listed once in [`REGISTRARS`]. A
-//! volume effect writes the main camera's active post-processing volume and a camera
-//! effect (motion blur, FXAA, TAA) the main camera's component, both through the
-//! `edit::authoring` ops the Inspector calls; an effect's numeric knobs that are a
-//! pair on their own come from its knob table (`knobs`).
-
 use super::super::Reg;
 use crate::api::ApiCell;
 use rusty_scene::Scene;
@@ -28,10 +21,8 @@ mod volumetric_fog;
 use grading::{color_adjustments, color_lookup, lift_gamma_gain, tonemapping, white_balance};
 use lens::{chromatic_aberration, film_grain, vignette};
 
-/// One effect's `Graphics.*` functions, registered onto the namespace's table.
 pub type Registrar = fn(&mlua::Lua, &mlua::Table, ApiCell<Scene>) -> Reg;
 
-/// Every effect's registrar, by the effect's name.
 pub const REGISTRARS: &[(&str, Registrar)] = &[
     // sorted: one row per effect; each registers names no other does
     ("bloom", bloom::register),
@@ -55,7 +46,6 @@ pub const REGISTRARS: &[(&str, Registrar)] = &[
     ("white_balance", white_balance::register),
 ];
 
-/// Register every effect's functions onto `table`.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for (_, register) in REGISTRARS {
         register(lua, table, scene)?;

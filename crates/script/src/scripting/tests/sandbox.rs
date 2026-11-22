@@ -1,5 +1,3 @@
-//! The deterministic Lua sandbox (#443): no wall clock, one seeded RNG stream.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -29,14 +27,12 @@ fn live_manager() -> ScriptManager {
     m
 }
 
-/// Run `code` and return the string it left in the global `out`.
 fn run(m: &ScriptManager, code: &str) -> String {
     m.exec(code).expect("lua runs");
     let lua = m.lua.as_ref().expect("live");
     lua.globals().get("out").expect("`out` is a string")
 }
 
-/// Draws a mixed sequence through every entry point into one comparable string.
 const DRAWS: &str = r#"
 local t = {}
 for _ = 1, 5 do
@@ -119,8 +115,6 @@ fn range_overloads_follow_the_number_subtype() {
 
 #[test]
 fn cached_math_random_survives_across_evaluations() {
-    // `local random = math.random` at load time is a common Lua idiom; the shim
-    // resolves `Random` per call, so it must keep working in a later evaluation.
     let m = live_manager();
     m.exec("cached = math.random").expect("cache");
     assert_eq!(run(&m, "local v = cached(1, 1); out = tostring(v)"), "1");

@@ -1,6 +1,5 @@
 use super::*;
 
-/// A per-test temp file, unique to this process so parallel runs never collide.
 fn temp_path(name: &str) -> PathBuf {
     let path = rusty_test_support::temp::dir()
         .join(format!("rusty_build_{}_{name}.json", std::process::id()));
@@ -36,8 +35,6 @@ fn bound_instance_writes_through_on_every_setter() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// A default graphics option writes `project.rusty` when bound and keeps the build
-/// settings beside it; reopening reads it back (#1438).
 #[test]
 fn a_default_graphics_option_writes_through_the_bound_file() {
     use crate::settings::graphics_options::{GraphicsOption, GraphicsOptions};
@@ -65,8 +62,6 @@ fn a_default_graphics_option_writes_through_the_bound_file() {
     let _ = std::fs::remove_file(&path);
 }
 
-/// The render-scale default (#1715) writes the bound file, reaches the live
-/// setting, and reopening reads it back; a demo's settings carry it.
 #[test]
 fn the_render_scale_default_writes_through_the_bound_file() {
     use crate::settings::render_scale::{RenderScaleDefault, RenderScaleSetting};

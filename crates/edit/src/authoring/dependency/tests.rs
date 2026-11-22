@@ -1,14 +1,9 @@
-//! Tests for the component dependency mechanism (`dependency`, #359).
-
 use super::*;
 use crate::authoring::{create_entity, default_post_processing};
 use rusty_scene::Scene;
 
 #[test]
 fn all_kinds_are_addable_and_probeable() {
-    // Guards `ComponentKind::ALL` against drift: every listed kind adds a default
-    // and is then seen by the presence probe (the compiler already forces the
-    // per-kind match arms to be exhaustive).
     let mut scene = Scene::new();
     for &kind in ComponentKind::ALL {
         let id = create_entity(&mut scene, "E", None);
@@ -66,7 +61,6 @@ fn reconcile_drops_orphaned_dependent() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "FX", None);
     add_with_requirements(&mut scene.world, id, ComponentKind::PostProcessing);
-    // Clear the requirement out from under the dependent (as another card might).
     scene.world.set_camera(id, None);
     assert!(reconcile_requirements(&mut scene.world, id));
     assert!(!scene.world.has_post_processing(id));
@@ -76,7 +70,6 @@ fn reconcile_drops_orphaned_dependent() {
 fn enforce_on_load_auto_adds_missing_requirement() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "FX", None);
-    // Simulate a hand-edited scene: a dependent with no requirement.
     scene
         .world
         .set_post_processing(id, Some(default_post_processing()));
@@ -86,6 +79,5 @@ fn enforce_on_load_auto_adds_missing_requirement() {
         vec![(ComponentKind::PostProcessing, ComponentKind::Camera)]
     );
     assert!(scene.world.has_camera(id));
-    // Idempotent: a second pass finds nothing to add.
     assert!(enforce_requirements(&mut scene.world, id).is_empty());
 }

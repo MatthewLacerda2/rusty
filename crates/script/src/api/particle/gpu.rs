@@ -1,13 +1,7 @@
-//! crates/script/src/api/particle/gpu.rs — the live particle calls on a `Gpu`
-//! emitter (#2170), whose particles are the renderer's: every read
-//! (`GetParticles`, `GetArrays`, `ForEach`) sees none, so `ForEach` writes back
-//! nothing, and a write (`SetParticles`, `SetArrays`) changes nothing and warns,
-//! once between them ([`refuse`]).
+//! A `Gpu` emitter's particles are the renderer's: reads see none, a write changes nothing and warns once ([`refuse`]).
 
 use rusty_components::particle::ParticleEmitterComponent;
 
-/// A write (`verb`) to entity `id`'s `Gpu` emitter `e`: nothing changes, the
-/// first one warns, and the number live is returned.
 pub(super) fn refuse(e: &mut ParticleEmitterComponent, verb: &str, id: u32) -> u32 {
     if e.runtime.gpu.first_warning() {
         log::warn!(

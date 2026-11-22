@@ -1,25 +1,10 @@
-//! The REPL input line and its shell-style history recall.
-
-/// Most lines history keeps; the oldest is dropped past it.
 const MAX_HISTORY: usize = 100;
 
-/// A single line of REPL input plus a bounded history, owned by whatever UI hosts
-/// the console (the editor's bottom panel). Kept separate from `ConsoleLogs` so
-/// the log buffer stays a pure sink with no UI state.
-///
-/// Recall works like a shell's readline: `recall_prev` (Up) walks back through
-/// submitted lines, `recall_next` (Down) walks forward and, past the newest,
-/// restores the line that was being typed. Recalled text is a copy in `buffer`;
-/// history entries are never edited.
 #[derive(Default)]
 pub struct ReplInput {
-    /// The text currently being edited in the input line.
     pub buffer: String,
-    /// Previously submitted lines, newest last.
     history: Vec<String>,
-    /// Index into `history` while recalling; `None` when editing a fresh line.
     recall: Option<usize>,
-    /// The line being typed when recall began, restored by walking past the newest.
     draft: String,
 }
 
@@ -29,9 +14,6 @@ impl ReplInput {
         Self::default()
     }
 
-    /// Take the current buffer, record it in history (unless blank or an immediate
-    /// repeat of the previous entry), and clear the buffer and any recall.
-    /// Returns `None` if the buffer is blank.
     pub fn take_submit(&mut self) -> Option<String> {
         let line = std::mem::take(&mut self.buffer);
         self.recall = None;
@@ -53,7 +35,6 @@ impl ReplInput {
         &self.history
     }
 
-    /// Up: replace the buffer with the previous entry (stays on the oldest).
     pub fn recall_prev(&mut self) {
         let next = match self.recall {
             None if self.history.is_empty() => return,
@@ -67,7 +48,6 @@ impl ReplInput {
         self.buffer = self.history[next].clone();
     }
 
-    /// Down: replace the buffer with the next entry; past the newest, restore the draft.
     pub fn recall_next(&mut self) {
         let Some(i) = self.recall else { return };
         if i + 1 < self.history.len() {
@@ -124,15 +104,15 @@ mod tests {
         r.recall_prev();
         r.recall_prev();
         assert_eq!(r.buffer, "one");
-        r.recall_prev(); // stays on the oldest
+        r.recall_prev();
         assert_eq!(r.buffer, "one");
         r.recall_next();
         assert_eq!(r.buffer, "two");
         r.recall_next();
         assert_eq!(r.buffer, "three");
-        r.recall_next(); // past the newest
+        r.recall_next();
         assert_eq!(r.buffer, "draft");
-        r.recall_next(); // not recalling: no-op
+        r.recall_next();
         assert_eq!(r.buffer, "draft");
     }
 

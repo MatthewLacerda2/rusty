@@ -1,20 +1,3 @@
-//! crates/script/src/api/physics/mod.rs — `Physics` namespace.
-//!
-//! Rigidbody velocity/force/kinematic controls plus the spatial query surface
-//! over the live rapier/parry `PhysicsWorld` — the same query pipeline the
-//! engine uses, so script and engine queries agree (#31, #311). The queries
-//! split by shape: line and shape casts (`Raycast`, `SphereCast`/`CapsuleCast`/
-//! `BoxCast`, the `*All` forms) in `cast`, volume overlaps (`Overlap*`/`Check*`)
-//! in `volume`, per-collider point queries
-//! (`ClosestPoint`/`ContainsPoint`/`GetBounds`) in `point`, and the collider's
-//! authorable shape + inline physics material (#447) in `collider`, the shared
-//! physics material assets (#1878) in `material`, the per-bone
-//! hitbox generator (#464) in `hitbox`, forces / impulses at a point (#466)
-//! in `impulse`, mass, gravity and the trigger flag (#1365) in `body`, the layer collision matrix (#827) in `matrix`, and the
-//! enter/exit penetration cast (`RaycastThrough`, #830) in `through`.
-//! `register` creates the `Physics` table; `register_hitscan` extends it once
-//! the live physics handle is available.
-
 mod body;
 mod cast;
 mod collider;
@@ -38,8 +21,6 @@ use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 
-/// Register the rigidbody half of `Physics` (velocity/force/kinematic) onto
-/// `lua`, creating the `Physics` global table.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -58,7 +39,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `GetVelocity` / `SetVelocity` over the entity's rigidbody.
 fn register_velocity(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -180,10 +160,6 @@ fn register_force(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
             let mut scene = scene.borrow_mut();
             if let Some(mut rb) = scene.world.rigidbody_mut(id) {
                 if !rb.is_kinematic {
-                    // Continuous force (Unity `ForceMode.Force`): a force F over a
-                    // fixed step dt changes velocity by F/m · dt. Scaling by the
-                    // fixed step makes one call's effect match the physics tick it
-                    // feeds, instead of an unscaled (dt-independent) velocity jump.
                     let dv = Vec3::new(fx, fy, fz) / rb.mass.max(0.0001) * FIXED_DELTA_TIME;
                     rb.velocity += dv;
                 }
@@ -207,13 +183,6 @@ fn register_force(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// Extend `Physics` with the spatial query surface (#31, #311, #1881): the
-/// line and shape casts (`Raycast`, `SphereCast`/`CapsuleCast`/`BoxCast`,
-/// `RaycastAll`/`SphereCastAll`), the volume overlaps (`Overlap*` +
-/// `Check*` for spheres, oriented boxes and capsules), and the per-collider point
-/// queries (`ClosestPoint`/`ContainsPoint`/`GetBounds`). All route through the
-/// live rapier/parry `PhysicsWorld` — the same query pipeline the engine uses —
-/// so a script's query and the engine's return identical answers.
 pub fn register_hitscan(
     lua: &Lua,
     scene: ApiCell<Scene>,

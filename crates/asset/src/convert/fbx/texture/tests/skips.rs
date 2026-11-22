@@ -1,5 +1,5 @@
 //! A texture left out on purpose is reported in `Converted::skipped` by the
-//! converter itself (#1197), not only by `refresh` replaying it.
+//! converter itself, not only by `refresh` replaying it.
 
 use super::fixture;
 use crate::convert::fbx::convert;

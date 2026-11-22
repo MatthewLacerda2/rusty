@@ -1,12 +1,3 @@
-//! crates/script/src/api/animator/ik.rs — the `Animator` IK surface (#461).
-//!
-//! `AddTwoBoneIK` / `AddAimIK` / `RemoveIK` author an animator's named IK
-//! constraints (saved with it); `SetIKTarget[Entity]`, `SetIKHint[Entity]` and
-//! `SetIKWeight` / `GetIKWeight` drive them at runtime — Unity's
-//! `Animator.SetIKPosition` / `SetIKHintPosition` / `SetIKPositionWeight` and
-//! `SetLookAtPosition`, generalised to named chains over bone GameObjects. The
-//! solve itself is `Scene::solve_ik`, after `LateUpdate`.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -19,7 +10,6 @@ use crate::scripting::ConsoleLogs;
 use rusty_components::{IkChain, IkConstraint, IkTarget};
 use rusty_scene::Scene;
 
-/// Register the IK functions onto the `Animator` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -32,8 +22,6 @@ pub(super) fn register(
     register_weight(lua, table, scene, console)
 }
 
-/// Add (or replace) `constraint` on `id`'s animator once every bone it names
-/// exists in `id`'s skeleton; otherwise warn and refuse.
 fn add(scene: &RefCell<Scene>, console: &RefCell<ConsoleLogs>, id: u32, c: IkConstraint) -> bool {
     let mut scene = scene.borrow_mut();
     let missing = c
@@ -130,7 +118,6 @@ fn aim_options(c: &mut IkConstraint, t: &Table) -> mlua::Result<()> {
     Ok(())
 }
 
-/// `RemoveIK(id, name)` — drop the constraint, putting back what it last wrote.
 fn register_remove(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -148,7 +135,6 @@ fn register_remove(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg
     )
 }
 
-/// Run `f` on `id`'s constraint `name`; warn and return `false` when absent.
 fn with_ik(
     scene: &RefCell<Scene>,
     console: &RefCell<ConsoleLogs>,
@@ -168,8 +154,6 @@ fn with_ik(
     found.is_some()
 }
 
-/// `SetIKTarget(id, name, x, y, z)`, `SetIKTargetEntity(id, name, target)`,
-/// `SetIKHint(id, name, x, y, z)`, `SetIKHintEntity(id, name, hint)`.
 fn register_targets(
     lua: &mlua::Lua,
     table: &Table,

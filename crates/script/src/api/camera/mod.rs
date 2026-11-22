@@ -1,14 +1,3 @@
-//! crates/script/src/api/camera/mod.rs — `Camera` namespace.
-//!
-//! Get/Set for position, yaw, pitch and fov of the main view, plus `GetForward`/`GetRight` basis vectors so a controller
-//! script can move and aim relative to where the camera looks, and the world ↔
-//! screen projections (`WorldToScreen`, `ScreenToWorldRay`, #429; `MouseRay`, the
-//! ray under the cursor, so a mouse pick never flips `y` by hand). The pose is the
-//! main camera entity's Transform and the fov its lens when the scene has one, else
-//! the free view camera's (`scene::camera::view`, #1619); the per-entity functions (`component`) tune a camera *entity's*
-//! projection and render-texture target (#430), lens and stacking (`lens`, #1341).
-//! `ResetHistory` cuts a camera's view (#2003, `scene::camera::HistoryCuts`).
-
 pub mod component;
 mod lens;
 
@@ -22,7 +11,6 @@ use crate::api::entity_arg::EntityArg;
 use rusty_scene::camera::{main_camera, set_view_fov, set_view_orientation, set_view_position};
 use rusty_scene::{game_camera_from_scene, Camera, Scene};
 
-/// Register the `Camera` namespace onto `lua`.
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_position(lua, &table, ctx)?;
@@ -38,12 +26,10 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// The main view as it stands: the main camera entity's pose, else the free camera.
 fn view(camera: &RefCell<Camera>, scene: &RefCell<Scene>) -> Camera {
     game_camera_from_scene(&camera.borrow(), &scene.borrow())
 }
 
-/// `GetPosition` / `SetPosition` plus the `GetForward` / `GetRight` basis vectors.
 fn register_position(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let (camera, scene) = (ctx.camera, ctx.scene);
     put(
@@ -69,9 +55,6 @@ fn register_position(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg 
         }),
     )?;
 
-    // Forward / right basis vectors derived from yaw+pitch. Pure engine math
-    // (`Camera::forward`/`right`) exposed so a controller script can move and aim
-    // relative to where the camera looks, instead of re-deriving the trig in Lua.
     put(
         table,
         "GetForward",
@@ -153,16 +136,11 @@ fn register_fov(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     )
 }
 
-/// The sim's screen size in pixels (`UI.GetScreenSize`), the frame every
-/// projection speaks.
 fn screen_px(ctx: &ApiCtx) -> impl Fn(&Lua) -> mlua::Result<Vec2> + Copy + 'static {
     let (screen, video) = (ctx.screen, ctx.video);
     move |lua: &Lua| Ok(screen.get(lua)?.borrow().pixels(&video.get(lua)?.borrow()))
 }
 
-/// `WorldToScreen(x, y, z [, canvas])` → `sx, sy, depth, onScreen` — UI screen
-/// pixels (bottom-left, y-up), or the canvas's reference units when a canvas id is
-/// given; `depth` ≤ 0 is behind the camera.
 fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let (camera, scene, px) = (ctx.camera, ctx.scene, screen_px(ctx));
     put(
@@ -189,10 +167,6 @@ fn register_projection(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Re
     )
 }
 
-/// `ScreenToWorldRay(x, y)` → the ray's origin and unit direction through a UI
-/// screen pixel; `MouseRay()` the same through the cursor (`Input`'s top-left
-/// position flipped, the screen centre while the cursor is locked, as the UI
-/// pointer reads it).
 fn register_rays(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let (camera, scene, input, px) = (ctx.camera, ctx.scene, ctx.input, screen_px(ctx));
     put(
@@ -225,9 +199,6 @@ fn register_rays(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     )
 }
 
-/// `ResetHistory([id])`: the next frame of camera `id`'s view (the screen's base
-/// camera, `Camera.main`, when omitted or `nil`) starts every history over, URP's
-/// `resetHistory`. A dead id or an entity with no camera does nothing.
 fn register_reset_history(lua: &mlua::Lua, table: &mlua::Table, ctx: &ApiCtx) -> Reg {
     let scene = ctx.scene;
     put(

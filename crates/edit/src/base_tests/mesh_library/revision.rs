@@ -1,4 +1,4 @@
-//! A library mesh's revisions only move forward (#2059's review): an entry put
+//! A library mesh's revisions only move forward: an entry put
 //! back by Undo or Stop takes a revision newer than any an entity drew, so the
 //! renderer, which keeps the newest upload for a name, uploads its data again.
 

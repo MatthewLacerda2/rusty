@@ -1,8 +1,3 @@
-//! crates/physics/src/watch/tests.rs — the incremental sync is the full one (#1707): two
-//! copies of a scene take the same random edits and steps, one synced from the
-//! change log, one in full every step, and rapier holds the same bits in both
-//! after every step, as do the scenes the bodies write back into.
-
 use proptest::prelude::*;
 
 use super::fixture_tests::{digest, fixture, scene_digest};
@@ -12,7 +7,6 @@ use rusty_components::RigidBodyComponent;
 use rusty_ecs::{Changes, WorldPose};
 use rusty_scene::Scene;
 
-/// The fixture twice: `a` synced from the change log, `b` in full every step.
 pub struct Twin {
     pub a: Scene,
     b: Scene,
@@ -21,7 +15,6 @@ pub struct Twin {
 }
 
 impl Twin {
-    /// Both copies, built and never stepped.
     pub fn new() -> Self {
         let (a, b) = (fixture(), fixture());
         let (fast, mut full) = (PhysicsWorld::from_scene(&a), PhysicsWorld::from_scene(&b));
@@ -29,7 +22,6 @@ impl Twin {
         Self { a, b, fast, full }
     }
 
-    /// Apply `op` to both copies, which must agree after every step it takes.
     pub fn run(&mut self, op: &Op) -> Result<(), TestCaseError> {
         if matches!(op, Op::Settle) {
             for _ in 0..SETTLE_STEPS {
@@ -47,14 +39,12 @@ impl Twin {
     }
 }
 
-/// `l` and `r` are the same text; otherwise fail with the lines that differ.
 fn same(what: &str, l: &str, r: &str) -> Result<(), TestCaseError> {
     let diff: Vec<_> = l.lines().zip(r.lines()).filter(|(a, b)| a != b).collect();
     prop_assert!(l == r, "{} differs: {:#?}", what, diff);
     Ok(())
 }
 
-/// Run `ops`, then two steps, on a [`Twin`].
 pub fn agree(ops: &[Op]) -> Result<(), TestCaseError> {
     let mut twin = Twin::new();
     for (n, op) in ops.iter().chain(&[Op::Step, Op::Step]).enumerate() {
@@ -73,10 +63,6 @@ proptest! {
     }
 }
 
-/// The sequence that panicked rapier's solver (#1775): the ground is adopted by
-/// an inactive parent that then gets a dynamic Rigidbody (a body built
-/// disabled), a box is jointed to it, and the box turns static. The joint is
-/// inert, and both syncs step on.
 #[test]
 fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
     use rusty_ecs::changes::ops::{Edit, Op as W};
@@ -90,17 +76,12 @@ fn a_joint_from_a_fixed_body_to_a_disabled_one_steps() {
     .unwrap();
 }
 
-/// The sequence that panicked rapier's island manager (#1795): the world's first
-/// step has `dt` 0 (Play starting paused), a dynamic body is despawned, and the
-/// next real step steps on.
 #[test]
 fn a_paused_first_step_then_a_despawn_steps() {
     use rusty_ecs::changes::ops::{Edit, Op as W};
     agree(&[Op::Pause, Op::World(W::On(1, Edit::Despawn)), Op::Step]).unwrap();
 }
 
-/// Bodies at rest write back what they hold, which stamps nothing: once the
-/// fixture settles, a step names no entity on the channels the sync reads.
 #[test]
 fn a_settled_level_names_nothing() {
     let mut scene = fixture();
@@ -118,9 +99,6 @@ fn a_settled_level_names_nothing() {
     panic!("a body at rest still names itself every step");
 }
 
-/// Edits on moving bodies, each on one channel the narrowed passes read (#2344):
-/// a hitbox re-parented from one falling body to another, a falling collider
-/// switched off and on, and a falling collider's layer and material changed.
 #[test]
 fn edits_on_moving_bodies_sync_alike() {
     use rusty_ecs::changes::ops::{Edit, Op as W};

@@ -1,14 +1,3 @@
-//! crates/script/src/api/character_controller.rs — `CharacterController` namespace (#451).
-//!
-//! Unity's `CharacterController`: `Move` sweeps the entity's capsule by a
-//! displacement with collide-and-slide against the live physics world, raises
-//! `OnControllerColliderHit` on the controller's scripts for each collider it
-//! touched (#1879) and returns what it touched; the getters read back the grounded state that move
-//! left; the size and tuning setters route through the shared
-//! `edit::authoring::physics::character_controller` ops the inspector card uses.
-//! Getters return a neutral default without a controller; setters and `Move` are
-//! then no-ops. Attach one with `Scene.AddComponent(id, "CharacterController")`.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -26,12 +15,9 @@ use rusty_edit::authoring::physics::character_controller as ops;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// A field's reader and its shared-op writer.
 type Field<T> = (fn(&Cc) -> T, fn(&mut Cc, T));
-/// `below, sides, above`.
 type Flags = (bool, bool, bool);
 
-/// Register the `CharacterController` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_motion(lua, &t, scene, physics)?;
@@ -41,7 +27,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<Physic
         .map_err(|e| e.to_string())
 }
 
-/// `id`'s controller, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<Cc> {
     scene
         .borrow()
@@ -50,7 +35,6 @@ fn get(scene: &RefCell<Scene>, id: u32) -> Option<Cc> {
         .map(|c| c.clone())
 }
 
-/// Split a `COLLIDED_*` mask into `below, sides, above`.
 fn flags(mask: u8) -> Flags {
     (
         mask & COLLIDED_BELOW != 0,
@@ -59,7 +43,6 @@ fn flags(mask: u8) -> Flags {
     )
 }
 
-/// `Move`, `IsGrounded`, `GetCollisionFlags`, `GetGroundNormal`, `CanStand`.
 fn register_motion(
     lua: &mlua::Lua,
     t: &Table,
@@ -78,7 +61,6 @@ fn register_motion(
         let Some(moved) = moved else {
             return Ok(flags(0));
         };
-        // Unity raises `OnControllerColliderHit` inside `Move` (#1879).
         dispatch_controller_hits(lua, scene, id, &moved.hits)?;
         Ok(flags(moved.flags))
     });
@@ -112,7 +94,6 @@ fn register_motion(
     put(t, "CanStand", f)
 }
 
-/// `Get<name>` / `Set<name>` over one `f32` field (`0` without a controller).
 fn f32_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -140,8 +121,6 @@ fn f32_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// The capsule (`Height`, `Radius`, `Center`) and its tuning (`StepOffset`,
-/// `SlopeLimit`, `SkinWidth`, `MinMoveDistance`).
 fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     f32_pair(lua, t, scene, "Height", (|c| c.height, ops::set_height))?;
     f32_pair(lua, t, scene, "Radius", (|c| c.radius, ops::set_radius))?;

@@ -1,11 +1,3 @@
-//! crates/script/src/api/physics/material.rs — physics material assets (#1878): `SetMaterial` /
-//! `GetMaterial` name a collider's shared asset (Unity's `Collider.sharedMaterial`),
-//! and `CreateMaterialAsset` / `GetMaterialAsset` / `SetMaterialAsset` make and edit
-//! the asset file itself, the verbs the inspector's Collider card has.
-//!
-//! The asset and its cache are `scene::physics_material`'s; a field table is
-//! `{friction, bounciness, friction_combine, bounce_combine}`, each optional.
-
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
@@ -21,13 +13,11 @@ fn err(msg: String) -> mlua::Error {
     mlua::Error::RuntimeError(msg)
 }
 
-/// Register the five verbs onto the `Physics` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     register_reference(lua, table, scene)?;
     register_asset(lua, table)
 }
 
-/// `SetMaterial(id, path | nil)` and `GetMaterial(id)` → the path or nil.
 fn register_reference(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -54,8 +44,6 @@ fn register_reference(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
-/// `CreateMaterialAsset(path [, fields])`, `GetMaterialAsset(path)` → a field
-/// table or nil, `SetMaterialAsset(path, fields)`.
 fn register_asset(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -99,8 +87,6 @@ fn register_asset(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// `m` with the fields `t` names replaced; an error on a non-finite coefficient or
-/// an unknown combine mode.
 fn merged(mut m: PhysicsMaterial, t: &Table, verb: &str) -> mlua::Result<PhysicsMaterial> {
     for (key, slot) in [
         ("friction", &mut m.friction),

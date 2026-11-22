@@ -1,8 +1,3 @@
-//! `Material.Set<Field>` / `Get<Field>` and the recipe keys for the table-driven
-//! fields (the transparent surface, #1523; the map coordinates, #1573; the height
-//! map and its scale, #2191), through a
-//! real Lua VM.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -12,7 +7,6 @@ use crate::api::bind;
 use rusty_components::BlendMode;
 use rusty_scene::Scene;
 
-/// Run `script` with the `Material` namespace over `scene`, returning its value.
 fn eval<T: mlua::FromLuaMulti>(scene: &Rc<RefCell<Scene>>, script: &str) -> mlua::Result<T> {
     let lua = Lua::new();
     crate::api::attempt(|| {

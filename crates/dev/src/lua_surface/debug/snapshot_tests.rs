@@ -1,6 +1,3 @@
-//! `Debug.Snapshot` reports the scene's one play state (#180, #1302): flipping it
-//! must show up in the snapshot.
-
 use crate::session::Session;
 
 #[test]

@@ -1,23 +1,12 @@
-//! A viewpoint as a report keeps it, and when two runs benched the same one.
-
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// How far a viewpoint may move between two runs and still be the same one,
-/// metres: a float reordered in transform propagation or the navmesh bake moves
-/// a point by far less, a navmesh point picked elsewhere by far more.
 const SAME_AT_M: f32 = 1e-3;
-/// How far its yaw may turn and still be the same one, degrees.
 const SAME_YAW_DEG: f32 = 0.01;
 
-/// A viewpoint as a report keeps it: two runs benched the same viewpoint when
-/// these are equal, so a navmesh point that moved, or another camera of the same
-/// name, is not one. Equal is within `SAME_AT_M` and `SAME_YAW_DEG`, so an
-/// optimization that moves a point by a rounding error still compares.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ViewKey {
     pub label: String,
-    /// The camera's entity id, for a camera's view.
     pub camera: Option<u32>,
     pub at: [f32; 3],
     pub yaw: f32,
@@ -26,7 +15,6 @@ pub struct ViewKey {
 impl PartialEq for ViewKey {
     fn eq(&self, other: &Self) -> bool {
         let moved = Vec3::from(self.at).distance(Vec3::from(other.at));
-        // The yaws' difference on the circle: 359.999 and -0.001 are one yaw.
         let turned = (self.yaw - other.yaw).rem_euclid(360.0);
         let turned = turned.min(360.0 - turned);
         self.label == other.label

@@ -1,17 +1,6 @@
-//! crates/edit/src/authoring/audio/reverb_zone.rs — Shared AudioReverbZone authoring ops (#469).
-//!
-//! The ONE place the engine mutates a `ReverbZoneComponent`. The inspector card and
-//! the Lua `AudioReverbZone.*` setters both route every write through these, so the
-//! bounds live once: radii stay non-negative with the fade radius never inside the
-//! full one, and params stay in range. Unity's preset rule lives here too: picking a
-//! preset writes its params, editing a param makes the zone `Custom`.
-//!
-//! Pure.
-
 use rusty_components::{ReverbParams, ReverbPreset, ReverbZoneComponent};
 use rusty_scene::rules::sanitize::non_negative;
 
-/// Set the full-effect radius, floored at 0; the fade radius grows to keep up.
 pub fn set_min_distance(z: &mut ReverbZoneComponent, distance: f32) {
     z.min_distance = non_negative(distance);
     z.max_distance = z.max_distance.max(z.min_distance);
@@ -22,7 +11,6 @@ pub fn set_max_distance(z: &mut ReverbZoneComponent, distance: f32) {
     z.max_distance = non_negative(distance).max(z.min_distance);
 }
 
-/// Switch to `preset`, writing its params; `Custom` keeps the params as they are.
 pub fn set_preset(z: &mut ReverbZoneComponent, preset: ReverbPreset) {
     z.preset = preset;
     if let Some(params) = preset.params() {
@@ -30,7 +18,6 @@ pub fn set_preset(z: &mut ReverbZoneComponent, preset: ReverbPreset) {
     }
 }
 
-/// Set the params (clamped into range); the zone becomes `Custom`.
 // lint: allow(sanitize) `ReverbParams::clamped` takes NaN to each field's floor and clamps ±inf into range
 pub fn set_params(z: &mut ReverbZoneComponent, params: ReverbParams) {
     z.params = params.clamped();

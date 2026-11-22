@@ -1,7 +1,5 @@
-//! crates/procgen/src/catalog/vector/mod.rs — the vector / normal ops, one file each.
-//! Their math lives in [`crate::ops::vector`] and, for `tile` and `scatter`,
-//! [`crate::ops::tile`] and [`crate::ops::scatter`].
-
+//! The vector / normal ops, one file each. Math in [`crate::ops::vector`] and, for `tile` and
+//! `scatter`, [`crate::ops::tile`] and [`crate::ops::scatter`].
 // sorted: one module per vector op; none reads another
 pub mod bump_to_normal;
 pub mod combine_rgb;

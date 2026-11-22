@@ -1,31 +1,19 @@
-//! The yield instructions a coroutine hands the scheduler (#444).
-//!
-//! `Timer.WaitForSeconds(t)` & co. return a small tagged table; the coroutine
-//! yields it (`coroutine.yield(Timer.WaitForSeconds(0.5))`, Unity's
-//! `yield return new WaitForSeconds(0.5)`), and [`parse`] turns the yielded value
-//! back into a [`Wait`]. A bare `coroutine.yield()` means "next tick".
-
 use mlua::{Lua, RegistryKey, Table, Value};
 
 use super::Clock;
 
-/// The field that tags a yield-instruction table, and its kinds.
 const TAG: &str = "__wait";
 const SECONDS: &str = "seconds";
 const REALTIME: &str = "realtime";
 const FIXED: &str = "fixed";
 const UNTIL: &str = "until";
 
-/// What a job is waiting on.
 pub(crate) enum Wait {
-    /// `delay` seconds on `clock` (0 = the next tick).
     Elapsed { delay: f64, clock: Clock },
-    /// A Lua predicate, asked once per tick until it returns a truthy value.
     Until(RegistryKey),
 }
 
 impl Wait {
-    /// `delay` seconds of scaled time (negative clamps to 0).
     pub(crate) fn scaled(delay: f64) -> Self {
         Wait::Elapsed {
             delay: delay.max(0.0),
@@ -34,22 +22,18 @@ impl Wait {
     }
 }
 
-/// `Timer.WaitForSeconds(t)`: `t` seconds of scaled time.
 pub(crate) fn seconds(lua: &Lua, t: f64) -> mlua::Result<Table> {
     tagged(lua, SECONDS, Value::Number(t))
 }
 
-/// `Timer.WaitForSecondsRealtime(t)`: `t` seconds of unscaled time.
 pub(crate) fn realtime(lua: &Lua, t: f64) -> mlua::Result<Table> {
     tagged(lua, REALTIME, Value::Number(t))
 }
 
-/// `Timer.WaitForFixedUpdate()`: the next fixed tick.
 pub(crate) fn fixed(lua: &Lua) -> mlua::Result<Table> {
     tagged(lua, FIXED, Value::Nil)
 }
 
-/// `Timer.WaitUntil(fn)`: until `fn()` is truthy.
 pub(crate) fn until(lua: &Lua, f: mlua::Function) -> mlua::Result<Table> {
     tagged(lua, UNTIL, Value::Function(f))
 }
@@ -61,8 +45,6 @@ fn tagged(lua: &Lua, kind: &str, arg: Value) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// Turn a coroutine's yielded value into a [`Wait`]. `nil` is "next tick"; a
-/// `Timer.Wait*` table is its instruction; anything else is a script error.
 pub(crate) fn parse(lua: &Lua, value: Value) -> Result<Wait, String> {
     let table = match value {
         Value::Nil => return Ok(Wait::scaled(0.0)),

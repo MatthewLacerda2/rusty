@@ -1,4 +1,4 @@
-//! The node walk (#1083): parents first, names filled in, a skinned mesh's joints
+//! The node walk: parents first, names filled in, a skinned mesh's joints
 //! left out and what one holds hung from its bone.
 
 use glam::{Quat, Vec3};

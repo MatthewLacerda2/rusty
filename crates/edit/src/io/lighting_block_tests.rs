@@ -2,7 +2,6 @@ use super::{save_lighting, LightingSave};
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// A scratch folder per test, so parallel tests never share a scene file.
 fn scratch(name: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("lighting_block_{name}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -71,8 +70,6 @@ fn a_missing_file_is_an_error() {
     assert!(save_lighting(&Scene::new(), &path).is_err());
 }
 
-/// A scene saved before the diffuse model existed (#1698), with a custom knob so its
-/// settings block is in the file: its first Generate still writes the lighting.
 #[test]
 fn a_settings_block_without_the_diffuse_model_is_written_and_takes_it() {
     let path = scratch("pre_diffuse");

@@ -1,8 +1,3 @@
-//! crates/physics/src/live_tests.rs — mid-play edits reach the built bodies (#466): a
-//! Rigidbody's mass, a kinematic switch and a layer change, plus the velocity
-//! change an impulse at a point gives; and the bodies' write-back reaches the
-//! colliders hanging under them (#1157).
-
 use glam::Vec3;
 
 use super::PhysicsWorld;
@@ -12,7 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A body at `pos` with a `size` box collider: dynamic unless `is_static`.
 fn body(scene: &mut Scene, pos: Vec3, size: Vec3, is_static: bool) -> u32 {
     let id = scene.add_entity("Body".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;

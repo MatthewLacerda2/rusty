@@ -1,8 +1,3 @@
-//! crates/physics/src/watch/fixture_tests.rs — what the incremental sync's equivalence
-//! proptest (#1707, `tests.rs`) starts from and compares: the scene it edits,
-//! the World edits completed as an Undo completes them, and exact digests of what
-//! rapier and the scene hold.
-
 use std::fmt::Write;
 
 use glam::Vec3;
@@ -13,9 +8,6 @@ use crate::PhysicsWorld;
 use rusty_ecs::changes::ops;
 use rusty_scene::Scene;
 
-/// A ground slab, three bodies dropped side by side onto it and a kinematic box
-/// above them: entities 0..4, so the first ops find bodies falling, landing and
-/// at rest.
 pub fn fixture() -> Scene {
     let mut scene = Scene::new();
     let mut physics = PhysicsWorld::from_scene(&scene);
@@ -45,7 +37,6 @@ pub fn fixture() -> Scene {
     scene
 }
 
-/// Every entity's local Transform and Rigidbody, as exact text.
 pub fn scene_digest(scene: &Scene) -> String {
     let w = &scene.world;
     let rows = w.ids().iter().map(|&id| {
@@ -56,9 +47,6 @@ pub fn scene_digest(scene: &Scene) -> String {
     rows.collect()
 }
 
-/// The shared World edit, completed as an Undo completes it: `restore_entity`'s
-/// one caller (`scene::undo::restore::apply`) also restores the parent's record,
-/// whose `children` names the restored child again, then rewinds the log.
 pub fn world_op(w: &mut rusty_ecs::World, op: &ops::Op) {
     use ops::{Edit, Op};
     let undone = match op {
@@ -74,13 +62,6 @@ pub fn world_op(w: &mut rusty_ecs::World, op: &ops::Op) {
     }
 }
 
-/// Everything rapier holds for the scene's entities that a sync writes or a step
-/// reads back: each body's class, enabled and sleeping flags, pose and next
-/// (kinematic) pose, velocities, gravity, CCD and mass; each collider's flags,
-/// collision and solver groups, offset, extent, material and mass; each joint's
-/// key, bodies and frames; the contact pairs in the order the solver meets
-/// them. As exact text (`{:?}` prints
-/// an `f32` so it reads back to the same bits).
 pub fn digest(p: &PhysicsWorld) -> String {
     let mut out = format!("plan {:?}\n", p.plan);
     let mut bodies: Vec<_> = p.id_to_body.iter().collect();
@@ -125,7 +106,7 @@ pub fn digest(p: &PhysicsWorld) -> String {
         let _ = writeln!(out, "j{id} {:?} {frames:?}", j.key);
     }
     // The order the solver meets the contacts in: two twins listing the same
-    // pairs in another order step apart (#1798).
+    // pairs in another order step apart.
     let id = |h| p.collider_to_id.get(&h).copied();
     let pairs = p.narrow_phase.contact_pairs();
     let order: Vec<_> = pairs.map(|c| (id(c.collider1), id(c.collider2))).collect();

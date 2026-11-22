@@ -1,6 +1,3 @@
-//! rusty bench's rules (#854, #942): what New makes, what Open accepts, and what each
-//! does to the recent list.
-
 use super::*;
 use crate::project::{pin_engine, ProjectFile, PROJECT_FILE};
 

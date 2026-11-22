@@ -1,19 +1,12 @@
-//! crates/procgen/src/runner/slots.rs — the images a run holds between nodes, and what
-//! they cost (#2002's review): how many are alive at once and how many bytes, at
-//! the two moments a node's run peaks (while its op runs, and while its output
-//! packs to one channel).
-
 use std::borrow::Cow;
 
 use super::held::Held;
 use crate::image_buf::Image;
 
-/// Bytes of one RGBA f32 image.
 pub(super) fn image_bytes(img: &Image) -> usize {
     std::mem::size_of_val(img.pixels())
 }
 
-/// Each node's held image, with the run's peaks.
 pub(super) struct Slots {
     slots: Vec<Option<Held>>,
     live: usize,
@@ -50,8 +43,6 @@ impl Slots {
         Some(held)
     }
 
-    /// A node's op is running: `images` more are alive beside the held ones (its
-    /// rebuilt or taken inputs and its output), `bytes` more bytes.
     pub fn note(&mut self, images: usize, bytes: usize) {
         self.peak_live = self.peak_live.max(self.live + images);
         self.peak_bytes = self.peak_bytes.max(self.held_bytes + bytes);
@@ -96,19 +87,16 @@ impl Slots {
     }
 }
 
-/// A node's inputs as [`Slots::gather`] hands them out.
 pub(super) struct Gathered<'a> {
     views: Vec<Cow<'a, Image>>,
     index: Vec<usize>,
 }
 
 impl Gathered<'_> {
-    /// One image per entry of the gathered ids.
     pub fn edges(&self) -> Vec<&Image> {
         self.index.iter().map(|&k| self.views[k].as_ref()).collect()
     }
 
-    /// The images and bytes the views own (rebuilt or taken, not borrowed).
     pub fn owned(&self) -> (usize, usize) {
         let owned = self.views.iter().filter_map(|v| match v {
             Cow::Owned(img) => Some(image_bytes(img)),

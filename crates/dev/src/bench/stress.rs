@@ -1,10 +1,3 @@
-//! The shooter-shaped worst case `make bench` measures (#835), loaded onto the
-//! default fy_pool_day yard (#747) by `Harness.LoadStress`: skinned, animated
-//! soldiers walking the navmesh with a Lua brain each; realtime point and spot
-//! lights, some flickering like muzzle flashes and some casting shadows;
-//! 256 decals; a few particle systems. Pure placement — no RNG, no I/O — so
-//! the scene is the same every run and two runs on one machine compare.
-
 use glam::{Quat, Vec3};
 
 use super::rig;
@@ -18,21 +11,14 @@ use rusty_edit::default_scene::layout::{ground_at, YARD_HALF};
 use rusty_scene::decal::DecalSpec;
 use rusty_scene::Scene;
 
-/// What to spawn. [`Default`] is the issue's worst case.
 #[derive(Clone, Debug, PartialEq)]
 pub struct StressSpec {
     pub enemies: u32,
-    /// Realtime lights, alternating point and spot.
     pub lights: u32,
-    /// How many of those lights run `flicker_script` (muzzle flashes).
     pub flickering: u32,
-    /// How many lights, from the first, cast shadows: half point lights (six
-    /// atlas tiles each), half spots (one).
     pub shadowed: u32,
-    /// Decals stamped, all unowned: the world budget (`DecalLimits`) caps what stays.
     pub decals: u32,
     pub particle_systems: u32,
-    /// Each soldier's Lua brain, relative to the workspace.
     pub enemy_script: String,
     pub flicker_script: String,
 }
@@ -52,7 +38,6 @@ impl Default for StressSpec {
     }
 }
 
-/// What was spawned, for the scenario to check.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Spawned {
     pub enemies: u32,
@@ -61,12 +46,8 @@ pub struct Spawned {
     pub particle_systems: u32,
 }
 
-/// Where the Player stands: 3 m in from its spawn, so the follow camera 4.5 m
-/// behind it is inside the yard and looks down its length at the whole scene.
 pub const PLAYER_AT: Vec3 = Vec3::new(0.0, 1.5, -15.0);
 
-/// Spawn `spec` into `scene` (already holding the yard), and stand the Player at
-/// [`PLAYER_AT`].
 pub fn load(scene: &mut Scene, spec: &StressSpec) -> Spawned {
     if let Some(player) = scene.find_entity_by_name("Player") {
         scene.world.transform_mut(player).unwrap().position = PLAYER_AT;
@@ -105,7 +86,6 @@ pub fn load(scene: &mut Scene, spec: &StressSpec) -> Spawned {
     spawned
 }
 
-/// Soldier `i`: four columns on the deck either side of the pool, 2 m apart.
 pub fn soldier_spot(i: u32) -> Vec3 {
     let x = [-12.5, -7.0, 7.0, 12.5][(i % 4) as usize];
     let z = -12.0 + (i / 4) as f32 * 2.0;
@@ -137,13 +117,10 @@ fn soldier(scene: &mut Scene, i: u32, script: &str) {
         nav_agent::set_base_offset(&mut a, 0.0);
         nav_agent::set_target(&mut a, soldier_spot(i));
     }
-    // Hitboxes too: a shooter's enemies are shot at, so their bones carry colliders.
     let _ = scene.generate_hitboxes(id, &Default::default());
     attach(scene, id, script);
 }
 
-/// Light `i`, `Mixed` so it is live: even ones are point lights along the side
-/// walls, odd ones spots hanging over the pool and deck, pointing down.
 fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
     let row = (i / 2) as f32;
     let side = alternate(i / 2);
@@ -162,7 +139,6 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
         authoring::rendering::light::set_intensity(&mut l, 2.0);
         authoring::rendering::light::set_range(&mut l, 9.0);
         authoring::rendering::light::set_cast_shadows(&mut l, shadowed);
-        // The live lights the bench measures (#2522: a light is Baked unless told).
         authoring::rendering::light::set_mode(&mut l, rusty_components::LightMode::Mixed);
     }
     if let Some(script) = flicker {
@@ -170,8 +146,6 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
     }
 }
 
-/// Decal `i`: two in three on the deck around the pool, the rest on the side
-/// walls, scattered by a fixed stride so they never stack.
 fn decal_spot(i: u32) -> (Vec3, Vec3) {
     let along = -20.0 + (i * 13 % 400) as f32 * 0.1;
     if i % 3 == 2 {
@@ -183,7 +157,6 @@ fn decal_spot(i: u32) -> (Vec3, Vec3) {
     (Vec3::new(x, 0.0, along), Vec3::Y)
 }
 
-/// Smoke column `i`, in the yard's corners and by the jacuzzi.
 fn smoke(scene: &mut Scene, i: u32) {
     let spots = [(-12.0, -16.0), (12.0, 16.0), (-12.0, 16.0), (10.0, 3.0)];
     let (x, z) = spots[i as usize % spots.len()];
@@ -199,7 +172,6 @@ fn smoke(scene: &mut Scene, i: u32) {
     }
 }
 
-/// `1` for even `i`, `-1` for odd: which side of the yard.
 fn alternate(i: u32) -> f32 {
     if i.is_multiple_of(2) {
         1.0

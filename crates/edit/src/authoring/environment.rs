@@ -1,17 +1,3 @@
-//! crates/edit/src/authoring/environment.rs — Shared scene-environment ops (#1612).
-//!
-//! The ONE place the engine writes the scene's environment scalars: the skybox
-//! panorama, the ambient light (Unity's `RenderSettings.skybox`, `ambientLight`,
-//! `ambientIntensity`, and `ambientMode` with its sky, equator and ground colours,
-//! #1647) and the procedural sky's look (#1620, `SkySettings`). BOTH the editor's Scene Settings panel and the Lua
-//! `Lighting.Set*` setters route through these, so panel and binding share one
-//! write and one clamp. The renderer picks a change up on its next frame: a new
-//! panorama is loaded and its sky reflection cube baked (#1553), the ambient
-//! colour is packed into every pass's lighting uniform, and a changed procedural
-//! sky re-bakes the procedural sky's cube.
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_scene::rules::sanitize::{
@@ -19,9 +5,6 @@ use rusty_scene::rules::sanitize::{
 };
 use rusty_scene::{AmbientMode, AmbientSettings, Scene, SkySettings};
 
-/// Set the skybox panorama's path, as the scene file stores it; an empty path goes
-/// back to the procedural sky. A path that loads nothing draws the renderer's
-/// fallback texture, as a hand-edited scene file's would.
 pub fn set_skybox(scene: &mut Scene, path: &str) {
     scene.skybox_path = path.to_string();
 }
@@ -37,12 +20,6 @@ pub fn set_ambient_intensity(scene: &mut Scene, intensity: f32) {
     scene.ambient_intensity = non_negative(intensity);
 }
 
-// The ambient source's ops take its `AmbientSettings`, as the sky's take its
-// `SkySettings`. A changed mode or colour shows on dynamic objects at once and on
-// baked lightmaps and probes after the next Generate Lighting, as in Unity.
-
-/// Set the ambient source: `Color` (one colour), `Gradient` (three) or `Skybox`
-/// (the sky itself, #1675).
 pub fn set_ambient_mode(ambient: &mut AmbientSettings, mode: AmbientMode) {
     ambient.mode = mode;
 }
@@ -53,17 +30,14 @@ pub fn set_ambient_sky_color(ambient: &mut AmbientSettings, color: Vec3) {
     ambient.sky = finite3_or(color, ambient.sky).max(Vec3::ZERO);
 }
 
-/// Set the gradient's equator colour (sideways-facing surfaces), as the sky's.
 pub fn set_ambient_equator_color(ambient: &mut AmbientSettings, color: Vec3) {
     ambient.equator = finite3_or(color, ambient.equator).max(Vec3::ZERO);
 }
 
-/// Set the gradient's ground colour (down-facing surfaces), as the sky's.
 pub fn set_ambient_ground_color(ambient: &mut AmbientSettings, color: Vec3) {
     ambient.ground = finite3_or(color, ambient.ground).max(Vec3::ZERO);
 }
 
-/// `ambient` held to what the setters store: how a loaded scene file's block comes in.
 pub fn held_ambient(ambient: AmbientSettings) -> AmbientSettings {
     let mut held = AmbientSettings::default();
     set_ambient_mode(&mut held, ambient.mode);
@@ -73,22 +47,14 @@ pub fn held_ambient(ambient: AmbientSettings) -> AmbientSettings {
     held
 }
 
-// The procedural sky's ops take its `SkySettings`, as `fog`'s take its
-// `FogSettings`: a caller passes `&mut scene.sky`, and a loaded block is held
-// through the same ops (`held_sky`).
-
-/// Set the sky's zenith colour (linear RGB); `None` follows the ambient colour.
 pub fn set_sky_zenith(sky: &mut SkySettings, color: Option<Vec3>) {
     sky.zenith = optional_color_or(color, sky.zenith);
 }
 
-/// Set the sky's horizon colour (linear RGB); `None` lifts the zenith toward white.
 pub fn set_sky_horizon(sky: &mut SkySettings, color: Option<Vec3>) {
     sky.horizon = optional_color_or(color, sky.horizon);
 }
 
-/// Set the ground colour below the horizon (linear RGB); `None` is a quarter of
-/// the zenith.
 pub fn set_sky_ground(sky: &mut SkySettings, color: Option<Vec3>) {
     sky.ground = optional_color_or(color, sky.ground);
 }
@@ -100,14 +66,11 @@ pub fn set_cloud_coverage(sky: &mut SkySettings, coverage: f32) {
     sky.cloud_coverage = clamped(v, 0.0, 1.0);
 }
 
-/// Set the cloud opacity, clamped to `0..=1`. A NaN or infinite value changes
-/// nothing.
 pub fn set_cloud_opacity(sky: &mut SkySettings, opacity: f32) {
     let v = finite_or(opacity, sky.cloud_opacity);
     sky.cloud_opacity = clamped(v, 0.0, 1.0);
 }
 
-/// `sky` held to what the setters store: how a loaded scene file's block comes in.
 pub fn held_sky(sky: SkySettings) -> SkySettings {
     let mut held = SkySettings::default();
     set_sky_zenith(&mut held, sky.zenith);

@@ -1,5 +1,3 @@
-//! The `noise` op: Perlin and its fBM / ridged / turbulence sums.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,17 +5,10 @@ use crate::image_buf::Image;
 use crate::ops::generators;
 use crate::recipe::{choice, op, opt, req, socket, Lit, NoiseKind, OpInfo, Param, SEED, SOURCE};
 
-/// Gradient noise (grayscale, written to RGB, alpha 1). The fBM family (`fbm`,
-/// `ridged`, `turbulence`) sums `octaves`, each `lacunarity`× the previous frequency
-/// (rounded to a whole count, so every octave tiles) and `gain`× its amplitude;
-/// `perlin` is one octave. `distortion` warps the domain by up to about that many
-/// lattice cells first, Blender's Noise Texture *Distortion*.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Noise {
     pub kind: NoiseKind,
     pub scale: f32,
-    /// `scale`'s multiplier across and down (#2002): `{1, 2}` packs twice the cells
-    /// down as across, for a map twice as tall as it is wide.
     #[serde(default = "square")]
     pub aspect: [f32; 2],
     #[serde(default = "one")]

@@ -1,13 +1,3 @@
-//! crates/physics/src/shape/triangles.rs — a collider's world-space triangles, for the navmesh bake.
-//!
-//! The navmesh (#454) rasterises the geometry physics actually collides with, so it
-//! builds the same parry shape [`build_shape`] gives rapier (world scale baked in,
-//! Unity-style) and tessellates it at the entity's world pose. A concave mesh is
-//! its exact triangles here even on a dynamic body, whose physics shape is
-//! convex pieces (#1886): the bake wants the surface, not an approximation. Boxes, hulls and
-//! trimeshes come out exact; spheres, cylinders and capsules are tessellated finely
-//! enough for a grid whose cells are tens of centimetres wide.
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
@@ -16,12 +6,9 @@ use super::fit::build_shape_for;
 use crate::compound::world_pose;
 use rusty_scene::Scene;
 
-/// Segments around a round shape's circumference.
 const ROUND_SUBDIV: u32 = 16;
-/// Segments from pole to pole of a sphere / capsule cap.
 const POLE_SUBDIV: u32 = 8;
 
-/// One collider's surface as world-space triangles.
 pub struct ColliderTriangles {
     pub vertices: Vec<Vec3>,
     pub triangles: Vec<[u32; 3]>,
@@ -31,8 +18,6 @@ pub struct ColliderTriangles {
     pub convex: bool,
 }
 
-/// `id`'s active collider as world-space triangles, or `None` when it has no active
-/// collider or a degenerate mesh. Pure geometry: deterministic for a given scene.
 pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriangles> {
     let inp = collider_inputs(&scene.world, id)?;
     let pose = world_pose(scene, id)?;
@@ -55,7 +40,6 @@ pub fn collider_world_triangles(scene: &Scene, id: u32) -> Option<ColliderTriang
 
 type Tessellation = (Vec<Vector>, Vec<[u32; 3]>, bool);
 
-/// The local-space triangles of every shape `build_shape` produces.
 fn tessellate(shape: &dyn Shape) -> Option<Tessellation> {
     if let Some(s) = shape.as_cuboid() {
         let (v, i) = s.to_trimesh();
@@ -132,8 +116,6 @@ mod tests {
         );
     }
 
-    /// Off the origin and turned, every triangle still faces out of the box: the
-    /// pose moves each vertex, it never mirrors the shape inside out.
     #[test]
     fn an_off_origin_turned_box_keeps_its_triangles_facing_out() {
         let mut scene = Scene::new();
@@ -149,8 +131,6 @@ mod tests {
         }
     }
 
-    /// Every shape `build_shape` makes tessellates: round ones finely enough to
-    /// reach their radius, a hull as convex, a trimesh as itself and not convex.
     #[test]
     fn every_built_shape_tessellates_within_its_extent() {
         use rusty_components::CapsuleAxis;

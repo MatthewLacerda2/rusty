@@ -1,6 +1,3 @@
-//! crates/physics/src/shape/decompose/tests.rs — a concave mesh on a dynamic body becomes
-//! convex pieces, the same ones every run, made once per mesh (#1886).
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
@@ -21,7 +18,6 @@ pub(super) fn points(mesh: &(Vec<[f32; 3]>, Vec<u32>)) -> (Vec<Vector>, Vec<[u32
     (p, t)
 }
 
-/// Every hull's points, in order: the decomposition's bits.
 pub(super) fn hull_bits(shape: &SharedShape) -> Vec<[u32; 3]> {
     let compound = shape.as_compound().expect("a compound");
     (compound.shapes().iter())
@@ -75,7 +71,6 @@ fn the_same_mesh_decomposes_to_the_same_bits() {
 
 #[test]
 fn a_flat_concave_mesh_falls_back_to_the_trimesh() {
-    // An L of two triangles' worth of floor: area, but no volume to split.
     #[rustfmt::skip]
     let flat = (
         vec![[0.0, 0.0, 0.0], [2.0, 0.0, 0.0], [2.0, 0.0, 1.0], [1.0, 0.0, 1.0],
@@ -84,7 +79,6 @@ fn a_flat_concave_mesh_falls_back_to_the_trimesh() {
     );
     assert!(decomposition(&flat.0, &flat.1, Vec3::ONE).is_none());
     assert!(build(&flat, Vec3::ONE, true).shape().as_trimesh().is_some());
-    // One warning, naming the entity; never a body without a collider.
     rusty_test_support::logs::init();
     rusty_test_support::logs::take();
     let geom = Some((flat.0.as_slice(), flat.1.as_slice()));

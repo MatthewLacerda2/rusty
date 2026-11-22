@@ -1,10 +1,5 @@
-//! crates/core/src/color.rs — the colour maths more than one module needs (#939): the sRGB
-//! transfer pair, Rec. 709 luminance, `#rrggbb` hex parsing and IEEE half floats
-//! (the `Rgba16Float` texels a prefiltered cube face holds before BC6H, #1696,
-//! #1885). Kept in `core` because `procgen`, `scene`,
-//! `render` and `dev` all reach it. The shaders keep their own WGSL copies.
+//! The shaders keep their own WGSL copies of these.
 
-/// Inverse-sRGB transfer (IEC 61966-2-1) for one 8-bit channel, to linear `[0, 1]`.
 pub fn srgb_to_linear(b: u8) -> f32 {
     gamma_to_linear(b as f32 / 255.0)
 }
@@ -19,7 +14,6 @@ pub fn gamma_to_linear(c: f32) -> f32 {
     }
 }
 
-/// Linear → sRGB transfer (IEC 61966-2-1) for one channel, clamped to `[0, 1]` first.
 pub fn linear_to_srgb(c: f32) -> f32 {
     let c = c.clamp(0.0, 1.0);
     if c <= 0.003_130_8 {
@@ -29,19 +23,17 @@ pub fn linear_to_srgb(c: f32) -> f32 {
     }
 }
 
-/// Rec. 709 luminance of a linear RGB colour.
 pub fn luminance(rgb: impl Into<[f32; 3]>) -> f32 {
     let [r, g, b] = rgb.into();
     0.2126 * r + 0.7152 * g + 0.0722 * b
 }
 
-/// The bytes of `"#rrggbb"` / `"#rrggbbaa"`: RGB, and alpha when written. Every digit
-/// must be a hex digit, since `u8::from_str_radix` alone also takes a sign (`"+f"`).
 pub fn hex_bytes(hex: &str) -> Option<([u8; 3], Option<u8>)> {
     let digits = hex.strip_prefix('#')?;
     if !matches!(digits.len(), 6 | 8) || !digits.bytes().all(|b| b.is_ascii_hexdigit()) {
         return None;
     }
+    // `from_str_radix` alone also takes a sign (`"+f"`), so check the digits.
     let byte = |i: usize| u8::from_str_radix(&digits[2 * i..2 * i + 2], 16).ok();
     let alpha = if digits.len() == 8 {
         Some(byte(3)?)
@@ -66,7 +58,6 @@ pub fn f32_to_f16(v: f32) -> u16 {
         return sign | 0x7c00;
     }
     if half_exp <= 0 {
-        // A subnormal half (or zero): the implicit one joins the mantissa.
         if half_exp < -10 {
             return sign;
         }
@@ -74,17 +65,14 @@ pub fn f32_to_f16(v: f32) -> u16 {
         let shift = (14 - half_exp) as u32;
         return sign | round_shift(m, shift) as u16;
     }
-    // A carry out of the mantissa rounds into the exponent, as the format means it to.
     sign | (((half_exp as u32) << 10) + round_shift(mantissa, 13)) as u16
 }
 
-/// `m >> shift`, rounded to nearest, ties to even.
 fn round_shift(m: u32, shift: u32) -> u32 {
     let (kept, rest, half) = (m >> shift, m & ((1 << shift) - 1), 1 << (shift - 1));
     kept + u32::from(rest > half || (rest == half && kept & 1 == 1))
 }
 
-/// The value of IEEE 754 half float `h`: normals, subnormals, zeros, infinities, NaN.
 pub fn f16_to_f32(h: u16) -> f32 {
     let sign = if h & 0x8000 != 0 { -1.0 } else { 1.0 };
     let exp = i32::from((h >> 10) & 0x1f);
@@ -115,7 +103,6 @@ mod tests {
         assert_eq!(f16_to_f32(f32_to_f16(100_000.0)), f32::INFINITY);
         assert!(f16_to_f32(f32_to_f16(f32::NAN)).is_nan());
         assert_eq!(f32_to_f16(1.0e-9), 0, "below the smallest subnormal");
-        // Every half's value converts back to the same half.
         for h in (0..0x7c00u16).step_by(7) {
             assert_eq!(f32_to_f16(f16_to_f32(h)), h, "{h:#x}");
         }

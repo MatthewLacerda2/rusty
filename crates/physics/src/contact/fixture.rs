@@ -1,6 +1,3 @@
-//! crates/physics/src/contact/fixture.rs — a body set rolling or standing on a floor,
-//! for the contact tests (#2071).
-
 use glam::{Quat, Vec3};
 
 use crate::PhysicsWorld;
@@ -12,11 +9,8 @@ use rusty_scene::Scene;
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// The floors a level is built from, all topped at y = 0: a `Box` collider (a
-/// cuboid) 600 m across, the same box crate-sized (2 m across), and the `Plane`
-/// primitive (a triangle-mesh collider). The crate matters because rapier
-/// recycles a pair's contacts while its relative pose drifts less than a window
-/// scaled by the pair's size, and a 600 m floor makes that window tiny.
+/// The 2 m crate floor matters: rapier recycles a pair's contacts while its relative pose
+/// drifts less than a window scaled by the pair's size; a 600 m floor makes that window tiny.
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Floor {
     Box,
@@ -24,7 +18,6 @@ pub(super) enum Floor {
     Plane,
 }
 
-/// A static floor of `kind`.
 pub(super) fn floor(scene: &mut Scene, kind: Floor) {
     let id = match kind {
         Floor::Box | Floor::Crate => {
@@ -53,8 +46,6 @@ pub(super) fn floor(scene: &mut Scene, kind: Floor) {
     scene.world.set_static(id, true);
 }
 
-/// A dynamic body of `shape`, turned by `rot` and centred at `pos`, moving at
-/// `vel` and spinning at `spin`.
 pub(super) fn body(
     scene: &mut Scene,
     shape: ColliderShape,
@@ -82,13 +73,11 @@ pub(super) fn body(
     id
 }
 
-/// `id`'s speed along the floor.
 pub(super) fn floor_speed(scene: &Scene, id: u32) -> f32 {
     let v = scene.world.rigidbody(id).unwrap().velocity;
     Vec3::new(v.x, 0.0, v.z).length()
 }
 
-/// Step `scene` for `seconds` of fixed ticks, calling `each` after every tick.
 pub(super) fn run(scene: &mut Scene, seconds: f32, mut each: impl FnMut(&Scene)) {
     let mut world = PhysicsWorld::from_scene(scene);
     for _ in 0..(seconds / DT).round() as usize {

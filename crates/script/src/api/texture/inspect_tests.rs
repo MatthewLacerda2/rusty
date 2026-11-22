@@ -1,5 +1,3 @@
-//! `Texture.Stats` / `Texture.Preview` from Lua (#1486).
-
 use mlua::{Lua, Table};
 
 use super::register;

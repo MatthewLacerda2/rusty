@@ -1,14 +1,9 @@
-//! A bake's scratch folder (#2312): in the project's `cache/`, never its
-//! `assets/`; gone when its pages are, on every exit; a killed bake's removed by
-//! the next bake of any scene of the project, a live one's never.
-
 use std::path::{Path, PathBuf};
 
 use super::spill::{Spill, SPILL_DIR};
 use super::tests::{quick, scene};
 use super::*;
 
-/// A project folder holding `assets/scenes/`; the path of its scene `name`.
 fn project(dir: &str) -> (PathBuf, impl Fn(&str) -> String) {
     let root = rusty_test_support::temp::dir().join(format!("rusty_spill_{dir}"));
     let _ = std::fs::remove_dir_all(&root);
@@ -19,7 +14,6 @@ fn project(dir: &str) -> (PathBuf, impl Fn(&str) -> String) {
     (root, scene)
 }
 
-/// What lies in the project's scratch folders' folder, by name.
 fn spills(root: &Path) -> Vec<String> {
     let dir = root.join(rusty_core::project::CACHE_DIR).join(SPILL_DIR);
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -33,7 +27,6 @@ fn spills(root: &Path) -> Vec<String> {
     found
 }
 
-/// Every file under `dir`, recursively.
 fn files_under(dir: &Path) -> Vec<PathBuf> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(dir).unwrap().flatten() {
@@ -53,7 +46,6 @@ fn a_spill_lies_in_the_project_s_cache_and_holds_its_files_until_dropped() {
     let mut spill = Spill::open(&path).unwrap();
     let file = spill.put(b"page").unwrap();
     assert_eq!(file.read().unwrap(), b"page");
-    // Canonical, as macOS's temp folder lies behind a symlink.
     let cache = std::fs::canonicalize(&root).unwrap().join("cache");
     assert!(spill.dir().starts_with(cache), "{:?}", spill.dir());
     let linked = Path::new(&path).with_extension("linked");
@@ -74,8 +66,6 @@ fn a_spill_lies_in_the_project_s_cache_and_holds_its_files_until_dropped() {
 fn a_killed_bake_leaves_nothing_in_assets_and_any_scene_s_bake_clears_it() {
     let (root, scene_path) = project("killed");
     let (killed, other) = (scene_path("cafe.scene"), scene_path("level.scene"));
-    // A bake of the project still running, then one killed mid-pages: a page
-    // spilled, then the kernel drops its lock.
     let live = Spill::open(&killed).unwrap();
     let mut dead = Spill::open(&killed).unwrap();
     dead.put(b"a page").unwrap();

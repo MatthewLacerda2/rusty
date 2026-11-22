@@ -1,6 +1,3 @@
-//! Generate a test game's project: copy its files in, then run its recipe in edit
-//! mode, as one `session` command.
-
 use std::path::Path;
 
 use super::{tree, Game, Params, RECIPE, SHOTS};
@@ -8,16 +5,6 @@ use crate::session::Session;
 use rusty_app::ProjectSource;
 use rusty_core::project::{Access, BootPlan};
 
-/// Build `game` into the project folder `out` (made, or cleared when an earlier
-/// generation made it) with the recipe's `params`.
-///
-/// The game's `scripts/` go to `assets/scripts/`, its `scenarios/` to
-/// `scenarios/`, and its recipe and shots to the project root. The project is then
-/// opened for editing and seeded as `session` opens one (so the bundled scripts
-/// are in it, as in every project), and the recipe runs on an empty scene in a
-/// [`Session`] through the console's evaluator, called with the params table.
-/// What the recipe raised fails the generation; the engine's warnings are printed
-/// to stderr. Opening the project makes `out` the working directory.
 pub fn generate(game: &Game, out: &Path, params: &Params) -> Result<(), String> {
     let out = &std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     tree::clear(out)?;

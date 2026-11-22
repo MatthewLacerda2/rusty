@@ -1,15 +1,3 @@
-//! crates/script/src/api/physics/volume.rs — `Physics.Overlap*` / `Physics.Check*`.
-//!
-//! Area queries over the live rapier world (#311): which entities' colliders
-//! are inside a sphere/box/capsule *right now* (Unity `Physics.OverlapSphere` /
-//! `OverlapBox` / `OverlapCapsule`), plus the boolean `CheckSphere` /
-//! `CheckBox` / `CheckCapsule` fast-path for "is anything there?". The box
-//! takes an optional orientation in Euler degrees (#1881). Overlap results are
-//! arrays of entity ids sorted ascending. Every verb takes an optional trailing
-//! `query_triggers` after `layer_mask` (#1720; absent hits triggers); with no
-//! live physics world (edit mode) every overlap is empty and every check is
-//! false. A negative or non-finite size is a Lua error (`cast::check`).
-
 use glam::{Quat, Vec3};
 use mlua::{Function, Table};
 
@@ -19,7 +7,6 @@ use crate::api::ApiCell;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// A volume to test, with its sizes checked.
 #[derive(Clone, Copy)]
 enum Volume {
     Sphere(Vec3, f32),
@@ -27,13 +14,10 @@ enum Volume {
     Capsule(Vec3, Vec3, f32),
 }
 
-/// A verb's checked volume and its `layer_mask, query_triggers`.
 type Query = (Volume, Option<u32>, Option<bool>);
 
-/// The two cells every volume query reads.
 type Cells = (ApiCell<Scene>, ApiCell<Option<PhysicsWorld>>);
 
-/// Ids of the accepted colliders overlapping `volume`; empty with no world.
 fn ids_in(
     lua: &mlua::Lua,
     (scene, physics): Cells,
@@ -57,8 +41,6 @@ fn ids_in(
     })
 }
 
-/// Register `Overlap<name>` (the id array) and `Check<name>` (whether it is
-/// non-empty), both reading their volume with `volume`.
 fn register_pair<A: mlua::FromLuaMulti + 'static>(
     lua: &mlua::Lua,
     table: &Table,
@@ -82,7 +64,6 @@ fn register_pair<A: mlua::FromLuaMulti + 'static>(
     put(table, &check, query(check.clone(), true))
 }
 
-/// Register the overlap/check family onto the `Physics` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -90,7 +71,6 @@ pub(super) fn register(
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
     let cells = (scene, physics);
-    // `(cx,cy,cz, radius [, layer_mask [, query_triggers]])`.
     type SphereArgs = (f32, f32, f32, f32, Option<u32>, Option<bool>);
     register_pair(lua, table, cells, "Sphere", |verb, args: SphereArgs| {
         let (cx, cy, cz, radius, mask, triggers) = args;

@@ -1,35 +1,24 @@
-//! crates/core/src/input/frame.rs — everything the next tick will publish, as one value (#1581).
-//!
-//! [`InputFrame`] is the input a tick reads, taken *before* the tick's
-//! [`InputState::begin_tick`]: the held keys, the pending edges, deltas and text,
-//! the axes, the pointer, the connected pads and the clipboard capture. A demo
-//! recorder reads one per tick ([`InputState::frame`]) and a replay writes it back
-//! ([`InputState::set_frame`]) at the same point, so the tick publishes exactly
-//! what it published when recorded, whoever wrote the input then.
-//!
+//! The input the next tick reads, taken before its `begin_tick`, so a demo replay writes
+//! back exactly what was recorded. Sets and maps are sorted so frames compare and encode
+//! in one order.
+
 //! The sets and maps are sorted vectors, so two frames compare and encode in one
 //! order whatever order the keys were pressed in.
 
 use super::gamepad::MAX_PADS;
 use super::{InputState, TickInput};
 
-/// The input one tick reads, before the tick publishes it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct InputFrame {
-    /// Held keys, mouse buttons and pad buttons, sorted.
     pub held: Vec<String>,
-    /// Keys that went down since the last tick, sorted.
     pub down: Vec<String>,
-    /// Keys that went up since the last tick, sorted.
     pub up: Vec<String>,
     pub mouse_delta: (f64, f64),
     pub scroll: f64,
     pub text: String,
-    /// Named axes as last written, sorted by name.
     pub axes: Vec<(String, f32)>,
     pub mouse_position: (f64, f64),
     pub pads: [bool; MAX_PADS],
-    /// The clipboard text captured since the last tick, if any.
     pub clipboard: Option<String>,
 }
 
@@ -40,8 +29,6 @@ fn sorted(set: &crate::collections::Set<String>) -> Vec<String> {
 }
 
 impl InputState {
-    /// What the next tick will publish, as one value: call it right before the
-    /// tick's `begin_tick`.
     pub fn frame(&self) -> InputFrame {
         let mut axes: Vec<(String, f32)> = self
             .pending_axes
@@ -63,8 +50,6 @@ impl InputState {
         }
     }
 
-    /// Replace whatever was written since the last tick with `frame`, so the next
-    /// `begin_tick` publishes exactly it: the replay half of [`frame`](Self::frame).
     pub fn set_frame(&mut self, frame: &InputFrame) {
         self.keys_down = frame.held.iter().cloned().collect();
         self.pending = TickInput {

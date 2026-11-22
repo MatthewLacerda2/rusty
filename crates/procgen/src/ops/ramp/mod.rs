@@ -1,6 +1,3 @@
-//! `color_ramp`'s math: a gradient of stops, looked up by binary search, and filled
-//! between them as Blender's ColorRamp (`spline` holds its `cardinal` and `b_spline`).
-
 #[cfg(test)]
 mod pinned_tests;
 mod spline;
@@ -13,9 +10,6 @@ use super::super::image_buf::{Image, Rgba};
 use super::super::recipe::{RampInterpolation, RampStop};
 use spline::Spline;
 
-/// Map the input's red channel through a sorted gradient of [`RampStop`]s, filled
-/// between stops by `interpolation`. With no stops the input passes through
-/// unchanged.
 pub fn color_ramp(mut img: Image, stops: &[RampStop], interpolation: RampInterpolation) -> Image {
     if stops.is_empty() {
         return img;
@@ -32,16 +26,10 @@ pub fn color_ramp(mut img: Image, stops: &[RampStop], interpolation: RampInterpo
     img
 }
 
-/// Sample a sorted ramp at scalar `t`. The two families end differently, as
-/// Blender's: `linear`, `constant` and `ease` hold the end stops' colours past the
-/// ends (`constant` takes the last stop at or below `t`, a stop's colour starting at
-/// its position; `linear` and `ease` blend the bracketing stops, `ease` through a
-/// smoothstep), while `cardinal` and `b_spline` are not clamped to the ends: they
-/// weigh the four stops around `t` and run on past the end stops toward copies of
-/// them at 0 and 1 ([`spline::fill`]), so the end clamp must stay below the spline
-/// branch. The stops are found by binary search (#2002), so a lookup ramp of
-/// thousands of stops costs a dozen comparisons a pixel. `sorted` holds no NaN position: [`color_ramp`]
-/// sends such a ramp to [`scan_ramp`]'s linear walk, the two agreeing everywhere else.
+/// The end clamp of `linear`, `constant` and `ease` must stay below the spline branch:
+/// `cardinal` and `b_spline` are not clamped to the ends, they run on toward copies of the end stops ([`spline::fill`]).
+/// `sorted` holds no NaN position: [`color_ramp`]
+/// sends such a ramp to [`scan_ramp`]'s linear walk.
 fn sample_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> Rgba {
     let above = |t| sorted.partition_point(|s| pos(s) <= t);
     let ease = match interpolation {
@@ -62,7 +50,6 @@ fn sample_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) ->
     blend(sorted[k], sorted[k + 1], t, ease)
 }
 
-/// `t` between stops `a` and `b`, through a smoothstep when `ease`.
 fn blend(a: RampStop, b: RampStop, t: f32, ease: bool) -> Rgba {
     let span = (b.pos - a.pos).max(1e-6);
     let f = (t - a.pos) / span;
@@ -70,8 +57,6 @@ fn blend(a: RampStop, b: RampStop, t: f32, ease: bool) -> Rgba {
     std::array::from_fn(|c| lerp(a.color[c], b.color[c], f))
 }
 
-/// [`sample_ramp`] by walking the stops in order: its reference, and its path for a
-/// NaN position.
 fn scan_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> Rgba {
     // Blender's own walk: the first stop past `t`.
     let above = |t| {
@@ -103,8 +88,6 @@ fn scan_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> R
     window.map_or(last.color, |w| blend(w[0], w[1], t, ease))
 }
 
-/// A stop's position, read through one place so a test can count how many stops a
-/// lookup reads (the work a ramp costs per pixel).
 #[inline]
 fn pos(stop: &RampStop) -> f32 {
     #[cfg(test)]

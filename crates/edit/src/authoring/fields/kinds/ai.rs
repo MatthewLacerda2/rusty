@@ -1,5 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/ai.rs — the AI components' field tables.
-
 use super::super::table::{inspect, op, with};
 use super::super::value::Mask;
 use crate::authoring::ai::perception as ops;

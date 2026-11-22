@@ -1,8 +1,3 @@
-//! The bench's lines for baked data a scene has on disk and ran without
-//! (`notes::bakes_unused`), without an adapter: what each says, and which scene's
-//! records it reads.
-
-/// The bake lines of a scene at `levels/a.scene` (`path`) whose records hold `refused`.
 fn bake_lines(
     path: &str,
     refused: &[&str],

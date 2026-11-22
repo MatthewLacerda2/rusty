@@ -1,10 +1,5 @@
-//! crates/components/src/ribbon/trail.rs — TrailRenderer: a ribbon along the entity's
-//! recent path.
-//!
-//! The recorded points are **sim state**: `app::systems::trails` samples the entity's world
-//! position once per fixed tick and ages the points on the same `dt`, so a
-//! headless replay records exactly the same trail as a windowed run. The renderer
-//! only reads [`TrailRuntime::points`].
+//! The recorded points are **sim state**: `app::systems::trails` samples the world position once
+//! per fixed tick and ages points on the same `dt`, so headless replay matches a windowed run.
 
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
@@ -12,31 +7,24 @@ use serde::{Deserialize, Serialize};
 use super::RibbonStyle;
 use rusty_core::curve::{Curve, Gradient};
 
-/// One recorded trail point: where the entity was and when (trail clock seconds).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct TrailPoint {
     pub position: Vec3,
     pub time: f32,
 }
 
-/// The live recording — transient, never serialized.
 #[derive(Clone, Debug, Default)]
 pub struct TrailRuntime {
-    /// Oldest first; the last point is the head, which follows the entity.
     pub points: Vec<TrailPoint>,
-    /// Seconds this trail has been ticked (the points' timestamps' clock).
     pub clock: f32,
 }
 
-/// Authoring component: a trail behind a moving entity (Unity's `TrailRenderer`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct TrailComponent {
-    /// Whether new points are recorded. Off, the existing trail still ages out.
     pub emitting: bool,
-    /// Seconds a point lives before it drops off the tail.
+    /// Seconds a point lives.
     pub time: f32,
-    /// The head must move this far (world units) before it is committed and a new
-    /// head starts; below it the head just follows the entity.
+    /// World units the head must move before a new head starts.
     pub min_vertex_distance: f32,
     pub style: RibbonStyle,
     #[serde(skip)]
@@ -69,9 +57,6 @@ impl PartialEq for TrailRuntime {
 }
 
 impl TrailComponent {
-    /// Advance the trail one tick: age out expired points, then (when emitting)
-    /// record `position` — moving the head, or committing it and starting a new
-    /// one once it is `min_vertex_distance` past the previous point.
     pub fn advance(&mut self, position: Vec3, dt: f32) {
         let rt = &mut self.runtime;
         rt.clock += dt;
@@ -94,12 +79,10 @@ impl TrailComponent {
         }
     }
 
-    /// Forget every recorded point (Unity's `TrailRenderer.Clear`).
     pub fn clear(&mut self) {
         self.runtime.points.clear();
     }
 
-    /// The recorded positions, oldest first.
     pub fn positions(&self) -> impl DoubleEndedIterator<Item = Vec3> + '_ {
         self.runtime.points.iter().map(|p| p.position)
     }
@@ -151,7 +134,6 @@ mod tests {
         for i in 0..5 {
             t.advance(Vec3::X * i as f32, 0.4);
         }
-        // Clock 2.0: points stamped before 1.0 are gone.
         assert!(t.runtime.points.iter().all(|p| p.time >= 1.0));
         assert_eq!(t.runtime.points.len(), 3);
         t.emitting = false;

@@ -1,9 +1,3 @@
-//! Which casters a masked light's realtime maps hold (#1695). Under plain
-//! `Shadowmask` its static casters leave them, but only while its mask pages are
-//! bound and no volumetric fog is on, whose air reads only the maps; under
-//! `DistanceShadowmask` they always stay. A mask page whitened after the bake
-//! (lit everywhere) shows what the maps alone draw.
-
 use super::fixture::{bake, patch, renderer, scene, settled};
 use super::static_tests::{pillar, LIT, SHADED};
 use rusty_components::{LightMode, VolumetricFog};
@@ -12,7 +6,6 @@ use rusty_render::Renderer;
 use rusty_scene::lighting::MixedLightingMode::Shadowmask;
 use rusty_scene::Scene;
 
-/// Every mask page lit at every texel: what's dark is the realtime maps' doing.
 pub(super) fn whiten(scene: &Scene) {
     for path in &scene.lightmaps.masks {
         let (w, h) = image::image_dimensions(path).expect("a mask page");
@@ -21,7 +14,6 @@ pub(super) fn whiten(scene: &Scene) {
     }
 }
 
-/// A thin volumetric fog on the camera's volume, or none.
 pub(super) fn set_fog(scene: &mut Scene, on: bool) {
     let fog = VolumetricFog {
         active: on,
@@ -33,7 +25,6 @@ pub(super) fn set_fog(scene: &mut Scene, on: bool) {
     }
 }
 
-/// The floor behind the static pillar against the lit floor, as a share.
 fn shade(r: &mut Renderer, s: &Scene, mode: ShadowmaskMode) -> f32 {
     r.quality.shadowmask_mode = mode;
     let frame = settled(r, s);
@@ -42,7 +33,6 @@ fn shade(r: &mut Renderer, s: &Scene, mode: ShadowmaskMode) -> f32 {
     behind / lit
 }
 
-/// The pillar scene, baked; its masks whitened when `white`.
 fn pillar_scene(name: &str, white: bool) -> Scene {
     let (mut s, _) = scene(LightMode::Mixed, Shadowmask, 1.0);
     pillar(&mut s);
@@ -70,7 +60,6 @@ fn gpu_static_casters_leave_a_masked_lamps_map_under_shadowmask_only() {
 fn gpu_with_no_mask_bound_a_static_pillar_still_shadows_the_floor() {
     let Some(mut r) = renderer() else { return };
     let mut s = pillar_scene("unbound", false);
-    // Channels recorded, no page bound: as while a page decodes, or failed to.
     s.lightmaps.masks.clear();
     assert!(!s.lightmaps.channels.is_empty());
     let plain = shade(&mut r, &s, ShadowmaskMode::Shadowmask);

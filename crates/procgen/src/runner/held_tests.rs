@@ -1,6 +1,3 @@
-//! Tests for what the runner holds between nodes (#2002): one-channel grayscale
-//! and lazily decoded files change memory, never bytes.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -17,7 +14,6 @@ fn only_a_lossless_gray_image_packs_to_one_channel() {
     let gray = Image::fill_uv(4, |u, _| [u, u, u, 1.0]);
     assert!(matches!(Held::pack(gray.clone()), Held::Gray(..)));
     assert_eq!(bits(&Held::pack(gray.clone()).into_image()), bits(&gray));
-    // -0.0 beside 0.0, alpha below 1 and colour each keep all four channels.
     for p in [
         [-0.0, 0.0, 0.0, 1.0],
         [0.5, 0.5, 0.5, 0.9],
@@ -32,7 +28,6 @@ fn only_a_lossless_gray_image_packs_to_one_channel() {
     assert_eq!(bits(&Held::pack(nan.clone()).view()), bits(&nan));
 }
 
-/// A graph of gray and colour nodes, each read more than once, with an `image`.
 fn mixed() -> TextureRecipe {
     let nodes = vec![
         node(
@@ -65,8 +60,6 @@ fn file() -> Source {
     Source::from_texels(8, 8, texels).unwrap()
 }
 
-/// `mixed` run node by node with nothing held between them: the bytes the runner
-/// gave before it packed or loaded lazily.
 fn reference(recipe: &TextureRecipe, sources: &Sources) -> Image {
     let mut done: Vec<(String, Image)> = Vec::new();
     for n in &recipe.nodes {
@@ -104,7 +97,6 @@ fn a_file_no_requested_output_reads_is_never_decoded() {
     let lazy = Sources::lazy(["a.png".into()], counting_loader(calls.clone()));
     evaluate_with(&mixed().with_output("m"), &lazy).unwrap();
     assert_eq!(calls.load(Ordering::SeqCst), 0);
-    // Two nodes reading one file decode it once.
     let mut recipe = mixed();
     let twin = json!({ "op": "image", "path": "a.png", "encoding": "srgb" });
     recipe.nodes.insert(3, node("j", twin, &[]));

@@ -1,4 +1,4 @@
-//! Bones are GameObjects (#453): spawning, re-binding, the palette build, lookup,
+//! Bones are GameObjects: spawning, re-binding, the palette build, lookup,
 //! and destroy (the snapshot's bone filter is `api::snapshot::bone_tests`).
 
 use glam::Vec3;

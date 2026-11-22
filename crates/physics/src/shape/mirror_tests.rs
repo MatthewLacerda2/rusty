@@ -1,9 +1,3 @@
-//! crates/physics/src/shape/mirror_tests.rs — colliders under a mirrored parent (#1124).
-//!
-//! A negative world scale (see `MIRRORS` for where one lands) keeps every primitive
-//! at its drawn size, Unity-style, and turns a mesh collider's geometry without
-//! turning its triangles inside out. Exact ray distances catch a collapsed axis.
-
 use glam::{vec3, Vec3};
 
 use super::build::build_shape;
@@ -21,7 +15,6 @@ const MIRRORS: [Vec3; 4] = [
     vec3(1.0, 1.0, -2.0),
 ];
 
-/// A static `shape` at local `pos` under `parent`.
 fn add_child(scene: &mut Scene, parent: u32, pos: Vec3, shape: ColliderShape) -> u32 {
     let id = scene.add_entity("Child".to_string());
     scene.set_parent(id, Some(parent)).unwrap();
@@ -35,7 +28,6 @@ fn add_child(scene: &mut Scene, parent: u32, pos: Vec3, shape: ColliderShape) ->
     id
 }
 
-/// Distance a ray from `x = -10` along +X at height `y` and depth `z` travels to `id`.
 fn hit_from_minus_x(world: &PhysicsWorld, id: u32, y: f32, z: f32) -> f32 {
     let hit = world
         .raycast_hit(Vec3::new(-10.0, y, z), Vec3::X, 50.0, |_| true)
@@ -118,7 +110,6 @@ fn a_ray_hits_mirrored_shapes_where_they_are_drawn() {
     }
 }
 
-/// Whether every triangle of a trimesh centred on the origin faces away from it.
 fn faces_out(collider: &rapier3d::prelude::Collider) -> bool {
     let mesh = collider.shape().as_trimesh().expect("a trimesh");
     let v = mesh.vertices();
@@ -130,7 +121,6 @@ fn faces_out(collider: &rapier3d::prelude::Collider) -> bool {
 
 #[test]
 fn a_mirrored_trimesh_faces_out() {
-    // A regular tetrahedron centred on the origin, every face wound outward.
     let p = [
         [1.0, 1.0, 1.0],
         [1.0, -1.0, -1.0],

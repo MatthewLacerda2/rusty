@@ -1,24 +1,9 @@
-//! What Blender exported, made into the cached `.glb` (#1072).
-//!
-//! The export script writes a glTF with its buffer and the images the conversion
-//! made beside it (`export.py`). This joins the JSON and the buffer into one
-//! binary glTF (`glb::container`), and resolves each image:
-//!
-//! - one the conversion made (a packed or generated image, under the export
-//!   folder) is moved into [`Staging::textures`], flat, named after the identity
-//!   the script gave it (its image's name, made unique), and the glTF image takes
-//!   that identity as its name: the importer references it as
-//!   `model.blend#tex/<identity>` (#1130);
-//! - one that is a file on disk is referenced where it lies, from the `.glb`'s
-//!   folder, its name dropped, and the importer reads it as the plain path it is:
-//!   a name could only shadow a made image's identity.
-//!
-//! A made file whose bytes are not a format the importer reads (by their magic
-//! number, among [`IMAGE_EXTENSIONS`]) is never referenced: it is a [`Skip`], and the glTF
-//! loses the image and every texture and material slot that sampled it (`drop`).
-//!
-//! Every linked library, and every image on disk a material uses, is looked at
-//! and recorded, found or not, so the cache re-converts when one changes (#1189).
+//! An image the conversion made is moved flat into [`Staging::textures`] named by its identity
+//! (the image's name, made unique) and referenced as `model.blend#tex/<identity>`; one on disk
+//! is referenced where it lies with its name dropped, since a name could only shadow a made
+//! image's identity.
+//! A made file whose bytes are no format the importer reads is a [`Skip`]: the glTF loses the
+//! image and every texture and material slot sampling it (`drop`).
 
 use super::super::stage::hook::{self, Step};
 use super::super::texture_file::{self, file_name, relative_uri, sniff, unique};
@@ -31,12 +16,9 @@ use serde::Deserialize;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// The glTF the export script writes, in the export folder.
 pub(super) const GLTF: &str = "model.gltf";
-/// What the export script looked at and left out, beside it.
 const REPORT: &str = "rusty.json";
 
-/// `rusty.json`: what the export script found in the `.blend`.
 #[derive(Deserialize)]
 struct Report {
     libraries: Vec<PathBuf>,
@@ -45,15 +27,12 @@ struct Report {
     skipped: Vec<Skipped>,
 }
 
-/// An image the export script wrote into `made/`, by its file there, and the
-/// identity it gave it.
 #[derive(Deserialize)]
 struct Made {
     file: String,
     name: String,
 }
 
-/// An image the `.blend` names as a file on disk.
 #[derive(Deserialize)]
 struct External {
     name: String,
@@ -66,7 +45,6 @@ struct Skipped {
     why: String,
 }
 
-/// Turn the export in `dir` into the `.glb` and textures `to` stages.
 pub(super) fn pack(dir: &Path, to: &Staging) -> Result<Converted, ImportError> {
     let report: Report = serde_json::from_slice(&read(&dir.join(REPORT))?)
         .map_err(|e| failed(&dir.join(REPORT), &e.to_string()))?;
@@ -110,8 +88,6 @@ pub(super) fn pack(dir: &Path, to: &Staging) -> Result<Converted, ImportError> {
     Ok(converted)
 }
 
-/// The bytes of the export's one buffer, its `uri` removed so it becomes the
-/// `.glb`'s binary chunk. No buffer is an empty one.
 fn buffer(dir: &Path, doc: &mut Value) -> Result<Vec<u8>, ImportError> {
     let Some(buffers) = doc.get_mut("buffers").and_then(Value::as_array_mut) else {
         return Ok(Vec::new());
@@ -127,18 +103,12 @@ fn buffer(dir: &Path, doc: &mut Value) -> Result<Vec<u8>, ImportError> {
     read(&dir.join(decoded))
 }
 
-/// The images of one export, as they are resolved.
 struct Images<'a> {
-    /// The export folder: an image under it is one the conversion made.
     dir: &'a Path,
     to: &'a Staging,
-    /// The `.glb`'s final folder, which an image on disk is referenced from.
     out_dir: PathBuf,
-    /// Each made image's identity, by its file name in `made/`.
     made: Map<String, String>,
-    /// File names written into the textures folder so far.
     written: Vec<String>,
-    /// The glTF images left out, by index, and why.
     dropped: Vec<usize>,
     skipped: Vec<Skip>,
 }
@@ -160,7 +130,6 @@ impl<'a> Images<'a> {
         }
     }
 
-    /// Point every image with a URI at where it lies once swapped in.
     fn resolve(&mut self, doc: &mut Value) -> Result<(), ImportError> {
         let Some(images) = doc.get_mut("images").and_then(Value::as_array_mut) else {
             return Ok(());
@@ -192,9 +161,6 @@ impl<'a> Images<'a> {
         Ok(())
     }
 
-    /// Move `file`, an image the conversion made, into the textures folder: its
-    /// URI there, and its identity. `None`, and a [`Skip`], when its bytes are not
-    /// an image the importer reads.
     fn extract(&mut self, file: &Path) -> Result<Option<(String, String)>, ImportError> {
         let bytes = read(file)?;
         let made = file
@@ -204,10 +170,7 @@ impl<'a> Images<'a> {
             self.made.get(made.as_ref()).cloned().ok_or_else(|| {
                 failed(file, "an image the export script made but gave no identity")
             })?;
-        // The made file's extension is the format the script wrote; the bytes'
-        // own format still wins (`file_name`).
         let ext = made.rsplit_once('.').map_or("", |(_, ext)| ext);
-        // The script writes only PNG or JPEG; anything else is never referenced.
         if !sniff(&bytes).is_some_and(|kind| IMAGE_EXTENSIONS.contains(&kind)) {
             self.skipped.push(Skip {
                 what: format!("Blender image `{identity}`"),
@@ -228,8 +191,8 @@ impl<'a> Images<'a> {
     }
 }
 
-/// `path` relative to the working directory when it lies in it, as a project's
-/// paths are written: a stamp that holds on every clone of the project.
+/// `path` relative to the working directory when it lies in it, so a stamp holds on every clone
+/// of the project.
 fn local(path: &Path) -> PathBuf {
     match relative_to_cwd(path) {
         Some(rel) if !rel.as_os_str().is_empty() => rel,

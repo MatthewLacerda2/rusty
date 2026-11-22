@@ -1,13 +1,5 @@
-//! FBX animation stacks → glTF animations (#1081).
-//!
-//! `ufbx::bake_anim` does the hard half: it evaluates every layer of a stack,
-//! resolves pivots, pre/post-rotations and Euler orders, and resamples the curves
-//! into per-node translation, rotation and scale keys in the same space as
-//! `Node::local_transform`. Here each key goes through the file's [`Basis`]
-//! part by part, the same calls [`Basis::local`] makes for a node's rest
-//! transform, so a key and the rest pose it equals split alike (#1110); each channel
-//! is cut to its take's range (`range`), and each stack becomes one glTF
-//! animation.
+//! Each key goes through [`Basis`] part by part, the same calls [`Basis::local`]
+//! makes for a rest transform, so a key and the rest pose it equals split alike.
 
 mod range;
 
@@ -16,10 +8,8 @@ use crate::convert::{glb, Skip};
 use glam::{Quat, Vec3};
 use rusty_core::collections::Map;
 
-/// One glTF animation per stack in `scene`, keying the nodes `nodes` maps (FBX
-/// element id → glTF node index). A stack that keys none of them is dropped; one
-/// that fails to bake is added to `skipped` (#1102), as Unity imports the model
-/// and its other takes.
+/// `nodes` maps FBX element id → glTF node index. A stack keying none of them is
+/// dropped; one that fails to bake is skipped, as Unity keeps the other takes.
 pub fn animations(
     scene: &ufbx::Scene,
     basis: Basis,
@@ -62,8 +52,7 @@ pub fn animations(
     out
 }
 
-/// What every channel of one stack is converted with: the file's axes and the
-/// take's range, in seconds.
+/// `begin` and `end` are in seconds.
 struct Take {
     basis: Basis,
     begin: f64,
@@ -71,7 +60,6 @@ struct Take {
 }
 
 impl Take {
-    /// The translation, rotation and scale channels of one baked node.
     fn node_channels(&self, node: usize, baked: &ufbx::BakedNode) -> Vec<glb::Channel> {
         let b = self.basis;
         let t: Vec<_> = (baked.translation_keys.iter())
@@ -95,7 +83,6 @@ impl Take {
         .collect()
     }
 
-    /// One channel cut to the take, or `None` when ufbx baked no keys for it.
     fn channel<T: Copy>(
         &self,
         node: usize,
@@ -116,7 +103,6 @@ impl Take {
     }
 }
 
-/// glam values as the arrays `glb` stores.
 fn arrays<T: Into<[f32; N]>, const N: usize>(values: Vec<T>) -> Vec<[f32; N]> {
     values.into_iter().map(Into::into).collect()
 }

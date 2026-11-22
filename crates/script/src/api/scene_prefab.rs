@@ -1,15 +1,3 @@
-//! crates/script/src/api/scene_prefab.rs — the `Scene` namespace's prefab + asset-spawn verbs.
-//!
-//! Split out of `api::scene` (size-cap) but registered onto the SAME `Scene` table,
-//! so callers still write `Scene.Instantiate(...)`. Covers prefabs v1 (#215, the
-//! unpacked copy + `SavePrefab`), the asset spawn (#182), and prefabs v2 (#216, the
-//! linked instance + apply / revert / reimport / list-overrides).
-//!
-//! `Instantiate(prefabPath, ...)` is **linked by default** (the Unity default: an
-//! instance that tracks its source). The v1 unpacked copy is the explicit special
-//! case `InstantiateUnpacked(prefabPath, ...)`. Every verb routes through
-//! `edit::authoring`, so the API and the editor never drift.
-
 use std::cell::RefCell;
 
 use super::{put, Reg};
@@ -18,14 +6,12 @@ use crate::api::ApiCell;
 use rusty_edit::authoring;
 use rusty_scene::Scene;
 
-/// Register every prefab/asset verb onto the (already-created) `Scene` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_save_and_spawn(lua, table, scene)?;
     register_overrides(lua, table, scene)?;
     register_apply_to_source(lua, table, scene)
 }
 
-/// `SavePrefab` + the two spawn verbs (`Instantiate` linked, `InstantiateUnpacked`).
 fn register_save_and_spawn(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -61,9 +47,6 @@ fn register_save_and_spawn(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<
     )
 }
 
-/// `Instantiate` / `InstantiateUnpacked` body: dispatch on the path kind. A `.prefab`
-/// path stamps a linked (or unpacked) instance; any other path is an asset reference
-/// spawned at a position (#182), which has no linked/unpacked distinction.
 fn instantiate(
     scene: &RefCell<Scene>,
     path: &str,
@@ -86,9 +69,6 @@ fn instantiate(
     }
 }
 
-/// The on-instance linked-instance verbs (#216): revert, reimport, and the
-/// list-overrides read verb. All take the instance ROOT id. An edit to an instance is
-/// an override the moment it is made, so there is nothing to record (#1527).
 fn register_overrides(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -120,11 +100,6 @@ fn register_overrides(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     )
 }
 
-/// The apply-to-source verbs (#268): write an instance's overrides BACK into the source
-/// `.prefab` on disk (so other instances pick the change up on reload/reimport), then
-/// clear them on the instance. Whole-object (`ApplyPrefabToSource(rootId)`) and per-
-/// field (`ApplyPrefabFieldToSource(entityId, key)`) forms, plus the per-field
-/// revert (`RevertPrefabField(entityId, key)`).
 fn register_apply_to_source(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -136,7 +111,6 @@ fn register_apply_to_source(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell
         }),
     )?;
 
-    // The per-field opposite (#998): drop one override, the leaf tracks the source.
     put(
         table,
         "RevertPrefabField",
@@ -174,9 +148,6 @@ fn prefab_parent(rest: &[mlua::Value]) -> mlua::Result<Option<u32>> {
     }
 }
 
-/// Parse the optional `[name][, x, y, z]` trailing args of the asset spawn form. A
-/// leading string is the entity name; the next three numbers are the position
-/// (defaulting to the origin when omitted).
 fn asset_args(rest: &[mlua::Value]) -> mlua::Result<(Option<String>, glam::Vec3)> {
     let (name, coords) = match rest.first() {
         Some(mlua::Value::String(s)) => (Some(s.to_str()?.to_string()), &rest[1..]),

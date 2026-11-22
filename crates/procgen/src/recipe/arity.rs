@@ -1,8 +1,3 @@
-//! crates/procgen/src/recipe/arity.rs — how many inputs an op accepts (#1485).
-//!
-//! Each [`super::OPS`] row carries one; [`super::Node::check_arity`] holds a node's
-//! `inputs` to it, so a dangling or surplus input is an error, never a black map.
-
 /// How many inputs an op accepts: `min..=max`. Optional inputs are the trailing
 /// ones (`mix`'s mask, `combine_rgb`'s G and B channels).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,7 +7,6 @@ pub struct Arity {
 }
 
 impl Arity {
-    /// Whether a node wired with `given` inputs is accepted.
     pub fn accepts(self, given: usize) -> bool {
         (usize::from(self.min)..=usize::from(self.max)).contains(&given)
     }
@@ -31,7 +25,5 @@ pub(crate) const fn arity(min: u8, max: u8) -> Arity {
     Arity { min, max }
 }
 
-/// A generator: no inputs.
 pub(crate) const SOURCE: Arity = arity(0, 0);
-/// A single-input op.
 pub(crate) const ONE: Arity = arity(1, 1);

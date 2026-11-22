@@ -1,17 +1,4 @@
-//! The `scatter` op's math (#2187): stamps placed freely over the torus, off any
-//! grid. Each stamp's place and draws come from its index and the node seed, each
-//! from its own hash stream (`place` for the place, the channels below for the
-//! rest), so raising `amount` adds stamps without moving the others and a param
-//! added later reshuffles nothing.
-//!
-//! A stamp input is read as `tile` reads its one: the unit square, nothing outside
-//! it. `density`, `scale` and `rotation` are read once per stamp at its centre,
-//! wrapped, so the map tiles and looks the same at any resolution.
-//!
-//! **Cost.** The drawn stamps are filed into buckets (`buckets`) as wide as their
-//! own size, a grid per power of two, so a pixel visits only the stamps that can
-//! cover it, whatever the spread of sizes; the rows are split across threads by
-//! [`Image::fill_uv`]'s bands.
+//! Each stamp's place and draws come from its index and the node seed, each from its own hash stream, so raising `amount` adds stamps without moving the others and a param added later reshuffles nothing.
 
 mod buckets;
 mod place;
@@ -29,10 +16,8 @@ use super::field::{Field, Links};
 use super::generators::{clamp_or, finite};
 use super::tile::{coverage, fill, fold, over};
 
-/// The most stamps a tile holds: a pebble a few texels wide over a 2048² map.
 const MAX_STAMPS: f32 = 65_536.0;
 
-/// The largest a stamp's size reads (one tile across) before its jitter.
 const MAX_SCALE: f32 = 1.0;
 
 /// The hash channels of a stamp's draws past its place (`place` takes 40–41).
@@ -44,24 +29,19 @@ const VALUE: u64 = DRAWS + 3;
 const GREY: u64 = DRAWS + 4;
 const CHANCE: u64 = DRAWS + 5;
 
-/// Everything a scatter reads besides its stamp images, resolved and clamped.
 #[derive(Clone, Copy, Debug)]
 pub struct Settings<'a> {
     /// Stamps per tile, a whole count in `0..=65 536`.
     pub amount: u32,
-    /// A stamp's size in tiles, read at its centre (up to 1).
     pub scale: Field<'a>,
     /// Each stamp's size times `1 ± scale_jitter / 2`; 0–1.
     pub scale_jitter: f32,
-    /// A stamp's turn in turns, read at its centre.
     pub rotation: Field<'a>,
     /// Each stamp turned up to `± rotation_jitter / 2` turns more; 0–1.
     pub rotation_jitter: f32,
     /// Each stamp's value times `1 ± value_jitter / 2`; 0–2.
     pub value_jitter: f32,
-    /// 0 places stamps purely at random; toward 1 they keep apart (`place::gap`).
     pub spacing: f32,
-    /// The chance a stamp is drawn, read at its centre.
     pub density: Field<'a>,
     pub output: TileOutput,
     pub blend: TileBlend,
@@ -69,8 +49,6 @@ pub struct Settings<'a> {
 }
 
 impl<'a> Settings<'a> {
-    /// The op's params resolved against its `links`, under its node seed. A NaN
-    /// number reads its default; one out of range is clamped.
     pub fn of(p: &Params, links: &Links<'a>, seed: u64) -> Self {
         Self {
             amount: clamp_or(p.amount, AMOUNT, 0.0, MAX_STAMPS).round() as u32,
@@ -88,8 +66,6 @@ impl<'a> Settings<'a> {
     }
 }
 
-/// One drawn stamp: its centre (tiles), `(cos, sin)` of its turn, `1 / size`,
-/// which input it stamps and the value its colour is multiplied by.
 #[derive(Clone, Copy, Debug)]
 struct Stamp {
     centre: [f32; 2],
@@ -100,9 +76,6 @@ struct Stamp {
 }
 
 impl Stamp {
-    /// Stamp `i` at `centre`, or `None` when its density draw or its size leaves
-    /// it out. A draw whose setting can't change the stamp (a jitter of 0, a
-    /// density of 1, a pick from one input) is not hashed.
     fn of(i: u32, centre: [f32; 2], inputs: usize, s: &Settings) -> Option<Self> {
         let unit = |ch| hash::unit2(i64::from(i), 0, ch, s.seed);
         let [u, v] = centre;
@@ -141,14 +114,11 @@ impl Stamp {
         })
     }
 
-    /// How far the stamp's turned square reaches from its centre on either axis.
     fn half_width(&self) -> f32 {
         let (c, s) = self.turn;
         0.5 * (c.abs() + s.abs()) / self.inv_size
     }
 
-    /// The stamp-space point for the tile point `(x, y)` (relative to the copy
-    /// whose centre is this stamp's, already shifted).
     #[inline]
     fn local(&self, x: f32, y: f32) -> (f32, f32) {
         let (x, y) = (x - self.centre[0], y - self.centre[1]);
@@ -158,7 +128,6 @@ impl Stamp {
     }
 }
 
-/// The stamps `s` draws, in index order, over `inputs` stamp images.
 fn stamps(s: &Settings, inputs: usize) -> Vec<Stamp> {
     let size = s.scale.max();
     let gap = place::gap(s.spacing, s.amount, if size.is_nan() { 0.0 } else { size });
@@ -169,12 +138,10 @@ fn stamps(s: &Settings, inputs: usize) -> Vec<Stamp> {
         .collect()
 }
 
-/// Scatter `inputs` (1–8 stamp images, all one size) under `s`.
 pub fn scatter(inputs: &[&Image], s: &Settings) -> Image {
     draw(inputs, &stamps(s, inputs.len()), s)
 }
 
-/// Draw `stamps` (in index order) over the tile.
 fn draw(inputs: &[&Image], stamps: &[Stamp], s: &Settings) -> Image {
     let boxes: Vec<_> = stamps
         .iter()

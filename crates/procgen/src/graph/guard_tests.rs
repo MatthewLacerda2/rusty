@@ -1,7 +1,3 @@
-//! Tests for what the review of #1744 found slipping through: ids shared with an
-//! instance, a placeholder path, a seed that isn't a `u32`, a graph param named
-//! `param`, errors naming their file, and the node cap.
-
 use serde_json::{json, Value};
 
 use super::refuse_tests::{expand_err, instancing};
@@ -18,11 +14,9 @@ fn an_id_shared_with_an_instance_is_refused_in_every_scope() {
     doc["nodes"][0]["id"] = json!("w");
     let err = expand_err(doc.clone(), &wear_entries());
     assert!(err.contains("two nodes share the id 'w'"), "{err}");
-    // Two instances under one id.
     doc["nodes"][0] = doc["nodes"][1].clone();
     let err = expand_err(doc, &wear_entries());
     assert!(err.contains("two nodes share the id 'w'"), "{err}");
-    // Inside a graph, the prefixed id and the file are named.
     let mut twice = wear();
     twice["nodes"][1]["id"] = json!("grain");
     let doc = instancing("wear.graph.json", json!({}), &["base"]);

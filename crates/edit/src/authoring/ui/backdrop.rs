@@ -1,32 +1,22 @@
-//! crates/edit/src/authoring/ui/backdrop.rs — Shared BackdropFilter-authoring ops (#426).
-//!
-//! The ONE place the engine mutates an entity's first-class
-//! `BackdropFilterComponent`. The editor's Backdrop Filter card and the Lua
-//! `BackdropFilter.*` namespace both route every write through this.
-//!
-//! Pure.
-
 use glam::Vec4;
 
 use rusty_components::BackdropFilterComponent;
 use rusty_scene::rules::sanitize::{non_negative, unit_color};
 
-/// Set the blur radius in reference units, clamped to `>= 0`.
 pub fn set_blur_radius(b: &mut BackdropFilterComponent, radius: f32) {
     b.blur_radius = non_negative(radius);
 }
 
-/// Set the tint mixed over the backdrop (RGBA; alpha is the mix), clamped to `[0, 1]`.
+/// Alpha is the mix.
 pub fn set_tint(b: &mut BackdropFilterComponent, tint: Vec4) {
     b.tint = unit_color(tint);
 }
 
-/// Set the saturation (`1` unchanged, `0` greyscale), clamped to `>= 0`.
+/// `1` unchanged, `0` greyscale.
 pub fn set_saturation(b: &mut BackdropFilterComponent, saturation: f32) {
     b.saturation = non_negative(saturation);
 }
 
-/// Set the brightness multiplier, clamped to `>= 0`.
 pub fn set_brightness(b: &mut BackdropFilterComponent, brightness: f32) {
     b.brightness = non_negative(brightness);
 }

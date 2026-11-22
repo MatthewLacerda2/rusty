@@ -1,10 +1,3 @@
-//! crates/components/src/physics/collider/mod.rs — Collider component
-//!
-//! box/sphere/cylinder/capsule/mesh shapes, the inline physics material
-//! (`physics_material`) or the path of a shared one, the mesh it keeps once its Mesh is gone (`shared_mesh`), the collision mesh it builds from instead (`collision_mesh`),
-//! the shape under a world scale (`scaled`), and the
-//! cached world AABB. Unity: Collider.
-
 mod physics_material;
 mod scaled;
 mod shared_mesh;
@@ -19,7 +12,6 @@ use crate::Pose;
 use serde::{Deserialize, Serialize};
 
 rusty_core::named_enum! {
-    /// The local axis a capsule's length runs along (Unity: `CapsuleCollider.direction`).
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CapsuleAxis {
         X = "X",
@@ -30,7 +22,6 @@ rusty_core::named_enum! {
 }
 
 impl CapsuleAxis {
-    /// The unit vector of this axis in the collider's local space.
     pub fn unit(self) -> Vec3 {
         match self {
             Self::X => Vec3::X,
@@ -52,21 +43,11 @@ pub enum ColliderShape {
         radius: f32,
         height: f32,
     },
-    /// A capsule (#447): a cylinder capped by two hemispheres, the standard shape
-    /// for characters and limb hitboxes. As in Unity, `height` is the **full**
-    /// end-to-end length, caps included; a height below `2 * radius` degenerates
-    /// to a sphere of `radius`.
     Capsule {
         radius: f32,
         height: f32,
         axis: CapsuleAxis,
     },
-    /// A collider baked from an imported mesh's rest pose (#77). `convex` selects a
-    /// convex hull (cheaper, valid for dynamic bodies) over an exact triangle mesh
-    /// (static geometry). `local_min`/`local_max` are the mesh's local AABB, cached
-    /// so the world AABB can be computed without the triangle data — the rapier
-    /// shape itself is rebuilt from the entity's live mesh vertices at build time,
-    /// keeping geometry out of the scene document.
     Mesh {
         convex: bool,
         local_min: Vec3,
@@ -79,31 +60,14 @@ pub struct ColliderComponent {
     pub active: bool,
     pub shape: ColliderShape,
     pub is_trigger: bool,
-    /// Friction, bounciness and their combine modes (#447). Absent in scenes
-    /// saved before it, which load with the defaults.
     #[serde(default)]
     pub material: PhysicsMaterial,
-    /// The shared physics material asset this collider uses instead of `material`
-    /// (#1878): a project path (`scene::physics_material`), Unity's
-    /// `Collider.sharedMaterial`. While set, the inline values are ignored; a path
-    /// that no longer loads falls back to the default material, never to them.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub material_asset: Option<String>,
-    /// The mesh a `Mesh` shape builds from once its entity has no Mesh (#1657):
-    /// the copy kept when the Mesh was removed. Set when the Mesh is removed,
-    /// cleared when one is added; the entity's own Mesh wins while it has one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
-    /// The collision mesh a `Mesh` shape builds from instead of whatever Mesh its
-    /// entity has (#1960, `edit::asset_instance::collision`): Unity's
-    /// `MeshCollider.sharedMesh` pointed at a low-poly copy, named by its model's
-    /// sidecar or a script. Adding or removing a Mesh never touches it. While its
-    /// geometry is empty (the sub-object failed to load) the collider falls back to
-    /// the entity's Mesh, then to `shared_mesh`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub collision_mesh: Option<SharedMesh>,
-    /// The world-space bounds, derived from the shape and the entity's world pose
-    /// (`ecs::world_space::bounds`): never saved, and recomputed on every load.
     #[serde(skip)]
     pub aabb_min: Vec3,
     #[serde(skip)]
@@ -111,9 +75,6 @@ pub struct ColliderComponent {
 }
 
 impl ColliderComponent {
-    /// This collider with its shared and collision meshes' geometry left out
-    /// ([`SharedMesh::without_geometry`]): what an undo record and a prefab diff copy.
-    /// Every field is named, so a new one must be placed here.
     pub fn without_geometry(&self) -> Self {
         Self {
             active: self.active,
@@ -131,16 +92,11 @@ impl ColliderComponent {
         }
     }
 
-    /// The collision mesh a Mesh shape builds from (#1960), when it has triangles: an
-    /// empty one (its sub-object failed to load) is not built from.
     pub fn built_collision_mesh(&self) -> Option<&SharedMesh> {
         let mesh = self.collision_mesh.as_ref();
         mesh.filter(|m| !m.indices.is_empty() && matches!(self.shape, ColliderShape::Mesh { .. }))
     }
 
-    /// Build a mesh collider baked from an imported mesh's rest-pose bounds (#77).
-    /// `convex` chooses a convex hull over a triangle mesh. The world AABB is left
-    /// zeroed; the scene recomputes it via [`Self::calculate_world_aabb`] on load.
     pub fn from_mesh_bounds(convex: bool, local_min: Vec3, local_max: Vec3) -> Self {
         Self {
             active: true,
@@ -159,12 +115,6 @@ impl ColliderComponent {
         }
     }
 
-    /// The world AABB of the shape physics builds at `pose` (a world
-    /// [`Pose`], as `World::world_pose` gives it): the shape sized by
-    /// [`ColliderShape::scaled`], as `physics::shape::build` sizes it, then turned and
-    /// moved by the pose. A sphere, cylinder or capsule stays round under
-    /// non-uniform scale, and a mesh's local box is carried through the pose's
-    /// signed scale (#1140).
     pub fn calculate_world_aabb(&self, pose: Pose) -> (Vec3, Vec3) {
         let (n, x) = self.shape.scaled(pose.scale).local_box();
         let mut min = Vec3::splat(f32::MAX);
@@ -178,7 +128,6 @@ impl ColliderComponent {
     }
 }
 
-/// The eight corners of the local box `min`..`max`.
 fn box_corners(n: Vec3, x: Vec3) -> [Vec3; 8] {
     [
         Vec3::new(n.x, n.y, n.z),

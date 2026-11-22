@@ -1,23 +1,3 @@
-//! `PROFILE=1`: which function inside a stage costs the time. A scene is loaded
-//! and each viewpoint warmed up and measured as a timed run does, while the
-//! platform's sampling profiler records this process, and only the samples of
-//! the measured frames are kept: [`perf`] on Linux records the whole scene once
-//! and is cut to the measured windows by timestamp ([`window`]); [`sample`] on
-//! macOS, whose samples carry no time, is attached for each viewpoint's measured
-//! frames. The samples are folded together ([`folded`]). Kept beside the scene's
-//! report: `<scene>.profile.txt`, the top functions by self and by total time,
-//! and `<scene>.folded`, the raw folded stacks for a flame graph.
-//!
-//! A profile that did not record soundly (too few samples, or too few that name
-//! a function of the bench's own binary) is refused ([`trust`]): its file and
-//! the console say it is not to be trusted and why, and no tables are written.
-//!
-//! A run of its own, after the timed ones: the profiler's overhead never reaches
-//! a timing. A release build with line tables and frame pointers (`make
-//! bench-scenes PROFILE=1` builds the `profiling` profile), so the stacks name
-//! functions and walk cheaply. No profiler on `PATH` is an error naming the
-//! package to install, never a skip.
-
 pub mod folded;
 pub mod perf;
 pub mod sample;
@@ -37,15 +17,12 @@ use folded::Folded;
 use trust::Tally;
 use window::Window;
 
-/// The platform's sampling profiler, found on `PATH`.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Profiler {
     Perf(PathBuf),
     Sample(PathBuf),
 }
 
-/// The profiler this platform profiles with, looked up on the `PATH` `path`
-/// (`std::env::var_os("PATH")`); an error naming what to install without it.
 pub fn find(path: Option<&OsStr>) -> Result<Profiler, String> {
     let on_path = |name: &str| {
         let dirs = path.map(std::env::split_paths).into_iter().flatten();
@@ -64,19 +41,13 @@ pub fn find(path: Option<&OsStr>) -> Result<Profiler, String> {
     })
 }
 
-/// Whether `profiler` may record this process here: started and stopped once,
-/// before any scene, so a refusal (a stricter `kernel.perf_event_paranoid`)
-/// ends the run with what to set instead of failing every scene's profile.
-/// `scratch` holds the throwaway recording and is removed.
 pub fn probe(profiler: &Profiler, scratch: &Path) -> Result<(), String> {
     std::fs::create_dir_all(scratch).map_err(|e| e.to_string())?;
-    // What a started recording folds is thrown away: the probe asks only whether it starts.
     let stopped = profiler.start(scratch).map(|r| drop(r.stop(&[], "")));
     let _ = std::fs::remove_dir_all(scratch);
     stopped
 }
 
-/// A profiler recording this process.
 enum Recording {
     Perf(perf::Recording),
     Sample(sample::Recording),
@@ -100,13 +71,10 @@ impl Profiler {
         }
     }
 
-    /// Whether one recording covers the whole scene, cut to the measured
-    /// windows by its samples' timestamps; else one is made per window.
     fn cuts_by_time(&self) -> bool {
         matches!(self, Self::Perf(_))
     }
 
-    /// Samples a second, for the count a sound recording should reach.
     fn hz(&self) -> u32 {
         match self {
             Self::Perf(_) => perf::HZ,
@@ -116,8 +84,6 @@ impl Profiler {
 }
 
 impl Recording {
-    /// Stop and fold the samples inside `windows` (a per-window recording keeps
-    /// all of its own), a leaf in the image named `own` counted as the bench's.
     fn stop(self, windows: &[Window], own: &str) -> Result<(Folded, Tally), String> {
         match self {
             Self::Perf(r) => r.stop(windows, own),
@@ -126,9 +92,6 @@ impl Recording {
     }
 }
 
-/// Profile `scene` of the project at `root` with `profiler`: each viewpoint's
-/// measured frames, folded, written beside its report in `out_dir`, or refused
-/// when the recording is not sound. Returns the path of the profile's text.
 pub fn run(
     profiler: &Profiler,
     (root, scene): (&Path, &str),
@@ -173,7 +136,6 @@ pub fn run(
     if let Some(refused) = refused {
         head = format!("{head}\n{refused}");
         write(&tables, format!("{head}\n"))?;
-        // A stale flame graph from an earlier run would read as this one's.
         let _ = std::fs::remove_file(&folded);
         println!("{head}\n  {}", tables.display());
         return Ok(tables);
@@ -188,14 +150,10 @@ pub fn run(
     Ok(tables)
 }
 
-/// Where `scene`'s profile text is kept in `out_dir`.
 pub fn tables_path(out_dir: &Path, scene: &str) -> PathBuf {
     out_dir.join(format!("{scene}.profile.txt"))
 }
 
-/// The closing lines naming each of `scenes` whose profile in `out_dir` refused
-/// itself, with the opening of its first reason; `None` when none did. Said,
-/// not failed: the recording ran, and its file says why it is not to be read.
 pub fn refusals<'a>(out_dir: &Path, scenes: impl Iterator<Item = &'a String>) -> Option<String> {
     let refused = |scene: &String| {
         let text = std::fs::read_to_string(tables_path(out_dir, scene)).ok()?;
@@ -205,15 +163,11 @@ pub fn refusals<'a>(out_dir: &Path, scenes: impl Iterator<Item = &'a String>) ->
     (!lines.is_empty()).then(|| format!("profile not to be trusted (see its .profile.txt):{lines}"))
 }
 
-/// Whether this binary is the `profiling` build (cargo puts a profile's
-/// binaries in a folder named after it), whose timings a report says it is on.
 pub fn on_profiling_build() -> bool {
     let exe = std::env::current_exe().unwrap_or_default();
     exe.parent().and_then(Path::file_name) == Some(OsStr::new("profiling"))
 }
 
-/// What [`record`] gives: the folded samples, their tally, the measured windows
-/// and the event perf sampled (`, cycles:u`).
 struct Recorded {
     stacks: Folded,
     tally: Tally,
@@ -222,7 +176,6 @@ struct Recorded {
 }
 
 impl Recorded {
-    /// Stop `r` and keep what it sampled inside `windows`.
     fn keep(&mut self, r: Recording, windows: &[Window], own: &str) -> Result<(), String> {
         if let Recording::Perf(p) = &r {
             self.event = format!(", {}", p.event);
@@ -234,8 +187,6 @@ impl Recorded {
     }
 }
 
-/// Measure every viewpoint of `views` while `profiler` records: once over the
-/// whole scene when it cuts by time, else once per measured window.
 fn record(
     profiler: &Profiler,
     harness: &mut Harness,

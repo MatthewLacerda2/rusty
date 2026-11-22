@@ -1,7 +1,3 @@
-//! The store's queue: a despawn re-roots its children where they stand (#1264),
-//! and writes made parents first, as the Animator makes them, are all seen by the
-//! next read (#1170).
-
 use glam::{Mat4, Vec3};
 
 use crate::World;
@@ -47,7 +43,6 @@ fn despawning_a_parent_leaves_its_children_as_roots_at_their_world_pose() {
 
 #[test]
 fn a_write_under_a_written_parent_is_seen_by_the_next_read() {
-    // Parents first, as the Animator writes: the second write queues nothing new.
     let mut w = World::new();
     let p = w.spawn("p".into());
     let c = child_of(&mut w, p);

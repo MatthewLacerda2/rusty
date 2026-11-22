@@ -1,10 +1,3 @@
-//! crates/script/src/api/audio/doppler.rs — the `Audio` doppler verbs (#1749).
-//!
-//! The per-source level (`AudioSource.doppler_level`, the authoring op the
-//! inspector shares), the running speed of sound and the project's saved one (the
-//! Build Settings window's twin), and the rate a source's voice plays at now, for a
-//! play-test to assert a pass-by bends the pitch.
-
 use mlua::Table;
 
 use super::super::{put, Reg};
@@ -16,7 +9,6 @@ use rusty_core::application::Application;
 use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::Scene;
 
-/// `SetDopplerLevel` / `GetDopplerLevel` / `GetDoppler`, and the speed of sound.
 pub(super) fn register_doppler(
     lua: &mlua::Lua,
     table: &Table,
@@ -57,8 +49,6 @@ pub(super) fn register_doppler(
     register_speed_of_sound(lua, table, audio)
 }
 
-/// `SetSpeedOfSound` / `GetSpeedOfSound`: the running game's, until Stop puts the
-/// project's back.
 fn register_speed_of_sound(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
@@ -80,10 +70,6 @@ fn register_speed_of_sound(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioM
     )
 }
 
-/// `SetDefaultSpeedOfSound` / `GetDefaultSpeedOfSound`: the project's, in
-/// `project.rusty` (`Application::set_speed_of_sound`, the op the Build Settings
-/// window calls). It writes the file where one is bound (the editor, a session) and
-/// changes the value in memory elsewhere; entering Play and Stop apply it.
 pub(super) fn register_default_speed(
     lua: &mlua::Lua,
     table: &Table,

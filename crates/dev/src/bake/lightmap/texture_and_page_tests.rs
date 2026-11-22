@@ -1,12 +1,8 @@
-//! A texture's share of the bake's albedo, a page's content tag in its file name, and
-//! a cleanup that spares files the bake did not write.
-
 use super::tests::{quick, scene, scene_path};
 use std::path::Path;
 
 use super::*;
 
-/// The sRGB texels `pixels` (`rows` equal rows) written as a PNG in a fresh temp dir.
 fn png(name: &str, pixels: &[[u8; 4]], rows: usize) -> String {
     let dir = Path::new(&scene_path(name)).parent().unwrap().to_path_buf();
     let path = dir.join("albedo.png");
@@ -20,8 +16,6 @@ fn png(name: &str, pixels: &[[u8; 4]], rows: usize) -> String {
 
 #[test]
 fn texture_average_is_the_linear_mean_of_its_texels() {
-    // 188 is past the sRGB toe (≈ 0.5029 linear), 10 is inside it (10/255/12.92).
-    // Two rows (#894): a 2×1 image can't tell `w * h` texels from `w / h`.
     let path = png("albedo", &[[188, 10, 0, 255], [188, 10, 255, 255]], 2);
     let average =
         texture_average(&path.as_str().into(), MapEncoding::Colour).expect("a readable PNG");
@@ -30,7 +24,6 @@ fn texture_average_is_the_linear_mean_of_its_texels() {
     assert!((average.z - 0.5).abs() < 1e-6, "{average}");
 }
 
-/// A data map (an occlusion map, #2299) is averaged raw, as the renderer samples it.
 #[test]
 fn a_data_map_averages_its_raw_bytes() {
     let path = png("occlusion", &[[188, 10, 0, 255], [64, 10, 255, 255]], 2);
@@ -50,7 +43,6 @@ fn an_unreadable_texture_has_no_average() {
 
 #[test]
 fn the_content_tag_is_the_content_hash_folded_to_32_bits() {
-    // XXH3_64bits("") = 0x2d06_8005_38d3_94c2; its halves xored.
     assert_eq!(content_tag(b""), 0x15d5_14c7);
     let fold = |h: u64| (h ^ (h >> 32)) as u32;
     assert_eq!(

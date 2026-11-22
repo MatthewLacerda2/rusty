@@ -1,18 +1,3 @@
-//! The scenario's calls that must run in the gameplay VM: `Damage.*` (#1893)
-//! and `CharacterController.Move` (#1879).
-//!
-//! Both call script callbacks synchronously, inside the call (`OnTakeDamage`,
-//! `OnControllerColliderHit`), on the live script instances, and those live in
-//! the gameplay VM: the scenario's own copy of the namespace would find none.
-//! So each verb here copies its arguments into the gameplay VM (`copy`), calls
-//! that VM's `<Namespace>.<verb>` and copies the returns back, the way a
-//! `Scene.GetScript` handle calls a game function (`script_ref`). A handler's
-//! error is raised as the scenario's.
-//!
-//! The verbs, and what each does before the first `Harness.Step` (no gameplay
-//! VM yet), are `demo::forwards`' table: the replay makes them by the same
-//! rule, so a demo recorded through these forwards replays (#1929).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -22,7 +7,6 @@ use super::copy::Copier;
 use crate::demo::{Forward, FORWARDS};
 use rusty_app::GameWorld;
 
-/// Replace the scenario's [`FORWARDS`] with forwards into the gameplay VM.
 pub fn register(lua: &Lua, world: &Rc<RefCell<GameWorld>>) -> LuaResult<()> {
     for entry in &FORWARDS {
         let table: Table = lua.globals().get(entry.namespace)?;
@@ -34,8 +18,6 @@ pub fn register(lua: &Lua, world: &Rc<RefCell<GameWorld>>) -> LuaResult<()> {
     Ok(())
 }
 
-/// `entry`'s `verb`, run in the gameplay VM, or as [`Forward::run`] says while
-/// that VM is down (`own`, the scenario's, for a verb that falls back).
 fn forward(
     lua: &Lua,
     world: &Rc<RefCell<GameWorld>>,
@@ -52,8 +34,6 @@ fn forward(
         )
     })
 }
-/// `namespace.verb(args)` in the gameplay VM, its returns copied back to
-/// `lua`; `None` while that VM is down.
 fn in_game(
     lua: &Lua,
     world: &GameWorld,

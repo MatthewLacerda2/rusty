@@ -1,9 +1,3 @@
-//! A part whose node the model lost goes the way the moment allows (#1665): at
-//! once while a document is applied, a Play-mode `Scene.Load` included, and
-//! through the destroy queue for a Play-mode reimport, so its scripts are torn
-//! down. A part of the instance that survives under it moves out with what hangs
-//! under it, its overrides kept.
-
 use std::collections::BTreeSet;
 
 use glam::Vec3;

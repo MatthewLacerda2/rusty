@@ -1,6 +1,3 @@
-//! Re-importing a model (#831, #891) rebuilds only that model's unskinned meshes,
-//! and keeps the old geometry when the model yields nothing.
-
 use glam::Vec3;
 
 use super::{reimport_model, Rig};

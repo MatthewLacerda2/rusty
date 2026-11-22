@@ -1,11 +1,9 @@
-//! The projection and render-texture ops (#430), and the lens clamps (#1341).
-
 use super::*;
 
 #[test]
 fn target_ops_clamp_keep_settings_and_clear() {
     let mut c = CameraComponent::default();
-    set_target_post_fx(&mut c, false); // no target yet: a no-op
+    set_target_post_fx(&mut c, false);
     assert!(c.target_texture.is_none());
 
     set_target_texture(&mut c, " minimap ", 0, 99_999);

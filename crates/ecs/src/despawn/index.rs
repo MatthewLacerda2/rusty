@@ -1,26 +1,3 @@
-//! crates/ecs/src/despawn/index.rs — who names whom: the reverse index a despawn reads
-//! instead of scanning every holder (#1708).
-//!
-//! Per target id, the live entities whose components hold it, by
-//! [`EntityRefs::each_held`] (the saved id leaves and a skinned mesh's bone slots).
-//! It is derived and never saved. It is opened by the World's first despawn and
-//! kept from then on through one change cursor per reference-holding column
-//! (`with_ref_components`): each despawn first re-reads the holders written since
-//! the last one, so a burst of edits costs one pass over the ids it changed, and a
-//! cursor answering `Rebuild` (a load, a clear, Play's restore, an Undo step, a log
-//! that dropped its tail) costs one walk over every holder, which is what every
-//! despawn paid before.
-//!
-//! **Exact, not a superset.** After a refresh, a target's holders are exactly the
-//! live entities whose components name it: every write to a holding column goes
-//! through the funnel, which stamps that column's channel (`ecs::changes`), and a
-//! placement, overwrite or removal stamps every column the entity carries or
-//! carried, the holding ones among them. `index_tests` compares it
-//! with the full scan over random edit and despawn sequences.
-//!
-//! **Determinism.** Ordered maps only; a despawn hands the holders over ascending,
-//! the order the scan gave.
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::{Changes, Cursor, World};
@@ -28,7 +5,6 @@ use rusty_components::{with_ref_components, EntityRefs};
 
 macro_rules! index_walk {
     ($($field:ident: $ty:ty,)*) => {
-        /// One cursor per column that can hold an id.
         struct Cursors {
             $($field: Cursor<$ty>,)*
         }
@@ -38,8 +14,6 @@ macro_rules! index_walk {
                 Self { $($field: world.change_cursor::<$ty>(),)* }
             }
 
-            /// The holders written since the last read, or `None` when any column's
-            /// log cannot say. Every cursor is read, so each one moves on.
             fn read(&mut self, world: &mut World) -> Option<BTreeSet<u32>> {
                 let mut ids = Some(BTreeSet::new());
                 $(match world.changes(&mut self.$field) {
@@ -55,7 +29,6 @@ macro_rules! index_walk {
         }
 
         impl World {
-            /// Every id the components of `id` hold, ascending, each once.
             pub(crate) fn held_by(&self, id: u32) -> Vec<u32> {
                 let mut held = Vec::new();
                 $(if let Some(c) = self.component::<$ty>(id) {
@@ -70,21 +43,15 @@ macro_rules! index_walk {
 }
 with_ref_components!(index_walk);
 
-/// The reverse index. See the module docs.
 pub(crate) struct RefIndex {
     cursors: Cursors,
-    /// Target id -> the live entities holding it.
     by_target: BTreeMap<u32, BTreeSet<u32>>,
-    /// Holder id -> what it held when last read, ascending.
     by_holder: BTreeMap<u32, Vec<u32>>,
-    /// Holders re-read or handed to a despawn since opening: what a test counts
-    /// a despawn's work by.
     #[cfg(test)]
     pub(crate) touched: u64,
 }
 
 impl RefIndex {
-    /// Open the cursors and index every holder.
     pub(crate) fn open(world: &mut World) -> Self {
         let mut index = Self {
             cursors: Cursors::open(world),
@@ -97,7 +64,6 @@ impl RefIndex {
         index
     }
 
-    /// Catch up with every holder written since the last refresh.
     pub(crate) fn refresh(&mut self, world: &mut World) {
         match self.cursors.read(world) {
             None => self.rebuild(world),
@@ -113,7 +79,6 @@ impl RefIndex {
         }
     }
 
-    /// Re-read what `holder` holds now (nothing, once it is gone).
     fn reindex(&mut self, world: &World, holder: u32) {
         #[cfg(test)]
         {
@@ -145,9 +110,6 @@ impl RefIndex {
         };
     }
 
-    /// The live entities outside `dead` holding any of its ids, ascending. Read
-    /// only: the despawn writes each of them, and removes the dead rows, so the
-    /// next refresh re-reads every holder involved and the index stays exact.
     pub(crate) fn naming(&self, dead: &BTreeSet<u32>) -> Vec<u32> {
         let holders = dead.iter().filter_map(|d| self.by_target.get(d)).flatten();
         let naming: BTreeSet<u32> = holders.filter(|h| !dead.contains(h)).copied().collect();

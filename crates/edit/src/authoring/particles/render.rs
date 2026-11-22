@@ -1,11 +1,6 @@
-//! crates/edit/src/authoring/particles/render.rs — the emitter's render-settings ops
-//! (#440): what the Particle System card's Render section and the `Particles.Set*`
-//! render bindings both call, so the two can never clamp differently.
-
 use rusty_components::{Flipbook, ParticleEmitterComponent, ParticleRenderMode, TaaReactive};
 use rusty_scene::rules::sanitize::non_negative;
 
-/// Set how the particles are drawn (billboard / stretched / flat / mesh).
 pub fn set_render_mode(p: &mut ParticleEmitterComponent, mode: ParticleRenderMode) {
     p.render.mode = mode;
     super::Dishonoured::Mesh.warn(p);
@@ -18,18 +13,14 @@ pub fn set_stretch(p: &mut ParticleEmitterComponent, length_scale: f32, speed_sc
     p.render.speed_scale = non_negative(speed_scale);
 }
 
-/// Set (or, with an empty string, clear) the mesh-particle mesh: a primitive name
-/// or a model asset path.
 pub fn set_render_mesh(p: &mut ParticleEmitterComponent, mesh: String) {
     p.render.mesh = (!mesh.is_empty()).then_some(mesh);
 }
 
-/// Set (or, with an empty string, clear) the mesh particles' scene material.
 pub fn set_render_material(p: &mut ParticleEmitterComponent, material: String) {
     p.render.material = (!material.is_empty()).then_some(material);
 }
 
-/// Set the flipbook grid; `columns`/`rows` clamp to `≥ 1`, `cycles` to `≥ 0`.
 // lint: allow(sanitize) its one float, `cycles`, goes through `non_negative`
 pub fn set_flipbook(p: &mut ParticleEmitterComponent, flipbook: Flipbook) {
     p.render.flipbook = Flipbook {
@@ -40,17 +31,14 @@ pub fn set_flipbook(p: &mut ParticleEmitterComponent, flipbook: Flipbook) {
     };
 }
 
-/// Set the soft-particle fade distance (world units, `≥ 0`; `0` = hard edges).
 pub fn set_soft_distance(p: &mut ParticleEmitterComponent, distance: f32) {
     p.render.soft_distance = non_negative(distance);
 }
 
-/// Set how reactive the sprites are under TAA (#1845).
 pub fn set_reactive(p: &mut ParticleEmitterComponent, reactive: TaaReactive) {
     p.render.reactive = reactive;
 }
 
-/// Set whether the particles are lit by the scene.
 pub fn set_lit(p: &mut ParticleEmitterComponent, lit: bool) {
     p.render.lit = lit;
 }

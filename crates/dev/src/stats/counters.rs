@@ -1,7 +1,3 @@
-//! crates/dev/src/stats/counters.rs — the world counters a frame's stats record at
-//! its end: what the world holds, and what each change channel dirtied, read by
-//! [`TimingProbe::record_frame`], the probe's own work (`probe_ms`).
-
 use std::collections::BTreeMap;
 
 use rusty_app::{Resources, Stage, World};
@@ -9,8 +5,6 @@ use rusty_core::frame_stats::FrameStats;
 
 use super::{stage_key, TimingProbe};
 
-/// The world counters: entities, rigid bodies, nav agents, live particles, scripts,
-/// skeletons and their bones (#1617).
 pub(super) fn record_world(stats: &mut FrameStats, world: &World, res: &Resources) {
     let scene = world.scene.borrow();
     let w = &scene.world;
@@ -36,8 +30,6 @@ pub(super) fn record_world(stats: &mut FrameStats, world: &World, res: &Resource
     stats.record("bones", bones as f64);
 }
 
-/// `changes_<channel>`: per change channel a cursor reads, the distinct ids dirtied
-/// this frame (the entries its log appended since the last frame, #1705).
 pub(super) fn record_changes(
     stats: &mut FrameStats,
     channels: impl Iterator<Item = (&'static str, u64)>,
@@ -51,14 +43,10 @@ pub(super) fn record_changes(
 }
 
 impl TimingProbe {
-    /// The frame's stage totals, its loads' samples and the world counters, into
-    /// the stats: [`end_frame`](rusty_app::SystemProbe::end_frame)'s work, timed as the probe's own.
     pub(super) fn record_frame(&mut self, world: &World, res: &Resources) {
         #[cfg(test)]
         super::verbs::advance(RECORD_COST.with(std::cell::Cell::get));
         let mut stats = self.stats.borrow_mut();
-        // The first frame of a Play session (`advance_frame` has just made it 1)
-        // starts the stats afresh.
         if res.play_frame() == 1 {
             *stats = FrameStats::default();
         }
@@ -79,10 +67,6 @@ impl TimingProbe {
 
 #[cfg(test)]
 thread_local! {
-    /// What each `record_frame` charges a test's driven clock, in ms: the probe's
-    /// own work made visible (`probe_cost_tests`).
     pub(super) static RECORD_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
-    /// What each closing `end_tick` charges a test's driven clock, in ms, inside its
-    /// recording, after the tick's span has closed (`probe_cost_tests`).
     pub(super) static END_COST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }

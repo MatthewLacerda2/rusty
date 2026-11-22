@@ -1,9 +1,3 @@
-//! Tests for `Material.DefineAsset { maps = … }` and `Material.Rebake` (#409), and the
-//! occlusion and specular-level map setters (#2151).
-//!
-//! The binding bakes into the project texture workspace (`MAPS_DIR`), so each test
-//! names its material after itself and the process, and removes what it wrote.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,13 +8,11 @@ use rusty_asset::MapRef;
 use rusty_edit::authoring::material::MAPS_DIR;
 use rusty_scene::Scene;
 
-/// A multi-output checker recipe: albedo and a packed metallic-roughness map.
 const MAPS: &str = r#"{ resolution = 8, seed = 3,
     nodes = { { id = "c", op = "checker", tiles = 2,
                 color_a = {0,0,0,1}, color_b = {1,1,1,1} } },
     outputs = { base_color = "c", metallic_roughness = "c" } }"#;
 
-/// Run `script` against `scene` with the `Material` namespace; `Err` is the message.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let lua = Lua::new();
     crate::api::attempt(|| {
@@ -31,14 +23,12 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// A per-process material name, and the baked path of its `slot`.
 fn names(test: &str) -> (String, impl Fn(&str) -> String) {
     let name = format!("test409_{test}_{}", std::process::id());
     let prefix = format!("{MAPS_DIR}/{name}");
     (name, move |slot: &str| format!("{prefix}_{slot}.png"))
 }
 
-/// Remove the maps baked for material `name`.
 fn cleanup(name: &str) {
     for slot in ["base_color", "metallic_roughness"] {
         std::fs::remove_file(format!("{MAPS_DIR}/{name}_{slot}.png")).ok();

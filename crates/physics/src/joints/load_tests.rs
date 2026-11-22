@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/load_tests.rs — the torque a joint carries about its anchor
-//! (#803): a weight welded off its pivot loads it with weight × lever (Unity's
-//! `currentTorque`), a free hinge axis or a ball carries none, a weld between two
-//! moving bodies reads the same as one to the world, and `break_torque` breaks on it.
-
 use glam::Vec3;
 
 use super::super::world::PhysicsWorld;
@@ -13,10 +8,8 @@ use rusty_components::{
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
-/// A unit cube's weight: one kilogram under the default gravity.
 const WEIGHT: f32 = 9.81;
 
-/// A dynamic unit cube (one kilogram) at `pos`.
 fn cube(scene: &mut Scene, pos: Vec3) -> u32 {
     let id = scene.add_entity("Cube".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -33,7 +26,6 @@ fn cube(scene: &mut Scene, pos: Vec3) -> u32 {
     id
 }
 
-/// A cube `lever` metres right of its joint's pivot, far from anything else.
 fn off_pivot(kind: JointKind, axis: Vec3, lever: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = cube(&mut scene, Vec3::new(lever, 10.0, 0.0));
@@ -47,7 +39,6 @@ fn off_pivot(kind: JointKind, axis: Vec3, lever: f32) -> (Scene, u32) {
     (scene, id)
 }
 
-/// The torque (N·m) joint `id` carries after `ticks` steps.
 fn torque_after(scene: &mut Scene, id: u32, ticks: usize) -> f32 {
     let mut world = PhysicsWorld::from_scene(scene);
     for _ in 0..ticks {
@@ -76,8 +67,6 @@ fn a_weld_off_its_pivot_carries_weight_times_lever() {
 
 #[test]
 fn only_locked_rotation_carries_torque() {
-    // Gravity twists the cube about Z: a hinge about Y holds that, one about Z
-    // swings freely, and a ball joint holds no rotation at all.
     let (mut held, id) = off_pivot(JointKind::Hinge, Vec3::Y, 1.0);
     let t = torque_after(&mut held, id, 1);
     assert!(near(t, WEIGHT), "hinge across the twist: {t}");
@@ -90,8 +79,6 @@ fn only_locked_rotation_carries_torque() {
 
 #[test]
 fn a_weld_between_two_moving_bodies_reads_the_same() {
-    // A held to the world; B welded to A a metre and a half to its right. By tick
-    // 60 both sleep, on the impulses of their last awake step.
     let mut scene = Scene::new();
     let a = cube(&mut scene, Vec3::new(0.0, 10.0, 0.0));
     let b = cube(&mut scene, Vec3::new(1.5, 10.0, 0.0));

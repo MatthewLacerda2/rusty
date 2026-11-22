@@ -1,17 +1,3 @@
-//! crates/script/src/api/snapshot/mod.rs — the structured scene-read ("what the agent sees").
-//!
-//! The read half of the editor↔API parity surface (#180, epic #176). It turns the
-//! **live** world into a stable, diffable JSON document rich enough to *author*
-//! against: per entity the full transform (incl. scale), the component inventory,
-//! the mesh/asset reference, material params, every first-class component's
-//! authoring fields, and the world-space bounds for overlap-aware placement —
-//! plus the camera and play-state envelope. GPU buffers are never dumped; only
-//! references and values, mirroring the `SceneData` document.
-//!
-//! It lives in `api` (not `dev`) so both callers depend *downward*: the dev
-//! harness (`dev::snapshot`) and the dev-only `Debug.Snapshot` binding both call
-//! it, and reads stay on the one API surface.
-
 use glam::{Mat4, Vec3};
 use serde_json::{json, Value};
 
@@ -28,15 +14,10 @@ use rusty_ecs::World;
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 use rusty_ui::UiView;
-/// A `glam::Vec3` as a `[x, y, z]` JSON array. Shared with the `components` and `ui` builders.
 pub(crate) fn vec3(v: Vec3) -> Value {
     json!([v.x, v.y, v.z])
 }
 
-/// The whole-world snapshot: play-state envelope + camera + every entity. `view` is
-/// what the UI is computed against (each UI element's `ui_rect`): the screen, the
-/// texture sizes and `camera`, through which markers are placed (#429).
-/// Skeleton bones (#453) are left out — see [`world_value_with`].
 pub fn world_value(
     scene: &Scene,
     camera: &Camera,
@@ -47,9 +28,6 @@ pub fn world_value(
     world_value_with(scene, camera, frame, playing, view, false)
 }
 
-/// [`world_value`], choosing whether skeleton bones are included (#453): a
-/// character's ~65 bones would flood the read, so they are opt-in, and an
-/// included bone is marked `"bone": true`.
 pub fn world_value_with(
     scene: &Scene,
     camera: &Camera,
@@ -83,7 +61,6 @@ pub fn world_value_with(
     })
 }
 
-/// The active (world) camera — pose + lens.
 fn camera_value(cam: &Camera) -> Value {
     json!({
         "pos": vec3(cam.position),
@@ -93,11 +70,6 @@ fn camera_value(cam: &Camera) -> Value {
     })
 }
 
-/// One entity in the stable authoring shape. `world_matrix` is the entity's
-/// parent-aware world transform, used for the world-space bounds; `view` is the
-/// UI's screen and camera, used for the computed `ui_rect` (markers included). Reads route
-/// through the `World` component accessors (#344) instead of projecting fields
-/// out of a whole-`Entity` borrow, so heavy fields (meshes) are never cloned.
 pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -> Value {
     let world = &scene.world;
     let mut value = json!({
@@ -130,9 +102,6 @@ pub fn entity_value(scene: &Scene, id: u32, world_matrix: Mat4, view: &UiView) -
     value
 }
 
-/// Names of the optional first-class components this entity carries (the
-/// "component inventory" authoring needs), then `Script` when it has any.
-/// `Transform` is mandatory and omitted.
 fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     let mut names = fields::carried(world, id);
     if world.scripts(id).is_some_and(|s| !s.is_empty()) {
@@ -141,7 +110,6 @@ fn inventory(world: &World, id: u32) -> Vec<&'static str> {
     names
 }
 
-/// Full transform — position, Euler rotation (degrees), and **scale**.
 fn transform_value(t: &TransformComponent) -> Value {
     json!({
         "pos": vec3(t.position),
@@ -150,8 +118,6 @@ fn transform_value(t: &TransformComponent) -> Value {
     })
 }
 
-/// World-space AABB for overlap-aware placement: the mesh bounds when present,
-/// else the collider bounds, else `null`.
 fn bounds_value(scene: &Scene, id: u32, world_matrix: Mat4) -> Value {
     let aabb = scene
         .world

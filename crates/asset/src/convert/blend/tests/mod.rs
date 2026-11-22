@@ -1,4 +1,4 @@
-//! The `.blend` fixture through Blender (#1072). These need Blender 5+, so they
+//! The `.blend` fixture through Blender. These need Blender 5+, so they
 //! are skipped by default and run by CI's `blender` job (`--run-ignored only`).
 //! Finding Blender is tested without it, with fakes (`locate`).
 

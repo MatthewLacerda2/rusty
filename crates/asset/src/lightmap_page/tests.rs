@@ -1,12 +1,8 @@
-//! A lightmap page round trip (#1694): BC6H holds linear HDR within 5%
-//! with no RGBM range cap, the KTX2 file reads back exactly what was written in
-//! the spec's level layout, and a malformed file is refused.
-
 use glam::Vec3;
 
 use super::*;
 
-/// An `edge`² gradient of smooth HDR light, up past RGBM's old cap of 8.
+/// Smooth HDR light, up past RGBM's old cap of 8.
 fn light(edge: u32) -> Vec<Vec3> {
     (0..edge * edge)
         .map(|i| {
@@ -19,7 +15,6 @@ fn light(edge: u32) -> Vec<Vec3> {
         .collect()
 }
 
-/// A BC6H page nobody stops.
 fn bc6h(edge: u32, levels: &[Vec<Vec3>], threads: usize) -> Page {
     encode_bc6h(edge, levels, threads, &|| false).expect("never stopped")
 }
@@ -71,8 +66,6 @@ fn the_same_page_encodes_the_same_on_any_thread_count() {
 fn a_ktx2_page_round_trips_in_the_specs_layout() {
     let page = bc6h(8, &[light(8), light(4)], 2);
     let file = write(&page);
-    // The spec's layout: the index largest first, the images smallest first,
-    // each 16-byte aligned.
     let offset = |l: usize| {
         let at = 80 + l * 24;
         u64::from_le_bytes(file[at..at + 8].try_into().unwrap())
@@ -98,8 +91,6 @@ fn a_malformed_file_is_refused_naming_why() {
     assert!(read(&wide).is_err(), "not square, levels the wrong length");
 }
 
-/// A direction page (#1996): RGBA8 levels round trip as they are, and a level of
-/// the wrong length is refused.
 #[test]
 fn an_rgba8_page_round_trips_and_its_lengths_are_checked() {
     let level = |edge: u32| (0..edge * edge * 4).map(|i| (i * 7) as u8).collect();
@@ -126,8 +117,7 @@ fn levels_stop_at_whole_blocks() {
     assert_eq!(max_levels(6), 0);
 }
 
-/// A level under a block (a cube's 2×2 and 1×1 mips, #1885) is one padded block,
-/// and decodes to its own texels.
+/// A level under a block (a cube's 2×2 and 1×1 mips) is one padded block.
 #[test]
 fn a_level_under_a_block_is_one_padded_block() {
     for edge in [1u32, 2] {

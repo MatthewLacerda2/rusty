@@ -1,6 +1,3 @@
-//! `Debug.GetAdaptedExposure` (#1444): the screen's adapted EV a frontend publishes,
-//! `nil` before one has.
-
 use crate::session::Session;
 
 #[test]

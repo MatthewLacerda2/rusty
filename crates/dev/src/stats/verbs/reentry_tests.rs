@@ -1,19 +1,11 @@
-//! Where re-entered Lua ends (an error a handler catches, a main chunk), the
-//! Rust halves of a Lua-written verb, and the wrappers' own time.
-
 use mlua::Lua;
 
 use super::super::wrap::wrap_globals;
 use super::super::{advance, drive, take, Frame, RECORDER, SYSTEM, UPDATE_SYSTEM};
 use super::{assert_ms, verb, vm};
 
-/// Lua's own work inside the handler: 50 ms on the driven clock.
 const SPEND: &str = "spend(50)";
 
-/// `Fake.Then(handler)`, inside `update_scripts` on the driven clock: a verb
-/// that calls `handler` back, then does 20 ms of work on Rust's side. It must be
-/// charged exactly those 20 ms and none of the handler's Lua, which is no
-/// verb's and no wrapper's either.
 fn reenter_then_work(handler: &str) {
     let lua = vm(true);
     let then = lua
@@ -99,8 +91,6 @@ fn the_wrappers_own_time_is_kept_apart_and_a_bare_vm_has_none() {
     lua.load("for i = 1, 2000 do Fake.Cheap(i) end")
         .exec()
         .unwrap();
-    // The real clock, so only a lower bound: the wrappers cost something.
-    // Outside any system, the overhead is not summed for update_scripts...
     assert_eq!(take().overhead_ms, 0.0);
     SYSTEM.with(|s| s.set(UPDATE_SYSTEM));
     lua.load("for i = 1, 2000 do Fake.Cheap(i) end")

@@ -1,6 +1,3 @@
-//! Nested blend trees on the graph asset (#1746): a child holding a tree parses
-//! and round-trips, and every level is validated, each problem naming its path.
-
 use super::*;
 
 const NESTED: &str = r#"{
@@ -26,7 +23,6 @@ fn problems(graph: &AnimationGraph) -> String {
     }
 }
 
-/// The nested 1D tree of the parsed graph.
 fn inner(graph: &mut AnimationGraph) -> &mut BlendTree {
     let Some(BlendTree::FreeformDirectional2D { children, .. }) =
         &mut graph.base.nodes[0].blend_tree

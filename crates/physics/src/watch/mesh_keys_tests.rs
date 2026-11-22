@@ -1,7 +1,3 @@
-//! A Mesh collider built from a library mesh follows a replace in Play (#2059's
-//! review): what rests on a plank that is halved falls, through the incremental
-//! sync and the full pass alike.
-
 use glam::Vec3;
 
 use crate::PhysicsWorld;
@@ -11,7 +7,6 @@ use rusty_scene::{mesh_library, Scene};
 
 pub(super) const DT: f32 = 1.0 / 60.0;
 
-/// A flat quad at y = 0 from x = `x0` to `x1`, z from -2 to 2, facing up.
 pub(super) fn plank(x0: f32, x1: f32) -> MeshData {
     MeshData {
         positions: vec![
@@ -25,8 +20,6 @@ pub(super) fn plank(x0: f32, x1: f32) -> MeshData {
     }
 }
 
-/// A static plank drawing the library mesh "plank" with a Mesh collider, and a
-/// dynamic half-metre box above its right half.
 pub(super) fn scene() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.define_mesh("plank", plank(-2.0, 2.0)).unwrap();
@@ -61,8 +54,6 @@ pub(super) fn y(scene: &Scene, id: u32) -> f32 {
     scene.world.transform(id).unwrap().position.y
 }
 
-/// The crate's height at rest on the whole plank, and a second after the plank
-/// is replaced with its left half.
 fn rest_then_halve(always_full: bool) -> (f32, f32) {
     let (mut scene, crate_) = scene();
     let mut world = PhysicsWorld::from_scene(&scene);
@@ -75,7 +66,6 @@ fn rest_then_halve(always_full: bool) -> (f32, f32) {
         world.bodies[world.id_to_body[&crate_]].is_sleeping(),
         "asleep at rest"
     );
-    // The same data again re-shapes nothing and keeps it resting.
     scene.define_mesh("plank", plank(-2.0, 2.0)).unwrap();
     world.step(&mut scene, DT);
     assert!((y(&scene, crate_) - rest).abs() < 1e-3);

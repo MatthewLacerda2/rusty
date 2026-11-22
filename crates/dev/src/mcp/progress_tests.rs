@@ -1,14 +1,9 @@
-//! A request with a progress token hears its bake's lines as
-//! `notifications/progress` before its response; one without hears none (#1999).
-
 use serde_json::{json, Value};
 
 use super::progress::{token, Captured};
 use super::{run, EvalBackend};
 use crate::bake::progress::listen::tell;
 
-/// A slow verb, mocked: it tells two progress lines, as a bake's log does, and
-/// returns.
 struct SlowBake;
 
 impl EvalBackend for SlowBake {
@@ -27,7 +22,6 @@ fn call(meta: Value) -> String {
     .to_string()
 }
 
-/// Every line `run` wrote for `request`, parsed.
 fn exchange(request: &str) -> Vec<Value> {
     let out = Captured::default();
     run(&SlowBake, format!("{request}\n").as_bytes(), out.clone()).expect("runs to EOF");

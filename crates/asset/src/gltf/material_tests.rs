@@ -1,7 +1,6 @@
-//! A glTF material's `doubleSided` on import (#1615): honoured for an authored
-//! `.gltf`, ignored for a `.blend`'s conversion; its `KHR_materials_ior` and
-//! `KHR_materials_specular` factors (#1998); its occlusion and specular-level
-//! textures (#2151).
+//! A glTF material's `doubleSided` on import (honoured for an authored `.gltf`, ignored
+//! for a `.blend`'s conversion), its `KHR_materials_ior` and `KHR_materials_specular`
+//! factors, and its occlusion and specular-level textures.
 
 use super::super::import::{import, import_from};
 
@@ -63,7 +62,7 @@ fn a_gltf_without_them_keeps_the_extensions_defaults() {
 #[test]
 fn an_orm_gltf_names_one_image_for_occlusion_and_metallic_roughness() {
     // Texture 0 is the ORM image (occlusion and metallic-roughness), 1 the
-    // `KHR_materials_specular` level (#2151).
+    // `KHR_materials_specular` level.
     let ext = r#"{"name":"Felt","occlusionTexture":{"index":0,"strength":0.25},
         "pbrMetallicRoughness":{"metallicRoughnessTexture":{"index":0}},
         "extensions":{"KHR_materials_specular":{"specularTexture":{"index":1}}}}],

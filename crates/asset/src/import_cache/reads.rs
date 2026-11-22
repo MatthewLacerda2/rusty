@@ -1,15 +1,5 @@
-//! crates/asset/src/import_cache/reads.rs — the other files an import reads (#857).
-//!
-//! A cached import is current only while every file its parse read still reads
-//! the same, as a conversion is only while its dependencies do
-//! (`convert::depends`): an `.obj`'s `mtllib` files and a `.gltf`'s external
-//! `.bin` buffers. Textures are not among them: the importer never decodes an
-//! image (`gltf::import`), it names it, and the renderer reads it.
-//!
-//! Found the way the parsers find them: `tobj` takes the rest of an `mtllib` line
-//! as one file name beside the `.obj`, and a buffer's relative URI resolves
-//! beside the glTF (`gltf::uri::file`). A `data:` URI and a `.glb`'s own blob are
-//! no file. A `.glb`'s JSON chunk is read alone, never its binary one.
+//! An `.obj`'s `mtllib` files and a `.gltf`'s external buffers; not textures, which
+//! the importer only names. `tobj` takes the rest of an `mtllib` line as one file name.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -19,22 +9,19 @@ use std::time::Duration;
 use crate::gltf::uri;
 use rusty_core::paths;
 
-/// A file's size and modified time (`None`: it could not be read).
+/// `None`: it could not be read.
 pub(super) type Stamp = Option<(u64, Option<Duration>)>;
 
-/// The files an import read, the parsed one first, each with its [`Stamp`].
 pub(super) type Files = Vec<(String, Stamp)>;
 
-/// Then, for each model `borrowed` names (#1747), the files its parse reads,
-/// its own file when that is converted, and its sidecar, whose humanoid map
-/// shapes the borrowed clips.
+/// For each `borrowed` model: its parse's files, its converted source, and its
+/// sidecar (whose humanoid map shapes the clips).
 pub(super) fn files_of(read: &Path, borrowed: &[String]) -> Files {
     let own = std::iter::once(read.to_path_buf()).chain(reads(read));
     let sources = borrowed.iter().flat_map(|from| {
         let from = Path::new(from);
         let read = crate::read_target(from).unwrap_or_else(|_| from.to_path_buf());
         let meta = crate::sidecar::meta_path(from);
-        // The source itself too, when a conversion reads another file for it.
         let own = (read != from).then(|| from.to_path_buf());
         std::iter::once(read.clone())
             .chain(reads(&read))
@@ -46,8 +33,6 @@ pub(super) fn files_of(read: &Path, borrowed: &[String]) -> Files {
         .collect()
 }
 
-/// The files a parse of `read` reads for its geometry: `read`, then the others it
-/// pulls in. What a cooked model is stamped by (`cook::stamp`).
 pub(crate) fn parsed(read: &Path) -> Vec<PathBuf> {
     std::iter::once(read.to_path_buf())
         .chain(reads(read))
@@ -61,7 +46,6 @@ pub(super) fn stamp(path: &Path) -> Stamp {
     Some((meta.len(), since))
 }
 
-/// The files besides `read` a parse of it reads, found or not.
 fn reads(read: &Path) -> Vec<PathBuf> {
     let base = read.parent().unwrap_or_else(|| Path::new(""));
     match paths::extension(read).as_str() {
@@ -78,7 +62,6 @@ fn reads(read: &Path) -> Vec<PathBuf> {
     }
 }
 
-/// The `mtllib` files an `.obj`'s text names, beside it.
 fn mtllibs(obj: &[u8], base: &Path) -> Vec<PathBuf> {
     let text = String::from_utf8_lossy(obj);
     let named = text.lines().filter_map(|line| {
@@ -90,7 +73,6 @@ fn mtllibs(obj: &[u8], base: &Path) -> Vec<PathBuf> {
     named.collect()
 }
 
-/// The external buffer files a glTF document's JSON names, beside it.
 fn buffers(json: &[u8], base: &Path) -> Vec<PathBuf> {
     let Ok(root) = gltf::json::deserialize::from_slice::<gltf::json::Root>(json) else {
         return Vec::new();
@@ -100,8 +82,7 @@ fn buffers(json: &[u8], base: &Path) -> Vec<PathBuf> {
     files.filter_map(|u| uri::file(base, u)).collect()
 }
 
-/// A `.glb`'s JSON chunk: the 12-byte header, then the first chunk's length and
-/// type, then its bytes (a cooked file's stamp is read so, `cook::is_stamped`).
+/// A `.glb`'s JSON chunk: 12-byte header, then the first chunk's length and type.
 pub(crate) fn glb_json(path: &Path) -> Option<Vec<u8>> {
     let mut file = std::fs::File::open(path).ok()?;
     let mut head = [0u8; 20];

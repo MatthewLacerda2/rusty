@@ -1,7 +1,3 @@
-//! crates/core/src/hulls/tests.rs — kept decompositions: keyed by content, bounded,
-//! and marked for writing only where something writes (#1940). Each test works
-//! on a `Store` of its own, so no test reads what another one kept.
-
 use super::*;
 
 fn one(x: f32) -> Pieces {

@@ -1,6 +1,3 @@
-//! What placement reads as solid (#1737): the static colliders and the opaque
-//! static meshes, so a ceiling built as a render mesh alone still roofs its room.
-
 use glam::Vec3;
 
 use super::{static_solids, survey};
@@ -9,8 +6,6 @@ use rusty_lighting::placement::Occupancy;
 use rusty_lighting::placement::{plan_reflection_probes, ReflectionPlacement, Solid};
 use rusty_scene::Scene;
 
-/// A 12 × 12 m floor and four walls with colliders, under a ceiling 4 m up that
-/// is a box mesh with no collider.
 fn room_under_a_mesh_ceiling() -> Scene {
     let mut scene = Scene::new();
     let block = rusty_lighting::placement::test_level::block;
@@ -61,7 +56,6 @@ fn a_mesh_ceiling_roofs_its_room() {
     );
 }
 
-/// A transparent mesh (a pool's water, a pane of glass) is not solid.
 #[test]
 fn a_transparent_mesh_is_not_solid() {
     use rusty_components::{MaterialAsset, MaterialComponent, RenderMode};

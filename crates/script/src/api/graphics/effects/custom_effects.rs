@@ -1,8 +1,3 @@
-//! `Graphics.{Get,Set}CustomEffects` (#397): the ordered authored post-FX modules the
-//! active post-processing volume runs, through the same
-//! `authoring::rendering::post_processing` op the Inspector's list calls — and
-//! `Graphics.{Get,Set}PostParam` (#671), those modules' runtime params.
-
 use mlua::{IntoLua, Value};
 
 use super::super::super::material::shader::params::floats;
@@ -13,14 +8,11 @@ use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 use rusty_shadergen::post_params::catalog_default;
 
-/// The list and its params.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_names(lua, table, scene)?;
     register_params(lua, table, scene)
 }
 
-/// `SetCustomEffects({names})` replaces the list (an invalid name is a Lua error and
-/// nothing changes); `GetCustomEffects()` returns it, empty without an active volume.
 fn register_names(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -44,9 +36,6 @@ fn register_names(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// `SetPostParam(name, value)` sets a runtime param of the active volume's effects
-/// (strict: an unknown or baked name, a wrong arity, or no active volume is a Lua
-/// error); `GetPostParam(name)` reads it back, or the catalog default with no volume.
 fn register_params(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

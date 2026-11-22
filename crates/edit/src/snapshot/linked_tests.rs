@@ -1,9 +1,3 @@
-//! Stop and a load over whole models placed in a level, each a linked instance
-//! whose propagation rebuilds it from its model: one lookup of the model file per
-//! pass, and no copy of any instance's geometry, whatever the count of instances:
-//! a pass rebuilds the model alone (its node tree's build and its baseline stamp,
-//! both sharing the import's buffers), never per instance.
-
 use glam::Vec3;
 
 use crate::asset_instance::instantiate_asset;
@@ -17,8 +11,6 @@ use rusty_scene::rehydrate::rebuilds;
 use rusty_scene::Scene;
 use rusty_test_support::models::{quad_file, quad_mode_gltf};
 
-/// `n` whole-model instances of a quad in folder `dir`; each instance's meshed
-/// part, and the quad's path.
 fn level(dir: &str, n: usize) -> (Scene, Vec<u32>, String) {
     let path = quad_file(dir);
     let mut scene = Scene::new();
@@ -36,7 +28,6 @@ fn level(dir: &str, n: usize) -> (Scene, Vec<u32>, String) {
     (scene, parts, path)
 }
 
-/// Whether entity `id`'s buffers are its import's own: a deep copy fails it.
 fn shares_import(scene: &Scene, id: u32) -> bool {
     let mesh = scene.world.mesh(id).unwrap();
     let reference = mesh.asset_ref.as_deref().unwrap();
@@ -50,23 +41,19 @@ fn indices(scene: &Scene, id: u32) -> Vec<u32> {
     scene.world.mesh(id).unwrap().indices.to_vec()
 }
 
-/// The geometry work done since `from` (rebuilds, copies): every mesh given
-/// geometry by a rebuild from its import (which shares the import's buffers), and
-/// every vertex or index buffer copied to edit it (`mesh::copies`).
 fn copied(from: (usize, usize)) -> (usize, usize) {
     (rebuilds() - from.0, copies() - from.1)
 }
 
-/// What an untouched Play -> Stop over `n` instances costs: (lookups, copies).
 fn untouched_stop(dir: &str, n: usize) -> (usize, (usize, usize)) {
     let (mut scene, parts, _) = level(dir, n);
     let revisions: Vec<_> = parts
         .iter()
         .map(|&id| scene.world.mesh(id).unwrap().revision)
         .collect();
-    let snapshot = SceneSnapshot::capture(&scene); // Play
+    let snapshot = SceneSnapshot::capture(&scene);
     let (looked, from) = (lookups(), (rebuilds(), copies()));
-    snapshot.restore(&mut scene); // Stop
+    snapshot.restore(&mut scene);
     let cost = (lookups() - looked, copied(from));
     for (i, &id) in parts.iter().enumerate() {
         assert_eq!(indices(&scene, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
@@ -94,10 +81,10 @@ fn stop_rebuilds_an_instance_whose_override_re_meshes_it() {
     let (mut scene, parts, _) = level("rusty_stop_linked_override", 3);
     let sphere = create_entity(&mut scene, "S", Some(Primitive::Sphere));
     let sphere = scene.world.mesh(sphere).unwrap().clone();
-    scene.world.set_mesh(parts[1], Some(sphere.clone())); // an override, in edit mode
-    let snapshot = SceneSnapshot::capture(&scene); // Play
+    scene.world.set_mesh(parts[1], Some(sphere.clone()));
+    let snapshot = SceneSnapshot::capture(&scene);
     let looked = lookups();
-    snapshot.restore(&mut scene); // Stop
+    snapshot.restore(&mut scene);
     assert_eq!(lookups() - looked, 1, "the model file, once");
     assert_eq!(
         indices(&scene, parts[1]),
@@ -115,7 +102,6 @@ fn a_load_of_linked_models_looks_the_file_up_once() {
     let (looked, from) = (lookups(), (rebuilds(), copies()));
     apply_scene_data(&mut loaded, data);
     assert_eq!(lookups() - looked, 1, "one lookup of the model file");
-    // Each part's own rebuild, plus the model's build and its baseline's.
     assert_eq!(copied(from), (parts.len() + 2, 0), "no copy per instance");
     for &id in &parts {
         assert_eq!(indices(&loaded, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
@@ -126,18 +112,15 @@ fn a_load_of_linked_models_looks_the_file_up_once() {
     }
 }
 
-/// A model rewritten on disk during Play by no engine writer (a headless or MCP
-/// session, no file watch, no note in the write log) comes back new at Stop,
-/// every copy of it: the lookup's own check sees the file changed.
 #[test]
 fn stop_reloads_a_model_rewritten_during_play_with_no_note() {
     let (mut scene, parts, path) = level("rusty_stop_linked_rewritten", 3);
-    let snapshot = SceneSnapshot::capture(&scene); // Play
+    let snapshot = SceneSnapshot::capture(&scene);
     let (json, bin) = quad_mode_gltf(4, &[0, 1, 2]);
     let dir = std::path::Path::new(&path).parent().unwrap();
     std::fs::write(dir.join("quad.bin"), bin).unwrap();
     std::fs::write(&path, json).unwrap();
-    snapshot.restore(&mut scene); // Stop
+    snapshot.restore(&mut scene);
     for &id in &parts {
         assert_eq!(
             indices(&scene, id),

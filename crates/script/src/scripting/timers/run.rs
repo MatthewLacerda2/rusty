@@ -1,18 +1,8 @@
-//! The per-tick timer phase (#444): step the scheduler and call into Lua.
-//!
-//! Runs inside the script system right after every `Update`, so it sees this
-//! tick's gameplay and settles before `LateUpdate` (Unity resumes `yield null` /
-//! `WaitForSeconds` coroutines and fires `Invoke`s in the same slot). Jobs whose
-//! owner is inactive or gone are dropped first — Unity stops coroutines when their
-//! GameObject deactivates, and rusty applies that one rule to invokes too.
-
 use mlua::{Function, Lua, MultiValue, Table, Thread, Value};
 
 use super::super::manager::ScriptManager;
 use super::{wait, Target, Wait, Work};
 
-/// What a due job will do, pulled out of the scheduler so no borrow of it is held
-/// while Lua runs (scripts re-enter the `Timer` namespace).
 enum Step {
     Call {
         func: Option<Function>,
@@ -23,17 +13,11 @@ enum Step {
         thread: Thread,
         until: Option<Function>,
     },
-    /// A tween: sample and write its property (`tween/step.rs`).
     Tween,
-    /// A function or thread the job holds no longer resolves in this VM (it was
-    /// made in another one): the job can never run, so it is cancelled.
     Lost(&'static str),
 }
 
 impl ScriptManager {
-    /// The timer phase: advance every pending timer and coroutine by this tick's
-    /// scaled `dt` (or the unscaled step, for the realtime waits) and run the ones
-    /// that came due, in ascending `(owner entity, handle)` order.
     pub fn tick_timers(&mut self, delta_time: f32) {
         let unscaled = self.cells.time.borrow().unscaled_delta_time;
         self.cells
@@ -55,8 +39,6 @@ impl ScriptManager {
         self.cells.timers.borrow_mut().end_phase();
     }
 
-    /// Run one due job, if it is still pending and its owner still active (an
-    /// earlier job this phase may have cancelled it or disabled its entity).
     fn run_job(&self, lua: &Lua, handle: u64) {
         let Some((owner, step)) = self.take_step(lua, handle) else {
             return;
@@ -126,9 +108,6 @@ impl ScriptManager {
         Some((job.owner, step))
     }
 
-    /// Fire an invoke: call `target(owner)` (`Err` carries the name that did not
-    /// resolve), then re-arm a repeating one (keeping its overshoot, so it never
-    /// drifts) or retire a one-shot.
     fn fire_invoke(
         &self,
         handle: u64,
@@ -160,7 +139,6 @@ impl ScriptManager {
         }
     }
 
-    /// The first function named `name` on `owner`'s scripts, in script-index order.
     fn named_callback(&self, lua: &Lua, owner: u32, name: &str) -> Option<Function> {
         self.entity_scripts
             .range((owner, 0)..=(owner, usize::MAX))
@@ -168,8 +146,6 @@ impl ScriptManager {
             .find_map(|t| t.get::<Function>(name).ok())
     }
 
-    /// Resume a coroutine whose wait is over (asking its `WaitUntil` predicate
-    /// first), then re-arm it on whatever it yields next, or retire it.
     fn resume(&self, lua: &Lua, handle: u64, owner: u32, thread: Thread, until: Option<Function>) {
         if let Some(pred) = until {
             match pred.call::<bool>(()) {
@@ -193,7 +169,6 @@ impl ScriptManager {
         }
     }
 
-    /// Drop a coroutine that failed, surfacing the error like an `Update` error.
     fn retire(&self, handle: u64, owner: u32, err: &str) {
         self.cells.timers.borrow_mut().cancel(handle);
         self.log_error(owner, "Coroutine", err);

@@ -5,8 +5,8 @@ use crate::image_buf::Image;
 use crate::ops::vector;
 use crate::recipe::{arity, op, OpInfo};
 
-/// Combine up to four single-channel inputs into one image, R, G, B then alpha
-/// (#2002); a colour channel without an input reads 0, alpha without one reads 1.
+/// Combine up to four single-channel inputs into R, G, B then alpha; a colour channel without
+/// an input reads 0, alpha reads 1.
 pub struct CombineRgb;
 
 impl Row for CombineRgb {

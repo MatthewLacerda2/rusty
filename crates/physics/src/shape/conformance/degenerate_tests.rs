@@ -1,6 +1,3 @@
-//! Invariant 4 (#1171): degenerate input either builds or returns a [`Skip`] that
-//! logs a warning naming the entity. It never panics, and never vanishes silently.
-
 use glam::Vec3;
 
 use super::{turns, world_poses, SCALES};
@@ -9,7 +6,6 @@ use crate::shape::fit::build_shape_for;
 use crate::shape::mesh::Skip;
 use rusty_components::{CapsuleAxis, ColliderShape};
 
-/// Every primitive variant at zero size.
 const FLAT: [ColliderShape; 4] = [
     ColliderShape::Box { size: Vec3::ZERO },
     ColliderShape::Sphere { radius: 0.0 },
@@ -42,8 +38,6 @@ fn a_zero_sized_primitive_still_builds() {
 
 type Geometry = (Vec<[f32; 3]>, Vec<u32>);
 
-/// A bad mesh: what it is, its geometry, and what a hull and a trimesh built
-/// from it come to.
 type BadMesh = (&'static str, Option<Geometry>, [Result<(), Skip>; 2]);
 
 fn bad_meshes() -> Vec<BadMesh> {

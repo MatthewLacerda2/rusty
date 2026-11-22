@@ -1,4 +1,4 @@
-//! `Scene::delete_mesh` (#2059, `Mesh.DeleteAsset`): refused while used, forced off
+//! `Scene::delete_mesh` (`Mesh.DeleteAsset`): refused while used, forced off
 //! every user.
 
 use glam::Vec3;

@@ -1,4 +1,4 @@
-//! Generated hitboxes survive a save/load (#464): bones are rebuilt from the model,
+//! Generated hitboxes survive a save/load: bones are rebuilt from the model,
 //! and each hitbox comes back under its bone, re-bound by the bone's name.
 
 use super::super::fixture::hero;

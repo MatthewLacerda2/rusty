@@ -1,7 +1,3 @@
-//! crates/edit/src/authoring/fields/kinds/graphic.rs — the drawn UI components' field tables:
-//! `Text` and `Shape`. A setter taking several fields (`set_outline(width,
-//! color)`) is one group, called once with each field's new or current value.
-
 use glam::{Vec2, Vec4};
 
 use super::super::table::{group, inspect, op, part, unheld, with, Group};

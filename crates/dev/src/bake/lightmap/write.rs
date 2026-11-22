@@ -1,8 +1,3 @@
-//! Writing a bake's encoded pages beside its scene (#438, #1694) and pointing the
-//! scene at them ([`apply_encoded`]), and a progressive bake's preview pages
-//! (#1970, `lightmap_preview_*` in the same folder, [`write_set`]), which the
-//! finished bake's write clears with the rest.
-//!
 //! stored-format: the lightmap pages a bake writes into `<scene>.lightmaps/`
 
 use std::collections::BTreeSet;
@@ -15,13 +10,9 @@ use rusty_scene::Scene;
 use super::spill::Spilled;
 use super::{encode_pages, lightmap_dir, EncodedPages};
 
-/// The file names a finished bake's pages start with.
 pub(super) const FINAL: &str = "lightmap";
-/// The file names a progressive bake's preview pages start with (#1970).
 pub(super) const PREVIEW: &str = "lightmap_preview";
 
-/// [`encode_pages`] then [`apply_encoded`]: write `maps` beside `scene_path`, on
-/// pages of the scene's Max Lightmap Size.
 pub fn apply_lightmaps(
     scene: &mut Scene,
     scene_path: &str,
@@ -32,11 +23,6 @@ pub fn apply_lightmaps(
     apply_encoded(scene, scene_path, &encoded.ok_or("never cancelled")?)
 }
 
-/// Write `encoded` beside `scene_path` (its spilled files linked into the
-/// scene's lightmap folder) and point the scene at it, replacing the previous
-/// bake's pages. Returns how many lightmaps were written. The old pages
-/// are removed only once the new ones are all written and shown, so a write that
-/// fails leaves the scene on its old pages, still on disk.
 pub fn apply_encoded(
     scene: &mut Scene,
     scene_path: &str,
@@ -44,15 +30,11 @@ pub fn apply_encoded(
 ) -> Result<usize, String> {
     let dir = lightmap_dir(scene_path);
     if encoded.maps == 0 {
-        // No lightmap, but the probes still mask by these channels (#1695), and
-        // hold the direct light of the lights it baked as `Baked` (#2522): no page
-        // holds their bounce, so `lights` stays empty for SSIL.
         let mut set = LightmapSet::default();
         set.channels = encoded.shadowmask.channels.clone();
         set.fell_back = encoded.shadowmask.fell_back.clone();
         set.record_taken(&encoded.lights);
         warn_fell_back(&set);
-        // The scene points away from the old pages before they go, as below.
         scene.lightmaps = set.into();
         warn_unremoved(clear_pages(&dir, FINAL, &BTreeSet::new()));
         return Ok(0);
@@ -61,7 +43,6 @@ pub fn apply_encoded(
     let set = match write_set(&dir, FINAL, encoded) {
         Ok(set) => set,
         Err(e) => {
-            // The pages written before the failure; what the scene shows stays.
             let mut keep = stems(&scene.lightmaps);
             keep.extend(
                 scene
@@ -88,36 +69,28 @@ pub fn apply_encoded(
         },
         bytes as f64 / (1024.0 * 1024.0),
         dir.display(),
-        // The process's lifetime high-water mark (#2312): a headless bake's own.
         crate::memory::rss_peak_bytes()
             .map(|b| format!("; process peak {}", crate::bake::progress::format::gb(b)))
             .unwrap_or_default()
     );
     let keep = stems(&set);
     scene.lightmaps = set.into();
-    // A previous bake's pages and any preview's; a page the new bake made again
-    // byte for byte has its name, and stays.
     warn_unremoved(clear_pages(&dir, FINAL, &keep));
     Ok(encoded.maps)
 }
 
-/// Say a leftover page could not be removed: the scene no longer points at it.
 fn warn_unremoved(cleared: Result<(), String>) {
     if let Err(e) = cleared {
         log::warn!("[LightmapBake] remove an old lightmap page: {e}");
     }
 }
 
-/// The file stems (`lightmap_0_<tag>`) of every page `set` points at: an
-/// irradiance KTX2 page's PNG beside it shares its stem.
 pub(super) fn stems(set: &LightmapSet) -> BTreeSet<String> {
     let paths = set.pages.iter().chain(&set.directions).chain(&set.masks);
     let stem = |p: &String| Some(Path::new(p).file_stem()?.to_string_lossy().into_owned());
     paths.filter_map(stem).collect()
 }
 
-/// Write `encoded`'s pages into `dir` under names starting `prefix` ([`FINAL`]
-/// or [`PREVIEW`]), and the set that points at them.
 pub(super) fn write_set(
     dir: &Path,
     prefix: &str,
@@ -127,7 +100,6 @@ pub(super) fn write_set(
     let mut set = LightmapSet::default();
     for (k, (ktx2, png)) in encoded.colour.iter().enumerate() {
         let stem = dir.join(format!("{prefix}_{k}_{:08x}", ktx2.tag()));
-        // The PNG first: the scene stores the KTX2's path.
         link(png, &stem.with_extension("png"))?;
         set.pages.push(link(ktx2, &stem.with_extension("ktx2"))?);
     }
@@ -147,24 +119,14 @@ pub(super) fn write_set(
     Ok(set)
 }
 
-/// Put the spilled `file` at `path` and return the path the scene stores. A
-/// page already there under that name and size (its content tag) is left as it
-/// is, as [`write_png`] leaves one, so a page the bake made again byte for byte
-/// is neither rewritten nor reloaded.
 fn link(file: &Spilled, path: &Path) -> Result<String, String> {
     if !there(path, file.len()) {
         file.link(path)?;
         rusty_core::fs::written::note_written(&path.to_string_lossy());
     }
-    // The scene document stores `/` paths, like its other assets (#819).
     Ok(rusty_core::paths::to_slash(path))
 }
 
-/// Write one page as `<dir>/<prefix>_<k>_<tag>.png` and return its path: a
-/// shadowmask page, or any page of a progressive bake's preview (#1970). A page
-/// already there under that name and size (its content tag) is left as it is,
-/// so a page a pass did not change (a shadowmask, once its texels are in) is
-/// neither rewritten nor reloaded.
 pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Result<String, String> {
     let path = dir.join(format!("{prefix}_{k}_{:08x}.png", content_tag(png)));
     if !there(&path, png.len() as u64) {
@@ -174,8 +136,6 @@ pub(super) fn write_png(dir: &Path, prefix: &str, k: usize, png: &[u8]) -> Resul
     Ok(rusty_core::paths::to_slash(&path))
 }
 
-/// Say, once per bake, which `Mixed` lights found no shadowmask channel and were
-/// baked as `Baked` (#1695): more than four overlapped there.
 fn warn_fell_back(set: &LightmapSet) {
     if set.fell_back.is_empty() {
         return;
@@ -189,24 +149,18 @@ fn warn_fell_back(set: &LightmapSet) {
     );
 }
 
-/// Whether a file of `len` bytes is at `path`: under a name carrying its content
-/// tag, the page already written.
 fn there(path: &Path, len: u64) -> bool {
     std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == len)
 }
 
-/// The page's content hash, folded to 32 bits: the file name's content tag.
 pub(super) fn content_tag(bytes: &[u8]) -> u32 {
     fold_tag(rusty_core::hash::content(bytes))
 }
 
-/// A content hash folded to the 32-bit tag a page's file name carries.
 pub(super) fn fold_tag(hash: u64) -> u32 {
     (hash ^ (hash >> 32)) as u32
 }
 
-/// Remove the `.png` pages whose stems `gone` holds from `dir` ([`stems`]: a
-/// preview's pages are PNGs only); one already gone is no error.
 pub(super) fn remove_stems(dir: &Path, gone: &BTreeSet<String>) -> Result<(), String> {
     for stem in gone {
         let path = dir.join(format!("{stem}.png"));
@@ -221,12 +175,9 @@ pub(super) fn remove_stems(dir: &Path, gone: &BTreeSet<String>) -> Result<(), St
     Ok(())
 }
 
-/// Remove the pages (`.ktx2` and `.png`) whose names start `<prefix>_` from `dir`,
-/// but those whose stem `keep` holds ([`stems`]): under [`FINAL`] every page a
-/// previous bake left, its previews included.
 pub(super) fn clear_pages(dir: &Path, prefix: &str, keep: &BTreeSet<String>) -> Result<(), String> {
     let Ok(entries) = std::fs::read_dir(dir) else {
-        return Ok(()); // never baked
+        return Ok(());
     };
     for entry in entries.flatten() {
         let path = entry.path();
@@ -237,7 +188,6 @@ pub(super) fn clear_pages(dir: &Path, prefix: &str, keep: &BTreeSet<String>) -> 
             .is_some_and(|s| keep.contains(&*s.to_string_lossy()));
         if name.starts_with(&format!("{prefix}_")) && page && !kept {
             std::fs::remove_file(&path).map_err(|e| format!("remove {name}: {e}"))?;
-            // Noted like a write, so the renderer frees the arrays holding it.
             rusty_core::fs::written::note_written(&path.to_string_lossy());
         }
     }

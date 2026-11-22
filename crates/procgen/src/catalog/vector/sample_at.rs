@@ -1,5 +1,4 @@
-//! The `sample_at` op: read a map at coordinates other maps give (#2002).
-
+//! The `sample_at` op: read a map at coordinates other maps give.
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::ops::sample::{sample_at, Coords};

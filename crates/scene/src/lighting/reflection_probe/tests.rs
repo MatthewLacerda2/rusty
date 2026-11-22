@@ -1,6 +1,3 @@
-//! Unit tests for the reflection-probe data model and its settings (no GPU); the
-//! parallax math is `projection_tests.rs`, the volume `volume_tests.rs`.
-
 use super::*;
 
 #[test]
@@ -13,12 +10,10 @@ fn add_move_set_remove() {
 
     set.move_probe(i, Vec3::new(10.0, 0.0, 0.0));
     assert_eq!(set.probes[i].position, Vec3::new(10.0, 0.0, 0.0));
-    // Box stays centred on the new position with the same half-extents.
     assert_eq!(set.probes[i].box_min, Vec3::new(8.0, -2.0, -2.0));
     assert_eq!(set.probes[i].box_max, Vec3::new(12.0, 2.0, 2.0));
 
     set.set_box(i, Vec3::new(5.0, 5.0, 5.0), Vec3::new(1.0, 1.0, 1.0));
-    // Corners are normalized so min <= max.
     assert_eq!(set.probes[i].box_min, Vec3::ONE);
     assert_eq!(set.probes[i].box_max, Vec3::splat(5.0));
 
@@ -33,7 +28,7 @@ fn add_move_set_remove() {
 fn contains_inclusive() {
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::ONE);
     assert!(probe.contains(Vec3::ZERO));
-    assert!(probe.contains(Vec3::ONE)); // boundary is inclusive
+    assert!(probe.contains(Vec3::ONE));
     assert!(!probe.contains(Vec3::new(1.001, 0.0, 0.0)));
 }
 

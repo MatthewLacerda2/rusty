@@ -1,7 +1,3 @@
-//! A Mesh-shaped collider's shared mesh (#1657) follows its model: a live re-import
-//! (the Scale Factor) rebuilds it and refits the collider's box, and a load holds
-//! its subdivisions like a Mesh's.
-
 use glam::Vec3;
 
 use crate::asset_instance::{instantiate_asset, set_model_scale_factor};
@@ -40,7 +36,6 @@ fn a_scale_factor_change_reaches_a_part_without_its_mesh() {
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
     assert_eq!(shared_max(&scene, id), Vec3::new(1.0, 1.0, 0.0));
 
-    // It counts Meshes re-imported (`Assets.md`), and the part has none.
     assert_eq!(set_model_scale_factor(&mut scene, &path, 0.5), Ok(0));
     assert!(shared_max(&scene, id).abs_diff_eq(Vec3::new(0.5, 0.5, 0.0), 1e-6));
     let (_, max) = mesh_box(&scene.world.collider(id).unwrap());
@@ -63,7 +58,6 @@ fn a_re_import_with_no_geometry_keeps_the_old_shared_mesh() {
     let collider = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ONE);
     scene.world.set_collider(id, Some(collider));
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
-    // The quad is now points: not a surface, so it imports no triangles.
     let (json, bin) = rusty_test_support::models::quad_mode_gltf(0, &[]);
     let dir = std::path::Path::new(&path).parent().unwrap();
     std::fs::write(dir.join("quad.bin"), bin).unwrap();

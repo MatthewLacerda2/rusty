@@ -1,6 +1,3 @@
-//! What scripts read from disk (#1062): `require` searches the project, then the
-//! engine's scripts, then `package.path`; a read outside the project warns once.
-
 mod dofile;
 mod require;
 
@@ -17,7 +14,6 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::{Camera, Scene};
 use rusty_time::Time;
 
-/// A fresh, empty directory under the test's own temp dir.
 pub(super) fn dir(name: &str) -> PathBuf {
     let dir = rusty_test_support::temp::dir().join(name);
     std::fs::remove_dir_all(&dir).ok();
@@ -25,8 +21,6 @@ pub(super) fn dir(name: &str) -> PathBuf {
     dir
 }
 
-/// A fresh directory whose path holds a `\`, a filename character on macOS and
-/// Linux, so a path test proves the engine never respells it as a separator (#1106).
 pub(super) fn backslash_dir(name: &str) -> PathBuf {
     let dir = dir(name).join("a\\b");
     std::fs::create_dir_all(&dir).expect("backslash dir");
@@ -38,7 +32,6 @@ pub(super) fn write(path: &Path, code: &str) {
     std::fs::write(path, code).expect("write");
 }
 
-/// A live VM reading against `workspace`, and its console.
 pub(super) fn manager(workspace: &Path) -> (ScriptManager, Rc<RefCell<ConsoleLogs>>) {
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
     let mut m = ScriptManager::new(

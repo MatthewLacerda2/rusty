@@ -1,5 +1,3 @@
-//! Tests for `edit::authoring::components`: the Add/Remove verbs and `ComponentKind`.
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 
@@ -12,11 +10,9 @@ fn add_remove_component_with_cascades() {
     assert!(remove_component(&mut scene, id, ComponentKind::Light));
     assert!(!scene.world.has_light(id));
 
-    // Adding PostProcessing auto-adds its required Camera (RequireComponent).
     add_component(&mut scene, id, ComponentKind::PostProcessing);
     assert!(scene.world.has_post_processing(id) && scene.world.has_camera(id));
 
-    // Removing Camera cascades to PostProcessing (editor parity).
     remove_component(&mut scene, id, ComponentKind::Camera);
     assert!(!scene.world.has_camera(id) && !scene.world.has_post_processing(id));
 
@@ -62,7 +58,6 @@ fn an_unknown_kind_lists_the_kinds() {
     let err = ComponentKind::parse_or_list("Meshh").unwrap_err();
     assert!(err.starts_with("unknown component 'Meshh' (kinds: AIPerception, Animator,"));
     let listed = err.split("(kinds: ").nth(1).unwrap().trim_end_matches(')');
-    // The names Component.* uses, each one AddComponent takes, every kind once.
     assert!(
         listed.contains("Material, ") && !listed.contains("Texture"),
         "{err}"
@@ -88,7 +83,6 @@ fn removing_a_mesh_keeps_the_entity_and_its_collider() {
     let w = &scene.world;
     assert!(!w.has_mesh(id) && w.has_collider(id), "collider stays");
     assert!(!w.has_material(id), "the renderer's material goes with it");
-    // Removing again is a no-op success; a missing entity is not.
     assert!(remove_component(&mut scene, id, ComponentKind::Mesh));
     assert!(!remove_component(&mut scene, 9999, ComponentKind::Mesh));
 }

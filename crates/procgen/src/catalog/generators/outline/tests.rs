@@ -1,6 +1,3 @@
-//! `text` and `path` baked in a recipe: against a glyph filled by hand and against
-//! `shape`, and refusing a bad font or path by node.
-
 use glam::Vec2;
 use serde_json::{json, Value};
 
@@ -100,7 +97,6 @@ fn a_font_nobody_handed_in_is_refused_before_anything_bakes() {
             .contains(r#"has no font loaded for "fonts/stencil.ttf""#),
         "{e}"
     );
-    // The same bytes as the default, handed in, bake what the default does.
     let mut sources = Sources::new();
     let bytes = std::fs::read(
         rusty_core::project::checkout().join("engine/fonts/InstrumentSans-Regular.ttf"),

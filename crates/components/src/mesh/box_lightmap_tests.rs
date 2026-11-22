@@ -1,7 +1,3 @@
-//! A Box's lightmap cells pinned exactly (#820): each face owns a padded cell of a
-//! 3×2 grid, so a bleed-free border surrounds every face in the atlas. And its
-//! faces' corners (#894): four distinct points spanning the whole face.
-
 use super::primitives::generate_box;
 
 const PAD: f32 = 0.06;

@@ -1,8 +1,3 @@
-//! `Graphics.{Get,Set}Ssao{Active,Radius,Intensity}` (#436) and its quality,
-//! `Graphics.{Get,Set}Ssao{Quality,Samples,ResolutionDivisor}` (#1522): screen-space
-//! ambient occlusion on the active post-processing volume, through the same
-//! `authoring::rendering::post_processing` ops the Inspector card calls.
-
 use super::super::{put, Reg};
 use super::effects::knobs::{register_count, register_quality};
 use super::state::{with_vc, with_vc_mut};
@@ -11,9 +6,6 @@ use rusty_components::SsaoSettings;
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
-/// Active flag, radius and intensity. AO lives on the volume, so without an active
-/// one `GetSsaoActive` reports `false` (nothing runs) and the other getters report
-/// the defaults a new volume would start with.
 pub(super) fn register_ssao(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -36,7 +28,6 @@ pub(super) fn register_ssao(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell
     register_ssao_quality(lua, table, scene)
 }
 
-/// The occlusion's radius and intensity.
 fn register_ssao_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let defaults = SsaoSettings::default();
     put(
@@ -75,7 +66,6 @@ fn register_ssao_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     )
 }
 
-/// The quality level and its `Custom` sample count and resolution divisor (#1522).
 fn register_ssao_quality(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_quality(
         lua,

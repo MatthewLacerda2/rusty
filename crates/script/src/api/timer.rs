@@ -1,13 +1,3 @@
-//! crates/script/src/api/timer.rs — `Timer` namespace (#444).
-//!
-//! Unity's MonoBehaviour timing conveniences — `Invoke` / `InvokeRepeating` /
-//! `CancelInvoke` / `IsInvoking`, `StartCoroutine` / `StopAllCoroutines` and the
-//! `WaitForSeconds` / `WaitForSecondsRealtime` / `WaitForFixedUpdate` /
-//! `WaitUntil` yield instructions — plus `Cancel` / `IsPending` on the handle
-//! every start returns. They are a namespace rather than bare globals so the one
-//! API surface stays one set of namespaces: the REPL, bot-players and scripts all
-//! reach them the same way, and the doc-drift gate (#280) can see them.
-//!
 //! Backed by the scripting layer's [`TimerScheduler`]; the scheduler is stepped
 //! once per fixed tick right after `Update`, so everything here is deterministic.
 
@@ -19,7 +9,6 @@ use crate::api::ApiCell;
 use crate::scripting::{require_sim_vm, wait, ConsoleLogs, Target, TimerScheduler, Wait, Work};
 use rusty_scene::Scene;
 
-/// Register the `Timer` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
@@ -34,7 +23,6 @@ pub fn register(
     lua.globals().set("Timer", table).map_err(|e| e.to_string())
 }
 
-/// `Invoke` / `InvokeRepeating`, then the queries.
 fn register_invoke(
     lua: &mlua::Lua,
     table: &Table,
@@ -80,7 +68,6 @@ fn register_invoke(
     register_invoke_queries(lua, table, timers)
 }
 
-/// `CancelInvoke` / `IsInvoking`.
 fn register_invoke_queries(lua: &mlua::Lua, table: &Table, timers: ApiCell<TimerScheduler>) -> Reg {
     put(
         table,
@@ -106,7 +93,6 @@ fn register_invoke_queries(lua: &mlua::Lua, table: &Table, timers: ApiCell<Timer
     )
 }
 
-/// `Cancel` / `IsPending`: the handle-level verbs, for invokes and coroutines alike.
 fn register_handles(lua: &mlua::Lua, table: &Table, timers: ApiCell<TimerScheduler>) -> Reg {
     put(
         table,
@@ -178,7 +164,6 @@ fn register_coroutines(
     )
 }
 
-/// The yield instructions. They read no engine state.
 fn register_waits(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -214,8 +199,6 @@ pub(super) fn require_active(scene: &Scene, id: u32) -> mlua::Result<()> {
     Ok(())
 }
 
-/// A function, or the name of a function on the owner's scripts.
-/// `verb` names the caller in the refusal of a function from another VM.
 fn to_target(lua: &Lua, value: Value, verb: &str) -> mlua::Result<Target> {
     match value {
         Value::Function(f) => {

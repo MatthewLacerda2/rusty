@@ -1,39 +1,16 @@
-//! A plain Lua value copied from one VM into another (#1384).
-//!
-//! A Lua value never leaves the VM that made it, so a field crossing between the
-//! scenario VM and the gameplay VM (`script_ref`) is rebuilt on the other side:
-//! nil, booleans, integers, floats (`math.huge` and NaN too) and strings as they
-//! are, tables recursively, keys included, so `{[0]=true}` keeps its integer key
-//! and `{"rifle", ammo=30}` stays one mixed table. A table met twice is copied
-//! once (shared and cyclic tables keep their shape). Metatables are not copied;
-//! a function, userdata or thread cannot cross and is an error, and so is a table
-//! nested deeper than [`MAX_DEPTH`] (an error, not a stack overflow). The same
-//! copy carries a proxied call's arguments and returns (`script_ref`, #1580), one
-//! [`Copier`] for all of a call's arguments and one for all its returns, so a
-//! table passed twice arrives as one table: an entity id is an integer, so it
-//! crosses as one.
-
 use std::collections::BTreeMap;
 
 use mlua::{Lua, Result as LuaResult, Table, Value};
 
-/// How deep a copied table may nest. Lua's own C-call limit is 200, so no data a
-/// script means to pass comes near it; a deeper chain is refused before the
-/// recursion can overflow the native stack.
 pub const MAX_DEPTH: usize = 200;
 
-/// `value`, rebuilt in `into` (see the module doc).
 pub fn copy(value: &Value, into: &Lua) -> LuaResult<Value> {
     Copier::new(into).value(value)
 }
 
-/// One copy into `into` that may span several values: a table met in any of
-/// them is copied once.
 pub struct Copier<'a> {
     into: &'a Lua,
-    /// Source tables already copied, by address, so each is copied once.
     seen: BTreeMap<usize, Table>,
-    /// Tables entered and not yet left, against [`MAX_DEPTH`].
     depth: usize,
 }
 

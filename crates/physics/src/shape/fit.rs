@@ -1,22 +1,9 @@
-//! crates/physics/src/shape/fit.rs — a collider entity's shape as its body needs it.
-//!
-//! Two shapes depend on their body. A concave mesh collider is the exact trimesh
-//! on a static or kinematic body and convex pieces on a dynamic one (#1886); a
-//! cylinder or capsule on a dynamic body is built to roll (`physics::contact`,
-//! #2071), and is the plain shape on any other. This builds a collider for an
-//! entity, logs why one was not built or not split, and stamps the fit it was
-//! built for, which the live sync reads when a body changes type in Play.
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
 use super::build::try_build_body_shape;
 use rusty_components::ColliderShape;
 
-/// [`try_build_body_shape`] for collider entity `id` on a body that is `dynamic` or
-/// not: a skipped mesh collider is logged once, naming the entity and the reason
-/// (#1141), and so is a concave one on a dynamic body that V-HACD could not split,
-/// kept as a trimesh (#1886). The collider's [`fit_mark`] records the fit asked for.
 pub(crate) fn build_shape_for(
     id: u32,
     shape: &ColliderShape,
@@ -37,18 +24,10 @@ pub(crate) fn build_shape_for(
     Some(collider)
 }
 
-/// A concave mesh collider built for a dynamic body (decomposed), in its rapier
-/// collider's `user_data`: the fit `live::sync_fits` compares with the body's
-/// class, to rebuild the shape when a body changes type in Play.
 pub(crate) const DECOMPOSED: u128 = 2;
-/// A concave mesh, cylinder or capsule collider built for a static or kinematic
-/// body (the exact shape).
 pub(crate) const EXACT: u128 = 1;
-/// A cylinder or capsule collider built for a dynamic body (rolling).
 pub(crate) const ROLLING: u128 = 3;
 
-/// The `user_data` [`build_shape_for`] stamps: [`DECOMPOSED`], [`ROLLING`],
-/// [`EXACT`], or zero for every collider whose shape is the same on any body.
 pub(crate) fn fit_mark(shape: &ColliderShape, dynamic: bool) -> u128 {
     match shape {
         ColliderShape::Mesh { convex: false, .. } if dynamic => DECOMPOSED,

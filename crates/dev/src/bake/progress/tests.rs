@@ -1,5 +1,3 @@
-//! The bake log (#1667) on a fake clock: when it prints, and what.
-
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
@@ -24,7 +22,6 @@ fn reflections(done: u64, total: u64) -> Progress {
     }
 }
 
-/// Run `observe` against a log on a clock it can set, and return the lines.
 pub(super) fn logged(run: impl FnOnce(&mut BakeLog, &dyn Fn(u64))) -> Vec<Line> {
     let now = Cell::new(Duration::ZERO);
     let lines = RefCell::new(Vec::new());
@@ -48,7 +45,6 @@ fn the_issue_line_reads_as_written() {
         "[Lighting] 0:00 lightmaps 0% (0/1501 meshes, 0/7.6M texels)"
     );
     assert!(lines[0].milestone);
-    // 3.1M texels in 26 min leaves 4.5M at the same rate: ~37.7 min.
     assert_eq!(
         lines[1].text,
         "[Lighting] 26:00 lightmaps 40% (612/1501 meshes, 3.1M/7.6M texels), ~37 min left"
@@ -63,15 +59,13 @@ fn a_step_prints_at_most_once_per_interval_but_every_step_change() {
         at(0);
         log.observe(lightmaps(0, 100, (0, 2)));
         at(step - 1);
-        log.observe(lightmaps(50, 100, (1, 2))); // too soon
+        log.observe(lightmaps(50, 100, (1, 2)));
         at(step);
         log.observe(lightmaps(60, 100, (1, 2)));
         at(step + 1);
-        log.observe(reflections(0, 4)); // a new step prints at once
+        log.observe(reflections(0, 4));
         log.finish();
     });
-    // A probe step's start is no milestone: the job says it in the console already,
-    // nor is the summary (#1891): only the total is.
     let milestones: Vec<bool> = lines.iter().map(|l| l.milestone).collect();
     assert_eq!(milestones, [true, false, false, false, false, true]);
     assert_eq!(lines[5].text, format!("[Lighting] done in {} s", step + 1));
@@ -114,7 +108,6 @@ fn no_eta_before_any_work_or_while_the_total_is_unknown() {
         log.observe(lightmaps(0, 1000, (0, 3)));
     });
     assert_eq!(lines[0].text, "[Lighting] 0:00 lightmaps preparing");
-    // The rate starts when the total is known, so rasterizing never skews it.
     assert_eq!(
         lines[2].text,
         "[Lighting] 1:00 lightmaps 0% (0/3 meshes, 0/1.0k texels)"

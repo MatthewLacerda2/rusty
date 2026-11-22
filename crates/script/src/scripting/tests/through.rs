@@ -1,6 +1,3 @@
-//! `Physics.RaycastThrough` from script (#830), over `spatial`'s two
-//! boxes: `a` spanning [-1,1]³ on layer 0 and `b` spanning z ∈ [9,11] on layer 3.
-
 use super::spatial::spatial_runtime;
 
 #[test]

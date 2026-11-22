@@ -1,30 +1,20 @@
-//! Extracting a live subtree into a [`PrefabData`] (split from `prefab/mod.rs` to
-//! stay under the size cap).
-
 use std::collections::BTreeMap;
 
 use super::PrefabData;
 use rusty_components::{Entity, EntityRefs};
 use rusty_scene::Scene;
 
-/// Walk `root_id` + its descendants, copy their saved documents (references
-/// only: a prefab never carries mesh geometry, which every stamp rebuilds from
-/// the reference, `World::saved_document`), remap to local (0-based) ids — rewriting `parent_id`/`children` through the map and detaching
-/// the root's own parent — and slice out every material the subtree names.
-/// Returns `None` if `root_id` is not a live entity.
 pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     if !scene.world.contains(root_id) {
         return None;
     }
-    // Bones are rebuilt from the model, so a prefab saves only what was authored
-    // on them (#453) — the same strip a scene save does.
+    // Bones are rebuilt from the model, so a prefab saves only what was authored on them.
     let mut docs = collect_subtree(scene, root_id)
         .into_iter()
         .map(|id| scene.world.saved_document(id))
         .collect::<Option<Vec<_>>>()?;
     rusty_scene::skeleton::strip_bones(&mut docs);
 
-    // Stable old-id -> local-id map (root = 0, then descendants in subtree order).
     let local: BTreeMap<u32, u32> = docs
         .iter()
         .enumerate()
@@ -36,7 +26,6 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     for mut entity in docs {
         let is_root = entity.id == root_id;
         remap_entity(&mut entity, &local, is_root);
-        // Every key the entity names, slots and particles alike (#1576).
         for key in crate::authoring::material::entity_keys(&entity) {
             if let Some(asset) = scene.materials.get(&key) {
                 materials.insert(key, asset.clone());
@@ -52,19 +41,11 @@ pub fn extract_prefab(scene: &Scene, root_id: u32) -> Option<PrefabData> {
     })
 }
 
-/// Depth-first subtree ids starting at `root_id` (root first, children in declared
-/// order), so extract order is deterministic and parent precedes child.
 fn collect_subtree(scene: &Scene, root_id: u32) -> Vec<u32> {
     scene.world.self_and_descendants(root_id).collect()
 }
 
-/// Rewrite one entity's identity into the local id space: its own `id`, its
-/// `children`, its component references (dropped when outside the subtree), and its
-/// `parent_id` (cleared for the root, which detaches from its scene). The `pending_material` staging slot is never
-/// part of a freshly cloned runtime entity, so nothing to scrub there. Any
-/// `prefab_link` is **dropped**: extracting an already-linked instance bakes it down
-/// into a fresh flat prefab — the new `.prefab` is a plain subtree with no nested
-/// links back to whatever the instance came from (#216 scope).
+/// Any `prefab_link` is dropped: extracting a linked instance bakes it into a flat prefab with no nested links.
 fn remap_entity(entity: &mut Entity, local: &BTreeMap<u32, u32>, is_root: bool) {
     entity.id = local[&entity.id];
     entity.prefab_link = None;

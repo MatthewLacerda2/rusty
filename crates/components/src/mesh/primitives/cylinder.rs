@@ -1,12 +1,8 @@
-//! The Cylinder primitive: a tube between two points plus its two disk caps, with a
-//! generated lightmap UV (#831).
-
 use glam::Vec3;
 
 use super::fill_tangents_unwrapped;
 use crate::mesh::Vertex;
 
-/// Generates a cylinder between two arbitrary 3D points
 pub fn generate_cylinder(
     p1: Vec3,
     p2: Vec3,
@@ -19,7 +15,6 @@ pub fn generate_cylinder(
     let d_vec = p2 - p1;
     let dir = d_vec.normalize();
 
-    // Create orthonormal basis (dir, u, v)
     let u = if dir.x.abs() < 0.9 {
         dir.cross(Vec3::X).normalize()
     } else {
@@ -27,7 +22,6 @@ pub fn generate_cylinder(
     };
     let v = dir.cross(u).normalize();
 
-    // 1. Tube wall, 2. bottom cap (−dir at p1), 3. top cap (+dir at p2).
     push_cylinder_tube(
         &mut vertices,
         &mut indices,
@@ -56,8 +50,6 @@ pub fn generate_cylinder(
     fill_tangents_unwrapped(vertices, indices)
 }
 
-/// Append the cylinder's side wall: paired bottom/top ring vertices and the
-/// triangles connecting consecutive segments.
 fn push_cylinder_tube(
     vertices: &mut Vec<Vertex>,
     indices: &mut Vec<u32>,
@@ -73,7 +65,6 @@ fn push_cylinder_tube(
         let radial_dir = u * theta.cos() + v * theta.sin();
         let p_offset = radial_dir * radius;
         let uv_x = (i as f32) / (segments as f32);
-        // Bottom vertex (on P1 plane), then top vertex (on P2 plane).
         vertices.push(Vertex::new(p1 + p_offset, radial_dir, [uv_x, 0.0]));
         vertices.push(Vertex::new(p2 + p_offset, radial_dir, [uv_x, 1.0]));
     }
@@ -83,8 +74,6 @@ fn push_cylinder_tube(
     }
 }
 
-/// Append one disk cap. `cap` is `(center, outward normal, flip_winding)`: the bottom
-/// cap winds (center, i+1, i) so the face points outward, the top cap (center, i, i+1).
 fn push_cylinder_cap(
     vertices: &mut Vec<Vertex>,
     indices: &mut Vec<u32>,

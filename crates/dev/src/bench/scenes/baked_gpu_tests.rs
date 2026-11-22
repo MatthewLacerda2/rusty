@@ -1,8 +1,3 @@
-//! A scene benched without the baked data it has on disk says so, one line a kind:
-//! a `.occlusion` its load refused, a PVS its statics no longer matched at load, a
-//! navmesh Play's start refused; a scene whose bakes are current says nothing, even
-//! when the game then moves a baked static.
-
 use glam::Vec3;
 use rusty_components::CameraComponent;
 use rusty_lighting::occlusion::bake_occlusion;
@@ -21,7 +16,6 @@ const OPTS: Options = Options {
     switches: rusty_render::RenderSwitches::ON,
 };
 
-/// A static wall between a camera and a box, the wall at `wall_x`.
 fn walled(wall_x: f32) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -45,12 +39,10 @@ fn walled(wall_x: f32) -> Scene {
     scene
 }
 
-/// The folder of the project `name`.
 fn root(name: &str) -> std::path::PathBuf {
     rusty_test_support::temp::dir().join(format!("baked_{name}"))
 }
 
-/// A project of `scene` as `walls.scene`, beside `pvs` as its `.occlusion`.
 fn project(name: &str, scene: &Scene, pvs: &[u8]) -> std::path::PathBuf {
     let root = root(name);
     let _ = std::fs::remove_dir_all(&root);
@@ -98,7 +90,6 @@ fn gpu_a_current_pvs_says_nothing_and_a_refused_one_says_why() {
 #[test]
 fn gpu_a_pvs_whose_occluder_moved_since_says_stale() {
     let stale = baked(&project("stale", &walled(3.0), &pvs()));
-    // The renderer judges it: with no adapter, nothing is drawn and nothing judged.
     let Some(line) = stale.first() else {
         return assert!(!rusty_render::gpu_required(), "no line");
     };
@@ -120,8 +111,6 @@ fn gpu_a_navmesh_plays_start_refused_says_so() {
     assert!(lines[0].starts_with(refused), "{lines:?}");
 }
 
-/// What the mover script does: from its second `Update` (after the load's first
-/// frame), the wall it sits on is moved off the bake.
 const MOVER: &str = "local Mover = {}
 local ticks = 0
 function Mover.Update(id, dt)

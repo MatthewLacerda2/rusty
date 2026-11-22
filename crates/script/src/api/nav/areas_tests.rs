@@ -1,6 +1,3 @@
-//! The navigation areas through Lua (#460): the area table on `Navigation`, the
-//! agent's mask on `NavMeshAgent`, and the optional mask on the path queries.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,7 +10,6 @@ use rusty_navigation::test_support::{add_floor, add_modifier, bake_pinned};
 use rusty_navigation::NavigationGraph;
 use rusty_scene::{NavMeshAgentComponent, Scene};
 
-/// A floor with a wall of "Fire" (area 2) across the pinned grid at x 5, and an agent.
 fn fire_world() -> (Rc<RefCell<Scene>>, Rc<RefCell<NavigationGraph>>, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.agent_radius = 0.0;

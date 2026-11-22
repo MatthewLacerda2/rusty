@@ -1,20 +1,9 @@
-//! A row against the same row of an earlier run: the change in its average, or
-//! `unresolved` when that change is inside the run-to-run spread, so noise is not
-//! read as a win. A row's spread is the lowest to the highest of its runs'
-//! averages (`RUNS`); two runs' rows resolve a change only when their spreads do
-//! not overlap. A run of one, or a one-off row (load, memory), has no spread, and
-//! its change is printed as measured. Rows compare only between runs of one
-//! shape (`SceneReport::same_shape`); [`SceneReport::against`] says why not.
-
 use super::super::super::clock::{clock_drift, GAME_ROWS};
 use super::super::super::report::{change, num, tick_timed_since};
 use super::super::editor;
 use super::{Row, SceneReport, ViewKey};
 
 impl SceneReport {
-    /// What the comparison with `previous` should warn of: a run of another
-    /// shape ([`Self::same_shape`]), whose rows get no change column, or a CPU
-    /// clock that moved since it (`clock::cpu_drift`).
     pub fn against(&self, previous: Option<&SceneReport>) -> Vec<String> {
         let Some(previous) = previous else {
             return Vec::new();
@@ -49,7 +38,6 @@ impl SceneReport {
                 what.join(", ")
             )];
         }
-        // The game rows' clock, and the editor round's (#2314), each on its own.
         let rounds = [
             ("cpu_clock_pct", GAME_ROWS, ""),
             ("editor.cpu_clock_pct", editor::CLOCK_ROWS, editor::SAID),
@@ -64,13 +52,10 @@ impl SceneReport {
         warnings.chain(self.tick_timed_since(previous)).collect()
     }
 
-    /// [`tick_timed_since`] on this report's rows and `previous`'s.
     fn tick_timed_since(&self, previous: &SceneReport) -> Option<String> {
         tick_timed_since(|k| self.row(k).is_some(), |k| previous.row(k).is_some())
     }
 
-    /// The warning for a comparison across other `--set` overrides: the change
-    /// is the settings' as much as the code's.
     fn set_moved(&self, previous: &SceneReport) -> Option<String> {
         let said = |s: &[String]| match s.is_empty() {
             true => "none".to_string(),
@@ -88,7 +73,6 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// The notes on what the change column compares: the spread, or no earlier run.
     pub(super) fn comparison_notes(&self, first: bool) -> [(bool, &'static str); 3] {
         [
             (
@@ -108,8 +92,6 @@ impl SceneReport {
     }
 }
 
-/// What moved between two runs' viewpoints: their count, or the first one that
-/// looks from elsewhere (a navmesh point that moved, another camera of one name).
 fn views_moved(before: &[ViewKey], now: &[ViewKey]) -> String {
     if before.len() != now.len() {
         return format!("viewpoints {} -> {}", before.len(), now.len());

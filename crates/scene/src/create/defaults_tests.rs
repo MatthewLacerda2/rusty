@@ -1,7 +1,3 @@
-//! The components with no `Default` keep their serde defaults equal to their Add
-//! Component defaults here: `components::registry`'s test checks every other one
-//! against its `Default`.
-
 use super::*;
 use crate::create::{primitive_mesh_component, Primitive};
 use rusty_components::registry::default_drift;

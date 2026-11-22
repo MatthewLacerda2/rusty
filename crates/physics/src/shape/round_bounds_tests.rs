@@ -1,8 +1,3 @@
-//! crates/physics/src/shape/round_bounds_tests.rs — a collider's stored world AABB against
-//! the rapier shape physics builds for it (#1140): both read one pose
-//! (`World::world_pose`) and one sizing rule (`ColliderShape::scaled`), so the
-//! box always holds the shape, parented and rotated or not.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Quat, Vec3};
@@ -29,7 +24,6 @@ const SHAPES: [ColliderShape; 4] = [
     },
 ];
 
-/// An entity with `shape`, under `parent` when given, at local `rot` and `scale`.
 fn add(
     scene: &mut Scene,
     parent: Option<u32>,
@@ -50,7 +44,6 @@ fn add(
     id
 }
 
-/// `(stored AABB, rapier shape's AABB)` for `id`.
 fn bounds(scene: &Scene, id: u32) -> ((Vec3, Vec3), (Vec3, Vec3)) {
     let c = scene.world.collider(id).unwrap();
     let pose = world_pose(scene, id).unwrap();
@@ -61,7 +54,6 @@ fn bounds(scene: &Scene, id: u32) -> ((Vec3, Vec3), (Vec3, Vec3)) {
     ((c.aabb_min, c.aabb_max), (want.mins, want.maxs))
 }
 
-/// The stored box holds the shape, and overshoots it by under `slack`.
 fn assert_holds(scene: &Scene, id: u32, slack: f32) {
     let ((min, max), (wmin, wmax)) = bounds(scene, id);
     let what = &scene.world.collider(id).unwrap().shape;
@@ -104,7 +96,7 @@ fn stored_bounds_hold_a_turned_shape() {
 fn a_turned_child_reads_its_parents_scale_as_physics_does() {
     // Parent (1,1,3), child turned 90° about Y: the child's X lies along world Z,
     // which the parent stretches 3×, so the drawn capsule is 6·3 = 18 long along
-    // world Z with radius 0.5 (#1156). Reading the parent's scale in the child's
+    // world Z with radius 0.5. Reading the parent's scale in the child's
     // own axes once said length 6 and radius 1.5.
     let mut scene = Scene::new();
     let parent = scene.add_entity("P".to_string());

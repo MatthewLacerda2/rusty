@@ -1,10 +1,3 @@
-//! crates/edit/src/rehydrate/reimport/mod.rs — re-import the meshes already in a scene when
-//! their model changed: an import setting (Generate Lightmap UVs, #831; the Scale
-//! Factor, #1398) or the file itself (#1242). Each model file is looked up once per
-//! call however many instances name it, through its shared import
-//! (`rusty_asset::imported`, #857), so a Dust2-sized level with hundreds of one prop
-//! parses and unwraps it once per edit, and not at all when nothing changed.
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
@@ -19,32 +12,20 @@ mod shared;
 #[cfg(test)]
 mod shared_tests;
 
-/// What a re-import does with a skinned mesh (one skinned before or after it).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rig {
-    /// Leave it as it is.
     Keep,
-    /// Take the new mesh and rig, and re-bind the bones to it.
     Rebuild,
 }
 
-/// Re-import every mesh in `scene` instanced from the model at `path`, so a changed
-/// import setting shows at once rather than on the next load. `rig` says what a
-/// skinned one does: a setting that never touches them (Generate Lightmap UVs, #831)
-/// keeps them, since re-binding their rig would touch their bones for nothing; one
-/// that does (the Scale Factor, #1398) rebuilds them, their bones re-bound by name.
-/// Returns how many were rebuilt.
 pub fn reimport_model(scene: &mut Scene, path: &str, rig: Rig) -> usize {
     reimport_model_ids(scene, path, rig).len()
 }
 
-/// [`reimport_model`], returning the ids of the entities whose mesh was rebuilt.
 pub fn reimport_model_ids(scene: &mut Scene, path: &str, rig: Rig) -> Vec<u32> {
     reimport_model_except(scene, path, rig, &BTreeSet::new())
 }
 
-/// [`reimport_model_ids`] leaving out the entities in `skip` (a linked model
-/// instance's parts, which its rebuild re-imports, #1637).
 pub fn reimport_model_except(
     scene: &mut Scene,
     path: &str,
@@ -54,13 +35,6 @@ pub fn reimport_model_except(
     reimport_where(scene, rig, skip, |file| file == path)
 }
 
-/// Re-import every mesh in `scene` whose model file `stale` names: the engine
-/// re-wrote it (#1242), and Unity updates every instance of a re-imported model.
-/// A skinned one takes the new rig too, its bones re-bound to it by name (#1265), and
-/// a model borrowing clips from a re-written one (#1747) re-imports with it. Each
-/// distinct file is matched against `stale` once. The entities in `skip` are left
-/// out (a linked model instance's parts, which its rebuild re-imports, #1637).
-/// Returns how many were rebuilt.
 pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) -> usize {
     if stale.is_empty() {
         return 0;
@@ -74,12 +48,6 @@ pub fn reimport_written(scene: &mut Scene, stale: &Stale, skip: &BTreeSet<u32>) 
     rebuilt.len()
 }
 
-/// Re-import every mesh outside `skip` whose reference's file `names` accepts,
-/// importing each such file once, and every Mesh-shaped collider's shared and
-/// collision meshes (#1657, #1960) the same way when `rig` rebuilds: a setting that keeps rigs (Generate
-/// Lightmap UVs) never moves a vertex, and a shared mesh holds only positions and
-/// triangles. Returns the ids of the entities whose Mesh was rebuilt; a shared mesh
-/// is not counted.
 fn reimport_where(
     scene: &mut Scene,
     rig: Rig,
@@ -107,7 +75,6 @@ fn reimport_where(
         let sub = asset
             .as_ref()
             .and_then(|a| Some((a.sub_mesh(&reference.sub_object)?, a.revision)));
-        // A linked prefab entity's refit is the model's, never an override (#1527).
         let linked = scene.world.prefab_link(id).is_some();
         let before = linked.then(|| scene.world.reference_document(id)).flatten();
         if sub.is_some_and(|sub| reimport_entity_mesh(scene, id, sub, rig)) {
@@ -123,11 +90,6 @@ fn reimport_where(
     rebuilt
 }
 
-/// Put `sub` on entity `id`'s mesh, and refit its mesh collider's box to what it
-/// builds from (`rehydrate::refit_collider`). A
-/// skinned mesh (before or after) takes the new rig, its bones re-bound, when `rig`
-/// says so, and is kept otherwise. `revision` is the import's `sub` came from.
-/// Returns whether the mesh was rebuilt.
 fn reimport_entity_mesh(
     scene: &mut Scene,
     id: u32,
@@ -142,8 +104,6 @@ fn reimport_entity_mesh(
     let Some(bounds) = sub.bounds() else {
         return false;
     };
-    // The bones are noted against the rig they were built from before it is
-    // replaced, and re-bound to the new one by name.
     let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
         install_sub_mesh(&mut mesh, sub, revision);
@@ -151,8 +111,6 @@ fn reimport_entity_mesh(
     if let Some(hung) = hung {
         scene.restore_skeleton(id, hung);
     }
-    // The guard refreshes the world AABB. A collision mesh, while it has
-    // triangles, still sizes the box (#1960).
     if let Some(mut collider) = scene.world.collider_mut(id) {
         rusty_scene::rehydrate::refit_collider(&mut collider, Some(bounds));
     }

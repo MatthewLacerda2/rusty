@@ -1,14 +1,7 @@
-//! Tweening runtime shader params (#661): `"Material.<p>"` eases the entity's own
-//! override (#670), `"UI.<p>"` its ui shader's value, `"Graphics.<p>"` its volume's
-//! post param (#671) — each through the setter's op, so the strict errors are the
-//! setters' own.
-
 use super::timers::{counted, rig, tick};
 use rusty_edit::authoring::defaults;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
-/// A shader baked from `pass` + `block` under a name unique to this test and run
-/// (tests share a process under `cargo test`); removed on drop.
 pub(super) struct Baked(pub(super) String);
 
 impl Baked {
@@ -33,7 +26,6 @@ impl Drop for Baked {
     }
 }
 
-/// `expr` rounded to 3 decimals (f32 steps sum inexactly).
 pub(super) fn eval(m: &crate::scripting::manager::ScriptManager, expr: &str) -> String {
     m.eval(&format!("math.floor(({expr}) * 1000 + 0.5) / 1000"))
         .unwrap()
@@ -51,7 +43,6 @@ fn a_material_tween_eases_the_entitys_override_not_the_shared_material() {
     ))
     .unwrap();
     let get = format!("Material.GetShaderParam({id}, 'hit_flash.amount')");
-    // Started between ticks: the next tick is its own (the one-tick rule).
     tick(&mut m, 3);
     assert_eq!(eval(&m, &get), "0.5");
     tick(&mut m, 2);
@@ -99,7 +90,6 @@ fn a_graphics_tween_fades_the_volumes_post_param() {
         .borrow_mut()
         .world
         .set_post_processing(id, Some(vc));
-    // `Graphics.*` edits the main camera's volume (#1434).
     let camera = rusty_components::CameraComponent::default();
     m.cells
         .scene

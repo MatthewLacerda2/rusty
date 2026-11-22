@@ -1,10 +1,3 @@
-//! crates/script/src/api/physics/cast/filter.rs — what every spatial query lets through.
-//!
-//! One [`Filter`] (ignore id, layer mask, trigger flag) and one [`reach`] rule
-//! for a cast's `max_distance` (#1720), shared by the line casts, the
-//! penetration cast and the volume queries, so every `Physics.*` query honours
-//! the same ignore / layer-mask / trigger rules (#91, #311).
-
 use rusty_physics::is_hittable;
 use rusty_scene::{layer_in_mask, Scene};
 
@@ -13,11 +6,8 @@ use rusty_scene::{layer_in_mask, Scene};
 /// as blockers.
 #[derive(Debug, Clone, Copy)]
 pub(in crate::api::physics) struct Filter {
-    /// The one entity to skip (e.g. the shooter).
     pub ignore: Option<u32>,
-    /// Bit per layer; `None` accepts every layer.
     pub mask: Option<u32>,
-    /// Whether triggers are hit.
     pub triggers: bool,
 }
 
@@ -33,11 +23,6 @@ impl Filter {
         }
     }
 
-    /// Whether the collider owned by `id` counts: not the ignored entity,
-    /// hittable ([`is_hittable`]), not a trigger when triggers are off, and on
-    /// a layer the mask names. The trigger flag read is the scene's
-    /// `Collider.is_trigger`, which the live world's sensor flag follows, except
-    /// on a character: its capsule replaces that Collider and is never a sensor.
     pub fn accepts(self, scene: &Scene, id: u32) -> bool {
         if Some(id) == self.ignore || !is_hittable(scene, id) {
             return false;
@@ -53,10 +38,6 @@ impl Filter {
     }
 }
 
-/// How far a cast reaches for a `max_distance` argument, or `None` when it
-/// casts nothing. Absent (nil) or infinite means unlimited (`f32::MAX`); a
-/// negative or NaN distance hits nothing, as Unity's PhysX casts reject it.
-/// The reach is handed to rapier, so the traversal itself stops there.
 pub(in crate::api::physics) fn reach(max_distance: Option<f32>) -> Option<f32> {
     match max_distance {
         None => Some(f32::MAX),

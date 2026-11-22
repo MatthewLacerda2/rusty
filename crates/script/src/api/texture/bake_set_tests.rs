@@ -1,12 +1,9 @@
-//! Tests for `Texture.BakeSet` (#403): one evaluation, one PNG per slot.
-
 use std::path::PathBuf;
 
 use mlua::{Lua, Table};
 
 use super::register;
 
-/// A brick-and-noise graph with three outputs sharing the `b` upstream node.
 const RECIPE: &str = r#"{
   resolution = 32, seed = 7,
   nodes = {

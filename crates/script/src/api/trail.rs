@@ -1,12 +1,3 @@
-//! crates/script/src/api/trail.rs — `Trail` namespace (#441).
-//!
-//! Script control over an entity's `TrailComponent` (Unity's `TrailRenderer`):
-//! start/stop recording, wipe it (`Clear`, e.g. after a teleport), tune how long
-//! points live and how far apart they are, read the recorded points back, and
-//! restyle it with the width / colour / texture / blend verbs it shares with
-//! `Line` (`ribbon_style`). Setters route through `edit::authoring::ribbon::trail` /
-//! `ribbon`. Without a Trail, getters return a neutral default; setters no-op.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table};
@@ -19,7 +10,6 @@ use rusty_components::TrailComponent;
 use rusty_edit::authoring::ribbon::trail as ops;
 use rusty_scene::Scene;
 
-/// Register the `Trail` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_settings(lua, &t, scene)?;
@@ -28,20 +18,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Trail", t).map_err(|e| e.to_string())
 }
 
-/// Read `id`'s Trail through `f`, or `None` without one.
 fn read<T>(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&TrailComponent) -> T) -> Option<T> {
     scene.borrow().world.trail(id).map(|t| f(&t))
 }
 
-/// Apply `f` to `id`'s Trail, when it has one.
 fn write(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut TrailComponent)) {
     if let Some(mut t) = scene.borrow_mut().world.trail_mut(id) {
         f(&mut t);
     }
 }
 
-/// `IsEmitting` / `SetEmitting`, `GetTime` / `SetTime`,
-/// `GetMinVertexDistance` / `SetMinVertexDistance`.
 fn register_settings(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(read(&*scene.get(lua)?, id.read(), |t| t.emitting) == Some(true))
@@ -77,8 +63,6 @@ fn register_settings(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "SetMinVertexDistance", f)
 }
 
-/// `Clear`, `GetPositionCount`, `GetPositions` (a list of `{x, y, z}`, oldest
-/// first, world space).
 fn register_points(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         let id = id.live("Trail", "Clear")?;

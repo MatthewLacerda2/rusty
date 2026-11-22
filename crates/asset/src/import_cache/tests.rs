@@ -1,5 +1,3 @@
-//! The import cache (#857): one parse per file, as fresh as a re-import.
-
 use super::*;
 use crate::{import_file, sidecar};
 use rusty_test_support::models::TRIANGLE_OBJ;
@@ -47,7 +45,7 @@ fn a_written_source_is_parsed_again_and_its_sidecar_is_not_followed() {
         second.revision > first.revision,
         "a real re-import is new geometry"
     );
-    // A sidecar save that keeps the geometry settings keeps the import (#857).
+    // A sidecar save that keeps the geometry settings keeps the import.
     let meta = sidecar::meta_path(&path);
     rusty_core::fs::written::note_written(&meta.to_string_lossy());
     assert_eq!(imported(&path).unwrap().revision, second.revision);

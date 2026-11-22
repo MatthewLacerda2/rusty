@@ -1,10 +1,5 @@
-//! crates/ecs/src/changes/stamp_tests.rs — the subtree stamps' kept walk (`stamp.rs`): a
-//! stamp below an id names its whole subtree once, a malformed child list included,
-//! and a warm walk forgets the ids the walk before it reached.
-
 use crate::{Activity, Changes, World, WorldPose};
 
-/// root -> {a -> a1, b}, with `b` listing `root` back and `a` listed twice.
 fn tree() -> (World, [u32; 5]) {
     let mut w = World::new();
     let ids = ["root", "a", "a1", "b", "other"].map(|n| w.spawn(n.into()));
@@ -24,7 +19,7 @@ fn a_pose_stamp_names_the_subtree_once_and_again_after_a_read() {
     w.stamp_pose_below(other);
     assert_eq!(w.changes(&mut poses), Changes::Ids(vec![other]));
     for _ in 0..3 {
-        w.stamp_pose_below(a); // a warm walk reaches ids the last one did
+        w.stamp_pose_below(a);
         assert_eq!(w.changes(&mut poses), Changes::Ids(vec![a, a1]));
     }
 }

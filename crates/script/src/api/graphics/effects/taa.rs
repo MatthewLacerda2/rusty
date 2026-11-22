@@ -1,9 +1,3 @@
-//! `Graphics.{Get,Set}Taa*` (#1702, its knobs #1847): a **camera** effect, on the
-//! main camera's `CameraComponent`, through the `authoring::rendering::camera` ops
-//! the Camera card calls (#287). The float knobs come from the camera's knob table
-//! (`camera::TAA_KNOBS`), so these functions, the Inspector sliders and the
-//! `Graphics.taa.<knob>` tween paths reach one op.
-
 use super::super::state::{with_cam, with_cam_mut};
 use crate::api::ApiCell;
 use crate::api::{put, Reg};
@@ -12,10 +6,6 @@ use rusty_edit::authoring::default_camera;
 use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
-/// TAA: temporal anti-aliasing (#1702) and its knobs (#1847) over the main camera's
-/// component, the same write path the editor's Camera card uses. Without a screen
-/// camera nothing runs it, so the getters report a new camera's defaults (and
-/// `GetTaaActive` reports `false`).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -36,7 +26,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     register_knobs(lua, table, scene)
 }
 
-/// `Set/GetTaaQuality(level)`: URP's `VeryLow`…`VeryHigh`, an unknown one refused.
 fn register_quality(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -64,9 +53,6 @@ fn register_quality(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
     )
 }
 
-/// `Set/Get<api>(value)` for each float knob, through its op, so the function, the
-/// slider and the tween path clamp the same way. Without a screen camera the getter
-/// reports a new camera's value.
 fn register_knobs(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for knob in camera_ops::TAA_KNOBS {
         put(

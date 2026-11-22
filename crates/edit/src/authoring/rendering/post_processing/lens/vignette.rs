@@ -1,34 +1,24 @@
-//! The vignette's ops: the switch, the strength, the falloff, the colour and the
-//! centre. Each axis of the centre is a knob of its own, the other axis kept.
-
 use super::super::{Effect, Knob};
 use crate::authoring::fields::table::effect;
 use rusty_components::{PostProcessingComponent, Vignette};
 use rusty_scene::rules::sanitize::{clamped, finite_array_or, unit};
 
-/// Set whether the vignette draws.
 pub fn set_active(vc: &mut PostProcessingComponent, active: bool) {
     vc.vignette.active = active;
 }
 
-/// Set how strongly the vignette darkens the edges, clamped to `0..=1`.
 pub fn set_intensity(vc: &mut PostProcessingComponent, value: f32) {
     vc.vignette.intensity = unit(value);
 }
 
-/// Set the vignette's falloff softness, clamped to `0.01..=1`.
 pub fn set_smoothness(vc: &mut PostProcessingComponent, value: f32) {
     vc.vignette.smoothness = clamped(value, Vignette::MIN_SMOOTHNESS, 1.0);
 }
 
-/// Set the colour the vignette fades to, each channel clamped to `0..=1` (a colour
-/// with a NaN or infinite channel keeps the current one).
 pub fn set_color(vc: &mut PostProcessingComponent, color: [f32; 3]) {
     vc.vignette.color = finite_array_or(color, vc.vignette.color).map(unit);
 }
 
-/// Set the vignette's clear centre in screen uv, each axis clamped to `0..=1` (a
-/// point with a NaN or infinite axis keeps the current one).
 pub fn set_center(vc: &mut PostProcessingComponent, center: [f32; 2]) {
     vc.vignette.center = finite_array_or(center, vc.vignette.center).map(unit);
 }

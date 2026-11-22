@@ -1,14 +1,3 @@
-//! crates/script/src/api/material/surface.rs — the table-driven material fields: a
-//! `Material.Set<api>(id, value)` / `Material.Get<api>(id)` pair for every row of
-//! `authoring::material::material_fields` — the transparent-surface fields (#1523:
-//! `SetBlendMode`, `GetReceiveShadows`, …) and the map coordinates (#1573:
-//! `SetTiling`, `SetUvMapping`, …).
-//!
-//! A thin adapter (#287): it turns the Lua value into the row's `SurfaceValue` and
-//! hands it to the shared `set_surface` op, which owns the validation the Inspector
-//! and `DefineAsset` share. A value the field cannot take is a Lua error naming
-//! what it takes.
-
 use mlua::{IntoLua, Value};
 
 use super::{put, with_material, Reg};
@@ -19,7 +8,6 @@ use rusty_edit::authoring::material::{
 };
 use rusty_scene::Scene;
 
-/// Register a Set/Get pair per surface field onto the `Material` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for field in material_fields() {
         let set = format!("Set{}", field.api);
@@ -52,8 +40,6 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     Ok(())
 }
 
-/// `value` as `field`'s kind takes it; any other Lua type is an error naming the
-/// field. The row's own `check` still clamps and parses it.
 pub(super) fn from_lua(field: &SurfaceField, value: &Value) -> Result<SurfaceValue, String> {
     let wrong = || format!("{}: unexpected {}", field.key, value.type_name());
     let number = |v: &Value| match v {
@@ -75,7 +61,6 @@ pub(super) fn from_lua(field: &SurfaceField, value: &Value) -> Result<SurfaceVal
                 _ => Err(wrong()),
             }
         }
-        // `{x, y}` by position, or `{x = …, y = …}`.
         (SurfaceKind::Vec2(_), Value::Table(t)) => {
             let lane = |i: usize, name: &str| {
                 let v = t.get::<Value>(i).ok().filter(|v| !v.is_nil());
@@ -92,8 +77,6 @@ pub(super) fn from_lua(field: &SurfaceField, value: &Value) -> Result<SurfaceVal
     }
 }
 
-/// A field's value back to Lua: a string, a boolean, a number, an `{r, g, b}` or
-/// an `{x, y}`.
 fn to_lua(lua: &mlua::Lua, value: SurfaceValue) -> mlua::Result<Value> {
     match value {
         SurfaceValue::Text(t) => t.into_lua(lua),

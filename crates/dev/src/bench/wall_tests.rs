@@ -1,12 +1,6 @@
-//! `wall_ms` (#2494): each measured frame end to end on the wall, its sim step
-//! and its draw until the GPU finished.
-
 use super::stress::{self, StressSpec};
 use super::*;
 
-/// A primitive scene measured for real, frame by frame after a warm-up: a frame
-/// on the wall holds its tick's time, the renderer's CPU time and the GPU's raw
-/// time, since the draw waits for the GPU to finish.
 #[test]
 fn gpu_wall_ms_holds_the_ticks_the_renderers_and_the_gpus_time_each_frame() {
     let out = rusty_test_support::temp::dir().join(format!("bench_wall_{}", std::process::id()));
@@ -19,7 +13,7 @@ fn gpu_wall_ms_holds_the_ticks_the_renderers_and_the_gpus_time_each_frame() {
         ..StressSpec::default()
     };
     stress::load(&mut h.world.borrow().scene().borrow_mut(), &spec);
-    measure(&mut h, 2); // warm-up: pipelines built, GPU times flowing
+    measure(&mut h, 2);
     let probe = h.renderer().and_then(|r| ClockProbe::new(r));
     let (_, samples) = measure_posed(&mut h, 4, probe.as_ref(), &mut |_| {});
     let wall = samples.values("wall_ms");
@@ -28,7 +22,7 @@ fn gpu_wall_ms_holds_the_ticks_the_renderers_and_the_gpus_time_each_frame() {
             !rusty_render::gpu_required(),
             "no adapter, but one is required"
         );
-        return; // nothing drawn: no frame has a wall time
+        return;
     }
     let frame = samples.values("frame_ms");
     let renderer = samples.values("renderer_ms");
@@ -47,8 +41,6 @@ fn gpu_wall_ms_holds_the_ticks_the_renderers_and_the_gpus_time_each_frame() {
     }
 }
 
-/// What `frame_ms` leaves out of the tick is left out of `wall_ms`: a row the
-/// tick recorded counts, one an earlier tick left behind does not.
 #[test]
 fn wall_ms_leaves_out_only_what_this_tick_recorded_beside_frame_ms() {
     let mut stats = FrameStats::default();

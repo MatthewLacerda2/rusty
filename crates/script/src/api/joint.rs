@@ -1,15 +1,3 @@
-//! crates/script/src/api/joint.rs — `Joint` namespace (#449).
-//!
-//! Get/Set over an entity's `JointComponent`: its kind, the connected body, the
-//! anchors and axes, the limits, the break thresholds, the collision flag and the
-//! drive (#1895).
-//! Every setter routes through the shared `edit::authoring::physics::joint` ops the
-//! inspector card uses. Getters return a neutral default without a Joint; setters
-//! are then no-ops. The kind travels as its name (`"Fixed"`, `"Hinge"`, `"Ball"`,
-//! case-insensitive; an unknown name is ignored). Attach one with
-//! `Scene.AddComponent(id, "Joint")`; a broken joint's component is gone, so
-//! `Scene.HasComponent(id, "Joint")` turns false and `OnJointBreak` fires.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -22,12 +10,9 @@ use rusty_components::{JointComponent, JointKind};
 use rusty_edit::authoring::physics::joint as ops;
 use rusty_scene::Scene;
 
-/// A field's reader and its shared-op writer.
 type Field<T> = (fn(&JointComponent) -> T, fn(&mut JointComponent, T));
-/// `(id, min, max)`.
 type IdRange = (EntityArg, f32, f32);
 
-/// Register the `Joint` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_shape(lua, &t, scene)?;
@@ -35,19 +20,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Joint", t).map_err(|e| e.to_string())
 }
 
-/// `id`'s Joint, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<JointComponent> {
     scene.borrow().world.joint(id).map(|j| j.clone())
 }
 
-/// Apply `f` to `id`'s Joint, when it has one.
 fn set(scene: &RefCell<Scene>, id: u32, f: &dyn Fn(&mut JointComponent)) {
     if let Some(mut j) = scene.borrow_mut().world.joint_mut(id) {
         f(&mut j);
     }
 }
 
-/// `Get<name>` / `Set<name>` over one `f32` field (`0` without a Joint).
 fn f32_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -68,7 +50,6 @@ fn f32_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get<name>` / `Set<name>` over one `bool` field (`false` without a Joint).
 fn bool_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -89,7 +70,6 @@ fn bool_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get<name>` → `x, y, z` / `Set<name>(id, x, y, z)` over one `Vec3` field.
 fn vec3_pair(
     lua: &mlua::Lua,
     t: &Table,
@@ -111,8 +91,6 @@ fn vec3_pair(
     put(t, &format!("Set{name}"), f)
 }
 
-/// `Get/SetKind`, `Get/SetConnectedBody`, the anchors, the axes and
-/// `Get/SetEnableCollision`.
 fn register_shape(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|j| j.kind.name()))

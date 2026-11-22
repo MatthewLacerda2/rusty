@@ -1,11 +1,3 @@
-//! crates/script/src/api/audio/groups.rs — the `Audio` mixer-group verbs (#465).
-//!
-//! Groups (buses) on the `AudioMaestro`'s mixer: list and create them, set their
-//! volume / mute / filters / reverb send, read any group's live state back, and pick
-//! the group an entity's `AudioSource` plays through (Unity's
-//! `outputAudioMixerGroup`). Unknown group names are errors naming the groups that
-//! exist, so a typo never fails silently.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table};
@@ -18,17 +10,14 @@ use rusty_audio::AudioMaestro;
 use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::Scene;
 
-/// A mixer error as a Lua error.
 pub(super) fn err(e: String) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Audio: {e}"))
 }
 
-/// Apply `patch` to group `name`.
 fn set(audio: &RefCell<AudioMaestro>, name: &str, patch: GroupPatch) -> mlua::Result<()> {
     audio.borrow_mut().set_group(name, &patch).map_err(err)
 }
 
-/// `GetGroups` / `CreateGroup` / `GetGroupState`, then the setters.
 pub(super) fn register_groups(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
@@ -69,7 +58,6 @@ pub(super) fn register_groups(lua: &mlua::Lua, table: &Table, audio: ApiCell<Aud
     register_filters(lua, table, audio)
 }
 
-/// `SetGroupVolume` / `SetGroupMute` / `SetGroupReverbSend`.
 fn register_levels(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
@@ -115,7 +103,6 @@ fn register_levels(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>)
     )
 }
 
-/// `SetGroupLowPass` / `SetGroupHighPass`.
 fn register_filters(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>) -> Reg {
     put(
         table,
@@ -149,9 +136,6 @@ fn register_filters(lua: &mlua::Lua, table: &Table, audio: ApiCell<AudioMaestro>
     )
 }
 
-/// `SetOutputGroup` / `GetOutputGroup` — the mixer group an entity's `AudioSource`
-/// plays through (`""` is Master). Read when its voice starts, so a change reroutes
-/// the next `Play`.
 pub(super) fn register_output(
     lua: &mlua::Lua,
     table: &Table,
@@ -192,7 +176,6 @@ pub(super) fn register_output(
     )
 }
 
-/// A group's live state as the table `GetGroupState` returns.
 fn state_table(lua: &Lua, state: &GroupState) -> mlua::Result<Table> {
     let s = &state.settings;
     let t = lua.create_table()?;

@@ -1,4 +1,4 @@
-//! The fixture's "Rise" stack (#1081) through the whole import: baked, keyed in
+//! The fixture's "Rise" stack through the whole import: baked, keyed in
 //! glTF's axes and units, and read back as the skin's clip.
 
 use crate::{gltf, ImportedAsset};

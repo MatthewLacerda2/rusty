@@ -1,11 +1,3 @@
-//! crates/physics/src/character/bench.rs — test hook: the level a `Move`'s cost is
-//! measured on (#2335). A capsule (the component's defaults: 2 m tall, 0.5 m
-//! radius) on a flat triangle-mesh floor of `cells` × `cells` half-metre quads,
-//! so every stride crosses seams between coplanar triangles, as a level's mesh
-//! floor does. The counted gate run is `cost_tests`; the timing, a
-//! release-build measurement run by hand, is `rusty_dev`'s
-//! `bench::move_cost_tests::move_cost` (a sim module may not read a clock).
-
 use glam::Vec3;
 
 use super::move_character;

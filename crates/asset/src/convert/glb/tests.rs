@@ -1,4 +1,4 @@
-//! The GLB writer (#1024): what it writes parses as glTF and carries what it was given.
+//! The GLB writer: what it writes parses as glTF and carries what it was given.
 
 use super::{
     write, Animation, Channel, Document, Keys, Material, Mesh, Node, Primitive, Skin, Texture,

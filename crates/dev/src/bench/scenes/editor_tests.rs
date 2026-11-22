@@ -1,6 +1,3 @@
-//! The editor round's rows (#2314): the meter's fold of a round's numbers, its
-//! warnings and its file.
-
 use super::*;
 
 fn ui(ms: f64) -> UiTime {
@@ -11,8 +8,6 @@ fn ui(ms: f64) -> UiTime {
     }
 }
 
-/// A round of two runs: frames of `ui` ms (and one rendered frame each), then
-/// one Play entry each.
 pub(super) fn round(ui_ms: [f64; 2], enter: [f64; 2]) -> EditorRound {
     let mut meter = Meter::new();
     for run in 0..2 {
@@ -59,7 +54,6 @@ fn the_meter_folds_each_runs_frames_and_singles_into_rows_with_their_spread() {
     let enter = row(&round, "play_enter_ms");
     assert_eq!((enter.avg, enter.lo, enter.hi), (120.0, 100.0, 140.0));
     assert!(enter.worst.is_empty(), "a single sample has no viewpoint");
-    // No GPU times were handed in: no `editor.gpu` row, not a zero one.
     assert!(!round
         .rows
         .iter()

@@ -1,8 +1,3 @@
-//! Volumetric fog over shadowmasked lights (#1695). The fog's air is lit through
-//! the realtime maps alone, never a mask, so while it is on the maps keep their
-//! static casters: a sealed room's air stays as dark as on `BakedIndirect`, and a
-//! masked sun's cascades re-bake with and without them as the fog toggles.
-
 use glam::{Quat, Vec3};
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
@@ -12,11 +7,8 @@ use rusty_core::settings::quality::ShadowmaskMode;
 use rusty_scene::lighting::MixedLightingMode::{self, BakedIndirect, Shadowmask};
 use rusty_scene::Scene;
 
-/// How much brighter (linear, summed RGB / 3) the masked room's air may read than
-/// the `BakedIndirect` one's: a sealed room holds no light either way.
 const SEALED: f32 = 0.01;
 
-/// A directional `Mixed` sun added to `s`, low from -X.
 fn sun(s: &mut Scene) -> u32 {
     let id = s.add_entity("Sun".to_string());
     let light = rusty_components::LightComponent {
@@ -31,9 +23,6 @@ fn sun(s: &mut Scene) -> u32 {
     id
 }
 
-/// The camera sealed in a static box (floor, ceiling and four walls), the fixture's
-/// lamp just outside its back wall and a sun over it, both `Mixed`, baked on
-/// `mixed`, with fog on.
 fn sealed(mixed: MixedLightingMode, name: &str) -> Scene {
     let (mut s, lamp) = scene(LightMode::Mixed, mixed, 1.0);
     let sun = sun(&mut s);
@@ -55,7 +44,6 @@ fn sealed(mixed: MixedLightingMode, name: &str) -> Scene {
     s
 }
 
-/// The mean of the frame (summed RGB / 3, linear), air and walls.
 fn mean(frame: &[u8]) -> f32 {
     let lin = |b: &u8| rusty_core::color::srgb_to_linear(*b);
     let sum: f32 = frame.chunks(4).flat_map(|p| &p[..3]).map(lin).sum();

@@ -1,12 +1,7 @@
-//! One teardown order (#1298): a destroy and a scene unload both fire `OnDisable`
-//! then `OnDestroy`, each pass children before parents, each hook exactly once,
-//! and an entity already inactive gets only its `OnDestroy`.
-
 use super::destroy_subtree::{destroy, scripted};
 use super::timers::tick;
 use crate::scripting::manager::ScriptManager;
 
-/// A scripted parent with a scripted child under it (the child's id is higher).
 fn family(name: &str) -> (ScriptManager, u32, u32) {
     scripted(name, |scene, parent| {
         let child = scene.add_entity("Child".to_string());

@@ -1,17 +1,8 @@
-//! crates/edit/src/default_scene/yard.rs — the deck, the perimeter walls and the spawn
-//! crates (#747).
-//!
-//! The deck is four slabs framing the pool's hole; their inner faces are the pool's
-//! walls. The perimeter walls stand on the deck's outer edge. Each spawn gets a few
-//! crates for cover, kept off the spawn-to-spawn axis except one: the crate right in
-//! front of Enemy_1, so its first chase paths around it.
-
 use glam::Vec3;
 
 use super::layout::*;
 use super::{block, looks, Scene};
 
-/// The deck: four slabs around the pool, top at `DECK_TOP`.
 pub(super) fn add_deck(scene: &mut Scene) {
     let ((yx, yz), (px, pz)) = (YARD_HALF, POOL_HALF);
     let (lo, hi) = (SLAB_BOTTOM, DECK_TOP);
@@ -30,7 +21,6 @@ pub(super) fn add_deck(scene: &mut Scene) {
     }
 }
 
-/// The perimeter: four walls on the deck's outer edge, `WALL_HEIGHT` tall.
 pub(super) fn add_walls(scene: &mut Scene) {
     let (yx, yz) = YARD_HALF;
     let (t, top) = (WALL_THICK, DECK_TOP + WALL_HEIGHT);
@@ -61,7 +51,6 @@ pub(super) fn add_walls(scene: &mut Scene) {
     }
 }
 
-/// Crates at both spawns: `(name, x, z, size, stacked on another)`.
 const CRATES: &[(&str, f32, f32, f32, bool)] = &[
     ("Crate_South_1", -4.5, -15.5, 1.2, false),
     ("Crate_South_2", 5.0, -14.0, 1.2, false),
@@ -73,7 +62,6 @@ const CRATES: &[(&str, f32, f32, f32, bool)] = &[
     ("Crate_North_4", 10.0, 20.0, 1.2, false),
 ];
 
-/// The spawn crates. A stacked crate sits on the 1.4 m one under it.
 pub(super) fn add_crates(scene: &mut Scene) {
     for &(name, x, z, size, stacked) in CRATES {
         let floor = if stacked { DECK_TOP + 1.4 } else { DECK_TOP };

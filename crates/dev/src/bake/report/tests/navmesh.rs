@@ -1,6 +1,3 @@
-//! The navmesh report: a deliberate unreachable island is counted, and the
-//! colliders the bake read come heaviest first.
-
 use glam::Vec3;
 
 use super::{assert_common, scene_path};
@@ -11,7 +8,6 @@ use rusty_lighting::occlusion::test_level::block;
 use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 
-/// A static box over `[min, max]` with a box collider.
 fn solid(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) -> u32 {
     let id = block(scene, name, min, max);
     let mut c = ColliderComponent::from_mesh_bounds(false, Vec3::ZERO, Vec3::ZERO);
@@ -20,7 +16,6 @@ fn solid(scene: &mut Scene, name: &str, min: Vec3, max: Vec3) -> u32 {
     id
 }
 
-/// A 20 m floor, and a 4 m platform off its edge 5 m up that nothing reaches.
 fn level() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 0.5;
@@ -59,7 +54,6 @@ fn a_navmesh_bake_reports_the_unreachable_island() {
         (ledge_y - 5.0).abs() < 0.1,
         "the ledge's island is up on it: {ledge}"
     );
-    // Its box runs along the cells' outer edges: whole cells wide, never zero.
     let cell = report["grid"]["cellSize"].as_f64().unwrap();
     let wide = (ledge["max"][0].as_f64().unwrap() - ledge["min"][0].as_f64().unwrap()) / cell;
     assert!(wide >= 1.0 && (wide - wide.round()).abs() < 0.02, "{ledge}");

@@ -1,6 +1,3 @@
-//! Frames held until whole (#2206): a frame's own wall time and GPU times, the
-//! bound, the order, and what a read sees while they wait.
-
 use super::*;
 use crate::frame_log::record::{frame, Place};
 use crate::stats::WindowFrame;
@@ -46,13 +43,11 @@ fn json(line: &str) -> serde_json::Value {
     serde_json::from_str(line).unwrap()
 }
 
-/// A hitch's line carries its own 60 ms and its own GPU times, which arrive two
-/// frames late; a neighbour's never ride on it.
 #[test]
 fn a_frame_is_written_with_its_own_times() {
     let mut held = Held::default();
     assert!(held.push(entry(1, true)).is_empty());
-    held.ended(60.0); // frame 2 starts: frame 1 took 60 ms
+    held.ended(60.0);
     assert!(
         held.push(entry(2, true)).is_empty(),
         "frame 1 waits on its GPU times"
@@ -72,8 +67,6 @@ fn a_frame_is_written_with_its_own_times() {
     assert!(f.get("unresolved").is_none(), "{f}");
 }
 
-/// Past the bound a frame is written as it stands, saying what never came; an
-/// adapter without timestamps waits on none; what is held is read as it stands.
 #[test]
 fn a_frame_waits_at_most_the_bound() {
     let dir = rusty_test_support::temp::dir();

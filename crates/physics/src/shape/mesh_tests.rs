@@ -1,6 +1,3 @@
-//! crates/physics/src/shape/mesh_tests.rs — which mesh colliders build, and which are skipped (#1132),
-//! and a cylinder's radius under a stretched Z (#1131).
-
 use glam::Vec3;
 use rapier3d::prelude::*;
 
@@ -73,7 +70,6 @@ fn a_ramp_scaled_flat_is_skipped_but_one_good_triangle_keeps_the_mesh() {
     assert!(build_shape(&mesh_shape(false), Vec3::ONE, mixed).is_some());
 }
 
-/// Parry takes coplanar points as a flat hull; collinear ones are what it refuses.
 #[test]
 fn four_collinear_points_form_no_convex_hull() {
     let line = [

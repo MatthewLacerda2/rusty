@@ -1,4 +1,4 @@
-//! A filesystem without locks is warned of once per process (#1166, #1197): the
+//! A filesystem without locks is warned of once per process: the
 //! first failed `lock::hold` warns, the ones after it stay quiet. `WARNED` is
 //! the process's, so the test runs alone (`rusty_test_support::alone!`).
 

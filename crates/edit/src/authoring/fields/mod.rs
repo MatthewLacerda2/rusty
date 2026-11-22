@@ -1,12 +1,3 @@
-//! crates/edit/src/authoring/fields/mod.rs — the field table (#1369): every serialized
-//! field of every first-class component, and the authoring op that writes it.
-//!
-//! One table, two readers: `Component.Set` (`api::component`) writes a Lua table's
-//! fields through it, and a scene or prefab load holds what it read through it
-//! ([`hold_world`], [`hold_entities`], #1418), both by one walk over the fields, so a value the inspector's setters would refuse never reaches
-//! the World from a file either. It lives here, not in `api`, because loading is
-//! `scene`'s and `scene` sits below `api` in the layer table.
-
 mod hold;
 mod inspect;
 pub(crate) mod introspect;

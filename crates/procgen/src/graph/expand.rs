@@ -1,12 +1,6 @@
-//! crates/procgen/src/graph/expand.rs — a recipe and the graphs it instances, made one flat
-//! recipe (#1744).
-//!
-//! Each instance's nodes are pasted in its place under the instance's id
-//! (`brick/mortar`, nested `brick/wear/blur_2`), its placeholders take the values
-//! the instance gives (or the defaults), its `inputs` read what the instance wires,
-//! and its seed folds into each inner node's. Everything else is copied as written,
-//! so a recipe without instances expands to itself and an instance at seed 0 bakes
-//! exactly like its nodes pasted by hand.
+//! Instance nodes are pasted under the instance id (`brick/mortar`, nested
+//! `brick/wear/blur_2`). A recipe without instances expands to itself, and an
+//! instance at seed 0 bakes exactly like its nodes pasted by hand.
 
 use std::collections::BTreeMap;
 
@@ -20,20 +14,15 @@ use crate::recipe::{Node, OpKind, TextureRecipe};
 use crate::runner::{validate, RunError};
 use rusty_core::naming::variant_case::decode;
 
-/// The graph documents a recipe's instances name, by the path they are named by.
 pub type Graphs = BTreeMap<String, TextureRecipe>;
 
-/// A recipe with every instance expanded, and which graph file each id prefix came
-/// from, for the errors that name a node inside one.
 #[derive(Debug)]
 pub struct Expanded {
     pub recipe: TextureRecipe,
-    /// `("brick/", "textures/brick.graph.json")`, outermost first.
     files: Vec<(String, String)>,
 }
 
 impl Expanded {
-    /// The graph file node `id` came from; `None` for one of the recipe's own.
     pub fn file_of(&self, id: &str) -> Option<&str> {
         let deepest = self
             .files
@@ -44,8 +33,6 @@ impl Expanded {
             .map(|(_, f)| f.as_str())
     }
 
-    /// [`validate`] the flat recipe; an error about a node from a graph names its
-    /// file too.
     pub fn validate(&self) -> Result<(), String> {
         validate(&self.recipe).map_err(|e| {
             let id = match &e {
@@ -61,9 +48,6 @@ impl Expanded {
     }
 }
 
-/// `recipe` with each `op = "graph"` node replaced by its graph's nodes, read from
-/// `graphs` (keyed by the instance's `path`). A recipe that declares `inputs` is
-/// refused: it bakes only through an instance.
 pub fn expand(recipe: &TextureRecipe, graphs: &Graphs) -> Result<Expanded, String> {
     if !recipe.inputs.is_empty() {
         return Err(format!(
@@ -96,14 +80,12 @@ pub fn expand(recipe: &TextureRecipe, graphs: &Graphs) -> Result<Expanded, Strin
     })
 }
 
-/// What an expansion has pasted so far.
 #[derive(Default)]
 struct Out {
     nodes: Vec<Node>,
     files: Vec<(String, String)>,
 }
 
-/// Paste `scope`'s nodes into `out`, each instance expanded in its place.
 fn paste(scope: &Scope, out: &mut Out) -> Result<(), String> {
     check_ids(scope)?;
     for node in &scope.graph.nodes {
@@ -129,8 +111,6 @@ fn paste(scope: &Scope, out: &mut Out) -> Result<(), String> {
     Ok(())
 }
 
-/// Refuse two of `scope`'s own nodes sharing an id, instances included: an
-/// instance leaves no node of its own in the flat recipe for the runner to catch.
 fn check_ids(scope: &Scope) -> Result<(), String> {
     let nodes = &scope.graph.nodes;
     for (i, node) in nodes.iter().enumerate() {
@@ -142,7 +122,6 @@ fn check_ids(scope: &Scope) -> Result<(), String> {
     Ok(())
 }
 
-/// Paste the graph `node` instances, in `scope`.
 fn paste_instance(scope: &Scope, node: &Node, out: &mut Out) -> Result<(), String> {
     let OpKind::Graph(instance) = &node.op else {
         return Ok(());
@@ -174,7 +153,6 @@ fn paste_instance(scope: &Scope, node: &Node, out: &mut Out) -> Result<(), Strin
     paste(&child, out)
 }
 
-/// An instance's `params` placeholders, swapped for `scope`'s values.
 fn fill_placeholders(scope: &Scope, node: &mut Value) -> Result<(), String> {
     let Some(params) = node.get_mut("params").and_then(Value::as_object_mut) else {
         return Ok(());
@@ -191,9 +169,6 @@ fn fill_placeholders(scope: &Scope, node: &mut Value) -> Result<(), String> {
     Ok(())
 }
 
-/// A typed node's value, its inputs and links resolved and its seed folded, parsed
-/// back strictly, then its id prefixed (a parse refuses the `/` the prefix adds, so
-/// the id goes on after; an error names the prefixed id all the same).
 fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
     let Some(map) = value.as_object_mut() else {
         return Err(scope.in_file("a node is not an object".into()));
@@ -227,14 +202,13 @@ fn rewrite(scope: &Scope, mut value: Value) -> Result<Node, String> {
     Ok(node)
 }
 
-/// A node's own seed, where [`rewrite`] finds it: its top-level `seed`, when a `u32`.
 pub(super) fn seed_of(node: &Map<String, Value>) -> Option<u32> {
     let seed = node.get("seed")?.as_u64()?;
     u32::try_from(seed).ok()
 }
 
 /// A node's link references, where [`rewrite`] finds them: the `node` of each
-/// top-level object value (#1494's links). A catalog-wide test holds this to
+/// top-level object value (links). A catalog-wide test holds this to
 /// [`crate::recipe::OpKind::links`], so an op nesting a link deeper fails it.
 pub(super) fn link_refs(node: &mut Map<String, Value>) -> impl Iterator<Item = &mut String> {
     node.values_mut()

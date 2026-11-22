@@ -1,7 +1,3 @@
-//! crates/physics/src/watch/edit_tests.rs — the physics edits the incremental sync's
-//! equivalence proptest makes to one entity (#1707, `tests.rs`): a Collider, a
-//! Rigidbody, a CharacterController or a Joint attached, edited or detached.
-
 use glam::Vec3;
 use proptest::prelude::*;
 
@@ -58,7 +54,6 @@ fn shape(kind: u8) -> ColliderShape {
     }
 }
 
-/// Apply one physics edit to entity `e`.
 pub fn edit_one(w: &mut World, e: u32, edit: &Phys) {
     match *edit {
         Phys::Collider(k) => {

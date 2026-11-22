@@ -1,4 +1,4 @@
-//! The cooked file (#2332): a current one is read, bit for bit the fresh cook, and
+//! The cooked file: a current one is read, bit for bit the fresh cook, and
 //! every change of what it was made from cooks again.
 
 use super::fixture;

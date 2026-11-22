@@ -1,18 +1,12 @@
-//! crates/asset/src/gltf/anim.rs — glTF `animation` → [`AnimationClip`] extraction (#80).
-//!
-//! Reads the document's `animations` into named clips whose tracks are keyed by the
-//! *joint slot* of a given skin (the same order #79's [`SkinData`](crate::SkinData) uses), so the
-//! sampler can pose the skeleton directly. A channel that targets a node outside the
-//! skin's joints is ignored (it can't drive this mesh's palette). Pure data — the
-//! `gltf` crate + `glam`, never wgpu/egui/mlua.
+//! glTF `animation` extraction into [`AnimationClip`]s, keyed by the joint slot of a
+//! skin (the order of [`SkinData`](crate::SkinData)). A channel targeting a node
+//! outside the skin's joints is ignored.
 
 use crate::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use glam::{Quat, Vec3};
 use rusty_core::collections::Map;
 
-/// Read every animation in the document into clips bound to `joint_nodes` (the skin's
-/// joint slots, by glTF node index). Clips with no track for any of these joints are
-/// dropped, so a returned clip always drives at least one of the skin's joints.
+/// Clips with no track for any of these joints are dropped.
 pub fn clips_for_skin(
     document: &gltf::Document,
     buffers: &[gltf::buffer::Data],
@@ -63,8 +57,6 @@ fn clip_from_animation(
     clip
 }
 
-/// Read one channel's sampler (times + values) into the matching T/R/S track of a
-/// joint. An unreadable or non-T/R/S channel leaves the track untouched.
 fn apply_channel(
     channel: &gltf::animation::Channel,
     buffers: &[gltf::buffer::Data],
@@ -88,13 +80,11 @@ fn apply_channel(
             let values = r.into_f32().map(Quat::from_array).collect();
             track.rotation = quat_track(times, values, interpolation);
         }
-        // `MorphTargetWeights` (and any future output) don't drive joint TRS.
         _ => {}
     }
 }
 
-/// glTF `CubicSpline` carries in/out tangents we don't read; treat it as `Linear`,
-/// a faithful-enough, deterministic approximation. `Step` and `Linear` map directly.
+/// `CubicSpline` carries in/out tangents we don't read; treated as `Linear`.
 fn interp_of(i: gltf::animation::Interpolation) -> Interpolation {
     match i {
         gltf::animation::Interpolation::Step => Interpolation::Step,
@@ -102,9 +92,8 @@ fn interp_of(i: gltf::animation::Interpolation) -> Interpolation {
     }
 }
 
-/// Pair vector times+values into a track, guarding the count invariant. A
-/// `CubicSpline` output is 3× the key count (in-tangent, value, out-tangent); we
-/// keep only the value samples so it degrades cleanly to `Linear`.
+/// A `CubicSpline` output is 3x the key count (in-tangent, value, out-tangent); only the
+/// values are kept.
 fn vec_track(times: Vec<f32>, mut values: Vec<Vec3>, interpolation: Interpolation) -> Track<Vec3> {
     values = align_values(times.len(), values);
     Track {
@@ -123,9 +112,6 @@ fn quat_track(times: Vec<f32>, mut values: Vec<Quat>, interpolation: Interpolati
     }
 }
 
-/// Reconcile an output count with the key count. A 3×-length output is cubic-spline
-/// (in, value, out) — keep the middle value of each triple; otherwise truncate to
-/// match (a malformed accessor mismatch shouldn't panic the importer).
 fn align_values<T: Copy>(key_count: usize, values: Vec<T>) -> Vec<T> {
     if key_count > 0 && values.len() == key_count * 3 {
         return (0..key_count).map(|k| values[k * 3 + 1]).collect();

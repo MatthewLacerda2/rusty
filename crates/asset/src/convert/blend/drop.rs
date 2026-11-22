@@ -1,11 +1,8 @@
-//! Leaving images out of an exported glTF (#1072): an image the conversion made
-//! but the importer cannot read is removed with every texture that samples it and
-//! every material slot that samples one of those, and the indices after each
-//! removal are renumbered, so the glTF stays valid and nothing references it.
+//! Leaving images out of an exported glTF: a dropped image takes its textures and the material
+//! slots sampling them with it, and later indices are renumbered.
 
 use serde_json::Value;
 
-/// Remove the images at `dropped` from `doc`, and what samples them.
 pub(super) fn images(doc: &mut Value, dropped: &[usize]) {
     if dropped.is_empty() {
         return;
@@ -21,8 +18,6 @@ pub(super) fn images(doc: &mut Value, dropped: &[usize]) {
     }
 }
 
-/// Remove the entries of `doc[key]` that `drop` picks: each old index's new one,
-/// `None` for a removed entry.
 fn remove(
     doc: &mut Value,
     key: &str,
@@ -45,7 +40,6 @@ fn remove(
     map
 }
 
-/// Point `field` of every entry of `doc[key]` at its entry's new index.
 fn renumber(doc: &mut Value, key: &str, field: &str, map: &[Option<usize>]) {
     let Some(list) = doc.get_mut(key).and_then(Value::as_array_mut) else {
         return;
@@ -58,8 +52,6 @@ fn renumber(doc: &mut Value, key: &str, field: &str, map: &[Option<usize>]) {
     }
 }
 
-/// Renumber every texture slot under `value` (any object with an `index`, a
-/// glTF material's only indexed field), removing the slots of a removed texture.
 fn slots(value: &mut Value, textures: &[Option<usize>]) {
     match value {
         Value::Object(object) => {

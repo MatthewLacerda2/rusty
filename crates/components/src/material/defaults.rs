@@ -1,5 +1,3 @@
-//! [`MaterialAsset`]'s defaults: Unity's default material, every field written out.
-
 use std::collections::BTreeMap;
 
 use super::{

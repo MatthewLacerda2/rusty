@@ -1,5 +1,5 @@
 //! A conversion made again only because a file it looked at changed writes a
-//! textures folder of its own (#1072): a `.blend`'s linked library changes the
+//! textures folder of its own: a `.blend`'s linked library changes the
 //! bytes of an image whose name stays, which must never be rewritten in the
 //! folder the live `.glb` reads.
 

@@ -1,5 +1,3 @@
-//! The `voronoi` op: Voronoi / Worley cellular noise.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -10,15 +8,9 @@ use crate::recipe::{
     SOURCE,
 };
 
-/// Voronoi / Worley cellular pattern; `randomness` jitters each cell's point (0 = a
-/// regular grid, 1 = anywhere in its cell); `metric` is how distance is measured.
-/// A linked `randomness` is read once per cell, at its centre. `smoothness` (0–1)
-/// rounds `smooth_f1`'s creases, Blender's *Smooth F1*; the other outputs ignore it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Voronoi {
     pub scale: f32,
-    /// `scale`'s multiplier across and down (#2002): `{1, 2}` packs twice the cells
-    /// down as across, for a map twice as tall as it is wide.
     #[serde(default = "square")]
     pub aspect: [f32; 2],
     #[serde(default)]
@@ -29,8 +21,6 @@ pub struct Voronoi {
     pub randomness: Param,
     #[serde(default = "one_f32")]
     pub smoothness: f32,
-    /// `cells` as one gray value per cell, not a random colour (#2002): what a
-    /// mask or a height reads. The other outputs are gray already.
     #[serde(default)]
     pub grayscale: bool,
     #[serde(default)]

@@ -1,9 +1,3 @@
-//! crates/physics/src/shape/mod.rs — turning a `Collider` into a rapier shape: the
-//! builder (`build`), the triangle-mesh shape (`mesh`), its convex
-//! decomposition on a dynamic body (`decompose`, chosen per body by `fit`), a
-//! convex hull measured by its face planes (`hull`) and the world-space triangle read-back
-//! (`triangles`).
-
 pub(super) mod build;
 #[cfg(test)]
 mod build_tests;

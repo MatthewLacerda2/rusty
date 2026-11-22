@@ -1,5 +1,3 @@
-//! `Harness.Warnings` reads the run's warnings and errors (#2054).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -7,8 +5,6 @@ use mlua::Lua;
 
 use crate::harness::Harness;
 
-/// Run `scenario` on a fresh harness world (the default scene) with the API and
-/// the `Harness` table, as `play` registers them.
 fn run(scenario: &str) -> mlua::Result<()> {
     rusty_logging::init_for_tests();
     let out = rusty_test_support::temp::dir().join(format!("bridge_warn_{}", std::process::id()));

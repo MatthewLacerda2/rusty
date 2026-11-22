@@ -1,9 +1,3 @@
-//! crates/physics/src/query/raycast_tests.rs — ray hit info and the all-hits cast (#446).
-//!
-//! Asserts the *signed* point and normal each face reports, and the exact order
-//! `raycast_all` returns — so a flipped normal, a point off the surface, or an
-//! order leaking parry's traversal is caught, not merely that a hit came back.
-
 use glam::Vec3;
 
 use super::{sort_hits, RayHit};

@@ -1,13 +1,7 @@
-//! crates/ecs/src/static_revision_tests.rs — activation moves `World::static_revision` only
-//! when it can change the static caster set (#1496): the shadow sweeps skip inactive
-//! entities, but a muzzle flash toggled every shot must not re-bake the static shadows.
-//! A static move moves `World::static_geometry`'s revision instead (#2346).
-
 use rusty_components::ColliderComponent;
 
 use crate::World;
 
-/// `root` with one child `wall`, linked both ways.
 fn room(w: &mut World) -> (u32, u32) {
     let root = w.spawn("root".into());
     let wall = w.spawn("wall".into());
@@ -45,9 +39,6 @@ fn toggling_an_entity_with_no_static_below_leaves_the_revision() {
     assert_eq!(w.static_revision(), before, "a static parent is not below");
 }
 
-/// A static entity's move moves `World::static_geometry`'s revision but not
-/// `static_revision`, whose readers (the shadow sweeps, probe lighting) must not
-/// re-run on a move; a dynamic one's moves and Collider edits move neither.
 #[test]
 fn a_static_move_moves_the_geometry_revision_only() {
     let mut w = World::new();
@@ -71,13 +62,11 @@ fn a_static_move_moves_the_geometry_revision_only() {
     assert_eq!(w.static_revision(), statics);
 }
 
-/// A watch opened on one World, asked of another whose revision is equal, reads
-/// a change: the cursor's epoch is what tells the two Worlds apart.
 #[test]
 fn a_watch_asked_of_another_world_reads_a_change() {
     let (mut first, mut other) = (World::new(), World::new());
     let mut geometry = first.static_geometry();
-    let _pose = other.static_geometry(); // `other` records `WorldPose` too
+    let _pose = other.static_geometry();
     for w in [&mut first, &mut other] {
         w.spawn("e".to_string());
     }

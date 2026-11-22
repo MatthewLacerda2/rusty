@@ -1,52 +1,16 @@
-//! crates/script/src/api/sound/from_lua.rs — marshal the `Sound` namespace's Lua arguments into
-//! the engine's types (#357).
-//!
-//! Four conversions, all of them tiny, kept out of the registrar so the namespace
-//! file reads as a list of verbs:
-//!
-//! - a **patch** (a table or its JSON string, #410) → [`Patch`], via the shared
-//!   [`crate::api::lua_json`] converter, so the field decoding lives ONCE in the
-//!   patch's serde derive and a Lua-authored patch is the same document as one
-//!   loaded from `.json`;
-//! - a **note** → a MIDI number, accepting either the name a score would use
-//!   (`"C#4"`) or a raw number;
-//! - an **opts table** → [`NoteOpts`], every field optional and every unknown key
-//!   refused by name;
-//! - a **song** (table or JSON string) → [`Song`], the same way (#358).
-//!
-//! The document types are zimmer's (#413); the Lua patch shape mirrors its JSON
-//! one-to-one:
-//!
-//! ```lua
-//! {
-//!   source = { kind = "osc_stack", oscs = { { wave = "saw", detune_cents = -7 } } },
-//!   amp    = { a = 0.005, d = 0.1, s = 0.7, r = 0.3 },
-//!   filter = { kind = "lowpass", cutoff = 1200, resonance = 0.4, env_octaves = 2 },
-//!   fx     = { { fx = "reverb", size = 0.6, damp = 0.5, mix = 0.2 } },
-//! }
-//! ```
-
 use mlua::{Table, Value};
 
 use crate::api::lua_json::recipe_from_lua;
 use rusty_zimmer::{parse_note, Glide, NoteOpts, Patch, Song};
 
-/// Parse a patch argument — a Lua table or its JSON string — into a [`Patch`].
 pub fn patch_from_lua(value: &Value) -> Result<Patch, String> {
     recipe_from_lua(value)
 }
 
-/// Parse a song argument — a Lua table or its JSON string — into a [`Song`] (#358).
-///
-/// Same one-liner as [`patch_from_lua`] and for the same reason: the field decoding
-/// lives once, in the song's serde derive, so a Lua-authored song and one loaded from
-/// `.json` are the same document.
 pub fn song_from_lua(value: &Value) -> Result<Song, String> {
     recipe_from_lua(value)
 }
 
-/// Resolve a `note` argument to a MIDI number: a name (`"C#4"`, `"Bb3"`) or the
-/// number itself.
 pub fn note_from_value(note: &Value) -> Result<f32, String> {
     match note {
         Value::String(s) => {
@@ -64,9 +28,6 @@ pub fn note_from_value(note: &Value) -> Result<f32, String> {
 /// ignored, so a typo (`velocty`) is an error, not a silently default note.
 const OPTS_KEYS: [&str; 5] = ["duration", "velocity", "timbre", "glide", "seed"];
 
-/// Read the optional `{ duration, velocity, timbre, glide, seed }` table, defaulting
-/// each field it omits (see [`NoteOpts::default`]). `glide` is itself a table,
-/// `{ semitones, seconds }`, both required.
 pub fn opts_from_table(opts: Option<&Table>) -> Result<NoteOpts, String> {
     let mut out = NoteOpts::default();
     let Some(table) = opts else { return Ok(out) };
@@ -97,7 +58,6 @@ pub fn opts_from_table(opts: Option<&Table>) -> Result<NoteOpts, String> {
     Ok(out)
 }
 
-/// Read `opts.glide = { semitones, seconds }`, if present.
 fn glide_from_table(opts: &Table) -> Result<Option<Glide>, String> {
     let glide = match opts.get::<Value>("glide").map_err(|e| e.to_string())? {
         Value::Nil => return Ok(None),
@@ -115,7 +75,6 @@ fn glide_from_table(opts: &Table) -> Result<Option<Glide>, String> {
     }))
 }
 
-/// Read an optional numeric field, reporting the key when the value is not a number.
 fn get_number(table: &Table, key: &str) -> Result<Option<f64>, String> {
     match table.get::<Value>(key).map_err(|e| e.to_string())? {
         Value::Nil => Ok(None),

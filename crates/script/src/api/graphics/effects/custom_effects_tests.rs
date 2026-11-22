@@ -1,8 +1,3 @@
-//! `Graphics.SetPostParam` / `GetPostParam` (#671): values land on the active volume,
-//! read back (defaults included), a name the volume's effects don't expose at runtime
-//! is an error naming it, and with no volume a set errors while a get answers with the
-//! catalog default.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,8 +8,6 @@ use rusty_edit::authoring::defaults;
 use rusty_scene::Scene;
 use rusty_shadergen::{bake_recipe, engine_shader_dir, ShaderRecipe, DEFAULT_OUT_DIR};
 
-/// A baked damage-vignette postfx module, unique to this test and run (tests share
-/// a process under `cargo test`); removed on drop.
 struct Baked(String);
 
 impl Baked {
@@ -40,7 +33,6 @@ impl Drop for Baked {
     }
 }
 
-/// Run `script` against the `Graphics` namespace, returning its error if any.
 fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     let (lua, graphics) = (Lua::new(), Rc::new(RefCell::new(Default::default())));
     let app = Rc::default();
@@ -57,14 +49,12 @@ fn run(scene: &Rc<RefCell<Scene>>, script: &str) -> Result<(), String> {
     .map_err(|e| e.to_string())
 }
 
-/// A scene whose active volume runs `effect`.
 fn scene_running(effect: &str) -> Rc<RefCell<Scene>> {
     let mut scene = Scene::new();
     let id = scene.add_entity("Volume".into());
     let mut vc = defaults::default_post_processing();
     vc.custom_effects.names = vec![effect.to_owned()];
     scene.world.set_post_processing(id, Some(vc));
-    // `Graphics.*` edits the main camera's volume (#1434).
     scene.world.set_camera(id, Some(defaults::default_camera()));
     Rc::new(RefCell::new(scene))
 }

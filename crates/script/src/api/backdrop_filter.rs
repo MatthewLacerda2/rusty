@@ -1,11 +1,3 @@
-//! crates/script/src/api/backdrop_filter.rs — `BackdropFilter` namespace (#426).
-//!
-//! Get/Set over an entity's `BackdropFilterComponent`: the frosted-glass blur
-//! radius, tint, saturation and brightness. Whether one exists is
-//! `Scene.AddComponent(id, "BackdropFilter")` / `RemoveComponent`. Setters route
-//! through the shared `edit::authoring::ui::backdrop` ops the inspector card uses;
-//! getters return the defaults without one, and setters are then no-ops.
-
 use glam::Vec4;
 use mlua::Lua;
 
@@ -19,14 +11,12 @@ use rusty_scene::Scene;
 type Get = fn(&BackdropFilterComponent) -> f32;
 type Set = fn(&mut BackdropFilterComponent, f32);
 
-/// `(suffix, getter, setter)` for the scalar `Get<X>` / `Set<X>` pairs.
 const SCALARS: [(&str, Get, Set); 3] = [
     ("BlurRadius", |b| b.blur_radius, ops::set_blur_radius),
     ("Saturation", |b| b.saturation, ops::set_saturation),
     ("Brightness", |b| b.brightness, ops::set_brightness),
 ];
 
-/// Register the `BackdropFilter` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_scalars(lua, &table, scene)?;
@@ -36,7 +26,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// The [`SCALARS`] getter/setter pairs.
 fn register_scalars(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     for (suffix, get, set) in SCALARS {
         put(
@@ -65,7 +54,6 @@ fn register_scalars(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Re
     Ok(())
 }
 
-/// `GetTint` / `SetTint`.
 fn register_tint(lua: &Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

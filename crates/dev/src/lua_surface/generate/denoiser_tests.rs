@@ -1,7 +1,3 @@
-//! `Lighting.SetSettings{ denoiser = … }` (#1884): any case of a denoiser's name is
-//! taken, and an unknown one raises and changes nothing; and `backfaceTolerance`
-//! (#1949) and `directSamples` (#2355), clamped like the other knobs.
-
 use super::super::super::session::Session;
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 

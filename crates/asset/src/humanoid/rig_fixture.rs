@@ -1,13 +1,11 @@
-//! Primitive humanoid rigs for the retarget tests (#1747): built from model-space
-//! rests, so two rigs can share a silhouette while their bone axes, rest poses,
-//! root offsets, heights, facing and the armature their mesh sits under differ.
+//! Primitive humanoid rigs for the retarget tests, built from model-space rests so two
+//! rigs share a silhouette while bone axes, poses, heights, facing and armature differ.
 
 use glam::{Mat4, Quat, Vec3};
 
 use crate::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use crate::mesh_data::{JointTransform, SkinData};
 
-/// (name, parent, rest position in mesh space at height 1, T-pose).
 pub const BONES: &[(&str, Option<usize>, [f32; 3])] = &[
     ("mixamorig:Hips", None, [0.0, 0.9, 0.0]),
     ("mixamorig:Spine", Some(0), [0.0, 1.1, 0.0]),
@@ -26,26 +24,18 @@ pub const LEFT_FOOT: usize = 5;
 pub const LEFT_UPPER_ARM: usize = 9;
 pub const LEFT_LOWER_ARM: usize = 10;
 
-/// How a rig differs from the plain one.
 #[derive(Clone, Copy)]
 pub struct Shape {
     pub height: f32,
-    /// Each bone's rest axes turned by this, varied per slot (a different export).
     pub axes: Quat,
-    /// The arm lowered by this many radians about +Z at the shoulder (an A-pose).
     pub arm_down: f32,
-    /// The skeleton root's parent space, relative to the mesh node.
     pub root_offset: Mat4,
-    /// The node the mesh and the skeleton sit under, in model space: what a
-    /// Blender export of a Mixamo FBX writes ([`blender_armature`]).
     pub armature: Mat4,
-    /// The way the body faces, a turn about +Y from glTF's +Z.
     pub facing: f32,
 }
 
-/// A Mixamo character through Blender's glTF export: the `Armature` object
-/// turned +90° about X and scaled 0.01, the mesh parented under it, so the
-/// mesh's own space is Z-up and in centimetres.
+/// A Mixamo character through Blender's glTF export: `Armature` turned +90° about X and
+/// scaled 0.01, the mesh under it, so mesh space is Z-up in centimetres.
 pub fn blender_armature() -> Mat4 {
     Mat4::from_scale_rotation_translation(
         Vec3::splat(0.01),
@@ -67,7 +57,6 @@ impl Default for Shape {
     }
 }
 
-/// The rig `shape` describes.
 pub fn rig(shape: Shape) -> SkinData {
     let down = Quat::from_rotation_z(-shape.arm_down);
     let face = Quat::from_rotation_y(shape.facing);
@@ -113,14 +102,11 @@ pub fn rig(shape: Shape) -> SkinData {
     }
 }
 
-/// `skin`'s rest of joint `slot` in model space.
 pub fn model_rest(skin: &SkinData, slot: usize) -> Mat4 {
     skin.mesh_to_model() * skin.bind_global[slot]
 }
 
-/// Five keys of a walk on `skin`: the hips bob and travel 1 m along model +Z
-/// (whatever space the root's parent is in), the legs and the arm swing, each
-/// key a turn on top of the bone's rest local.
+/// The hips bob and travel 1 m along model +Z (whatever space the root's parent is in).
 pub fn walk(skin: &SkinData) -> AnimationClip {
     let times = vec![0.0, 0.25, 0.5, 0.75, 1.0];
     let swing = [0.0, 0.5, 0.0, -0.5, 0.0];
@@ -157,8 +143,6 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
         (10, 0.4),
     ] {
         tracks[slot].rotation = turn(slot, Vec3::X, k);
-        // A translation key on a limb, the source's own length: the retarget
-        // drops it, so the target's length holds.
         tracks[slot].translation = Track {
             times: vec![0.0],
             values: vec![rest(slot).translation],
@@ -174,9 +158,7 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
     clip
 }
 
-/// A one-second clip "Lunge" on `skin`: the hips travel `travel` and turn
-/// `turn` radians about their own model +Y, both in model space whatever the
-/// armature, linearly, and rise 0.1 model units halfway (#1822).
+/// "Lunge": the hips travel `travel` and turn `turn` radians about model +Y.
 pub fn lunge(skin: &SkinData, travel: Vec3, turn: f32) -> AnimationClip {
     let parent = skin.mesh_to_model() * skin.root_offset(HIPS);
     let rest = skin.local_bind[HIPS];
@@ -210,8 +192,6 @@ pub fn lunge(skin: &SkinData, travel: Vec3, turn: f32) -> AnimationClip {
     clip
 }
 
-/// `skin`'s model-space joint globals at `clip`'s key `k` (every keyed track
-/// has a value there, or one held), rests where unkeyed.
 pub fn posed(skin: &SkinData, clip: &AnimationClip, k: usize) -> Vec<Mat4> {
     let mut globals: Vec<Mat4> = Vec::with_capacity(skin.parents.len());
     for slot in 0..skin.parents.len() {

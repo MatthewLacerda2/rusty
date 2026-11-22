@@ -1,4 +1,4 @@
-//! The scene mesh library (#2059) across save and load, Play and Stop, Undo, a
+//! The scene mesh library across save and load, Play and Stop, Undo, a
 //! prefab and a Mesh collider.
 
 use glam::Vec3;

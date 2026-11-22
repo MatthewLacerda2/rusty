@@ -1,38 +1,3 @@
-//! crates/dev/src/demo/ — demos: every Play session recorded, replayed headless bit for
-//! bit (#1581), DOOM's `-record` / `-playdemo`.
-//!
-//! The sim is a pure function of (seed, inputs, fixed dt), so a Play session is
-//! kept whole by its start (scene, settings, save data, seed) and what reached it
-//! tick by tick: the input each tick published, and every act of a host on the
-//! world between ticks — a console or MCP line, a scenario's API call. A dev build
-//! records each Play session (the editor's, `play`'s, the dev player's) into
-//! `saved/demos/`, keeping the newest `demos.keep` (`project.rusty`, default 20);
-//! `play --demo <file>` replays one headless, with a scenario on top if asked.
-//!
-//! - **One hook.** Recording and replay are [`TickTap`](rusty_app::TickTap)s on
-//!   `GameWorld::tick`, which every host drives: [`Recorder`] reads each tick's
-//!   `InputFrame` right before it is published, [`Replayer`] writes it back there.
-//! - **Host acts** go through the world's journal (`scripting::HostJournal`): the
-//!   one REPL evaluator notes its lines, a scenario VM's API calls are noted by
-//!   [`journal_calls`], and a `Scene.GetScript` handle's field writes and calls by
-//!   `script_ref`. What cannot be carried as plain data (an Inspector edit, a
-//!   function passed to a call) taints the demo from that tick, and the replay warns.
-//! - **Checked, not promised.** A digest of the world every two seconds and one
-//!   when Play ends (`digest`), compared on replay: the first that differs is
-//!   reported.
-//! - **Every tick's `dt`.** The editor and the dev player tick on wall-clock
-//!   time; a demo keeps each tick's `dt` (only when it changes), and the replay
-//!   runs on it.
-//! - **Nothing of it in a ship build**: the whole module is `dev`.
-//!
-//! - **Found, sought, cut** (#1597): an index beside the tick lines (`index`: the
-//!   camera sampled, the engine's events, the console, `Debug.Mark`s) that
-//!   [`Demo::find`] searches without replaying; [`seek`] replays to a tick, back
-//!   by restarting; [`cut`] writes a scenario reproducing a range of ticks.
-//!
-//! The file format is in `format`; the per-tick reader a replay steps through is
-//! [`Demo::ticks`], the index's is [`Demo::index`].
-//!
 //! stored-format: the `.demo` file a recorded playtest is saved as
 
 mod calls;
@@ -66,30 +31,20 @@ use crate::harness::Harness;
 use crate::scenario::{self, RunReport};
 use rusty_app::GameWorld;
 
-/// The state digest a demo stores every 120 ticks (`digest`), of `world` as it
-/// stands: two worlds with the same one are the same, bit for bit.
 pub fn state_digest(world: &GameWorld) -> String {
     digest::of(world)
 }
 
-/// Record every Play session of `world` to `destination` from now on.
 pub fn record(world: &mut GameWorld, destination: Destination) {
     world.script_manager().journal().borrow_mut().start();
     let recorder = Recorder::new(destination, world);
     world.set_tap(Some(Box::new(recorder)));
 }
 
-/// What a dev build does on boot: record into the project's [`DEMOS_DIR`].
 pub fn record_project(world: &mut GameWorld) {
     record(world, Destination::Folder(DEMOS_DIR.into()));
 }
 
-/// Replay the demo at `demo_path` headless on the open project, writing a
-/// scenario run's results into `out_dir`. With `scenario_path` that scenario
-/// drives the run (its steps advance the replay); without, the whole demo plays.
-/// `run.record_audio` captures the replay's mix, as `play --record-audio`; the
-/// Game view size is the demo's (the sim lays the UI out on it), so `run.size` is
-/// not read.
 pub fn replay(
     demo_path: &Path,
     scenario_path: Option<&Path>,
@@ -115,9 +70,6 @@ pub fn replay(
     }
 }
 
-/// End a run's demo: a recording one's end line (its final digest) is written,
-/// and a replay's verdict goes into the run's results: a divergence fails it,
-/// and each taint is logged.
 pub fn conclude(harness: &mut Harness) {
     let verdict = {
         let mut world = harness.world.borrow_mut();
@@ -143,7 +95,6 @@ pub fn conclude(harness: &mut Harness) {
     let short = verdict.ticks < verdict.of;
     match &verdict.diverged {
         Some(divergence) => harness.expect(false, format!("the demo replays: {divergence}")),
-        // Its end digest never compared: only a scenario may stop it short.
         None if short && !verdict.scenario => harness.expect(
             false,
             format!(

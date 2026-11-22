@@ -1,5 +1,3 @@
-//! The `gradient` op: a linear or radial ramp.
-
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,7 +5,6 @@ use crate::image_buf::Image;
 use crate::ops::generators;
 use crate::recipe::{choice, op, GradientKind, OpInfo, SOURCE};
 
-/// Linear or radial gradient ramp (grayscale).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Gradient {
     pub kind: GradientKind,

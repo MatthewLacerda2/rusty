@@ -1,21 +1,14 @@
-//! crates/ecs/src/placement_tests.rs — both sides of a placed parent link (#1805). A
-//! document naming a parent its `children` lacks is listed there, at once when the
-//! parent is live and when it arrives otherwise, so every subtree walk (activity,
-//! world matrices, the change logs, a despawn's re-rooting) reaches the child.
-
 use glam::Vec3;
 
 use crate::{Activity, Changes, World};
 use rusty_components::Entity;
 
-/// A document naming `parent`, as a load or a prefab stamp inserts it.
 fn orphan(id: u32, parent: u32) -> Entity {
     let mut e = Entity::new(id, "orphan".into());
     e.parent_id = Some(parent);
     e
 }
 
-/// A World holding orphan 1, waiting for 3, and then 3 spawned.
 fn late_parent() -> World {
     let mut w = World::new();
     w.insert_entity(orphan(1, 3));
@@ -24,8 +17,6 @@ fn late_parent() -> World {
     w
 }
 
-/// The proptest's minimal case, as its `cc` line in
-/// `crates/ecs/proptest-regressions/activity_tests.txt` records it.
 #[test]
 fn an_overwrite_naming_a_future_id_follows_that_id_once_it_spawns() {
     let mut w = World::new();
@@ -106,8 +97,6 @@ fn a_document_naming_a_live_parent_is_listed_at_once() {
 
 #[test]
 fn a_parent_put_back_listing_its_child_lists_it_once() {
-    // Undo puts a step's entities back in id order: a child can arrive before the
-    // parent whose document lists it.
     let mut w = World::new();
     w.insert_entity(orphan(1, 2));
     let mut parent = Entity::new(2, "parent".into());

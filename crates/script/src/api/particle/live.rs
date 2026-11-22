@@ -1,24 +1,4 @@
-//! crates/script/src/api/particle/live.rs — the live-particle calls (#2171):
-//! `GetParticles` / `SetParticles`, Unity's `ParticleSystem.GetParticles` /
-//! `SetParticles`, and `ForEach`, one reused table refilled per particle.
-//!
-//! A particle table is flat and in world space: `x, y, z`, `vx, vy, vz`, `age`,
-//! `lifetime`, `size` (start size), `rotation` (degrees), `r, g, b, a` (the start
-//! tint) and `custom1` to `custom4` (four numbers the engine never reads). The
-//! tables are built and read by `live.lua`; this half moves the particles across
-//! as one packed string each way (`read`, `write`), since a Rust call per field
-//! costs several times the whole Lua side, and takes `ForEach`'s changes back as
-//! a list of edits (`edit`) applied to what it read. Every write bumps the
-//! emitter's `revision` ([`touched`]), as a tick, an emit and a clear do. A field written back as a
-//! NaN or an infinity (what `live.lua` sends for one left out) keeps its value;
-//! an added particle's is `ParticleEmitterComponent::placed`'s. A table keeps
-//! the identity of the particle it was read from (`live.lua` sends its source
-//! with it, and the revision of its read), so a script that removes or reorders
-//! entries keeps each survivor's hidden fields; after anything else changed the
-//! emitter, every entry is an added particle. A `Local` emitter is carried to where it stands before every
-//! read and write, so what a script reads and writes is where the particles draw
-//! now. The fastest access, whole arrays per field, is `arrays.rs`. A `Gpu`
-//! emitter's particles are the renderer's: its guard is `gpu.rs`.
+//! A field written back as NaN or infinity keeps its value; an added particle's is `ParticleEmitterComponent::placed`'s.
 
 use mlua::{Function, Lua, Table};
 
@@ -28,33 +8,22 @@ use crate::api::Reg;
 use rusty_components::particle::{EmitterFrame, Particle, ParticleEmitterComponent};
 use rusty_scene::Scene;
 
-/// The f32s of one particle on the wire, named in wire order. `live.lua` gets
-/// the names and the two formats below as upvalues and refuses to load if its
-/// own order differs, so this list is the layout's one source.
+/// `live.lua` refuses to load if its own order differs, so this list is the layout's one source.
 pub(super) const NAMES: [&str; FIELDS] = [
     "x", "y", "z", "vx", "vy", "vz", "age", "lifetime", "size", "rotation", "r", "g", "b", "a",
     "custom1", "custom2", "custom3", "custom4",
 ];
 pub(super) const FIELDS: usize = 18;
-/// The bytes of one particle on the wire, and of one record written back: a u32
-/// source (the live particle a table was read from, [`NO_SOURCE`] for one the
-/// script built) first.
 const PARTICLE: usize = FIELDS * 4;
 const RECORD: usize = 4 + PARTICLE;
-/// A record's source when the table did not come from the emitter's newest read.
 const NO_SOURCE: u32 = u32::MAX;
-/// An edit's key is `index * SLOTS + slot`; `live.lua` gets it as an upvalue.
 const SLOTS: u32 = 32;
 const _: () = assert!(FIELDS as u32 <= SLOTS, "an edit's slot must fit its stride");
 
-/// The particles a `ForEach` read, held until its edits come back: the write
-/// replaces what is live with them, as `SetParticles` replaces it with its list.
 struct Snapshot(Vec<Particle>);
 
-/// The verbs (the first three) and the Rust halves' keys in `RUST_HALVES`.
 const HALVES: [&str; 4] = ["GetParticles", "SetParticles", "ForEach", "ForEach/edit"];
 
-/// Register `GetParticles`, `SetParticles` and `ForEach` onto the `Particles` table.
 pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     let halves = (read(lua, scene), write(lua, scene), edit(lua, scene));
     let (read, write, edit) = match halves {
@@ -79,19 +48,14 @@ pub(super) fn register(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// Mark `e`'s particles changed: a read before this is no longer of them.
 pub(super) fn touched(e: &mut ParticleEmitterComponent) {
     e.runtime.revision = e.runtime.revision.wrapping_add(1);
 }
 
-/// `e`'s revision as a Lua integer (its bits; only equality is ever asked).
 pub(super) fn revision(e: &ParticleEmitterComponent) -> i64 {
     e.runtime.revision as i64
 }
 
-/// `read(id, keep)`: the emitter's particles on the wire, their count, the
-/// emitter's revision (`nil` without one) and, when `keep`, a [`Snapshot`] of
-/// them for `edit`.
 fn read(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     lua.create_function(move |lua, (id, keep): (EntityArg, bool)| {
         let scene = &*scene.get(lua)?;
@@ -107,8 +71,6 @@ fn read(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     })
 }
 
-/// `write(id, verb, rev, records)`: replace the live particles with `records`,
-/// their sources honoured only when `rev` is still the emitter's revision.
 fn write(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     type Args = (EntityArg, String, Option<i64>, mlua::LuaString);
     lua.create_function(move |lua, (id, verb, rev, records): Args| {
@@ -133,8 +95,6 @@ fn write(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     })
 }
 
-/// `edit(id, snapshot, edits, kills)`: replace the live particles with the
-/// `ForEach` read `snapshot`, edited ([`edited`]).
 fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     type Args = (EntityArg, Option<mlua::AnyUserData>, Vec<f64>, Vec<u32>);
     lua.create_function(move |lua, (id, kept, edits, kills): Args| {
@@ -153,12 +113,7 @@ fn edit(lua: &Lua, scene: ApiCell<Scene>) -> mlua::Result<Function> {
     })
 }
 
-/// Run `f` on `id`'s emitter after carrying a `Local` one to where it stands,
-/// with its frame; `None` without an emitter. The carry runs on an emitter
-/// inactive in the hierarchy too (the sim's `carry_local_particles` skips it): a
-/// particle `f` adds is placed under the current frame, so its siblings must be
-/// under it as well, and the carry is idempotent, so reactivation moves them all
-/// by what is left of the change.
+/// A `Local` emitter is carried to where it stands first, even inactive in the hierarchy: a particle added is placed under the current frame, and the carry is idempotent.
 pub(super) fn with_carried<R>(
     scene: &mut Scene,
     id: u32,
@@ -170,7 +125,6 @@ pub(super) fn with_carried<R>(
     Some(f(&mut emitter, &frame))
 }
 
-/// `particles` on the wire.
 fn packed(particles: &[Particle]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(particles.len() * PARTICLE);
     for p in particles {
@@ -181,12 +135,10 @@ fn packed(particles: &[Particle]) -> Vec<u8> {
     bytes
 }
 
-/// The 4 bytes at `at` of `b`.
 fn word(b: &[u8], at: usize) -> [u8; 4] {
     [b[at], b[at + 1], b[at + 2], b[at + 3]]
 }
 
-/// `p`'s field at wire `slot`, as [`fields`] has it.
 pub(super) fn field(p: &Particle, slot: usize) -> f32 {
     match slot {
         0..=2 => p.position[slot],
@@ -200,7 +152,6 @@ pub(super) fn field(p: &Particle, slot: usize) -> f32 {
     }
 }
 
-/// `p`'s fields in wire order, its rotation in degrees.
 pub(super) fn fields(p: &Particle) -> [f32; FIELDS] {
     let ([px, py, pz], [vx, vy, vz]) = (p.position.to_array(), p.velocity.to_array());
     let ([r, g, b, a], [c1, c2, c3, c4]) = (p.color, p.custom);
@@ -210,12 +161,6 @@ pub(super) fn fields(p: &Particle) -> [f32; FIELDS] {
     ]
 }
 
-/// Replace `e`'s live particles, under its frame `frame`, with `records` (a
-/// whole number of [`RECORD`]s): dead ones and those past `max_particles`
-/// dropped, no death sub-emitter fired. When `same` (nothing changed the
-/// emitter since the read), a record with a source keeps that particle's hidden
-/// fields (`start_frame`, `axis`, `turn`), wherever it now sits in the list; any
-/// other is an added particle. Returns the number live.
 fn write_records(
     e: &mut ParticleEmitterComponent,
     frame: &EmitterFrame,
@@ -247,9 +192,6 @@ fn write_records(
     e.runtime.particles.len() as u32
 }
 
-/// `read` with `edits` (`key, value` pairs, the key `index * SLOTS + slot`)
-/// applied and the particles at `kills` and those dead after the edits
-/// dropped; an error when a key is past the read (the two halves disagree).
 fn edited(mut read: Vec<Particle>, edits: &[f64], kills: &[u32]) -> Result<Vec<Particle>, String> {
     for pair in edits.chunks_exact(2) {
         let key = pair[0] as u32;
@@ -276,9 +218,7 @@ fn edited(mut read: Vec<Particle>, edits: &[f64], kills: &[u32]) -> Result<Vec<P
     Ok(read)
 }
 
-/// Write `values` (wire order) into `p`; a NaN or an infinity keeps the field.
-/// The rotation is written only when it differs from `p`'s in degrees, so a
-/// round trip keeps the radians bit for bit.
+/// Rotation is written only when it differs from `p`'s in degrees, so a round trip keeps the radians bit for bit.
 pub(super) fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
     let mut now = fields(p);
     let degrees = now[9];

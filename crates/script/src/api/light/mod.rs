@@ -1,15 +1,3 @@
-//! crates/script/src/api/light/ — `Light` namespace.
-//!
-//! Get/Set over an entity's optional `LightComponent`: colour, intensity, range,
-//! light type, whether it casts shadows and how far its shadow reaches
-//! (`shadows`), its mode (#438) and an Area light's size (#1674). Every setter maps onto a
-//! real field the renderer reads
-//! (`apply_scene_lights`), so a script tweak takes effect on the next frame's
-//! lighting uniform; an Area light is baked only, so its size shows after the
-//! next bake. There is no per-light "active" flag in the engine — a light
-//! is gated by its owning entity's `active` (a `Scene` concern), so this surface
-//! deliberately exposes the light's own data and nothing more.
-
 mod shadows;
 
 use glam::Vec3;
@@ -23,7 +11,6 @@ use rusty_components::{LightMode, LightType};
 use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::Scene;
 
-/// Register the `Light` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -38,7 +25,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, console: ApiCell<ConsoleLogs>)
     lua.globals().set("Light", table).map_err(|e| e.to_string())
 }
 
-/// `GetColor` / `SetColor` over the light's linear RGB colour.
 fn register_color(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -125,8 +111,6 @@ fn register_range(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -
     )
 }
 
-/// `GetType` / `SetType` over the light's kind, by name. Unknown names on `SetType`
-/// are ignored (the current type is kept).
 fn register_type(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -160,10 +144,6 @@ fn register_type(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
     )
 }
 
-/// `GetMode` / `SetMode` over the light's Realtime / Mixed / Baked mode (#438), by
-/// name. Unknown names on `SetMode` are ignored (the current mode is kept); an Area
-/// light reads its effective `Baked` and refuses anything else with a console
-/// warning (#1674).
 fn register_mode(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -207,8 +187,6 @@ fn register_mode(
     )
 }
 
-/// `GetAreaSize` / `SetAreaSize`: an Area light's width and height, Unity's
-/// `areaSize` (#1674). Any light carries one; only an Area light uses it.
 fn register_area_size(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

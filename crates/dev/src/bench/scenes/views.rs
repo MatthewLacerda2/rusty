@@ -1,15 +1,3 @@
-//! Where `make bench-scenes` looks from: deterministic viewpoints no one authors.
-//!
-//! At most [`MAX_POINTS`] positions, in order: every active screen camera the
-//! scene holds, at its own transform, by entity id (past [`MAX_POINTS`] the rest
-//! are left out, and the report says so, as it does when the cameras fill every
-//! position and the scene has a spawn or a navmesh); the player's spawn (the entity named
-//! `PlayerSpawn`, else `Player`), one view along its facing; then points on the
-//! navmesh at eye height, each looking along four yaws (0, 90, 180 and 270°),
-//! picked from a fixed seed for the positions left. A scene with no navmesh uses
-//! its cameras and spawn alone; one with none of the three looks along +Z from its
-//! bounds' centre.
-
 use glam::Vec3;
 
 use rusty_navigation::{NavigationGraph, SpanRef, NOT_WALKABLE_AREA};
@@ -18,21 +6,14 @@ use rusty_scene::Scene;
 
 use super::report::ViewKey;
 
-/// Eye height above the floor, metres.
 pub const EYE_HEIGHT: f32 = 1.7;
-/// The most points (cameras, the spawn, navmesh points) a scene is benched from.
 pub const MAX_POINTS: usize = 8;
-/// The yaws each navmesh point looks along, degrees.
 pub const YAWS: [f32; 4] = [0.0, 90.0, 180.0, 270.0];
-/// The navmesh points' seed: the same scene gives the same points on every run.
 const SEED: u64 = 0x2294_BE7C_5CE7_E5ED;
 
-/// Where one viewpoint looks from.
 #[derive(Clone, Debug, PartialEq)]
 pub enum View {
-    /// A scene camera, as the only screen camera.
     Camera(u32),
-    /// The main view moved here (yaw and pitch in degrees, `Camera`'s convention).
     Pose {
         position: Vec3,
         yaw: f32,
@@ -40,15 +21,11 @@ pub enum View {
     },
 }
 
-/// One viewpoint, the label its rows name it by, and where it looks from as
-/// picked (a camera's at its pick: a script may move it later), which is what
-/// tells two runs' viewpoints apart ([`Viewpoint::key`]).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Viewpoint {
     pub label: String,
     pub view: View,
     pub at: Vec3,
-    /// Degrees, `Camera`'s convention.
     pub yaw: f32,
 }
 
@@ -66,7 +43,6 @@ impl Viewpoint {
         }
     }
 
-    /// What a report keeps of it, to compare two runs' viewpoints by.
     pub fn key(&self) -> ViewKey {
         ViewKey {
             label: self.label.clone(),
@@ -80,14 +56,12 @@ impl Viewpoint {
     }
 }
 
-/// A scene's viewpoints, and what the report should say about how they were picked.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Views {
     pub views: Vec<Viewpoint>,
     pub warnings: Vec<String>,
 }
 
-/// The viewpoints for `scene` with its navmesh `nav`: see the module docs.
 pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
     let mut out = Views::default();
     let mut cameras: Vec<u32> = active_cameras(scene)
@@ -134,9 +108,6 @@ pub fn pick(scene: &Scene, nav: &NavigationGraph) -> Views {
     out
 }
 
-/// The warning for `cameras` screen cameras filling every position: what the
-/// cap left out (the cameras past it, the spawn, the navmesh points), each only
-/// when the scene has it. `None` when the cap left nothing out.
 fn capped(cameras: usize, spawn: bool, floors: bool) -> Option<String> {
     let extra = cameras - MAX_POINTS;
     let s = if extra == 1 { "" } else { "s" };
@@ -159,8 +130,6 @@ fn capped(cameras: usize, spawn: bool, floors: bool) -> Option<String> {
     ))
 }
 
-/// A scene without a navmesh: the views already picked (its cameras, its spawn)
-/// alone, or, with neither, one view from its bounds' centre.
 fn no_floor(out: &mut Views, scene: &Scene) {
     let cameras = out.views.iter().any(|v| matches!(v.view, View::Camera(_)));
     let spawn = out.views.iter().any(|v| v.label == "spawn");
@@ -183,8 +152,6 @@ fn no_floor(out: &mut Views, scene: &Scene) {
     out.warnings.push(format!("no navmesh: {used}"));
 }
 
-/// The spawn's view: eye height over the floor under it (its own height without
-/// a floor there), along the way it faces.
 fn spawn_view(scene: &Scene, nav: &NavigationGraph) -> Option<Viewpoint> {
     let id = ["PlayerSpawn", "Player"]
         .iter()
@@ -195,21 +162,16 @@ fn spawn_view(scene: &Scene, nav: &NavigationGraph) -> Option<Viewpoint> {
     Some(Viewpoint::pose("spawn".into(), position, facing(scene, id)))
 }
 
-/// The yaw entity `id` faces along (its local -Z), degrees.
 fn facing(scene: &Scene, id: u32) -> f32 {
     let forward = scene.world.world_rotation(id) * Vec3::NEG_Z;
     forward.z.atan2(forward.x).to_degrees()
 }
 
-/// Every walkable span, in the graph's span order: walked, never collected, so a
-/// big level's spans are not all held to pick a few.
 fn walkable(nav: &NavigationGraph) -> impl Iterator<Item = SpanRef> + '_ {
     nav.span_refs()
         .filter(|s| nav.spans[s.index as usize].area != NOT_WALKABLE_AREA)
 }
 
-/// Up to `n` distinct walkable floors' points of the `floors` the graph has,
-/// drawn as indices into [`walkable`] from [`SEED`] (SplitMix64).
 fn seeded(nav: &NavigationGraph, floors: usize, n: usize) -> Vec<Vec3> {
     let mut state = SEED;
     let mut picked: Vec<usize> = Vec::new();
@@ -223,7 +185,6 @@ fn seeded(nav: &NavigationGraph, floors: usize, n: usize) -> Vec<Vec3> {
             picked.push(at);
         }
     }
-    // One walk, up to the furthest pick, each point kept in its pick's place.
     let reach = picked.iter().max().map_or(0, |&i| i + 1);
     let mut points = vec![None; picked.len()];
     for (i, span) in walkable(nav).enumerate().take(reach) {
@@ -234,7 +195,6 @@ fn seeded(nav: &NavigationGraph, floors: usize, n: usize) -> Vec<Vec3> {
     points.into_iter().flatten().collect()
 }
 
-/// The centre of every entity's world position (the origin in an empty scene).
 fn bounds_centre(scene: &Scene) -> Vec3 {
     let positions = scene
         .world
@@ -249,8 +209,6 @@ fn bounds_centre(scene: &Scene) -> Vec3 {
     }
 }
 
-/// Make `view` the one the next frame draws. A camera view turns every other
-/// screen camera off and returns them, for [`restore`]; a pose moves the main view.
 pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View) -> Vec<u32> {
     match view {
         View::Camera(id) => {
@@ -277,7 +235,6 @@ pub fn apply(scene: &mut Scene, camera: &mut rusty_scene::Camera, view: &View) -
     }
 }
 
-/// Turn back on the cameras [`apply`] turned off.
 pub fn restore(scene: &mut Scene, turned_off: &[u32]) {
     for &id in turned_off {
         if let Some(mut c) = scene.world.camera_mut(id) {

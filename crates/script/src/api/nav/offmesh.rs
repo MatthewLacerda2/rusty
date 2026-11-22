@@ -1,14 +1,3 @@
-//! crates/script/src/api/nav/offmesh.rs — off-mesh links on the `NavMeshAgent` and `Navigation`
-//! namespaces (#462).
-//!
-//! `NavMeshAgent`: `IsOnOffMeshLink`, `GetCurrentOffMeshLink`, `CompleteOffMeshLink`
-//! and `Get/SetAutoTraverseOffMeshLink` (Unity's agent link members). `Navigation`:
-//! `GetOffMeshLinks`, every link in the navmesh, and the generation settings.
-//!
-//! A link is `{type = "manual"|"drop"|"jump", startPos = {x,y,z}, endPos = {x,y,z},
-//! owner = id|nil}` (Unity's `OffMeshLinkData`); `GetOffMeshLinks` adds
-//! `bidirectional`.
-
 use glam::Vec3;
 use mlua::{Lua, Table};
 
@@ -29,7 +18,6 @@ fn point(lua: &Lua, p: Vec3) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// A link as its Lua table.
 fn link_table(lua: &Lua, l: &OffMeshLinkData) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("type", l.kind.name())?;
@@ -39,7 +27,6 @@ fn link_table(lua: &Lua, l: &OffMeshLinkData) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// The agent's link state and the script's two levers on it.
 pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let current = move |lua: &mlua::Lua, id: u32| -> mlua::Result<_> {
         let scene = scene.get(lua)?;
@@ -92,8 +79,6 @@ pub(super) fn register_agent(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) 
     put(t, "SetAutoTraverseOffMeshLink", f)
 }
 
-/// `Navigation.GetOffMeshLinks` and the generation settings' getters and setters
-/// (`DropHeight`, `JumpDistance`, `JumpHeight`, `LinkSpacing`), which re-bake.
 pub(super) fn register_navigation(
     lua: &mlua::Lua,
     t: &Table,

@@ -1,34 +1,9 @@
-//! One clip rewritten from its source rig onto a target rig (#1747).
-//!
-//! **Rotation** keys transfer in rest-relative space. The composition is
-//! Godot 4's skeleton rest fixer (`post_import_plugin_skeleton_rest_fixer.cpp`,
-//! its "fix animation by changing rest" step), with the source bone's rests as
-//! the old ones and the target bone's as the new ones:
-//!
-//! `q_t = Pt⁻¹ · Ps · q_s · Gs⁻¹ · Gt`
-//!
-//! where `q_s` is the source key, `Ps`/`Pt` the global rest rotations of each
-//! bone's parent (the root offset for a skeleton root) and `Gs`/`Gt` the bones'
-//! own global rest rotations. It hands the bone's model-space turn away from its
-//! rest (`Ps · q_s · Gs⁻¹`) to the target bone, so differing rest poses (an A-pose
-//! arm onto a T-pose one) and differing bone axes carry the motion, not the
-//! source's rest. A turn on a source bone the map leaves out is not carried.
-//!
-//! **Translations** are dropped (the target's rest lengths hold) except the
-//! hips', which move by the source's offset from its rest, scaled by the target
-//! over source hip height (Godot's motion scale; Unity's Humanoid does the same)
-//! and carried through the parents' rests the same way: `t_t = Pt⁻¹(r · Ps(t_s −
-//! rest_s)) + rest_t`. Scale keys are dropped.
-//!
-//! **Both rigs' rests are read in their body frame** ([`body`]): model space
-//! (the skinned mesh node's own transform applied, so an `Armature` node's
-//! rotation and scale, Blender's Z-up and centimetres, are undone and up is +Y as
-//! glTF has it), turned about +Y so the body faces +Z, as Unity's Humanoid
-//! normalises. So a rig exported Z-up, or facing −Z, takes a walk forward and up.
-//!
-//! Each key is mapped on its own, at its own time: a fixed rotation on either
-//! side of a slerp is a slerp of the rotated ends, and the translation map is
-//! affine, so the retargeted clip samples between keys as the source would.
+//! One clip rewritten from its source rig onto a target rig. Rotation keys transfer in
+//! rest-relative space, as in Godot 4's skeleton rest fixer:
+//! `q_t = Pt⁻¹ · Ps · q_s · Gs⁻¹ · Gt` (`P` a parent's global rest, `G` the bone's own).
+//! Translations are dropped except the hips', scaled by target over source hip height (as
+//! Godot and Unity do). Rests are read in each rig's body frame ([`body`]): model space
+//! turned about +Y so the body faces +Z, as Unity's Humanoid normalises.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -36,12 +11,8 @@ use super::BoneMap;
 use crate::anim_data::{AnimationClip, JointTrack, Track};
 use crate::mesh_data::SkinData;
 
-/// A hip height under this is no height: the hips' offset is carried unscaled.
 const MIN_HEIGHT: f32 = 1e-4;
 
-/// `clip`, keyed for `src`'s joint slots, rewritten for `dst`'s, through each
-/// rig's humanoid map. Joints of `dst` no mapped source bone drives keep empty
-/// tracks (their rest).
 pub fn retarget(
     clip: &AnimationClip,
     src: (&SkinData, &BoneMap),
@@ -78,8 +49,7 @@ pub fn retarget(
             });
         }
     }
-    // The source's length, not the kept tracks': wrap, phase and events land
-    // where they do on the source rig.
+    // The source's length, so wrap and events land as on the source rig.
     AnimationClip {
         name: clip.name.clone(),
         tracks,
@@ -87,8 +57,6 @@ pub fn retarget(
     }
 }
 
-/// A joint's rests: its own and its parent's, in its rig's body frame, and its
-/// local translation.
 struct Rest {
     rot: Quat,
     parent: Mat4,
@@ -121,8 +89,6 @@ fn rotation(m: Mat4) -> Quat {
     m.to_scale_rotation_translation().1.normalize()
 }
 
-/// The target over source hip height (each rig's hips above its model origin
-/// at rest, along model +Y); 1 when either has no hips or no height.
 pub(super) fn hip_ratio(src: (&SkinData, &BoneMap), dst: (&SkinData, &BoneMap)) -> f32 {
     let height = |(skin, map): (&SkinData, &BoneMap)| {
         let slot = map.slot("Hips")?;
@@ -141,11 +107,6 @@ pub(super) fn hip_ratio(src: (&SkinData, &BoneMap), dst: (&SkinData, &BoneMap)) 
     }
 }
 
-/// From `skin`'s mesh-local space into its body frame: model space (the mesh
-/// node's transform, [`SkinData::mesh_to_model`]), then turned about +Y so the
-/// body faces +Z. Its facing is the ground-plane direction its left side points
-/// (glTF: a model faces +Z, its left on +X), read from the first left/right pair
-/// the map has; a rig without one keeps model space's facing.
 pub(super) fn body(skin: &SkinData, map: &BoneMap) -> Mat4 {
     let model = skin.mesh_to_model();
     let at = |slot: usize| {

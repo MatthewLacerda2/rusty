@@ -1,15 +1,10 @@
-//! The copy and the output checks, on a scratch project (no working-directory
-//! move: the conversion half runs through the `export` binary, `tests/export/`).
-
 mod check;
 
 use super::copy_runtime_files;
 use std::path::{Path, PathBuf};
 
-/// The import cache of `assets/models/<name>`.
 const CACHE: &str = "assets/generated/imported/assets/models";
 
-/// A project holding one file of each kind the copy decides about.
 fn project(root: &Path) {
     let cached = |file: &str| format!("{CACHE}/{file}");
     for (rel, text) in [
@@ -54,7 +49,6 @@ fn project(root: &Path) {
     }
 }
 
-/// The sources [`project`] holds, as `export` finds them.
 fn sources() -> Vec<PathBuf> {
     ["assets/models/crate.blend", "assets/models/soldier.fbx"]
         .map(PathBuf::from)

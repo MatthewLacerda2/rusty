@@ -1,18 +1,8 @@
-//! Folding a scene's viewpoints into one report: every row over them (the
-//! average of their averages, the worst p95 and the viewpoint that gave it), then
-//! over the runs (the average of the runs', the worst p95, and the lowest and
-//! highest run as the row's spread), and one warning per kind of CPU spread their
-//! windows showed. A `script.` row (`bench::verbs`) a viewpoint or run lacks is
-//! a verb it never called, so it counts there as zero: each verb's row is over the
-//! same frames as `cpu.update_scripts`.
-
 use super::super::clock::{ClockRows, Spread};
 use super::super::{Report, Summary};
 use super::report::Row;
 use crate::bench::verbs::absent_is_zero;
 
-/// Fold the viewpoints' reports, labelled, into rows: metrics in the order they
-/// were first seen, each the average of the averages and the worst p95.
 pub fn aggregate(reports: &[(String, Report)]) -> Vec<Row> {
     let mut rows: Vec<(Row, u32)> = Vec::new();
     for (label, report) in reports {
@@ -43,9 +33,6 @@ pub fn aggregate(reports: &[(String, Report)]) -> Vec<Row> {
         .collect()
 }
 
-/// Fold each run's rows ([`aggregate`]) into one: metrics in the order first
-/// seen, each the average of the runs' averages, the worst p95 and where it
-/// was, and the lowest and highest run's average as its spread.
 pub fn over_runs(runs: &[Vec<Row>]) -> Vec<Row> {
     let mut rows: Vec<(Row, u32)> = Vec::new();
     for run in runs {
@@ -68,7 +55,6 @@ pub fn over_runs(runs: &[Vec<Row>]) -> Vec<Row> {
     rows.into_iter()
         .map(|(mut row, n)| {
             if absent_is_zero(&row.metric) && n < all {
-                // The runs without it called it no time: one of them is the lowest.
                 row.lo = row.lo.min(0.0);
                 row.avg /= f64::from(all);
             } else {
@@ -91,9 +77,6 @@ fn first(metric: &str, label: &str, s: &Summary) -> Row {
     }
 }
 
-/// One warning per kind of CPU spread the measured windows showed (each
-/// window, a viewpoint in a run, labelled, with its spreads, `clock::cpu_spreads`): the worst one's,
-/// naming its viewpoint and how many of them had it, in `rows`' names.
 pub fn spread_warnings(spreads: &[(String, Vec<(Spread, f64)>)], rows: ClockRows) -> Vec<String> {
     let mut out = Vec::new();
     for kind in [Spread::Clock, Spread::Cpu] {

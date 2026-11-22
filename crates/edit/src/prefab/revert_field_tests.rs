@@ -1,12 +1,8 @@
-//! Tests for the per-field revert (#998): one override dropped, the leaf re-tracks
-//! the source, everything else stays — and a failure changes nothing.
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use crate::{list_instance_overrides, load_and_instantiate_linked, save_prefab};
 use rusty_scene::Scene;
 
-/// A linked instance of a fresh Box-root + Sphere-child prefab: (scene, root, path).
 fn linked(tag: &str) -> (Scene, u32, String) {
     let mut author = Scene::new();
     let root = create_entity(&mut author, "Root", Some(Primitive::Box));
@@ -29,7 +25,6 @@ fn reverting_a_child_field_resolves_the_root_and_keeps_the_rest() {
     scene.world.set_name(child, "Renamed".into());
     scene.world.transform_mut(root).unwrap().scale.x = 5.0;
 
-    // Pass the CHILD id: the verb walks up to the root and reimports the instance.
     assert_eq!(revert_instance_field(&mut scene, child, "/name"), Ok(true));
     assert_eq!(scene.world.name(child).unwrap().as_str(), "Child");
     assert_eq!(scene.world.transform(root).unwrap().scale.x, 5.0);

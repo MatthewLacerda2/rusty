@@ -1,12 +1,3 @@
-//! The lightmap bake's cost (#1883), measured by hand in a release build:
-//! `cargo nextest run --release --features dev --run-ignored only -E
-//! 'test(lightmap_trace_cost)' --no-capture`. A measurement, never a gate. It
-//! traces a spread of texels (`lightmap::trace_texels`) of the occlusion bench's
-//! levels, lit three lamps a room (two points and an Area panel, a spot in every
-//! fifth room) with a few emissive props, at the default bake settings, and
-//! prints texels per second on 4 threads. The gate beside it counts rays, never
-//! time: a timing is not deterministic (`docs/testing.md`).
-
 use std::time::Instant;
 
 use glam::Vec3;
@@ -15,7 +6,6 @@ use rusty_lighting::lightmap::{trace_texels, AreaShape, BakeLight, BakeScene, Li
 use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::lighting::settings::BakeSettings;
 
-/// The `n × n`-rooms bench level as the bake sees it, with its lamps.
 pub(in crate::bake) fn lit_level(n: usize) -> BakeScene {
     let mut scene = BakeScene::gather(&rooms(n), &|_, _| None);
     let lamp = |shape, radiance: f32| BakeLight {
@@ -84,8 +74,6 @@ fn lightmap_trace_cost() {
     }
 }
 
-/// The 2 × 2-rooms level with `lamps` points spread through it, every one in range
-/// of most of it.
 fn crowded(lamps: usize) -> BakeScene {
     let mut scene = BakeScene::gather(&rooms(2), &|_, _| None);
     scene.lights = (0..lamps)
@@ -109,8 +97,6 @@ fn crowded(lamps: usize) -> BakeScene {
 
 #[test]
 fn a_hundred_and_fifty_lamps_cast_a_small_factor_of_ones_rays() {
-    // The rays cast are the bake's cost: one pick per path vertex, however many
-    // lamps are in range, plus the texel's own shadow ray per `Baked` lamp.
     let settings = BakeSettings {
         samples: 16,
         ..Default::default()

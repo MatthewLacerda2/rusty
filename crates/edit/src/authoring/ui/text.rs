@@ -1,27 +1,14 @@
-//! crates/edit/src/authoring/ui/text.rs — Shared Text-authoring ops (#419).
-//!
-//! The ONE place the engine knows how to mutate an entity's first-class
-//! `TextComponent` field by field. The editor's Text card and the Lua `Text.*`
-//! namespace both route every write through these, so validation lives once:
-//! colours stay in `[0, 1]`, sizes stay positive (auto-size keeps `min ≤ max`),
-//! effect widths are non-negative, and an empty font path means "the default".
-//!
-//! Pure.
-
 use glam::{Vec2, Vec4};
 
 use rusty_components::{TextAlignment, TextComponent, TextOverflow};
 use rusty_scene::rules::sanitize::{at_least, finite, finite2, non_negative, unit_color};
 
-/// The smallest size a text can be set to, in reference units.
 pub const MIN_FONT_SIZE: f32 = 0.5;
 
-/// Set the string drawn.
 pub fn set_text(t: &mut TextComponent, text: String) {
     t.text = text;
 }
 
-/// The three font slots a text names: regular, bold and italic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FontSlot {
     Regular,
@@ -29,8 +16,8 @@ pub enum FontSlot {
     Italic,
 }
 
-/// Set a font path; `None` or an empty path falls back (the default font for
-/// `Regular`, a synthesized style for `Bold` / `Italic`).
+/// `None` or an empty path falls back: the default font for `Regular`, a synthesized style for
+/// `Bold` / `Italic`.
 pub fn set_font(t: &mut TextComponent, slot: FontSlot, path: Option<String>) {
     let path = path.filter(|p| !p.is_empty());
     match slot {
@@ -40,42 +27,35 @@ pub fn set_font(t: &mut TextComponent, slot: FontSlot, path: Option<String>) {
     }
 }
 
-/// Set the em size in reference units, kept ≥ [`MIN_FONT_SIZE`].
 pub fn set_font_size(t: &mut TextComponent, size: f32) {
     t.font_size = at_least(size, MIN_FONT_SIZE);
 }
 
-/// Set the fill colour, each channel clamped to `[0, 1]`.
 pub fn set_color(t: &mut TextComponent, color: Vec4) {
     t.color = unit_color(color);
 }
 
-/// Set where the block sits in the rect.
 pub fn set_alignment(t: &mut TextComponent, alignment: TextAlignment) {
     t.alignment = alignment;
 }
 
-/// Set word wrapping.
 pub fn set_wrap(t: &mut TextComponent, wrap: bool) {
     t.wrap = wrap;
 }
 
-/// Set what happens to text that does not fit.
 pub fn set_overflow(t: &mut TextComponent, overflow: TextOverflow) {
     t.overflow = overflow;
 }
 
-/// Set the line-pitch multiplier, kept ≥ 0.
 pub fn set_line_spacing(t: &mut TextComponent, spacing: f32) {
     t.line_spacing = non_negative(spacing);
 }
 
-/// Set the extra advance between characters, in ems (negative tightens).
+/// Ems; negative tightens.
 pub fn set_letter_spacing(t: &mut TextComponent, spacing: f32) {
     t.letter_spacing = finite(spacing);
 }
 
-/// Set auto-size and its size range; both bounds stay positive and `min ≤ max`.
 pub fn set_auto_size(t: &mut TextComponent, enabled: bool, min: f32, max: f32) {
     let (min, max) = (at_least(min, MIN_FONT_SIZE), at_least(max, MIN_FONT_SIZE));
     t.auto_size = enabled;
@@ -83,34 +63,28 @@ pub fn set_auto_size(t: &mut TextComponent, enabled: bool, min: f32, max: f32) {
     t.auto_size_max = max.max(min);
 }
 
-/// Set whether rich-text tags are parsed.
 pub fn set_rich_text(t: &mut TextComponent, rich: bool) {
     t.rich_text = rich;
 }
 
-/// Set whether the pointer can hit this graphic.
 pub fn set_raycast_target(t: &mut TextComponent, target: bool) {
     t.raycast_target = target;
 }
 
-/// Set how it composites onto the frame (#425).
 pub fn set_blend(t: &mut TextComponent, blend: rusty_components::UiBlend) {
     t.blend = blend;
 }
 
-/// Set the outline: thickness in ems (≥ 0) and colour.
 pub fn set_outline(t: &mut TextComponent, width: f32, color: Vec4) {
     t.outline_width = non_negative(width);
     t.outline_color = unit_color(color);
 }
 
-/// Set the drop shadow: offset in reference units and colour.
 pub fn set_shadow(t: &mut TextComponent, offset: Vec2, color: Vec4) {
     t.shadow_offset = finite2(offset);
     t.shadow_color = unit_color(color);
 }
 
-/// Set the glow: reach in ems (≥ 0) and colour.
 pub fn set_glow(t: &mut TextComponent, size: f32, color: Vec4) {
     t.glow_size = non_negative(size);
     t.glow_color = unit_color(color);

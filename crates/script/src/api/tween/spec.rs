@@ -1,6 +1,3 @@
-//! Reading one tween out of Lua (#424): `Tween.To`'s arguments, or one
-//! `Tween.Sequence` item, validated in full before anything is scheduled.
-
 use glam::Vec4;
 use mlua::{Lua, Table, Value};
 
@@ -9,7 +6,6 @@ use crate::scripting::tween::{Ease, Property, Tween};
 use crate::scripting::{require_sim_vm, Clock};
 use rusty_scene::Scene;
 
-/// The `opts` keys `Tween.To` accepts; anything else is a typo, and an error.
 const OPTS: [&str; 7] = [
     "ease",
     "delay",
@@ -20,14 +16,12 @@ const OPTS: [&str; 7] = [
     "on_complete",
 ];
 
-/// A validated tween, ready to schedule.
 pub(super) struct Spec {
     pub(super) owner: u32,
     pub(super) tween: Tween,
     /// Seconds before it starts (its `delay`, plus its place in a sequence).
     pub(super) delay: f64,
     pub(super) clock: Clock,
-    /// A sequence item that starts with the previous one.
     pub(super) join: bool,
 }
 
@@ -39,7 +33,6 @@ impl Spec {
     }
 }
 
-/// The positional part of a tween: `(id, property, target, duration)`.
 pub(super) struct Args {
     pub(super) id: u32,
     pub(super) path: String,
@@ -47,8 +40,6 @@ pub(super) struct Args {
     pub(super) duration: f64,
 }
 
-/// Validate `args` + `opts` against the live scene. `in_sequence` also accepts a
-/// sequence item's own keys (its positional `1..=4` and `join`).
 pub(super) fn parse(
     lua: &Lua,
     scene: &Scene,
@@ -163,8 +154,6 @@ fn read_opt(lua: &Lua, key: &str, value: Value, spec: &mut Spec) -> mlua::Result
     Ok(())
 }
 
-/// A tween value: a number for a one-number property, else a `{x, y[, z[, w]]}`
-/// array with exactly as many numbers as the property has.
 fn to_vec4(property: &Property, value: Value) -> mlua::Result<Vec4> {
     let arity = property.arity();
     let nums: Vec<f32> = match value {

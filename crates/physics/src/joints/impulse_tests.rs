@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/impulse_tests.rs — a joint's load is the impulse over the
-//! whole step (#806): a one-off spin or kick the joint absorbs in rapier's first
-//! solver substep counts against `break_torque` / `break_force`, as Unity's
-//! `currentTorque` / `currentForce` do. The steady loads stay in `load_tests.rs`.
-
 use glam::Vec3;
 
 use super::super::world::PhysicsWorld;
@@ -14,13 +9,9 @@ use rusty_components::{
 use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
-/// A weld stopping 2 rad/s on a unit cube (inertia 1/6 kg·m²) in one tick.
 const SPIN_TORQUE: f32 = 2.0 / 6.0 / DT;
-/// A weld stopping 1 m/s on a one-kilogram cube in one tick.
 const KICK_FORCE: f32 = 1.0 / DT;
 
-/// A weightless one-kilogram unit cube welded to the world at its centre, with
-/// `break_force` / `break_torque` set.
 fn welded(break_force: f32, break_torque: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = scene.add_entity("Cube".to_string());
@@ -45,8 +36,6 @@ fn welded(break_force: f32, break_torque: f32) -> (Scene, u32) {
     (scene, id)
 }
 
-/// Step ten ticks, setting the cube's velocities before each (a script's
-/// `SetVelocity` / `SetAngularVelocity`, or a blast), collecting the breaks.
 fn kicked(scene: &mut Scene, id: u32, vel: Vec3, spin: Vec3) -> Vec<JointBreak> {
     let mut world = PhysicsWorld::from_scene(scene);
     let mut breaks = Vec::new();

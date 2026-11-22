@@ -1,6 +1,3 @@
-//! A logged lightmap bake (#1667): the same bytes as an unlogged one, and lines
-//! that end at every texel and mesh, then at every page encoded (#1694).
-
 use std::cell::{Cell, RefCell};
 use std::time::Duration;
 
@@ -17,7 +14,6 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     let path = scene_path("logged_bytes");
     let plain = bake_logged(&input, &quick(), &mut BakeLog::off(), &path).unwrap();
     let (plain, untimed) = (plain.pages, plain.measured.times);
-    // A clock that jumps a minute per read, so every observation prints.
     let now = Cell::new(Duration::ZERO);
     let lines: RefCell<Vec<Line>> = RefCell::default();
     let clock = || {
@@ -30,7 +26,6 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     drop(log);
     assert!(plain.maps > 0);
     assert_eq!(logged, plain, "a log never changes a byte");
-    // Every bake times its meshes (#1891, and #1980's report), one entry each.
     assert_eq!((times.len(), untimed.len()), (plain.maps, plain.maps));
     assert!(
         times.iter().all(|t| t.texels > 0 && !t.busy.is_zero()),
@@ -38,15 +33,12 @@ fn a_logged_bake_is_byte_identical_to_an_unlogged_one() {
     );
     let lines = lines.into_inner();
     assert!(lines[0].milestone, "the step's first line is a milestone");
-    // The trace, then the encode, whose last line is its last page.
     let pages = plain.colour.len() + plain.directions.len();
     let last = &lines.last().expect("a line").text;
     let encoded = format!(" lightmap pages 100% ({pages}/{pages} pages encoded)");
     assert!(last.ends_with(&encoded), "{last}");
 }
 
-/// A trace done before the first poll (#1808): the worker reaches and finishes its
-/// pages at once, yet the log still says the lightmap step started, first.
 #[test]
 fn a_bake_that_reaches_its_pages_at_once_still_says_the_lightmaps_first() {
     let lines: RefCell<Vec<Line>> = RefCell::default();
@@ -59,7 +51,6 @@ fn a_bake_that_reaches_its_pages_at_once_still_says_the_lightmaps_first() {
     watch(&BakeProgress::default(), read, &mut log, instant).unwrap();
     drop(log);
     let lines = lines.into_inner();
-    // No timing: whatever a poll saw in between, the first and last lines hold.
     assert_eq!(lines[0].text, "[Lighting] 0:00 lightmaps preparing");
     assert!(lines[0].milestone, "the step's start stays in the console");
     let last = &lines.last().expect("a line").text;

@@ -1,4 +1,4 @@
-//! A bone mirrored by scale -1 (#1110), through the whole import: its rest pose
+//! A bone mirrored by scale -1, through the whole import: its rest pose
 //! and its clip's key 0 are the same transform, so they must split into the same
 //! parts, or blending the rest pose with the clip flattens the bone halfway (that
 //! blend is the animator's test, `app::animation`'s `mirrored_tests`).

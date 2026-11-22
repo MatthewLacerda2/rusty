@@ -1,18 +1,3 @@
-//! crates/script/src/api/texture/mesh_maps.rs — `Texture.BakeMeshMaps` (#1849): bake a model's
-//! mesh maps (`lighting::mesh_maps`) to `<prefix><map>.png`, for a recipe's
-//! `image` op to read.
-//!
-//! `model` is an asset reference as `Scene.Instantiate` takes it:
-//! `path::SubObject`, or a bare model path when the file holds one mesh. The ID map
-//! is an 8-bit PNG (its colours are labels, not values); every other map is a 16-bit
-//! `data` PNG, so a gradient read from it never terraces.
-//!
-//! The fourth argument is the resolution or a settings table (#2260,
-//! [`settings`]): `resolution` or `size = {w, h}`, `curvature_radius`, `ao_rays`,
-//! `thickness_rays`, each defaulting to what a call naming none bakes. A
-//! `curvature_radius` narrower than three of some UV island's texels bakes those
-//! islands wider, and the call warns once saying so.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -28,10 +13,8 @@ use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::image_buf::Size;
 use rusty_procgen::Slot;
 
-/// The resolution a call that names none bakes at.
 pub(super) const DEFAULT_RESOLUTION: u32 = 1024;
 
-/// Put `BakeMeshMaps` on the `Texture` table.
 pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -50,7 +33,6 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// The settings table's fields, as a script writes them; every one optional.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Options {
@@ -61,10 +43,6 @@ struct Options {
     thickness_rays: Option<u32>,
 }
 
-/// The bake settings the fourth argument names: `nil` (the defaults), a number
-/// (the square resolution) or a settings table. A table naming both `resolution`
-/// and `size`, or a field the table doesn't know, is an error, and so is a `size`
-/// side out of range (named as `size`); every other range is the baker's to check.
 pub(super) fn settings(options: &Value) -> Result<Settings, String> {
     let table = match options {
         Value::Nil => return Ok(Settings::new(DEFAULT_RESOLUTION)),
@@ -102,18 +80,10 @@ pub(super) fn settings(options: &Value) -> Result<Settings, String> {
     })
 }
 
-/// A resolution as a side, or why it can't be one (the baker checks the range).
 fn side(n: i64) -> Result<u32, String> {
     u32::try_from(n).map_err(|_| format!("resolution {n} is outside 1..={MAX_RESOLUTION}"))
 }
 
-/// Bake `maps` of `model` as `settings` says and write each to `<prefix><map>.png`
-/// as it is baked, the folders above the first made before the bake when inside
-/// `root`. Returns map → path; a `curvature_radius` some UV island's texels are too
-/// coarse to hold is said once, as a console warning naming the radius each baked
-/// at, and so is a UV area so many faces stack on that it costs a trace per face
-/// per texel. An error names the verb and the model; a map that
-/// failed to write stops the bake, the maps before it stay written.
 pub(super) fn bake_mesh_maps(
     model: &str,
     maps: &[String],
@@ -131,7 +101,6 @@ pub(super) fn bake_mesh_maps(
         .collect::<Result<Vec<_>, _>>()
         .map_err(fail)?;
     let source = load(model).map_err(fail)?;
-    // `<prefix>` may end in a folder of its own (`maps/`): make it before the bake.
     let path = |map: &MeshMap| format!("{prefix}{}.png", map.name());
     let paths: Vec<String> = maps.iter().map(path).collect();
     let Size { width, height } = settings.size;
@@ -139,8 +108,6 @@ pub(super) fn bake_mesh_maps(
     folder::make_parents(&paths[0], root).map_err(fail)?;
     let mut out = BTreeMap::new();
     let notes = bake(&source, &maps, settings, |map, image| {
-        // Readied once the baker has checked the settings and the mesh, before
-        // the first map is written.
         if out.is_empty() {
             let all = paths.iter().map(String::as_str);
             prepare_bake("Texture.BakeMeshMaps", (width, height), all)?;
@@ -164,7 +131,6 @@ pub(super) fn bake_mesh_maps(
     Ok(out)
 }
 
-/// The mesh `model` names, imported.
 fn load(model: &str) -> Result<MeshSource, String> {
     let (path, sub) = match model.split_once(rusty_asset::REF_SEPARATOR) {
         Some(_) => {

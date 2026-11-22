@@ -1,4 +1,4 @@
-//! References to extracted textures (#1130): what is one, and what it resolves to.
+//! References to extracted textures: what is one, and what it resolves to.
 
 use super::{file, reference, source};
 use crate::import_file;

@@ -1,8 +1,3 @@
-//! crates/physics/src/events/kinematic_pairs_tests.rs — only a pair with a dynamic
-//! body generates contacts (#2321): a kinematic collider against the level or
-//! another kinematic one keeps no pair, a kinematic mover still wakes and pushes a
-//! sleeping dynamic body, and a pair whose dynamic side turns kinematic exits.
-
 use glam::Vec3;
 use rapier3d::prelude::ActiveCollisionTypes;
 

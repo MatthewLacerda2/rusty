@@ -1,37 +1,23 @@
-//! crates/edit/src/authoring/nav/modifier.rs — Shared NavMeshModifierVolume authoring ops (#460).
-//!
-//! The ONE place the engine mutates an entity's `NavMeshModifierVolumeComponent`.
-//! The editor's card and the Lua `NavMeshModifierVolume.*` setters both route
-//! every write through these, so the rules live once: the centre stays finite, the
-//! box keeps a positive size, and the area is a valid id (`0..MAX_AREAS`).
-//!
-//! Pure.
-
 use glam::Vec3;
 
 use rusty_components::NavMeshModifierVolumeComponent as Volume;
 use rusty_scene::nav_settings::MAX_AREAS;
 use rusty_scene::rules::sanitize::finite3_or;
 
-/// The smallest extent a box side may have.
 pub const MIN_SIZE: f32 = rusty_scene::rules::sanitize::MIN_EXTENT;
 
-/// Enable or disable the volume.
 pub fn set_active(v: &mut Volume, active: bool) {
     v.active = active;
 }
 
-/// Set the box's centre, local to the entity. A non-finite centre is ignored.
 pub fn set_center(v: &mut Volume, center: Vec3) {
     v.center = finite3_or(center, v.center);
 }
 
-/// Set the box's size, each side at least [`MIN_SIZE`]. A non-finite size is ignored.
 pub fn set_size(v: &mut Volume, size: Vec3) {
     v.size = finite3_or(size, v.size).max(Vec3::splat(MIN_SIZE));
 }
 
-/// Set the area the volume assigns. An id past the area table's limit is ignored.
 pub fn set_area(v: &mut Volume, area: i64) {
     if (0..MAX_AREAS as i64).contains(&area) {
         v.area = area as u8;

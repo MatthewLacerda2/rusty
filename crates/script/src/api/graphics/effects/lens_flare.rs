@@ -1,6 +1,3 @@
-//! `Graphics.{Get,Set}LensFlare{Active,Intensity,GhostCount,GhostIntensity,
-//! HaloIntensity,StreakIntensity,Tint,ChromaticAberration}` (#1443).
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use super::knobs::{register as knobs, register_flag};
@@ -9,8 +6,6 @@ use rusty_components::rendering::post_processing::LensFlare;
 use rusty_edit::authoring::rendering::post_processing::lens_flare;
 use rusty_scene::Scene;
 
-/// The switch, the knobs, the ghost count and the tint (a new volume's without an
-/// active volume).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let set = lens_flare::set_active;
     register_flag(
@@ -24,8 +19,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     register_count_and_tint(lua, table, scene)
 }
 
-/// `SetLensFlareGhostCount(n)` / `GetLensFlareGhostCount() -> n` and
-/// `SetLensFlareTint(r, g, b)` / `GetLensFlareTint() -> r, g, b`.
 fn register_count_and_tint(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let defaults = LensFlare::DEFAULT;
     put(

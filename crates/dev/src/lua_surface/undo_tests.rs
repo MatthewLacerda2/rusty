@@ -1,6 +1,3 @@
-//! `Editor.Undo/Redo/UndoName/RedoName` (#1631): every edit-mode API call is one
-//! Undo step, undone and redone to the very scene document it started from.
-
 use super::super::session::Session;
 
 fn session() -> Session {
@@ -12,8 +9,6 @@ fn run(s: &mut Session, line: &str) -> String {
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
 }
 
-/// The scene as `Scene.Save` would write it, but for the id allocator: an
-/// undone create's id stays retired, so the allocator may only have moved on.
 fn document(s: &Session) -> String {
     let scene = s.world().world.scene.borrow();
     let mut data = rusty_edit::to_scene_data(&scene);
@@ -21,7 +16,6 @@ fn document(s: &Session) -> String {
     serde_json::to_string(&data).expect("a scene serializes")
 }
 
-/// The id allocator as saved.
 fn next_id(s: &Session) -> u32 {
     rusty_edit::to_scene_data(&s.world().world.scene.borrow()).next_entity_id
 }

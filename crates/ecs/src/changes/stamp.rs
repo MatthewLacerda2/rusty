@@ -1,37 +1,14 @@
-//! crates/ecs/src/changes/stamp.rs — where the World stamps its logs (#1705).
-//!
-//! A column write is [`World::touch`] (or [`World::touch_entity`] for a whole
-//! entity): one call that notes the write for the edit journal and stamps the
-//! log, so a raw write cannot do one and forget the other. The raw hecs writes
-//! live in `funnel.rs`, `placement.rs` and `World::remove_rows` / `clear`, each
-//! with the `ecs-write` lint's inline allow; a column write calls `touch` only
-//! once the entity is found to hold the column.
-//!
-//! A derived channel is stamped at the source of its fact, its subtree included:
-//! [`World::stamp_pose_below`] from `World::moved`, [`World::stamp_hierarchy_below`]
-//! wherever an `active` flag or a parent link changes. A walk is taken only while a
-//! cursor is open on the channel it feeds; with none, an `any` and one stamp keep
-//! [`World::static_revision`] moving. The pose walk, and a write to a
-//! `Channel::STATIC_GEOMETRY` column (the Collider), on a static entity also move
-//! [`World::static_geometry`]'s revision.
-
 use super::{Activity, Channel, Children, Layer, WorldPose, STATIC};
 use crate::World;
 
-/// A subtree stamp's walk state, kept on the change log between walks so a warm
-/// walk allocates nothing (`world_space::bounds`' flush walks the same way). A
-/// walk started inside another's visit finds it taken and starts cold: correct,
-/// only not allocation-free.
 #[derive(Debug, Default)]
 pub(super) struct Scratch {
     stack: Vec<u32>,
-    /// The walk that last reached each id, so a walk yields it once.
     seen: Vec<u32>,
     walk: u32,
 }
 
 impl Scratch {
-    /// Start a walk: a new stamp, which no id carries yet.
     fn begin(&mut self) {
         self.walk = self.walk.wrapping_add(1);
         if self.walk == 0 {
@@ -40,7 +17,6 @@ impl Scratch {
         }
     }
 
-    /// Whether `id` is first reached in this walk (and mark it reached).
     fn first_visit(&mut self, id: u32) -> bool {
         let at = id as usize;
         if at >= self.seen.len() {
@@ -51,7 +27,6 @@ impl Scratch {
 }
 
 impl World {
-    /// A write to column `T` of `id`: noted for the journal and stamped on `T`.
     pub(crate) fn touch<T: Channel>(&mut self, id: u32) {
         const { assert!(T::COLUMN, "a derived channel is stamped at its source") };
         self.note(id);
@@ -59,21 +34,13 @@ impl World {
             self.static_geometry_moved();
         }
         if self.changes.get_mut().logs.len() == 1 {
-            return; // only `StaticSet` exists: no column was ever opened
+            return;
         }
         if let Some(at) = self.changes.get_mut().find::<T>() {
             self.stamp_at(at, id);
         }
     }
 
-    /// `id` written whole (placed, overwritten or removed; `is_static` its flag):
-    /// noted for the journal and stamped on the columns its row carries now
-    /// ([`World::stamp_carried`]), [`Activity`], [`Layer`], [`Children`] and, when
-    /// static, [`super::StaticSet`]. Called before the row is written, so a removal
-    /// stamps what it had and a placement no column yet: the writer stamps the new
-    /// row's with [`World::stamp_carried`] once it is spawned. [`WorldPose`] follows
-    /// from `World::moved` (or, for a removal, its own walk), so its stamps are always
-    /// a whole subtree's.
     pub(crate) fn touch_entity(&mut self, id: u32, is_static: bool) {
         self.note(id);
         if is_static {
@@ -92,13 +59,9 @@ impl World {
         }
     }
 
-    /// Stamp `id` on each opened column its row carries (none for a dead id): what a
-    /// whole-entity write stamps, so a column's channel never names an entity that
-    /// lacks its component. One archetype lookup per opened column
-    /// (`EntityRef::has`), on the row looked up once.
     pub(crate) fn stamp_carried(&mut self, id: u32) {
         if self.changes.get_mut().logs.len() == 1 {
-            return; // only `StaticSet` exists: no column was ever opened
+            return;
         }
         let Some(handle) = self.handles.get(id) else {
             return;
@@ -119,34 +82,27 @@ impl World {
         self.changes.get_mut().logs[at].stamp(id, live);
     }
 
-    /// `id`'s membership of the static set may have changed ([`super::StaticSet`]).
     pub(crate) fn stamp_static(&mut self, id: u32) {
         self.stamp_at(STATIC, id);
     }
 
-    /// `id`'s layer changed ([`Layer`]).
     pub(crate) fn stamp_layer(&mut self, id: u32) {
         if let Some(at) = self.changes.get_mut().find::<Layer>() {
             self.stamp_at(at, id);
         }
     }
 
-    /// `id`'s child list changed ([`Children`]).
     pub(crate) fn stamp_children(&mut self, id: u32) {
         if let Some(at) = self.changes.get_mut().find::<Children>() {
             self.stamp_at(at, id);
         }
     }
 
-    /// Whether `id` and everything below it are active in the hierarchy may have
-    /// changed (an activation or a re-parent there, a placement that brings
-    /// children): stamp the subtree on [`Activity`], and its static entities on
-    /// [`super::StaticSet`].
     pub(crate) fn stamp_hierarchy_below(&mut self, id: u32) {
         let activity = self.changes.get_mut().find::<Activity>();
         if activity.is_none() && !self.changes.get_mut().logs[STATIC].recording {
             if self.self_and_descendants(id).any(|e| self.is_static(e)) {
-                self.stamp_static(id); // unrecorded: only the revision moves
+                self.stamp_static(id);
             }
             return;
         }
@@ -160,12 +116,6 @@ impl World {
         });
     }
 
-    /// `id`'s world pose and every descendant's may have changed ([`WorldPose`]); a
-    /// static node among them moves [`World::static_geometry`]'s revision.
-    /// Skipped when `id` is still unread in the log: every stamp on this channel is
-    /// a subtree walk, so its subtree was stamped with it (an entity joining it
-    /// since was moved, and walked, itself), and its static nodes bumped the
-    /// revision after every cursor's last read.
     pub(crate) fn stamp_pose_below(&mut self, id: u32) {
         let Some(at) = self.changes.get_mut().find::<WorldPose>() else {
             return;
@@ -181,16 +131,10 @@ impl World {
         });
     }
 
-    /// A static entity's pose or static-geometry column changed:
-    /// [`World::static_geometry`]'s revision moves.
     fn static_geometry_moved(&mut self) {
         self.changes.get_mut().static_geometry += 1;
     }
 
-    /// `visit` each id [`World::self_and_descendants`] yields, in its order, with the
-    /// World writable and the id's static flag, read from the `Core` its children
-    /// come from: the walk keeps its stack and seen set on the change log instead of
-    /// collecting the subtree first, and looks each node up once.
     fn each_below(&mut self, id: u32, mut visit: impl FnMut(&mut World, u32, bool)) {
         let mut s = std::mem::take(&mut self.changes.get_mut().scratch);
         s.begin();

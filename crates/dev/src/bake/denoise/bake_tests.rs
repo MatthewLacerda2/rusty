@@ -1,7 +1,3 @@
-//! A whole bake through real OIDN (#1884), skipped where OIDN is missing: the same
-//! bytes whatever order the workers finish their charts in, and on whichever of
-//! the bake's devices each chart lands, and each chart counted once.
-
 use glam::Vec3;
 
 use super::tests::oidn_or_skip;

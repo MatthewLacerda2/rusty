@@ -1,6 +1,3 @@
-//! A scene load instancing one file many times parses it once, and every instance
-//! carries the import's revision (#857).
-
 use glam::Vec3;
 
 use crate::asset_instance::instantiate_asset;

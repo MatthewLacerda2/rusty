@@ -1,8 +1,3 @@
-//! crates/physics/src/joints/impulse_pair_tests.rs — the step's impulse (#806) where
-//! signs matter: a weld between two free bodies ends with both moving, a kick
-//! against gravity, a kinematic partner rapier never accelerates, and a steady
-//! load the last substep alone reports.
-
 use glam::Vec3;
 
 use super::super::world::PhysicsWorld;
@@ -12,7 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A one-kilogram unit cube at `pos`.
 fn cube(scene: &mut Scene, pos: Vec3, use_gravity: bool, is_kinematic: bool) -> u32 {
     let id = scene.add_entity("Cube".to_string());
     scene.world.transform_mut(id).unwrap().position = pos;
@@ -30,7 +24,6 @@ fn cube(scene: &mut Scene, pos: Vec3, use_gravity: bool, is_kinematic: bool) -> 
     id
 }
 
-/// `b` welded to `a`, a metre and a half to its left, at `a`'s centre.
 fn weld_to(scene: &mut Scene, b: u32, a: u32, j: JointComponent) {
     let weld = JointComponent {
         connected_body: Some(a),
@@ -40,7 +33,6 @@ fn weld_to(scene: &mut Scene, b: u32, a: u32, j: JointComponent) {
     scene.world.set_joint(b, Some(weld));
 }
 
-/// Set `id`'s velocities once, then step `ticks` times, collecting the breaks.
 fn kick_once(scene: &mut Scene, id: u32, vel: Vec3, spin: Vec3, ticks: usize) -> Vec<JointBreak> {
     let mut world = PhysicsWorld::from_scene(scene);
     if let Some(mut rb) = scene.world.rigidbody_mut(id) {
@@ -56,7 +48,6 @@ fn near(got: f32, want: f32) -> bool {
     (got - want).abs() < 0.05 * want
 }
 
-/// Two weightless cubes, B welded to A along X, with `j`'s thresholds.
 fn free_pair(j: JointComponent) -> (Scene, u32) {
     let mut scene = Scene::new();
     let a = cube(&mut scene, Vec3::ZERO, false, false);
@@ -127,9 +118,6 @@ fn a_kinematic_partner_adds_no_load() {
 
 #[test]
 fn a_steady_load_the_estimate_misses_still_breaks() {
-    // B hangs off A, which hangs off the world: both held still, their velocity
-    // changes match and the estimate reads nothing for B's weld. The last
-    // substep reads B's weight (most of it on tick 1, before A settles).
     let mut scene = Scene::new();
     let a = cube(&mut scene, Vec3::new(0.0, 10.0, 0.0), true, false);
     let b = cube(&mut scene, Vec3::new(1.5, 10.0, 0.0), true, false);

@@ -1,11 +1,7 @@
-//! Tests for prefab extract / instantiate (#215).
-
 use super::*;
 use crate::authoring::{create_entity, Primitive};
 use rusty_components::{MaterialAsset, MaterialComponent};
 
-/// Build a small subtree: a Box root with a child Sphere and a grandchild Plane,
-/// the root carrying a named library material. Returns `(scene, root_id)`.
 fn fixture() -> (Scene, u32) {
     let mut scene = Scene::new();
     let root = create_entity(&mut scene, "Root", Some(Primitive::Box));
@@ -30,7 +26,6 @@ fn extract_uses_local_zero_based_ids_and_detaches_root() {
 
     assert_eq!(prefab.root, 0);
     assert_eq!(prefab.entities.len(), 3, "root + 2 descendants");
-    // Local ids are 0,1,2 in subtree order; the root's parent is detached.
     assert_eq!(prefab.entities[0].id, 0);
     assert_eq!(prefab.entities[0].parent_id, None);
     assert_eq!(prefab.entities[0].children, vec![1]);
@@ -43,7 +38,6 @@ fn extract_uses_local_zero_based_ids_and_detaches_root() {
 #[test]
 fn extract_slices_only_referenced_materials() {
     let (mut scene, root) = fixture();
-    // An unrelated material the subtree does NOT reference must not be sliced.
     scene
         .materials
         .insert("Unused".into(), MaterialAsset::default());
@@ -74,7 +68,6 @@ fn roundtrip_preserves_structure() {
         1,
         "grandchild preserved"
     );
-    // The mesh is rehydrated on instantiate — geometry is present, not stored.
     assert!(!target.world.mesh(new_root).unwrap().vertices.is_empty());
 }
 
@@ -83,10 +76,10 @@ fn instantiate_assigns_fresh_sequential_deterministic_ids() {
     let (scene, root) = fixture();
     let prefab = extract_prefab(&scene, root).unwrap();
 
-    // Two scenes seeded identically must yield identical ids — no wall-clock/RNG.
+    // Two scenes seeded identically must yield identical ids.
     let make = || {
         let mut s = Scene::new();
-        create_entity(&mut s, "Existing", None); // occupies id 1
+        create_entity(&mut s, "Existing", None);
         let id = instantiate_prefab(&mut s, &prefab, None);
         (s.entity_ids(), id)
     };
@@ -94,7 +87,6 @@ fn instantiate_assigns_fresh_sequential_deterministic_ids() {
     let (ids_b, root_b) = make();
     assert_eq!(ids_a, ids_b);
     assert_eq!(root_a, root_b);
-    // Fresh ids are sequential from the world's next_id (2,3,4 after the existing 1).
     assert_eq!(ids_a, vec![1, 2, 3, 4]);
     assert_eq!(root_a, 2);
 }
@@ -115,14 +107,12 @@ fn identical_material_is_reused_conflict_is_uniquified() {
     let (scene, root) = fixture();
     let prefab = extract_prefab(&scene, root).unwrap();
 
-    // Case 1: scene already has an IDENTICAL "Stone" — reused, no new key.
     let mut a = Scene::new();
     a.materials.insert("Stone".into(), MaterialAsset::default());
     let ra = instantiate_prefab(&mut a, &prefab, None);
     assert_eq!(a.materials.len(), 1);
     assert_eq!(a.world.material(ra).unwrap().first(), "Stone");
 
-    // Case 2: scene has a DIFFERENT "Stone" — prefab's is uniquified + rewritten.
     let mut b = Scene::new();
     let other = MaterialAsset {
         base_color: [0.1, 0.2, 0.3],
@@ -148,12 +138,10 @@ fn unpacked_instantiate_leaves_no_link_linked_stamps_one() {
     let (scene, root) = fixture();
     let prefab = extract_prefab(&scene, root).unwrap();
 
-    // v1 unpacked copy: no live link back to the asset.
     let mut a = Scene::new();
     let ra = instantiate_prefab(&mut a, &prefab, None);
     assert!(!a.world.has_prefab_link(ra));
 
-    // Linked instance (#216): every entity carries a link to the given source path.
     let mut b = Scene::new();
     let rb = instantiate_prefab_linked(&mut b, &prefab, None, "Enemy.prefab");
     let link = b.world.prefab_link(rb).unwrap().clone();

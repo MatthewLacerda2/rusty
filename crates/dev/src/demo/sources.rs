@@ -1,26 +1,16 @@
-//! What a demo was recorded against besides the engine build: the scene file and
-//! the project's Lua scripts, each as a digest in the header (#1581). A replay
-//! whose project changed since says so beside the engine-commit warning: the
-//! demo still plays, but a divergence then has a cause to look at first.
-
 use std::path::{Path, PathBuf};
 
 use rusty_app::GameWorld;
 use rusty_core::hash::content;
 
-/// The scene file's and the scripts' digests, in hex.
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Sources {
-    /// The scene file Play started in; `None` without one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scene: Option<String>,
-    /// Every `.lua` under the project (path and bytes), in path order.
     #[serde(default)]
     pub scripts: String,
 }
 
-/// Warn when the demo was recorded on another engine build, or on a project whose
-/// scene file or scripts changed since: it replays anyway.
 pub(super) fn warn_changes(world: &GameWorld, header: &super::format::Header) {
     let running = rusty_core::project::engine_commit();
     let mut console = world.console().borrow_mut();
@@ -38,13 +28,11 @@ pub(super) fn warn_changes(world: &GameWorld, header: &super::format::Header) {
     }
 }
 
-/// Folders no script of the game lives in: what the engine writes, and hidden ones.
 fn skipped(name: &str) -> bool {
     use rusty_core::project::{CACHE_DIR, SAVED_DIR};
     name.starts_with('.') || [SAVED_DIR, CACHE_DIR, "target"].contains(&name)
 }
 
-/// Every `.lua` under `root`, relative to it, sorted.
 fn lua_files(root: &Path) -> Vec<PathBuf> {
     let (mut found, mut dirs) = (Vec::new(), vec![root.to_path_buf()]);
     while let Some(dir) = dirs.pop() {
@@ -65,7 +53,6 @@ fn lua_files(root: &Path) -> Vec<PathBuf> {
     found
 }
 
-/// The digest of every `.lua` under `root`: each one's path and bytes.
 fn scripts_digest(root: &Path) -> String {
     let mut all = Vec::new();
     for file in lua_files(root) {
@@ -78,7 +65,6 @@ fn scripts_digest(root: &Path) -> String {
 }
 
 impl Sources {
-    /// `world`'s scene file and scripts as they are on disk now.
     pub fn of(world: &GameWorld) -> Self {
         let root = world.script_manager().resolve_script("");
         let root = if root.as_os_str().is_empty() {
@@ -96,7 +82,6 @@ impl Sources {
         }
     }
 
-    /// What differs in `now` from these, recorded: `None` when nothing does.
     pub fn changed(&self, now: &Self) -> Option<&'static str> {
         match (self.scene != now.scene, self.scripts != now.scripts) {
             (true, true) => Some("its scene file and its scripts"),

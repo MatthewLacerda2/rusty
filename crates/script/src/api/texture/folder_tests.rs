@@ -1,5 +1,3 @@
-//! Tests for the folder a `Texture` bake writes into (#1850).
-
 use mlua::Lua;
 
 use super::super::{bake, bake_whole_set, from_lua::parse_recipe, register};
@@ -26,8 +24,6 @@ fn bake_makes_a_missing_nested_folder_inside_the_project() {
 #[test]
 fn bake_set_and_a_relative_path_make_missing_nested_folders() {
     let root = rusty_test_support::temp::dir();
-    // Relative, as a game writes it: read against the root. The write itself reads
-    // against the working directory, so the prefix is made absolute for it here.
     make_parents("assets/set/sub/brick", &root).unwrap();
     assert!(root.join("assets").join("set").join("sub").is_dir());
     let prefix = root.join("deep").join("er").join("brick");

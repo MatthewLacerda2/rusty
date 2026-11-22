@@ -1,13 +1,9 @@
-//! A lighting bake is no edit (#1631): Undo never takes a bake back, and a bake
-//! landing between edits never joins the step before it.
-
 use glam::Vec3;
 
 use crate::create::{create_entity, Primitive};
 use crate::lighting::lightmap_set::LightmapEntry;
 use crate::{Scene, Sh9};
 
-/// A scene with one crate, two light probes and a reflection probe, unbaked.
 fn scene_with_probes() -> (Scene, u32) {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Crate", Some(Primitive::Box));
@@ -17,7 +13,6 @@ fn scene_with_probes() -> (Scene, u32) {
     (scene, id)
 }
 
-/// What Generate Lighting writes, outside any edit.
 fn bake(scene: &mut Scene, id: u32) {
     let mut sh = Sh9::zero();
     sh.coeffs[0] = [1.0, 0.5, 0.25];
@@ -64,8 +59,6 @@ fn undoing_a_setting_or_a_probe_move_after_a_bake_keeps_the_bake() {
         Vec3::X,
         "the move is undone"
     );
-    // The bake lit probe 1 at Y, not X: back at X it keeps what it had there
-    // (#1737, matched by position).
     assert_eq!(scene.probes.probes()[1].sh, Sh9::zero());
     scene.probes.probes_mut()[1].sh = scene.probes.probes()[0].sh;
     scene.undo();
@@ -83,10 +76,8 @@ fn a_change_landing_between_edits_never_joins_the_last_step() {
     scene.begin_edits();
     scene.world.set_name(id, "Renamed".into());
     scene.commit_edits(None);
-    // A bake, and a scene-level write from outside the editor's edits.
     bake(&mut scene, id);
     scene.skybox_path = "watched.hdr".into();
-    // An idle frame with the crate selected: the Inspector borrows it mutably.
     scene.begin_edits();
     drop(scene.world.transform_mut(id));
     scene.pause_edits();
@@ -103,7 +94,6 @@ fn a_bake_landing_on_an_idle_frame_neither_joins_the_last_step_nor_clears_redo()
     scene.begin_edits();
     scene.world.set_name(id, "Renamed".into());
     scene.commit_edits(None);
-    // Generate Lighting lands on a frame nobody touched, auto-placing a probe.
     scene.begin_edits();
     scene.unrecorded(|s| {
         s.probes.add_probe(Vec3::Y);
@@ -114,7 +104,6 @@ fn a_bake_landing_on_an_idle_frame_neither_joins_the_last_step_nor_clears_redo()
     assert_eq!(scene.undo().as_deref(), Some("Edit Renamed"));
     assert_eq!(scene.probes.probes().len(), 3, "the bake's probe stays");
     assert_baked(&scene, id);
-    // An idle frame's own follow-up after an Undo keeps it redoable.
     scene.begin_edits();
     scene.ambient_intensity = 0.5;
     scene.pause_edits();

@@ -1,26 +1,11 @@
-//! The state digest a demo stores every [`EVERY`] ticks and when Play ends, and a
-//! replay compares (#1581): what makes "bit for bit" a check, not a promise.
-//!
-//! It hashes the fields straight from the world, never a serialized snapshot, so
-//! a Dust2-sized scene does not hitch every two seconds of a playtest: every
-//! entity's id, name, own active flag and transform, every rigidbody's linear and
-//! angular velocity, the play frame, `Time.time`, and where the `Random` stream
-//! stands, so a draw the world shows nothing of yet still counts. It does **not**
-//! cover script state (a Lua table's fields): a script that diverges shows up
-//! once it moves something.
-
 use rusty_app::GameWorld;
 
-/// Ticks between two digests: two seconds at 60 Hz.
 pub const EVERY: u64 = 120;
 
-/// Whether the tick `t` (from the one that entered Play) ends with a digest.
 pub fn due(t: u64) -> bool {
     (t + 1).is_multiple_of(EVERY)
 }
 
-/// The fields, gathered into one buffer for [`rusty_core::hash::content`]: one
-/// xxh3 pass, not a byte-at-a-time hash run at opt-level 0 (#1326).
 #[derive(Default)]
 struct Fields(Vec<u8>);
 
@@ -40,7 +25,6 @@ impl Fields {
     }
 }
 
-/// The world's state as one hex string.
 pub fn of(world: &GameWorld) -> String {
     let mut h = Fields::default();
     let scene = world.scene().borrow();

@@ -1,30 +1,3 @@
-//! Ragdolls (#466): a skinned character's hitboxes turned into jointed bodies.
-//!
-//! [`Scene::build_ragdoll`] is Unity's Ragdoll Wizard: it puts a `Rigidbody` on
-//! every bone that has a hitbox (generating the hitboxes first if there are none)
-//! and a `Joint` to its nearest ragdolled ancestor, shaped by the humanoid preset
-//! (`preset`). The output is ordinary components on the bones, saved by bone name
-//! (`BoneBinding::bodies`), so it stays hand-tweakable.
-//!
-//! **Mass.** The total `mass` is split over the bodies by hitbox volume, so a
-//! chest outweighs a hand whatever the rig.
-//!
-//! **Animated or simulated.** The bodies start kinematic: the Animator poses the
-//! bones and the bodies follow. [`Scene::set_ragdoll`] flips them dynamic (or back)
-//! and, on the way in, seeds each body with the velocity its animation gave it.
-//! While a body is dynamic the physics step owns its bone; the post-animation
-//! writer (`PhysicsWorld::pose_bones`) overrides the Animator before skinning.
-//!
-//! **Layers.** Alive, a hitbox sits on the `Hitbox` layer, which collides with
-//! nothing, so the character's capsule moves it. Ragdolled, it moves to the
-//! `Ragdoll` layer — created on first use, colliding with every layer except
-//! `Hitbox` — so the body falls on the floor and onto other bodies. Joined bones
-//! never collide with each other (`Joint::enable_collision` off).
-//!
-//! **In part** (#1895, `partial`): one branch of the body on physics, its joints
-//! driven toward the animated pose, its drawn pose blended between the two, and
-//! the hit reaction built from them; the runtime state they keep is `runtime`'s.
-
 mod partial;
 mod preset;
 mod runtime;
@@ -40,16 +13,12 @@ use crate::Scene;
 use preset::{preset_for, Bend, JointPreset};
 use rusty_components::{ColliderShape, JointComponent, RigidBodyComponent};
 
-/// The layer ragdolled hitboxes move to.
 pub const RAGDOLL_LAYER: &str = "Ragdoll";
 
-/// A skeleton's bones, their parent slots and their names, in joint order.
 type Skeleton = (Vec<Option<u32>>, Vec<Option<usize>>, Vec<String>);
 
-/// What [`Scene::build_ragdoll`] builds.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RagdollOptions {
-    /// The whole body's mass (kilograms), split over the bones by volume.
     pub mass: f32,
 }
 
@@ -60,9 +29,6 @@ impl Default for RagdollOptions {
 }
 
 impl Scene {
-    /// Build (or rebuild) `owner`'s ragdoll and return its bodies as `(bone name,
-    /// bone)` pairs in joint order. Bones without a hitbox lose any Rigidbody and
-    /// Joint. `Err` when `owner` is not skinned or no layer is free.
     pub fn build_ragdoll(
         &mut self,
         owner: u32,
@@ -83,12 +49,12 @@ impl Scene {
         let mut made = Vec::new();
         for (slot, &bone) in bones.iter().enumerate() {
             let Some(bone) = bone else {
-                continue; // missing (#1273); its volume is `None`, so it is skipped over
+                continue;
             };
             let Some(volume) = volumes[slot] else {
                 self.world.set_rigidbody(bone, None);
                 self.world.set_joint(bone, None);
-                self.ragdolls.retain(|b| b != bone); // its runtime state goes with its body
+                self.ragdolls.retain(|b| b != bone);
                 continue;
             };
             let body = RigidBodyComponent {
@@ -105,8 +71,6 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = bones[p];
-                // The world axes, in the bone's local space: the exact inverse of how
-                // physics builds a joint's world frame, so it comes back on them (#1125).
                 (j.axis, j.swing_axis) =
                     self.world
                         .inverse_transform_frame(bone, j.axis, j.swing_axis);
@@ -118,8 +82,6 @@ impl Scene {
         Ok(made)
     }
 
-    /// Every ragdoll bone (a bone with a Rigidbody) of every skinned mesh at or
-    /// under `id`, ascending.
     pub fn ragdoll_bones(&self, id: u32) -> Vec<u32> {
         let mut out = Vec::new();
         for e in self.world.self_and_descendants(id) {
@@ -132,7 +94,6 @@ impl Scene {
         out
     }
 
-    /// `owner`'s bones, their parent slots and names, in joint order.
     fn skeleton_of(&self, owner: u32) -> Result<Skeleton, String> {
         let mesh = self
             .world
@@ -149,9 +110,6 @@ impl Scene {
         Ok((mesh.skeleton.bones.clone(), parents, names))
     }
 
-    /// The world direction bone `slot` points: toward the mean of its child
-    /// bones, or on from its parent when it has none. A missing (destroyed) child
-    /// is no direction to point in, and is skipped (#1273).
     fn bone_direction(
         &self,
         bones: &[Option<u32>],
@@ -172,10 +130,6 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
-    /// `owner`'s front and side (the model's +Z and +X) as drawn, through its
-    /// own mirror (#1145). Read in model space, so a mesh under a Blender
-    /// export's turned `Armature` (its own +Z pointing down) still bends its
-    /// knees forward (#1822).
     fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
         let w = &self.world;
         let model = w
@@ -189,8 +143,6 @@ impl Scene {
         (axis(Vec3::Z), axis(Vec3::X))
     }
 
-    /// A collider's volume at its world scale — what its share of the mass is
-    /// weighed by.
     fn collider_volume(&self, id: u32) -> f32 {
         let scale = self.world.lossy_scale(id);
         let pi = std::f32::consts::PI;
@@ -208,9 +160,6 @@ impl Scene {
     }
 }
 
-/// A `Joint` in world terms from `p`: its axis is the one the bone (pointing
-/// `dir`) flexes about toward `p.bend` in the character's frame (`(front, side)`,
-/// its drawn +Z and +X), its swing axis that bend direction.
 fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointComponent {
     let bend = match p.bend {
         Bend::Forward => front,
@@ -230,9 +179,6 @@ fn joint_from(p: JointPreset, dir: Vec3, (front, side): (Vec3, Vec3)) -> JointCo
     }
 }
 
-/// rapier measures a joint's angle as the connected body's turn relative to this
-/// one's — the parent's turn seen from the bone — so a bone flexing by `+a`
-/// reads `-a`.
 fn flex_limits((min, max): (f32, f32)) -> glam::Vec2 {
     glam::Vec2::new(-max, -min)
 }

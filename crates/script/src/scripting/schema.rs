@@ -1,34 +1,9 @@
-//! crates/script/src/scripting/schema.rs — schema-driven script fields (#84).
-//!
-//! A Lua script may `return` an optional `fields` table describing its
-//! inspector-editable serialized fields — the engine's equivalent of Unity's
-//! `[Range(0,1)]` / `[Tooltip]` / `[Header]` attributes:
-//!
-//! ```lua
-//! return {
-//!   fields = {
-//!     speed = { type = "number", range = {0, 1}, default = 0.5, tooltip = "u/s" },
-//!     name  = "Rusty",                       -- bare value: type inferred, no decoration
-//!   },
-//!   Start = function() end,
-//!   Update = function(dt) end,
-//! }
-//! ```
-//!
-//! The schema is parsed in a throwaway sandboxed `Lua` (same approach as
-//! `discovery.rs`), so parsing is side-effect-free and determinism-clean — no
-//! wall-clock, no RNG. Order within a Lua table is unspecified, so the parsed
-//! fields are sorted by name for a stable inspector layout.
-
 use std::collections::BTreeMap;
 
 use mlua::{Table, Value};
 
 use rusty_components::ScriptFieldValue;
 
-/// Inspector-editable type of a script field. Drives which egui control the
-/// inspector draws (slider/drag for `Number`, checkbox for `Boolean`, text edit
-/// for `Text`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldKind {
     Number,
@@ -36,31 +11,20 @@ pub enum FieldKind {
     Text,
 }
 
-/// One parsed field from a script's `fields` schema: its name, type, optional
-/// decorators, and the default the inspector starts from.
 #[derive(Clone, Debug)]
 pub struct ScriptField {
     pub name: String,
     pub kind: FieldKind,
-    /// `[Range(min, max)]` — only meaningful for `Number`; drives a slider.
     pub range: Option<(f64, f64)>,
-    /// The default value, used until the inspector overrides it.
     pub default: ScriptFieldValue,
-    /// `[Tooltip]` hover text.
     pub tooltip: Option<String>,
-    /// `[Header]` section label rendered above the field.
     pub header: Option<String>,
 }
 
-/// Parse the optional `fields` schema from a script's source `code`. Returns the
-/// declared fields sorted by name; an empty vec if the script has no schema or
-/// fails to compile (the inspector then simply shows no field controls).
 pub fn parse_fields(code: &str) -> Vec<ScriptField> {
     read_fields(code).unwrap_or_default()
 }
 
-/// [`parse_fields`], but a chunk that fails to evaluate is an error (the loader
-/// warns on it, #1709) rather than an empty schema.
 pub(super) fn read_fields(code: &str) -> mlua::Result<Vec<ScriptField>> {
     let lua = super::sandbox::inspection_vm();
     let table = lua.load(code).eval::<Table>()?;
@@ -76,10 +40,6 @@ pub(super) fn read_fields(code: &str) -> mlua::Result<Vec<ScriptField>> {
     Ok(out)
 }
 
-/// Merge the inspector `overrides` over the schema `fields`' defaults and write the
-/// resulting field values onto the live script `table`, so `self.speed` inside
-/// the script reads the configured value. Schema defaults fill in any field the
-/// inspector left untouched. Pure data assignment — no clock/RNG.
 pub fn apply_field_values(
     table: &Table,
     fields: &[ScriptField],
@@ -96,8 +56,6 @@ pub fn apply_field_values(
     Ok(())
 }
 
-/// Parse one `name = meta` entry. `meta` is either a metadata table or a bare
-/// value (number/bool/string) whose type is inferred and used as the default.
 fn parse_field(name: String, meta: Value) -> Option<ScriptField> {
     match meta {
         Value::Table(t) => Some(parse_meta_table(name, &t)),
@@ -121,7 +79,6 @@ fn parse_field(name: String, meta: Value) -> Option<ScriptField> {
     }
 }
 
-/// A bare-value field: inferred type, given default, no decorators.
 fn scalar(name: String, kind: FieldKind, default: ScriptFieldValue) -> ScriptField {
     ScriptField {
         name,
@@ -133,7 +90,6 @@ fn scalar(name: String, kind: FieldKind, default: ScriptFieldValue) -> ScriptFie
     }
 }
 
-/// Parse a full `{ type=, range=, default=, tooltip=, header= }` metadata table.
 fn parse_meta_table(name: String, t: &Table) -> ScriptField {
     let default_val = t.get::<Value>("default").ok();
     let kind = t
@@ -180,7 +136,6 @@ fn kind_from_value(v: &Value) -> Option<FieldKind> {
     }
 }
 
-/// Coerce a Lua value into a stored field value of the declared `kind`.
 fn value_as(kind: FieldKind, v: &Value) -> Option<ScriptFieldValue> {
     match kind {
         FieldKind::Number => match v {

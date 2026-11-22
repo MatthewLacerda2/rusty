@@ -1,10 +1,5 @@
-//! crates/procgen/src/recipe/op_info.rs — the shape of one [`super::OPS`] row (#411): an
-//! op's tag, category, input [`Arity`] and params, and the `const` builders the
-//! table is written with.
-
 use super::arity::Arity;
 
-/// A param's literal default value, as the agent would write it in a recipe.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Lit {
     Number(f32),
@@ -14,34 +9,24 @@ pub enum Lit {
     Text(&'static str),
 }
 
-/// One param of an op: its recipe key, value type, the allowed values when the type
-/// is `"enum"`, and its default (`None` = required).
 #[derive(Clone, Copy, Debug)]
 pub struct OpParam {
     pub name: &'static str,
-    /// `number` | `integer` | `bool` | `color` (a linear RGBA array, or an sRGB
-    /// `"#rrggbb"` / `"#rrggbbaa"` string) | `vec2` | `enum` | `stops` | `path` (a
-    /// project-relative file path) | `text` (any string: an `expression` formula,
-    /// lettering, SVG path data).
+    /// `number` | `integer` | `bool` | `color` | `vec2` | `enum` | `stops` | `path` (project-relative
+    /// file) | `text` (any string).
     pub ty: &'static str,
-    /// The accepted tags for an `enum` param; empty otherwise.
     pub values: &'static [&'static str],
     pub default: Option<Lit>,
-    /// Whether the param takes a link to another node as well as a number (#1494):
-    /// the curated, amount-like ones, never a whole count, an enum, a colour or a
-    /// size ([`super::Param`]).
+    /// Takes a link to another node as well as a number: only curated, amount-like params.
     pub socket: bool,
-    /// A valid value for a required param whose type's generic sample would not
-    /// parse (SVG path data is not any text): what the catalog tests and the Lua
-    /// enum-case test fill it with. `None` takes the type's sample.
+    /// A valid value for a required param whose type's generic sample would not parse
+    /// (SVG path data is not any text). `None` takes the type's sample.
     pub sample: Option<&'static str>,
 }
 
-/// One op: its `op` tag, menu category, the inputs it accepts, and its params.
 #[derive(Clone, Copy, Debug)]
 pub struct OpInfo {
     pub op: &'static str,
-    /// `generator` | `color` | `vector` | `math` | `filter`.
     pub category: &'static str,
     pub inputs: Arity,
     pub params: &'static [OpParam],
@@ -69,7 +54,6 @@ pub(crate) const fn opt(name: &'static str, ty: &'static str, default: Lit) -> O
     }
 }
 
-/// The required text param `name`, sampled in tests by `sample`.
 pub(crate) const fn req_sampled(name: &'static str, sample: &'static str) -> OpParam {
     OpParam {
         sample: Some(sample),
@@ -77,7 +61,6 @@ pub(crate) const fn req_sampled(name: &'static str, sample: &'static str) -> OpP
     }
 }
 
-/// `p`, made socketable: it takes a link as well as a number.
 pub(crate) const fn socket(p: OpParam) -> OpParam {
     OpParam { socket: true, ..p }
 }
@@ -107,5 +90,5 @@ pub(crate) const fn op(
     }
 }
 
-/// A stochastic op's own seed, folded into the recipe seed (#1487).
+/// A stochastic op's own seed, folded into the recipe seed.
 pub(crate) const SEED: OpParam = opt("seed", "integer", Lit::Integer(0));

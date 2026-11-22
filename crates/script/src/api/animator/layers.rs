@@ -1,13 +1,3 @@
-//! crates/script/src/api/animator/layers.rs — the `Animator` layer surface (#457).
-//!
-//! `SetLayerWeight` / `GetLayerWeight` and the layer-aware `GetCurrentNode` /
-//! `GetCurrentTag`. A
-//! layer is addressed Unity's way, by index — 0 is the base layer, 1.. the
-//! graph's extra layers in order — or, rusty's convenience, by its name in the
-//! graph. A script's `Start` runs before the evaluator's first step, so a layer
-//! that isn't bound yet is bound here from the graph asset on first use rather
-//! than refused.
-
 use std::path::Path;
 
 use mlua::Value;
@@ -20,7 +10,6 @@ use rusty_asset::animation_graph;
 use rusty_components::AnimatorComponent;
 use rusty_scene::Scene;
 
-/// Register the layer functions onto the `Animator` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -31,7 +20,6 @@ pub(super) fn register(
     register_get_current_node(lua, table, scene)
 }
 
-/// The layer `layer` names on `anim` (0 = base), among the layers bound so far.
 pub(super) fn lookup(anim: &AnimatorComponent, layer: &Value) -> Option<usize> {
     let index = match layer {
         Value::Integer(i) => usize::try_from(*i).ok()?,
@@ -42,8 +30,6 @@ pub(super) fn lookup(anim: &AnimatorComponent, layer: &Value) -> Option<usize> {
     (index <= anim.layers.len()).then_some(index)
 }
 
-/// [`lookup`], binding the graph's layers from its asset first when the layer
-/// isn't found among the bound ones (the evaluator hasn't stepped yet).
 pub(super) fn resolve(anim: &mut AnimatorComponent, layer: &Value) -> Option<usize> {
     if let Some(index) = lookup(anim, layer) {
         return Some(index);
@@ -54,11 +40,6 @@ pub(super) fn resolve(anim: &mut AnimatorComponent, layer: &Value) -> Option<usi
     lookup(anim, layer)
 }
 
-/// `SetLayerWeight(id, layer, w)` — set an extra layer's weight, clamped to
-/// `[0, 1]`; `true` when it was set. The base layer is always at full weight
-/// (as in Unity), so layer 0 is refused with a warning, as is an unknown layer.
-/// `GetLayerWeight(id, layer)` — the live weight (`1` for the base layer), or
-/// `nil` for an unknown layer.
 fn register_layer_weight(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -114,10 +95,6 @@ fn register_layer_weight(
     )
 }
 
-/// `GetCurrentNode(id [, layer])` — the active graph node's name in `layer`
-/// (default: the base layer), or `nil` when there is no animator, no such layer,
-/// or the evaluator hasn't bound it yet. `GetCurrentTag(id [, layer])` — that
-/// node's tag (#1901), read from the graph asset, `nil` when it has none.
 fn register_get_current_node(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let reader = |read: fn(&AnimatorComponent, usize, &str) -> Option<String>| {
         move |lua: &mlua::Lua, (id, layer): (EntityArg, Option<Value>)| {
@@ -148,15 +125,12 @@ fn register_get_current_node(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCel
     )
 }
 
-/// The tag of `node` in layer `index` of `anim`'s graph, from the asset, so a
-/// loaded scene's saved node reads its tag before the first step.
 fn node_tag(anim: &AnimatorComponent, index: usize, node: &str) -> Option<String> {
     let graph = animation_graph::load(Path::new(anim.graph.as_deref()?)).ok()?;
     let tag = &graph.machine(index)?.node(node)?.tag;
     (!tag.is_empty()).then(|| tag.clone())
 }
 
-/// A layer argument as a warning shows it.
 pub(super) fn describe(layer: &Value) -> String {
     match layer {
         Value::String(s) => format!("'{}'", s.to_string_lossy()),

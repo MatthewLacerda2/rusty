@@ -1,8 +1,3 @@
-//! A scene's reflection cubes live in its own `<scene>.reflections/` folder (#1692):
-//! two scenes in one folder bake without overwriting each other's cubes, and a rebake
-//! with fewer probes removes only its own extra cubes. The GPU half skips without an
-//! adapter.
-
 use std::path::Path;
 
 use glam::Vec3;
@@ -12,13 +7,11 @@ use crate::bake::lighting::{start_lighting, LightingBakeParams};
 use crate::bake::steps::LightingBake;
 use rusty_scene::Scene;
 
-/// A scene of `probes` reflection probes at a small resolution, each at its own spot.
 pub(super) fn probed(probes: usize, x: f32) -> Scene {
     let mut scene = Scene::new();
     for i in 0..probes {
         let at = Vec3::new(x + i as f32 * 4.0, 1.0, 0.0);
         let i = scene.reflection_probes.add(at, Vec3::splat(2.0));
-        // Placed by hand: a bake keeps it rather than re-placing it (#1737).
         scene.reflection_probes.edit(i, |p| p.manual = true);
     }
     scene.lighting_settings.reflections.resolution = 16;
@@ -60,8 +53,6 @@ fn prune_removes_only_cubes_past_the_count() {
     prune_stale(&dir.join("missing"), 0).unwrap();
 }
 
-/// The game's repro: two scenes in one folder, each baked by Generate Lighting's
-/// stepped bake, one after the other. The first keeps its own cubes, byte for byte.
 #[test]
 fn gpu_two_scenes_in_one_folder_keep_their_own_cubes() {
     let dir = fresh_dir("two_scenes");
@@ -69,7 +60,7 @@ fn gpu_two_scenes_in_one_folder_keep_their_own_cubes() {
     let (kolvik_path, default_path) = (path("kolvik.scene"), path("default.scene"));
     let mut kolvik = probed(2, 0.0);
     if !generate(&mut kolvik, &kolvik_path) {
-        return; // no adapter
+        return;
     }
     let mut default = probed(3, 50.0);
     assert!(generate(&mut default, &default_path));
@@ -79,9 +70,6 @@ fn gpu_two_scenes_in_one_folder_keep_their_own_cubes() {
     assert!(Path::new(&cube(&default, 0)).starts_with(reflection_dir(&default_path)));
     assert_ne!(cube(&kolvik, 0), cube(&default, 0));
 
-    // A rebake of the first scene with fewer probes, through Generate Lighting's
-    // commit as the editor and `Lighting.Generate()` run it: its extra cube goes, and
-    // the second scene's cubes stay.
     let before = std::fs::read(cube(&default, 2)).unwrap();
     kolvik.reflection_probes.remove(1);
     assert!(generate(&mut kolvik, &kolvik_path));
@@ -91,8 +79,6 @@ fn gpu_two_scenes_in_one_folder_keep_their_own_cubes() {
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Run Generate Lighting's probe bake to its end and commit it. False when the
-/// reflection bake skipped (no adapter).
 pub(super) fn generate(scene: &mut Scene, path: &str) -> bool {
     let Some(mut job) = finished(scene, path) else {
         return false;
@@ -101,8 +87,6 @@ pub(super) fn generate(scene: &mut Scene, path: &str) -> bool {
     true
 }
 
-/// Generate Lighting's probe bake stepped to its end, not committed. `None` when the
-/// reflection bake skipped (no adapter).
 pub(super) fn finished(scene: &mut Scene, path: &str) -> Option<LightingBake> {
     let params = LightingBakeParams::default();
     let mut job = start_lighting(scene, Some(path), None, params).unwrap();

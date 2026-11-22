@@ -1,13 +1,7 @@
-//! The frame log written from a live world (#2206): one frame end to end, and
-//! the hosts and budgets that start none.
-
 use super::*;
 use crate::stats::{record_window, WindowFrame};
 use rusty_script::scripting::LogLevel::Warning;
 
-/// One frame of a world, written and read back: its place, sim time and heavy
-/// system, and the console lines beside it (one logged before the first frame
-/// too); then a channel switched off.
 #[test]
 fn a_frame_of_a_world_is_written_with_what_was_logged() {
     let dir = rusty_test_support::temp::dir();
@@ -71,9 +65,6 @@ fn a_host_off_or_a_budget_of_zero_starts_no_log() {
     assert!(FrameLog::for_host(LogHost::Player, LogSettings::default()).is_none());
 }
 
-/// A Play-mode load is one `loads` record on the frame that ran it. An edit-mode
-/// load (File ▸ Open) runs outside the load probe: it leaves no record, and none
-/// turns up stale on the first Play frame after it.
 #[test]
 fn a_play_load_is_one_record_and_an_edit_load_none() {
     use rusty_core::input::InputState;
@@ -119,8 +110,6 @@ fn a_play_load_is_one_record_and_an_edit_load_none() {
     assert_eq!(ticks, [2], "the Play load alone, on its own tick");
 }
 
-/// Every console line reaches the file, past the 100-line buffer; a warning
-/// repeated every frame is written on each frame with its count.
 #[test]
 fn every_console_line_is_written_and_a_repeat_each_frame() {
     let dir = rusty_test_support::temp::dir();

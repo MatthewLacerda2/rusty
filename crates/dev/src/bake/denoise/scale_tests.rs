@@ -1,17 +1,3 @@
-//! The denoise at Dust2 scale (#1884's review), measured by hand in a release
-//! build: `cargo test --release --features dev --lib denoised_dust2_bake_cost --
-//! --ignored --nocapture`. A measurement, never a gate. The level is the lightmap
-//! cost bench's Dust2-sized one (6344 meshes, 2400 lamps), baked whole at the
-//! default samples: the trace alone, OIDN on a device per worker (what a bake
-//! lends), OIDN on one shared device of every core (this branch's first design),
-//! and the Gaussian at the old default of 128. It prints each bake's wall time,
-//! OIDN's time summed over its devices, and the charts it cleaned.
-//!
-//! At [`DENSITY`], not the default 8: the chart count, which is what a per-chart
-//! denoise pays for, is the same at any density, smaller charts make OIDN's cost
-//! per call weigh more, and at 8 texels a unit the level has about 16 times the
-//! texels, an hour a bake on an 8-core machine.
-
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -21,10 +7,8 @@ use rusty_lighting::lightmap::max_map_edge;
 use rusty_lighting::lightmap::{bake_with_progress, lightmap_size, BakeProgress};
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
-/// Lightmap texels per world unit the level is baked at.
 const DENSITY: f32 = 2.0;
 
-/// One bake: its name, samples, denoiser, and how many OIDN devices it is lent.
 type Row = (&'static str, u32, Denoiser, usize);
 
 #[test]

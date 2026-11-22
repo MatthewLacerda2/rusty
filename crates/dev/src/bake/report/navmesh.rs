@@ -1,14 +1,3 @@
-//! The navmesh bake's report (#1980): the grid, the walkable area per nav area,
-//! the islands the spans fall into, the generated off-mesh links, and the
-//! colliders the bake read, heaviest first. A render-density mesh collider on a
-//! chair is one line at the top of that list, before anyone walks into it.
-//!
-//! An **island** is a walking area: spans joined by grid steps alone
-//! (`NavigationGraph::walk_areas`). One is **reachable** when an actor can get to
-//! it (`reachable_spans`: the main floor, wherever an actor starts, and what an
-//! off-mesh link leads to). A wall top is an unreachable island too; a small
-//! unreachable floor is usually a bug.
-
 use serde_json::{json, Value};
 
 use super::{entity_name, point, Kind, Report, Stages, TOP};
@@ -16,11 +5,8 @@ use rusty_navigation::{bake_collider_ids, baked_fingerprint, NavigationGraph};
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
-/// The most islands a report lists, largest first (the count holds them all).
 pub const ISLANDS: usize = 256;
 
-/// The report of the bake that left `nav` and wrote `bytes` (`output_bytes` on
-/// disk) for `scene`.
 pub fn report(
     scene: &Scene,
     nav: &NavigationGraph,
@@ -46,7 +32,6 @@ pub fn report(
     }))
 }
 
-/// Per nav area with any span: its name, spans and walkable square metres.
 fn areas(scene: &Scene, nav: &NavigationGraph) -> Value {
     let mut spans = [0usize; rusty_navigation::MAX_AREAS];
     for s in &nav.spans {
@@ -62,8 +47,6 @@ fn areas(scene: &Scene, nav: &NavigationGraph) -> Value {
     Value::Array(used.map(area).collect())
 }
 
-/// One island: its spans, area, bounds (of its spans' cell centres, widened to
-/// the cells' edges when listed) and centre, and whether it is reachable.
 struct Island {
     spans: usize,
     min: glam::Vec3,
@@ -72,7 +55,6 @@ struct Island {
     reachable: bool,
 }
 
-/// The islands, largest first (ties to scan order), at most [`ISLANDS`] listed.
 pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     let (area, sizes) = nav.walk_areas();
     let starts = crate::bake::lighting::actor_starts(scene);
@@ -95,7 +77,6 @@ pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     let mut order: Vec<usize> = (0..all.len()).collect();
     order.sort_by_key(|&i| std::cmp::Reverse(all[i].spans));
     let cell = nav.grid_spacing * nav.grid_spacing;
-    // A span stands at its cell's centre: the box spans the cells' outer edges.
     let half = glam::Vec3::new(nav.grid_spacing, 0.0, nav.grid_spacing) * 0.5;
     let listed = order.iter().take(ISLANDS).map(|&i| {
         let island = &all[i];
@@ -111,7 +92,6 @@ pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     json!({ "count": all.len(), "unreachable": unreachable, "list": listed.collect::<Vec<_>>() })
 }
 
-/// The off-mesh links: the generated ones by kind, and the authored count.
 fn links(nav: &NavigationGraph) -> Value {
     let (mut drop, mut jump, mut authored) = (0, 0, 0);
     for link in nav.offmesh_links() {
@@ -125,8 +105,6 @@ fn links(nav: &NavigationGraph) -> Value {
     json!({ "generated": { "drop": drop, "jump": jump }, "authored": authored })
 }
 
-/// The colliders the bake read with their world triangles, heaviest first (ties
-/// to the lower id), at most [`TOP`] listed.
 fn colliders(scene: &Scene) -> Value {
     let ids = bake_collider_ids(scene);
     let triangles = |id: u32| collider_world_triangles(scene, id).map_or(0, |t| t.triangles.len());

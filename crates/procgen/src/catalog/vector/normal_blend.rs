@@ -1,5 +1,4 @@
-//! The `normal_blend` op: Reoriented Normal Mapping (#1492).
-
+//! The `normal_blend` op: Reoriented Normal Mapping.
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
@@ -7,7 +6,7 @@ use crate::image_buf::Image;
 use crate::ops::vector;
 use crate::recipe::{arity, op, opt, socket, Lit, OpInfo, Param};
 
-/// Reoriented Normal Mapping (#1492): lay the second input's normal map (detail)
+/// Reoriented Normal Mapping: lay the second input's normal map (detail)
 /// over the first's (base). `strength` scales the detail's tilt first; 0 leaves the
 /// base, up to the floor: no output texel is under `ops::vector::MIN_NORMAL_Z`, a
 /// base texel already under it included, whatever the detail or `strength`.

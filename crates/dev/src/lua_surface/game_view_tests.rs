@@ -1,7 +1,3 @@
-//! `Editor.SetGameViewSize` and its siblings (#2207): the Game view's size from Lua,
-//! through `Application`'s mailbox. The editor's own half (the window taking the set
-//! at its frame) is `core::application::game_view`'s tests.
-
 use super::super::session::Session;
 use rusty_core::application::{GameViewSetting, GameViewSize};
 
@@ -14,7 +10,6 @@ fn run(s: &mut Session, line: &str) -> String {
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
 }
 
-/// A session marked as the editor window would mark it.
 fn windowed() -> Session {
     let s = session();
     let app = &s.world().resources.application;
@@ -31,7 +26,6 @@ const READ: &str = "local v = Editor.GetGameViewSize(); \
     return v.mode .. ' ' .. tostring(v.width) .. ' ' .. tostring(v.height) .. ' ' \
     .. tostring(v.low_resolution)";
 
-/// Each set reads back on the next line, and the editor's frame takes the last.
 #[test]
 fn sets_read_back_and_reach_the_editor() {
     let mut s = windowed();
@@ -56,8 +50,6 @@ fn sets_read_back_and_reach_the_editor() {
     );
 }
 
-/// A size out of range, fractional or not a number is refused with a warning and
-/// changes nothing.
 #[test]
 fn bad_sizes_are_refused() {
     let mut s = windowed();
@@ -70,8 +62,6 @@ fn bad_sizes_are_refused() {
     assert_eq!(run(&mut s, READ), "Free nil nil false");
 }
 
-/// A host with no Game view (the headless session) refuses every set, with a
-/// warning; the getter still answers.
 #[test]
 fn a_host_without_a_game_view_refuses() {
     let mut s = session();

@@ -1,9 +1,3 @@
-//! crates/physics/src/recover_tests.rs — the rapier world rebuilt from the scene (#1797,
-//! `recover`): a panic forced through the test seam, under the release behaviour,
-//! rebuilds the world deterministically and keeps the contact memory; a debug
-//! build still panics; and a paused start (#1795) steps as a world that never
-//! paused.
-
 use glam::Vec3;
 
 use super::watch::fixture_tests::{digest, fixture, scene_digest};
@@ -13,7 +7,6 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 
-/// `steps` steps of the fixture, with a panic forced on step `panic_at`.
 fn run(steps: usize, panic_at: usize) -> (Scene, PhysicsWorld, Vec<Option<String>>) {
     let mut scene = fixture();
     let mut world = PhysicsWorld::from_scene(&scene);
@@ -60,7 +53,6 @@ fn a_debug_build_still_panics() {
     world.step(&mut scene, DT);
 }
 
-/// A static floor and a dynamic sphere already resting on it.
 fn resting_sphere() -> Scene {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());
@@ -85,8 +77,6 @@ fn resting_sphere() -> Scene {
     scene
 }
 
-/// How many contacts entered, and exited, over `dts`, with a panic forced on
-/// step `panic_at`.
 fn edges(dts: &[f32], panic_at: Option<usize>) -> (usize, usize) {
     let mut scene = resting_sphere();
     let mut world = PhysicsWorld::from_scene(&scene);
@@ -114,7 +104,6 @@ fn a_contact_enters_once_across_a_rebuild() {
     assert_eq!(edges(&[0.0, DT, DT, 0.0, DT], Some(2)), (1, 0));
 }
 
-/// The frame after unpausing steps as a world that never paused (#1795).
 #[test]
 fn a_paused_start_steps_as_one_that_never_paused() {
     let (mut paused, mut straight) = (fixture(), fixture());
@@ -130,7 +119,6 @@ fn a_paused_start_steps_as_one_that_never_paused() {
     }
 }
 
-/// A pair that separates across a rebuild exits on the step after it.
 #[test]
 fn a_contact_that_separates_across_a_rebuild_exits() {
     let mut scene = resting_sphere();

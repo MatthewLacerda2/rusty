@@ -1,22 +1,5 @@
-//! crates/edit/src/prefab/link.rs — linked prefab instances: live link operations (#216).
-//!
-//! The verbs that act on an already-stamped **linked** instance (one whose entities
-//! carry a [`PrefabLink`](rusty_components::PrefabLink)): list its per-instance
-//! overrides, revert them, and re-import (propagate) the source onto it. They are the apply/revert side
-//! of prefabs v2 and the load-time propagation, all sharing one mechanism:
-//!
-//!   propagate(instance) = rebuild every entity from a FRESH source baseline, then
-//!                         re-apply that entity's override map on top.
-//!
-//! "Fresh source baseline" = the source `.prefab` re-instantiated through the v1
-//! material merge/rename + mesh rehydrate, so material refs re-resolve through the
-//! same rename map and geometry is rebuilt from the reference (never diffed).
-//!
-//! Scope (#216): a `.prefab` instance is FLAT. Propagation matches an instance
-//! entity to a source entity purely by the link's `local_id`, and drops nothing /
-//! adds nothing structurally. A model instance also takes its model's node tree
-//! (a node added or removed, `structure`, #1665). Nested prefabs are out of scope:
-//! an instance's walk stops at another instance's root (`instance`).
+//! propagate(instance) = rebuild every entity from a FRESH source baseline, then re-apply that entity's override map on top.
+//! A `.prefab` instance is flat: entities match by the link's `local_id` only. Nested prefabs are out of scope: an instance's walk stops at another instance's root.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -34,10 +17,6 @@ use rusty_components::{Entity, EntityRefs};
 use rusty_scene::rehydrate::{adopt_or_rehydrate, Imports, Keep};
 use rusty_scene::Scene;
 
-/// `baselines` (keyed by local id) with their component references moved from
-/// local ids to the ids of the instance entities `ids`, so an untouched reference
-/// diffs clean and a rebuilt one points inside its own instance; one kept by bone
-/// name is bound to the instance's live bone.
 fn in_instance_space(
     scene: &Scene,
     ids: &[u32],
@@ -55,25 +34,17 @@ fn in_instance_space(
     baselines
 }
 
-/// Re-import the source onto the instance: rebuild every entity from its fresh
-/// baseline, then re-apply its overrides, the edits made since it last took the
-/// source among them (`live/`, #1527). Non-overridden fields pick up the latest
-/// source; overridden ones are preserved. This is the propagation step run on scene
-/// load and by the explicit reimport verb.
 pub fn reimport_instance(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let ids = require_instance(scene, root_id)?;
     sync_overrides(&mut scene.world, &ids);
     propagate(scene, root_id)
 }
 
-/// [`reimport_instance`] re-applying the overrides the links hold as they are, for a
-/// caller that has just synced them and dropped one (a per-field revert or apply).
 pub(super) fn propagate(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     let source = link_source(scene, root_id)?;
     propagate_from(scene, root_id, &source, &read_source(&source)?)
 }
 
-/// [`propagate`] from `prefab`, the instance's `source` as already read.
 pub(super) fn propagate_from(
     scene: &mut Scene,
     root_id: u32,
@@ -88,13 +59,6 @@ pub(super) fn propagate_from(
     Ok(())
 }
 
-/// Rebuild every entity of the instance at `root_id` from `prefab` (its `source` as
-/// already read), re-applying its overrides when `keep` and dropping them
-/// otherwise (a removed part's among them, so it comes back). The baselines and
-/// lookups come from `pass`, and whether a document is being applied
-/// (`structure::reshape`). Leaves out the whole-scene passes ([`finish_rebuild`],
-/// [`Pass::finish`]), which a caller rebuilding many instances runs once after
-/// them (`restamp::propagate_roots`).
 pub(super) fn rebuild_instance(
     scene: &mut Scene,
     root_id: u32,
@@ -123,19 +87,12 @@ pub(super) fn rebuild_instance(
     Ok(())
 }
 
-/// The whole-scene passes a rebuild needs once, however many instances it rebuilt:
-/// a rebuilt skinned mesh lost its bone binding, re-bound by name (#453), and every
-/// collider is refreshed.
 pub(super) fn finish_rebuild(scene: &mut Scene) {
     scene.sync_skeletons();
-    // A rebuilt part drawing a library mesh (#2059, an override) takes its geometry.
     scene.sync_scene_meshes();
     scene.update_all_colliders();
 }
 
-/// Drop every override on the instance and rebuild it straight from the fresh source
-/// baseline (the instance becomes a pristine copy of the current source, a model
-/// instance its node tree too, #1665).
 pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), String> {
     require_instance(scene, root_id)?;
     let source = link_source(scene, root_id)?;
@@ -148,14 +105,11 @@ pub fn revert_instance_overrides(scene: &mut Scene, root_id: u32) -> Result<(), 
     Ok(())
 }
 
-/// The live override paths of the instance, as `"<local_id>:<json-pointer>"`
-/// strings sorted for a stable read. Empty when the instance has no overrides.
 pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String>, String> {
     let ids = require_instance(scene, root_id)?;
     let mut out = Vec::new();
     for id in ids {
-        // A part whose node the model lost is not the model's any more: it waits
-        // for Play's destroy phase, and has no local id to list it under.
+        // A part whose node the model lost waits for Play's destroy phase, and has no local id to list it under.
         let Some(link) = scene.world.prefab_link(id).filter(|l| l.local_id != GONE) else {
             continue;
         };
@@ -167,36 +121,12 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     Ok(out)
 }
 
-/// Propagate EVERY linked instance in the scene, re-applying the overrides each link
-/// holds: a loaded file's, or a Play snapshot's, written while its bones still had
-/// their ids (#1527). So a source changed meanwhile (on disk, or applied to during
-/// Play) reaches each instance, and every baseline is rebuilt against the live
-/// bones, which a load or a Stop respawns with fresh ids. An instance root is a
-/// linked entity with `local_id == 0` (the prefab root). A source whose file is
-/// missing is skipped, so a renamed/deleted `.prefab` never aborts the scene load:
-/// the instance keeps its values and the overrides its links hold, and has no
-/// baseline (the document it came from carries none), so an edit made meanwhile is
-/// not tracked until the source is back. Each source is read once, however many
-/// instances it has: a level holding hundreds of one model builds it once. It runs
-/// as a document is applied (`apply_scene_data`), so a part whose node the model
-/// lost goes at once, in Play too (`structure::reshape`). Each model file is
-/// looked up once through `imports`, the lookups of the rehydrate that applied
-/// the document, and a part whose live geometry is still what its source builds
-/// keeps it (`rebuild_entity`).
+/// A source whose file is missing is skipped, so a deleted `.prefab` never aborts a scene load: the instance keeps its values and overrides, with no baseline until the source is back.
 pub fn propagate_linked_instances_in(scene: &mut Scene, imports: &mut Imports) {
     let roots = instance_roots(scene, |_| true);
     propagate_roots(scene, roots, true, imports);
 }
 
-/// Rebuild one instance entity from its baseline (recorded without geometry),
-/// preserving live identity/structure and (when `keep`) re-applying its override
-/// map; the baseline it was built from is stored on its link, and a root keeps its
-/// own placement. Its meshes take the live entity's geometry where that is still
-/// what they build ([`Keep::Current`]: the same source, at the baseline's revision,
-/// current in `imports`), and are rebuilt from their reference otherwise: an
-/// override that re-meshes the part, or a source that changed. Either way its
-/// Mesh fields are held, it is unbound from the bones, which `finish_rebuild`
-/// binds, and its collider refit (`adopt_or_rehydrate`).
 fn rebuild_entity(
     scene: &mut Scene,
     id: u32,
@@ -232,22 +162,18 @@ fn rebuild_entity(
     keep_root_placement(&mut rebuilt, placement.as_ref());
     adopt_or_rehydrate(&mut scene.world, &mut rebuilt, Keep::Current, imports);
     scene.world.replace_entity(rebuilt);
-    // The source file and the overrides are held as a scene file is (#1418).
     crate::authoring::fields::hold_entity(&mut scene.world, id);
 }
 
-/// The instance ids, erroring if `root_id` is not a linked instance root.
 fn require_instance(scene: &Scene, root_id: u32) -> Result<Vec<u32>, String> {
     instance_members(scene, root_id)
         .ok_or_else(|| format!("entity {root_id} is not a linked prefab instance"))
 }
 
-/// The source `local_id` recorded on entity `id`, if it is linked.
 fn local_id_of(scene: &Scene, id: u32) -> Option<u32> {
     scene.world.prefab_link(id).map(|l| l.local_id)
 }
 
-/// The source path recorded on the instance root.
 pub(super) fn link_source(scene: &Scene, root_id: u32) -> Result<String, String> {
     scene
         .world

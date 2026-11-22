@@ -1,5 +1,5 @@
 //! A re-written skinned model re-binds the rig and bones of the entities built from
-//! it (#1252, #1265), keeping the bone overrides and what hangs from a bone.
+//! it, keeping the bone overrides and what hangs from a bone.
 
 use std::collections::BTreeSet;
 
@@ -14,14 +14,11 @@ use rusty_scene::skeleton::HITBOX_NAME;
 use rusty_scene::Scene;
 use rusty_test_support::models::anim::ANIMATED_GLTF;
 
-/// The rewrite that drops `Joint1` from the fixture's skin.
 const DROP_JOINT1: (&str, &str) = (
     r#""joints": [ 1, 2 ], "inverseBindMatrices": 3"#,
     r#""joints": [ 1 ]"#,
 );
 
-/// Instantiate the animated fixture written under `tag`, and return the entity and
-/// the model file's path.
 fn hero(scene: &mut Scene, tag: &str) -> (u32, String) {
     let model = animated_model(tag);
     let reference = model.to_string_ref();
@@ -37,7 +34,6 @@ fn rewrite(path: &str, from: &str, to: &str) {
     rusty_core::fs::written::write(std::path::Path::new(path), text.as_bytes()).unwrap();
 }
 
-/// Hang a `Gun` one unit forward of `owner`'s bone `bone`.
 fn hang_gun(scene: &mut Scene, owner: u32, bone: &str) -> u32 {
     let gun = scene.add_entity("Gun".to_string());
     scene.world.transform_mut(gun).unwrap().position = Vec3::Z;
@@ -51,8 +47,6 @@ fn parent_name(scene: &Scene, id: u32) -> String {
     scene.world.name(parent).unwrap().clone()
 }
 
-/// `old` are all gone, no live entity lists a dead child, and a saved scene names
-/// none either.
 fn assert_dead_and_unlisted(scene: &Scene, old: &[u32]) {
     for &id in old {
         assert!(!scene.world.contains(id), "entity {id} was despawned");

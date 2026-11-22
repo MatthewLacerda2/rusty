@@ -1,8 +1,4 @@
-//! crates/script/src/api/nav/turning.rs — how a `NavMeshAgent` turns to face where it steers
-//! (#744): `Get`/`SetUpdateRotation` (Unity's `updateRotation`),
-//! `Get`/`SetAngularSpeed` (degrees/second, Unity's `angularSpeed`) and
-//! `Get`/`SetAngularAcceleration` (degrees/second²). Getters on an entity without an
-//! agent return `false` / `0`, as `GetBaseOffset` does.
+//! Angular speed is degrees/second, angular acceleration degrees/second². Getters without an agent return `false` / `0`.
 
 use mlua::{FromLua, IntoLua, Table};
 
@@ -13,7 +9,6 @@ use rusty_components::NavMeshAgentComponent;
 use rusty_edit::authoring::nav::agent as nav_ops;
 use rusty_scene::Scene;
 
-/// The turning getters and setters on `NavMeshAgent`.
 pub(super) fn register(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     field(
         lua,
@@ -41,8 +36,6 @@ pub(super) fn register(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg
     )
 }
 
-/// `Get<name>(id)` reading through `get` and `Set<name>(id, value)` writing through
-/// the shared authoring op `set`.
 fn field<T>(
     lua: &mlua::Lua,
     t: &Table,

@@ -1,17 +1,9 @@
-//! crates/asset/src/audio/wav.rs — the WAV writer imported audio is stored as (#385).
-//!
-//! 16-bit PCM, any channel count and rate: the same encoding zimmer bakes `Sound.*`
-//! output to, so a converted MP3 and a bake are the same kind of file. zimmer's
-//! encoder is crate-private (and fixed to stereo at its own rate), hence this one.
+//! Same 16-bit PCM as zimmer's bake; its encoder is crate-private and stereo-only, hence this one.
 
-/// Bytes per sample in the written file (16-bit PCM).
 const BYTES_PER_SAMPLE: u16 = 2;
-/// Format tag 1 = uncompressed PCM.
 const FORMAT_PCM: u16 = 1;
 
-/// Encode interleaved `samples` (`channels` per frame, `-1..1`) as a complete WAV.
-/// Samples are clamped and rounded to nearest, so an overshoot cannot wrap into a
-/// click.
+/// Samples are clamped and rounded, so an overshoot cannot wrap into a click.
 pub fn encode(channels: u16, sample_rate: u32, samples: &[f32]) -> Vec<u8> {
     let channels = channels.max(1);
     let block_align = channels * BYTES_PER_SAMPLE;
@@ -35,7 +27,6 @@ pub fn encode(channels: u16, sample_rate: u32, samples: &[f32]) -> Vec<u8> {
     out
 }
 
-/// Quantise one sample to 16-bit, clamping first so `±1.0` hits the endpoints.
 fn to_i16(sample: f32) -> i16 {
     (sample.clamp(-1.0, 1.0) * f32::from(i16::MAX)).round() as i16
 }

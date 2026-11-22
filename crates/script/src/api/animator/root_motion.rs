@@ -1,15 +1,3 @@
-//! crates/script/src/api/animator/root_motion.rs — the `Animator` root-motion surface (#1745).
-//!
-//! Unity's `applyRootMotion` and `deltaPosition` / `deltaRotation`:
-//! `SetApplyRootMotion` / `GetApplyRootMotion` toggle whether the root bone's
-//! horizontal travel and yaw move the entity (through its CharacterController,
-//! else its NavMeshAgent, else its Transform), `SetRootBone` / `GetRootBone`
-//! name that bone (empty: the skeleton's first root joint), and
-//! `GetRootMotion` reads the last fixed step's delta — world-space metres and a
-//! yaw in degrees — whether or not it was applied, for a script that moves the
-//! entity itself. Writes go through `authoring::animator`, the ops the
-//! inspector's Animator card uses.
-
 use mlua::IntoLuaMulti;
 
 use super::{put, Reg};
@@ -18,13 +6,11 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::animator as animator_ops;
 use rusty_scene::Scene;
 
-/// Register the root-motion verbs onto the `Animator` table.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_settings(lua, table, scene)?;
     register_get_root_motion(lua, table, scene)
 }
 
-/// The saved settings: `Set`/`GetApplyRootMotion` and `Set`/`GetRootBone`.
 fn register_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

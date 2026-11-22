@@ -1,6 +1,3 @@
-//! The lightmap report (#1980): written by the bake, a line per lightmapped mesh
-//! with its texels and worker time, and its page's occupancy.
-
 use super::tests::{quick, scene, scene_path};
 use super::*;
 use crate::bake::report::{read, Kind};

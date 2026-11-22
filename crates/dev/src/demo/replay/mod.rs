@@ -1,16 +1,3 @@
-//! The replay: a [`TickTap`] that feeds a demo back into a world, tick by tick,
-//! and checks the world against the demo's digests (#1581).
-//!
-//! Right before Play is entered it repeats the acts made before it (a scenario's
-//! set-up); right before each tick's input is published it repeats the host acts
-//! recorded for it (a console line, a scenario's API call or handle act), sets
-//! the Game view size and writes the recorded [`InputFrame`](rusty_core::input::InputFrame)
-//! over whatever live input there was, and the tick runs on the recorded `dt` with
-//! the `Scene.LoadAsync` operations ready that were then;
-//! after the tick it compares the digest, when one was stored, and after the
-//! last the digest Play ended on. The first tick whose digest differs is the divergence, and
-//! a tainted tick is warned about from there on: a replay never drifts in silence.
-
 use mlua::Lua;
 
 use super::format::{host_call, End};
@@ -33,7 +20,6 @@ use seek::Start;
 pub use seek::{seek, NO_DEMO};
 pub use verdict::{Divergence, Verdict};
 
-/// Feeds a demo into the world it is installed on; see [`prepare`].
 pub struct Replayer {
     ticks: DemoTicks,
     tick: Option<DemoTick>,
@@ -41,9 +27,7 @@ pub struct Replayer {
     end: End,
     lua: Lua,
     verdict: Verdict,
-    /// Where a seek back restarts it (`seek`).
     start: Start,
-    /// Whether the world ran a tick past the demo's last.
     past_end: bool,
 }
 
@@ -52,34 +36,26 @@ impl Replayer {
         &self.verdict
     }
 
-    /// Whether every tick of the demo was replayed.
     pub fn finished(&self) -> bool {
         self.verdict.ticks >= self.verdict.of
     }
 
-    /// A scenario on top steps this replay, so stopping short is its choice.
     pub fn driven_by_scenario(&mut self) {
         self.verdict.scenario = true;
     }
 
-    /// The demo file it replays.
     pub fn demo_path(&self) -> &std::path::Path {
         self.start.path()
     }
 
-    /// Whether the world ran on past the demo's last tick: it no longer stands
-    /// where the replay left it.
     pub fn past_end(&self) -> bool {
         self.past_end
     }
 
-    /// Its start state and its verdict: what a restart keeps (`seek`).
     pub(super) fn into_start(self) -> (Start, Verdict) {
         (self.start, self.verdict)
     }
 
-    /// A restarted replay keeps what the run before found: a divergence, and that
-    /// a scenario steps it.
     pub(super) fn carry(&mut self, before: Verdict) {
         self.verdict.scenario = before.scenario;
         if self.verdict.diverged.is_none() {
@@ -125,33 +101,24 @@ impl Replayer {
     }
 }
 
-/// Set `world` up as `demo` started — its seed, save data, the options and quality
-/// the player had saved, the time scale and pause, the Game view size — and install the
-/// replay. Call before the world's first tick; the project settings go in when
-/// the harness is built.
 pub fn prepare(world: &mut GameWorld, demo: Demo) -> Result<(), String> {
     let lua = replay_vm(world)?;
     install(world, demo, lua);
     Ok(())
 }
 
-/// The replay's own VM, with the API over `world`'s cells installed once (#1709):
-/// the scenario calls the demo recorded are made again in it.
 pub(super) fn replay_vm(world: &GameWorld) -> Result<Lua, String> {
     let lua = rusty_script::scripting::sandboxed_vm()?;
     world.script_manager().api_cells().install(&lua)?;
     Ok(lua)
 }
 
-/// [`prepare`], with what can fail done: `lua` is the replay's own VM.
 fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let start = Start::of(world, demo.path());
     let header = &demo.header;
     super::sources::warn_changes(world, header);
-    // Written through the lent list, so it writes nothing `lend` does not take.
     let mut host = Host::take(world);
     host.seed = header.seed;
-    // An `f32` widened to `f64` narrows back exactly.
     host.time.time_scale = header.time_scale.0 as f32;
     (host.time.paused, host.time.pending_steps) = (header.paused, header.pending_steps);
     host.storage.replace(header.storage.clone());
@@ -188,9 +155,6 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
 }
 
 impl Replayer {
-    /// Right before Play is entered: the acts made before it. A line run in edit
-    /// mode needs the edit-mode runtime the recording host had (the editor's, the
-    /// session's), which a headless replay brings up for it.
     fn before_play(&mut self, world: &mut GameWorld) {
         let acts = std::mem::take(&mut self.before_play);
         if acts.iter().any(|act| matches!(act, HostCall::Eval(_))) {
@@ -200,9 +164,6 @@ impl Replayer {
         self.acts(world, 0, acts);
     }
 
-    /// Before input is published: the tick's host acts again, and its Game view
-    /// size. After the transition, so the acts made between entering Play and
-    /// the first tick land after entering it, however it was entered.
     fn before_input(&mut self, world: &mut GameWorld) {
         let Some(tick) = &mut self.tick else {
             return;
@@ -223,8 +184,6 @@ impl Replayer {
         }
     }
 
-    /// After the tick: its digest compared, when the demo stored one; after the
-    /// last, the acts made before Stop and the digest Play ended on.
     fn after_tick(&mut self, world: &mut GameWorld) {
         let Some(tick) = self.tick.take() else {
             self.past_end |= self.finished();
@@ -244,7 +203,6 @@ impl Replayer {
         }
     }
 
-    /// Compare the world's digest with `expected`, stored at tick `t`.
     fn compare(&mut self, world: &GameWorld, t: u64, expected: String) {
         self.verdict.checked += 1;
         if self.verdict.diverged.is_some() {
@@ -284,8 +242,6 @@ impl TickTap for Replayer {
         self.tick.as_ref().map_or(dt, |tick| tick.dt)
     }
 
-    /// The recorded ready operations, never the live ones: the world waits for its
-    /// own loader on each (#2123).
     fn loads(&mut self, ready: Vec<u32>) -> Vec<u32> {
         self.tick.as_ref().map_or(ready, |tick| tick.loads.clone())
     }

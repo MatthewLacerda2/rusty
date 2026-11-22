@@ -1,33 +1,8 @@
-//! crates/script/src/api/shader/from_lua.rs — marshal a Lua shader-recipe table into a
-//! [`ShaderRecipe`] (#272).
-//!
-//! mlua's `serde` feature is not enabled, so the Lua → recipe bridge goes Lua
-//! table → `serde_json::Value` (via the shared [`crate::api::lua_json`] converter)
-//! → `ShaderRecipe`, so the recipe decoding lives ONCE in the serde derive. The
-//! Lua shape mirrors the serde document one-to-one (so a recipe authored in Lua
-//! and one loaded from `.json` describe the same module):
-//!
-//! ```lua
-//! {
-//!   pass = "postfx",            -- "surface" | "postfx"
-//!   name = "warm_grade",        -- baked file becomes <name>.wgsl
-//!   blocks = {
-//!     { id = "tint", params = { color = {1.0, 0.8, 0.6} } },
-//!     { id = "scanline", params = { strength = 0.6 } },
-//!   },
-//! }
-//! ```
-//!
-//! Each block table carries an `id` and an optional `params` map; a param is a
-//! scalar, a small float array, or a choice param's name (`kind = "slot"`, #1679).
-
 use mlua::Value;
 
 use crate::api::lua_json::recipe_from_lua;
 use rusty_shadergen::ShaderRecipe;
 
-/// Parse a recipe argument — a Lua table or its JSON string (#410) — into a
-/// [`ShaderRecipe`]. Errors carry a message the REPL/script surfaces verbatim.
 pub fn parse_recipe(value: &Value) -> Result<ShaderRecipe, String> {
     recipe_from_lua(value)
 }

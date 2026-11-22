@@ -1,60 +1,34 @@
-//! crates/core/src/storage.rs — Storage: JSON-backed key-value persistence.
-//!
-//! The engine's PlayerPrefs analog (issue #86): a per-World key-value store
-//! developers (and the engine's own settings) save across runs, backed by a
-//! human-readable JSON file so an agent can read/diff a save in a PR. Values are
-//! grouped into **namespaces** (one JSON object each), and a value can be any
-//! structured blob, not just a flat scalar.
-//!
-//! ## Determinism discipline
-//! The simulation is a pure function of `(seed, inputs, fixed dt)`, so the store
-//! must never let disk contents leak into a tick:
-//! - **Reads** resolve from the in-memory map, loaded once at a boundary
-//!   ([`open`]) — the loaded snapshot *is* an input, like the scene itself.
-//! - **Writes** mutate the in-memory map and are persisted only by [`flush`] at a
-//!   boundary (Stop / quit), never inside `FixedUpdate`.
-//! - A pathless store ([`new`]) never touches disk, so the headless harness and
-//!   tests stay reproducible — `flush` is a no-op without a path.
-//!
-//! `core` is outside the determinism guard's sim dirs and stays decoupled from
-//! egui / wgpu / mlua; the Lua `Storage` namespace lives in `api/storage.rs`.
+//! The PlayerPrefs analog, a human-readable JSON file. Reads resolve from memory loaded
+//! once at a boundary ([`open`]); writes persist only at [`flush`] (Stop or quit), never
+//! inside `FixedUpdate`, so disk contents never leak into a tick. A pathless store
+//! ([`new`]) never touches disk.
 //!
 //! [`open`]: Storage::open
 //! [`flush`]: Storage::flush
 //! [`new`]: Storage::new
-//!
+
+//! [`open`]: Storage::open
+//! [`flush`]: Storage::flush
+//! [`new`]: Storage::new
 //! stored-format: the PlayerPrefs save file
 
 use std::path::PathBuf;
 
 use serde_json::{Map, Value};
 
-/// Default on-disk location for the windowed app's store (the gitignored runtime
-/// workspace, alongside the seeded scenes). The harness/tests leave the store
-/// pathless instead.
 pub const DEFAULT_STORAGE_PATH: &str = "saved/storage.json";
 
-/// A namespaced, JSON-backed key-value store. The top level maps a namespace name
-/// to a JSON object of its keys.
 #[derive(Default)]
 pub struct Storage {
-    /// `Some` once bound to a file via [`Storage::open`]; `None` keeps the store
-    /// entirely in memory (harness/tests), so [`Storage::flush`] never writes.
     path: Option<PathBuf>,
-    /// namespace -> object of `{ key: value }`.
     data: Map<String, Value>,
 }
 
 impl Storage {
-    /// An empty, pathless store — the default for the harness and tests, which
-    /// must never read a developer's real save.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Bind the store to `path` and load it into memory if the file exists. This
-    /// is the boundary read; a missing file is the normal first-run case (not an
-    /// error). Returns `Err` only when an existing file is unreadable or malformed.
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
         if path.exists() {
@@ -71,8 +45,6 @@ impl Storage {
         Ok(())
     }
 
-    /// Persist the in-memory store to disk as pretty JSON. A no-op when the store
-    /// is pathless. The boundary write — called on Stop / quit, never per tick.
     pub fn flush(&self) -> Result<(), String> {
         let Some(path) = &self.path else {
             return Ok(());
@@ -87,15 +59,10 @@ impl Storage {
             .map_err(|e| format!("Failed to write storage file: {}", e))
     }
 
-    /// Everything stored, as one JSON object: what a demo records as the save data
-    /// its Play session started from (#1581).
     pub fn data(&self) -> Value {
         Value::Object(self.data.clone())
     }
 
-    /// Replace everything stored with `data` (a JSON object; anything else empties
-    /// the store), leaving the bound path alone: a replay starts from the save
-    /// data its demo recorded.
     pub fn replace(&mut self, data: Value) {
         self.data = match data {
             Value::Object(map) => map,
@@ -103,12 +70,10 @@ impl Storage {
         };
     }
 
-    /// The value at `namespace.key`, or `None` if either is absent.
     pub fn get(&self, namespace: &str, key: &str) -> Option<Value> {
         self.data.get(namespace)?.as_object()?.get(key).cloned()
     }
 
-    /// Set `namespace.key` to `value`, creating the namespace object if needed.
     pub fn set(&mut self, namespace: &str, key: &str, value: Value) {
         let entry = self
             .data
@@ -117,19 +82,16 @@ impl Storage {
         if !entry.is_object() {
             *entry = Value::Object(Map::new());
         }
-        // Safe: just ensured `entry` is an object.
         entry
             .as_object_mut()
             .expect("namespace entry is an object")
             .insert(key.to_string(), value);
     }
 
-    /// Whether `namespace.key` exists.
     pub fn has(&self, namespace: &str, key: &str) -> bool {
         self.get(namespace, key).is_some()
     }
 
-    /// Remove `namespace.key`. Returns whether something was removed.
     pub fn delete(&mut self, namespace: &str, key: &str) -> bool {
         self.data
             .get_mut(namespace)
@@ -138,12 +100,10 @@ impl Storage {
             .is_some()
     }
 
-    /// The whole namespace object as a structured blob, or `None` if absent.
     pub fn get_namespace(&self, namespace: &str) -> Option<Value> {
         self.data.get(namespace).cloned()
     }
 
-    /// Replace (or create) a whole namespace with `value` in one shot.
     pub fn set_namespace(&mut self, namespace: &str, value: Value) {
         self.data.insert(namespace.to_string(), value);
     }
@@ -161,7 +121,6 @@ mod tests {
         assert!(s.has("audio", "volume"));
         assert!(s.delete("audio", "volume"));
         assert!(!s.has("audio", "volume"));
-        // Pathless flush is a harmless no-op.
         assert!(s.flush().is_ok());
     }
 
