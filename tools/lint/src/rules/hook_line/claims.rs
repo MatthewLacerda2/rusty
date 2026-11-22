@@ -125,7 +125,7 @@ fn header<'a>(file: &File<'a>, text: &str, at: usize, here: &str) -> Vec<Found<'
     if !named.is_empty() {
         return named;
     }
-    let opening = sentence.trim_start_matches(|c: char| c == '/' || c == '!' || c == ' ');
+    let opening = sentence.trim_start_matches(['/', '!', ' ']);
     let opening = opening.strip_prefix("A ").unwrap_or(opening);
     let module_is_one = phrase(opening) == Some(0);
     match module_name(file.path).filter(|_| module_is_one) {
