@@ -67,3 +67,29 @@ pub fn profile_one(run: &Run, scene: &str) {
         exit(1);
     }
 }
+
+/// `make ray-scene`: each scene's ray-traced tree, measured.
+pub fn rays_all(run: &Run, names: &[String]) {
+    use rusty::render::rays::probe::measure;
+    let opened = open(run, &run.project, "the project");
+    println!("scene | triangles | instances | meshes | GPU MiB | build ms | trace ms | hit px");
+    for scene in names {
+        let loaded = scenes::load(&run.out, &opened.root, scene, opened.settings, run.opts);
+        let (mut harness, _) =
+            loaded.unwrap_or_else(|e| fail(&format!("{scene}: load failed: {e}")));
+        let world = std::rc::Rc::clone(&harness.world);
+        let world = world.borrow();
+        let (camera, edit) = (world.main_view(), world.scene().borrow());
+        let Some(r) = harness.renderer() else {
+            fail("no GPU adapter")
+        };
+        let Some(m) = measure(r, &edit, &camera, (1920, 1080)) else {
+            fail(&format!("{scene}: the renderer holds no extract of it"))
+        };
+        let mib = m.gpu_bytes as f64 / f64::from(1 << 20);
+        println!(
+            "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {:.2} | {}",
+            m.triangles, m.instances, m.meshes, m.build_ms, m.trace_ms, m.hit_pixels
+        );
+    }
+}

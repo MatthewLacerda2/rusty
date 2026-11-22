@@ -547,6 +547,13 @@ bench-scenes: ## Benchmark a project's own scenes. make bench-scenes PROJECT=~/g
 	@test -n "$(PROJECT)" || { echo "bench-scenes: make bench-scenes PROJECT=<project dir> [SCENES=a,b] [RES=WxH] [RUNS=n] [LOAD_RUNS=n] [BEFORE=dir] [PROFILE=1] [IMPORT=1] [SCRIPT=1] [EDITOR=0] [SET=key=value]" >&2; exit 1; }
 	$(if $(filter 1,$(PROFILE)),RUSTFLAGS="$$RUSTFLAGS -C force-frame-pointers=yes") cargo run $(if $(filter 1,$(PROFILE)),--profile profiling,--release) --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) $(if $(RES),--size $(RES)) $(if $(RUNS),--runs $(RUNS)) $(if $(LOAD_RUNS),--load-runs $(LOAD_RUNS)) $(if $(BEFORE),--before $(BEFORE)) $(if $(filter 1,$(PROFILE)),--profile) $(if $(filter 1,$(IMPORT)),--import) $(if $(filter 1,$(SCRIPT)),--script) $(if $(filter 0,$(EDITOR)),--no-editor) $(foreach s,$(SET),--set '$(s)') out/bench/scenes
 
+# The ray-traced scene's numbers per scene: its triangles, instances and meshes, the
+# tree's GPU bytes, a from-scratch build and the median of five one-ray-per-pixel
+# traces at 1920x1080 from the spawn camera, both wall-clock ms (no GPU timestamps).
+ray-scene: ## The ray-traced tree's size, build and 1080p trace time per scene. make ray-scene PROJECT=<dir> [SCENES=a,b]
+	@test -n "$(PROJECT)" || { echo "ray-scene: make ray-scene PROJECT=<project dir> [SCENES=a,b]" >&2; exit 1; }
+	cargo run --release --quiet --features dev --bin bench-scenes -- --project $(PROJECT) $(if $(SCENES),--scenes $(SCENES)) --rays out/bench/scenes
+
 # A pull request's measured rows (#2381): `main`, the PR's head, `main` again, back to
 # back, each built in a detached worktree of its own; the second `main` leg is each
 # row's noise floor, and a change inside it reads *inside the floor*. Refuses another timed
