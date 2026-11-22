@@ -7,6 +7,8 @@ from itertools import combinations
 from merging.watch import board
 
 
+# CLAUDE.md's label order, best first: the one table every tool that ranks issues reads (the
+# coders' waiting line too, `dispatch.waiting.RANKS`, #2615).
 PRIORITY = ("infrastructure", "architecture", "bug", "foundation", "feature")
 
 # Where the development tooling lives (#969): a `bug` pull request touching only

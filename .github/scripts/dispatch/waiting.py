@@ -14,7 +14,18 @@ a tool can hold.
 - **Order** ([`ordered`]): a round (a `Round:` line in the issue's newest
   `Brief`, `rebriefs.ROUND`) ahead of a first launch, since a draft with
   findings open is nearly done and CLAUDE.md's merge order favours finishing;
-  then the order asked.
+  then the issue's [`priority`] (#2615: a red-`main` fix asked with fourteen
+  entries in line waited behind eight by ask time alone); then the order asked.
+- **Priority** ([`priority`], [`RANKS`]): a red `main` first, told by the
+  marker `main-health.sh` writes in its issue's body ([`RED_MAIN_MARKER`]),
+  never by the title; then CLAUDE.md's label order, read from the one table
+  the merge queue ranks by (`merging/watch/order.PRIORITY`), an issue with
+  several labels taking its highest; then an issue with none of them. It is
+  read when the issue is asked for and again whenever [`refresh`] reads it
+  (labels change), and kept on the entry (`priority`). An entry without one (written
+  before #2615, or asked when its labels could not be read) sorts among the
+  lowest rank in ask order, and `make coders` says so. No preemption: a
+  running coder is never stopped for a higher-ranked entry.
 - **Nothing launches by itself**: `dispatch/drain.py` runs only when `make coders` is
   called (the orchestrator's watch, once a minute), never from a daemon, so
   there is no process to keep alive across a reboot.
@@ -51,6 +62,8 @@ from typing import Callable
 
 from dispatch import brief, rebriefs, remote
 from merging import state as files
+from merging.watch import board
+from merging.watch.order import PRIORITY
 
 #: Where the line lives, under the common git directory.
 FILE = "merge-queue/coders-waiting.json"
@@ -146,9 +159,32 @@ def is_round(found: dict) -> bool:
     return rebriefs.ROUND.search(found.get("body") or "") is not None
 
 
+#: What `main-health.sh` writes at the top of the issue it files for a red workflow on `main`.
+RED_MAIN_MARKER = "<!-- main-health:workflow="
+
+#: The ranks, best first: a red `main`, CLAUDE.md's label order, then an issue with none of them.
+RED_MAIN, UNLABELLED = "red main", "unlabelled"
+RANKS = (RED_MAIN, *PRIORITY, UNLABELLED)
+
+
+def priority(issue: object) -> str | None:
+    """`issue`'s rank in [`RANKS`]; `None` when it is not an issue read from GitHub."""
+    if not isinstance(issue, dict):
+        return None
+    if RED_MAIN_MARKER in (issue.get("body") or ""):
+        return RED_MAIN
+    labels = board.names(issue.get("labels"))
+    return next((label for label in PRIORITY if label in labels), UNLABELLED)
+
+
+def rank(entry: dict) -> int:
+    """Where `entry`'s priority sorts; none read sorts with the lowest."""
+    return RANKS.index(entry["priority"]) if entry.get("priority") in RANKS else len(RANKS) - 1
+
+
 def ordered(entries: list[dict]) -> list[dict]:
-    """Rounds first, then the order asked."""
-    return sorted(entries, key=lambda e: (not e.get("round"), e["asked"], e["issue"]))
+    """Rounds first, then by priority, then the order asked."""
+    return sorted(entries, key=lambda e: (not e.get("round"), rank(e), e["asked"], e["issue"]))
 
 
 def ahead(entries: list[dict], number: int) -> int:
@@ -156,11 +192,14 @@ def ahead(entries: list[dict], number: int) -> int:
     return next((i for i, e in enumerate(ordered(entries)) if e["issue"] == number), len(entries))
 
 
-def enqueue(entries: list[dict], number: int, found: dict, now: datetime) -> tuple[list[dict], bool]:
-    """The line with #`number` on the brief `found`, and whether it was added; an issue already in
-    line keeps its place and takes the newer brief."""
+def enqueue(entries: list[dict], number: int, found: dict, now: datetime,
+            issue: dict | None = None) -> tuple[list[dict], bool]:
+    """The line with #`number` (the `issue` read from GitHub) on the brief `found`, and whether it
+    was added; an issue already in line keeps its ask time and takes the newer brief and priority."""
     stamp = f"{now:%Y-%m-%dT%H:%M:%S}Z"
     entry = {"issue": number, "brief": found.get("html_url", ""), "round": is_round(found)}
+    if (ranked := priority(issue)) is not None:
+        entry["priority"] = ranked
     for kept in entries:
         if kept["issue"] == number:
             kept.update(entry)
@@ -175,7 +214,7 @@ def without(entries: list[dict], number: int) -> list[dict]:
 def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callable[[str], None],
             dry: bool = False) -> dict | None:
     """The newest brief `entry` would launch on, `None` to drop it, or `{}` to keep it
-    unlaunched because GitHub could not be read. Updates the entry's brief and round."""
+    unlaunched because GitHub could not be read. Updates the entry's brief, round and priority."""
     number = entry["issue"]
     if not isinstance(issue, dict) or comments is None:
         say(f"#{number}: could not read it from GitHub; kept in line, not launched")
@@ -190,4 +229,17 @@ def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callabl
             "a launch from the line takes it")
         entry["brief"] = found.get("html_url", "")
     entry["round"] = is_round(found)
+    entry["priority"] = priority(issue)
     return found
+
+
+def relabel(entries: list[dict], seen: dict[int, dict]) -> list[dict]:
+    """`entries` with the round and priority a pass read (`seen`, by issue) written onto them."""
+    return [{**e, **seen.get(e["issue"], {})} for e in entries]
+
+
+def described(entry: dict) -> str:
+    """An entry's round and rank, as `make coders` lists them."""
+    kind = "round" if entry.get("round") else "first launch"
+    ranked = entry.get("priority")
+    return f"{kind}, {ranked if ranked in RANKS else 'priority unread: sorted with the lowest'}"
