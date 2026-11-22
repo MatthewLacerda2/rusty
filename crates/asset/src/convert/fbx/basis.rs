@@ -7,7 +7,7 @@ use glam::{DMat3, DMat4, DQuat, DVec3};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Local {
     pub translation: [f32; 3],
-    /// Unit quaternion `[x, y, z, w]`.
+    /// `[x, y, z, w]`, unit.
     pub rotation: [f32; 4],
     pub scale: [f32; 3],
 }
@@ -131,6 +131,7 @@ mod tests {
         }
     }
 
+    /// Positive scales: only there do both splits agree.
     fn keys_agree_with_the_conjugated_matrix(basis: Basis) {
         let q = DQuat::from_rotation_z(0.7) * DQuat::from_rotation_x(0.3);
         let s = DVec3::new(1.0, 2.0, 3.0);

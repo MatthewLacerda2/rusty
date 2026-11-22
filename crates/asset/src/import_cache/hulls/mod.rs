@@ -21,6 +21,7 @@ pub use write::save_pending;
 
 pub const SUFFIX: &str = ".hulls";
 
+/// Public for `physics`' sidecar tests too.
 pub fn sidecar_of(source: &Path) -> Option<PathBuf> {
     crate::convert::cache_location_as(source, SUFFIX).ok()
 }

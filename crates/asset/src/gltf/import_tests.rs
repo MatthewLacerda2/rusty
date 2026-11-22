@@ -5,6 +5,7 @@ use crate::import_file;
 use crate::mesh_data::SubMesh;
 use rusty_test_support::models::quad_mode_gltf;
 
+// glTF 2.0's `primitive.mode` values.
 const POINTS: u32 = 0;
 const LINES: u32 = 1;
 const LINE_LOOP: u32 = 2;

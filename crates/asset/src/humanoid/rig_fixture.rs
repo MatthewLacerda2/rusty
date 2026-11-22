@@ -1,11 +1,11 @@
-//! Primitive humanoid rigs for the retarget tests, built from model-space rests so two
-//! rigs share a silhouette while bone axes, poses, heights, facing and armature differ.
+//! Rigs share a silhouette while bone axes, poses, heights, facing and armature differ.
 
 use glam::{Mat4, Quat, Vec3};
 
 use crate::anim_data::{AnimationClip, Interpolation, JointTrack, Track};
 use crate::mesh_data::{JointTransform, SkinData};
 
+/// (name, parent slot, model-space rest position at height 1, T-pose).
 pub const BONES: &[(&str, Option<usize>, [f32; 3])] = &[
     ("mixamorig:Hips", None, [0.0, 0.9, 0.0]),
     ("mixamorig:Spine", Some(0), [0.0, 1.1, 0.0]),
@@ -143,6 +143,7 @@ pub fn walk(skin: &SkinData) -> AnimationClip {
         (10, 0.4),
     ] {
         tracks[slot].rotation = turn(slot, Vec3::X, k);
+        // The source's own limb length: the retarget drops it, so the target's holds.
         tracks[slot].translation = Track {
             times: vec![0.0],
             values: vec![rest(slot).translation],

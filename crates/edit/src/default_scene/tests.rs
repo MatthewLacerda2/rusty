@@ -113,6 +113,7 @@ fn seeding_bakes_the_texture_and_shader_once() {
         );
     }
     let json = std::fs::read_to_string(shaders.join(format!("{SHADER_NAME}.recipe.json")));
+    // Decoded as `rusty-script`'s `recipe_from_json_str` decodes it.
     let json = serde_json::from_str(&json.unwrap()).unwrap();
     assert_eq!(
         rusty_core::naming::variant_case::decode(json),

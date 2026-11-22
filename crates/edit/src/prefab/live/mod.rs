@@ -1,8 +1,5 @@
 //! The diff is taken against the source as last *propagated*, never the file as it is now: a source
-//! changed since would turn every leaf the instance never touched into an override. The live diff
-//! *is* the override set: an edit the author undid never comes back, and an override on a component
-//! the source removed is dropped (Unity keeps an "unused override"; rusty does not). The root's
-//! position and rotation belong to the instance, never the source (as Unity): never an override.
+//! changed since would turn every leaf the instance never touched into an override.
 
 use std::sync::Arc;
 
@@ -35,6 +32,7 @@ pub fn entity_overrides(world: &World, id: u32) -> PrefabOverrides {
         .unwrap_or_default()
 }
 
+/// Call before any rebuild of these instances: a rebuild re-applies only the links' overrides.
 pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     for &id in ids {
         let overrides = entity_overrides(world, id);
@@ -44,6 +42,7 @@ pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     }
 }
 
+/// Drops the baseline: one naming bones a Stop respawns must not outlive its World.
 pub fn write_overrides(entities: &mut [Entity]) {
     for entity in entities {
         let overrides = live_overrides(entity);

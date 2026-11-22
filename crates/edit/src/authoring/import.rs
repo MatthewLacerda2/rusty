@@ -7,6 +7,8 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         base_color: [data.base_color[0], data.base_color[1], data.base_color[2]],
         base_color_map: data.base_color_map.clone(),
         metallic: data.metallic,
+        // glTF packs metallic (B) and roughness (G) in one image: both maps name it, and the
+        // shader reads its own channel from each.
         metallic_map: data.metallic_roughness_map.clone(),
         roughness: data.roughness,
         roughness_map: data.metallic_roughness_map.clone(),
@@ -19,10 +21,11 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
             true => RenderFace::Both,
             false => RenderFace::Front,
         },
+        // glTF's `alphaMode` is not read: an import is Opaque until transparency is authored.
         ..MaterialAsset::default()
     };
     super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
-    // Its strength through its row, clamped as an authored one is.
+    // The occlusion strength goes through its row, clamped as an authored one is.
     let strength = SurfaceValue::Number(data.occlusion_strength);
     super::material::import_field(&mut asset, "occlusion_strength", strength);
     super::material::fit_map_slots(&asset);

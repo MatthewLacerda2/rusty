@@ -50,6 +50,7 @@ pub fn node(scene: &mut Scene, name: &str, parent: Option<u32>, place: Place) ->
     let id = scene.add_entity(name.to_string());
     scene.world.set_rect_transform(id, Some(place.rect()));
     if let Some(p) = parent {
+        // A fresh node under a live parent cannot form a cycle.
         let _ = scene.set_parent(id, Some(p));
     }
     id

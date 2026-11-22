@@ -58,6 +58,7 @@ pub fn has_unsaved_edits(scene: &Scene, path: &str) -> bool {
         return true;
     };
     let compact = |mut data: SceneData| {
+        // The editor copies its selection into the scene every frame: not an edit.
         data.selected_entity_id = None;
         serde_json::to_string(&data).ok()
     };
@@ -72,6 +73,8 @@ pub fn load_from_file(scene: &mut Scene, path: &str) -> Result<(), LoadError> {
     load_parsed(scene, path, json, data)
 }
 
+/// For a caller that already parsed the text (the editor's follow). Fails only with
+/// [`LoadError::Sidecar`], after the World was replaced.
 pub fn load_parsed(
     scene: &mut Scene,
     path: &str,
@@ -89,7 +92,10 @@ pub fn load_rehydrated(
 ) -> Result<(), LoadError> {
     apply_rehydrated(scene, document);
     scene.renew_id();
+    // Recorded even if the sidecar fails: without it the next Generate Lighting or `touch`
+    // makes the follow reload over unsaved edits.
     scene.record_disk_text(path, json);
+    // Forgotten first: the navmesh and sidecar loads below record this scene's bake files.
     scene.forget_bake_files();
     rusty_scene::nav_settings::load_navmesh(scene, path);
     rusty_scene::lighting::io::load_lighting_sidecar(scene, path).map_err(LoadError::Sidecar)

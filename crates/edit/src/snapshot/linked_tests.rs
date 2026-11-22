@@ -102,6 +102,7 @@ fn a_load_of_linked_models_looks_the_file_up_once() {
     let (looked, from) = (lookups(), (rebuilds(), copies()));
     apply_scene_data(&mut loaded, data);
     assert_eq!(lookups() - looked, 1, "one lookup of the model file");
+    // Each part's own rebuild, plus the model's build and its baseline's.
     assert_eq!(copied(from), (parts.len() + 2, 0), "no copy per instance");
     for &id in &parts {
         assert_eq!(indices(&loaded, id), vec![0, 1, 2, 0, 2, 3], "part {id}");
@@ -118,6 +119,7 @@ fn stop_reloads_a_model_rewritten_during_play_with_no_note() {
     let snapshot = SceneSnapshot::capture(&scene);
     let (json, bin) = quad_mode_gltf(4, &[0, 1, 2]);
     let dir = std::path::Path::new(&path).parent().unwrap();
+    // Plain `std::fs::write`: no note in the write log, so only the lookup's own check sees it.
     std::fs::write(dir.join("quad.bin"), bin).unwrap();
     std::fs::write(&path, json).unwrap();
     snapshot.restore(&mut scene);

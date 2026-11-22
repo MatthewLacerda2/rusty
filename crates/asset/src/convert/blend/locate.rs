@@ -1,8 +1,5 @@
-//! [`RUSTY_BLENDER`] names it when set; otherwise the first `blender` on `PATH`, then the
-//! platform's usual install places. Refused below [`MIN_MAJOR`].
-//! Asking a version starts Blender (most of a second), so answers are remembered by the
-//! executable's path as found and canonicalized plus its length and mtime; an upgrade asks
-//! again. No answer at all is not remembered.
+//! Asking a version starts Blender (most of a second), so this process remembers each answer, a
+//! refusal too, per executable as it is now; no answer (it could not start, or timed out) is not.
 
 use super::known::{self, Known};
 use crate::ImportError;
@@ -18,6 +15,8 @@ pub const MIN_MAJOR: u32 = 5;
 
 pub const RUSTY_BLENDER_TIMEOUT: &str = "RUSTY_BLENDER_TIMEOUT";
 
+/// Long enough for a big scene, short enough that a hung Blender gives the editor and the cache's
+/// lock back.
 const EXPORT_TIMEOUT: Duration = Duration::from_secs(600);
 
 pub(super) const VERSION_TIMEOUT: Duration = Duration::from_secs(10);
@@ -201,6 +200,7 @@ fn version(path: &Path, known: Option<&Path>, memo: &Memo) -> Result<String, Imp
                         version: version.clone(),
                         reads: 0,
                     };
+                    // Not kept is no error: the next process asks Blender again.
                     known::write(file, &entry).unwrap_or(());
                 }
             }

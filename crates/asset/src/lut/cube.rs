@@ -41,7 +41,7 @@ pub(super) fn parse(text: &str) -> Result<Lut, Error> {
     header.finish(texels, last.max(1))
 }
 
-/// Each with the line that set it; `0` for the default domain.
+/// The size and domain read, each with the line that set it; `0` for the default domain.
 struct Header {
     size: Option<(usize, u32)>,
     domain: [[f32; 3]; 2],

@@ -2,6 +2,7 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Deserializer, Serialize};
 use serde_json::{Map, Value};
 
+/// An empty Lua table crosses as `{}`, so a failed decode is retried with every empty table a list.
 pub fn decode<T: DeserializeOwned>(json: Value) -> Result<T, String> {
     let error = match rusty_core::naming::variant_case::decode(json.clone()) {
         Ok(value) => return Ok(value),
@@ -28,6 +29,7 @@ pub fn over(held: Value, written: Value) -> Value {
     }
 }
 
+/// A written key `T` has no field for is an error: serde would drop it without a word.
 pub fn merged<T: Serialize + DeserializeOwned>(held: &T, written: Value) -> Result<T, String> {
     let to_json = |v: &T| serde_json::to_value(v).map_err(|e| e.to_string());
     let value: T = decode(over(to_json(held)?, written.clone()))?;

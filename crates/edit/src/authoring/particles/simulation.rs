@@ -10,6 +10,8 @@ pub fn set_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimu
     warn_switch(was, p);
 }
 
+/// `set_simulation` without its warnings, for `Component.Set`'s draft: [`commit`] warns once, for
+/// the emitter as written.
 pub fn switch_simulation(p: &mut ParticleEmitterComponent, simulation: ParticleSimulation) {
     retarget(p, simulation, p.simulation_space);
 }
@@ -35,6 +37,7 @@ pub(super) fn retarget(
     if target || simulation == ParticleSimulation::Gpu {
         p.clear_particles();
     }
+    // Forget the frames the particles were carried by, so none moves by a stale matrix.
     p.runtime.anchor = None;
     p.runtime.base = None;
     p.simulation = simulation;

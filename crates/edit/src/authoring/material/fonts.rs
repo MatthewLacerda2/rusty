@@ -49,13 +49,16 @@ pub(super) fn read_fonts(
     Ok(())
 }
 
-/// Compared for equality, never against a clock; an unreadable modified time is never cached.
+/// Compared for equality, never against a clock; one with no modified time never matches a kept
+/// font, so its file is re-read.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Stamp {
     len: u64,
     modified: Option<Duration>,
 }
 
+/// Kept for the process: each bake re-reads its recipe, and a re-read font would re-parse and
+/// start its shaper's memo empty.
 fn parsed() -> &'static Mutex<BTreeMap<PathBuf, (Stamp, FontHandle)>> {
     static PARSED: OnceLock<Mutex<BTreeMap<PathBuf, (Stamp, FontHandle)>>> = OnceLock::new();
     PARSED.get_or_init(Mutex::default)

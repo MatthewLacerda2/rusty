@@ -72,7 +72,8 @@ fn a_second_conversion_waits_for_the_first() {
 
 #[test]
 fn without_the_lock_an_interleaved_conversion_still_leaves_a_whole_set() {
-    // B converts "two" with no locks while A, converting "three", is at `step`.
+    // B converts "two" with no locks while A, converting "three", is at `step`. Not
+    // `GlbIn`: between A's `.glb` rename and its stamp only the lock keeps B out (above).
     for (step, stamped) in [
         (Step::Staged, true),
         (Step::TexturesIn, false),

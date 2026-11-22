@@ -11,6 +11,8 @@ use rusty_components::animator::Playback;
 use rusty_components::Entity;
 use rusty_scene::Scene;
 
+// The GameObject's header, its scripts (by path), its prefab link, and its links to parents,
+// bones and children.
 const NOT_COMPONENTS: &[&str] = &[
     "id",
     "name",
@@ -87,6 +89,7 @@ fn each_kind_reads_its_entity_key() {
     let doc = serde_json::to_value(scene.world.entity_document(id).unwrap()).unwrap();
     for kind in KINDS {
         let read = (kind.read)(&scene.world, id).expect(kind.name).unwrap();
+        // A `shown` hook may add a field the file leaves out at its default.
         let mut stored = read.clone();
         stored
             .as_object_mut()

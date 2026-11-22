@@ -1,5 +1,6 @@
 //! An extracted texture has no sidecar, so its import settings are typed by the slots
-//! its model's glTF samples it in (`of_slots`); a mix takes `Default`.
+//! its model's glTF samples it in (`of_slots`); a mix takes `Default`, which every slot
+//! reads whole (`texture_import::fits`).
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -48,6 +49,7 @@ fn absolute(path: &Path) -> PathBuf {
     rusty_core::paths::fold(&made)
 }
 
+/// `None` outside a project: the temp cache keeps no source path.
 pub fn model_source(image: &Path) -> Option<PathBuf> {
     let glb = rusty_core::paths::to_slash(&glb_of(image)?);
     let marker = format!("{}/", crate::convert::IMPORT_CACHE_DIR);

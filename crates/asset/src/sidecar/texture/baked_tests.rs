@@ -7,6 +7,7 @@ fn prepare(path: &Path, side: u32) -> Result<(), String> {
     prepare_bake("test", (side, 4), [path.to_str().unwrap()])
 }
 
+/// Four texels tall, so a wide side costs little.
 fn png(dir: &Path, name: &str, w: u32) -> PathBuf {
     let path = dir.join(name);
     image::RgbaImage::new(w, 4).save(&path).unwrap();

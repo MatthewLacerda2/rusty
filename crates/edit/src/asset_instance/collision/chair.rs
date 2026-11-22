@@ -1,9 +1,11 @@
-//! A test hook, compiled in every build: the scripting tests that import it are another crate's.
+//! A test hook, compiled in every build: `rusty-script`'s scripting tests import it.
 
 use std::path::Path;
 
 use rusty_asset::{sidecar, MeshColliderKind, SubObjectCollider};
 
+/// `Chair`'s 2n² triangles, 0.1 high, and `Chair_col`'s two, 0.5 high: a collider's triangle
+/// count or box top tells which built it.
 pub fn write(path: &Path, n: u32, mesh: Option<&str>) -> Result<String, String> {
     let mut obj = String::from("o Chair\n");
     for z in 0..=n {

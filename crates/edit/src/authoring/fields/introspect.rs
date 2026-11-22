@@ -1,5 +1,7 @@
 use serde::de::{self, Deserialize, Visitor};
 
+/// Records the list a derived `Deserialize` hands `deserialize_struct`, then stops;
+/// `#[serde(skip)]` fields are not in it.
 #[cfg(test)]
 pub fn serde_fields<'de, T: Deserialize<'de>>() -> Option<&'static [&'static str]> {
     let mut found = None;
@@ -52,6 +54,7 @@ impl<'de> de::Deserializer<'de> for Probe<'_> {
     }
 }
 
+/// Whether `name` is optional, and the Lua type it reads as: `None` where the derive does not say.
 pub fn field_type<'de, T: Deserialize<'de>>(name: &'static str) -> (bool, Option<&'static str>) {
     let mut found = Shape::default();
     let _ = T::deserialize(FieldProbe {
@@ -181,6 +184,8 @@ impl<'de> de::Deserializer<'de> for TypeProbe<'_> {
         self.found("table")
     }
 
+    // For an enum carrying data, `Component.Fields` takes "table" from the default value
+    // (when there is one), which wins.
     fn deserialize_enum<V: Visitor<'de>>(
         self,
         _: &'static str,

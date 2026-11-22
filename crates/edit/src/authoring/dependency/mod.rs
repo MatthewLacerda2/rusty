@@ -30,6 +30,8 @@ pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> b
             remove_with_cascade(world, id, dependent);
         }
     }
+    // The Mesh is Unity's Mesh Filter and Renderer in one, so it takes the Material (`Texture`)
+    // along; not a `requires`, which would make adding a Material add a Mesh.
     if kind == ComponentKind::Mesh {
         clear_one(world, id, ComponentKind::Texture);
         keep_collider_mesh(world, id);
@@ -37,6 +39,8 @@ pub fn remove_with_cascade(world: &mut World, id: u32, kind: ComponentKind) -> b
     clear_one(world, id, kind)
 }
 
+/// Before the Mesh clears: a Mesh-shaped collider keeps it as `shared_mesh`, so the entity keeps
+/// colliding.
 fn keep_collider_mesh(world: &mut World, id: u32) {
     let Some(shared) = world.mesh(id).map(|m| SharedMesh::of(&m)) else {
         return;

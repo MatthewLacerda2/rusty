@@ -1,6 +1,3 @@
-//! The editor's background import: a worker thread drains a queue of images so the editor stays
-//! responsive while it encodes.
-
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
@@ -63,7 +60,7 @@ pub fn queue(sources: Vec<PathBuf>) {
     let inbox = worker.get_or_insert_with(start);
     for source in sources {
         if inbox.send(source).is_err() {
-            // The worker is gone (it panicked): the next queue starts another.
+            // The worker panicked: the next queue starts another.
             log::warn!("[Import] the texture import worker stopped; textures stay uncompressed");
             *worker = None;
             return;
@@ -72,6 +69,8 @@ pub fn queue(sources: Vec<PathBuf>) {
 }
 
 pub(super) fn import_queued(source: &Path) {
+    // An extracted image gone since queued: a re-conversion removed its folder. Checked
+    // first, so no slot is asked of it; the match covers a later removal.
     if !source.exists() {
         return;
     }
@@ -85,6 +84,7 @@ pub(super) fn import_queued(source: &Path) {
         Err(_) if !source.exists() => {}
         Err(e) => {
             log::warn!("[Import] {e}");
+            // The console shows it only on a drawn frame.
             rusty_core::wake::frame();
         }
     }
