@@ -137,6 +137,8 @@ pub(crate) fn lazy_depth_pipeline(
     })
 }
 
+/// Culls back faces, as Unity does: culling front ones would store the far side, light a strip
+/// under every base, and drop single-sided planes. `Cw` keeps a mirrored caster's lit side.
 pub(crate) fn depth_pipeline(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -177,6 +179,7 @@ pub(crate) fn depth_pipeline(
             depth_write_enabled: Some(true),
             depth_compare: Some(wgpu::CompareFunction::Less),
             stencil: wgpu::StencilState::default(),
+            // Hardware slope bias against acne, beside the receiver's normal offset.
             bias: wgpu::DepthBiasState {
                 constant: 2,
                 slope_scale: 2.0,

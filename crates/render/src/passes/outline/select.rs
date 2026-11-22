@@ -47,6 +47,7 @@ fn owning_group(scene: &Scene, id: u32) -> Option<u32> {
         world
             .lod_group(g)
             .is_some_and(|l| l.renderers().any(|r| r == id))
+            // An inactive group hides nothing (`LodSelection`), so it owns nothing here.
             && world.is_active_in_hierarchy(g)
     })
 }

@@ -51,6 +51,7 @@ impl Renderer {
             .counted_write_buffer(&mask.uniform, 0, bytemuck::bytes_of(&params));
         self.record_mask(encoder, &mask.mask, &solids.draws);
         let rect = [x, y, w, h];
+        // White is `edge.wgsl`'s `NONE`: a row distance the scissor skips reads as no mask near.
         let rows = (&mask.rows, wgpu::LoadOp::Clear(wgpu::Color::WHITE));
         let dilate = (&self.outline.dilate, &mask.dilate_group);
         self.scissored(encoder, "Selection Dilate Pass", rows, dilate, rect);
@@ -69,6 +70,7 @@ impl Renderer {
         let timed = ("Selection Mask Pass", &self.gpu_timer, GpuPass::Outline);
         let mut pass = color_pass(encoder, timed, mask, clear);
         pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
+        // The mask reads nothing from the scene group; the no-AO one satisfies the layout.
         pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         let mut bound = None;
         for draw in &draws.outline {

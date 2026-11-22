@@ -5,6 +5,7 @@ use rusty_asset::MapRef;
 use rusty_components::{MeshComponent, RenderFace, ShadowCasting};
 use rusty_scene::{Scene, SceneId};
 
+/// The scene, `World::static_revision` and the static meshes' `casting_key`.
 pub(crate) type StaticsKey = (SceneId, u64, u64);
 
 #[cfg(test)]
@@ -27,6 +28,8 @@ pub(crate) fn statics_key(scene: &Scene) -> StaticsKey {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// Every renderer of a LODGroup one of whose renderers culls small: the bake draws LOD0 only,
+/// so a group split with the per-frame sweep would lose or double a level's shadow.
 pub(crate) struct UnbakedCasters {
     grouped: HashSet<u32>,
 }
@@ -52,6 +55,7 @@ impl UnbakedCasters {
     }
 }
 
+/// An FNV-style step on the 64-bit FNV prime.
 fn mix(key: u64, word: u64) -> u64 {
     key.wrapping_mul(0x100_0000_01b3).wrapping_add(word + 1)
 }
@@ -91,8 +95,10 @@ pub(crate) struct ObjectCasting {
 impl ObjectCasting {
     pub(crate) fn of(scene: &Scene, id: u32, mesh: &MeshComponent) -> Self {
         let mode = mesh.cast_shadows;
+        // `ShadowsOnly` casts as `On` does, so switching between them keeps the bake.
         let changes = !mode.casts() || mode == ShadowCasting::TwoSided;
         let mut slots = Vec::new();
+        // By slot index, unresolved slots included, so the digest names the slot the shadow clips.
         let count = scene.world.material(id).map_or(0, |m| m.materials.len());
         for slot in 0..count {
             let Some((_, asset)) = scene.material_entry_at(id, slot) else {

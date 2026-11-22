@@ -9,6 +9,7 @@ pub(crate) struct GpuClusters {
     pub(crate) lease: Lease,
 }
 
+/// Rows of `hiz_clusters.wgsl`'s `Cluster`, first index (moved by `base`) and count as bits.
 pub(super) fn pack(clusters: &Clusters, base: u32) -> Vec<[f32; 16]> {
     let one = |c: &rusty_asset::clusters::Cluster| {
         let (first, count) = (base + c.indices.start, c.indices.len() as u32);
@@ -45,10 +46,12 @@ impl crate::Renderer {
         id: &crate::MeshId,
         (clusters, indices): (Option<&Clusters>, &[u32]),
     ) {
+        // Noted again below only if the pool refuses it this time.
         self.retained.residency.refused.remove(id);
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
+        // The old lease goes first, so its range is free for the new one.
         mesh.clusters = None;
         let own = |c: &&Clusters| {
             let end = c.list.last().map(|l| l.indices.end);

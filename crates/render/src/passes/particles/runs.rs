@@ -8,6 +8,7 @@ use rusty_scene::{Scene, SceneId};
 
 pub(super) enum Sprites {
     Instances(Vec<ParticleInstance>),
+    /// The emitter's key, the slots to draw, and its live particles for the counters.
     Gpu((SceneId, u32), u32, u32),
 }
 
@@ -48,6 +49,7 @@ pub(super) fn collect_runs(
                 texture: emitter.texture.clone(),
                 sprites: Sprites::Gpu((scene.id(), id), slots, emitter.live_count() as u32),
             };
+            // By its origin: the CPU never knows a `Gpu` emitter's centroid.
             runs.push((run, view_depth(origin, eye.pos, eye.fwd)));
             continue;
         }

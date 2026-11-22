@@ -12,6 +12,7 @@ use rusty_components::{LightType, ShadowSettings};
 use rusty_scene::{Camera, Scene};
 
 impl Renderer {
+    /// Once a frame, before the camera stack draws, so every stacked camera samples the same maps.
     pub(crate) fn run_shadow_passes(
         &mut self,
         commands: &mut Commands,
@@ -101,6 +102,7 @@ impl Renderer {
         c.shadow_lights_dropped = plan.dropped;
         c.shadow_atlas_tiles = plan.tiles.len() as u32;
         c.shadow_atlas_texels = plan.texels();
+        // A held-back resize is history: drawing the frame again counts towards it.
         c.history_passes += u32::from(plan.resizing);
         self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
     }
@@ -153,6 +155,7 @@ fn keep_masked_statics_out(
     }
 }
 
+/// In `clusters::local_lights`' order: each light's tiles are kept under its id.
 pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
     let world = &scene.world;
     (world.ids_with_light().into_iter())

@@ -1,7 +1,7 @@
 //! Mesh particles draw as solid entities (forward shader, shadows received, fog), one DrawItem
 //! each, so a mesh and material batch into one instanced draw. Emitter colour and gradient do not
-//! apply; they cast no shadows and take no decal stamp. Placed unmirrored: the material's face
-//! picks the cull.
+//! apply; they cast no shadows and take no decal stamp. A particle is placed unmirrored, so the
+//! material's face alone picks the cull.
 
 use glam::{Mat4, Quat, Vec3};
 
@@ -48,6 +48,8 @@ impl Renderer {
             if emitter.render.mode != ParticleRenderMode::Mesh {
                 continue;
             }
+            // Before the checks: an inactive or culled emitter's mesh stays resident, as an
+            // inactive entity's does.
             self.note_emitter_mesh(scene, &emitter);
             if emitter.runtime.particles.is_empty()
                 || !scene.world.is_active_in_hierarchy(id)

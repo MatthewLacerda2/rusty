@@ -2,6 +2,7 @@ use glam::Vec3;
 
 use rusty_components::{RibbonStyle, TextureMode};
 
+/// Fields and `ATTRIBS` match `ribbons.wgsl`'s `VertexInput`: change the two together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct RibbonVertex {
@@ -32,8 +33,10 @@ impl RibbonVertex {
     }
 }
 
+/// Metres: closer points merge, since a zero-length segment has no direction.
 const MERGE: f32 = 1e-5;
 
+/// `points` in world space. Returns the indices added: 0 when under two distinct points remain.
 pub(crate) fn build(
     points: &[Vec3],
     looping: bool,
