@@ -1,5 +1,3 @@
-//! file on purpose says why with `// lint: allow(self-path) <why>` on the line.
-
 use super::finding::{self, Finding};
 use super::scan::Scan;
 use std::collections::BTreeSet;
@@ -10,6 +8,7 @@ const ROOTS: &[&str] = &[
     "src/", "crates/", "tests/", "tools/", "fuzz/", "engine/", ".github/",
 ];
 
+/// Leading lines searched for the header: attributes may come first.
 const HEAD: usize = 10;
 
 pub fn dirs_of<'a>(files: impl IntoIterator<Item = &'a String>) -> BTreeSet<String> {

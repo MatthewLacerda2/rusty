@@ -11,6 +11,7 @@ use std::path::Path;
 use std::process::{exit, Command};
 
 const REPORT: &str = ".lint/dead-pub.txt";
+/// Never copied: build output, git, the worktrees under `.claude/`, reports and run output.
 const SKIP: &[&str] = &["target", ".git", ".claude", ".lint", "out"];
 
 pub fn run() {
@@ -18,6 +19,7 @@ pub fn run() {
     let tree = root.join("target/dead-pub/tree");
     let target = root.join("target");
     let result = prepare(&root, &tree, "rusty").and_then(|()| {
+        // `dev` on in both: code behind `not(feature = "dev")` is never checked.
         let with_tests = check(&tree, &target, &["--profile", "test"], &["dev"])?;
         let without_tests = check(&tree, &target, &[], &["dev"])?;
         Ok(report::render(&with_tests, &without_tests, &|p| {
@@ -116,6 +118,8 @@ pub fn check(
     features: &[&str],
 ) -> io::Result<std::collections::BTreeSet<report::Warning>> {
     let mut cargo = Command::new("cargo");
+    // Folded into the lib, an integration test's `env!("CARGO_BIN_EXE_<bin>")` is
+    // unset; the binary never runs, so any path does.
     for bin in fold::bins(&fs::read_to_string(tree.join("Cargo.toml"))?) {
         let exe = target.join("dead-pub/never-run").join(&bin.name);
         cargo.env(format!("CARGO_BIN_EXE_{}", bin.name), exe);
@@ -123,6 +127,8 @@ pub fn check(
     cargo
         .current_dir(tree)
         .args(["check", "--lib", "--message-format", "short"]);
+    // Not `--locked`: the fold rewrote the root's dependencies, so their lock entry moves.
+    // The worktree's own `target/`, so only the folded crate compiles afresh.
     cargo.arg("--target-dir").arg(target).args(profile);
     if !features.is_empty() {
         cargo.args(["--features", &features.join(",")]);

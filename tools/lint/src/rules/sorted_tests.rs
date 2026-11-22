@@ -102,6 +102,7 @@ fn fails_on_a_listed_file_it_cannot_read() {
     assert!(found[0].message.contains("could not read"), "{found:?}");
 }
 
+// Linux only: macOS (APFS) refuses a file name that is not valid UTF-8.
 #[cfg(target_os = "linux")]
 #[test]
 fn checks_a_markdown_file_whose_name_is_not_utf8() {

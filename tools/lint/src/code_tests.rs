@@ -37,6 +37,8 @@ fn a_block_comment_carries_across_lines_and_nests() {
     assert_eq!(lines, ["a  ", " ", "  b", "c"]);
 }
 
+/// Lines that cut at their first `//` by hand, which misreads `"http://x"` and
+/// `/* */`: a scan reads a line's code through `strip_comment` instead.
 fn hand_rolled(source: &str) -> Vec<usize> {
     let cut = [".split(\"//\")", ".find(\"//\")", ".split_once(\"//\")"];
     let lines: Vec<&str> = source.lines().collect();

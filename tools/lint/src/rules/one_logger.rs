@@ -7,6 +7,7 @@ pub const RULE: &str = "one-logger";
 
 const CRATE: &str = "rusty_test_support";
 
+/// Stands for the glob `flatten_use` drops: an identifier no real path holds.
 const GLOB: &str = "__glob__";
 
 pub fn check(path: &str, manifest: &str, source: &str) -> Vec<Finding> {

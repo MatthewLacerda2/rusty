@@ -1,5 +1,3 @@
-//! `// lint: allow(named-enum) <why>`. Test code is not scanned.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{code_of, Open};

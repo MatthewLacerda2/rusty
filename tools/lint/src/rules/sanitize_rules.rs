@@ -1,5 +1,3 @@
-//! with `// lint: allow(sanitize) <why>` when it holds its value another way (a
-
 use super::finding::Finding;
 use super::sanitize::{float_params, ident_after, matching, passes_at, split_top, RULE};
 use crate::code::{code_lines, is_ident};

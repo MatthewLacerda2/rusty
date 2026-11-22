@@ -1,5 +1,3 @@
-//! `// lint: allow(full-literal) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
@@ -7,6 +5,7 @@ use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
 const ENTITY: [&str; 2] = ["src/components/entity/mod.rs", "src/components/registry.rs"];
+/// Fields: below this a literal is the clearest build, and a new field breaks few tests.
 const MIN_FIELDS: usize = 3;
 
 pub struct Components(BTreeMap<String, Vec<String>>);
@@ -165,6 +164,8 @@ mod tests;
 
 #[cfg(test)]
 #[test]
+/// `Entity`'s own body names only `Transform` and `ScriptComponent`: the rest are the
+/// registry's.
 fn the_real_tree_names_the_registry_components() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let scan = Scan::at(&root);

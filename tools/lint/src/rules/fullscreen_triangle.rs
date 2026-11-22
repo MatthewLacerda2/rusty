@@ -1,5 +1,3 @@
-//! stand alone says why with `// lint: allow(fullscreen-triangle) <why>`.
-
 use super::finding::{self, Finding};
 use super::scan::Scan;
 

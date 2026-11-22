@@ -1,5 +1,3 @@
-//! `// lint: allow(cfg-test-switch) <why>`. A `#[cfg(test)]` gate is not a switch
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

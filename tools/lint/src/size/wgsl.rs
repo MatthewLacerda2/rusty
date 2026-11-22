@@ -47,6 +47,7 @@ mod tests {
 
     #[test]
     fn block_comments_nest() {
+        // A scan closing at the inner `*/` would count `still comment` as code.
         let src = "/* outer\n/* inner */\nstill comment\n*/\nlet a = 1;\n";
         assert_eq!(code_lines(src), 1);
     }
