@@ -72,6 +72,8 @@ impl<'de> Deserialize<'de> for Layer {
     }
 }
 
+/// Keeps every key in order, duplicates too, so the chosen form's reader refuses a duplicate
+/// rather than it collapsing.
 struct Fields;
 
 impl<'de> Visitor<'de> for Fields {
@@ -90,6 +92,7 @@ impl<'de> Visitor<'de> for Fields {
     }
 }
 
+/// Any `layers` key makes the object a `Layers`, so a `pattern` beside it is refused, not dropped.
 enum EntryBody {
     Layered(Layers),
     Played(Play),
@@ -124,6 +127,8 @@ impl<'de> Deserialize<'de> for ArrangementEntry {
     }
 }
 
+/// Looked for in this order: `steps` before `note`, since a `Steps` may carry a `note`; a second
+/// form's key is refused by name.
 const ENTRY_KEYS: [&str; 4] = ["steps", "chord", "degree", "note"];
 
 struct EntryVisitor;

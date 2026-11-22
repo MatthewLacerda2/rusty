@@ -29,6 +29,7 @@ where
 }
 
 #[derive(Debug, Clone, Copy, Default)]
+/// Test hook: refuses every named patch; only zimmer's own tests use it.
 pub struct InlineOnly;
 
 impl PatchResolver for InlineOnly {
@@ -44,10 +45,12 @@ pub(crate) struct Mixdown {
     pub(crate) sections: Vec<Cut>,
 }
 
+/// Test hook: only zimmer's own tests call it.
 pub fn render_song(song: &Song, resolve: &dyn PatchResolver) -> Result<Vec<f32>, SynthError> {
     render_excerpt(song, resolve, &Excerpt::default())
 }
 
+/// Test hook: only zimmer's own tests call it.
 pub fn render_excerpt(
     song: &Song,
     resolve: &dyn PatchResolver,
@@ -64,6 +67,7 @@ pub(crate) fn never() -> bool {
     false
 }
 
+/// Asks `stop` before each note it synthesises and before the fold-down; `Ok(None)` if it stopped.
 pub(crate) fn mix_song(
     song: &Song,
     resolve: &dyn PatchResolver,
@@ -72,6 +76,7 @@ pub(crate) fn mix_song(
 ) -> Result<Option<Mixdown>, SynthError> {
     let walk = Walk::new(song, resolve, excerpt)?;
     let arrangement_end = walk.arrangement_end();
+    // The master starts at the arrangement's length, so a closing rest is not cut.
     let mut mix = Mix::new(song, arrangement_end, &walk.clock, &walk.scope);
     if !walk.run(&mut mix, stop)? {
         return Ok(None);
@@ -82,8 +87,9 @@ pub(crate) fn mix_song(
     }
     let (mut master, tracks) = mix.finish(&sections);
     limit(song, &mut master, arrangement_end)?;
-    // Then length and level, in that order, on the limited signal.
+    // After the limiter: `shape` sets the length, then the fades.
     shape(song, &mut master, arrangement_end);
+    // Cut last: the limiter and `shape` run on the piece around the window.
     let (from, to) = walk.scope.keep(master.frames());
     master.cut(from, to);
     Ok(Some(Mixdown {

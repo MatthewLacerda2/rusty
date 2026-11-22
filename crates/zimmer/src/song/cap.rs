@@ -7,8 +7,10 @@ use super::shape::{fitted, plan};
 use super::Song;
 use crate::error::SynthError;
 
+/// Seconds, ten minutes: a song renders into one in-memory buffer, so its length bounds its memory.
 pub const MAX_SONG_SECONDS: f32 = 600.0;
 
+/// A note's release and fx tail are not counted: `core` bounds each note (`NoteTooLong`).
 pub(super) fn check(song: &Song, key: Option<&Key>) -> Result<(), SynthError> {
     let (clock, passes) = plan(song);
     let before = song.arrangement_beats() * passes.saturating_sub(1) as f32;

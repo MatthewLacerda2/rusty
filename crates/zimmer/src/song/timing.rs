@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::Song;
 use crate::error::SynthError;
 
+/// Largest tempo move a stretch fit or an anchored span may make, as a fraction either way.
 pub(crate) const MAX_STRETCH: f32 = 0.25;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -27,6 +28,7 @@ impl Fit {
         }
     }
 
+    /// Only zimmer's tests call it: no baker resolves a `to` yet.
     pub fn resolved(self, seconds: f32) -> Self {
         Self::lasting(seconds, self.mode)
     }
@@ -116,6 +118,7 @@ pub(super) fn check(song: &Song) -> Result<(), SynthError> {
     if !(seconds.is_finite() && seconds > 0.0) {
         return Err(SynthError::BadFitSeconds { seconds });
     }
+    // An anchored song is stretched span by span, and `anchor::check` bounds each span.
     let stretch = song
         .anchors
         .is_empty()

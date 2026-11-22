@@ -5,12 +5,15 @@ use serde::{Deserialize, Serialize};
 use crate::hash::unit2;
 use crate::song::{Song, Track};
 
+// Per-note hash channels, one per draw so no two draws move together;
+// `render::walk::note_seed` takes 0 and 1.
 const ONSET: u64 = 2;
 
 const VELOCITY: u64 = 3;
 
 const TIMBRE: u64 = 4;
 
+/// Floor on the humanised velocity scale: past it a note falls silent, then inverts phase.
 const QUIETEST: f32 = 0.05;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
@@ -25,6 +28,7 @@ pub struct Humanize {
 }
 
 impl Humanize {
+    /// Positive is late; `render::walk` clamps the onset at sample 0.
     pub(crate) fn onset_seconds(self, track: usize, ordinal: u64, song_seed: u64) -> f32 {
         if self.timing <= 0.0 {
             return 0.0;

@@ -1,6 +1,3 @@
-//! Where the notes are summed, and where an effect that belongs to the *mix* runs rather than to
-//! one instrument.
-
 use crate::core::{RATE, SAMPLE_RATE};
 use crate::fx;
 use crate::level::{Cut, Layer};
@@ -43,11 +40,13 @@ impl<'a> Mix<'a> {
         }
     }
 
+    /// A keyed track plays even outside a solo, so the solo hears the duck the mix has.
     pub(super) fn needs(&self, track: usize) -> bool {
         self.scope.heard(track) || self.keys[track].is_some()
     }
 
     pub(super) fn add(&mut self, track: usize, src: &Stereo, at: usize) {
+        // The part as played, ahead of chain, gain and pan: a kick turned down still ducks.
         if let Some(key) = self.keys[track].as_mut() {
             mix_into(key, src, at, UNITY);
         }
@@ -59,6 +58,8 @@ impl<'a> Mix<'a> {
             mix_into(self.parts[track].get_or_insert_default(), src, at, UNITY);
             return;
         }
+        // Straight to the master, never a unity bus scaled later: `(a + b)·g` and `a·g + b·g`
+        // differ in `f32`.
         let placed = placement(played.gain, played.pan);
         mix_into(&mut self.master, src, at, placed);
         if let Some(sent) = self.sent.as_mut() {
@@ -72,6 +73,7 @@ impl<'a> Mix<'a> {
     pub(super) fn finish(mut self, cuts: &[Cut]) -> (Stereo, Vec<Layer>) {
         let song = self.song;
         let mut parts = std::mem::take(&mut self.parts);
+        // Taken whole before any chain runs, so every chain hears the same keys.
         let keys = Keyed {
             song,
             parts: std::mem::take(&mut self.keys),

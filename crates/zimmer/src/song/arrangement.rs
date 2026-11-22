@@ -1,10 +1,10 @@
-//! An entry in the running order: a pattern — or several at once — and optionally how to play each.
-
 use serde::{Deserialize, Serialize};
 
 use super::Key;
 use crate::note::MIDI_RANGE;
 
+/// Written untagged; read by hand in `song::forms`, keyed on `layers`, so a misspelt key is
+/// refused by name.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum ArrangementEntry {
@@ -15,6 +15,7 @@ pub enum ArrangementEntry {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Layers {
+    /// Order matters: `render::walk` counts note ordinals, and so seeds, layer by layer.
     pub layers: Vec<Layer>,
 }
 
@@ -75,6 +76,8 @@ impl Layer {
         }
     }
 
+    /// The one place both transposes apply: rendering, glides and the survey all call it, so they
+    /// agree.
     pub fn played_pitch(&self, midi: f32, key: Option<&Key>) -> f32 {
         let moved = match key {
             Some(key) => key.shift(midi, self.transpose_degrees()),

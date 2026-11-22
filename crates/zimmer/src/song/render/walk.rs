@@ -1,5 +1,3 @@
-//! One pass over the arrangement: each note placed, played and rendered into the mix.
-
 use rusty_core::collections::Map;
 
 use super::mix::Mix;
@@ -149,6 +147,7 @@ impl<'s> Walk<'s> {
                     }
                 }
             }
+            // After the whole slot, sounded or not: a layer never slides from one beside it.
             for layer in entry.layers() {
                 if let Some(slides) = self.slides.get(layer.pattern()) {
                     trail.advance(slides, layer, self.key.as_ref());
@@ -220,6 +219,7 @@ impl<'s> Walk<'s> {
         let stroke = Stroke::of(note.articulation);
         let written = note.vel * layer.vel_scale() * stroke.velocity;
         let velocity = feel.velocity(written, track, place, song.seed);
+        // Swung, not marked or humanised: a curve read here carries no ghost or jitter.
         let beat_at = at.cursor_beats + swung(note.start, swing);
         let gate = self.clock.span(beat_at, note.dur * stroke.gate);
         let pitch = layer.played_pitch(note.note.to_midi()?, key);
