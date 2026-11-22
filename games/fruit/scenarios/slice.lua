@@ -1,4 +1,4 @@
--- scenarios/slice.lua — a swipe of the mouse across a thrown apple cuts it: the
+-- A swipe of the mouse across a thrown apple cuts it: the
 -- apple is gone, two halves fall away from where it was, and it scores.
 
 local Swipe = dofile("scenarios/lib/swipe.lua")

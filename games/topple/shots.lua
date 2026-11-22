@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the topple game is screenshotted from, on its
+-- The fixed cameras the topple game is screenshotted from, on its
 -- startup scene (level 1, untouched). The scenarios take the rest from the
 -- game's own camera: the barrel going off (boom.lua), a figure mid-fall
 -- (replay.lua) and the large pile at rest (settle.lua).

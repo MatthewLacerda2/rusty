@@ -1,4 +1,4 @@
--- match.lua — the deathmatch's score: everyone against everyone. Each death is
+-- The deathmatch's score: everyone against everyone. Each death is
 -- reported here (combat.lua); the match ends when a fighter reaches the kill
 -- limit or the time runs out, and then every fighter stops.
 

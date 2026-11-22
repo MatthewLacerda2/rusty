@@ -1,4 +1,4 @@
--- scenarios/hit.lua — no inputs: the runner keeps to the middle lane, and the
+-- No inputs: the runner keeps to the middle lane, and the
 -- first hazard in that lane ends the run there, not later and not never.
 
 local game_id = Scene.FindEntityByName("Game")

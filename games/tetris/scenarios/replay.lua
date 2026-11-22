@@ -1,4 +1,4 @@
--- scenarios/replay.lua — determinism: the same seed and inputs, played twice
+-- Determinism: the same seed and inputs, played twice
 -- from a restart, end with the same board, score and piece order.
 
 local game_id = Scene.FindEntityByName("Game")

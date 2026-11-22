@@ -1,4 +1,4 @@
--- scenarios/lib/swipe.lua — the helpers the fruit scenarios share, loaded with
+-- The helpers the fruit scenarios share, loaded with
 -- `dofile` (a scenario is only a top-level `scenarios/*.lua`, so this is none).
 
 local Swipe = {}

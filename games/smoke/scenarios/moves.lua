@@ -1,4 +1,4 @@
--- scenarios/moves.lua — the smoke game's crate is moved by its script.
+-- The smoke game's crate is moved by its script.
 
 local crate = Scene.FindEntityByName("Crate")
 Harness.Expect(crate ~= nil, "the smoke scene has a Crate")

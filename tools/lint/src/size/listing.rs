@@ -17,7 +17,10 @@ pub(super) fn committable(base: &Path, roots: &[&str]) -> Result<Vec<PathBuf>, S
 /// (`/project/`, `/out/`): what git would list, near enough, when git cannot.
 pub(super) fn on_disk(root: &Path) -> Vec<PathBuf> {
     let ignored = ignored_roots(root);
-    let wanted = |p: &Path| Lang::of(p).is_some();
+    let wanted = |p: &Path| {
+        let rel = p.strip_prefix(root).unwrap_or(p).to_string_lossy();
+        Lang::of(p).is_some() || crate::comments::reads_prose(rel.trim_start_matches("./"))
+    };
     let mut out = Vec::new();
     for entry in fs::read_dir(root).into_iter().flatten().flatten() {
         let (path, name) = (

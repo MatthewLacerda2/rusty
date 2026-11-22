@@ -116,12 +116,16 @@ fn history(kind: Kind, source: &str) -> Vec<String> {
 #[test]
 fn an_issue_or_pr_of_this_repository_is_flagged() {
     for (line, what) in [
+        // lint: allow(comment-history) the rule's own input
         ("// fixed (#1695)", "#1695"),
+        // lint: allow(comment-history) the rule's own input
         ("// since #453 it waits", "#453"),
         (
+            // lint: allow(comment-history) the rule's own input
             "// https://github.com/MatthewLacerda2/rusty/issues/123",
             "/issues/123",
         ),
+        // lint: allow(comment-history) the rule's own input
         ("// rusty#2001 and PR#404", "#2001"),
     ] {
         assert_eq!(history(Kind::Rust, line), [what], "{line}");
@@ -166,6 +170,7 @@ fn the_messages_say_what_to_do() {
 fn the_size_gate_fails_on_each_and_passes_a_clean_path_and_no_allow_excuses_the_cap() {
     let repo = Repo::new("comments", true);
     repo.file("src/a.rs", &comment(Kind::Rust, 101));
+    // lint: allow(comment-history) the rule's own input
     repo.file("src/b.rs", "// fixed in #1234\n");
     repo.file("other/c.wgsl", "// ok\n");
     let allow = "// lint: allow(comment-cap) the format's grammar, quoted whole\n";
