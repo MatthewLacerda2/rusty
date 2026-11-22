@@ -5,6 +5,8 @@ use mlua::{Function, MultiValue, Table, Value};
 use super::calls::{plain, to_lua};
 use rusty_script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
+/// Names a `Scene.GetScript` handle's acts in the file, as `Harness.` names the harness
+/// verbs: no Lua namespace has it.
 pub const PREFIX: &str = "ScriptRef.";
 
 pub fn note_set(
@@ -20,6 +22,7 @@ pub fn note_set(
     journal.borrow_mut().push(act);
 }
 
+/// `with_self`: the first argument was the handle itself (`ref:F(...)`), left out of `args`.
 pub fn note_call(
     journal: &RefCell<HostJournal>,
     (id, name): (u32, &str),

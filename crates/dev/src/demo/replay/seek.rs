@@ -74,7 +74,7 @@ pub fn seek(world: &mut GameWorld, tick: u64) -> Result<(), String> {
 }
 
 /// The same world, not a new one: a scenario's API is bound to its cells for the whole run.
-/// What can fail (the file read again, the VM) runs first, so a failed restart changes nothing.
+/// The file is read again and the VM built before anything is torn down: either can fail.
 fn restart(world: &mut GameWorld) -> Result<(), String> {
     let replayer = world.tap_mut::<Replayer>().ok_or(NO_DEMO)?;
     let demo = Demo::read(replayer.demo_path())?;
