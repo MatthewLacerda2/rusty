@@ -2,6 +2,7 @@ use glam::{Vec2, Vec3, Vec4};
 
 use rusty_core::curve::{ColorRange, Curve, Gradient, Range};
 
+/// The floor of a size (a box side, a radius, a scale), in its own field's unit.
 pub const MIN_EXTENT: f32 = 1e-3;
 
 /// `v`, or `0.0` when it is NaN or infinite.

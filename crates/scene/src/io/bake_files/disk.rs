@@ -1,3 +1,6 @@
+//! A file is compared by its length, then its content hash, never a clock (the sim reads
+//! none), so a same-length rewrite is caught too.
+
 use std::path::Path;
 
 use rusty_core::hash::content;
@@ -49,6 +52,7 @@ pub(super) fn change(path: &Path, disk: Disk) -> Change {
             meta.is_ok_and(|m| m.is_file() && m.len() == s.len)
                 && std::fs::read(path).is_ok_and(|bytes| content(&bytes) == s.hash)
         }
+        // Still unreadable: nothing to tell it by, so it is as it was.
         Disk::Unreadable => std::fs::read(path).is_err(),
     };
     if same {
@@ -58,6 +62,8 @@ pub(super) fn change(path: &Path, disk: Disk) -> Change {
     }
 }
 
+/// The one spelling a path is recorded under, absolute and folded. No disk read: a symlink
+/// stays its own spelling.
 pub(super) fn key(path: &Path) -> std::path::PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     rusty_core::paths::fold(&absolute)

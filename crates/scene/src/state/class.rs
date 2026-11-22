@@ -1,16 +1,23 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Class {
     Authored,
+    /// Saved, never undone (as in Unity).
     BakeOutput,
     Entities,
     Selection,
+    /// Play's own, cleared by Stop.
     Runtime,
+    /// Kept across Play, dropped by a load.
     EditRuntime,
+    /// Written by the host every frame.
     Frame,
     Identity,
+    /// The engine's last disk read or write.
     DiskRecord,
+    /// The meshes' write-log stamp; every applied document re-stamps it.
     Follow,
     History,
+    /// Edit mode's request of the next frame; dropped by Play, Stop, any load.
     Request,
 }
 
@@ -71,6 +78,8 @@ impl Class {
     }
 }
 
+/// A Play load drops entries keyed by an entity it leaves behind: the old id may name an
+/// incoming one.
 pub fn promise(class: Class, keyed: Keyed, lifecycle: Lifecycle) -> Outcome {
     match (keyed, lifecycle) {
         (Keyed::Dropped | Keyed::Restored, Lifecycle::PlayLoad) => Outcome::Gone,
@@ -82,7 +91,9 @@ pub fn promise(class: Class, keyed: Keyed, lifecycle: Lifecycle) -> Outcome {
 pub enum Keyed {
     No,
     Dropped,
+    /// Put back with its entity when the Destroy is undone.
     Restored,
+    /// Checked against a fingerprint on use: a despawn or Play load leaves it.
     Checked,
 }
 

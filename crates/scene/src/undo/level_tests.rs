@@ -29,6 +29,7 @@ fn undo_after_a_re_placing_bake_matches_cubes_by_position() {
     scene.begin_edits();
     scene.reflection_probes.edit(0, |p| p.position = Vec3::Y);
     assert!(scene.commit_edits(None));
+    // The bake: probe 1's position first, then a new one, each with a new cube.
     let mut baked = crate::ReflectionProbeSet::default();
     for (i, x) in [1.0, 5.0].into_iter().enumerate() {
         baked.add(Vec3::X * x, Vec3::ONE);

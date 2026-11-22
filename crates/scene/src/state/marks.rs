@@ -1,3 +1,6 @@
+//! One mark per field of the inventory, set on a scene and looked for after each lifecycle.
+//! A field made of two classes has a mark per part, `field.part`, held to its own class.
+
 use std::sync::OnceLock;
 
 use glam::Vec3;
@@ -24,6 +27,8 @@ impl Mark {
     }
 }
 
+/// One box (the base entity) and a probe of each kind, so a mark can change a probe and not
+/// the count.
 pub fn base() -> (Scene, u32) {
     let mut scene = Scene::new();
     let base = create_entity(&mut scene, "Base", Some(Primitive::Box));
@@ -145,6 +150,7 @@ pub fn all() -> Vec<&'static Mark> {
     marks.collect()
 }
 
+/// A one-cell PVS of no object, its cell 7 m.
 fn marked_occlusion() -> crate::lighting::occlusion::OcclusionData {
     let grid = crate::lighting::occlusion::Grid {
         origin: Vec3::ZERO,

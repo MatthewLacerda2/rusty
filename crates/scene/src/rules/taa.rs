@@ -1,3 +1,6 @@
+//! The one place TAA's camera fields are written: the Camera card, `Graphics.Set/GetTaa*`, a
+//! file's hold and a `Graphics.taa.<field>` tween all go through these ops.
+
 use super::sanitize::saturated;
 use rusty_components::{CameraComponent, TaaQuality};
 
@@ -41,6 +44,8 @@ pub fn set_taa_anti_flicker(c: &mut CameraComponent, value: f32) {
     c.taa_anti_flicker = saturated(value, 0.0, 1.0);
 }
 
+/// A volume effect's `Knob`, over the camera: `field` ends the tween path, `api` names the
+/// `Graphics.Get/Set<api>` pair, `label` is URP's, `range` is the slider's and `set`'s clamp.
 #[derive(Debug)]
 pub struct CameraKnob {
     pub field: &'static str,
@@ -53,6 +58,7 @@ pub struct CameraKnob {
 
 pub const TAA_EFFECT: &str = "taa";
 
+/// In the Inspector's order.
 pub const TAA_KNOBS: &[CameraKnob] = &[
     CameraKnob {
         field: "base_blend_factor",

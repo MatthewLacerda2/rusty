@@ -1,3 +1,7 @@
+//! The text the engine last read or wrote at the scene's file. The editor's follow
+//! (`shell::editor::watch`) reloads a file changed outside the engine; one holding this
+//! text is the engine's own write or no change. Interior mutability: writers take `&Scene`.
+
 use std::cell::RefCell;
 
 use crate::Scene;
@@ -40,6 +44,8 @@ impl Scene {
         self.disk_text = record;
     }
 
+    /// The World was rebuilt to stand for `path` unread (Reset Scene): its text as it is, so a
+    /// `touch` or the editor's own Generate Lighting is no change.
     pub fn adopt_disk_text(&self, path: &str) {
         match std::fs::read_to_string(path) {
             Ok(disk) => self.disk_text.record(path, disk),

@@ -7,12 +7,16 @@ use rusty_core::hash::content;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Mark {
+    /// Only read or written: what this world holds came from that file.
     Loaded,
+    /// Rewritten or removed by a save while the file is still that one.
     Refused,
+    /// Written whatever is on disk: the last write wins.
     Baked,
 }
 
 impl BakeFiles {
+    /// `to` takes `from`'s record, so a save to `to` does what a save to `from` would.
     pub fn copied(&self, from: &Path, to: &Path) {
         let Some(mut seen) = self.seen.borrow().get(&key(from)).cloned() else {
             return;
@@ -27,7 +31,11 @@ impl BakeFiles {
 #[derive(Clone, Debug)]
 pub(super) struct Seen {
     pub(super) disk: Disk,
+    /// The hash of what this world would write: a format that does not round-trip byte for
+    /// byte still tells a bake since.
     pub(super) held: Option<u64>,
+    /// Kept alive so its address names the bytes `held` hashes: the same `Arc` is not hashed
+    /// again.
     pub(super) buffer: Option<Arc<[u8]>>,
     pub(super) mark: Mark,
     pub(super) why: Option<String>,

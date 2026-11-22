@@ -14,6 +14,7 @@ macro_rules! scene_level {
             $($field: $ty,)*
         }
 
+        /// Only the fields a step changed, so its Undo never reverts one it did not touch.
         #[derive(Debug)]
         pub(super) struct LevelDelta {
             $($field: Option<$ty>,)*
@@ -46,6 +47,7 @@ macro_rules! scene_level {
                 })*
             }
 
+            /// This step's record of a field is older, so it wins.
             pub(super) fn absorb(&mut self, later: Self) {
                 $(if self.$field.is_none() {
                     self.$field = later.$field;
@@ -61,6 +63,7 @@ fn eq<T: PartialEq>(a: &T, b: &T) -> bool {
     a == b
 }
 
+/// `==` first; on a mismatch the saved form decides, so a NaN is no edit.
 fn eq_or_bytes<T: PartialEq + Serialize>(a: &T, b: &T) -> bool {
     a == b || same_bytes(a, b)
 }
@@ -86,6 +89,8 @@ fn at(p: glam::Vec3) -> [u32; 3] {
     p.to_array().map(f32::to_bits)
 }
 
+/// Each keeps the baked SH and occlusion of a live probe at its position: by position, not
+/// index, since a bake that re-places the set would hand old probes the new set's light.
 fn put_probes(mut value: ProbeVolume, slot: &mut ProbeVolume) {
     let mut live: BTreeMap<[u32; 3], _> = BTreeMap::new();
     for p in slot.probes().iter().rev() {
@@ -113,6 +118,7 @@ fn same_reflections(a: &ReflectionProbeSet, b: &ReflectionProbeSet) -> bool {
         })
 }
 
+/// Each keeps the cubemap and irradiance of a live probe at its position, as `put_probes`.
 fn put_reflections(mut value: ReflectionProbeSet, slot: &mut ReflectionProbeSet) {
     let mut live: BTreeMap<[u32; 3], (&str, _)> = BTreeMap::new();
     for p in slot.probes.iter().rev() {
