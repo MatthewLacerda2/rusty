@@ -1,5 +1,5 @@
 // engine/shaders/postfx/effects/chromatic_aberration.wgsl — Chromatic Aberration
-// (#1439), Unity URP's uber-pass three-tap path, on the HDR image before the grade.
+//, Unity URP's uber-pass three-tap path, on the HDR image before the grade.
 // Slot 0: x intensity (`0`: off, the image byte-identical).
 
 #define_import_path postfx::effects::chromatic_aberration

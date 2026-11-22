@@ -1,40 +1,14 @@
-//! crates/render/src/gpu/shaders.rs — runtime WGSL loader backed by naga_oil.
-//!
-//! [`ShaderRegistry`] reads `.wgsl` files from disk at runtime (not via
-//! `include_str!`) and pre-processes them through a `naga_oil` [`Composer`]
-//! before handing the result to wgpu as a compiled [`naga`] module. This lets
-//! shaders be edited without recompiling the Rust crate, and allows passes to
-//! share type definitions via `#import "common"` rather than duplicating them.
-//!
-//! The composition itself — `common.wgsl` registration and `make_naga_module` —
-//! is [`rusty_shadergen::compose`], the GPU-free path the shader bake validates
-//! through too (#722). This file keeps only the disk lookup and the wgpu handoff.
-
 use naga_oil::compose::Composer;
 
 use rusty_shadergen::compose;
 
-/// Resolves and compiles WGSL shaders at runtime using a naga_oil Composer.
-///
-/// The registry is pre-loaded with `common.wgsl` from the shader base
-/// directory so any shader that writes `#import "common"` automatically gets
-/// the shared [`CameraUniforms`] and [`VertexInput`] struct definitions.
 pub struct ShaderRegistry {
     composer: Composer,
     base: String,
-    /// The modules [`add_module`](Self::add_module) registered beyond `compose::MODULES`.
     added: Vec<String>,
 }
 
 impl ShaderRegistry {
-    /// Build a registry rooted at `base` (e.g. `"engine/shaders"`).
-    /// Reads and registers `<base>/common.wgsl` as the `"common"` module.
-    ///
-    /// # Panics
-    /// Panics if `common.wgsl` cannot be read or fails naga_oil validation —
-    /// the shader files are part of the shipped binary's asset set and a
-    /// missing or invalid common module is a packaging error, not a runtime
-    /// condition.
     pub fn new(base: impl Into<String>) -> Self {
         let base = base.into();
         let composer =
@@ -46,12 +20,6 @@ impl ShaderRegistry {
         }
     }
 
-    /// Register the composable module `<base>/<module>` (named by its
-    /// `#define_import_path`), once: the post effects' modules, which the composite and
-    /// the grading bake are assembled from (#1467).
-    ///
-    /// # Panics
-    /// On a missing or broken module, as [`load`](Self::load) does.
     pub fn add_module(&mut self, module: &str) {
         if self.added.iter().any(|m| m == module) {
             return;
@@ -70,7 +38,6 @@ impl ShaderRegistry {
             .unwrap_or_else(|e| panic!("ShaderRegistry: {name} failed to compose: {e}"))
     }
 
-    /// [`load`](Self::load) for a source assembled in code rather than read from disk.
     pub fn load_source(
         &mut self,
         device: &wgpu::Device,
@@ -84,14 +51,6 @@ impl ShaderRegistry {
         })
     }
 
-    /// Resolve `<base>/<name>` through [`compose::compose`] (handling any
-    /// `#import "common"` directives) into a validated naga module. GPU-free:
-    /// the wgpu device handoff lives in [`load`], so this path is unit-testable
-    /// without an adapter.
-    ///
-    /// # Panics
-    /// Panics on missing files or shader errors — both are authoring mistakes
-    /// caught during engine startup, not recoverable runtime conditions.
     fn compose(&mut self, name: &str) -> compose::Module {
         let path = format!("{}/{name}", self.base);
         let source = std::fs::read_to_string(&path)
@@ -100,12 +59,6 @@ impl ShaderRegistry {
             .unwrap_or_else(|e| panic!("ShaderRegistry: {path} failed to compose: {e}"))
     }
 
-    /// Load `<base>/<name>`, run it through the naga_oil Composer (resolving
-    /// any `#import "common"` directives), and create a wgpu shader module.
-    ///
-    /// # Panics
-    /// Panics on missing files or shader errors — both are authoring mistakes
-    /// caught during engine startup, not recoverable runtime conditions.
     pub fn load(&mut self, device: &wgpu::Device, name: &str, label: &str) -> wgpu::ShaderModule {
         let naga_module = self.compose(name);
         device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -155,9 +108,6 @@ mod tests {
         }
     }
 
-    /// "Validated at bake" means validated by the code that loads it (#722): the
-    /// bake's `validate` and the registry's load agree on every shipped shader's
-    /// composed entry points, and a module one rejects the other rejects too.
     #[test]
     fn bake_validation_and_load_compose_identically() {
         let mut registry = ShaderRegistry::new(rusty_shadergen::engine_shader_dir());

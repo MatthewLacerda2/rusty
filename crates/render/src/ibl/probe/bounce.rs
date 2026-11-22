@@ -1,33 +1,3 @@
-//! crates/render/src/ibl/probe/bounce.rs — Multi-bounce light-probe solve (#285).
-//!
-//! The iteration that turns the single-capture probe bake (`bake.rs`) into a
-//! true multi-bounce GI bake. Each pass re-captures every probe and projects the
-//! captured radiance into SH; from bounce 2 on, the capture re-lights the STATIC
-//! scene with the *previous* pass's probe field (`capture_light_probe`'s `bounce`), so
-//! every iteration folds in one more bounce of indirect light. The passes are
-//! accumulated in place on `scene.probes`, then a `<scene>.lighting.json` sidecar
-//! persists the converged result exactly as the single-bounce bake did.
-//!
-//! Two stops, whichever fires first:
-//!   * a fixed cap of [`MAX_BOUNCES`] passes, and
-//!   * an early-out when a pass adds less than [`CONVERGENCE_EPSILON`] energy
-//!     (max per-coefficient SH delta over the whole field) — the next bounce is too
-//!     dim to matter.
-//!
-//! Once the solve stops, the direct light of `Baked` lights is added to every probe
-//! analytically (#809), by the [`BakedDirect`] the bake hands in
-//! (`rusty_lighting::lightmap::probe_direct`, so a lightmapper edit never rebuilds
-//! this crate's live code): those lights
-//! never render live, so the probes are how dynamic objects receive them, and a
-//! capture only ever sees lit surfaces, never a light. It is added after the loop, so
-//! the bounce captures (which re-light static surfaces from the field) never count it
-//! twice. `Realtime` lights stay out of every capture (`LightMode::renders_live`).
-//!
-//! The loop is a pure function of (static scene, probe positions, resolution); the
-//! convergence decision (`pass_converged`) is GPU-free and unit-tested directly, so
-//! the early-out logic is covered even on an adapter-less host. Render layer: exempt
-//! from the determinism guard, but the SH output is byte-identical across runs.
-
 use glam::{Vec3, Vec4};
 
 use super::solve::BounceSolve;
@@ -36,45 +6,19 @@ use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
 
-/// The direct light of a scene's `Baked` lights at each probe position, and each
-/// probe's shadowmask occlusion of its `Mixed` lights (#809, #1695): what the solve
-/// adds once its bounces stop. The lightmapper computes it
-/// (`rusty_lighting::lightmap::probe_direct`), so the bake that drives the solve
-/// hands it in, and this crate's live code never names the lightmapper.
 pub type BakedDirect = fn(&Scene, &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>);
 
-/// Hard cap on bounce iterations. Five passes capture direct light plus four
-/// indirect bounces — well past the point diffuse GI stops visibly changing for the
-/// SH precision the bake stores; the convergence test usually stops it sooner.
 pub const MAX_BOUNCES: u32 = 5;
 
-/// Early-out threshold on the energy a pass adds, measured as the max absolute
-/// per-coefficient SH delta across every probe (see `field_delta`). An absolute
-/// bound: a fully white hemisphere projects to a DC coefficient of a few units, so a
-/// pass that nudges no coefficient by even 1e-3 cannot matter, and we stop. A bright
-/// field whose static surfaces read the probes (no lightmap) rarely gets that close,
-/// so it runs to [`MAX_BOUNCES`]; lightmapped surfaces don't change between passes.
 pub const CONVERGENCE_EPSILON: f32 = 1.0e-3;
 
-/// Outcome of a multi-bounce bake — the converged SH per probe is written in place on
-/// the scene; this reports *how* the solve terminated, for tests and diagnostics.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BounceReport {
-    /// Number of capture passes actually run (1..=[`MAX_BOUNCES`]).
     pub bounces: u32,
-    /// `true` if the early-out (energy < epsilon) stopped it before the cap.
     pub converged: bool,
 }
 
 impl Renderer {
-    /// Bake every probe with a true multi-bounce solve (#285), writing the converged
-    /// SH in place on `scene.probes`. Bounce 1 captures direct light only; each later
-    /// bounce re-lights the static scene with the previous pass's probe field, adding
-    /// one indirect bounce. Stops at [`MAX_BOUNCES`] or when a pass adds less than
-    /// [`CONVERGENCE_EPSILON`] energy, whichever comes first; then every probe gains
-    /// the direct light of the scene's `Baked` lights (#809). With no probes it is a
-    /// no-op. Returns a [`BounceReport`] describing the termination. The solve is
-    /// `probe::solve::BounceSolve` run to its end; the editor steps the same one across frames.
     pub fn bake_probes_multibounce(
         &mut self,
         scene: &mut Scene,
@@ -84,10 +28,6 @@ impl Renderer {
         self.bake_probes_observed(scene, resolution, direct, &mut |_, _, _| {})
     }
 
-    /// [`bake_probes_multibounce`](Self::bake_probes_multibounce), telling `observe`
-    /// where the solve is before every probe it captures: `(bounce, done, total)`, as
-    /// `BounceSolve::progress` reads it. The one run-to-end loop: `Probe.Bake()` logs
-    /// through it (#1667).
     pub fn bake_probes_observed(
         &mut self,
         scene: &mut Scene,
@@ -100,7 +40,6 @@ impl Renderer {
             let (bounce, done, total) = solve.progress();
             observe(bounce, done, total);
             if let Some(report) = solve.step(self, scene) {
-                // Nothing edits the scene inside this call, so its probes are the ones baked.
                 let committed = solve.commit(scene);
                 debug_assert!(committed.is_ok(), "{committed:?}");
                 return report;
@@ -109,18 +48,12 @@ impl Renderer {
     }
 }
 
-/// Write a freshly-solved SH field onto a solve's probes (one SH per probe, in
-/// order). The next bounce's lit capture reads these back through the probe field.
 pub(super) fn write_field(volume: &mut ProbeVolume, field: &[Sh9]) {
     for (probe, &sh) in volume.probes_mut().iter_mut().zip(field) {
         probe.sh = sh;
     }
 }
 
-/// Add the direct light of `scene`'s `Baked` lights to every probe of `volume` (#809),
-/// shadowed by the static meshes the lightmap bake sees, and write each probe's
-/// shadowmask occlusion (#1695; unoccluded unless the scene's Mixed Lighting Mode is
-/// `Shadowmask`), both as `direct` computes them ([`BakedDirect`]).
 pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume, direct: BakedDirect) {
     let positions: Vec<Vec3> = volume.probes().iter().map(|p| p.position).collect();
     if positions.is_empty() {
@@ -133,10 +66,6 @@ pub(super) fn add_baked_direct(scene: &Scene, volume: &mut ProbeVolume, direct: 
     }
 }
 
-/// The energy a pass added: the max absolute per-coefficient difference between two
-/// SH fields, over every probe and every RGB channel of all 9 coefficients. A pure
-/// scalar metric (no GPU) that drives the early-out, so the convergence behaviour is
-/// unit-testable on any host. Mismatched lengths compare the common prefix.
 pub fn field_delta(prev: &[Sh9], next: &[Sh9]) -> f32 {
     let mut max = 0.0f32;
     for (a, b) in prev.iter().zip(next) {
@@ -149,9 +78,6 @@ pub fn field_delta(prev: &[Sh9], next: &[Sh9]) -> f32 {
     max
 }
 
-/// Convergence test for one pass: did it add less than `epsilon` energy? Stops the
-/// loop when `true`. Factored out (pure, GPU-free) so the early-out decision is
-/// covered without a capture.
 pub fn pass_converged(prev: &[Sh9], next: &[Sh9], epsilon: f32) -> bool {
     field_delta(prev, next) < epsilon
 }

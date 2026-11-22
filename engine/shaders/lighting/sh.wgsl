@@ -1,4 +1,4 @@
-// engine/shaders/lighting/sh.wgsl — the real L2 spherical-harmonic basis (#1675),
+// the real L2 spherical-harmonic basis,
 // `scene::Sh9`'s order and constants, shared by every shader that evaluates SH: the
 // probes' `forward::lighting::eval_sh` and the `Skybox` ambient's
 // `lighting::ambient::sky_sh`. One copy, so the two can never disagree.

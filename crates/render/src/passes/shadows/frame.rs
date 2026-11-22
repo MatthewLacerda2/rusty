@@ -1,10 +1,3 @@
-//! The frame's shadow sweep (#435): pick the sun, fit the cascades to the base camera,
-//! upload both uniforms, plan the point/spot shadow atlas (#468) and record the depth
-//! passes — once per frame, before the camera stack draws, so every stacked camera
-//! samples the same maps. A frame with no live sun fits no cascade, draws none and
-//! uploads a count of 0, which the forward shader's `calculate_shadow` skips on
-//! (#1713): a `Baked` sun costs no shadow work, as in Unity.
-
 use crate::gpu::commands::Commands;
 use crate::gpu::ops::CountedQueue as _;
 use glam::Vec3;
@@ -19,12 +12,6 @@ use rusty_components::{LightType, ShadowSettings};
 use rusty_scene::{Camera, Scene};
 
 impl Renderer {
-    /// Fit the cascades to `camera` (at `aspect`), plan the atlas for the lights it
-    /// sees, upload the frame's local lights with their tiles, and render the shadow
-    /// maps — the dynamic casters at the LOD levels `lod` (the base camera's) shows
-    /// (#472). `settings` are the screen's base camera's volume's (#1434), the
-    /// defaults without one.
-    /// Recorded into `commands`, the frame's first camera's (#2353).
     pub(crate) fn run_shadow_passes(
         &mut self,
         commands: &mut Commands,
@@ -33,7 +20,6 @@ impl Renderer {
         (settings, lod): (&ShadowSettings, &LodSelection),
     ) {
         let fitted = frame_cascades(scene, self.capture.static_only, camera, aspect, settings);
-        // A probe captured without shadows (#1584) samples no cascade.
         let sampled: &[_] = if self.casts_shadows() { &fitted } else { &[] };
         let uniform = CascadeUniform::new(sampled, camera.position, camera.forward());
         self.queue.counted_write_buffer(
@@ -51,10 +37,7 @@ impl Renderer {
         self.plan_shadow_atlas(scene, camera, aspect, masking);
 
         let encoder = commands.encoder();
-        // Measured from the base camera, never the light (#1714); a capture culls
-        // nothing.
         let small = self.small_object_cull(camera);
-        // `prepare_frame`, which every caller runs first, extracted the scene.
         let objects = self
             .retained
             .scene(scene.id())
@@ -74,8 +57,6 @@ impl Renderer {
             small,
         };
         if self.casts_shadows() {
-            // a probe captured without shadows samples no cascade, so draws none;
-            // without a live sun there is no cascade to draw (#1713)
             self.shadow_renderer.render_cascades(encoder, &frame, lod);
         }
         let bake = self.shadow_renderer.render_atlas(encoder, &frame, lod);
@@ -85,20 +66,14 @@ impl Renderer {
 }
 
 impl Renderer {
-    /// Place the staged local lights' shadows in the atlas as `camera` (at `aspect`)
-    /// sees them, upload the lights with their tiles, and count what fit (#468).
-    /// Only lights the camera's light budget keeps are planned (#873). Each light
-    /// keeps its tiles from frame to frame (#1711); a bake capture plans on its own,
-    /// so it never moves them.
     fn plan_shadow_atlas(&mut self, scene: &Scene, camera: &Camera, aspect: f32, masking: bool) {
         let view_proj = camera.build_view_projection(aspect);
         let grid = ClusterGrid::new(camera, aspect);
         let mut requests = clusters::shadow_requests(&grid, &self.clusters.staged());
         let casts = self.casts_shadows();
         if !casts {
-            requests.clear(); // a probe captured without shadows plans no tile
+            requests.clear();
         }
-        // Without shadows the kept tiles stay as they are, for when they come back.
         let plan = if self.capture.static_only || !casts {
             atlas::plan(&requests, view_proj, camera.position)
         } else {
@@ -126,32 +101,16 @@ impl Renderer {
         c.shadow_lights_dropped = plan.dropped;
         c.shadow_atlas_tiles = plan.tiles.len() as u32;
         c.shadow_atlas_texels = plan.texels();
-        // A tile resize the hysteresis holds back is history: the frame drawn again
-        // counts another frame towards it (#2092).
         c.history_passes += u32::from(plan.resizing);
         self.shadow_renderer.atlas.update(&self.queue, plan.tiles);
     }
 }
 
 impl Renderer {
-    /// Whether the frame's lights cast shadows: not in a reflection probe captured
-    /// without them (#1584), nor with the `shadows` measurement switch off.
     fn casts_shadows(&self) -> bool {
         self.switches.casts_shadows(self.capture.shadows)
     }
 
-    /// Whether this frame's realtime shadows leave a masked light's static casters
-    /// out (#1695): the frame (never a bake capture, which draws `Mixed` lights as
-    /// `BakedIndirect` does) of a scene on `Shadowmask` under the plain
-    /// `Shadowmask` quality mode (not `DistanceShadowmask`), while the mask pages
-    /// are bound and no camera's volume turns volumetric fog on. A light the scene
-    /// masks by a channel ([`masked`]) then takes its static shadow from the bake.
-    ///
-    /// Until the masks are bound (a page still decoding, a missing or refused PNG,
-    /// a bake that wrote channels and no page) the maps keep their statics and a
-    /// masked light draws as Distance Shadowmask does near the camera. The fog's
-    /// air reads only the maps, never a mask, so with fog on they keep their
-    /// statics too, and a sealed room's air stays dark.
     fn masking_statics(&self, scene: &Scene) -> bool {
         use rusty_core::settings::quality::ShadowmaskMode;
         use rusty_scene::lighting::MixedLightingMode;
@@ -161,13 +120,10 @@ impl Renderer {
     }
 }
 
-/// Whether light `id` is one the scene masks by a channel.
 fn masked(scene: &Scene, id: u32) -> bool {
     scene.mask_channel(id).is_some()
 }
 
-/// Whether any active camera's volume turns volumetric fog on (#1703): its air
-/// samples the shadow maps, so they must keep their static casters.
 pub(super) fn fog_on(scene: &Scene) -> bool {
     let world = &scene.world;
     world.ids_with_camera().into_iter().any(|id| {
@@ -175,9 +131,6 @@ pub(super) fn fog_on(scene: &Scene) -> bool {
     })
 }
 
-/// Mark the tiles of every light the scene masks ([`masked`]), so the atlas bakes
-/// them without statics (`Tile::statics`). Only called while
-/// `Renderer::masking_statics` holds.
 fn keep_masked_statics_out(
     scene: &Scene,
     requests: &[(clusters::LocalLight, bool)],
@@ -200,9 +153,6 @@ fn keep_masked_statics_out(
     }
 }
 
-/// The entity ids of the lights `clusters::local_lights(scene, capture)` stages, in
-/// its order: the key each light's atlas tiles are kept under (#1711).
-/// `frame_tests` holds the two in step.
 pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
     let world = &scene.world;
     (world.ids_with_light().into_iter())
@@ -219,9 +169,6 @@ pub(super) fn local_light_ids(scene: &Scene, capture: bool) -> Vec<u32> {
         .collect()
 }
 
-/// The cascades the frame fits to `camera` (at `aspect`): `settings`' count for the
-/// live sun, none without one (#1713), so nothing is swept, re-baked or sampled for a
-/// `Baked` sun.
 fn frame_cascades(
     scene: &Scene,
     capture: bool,
@@ -234,16 +181,11 @@ fn frame_cascades(
     })
 }
 
-/// The direction the scene's (last) active directional light shines, or `None` when
-/// there is none. Only lights the frame (or a bake `capture`) draws live count
-/// (#809), so the cascades follow the light in the uniform's slot 0. The sun always
-/// casts: its `cast_shadows` is not read.
 fn live_sun(scene: &Scene, capture: bool) -> Option<Vec3> {
     let id = live_sun_id(scene, capture)?;
     Some(scene.world.transform_direction(id, Vec3::NEG_Z).normalize())
 }
 
-/// The entity of [`live_sun`]'s light.
 fn live_sun_id(scene: &Scene, capture: bool) -> Option<u32> {
     let mut sun = None;
     for id in scene.world.ids_with_light() {

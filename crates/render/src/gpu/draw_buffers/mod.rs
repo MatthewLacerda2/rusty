@@ -1,36 +1,3 @@
-//! crates/render/src/gpu/draw_buffers/ — the forward pass's instancing buffers (#470), and
-//! the resources every per-draw bind group is built from.
-//!
-//! This replaces the per-entity pool of #210 (one uniform buffer, bone buffer and two
-//! bind groups kept alive per entity). A camera's solids are four packed arrays —
-//! per-draw uniforms at a 256-byte stride, joint matrices, instances and the Light
-//! Probe Proxy Volumes the instances index (#1672) — and the two kept tables below
-//! (objects, and the material records the uniforms index, #1616), behind **one** bind
-//! group whose dynamic offset picks a batch's
-//! uniform. The per-camera arrays are written with a `write_buffer` each. Nothing is
-//! keyed by entity, so two scenes rendered in one frame (#355) cannot evict each
-//! other: each camera rewrites the arrays once, and its passes go out in its one
-//! submit (`gpu::commands`) before the next camera rewrites them.
-//!
-//! **The object array** (#1706) is not packed per camera: every kept
-//! object's [`ObjectData`] (world matrix, probe SH, lightmap) at its slot of the
-//! renderer's `scene::ObjectTable`, written where it changed (`objects.rs`). A
-//! camera's instance is 16 bytes naming its object's slot, so the per-camera upload
-//! no longer grows with what the objects hold.
-//!
-//! **The material array** is held the same way (#1706): every kept material record
-//! (one per scene, library material and variant, `scene::MaterialRecords`) at its slot,
-//! written where it changed. A draw's uniform names the slot (its value class's
-//! least, so equal records batch), so a colour edit uploads that one record and no
-//! camera re-packs records.
-//!
-//! The joint matrices are one storage array (#455), not a fixed 64-matrix uniform: a
-//! skinned draw's palette is its run of the array, as long as its skin, and the draw's
-//! uniform carries where that run starts (`bone_base`). Element 0 is one identity
-//! matrix, which every non-skinned draw and overlay points at. A view writing motion
-//! vectors appends each instance's last-frame world matrix and palette there too
-//! (`motion::track`).
-
 use wgpu::util::DeviceExt;
 
 mod objects;
@@ -50,19 +17,10 @@ use crate::{DrawUniform, InstanceData, MaterialData};
 pub(crate) const UNIFORM_STRIDE: usize = 256;
 const _: () = assert!(std::mem::size_of::<DrawUniform>() <= UNIFORM_STRIDE);
 
-/// Where [`DrawBuffers::draw_group_buffers`] puts the instances it was given.
 pub(crate) const DRAW_GROUP_INSTANCES: usize = 2;
 
-/// The shared identity joint: element 0 of the frame's joint array, and the whole of
-/// the array overlays bind.
 const IDENTITY_JOINT: [f32; 16] = glam::Mat4::IDENTITY.to_cols_array();
 
-/// One camera's draw data: `uniforms` in slot order, the skinned draws' `joints`
-/// back to back (a draw whose `bone_base` is `n` starts at `joints[n - 1]`; element 0
-/// of the uploaded array is the identity), the packed `instances`, and the
-/// `proxies` the instances index (`draw::proxy_volume`), and the slot tables the
-/// uniforms and instances name (materials and objects), whose changed slots and
-/// transient ones are written with them.
 pub(crate) struct FrameUpload<'a> {
     pub uniforms: &'a [DrawUniform],
     pub joints: &'a [JointMatrix],
@@ -78,15 +36,12 @@ pub(crate) struct DrawBuffers {
     instances: GrowBuffer,
     materials: GrowBuffer,
     proxies: GrowBuffer,
-    /// Every kept object's record, by slot (`objects.rs`).
     objects: GrowBuffer,
     /// Bytes written since the last [`Self::take_written`] (`Debug.Stats`'
     /// `render_upload_bytes`).
     written: u64,
     bind_group: wgpu::BindGroup,
-    /// The identity joint alone, for overlays (they bind their own uniform).
     default_bones: wgpu::Buffer,
-    /// A one-element instance array holding [`InstanceData::IDENTITY`], for overlays.
     identity_instance: wgpu::Buffer,
 }
 
@@ -98,7 +53,6 @@ impl DrawBuffers {
         let instances = GrowBuffer::new(device, "Frame Instances", U::STORAGE);
         let materials = GrowBuffer::new(device, "Material Records", U::STORAGE | U::COPY_SRC);
         let proxies = GrowBuffer::new(device, "Frame Proxy Volumes", U::STORAGE);
-        // Copyable, so a test can read back that it mirrors the table.
         let objects = GrowBuffer::new(device, "Object Records", U::STORAGE | U::COPY_SRC);
         let init = |label, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -144,8 +98,6 @@ impl DrawBuffers {
         }
     }
 
-    /// Write one camera's draw data, and the object and material slots that changed
-    /// since the last upload. Rebuilds the bind group only when a buffer had to grow.
     pub(crate) fn upload(
         &mut self,
         device: &wgpu::Device,
@@ -184,7 +136,6 @@ impl DrawBuffers {
         }
     }
 
-    /// Rebuild the bind group over the buffers as they are now (one grew).
     fn rebind(&mut self, device: &wgpu::Device, layout: &wgpu::BindGroupLayout) {
         let instances = self.instances.buffer();
         self.bind_group = self.group_over(device, layout, ("Frame Draw Bind Group", instances));
@@ -195,23 +146,18 @@ impl DrawBuffers {
         std::mem::take(&mut self.written)
     }
 
-    /// The one per-draw bind group every solid draw binds, at [`Self::offsets`].
     pub(crate) fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
     }
 
-    /// The dynamic offset selecting uniform `slot`.
     pub(crate) fn offsets(slot: u32) -> [u32; 1] {
         [slot * UNIFORM_STRIDE as u32]
     }
 
-    /// The camera's packed instances, which GPU occlusion culling reads (#1963).
     pub(crate) fn instances(&self) -> &wgpu::Buffer {
         self.instances.buffer()
     }
 
-    /// A per-draw group over these buffers with `instances` in place of the camera's own:
-    /// the instances GPU occlusion culling kept (#1963), at their batches' runs.
     pub(crate) fn group_with_instances(
         &self,
         device: &wgpu::Device,
@@ -221,7 +167,6 @@ impl DrawBuffers {
         self.group_over(device, layout, ("Culled Draw Bind Group", instances))
     }
 
-    /// The per-draw group over these buffers and `instances`, labelled.
     fn group_over(
         &self,
         device: &wgpu::Device,
@@ -231,9 +176,6 @@ impl DrawBuffers {
         draw_group(device, layout, label, self.draw_group_buffers(instances))
     }
 
-    /// The buffers a per-draw group over `instances` binds, in [`draw_group`]'s order: what a
-    /// kept group compares to know it still names them (#1963). `instances` is at
-    /// [`DRAW_GROUP_INSTANCES`].
     pub(crate) fn draw_group_buffers<'a>(
         &'a self,
         instances: &'a wgpu::Buffer,
@@ -264,7 +206,6 @@ impl DrawBuffers {
         self.proxies.buffer()
     }
 
-    /// The object array, which overlays bind for its identity at slot 0.
     pub(crate) fn objects(&self) -> &wgpu::Buffer {
         self.objects.buffer()
     }

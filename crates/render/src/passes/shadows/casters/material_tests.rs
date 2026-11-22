@@ -1,20 +1,10 @@
-//! A clipped caster's draw reads its material (#1616), as Unity's ShadowCaster pass
-//! does: the shadow layout carries the forward pass's per-draw uniform and material
-//! array, so a vertex block reading `material()` in `vs_shadow` builds.
-
 use crate::gpu::pipelines::surface::STANDARD;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// What the catalog's `vertex_waves` opens with, and the same line scaled by the
-/// record's tint alpha: a vertex block that reads the material.
 const WAVES_NORMAL: &str = "let n = normalize(v.normal);";
 const READS_MATERIAL: &str = "let n = normalize(v.normal) * material().color_tint.a;";
 
-/// The variant's forward pipelines and its depth ones (`vs_shadow` through the
-/// shadow layout) all build: without the material array in the shadow layout wgpu
-/// refuses the shadow pipeline and the whole variant falls back to the standard
-/// shader.
 #[test]
 fn gpu_a_vertex_block_reading_the_material_builds_its_shadow_pipelines() {
     let name = format!("test_material_vertex_{}", std::process::id());
@@ -43,7 +33,6 @@ fn gpu_a_vertex_block_reading_the_material_builds_its_shadow_pipelines() {
     );
 }
 
-/// The variant's baked files, removed when the test ends, whether it passes or not.
 struct Baked(String);
 
 impl Drop for Baked {
@@ -54,9 +43,6 @@ impl Drop for Baked {
     }
 }
 
-/// Two Cutout materials that share an albedo map but differ in tint clip their
-/// shadows alike: the standard cutout reads its test per caster and never the
-/// record, so its clip carries none and both stay one caster batch.
 #[test]
 fn gpu_cutouts_differing_only_in_tint_share_one_caster_batch() {
     use super::{batch_casters, CasterData, CasterKey};

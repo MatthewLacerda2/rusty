@@ -1,7 +1,3 @@
-//! Per-cluster culling on lavapipe (#1968): a wall hides half of a big panel and
-//! only its visible half is drawn; a panel facing away is dropped by its normal
-//! cones, and drawn whole on a two-sided material; pixels match with it off.
-
 use std::sync::Arc;
 
 use glam::{Quat, Vec3};
@@ -13,16 +9,12 @@ use rusty_components::RenderFace;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{create::create_entity, create::Primitive, Camera, Scene};
 
-/// Quads per side of a test panel: 8192 triangles, about 70 clusters.
 const N: u32 = 64;
 
-/// A clustered `N`×`N` panel, `size` metres square, its corner at `at`, facing
-/// +Z turned by `turn`.
 pub(super) fn panel(scene: &mut Scene, name: &str, at: (Vec3, f32, Quat)) -> u32 {
     panel_of(scene, (name, N), at)
 }
 
-/// [`panel`] cut `n`×`n` (at least 46, for the import's `MIN_TRIANGLES`).
 pub(crate) fn panel_of(
     scene: &mut Scene,
     (name, n): (&str, u32),
@@ -36,8 +28,6 @@ pub(crate) fn panel_of(
     id
 }
 
-/// Give `id` the geometry and clusters of an `n`×`n` unit-spaced grid at a new
-/// revision, as an import of the model `name` would.
 pub(super) fn cut(scene: &mut Scene, id: u32, (name, n): (&str, u32)) {
     let row = |y| (0..=n).map(move |x| [x as f32, y as f32, 0.0]);
     let positions: Vec<_> = (0..=n).flat_map(row).collect();
@@ -62,7 +52,6 @@ pub(super) fn cut(scene: &mut Scene, id: u32, (name, n): (&str, u32)) {
     mesh.clusters = Some((mesh.revision, Arc::new(clusters)));
 }
 
-/// Indices the base camera's last frame drew by cluster, summed over its jobs.
 pub(super) fn cluster_indices(r: &Renderer, view: &crate::RenderView) -> u32 {
     let cull = &view.hiz.cameras[0].clusters;
     let args = words(r, cull.args());
@@ -70,9 +59,6 @@ pub(super) fn cluster_indices(r: &Renderer, view: &crate::RenderView) -> u32 {
     jobs.map(|a| a[0] * a[1]).sum()
 }
 
-/// Frames of `scene` from `cam` with cluster culling on (a few, so the
-/// history settles) and off: the on frame, its drawn cluster indices, and
-/// whether the two frames match.
 fn on_and_off(r: &mut Renderer, scene: &Scene, cam: &Camera) -> (Vec<u8>, u32, bool) {
     let mut view = offscreen(r);
     let mut on = Vec::new();
@@ -107,7 +93,6 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
         half > ALL / 4 && half < ALL * 3 / 4,
         "about half: {half} of {ALL}"
     );
-    // The count reads back a frame or so late; once culling stops it is 0.
     let mut view = offscreen(&r);
     let mut frame = || shot(&mut r, &mut view, &scene, &cam).1;
     let c = (0..9).map(|_| frame()).last().expect("nine frames");
@@ -116,7 +101,6 @@ fn gpu_a_wall_hides_half_a_panel_and_only_the_visible_half_is_drawn() {
     let c = shot(&mut r, &mut view, &scene, &cam).1;
     assert_eq!(c.cluster_culled, 0, "stale once culling stopped: {c:?}");
     r.quality.gpu_cluster_culling = true;
-    // With nothing in front and all of it on screen, every cluster is drawn.
     let mut open = Scene::new();
     open.skybox_path = String::new();
     panel(&mut open, "Panel", at);

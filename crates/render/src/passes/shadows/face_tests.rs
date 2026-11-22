@@ -1,9 +1,3 @@
-//! A material's Render Face (#1615) in the shadow casters, as Unity's ShadowCaster
-//! pass culls by `_Cull`: a one-sided card casts from the faces its material draws.
-//! `Front` casts only while its front faces the light, `Back` only while its back
-//! does, and `Both` either way, as a `TwoSided` caster (#1571). A static card's
-//! cached bake follows its face. The GPU tests skip with no adapter.
-
 use super::casting_tests::card;
 use super::mirror_tests::sun_yard;
 use super::statics_key;
@@ -11,8 +5,6 @@ use crate::gpu::pipelines::surface::cut_depth_tests::ground_halves;
 use crate::Renderer;
 use rusty_components::{RenderFace, ShadowCasting};
 
-/// The ground's brightness under each half of a card drawing `face`, its front up
-/// toward the sun or, with `down`, away from it; none for `None`.
 fn shade(r: &mut Renderer, face: Option<RenderFace>, down: bool) -> [f32; 2] {
     let mut scene = sun_yard();
     if let Some(face) = face {
@@ -50,8 +42,6 @@ fn gpu_a_card_casts_from_the_faces_its_material_draws() {
     assert!(casts(both_up) && casts(both_down), "Both casts either way");
 }
 
-/// A static card's shadow bake is keyed by its slots' faces: switching `Front` ↔
-/// `Both` (or `Back`) re-bakes it, as a material edit moves no static revision.
 #[test]
 fn a_static_cards_render_face_moves_the_bake_key() {
     let mut scene = sun_yard();

@@ -1,8 +1,3 @@
-//! A material map uploads block-compressed (#1574): the format follows its Texture
-//! Type, every mip comes from the import cache, it draws what its uncompressed twin
-//! draws, and a slot its type cannot serve reads an uncompressed copy. On a GPU
-//! without BC every one falls back to RGBA8.
-
 use std::path::Path;
 
 use image::{Rgba, RgbaImage};
@@ -17,8 +12,6 @@ use rusty_asset::MapRef;
 use rusty_components::MaterialAsset;
 use wgpu::TextureFormat as F;
 
-/// A 16² PNG of `texel` everywhere at a fresh path named `name`, of
-/// `texture_type`, its compressed copy imported.
 fn flat(name: &str, texel: [u8; 4], texture_type: TextureType) -> String {
     typed(
         name,
@@ -27,7 +20,6 @@ fn flat(name: &str, texel: [u8; 4], texture_type: TextureType) -> String {
     )
 }
 
-/// `image` at a fresh path named `name`, of `texture_type`, imported.
 pub(super) fn typed(name: &str, image: RgbaImage, texture_type: TextureType) -> String {
     let path = temp_png(name);
     image.save(&path).unwrap();
@@ -60,7 +52,6 @@ fn gpu_each_type_uploads_in_its_block_format_where_its_slot_reads_it() {
         (&colour, TextureKind::Mask, F::Bc7RgbaUnormSrgb),
         (&normal, TextureKind::Normal, F::Bc5RgUnorm),
         (&grey, TextureKind::Mask, F::Bc4RUnorm),
-        // A slot the type cannot serve uploads uncompressed.
         (&normal, TextureKind::Colour, F::Rgba8UnormSrgb),
         (&grey, TextureKind::Data, F::Rgba8UnormSrgb),
     ];
@@ -76,7 +67,6 @@ fn gpu_each_type_uploads_in_its_block_format_where_its_slot_reads_it() {
     let raw = renderer.upload_map(&MapRef::from(colour.as_str()), TextureKind::Colour);
     let raw = raw.unwrap();
     assert_eq!(raw.texture.format(), F::Rgba8UnormSrgb);
-    // 16² + 8² + 4² + 2² + 1² texels at four bytes.
     assert_eq!(gpu_bytes(&raw.texture), 341 * 4);
     if !bc {
         eprintln!("no BC on this adapter: the fallback was tested");
@@ -106,8 +96,6 @@ fn gpu_a_compressed_map_draws_like_its_uncompressed_twin() {
     );
 }
 
-/// A one-channel map first loaded as a mask (BC4), then drawn as emissive colour,
-/// draws its grey, not BC4's red alone (#1574's review, finding 2).
 #[test]
 fn gpu_a_one_channel_map_reads_red_as_a_mask_and_grey_as_colour() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(16, 16) else {
@@ -126,7 +114,6 @@ fn gpu_a_one_channel_map_reads_red_as_a_mask_and_grey_as_colour() {
     };
     let uniform = crate::draw::uniforms::material_data(true, Some(&material));
     let uniform = renderer.with_map_channels(uniform, Some(&material));
-    // Its Texture Type sets red, BC4 or not yet (#1574).
     assert_eq!(uniform.use_roughness_map, 2);
     assert_eq!(uniform.use_metallic_map, 0, "no metallic map");
     let drawn = centre(&mut renderer, &emissive_scene(&grey));

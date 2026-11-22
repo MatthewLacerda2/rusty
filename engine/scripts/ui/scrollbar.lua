@@ -1,10 +1,6 @@
--- scrollbar.lua — the engine's Scrollbar widget (#422), Unity's `Scrollbar`.
---
--- `Sliding Area/Handle` spans `size` (0..1) of the track at `value` (0..1). Drag
--- the handle to move it; press the track beside it to page one handle-length that
--- way. While focused, the arrows along its axis step it (a tenth, or one step with
--- `number_of_steps`); across it they move the focus. A scroll view drives its
--- bars through the same API.
+-- Unity's `Scrollbar`. `Sliding Area/Handle` spans `size` (0..1) of the track at
+-- `value` (0..1). Pressing the track beside the handle pages one handle-length.
+-- Arrows along the axis step a tenth (or one step with `number_of_steps`).
 --
 -- Owner API (via `Scene.GetScript(id, "scrollbar")`):
 --   value, size                                   -- read them
@@ -34,7 +30,6 @@ local function quantize(v)
     return v
 end
 
--- The handle's span along the track, 0..1, in track coordinates.
 local function span()
     local s = math.max(0, math.min(1, Scrollbar.size))
     local v = reversed and 1 - Scrollbar.value or Scrollbar.value
@@ -65,7 +60,6 @@ function Scrollbar.set_size(s)
     place()
 end
 
--- Put the handle's start at track position `lo` (0..1).
 local function set_start(lo)
     local room = 1 - math.max(0, math.min(1, Scrollbar.size))
     local v = room > 0 and lo / room or 0
@@ -81,12 +75,10 @@ function Scrollbar.Awake(id)
     place()
 end
 
--- The pointer along the track (0..1, clamped), or nil when there is no layout yet.
 local function track_t(event)
     return RangeAxis.track(area or self_id, event, vertical)
 end
 
--- On the handle: hold it where pressed. Beside it: page toward the pointer.
 function Scrollbar.OnPointerDown(id, event)
     if event.button ~= "Left" then return end
     local t = track_t(event)

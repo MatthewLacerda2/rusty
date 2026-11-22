@@ -1,5 +1,3 @@
-//! The mip chain's settings (#1322): how many levels an upload gets.
-
 use super::*;
 
 fn settings(kind: TextureKind) -> MipSettings {

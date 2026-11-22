@@ -1,16 +1,3 @@
-//! The opaque copy (#1523): Unity's *Opaque Texture* and *Depth Texture*, one
-//! texture holding a camera's colour (rgb) and each pixel's distance from its eye
-//! (alpha), drawn after its opaque pass and SSR (so a refracting surface sees the
-//! reflected floor) by `opaque_copy.wgsl`. One texture, so the forward pass stays
-//! inside its sampled-texture budget (`render::setup::limits`, 17 per stage). The transparent pass reads it
-//! through its scene group. Made only on a camera whose visible translucents ask for it
-//! (a material that refracts or absorbs, `MaterialAsset::reads_opaque`, or traces
-//! SSR, `postfx::effects::ssr::transparent`) and counted
-//! in `Debug.Stats().opaque_copies`; every other pass binds a 1x1 stand-in.
-//!
-//! The copy is the view's own state in `PostFx::targets`, like SSR's source copy,
-//! kept while the view's size holds; a camera that needs none binds none.
-
 use crate::draw::batch::DrawBatch;
 use crate::gpu::bind_entry as entry;
 use crate::gpu::bind_layouts::create_shadow_bind_group;
@@ -23,16 +10,12 @@ use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
-/// The opaque copy a forward pass's scene group binds, and its sampler.
 #[derive(Clone, Copy)]
 pub(crate) struct OpaqueViews<'a> {
     pub texture: &'a wgpu::TextureView,
     pub sampler: &'a wgpu::Sampler,
 }
 
-/// The copy's pipeline, the 1x1 stand-in every scene group binds outside a transparent
-/// pass that copied, and the copy's sampler: linear, clamped, so a lookup bent off
-/// screen reads the edge.
 pub(crate) struct OpaqueCopyPass {
     layout: wgpu::BindGroupLayout,
     pipeline: LazyPipeline,
@@ -78,6 +61,7 @@ impl OpaqueCopyPass {
             fallback: PostFx::target(device, 1, 1, "Opaque Copy Stand-in", HDR_FORMAT),
             sampler: device.create_sampler(&wgpu::SamplerDescriptor {
                 label: Some("Opaque Copy Sampler"),
+                // Clamped: a lookup bent off screen reads the edge.
                 mag_filter: wgpu::FilterMode::Linear,
                 min_filter: wgpu::FilterMode::Linear,
                 ..Default::default()
@@ -85,7 +69,6 @@ impl OpaqueCopyPass {
         }
     }
 
-    /// The stand-in's views.
     pub(crate) fn fallback(&self) -> OpaqueViews<'_> {
         OpaqueViews {
             texture: &self.fallback.view,
@@ -93,22 +76,17 @@ impl OpaqueCopyPass {
         }
     }
 
-    /// The pipeline, for warming (`Renderer::lazy_pipelines`).
     pub(crate) fn lazy_pipeline(&self) -> &LazyPipeline {
         &self.pipeline
     }
 }
 
-/// One view's opaque copy, and the scene group its transparent pass binds this camera
-/// (`None` on a camera that made no copy).
 pub(crate) struct OpaqueCopy {
     size: (u32, u32),
     target: PfxTarget,
     pub(crate) group: Option<wgpu::BindGroup>,
 }
 
-/// Whether any of a camera's translucent `batches` reads the opaque copy: one that
-/// refracts or absorbs, or traces SSR (#1570) on a camera that marches (`traces`).
 pub(crate) fn wanted(batches: &[DrawBatch], traces: bool) -> bool {
     batches.iter().any(|b| {
         let t = b.key.traits;
@@ -117,9 +95,6 @@ pub(crate) fn wanted(batches: &[DrawBatch], traces: bool) -> bool {
 }
 
 impl Renderer {
-    /// Copy this camera's opaque colour and eye distances when its `translucents`
-    /// read them (`traces`: the camera marches SSR, [`wanted`]), and build the group
-    /// 3 its transparent pass binds; else leave the view's copy unbound for this camera.
     pub(crate) fn copy_opaque(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -171,7 +146,6 @@ impl Renderer {
         self.frame_counters.opaque_copies += 1;
     }
 
-    /// Draw `view`'s opaque colour and eye distances into `target`.
     fn draw_copy(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -199,8 +173,6 @@ impl Renderer {
         }
     }
 
-    /// The scene group `view`'s transparent pass binds: its copy's this camera, else the
-    /// no-AO group with the stand-in.
     pub(crate) fn transparent_scene_group<'a>(
         &'a self,
         view: &'a RenderView,

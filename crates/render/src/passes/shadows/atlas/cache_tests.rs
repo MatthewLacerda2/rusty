@@ -1,5 +1,3 @@
-//! The atlas's static-tile bookkeeping (#694): what re-bakes, and what a bake forgets.
-
 use glam::camera::rh::view::look_at_mat4;
 use glam::Vec3;
 
@@ -7,7 +5,6 @@ use super::StaticTiles;
 use crate::passes::shadows::atlas::Tile;
 use rusty_scene::SceneId;
 
-/// A tile at `origin`, `size` texels across, seen from `eye`.
 fn tile(origin: [u32; 2], size: u32, eye: Vec3) -> Tile {
     Tile {
         view_proj: look_at_mat4(eye, Vec3::ZERO, Vec3::Y),
@@ -47,12 +44,10 @@ fn a_bake_forgets_only_the_tiles_it_drew_over() {
     let mut cache = StaticTiles::default();
     cache.commit(scene, [left, right]);
 
-    // A smaller tile inside `left` overwrites part of it: `left` must re-bake.
     let inside = tile([128, 128], 128, Vec3::new(1.0, 2.0, 3.0));
     cache.commit(scene, [inside]);
     assert_eq!(cache.stale(scene, &[left, right, inside]), [0]);
 
-    // Edge-adjacent tiles share no texel.
     let below = tile([0, 256], 256, Vec3::NEG_X);
     cache.commit(scene, [below]);
     assert!(cache.stale(scene, &[right, inside, below]).is_empty());

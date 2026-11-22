@@ -1,106 +1,3 @@
-//! crates/render/src/passes/hiz/ — GPU occlusion culling (#1963): two-phase Hi-Z per
-//! instance, Unity 6's *GPU Occlusion Culling* beside the baked PVS (#1714).
-//!
-//! It needs no bake and culls wherever the camera stands. Per camera, after the CPU
-//! culls (mask, LOD, frustum, small objects, then the PVS row when the bake is
-//! usable: what that drops is never tested here), its `occlusion` stage
-//! ([`Renderer::cull_by_hiz`]) runs:
-//! 1. **phase one**: each opaque batch keeps, in order, the instances whose object
-//!    was drawn last frame (`hiz.wgsl`'s `cs_select`, marking each drawn early),
-//!    and the SSAO prepass's pipelines draw them into the view's depth through
-//!    indirect args;
-//! 2. the depth is max-reduced into a pyramid ([`pyramid`]);
-//! 3. every opaque instance's world bounds are tested against it (`cs_test`): the
-//!    level where its screen rect spans at most 2x2 texels, hidden only when its
-//!    nearest point is behind the farthest depth there, and never when a corner
-//!    crosses the near plane. The verdict is next frame's phase-one set;
-//! 4. each batch keeps its visible instances, in order (`cs_compact`): the opaque
-//!    passes (the SSAO and SSIL prepass, the forward and velocity pass) draw those
-//!    through indirect args ([`Culled`]), so an object that came out from behind a
-//!    wall this frame is drawn this frame. The same loop lists the **late set**, the
-//!    visible instances phase one did not draw ([`Culled::late`], #2336).
-//!
-//! Steps 2 to 4 and the cluster cull below record into one compute pass, after
-//! phase one's depth draw; the select has its own pass before it (#2327). On a
-//! frame the GPU timer times, each part is its own pass and timestamp pair
-//! instead (`stage`, #2401), so the bench reads the stage by part.
-//!
-//! The phase-one draw is depth only, into the view's depth, and it is kept: the
-//! depth prepass (SSAO's or SSIL's, or with neither the one that primes the forward
-//! pass, where priming runs) loads it and draws only the late set, so a held view
-//! draws its depth once (#2336). That leaves the depth a full prepass of the final
-//! set would, byte for byte: an instance phase one drew and the test now hides is
-//! behind phase one's own depth, so it wins no texel, and phase one draws through
-//! the prepass's pipelines. A clustered batch's late instances are drawn whole,
-//! the clusters their cull leaves out (hidden, out of the frustum, facing away)
-//! winning no texel either. A camera that does not cull clears and draws all. The
-//! forward and velocity pass draw the final set, primed or clearing depth as
-//! before (on Metal nothing primes, so it clears). Order within a batch is kept,
-//! so a frame where nothing is hidden draws exactly what the CPU batched.
-//!
-//! **First frames.** A camera's first culled frame has no history: every slot
-//! reads "drawn", so phase one draws every instance and the late set is empty.
-//! So does a slot new to its history (a spawn, a scene load). A resize keeps the
-//! history; phase one draws into the resized depth.
-//!
-//! **What is tested.** Opaque and cutout batches only: a translucent is never an
-//! occluder and always drawn. Phase one draws through the prepass's own pipelines,
-//! so only what the prepass writes (lit solids, cutouts clipped, a surface variant's
-//! own cut or moved vertices) is ever an occluder. A skinned object is tested with
-//! its posed bounds, an object whose bounds are unknown, one the selection outline
-//! rings, a mesh particle, and one a surface variant whose cut moves draws
-//! (`RenderObject::moving`: a `vertex_waves` swell leaves its undisplaced bounds)
-//! are always drawn. The opaque batches are an `OpaqueBatches`, which only
-//! `Renderer::draw_solids` draws, so no opaque pass can skip the verdict.
-//!
-//! **What it keeps.** Its bind groups (the cull's, the pyramid's levels, the
-//! kept instances' per-draw group) and the draws holding them are rebuilt only when a
-//! buffer they bind or draw from grew or the depth was resized
-//! ([`Kept`](crate::gpu::kept::Kept)): a `Kept`'s key names every resource its
-//! value holds (#2021). Its CPU tables are reused. Grown history keeps its
-//! verdicts: only new object slots read "drawn".
-//!
-//! **Who culls.** [`Renderer::hiz_culls`]: the quality preset's
-//! `gpu_occlusion_culling` (off in every seeded preset, #2388), the camera's
-//! `use_occlusion_culling`, and never during a capture, which bakes every static
-//! mesh. Then the stage itself skips a camera that tests fewer than
-//! [`MIN_INSTANCES`] objects (`CameraSolids::tested`: a viewmodel camera
-//! drawing a gun, #2338) and draws none of its opaque batches by cluster: it
-//! holds no buffers or pyramid for it and leaves it drawn as a camera with the
-//! flag off is, since a cull of so few cannot hide what it costs, but for its
-//! forward pass: that stays primed, by a depth prepass of its few batches
-//! (`SolidResources::floored`), as it was while phase one's depth sat under it. A camera with a
-//! clustered mesh in view keeps the cull under the floor while the preset's
-//! cluster cull is on: one million-triangle shell gains by cluster whatever the
-//! instance count. The floor counts what the cull tests, not whether the camera
-//! is an overlay, so a stacked camera showing the level still culls. A camera
-//! that drops under it, or whose flag goes off, drops its counters' read in
-//! flight, so its first frame back never reports a count from before it; one
-//! that crosses back culls on its first frame above from the history it kept
-//! (every slot "drawn" when it never culled), and correctness never rests on
-//! that history: the late set draws what it missed.
-//!
-//! An orthographic camera and one with a far near plane do cull: the test
-//! reads the depth the camera drew, so a wall its near plane clips away writes none,
-//! and the projected rect is exact for an orthographic projection. An adapter
-//! without `INDIRECT_FIRST_INSTANCE` culls nothing this way.
-//!
-//! **By cluster.** A batch of a mesh the import split into clusters is then
-//! culled cluster by cluster against the same pyramid and drawn per instance
-//! ([`clusters`], #1968); the quality preset's `gpu_cluster_culling` turns it on.
-//!
-//! **What it counts.** The CPU records the cull's draws as indirect ones, so the
-//! triangles they drew are read back from their args with the stage's counts
-//! ([`drawn`]), a frame or so late, and counted where each pass draws: phase
-//! one's in the stage (`hiz_depth_triangles` beside), the late set's with the
-//! prepass, the final set's with the camera. Nothing hidden, no triangle is
-//! drawn twice: phase one's depth stands in for the prepass's where one runs.
-//!
-//! **Seams.** The pyramid ([`pyramid::Pyramid`]) is built once per camera and
-//! read by mip level and texel through `hiz/hidden.wgsl`'s `hidden`, which the
-//! instance and cluster tests share; a light's shadow views and the CPU frustum
-//! loop could feed it the same way, from their own depth.
-
 pub(crate) mod clusters;
 mod counters;
 mod cull;
@@ -153,32 +50,18 @@ use crate::Renderer;
 
 pub(crate) use cull::{CameraCull, Culled, ARGS};
 
-/// The device feature the indirect draws need: each batch's kept instances start
-/// at its own run of the array, so its args name a first instance.
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::INDIRECT_FIRST_INSTANCE;
 
-/// The fewest objects a camera's Hi-Z cull tests for it to run ([module
-/// docs](self), *Who culls*; a camera drawing by cluster runs under it): below it the stage's select, depth pass, pyramid, test, submit
-/// and read-backs cost more than the few draws they could hide. A renderer
-/// constant, not a preset row: it changes no pixel.
 pub(crate) const MIN_INSTANCES: u32 = 32;
 
-/// Whether a camera culls by Hi-Z, from its rules ([module docs](self), *Who
-/// culls*): the adapter's `supported` feature, the preset's and the camera's
-/// switches, and no capture.
 fn culls(supported: bool, (preset, camera): (bool, bool), capturing: bool) -> bool {
     supported && preset && camera && !capturing
 }
 
-/// Whether a camera whose cull would test `tested` objects has enough for the
-/// cull to pay, against the renderer's `floor` ([`MIN_INSTANCES`]), or draws a
-/// batch by cluster (`clustered`, a walk of its batches, asked only under the
-/// floor).
 fn draws_enough((tested, clustered): (usize, impl FnOnce() -> bool), floor: u32) -> bool {
     tested >= floor as usize || clustered()
 }
 
-/// The compute pipelines, shared by every view, built on their first dispatch.
 pub(crate) struct HiZ {
     pub(super) cull_layout: wgpu::BindGroupLayout,
     pub(super) select: LazyCompute,
@@ -186,16 +69,10 @@ pub(crate) struct HiZ {
     pub(super) compact: LazyCompute,
     pub(super) reduce_depth: LazyCompute,
     pub(super) reduce: LazyCompute,
-    /// The per-cluster passes (#1968).
     pub(crate) clusters: clusters::ClusterPipelines,
-    /// The fewest objects a camera's cull tests: [`MIN_INSTANCES`]. The tests
-    /// of the cull's mechanism lower it to 0 (`test_gpu::culling`), so their
-    /// primitive scenes of a few boxes still cull.
     pub(crate) min_instances: u32,
 }
 
-/// What one view keeps for it: the pyramid, and each stacked camera's buffers,
-/// by its place in the stack.
 #[derive(Default)]
 pub(crate) struct HiZView {
     pub(crate) pyramid: Option<pyramid::Pyramid>,
@@ -224,7 +101,6 @@ impl HiZ {
         }
     }
 
-    /// The pipelines, for warming (`Renderer::lazy_computes`).
     pub(crate) fn lazy_computes(&self) -> [&LazyCompute; 8] {
         let Self {
             select,
@@ -250,8 +126,6 @@ impl HiZ {
 }
 
 impl Renderer {
-    /// Whether `cam` is culled by the GPU's depth pyramid ([module docs](self)).
-    /// The stage then skips one with too few instances ([`Self::hiz_draws_enough`]).
     pub(crate) fn hiz_culls(&self, cam: &rusty_scene::Camera) -> bool {
         let supported = self.device.features().contains(FEATURE);
         let on = (
@@ -261,16 +135,11 @@ impl Renderer {
         culls(supported, on, self.capture.static_only)
     }
 
-    /// Whether a camera [`Self::hiz_culls`] draws enough in `solids` for the
-    /// stage to run: at least [`MIN_INSTANCES`] objects its cull tests, or a
-    /// batch it draws by cluster ([`Self::draws_clustered`]).
     pub(crate) fn hiz_draws_enough(&self, solids: &crate::draw::resources::SolidResources) -> bool {
         let clustered = || self.draws_clustered(&solids.draws);
         draws_enough((solids.tested.len(), clustered), self.hiz.min_instances)
     }
 
-    /// Whether a camera that culls by Hi-Z also culls its clustered meshes by
-    /// cluster (#1968): the preset's `gpu_cluster_culling`.
     pub(crate) fn cluster_culls(&self) -> bool {
         self.quality.gpu_cluster_culling
     }

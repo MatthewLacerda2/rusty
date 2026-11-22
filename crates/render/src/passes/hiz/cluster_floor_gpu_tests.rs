@@ -1,9 +1,3 @@
-//! The instance floor spares a camera drawing by cluster (#2338): one big
-//! clustered panel and a wall, two objects, far under the floor, still cull
-//! the panel's hidden half by cluster, so a level imported as a few big meshes
-//! keeps its cluster cull. With the preset's cluster cull off the same camera
-//! is under the floor and skips the stage.
-
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::panel;
@@ -24,7 +18,6 @@ fn gpu_a_clustered_mesh_under_the_floor_still_culls_by_cluster() {
     panel(&mut scene, "Panel", at);
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
     let mut view = offscreen(&r);
-    // The count reads back a frame or so late.
     let c = (0..9)
         .map(|_| shot(&mut r, &mut view, &scene, &cam).1)
         .last();

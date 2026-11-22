@@ -1,7 +1,3 @@
-//! crates/shadergen/src/ui_tests.rs — the `ui` pass (#427): every block composes against
-//! the real `ui.wgsl`, the variant keeps both entry-point pairs and replaces only
-//! `graphic()`, and its runtime params get uniform slots and a sidecar.
-
 use std::collections::BTreeMap;
 
 use super::assemble::{assemble, assemble_with_params};
@@ -62,7 +58,6 @@ fn only_graphic_is_replaced_and_the_chain_folds_over_shade() {
     assert!(wgsl.contains(
         "return ui_rgb_split(ui_scanlines(shade(in), in, f, scanlines_0_spacing, shader_params.v[0].x, scanlines_0_speed), in, f, shader_params.v[1].x, rgb_split_1_angle);"
     ));
-    // The world pass keeps its RectMask clip and Mask coverage around the custom colour.
     assert!(wgsl.contains("let c = graphic(in) * clip_coverage(in.canvas);"));
 }
 

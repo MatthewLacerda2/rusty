@@ -1,9 +1,6 @@
--- toggle_group.lua — the engine's ToggleGroup (#422), Unity's `ToggleGroup`.
---
--- Put it on any ancestor of some toggles: they become radio buttons — at most one
--- is on, and (unless `allow_switch_off`) exactly one, so clicking the on one does
--- nothing. A group starting with none on turns its first on; with several, keeps
--- the first.
+-- Unity's `ToggleGroup`: on any ancestor of some toggles, at most one is on (exactly
+-- one unless `allow_switch_off`). A group starting with none on turns its first on;
+-- with several on, keeps the first.
 --
 -- Owner API (via `Scene.GetScript(id, "toggle_group")`):
 --   active()           -- the `toggle` script table that is on, or nil
@@ -17,7 +14,6 @@ local Group = {
 
 local toggles = {}
 
--- Called by each member toggle in its Awake.
 function Group.register(t)
     toggles[#toggles + 1] = t
 end
@@ -28,7 +24,6 @@ function Group.active()
     end
 end
 
--- Whether `t` may not turn off: the group needs one on and no other is.
 function Group.is_locked(t)
     if Group.allow_switch_off then return false end
     for _, other in ipairs(toggles) do
@@ -37,7 +32,6 @@ function Group.is_locked(t)
     return true
 end
 
--- A member turned on: turn the others off (each announcing its change).
 function Group.notify_on(on)
     for _, t in ipairs(toggles) do
         if t ~= on and t.is_on then t.set_is_on(false) end

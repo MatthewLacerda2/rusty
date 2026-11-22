@@ -1,26 +1,12 @@
--- dropdown.lua — the engine's Dropdown widget (#422), Unity's `Dropdown`.
+-- Unity's `Dropdown`. Opening lifts the inactive `Template` onto a popup canvas
+-- above every other canvas, behind which a transparent `Blocker` swallows the
+-- closing click. Clicks come through `dropdown_item.lua`.
+-- `options` is `|`-separated in the inspector.
 --
--- Shows the chosen option on its `Label`. Click it (or Enter while focused) to
--- open the list: the inactive `Template` (a scroll view) is lifted onto a popup
--- canvas above every other canvas, behind which a transparent `Blocker` covers the
--- screen — a click there closes the list and reaches nothing underneath, like
--- Unity's. On a world or camera canvas (#429) the list opens on that canvas
--- instead, as its top-most child, and the blocker covers that canvas.
--- The list holds one `Item` per option (a Selectable, so it highlights);
--- click one, or pick it with the arrows and Enter. Escape closes it. The items'
--- and the blocker's clicks arrive through `dropdown_item.lua` (#996), so they
--- follow the event system's click and drag rules.
---
--- `options` is the list, `|`-separated in the inspector; `value` is 0-based.
---
--- Owner API (via `Scene.GetScript(id, "dropdown")`):
---   value                                        -- 0-based index of the choice
---   on_value_changed = function(id, value, text) … end
---   set_value(i) / set_value_without_notify(i)
---   get_options() / set_options({ "Low", "High" })
---   show() / hide() / is_expanded()
---   select_item(i)                               -- what a list click calls: pick option i
---                                                -- (0-based) and close, or just close for -1
+-- Owner API (via `Scene.GetScript(id, "dropdown")`): value (0-based),
+-- on_value_changed(id, value, text), set_value(i), set_value_without_notify(i),
+-- get_options(), set_options(t), show(), hide(), is_expanded(), select_item(i)
+-- (-1 just closes).
 
 local Dropdown = {
     fields = {
@@ -34,10 +20,10 @@ local Dropdown = {
 local POPUP_ORDER = 30000
 local ITEM_SCRIPT = "assets/scripts/ui/dropdown_item.lua"
 local self_id, label, template
-local list = {}                   -- the options
+local list = {}
 local items = {}                  -- item entity per option, built on open
 local stale = true                -- items no longer match the options
-local popup, blocker, home        -- open state: popup canvas, blocker, template's own placement
+local popup, blocker, home        -- open state; `home` is the template's own placement
 local opened_tick
 
 local function split(s)
@@ -72,7 +58,6 @@ function Dropdown.set_options(opts)
     refresh_label()
 end
 
--- A child of `parent` stretched over it, inset `l, r` from the sides.
 local function child(parent, name, l, r)
     local e = Scene.CreateEntity(name)
     Scene.AddComponent(e, "RectTransform")
@@ -84,7 +69,6 @@ local function child(parent, name, l, r)
     return e
 end
 
--- One Item per option under the template's Content, navigable top to bottom.
 local function build_items()
     for _, e in ipairs(items) do
         Scene.SetActive(e, false)
@@ -126,7 +110,6 @@ local function build_items()
     stale = false
 end
 
--- Which option's item `hit` is (or is inside), or nil.
 local function item_of(hit)
     while hit do
         for i, e in ipairs(items) do
@@ -149,8 +132,6 @@ function Dropdown.show()
         Canvas.SetReferenceResolution(popup, rw, rh)
         Canvas.SetMatchWidthOrHeight(popup, Canvas.GetMatchWidthOrHeight(r.canvas))
     else
-        -- A world or camera canvas: the list opens on that canvas, as its last
-        -- (top-most) child, and the blocker covers that canvas only.
         popup = child(r.canvas, "Dropdown List", 0, 0)
     end
     blocker = child(popup, "Blocker", 0, 0)
@@ -172,7 +153,6 @@ function Dropdown.show()
     RectTransform.SetAnchoredPosition(template, r.x, below and r.y or r.y + r.height)
     RectTransform.SetSizeDelta(template, r.width, height)
     for i, e in ipairs(items) do
-        -- An item built without a checkmark has none to show.
         local mark = Scene.FindChild(e, "Item Checkmark")
         if mark then
             Scene.SetActive(mark, i == Dropdown.value + 1)
@@ -220,7 +200,6 @@ function Dropdown.OnSubmit(id)
     Dropdown.show()
 end
 
--- While open: Enter on the focused item, and Escape. Clicks come from the items.
 function Dropdown.Update(id)
     if not popup or Time.frameCount() == opened_tick then return end
     if Input.GetKeyDown("ESCAPE") then return Dropdown.hide() end

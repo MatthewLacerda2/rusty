@@ -1,9 +1,9 @@
-// engine/shaders/postfx/effects/bloom.wgsl — bloom's add, in the composite: the
+// bloom's add, in the composite: the
 // top of its mip chain (`postfx/bloom.wgsl`, run before the composite) over the HDR
-// image, and the lens dirt it lights (#1442), as Unity's `UberPost` adds them:
+// image, and the lens dirt it lights, as Unity's `UberPost` adds them:
 // `bloom *= intensity; color += bloom; color += dirt * dirt_intensity * bloom`.
 // Slot 0: x intensity, y intensity × dirt intensity (`0`: no dirt), w `1` while
-// bloom runs. `dirt` is bloom's composite texture (#1473): the volume's dirt,
+// bloom runs. `dirt` is bloom's composite texture: the volume's dirt,
 // black while there is none.
 
 #define_import_path postfx::effects::bloom

@@ -1,12 +1,6 @@
-//! A surface variant whose cut follows a UV-stage block (#648) builds its depth
-//! pipelines. Skips with no adapter.
-
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// A scrolled cut (#648) builds its depth pipelines: its shadow cut reads
-/// `camera.time`, which the shadow pass binds — wgpu would refuse it otherwise and
-/// the variant would quietly fall back to the standard shader.
 #[test]
 fn gpu_a_scrolled_dissolve_builds_its_cut_pipelines() {
     let name = format!("test_scrolled_cut_{}", std::process::id());

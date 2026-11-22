@@ -1,7 +1,3 @@
-//! Light-probe captures in HDR (#1696): with nothing clamping the bounces, the
-//! solve still converges. Radiance above 1 and a texel past the half float's
-//! range: `hdr_finite_tests`.
-
 use glam::{Quat, Vec3};
 
 use crate::project_cubemap;
@@ -19,8 +15,6 @@ pub(super) const NORMALS: [Vec3; 6] = [
     Vec3::NEG_Z,
 ];
 
-/// A closed box of six static walls around the origin, each `albedo` and glowing
-/// `emissive`, the probe outside every wall's back face (#1615).
 pub(super) fn closed_room(albedo: [f32; 3], emissive: [f32; 3]) -> Scene {
     let mut scene = Scene::new();
     scene.materials.insert(
@@ -58,9 +52,6 @@ pub(super) fn finite(sh: &Sh9) -> bool {
     sh.coeffs.iter().flatten().all(|c| c.is_finite())
 }
 
-/// With nothing clamping them, the bounces of a closed, bright, light-walled room
-/// still converge: each pass adds less light than the one before, so the field
-/// settles instead of growing per bounce.
 #[test]
 fn gpu_bounces_in_a_bright_closed_room_shrink_each_pass() {
     use crate::ibl::probe::bounce::field_delta;

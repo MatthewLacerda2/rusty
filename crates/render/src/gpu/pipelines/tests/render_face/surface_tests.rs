@@ -1,10 +1,3 @@
-//! An authored surface shader on a two-sided face (#1615): its colour blocks read
-//! the normal the face is shaded with, turned toward the viewer when it is seen
-//! from behind, so a Fresnel rim on a `Both` card seen head-on from behind stays
-//! dark, as from the front, instead of glowing over the whole card. Its facing
-//! pipelines are built with the slot in a warmed (windowed) renderer. Skips with
-//! no adapter.
-
 use std::collections::BTreeMap;
 
 use super::render_face_tests::{asset, card, frame, mean, RES};
@@ -13,7 +6,6 @@ use rusty_components::RenderFace;
 use rusty_shadergen::recipe::{BlockSel, ParamValue, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir};
 
-/// Bake `name` into `dir`: one white `fresnel_rim` of `power` (0 glows everywhere).
 fn bake_rim(dir: &str, name: &str, power: f32) {
     let params = BTreeMap::from([
         ("color".to_string(), ParamValue::Vector(vec![4.0; 3])),
@@ -31,7 +23,6 @@ fn bake_rim(dir: &str, name: &str, power: f32) {
     bake_recipe(&recipe, engine_shader_dir(), dir).expect("bake succeeds");
 }
 
-/// The `Both` card seen head-on from behind, shaded by `shader` (`None`: standard).
 fn behind(r: &mut Renderer, shader: Option<&str>) -> f32 {
     let (mut scene, cam) = card(RenderFace::Both, false, true);
     let id = scene.world.find_by_name("Card").expect("the card");

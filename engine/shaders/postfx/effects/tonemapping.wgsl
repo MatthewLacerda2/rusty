@@ -1,24 +1,18 @@
-// engine/shaders/postfx/effects/tonemapping.wgsl — Tonemapping (#1440, #1701): the
-// operator that brings scene-linear HDR to the display (slot: x its index, mirroring
-// `Tonemap::to_index`: 0 none, 1 Reinhard, 2 ACES, 3 Neutral, 4 AgX), and, last in
-// the grade, the display-gamma tweak (slot: x the gamma). Both are baked into the
-// grading LUT, so a curve's cost is paid per texel of the table; per pixel every
-// mode costs the same LUT read (`postfx::grade::lut_sample`, four texel loads).
+// Tonemapping: the operator that brings scene-linear HDR to the display (slot: x its index,
+// mirroring `Tonemap::to_index`: 0 none, 1 Reinhard, 2 ACES, 3 Neutral, 4 AgX), and, last in
+// the grade, the display-gamma tweak (slot: x the gamma).
 
 #define_import_path postfx::effects::tonemapping
 
-// Narkowicz's fit of the ACES RRT + sRGB ODT. The fit itself is pre-exposed (1 in
-// maps to ~0.8 out); his note: "for the original ACES curve just multiply input by
-// 0.6", which is the curve Unity's ACES mode draws (#1701).
 fn aces(x_in: vec3<f32>) -> vec3<f32> {
     let x = x_in * 0.6;
     let a = 2.51; let b = 0.03; let c = 2.43; let d = 0.59; let e = 0.14;
     return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
-// Khronos PBR Neutral (glTF's reference implementation): below 0.76 a colour passes
-// through, less a small black offset; above it the peak channel rolls off towards 1
-// and the colour moves towards white along a line, so its hue is kept.
+// Khronos PBR Neutral (glTF's reference implementation): below 0.76 a colour passes through,
+// less a small black offset; above it the peak channel rolls off towards 1 and the colour moves
+// towards white along a line, so its hue is kept.
 fn pbr_neutral(c_in: vec3<f32>) -> vec3<f32> {
     let start = 0.8 - 0.04;
     let desaturation = 0.15;
@@ -36,10 +30,9 @@ fn pbr_neutral(c_in: vec3<f32>) -> vec3<f32> {
     return clamp(mix(c, vec3<f32>(new_peak), g), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
-// AgX, Troy Sobotka's, as Blender 4 ships it, by way of Filament and three.js: into
-// Rec.2020, an inset gamut, a log2 encoding of [-12.47, 4.03] EV around middle grey
-// (so the curve reaches white near 16, well inside the LUT's ~50), a polynomial
-// sigmoid, the outset, and back. Matrices are column-major, as WGSL's constructor.
+// AgX, Troy Sobotka's, as Blender 4 ships it, by way of Filament and three.js: into Rec.2020,
+// an inset gamut, a log2 encoding of [-12.47, 4.03] EV around middle grey (so the curve reaches
+// white near 16, well inside the LUT's ~50), a polynomial sigmoid, the outset, and back.
 const SRGB_TO_REC2020 = mat3x3<f32>(
     vec3<f32>(0.6274, 0.0691, 0.0164),
     vec3<f32>(0.3293, 0.9195, 0.0880),
@@ -93,8 +86,8 @@ fn tonemap(c: vec3<f32>, p: vec4<f32>) -> vec3<f32> {
     return tonemap_with(c, u32(p.x));
 }
 
-// The display-gamma tweak (neutral 1), NOT the output encode: every target the
-// composite writes is sRGB, and the hardware encodes on write (#415).
+// The display-gamma tweak (neutral 1), NOT the output encode: every target the composite writes
+// is sRGB, and the hardware encodes on write.
 fn display_gamma(c_in: vec3<f32>, p: vec4<f32>) -> vec3<f32> {
     let c = clamp(c_in, vec3<f32>(0.0), vec3<f32>(1.0));
     return pow(c, vec3<f32>(1.0 / max(p.x, 0.01)));

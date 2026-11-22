@@ -1,12 +1,8 @@
-//! The fallback probe among the frame's residents (#1697): ranked first and slot 0,
-//! and never at the cost of the camera's own room's probe.
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, first, probes_at, renderer};
 use super::ranked;
 
-/// The fallback leads, then the probes by box distance, ties to the lower index.
 #[test]
 fn the_fallback_ranks_first_then_the_nearest() {
     let mut scene = probes_at(&[(9.0, "a"), (-3.0, "b"), (40.0, "fallback"), (3.0, "c")]);
@@ -17,8 +13,6 @@ fn the_fallback_ranks_first_then_the_nearest() {
     assert_eq!(ranked(&set.probes, Vec3::ZERO), vec![1, 3, 0, 2]);
 }
 
-/// A far fallback whose cube alone fills the budget does not evict the camera's own
-/// room's probe: both are taken whatever the budget, the fallback in slot 0.
 #[test]
 fn gpu_a_big_fallback_keeps_the_nearest_probe_resident() {
     let Some(mut renderer) = renderer() else {

@@ -1,46 +1,24 @@
-//! How many instances a camera's GPU occlusion cull hid (#1963), and how many
-//! clusters its cluster cull dropped (#1968): what the GPU drew copied to a mapped
-//! buffer and read a frame or so later, never waited on, so `Debug.Stats`'
-//! `hiz_culled` and `cluster_culled` trail the frame they describe.
-
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::Arc;
 
 use crate::gpu::commands::Commands;
 
-/// A read whose map has not answered yet.
 const PENDING: u8 = 0;
-/// A read whose copy is mapped and readable.
 const MAPPED: u8 = 1;
-/// A read whose map failed: nothing to read, and the next copy may go.
 const FAILED: u8 = 2;
 
-/// One camera's read back, at most one in flight.
 #[derive(Default)]
 pub(crate) struct Counter {
     staging: Option<wgpu::Buffer>,
-    /// The items tested and bytes copied of the read in flight.
     in_flight: Option<(u32, u64)>,
-    /// Set by the map callback: [`MAPPED`] once the copy is readable, [`FAILED`]
-    /// when the map was refused; [`PENDING`] until then.
     mapped: Arc<AtomicU8>,
-    /// Whether the copy was recorded this frame and waits for its submit.
     copied: bool,
-    /// Items the last read found hidden.
     pub(crate) culled: u32,
-    /// Items the last read found drawn.
     pub(crate) drawn: u32,
-    /// The second count the last read's words carried: the late set's drawn
-    /// instances for an instance cull's (#2336), `0` for a cluster cull's.
     pub(crate) late: u32,
-    /// The triangles the last read's draws drew (#2387), by pass; `None` until
-    /// a read has come back since the counter was made or forgotten, and for a
-    /// cluster cull's.
     pub(crate) triangles: Option<Triangles>,
 }
 
-/// What a read's words say: the items drawn, a second count beside them
-/// ([`Counter::late`]) and the triangles drawn ([`Counter::triangles`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Read {
     pub drawn: u32,
@@ -48,9 +26,6 @@ pub(crate) struct Read {
     pub triangles: Triangles,
 }
 
-/// The triangles a camera's indirect draws drew (#2387), read from their args:
-/// phase one's depth, the late set's (drawn by the depth prepass, where it
-/// runs) and the final set's (the forward pass's, by cluster where it draws so).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Triangles {
     pub phase_one: u64,
@@ -59,7 +34,6 @@ pub(crate) struct Triangles {
 }
 
 impl Counter {
-    /// The count in a buffer's first word.
     pub(crate) fn first_word(words: &[u32]) -> Read {
         Read {
             drawn: words.first().copied().unwrap_or(0),
@@ -67,19 +41,14 @@ impl Counter {
         }
     }
 
-    /// Whether no read is in flight, so the next [`Self::copy`] copies.
     pub(crate) fn idle(&self) -> bool {
         self.in_flight.is_none()
     }
 
-    /// Take a finished read's counts, if one came back: `read` reads how many
-    /// tested items were drawn, its second count and its triangles, from the
-    /// copied words.
     pub(crate) fn collect(&mut self, device: &wgpu::Device, read: impl FnOnce(&[u32]) -> Read) {
         let Some((tested, bytes)) = self.in_flight else {
             return;
         };
-        // Lets a pending map's callback run, without waiting for it.
         let _ = device.poll(wgpu::PollType::Poll);
         if !self.settle() {
             return;
@@ -101,10 +70,6 @@ impl Counter {
         self.in_flight = None;
     }
 
-    /// Drop the read in flight and its counts, for a frame that tests nothing:
-    /// a later [`Self::collect`] reads none of it. The staging buffer goes with
-    /// it, since a map still pending would refuse the next copy into it, and so
-    /// does the flag its callback sets.
     pub(crate) fn forget(&mut self) {
         if self.in_flight.take().is_some() {
             self.staging = None;
@@ -115,9 +80,6 @@ impl Counter {
         self.triangles = None;
     }
 
-    /// Whether the read in flight is mapped and readable now. A refused map
-    /// leaves nothing to read: the read is dropped, so the next frame copies
-    /// afresh rather than waiting on it for ever and `culled` keeps moving.
     fn settle(&mut self) -> bool {
         match self.mapped.swap(PENDING, Ordering::AcqRel) {
             MAPPED => true,
@@ -129,9 +91,6 @@ impl Counter {
         }
     }
 
-    /// The last read's count while the items it counts are still being tested
-    /// (`active`), else `0`, forgotten: a frame that tests none culls none, and a
-    /// read still in flight from before reports at most a frame or so late.
     pub(crate) fn while_active(&mut self, active: bool) -> u32 {
         if !active {
             self.culled = 0;
@@ -139,9 +98,6 @@ impl Counter {
         self.culled
     }
 
-    /// Record a copy of `segments`, each `(source, from byte, bytes)` (multiples
-    /// of 4), one after another into one staging buffer, when no read is in
-    /// flight: one read back of them all, so their counts describe one frame.
     pub(crate) fn copy(
         &mut self,
         device: &wgpu::Device,
@@ -174,8 +130,6 @@ impl Counter {
         self.in_flight = Some((0, bytes));
     }
 
-    /// Map the copy once `commands`, which recorded it, are submitted, for
-    /// `tested` items.
     pub(crate) fn request(&mut self, tested: u32, commands: &mut Commands) {
         if !std::mem::take(&mut self.copied) {
             return;

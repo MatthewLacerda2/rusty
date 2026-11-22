@@ -1,9 +1,3 @@
-//! A two-sided face seen from behind (#1615), beyond its flat normal: a normal map
-//! reads mirrored through the surface (URP's *Mirror* mode: the tangent's
-//! handedness turns with the normal), and an orthographic camera sees the side its
-//! parallel rays hit, wherever the camera itself stands (#430). Skips with no
-//! adapter.
-
 use glam::{Quat, Vec3};
 
 use super::render_face_tests::{asset, card, frame, mean};
@@ -11,7 +5,6 @@ use rusty_components::{Projection, RenderFace};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A flat tangent-space normal map tilted `tilt` along the bitangent, written to disk.
 fn tilted_map(name: &str, tilt: f32) -> String {
     let z = (1.0 - tilt * tilt).sqrt();
     let byte = |v: f32| ((v * 0.5 + 0.5) * 255.0).round() as u8;
@@ -22,8 +15,6 @@ fn tilted_map(name: &str, tilt: f32) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// The `card` (a `Both` plane under a slanted sun) normal-mapped by `map`: seen from
-/// above under a sun shining down, or from below under its mirror image.
 fn mapped_card(r: &mut crate::Renderer, map: &str, above: bool) -> f32 {
     let (mut scene, cam) = card(RenderFace::Both, above, !above);
     let id = scene.world.find_by_name("Card").expect("the card");
@@ -48,8 +39,6 @@ fn gpu_a_normal_mapped_card_reads_mirrored_from_behind() {
     );
 }
 
-/// A large `Both` plane seen through an orthographic camera standing above it, whose
-/// rays climb and hit its underside; the sun shines `up` onto that side, or down.
 fn ortho_underside(r: &mut crate::Renderer, up: bool) -> f32 {
     let mut scene = Scene::new();
     (scene.skybox_path, scene.ambient_intensity) = (String::new(), 0.0);

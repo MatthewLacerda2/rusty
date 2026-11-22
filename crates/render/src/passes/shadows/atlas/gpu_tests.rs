@@ -1,7 +1,3 @@
-//! Point and spot shadows on the GPU (#468): a spotlight behind a wall leaves the
-//! far side dark, and a point light shadows along all six cube faces. Each check
-//! renders the scene with `cast_shadows` off as its control. Skips with no adapter.
-
 use glam::{Vec2, Vec3};
 
 use super::gpu_fixture::{dark, lamp};
@@ -11,21 +7,18 @@ use rusty_scene::{Camera, Scene};
 
 const RES: u32 = 96;
 
-/// A box at `position` scaled by `scale`.
 fn block(scene: &mut Scene, position: Vec3, scale: Vec3) {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
     (t.position, t.scale) = (position, scale);
 }
 
-/// A camera at `eye` looking at `target`.
 fn looking(eye: Vec3, target: Vec3) -> Camera {
     let d = (target - eye).normalize();
     let yaw = d.z.atan2(d.x).to_degrees();
     Camera::new(eye, yaw, d.y.asin().to_degrees())
 }
 
-/// Summed RGB of the pixels at each of `points`, as `cam` sees `scene`.
 fn brightness(r: &mut Renderer, scene: &Scene, cam: &Camera, points: &[Vec3]) -> Vec<u32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -100,7 +93,6 @@ fn gpu_a_point_light_casts_in_all_six_directions() {
         Vec3::NEG_Z,
     ];
     for axis in axes {
-        // A wall 3 m out along `axis`, a 1 m cube 2 m out, the camera off to the side.
         let side = axis.any_orthogonal_vector().normalize();
         let room = |shadows: bool| {
             let mut scene = dark();

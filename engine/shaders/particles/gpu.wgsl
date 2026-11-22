@@ -1,15 +1,9 @@
-// engine/shaders/particles/gpu.wgsl — what a GPU-simulated emitter's step
-// (`particles_step.wgsl`) and draw (`particles.wgsl`'s `vs_gpu`) share (#2170):
-// the particle record, the emitter's uniform and its over-life lookup table.
-// The Rust twins are `render::passes::particles::gpu::record`'s, field for field.
 #define_import_path particles::gpu
 
 // A slot's `next` when nothing lives in it: zero, so an all-zero buffer is empty.
 const EMPTY: u32 = 0u;
-// Samples per over-life curve in the lookup table.
 const LUT_SIZE: u32 = 64u;
 
-// One live particle, in world space (or, when `Local`, the space `frame` places it in).
 struct GpuParticle {
     position: vec3<f32>,
     lifetime: f32,
@@ -33,14 +27,12 @@ struct GpuBirth {
     @size(12) jumped: f32,
 };
 
-// One emitter's settings for its step and draw.
 struct GpuEmitter {
     // Where the stored positions are drawn: the emitter's `gpu_space` when `Local`, else identity.
     frame: mat4x4<f32>,
     // xyz: gravity in the stored space; w: the time the steps older than the
     // window took for a particle stepped at the last upload.
     gravity: vec4<f32>,
-    // The sprite's light lane, as `ParticleInstance::light`.
     light: vec4<f32>,
     // Flipbook columns, rows, cycles; soft-fade distance.
     sheet: vec4<f32>,
@@ -52,8 +44,6 @@ struct GpuEmitter {
     counts: vec4<u32>,
 };
 
-// The emitter and its lookup table, at the bindings both its step's group and its
-// draw's group give them (both at the per-draw index, `groups::DRAW`).
 @group(3) @binding(1) var<uniform> gpu_emitter: GpuEmitter;
 @group(3) @binding(3) var<storage, read> gpu_lut: array<vec4<f32>>;
 

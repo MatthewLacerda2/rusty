@@ -1,4 +1,4 @@
-// The Hi-Z pyramid (#1963, `render::hiz::pyramid`): the view's depth after the
+// The Hi-Z pyramid (`render::hiz::pyramid`): the view's depth after the
 // phase-one draws, max-reduced level by level for `hiz.wgsl`'s `cs_test`.
 
 // The pyramid's reduction: each texel the farthest depth of the 2x2 below it,

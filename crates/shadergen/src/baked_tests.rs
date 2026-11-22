@@ -1,6 +1,3 @@
-//! The one loader of an authored module (#1638): a build that may write re-bakes a
-//! stale module on disk, a shipped player re-composes it in memory and writes nothing.
-
 use std::path::PathBuf;
 
 use super::load_against;
@@ -8,7 +5,6 @@ use crate::bake_recipe;
 use crate::rebake::tests::{copy_engine, engine_copy, rim};
 use crate::validate::validate;
 
-/// A `rim` bake against one engine copy, and a second, changed copy it is stale against.
 fn stale(tag: &str) -> (PathBuf, PathBuf, String) {
     let (root, engine) = engine_copy(tag);
     let out = root.join("out");
@@ -46,7 +42,6 @@ fn an_editor_re_bakes_a_stale_module_on_disk_and_loads_it() {
         "re-baked"
     );
     validate(&engine, &baked.source).expect("composes");
-    // Up to date, a player loads exactly what is on disk.
     assert_eq!(load_against(&wgsl, &engine, false).unwrap(), baked);
     std::fs::remove_dir_all(&root).ok();
 }

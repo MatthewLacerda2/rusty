@@ -1,5 +1,3 @@
-//! The block catalogs' invariants.
-
 use super::*;
 
 #[test]
@@ -30,7 +28,6 @@ fn per_lane_defaults_fill_their_arity() {
 
 #[test]
 fn postfx_strengths_are_runtime() {
-    // #671: the amount a script fades (a hurt vignette following health) is live.
     let live = |id, name| {
         find(PassKind::Postfx, id)
             .and_then(|b| b.params.iter().find(|p| p.name == name))
@@ -55,7 +52,6 @@ fn vertex_stage_blocks_are_surface_only_and_ui_has_no_uv_stage() {
     for stage in [Stage::Uv, Stage::Vertex] {
         assert!(catalog(PassKind::Surface).iter().any(|b| b.stage == stage));
     }
-    // #1679: barrel warps where the frame is sampled.
     assert_eq!(find(PassKind::Postfx, "barrel").unwrap().stage, Stage::Uv);
 }
 
@@ -115,7 +111,6 @@ fn find_resolves_known_blocks_and_rejects_unknown() {
     assert!(find(PassKind::Surface, "toon_ramp").is_some());
     assert!(find(PassKind::Postfx, "scanline").is_some());
     assert!(find(PassKind::Surface, "scanline").is_none());
-    // #1439: the volume owns these now, so a recipe naming one is refused.
     for owned in ["vignette", "film_grain", "chromatic_aberration"] {
         assert!(find(PassKind::Postfx, owned).is_none(), "{owned}");
     }

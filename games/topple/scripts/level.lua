@@ -1,7 +1,3 @@
--- level.lua — one level's rules and HUD. Its targets are the bodies under
--- `Bodies` whose names start "Target"; the level is cleared when every one has
--- fallen below the platforms' top. Then the next level loads in the background
--- (Scene.LoadAsync) behind the `Loading` canvas, while this one keeps running.
 
 local Level = {
     fields = {
@@ -31,11 +27,10 @@ function Level.Start(id)
     Level.banner = Scene.FindEntityByName("Banner")
     Level.loading = Scene.FindEntityByName("Loading")
     Level.loading_text = Scene.FindEntityByName("LoadingText")
-    Scene.SetActive(Level.loading, false) -- found while active, then hidden
+    Scene.SetActive(Level.loading, false)
     Level.op = nil
 end
 
--- Start loading the next level behind the loading canvas; its operation.
 function Level.LoadNext()
     if not Level.op then
         Scene.SetActive(Level.loading, true)
@@ -44,7 +39,6 @@ function Level.LoadNext()
     return Level.op
 end
 
--- The loading canvas follows the operation; a load that failed hides it again.
 local function show_loading()
     if Scene.GetLoadStatus(Level.op) == "failed" then
         Scene.SetActive(Level.loading, false)
@@ -55,7 +49,6 @@ local function show_loading()
     Text.SetText(Level.loading_text, string.format("Loading level %d   %d%%", Level.number + 1, percent))
 end
 
--- How many targets still stand on a platform.
 function Level.Standing()
     local n = 0
     for _, target in ipairs(Level.targets) do

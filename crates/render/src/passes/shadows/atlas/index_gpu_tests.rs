@@ -1,8 +1,3 @@
-//! The caster index changes no texel (#1874): on the Kolvik-sized bench level
-//! (`n = 5`, three shadowed lamps a room, swinging every frame so every tile
-//! re-bakes), the atlas and the frame are bit-identical with the index and with
-//! every caster tested, while the index tests far fewer. Skips with no adapter.
-
 use glam::Vec3;
 
 use super::pvs_cost_tests::lit;
@@ -11,8 +6,6 @@ use super::ATLAS_SIZE;
 use crate::{readback, RenderCounters, RenderView, OFFSCREEN_FORMAT};
 use rusty_scene::Camera;
 
-/// Three swinging frames of the bench level, the caster index on or off: the
-/// last frame's atlas texels and pixels, and the counters summed.
 fn frames(index: bool) -> Option<(Vec<u8>, Vec<u8>, RenderCounters)> {
     let mut r = crate::test_gpu::headless_or_skip(RES, RES)?;
     r.shadow_renderer.index_casters = index;

@@ -67,7 +67,6 @@ fn a_clustered_batch_gets_a_job_per_instance_with_its_own_room() {
 #[test]
 fn meshes_of_unequal_counts_plan_one_chunk_list_with_no_padding() {
     let ccw = Facing::Ccw;
-    // Three meshes, 2, 64 and 150 clusters each, the shared table's ranges.
     let batches = [
         of_mesh(2, 0..2, 0..9000, ccw),
         of_mesh(0, 2..3, 0..60, ccw),
@@ -92,7 +91,6 @@ fn meshes_of_unequal_counts_plan_one_chunk_list_with_no_padding() {
         [(200, 150), (200, 150), (10, 2), (12, 64)],
         "in batch order"
     );
-    // A chunk a 64 clusters of a job: 3 + 3 + 1 + 1, none for a cluster past it.
     let chunks = [
         [0, 0],
         [0, 64],
@@ -111,8 +109,6 @@ fn meshes_of_unequal_counts_plan_one_chunk_list_with_no_padding() {
 
 #[test]
 fn as_many_instances_as_a_dispatch_row_holds_and_more_plan_whole() {
-    // Past a dispatch dimension's 65,535 workgroups, the dispatch takes a
-    // second (`record::workgroups`): no batch is dropped for it.
     let n = 65_536;
     let batches = [batch(0..n, 0..3, Facing::Ccw)];
     let all = instances(n);

@@ -1,10 +1,10 @@
-// engine/shaders/outline/mask.wgsl — the selection outline's mask (#1175).
+// engine/shaders/outline/mask.wgsl — the selection outline's mask.
 //
 // Draws a solid the forward pass already drew, from the same mesh, instance,
 // per-draw uniform, bone palette and material group, into a one-channel mask:
 // 1 where the selection covers the view. Vertices are placed by the forward pass's
 // own `vertex_to_world`, so the mask agrees with the solid about where it is, how it
-// is posed and which LOD it shows; a surface shader's vertex blocks (#1524) are not
+// is posed and which LOD it shows; a surface shader's vertex blocks are not
 // run (`passes::outline`). `outline/edge.wgsl` rings it.
 
 #import common::VertexInput
@@ -14,7 +14,7 @@
 struct MaskVertex {
     @builtin(position) clip_position: vec4<f32>,
     @location(0) tex_coords: vec2<f32>,
-    // Where a world-mapped material reads its albedo (#1573).
+    // Where a world-mapped material reads its albedo.
     @location(1) world_position: vec3<f32>,
     @location(2) world_normal: vec3<f32>,
 };

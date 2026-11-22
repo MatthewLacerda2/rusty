@@ -1,24 +1,3 @@
-//! Which shadow casters are clipped, and by what (#648).
-//!
-//! The plain depth pipeline has no fragment stage: every triangle of a caster lands in
-//! the cascade. Two kinds of caster need their fragments tested instead, and are drawn
-//! through a clipping pipeline that binds their material's group (`groups::MATERIAL`):
-//!
-//! - a **Cutout** material (#242): its albedo's alpha below the cutoff casts nothing,
-//!   as it shows nothing — `shader.wgsl`'s `fs_shadow`;
-//! - a **surface variant whose blocks cut, move the UVs or move the vertices**
-//!   (`dissolve`, #400; `uv_scroll`, #1499; the vertex stage's `vertex_waves`,
-//!   #1524): its `fs_shadow_cut` runs the same cut as its colour pass, against the
-//!   same runtime params and mask, and clips Cutout texels at the UVs the colour pass
-//!   samples; its own `vs_shadow` moves the vertices as its `vs_main` does.
-//!
-//! Such a variant's cut moves at runtime (a script drives `dissolve.amount`, the game
-//! time scrolls the UVs and swells the vertices), so its caster is drawn in the
-//! dynamic sweep even when static: the static bake is cached until its light volume
-//! moves, and would keep a stale cut or a frozen swell. A scrolling variant that is
-//! not Cutout pays for that sweep without clipping anything: the pipeline cannot tell
-//! a move from a cut.
-
 use crate::draw::batch::BatchKey;
 use crate::draw::uniforms::mapping_uniform;
 use crate::gpu::pipelines::surface::{SurfaceShaders, STANDARD};
@@ -26,12 +5,6 @@ use crate::gpu::uniforms::MappingUniform;
 use crate::scene::MaterialRecords;
 use rusty_components::{MaterialAsset, RenderMode};
 
-/// A clipped caster's draw key: the surface pipeline whose cut it runs
-/// ([`STANDARD`] for a cutout alone), its material group, and, for a variant, its
-/// material record's slot in the material table (#1616, #1706), which its
-/// `vs_shadow` and cut read through `material()` as its forward draw does. A cutout alone reads its test per caster
-/// and never the record, so it carries none: Cutout materials that share a map but
-/// differ in tint stay one shadow draw.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) struct Clip {
     pub pipeline: usize,
@@ -40,15 +13,11 @@ pub(crate) struct Clip {
 }
 
 impl Clip {
-    /// This clip naming its record's value class (`scene/classes.rs`) rather than
-    /// its slot, so a variant's casters of equal records batch as their forward
-    /// draws do.
     pub(crate) fn by_class(self, records: &MaterialRecords) -> Self {
         let record = self.record.map(|r| records.rep(r));
         Self { record, ..self }
     }
 
-    /// A clip of `pipeline` over material group `material`, reading no record.
     #[cfg(test)]
     pub(crate) fn of(pipeline: usize, material: usize) -> Self {
         Self {
@@ -59,16 +28,12 @@ impl Clip {
     }
 }
 
-/// How one caster's shadow is clipped.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CasterClip {
     pub clip: Clip,
-    /// The Cutout material's alpha test, when it is Cutout.
     pub cutout: Option<Cutout>,
 }
 
-/// A Cutout material's shadow test: its alpha cutoff, whether it has an albedo map to
-/// test, and where that map is read (#1594: its Tiling/Offset and world mapping).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Cutout {
     pub cutoff: f32,
@@ -77,7 +42,6 @@ pub(crate) struct Cutout {
 }
 
 impl Cutout {
-    /// `asset`'s test, or `None` when it is not Cutout.
     pub(crate) fn of(asset: &MaterialAsset) -> Option<Self> {
         (asset.render_mode == RenderMode::Cutout).then(|| Self {
             cutoff: asset.alpha_cutoff,
@@ -87,11 +51,6 @@ impl Cutout {
     }
 }
 
-/// How a slot drawn with `key` under `asset` clips its shadow, or `None` when it
-/// doesn't: the cut of its own surface pipeline, over its own material group and
-/// record, so both passes read one param buffer and mask. Derived with the slot's
-/// retained draw (`render::scene`, #1706), so a dropped material group or a rebuilt
-/// surface shader re-derives it as it does the camera's key.
 pub(crate) fn slot_clip(
     surfaces: &SurfaceShaders,
     key: &BatchKey,
@@ -110,19 +69,10 @@ pub(crate) fn slot_clip(
     Some(CasterClip { clip, cutout })
 }
 
-/// Whether the depth prepass may draw a slot through surface pipeline `pipeline`,
-/// whose shadow clip [`slot_clip`] gave as `clip`, with no fragment stage (#2347):
-/// it draws through the standard pipeline and nothing clips it, so no fragment of
-/// it is discarded. On the standard pipeline that is "not Cutout"; a variant keeps
-/// its own prepass whether it cuts or not. The prepass reads the shadow pass's
-/// clip rather than a rule of its own, derived once per slot with it: a slot
-/// wrongly marked would prime depth where the forward pass discards.
 pub(crate) fn depth_only(pipeline: usize, clip: Option<&CasterClip>) -> bool {
     pipeline == STANDARD && clip.is_none()
 }
 
-/// Whether surface pipeline `pipeline` is a variant whose cut moves at runtime: a
-/// caster with a slot drawn through one draws in the dynamic sweep, even when static.
 pub(crate) fn moves(surfaces: &SurfaceShaders, pipeline: usize) -> bool {
     pipeline != STANDARD && surfaces.cut(pipeline).is_some()
 }

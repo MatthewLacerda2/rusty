@@ -1,6 +1,6 @@
-// engine/shaders/numeric.wgsl — whether a value is finite, for the passes that keep
+// whether a value is finite, for the passes that keep
 // an `inf` or NaN out of what they write (motion blur's streaks, SSR's colour
-// pyramid, TAA's history, #1702). WGSL has no generics: one function per width.
+// pyramid, TAA's history). WGSL has no generics: one function per width.
 //
 // An infinity or NaN has every exponent bit set, so the test is on the bits: a
 // shader compiler may fold away a NaN compare (`v != v`).

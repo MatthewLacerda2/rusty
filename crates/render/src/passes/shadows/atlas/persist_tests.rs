@@ -1,7 +1,3 @@
-//! Persistent tiles (#1711), as the static cache sees them: a blinking light
-//! re-bakes no tile, a camera move within the size band changes no tile, and a
-//! light's first frame has its tiles.
-
 use glam::Vec3;
 
 use super::cache::StaticTiles;
@@ -13,7 +9,6 @@ use crate::clusters::LocalLight;
 use rusty_components::LightComponent;
 use rusty_scene::{Camera, LightType, Scene};
 
-/// A shadowed light of range 4 at `at`, shining down -Z.
 pub(super) fn light(kind: LightType, at: Vec3, intensity: f32) -> LocalLight {
     let light = LightComponent {
         light_type: kind,
@@ -28,8 +23,6 @@ pub(super) fn light(kind: LightType, at: Vec3, intensity: f32) -> LocalLight {
     LocalLight::new(at, Vec3::NEG_Z, &light).expect("a local light")
 }
 
-/// One frame of `slots` for `lights` keyed by `ids`, from `eye` looking down -Z;
-/// every id alive.
 pub(super) fn step(
     slots: &mut ShadowSlots,
     lights: &[LocalLight],
@@ -46,7 +39,6 @@ pub(super) fn step(
     slots.plan(None, &frame, |_| true)
 }
 
-/// Light `i`'s tiles in `plan`.
 fn tiles_of(plan: &AtlasPlan, i: usize) -> Vec<Tile> {
     let (index, (_, first)) = (plan.shadows.iter().enumerate())
         .find(|(_, s)| s.0 == i)
@@ -68,7 +60,6 @@ fn a_blinking_light_rebakes_no_tile() {
     let (mut slots, mut cache) = (ShadowSlots::default(), StaticTiles::default());
     let first = step(&mut slots, &lights, &ids, Vec3::ZERO);
     cache.commit(scene, first.tiles.iter().copied());
-    // On, off for a second, on again, twice: the off frames shade it unshadowed.
     for frame in 0..140 {
         lights[0].intensity = if (frame / 35) % 2 == 0 { 0.0 } else { 4.0 };
         let plan = step(&mut slots, &lights, &ids, Vec3::ZERO);
@@ -91,18 +82,14 @@ fn a_blinking_light_rebakes_no_tile() {
 fn a_camera_move_within_the_band_changes_no_tile() {
     let lamp = [light(LightType::Point, Vec3::new(0.0, 0.0, -10.0), 1.0)];
     let mut slots = ShadowSlots::default();
-    // Six metres away the light wants 341 texels: a 256 tile.
     let near = Vec3::new(0.0, 0.0, -4.0);
     let first = step(&mut slots, &lamp, &[1], near);
     assert_eq!(first.tiles[0].size, 256);
-    // Ten metres away it wants 205, a 128 step, but within the band of 256.
     for frame in 0..100 {
         let eye = if frame % 2 == 0 { Vec3::ZERO } else { near };
         let plan = step(&mut slots, &lamp, &[1], eye);
         assert_eq!(plan.tiles, first.tiles, "frame {frame}");
     }
-    // Forty metres away it wants 51: past the band, the tile shrinks once the
-    // want has stayed out for SETTLE_FRAMES frames.
     let far = Vec3::new(0.0, 0.0, 30.0);
     for frame in 1..SETTLE_FRAMES {
         let plan = step(&mut slots, &lamp, &[1], far);

@@ -1,9 +1,4 @@
--- games/smoke/recipe.lua — the smallest complete test game: it proves the
--- generator's machinery (#2029), not any one engine feature.
---
--- A floor, a crate wearing a Snyder texture and a zimmer sound, a sun, a camera,
--- and `mover.lua` sliding the crate along +X. Run in edit mode by `make game`:
--- `...` is the command line's `--param` table; the defaults below are what CI runs.
+-- `...` is the command line's `--param` table; the defaults are what CI runs.
 
 local p = { size = 20, seed = 1 }
 for key, value in pairs(... or {}) do
@@ -13,11 +8,9 @@ end
 
 Scene.New()
 
--- The floor: the 15 m Plane scaled to `size` metres a side.
 local floor = Scene.CreateEntity("Floor", "Plane")
 Transform.SetLocalScale(floor, p.size / 15, 1, p.size / 15)
 
--- The crate's albedo: a Snyder noise ramped from dark to light wood.
 local albedo = Texture.Bake({
     resolution = 64, seed = p.seed,
     nodes = {
@@ -34,7 +27,6 @@ Transform.SetPosition(crate, 0, 0.5, 0)
 Material.Set(crate, "crate")
 Scene.AddScript(crate, "assets/scripts/mover.lua", { speed = 1.0 })
 
--- The crate's sound: one zimmer blip, looped from its AudioSource.
 local blip = Sound.Bake({
     source = { kind = "osc_stack", oscs = { { wave = "sine", gain = 1.0 } } },
     amp = { a = 0.005, d = 0.1, s = 0.0, r = 0.05 },
@@ -43,7 +35,7 @@ Scene.AddComponent(crate, "AudioSource")
 Component.Set(crate, "AudioSource", { clip = blip, loop = true, play_on_start = true })
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
-Light.SetMode(sun, "Mixed") -- live: the level is not baked
+Light.SetMode(sun, "Mixed")
 Transform.SetRotation(sun, -50, 30, 0)
 
 local camera = Scene.CreateEntity("Camera")

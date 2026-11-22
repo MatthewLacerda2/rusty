@@ -1,26 +1,7 @@
-//! crates/shadergen/src/blocks/ui.rs — the ui building-block family (#427).
-//!
-//! UI blocks restyle **one graphic** — an `Image`, `Shape` or `Text` that names the baked
-//! shader. Each helper is a pure function
-//! `fn ui_<id>(c: vec4<f32>, in: VertexOut, f: UiFrag, <params…>) -> vec4<f32>`:
-//! `c` is the graphic's colour so far, **premultiplied, display space** (what the
-//! UI pass blends), `in` the interpolated vertex and `f` the per-graphic inputs the
-//! assembler's scaffold computes (`assemble::ui`): `f.uv` rect-local (0,0 bottom-left
-//! to 1,1 top-right), `f.size` the rect in pixels, `f.pixel` the fragment's pixel,
-//! `f.time` the UI clock.
-//!
-//! Sampling blocks (`rgb_split`, `glitch_slices`) re-shade the graphic at a
-//! rect-local offset through the scaffold's `ui_shift`, which — like the postfx
-//! sampling blocks (#402) — adds the tap's difference from the centre to the running
-//! colour, and draws nothing where the offset leaves the rect. Helpers call it
-//! unconditionally: it samples a texture, which must stay in uniform control flow.
-//!
-//! Premultiplied output may carry more colour than alpha: that light **adds** to
-//! what is under the graphic (the hologram's glow does this on purpose).
+//! `c` is premultiplied, display space; `f.uv` is rect-local, (0,0) bottom-left to (1,1) top-right.
 
 use super::{Block, Param, Reflection, Stage};
 
-/// The ui block catalog.
 pub const BLOCKS: &[Block] = &[
     Block {
         id: "scanlines",

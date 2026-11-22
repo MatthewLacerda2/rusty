@@ -1,11 +1,5 @@
-//! Where `hiz_clusters.wgsl`'s cone test looks from (#1968): the centre of
-//! projection of the camera's matrix.
-
 use glam::{Mat4, Vec4};
 
-/// The eye `hiz_clusters.wgsl` faces clusters against: `view_proj`'s centre of
-/// projection, which `(0, 0, 1, 0)` in clip space maps back to — a point (`w` 1)
-/// for a perspective camera, the view direction (`w` 0) for an orthographic one.
 pub(super) fn eye_of(view_proj: Mat4) -> Vec4 {
     let e = view_proj.inverse() * Vec4::new(0.0, 0.0, 1.0, 0.0);
     if e.w.abs() > 1e-6 * e.truncate().length().max(1e-30) {

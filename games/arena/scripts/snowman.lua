@@ -1,18 +1,8 @@
--- snowman.lua — a deathmatch bot: it fights every other fighter, bots and the
--- player alike. It knows only what its AIPerception saw, heard or was hit by
--- (the engine's engine/scripts/bot.lua chases the Player alone, so it does not
--- fit an everyone-against-everyone match).
---
---   * Sees someone: turns to face it and fires (combat.lua's gun, with spread
---     and recoil), closing in to a spot an EnvironmentQuery picks around it.
---     The query is time-sliced (Request / Poll): the bot keeps walking to its
---     last spot until the engine's per-tick budget answers it.
---   * Knows of someone it can't see (heard a shot, was hit, lost sight of it):
---     walks to where it last was.
---   * Knows of no one: roams between the spawn points, the upper floor and the
---     crate top, picked at random from the seeded stream.
---   * Hit and below half health with a grenade left: throws its smoke at its
---     feet. Dies at 0 health and respawns (combat.lua).
+-- A deathmatch bot that fights everyone, knowing only what its AIPerception
+-- saw, heard or was hit by (engine/scripts/bot.lua chases the Player alone).
+-- The EnvironmentQuery is time-sliced (Request / Poll): the bot keeps walking
+-- to its last spot until the engine's per-tick budget answers it. Roaming
+-- picks from the seeded stream.
 
 local Combat = require("combat")
 
@@ -52,7 +42,6 @@ local function face(id, dx, dz)
     end
 end
 
--- The nearest fighter this bot knows of that is alive, and whether it sees it.
 local function enemy(id)
     for _, known in ipairs(AIPerception.GetKnown(id)) do
         local script = Scene.GetScript(known.id, "snowman") or Scene.GetScript(known.id, "shooter")
@@ -73,7 +62,6 @@ local function roam(id)
     NavMeshAgent.SetTarget(id, x, y, z)
 end
 
--- Drop the query in flight, if any: its answer is for a fight that is over.
 local function drop_query()
     if Snowman.query ~= nil then
         EnvironmentQuery.Cancel(Snowman.query)
@@ -81,7 +69,6 @@ local function drop_query()
     end
 end
 
--- Walk to the spot the query in flight picked, once it is answered.
 local function poll_spot(id)
     if Snowman.query == nil then return end
     local state, found, sx, sy, sz = EnvironmentQuery.Poll(Snowman.query)

@@ -1,13 +1,6 @@
-//! Packing an object's probe blend into the one `u32` its instance carries (#1584).
-
 use super::MAX_REFLECTION_PROBES;
 use rusty_scene::lighting::reflection_probe::ProbeBlend;
 
-/// The packed blend an instance carries in `InstanceData::reflection_probe`, which
-/// `environment_reflection` in `engine/shaders/forward/reflection.wgsl` unpacks: bits
-/// 0–5 the first probe's index plus one, 6–11 the second's (0 for none), 12–21 the
-/// first's weight and 22–31 the second's, each in 1023ths; the sky takes what they
-/// leave. 0 is "the sky alone".
 pub(crate) fn pack_blend(blend: Option<ProbeBlend>) -> u32 {
     let Some(b) = blend else {
         return 0;

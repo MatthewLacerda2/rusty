@@ -1,4 +1,4 @@
-// engine/shaders/fog/height.wgsl — the height profile of the scene's fog (#437):
+// the height profile of the scene's fog:
 // `common::fog_factor` is its one caller.
 
 #define_import_path fog::height

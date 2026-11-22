@@ -1,6 +1,3 @@
-//! Unit tests for [`MeshId`] geometry-identity keying (#127). Split out of `mod.rs`
-//! to keep that file under the size cap.
-
 use crate::MeshId;
 use rusty_scene::MeshComponent;
 
@@ -13,8 +10,6 @@ fn mesh(primitive: &str, asset: Option<&str>) -> MeshComponent {
 
 #[test]
 fn identical_geometry_shares_one_id() {
-    // The key is the source, not the entity: two box meshes dedup to one
-    // buffer; two references to the same asset sub-object likewise.
     assert_eq!(
         MeshId::from_mesh(&mesh("Box", None)),
         MeshId::from_mesh(&mesh("Box", None))
@@ -48,8 +43,6 @@ fn a_subdivided_plane_keys_apart_from_the_single_quad() {
     assert_ne!(MeshId::from_mesh(&quad), MeshId::from_mesh(&grid));
 }
 
-/// The default scene's two waters, one Plane of each kind (#1524): each uploads its
-/// own buffer with its own index count, whichever is visited first.
 #[test]
 fn gpu_planes_with_different_subdivisions_upload_two_meshes() {
     use rusty_scene::create::{create_entity, Primitive};

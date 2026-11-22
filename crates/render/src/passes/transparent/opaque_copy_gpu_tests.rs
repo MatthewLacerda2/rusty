@@ -1,6 +1,3 @@
-//! The opaque copy is made only on a frame that shows a surface reading it (#1523),
-//! and counted.
-
 use glam::Vec3;
 
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -8,7 +5,6 @@ use rusty_components::{MaterialAsset, MaterialComponent, RefractionModel, Render
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A scene holding one transparent box at `z` drawn with `glass`.
 fn pane(glass: MaterialAsset, z: f32) -> Scene {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Pane", Some(Primitive::Box));
@@ -20,7 +16,6 @@ fn pane(glass: MaterialAsset, z: f32) -> Scene {
     scene
 }
 
-/// Render one frame of `scene`, looking down -z, and return how many copies it made.
 fn copies(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> u32 {
     let cam = Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0);
     let out = view.color_target_view().unwrap();

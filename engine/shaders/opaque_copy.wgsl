@@ -1,4 +1,4 @@
-// engine/shaders/opaque_copy.wgsl — the opaque copy (#1523), Unity's *Opaque
+// engine/shaders/opaque_copy.wgsl — the opaque copy, Unity's *Opaque
 // Texture* and *Depth Texture* in one texel: the camera's opaque colour in rgb, and
 // in alpha the distance from its eye to the opaque surface there (`SKY_DISTANCE`
 // where nothing was drawn). One texture, so the forward pass binds one, not two,

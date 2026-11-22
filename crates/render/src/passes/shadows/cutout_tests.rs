@@ -1,15 +1,9 @@
-//! A Cutout caster's shadow is clipped as its surface is (#242, #648): the depth pass
-//! had no fragment stage, so a leaf card or a grate cast a solid rectangle. A slab
-//! whose albedo is clear on its -X half shadows only its +X half once it is Cutout;
-//! Opaque, it shadows both (the control). Skips with no adapter.
-
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use rusty_asset::MapRef;
 use rusty_components::RenderMode;
 
 #[test]
 fn gpu_a_cutout_caster_casts_no_shadow_where_its_texels_are_clear() {
-    // Clear where u < 0.5 — the slab's -X half — opaque white beyond.
     let albedo = image::RgbaImage::from_fn(4, 1, |x, _| {
         image::Rgba([255, 255, 255, 255 * (x / 2) as u8])
     });

@@ -1,6 +1,3 @@
-//! The atlas plan (#468): only lights that cast and reach the view get tiles, the
-//! most important first, tiles never overlap, and what does not fit is counted.
-
 use glam::{Vec3, Vec4};
 
 use super::plan::{plan, AtlasPlan, MAX_TILE, MIN_TILE};
@@ -9,7 +6,6 @@ use crate::clusters::LocalLight;
 use rusty_components::LightComponent;
 use rusty_scene::{Camera, LightType};
 
-/// A camera at the origin looking down -Z.
 fn camera() -> Camera {
     Camera::new(Vec3::ZERO, -90.0, 0.0)
 }
@@ -85,7 +81,6 @@ fn tiles_stay_inside_the_atlas_and_never_overlap() {
 
 #[test]
 fn the_least_important_lights_are_dropped_and_counted() {
-    // 60 point lights in view want 360 tiles; the atlas holds 256 of the smallest.
     let lights: Vec<_> = (0..60)
         .map(|i| {
             let at = Vec3::new((i % 10) as f32 - 5.0, (i / 10) as f32 - 3.0, -40.0);
@@ -95,7 +90,6 @@ fn the_least_important_lights_are_dropped_and_counted() {
     let p = plan_for(&lights);
     assert!(p.dropped > 0, "{} shadowed", p.shadows.len());
     assert_eq!(p.shadows.len() as u32 + p.dropped, 60);
-    // The brightest (here, the last) win.
     let kept_min = p.shadows.iter().map(|s| s.0).min().unwrap();
     assert_eq!(kept_min, p.dropped as usize, "the dimmest were dropped");
 }
@@ -140,7 +134,6 @@ fn a_point_lights_faces_each_see_their_own_axis() {
             "face {face}: {ndc:?}"
         );
     }
-    // A spotlight's one view looks down its cone.
     let spot = light(LightType::Spotlight, at, 1.0);
     let p = plan_for(&[(spot, true)]);
     let clip = p.tiles[0].view_proj * Vec4::from((at + Vec3::NEG_Z, 1.0));

@@ -1,6 +1,6 @@
-// engine/shaders/color/srgb.wgsl — the sRGB transfer curves (IEC 61966-2-1), per
+// the sRGB transfer curves (IEC 61966-2-1), per
 // channel: the UI's sampled-texture and fog conversions, and the user LUT's
-// sRGB-encoded lookup in the grading bake (#1441).
+// sRGB-encoded lookup in the grading bake.
 
 #define_import_path color::srgb
 

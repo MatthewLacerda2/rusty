@@ -1,5 +1,3 @@
-//! The probe array on a GPU (#1206): what a frame copies, and what it leaves alone.
-
 use glam::Vec3;
 
 use crate::ibl::ktx2_encode::encode_cubemap;
@@ -7,7 +5,6 @@ use crate::ibl::reflection_prefilter::PrefilteredCubemap;
 use crate::Renderer;
 use rusty_scene::Scene;
 
-/// A one-mip `size`² cube file named `name`, every texel `value`; returns its path.
 pub(crate) fn cube_file(name: &str, size: u32, value: u8) -> String {
     let face = vec![value; (size * size * 8) as usize];
     let cube = PrefilteredCubemap {
@@ -19,7 +16,6 @@ pub(crate) fn cube_file(name: &str, size: u32, value: u8) -> String {
     path.to_string_lossy().into_owned()
 }
 
-/// A scene with one probe per `(x, cube path)`, each a 2-unit box around `x`.
 pub(super) fn probes_at(probes: &[(f32, &str)]) -> Scene {
     let mut scene = Scene::new();
     for (x, path) in probes {
@@ -30,7 +26,6 @@ pub(super) fn probes_at(probes: &[(f32, &str)]) -> Scene {
     scene
 }
 
-/// The resident index of the first probe a packed blend names (`pack_blend`).
 pub(super) fn first(packed: u32) -> usize {
     assert_ne!(packed & 63, 0, "a probe is named");
     (packed & 63) as usize - 1
@@ -40,15 +35,12 @@ pub(super) fn renderer() -> Option<Renderer> {
     crate::test_gpu::headless_or_skip(4, 4)
 }
 
-/// A renderer whose probe array holds half floats, whatever the adapter.
 pub(super) fn uncompressed() -> Option<Renderer> {
     let mut renderer = renderer()?;
     renderer.reflection_probes.force_uncompressed();
     Some(renderer)
 }
 
-/// The Inspector preview renders a probe-less scene every frame beside the viewport:
-/// it must leave the viewport's cubes resident, so going back costs no copy.
 #[test]
 fn gpu_a_probe_less_scene_keeps_the_resident_cubes() {
     let Some(mut renderer) = renderer() else {
@@ -82,7 +74,6 @@ fn gpu_a_probe_less_scene_keeps_the_resident_cubes() {
     );
 }
 
-/// Two probes on one cube share its layer but keep their own boxes and centres.
 #[test]
 fn gpu_probes_sharing_a_cube_keep_their_own_boxes() {
     let Some(mut renderer) = renderer() else {
@@ -103,8 +94,6 @@ fn gpu_probes_sharing_a_cube_keep_their_own_boxes() {
     assert_eq!(r.box_min, [1.0, -1.0, -1.0]);
 }
 
-/// A cube whose size is not a power of two is left out: its probe takes no layer and
-/// its objects reflect the sky.
 #[test]
 fn gpu_a_cube_of_another_size_is_left_out() {
     let Some(mut renderer) = renderer() else {
@@ -119,8 +108,6 @@ fn gpu_a_cube_of_another_size_is_left_out() {
     assert_eq!(probes.probe_for(Vec3::new(2.0, 0.0, 0.0)), 0);
 }
 
-/// The array's face follows the largest resident cube (#1584); a smaller one rides
-/// in its lower mips.
 #[test]
 fn gpu_the_face_follows_the_largest_cube() {
     let Some(mut renderer) = renderer() else {

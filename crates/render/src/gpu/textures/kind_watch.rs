@@ -1,18 +1,7 @@
-//! Warns when a texture is used as two kinds (#1416): colour and data, say.
-//!
-//! A texture keeps one mip chain, averaged for the [`TextureKind`] of its first
-//! use (#1322). A file later requested as another kind reads mips averaged wrongly
-//! for that use, and which use wins depends on load order. (Its compressed format
-//! follows its Texture Type instead, and a slot that cannot read it gets an
-//! uncompressed copy, #1574.) Unity keeps one setting per
-//! texture and warns on a mismatch; this does the same, once per file. Both the
-//! material texture cache and the decal atlas hold one.
-
 use std::collections::{HashMap, HashSet};
 
 use super::TextureKind;
 
-/// What each loaded file was uploaded as, and which have been warned about.
 #[derive(Default)]
 pub(crate) struct KindWatch {
     uploaded: HashMap<String, TextureKind>,
@@ -20,18 +9,14 @@ pub(crate) struct KindWatch {
 }
 
 impl KindWatch {
-    /// `path` was just uploaded as `kind`: its first use decides.
     pub(crate) fn uploaded(&mut self, path: &str, kind: TextureKind) {
         self.uploaded.insert(path.to_owned(), kind);
     }
 
-    /// The kind `path` was first uploaded as, if it was.
     pub(crate) fn kind_of(&self, path: &str) -> Option<TextureKind> {
         self.uploaded.get(path).copied()
     }
 
-    /// `path`, already uploaded, is requested as `kind` by `user`. Warns once per
-    /// file when `kind` differs from the upload; returns whether it warned.
     pub(crate) fn requested(&mut self, path: &str, kind: TextureKind, user: &str) -> bool {
         let Some(&first) = self.uploaded.get(path) else {
             return false;

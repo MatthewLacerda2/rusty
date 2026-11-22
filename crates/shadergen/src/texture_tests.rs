@@ -1,7 +1,3 @@
-//! crates/shadergen/src/texture_tests.rs — the extra texture socket (#400): a surface
-//! variant declares the `mask` slot only when a block reads it, once however many
-//! do, and the declaring module composes against the real forward base.
-
 use std::collections::BTreeMap;
 
 use super::assemble::assemble;
@@ -47,9 +43,6 @@ fn dissolve_amount_is_runtime_so_a_script_burns_the_surface_away() {
     assert!(wgsl.contains("discard;"));
 }
 
-/// A cutting block gives the variant depth entry points that cut with the same
-/// runtime `amount` the colour pass reads (#648); a variant that only restyles
-/// colour gets none, so it keeps the shared depth pipelines.
 #[test]
 fn only_a_cutting_variant_gets_depth_entry_points_and_they_compose() {
     use super::assemble::{CUT_PREPASS, CUT_SHADOW};
@@ -64,7 +57,6 @@ fn only_a_cutting_variant_gets_depth_entry_points_and_they_compose() {
     assert!(!plain.iter().any(|e| e == CUT_PREPASS || e == CUT_SHADOW));
 }
 
-/// Behind a UV-stage block, the depth passes cut at the moved UVs, as `fs_main` does.
 #[test]
 fn a_scrolled_cut_moves_its_uvs_in_the_depth_passes_too() {
     let wgsl = surface(&["uv_scroll", "dissolve"]);
@@ -73,8 +65,6 @@ fn a_scrolled_cut_moves_its_uvs_in_the_depth_passes_too() {
     validate(engine_shader_dir(), &wgsl).expect("scrolled cut composes");
 }
 
-/// A UV-stage block alone still gets depth entry points (#1499): the shared ones
-/// would clip a Cutout texture at the raw UVs while `fs_main` clips at the moved ones.
 #[test]
 fn a_uv_move_without_a_cut_gets_depth_entry_points_too() {
     use super::assemble::{CUT_PREPASS, CUT_SHADOW};

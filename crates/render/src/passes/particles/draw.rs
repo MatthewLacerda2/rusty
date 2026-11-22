@@ -1,11 +1,6 @@
-//! crates/render/src/passes/particles/draw.rs — per-frame sprite particle draws.
-//!
-//! Turns every visible sprite emitter into a run of instances (a GPU-simulated one
-//! into one draw of its buffer, #2170, `runs`), orders the emitters
-//! back to front (so smoke in front of fire composites over it), merges neighbours
-//! that share a blend + texture into one draw, uploads the instances + globals, and
-//! records a pass into the HDR scene target (after solids/skybox/transparents,
-//! before post-FX). Mesh emitters are skipped here — they draw with the solids.
+//! The billboard basis falls back when the camera looks straight up or down: forward × Y collapses
+//! and every quad would vanish. `depth_ops: None` makes the depth read-only so the same texture
+//! can be sampled in this pass.
 
 use crate::gpu::groups;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
@@ -24,12 +19,8 @@ use rusty_components::particle::ParticleBlend;
 use rusty_scene::Camera;
 use rusty_scene::{Scene, SceneId};
 
-/// Camera-facing billboard basis (right, up). Derived from the camera forward, with
-/// a fallback when the camera looks near straight up/down — there `forward × Y`
-/// collapses, so `camera.right()` would be NaN/zero and every quad would vanish.
 fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
     let forward = camera.forward();
-    // Pick a reference up that isn't parallel to forward.
     let reference = if forward.y.abs() > 0.99 {
         Vec3::Z
     } else {
@@ -40,17 +31,13 @@ fn billboard_basis(camera: &Camera) -> (Vec3, Vec3) {
     (right, up)
 }
 
-/// A draw call: a slice of the frame's instance buffer sharing blend + texture, or
-/// one GPU-simulated emitter's slots.
 struct ParticleBatch {
     blend: ParticleBlend,
     texture: Rc<GpuTexture>,
     instances: std::ops::Range<u32>,
-    /// The GPU-simulated emitter it draws, by key, else the instance buffer.
     gpu: Option<(SceneId, u32)>,
 }
 
-/// What the sprite pass drew for one camera, for the frame counters (#433).
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct ParticleDraws {
     pub draw_calls: u32,
@@ -58,7 +45,6 @@ pub(crate) struct ParticleDraws {
 }
 
 impl Renderer {
-    /// Draw every sprite emitter's live particles into the HDR scene target.
     pub(crate) fn draw_particles(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -91,15 +77,12 @@ impl Renderer {
             bytemuck::bytes_of(&globals),
         );
 
-        // On a due render only: an emitter has no change signal of its own, and a
-        // map new to the cache makes the next render due (`scene::residency::notes`).
         if self.notes_due() {
             for texture in runs.iter().filter_map(|r| r.texture.as_ref()) {
                 self.note_map(scene.id(), texture.as_str());
             }
         }
         let (all, batches, drawn) = self.batch_runs(runs);
-        // Only `Gpu` emitters: no instance is built, and no buffer either.
         let instance_buffer = (!all.is_empty()).then(|| {
             self.device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -116,9 +99,6 @@ impl Renderer {
         }
     }
 
-    /// Build the view's cached scene-depth bind group if absent (first frame that
-    /// needs it, or after the view's resize invalidated it). The depth view only
-    /// changes on resize, so it is reused across frames and cameras (#210).
     pub(crate) fn ensure_scene_depth_bind_group(&self, view: &mut RenderView) {
         if view.scene_depth_bind_group.is_some() {
             return;
@@ -134,9 +114,6 @@ impl Renderer {
             }));
     }
 
-    /// Pack the (already back-to-front) runs into one instance array, merging
-    /// neighbouring runs with the same blend + texture into one draw; a
-    /// GPU-simulated emitter is a draw of its own. Also the particles drawn.
     fn batch_runs(
         &mut self,
         runs: Vec<EmitterRun>,
@@ -185,9 +162,6 @@ impl Renderer {
         (all, batches, drawn)
     }
 
-    /// Record the particle render pass: load the HDR colour, bind the scene depth
-    /// read-only (tested against, and sampled for soft particles), then draw each
-    /// batch with its blend pipeline and sprite texture.
     fn encode_particle_pass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -206,8 +180,6 @@ impl Renderer {
                 multiview_mask: None,
                 label: Some("Particle Pass"),
                 color_attachments: &taa::reactive::hdr_attachments(view),
-                // `depth_ops: None` makes the attachment read-only, which is what lets
-                // the same texture be sampled (the scene group) in this pass.
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
                     view: &view.depth_view,
                     depth_ops: None,

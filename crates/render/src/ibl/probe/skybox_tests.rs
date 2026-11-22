@@ -1,8 +1,3 @@
-//! A light probe in `Skybox` mode (#1675): an empty scene's GPU-baked probe takes
-//! the panorama's light as the shader shades an unbaked surface with it
-//! (`AmbientRadiance::at`, which `ambient_gpu_tests` holds the shader to and the
-//! lightmap's `skybox_tests` the trace), and a different panorama moves it.
-
 use glam::Vec3;
 
 use rusty_scene::{AmbientMode, Scene};

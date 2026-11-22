@@ -1,7 +1,3 @@
-//! The irradiance a reflection bake stores beside each cube (#1697): its capture's
-//! SH, which reads back the room's colours, with the scene's ambient where the view
-//! escapes, as a light probe at that point holds it, whatever the ambient source.
-
 use glam::Vec3;
 
 use std::f32::consts::PI;
@@ -17,7 +13,6 @@ use rusty_test_support::panorama::fixture as panorama_fixture;
 
 const RES: u32 = 32;
 
-/// `scene` with one probe at the origin, baked; its stored irradiance along `n`.
 fn bake(mut scene: Scene, name: &str, n: Vec3) -> Option<Vec3> {
     let mut renderer = crate::test_gpu::headless_or_skip(RES, RES)?;
     scene.lighting_settings.reflections.resolution = RES;
@@ -33,7 +28,6 @@ fn bake(mut scene: Scene, name: &str, n: Vec3) -> Option<Vec3> {
 
 #[test]
 fn gpu_a_bake_stores_the_irradiance_its_cube_gives() {
-    // The +X wall glows red, the -X wall green.
     let Some(red) = bake(colored_room(), "room_x", Vec3::X) else {
         return;
     };
@@ -45,11 +39,6 @@ fn gpu_a_bake_stores_the_irradiance_its_cube_gives() {
     );
 }
 
-/// A probe 1 m over an open, unoccluded floor stores what a light probe there holds
-/// (the sky the capture draws is not what the lightmap sees), so the floor keeps its
-/// reflection, for every ambient source. With no ambient the sky the capture draws
-/// is not stored either: only the floor's own sheen of it is, which the lightmap
-/// lacks (the PR's note).
 #[test]
 fn gpu_an_open_sky_probe_stores_what_a_light_probe_holds() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -93,7 +82,6 @@ fn gpu_an_open_sky_probe_stores_what_a_light_probe_holds() {
     }
 }
 
-/// `scene` with one probe at `at`, baked by `renderer`; its stored irradiance.
 fn stored_sh(renderer: &mut Renderer, mut scene: Scene, at: Vec3, name: &str) -> Sh9 {
     scene.lighting_settings.reflections.resolution = RES;
     scene.reflection_probes.add(at, Vec3::splat(5.0));

@@ -1,24 +1,14 @@
-//! A mesh's clusters on the GPU (#1968): its rows of the renderer's one cluster
-//! table and its indices in the pool (`pool`, #2417), leased at upload, and the
-//! CPU's copy of where each cluster's indices start, which a batch's run is
-//! matched against.
-
 use std::ops::Range;
 
 use rusty_asset::clusters::Clusters;
 
 use super::pool::Lease;
 
-/// A resident mesh's clusters: where they sit in the shared table and pool.
 pub(crate) struct GpuClusters {
-    /// Each cluster's index range in the mesh's own indices, in order.
     pub(crate) runs: Vec<Range<u32>>,
-    /// Its rows and pooled indices, given back when this is dropped.
     pub(crate) lease: Lease,
 }
 
-/// `clusters` as `hiz_clusters.wgsl`'s `Cluster` rows (16 words each), their
-/// first index moved by `base`, where the mesh's indices start in the pool.
 pub(super) fn pack(clusters: &Clusters, base: u32) -> Vec<[f32; 16]> {
     let one = |c: &rusty_asset::clusters::Cluster| {
         let (first, count) = (base + c.indices.start, c.indices.len() as u32);
@@ -35,9 +25,6 @@ pub(super) fn pack(clusters: &Clusters, base: u32) -> Vec<[f32; 16]> {
 }
 
 impl GpuClusters {
-    /// The clusters making up exactly the index run `run`, by their place in the
-    /// shared table: `None` when the run does not start and end on a cluster's
-    /// edge.
     pub(crate) fn covering(&self, run: Range<u32>) -> Option<Range<u32>> {
         let local = cover(&self.runs, run)?;
         let first = self.lease.table.start;
@@ -45,7 +32,6 @@ impl GpuClusters {
     }
 }
 
-/// The clusters of `runs` making up exactly the index run `run`, by their place.
 pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> {
     let lo = runs.partition_point(|c| c.start < run.start);
     let hi = runs.partition_point(|c| c.end <= run.end);
@@ -54,24 +40,15 @@ pub(super) fn cover(runs: &[Range<u32>], run: Range<u32>) -> Option<Range<u32>> 
 }
 
 impl crate::Renderer {
-    /// Give the resident mesh `id` the clusters of its import (still describing
-    /// its geometry, `indices`), or none. Clusters that don't end at its last
-    /// index are not its own, and are dropped. So are those the pool cannot
-    /// hold: its limit is the device's binding limit over every clustered mesh
-    /// resident at once, not this mesh's alone. A mesh refused logs it, is drawn
-    /// whole (tested as one instance) and is noted in `Residency::refused`, so
-    /// a release that frees ranges retries it (`scene::residency`).
     pub(crate) fn attach_clusters(
         &mut self,
         id: &crate::MeshId,
         (clusters, indices): (Option<&Clusters>, &[u32]),
     ) {
-        // Noted again below only if the pool refuses it this time.
         self.retained.residency.refused.remove(id);
         let Some(mesh) = self.gpu_meshes.get_mut(id) else {
             return;
         };
-        // The old lease goes first, so its range is free for the new one.
         mesh.clusters = None;
         let own = |c: &&Clusters| {
             let end = c.list.last().map(|l| l.indices.end);

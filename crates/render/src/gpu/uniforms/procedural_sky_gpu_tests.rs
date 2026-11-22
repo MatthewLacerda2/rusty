@@ -1,10 +1,3 @@
-//! The CPU's procedural sky is the shader's (#1675): `Skybox` mode projects
-//! `scene::procedural_sky_color` into the ambient, so a retune of
-//! `common::procedural_sky` that left it behind would light the scene with a sky it
-//! no longer draws. Clouds off (`cloud_opacity = 0`): the CPU hashes its noise
-//! differently on purpose (`skybox::procedural`), so only the gradient is the same
-//! function term for term.
-
 use glam::Vec3;
 
 use super::ProceduralSkyUniform;
@@ -12,8 +5,6 @@ use rusty_scene::{procedural_sky_color, SkySettings};
 
 const AMBIENT: Vec3 = Vec3::new(0.3, 0.5, 0.9);
 
-/// Per invocation (128): a unit direction spread over the sphere, then the sky
-/// along it.
 const PROBE: &str = "
 #import common::{ProceduralSky, procedural_sky}
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;
@@ -37,7 +28,6 @@ fn directions() -> impl Iterator<Item = Vec3> {
     })
 }
 
-/// The sky along each direction, as the GPU draws `sky`.
 fn gpu_sky(r: &crate::Renderer, sky: &SkySettings) -> Vec<Vec3> {
     let u = ProceduralSkyUniform::from_settings(sky);
     let v = |c: [f32; 4]| format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", c[0], c[1], c[2], c[3]);

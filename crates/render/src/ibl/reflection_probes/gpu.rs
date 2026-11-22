@@ -1,6 +1,3 @@
-//! The probe array's GPU side (#1206): allocating the cube-array texture and copying
-//! a baked cube into one of its layers.
-
 use super::super::cubemap::CubemapTexture;
 use super::super::upload::block_extent;
 use super::ProbeArray;
@@ -8,10 +5,6 @@ use crate::gpu::ops::CountedQueue as _;
 use crate::gpu::textures::compressed::gpu_bytes;
 
 impl ProbeArray {
-    /// The bytes the cube array takes on the GPU (#2085): every layer it is
-    /// allocated with, spare slots included, at every mip. The array is the only
-    /// copy of a resident cube, so this is all the probe memory there is; 0 while it
-    /// is the black stand-in no cube was ever copied into.
     pub(crate) fn gpu_bytes(&self) -> u64 {
         if (self.face, self.mips, self.cubes) == (1, 1, 1) && !self.table.holds_any() {
             return 0;
@@ -19,9 +12,6 @@ impl ProbeArray {
         gpu_bytes(&self.texture)
     }
 
-    /// With no cube resident (every one refused or re-written, #1609), shrink the
-    /// array back to the black 1×1 stand-in [`ProbeArray::new`] starts with, so a
-    /// refused large cube leaves nothing allocated; true when it was rebuilt.
     pub(super) fn release_if_empty(&mut self, device: &wgpu::Device) -> bool {
         if self.table.holds_any() || (self.face, self.mips, self.cubes) == (1, 1, 1) {
             return false;
@@ -33,15 +23,10 @@ impl ProbeArray {
     }
 }
 
-/// The array before any cube is resident: one black 1×1 `Rgba16Float` cube (a BC
-/// texture cannot be smaller than a block). No cube is ever copied into it: the
-/// first resident cube rebuilds the array at its face and format.
 pub(super) fn stand_in(device: &wgpu::Device) -> (wgpu::Texture, wgpu::TextureView) {
     array_texture(device, 1, 1, 1, wgpu::TextureFormat::Rgba16Float)
 }
 
-/// A cube-array texture of `cubes` black cubes in `format`, `face` texels square
-/// with `mips` levels, and its `CubeArray` view.
 pub(super) fn array_texture(
     device: &wgpu::Device,
     face: u32,
@@ -71,8 +56,6 @@ pub(super) fn array_texture(
     (texture, view)
 }
 
-/// Record the copy of every mip of `cube` into array layer `slot`, `shift` mips down.
-/// A BC6H level under 4×4 copies its one padded block (`block_extent`).
 pub(super) fn copy_cube(
     encoder: &mut wgpu::CommandEncoder,
     cube: &CubemapTexture,
@@ -108,8 +91,6 @@ pub(super) fn copy_cube(
     }
 }
 
-/// Copy each `(cube, slot, shift)` into its array layer, in one submission; nothing
-/// to copy submits nothing.
 pub(super) fn copy_into(
     device: &wgpu::Device,
     queue: &wgpu::Queue,

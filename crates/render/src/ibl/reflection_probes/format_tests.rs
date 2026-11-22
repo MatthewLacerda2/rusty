@@ -1,16 +1,9 @@
-//! The array's cube format (#1885): BC6H where the adapter has BC, half floats
-//! decoded at load where it doesn't, and what each costs the budget.
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{probes_at, renderer, uncompressed};
 use super::array_bytes;
 use crate::ibl::upload::chained_cube;
 
-/// A 512-texel cube with its mips is 16 MiB in half floats (#1696) and 2 MiB in
-/// BC6H (#1885): the default 256 MB budget held 14 such cubes and two spares; it
-/// now pays for 128, so the 32 the array shades at most (its layer cap,
-/// `MAX_REFLECTION_PROBES`) are all resident.
 #[test]
 fn bc6h_cubes_fit_eight_times_as_many_in_the_budget() {
     use super::super::{MAX_REFLECTION_PROBES, SPARE_SLOTS};
@@ -27,9 +20,6 @@ fn bc6h_cubes_fit_eight_times_as_many_in_the_budget() {
     assert_eq!(resident(Bc6hRgbUfloat), (128, 32));
 }
 
-/// Two full-chain cubes, 16 and 4 texels (the smaller lands two mips down, its
-/// 2×2 and 1×1 mips one padded block each), become resident in the array's format
-/// on both paths: BC6H where the adapter has it, half floats when forced.
 #[test]
 fn gpu_mipped_cubes_are_resident_compressed_or_decoded() {
     for decode in [false, true] {

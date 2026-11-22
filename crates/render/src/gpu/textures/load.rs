@@ -1,7 +1,3 @@
-//! Loading a texture by the map that names it: the path-keyed cache, its misses
-//! and the uncompressed copies a slot needs (#689, #1574), and the one upload of an
-//! image file, compressed from the import cache or decoded and fitted.
-
 use std::rc::Rc;
 
 use image::GenericImageView;
@@ -13,21 +9,10 @@ use rusty_asset::texture_import::{self, Texels};
 use rusty_asset::MapRef;
 
 impl Renderer {
-    /// Loads and registers the texture `map` names. Caches results dynamically,
-    /// keyed by the map; a failed load is remembered as a miss (drawn with the
-    /// default) and retried once the file appears, never cached under its path (#689).
-    /// A colour texture; `load_texture_as` names what the texels hold.
     pub fn load_texture(&mut self, map: &MapRef) -> Rc<GpuTexture> {
         self.load_texture_as(map, TextureKind::Colour)
     }
 
-    /// [`Self::load_texture`] for a texture holding `kind`, which decides how an
-    /// uncompressed upload's mips average. The first load of a file decides it:
-    /// the cache keeps one upload per file, and a later request of the other kind
-    /// warns once ([`kind_watch::KindWatch`]). An upload a later slot cannot read
-    /// (`deep::serves`: a compressed one, or an 8-bit copy of a normal map kept at
-    /// 16 bits for a normal slot) is joined by a copy made for it, so no use loses
-    /// a channel or its precision (#1574, #2257).
     pub(crate) fn load_texture_as(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         let path_str = map.as_str();
         if let Some(tex) = self.gpu_textures.get(path_str) {
@@ -40,9 +25,6 @@ impl Renderer {
         if self.texture_freshness.is_miss(path_str) {
             return Rc::clone(&self.default_texture);
         }
-        // A render texture (#430) is never on disk: it is registered by the frame
-        // that draws it, and until then shows the default — uncached, so it appears
-        // the moment its camera exists.
         if crate::render_texture::is_render_texture(path_str) {
             return Rc::clone(&self.default_texture);
         }
@@ -57,10 +39,6 @@ impl Renderer {
         tex
     }
 
-    /// The texture `map` names for a slot holding `kind`, when its cached upload is
-    /// one [`Self::load_texture_as`] already made: that upload, or the copy made
-    /// where it does not serve the slot (`deep::serves`). What a material bind
-    /// group binds.
     pub(crate) fn texture_for(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
         let tex = self.gpu_textures.get(map)?;
         match deep::serves(tex, kind) {
@@ -69,10 +47,6 @@ impl Renderer {
         }
     }
 
-    /// The copy of `map` for `kind`, made on first need: uncompressed, at 16 bits
-    /// for a normal slot of a normal map kept at 16 bits. One per map: the cached
-    /// upload serves every slot but one kind of slot (colour, or the slots its
-    /// block format lacks, or a normal slot), and the copy serves that kind.
     fn fallback(&mut self, map: &MapRef, kind: TextureKind) -> Rc<GpuTexture> {
         if let Some(tex) = self.texture_fallbacks.get(map) {
             return Rc::clone(tex);
@@ -85,22 +59,11 @@ impl Renderer {
         tex
     }
 
-    /// Upload the image `map` names, uncached, with the mips, compression, size
-    /// and sampler its import settings ask for; `None` when it cannot be read. A
-    /// cache with its own keys (bloom's lens dirt, #1442) loads through this.
-    /// Compressed, its levels come from the import cache (#1574), when it has a
-    /// current one and its type fits `kind`; else it is decoded, fitted to its
-    /// *Max Size* and its mips drawn on the GPU.
     pub(crate) fn upload_map(&self, map: &MapRef, kind: TextureKind) -> Option<Rc<GpuTexture>> {
         let decoded = decode(map, kind, self.device.features())?;
         Some(self.upload_decoded(map, kind, decoded))
     }
 
-    /// Cache `decoded`, the file `map` names read for `kind` off the frame thread
-    /// (`render::warm`), as [`Self::load_texture_as`] would have cached it: the
-    /// upload, its uncompressed copy where a cached upload cannot be read as `kind`,
-    /// or a miss when the file could not be read. Nothing when a lookup already
-    /// finds it.
     pub(crate) fn install_decoded(
         &mut self,
         map: &MapRef,
@@ -130,15 +93,12 @@ impl Renderer {
         }
     }
 
-    /// Whether a lookup of `map` for `kind` reads nothing from disk: it is cached,
-    /// remembered as a miss, or a render texture (never on disk).
     pub(crate) fn texture_settled(&self, map: &MapRef, kind: TextureKind) -> bool {
         self.texture_for(map, kind).is_some()
             || self.texture_freshness.is_miss(map.as_str())
             || crate::render_texture::is_render_texture(map.as_str())
     }
 
-    /// The GPU half of [`Self::upload_map`]: `decoded` uploaded.
     fn upload_decoded(&self, map: &MapRef, kind: TextureKind, decoded: Decoded) -> Rc<GpuTexture> {
         let Decoded { import, loaded } = decoded;
         let srgb = !texture_import::is_linear(&import);
@@ -166,9 +126,6 @@ impl Renderer {
         Rc::new(texture)
     }
 
-    /// Uploads a decoded image holding `kind`, with the mips and the sampler its
-    /// import settings ask for (#1323); a normal map of more than 8 bits a channel
-    /// at 16 (`deep`, #2257).
     fn upload_image_texture(
         &self,
         path_str: &str,
@@ -211,16 +168,11 @@ impl Renderer {
     }
 }
 
-/// An image file read, decoded and fitted for one slot, ready to upload: the file
-/// half of an upload, which runs on any thread.
 pub(crate) struct Decoded {
     import: TextureSettings,
     loaded: texture_import::Loaded,
 }
 
-/// Read the file `map` names for a slot holding `kind`, on a device with
-/// `features`: its import settings, then its compressed levels from the import
-/// cache or its decoded, fitted image. `None` when it cannot be read.
 pub(crate) fn decode(map: &MapRef, kind: TextureKind, features: wgpu::Features) -> Option<Decoded> {
     let file = map.file()?;
     let import = rusty_asset::sidecar::texture(&file);

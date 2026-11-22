@@ -1,13 +1,9 @@
-//! The sky reflection cubes on a GPU (#1553): a sky change bakes once and a still
-//! sky never, and the bake lays the sky out as a `texture_cube` samples it.
-
 use glam::Vec3;
 
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_core::color::srgb_to_linear;
 use rusty_scene::{Camera, Scene};
 
-/// A `w × h` panorama of `texel(x, y)`, written under `name`; returns its path.
 fn panorama(name: &str, (w, h): (u32, u32), texel: impl Fn(u32, u32) -> [u8; 3]) -> String {
     let img = image::RgbaImage::from_fn(w, h, |x, y| {
         let [r, g, b] = texel(x, y);
@@ -18,7 +14,6 @@ fn panorama(name: &str, (w, h): (u32, u32), texel: impl Fn(u32, u32) -> [u8; 3])
     path.to_string_lossy().into_owned()
 }
 
-/// Render one frame of `scene` and return how many sky cubes it baked.
 fn bakes(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> u32 {
     let cam = Camera::new(Vec3::ZERO, -90.0, 0.0);
     let out = view.color_target_view().unwrap();
@@ -63,7 +58,6 @@ fn gpu_a_sky_change_bakes_once_and_a_still_sky_never() {
     assert_eq!(bakes(&mut r, &mut view, &scene), 1, "another panorama");
 }
 
-/// An IEEE half to f32 (normal and zero halves: all a bake writes here).
 pub(super) fn half(bits: u16) -> f32 {
     let exp = i32::from((bits >> 10) & 0x1f);
     let mantissa = f32::from(bits & 0x3ff) / 1024.0;
@@ -74,7 +68,6 @@ pub(super) fn half(bits: u16) -> f32 {
     }
 }
 
-/// The rgba at the centre of mip 0's `face`.
 fn centre(r: &Renderer, face: u32) -> [f32; 4] {
     let (_, cube) = r.sky_reflection.panorama.as_ref().expect("a panorama cube");
     let size = super::SKY_FACE;
@@ -89,9 +82,6 @@ fn centre(r: &Renderer, face: u32) -> [f32; 4] {
     })
 }
 
-/// Red ramps with the panorama's u, green with its v: each face's centre direction
-/// lands where `equirect_uv` puts it, in `texture_cube`'s face order (+X, -X, +Y,
-/// -Y, +Z, -Z; -X sits on the seam, so is left out).
 #[test]
 fn gpu_the_bake_lays_the_faces_out_as_a_cube_samples_them() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
@@ -104,7 +94,6 @@ fn gpu_the_bake_lays_the_faces_out_as_a_cube_samples_them() {
         [(x * 255 / (w - 1)) as u8, (y * 255 / (h - 1)) as u8, 0]
     });
     assert_eq!(bakes(&mut r, &mut view, &scene), 1);
-    // (face, u, v) of its centre direction.
     for (face, u, v) in [
         (0, 0.5, 0.5),
         (2, f32::NAN, 0.0),

@@ -1,12 +1,4 @@
--- games/tetris/recipe.lua — a falling-blocks puzzle in 3D (#2032): play is on a 2D
--- grid, but the well, the pieces and the room are lit cubes seen through a
--- perspective camera, with shadows, a light that pulses on a line clear and the
--- cleared cubes bursting out as rigidbodies. It proves input with repeat timing,
--- UI text and layout, many small meshes changing every few ticks, rigidbodies
--- spawned and despawned in bursts, zimmer sounds and a deterministic game.
---
--- Run in edit mode by `make game`: `...` is the command line's `--param` table;
--- the defaults below are what CI runs. `tetris.lua` is the game.
+-- `...` is the command line's `--param` table; the defaults are what CI runs.
 
 local p = { width = 10, height = 20, level = 1, seed = 1 }
 for key, value in pairs(... or {}) do
@@ -16,7 +8,6 @@ end
 
 Scene.New()
 
--- A Snyder bevelled tile for every block, tinted per piece by its material.
 local tile = Texture.Bake({
     resolution = 64, seed = p.seed,
     nodes = {
@@ -35,7 +26,7 @@ for kind, c in ipairs(colors) do
 end
 Material.DefineAsset("well", { base_color = { 0.35, 0.38, 0.45 }, roughness = 0.9 })
 
--- A box with a collider (#2051: a primitive gets none of its own yet).
+-- A box with a collider (a primitive gets none of its own yet).
 local function solid(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
@@ -45,8 +36,6 @@ local function solid(name, x, y, z, sx, sy, sz, material)
     return id
 end
 
--- The well: walls, a floor under the grid, a back panel the shadows fall on, and
--- the room's floor the burst cubes land on.
 local w, h = p.width, p.height
 solid("WallLeft", -w / 2 - 0.5, h / 2 - 0.5, 0, 1, h + 1, 1, "well")
 solid("WallRight", w / 2 + 0.5, h / 2 - 0.5, 0, 1, h + 1, 1, "well")
@@ -55,23 +44,21 @@ solid("Back", 0, h / 2, -0.75, w + 2, h + 2, 0.5, "well")
 solid("Ground", 0, -1.5, 6, 60, 1, 30, "well")
 
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
-Light.SetMode(sun, "Mixed") -- live: the level is not baked
+Light.SetMode(sun, "Mixed")
 Transform.SetRotation(sun, -40, 25, 0)
 Light.SetCastShadows(sun, true)
 
--- The light that pulses on a line clear: dark until `tetris.lua` raises it.
 local pulse = Scene.CreateEntity("Pulse", "PointLight")
 Transform.SetPosition(pulse, 0, h / 2, 4)
 Light.SetColor(pulse, 1.0, 0.9, 0.7)
 Light.SetRange(pulse, 30)
 Light.SetIntensity(pulse, 0)
-Light.SetMode(pulse, "Realtime") -- it pulses at runtime
+Light.SetMode(pulse, "Realtime")
 
 local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")
-Transform.SetPosition(camera, -4.5, h / 2 + 1.5, h * 1.6) -- looking down -Z, so +X is screen right
+Transform.SetPosition(camera, -4.5, h / 2 + 1.5, h * 1.6) -- looking down -Z: +X is screen right
 
--- The sounds: zimmer one-shots for rotate, lock, clear and game over, and a loop.
 local function bake(name, patch, note, opts)
     opts.seed = p.seed
     return Sound.Bake(patch, note, "assets/sounds/" .. name .. ".wav", opts)
@@ -104,8 +91,6 @@ Scene.AddScript(game, "assets/scripts/tetris.lua",
 Scene.AddComponent(game, "AudioSource")
 Component.Set(game, "AudioSource", { clip = loop, loop = true, play_on_start = true, volume = 0.4 })
 
--- The HUD: score, level and lines in a column, the next piece in a 4×4 grid, and
--- a game-over banner shown only once the stack tops out.
 local canvas = UI.Create("Canvas")
 Scene.SetName(canvas, "HUD")
 local function element(name, parent, kind, ax, ay, x, y, sw, sh)
