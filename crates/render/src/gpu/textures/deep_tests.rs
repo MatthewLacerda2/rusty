@@ -62,6 +62,13 @@ fn a_16_bit_upload_serves_only_a_normal_slot() {
 }
 
 #[test]
+fn the_shader_reads_the_flag_a_signed_upload_sets() {
+    let wgsl = include_str!("../../../../../engine/shaders/forward/mapping.wgsl");
+    let line = format!("const SIGNED_NORMAL_MAP: u32 = {SIGNED_NORMAL_MAP}u;");
+    assert!(wgsl.contains(&line), "{line}");
+}
+
+#[test]
 fn near_flat_every_step_of_the_file_survives_the_half_float() {
     let near_flat = (0..=u16::MAX).filter(|&v| signed(v).abs() < 1.0 / 16.0);
     for v in near_flat {

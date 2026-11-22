@@ -97,12 +97,18 @@ impl Renderer {
         }
         let normal = m.normal_map.as_ref();
         let bound = normal.and_then(|p| self.texture_for(p, TextureKind::Normal));
-        if let Some(table) = bound.as_ref().and_then(|t| t.normal_variance) {
-            record.use_normal_map = 2;
-            record.normal_variance = pack_variance(table);
-        }
-        if bound.is_some_and(|t| t.texture.format() == DEEP_FORMAT) {
-            record.use_normal_map = SIGNED_NORMAL_MAP;
+        match bound.as_deref() {
+            Some(t) if t.texture.format() == DEEP_FORMAT => {
+                record.use_normal_map = SIGNED_NORMAL_MAP
+            }
+            Some(GpuTexture {
+                normal_variance: Some(table),
+                ..
+            }) => {
+                record.use_normal_map = 2;
+                record.normal_variance = pack_variance(*table);
+            }
+            _ => {}
         }
         for slot in &MAP_SLOTS {
             let Some(flag) = slot.off_while_missing else {

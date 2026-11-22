@@ -57,7 +57,8 @@ copy, unless its `compression` is `"None"`; see `Assets.md`), so its extra preci
 serves what reads the file itself (an `image` node, a terrain or displacement bake).
 A `normal16` map in a material's normal slot keeps it on the GPU too: a 16-bit
 `"NormalMap"` is never block-compressed and uploads as signed half floats, which keep
-every step of the file up to a tilt of about 3.5°, at eight bytes a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
+every step of the file up to a tilt of about 3.5° and step 0.056° at 60°, at eight
+bytes a texel (twice an 8-bit map, eight times BC5; `Assets.md`, `textureType`), so bake
 `normal16` for the subtle relief that needs it and `normal` for the rest.
 A `height` map's parallax reads the file as uploaded, BC4 by default, which marches
 without visible terracing (`Material.md`, `SetHeightMap`).

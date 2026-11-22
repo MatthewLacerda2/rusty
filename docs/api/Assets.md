@@ -293,7 +293,7 @@ clamped sampler.
   | type | format | for |
   |---|---|---|
   | `"Default"` | BC7 (a byte a texel), alpha kept, mips averaged in linear light (raw with `sRGB` off) | colour, packed data (glTF's occlusion-roughness-metallic, with `sRGB` off) |
-  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z. A 16-bit file (`Texture.Bake`'s `normal16`) is never compressed: it uploads as half floats (`Rgba16Float`, eight bytes a texel) holding x, y and z signed, where half floats are finest near flat: up to a tilt of about 3.5° (a slope of 1/16) they keep every step the file holds (0.0017°), and they step at most 0.028° at steep tilts, where 8 bits (and BC5) step every 0.45° | tangent-space normal maps |
+  | `"NormalMap"` | BC5 (a byte a texel): x and y; the shader rebuilds z. A 16-bit file (`Texture.Bake`'s `normal16`) is never compressed: it uploads as half floats (`Rgba16Float`, eight bytes a texel) holding x, y and z signed, where half floats are finest near flat: up to a tilt of about 3.5° (a slope of 1/16) they keep every step the file holds (0.0017°); x and y then step coarser as they grow, 2^-12 below 0.5 and 2^-11 above it, which turns the normal by 0.014° at a tilt of 15°, 0.040° at 45°, 0.056° at 60° and 0.16° at 80°, where 8 bits (and BC5) step every 0.45° near flat | tangent-space normal maps |
   | `"SingleChannel"` | BC4 (half a byte): red only | roughness, metallic, masks, height maps |
 
   Assigning a `"Default"` image to a material's normal slot (`Material.SetNormalMap`,
