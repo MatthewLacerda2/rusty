@@ -1,5 +1,3 @@
-//! real need says why with `// lint: allow(held-warn) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{strip_comment, Open};

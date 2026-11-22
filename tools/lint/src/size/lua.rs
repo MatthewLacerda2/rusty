@@ -118,6 +118,7 @@ mod tests {
 
     #[test]
     fn a_long_string_is_code_on_every_line() {
+        // The blank line inside is blank either way; the closing `]]` line is code.
         let src = "local s = [[\n-- not a comment\n\n]]\nx = 1\n";
         assert_eq!(code_lines(src), 4);
     }

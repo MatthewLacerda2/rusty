@@ -18,10 +18,12 @@ pub fn names(text: &str, dep: &str) -> bool {
 }
 
 pub struct Scan {
+    /// The repository scanned, `""` for the working directory.
     pub base: PathBuf,
     pub files: Vec<String>,
     sources: BTreeMap<String, String>,
     test_lines: BTreeMap<String, Vec<bool>>,
+    /// From this build's layer table, not from `base`: the table is code, compiled in.
     pub sim_dirs: Vec<String>,
     shaders: OnceCell<Vec<(String, String)>>,
 }
@@ -69,6 +71,8 @@ impl Scan {
         }
     }
 
+    /// [`Scan::base`] to list or run git in: `.` for the working directory, since
+    /// `read_dir("")` fails.
     pub fn root(&self) -> &Path {
         if self.base.as_os_str().is_empty() {
             Path::new(".")

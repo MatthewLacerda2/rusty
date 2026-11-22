@@ -1,10 +1,9 @@
-//! on a plain `//` comment line anywhere in it: `// lint: allow(dir-size) <why>`.
-
 use super::finding::{parse_allow, Finding, Form};
 use super::prefix::owner_of;
 use super::scan::Scan;
 
 pub const RULE: &str = "dir-size";
+/// Source files: CLAUDE.md's aim of ≲10, with two files of room.
 pub const MAX_FILES_PER_DIR: usize = 12;
 
 pub fn sources<'a>(dir: &str, files: &[&'a str]) -> Vec<&'a str> {

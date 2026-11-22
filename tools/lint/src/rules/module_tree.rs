@@ -52,6 +52,7 @@ pub fn reached(path: &str, mod_rs: bool, text: &str, exists: impl Fn(&str) -> bo
                 let inner = rest.get(1) == Some(&Tok::Punct('!'));
                 let attr = &rest[1 + usize::from(inner)..];
                 let (found, len) = attribute(attr);
+                // `#![…]`, an inner attribute, never sets a `mod`'s path.
                 path_attr = found.filter(|_| !inner).or(path_attr);
                 if len > 0 {
                     out.extend(
@@ -117,6 +118,7 @@ fn external(
     if let Some(p) = path_attr {
         let path = normal(&dir.path.join(p.path));
         out.push(Reach::Module { path, mod_rs: true });
+        // A `cfg_attr` path: the builds it is off in load the default file too.
         if !p.conditional {
             return out;
         }

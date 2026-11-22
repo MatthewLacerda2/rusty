@@ -1,5 +1,3 @@
-//! why with `// lint: allow(subprocess) <why>`. `tests/` and `tools/` are not the
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

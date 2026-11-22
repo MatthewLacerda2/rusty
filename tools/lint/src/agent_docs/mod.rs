@@ -1,5 +1,3 @@
-//! An exception is inline, with a reason: `<!-- lint: allow(<rule>) <why> -->` on
-
 mod agent;
 mod frontmatter;
 pub(crate) mod history;
@@ -16,6 +14,7 @@ pub const CLAUDE_MD: &str = "claude-md";
 pub const SKILL: &str = "skill";
 pub const AGENT: &str = "agent";
 pub const HISTORY: &str = "history";
+// Lines, blank ones counted: each file is read whole into context on every load.
 pub const MAX_CLAUDE_MD_LINES: usize = 300;
 pub const MAX_SKILL_FILE_LINES: usize = 500;
 pub const MAX_AGENT_LINES: usize = 60;

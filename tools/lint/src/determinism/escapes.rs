@@ -2,6 +2,7 @@ use crate::code::{code_of, Open};
 
 const LOCKED: &[&str] = &["clippy::too_many_lines", "clippy::unwrap_used"];
 
+/// (file at its module path, lint): each row excuses one attribute in that file.
 const ESCAPES: &[(&str, &str)] = &[("src/render/setup/mod.rs", "clippy::too_many_lines")];
 
 pub const ROOTS: &[&str] = &["src", "crates", "tests", "fuzz"];

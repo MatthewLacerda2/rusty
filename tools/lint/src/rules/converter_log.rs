@@ -1,11 +1,11 @@
-//! why with `// lint: allow(converter-log) <why>`.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{strip_comment, Open};
 
 pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
+/// The cache's own modules, not converters: a new one joins this list, or its
+/// logging is a finding.
 const NOT_CONVERTERS: &[&str] = &[
     "converter",
     "depends",

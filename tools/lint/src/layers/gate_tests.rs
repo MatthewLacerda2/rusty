@@ -88,6 +88,7 @@ fn declarations_read_in_memory_with_quoted_brackets_shared_lines_and_dotted_path
                #[cfg(test)] use super::X;\nmod production;\n#[cfg(test)] mod fixture;\n\
                #[cfg(test)]\n#[path = \"./dotted.rs\"]\nmod dotted;\n\
                #[cfg(test)] #[path = \"sub/../up.rs\"] mod up;\n";
+    // `lib` is never written to disk: `test_only_files` reads it through `source` only.
     let lib_path = src.join("lib.rs");
     let found = test_only_files(std::slice::from_ref(&lib_path), |p| {
         (p == lib_path).then_some(lib)

@@ -96,6 +96,7 @@ fn the_tree_reads_tracked_files_only_and_flags_a_skill_folder_without_skill_md()
     repo.file(".claude/agents/coder.md", &agent_md("coder"));
     repo.file(".claude/agents/reviewer.md", &agent_md("reviewer"));
     repo.git(&["add", "."]);
+    // Untracked: never read, however wrong.
     repo.file("scratch/CLAUDE.md", &blank(MAX_CLAUDE_MD_LINES + 1));
     repo.file(".claude/skills/new/SKILL.md", "no frontmatter, see #3\n");
     let found = tree(&repo.0).expect("git lists the tree");

@@ -56,6 +56,7 @@ pub struct Ref {
 pub fn walk(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk_into(dir, &mut out);
+    // `read_dir`'s order is the filesystem's: sorted, so reports are stable.
     out.sort();
     out
 }

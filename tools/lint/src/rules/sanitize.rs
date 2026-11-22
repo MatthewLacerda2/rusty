@@ -1,5 +1,3 @@
-//! way says so with `// lint: allow(sanitize) <why>`. Test code is not scanned.
-
 use super::finding::Finding;
 use super::sanitize_rules::{resolved, unheld, Rule};
 use super::scan::Scan;

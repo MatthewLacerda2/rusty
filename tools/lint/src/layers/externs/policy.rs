@@ -7,6 +7,7 @@ pub struct Policy {
     pub common: &'static [&'static str],
     pub unscoped: &'static [(&'static str, &'static str)],
     pub confined: &'static [Confined],
+    /// Crate families no sim member may take, tests included: `egui` bans `egui_extras`.
     pub display: &'static [&'static str],
 }
 

@@ -78,6 +78,8 @@ pub fn test_only_files<'a>(
     test_only
 }
 
+/// A gate or `#[path]` holds across the comment and blank lines before its item, as
+/// `extent::head` reads them: change both together.
 fn declared_mods(file: &Path, content: &str) -> Vec<(PathBuf, bool)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();
@@ -138,6 +140,7 @@ fn resolve(file: &Path, name: &str, path_attr: Option<&str>) -> Option<PathBuf> 
     .find(|p| p.is_file())
 }
 
+/// Lexical: each `..` folds the segment before it, and symlinks are not followed.
 pub fn normalise(path: &Path) -> PathBuf {
     let mut out = PathBuf::new();
     for part in path.components() {

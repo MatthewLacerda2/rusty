@@ -1,6 +1,3 @@
-//! //! stored-format: the `<scene>.occlusion` file beside the scene
-//! `// lint: allow(stored-format) <why>` on each such line. A format coded by hand (the
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
@@ -8,6 +5,7 @@ use crate::code::{code_lines, is_ident};
 pub const RULE: &str = "stored-format";
 pub const MARKER: &str = "//! stored-format:";
 
+/// Each matches only as a whole word at its end, so `fs::read` is not `fs::read_dir`.
 const IO: &[&str] = &[
     "fs::write",
     "fs::read",
@@ -19,6 +17,7 @@ const IO: &[&str] = &[
     "written::write",
 ];
 
+/// The type a codec call moves may be derived anywhere, so the call alone says "a document".
 const CODEC: &[&str] = &["serde_json::to_", "serde_json::from_"];
 
 pub struct Source<'a> {
@@ -68,6 +67,7 @@ pub fn marker(text: &str) -> Option<(usize, &str)> {
 }
 
 pub fn covered(path: &str, marked: &[&str]) -> bool {
+    // Both sides at module paths: a crate's `lib.rs` covers its folder, as a `mod.rs`.
     use crate::modules::module_path;
     let path = &*module_path(path);
     let marked: Vec<_> = marked.iter().map(|m| module_path(m)).collect();

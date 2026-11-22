@@ -234,10 +234,13 @@ pub fn manifest(root_toml: &str, all: &[Deps], members: &[String]) -> String {
                 || l == "[features]"
                 || (l.starts_with("[target.") && l.ends_with(".dependencies]"));
         }
+        // `default-members` would make `cargo check --lib` check each member again on
+        // its own; without it, only the root, which now holds them all.
         if !skip && !l.starts_with("default-members") {
             out.push_str(&format!("{l}\n"));
         }
     }
+    // A member's only features are `dev` and `editor`, so two plain ones stand for all.
     out.push_str("\n[features]\ndefault = [\"editor\"]\ndev = []\neditor = []\n\n[dependencies]\n");
     normal.iter().for_each(|n| out.push_str(&line(n)));
     out.push_str("\n[dev-dependencies]\n");

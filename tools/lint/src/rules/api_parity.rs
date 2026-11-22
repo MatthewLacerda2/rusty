@@ -1,5 +1,3 @@
-//! display toggle) says why at its `fn` with `// lint: allow(api-parity) <why>`, above
-
 use super::finding::{allowed, Finding};
 use super::scan::Scan;
 use crate::code::{code_lines, is_ident};
@@ -16,7 +14,9 @@ pub const RULE: &str = "api-parity";
 const AUTHORING: &str = "src/edit/authoring/";
 pub const ROOT: &str = "crate::edit::authoring";
 const EDITOR: &str = "src/editor/";
+/// Where Lua reaches ops: the bindings, and `Component.Set`'s field table.
 const API: &[&str] = &["src/script/api/", "src/edit/authoring/fields/"];
+/// Modules whose own file holds the field-table row that calls their ops by bare name.
 const ROWS: &[&str] = &["src/edit/authoring/rendering/post_processing/"];
 
 type Op = String;
