@@ -32,6 +32,7 @@ pub fn entity_overrides(world: &World, id: u32) -> PrefabOverrides {
         .unwrap_or_default()
 }
 
+/// Call before any rebuild of these instances: a rebuild re-applies only the links' overrides.
 pub fn sync_overrides(world: &mut World, ids: &[u32]) {
     for &id in ids {
         let overrides = entity_overrides(world, id);

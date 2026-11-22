@@ -11,10 +11,10 @@ use crate::prefab::source::{is_model_source, node_paths, read_source};
 use rusty_scene::rehydrate::Imports;
 use rusty_scene::Scene;
 
-/// Each instance's edits are taken as overrides against the model as it was, then `refit` runs,
-/// then each instance is rebuilt from the model as it imports now. `refit` skips static meshed
-/// parts (the rebuild re-imports them) and parts whose node is gone; a skinned part still in the
-/// model is left to it, since its rig and bones are the refit's to move.
+/// No Undo step when an instance is rebuilt; with none linked, `refit` runs in the caller's step.
+/// Takes each instance's edits as overrides against the model as it was, runs `refit`, then
+/// rebuilds each from the model as it imports now. `refit` skips static meshed parts, rebuilt
+/// anyway, and gone nodes; a skinned part is left to it: its rig and bones are the refit's.
 pub fn restamp_models<R>(
     scene: &mut Scene,
     names: impl Fn(&str) -> bool,

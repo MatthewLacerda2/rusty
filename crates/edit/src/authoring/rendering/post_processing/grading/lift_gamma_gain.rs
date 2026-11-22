@@ -14,7 +14,6 @@ pub fn set_wheel(vc: &mut PostProcessingComponent, which: Wheel, color: [f32; 3]
     wheel.offset = clamped(offset, -1.0, 1.0);
 }
 
-/// Set `which`'s offset, keeping its colour.
 fn set_offset(vc: &mut PostProcessingComponent, which: Wheel, offset: f32) {
     let color = vc.lift_gamma_gain.wheel(which).color;
     set_wheel(vc, which, color, offset);

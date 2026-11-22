@@ -3,7 +3,6 @@ use glam::{Vec2, Vec4};
 use rusty_components::{TextAlignment, TextComponent, TextOverflow};
 use rusty_scene::rules::sanitize::{at_least, finite, finite2, non_negative, unit_color};
 
-/// The smallest em size, in reference units.
 pub const MIN_FONT_SIZE: f32 = 0.5;
 
 pub fn set_text(t: &mut TextComponent, text: String) {

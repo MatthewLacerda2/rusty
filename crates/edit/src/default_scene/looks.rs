@@ -16,8 +16,8 @@ pub const ENEMY: &str = "enemy_red";
 pub const CRATE: &str = "crate";
 pub const WATER: &str = "water";
 
-/// Where `bake_maps` writes `FLOOR`'s map (`<MAPS_DIR>/<FLOOR>_base_color.png`): change them
-/// together.
+/// Where `bake_maps` writes `FLOOR`'s map (`<MAPS_DIR>/<FLOOR>_base_color.png`), as
+/// `the_floor_names_the_map_its_recipe_bakes` holds.
 pub const CHECKER_MAP: &str = "assets/textures/checker_base_color.png";
 pub const SHADER_NAME: &str = "default_rim";
 

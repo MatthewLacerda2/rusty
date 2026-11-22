@@ -41,7 +41,7 @@ pub const EFFECTS: &[Effect] = &[
     white_balance::EFFECT,
 ];
 
-/// Test hook for the root `tests/post_effect_layers.rs`: this layer's tables, by name, for
+/// Test hook for the root package's tests: this layer's tables, by name, for
 /// `render::postfx::completeness`.
 pub fn authored() -> rusty_scene::authored::Authored {
     let fields_of = |kind: &str| -> Vec<String> {

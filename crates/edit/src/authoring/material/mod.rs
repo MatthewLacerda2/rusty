@@ -52,7 +52,8 @@ pub use rusty_scene::rules::material::FACTOR_RANGE;
 
 pub type MaterialLibrary = BTreeMap<String, MaterialAsset>;
 
-/// Stores `asset` unclamped: `Material.DefineAsset` runs its values through the `set_*` ops after.
+/// Stores `asset` unclamped: `Material.DefineAsset` then runs metallic, roughness, alpha and the
+/// modes through their `set_*` ops, never base colour or emissive.
 pub fn define_asset(materials: &mut MaterialLibrary, name: &str, asset: MaterialAsset) {
     fit_map_slots(&asset);
     materials.insert(name.to_string(), asset);

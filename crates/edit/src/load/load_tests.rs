@@ -4,7 +4,7 @@ use super::make_room;
 use crate::to_scene_data;
 use rusty_scene::Scene;
 
-/// No lighting sidecar beside this path, so the swap's sidecar merge is a no-op.
+/// No navmesh or lighting sidecar beside this path, so the swap reads none.
 const NO_SIDECAR: &str = "rusty_432_no_such_dir/level.scene";
 
 /// Floor (1) and its child Lamp (2): ids the outgoing scene's survivors can hold.

@@ -78,7 +78,6 @@ fn reimport_one(
     shared.take_geometry(&mesh);
     refit_collider(&mut collider, own);
     drop(collider);
-    // A linked prefab entity's refit is the model's change, never an override.
     if let Some(before) = before {
         shift_baseline(&mut scene.world, id, &masked(&before));
     }

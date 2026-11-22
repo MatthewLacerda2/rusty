@@ -49,7 +49,8 @@ pub(super) fn read_fonts(
     Ok(())
 }
 
-/// Compared for equality, never against a clock; an unreadable modified time is never cached.
+/// Compared for equality, never against a clock; one with no modified time never matches a kept
+/// font, so its file is re-read.
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct Stamp {
     len: u64,

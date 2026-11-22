@@ -76,8 +76,8 @@ pub fn print_refresh(report: &rusty_asset::audio::Refresh) {
     }
 }
 
-/// Writes over whatever is there, without the manifest: the harness runs here and must
-/// never read a stale or edited copy.
+/// Writes over whatever is in `root`, without the manifest, so `root` is a folder the caller
+/// owns: the harness runs here and must never read a stale or edited copy.
 pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     use crate::authoring::ui::widgets::parts::SCRIPT_DIR;
     let scripts = root.join(DEFAULT_SCRIPTS_DEST_DIR);
@@ -90,7 +90,7 @@ pub fn seed_workspace(root: &Path, samples: Option<&Path>) {
     ));
     for (to, bytes) in files {
         let parent = to.parent().unwrap_or(root);
-        // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
+        // lint: allow(asset-write) the harness's scripts and materials, seeded before it builds
         let written = std::fs::create_dir_all(parent).and_then(|()| std::fs::write(&to, bytes));
         if let Err(e) = written {
             eprintln!("[Seed] seeding {} failed: {e}", to.display());

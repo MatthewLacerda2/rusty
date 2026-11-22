@@ -24,8 +24,9 @@ pub enum SurfaceKind {
 }
 
 pub struct SurfaceField {
-    /// Its name in a `DefineAsset` recipe (`"blend_mode"`); `api` names its `Material.Set<api>`.
+    /// Its name in a `DefineAsset` recipe (`"blend_mode"`).
     pub key: &'static str,
+    /// Names its `Material.Set<api>` call.
     pub api: &'static str,
     pub label: &'static str,
     pub kind: SurfaceKind,

@@ -6,7 +6,7 @@ use super::{Skip, KINDS};
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
-/// An integer goes to 250 or 0, the widest every integer type, `u8` too, still reads.
+/// Integers go to 250 or 0: the widest values that every integer type, `u8` too, still reads.
 fn push_out(v: &mut Value, up: bool) {
     match v {
         Value::Number(n) if n.is_f64() => {

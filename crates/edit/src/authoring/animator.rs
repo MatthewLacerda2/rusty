@@ -33,7 +33,6 @@ pub fn set_graph(a: &mut AnimatorComponent, graph: Option<String>) {
     // The old graph's sync group would otherwise match a new node's by name.
     a.base.sync = Default::default();
     a.layers.clear();
-    // A montage ran against the old graph's slots: it goes, firing nothing.
     a.montages.clear();
     a.states.clear();
 }

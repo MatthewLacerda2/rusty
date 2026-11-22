@@ -25,7 +25,7 @@ pub fn material_asset_from_import(data: &rusty_asset::MaterialData) -> MaterialA
         ..MaterialAsset::default()
     };
     super::material::import_reflectance(&mut asset, data.ior, data.specular, data.specular_color);
-    // Its strength through its row, clamped as an authored one is.
+    // The occlusion strength goes through its row, clamped as an authored one is.
     let strength = SurfaceValue::Number(data.occlusion_strength);
     super::material::import_field(&mut asset, "occlusion_strength", strength);
     super::material::fit_map_slots(&asset);

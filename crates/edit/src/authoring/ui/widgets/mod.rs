@@ -50,7 +50,7 @@ impl UiWidget {
         Self::InputField,
     ];
 
-    /// Also each builder's root name and the prefab's file stem: rename them together.
+    /// Also the prefab's stem; each builder spells it as its root's name: rename both.
     pub fn label(self) -> &'static str {
         match self {
             Self::Canvas => "Canvas",

@@ -184,8 +184,8 @@ impl<'de> de::Deserializer<'de> for TypeProbe<'_> {
         self.found("table")
     }
 
-    // For an enum carrying data, `Component.Fields` takes "table" from the default value,
-    // which wins.
+    // For an enum carrying data, `Component.Fields` takes "table" from the default value
+    // (when there is one), which wins.
     fn deserialize_enum<V: Visitor<'de>>(
         self,
         _: &'static str,

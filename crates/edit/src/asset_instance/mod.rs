@@ -8,8 +8,6 @@ use rusty_components::{ColliderComponent, MaterialComponent};
 use rusty_scene::rehydrate;
 use rusty_scene::Scene;
 
-/// The base name of a `_LOD<n>` set (`crate.glb::Crate`) spawns the whole set as one LODGroup;
-/// its id is the group's.
 pub fn instantiate_asset(
     scene: &mut Scene,
     reference: &str,

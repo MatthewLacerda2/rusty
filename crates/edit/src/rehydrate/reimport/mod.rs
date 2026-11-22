@@ -80,7 +80,6 @@ fn reimport_where(
         let linked = scene.world.prefab_link(id).is_some();
         let before = linked.then(|| scene.world.reference_document(id)).flatten();
         if sub.is_some_and(|sub| reimport_entity_mesh(scene, id, sub, rig)) {
-            // A linked prefab entity's refit is the model's change, never an override.
             if let Some(before) = before {
                 shift_baseline(&mut scene.world, id, &masked(&before));
             }

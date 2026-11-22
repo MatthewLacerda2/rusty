@@ -47,7 +47,8 @@ pub fn reimport_noted_except(
     skip: &BTreeSet<u32>,
 ) -> Vec<u32> {
     let at = note_written(path);
-    // Recorded, so this scene's own `follow` skips the note and its meshes are not read twice.
+    // Kept in `meshes_reimported`, so this scene's own `follow` skips the note and its meshes are
+    // not read twice.
     scene.meshes_reimported.insert(path.to_string(), at);
     reimport_model_except(scene, path, rig, skip)
 }

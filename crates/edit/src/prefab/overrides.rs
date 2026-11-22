@@ -13,9 +13,8 @@ enum Op<'a> {
     Set(&'a str, &'a Value),
 }
 
-/// A path that no longer resolves is skipped. A `null` written into an array element the type can't
-/// hold (a dropped LOD renderer's id) drops that element. An override that still doesn't fit is
-/// skipped with a warning.
+/// A path that no longer resolves is skipped; an override that still doesn't fit is skipped with a
+/// warning.
 pub fn apply_overrides(baseline: &mut Entity, overrides: &PrefabOverrides) {
     if overrides.is_empty() {
         return;
@@ -131,6 +130,7 @@ fn run(value: &mut Value, op: &Op, grown: &mut Vec<String>) {
             }
         }
         Op::Size(list, n) => {
+            // A list the baseline omits (`Vec::is_empty` skips it) is an empty one, as in `diff`.
             let parent = list.rsplit_once('/').map_or("", |(p, _)| p);
             let missing = value.pointer(list).is_none_or(Value::is_null);
             if missing && value.pointer(parent).is_some_and(Value::is_object) {

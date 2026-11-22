@@ -98,7 +98,6 @@ pub(crate) fn set_levels(scene: &mut Scene, group: u32, levels: Vec<Vec<u32>>, s
 pub(crate) fn lod0_size<'a>(asset: &ImportedAsset, lod0: impl Iterator<Item = &'a str>) -> f32 {
     let bounds = lod0.filter_map(|id| asset.sub_mesh(id).and_then(|s| s.bounds()));
     let union = bounds.reduce(|(a0, a1), (b0, b1)| (a0.min(b0), a1.max(b1)));
-    // An LOD0 with no bounds sizes at 1 unit; one smaller than `MIN_SIZE` takes `MIN_SIZE`.
     union.map_or(1.0, |(lo, hi)| (hi - lo).max_element().max(MIN_SIZE))
 }
 

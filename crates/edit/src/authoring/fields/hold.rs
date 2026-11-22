@@ -7,8 +7,8 @@ use super::write::{named, run_ops, serialized};
 use rusty_components::Entity;
 use rusty_ecs::World;
 
-/// Runs every number a scene file loaded through its field's op, so the World never holds a value
-/// its setters would refuse.
+/// Runs each number a scene file loaded through its field's op, `unheld!` fields aside; a refused
+/// op keeps the loaded value and warns.
 pub fn hold_world(world: &mut World) {
     for id in world.ids().to_vec() {
         hold_entity(world, id);

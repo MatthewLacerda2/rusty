@@ -12,8 +12,7 @@ use rusty_scene::{read_scene_file, Scene};
 
 /// The marks that enter Play. A save refuses them (`SAVE_IN_PLAY`), and Undo has
 /// nothing to judge them by: in Play `begin_edits` and `undo` are no-ops and
-/// entering Play forgets the history, so no step holds them. What Play does with
-/// them is judged by the Stop and Play-load runners instead.
+/// entering Play forgets the history, so no step holds them.
 pub const IN_PLAY: &[&str] = &["playing"];
 
 pub fn run(lifecycle: Lifecycle, mark: &Mark) -> Option<Outcome> {
@@ -80,6 +79,7 @@ fn stop(mark: &Mark) -> Outcome {
 fn undo(mark: &Mark) -> Option<Outcome> {
     let (mut scene, base) = base();
     scene.begin_edits();
+    // A real edit beside the mark, so a step Undo refused can't pass for `Left`.
     scene.world.transform_mut(base).expect("live").position.x = 3.0;
     (mark.set)(&mut scene, base);
     let in_play = IN_PLAY.contains(&mark.name);
