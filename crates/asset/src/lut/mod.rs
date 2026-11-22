@@ -22,6 +22,7 @@ pub struct Lut {
 impl Lut {
     /// Resolve's 65³ fits; a 256³ table (268 MB uploaded) is refused.
     pub const MAX_SIZE: u32 = 65;
+    /// The `.cube` spec's smallest side.
     pub const MIN_SIZE: u32 = 2;
 
     fn fits(size: u32) -> bool {
@@ -29,7 +30,6 @@ impl Lut {
     }
 }
 
-/// The error names the file, and for a `.cube` the line.
 pub fn load(path: &Path) -> Result<Lut, ImportError> {
     let named = |why: String| ImportError::Parse(format!("{}{why}", path.display()));
     let ext = paths::extension(path);
@@ -52,6 +52,7 @@ pub fn load(path: &Path) -> Result<Lut, ImportError> {
         .map_err(|why| named(format!(": {why}")))
 }
 
+/// The one [`LUT_EXTENSIONS`] entry read as text; any other is read as a strip image.
 const CUBE: &str = "cube";
 
 #[cfg(test)]

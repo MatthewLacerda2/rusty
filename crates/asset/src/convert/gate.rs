@@ -1,6 +1,6 @@
 //! Conversion is refused while a [`PlayHold`] is taken: a cache re-made mid-game
 //! would give new instances geometry the old ones lack (Unity refreshes before Play).
-//! Changed sources are held for [`convert_held`]. The gate is per thread.
+//! Changed sources are held for [`convert_held`].
 
 use super::{cache_location, cached_gltf, converter_for, record, stale, Converter, Tool};
 use crate::ImportError;
@@ -35,7 +35,8 @@ const ON: Gate = Gate {
     missing: Vec::new(),
 };
 
-// Not `cfg(test)`: the integration binary links without it.
+// Per thread in every build (integration tests lack `cfg(test)`): a world loads on its
+// ticking thread, and a load elsewhere must take its own hold.
 thread_local! {
     static GATE: std::cell::RefCell<Gate> = const { std::cell::RefCell::new(ON) };
 }
@@ -202,7 +203,6 @@ fn not_imported(source: &Path) -> ImportError {
     ))
 }
 
-/// `./assets/x.fbx` and `assets/x.fbx` are one entry.
 pub(super) fn key(source: &Path) -> PathBuf {
     source
         .components()

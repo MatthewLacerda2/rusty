@@ -1,8 +1,8 @@
-//! Keyed by the executable's path as found, canonicalized, plus its length and mtime, so an
-//! upgrade or a moved link asks again and two launchers of one binary (`snap`) never share an
-//! answer. A refused version is never kept. An answer is read at most [`READS`] times, then
-//! asked again: a count, not an age (this crate reads no clock); a read whose count cannot be
-//! written is no read.
+//! Keyed by the executable's path as found, canonicalized, plus its length and mtime. A refused
+//! version is never kept, so the upgrade its message asks for is seen at once.
+//! An answer is read at most [`READS`] times, then asked again: a launcher that never changes
+//! with Blender (snap's `/snap/bin/blender` is `snap` itself) would keep a stale one for good. A
+//! count, not an age (this crate reads no clock); a read whose count cannot be written is no read.
 
 use rusty_core::project;
 use serde::{Deserialize, Serialize};

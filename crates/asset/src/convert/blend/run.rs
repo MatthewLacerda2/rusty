@@ -1,7 +1,5 @@
 //! Blender runs headless on factory settings with the `.blend`'s scripts disabled: an import
 //! never runs code a downloaded file carries.
-//! The time limit is counted in sleeps between polls, not read off a clock (the sim modules read
-//! none).
 
 use super::locate::{RUSTY_BLENDER_TIMEOUT, VERSION_TIMEOUT};
 use crate::ImportError;
@@ -21,6 +19,8 @@ const POLL: Duration = Duration::from_millis(20);
 const BUSY_TRIES: u32 = 100;
 const BUSY_WAIT: Duration = Duration::from_millis(2);
 
+/// `Err`: no answer (it could not start, or timed out), never remembered; `Ok(Err)`: an answer
+/// naming no version.
 pub(super) type Answer = Result<Result<String, ImportError>, ImportError>;
 
 pub(super) fn version(path: &Path) -> Answer {
@@ -141,6 +141,7 @@ fn drain(pipe: Option<impl Read + Send + 'static>) -> JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
         if let Some(mut pipe) = pipe {
+            // What was read before a failed read is kept: it is only quoted.
             if pipe.read_to_end(&mut bytes).is_err() {}
         }
         bytes

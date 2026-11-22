@@ -1,8 +1,8 @@
 //! Deletes on refresh the `.bctex` whose source is gone, is a baked lightmap page, or is a stale
-//! `NormalMap` copy of a 16-bit file. Only proven orphans go: a source that exists but cannot be
-//! read is not gone, nothing outside the import cache is walked, and a model's cache is never
-//! touched (an export ships it without its source, `convert::served_from_cache`). An extracted
-//! texture is gone once its model's glTF names no image of its name.
+//! `NormalMap` copy of a 16-bit file. Only proven orphans go: nothing outside the import cache is
+//! walked, and a model's cache is never touched (an export ships it without its source,
+//! `convert::served_from_cache`). An extracted texture is gone once its model's glTF names no
+//! image of its name.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -111,6 +111,7 @@ fn is_gone(path: &Path) -> bool {
     std::fs::symlink_metadata(path).is_err_and(|e| e.kind() == std::io::ErrorKind::NotFound)
 }
 
+/// `file_type` follows no symlink, so the sweep never deletes outside the cache.
 fn walk(dir: &Path, visit: &mut dyn FnMut(&Path)) {
     let Ok(read) = std::fs::read_dir(dir) else {
         return;

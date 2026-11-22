@@ -1,4 +1,5 @@
-//! Read from the JSON chunk alone, as [`super::image_uris`] is.
+//! What an extracted texture is compressed by, since it has no sidecar of its own
+//! (`texture_ref::extracted`). Read from the JSON chunk alone, as [`super::image_uris`] is.
 
 use super::read::json_chunk;
 use serde_json::Value;
@@ -42,7 +43,8 @@ pub fn image_slots(path: &Path) -> Option<BTreeMap<String, Vec<Slot>>> {
     Some(slots)
 }
 
-/// `specularColorTexture`, which no slot reads, is not among them.
+/// The slots `gltf::material` reads, so `KHR_materials_specular`'s `specularColorTexture`, which
+/// none does, is not among them: change the two together.
 fn textures(material: &Value) -> Vec<(&Value, Slot)> {
     let at = |path: &[&str]| path.iter().try_fold(material, |v, key| v.get(key));
     let named = [

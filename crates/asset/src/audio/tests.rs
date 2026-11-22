@@ -34,6 +34,7 @@ fn a_converted_mp3_is_a_wav_of_the_same_length_rate_and_signal() {
     let audio = converted("rusty_import_tone");
     assert_eq!((audio.channels, audio.sample_rate), (1, RATE));
     assert_eq!(audio.frames(), FRAMES);
+    // Sample for sample against the source: a delay left in would shift it, not just shorten it.
     let worst = (0..FRAMES)
         .map(|i| (audio.samples[i] - tone(i)).abs())
         .fold(0.0, f32::max);
@@ -48,6 +49,7 @@ fn a_converted_loop_has_no_silence_at_the_seam() {
     let seam = (s[0] - s[s.len() - 1]).abs();
     assert!(seam < max_step, "seam step {seam}");
     let rms = |w: &[f32]| (w.iter().map(|x| x * x).sum::<f32>() / w.len() as f32).sqrt();
+    // About one period (44100 / 440 samples) of the tone, whose RMS is 0.5/√2 ≈ 0.35.
     assert!(rms(&s[..100]) > 0.3, "head is silent");
     assert!(rms(&s[s.len() - 100..]) > 0.3, "tail is silent");
 }

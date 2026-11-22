@@ -1,8 +1,8 @@
 //! A lock file of its own, never the source (an exporter renaming over it would hand
 //! the next conversion an unlocked file), and never removed on release (a waiter
 //! would lock a file no newcomer opens). Never beside the cache: that sits in
-//! `assets/`. Named by a digest of the canonical cache path, so any spelling opens
-//! one file.
+//! `assets/`, which may be versioned or shipped. Named by a digest of the canonical
+//! cache path, so any spelling opens one file.
 
 use super::IMPORT_CACHE_DIR;
 use rusty_core::{hash, paths, project};
@@ -26,8 +26,7 @@ pub fn unavailable<T>(f: impl FnOnce() -> T) -> T {
     result
 }
 
-/// `None` when the filesystem has no locks: the conversion runs unlocked (`stage`
-/// keeps it whole in most interleavings).
+/// `None` when the filesystem has no locks: the conversion then runs unlocked.
 pub fn hold(out: &Path) -> Option<File> {
     #[cfg(test)]
     if UNAVAILABLE.with(std::cell::Cell::get) {

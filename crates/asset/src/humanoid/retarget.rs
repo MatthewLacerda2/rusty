@@ -1,5 +1,4 @@
-//! One clip rewritten from its source rig onto a target rig. Rotation keys transfer in
-//! rest-relative space, as in Godot 4's skeleton rest fixer:
+//! Rotation keys transfer in rest-relative space, as in Godot 4's skeleton rest fixer:
 //! `q_t = Pt⁻¹ · Ps · q_s · Gs⁻¹ · Gt` (`P` a parent's global rest, `G` the bone's own).
 //! Translations are dropped except the hips', scaled by target over source hip height (as
 //! Godot and Unity do). Rests are read in each rig's body frame ([`body`]): model space
@@ -11,6 +10,7 @@ use super::BoneMap;
 use crate::anim_data::{AnimationClip, JointTrack, Track};
 use crate::mesh_data::SkinData;
 
+/// Model units: a hip height or left/right gap below this counts as none.
 const MIN_HEIGHT: f32 = 1e-4;
 
 pub fn retarget(

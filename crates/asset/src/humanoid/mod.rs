@@ -1,6 +1,6 @@
-//! Retargeting clips between humanoid rigs, after Godot 4's `BoneMap` and Unity's Humanoid
-//! avatar in a simpler form: a model's sidecar may carry [`HumanoidSettings`], a map from
-//! [`CANONICAL`] bones to its own, and `clips_from` models whose clips play on this one.
+//! After Godot 4's `BoneMap` and Unity's Humanoid avatar in a simpler form: a model's sidecar
+//! may carry [`HumanoidSettings`], a map from [`CANONICAL`] bones to its own, and `clips_from`
+//! models whose clips play on this one.
 //! Unmapped bones are guessed from common names (`guess`), else said once per import.
 //!
 //! The retarget runs at import (`borrow`): the result is an ordinary clip cached with the
@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use super::mesh_data::SkinData;
 use rusty_core::fs::written::Stale;
 
+/// Unity's `HumanBodyBones` names, the sidecar's `bones` keys.
 pub const CANONICAL: &[&str] = &[
     "Hips",
     "Spine",

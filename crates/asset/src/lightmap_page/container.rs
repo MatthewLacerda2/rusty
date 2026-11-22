@@ -26,18 +26,18 @@ pub fn write(page: &Page) -> Vec<u8> {
     out[0..12].copy_from_slice(&MAGIC);
     let words = [
         page.format.vk_format(),
-        1, // typeSize
+        1, // typeSize, 1 for both formats
         page.edge,
         page.edge,
-        0,
-        0,
-        1,
+        0, // pixelDepth: 2D
+        0, // layerCount: no array
+        1, // faceCount
         page.levels.len() as u32,
-        0,
+        0, // supercompressionScheme: none
         dfd_at as u32,
         dfd.len() as u32,
-        0,
-        0,
+        0, // kvdByteOffset
+        0, // kvdByteLength
     ];
     for (i, w) in words.iter().enumerate() {
         put(&mut out, 12 + 4 * i, &w.to_le_bytes());
@@ -107,13 +107,13 @@ fn dfd(format: PageFormat) -> Vec<u8> {
     };
     let block = 24 + 16 * samples.len() as u32;
     let mut words = vec![
-        4 + block,
-        0,
+        4 + block,                    // dfdTotalSize
+        0,                            // vendorId and descriptorType: Khronos, basic
         2 | (block << 16),            // versionNumber 2, descriptorBlockSize
         model | (1 << 8) | (1 << 16), // model, primaries BT.709, transfer linear
         block_dims,                   // each dimension less one
         plane0,                       // bytesPlane0
-        0,
+        0,                            // bytesPlane4..7
     ];
     for &(offset, len, channel, upper) in samples {
         words.extend([offset | (len << 16) | (channel << 24), 0, 0, upper]);

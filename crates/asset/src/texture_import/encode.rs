@@ -1,7 +1,3 @@
-//! Block format choice and mip-chain encoding with `block_compression`'s CPU encoders. No BC1: its
-//! encoder collapses a two-colour block whose channels move against each other (red beside blue) to
-//! one flat grey; BC7 keeps both.
-
 use block_compression::{encode::compress_rgba8, BC7Settings, CompressionVariant};
 use image::{DynamicImage, RgbaImage};
 
@@ -17,6 +13,7 @@ pub enum BlockFormat {
 }
 
 impl BlockFormat {
+    /// The order is the `.bctex` format byte (`cache`): a reorder bumps `ENCODER_VERSION`.
     pub const ALL: [Self; 3] = [Self::Bc4, Self::Bc5, Self::Bc7];
 
     pub fn block_bytes(self) -> u32 {
@@ -36,6 +33,7 @@ pub struct Compressed {
     pub format: BlockFormat,
     pub width: u32,
     pub height: u32,
+    /// Every mip level's blocks, largest first.
     pub levels: Vec<Vec<u8>>,
     pub variance: VarianceTable,
 }
@@ -64,7 +62,8 @@ pub(super) fn encode(
     let threads = cores.threads();
     let mut levels = vec![compress(&base, variant, format, threads)];
     let mut working = to_working(&base, kind);
-    // `as_read` leaves x and y as they were, so one pyramid gives both the blocks and the spread.
+    // `half` filters each channel alone and BC5 keeps only x and y, which `as_read` leaves, so one
+    // pyramid gives both the blocks and the spread.
     let bc5 = format == BlockFormat::Bc5;
     if bc5 {
         working = variance::as_read(&working);
@@ -87,8 +86,8 @@ pub(super) fn encode(
     })
 }
 
-/// Import-time BC7 profiles: a 2048² map took 8 to 11 s at `Normal`, 21 s at `HighQuality` on one
-/// core. Ultra-fast flattens contrasting colours like BC1.
+/// Not BC7's ultra-fast profiles, quicker still: like BC1, they flatten a block of two
+/// contrasting colours (red beside blue) to one.
 fn variant(
     format: BlockFormat,
     compression: Compression,
@@ -149,8 +148,8 @@ pub fn blocks_len(width: u32, height: u32, block_bytes: u32) -> usize {
     width.div_ceil(4) as usize * height.div_ceil(4) as usize * block_bytes as usize
 }
 
-/// `encode(out, rows, first_row)` fills one band of `rows` texel rows; the blocks are the same
-/// whichever thread wrote them.
+/// `width` and `height` are multiples of 4. `encode(out, rows, first_row)` fills one band of
+/// `rows` texel rows; the blocks are the same whichever thread wrote them.
 pub(crate) fn banded(
     width: u32,
     height: u32,

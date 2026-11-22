@@ -1,9 +1,9 @@
-//! A glTF file's node hierarchy as [`ModelNode`]s, walked depth-first from the default
-//! scene (else the first, else every parentless node), so each node follows its parent.
+//! Nodes come depth-first from the default scene (else the first, else every parentless
+//! node), each after its parent.
 //!
 //! A joint of a skin some kept mesh uses is left out: it spawns as that skinned mesh's
-//! bone child. What a joint holds hangs from the bone (Unity keeps a gun under `Hand`):
-//! kept with the skinned node as parent and the bone named ([`NodeBone`]), walked after
+//! bone child. What a joint holds hangs from the bone (Unity keeps a gun under `Hand`): it
+//! is kept with the skinned node as parent and the bone named ([`NodeBone`]), walked after
 //! the main tree. A node reached twice is kept the first time only.
 
 use glam::{Mat4, Quat};
@@ -27,6 +27,7 @@ pub fn model_nodes<'a>(document: &'a gltf::Document, mesh_ids: &'a [&'a str]) ->
     while !walk.held.is_empty() {
         for (held, owner, name, joint) in std::mem::take(&mut walk.held) {
             let parent = walk.kept[owner];
+            // Relative to the skinned node, as `gltf::skin` builds `SkinData::bind_global`.
             let rest = walk.global[owner].inverse() * walk.global[joint];
             let bone = Some(NodeBone { name, rest });
             match held {
@@ -95,6 +96,7 @@ fn bones(document: &gltf::Document, roots: &[gltf::Node]) -> Vec<Option<(usize, 
             continue;
         };
         for (slot, j) in skin.joints().enumerate() {
+            // As `gltf::skin` names it: `edit::model_instance` finds the bone by it.
             let name = j
                 .name()
                 .map_or_else(|| format!("joint_{slot}"), str::to_string);

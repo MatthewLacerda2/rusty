@@ -1,4 +1,4 @@
-//! Unity's *Lightmap* texture type. Irradiance is BC6H, HDR stored as is (no
+//! A page is Unity's *Lightmap* texture type. Irradiance is BC6H, HDR stored as is (no
 //! RGBM, so bilinear filtering is linear in the light). A direction page is
 //! RGBA8, never block-compressed: BC7 turned a lamp's direction up to 5° off a
 //! texel, a sawtooth in glossy highlights.
@@ -64,7 +64,7 @@ impl Page {
     }
 }
 
-/// Levels whose edges are each a whole number of blocks.
+/// The most levels a page may hold: each one's edge a whole number of blocks.
 pub fn max_levels(edge: u32) -> u32 {
     (0..32)
         .take_while(|&l| edge >> l >= 4 && (edge >> l).is_multiple_of(4))

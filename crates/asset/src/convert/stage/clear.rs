@@ -1,5 +1,3 @@
-//! Step 5 of the swap.
-
 use super::super::record::tag_of;
 use super::super::stamp_path;
 use super::{textures_name, STAGING, TEXTURES};
@@ -8,8 +6,7 @@ use std::path::{Path, PathBuf};
 
 /// The stamp is re-read before each folder goes (another process may have swapped in):
 /// the folder kept is the one the current `.glb` references. With no stamp a swap is
-/// between steps 3 and 4, so no textures folder is touched. A staging folder still in
-/// use belongs to a concurrent conversion, whose converter then fails to write.
+/// between steps 3 and 4, so no textures folder is touched.
 pub(super) fn clear(dir: &Path, name: &str) {
     let stamp = stamp_path(&dir.join(name));
     let current = || {
@@ -34,7 +31,8 @@ pub(super) fn clear(dir: &Path, name: &str) {
     }
 }
 
-/// Current or left by an earlier conversion: `<out>.<tag>.textures/`.
+/// Current or left by an earlier conversion: `<out>.<tag>.textures/`, or an older
+/// converter's untagged `<out>.textures/`.
 pub fn textures_dirs(out: &Path) -> Vec<PathBuf> {
     let (dir, name) = split(out);
     std::fs::read_dir(&dir)
@@ -67,7 +65,8 @@ fn is_textures_of(entry: &str, name: &str) -> bool {
     middle == "." || tag.is_some_and(|t| t.len() == 16 && t.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// `out`'s folder (`.` for a bare file name) and file name.
+/// `out`'s folder (`.` for a bare file name) and file name, lossless: `project_relative`
+/// refuses non-UTF-8 paths, and `temp_path` names lossily.
 pub(super) fn split(out: &Path) -> (PathBuf, String) {
     let dir = match out.parent() {
         Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),

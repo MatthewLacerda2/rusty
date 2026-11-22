@@ -1,6 +1,3 @@
-//! The editor's background import: a worker thread drains a queue of images so the editor stays
-//! responsive while it encodes.
-
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
@@ -72,6 +69,7 @@ pub fn queue(sources: Vec<PathBuf>) {
 }
 
 pub(super) fn import_queued(source: &Path) {
+    // Gone since queued: its model's re-conversion removed its folder and queued the new images.
     if !source.exists() {
         return;
     }
@@ -85,6 +83,7 @@ pub(super) fn import_queued(source: &Path) {
         Err(_) if !source.exists() => {}
         Err(e) => {
             log::warn!("[Import] {e}");
+            // The console shows it only on a drawn frame.
             rusty_core::wake::frame();
         }
     }

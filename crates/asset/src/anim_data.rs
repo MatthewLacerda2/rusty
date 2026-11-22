@@ -8,8 +8,8 @@ pub enum Interpolation {
     Linear,
 }
 
-/// `times.len() == values.len()` by construction; an empty track contributes
-/// nothing (the joint keeps its bind value).
+/// The glTF import cuts `values` to `times`' length but never pads it, so a short output
+/// accessor stays short. An empty track contributes nothing (the joint keeps its bind value).
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct Track<T> {
     pub times: Vec<f32>,

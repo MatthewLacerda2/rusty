@@ -1,5 +1,6 @@
-//! Swap order: textures folder in, old stamp removed, `.glb` renamed over the old one,
-//! new stamp written (earlier it would bless the old `.glb`), then `clear`.
+//! The swap: (1) the converter stages; (2) textures folder in; (3) old stamp removed, then
+//! the `.glb` renamed over the old one; (4) new stamp written (earlier, it would bless the
+//! old `.glb`); (5) `clear`.
 
 mod clear;
 pub(in crate::convert) mod hook;
@@ -15,7 +16,6 @@ use std::path::{Path, PathBuf};
 
 /// Where one conversion writes: plain files, in a fresh folder of its own.
 pub struct Staging {
-    /// Where the glTF goes.
     pub glb: PathBuf,
     pub textures: PathBuf,
     pub out: PathBuf,

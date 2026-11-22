@@ -13,7 +13,7 @@ use std::sync::{LazyLock, Mutex, PoisonError};
 /// skip differently.
 static WARNED: LazyLock<Mutex<Set<(PathBuf, String)>>> = LazyLock::new(Mutex::default);
 
-/// E.g. `blender 1 <digest> 5.0.1`.
+/// `blender 1 <digest> 5.0.1` and a newline, which `record` and `split_record` rely on.
 pub(super) fn stamp(converter: &Converter, digest: u64, tool: Option<&str>) -> String {
     let base = format!("{} {} {digest:016x}", converter.name, converter.version);
     match tool {
@@ -22,6 +22,7 @@ pub(super) fn stamp(converter: &Converter, digest: u64, tool: Option<&str>) -> S
     }
 }
 
+/// The converter, version and digest: `stamp`'s first three words.
 fn untooled(stamp: &str) -> Vec<&str> {
     stamp.split_whitespace().take(3).collect()
 }

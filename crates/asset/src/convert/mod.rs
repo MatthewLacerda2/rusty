@@ -1,5 +1,4 @@
-//! A converter never logs: it reports deliberate skips in `Converted` and fails otherwise, or
-//! a partial cache is stamped current. Atomicity (staging swap, lock) is this module's.
+//! Atomicity (staging swap, lock) is this module's, never a converter's.
 //!
 //! stored-format: the import cache's converted `.glb` files and their fingerprints
 
@@ -45,7 +44,6 @@ pub fn conversions() -> usize {
 
 pub const IMPORT_CACHE_DIR: &str = "assets/generated/imported";
 
-/// While conversion is off: the cache as it stands, else an error.
 pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
     let converter = converter_for(path)
         .ok_or_else(|| ImportError::UnsupportedFormat(paths::extension(path)))?;
@@ -62,6 +60,7 @@ pub fn cache_location(path: &Path) -> Result<PathBuf, ImportError> {
     cache_location_as(path, ".glb")
 }
 
+/// Outside a project, the temp folder: a conversion never writes into a tree that is not one.
 pub fn cache_location_as(path: &Path, suffix: &str) -> Result<PathBuf, ImportError> {
     Ok(project_cache_as(path, suffix)?.unwrap_or_else(|| temp_path(path, suffix)))
 }
@@ -102,6 +101,7 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
             let stored = record::Stored::written(&stamp, &tag, &converted);
             record::report(source, out, &stored);
         }
+        // Unlocked, another process may have converted this source meanwhile.
         Err(e) => {
             let stored = record::current(out, &stamp).ok_or(e)?;
             record::replay(source, out, &stored);

@@ -44,6 +44,8 @@ pub fn cooked_path(source: &Path) -> Option<PathBuf> {
     }
 }
 
+/// Reads a converted source's glTF as it stands, as a standalone load does, and only
+/// the stamp: a load's full read may still refuse the file.
 pub fn is_stamped(path: &Path) -> bool {
     let read = match convert::converter_for(path) {
         Some(_) => convert::cache_location(path).ok().filter(|r| r.is_file()),
