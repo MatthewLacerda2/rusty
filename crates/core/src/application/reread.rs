@@ -1,3 +1,7 @@
+//! The bound `project.rusty`'s budgets, presets, audio, log and render-scale settings are
+//! reread at each Play and before each write, so a hand edit reaches the running editor
+//! and a save never writes back a copy from before it.
+
 use super::Application;
 use crate::project::ProjectFile;
 use crate::settings::audio::AudioSettings;
@@ -42,6 +46,7 @@ impl Application {
         self.decal_limits = limits;
     }
 
+    /// Reads no file, unlike `decal_limits`: the Build Settings window asks every frame.
     pub fn audio_settings(&self) -> AudioSettings {
         self.audio
     }

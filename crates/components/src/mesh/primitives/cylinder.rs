@@ -15,6 +15,7 @@ pub fn generate_cylinder(
     let d_vec = p2 - p1;
     let dir = d_vec.normalize();
 
+    // Cross with an axis far from `dir`, so `u` never degenerates.
     let u = if dir.x.abs() < 0.9 {
         dir.cross(Vec3::X).normalize()
     } else {
@@ -74,6 +75,7 @@ fn push_cylinder_tube(
     }
 }
 
+/// `cap` is `(center, outward normal, flip)`: the bottom cap flips its winding to face outward.
 fn push_cylinder_cap(
     vertices: &mut Vec<Vertex>,
     indices: &mut Vec<u32>,

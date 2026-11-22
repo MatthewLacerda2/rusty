@@ -21,6 +21,7 @@ pub struct SyncState {
     pub leader: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub previous_leader: Option<String>,
+    /// Playhead units re-matched against play, signed by its direction: silent until repaid.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rewind: f32,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -59,6 +60,7 @@ impl SyncState {
     }
 
     pub(super) fn end_fade(&mut self) {
+        // `rewind` stays owed: the motion plays on.
         self.following = false;
         self.previous_node = None;
         self.previous_leader = None;
@@ -133,7 +135,7 @@ impl Playback {
         let dir = if forward { 1.0 } else { -1.0 };
         let along = (step.events.1 - step.events.0) * dir;
         if along <= 0.0 {
-            return step;
+            return step; // nothing travelled: a pause turns nothing round
         }
         self.drop_flipped_rewind(dir);
         let owed = along.min(self.sync.rewind * dir);
@@ -148,6 +150,7 @@ impl Playback {
         let synced = node.sync_group.is_some()
             && node.sync_group == self.sync.group
             && self.current_node.as_deref() != Some(node.name.as_str());
+        // A placement still pending wins, so a motion never placed is not taken as the phase.
         synced.then(|| {
             self.sync
                 .from

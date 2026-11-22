@@ -48,6 +48,8 @@ pub enum ColliderShape {
         height: f32,
         axis: CapsuleAxis,
     },
+    /// The local bounds cache the box for the world AABB; the rapier shape is rebuilt from the
+    /// live vertices, keeping geometry out of the scene.
     Mesh {
         convex: bool,
         local_min: Vec3,
@@ -63,7 +65,11 @@ pub struct ColliderComponent {
     #[serde(default)]
     pub material: PhysicsMaterial,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// While set, the inline `material` is ignored; a path that no longer loads falls back to
+    /// the default, never to it.
     pub material_asset: Option<String>,
+    // `physics::shape::build` takes a built `collision_mesh`, else the entity's Mesh, else
+    // `shared_mesh`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shared_mesh: Option<SharedMesh>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -97,6 +103,7 @@ impl ColliderComponent {
         mesh.filter(|m| !m.indices.is_empty() && matches!(self.shape, ColliderShape::Mesh { .. }))
     }
 
+    /// The world AABB stays zeroed until the World stores it (`World::set_collider` refreshes it).
     pub fn from_mesh_bounds(convex: bool, local_min: Vec3, local_max: Vec3) -> Self {
         Self {
             active: true,

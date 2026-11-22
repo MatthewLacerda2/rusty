@@ -11,6 +11,7 @@ pub struct WhiteBalance {
 impl WhiteBalance {
     pub const RANGE: f32 = 100.0;
 
+    /// Both at neutral: the bake skips the white-point transform.
     pub fn is_neutral(&self) -> bool {
         self.temperature == 0.0 && self.tint == 0.0
     }

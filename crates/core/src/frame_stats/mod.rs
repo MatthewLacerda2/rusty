@@ -36,6 +36,7 @@ impl Series {
     }
 }
 
+/// Samples kept per metric for a window: ten seconds at 60 Hz.
 pub const RECENT: usize = 600;
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -46,6 +47,7 @@ pub struct FrameStats {
     pub systems: BTreeMap<String, Series>,
     pub tick_systems: Vec<(&'static str, f64)>,
     tick_closed: bool,
+    /// Empty where the adapter has no timestamps.
     pub gpu_passes: BTreeMap<String, Series>,
     recent: Recent,
 }
@@ -169,6 +171,8 @@ impl FrameStats {
         self.metrics.get(key)
     }
 
+    /// The pass line holds no measured value, so a passing budget keeps `results.json`
+    /// byte-identical.
     pub fn check_budget(&self, key: &str, limit: f64) -> Result<String, String> {
         let head = format!("budget {key} <= {limit}");
         match self.get(key) {

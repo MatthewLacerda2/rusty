@@ -19,6 +19,7 @@ rusty_core::named_enum! {
 }
 
 impl Tonemap {
+    /// The `case`s of `tonemapping.wgsl`'s operator switch: change the two together.
     pub const fn to_index(self) -> u32 {
         match self {
             Tonemap::None => 0,

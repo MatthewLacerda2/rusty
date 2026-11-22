@@ -1,6 +1,7 @@
 use glam::{Mat4, Vec3};
 use serde::{Deserialize, Serialize};
 
+/// How far in metres a link end may lie from the navmesh and still connect.
 pub const LINK_SNAP_DISTANCE: f32 = 1.0;
 
 rusty_core::named_enum! {
@@ -13,6 +14,7 @@ rusty_core::named_enum! {
     }
 }
 
+/// A link as an agent crosses it, ends in travel order; `owner` is `None` for a generated link.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OffMeshLinkData {
     pub kind: OffMeshLinkKind,

@@ -18,6 +18,8 @@ pub(super) fn write(root: &Path, mcp: bool) -> Vec<String> {
     write_for(root, mcp, &checkout())
 }
 
+/// Read from where `exe` sits, never `cfg!(debug_assertions)`, which a custom profile
+/// or a release build with assertions gets wrong.
 pub(super) fn session_binary(
     engine: &Path,
     exe: Option<&Path>,
@@ -134,6 +136,8 @@ pub(super) fn merge(
     Ok(())
 }
 
+/// A built `session-mcp`, run directly: `cargo run` from a game folder would skip the checkout's
+/// toolchain and config and cold-build past Claude Code's startup timeout.
 fn server(command: &str, args: &[&str]) -> Value {
     json!({ "command": command, "args": args })
 }

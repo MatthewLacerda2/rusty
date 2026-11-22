@@ -1,3 +1,7 @@
+//! A test hook: the random edit sequences every channel's proptest runs, compiled in so other
+//! crates' tests drive the World with them. [`edit_ops!`](crate::edit_ops) expands in the caller's
+//! test, so proptest stays a dev-dependency.
+
 use crate::World;
 use rusty_components::Entity;
 
@@ -16,10 +20,14 @@ pub enum Edit {
     SetStatic(bool),
     SetActive(bool),
     SetLayer(u8),
+    /// The small range lands the value already held too.
     Move(u8),
+    /// Under an older entity, or unparented; a cycle (an adopted entity's parent is younger) is
+    /// refused, as `Scene::set_parent` refuses it.
     Reparent(Option<usize>),
     Despawn,
     Overwrite(bool, bool),
+    /// A load's `insert_entity` of a new parent over an orphan already naming it.
     Adopt(bool),
     UndoFlip,
     UndoDespawn,
@@ -58,7 +66,7 @@ fn reparent(w: &mut World, child: u32, parent: Option<u32>) {
         w.remove_child(old, child);
     }
     if let Some(p) = parent {
-        w.add_child(p, child);
+        w.add_child(p, child); // first, as `Scene::set_parent` does
     }
     w.set_parent_id(child, parent);
 }
@@ -118,6 +126,7 @@ pub fn apply(w: &mut World, op: &Op) {
     }
 }
 
+/// Puts back every entity the journal recorded, as `scene::undo` does.
 fn undo(w: &mut World, edit: impl FnOnce(&mut World)) {
     w.journal_resume();
     edit(w);

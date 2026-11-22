@@ -1,3 +1,6 @@
+//! One spawn path for the sim's emission, sub-emitters and `Particles.Emit`/`Burst`, so all
+//! draw from the same seeded stream in the same order.
+
 use glam::{Mat4, Vec3};
 
 use super::runtime::{Particle, SubEmitEvent};
@@ -90,6 +93,8 @@ impl ParticleEmitterComponent {
         self.spawn(frame, frame.origin(), Vec3::ZERO, count, true)
     }
 
+    /// Never queues birth sub-emitters, so two emitters naming each other cannot feed back
+    /// unbounded.
     pub fn emit_sub(
         &mut self,
         frame: EmitterFrame,
@@ -109,6 +114,8 @@ impl ParticleEmitterComponent {
         births: bool,
     ) -> u32 {
         self.ensure_initialized();
+        // Carry first: a particle born now is never carried by an earlier move, and `gpu_space`
+        // below reads the new anchor.
         self.carry_to(frame);
         let cap = self.particle_cap() as usize;
         let birth = self.sub_emitters.birth.filter(|_| births);

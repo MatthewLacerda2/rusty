@@ -9,9 +9,12 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BoneBinding {
+    /// Each joint's bone, in the skin's order; never saved, as bones get fresh ids each load. A
+    /// destroyed bone's slot is `None` and skins at its bind pose.
     #[serde(skip)]
     pub bones: Vec<Option<u32>>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    /// Filled from the live bones on save and consumed on load, so the live value is empty.
     pub overrides: BTreeMap<String, TransformComponent>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bodies: BTreeMap<String, BoneBody>,
@@ -22,6 +25,7 @@ impl BoneBinding {
         self.overrides.is_empty() && self.bodies.is_empty()
     }
 
+    /// A test hook, for other crates' tests: panics on a missing slot.
     #[doc(hidden)]
     pub fn ids(&self) -> Vec<u32> {
         self.bones
@@ -38,6 +42,7 @@ pub struct BoneBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub joint: Option<JointComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// A joint to this skeleton's bone, by its chain (name, then ancestors nearest first).
     pub connected_bone: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bone_refs: BTreeMap<String, Vec<String>>,
@@ -72,6 +77,8 @@ impl EntityRefs for MeshComponent {
         }
     }
 
+    /// Bone slots clear here too, so no dead id outlives a despawn; never saved, they skip
+    /// `visit_refs`.
     fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
         self.visit_refs(&mut |_, r| {
             if r.is_some_and(dead) {

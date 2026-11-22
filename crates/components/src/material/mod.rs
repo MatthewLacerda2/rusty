@@ -1,3 +1,6 @@
+//! A material's data lives once in `Scene.materials`; an entity's `MaterialComponent` holds
+//! only library keys into it.
+
 mod component;
 mod decal;
 mod defaults;
@@ -27,6 +30,7 @@ use surface::{default_ior, default_one, white};
 pub use surface::{BlendMode, RefractionModel, RenderFace, RenderMode};
 pub use temporal::{TaaReactive, MAX_REACTIVE};
 
+/// How far `sorting_priority` reaches either way: HDRP's `HDRenderQueue.sortingPriorityRange`.
 pub const SORTING_PRIORITY_RANGE: i32 = 50;
 
 fn is_true(value: &bool) -> bool {

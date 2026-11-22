@@ -14,7 +14,9 @@ pub struct LensFlare {
     pub halo_intensity: f32,
     /// `≥ 0`; off at `0`.
     pub streak_intensity: f32,
+    /// Linear RGB, `0..=1`.
     pub tint: [f32; 3],
+    /// How far red and blue split from green, `0..=1`.
     pub chromatic_aberration: f32,
 }
 

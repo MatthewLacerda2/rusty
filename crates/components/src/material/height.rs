@@ -1,5 +1,6 @@
 use super::{MaterialAsset, RenderMode, UvMapping};
 
+/// The deepest a height map reaches, as a fraction of one repeat's width.
 pub const HEIGHT_SCALE_MAX: f32 = 0.2;
 
 pub(super) fn default_height_scale() -> f32 {
@@ -14,6 +15,8 @@ impl MaterialAsset {
         }
     }
 
+    /// A `Cutout`'s holes clip at the unshifted UV, a `Transparent` shows what is behind, and
+    /// `Triplanar`'s three projections are not marched: only `Opaque` under `UV0` or `Planar`.
     pub fn height_applies(&self) -> bool {
         self.height_map.is_some()
             && self.render_mode == RenderMode::Opaque

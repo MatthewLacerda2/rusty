@@ -23,10 +23,12 @@ pub struct NavMeshObstacleComponent {
     pub carve_only_stationary: bool,
     pub move_threshold: f32,
     pub time_to_stationary: f32,
+    /// Where it last stood still; `None` until the play tick first sees it.
     #[serde(skip)]
     pub carve_pose: Option<Mat4>,
     #[serde(skip)]
     pub stationary_time: f32,
+    /// World velocity over the last tick, which local avoidance predicts with.
     #[serde(skip)]
     pub velocity: Vec3,
     #[serde(skip)]

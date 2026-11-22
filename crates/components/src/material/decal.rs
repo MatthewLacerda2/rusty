@@ -4,6 +4,7 @@ fn one() -> f32 {
     1.0
 }
 
+/// Degrees: a surface turned this far from facing the projector still takes the decal whole.
 fn default_angle_fade() -> f32 {
     60.0
 }
@@ -39,6 +40,7 @@ impl Default for DecalBlend {
 }
 
 impl DecalBlend {
+    /// A decal with no material changes the albedo alone; its 60° is `default_angle_fade`'s.
     pub const ALBEDO_ONLY: Self = Self {
         albedo: 1.0,
         normal: 0.0,

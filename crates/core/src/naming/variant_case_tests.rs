@@ -1,3 +1,6 @@
+//! The mechanism on stand-in types; the real enums a script reaches are in
+//! `script`'s `api/lua_json/enum_case_tests.rs`.
+
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 

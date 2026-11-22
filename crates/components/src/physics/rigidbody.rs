@@ -27,6 +27,7 @@ pub struct RigidBodyComponent {
     pub angular_drag: f32,
 }
 
+/// Unity's `Rigidbody.angularDrag` default, a damping rate per second.
 pub const DEFAULT_ANGULAR_DRAG: f32 = 0.05;
 
 fn default_angular_drag() -> f32 {

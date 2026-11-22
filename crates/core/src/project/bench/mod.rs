@@ -1,3 +1,5 @@
+//! Unity Hub's projects list, for the editor's picker and the MCP's `bench_*` tools
+//! alike; not `make bench`, which is `dev::bench`.
 pub mod recent;
 
 use std::path::{Path, PathBuf};
