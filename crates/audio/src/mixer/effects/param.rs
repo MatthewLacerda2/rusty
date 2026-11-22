@@ -12,21 +12,16 @@ pub type Fields = Vec<(String, Value)>;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Range {
-    Number {
-        min: f32,
-        max: f32,
-        default: f32,
-    },
+    /// A number in `[min, max]`, glided linearly.
+    Number { min: f32, max: f32, default: f32 },
     /// A frequency in Hz in `[min, max]`, glided in octaves.
-    Hz {
-        min: f32,
-        max: f32,
-        default: f32,
-    },
+    Hz { min: f32, max: f32, default: f32 },
+    /// One of `names` (stored as its index), switched at once.
     Choice {
         names: &'static [&'static str],
         default: u8,
     },
+    /// Another mixer group, by name (stored as its index; `-1` is none).
     Group,
 }
 

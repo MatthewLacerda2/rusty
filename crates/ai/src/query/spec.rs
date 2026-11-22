@@ -77,14 +77,10 @@ pub(super) fn grid_side(half_size: f32, spacing: f32) -> usize {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Measure {
     /// Metres from `to` to the item; on the XZ plane when `flat`.
-    Distance {
-        to: Anchor,
-        flat: bool,
-    },
-    Dot {
-        from: Anchor,
-        flat: bool,
-    },
+    Distance { to: Anchor, flat: bool },
+    /// 1 straight ahead, -1 straight behind.
+    Dot { from: Anchor, flat: bool },
+    /// 1 when a ray hits nothing, else 0.
     Trace {
         from: Anchor,
         from_height: f32,
@@ -92,20 +88,20 @@ pub enum Measure {
         mask: Option<u32>,
         visible: bool,
     },
+    /// 1 when inside the camera's view, else 0.
     View {
         margin: f32,
         item_height: f32,
         inside: bool,
     },
+    /// 1 when walkable, else 0.
     PathExists,
+    /// Navmesh metres; unreachable is dropped.
     PathLength,
-    Separation {
-        radius: f32,
-    },
+    /// Metres to the nearest other agent's target or position, capped at `radius`.
+    Separation { radius: f32 },
     /// Metres from the item to the nearest of `points` (infinite with none).
-    NearPoints {
-        points: Vec<Vec3>,
-    },
+    NearPoints { points: Vec<Vec3> },
 }
 
 impl Measure {
