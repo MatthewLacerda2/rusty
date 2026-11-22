@@ -51,26 +51,32 @@ pub struct NodeError {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Fault {
+    /// The node did not parse: a missing or mistyped param, an unknown key or op.
     Parse(String),
+    /// Wired with more or fewer inputs than its op accepts.
     Arity {
         /// The `math` func, whose arity narrows the op's (a unary func takes one input).
         func: Option<String>,
+        /// What to do, when the node's params decide its inputs (`expression`).
         fix: Option<String>,
         given: usize,
         accepts: Arity,
     },
+    /// An input id no node defines.
     UnknownInput(String),
-    UnknownLink {
-        param: String,
-        link: String,
-    },
+    /// A param linked to an id no node defines.
+    UnknownLink { param: String, link: String },
+    /// The node is on a cycle (the graph is not a DAG).
     Cycle,
+    /// An `image` node whose file was not handed in.
     MissingSource(String),
+    /// A `text` node whose font file was not handed in.
     MissingFont(String),
-    Unreadable {
-        path: String,
-        error: String,
-    },
+    /// An `image` node whose file the caller's loader could not read or decode when
+    /// the node ran.
+    Unreadable { path: String, error: String },
+    /// A graph instance left in the recipe the runner was handed: its
+    /// caller skipped [`crate::graph::expand`].
     Unexpanded(String),
 }
 

@@ -11,15 +11,10 @@ use crate::world::PhysicsWorld;
 /// Unity's single casts skip such a collider.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Sweep {
-    Sphere {
-        center: Vec3,
-        radius: f32,
-    },
-    Capsule {
-        a: Vec3,
-        b: Vec3,
-        radius: f32,
-    },
+    /// A sphere.
+    Sphere { center: Vec3, radius: f32 },
+    /// A capsule between sphere centers `a` and `b`.
+    Capsule { a: Vec3, b: Vec3, radius: f32 },
     Box {
         center: Vec3,
         half_extents: Vec3,

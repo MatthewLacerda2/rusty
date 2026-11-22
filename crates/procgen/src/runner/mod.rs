@@ -109,12 +109,12 @@ struct Run {
     images: Vec<Image>,
     #[cfg_attr(
         not(test),
-        expect(dead_code, reason = "read by the O(1)-live-images test")
+        expect(dead_code, reason = "read by the O(1)-live-images test (#1485)")
     )]
     peak_live: usize,
     #[cfg_attr(
         not(test),
-        expect(dead_code, reason = "read by the gray-chain peak test")
+        expect(dead_code, reason = "read by the gray-chain peak test (#2002)")
     )]
     peak_bytes: usize,
 }
