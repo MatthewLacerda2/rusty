@@ -5,41 +5,29 @@ use rapier3d::prelude::*;
 
 use crate::world::PhysicsWorld;
 
-/// One contact as seen by the entity receiving the callback.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Contact {
-    /// World-space contact point.
     pub point: Vec3,
-    /// Unit normal pointing out of the other collider, into the receiver — a
-    /// ball resting on a floor reads `(0, 1, 0)`.
+    /// Unit normal out of the other collider, into the receiver.
     pub normal: Vec3,
-    /// The other side's velocity minus the receiver's, at the contact point,
-    /// taken *before* this tick's solve — the closing speed of an impact.
     pub relative_velocity: Vec3,
-    /// Total normal impulse the solver applied across the pair this tick.
     pub impulse: f32,
-    /// The entity owning the other collider's rigid body (its compound root).
     pub other_body: u32,
 }
 
-/// One touching pair, keyed `(a, b)` with `a < b`, carrying `a`'s view of it.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CollisionPair {
     pub a: u32,
     pub b: u32,
-    /// The contact as `a` sees it (`other_body` is `b`'s body owner).
     pub contact: Contact,
-    /// `a`'s own body owner — `b`'s `other_body`.
     pub body_a: u32,
 }
 
 impl CollisionPair {
-    /// The sorted key the edge diff runs on.
     pub fn key(&self) -> (u32, u32) {
         (self.a, self.b)
     }
 
-    /// The same pair keyed from `b`'s side.
     pub(crate) fn swapped(&self) -> Self {
         let [_, (a, b, contact)] = self.sides();
         Self {
@@ -50,8 +38,6 @@ impl CollisionPair {
         }
     }
 
-    /// Both receivers' views, A about B then B about A: `(id, other, contact)`.
-    /// B's view flips the normal and the relative velocity.
     pub fn sides(&self) -> [(u32, u32, Contact); 2] {
         let c = self.contact;
         let flipped = Contact {
@@ -64,28 +50,16 @@ impl CollisionPair {
     }
 }
 
-/// Solid-contact events for one physics tick, every list sorted by pair key.
 #[derive(Debug, Default)]
 pub struct CollisionEvents {
-    /// Pairs touching this tick that were not touching last tick.
     pub entered: Vec<CollisionPair>,
-    /// Every pair touching this tick — the stay set, enter tick included (the
-    /// same edge rule as `OnTrigger`).
     pub stayed: Vec<CollisionPair>,
-    /// Pairs touching last tick that no longer touch. No contact data: there
-    /// is no contact left to describe.
     pub exited: Vec<(u32, u32)>,
 }
 
 impl CollisionEvents {
-    /// Diff last tick's sorted pair keys against this tick's sorted touching
-    /// pairs. A pair *enters* only once the solver has pushed on it (impulse
-    /// above zero): rapier finds a new contact after the tick's solve, so the
-    /// impact lands a tick later, and entering then gives `OnCollisionEnter` the
-    /// real impact impulse. It is also Unity's rule that a collision needs a
-    /// dynamic body. A pair with no dynamic side is not in rapier's contact
-    /// graph at all (`assemble::ACTIVE_TYPES`), so it never reaches here; the
-    /// impulse check covers what remains. Once in, a pair stays while it touches.
+    /// A pair enters only once the solver has pushed on it (impulse above zero): rapier finds a new
+    /// contact after the tick's solve, so `OnCollisionEnter` gets the real impulse a tick later.
     pub fn from_contact_sets(prev: &[(u32, u32)], current: Vec<CollisionPair>) -> Self {
         let was_in = |k: &(u32, u32)| prev.binary_search(k).is_ok();
         let current: Vec<CollisionPair> = current
@@ -110,18 +84,15 @@ impl CollisionEvents {
         }
     }
 
-    /// The touching pair keys — carried to next tick's diff.
     pub fn stayed_keys(&self) -> Vec<(u32, u32)> {
         self.stayed.iter().map(CollisionPair::key).collect()
     }
 
-    /// True when the tick produced no collision events at all.
     pub fn is_empty(&self) -> bool {
         self.entered.is_empty() && self.stayed.is_empty() && self.exited.is_empty()
     }
 }
 
-/// A body's velocity state before the solve: linear, angular, world centre of mass.
 #[derive(Clone, Copy)]
 pub(crate) struct BodyVelocity {
     pub(crate) lin: Vec3,
@@ -135,12 +106,9 @@ impl BodyVelocity {
     }
 }
 
-/// Pre-solve velocities of every moving body, read by the contact collector.
 pub(crate) type VelocitySnapshot = Map<RigidBodyHandle, BodyVelocity>;
 
 impl PhysicsWorld {
-    /// Capture every non-fixed body's velocity before the pipeline solves the
-    /// tick, so an impact reports its closing speed rather than the resolved one.
     pub(crate) fn snapshot_velocities(&self) -> VelocitySnapshot {
         self.bodies
             .iter()
@@ -156,9 +124,6 @@ impl PhysicsWorld {
             .collect()
     }
 
-    /// This tick's touching solid pairs (see [`TOUCH_TOLERANCE`]), sorted by
-    /// key, each with its strongest contact. A disabled collider or body generates no contacts, so the pairs
-    /// follow the same liveness rule as the queries (#521).
     pub(crate) fn collect_contact_pairs(&self, pre: &VelocitySnapshot) -> Vec<CollisionPair> {
         let owner_of = |c: ColliderHandle| {
             let parent = self.colliders.get(c).and_then(|c| c.parent());
@@ -185,8 +150,6 @@ impl PhysicsWorld {
                 h.and_then(|h| pre.get(h))
                     .map_or(Vec3::ZERO, |v| v.at(point))
             };
-            // Seen by collider 1: the normal points out of 2 into 1, and the
-            // relative velocity is 2's minus 1's.
             let seen_by_1 = Contact {
                 point,
                 normal: -normal12,
@@ -207,24 +170,12 @@ impl PhysicsWorld {
     }
 }
 
-/// How close two colliders' surfaces must be for their contact to count as
-/// touching. rapier also reports *speculative* contacts — surfaces still apart
-/// but within the prediction distance, whose impulse is zero — and a falling
-/// body would otherwise "enter" a tick before it lands, with no impact impulse.
-/// A resting body sits ~1 mm deep (rapier's allowed error), so 5 mm keeps a
-/// resting contact steady while leaving speculative ones out.
+/// rapier also reports speculative contacts (surfaces apart, zero impulse), which would make a
+/// falling body enter a tick early. A resting body sits ~1 mm deep, so 5 mm keeps resting
+/// contact steady.
 const TOUCH_TOLERANCE: f32 = 0.005;
-
-/// The pair's strongest touching contact: among the solver's manifolds with a
-/// touching solver point, the one with the largest solver impulse (ties keep the
-/// first), and its deepest point. Returns the world point (the midpoint of the two
-/// surface points, rapier's effective contact point) and the manifold normal,
-/// which points from collider 1 toward collider 2. `None` when nothing touches.
-///
-/// "Touching" is measured at the poses the step ended on: rapier stores a
-/// contact's distance once per full narrow-phase update (at the start of a step)
-/// and recycles it, so the two surface points are resolved through the bodies'
-/// current poses and their gap along the normal is the live separation.
+/// Touching is measured at the poses the step ended on: rapier stores contact distance once per
+/// narrow-phase update and recycles it.
 fn strongest_contact(pair: &ContactPair, bodies: &RigidBodySet) -> Option<(Vec3, Vec3)> {
     let deepest = |m: &ContactManifold| {
         m.data
@@ -252,7 +203,6 @@ fn strongest_contact(pair: &ContactPair, bodies: &RigidBodySet) -> Option<(Vec3,
     Some((point, manifold.data.normal))
 }
 
-/// Sum of a manifold's normal impulses (rapier's own helper trait is private).
 fn total_impulse(m: &ContactManifold) -> f32 {
     m.points.iter().map(|p| p.data.impulse).sum()
 }

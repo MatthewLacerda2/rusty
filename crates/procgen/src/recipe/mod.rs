@@ -32,7 +32,6 @@ use serde::{Deserialize, Serialize};
 
 use super::graph::{Bound, ParamDecl};
 
-/// A ramp stop: `pos` in `[0, 1]`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RampStop {
@@ -49,7 +48,6 @@ pub struct TextureRecipe {
     /// Ignored when `size` is set (reads 0, not written).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub resolution: u32,
-    /// `[width, height]`, each a positive power of two.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -65,7 +63,6 @@ pub struct TextureRecipe {
     pub outputs: BTreeMap<String, String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub params: BTreeMap<String, ParamDecl>,
-    /// A recipe with inputs bakes only through an instance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub inputs: Vec<String>,
     #[serde(skip)]

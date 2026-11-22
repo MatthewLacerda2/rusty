@@ -99,7 +99,7 @@ fn taps(src: &[Rgba], a: f32, out: &mut [Rgba]) {
     }
 }
 
-/// A dropped pixel past this magnitude re-sums the window, so its rounding residue doesn't linger.
+/// A dropped pixel past this magnitude re-sums the window.
 const LARGE: f32 = 1e3;
 
 fn slide(src: &[Rgba], r: i64, inv: f64, out: &mut [Rgba]) {
@@ -139,7 +139,6 @@ pub fn cavity(img: &Image, radius: (f32, f32)) -> Image {
     out
 }
 
-/// Above mid-grey is convex (raised edges), below is concave.
 pub fn curvature(img: &Image, radius: f32, strength: Field) -> Image {
     let h = |u: f32, v: f32| img.sample_bilinear_wrapped(u, v)[0];
     let diag = radius * std::f32::consts::FRAC_1_SQRT_2;

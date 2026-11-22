@@ -7,8 +7,6 @@ const POS_Y: u64 = 41;
 
 const CANDIDATES: i64 = 32;
 
-/// The finest grid the dart throw files earlier stamps in: past it a cell holds
-/// several stamps.
 const MAX_GRID: usize = 256;
 
 /// The closest two stamp centres may sit, in tiles: `spacing` times the smaller of the stamp's size and `√(0.5 / amount)`,

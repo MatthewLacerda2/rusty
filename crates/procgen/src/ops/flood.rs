@@ -48,7 +48,6 @@ impl Islands {
     }
 }
 
-/// Serial, `O(pixels)`.
 pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
     let size = img.size();
     let (w, h) = (size.width as i64, size.height as i64);
