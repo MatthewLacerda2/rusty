@@ -169,8 +169,9 @@ fn fs_trace(@builtin(position) pos: vec4<f32>) -> Traced {
 @group(1) @binding(0) var t_hits: texture_2d<f32>;
 @group(1) @binding(1) var t_spread: texture_2d<f32>;
 
-const TAPS: i32 = 12;
-const GOLDEN_ANGLE: f32 = 2.3999632;
+const VOGEL_TAPS: i32 = 12;
+const GOLDEN_ANGLE_RADIANS: f32 = 2.3999632;
+const VOGEL_TAP_GAP_PER_RADIUS: f32 = 0.5;
 // Pixels; below it a hit reads where traced.
 const SHARP: f32 = 0.5;
 
@@ -185,17 +186,17 @@ fn on_plane(q: vec2<f32>, world: vec3<f32>, g: vec3<f32>, fwd: vec3<f32>) -> boo
     return abs(dot(g, there - world)) <= max(ssr_march::THICKNESS, depth * ssr_march::DEPTH_SLACK);
 }
 
-fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, trust: f32) -> f32 {
+fn mean_unit(uv: vec2<f32>, lod: f32, fallback: f32, prior: f32) -> f32 {
     let s = textureSampleLevel(t_spread, s_color, uv, lod);
-    let count = s.z / COUNT_SCALE + trust;
-    return (s.y + trust * fallback) / max(count, LONE * exp2(-2.0 * lod));
+    let count = s.z / COUNT_SCALE + prior;
+    return (s.y + prior * fallback) / max(count, LONE * exp2(-2.0 * lod));
 }
 
 // Share of one hit's pixel below which a window holds nothing.
 const LONE: f32 = 0.02;
 
-const RADIUS_TRUST: f32 = 0.02;
-const REFINE: i32 = 2;
+const WIDER_WINDOW_PRIOR_HITS: f32 = 0.02;
+const NARROWING_PASSES: i32 = 2;
 
 // The hits' mean radius, not this ray's own; plain on purpose: a nearest-biased mean
 // collapsed short rays' radii into blotches.
@@ -206,10 +207,14 @@ fn blur_radius(uv: vec2<f32>, world: vec3<f32>, roughness: f32, dim: vec2<f32>) 
         return 0.0;
     }
     var unit = mean_unit(uv, log2(cap), 0.0, 0.0);
-    for (var i = 0; i < REFINE; i = i + 1) {
-        unit = mean_unit(uv, log2(max(min(c * unit, cap), 1.0)), unit, RADIUS_TRUST);
+    for (var i = 0; i < NARROWING_PASSES; i = i + 1) {
+        unit = mean_unit(uv, log2(max(min(c * unit, cap), 1.0)), unit, WIDER_WINDOW_PRIOR_HITS);
     }
     return min(c * unit, cap);
+}
+
+fn level_as_wide_as_tap_gap(radius: f32) -> f32 {
+    return max(log2(radius * VOGEL_TAP_GAP_PER_RADIUS), 0.0);
 }
 
 @fragment
@@ -230,12 +235,12 @@ fn fs_resolve(@builtin(position) pos: vec4<f32>) -> @location(0) vec4<f32> {
     if (radius >= SHARP) {
         var g = geometric_normal(px, world, fwd, s.normal);
         g = select(s.normal, g, dot(g, g) > 0.0);
-        let lod = max(log2(radius * 0.5), 0.0);
+        let lod = level_as_wide_as_tap_gap(radius);
         var sum = vec4<f32>(0.0);
         var traced = 0.0;
-        for (var i = 0; i < TAPS; i = i + 1) {
-            let a = f32(i) * GOLDEN_ANGLE;
-            let q = uv + vec2<f32>(cos(a), sin(a)) * radius * sqrt((f32(i) + 0.5) / f32(TAPS)) / dim;
+        for (var i = 0; i < VOGEL_TAPS; i = i + 1) {
+            let a = f32(i) * GOLDEN_ANGLE_RADIANS;
+            let q = uv + vec2<f32>(cos(a), sin(a)) * radius * sqrt((f32(i) + 0.5) / f32(VOGEL_TAPS)) / dim;
             if (any(q < vec2<f32>(0.0)) || any(q > vec2<f32>(1.0)) || !on_plane(q, world, g, fwd)) {
                 continue;
             }

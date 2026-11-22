@@ -47,19 +47,29 @@ pub(super) fn project(sky: &SkySettings, color: Vec3) -> Sh9 {
     sh
 }
 
+const SKY_ZENITH_EXPONENT: f32 = 0.5;
+const SKY_GROUND_EXPONENT: f32 = 0.35;
+const CLOUD_DOME_MIN_HEIGHT: f32 = 0.15;
+const CLOUD_CELLS_PER_UNIT: f32 = 1.6;
+const CLOUD_FBM_EDGE_START: f32 = 0.45;
+const CLOUD_FBM_EDGE_END: f32 = 0.80;
+const CLOUD_BAND_START: f32 = 0.05;
+const CLOUD_BAND_END: f32 = 0.35;
+const CLOUD_TO_WHITE: f32 = 0.85;
+
 /// `common::procedural_sky` before fog (a GPU test holds the gradient to it).
 pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     let [zenith, horizon, ground] = sky.resolved(ambient);
     let up = dir.y.clamp(0.0, 1.0);
     let down = (-dir.y).clamp(0.0, 1.0);
-    let mut color = horizon.lerp(zenith, up.powf(0.5));
-    color = color.lerp(ground, down.powf(0.35));
+    let mut color = horizon.lerp(zenith, up.powf(SKY_ZENITH_EXPONENT));
+    color = color.lerp(ground, down.powf(SKY_GROUND_EXPONENT));
     if dir.y > 0.0 {
-        let dome = Vec2::new(dir.x, dir.z) / dir.y.max(0.15);
-        let fbm = fbm(dome * 1.6) + cloud_shift(sky.cloud_coverage);
-        let coverage = smoothstep(0.45, 0.80, fbm);
-        let band = smoothstep(0.05, 0.35, up);
-        let cloud = zenith.lerp(Vec3::ONE, 0.85);
+        let dome = Vec2::new(dir.x, dir.z) / dir.y.max(CLOUD_DOME_MIN_HEIGHT);
+        let fbm = fbm(dome * CLOUD_CELLS_PER_UNIT) + cloud_shift(sky.cloud_coverage);
+        let coverage = smoothstep(CLOUD_FBM_EDGE_START, CLOUD_FBM_EDGE_END, fbm);
+        let band = smoothstep(CLOUD_BAND_START, CLOUD_BAND_END, up);
+        let cloud = zenith.lerp(Vec3::ONE, CLOUD_TO_WHITE);
         color = color.lerp(cloud, coverage * band * sky.cloud_opacity);
     }
     color

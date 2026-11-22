@@ -27,6 +27,9 @@ impl Default for SkySettings {
     }
 }
 
+const SKY_HORIZON_TO_WHITE: f32 = 0.6;
+const SKY_GROUND_OF_ZENITH: f32 = 0.25;
+
 impl SkySettings {
     pub fn is_default(&self) -> bool {
         *self == Self::default()
@@ -35,8 +38,10 @@ impl SkySettings {
     /// Unset colours derive as `common::procedural_sky` derives them: change the two together.
     pub fn resolved(&self, ambient: Vec3) -> [Vec3; 3] {
         let zenith = self.zenith.unwrap_or(ambient);
-        let horizon = self.horizon.unwrap_or(zenith.lerp(Vec3::ONE, 0.6));
-        let ground = self.ground.unwrap_or(zenith * 0.25);
+        let horizon = self
+            .horizon
+            .unwrap_or(zenith.lerp(Vec3::ONE, SKY_HORIZON_TO_WHITE));
+        let ground = self.ground.unwrap_or(zenith * SKY_GROUND_OF_ZENITH);
         [zenith, horizon, ground]
     }
 }

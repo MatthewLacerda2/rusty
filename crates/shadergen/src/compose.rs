@@ -20,6 +20,7 @@ pub const MODULES: &[&str] = &[
     "lighting/sh.wgsl",
     "color/srgb.wgsl",
     "sky/noise.wgsl",
+    "sky/look.wgsl",
     "fog/height.wgsl",
     "fog/volumetric.wgsl",
     "lighting/falloff.wgsl",

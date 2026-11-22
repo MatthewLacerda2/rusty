@@ -12,12 +12,16 @@ local RANGE = 60       -- m
 local DAMAGE = 20
 local RESIST = 4       -- shot power lost per metre of solid
 local RESPAWN = 1.0    -- s
+local MAX_KICKS = 4
+local RECOIL_CLIMB = 0.5
+local MUZZLE_AHEAD = 0.6  -- m
+local MUZZLE_BELOW_EYE = 0.4
 
 -- A gun's state: `rate` seconds between shots, `spread` radians of aim error,
 -- `kick` radians of recoil each shot adds, recovering at `recover` per second.
 function Combat.gun(opts)
     return { cooldown = 0, recoil = 0, rate = opts.rate, spread = opts.spread,
-             kick = opts.kick, max_recoil = 4 * opts.kick, recover = opts.recover }
+             kick = opts.kick, max_recoil = MAX_KICKS * opts.kick, recover = opts.recover }
 end
 
 function Combat.tick(gun, dt)
@@ -51,7 +55,7 @@ function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
     gun.cooldown = gun.rate
     local stray = gun.spread + gun.recoil
     local rx, ry, rz = Random.InsideUnitSphere()
-    dx, dy, dz = dx + rx * stray, dy + ry * stray + gun.recoil * 0.5, dz + rz * stray
+    dx, dy, dz = dx + rx * stray, dy + ry * stray + gun.recoil * RECOIL_CLIMB, dz + rz * stray
     local len = math.sqrt(dx * dx + dy * dy + dz * dz)
     dx, dy, dz = dx / len, dy / len, dz / len
     gun.recoil = math.min(gun.max_recoil, gun.recoil + gun.kick)
@@ -67,7 +71,7 @@ function Combat.fire(gun, shooter, ox, oy, oz, dx, dy, dz)
             if power <= 0.05 or not crossing.exit then break end -- under 5 % left
         end
     end
-    burst("Flash", ox + dx * 0.6, oy - 0.4, oz + dz * 0.6, 4)
+    burst("Flash", ox + dx * MUZZLE_AHEAD, oy - MUZZLE_BELOW_EYE, oz + dz * MUZZLE_AHEAD, 4)
     Audio.PlayAt("assets/sounds/shot.wav", ox, oy, oz, 0.5)
     AIPerception.ReportNoise(ox, oy, oz, 1.0, { instigator = shooter, tag = "gunshot" })
     return true
