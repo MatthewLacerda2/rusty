@@ -13,16 +13,10 @@ use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_edit::authoring::nav::obstacle as obstacle_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-    op: impl FnOnce(&mut Obstacle),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Obstacle)) {
     if let Some(mut o) = world.nav_obstacle_mut(id) {
         op(&mut o);
     }
-    *is_dirty = true;
 }
 
 /// One labelled drag row; `Some(new)` when it was edited.
@@ -36,12 +30,7 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, speed: f64) -> Optio
     .inner
 }
 
-pub fn draw_nav_obstacle(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_nav_obstacle(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(o) = world.nav_obstacle(id).map(|o| o.clone()) else {
         return;
     };
@@ -54,28 +43,20 @@ pub fn draw_nav_obstacle(
         |ui| {
             let mut active = o.active;
             if ui.checkbox(&mut active, "Active").changed() {
-                write(world, id, &mut *is_dirty, |o| {
-                    obstacle_ops::set_active(o, active)
-                });
+                write(world, id, |o| obstacle_ops::set_active(o, active));
             }
-            draw_shape(ui, world, id, &o, &mut *is_dirty);
-            draw_carving(ui, world, id, &o, &mut *is_dirty);
+            draw_shape(ui, world, id, &o);
+            draw_carving(ui, world, id, &o);
             ui.label(format!("Carving now: {}", o.is_carving()));
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::NavMeshObstacle, is_dirty);
+        remove_component(world, id, ComponentKind::NavMeshObstacle);
     }
 }
 
 /// Shape selector, centre, and the box size or capsule radius/height.
-fn draw_shape(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    o: &Obstacle,
-    d: &mut bool,
-) {
+fn draw_shape(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, o: &Obstacle) {
     let mut shape = o.shape;
     egui::ComboBox::from_label("Shape")
         .selected_text(shape.name())
@@ -85,56 +66,48 @@ fn draw_shape(
             }
         });
     if shape != o.shape {
-        write(world, id, &mut *d, |o| obstacle_ops::set_shape(o, shape));
+        write(world, id, |o| obstacle_ops::set_shape(o, shape));
     }
     if let Some(v) = vec3_row(ui, "Center:", o.center) {
-        write(world, id, &mut *d, |o| obstacle_ops::set_center(o, v));
+        write(world, id, |o| obstacle_ops::set_center(o, v));
     }
     match o.shape {
         ObstacleShape::Box => {
             if let Some(v) = vec3_row(ui, "Size:", o.size) {
-                write(world, id, d, |o| obstacle_ops::set_size(o, v));
+                write(world, id, |o| obstacle_ops::set_size(o, v));
             }
         }
         ObstacleShape::Capsule => {
             if let Some(v) = drag_row(ui, "Radius:", o.radius, 0.02) {
-                write(world, id, &mut *d, |o| obstacle_ops::set_radius(o, v));
+                write(world, id, |o| obstacle_ops::set_radius(o, v));
             }
             if let Some(v) = drag_row(ui, "Height:", o.height, 0.05) {
-                write(world, id, d, |o| obstacle_ops::set_height(o, v));
+                write(world, id, |o| obstacle_ops::set_height(o, v));
             }
         }
     }
 }
 
 /// Carve, carve-only-stationary and its two thresholds.
-fn draw_carving(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    o: &Obstacle,
-    d: &mut bool,
-) {
+fn draw_carving(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, o: &Obstacle) {
     let mut carve = o.carve;
     if ui.checkbox(&mut carve, "Carve").changed() {
-        write(world, id, &mut *d, |o| obstacle_ops::set_carve(o, carve));
+        write(world, id, |o| obstacle_ops::set_carve(o, carve));
     }
     if !o.carve {
         return;
     }
     let mut only = o.carve_only_stationary;
     if ui.checkbox(&mut only, "Carve Only Stationary").changed() {
-        write(world, id, &mut *d, |o| {
+        write(world, id, |o| {
             obstacle_ops::set_carve_only_stationary(o, only)
         });
     }
     if let Some(v) = drag_row(ui, "Move Threshold:", o.move_threshold, 0.01) {
-        write(world, id, &mut *d, |o| {
-            obstacle_ops::set_move_threshold(o, v)
-        });
+        write(world, id, |o| obstacle_ops::set_move_threshold(o, v));
     }
     if let Some(v) = drag_row(ui, "Time To Stationary:", o.time_to_stationary, 0.05) {
-        write(world, id, d, |o| obstacle_ops::set_time_to_stationary(o, v));
+        write(world, id, |o| obstacle_ops::set_time_to_stationary(o, v));
     }
 }
 

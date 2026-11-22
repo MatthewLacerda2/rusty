@@ -13,7 +13,7 @@ use rusty_edit::authoring::ui::rect_mask as mask_ops;
 
 /// Rect Mask card. A THIN client: the widget reads a snapshot and routes the
 /// write through the shared op; remove detaches the component.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some((padding, mut feather)) = world.rect_mask(id).map(|m| (m.padding, m.feather)) else {
         return;
     };
@@ -39,13 +39,12 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     });
     if remove {
-        remove_component(world, id, ComponentKind::RectMask, is_dirty);
+        remove_component(world, id, ComponentKind::RectMask);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// Mask card: whether the mask graphic also draws. Same thin-client shape.
-pub fn draw_mask(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw_mask(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut show) = world.mask(id).map(|m| m.show_mask_graphic) else {
         return;
     };
@@ -59,9 +58,8 @@ pub fn draw_mask(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_di
         }
     });
     if remove {
-        remove_component(world, id, ComponentKind::Mask, is_dirty);
+        remove_component(world, id, ComponentKind::Mask);
     }
-    *is_dirty |= remove || changed;
 }
 
 impl crate::inspector::components::add::AddEntry for rusty_components::MaskComponent {

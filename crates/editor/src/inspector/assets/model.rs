@@ -77,6 +77,7 @@ fn draw_scale_factor(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene
     if r.drag_stopped() || (r.changed() && !r.dragged()) {
         ui.data_mut(|d| d.remove::<f32>(held));
         let set = rusty_edit::asset_instance::set_model_scale_factor(scene, path, scale);
+        // The instances rebuild outside the Undo history, so they mark the scene here.
         editor.is_dirty |= set.is_ok_and(|n| n > 0);
     } else if r.dragged() {
         ui.data_mut(|d| d.insert_temp(held, scale));
@@ -233,7 +234,6 @@ fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
         Err(_) => return,
     };
     let root = rusty_edit::authoring::instantiate_model(scene, path, &asset, glam::Vec3::ZERO);
-    editor.is_dirty = true;
     editor.selected_entity_id = Some(root);
     editor.selected_asset_path = None;
 }

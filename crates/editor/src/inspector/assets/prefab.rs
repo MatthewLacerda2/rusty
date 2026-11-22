@@ -63,7 +63,6 @@ fn counts(path: &str) -> Option<(usize, usize)> {
 /// the editor dirty — the same effect as the model inspector's instantiate.
 fn instantiate(editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     if let Ok(root_id) = rusty_edit::load_and_instantiate(scene, path, None) {
-        editor.is_dirty = true;
         editor.selected_entity_id = Some(root_id);
         editor.selected_asset_path = None;
     }

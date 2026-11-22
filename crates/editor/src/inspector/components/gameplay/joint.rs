@@ -9,47 +9,35 @@ use rusty_components::{JointComponent, JointKind};
 use rusty_edit::authoring::physics::joint as joint_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-    op: impl FnOnce(&mut JointComponent),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut JointComponent)) {
     if let Some(mut j) = world.joint_mut(id) {
         op(&mut j);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_joint(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw_joint(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(j) = world.joint(id).map(|j| j.clone()) else {
         return;
     };
     let mut remove = false;
     component_card(ui, icon::LINK, "Joint", Some(&mut remove), |ui| {
-        draw_kind(ui, world, id, j.kind, is_dirty);
-        draw_bodies(ui, world, id, &j, is_dirty);
+        draw_kind(ui, world, id, j.kind);
+        draw_bodies(ui, world, id, &j);
         // Rows the kind does not use are hidden, not cleared, so switching back loses
         // nothing.
         if j.kind != JointKind::Fixed {
-            draw_limits(ui, world, id, &j, is_dirty);
-            draw_drive(ui, world, id, &j, is_dirty);
+            draw_limits(ui, world, id, &j);
+            draw_drive(ui, world, id, &j);
         }
-        draw_breaking(ui, world, id, &j, is_dirty);
+        draw_breaking(ui, world, id, &j);
     });
     if remove {
-        remove_component(world, id, ComponentKind::Joint, is_dirty);
+        remove_component(world, id, ComponentKind::Joint);
     }
 }
 
 /// The Fixed / Hinge / Ball combo.
-fn draw_kind(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    current: JointKind,
-    is_dirty: &mut bool,
-) {
+fn draw_kind(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, current: JointKind) {
     let mut kind = current;
     egui::ComboBox::from_label("Kind")
         .selected_text(kind.name())
@@ -59,18 +47,12 @@ fn draw_kind(
             }
         });
     if kind != current {
-        write(world, id, is_dirty, |c| joint_ops::set_kind(c, kind));
+        write(world, id, |c| joint_ops::set_kind(c, kind));
     }
 }
 
 /// Connected body, anchors and the collision flag.
-fn draw_bodies(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    j: &JointComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, j: &JointComponent) {
     let mut connected = j.connected_body.is_some();
     let mut body = j.connected_body.unwrap_or(0);
     let changed = ui
@@ -83,53 +65,39 @@ fn draw_bodies(
         .inner;
     if changed {
         let target = connected.then_some(body);
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_connected_body(c, target)
-        });
+        write(world, id, |c| joint_ops::set_connected_body(c, target));
     }
     if let Some(v) = vec3_row(ui, "Anchor:", j.anchor) {
-        write(world, id, is_dirty, |c| joint_ops::set_anchor(c, v));
+        write(world, id, |c| joint_ops::set_anchor(c, v));
     }
     let mut auto = j.auto_configure_connected_anchor;
     if ui
         .checkbox(&mut auto, "Auto Configure Connected Anchor")
         .changed()
     {
-        write(world, id, is_dirty, |c| {
+        write(world, id, |c| {
             joint_ops::set_auto_configure_connected_anchor(c, auto)
         });
     }
     if !auto {
         if let Some(v) = vec3_row(ui, "Connected Anchor:", j.connected_anchor) {
-            write(world, id, is_dirty, |c| {
-                joint_ops::set_connected_anchor(c, v)
-            });
+            write(world, id, |c| joint_ops::set_connected_anchor(c, v));
         }
     }
     let mut collide = j.enable_collision;
     if ui.checkbox(&mut collide, "Enable Collision").changed() {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_enable_collision(c, collide)
-        });
+        write(world, id, |c| joint_ops::set_enable_collision(c, collide));
     }
 }
 
 /// Axis and angle limits (Hinge and Ball).
-fn draw_limits(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    j: &JointComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_limits(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, j: &JointComponent) {
     if let Some(v) = vec3_row(ui, "Axis:", j.axis) {
-        write(world, id, is_dirty, |c| joint_ops::set_axis(c, v));
+        write(world, id, |c| joint_ops::set_axis(c, v));
     }
     let mut use_limits = j.use_limits;
     if ui.checkbox(&mut use_limits, "Use Limits").changed() {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_use_limits(c, use_limits)
-        });
+        write(world, id, |c| joint_ops::set_use_limits(c, use_limits));
     }
     if !use_limits {
         return;
@@ -144,23 +112,17 @@ fn draw_limits(
         })
         .inner;
     if changed {
-        write(world, id, is_dirty, |c| joint_ops::set_limits(c, min, max));
+        write(world, id, |c| joint_ops::set_limits(c, min, max));
     }
     if j.kind == JointKind::Ball {
-        draw_swing(ui, world, id, j, is_dirty);
+        draw_swing(ui, world, id, j);
     }
 }
 
 /// A Ball's swing axis and its two swing limits (Unity's swing 1 / swing 2).
-fn draw_swing(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    j: &JointComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_swing(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, j: &JointComponent) {
     if let Some(v) = vec3_row(ui, "Swing Axis:", j.swing_axis) {
-        write(world, id, is_dirty, |c| joint_ops::set_swing_axis(c, v));
+        write(world, id, |c| joint_ops::set_swing_axis(c, v));
     }
     let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
         ui.horizontal(|ui| {
@@ -172,25 +134,15 @@ fn draw_swing(
     };
     let (mut swing1, mut swing2) = (j.swing_limit, j.swing2_limit);
     if row(ui, "Swing 1 Limit (deg):", &mut swing1) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_swing_limit(c, swing1)
-        });
+        write(world, id, |c| joint_ops::set_swing_limit(c, swing1));
     }
     if row(ui, "Swing 2 Limit (deg):", &mut swing2) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_swing2_limit(c, swing2)
-        });
+        write(world, id, |c| joint_ops::set_swing2_limit(c, swing2));
     }
 }
 
 /// The drive's strength (0 = no motor) and damping.
-fn draw_drive(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    j: &JointComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_drive(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, j: &JointComponent) {
     let (mut strength, mut damping) = (j.drive_strength, j.drive_damping);
     let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
         ui.horizontal(|ui| {
@@ -201,25 +153,15 @@ fn draw_drive(
         .inner
     };
     if row(ui, "Drive Strength (0 = none):", &mut strength) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_drive_strength(c, strength)
-        });
+        write(world, id, |c| joint_ops::set_drive_strength(c, strength));
     }
     if row(ui, "Drive Damping:", &mut damping) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_drive_damping(c, damping)
-        });
+        write(world, id, |c| joint_ops::set_drive_damping(c, damping));
     }
 }
 
 /// Break force and torque (0 = unbreakable).
-fn draw_breaking(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    j: &JointComponent,
-    is_dirty: &mut bool,
-) {
+fn draw_breaking(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, j: &JointComponent) {
     let mut force = j.break_force;
     let mut torque = j.break_torque;
     let row = |ui: &mut egui::Ui, label: &str, v: &mut f32| {
@@ -231,14 +173,10 @@ fn draw_breaking(
         .inner
     };
     if row(ui, "Break Force (0 = never):", &mut force) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_break_force(c, force)
-        });
+        write(world, id, |c| joint_ops::set_break_force(c, force));
     }
     if row(ui, "Break Torque (0 = never):", &mut torque) {
-        write(world, id, is_dirty, |c| {
-            joint_ops::set_break_torque(c, torque)
-        });
+        write(world, id, |c| joint_ops::set_break_torque(c, torque));
     }
 }
 

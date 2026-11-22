@@ -70,7 +70,6 @@ pub(crate) fn delete(editor: &mut EditorUi, scene: &mut Scene, id: u32) {
     editor.selected_entity_id = editor
         .selected_entity_id
         .filter(|&sel| scene.world.contains(sel));
-    editor.is_dirty = true;
 }
 
 /// Collapsed state: a thin rail with a caret that reopens the hierarchy panel.

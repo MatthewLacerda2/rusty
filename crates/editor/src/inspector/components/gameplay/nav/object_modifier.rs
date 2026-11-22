@@ -14,28 +14,16 @@ use rusty_edit::authoring::nav::object_modifier as ops;
 use rusty_navigation::{MAX_AREAS, NOT_WALKABLE_AREA};
 
 /// Route one edit through the shared ops and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-    op: impl FnOnce(&mut Modifier),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Modifier)) {
     if let Some(mut m) = world.nav_mesh_modifier_mut(id) {
         op(&mut m);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_nav_mesh_modifier(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_nav_mesh_modifier(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(m) = world.nav_mesh_modifier(id).map(|m| m.clone()) else {
         return;
     };
-    let d = is_dirty;
     let mut remove = false;
     component_card(
         ui,
@@ -45,13 +33,11 @@ pub fn draw_nav_mesh_modifier(
         |ui| {
             let mut active = m.active;
             if ui.checkbox(&mut active, "Active").changed() {
-                write(world, id, &mut *d, |m| ops::set_active(m, active));
+                write(world, id, |m| ops::set_active(m, active));
             }
             let mut ignore = m.ignore_from_build;
             if ui.checkbox(&mut ignore, "Ignore From Build").changed() {
-                write(world, id, &mut *d, |m| {
-                    ops::set_ignore_from_build(m, ignore)
-                });
+                write(world, id, |m| ops::set_ignore_from_build(m, ignore));
             }
             let mut overrides = m.override_area.is_some();
             let mut area = m.override_area.unwrap_or(NOT_WALKABLE_AREA);
@@ -65,19 +51,17 @@ pub fn draw_nav_mesh_modifier(
                 .inner;
             if edited {
                 let area = overrides.then_some(i64::from(area));
-                write(world, id, &mut *d, |m| ops::set_override_area(m, area));
+                write(world, id, |m| ops::set_override_area(m, area));
             }
             let mut children = m.apply_to_children;
             if ui.checkbox(&mut children, "Apply To Children").changed() {
-                write(world, id, &mut *d, |m| {
-                    ops::set_apply_to_children(m, children)
-                });
+                write(world, id, |m| ops::set_apply_to_children(m, children));
             }
             ui.label("Furniture: Override Area 1 (NotWalkable). Ignore removes the object");
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::NavMeshModifier, d);
+        remove_component(world, id, ComponentKind::NavMeshModifier);
     }
 }
 

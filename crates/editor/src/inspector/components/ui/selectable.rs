@@ -16,7 +16,7 @@ use rusty_edit::authoring::ui::selectable as ops;
 
 /// Selectable card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back through the shared ops; remove detaches.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(mut edit) = world.selectable(id).map(|s| s.clone()) else {
         return;
     };
@@ -41,9 +41,8 @@ pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: 
         }
     }
     if remove {
-        remove_component(world, id, ComponentKind::Selectable, is_dirty);
+        remove_component(world, id, ComponentKind::Selectable);
     }
-    *is_dirty |= remove || changed;
 }
 
 /// Transition, target graphic, and the per-state colours + fade or sprites.

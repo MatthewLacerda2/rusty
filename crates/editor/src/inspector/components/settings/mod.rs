@@ -5,29 +5,28 @@ use egui_phosphor::regular as icon;
 use glam::Vec3;
 
 use crate::theme;
-use crate::EditorUi;
 use rusty_edit::authoring::environment as env_ops;
 use rusty_edit::authoring::fog as fog_ops;
 use rusty_scene::{FogMode, FogSettings, Scene, LAYER_COUNT};
 
 /// Render the Scene Settings panel (skybox, ambient light, Tags & Layers).
-pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+pub fn draw(ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     ui.heading(format!("{}  Scene Settings", icon::GLOBE));
     ui.separator();
     ui.add_space(5.0);
 
-    draw_environment(editor, ui, scene);
+    draw_environment(ui, scene);
 
-    sky::draw(editor, ui, scene);
+    sky::draw(ui, scene);
 
-    draw_fog(editor, ui, scene);
+    draw_fog(ui, scene);
     ui.add_space(8.0);
 
-    draw_layers(editor, ui, scene);
+    draw_layers(ui, scene);
     ui.add_space(8.0);
 
-    draw_collision_matrix(editor, ui, scene);
+    draw_collision_matrix(ui, scene);
 
     ui.add_space(15.0);
     ui.separator();
@@ -40,14 +39,13 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 
 /// The skybox path and the ambient colour and intensity, each written through its
 /// `authoring::environment` op, the one `Lighting.Set*` calls.
-fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+fn draw_environment(ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     ui.horizontal(|ui| {
         ui.label("Skybox:");
         let mut path = scene.skybox_path.clone();
         if ui.text_edit_singleline(&mut path).changed() {
             env_ops::set_skybox(scene, &path);
-            editor.is_dirty = true;
         }
     });
     ui.colored_label(
@@ -56,7 +54,7 @@ fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene)
     );
     ui.add_space(8.0);
 
-    ambient::draw(editor, ui, scene);
+    ambient::draw(ui, scene);
     ui.add_space(8.0);
 
     ui.label("Ambient Intensity:");
@@ -64,14 +62,13 @@ fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene)
     let response = ui.add(crate::widgets::slider(&mut intensity, 0.0..=5.0).text("intensity"));
     if response.changed() {
         env_ops::set_ambient_intensity(scene, intensity);
-        editor.is_dirty = true;
     }
     ui.add_space(8.0);
 }
 
 /// The Tags & Layers surface: rename the project's 32 layer slots. Layer 0 is the
 /// fixed `"Default"`; the rest are editable. Names persist with the scene.
-fn draw_layers(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+fn draw_layers(ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     egui::CollapsingHeader::new(format!("{}  Tags & Layers", icon::STACK)).show(ui, |ui| {
         ui.colored_label(t.text_secondary, "Layer 0 is the fixed Default layer.");
@@ -90,14 +87,13 @@ fn draw_layers(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
                 );
                 if resp.changed() {
                     scene.layers.set_name(i, name);
-                    editor.is_dirty = true;
                 }
             });
         }
     });
 }
 
-fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+fn draw_collision_matrix(ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
     egui::CollapsingHeader::new(format!("{}  Layer Collision Matrix", icon::STACK)).show(
         ui,
@@ -121,7 +117,6 @@ fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut S
                             let mut on = scene.collision_matrix.can_collide(*i, *j);
                             if ui.checkbox(&mut on, "").changed() {
                                 scene.collision_matrix.set_collision(*i, *j, on);
-                                editor.is_dirty = true;
                             }
                         }
                         ui.end_row();
@@ -134,10 +129,9 @@ fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut S
 /// The scene fog section. A thin client: each widget edits a snapshot and
 /// routes the write through the shared `authoring::fog` op the `Graphics.SetFog*`
 /// bindings call, so panel and API share one clamp.
-fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
+fn draw_fog(ui: &mut egui::Ui, scene: &mut Scene) {
     let f = scene.fog;
     let fog = &mut scene.fog;
-    let mut changed = false;
     egui::CollapsingHeader::new(format!("{}  Fog", icon::CLOUD_FOG)).show(ui, |ui| {
         egui::ComboBox::from_label("Mode")
             .selected_text(f.mode.name())
@@ -145,7 +139,6 @@ fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
                 for mode in FogMode::ALL {
                     if ui.selectable_label(f.mode == mode, mode.name()).clicked() {
                         fog_ops::set_mode(fog, mode);
-                        changed = true;
                     }
                 }
             });
@@ -154,12 +147,10 @@ fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             ui.label("Color:");
             if ui.color_edit_button_rgb(&mut rgb).changed() {
                 fog_ops::set_color(fog, Vec3::from_array(rgb));
-                changed = true;
             }
         });
-        changed |= draw_fog_sliders(ui, fog, &f);
+        draw_fog_sliders(ui, fog, &f);
     });
-    editor.is_dirty |= changed;
 }
 
 /// The fog's five scalar sliders, each through its shared op. Returns whether any

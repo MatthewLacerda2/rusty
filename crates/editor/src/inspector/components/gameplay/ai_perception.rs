@@ -12,50 +12,32 @@ type Op = fn(&mut Perception, f32);
 type MaskOp = fn(&mut Perception, u32);
 
 /// Route one edit through the shared ops and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-    op: impl FnOnce(&mut Perception),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut Perception)) {
     if let Some(mut p) = world.ai_perception_mut(id) {
         op(&mut p);
     }
-    *is_dirty = true;
 }
 
-pub fn draw_ai_perception(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_ai_perception(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(p) = world.ai_perception(id).map(|p| p.clone()) else {
         return;
     };
-    let d = is_dirty;
     let mut remove = false;
     component_card(ui, icon::EYE, "AI Perception", Some(&mut remove), |ui| {
-        draw_distances(ui, world, id, &p, &mut *d);
-        draw_ages(ui, world, id, &p, &mut *d);
-        draw_masks(ui, world, id, &p, &mut *d);
+        draw_distances(ui, world, id, &p);
+        draw_ages(ui, world, id, &p);
+        draw_masks(ui, world, id, &p);
         draw_known(ui, &p);
     });
     if remove {
-        remove_component(world, id, ComponentKind::AIPerception, d);
+        remove_component(world, id, ComponentKind::AIPerception);
     }
 }
 
 type Row<'a> = (&'a str, f32, RangeInclusive<f32>, Op);
 
 /// The ranges, the cone and the eye height, one drag row each.
-fn draw_distances(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    p: &Perception,
-    d: &mut bool,
-) {
+fn draw_distances(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, p: &Perception) {
     let sight: [Row; 5] = [
         (
             "Sight Range:",
@@ -88,17 +70,11 @@ fn draw_distances(
             ops::set_hearing_range,
         ),
     ];
-    drag_rows(ui, world, id, d, sight);
+    drag_rows(ui, world, id, sight);
 }
 
 /// The three max ages.
-fn draw_ages(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    p: &Perception,
-    d: &mut bool,
-) {
+fn draw_ages(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, p: &Perception) {
     let ages: [Row; 3] = [
         (
             "Sight Max Age (s):",
@@ -119,7 +95,7 @@ fn draw_ages(
             ops::set_damage_max_age,
         ),
     ];
-    drag_rows(ui, world, id, d, ages);
+    drag_rows(ui, world, id, ages);
     ui.label("Max age 0: remembered forever");
 }
 
@@ -128,7 +104,6 @@ fn drag_rows<const N: usize>(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
     id: u32,
-    d: &mut bool,
     rows: [Row; N],
 ) {
     for (label, mut value, range, op) in rows {
@@ -140,26 +115,20 @@ fn drag_rows<const N: usize>(
             })
             .inner;
         if edited {
-            write(world, id, d, |p| op(p, value));
+            write(world, id, |p| op(p, value));
         }
     }
 }
 
 /// The sight and blocking layer masks.
-fn draw_masks(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    p: &Perception,
-    d: &mut bool,
-) {
+fn draw_masks(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, p: &Perception) {
     let masks: [(&str, u32, MaskOp); 2] = [
         ("Sight Mask:", p.sight_mask, ops::set_sight_mask),
         ("Blocking Mask:", p.blocking_mask, ops::set_blocking_mask),
     ];
     for (label, mask, op) in masks {
         if let Some(next) = mask_row(ui, label, mask) {
-            write(world, id, d, |p| op(p, next));
+            write(world, id, |p| op(p, next));
         }
     }
 }

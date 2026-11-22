@@ -92,9 +92,11 @@ pub(in crate::editor) fn paint_pass(
     repaint_after
 }
 
+/// Before the editor draws, so a save this frame clears a mark an earlier frame's edit raised.
 pub(super) fn take_edits(editor_ui: &mut EditorUi, game: &GameWorld) -> bool {
-    let edited = std::mem::take(&mut editor_ui.is_dirty);
-    if edited && game.scene().borrow().is_playing() {
+    let mut scene = game.scene().borrow_mut();
+    let edited = editor_ui.follow_edits(&mut scene);
+    if edited && scene.is_playing() {
         let what = "an editor edit (the Inspector, the hierarchy, a gizmo)".to_string();
         let journal = game.script_manager().journal();
         journal
@@ -112,8 +114,6 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
             &game.resources.console,
             &line,
         );
-        // Outside Play a line may have moved static geometry: the scene is dirty.
-        editor_ui.is_dirty |= !game.scene().borrow().is_playing();
     }
 }
 
@@ -134,14 +134,25 @@ mod tests {
         let mut ui = EditorUi::new(Default::default());
         let journal = h.world.borrow().script_manager().journal();
         journal.borrow_mut().start();
-        ui.is_dirty = true;
-        assert!(take_edits(&mut ui, &h.world.borrow()) && !ui.is_dirty);
+        let edit = |h: &Harness| {
+            let world = h.world.borrow();
+            let mut scene = world.scene().borrow_mut();
+            scene.begin_edits();
+            let first = scene.world.ids().first().copied();
+            let id = first.unwrap_or_else(|| scene.add_entity("Cube".to_string()));
+            if let Some(mut t) = scene.world.transform_mut(id) {
+                t.position.x += 1.0;
+            }
+            scene.commit_edits(None);
+        };
+        edit(&h);
+        assert!(take_edits(&mut ui, &h.world.borrow()) && ui.is_dirty);
         assert!(
             journal.borrow_mut().take().is_empty(),
             "edit mode: no taint"
         );
         h.step(1); // enters Play
-        ui.is_dirty = true;
+        edit(&h);
         assert!(take_edits(&mut ui, &h.world.borrow()));
         let acts = journal.borrow_mut().take();
         assert!(matches!(&acts[..], [HostCall::Taint(what)] if what.contains("editor edit")));

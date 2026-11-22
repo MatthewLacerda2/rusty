@@ -2,7 +2,6 @@ use egui_phosphor::regular as icon;
 
 use crate::inspector::components::transform::drag_angle;
 use crate::widgets::DragRange;
-use crate::EditorUi;
 use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
@@ -10,14 +9,13 @@ use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 /// Cube face edges in pixels, as Unity's probe offers.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
 
-pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
+pub fn draw(ui: &mut egui::Ui, scene: &mut Scene) {
     ui.add_space(8.0);
     egui::CollapsingHeader::new(format!("{}  Reflection Probes", icon::SPHERE))
         .default_open(false)
         .show(ui, |ui| {
-            let mut changed = draw_defaults(ui, &mut scene.lighting_settings.reflections);
-            changed |= draw_probes(ui, scene);
-            editor.is_dirty |= changed;
+            draw_defaults(ui, &mut scene.lighting_settings.reflections);
+            draw_probes(ui, scene);
         });
 }
 

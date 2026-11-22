@@ -5,13 +5,13 @@ use rusty_edit::authoring::{self, ComponentKind};
 use rusty_edit::DEFAULT_SCRIPTS_DEST_DIR;
 
 /// Add Component — Unity-style full-width pill that opens the component menu.
-pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
+pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     ui.add_space(crate::theme::from_ui(ui).space_sm);
     ui.with_layout(
         egui::Layout::top_down_justified(egui::Align::Center),
         |ui| {
             ui.menu_button(format!("{}  Add Component", icon::PLUS), |ui| {
-                *is_dirty |= add_menu(ui, world, id);
+                add_menu(ui, world, id);
             });
         },
     );

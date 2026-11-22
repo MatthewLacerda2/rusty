@@ -19,7 +19,7 @@ thread_local! {
     });
 }
 
-pub fn draw_script_fields(ui: &mut egui::Ui, script: &mut ScriptComponent, is_dirty: &mut bool) {
+pub fn draw_script_fields(ui: &mut egui::Ui, script: &mut ScriptComponent) {
     let fields = cached_schema(&script.path);
     if fields.is_empty() {
         return;
@@ -30,7 +30,7 @@ pub fn draw_script_fields(ui: &mut egui::Ui, script: &mut ScriptComponent, is_di
             ui.add_space(4.0);
             ui.label(egui::RichText::new(header).strong());
         }
-        draw_field(ui, field, &mut script.values, is_dirty);
+        draw_field(ui, field, &mut script.values);
     }
 }
 
@@ -40,7 +40,6 @@ fn draw_field(
     ui: &mut egui::Ui,
     field: &ScriptField,
     values: &mut BTreeMap<String, ScriptFieldValue>,
-    is_dirty: &mut bool,
 ) {
     let current = values
         .get(&field.name)
@@ -61,7 +60,6 @@ fn draw_field(
                 .inner;
             if resp.changed() {
                 values.insert(field.name.clone(), ScriptFieldValue::Number(v));
-                *is_dirty = true;
             }
             resp
         }
@@ -70,7 +68,6 @@ fn draw_field(
             let resp = ui.checkbox(&mut b, &field.name);
             if resp.changed() {
                 values.insert(field.name.clone(), ScriptFieldValue::Boolean(b));
-                *is_dirty = true;
             }
             resp
         }
@@ -84,7 +81,6 @@ fn draw_field(
                 .inner;
             if resp.changed() {
                 values.insert(field.name.clone(), ScriptFieldValue::Text(s));
-                *is_dirty = true;
             }
             resp
         }

@@ -12,12 +12,7 @@ use rusty_edit::authoring::physics::collider as collider_ops;
 use rusty_edit::authoring::ComponentKind;
 use rusty_scene::ColliderShape;
 
-pub fn draw_collider(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-) {
+pub fn draw_collider(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(collider) = world.collider(id).map(|c| c.clone()) else {
         return;
     };
@@ -33,14 +28,12 @@ pub fn draw_collider(
                 if let Some(mut c) = world.collider_mut(id) {
                     collider_ops::set_active(&mut c, active);
                 }
-                *is_dirty = true;
             }
             let mut is_trigger = collider.is_trigger;
             if ui.checkbox(&mut is_trigger, "Is Trigger").changed() {
                 if let Some(mut c) = world.collider_mut(id) {
                     collider_ops::set_trigger(&mut c, is_trigger);
                 }
-                *is_dirty = true;
             }
             let mut shape = collider.shape.clone();
             let mut shape_changed = draw_shape_selector(ui, &mut shape);
@@ -49,13 +42,12 @@ pub fn draw_collider(
                 if let Some(mut c) = world.collider_mut(id) {
                     collider_ops::set_shape(&mut c, shape);
                 }
-                *is_dirty = true;
             }
-            material::draw(ui, world, id, &collider, is_dirty);
+            material::draw(ui, world, id, &collider);
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::Collider, is_dirty);
+        remove_component(world, id, ComponentKind::Collider);
     }
 }
 

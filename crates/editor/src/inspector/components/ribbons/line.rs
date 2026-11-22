@@ -9,21 +9,15 @@ use rusty_components::LineComponent;
 use rusty_edit::authoring::ribbon::line as line_ops;
 
 /// Route one edit through the shared ops and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    dirty: &mut bool,
-    op: impl FnOnce(&mut LineComponent),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, op: impl FnOnce(&mut LineComponent)) {
     if let Some(mut l) = world.line_mut(id) {
         op(&mut l);
     }
-    *dirty = true;
 }
 
 /// Line Renderer card: world space, loop, the point list, and the shared
 /// Style section.
-pub fn draw_line(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, dirty: &mut bool) {
+pub fn draw_line(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32) {
     let Some(l) = world.line(id).map(|l| l.clone()) else {
         return;
     };
@@ -36,24 +30,22 @@ pub fn draw_line(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, dirty
         |ui| {
             let mut world_space = l.use_world_space;
             if ui.checkbox(&mut world_space, "Use World Space").changed() {
-                write(world, id, dirty, |c| {
-                    line_ops::set_use_world_space(c, world_space)
-                });
+                write(world, id, |c| line_ops::set_use_world_space(c, world_space));
             }
             let mut looping = l.looping;
             if ui.checkbox(&mut looping, "Loop").changed() {
-                write(world, id, dirty, |c| line_ops::set_looping(c, looping));
+                write(world, id, |c| line_ops::set_looping(c, looping));
             }
             if let Some(points) = draw_points(ui, &l.positions) {
-                write(world, id, dirty, |c| line_ops::set_positions(c, &points));
+                write(world, id, |c| line_ops::set_positions(c, &points));
             }
             if let Some(edit) = draw_style(ui, &l.style) {
-                write(world, id, dirty, |c| edit.apply(&mut c.style));
+                write(world, id, |c| edit.apply(&mut c.style));
             }
         },
     );
     if remove {
-        remove_component(world, id, ComponentKind::Line, dirty);
+        remove_component(world, id, ComponentKind::Line);
     }
 }
 

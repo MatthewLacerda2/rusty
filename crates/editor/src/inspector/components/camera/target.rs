@@ -12,7 +12,6 @@ pub(super) fn draw_projection_mode(
     world: &mut rusty_ecs::World,
     id: u32,
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     let mut next = None;
     ui.horizontal(|ui| {
@@ -48,7 +47,6 @@ pub(super) fn draw_projection_mode(
         if let Some(mut c) = world.camera_mut(id) {
             camera_ops::set_projection(&mut c, p);
         }
-        *is_dirty = true;
     }
 }
 
@@ -59,7 +57,6 @@ pub(super) fn draw_target(
     world: &mut rusty_ecs::World,
     id: u32,
     cam: &CameraComponent,
-    is_dirty: &mut bool,
 ) {
     ui.add_space(3.0);
     let target = cam.target_texture.clone();
@@ -74,7 +71,7 @@ pub(super) fn draw_target(
     let Some(t) = target else {
         ui.weak("Empty: renders to the screen. Named: shows as rt:<name>.");
         if changed {
-            write(world, id, is_dirty, |c| {
+            write(world, id, |c| {
                 camera_ops::set_target_texture(c, &name, w, h)
             });
         }
@@ -91,37 +88,27 @@ pub(super) fn draw_target(
             .changed();
     });
     if changed {
-        write(world, id, is_dirty, |c| {
+        write(world, id, |c| {
             camera_ops::set_target_texture(c, &name, w, h)
         });
     }
     let mut post_fx = t.post_fx;
     if ui.checkbox(&mut post_fx, "Target Post-FX").changed() {
-        write(world, id, is_dirty, |c| {
-            camera_ops::set_target_post_fx(c, post_fx)
-        });
+        write(world, id, |c| camera_ops::set_target_post_fx(c, post_fx));
     }
     let mut every = t.update_every;
     ui.horizontal(|ui| {
         ui.label("Update Every N Frames:");
         let drag = egui::DragValue::new(&mut every).ranged(1..=120);
         if ui.add(drag).changed() {
-            write(world, id, is_dirty, |c| {
-                camera_ops::set_target_update_every(c, every)
-            });
+            write(world, id, |c| camera_ops::set_target_update_every(c, every));
         }
     });
 }
 
 /// Run `f` on `id`'s camera and mark the scene dirty.
-fn write(
-    world: &mut rusty_ecs::World,
-    id: u32,
-    is_dirty: &mut bool,
-    f: impl FnOnce(&mut CameraComponent),
-) {
+fn write(world: &mut rusty_ecs::World, id: u32, f: impl FnOnce(&mut CameraComponent)) {
     if let Some(mut c) = world.camera_mut(id) {
         f(&mut c);
     }
-    *is_dirty = true;
 }

@@ -18,13 +18,7 @@ pub(super) const SECTION: Section = Section {
 };
 
 /// Draw the list and the add row; writes the edited list back through the op.
-fn draw(
-    ui: &mut egui::Ui,
-    world: &mut rusty_ecs::World,
-    id: u32,
-    vc: &PostProcessingComponent,
-    is_dirty: &mut bool,
-) {
+fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, vc: &PostProcessingComponent) {
     ui.add_space(3.0);
     ui.label("Custom Effects (after tonemap, in order)");
     let mut names = vc.custom_effects.names.clone();
@@ -46,10 +40,8 @@ fn draw(
         let result = world
             .post_processing_mut(id)
             .map(|mut c| vc_ops::custom_effects::set_names(&mut c, names));
-        match result {
-            Some(Err(e)) => log::warn!("[Editor] {e}"),
-            Some(Ok(())) => *is_dirty = true,
-            None => {}
+        if let Some(Err(e)) = result {
+            log::warn!("[Editor] {e}");
         }
     }
     ui.data_mut(|d| d.insert_temp(key, input));

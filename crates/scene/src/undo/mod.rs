@@ -1,3 +1,4 @@
+mod edited;
 mod level;
 mod restore;
 mod side;
@@ -28,6 +29,7 @@ pub struct UndoStack {
     open: bool,
     level: Option<SceneLevel>,
     dropped: side::Side,
+    edited: bool,
 }
 
 impl Scene {
@@ -35,6 +37,7 @@ impl Scene {
     /// this resumes it.
     pub fn begin_edits(&mut self) {
         if self.is_playing() {
+            self.world.journal_resume();
             return;
         }
         if !self.history.open {
@@ -46,6 +49,9 @@ impl Scene {
 
     pub fn pause_edits(&mut self) {
         self.world.journal_pause();
+        if self.is_playing() {
+            self.take_step(None);
+        }
     }
 
     pub fn commit_edits(&mut self, name: Option<&str>) -> bool {
@@ -67,6 +73,7 @@ impl Scene {
             self.push_undo(step);
             return true;
         };
+        self.history.edited = true;
         for (id, before) in step.entities {
             // The last step's record is older, so it wins.
             last.entities.entry(id).or_insert(before);
@@ -98,15 +105,20 @@ impl Scene {
     fn take_step(&mut self, name: Option<&str>) -> Option<Step> {
         self.world.journal_pause();
         let journaled = self.world.journal_take();
-        if !std::mem::take(&mut self.history.open) || self.is_playing() {
+        let open = std::mem::take(&mut self.history.open);
+        let before = journaled.map(|j| j.before).unwrap_or_default();
+        let changed_now = |(id, before): &(u32, Option<Recorded>)| {
+            changed(before.as_ref(), self.world.record(*id).as_ref())
+        };
+        if self.is_playing() {
+            self.history.edited |= before.into_iter().any(|entry| changed_now(&entry));
             return None;
         }
-        let before = journaled.map(|j| j.before).unwrap_or_default();
+        if !open {
+            return None;
+        }
         let mut dropped = std::mem::take(&mut self.history.dropped);
-        let entities: BTreeMap<_, _> = before
-            .into_iter()
-            .filter(|(id, before)| changed(before.as_ref(), self.world.record(*id).as_ref()))
-            .collect();
+        let entities: BTreeMap<_, _> = before.into_iter().filter(changed_now).collect();
         let level = self
             .level_changed()
             .then(|| self.history.level.take())
@@ -159,6 +171,7 @@ impl Scene {
             self.history.redo.pop()
         }?;
         let inverse = restore::apply(self, step);
+        self.history.edited = true;
         let name = inverse.name.clone();
         if back {
             self.history.redo.push(inverse);
@@ -172,6 +185,7 @@ impl Scene {
     }
 
     fn push_undo(&mut self, step: Step) {
+        self.history.edited = true;
         if self.history.undo.len() == DEPTH {
             self.history.undo.pop_front();
         }
