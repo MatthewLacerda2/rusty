@@ -1,5 +1,3 @@
-//! `// lint: allow(binary-init) <why>` on its `fn main` line.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;

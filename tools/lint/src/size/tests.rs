@@ -48,6 +48,7 @@ fn test_and_fixture_files_get_the_tight_cap() {
 
 #[test]
 fn one_binary_test_layout_keeps_the_tight_cap() {
+    // `tests/` is one binary: its root, a folder's `mod.rs` and the files in it are tests.
     assert_eq!(
         limit_for(Path::new(""), Path::new("tests/main.rs")),
         MAX_TEST_FILE_LINES
@@ -92,6 +93,7 @@ fn tests_sibling_gets_the_source_cap_not_the_tight_one() {
 fn an_orphan_tests_file_gets_the_tight_cap() {
     let tmp = Scratch::new("960-orphan");
     let orphan = tmp.file("src/foo_tests.rs", &"//\n".repeat(MAX_TEST_FILE_LINES + 1));
+    // A neighbour sharing the word is no `foo.rs`: the orphan keeps the tight cap.
     tmp.file("src/foo_other.rs", "//\n");
     assert_eq!(limit_for(Path::new(""), &orphan), MAX_TEST_FILE_LINES);
     let line = check_file(Path::new(""), &orphan).expect("an orphan over the tight cap must fail");

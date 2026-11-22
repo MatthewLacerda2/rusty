@@ -26,6 +26,7 @@ fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
             .into_iter()
             .find(|f| f.path.ends_with(case.flags) && f.rule == *name)
         else {
+            // A case that flags nothing is the wiring test's finding.
             continue;
         };
         let before = kept(&repo, name, &hit.path);

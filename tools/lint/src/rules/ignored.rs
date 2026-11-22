@@ -42,8 +42,10 @@ fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
     stdin
         .write_all(files.join("\n").as_bytes())
         .map_err(|e| e.to_string())?;
+    // Closed before the wait: git reads its list to the end, so an open pipe hangs it.
     drop(stdin);
     let out = child.wait_with_output().map_err(|e| e.to_string())?;
+    // Exit 1 means nothing is ignored; only past it did git fail.
     if out.status.code().is_none_or(|c| c > 1) {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
     }

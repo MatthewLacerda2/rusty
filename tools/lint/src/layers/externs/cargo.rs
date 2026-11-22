@@ -1,5 +1,6 @@
 pub fn dependencies(manifest: &str) -> Vec<String> {
     let mut out = keys(manifest);
+    // The workspace's own crates are modules: the table's module half holds them.
     out.retain(|k| !k.starts_with("rusty_"));
     out
 }
@@ -29,6 +30,7 @@ fn table_keys(manifest: &str, table: &str) -> Vec<String> {
         let Some((key, _)) = line.split_once('=').filter(|_| in_deps) else {
             continue;
         };
+        // `serde.workspace = true` names `serde`.
         let key = key.trim().split('.').next().unwrap_or("");
         if key.starts_with(|c: char| c.is_ascii_alphabetic()) {
             out.push(key.replace('-', "_"));
@@ -40,6 +42,8 @@ fn table_keys(manifest: &str, table: &str) -> Vec<String> {
 }
 
 fn header_crate<'a>(header: &'a str, table: &str) -> Option<Option<&'a str>> {
+    // A target's quoted cfg may hold dots, so its table follows the closing quote; a
+    // bare triple (`aarch64-apple-darwin`) holds none.
     let rest = match header.strip_prefix("target.") {
         Some(t) if t.starts_with(['\'', '"']) => t
             .split_once("'.")

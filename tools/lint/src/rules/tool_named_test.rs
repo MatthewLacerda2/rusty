@@ -1,5 +1,3 @@
-//! itself named so (a filter's survivors) takes `// lint: allow(tool-named-test) <why>`
-
 use super::finding::Finding;
 use super::scan::Scan;
 

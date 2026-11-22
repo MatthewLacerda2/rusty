@@ -30,6 +30,7 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
         .iter()
         .map(|m| (m.ident.clone(), m.module.clone()))
         .collect();
+    // What the fold rewrites. Not the root's own lib: the fold mounts its re-exports.
     let mut folded: Vec<String> = members.iter().map(|m| format!("{}/src/", m.dir)).collect();
     folded.push("tests/".to_string());
     for bin in fold::bins(&manifest) {

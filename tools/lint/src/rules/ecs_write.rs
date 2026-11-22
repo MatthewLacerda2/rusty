@@ -1,11 +1,10 @@
-//! `// lint: allow(ecs-write) <why>`, and so does `World::derived_mut`, the one
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;
 
 pub const RULE: &str = "ecs-write";
 
+// Calls that borrow mutably when their turbofish names `&mut`, and those that always do.
 const BORROWS: &[&str] = &["get::<", "query::<", "query_one::<"];
 const ALWAYS_MUT: &[&str] = &["query_mut", "query_one_mut"];
 const SHAPES: &[&str] = &[

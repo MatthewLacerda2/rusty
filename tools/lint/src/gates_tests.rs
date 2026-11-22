@@ -110,6 +110,8 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
     })
 }
 
+/// At a path with a `tests` segment of its own: a gate judging a file by its absolute
+/// path would cap every file as a test.
 fn plant(tag: &str, files: &[(&str, String)]) -> (Repo, Repo) {
     let holder = Repo::new(tag, false);
     let repo = Repo(holder.0.join("tests"));
@@ -155,6 +157,7 @@ fn every_gate_reports_its_must_flag_cases_through_its_row() {
 
 #[test]
 fn a_file_is_capped_by_its_path_under_base_not_above_it() {
+    // 200 lines: past the test cap, inside the source cap.
     let (repo, _holder) = plant("gate-base-cap", &[("src/mid.rs", "\n".repeat(200))]);
     for args in [vec![], vec!["src/mid.rs".to_string()]] {
         let found = crate::size::verdict(&repo.0, &args).findings;

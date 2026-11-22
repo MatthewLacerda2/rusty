@@ -1,5 +1,3 @@
-//! says so with `// lint: allow(atomic-write) <why>`. A `rename` imported from
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::code_lines;

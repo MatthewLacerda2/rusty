@@ -1,5 +1,3 @@
-//! so with `// lint: allow(asset-write) <why>`, which is also the note on why it
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::{bare_lines, is_ident};
@@ -41,6 +39,7 @@ fn starts_fn(line: &str) -> bool {
         l = l.trim_start();
     }
     loop {
+        // `extern "C"`: its ABI string is blanked to spaces, as every literal is.
         let next = ["const ", "async ", "unsafe ", "extern "]
             .iter()
             .find_map(|q| l.strip_prefix(q));
@@ -51,6 +50,7 @@ fn starts_fn(line: &str) -> bool {
     }
 }
 
+/// The line before the next `fn` line, so a nested `fn` ends the function early.
 fn fn_end(code: &[String], from: usize) -> usize {
     (from + 1..code.len())
         .find(|&i| starts_fn(&code[i]))

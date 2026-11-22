@@ -1,5 +1,3 @@
-//! `// lint: allow(statement-opt-out) <why>` (the rules gate's inline allow).
-
 mod escapes;
 
 use crate::code::code_lines;
@@ -23,6 +21,7 @@ const BANNED: &[&str] = &[
     "std::collections::HashMap",
     "std::collections::HashSet",
     "std::hash::RandomState",
+    // Process-wide state, banned crate-wide so no test races another on it.
     "std::env::set_var",
     "std::env::remove_var",
     "std::env::set_current_dir",
@@ -44,7 +43,8 @@ const OPT_OUTS: &[&str] = &[
     "clippy::all",
 ];
 
-/// The rule a `lint: allow(…)` names to excuse one statement's opt-out: one call
+/// The rule a `lint: allow(…)` names to excuse one statement's opt-out, meant for
+/// process-wide state (`set_current_dir`): the gate does not check which call it is.
 const STATEMENT_OPT_OUT: &str = "statement-opt-out";
 
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {

@@ -1,5 +1,3 @@
-//! reason: `// lint: allow(skip) <why>` on the line or right above it.
-
 use super::finding::Finding;
 use super::scan::Scan;
 

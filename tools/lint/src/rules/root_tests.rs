@@ -55,6 +55,7 @@ pub fn check_manifest(text: &str) -> Vec<Finding> {
 }
 
 pub fn check_source(path: &str, test: &[bool]) -> Option<Finding> {
+    // The raw path, not `module_path`, which maps each member's `src/` to `src/<m>/` too.
     if !path.starts_with("src/") {
         return None;
     }
