@@ -18,6 +18,7 @@ pub(crate) fn repl_input_id() -> egui::Id {
     egui::Id::new("rusty.repl_input")
 }
 
+/// Any focused text field but the console holds the Undo step open.
 pub fn typing_holds_step(ctx: &egui::Context) -> bool {
     ctx.text_edit_focused() && ctx.memory(|m| m.focused()) != Some(repl_input_id())
 }
