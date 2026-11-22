@@ -1,18 +1,6 @@
-//! Every row of [`super::GATES`] is wired: its entry point, run over a fixture it
-//! must flag, reports that fixture's planted file. Each gate's own tests hold its
-//! judgement; this holds that the row `main` dispatches still reaches it, so a gate
-//! emptied to "no findings", or a pass it stopped calling, fails here.
-//!
-//! The cases are keyed by the row's flag, so a new row with no case fails the test
-//! naming the gate. A gate with several passes has a case per pass. Every scratch
-//! repository sits under a `tests/` directory, and a finding naming the repository's
-//! own path fails: a gate judges and names a file by its path relative to `base`.
-
 use super::GATES;
 use crate::repo::scaffold::Repo;
 
-/// A must-flag case: the files of a scratch repository, and text one of the
-/// gate's findings must contain.
 type Case = (Vec<(&'static str, String)>, &'static str);
 
 const REGISTRY: (&str, &str) = (
@@ -24,7 +12,6 @@ fn files(list: &[(&'static str, &str)]) -> Vec<(&'static str, String)> {
     list.iter().map(|(p, b)| (*p, b.to_string())).collect()
 }
 
-/// The must-flag cases of the gate selected by `flag`, `None` when it has none.
 fn cases_for(flag: &str) -> Option<Vec<Case>> {
     let no_registry = (files(&[("README.md", "")]), "NO_REGISTRY");
     Some(match flag {
@@ -63,13 +50,10 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
             ),
         ],
         "--layers" => vec![
-            // the table against the tree: a declared module that is absent
             (
                 files(&[("Cargo.toml", "[package]\nname = \"t\"\n")]),
                 "MISSING_MODULE physics",
             ),
-            // `externs`: a confined crate named outside its confinement, which
-            // only reading the code (`uses`) finds
             (
                 files(&[
                     (
@@ -95,12 +79,10 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
             ),
         ],
         "--rules" => vec![
-            // the allow with no reason (`finding::unexplained`)
             (
                 files(&[("src/a.rs", "fn f() {} // lint: allow(markers)\n")]),
                 "src/a.rs:1: [allow]",
             ),
-            // a rule's own finding, through the `RULES` loop
             (
                 files(&[("crates/app/src/b.rs", concat!("// TO", "DO: later\n"))]),
                 "crates/app/src/b.rs:1: [markers]",
@@ -110,8 +92,6 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
     })
 }
 
-/// A scratch git repository holding `files`, at a path with a `tests` segment of
-/// its own; `holder` owns the directory above it.
 fn plant(tag: &str, files: &[(&str, String)]) -> (Repo, Repo) {
     let holder = Repo::new(tag, false);
     let repo = Repo(holder.0.join("tests"));
@@ -157,7 +137,6 @@ fn every_gate_reports_its_must_flag_cases_through_its_row() {
 
 #[test]
 fn a_file_is_capped_by_its_path_under_base_not_above_it() {
-    // under `<tmp>/tests/`, a 200-line source file is still source, not a test
     let (repo, _holder) = plant("gate-base-cap", &[("src/mid.rs", "\n".repeat(200))]);
     for args in [vec![], vec!["src/mid.rs".to_string()]] {
         let found = crate::size::verdict(&repo.0, &args).findings;

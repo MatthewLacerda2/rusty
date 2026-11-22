@@ -1,15 +1,9 @@
-//! How `api-parity` finds the ops a file names: by path through its `use` aliases
-//! ([`ops_named`]), and, in a module holding its own field-table row, by bare name
-//! ([`local_ops_named`]).
-
 use super::{Op, ROOT};
 use crate::code::{code_lines, is_ident};
 use crate::layers::flatten_use;
 use crate::modules::{crate_module, module_path};
 use std::collections::{BTreeMap, BTreeSet};
 
-/// Every op `source` names outside its test lines, `root` being the path its
-/// file spells `edit::authoring` by ([`root_of`]).
 pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
     let code = code_lines(source);
     let live: Vec<&str> = (0..code.len())
@@ -35,7 +29,6 @@ pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
             let Some((tail, _)) = rest.split_last() else {
                 return aliases.get(head).cloned();
             };
-            // A path spelled from the root is whole; one through an alias goes on from it.
             let base = match aliases.get(head.as_str()) {
                 Some(base) => join(base, &rest[..rest.len() - 1].join("::")),
                 None if segs.join("::").starts_with(&format!("{root}::")) => {
@@ -48,8 +41,6 @@ pub fn ops_named(source: &str, test: &[bool], root: &str) -> BTreeSet<Op> {
         .collect()
 }
 
-/// Every op `source` defines and also calls by its bare name outside its test lines
-/// (in its field-table row or knob table), as `module::set_x`.
 pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op> {
     let code = code_lines(source);
     let live: Vec<&str> = (0..code.len())
@@ -90,10 +81,6 @@ pub fn local_ops_named(source: &str, test: &[bool], module: &str) -> BTreeSet<Op
         .collect()
 }
 
-/// How the file at `path` spells `edit::authoring`, by the crate it is in:
-/// `crate::authoring` inside `rusty-edit`, `rusty_edit::authoring` in another
-/// member crate, `crate::edit::authoring` ([`ROOT`]) in the root package, which
-/// re-exports the crate as its module `edit`.
 pub fn root_of(path: &str) -> &'static str {
     let module = module_path(path);
     let module = module
@@ -114,9 +101,6 @@ pub(super) fn join(a: &str, b: &str) -> String {
     }
 }
 
-/// Each name a `use` of `edit::authoring` binds, to its path under `authoring`
-/// (`""` for `authoring` itself, `rigidbody::set_mass` for a setter by name). Read
-/// from each `use` starting where `root` does (`use crate::…`, `use rusty_edit::…`).
 fn aliases(text: &str, root: &str) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     let first = root.split("::").next().unwrap_or(root);
@@ -136,8 +120,6 @@ fn aliases(text: &str, root: &str) -> BTreeMap<String, String> {
     out
 }
 
-/// Every path in `text` whose last segment is `set_*`, as its segments, of two or
-/// more; and every lone `bare` name not called as a method.
 fn paths(text: &str, bare: &BTreeSet<&str>) -> Vec<Vec<String>> {
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::new();

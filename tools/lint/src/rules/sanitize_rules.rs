@@ -1,39 +1,22 @@
-//! `sanitize`'s rules: the `pub fn`s under `src/scene/rules/` a setter may store
-//! through, and which of each one's float parameters it holds. A setter's float
-//! counts as held only when it reaches a rule at one of those positions, so a rule
-//! that passes a value through (a fallback, a bound) never vouches for it.
-//!
-//! A rule holds a float parameter when a statement or match arm of its body calls
-//! `is_finite()` on it (on the parameter itself, a field or a chain of it; `is_nan`
-//! alone lets `±inf` through) or hands it whole to another rule at a position that
-//! rule holds; the positions are found to a fixed point over every rule. A rule
-//! taking floats and holding none (a pass-through) is itself a finding, excused
 //! with `// lint: allow(sanitize) <why>` when it holds its value another way (a
-//! match that tests each arm's float); an excused rule holds its first float.
 
 use super::finding::Finding;
 use super::sanitize::{float_params, ident_after, matching, passes_at, split_top, RULE};
 use crate::code::{code_lines, is_ident};
 
-/// The folder of rules the setters must store through.
 pub const HELPERS: &str = "src/scene/rules/";
 
-/// One rule: a bare `pub fn` under [`HELPERS`], outside its file's tests.
 #[derive(Clone, Debug)]
 pub struct Rule {
     pub name: String,
     path: String,
     line: usize,
-    /// Every parameter's name, in order.
     params: Vec<String>,
-    /// The positions of its float-carrying parameters.
     floats: Vec<usize>,
     body: String,
-    /// The positions of the parameters it holds.
     pub held: Vec<usize>,
 }
 
-/// The rules `source`, at `path`, defines: each bare `pub fn` before its tests.
 pub fn defined(path: &str, source: &str) -> Vec<Rule> {
     let code = code_lines(source);
     let code: Vec<&str> = code.iter().map(|c| c.as_ref()).collect();
@@ -84,7 +67,6 @@ fn rule(path: &str, code: &[&str], i: usize) -> Option<Rule> {
     })
 }
 
-/// Every rule of `files` under [`HELPERS`], its held positions resolved.
 pub fn resolved<'a>(files: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<Rule> {
     let under = |p: &str| crate::modules::module_path(p).starts_with(HELPERS);
     let mut rules: Vec<Rule> = (files.filter(|(p, _)| under(p)))
@@ -107,9 +89,6 @@ pub fn resolved<'a>(files: impl Iterator<Item = (&'a str, &'a str)>) -> Vec<Rule
     }
 }
 
-/// Whether `rule`'s body tests `param` itself in one statement (an `is_finite()`
-/// whose receiver starts at `param`, see [`tested`]), or hands it to another of
-/// `rules` at a position that one holds.
 fn holds(rule: &Rule, param: &str, rules: &[Rule]) -> bool {
     rule.body
         .split([';', ',', '{', '}'])
@@ -118,15 +97,8 @@ fn holds(rule: &Rule, param: &str, rules: &[Rule]) -> bool {
             .any(|r| passes_at(&rule.body, &r.name, param, Some(&r.held)))
 }
 
-/// Whether `segment` calls `is_finite()` on `param`: on the parameter, a field or a
-/// method chain of it (`r.min.is_finite()`, `v.iter().all(|x| x.is_finite())`, the
-/// closure's argument traced back to the chain it is called on). A test on another
-/// variable vouches for nothing, and neither does `is_nan` alone: it lets `±inf`
-/// through.
 pub(super) fn tested(segment: &str, param: &str) -> bool {
     segment.match_indices(".is_finite()").any(|(mut at, _)| {
-        // A closure's argument stands for the chain the closure is passed to; each
-        // step moves left, so the walk ends.
         while let Some(root) = receiver_root(segment, at) {
             let Some(bar) = segment[..at].rfind(&format!("|{root}|")) else {
                 return root == param;
@@ -140,8 +112,6 @@ pub(super) fn tested(segment: &str, param: &str) -> bool {
     })
 }
 
-/// The identifier a method chain ending at byte `end` of `s` starts from: back over
-/// `.name`, `(..)` and `[..]` groups and whitespace.
 fn receiver_root(s: &str, end: usize) -> Option<&str> {
     let b = s.as_bytes();
     let mut i = end;
@@ -170,7 +140,6 @@ fn receiver_root(s: &str, end: usize) -> Option<&str> {
     }
 }
 
-/// The index of the bracket opening the group that closes at `close`.
 fn group_start(b: &[u8], close: usize) -> Option<usize> {
     let mut depth = 0usize;
     for k in (0..=close).rev() {
@@ -188,7 +157,6 @@ fn group_start(b: &[u8], close: usize) -> Option<usize> {
     None
 }
 
-/// The index of the unmatched `(` enclosing byte `at` of `s`.
 fn open_paren(s: &str, at: usize) -> Option<usize> {
     let mut depth = 0usize;
     for (k, c) in s.as_bytes()[..at].iter().enumerate().rev() {
@@ -202,9 +170,6 @@ fn open_paren(s: &str, at: usize) -> Option<usize> {
     None
 }
 
-/// A finding for each rule taking floats and holding none of them: a pass-through.
-/// One that holds its value and passes a fallback or a bound through is a rule; a
-/// setter's float counts only at the value's position.
 pub fn unheld(rules: &[Rule]) -> Vec<Finding> {
     let unheld = |r: &Rule| !r.floats.is_empty() && r.held.is_empty();
     (rules.iter().filter(|r| unheld(r)))

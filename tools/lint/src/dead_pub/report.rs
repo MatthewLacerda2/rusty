@@ -1,8 +1,5 @@
-//! rustc's warnings, sorted into what the dead-pub signal reports (#1003).
-
 use std::collections::BTreeSet;
 
-/// One rustc warning, as `--message-format short` prints it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Warning {
     pub path: String,
@@ -10,8 +7,6 @@ pub struct Warning {
     pub message: String,
 }
 
-/// The warnings in `stderr` that name an unused item or import; and whether rustc
-/// reported an error (then there is no report to trust).
 pub fn parse(stderr: &str) -> (BTreeSet<Warning>, bool) {
     let mut found = BTreeSet::new();
     let mut failed = false;
@@ -29,8 +24,6 @@ pub fn parse(stderr: &str) -> (BTreeSet<Warning>, bool) {
             .strip_prefix("warning: ")
             .filter(|m| is_dead(m) || is_import(m))
         {
-            // A folded member's file is reached through the lib's `#[path]`:
-            // `src/../crates/<m>/…` is named by its real path.
             found.insert(Warning {
                 path: path.strip_prefix("src/../").unwrap_or(path).to_string(),
                 line: row,
@@ -47,15 +40,10 @@ fn is_dead(message: &str) -> bool {
         .any(|m| message.contains(m))
 }
 
-/// An unused import: in a `pub use`, the re-export of a type a public function
-/// may still return, so it is listed apart (#940 kept them).
 pub fn is_import(message: &str) -> bool {
     message.starts_with("unused import")
 }
 
-/// The report: dead even counting tests, used only by tests, and unused imports.
-/// `gated` says whether a finding's file is platform-gated (see [`super::platform`]):
-/// those are listed under their own heading, since the host build cannot see their use.
 pub fn render(
     with_tests: &BTreeSet<Warning>,
     without_tests: &BTreeSet<Warning>,

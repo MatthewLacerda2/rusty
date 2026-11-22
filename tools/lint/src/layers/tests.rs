@@ -151,7 +151,6 @@ fn real_table_is_well_formed() {
 
 #[test]
 fn sim_set_is_pinned() {
-    // Dropping a module out of the sim set must be a deliberate, reviewed edit (#723).
     let mut dirs = super::sim_dirs();
     dirs.sort();
     let want = [

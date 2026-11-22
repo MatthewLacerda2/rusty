@@ -1,12 +1,3 @@
-//! The rules gate (#934): every check that reports a [`Finding`] and honours the
-//! shared inline allow (`finding.rs`). A new rule is a module with its own
-//! `<rule>_tests.rs`, plus one line in the sorted `mod` list, one row in the
-//! sorted [`RULES`] (#911) and its must-flag case in `wiring.rs`: not a new flag,
-//! gate or baseline.
-//!
-//! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --rules`
-//! Exit code 1 on any finding; report mirrored to `.lint/report.txt` (`gates.rs`).
-
 mod finding;
 mod scan;
 mod test_code;
@@ -68,25 +59,12 @@ use std::path::Path;
 #[derive(PartialEq)]
 enum Allow {
     Inline,
-    /// Nothing may excuse it: `ignored` and `orphan-seeds`, whose fixes are a
-    /// `.gitignore` pattern and a moved file, `root-tests`, whose fix is the
-    /// manifest key or a moved test, and `fold-names`, which an allow would not
-    /// make fold.
     Never,
-    /// The rule reads its own allows, so it can report a stale one
-    /// (`api-parity`, whose allow sits on the op, not on the finding's cause;
-    /// `dir-size`, whose allow sits anywhere in the directory's owner file), or so
-    /// one of its findings stays unexcusable (`orphan-module`, whose unreadable
-    /// workspace sits on a manifest).
     Own,
 }
 
-/// A rule: every finding it has over the scan.
 type Rule = fn(&Scan) -> Vec<Finding>;
 
-/// Every rule, by the name its findings carry (a rule reporting several names,
-/// `test-shape`'s, goes by one). A new rule is one row, in its sorted place, and a
-/// must-flag case in `wiring.rs`, whose test fails naming any row without one.
 const RULES: &[(&str, Rule, Allow)] = &[
     // sorted: rules are independent; allows apply to each rule's own findings
     (active_self::RULE, active_self::run, Allow::Inline),
@@ -143,8 +121,6 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (world_space::RULE, world_space::run, Allow::Inline),
 ];
 
-/// The gate over the repository at `base`: every rule over
-/// [`crate::size::SCAN_ROOTS`], each allow it honours applied.
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {
     let scan = Scan::at(base);
     let findings = all(&scan);
@@ -156,8 +132,6 @@ pub fn verdict(base: &Path, _: &[String]) -> Verdict {
     }
 }
 
-/// Every rule's findings over `scan`, minus what an inline allow excuses, plus
-/// every allow without a reason.
 fn all(scan: &Scan) -> Vec<Finding> {
     let mut findings = Vec::new();
     for (_, rule, allow) in RULES {
@@ -171,9 +145,6 @@ fn all(scan: &Scan) -> Vec<Finding> {
     findings
 }
 
-/// Directories past the ≲10-files aim, most crowded first, counted as `dir-size`
-/// counts (#1367). A signal, never a failure: what is past the gate's cap under
-/// `src/` is that rule's finding or allow, so it is left out here.
 fn crowded<'a>(dirs: &BTreeMap<&'a str, Vec<&str>>) -> Vec<(&'a str, usize)> {
     let mut over: Vec<(&str, usize)> = dirs
         .iter()

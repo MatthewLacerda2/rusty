@@ -1,8 +1,3 @@
-//! The repository as git sees it: the one place the lint tool asks git which files
-//! exist (#1387). The size gate lists what can be committed and the `sorted` rule
-//! lists the tracked Markdown; both go through [`ls_files`], so they decode names and
-//! report git's failures the same way.
-
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -11,18 +6,12 @@ pub mod scaffold;
 #[cfg(test)]
 mod tests;
 
-/// `git -C root`, answering for the repository at `root` and never for one the
-/// caller's environment names: under a hook or `git rebase -x`, `GIT_DIR` and its
-/// kin point at the outer repository.
 pub fn git(root: &Path) -> Command {
     let mut cmd = Command::new("git");
-    // Git's own messages in English, whatever the user's locale, so a caller (and
-    // a test) reading git's error sees one wording.
     cmd.env("LC_ALL", "C");
     for var in ["GIT_DIR", "GIT_INDEX_FILE", "GIT_WORK_TREE"] {
         cmd.env_remove(var);
     }
-    // A scratch repo under the temp dir must not discover a repo above it.
     #[cfg(test)]
     if let Some(tmp) = root
         .starts_with(std::env::temp_dir())
@@ -38,16 +27,11 @@ pub fn git(root: &Path) -> Command {
     cmd
 }
 
-/// Git's file names are raw bytes, kept as such, so a name that isn't UTF-8 still
-/// names the file on disk.
 fn path_of(bytes: &[u8]) -> PathBuf {
     use std::os::unix::ffi::OsStrExt;
     PathBuf::from(std::ffi::OsStr::from_bytes(bytes))
 }
 
-/// `git ls-files -z <flags> -- <pathspecs>` in the repository at `root`: the paths
-/// relative to it, sorted and deduplicated (a file with a merge conflict is listed
-/// once per stage). `Err` carries git's own message, or why it couldn't run.
 pub fn ls_files(root: &Path, flags: &[&str], pathspecs: &[&str]) -> Result<Vec<PathBuf>, String> {
     let out = git(root)
         .args(["ls-files", "-z"])

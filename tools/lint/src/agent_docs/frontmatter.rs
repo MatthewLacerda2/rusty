@@ -1,19 +1,6 @@
-//! A `SKILL.md`'s frontmatter, held to the limits Claude Code loads a skill by: a
-//! skill outside them is skipped without a word, so the gate says it at commit
-//! time instead.
-//!
-//! ```text
-//! ---
-//! name: <the folder's name: ≤ 64 characters of [a-z0-9-]>
-//! description: <non-empty, ≤ 1024 characters>
-//! ---
-//! ```
-
 pub const MAX_NAME: usize = 64;
 pub const MAX_DESCRIPTION: usize = 1024;
 
-/// Every problem with the frontmatter of `source`, the `SKILL.md` of `folder`, as
-/// (1-based line, message).
 pub fn check(folder: &str, source: &str) -> Vec<(usize, String)> {
     let Some(lines) = block(source) else {
         let msg = "a `SKILL.md` opens with `---`, its `name:` and `description:`, and a \
@@ -51,8 +38,6 @@ pub fn check(folder: &str, source: &str) -> Vec<(usize, String)> {
     found
 }
 
-/// The lines between a file's opening `---` and its closing `---` (the first is
-/// the file's line 2), or `None` when `source` opens with no closed block.
 pub(super) fn block(source: &str) -> Option<Vec<&str>> {
     let lines: Vec<&str> = source.lines().collect();
     let end = (lines.first().map(|l| l.trim_end()) == Some("---"))
@@ -81,12 +66,6 @@ fn name_problem(folder: &str, name: &str) -> Option<String> {
     }
 }
 
-/// `key`'s value in the frontmatter `block` (whose first line is the file's line
-/// 2) and the line it is on: quotes dropped, a trailing ` #` comment cut from an
-/// unquoted value, and the indented lines after it joined, whether they continue
-/// a plain or quoted value or hold a folded (`>`) or literal (`|`) block. As in
-/// YAML, the key is `key:` followed by a space or the line's end (`key:value` is
-/// no key at all).
 pub(super) fn value(block: &[&str], key: &str) -> Option<(usize, String)> {
     let at = block.iter().position(|l| {
         l.strip_prefix(key)

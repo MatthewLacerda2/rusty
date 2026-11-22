@@ -1,15 +1,4 @@
-//! `cfg-test-switch`: live code never switches on `cfg!(test)`.
-//!
-//! `cfg!(test)` is true only while a crate builds its *own* unit tests. In a
-//! workspace, every other crate's tests (and `tests/`, the root's integration
-//! binary) link the crate's normal build, where it is false: a behaviour meant
-//! for "under test" silently never happens for them. A switch a test elsewhere
-//! relies on is a test hook instead, compiled in every build and off until a test
-//! arms it (`crates/CLAUDE.md`, *Test hooks*). A `cfg!(…)` naming `test` on a
-//! production line of an engine source (`test_code.rs` says which lines are
-//! tests) is a finding; one that only the crate's own tests need says why with
 //! `// lint: allow(cfg-test-switch) <why>`. A `#[cfg(test)]` gate is not a switch
-//! and never counts.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -17,8 +6,6 @@ use crate::code::code_lines;
 
 pub const RULE: &str = "cfg-test-switch";
 
-/// Every production line of `path` (`test`, per line) holding a `cfg!` that names
-/// `test`.
 pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with("src/") {
@@ -40,7 +27,6 @@ pub fn check_file(path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
         .collect()
 }
 
-/// Does `code` hold a `cfg!(…)` whose predicate names the word `test`?
 fn switches(code: &str) -> bool {
     code.match_indices("cfg!(").any(|(at, open)| {
         let rest = &code[at + open.len()..];
@@ -62,7 +48,6 @@ fn switches(code: &str) -> bool {
     })
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(|p, s| check_file(p, s, scan.test_lines(p)))
 }

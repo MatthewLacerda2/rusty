@@ -1,5 +1,3 @@
-//! The proof's edges: lifetimes, joined punctuation and the line it names.
-
 use super::tests::{passes, prove};
 
 #[test]

@@ -1,39 +1,4 @@
-//! `test-static-write`: a test never writes a process-wide `static`.
-//!
-//! nextest gives each test a process of its own, but the one-process run
-//! (`cargo test`, `make test-one-process`) shares one between every test of a
-//! binary, on many threads (`docs/testing.md`, *Every module can share one
-//! process*). A test that stores to a crate `static` (a flag it flips, a counter it
-//! resets, a cache it fills) passes the gates and then fails, or silently stops
-//! testing, there. Two shapes are findings:
-//!
-//! - a **test line** writing a `static` declared outside a `thread_local!`: an
-//!   atomic's `.store(`, `.swap(`, `.fetch_*(` or `.compare_exchange*(`, a
-//!   `OnceLock`'s `.set(` or `.get_or_init(` (a cache filled), an `RwLock`'s
-//!   `.write()`, or a `.lock()` whose guard (past one `.unwrap()`,
-//!   `.unwrap_or_else(..)` or `.expect(..)`) is written through: assigned
-//!   (`*X.lock().unwrap() = …`), a field or index of it assigned (`.count += 1`),
-//!   or a mutating first call (`.push*(`, `.pop*(`, `.insert(`, `.sort*(`, …, a
-//!   one-argument `.replace(`). A chain rustfmt split onto `.`-led lines is read
-//!   as one line;
-//! - a **test hook** writing one: the same write on a production line inside a
-//!   `fn` whose doc says it is a test hook, or anywhere in a file whose `//!`
-//!   header says so (`crates/CLAUDE.md`, *Test hooks*), which every test that
-//!   arms it inherits.
-//!
-//! The sound shapes are state owned by the value under test
-//! (`lighting::lightmap::Rays::counted`), a `thread_local!` when the code under
-//! test runs on the test's own thread, and a child process when the state is truly
-//! process-wide. A write that is sound anyway (a one-shot, idempotent install)
 //! says why with `// lint: allow(test-static-write) <why>`.
-//!
-//! A line scan, not a type checker. It cannot see a guard bound on one line and
-//! written through on the next (`let mut g = X.lock()…; g.push(…)`), a guard
-//! call whose argument spans lines, a `LazyLock` filled by being read, a static
-//! reached through a function that is not marked as a test hook, process-wide
-//! state behind another crate's API (a registry a call appends to), nor
-//! `crates/test-support/`, which holds process-wide statics (`logs.rs`' `KEPT`,
-//! `ONCE`) that the shared test-line definition does not count as test code: those stay the nightly one-process run's to catch.
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::code::bare_lines;
@@ -44,18 +9,15 @@ pub use writes::writes;
 
 pub const RULE: &str = "test-static-write";
 
-/// The `static` names one file declares: process-wide, and inside a `thread_local!`.
 #[derive(Default)]
 pub struct Decls {
     pub process: BTreeSet<String>,
     pub local: BTreeSet<String>,
 }
 
-/// The statics `bare` (a file's [`bare_lines`]) declares.
 pub fn decls(bare: &[String]) -> Decls {
     let mut out = Decls::default();
     let mut depth = 0i32;
-    // The depth a `thread_local!` opened at, while its body is still open.
     let mut local_at: Option<i32> = None;
     for line in bare {
         if local_at.is_none() && line.contains("thread_local!") {
@@ -82,7 +44,6 @@ pub fn decls(bare: &[String]) -> Decls {
     out
 }
 
-/// The name a `static NAME:` on `line` declares, `static mut` included.
 fn declared(line: &str) -> Option<String> {
     let mut words = line
         .split(|c: char| !(c.is_alphanumeric() || c == '_' || c == '\''))
@@ -99,8 +60,6 @@ fn declared(line: &str) -> Option<String> {
     (upper && rest.trim_start().starts_with(':')).then(|| name.to_string())
 }
 
-/// Is the production line `at` of `bare` inside a `fn` whose doc (`raw`'s comment
-/// and attribute lines right above it) calls it a test hook?
 pub fn in_test_hook(bare: &[String], raw: &[&str], at: usize) -> bool {
     let indent = |l: &str| l.len() - l.trim_start().len();
     let mine = indent(&bare[at]);
@@ -118,14 +77,12 @@ pub fn in_test_hook(bare: &[String], raw: &[&str], at: usize) -> bool {
         .any(|l| l.to_lowercase().contains("test hook"))
 }
 
-/// Does the file's `//!` header call the whole module a test hook?
 fn hook_module(raw: &[&str]) -> bool {
     raw.iter()
         .take_while(|l| l.trim_start().starts_with("//!"))
         .any(|l| l.to_lowercase().contains("test hook"))
 }
 
-/// Line `i` of `bare`, with the `.`-led lines rustfmt split its chain onto.
 fn chained(bare: &[String], i: usize) -> std::borrow::Cow<'_, str> {
     let next = bare[i + 1..]
         .iter()
@@ -139,8 +96,6 @@ fn chained(bare: &[String], i: usize) -> std::borrow::Cow<'_, str> {
     joined.into()
 }
 
-/// The findings of one file (`bare`, its [`bare_lines`]), given which `static`
-/// names are process-wide for it.
 pub fn check_file(
     path: &str,
     source: &str,
@@ -183,15 +138,10 @@ pub fn check_file(
         .collect()
 }
 
-/// The directory `path` sits in, `""` at the root.
 fn dir(path: &str) -> &str {
     path.rsplit_once('/').map_or("", |(d, _)| d)
 }
 
-/// The rule over every scanned file. A name a file declares is what that file
-/// says; any other is process-wide when some file declares it so, unless a file
-/// in its directory or the one above declares it thread-local: the same name is
-/// a `static` in one module and a `thread_local!` in another.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let bare: BTreeMap<&str, Vec<String>> = scan
         .files

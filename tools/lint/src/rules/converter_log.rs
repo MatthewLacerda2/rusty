@@ -1,16 +1,3 @@
-//! `converter-log`: a converter reports, never logs or discards (#1172).
-//!
-//! A converter that logs a failure and carries on returns `Ok`, and the import
-//! cache stamps a file missing a part as current (#1168); one that logs a skip is
-//! heard once, then never again from the cache. So a converter returns what it
-//! skipped in `Converted` and fails on anything else, and `convert::refresh`
-//! alone warns. Under `src/asset/convert/` (a module path, `crates/asset/src/convert/`
-//! on disk), every module but [`NOT_CONVERTERS`]
-//! is a converter's, a folder or a single file, and a code line there that names
-//! `log::` or a bare logging macro is a finding. Its root (`<name>/mod.rs` or
-//! `<name>.rs`) must also carry [`DENY`], however rustfmt wraps it: clippy, not
-//! this scan, then refuses `let _ =` on a `Result`, a discarded `.ok()` and a
-//! print there. A `drop(result)` or `_ = expr;` gets past both. A real need says
 //! why with `// lint: allow(converter-log) <why>`.
 
 use super::finding::Finding;
@@ -19,12 +6,6 @@ use crate::code::{strip_comment, Open};
 
 pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
-/// Modules under [`ROOT`] that are not converters: the cache itself, the table of
-/// converters, the files a conversion depends on, the switch Play turns off, its
-/// lock and its stamp record, which report, the swap, whether a cache is current,
-/// what resolves a texture
-/// reference through the cache, and the cache's tests. A new module of the cache's
-/// own goes here.
 const NOT_CONVERTERS: &[&str] = &[
     "converter",
     "depends",
@@ -38,17 +19,12 @@ const NOT_CONVERTERS: &[&str] = &[
     "tests",
     "texture_ref",
 ];
-/// What a converter's root module carries: every lint it names, in one inner
-/// `deny`, wrapped or not.
 pub const DENY: &str = "#![deny(clippy::let_underscore_must_use, clippy::unused_result_ok, \
                         clippy::print_stdout, clippy::print_stderr)]";
-/// What a converter must not call.
 const LOGGING: &[&str] = &[
     "log::", "log!", "warn!", "error!", "info!", "debug!", "trace!",
 ];
 
-/// Every logging line of a converter's source, and a converter root without
-/// [`DENY`].
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     let Some(name) = converter(&at) else {
@@ -81,7 +57,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     found
 }
 
-/// The converter `path` belongs to, if any: its folder, or its file's stem.
 fn converter(path: &str) -> Option<&str> {
     let rest = path.strip_prefix(ROOT)?;
     let name = match rest.split_once('/') {
@@ -91,7 +66,6 @@ fn converter(path: &str) -> Option<&str> {
     (!NOT_CONVERTERS.contains(&name)).then_some(name)
 }
 
-/// Does `code` call a logging macro, with no identifier character before it?
 fn logs(code: &str) -> bool {
     LOGGING.iter().any(|name| {
         code.match_indices(name).any(|(at, _)| {
@@ -103,8 +77,6 @@ fn logs(code: &str) -> bool {
     })
 }
 
-/// Does `source` carry an inner `#![deny(…)]` naming every lint [`DENY`] names?
-/// Read across the lines rustfmt wraps it over, comments stripped.
 fn denies(source: &str) -> bool {
     let wanted = lints(DENY).unwrap_or_default();
     let mut open = Open::None;
@@ -126,7 +98,6 @@ fn denies(source: &str) -> bool {
     false
 }
 
-/// The lints a whole `#![deny(…)]` names; `None` while it is not closed yet.
 fn lints(attr: &str) -> Option<Vec<&str>> {
     let inner = attr.strip_prefix("#![deny(")?.strip_suffix(")]")?;
     Some(
@@ -138,7 +109,6 @@ fn lints(attr: &str) -> Option<Vec<&str>> {
     )
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

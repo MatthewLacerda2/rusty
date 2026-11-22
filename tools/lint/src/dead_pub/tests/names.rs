@@ -1,6 +1,3 @@
-//! Every way a file names a sibling crate or the lib, folded: each form the fold
-//! rewrites, and each it must leave and report.
-
 use super::super::fold;
 
 fn members() -> Vec<(String, String)> {
@@ -78,9 +75,6 @@ fn a_form_the_fold_cannot_rewrite_is_left_and_reported() {
     assert!(left("pub use rusty_font::{Glyph, Font};\n").is_empty());
 }
 
-/// A bare `rusty` or `rusty_<m>` outside a crate position is a variable, a
-/// field, a parameter or a later path segment: folded as written, never
-/// reported.
 #[test]
 fn a_bare_name_outside_a_crate_position_is_left_and_not_reported() {
     let src = "let rusty = 1;\nfn f(rusty: u32, rusty_font: u8) {}\n\
@@ -122,8 +116,6 @@ fn a_crate_position_spans_lines_and_attributes() {
     }
 }
 
-/// Every spelling of a whole-crate re-export, and the lib's `{self}`: the item,
-/// not the line, decides `pub`.
 #[test]
 fn a_whole_crate_reexport_or_the_lib_alone_is_reported_in_any_spelling() {
     let cases = [

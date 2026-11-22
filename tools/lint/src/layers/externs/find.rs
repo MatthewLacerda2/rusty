@@ -1,28 +1,18 @@
-//! Which external crates a file names: the scan behind the crate half of the table
-//! (#938). Not a parser, like the sibling-crate scan beside it, but it knows the one
-//! thing a line scan gets wrong: a local item that shares a crate's name. A file
-//! that declares `mod image;` or imports `super::image` means its own `image::` when
-//! it writes one, so that name is not counted there. Glob imports (`use super::*`)
-//! are not followed.
-
 use crate::layers::scan::{is_ident, live_lines};
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-/// One external crate named at `line`.
 pub struct CrateRef {
     pub line: usize,
     pub krate: String,
 }
 
-/// Every reference to one of `crates` in the live code of `content`: the first
-/// segment of a `use` path, or a `name::` path anywhere else.
+/// A file that declares `mod image;` or imports `super::image` means its own `image::`, not the crate.
 pub fn crate_refs(content: &str, crates: &BTreeSet<String>) -> Vec<CrateRef> {
     let lines = live_lines(content);
     let uses = use_statements(&lines);
     let mut shadowed: BTreeSet<String> = lines.iter().filter_map(|(_, c)| mod_name(c)).collect();
     for (_, paths) in &uses {
-        // Any import but `use <crate>;` binds a name that is no longer the crate.
         for (path, binding) in paths {
             if path.as_slice() != std::slice::from_ref(binding) {
                 shadowed.insert(binding.clone());
@@ -51,20 +41,16 @@ pub fn crate_refs(content: &str, crates: &BTreeSet<String>) -> Vec<CrateRef> {
     out
 }
 
-/// `mod x;` / `pub mod x {` → `x`.
 fn mod_name(code: &str) -> Option<String> {
     let t = code.trim_start();
     let t = t
         .strip_prefix("pub")
         .map_or(t, |r| r.trim_start_matches(|c| c != ' '));
     let rest = t.trim_start().strip_prefix("mod ")?;
-    // An empty name (`mod {`) shadows nothing: no crate is named "".
     let end = rest.find(|c: char| !is_ident(c)).unwrap_or(rest.len());
     Some(rest[..end].to_string())
 }
 
-/// Each `use … ;` statement: the lines it spans and its flattened paths, each with
-/// the name it binds.
 type Paths = Vec<(Vec<String>, String)>;
 
 fn use_statements(lines: &[(usize, Cow<str>)]) -> Vec<(std::ops::Range<usize>, Paths)> {
@@ -86,7 +72,6 @@ fn use_statements(lines: &[(usize, Cow<str>)]) -> Vec<(std::ops::Range<usize>, P
     out
 }
 
-/// The tree after `use` on a line that opens a use statement, else `None`.
 fn use_tree_start(code: &str) -> Option<&str> {
     let t = code.trim_start();
     let t = match t.strip_prefix("pub") {
@@ -97,9 +82,6 @@ fn use_tree_start(code: &str) -> Option<&str> {
     t.strip_prefix("use ")
 }
 
-/// Flatten a use tree (`a::{b, c::{d as e}}`) into `(path, binding)` pairs. A glob
-/// binds nothing and is dropped; `self` binds the segment before it. Shared with
-/// the `api-parity` rule's alias scan.
 pub fn flatten(tree: &str) -> Paths {
     let tokens = tokenize(tree);
     let mut out = Vec::new();
@@ -109,9 +91,6 @@ pub fn flatten(tree: &str) -> Paths {
 
 type Tokens<'a> = std::iter::Peekable<std::slice::Iter<'a, String>>;
 
-/// One path of the tree from `tokens`, after `prefix`, onto `out`, up to the `,`
-/// or `}` that ends it (left for the group to read). Every loop takes a token
-/// each turn or stops, so a tree of any shape is read to its end.
 fn walk(tokens: &mut Tokens, prefix: &[String], out: &mut Paths) {
     let mut path = prefix.to_vec();
     while let Some(tok) = tokens.next_if(|t| *t != "," && *t != "}") {
@@ -137,9 +116,7 @@ fn walk(tokens: &mut Tokens, prefix: &[String], out: &mut Paths) {
     }
 }
 
-/// The paths of a `{…}` group whose `{` was just read, its `}` included.
 fn group(tokens: &mut Tokens, prefix: &[String], out: &mut Paths) {
-    // `{}`, or the `}` after a trailing comma, closes it with no path
     while tokens.next_if(|t| *t == "}").is_none() {
         walk(tokens, prefix, out);
         if tokens.next_if(|t| *t == ",").is_none() {
@@ -166,8 +143,6 @@ fn tokenize(tree: &str) -> Vec<String> {
     out
 }
 
-/// The leading segment of every `name::` path on a line: an identifier right before
-/// a `::` that is not itself the tail of a longer path (`a::name::`).
 fn path_heads(code: &str) -> Vec<String> {
     let mut out = Vec::new();
     for (at, _) in code.match_indices("::") {

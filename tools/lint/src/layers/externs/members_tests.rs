@@ -114,8 +114,6 @@ fn a_sim_member_testing_against_a_platform_sibling_below_it_is_flagged() {
     let found = display("physics", text, &rows, &POLICY);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].starts_with("PLATFORM_DEV_CRATE crates/physics/Cargo.toml → rusty-logging"));
-    // The real table's own platform rows sit above every sim row: a dev-dependency
-    // there is `STRAY_DEV_CRATE`'s, so one line never gets two findings.
     let up = "[dev-dependencies]\nrusty-render = { workspace = true }\n";
     assert!(display("physics", up, LAYERS, &POLICY).is_empty());
     assert_eq!(dev_stray("physics", up, LAYERS).len(), 1);
@@ -133,7 +131,6 @@ fn test_support_naming_a_sibling_or_a_display_crate_is_flagged() {
     assert_eq!(found.lines().count(), 3, "{found}");
     let plain = "[dependencies]\nimage = { workspace = true }\nlog = { workspace = true }\n";
     assert!(support("test-support", plain).is_empty());
-    // A module of the table is its row's business, not this check's.
     assert!(support("physics", text).is_empty());
 }
 

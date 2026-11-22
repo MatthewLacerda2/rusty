@@ -1,25 +1,3 @@
-//! `--dead-pub`: `pub` items nothing in the project uses. A **signal**,
-//! never a gate: it prints and exits 0, and exits 1 only when it produced no report.
-//!
-//! A `pub` item across a crate boundary is never dead to rustc, and the engine is a
-//! workspace of one crate per module. So on a copy of the tree under
-//! `target/dead-pub/` (the worktree is never touched) the fold rebuilds the one-crate
-//! shape for the check only: [`workspace`] mounts every member crate as a
-//! crate-private module of the root's lib and gives the root their dependencies,
-//! [`fold`] folds every bin and the integration suite in as modules, and every
-//! `rusty_<m>` becomes `crate::<m>`, as a path or bare ([`names`]). A use from
-//! another crate is then a use rustc sees. `cargo check --lib` runs twice with `--features dev`: with `--profile
-//! test` (dead even counting tests) and without (the difference is what only tests
-//! use). Both share this worktree's `target/`, so only the copied crate compiles.
-//! Code behind `not(feature = "dev")` is not seen. A fold that made nothing
-//! crate-private is an error, not an empty report: a layout the fold does not know
-//! would otherwise read as "nothing dead". It runs weekly on `main`
-//! (`cargo-test.yml`'s `dead-pub` job), so a fold that stops compiling goes red
-//! there instead of silently; a name the fold cannot rewrite is caught sooner, by
-//! the `fold-names` rule in `make rules` ([`names::Left`]).
-//!
-//! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --dead-pub` (`make dead-pub`)
-
 pub mod fold;
 pub mod names;
 pub mod platform;
@@ -33,10 +11,8 @@ use std::path::Path;
 use std::process::{exit, Command};
 
 const REPORT: &str = ".lint/dead-pub.txt";
-/// Never copied: build output, git, the operator's worktrees and run output.
 const SKIP: &[&str] = &["target", ".git", ".claude", ".lint", "out"];
 
-/// Entry point, from the repo root.
 pub fn run() {
     let root = std::env::current_dir().expect("current dir");
     let tree = root.join("target/dead-pub/tree");
@@ -63,7 +39,6 @@ pub fn run() {
     }
 }
 
-/// `body` into `report`, its directory made first.
 fn write_report(report: &Path, body: &str) -> io::Result<()> {
     if let Some(dir) = report.parent() {
         fs::create_dir_all(dir)?;
@@ -71,9 +46,6 @@ fn write_report(report: &Path, body: &str) -> io::Result<()> {
     fs::write(report, body)
 }
 
-/// Copy `root` to `tree` (a fresh copy) and fold its members and callers into its
-/// lib. An error when the fold made nothing crate-private: then rustc would see
-/// every `pub` item as used and the report would be empty for the wrong reason.
 pub fn prepare(root: &Path, tree: &Path, lib_name: &str) -> io::Result<()> {
     if tree.exists() {
         fs::remove_dir_all(tree)?;
@@ -137,7 +109,6 @@ pub fn prepare(root: &Path, tree: &Path, lib_name: &str) -> io::Result<()> {
     Ok(())
 }
 
-/// `cargo check --lib` of `tree`: the unused-item warnings, or an error when it failed.
 pub fn check(
     tree: &Path,
     target: &Path,
@@ -145,10 +116,6 @@ pub fn check(
     features: &[&str],
 ) -> io::Result<std::collections::BTreeSet<report::Warning>> {
     let mut cargo = Command::new("cargo");
-    // Folded into the lib, an integration test's `env!("CARGO_BIN_EXE_<bin>")`
-    // is not defined: cargo sets it only for an integration test target. rustc
-    // reads `env!` from its environment, and the folded binary never runs, so
-    // any value will do (#1205).
     for bin in fold::bins(&fs::read_to_string(tree.join("Cargo.toml"))?) {
         let exe = target.join("dead-pub/never-run").join(&bin.name);
         cargo.env(format!("CARGO_BIN_EXE_{}", bin.name), exe);
@@ -157,9 +124,6 @@ pub fn check(
         .current_dir(tree)
         .args(["check", "--lib", "--message-format", "short"]);
     cargo.arg("--target-dir").arg(target).args(profile);
-    // Not `--locked`: the fold rewrote the root's dependency list, so its entry in
-    // the copied `Cargo.lock` changes. Every other entry, version and git rev stays
-    // what the lock says: cargo re-resolves only what the manifest moved.
     if !features.is_empty() {
         cargo.args(["--features", &features.join(",")]);
     }
@@ -191,7 +155,6 @@ fn copy(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
-/// `visit` on every `.rs` under `dir`, when it exists.
 fn each_rs(dir: &Path, visit: &mut dyn FnMut(&Path) -> io::Result<()>) -> io::Result<()> {
     if !dir.is_dir() {
         return Ok(());

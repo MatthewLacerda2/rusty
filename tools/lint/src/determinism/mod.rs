@@ -1,32 +1,4 @@
-//! Determinism gate — protects the headless harness's bit-determinism.
-//!
-//! The simulation must be a pure function of (seed, inputs, fixed dt). Wall-clock
-//! reads and unseeded RNG break replayability, so they are banned from the sim —
-//! and so are `std`'s hash maps, whose OS-seeded hasher is an unseeded RNG that
-//! decides their iteration order (#764).
-//! **Clippy enforces the ban** (#757): `clippy.toml` lists the banned items under
-//! `disallowed-methods` / `disallowed-types` and `Cargo.toml` denies both lints.
-//! Clippy matches resolved paths, so an alias (`use std::time::Instant as Clock`)
-//! or a re-export can't slip past the way it did the old substring scan.
-//!
-//! The ban is crate-wide, so the platform modules that need real time opt out with
-//! `#![allow(clippy::disallowed_methods, clippy::disallowed_types)]` at their module
-//! root. This gate keeps that escape hatch honest:
-//! - only a platform row's root (`src/<module>/mod.rs`, from the layer table,
-//!   `layers/table.rs`) may name those lints, or allow the groups that hold them;
-//! - `clippy.toml` still lists every banned item, and `Cargo.toml` still denies them.
-//!
-//! The ban also covers process-wide state (`std::env::set_var`, `set_current_dir`,
-//! #977), which a sim module may own for one statement: `project::open` moves the
-//! working directory. That statement's opt-out carries
 //! `// lint: allow(statement-opt-out) <why>` (the rules gate's inline allow).
-//!
-//! It also holds the rest of the lint policy (#961): `Cargo.toml` still denies an
-//! `#[allow]` and an exception without a `reason`, `clippy.toml` still lets test
-//! code unwrap, and the locked lints keep their exact escapes (`escapes.rs`).
-//!
-//! Usage: `cargo run --manifest-path tools/lint/Cargo.toml -- --determinism`
-//! Exit code 1 on any violation; report mirrored to `.lint/report.txt`.
 
 mod escapes;
 
@@ -35,7 +7,6 @@ use crate::gates::Verdict;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Every item the ban must cover, each as it appears in a `path = "…"` of `clippy.toml`.
 const BANNED: &[&str] = &[
     "std::time::Instant::now",
     "std::time::Instant::elapsed",
@@ -52,26 +23,20 @@ const BANNED: &[&str] = &[
     "std::collections::HashMap",
     "std::collections::HashSet",
     "std::hash::RandomState",
-    // Process-wide state (#977): banned crate-wide so no test races another on it.
     "std::env::set_var",
     "std::env::remove_var",
     "std::env::set_current_dir",
 ];
 
-/// The `Cargo.toml` `[lints.clippy]` lines that turn the ban into an error.
 const DENIES: &[&str] = &[
     "disallowed_methods = \"deny\"",
     "disallowed_types = \"deny\"",
-    // Every exception carries its reason (#961): `#[expect(lint, reason = "…")]`.
     "allow_attributes = \"deny\"",
     "allow_attributes_without_reason = \"deny\"",
 ];
 
-/// The `clippy.toml` lines the policy rests on: test code unwraps freely, so the
-/// sim's `unwrap_used` ban needs no per-test exception (#961).
 const SETTINGS: &[&str] = &["allow-unwrap-in-tests = true"];
 
-/// Names that switch the ban off: the two lints, and the groups that contain them.
 const OPT_OUTS: &[&str] = &[
     "clippy::disallowed_methods",
     "clippy::disallowed_types",
@@ -80,16 +45,12 @@ const OPT_OUTS: &[&str] = &[
 ];
 
 /// The rule a `lint: allow(…)` names to excuse one statement's opt-out: one call
-/// the ban covers for another reason (`std::env::set_current_dir`, #977), never a clock.
 const STATEMENT_OPT_OUT: &str = "statement-opt-out";
 
-/// The gate over the repository at `base`: the clippy config and every opt-out
-/// under `src/` and the member crates, and the locked lints' escapes.
 pub fn verdict(base: &Path, _: &[String]) -> Verdict {
     let read = |p: &Path| fs::read_to_string(p).unwrap_or_default();
     let root_manifest = read(&base.join("Cargo.toml"));
     let mut violations = config_violations(&read(&base.join("clippy.toml")), &root_manifest);
-    // The root package (the binaries and `tests/`) inherits the policy too.
     violations.extend(member_violations("Cargo.toml", &root_manifest));
     for manifest in crate::modules::member_manifests(base) {
         let at = relative(base, &manifest);
@@ -121,7 +82,6 @@ pub fn verdict(base: &Path, _: &[String]) -> Verdict {
     })
 }
 
-/// `path` as the repository at `base` names it: opt-outs are judged by module path.
 fn relative(base: &Path, path: &Path) -> String {
     path.strip_prefix(base)
         .unwrap_or(path)
@@ -129,7 +89,6 @@ fn relative(base: &Path, path: &Path) -> String {
         .into_owned()
 }
 
-/// The banned items missing from `clippy.toml`, and the lints `Cargo.toml` no longer denies.
 fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
     let unset = SETTINGS
         .iter()
@@ -146,9 +105,6 @@ fn config_violations(clippy_toml: &str, cargo_toml: &str) -> Vec<String> {
     missing.chain(undenied).chain(unset).collect()
 }
 
-/// A package (the root's or a member crate's) that does not inherit the
-/// workspace's lints: its code would escape the clock ban and every deny above.
-/// Defining `[workspace.lints]` applies it to nobody; each package opts in.
 fn member_violations(path: &str, manifest: &str) -> Vec<String> {
     let mut section = "";
     let inherits = manifest.lines().any(|l| {
@@ -168,7 +124,6 @@ fn member_violations(path: &str, manifest: &str) -> Vec<String> {
     }
 }
 
-/// Every line of `path` that opts out of the ban, unless `path` is a platform root.
 fn opt_out_violations(path: &str, content: &str, roots: &[String]) -> Vec<String> {
     if roots
         .iter()
@@ -191,8 +146,6 @@ fn opt_out_violations(path: &str, content: &str, roots: &[String]) -> Vec<String
     out
 }
 
-/// Whether `code` names the lint `name` as a whole path (so `clippy::all` does not
-/// match `clippy::all_something`).
 fn names_lint(code: &str, name: &str) -> bool {
     code.match_indices(name).any(|(at, _)| {
         let next = code[at + name.len()..].chars().next();
@@ -200,7 +153,6 @@ fn names_lint(code: &str, name: &str) -> bool {
     })
 }
 
-/// Every `.rs` file under `dir`, or `dir` itself when it is one (`build.rs`).
 fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
     if dir.is_file() {
         out.push(dir.to_path_buf());

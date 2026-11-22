@@ -1,11 +1,6 @@
-//! The one temp-repo scaffold the lint tool's tests share (#1387).
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// A scratch directory under the temp dir, removed when dropped; a git repository
-/// when `git` is set. Its git calls go through [`super::git`], so an outer repository
-/// (a hook, `git rebase -x`) is never the one that answers.
 pub struct Repo(pub PathBuf);
 
 impl Repo {

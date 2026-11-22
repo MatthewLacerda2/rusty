@@ -1,35 +1,5 @@
-//! `stored-format`: a module that keeps a serde type in a file says so (#1966).
-//!
-//! `make review-level` (`.github/scripts/dispatch/review_level.py`) reviews a
-//! change to an on-disk format at `high`. It used to learn which modules those are
-//! from a hand-kept path table, and missed a new format three times in one batch
-//! (#1946's hull sidecars, #1942's `.animgraph`, PR #1962's `.occlusion`): each new
-//! format is a module the table had not heard of. Now the module declares it where
-//! it lives, in its top doc comment:
-//!
-//! ```text
 //! //! stored-format: the `<scene>.occlusion` file beside the scene
-//! ```
-//!
-//! A marker in `mod.rs` (a crate's `lib.rs`) covers its directory and
-//! everything under it; one in `x.rs` covers that file and `x/`. `review_level.py` reads the markers.
-//!
-//! This rule keeps the marker from being forgotten. A non-test file of `src/` is a
-//! finding, on every file read or write, when it
-//! * reads or writes a file (`fs::write`, `fs::read`, `fs::read_to_string`,
-//!   `File::open`, `File::create`, `OpenOptions`, `write_atomic`, and
-//!   `written::write`, which every engine asset write goes through), and
-//! * either encodes or decodes with a serde format crate (`serde_json::to_*` or
-//!   `serde_json::from_*`), wherever the type is derived, or names serde
-//!   (`serde_json`, `serde::`) in a directory whose non-test code derives
-//!   `Serialize` or `Deserialize`,
-//!
-//! and no marker covers it. Every IO line is reported, so an allow on one never
-//! excuses another. A file that uses serde and touches disk for another reason
-//! (it reads a script, not a document) says so with
 //! `// lint: allow(stored-format) <why>` on each such line. A format coded by hand (the
-//! binary `.occlusion` and `.navmesh` files, a KTX2 cubemap) never trips the rule:
-//! its module is marked by hand. A marker with no text after the colon is a finding.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -38,8 +8,6 @@ use crate::code::{code_lines, is_ident};
 pub const RULE: &str = "stored-format";
 pub const MARKER: &str = "//! stored-format:";
 
-/// What reads or writes a file. Each must stand alone as a word at its end, so
-/// `fs::read` is not `fs::read_dir`.
 const IO: &[&str] = &[
     "fs::write",
     "fs::read",
@@ -51,11 +19,8 @@ const IO: &[&str] = &[
     "written::write",
 ];
 
-/// A serde format crate's encode or decode call: the type it moves may be
-/// derived anywhere, so these say "a document" on their own.
 const CODEC: &[&str] = &["serde_json::to_", "serde_json::from_"];
 
-/// One scanned source: its path, its text, and which lines are test code.
 pub struct Source<'a> {
     pub path: &'a str,
     pub text: &'a str,
@@ -70,7 +35,6 @@ fn ends_word(code: &str, token: &str) -> bool {
     })
 }
 
-/// The code lines of `s` that are not test code, numbered from 1.
 fn live<'a>(s: &'a Source) -> Vec<(usize, std::borrow::Cow<'a, str>)> {
     code_lines(s.text)
         .into_iter()
@@ -80,7 +44,6 @@ fn live<'a>(s: &'a Source) -> Vec<(usize, std::borrow::Cow<'a, str>)> {
         .collect()
 }
 
-/// The code lines joined back into one text, so a construct may span lines.
 fn joined(code: &[(usize, std::borrow::Cow<str>)]) -> String {
     code.iter()
         .map(|(_, c)| c.as_ref())
@@ -88,8 +51,6 @@ fn joined(code: &[(usize, std::borrow::Cow<str>)]) -> String {
         .join("\n")
 }
 
-/// Whether any `derive(...)` in `code` names `Serialize` or `Deserialize`, also
-/// when rustfmt wraps the list over several lines.
 fn derives_serde(code: &str) -> bool {
     code.match_indices("derive(").any(|(at, open)| {
         let rest = &code[at + open.len()..];
@@ -98,7 +59,6 @@ fn derives_serde(code: &str) -> bool {
     })
 }
 
-/// The text of the file's marker, if it has one (empty when it says nothing).
 pub fn marker(text: &str) -> Option<(usize, &str)> {
     text.lines().enumerate().find_map(|(i, l)| {
         l.trim_start()
@@ -107,10 +67,6 @@ pub fn marker(text: &str) -> Option<(usize, &str)> {
     })
 }
 
-/// Whether a marked file covers `path`: the file itself, a `mod.rs` of its
-/// directory or one above it, or the `<dir>.rs` beside any of those directories.
-/// Both sides are read at their module paths, so a crate's `lib.rs` covers its
-/// folder as the `mod.rs` it was (`shadergen`'s marker, #2140).
 pub fn covered(path: &str, marked: &[&str]) -> bool {
     use crate::modules::module_path;
     let path = &*module_path(path);
@@ -130,7 +86,6 @@ pub fn covered(path: &str, marked: &[&str]) -> bool {
     false
 }
 
-/// Every finding over `sources`.
 pub fn check(sources: &[Source]) -> Vec<Finding> {
     let mut found = Vec::new();
     let mut marked = Vec::new();
@@ -187,7 +142,6 @@ fn finding(path: &str, line: usize, message: &str) -> Finding {
     }
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let sources: Vec<Source> = scan
         .files

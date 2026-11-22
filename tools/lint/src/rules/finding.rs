@@ -1,27 +1,13 @@
-//! The one report shape and the one inline exception every rule shares (#934).
-//!
-//! A rule reports a [`Finding`] at `path:line`. Code that breaks a rule on purpose
-//! says why on that line, or in the comment and attribute lines right above it:
-//!
-//! ```text
 //! // lint: allow(prefix-group) one file per Unity component, mirrored in the editor
-//! ```
-//!
-//! The reason is required: an allow without one is itself a finding, under the
-//! [`ALLOW`] rule. Rules never grow their own flag or baseline for exceptions.
 
 use std::fmt;
 
-/// The rule an allow comment with no reason is reported under.
 pub const ALLOW: &str = "allow";
 const MARKER: &str = "lint: allow(";
 
-/// One broken rule, at one place.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Finding {
-    /// Repo-relative path, `/`-separated.
     pub path: String,
-    /// 1-based line the finding (and any allow for it) anchors to.
     pub line: usize,
     pub rule: &'static str,
     pub message: String,
@@ -37,10 +23,8 @@ impl fmt::Display for Finding {
     }
 }
 
-/// Which comment an allow is written in, chosen by the file's type: code's
 /// `// lint: allow(<rule>) <why>`, Lua's `-- lint: allow(<rule>) <why>`, or Markdown's
 /// `<!-- lint: allow(<rule>) <why> -->`, whose reason ends at the `-->`. Each file
-/// reads only its own form, so code quoting the other in a string is not an allow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Form {
     Code,
@@ -49,7 +33,6 @@ pub enum Form {
 }
 
 impl Form {
-    /// The form for the repo-relative `path`.
     pub fn of(path: &str) -> Form {
         if path.ends_with(".md") {
             Form::Markdown
@@ -68,15 +51,11 @@ impl Form {
         }
     }
 
-    /// Whether the trimmed `line` belongs to the run of comment (and, in code,
-    /// attribute) lines an allow above an item may sit in.
     fn continues(self, line: &str) -> bool {
         line.starts_with(self.opener()) || (self == Form::Code && line.starts_with("#["))
     }
 }
 
-/// An allow comment of `form` on `line`: the rule it names, and its reason
-/// (maybe empty).
 pub(super) fn parse_allow(line: &str, form: Form) -> Option<(&str, &str)> {
     // comment-cut: this reads the comment itself, never the code before it
     let comment = &line[line.find(form.opener())?..];
@@ -90,15 +69,10 @@ pub(super) fn parse_allow(line: &str, form: Form) -> Option<(&str, &str)> {
     Some((rest[..close].trim(), why.trim()))
 }
 
-/// Is the 1-based `line` of the code `source` excused from `rule`? An allow
-/// counts on the line itself or in the unbroken run of comment and attribute
-/// lines above it, and only when it gives a reason. [`allowed_in`] for a file
-/// whose type is known by its path.
 pub fn allowed(source: &str, line: usize, rule: &str) -> bool {
     allowed_as(Form::Code, source, line, rule)
 }
 
-/// [`allowed`], reading the allow form of `path`'s type ([`Form::of`]).
 pub fn allowed_in(path: &str, source: &str, line: usize, rule: &str) -> bool {
     allowed_as(Form::of(path), source, line, rule)
 }
@@ -121,8 +95,6 @@ fn allowed_as(form: Form, source: &str, line: usize, rule: &str) -> bool {
         .any(excuses)
 }
 
-/// Every allow in `source` (the file at `path`, read in its [`Form`]) that names a
-/// rule but gives no reason.
 pub fn unexplained(path: &str, source: &str) -> Vec<Finding> {
     source
         .lines()

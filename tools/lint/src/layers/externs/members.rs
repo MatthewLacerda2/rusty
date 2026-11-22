@@ -1,19 +1,7 @@
-//! Each member's manifest against its own row: a member `crates/<m>` that is a
-//! module of the table depends on exactly the sibling crates of its row's `deps` (as
-//! `rusty-<dep>`) and exactly the external crates of its row's `uses`, plus any of
-//! the common list. Cargo then holds the code to the manifest, so the row is what
-//! the crate can name. Its dev-dependencies may name a sibling crate only below its
-//! row ([`dev_stray`]): cargo accepts a dev-dependency cycle, the table does not.
-//! A sim member names no display crate at all, and its tests no platform sibling
-//! ([`display`]); a member that is no module names no sibling or display crate
-//! ([`support`]).
-
 use super::cargo::{dev_keys, keys};
 use super::policy::Policy;
 use crate::layers::table::Layer;
 
-/// Every dependency in the manifest `text` of the member `module` that its row
-/// lacks, and every one its row names that the manifest lacks.
 pub fn stray(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> Vec<String> {
     let Some(row) = layers.iter().find(|l| l.module == module) else {
         return Vec::new();
@@ -45,10 +33,7 @@ pub fn stray(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> Vec
     out
 }
 
-/// Every sibling crate the `[dev-dependencies]` of member `module` may not name: itself,
-/// or a module at or above its row (the table is acyclic, so a row below never reaches
-/// back). A member that is no module of the table (`rusty-test-support`) is no row's,
-/// so any member may take it.
+/// Cargo accepts a dev-dependency cycle; the table does not.
 pub fn dev_stray(module: &str, text: &str, layers: &[Layer]) -> Vec<String> {
     let Some(at) = layers.iter().position(|l| l.module == module) else {
         return Vec::new();
@@ -77,10 +62,6 @@ pub fn dev_stray(module: &str, text: &str, layers: &[Layer]) -> Vec<String> {
     out
 }
 
-/// Every display crate ([`Policy::is_display`]) the manifest of a sim member `module`
-/// names, as a dependency or a dev-dependency, and every platform sibling below its row
-/// in its dev-dependencies (one above is a [`dev_stray`]; one in `[dependencies]` is
-/// the row's, held by `SIM_LEAK`): the sim and its tests run with no GPU and no window.
 pub fn display(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> Vec<String> {
     let Some(at) = layers.iter().position(|l| l.module == module && l.sim) else {
         return Vec::new();
@@ -112,10 +93,6 @@ pub fn display(module: &str, text: &str, layers: &[Layer], policy: &Policy) -> V
     out
 }
 
-/// Every sibling and display crate the manifest of a member that is no module of the
-/// table (`modules::NOT_MODULES`: `rusty-test-support`) names. Any member may take it
-/// as a dev-dependency, unchecked, so it reaches nothing a sim crate's tests may not,
-/// and no sibling at all (a dev-dependency cycle the table cannot see).
 pub fn support(module: &str, text: &str) -> Vec<String> {
     if !crate::modules::NOT_MODULES
         .iter()
@@ -137,7 +114,6 @@ pub fn support(module: &str, text: &str) -> Vec<String> {
         .collect()
 }
 
-/// The manifest's dependencies and dev-dependencies, sorted, each once.
 fn all_keys(text: &str) -> Vec<String> {
     let mut named = keys(text);
     named.extend(dev_keys(text));

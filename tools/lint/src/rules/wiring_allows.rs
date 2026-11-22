@@ -1,12 +1,8 @@
-//! Every row's `Allow` column is the one meant, run over the must-flag cases of
-//! `wiring.rs`: an inline allow excuses a finding exactly when the row says it may.
-
 use super::scan::Scan;
 use super::wiring::case_for;
 use super::{Allow, RULES};
 use crate::repo::scaffold::Repo;
 
-/// The findings `all` keeps of rule `name` on `path`, over `repo`.
 fn kept(repo: &Repo, name: &str, path: &str) -> usize {
     let all = super::all(&Scan::at(&repo.0));
     all.iter()
@@ -14,15 +10,8 @@ fn kept(repo: &Repo, name: &str, path: &str) -> usize {
         .count()
 }
 
-/// The rules nothing may excuse, said here apart from `RULES`' `Allow` column so
-/// that switching a row's mode disagrees with it.
 const UNEXCUSABLE: &[&str] = &["fold-names", "ignored", "orphan-seeds", "root-tests"];
 
-/// Every row's `Allow` is the one meant: an inline allow above its must-flag
-/// finding excuses it (through the shared filter, or as an `Own` rule reads it)
-/// unless the rule is [`UNEXCUSABLE`], and only a `Never` row's survives it. A
-/// manifest's or a seed file's finding is one the shared filter cannot read, so
-/// `Inline` on `orphan-seeds` fails the second half.
 #[test]
 fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
     let mut broken = Vec::new();
@@ -37,7 +26,7 @@ fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
             .into_iter()
             .find(|f| f.path.ends_with(case.flags) && f.rule == *name)
         else {
-            continue; // the test above names it
+            continue;
         };
         let before = kept(&repo, name, &hit.path);
         let text = std::fs::read_to_string(repo.0.join(&hit.path)).unwrap_or_default();
@@ -56,8 +45,6 @@ fn an_inline_allow_on_each_row_s_finding_is_honoured_by_its_mode() {
     assert!(broken.is_empty(), "{}", broken.join("\n"));
 }
 
-/// An `Own` row skips the shared filter, so what the rule reports about its own
-/// allows survives one: `api-parity`'s stale allow, on an op no inspector writes.
 #[test]
 fn an_own_row_s_report_on_its_own_allow_is_not_excused_by_it() {
     let repo = Repo::new("wiring-own", true);

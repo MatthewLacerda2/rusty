@@ -1,13 +1,3 @@
-//! `full-literal`: a test builds a first-class component through a constructor or
-//! `..Default::default()`, never a literal naming every field (#663, #976).
-//!
-//! A literal that spells out every field breaks the day the component gains one,
-//! so one new field means a sweep across the suite, and a reader can't see which
-//! field the test is about. The rule is scoped to the first-class components (the
-//! `…Component` types `Entity` and the registry rows its fields are generated from
-//! name, `src/components/entity/mod.rs` and `registry.rs`, #2023): any struct
-//! expression in test code (`test_code.rs`) that names every field of one with
-//! three or more, with no `..rest`, is a finding. When every field is the point of the test, say so:
 //! `// lint: allow(full-literal) <why>`.
 
 use super::finding::Finding;
@@ -16,18 +6,12 @@ use crate::code::{code_lines, is_ident};
 use std::collections::BTreeMap;
 
 pub const RULE: &str = "full-literal";
-/// Where the component types are named: `Entity` (Transform) and the registry.
 const ENTITY: [&str; 2] = ["src/components/entity/mod.rs", "src/components/registry.rs"];
-/// A component with fewer fields is exempt: `MaterialComponent { name }` is the
-/// clearest way to build a one-field struct, and a new field there breaks few tests.
 const MIN_FIELDS: usize = 3;
 
-/// Each first-class component's name and its named fields.
 pub struct Components(BTreeMap<String, Vec<String>>);
 
 impl Components {
-    /// The components `Entity` names, with the fields of their `pub struct` in
-    /// `sources` (path, text). A component under [`MIN_FIELDS`] fields is left out.
     pub fn load<'a>(sources: impl IntoIterator<Item = (&'a str, &'a str)>) -> Self {
         let sources: Vec<_> = sources.into_iter().collect();
         let mut names = Vec::new();
@@ -47,8 +31,6 @@ impl Components {
         Components(map)
     }
 
-    /// Every full literal of a component in the test code of `path` (`test`, per
-    /// line).
     pub fn check(&self, path: &str, source: &str, test: &[bool]) -> Vec<Finding> {
         let stripped = code_lines(source);
         let lines: Vec<&str> = stripped.iter().map(|l| l.as_ref()).collect();
@@ -76,8 +58,6 @@ impl Components {
     }
 }
 
-/// The `…Component` type names in the body of `pub struct Entity`, or in the
-/// registry's rows (`first_class!`).
 fn component_types(source: &str) -> Vec<String> {
     let mut out: Vec<String> = Vec::new();
     let rows = source
@@ -95,7 +75,6 @@ fn component_types(source: &str) -> Vec<String> {
     out
 }
 
-/// The named fields of `pub struct name { … }` in `source`, if it is defined there.
 fn struct_fields(source: &str, name: &str) -> Option<Vec<String>> {
     let fields: Vec<String> = code_lines(&body(source, name)?)
         .iter()
@@ -113,7 +92,6 @@ fn struct_fields(source: &str, name: &str) -> Option<Vec<String>> {
     (!fields.is_empty()).then_some(fields)
 }
 
-/// The text between the braces of `pub struct name {`, joined by newlines.
 fn body(source: &str, name: &str) -> Option<String> {
     let head = format!("pub struct {name} {{");
     let mut lines = source
@@ -124,8 +102,6 @@ fn body(source: &str, name: &str) -> Option<String> {
     Some(body.join("\n"))
 }
 
-/// Byte offsets in `line` where a struct expression `name {` starts: the whole
-/// identifier, not a `struct`/`impl` header.
 fn literal_starts(line: &str, name: &str) -> Vec<usize> {
     line.match_indices(name)
         .filter(|(at, _)| {
@@ -141,8 +117,6 @@ fn literal_starts(line: &str, name: &str) -> Vec<usize> {
         .collect()
 }
 
-/// The field names a literal starting at `from` (the rest of the first line, then
-/// `rest[1..]`) sets at its top level, or `None` when it has a `..rest`.
 fn literal_fields(rest: &[&str], from: &str) -> Option<Vec<String>> {
     let text = std::iter::once(from)
         .chain(rest.iter().skip(1).copied())
@@ -180,7 +154,6 @@ fn literal_fields(rest: &[&str], from: &str) -> Option<Vec<String>> {
     Some(names)
 }
 
-/// The rule over every scanned file, with `Entity`'s components read from the scan.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let components = Components::load(scan.files.iter().map(|p| (p.as_str(), scan.source(p))));
     scan.each_file(|p, s| components.check(p, s, scan.test_lines(p)))
@@ -190,8 +163,6 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
 #[path = "full_literal_tests.rs"]
 mod tests;
 
-/// The real tree's components are found: the day `Entity` became generated from the
-/// registry (#2023), reading `Entity`'s body alone would have found only Transform.
 #[cfg(test)]
 #[test]
 fn the_real_tree_names_the_registry_components() {

@@ -1,21 +1,3 @@
-//! `fold-names`: every source the dead-pub fold rewrites names its sibling
-//! crates in a way the fold can fold.
-//!
-//! `make dead-pub` (`dead_pub`) compiles a copy of the workspace folded into one
-//! crate, so each member's, bin's and integration test's name for a sibling crate
-//! or the lib is rewritten to a `crate::` path. Compiling that copy takes a whole
-//! engine build, so it runs weekly, as a signal; a spelling it cannot rewrite
-//! would leave the signal red and silent until then. This rule reads the same
-//! files with the fold's own tokenizer (`dead_pub::names`), so it flags exactly
-//! what the rewrite cannot fold: a whole crate re-exported by a `pub use` (or
-//! `pub extern crate`, or `pub use rusty_<m>::{self …}`), and the lib named by
-//! itself (`use rusty;`, `use rusty::{self};`). Every other form folds: a path
-//! (`rusty_<m>::…`), and a bare name at a `use` head or in its top group, in an
-//! `extern crate`, or as a whole attribute or macro argument. A bare name
-//! anywhere else is no crate, and neither the fold nor the rule touches it.
-//! Nothing excuses a finding (`Allow::Never`): an allow would not make
-//! the folded copy compile, so the fix is the line, or teaching the fold the form.
-
 use super::finding::Finding;
 use super::scan::Scan;
 use crate::dead_pub::{fold, workspace};
@@ -23,9 +5,6 @@ use std::fs;
 
 pub const RULE: &str = "fold-names";
 
-/// The rule over the scanned files the fold rewrites: each member's `src/`,
-/// each `[[bin]]` and its module directory, and `tests/`. The root's own lib is
-/// not one: the fold mounts its re-exports instead (`workspace::mount`).
 pub fn run(scan: &Scan) -> Vec<Finding> {
     let read = |p: &str| fs::read_to_string(scan.root().join(p)).unwrap_or_default();
     let manifest = read("Cargo.toml");
@@ -68,7 +47,6 @@ pub fn run(scan: &Scan) -> Vec<Finding> {
     })
 }
 
-/// Every name in `source` the fold must leave, at its line.
 pub fn check(path: &str, source: &str, lib: &str, members: &[(String, String)]) -> Vec<Finding> {
     fold::unfoldable(source, "m", lib, members)
         .into_iter()

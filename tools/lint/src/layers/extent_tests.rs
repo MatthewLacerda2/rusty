@@ -5,7 +5,6 @@ fn bracket_delta(code: &str) -> i32 {
     brackets(code, &mut Open::None).1
 }
 
-/// The last line (1-based) of the item at line `from` (1-based) of `src`.
 fn end(src: &str, from: usize) -> usize {
     let lines: Vec<&str> = src.lines().collect();
     item_end(&lines, from - 1) + 1

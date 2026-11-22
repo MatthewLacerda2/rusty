@@ -1,15 +1,4 @@
-//! `atomic-write`: a file a reader may open is written through the one helper (#1129).
-//!
-//! `core::fs::write_atomic` writes beside the target under a name unique to the
-//! process and the call, renames it into place, and removes its temp file on any
-//! failure. Hand-rolled copies drifted (a fixed `.part` name two writers share, a
-//! pid-only one two threads share, litter left on failure), so a line of `src/`
-//! outside `src/core/fs/` whose code names `fs::rename` is a finding. A rename
-//! that is a move, not a write (a staged folder swapped in, a project migrated),
 //! says so with `// lint: allow(atomic-write) <why>`. A `rename` imported from
-//! `std::fs` (grouped, or aliased with `as`) is the same call, so a bare `rename(`
-//! in such a file is a finding too. `tests/` and `tools/` are not the engine and
-//! are not scanned.
 
 use super::finding::Finding;
 use super::scan::Scan;
@@ -18,10 +7,6 @@ use crate::code::code_lines;
 pub const RULE: &str = "atomic-write";
 const HOME: &str = "src/core/fs/";
 
-/// The names `std::fs::rename` is imported under: `rename`, or its `as` alias.
-///
-/// Reads each `use std::fs::...;` statement (it may span lines) and takes the
-/// `rename` item of a plain, grouped or aliased import.
 fn imported_names(code: &[std::borrow::Cow<str>]) -> Vec<String> {
     let text = code.join("\n");
     let mut names = Vec::new();
@@ -45,7 +30,6 @@ fn imported_names(code: &[std::borrow::Cow<str>]) -> Vec<String> {
     names
 }
 
-/// Whether `code` calls `name(` as a free function: not a method, a path tail or a longer word.
 fn calls_bare(code: &str, name: &str) -> bool {
     let call = format!("{name}(");
     code.match_indices(&call).any(|(i, _)| {
@@ -56,8 +40,6 @@ fn calls_bare(code: &str, name: &str) -> bool {
     })
 }
 
-/// Every line of an engine source outside [`HOME`] whose code names `fs::rename`,
-/// or calls `rename` bare after importing it from `std::fs`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with("src/") || at.starts_with(HOME) {
@@ -82,7 +64,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
         .collect()
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

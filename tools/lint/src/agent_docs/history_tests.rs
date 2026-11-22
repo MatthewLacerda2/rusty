@@ -37,8 +37,6 @@ fn look_alikes_pass() {
         "an id abc2026-11-12 glued to a word",
         "a Markdown heading:\n# Title\n## Sub",
         "a long dash — then #x and /issues/ alone",
-        // each part of a date's shape is needed: four digits, the dashes, two
-        // and two more, a real month and a real day
         "a key abcd-11-08, a sign 2026-+1-08, a month 2026-13-08",
     ] {
         assert_eq!(flagged(line), None, "{line:?} flagged");

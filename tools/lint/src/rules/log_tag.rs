@@ -1,13 +1,3 @@
-//! `log-tag`: an engine warning names where it came from (#1139).
-//!
-//! Engine `warn!` / `error!` records reach the console, the session's replies and the
-//! MCP results beside Lua's own output (`crates/logging`), so each message opens with
-//! its module in brackets, `[Asset]`, `[Physics]`, as Unity's Console entries carry
-//! their source. In `src/`, a warning or error call whose message literal does not
-//! start with `[` is a finding. The calls read are `log::warn!`, `log::error!`, the
-//! bare `warn!` / `error!` of a file that imports from `log`, and `log!` at
-//! `Level::Warn` or `Level::Error`, with an optional `target: "…",` first and the
-//! arguments laid out over several lines. The message may be a raw string. A
 //! message that is not a literal says why with `// lint: allow(log-tag) <why>`.
 
 use super::finding::Finding;
@@ -16,13 +6,10 @@ use crate::code::code_lines;
 
 pub const RULE: &str = "log-tag";
 
-/// The macros whose message the rule reads; `log!` takes its level first.
 const MACROS: &[&str] = &["warn!", "error!", "log!"];
 
-/// How many lines after the call's own the arguments may spread over.
 const SPREAD: usize = 6;
 
-/// Every engine warning or error whose message does not open with `[Module]`.
 pub fn check(path: &str, source: &str) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with("src/") {
@@ -48,8 +35,6 @@ pub fn check(path: &str, source: &str) -> Vec<Finding> {
     found
 }
 
-/// Each logging call on `line`: the macro's name and where its arguments start.
-/// `bare` admits an unqualified `warn!(` (the file imports from `log`).
 fn calls(line: &str, bare: bool) -> Vec<(&'static str, usize)> {
     let mut out = Vec::new();
     for &name in MACROS {
@@ -71,7 +56,6 @@ fn calls(line: &str, bare: bool) -> Vec<(&'static str, usize)> {
     out
 }
 
-/// Does a call of `name` with argument text `args` pass: tagged, or not a warning?
 fn passes(name: &str, args: &str) -> bool {
     let mut rest = skip_target(args.trim_start());
     if name == "log!" {
@@ -91,7 +75,6 @@ fn passes(name: &str, args: &str) -> bool {
     literal.starts_with("\"[")
 }
 
-/// The arguments past an optional `target: "…",`.
 fn skip_target(args: &str) -> &str {
     let Some(after) = args.strip_prefix("target:") else {
         return args;
@@ -101,7 +84,6 @@ fn skip_target(args: &str) -> &str {
     rest.strip_prefix(',').unwrap_or(rest).trim_start()
 }
 
-/// The rule over every scanned file.
 pub fn run(scan: &Scan) -> Vec<Finding> {
     scan.each_file(check)
 }

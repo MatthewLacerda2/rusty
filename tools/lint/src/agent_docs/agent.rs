@@ -1,21 +1,5 @@
-//! A subagent definition's frontmatter (`.claude/agents/<name>.md`), held to what
-//! Claude Code loads it by, and to the models the orchestration rule pins: the
-//! harness ignores a key it does not know without a word, and a definition with
-//! no concrete `model:` follows the orchestrator's model again.
-//!
-//! ```text
-//! ---
-//! name: <the file's stem>
-//! description: <non-empty>
-//! model: <opus | sonnet | haiku | fable | a full `claude-…` model id>
-//! <any other key Claude Code documents for a subagent file>
-//! ---
-//! ```
-
 use super::frontmatter::{block, value};
 
-/// Every key Claude Code documents for a subagent file
-/// (<https://code.claude.com/docs/en/sub-agents>, *Supported frontmatter fields*).
 pub const KEYS: &[&str] = &[
     "name",
     "description",
@@ -38,17 +22,10 @@ pub const KEYS: &[&str] = &[
     "experimental",
 ];
 
-/// The model aliases a definition may pin; a full model id starts `claude-`.
 pub const ALIASES: &[&str] = &["opus", "sonnet", "haiku", "fable"];
 
-/// The pins the orchestration rule names (root `CLAUDE.md`, *Coding
-/// parallelises*; `issue-batch`, *Who runs on what*): definition → model. Who
-/// writes or judges code is changed here, as a visible edit, not by one word in a
-/// Markdown file. A definition not listed needs a concrete model, any one.
 pub const PINS: &[(&str, &str)] = &[("coder", "opus"), ("reviewer", "opus")];
 
-/// Every problem with the frontmatter of `source`, the definition whose file stem
-/// is `stem`, as (1-based line, message).
 pub fn check(stem: &str, source: &str) -> Vec<(usize, String)> {
     let Some(lines) = block(source) else {
         let msg = "a subagent definition opens with `---`, its `name:`, `description:` \
@@ -78,8 +55,6 @@ pub fn check(stem: &str, source: &str) -> Vec<(usize, String)> {
     found
 }
 
-/// A top-level key (a line opening with neither a space nor `#`) that no subagent
-/// file documents.
 fn unknown_keys<'a>(lines: &'a [&'a str]) -> impl Iterator<Item = (usize, String)> + 'a {
     lines.iter().enumerate().filter_map(|(i, l)| {
         if l.is_empty() || l.starts_with([' ', '\t', '#', '-']) {

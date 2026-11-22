@@ -1,14 +1,7 @@
-//! The crate checks, pure over (table, policy, the manifests' crates, measured
-//! uses). Cargo rejects code naming a crate its manifest lacks, and each manifest
-//! equals its row ([`super::members`]), so the source is read only for what cargo
-//! accepts: a declared crate nothing names, and a confined crate named outside its
-//! subtree of one crate.
-
 use super::policy::Policy;
 use super::Use;
 use crate::layers::table::Layer;
 
-/// Every violation: the table's shape against `Cargo.toml` first, then the source.
 pub fn all(layers: &[Layer], policy: &Policy, deps: &[String], uses: &[Use]) -> Vec<String> {
     let mut out = Vec::new();
     accounted(layers, policy, deps, &mut out);
@@ -17,8 +10,6 @@ pub fn all(layers: &[Layer], policy: &Policy, deps: &[String], uses: &[Use]) -> 
     out
 }
 
-/// Every dependency is common, unscoped or named by a row, and every crate the
-/// table names is a dependency.
 fn accounted(layers: &[Layer], policy: &Policy, deps: &[String], out: &mut Vec<String>) {
     let in_rows = |k: &str| layers.iter().any(|l| l.crates.contains(&k));
     let common = |k: &str| policy.common.contains(&k);
@@ -52,7 +43,6 @@ fn accounted(layers: &[Layer], policy: &Policy, deps: &[String], out: &mut Vec<S
     }
 }
 
-/// Each use of a confined crate is inside its confinement.
 fn confined(policy: &Policy, uses: &[Use], out: &mut Vec<String>) {
     for u in uses {
         let k = u.krate.as_str();
@@ -69,7 +59,6 @@ fn confined(policy: &Policy, uses: &[Use], out: &mut Vec<String>) {
     }
 }
 
-/// The table names nothing the code no longer uses.
 fn stale(layers: &[Layer], policy: &Policy, uses: &[Use], out: &mut Vec<String>) {
     let used = |m: &str, k: &str| uses.iter().any(|u| u.module == m && u.krate == k);
     for l in layers {

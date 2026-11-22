@@ -1,7 +1,3 @@
-//! Which findings sit in platform-gated code (#1092). The check runs on the host,
-//! so an item used only under `cfg(target_os = "macos")` reads as dead there, and
-//! narrowing it breaks the other platform's build.
-
 use crate::code::code_lines;
 use std::path::Path;
 
@@ -12,15 +8,12 @@ const MARKERS: &[&str] = &[
     "cfg(any(target_os",
 ];
 
-/// Whether `source` names a platform cfg anywhere.
 pub fn mentions_platform(source: &str) -> bool {
     code_lines(source)
         .iter()
         .any(|l| MARKERS.iter().any(|m| l.contains(m)))
 }
 
-/// Whether the file `path` under `tree` is platform-gated: it mentions a platform
-/// cfg itself, or its parent declares it as `mod <name>` under one.
 pub fn is_gated(tree: &Path, path: &str) -> bool {
     let file = Path::new(path);
     let read = |p: &Path| std::fs::read_to_string(tree.join(p)).unwrap_or_default();
@@ -30,8 +23,6 @@ pub fn is_gated(tree: &Path, path: &str) -> bool {
     let (Some(stem), Some(dir)) = (file.file_stem().and_then(|s| s.to_str()), file.parent()) else {
         return false;
     };
-    // `a/b.rs` and `a/b/mod.rs` are both declared in `a.rs` or `a/mod.rs`, or
-    // (for `mod.rs`) one directory up.
     let (name, dir) = if stem == "mod" {
         let name = dir.file_name().and_then(|s| s.to_str()).unwrap_or("");
         (name, dir.parent().unwrap_or(dir))
@@ -48,7 +39,6 @@ pub fn is_gated(tree: &Path, path: &str) -> bool {
         .any(|p| declared_under_platform_cfg(&read(p), name))
 }
 
-/// `source` declares `mod name` with a platform cfg attribute directly above it.
 fn declared_under_platform_cfg(source: &str, name: &str) -> bool {
     let lines: Vec<&str> = source.lines().map(str::trim).collect();
     lines.iter().enumerate().any(|(i, l)| {

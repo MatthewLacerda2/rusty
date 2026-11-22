@@ -1,7 +1,6 @@
 use super::{check, split, Kind, Line, CAP, HISTORY, STRICT};
 use crate::repo::scaffold::Repo;
 
-/// `n` words of comment in `kind`'s line-comment form, ten to a line.
 fn comment(kind: Kind, n: usize) -> String {
     let marker = if kind == Kind::Lua { "--" } else { "//" };
     let words: Vec<&str> = std::iter::repeat_n("word", n).collect();

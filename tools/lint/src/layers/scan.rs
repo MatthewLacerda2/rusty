@@ -1,9 +1,3 @@
-//! Source scan for the layering lint: which sibling crates each file names.
-//!
-//! Test code is exempt (#724), as `gate` defines it: a test-gated item is
-//! skipped here, and the graph drops the test-only files whole. Not a parser — a
-//! coarse line scan.
-
 use super::extent::item_end;
 use super::gate::{is_test_gate, test_only_files};
 use crate::code::{strip_comment, Open};
@@ -13,9 +7,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// The engine's modules, read once and shared by the edge scan and the
-/// external-crate scan (#1136): every `.rs` file's text under each module's
-/// `crates/<m>/src/` (`crate::modules`), and which files are test-only.
 pub struct Tree {
     pub root: PathBuf,
     sources: BTreeMap<PathBuf, String>,
@@ -23,7 +14,6 @@ pub struct Tree {
 }
 
 impl Tree {
-    /// The tree of the repository at `root` (`""` for the working directory).
     pub fn read(root: &Path) -> Self {
         let mut files = Vec::new();
         for m in modules::all(root) {
@@ -41,7 +31,6 @@ impl Tree {
         }
     }
 
-    /// The module whose crate holds `file`.
     pub fn owner(&self, file: &Path) -> Option<String> {
         let rel = file.strip_prefix(&self.root).unwrap_or(file);
         modules::crate_module(&rel.to_string_lossy()).map(str::to_string)
@@ -51,7 +40,6 @@ impl Tree {
         self.test_only.contains(path)
     }
 
-    /// Each file that is not test-only, with its text, in path order.
     pub fn live_files(&self) -> impl Iterator<Item = (&Path, &str)> {
         self.sources
             .iter()
@@ -60,14 +48,11 @@ impl Tree {
     }
 }
 
-/// One reference to a sibling crate in non-test, non-comment code:
-/// `rusty_<module>::`.
 pub struct Ref {
     pub line: usize,
     pub module: String,
 }
 
-/// Every `.rs` file under `dir`, sorted so reports are stable.
 pub fn walk(dir: &Path) -> Vec<PathBuf> {
     let mut out = Vec::new();
     walk_into(dir, &mut out);
@@ -91,8 +76,6 @@ fn walk_into(dir: &Path, out: &mut Vec<PathBuf>) {
 
 pub use crate::code::is_ident;
 
-/// The sibling crates `content` names, minus comments and inline `#[cfg(test)]`
-/// items: `rusty_core::x` yields `core`.
 pub fn refs(content: &str) -> Vec<Ref> {
     let mut out = Vec::new();
     for (line, code) in live_lines(content) {
@@ -102,7 +85,6 @@ pub fn refs(content: &str) -> Vec<Ref> {
     out
 }
 
-/// The modules a line names through their crates: `rusty_<module>::…`.
 fn sibling_refs(code: &str) -> Vec<String> {
     code.match_indices(modules::CRATE_PREFIX)
         .filter(|(at, _)| !code[..*at].chars().next_back().is_some_and(is_ident))
@@ -114,9 +96,6 @@ fn sibling_refs(code: &str) -> Vec<String> {
         .collect()
 }
 
-/// The lines of `content` that are live (non-test) code, numbered from 1, each with
-/// read through `crate::code::strip_comment` (comments cut, a string or block
-/// comment open across lines carried). Shared with the external-crate scan.
 pub fn live_lines(content: &str) -> Vec<(usize, Cow<'_, str>)> {
     let lines: Vec<&str> = content.lines().collect();
     let mut out = Vec::new();

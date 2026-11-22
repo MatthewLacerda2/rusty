@@ -1,21 +1,10 @@
-//! Where a bare word stands, for [`super::names`]: the brackets open around it
-//! (an attribute's, a macro call's, a `use` group's) and the `use` item it is in,
-//! carried from one line to the next. A token scan over code, not a parser: it
-//! knows a crate position (a `use` head, an attribute or macro argument) from
-//! every other place a word can be, which is all the fold needs.
-
 use super::names::Left;
 use crate::code::is_ident;
 
-/// Where a bare word stands.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Spot {
-    /// The head of a `use` item (or `extern crate`), or of an entry in its top
-    /// `{…}` group: `public` when the item is a plain `pub` one.
     Head { public: bool },
-    /// A whole argument of an attribute, or (`macro_call`) of a macro.
     Argument { macro_call: bool },
-    /// Anywhere else: a value, a field, a parameter, a later path segment.
     Elsewhere,
 }
 
@@ -23,8 +12,6 @@ pub enum Spot {
 enum Kind {
     Attribute,
     Macro,
-    /// A `use` group: `root` right after `use` (its entries are crates), and
-    /// what a `self` entry cannot fold for, when it groups a crate's path.
     Group {
         root: bool,
         self_of: Option<(String, &'static str)>,
@@ -38,13 +25,10 @@ struct Frame {
     close: char,
 }
 
-/// The `use` item being read.
 #[derive(Debug)]
 struct Item {
     public: bool,
-    /// How many brackets were open where it began.
     base: usize,
-    /// The next word starts an entry.
     start: bool,
 }
 
@@ -54,23 +38,19 @@ enum Tok {
     None,
     Word(String),
     Punct(char),
-    /// `!` right after a word: a macro call.
     Bang,
 }
 
-/// The scan's state through one file.
 #[derive(Debug, Default)]
 pub struct Scope {
     stack: Vec<Frame>,
     item: Option<Item>,
     prev: Tok,
     prev2: Tok,
-    /// A crate's path just read at a `use` head, until its `::{` opens.
     watch: Option<(String, &'static str)>,
 }
 
 impl Scope {
-    /// Where a word between `before` and `after` on its line stands.
     pub fn spot(&self, before: &str, after: &str) -> Spot {
         let top = self.stack.last();
         if let Some(item) = &self.item {
@@ -109,9 +89,6 @@ impl Scope {
         Spot::Elsewhere
     }
 
-    /// A word of code read; `watch` is set when it is a crate's path at a `use`
-    /// head whose `::{…}` group a `self` entry cannot fold for. Returns that
-    /// `self`, when it is one.
     pub fn ident(&mut self, word: &str, watch: Option<(String, &'static str)>) -> Option<Left> {
         let mut left = None;
         let base = self.stack.len();
@@ -161,7 +138,6 @@ impl Scope {
         left
     }
 
-    /// A char of code outside a word, `before` it on its line.
     pub fn punct(&mut self, c: char, before: &str) {
         if c.is_whitespace() {
             return;
