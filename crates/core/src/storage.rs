@@ -27,6 +27,11 @@ impl Storage {
         Self::default()
     }
 
+    /// The file [`open`](Self::open) read and [`flush`](Self::flush) writes; `None` pathless.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        self.path.as_deref()
+    }
+
     pub fn open(&mut self, path: impl Into<PathBuf>) -> Result<(), String> {
         let path = path.into();
         if path.exists() {

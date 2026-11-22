@@ -105,4 +105,5 @@ demand from the live scene, so it reflects a change made earlier in the same
 script, in edit mode as well as in Play. The screen size is the game view's pixel
 size in the windowed app (in the editor, the size its dropdown gives it, *Free
 Aspect* being the panel's pixels: [`Editor.md`](Editor.md#the-game-views-size)) and
-the `Video` resolution headless.
+the `Video` resolution headless: a sim input, which a demo records and the machine's
+saved settings never reach ([`Video.md`](Video.md), *Determinism*).
