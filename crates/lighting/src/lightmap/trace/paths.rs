@@ -1,11 +1,3 @@
-//! One texel's light traced in parts (#1970): its bounce paths summed as they go
-//! ([`Paths`]), then resolved into a [`TexelLight`]. The one-shot bake traces every
-//! path at once ([`Tracer::texel`]); a progressive bake traces them a pass at a
-//! time, keeping each texel's [`Paths`] and its seeded stream between passes, and
-//! resolves at the end. The sums are added in the same order either way, and the
-//! texel's direct light is drawn from its stream after its last path either way,
-//! so the two give the same bits.
-
 use std::f32::consts::PI;
 
 use glam::{Vec3, Vec4};
@@ -14,30 +6,20 @@ use super::super::rng::Rng;
 use super::sources::Picks;
 use super::{TexelLight, Tracer, SURFACE_OFFSET};
 
-/// A texel's bounce paths so far: the radiance they brought back and its
-/// luminance-weighted direction, summed (never averaged, so a pass boundary never
-/// rounds them).
 #[derive(Clone, Copy, Debug, Default)]
 pub(in crate::lightmap) struct Paths {
     pub sum: Vec3,
     pub dir: Vec3,
 }
 
-/// What a progressive bake shows of a texel before it is finished: its direct
-/// light and shadowmask, taken once from a display stream of its own
-/// (`Rng::preview`), so its own stream stays as the one-shot bake draws it.
 #[derive(Clone, Copy, Debug)]
 pub(in crate::lightmap) struct Shown {
     pub direct: Vec3,
     pub direct_dir: Vec3,
-    /// A `Vec4`'s floats, unaligned: a progressive bake holds one per texel
-    /// between passes, so it stays 40 bytes, not 48.
     pub mask: [f32; 4],
 }
 
 impl Paths {
-    /// The texel's light after `done` paths, its direct part from `shown`: the
-    /// light a progressive bake displays between passes.
     pub fn light(&self, done: u32, shown: &Shown) -> TexelLight {
         let n = done.max(1) as f32;
         TexelLight {
@@ -52,10 +34,6 @@ impl Paths {
 }
 
 impl Tracer<'_> {
-    /// The lightmap value at `position` facing `normal`, in its two parts: the bounce
-    /// and sky over `samples` paths `bounces` deep, and the direct light of `Baked`
-    /// lights (an Area light over `direct` or more points). The bake filters the
-    /// first and adds the second.
     pub(in crate::lightmap) fn texel(
         &self,
         position: Vec3,
@@ -69,8 +47,6 @@ impl Tracer<'_> {
         self.resolve(position, normal, (samples, direct), &paths, rng)
     }
 
-    /// `count` more bounce paths, `bounces` deep, from the texel at `position`
-    /// facing `normal`, added to `paths` from `rng`.
     pub(in crate::lightmap) fn gather(
         &self,
         position: Vec3,
@@ -88,9 +64,6 @@ impl Tracer<'_> {
         }
     }
 
-    /// The texel's light once all `samples` of its `paths` are in: the mean of the
-    /// bounce, and its direct light (an Area light over `direct` or more points)
-    /// drawn from `rng` (where the paths left it).
     pub(in crate::lightmap) fn resolve(
         &self,
         position: Vec3,
@@ -103,8 +76,6 @@ impl Tracer<'_> {
         paths.light(samples, &shown)
     }
 
-    /// The texel's direct light (an Area light over `area_samples` or more points
-    /// drawn from `rng`) and shadowmask.
     pub(in crate::lightmap) fn shown(
         &self,
         position: Vec3,

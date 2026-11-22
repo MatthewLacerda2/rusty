@@ -1,15 +1,9 @@
-//! Light probes from the occupancy grid (#1737), and the whole site at Dust2's
-//! scale. Light probes over a baked nav surface: `navigation::probe_site::light_tests`.
-
 use glam::Vec3;
 
 use super::test_level::block;
 
 use super::{plan_reflection_probes, ReflectionPlacement, Site};
 
-/// Dust2's scale (#1737): a 200 × 200 m level with a 40 m tower keeps the 0.5 m
-/// cell, in about 1.6 MB, and its whole site (floor plan, occupancy grid, both
-/// probe sets) plans.
 #[test]
 fn a_dust2_sized_site_keeps_the_fine_cell() {
     let mut scene = super::test_level::grid_of_rooms(10, 20.0);
@@ -27,8 +21,6 @@ fn a_dust2_sized_site_keeps_the_fine_cell() {
     assert!(!site.plan_light_probes(4.0, &[]).is_empty());
 }
 
-/// A 2 m walkway at 3 m over open ground: the ground's lattice points that share
-/// its keys sit inside its slab and are skipped, and the walkway keeps its own.
 #[test]
 fn a_walkway_keeps_its_probes_over_the_grounds_skipped_ones() {
     let mut scene = rusty_scene::Scene::new();

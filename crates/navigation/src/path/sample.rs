@@ -1,19 +1,13 @@
-//! The nearest walkable point (#458): Unity's `NavMesh.SamplePosition`.
-
 use glam::Vec3;
 
 use super::super::{in_mask, NavigationGraph, ALL_AREAS};
 
 impl NavigationGraph {
-    /// The walkable point nearest `point` (straight-line 3D distance) within
-    /// `max_distance`, or `None`. Each span covers its cell's square at its floor
-    /// height, so the answer is `point` clamped into the nearest span's cell, on its
-    /// floor. Ties keep the first span in storage order, so the answer is deterministic.
+    /// Ties keep the first span in storage order, so the answer is deterministic.
     pub fn sample_position(&self, point: Vec3, max_distance: f32) -> Option<Vec3> {
         self.sample_position_masked(point, max_distance, ALL_AREAS)
     }
 
-    /// [`Self::sample_position`] over the spans whose area is in `mask` (#460).
     pub fn sample_position_masked(
         &self,
         point: Vec3,

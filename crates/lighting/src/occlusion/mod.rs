@@ -1,13 +1,3 @@
-//! crates/lighting/src/occlusion/ — the baked occlusion culling's bake (#1714): the
-//! potentially visible set a scene holds (`rusty_scene::lighting::occlusion`, whose
-//! module doc says what a cell holds and how it is sampled), baked from the static
-//! scene. `gather` (the base's, `rusty_scene::lighting::occlusion::gather`) reads what
-//! the bake is against (each object's [`fingerprint`]),
-//! `reach` says which cells a camera can be in, the only ones sampled (#2328),
-//! `sample` casts the seeded rays and proves the ones it can skip, `bake` drives it,
-//! watched and stopped through `progress`, and `fold` dilates the cells into the
-//! rows they share.
-
 mod bake;
 mod fold;
 use rusty_scene::lighting::occlusion::gather;
@@ -36,7 +26,6 @@ pub use unsaved::unsaved_materials;
 
 #[cfg(test)]
 mod bake_tests;
-// Test hooks: the levels other crates' bake, render and cost tests build.
 #[cfg(feature = "dev")]
 #[doc(hidden)]
 pub mod bench;

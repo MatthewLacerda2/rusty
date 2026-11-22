@@ -1,7 +1,3 @@
-//! The curvature band's floor is per UV island (#2292): an island packed small in
-//! UV bakes wider, the others keep the radius asked for, and the bake says which
-//! were raised; a radius above every floor is used exactly as asked.
-
 use glam::Vec2;
 
 use super::curvature::Curvature;
@@ -12,8 +8,6 @@ use rusty_procgen::image_buf::Image;
 
 const SIZE: u32 = 64;
 
-/// The unit cube with its +Z face (vertices 16..20, cell 4) packed into a UV
-/// square `shrink` of its cell's side: `1 / shrink` times coarser texels there.
 fn packed(shrink: f32) -> MeshSource {
     let mut m = cube();
     let (lo, _) = cell(4);
@@ -27,8 +21,6 @@ fn packed_cube() -> MeshSource {
     packed(0.25)
 }
 
-/// The three-texel floor at [`SIZE`] of one 1 m² cube face packed into a cell
-/// scaled by `shrink` on each side.
 fn cell_floor(shrink: f32) -> f32 {
     let (lo, hi) = cell(0);
     let uv = (hi - lo) * shrink;
@@ -42,7 +34,6 @@ fn settings(radius: f32) -> Settings {
     }
 }
 
-/// The curvature of `mesh` at `radius`, and the islands the bake raised.
 fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<Raised>) {
     let mut out = None;
     let raised = super::bake(mesh, &[MeshMap::Curvature], &settings(radius), |_, img| {
@@ -54,8 +45,6 @@ fn curvature(mesh: &MeshSource, radius: f32) -> (Image, Option<Raised>) {
     (out.unwrap(), raised)
 }
 
-/// The red channel of `img` over the texels whose centres lie inside cell `k`'s
-/// corner `share` of its side (1 the whole cell).
 fn cell_texels(img: &Image, k: usize, share: f32) -> Vec<f32> {
     let (lo, hi) = cell(k);
     let hi = lo + (hi - lo) * share;
@@ -79,13 +68,9 @@ fn a_radius_between_two_islands_floors_holds_on_the_roomy_one() {
     let between = (big + small) * 0.5;
     let (asked, raised) = curvature(&mesh, between);
     let (floored, _) = curvature(&mesh, small);
-    // The +Y face (cell 0) bakes the radius asked for: a narrower band than the
-    // packed face's floor gives it.
     let (a, f) = (cell_texels(&asked, 0, 1.0), cell_texels(&floored, 0, 1.0));
     let wider = |v: &[f32]| v.iter().filter(|&&r| r > 0.5 + 1e-3).count();
     assert!(wider(&a) < wider(&f), "{} vs {}", wider(&a), wider(&f));
-    // The packed face is raised to its own floor either way (only its own square:
-    // the rest of its cell holds the margins other islands fill).
     let packed = |img| cell_texels(img, 4, 0.25);
     assert!(packed(&asked).len() > 4);
     assert_eq!(packed(&asked), packed(&floored));
@@ -106,8 +91,6 @@ fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
     let mesh = packed_cube();
     let r = cell_floor(0.25) * 1.5;
     let baked = Baked::new(&mesh, &settings(r)).unwrap().0;
-    // The single radius the bake had before was `max(r, 3 × the mesh's average
-    // texel)`: r here too, so this bake is the same, texel for texel.
     assert!(MIN_TEXELS * baked.texel_world() < r);
     let radii = Radii::new(&baked);
     assert!(radii.per_tri.iter().all(|&x| x == r), "{:?}", radii.per_tri);
@@ -118,7 +101,6 @@ fn a_radius_above_every_floor_is_used_as_asked_and_says_nothing() {
 
 #[test]
 fn a_bake_naming_no_radius_reports_nothing_raised() {
-    // At 4² every island's floor is past 2 % of the diagonal: wider, but not asked.
     let radii = Radii::new(&Baked::new(&packed_cube(), &Settings::new(4)).unwrap().0);
     assert!(
         radii.per_tri.iter().all(|&r| r > radii.reach),
@@ -132,7 +114,6 @@ fn a_bake_naming_no_radius_reports_nothing_raised() {
         |_, _| Ok(()),
     );
     assert_eq!(raised.map(|n| n.raised), Ok(None));
-    // A bake without the curvature map draws no band, so it raises none.
     let ao = super::bake(&packed_cube(), &[MeshMap::Ao], &settings(0.01), |_, _| {
         Ok(())
     });

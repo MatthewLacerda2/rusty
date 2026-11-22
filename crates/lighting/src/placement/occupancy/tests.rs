@@ -1,10 +1,7 @@
-//! Tests for the occupancy grid (#1737).
-
 use glam::Vec3;
 
 use super::{Occupancy, Solid, CELL};
 
-/// A 10 × 10 m floor slab under a 1 m cube at its middle.
 fn floor_and_cube() -> Occupancy {
     let solids = [
         Solid::cuboid(Vec3::new(-5.0, -0.5, -5.0), Vec3::new(5.0, 0.0, 5.0)),
@@ -61,7 +58,6 @@ fn solid_fraction_counts_the_boxs_cells() {
     assert_eq!(occ.solid_fraction(Vec3::ZERO, Vec3::ZERO), 0.0);
 }
 
-/// A non-convex mesh marks its surface, not the space it wraps.
 #[test]
 fn a_mesh_solid_marks_only_its_surface() {
     let mut shell = Solid::cuboid(Vec3::splat(-3.0), Vec3::splat(3.0));
@@ -71,7 +67,6 @@ fn a_mesh_solid_marks_only_its_surface() {
     assert!(!occ.is_solid(Vec3::ZERO));
 }
 
-/// A malformed solid (a NaN vertex, an index past the end) is skipped, not a panic.
 #[test]
 fn malformed_triangles_are_skipped() {
     let bad = Solid {
@@ -85,7 +80,6 @@ fn malformed_triangles_are_skipped() {
     assert!(Occupancy::build(&[], CELL).is_none());
 }
 
-/// A level too wide for the cap is gridded coarser rather than failing.
 #[test]
 fn a_huge_level_is_gridded_coarser() {
     let slab = Solid::cuboid(Vec3::ZERO, Vec3::new(400.0, 4.0, 400.0));
@@ -95,8 +89,6 @@ fn a_huge_level_is_gridded_coarser() {
     assert!(occ.is_solid(Vec3::new(200.0, 2.0, 200.0)));
 }
 
-/// A box scaled so far its cell count overflows a `usize` is gridded coarser, not
-/// wrapped to a small count; one whose span overflows a float is no grid.
 #[test]
 fn a_huge_scaled_box_does_not_overflow_the_count() {
     let huge = Solid::cuboid(Vec3::splat(-1.0e18), Vec3::splat(1.0e18));

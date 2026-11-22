@@ -1,5 +1,4 @@
-//! Progress and cancel (#808): watching a bake never changes its bytes, the counter
-//! ends at the total, and a cancelled bake returns nothing.
+//! Watching a bake never changes its bytes, the counter ends at the total, and a cancelled bake returns nothing.
 
 use std::sync::{Arc, Mutex};
 
@@ -18,7 +17,6 @@ fn scene() -> BakeScene {
     }
 }
 
-/// Every texel of every map as raw bits, so "equal" means byte for byte.
 fn bits(maps: &[Lightmap]) -> Vec<(u32, u32, Vec<[u32; 3]>)> {
     maps.iter()
         .map(|m| {
@@ -40,8 +38,6 @@ fn a_watched_bake_is_byte_identical_to_an_unwatched_one() {
     assert_eq!(bits(&watched), bits(&plain));
 }
 
-/// An observer that counts what it hears: the meshes, and each chart's batches
-/// started, finished and the texels those finished.
 #[derive(Default)]
 struct Counting {
     meshes: Mutex<Vec<(u32, u64)>>,
@@ -94,7 +90,7 @@ fn progress_counts_every_texel_up_to_the_total() {
     let maps = bake_with_progress(&scene(), &settings(), &progress).expect("not cancelled");
     assert!(progress.total() > 0);
     assert_eq!(progress.done(), progress.total());
-    // Every lightmap made counts its mesh once (#1667).
+    // Every lightmap made counts its mesh once.
     assert_eq!(progress.meshes_total(), maps.len() as u64);
     assert_eq!(progress.meshes_done(), progress.meshes_total());
 }

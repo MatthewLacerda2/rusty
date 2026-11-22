@@ -1,23 +1,13 @@
-//! Which faces make a sheet (#1714, part 3): those on one plane, to float noise,
-//! that draw the same side.
-
 use glam::Vec3;
 
 use super::{Member, Sheet, CLEAR};
 
-/// Float noise, relative to the largest coordinate a plane's faces reach: a few
-/// `f32` steps there.
 const NOISE: f32 = 8.0 * f32::EPSILON;
 
-/// A face's index under its plane's key: normal, offset and side.
 type Keyed = (([i64; 3], i64, u8), u32);
 
-/// The sheets `faces` make, and per face its sheet (`u32::MAX` for a face alone
-/// on its plane, which its own polygon tests as well, on a sparse sheet, or with
-/// no plane).
 pub(in super::super) fn sheets(faces: &[Member]) -> (Vec<Sheet>, Vec<u32>) {
     // Each face keyed by its plane and side, sorted: a plane's faces then run
-    // together, in face order.
     let key = |f: &Member| {
         let n = (f.normal * 1e6).round().as_i64vec3().to_array();
         (
@@ -48,16 +38,11 @@ pub(in super::super) fn sheets(faces: &[Member]) -> (Vec<Sheet>, Vec<u32>) {
     (sheets, of)
 }
 
-/// Float noise for a plane whose faces have the corners `points`: [`NOISE`] times
-/// the largest coordinate they reach, and never under `NOISE` itself.
 pub(super) fn tolerance<'a>(points: impl Iterator<Item = &'a Vec3>) -> f32 {
     let scale = points.fold(1.0f32, |m, p| m.max(p.abs().max_element()));
     NOISE * scale
 }
 
-/// A run of faces that share a plane to the grouping's rounding, split into runs
-/// of two or more whose faces lie within [`tolerance`] of one depth; a face that
-/// is not itself flat to it is left out.
 fn depths(faces: &[Member], run: &[Keyed]) -> Vec<Vec<u32>> {
     let normal = faces[run[0].1 as usize].normal;
     let all = run.iter().flat_map(|&(_, i)| faces[i as usize].corners);
@@ -83,7 +68,6 @@ fn depths(faces: &[Member], run: &[Keyed]) -> Vec<Vec<u32>> {
         }
     }
     out.retain(|g| g.len() > 1);
-    // Each run in face order, as the sheets' members and `of` expect.
     out.iter_mut().for_each(|g| g.sort_unstable());
     out
 }

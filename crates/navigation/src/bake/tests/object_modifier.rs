@@ -1,16 +1,9 @@
-//! `NavMeshModifier`s (#1959): a table overridden to `NotWalkable` keeps its top
-//! off the navmesh but still blocks the floor under it, `ignore_from_build` takes
-//! it out of the bake, children inherit their parent's modifier unless they have
-//! their own. Their edits' rebakes: `object_modifier_sync`.
-
 use super::super::super::test_support::{add_box, add_floor};
 use super::super::super::{NavBounds, NavigationGraph, NOT_WALKABLE_AREA};
 use glam::Vec3;
 use rusty_components::NavMeshModifierComponent as Modifier;
 use rusty_scene::Scene;
 
-/// A 20 × 10 floor on a pinned unit grid, no erosion, and a table at (10, 5): a
-/// 3 × 3 top at 0.8 m on four legs, all children of an empty `table` root.
 pub fn room() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;

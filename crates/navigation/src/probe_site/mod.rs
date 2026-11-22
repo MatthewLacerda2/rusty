@@ -1,7 +1,4 @@
-//! Probe placement on a baked nav surface (#1737): `lighting::placement`
-//! surveys the reachable floor `NavigationGraph::floor_grid` plans, as
-//! `dev::bake::lighting` asks it to. The placement's own tests are `lighting`'s; these
-//! are the half that bakes a navmesh.
+//! The half of probe placement that bakes a navmesh; the placement's own tests are `lighting`'s.
 
 use glam::Vec3;
 
@@ -15,23 +12,19 @@ mod light_tests;
 mod liquid_tests;
 mod reflection_tests;
 
-/// `scene`'s reflection plans on its baked nav surface's reachable floor.
 pub(super) fn plan_on_nav(scene: &Scene) -> Vec<ReflectionPlan> {
     plan_on_nav_from(scene, &[])
 }
 
-/// [`plan_on_nav`] with actors starting at `starts`.
 pub(super) fn plan_on_nav_from(scene: &Scene, starts: &[Vec3]) -> Vec<ReflectionPlan> {
     let site = site_on_nav_from(scene, starts);
     plan_reflection_probes(scene, &site, &ReflectionPlacement::default(), &[])
 }
 
-/// `scene`'s site on its baked nav surface's reachable floor.
 pub(super) fn site_on_nav(scene: &Scene) -> Site {
     site_on_nav_from(scene, &[])
 }
 
-/// [`site_on_nav`] with actors starting at `starts`.
 pub(super) fn site_on_nav_from(scene: &Scene, starts: &[Vec3]) -> Site {
     let nav = NavigationGraph::from_scene(scene);
     let reach = nav.reachable_spans(starts);

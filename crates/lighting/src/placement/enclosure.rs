@@ -1,44 +1,17 @@
-//! What the occupancy grid tells reflection placement about a room (#1737).
-//!
-//! * **Open sky.** Rays cast up from a capture point (straight up, and a ring at
-//!   [`RING_TILT`] from vertical) either hit a ceiling or leave the level. A room
-//!   where most of them leave is open air (a courtyard, a pool hall): box
-//!   projection against a ceiling that isn't there bends the sky, so it gets one
-//!   probe without it.
-//! * **Ceiling.** Under a roof, the box's top is where the straight-up ray hits,
-//!   when that is lower than the floor plan says (a glass roof, a lean-to).
-//! * **Clutter.** The solid fraction of the air a room's actors move through
-//!   (between a step and head height over its floor, column by column, the small
-//!   obstacles it encloses included) sets how dense its probes are: a hangar full
-//!   of crates gets more and smaller boxes than an empty hall, and a corridor round
-//!   a solid core no more than an empty corridor.
-//! * **Clearance.** A capture point keeps [`CAPTURE_CLEARANCE`] from geometry,
-//!   so it never sits in a pillar or against a wall.
-
 use glam::{Vec2, Vec3};
 
 use super::occupancy::Occupancy;
 use rusty_core::collections::Set;
 use rusty_scene::lighting::floor::FloorGrid;
 
-/// How far up a ray looks for a ceiling, world units: past it is sky.
 const SKY_REACH: f32 = 60.0;
-/// The tilt of the ring of up rays from vertical, radians (30°).
 const RING_TILT: f32 = std::f32::consts::FRAC_PI_6;
-/// Rays in the ring.
 const RING: usize = 8;
-/// How much more densely a room is probed per unit of clutter: a room a quarter
-/// full of geometry takes probes four times as narrow as an empty one.
 pub const CLUTTER_GAIN: f32 = 12.0;
-/// The least distance a capture point keeps from geometry, world units.
 pub const CAPTURE_CLEARANCE: f32 = 0.5;
-/// The body layer clutter is measured in: from a step over the floor to a head.
 const BODY: (f32, f32) = (0.4, 1.8);
-/// The largest blocked patch a room counts as clutter, square metres: a vehicle,
-/// a stack of crates. A larger one is architecture.
 pub const CLUTTER_PATCH: f32 = 16.0;
 
-/// Whether most of the up rays from `at` leave the level without a hit.
 pub fn open_to_sky(occ: &Occupancy, at: Vec3) -> bool {
     let (sin, cos) = RING_TILT.sin_cos();
     let ring = (0..RING).map(|k| {
@@ -52,16 +25,10 @@ pub fn open_to_sky(occ: &Occupancy, at: Vec3) -> bool {
     open * 2 > rays.len()
 }
 
-/// The world `y` of the first solid straight above `at`, if one is in reach.
 pub fn ceiling_over(occ: &Occupancy, at: Vec3) -> Option<f32> {
     occ.ray(at, Vec3::Y, SKY_REACH).map(|t| at.y + t)
 }
 
-/// The solid fraction of the body layer over a room (`cells` of `grid`): its own
-/// columns, each from its own floor, and the small blocked patches it encloses
-/// (crates, a vehicle: no larger than [`CLUTTER_PATCH`]), each from the lowest
-/// floor beside it. A larger enclosed patch is architecture, the solid core a
-/// corridor wraps, not clutter; so is everything outside the room.
 pub fn room_clutter(grid: &FloorGrid, occ: &Occupancy, cells: &[usize]) -> f32 {
     let mut columns: Vec<(usize, f32)> = (cells.iter())
         .filter_map(|&i| grid.cells[i].map(|c| (i, c.floor)))
@@ -87,9 +54,6 @@ pub fn room_clutter(grid: &FloorGrid, occ: &Occupancy, cells: &[usize]) -> f32 {
     }
 }
 
-/// The blocked cells `cells` encloses in patches of at most [`CLUTTER_PATCH`],
-/// each with the lowest floor of the room cells beside its patch. The search
-/// stays inside the room's bounding rectangle, so it costs the room's area.
 fn enclosed_patches(grid: &FloorGrid, cells: &[usize]) -> Vec<(usize, f32)> {
     let mut mine = Set::default();
     mine.extend(cells.iter().copied());
@@ -140,7 +104,6 @@ fn enclosed_patches(grid: &FloorGrid, cells: &[usize]) -> Vec<(usize, f32)> {
     out
 }
 
-/// The four cells beside `i`, `None` past the plan's edge.
 fn neighbours(grid: &FloorGrid, i: usize) -> [Option<usize>; 4] {
     let (x, z) = (i % grid.width, i / grid.width);
     [
@@ -151,14 +114,10 @@ fn neighbours(grid: &FloorGrid, i: usize) -> [Option<usize>; 4] {
     ]
 }
 
-/// The probe width for a room of `clutter` when an empty one takes `region`,
-/// never under `least`.
 pub fn cluttered_region(region: f32, clutter: f32, least: f32) -> f32 {
     (region / (1.0 + CLUTTER_GAIN * clutter.max(0.0))).max(least.min(region))
 }
 
-/// The first of `candidates` whose point keeps [`CAPTURE_CLEARANCE`], else the
-/// one with the most room around it; ties keep the earlier.
 pub fn clearest<T: Copy>(occ: &Occupancy, candidates: &[(T, Vec3)]) -> Option<(T, Vec3)> {
     let mut best: Option<(f32, (T, Vec3))> = None;
     for &(id, at) in candidates {

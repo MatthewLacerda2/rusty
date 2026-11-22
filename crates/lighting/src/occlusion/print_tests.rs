@@ -1,8 +1,3 @@
-//! A fingerprint is what the bake reads and nothing else (#1958): the same
-//! triangles stored another way and a material renamed keep it, while a real change
-//! still breaks it. A scene loaded straight after its own bake matching it is the
-//! integration suite's (`tests/occlusion/fresh_load.rs`): it saves and loads.
-
 use glam::Vec3;
 
 use crate::occlusion::fingerprint;
@@ -10,8 +5,6 @@ use crate::occlusion::test_level::corridors;
 use rusty_components::{RenderFace, RenderMode};
 use rusty_scene::{MaterialAsset, MaterialComponent, MeshRevision, Scene};
 
-/// `id`'s mesh with every corner its own vertex: the triangles of a re-export
-/// that welds nothing, under a new revision.
 fn unwelded(scene: &mut Scene, id: u32) {
     let mut mesh = scene.world.mesh_mut(id).unwrap();
     let corners: Vec<_> = mesh

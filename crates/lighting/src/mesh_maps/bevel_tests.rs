@@ -1,6 +1,3 @@
-//! Curvature follows the shape, not the tessellation (#1849 review): a right-angled
-//! edge reads the same peak sharp, chamfered or rounded.
-
 use std::f32::consts::FRAC_PI_2;
 
 use glam::{Vec2, Vec3};
@@ -10,12 +7,8 @@ use super::fixtures::quad;
 use super::{Baked, MeshSource, Settings};
 use crate::lightmap::TexelPoint;
 
-/// The bevel's width beside the band (the band is 2 % of the √3 diagonal, ~0.035).
 const BEVEL: f32 = 0.004;
 
-/// A convex right-angled edge along z: a top face `y = 0` for `x ∈ [-1, 0]`, a side
-/// `x = 0` for `y ∈ [-1, 0]`, the corner rounded in `segments` flat steps
-/// (0 sharp, 1 a 45° chamfer). Returns the mesh and its profile.
 fn edge(segments: u32) -> (MeshSource, Vec<Vec2>) {
     let mut profile = vec![Vec2::new(-1.0, 0.0)];
     if segments == 0 {
@@ -41,7 +34,6 @@ fn edge(segments: u32) -> (MeshSource, Vec<Vec2>) {
     (m, profile)
 }
 
-/// The brightest curvature anywhere across the profile, at mid-length.
 fn peak(segments: u32) -> f32 {
     let (source, profile) = edge(segments);
     let (min, max) = (Vec3::new(-1.0, -1.0, 0.0), Vec3::new(0.0, 0.0, 1.0));
@@ -76,7 +68,6 @@ fn a_right_angle_peaks_alike_sharp_chamfered_and_rounded() {
     assert!((sharp - 1.0).abs() < 1e-3, "sharp edge peaks at {sharp}");
     for segments in [1, 3, 8] {
         let bevel = peak(segments);
-        // The bevel is ~an eighth of the band wide: its creases sit that far apart.
         assert!(
             (bevel - sharp).abs() < 0.05,
             "{segments}-segment bevel peaks at {bevel}, sharp at {sharp}"

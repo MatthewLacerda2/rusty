@@ -1,12 +1,9 @@
-//! Restoring: the same graph a bake gives, refused when stale, incremental after.
-
 use glam::Vec3;
 
 use super::super::super::super::test_support::{assert_same_mesh, move_to};
 use super::super::super::super::{NavigationGraph, Rebake, Start};
 use super::{baked, level, saved};
 
-/// Every generated link, as comparable values.
 fn links(g: &NavigationGraph) -> Vec<String> {
     g.offmesh_links().map(|l| format!("{l:?}")).collect()
 }
@@ -62,8 +59,6 @@ fn an_area_cost_change_keeps_the_file() {
     assert_eq!(g.area_costs[0], 3.0);
 }
 
-/// The issue's check: after a restore, moving a static collider rebakes only its
-/// cells, and the result is the graph a full bake of the moved scene gives.
 #[test]
 fn a_restored_graph_rebakes_only_what_changed() {
     let (mut scene, crate_id) = level();
@@ -85,7 +80,6 @@ fn a_restored_graph_rebakes_only_what_changed() {
     assert_eq!(links(&g), links(&baked(&scene)));
 }
 
-/// Play's first tick takes the saved navmesh when it matches, and bakes when not.
 #[test]
 fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     let (mut scene, crate_id) = level();
@@ -100,9 +94,6 @@ fn start_tracked_restores_a_matching_file_and_bakes_a_stale_one() {
     assert_same_mesh(&fresh, &baked(&scene));
 }
 
-/// A bake that re-shapes the grid during Play (`Navigation.SetGridSpacing`,
-/// `Navigation.Bake`) keeps the play loop's tracking, so the next tick syncs
-/// rather than refusing the saved navmesh and baking again.
 #[test]
 fn a_reshaping_bake_keeps_tracking_the_scene() {
     let (mut scene, _) = level();
@@ -114,7 +105,6 @@ fn a_reshaping_bake_keeps_tracking_the_scene() {
     assert!(g.tracks(&scene));
 }
 
-/// Zero: an empty scene's navmesh (no span, no link) saves and restores too.
 #[test]
 fn an_empty_scene_round_trips() {
     let scene = rusty_scene::Scene::new();

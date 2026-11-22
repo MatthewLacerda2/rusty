@@ -1,7 +1,3 @@
-//! Which geometry a texel reads (#1849's review): only its own connected surface's
-//! creases, no crease between a face and its reversed copy, corners welded through
-//! `-0.0`, rays above the face's own plane, and the ID map keyed on the material.
-
 use glam::{Vec2, Vec3};
 
 use super::fixtures::{bake_all, cell, cube, quad};
@@ -14,7 +10,6 @@ fn one(mesh: &MeshSource, map: MeshMap) -> Image {
     bake_all(mesh, &[map], S).unwrap().remove(0).1
 }
 
-/// Every texel centre strictly inside the UV rectangle `r`, two texels in.
 fn inside(img: &Image, (lo, hi): (Vec2, Vec2)) -> impl Iterator<Item = f32> + '_ {
     let (a, b) = ((lo * S as f32).ceil() + 2.0, (hi * S as f32).floor() - 2.0);
     (a.y as usize..b.y as usize)
@@ -40,7 +35,6 @@ fn a_box_on_a_separate_plane_leaves_the_plane_flat() {
     quad(&mut m, FLOOR, plane, 0);
     let img = one(&m, MeshMap::Curvature);
     assert!(inside(&img, plane).all(|v| (v - 0.5).abs() < 1e-3));
-    // The box's own edges still light: its top face's border is bright.
     let (lo, _) = cell(0);
     let edge = ((lo * Vec2::new(1.0, 0.5) * S as f32).ceil() + 0.5).as_uvec2();
     assert!(img.pixels()[(edge.y * S + edge.x + 4) as usize][0] > 0.8);
@@ -61,7 +55,6 @@ fn a_double_sided_face_has_no_crease_at_its_outline() {
 #[test]
 fn a_negative_zero_corner_still_welds() {
     let mut m = cube();
-    // The -X face (cell 3, vertices 12..16) written with x = -0.0.
     m.positions[12..16].iter_mut().for_each(|p| p.x = -0.0);
     let img = one(&m, MeshMap::Curvature);
     let (lo, hi) = cell(3);
@@ -72,7 +65,6 @@ fn a_negative_zero_corner_still_welds() {
 
 #[test]
 fn ao_never_casts_under_the_faces_own_plane() {
-    // A floor whose normals lean hard towards +X, over a second floor below it.
     let mut m = MeshSource::default();
     quad(&mut m, FLOOR, cell(0), 0);
     m.normals
@@ -85,7 +77,6 @@ fn ao_never_casts_under_the_faces_own_plane() {
 
 #[test]
 fn the_id_map_colours_by_material_not_by_run() {
-    // Metal, Rubber, Metal: three runs, two materials.
     let mut m = MeshSource::default();
     for (k, material) in [0, 1, 0].into_iter().enumerate() {
         let shift = Vec3::X * 2.0 * k as f32;

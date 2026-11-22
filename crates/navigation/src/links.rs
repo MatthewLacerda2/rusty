@@ -1,34 +1,12 @@
-//! crates/navigation/src/links.rs — which span in a neighbouring cell a move reaches (#454).
-//!
-//! Connectivity is a rule evaluated on demand rather than a stored edge list:
-//! columns hold a handful of spans, so finding the one a step lands on is a
-//! short scan, and nothing has to be rebuilt when the bake changes a cell. A
-//! move from span `a` to span `b` is allowed when
-//!
-//! * the floor delta clears `max_step`, an absolute curb height (Recast's
-//!   `walkableClimb`), and
-//! * the open gap the two columns share, from the higher floor to the lower
-//!   ceiling, still fits `agent_height` (Recast's `walkableHeight` rule), so an
-//!   agent can't squeeze under a low lintel between two otherwise open spans.
-//!
-//! `max_slope` is not part of the rule. It decides which triangles are walkable at
-//! rasterisation (`bake::raster`), as Recast's `walkableSlopeAngle` does; a ramp too
-//! steep to walk bakes no spans to link. Held between neighbouring cell tops, a grade
-//! would refuse any step taller than `max_slope × grid_spacing`, so a 0.15 m riser
-//! joined at a 0.15 m grid and split at 0.1 (#2001): a finer grid disconnected what
-//! a coarser one joined.
-//!
-//! When several spans of the target column qualify (rare: they'd need to sit
-//! within a step of each other with a full agent height between them), the one
-//! closest in height wins, then the lower one, so the answer is deterministic.
+//! A move needs the floor delta within `max_step` (Recast's `walkableClimb`) and the shared gap to
+//! fit `agent_height` (`walkableHeight`). `max_slope` is deliberately not part of it: held between
+//! cell tops it would refuse steps taller than `max_slope × grid_spacing`, so a finer grid
+//! disconnected what a coarser one joined. Of several qualifying spans the closest in height wins,
+//! then the lower.
 
 use super::{NavigationGraph, SpanRef};
 
 impl NavigationGraph {
-    /// The span in cell `(gx, gz)` an agent on `from` reaches by walking there in a
-    /// straight line, or `None` when no span of that column is within a step.
-    /// `(gx, gz)` may be any cell; only the floor delta and the shared headroom count,
-    /// not the horizontal run between the cells.
     pub fn link_to(&self, from: SpanRef, gx: i32, gz: i32) -> Option<SpanRef> {
         if (gx, gz) == (from.gx, from.gz) {
             return Some(from);
@@ -52,18 +30,13 @@ impl NavigationGraph {
         })
     }
 
-    /// Whether an agent can walk between spans `a` and `b` of neighbouring cells: the
-    /// floor delta clears `max_step`, and the gap they share fits `agent_height`.
-    /// Symmetric in `a` and `b`.
     pub(super) fn steps(&self, a: super::NavSpan, b: super::NavSpan) -> bool {
         let dh = (b.y - a.y).abs();
         let gap = a.ceiling.min(b.ceiling) - a.y.max(b.y);
         dh <= self.max_step && gap >= self.agent_height
     }
 
-    /// The span an 8-way grid step `(dx, dz)` from `from` lands on. A diagonal step
-    /// also needs both cardinal cells it cuts past to be reachable from `from`, so
-    /// an agent never slips diagonally around a wall corner or a ledge.
+    /// A diagonal also needs both cardinal cells it cuts past, so an agent never slips around a corner.
     pub fn neighbour(&self, from: SpanRef, dx: i32, dz: i32) -> Option<SpanRef> {
         if dx != 0 && dz != 0 {
             self.link_to(from, from.gx + dx, from.gz)?;
@@ -78,7 +51,6 @@ mod tests {
     use super::super::NavSpan;
     use super::*;
 
-    /// A 3x1 strip whose middle cell holds a ground span and a second floor.
     fn stacked() -> NavigationGraph {
         let mut g = NavigationGraph::new(0.0, 2.0, 0.0, 0.0, 1.0);
         let ground = NavSpan {
@@ -112,14 +84,13 @@ mod tests {
     #[test]
     fn low_shared_gap_blocks_the_move() {
         let mut g = stacked();
-        g.agent_height = 3.5; // more than the 3.0 under the upper floor
+        g.agent_height = 3.5;
         assert_eq!(g.link_to(at(0, 0), 1, 0), None);
     }
 
     #[test]
     fn only_max_step_limits_a_step() {
-        // A 0.15 m step on a 0.1 m grid is a 1.5 grade between cell centres: the
-        // slope limit is the rasteriser's, so the step still links (#2001).
+        // A 0.15 m step on a 0.1 m grid: the slope limit is the rasteriser's, so the step still links.
         let mut g = NavigationGraph::new(0.0, 0.1, 0.0, 0.0, 0.1);
         g.spans[1].y = 0.15;
         let from = at(0, 0);
@@ -139,7 +110,7 @@ mod tests {
             index: 0,
         };
         assert!(g.neighbour(from, 1, 1).is_some());
-        g.spans[1].y = 3.0; // cell (1, 0) becomes a wall top
+        g.spans[1].y = 3.0;
         assert!(g.neighbour(from, 1, 1).is_none(), "no corner cutting");
     }
 }

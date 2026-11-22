@@ -1,33 +1,3 @@
-//! Occluder fusion on a plane (#1714, part 3): the occluder faces that lie on one
-//! plane and draw the same side, as one sheet. A floor of tiles, a wall built of
-//! pieces, the tops of a row of walls and the slab above them each hide, together,
-//! what none of their faces hides alone.
-//!
-//! A sheet is a grid of square texels on its plane, one bit each: set when the
-//! texel lies wholly inside one member face, or inside their union (`cover`:
-//! a tessellated wall's triangles, whatever their order). Every segment from one box to
-//! another that clear the plane on opposite sides crosses it inside the
-//! rectangle round the crossings of their corners' segments (`shaft` says why),
-//! so when every texel that rectangle touches is set, every segment crosses a
-//! member face, and the box is hidden. A texel half-covered by two faces is not
-//! set, so a seam off the texel grid fuses nothing: it only shows more. The grid
-//! sits on multiples of [`TEXEL`] in world units, where modular levels put their
-//! seams.
-//!
-//! The members' faces may differ from the plane by float noise ([`tolerance`]):
-//! the sheet is a slab from the nearest to the farthest member corner, and the
-//! rectangle holds the crossings of both its planes. Noise is all a slab may hold:
-//! members a millimetre apart would leave a step a segment slips through while
-//! every texel under its rectangle is set, so faces that share a plane only to
-//! the grouping's rounding are split into sheets of one depth each. An object's
-//! own faces never hide it, so a sheet it is a member of is not used for it
-//! (`shaft` falls back to its own polygon).
-//!
-//! A texel is held by a face whose edge misses its corner by noise and no more,
-//! so a slit between two faces is seen through however thin, down to float noise.
-//! Faces join across an edge only where they share its corners bit for bit
-//! (`cover`), so two faces a slit apart never do.
-
 use glam::{UVec2, Vec2, Vec3};
 
 use super::{corners, opposite, CLEAR};
@@ -40,31 +10,22 @@ mod cover;
 mod group;
 use crate::occlusion::gather::Face;
 
-/// A texel's edge, metres.
 const TEXEL: f32 = 0.25;
-/// The most texels one sheet holds; a larger plane takes coarser texels.
 const MAX_TEXELS: usize = 1 << 22;
 
-/// One plane's fused occluder faces.
 pub(super) struct Sheet {
     normal: Vec3,
-    /// The slab the members lie in: `lo <= normal · p <= hi`.
     lo: f32,
     hi: f32,
     face: Face,
-    /// The plane's axes, and texel `(0, 0)`'s low corner on them.
     axes: (Vec3, Vec3),
     origin: Vec2,
     texel: f32,
     dims: UVec2,
-    /// Set texels counted over each prefix rectangle, `(dims + 1)` a side.
     sums: Vec<u32>,
-    /// The objects whose faces it holds, ascending.
     members: Vec<u32>,
 }
 
-/// One member face: its corners (convex, wound about the sheet's normal or
-/// against it), its object and its side.
 pub(super) struct Member<'a> {
     pub corners: &'a [Vec3],
     pub normal: Vec3,
@@ -73,8 +34,6 @@ pub(super) struct Member<'a> {
 }
 
 impl Sheet {
-    /// The sheet of `members`, `None` when their faces cover under a quarter of
-    /// the rectangle round them (it would be [`Self::sparse`]: no texel is made).
     fn of<'a>(members: impl Iterator<Item = &'a Member<'a>> + Clone) -> Option<Self> {
         let first = members.clone().next().expect("a sheet has a member");
         let normal = first.normal;
@@ -123,28 +82,21 @@ impl Sheet {
         })
     }
 
-    /// Whether under a quarter of its texels are set: faces scattered over a plane
-    /// (the same facet of props in a row) fuse little, and would cost their
-    /// texels' memory for it.
     fn sparse(&self) -> bool {
         let total = self.dims.x as usize * self.dims.y as usize;
         let set = *self.sums.last().unwrap_or(&0) as usize;
         set * 4 < total
     }
 
-    /// The bytes its texels' sums take.
     #[cfg(feature = "dev")]
     pub fn bytes(&self) -> usize {
         self.sums.len() * 4
     }
 
-    /// Whether `object` has a face on it.
     pub fn holds(&self, object: u32) -> bool {
         self.members.binary_search(&object).is_ok()
     }
 
-    /// Whether every segment from box `from` to box `to` crosses a member face's
-    /// drawn side.
     pub fn hides(&self, from: (Vec3, Vec3), to: (Vec3, Vec3)) -> bool {
         let n = self.normal;
         let dir = (to.0 + to.1) * 0.5 - (from.0 + from.1) * 0.5;
@@ -166,7 +118,6 @@ impl Sheet {
         self.covered(min - Vec2::splat(CLEAR), max + Vec2::splat(CLEAR))
     }
 
-    /// Whether every texel the rectangle `(min, max)` touches is set.
     fn covered(&self, min: Vec2, max: Vec2) -> bool {
         let lo = ((min - self.origin) / self.texel).floor();
         let hi = ((max - self.origin) / self.texel).floor();
@@ -182,8 +133,6 @@ impl Sheet {
     }
 }
 
-/// The texel grid round the rectangle `(min, max)`: its origin, texel and size,
-/// [`TEXEL`]s unless that makes more than [`MAX_TEXELS`].
 fn grid(min: Vec2, max: Vec2) -> (Vec2, f32, UVec2) {
     let mut texel = TEXEL;
     loop {
@@ -196,8 +145,6 @@ fn grid(min: Vec2, max: Vec2) -> (Vec2, f32, UVec2) {
     }
 }
 
-/// Two unit axes on the plane with `normal`: the world axes for an axis-aligned
-/// plane, so its texels sit on world multiples.
 fn axes(normal: Vec3) -> (Vec3, Vec3) {
     let a = [Vec3::X, Vec3::Y, Vec3::Z];
     let pick = a
@@ -208,8 +155,6 @@ fn axes(normal: Vec3) -> (Vec3, Vec3) {
     (u, normal.cross(u))
 }
 
-/// Set every texel of the grid `(origin, texel, dims)` wholly inside the convex
-/// polygon `poly`, whose edges may miss a texel's corner by `tol`.
 fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec2), tol: f32) {
     let k = poly.len();
     if k < 3 {
@@ -243,7 +188,6 @@ fn fill(set: &mut [bool], poly: &[Vec2], (origin, texel, dims): (Vec2, f32, UVec
     }
 }
 
-/// The signed area of `poly`, positive when it winds counter-clockwise.
 fn area(poly: &[Vec2]) -> f32 {
     let k = poly.len();
     (0..k)
@@ -252,7 +196,6 @@ fn area(poly: &[Vec2]) -> f32 {
         * 0.5
 }
 
-/// The prefix sums of `set` over a `dims` grid, `(dims + 1)` a side.
 fn sums(set: &[bool], dims: UVec2) -> Vec<u32> {
     let w = dims.x as usize + 1;
     let mut s = vec![0u32; w * (dims.y as usize + 1)];

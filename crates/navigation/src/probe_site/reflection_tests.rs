@@ -1,12 +1,9 @@
-//! Reflection probes only on reachable floor (#1737).
-
 use glam::Vec3;
 
 use super::{plan_on_nav, plan_on_nav_from, site_on_nav_from};
 use rusty_lighting::placement::test_sites::{indoor_house, roofed_house, yard};
 use rusty_lighting::placement::ReflectionPlan;
 
-/// No plan on the roof, and one in the room.
 fn assert_in_the_room(plans: &[ReflectionPlan]) {
     assert!(!plans.is_empty());
     for p in plans {
@@ -19,9 +16,6 @@ fn assert_in_the_room(plans: &[ReflectionPlan]) {
     );
 }
 
-/// An indoor level whose roof is larger than its room: with no actor the room is
-/// still the main floor (the roof is an elevated top), and with one in the room
-/// the roof gets nothing either, light probes included.
 #[test]
 fn an_indoor_roof_gets_no_probe_with_or_without_an_actor() {
     let scene = indoor_house();
@@ -40,8 +34,6 @@ fn an_unreachable_roof_gets_no_probe() {
     assert_in_the_room(&plan_on_nav(&scene));
 }
 
-/// The only actor is a sentry on the roof: the room, the main floor, still gets
-/// its own probe.
 #[test]
 fn a_sentry_on_the_roof_keeps_the_room_probed() {
     let scene = indoor_house();
@@ -55,8 +47,6 @@ fn a_sentry_on_the_roof_keeps_the_room_probed() {
     );
 }
 
-/// A yard round a roofed house: its open-air probe captures from under the sky,
-/// not from the doorway nearest the yard's centroid, which is inside the house.
 #[test]
 fn a_yard_round_a_house_captures_outdoors() {
     let mut scene = yard();

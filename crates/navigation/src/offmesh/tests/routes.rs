@@ -1,6 +1,3 @@
-//! Paths across links: a drop is taken when it is the short way, never climbed
-//! back up, and a ladder joins two floors.
-
 use glam::Vec3;
 
 use super::*;
@@ -33,7 +30,6 @@ fn a_one_way_drop_is_never_climbed_back_up() {
     let g = baked(&platform());
     let up = g.calculate_path(Vec3::new(14.0, 0.0, 4.0), Vec3::new(4.0, 3.0, 4.0));
     assert_eq!(up.status, NavPathStatus::Complete, "up the ramp");
-    // A jump onto the ramp's low side (under 1 m) is fine; nothing climbs 3 m.
     let climbs = |l: &OffMeshLinkData| l.end.y - l.start.y > 1.2;
     assert!(!up.links.iter().any(|(_, l)| climbs(l)), "{:?}", up.links);
     assert!(

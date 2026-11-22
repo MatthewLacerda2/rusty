@@ -1,7 +1,4 @@
-//! Max Lightmap Size and Scale In Lightmap in the bake (#1704), Unity's rules: a
-//! mesh's map follows its area × density up to the largest map a page holds; Scale
-//! In Lightmap multiplies that density; at 0 the mesh gets no lightmap but still
-//! blocks and bounces light.
+//! Max Lightmap Size and Scale In Lightmap, Unity's rules: a map follows its mesh's area × density up to the largest map a page holds; scale multiplies density; at 0 the mesh gets no lightmap but still blocks and bounces light.
 
 use glam::Vec3;
 
@@ -9,7 +6,6 @@ use super::tests::{floor, settings};
 use super::*;
 use rusty_components::MeshComponent;
 
-/// A `Baked` sun shining straight down.
 fn noon() -> BakeLight {
     BakeLight {
         shape: LightShape::Directional {
@@ -21,7 +17,6 @@ fn noon() -> BakeLight {
     }
 }
 
-/// The 4×4 floor and a copy of it 1 unit above, facing down, at `scale`.
 fn floor_under_panel(scale: f32) -> BakeScene {
     let mut panel = floor();
     panel.entity = 3;

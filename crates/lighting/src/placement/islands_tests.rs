@@ -1,14 +1,8 @@
-//! Jump boxes on a nav-style floor plan (#1584): their tops join the room around
-//! them; a platform big enough keeps a probe of its own.
-
 use glam::Vec2;
 
 use super::super::rooms::{find_rooms, RoomParams};
 use rusty_scene::lighting::floor::{FloorCell, FloorGrid};
 
-/// A 20 × 20 m room at 0.5 m cells, floor 0. Each `(x0, z0, side)` is a box 1 m
-/// high, its top walkable and a 0.5 m agent-radius gap left unwalkable around it,
-/// as a nav surface leaves them.
 fn room_with_boxes(boxes: &[(usize, usize, usize)]) -> FloorGrid {
     let n = 40;
     let mut cells = vec![
@@ -42,7 +36,6 @@ fn room_with_boxes(boxes: &[(usize, usize, usize)]) -> FloorGrid {
 
 #[test]
 fn a_jump_box_top_joins_the_room_around_it() {
-    // Three 2 × 2 m boxes (4 m², under the 9 m² floor).
     let grid = room_with_boxes(&[(6, 6, 4), (20, 8, 4), (10, 28, 4)]);
     let (room, count) = find_rooms(&grid, &RoomParams::default());
     assert_eq!(count, 1, "one room, no probe per box");
@@ -52,7 +45,6 @@ fn a_jump_box_top_joins_the_room_around_it() {
 
 #[test]
 fn a_platform_past_the_floor_keeps_its_own_room() {
-    // A 2 × 5 m ledge (10 m²): narrower than a doorway, so no core, but big enough.
     let grid = room_with_boxes(&[(6, 6, 4), (20, 8, 4)]);
     let mut grid = grid;
     for z in 20..30 {

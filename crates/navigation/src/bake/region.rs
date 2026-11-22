@@ -1,15 +1,7 @@
-//! crates/navigation/src/bake/region.rs — a rectangle of grid cells, the unit of an
-//! incremental rebake (#456).
-//!
-//! The bake picks **dirty rectangles** over fixed tiles: a moved crate dirties
-//! exactly the cells its old and new footprints cover, so the work tracks the size
-//! of the change rather than a tile size, and there are no tile seams to stitch.
-
 use glam::Vec3;
 
 use super::super::NavigationGraph;
 
-/// An inclusive rectangle of cells, `x0..=x1` × `z0..=z1`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CellRect {
     pub x0: i32,
@@ -19,7 +11,6 @@ pub struct CellRect {
 }
 
 impl CellRect {
-    /// Every cell of `g`.
     pub fn all(g: &NavigationGraph) -> Self {
         Self {
             x0: 0,
@@ -29,8 +20,6 @@ impl CellRect {
         }
     }
 
-    /// The cells whose squares an XZ box `lo..hi` reaches into, clamped to `g`;
-    /// `None` when the box lies off the grid.
     pub fn covering(g: &NavigationGraph, lo: Vec3, hi: Vec3) -> Option<Self> {
         let s = g.grid_spacing;
         let cell_of = |v: f32, origin: f32| ((v - origin) / s).round() as i32;
@@ -43,7 +32,6 @@ impl CellRect {
         .clamped(g)
     }
 
-    /// Grown by `n` cells on every side (not clamped).
     pub fn grown(self, n: i32) -> Self {
         Self {
             x0: self.x0 - n,
@@ -53,12 +41,10 @@ impl CellRect {
         }
     }
 
-    /// Clipped to `g`'s cells; `None` when nothing is left.
     pub fn clamped(self, g: &NavigationGraph) -> Option<Self> {
         self.intersection(Self::all(g))
     }
 
-    /// The cells both rectangles hold, `None` when they are disjoint.
     pub fn intersection(self, o: Self) -> Option<Self> {
         let r = Self {
             x0: self.x0.max(o.x0),
@@ -69,7 +55,6 @@ impl CellRect {
         (r.x0 <= r.x1 && r.z0 <= r.z1).then_some(r)
     }
 
-    /// The smallest rectangle holding both.
     pub fn union(self, o: Self) -> Self {
         Self {
             x0: self.x0.min(o.x0),
@@ -87,12 +72,10 @@ impl CellRect {
         self.x1 - self.x0 + 1
     }
 
-    /// Number of cells.
     pub fn cells(self) -> usize {
         (self.width() * (self.z1 - self.z0 + 1)) as usize
     }
 
-    /// The world XZ box the cells' squares cover (`y` is zero).
     pub fn world_box(self, g: &NavigationGraph) -> (Vec3, Vec3) {
         let half = g.grid_spacing * 0.5;
         let lo = g.cell_center(self.x0, self.z0) - Vec3::new(half, 0.0, half);
@@ -101,8 +84,6 @@ impl CellRect {
     }
 }
 
-/// Merge rectangles until none overlap, in a deterministic order: a pair is
-/// replaced by its union, so the result covers every input cell.
 pub fn merge_overlapping(mut rects: Vec<CellRect>) -> Vec<CellRect> {
     let mut merged = true;
     while merged {

@@ -1,6 +1,4 @@
-//! Prioritize View converges what the camera sees first (#1970's review): at a
-//! shown step the view's texels hold more paths than the rest, and the camera's
-//! own test reads orthographic views and lets a `ShadowsOnly` mesh hide nothing.
+//! At a shown step the camera's texels hold more paths than the rest; orthographic views work, and a `ShadowsOnly` mesh hides nothing.
 
 use glam::Vec3;
 

@@ -1,13 +1,4 @@
-//! A search in flight across an incremental rebake (#2087).
-//!
-//! A moving carving obstacle rebakes every few ticks. Restarting the head search
-//! each time would stall the queue for good behind a search longer than a few
-//! ticks' budget, so a search is carried over instead whenever nothing it reached
-//! (a span it costed, or the goal) lies near a changed cell: near enough that a
-//! changed span or a regenerated off-mesh link could have changed one of its
-//! moves. The splice renumbers the spans, so the carried search is renumbered too,
-//! cell by cell (an untouched cell keeps its spans, in order, at a new offset). A
-//! search a change does reach, a full bake, or an area-cost change restarts.
+//! A search in flight is carried across an incremental rebake unless something it reached (a span it costed, or the goal) lies near a changed cell; its spans are renumbered cell by cell. A search a change does reach, a full bake or an area-cost change restarts.
 
 use super::super::bake::CellRect;
 use super::super::offmesh::LinkParams;
@@ -15,19 +6,12 @@ use super::super::{NavMeshSettings, NavigationGraph, SpanRef};
 use super::PathQueue;
 
 impl NavigationGraph {
-    /// Before a rebake rewrites the spans: the cell offsets the active search's and
-    /// the island map's span indices count from (`islands::carry`), or `None` with
-    /// neither to carry.
     pub(crate) fn cells_before_rebake(&mut self) -> Option<Vec<u32>> {
         let searching = self.requests.get_mut().active.is_some();
         let mapped = self.islands.current(self.bake_generation, self.spans.len());
         (searching || mapped).then(|| self.cell_start.clone())
     }
 
-    /// After an incremental rebake of `changed`: carry the active search onto the
-    /// new spans when no change reaches it (see the module doc), else drop it so it
-    /// restarts on the new navmesh. `old_start` is
-    /// [`Self::cells_before_rebake`]'s.
     pub(crate) fn carry_search(
         &self,
         old_start: Option<&[u32]>,
@@ -55,11 +39,7 @@ impl NavigationGraph {
 }
 
 impl NavigationGraph {
-    /// A span index counted from the cell offsets `old_start` (the bake before
-    /// an incremental rebake of `changed`), renumbered onto the current spans:
-    /// `None` for a span in a cell near enough a change that one of its moves may
-    /// have changed (see the module doc). The held flood is carried with it too
-    /// (`flood::carry`, #2116).
+    /// A span index counted from `old_start`, renumbered onto the current spans: `None` for a span in a cell near enough a change that one of its moves may have changed.
     pub(crate) fn spliced<'a>(
         &'a self,
         old_start: &'a [u32],

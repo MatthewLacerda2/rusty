@@ -1,16 +1,7 @@
-//! The occlusion bake's dilation (#1714): each cell's seen set widened by its 26
-//! neighbours', folded into the distinct rows the cells share. A cell the bake did
-//! not sample (#2328, `reach`) sees every object, so one beside it takes the one
-//! shared all-objects row outright.
-
 use std::collections::BTreeMap;
 
 use rusty_scene::lighting::occlusion::Grid;
 
-/// Each cell's set widened by its neighbours' (the dilation), then the distinct
-/// sets as rows in first-seen cell order and each cell's row. An unsampled cell
-/// (`None`) sees all `objects`, so a cell beside one takes the all-objects row
-/// outright: one shared row, never built per cell nor ORed (#2328).
 pub(super) fn fold_rows(
     grid: &Grid,
     seen: &[Option<Vec<u64>>],
@@ -45,7 +36,6 @@ pub(super) fn fold_rows(
     (rows, cells)
 }
 
-/// The row of a cell that sees all `objects`.
 fn every_object(objects: usize) -> Vec<u64> {
     let mut every = vec![u64::MAX; objects / 64];
     if !objects.is_multiple_of(64) {

@@ -1,4 +1,4 @@
-//! A lightmap's charts and the in-chart fill (#1949).
+//! Charts and the in-chart fill.
 
 use glam::{Vec2, Vec3};
 

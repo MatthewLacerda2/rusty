@@ -1,23 +1,13 @@
-//! A lightmap's charts, and filling a chart's invalid texels from its own valid
-//! ones (#1949).
-//!
-//! A chart is one island of a mesh's lightmap UV: the triangles joined through
-//! shared UV corners. A texel the bake judges inside geometry (`trace::validity`)
-//! is dropped, and [`fill_within`] fills it from valid texels of its own chart
-//! only, as Unity dilates an invalid texel within its chart: a texel on a floor's
-//! edge is never filled from the dark chart packed beside it in the map.
+//! A chart is an island of a mesh's lightmap UV. An invalid texel is filled only from valid texels of its own chart, so a floor's edge never takes the dark chart beside it.
 
 use std::collections::BTreeMap;
 
 use super::fill::NEIGHBOURS;
 use super::{Surface, Texel, TexelPoint};
 
-/// The label of a texel no triangle covers.
 pub(in crate::lightmap) const NO_CHART: u32 = u32::MAX;
 
-/// Per triangle of `mesh`, in index order, the chart it belongs to: triangles that
-/// share a lightmap-UV corner (bit for bit) are one chart. Labels run from 0 in
-/// order of each chart's first triangle.
+/// Triangles sharing a lightmap-UV corner (bit for bit) are one chart.
 pub(in crate::lightmap) fn chart_of_triangles(mesh: &Surface) -> Vec<u32> {
     let tris = mesh.indices.len() / 3;
     let mut parent: Vec<usize> = (0..tris).collect();
@@ -57,8 +47,6 @@ fn union(parent: &mut [usize], a: usize, b: usize) {
     parent[a.max(b)] = a.min(b);
 }
 
-/// Per texel of a `size`² map, the chart of the triangle `points` took it from
-/// ([`NO_CHART`] where none did); `charts` is [`chart_of_triangles`]' answer.
 pub(in crate::lightmap) fn texel_charts(
     points: &[TexelPoint],
     charts: &[u32],
@@ -71,12 +59,7 @@ pub(in crate::lightmap) fn texel_charts(
     labels
 }
 
-/// Fill every texel a chart covers that is not `filled` (an invalid one) from the
-/// filled texels of the same chart: ring by ring, each the average of its filled
-/// eight neighbours in its chart, and one no ring reaches (cut off from the rest
-/// of its chart) with the chart's mean. A chart with no filled texel at all is
-/// left as it is, for the map's dilation to fill as before; the count of such
-/// charts is returned.
+/// A texel no ring reaches gets the chart's mean; a chart with no filled texel is left for dilation.
 pub(in crate::lightmap) fn fill_within<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],
@@ -106,12 +89,7 @@ pub(in crate::lightmap) fn fill_within<T: Texel>(
     means.values().filter(|(_, n)| *n == 0.0).count()
 }
 
-/// [`fill_within`]'s rings, as a frontier: a ring is the unfilled texels of a
-/// chart beside the ring before it, so each texel is visited a bounded number of
-/// times and the work is linear in `pending` (the invalid texels), however many
-/// rings a buried region takes. Each ring reads only texels filled before it, and
-/// sums its neighbours in `NEIGHBOURS` order, so neither the order within a ring
-/// nor the queue shows in the bytes.
+/// Linear in `pending` however many rings a buried region takes; rings sum in `NEIGHBOURS` order so no visiting order shows in the bytes.
 fn fill_rings<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],
@@ -157,8 +135,6 @@ fn fill_rings<T: Texel>(
     }
 }
 
-/// The indices of texel `i`'s eight neighbours inside a `size`² map, in
-/// `NEIGHBOURS` order.
 fn near(i: usize, size: u32) -> impl Iterator<Item = usize> {
     let size = size as i32;
     let (x, y) = (i as i32 % size, i as i32 / size);

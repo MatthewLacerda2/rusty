@@ -1,22 +1,10 @@
-//! [`OCCLUSION_VERSION`]'s rule held (#2348): the bake's bytes for one small fixed
-//! scene are pinned beside the version, so a change to what the bake writes for the
-//! same objects fails until the version is bumped, which makes Generate Lighting
-//! re-bake a PVS an older engine made instead of keeping it.
-//!
-//! Linux only: a bake is byte-identical on one machine, not across architectures
-//! (`docs/testing.md`, *Rules*), and the pin is Linux's, as the converters' are.
-
 use crate::occlusion::test_level::corridors;
 use crate::occlusion::{bake_occlusion, OCCLUSION_VERSION};
 use rusty_scene::lighting::occlusion::encode;
 
-/// The version the pin was taken at, and the content hash of the corridors level's
-/// PVS with its stamp's version zeroed (so the hash is the bake's bytes alone).
-/// Under its one test's `cfg`, so no other build holds an unused constant.
 #[cfg(target_os = "linux")]
 const PINNED: (u32, u64) = (2, 0x6d14_53fc_688c_888a);
 
-/// The corridors level's PVS bytes, the version field zeroed.
 fn bytes_hash() -> u64 {
     let mut data = bake_occlusion(&corridors(), 2).0.expect("occluders");
     data.stamp.version = 0;

@@ -1,5 +1,3 @@
-//! The bake reads its tunables from `scene.nav_settings` (#276).
-
 use super::super::super::test_support::{add_box, add_floor, bake_pinned, ground};
 use super::super::super::{NavBounds, NavigationGraph};
 use glam::Vec3;

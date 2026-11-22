@@ -1,5 +1,4 @@
-//! How much world surface one unit of UV covers: the measure that sizes a
-//! lightmap and a mesh map's texel, of a whole mesh or of one UV island.
+//! World surface per unit of UV: sizes a lightmap and a mesh map's texel, of a whole mesh or of one UV island.
 
 use super::Surface;
 
@@ -13,9 +12,7 @@ pub(crate) fn world_per_uv(mesh: &Surface) -> Option<f32> {
     areas.world_per_uv()
 }
 
-/// A running sum of triangles' world and UV areas, added in the order given: the
-/// measure [`world_per_uv`] takes of a whole mesh, open to a part of one (a UV
-/// island) so the part's measure is the same arithmetic.
+/// Open to a part of a mesh (a UV island), so the part's measure is the same arithmetic as the whole's.
 #[derive(Clone, Copy, Debug, Default)]
 pub(crate) struct Areas {
     world: f32,
@@ -23,7 +20,6 @@ pub(crate) struct Areas {
 }
 
 impl Areas {
-    /// Add the triangle `t` (its three indices into `mesh`).
     pub(crate) fn add(&mut self, mesh: &Surface, t: &[u32]) {
         let [a, b, c] = [t[0], t[1], t[2]].map(|i| i as usize);
         let (pa, pb, pc) = (mesh.positions[a], mesh.positions[b], mesh.positions[c]);
@@ -32,8 +28,7 @@ impl Areas {
         self.uv += (ub - ua).perp_dot(uc - ua).abs() * 0.5;
     }
 
-    /// World units per unit of UV over what was added; `None` when its UVs
-    /// enclose no area.
+    /// `None` when its UVs enclose no area.
     pub(crate) fn world_per_uv(self) -> Option<f32> {
         (self.uv >= 1e-8 && self.world > 0.0).then(|| (self.world / self.uv).sqrt())
     }

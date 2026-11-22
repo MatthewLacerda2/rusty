@@ -1,5 +1,3 @@
-//! A progressive bake's texels between steps (#1970) and one step's work on each.
-
 use super::super::super::raster::TexelPoint;
 use super::super::super::rng::Rng;
 use super::super::super::trace::{Paths, Shown, TexelLight, Tracer};
@@ -7,9 +5,6 @@ use super::super::pool;
 use super::schedule::Step;
 use rusty_scene::lighting::settings::BakeSettings;
 
-/// One texel between passes: where it is, its stream, its sums, whether it lies
-/// inside geometry (#1949, decided on its first pass and never traced then), and
-/// once a pass has shown it, what it shows.
 #[derive(Debug)]
 pub(super) struct Texel {
     pub point: TexelPoint,
@@ -19,11 +14,8 @@ pub(super) struct Texel {
     shown: Option<Shown>,
 }
 
-/// Every chart's texels, cut into the pool's batches.
 pub(super) type Charts = Vec<Vec<Vec<Texel>>>;
 
-/// Every chart's texels before the first pass, each with its own stream, in the
-/// pool's batches.
 pub(super) fn fresh(points: Vec<Vec<TexelPoint>>, heads: &[(usize, u32)], seed: u64) -> Charts {
     let chart = |(c, chart): (usize, Vec<TexelPoint>)| {
         let mesh = heads[c].0 as u64;
@@ -39,8 +31,6 @@ pub(super) fn fresh(points: Vec<Vec<TexelPoint>>, heads: &[(usize, u32)], seed: 
     points.into_iter().enumerate().map(chart).collect()
 }
 
-/// One step's work on a texel: `step`'s paths after `done`, the last step
-/// resolving every texel, a step that shows giving each its light so far.
 pub(super) struct Work<'a> {
     pub tracer: &'a Tracer<'a>,
     pub settings: &'a BakeSettings,
@@ -51,13 +41,6 @@ pub(super) struct Work<'a> {
 }
 
 impl Work<'_> {
-    /// Texel `t` of receiving mesh `mesh` (in the view's group when `seen`) after
-    /// this step, updated in place, and its light when the step needs it: what it
-    /// shows so far, or on the last step its finished light. Its first pass
-    /// decides its validity as the one-shot bake does (`super::texel`); a step that
-    /// shows it takes its direct light once, from its display stream, so a bake of
-    /// one pass traces it only as one-shot does. A texel whose paths were all in
-    /// before the last step is resolved there: nothing drew from its stream since.
     pub fn texel(&self, mesh: u64, seen: bool, t: &mut Texel) -> Option<TexelLight> {
         let (s, tracer) = (self.settings, self.tracer);
         let (position, normal) = (t.point.position, t.point.normal);

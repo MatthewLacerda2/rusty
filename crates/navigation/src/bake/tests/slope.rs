@@ -1,6 +1,3 @@
-//! A ramp's surface (#781): the height an agent stands at follows the slope, not its
-//! cells' highest points, and the creases at the foot and the top come out exact.
-
 use super::super::super::test_support::{add_box, add_floor, add_rotated_box, bake_pinned};
 use super::super::super::NavigationGraph;
 use glam::{Quat, Vec3};
@@ -9,8 +6,6 @@ use rusty_scene::Scene;
 const GRADE: f32 = 0.3;
 const THICK: f32 = 0.4;
 
-/// A floor at y = 0, a 0.3-grade ramp up +x from x = 2 to x = 8 (z 3..7), and a
-/// platform at its top from x = 8 on.
 fn ramp() -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 12.0, 0.0, 10.0);
@@ -34,7 +29,6 @@ fn ramp() -> NavigationGraph {
     bake_pinned(&mut scene)
 }
 
-/// The ground the scene above is built with, at `x`.
 fn truth(x: f32) -> f32 {
     (GRADE * (x - 2.0)).clamp(0.0, 6.0 * GRADE)
 }

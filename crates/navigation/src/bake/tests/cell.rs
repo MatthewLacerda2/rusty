@@ -1,11 +1,3 @@
-//! The 0.25 m default cell (#1887): passages the old 1 m cell closed stay open.
-//!
-//! What fits through a gap is the cell *and* the agent radius: erosion drops every
-//! span within the radius of an edge (`erosion`), so at the default 0.5 m radius no
-//! gap under about 1 m is walkable at any cell, by design. So the 0.6 m gap is
-//! measured with no radius (the cell alone decides), and a 1.4 m doorway, the
-//! Dust2 bench level's, at the default radius.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_floor, arrives, ground};
@@ -13,8 +5,6 @@ use super::super::super::{NavBounds, NavigationGraph};
 use rusty_scene::nav_settings::{DEFAULT_AGENT_RADIUS, DEFAULT_GRID_SPACING};
 use rusty_scene::Scene;
 
-/// A 10 × 6 floor split along x = 5 by a wall with a `gap` wide opening at z = 3,
-/// baked at `spacing` with `radius`; whether a path crosses it.
 fn crosses(gap: f32, spacing: f32, radius: f32) -> bool {
     let mut scene = Scene::new();
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 6.0));

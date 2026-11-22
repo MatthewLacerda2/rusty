@@ -1,22 +1,4 @@
-//! crates/navigation/src/bake/sync.rs — rebake only what changed (#456).
-//!
-//! [`NavigationGraph::sync`] runs every play tick (through `sync_changes`, `still`)
-//! in place of the old full rebake every 60 frames. It diffs the scene against the
-//! inputs the last bake read (`inputs`): nothing changed costs one pass over the
-//! obstacles, the modifier volumes (#460) and the authored links, plus one over the
-//! static colliders unless the change log says none of them changed (#1707). A changed one dirties the cells
-//! its old and new footprints cover; overlapping dirty rectangles merge. Each rectangle's
-//! pre-erosion columns are rebuilt and spliced in, then erosion re-runs over the
-//! rectangles grown by its reach, and those cells of the final graph are spliced.
-//!
-//! A settings change or a change of the grid's bounds or spacing is a full bake:
-//! every cell moves or every span may differ. Connectivity is computed on demand
-//! from the spans (`links.rs`), so there are no stored components or links to
-//! recompute, locally or globally. Three things are carried instead: off-mesh links
-//! (#462), the generated ones near the change regenerated and the authored ones
-//! re-snapped; the agents' search in progress (`request::carry`, #2087); and the
-//! island map (`request::islands::carry`, #2111), joined anew around the change
-//! and built fresh after a quiet spell, which a sync without a change counts.
+//! A settings change or a change of the grid's bounds or spacing is a full bake. Connectivity is computed on demand from the spans, so only off-mesh links, the agents' search in progress and the island map are carried.
 
 use super::super::NavigationGraph;
 use super::erosion;
@@ -31,51 +13,28 @@ use rusty_scene::Scene;
 
 #[cfg(test)]
 thread_local! {
-    /// The static collider diffs `update_inputs` ran on this thread: what a test
-    /// counts a skipped diff by.
     pub(crate) static STATIC_DIFFS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
 }
 
-/// What a [`NavigationGraph::sync`] did.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Rebake {
-    /// Nothing the bake reads changed.
     Unchanged,
-    /// These cell rectangles were rebaked (erosion reach included).
     Incremental(Vec<CellRect>),
-    /// The whole grid was rebaked.
     Full,
 }
 
 impl NavigationGraph {
-    /// Bring the navmesh up to date with `scene`, rebaking only the cells whose
-    /// inputs changed since the last bake. A graph that was never baked, or whose
-    /// settings, bounds or spacing changed, is baked in full. The result is the
-    /// same graph a full [`Self::bake`] of `scene` gives.
-    ///
-    /// Area costs (#460) are not a bake input: a changed cost is adopted here
-    /// without rebaking anything, and only makes cached agent paths stale.
+    /// Area costs are not a bake input: a changed cost is adopted here without rebaking, and only makes cached agent paths stale.
     pub fn sync(&mut self, scene: &Scene) -> Rebake {
         self.sync_inner(scene, false)
     }
 
-    /// Whether the navmesh is what a bake of `scene` gives now, read without
-    /// rebaking: baked, with the settings, the grid and every input (static
-    /// collider, carving obstacle, modifier volume, authored link) the scene holds.
-    /// The editor's per-frame [`Self::sync`] keeps it so; a scene edited since its
-    /// last sync, or a graph never baked, is not. What a bake that takes the
-    /// navmesh as the level's floor asks first (the occlusion bake's reach).
     pub fn is_current_for(&self, scene: &Scene) -> bool {
         self.bakes_current(scene, false)
             && (self.bake_state.as_ref())
                 .is_some_and(|st| st.inputs.are(InputKeys::of(scene, false)))
     }
 
-    /// Whether a sync may splice into this bake rather than bake in full: baked,
-    /// with the settings `scene` holds and its grid's bounds and spacing
-    /// (`statics_still` skips the reshape check, which reads only the static
-    /// geometry and the settings). The half of "current" that is not the inputs,
-    /// shared by [`Self::sync`] and [`Self::is_current_for`].
     fn bakes_current(&self, scene: &Scene, statics_still: bool) -> bool {
         self.bake_state.as_ref().is_some_and(|st| {
             st.inputs.settings.bakes_like(&scene.nav_settings)
@@ -83,9 +42,6 @@ impl NavigationGraph {
         })
     }
 
-    /// [`Self::sync`]; `statics_still` (the change log saw no static entity change
-    /// since the last sync, `still`) skips the static collider diff and the
-    /// reshape check, which read only that geometry and the settings.
     pub(super) fn sync_inner(&mut self, scene: &Scene, statics_still: bool) -> Rebake {
         let current = self.bakes_current(scene, statics_still);
         if current {
@@ -99,7 +55,7 @@ impl NavigationGraph {
         let (dirty, link_dirty) = st.update_inputs(scene, keys, self);
         if dirty.is_empty() && link_dirty.is_empty() {
             self.bake_state = Some(st);
-            self.islands.still(); // a carried island map rebuilds after a quiet spell (#2111)
+            self.islands.still();
             return Rebake::Unchanged;
         }
         let before = self.cells_before_rebake();
@@ -111,14 +67,11 @@ impl NavigationGraph {
         self.bake_generation = self.bake_generation.wrapping_add(1);
         st.log.record(self.bake_generation, Some(changed.clone()));
         self.bake_state = Some(st);
-        self.carry_search(before.as_deref(), &changed, &scene.nav_settings); // #2087
-        self.carry_islands(before.as_deref(), &changed); // #2111
+        self.carry_search(before.as_deref(), &changed, &scene.nav_settings);
+        self.carry_islands(before.as_deref(), &changed);
         Rebake::Incremental(changed)
     }
 
-    /// Rebuild the spans of the `dirty` cells and erode around them, then regenerate
-    /// the drop and jump links those cells can reach. Returns the cells whose final
-    /// spans were rebuilt.
     fn rebake_regions(
         &mut self,
         scene: &Scene,
@@ -147,8 +100,6 @@ impl NavigationGraph {
         changed
     }
 
-    /// Replace the generated links leaving any cell a change to `changed` can reach
-    /// (`LinkParams::region`) with freshly generated ones, in full-bake order.
     fn regenerate_links(&mut self, raw: &NavigationGraph, scene: &Scene, changed: &[CellRect]) {
         let Some(p) = LinkParams::new(&scene.nav_settings, self.grid_spacing) else {
             return;
@@ -167,10 +118,6 @@ impl NavigationGraph {
 }
 
 impl BakeState {
-    /// Diff the recorded inputs against `keys` (`scene`'s now), record them, and
-    /// return the cells whose spans' inputs changed and those a changed authored
-    /// link spanned (before or after). With no `colliders` (unread:
-    /// `InputKeys::of`) the static colliders keep their records undiffed.
     fn update_inputs(
         &mut self,
         scene: &Scene,
@@ -205,8 +152,6 @@ impl BakeState {
         (dirty, self.update_links(links, g))
     }
 
-    /// Diff the recorded authored links against `links` (the scene's now), record
-    /// them, and return the cells a changed link spanned (before or after).
     fn update_links(
         &mut self,
         links: Vec<(u32, AuthoredKey)>,

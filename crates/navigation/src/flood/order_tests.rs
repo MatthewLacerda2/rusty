@@ -1,16 +1,9 @@
-//! The flood's kept state (#2088): the search pool and the island answers it
-//! carries between queries never change an answer. The same queries give the
-//! same costs in any order, on a fresh graph or one that ran others first, and
-//! a rebake drops what the old navmesh proved.
-
 use glam::Vec3;
 
 use crate::test_support::{add_box, add_floor, move_to};
 use crate::{NavBounds, NavigationGraph, ALL_AREAS};
 use rusty_scene::Scene;
 
-/// A 40 × 40 m floor, a wall with a doorway, a 2 m crate (an island, with drops
-/// off it) and its box id, so a test can move it.
 fn level() -> (Scene, u32) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -20.0, 20.0, -20.0, 20.0);
@@ -42,7 +35,6 @@ fn bake(scene: &Scene) -> NavigationGraph {
 
 const TOP: Vec3 = Vec3::new(7.0, 2.0, 7.0);
 
-/// `(start, goals)`: across the doorway, onto and off the crate, from its top.
 fn queries() -> Vec<(Vec3, Vec<Vec3>)> {
     let floor = |x: f32, z: f32| Vec3::new(x, 0.0, z);
     vec![
@@ -65,7 +57,6 @@ fn queries() -> Vec<(Vec3, Vec<Vec3>)> {
     ]
 }
 
-/// Each goal's length, per query, run in the order given.
 fn run(nav: &NavigationGraph, order: &[usize]) -> Vec<(usize, Vec<Option<f32>>)> {
     let all = queries();
     order

@@ -1,14 +1,3 @@
-//! The occlusion bake's sampling (#1714): the static scene ready to trace, and what
-//! one cell sees. Rays go from seeded points in the cell to each object's targets
-//! (`targets`) through the lightmap bake's BVH (`lightmap::Rays`), once no
-//! occluder face, alone (`shaft`) or fused with the others on its plane
-//! (`sheets`), proves them hidden (`sight`).
-//!
-//! The eye keeps one density at every cell size: a cell is sampled as
-//! [`Grid::subdivisions`] cubes of at most `CELL_SIZE` a side, each with its
-//! centre and [`CUBE_POINTS`]` - 1` seeded points, so a gap a 2 m cell sees through
-//! is seen through by a 3.9 m one.
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -24,50 +13,35 @@ use crate::occlusion::progress::OcclusionProgress;
 use crate::occlusion::OCCLUSION_SEED;
 use rusty_scene::lighting::occlusion::Grid;
 
-/// Points sampled in each sampling cube of a cell (its centre first, the rest
-/// seeded in the cube).
 const CUBE_POINTS: usize = 6;
-/// How far short of a target point a ray stops, so the triangle it lies on (or
-/// one touching it) does not hide it.
 pub(super) const REACH_SLACK: f32 = 1e-3;
 
-/// An object's world bounds and its targets (`None`: too large or not finite to
-/// sample, so it stays in sight of every cell).
 pub(super) type Targets = (Vec3, Vec3, Option<Vec<Chunk>>);
 
-/// The scene ready to sample: the occluders' BVH, each triangle's drawn side and
-/// the planar polygons they make, and per object its bounds and target points.
 pub(in crate::occlusion) struct Baking {
     pub(super) rays: Rays,
     pub(super) faces: Vec<Face>,
     pub(super) polygons: Polygons,
     pub(super) targets: Vec<Targets>,
     pub(super) clusters: Vec<Cluster>,
-    /// The bounds of every object that can be culled, `None` when none can: a
-    /// never-culled one (a ground slab) needs no cell, so it never coarsens them.
     pub bounds: Option<(Vec3, Vec3)>,
 }
 
 impl Baking {
-    /// How many objects are too large or not finite to sample, and so are kept
-    /// in sight of every cell.
     pub fn never_culled(&self) -> usize {
         self.targets.iter().filter(|t| t.2.is_none()).count()
     }
 
-    /// How many sheets the occluders fused into, and the bytes they take.
     #[cfg(feature = "dev")]
     pub fn sheets(&self) -> (usize, usize) {
         self.polygons.sheet_bytes()
     }
 
-    /// How many rays it has cast, for a cost measurement ([`Self::counted`]).
     #[cfg(feature = "dev")]
     pub fn rays_cast(&self) -> u64 {
         self.rays.cast.load(Ordering::Relaxed)
     }
 
-    /// This bake, counting its rays (a cost measurement's).
     #[cfg(feature = "dev")]
     pub fn counted(self) -> Self {
         Self {
@@ -81,7 +55,6 @@ impl Baking {
         let mut bounds: Option<(Vec3, Vec3)> = None;
         let mut targets = Vec::with_capacity(objects.len());
         for (i, object) in objects.iter().enumerate() {
-            // A corner that is not finite stops nothing; dropping it only shows more.
             let finite = object
                 .occluding
                 .iter()
@@ -113,11 +86,6 @@ impl Baking {
         }
     }
 
-    /// Each cell's own visible bits, `words` per cell, baked on `threads` workers;
-    /// `None` when `progress` was cancelled. Only the cells `sampled` marks are
-    /// sampled (all of them when `None`): every other one is `None`, a cell that
-    /// sees every object (#2328), which the dilation reads as such
-    /// (`bake::fold_rows`).
     pub fn cells(
         &self,
         grid: &Grid,
@@ -151,8 +119,6 @@ impl Baking {
         (!progress.is_cancelled()).then_some(out)
     }
 
-    /// Cell `index`'s sampling cubes, each as its points: the centre, then seeded
-    /// ones from the cell's own stream.
     fn samples(&self, grid: &Grid, index: usize) -> Vec<Vec<Vec3>> {
         let (min, _) = grid.bounds(index);
         let n = grid.subdivisions();
@@ -167,8 +133,6 @@ impl Baking {
             });
             cubes.push(points.collect::<Vec<_>>());
         }
-        // A point inside a wall or a floor sees out through the back faces round it,
-        // which no camera does: it is dropped, unless every point is inside.
         let open = |p: &Vec3| !self.inside(*p);
         let kept: Vec<Vec<Vec3>> = cubes
             .iter()
@@ -181,8 +145,6 @@ impl Baking {
         cubes
     }
 
-    /// What cell `index` sees on its own: an object whose bounds reach the cell or
-    /// its neighbours outright, any other when a sampled ray reaches it.
     pub fn cell(&self, grid: &Grid, index: usize) -> Vec<u64> {
         let (min, max) = grid.bounds(index);
         let samples = self.samples(grid, index).into_iter();
@@ -196,8 +158,6 @@ impl Baking {
                 bits[i / 64] |= 1 << (i % 64);
             }
         }
-        // Eye by eye, cluster by cluster: nearby objects one after another, so
-        // the polygons an eye remembers keep hiding them (`eye`).
         for eye in &mut eyes {
             for cluster in &self.clusters {
                 if cluster.objects.iter().all(|&i| set(&bits, i))
@@ -217,15 +177,10 @@ impl Baking {
         bits
     }
 
-    /// Whether one polygon hides the box `to`, which holds whole objects, from
-    /// all of `eye`. Any polygon will do: one of those objects' own lies inside
-    /// the box, so it never separates it.
     fn hidden(&self, eye: &mut Eye, to: (Vec3, Vec3)) -> bool {
         self.proved(eye, eye.bounds, to, u32::MAX)
     }
 
-    /// Whether `point` sits inside an occluder: most of the six axis rays from it
-    /// first meet the back of an occluder's triangle (Unity's backface threshold).
     fn inside(&self, point: Vec3) -> bool {
         let axes = [
             Vec3::X,

@@ -1,6 +1,4 @@
-//! A page's mip chain (#1694): the levels the atlas keeps apart never mix two maps
-//! or a map's empty background, the bake fills a map's background from its charts,
-//! and mixed directions average to a less directional texel.
+//! Levels never mix two maps or a map's empty background; the bake fills a map's background from its charts; mixed directions average to a less directional texel.
 
 use glam::Vec3;
 

@@ -1,7 +1,3 @@
-//! The queue's two steps each tick (#2087): the agents ask for the paths they need
-//! ([`NavigationGraph::ask_paths`]), then the queue spends its budget answering
-//! them ([`NavigationGraph::serve_paths`]).
-
 use glam::Vec3;
 
 use super::super::agents::{TARGET_SAMPLE_DISTANCE, WAYPOINT_REACHED_DISTANCE};
@@ -9,25 +5,16 @@ use super::super::{NavPath, NavigationGraph};
 use super::{Active, PathQueue, Request};
 use rusty_scene::{NavMeshAgentComponent, Scene};
 
-/// What a search reads off its agent when it begins: where its feet are, its raw
-/// target and its area mask.
 type Ends = (Vec3, Vec3, u32);
 
-/// A finished request: its path, the target it was planned for, where the agent's
-/// feet were when its search began, and whether the answer holds only from there
-/// (a capped search, or a start off the navmesh: the agent's `replan_from`).
 type Answer = (NavPath, Vec3, Vec3, bool);
 
-/// How the request at the head starts: answered at once, or a search to run.
 enum Begun {
     Answered(Answer),
     Searching(Active),
 }
 
 impl NavigationGraph {
-    /// Every active agent that needs a new path and is not already waiting for one
-    /// queues a request, in ECS order. A wait the queue lost (the graph was
-    /// replaced) is asked again.
     pub(crate) fn ask_paths(&self, scene: &mut Scene) {
         let mut queue = self.requests.borrow_mut();
         for id in scene.world.ids_with_nav_agent() {
@@ -50,16 +37,11 @@ impl NavigationGraph {
         }
     }
 
-    /// Whether `agent`, standing at `position`, is waiting for a path or will ask
-    /// for one on its next tick (Unity's `pathPending`). Read-only: a rebake that
-    /// left its path untouched does not count, as the next tick would keep that path.
     pub fn path_pending(&self, agent: &NavMeshAgentComponent, position: Vec3) -> bool {
         let current = self.path_untouched(agent, agent.feet(position));
         agent.path_request != 0 || self.needs_path_on(agent, position, current)
     }
 
-    /// Spend this tick's budget on the queue, head first, handing each finished path
-    /// to its agent. A request its agent can no longer use is dropped unsearched.
     pub(crate) fn serve_paths(&self, scene: &mut Scene) {
         let mut queue = self.requests.borrow_mut();
         let mut budget = queue.iterations;
@@ -87,8 +69,6 @@ impl NavigationGraph {
         }
     }
 
-    /// Run the head request on `budget`, beginning its search from `ends` if none
-    /// runs yet: its answer once found, `None` when the budget ran out first.
     fn advance(&self, queue: &mut PathQueue, ends: Ends, budget: &mut u32) -> Option<Answer> {
         let PathQueue { active, pool, .. } = queue;
         if active
@@ -111,11 +91,7 @@ impl NavigationGraph {
         Some((path, a.target, a.from, capped))
     }
 
-    /// Begin a search from the agent's feet toward the walkable point nearest its
-    /// target (within [`TARGET_SAMPLE_DISTANCE`], #666): exactly the ends a
-    /// synchronous `calculate_path_masked` would snap. With no walkable point near
-    /// either end the answer is no path, at once; one that failed on the start holds
-    /// only where the agent stands.
+    /// Begin a search from the agent's feet toward the walkable point nearest its target (within [`TARGET_SAMPLE_DISTANCE`]): exactly the ends a synchronous `calculate_path_masked` would snap.
     fn begin_request(&self, pool: &mut super::NodePool, (from, target, mask): Ends) -> Begun {
         let goal = self.sample_position(target, TARGET_SAMPLE_DISTANCE);
         let start = self.snap(from);
@@ -135,12 +111,7 @@ impl NavigationGraph {
         })
     }
 
-    /// Skip the waypoints at the head of a just-delivered path that the agent,
-    /// now at `feet`, walked past while it waited (it stood at `from` when the
-    /// search began), so a chaser does not turn back to touch a corner: while the
-    /// next waypoint lies no farther along the path than the agent has walked, no
-    /// off-mesh link comes before the one after it, and that one is in clear
-    /// navmesh sight.
+    /// Skip the waypoints at the head of a just-delivered path that the agent walked past while it waited, so a chaser does not turn back to touch a corner.
     fn skip_passed(&self, agent: &mut NavMeshAgentComponent, from: Vec3, feet: Vec3) {
         let walked = from.distance(feet) + WAYPOINT_REACHED_DISTANCE;
         let (mut along, mut prev) = (0.0, from);
@@ -160,11 +131,6 @@ impl NavigationGraph {
     }
 }
 
-/// What the head request's search begins from, while agent `id` still holds
-/// `ticket` and can use a path: active, enabled in the hierarchy and not crossing
-/// an off-mesh link. Otherwise `None`, and the agent gives the ticket up, so it
-/// asks again once it can use one (a link's own landing re-plans only if its path
-/// went stale meanwhile).
 fn wanted(scene: &mut Scene, id: u32, ticket: u32) -> Option<Ends> {
     let live = scene.world.is_active_in_hierarchy(id);
     let position = scene.world.world_position(id);

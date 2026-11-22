@@ -1,20 +1,12 @@
-//! Smoothing the baked bounce (#438), Unity's lightmap *Gaussian filter* on the
-//! indirect term. A few hundred paths per texel still leave grain where the bounce
-//! comes from a small bright patch, so the indirect light is blurred across
-//! neighbouring texels, weighted so it never crosses a crease or a gap: a neighbour
-//! counts only if it faces the same way and sits on the same stretch of surface.
-//! Baked direct light is never filtered, so its shadows stay sharp.
+//! Gaussian filter on the indirect term (Unity's lightmap filter). A neighbour counts only if it faces the same way and sits on the same stretch of surface, so the blur never crosses a crease or a gap. Baked direct light is never filtered.
 
 use glam::Vec3;
 
 use super::raster::TexelPoint;
 
-/// A neighbour must face within this cosine of the texel's own normal.
 const MIN_NORMAL_COS: f32 = 0.9;
 
-/// The indirect light of `points` (one value each, in order), blurred over a
-/// `radius`-texel Gaussian on a `size`² lightmap whose texels are `texel_world`
-/// world units across. `radius == 0` returns it unchanged.
+/// `radius == 0` returns `points` unchanged; `texel_world` is the texel's edge in world units.
 pub(super) fn smooth(
     points: &[TexelPoint],
     indirect: &[Vec3],

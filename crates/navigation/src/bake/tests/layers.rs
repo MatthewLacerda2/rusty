@@ -1,11 +1,8 @@
-//! Stacked floors (#454): several spans per cell, linked floor by floor.
-
 use super::super::super::test_support::{add_box, add_floor, arrives, bake_pinned, floors, ground};
 use crate::ALL_AREAS;
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// Ground floor plus a 3 m-high upper deck over x = 2..8, z = 2..8 (0.2 thick).
 fn two_floors() -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);

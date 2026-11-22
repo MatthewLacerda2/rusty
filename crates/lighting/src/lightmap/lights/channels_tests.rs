@@ -1,5 +1,4 @@
-//! Shadowmask channels (#1695): an overlap colouring of the `Mixed` lights' reach,
-//! four to a texel, the rest baked as `Baked`.
+//! An overlap colouring of the `Mixed` lights' reach, four to a texel, the rest baked as `Baked`.
 
 use glam::Vec3;
 

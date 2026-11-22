@@ -1,31 +1,13 @@
-//! Whether a texel sits inside geometry (#1949), Unity's *Backface Tolerance*.
-//!
-//! A texel under a crate or inside a wall sees mostly back faces: its light is
-//! meaningless, so the bake drops it and fills it from its own chart
-//! (`raster::charts`). The test is its own fixed budget of [`PROBES`] rays per
-//! texel from its own seeded stream ([`Rng::probes`]), never the paths that gather
-//! light: so a texel near the threshold is valid or not the same way at 16 paths
-//! and at 4096, and does not flip as the sample count changes.
-
 use glam::Vec3;
 
 use super::super::rng::Rng;
 use super::{cosine_sample, Tracer, SURFACE_OFFSET, T_MIN};
 use rusty_scene::lighting::settings::BakeSettings;
 
-/// Probe rays per texel that decide its validity, whatever the bake's samples. 32
-/// removed the same blobs as 64 on `quality_tests`' interior at 64 samples for a
-/// third of the cost (about +5% of the bake against +32%, #1949).
+/// Fixed per texel whatever the sample count, so validity never flips with it.
 pub(in crate::lightmap) const PROBES: u32 = 32;
 
 impl Tracer<'_> {
-    /// Whether the texel at `position` facing `normal` is valid: at least
-    /// `tolerance` of its [`PROBES`] cosine-weighted rays reach a front face or
-    /// escape (Unity counts a texel valid by the share of its rays that see front
-    /// faces; a ray that meets nothing sees no back face either). `tolerance` is
-    /// held as [`BakeSettings::backface_tolerance_of`] holds it (NaN or ∞ take
-    /// 0.9): 1 drops a texel that sees any back face, and 0 keeps every texel
-    /// without casting a probe.
     pub(in crate::lightmap) fn valid(
         &self,
         position: Vec3,

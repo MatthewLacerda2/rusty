@@ -1,11 +1,5 @@
-//! MaxRects (Jylänki's *best short side fit*): the free space of one atlas page as
-//! the maximal empty rectangles left in it, each placement taking the free
-//! rectangle it fits most snugly and splitting every free rectangle it overlaps.
-//! Unlike a shelf packer, a gap left by an earlier placement stays available to
-//! every later one. Integer arithmetic and a fixed visiting order: the same inputs
-//! always give the same corners.
+//! MaxRects (Jylänki's *best short side fit*): free space is the maximal empty rectangles; a gap left by an earlier placement stays available to every later one. Integer arithmetic and a fixed visiting order give the same corners for the same inputs.
 
-/// An axis-aligned rectangle, in the packer's grid units.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct Rect {
     pub x: u32,
@@ -32,13 +26,11 @@ impl Rect {
     }
 }
 
-/// One page's free space.
 pub(super) struct Page {
     free: Vec<Rect>,
 }
 
 impl Page {
-    /// An empty `edge`² page.
     pub fn new(edge: u32) -> Self {
         Self {
             free: vec![Rect {
@@ -50,7 +42,6 @@ impl Page {
         }
     }
 
-    /// Place an `edge`² square: its corner, or `None` when no free space holds it.
     pub fn place(&mut self, edge: u32) -> Option<(u32, u32)> {
         let best = self
             .free
@@ -71,8 +62,6 @@ impl Page {
         Some((used.x, used.y))
     }
 
-    /// Carve `used` out of every free rectangle it overlaps, then drop the free
-    /// rectangles another one contains.
     fn split(&mut self, used: &Rect) {
         let mut next = Vec::with_capacity(self.free.len() + 4);
         for f in &self.free {
@@ -109,8 +98,7 @@ impl Page {
                 });
             }
         }
-        // A rectangle another one holds is redundant; of two equal ones, the
-        // first is kept.
+        // Of two equal rectangles the first is kept.
         let kept: Vec<Rect> = next
             .iter()
             .enumerate()

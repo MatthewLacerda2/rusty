@@ -1,14 +1,9 @@
-//! Tests for `NavigationGraph::walkable_aabb` (`bounds.rs`, #721): the walkable
-//! extent light-probe placement fills, and the probe grid it yields through
-//! `lighting::placement` — the same layout the graph-taking placement gave.
-
 use super::test_support::{add_box, add_floor};
 use super::*;
 use glam::Vec3;
 use rusty_lighting::placement::plan_light_probes;
 use rusty_scene::Scene;
 
-/// A 20×6×20 room: a single static box spanning [-10,10] in XZ, [-3,3] in Y.
 fn room_scene() -> Scene {
     let mut scene = Scene::new();
     add_box(
@@ -34,8 +29,6 @@ fn a_degenerate_graph_has_no_walkable_extent() {
     );
 }
 
-/// Flat in X alone: one column of cells along Z is still no baked grid, so a single
-/// degenerate axis is enough to report no extent.
 #[test]
 fn a_graph_degenerate_in_one_axis_has_no_walkable_extent() {
     assert_eq!(
@@ -50,7 +43,6 @@ fn a_graph_with_nothing_walkable_has_no_extent() {
     assert_eq!(g.walkable_aabb(), None, "no geometry, no spans (#454)");
 }
 
-/// The bounds of a real bake: the slab's top, inset by the agent-radius erosion.
 #[test]
 fn a_baked_floor_bounds_its_eroded_surface() {
     let mut scene = Scene::new();
@@ -64,8 +56,6 @@ fn a_baked_floor_bounds_its_eroded_surface() {
     );
 }
 
-/// The walkable extent handed to placement gives the layout the graph-taking
-/// placement gave: XZ clipped to the level, Y from the floors up 3 units of headroom.
 #[test]
 fn probe_placement_through_walkable_bounds_is_unchanged() {
     let g = NavigationGraph::new(-4.0, 4.0, -4.0, 4.0, 1.0);
@@ -75,8 +65,7 @@ fn probe_placement_through_walkable_bounds_is_unchanged() {
     assert_eq!(plan.spacing, 4.0);
 }
 
-/// Agent-radius erosion (#277) must TIGHTEN — never grow — the probe bounds: probes
-/// track where agents can actually stand.
+/// Agent-radius erosion must tighten, never grow, the probe bounds.
 #[test]
 fn erosion_tightens_light_probe_bounds() {
     let bake_with = |radius: f32| {

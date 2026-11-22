@@ -1,16 +1,3 @@
-//! crates/navigation/src/bake/carve.rs — cut carving obstacles out of the spans (#456).
-//!
-//! Unity's `NavMeshObstacle` carving. A carving obstacle's volume is rasterised
-//! like a convex collider, one solid interval per cell column it reaches. Every
-//! pre-erosion span whose standing room (`y .. y + agent_height`) that interval
-//! touches is removed. Erosion then pulls the walkable surface back by the agent
-//! radius around the hole, exactly as around a wall, so a path keeps an agent's
-//! footprint clear of the obstacle.
-//!
-//! A span on another floor is untouched: a crate on the ground floor carves
-//! nothing out of the floor above it. Carving runs per column, before erosion, so
-//! it rebakes with the rest of a dirty rectangle.
-
 use super::super::obstacle::ObstacleVolume;
 use super::super::{NavSpan, NavigationGraph};
 use super::columns::Columns;
@@ -21,8 +8,6 @@ use super::region::CellRect;
 /// floors are exact, so this only absorbs float error.
 const CARVE_TOLERANCE: f32 = 0.05;
 
-/// Remove from `cols` (the columns of `region`) every span a carving `obstacle`
-/// reaches. `g` supplies the grid and the agent height.
 pub(super) fn carve(
     g: &NavigationGraph,
     cols: &mut Columns,
@@ -55,7 +40,6 @@ pub(super) fn carve(
     *cols = out;
 }
 
-/// Whether an obstacle interval reaches into a span's standing room.
 fn cuts(c: &Solid, s: &NavSpan, agent_height: f32) -> bool {
     c.min < s.y + agent_height && c.max >= s.y - CARVE_TOLERANCE
 }

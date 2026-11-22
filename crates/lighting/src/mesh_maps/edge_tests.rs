@@ -1,5 +1,3 @@
-//! The mesh-map bake at its edges (#1849): sizes, broken meshes, overlapping UVs.
-
 use glam::{Vec2, Vec3};
 
 use super::fixtures::{bake_all, cell, l_shape, quad};
@@ -45,8 +43,6 @@ fn a_broken_mesh_is_an_error_never_a_panic() {
 
 #[test]
 fn overlapping_uvs_equally_open_give_a_texel_to_the_lower_triangle_index() {
-    // One lone floor quad drawn twice over one UV cell: every ray of either copy
-    // leaves (a tie), and only their shading normals tell them apart.
     let v = |x: f32, y: f32, z: f32| Vec3::new(x, y, z);
     let floor = [v(0., 0., 0.), v(0., 0., 1.), v(1., 0., 1.), v(1., 0., 0.)];
     let leans = [Vec3::new(0.6, 0.8, 0.0), Vec3::new(0.0, 0.8, 0.6)];
@@ -83,8 +79,6 @@ fn a_map_asked_twice_bakes_once_and_unknown_names_are_listed() {
 
 #[test]
 fn a_face_wound_against_its_normal_still_casts_its_rays() {
-    // An .obj floor wound clockwise seen from its `vn 0 1 0`: the face normal says
-    // down, the shading normal up. Nothing occludes it, so AO and thickness read open.
     let v = |x: f32, z: f32| Vec3::new(x, 0.0, z);
     let mut m = MeshSource::default();
     quad(

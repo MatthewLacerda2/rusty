@@ -1,24 +1,11 @@
-//! crates/navigation/src/obstacle.rs — NavMeshObstacle in the navigation sim (#456).
-//!
-//! * [`tick_obstacles`] is the play-mode bookkeeping Unity's carving options need:
-//!   each obstacle's velocity, whether it moved past its `move_threshold` since it
-//!   last carved, and how long it has stood still.
-//! * [`ObstacleVolume`] is what a carving obstacle cuts: its box or upright capsule
-//!   at the pose it carves at, as world triangles the bake clips into cell columns.
-//! * [`carving_volumes`] lists the obstacles carving right now, the bake's input.
-//!
-//! Pure functions of the scene and the fixed `dt`, so the sim stays deterministic.
-
 use glam::{Mat4, Vec2, Vec3};
 
 use super::avoidance::AvoidanceAgent;
 use rusty_components::{NavMeshObstacleComponent as Obstacle, ObstacleShape};
 use rusty_scene::Scene;
 
-/// Segments around a capsule obstacle's footprint.
 const ROUND_SEGMENTS: usize = 16;
 
-/// An obstacle's shape at one world pose: what it carves.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ObstacleVolume {
     pub shape: ObstacleShape,
@@ -41,7 +28,6 @@ impl ObstacleVolume {
         }
     }
 
-    /// The upright capsule's world centre, radius and height (scaled).
     fn capsule(&self) -> (Vec3, f32, f32) {
         // The pose's axis lengths: the stored pose may be a carve anchor, not a live
         // entity, so it is read off the matrix rather than the world API.
@@ -51,8 +37,6 @@ impl ObstacleVolume {
         (c, r, self.height * size(self.pose.y_axis))
     }
 
-    /// Points that follow the shape: a box's corners, a capsule's end centres. How
-    /// far they move is how far the obstacle moved.
     fn key_points(&self) -> Vec<Vec3> {
         match self.shape {
             ObstacleShape::Box => box_corners(self).to_vec(),
@@ -63,7 +47,6 @@ impl ObstacleVolume {
         }
     }
 
-    /// The largest distance any point of the shape moved from `other` to `self`.
     pub fn displacement(&self, other: &Self) -> f32 {
         let a = self.key_points();
         let b = other.key_points();
@@ -73,8 +56,7 @@ impl ObstacleVolume {
             .fold(0.0, f32::max)
     }
 
-    /// The convex volume as world triangles: the box's twelve, or an upright prism
-    /// circumscribing the capsule's footprint over its full height.
+    /// An upright prism circumscribing the capsule's footprint for a capsule.
     pub fn triangles(&self) -> Vec<[Vec3; 3]> {
         match self.shape {
             ObstacleShape::Box => {
@@ -109,8 +91,6 @@ impl ObstacleVolume {
         out
     }
 
-    /// The radius of the XZ disc around the shape's centre that holds it, for local
-    /// avoidance.
     fn avoidance_disc(&self) -> (Vec2, f32) {
         match self.shape {
             ObstacleShape::Capsule => {
@@ -130,7 +110,6 @@ impl ObstacleVolume {
     }
 }
 
-/// The quads of a box, as indices into [`box_corners`].
 const BOX_FACES: [[usize; 4]; 6] = [
     [0, 1, 3, 2],
     [4, 6, 7, 5],
@@ -149,10 +128,7 @@ fn box_corners(v: &ObstacleVolume) -> [Vec3; 8] {
     })
 }
 
-/// Advance every obstacle's carving bookkeeping by one play tick of `dt` seconds:
-/// its velocity, and whether it moved past its threshold (it re-anchors where it
-/// is, and its stationary time restarts) or stood still (the time grows). An
-/// obstacle seen for the first time has not moved, so it counts as stationary.
+/// An obstacle seen for the first time counts as stationary.
 pub fn tick_obstacles(scene: &mut Scene, dt: f32) {
     for id in scene.world.ids_with_nav_obstacle() {
         let pose = scene.world.local_to_world(id);
@@ -182,7 +158,6 @@ pub fn tick_obstacles(scene: &mut Scene, dt: f32) {
     }
 }
 
-/// Every obstacle carving right now, with the volume it cuts, by ascending id.
 pub(super) fn carving_volumes(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
     let mut out: Vec<_> = scene
         .world
@@ -203,8 +178,7 @@ pub(super) fn carving_volumes(scene: &Scene) -> Vec<(u32, ObstacleVolume)> {
     out
 }
 
-/// Every active obstacle that is not carving, as a disc local avoidance steers
-/// around: it never dodges back, like a Unity obstacle (#463's hook).
+/// It never dodges back, like a Unity obstacle.
 pub(super) fn avoidance_obstacles(scene: &Scene) -> Vec<AvoidanceAgent> {
     let mut ids = scene.world.ids_with_nav_obstacle();
     ids.sort_unstable();

@@ -1,5 +1,3 @@
-//! Tests for placing one reflection probe per room (#1584), on primitive levels.
-
 use glam::Vec3;
 
 use super::super::test_level::{arena, grid_of_rooms, plan_static, WALL_HEIGHT};
@@ -10,7 +8,6 @@ fn plan(scene: &Scene) -> Vec<ReflectionPlan> {
     plan_static(scene, &ReflectionPlacement::default())
 }
 
-/// The plans whose capture point stands within `x` (exclusive).
 fn standing_in(plans: &[ReflectionPlan], x: (f32, f32)) -> Vec<ReflectionPlan> {
     let inside = |p: &&ReflectionPlan| p.position.x > x.0 && p.position.x < x.1;
     plans.iter().filter(inside).copied().collect()
@@ -23,8 +20,6 @@ fn each_side_room_of_the_arena_gets_one_probe_fitted_to_its_walls() {
         let room = standing_in(&plans, x);
         assert_eq!(room.len(), 1, "{name}: {room:?}");
         let p = room[0];
-        // The box meets the walls (to within a cell and the doorway it takes a
-        // share of), the floor and the roof.
         let near = |a: f32, b: f32, tol: f32| (a - b).abs() <= tol;
         assert!(
             near(p.box_min.x, x.0, 0.6) && near(p.box_max.x, x.1, 0.6),
@@ -40,8 +35,6 @@ fn each_side_room_of_the_arena_gets_one_probe_fitted_to_its_walls() {
     }
 }
 
-/// The hall has no roof: it gets one probe without box projection, its box the
-/// whole hall up to the top of the level (#1737).
 #[test]
 fn the_open_hall_gets_one_probe_without_box_projection() {
     let plans = plan(&arena());
@@ -74,8 +67,6 @@ fn no_capture_point_is_inside_geometry() {
 
 #[test]
 fn a_dust2_sized_level_gets_a_probe_per_room() {
-    // 10 × 10 rooms of 20 m: 200 m across, Dust2's scale. Each 20 m room is split
-    // in 2 × 2 by the 12 m region.
     let scene = grid_of_rooms(10, 20.0);
     let plans = plan(&scene);
     assert_eq!(plans.len(), 400);
@@ -91,8 +82,6 @@ fn a_dust2_sized_level_gets_a_probe_per_room() {
 
 #[test]
 fn an_area_too_narrow_for_a_core_gets_its_own_probes() {
-    // A 1.5 m wide, 20 m long roofed walkway alone: narrower than a doorway everywhere,
-    // so it holds no room core, and still gets probes, tiled by the 12 m region.
     let mut scene = Scene::new();
     let block = super::super::test_level::block;
     block(

@@ -1,22 +1,12 @@
-//! The eye side at a Dust2-sized cell (#1714): a 1 m cube seen through a 1 m
-//! window is kept from every eye that sees it, though the grid's cells are 3.9 m.
-//! A cell that large is sampled as 2 m cubes, so it sees what a 2 m cell does.
-
 use glam::Vec3;
 
 use crate::occlusion::bake_occlusion;
 use crate::occlusion::test_level::block;
 use rusty_scene::Scene;
 
-/// The window in the wall at z = 0 (0.2 m thick), off any regular spacing.
 const WINDOW: (Vec3, Vec3) = (Vec3::new(0.37, 1.13, -0.1), Vec3::new(1.37, 2.13, 0.1));
-/// The cube 35 m behind it: from far out, the window shows it to a thin cone of
-/// eyes, which one 3.9 m cell's six points miss (6 of 534 eyes, with the grid
-/// sampled as one cube per cell).
 const CUBE: (Vec3, Vec3) = (Vec3::new(0.37, 1.13, -36.0), Vec3::new(1.37, 2.13, -35.0));
 
-/// The wall with its window, the cube, and two small markers 160 m apart that
-/// make the static bounds Dust2-sized: the cube's id.
 fn level() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -37,8 +27,6 @@ fn level() -> (Scene, u32) {
     (scene, cube)
 }
 
-/// Whether some segment from `eye` to a point on the cube's surface passes the
-/// window's front and back openings: a sampled, so one-way, test of sight.
 fn sees_through_window(eye: Vec3) -> bool {
     let through = |p: Vec3| {
         [WINDOW.0.z, WINDOW.1.z].into_iter().all(|z| {
@@ -99,6 +87,5 @@ fn a_cube_through_a_window_is_kept_from_every_eye_at_a_dust2_cell() {
         missed.len(),
         &missed[..missed.len().min(5)]
     );
-    // Sampled, not kept everywhere: some cell behind the wall's far side hides it.
     assert!((0..data.row_count() as u32).any(|r| !data.sees(r, object)));
 }

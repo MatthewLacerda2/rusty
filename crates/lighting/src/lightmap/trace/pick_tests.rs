@@ -1,6 +1,3 @@
-//! Next-event estimation (#1883): one importance-picked source per vertex, over
-//! its pick probability, averages to the light of every source counted at once.
-
 use glam::{Vec2, Vec3};
 
 use super::super::bake::triangles;
@@ -21,7 +18,6 @@ fn lamp(shape: LightShape, radiance: f32) -> BakeLight {
     }
 }
 
-/// Every kind of source near the origin, one point lamp behind a blocker.
 pub(super) fn scene() -> BakeScene {
     let at = |x, y, z| Vec3::new(x, y, z);
     let point = |k: usize| LightShape::Point {
@@ -51,7 +47,6 @@ pub(super) fn scene() -> BakeScene {
         },
         0.5,
     ));
-    // A glowing tile over the origin and a slab shading the first lamp.
     let p = |x, z| Vec3::new(x, 1.5, z);
     let mut tile = quad(
         3,
@@ -79,7 +74,6 @@ fn one_picked_lamp_averages_to_every_lamp_counted() {
     let rays = Rays::build(triangles(&scene));
     let tracer = Tracer::new(&scene, &rays);
     let (point, normal) = (Vec3::new(0.1, 1e-3, 0.2), Vec3::Y);
-    // Every lamp counted once, an Area panel over a fine grid of points.
     let exact: Vec3 = (scene.lights.iter())
         .map(|light| match light.shape {
             LightShape::Area(_) => {
@@ -106,7 +100,6 @@ fn a_vertex_no_source_reaches_draws_nothing_and_lamps_can_be_left_out() {
     let rays = Rays::build(triangles(&scene));
     let tracer = Tracer::new(&scene, &rays);
     let (mut rng, mut picks) = (Rng::new(5, 0, 0), Picks::default());
-    // Facing straight down, under everything: nothing lies in front of it.
     let below = Vec3::new(0.0, -1.0, 0.0);
     let lit = tracer.next_event(below, Vec3::NEG_Y, (true, true), &mut rng, &mut picks);
     assert_eq!(lit.0, Vec3::ZERO);

@@ -1,5 +1,4 @@
-//! Area lights in the bake (#1674): intensity × area far away, one-sided, faded to
-//! zero at `range`, and penumbrae that widen with the panel.
+//! Area lights: intensity × area far away, one-sided, faded to zero at `range`, penumbrae widening with the panel.
 
 use glam::Vec3;
 
@@ -14,7 +13,6 @@ use rusty_components::falloff;
 
 pub(super) const RADIANCE: f32 = 4.0;
 
-/// A `w × h` panel at height `y` over the origin, facing down.
 pub(super) fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
     BakeLight {
         shape: LightShape::Area(AreaShape {
@@ -30,7 +28,6 @@ pub(super) fn panel(w: f32, h: f32, y: f32, range: f32) -> BakeLight {
     }
 }
 
-/// The baked direct irradiance `E` at `p` facing `normal`.
 pub(super) fn direct_at(scene: &BakeScene, p: Vec3, normal: Vec3) -> f32 {
     let rays = Rays::build(triangles(scene));
     let tracer = Tracer::new(scene, &rays);

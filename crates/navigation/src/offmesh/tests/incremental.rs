@@ -1,12 +1,9 @@
-//! Incremental rebakes regenerate the links near a change and match a full bake.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, move_to};
 use super::super::super::Rebake;
 use super::*;
 
-/// The platform level plus crates by its +x ledge and the ladder link.
 fn level(radius: f32, spacing: f32) -> (Scene, Vec<u32>) {
     let mut scene = platform();
     scene.nav_settings.agent_radius = radius;

@@ -1,21 +1,11 @@
-//! crates/navigation/src/bake/plane.rs — which triangle's plane a solid's top follows (#781).
-//!
-//! Every walkable triangle clipped into a cell brings its plane; when solids merge,
-//! the top keeps the plane of the one that reaches highest. Two tops level within
-//! [`TOP_EPS`] meet at a crease on the cell's top edge (a ramp's upper end on the
-//! deck): the steeper wins, because the span's top caps it where the flatter one
-//! takes over, so the crease comes out exact. A lower walkable top merged under a
-//! higher one becomes the surface's `floor`, so a ramp's plane never digs under the
-//! floor its foot rests on. See `navigation::surface` for how agents read it.
+//! Two tops level within [`TOP_EPS`] meet at a crease (a ramp's upper end on the deck): the steeper plane wins, because the span's top caps it where the flatter one takes over.
 
 use glam::{Vec2, Vec3};
 
 use super::super::Surface;
 
-/// Two tops within this of each other count as the same top.
 pub(super) const TOP_EPS: f32 = 1e-3;
 
-/// A plane over one cell: height `y` at the cell centre, rising `slope` per metre.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct Plane {
     pub y: f32,
@@ -23,8 +13,6 @@ pub(super) struct Plane {
 }
 
 impl Plane {
-    /// The plane of triangle `t` over the cell centred at `centre` (XZ); `None` for
-    /// a vertical triangle.
     pub fn of(t: [Vec3; 3], centre: Vec2) -> Option<Self> {
         let n = (t[1] - t[0]).cross(t[2] - t[0]);
         if n.y.abs() <= f32::EPSILON * n.length() {
@@ -35,7 +23,6 @@ impl Plane {
         Some(Self { y, slope })
     }
 
-    /// The surface a span whose top is at `top`, with `floor` under it, stands on.
     pub fn surface(plane: Option<Self>, top: f32, floor: f32) -> Surface {
         let Some(p) = plane else {
             return Surface::FLAT;
@@ -47,8 +34,6 @@ impl Plane {
         }
     }
 
-    /// A total order for the bake's sort, so the result never depends on the order
-    /// colliders were visited in.
     pub fn order(a: Option<Self>, b: Option<Self>) -> std::cmp::Ordering {
         let key = |p: Option<Self>| p.map(|p| [p.y, p.slope.x, p.slope.y]);
         match (key(a), key(b)) {
@@ -64,7 +49,7 @@ impl Plane {
 }
 
 /// The plane a merged top follows, from two tops `(max, plane)`: the higher one's,
-/// or on a level pair the steeper one's (the first on a tie; a plane beats none).
+/// or on a level pair the steeper one's.
 /// A higher top with no plane (unwalkable, a low lip) has none: a plane under it
 /// is a lower face, never its top.
 pub(super) fn top_plane(a: (f32, Option<Plane>), b: (f32, Option<Plane>)) -> Option<Plane> {

@@ -1,12 +1,8 @@
-//! The headroom filter (#278): spans with less than `agent_height` of open space.
-
 use super::super::super::test_support::{add_box, add_floor, bake_pinned, floors};
 use super::super::super::NavigationGraph;
 use glam::Vec3;
 use rusty_scene::Scene;
 
-/// Floor over the whole grid, a slab over cells x = 3..=5, z = 4..=6 whose underside
-/// is at `bottom`, baked at `agent_height` with no erosion.
 fn overhang(bottom: f32, agent_height: f32) -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, 0.0, 10.0, 0.0, 10.0);

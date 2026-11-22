@@ -1,16 +1,11 @@
-//! Texels inside geometry (#1949): filled from their own chart, never a neighbour's,
-//! and judged the same whatever the sample count.
+//! Texels inside geometry are filled from their own chart, never a neighbour's, and judged the same whatever the sample count.
 
 use glam::{Vec2, Vec3};
 
 use super::tests::sun;
 use super::*;
 
-/// A sunlit 4×4 floor (y = 0, facing up) and a 4×4 underside (y = -1, facing
-/// down, which nothing lights) as two charts of one mesh, side by side in its
-/// lightmap UV with a texel's gap between them: the floor on `u` 0.05–0.48, the
-/// underside on 0.52–0.95. The floor's `+X` edge (`x = 2`) is the chart edge that
-/// faces the dark one.
+/// Floor on `u` 0.05–0.48, dark underside on 0.52–0.95; the floor's `+X` edge (`x = 2`) faces the dark chart.
 fn two_charts() -> BakeMesh {
     let floor = [(-2.0, 2.0), (2.0, 2.0), (2.0, -2.0), (-2.0, -2.0)];
     let under = [(-2.0, -2.0), (2.0, -2.0), (2.0, 2.0), (-2.0, 2.0)];
@@ -45,7 +40,6 @@ fn run(end: u32) -> BakeRun {
     }
 }
 
-/// A closed box `min..max`, faces outward, receiving no lightmap.
 fn crate_box(min: Vec3, max: Vec3) -> BakeMesh {
     let corner = |i: u32| Vec3::select(glam::BVec3::new(i & 1 > 0, i & 2 > 0, i & 4 > 0), max, min);
     let positions: Vec<Vec3> = (0..8).map(corner).collect();
@@ -66,8 +60,6 @@ fn crate_box(min: Vec3, max: Vec3) -> BakeMesh {
     }
 }
 
-/// The floor, the dark underside and a crate from `x = wall` over the floor's `+X` edge,
-/// so the floor texels under it are inside geometry, lit by a baked sun from above.
 fn room(wall: f32) -> BakeScene {
     let mut light = sun(true);
     light.shape = LightShape::Directional {
@@ -93,7 +85,6 @@ fn settings() -> BakeSettings {
     }
 }
 
-/// The floor chart's texels, one texel in from its UV edges.
 fn floor_texels(map: &Lightmap) -> Vec<Vec3> {
     let size = map.size as f32;
     let inside = |c: f32, lo: f32, hi: f32| c > lo * size + 1.0 && c < hi * size - 1.0;
@@ -122,10 +113,7 @@ fn an_invalid_texel_is_filled_from_its_own_chart() {
 
 #[test]
 fn validity_does_not_depend_on_the_sample_count() {
-    // Stand the crate's -X wall on the centre of a floor texel, so it sees half back
-    // faces. Its light is the sun's (unsampled) or what it was filled with, so the
-    // map only changes with the sample count (beyond a little bounce) if its
-    // validity does: it used to.
+    // Stand the crate's -X wall on a floor texel's centre so it sees half back faces; its light is the sun's or what it was filled with, so the map moves with the sample count only if validity does.
     let size = lightmap_size(&two_charts(), settings().texels_per_unit, 1024).expect("UVs");
     let u = 5.5 / size as f32;
     let wall = -2.0 + (u - 0.05) / 0.43 * 4.0;

@@ -1,16 +1,10 @@
-//! The corridors-and-rooms primitive level the occlusion tests bake and render
-//! (#1714): a roofed corridor along +X, two rooms either side opening onto it by a
-//! doorway each, and props (1 m boxes) in every room and down the corridor.
-
 use glam::Vec3;
 
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// The corridor's half width and the rooms' depth past its walls, metres.
 pub const HALF: f32 = 1.0;
 pub const DEPTH: f32 = 8.0;
-/// The level's length along X and its height.
 pub const LENGTH: f32 = 20.0;
 pub const HEIGHT: f32 = 3.0;
 pub(super) const WALL: f32 = 0.2;
@@ -18,7 +12,6 @@ pub(super) const DOOR: f32 = 1.4;
 
 pub use rusty_scene::test_levels::block;
 
-/// A wall along X at `z` over `[x0, x1]`, with a doorway centred at `door`.
 fn wall_x(scene: &mut Scene, z: f32, (x0, x1): (f32, f32), door: Option<f32>) {
     let mut piece = |a: f32, b: f32| {
         if b > a {
@@ -38,7 +31,6 @@ fn wall_x(scene: &mut Scene, z: f32, (x0, x1): (f32, f32), door: Option<f32>) {
     }
 }
 
-/// A wall along Z at `x` over `[z0, z1]`.
 fn wall_z(scene: &mut Scene, x: f32, (z0, z1): (f32, f32)) {
     let (lo, hi) = (
         Vec3::new(x - WALL / 2.0, 0.0, z0),
@@ -47,7 +39,6 @@ fn wall_z(scene: &mut Scene, x: f32, (z0, z1): (f32, f32)) {
     block(scene, "Wall", lo, hi);
 }
 
-/// The level, lit by a sun the roof shuts out: the props are where a test looks.
 pub fn corridors() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -77,8 +68,6 @@ pub fn corridors() -> Scene {
     scene
 }
 
-/// The two rooms on `side` (-1 south, +1 north): the corridor wall with a door into
-/// each, the far wall, the walls between, and three props in each.
 fn rooms(scene: &mut Scene, side: f32) {
     let half = LENGTH / 2.0;
     wall_x(scene, side * HALF, (0.0, half), Some(half / 2.0));
@@ -99,7 +88,6 @@ fn rooms(scene: &mut Scene, side: f32) {
     }
 }
 
-/// A static cube centred at `at`, `half` its half edge.
 fn cube(scene: &mut Scene, name: &str, at: Vec3, half: f32) -> u32 {
     block(scene, name, at - Vec3::splat(half), at + Vec3::splat(half))
 }

@@ -1,10 +1,7 @@
-//! A malformed file is refused whole, never a panic (#1887).
-
 use super::super::super::super::NavigationGraph;
 use super::super::file::decode;
 use super::{level, saved};
 
-/// Byte offset of the first span's floor in the baked layer.
 fn first_span(bytes: &[u8]) -> usize {
     let starts = u32::from_le_bytes(bytes[44..48].try_into().unwrap()) as usize;
     48 + starts * 4 + 4
@@ -38,7 +35,6 @@ fn a_nan_a_bad_area_or_a_wrong_format_is_refused() {
     refused(&|b| b[at..at + 4].copy_from_slice(&f32::NAN.to_le_bytes()));
     refused(&|b| b[at + 8] = 200);
     refused(&|b| b[at + 9] = 9);
-    // A negative floor depth would make `Surface::height` clamp backwards.
     assert!(bytes[at + 9] < 8, "the first span is a level floor");
     refused(&|b| b[at + 10..at + 14].copy_from_slice(&(-1.0f32).to_le_bytes()));
     refused(&|b| b[4] = 9);
@@ -46,14 +42,10 @@ fn a_nan_a_bad_area_or_a_wrong_format_is_refused() {
     refused(&|b| b[16..20].copy_from_slice(&f32::NAN.to_le_bytes()));
 }
 
-/// Flipping any one byte decodes or is refused; it never panics.
 #[test]
 fn no_single_byte_flip_panics() {
     let (scene, _) = level();
     let (_, bytes) = saved(&scene);
-    // One graph for every flip: `restore` reads only the scene and the bytes
-    // (a refusal leaves the graph as it was, a success replaces it whole), and
-    // building it is a full bake, which per flip was the sweep's whole cost.
     let mut g = NavigationGraph::from_scene(&scene);
     for i in 0..bytes.len() {
         let mut b = bytes.clone();

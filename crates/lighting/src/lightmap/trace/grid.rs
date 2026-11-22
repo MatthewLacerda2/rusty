@@ -1,31 +1,13 @@
-//! Which sources can reach a point (#1883): a uniform grid over spheres of
-//! influence, so a path vertex weighs only the lamps in range of it (and the
-//! emitters near it), however many the level holds. A source lands in every cell
-//! its sphere's box touches; one with no finite reach (a directional, a NaN or
-//! unbounded range) is in every cell, through `global`. The grid spans the spheres'
-//! bounds clipped to the scene's geometry (`clip`), so one long-range lamp (a
-//! 1000 m point standing in for a sun) does not stretch every cell to tens of
-//! metres; a point outside the grid (a probe above the level) is offered the
-//! spheres that spill past it and hold it (`spill`). Built once per bake, read by
-//! every vertex.
-
 use glam::Vec3;
 
 use super::super::input::{BakeLight, LightShape};
 
-/// The most cells a grid spans along one axis.
 const MAX_CELLS: f32 = 64.0;
-/// The smallest cell edge, in world units.
 const MIN_CELL: f32 = 2.0;
-/// How far past the geometry's bounds the grid reaches, in world units: the
-/// offset hit points and texels a hair off the outermost surfaces stay inside.
 const CLIP_PAD: f32 = 0.5;
 
-/// A box, low and high corners.
 pub(super) type Bounds = (Vec3, Vec3);
 
-/// The sources by cell: `items[starts[c]..starts[c + 1]]` are cell `c`'s, each in
-/// ascending lamp order, so a walk over them is deterministic.
 #[derive(Debug, Default)]
 pub(super) struct LightGrid {
     origin: Vec3,
@@ -34,12 +16,9 @@ pub(super) struct LightGrid {
     starts: Vec<u32>,
     items: Vec<u32>,
     global: Vec<u32>,
-    /// The bounded items whose sphere's box reaches past the grid, with that box,
-    /// in ascending order: all a point outside the grid can be reached by.
     spill: Vec<(u32, Bounds)>,
 }
 
-/// The sphere lamp `light` lights, if it has a finite one.
 fn reach(light: &BakeLight) -> Option<(Vec3, f32)> {
     let (centre, range) = match light.shape {
         LightShape::Directional { .. } => return None,
@@ -53,14 +32,10 @@ fn reach(light: &BakeLight) -> Option<(Vec3, f32)> {
 }
 
 impl LightGrid {
-    /// The grid of `lights`, each by its sphere of influence, over at most `clip`.
     pub(super) fn build(lights: &[BakeLight], clip: Option<Bounds>) -> Self {
         Self::of(lights.iter().map(reach).collect(), clip)
     }
 
-    /// The grid of `spheres` (centre, radius), item `i` reaching only inside the
-    /// `i`th; one with `None` (or not finite) reaches everywhere. Its cells cover
-    /// the spheres' bounds, cut to `clip` (padded by [`CLIP_PAD`]) when given.
     pub(super) fn of(spheres: Vec<Option<(Vec3, f32)>>, clip: Option<Bounds>) -> Self {
         let finite =
             |s: Option<(Vec3, f32)>| s.filter(|(c, r)| c.is_finite() && r.is_finite() && *r >= 0.0);
@@ -85,7 +60,7 @@ impl LightGrid {
             s.map(|(c, r)| (i as u32, (c - Vec3::splat(r), c + Vec3::splat(r))))
         });
         if !(lo.cmple(hi).all()) {
-            grid.spill = boxes.collect(); // No cell: every bounded item spills.
+            grid.spill = boxes.collect();
             return grid;
         }
         let extent = (hi - lo).max_element();
@@ -98,8 +73,6 @@ impl LightGrid {
         grid
     }
 
-    /// List each item in every cell its box touches, and as spilling when its box
-    /// reaches past the cells (or lies wholly outside them, then in no cell).
     fn fill(&mut self, boxes: impl Iterator<Item = (u32, Bounds)>) {
         let mut buckets = vec![Vec::new(); self.dims.iter().product()];
         let span = self.span();
@@ -108,7 +81,7 @@ impl LightGrid {
                 self.spill.push((i, (a, b)));
             }
             if b.cmplt(span.0).any() || a.cmpgt(span.1).any() {
-                continue; // Wholly outside the cells.
+                continue;
             }
             let (a, b) = (self.coords(a), self.coords(b));
             for z in a[2]..=b[2] {
@@ -126,7 +99,6 @@ impl LightGrid {
         }
     }
 
-    /// The cell coordinates of `p`, clamped into the grid.
     fn coords(&self, p: Vec3) -> [usize; 3] {
         let f = (p - self.origin) / self.cell;
         let at = |v: f32, n: usize| (v.max(0.0) as usize).min(n - 1);
@@ -137,7 +109,6 @@ impl LightGrid {
         ]
     }
 
-    /// The box the cells cover.
     fn span(&self) -> Bounds {
         let dims = Vec3::new(
             self.dims[0] as f32,
@@ -151,9 +122,6 @@ impl LightGrid {
         (z * self.dims[1] + y) * self.dims[0] + x
     }
 
-    /// Every lamp that may reach `p`: the unbounded ones, then those whose sphere
-    /// touches `p`'s cell, or for a point outside the cells, the spilling ones
-    /// whose box holds it. A point outside every sphere's box gets only the first.
     pub(super) fn near(&self, p: Vec3) -> impl Iterator<Item = usize> + '_ {
         let inside = self.starts.len() > 1 && {
             let (lo, hi) = self.span();

@@ -1,6 +1,3 @@
-//! The bounded flood (#1892): it reaches what A\* reaches at the cost A\* walks,
-//! stops at its bound, and never crosses a wall.
-
 use glam::Vec3;
 
 use crate::test_support::{add_box, add_floor, bake_pinned};
@@ -50,7 +47,6 @@ fn the_bound_stops_the_flood() {
 fn a_wall_the_flood_cannot_cross_leaves_the_far_side_unreached() {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);
-    // A wall right across the grid at x ≈ 5.
     add_box(
         &mut scene,
         Vec3::new(4.8, 0.0, -5.0),
@@ -64,7 +60,6 @@ fn a_wall_the_flood_cannot_cross_leaves_the_far_side_unreached() {
 
 #[test]
 fn off_the_navmesh_is_no_flood() {
-    // No floor at all: no span to start from.
     let nav = bake_pinned(&mut Scene::new());
     assert!(nav
         .flood(Vec3::new(2.5, 0.0, 2.5), 10.0, ALL_AREAS)
@@ -87,7 +82,7 @@ fn a_flood_to_goals_stops_once_they_settle_with_the_same_costs() {
         to.reached(),
         full.reached()
     );
-    let far = Vec3::new(500.0, 0.0, 500.0); // clamps onto the grid's corner
+    let far = Vec3::new(500.0, 0.0, 500.0);
     let both = nav
         .flood_to(from, &[goal, far], 100.0, ALL_AREAS)
         .expect("flood");

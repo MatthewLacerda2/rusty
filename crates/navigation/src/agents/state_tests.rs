@@ -1,6 +1,3 @@
-//! Agent path state (#458): what scripts read from an agent's path, `Warp` and
-//! `ResetPath`, and stopping at the end of a partial path.
-
 use glam::Vec3;
 
 use super::super::test_support::{add_box, add_floor, bake_pinned};
@@ -11,7 +8,6 @@ use rusty_scene::{NavMeshAgentComponent, Scene};
 
 const DT: f32 = 1.0 / 60.0;
 
-/// A floor over the grid, with a full-length wall at x = 5 when `walled`.
 fn level(walled: bool) -> (Scene, NavigationGraph) {
     let mut scene = Scene::new();
     add_floor(&mut scene, -5.0, 15.0, -5.0, 15.0);

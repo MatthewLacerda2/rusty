@@ -1,25 +1,13 @@
-//! crates/navigation/src/agents/root_motion.rs — an agent moved by its Animator's root
-//! motion (#1745).
-//!
-//! With *Apply Root Motion* on, a NavMeshAgent still plans its path and steers
-//! (its `velocity` is the one it wants, for a script to feed the blend tree), but
-//! it no longer moves itself: the root motion moves it, constrained to the
-//! navmesh by the same walkable-cell slide its own steering uses (Unity's
-//! `updatePosition = false` with the Animator driving the body). Root motion
-//! drives it only while `AnimatorComponent::drives_root_motion` holds (the
-//! animator running, its root bone in the skeleton); otherwise the agent moves
-//! itself, so a stopped animator or a misspelled bone never freezes it.
-//! Local avoidance sees it as a neighbour that doesn't dodge, moving at what
-//! the root motion really moved it by last step.
+//! With *Apply Root Motion* on, the agent still plans and steers but the Animator's root
+//! motion moves it (Unity's `updatePosition = false`), sliding on the navmesh. Only while
+//! `drives_root_motion` holds; otherwise it moves itself, so a stopped animator or a
+//! misspelled bone never freezes it.
 
 use glam::Vec3;
 
 use super::super::NavigationGraph;
 use rusty_scene::Scene;
 
-/// The world velocity root motion really moved agent `id` at last step, when
-/// root motion drives it (its Animator, see the module doc); `None` when the
-/// agent moves itself.
 pub(super) fn root_moved(scene: &Scene, id: u32, delta_time: f32) -> Option<Vec3> {
     let anim = scene.world.animator(id)?;
     let mesh = scene.world.mesh(id);
@@ -32,11 +20,6 @@ pub(super) fn root_moved(scene: &Scene, id: u32, delta_time: f32) -> Option<Vec3
 }
 
 impl NavigationGraph {
-    /// Move agent `id` by the world-space displacement `motion`, sliding along
-    /// the navmesh as its steering would: only onto walkable spans linked to the
-    /// one it stands on, then onto that floor's height. The agent's own velocity
-    /// is left as it was. Nothing moves without an agent.
-    /// Only `slide` runs while the agent is borrowed, so it is edited in its column.
     pub fn move_agent(&self, scene: &mut Scene, id: u32, motion: Vec3) {
         let body = scene.world.world_position(id);
         let to = {

@@ -1,18 +1,12 @@
-//! `NavMeshModifier` edits (#1959) rebake only the cells of the colliders they
-//! cover, to exactly a full bake, in the editor's `sync` and in Play's
-//! `sync_changes`, which must not skip a modifier on a non-static parent.
-
 use super::super::super::test_support::assert_same_mesh;
 use super::super::super::{CellRect, Rebake};
 use super::object_modifier::{baked, not_walkable, room, set};
 use rusty_scene::Scene;
 
-/// The table covers cells 9..=11 × 4..=6 (with slack); erosion is off.
 fn inside(r: &CellRect) -> bool {
     r.x0 >= 8 && r.x1 <= 12 && r.z0 >= 3 && r.z1 <= 7
 }
 
-/// One edit of the scene.
 type Edit = Box<dyn Fn(&mut Scene)>;
 
 fn edits(table: u32, top: u32) -> [Edit; 5] {

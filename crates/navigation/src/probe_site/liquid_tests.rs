@@ -1,6 +1,3 @@
-//! A liquid is not floor on the nav surface either (#1737): a pit with water at
-//! deck level.
-
 use glam::Vec3;
 
 use super::plan_on_nav;

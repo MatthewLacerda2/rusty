@@ -1,32 +1,21 @@
-//! Where a texel a triangle only overlaps is traced (#1687): the triangle clipped
-//! to the texel square, then to [`INSET`] off its edges, all on the stack.
-
 use glam::{Vec2, Vec3};
 
 use super::UvTri;
 
-/// How far in from its triangle's edges a texel claimed by overlap is traced, in
-/// texels, when the overlap is deep enough (#1687). A point on an edge sits on
-/// whatever surface meets the mesh there (a wall a floor stops at, the other face
-/// of a crease), so rays from it leak through that surface or start on its back.
+/// A point on a triangle's edge sits on whatever surface meets the mesh there, so rays from it leak or start on its back: texels claimed by overlap are traced this far in (texels).
 pub(in super::super) const INSET: f32 = 0.125;
 
-/// Where the overlap is too thin for [`INSET`], the share of the triangle's local
-/// width (the distances to its two nearest edges, summed) a traced point must keep
-/// off every edge. A sliver's overlap centroid sits on its midline, half the width.
+/// For overlaps too thin for [`INSET`]: the share of the triangle's local width (two nearest edge distances, summed) kept off every edge.
 const THIN_SHARE: f32 = 0.25;
 
-/// The most vertices a triangle clipped by seven half-planes can have.
 const MAX_VERTS: usize = 10;
 
-/// A point in texel space and its barycentric weights in the triangle it lies in.
 #[derive(Clone, Copy, Default)]
 struct Vert {
     uv: Vec2,
     w: Vec3,
 }
 
-/// A convex polygon of at most [`MAX_VERTS`] vertices, on the stack.
 #[derive(Clone, Copy)]
 struct Poly {
     v: [Vert; MAX_VERTS],
@@ -39,8 +28,6 @@ impl Poly {
     }
 }
 
-/// Triangle `t`'s corners with their weights, and the distance from each corner to
-/// the opposite edge (texels): a point's distance to edge `i` is `w[i] * height[i]`.
 pub(super) struct Clipper {
     tri: Poly,
     height: Vec3,
@@ -63,14 +50,7 @@ impl Clipper {
         }
     }
 
-    /// The barycentric weights to trace the texel whose lower corner is `lo` at, or
-    /// `None` when the triangle leaves it to dilation. The triangle is clipped to the
-    /// texel; that overlap clipped again to [`INSET`] off every edge gives the
-    /// centroid when anything is left. Otherwise (a sliver, a tip) the overlap's own
-    /// centroid is taken when it keeps `min(INSET, THIN_SHARE × local width)` off
-    /// every edge, and an overlap shallower than that is left to dilation. The
-    /// weights are carried through the clip, never recovered by dividing by the
-    /// triangle's (maybe tiny) area.
+    /// Weights are carried through the clip, never recovered by dividing by the triangle's (maybe tiny) area.
     pub(super) fn trace_weights(&self, lo: Vec2) -> Option<Vec3> {
         let mut poly = self.tri;
         for (axis, bound, sign) in [
@@ -96,7 +76,6 @@ impl Clipper {
     }
 }
 
-/// The weights of `poly`'s area centroid, or `None` when it encloses no area.
 fn centroid(poly: &Poly) -> Option<Vec3> {
     let v = poly.verts();
     let (mut area, mut sum) = (0.0f32, Vec3::ZERO);
@@ -109,9 +88,6 @@ fn centroid(poly: &Poly) -> Option<Vec3> {
     (area.abs() > 1e-9).then(|| sum / area)
 }
 
-/// `poly` with the part where `inside` is negative cut away (one Sutherland–Hodgman
-/// step), each new vertex's weights interpolated with its position; `None` when
-/// fewer than three vertices are left.
 fn clip(poly: &Poly, inside: impl Fn(&Vert) -> f32) -> Option<Poly> {
     let mut out = Poly {
         v: [Vert::default(); MAX_VERTS],

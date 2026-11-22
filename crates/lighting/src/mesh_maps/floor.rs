@@ -1,34 +1,17 @@
-//! The curvature band's narrowest reach, per UV island (#2292): three of the
-//! island's **own** texels, its world size per texel at the bake's resolution, so a
-//! band never shrinks below what its texels can show. An island packed small in UV
-//! (faces the player never sees) gets a wider floor; the faces given room keep the
-//! radius asked for. A radius at or above every island's floor is used as asked.
-//!
-//! An island whose UVs enclose no area takes the mesh's average texel instead: it
-//! covers no texel, so its floor only keeps it from reading nothing, and it is
-//! never reported as raised (faces collapsed on purpose need no UV space).
-
 use std::fmt;
 
 use super::Baked;
 use crate::lightmap::Areas;
 use rusty_core::collections::Map;
 
-/// The narrowest band, in the island's texels.
 pub(super) const MIN_TEXELS: f32 = 3.0;
 
-/// The band's radius for each triangle, the reach asked for (the narrowest of
-/// them), and what the floor raised.
 pub(super) struct Radii {
     pub per_tri: Vec<f32>,
     pub reach: f32,
     pub raised: Option<Raised>,
 }
 
-/// The UV islands whose floor raised the `curvature_radius` a bake named: the
-/// radius asked for, the narrowest and widest radius those islands baked at, how
-/// many were raised and of how many islands that cover texels. A bake that names
-/// no radius reports none.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Raised {
     pub requested: f32,
@@ -49,7 +32,6 @@ impl Radii {
         }
         let reach = baked.settings.curvature_reach(baked.diagonal);
         let average = baked.texel_world();
-        // Per island, its floor and whether its UVs enclose any area.
         let floors: Map<u32, (f32, bool)> = areas
             .iter()
             .map(|(&k, a)| {
@@ -98,9 +80,6 @@ impl fmt::Display for Raised {
     }
 }
 
-/// `x` to three significant figures, rounded first so a value that rounds up to
-/// the next power of ten keeps three (0.0099996 is `0.0100`). Zero and a value
-/// that is not finite print as they are.
 pub(super) fn sig(x: f32) -> String {
     if x == 0.0 || !x.is_finite() {
         return format!("{x}");

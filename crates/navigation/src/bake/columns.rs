@@ -1,11 +1,3 @@
-//! crates/navigation/src/bake/columns.rs — the spans of a rectangle of cells, and
-//! splicing them into a graph (#456).
-//!
-//! An incremental rebake builds new columns for just the dirty rectangle and
-//! splices them over the old ones. The compact storage (`spans` + `cell_start`)
-//! is rebuilt in row-sized blocks: the cells outside the rectangle are copied
-//! across in runs, so a splice costs one pass of memory copies, not a bake.
-
 use super::super::{NavSpan, NavigationGraph};
 use super::region::CellRect;
 
@@ -27,26 +19,22 @@ impl Columns {
         }
     }
 
-    /// Append the next cell's spans, bottom-up.
     pub fn push_column(&mut self, spans: impl IntoIterator<Item = NavSpan>) {
         self.spans.extend(spans);
         self.cell_start.push(self.spans.len() as u32);
     }
 
-    /// The spans of local cell `i`.
     pub fn column(&self, i: usize) -> &[NavSpan] {
         &self.spans[self.cell_start[i] as usize..self.cell_start[i + 1] as usize]
     }
 }
 
 impl NavigationGraph {
-    /// Replace the spans of `region`'s cells with `cols` (built for `region`).
     pub(crate) fn splice(&mut self, region: CellRect, cols: &Columns) {
         let old_start = std::mem::take(&mut self.cell_start);
         let old_spans = std::mem::take(&mut self.spans);
         let mut start = Vec::with_capacity(old_start.len());
         let mut spans = Vec::with_capacity(old_spans.len() + cols.spans.len());
-        // Copy old cells `c0..c1` across, re-basing their offsets.
         let copy_old = |c0: usize, c1: usize, start: &mut Vec<u32>, spans: &mut Vec<_>| {
             let base = spans.len() as u32;
             start.extend(old_start[c0..c1].iter().map(|&s| s - old_start[c0] + base));
@@ -68,7 +56,6 @@ impl NavigationGraph {
         self.spans = spans;
     }
 
-    /// The stored columns of `region`.
     pub(crate) fn columns(&self, region: CellRect) -> Columns {
         let mut out = Columns::with_capacity(region.cells());
         for gz in region.z0..=region.z1 {

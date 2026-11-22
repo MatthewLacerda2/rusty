@@ -1,32 +1,12 @@
-//! Liquids are not floor (#1737). A pool's floor is walkable (an actor wades or
-//! swims there), but a reflection probe captured from eye height over it sits at
-//! or under the water's surface and reflects the inside of the pit.
-//!
-//! The engine has no liquid component, so a liquid is what a level builds one
-//! from, as the default scene's pool does: a **static, active mesh, flat (under
-//! [`FLAT`] tall), drawn `Transparent`, with no solid collider** (none, an
-//! inactive one, or a trigger), so nothing stands on it. A collider-less glass
-//! pane laid flat reads the same way; give a skylight a collider.
-//!
-//! The floor at the bottom of a liquid is dropped from the plan (the first one
-//! under its surface, when at least [`DEPTH`] down), so the floor around the pool
-//! keeps its own probe and none captures from the water. Floors further down stay.
-//!
-//! Pure data + math — deterministic, entity order.
-
 use glam::Vec2;
 
 use rusty_components::RenderMode;
 use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::Scene;
 
-/// The most a liquid's surface may rise across its bounds, world units.
 const FLAT: f32 = 0.05;
-/// How far under a liquid's surface a floor must be to be its bottom, world units:
-/// shallower is a puddle or a decal over the floor, which an actor stands on.
 pub const DEPTH: f32 = 0.3;
 
-/// A liquid's surface: its XZ bounds and its height.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Liquid {
     pub min: Vec2,
@@ -34,7 +14,6 @@ pub struct Liquid {
     pub surface: f32,
 }
 
-/// The liquids of `scene`, by the module docs' rule, in entity order.
 pub fn liquids(scene: &Scene) -> Vec<Liquid> {
     let world = &scene.world;
     let mut out = Vec::new();
@@ -66,11 +45,6 @@ pub fn liquids(scene: &Scene) -> Vec<Liquid> {
     out
 }
 
-/// Drop the floor of `plan` under each of `liquids`' surfaces: in every cell whose
-/// centre is over a liquid's bounds, the first floor below the surface (the pit's
-/// or pool's bottom), when it is at least `DEPTH` below. A floor further down (the
-/// ground storey under a rooftop pool) and one barely under (the deck under a
-/// puddle or a grime decal) stay.
 pub fn drown(plan: &mut FloorGrid, liquids: &[Liquid]) {
     let mut drowned: Vec<(usize, f32)> = Vec::new();
     for i in 0..plan.cells.len() {
@@ -97,7 +71,6 @@ pub fn drown(plan: &mut FloorGrid, liquids: &[Liquid]) {
     });
 }
 
-/// Every floor of `plan`'s cell `i`: its lowest, then its upper storeys.
 fn floors_of(plan: &FloorGrid, i: usize) -> impl Iterator<Item = f32> + '_ {
     let from = plan.upper.partition_point(|u| u.0 < i);
     let upper = plan.upper[from..].iter().take_while(move |u| u.0 == i);

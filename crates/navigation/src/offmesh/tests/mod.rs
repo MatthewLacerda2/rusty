@@ -1,6 +1,3 @@
-//! Off-mesh link tests (#462). Levels are primitive boxes only: a floor, a 3 m
-//! platform with a ramp up its far side, a deck reached by nothing but a ladder.
-
 mod generate;
 mod incremental;
 mod routes;
@@ -14,8 +11,6 @@ use super::{OffMeshLink, OffMeshLinkKind};
 use rusty_components::OffMeshLinkComponent;
 use rusty_scene::Scene;
 
-/// A 20 × 20 floor, a 3 m platform over x 0..8, z 0..8, and a ramp from the
-/// platform's +z edge down to the floor at z = 16. Drops and jump-ups enabled.
 fn platform() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
@@ -37,8 +32,6 @@ fn platform() -> Scene {
     scene
 }
 
-/// A floor and a deck at y = 4 over x 10..20 with no way up; returns the scene
-/// and a ladder link from the ground at x = 8 to the deck at x = 12.
 fn ladder() -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;

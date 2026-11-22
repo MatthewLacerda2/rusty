@@ -1,6 +1,3 @@
-//! Answers that hold only where they were planned (#2087): a mask changed while
-//! its search runs, a capped partial path walked out, a start off the navmesh.
-
 use glam::Vec3;
 
 use super::super::super::test_support::{add_box, add_floor};
@@ -13,7 +10,6 @@ use rusty_scene::Scene;
 fn a_mask_changed_mid_search_plans_with_the_new_mask() {
     let mut g = level();
     let (from, to) = (Vec3::new(15.0, 0.0, 2.0), Vec3::new(15.0, 0.0, 28.0));
-    // Forbid the side of the block the unmasked path takes.
     let all = sync_path(&g, from, to);
     let left = all.iter().map(|p| p.x).sum::<f32>() < 15.0 * all.len() as f32;
     for r in g.span_refs().collect::<Vec<_>>() {
@@ -50,8 +46,6 @@ fn a_mask_changed_mid_search_plans_with_the_new_mask() {
     assert_ne!(a.cached_path, all, "the forbidden side is avoided");
 }
 
-/// A 40 × 40 floor at the 0.25 m default cell, a 2 m crate no step climbs, and a
-/// wall between the crate and the agent.
 fn crate_scene() -> NavigationGraph {
     let mut scene = Scene::new();
     add_floor(&mut scene, -1.0, 41.0, -1.0, 41.0);
@@ -60,7 +54,6 @@ fn crate_scene() -> NavigationGraph {
         Vec3::new(30.0, 0.0, 30.0),
         Vec3::new(36.0, 2.0, 36.0),
     );
-    // A wall the first capped search floods in front of, its gap at the far end.
     add_box(
         &mut scene,
         Vec3::new(-1.0, 0.0, 20.0),
@@ -110,7 +103,6 @@ fn a_capped_path_is_asked_again_until_the_crates_foot() {
 
 #[test]
 fn an_agent_off_the_navmesh_asks_again_once_back_on_it() {
-    // An open 30 × 30 floor with its 13 × 13 corner gone: nothing to snap to there.
     let mut g = NavigationGraph::new(0.0, 30.0, 0.0, 30.0, 1.0);
     for gz in (0..13).rev() {
         for gx in (0..13).rev() {
