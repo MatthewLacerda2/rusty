@@ -170,8 +170,11 @@ impl Tracer<'_> {
     }
 }
 
+/// The probe's blocks, one picked point in each.
 pub(super) const BLOCKS: usize = (PROBE * PROBE) as usize;
 
+/// A share of each side: a corner on the edge sits where a recess wall meets the panel, and
+/// rounding would block its ray.
 const INSET: f32 = 1.0 / 64.0;
 
 const CORNERS: [Vec2; 4] = [
@@ -181,6 +184,7 @@ const CORNERS: [Vec2; 4] = [
     Vec2::new(1.0 - INSET, 1.0 - INSET),
 ];
 
+/// The four corners, then one point per block.
 const PROBE_RAYS: u32 = 4 + BLOCKS as u32;
 
 fn probes(m: u32) -> bool {

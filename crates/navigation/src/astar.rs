@@ -1,6 +1,4 @@
-//! Nodes are spans, not cells, so a path can climb onto the floor above where it started. Every
-//! cost is at least 1, so the octile heuristic stays admissible. The start span is exempt from the
-//! area mask, so an agent in a forbidden area can walk out.
+//! Nodes are spans, not cells.
 
 use super::pool::NodePool;
 use super::{in_mask, NavSpan, NavigationGraph, SpanRef, ALL_AREAS, MIN_AREA_COST};
@@ -86,6 +84,7 @@ impl NavigationGraph {
         path.corners.get(1).copied().unwrap_or(target)
     }
 
+    /// A test hook: the span path other crates' navigation tests assert.
     pub fn path_between(&self, start: Vec3, target: Vec3) -> Option<Vec<SpanRef>> {
         let (path, complete) =
             self.find_path_masked(self.snap(start)?, self.snap(target)?, ALL_AREAS);
@@ -107,6 +106,8 @@ impl NavigationGraph {
         })
     }
 
+    /// `pool` must be begun for the graph's spans first, or the last search's slots read as
+    /// reached.
     pub(crate) fn begin_search(
         &self,
         start: SpanRef,
@@ -168,6 +169,8 @@ impl NavigationGraph {
         Some((reconstruct_path(frontier.pool, search.closest.2), false))
     }
 
+    /// A diagonal pays its dearer cardinal's area cost, so no path shaves an area's corner;
+    /// `flood::moves` mirrors this step.
     fn expand(&self, current: NodeState, goal: SpanRef, mask: u32, frontier: &mut Frontier) {
         let here = current.node;
         let NavSpan { y, area, .. } = self.spans[here.index as usize];

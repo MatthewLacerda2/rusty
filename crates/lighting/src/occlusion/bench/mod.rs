@@ -1,3 +1,5 @@
+//! Test hooks: the bench levels other crates' cost and GPU tests bake.
+
 pub use rusty_scene::test_levels::rooms as level;
 pub mod town;
 

@@ -2,8 +2,11 @@ use glam::Vec3;
 
 use super::super::input::{BakeLight, LightShape};
 
+/// Per axis.
 const MAX_CELLS: f32 = 64.0;
+/// World units.
 const MIN_CELL: f32 = 2.0;
+/// World units past the geometry's bounds, so offset points a hair outside stay in.
 const CLIP_PAD: f32 = 0.5;
 
 pub(super) type Bounds = (Vec3, Vec3);

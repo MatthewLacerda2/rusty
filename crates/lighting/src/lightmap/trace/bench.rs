@@ -1,3 +1,5 @@
+//! Test hooks: `dev::bake`'s per-texel cost bench, counting rays instead of timing.
+
 use std::thread;
 
 use super::super::bake::{texel, triangles};

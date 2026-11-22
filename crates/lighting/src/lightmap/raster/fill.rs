@@ -1,6 +1,7 @@
 use super::Texel;
 
-/// So bilinear filtering at a chart's edge reads lit texels, not black.
+/// Fills each empty texel bordering filled ones with their average, `passes` rings deep, so
+/// bilinear filtering at a chart's edge reads lit texels, not black.
 pub(in crate::lightmap) fn dilate<T: Texel>(
     texels: &mut [T],
     filled: &mut [bool],

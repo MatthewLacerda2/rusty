@@ -7,6 +7,7 @@ use glam::Vec3;
 
 use super::{NavigationGraph, SpanRef};
 
+/// Rings of cells a snap searches when the point's own column has no walkable span.
 pub const SNAP_RINGS: i32 = 5;
 
 impl NavigationGraph {

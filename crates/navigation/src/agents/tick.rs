@@ -20,7 +20,7 @@ fn xz(v: Vec3) -> Vec2 {
 }
 
 impl NavigationGraph {
-    /// In the ECS's stable order, so the tick is deterministic.
+    /// Visits agents in the ECS's stable order: the tick is deterministic.
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
         self.ask_paths(scene);
         self.serve_paths(scene);

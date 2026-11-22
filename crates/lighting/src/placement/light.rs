@@ -4,7 +4,9 @@ use super::occupancy::Occupancy;
 use super::VERTICAL_HEADROOM;
 use rusty_scene::lighting::floor::FloorGrid;
 
+/// World units over its floor: a crouching actor's chest.
 const LOWEST: f32 = 1.0;
+/// World units a probe keeps from geometry after its virtual offset.
 pub const PROBE_CLEARANCE: f32 = 0.3;
 
 pub fn plan_light_set(

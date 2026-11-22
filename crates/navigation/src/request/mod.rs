@@ -1,5 +1,5 @@
-//! A request names only the agent: when its search begins it reads where the agent stands, its
-//! target and area mask then, so a waiting request plans from where the agent is now. Determinism:
+//! A request names only the agent: its search reads the agent's feet, target and mask when it
+//! begins, so a waiting request plans from where the agent is now. Determinism:
 //! the budget is a count of expansions, never a clock; a search resumes on the same heap and node
 //! pool, so it finds the path a synchronous search would.
 
@@ -39,6 +39,7 @@ struct Active {
 pub(crate) struct PathQueue {
     pending: VecDeque<Request>,
     active: Option<Active>,
+    /// Not the graph's shared scratch: a synchronous query between ticks would reset this search.
     pool: NodePool,
     last_ticket: u32,
     iterations: u32,
@@ -57,7 +58,6 @@ impl Default for PathQueue {
 }
 
 impl PathQueue {
-    /// Queue a request for `agent` and return its ticket, never 0.
     fn push(&mut self, agent: u32) -> u32 {
         self.last_ticket = self.last_ticket.wrapping_add(1).max(1);
         let ticket = self.last_ticket;

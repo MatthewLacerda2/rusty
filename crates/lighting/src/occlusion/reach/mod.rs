@@ -6,8 +6,11 @@ use rusty_scene::lighting::occlusion::{FloorSource, Grid};
 use rusty_scene::nav_settings::NavMeshSettings;
 use rusty_scene::Scene;
 
+/// Metres over the agent's height: a navmesh baked without jump links still has a player who
+/// jumps.
 pub const JUMP_ALLOWANCE: f32 = 1.0;
 
+/// Metres: the default 2 m agent and a 1 m jump.
 pub const MIN_PLAY_HEIGHT: f32 = 3.0;
 
 pub fn play_height(settings: &NavMeshSettings) -> f32 {
@@ -33,6 +36,8 @@ pub struct Cells {
     pub grid: Grid,
     pub source: FloorSource,
     pub sampled: Option<Vec<bool>>,
+    /// A hash of the seed cells, 0 when every cell is sampled: a kept PVS must match it
+    /// (`bake::is_current`).
     pub key: u64,
 }
 

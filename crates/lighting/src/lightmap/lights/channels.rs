@@ -12,6 +12,7 @@ use rusty_components::{LightMode, LightType};
 use rusty_scene::lighting::MixedLightingMode;
 use rusty_scene::Scene;
 
+/// Lights one texel's shadowmask holds: one per RGBA channel.
 pub const MASK_CHANNELS: u8 = 4;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

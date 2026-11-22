@@ -1,6 +1,7 @@
 use super::{curvature, rays, MAX_RESOLUTION};
 use rusty_procgen::image_buf::Size;
 
+/// Per texel per map: 16× the default, bounding a bake's time (rays cost time, not memory).
 pub const MAX_RAYS: u32 = 1024;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

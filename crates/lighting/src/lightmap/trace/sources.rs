@@ -90,6 +90,8 @@ impl Picks {
     }
 }
 
+/// Lamp `light`'s pick weight at `point`: exact unshadowed luminance, or a bound for
+/// an Area panel. Never 0 where the lamp can light `point`, or that light is lost.
 pub(super) fn lamp_weight(
     light: &BakeLight,
     point: Vec3,

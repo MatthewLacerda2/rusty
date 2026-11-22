@@ -6,6 +6,7 @@ use glam::Vec3;
 
 use super::raster::TexelPoint;
 
+/// A neighbour blends in only when its normal is within this cosine of the texel's own.
 const MIN_NORMAL_COS: f32 = 0.9;
 
 /// `radius == 0` returns `points` unchanged; `texel_world` is the texel's edge in world units.
