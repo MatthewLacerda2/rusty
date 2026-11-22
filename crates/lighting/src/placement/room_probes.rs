@@ -7,7 +7,9 @@ use super::{ReflectionPlan, MIN_REGION, OPEN_AIR_IMPORTANCE};
 use rusty_scene::lighting::floor::FloorGrid;
 use rusty_scene::ReflectionProbe;
 
+/// Metres: a standing actor's eyes.
 pub const EYE_HEIGHT: f32 = 1.6;
+/// World units a capture point keeps under the ceiling.
 const CEILING_GAP: f32 = 0.1;
 
 pub struct Rooms {

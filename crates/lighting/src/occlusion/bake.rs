@@ -11,6 +11,7 @@ use super::sampler::Sampler;
 use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, FloorSource, OcclusionData};
 use rusty_scene::Scene;
 
+/// One fixed stream, so a re-bake of an unchanged scene writes the same bytes.
 pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
 pub use rusty_scene::lighting::occlusion::OCCLUSION_VERSION;
@@ -32,6 +33,8 @@ pub fn gather_with(scene: &Scene, prints: &Fingerprints, reach: Reach) -> Occlus
     }
 }
 
+/// The one walk `gather_with` bakes and `is_current` compares, so the two never disagree on
+/// which objects, or in what order.
 fn walk<'a, T: 'a>(
     scene: &'a Scene,
     read: impl FnMut(u32) -> Option<T> + 'a,
@@ -51,6 +54,7 @@ pub fn bake_occlusion(
         .expect("nobody cancels it")
 }
 
+/// Sound only while the fingerprint hashes all the bake reads of an object: a new input joins it.
 pub fn is_current(scene: &Scene, held: &OcclusionData, reach: &Reach) -> bool {
     matches(scene, held, &Fingerprints::of_scene(scene), reach)
 }
@@ -92,6 +96,7 @@ pub fn current_pvs<'a>(scene: &'a Scene, reach: &Reach) -> Result<&'a OcclusionD
 
 impl OcclusionInput {
     #[cfg(feature = "dev")]
+    /// A test hook: the sampler `dev::bake`'s cost tests drive.
     #[doc(hidden)]
     pub fn sampler(&self) -> Option<Sampler> {
         let baking = Baking::of(&self.objects).counted();
@@ -106,6 +111,7 @@ impl OcclusionInput {
     }
 
     #[cfg(feature = "dev")]
+    /// A test hook: `dev::bake`'s cost tests sample `count` cells with it.
     #[doc(hidden)]
     pub fn bake_sample(&self, count: usize) -> Option<(usize, f32, (usize, usize))> {
         let sampler = self.sampler()?;

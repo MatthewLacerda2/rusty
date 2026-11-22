@@ -10,7 +10,9 @@ mod cover;
 mod group;
 use crate::occlusion::gather::Face;
 
+/// A texel's edge, metres.
 const TEXEL: f32 = 0.25;
+/// Per sheet; a larger plane takes coarser texels.
 const MAX_TEXELS: usize = 1 << 22;
 
 pub(super) struct Sheet {

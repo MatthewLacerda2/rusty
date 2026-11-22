@@ -5,6 +5,7 @@ use glam::Vec2;
 
 use super::{walk, Surface, TexelPoint};
 
+/// Texels, near the origin: two triangles sharing only an edge never reach this deep.
 const DEPTH: f32 = 1e-4;
 
 pub(crate) struct Claim<'a> {
@@ -112,9 +113,7 @@ pub(super) fn in_uv(a: [Vec2; 3], b: [Vec2; 3]) -> bool {
     !separates(&a, &b, depth) && !separates(&b, &a, depth)
 }
 
-/// The overlap depth for coordinates up to `reach` texels from the image's corner:
-/// each is good to half an f32 unit in the last place at that size, and a
-/// projection of the six to a few of them.
+/// For coordinates up to `reach` texels from the corner: a few f32 ulps at that size.
 fn depth(reach: f32) -> f32 {
     DEPTH.max(16.0 * f32::EPSILON * reach)
 }

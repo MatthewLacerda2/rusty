@@ -15,6 +15,7 @@ pub use targets::{MAX_TARGETS, TARGET_SPACING, VOXEL};
 
 use glam::Vec3;
 
+/// Metres both boxes must clear an occluder's plane by for a proof to hold.
 const CLEAR: f32 = 1e-3;
 
 fn corners((min, max): (Vec3, Vec3)) -> ([Vec3; 8], usize) {

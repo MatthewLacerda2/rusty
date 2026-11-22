@@ -23,9 +23,12 @@ pub(super) struct Emitter {
     hi: Vec3,
 }
 
+/// In multiples of the emitter's `√area`: past it a bounce ray finds it about once in 800.
 const REACH: f32 = 16.0;
+/// World units past the bounds: a glowing floor is found by bounce rays from a room away.
 const MAX_REACH: f32 = 16.0;
 
+/// No emitter: the mark for a run that emits nothing a ray can see.
 pub(super) const NONE: u32 = u32::MAX;
 
 pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
@@ -77,6 +80,8 @@ pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {
 }
 
 impl Emitter {
+    /// A bound that only steers the pick, not the light: never 0 where this emitter
+    /// can light `point`, or its light is lost.
     pub(super) fn weight(&self, point: Vec3, normal: Vec3) -> f32 {
         let corners = (0..8).map(|k| {
             let pick = |bit: u32, lo: f32, hi: f32| if k & bit == 0 { lo } else { hi };

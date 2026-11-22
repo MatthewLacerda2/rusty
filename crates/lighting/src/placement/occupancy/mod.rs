@@ -5,8 +5,11 @@ use glam::Vec3;
 pub use self::voxelize::Solid;
 use rusty_scene::Scene;
 
+/// World units.
 pub const CELL: f32 = 0.5;
+/// About 32 MB of bits; a larger level is gridded coarser.
 pub const MAX_CELLS: usize = 256_000_000;
+/// World units `Occupancy::clearance` looks at most.
 pub const REACH: f32 = 2.0;
 
 #[derive(Clone, Debug)]

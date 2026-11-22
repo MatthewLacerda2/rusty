@@ -34,6 +34,8 @@ pub(super) fn read(scene: &Scene, raw: &NavigationGraph) -> (BakeInputs, u64) {
     let obstacles = obstacle_keys(scene);
     let modifiers = modifier_keys(scene);
     let links = authored_keys(scene);
+    // `Debug` names every field and prints an `f32` as its shortest round trip, so a field
+    // added later is hashed too.
     let text = |v: &dyn std::fmt::Debug| format!("{v:?}").into_bytes();
     join(&mut bytes, obstacles.iter().map(|(_, v)| text(v)).collect());
     join(&mut bytes, modifiers.iter().map(|(_, v)| text(v)).collect());

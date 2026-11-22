@@ -1,5 +1,5 @@
 //! Moving a recess's shade from the albedo into the occlusion map bakes the same bounce; a material
-//! without one bakes as before.
+//! without one bakes from its albedo alone.
 
 use glam::Vec3;
 
