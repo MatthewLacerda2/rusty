@@ -9,6 +9,7 @@ use rusty_scene::Scene;
 
 const DT: f32 = 1.0 / 60.0;
 const MIRROR: Vec3 = Vec3::new(-1.0, 1.0, 1.0);
+/// Off every axis tested, so gravity turns the cube about each.
 const OFFSET: Vec3 = Vec3::new(1.0, 0.0, 0.5);
 
 fn hinge(parent_scale: Vec3, pos: Vec3, scale: Vec3, axis: Vec3) -> (Scene, u32) {

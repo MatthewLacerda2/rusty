@@ -1,5 +1,5 @@
-//! A field a hand-kept comparison forgets is a write that silently never happens, so each field
-//! alone must flip it.
+//! `state_differs` and `material_differs` are hand-kept copies of their setters' checks: a field
+//! one forgets is a write that silently never happens, so each field alone must flip it.
 
 use glam::{Quat, Vec3};
 use rapier3d::prelude::*;

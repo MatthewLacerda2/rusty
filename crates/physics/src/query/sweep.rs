@@ -7,8 +7,8 @@ use super::{sort_hits, RayHit};
 use crate::convert::to_pose;
 use crate::world::PhysicsWorld;
 
-/// A sweep starting inside a collider hits it at distance 0 (parry's `stop_at_penetration`);
-/// Unity's single casts skip such a collider.
+/// Sizes are trusted here: the Lua layer (`api::physics::cast::check`) refuses a negative
+/// or non-finite one.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Sweep {
     /// A sphere.

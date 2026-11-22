@@ -25,7 +25,6 @@ impl<'a> ControllerView<'a> {
 }
 
 impl PhysicsWorld {
-    /// The view rapier's controller sweeps (see the module doc).
     pub(super) fn controller_view(&self) -> ControllerView<'_> {
         ControllerView {
             bodies: self.controller_bodies.of(&self.bodies),

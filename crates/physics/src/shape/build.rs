@@ -135,6 +135,8 @@ pub(crate) fn body_state(scene: &Scene, id: u32) -> Option<EntityBodyState> {
     let class = class_of(world, id);
     let rb = world.rigidbody(id);
     let rb = rb.as_deref();
+    // `is_some_and`, unlike `body_inputs`: only dynamic bodies integrate gravity, and
+    // they always have a Rigidbody.
     let use_gravity = rb.is_some_and(|r| r.use_gravity);
     let collision_detection = rb.map(|r| r.collision_detection).unwrap_or_default();
     Some(EntityBodyState {

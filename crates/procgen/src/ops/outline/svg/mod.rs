@@ -1,6 +1,7 @@
 //! `d` comes from disk, so nothing here may panic, recurse or grow without bound:
 //! `d` is at most [`MAX_BYTES`] long, the flattened points at most
-//! [`MAX_POINTS`], and a point past ±[`REACH`] tiles is refused. Each refusal
+//! [`MAX_POINTS`], and a point past ±[`REACH`] tiles is refused. A parse refusal
+//! names the byte where it happened.
 
 mod curve;
 mod lex;

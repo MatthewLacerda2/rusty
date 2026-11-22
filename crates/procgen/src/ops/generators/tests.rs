@@ -165,6 +165,7 @@ fn counts_round_to_whole_periods_and_brick_rows_to_even() {
         64,
         0,
     );
+    // 3 rows round to 4, so the half-brick alternation closes at the wrap.
     assert_eq!(f(0.5, 0.3)[0], 1.0);
     assert_eq!(f(0.76, 0.2)[0], 1.0, "row 0 is not offset");
     assert_eq!(f(0.76, 0.3)[0], 0.0, "row 1 is offset half a brick");
@@ -201,6 +202,7 @@ fn voronoi_randomness_zero_is_a_regular_grid() {
 fn voronoi_edges_are_dark_on_cell_borders_and_bright_at_centres() {
     let edges = grid_voronoi(VoronoiOutput::Edges);
     let f2 = grid_voronoi(VoronoiOutput::F2);
+    // u = 0.25 is as far from the centres at 0.125 and 0.375: F1 = F2.
     assert!(edges(0.25, 0.125)[0] < 1e-5);
     assert!((f2(0.125, 0.125)[0] - 1.0).abs() < 1e-5);
     assert!((edges(0.125, 0.125)[0] - 1.0).abs() < 1e-5);

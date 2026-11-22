@@ -6,6 +6,7 @@ use crate::ops::generators::clamp_or;
 use crate::ops::outline::{self, fill, stroke, svg};
 use crate::recipe::{choice, op, opt, req_sampled, Lit, OpInfo, OpParam, SOURCE};
 
+/// The widest stroke, in tiles.
 const MAX_STROKE: f32 = 1.0;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -16,6 +17,7 @@ pub enum FillRule {
     Evenodd,
 }
 
+/// The fields are private: the parsed `subpaths` are built once from them.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(try_from = "Written")]
 pub struct Path {

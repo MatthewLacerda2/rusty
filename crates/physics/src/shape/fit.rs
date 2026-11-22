@@ -24,6 +24,9 @@ pub(crate) fn build_shape_for(
     Some(collider)
 }
 
+// The fit a collider was built for, stamped in its rapier `user_data`: `live`'s sync
+// rebuilds the shape when the body's class in Play wants another. Zero: the same on
+// any body.
 pub(crate) const DECOMPOSED: u128 = 2;
 pub(crate) const EXACT: u128 = 1;
 pub(crate) const ROLLING: u128 = 3;

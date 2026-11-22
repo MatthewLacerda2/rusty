@@ -4,8 +4,9 @@ use super::fixture::{body, floor, floor_speed, run, Floor};
 use rusty_components::{CapsuleAxis, ColliderShape};
 use rusty_scene::Scene;
 
-/// A facet landing adds a small bump: 1.5% at most over this matrix at 0.3 m/s, while rapier's
-/// own contacts read 40% to 700% over.
+/// Fractions of the start speed. A facet landing bumps 1.5% at most over this matrix at 0.3 m/s;
+/// the crate's slow rolls bump less, so 1% still catches rapier recycling a pair's frozen
+/// contacts there (1% to 3% over).
 fn tolerance(ground: Floor) -> f32 {
     match ground {
         Floor::Crate => 0.01,
@@ -28,6 +29,7 @@ impl Along {
     }
 }
 
+// `roller`'s two kinds past its three cylinders (0 to 2).
 const SPHERE: usize = 3;
 const CAPSULE: usize = 4;
 
@@ -58,8 +60,10 @@ fn roller(kind: usize, along: Along) -> (ColliderShape, Quat, f32) {
     }
 }
 
+/// Seconds per roll: enough for every gaining case to show it.
 const SECONDS: f32 = 20.0;
 
+/// Metres a roll may run on the 2 m crate, short of its far edge.
 const CRATE_RUN: f32 = 1.6;
 
 fn peak(kind: usize, along: Along, ground: Floor, v: f32) -> f32 {
@@ -68,7 +72,6 @@ fn peak(kind: usize, along: Along, ground: Floor, v: f32) -> f32 {
     let (shape, rot, radius) = roller(kind, along);
     // Rolling without slipping: spin × (contact − centre) cancels the velocity.
     let spin = Vec3::NEG_Y.cross(along.dir()) * (-v / radius);
-    // On the crate it sets off from one edge and is stopped before the other.
     let (start, seconds) = match ground {
         Floor::Crate => (-CRATE_RUN / 2.0, SECONDS.min(CRATE_RUN / v)),
         _ => (0.0, SECONDS),

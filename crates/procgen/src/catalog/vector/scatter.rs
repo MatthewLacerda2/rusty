@@ -38,6 +38,7 @@ pub struct Scatter {
     pub seed: u32,
 }
 
+/// Stamps per tile: `amount`'s default, and what a NaN `amount` reads.
 pub(crate) const AMOUNT: f32 = 32.0;
 
 fn amount() -> f32 {

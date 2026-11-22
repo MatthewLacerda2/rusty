@@ -1,3 +1,5 @@
+//! The physics build (`try_build_shape`), the world AABB (`calculate_world_aabb`) and the
+//! drawn primitive each read a `ColliderShape`; these run every variant through each.
 mod bounds_tests;
 mod degenerate_tests;
 mod drawn_tests;
@@ -47,6 +49,7 @@ pub(super) const KINDS: [ColliderShape; 5] = [
     },
 ];
 
+/// No `_` arm: a new variant does not compile until it has samples here.
 pub(super) fn samples(kind: &ColliderShape) -> Vec<Sample> {
     match kind {
         ColliderShape::Box { .. } => vec![Sample::of(ColliderShape::Box {
@@ -79,7 +82,6 @@ pub(super) fn all_samples() -> Vec<Sample> {
     KINDS.iter().flat_map(samples).collect()
 }
 
-/// A mesh collider over [`off_centre_cylinder`], so its local box is not centred.
 fn off_centre_mesh(convex: bool) -> Sample {
     let (vertices, indices) = off_centre_cylinder();
     let points: Vec<Vec3> = vertices.iter().map(|v| Vec3::from(v.position)).collect();

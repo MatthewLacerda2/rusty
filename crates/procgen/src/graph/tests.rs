@@ -64,6 +64,7 @@ fn an_instance_at_seed_zero_is_its_nodes_pasted_by_hand() {
     let flat = expanded(0);
     let ids: Vec<&str> = flat.nodes.iter().map(|n| n.id.as_str()).collect();
     assert_eq!(ids, ["base", "wear/grain", "wear/blend", "out"]);
+    // A `/` id parses nowhere, so the hand-pasted copy spells `wear_`.
     let renamed = flat.to_json().unwrap().replace("wear/", "wear_");
     assert_eq!(recipe(serde_json::from_str(&renamed).unwrap()), pasted);
     let hand = evaluate(&pasted).unwrap();

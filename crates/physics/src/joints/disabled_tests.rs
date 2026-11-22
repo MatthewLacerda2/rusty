@@ -95,6 +95,8 @@ fn deactivating_the_owner_of_an_inactive_connected_part_drops_the_joint() {
         ..Default::default()
     };
     scene.world.set_joint(a, Some(j));
+    // The part is inactive, its owner's body enabled: the joint is built. Nothing moves,
+    // so no pose stamp re-runs the joint sync by chance once the owner goes.
     let mut physics = PhysicsWorld::from_scene(&scene);
     step(&mut scene, &mut physics, 2);
     assert_eq!(physics.joints.len(), 1, "built to the enabled body");

@@ -22,6 +22,7 @@ use super::recipe::OpKind;
 use super::source::Sources;
 use field::Links;
 
+/// A test hook: the crate's tests run one node with no links.
 pub fn eval_node(
     op: &OpKind,
     inputs: &[&Image],
@@ -36,7 +37,7 @@ pub fn eval_node(
 /// accepts: the runner refuses a miswired node before anything evaluates, so
 /// every required input is read directly, and this panics if called with fewer. The
 /// runner likewise refuses an `image` node whose file is not in `sources`, and hands
-/// in every node a param links to.
+/// in every node a param links to, and passes `seed` with the node's own folded in.
 pub fn eval_linked(
     op: &OpKind,
     inputs: &[&Image],

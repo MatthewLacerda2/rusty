@@ -16,6 +16,7 @@ fn run(op: &OpKind, img: &Image, slope: &Image) -> Image {
     eval_node(op, &[img, slope], img.size(), 0, &Sources::new())
 }
 
+/// One sine period across, rising from `u = 0`: its slope runs along `u` only.
 fn hill(n: u32) -> Image {
     Image::fill_uv(n, |u, _| [0.5 + 0.5 * (std::f32::consts::TAU * u).sin(); 4])
 }
@@ -45,6 +46,7 @@ fn a_noise_on_a_slope_smears_along_it() {
     let step = |dx, dy| {
         let mut s = 0.0;
         for y in 0..64 {
+            // Near `u = 0`, where the hill is steepest, the smear runs across.
             for x in 0..12 {
                 let d = out.get_wrapped(x + dx, y + dy)[0] - out.get_wrapped(x, y)[0];
                 s += d * d;
@@ -125,6 +127,7 @@ fn every_mode_reads_the_pixel_itself() {
 #[test]
 fn a_hard_edge_reaches_as_far_at_every_resolution() {
     let moved = |n| {
+        // A step up over `u ∈ [0.25, 0.75)` as the slope; what the smear moves, per pixel.
         let step = Image::fill_uv(n, |u, _| [f32::from((0.25..0.75).contains(&u)); 4]);
         let ramp = Image::fill_uv(n, |u, _| [u, 0.0, 0.0, 1.0]);
         let out = run(&sblur(0.005, 8, SlopeMode::Blur), &ramp, &step);

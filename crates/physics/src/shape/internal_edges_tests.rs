@@ -6,6 +6,8 @@ use super::mesh::{build_mesh_shape, MeshFit, TRIMESH_FLAGS};
 const TILES: usize = 16;
 const DT: f32 = 1.0 / 60.0;
 
+/// 1 m tiles laid like modular ones: none shares a vertex with its neighbour, so only
+/// the trimesh's vertex merge joins them.
 fn tiled_floor() -> (Vec<[f32; 3]>, Vec<u32>) {
     let (mut positions, mut indices) = (Vec::new(), Vec::new());
     let half = TILES as f32 / 2.0;
@@ -21,6 +23,8 @@ fn tiled_floor() -> (Vec<[f32; 3]>, Vec<u32>) {
     (positions, indices)
 }
 
+/// The largest vertical speed, m/s, `body` reaches sliding at `speed` over `floor`
+/// for 3 s, the first 1/3 s left to settle.
 fn worst_hop(floor: Collider, body: Collider, height: f32, speed: f32) -> f32 {
     let (mut bodies, mut colliders) = (RigidBodySet::new(), ColliderSet::new());
     colliders.insert(floor);
@@ -83,6 +87,7 @@ fn tiled(engine: bool) -> Collider {
     floor
 }
 
+/// Vertical speed, m/s, past which a body resting on a flat floor was kicked by a seam.
 const HOP: f32 = 0.05;
 
 fn assert_no_hop(body: impl Fn() -> Collider, height: f32) {

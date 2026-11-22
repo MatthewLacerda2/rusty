@@ -72,6 +72,8 @@ fn the_snap_lands_within_its_documented_error() {
 
 #[test]
 fn it_repeats_once_per_tile_not_once_per_step() {
+    // At (2, 1) a shift of (0.4, 0.2) moves `s` and `t` by whole units: a lattice wrapping per
+    // unit of them would repeat there, five times a tile.
     assert_eq!(snap(0.07, 30.0), (2, 1));
     let f = sampler(&op(30.0, 1.0, 0.07), 4);
     let same = (0..200)
