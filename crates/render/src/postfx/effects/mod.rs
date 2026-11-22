@@ -74,6 +74,7 @@ pub(crate) struct PostEffect {
 #[derive(Clone, Copy)]
 pub(crate) enum History {
     None(&'static str),
+    /// Whether it runs on this frame of the view.
     Reads(fn(&HistoryCx) -> bool),
 }
 
@@ -121,6 +122,7 @@ pub(crate) enum Pass {
     Scene { order: u16, run: ScenePass },
     Ldr {
         order: u16,
+        /// Readies this frame (compile, upload) and says whether the pass runs.
         prepare: fn(&mut super::PostFx, &wgpu::Device, &EffectCx) -> bool,
         run: LdrRun,
     },
