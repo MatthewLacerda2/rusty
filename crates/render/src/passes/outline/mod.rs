@@ -14,12 +14,16 @@ pub(crate) use select::outlined;
 pub(crate) use setup::OutlinePasses;
 pub(crate) use targets::SelectionMask;
 
+/// Ring width in pixels at display scale 1; `RenderView::pixel_scale` multiplies it.
 pub(crate) const OUTLINE_PX: f32 = 3.0;
 
+/// Linear RGBA orange.
 const OUTLINE_COLOR: [f32; 4] = [1.0, 0.5, 0.0, 1.0];
 
+/// One unorm channel for the mask and the row distances, so a ring stays under 255 px.
 const MASK_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::R8Unorm;
 
+/// CPU mirror of `EdgeParams` in `outline/edge.wgsl`: change the two together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct EdgeUniform {
