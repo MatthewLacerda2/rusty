@@ -1,4 +1,4 @@
-//! Semi-implicit Euler closed form: x_n = n·dt·v0 + dt²·g·n(n+1)/2.
+//! `advance` is semi-implicit Euler, whose closed form is x_n = n·dt·v0 + dt²·g·n(n+1)/2.
 
 use glam::{Mat4, Vec3};
 

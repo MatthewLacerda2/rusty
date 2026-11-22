@@ -16,6 +16,7 @@ use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle};
 use rusty_scene::{Camera, Scene};
 
+/// `ribbons.wgsl`'s `@group`s: change the two together.
 const GLOBALS: u32 = 0;
 const TEXTURE: u32 = 1;
 
@@ -34,6 +35,8 @@ struct Ribbons {
 }
 
 impl Renderer {
+    /// Every ribbon before every sprite particle. `view_proj` is the solids' (jittered under TAA),
+    /// so a depth-tested or depth-faded effect lines up with the depth it reads.
     pub(crate) fn draw_effects(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -71,6 +74,7 @@ impl Renderer {
         let rr = &self.ribbon_renderer;
         self.queue
             .counted_write_buffer(&rr.globals_buffer, 0, bytemuck::bytes_of(&globals));
+        // Due renders only, as `draw_particles` notes its maps.
         if self.notes_due() {
             for texture in ribbons.draws.iter().filter_map(|d| d.texture.as_ref()) {
                 self.note_map(scene.id(), texture.as_str());

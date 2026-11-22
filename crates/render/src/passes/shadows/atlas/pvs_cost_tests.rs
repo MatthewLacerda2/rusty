@@ -54,6 +54,8 @@ fn run(r: &mut Renderer, scene: &mut Scene, lamps: &[(u32, Vec3)], swing: f32) -
     sum
 }
 
+/// By hand: `cargo nextest run --release --features dev --run-ignored only -E
+/// 'test(gpu_shadow_pvs_cost)' --no-capture`, under a longer slow-timeout than nextest's.
 #[test]
 // lint: allow(skip) a timing measurement in a release build, run by hand, never a gate
 #[ignore = "a release-build measurement, run by hand"]

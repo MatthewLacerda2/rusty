@@ -1,3 +1,6 @@
+//! Committing a bake forgets every entry it overlaps, so a listed entry is still in the static
+//! atlas, even when its light skipped a frame.
+
 use super::Tile;
 use crate::passes::shadows::StaticsKey;
 

@@ -5,6 +5,8 @@ use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 const WAVES_NORMAL: &str = "let n = normalize(v.normal);";
 const READS_MATERIAL: &str = "let n = normalize(v.normal) * material().color_tint.a;";
 
+/// Without the material array in the shadow layout, wgpu refuses the shadow pipeline and the
+/// whole variant silently falls back to the standard shader.
 #[test]
 fn gpu_a_vertex_block_reading_the_material_builds_its_shadow_pipelines() {
     let name = format!("test_material_vertex_{}", std::process::id());

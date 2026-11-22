@@ -3,9 +3,11 @@ use super::run::ClusterCull;
 use crate::timing::GpuPart;
 use crate::Renderer;
 
+/// Bind groups: the stage's own, then the shared pool's.
 const STEP: u32 = 0;
 const POOL: u32 = 1;
 
+/// Workgroups: wgpu's default `max_compute_workgroups_per_dimension`.
 const MAX_DIMENSION: u32 = 65535;
 
 impl Renderer {

@@ -1,5 +1,6 @@
 //! Phase one draws through the prepass's pipelines, so the depth it keeps equals a full
-//! prepass of the final set byte for byte.
+//! prepass of the final set byte for byte. Unlike the baked PVS, an orthographic or far-near-plane
+//! camera does cull: the test reads the depth that camera drew.
 
 pub(crate) mod clusters;
 mod counters;
@@ -53,10 +54,13 @@ use crate::Renderer;
 
 pub(crate) use cull::{CameraCull, Culled, ARGS};
 
+/// Each batch's kept instances start at a run of their own, so its args name a first instance.
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::INDIRECT_FIRST_INSTANCE;
 
+/// Objects tested; below it the stage costs more than it hides.
 pub(crate) const MIN_INSTANCES: u32 = 32;
 
+/// A capture never culls: it bakes every static mesh.
 fn culls(supported: bool, (preset, camera): (bool, bool), capturing: bool) -> bool {
     supported && preset && camera && !capturing
 }
@@ -73,6 +77,7 @@ pub(crate) struct HiZ {
     pub(super) reduce_depth: LazyCompute,
     pub(super) reduce: LazyCompute,
     pub(crate) clusters: clusters::ClusterPipelines,
+    /// `MIN_INSTANCES`; the mechanism tests lower it to 0, so their few boxes still cull.
     pub(crate) min_instances: u32,
 }
 

@@ -12,6 +12,7 @@ use crate::passes::hiz::counters::Counter;
 use crate::passes::hiz::pyramid::Pyramid;
 use crate::Renderer;
 
+/// Mirrors `hiz_clusters.wgsl`'s `Params`: change the two together.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 struct Params {
@@ -143,6 +144,7 @@ impl Renderer {
         let [tally, args, indices] =
             [&cull.tally, &cull.out_args, &cull.out_indices].map(GrowBuffer::buffer);
         let objects = self.draw_buffers.objects();
+        // In `layout::TEST`/`SCAN`/`COPY`'s binding order, the pyramid aside: change both together.
         let test = [jobs, objects, visible, state, tally, chunks].map(Clone::clone);
         let view = Some(pyramid.view.clone());
         cull.test_group.get((test.clone(), view.clone()), || {
@@ -176,6 +178,7 @@ impl Renderer {
         (pyramid, view_proj): (&Pyramid, Mat4),
     ) {
         let (device, queue) = (&self.device, &self.queue);
+        // In vec4s: the shader reads `objects` as an `array<vec4<f32>>`.
         let stride = std::mem::size_of::<crate::gpu::uniforms::ObjectData>() / 16;
         let params = Params {
             view_proj: view_proj.to_cols_array(),
