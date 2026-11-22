@@ -1,3 +1,7 @@
+//! Generate Lighting's probe step, stepped once a frame by the editor and run to the end by
+//! a script. It bakes planned copies and applies them only at `commit`, so a dropped or
+//! failed bake changes nothing.
+
 use super::lighting::{LightingBakeReport, PlannedProbes};
 use super::reflection::{out_dir, prune_stale, reflection_dir, UNSAVED};
 use super::report::probes::Timeline;
@@ -11,6 +15,8 @@ use staged::{ReflectionSnapshot, StagedCubemaps};
 
 mod staged;
 
+/// Four 32-texel light probes are still a fraction of the one default 128-texel reflection
+/// probe a reflection step bakes.
 const LIGHT_PROBES_PER_STEP: usize = 4;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -29,6 +35,7 @@ pub enum Stage {
 
 pub struct LightingBake {
     renderer: Option<Renderer>,
+    // Probes to bake and no adapter: commit applies nothing, unlike an empty plan.
     skipped: bool,
     light: BounceSolve,
     light_done: bool,
@@ -148,6 +155,7 @@ impl LightingBake {
             .ok_or("the light-probe bake has not finished")?;
         let mut reflections = self.planned.clone();
         for (i, &from) in self.kept.iter().enumerate() {
+            // The live probe, so an edit the cube is not baked from (a box) survives.
             let live = scene.reflection_probes.probes.get(from).cloned();
             reflections.probes[i] = live.ok_or(PROBES_CHANGED)?;
         }

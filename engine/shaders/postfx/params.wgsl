@@ -1,7 +1,6 @@
-// engine/shaders/postfx/params.wgsl — the post-process chain's frame uniform, its own
-// module: every post pass binds it, built-in (the composite, `postfx/frame.wgsl`)
-// and authored (the `Shader.Bake` postfx scaffold, which reads the game time from it,
-// It holds only what every effect shares: each effect's own numbers live in its
+// The post-process chain's frame uniform, its own module: every post pass binds it, built-in (the
+// composite, `postfx/frame.wgsl`) and authored (the `Shader.Bake` postfx scaffold, which reads the
+// game time from it). It holds only what every effect shares: each effect's own numbers live in its
 // slots of the composite's effect array (`render::postfx::effects`).
 
 #define_import_path postfx::params

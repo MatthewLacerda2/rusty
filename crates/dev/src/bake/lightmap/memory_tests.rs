@@ -10,16 +10,21 @@ use rusty_lighting::lightmap::{
 };
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
+// Texels per unit and units a side: 500² a plane.
 pub(crate) const DENSITY: f32 = 25.0;
 pub(crate) const SIDE: f32 = 20.0;
 
+/// Per worker, as in-flight work is; at most `PAIR.0`, so each worker has a mesh.
 pub(crate) const WORKERS: usize = 2;
 
+/// Smaller first: macOS keeps a reserve of freed blocks 2 planes do not fill, so it starts
+/// at 8.
 pub(crate) const PAIR: (usize, usize) = match cfg!(target_os = "macos") {
     true => (8, 32),
     false => (2, 8),
 };
 
+/// Slack bytes (allocator, pool); `denoise::memory_tests` uses it too.
 pub(crate) const MARGIN: u64 = 48 << 20;
 
 pub(crate) fn planes(n: usize, side: f32) -> BakeScene {
@@ -73,6 +78,7 @@ pub(crate) fn kept(maps: &[Lightmap]) -> u64 {
 }
 
 pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
+    // As a real bake: frees handed back, progress observed.
     crate::memory::return_large_frees();
     let observed = BakeProgress::observed(Arc::new(MeshClocks::default()));
     let progress = match denoiser {
@@ -87,6 +93,8 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     (peak, kept)
 }
 
+/// Bytes a chart's freed buffers macOS's footprint keeps counted: 7.9 MB measured, rounded
+/// up; a bake keeping its buffers (20 MB a chart) still fails. 0 elsewhere.
 pub(crate) const FREED_PER_CHART: u64 = (cfg!(target_os = "macos") as u64) * (8 << 20);
 
 pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str) {

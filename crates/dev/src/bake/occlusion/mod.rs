@@ -1,3 +1,6 @@
+//! The occlusion bake's runs: a PVS baked on the worker while the scene is edited is still
+//! safe to apply, since the renderer culls only objects whose fingerprint matches the bake.
+
 use std::sync::Arc;
 use std::thread::{self, JoinHandle};
 use std::time::Instant;

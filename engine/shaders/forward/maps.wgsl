@@ -1,6 +1,5 @@
-// engine/shaders/forward/maps.wgsl — reading a material map's texel as the value the
-// forward pass shades with: what a texture's compression keeps decides
-// which channels hold it.
+// Reading a material map's texel as the value the forward pass shades with: what a texture's
+// compression keeps decides which channels hold it.
 
 #define_import_path forward::maps
 

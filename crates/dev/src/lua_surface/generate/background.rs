@@ -23,6 +23,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             }
             let scene = scene.get(lua)?;
             let mut scene = scene.borrow_mut();
+            // Play asked for but not yet taken counts, as Unity's `isPlayingOrWillChangePlaymode`.
             if scene.is_playing() || app.borrow().play_heading() {
                 return refuse(LIGHTING_IN_PLAY);
             }
@@ -32,6 +33,7 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
             }
             scene.lighting_bake_requested = true;
             scene.lighting_bake_status = BakeStatus::Requested;
+            // The editor sleeps outside Play: wake it for a frame to take the request.
             rusty_core::wake::frame();
             Ok(true)
         }),

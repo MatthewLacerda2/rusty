@@ -48,6 +48,7 @@ struct Batch {
 @group(0) @binding(7) var<storage, read_write> args: array<u32>;
 @group(0) @binding(8) var pyramid: texture_2d<f32>;
 
+// `at` counts words: one `DrawIndexedIndirectArgs` is five.
 fn write_args(at: u32, b: u32, n: u32, first: u32) {
     let batch = batches[b];
     args[at] = batch.index_count;
@@ -75,6 +76,8 @@ fn keep_early(b: u32) {
 
 fn compact(b: u32) {
     let batch = batches[b];
+    // A clustered batch keeps every instance at its own place: `hiz_clusters.wgsl` draws each
+    // one's visible clusters.
     let in_place = batch.clustered != 0u;
     let late_first = params.instances + batch.first;
     var n = 0u;
@@ -92,6 +95,7 @@ fn compact(b: u32) {
         if keep {
             n++;
         }
+        // A clustered batch's late instances draw whole: their depth equals their kept clusters'.
         if keep && (flags & 2u) == 0u {
             kept[late_first + late] = instance;
             late++;

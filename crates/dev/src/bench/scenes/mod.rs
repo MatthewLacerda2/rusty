@@ -21,6 +21,7 @@ pub use notes::{unbaked, uncompressed};
 pub use report::SceneReport;
 
 pub const DEFAULT_SIZE: (u32, u32) = (1920, 1080);
+// Frames a viewpoint draws: `WARMUP` unmeasured, keeping first-draw costs out, then `FRAMES`.
 pub const WARMUP: u32 = 60;
 pub const FRAMES: u32 = 300;
 pub const RUNS: u32 = 3;
@@ -31,6 +32,8 @@ pub struct Options {
     pub warmup: u32,
     pub frames: u32,
     pub runs: u32,
+    /// Build every lazy pipeline before the first frame, off the clock, as a game's window
+    /// does. Only tests turn it off, where no frame's cost is read.
     pub warm: bool,
     pub switches: rusty_render::RenderSwitches,
 }
@@ -94,10 +97,12 @@ pub fn project_scenes(root: &Path) -> Vec<String> {
     scenes
 }
 
+/// `project` must be canonical (`std::fs::canonicalize`), or one project gets two histories.
 pub fn out_key(project: &Path) -> String {
     let name = project
         .file_name()
         .map_or("project".into(), |n| n.to_string_lossy().into_owned());
+    // FNV-1a: stable across runs and builds, unlike std's hasher, so a project keeps its folder.
     let hash = project
         .to_string_lossy()
         .bytes()
@@ -116,6 +121,8 @@ pub fn bench(
     extra: &Extra,
 ) -> Result<SceneReport, String> {
     let (mut harness, own) = load(out_dir, root, scene, settings, opts)?;
+    // Read before the measured ticks: a static the game moves later is the game's, not a stale
+    // bake.
     let loaded = harness.world.borrow().scene().borrow().id();
     let stale = harness.renderer().and_then(|r| r.stale_occlusion(loaded));
     let lights = notes::lights(&harness.world.borrow().scene().borrow());

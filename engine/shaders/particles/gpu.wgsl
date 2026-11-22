@@ -1,7 +1,10 @@
+// A GPU emitter's step (`particles_step.wgsl`) and draw (`particles.wgsl`) share these; their
+// Rust twins, field for field, are in `passes::particles::gpu::record`.
 #define_import_path particles::gpu
 
 // A slot's `next` when nothing lives in it: zero, so an all-zero buffer is empty.
 const EMPTY: u32 = 0u;
+// Samples per over-life curve.
 const LUT_SIZE: u32 = 64u;
 
 struct GpuParticle {

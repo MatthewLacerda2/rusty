@@ -69,6 +69,7 @@ impl Query {
 }
 
 impl Demo {
+    /// A test hook: `Harness.FindInDemo` goes through [`find_in`] instead.
     pub fn find(&self, query: &Query) -> Vec<u64> {
         find_in(self.path(), self.ticks, query)
     }

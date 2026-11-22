@@ -90,6 +90,7 @@ fn gpu_a_current_pvs_says_nothing_and_a_refused_one_says_why() {
 #[test]
 fn gpu_a_pvs_whose_occluder_moved_since_says_stale() {
     let stale = baked(&project("stale", &walled(3.0), &pvs()));
+    // The renderer judges staleness, so with no adapter there is no line.
     let Some(line) = stale.first() else {
         return assert!(!rusty_render::gpu_required(), "no line");
     };
@@ -111,6 +112,8 @@ fn gpu_a_navmesh_plays_start_refused_says_so() {
     assert!(lines[0].starts_with(refused), "{lines:?}");
 }
 
+// Moves the wall from its second `Update`: the first runs before the load's first frame,
+// where staleness is judged.
 const MOVER: &str = "local Mover = {}
 local ticks = 0
 function Mover.Update(id, dt)

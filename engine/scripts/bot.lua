@@ -7,9 +7,8 @@ function BotAI.Start(entity_id)
     print("[Lua] Bot initialized")
 end
 
--- `separation` reads other agents' NavMeshAgent targets, so a target is a claim.
 -- The last-known position is the player's feet: a trace from 1.5 m over it
--- starts inside the player's body, so it traces only against the bot's
+-- starts inside the player's body, so the trace tests only the bot's
 -- AIPerception blocking mask (the level), set per bot before each run.
 local TRACE = { from = "target", visible = true, item_height = 1.0 }
 local SPOT = {
@@ -37,6 +36,7 @@ local function choose_spot(entity_id, kx, ky, kz)
 end
 
 function BotAI.Update(entity_id, delta_time)
+    -- A dead bot stops chasing, so its death animation is not walked over.
     if BotAI.health <= 0.0 then
         NavMeshAgent.ResetPath(entity_id)
         return
@@ -60,14 +60,13 @@ function BotAI.Update(entity_id, delta_time)
 
     local vx, vy, vz = NavMeshAgent.GetVelocity(entity_id)
     local speed_sq = vx * vx + vz * vz
-    if speed_sq > 0.01 then
+    if speed_sq > 0.01 then -- (m/s)²: below 0.1 m/s the bot idles
         Animator.Play(entity_id, "Walk")
     else
         Animator.Play(entity_id, "Idle")
     end
 end
 
--- Health is this script's (the engine stores none); returns the damage taken.
 function BotAI.OnTakeDamage(entity_id, amount, event)
     if BotAI.health <= 0.0 then
         return 0

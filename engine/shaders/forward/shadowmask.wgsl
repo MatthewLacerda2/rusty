@@ -10,9 +10,9 @@
 #import forward::bindings::{lighting, objects, s_linear_clamp, t_lightmap_masks}
 #import forward::local_shadow::local_shadow_parts
 
-// All ones while the shadowmask pages are not bound (loading or failed) or the scene
-// masks nothing, for a uniform branch and no texture read. Taken before any branch
-// (derivatives).
+// All ones while the scene masks nothing, for a uniform branch and no texture read, or while
+// the shadowmask pages are unbound (loading or failed): the shadow maps then keep their static
+// casters (`passes::shadows` `masking_statics`). `lod` is taken before any branch.
 fn baked_occlusion(uv: vec2<f32>, page: u32, lod: f32, object: u32) -> vec4<f32> {
     if (lighting.shadowmask < 0.5) {
         return vec4<f32>(1.0);

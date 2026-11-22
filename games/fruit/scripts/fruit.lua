@@ -12,8 +12,8 @@ local Fruit = {
     },
 }
 
-local LAUNCH_Y, LAUNCH_Z = -7, 1.5 -- below the view
-local GONE_Y = -9
+local LAUNCH_Y, LAUNCH_Z = -7, 1.5 -- m: below the view, before the counter
+local GONE_Y = -9                   -- m: a body falling past this is gone
 local FIRST_WAVE, WAVE_GAP = 30, 100 -- ticks
 local RESTART_TICKS = 60            -- ticks
 

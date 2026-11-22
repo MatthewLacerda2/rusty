@@ -69,6 +69,8 @@ pub struct Block {
     pub desc: &'static str,
     pub params: &'static [Param],
     pub helper: &'static str,
+    /// `{prev}` is the incoming value and `{args}` the instance's params (`, a, b`), which
+    /// the helper takes last, in `params` order.
     pub call: &'static str,
     pub textures: &'static [&'static str],
     pub stage: Stage,
@@ -79,6 +81,7 @@ pub struct Block {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Reflection {
     Kept,
+    /// A `vec3<f32>` factor, with `in` in scope and `{args}` filled as in `call`.
     Scaled(&'static str),
     Dropped,
 }

@@ -80,6 +80,7 @@ end
 local function fight(id, known, now)
     local x, y, z = Transform.GetPosition(id)
     local tx, ty, tz = Transform.GetPosition(known.id)
+    -- Aims 1.2 m over the target's feet, at its body.
     local dx, dy, dz = tx - x, (ty + 1.2) - (y + Combat.EYE), tz - z
     face(id, dx, dz)
     local len = math.sqrt(dx * dx + dy * dy + dz * dz)

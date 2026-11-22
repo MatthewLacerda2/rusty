@@ -30,6 +30,7 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
     )
 }
 
+/// `Harness.Warnings`' names, as `demo::index::level_name` writes them: change both together.
 fn level_name(level: &LogLevel) -> &'static str {
     match level {
         LogLevel::Error => "error",

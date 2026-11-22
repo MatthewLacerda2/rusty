@@ -4,9 +4,13 @@
 
 #import fullscreen
 
+// Filled by `lens_flare::FlareParams`.
 struct FlareParams {
+    // rgb: the tint times the intensity; w: the ghost count
     tint: vec4<f32>,
+    // x: ghosts, y: halo, z: streaks, w: the chromatic aberration
     strengths: vec4<f32>,
+    // x: the view's aspect (width / height)
     frame: vec4<f32>,
 };
 
@@ -35,11 +39,14 @@ const MAX_GHOSTS: i32 = 8;
 // resolution.
 const STREAK_STEP: f32 = 0.008;
 
+// What a strength of 1 adds of the bright pass: a real lens's ghosts reflect a few percent
+// of the light, and the streak's taps sum to about 8.
 const GHOST_WEIGHT: f32 = 0.08;
 const HALO_WEIGHT: f32 = 0.1;
 const STREAK_WEIGHT: f32 = 0.03;
 
-// A function: naga forbids dynamic indexing of a function-local array.
+// 1 mirrors a source exactly; a smaller ghost sits nearer the centre. A function: naga
+// forbids dynamic indexing of a function-local array.
 fn ghost_scale(i: i32) -> f32 {
     switch i {
         case 0: { return 1.0; }

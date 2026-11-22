@@ -1,8 +1,7 @@
-// engine/shaders/lighting/ambient.wgsl — the scene's ambient light as the shaders
-// read it: the `Color` hemisphere, the `Gradient` trilight or the `Skybox`
-// sky's SH, the WGSL side of `scene::settings::ambient`. The data is `common::AmbientLight` (in
-// `common::LightingUniforms`); the forward pass (`forward::lighting::flat_ambient`)
-// and lit particles evaluate it here.
+// The scene's ambient light as the shaders read it: the `Color` hemisphere, the `Gradient` trilight
+// or the `Skybox` sky's SH, the WGSL side of `scene::settings::ambient`. The data is
+// `common::AmbientLight` (in `common::LightingUniforms`); the forward pass
+// (`forward::lighting::flat_ambient`) and lit particles evaluate it here.
 
 #define_import_path lighting::ambient
 
@@ -10,8 +9,8 @@
 #import lighting::sh::sh_basis
 
 // The ambient a surface with unit normal `n` takes, intensity applied, as
-// irradiance / pi. `Color` mode is the hemisphere the forward pass has always
-// drawn, `color` straight up fading to a quarter of it straight down; `Gradient` is
+// irradiance / pi. `Color` mode is a hemisphere,
+// `color` straight up fading to a quarter of it straight down; `Gradient` is
 // Unity's trilight, linear in `n.y` from the ground through the equator to the sky;
 // `Skybox` is the sky's L2 SH, uploaded already convolved. The CPU's
 // `scene::AmbientRadiance::at` is the same function (a GPU test holds the two equal); lightmaps and

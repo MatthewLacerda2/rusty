@@ -1,3 +1,5 @@
+//! The wall-clock time is in a demo's file name only, and never reaches the sim.
+
 use std::fs::{File, TryLockError};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -8,6 +10,7 @@ pub const EXTENSION: &str = "demo";
 
 pub enum Destination {
     Folder(PathBuf),
+    /// A test hook: one file, rewritten by each Play session.
     File(PathBuf),
 }
 
@@ -28,6 +31,7 @@ impl Destination {
     }
 }
 
+/// Never removes a demo a recorder still writes: a paused Play's file can look oldest.
 fn prune(dir: &Path, keep: usize) {
     let demos = demos_in(dir);
     let excess = demos.len().saturating_sub(keep);
@@ -44,6 +48,7 @@ fn is_being_written(path: &Path) -> bool {
     matches!(file.try_lock_shared(), Err(TryLockError::WouldBlock))
 }
 
+/// Public as a test hook: the integration tests list the demos a run wrote.
 pub fn demos_in(dir: &Path) -> Vec<PathBuf> {
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
@@ -80,6 +85,7 @@ fn fresh_name(dir: &Path, scene: &str) -> PathBuf {
 
 fn utc_stamp(seconds: u64) -> String {
     let (days, rest) = (seconds / 86_400, seconds % 86_400);
+    // The civil date from days since 1970-01-01, by Howard Hinnant's algorithm.
     let z = days as i64 + 719_468;
     let era = z.div_euclid(146_097);
     let doe = z - era * 146_097;

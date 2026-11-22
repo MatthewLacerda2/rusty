@@ -12,6 +12,7 @@ pub mod audio;
 mod build;
 mod render;
 
+/// Seconds per sim tick.
 pub const FIXED_DT: f32 = 1.0 / 60.0;
 
 #[derive(Clone)]
@@ -132,6 +133,8 @@ impl Harness {
         // lint: allow(stored-format) a run report for the reader, never loaded back
         std::fs::write(&results_path, serde_json::to_string_pretty(&results)?)?;
 
+        // With timings: they differ run to run, so only `stats.json` has them, never
+        // `results.json`, which a replay must write byte for byte.
         let stats = self.stats.borrow().to_json(true);
         // lint: allow(asset-write) a harness report, not read by a path-keyed cache
         // lint: allow(stored-format) a run report for the reader, never loaded back

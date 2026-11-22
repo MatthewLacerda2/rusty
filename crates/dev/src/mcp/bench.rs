@@ -107,6 +107,7 @@ fn open(
             ));
         }
     }
+    // Read before the open: an edit-open records this engine, after which no upgrade shows.
     let upgrade = inspect(dir)?.upgrade();
     let (root, warning) = bench.open(dir, now)?;
     match backend.reopen(&root) {

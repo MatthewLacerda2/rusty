@@ -56,6 +56,7 @@ fn lua_files(root: &Path) -> Vec<PathBuf> {
 fn scripts_digest(root: &Path) -> String {
     let mut all = Vec::new();
     for file in lua_files(root) {
+        // A 0 byte ends each path and each file, so where one ends is hashed too.
         all.extend_from_slice(file.to_string_lossy().as_bytes());
         all.push(0);
         all.extend(std::fs::read(root.join(&file)).unwrap_or_default());

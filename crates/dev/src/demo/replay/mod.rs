@@ -117,6 +117,7 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
     let start = Start::of(world, demo.path());
     let header = &demo.header;
     super::sources::warn_changes(world, header);
+    // Written through `Host`, so the replay writes nothing `lend` does not take back.
     let mut host = Host::take(world);
     host.seed = header.seed;
     host.time.time_scale = header.time_scale.0 as f32;
@@ -157,6 +158,7 @@ fn install(world: &mut GameWorld, demo: Demo, lua: Lua) {
 impl Replayer {
     fn before_play(&mut self, world: &mut GameWorld) {
         let acts = std::mem::take(&mut self.before_play);
+        // A line run in edit mode needs the edit-mode runtime the recording host had.
         if acts.iter().any(|act| matches!(act, HostCall::Eval(_))) {
             let init = world.init_edit_runtime();
             world.report_lua_init(init);

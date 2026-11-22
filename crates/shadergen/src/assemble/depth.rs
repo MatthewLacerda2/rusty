@@ -8,6 +8,9 @@ use crate::params::ParamLayout;
 pub const CUT_PREPASS: &str = "fs_prepass_cut";
 pub const CUT_SHADOW: &str = "fs_shadow_cut";
 
+/// The shared depth pipelines never cut, clip at the raw UVs and draw the unmoved vertex,
+/// so a variant that cuts or moves its UVs or vertices gets its own: the prepass must keep
+/// `fs_main`'s depth.
 pub fn entry_points(instances: &[Instance], layout: &ParamLayout) -> String {
     let cuts = cuts(instances, layout);
     let (param, opening) = match moved_in(instances, layout) {

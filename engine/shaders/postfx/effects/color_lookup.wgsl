@@ -1,8 +1,7 @@
-// engine/shaders/postfx/effects/color_lookup.wgsl — the Color Lookup, the last
-// step of the grading bake: the user LUT, as URP applies it, on the display colour,
-// sRGB-encoded, mapped through the LUT's domain and blended in by its contribution.
-// Slot 0: xyz the LUT's input range start, w its contribution (`0`: none applies);
-// slot 1: xyz the range end.
+// The Color Lookup, the last step of the grading bake: the user LUT, as URP applies it, on the
+// display colour, sRGB-encoded, mapped through the LUT's domain and blended in by its contribution.
+// Slot 0: xyz the LUT's input range start, w its contribution (`0`: none applies); slot 1: xyz the
+// range end.
 
 #define_import_path postfx::effects::color_lookup
 

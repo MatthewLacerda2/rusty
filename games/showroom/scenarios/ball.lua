@@ -3,7 +3,7 @@ local ball = Scene.FindEntityByName("Ball")
 Harness.Expect(ball ~= nil, "the showroom has a Ball")
 
 -- The probe field at the ball's centre, averaged over the six axis directions.
--- The sun reaches the ball directly, so the probes hold only the bounced light.
+-- The probes hold only the light bounced into the room: the sun reaches the ball directly.
 local AXES = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } }
 local function light()
     local x, y, z = Transform.GetPosition(ball)

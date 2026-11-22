@@ -7,6 +7,7 @@ use rusty_navigation::{NavigationGraph, Rebake};
 use rusty_scene::test_levels::rooms::rooms;
 use rusty_scene::Scene;
 
+/// Peak resident MB from Linux's `/proc`; 0 elsewhere.
 fn peak_mb() -> u64 {
     let status = std::fs::read_to_string("/proc/self/status").unwrap_or_default();
     let line = status.lines().find(|l| l.starts_with("VmHWM:"));

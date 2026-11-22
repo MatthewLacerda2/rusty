@@ -14,6 +14,7 @@ function Push.OnControllerColliderHit(id, hit)
     if not body then return end -- static geometry, another character
     local rb = Component.Get(body, "RigidBody")
     if not rb or rb.is_kinematic then return end
+    -- A move pressing down onto the body (standing on it) pushes nothing.
     if hit.moveDirection.y < -0.3 then return end
     local power = Push.push_power
     local _, vy, _ = Physics.GetVelocity(body)

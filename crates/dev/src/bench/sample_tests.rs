@@ -104,6 +104,7 @@ fn every_recorded_counter_is_a_row_and_only_the_shown_ones_are_loud() {
     assert!(quiet.clone().all(|(m, _)| !SHOWN.contains(&m.as_str())));
     let pairs = RenderedFrame::default().counters.pairs();
     let counted = pairs.iter().filter(|(k, _)| is_counter(k)).count();
+    // `made_up_counter`, the one tick counter; `frame_ms` and `load_scene_ms` are timings.
     let tick = 1;
     assert_eq!(quiet.count(), counted - SHOWN.len() + tick, "every counter");
 }

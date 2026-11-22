@@ -96,6 +96,7 @@ fn mesh_rows(
             }),
         ));
     }
+    // Slowest first: `None` sorts below any time, so untimed meshes come last.
     meshes.sort_by_key(|m| std::cmp::Reverse(m.0));
     (meshes.into_iter().map(|m| m.1).collect(), texels_lit)
 }
@@ -156,6 +157,7 @@ fn lights_in_reach(mesh: &BakeMesh, lights: &[BakeLight]) -> Vec<usize> {
         .collect()
 }
 
+/// UV charts: a UV seam splits a vertex, so triangles joined through shared vertices are one.
 pub(super) fn charts(mesh: &BakeMesh) -> usize {
     let mut parent: Vec<u32> = (0..mesh.positions.len() as u32).collect();
     fn root(parent: &mut [u32], mut i: u32) -> u32 {

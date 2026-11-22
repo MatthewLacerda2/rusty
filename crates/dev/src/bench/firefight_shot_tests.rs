@@ -35,6 +35,7 @@ fn every_shot_leaves_its_muzzle_and_lands_away_from_the_shooter() {
     let before = h.world.borrow().scene().borrow().decals.len();
     let mut shots = Vec::new();
     for _ in 0..40 {
+        // The console keeps 100 lines, so it is read and cleared every tick.
         h.step(1);
         shots.extend(self::shots(&h.console_text()));
         h.console.borrow_mut().messages.clear();

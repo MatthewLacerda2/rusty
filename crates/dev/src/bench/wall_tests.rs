@@ -13,6 +13,7 @@ fn gpu_wall_ms_holds_the_ticks_the_renderers_and_the_gpus_time_each_frame() {
         ..StressSpec::default()
     };
     stress::load(&mut h.world.borrow().scene().borrow_mut(), &spec);
+    // Warm-up: pipelines built, GPU times flowing.
     measure(&mut h, 2);
     let probe = h.renderer().and_then(|r| ClockProbe::new(r));
     let (_, samples) = measure_posed(&mut h, 4, probe.as_ref(), &mut |_| {});

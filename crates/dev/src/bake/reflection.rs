@@ -17,6 +17,7 @@ pub fn reflection_dir(scene_path: &str) -> PathBuf {
     PathBuf::from(format!("{scene_path}{REFLECTION_DIR_SUFFIX}"))
 }
 
+/// Called only once a cube is about to be written, so a skipped bake leaves no empty folder.
 pub(super) fn out_dir(scene_path: Option<&str>) -> Result<PathBuf, String> {
     let dir = reflection_dir(scene_path.ok_or(UNSAVED)?);
     std::fs::create_dir_all(&dir)
@@ -54,6 +55,7 @@ pub fn bake_scene_reflections(
     }
     scene_path.ok_or(UNSAVED)?;
 
+    // Each probe renders into a target of its own size: this one is a placeholder.
     let mut renderer = match pollster::block_on(Renderer::new_headless(64, 64)) {
         Some(r) => r,
         None => {

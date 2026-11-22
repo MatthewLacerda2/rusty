@@ -1,27 +1,30 @@
-// what TAA's resolve (`postfx/taa.wgsl`) reads: its uniform
-// (`render::postfx::effects::taa::params::TaaParams`), its bindings (`taa::pass`'s layouts: 0
-// to 6 for every resolve, 7 for the `_held` ones only) and the current frame, read safely.
-
 #define_import_path postfx::taa::io
 
 #import numeric
 
+// Mirrors `taa::params::TaaParams`.
 struct TaaParams {
+    // xy: history size in pixels (the output's when upscaling); zw: reciprocal
     size: vec4<f32>,
+    // x: frame influence; y: variance clamp scale; z: 1 when the history holds this view;
+    // w: the history pixels a frame of motion below which a pixel is still
     knobs: vec4<f32>,
+    // xy: current frame size in pixels; zw: reciprocal
     scene: vec4<f32>,
-    // xy: this frame's jitter in scene pixels (`jitter::pixels`, NDC's y up); z: 1 when a
-    // translucent wrote the reactive mask this frame; w: unused
+    // xy: jitter in scene pixels, NDC's y up; z: 1 when a translucent wrote the
+    // reactive mask this frame
     jitter: vec4<f32>,
-    // The quality level's steps (`params::levels`), URP's `DoTemporalAA` arguments: x clamp (0
-    // cross, 2 variance, 3 clipping), y motion (0 own, 1 cross, 2 3×3), z history (below 2
-    // bilinear, 2 bicubic), w central filtering (1 on)
+    // URP's `DoTemporalAA` arguments: x clamp (0 cross, 2 variance, 3 clipping), y motion
+    // (0 own, 1 cross, 2 3×3), z history (2 bicubic, else bilinear), w central filter (1 on)
     levels: vec4<f32>,
+    // x: a moving pixel's frame influence at y history pixels a frame; z, w: the relative
+    // distance gaps where history starts to fade and is gone
     rejection: vec4<f32>,
+    // x: a flicker's share kept per frame; y: how many times its recurring flicker the
+    // history's luma may sit outside the box
     flicker: vec4<f32>,
-    // Each camera of the stack by its index (the velocity's `.w`; a camera past the last slot
-    // reads the last): xy, the view-space offset per NDC unit at one unit of view depth
-    // (perspective) or at any (orthographic); z, 1 for perspective.
+    // Per camera, by velocity `.w` (clamped to the last): xy, the view offset per
+    // NDC unit at view depth 1 (perspective) or any (orthographic); z, 1 for perspective.
     lenses: array<vec4<f32>, MAX_CAMERAS>,
 };
 
@@ -33,12 +36,12 @@ const MAX_CAMERAS: u32 = 8u;
 @group(0) @binding(3) var t_velocity: texture_2d<f32>;
 @group(0) @binding(4) var s_linear: sampler;
 @group(0) @binding(5) var t_surface_history: texture_2d<f32>;
-// This frame's reactive mask at the scene's size (`reactive.wgsl`): the topmost camera that
-// drew a translucent there, plus how much of the pixel that camera's translucents laid down
-// (below 1); 0 where none drew.
+// Scene-sized: the topmost camera that drew a translucent plus its share of the pixel (below
+// 1, `reactive.wgsl`); 0 where none drew.
 @group(0) @binding(6) var t_reactive: texture_2d<f32>;
 @group(0) @binding(7) var t_flicker_history: texture_2d<f32>;
 
+// f16's largest finite value.
 const MAX_HDR: f32 = 65504.0;
 
 fn current(p: vec2<i32>) -> vec4<f32> {

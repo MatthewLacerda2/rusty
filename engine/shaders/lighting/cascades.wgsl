@@ -1,6 +1,5 @@
-// the sun's cascaded shadow maps as the
-// shaders read them: the forward pass (`forward::bindings::shadow`) and the
-// volumetric fog's froxels bind the same uniform.
+// The forward pass (`forward::bindings::shadow`) and the volumetric fog's froxels read the sun's
+// cascaded shadow maps through this one uniform.
 
 #define_import_path lighting::cascades
 

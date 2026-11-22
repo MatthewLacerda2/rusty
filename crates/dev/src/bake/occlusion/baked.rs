@@ -15,6 +15,8 @@ pub struct BakedOcclusion {
 }
 
 impl BakedOcclusion {
+    /// `Err` hands back the fingerprints compared, so the bake gathers through them: no mesh
+    /// is hashed twice.
     pub fn kept(scene: &Scene, reach: &Reach) -> Result<Self, Fingerprints> {
         let started = Instant::now();
         let held = current_pvs(scene, reach)?;

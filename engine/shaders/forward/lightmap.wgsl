@@ -1,3 +1,6 @@
+// Directional specular, as Bakery's and Frostbite's (Unity has none): it lights the page's
+// dominant direction as one GGX light. Only the lamps' share (A) feeds it; the environment
+// reflection holds bounce, sky and emission.
 
 #define_import_path forward::lightmap
 
@@ -17,6 +20,7 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind
     var out = LightmapLight(textureSampleLevel(t_lightmaps, s_linear_clamp, uv, layer, lod).rgb, vec3<f32>(0.0));
     if (directional) {
         var dir = decode_lightmap_direction(textureSampleLevel(t_lightmap_dirs, s_linear_clamp, uv, layer, lod));
+        // The bake traced only the front's hemisphere: a back face mirrors it and gets no lobe.
         if (behind) {
             dir = vec4<f32>(reflect(dir.xyz, Ng), 0.0);
         }
@@ -26,16 +30,18 @@ fn lightmap_light(uv: vec2<f32>, layer: u32, lod: f32, directional: bool, behind
     return out;
 }
 
-// The least diffuse response the radiance is divided by: Lambert's at a light about 84° off the
-// geometric normal (closer to the plane, a flat surface's highlight weakens by Ng·L / 0.1,
-// above); the squared wrap's at about 112° (Ng·L ≈ -0.37), past the surface's horizon, so under
-// `HalfLambert` it holds only for a light behind the surface a normal map has turned toward.
+// The least diffuse response the radiance is divided by, so a normal map turned toward a light
+// grazing Ng never makes a highlight of a whisker of light. Lambert's reaches it about 84° off
+// Ng (closer to the plane, a flat surface's highlight weakens by Ng·L / 0.1); the squared
+// wrap's at about 112° (Ng·L ≈ -0.37), past the surface's horizon, so under `HalfLambert` it
+// holds only for a light behind the surface a normal map has turned toward.
 const GRAZING_FLOOR: f32 = 0.1;
 
+// The bake's `LAMP_RAMP` (`lightmap::share_tests`): below it the page's direction is partly
+// all light's mean, not the lamps', so the lobe fades with it.
 const LAMP_RAMP: f32 = 0.25;
 
-// The least directionality the lobe takes its direction from: below it the page's 8-bit vector
-// is too short to aim a highlight.
+// Below this directionality the page's 8-bit vector is too short to aim a highlight.
 const MIN_DIRECTIONALITY: f32 = 0.02;
 
 fn baked_specular(texel: vec3<f32>, dir: vec4<f32>, N: vec3<f32>, Ng: vec3<f32>, V: vec3<f32>, F0: vec3<f32>, F90: f32, roughness: f32) -> vec3<f32> {
