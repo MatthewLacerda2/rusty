@@ -3,6 +3,9 @@ use std::ops::{Deref, DerefMut};
 use crate::World;
 use rusty_components::TransformComponent;
 
+/// The one way a Transform is written: a copy that lands on drop. A changed value queues the
+/// entity as moved, O(1); an unchanged one moves and stamps nothing (a recording journal still
+/// notes it), so a guard taken only to read costs nothing.
 pub struct TransformMut<'w> {
     world: &'w mut World,
     id: u32,
@@ -29,6 +32,7 @@ impl Drop for TransformMut<'_> {
     }
 }
 
+/// The same bits, so a `-0.0` over a `0.0` still lands.
 fn same(a: &TransformComponent, b: &TransformComponent) -> bool {
     let bits = |t: &TransformComponent| {
         let (p, r, s) = (t.position, t.rotation, t.scale);
@@ -51,6 +55,8 @@ impl World {
         let Some(unchanged) = self.transform(id).map(|stored| same(&stored, &value)) else {
             return;
         };
+        // Compared before the mutable borrow, which stamps: a body physics writes back unmoved
+        // names nothing.
         if unchanged {
             self.note(id);
             return;

@@ -1,5 +1,5 @@
-//! Unity's Game view resolution dropdown. Anything but `Free` is drawn letterboxed in
-//! the panel; the sim, UI, pointer and renderer read the resolved size, never the
+//! The Game view's size, Unity's resolution dropdown. Anything but `Free` is drawn
+//! letterboxed in the panel; the sim, UI, pointer and renderer read the resolved size, never the
 //! panel's. Editor state, never the project's.
 
 use super::Application;

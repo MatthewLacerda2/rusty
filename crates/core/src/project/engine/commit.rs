@@ -1,4 +1,4 @@
-//! Std-only: `crates/core/build.rs` includes this file with `#[path]` to stamp a release.
+//! Std-only: `crates/core/build.rs` includes this file with `#[path]` to stamp a release build.
 use std::path::Path;
 // lint: allow(subprocess) asks git which commit a debug build's checkout is; a release build is stamped and never runs it
 use std::process::Command;

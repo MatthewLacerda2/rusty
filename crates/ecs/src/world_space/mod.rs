@@ -43,6 +43,7 @@ impl World {
         })
     }
 
+    /// Unity's default *Local* Scaling Mode: own scale only, every parent's ignored.
     pub fn emitter_frame(&self, id: u32) -> EmitterFrame {
         let Some(scale) = self.transform(id).map(|t| t.scale) else {
             return EmitterFrame::IDENTITY;
@@ -62,6 +63,7 @@ impl World {
         self.world_pose(id).map_or(Vec3::ONE, |p| p.scale)
     }
 
+    /// A test hook (`tests/proptest/world_space.rs`).
     pub fn is_mirrored(&self, id: u32) -> bool {
         self.local_to_world(id).determinant() < 0.0
     }

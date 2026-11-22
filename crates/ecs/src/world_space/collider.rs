@@ -3,6 +3,8 @@ use std::ops::{Deref, DerefMut};
 use crate::{CompRef, World};
 use rusty_components::ColliderComponent;
 
+/// A collider being written: on drop it lands the edit (nothing when unchanged) and refreshes the
+/// AABB only when the shape changed, so a collider added in Play never keeps a zero box.
 pub struct ColliderMut<'w> {
     world: &'w mut World,
     id: u32,

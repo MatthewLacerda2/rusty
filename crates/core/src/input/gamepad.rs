@@ -46,6 +46,7 @@ impl Default for DeadZones {
 }
 
 impl DeadZones {
+    /// Each at most 0.95, so full travel reads as 1.
     pub fn clamped(stick: f32, trigger: f32) -> Self {
         Self {
             stick: stick.clamp(0.0, 0.95),

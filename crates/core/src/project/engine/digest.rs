@@ -1,4 +1,5 @@
-//! The root `build.rs` includes this file with `#[path]`: only std and `xxhash_rust`.
+//! The root `build.rs` includes this file with `#[path]`, so it names only std and
+//! `xxhash_rust`, that script's one build-dependency.
 use std::path::Path;
 
 pub fn digest(dir: &Path) -> Result<String, String> {

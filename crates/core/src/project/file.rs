@@ -21,7 +21,7 @@ pub const PROJECT_FILE: &str = "project.rusty";
 pub struct ProjectFile {
     pub engine_commit: String,
     /// The field's own `default`: an omitted count reads as `None`, never the running
-    /// engine's, so a record from before counts is an upgrade.
+    /// engine's, so a record from before counts were kept is an upgrade.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine_order: Option<u64>,
     pub build: BuildSettings,

@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use super::AnimatorComponent;
 
+/// Name-sorted, so the graph evaluator's fixed-step walk is deterministic.
 pub type AnimatorParameters = BTreeMap<String, AnimatorParameter>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
@@ -40,6 +41,7 @@ impl AnimatorComponent {
         }
     }
 
+    // Test hooks: the four typed setters only tests call; scripts go through `set_parameter`.
     pub fn set_bool(&mut self, name: &str, value: bool) -> bool {
         self.set_parameter(name, AnimatorParameter::Bool(value))
     }

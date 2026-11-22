@@ -35,6 +35,8 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
     fill_tangents(vertices, indices)
 }
 
+/// Gutter round each face's lightmap cell, as a fraction of the cell: filtering and the
+/// bake's dilation never bleed one face into the next.
 const LIGHTMAP_CELL_PAD: f32 = 0.06;
 
 fn box_lightmap_uv(face: usize, uv: [f32; 2]) -> [f32; 2] {

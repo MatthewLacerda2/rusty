@@ -13,6 +13,7 @@ pub struct IkConstraint {
     pub target: Option<IkTarget>,
     #[serde(skip)]
     pub hint: Option<IkTarget>,
+    /// `(bone, local rotation written, rotation before)`: what the next solve puts back first.
     #[serde(skip)]
     pub applied: Vec<(u32, Quat, Quat)>,
 }

@@ -118,7 +118,7 @@ impl Playback {
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
         self.previous_loop = self.loop_clip;
-        self.states.previous_node = None;
+        self.states.previous_node = None; // `enter_node` names the node it leaves
         self.sync.begin_fade();
         self.set_current(motion);
         self.time = 0.0;
@@ -199,6 +199,7 @@ impl Playback {
         });
         let to = finite(to(from));
         self.time = bounds.apply(to);
+        // An unknown length says nothing about the end: `ended` holds, so no second `End`.
         let Bounds::Clamp(end) = bounds else {
             return Step::travel(from, to);
         };

@@ -1,3 +1,6 @@
+//! The in-game UI's first-class components, pure authoring data: computed rects and batches
+//! live in `ui::UiLayout` and the renderer. The model is `docs/ui.md`.
+
 pub mod backdrop;
 pub mod image;
 pub mod layout;
