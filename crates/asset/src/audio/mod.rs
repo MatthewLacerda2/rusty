@@ -1,24 +1,6 @@
-//! crates/asset/src/audio/ — audio import: one decoder, and MP3 → WAV on arrival (#385).
-//!
-//! **MP3 is a source format, never a shipped one.** Every `.mp3` that enters a
-//! project — dropped in by hand or copied in by a tool — is decoded
-//! once, its encoder delay and padding trimmed, and written as a 16-bit PCM `.wav`
-//! beside it; the `.mp3` is then removed. A one-shot so converted fires on its first
-//! real sample and a loop has no silence at the seam, which an MP3 played directly
-//! cannot promise without the gapless header being honoured on every play. OGG
-//! (Vorbis) is a shipped format in its own right (music, long dialogue) and is never
-//! converted.
-//!
-//! The decoder here is also the runtime's: `audio::device::decode` plays every clip
-//! through [`decode_file`], so an MP3 that has not been converted yet (dropped in
-//! while the editor runs, before the next refresh) still plays, trimmed the same way.
-//!
-//! Channels and rate are kept as the source has them, the way Unity's AudioImporter
-//! does by default ("Force To Mono" off): the voice (#412) already plays mono and
-//! stereo, folding a stereo clip toward its mono downmix as `spatialBlend` rises, so
-//! forcing either would only lose information.
-//!
-//! Purity: symphonia and `std::fs` only — no kira, wgpu, egui or mlua.
+//! MP3 is a source format, never shipped: trimmed of encoder delay and padding so a one-shot
+//! fires on its first real sample and a loop has no seam. OGG ships as is.
+//! Channels and rate stay as the source has them (Unity's AudioImporter, "Force To Mono" off).
 
 mod import;
 pub mod wav;
@@ -41,29 +23,23 @@ pub struct DecodedAudio {
 }
 
 impl DecodedAudio {
-    /// Whole frames (one sample per channel) in the clip.
     #[cfg(test)]
     pub fn frames(&self) -> usize {
         self.samples.len() / usize::from(self.channels.max(1))
     }
 }
 
-/// Decode the file at `path` (`.ogg` Vorbis / `.wav` / `.mp3`). Errs with a
-/// human-readable reason on any open/decode failure.
 pub fn decode_file(path: &str) -> Result<DecodedAudio, String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     decode_source(Box::new(file))
 }
 
-/// Decode an in-memory encoded file (an MP3 read whole before it is converted).
 fn decode_bytes(bytes: Vec<u8>) -> Result<DecodedAudio, String> {
     decode_source(Box::new(Cursor::new(bytes)))
 }
 
-/// Decode one stream to interleaved `f32`. Symphonia's probe sniffs the container
-/// from the bytes, so an extension need not be trusted. Its decoders run gapless by
-/// default: an MP3 carrying a LAME/Xing header comes out with the encoder delay and
-/// padding already trimmed, sample-exact to what was encoded.
+/// Symphonia decoders run gapless: an MP3 with a LAME/Xing header comes out with encoder delay
+/// and padding trimmed.
 fn decode_source(source: Box<dyn MediaSource>) -> Result<DecodedAudio, String> {
     let stream = MediaSourceStream::new(source, Default::default());
     let mut reader = symphonia::default::get_probe()

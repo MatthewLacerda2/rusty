@@ -1,8 +1,3 @@
-//! A texture on disk is referenced only when the renderer can load it: an image
-//! extension, bytes that agree with it, not empty (#1293). Otherwise the next
-//! file, then an embedded copy, stands in, or the texture is skipped and the
-//! material keeps its colour.
-
 use super::fixture;
 use crate::convert::fbx::convert;
 use crate::convert::{Skip, Staging};
@@ -12,9 +7,7 @@ use std::path::PathBuf;
 const PNG: &[u8] = b"\x89PNG\r\n\x1a\n";
 const JPEG: &[u8] = &[0xFF, 0xD8, 0xFF, 0xE0];
 
-/// The fixture `name` with each `(from, to)` rewrite (`{dir}` is the folder),
-/// written into a fresh folder beside `files`, then converted and imported: what
-/// it skipped, its materials, and the folder.
+/// `{dir}` in a `(from, to)` rewrite is the folder.
 fn convert_in(
     name: &str,
     rewrites: &[(&str, &str)],
@@ -42,8 +35,6 @@ fn convert_in(
     (skipped, materials, dir)
 }
 
-/// `missing_texture.fbx` beside one file, its texture renamed `file`: why `Gone`
-/// was skipped, after checking its colour stayed.
 fn gone_skipped_beside(file: &str, bytes: &[u8]) -> String {
     let (skips, materials, _) = convert_in(
         "missing_texture.fbx",
@@ -63,8 +54,7 @@ fn gone_skipped_beside(file: &str, bytes: &[u8]) -> String {
 
 #[test]
 fn a_format_the_importer_cannot_read_is_skipped_whatever_its_bytes() {
-    // Store packs ship `.psd` beside the FBX: referenced, it rendered flat white.
-    // The renderer decodes by extension, so PNG bytes inside don't save it.
+    // The renderer decodes by extension: PNG bytes under `.psd` render flat white.
     for bytes in [b"8BPS".as_slice(), PNG] {
         let why = gone_skipped_beside("gone.psd", bytes);
         assert!(why.ends_with("gone.psd is not an image format the importer reads"));

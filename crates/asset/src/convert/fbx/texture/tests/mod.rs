@@ -1,4 +1,4 @@
-//! Embedded FBX textures extracted beside the cached `.glb` (#1082).
+//! Embedded FBX textures extracted beside the cached `.glb`.
 
 use super::super::{convert_and_import, fixture};
 use crate::convert::textures_dirs;

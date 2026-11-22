@@ -1,4 +1,4 @@
-//! The import cache (#1024): where a converted source is cached, and that it is
+//! The import cache: where a converted source is cached, and that it is
 //! re-made exactly when the source changes.
 
 use super::{converter_for, is_import_cache, refresh, Converted, Converter, Staging};

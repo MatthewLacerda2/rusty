@@ -1,14 +1,10 @@
-//! Which material slots sample each image of a written `.glb` (#2365): what a
-//! texture a conversion extracted is compressed by, since it has no sidecar of its
-//! own (`texture_ref::extracted`). Read from the JSON chunk alone, as
-//! [`super::image_uris`] is.
+//! Read from the JSON chunk alone, as [`super::image_uris`] is.
 
 use super::read::json_chunk;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::Path;
 
-/// What a glTF slot reads from its image.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Slot {
     /// sRGB colour: `baseColorTexture`, `emissiveTexture`.
@@ -22,9 +18,7 @@ pub enum Slot {
     Data,
 }
 
-/// The slots every material of the `.glb` at `path` samples each image in, by the
-/// image's URI as written; an image no material samples is absent. `None` when the
-/// file is not a `.glb`.
+/// By the image's URI as written; an image no material samples is absent.
 pub fn image_slots(path: &Path) -> Option<BTreeMap<String, Vec<Slot>>> {
     let doc: Value = serde_json::from_slice(&json_chunk(path)?).ok()?;
     let list = |key: &str| doc.get(key).and_then(Value::as_array);
@@ -48,8 +42,6 @@ pub fn image_slots(path: &Path) -> Option<BTreeMap<String, Vec<Slot>>> {
     Some(slots)
 }
 
-/// Each texture reference `material` holds, with the slot it fills: the slots a
-/// material has (`gltf::material`), so `KHR_materials_specular`'s
 /// `specularColorTexture`, which no slot reads, is not among them.
 fn textures(material: &Value) -> Vec<(&Value, Slot)> {
     let at = |path: &[&str]| path.iter().try_fold(material, |v, key| v.get(key));

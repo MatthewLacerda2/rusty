@@ -1,11 +1,7 @@
-//! The swap seen from between its steps (`stage::hook`): a reader, a second
-//! conversion, a rename that fails.
-
 use super::*;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-/// A source and its cache in a fresh folder, converted once from "one".
 fn cached() -> (PathBuf, PathBuf, PathBuf) {
     let dir = rusty_test_support::temp::dir();
     let (source, out) = (dir.join("a.src"), dir.join("a.src.glb"));
@@ -68,7 +64,6 @@ fn a_second_conversion_waits_for_the_first() {
     let a = refresh(&TEXTURED, &source, &out);
     hook::unset();
     a.unwrap();
-    // B converted after A, reading what is on disk by then.
     let handle = b.borrow_mut().take().expect("B started");
     handle.join().unwrap().unwrap();
     assert_eq!(read_whole(&out), "two");
@@ -77,9 +72,7 @@ fn a_second_conversion_waits_for_the_first() {
 
 #[test]
 fn without_the_lock_an_interleaved_conversion_still_leaves_a_whole_set() {
-    // B converts "two" through another source path, as on a filesystem with no
-    // locks, while A, converting "three", is at `step`. Between A's `.glb` rename
-    // and its stamp only the lock keeps B out (the test above).
+    // B converts "two" with no locks while A, converting "three", is at `step`.
     for (step, stamped) in [
         (Step::Staged, true),
         (Step::TexturesIn, false),

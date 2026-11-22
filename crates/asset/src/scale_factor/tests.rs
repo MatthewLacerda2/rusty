@@ -1,7 +1,3 @@
-//! The Scale Factor at import (#1398): a primitive model at 0.01 and 1, a skinned
-//! one whose bones still line up with its scaled mesh, and an animated one whose
-//! translation keys scale with it.
-
 use glam::{Mat4, Vec3};
 
 use super::{sanitize, MIN_SCALE};
@@ -9,7 +5,6 @@ use crate::{import_file, sidecar, ImportedAsset};
 use rusty_test_support::models::anim::{animated_buffer, ANIMATED_GLTF};
 use rusty_test_support::models::{quad_mode_gltf, skinned_buffer, SKINNED_GLTF};
 
-/// Write `files` into a fresh temp dir and import `main` from it at `scale`.
 fn import_at(dir: &str, files: &[(&str, &[u8])], main: &str, scale: f32) -> ImportedAsset {
     let dir = rusty_test_support::temp::dir().join(dir);
     let _ = std::fs::remove_dir_all(&dir);

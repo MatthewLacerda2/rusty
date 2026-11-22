@@ -1,19 +1,8 @@
-//! crates/asset/src/audio/import.rs — MP3 arrives, WAV stays (#385).
-//!
-//! [`refresh`] sweeps a project tree for `.mp3` files (every authoring open runs it,
-//! `edit::seed_project`, and the editor again whenever its window regains focus,
-//! Unity's auto-refresh; the shipped player never does, #1653; scripts call it as
-//! `Assets.Refresh()`), trimming encoder delay and padding through the shared
-//! decoder. A scene that still names `foo.mp3` keeps working:
-//! [`resolve_clip_path`] sends it to the `foo.wav` that replaced it.
-
 use std::borrow::Cow;
 use std::path::{Path, PathBuf};
 
 use super::{decode_bytes, wav};
 
-/// What one [`refresh`] did: each MP3 converted (source → WAV written), and each it
-/// left in place with the reason.
 #[derive(Debug, Default, PartialEq)]
 pub struct Refresh {
     pub converted: Vec<(PathBuf, PathBuf)>,
@@ -21,7 +10,6 @@ pub struct Refresh {
 }
 
 impl Refresh {
-    /// One console line per file: `(is_warning, text)`.
     pub fn lines(&self) -> Vec<(bool, String)> {
         let converted = self.converted.iter().map(|(mp3, wav)| {
             let text = format!("[Assets] {} -> {}", mp3.display(), wav.display());
@@ -35,11 +23,9 @@ impl Refresh {
     }
 }
 
-/// Convert every `.mp3` under `root` (recursively, in path order) to a `.wav` beside
-/// it and remove the `.mp3`. An MP3 whose `.wav` sibling already exists is left
-/// alone (never overwrite a file somebody made), as is one that fails to decode — a
-/// file still being copied in, say, which the next refresh retries. Both still play
-/// through the runtime's MP3 fallback meanwhile.
+/// Convert every `.mp3` under `root` to a `.wav` beside it and remove the `.mp3`. One whose
+/// `.wav` sibling exists is left alone (never overwrite), as is one that fails to decode (maybe
+/// still being copied; the next refresh retries).
 pub fn refresh(root: &Path) -> Refresh {
     let mut mp3s = Vec::new();
     collect_mp3s(root, &mut mp3s);
@@ -60,8 +46,6 @@ pub fn refresh(root: &Path) -> Refresh {
     report
 }
 
-/// Where a clip reference actually plays from: `foo.mp3` that has been converted
-/// (gone, with `foo.wav` beside it) resolves to `foo.wav`; anything else is itself.
 pub fn resolve_clip_path(path: &str) -> Cow<'_, str> {
     let source = Path::new(path);
     if !is_mp3(source) || source.exists() {
@@ -74,9 +58,8 @@ pub fn resolve_clip_path(path: &str) -> Cow<'_, str> {
     }
 }
 
-/// One MP3 file → its WAV, then the MP3 is removed. The write is atomic and noted
-/// (`core::fs::written`), so a reader never sees half a WAV and a clip cache drops
-/// the old one (#1207).
+/// Atomic write, noted through `core::fs::written`: a reader never sees half a WAV and a clip
+/// cache drops the old one.
 fn convert(mp3: &Path, wav: &Path) -> Result<(), String> {
     let bytes = std::fs::read(mp3).map_err(|e| e.to_string())?;
     let audio = decode_bytes(bytes)?;

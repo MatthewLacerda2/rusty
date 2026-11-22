@@ -1,14 +1,8 @@
-//! The import cache's garbage collection (#1694): a compressed texture whose
-//! source is gone, or is a baked lightmap page, is an orphan; one whose source
-//! answers anything but *not found* is kept; nothing outside a project's import
-//! cache is walked. And a baked page is never an image to compress.
-
 use std::path::Path;
 
 use super::orphans::{collect, orphans};
 use super::*;
 
-/// Write an (empty) file at `dir/rel`, making its folders.
 fn touch(dir: &Path, rel: &str) {
     let path = dir.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -43,14 +37,11 @@ fn caches_of_gone_sources_and_of_baked_pages_are_orphans_and_the_rest_stay() {
     );
 }
 
-/// A path under a file answers `ENOTDIR`, an error that is not "not found", so the
-/// source is unreadable, not gone.
+/// A path under a file answers `ENOTDIR`: unreadable, not "not found".
 #[test]
 fn a_source_that_cannot_be_read_is_not_gone() {
     let root = rusty_test_support::temp::dir();
     let (cache, sources) = (root.join("cache"), root.join("assets"));
-    // `blocked.png/x.png` cannot be looked at (its parent is a file): an error,
-    // but not "not found", so its cache is kept.
     touch(&sources, "blocked.png");
     touch(&cache, "blocked.png/x.png.bctex");
     assert!(orphans(&cache, &sources).is_empty());

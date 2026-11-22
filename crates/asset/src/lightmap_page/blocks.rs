@@ -1,9 +1,3 @@
-//! Encoding a page's levels into blocks, and back (#1694), with
-//! `block_compression`'s CPU encoders (a pure-Rust port of Intel's ISPC texture
-//! compressor). Each level's bands of block rows encode on `threads` threads: the
-//! blocks are the same whichever thread wrote them, so a bake's pages never
-//! depend on the machine.
-
 use block_compression::decode::decompress_blocks_as_rgba16f;
 use block_compression::encode::compress_rgba16;
 use block_compression::half::f16;
@@ -13,16 +7,11 @@ use glam::Vec3;
 use super::{Page, PageFormat};
 use crate::texture_import::banded;
 
-/// BC6H's profile. Lightmaps are smooth, so the very fast profile holds them within
-/// 5% (`tests`); a 2048² page with its mips took 1.9 s on four cores of the 2026
-/// cloud container, against 4.8 s at `basic`, which held them no closer.
+/// Very fast holds smooth lightmaps within 5% (`tests`).
 const BC6H: CompressionVariant = CompressionVariant::BC6H(BC6HSettings::very_fast());
-/// The largest value a BC6H unsigned-float texel holds (half float's).
 pub const BC6H_MAX: f32 = 65504.0;
 
-/// A BC6H page of linear HDR `levels` (level `l` is `(edge >> l)`² texels,
-/// row-major). A negative, NaN or overflowing channel is clamped into BC6H's range.
-/// `None` when `stop` answers true before a level.
+/// Level `l` is `(edge >> l)`² texels, row-major. `None` when `stop` fires.
 pub fn encode_bc6h(
     edge: u32,
     levels: &[Vec<Vec3>],
@@ -43,13 +32,9 @@ pub fn encode_bc6h(
     })
 }
 
-/// One `edge`² level of linear HDR `texels` (row-major) as BC6H unsigned-float
-/// blocks, on `threads` threads: the one encoder lightmap pages and baked
-/// reflection cubes (`render::ibl::ktx2_encode`, #1885) share. A level whose edge
-/// is under a block (a cube's 2×2 and 1×1 mips) is padded to one 4×4 block by
-/// repeating its last row and column, as wgpu stores such a mip; the padding is
-/// never sampled. Channels are clamped as [`encode_bc6h`] says. Panics when `edge`
-/// is neither under 4 nor a multiple of 4.
+/// A level under a block (a cube's 2×2 and 1×1 mips) is padded to one 4×4 block
+/// by repeating its last row and column, as wgpu stores it. Panics when `edge` is
+/// neither under 4 nor a multiple of 4.
 pub fn bc6h_level(edge: u32, texels: &[Vec3], threads: usize) -> Vec<u8> {
     let w = edge.max(4);
     assert!(
@@ -71,18 +56,13 @@ pub fn bc6h_level(edge: u32, texels: &[Vec3], threads: usize) -> Vec<u8> {
     })
 }
 
-/// Level `level` of a BC6H `page` decoded back to linear HDR: what a GPU samples.
 pub fn decode_bc6h(page: &Page, level: usize) -> Vec<Vec3> {
     bc6h_texels(page.edge >> level, &page.levels[level])
 }
 
-/// The `edge`² texels a [`bc6h_level`] holds, decoded back to linear HDR, its
-/// padding (a level under a block) dropped.
-///
-/// The crate's decoders (0.11.0) lay BC6H out wrong: its `f32` one runs off the end
-/// of its RGBA destination, and its half-float one writes each block's rows as RGB
-/// (three halves a texel) into an RGBA-pitched buffer. The half-float one is read
-/// through that layout: texel `(x, y)` is at `y * 4w + (x / 4) * 16 + (x % 4) * 3`.
+/// `block_compression` 0.11.0 decodes BC6H wrong (the `f32` decoder overruns; the
+/// half-float one writes RGB into an RGBA-pitched buffer): texel `(x, y)` is at
+/// `y * 4w + (x / 4) * 16 + (x % 4) * 3`.
 pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     let w = edge.max(4);
     let pitch = (w * 4) as usize;
@@ -103,8 +83,7 @@ pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     texels
 }
 
-/// Linear HDR texels as `Rgba16Float` bytes (alpha 1): the upload of a page on a
-/// GPU without BC compression.
+/// For a GPU without BC compression.
 pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
     texels
         .iter()
@@ -116,7 +95,7 @@ pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
         .collect()
 }
 
-/// A channel clamped into what BC6H unsigned float holds; NaN reads 0.
+/// NaN reads 0.
 fn clean(v: f32) -> f32 {
     if v.is_nan() {
         0.0

@@ -1,7 +1,3 @@
-//! Leaving an unreadable made image out of the glTF (#1072): the image, the
-//! textures that sample it and the material slots that sample those go, and every
-//! index after them is renumbered.
-
 use super::super::drop;
 use serde_json::json;
 

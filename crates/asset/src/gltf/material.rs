@@ -1,6 +1,3 @@
-//! One glTF material as the pure-data [`MaterialData`]: its factors and the
-//! textures it samples, as paths or, for a converted source, references.
-
 use super::uri;
 use crate::convert::texture_ref;
 use crate::mesh_data::MaterialData;
@@ -8,10 +5,6 @@ use crate::MapRef;
 use rusty_core::paths;
 use std::path::Path;
 
-/// Read one glTF material into the pure-data [`MaterialData`]: the metallic-roughness
-/// factors plus the resolved file paths of its external textures (`base_dir` anchors
-/// relative URIs), or references into `source` (see [`texture_path`]). Embedded
-/// images yield `None` maps.
 pub(super) fn material_data(
     material: gltf::Material,
     base_dir: &Path,
@@ -47,16 +40,13 @@ pub(super) fn material_data(
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         emissive: material.emissive_factor(),
-        // glTF's `occlusionTexture` (#2151): an ORM image shared with the
-        // metallic-roughness texture resolves to the same path, so one upload.
+        // An ORM image shared with metallic-roughness resolves to the same path: one upload.
         occlusion_map: material
             .occlusion_texture()
             .and_then(|t| texture_path(&t.texture(), base_dir, source))
             .map(MapRef::from),
         occlusion_strength: material.occlusion_texture().map_or(1.0, |t| t.strength()),
         double_sided: material.double_sided() && !from_blend(source),
-        // `KHR_materials_ior` / `KHR_materials_specular` (#1998): the factors, and
-        // `specularTexture` (#2151); the material has no `specularColorTexture` slot.
         ior: material.ior().unwrap_or(1.5),
         specular: specular.as_ref().map_or(1.0, |s| s.specular_factor()),
         specular_map: specular
@@ -68,10 +58,8 @@ pub(super) fn material_data(
     }
 }
 
-/// Each texture of `material` authored on a UV set other than 0 (its `texCoord`),
-/// by the map it feeds: the renderer reads every map through UV0, so those land
-/// in the wrong places (an occlusion map on `TEXCOORD_1` most often), and the
-/// import warns once per material and map.
+/// The renderer reads every map through UV0, so a texture authored on another `texCoord`
+/// set lands wrong: the import warns once per material and map.
 pub(super) fn off_uv0(material: &gltf::Material) -> Vec<(&'static str, u32)> {
     let pbr = material.pbr_metallic_roughness();
     let specular = material.specular();
@@ -108,12 +96,9 @@ pub(super) fn off_uv0(material: &gltf::Material) -> Vec<(&'static str, u32)> {
         .collect()
 }
 
-/// Whether the glTF is a `.blend`'s conversion, whose `doubleSided` says nothing
-/// (#1615): Blender's exporter writes it on every material whose Backface Culling
-/// is off, Blender's default, which would draw every Blender model's back faces. So
-/// a `.blend` imports single-sided, as Unity's `.blend` import does (through FBX,
-/// which has no such flag), and *Render Face* is set after import. A `.gltf` or
-/// `.glb` authored as such keeps its `doubleSided`, as Unity's glTFast reads it.
+/// Whether the glTF is a `.blend`'s conversion, whose `doubleSided` says nothing: Blender's
+/// exporter writes it whenever Backface Culling is off (the default). A `.blend` imports
+/// single-sided, as Unity's does; a `.gltf`/`.glb` keeps its own.
 fn from_blend(source: Option<&str>) -> bool {
     source.is_some_and(|s| paths::extension(s) == "blend")
 }
@@ -122,20 +107,12 @@ fn from_blend(source: Option<&str>) -> bool {
 #[path = "material_tests.rs"]
 mod tests;
 
-/// Resolve a glTF texture's image to a file path, anchored at the glTF file's
-/// directory; a named image a conversion of `source` wrote, which lies in the
-/// cache's folder, is the reference to it instead (`convert::texture_ref`). One
-/// that lies elsewhere is a file on disk and stays the path it is, whatever the
-/// converter named it (#1072). Only the EXTERNAL-URI case is handled: an embedded
-/// image (`Source::View`, a buffer view / data URI) returns `None` — extracting
-/// its pixels to disk is a documented follow-up, out of scope for #203. The URI is
-/// percent-decoded and folded (`uri::file`); one that doesn't decode is warned
-/// about and dropped.
+/// A named image a conversion wrote into the cache is a reference to it; one lying
+/// elsewhere stays the path it is. An embedded image returns `None`.
 fn texture_path(texture: &gltf::Texture, base_dir: &Path, source: Option<&str>) -> Option<String> {
     let image = texture.source();
     let file = match image.source() {
         gltf::image::Source::Uri { uri, .. } => uri::file(base_dir, uri)?,
-        // Embedded image: no on-disk path to reference (follow-up).
         gltf::image::Source::View { .. } => return None,
     };
     if let (Some(source), Some(name)) = (source, image.name()) {

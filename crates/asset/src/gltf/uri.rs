@@ -1,18 +1,12 @@
-//! Percent-encoding for the relative URIs a glTF names its files by (#1082).
-//!
-//! The FBX converter writes a texture's path as a URI ([`encode_path`]) and the
-//! importer turns it back into the path ([`decode`]), so a file name holding a `:`,
-//! a space or a literal `%` survives the round trip: unencoded, `Soldier: v2.png`
-//! reads as a URI scheme and `a%20b.png` as `a b.png`.
+//! Percent-encoding for the relative URIs a glTF names files by: unencoded,
+//! `Soldier: v2.png` reads as a URI scheme and `a%20b.png` as `a b.png`.
 
 use rusty_core::paths;
 use std::path::{Path, PathBuf};
 
-/// The file a glTF's relative `uri` names, anchored at `base_dir` (the glTF's
-/// folder): decoded, joined, and folded lexically (`paths::fold`), so a URI that
-/// climbs out of the import cache names the file where it lies, never a path
-/// through the cache (#1130). A URI that doesn't decode is warned about and
-/// names nothing. The one join the importer and `convert::texture_ref` share.
+/// Decoded, joined and folded lexically (`paths::fold`), so a URI climbing out of the
+/// import cache names the file where it lies. A URI that doesn't decode is warned about
+/// and names nothing.
 pub fn file(base_dir: &Path, uri: &str) -> Option<PathBuf> {
     let Some(decoded) = decode(uri) else {
         log::warn!("[Asset] glTF texture URI `{uri}` is not valid percent-encoding");
@@ -21,8 +15,6 @@ pub fn file(base_dir: &Path, uri: &str) -> Option<PathBuf> {
     Some(paths::fold(&base_dir.join(decoded)))
 }
 
-/// `path`'s `/`-separated segments with every byte outside RFC 3986's unreserved
-/// set (`A-Z a-z 0-9 - . _ ~`) percent-encoded, the `/`s kept.
 pub fn encode_path(path: &str) -> String {
     let mut out = String::with_capacity(path.len());
     for byte in path.bytes() {
@@ -36,8 +28,6 @@ pub fn encode_path(path: &str) -> String {
     out
 }
 
-/// `uri` with every `%XX` escape decoded, or `None` when an escape is cut short,
-/// isn't hex, or the bytes aren't UTF-8.
 pub fn decode(uri: &str) -> Option<String> {
     let bytes = uri.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

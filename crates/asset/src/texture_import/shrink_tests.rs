@@ -1,13 +1,8 @@
-//! A file larger than its *Max Size* is said so once (`shrink::warn_if_shrunk`,
-//! #2259): by the first import or upload, never again for the same file, size and
-//! setting, and never for one that fits.
-
 use image::RgbaImage;
 
 use super::*;
 use crate::sidecar::{set_texture, texture};
 
-/// The warnings naming `source` as shrunk that this thread logged since the last call.
 fn shrunk_warnings(source: &Path) -> usize {
     let named = format!("[Import] {}: ", source.display());
     rusty_test_support::logs::take()
@@ -16,7 +11,6 @@ fn shrunk_warnings(source: &Path) -> usize {
         .count()
 }
 
-/// Import `source` the ways a project does: a refresh and two uploads.
 fn reimport(source: &Path) {
     let settings = texture(source);
     refresh(source, "").unwrap();

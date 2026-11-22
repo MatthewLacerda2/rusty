@@ -1,6 +1,3 @@
-//! The import pass's cooked files (#2332): it decides a model's by the read a load
-//! makes, so a file that read refuses is written again, stamp or not.
-
 use super::import_all;
 use std::path::Path;
 

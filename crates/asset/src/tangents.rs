@@ -1,38 +1,15 @@
-//! Per-vertex tangent generation (MikkTSpace) for normal mapping.
-//!
-//! A normal map stores perturbations in *tangent space*, so the fragment shader
-//! needs a per-vertex tangent basis (T, with the vertex normal N and the derived
-//! bitangent B) to rotate them into world space. glTF supplies a `TANGENT` accessor
-//! when the exporter wrote one; when it didn't — and for `.obj` and the engine's
-//! procedural primitives — we synthesize tangents here so the same `t_normal`
-//! sampling path works for every mesh.
-//!
-//! The basis is **MikkTSpace** (#756), through `bevy_mikktspace`: the space Blender
-//! and the other bakers write normal maps in, and the one the glTF 2.0 spec tells a
-//! loader to generate. Any other basis lights the same normal map with seams and
-//! wrong shading wherever the two disagree. The crate is pure, dependency-free math
-//! with a fixed internal sort seed, so the output is a function of the mesh alone.
-//!
-//! The output is the glTF-convention `[x, y, z, w]`: the unit tangent plus a
-//! handedness sign `w` (±1) the shader uses to reconstruct the bitangent as
-//! `w * cross(N, T)`.
+//! MikkTSpace tangents (`bevy_mikktspace`): the basis Blender and other bakers write normal maps in, and the one glTF tells a loader to generate; any other basis shows seams. Output is glTF-convention `[x, y, z, w]`, `w` (±1) the handedness so the bitangent is `w * cross(N, T)`.
 
 use bevy_mikktspace::Geometry;
 use glam::Vec3;
 
-/// What a parse does for a mesh its source gave no tangents (#2332).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Missing {
-    /// Generate them ([`generate_tangents`]): every import but a cooked one.
     Generate,
-    /// Leave the `+X` placeholder: a cooked import (`asset::cook`) writes every
-    /// vertex's tangent from its cooked file right after, so generating one would
-    /// be work thrown away.
+    /// The `+X` placeholder: a cooked import overwrites every tangent from its cooked file, so generating is wasted work.
     Placeholder,
 }
 
-/// The tangents of a mesh with no source tangent, as `missing` says: generated,
-/// or one placeholder per vertex.
 pub fn fill(
     missing: Missing,
     positions: &[[f32; 3]],
@@ -46,10 +23,7 @@ pub fn fill(
     }
 }
 
-/// Generate one `[x, y, z, w]` MikkTSpace tangent per vertex. `indices` lists
-/// triangles (triples). A vertex MikkTSpace can give no tangent (a degenerate face
-/// with no usable neighbour, or one no triangle references) falls back to an
-/// arbitrary unit tangent orthogonal to its normal, so the basis is always finite.
+/// A vertex MikkTSpace can give no tangent (degenerate face, or unreferenced) falls back to an arbitrary unit tangent orthogonal to its normal.
 pub fn generate_tangents(
     positions: &[[f32; 3]],
     normals: &[[f32; 3]],
@@ -79,9 +53,6 @@ pub fn generate_tangents(
         .collect()
 }
 
-/// rusty's indexed triangle list, seen through MikkTSpace's face/corner interface.
-/// Corners that share a vertex index share its position, normal and UV, so the
-/// algorithm welds them and writes them the same tangent.
 struct IndexedMesh<'a> {
     positions: &'a [[f32; 3]],
     normals: &'a [Vec3],
@@ -128,13 +99,11 @@ impl Geometry for IndexedMesh<'_> {
     }
 }
 
-/// True when the tangent's xyz is finite and unit length, i.e. usable as a basis.
 fn is_unit_finite(t: &[f32; 4]) -> bool {
     let v = Vec3::new(t[0], t[1], t[2]);
     v.is_finite() && (v.length() - 1.0).abs() < 1e-3
 }
 
-/// Any unit tangent orthogonal to `n`, right-handed — for vertices MikkTSpace skips.
 fn fallback(n: Vec3) -> [f32; 4] {
     let axis = if n.x.abs() < 0.9 { Vec3::X } else { Vec3::Y };
     let t = n.cross(axis).try_normalize().unwrap_or(Vec3::X);

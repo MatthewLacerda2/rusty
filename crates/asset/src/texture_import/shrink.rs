@@ -1,9 +1,4 @@
-//! Downscaling an image: to its *Max Size* ([`fit`]) and one mip level at a time
-//! ([`half`]). Colour averages in linear light, as the GPU mip pass does
-//! (`render::gpu::textures::mips`), so neither darkens a high-contrast texture;
-//! every other kind averages its raw values. A file larger than its Max Size is
-//! said so once ([`warn_if_shrunk`]), as Unity's inspector shows the original size
-//! beside the imported one.
+//! Colour averages in linear light, as the GPU mip pass does (`render::gpu::textures::mips`), so downscaling never darkens a high-contrast texture; every other kind averages raw values.
 
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -16,12 +11,7 @@ use super::TextureKind;
 use crate::sidecar::MAX_SIZES;
 use rusty_core::color::{linear_to_srgb, srgb_to_linear};
 
-/// `image` downscaled, its aspect kept, until its longer side is at most
-/// `max_size` (Unity's *Max Size*); unchanged when it already fits. Averaged in
-/// linear light for colour. An image of more than 8 bits a channel fitted for a
-/// normal slot stays 16-bit, so a normal map kept at 16 bits ([`super::keeps_deep`])
-/// keeps its slopes; every other kind is fitted at 8 bits, so the import's encoder
-/// (which never fits for a normal slot) sees the bytes it always has.
+/// An image of more than 8 bits a channel fitted for a normal slot stays 16-bit, so a normal map kept at 16 bits keeps its slopes; every other kind is fitted at 8 bits.
 pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImage {
     let (w, h) = fitted_size(image.width(), image.height(), max_size);
     if (w, h) == (image.width(), image.height()) {
@@ -38,9 +28,7 @@ pub fn fit(image: DynamicImage, max_size: u32, kind: TextureKind) -> DynamicImag
     ))
 }
 
-/// The size a `width`×`height` image is fitted to ([`fit`]). A downscaled side
-/// is rounded to a multiple of 4, at least 4, so it stays compressible: a
-/// 4096×2732 image at 2048 is 2048×1368, not 2048×1366.
+/// A downscaled side is rounded to a multiple of 4, at least 4, so it stays compressible.
 pub fn fitted_size(width: u32, height: u32, max_size: u32) -> (u32, u32) {
     let longer = width.max(height);
     if longer <= max_size {
@@ -53,14 +41,10 @@ pub fn fitted_size(width: u32, height: u32, max_size: u32) -> (u32, u32) {
     (scale(width), scale(height))
 }
 
-/// Each (file, its size, the Max Size) already warned of by [`warn_if_shrunk`].
 type Warned = BTreeSet<(PathBuf, (u32, u32), u32)>;
 static WARNED: Mutex<Warned> = Mutex::new(BTreeSet::new());
 
-/// Warn that the image at `source`, `size` on disk, is imported smaller under
-/// `max_size`: once per file, size and Max Size, so every re-import and upload
-/// after the first is quiet, and a changed file or setting is told again. Silent
-/// when it fits.
+/// Once per file, size and Max Size, so a changed file or setting is told again.
 pub(super) fn warn_if_shrunk(source: &Path, size: (u32, u32), max_size: u32) {
     let (w, h) = size;
     let fitted = fitted_size(w, h, max_size);
@@ -85,14 +69,11 @@ pub(super) fn warn_if_shrunk(source: &Path, size: (u32, u32), max_size: u32) {
     );
 }
 
-/// The next mip level of `level`: half its size on each side, at least 1.
 pub(super) fn half(level: &Rgba32FImage) -> Rgba32FImage {
     let (w, h) = ((level.width() / 2).max(1), (level.height() / 2).max(1));
     resize(level, w, h, FilterType::Triangle)
 }
 
-/// `image` as the values its mips average: linear light for colour (alpha stays
-/// linear), the raw bytes over 255 for the rest.
 pub(super) fn to_working(image: &RgbaImage, kind: TextureKind) -> Rgba32FImage {
     let colour = kind.is_colour();
     Rgba32FImage::from_fn(image.width(), image.height(), |x, y| {
@@ -105,7 +86,6 @@ pub(super) fn to_working(image: &RgbaImage, kind: TextureKind) -> Rgba32FImage {
     })
 }
 
-/// The inverse of [`to_working`], rounded to the nearest byte.
 pub(super) fn to_bytes(image: &Rgba32FImage, kind: TextureKind) -> RgbaImage {
     let colour = kind.is_colour();
     let byte = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;

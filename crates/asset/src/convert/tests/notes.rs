@@ -1,4 +1,4 @@
-//! A conversion notes what it swapped in, in the write log (#1219): the cached
+//! A conversion notes what it swapped in, in the write log: the cached
 //! `.glb` and the source, so a path-keyed cache drops what it read from the old
 //! conversion.
 

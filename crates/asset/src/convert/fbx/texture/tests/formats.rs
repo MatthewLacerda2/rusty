@@ -1,5 +1,5 @@
 //! Embedded textures the `gltf` crate can't decode, or whose names don't say their
-//! format, still import with their mesh (#1082).
+//! format, still import with their mesh.
 
 use super::{convert_and_import, fixture, material, textures};
 use crate::ImportedAsset;

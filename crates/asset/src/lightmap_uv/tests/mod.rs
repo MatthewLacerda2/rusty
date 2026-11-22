@@ -1,7 +1,3 @@
-//! Generate Lightmap UVs (#831): every triangle gets UV area inside `[0, 1]²`, no two
-//! triangles overlap, charts sit at least the pack margin apart, and the same input
-//! always unwraps the same way.
-
 use glam::{Vec2, Vec3};
 
 use super::overlap::interiors_overlap;
@@ -35,8 +31,7 @@ pub(super) fn cube(size: f32) -> (Vec<[f32; 3]>, Vec<u32>) {
     (positions, indices)
 }
 
-/// A ramp spiralling two full turns, rising slowly: every face points nearly up, so
-/// flattening it in one piece would lay the second turn over the first.
+/// Every face points nearly up, so one flat piece would lay turn two over turn one.
 pub(super) fn spiral_ramp() -> (Vec<[f32; 3]>, Vec<u32>) {
     let steps = 64;
     let mut positions = Vec::new();
@@ -55,8 +50,7 @@ pub(super) fn spiral_ramp() -> (Vec<[f32; 3]>, Vec<u32>) {
     (positions, indices)
 }
 
-/// A unit UV sphere of `rings` × `sectors` quads, poles included, laid out as the
-/// engine's Sphere primitive is before its unwrap (`components` sits above this crate).
+/// Laid out as the engine's Sphere primitive is (`components` sits above this crate).
 pub(super) fn sphere(rings: u32, sectors: u32) -> (Vec<[f32; 3]>, Vec<u32>) {
     use std::f32::consts::{PI, TAU};
     let mut positions = Vec::new();
@@ -94,8 +88,7 @@ fn tris(u: &Unwrap) -> Vec<[Vec2; 3]> {
         .collect()
 }
 
-/// Inside `[0, 1]²`, no two triangles overlapping, and UV area wherever the triangle
-/// has surface (a sphere's pole triangles have none).
+/// A sphere's pole triangles have no surface, so no UV area is required there.
 pub(super) fn assert_valid(positions: &[[f32; 3]], u: &Unwrap) {
     assert!(u.uvs.iter().flatten().all(|c| (0.0..=1.0).contains(c)));
     let tris = tris(u);
@@ -114,7 +107,6 @@ pub(super) fn assert_valid(positions: &[[f32; 3]], u: &Unwrap) {
     }
 }
 
-/// Each chart's UV rectangle: triangles sharing an output vertex are one chart.
 pub(super) fn chart_rects(u: &Unwrap) -> Vec<(Vec2, Vec2)> {
     let mut chart = (0..u.uvs.len()).collect::<Vec<_>>();
     let root = |c: &mut Vec<usize>, mut i: usize| {

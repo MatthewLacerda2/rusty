@@ -1,16 +1,13 @@
-//! A model that exercises every cooking step (#2332): several sub-meshes, none
-//! with a source tangent (an `.obj` has none), one past the cluster threshold
-//! (`clusters::MIN_TRIANGLES`), and Generate Lightmap UVs ticked in its sidecar.
+//! A model exercising every cooking step: several sub-meshes without source tangents,
+//! one past `clusters::MIN_TRIANGLES`, lightmap UVs ticked in its sidecar.
 
 use std::fmt::Write;
 use std::path::PathBuf;
 
 use crate::lightmap_uv::LightmapUvSettings;
 
-/// Quads along an edge of the big grid: 64² × 2 triangles, past the threshold.
 const GRID: usize = 64;
 
-/// The model, written fresh into its own folder `name` under the temp dir.
 pub fn model(name: &str) -> PathBuf {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_cook_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -22,18 +19,14 @@ pub fn model(name: &str) -> PathBuf {
         ..LightmapUvSettings::default()
     };
     crate::sidecar::set_lightmap_uvs(&path, on).unwrap();
-    // A run before this one may have cooked it into the temp folder.
     let _ = std::fs::remove_file(cooked_file(&path));
     path
 }
 
-/// Where a test's cooked file of `model` goes: outside a project, only a test
-/// pinning writes has one (`cook::with_writes`), in the temp folder.
 pub fn cooked_file(model: &std::path::Path) -> PathBuf {
     super::with_writes(true, || super::cooked_path(model)).expect("a temp path")
 }
 
-/// The `.obj` text: a bumpy grid, then a box, then a lone triangle.
 fn obj() -> String {
     let mut out = String::new();
     let mut base = 1;
@@ -86,7 +79,6 @@ fn obj() -> String {
     out
 }
 
-/// One object: its corners (position, UV) with an up-ish normal each, and its quads.
 fn write_object(
     out: &mut String,
     name: &str,

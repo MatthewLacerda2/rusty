@@ -1,6 +1,3 @@
-//! Animation events on the graph asset (#459): they parse onto clip nodes and
-//! blend-tree children, round-trip, and malformed ones are rejected.
-
 use super::*;
 
 const EVENTS: &str = r#"{

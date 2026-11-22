@@ -1,5 +1,5 @@
 //! A cooked file keeps its values bit for bit and refuses a malformed or stale one
-//! whole (#2332).
+//! whole.
 
 use std::sync::Arc;
 

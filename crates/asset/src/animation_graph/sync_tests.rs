@@ -1,7 +1,3 @@
-//! Sync groups and markers on the graph asset (#1896): they parse onto clip
-//! nodes and blend-tree children, load sorted by time, round-trip, stay out of
-//! a graph that doesn't use them, and malformed ones are rejected.
-
 use super::*;
 
 const SYNCED: &str = r#"{

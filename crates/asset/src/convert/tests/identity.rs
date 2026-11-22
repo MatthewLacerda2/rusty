@@ -1,4 +1,4 @@
-//! A cache's identity is its whole source path (#1167): two sources never share
+//! A cache's identity is its whole source path: two sources never share
 //! one, whatever their prefix, case or separators.
 
 use super::super::{cache_path, project_relative};
@@ -82,8 +82,6 @@ fn project_relative_keeps_a_backslash_and_drops_a_leading_dot() {
     assert_ne!(cache_of(&root, &["A.fbx"]), cache_of(&root, &["a.fbx"]));
 }
 
-/// A name that is not UTF-8 is refused, so every name the cache derives from
-/// it is exact.
 #[test]
 fn a_non_utf8_source_path_is_refused() {
     use std::ffi::OsStr;

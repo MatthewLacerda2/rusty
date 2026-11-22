@@ -1,27 +1,12 @@
-//! crates/asset/src/animation_graph/validate.rs — graph validation (#315).
-//!
-//! The guardrail between the serialized document and everything that consumes it:
-//! a graph that loads is a graph whose references resolve — the entry and every
-//! edge point at real nodes, and every condition reads a *declared* parameter with
-//! a type-compatible operator. Violations are collected (not first-error-wins), so
-//! an authoring agent sees the whole fix list in one pass.
-
 use std::collections::BTreeSet;
 use std::fmt;
 
 use super::{AnimationGraph, Condition, ParameterDeclaration, StateMachine};
 
-/// Anything that can go wrong loading, saving, or validating a graph. String-y
-/// like `ImportError`: the asset layer is a leaf and callers surface these to a
-/// log/console.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GraphError {
-    /// Reading/writing the graph file failed.
     Io(String),
-    /// The file isn't a well-formed graph document.
     Parse(String),
-    /// The document parsed but its references/values don't hold up — every
-    /// violation, one message each.
     Invalid(Vec<String>),
 }
 
@@ -40,13 +25,7 @@ impl fmt::Display for GraphError {
 impl std::error::Error for GraphError {}
 
 impl AnimationGraph {
-    /// Check every internal reference and value, in every layer: unique named
-    /// nodes, an entry that exists, edges between existing nodes with sane
-    /// durations, conditions over declared, type-matching parameters, well-formed
-    /// motions (#457), unique, sanely weighted layers, and sound slots and
-    /// montages (#1894, each problem named by its path: `montages[1].clip: empty`). `Ok(())` or ALL the
-    /// violations. A base-layer problem is reported bare; an extra layer's carries
-    /// a `layer 'name': ` prefix.
+    /// A base-layer problem is reported bare; an extra layer's carries a `layer 'name': ` prefix.
     pub fn validate(&self) -> Result<(), GraphError> {
         let mut problems = Vec::new();
         self.check_machine("", &self.base, &mut problems);
@@ -121,8 +100,6 @@ impl AnimationGraph {
             }
         }
     }
-    /// A condition must read a *declared* parameter, and its variant (which keys
-    /// the operator set) must match the declared type.
     fn check_condition(&self, label: &str, condition: &Condition, problems: &mut Vec<String>) {
         let name = condition.parameter();
         let Some(declared) = self.parameters.get(name) else {

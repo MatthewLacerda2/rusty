@@ -1,5 +1,5 @@
-//! A model's borrowed clips (#1747): each `clips_from` model's clips,
-//! retargeted onto every skinned sub-mesh of the importing model.
+//! A model's borrowed clips: each `clips_from` model's clips, retargeted onto every
+//! skinned sub-mesh of the importing model.
 
 use std::path::Path;
 
@@ -8,7 +8,6 @@ use crate::anim_data::AnimationClip;
 use crate::mesh_data::{ImportedAsset, SkinData};
 use crate::ImportError;
 
-/// A source model's rig and clips: its first skinned sub-mesh that has clips.
 pub struct Source {
     pub path: String,
     pub skin: SkinData,
@@ -17,8 +16,6 @@ pub struct Source {
 }
 
 impl Source {
-    /// The rig and clips of `asset` (imported from `path` with `settings`), or
-    /// `None` when no sub-mesh of it is skinned and animated.
     pub fn of(path: &str, asset: ImportedAsset, settings: &HumanoidSettings) -> Option<Self> {
         let sub =
             (asset.sub_meshes.into_iter()).find(|s| s.skin.is_some() && !s.clips.is_empty())?;
@@ -37,12 +34,9 @@ impl Source {
     }
 }
 
-/// Append to each skinned sub-mesh of `asset` (imported from `path`) the clips
-/// of the models `settings.clips_from` names, retargeted onto its rig. `load`
-/// reads a source model with its own settings (never its own borrowed clips, so
-/// two models borrowing from each other end there). A clip whose name the
-/// sub-mesh already has is skipped: its own clips, and earlier sources, win.
-/// What cannot be read or mapped is warned of and left out.
+/// `load` reads a source model with its own settings, never its own borrowed clips, so two
+/// models borrowing from each other end there. A clip name the sub-mesh already has is
+/// skipped: its own clips and earlier sources win.
 pub fn borrow_clips(
     path: &Path,
     asset: &mut ImportedAsset,
@@ -100,9 +94,8 @@ pub fn borrow_clips(
     }
 }
 
-/// What a borrowed clip loses when a joint above `skin`'s hips (a UE-style
-/// `root`) carries travel in one of `clips`: the retarget moves only the
-/// hips, so the clip plays in place on every rig that borrows it.
+/// A joint above the hips (a UE-style `root`) carrying travel is lost: the retarget moves
+/// only the hips.
 pub(crate) fn root_travel_lost(
     skin: &SkinData,
     map: &BoneMap,
@@ -128,7 +121,6 @@ pub(crate) fn root_travel_lost(
     None
 }
 
-/// Say once what resolving `map` for the model at `path` found wrong.
 fn warn_problems(path: &str, map: &BoneMap) {
     if !map.problems.is_empty() {
         log::warn!("[Asset] {path}: humanoid map: {}", map.problems.join("; "));

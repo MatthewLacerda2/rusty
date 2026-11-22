@@ -1,10 +1,4 @@
-//! Choosing a block format and encoding an image's mip chain into it (#1574),
-//! with `block_compression`'s CPU encoders (a pure-Rust port of Intel's ISPC
-//! texture compressor). No BC1: its encoder (and `texpresso`'s) collapses a block
-//! of two colours whose channels move against each other (red beside blue) to
-//! their average, one flat grey; BC7 keeps both. The bands of block rows encode on
-//! the [`Cores`] the caller gives: the blocks are the same whichever thread wrote
-//! them.
+//! Block format choice and mip-chain encoding with `block_compression`'s CPU encoders. No BC1: its encoder collapses a two-colour block whose channels move against each other (red beside blue) to one flat grey; BC7 keeps both.
 
 use block_compression::{encode::compress_rgba8, BC7Settings, CompressionVariant};
 use image::{DynamicImage, RgbaImage};
@@ -13,21 +7,16 @@ use super::shrink::{half, to_bytes, to_working};
 use super::variance::{self, VarianceTable};
 use super::{Compression, TextureKind, TextureSettings};
 
-/// A block-compressed GPU format: 4×4 texels a block.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BlockFormat {
-    /// One channel, 8 bytes a block.
     Bc4,
-    /// Two channels, 16 bytes a block.
     Bc5,
-    /// RGBA, 16 bytes a block (a byte a texel).
     Bc7,
 }
 
 impl BlockFormat {
     pub const ALL: [Self; 3] = [Self::Bc4, Self::Bc5, Self::Bc7];
 
-    /// The bytes of one 4×4 block.
     pub fn block_bytes(self) -> u32 {
         match self {
             Self::Bc4 => 8,
@@ -35,34 +24,24 @@ impl BlockFormat {
         }
     }
 
-    /// The bytes a `width`×`height` level takes: whole blocks, so a level smaller
-    /// than one still takes one.
     pub fn level_bytes(self, width: u32, height: u32) -> usize {
         blocks_len(width, height, self.block_bytes())
     }
 }
 
-/// A texture ready to upload: its format, the base level's size, every mip
-/// level's blocks, largest first, and for BC5 what its mips' normals lost
-/// (`variance`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Compressed {
     pub format: BlockFormat,
     pub width: u32,
     pub height: u32,
     pub levels: Vec<Vec<u8>>,
-    /// Each level's mean spread of normals (#1702): all zero unless BC5.
     pub variance: VarianceTable,
 }
 
-/// How many levels a full chain of a `width`×`height` image has, down to 1×1.
 pub fn full_chain_len(width: u32, height: u32) -> u32 {
     32 - width.max(height).max(1).leading_zeros()
 }
 
-/// `image` (already fitted) compressed with `settings`, every level its
-/// *Generate Mip Maps* asks for; `None` when it is left uncompressed (*Compression*
-/// `None`, or a side that is not a multiple of 4).
 pub(super) fn encode(
     image: &DynamicImage,
     settings: &TextureSettings,
@@ -83,9 +62,7 @@ pub(super) fn encode(
     let threads = cores.threads();
     let mut levels = vec![compress(&base, variant, format, threads)];
     let mut working = to_working(&base, kind);
-    // A BC5 map's normals as the shader reads them, z rebuilt (#1702). `half`
-    // filters each channel alone and BC5 keeps only x and y, which `as_read` leaves
-    // as they were, so one pyramid gives both the blocks and the spread.
+    // `as_read` leaves x and y as they were, so one pyramid gives both the blocks and the spread.
     let bc5 = format == BlockFormat::Bc5;
     if bc5 {
         working = variance::as_read(&working);
@@ -108,12 +85,7 @@ pub(super) fn encode(
     })
 }
 
-/// The encoder for `format` on `texels`. BC7's profiles are chosen for import
-/// time: on one core of the 2026 cloud container a 2048² map took 8 to 11 s at
-/// `Normal` (very fast) and 21 s at `HighQuality` (fast), the bands spread over
-/// every core. The ultra-fast profiles (2 s) are not used: like BC1 they flatten
-/// a block of two contrasting colours to one. An opaque image encodes three
-/// channels, faster and closer.
+/// Import-time BC7 profiles: a 2048² map took 8 to 11 s at `Normal`, 21 s at `HighQuality` on one core. Ultra-fast flattens contrasting colours like BC1.
 fn variant(
     format: BlockFormat,
     compression: Compression,
@@ -134,13 +106,9 @@ fn variant(
     }
 }
 
-/// How many cores an encode spreads over.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Cores {
-    /// Every one: what Play and an export wait for.
     All,
-    /// Half, at least one: the editor's background worker, so the editor stays
-    /// responsive while it encodes.
     Half,
 }
 
@@ -154,8 +122,6 @@ impl Cores {
     }
 }
 
-/// `level`'s blocks, its edge texels repeated out to whole blocks, its bands of
-/// block rows spread over `threads`.
 fn compress(
     level: &RgbaImage,
     variant: CompressionVariant,
@@ -176,17 +142,11 @@ fn compress(
     })
 }
 
-/// The bytes of a `width`×`height` level in 4×4 blocks of `block_bytes`: whole
-/// blocks, so a level smaller than one still takes one.
 pub fn blocks_len(width: u32, height: u32, block_bytes: u32) -> usize {
     width.div_ceil(4) as usize * height.div_ceil(4) as usize * block_bytes as usize
 }
 
-/// A `width`×`height` level's blocks (both multiples of 4), its block rows split
-/// in bands over `threads`: `encode(out, rows, first_row)` fills one band, `rows`
-/// texel rows from texel row `first_row`. The blocks are the same whichever
-/// thread wrote them. The texture importer and the lightmap pages
-/// (`asset::lightmap_page`) both encode through it.
+/// `encode(out, rows, first_row)` fills one band of `rows` texel rows; the blocks are the same whichever thread wrote them.
 pub(crate) fn banded(
     width: u32,
     height: u32,

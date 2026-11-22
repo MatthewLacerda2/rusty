@@ -1,7 +1,5 @@
-//! A linked library's image on disk (#1072): `library_image/direct.blend` packs a
-//! red image named `Wood` and links a crate from `sub2/lib.blend`, whose material
-//! samples `sub2/tex.png`, a green file on disk also named `Wood`. Needs Blender
-//! 5+, so skipped by default (see `tests`).
+//! `library_image/direct.blend` packs a red image `Wood` and links a crate whose material
+//! samples `sub2/tex.png`, a green file also named `Wood`.
 
 use super::{base_color_map, fixture, pixel};
 use crate::convert::{converter_for, record, refresh};
@@ -9,8 +7,8 @@ use crate::gltf::import::import_from;
 use crate::{ImportedAsset, MapRef};
 use std::path::{Path, PathBuf};
 
-/// The fixture copied into a folder of its own, with `decoy` (a white `tex.png`
-/// beside `direct.blend`, where the exporter alone would look) or without.
+/// The fixture copied into a folder of its own, with `decoy` (a white `tex.png` beside
+/// `direct.blend`) or without.
 fn copied(decoy: bool) -> PathBuf {
     let (from, dir) = (fixture("library_image"), rusty_test_support::temp::dir());
     std::fs::create_dir_all(dir.join("sub2")).unwrap();

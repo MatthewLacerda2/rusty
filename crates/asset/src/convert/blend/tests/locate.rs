@@ -1,4 +1,4 @@
-//! Finding Blender, with fake executables (#1072): what each refusal says.
+//! Finding Blender, with fake executables: what each refusal says.
 
 use super::super::locate::parse_version;
 use super::super::Search;
@@ -11,7 +11,7 @@ pub(super) fn fake(dir: &Path, output: &str) -> PathBuf {
 
 /// A fake `blender` in `dir` that runs the shell `body`. A process another test
 /// forks meanwhile may hold it open for writing an instant longer, so starting
-/// it can meet "text file busy": the engine's start waits that out (#1821).
+/// it can meet "text file busy": the engine's start waits that out.
 pub(super) fn script(dir: &Path, body: &str) -> PathBuf {
     use std::os::unix::fs::PermissionsExt;
     std::fs::create_dir_all(dir).unwrap();

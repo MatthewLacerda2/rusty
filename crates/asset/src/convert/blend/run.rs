@@ -1,12 +1,7 @@
-//! Running Blender (#1072): asking its version, and running the export script.
-//!
-//! Blender runs headless with its factory settings, so a user's add-ons and
-//! preferences never change what a conversion writes, and with scripts in the
-//! `.blend` disabled: an import never runs code a downloaded file carries.
-//!
-//! Every run has a time limit: one past it is killed and fails, so a hung Blender
-//! never holds the editor, or the cache's lock, for good. The limit is counted in
-//! sleeps between polls, not read off a clock (the sim modules read none).
+//! Blender runs headless on factory settings with the `.blend`'s scripts disabled: an import
+//! never runs code a downloaded file carries.
+//! The time limit is counted in sleeps between polls, not read off a clock (the sim modules read
+//! none).
 
 use super::locate::{RUSTY_BLENDER_TIMEOUT, VERSION_TIMEOUT};
 use crate::ImportError;
@@ -17,31 +12,21 @@ use std::process::{Child, Command, ExitStatus, Output, Stdio};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
-/// The export settings, pinned in one place (see the script's header).
 const EXPORT: &str = include_str!("export.py");
 
-/// How much of a failed run's output an error quotes, from its end.
 const TAIL_LINES: usize = 12;
 
-/// How often a run is polled for its end.
 const POLL: Duration = Duration::from_millis(20);
 
-/// How often, and how far apart, a start refused as "text file busy" is tried
-/// again: about a fifth of a second in all.
 const BUSY_TRIES: u32 = 100;
 const BUSY_WAIT: Duration = Duration::from_millis(2);
 
-/// What the Blender at `path` answers when asked its version: `Ok` of the version
-/// its answer names (or why it names none), `Err` when it gave no answer at all,
-/// since it could not start or ran past its limit.
 pub(super) type Answer = Result<Result<String, ImportError>, ImportError>;
 
-/// The version the Blender at `path` reports.
 pub(super) fn version(path: &Path) -> Answer {
     version_within(path, VERSION_TIMEOUT)
 }
 
-/// [`version`], asked within `limit`.
 pub(super) fn version_within(path: &Path, limit: Duration) -> Answer {
     let output = run(path, Command::new(path).arg("--version"), limit)
         .map_err(|e| e.error(&format!("{} --version", path.display()), ""))?;
@@ -54,8 +39,6 @@ pub(super) fn version_within(path: &Path, limit: Duration) -> Answer {
     }))
 }
 
-/// Export `source` with the Blender at `blender` into the folder `dir`, within
-/// `timeout`.
 pub(super) fn export(
     blender: &Path,
     source: &Path,
@@ -84,16 +67,12 @@ pub(super) fn export(
     )))
 }
 
-/// Why a run gave no output.
 enum Failed {
-    /// The program could not be started.
     Start(ImportError),
-    /// It ran past its limit, and was killed.
     Timeout(Duration),
 }
 
 impl Failed {
-    /// The failure as an error about `what` was running; a timeout's says `hint`.
     fn error(self, what: &str, hint: &str) -> ImportError {
         match self {
             Self::Start(e) => e,
@@ -105,8 +84,6 @@ impl Failed {
     }
 }
 
-/// Run `command` (starting the program at `program`) to its end, output captured,
-/// killing it once it has run `limit`.
 fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output, Failed> {
     command
         .stdin(Stdio::null())
@@ -121,8 +98,8 @@ fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output,
             stdout: stdout.join().unwrap_or_default(),
             stderr: stderr.join().unwrap_or_default(),
         }),
-        // Killed and reaped; the readers are left to end with the pipes, since a
-        // process the program started may still hold them.
+        // Killed and reaped; the readers end with the pipes, since a process the program started
+        // may still hold them.
         Ok(None) => match child.kill().and_then(|()| child.wait()) {
             Ok(_) => Err(Failed::Timeout(limit)),
             Err(e) => Err(Failed::Start(start_error(program, &e))),
@@ -131,12 +108,8 @@ fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output,
     }
 }
 
-/// Start `command`, trying again for a bounded moment while the system refuses
-/// it as "text file busy" (`ETXTBSY`, #1821): the program was just written, and
-/// a process another thread is forking holds the file open for writing until
-/// its own `exec`. A fake Blender a test writes meets this; renaming the file
-/// into place does not help, since the inherited descriptor is on the file
-/// itself, not its name. A real install is only ever busy that briefly too.
+/// Retries briefly on "text file busy" (`ETXTBSY`): a just-written program stays open for
+/// writing in a process another thread is forking, until its `exec`.
 fn spawn(command: &mut Command) -> std::io::Result<Child> {
     let mut tries = 1;
     loop {
@@ -150,7 +123,6 @@ fn spawn(command: &mut Command) -> std::io::Result<Child> {
     }
 }
 
-/// The run's status once it ends, `None` when it is still running after `limit`.
 fn wait(child: &mut Child, limit: Duration) -> std::io::Result<Option<ExitStatus>> {
     let mut waited = Duration::ZERO;
     loop {
@@ -165,13 +137,10 @@ fn wait(child: &mut Child, limit: Duration) -> std::io::Result<Option<ExitStatus
     }
 }
 
-/// Read all of `pipe` on a thread of its own, so neither pipe fills and stalls
-/// the program while the other is read.
 fn drain(pipe: Option<impl Read + Send + 'static>) -> JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
         if let Some(mut pipe) = pipe {
-            // What was read before a failed read is kept: it is only quoted.
             if pipe.read_to_end(&mut bytes).is_err() {}
         }
         bytes
@@ -182,7 +151,6 @@ fn start_error(program: &Path, e: &std::io::Error) -> ImportError {
     ImportError::Parse(format!("starting {}: {e}", program.display()))
 }
 
-/// The last lines of what a run printed, stderr after stdout.
 fn tail(output: &Output) -> String {
     let text = [&output.stdout, &output.stderr]
         .map(|b| String::from_utf8_lossy(b).into_owned())
