@@ -29,13 +29,14 @@ def order(line: list[dict]) -> list[int]:
 
 
 class Order(unittest.TestCase):
-    def test_a_round_then_red_main_then_infrastructure_then_feature_whatever_the_ask_order(self):
+    def test_a_round_then_red_main_then_docs_then_infrastructure_then_feature_whatever_the_ask_order(self):
         line = asked((10, issue(10, "feature"), brief_on(10)),
                      (11, issue(11, "infrastructure"), brief_on(11)),
+                     (14, issue(14, "documentation", "feature"), brief_on(14)),
                      (12, issue(12, "bug", body=RED), brief_on(12)),
                      (13, issue(13, "feature"), brief_on(13, body=ROUND)))
-        self.assertEqual(order(line), [13, 12, 11, 10])
-        self.assertEqual(waiting.ahead(line, 10), 3)
+        self.assertEqual(order(line), [13, 12, 14, 11, 10])
+        self.assertEqual(waiting.ahead(line, 10), 4)
 
     def test_red_main_is_told_by_the_marker_not_the_title_or_the_bug_label(self):
         titled = {**issue(9, "bug"), "title": "Red main: the `ci` workflow is failing"}
@@ -88,6 +89,24 @@ class Drain(unittest.TestCase):
         fake.coders()  # #10 is read, its create fails, so it stays in line with the label read
         self.assertEqual([(e["issue"], e["priority"]) for e in waiting.load(fake.line)],
                          [(9, "feature"), (10, "feature")])
+
+    def test_a_round_asked_during_a_pass_keeps_its_round_and_goes_first(self):
+        fake = self.full()
+        fake.pulls, fake.routines, fake.create = drafts(1, 2, 3, 4), busy(1, 2, 3, 4), (500, {"error": "down"})
+        read, again = fake.gh, brief_on(10, comment=2, body=ROUND)
+
+        def gh(path: str):  # #10 re-asked on a `Round:` brief right after this pass read it
+            got = read(path)
+            if "/issues/10/comments" in path and "page=1" in path:
+                on_disk = waiting.load(fake.line)
+                waiting.save(fake.line, waiting.enqueue(on_disk, 10, again, START, issue(10, "infrastructure"))[0])
+            return got
+
+        fake.gh = gh
+        fake.coders()
+        kept = waiting.load(fake.line)
+        self.assertEqual([(e["issue"], e["brief"], e["round"]) for e in waiting.ordered(kept)],
+                         [(10, again["html_url"], True), (9, brief_on(9)["html_url"], False)])
 
 if __name__ == "__main__":
     unittest.main()

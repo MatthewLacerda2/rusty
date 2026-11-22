@@ -107,8 +107,10 @@ def wait(line: Path, entries: list[dict], number: int, issue: dict, found: dict,
 def turn(entries: list[dict], number: int, issue: dict, found: dict, now: datetime, free: int,
          taken: set[int]) -> str | None:
     """Why #`number` must wait behind the line for one of `free` slots, or `None` when it fits:
-    a hand launch never jumps ahead of an entry asked before it in the line's order. An entry
-    ahead whose issue already holds a slot (`taken`, a round replacing its coder) takes none."""
+    a hand launch is placed in the line as an ask would be (rounds first, then priority, then ask
+    time, `waiting.ordered`) and never jumps an entry that order puts ahead of it, but goes before
+    a lower-priority one asked earlier. An entry ahead whose issue already holds a slot (`taken`,
+    a round replacing its coder) takes none."""
     placed, _ = waiting.enqueue([dict(e) for e in entries], number, found, now, issue)
     ahead = [e for e in waiting.ordered(placed)[:waiting.ahead(placed, number)] if e["issue"] not in taken]
     if len(ahead) < free:

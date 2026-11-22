@@ -32,7 +32,9 @@ an ordinary case:
   until no entry left could take one ([`fill`]). The order is the one stored: a
   brief that turns an entry into a round, or a label that changes its priority
   (#2615), is written back by the pass that read it ([`forget`]) and moves it
-  from the next pass.
+  from the next pass; an entry asked again on another brief during the pass
+  keeps what that ask wrote (the review of #2625: keyed on the issue alone,
+  the write-back put a round mid-pass back behind first launches).
 
 `launched_since` has two limits not closed here, which a reader deciding
 whether to trust the line needs:
@@ -99,8 +101,9 @@ class Pass:
     start: Callable[[int, dict, dict], int]
     say: Callable[[str], None]
     dry: bool
-    #: The round and priority each entry read this pass has now, by issue: [`forget`] writes them.
-    seen: dict[int, dict] = field(default_factory=dict)
+    #: The brief, round and priority each entry read this pass has now, by its issue and the brief
+    #: it was loaded on: [`forget`] writes them only onto an entry still on that brief.
+    seen: dict[tuple[int, str], dict] = field(default_factory=dict)
 
 
 def run(go: Pass) -> int:
@@ -155,16 +158,18 @@ def fill(go: Pass, entries: list[dict], read: dict[int, tuple], dropped: list[di
 
 
 def refreshed(go: Pass, entry: dict, issue, comments) -> dict | None:
-    """[`waiting.refresh`], noting in `go.seen` the round and priority it read."""
+    """[`waiting.refresh`], noting in `go.seen` the brief, round and priority it read, keyed on the
+    brief the entry was loaded on."""
+    loaded = entry["brief"]
     found = waiting.refresh(entry, issue, comments, go.say, go.dry)
     if found:
-        go.seen[entry["issue"]] = {"round": entry["round"], "priority": entry["priority"]}
+        go.seen[(entry["issue"], loaded)] = {k: entry[k] for k in ("brief", "round", "priority")}
     return found
 
 
 def forget(go: Pass, dropped: list[dict]) -> int:
     """Write the line without `dropped` and with what `go.seen` read, under the lock; a re-ask on
-    a newer brief stays. 0 or 2."""
+    a newer brief (saved during the pass) is neither dropped nor overwritten. 0 or 2."""
     if go.dry or not (dropped or stale(go)):
         return 0
     with waiting.held(go.line, go.say):

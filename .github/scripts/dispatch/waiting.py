@@ -18,7 +18,9 @@ a tool can hold.
   entries in line waited behind eight by ask time alone); then the order asked.
 - **Priority** ([`priority`], [`RANKS`]): a red `main` first, told by the
   marker `main-health.sh` writes in its issue's body ([`RED_MAIN_MARKER`]),
-  never by the title; then CLAUDE.md's label order, read from the one table
+  never by the title; then `documentation`, which CLAUDE.md says never waits
+  its turn (the review of #2625: absent from the table, it sorted last); then
+  CLAUDE.md's label order, read from the one table
   the merge queue ranks by (`merging/watch/order.PRIORITY`), an issue with
   several labels taking its highest; then an issue with none of them. It is
   read when the issue is asked for and again whenever [`refresh`] reads it
@@ -162,9 +164,10 @@ def is_round(found: dict) -> bool:
 #: What `main-health.sh` writes at the top of the issue it files for a red workflow on `main`.
 RED_MAIN_MARKER = "<!-- main-health:workflow="
 
-#: The ranks, best first: a red `main`, CLAUDE.md's label order, then an issue with none of them.
-RED_MAIN, UNLABELLED = "red main", "unlabelled"
-RANKS = (RED_MAIN, *PRIORITY, UNLABELLED)
+#: The ranks, best first: a red `main`, `documentation` (CLAUDE.md: it never waits its turn),
+#: CLAUDE.md's label order, then an issue with none of them.
+RED_MAIN, DOCUMENTATION, UNLABELLED = "red main", "documentation", "unlabelled"
+RANKS = (RED_MAIN, DOCUMENTATION, *PRIORITY, UNLABELLED)
 
 
 def priority(issue: object) -> str | None:
@@ -174,7 +177,7 @@ def priority(issue: object) -> str | None:
     if RED_MAIN_MARKER in (issue.get("body") or ""):
         return RED_MAIN
     labels = board.names(issue.get("labels"))
-    return next((label for label in PRIORITY if label in labels), UNLABELLED)
+    return next((label for label in RANKS[1:-1] if label in labels), UNLABELLED)
 
 
 def rank(entry: dict) -> int:
@@ -233,9 +236,10 @@ def refresh(entry: dict, issue: dict | None, comments: list | None, say: Callabl
     return found
 
 
-def relabel(entries: list[dict], seen: dict[int, dict]) -> list[dict]:
-    """`entries` with the round and priority a pass read (`seen`, by issue) written onto them."""
-    return [{**e, **seen.get(e["issue"], {})} for e in entries]
+def relabel(entries: list[dict], seen: dict[tuple[int, str], dict]) -> list[dict]:
+    """`entries` with what a pass read (`seen`, by issue and the brief it was read on) written onto
+    each entry still on that brief; one asked again on another brief keeps its own."""
+    return [{**e, **seen.get((e["issue"], e["brief"]), {})} for e in entries]
 
 
 def described(entry: dict) -> str:
