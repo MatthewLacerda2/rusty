@@ -112,9 +112,7 @@ fn braking_inside_the_stopping_distance_still_moves() {
     assert!((speed(&scene, id) - v).abs() < 1e-5);
 }
 
-/// An agent that has arrived stands its ground: it is not steering, so it does
-/// not dodge a passer-by (only steering agents solve avoidance) even while it
-/// still holds the path it arrived on.
+/// An arrived agent is not steering, so it does not dodge a passer-by.
 #[test]
 fn an_arrived_agent_does_not_dodge() {
     let home = Vec3::new(10.0, 0.0, 10.0);

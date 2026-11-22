@@ -1,6 +1,4 @@
-//! A carving `NavMeshObstacle` closing a doorway mid-walk: the agent heading
-//! for it re-plans through the other doorway the same tick the door carves, and
-//! arrives; a replay is bit-identical. A non-carving obstacle is steered around.
+//! A carving `NavMeshObstacle` closing a doorway mid-walk: the agent re-plans through the other doorway the same tick, and arrives; a replay is bit-identical.
 
 use glam::Vec3;
 use rusty::components::NavMeshObstacleComponent;
@@ -12,8 +10,7 @@ use crate::navigation_layered::add_box;
 const DT: f32 = 1.0 / 60.0;
 const GOAL: Vec3 = Vec3::new(25.0, 0.0, 6.0);
 
-/// A 30 × 20 floor split at x = 15, doorway A over z 4..8, doorway B over z 14..18;
-/// an agent west of A bound east, and a door obstacle (not carving yet) in A.
+/// A 30 × 20 floor split at x = 15, doorways A (z 4..8) and B (z 14..18); the agent west of A bound east, a door obstacle (not carving yet) in A.
 fn level() -> (Scene, NavigationGraph, u32, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 30.0, 0.0, 20.0));
@@ -52,14 +49,12 @@ fn level() -> (Scene, NavigationGraph, u32, u32) {
     (scene, nav, door, agent)
 }
 
-/// The play-mode order: obstacle bookkeeping, incremental rebake, agent steering.
 fn tick(scene: &mut Scene, nav: &mut NavigationGraph) {
     tick_obstacles(scene, DT);
     nav.sync(scene);
     nav.tick_nav_agents(scene, DT);
 }
 
-/// Close door A after one second; returns every position the agent passed.
 fn run() -> Vec<Vec3> {
     let (mut scene, mut nav, door, agent) = level();
     let mut trail = Vec::new();
