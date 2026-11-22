@@ -62,6 +62,8 @@ impl LayerRegistry {
             .map(|(i, n)| (i as u8, n.as_str()))
     }
 
+    /// Call after deserializing: restores exactly `LAYER_COUNT` slots with "Default" at 0,
+    /// whatever the file held.
     pub fn normalize(&mut self) {
         self.names.resize(LAYER_COUNT, String::new());
         self.names[0] = DEFAULT_LAYER_NAME.to_string();

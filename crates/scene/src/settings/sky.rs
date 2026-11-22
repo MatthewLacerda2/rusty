@@ -1,7 +1,7 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
-/// Fractions `0..=1`: of the sky the clouds cover, and of a cloud's opacity.
+// Fractions `0..=1`: of the sky the clouds cover, and of a cloud's opacity.
 pub const DEFAULT_CLOUD_COVERAGE: f32 = 0.5;
 pub const DEFAULT_CLOUD_OPACITY: f32 = 0.6;
 

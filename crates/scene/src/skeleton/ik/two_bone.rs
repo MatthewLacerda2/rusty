@@ -4,6 +4,8 @@ use glam::{Quat, Vec3};
 
 use super::BonePose;
 
+/// Metres: a bone, a reach or a bend vector shorter than this counts as zero, leaving the
+/// limb no triangle or plane to solve in.
 const EPS: f32 = 1e-6;
 
 pub fn solve_two_bone(

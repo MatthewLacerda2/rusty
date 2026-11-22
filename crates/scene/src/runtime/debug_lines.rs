@@ -1,5 +1,5 @@
-//! Draw-only: nothing in the sim reads these lines back, so they never change what a run does;
-//! they sit on the scene because the renderer reads it.
+//! Draw-only: the sim never reads these lines back; they sit on the scene because the
+//! renderer reads it.
 
 use std::collections::VecDeque;
 
@@ -40,6 +40,8 @@ impl DebugLines {
         });
     }
 
+    /// Run at the tick's head, before scripts draw: a one-tick `Update` line still shows in
+    /// that tick's render.
     pub fn tick(&mut self) {
         self.lines.retain_mut(|line| {
             line.ticks -= 1;

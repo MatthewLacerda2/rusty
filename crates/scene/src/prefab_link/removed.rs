@@ -1,6 +1,3 @@
-//! Unity's *Removed GameObject* override: propagation stamps in every model node no
-//! member claims, so a destroyed or moved-out part comes back unless its node path is
-//! recorded on the instance root's `removed_parts`.
 use std::collections::BTreeSet;
 
 use super::instance::{instance_members_with, instance_root_with};
@@ -15,7 +12,6 @@ pub fn is_removed(removed: &BTreeSet<String>, path: &str) -> bool {
     })
 }
 
-/// Play records nothing: Stop discards the scene it would be recorded on.
 pub fn record_removed(scene: &mut Scene, id: u32) {
     if scene.playing {
         return;
@@ -38,8 +34,6 @@ pub fn record_removed(scene: &mut Scene, id: u32) {
 }
 
 impl Scene {
-    /// Moving a part out of its instance unpacks it (Unity refuses the move without
-    /// one): its links go, and its node is recorded removed.
     pub fn reparent(&mut self, id: u32, parent: Option<u32>) -> Result<(), String> {
         let is_model_part = self
             .world

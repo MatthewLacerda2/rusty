@@ -4,7 +4,6 @@ use super::*;
 use crate::AmbientMode;
 use rusty_components::{LightComponent, LightType};
 
-/// Through `Scene::new`, never a struct update: the constructor gives each scene its own id.
 fn scene_with_ambient(color: Vec3, intensity: f32) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_color = color;

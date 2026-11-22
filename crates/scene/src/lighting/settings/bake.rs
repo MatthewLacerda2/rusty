@@ -73,7 +73,6 @@ impl BakeSettings {
     /// Paths per texel: the fewest at which OIDN then the Gaussian matches the Gaussian alone
     /// at 128 (`denoise::quality_tests`, run by hand).
     pub const DEFAULT_SAMPLES: u32 = 64;
-    /// Eight passes at the default samples: the first preview shows after an eighth of the trace.
     pub const DEFAULT_SAMPLES_PER_PASS: u32 = 8;
     pub const DEFAULT_BACKFACE_TOLERANCE: f32 = 0.9;
     pub const BACKFACE_TOLERANCE: RangeInclusive<f32> = 0.0..=1.0;

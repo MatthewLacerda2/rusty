@@ -1,4 +1,3 @@
-//! A five-bone mini humanoid for the hitbox tests: `pelvis → spine → {head, arm → finger}`.
 use glam::{Mat4, Vec3};
 
 use crate::Scene;
@@ -83,7 +82,6 @@ pub(super) fn skin(scale: f32) -> SkinData {
     }
 }
 
-/// Eight corner vertices per bone box, weighted 0.8 to the bone and 0.2 to its parent.
 pub(super) fn vertices() -> Vec<Vertex> {
     let mut out = Vec::new();
     for (slot, b) in BONES.iter().enumerate() {

@@ -13,12 +13,9 @@ pub use bake::{page_edge, BakeSettings, Denoiser, MAX_PAGE, MIN_PAGE};
 pub struct LightingSettings {
     pub lightmaps: BakeSettings,
     pub reflections: ReflectionSettings,
-    /// Realtime shading, the lightmap bake and the probe bake all read it, so a lamp lights a
-    /// surface the same Baked or Realtime.
     #[serde(skip_serializing_if = "DiffuseModel::is_lambert")]
     pub diffuse_model: DiffuseModel,
-    /// Takes effect at the next bake: the frame follows what the last one recorded
-    /// (`LightmapSet::channels`).
+    /// Takes effect at the next bake.
     #[serde(skip_serializing_if = "MixedLightingMode::is_baked_indirect")]
     pub mixed_lighting_mode: MixedLightingMode,
 }

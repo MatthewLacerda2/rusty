@@ -1,5 +1,5 @@
-//! The scene's ambient light, Unity's *Environment Lighting*. One evaluation, `AmbientRadiance`,
-//! serves the forward shader, the lightmap trace, the probe fill and the GPU probe bake.
+//! One evaluation, `AmbientRadiance`, serves the forward shader, the lightmap trace, the
+//! probe fill and the GPU probe bake.
 
 mod radiance;
 mod skybox;

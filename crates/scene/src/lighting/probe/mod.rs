@@ -22,8 +22,6 @@ const ON_PROBE: f32 = 1.0e-8;
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Probe {
     pub position: Vec3,
-    /// Placed by hand: automatic placement keeps it and replaces only the others. A saved probe
-    /// without the field reads as placed.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub manual: bool,
     #[serde(skip)]
@@ -120,7 +118,6 @@ impl ProbeVolume {
         }
     }
 
-    /// Drops the grid too: the indices it lays out shift.
     pub fn remove_probe(&mut self, index: usize) {
         if index < self.probes.len() {
             self.probes.remove(index);

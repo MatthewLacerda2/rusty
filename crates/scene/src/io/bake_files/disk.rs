@@ -1,6 +1,3 @@
-//! A file is compared by its length, then its content hash, never a clock (the sim reads
-//! none), so a same-length rewrite is caught too.
-
 use std::path::Path;
 
 use rusty_core::hash::content;

@@ -1,5 +1,6 @@
 //! stored-format: the fingerprint each baked object carries in the `<scene>.occlusion` file
-//! In the base, beside the file, because the renderer checks the prints every frame.
+//! The print is taken here in the base, beside the file, because the renderer checks it
+//! every frame.
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};

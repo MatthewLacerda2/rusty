@@ -35,7 +35,7 @@ impl Imports {
         }
         match Primitive::parse(&mesh.primitive_type) {
             Some(p) => primitive_revision(p, mesh.subdivisions) == mesh.revision,
-            // A library mesh, which a restore syncs: current by its revision, the caller's check.
+            // A library mesh counts as current here: the restore's mesh sync checks its revision.
             None => true,
         }
     }

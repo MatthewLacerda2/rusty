@@ -1,4 +1,3 @@
-//! One mark per field of the inventory, set on a scene and looked for after each lifecycle.
 //! A field made of two classes has a mark per part, `field.part`, held to its own class.
 
 use std::sync::OnceLock;
@@ -150,7 +149,6 @@ pub fn all() -> Vec<&'static Mark> {
     marks.collect()
 }
 
-/// A one-cell PVS of no object, its cell 7 m.
 fn marked_occlusion() -> crate::lighting::occlusion::OcclusionData {
     let grid = crate::lighting::occlusion::Grid {
         origin: Vec3::ZERO,

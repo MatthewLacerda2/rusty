@@ -16,8 +16,7 @@ impl Scene {
     }
 
     /// A lost bone hands what hung from it to its nearest ancestor bone left, with a
-    /// warning, as Unity keeps it; a generated hitbox goes with its bone. `why` says why
-    /// that despawn may skip script teardown (no script instance yet, or outside Play).
+    /// warning, as Unity keeps it; a generated hitbox goes with its bone.
     pub fn attach_to_bones(&mut self, pending: Vec<Hung>, why: Despawn) {
         for (child, chain) in pending {
             let (Some(owner), Some(name)) = (self.world.parent_id(child), chain.first()) else {

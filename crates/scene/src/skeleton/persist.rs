@@ -1,4 +1,3 @@
-//! What a document keeps of a skeleton, all re-bound by bone name on load.
 use std::collections::BTreeMap;
 
 use super::bone_refs::{repoint_refs, BoneIndex};
@@ -8,7 +7,8 @@ use rusty_asset::SkinData;
 use rusty_components::mesh::BoneBody;
 use rusty_components::{Entity, TransformComponent};
 
-/// How far a bone may drift from its rest pose before it counts as an override.
+/// How far a bone may drift from its rest pose before it counts as an override: metres,
+/// scale and quaternion components alike, per component.
 pub(super) const OVERRIDE_EPS: f32 = 1.0e-5;
 
 pub fn strip_bones(entities: &mut Vec<Entity>) {

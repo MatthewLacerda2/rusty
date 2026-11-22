@@ -33,7 +33,6 @@ impl Camera {
     pub fn world_to_screen(&self, p: Vec3, screen: Vec2) -> ScreenPoint {
         let screen = screen.max(Vec2::ONE);
         let clip = self.build_view_projection(screen.x / screen.y) * p.extend(1.0);
-        // A guard against dividing by zero for a point on the camera's plane.
         let w = if clip.w.abs() < 1e-6 { 1e-6 } else { clip.w };
         let ndc = clip.truncate().truncate() / w;
         ScreenPoint {

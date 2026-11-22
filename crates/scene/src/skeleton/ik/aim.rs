@@ -3,9 +3,11 @@ use glam::{Quat, Vec3};
 use super::BonePose;
 use rusty_components::transform::mirrored_direction;
 
-/// Re-aims per solve: each re-measures from the tip, absorbing the parallax of turning
+/// Re-aim passes per solve: each re-measures from the tip, absorbing the parallax of turning
 /// lower bones. Fixed, so the result is deterministic.
 const PASSES: usize = 4;
+/// The zero below which a squared length, a weight sum or an angle (radians) leaves
+/// nothing to normalise or divide by.
 const EPS: f32 = 1e-6;
 
 #[derive(Clone, Copy, Debug)]

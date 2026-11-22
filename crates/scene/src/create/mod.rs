@@ -1,5 +1,5 @@
-//! A new GameObject: the Create menu's primitives and the Add Component defaults. They
-//! sit below `edit::authoring`, which re-exports them, because the base builds with them.
+//! The Create menu's primitives and Add Component defaults sit below `edit::authoring`,
+//! which re-exports them, because the base builds with them.
 pub mod defaults;
 mod primitive;
 

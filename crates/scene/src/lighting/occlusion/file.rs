@@ -1,5 +1,6 @@
-//! Little-endian, read whole. The version `u32` follows the magic in every layout,
-//! so a decoder reads it first and refuses another version's file as that.
+//! Little-endian, read whole. The version `u32` follows the magic in every layout since
+//! the oldest, which `is_unversioned` recognises, so a decoder refuses another version's
+//! file as that.
 
 use std::path::PathBuf;
 

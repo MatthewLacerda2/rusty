@@ -49,7 +49,6 @@ fn a_failed_re_parent_keeps_the_child_under_its_old_parent() {
     let gone = scene.add_entity("gone".into());
     scene.set_parent(child, Some(parent)).unwrap();
     scene.world.despawn(gone);
-    // `pcall(Scene.SetParent, child, destroyedId)`: the call fails and changes nothing.
     assert!(scene.set_parent(child, Some(gone)).is_err());
     assert_eq!(scene.world.parent_id(child), Some(parent));
     assert_eq!(scene.world.children(parent), vec![child]);

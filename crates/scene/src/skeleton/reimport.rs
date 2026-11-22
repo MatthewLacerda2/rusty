@@ -1,5 +1,3 @@
-//! A re-imported rig re-binds a live skeleton in place, by bone name, as Unity keeps a
-//! model's bone Transforms: a kept bone keeps its entity, children and any override.
 use std::collections::{BTreeMap, BTreeSet};
 
 use super::bone_refs::BoneRef;

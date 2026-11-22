@@ -3,7 +3,6 @@ use glam::Vec3;
 use super::volume::ProbeFrame;
 use super::{ReflectionProbe, ReflectionProbeSet};
 
-/// The sky takes the weight the two probes leave.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ProbeBlend {
     pub first: usize,

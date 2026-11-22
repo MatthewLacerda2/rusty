@@ -1,5 +1,3 @@
-//! Unity's Ragdoll Wizard: a kinematic body on every bone with a hitbox, jointed to its
-//! nearest ragdolled ancestor, the mass split by hitbox volume. Joined bones never collide.
 mod partial;
 mod preset;
 mod runtime;
@@ -75,7 +73,8 @@ impl Scene {
                 let dir = self.bone_direction(&bones, &parents, slot);
                 let mut j = joint_from(preset_for(&names[slot]), dir, owner_axes);
                 j.connected_body = bones[p];
-                // The exact inverse of how physics builds a joint's world frame.
+                // The exact inverse of the world frame `physics::joints`' `build_joint` gives a
+                // joint: change the two together.
                 (j.axis, j.swing_axis) =
                     self.world
                         .inverse_transform_frame(bone, j.axis, j.swing_axis);
@@ -135,8 +134,8 @@ impl Scene {
         dir.try_normalize().unwrap_or(Vec3::Y)
     }
 
-    /// The model's +Z and +X as drawn, read in model space, so a mesh under a Blender
-    /// export's turned `Armature` still bends its knees forward.
+    /// The model's +Z and +X as drawn, in world space, taken through the skin's model axes
+    /// so a mesh under a Blender export's turned `Armature` still bends its knees forward.
     fn front_and_side(&self, owner: u32) -> (Vec3, Vec3) {
         let w = &self.world;
         let model = w

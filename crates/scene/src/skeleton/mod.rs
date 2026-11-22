@@ -1,4 +1,3 @@
-//! Bones are GameObjects, rebuilt from the model on every load and never saved.
 mod bone_refs;
 mod hang;
 mod hitbox;
@@ -26,7 +25,8 @@ pub use ragdoll::{
 use crate::Scene;
 
 /// The World's next id less the bones at its top: bones respawn with fresh ids on each
-/// load, so otherwise every load and save would grow the saved counter.
+/// load, so otherwise every load and save would grow the saved counter. Reusing those ids is
+/// safe only because `strip_bones` repoints every saved id naming a bone.
 pub fn saved_next_id(scene: &Scene) -> u32 {
     let bones = scene.bone_ids();
     let mut next = scene.world.next_id();
@@ -120,7 +120,7 @@ impl Scene {
             .collect()
     }
 
-    /// Any present slot, as Unity keeps a bone a script moved away: `Animator.GetBone`.
+    /// Finds a bone a script moved away too, as Unity keeps it; `Animator.GetBone` reads this.
     pub fn find_bone(&self, owner: u32, name: &str) -> Option<u32> {
         let bones = self.world.mesh(owner)?.skeleton.bones.clone();
         bones

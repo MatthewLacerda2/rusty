@@ -65,7 +65,8 @@ pub fn sky_color(sky: &SkySettings, ambient: Vec3, dir: Vec3) -> Vec3 {
     color
 }
 
-/// `sky/noise.wgsl`'s `cloud_shift`, `sky_fbm` and `sky_value_noise` below.
+/// Ports `sky/noise.wgsl`'s `cloud_shift`; `fbm` and `value_noise` port its `sky_fbm` and
+/// `sky_value_noise`.
 fn cloud_shift(coverage: f32) -> f32 {
     let c = coverage - 0.5;
     c * if c > 0.0 { 1.6 } else { 1.1 }

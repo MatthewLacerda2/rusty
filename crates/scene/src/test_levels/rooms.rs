@@ -1,5 +1,3 @@
-//! The Dust2-sized level the occlusion bake is measured on: `n × n` rooms a storey, on
-//! two storeys, doorways between neighbours and a hole in some ceilings.
 use glam::Vec3;
 
 use super::block;
@@ -13,6 +11,7 @@ const STOREY: f32 = 4.0;
 const WALL: f32 = 0.2;
 const DOOR: f32 = 1.4;
 
+/// `n = 20` is the Dust2-sized level, 200 m a side; `n = 5` is about Kolvik's size.
 pub fn rooms(n: usize) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -99,5 +98,6 @@ fn props(scene: &mut Scene, lo: Vec3, k: usize, sphere: &(Shared<Vertex>, Shared
     let mut mesh = scene.world.mesh_mut(id).expect("a box");
     (mesh.vertices, mesh.indices) = sphere.clone();
     mesh.revision = MeshRevision::next();
-    mesh.own_geometry = Some(mesh.revision); // not the box's: a slot of its own
+    // The sphere gets a geometry slot of its own, so it is never drawn as the box it replaced.
+    mesh.own_geometry = Some(mesh.revision);
 }

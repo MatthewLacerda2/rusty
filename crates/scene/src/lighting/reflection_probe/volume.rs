@@ -24,8 +24,6 @@ impl ProbeFrame {
         rotate(self.inverse.conjugate(), v)
     }
 
-    /// Past the influence, the span the projection fades out over: the half-diagonal (the
-    /// radius), scale-free, so a 2 m box and a 40 m hall fade alike.
     pub fn fade_span(&self) -> f32 {
         let size = match self.sphere {
             Some(r) => r,

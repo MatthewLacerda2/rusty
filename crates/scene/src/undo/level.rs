@@ -63,7 +63,8 @@ fn eq<T: PartialEq>(a: &T, b: &T) -> bool {
     a == b
 }
 
-/// `==` first; on a mismatch the saved form decides, so a NaN is no edit.
+/// `==` first, as serializing the material library on every edit frame is dear; on a
+/// mismatch the saved form decides, so a NaN is no edit.
 fn eq_or_bytes<T: PartialEq + Serialize>(a: &T, b: &T) -> bool {
     a == b || same_bytes(a, b)
 }

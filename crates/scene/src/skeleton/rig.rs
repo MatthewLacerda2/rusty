@@ -10,7 +10,6 @@ pub fn armature_skin() -> SkinData {
     chain_skin(&["hips", "spine", "head"])
 }
 
-/// Joints named `names`, each 1 unit up its parent, the root under a 90° X turn and 0.5 scale.
 pub fn chain_skin(names: &[&str]) -> SkinData {
     let armature = Mat4::from_scale_rotation_translation(
         Vec3::splat(0.5),

@@ -1,8 +1,6 @@
 //! stored-format: the `<scene>.navmesh` file beside the scene
 //!
-//! The scene holds the file's bytes; `navigation` checks them on use. A save never
-//! bakes, and writes by `io::BakeFiles`' rule, never over a newer file with bytes it
-//! only loaded.
+//! The scene holds the file's bytes; `navigation` checks them on use.
 
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -30,7 +30,7 @@ impl Keep {
 
 impl RehydratedScene {
     pub fn adopting(mut data: crate::serialize::SceneData, live: &mut World) -> Self {
-        // Before the lookups, so a model written while they ran is still followed.
+        // Stamped before the lookups, so a model written while they ran is still followed.
         let read_at = rusty_core::fs::written::written_since(u64::MAX).0;
         let mut imports = Imports::default();
         for doc in &mut data.entities {
@@ -51,6 +51,8 @@ fn unbind(doc: &mut Entity) {
     }
 }
 
+/// True when the Mesh was rebuilt, unbound from its bones: the caller then runs
+/// `Scene::sync_skeleton` on it.
 pub fn adopt_or_rehydrate(
     world: &mut World,
     doc: &mut Entity,

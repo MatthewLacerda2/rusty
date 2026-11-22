@@ -11,7 +11,6 @@ use rusty_core::collections::Map;
 
 /// Below this many a scan is as fast.
 const SCAN_BELOW: usize = 32;
-/// Probes a cube holds on average.
 const PER_CELL: f32 = 2.0;
 /// Cubes along an axis past which a set is too spread to grid.
 const MAX_DIM: f32 = 1.0e6;

@@ -1,5 +1,3 @@
-//! Runs after every pose writer (the Animator, `LateUpdate` scripts, physics, IK) and
-//! before render, so whatever moved a bone last is what the mesh shows.
 use glam::Mat4;
 
 use crate::Scene;
@@ -47,7 +45,8 @@ impl Scene {
             };
             out.push(m);
         }
-        // Only now fold in the inverse binds: a child above read its parent's matrix from `out`.
+        // Inverse binds fold in only now: until here each child read its parent's bare matrix
+        // from `out`.
         for (g, ib) in out.iter_mut().zip(skin.inverse_bind.iter()) {
             *g *= *ib;
         }

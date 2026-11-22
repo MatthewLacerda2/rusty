@@ -1,6 +1,3 @@
-//! How a reader learns a scene-level value changed with one compare, instead of comparing a
-//! copy each frame.
-
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 

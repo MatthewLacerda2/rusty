@@ -18,7 +18,6 @@ mod unread_tests;
 
 pub type SceneOcclusion = crate::revision::Revisioned<Option<std::sync::Arc<OcclusionData>>>;
 
-/// Metres, half a cell: a nearer wall is clipped, so the camera sees what the PVS culls.
 pub const MAX_CULLING_NEAR: f32 = CELL_SIZE / 2.0;
 
 pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {

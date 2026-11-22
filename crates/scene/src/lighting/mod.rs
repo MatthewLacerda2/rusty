@@ -1,5 +1,3 @@
-//! Baked lighting's data for a scene; the bakes that write it are `rusty-lighting`'s.
-
 pub mod area;
 #[cfg(feature = "dev")]
 pub mod bake_status;

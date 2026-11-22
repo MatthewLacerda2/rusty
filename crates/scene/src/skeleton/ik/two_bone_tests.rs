@@ -8,6 +8,7 @@ fn arm() -> (BonePose, BonePose, Vec3) {
         rot: Quat::IDENTITY,
         mirror: Vec3::ONE,
     };
+    // The elbow sits 0.1 toward -Z, off the shoulder-to-hand line, so the limb has a plane.
     let elbow = BonePose {
         pos: Vec3::new(1.0, 0.0, -0.1),
         rot: Quat::IDENTITY,

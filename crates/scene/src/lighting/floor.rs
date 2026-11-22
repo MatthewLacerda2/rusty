@@ -1,6 +1,3 @@
-//! The floor plan reflection probes are placed on. A baked nav surface builds it
-//! (`NavigationGraph::floor_grid`); without one, `from_static` rasterizes the colliders.
-
 use glam::{Vec2, Vec3};
 
 use crate::Scene;
@@ -82,6 +79,7 @@ impl FloorGrid {
         Some(grid)
     }
 
+    /// Every cell the footprint overlaps at all, so a wall thinner than a cell still blocks one.
     fn for_each_under(&self, lo: Vec3, hi: Vec3, mut f: impl FnMut(usize)) {
         let range = |a: f32, b: f32, o: f32, n: usize| {
             let first = ((a - o) / self.cell - 0.5).floor() + 1.0;

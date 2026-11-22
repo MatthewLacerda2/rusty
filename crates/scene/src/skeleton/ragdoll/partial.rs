@@ -1,5 +1,3 @@
-//! A simulated branch keeps its hitboxes on the hitbox layer, so a flinching arm can't
-//! catch on a door frame.
 use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
@@ -102,6 +100,8 @@ impl Scene {
         n
     }
 
+    /// Physics' `drive_joints` calls this, so a drive set through `Joint` chases the
+    /// animation too.
     pub fn track_driven_bone(&mut self, joint: u32) {
         if !self.ragdolls.is_tracked(joint) && self.is_bone(joint) {
             self.track_if_simulated(joint);
@@ -216,6 +216,7 @@ impl Scene {
         }
     }
 
+    /// Run after the bones are posed, so a released bone's last tick draws at weight 0.
     pub fn end_reactions(&mut self) {
         for b in self.ragdolls.release() {
             self.switch_body(b, None, false);

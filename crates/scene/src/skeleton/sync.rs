@@ -115,6 +115,7 @@ impl Scene {
         refs
     }
 
+    /// Resolves both ends by `World::body_carrier`, as physics resolves a joint's bodies.
     fn joint_effect(&self, bone: u32, to: u32) -> String {
         let own = self.world.body_carrier(bone);
         match self.world.body_carrier(to) {

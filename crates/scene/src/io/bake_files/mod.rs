@@ -1,8 +1,4 @@
-//! What this world last read or wrote at each bake sidecar (`<scene>.occlusion`,
-//! `<scene>.navmesh`), and the rule a save follows there: `docs/api/Lighting.md`, *Bake
-//! files and the scene save*. The SH sidecar is no such file: half the scene document, it
-//! is written with it. Keyed by one spelling of each path; interior mutability because a
-//! save takes `&Scene`.
+//! Keyed by one spelling of each path; interior mutability because a save takes `&Scene`.
 
 mod disk;
 mod record;

@@ -1,6 +1,4 @@
 //! stored-format: the scene file as read (`read_scene_file`), its bake files (`bake_files`)
-//!
-//! Saving and loading into a live scene are the edit side's (`rusty_edit::io`).
 
 mod bake_files;
 mod disk_text;

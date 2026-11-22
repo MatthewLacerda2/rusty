@@ -70,6 +70,7 @@ impl Default for ReflectionProbe {
 
 impl ReflectionProbe {
     pub const RESOLUTION: RangeInclusive<u32> = 16..=2048;
+    /// Metres: keeps the capture's near plane off zero.
     pub const MIN_NEAR_CLIP: f32 = 0.01;
     pub const INTENSITY: RangeInclusive<f32> = 0.0..=8.0;
 
@@ -87,7 +88,6 @@ impl ReflectionProbe {
             blend_distance: 1.0,
             importance: 1,
             resolution: None,
-            // Unity's defaults: a bake captures every static object.
             near_clip: 0.05,
             far_clip: 1000.0,
             shadows: true,
@@ -128,7 +128,9 @@ pub fn clamp_resolution(size: u32) -> u32 {
     }
 }
 
+/// Metres: the `Default` box's half-extent, as a sphere.
 pub const DEFAULT_RADIUS: f32 = 5.0;
+/// Metres: the floor on a radius and on the fade span `past_influence` divides by.
 pub(super) const MIN_RADIUS: f32 = 0.01;
 
 fn is_identity(q: &Quat) -> bool {

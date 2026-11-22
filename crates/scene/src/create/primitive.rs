@@ -86,7 +86,6 @@ fn generated(primitive: Primitive, subdivisions: u32) -> Option<(Vec<Vertex>, Ve
     match primitive {
         Primitive::Box => Some(primitives::generate_box(1.0, 1.0, 1.0)),
         Primitive::Sphere => Some(primitives::generate_sphere(RADIUS, 16, 16)),
-        // 15 m a side.
         Primitive::Plane => Some(primitives::generate_plane_grid(15.0, 15.0, subdivisions)),
         // Unity's Cylinder: diameter 1, height 2, along Y.
         Primitive::Cylinder => Some(primitives::generate_cylinder(

@@ -1,6 +1,4 @@
 //! stored-format: the `<scene>.lighting.json` SH sidecar
-//! Written with the document, always, not by the bake files' keep-newer rule; refused on
-//! load when its `ProbeKey` disagrees, so SH never lands on the wrong probe.
 
 use std::path::PathBuf;
 

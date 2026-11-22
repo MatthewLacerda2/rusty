@@ -52,7 +52,6 @@ impl BakeProgress {
 }
 
 impl Scene {
-    /// The mirror of the bakes' refusal during Play: whichever was asked for first wins.
     pub fn play_refusal(&self) -> Option<String> {
         if !self.bake_busy() {
             return None;

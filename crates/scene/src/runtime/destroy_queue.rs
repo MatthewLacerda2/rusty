@@ -5,7 +5,6 @@ use crate::Scene;
 
 impl Scene {
     pub fn destroy(&mut self, id: u32) {
-        // Recorded as removed from its model instance, so propagation never stamps it back.
         crate::prefab_link::removed::record_removed(self, id);
         if self.playing {
             self.request_destroy(id);

@@ -1,5 +1,3 @@
-//! IK runs after `LateUpdate` scripts set the targets and before `follow_bones`, so
-//! hitboxes follow the bent pose.
 mod aim;
 mod two_bone;
 
@@ -43,7 +41,6 @@ impl Scene {
                 continue;
             }
             let mut order: Vec<usize> = (0..constraints.len()).collect();
-            // Aims before limbs (Unity's order): a support hand reaches where the aim put the gun.
             order.sort_by_key(|&i| !constraints[i].is_aim());
             for &i in order.iter().rev() {
                 self.undo_ik(&mut constraints[i]);

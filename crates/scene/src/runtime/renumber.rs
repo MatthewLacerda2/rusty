@@ -1,5 +1,5 @@
-//! A Play load's renumbering: survivors keep their ids, so an incoming entity holding one moves
-//! to a fresh id, and every field outside the World naming entities follows it.
+//! A Play load's renumbering: an incoming entity holding a survivor's id moves to a fresh
+//! one, and every field outside the World naming entities follows it.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -61,6 +61,7 @@ impl Moves {
 }
 
 impl Scene {
+    /// Call once the load's sidecars are in: it renames the baked PVS's ids.
     pub fn renumber_sidecars(&mut self, moves: &Moves) {
         if moves.is_empty() {
             return;

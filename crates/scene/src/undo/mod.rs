@@ -1,5 +1,3 @@
-//! Unity's `Undo`: `docs/api/Editor.md`, *Undo and Redo*.
-
 mod level;
 mod restore;
 mod side;
@@ -33,6 +31,8 @@ pub struct UndoStack {
 }
 
 impl Scene {
+    /// Records writes until `pause_edits` or `commit_edits`; a paused edit stays open and
+    /// this resumes it.
     pub fn begin_edits(&mut self) {
         if self.is_playing() {
             return;
@@ -57,8 +57,8 @@ impl Scene {
         true
     }
 
-    /// The open edit joins the last step, as Unity folds it into the current group. It never
-    /// clears Redo: it is no new edit.
+    /// The open edit joins the last step, as Unity folds it into the current group, and
+    /// never clears Redo.
     pub fn commit_follow_up(&mut self) -> bool {
         let Some(step) = self.take_step(None) else {
             return false;
@@ -80,8 +80,7 @@ impl Scene {
         true
     }
 
-    /// An open edit closes first and reopens after, so a bake landing mid-drag joins neither
-    /// step.
+    /// An open edit closes first and reopens after, so a mid-drag bake joins neither step.
     pub fn unrecorded<R>(&mut self, f: impl FnOnce(&mut Self) -> R) -> R {
         let (open, recording) = (self.history.open, self.world.journal_recording());
         self.commit_edits(None);

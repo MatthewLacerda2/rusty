@@ -1,5 +1,3 @@
-//! An Area light's world rectangle: the one shape the lightmap bake samples.
-
 use glam::{Vec2, Vec3};
 
 use crate::Scene;

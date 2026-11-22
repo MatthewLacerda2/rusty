@@ -1,6 +1,3 @@
-//! Per-entity runtime shader params, Unity's `MaterialPropertyBlock`: never saved, dropped on
-//! destroy and when a document is applied. Keyed by canonical name, merged over the material's.
-
 use std::collections::BTreeMap;
 
 pub type ParamValues = BTreeMap<String, Vec<f32>>;

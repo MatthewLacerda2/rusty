@@ -11,6 +11,8 @@ pub struct CarriedDecal {
 }
 
 impl Scene {
+    /// Call while the outgoing World still stands, as owner paths are read from it; land the
+    /// result once the incoming entities and survivors are in.
     pub fn take_persistent_decals(&mut self, survivors: &BTreeSet<u32>) -> Vec<CarriedDecal> {
         let world = &self.world;
         let mut paths: BTreeMap<u32, Option<HierarchyPath>> = BTreeMap::new();

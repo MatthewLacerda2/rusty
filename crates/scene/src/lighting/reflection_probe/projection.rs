@@ -24,8 +24,6 @@ fn project(frame: &ProbeFrame, world_pos: Vec3, dir: Vec3) -> Vec3 {
     projected.lerp(dir, fade).normalize_or(dir)
 }
 
-/// 0 within the influence volume, 1 a `fade` past it: far outside, every exit lies on the
-/// volume, so projected directions would collapse to one patch of the cube.
 fn past_influence(frame: &ProbeFrame, p: Vec3) -> f32 {
     let x = ((frame.outside(p) - frame.influence) / frame.fade).clamp(0.0, 1.0);
     x * x * (3.0 - 2.0 * x)

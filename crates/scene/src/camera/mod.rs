@@ -27,7 +27,7 @@ pub struct Camera {
     pub pitch: f32,
     /// Vertical field of view, in degrees.
     pub fov: f32,
-    /// Clip plane distances, in metres.
+    // Clip plane distances, in metres.
     pub near: f32,
     pub far: f32,
     pub culling_mask: u32,
@@ -163,7 +163,6 @@ pub fn apply_lens(cam: &mut Camera, c: &rusty_components::CameraComponent) {
 mod sync_tests;
 
 fn yaw_pitch_from_matrix(world: Mat4) -> (f32, f32) {
-    // An entity looks down its local -Z; near vertical, its up axis gives the heading.
     let forward = (-world.col(2).truncate()).normalize_or_zero();
     let pitch = forward.y.clamp(-1.0, 1.0).asin().to_degrees();
     let heading = if forward.x.hypot(forward.z) < VERTICAL_EPSILON {

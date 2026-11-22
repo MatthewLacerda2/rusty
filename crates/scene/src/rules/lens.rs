@@ -4,7 +4,7 @@ use rusty_components::Projection;
 // Unity's Camera inspector bounds, in degrees.
 pub const MIN_FOV: f32 = 1.0;
 pub const MAX_FOV: f32 = 179.0;
-/// The nearest a near plane may sit (Unity's inspector floor): a viewmodel's
+/// The nearest a near plane may sit, in metres (Unity's inspector floor): a viewmodel's
 /// 0.01 is allowed, 0 (an infinite depth range) is not.
 pub const MIN_NEAR: f32 = 0.01;
 /// Metres the far plane sits at least beyond the near one (Unity's gap).

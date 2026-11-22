@@ -1,5 +1,4 @@
-//! Box-projector decal records, the sim's half: ephemeral scene state, not a component, kept in
-//! spawn order, their blend order.
+//! Records are kept in spawn order, which is their blend order.
 
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Quat, Vec3};
@@ -56,7 +55,8 @@ pub struct Decal {
     pub texture: Option<MapRef>,
     pub material: Option<String>,
     pub owner: Option<DecalOwner>,
-    /// Sim seconds since stamped; `lifetime` is an age, `fade` seconds ending at it.
+    // Sim seconds: `age` since stamped, `lifetime` the age it ends at, `fade` the span
+    // ending there.
     pub age: f32,
     pub lifetime: Option<f32>,
     pub fade: f32,

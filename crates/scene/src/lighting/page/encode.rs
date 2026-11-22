@@ -3,7 +3,7 @@
 
 use glam::{Vec3, Vec4};
 
-/// The brightest linear value RGBM holds, per channel (Unity's range).
+/// The brightest linear value RGBM holds, per channel; brighter texels clamp to it.
 pub const RGBM_RANGE: f32 = 8.0;
 
 pub fn encode_rgbm(c: Vec3) -> [u8; 4] {

@@ -1,5 +1,3 @@
-//! Which lightmap page each static mesh wears, and where (Unity's `lightmapScaleOffset`).
-
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
@@ -38,7 +36,8 @@ pub struct LightmapSet {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub baked_as: BTreeMap<u32, LightMode>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    /// Channel `c` holds how much of channel `c`'s `Mixed` light passes static occluders (1 lit).
+    /// Shadowmask pages, one per colour page: channel `c` is the share of `Mixed` channel
+    /// `c` past static occluders, 1 lit.
     pub masks: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub channels: BTreeMap<u32, u8>,
@@ -80,8 +79,7 @@ impl LightmapSet {
         }
     }
 
-    /// `None` when two ids collide, as `OcclusionData::remap` refuses: an entity would get
-    /// another's page.
+    /// `None` when two ids collide, as `OcclusionData::remap` refuses.
     pub(crate) fn remap(&self, moves: &Moves) -> Option<Self> {
         let to = |id: u32| moves.to(id);
         let entries: BTreeMap<_, _> = self
@@ -144,6 +142,7 @@ impl LightmapSet {
         self.lights.contains(&entity)
     }
 
+    /// Reads `fell_back` through `baked_mode`: set that first.
     pub fn record_taken(&mut self, taken: &BTreeMap<u32, LightMode>) {
         let baked = taken.iter().map(|(&id, &m)| (id, self.baked_mode(id, m)));
         self.baked_as = baked.collect();

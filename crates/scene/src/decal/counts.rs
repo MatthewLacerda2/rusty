@@ -10,7 +10,6 @@ pub(super) struct Counts {
     /// Whole decals per bucket; an empty bucket has no entry, so a destroyed owner leaves none.
     whole: BTreeMap<Option<u32>, u32>,
     pub total: u32,
-    /// Decals fading because a spawn evicted them.
     pub evicting: usize,
 }
 

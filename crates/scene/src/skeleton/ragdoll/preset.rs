@@ -1,5 +1,4 @@
-//! The humanoid preset, by Mixamo bone name: a `Left`/`Right` prefix and a namespace
-//! before the last `:` are ignored. Angles are degrees, as Unity's Ragdoll Wizard limits.
+//! Angles are in degrees, as in Unity's Ragdoll Wizard.
 use rusty_components::JointKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,7 +40,6 @@ const fn hinge(bend: Bend, max: f32) -> JointPreset {
     }
 }
 
-/// A bone the table doesn't name: a moderate ball joint, so any rig ragdolls.
 pub(super) const DEFAULT: JointPreset = ball((-30.0, 30.0), 30.0, 30.0);
 
 const HUMANOID: [(&str, JointPreset); 13] = [

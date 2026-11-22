@@ -33,7 +33,6 @@ pub(crate) fn light(
     }
 }
 
-/// A 10 m point light of intensity 1.5.
 pub fn default_light() -> LightComponent {
     light(LightType::Point, Vec3::ONE, 1.5, 10.0)
 }

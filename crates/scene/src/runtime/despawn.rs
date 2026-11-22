@@ -1,5 +1,5 @@
-//! The one door every despawn goes through. In Play a removed entity's scripts are torn down
-//! first, so a despawn names why it may skip that.
+//! In Play a removed entity's scripts are torn down first, so a despawn names why it may
+//! skip that.
 
 use std::collections::BTreeSet;
 
@@ -20,6 +20,8 @@ impl Scene {
         self.playing
     }
 
+    /// Entering Play forgets every `AIPerception` memory: call it before any `Start`, or a
+    /// noise one reports is lost.
     pub fn set_playing(&mut self, playing: bool) {
         #[cfg(feature = "dev")]
         if playing != self.playing {
@@ -60,7 +62,6 @@ impl Scene {
         }
     }
 
-    /// File ▸ New: the session keeps its play state and decal budgets.
     pub fn clear(&mut self) {
         #[cfg(feature = "dev")]
         self.drop_bake_request("a new scene was started");

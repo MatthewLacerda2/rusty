@@ -9,9 +9,7 @@ use rusty_core::hash::content;
 pub(super) enum Mark {
     /// Only read or written: what this world holds came from that file.
     Loaded,
-    /// Rewritten or removed by a save while the file is still that one.
     Refused,
-    /// Written whatever is on disk: the last write wins.
     Baked,
 }
 

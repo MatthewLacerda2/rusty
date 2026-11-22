@@ -1,4 +1,3 @@
-//! The scene's meshes made from data (Unity's script-built `Mesh`); a prefab holds none.
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, OnceLock};
 
@@ -127,7 +126,8 @@ pub fn missing_key(name: &str) -> String {
 }
 
 /// Revisions only move forward: the renderer keeps a name's newest upload, so an older
-/// revision put back would draw the newer data.
+/// revision put back would draw the newer data. Entities catch up only at the next
+/// `Scene::sync_scene_meshes`, so run it once they are back.
 pub fn put_back(mut library: MeshLibrary, slot: &mut MeshLibrary) {
     for (name, entry) in &mut library {
         entry.revision = match slot.get(name) {

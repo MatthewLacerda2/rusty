@@ -1,13 +1,10 @@
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Class {
     Authored,
-    /// Saved, never undone (as in Unity).
     BakeOutput,
     Entities,
     Selection,
-    /// Play's own, cleared by Stop.
     Runtime,
-    /// Kept across Play, dropped by a load.
     EditRuntime,
     /// Written by the host every frame.
     Frame,

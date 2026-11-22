@@ -28,8 +28,7 @@ enum Read {
     Unreadable(std::io::Error),
     Refused(Vec<u8>, String),
     OtherVersion(Vec<u8>, String),
-    /// The file's bytes, the bytes a save would write (encoded afresh: a file that does not
-    /// round-trip never reads as a bake since), and the PVS.
+    /// The file's bytes, the PVS encoded afresh as a save would write it, and the PVS.
     Decoded(Vec<u8>, Vec<u8>, OcclusionData),
 }
 
@@ -80,8 +79,7 @@ pub fn apply_sidecar(scene: &mut Scene, file: OcclusionFile) {
 }
 
 impl Scene {
-    /// The one place a bake's output lands, so its next save writes it, even over a newer
-    /// file another process baked.
+    /// The next save writes what lands here even over a newer file another process baked.
     pub fn put_baked_occlusion(&mut self, data: Option<OcclusionData>) {
         self.bake_files.baked(SUFFIX);
         *self.occlusion = data.map(Arc::new);

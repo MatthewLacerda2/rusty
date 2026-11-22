@@ -44,7 +44,6 @@ impl ReflectionProbeSet {
         }
     }
 
-    /// A new cube drops the old one's irradiance: it is not normalised by another cube's light.
     pub fn set_cubemap(&mut self, index: usize, path: String) {
         if let Some(p) = self.probes.get_mut(index) {
             if p.cubemap_path != path {
