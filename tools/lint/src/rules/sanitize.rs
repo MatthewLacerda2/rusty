@@ -123,6 +123,7 @@ fn carries_float(ty: &str) -> bool {
     FLOATS.contains(&ty.rsplit("::").next().unwrap_or(ty))
 }
 
+/// A `->` in a type (a closure's) closes a `<` it never opened, so such a list splits wrong.
 pub(super) fn split_top(s: &str) -> Vec<&str> {
     let (mut depth, mut from, mut parts) = (0i32, 0, Vec::new());
     for (at, c) in s.char_indices() {
