@@ -6,7 +6,8 @@
 // arrays the same way on the CPU, and the tests hold the two equal.
 
 const RT_NONE: u32 = 0xffffffffu;
-const RT_STACK: u32 = 64u;
+// `rays::build::STACK`: the depth cap plus one, which a test holds equal.
+const RT_STACK: u32 = 49u;
 const RT_FRONT: u32 = 1u;
 const RT_BACK: u32 = 2u;
 

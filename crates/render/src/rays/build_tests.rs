@@ -62,3 +62,13 @@ fn items_at_one_point_still_split_and_end() {
 fn nothing_builds_no_node() {
     assert_eq!(build(&[]), (Vec::new(), Vec::new()));
 }
+
+#[test]
+fn the_shader_stack_is_the_depth_cap_plus_one() {
+    let shader = include_str!("../../../../engine/shaders/rt/trace.wgsl");
+    let want = format!("const RT_STACK: u32 = {}u;", super::STACK);
+    assert!(
+        shader.contains(&want),
+        "rt/trace.wgsl's RT_STACK must read `{want}` (rays::build::STACK, MAX_DEPTH + 1)"
+    );
+}

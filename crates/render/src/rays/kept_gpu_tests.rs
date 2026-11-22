@@ -15,19 +15,28 @@ fn step(r: &mut Renderer, scene: &Scene) -> (u32, u32) {
     let tree = r.ray_tree(scene).expect("extracted");
     let packed = tree.packed();
     let gpu = tree.gpu.as_ref().expect("uploaded");
-    let [_, nodes, tris, _, instances, faces] = gpu.buffers();
-    let (nodes, tris) = (nodes.clone(), tris.clone());
-    let (instances, faces) = (instances.clone(), faces.clone());
-    let prefix = |bytes: Vec<u8>, want: &[u8]| bytes[..want.len()] == *want;
-    assert!(prefix(read(r, &nodes), bytemuck::cast_slice(&packed.nodes)));
-    assert!(prefix(read(r, &tris), bytemuck::cast_slice(&packed.tris)));
-    assert!(prefix(
-        read(r, &instances),
-        bytemuck::cast_slice(&packed.instances)
-    ));
-    assert!(prefix(read(r, &faces), bytemuck::cast_slice(&packed.faces)));
+    let buffers = gpu.buffers().map(Clone::clone);
+    let want: [&[u8]; 6] = [
+        bytemuck::bytes_of(&packed.header),
+        bytemuck::cast_slice(&packed.nodes),
+        bytemuck::cast_slice(&packed.tris),
+        bytemuck::cast_slice(&packed.uvs),
+        bytemuck::cast_slice(&packed.instances),
+        bytemuck::cast_slice(&packed.faces),
+    ];
+    let names = ["header", "nodes", "triangles", "UVs", "instances", "faces"];
+    for ((buffer, want), name) in buffers.iter().zip(want).zip(names) {
+        let bytes = read(r, buffer);
+        assert!(bytes[..want.len()] == *want, "the GPU's {name} differ");
+    }
     let c = r.frame_counters;
     (c.ray_tree_rebuilds, c.ray_mesh_builds)
+}
+
+/// The tree's triangle buffer: the same one while only the top is uploaded again.
+fn tris(r: &mut Renderer, scene: &Scene) -> wgpu::Buffer {
+    let tree = r.ray_tree(scene).expect("extracted");
+    tree.gpu.as_ref().expect("uploaded").buffers()[2].clone()
 }
 
 #[test]
@@ -66,6 +75,33 @@ fn gpu_the_kept_tree_equals_a_fresh_one_after_each_edit() {
         step(&mut r, &scene),
         (1, 1),
         "an edited mesh builds its own tree"
+    );
+}
+
+#[test]
+fn gpu_hiding_and_showing_a_prop_uploads_only_the_top() {
+    let Some(mut r) = crate::test_gpu::headless_or_skip(8, 8) else {
+        return;
+    };
+    let mut scene = level();
+    let ids = scene.world.ids_with_mesh();
+    step(&mut r, &scene);
+    let before = tris(&mut r, &scene);
+    scene.world.set_active(ids[0], false);
+    assert_eq!(
+        step(&mut r, &scene),
+        (1, 0),
+        "hiding the plane keeps its mesh's tree"
+    );
+    scene.world.set_active(ids[0], true);
+    assert_eq!(
+        step(&mut r, &scene),
+        (1, 0),
+        "showing it again builds nothing"
+    );
+    assert!(
+        tris(&mut r, &scene) == before,
+        "and uploads only the top again"
     );
 }
 

@@ -2,10 +2,8 @@
 
 use glam::{Vec3, Vec4};
 
-use super::build::Node;
+use super::build::{Node, STACK};
 use super::top::{face, Instance, Packed, NONE};
-
-const STACK: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct Hit {

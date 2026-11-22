@@ -47,6 +47,20 @@ pub(crate) struct Packed {
     pub faces: Vec<u32>,
 }
 
+impl Packed {
+    /// A tree holding nothing, which every ray misses.
+    pub(crate) fn empty() -> Self {
+        let header = Header {
+            top: NONE,
+            ..Header::default()
+        };
+        Self {
+            header,
+            ..Self::default()
+        }
+    }
+}
+
 /// One traced object, before packing.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Placed {

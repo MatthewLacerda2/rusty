@@ -70,8 +70,10 @@ pub fn profile_one(run: &Run, scene: &str) {
 
 /// `make ray-scene`: each scene's ray-traced tree, measured.
 pub fn rays_all(run: &Run, names: &[String]) {
-    use rusty::render::rays::probe::measure;
-    println!("scene | triangles | instances | meshes | GPU MiB | build ms | trace ms | hit px");
+    use rusty::render::rays::probe::{measure, Clock};
+    println!(
+        "scene | triangles | instances | meshes | GPU MiB | build ms | output | trace ms | Mrays/s | clock | hit px"
+    );
     for scene in names {
         let opened = open(run, &run.project, "the project");
         let loaded = scenes::load(&run.out, &opened.root, scene, opened.settings, run.opts);
@@ -87,9 +89,16 @@ pub fn rays_all(run: &Run, names: &[String]) {
             fail(&format!("{scene}: the renderer holds no extract of it"))
         };
         let mib = m.gpu_bytes as f64 / f64::from(1 << 20);
-        println!(
-            "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {:.2} | {}",
-            m.triangles, m.instances, m.meshes, m.build_ms, m.trace_ms, m.hit_pixels
-        );
+        let clock = match m.clock {
+            Clock::Gpu => "GPU timestamps",
+            Clock::Wall => "wall (no timestamps)",
+        };
+        for (output, ms) in [("lean 4 B/px", m.lean_ms), ("full hit 32 B/px", m.full_ms)] {
+            let mrays = m.rays_per_second(ms) / 1e6;
+            println!(
+                "{scene} | {} | {} | {} | {mib:.1} | {:.1} | {output} | {ms:.2} | {mrays:.0} | {clock} | {}",
+                m.triangles, m.instances, m.meshes, m.build_ms, m.hit_pixels
+            );
+        }
     }
 }

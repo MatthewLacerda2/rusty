@@ -1,20 +1,28 @@
 //! Traces through a scene's tree on the GPU: given rays (the tests) or one per pixel
-//! from a camera, timed (`make ray-scene`).
+//! from a camera, timed (`camera`, `make ray-scene`).
+
+mod camera;
+mod timer;
+
+pub use camera::{measure, Clock, Measure};
 
 use std::time::Instant;
 
 #[cfg(test)]
 use glam::Vec3;
+#[cfg(test)]
 use wgpu::util::DeviceExt;
 
 #[cfg(test)]
 use super::walk::Hit;
 use super::GROUP;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
+use timer::Timer;
 
 const IO: u32 = 0;
 use crate::Renderer;
-use rusty_scene::{Camera, Scene};
+#[cfg(test)]
+use rusty_scene::Scene;
 
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
@@ -25,26 +33,6 @@ struct ProbeHit {
     any: u32,
     bary: [f32; 2],
     pad: [f32; 2],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
-struct Eye {
-    inv_view_proj: [[f32; 4]; 4],
-    origin: [f32; 4],
-    size: [u32; 4],
-}
-
-/// What `make ray-scene` prints for one scene.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Measure {
-    pub triangles: u64,
-    pub instances: u32,
-    pub meshes: u32,
-    pub gpu_bytes: u64,
-    pub build_ms: f64,
-    pub trace_ms: f64,
-    pub hit_pixels: u64,
 }
 
 fn entry(binding: u32, ty: wgpu::BufferBindingType) -> wgpu::BindGroupLayoutEntry {
@@ -100,14 +88,12 @@ fn probe(r: &Renderer, entry_point: &str, io: &[wgpu::BindGroupLayoutEntry]) -> 
 fn group(
     r: &Renderer,
     layout: &wgpu::BindGroupLayout,
-    first: u32,
-    buffers: &[&wgpu::Buffer],
+    buffers: &[(u32, &wgpu::Buffer)],
 ) -> wgpu::BindGroup {
     let entries: Vec<wgpu::BindGroupEntry> = buffers
         .iter()
-        .enumerate()
-        .map(|(i, b)| wgpu::BindGroupEntry {
-            binding: first + i as u32,
+        .map(|&(binding, b)| wgpu::BindGroupEntry {
+            binding,
             resource: b.as_entire_binding(),
         })
         .collect();
@@ -118,17 +104,36 @@ fn group(
     })
 }
 
-fn dispatch(r: &Renderer, p: &Probe, io: &wgpu::BindGroup, tree: &wgpu::BindGroup, n: (u32, u32)) {
+/// Its milliseconds on `timer` when given, else on the wall clock.
+fn dispatch(
+    r: &Renderer,
+    p: &Probe,
+    (io, tree): (&wgpu::BindGroup, &wgpu::BindGroup),
+    n: (u32, u32),
+    timer: Option<&Timer>,
+) -> Option<f64> {
     let mut encoder = r.device.create_command_encoder(&Default::default());
     {
-        let mut pass = encoder.counted_compute_pass(&Default::default());
+        let mut pass = encoder.counted_compute_pass(&wgpu::ComputePassDescriptor {
+            label: Some("Ray Probe"),
+            timestamp_writes: timer.map(Timer::writes),
+        });
         pass.set_pipeline(&p.pipeline);
         pass.set_bind_group(IO, io, &[]);
         pass.set_bind_group(GROUP, tree, &[]);
         pass.dispatch_workgroups(n.0, n.1, 1);
     }
+    if let Some(timer) = timer {
+        timer.resolve(&mut encoder);
+    }
+    let start = Instant::now();
     r.queue.counted_submit(std::iter::once(encoder.finish()));
     r.device.poll(wgpu::PollType::wait_indefinitely()).ok();
+    let wall = start.elapsed().as_secs_f64() * 1000.0;
+    match timer {
+        Some(timer) => timer.read(&r.device),
+        None => Some(wall),
+    }
 }
 
 pub(super) fn read(r: &Renderer, buffer: &wgpu::Buffer) -> Vec<u8> {
@@ -185,18 +190,14 @@ pub(crate) fn trace(
         "Ray Probe Hits",
         (rays.len() * size_of::<ProbeHit>()) as u64,
     );
-    let io = group(r, &p.io, 0, &[&input, &out]);
+    let io = group(r, &p.io, &[(0, &input), (1, &out)]);
     let tree = r
         .retained
         .scene(scene.id())
         .and_then(|s| s.rays.bind_group().cloned());
-    dispatch(
-        r,
-        &p,
-        &io,
-        &tree.expect("uploaded above"),
-        ((rays.len() as u32).div_ceil(64), 1),
-    );
+    let tree = tree.expect("uploaded above");
+    let n = ((rays.len() as u32).div_ceil(64), 1);
+    dispatch(r, &p, (&io, &tree), n, None);
     let bytes = read(r, &out);
     let hits: &[ProbeHit] = bytemuck::cast_slice(&bytes);
     hits.iter()
@@ -212,73 +213,4 @@ pub(crate) fn trace(
             (hit, h.any != 0)
         })
         .collect()
-}
-
-fn eye(r: &Renderer, camera: &Camera, size: (u32, u32)) -> wgpu::Buffer {
-    let view_proj = camera.build_view_projection(size.0 as f32 / size.1.max(1) as f32);
-    let eye = Eye {
-        inv_view_proj: view_proj.inverse().to_cols_array_2d(),
-        origin: camera.position.extend(1.0).to_array(),
-        size: [size.0, size.1, 0, 0],
-    };
-    r.device
-        .create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Ray Probe Eye"),
-            contents: bytemuck::bytes_of(&eye),
-            usage: wgpu::BufferUsages::UNIFORM,
-        })
-}
-
-/// Builds `scene`'s tree from scratch and traces one ray per pixel of `size` from
-/// `camera`, each timed on the wall clock; `None` before the scene's first extract.
-pub fn measure(
-    r: &mut Renderer,
-    scene: &Scene,
-    camera: &Camera,
-    size: (u32, u32),
-) -> Option<Measure> {
-    r.retained.scene_mut(scene.id())?.rays = super::RayTree::default();
-    let start = Instant::now();
-    let tree = r.ray_tree(scene)?;
-    let build_ms = start.elapsed().as_secs_f64() * 1000.0;
-    let packed = tree.packed();
-    let (gpu_bytes, group_tree) = (tree.gpu_bytes(), tree.bind_group()?.clone());
-    let p = probe(
-        r,
-        "cs_camera",
-        &[
-            entry(2, wgpu::BufferBindingType::Uniform),
-            entry(3, storage(false)),
-        ],
-    );
-    let uniform = eye(r, camera, size);
-    let out = rw(r, "Ray Probe Depths", u64::from(size.0 * size.1) * 4);
-    let io = group(r, &p.io, 2, &[&uniform, &out]);
-    let groups = (size.0.div_ceil(8), size.1.div_ceil(8));
-    dispatch(r, &p, &io, &group_tree, groups);
-    let mut times: Vec<f64> = (0..5)
-        .map(|_| {
-            let start = Instant::now();
-            dispatch(r, &p, &io, &group_tree, groups);
-            start.elapsed().as_secs_f64() * 1000.0
-        })
-        .collect();
-    times.sort_by(f64::total_cmp);
-    let depths = read(r, &out);
-    let depths: &[f32] = bytemuck::cast_slice(&depths);
-    Some(Measure {
-        triangles: packed.tris.len() as u64,
-        instances: packed.instances.len() as u32,
-        meshes: mesh_count(r, scene),
-        gpu_bytes,
-        build_ms,
-        trace_ms: times[times.len() / 2],
-        hit_pixels: depths.iter().filter(|&&t| t >= 0.0).count() as u64,
-    })
-}
-
-fn mesh_count(r: &Renderer, scene: &Scene) -> u32 {
-    r.retained
-        .scene(scene.id())
-        .map_or(0, |s| s.rays.mesh_count())
 }

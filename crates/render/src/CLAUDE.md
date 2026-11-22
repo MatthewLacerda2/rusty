@@ -112,9 +112,11 @@ a `.wgsl` there too.** The root `CLAUDE.md` keeps the project-wide rules;
 - **Rays trace the scene's static geometry through `render::rays`**: a two-level
   tree (one per mesh, shared by its instances, and a top one over the static objects)
   kept on `RenderScene::rays`, rebuilt only after `RayTree::touch` (the same hooks
-  that touch the casters) or a camera's culling mask changed, and built the first
-  time `Renderer::ray_tree` is asked. A shader imports `rt::trace` (`trace_closest`,
-  `trace_any`, `hit_uvs`) and binds `RayTree::bind_group` at `rays::GROUP`; a hit
+  that touch the casters) or an active camera's culling mask changed, and built the
+  first time `Renderer::ray_tree` is asked. A mesh's own tree lives as long as its
+  `GpuMesh`, at that mesh's revision. A tree whose buffers would pass the device's
+  limits is refused whole (an empty one is bound, `gpu_bytes` 0, said once). A
+  shader imports `rt::trace` (`trace_closest`, `trace_any`, `hit_uvs`) and binds `RayTree::bind_group` at `rays::GROUP`; a hit
   names the object's slot, so the rest comes from `ObjectData`. Only what an opaque
   material draws of a still, static, shown object is in it (`rays::traced`,
   `top::Placed::of`); a new way to leave a static object out goes there, and a new
