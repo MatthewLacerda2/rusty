@@ -42,7 +42,10 @@ enum Step {
         path: String,
     },
     /// Bake Occlusion: the PVS alone, on its worker, written to `path`.
-    OcclusionOnly { job: OcclusionBakeJob, path: String },
+    OcclusionOnly {
+        job: OcclusionBakeJob,
+        path: String,
+    },
 }
 
 impl ActiveBake {
