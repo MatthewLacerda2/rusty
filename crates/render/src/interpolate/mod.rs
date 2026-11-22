@@ -1,3 +1,6 @@
+//! What a frame draws between fixed ticks: a moving entity blended between its last two, as
+//! Unity's `RigidbodyInterpolation.Interpolate`.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use glam::{Mat4, Quat};
@@ -6,7 +9,9 @@ use rusty_components::transform::Pose;
 use rusty_ecs::{Changes, Cursor, WorldPose};
 use rusty_scene::{Camera, Scene, SceneId};
 
+/// Metres in one tick (120 m/s at 60 Hz): a longer step is a teleport, drawn where it landed.
 pub const JUMP_DISTANCE: f32 = 2.0;
+/// Radians in one tick (90°): a larger turn is a teleport, drawn at its new pose.
 pub const JUMP_TURN: f32 = std::f32::consts::FRAC_PI_2;
 
 #[derive(Default)]

@@ -5,6 +5,7 @@ use super::cone::{Bounds, Cone, WIDEST_CULLED_CONE};
 use rusty_components::LightComponent;
 use rusty_scene::{LightType, Scene};
 
+/// `common.wgsl` reads these as literals (`kind` 0u, 2u) and as its own `NO_SHADOW`: change both.
 pub(crate) const KIND_POINT: u32 = 0;
 pub(crate) const KIND_SPOT: u32 = 1;
 pub(crate) const KIND_AREA: u32 = 2;
@@ -124,6 +125,8 @@ pub(crate) fn local_lights(scene: &Scene, capture: bool) -> Vec<(LocalLight, boo
             );
             let mut local = LocalLight::new(at, forward, &light)?;
             local.baked = f32::from(u8::from(mode.bakes_direct()));
+            // A probe's camera is no player: a fade from it would bake the lamp unshadowed through
+            // walls.
             if capture {
                 local.shadow_fade = 0.0;
             }

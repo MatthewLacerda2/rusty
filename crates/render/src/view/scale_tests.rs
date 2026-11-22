@@ -15,6 +15,7 @@ fn the_scene_size_is_the_output_at_the_scale_and_native_is_the_output() {
     assert_eq!(tiny, PixelSize::new(1, 1));
 }
 
+/// `wgpu::Limits::default().max_texture_dimension_2d`, in texels.
 const MAX: u32 = 8192;
 
 #[test]
@@ -104,6 +105,7 @@ fn gpu_an_upscaled_frame_is_the_native_frame_softened() {
             .map(|(a, b)| u64::from(a.abs_diff(*b)))
             .sum();
         let mean = diff as f64 / native.len() as f64;
+        // Only the box's edges move: the same picture fills the output, so the mean stays low.
         assert!(mean < 6.0, "scale {scale}: mean channel difference {mean}");
         let centre = ((H / 2 * W + W / 2) * 4) as usize;
         let (a, b) = (&native[centre..centre + 3], &scaled[centre..centre + 3]);

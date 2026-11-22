@@ -10,6 +10,7 @@ use crate::gpu::textures::{TextureKind, Uploader};
 use rusty_asset::MapRef;
 use rusty_core::fs::freshness::Freshness;
 
+/// A layer's side in texels; every map is resized to it, with a full mip chain (`MIPS`).
 pub(crate) const LAYER_SIZE: u32 = 512;
 const MIPS: u32 = LAYER_SIZE.ilog2() + 1;
 pub(crate) const MAX_LAYERS: u32 = 32;
@@ -53,6 +54,7 @@ impl DecalAtlas {
         self.slots.get(path).copied().unwrap_or(NO_LAYER)
     }
 
+    /// Returns whether the array was replaced (it grew), so group 0 must be rebuilt.
     pub(crate) fn prepare(
         &mut self,
         (device, writes, mips): Uploader,

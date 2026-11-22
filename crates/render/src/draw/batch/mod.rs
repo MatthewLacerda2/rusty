@@ -13,7 +13,8 @@ use crate::gpu::pipelines::Facing;
 use crate::scene::{MaterialRecords, MeshHandle};
 use crate::InstanceData;
 
-/// What two solids must share to be drawn by one instanced call.
+/// What two solids must share to be drawn by one instanced call. Field order is the derived `Ord`
+/// the opaque sort uses: keep the mesh before the material.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct BatchKey {
     pub pipeline: usize,

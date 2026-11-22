@@ -88,6 +88,8 @@ pub(crate) fn apply_scene_lights(
             | LightType::Area => {}
         }
     }
+    // Slot 0 is the shadowed one: the last live directional, as `shadows::frame::live_sun_id`
+    // picks.
     if let Some(sun) = dirs.pop() {
         dirs.insert(0, sun);
     }

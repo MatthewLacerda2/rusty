@@ -18,6 +18,7 @@ pub(crate) mod motion;
 pub(crate) mod passes;
 pub mod postfx;
 mod preview;
+pub mod rays;
 pub mod readback;
 pub(crate) mod render_texture;
 pub(crate) mod scene;
@@ -106,6 +107,8 @@ pub struct Renderer {
     unbaked: clusters::UnbakedNote,
     materials: gpu::material_cache::MaterialCache,
     pub(crate) surface_shaders: gpu::pipelines::surface::SurfaceShaders,
+    // Instancing and depth priming: always on in the engine; tests turn them off to
+    // compare against one draw per entity and the unprimed pass.
     pub(crate) instancing: bool,
     pub(crate) depth_priming: bool,
     pub(crate) priming_recommended: bool,

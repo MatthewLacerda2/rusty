@@ -6,10 +6,15 @@ use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
 
+/// Per position, the `Baked` lights' direct SH and the shadowmask occlusion (`Vec4`) of the
+/// `Mixed` ones: added once the bounces stop, so no capture counts it twice.
 pub type BakedDirect = fn(&Scene, &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>);
 
+/// In capture passes: direct light plus four indirect bounces.
 pub const MAX_BOUNCES: u32 = 5;
 
+/// A pass changing no SH coefficient by this much stops the solve; absolute, as a white
+/// hemisphere's DC coefficient is a few units.
 pub const CONVERGENCE_EPSILON: f32 = 1.0e-3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -19,6 +24,7 @@ pub struct BounceReport {
 }
 
 impl Renderer {
+    /// A test hook: `bounce_tests`; the dev bake runs `bake_probes_observed`.
     pub fn bake_probes_multibounce(
         &mut self,
         scene: &mut Scene,
@@ -40,6 +46,7 @@ impl Renderer {
             let (bounce, done, total) = solve.progress();
             observe(bounce, done, total);
             if let Some(report) = solve.step(self, scene) {
+                // Nothing edits the scene inside this call, so the commit cannot fail.
                 let committed = solve.commit(scene);
                 debug_assert!(committed.is_ok(), "{committed:?}");
                 return report;

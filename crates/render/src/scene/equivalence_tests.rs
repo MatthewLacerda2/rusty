@@ -28,7 +28,8 @@ fn holds(r: &mut Renderer, ops: &[R]) -> Result<(), TestCaseError> {
             let table = table_holds(r);
             prop_assert!(table.is_ok(), "{:?} after {:?}", table, ops);
             let shadows = shadow_ops::kept_equals_fresh(r, &scene)
-                .and_then(|()| occlusion_ops::kept_equals_fresh(r, &scene));
+                .and_then(|()| occlusion_ops::kept_equals_fresh(r, &scene))
+                .and_then(|()| r.rays_kept_equal_fresh(&scene));
             prop_assert!(shadows.is_ok(), "{:?} after {:?}", shadows, ops);
         }
     }

@@ -8,6 +8,7 @@ impl RenderView {
             .map(|t| t.create_view(&wgpu::TextureViewDescriptor::default()))
     }
 
+    /// The target through its non-sRGB twin, for egui, which samples the stored bytes, not linear.
     pub fn display_view(&self) -> Option<wgpu::TextureView> {
         let target = self.color_target.as_ref()?;
         Some(target.create_view(&wgpu::TextureViewDescriptor {

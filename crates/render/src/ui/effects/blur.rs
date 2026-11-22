@@ -7,6 +7,7 @@ use crate::timing::{GpuPass, GpuTimer};
 use crate::{RenderView, Renderer};
 use rusty_ui::CanvasSpace;
 
+/// `view` is sRGB, so blur taps filter in linear light; the UI pass reads `raw`, display-encoded.
 struct Level {
     view: wgpu::TextureView,
     raw: wgpu::TextureView,

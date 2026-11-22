@@ -54,3 +54,11 @@ fn the_editor_flags_are_read_and_taken_out() {
     let none = parse(argv(&["out"])).unwrap();
     assert!(!none.no_editor && none.editor_out.is_none() && none.editor.is_none());
 }
+
+#[test]
+fn rays_is_a_switch() {
+    let a = parse(argv(&["--rays", "out"])).unwrap();
+    assert!(a.rays);
+    assert_eq!(a.rest, ["out"]);
+    assert!(!parse(argv(&["out"])).unwrap().rays);
+}

@@ -35,6 +35,7 @@ impl Renderer {
         self.lap("ui.textures");
         let textures = &self.gpu_textures;
         let tex_size = |p: &str| {
+            // Source pixels, as the sim lays out with: an import's Max Size may shrink the upload.
             let (w, h) = textures.get(p)?.source_size;
             Some(Vec2::new(w as f32, h as f32))
         };

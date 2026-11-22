@@ -25,5 +25,6 @@ fn gpu_an_orthographic_camera_draws_an_off_axis_ball_whole() {
         srgb(FACES[4]),
         "the centre, the +Z face",
     );
+    // Column 54 is 6.5 px out, past the 6 px a quad facing the eye would leave.
     assert_near(pixel(&px, 54, row), srgb(FACES[0]), "the edge, the +X face");
 }

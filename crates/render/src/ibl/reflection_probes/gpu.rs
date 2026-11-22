@@ -23,6 +23,7 @@ impl ProbeArray {
     }
 }
 
+/// `Rgba16Float`, as a BC texture cannot be smaller than its block.
 pub(super) fn stand_in(device: &wgpu::Device) -> (wgpu::Texture, wgpu::TextureView) {
     array_texture(device, 1, 1, 1, wgpu::TextureFormat::Rgba16Float)
 }

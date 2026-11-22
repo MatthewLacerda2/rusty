@@ -25,8 +25,10 @@ impl CubemapCapture {
     }
 }
 
+/// The largest finite half float.
 pub(crate) const HALF_MAX: f32 = 65504.0;
 
+/// NaN to black, negatives to zero, +inf to `HALF_MAX`: one bad texel never poisons a mip or SH.
 pub(crate) fn sanitize(c: f32) -> f32 {
     if c.is_nan() {
         0.0
@@ -103,6 +105,7 @@ impl Renderer {
         (CubemapCapture { resolution, faces }, open)
     }
 
+    /// Texels whose depth is still the cleared far plane: directions escaping the scene.
     fn read_open_texels(&self, view: &RenderView, resolution: u32) -> Vec<bool> {
         let size = (resolution, resolution);
         let depth = read_texture_bytes(&self.device, &self.queue, &view.depth_texture, size, 4);
@@ -133,9 +136,12 @@ impl Renderer {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct CaptureMode {
+    /// Only `is_static` entities, so dynamic actors never bake into a probe.
     pub static_only: bool,
+    /// Bounce ≥2 of the probe bake: every static surface takes probe SH, not only probe readers.
     pub probe_bounce: bool,
     pub shadows: bool,
+    /// A light probe's: no sky, black clear, the CPU adds the ambient, as Unity bakes them.
     pub ambient_sky: bool,
 }
 

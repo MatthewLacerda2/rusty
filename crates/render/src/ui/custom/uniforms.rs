@@ -5,6 +5,8 @@ use crate::gpu::grow_buffer::GrowBuffer;
 use crate::{RenderView, Renderer};
 use rusty_shadergen::params::PackedParams;
 
+/// One graphic's slot; mirrors `UiShade` in `rusty_shadergen::params::UI_UNIFORM_DECL`: change both
+/// together.
 #[repr(C)]
 #[derive(Clone, Copy, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct UiShadeUniform {

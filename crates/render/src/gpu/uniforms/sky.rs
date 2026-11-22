@@ -1,5 +1,6 @@
 use rusty_scene::SkySettings;
 
+/// Mirrors `ProceduralSky` in `engine/shaders/common.wgsl`: change both together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ProceduralSkyUniform {

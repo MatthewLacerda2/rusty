@@ -69,7 +69,7 @@ fn gpu_a_lower_priority_liquid_draws_before_its_glass_whatever_the_slot_order() 
         return;
     };
     let mut scene = bottle(["glass", "liquid"]);
-    // Equal priority: slot order, the issue's broken bottle (the liquid erases the glass).
+    // Equal priority keeps slot order: the liquid, drawn second, erases the glass.
     assert_eq!(drawn(&mut r, &scene), [GLASS, LIQUID]);
     priority(&mut scene, "liquid", -1);
     assert_eq!(drawn(&mut r, &scene), [LIQUID, GLASS]);

@@ -1,5 +1,6 @@
 pub(crate) use rusty_shadergen::groups::{DRAW, GLOBAL, MATERIAL, SCENE};
 
+/// Groups per solid-path layout: the per-draw group sits at the last index.
 pub(crate) const COUNT: usize = DRAW as usize + 1;
 
 #[derive(Clone, Copy, Debug)]

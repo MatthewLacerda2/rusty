@@ -53,6 +53,7 @@ fn colored_box_scene() -> Scene {
         ("NegZ", Vec3::NEG_Z * 6.0, [0.0, 9.0, 9.0]),
     ];
     for (name, pos, emissive) in walls {
+        // The origin sits outside each thin wall, seeing its front face: back faces are culled.
         let thin = Vec3::splat(20.0) - pos.normalize().abs() * 19.5;
         add_box(&mut scene, name, pos, thin, emissive, true);
     }

@@ -18,6 +18,8 @@ pub(crate) fn joint_array_bytes(joints: &[JointMatrix]) -> Vec<u8> {
     bytes
 }
 
+/// `joint_array_bytes` puts the identity at element 0, so a run's `bone_base` is one past
+/// its index in `joints`; 0 means none.
 pub(crate) fn push_palette(joints: &mut Vec<JointMatrix>, palette: &[glam::Mat4]) -> u32 {
     if palette.is_empty() {
         return 0;

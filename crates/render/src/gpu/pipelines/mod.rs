@@ -28,6 +28,7 @@ pub(crate) struct ForwardPipelines {
     pub velocity: VelocityPipelines,
     pub transparent: TransparentPipelines,
     pub depth_postpass: DepthPostpassPipelines,
+    /// Drawn over the post-FX output, so built against `output_format`.
     pub line: LazyPipeline,
     pub vertex_line: LazyPipeline,
     pub prepass: PrepassPipelines,

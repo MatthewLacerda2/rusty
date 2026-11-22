@@ -1,5 +1,9 @@
+/// Cubes shaded per frame, the length of `refl_probes` in `engine/shaders/common.wgsl`: change
+/// both together. With the spares, 6 × 34 layers stay under wgpu's default 256.
 pub(crate) const MAX_REFLECTION_PROBES: usize = 32;
 
+/// In cubes: slots holding cubes that just left range, so pacing the budget's edge copies
+/// nothing. The budget counts them.
 pub(crate) const SPARE_SLOTS: usize = 2;
 
 #[derive(Debug, PartialEq)]

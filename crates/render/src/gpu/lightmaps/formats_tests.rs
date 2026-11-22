@@ -100,7 +100,7 @@ fn gpu_a_loader_that_died_is_a_failed_load_not_pending_forever() {
     let mut maps = Lightmaps::new(device, false);
     let list = vec!["dead.ktx2".to_string()];
     let (outbox, inbox) = std::sync::mpsc::channel();
-    drop(outbox);
+    drop(outbox); // the worker panicked before it answered
     maps.cache
         .insert(list.clone(), super::Entry::Pending(inbox));
     maps.bind(device, writes, &list, &[], &[]);

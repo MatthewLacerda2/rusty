@@ -19,8 +19,12 @@ fn is_wanted(name: &str, wanted: &str) -> bool {
     name.to_lowercase().contains(wanted)
 }
 
+/// Never GL: its EGL display is process-wide, and the renderers sharing `instance` would race on
+/// it.
 pub(crate) const HEADLESS_BACKENDS: wgpu::Backends = wgpu::Backends::PRIMARY;
 
+/// One for the process, never dropped: NVIDIA's Linux driver lists no adapter after about 19
+/// instances made and freed.
 fn instance() -> &'static wgpu::Instance {
     static INSTANCE: std::sync::OnceLock<wgpu::Instance> = std::sync::OnceLock::new();
     INSTANCE.get_or_init(|| {

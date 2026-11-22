@@ -18,6 +18,7 @@ impl Renderer {
 
     pub(crate) fn begin_frame_clocks(&mut self) {
         self.gpu_timer.begin_frame();
+        // Zero the GPU call counts: what ran before the render is counted on no frame.
         crate::gpu::ops::take();
     }
 
@@ -62,6 +63,7 @@ impl Renderer {
 
     pub(crate) fn finish_counters(&mut self, view: &RenderView) {
         let texture_bytes = self.resident_textures().map(gpu_bytes).sum();
+        let ray_tree_bytes = self.ray_tree_bytes();
         let c = &mut self.frame_counters;
         c.shadow_draws = self.shadow_renderer.drawn.len() as u32;
         let culls = self.shadow_renderer.culls;
@@ -84,6 +86,7 @@ impl Renderer {
         c.mesh_count = self.gpu_meshes.len() as u32;
         c.mesh_bytes = self.gpu_meshes.values().map(mesh_bytes).sum();
         c.cluster_pool_bytes = self.hiz.clusters.pool.leased_bytes();
+        c.ray_tree_bytes = ray_tree_bytes;
         c.uploads = std::mem::take(&mut self.uploads);
         c.uploads
             .add_all(std::mem::take(&mut self.lightmaps.uploads));
@@ -116,6 +119,7 @@ impl RenderCounters {
     }
 }
 
+/// `(active lights, lights with no slot)`, as `draw::lighting::apply_scene_lights` fills slots.
 pub(crate) fn count_lights(scene: &Scene) -> (u32, u32) {
     let mut per_type = [0u32; 5];
     for id in scene.world.ids_with_light() {

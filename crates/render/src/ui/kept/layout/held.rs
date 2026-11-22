@@ -120,6 +120,7 @@ impl Elements {
         held.differs(&Element::read(world, id, held.rect.is_none()))
     }
 
+    /// Compared each frame, not watched: a Transform cursor would log every sim Transform write.
     pub(super) fn spins_still(&self, world: &World) -> bool {
         let still = |(id, e): &(u32, Element)| match e.spin {
             None => true,

@@ -26,6 +26,7 @@ impl Renderer {
             &self.material_layout,
             &self.shadow_layout,
         );
+        // On the view, not the renderer, so an early return cannot shade the editor with it.
         view.set_forward_override(Some(pipelines.forward));
         self.render(view, scene, camera, output, false);
         view.set_forward_override(None);

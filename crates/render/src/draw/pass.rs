@@ -179,6 +179,7 @@ impl Renderer {
 
     fn primes_by(&self, view: &RenderView, prepass: bool) -> bool {
         let on = self.depth_priming && self.priming_recommended;
+        // A view's own forward pipeline (the shader preview) has no primed twin.
         on && prepass && !view.has_forward_override()
     }
 

@@ -51,6 +51,7 @@ pub const MODULES: &[&str] = &[
     "postfx/params.wgsl",
     "postfx/frame.wgsl",
     "postfx/grade.wgsl",
+    "rt/trace.wgsl",
 ];
 
 pub fn composer_with_common(base: &str) -> Result<Composer, String> {
