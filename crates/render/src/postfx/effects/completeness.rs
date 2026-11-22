@@ -1,3 +1,6 @@
+//! Test hooks: the post effects' completeness gate, which the root's `post_effect_layers`
+//! and `post_effect_cases` tests run with the layers above this crate.
+
 use super::textures::{composite_textures, PlacedTexture, GROUP};
 pub use super::Owner;
 use super::{assemble, History, PostEffect, POST_EFFECTS};

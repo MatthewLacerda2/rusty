@@ -6,8 +6,11 @@ use crate::timing::GpuPart;
 use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::{Camera, Scene};
 
+/// The stage's compute passes at one clustered batch and at three. Measured on lavapipe and Metal
+/// (CI's macOS leg).
 const PASSES: u32 = 2;
 
+/// Measured on lavapipe with the split forced (it has no timestamps).
 const TIMED_PASSES: u32 = 6;
 
 fn panels(n: usize) -> Scene {
@@ -111,6 +114,8 @@ fn gpu_the_stage_records_two_compute_passes_with_three_clustered_batches() {
     if let Some((tested, clusters, draws, depth, rest)) = stage_with(3) {
         assert_eq!((tested, clusters, draws), (4, 258, 8));
         assert_eq!(depth, WALL + 2 * PANEL, "the wall and the visible panels");
+        // Bounded: the half-hidden panel's kept clusters are the GPU's own texel answer. The
+        // pinned counts hold on lavapipe and Metal.
         let (lo, hi) = (WALL + PANEL, WALL + 2 * PANEL);
         assert!((lo..=hi).contains(&rest), "{rest} kept, not in {lo}..={hi}");
     }

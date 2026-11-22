@@ -7,6 +7,7 @@ use super::ranges::Ranges;
 use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::CountedDevice as _;
 
+/// One `hiz_clusters.wgsl` `Cluster`: 16 words. A pooled index is a 4-byte `u32`.
 const ROW_BYTES: u64 = 64;
 
 #[derive(Default)]
@@ -15,10 +16,13 @@ struct Ledger {
     indices: Ranges,
 }
 
+/// A leased range never moves: its rows carry their first index into the pool, so the shader
+/// adds no base.
 pub(crate) struct ClusterPool {
     table: GrowBuffer,
     indices: GrowBuffer,
     ledger: Arc<Mutex<Ledger>>,
+    /// Bytes either buffer may reach: the binding limit, lowered by tests to make a refusal cheap.
     pub(crate) limit: u64,
     pub(crate) group: wgpu::BindGroup,
 }
@@ -129,6 +133,8 @@ fn capacity(limit: u64) -> (u32, u32) {
     (clamp(limit / ROW_BYTES), clamp(limit / 4))
 }
 
+/// Each bound up to the limit: a grown buffer is a power of two, which may pass a limit that
+/// is not.
 fn bind(
     device: &wgpu::Device,
     layout: &wgpu::BindGroupLayout,

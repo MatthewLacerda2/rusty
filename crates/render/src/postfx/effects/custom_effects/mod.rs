@@ -126,6 +126,8 @@ impl EffectCache {
         }
     }
 
+    /// Traps wgpu's validation: a module that composes but doesn't fit the pass fails here, not
+    /// on the device.
     fn load(&mut self, device: &wgpu::Device, name: &str) -> Result<Effect, String> {
         let path = format!("{}/{name}.wgsl", self.dir);
         let baked = rusty_shadergen::baked::load(std::path::Path::new(&path))?;

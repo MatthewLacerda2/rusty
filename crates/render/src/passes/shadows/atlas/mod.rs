@@ -18,7 +18,9 @@ use cache::StaticTiles;
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ShadowTile {
     pub view_proj: [f32; 16],
+    /// In atlas UVs: xy the top-left, zw the size.
     pub rect: [f32; 4],
+    /// x: the world size of a texel one metre from the light.
     pub params: [f32; 4],
 }
 
@@ -78,6 +80,7 @@ impl ShadowAtlas {
             })
         };
         let tile_bytes = std::mem::size_of::<ShadowTile>() as u64;
+        // `MAX_TILES` long, so the forward group never rebuilds.
         let tiles = buffer(
             "Shadow Atlas Tiles",
             tile_bytes * MAX_TILES as u64,
@@ -128,6 +131,7 @@ fn light_space_bytes(tiles: &[Tile]) -> Vec<u8> {
     let mut bytes = vec![0u8; stride * tiles.len()];
     for (chunk, tile) in bytes.chunks_exact_mut(stride).zip(tiles) {
         let matrix = tile.view_proj.to_cols_array();
+        // 64 bytes: one `mat4x4<f32>`.
         chunk[..64].copy_from_slice(bytemuck::bytes_of(&matrix));
     }
     bytes

@@ -25,6 +25,7 @@ pub(crate) struct Culled {
 }
 
 impl Culled {
+    /// Each late batch is drawn whole, clustered or not: a culled cluster adds no nearer texel.
     pub(crate) fn late(&self) -> Option<Culled> {
         let at = self.late?;
         Some(Culled {
@@ -36,6 +37,7 @@ impl Culled {
     }
 }
 
+/// Bytes: one `DrawIndexedIndirectArgs`, five `u32`s.
 pub(crate) const ARGS: u64 = 20;
 
 pub(super) fn late_args(batches: usize) -> u64 {
@@ -169,6 +171,7 @@ impl Renderer {
             cam.drawn_batches = solids.draws.opaque.len() as u32;
         }
         self.frame_counters.hiz_tested += tested;
+        // The args are in the key: they grow by batch, not by instance.
         let key = [0, 1].map(|k| {
             let kept = cam.kept[k].buffer();
             let draw_group = self.draw_buffers.draw_group_buffers(kept).map(Clone::clone);

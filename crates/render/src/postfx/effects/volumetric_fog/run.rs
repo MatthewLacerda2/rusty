@@ -12,6 +12,7 @@ use crate::{RenderView, Renderer};
 const INPUTS: u32 = 0;
 const GRIDS: u32 = 1;
 
+/// Mirrors `cs_scatter`'s `@workgroup_size`.
 const SCATTER_GROUP: u32 = 4;
 const INTEGRATE_GROUP: u32 = 8;
 

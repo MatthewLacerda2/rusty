@@ -10,8 +10,11 @@ pub(crate) struct TaaFrame {
     pub mip_bias: f32,
 }
 
+/// Per pixel: its surface's distance from its camera (the sky's 65504 fits) and that camera's
+/// index in the stack.
 pub(crate) const SURFACE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
+/// Per pixel: its frame's perceptual luma, its last step, its flicker and how much recurs.
 pub(crate) const FLICKER_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 pub(crate) struct TaaHistory {
@@ -99,6 +102,7 @@ pub(crate) fn upscales(view: &RenderView, on: bool) -> bool {
     on && jitter::upscales(view.scene_size(), view.size()) // chain-size: scene compared to the output
 }
 
+/// Call after `motion.begin`: it reads this frame's cut from the motion history.
 pub(crate) fn begin(
     view: &mut RenderView,
     device: &wgpu::Device,

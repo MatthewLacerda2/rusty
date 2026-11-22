@@ -4,9 +4,12 @@ use crate::draw::batch::DrawBatch;
 use crate::gpu::pipelines::winding::Facing;
 use crate::InstanceData;
 
+/// Output indices, `u32`s: equal to the import's largest run.
 pub(crate) const MAX_OUT_INDICES: u64 = rusty_asset::clusters::MAX_RUN_INDICES as u64;
+/// Clusters a chunk covers: `hiz_clusters.wgsl`'s workgroup size and its `64u`s.
 pub(crate) const CHUNK: u32 = 64;
 
+/// Mirrors `hiz_clusters.wgsl`'s `Job`: change the two together.
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct Job {
@@ -51,6 +54,7 @@ impl Plan {
             let room = count * u64::from(batch.key.indices.len());
             let fits = u64::from(plan.out_indices) + room <= MAX_OUT_INDICES;
             let judged = batch.instances.clone().any(|i| tested(i as usize));
+            // Unjudged, it would cull only by frustum and cone, a draw an instance: one draw wins.
             if !fits || !judged {
                 continue;
             }
@@ -73,6 +77,7 @@ impl Plan {
                     clusters: n,
                 });
                 plan.out_indices += batch.key.indices.len();
+                // State words: the kept count, then two a cluster.
                 plan.states += 1 + 2 * n;
             }
             let jobs = first..plan.jobs.len() as u32;

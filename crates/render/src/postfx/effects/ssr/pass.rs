@@ -17,12 +17,14 @@ use rusty_core::settings::quality::SsrQuality;
 const INPUTS: u32 = 0;
 const TRACED: u32 = 1;
 
+/// Mirrors `SsrParams` in `postfx/ssr.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct SsrParams {
     inv_view_proj: [f32; 16],
     view_proj: [f32; 16],
     camera_pos: [f32; 4],
+    /// x: step count, y: step length (world units).
     march: [f32; 4],
     surface: [f32; 4],
 }
@@ -155,6 +157,7 @@ fn trace_and_resolve(
     timer: &GpuTimer,
 ) {
     {
+        // Cleared: a pixel that takes no SSR is discarded, so it traced nothing.
         let clear = wgpu::LoadOp::Clear(wgpu::Color::TRANSPARENT);
         let [hits, spread] = pyramids.tops();
         let targets = [(hits, clear), (spread, clear)];
@@ -166,6 +169,7 @@ fn trace_and_resolve(
     }
     pyramids.build(encoder, &passes.pyramid, timer);
     {
+        // Loaded: a pixel that takes no SSR is discarded, left as it was.
         let targets = [(scene, wgpu::LoadOp::Load)];
         let timed = timer.writes(GpuPass::SsrResolve);
         let mut pass = begin(encoder, "SSR Resolve", &targets, timed);

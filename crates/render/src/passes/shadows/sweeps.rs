@@ -23,6 +23,8 @@ impl ShadowRenderer {
             .filter(|&i| self.static_cache[i] != key(&self.cascades[i]))
             .collect();
         if !stale.is_empty() {
+            // The bake outlives the frame, so it cannot follow the camera's LOD: every group
+            // at LOD0.
             let finest = LodSelection::finest(scene);
             let batches = match with_statics {
                 true => {

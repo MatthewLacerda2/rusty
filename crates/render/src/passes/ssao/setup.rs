@@ -101,7 +101,7 @@ impl SsaoRenderer {
     }
 }
 
-/// All read with `textureLoad`, so no sampler.
+/// Every texture of the layout is read with `textureLoad`, so it has no sampler.
 fn create_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
         label: Some("SSAO Layout"),
