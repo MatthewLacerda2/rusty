@@ -1,3 +1,6 @@
+//! The stress scene `make bench` measures: pure placement, no RNG or I/O, so every run
+//! spawns the same scene and two runs on one machine compare.
+
 use glam::{Quat, Vec3};
 
 use super::rig;
@@ -139,6 +142,7 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
         authoring::rendering::light::set_intensity(&mut l, 2.0);
         authoring::rendering::light::set_range(&mut l, 9.0);
         authoring::rendering::light::set_cast_shadows(&mut l, shadowed);
+        // Live, as the bench measures: a light left at its default mode is Baked.
         authoring::rendering::light::set_mode(&mut l, rusty_components::LightMode::Mixed);
     }
     if let Some(script) = flicker {
@@ -147,6 +151,7 @@ fn light(scene: &mut Scene, i: u32, shadowed: bool, flicker: Option<&str>) {
 }
 
 fn decal_spot(i: u32) -> (Vec3, Vec3) {
+    // Metres; 13 is coprime with 400, so the first 400 decals never share a spot.
     let along = -20.0 + (i * 13 % 400) as f32 * 0.1;
     if i % 3 == 2 {
         let x = alternate(i) * 14.75;

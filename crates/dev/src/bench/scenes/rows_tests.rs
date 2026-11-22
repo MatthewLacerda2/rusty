@@ -86,6 +86,8 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
     );
     let scripts = avg(&report, "cpu.update_scripts");
     assert!(scripts.is_some(), "{:?}", report.metrics);
+    // Untimed work the nap's size fails three quarters of it; a loaded runner's oversleep only
+    // widens the nap.
     holds_whole(&report, "cpu.", cpu, 0.75 * napped);
 
     let Some(renderer) = avg(&report, "renderer_ms") else {
@@ -95,6 +97,7 @@ fn gpu_every_system_and_render_stage_is_a_row_and_together_they_are_the_whole() 
         let row = avg(&report, &format!("render.{stage}"));
         assert!(row.is_some(), "{stage}: {:?}", report.metrics);
     }
+    // 3% of `renderer_ms`: what no stage times should be timer overhead alone.
     holds_whole(&report, "render.", renderer, renderer * 0.03);
 }
 

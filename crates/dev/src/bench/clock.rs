@@ -1,8 +1,13 @@
+//! The probes that scale the bench's rows to a reference clock: `docs/testing.md`,
+//! *GPU time and the GPU clock* and *CPU time and the CPU clock*.
+
 use std::hint::black_box;
 use std::time::Instant;
 
 use super::{Report, Samples};
 
+/// Ms the GPU probe takes on an M4 at its top GPU clock, 1470 MHz: re-measure it when
+/// `ClockProbe`'s load changes.
 pub const REFERENCE_MS: f64 = 0.13;
 
 pub fn speed(before: Option<f64>, after: Option<f64>) -> Option<f64> {
@@ -14,8 +19,12 @@ pub fn speed(before: Option<f64>, after: Option<f64>) -> Option<f64> {
     Some(REFERENCE_MS / probe_ms)
 }
 
+/// Steps in the CPU probe's chain; each (a shift, an xor, a multiply: ~5 cycles) waits
+/// on the last, so no core overlaps them.
 const CPU_STEPS: u32 = 100_000;
 
+/// Ms of [`CPU_STEPS`] steps at ~5 cycles and 4.4 GHz, derived, not measured: re-derive
+/// it when the chain changes.
 pub const CPU_REFERENCE_MS: f64 = 0.114;
 
 pub fn cpu_probe_ms() -> f64 {
@@ -33,6 +42,7 @@ pub fn cpu_speed(before: f64, after: f64) -> Option<f64> {
     (probe_ms > 0.0 && probe_ms.is_finite()).then(|| CPU_REFERENCE_MS / probe_ms)
 }
 
+// Fractions past which the report warns: `docs/testing.md`, *CPU time and the CPU clock*.
 pub const CLOCK_SPREAD: f64 = 0.15;
 pub const CPU_SPREAD: f64 = 0.5;
 pub const CLOCK_DRIFT: f64 = 0.10;

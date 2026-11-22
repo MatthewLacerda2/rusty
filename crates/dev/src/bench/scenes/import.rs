@@ -46,6 +46,7 @@ fn copy_tree(
         let (Ok(real), Ok(kind)) = (std::fs::canonicalize(&src), std::fs::metadata(&src)) else {
             continue;
         };
+        // `skip` is the copy itself, when its folder sits inside the project.
         if real == skip || copying.contains(&real) {
             continue;
         }

@@ -8,6 +8,8 @@ use crate::bake::denoise::budget;
 use crate::bake::progress::format::gb;
 use crate::memory::Machine;
 
+// Bytes per texel each stage holds: in flight and progressive per covered texel, the other
+// three per texel of their square.
 pub const IN_FLIGHT_PER_TEXEL: u64 = 112;
 
 pub const FINISH_PER_TEXEL: u64 = 256;
@@ -18,6 +20,7 @@ pub const EXPAND_PER_TEXEL: u64 = 64;
 
 pub const PROGRESSIVE_PER_TEXEL: u64 = 116;
 
+/// Bytes a finished map keeps per covered texel; mirrors `Lightmap::kept_bytes`.
 pub fn result_bytes(settings: &BakeSettings, masked: bool) -> u64 {
     16 + 16 * u64::from(settings.directional) + 16 * u64::from(masked)
 }
@@ -33,6 +36,8 @@ pub struct Estimate {
 
 impl Estimate {
     pub fn peak(&self) -> u64 {
+        // A chart is denoised while it is assembled: the larger stands for both, as measured.
+        // The pages come after that work, so the peak holds the larger again.
         let work = self.in_flight.max(self.oidn);
         self.maps + self.progressive + work.max(self.pages)
     }
@@ -66,6 +71,7 @@ pub fn covered(mesh: &BakeMesh, edge: u32) -> u64 {
         area += f64::from((b - a).perp_dot(c - a).abs()) / 2.0;
         perimeter += f64::from(a.distance(b) + b.distance(c) + c.distance(a));
     }
+    // The UVs' area plus a texel-wide ring along every edge (the conservative raster).
     let e = f64::from(edge);
     let square = u64::from(edge) * u64::from(edge);
     ((area * e * e + perimeter * e).ceil() as u64).min(square)
@@ -92,6 +98,7 @@ pub fn estimate(
     let all: u64 = charts.iter().map(|c| c.1).sum();
     let flying = &charts[..threads.max(1).min(charts.len())];
     let largest = flying[0].0;
+    // Past `ASSEMBLE_ALONE` one chart assembles at a time, so `largest` stands for it.
     let beside = |&(square, covered): &(u64, u64)| match square > ASSEMBLE_ALONE {
         true => covered * IN_FLIGHT_PER_TEXEL,
         false => (covered * IN_FLIGHT_PER_TEXEL).max(square * FINISH_PER_TEXEL),
@@ -100,6 +107,7 @@ pub fn estimate(
     let oidn = match settings.denoiser {
         Denoiser::Oidn => {
             let denoise: u64 = flying.iter().map(|c| budget::cost(c.0 as usize)).sum();
+            // Mirrors `budget::Budget::run`: past `BUDGET` one chart runs alone, and always starts.
             denoise.min(budget::BUDGET.max(budget::cost(largest as usize)))
         }
         _ => 0,

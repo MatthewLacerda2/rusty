@@ -12,8 +12,12 @@ pub const INSTALL: &str = "install Open Image Denoise 2 (macOS: `brew install \
 const OIDN_DEVICE_TYPE_CPU: c_int = 1;
 const OIDN_FORMAT_FLOAT3: c_int = 3;
 
+/// OIDN's `maxMemoryMB`: a larger image is cleaned in tiles. Fixed, never read from the
+/// machine, so where a chart is cut never depends on it.
 pub const SCRATCH_MB: c_int = 512;
 
+/// Texels of the largest image whose filter a device keeps: a filter keeps the scratch of the
+/// largest image it ran, so one for a larger image is released after.
 pub const KEEP_TEXELS: usize = 128 * 128;
 
 type RawDevice = *mut c_void;
@@ -35,6 +39,8 @@ pub struct Api {
     release_device: unsafe extern "C" fn(RawDevice),
     device_error: unsafe extern "C" fn(RawDevice, *mut *const c_char) -> c_int,
     new_filter: unsafe extern "C" fn(RawDevice, *const c_char) -> Filter,
+    /// `oidnSetSharedFilterImage`: filter, name, data, format, width, height, byte offset,
+    /// pixel stride, row stride (a stride of 0: packed).
     set_image: unsafe extern "C" fn(
         Filter,
         *const c_char,
@@ -51,6 +57,7 @@ pub struct Api {
     commit_filter: unsafe extern "C" fn(Filter),
     execute_filter: unsafe extern "C" fn(Filter),
     release_filter: unsafe extern "C" fn(Filter),
+    /// Kept open as long as the calls above are: they point into it.
     _library: Library,
 }
 
@@ -148,6 +155,7 @@ impl Api {
             if let Some(n) = threads {
                 (self.set_device_int)(device.device, c"numThreads".as_ptr(), n as c_int);
             }
+            // Never pinned to cores: several devices run beside the bake's workers.
             (self.set_device_bool)(device.device, c"setAffinity".as_ptr(), false);
             (self.commit_device)(device.device);
         }

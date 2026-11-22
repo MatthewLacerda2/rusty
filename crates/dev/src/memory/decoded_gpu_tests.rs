@@ -1,3 +1,6 @@
+//! A direction check only: on CI's adapters it does not fail for an unbounded cached
+//! upload, which `textures_gpu_tests`' four-times test catches.
+
 use super::textures_gpu_tests::{compresses, images, load, mb, set_up, N};
 use crate::memory::rss_peak_bytes;
 
@@ -13,6 +16,7 @@ fn gpu_cached_textures_peak_no_higher_than_the_same_decoded() {
             return;
         }
         let start = rss_peak_bytes().expect("read");
+        // Cached first: the decoded load may reuse what it freed, never the other way round.
         let (after_cached, cached_gpu) = load(&mut renderer, &cached[1..]);
         let (after_decoded, decoded_gpu) = load(&mut renderer, &decoded);
         let beside = |grew: u64, gpu: u64| grew.saturating_sub(gpu);

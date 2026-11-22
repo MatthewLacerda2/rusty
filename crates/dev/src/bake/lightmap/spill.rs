@@ -48,6 +48,7 @@ impl Spill {
                 Taken::Held(lock) => lock,
                 Taken::Busy | Taken::Replaced => continue,
             };
+            // A folder of this name is a dead process's that had this pid.
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).map_err(fail)?;
             return Ok(Self {
@@ -94,6 +95,7 @@ impl Drop for Spill {
             );
         }
         let _ = std::fs::remove_file(lock_of(&self.dir));
+        // Released last, so no sweep takes a lock on a folder still in use.
         drop(lock);
     }
 }
@@ -150,6 +152,8 @@ pub(super) enum Taken {
     Replaced,
 }
 
+/// Checks the locked file is still the one at `path`: a sweep may delete it between the open
+/// and the lock. `between` runs there: nothing in a bake, a racing sweep in a test.
 pub(super) fn take_lock(path: &Path, between: impl FnOnce()) -> std::io::Result<Taken> {
     use std::os::unix::fs::MetadataExt;
     let file = open_lock(path)?;

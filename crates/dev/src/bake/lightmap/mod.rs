@@ -52,6 +52,7 @@ pub fn bake_scene_lightmaps_logged(
     spill::sweep(scene_path);
     let input = gather_bake_input(scene);
     fits::fits(&input, settings, false)?;
+    // Freed chart buffers go back to the system, as `fits`' estimate counts on.
     crate::memory::return_large_frees();
     stages.lap("gather");
     let run = logged::bake_logged(&input, settings, log, scene_path)?;

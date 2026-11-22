@@ -10,16 +10,21 @@ use rusty_lighting::lightmap::{
 };
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 
+// Lightmap texels per unit, and a plane's side in units: each plane is a 500² map.
 pub(crate) const DENSITY: f32 = 25.0;
 pub(crate) const SIDE: f32 = 20.0;
 
+/// What is in flight is per worker, so both bakes compared run as many.
 pub(crate) const WORKERS: usize = 2;
 
+/// The scene sizes compared, smaller first. macOS's allocator keeps a reserve of freed large
+/// blocks that 2 planes do not fill, so there the pair starts at 8.
 pub(crate) const PAIR: (usize, usize) = match cfg!(target_os = "macos") {
     true => (8, 32),
     false => (2, 8),
 };
 
+/// Bytes of slack on top of the extra maps: the allocator's and the pool's.
 pub(crate) const MARGIN: u64 = 48 << 20;
 
 pub(crate) fn planes(n: usize, side: f32) -> BakeScene {
@@ -87,6 +92,8 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
     (peak, kept)
 }
 
+/// Bytes of each extra chart's freed buffers macOS's footprint may keep counted, even after
+/// `memory::relieve`; Linux's leave (`return_large_frees`).
 pub(crate) const FREED_PER_CHART: u64 = (cfg!(target_os = "macos") as u64) * (8 << 20);
 
 pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str) {

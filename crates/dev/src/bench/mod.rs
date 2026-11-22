@@ -1,3 +1,6 @@
+//! `make bench`'s measure; what each row and window means: `docs/testing.md`,
+//! *Benchmark: `make bench`*.
+
 mod clock;
 mod engine;
 mod lua;
@@ -35,6 +38,7 @@ pub(crate) fn measure_posed(
     pose: &mut dyn FnMut(&mut Harness),
 ) -> (Report, Samples) {
     let mut samples = Samples::default();
+    // Each probe's first run pays for its setup (the GPU's pipeline): discarded.
     time_probe(probe, harness);
     clock::cpu_probe_ms();
     let mut verbs = verbs::Window::start();
@@ -51,6 +55,8 @@ pub(crate) fn measure_posed(
     (samples.report(), samples)
 }
 
+/// What `frame_ms` leaves out of the tick: each `run_part` of `app::probe`, as
+/// `<part>_ms`, and `probe_ms`; a new part joins here.
 const BESIDE: [&str; 3] = ["loads_ms", "taps_ms", "probe_ms"];
 
 fn step_and_draw(

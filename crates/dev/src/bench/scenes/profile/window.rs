@@ -19,6 +19,8 @@ pub fn seconds(windows: &[Window]) -> f64 {
     ns as f64 / 1e9
 }
 
+/// Nanoseconds of `CLOCK_MONOTONIC`, the clock `perf::start` passes `perf record -k`: change
+/// both together.
 #[cfg(target_os = "linux")]
 pub fn now() -> u64 {
     let mut ts = libc::timespec {
@@ -31,6 +33,7 @@ pub fn now() -> u64 {
     ts.tv_sec as u64 * 1_000_000_000 + ts.tv_nsec as u64
 }
 
+/// Nanoseconds since the first call: off Linux only the windows' lengths are read.
 #[cfg(not(target_os = "linux"))]
 pub fn now() -> u64 {
     static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();

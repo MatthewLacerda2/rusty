@@ -7,8 +7,11 @@ use super::forwards;
 use rusty_scene::Scene;
 use rusty_script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
+/// The `Harness` verbs that change the world without a tick, so a demo must note them: every
+/// other verb reads the world or steps it.
 pub const HARNESS_VERBS: &[&str] = &["AttachPlayerBot", "LoadStress"];
 
+// Skips `math`: its `random` shims call `Random.*`, which is wrapped, so each draw is noted once.
 const WRAP: &str = r#"
 local note, check, harness_verbs = ...
 local skip = { string = true, table = true, coroutine = true, utf8 = true, math = true,
@@ -41,6 +44,7 @@ for _, name in ipairs(harness_verbs) do
 end
 "#;
 
+/// Nesting a table argument may hold; deeper is taken for a cycle.
 const MAX_DEPTH: usize = 32;
 
 pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Result<()> {
@@ -55,6 +59,7 @@ pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Res
     })?;
     let checks = Rc::clone(journal);
     let check = lua.create_function(move |_, (function, returned): (String, MultiValue)| {
+        // Its handle notes its own field writes and calls (`script_ref`), so it is no taint.
         if function == "Scene.GetScript" {
             return Ok(());
         }
@@ -97,6 +102,7 @@ fn table(t: &Table, depth: usize) -> Result<Plain, &'static str> {
         let value = plain(&value, depth + 1)?;
         let key = match key {
             Value::String(s) => s.to_str().map_err(|_| "binary key")?.to_string(),
+            // Zero-padded, so the sort by key below puts indices in numeric order.
             Value::Integer(i) if i >= 1 && i as usize <= len => format!("{i:020}"),
             _ => return Err("table with mixed keys"),
         };

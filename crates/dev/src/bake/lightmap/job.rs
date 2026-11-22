@@ -24,6 +24,7 @@ type Encoded = (
 
 #[derive(Debug, PartialEq)]
 pub enum BakeOutcome {
+    /// Live entities wearing a lightmap from the new pages; one deleted mid-bake is not counted.
     Baked(usize),
     Cancelled,
     Failed(String),
@@ -51,6 +52,7 @@ impl LightmapBakeJob {
         let started = Instant::now();
         let input = gather_bake_input(scene);
         super::fits::fits(&input, &settings, true)?;
+        // Freed chart buffers go back to the system, as `fits`' estimate counts on.
         crate::memory::return_large_frees();
         let (progress, measure) = Measure::start(&settings, started.elapsed());
         let lights = rusty_lighting::lightmap::taken_lights(scene);
@@ -68,6 +70,7 @@ impl LightmapBakeJob {
             .spawn(move || {
                 let started = Instant::now();
                 let baked = bake_progressive(&input, &settings, &watch, view, &mut encoder);
+                // Joins the preview writer, so no preview page lands after the bake.
                 drop(encoder);
                 let traced = Instant::now();
                 let encoded = match baked {

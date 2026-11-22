@@ -23,6 +23,8 @@ pub(super) struct Previews {
     pub(super) prefix: String,
 }
 
+/// Numbers each bake's preview pages, so a writer finishing for a dropped bake removes only
+/// its own.
 static BAKES: AtomicU32 = AtomicU32::new(0);
 
 impl Previews {
@@ -36,6 +38,8 @@ impl Previews {
     }
 
     pub fn show(&mut self, scene: &mut Scene) -> Option<Pass> {
+        // Never waits on the writer's hand-over: a frame that finds it busy shows the pass at
+        // the next frame.
         let mut shared = match self.latest.try_lock() {
             Ok(shared) => shared,
             Err(TryLockError::Poisoned(e)) => e.into_inner(),
@@ -49,6 +53,7 @@ impl Previews {
         let keep = stems(&set);
         scene.lightmaps = set.into();
         let old = std::mem::replace(&mut shared.shown, keep);
+        // Only the pages shown before, not a prefix sweep: the writer may be writing the next pass.
         let gone = old.difference(&shared.shown).cloned().collect();
         if let Err(e) = remove_stems(&self.dir, &gone) {
             log::warn!("[LightmapBake] remove a preview page no longer shown: {e}");

@@ -1,3 +1,6 @@
+//! `bench-scenes`' flags. `src/bin/bench_scenes/children.rs` passes each child process its own:
+//! rename a flag in both.
+
 use std::path::PathBuf;
 
 use rusty_core::project::{take_flag, take_value};

@@ -37,6 +37,7 @@ pub(super) fn keep_console(harness: &Harness, out_dir: &Path, scene: &str) -> Op
     ))
 }
 
+/// The count a console line stands for, read from the `msg (×3)` `ConsoleLogs::collapsed` writes.
 fn repeats(msg: &str) -> u64 {
     msg.strip_suffix(')')
         .and_then(|m| m.rsplit_once(" (×"))
@@ -106,6 +107,7 @@ pub fn lights(scene: &Scene) -> Lights {
         }
         let mode = scene.light_mode(id, &light);
         out.total += 1;
+        // `false`: shaded as a frame draws it, not as a probe capture.
         out.live += u32::from(mode.renders_live(false));
         out.mixed += u32::from(mode == LightMode::Mixed);
     }
@@ -170,6 +172,7 @@ pub fn scene_bakes(
     let nav = nav.tracks(&live).then(|| nav.last_start()).flatten();
     let path = world.script_manager().scene_path_cell().borrow().clone();
     let path = path.unwrap_or_else(|| own.to_string_lossy().into_owned());
+    // `stale` was judged on scene `loaded`'s first frame: a scene swapped in since gets none.
     let stale = stale.filter(|_| live.id() == loaded);
     out.extend(bakes_unused(&live, &path, stale, nav));
     out
