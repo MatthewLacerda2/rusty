@@ -217,12 +217,6 @@ mod compressed_gpu_tests;
 #[cfg(test)]
 mod data_map_tests;
 #[cfg(test)]
-mod deep_draw_gpu_tests;
-#[cfg(test)]
-mod deep_gpu_tests;
-#[cfg(test)]
-mod deep_tests;
-#[cfg(test)]
 mod extracted_gpu_tests;
 #[cfg(test)]
 mod formats_tests;

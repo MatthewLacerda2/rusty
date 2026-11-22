@@ -56,3 +56,10 @@ pub(super) fn upload(
     super::write_base(writes, &texture, &bytes, 8);
     texture
 }
+
+#[cfg(test)]
+mod draw_gpu_tests;
+#[cfg(test)]
+mod gpu_tests;
+#[cfg(test)]
+mod tests;

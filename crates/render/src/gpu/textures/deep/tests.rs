@@ -2,10 +2,10 @@ use std::path::Path;
 
 use image::{DynamicImage, ImageBuffer, Rgba};
 
-use super::compressed::reads_as;
-use super::deep::{stored, wanted, DEEP_FORMAT, SIGNED_NORMAL_MAP};
-use super::freshness_tests::temp_png;
-use super::TextureKind;
+use super::{stored, wanted, DEEP_FORMAT, SIGNED_NORMAL_MAP};
+use crate::gpu::textures::compressed::reads_as;
+use crate::gpu::textures::freshness_tests::temp_png;
+use crate::gpu::textures::TextureKind;
 use crate::readback::read_texture_bytes;
 use rusty_asset::sidecar::{set_texture, TextureSettings, TextureType};
 use rusty_asset::MapRef;
@@ -63,7 +63,7 @@ fn a_16_bit_upload_serves_only_a_normal_slot() {
 
 #[test]
 fn the_shader_reads_the_flag_a_signed_upload_sets() {
-    let wgsl = include_str!("../../../../../engine/shaders/forward/mapping.wgsl");
+    let wgsl = include_str!("../../../../../../engine/shaders/forward/mapping.wgsl");
     let line = format!("const SIGNED_NORMAL_MAP: u32 = {SIGNED_NORMAL_MAP}u;");
     assert!(wgsl.contains(&line), "{line}");
 }

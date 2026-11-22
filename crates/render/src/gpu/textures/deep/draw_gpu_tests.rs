@@ -3,7 +3,7 @@ use std::path::Path;
 use glam::Vec3;
 use image::{ImageBuffer, Rgba};
 
-use super::freshness_tests::temp_png;
+use crate::gpu::textures::freshness_tests::temp_png;
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_asset::sidecar::{set_texture, Compression, TextureSettings, TextureType};
 use rusty_components::{
