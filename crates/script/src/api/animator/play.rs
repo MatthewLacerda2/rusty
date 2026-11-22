@@ -56,6 +56,7 @@ fn warn_unknown_clip(
     let Some(mesh) = scene.world.mesh(id) else {
         return;
     };
+    // No clips may mean not loaded yet: a `Play` issued before the mesh loads must not warn.
     if mesh.clips.is_empty() || mesh.clips.iter().any(|c| c.name == clip) {
         return;
     }

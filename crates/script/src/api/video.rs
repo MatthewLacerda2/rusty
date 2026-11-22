@@ -1,5 +1,6 @@
-//! touched from script. Every write is ONE-WAY into render-only state — it never
-//! feeds `FixedUpdate`, so the deterministic sim is unaffected.
+//! Writes land in the shared `VideoSettings` cell, which the platform layer applies to the
+//! surface and window: no GPU is touched from script. Headless, the resolution is also the
+//! UI's screen size (`ScreenSize::pixels`).
 //! `GetDisplayScale` reads the display's backing scale off the `ScreenSize`
 //! resource, a sim input like the Game view's size `UI.GetScreenSize` reads: 1
 //! headless, and recorded by a demo, so a replay never depends on the monitor.

@@ -22,17 +22,23 @@ pub(super) struct ScriptInstance {
     pub(super) table: RegistryKey,
     pub(super) awoken: bool,
     pub(super) started: bool,
+    /// `OnEnable` fired and no `OnDisable` since; the sweeps diff it against the entity's
+    /// active state.
     pub(super) enabled_last: bool,
 }
 
 pub struct ScriptManager {
     pub(super) lua: Option<Lua>,
+    /// Keyed by entity and slot in its `scripts`. A `BTreeMap`: every dispatch runs in key
+    /// order, which replays rely on.
     pub(super) entity_scripts: BTreeMap<(u32, usize), ScriptInstance>,
     pub(super) load_attempted: BTreeSet<(u32, usize)>,
     pub(super) classes: super::loader::ScriptClasses,
     pub(super) spawn_cursor: Option<Cursor<Vec<ScriptComponent>>>,
     pub(super) requeued: BTreeSet<u32>,
     pub(super) cells: ApiCells,
+    /// Empty, the working directory, for the editor and the player; the headless harness
+    /// sets its own.
     workspace: PathBuf,
     play_seed: u64,
     pub(super) journal: Rc<RefCell<HostJournal>>,
@@ -82,6 +88,8 @@ impl ScriptManager {
         *self.cells.random.borrow_mut() = Random::new(self.play_seed);
         *self.cells.event_system.borrow_mut() = EventSystem::default();
 
+        // This `print` is not the `api/` surface's, which reaches cells as app data: no
+        // injector swaps the console cell, so holding its `Rc` stays safe.
         let console_clone = Rc::clone(&self.cells.console);
         let print_fn = lua
             .create_function(move |_, msg: String| {
@@ -135,6 +143,7 @@ impl ScriptManager {
         self.play_seed
     }
 
+    /// Takes effect at the next `init_runtime`.
     pub fn set_play_seed(&mut self, seed: u64) {
         self.play_seed = seed;
     }

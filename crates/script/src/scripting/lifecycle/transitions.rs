@@ -5,6 +5,7 @@ use super::super::callbacks::{ON_DESTROY, ON_DISABLE};
 use super::super::manager::{ScriptInstance, ScriptManager};
 use rusty_scene::{Despawn, Scene};
 
+/// Deepest first, then `ids`' order (the sort is stable), so every child precedes its parent.
 fn teardown_order(scene: &Scene, ids: &[u32]) -> Vec<u32> {
     let mut order = ids.to_vec();
     order.sort_by_cached_key(|&id| Reverse(scene.world.ancestors(id).count()));
@@ -36,6 +37,8 @@ impl ScriptManager {
         }
     }
 
+    /// The queue is taken up front, so a destroy asked inside an `OnDestroy` waits for the
+    /// next tick's drain.
     pub fn apply_pending_destroys(&mut self) -> Vec<(u32, [f32; 3])> {
         let ids = self.cells.scene.borrow_mut().take_pending_destroys();
         if ids.is_empty() {
@@ -45,6 +48,7 @@ impl ScriptManager {
             let scene = self.cells.scene.borrow();
             let doomed: BTreeSet<u32> = ids.iter().flat_map(|&id| scene.destroy_set(id)).collect();
             let order = teardown_order(&scene, &doomed.iter().copied().collect::<Vec<_>>());
+            // World space: a child's sound stops where it was heard, not at its local offset.
             let at = |id: u32| (id, scene.world.world_position(id).to_array());
             let removed = order.iter().map(|&id| at(id)).collect();
             (doomed, order, removed)
@@ -58,6 +62,7 @@ impl ScriptManager {
         removed
     }
 
+    /// `ids` come sorted ascending: `forget_entities` binary-searches them.
     pub fn unload_entities(&mut self, ids: &[u32]) {
         let order = teardown_order(&self.cells.scene.borrow(), ids);
         self.dispatch_teardown(&order);

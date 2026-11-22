@@ -19,6 +19,8 @@ pub struct FileFeed {
 }
 
 impl FileFeed {
+    /// `fold`: a `repeated` record, which counts up the newest line only when that one
+    /// was a `repeated` record too, as the buffer folds.
     pub(super) fn push(&mut self, msg: &str, level: &LogLevel, times: u32, fold: bool) {
         if let Some(last) = self.lines.last_mut().filter(|_| fold && self.repeat) {
             if last.msg == msg && last.level == *level {

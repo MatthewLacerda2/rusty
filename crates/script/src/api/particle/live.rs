@@ -9,7 +9,7 @@ use crate::api::Reg;
 use rusty_components::particle::{EmitterFrame, Particle, ParticleEmitterComponent};
 use rusty_scene::Scene;
 
-/// `live.lua` refuses to load if its own order differs, so this list is the layout's one source.
+/// `live.lua` refuses to load if its order differs: this list is the layout's one source.
 pub(super) const NAMES: [&str; FIELDS] = [
     "x", "y", "z", "vx", "vy", "vz", "age", "lifetime", "size", "rotation", "r", "g", "b", "a",
     "custom1", "custom2", "custom3", "custom4",
@@ -17,6 +17,7 @@ pub(super) const NAMES: [&str; FIELDS] = [
 pub(super) const FIELDS: usize = 18;
 const PARTICLE: usize = FIELDS * 4;
 const RECORD: usize = 4 + PARTICLE;
+/// A record's source for a table no read handed out; `live.lua`'s `NO_SOURCE` mirrors it.
 const NO_SOURCE: u32 = u32::MAX;
 const SLOTS: u32 = 32;
 const _: () = assert!(FIELDS as u32 <= SLOTS, "an edit's slot must fit its stride");
@@ -53,6 +54,7 @@ pub(super) fn touched(e: &mut ParticleEmitterComponent) {
     e.runtime.revision = e.runtime.revision.wrapping_add(1);
 }
 
+/// Its bits, for equality only.
 pub(super) fn revision(e: &ParticleEmitterComponent) -> i64 {
     e.runtime.revision as i64
 }
@@ -220,7 +222,7 @@ fn edited(mut read: Vec<Particle>, edits: &[f64], kills: &[u32]) -> Result<Vec<P
     Ok(read)
 }
 
-/// Rotation is written only when it differs from `p`'s in degrees, so a round trip keeps the
+/// Rotation is written only when it differs from `p`'s in degrees, so a round trip keeps
 /// radians bit for bit.
 pub(super) fn apply(p: &mut Particle, values: &[f32; FIELDS]) {
     let mut now = fields(p);

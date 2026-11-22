@@ -5,6 +5,7 @@ use mlua::{Lua, Table};
 use super::refresh_table;
 use rusty_asset::audio::Refresh;
 
+// On macOS and Linux `\` is part of a file name, not a separator, so it reaches Lua as is.
 #[test]
 fn refresh_returns_paths_to_lua_as_spelled() {
     let report = Refresh {

@@ -28,6 +28,7 @@ pub(super) fn to_receiver(
     event: &Table,
 ) -> mlua::Result<f64> {
     sense_event(scene, id, amount, event)?;
+    // Bound apart so the scene borrow ends before a handler runs; a `match` scrutinee's would not.
     let found = receiver(lua, &scene.borrow(), id);
     match found {
         Some(r) => call(lua, r, amount, event),

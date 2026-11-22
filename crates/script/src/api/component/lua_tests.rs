@@ -129,6 +129,7 @@ fn every_component_round_trips_get_into_set_through_lua() {
                     fields.remove(name);
                 }
             }
+            // No unchanged-key skip: every op runs, so one refusing its own value fails here.
             let written = (kind.write)(&mut scene.borrow_mut().world, id, &fields, Skip::Nothing);
             assert_eq!(written, Ok(true), "{}", kind.name);
             let after = (kind.read)(&scene.borrow().world, id);

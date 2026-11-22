@@ -36,6 +36,7 @@ fn the_loader_applies_fields_of_a_chunk_reading_the_api() {
 
 #[test]
 fn an_unreadable_schema_warns_once_per_script() {
+    // Errors only in the inspection VM: the gameplay VM has `__gameplay` set before the load.
     let code = "if not rawget(_G, '__gameplay') then error('boom') end\n\
                 return { fields = { speed = 3 }, Start = function(id) end }";
     let (mut m, id) = manager_with_entity();
