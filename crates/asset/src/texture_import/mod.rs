@@ -1,6 +1,6 @@
-//! An image fitted to its *Max Size* and block-compressed at import, as Unity's texture importer does.
+//! Unity's texture importer: fitted to its *Max Size*, then block-compressed.
 //!
-//! A `Default` texture keeps sRGB storage; with *sRGB* off it is stored and sampled raw. One drawn in a slot its type cannot serve (a BC5 normal as albedo loses blue) uploads uncompressed ([`fits`]).
+//! A texture drawn in a slot its type cannot serve (a BC5 normal as albedo loses blue) uploads uncompressed ([`fits`]).
 //!
 //! stored-format: the `<source>.bctex` compressed copies in the import cache (`cache`), and an extracted texture's `<glb>.bctex/<image>.bctex` (`location`)
 //!
@@ -33,6 +33,8 @@ pub use shrink::{fit, fitted_size};
 use super::convert::{source_digest, Seen};
 use super::sidecar::{Compression, TextureSettings, TextureType};
 
+/// Bump whenever `encode` writes other blocks for the same input: it re-makes every cached
+/// texture.
 pub const ENCODER_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

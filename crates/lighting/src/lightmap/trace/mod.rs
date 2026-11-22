@@ -1,3 +1,6 @@
+//! A texel stores `E / π`, as ambient and SSIL's bounce do; the forward shader multiplies it
+//! by albedo.
+
 use std::f32::consts::{PI, TAU};
 
 use glam::{Vec2, Vec3, Vec4};
@@ -162,6 +165,8 @@ impl<'a> Tracer<'a> {
         Some((point + n * SURFACE_OFFSET, n, mesh.run_at(tri.first)))
     }
 
+    /// Visibility per light, not light: the shader multiplies the live attenuation by it, as
+    /// Unity's shadowmask does.
     pub(super) fn mask(&self, point: Vec3) -> Vec4 {
         let mut mask = Vec4::ONE;
         for light in &self.scene.lights {

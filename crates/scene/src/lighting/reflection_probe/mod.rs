@@ -146,6 +146,8 @@ fn finite_or(value: f32, fallback: f32) -> f32 {
     }
 }
 
+/// Both mirrored by the shader's `parallax_correct`; keep them equal (WGSL may assume no inf
+/// or NaN).
 pub const PARALLEL_EPSILON: f32 = 1e-6;
 pub const NO_HIT: f32 = 1e30;
 

@@ -1,4 +1,5 @@
-//! Atomicity (staging swap, lock) is this module's, never a converter's.
+//! A converter never logs: it reports deliberate skips in `Converted` and fails otherwise, or
+//! a partial cache is stamped current. Atomicity (staging swap, lock) is this module's.
 //!
 //! stored-format: the import cache's converted `.glb` files and their fingerprints
 
@@ -44,7 +45,7 @@ pub fn conversions() -> usize {
 
 pub const IMPORT_CACHE_DIR: &str = "assets/generated/imported";
 
-/// While conversion is off (Play, a shipped game): the cache as it stands, else an error.
+/// While conversion is off: the cache as it stands, else an error.
 pub fn cached_gltf(path: &Path) -> Result<PathBuf, ImportError> {
     let converter = converter_for(path)
         .ok_or_else(|| ImportError::UnsupportedFormat(paths::extension(path)))?;
@@ -90,7 +91,7 @@ pub fn refresh(converter: &Converter, source: &Path, out: &Path) -> Result<(), I
         std::fs::create_dir_all(dir).map_err(|e| write_error(dir, &e))?;
     }
     let _lock = lock::hold(out);
-    // Re-checked under the lock: a waiter may find the cache already converted.
+    // A waiter may find it already converted.
     let Some(stamp) = stale(converter, source, out, tool)? else {
         return Ok(());
     };
@@ -125,8 +126,7 @@ pub fn is_import_cache(path: &Path) -> bool {
     paths::to_slash(path).contains(IMPORT_CACHE_DIR)
 }
 
-/// Rebuilt from components, never by rewriting `\`: on Linux and macOS it is part of a
-/// file name.
+/// Rebuilt from components: on Linux and macOS `\` is part of a file name.
 fn project_relative(root: &Path, path: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !root.join(project::PROJECT_FILE).is_file() {
         return Ok(None);

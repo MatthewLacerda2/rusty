@@ -1,3 +1,6 @@
+//! Phase one draws through the prepass's pipelines, so the depth it keeps equals a full
+//! prepass of the final set byte for byte.
+
 pub(crate) mod clusters;
 mod counters;
 mod cull;

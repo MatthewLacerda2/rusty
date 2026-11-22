@@ -1,3 +1,7 @@
+//! Only pass-boundary timestamp writes (Apple GPUs sample at stage boundaries). Nothing waits
+//! on the GPU: a frame with no free readback buffer is not timed, and times pair with frames
+//! by index, never by arrival.
+
 mod clock;
 mod frame;
 mod readback;
@@ -62,7 +66,6 @@ struct Queries {
     /// Warned that a frame ran out of query pairs (once per timer).
     overflowed: Cell<bool>,
     ring: Ring,
-    /// The newest resolved frame not yet taken.
     ready: Option<GpuTimes>,
 }
 

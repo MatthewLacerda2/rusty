@@ -56,7 +56,7 @@ struct AmbientLight {
     _pad_equator: f32,
     gradient_ground: vec3<f32>,
     _pad_ground: f32,
-    // Intensity applied, convolved over π (so E / π); `w` unused.
+    // Intensity applied, convolved over π; `w` unused.
     sky_sh: array<vec4<f32>, 9>,
 };
 
@@ -103,7 +103,7 @@ struct LocalLight {
     mask_channel: f32,
 };
 
-// Index order is x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
+// x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
 fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     let clip = view_proj * vec4<f32>(world, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);

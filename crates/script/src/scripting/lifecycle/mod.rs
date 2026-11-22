@@ -54,6 +54,7 @@ impl ScriptManager {
             .then(|| scene.world.is_active_in_hierarchy(id))
     }
 
+    /// Collected before dispatch, since the hooks re-borrow the scene.
     fn eligible_keys(&self, pred: impl Fn(&ScriptInstance) -> bool) -> Vec<(u32, usize)> {
         self.entity_scripts
             .iter()
@@ -85,6 +86,8 @@ impl ScriptManager {
         self.dispatch_pending(|i| i.awoken && !i.started, START, |i| i.started = true);
     }
 
+    /// Eligibility is re-read per phase, so an `Awake` that deactivates its entity defers
+    /// `OnEnable` and `Start`.
     fn dispatch_pending(
         &mut self,
         pred: impl Fn(&ScriptInstance) -> bool,
