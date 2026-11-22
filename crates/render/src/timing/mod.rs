@@ -1,4 +1,4 @@
-//! GPU time per render pass, written only at pass boundaries (Apple GPUs sample only there).
+//! GPU time per render or compute pass, written at its boundaries only (Apple GPUs sample there).
 //! Nothing waits on the GPU: a frame with no free readback buffer is not timed, and times pair
 //! with frames by index, never by arrival.
 

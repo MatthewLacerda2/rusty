@@ -2,8 +2,8 @@ use std::ops::Range;
 
 use crate::gpu::uniforms::ObjectData;
 
-/// Clean slots a dirty run may span to join the next: 32 records (8 KB) cost about one
-/// `write_buffer` call (lavapipe, release).
+/// Clean slots a dirty run may span to join the next: 32 object records (8 KB) cost about
+/// one `write_buffer` call (lavapipe, release).
 pub(crate) const JOIN_GAP: u32 = 32;
 
 pub(crate) trait Slotted: Copy + PartialEq + bytemuck::Pod {

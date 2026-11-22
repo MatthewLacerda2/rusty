@@ -6,6 +6,7 @@ pub struct GpuMemory {
 }
 
 pub fn gpu_memory(device: &wgpu::Device) -> Option<GpuMemory> {
+    // Caught up first, so what was dropped before the call is freed, not counted.
     let _ = device.poll(wgpu::PollType::wait_indefinitely());
     if let Some(report) = device.generate_allocator_report() {
         return Some(GpuMemory {

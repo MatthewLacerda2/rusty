@@ -3,6 +3,7 @@
 
 use crate::Renderer;
 
+/// Holds a headless budget slot until dropped: never park it in a static.
 pub fn headless_or_skip(width: u32, height: u32) -> Option<Renderer> {
     pollster::block_on(Renderer::new_headless(width, height))
 }

@@ -8,7 +8,8 @@ use crate::postfx::PfxTarget;
 use crate::PixelSize;
 use rusty_core::settings::GraphicsSettings;
 
-/// rg NDC motion, b linear view depth (world units), a the drawing camera's stack index (0 base).
+/// rg NDC motion, b linear view depth (world units; not distance, so depth of field focuses on
+/// a plane), a the drawing camera's stack index (0 base).
 pub(crate) const VELOCITY_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 /// A half float's largest value: the sky's depth. `SKY_DISTANCE` in `sky/motion.wgsl` mirrors it.

@@ -106,7 +106,7 @@ impl Renderer {
         for idx in 0..pass.stack.len() {
             if idx > 0 {
                 // This camera rewrites the camera uniform and draw buffers the last one's
-                // passes read.
+                // passes read: send those passes first.
                 commands.flush();
                 self.lap("camera.submit");
             }
@@ -121,6 +121,7 @@ impl Renderer {
                 }
                 self.lap(name);
                 if flushes_after(flushes, name) {
+                    // The GPU starts on what is recorded (`EARLY_FLUSHES`).
                     ctx.commands.flush();
                     self.lap("camera.flush");
                 }
@@ -154,6 +155,8 @@ impl Renderer {
         let baked = view.post_fx.grade.prepare(gpu, bake, effect.volume());
         self.frame_counters.grade_lut_bakes += u32::from(baked);
 
+        // The base camera's eye, paired with `base_view_proj`: this runs on the last
+        // camera, which may be an overlay.
         let eye = stack.stack[0].position.to_array();
         let params = frame_params(scene, ctx.base_view_proj, eye);
         let sky = self.sky_panorama();

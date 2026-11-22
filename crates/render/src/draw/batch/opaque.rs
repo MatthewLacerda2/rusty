@@ -8,8 +8,8 @@ impl OpaqueBatches {
         Self(batches, order)
     }
 
-    /// Whether they were sorted for a forward pass `primed` or not: none to order
-    /// is either.
+    /// Whether they were sorted for a forward pass `primed` or not. No batches count as
+    /// sorted for both.
     pub(crate) fn ranked_for(&self, primed: bool) -> bool {
         self.0.is_empty() || self.1 == OpaqueOrder::primed(primed)
     }

@@ -100,6 +100,8 @@ impl Renderer {
         let guards = borrow_post_source(scene, screen.base_id);
         let post = guards.source();
         let shadows = post.volume.map(|vc| vc.shadows).unwrap_or_default();
+        // Shadows follow the base camera, which every camera samples: its cascades, its LOD
+        // levels and its small-object cull, so a shadow shows what its caster shows.
         let base_lod = LodSelection::for_camera(scene, &stack[0]);
         self.lap("setup");
         let mut commands = Commands::new(&self.device, &self.queue, "Frame Encoder");
@@ -157,6 +159,7 @@ impl Renderer {
     ) {
         self.begin_frame_clocks();
         self.prepare_frame(view, scene, camera);
+        // The main camera's shadow settings: how the scene is lit, not how the capture sees.
         let shadows = borrow_post_source(scene, rusty_scene::camera::main_camera(scene))
             .source()
             .volume

@@ -6,9 +6,10 @@ use rusty_components::{LightProbeProxyVolumeComponent as Volume, ProxyGrid, Prox
 use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::Scene;
 
-/// Both count vec4s, as `forward/proxy_volume.wgsl` does: the box matrix's 4 columns and the
-/// dims, then 4 L1 SH a point.
+// `forward/proxy_volume.wgsl` mirrors both constants: change them together.
+/// vec4s before a volume's points: the world-to-box matrix's 4 columns, then the grid's dims.
 pub(crate) const HEADER: usize = 5;
+/// vec4s per point: the L1 SH, one RGB coefficient each.
 pub(crate) const COEFFS: usize = 4;
 
 #[derive(Default)]

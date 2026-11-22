@@ -20,6 +20,7 @@ struct Slot {
 }
 
 pub(super) struct Ring {
+    /// Queries resolve here, then copy to a slot: a resolve target cannot be mapped.
     resolve: wgpu::Buffer,
     slots: Vec<Slot>,
 }

@@ -77,6 +77,8 @@ pub(crate) struct WorldUniforms {
 }
 
 impl Renderer {
+    /// `view_proj` is the one the solids drew with (`CameraCtx::view_proj`, jittered
+    /// under TAA), not the camera's: a canvas is depth-tested against them.
     pub(crate) fn draw_world_ui(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,

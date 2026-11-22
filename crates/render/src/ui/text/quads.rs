@@ -6,7 +6,7 @@ use crate::ui::vertex::MODE_TEXT;
 use rusty_components::TextComponent;
 use rusty_ui::text::{layout_text, PlacedGlyph};
 
-/// x per unit of height above the baseline (about 11°).
+/// Synthesized italic's shear: x per unit of height above the baseline (about 11°).
 const ITALIC_SHEAR: f32 = 0.2;
 /// Synthesized bold's dilation per side, in ems.
 const FAUX_BOLD_DILATE: f32 = 0.02;
@@ -38,6 +38,7 @@ pub(crate) fn text_quads(
         let lo = g.origin + atlas.origin * scale;
         let hi = lo + Vec2::new(atlas.texels[2] as f32, atlas.texels[3] as f32) * scale;
         let sdf = effects(text, g);
+        // A zero width zeroes its colour too: the shader's smoothstep still tints the edge.
         let unless_zero = |width: f32, c: Vec4| if width > 0.0 { c } else { Vec4::ZERO };
         main.push(TextQuad {
             font: font.clone(),

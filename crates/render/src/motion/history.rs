@@ -33,6 +33,7 @@ pub(crate) struct Pose {
 #[derive(Default)]
 pub(crate) struct MotionHistory {
     key: Option<HistoryKey>,
+    /// By camera entity, not stack place: a camera swapped in there starts with no last frame.
     cameras: HashMap<Option<u32>, Mat4>,
     prev: HashMap<u32, Pose>,
     next: HashMap<u32, Pose>,

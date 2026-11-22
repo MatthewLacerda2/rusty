@@ -120,6 +120,7 @@ impl Renderer {
         let mut instance = InstanceData::of(object.slot);
         instance.reflection_probe = self.reflection_probes.probe_for(centre);
         let use_sh = self.retained.objects.get(object.slot).use_sh == 1;
+        // A capture bakes the probes a proxy volume samples, so it binds none.
         if use_sh && !self.capture.static_only {
             let at = (object.world, object.local_aabb);
             instance.proxy_volume = self.proxy_volumes.push(scene, id, at, out.proxies);

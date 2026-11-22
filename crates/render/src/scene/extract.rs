@@ -206,7 +206,7 @@ impl Renderer {
         derived
     }
 
-    /// Inactive entities' maps too: re-enabling one must not stall on uploads and mip generation.
+    /// Loads inactive entities' maps too: re-enabling one must not stall on uploads and mips.
     fn load_maps_of(&mut self, scene: &Scene, entities: &[u32]) {
         for &id in entities {
             let maps = scene

@@ -110,6 +110,7 @@ impl<'a> CameraCtx<'a> {
             overlay,
             view_proj,
             base_view_proj: shared.view_projs[0],
+            // Drawn jittered under TAA; culled through the unjittered matrix.
             frustum: Frustum::from_view_proj(unjittered),
             fog: shared.fog,
             ssao: shared.ssao.filter(|_| !overlay),

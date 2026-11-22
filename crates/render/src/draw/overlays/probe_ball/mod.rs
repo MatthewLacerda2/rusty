@@ -8,7 +8,8 @@ use crate::Renderer;
 use rusty_core::application::{Gizmo, SceneGizmos};
 use rusty_scene::Scene;
 
-/// Metres, at any distance: Unity's reflection-probe preview sphere is about half a metre.
+/// Metres in the world, the same at any distance: Unity's reflection-probe preview sphere
+/// is about half a metre.
 pub(crate) const BALL_DIAMETER: f32 = 0.5;
 
 pub(crate) type BallResource = (u32, u32);

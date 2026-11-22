@@ -104,6 +104,7 @@ impl UiViewCache {
         self.uploads = 0;
         for (mesh, place) in meshes {
             let gpu = match old.remove(&mesh.canvas) {
+                // Adopt the new `Rc` even when equal, so the next still frame is `ptr_eq`.
                 Some(c) if Rc::ptr_eq(&c.mesh, &mesh) || c.mesh == mesh => CanvasGpu {
                     mesh,
                     place,

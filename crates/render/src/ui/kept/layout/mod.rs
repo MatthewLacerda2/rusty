@@ -124,6 +124,8 @@ impl Held {
         if (w.canvas || canvas_moved) && self.canvases != canvas_keys(world, view.screen) {
             return Some(Why::Screen);
         }
+        // A RectTransform write or an activation may join a laid-out parent, so it counts
+        // there; a re-parent stamps the parent's `Children`, so the rest count only held.
         let joins = |&id: &u32| e.moved(world, id, true);
         let held_only = |&id: &u32| e.holds(id).then(|| e.moved(world, id, false)).flatten();
         let why = (w.rect.iter())

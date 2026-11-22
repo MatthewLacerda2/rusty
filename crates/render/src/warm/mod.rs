@@ -107,8 +107,8 @@ fn meshes(data: &SceneData) -> Vec<Item> {
 }
 
 impl Renderer {
-    /// Whether it made one: `false` when done, or while the next is still read on a worker (retry
-    /// next frame).
+    /// Makes the next resource; returns whether it did: `false` when done, or while the next is
+    /// still read on a worker (retry next frame).
     pub fn warm_step(&mut self, data: &SceneData, warming: &mut Warming) -> bool {
         if warming.is_done() {
             return false;
