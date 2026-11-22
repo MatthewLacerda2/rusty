@@ -25,7 +25,7 @@ fn an_upright_cylinder_stands_flat_on_its_cap() {
             let up = (t.rotation * Vec3::Y).y;
             let label = format!("r {radius} h {height} on {ground:?}");
             assert!(up > 0.9999, "{label} tipped: up {up}");
-            // A tall thin one settles with a wobble of a centimetre a second, as before #2071.
+            // A tall thin one settles with a wobble of a centimetre a second.
             let drift = Vec3::new(t.position.x, 0.0, t.position.z).length();
             assert!(drift < 0.01, "{label} wandered {drift} m");
             assert!(floor_speed(&scene, id) < 1e-3, "{label} never settled");

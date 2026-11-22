@@ -23,8 +23,6 @@ use rusty_components::ColliderShape;
 
 type Manifold = ContactManifold<ContactManifoldData, ContactData>;
 
-/// The narrow phase every `PhysicsWorld` steps with: [`Rolling`] ahead of parry's
-/// default dispatcher, which answers everything `Rolling` leaves alone.
 pub(super) fn narrow_phase() -> NarrowPhase {
     NarrowPhase::with_query_dispatcher(Rolling::default().chain(DefaultQueryDispatcher))
 }
@@ -40,10 +38,9 @@ pub(crate) fn cylinder(half_height: Real, radius: Real, dynamic: bool) -> Collid
     }
 }
 
-/// `collider`, built for `shape` on a body that is `dynamic` or not, with its
-/// pairs kept out of rapier's contact recycling when it rolls (a cylinder or
-/// capsule on a dynamic body), by asking for a solver-contact hook the world
-/// never acts on (the module doc says why).
+/// Recycled contacts (kept while shapes barely move) fed energy into rolling bodies: a rolling
+/// cylinder or capsule on a dynamic body asks for a solver-contact hook the world never acts on,
+/// which keeps its pairs out of recycling.
 pub(crate) fn rolling(
     collider: ColliderBuilder,
     shape: &ColliderShape,
@@ -60,16 +57,12 @@ pub(crate) fn rolling(
     }
 }
 
-/// The contact generator for pairs with a rolling shape in them (the module doc
-/// says why). It answers `Unsupported` for everything else, so the chained
-/// default dispatcher handles it unchanged.
+/// Answers `Unsupported` for everything else, so the chained default dispatcher handles it.
 #[derive(Default)]
 struct Rolling {
     hulls: side::Hulls,
 }
 
-/// Whether `shape` rolls on a curved side, and so gets fresh points each tick:
-/// a rolling cylinder ([`side::rolling`]) or any capsule.
 fn rolls(shape: &dyn Shape) -> bool {
     shape.shape_type() == ShapeType::Capsule || side::rolling(shape).is_some()
 }
@@ -116,7 +109,6 @@ impl PersistentQueryDispatcher<ContactManifoldData, ContactData> for Rolling {
     }
 }
 
-/// Every one-shot query goes to the default dispatcher, on the true shapes.
 impl QueryDispatcher for Rolling {
     fn intersection_test(
         &self,
