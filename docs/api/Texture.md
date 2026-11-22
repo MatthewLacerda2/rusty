@@ -180,6 +180,8 @@ naming it.
 | `curvature_radius` | 2 % of the bounds diagonal | how far from a crease the `curvature` band reaches, in the model's own units (metres at import scale): `0.003` keeps a 3 mm chip on a 12 mm door edge. It is never narrower than three of its UV island's own texels: an island packed small in UV bakes wider, and the call warns once naming the radius asked for, the one those islands got and how many were raised (an island whose UVs enclose no area covers no texel and is never counted). One above the model's bounds diagonal is refused |
 | `ao_rays` | `64` (Substance's *Secondary Rays*) | rays per texel for `ao`, 1 to 1024: the grain falls with the square root (256 rays, half the grain of 64), and the time grows with the count: at 1024 a fully covered 4096² map takes about half an hour on 4 cores |
 | `thickness_rays` | `64` | rays per texel for `thickness`, 1 to 1024 |
+| `material` | every material | a material slot's name, or a list of them: only those materials' faces write texels (Substance's bake per *texture set*), so a model whose slots each fill UV0's unit square bakes one map per slot, one call each. Every other face still occludes them, and still shapes `curvature` across a shared edge. A face with no material is never named |
+| `ignore_occluders` | none | a list of material names (or one name) whose faces block no `ao` or `thickness` ray and pick no texel where triangles overlap (Substance's *Ignore* of a set among the occluders): glass, a decal sheet. They write no texel either, unless `material` names them too, which bakes their own atlas as if they were not there: a material in both lists blocks no ray of its own either, so a hollow glass bottle bakes `ao` and `thickness` flat |
 
 ```lua no-run
 Texture.BakeMeshMaps("assets/models/pool_fixtures.blend::Locker_Bank",
@@ -207,8 +209,23 @@ along every island's margin. Multiply it by `coverage` (a `mix` with
 triangle uses; the masked node's `mean` in `Texture.Stats`, divided by
 `coverage`'s own, is the mask's mean over the model's surface alone.
 
-The settings table sets the size, the curvature band and the ray counts; the
-rest is Substance's defaults and no argument changes it: an occluder distance of
+A name in `material` or `ignore_occluders` that the mesh's slots do not hold is an
+error listing the ones it does (`has no material "Glas" (its materials: Steel,
+Glass)`), and an empty list in either is refused before the model is read. A bake
+left with no face inside UV0's unit square is an error too: a `material` none of
+whose faces lies there, or an `ignore_occluders` that names every material. A material's render mode is not read: a `Transparent` one occludes like
+any other until `ignore_occluders` names it.
+
+```lua no-run
+local island = "assets/models/kolvik/control_island.blend::Control_Island"
+for _, slot in ipairs({ "Body", "Screens" }) do
+  Texture.BakeMeshMaps(island, { "ao", "coverage" }, "assets/textures/kolvik/island_" .. slot .. "_",
+    { resolution = 2048, ao_rays = 256, material = slot, ignore_occluders = { "Glass" } })
+end
+```
+
+The settings table sets the size, the curvature band, the ray counts and which
+faces take part; the rest is Substance's defaults and no argument changes it: an occluder distance of
 the whole bounds diagonal, and a **16-texel margin** around every UV island (a
 continuous map's margin averages its border, the ID map's copies it, so no margin
 holds a colour between two materials; `coverage` has none, and is the one map
@@ -607,7 +624,12 @@ and `flood_fill` reads it as a mask, its readers the islands it found.
   per channel, `[in_low, in_high]` → `[0, 1]` (clamped), raised to `1 / gamma`, then
   onto `[out_low, out_high]`, like Substance's *Levels*: `gamma` above 1 lifts the
   midtones and below 1 sinks them without moving the ends.
-- `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input).
+- `map_range {from_min, from_max, to_min, to_max}` (*math*, 1 input): remaps RGB
+  linearly from `[from_min, from_max]` onto `[to_min, to_max]`; alpha is left as it
+  is. **Unclamped**, unlike Blender's *Map Range*, whose Clamp is on by default: a
+  value outside the source range lands past the target range, and stays there until
+  a later op or the bake's own encoding clamps it. Equal `from_min` and `from_max`
+  give `to_min` everywhere.
 - `mapping {scale=[1,1], rotation=0, translation=[0,0], tiling=true}` (*vector*, 1
   input): bilinear, wrapped resample; `rotation` in turns; each transform left out is
   the identity, so `mapping {rotation = 0.25}` only turns. Each output point reads the
@@ -923,8 +945,10 @@ imported model, an earlier bake, a hand-made mask or logo
   folder named `engine/` is unreachable from a recipe.
 - `encoding = "srgb"` (the default, a colour image) decodes RGB from sRGB to linear;
   `"linear"` (a mask, a height, a normal map) reads every channel as stored. Alpha is
-  always as stored. 16-bit files keep their precision. png, jpeg and tga are read;
-  the format comes from the file's extension.
+  always as stored. 16-bit files keep their precision. png, jpeg and tga are read.
+  The format comes from the file's extension; a `path` whose extension names no
+  image format is read by its content instead, which finds a png or a jpeg but not
+  a tga (a tga has no signature to go by).
 - The file is resampled **bilinearly, wrapped**, to the recipe's `resolution` (or
   `size`, each axis on its own), so the recipe stays resolution-independent. A file
   already at that size reads back texel for texel.

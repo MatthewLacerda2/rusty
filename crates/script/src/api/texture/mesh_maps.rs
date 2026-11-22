@@ -8,7 +8,7 @@ use super::{folder, put};
 use crate::api::Reg;
 use rusty_asset::sidecar::{check_bake_size, prepare_bake};
 use rusty_asset::SubMesh;
-use rusty_lighting::mesh_maps::{bake, MeshMap, MeshSource, Settings, MAX_RESOLUTION};
+use rusty_lighting::mesh_maps::{bake, Faces, MeshMap, MeshSource, Settings, MAX_RESOLUTION};
 use rusty_procgen::bake::bake_to_png;
 use rusty_procgen::image_buf::Size;
 
@@ -21,11 +21,12 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
         "BakeMeshMaps",
         lua.create_function(
             |lua, (model, maps, prefix, options): (String, Vec<String>, String, Value)| {
-                let settings = settings(&options)
+                let (settings, faces) = settings(&options)
                     .map_err(|e| format!("Texture.BakeMeshMaps: {model}: {e}"))
                     .map_err(mlua::Error::RuntimeError)?;
                 let root = rusty_core::project::root();
-                let written = bake_mesh_maps(&model, &maps, &prefix, &settings, &root)
+                let call = (settings, faces);
+                let written = bake_mesh_maps(&model, &maps, &prefix, &call, &root)
                     .map_err(mlua::Error::RuntimeError)?;
                 lua.create_table_from(written)
             },
@@ -41,13 +42,45 @@ struct Options {
     curvature_radius: Option<f32>,
     ao_rays: Option<u32>,
     thickness_rays: Option<u32>,
+    material: Option<serde_json::Value>,
+    ignore_occluders: Option<serde_json::Value>,
 }
 
-pub(super) fn settings(options: &Value) -> Result<Settings, String> {
+/// Material names as the script wrote them, resolved once the model is loaded.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) struct FaceNames {
+    pub material: Option<Vec<String>>,
+    pub ignore_occluders: Vec<String>,
+}
+
+fn names(field: &str, value: Option<serde_json::Value>) -> Result<Option<Vec<String>>, String> {
+    use serde_json::Value as J;
+    let bad = || format!("settings: {field} is a material name or a list of them");
+    match value {
+        None => Ok(None),
+        Some(J::String(name)) => Ok(Some(vec![name])),
+        // An empty Lua table reaches JSON as an object.
+        Some(J::Object(o)) if o.is_empty() => Err(empty(field)),
+        Some(J::Array(list)) if list.is_empty() => Err(empty(field)),
+        Some(J::Array(list)) => list
+            .into_iter()
+            .map(|v| v.as_str().map(str::to_string).ok_or_else(bad))
+            .collect::<Result<_, _>>()
+            .map(Some),
+        Some(_) => Err(bad()),
+    }
+}
+
+fn empty(field: &str) -> String {
+    format!("settings: {field} is an empty list; name a material or leave {field} out")
+}
+
+pub(super) fn settings(options: &Value) -> Result<(Settings, FaceNames), String> {
+    let plain = |s| Ok((s, FaceNames::default()));
     let table = match options {
-        Value::Nil => return Ok(Settings::new(DEFAULT_RESOLUTION)),
-        Value::Integer(n) => return Ok(Settings::new(side(*n)?)),
-        Value::Number(n) if n.fract() == 0.0 => return Ok(Settings::new(side(*n as i64)?)),
+        Value::Nil => return plain(Settings::new(DEFAULT_RESOLUTION)),
+        Value::Integer(n) => return plain(Settings::new(side(*n)?)),
+        Value::Number(n) if n.fract() == 0.0 => return plain(Settings::new(side(*n as i64)?)),
         Value::Table(_) => crate::api::lua_json::lua_to_json(options)?,
         other => {
             return Err(format!(
@@ -72,12 +105,17 @@ pub(super) fn settings(options: &Value) -> Result<Settings, String> {
         (r, None) => Size::from(r.unwrap_or(DEFAULT_RESOLUTION)),
     };
     let defaults = Settings::new(size);
-    Ok(Settings {
+    let faces = FaceNames {
+        material: names("material", o.material)?,
+        ignore_occluders: names("ignore_occluders", o.ignore_occluders)?.unwrap_or_default(),
+    };
+    let settings = Settings {
         curvature_radius: o.curvature_radius,
         ao_rays: o.ao_rays.unwrap_or(defaults.ao_rays),
         thickness_rays: o.thickness_rays.unwrap_or(defaults.thickness_rays),
         ..defaults
-    })
+    };
+    Ok((settings, faces))
 }
 
 fn side(n: i64) -> Result<u32, String> {
@@ -88,7 +126,7 @@ pub(super) fn bake_mesh_maps(
     model: &str,
     maps: &[String],
     prefix: &str,
-    settings: &Settings,
+    (settings, faces): &(Settings, FaceNames),
     root: &Path,
 ) -> Result<BTreeMap<String, String>, String> {
     let fail = |e: String| format!("Texture.BakeMeshMaps: {model}: {e}");
@@ -100,7 +138,11 @@ pub(super) fn bake_mesh_maps(
         .map(|m| MeshMap::parse(m))
         .collect::<Result<Vec<_>, _>>()
         .map_err(fail)?;
-    let source = load(model).map_err(fail)?;
+    let (source, materials) = load(model).map_err(fail)?;
+    let settings = &Settings {
+        faces: resolve(faces, &materials).map_err(fail)?,
+        ..settings.clone()
+    };
     let path = |map: &MeshMap| format!("{prefix}{}.png", map.name());
     let paths: Vec<String> = maps.iter().map(path).collect();
     let Size { width, height } = settings.size;
@@ -128,7 +170,34 @@ pub(super) fn bake_mesh_maps(
     Ok(out)
 }
 
-fn load(model: &str) -> Result<MeshSource, String> {
+fn resolve(names: &FaceNames, materials: &[(usize, String)]) -> Result<Faces, String> {
+    let find = |list: &[String]| -> Result<Vec<usize>, String> {
+        let mut out = Vec::new();
+        for name in list {
+            let found = materials.iter().filter(|(_, n)| n == name).map(|&(i, _)| i);
+            let before = out.len();
+            out.extend(found);
+            if out.len() == before {
+                let known: Vec<_> = materials.iter().map(|(_, n)| n.as_str()).collect();
+                return Err(match known.is_empty() {
+                    true => format!("has no material \"{name}\" (it has no material slots)"),
+                    false => format!(
+                        "has no material \"{name}\" (its materials: {})",
+                        known.join(", ")
+                    ),
+                });
+            }
+        }
+        Ok(out)
+    };
+    Ok(Faces {
+        materials: names.material.as_deref().map(find).transpose()?,
+        ignore_occluders: find(&names.ignore_occluders)?,
+    })
+}
+
+/// The mesh, and the index and name of each material its runs draw with.
+fn load(model: &str) -> Result<(MeshSource, Vec<(usize, String)>), String> {
     let (path, sub) = match model.split_once(rusty_asset::REF_SEPARATOR) {
         Some(_) => {
             let r = rusty_asset::AssetRef::parse(model).map_err(|e| e.to_string())?;
@@ -144,7 +213,15 @@ fn load(model: &str) -> Result<MeshSource, String> {
         None if meshes.len() == 1 => meshes.first(),
         None => None,
     };
-    pick.map(MeshSource::from_sub_mesh).ok_or_else(|| {
+    let used = |mesh: &SubMesh| {
+        let mut used: Vec<usize> = mesh.ranges.iter().filter_map(|r| r.material).collect();
+        used.sort_unstable();
+        used.dedup();
+        let name = |i: usize| imported.asset.materials.get(i).map(|m| m.name.clone());
+        let names = used.into_iter().filter_map(|i| Some((i, name(i)?)));
+        (MeshSource::from_sub_mesh(mesh), names.collect())
+    };
+    pick.map(used).ok_or_else(|| {
         let ids = imported.asset.sub_mesh_ids().join(", ");
         match sub {
             Some(s) => format!("has no sub-object \"{s}\" (it has: {ids})"),
@@ -159,3 +236,7 @@ fn load(model: &str) -> Result<MeshSource, String> {
 #[cfg(test)]
 #[path = "mesh_maps_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "mesh_maps_faces_tests.rs"]
+mod faces_tests;

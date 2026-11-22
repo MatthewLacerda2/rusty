@@ -46,12 +46,13 @@ impl MeshSource {
         }
     }
 
-    pub(super) fn material_key(&self, first: usize) -> usize {
+    pub(super) fn material(&self, first: usize) -> Option<usize> {
         let run = self.runs.partition_point(|&(end, _)| end as usize <= first);
-        self.runs
-            .get(run)
-            .and_then(|&(_, m)| m)
-            .map_or(0, |m| m + 1)
+        self.runs.get(run).and_then(|&(_, m)| m)
+    }
+
+    pub(super) fn material_key(&self, first: usize) -> usize {
+        self.material(first).map_or(0, |m| m + 1)
     }
 
     pub(super) fn face_normal(&self, first: usize) -> Option<Vec3> {

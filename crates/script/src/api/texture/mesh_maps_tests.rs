@@ -21,6 +21,10 @@ fn project(name: &str) -> (PathBuf, String) {
     (dir, model.to_str().unwrap().to_string())
 }
 
+pub(super) fn plain(s: Settings) -> (Settings, FaceNames) {
+    (s, FaceNames::default())
+}
+
 fn all() -> Vec<String> {
     MeshMap::ALL.map(|m| m.name().to_string()).to_vec()
 }
@@ -29,7 +33,7 @@ fn all() -> Vec<String> {
 fn every_map_is_written_beside_the_prefix_in_a_new_folder() {
     let (dir, model) = project("mesh_maps_all");
     let prefix = format!("{}/maps/l_", dir.to_str().unwrap());
-    let written = bake_mesh_maps(&model, &all(), &prefix, &Settings::new(16), &dir).unwrap();
+    let written = bake_mesh_maps(&model, &all(), &prefix, &plain(Settings::new(16)), &dir).unwrap();
     assert_eq!(written.len(), MeshMap::ALL.len());
     for (map, path) in &written {
         assert_eq!(path, &format!("{prefix}{map}.png"));
@@ -47,7 +51,7 @@ fn a_prefix_ending_in_a_slash_gets_its_folder_made() {
         &model,
         &["id".to_string()],
         &prefix,
-        &Settings::new(8),
+        &plain(Settings::new(8)),
         &dir,
     )
     .unwrap();
@@ -61,7 +65,7 @@ fn a_bad_call_names_the_verb_and_the_model() {
     let (dir, model) = project("mesh_maps_bad");
     let prefix = format!("{}/l_", dir.to_str().unwrap());
     let bad = |model: &str, maps: &[String]| {
-        bake_mesh_maps(model, maps, &prefix, &Settings::new(8), &dir).unwrap_err()
+        bake_mesh_maps(model, maps, &prefix, &plain(Settings::new(8)), &dir).unwrap_err()
     };
     let e = bad(&model, &["dirt".to_string()]);
     assert!(
@@ -107,7 +111,7 @@ fn a_recipe_reads_a_baked_map_through_the_image_op() {
 }
 
 fn settings_of(src: &str) -> Result<Settings, String> {
-    settings(&Lua::new().load(src).eval::<mlua::Value>().unwrap())
+    settings(&Lua::new().load(src).eval::<mlua::Value>().unwrap()).map(|(s, _)| s)
 }
 
 #[test]
@@ -184,7 +188,7 @@ fn a_radius_the_texels_cannot_hold_is_told_once_per_bake() {
             curvature_radius: Some(radius),
             ..Settings::new(16)
         };
-        bake_mesh_maps(&model, &maps, &prefix, &s, &dir).unwrap();
+        bake_mesh_maps(&model, &maps, &prefix, &plain(s), &dir).unwrap();
         rusty_test_support::logs::take()
             .into_iter()
             .filter(|m| m.contains("BakeMeshMaps") && m.contains("UV islands"))

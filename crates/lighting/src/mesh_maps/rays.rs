@@ -1,6 +1,6 @@
 use glam::{Vec3, Vec4};
 
-use super::{Baked, MeshSource};
+use super::{Baked, Faces, MeshSource};
 use crate::lightmap::{cosine_sample, Rays, Rng, TexelPoint, Tri};
 
 /// Rays per texel: Substance's default *Secondary Rays*.
@@ -21,12 +21,13 @@ pub(super) struct MeshRays {
 }
 
 impl MeshRays {
-    pub(super) fn new(source: &MeshSource) -> Self {
+    pub(super) fn new(source: &MeshSource, faces: &Faces) -> Self {
         let p = &source.positions;
         let tris = source
             .indices
             .chunks_exact(3)
             .enumerate()
+            .filter(|&(k, _)| faces.occludes(source.material(3 * k)))
             .map(|(k, t)| {
                 let [a, b, c] = [t[0], t[1], t[2]].map(|i| p[i as usize]);
                 Tri::new(a, b, c, 0, 3 * k as u32)
