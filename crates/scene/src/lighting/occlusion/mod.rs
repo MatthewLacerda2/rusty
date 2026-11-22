@@ -1,66 +1,3 @@
-//! crates/scene/src/lighting/occlusion/ — baked occlusion culling's data (#1714,
-//! part 2): a potentially visible set (PVS) over a grid of cells, baked from the
-//! static scene. This half is what a scene holds, saves and loads: the grid, the
-//! PVS ([`OcclusionData`]) and its file, and the fingerprints it is baked against
-//! (`gather`). The bake (`bake`, `sample`, the levels its tests build) is
-//! `rusty_lighting::occlusion`; the module paths below are that crate's unless they
-//! are this one's (`file`, `gather`, `grid`).
-//!
-//! Unity's Occlusion Culling (Umbra) bakes the same thing from the same inputs:
-//! static occluders and static occludees (`StaticEditorFlags`), read at runtime by a
-//! camera with `Camera.useOcclusionCulling`. rusty has one static flag, so a static
-//! mesh is both: an opaque one occludes and is occluded, a transparent, cutout or
-//! custom-shader one is only occluded (its holes or its moving vertices let a view
-//! through). A mesh in a `LODGroup`, or with a small-object cull, is only occluded
-//! too: what draws of it changes with the camera.
-//!
-//! **Cells.** A uniform 3D grid over the bounds of the static meshes it can cull
-//! ([`Grid`]), up to [`MAX_CELL`] a side (past it nothing is culled), not the room
-//! finder's rooms: rooms are found on one floor's plan (`placement::rooms`), while a
-//! Dust2-sized level has storeys, stairs, drops and open yards a camera moves
-//! through. A uniform grid holds all of them. The bake samples only the cells a
-//! camera can be in, over walkable floor, at cameras and at shadow-casting lights, and their
-//! ring (#2328, `reach`), found on the navmesh when it is current, else every cell;
-//! every other cell sees every object. Cells that see the same set share one
-//! row (`rows`); after the dilation few do, so the data is about one bit per cell
-//! per object (11.8 MB for a Dust2-sized level of 6344 meshes, `docs/api/Lighting.md`).
-//!
-//! **What a cell holds** (`bake`, `sample`): every baked object any point in it may
-//! see. From seeded points in each 2 m cube of the cell (the same density at every
-//! cell size), rays go to points on each object's own triangles: its extremes and a
-//! lattice at most `TARGET_SPACING` apart, one per `VOXEL` of space, so the count
-//! follows its area, not its triangles (`targets`); one ray that no occluder stops
-//! before it arrives makes the object visible. Most rays never need casting
-//! (part 3): an occluder face, alone or fused with the other faces on its plane (a
-//! floor of tiles, a wall of pieces), that hides a cluster of objects, an object, or
-//! a chunk of its points from a cube or from one of its points proves their rays
-//! stopped, and each cube tries first the faces that last stopped one (`sight`).
-//! Every such proof is exact, so they change the bake's speed, not what it sees.
-//! An object too large for `MAX_TARGETS` points, or not finite, is never culled and
-//! lays no cell. Then every cell takes its 26 neighbours' sets too (the dilation),
-//! so a camera anywhere in a cell is covered by samples from the cells around it. The
-//! invariant is one way: a cell may keep what is hidden, and must never drop what is
-//! visible. The sampling is a pure function of the scene and the seed, and each cell
-//! is baked alone, so the bytes are the same at any worker count.
-//!
-//! **What is baked against** (`gather`): each object's fingerprint (`gather::fingerprint`), a hash of
-//! what the bake reads of it and nothing else (#1958): its triangles corner by
-//! corner (so a re-export that moved a doorway with the same counts differs, while
-//! one that welds the same corners differently does not), its world matrix, layer,
-//! cast mode, its `LODGroup`
-//! membership, and each drawn slot's material as an occluder reads it (opaque or
-//! not, and its Render Face; never its name). At runtime the renderer culls only an object whose fingerprint is still
-//! what was baked, and uses the PVS at all only while every baked occluder still
-//! matches: an object moved, added or given a material that occludes differently since the bake is drawn, and an
-//! occluder moved or removed turns the bake off until it is re-baked. Never stale
-//! pixels.
-//!
-//! **Stored** (`file`, `sidecar`) beside the scene as `<scene>.occlusion`, a small binary file
-//! the lighting save writes and the scene load reads; absent, the scene culls
-//! nothing by occlusion. A runtime level load that moves incoming ids out of a
-//! carried entity's way renames the baked objects with them ([`OcclusionData::remap`],
-//! through `Scene::renumber_sidecars`).
-//!
 //! stored-format: the `<scene>.occlusion` file and the baked PVS (its fingerprint: `gather`)
 
 mod file;
@@ -79,44 +16,17 @@ mod grid_tests;
 #[cfg(test)]
 mod unread_tests;
 
-/// A scene's baked PVS (`Scene::occlusion`): `None` until Generate Lighting bakes
-/// one, and then nothing is occlusion-culled. Every write moves its revision,
-/// which the renderer reads to re-bind it.
 pub type SceneOcclusion = crate::revision::Revisioned<Option<std::sync::Arc<OcclusionData>>>;
 
-/// The nearest a camera's near plane may be and still cull by the PVS, metres:
-/// half a cell. A wall closer than its near plane is clipped away, so the camera
-/// sees what the wall hides from the points round it, which the PVS culls.
 pub const MAX_CULLING_NEAR: f32 = CELL_SIZE / 2.0;
 
-/// Whether a camera with `projection` and near plane `near` may cull by the PVS,
-/// which says only what is seen from points near its eye: a perspective camera
-/// whose near plane clips nothing more than [`MAX_CULLING_NEAR`] away. An
-/// orthographic camera (a minimap over a roofless level) sees along parallel rays
-/// from a whole plane, not from its eye, so it culls nothing by occlusion.
 pub fn culls_from(projection: rusty_components::Projection, near: f32) -> bool {
     let perspective = matches!(projection, rusty_components::Projection::Perspective);
     perspective && near <= MAX_CULLING_NEAR
 }
 
-/// The occlusion bake's version, stamped on every PVS it makes ([`BakeStamp`]) and
-/// the file's first field after its magic, so a decoder of any layout reads it
-/// first (`file`): bump it whenever the bake would write other bytes for the same
-/// objects (its sampling, the dilation, `rusty_lighting::occlusion::OCCLUSION_SEED`,
-/// the grid's [`CELL_SIZE`], [`MAX_CELL`], [`MAX_CELLS`] and [`MAX_GRID_CELLS`],
-/// which cells it samples (`rusty_lighting::occlusion::Reach`, its `play_height`),
-/// the step `Grid::fitting` grows a cell by, the sampling of a large cell as
-/// `CELL_SIZE` sub-cubes (`Grid::subdivisions`), the targets' constants) or the
-/// file would hold another layout. Generate Lighting then re-bakes a PVS an older
-/// engine made instead of keeping it (`rusty_lighting::occlusion::is_current`), and a
-/// load refuses an older file whole, saying so. `rusty_lighting`'s `version_tests`
-/// holds the rule only in part: it pins this version beside the bytes a small
-/// fixed scene bakes to, so it covers the small-level path alone (2 m cells, no
-/// growth, no sub-cubes), and a change to the rest is bumped by hand.
 pub const OCCLUSION_VERSION: u32 = 2;
 
-/// One baked object: the entity, what it was baked as (its fingerprint), and
-/// whether it occludes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BakedObject {
     pub entity: u32,
@@ -124,45 +34,24 @@ pub struct BakedObject {
     pub occluder: bool,
 }
 
-/// What a PVS was baked by, beside what it was baked against: the occlusion bake's
-/// version ([`OCCLUSION_VERSION`]), so Generate Lighting
-/// keeps a PVS only an unchanged bake made (#2348); the objects the bake kept in
-/// sight of every cell, too large or not finite to sample, which only the bake
-/// can count; and which cells it sampled (#2328): where it found the floor, how
-/// many cells, a hash of the cells it was seeded from, and the bounds its grid
-/// was laid over, so a keep can lay the grid again. On a PVS no bake stamped,
-/// this build's version, every cell baked and the rest zero. A stamp that sampled
-/// every cell ([`FloorSource::Everywhere`]) baked them all with no reach hash, or
-/// the file is refused.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct BakeStamp {
     pub version: u32,
     pub never_culled: u32,
-    /// Where the bake found the floor a camera stands on.
     pub floor: FloorSource,
-    /// The cells it sampled; every other cell sees every object.
     pub baked: u32,
-    /// A hash of the cells it was seeded from (`rusty_lighting::occlusion::Reach`),
-    /// 0 when it sampled every cell.
     pub reach: u64,
-    /// The bounds its grid was laid over (`Grid::fitting`).
     pub bounds: (glam::Vec3, glam::Vec3),
 }
 
-/// Where an occlusion bake found the floor a camera can stand on (#2328), which
-/// decides the cells it samples: the scene's navmesh (every walkable span) when it
-/// is baked and current, else none, and then it samples every cell.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FloorSource {
-    /// No floor: every cell is sampled.
     #[default]
     Everywhere,
-    /// The navmesh's walkable spans.
     Navmesh,
 }
 
 impl FloorSource {
-    /// Its name in a bake report.
     pub fn name(self) -> &'static str {
         match self {
             Self::Everywhere => "everywhere",
@@ -170,12 +59,10 @@ impl FloorSource {
         }
     }
 
-    /// Its number in the file.
     pub fn code(self) -> u32 {
         self as u32
     }
 
-    /// The source numbered `code`, `None` past the last.
     pub fn of_code(code: u32) -> Option<Self> {
         [Self::Everywhere, Self::Navmesh]
             .get(code as usize)
@@ -183,28 +70,19 @@ impl FloorSource {
     }
 }
 
-/// A scene's baked PVS: the cells, the objects, and per cell one row of bits, bit
-/// `i` set when object `i` may be seen from the cell.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OcclusionData {
     pub grid: Grid,
-    /// The bake that made it ([`BakeStamp`]).
     pub stamp: BakeStamp,
-    /// A row's bit `i` is `objects[i]`; baked in entity order.
     pub objects: Vec<BakedObject>,
-    /// `(entity, index into objects)`, by entity.
     index: Vec<(u32, u32)>,
     /// `u64` words per row.
     words: usize,
-    /// The distinct rows, `words` words each.
     rows: Vec<u64>,
-    /// Per cell (`Grid::index` order), its row.
     cells: Vec<u32>,
 }
 
 impl OcclusionData {
-    /// Assemble the data, `None` when the parts disagree (a row index past the
-    /// rows, a cell count other than the grid's, rows not whole, an entity twice).
     pub fn new(
         grid: Grid,
         objects: Vec<BakedObject>,
@@ -235,13 +113,10 @@ impl OcclusionData {
         })
     }
 
-    /// The row of the cell holding `point`, `None` outside every cell (culls nothing).
     pub fn row_at(&self, point: glam::Vec3) -> Option<u32> {
         self.grid.index_of(point).map(|cell| self.cells[cell])
     }
 
-    /// Whether object `object` (an index into `objects`) may be seen from a cell
-    /// whose row is `row`.
     pub fn sees(&self, row: u32, object: u32) -> bool {
         let word = row as usize * self.words + object as usize / 64;
         self.rows
@@ -249,15 +124,11 @@ impl OcclusionData {
             .is_none_or(|w| w & (1u64 << (object % 64)) != 0)
     }
 
-    /// Index of `entity` in `objects`, if it was baked.
     pub fn object_of(&self, entity: u32) -> Option<u32> {
         let at = self.index.binary_search_by_key(&entity, |e| e.0).ok()?;
         Some(self.index[at].1)
     }
 
-    /// The same data with each baked entity renamed through `moves`, as a runtime
-    /// level load moves incoming ids out of a carried entity's way
-    /// (`scene::runtime::renumber`). `None` when two objects would share an id.
     pub fn remap(&self, moves: &crate::runtime::renumber::Moves) -> Option<Self> {
         let mut objects = self.objects.clone();
         for o in &mut objects {
@@ -267,24 +138,18 @@ impl OcclusionData {
         Some(data.stamped(self.stamp))
     }
 
-    /// The same data, stamped by the bake that made it.
     pub fn stamped(self, stamp: BakeStamp) -> Self {
         Self { stamp, ..self }
     }
 
-    /// How many distinct rows the cells share.
     pub fn row_count(&self) -> usize {
         self.rows.len().checked_div(self.words).unwrap_or(0)
     }
 
-    /// The bytes the data holds in memory, near enough (the file is a little less:
-    /// no entity index).
     pub fn byte_size(&self) -> usize {
         self.objects.len() * 21 + self.rows.len() * 8 + self.cells.len() * 4 + 72
     }
 
-    /// The distinct rows (`words` words each, bit `i` object `i`) and each cell's
-    /// row: what the file stores, and what a bake report counts (#1980).
     pub fn parts(&self) -> (&[u64], &[u32]) {
         (&self.rows, &self.cells)
     }

@@ -1,14 +1,9 @@
-//! The parallax projection (#244, #1995), no GPU: against the box and the sphere,
-//! continuous across a face, turned with an oriented box, and unchanged for a
-//! world-aligned one.
-
 use glam::{EulerRot, Quat, Vec3};
 
 use super::*;
 
 #[test]
 fn parallax_corrects_toward_box_wall() {
-    // A fragment at the centre of a [-2, 2] box reflecting +X hits (2, 0, 0).
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(2.0));
     let corrected = probe.parallax_correct(Vec3::ZERO, Vec3::X);
     assert!((corrected - Vec3::X).length() < 1e-5, "got {corrected:?}");
@@ -16,7 +11,6 @@ fn parallax_corrects_toward_box_wall() {
 
 #[test]
 fn parallax_offcentre_fragment_bends_direction() {
-    // Off the centre, +X hits the wall at (2, 1, 0): the room-tracking bend.
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(2.0));
     let corrected = probe.parallax_correct(Vec3::new(-1.0, 1.0, 0.0), Vec3::X);
     let expected = Vec3::new(2.0, 1.0, 0.0).normalize();
@@ -25,8 +19,6 @@ fn parallax_offcentre_fragment_bends_direction() {
 
 #[test]
 fn a_fragment_outside_the_box_projects_continuously() {
-    // #1995: past a face the ray still leaves through the box (or is held at the
-    // fragment), so just outside reflects what just inside does: no step.
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(2.0));
     for raw in [
         Vec3::new(1.0, 1.0, 0.0),
@@ -41,8 +33,6 @@ fn a_fragment_outside_the_box_projects_continuously() {
         );
         assert!(outside.is_finite() && (outside.length() - 1.0).abs() < 1e-5);
     }
-    // Outside, a ray turning parallel to the face it is past changes smoothly: a
-    // hit held at the fragment one way and at the far wall the other was a line.
     let past = Vec3::new(2.5, -1.5, 0.5);
     let tilt = |x: f32| probe.parallax_correct(past, Vec3::new(x, 1.0, -0.4));
     assert!(
@@ -55,12 +45,10 @@ fn a_fragment_outside_the_box_projects_continuously() {
 
 #[test]
 fn parallax_on_a_box_face_with_an_axis_aligned_ray_stays_finite() {
-    // A fragment on the floor reflecting straight up exits through the ceiling.
     let probe = ReflectionProbe::new(Vec3::ZERO, Vec3::splat(2.0));
     let floor = Vec3::new(1.0, -2.0, 0.0);
     let out = probe.parallax_correct(floor, Vec3::Y);
     assert!((out - Vec3::new(1.0, 2.0, 0.0).normalize()).length() < 1e-5);
-    // Leaving through the face it sits on: held at the fragment itself.
     let down = probe.parallax_correct(floor, Vec3::NEG_Y);
     assert!((down - floor.normalize()).length() < 1e-5, "{down}");
 }
@@ -85,8 +73,6 @@ fn a_rotated_box_projects_as_its_unrotated_twin_rotated() {
 
 #[test]
 fn a_world_aligned_box_projects_as_before_inside_it() {
-    // #1995's frame adds exact zeros for an identity rotation: every fragment inside
-    // the box gets the pre-#1995 projection, compared with `==`.
     let mut probe = ReflectionProbe::new(Vec3::new(0.3, 1.1, -0.7), Vec3::ONE);
     (probe.box_min, probe.box_max) = (Vec3::new(-3.0, 0.0, -5.0), Vec3::new(4.0, 3.0, 2.0));
     for (p, r) in samples(256) {
@@ -112,7 +98,6 @@ fn a_sphere_projects_against_its_surface() {
     assert!((inside - outside).length() < 2e-3, "{inside} / {outside}");
 }
 
-/// `n` (point in the unit cube, unit direction) pairs from a fixed LCG.
 fn samples(n: usize) -> Vec<(Vec3, Vec3)> {
     let mut s = 0x2545_f491_u32;
     let mut next = move || {
@@ -128,7 +113,6 @@ fn samples(n: usize) -> Vec<(Vec3, Vec3)> {
         .collect()
 }
 
-/// The projection as it ran before #1995, for a fragment inside the box.
 fn before_1995(probe: &ReflectionProbe, world_pos: Vec3, reflection: Vec3) -> Vec3 {
     let dir = reflection.normalize_or_zero();
     let mut t = NO_HIT;

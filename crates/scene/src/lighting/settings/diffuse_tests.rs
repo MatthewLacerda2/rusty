@@ -1,6 +1,3 @@
-//! The scene-wide diffuse model (#1698): its response and the probes' SH reshaping
-//! of it agree, so a probe-lit object answers a Baked lamp as a realtime one would.
-
 use glam::Vec3;
 
 use super::DiffuseModel;

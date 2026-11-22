@@ -1,7 +1,3 @@
-//! An Undo or Redo step rewinds the change log once, whatever it restores (#1705):
-//! each rewind resets every recording log, so one per restored entity made undoing
-//! a Dust2-sized move a hitch.
-
 use glam::Vec3;
 
 use crate::Scene;

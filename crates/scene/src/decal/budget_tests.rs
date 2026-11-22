@@ -1,6 +1,3 @@
-//! The decal budgets (#1517): per owner, the world and the total, each fading the
-//! oldest of its bucket out; blend order stays global spawn order.
-
 use glam::Vec3;
 
 use super::{EVICTION_FADE, EVICTION_HEADROOM};

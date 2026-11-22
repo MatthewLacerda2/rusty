@@ -1,6 +1,3 @@
-//! The decal registry (#639): handles, owners and the fixed tick. The budgets:
-//! `budget_tests.rs`.
-
 use glam::{Quat, Vec3};
 
 use crate::decal::DecalSpec;
@@ -42,7 +39,6 @@ fn an_owned_box_is_kept_in_its_owner_space_and_dropped_with_it() {
         t.rotation = Quat::from_rotation_y(std::f32::consts::FRAC_PI_2);
     }
     let pose = s.decal_pose(&s.decals[0]).unwrap();
-    // (0, 1, 0.5) in door space, turned 90° about Y and moved to (0, 0, 3).
     assert!(
         pose.centre().abs_diff_eq(Vec3::new(0.5, 1.0, 3.0), 1e-5),
         "{}",
@@ -100,7 +96,7 @@ fn a_new_scene_keeps_the_decal_budgets() {
         ..DecalLimits::default()
     };
     s.decals.set_limits(limits);
-    s.clear(); // File > New Scene
+    s.clear();
     assert_eq!(s.decals.limits(), limits, "the project's, not the engine's");
 }
 

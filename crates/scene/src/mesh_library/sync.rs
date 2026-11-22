@@ -1,5 +1,3 @@
-//! Bring the entities drawing a library mesh to its entry (`Scene::sync_scene_meshes`).
-
 use std::collections::BTreeSet;
 
 use super::{kept_mesh_name, scene_mesh_name, scene_mesh_users};
@@ -8,12 +6,6 @@ use crate::Scene;
 use rusty_components::mesh::MeshRevision;
 use rusty_components::ColliderShape;
 
-/// The names of the entries some entity is behind on, re-minting an entry's
-/// revision when an entity carries a newer one (its data went back, an Undo), so
-/// the renderer, which keeps the newest upload, takes the older data again. A Mesh
-/// is behind when its revision differs; a Mesh collider's kept copy (#1657), which
-/// carries no revision, when its triangles are not the entry's. A name with no
-/// entry is warned of once and left as it is.
 pub(super) fn stale_entries(scene: &mut Scene) -> BTreeSet<String> {
     let mut changed = BTreeSet::new();
     for id in scene.world.ids().to_vec() {
@@ -49,9 +41,6 @@ pub(super) fn stale_entries(scene: &mut Scene) -> BTreeSet<String> {
     changed
 }
 
-/// Give every entity drawing a `changed` entry its geometry and revision, and each
-/// Mesh collider's kept copy of a `changed` entry its triangles. The entry's
-/// geometry is built once, however many entities draw it.
 pub(super) fn install(scene: &mut Scene, changed: &BTreeSet<String>) {
     for id in scene.world.ids().to_vec() {
         let name = scene
@@ -77,8 +66,6 @@ pub(super) fn install(scene: &mut Scene, changed: &BTreeSet<String>) {
     }
 }
 
-/// Fill `id`'s Mesh collider's kept copy (#1657) from the entry it names, when
-/// that entry is `changed`.
 fn fill_kept_copy(scene: &mut Scene, id: u32, changed: &BTreeSet<String>) {
     let name = scene
         .world
@@ -99,7 +86,6 @@ fn fill_kept_copy(scene: &mut Scene, id: u32, changed: &BTreeSet<String>) {
     refit(scene, id);
 }
 
-/// Size `id`'s Mesh collider's box to what it now builds from, and its world box.
 pub fn refit(scene: &mut Scene, id: u32) {
     let own = scene
         .world

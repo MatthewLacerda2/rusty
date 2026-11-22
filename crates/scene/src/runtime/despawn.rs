@@ -1,47 +1,20 @@
-//! The one door every despawn goes through (#1264), and the play state that
-//! guards it (#1298, #1302).
-//!
-//! In Play a removed entity's scripts must get `OnDisable`/`OnDestroy` first, so
-//! a despawn names why it may skip that ([`Despawn`]). Only three reasons hold:
-//! edit mode, where no script runs; a teardown that already fired (the destroy
-//! queue's drain); a document being applied, whose entities have no script
-//! instance yet. Claiming edit mode in Play trips a debug assert, so an immediate
-//! destroy that would leak a script instance fails loudly in tests.
-
 use std::collections::BTreeSet;
 
 use crate::Scene;
 
-/// Why a despawn may skip script teardown (`Scene::despawn_batch`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Despawn {
-    /// Outside Play, where no script runs. Refused in Play (debug builds).
     EditMode,
-    /// The destroy queue's drain: the subtree's teardown already fired.
     TornDown,
-    /// A document being applied (a load, a snapshot restore, a prefab stamp):
-    /// what it removes was made by the same document and has no script instance.
     Applying,
 }
 
 impl Scene {
-    /// Whether this World is in Play: the single play state (#1302).
     pub fn is_playing(&self) -> bool {
         self.playing
     }
 
-    /// Enter or leave Play. Only `GameWorld`'s transition (`enter_play` /
-    /// `exit_play`) calls this outside tests, so every reader sees the state
-    /// change at the same moment.
-    /// Entering Play forgets the Undo history: Stop restores Play's changes. It
-    /// also empties every `AIPerception`'s memory (#1900), before any `Start`
-    /// can report a noise or a hit, so an agent starts Play knowing nothing.
-    /// Leaving it drops what Play asked for and never got (a load or destroy a
-    /// paused Play left queued, #1298), every `DontDestroyOnLoad` mark and every
-    /// `Debug.Draw*` line still held (#1882): the
-    /// scene state inventory's runtime class (`scene::state`, #1649).
     pub fn set_playing(&mut self, playing: bool) {
-        // A script's pending `Lighting.GenerateAsync()` was made in the other mode.
         #[cfg(feature = "dev")]
         if playing != self.playing {
             self.drop_bake_request(if playing {
@@ -51,13 +24,13 @@ impl Scene {
             });
         }
         if playing && !self.playing {
-            self.loads.enter_play(); // a session's operations are its own
+            self.loads.enter_play();
             self.clear_undo();
             self.forget_perception();
         }
         if !playing && self.playing {
             self.loads = Default::default();
-            self.pending_destroy.clear(); // the next Play must not destroy edit entities
+            self.pending_destroy.clear();
             self.persistent.clear();
             self.ragdolls = Default::default();
             self.debug_lines = Default::default();
@@ -65,8 +38,6 @@ impl Scene {
         self.playing = playing;
     }
 
-    /// Empty every `AIPerception`'s memory: known targets, sight and pending
-    /// updates. A perceiver that knows nothing is not written (no stamp).
     fn forget_perception(&mut self) {
         for id in self.world.ids_with_ai_perception() {
             if self
@@ -82,12 +53,7 @@ impl Scene {
         }
     }
 
-    /// Replace this scene with an empty one in place, keeping its play state and
-    /// its decal budgets (File ▸ New, Reset Scene): the scene is new, the session
-    /// (and the project's budgets it applied) is not.
     pub fn clear(&mut self) {
-        // A pending `Lighting.GenerateAsync()` asked about the old scene (#1999);
-        // the status is the editor's, so it says why the request went.
         #[cfg(feature = "dev")]
         self.drop_bake_request("a new scene was started");
         #[cfg(feature = "dev")]
@@ -102,34 +68,20 @@ impl Scene {
         }
     }
 
-    /// Remove entity `id` and everything under it ([`Scene::destroy_set`]), as
-    /// Unity's `Object.Destroy` takes a GameObject's children (#1283). Edit mode
-    /// only: in Play a destroy must tear its scripts down first, so it goes
-    /// through [`Scene::destroy`] (#1298).
     pub fn destroy_entity(&mut self, id: u32) {
         let doomed = self.destroy_set(id);
         self.despawn_batch(&doomed, Despawn::EditMode);
     }
 
-    /// What destroying `id` removes: `id` and every descendant, so a skinned
-    /// entity's bones and what hangs from them, and a bone's subtree (#1273). The
-    /// one answer [`Scene::destroy_entity`] despawns and the script teardown
-    /// notifies, so the two cannot drift (#1283). Empty for a dead id.
     pub fn destroy_set(&self, id: u32) -> BTreeSet<u32> {
         self.world.self_and_descendants(id).collect()
     }
 
-    /// Despawn every entity of `ids` together, then drop the scene's own references
-    /// to them (#1264): the selection, `DontDestroyOnLoad`, a queued destroy, their
-    /// lightmap entries, the decals they own, their shader overrides and ragdoll state. The World's references go in
-    /// `World::despawn_all`, one pass for the batch. Every despawn in the scene runs
-    /// through here, saying `why` it may skip script teardown.
     pub fn despawn_batch(&mut self, ids: &BTreeSet<u32>, why: Despawn) {
         debug_assert!(
             !(self.playing && why == Despawn::EditMode),
             "an edit-mode despawn of {ids:?} in Play skips script teardown; use Scene::destroy"
         );
-        // Before the World forgets them: a recorded edit keeps their entries (#1631).
         let decals = self.decals.take_owned(ids);
         self.keep_dropped(ids, decals);
         self.world.despawn_all(ids);

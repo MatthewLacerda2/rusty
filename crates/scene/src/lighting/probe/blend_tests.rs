@@ -1,14 +1,8 @@
-//! The nearest-probe blend fades a probe out before it leaves (#1737): a point
-//! swept past a swap of its nearest four moves its sample by no more than the step
-//! warrants, where plain inverse squared distance jumped by about a seventh.
-
 use glam::Vec3;
 
 use super::index::scan;
 use super::{ProbeVolume, BLEND_PROBES};
 
-/// A row of free probes zig-zagging off the x axis, the DC term of probe `k`
-/// being `k`, so every swap of the nearest four changes what they blend.
 fn row() -> ProbeVolume {
     let mut vol = ProbeVolume::new();
     for k in 0..12 {
@@ -47,7 +41,6 @@ fn a_point_swept_past_a_swap_never_jumps() {
     assert!(worst < 0.02, "a jump of {worst} over a {step} m step");
 }
 
-/// With fewer probes than the blend takes, it is plain inverse squared distance.
 #[test]
 fn fewer_probes_than_the_blend_still_blend() {
     let mut vol = ProbeVolume::new();

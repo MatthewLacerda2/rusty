@@ -1,11 +1,3 @@
-//! crates/scene/src/create/defaults.rs — Default component values.
-//!
-//! The single source of truth for the values the inspector's "Add Component" menu
-//! and the hierarchy toolbar's light primitives use. Both the editor and the
-//! `Scene.AddComponent` API read these (through `edit::authoring`'s re-exports), so
-//! a component added either way is identical; the base builds with them too (a
-//! ragdoll's bodies, a primitive's collider).
-
 use glam::Vec3;
 
 use crate::{
@@ -16,11 +8,8 @@ use crate::{
 use rusty_components::material::entity_material_key;
 use rusty_components::Playback;
 
-/// The cone angles (degrees) a new light carries, and a spot seeds when it has none.
 pub const DEFAULT_CONES: (f32, f32) = (30.0, 45.0);
 
-/// Construct a `LightComponent` with the standard cone defaults. Shared by the
-/// toolbar's light primitives and the Add-Component `Light` default.
 pub(crate) fn light(
     light_type: LightType,
     color: Vec3,
@@ -41,12 +30,10 @@ pub(crate) fn light(
     }
 }
 
-/// Default `LightComponent` (the Add-Component menu's values).
 pub fn default_light() -> LightComponent {
     light(LightType::Point, Vec3::ONE, 1.5, 10.0)
 }
 
-/// Default `AnimatorComponent` (the Add-Component menu's values).
 pub fn default_animator() -> AnimatorComponent {
     AnimatorComponent {
         base: Playback {
@@ -59,7 +46,6 @@ pub fn default_animator() -> AnimatorComponent {
     }
 }
 
-/// Default `ColliderComponent` (the Add-Component menu's values).
 pub fn default_collider() -> ColliderComponent {
     ColliderComponent {
         active: true,
@@ -74,7 +60,6 @@ pub fn default_collider() -> ColliderComponent {
     }
 }
 
-/// Default `RigidBodyComponent` (the Add-Component menu's values).
 pub fn default_rigidbody() -> RigidBodyComponent {
     RigidBodyComponent {
         active: true,
@@ -89,21 +74,10 @@ pub fn default_rigidbody() -> RigidBodyComponent {
     }
 }
 
-/// Default `MaterialAsset` (the data a fresh library material starts from — the
-/// Add-Component / "Material" menu's values: white base color, dielectric, mid
-/// roughness, no maps).
 pub fn default_material() -> MaterialAsset {
     MaterialAsset::default()
 }
 
-/// Attach a `MaterialComponent` to entity `id` referencing its own library material
-/// (keyed [`entity_material_key`]), creating a default one in the scene's library
-/// when none is there. A surviving asset under that key (the entity's material from
-/// before a remove, possibly shared by others) is kept, never reset: the same rule as
-/// `Material.Set*`'s resolve-or-create (#997), and Unity's, where adding a renderer
-/// never touches a material asset. Returns `false` if the entity does not exist.
-/// Material is the one "Add Component" verb that creates a shared library asset, not
-/// just entity data.
 pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
     if !scene
         .world
@@ -118,7 +92,6 @@ pub fn attach_default_material(scene: &mut Scene, id: u32) -> bool {
     true
 }
 
-/// Default `NavMeshAgentComponent` (the Add-Component menu's values).
 pub fn default_nav_agent() -> NavMeshAgentComponent {
     NavMeshAgentComponent {
         active: true,
@@ -132,7 +105,6 @@ pub fn default_nav_agent() -> NavMeshAgentComponent {
     }
 }
 
-/// Default `CameraComponent` (the Add-Component menu's values).
 pub fn default_camera() -> CameraComponent {
     CameraComponent {
         active: true,
@@ -163,10 +135,6 @@ pub fn default_camera() -> CameraComponent {
     }
 }
 
-/// Default `PostProcessingComponent` (the Add-Component menu's values).
-/// `PostProcessing` declares `requires(Camera)` (#359), so every surface that adds
-/// it auto-adds a `Camera` if missing — post-processing is inert without a camera
-/// to process, so the dependency is enforced rather than left to chance.
 pub fn default_post_processing() -> PostProcessingComponent {
     PostProcessingComponent::default()
 }

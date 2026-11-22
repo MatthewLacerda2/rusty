@@ -1,19 +1,3 @@
-//! crates/scene/src/revision.rs — how a reader learns a scene-level value changed without
-//! comparing it (#1706).
-//!
-//! The renderer keeps objects derived from the material library, the lightmap set
-//! and the probe field, and must learn when one of them changes. Comparing a copy
-//! each frame costs their size (a few hundred µs for a Kolvik-sized library and
-//! lightmap set in a dev build); a [`Revision`] costs one compare. A value moves
-//! its revision at every write: [`Revisioned`] at every `&mut` access, as Bevy's
-//! `Mut<T>` marks a component changed on `DerefMut`, and `ProbeVolume` in its own
-//! write methods. A spurious move (a `&mut` taken and nothing written) only makes
-//! the reader look closer, never miss a change.
-//!
-//! The counter is a plain atomic, no clock and no RNG, as [`super::SceneId`]'s is:
-//! a revision is only ever compared for equality, never read as sim, saved or
-//! digested.
-
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -21,9 +5,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
-/// What a value was last written as. Two reads give the same revision exactly when
-/// no write came between them, or one value is a copy of the other: a new or
-/// loaded value takes a fresh one (`Default`), and a clone keeps its original's.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Revision(u64);
 
@@ -33,8 +14,6 @@ impl Default for Revision {
     }
 }
 
-/// A value whose every `&mut` access takes a fresh [`Revision`]. Reads go through
-/// `Deref`; it saves, loads and compares as the value alone.
 #[derive(Clone, Debug, Default)]
 pub struct Revisioned<T> {
     value: T,
@@ -49,7 +28,6 @@ impl<T> Revisioned<T> {
         }
     }
 
-    /// What the value was last written as.
     pub fn revision(&self) -> Revision {
         self.revision
     }

@@ -1,6 +1,3 @@
-//! The main view's pose (#1619): `Camera.*` writes move the main camera entity, and
-//! the view camera mirrors it.
-
 use super::*;
 use crate::create::default_camera;
 
@@ -37,7 +34,6 @@ fn look_rotation_inverts_the_entity_pose() {
 #[test]
 fn setting_the_view_moves_the_main_camera_entity() {
     let (mut scene, id) = scene_with_camera();
-    // A parent offset: the pose is the entity's world one, not its local.
     let rig = scene.add_entity("Rig".to_string());
     scene.world.transform_mut(rig).expect("t").position = Vec3::new(10.0, 0.0, 0.0);
     scene.set_parent(id, Some(rig)).expect("parent");
@@ -61,8 +57,6 @@ fn the_view_camera_mirrors_the_entity_and_keeps_its_own_without_one() {
     sync_pose_from_scene(&mut camera, &scene);
     assert_pose(&camera, Vec3::new(4.0, 5.0, 6.0), -90.0, 0.0);
 
-    // No camera entity: the free camera is the view, untouched by the sync and
-    // moved by the setters alone.
     let mut empty = Scene::new();
     let mut free = Camera::new(Vec3::ONE, 10.0, 5.0);
     sync_pose_from_scene(&mut free, &empty);
@@ -72,8 +66,6 @@ fn the_view_camera_mirrors_the_entity_and_keeps_its_own_without_one() {
 
 #[test]
 fn a_vertical_camera_keeps_its_heading_when_tilted() {
-    // A top-down camera (pitch -90, yaw 30) has no horizontal forward: its heading
-    // comes from the up axis, so tilting it keeps the yaw instead of snapping.
     for pitch in [-90.0_f32, 90.0] {
         let (mut scene, id) = scene_with_camera();
         let rotation = Quat::from_rotation_y((-90.0 - 30.0_f32).to_radians())

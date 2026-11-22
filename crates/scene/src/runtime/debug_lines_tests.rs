@@ -3,7 +3,6 @@ use super::*;
 const DT: f32 = 1.0 / 60.0;
 const WHITE: [f32; 4] = [1.0; 4];
 
-/// A one-tick line survives until the next tick starts, then goes.
 #[test]
 fn a_one_tick_line_lasts_until_the_next_tick() {
     let mut lines = DebugLines::default();
@@ -13,7 +12,6 @@ fn a_one_tick_line_lasts_until_the_next_tick() {
     assert!(lines.is_empty());
 }
 
-/// A second at 60 Hz is sixty ticks: drawn through the sixtieth, gone at the next.
 #[test]
 fn a_duration_counts_ticks() {
     let mut lines = DebugLines::default();
@@ -38,7 +36,6 @@ fn durations_round_up_to_whole_ticks_and_never_below_one() {
     assert_eq!(duration_ticks(1e30, DT), u32::MAX);
 }
 
-/// A NaN end draws nothing, and the store keeps its newest lines past the cap.
 #[test]
 fn bad_lines_drop_and_the_store_is_bounded() {
     let mut lines = DebugLines::default();

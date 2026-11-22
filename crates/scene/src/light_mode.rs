@@ -1,39 +1,18 @@
-//! The mode the frame draws a light as (#1695): its own, but `Baked` for a `Mixed`
-//! light the last `Shadowmask` bake found no channel for (`LightmapSet::fell_back`),
-//! and the shadowmask channel it masks a light by; and the `Baked` lights no bake
-//! has taken in yet, which the editor previews live (#2522).
-
 use crate::lighting::MixedLightingMode;
 use crate::Scene;
 use rusty_components::{LightComponent, LightMode, LightType};
 
 impl Scene {
-    /// Light `id`'s mode as the renderer acts on it: `light.effective_mode()`, held
-    /// to what the last bake made of it (`LightmapSet::baked_mode`). A bake decides
-    /// afresh from `effective_mode`, never from this.
     pub fn light_mode(&self, id: u32, light: &LightComponent) -> LightMode {
         self.lightmaps.baked_mode(id, light.effective_mode())
     }
 
-    /// Whether light `id` is a `Baked` lamp or sun whose direct light no bake holds
-    /// (#2522, `LightmapSet::bakes_direct`): one added since the last bake, one in
-    /// a scene never baked, and one baked as `Mixed` (its bounce alone) and made
-    /// `Baked` since. It lights nothing until Generate Lighting, unless the frame
-    /// previews it ([`Self::drawn_mode`]). A `Mixed` light the shadowmask fell back
-    /// on was baked direct, so it does not wait. An Area light is always `Baked`
-    /// and never previewed (a panel has no live path), and an Ambient one is the
-    /// sky's.
     pub fn awaits_bake(&self, id: u32, light: &LightComponent) -> bool {
         !matches!(light.light_type, LightType::Area | LightType::Ambient)
             && self.light_mode(id, light) == LightMode::Baked
             && !self.lightmaps.bakes_direct(id)
     }
 
-    /// The mode the frame draws light `id` as: [`Self::light_mode`], but with
-    /// `preview` a light that [awaits a bake](Self::awaits_bake) draws as `Mixed`
-    /// would before its bake (live direct light and shadows, its bounce left to
-    /// SSIL), so a new light is never silently dark in the editor. A bake decides
-    /// from `effective_mode`, never from this.
     pub fn drawn_mode(&self, id: u32, light: &LightComponent, preview: bool) -> LightMode {
         match preview && self.awaits_bake(id, light) {
             true => LightMode::Mixed,
@@ -41,28 +20,18 @@ impl Scene {
         }
     }
 
-    /// Whether entity `id` holds a light the console note names: one that [awaits
-    /// a bake](Self::awaits_bake), active in the hierarchy and above intensity 0.
     pub fn waits_for_bake(&self, id: u32) -> bool {
         let world = &self.world;
         world.is_active_in_hierarchy(id)
             && (world.light(id)).is_some_and(|l| l.intensity > 0.0 && self.awaits_bake(id, &l))
     }
 
-    /// The lights that [wait for a bake](Self::waits_for_bake), in entity order:
-    /// what the renderer's console note names.
     pub fn lights_awaiting_bake(&self) -> Vec<u32> {
         (self.world.ids_with_light().into_iter())
             .filter(|&id| self.waits_for_bake(id))
             .collect()
     }
 
-    /// The shadowmask channel the frame masks light `id` by (#1695): its bake's
-    /// (`LightmapSet::mask_channel`) while the scene is on `Shadowmask` and the
-    /// light is still one a bake masks (a `Mixed` light casting shadows; a sun
-    /// always casts), else none. So a scene turned back to `BakedIndirect`, or a
-    /// lamp set to `Realtime` or its shadows turned off, draws as one before the
-    /// next bake.
     pub fn mask_channel(&self, id: u32) -> Option<u8> {
         if self.lighting_settings.mixed_lighting_mode != MixedLightingMode::Shadowmask {
             return None;
@@ -74,21 +43,13 @@ impl Scene {
     }
 }
 
-/// The note `Lighting.BakeLightmaps` leaves on a `Shadowmask` scene with probes
-/// (#1695): the lightmap bake writes the channels, only a probe bake writes their
-/// occlusion, so until one runs a dynamic object reads the old (or no) occlusion.
 pub const PROBES_STALE: &str = "Lighting.BakeLightmaps: the light probes' shadowmask \
      occlusion is stale until Probe.Bake() or Generate Lighting";
 
-/// The note `Probe.Bake` leaves on a `Shadowmask` scene whose lightmap bake recorded
-/// no channels (#1695): the probes then hold no light's occlusion.
 pub const NO_CHANNELS: &str = "Probe.Bake: no shadowmask channels are recorded, so the \
      probes hold no occlusion; run Lighting.BakeLightmaps() first, or Generate Lighting";
 
 impl Scene {
-    /// What a single bake verb should say about the probes' shadowmask occlusion
-    /// (#1695): `lightmaps` for `Lighting.BakeLightmaps`, else `Probe.Bake`. `None`
-    /// off `Shadowmask`, with no probe, or when the other bake's half agrees.
     pub fn shadowmask_note(&self, lightmaps: bool) -> Option<&'static str> {
         let on = self.lighting_settings.mixed_lighting_mode == MixedLightingMode::Shadowmask;
         if !on || self.probes.is_empty() {

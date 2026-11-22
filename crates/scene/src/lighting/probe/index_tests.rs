@@ -1,12 +1,8 @@
-//! The nearest-probe index returns exactly what the full scan does (#1737): the
-//! same probes, in the same order, ties to the lower index.
-
 use glam::Vec3;
 
 use super::{scan, ProbeIndex};
 use crate::lighting::probe::Probe;
 
-/// A deterministic scatter of `n` points in `[0, size)` (an LCG, no RNG needed).
 fn scatter(n: usize, size: Vec3) -> Vec<Probe> {
     let mut x: u32 = 12345;
     let mut next = move || {
@@ -18,8 +14,6 @@ fn scatter(n: usize, size: Vec3) -> Vec<Probe> {
         .collect()
 }
 
-/// Queries inside, on the edge of and far outside `size`, on a lattice that also
-/// lands on probes of a lattice set.
 fn queries(size: Vec3) -> impl Iterator<Item = Vec3> {
     (-2..=12).flat_map(move |i| {
         (-2..=12).flat_map(move |k| {
@@ -41,8 +35,6 @@ fn a_scatter_matches_the_scan() {
     assert_same(&scatter(3000, size), size);
 }
 
-/// A flat set grids in 2D: a query in it looks at a few cubes, never the
-/// millimetre grid a zero-height cube would make, nor a scan.
 #[test]
 fn a_flat_layout_matches_the_scan() {
     let size = Vec3::new(50.0, 0.0, 30.0);
@@ -56,8 +48,6 @@ fn a_flat_layout_matches_the_scan() {
     }
 }
 
-/// A lattice queried at its cells' middles has many probes at the same distance:
-/// the index breaks the ties as the scan does.
 #[test]
 fn ties_go_to_the_lower_index_as_in_the_scan() {
     let mut probes = Vec::new();
@@ -78,7 +68,6 @@ fn ties_go_to_the_lower_index_as_in_the_scan() {
     }
 }
 
-/// Small sets, non-finite positions and a stale index all fall back to the scan.
 #[test]
 fn what_it_cannot_index_it_scans() {
     assert!(ProbeIndex::build(&scatter(8, Vec3::ONE)).is_none(), "small");

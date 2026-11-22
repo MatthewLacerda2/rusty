@@ -1,9 +1,5 @@
-//! Tests for the per-scene navmesh settings: defaults, sparse files and the saved shape.
-
 use super::*;
 
-/// The struct `Default` and every field's serde default must equal the historical
-/// bake constants, so a scene missing the block bakes with the engine defaults.
 #[test]
 fn defaults_equal_bake_constants() {
     let d = NavMeshSettings::default();
@@ -16,7 +12,6 @@ fn defaults_equal_bake_constants() {
     assert_eq!(d.areas, default_areas());
 }
 
-/// The area table never forces a rebake: costs are read at search time (#460).
 #[test]
 fn the_area_table_is_not_a_bake_input() {
     let mut a = NavMeshSettings::default();
@@ -26,7 +21,6 @@ fn the_area_table_is_not_a_bake_input() {
     assert!(!a.bakes_like(&NavMeshSettings::default()));
 }
 
-/// A JSON object missing every field deserializes to the defaults.
 #[test]
 fn empty_json_object_fills_defaults() {
     let s: NavMeshSettings = serde_json::from_str("{}").expect("empty object loads");
@@ -58,9 +52,6 @@ fn round_trips_through_json() {
     assert_eq!(s, back);
 }
 
-/// The saved shape is pinned byte for byte (#721 moved the type out of `navigation`):
-/// same field names, same order, same serde defaults, so every scene file on disk
-/// loads and re-saves unchanged.
 const SAVED_DEFAULT: &str = concat!(
     r#"{"agent_radius":0.5,"agent_height":2.0,"max_slope":1.0,"max_step":0.3,"#,
     r#""grid_spacing":0.25,"bounds":null,"drop_height":0.0,"jump_distance":0.0,"#,
@@ -84,15 +75,12 @@ fn a_saved_bounds_override_keeps_its_shape() {
     assert_eq!(serde_json::from_str::<NavBounds>(json).expect("loads"), b);
 }
 
-/// The default navmesh never routes over what the default walker can't climb
-/// (#2001): a step it links is one the default controller steps up.
 #[test]
 fn the_default_step_is_one_the_default_controller_climbs() {
     let cc = rusty_components::CharacterControllerComponent::default();
     assert!(DEFAULT_MAX_STEP <= cc.step_offset);
 }
 
-/// Defining and re-costing rows of the area table (#460).
 #[test]
 fn defining_areas_appends_rows_up_to_the_limit() {
     let mut s = NavMeshSettings::default();

@@ -1,8 +1,3 @@
-//! `Scene::skinned_ids` on a level of static meshes: one walk of the Mesh column,
-//! no skeleton read, the rigs among them in insertion order, and a mesh seen the
-//! moment it becomes skinned or stops being; `build_skin_palettes` re-posing a
-//! rig into the palette it already holds.
-
 use glam::Quat;
 
 use super::probe;
@@ -52,8 +47,6 @@ fn rigs_among_static_meshes_come_back_in_insertion_order() {
     statics(&mut scene, 5);
     let second = armature_owner(&mut scene);
     scene.sync_skeletons();
-    // A despawn swap-removes inside hecs's archetype, so its iteration order
-    // drifts from insertion order: the sort on `Core::seq` must restore it.
     scene.destroy_entity(early[0]);
     let third = armature_owner(&mut scene);
     scene.sync_skeletons();
@@ -67,7 +60,6 @@ fn a_mesh_is_seen_the_tick_it_becomes_skinned_or_stops_being() {
     let rig = armature_owner(&mut scene);
     scene.sync_skeletons();
     assert_eq!(scene.skinned_ids(), vec![rig]);
-    // A model swap onto the prop: skinned once its skeleton is built.
     let skinned = scene.world.mesh(rig).unwrap().clone();
     scene.world.set_mesh(prop, Some(skinned));
     scene.world.mesh_mut(prop).unwrap().skeleton.bones.clear();

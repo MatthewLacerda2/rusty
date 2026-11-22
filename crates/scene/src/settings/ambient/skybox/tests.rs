@@ -1,5 +1,3 @@
-//! `Skybox` mode's light (#1675): the projection, its memo, and what the scene draws.
-
 use glam::Vec3;
 
 use super::{panorama, procedural};
@@ -22,7 +20,6 @@ fn skybox_scene(path: &str) -> Scene {
     scene
 }
 
-/// The bands converge as the rows grow (16 rows ring 1% into L2 at the poles).
 #[test]
 fn a_constant_panorama_lights_every_normal_alike() {
     let image = image::RgbaImage::from_pixel(128, 64, image::Rgba([51, 102, 204, 255]));
@@ -38,8 +35,6 @@ fn a_constant_panorama_lights_every_normal_alike() {
     }
 }
 
-/// The sky's SH is a radiance, so its cosine average is `at` exactly (no L2 cut on
-/// top of the projection's own), as the trace's and the probes' tests rely on.
 #[test]
 fn the_skys_incoming_cosine_averages_to_its_unbaked_ambient() {
     let dirs = fibonacci_sphere(20_000);
@@ -85,7 +80,6 @@ fn the_panorama_lights_by_direction_and_follows_its_file() {
         "blue above, orange below: {up} {down}"
     );
     assert!(sky.at(Vec3::X).x > sky.at(Vec3::NEG_X).x, "the warmer east");
-    // Intensity scales it; another file, and the same file rewritten, re-project.
     scene.ambient_intensity = 1.0;
     assert!(scene
         .drawn_ambient()
@@ -96,7 +90,6 @@ fn the_panorama_lights_by_direction_and_follows_its_file() {
     scene.skybox_path = other;
     let flipped = scene.drawn_ambient().radiance().at(Vec3::Y);
     assert!(flipped.x > flipped.z, "orange above now: {flipped}");
-    // A rewrite reaches the memo as any file change does: through the write log.
     panorama_fixture("dir.png", [10, 10, 10], [10, 10, 10], 0);
     rusty_core::fs::written::note_written(&path);
     scene.skybox_path = path;
@@ -111,7 +104,6 @@ fn the_procedural_sky_lights_without_a_panorama_and_is_affine_in_its_colour() {
     assert_eq!(drawn.gradient, None);
     let sky = drawn.radiance();
     assert!(sky.at(Vec3::Y).max_element() > sky.at(Vec3::NEG_Y).max_element());
-    // The memo combines two fixed terms; projecting afresh under the colour agrees.
     let color = Vec3::new(0.9, 0.2, 0.4);
     let s = SkySettings::default();
     let (memo, fresh) = (
@@ -121,7 +113,6 @@ fn the_procedural_sky_lights_without_a_panorama_and_is_affine_in_its_colour() {
     for n in NORMALS {
         assert!(memo.eval(n).abs_diff_eq(fresh.eval(n), 1e-4), "{n}");
     }
-    // A panorama that cannot be read falls back to the procedural sky.
     let missing = skybox_scene("no/such/sky.png").drawn_ambient();
     assert_eq!(missing.skybox, drawn.skybox);
 }

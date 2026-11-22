@@ -1,6 +1,3 @@
-//! The decal record's lifecycle (#639): opacity over a lifetime and fade, expiry,
-//! and retiring early without popping back to whole.
-
 use glam::Vec3;
 
 use super::{Decal, DecalSpec};
@@ -49,7 +46,7 @@ fn without_a_fade_it_is_whole_until_its_lifetime_ends() {
 #[test]
 fn retiring_fades_from_the_current_opacity_never_popping_back() {
     let mut d = stamped(Some(10.0), 4.0);
-    d.age = 8.0; // half faded on its own
+    d.age = 8.0;
     d.retire(1.0);
     assert!(d.retiring);
     assert!((d.opacity() - 0.5).abs() < 1e-6, "{}", d.opacity());

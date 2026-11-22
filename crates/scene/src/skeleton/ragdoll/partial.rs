@@ -1,14 +1,3 @@
-//! A ragdoll in part (#1895): one branch of the body on physics while the rest
-//! stays animated, its joints driven toward the animated pose, its drawn pose a
-//! blend of both, and the one-call hit reaction built from those three. Unreal's
-//! `SetAllBodiesBelowSimulatePhysics`, `SetAllBodiesBelowPhysicsBlendWeight` and
-//! physical animation in local space; the state they keep is `runtime`'s.
-//!
-//! A **branch** is a ragdoll bone and every ragdoll bone below it. A partly
-//! simulated branch keeps its hitboxes on the `Hitbox` layer, which collides with
-//! nothing, so a flinching arm can't catch on a door frame; only a full
-//! `Enable` moves a body to the `Ragdoll` layer.
-
 use std::collections::BTreeMap;
 
 use glam::{Quat, Vec3};
@@ -19,17 +8,13 @@ use crate::rules::joint::drive_value;
 use crate::skeleton::HitboxOptions;
 use crate::Scene;
 
-/// A body's `(linear, angular)` velocity, as physics has it.
 pub type Velocity<'a> = &'a dyn Fn(u32) -> Option<(Vec3, Vec3)>;
 
-/// What `Ragdoll.HitReact` was asked for beyond the bone, impulse and point.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct HitReact {
     /// How long the weight takes to ease back to 0 (seconds).
     pub duration: f32,
-    /// The branch's drive while it reacts.
     pub drive: Drive,
-    /// The bone whose branch reacts, instead of the default.
     pub up_to: Option<u32>,
 }
 
@@ -68,14 +53,12 @@ impl Default for HitReact {
 }
 
 impl Scene {
-    /// `owner`'s ragdoll bone at `bone`, or its nearest ancestor that is one.
     pub fn ragdoll_body_at(&self, owner: u32, bone: u32) -> Option<u32> {
         let bodies = self.ragdoll_bones(owner);
         let mut up = std::iter::once(bone).chain(self.world.ancestors(bone));
         up.find(|b| bodies.binary_search(b).is_ok())
     }
 
-    /// The ragdoll bones of `owner` at and below `bone`, ascending.
     pub fn ragdoll_branch(&self, owner: u32, bone: u32) -> Vec<u32> {
         let bodies = self.ragdoll_bones(owner);
         let mut out: Vec<u32> = self.world.self_and_descendants(bone).collect();
@@ -84,10 +67,6 @@ impl Scene {
         out
     }
 
-    /// Switch the branch at `bone` to physics (`on`, each body moving at the
-    /// velocity its animation gave it) or back to the Animator, leaving the rest
-    /// of the body as it is; how many bodies switched. Switching off moves a
-    /// fully ragdolled branch's hitboxes back to the hitbox layer.
     pub fn set_simulated(&mut self, owner: u32, bone: u32, on: bool, velocity: Velocity) -> usize {
         let bones = self.ragdoll_branch(owner, bone);
         self.ragdolls.forget(&bones);
@@ -104,9 +83,6 @@ impl Scene {
         bones.len()
     }
 
-    /// Set the drive on every joint of the branch at `bone`; how many joints.
-    /// Each joint's drive is its own merged with the fields given
-    /// ([`Drive::merged`]), so `{ damping = 80 }` changes only the damping.
     pub fn set_drive(&mut self, owner: u32, bone: u32, given: [Option<f32>; 2]) -> usize {
         let mut n = 0;
         for b in self.ragdoll_branch(owner, bone) {
@@ -125,18 +101,12 @@ impl Scene {
         n
     }
 
-    /// Start tracking simulated ragdoll bone `joint`'s animated pose, when it
-    /// isn't: its joint is driven, however the drive was set. Physics calls it
-    /// as it reads the drive, so `Joint.SetDriveStrength` or the inspector on an
-    /// `Enable`d body chases the animation as `Ragdoll.SetDrive` does.
     pub fn track_driven_bone(&mut self, joint: u32) {
         if !self.ragdolls.is_tracked(joint) && self.is_bone(joint) {
             self.track_if_simulated(joint);
         }
     }
 
-    /// Start tracking `bone`'s animated pose, from the pose it has now, when its
-    /// body is simulated: a drive or a blend weight now needs it.
     fn track_if_simulated(&mut self, bone: u32) {
         if self.is_simulated_body(bone) {
             let pose = self.world.transform(bone).map(|t| (t.position, t.rotation));
@@ -144,15 +114,12 @@ impl Scene {
         }
     }
 
-    /// Whether `bone`'s body is dynamic.
     pub(super) fn is_simulated_body(&self, bone: u32) -> bool {
         self.world
             .rigidbody(bone)
             .is_some_and(|rb| !rb.is_kinematic)
     }
 
-    /// Set the blend weight (clamped to `0..=1`; NaN is ignored) of every bone
-    /// of the branch at `bone`; how many bones.
     pub fn set_blend_weight(&mut self, owner: u32, bone: u32, weight: f32) -> usize {
         if weight.is_nan() {
             return 0;
@@ -165,13 +132,6 @@ impl Scene {
         bones.len()
     }
 
-    /// Start a hit reaction on `owner` hit at `bone` (world `point`), and return
-    /// the body the impulse belongs on: `bone`'s, or its nearest ragdolled
-    /// ancestor's, when that body is simulated; else the reacting branch's body
-    /// nearest `point` (a pelvis shot whose branch starts below it, an `up_to`
-    /// branch that doesn't hold the hit), since a kinematic body drops an
-    /// impulse. `None` without a ragdoll. A body already simulated outside any
-    /// reaction (`Enable`, `SetSimulated`) only takes the impulse.
     pub fn hit_react(
         &mut self,
         owner: u32,
@@ -205,7 +165,6 @@ impl Scene {
         Some(target)
     }
 
-    /// The bone of `bones` whose origin is nearest `point`; the first on a tie.
     fn nearest(&self, bones: &[u32], point: Vec3) -> Option<u32> {
         let distance = |b: &u32| self.world.world_position(*b).distance_squared(point);
         bones
@@ -214,10 +173,6 @@ impl Scene {
             .min_by(|a, b| distance(a).total_cmp(&distance(b)))
     }
 
-    /// The branch a hit on body `hit` moves by default: from its ragdolled
-    /// parent, so a forearm shot moves the arm and a chest shot the torso; from
-    /// `hit` itself when that parent is the root (the hips), which never reacts;
-    /// and for a hit on the root, the root's child body nearest `point`.
     fn reaction_root(&self, owner: u32, hit: u32, point: Vec3) -> u32 {
         let parent = |b: u32| self.world.joint(b).and_then(|j| j.connected_body);
         match parent(hit) {
@@ -231,16 +186,11 @@ impl Scene {
         }
     }
 
-    /// One fixed tick of the hit reactions: age them by `dt`. Run before the
-    /// ragdoll bones are posed, so a reaction's last tick poses at weight 0.
     pub fn advance_reactions(&mut self, dt: f32) {
-        self.ragdolls.take_physics(); // last tick's blend is done with
+        self.ragdolls.take_physics();
         self.ragdolls.advance(dt);
     }
 
-    /// Put every bone blended this tick back on its animated pose, so IK
-    /// solves on the animation as it would with no physics in the way; the
-    /// physics poses, for [`Scene::reblend_ragdolls`]. Run around IK only.
     pub(crate) fn unblend_ragdolls(&mut self) -> BTreeMap<u32, (Vec3, Quat)> {
         let blended = self.ragdolls.take_physics();
         for &b in blended.keys() {
@@ -252,9 +202,6 @@ impl Scene {
         blended
     }
 
-    /// Redo the blend of each bone [`Scene::unblend_ragdolls`] gave back, now
-    /// between its IK'd animated pose and its physics pose, so a reaction on an
-    /// aiming arm keeps the aim and ends with no snap.
     pub(crate) fn reblend_ragdolls(&mut self, blended: BTreeMap<u32, (Vec3, Quat)>) {
         for (b, (pos, rot)) in blended {
             let w = self.ragdolls.weight(b);
@@ -266,8 +213,6 @@ impl Scene {
         }
     }
 
-    /// Hand the bones no reaction holds any more back to the Animator: run after
-    /// they are posed, so they leave physics on a tick drawn at weight 0.
     pub fn end_reactions(&mut self) {
         for b in self.ragdolls.release() {
             self.switch_body(b, None, false);

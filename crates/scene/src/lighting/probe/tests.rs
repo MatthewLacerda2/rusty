@@ -1,12 +1,9 @@
-//! Tests for the light-probe data model and its sampling.
-
 use super::*;
 
 #[test]
 fn fill_grid_counts_and_positions() {
     let mut vol = ProbeVolume::new();
     vol.fill_grid(Vec3::ZERO, Vec3::new(2.0, 0.0, 2.0), 1.0);
-    // 3 along x, 1 along y, 3 along z = 9 probes.
     assert_eq!(vol.probes.len(), 9);
     let grid = vol.grid.unwrap();
     assert_eq!(grid.counts, [3, 1, 3]);
@@ -34,14 +31,12 @@ fn sample_none_when_empty() {
 fn trilinear_blends_between_probes() {
     let mut vol = ProbeVolume::new();
     vol.fill_grid(Vec3::ZERO, Vec3::new(1.0, 0.0, 0.0), 1.0);
-    // Two probes along x. Set distinct DC terms.
     vol.probes[0].sh.coeffs[0] = [0.0, 0.0, 0.0];
     vol.probes[1].sh.coeffs[0] = [1.0, 0.0, 0.0];
     let mid = vol.sample(Vec3::new(0.5, 0.0, 0.0)).unwrap();
     assert!((mid.coeffs[0][0] - 0.5).abs() < 1.0e-5);
 }
 
-/// Two free probes along x, their DC terms 0 and 1.
 fn pair() -> ProbeVolume {
     let mut vol = ProbeVolume::new();
     vol.add_probe(Vec3::ZERO);
@@ -50,8 +45,6 @@ fn pair() -> ProbeVolume {
     vol
 }
 
-/// Without a grid a point blends its nearest probes: on a probe it reads that
-/// probe, halfway it reads the mean, and nearer one probe it leans to it (#1737).
 #[test]
 fn free_probes_blend_by_distance() {
     let vol = pair();
@@ -63,7 +56,6 @@ fn free_probes_blend_by_distance() {
     assert!(near_first > 0.0 && near_first < 0.5, "{near_first}");
 }
 
-/// Only the nearest `BLEND_PROBES` count: a far probe adds nothing.
 #[test]
 fn a_far_probe_is_left_out_of_the_blend() {
     let mut vol = pair();
@@ -76,9 +68,6 @@ fn a_far_probe_is_left_out_of_the_blend() {
     assert!(s.coeffs[0][0] < 1.0, "{}", s.coeffs[0][0]);
 }
 
-/// Re-placing keeps the manual probes, in order, and drops the placed ones; a
-/// manual grid stays through any number of bakes (placed probes after it never
-/// shift its indices), and goes once one of its own probes is placed.
 #[test]
 fn replace_placed_keeps_manual_probes() {
     let mut vol = ProbeVolume::new();
@@ -98,7 +87,6 @@ fn replace_placed_keeps_manual_probes() {
     );
 }
 
-/// The flag saves only when set, and a saved probe without it loads as placed.
 #[test]
 fn the_manual_flag_round_trips_and_defaults_to_placed() {
     let mut probe = Probe::new(Vec3::X);
@@ -116,8 +104,6 @@ fn the_manual_flag_round_trips_and_defaults_to_placed() {
     );
 }
 
-/// A probe moved after the set was sampled is found where it now is: an edit
-/// through the volume drops the nearest-probe index (#1737).
 #[test]
 fn a_moved_probe_is_sampled_where_it_now_is() {
     let mut vol = ProbeVolume::new();
