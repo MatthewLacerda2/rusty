@@ -42,7 +42,8 @@ pub fn sampler(
     let push = finite(distortion, 0.0).clamp(-MAX_DISTORTION, MAX_DISTORTION);
     let warp = base.map(|b| push / b);
     Box::new(move |u, v| {
-        // Before the warp: a warped read would leave the tile and clamp, opening a seam.
+        // The gain is read before the warp: a warped read would leave the tile and clamp,
+        // opening a seam.
         let gain = gain.at_pixel(u, v);
         let (u, v) = if push == 0.0 {
             (u, v)

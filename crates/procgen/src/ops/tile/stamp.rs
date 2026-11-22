@@ -189,7 +189,7 @@ pub(super) fn stretch(per: (i64, i64)) -> f32 {
     per.0 as f32 / per.1 as f32
 }
 
-/// In `f64`, so a large grid neither overflows nor collapses neighbouring indices.
+/// Worked in `f64`, so a large grid neither overflows nor collapses neighbouring indices.
 fn index((x, y): (i64, i64), per: (i64, i64)) -> f32 {
     let (w, h) = (per.0 as f64, per.1 as f64);
     ((y as f64 * w + x as f64 + 1.0) / (w * h)) as f32

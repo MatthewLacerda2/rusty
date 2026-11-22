@@ -93,7 +93,7 @@ impl Buckets {
         Self { levels }
     }
 
-    /// In stamp order: `scatter` lays the copies `over` in that order.
+    /// Yields copies in stamp order, which `scatter` lays `over` in.
     #[inline]
     pub fn each(&self, u: f32, v: f32, mut f: impl FnMut(Entry)) {
         let mut lists: [&[Entry]; LEVELS] = [&[]; LEVELS];
