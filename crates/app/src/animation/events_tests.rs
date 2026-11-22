@@ -100,6 +100,7 @@ fn a_clip_being_faded_out_is_silent_and_the_incoming_one_fires() {
     let b = marked("B", "B", true, &[("in", 0.0)]);
     let graph = graph(vec![a, b.clone()], vec![]);
     let mut anim = rig(&graph).1;
+    // A, fading out, plays on from 0.4 across its 0.5 marker: only B's `in` may fire.
     anim.base.time = 0.4;
     anim.enter_node(&b, 0.5);
     assert_eq!(run(&graph, &mut anim, 4, 0.1), ["in"]);

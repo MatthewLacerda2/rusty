@@ -65,6 +65,7 @@ fn locate(times: &[f32], time: f32) -> Option<(usize, f32)> {
     if time >= times[times.len() - 1] {
         return Some((times.len() - 1, 0.0));
     }
+    // Assumes `times` ascends, as glTF requires: the first key past `time` ends the interval.
     let next = times
         .iter()
         .position(|&t| t > time)

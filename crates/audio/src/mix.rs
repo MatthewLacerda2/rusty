@@ -13,6 +13,7 @@ pub struct MixEnv {
     pub listener: Listener,
     pub time_scale: f32,
     pub paused: bool,
+    /// Scaled sim seconds since the last push: the span doppler measures velocity over.
     pub dt: f32,
 }
 
@@ -64,7 +65,7 @@ pub struct Rolloff {
 }
 
 impl Default for Rolloff {
-    /// The `AudioSource` default band (1 → 16 m), Unity's `PlayClipAtPoint` reach.
+    /// The `AudioSource` default band, 1 → 16 m.
     fn default() -> Self {
         let source = AudioSourceComponent::default();
         Self {
@@ -217,11 +218,14 @@ impl AudioMaestro {
         }
     }
 
+    /// A test hook: `app`'s audio tests read the pre-master mix last applied.
     #[doc(hidden)]
     pub fn voice_mix(&self, id: u32) -> Option<VoiceMix> {
         self.entity_voices.get(&id).map(|live| live.mix)
     }
 
+    /// An entity voice keeps its entry after its clip ends, so the backend is asked;
+    /// a one-shot's is reaped by the first push after it ends.
     pub fn is_sounding(&self) -> bool {
         let mut voices = self.entity_voices.values();
         voices.any(|live| self.backend.is_live(live.voice))

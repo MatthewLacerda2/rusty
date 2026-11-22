@@ -12,6 +12,8 @@ use super::layers::{compose as compose_layer, mask_slots, LayerPose};
 use super::motion::Pose;
 use super::root_motion::RootBone;
 
+/// Section changes one step may make, at most, so a looping section of almost no length can't
+/// spin.
 const MAX_SEGMENTS: usize = 16;
 
 pub(super) fn compose(
@@ -20,6 +22,8 @@ pub(super) fn compose(
     clips: &[AnimationClip],
     montages: &Montages,
 ) {
+    // `Montages::play` keeps `playing` in slot order, a slot's fading montage before its active
+    // one: poses here and root motion in `step` stack in that order.
     for m in &montages.playing {
         let weight = m.weight();
         let Some(clip) = find(clips, &m.montage.clip).filter(|_| weight > 0.0) else {
@@ -111,6 +115,7 @@ pub(super) fn step(
 struct Segment {
     span: (f32, f32),
     offset: f32,
+    /// The segment ran onto the end of a section with no next: a marker right on that end fires.
     last: bool,
 }
 
@@ -192,6 +197,7 @@ fn add_root(
     if weight <= 0.0 || !covers || !bone.keyed_by(clip) {
         return;
     }
+    // Clip seconds (scale 1), `Open`: `advance` already split the travel at each section's end.
     let delta = segments.iter().fold(RootMotion::ZERO, |acc, seg| {
         acc.then(bone.travel(skin, clip, Bounds::Open, 1.0, seg.span))
     });

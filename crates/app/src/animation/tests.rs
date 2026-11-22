@@ -68,6 +68,7 @@ fn linear_interpolation_at_known_time() {
     let t0 = palette[0].to_cols_array();
     assert!((t0[12] - 1.0).abs() < 1e-5, "joint0 x = {}", t0[12]);
 
+    // joint1 rides joint0's +1 on X; its inverse bind cancels its own +1 Y bind offset.
     let t1 = palette[1].to_cols_array();
     assert!((t1[12] - 1.0).abs() < 1e-5, "joint1 x = {}", t1[12]);
     assert!(t1[13].abs() < 1e-5, "joint1 y = {}", t1[13]);
@@ -121,6 +122,7 @@ fn blend_poses_lerps_translation_and_hits_the_endpoints() {
 }
 
 #[test]
+/// Lerped matrices would average +90° and -90° about Z into one collapsing the tip onto its root.
 fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let skin = chain_skin();
     let pose = |angle: f32| {
@@ -199,8 +201,10 @@ fn a_clip_playhead_wraps_at_the_actual_clip_length() {
         parameters: &parameters,
     };
     let wrap = |clips, clip| context(clips).playhead(Motion::Clip(clip)).wrap;
+    // Two lengths, so a stub returning one constant wrap fails on one of them.
     assert_eq!(wrap(&mesh.clips[..], "Short"), 0.75);
     assert_eq!(wrap(&mesh.clips[..], "Long"), 2.5);
+    // Below 0, the never-wrap sentinel: no clips, or a clip the mesh lacks.
     assert!(wrap(&[][..], "Short") < 0.0);
     assert!(wrap(&mesh.clips[..], "Ghost") < 0.0);
 }

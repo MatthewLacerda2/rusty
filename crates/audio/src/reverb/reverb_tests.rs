@@ -59,6 +59,7 @@ fn overlapping_zones_blend_by_weight() {
     ));
     assert!(close(both.params.wet, (r.wet + t.wet) / 2.0));
     assert_eq!((both.weight, both.zones), (1.0, 2));
+    // Full in the room, half-way out of the tunnel: weights 1 and ½.
     let tunnel_at = Vec3::new(12.5, 0.0, 0.0);
     let mixed = blend(Vec3::ZERO, &[(Vec3::ZERO, &room), (tunnel_at, &tunnel)]);
     assert!(close(

@@ -11,6 +11,8 @@ use rusty_components::{root_chain, Bounds, RootMotion};
 use super::clip::sample_joint;
 use super::motion::Pose;
 
+/// Whole loop cycles counted in one step, at most, so an absurd speed on a short clip can't
+/// spin the walk.
 const MAX_CYCLES: usize = 16;
 
 #[derive(Clone, Copy, Debug)]
@@ -168,6 +170,7 @@ fn wrapped(span: (f32, f32), length: f32, piece: impl Fn(f32, f32) -> RootMotion
     out.then(piece(start, b))
 }
 
+/// The twist of `q` about +Y, in radians within `(-π, π]`.
 fn yaw_of(q: Quat) -> f32 {
     wrap_angle(2.0 * q.y.atan2(q.w))
 }

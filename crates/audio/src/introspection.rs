@@ -55,6 +55,7 @@ impl Default for AudioEventLog {
     }
 }
 
+/// Events held before the oldest falls off, so an unattended run's log stays bounded.
 pub const DEFAULT_EVENT_CAP: usize = 1024;
 
 impl AudioEventLog {
@@ -106,6 +107,7 @@ impl AudioEventLog {
 }
 
 impl AudioMaestro {
+    /// A test hook: `app`'s and the root crate's tests read the log through it.
     pub fn events(&self) -> &[AudioEvent] {
         self.log.events()
     }

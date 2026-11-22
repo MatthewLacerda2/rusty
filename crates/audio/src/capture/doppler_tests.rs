@@ -9,6 +9,7 @@ use rusty_components::AudioSourceComponent;
 const TONE_HZ: f64 = 1_000.0;
 const DT: f32 = 0.01;
 
+/// One second at `RATE` holds a whole number of cycles, so the looped clip has no seam.
 fn sine(name: &str) -> PathBuf {
     let path = rusty_test_support::temp::dir().join(name);
     let mut wav = WavStream::create(&path).unwrap();

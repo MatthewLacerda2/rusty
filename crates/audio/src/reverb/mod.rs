@@ -38,6 +38,8 @@ pub fn weight(distance: f32, min: f32, max: f32) -> f32 {
     }
 }
 
+/// Sums `zones` in the order given, and a float sum depends on it: pass a stable order
+/// (`app` sorts by entity id).
 pub fn blend(listener: Vec3, zones: &[ZoneAt]) -> ReverbState {
     let mut total = 0.0;
     let mut count = 0;

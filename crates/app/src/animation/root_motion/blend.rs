@@ -6,6 +6,8 @@ use rusty_components::{
 use super::super::motion::MotionContext;
 use super::RootBone;
 
+/// Taken after `rebase_leaders` (`before_step`), so a change of leader isn't measured as travel.
+/// It keeps the outgoing motion, which the step may finish and drop.
 #[derive(Clone, Debug)]
 pub struct Before {
     leaves: Vec<LeafTime>,
@@ -137,6 +139,8 @@ impl MotionContext<'_> {
     }
 }
 
+/// Unwraps `to` to the lap nearest the travel the tree's `span` makes at the clip's length, so
+/// a small re-match back stays a small step back.
 fn leaf_travel(
     bounds: Bounds,
     duration: f32,

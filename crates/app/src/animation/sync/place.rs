@@ -11,6 +11,8 @@ impl MotionContext<'_> {
             return;
         }
         let node = playback.current_node.as_deref();
+        // Resolved before `from` is taken, so the placement stays pending until the incoming clips
+        // load.
         let Some(lead) = self.lead(playback.motion(), node, None) else {
             return;
         };
@@ -25,6 +27,8 @@ impl MotionContext<'_> {
         if lead.tree && !lead.markers.is_empty() {
             playback.sync.leader = Some(lead.clip.name.clone());
         }
+        // Entered twice before a step (A, B, C): B, fading out, was never placed, so it goes there
+        // too.
         let unplaced = playback.sync.following && playback.sync.previous_node != from.node;
         if let (Some(pos), true) = (pos, unplaced) {
             self.place_previous(playback, pos);
@@ -61,6 +65,7 @@ impl MotionContext<'_> {
             leaves.clear();
             return;
         };
+        // Updated in place while the leaf set matches the one stored, so a step allocates nothing.
         let (mut i, mut rebuilt) = (0, None::<Vec<LeafTime>>);
         self.for_each_leaf_clip(node, |clip, _, markers| {
             let near = stored_leaf(leaves, &clip.name);
