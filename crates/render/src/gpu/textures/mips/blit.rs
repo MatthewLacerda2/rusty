@@ -6,6 +6,8 @@ use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::deep::DEEP_FORMAT;
 
+/// On the GPU: the editor's dev build compiles this crate at opt-level 0, where a CPU box
+/// filter is slow.
 pub(crate) struct MipGenerator {
     layout: wgpu::BindGroupLayout,
     colour: wgpu::RenderPipeline,

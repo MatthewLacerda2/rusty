@@ -6,7 +6,8 @@ use rusty_scene::lighting::probe::ProbeVolume;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
 
-/// The `Baked` lights' direct light, added once the bounces stop so no capture counts it twice.
+/// Per position, the `Baked` lights' direct SH and the shadowmask occlusion (`Vec4`) of the
+/// `Mixed` ones: added once the bounces stop, so no capture counts it twice.
 pub type BakedDirect = fn(&Scene, &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>);
 
 /// In capture passes: direct light plus four indirect bounces.

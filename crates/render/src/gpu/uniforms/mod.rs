@@ -1,5 +1,5 @@
-//! Each `#[repr(C)]` struct mirrors its namesake in `engine/shaders/common.wgsl`: change both
-//! together.
+//! Each `#[repr(C)]` struct here mirrors one in `engine/shaders/common.wgsl`, named apart
+//! (`CameraUniform` is `CameraUniforms`, `ClusterUniform` is `Clusters`): change both together.
 
 use crate::ibl::reflection_probes::{ReflectionProbeUniform, MAX_REFLECTION_PROBES};
 

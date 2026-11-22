@@ -195,6 +195,7 @@ fn upload(
     texture
 }
 
+/// `Rgba16Float` is a storage format WebGPU guarantees, so every adapter takes the compute write.
 fn rough_texture(device: &wgpu::Device, sizes: &[u32]) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Reflection Probe Rough Mips"),

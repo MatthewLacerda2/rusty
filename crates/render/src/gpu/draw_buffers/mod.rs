@@ -31,8 +31,9 @@ pub(crate) struct FrameUpload<'a> {
     pub materials: &'a mut SlotTable<MaterialData>,
 }
 
-/// Each camera rewrites these arrays: its passes go out in its one submit before the next
-/// camera's rewrite.
+/// Each camera rewrites the uniform, joint, instance and proxy arrays; all its submits go out
+/// before the next camera's rewrite. `objects` and `materials` are kept tables, written where
+/// changed.
 pub(crate) struct DrawBuffers {
     uniforms: GrowBuffer,
     bones: GrowBuffer,

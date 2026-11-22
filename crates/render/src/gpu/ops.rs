@@ -1,4 +1,5 @@
-//! Counts are per thread, so two renderers on one thread must not nest their frames.
+//! Counts are per thread: two renderers on one thread never nest frames, and a render inside
+//! a frame goes through `Renderer::aside`.
 
 use std::cell::Cell;
 use std::panic::Location;
@@ -35,9 +36,8 @@ thread_local! {
 }
 
 thread_local! {
-    /// Every counted submit this thread made, never reset: the GPU timer tags
-    /// each pair with it, so pairs between the same two submits are known to
-    /// share a command buffer (`timing::times::Pair::submit`).
+    /// Counted submits on this thread, never reset: GPU timer pairs tagged with one count share
+    /// a command buffer (`timing::times::Pair::submit`).
     static SUBMITS: Cell<u64> = const { Cell::new(0) };
 }
 
@@ -100,6 +100,7 @@ pub(crate) trait CountedQueue {
     ) -> wgpu::SubmissionIndex;
     #[track_caller]
     fn counted_write_buffer(&self, buffer: &wgpu::Buffer, offset: wgpu::BufferAddress, data: &[u8]);
+    /// `staging` must be the renderer's for this queue, or its budget bounds nothing.
     fn counted_write_texture(
         &self,
         staging: &Staging,
@@ -153,13 +154,12 @@ impl CountedQueue for wgpu::Queue {
 
 pub(crate) type Writes<'a> = (&'a wgpu::Queue, &'a Staging);
 
-/// The texture bytes written between two of `Staging`'s own submits: two 2048²
-/// BC7 textures with their mips (5.6 MB each), or one 2048² RGBA8 base level.
+/// Texture bytes between two of `Staging`'s own submits: two 2048² BC7 textures with
+/// mips (5.6 MB each), or one 2048² RGBA8 base level.
 /// A test hook: `dev`'s memory tests bound staging by it.
 pub const STAGING_BUDGET: u64 = 16 << 20;
 
-/// Bounds the host memory `write_texture`'s staging holds until a submit, waiting and
-/// submitting past the budget.
+/// Bounds the host memory `write_texture` stages until a submit, submitting past the budget.
 pub(crate) struct Staging {
     device: wgpu::Device,
     since: Cell<u64>,

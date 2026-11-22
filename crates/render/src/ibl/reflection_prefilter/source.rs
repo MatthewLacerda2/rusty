@@ -33,6 +33,7 @@ fn halve(face: &[Vec3], size: usize) -> Vec<Vec3> {
         .collect()
 }
 
+/// To half floats, as the GPU's texture stores them, so the CPU reference reads what the GPU reads.
 fn quantize(face: &[Vec3]) -> Vec<Vec3> {
     let round = |c: f32| f16_to_f32(f32_to_f16(c));
     (face.iter())

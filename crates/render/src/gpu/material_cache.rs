@@ -123,7 +123,8 @@ impl MaterialCache {
         self.params.contains_key(owner)
     }
 
-    /// On a texture file rewrite, before any draw resolves an index; param buffers stay.
+    /// Drops every group when a texture file is rewritten, before any draw resolves an index;
+    /// param buffers stay.
     pub(crate) fn forget_groups(&mut self) {
         self.index.clear();
         self.groups.clear();

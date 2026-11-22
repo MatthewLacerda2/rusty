@@ -11,7 +11,7 @@ use rusty_core::color::f16_to_f32;
 const MAGIC: [u8; 12] = [
     0xAB, 0x4B, 0x54, 0x58, 0x20, 0x32, 0x30, 0xBB, 0x0D, 0x0A, 0x1A, 0x0A,
 ];
-/// Bytes: the KTX2 header and one level-index entry, as `cubemap`'s parse reads them.
+// Bytes: the KTX2 header and one level-index entry, as `cubemap`'s parse reads them.
 const HEADER_LEN: usize = 80;
 const LEVEL_INDEX_ENTRY_LEN: usize = 24;
 pub(crate) const VK_FORMAT_BC6H_UFLOAT_BLOCK: u32 = 143;

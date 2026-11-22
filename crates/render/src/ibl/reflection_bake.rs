@@ -106,8 +106,8 @@ impl Renderer {
     }
 }
 
-/// Open (sky) texels take the ambient instead, as the lightmap and a light probe see them, so
-/// the forward pass's ratio of the two compares like with like.
+/// The capture's irradiance SH, with open (sky) texels taking the ambient as the lightmap and a
+/// light probe see them, so the forward pass's ratio of the cube to the lightmap is like for like.
 pub fn stored_irradiance(
     mut cube: CubemapCapture,
     open: [Vec<bool>; 6],

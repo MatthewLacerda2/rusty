@@ -21,7 +21,7 @@ const BLOCK_BYTES: u32 = 16;
 
 pub(crate) type Refusal = &'static str;
 
-/// Bytes: the KTX2 header and one level-index entry.
+// Bytes: the KTX2 header and one level-index entry.
 const HEADER: usize = 80;
 const LEVEL_ENTRY: usize = 24;
 
@@ -155,7 +155,8 @@ fn is_rgba8(format: Format) -> bool {
     matches!(format, Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB)
 }
 
-/// Not a `GpuTexture` (a 2D material bind group): the probe array copies it in.
+/// Not a `GpuTexture`, whose bind group is the 2D material's: the probe array copies this into
+/// a layer.
 pub struct CubemapTexture {
     pub texture: wgpu::Texture,
     pub size: u32,
