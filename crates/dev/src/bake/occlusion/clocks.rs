@@ -12,6 +12,7 @@ pub struct CellClocks {
 
 const UNTIMED: u64 = u64::MAX;
 
+// Per thread: a cell starts and ends on one worker.
 thread_local! {
     static CELL_STARTED: Cell<Option<Instant>> = const { Cell::new(None) };
 }

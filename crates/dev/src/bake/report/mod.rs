@@ -1,3 +1,6 @@
+//! Each bake's measurements, written beside the scene: the clock is read here, so the bakes
+//! stay pure.
+//!
 //! stored-format: the bake reports, `<scene>.bake/<kind>.json`
 
 use std::path::{Path, PathBuf};
@@ -19,6 +22,7 @@ mod tests;
 
 pub const DIR_SUFFIX: &str = ".bake";
 
+/// How many entries a heaviest-first list names.
 pub const TOP: usize = 20;
 
 rusty_core::named_enum! {
@@ -36,6 +40,7 @@ pub fn report_dir(scene_path: &str) -> PathBuf {
     PathBuf::from(format!("{scene_path}{DIR_SUFFIX}"))
 }
 
+/// Another folder ending in `.bake` (`bread.bake/`) is the game's own: it ships and is compared.
 pub fn is_report_dir(name: &str) -> bool {
     let scene = name.strip_suffix(DIR_SUFFIX);
     scene.is_some_and(|s| {
@@ -132,6 +137,8 @@ pub fn bytes_under(path: &std::path::Path) -> u64 {
     entries.flatten().map(|e| bytes_under(&e.path())).sum()
 }
 
+/// The occlusion bake runs on this many workers; the lightmap tracer reads
+/// `available_parallelism` itself, so [`workers`] holds only while both agree.
 pub fn threads() -> usize {
     std::thread::available_parallelism().map_or(1, |n| n.get())
 }
@@ -144,6 +151,8 @@ pub fn workers(kind: Kind) -> Value {
     }
 }
 
+/// As the renderer picks a reflection probe: the local bounds under the world matrix, which
+/// for a turned asymmetric mesh is not the middle of its vertices' world box.
 pub fn drawn_centre(scene: &rusty_scene::Scene, id: u32) -> Option<glam::Vec3> {
     let world = &scene.world;
     let (min, max) = world.mesh(id)?.world_aabb(glam::Mat4::IDENTITY)?;
@@ -160,6 +169,7 @@ pub fn secs(d: std::time::Duration) -> f64 {
     (d.as_secs_f64() * 1000.0).round() / 1000.0
 }
 
+/// Rounded to the centimetre.
 pub fn point(p: glam::Vec3) -> Value {
     let r = |v: f32| ((v as f64) * 100.0).round() / 100.0;
     json!([r(p.x), r(p.y), r(p.z)])

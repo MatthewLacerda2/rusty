@@ -5,6 +5,7 @@ use rusty_components::{LightMode, LightType};
 use rusty_core::settings::quality::ShadowmaskMode;
 use rusty_scene::lighting::MixedLightingMode::Shadowmask;
 
+/// The largest step between neighbouring shaded floor points, as a share of the lit floor.
 const NO_POP: f32 = 0.15;
 
 #[test]

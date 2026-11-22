@@ -7,8 +7,11 @@ use rusty_scene::lighting::MixedLightingMode::{BakedIndirect, Shadowmask};
 pub(super) const LIT: Vec3 = Vec3::new(-1.0, 0.0, -5.0);
 pub(super) const SHADED: Vec3 = Vec3::new(1.6, 0.0, -5.0);
 
+/// The share the masked lamp's lit floor may stray from the `Baked` one's: a 16-sample trace
+/// against a live light.
 const LIKE_BAKED: f32 = 0.2;
 
+/// How many times brighter than a rough floor a glossy one reads where the lamp mirrors.
 const GLINT: f32 = 1.5;
 
 pub(super) fn pillar(scene: &mut rusty_scene::Scene) {
@@ -30,6 +33,7 @@ fn gpu_a_shadowmask_lamp_lights_a_static_floor_as_a_baked_one_and_its_shadow_hol
     let (b, m) = (patch(&baked, LIT), patch(&masked, LIT));
     eprintln!("[shadowmask] lit floor: {b} baked, {m} masked");
     assert!(b > 0.05 && (m - b).abs() <= b * LIKE_BAKED, "{m} vs {b}");
+    // The static pillar is in no realtime map under `Shadowmask`: the mask alone shades.
     let shaded = patch(&masked, SHADED);
     eprintln!(
         "[shadowmask] behind the pillar: {shaded} masked, {} baked",

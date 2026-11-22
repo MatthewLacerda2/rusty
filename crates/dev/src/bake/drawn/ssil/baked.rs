@@ -6,6 +6,7 @@ use rusty_render::test_gpu::ssil::{
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
+/// The share of its light an all-baked scene may gain with SSIL on: render's `INDIRECT_GAIN`.
 pub(super) const BAKED_GAIN: f32 = 0.005;
 
 pub(super) fn baked(mode: LightMode, name: &str) -> (Scene, u32) {
