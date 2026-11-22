@@ -1,7 +1,8 @@
-//! Release builds only: a debug build asks git at run time, because a stamp (and the
-//! `HEAD` rerun) would rebuild the crate on every commit. `RUSTY_ENGINE_ORDER` is
-//! left out in a shallow clone, which can't count.
-//! `cargo:rustc-env` reaches only the package whose script prints it.
+//! Stamps the engine commit into release builds only: a debug build asks git at run time,
+//! because a stamp (and the `HEAD` rerun) would rebuild the crate on every commit.
+//! `RUSTY_ENGINE_ORDER` is left out in a shallow clone, which can't count.
+//! `cargo:rustc-env` reaches only the package whose script prints it, so the script is
+//! `rusty-core`'s, beside the stamp's reader.
 
 use std::{env, path::Path};
 
@@ -26,7 +27,8 @@ fn main() {
     }
 
     // A rerun-if-changed path that doesn't exist reruns every build, so name only
-    // files git has (a packed ref has no loose file; packed-refs covers it).
+    // files git has (a packed ref has no loose file; packed-refs covers it). A stamped
+    // `-dirty` is as fresh as the last commit or checkout, not the last edit.
     let head_ref = commit::git(root, &["symbolic-ref", "-q", "HEAD"]);
     let head = head_ref.as_deref().unwrap_or("HEAD");
     let watched = ["HEAD", head, "packed-refs", "shallow"];

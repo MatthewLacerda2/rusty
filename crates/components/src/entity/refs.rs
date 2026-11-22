@@ -4,9 +4,11 @@ use crate::{
     SubEmitters,
 };
 
+/// Setting a slot to `None` drops the reference.
 pub type RefVisit<'a> = dyn FnMut(&str, &mut Option<u32>) + 'a;
 
 pub trait EntityRefs {
+    /// Visits an optional slot even when empty, so a caller can fill it.
     fn visit_refs(&mut self, visit: &mut RefVisit<'_>);
 
     fn each_ref(&self, visit: &mut dyn FnMut(&str, u32));
@@ -23,16 +25,20 @@ pub trait EntityRefs {
         });
     }
 
+    /// Includes clearing-only slots (a skinned mesh's bones): what the World's reverse index keys.
     fn each_held(&self, visit: &mut dyn FnMut(u32)) {
         self.each_ref(&mut |_, r| visit(r));
     }
 
+    /// Test hook for other crates' tests: one value holding each kind of id slot, filled or
+    /// left empty for a visit to fill.
     #[doc(hidden)]
     fn every_ref() -> Self
     where
         Self: Sized;
 }
 
+/// A new id-holding component joins here and `Entity::is_ref_pointer`.
 #[macro_export]
 macro_rules! with_ref_components {
     ($m:ident) => {
@@ -83,6 +89,7 @@ macro_rules! entity_walk {
 with_ref_components!(entity_walk);
 
 impl Entity {
+    /// An id under `/prefab_link/overrides` is not a component leaf.
     pub fn is_ref_pointer(pointer: &str) -> bool {
         let under = |prefix: &str, refs: &[&str]| {
             pointer
@@ -103,6 +110,7 @@ impl Entity {
 }
 
 impl Entity {
+    /// A dropped id leaves this list instead of becoming `None`.
     pub fn is_ref_list_pointer(pointer: &str) -> bool {
         pointer
             .strip_prefix("/lod_group")
@@ -110,6 +118,7 @@ impl Entity {
     }
 }
 
+/// RFC 6901's escape of one JSON Pointer token.
 pub fn escape_token(token: &str) -> String {
     token.replace('~', "~0").replace('/', "~1")
 }

@@ -1,3 +1,6 @@
+//! A bounded downward walk: each id is visited once, so a cycle or a child listed twice
+//! ends it, and a dead child is skipped.
+
 use rusty_core::collections::Set;
 
 use super::bundle::Core;
@@ -22,7 +25,7 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
             if (self.descend)(id) {
                 let at = self.stack.len();
                 self.world.push_children(id, &mut self.stack);
-                self.stack[at..].reverse();
+                self.stack[at..].reverse(); // off the stack in declared order
             }
             return Some(id);
         }
@@ -30,6 +33,7 @@ impl<F: FnMut(u32) -> bool> Iterator for Descendants<'_, F> {
 }
 
 impl World {
+    /// Allocates nothing once `out` is warm; returns `id`'s static flag (`false` when dead).
     pub fn push_children(&self, id: u32, out: &mut Vec<u32>) -> bool {
         let Some(core) = self.component::<Core>(id) else {
             return false;
@@ -99,6 +103,8 @@ impl World {
     }
 }
 
+/// Root first, each segment a name and its ordinal among same-named siblings. A value, so a `/`
+/// in a name needs no escaping.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct HierarchyPath(Vec<(String, usize)>);
 

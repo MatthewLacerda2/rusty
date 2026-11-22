@@ -78,6 +78,7 @@ fn shared_normals_weigh_each_face_by_its_area() {
         [1.0, 0.0, 0.0],
         [0.0, 1.0, 0.0],
     ];
+    // Vertex 0 joins a big +Y face and a small +Z one: its normal leans to +Y.
     let n = area_weighted_normals(&positions, &[0, 1, 2, 0, 3, 4]);
     let n0 = Vec3::from_array(n[0]);
     assert!(n0.y > n0.z && n0.z > 0.0, "{n0}");

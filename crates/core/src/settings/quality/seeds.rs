@@ -17,6 +17,8 @@ const fn ssil(samples: u32, resolution_divisor: u32) -> SsilQuality {
     }
 }
 
+// The `Medium` preset's SSR rows march HDRP's Max Ray Steps (16, 32, 64); steps × step length
+// is the reach in metres (8, 12, 16).
 const fn march(steps: u32, step_length: f32) -> SsrQuality {
     SsrQuality { steps, step_length }
 }
@@ -25,6 +27,7 @@ const fn froxels(resolution: u32, slices: u32) -> VolumetricFogQuality {
     VolumetricFogQuality { resolution, slices }
 }
 
+/// The `Low` preset: an integrated GPU's floor.
 pub(super) fn low() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(4, 2), ssao(6, 2), ssao(8, 2)),
@@ -41,6 +44,7 @@ pub(super) fn low() -> QualityValues {
     }
 }
 
+/// The `Medium` preset, and the values that run when a game defines none.
 pub(super) fn medium() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(6, 2), ssao(8, 2), ssao(16, 1)),
@@ -57,6 +61,7 @@ pub(super) fn medium() -> QualityValues {
     }
 }
 
+/// The `High` preset: a discrete GPU.
 pub(super) fn high() -> QualityValues {
     QualityValues {
         ssao: levels(ssao(8, 2), ssao(16, 1), ssao(32, 1)),

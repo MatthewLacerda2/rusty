@@ -1,9 +1,10 @@
-//! Unity's Game view resolution dropdown. Anything but `Free` is drawn letterboxed in
-//! the panel; the sim, UI, pointer and renderer read the resolved size, never the
+//! The Game view's size, Unity's resolution dropdown. Anything but `Free` is drawn
+//! letterboxed in the panel; the sim, UI, pointer and renderer read the resolved size, never the
 //! panel's. Editor state, never the project's.
 
 use super::Application;
 
+/// Pixels, either side: wgpu's default texture limit, which every Game view target must fit.
 pub const MAX_GAME_VIEW_SIDE: u32 = 8192;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -113,6 +114,7 @@ pub fn letterbox(panel: (f32, f32), (width, height): (u32, u32)) -> ((f32, f32),
 pub struct GameViewDesk {
     viewer: bool,
     setting: GameViewSetting,
+    /// Each set is a whole setting, so only a frame's last counts.
     request: Option<GameViewSetting>,
 }
 

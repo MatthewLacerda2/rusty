@@ -1,3 +1,6 @@
+//! Undo records a mesh without geometry; a restore takes it from the live mesh of the
+//! same source.
+
 use super::{MeshComponent, MeshRevision, Vertex};
 
 /// A full copy: [`MeshComponent::without_geometry`]'s fields (every one named
@@ -20,6 +23,7 @@ impl Clone for MeshComponent {
 }
 
 impl MeshComponent {
+    /// Names every field: a new one goes here, and in `Clone` if heavy.
     pub fn without_geometry(&self) -> Self {
         Self {
             primitive_type: self.primitive_type.clone(),
@@ -43,6 +47,7 @@ impl MeshComponent {
         }
     }
 
+    /// Copies a shared buffer; a new revision and identity draw the edit on this mesh only.
     pub fn vertices_mut(&mut self) -> &mut Vec<Vertex> {
         self.renew(!self.vertices.is_unique());
         self.vertices.edit()
@@ -53,6 +58,7 @@ impl MeshComponent {
         self.indices.edit()
     }
 
+    /// A `shared` buffer: another mesh (a clone) may hold this identity.
     fn renew(&mut self, shared: bool) {
         self.revision = MeshRevision::next();
         if shared || self.own_geometry.is_none() {
@@ -60,12 +66,14 @@ impl MeshComponent {
         }
     }
 
+    /// Whether a restore keeps the live geometry, in-place edits included (no Undo step).
     pub fn same_source(&self, other: &Self) -> bool {
         self.primitive_type == other.primitive_type
             && self.asset_ref == other.asset_ref
             && self.subdivisions == other.subdivisions
     }
 
+    /// The renderer has this geometry: nothing uploads again.
     pub fn adopt_geometry(&mut self, from: &mut Self) {
         self.vertices = std::mem::take(&mut from.vertices);
         self.indices = std::mem::take(&mut from.indices);

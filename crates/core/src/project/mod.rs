@@ -22,11 +22,9 @@ pub use engine::{EngineCheck, Verdict};
 pub use file::{ProjectFile, ProjectSettings, PROJECT_FILE};
 pub use locate::{checkout, engine_dir, engine_path, locate};
 
-/// The project's content folder, relative to its root (Unity's `Assets/`).
 pub const ASSETS_DIR: &str = "assets";
 /// Regenerable engine output (Unity's `Library/`, Unreal's `Intermediate/`).
 pub const CACHE_DIR: &str = "cache";
-/// The player's save data (Unreal's `Saved/`).
 pub const SAVED_DIR: &str = "saved";
 pub const DEFAULT_PROJECT_DIR: &str = "project";
 pub const SCRIPTS_DIR: &str = "assets/scripts";
@@ -78,6 +76,8 @@ pub struct Opened {
     pub settings: ProjectSettings,
 }
 
+/// Moves the working directory: open before reading any project path, after resolving
+/// other relative command-line paths. Progress goes to stderr: `session-mcp`'s stdout is JSON-RPC.
 pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     let (opened, mut lines) = prepare(dir, access)?;
     let root = &opened.root;
@@ -94,6 +94,7 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
         eprintln!("[Project] {line}");
     }
     if let Some(upgrade) = opened.engine.upgrade().filter(|_| access == Access::Edit) {
+        // Logged too, so the console and the MCP replies carry it.
         log::warn!("[Project] {upgrade}");
     }
     Ok(opened)

@@ -1,3 +1,6 @@
+//! The kept answers against the walk they replaced: a writer that forgets to invalidate fails it.
+//! Links are mostly written both sides, as `Scene::set_parent` does, sometimes one side raw.
+
 use proptest::prelude::*;
 
 use crate::World;

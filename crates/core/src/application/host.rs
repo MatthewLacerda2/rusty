@@ -5,6 +5,7 @@ impl Application {
         self.quit_requested = true;
     }
 
+    /// Without clearing it: the harness keeps the run ended.
     pub fn quit_requested(&self) -> bool {
         self.quit_requested
     }
@@ -46,6 +47,7 @@ impl Application {
         self.bake_host = true;
     }
 
+    /// Only the editor window steps a background bake (`Lighting.GenerateAsync()`).
     pub fn bake_host(&self) -> bool {
         self.bake_host
     }

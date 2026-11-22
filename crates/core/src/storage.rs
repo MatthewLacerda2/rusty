@@ -6,10 +6,7 @@
 //! [`open`]: Storage::open
 //! [`flush`]: Storage::flush
 //! [`new`]: Storage::new
-
-//! [`open`]: Storage::open
-//! [`flush`]: Storage::flush
-//! [`new`]: Storage::new
+//!
 //! stored-format: the PlayerPrefs save file
 
 use std::path::PathBuf;
@@ -25,6 +22,7 @@ pub struct Storage {
 }
 
 impl Storage {
+    /// Pathless, for the harness and tests, which must never read a developer's save.
     pub fn new() -> Self {
         Self::default()
     }

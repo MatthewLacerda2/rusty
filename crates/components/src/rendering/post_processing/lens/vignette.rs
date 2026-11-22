@@ -7,12 +7,14 @@ pub struct Vignette {
     /// `0..=1`; `0` draws nothing.
     pub intensity: f32,
     pub smoothness: f32,
+    /// Linear RGB, `0..=1`.
     pub color: [f32; 3],
     /// In screen uv (`0, 0` top-left, `1, 1` bottom-right).
     pub center: [f32; 2],
 }
 
 impl Vignette {
+    /// Unity's floor, short of a hard edge.
     pub const MIN_SMOOTHNESS: f32 = 0.01;
     pub const DEFAULT: Self = Self {
         active: false,

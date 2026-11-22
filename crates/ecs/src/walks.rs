@@ -1,3 +1,9 @@
+//! A test hook, compiled in because the tests reading it are other crates': per-thread counts of
+//! column walks, one-entity lookups, archetype moves and ids a change read collected. A thread
+//! counts once a reader here was called on it; unarmed, a count costs one thread-local read.
+//! Lookups and collected ids are the hottest, so they count only under `debug_assertions`, and
+//! their readers panic elsewhere rather than answer a silent 0.
+
 use std::cell::{Cell, RefCell};
 use std::collections::BTreeMap;
 
@@ -27,6 +33,7 @@ pub fn ids_collected() -> u64 {
     COLLECTED.with(Cell::get)
 }
 
+/// An attach to or detach from a live entity, which copies its columns to another archetype.
 #[inline]
 pub(crate) fn moved_if(moving: impl FnOnce() -> bool) {
     if ARMED.with(Cell::get) && moving() {

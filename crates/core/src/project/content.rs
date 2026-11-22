@@ -6,6 +6,7 @@ pub fn engine_relative(path: &str) -> Option<String> {
     let stored = crate::paths::stored(path);
     let parts: Vec<&str> = stored.split('/').filter(|p| !p.is_empty()).collect();
     let relative = parts.join("/");
+    // A rooted path keeps its `/`, so it is never `engine/…` and never joins as `/`.
     let normal = if stored.starts_with('/') {
         format!("/{relative}")
     } else {

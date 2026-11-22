@@ -118,7 +118,7 @@ impl Playback {
         self.previous_tree = self.current_tree.take();
         self.previous_time = self.time;
         self.previous_loop = self.loop_clip;
-        self.states.previous_node = None;
+        self.states.previous_node = None; // `enter_node` names the node it leaves
         self.sync.begin_fade();
         self.set_current(motion);
         self.time = 0.0;
@@ -166,18 +166,17 @@ impl Playback {
         moved
     }
 
-    /// `dt` seconds of play at `speed × node_speed`.
     pub fn scaled(&self, dt: f32, speed: f32) -> f32 {
         finite(dt * speed * self.node_speed)
     }
 
-    /// Move the current playhead by `step` seconds of play at `current`'s rate.
     pub fn advance_current(&mut self, step: f32, current: Playhead) -> Step {
         self.move_current(current, |from| {
             finite(from + finite(step * current.per_second))
         })
     }
 
+    /// The crossfade runs on unscaled `dt`, so speed 0 still completes it.
     pub fn advance_previous(&mut self, dt: f32, step: f32, per_second: f32) {
         if self.is_crossfading() {
             self.previous_time = finite(self.previous_time + finite(step * per_second));
@@ -199,6 +198,8 @@ impl Playback {
         });
         let to = finite(to(from));
         self.time = bounds.apply(to);
+        // A looping clip never ends, and an unknown length says nothing about the end: `ended`
+        // holds, so no second `End`.
         let Bounds::Clamp(end) = bounds else {
             return Step::travel(from, to);
         };

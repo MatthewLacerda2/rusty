@@ -1,6 +1,6 @@
-//! Unity's Gizmos menu (`GizmoUtility.SetGizmoEnabled`) plus the Game view's Gizmos and
-//! Stats toggles. Per session: a new editor starts from the rows' defaults. A new gizmo
-//! adds a row to [`gizmos!`] and the draw it gates.
+//! The editor's gizmo flags: Unity's Gizmos menu (`GizmoUtility.SetGizmoEnabled`), plus
+//! the Game view's Gizmos and Stats toggles. Per session: a new editor starts from the
+//! rows' defaults. A new gizmo adds a row to [`gizmos!`] and the draw it gates.
 
 use super::Application;
 
@@ -13,6 +13,7 @@ pub struct GizmoRow {
     /// Whether the tab strip shows its toggle: `false` while nothing draws it yet,
     /// the flag still set and read through the API.
     pub shown: bool,
+    /// Its toggle sits on the Game tab's strip, not the Scene tab's.
     pub game: bool,
 }
 
@@ -31,6 +32,7 @@ macro_rules! gizmos {
     };
 }
 
+// The tab strip's order, left to right.
 gizmos! {
     Ui => GizmoRow {
         name: "UI",

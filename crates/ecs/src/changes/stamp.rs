@@ -1,6 +1,11 @@
+//! [`World::touch`] notes a column write for the journal and stamps it in one call, so a raw
+//! write cannot do one and forget the other. A subtree's stamping walk runs only while a cursor
+//! reads its channel; with none, an `any` keeps `static_revision` moving.
+
 use super::{Activity, Channel, Children, Layer, WorldPose, STATIC};
 use crate::World;
 
+/// Kept between walks; a walk started inside another's visit finds it taken and starts cold.
 #[derive(Debug, Default)]
 pub(super) struct Scratch {
     stack: Vec<u32>,
@@ -34,13 +39,15 @@ impl World {
             self.static_geometry_moved();
         }
         if self.changes.get_mut().logs.len() == 1 {
-            return;
+            return; // only `StaticSet` exists: no column was ever opened
         }
         if let Some(at) = self.changes.get_mut().find::<T>() {
             self.stamp_at(at, id);
         }
     }
 
+    /// Called before the row is written, so a removal stamps the columns it had; a placement then
+    /// stamps the new row's with [`World::stamp_carried`].
     pub(crate) fn touch_entity(&mut self, id: u32, is_static: bool) {
         self.note(id);
         if is_static {
@@ -120,6 +127,7 @@ impl World {
         let Some(at) = self.changes.get_mut().find::<WorldPose>() else {
             return;
         };
+        // Still unread: its subtree was walked with that stamp.
         if self.changes.get_mut().logs[at].pending(id) {
             return;
         }

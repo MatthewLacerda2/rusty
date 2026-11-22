@@ -25,6 +25,7 @@ rusty_core::named_enum! {
 }
 
 rusty_core::named_enum! {
+    /// In the order `colors` and `sprites` hold a state's slot (`state as usize`).
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum SelectionState {
         Normal = "Normal",
@@ -55,6 +56,7 @@ impl Default for SelectableComponent {
             interactable: true,
             transition: SelectableTransition::ColorTint,
             target_graphic: None,
+            // Unity's `ColorBlock.defaultColorBlock`.
             colors: [
                 Vec4::ONE,
                 grey(0.961, 1.0),
@@ -71,6 +73,8 @@ impl Default for SelectableComponent {
 }
 
 impl SelectableComponent {
+    /// The id fields' JSON pointers, matching their serde paths: `Entity::is_ref_pointer` reads
+    /// them.
     pub const REF_POINTERS: [&'static str; 5] = [
         "/target_graphic",
         "/select_on/0",
