@@ -2,9 +2,12 @@ use serde_json::{Map, Value};
 
 pub const VIDEO_NAMESPACE: &str = "video";
 
+// The default window and headless-capture size, in physical pixels.
 pub const DEFAULT_WIDTH: u32 = 1280;
 pub const DEFAULT_HEIGHT: u32 = 720;
 
+/// wgpu's default `max_texture_dimension_2d`, which every renderer's device requests
+/// (`render::setup::limits`): no larger target could be made.
 pub const MAX_SIDE: u32 = 8192;
 
 pub fn parse_size(text: &str) -> Result<(u32, u32), String> {

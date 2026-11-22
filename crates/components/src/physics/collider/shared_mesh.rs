@@ -1,3 +1,6 @@
+//! A Mesh-shaped collider's own mesh (Unity's `MeshCollider.sharedMesh`): the copy kept when its
+//! Mesh is removed, or its collision mesh.
+
 use serde::{Deserialize, Serialize};
 
 use crate::mesh::MeshComponent;
@@ -8,6 +11,7 @@ pub struct SharedMesh {
     pub primitive_type: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub asset_ref: Option<String>,
+    /// Starts at 1, as `MeshComponent`'s does: change the two together.
     #[serde(default = "one", skip_serializing_if = "is_one")]
     pub subdivisions: u32,
     #[serde(skip)]
@@ -60,6 +64,7 @@ impl SharedMesh {
         self.indices = mesh.indices.clone();
     }
 
+    /// What an undo record and a prefab diff keep, as [`MeshComponent::without_geometry`] does.
     pub fn without_geometry(&self) -> Self {
         Self {
             primitive_type: self.primitive_type.clone(),

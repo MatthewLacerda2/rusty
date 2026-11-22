@@ -29,6 +29,7 @@ pub fn boot_scene(root: &Path, startup_scene: &str, access: Access) -> Result<Bo
         if startup_scene.trim().is_empty() {
             return Err("no startup scene is set (project.rusty, build.startup_scene)".into());
         }
+        // As named, unchecked: a run of a missing scene fails loudly, never plays nothing.
         return Ok(BootPlan::of(startup_scene));
     }
     let exists = |path: &str| !path.is_empty() && root.join(path).is_file();

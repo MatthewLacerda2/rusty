@@ -17,11 +17,12 @@ pub struct AIPerceptionComponent {
     pub sight_angle: f32,
     /// Metres above the entity's origin.
     pub eye_height: f32,
+    // One bit per layer.
     pub sight_mask: u32,
     pub blocking_mask: u32,
     /// Metres a noise of loudness 1 is heard (`HearingRange`).
     pub hearing_range: f32,
-    /// Seconds remembered; 0 = forever.
+    // Seconds each sense's target is remembered; 0 = forever.
     pub sight_max_age: f32,
     pub hearing_max_age: f32,
     pub damage_max_age: f32,
@@ -29,6 +30,7 @@ pub struct AIPerceptionComponent {
     pub memory: Memory,
 }
 
+/// The `Default` layer's bit: what blocks sight unless the author says otherwise.
 pub const DEFAULT_BLOCKING_MASK: u32 = 1;
 
 impl Default for AIPerceptionComponent {

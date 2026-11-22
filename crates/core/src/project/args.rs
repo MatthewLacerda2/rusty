@@ -4,6 +4,8 @@ const PROJECT_FLAG: &str = "--project";
 
 const HELP_FLAGS: [&str; 2] = ["--help", "-h"];
 
+/// Every binary calls it before opening a project, a window or a session
+/// (`tests/bin_help.rs`), so `--help` is a safe first look.
 pub fn answer_help(args: &[String], usage: &str) {
     if asks_for_help(args) {
         println!("{usage}");

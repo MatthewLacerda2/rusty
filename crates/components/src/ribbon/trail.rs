@@ -15,6 +15,7 @@ pub struct TrailPoint {
 
 #[derive(Clone, Debug, Default)]
 pub struct TrailRuntime {
+    /// Oldest first; the last is the head, which follows the entity.
     pub points: Vec<TrailPoint>,
     pub clock: f32,
 }

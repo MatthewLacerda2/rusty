@@ -1,3 +1,6 @@
+//! A new effect adds its file, its `mod` line and one field below; the root's
+//! `post_effect_layers` test finds it there and checks every layer has its part.
+
 use serde::{Deserialize, Serialize};
 
 // sorted: one module per effect (or family of effects); none reads another
@@ -38,6 +41,7 @@ pub use volumetric_fog::VolumetricFog;
 #[serde(default)]
 pub struct PostProcessingComponent {
     #[serde(default = "on")]
+    /// Off, the camera runs neutral.
     pub active: bool,
     // sorted: one field per post effect, named as every layer names the effect
     pub bloom: Bloom,

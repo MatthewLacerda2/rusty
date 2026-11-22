@@ -27,6 +27,7 @@ pub struct DetailLayer {
 }
 
 impl DetailLayer {
+    /// What of the layer a material's bind group depends on; `None` without a map.
     pub fn map_only(&self) -> Option<Self> {
         let map = self.map.clone()?;
         Some(Self {

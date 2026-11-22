@@ -25,6 +25,7 @@ pub fn falloff_window(d: f32, range: f32) -> f32 {
     w * w
 }
 
+/// For a caller that never takes the root: the cluster binner.
 pub fn falloff_window_sq(d2: f32, range: f32) -> f32 {
     let r2 = range * range;
     if !(range > 0.0 && d2 < r2) {

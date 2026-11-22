@@ -173,6 +173,7 @@ impl ParticleEmitterComponent {
         self.simulation == ParticleSimulation::Gpu
     }
 
+    /// Never negative, as in Unity: that would mirror a mesh particle inside out.
     pub fn size_of(&self, p: &Particle) -> f32 {
         (p.size * self.size_over_life.evaluate(p.life_t())).max(0.0)
     }

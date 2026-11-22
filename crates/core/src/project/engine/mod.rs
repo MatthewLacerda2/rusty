@@ -44,6 +44,8 @@ impl EngineCheck {
         if recorded == running {
             return Verdict::Same;
         }
+        // `main` is linear, so a later engine counts higher; a record without a count was
+        // written before counts were kept.
         let Some(running_order) = self.running_order else {
             return Verdict::Unknown;
         };

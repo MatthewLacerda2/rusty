@@ -4,6 +4,7 @@
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
+/// Grid points along one axis: Unity's cap.
 pub const MAX_RESOLUTION: u32 = 32;
 /// Grid points per metre.
 pub const DENSITY_RANGE: (f32, f32) = (0.1, 100.0);

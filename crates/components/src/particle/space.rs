@@ -1,3 +1,6 @@
+//! `Cpu` particles are always stored in world space, so every reader sees one kind of position;
+//! a `Local` emitter carries them.
+
 use glam::{Mat4, Quat, Vec3};
 
 use super::ParticleEmitterComponent;
@@ -11,11 +14,13 @@ rusty_core::named_enum! {
     }
 }
 
+/// A determinant this close to 0 (a zero scale) has no usable inverse: carries skip the frame.
 const SINGULAR: f32 = 1e-12;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EmitterFrame {
     pub matrix: Mat4,
+    /// What `matrix` was built with, so a carry turns particles without decomposing it.
     pub rotation: Quat,
 }
 
@@ -61,6 +66,7 @@ impl ParticleEmitterComponent {
         runtime.base.get_or_insert(frame);
     }
 
+    /// Births are stored under its inverse, relative to the first invertible frame (`base`).
     pub fn gpu_space(&self) -> Mat4 {
         match (
             self.simulation_space,

@@ -1,3 +1,9 @@
+//! Invariant: a dirty entity's descendants are all dirty, so a clean matrix was built from clean
+//! ancestors. A write only queues; the next read drains the queue, stopping at entities already
+//! dirty. A change the downward walk cannot see (an insert an orphan names, an overwrite) bumps
+//! the generation. A child linked one side only can read stale, never NaN. Stamps gate the
+//! cache, never a matrix.
+
 use std::cell::RefCell;
 
 use glam::Mat4;
@@ -25,6 +31,7 @@ struct Slots {
     index: Vec<u32>,
     slots: Vec<Slot>,
     free: Vec<u32>,
+    /// Never `0`, so a `0` stamp reads as dirty.
     generation: u32,
     pending: Vec<u32>,
     stack: Vec<u32>,
@@ -129,6 +136,7 @@ impl Slots {
 }
 
 impl WorldStore {
+    /// No slot: no read reached it, so no descendant was cleaned through it.
     pub(crate) fn moved(&self, id: u32) {
         let mut store = self.inner.borrow_mut();
         let Some(at) = store.find(id) else {
@@ -139,6 +147,7 @@ impl WorldStore {
         }
     }
 
+    /// Its children must already be queued ([`WorldStore::moved`]).
     pub(crate) fn forget(&self, id: u32) {
         let mut store = self.inner.borrow_mut();
         if let Some(at) = store.find(id) {

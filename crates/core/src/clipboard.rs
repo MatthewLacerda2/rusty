@@ -18,6 +18,7 @@ impl ClipboardRecord {
         self.pending.as_deref()
     }
 
+    /// A demo replay's capture, in place of the platform's.
     pub fn set_pending(&mut self, text: Option<String>) {
         self.pending = text;
     }
