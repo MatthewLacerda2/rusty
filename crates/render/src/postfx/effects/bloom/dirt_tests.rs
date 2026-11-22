@@ -44,6 +44,7 @@ fn the_engine_dirt_texture_is_the_generator_output() {
         .expect("engine/textures/lens_dirt.png")
         .to_rgba8();
     assert_eq!(shipped.dimensions(), made.dimensions());
+    // ±1: `f32::exp` may differ by an ulp between glibc and Apple's libm.
     let near = (shipped.as_raw().iter().zip(made.as_raw())).all(|(a, b)| a.abs_diff(*b) <= 1);
     assert!(near, "re-bless with RUSTY_BLESS_LENS_DIRT=1");
 }

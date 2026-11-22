@@ -94,6 +94,7 @@ fn poisoned(r: &mut crate::Renderer, scene: &Scene) -> Vec<[f32; 4]> {
         .collect()
 }
 
+/// Black too: a NaN becomes black on a driver whose `max(NaN, 0)` is 0 (lavapipe).
 fn spoilt(c: &[f32; 4]) -> bool {
     !c.iter().all(|v| v.is_finite()) || c[..3].iter().all(|v| *v == 0.0)
 }

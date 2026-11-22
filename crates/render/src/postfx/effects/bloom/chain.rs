@@ -4,6 +4,7 @@ use rusty_components::Bloom;
 
 pub(crate) const MAX_MIPS: usize = 8;
 
+/// URP's `CalcBloomMipCount`.
 pub(crate) fn mip_count((w, h): (u32, u32)) -> usize {
     let side = w.max(h).max(1);
     let log2 = side.ilog2() as usize;
@@ -20,8 +21,11 @@ pub(crate) fn mip_sizes(start: (u32, u32)) -> Vec<(u32, u32)> {
     sizes
 }
 
+/// Past `÷2` the 13 taps, a target texel apart, miss scene pixels: deeper divisors resample
+/// this half-size target (`prefilter_tests`).
 pub(crate) const PREFILTER_DIVISOR: u32 = 2;
 
+/// Mirrors `BloomParams` in `postfx/bloom.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(super) struct BloomParams {
@@ -122,6 +126,8 @@ impl BloomTargets {
         &top.view
     }
 
+    /// The first mip, thresholded and unspread: the lens flare reads it so that the scatter
+    /// never reshapes the flare.
     pub(crate) fn prefiltered(&self) -> &wgpu::TextureView {
         &self.down[0].view
     }

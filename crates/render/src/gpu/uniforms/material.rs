@@ -22,6 +22,7 @@ pub(crate) struct MaterialData {
     pub roughness: f32,
     pub use_metallic_map: u32,
     pub use_roughness_map: u32,
+    /// 0 no map, 1 an 8-bit map keeping z, 2 BC5 (spread in `normal_variance`), 3 16-bit signed.
     pub use_normal_map: u32,
     pub use_emissive_map: u32,
     pub emissive: [f32; 4],

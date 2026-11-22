@@ -124,12 +124,14 @@ impl PostFx {
         let (w, h) = (width.max(1), height.max(1));
         self.full_size = (w, h);
         self.scene_hdr = Self::target(device, w, h, "PostFX Scene HDR", HDR_FORMAT);
+        // No chain is 0 wide, so the next `fit_chain` remakes the LDR targets once.
         self.chain_size = (0, 0);
         self.motion.reset();
         self.exposure.cut();
         self.targets.clear();
     }
 
+    /// Called every frame, before any effect runs.
     pub(crate) fn fit_chain(&mut self, device: &wgpu::Device, size: (u32, u32)) {
         let size = (size.0.max(1), size.1.max(1));
         if size == self.chain_size {
@@ -173,6 +175,8 @@ impl PostFx {
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::TEXTURE_BINDING
+                // Copies: SSR and a reflection capture's readback copy the HDR scene out;
+                // the authored effects keep their result as next frame's history.
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],
@@ -215,6 +219,7 @@ impl PostFx {
                 texture_entry(3, wgpu::TextureViewDimension::D2),
                 depth_entry(4, wgpu::TextureViewDimension::D2),
                 texture_entry(5, wgpu::TextureViewDimension::D2),
+                // The skybox's own sampler: the panorama wraps at its seam.
                 sampler_entry(6),
                 texture_entry(7, wgpu::TextureViewDimension::D3),
                 uniform_entry(8, wgpu::ShaderStages::FRAGMENT),

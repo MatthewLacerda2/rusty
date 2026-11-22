@@ -7,7 +7,9 @@ use rusty_scene::{Camera, Scene};
 
 const FRAMES: u32 = 40;
 const PAN: f32 = 0.23;
+/// Measured on lavapipe: 13.3 held, 14.0 URP's.
 const BLINKS: f32 = 1.0;
+/// Measured on lavapipe: 1.58.
 const PANNED: f32 = 3.0;
 
 fn panning(f: u32) -> Camera {

@@ -8,9 +8,12 @@ use rusty_scene::Scene;
 
 const WARM: u32 = 8;
 const MEASURED: u32 = 12;
+/// Measured on lavapipe: FXAA 0.0403, TAA 0.0171.
 const FACTOR: f64 = 1.5;
 const STEP: f32 = 1.0;
 
+/// Unmipped: mipped, the sparkle is the driver's anisotropic filtering and LOD, which differ
+/// by adapter.
 fn bumpy_normal_map() -> String {
     let mut state = 0x9e37_79b9u32;
     let mut next = || {

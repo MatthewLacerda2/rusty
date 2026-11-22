@@ -65,6 +65,7 @@ fn gpu_a_thin_wire_at_half_scale_stays_continuous() {
     let Some((bilinear, taau, native)) = wire_at(0.5) else {
         return;
     };
+    // Measured on lavapipe: bilinear 0, TAAU 7, the reference 16.
     assert!(native >= 12, "the wire shows in the reference: {native}");
     assert!(
         4 * bilinear < native,

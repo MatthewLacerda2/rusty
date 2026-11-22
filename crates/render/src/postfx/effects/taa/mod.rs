@@ -19,6 +19,7 @@ use crate::postfx::PostFx;
 use crate::timing::{GpuPass, GpuTimer};
 
 impl PostFx {
+    /// `draw_stack` gates the history and the velocity target on the same `taa::wanted`.
     pub(crate) fn run_taa(
         &mut self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),

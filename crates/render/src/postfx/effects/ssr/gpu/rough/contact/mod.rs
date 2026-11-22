@@ -114,6 +114,7 @@ fn kept(r: &mut Renderer, case: Case) -> (f32, i32) {
     (walled as f32 / open.max(1) as f32, open)
 }
 
+/// Measured on lavapipe: a dark cube's foot keeps 0.95.
 const TIGHT: f32 = 0.9;
 
 #[test]

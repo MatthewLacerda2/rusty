@@ -1,5 +1,6 @@
 use rusty_components::CameraComponent;
 
+/// Mirrors `BlurParams` in `postfx/motion_blur.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct BlurParams {

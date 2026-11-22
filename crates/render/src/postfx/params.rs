@@ -49,6 +49,7 @@ impl Gate {
     }
 }
 
+/// The one place that decides it: every gated pass asks here.
 pub(crate) fn effect_runs(graphics: GraphicsSettings, gate: Gate, on: bool) -> bool {
     on && gate.option.is_none_or(|o| graphics.options.allows(o))
 }

@@ -1,9 +1,9 @@
 use std::collections::BTreeSet;
 use std::path::Path;
 
-use super::deep::DEEP_FORMAT;
-use super::freshness_tests::temp_png;
-use super::TextureKind;
+use super::DEEP_FORMAT;
+use crate::gpu::textures::freshness_tests::temp_png;
+use crate::gpu::textures::TextureKind;
 use crate::readback::{read_texture_bytes, read_texture_rgba8};
 use rusty_asset::sidecar::{set_texture, Compression, TextureSettings, TextureType};
 use rusty_asset::texture_import::refresh;

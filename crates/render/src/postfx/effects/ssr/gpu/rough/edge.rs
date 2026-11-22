@@ -62,6 +62,8 @@ pub(super) fn lifted(on: bool, roughness: f32) -> rusty_scene::Scene {
     s
 }
 
+/// The HDR image, not the 8-bit frame: the reflection adds a few levels of 255, which the
+/// frame's rounding can read as a hard step.
 fn hdr_red(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<f32> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let out = view.color_target_view().unwrap();
@@ -85,6 +87,7 @@ fn hdr_side_step(on: &[f32], off: &[f32]) -> (f32, f32) {
     (step / peak.max(1e-6), peak)
 }
 
+/// Measured on lavapipe: 0.29 of the mirror's.
 const SATIN_RED: f32 = 0.1;
 
 #[test]

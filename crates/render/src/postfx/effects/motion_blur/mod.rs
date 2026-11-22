@@ -1,3 +1,6 @@
+//! Depths come from the velocity target each camera writes, never the depth buffer, which a
+//! `DepthOnly` overlay has cleared.
+
 pub(crate) mod effect;
 mod params;
 
@@ -14,6 +17,7 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use crate::timing::{GpuPass, GpuTimer};
 
+/// A streak in pixels.
 const TILE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rg16Float;
 
 pub(crate) struct MotionBlurPasses {
@@ -160,6 +164,7 @@ impl PostFx {
                 ],
             })
         };
+        // Each pass reads the one before at binding 3; the first binds a texture it does not write.
         let steps = [
             (&passes.tile_max_x, &tiles.neighbor_max, &tiles.rows),
             (&passes.tile_max_y, &tiles.rows, &tiles.tile_max),

@@ -6,6 +6,7 @@ use rusty_scene::Scene;
 
 const FRAMES: u32 = 16;
 const AT: u32 = 4;
+/// Measured on lavapipe: 0.4 %.
 const SAME: f32 = 0.01;
 
 fn co(ycocg: [f32; 3]) -> f32 {

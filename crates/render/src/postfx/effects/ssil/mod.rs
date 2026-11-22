@@ -116,6 +116,7 @@ impl SsilFrame {
     }
 }
 
+/// Mirrors `SsilParams` in `postfx/ssil.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct SsilUniform {
