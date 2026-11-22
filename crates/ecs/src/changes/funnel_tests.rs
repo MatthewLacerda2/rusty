@@ -1,12 +1,6 @@
-//! crates/ecs/src/changes/funnel_tests.rs — a write to a column the entity lacks names
-//! nothing (#1705's third review): physics asked for `rigidbody_mut` on every body
-//! owner, a static collider included (it compares first since #1707), and the
-//! despawn walk borrows every reference column of every holder. One test per funnel in `ecs/funnel.rs`.
-
 use crate::{Changes, World};
 use rusty_components::{AnimatorComponent, JointComponent, LodGroupComponent, TransformComponent};
 
-/// A plain entity (no joint, no animator) and one carrying both.
 fn pair() -> (World, u32, u32) {
     let mut w = World::new();
     let plain = w.spawn("plain".into());
@@ -67,8 +61,6 @@ fn the_despawn_walk_names_only_the_columns_each_holder_has() {
     w.set_component(full, Some(joint));
     let mut joints = w.change_cursor::<JointComponent>();
     let mut lods = w.change_cursor::<LodGroupComponent>();
-    // `forget_in(full)` borrows every reference column `full` might hold; `plain`'s
-    // removal stamps only the columns it had: neither a Joint nor a LOD group.
     w.despawn(plain);
     assert_eq!(w.changes(&mut joints), Changes::Ids(vec![full]));
     assert_eq!(

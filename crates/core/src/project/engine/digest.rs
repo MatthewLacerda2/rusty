@@ -1,20 +1,5 @@
-//! crates/core/src/project/engine/digest.rs — one hash of the engine's content folder.
-//!
-//! Every file under `engine/` (shaders, fonts, scripts, models, textures), by its
-//! sorted `/`-separated relative path, its length and its bytes, folded into one
-//! 64-bit xxh3 hash (`core::hash`'s content hash), printed as 16 hex digits. A
-//! symbolic link is followed to what it names. A name starting with `.` (a Finder
-//! `.DS_Store`, an editor's swap file) is not content and is skipped.
-//!
-//! The root package's `build.rs` includes this file with `#[path]` to stamp what a
-//! `dev` binary was built with, and `content` hashes the folder on disk with it at
-//! run time, so both hash alike. It names only std and `xxhash_rust`, which both
-//! `rusty-core` and the root package's build script depend on.
-
 use std::path::Path;
 
-/// The digest of every file under `dir`, or why it could not be taken: the folder
-/// or an entry under it could not be read, or it holds no file.
 pub fn digest(dir: &Path) -> Result<String, String> {
     let mut files = Vec::new();
     walk(dir, "", &mut files)?;
@@ -36,9 +21,6 @@ pub fn digest(dir: &Path) -> Result<String, String> {
     Ok(format!("{:016x}", hash.digest()))
 }
 
-/// Every file under `dir/prefix`, as `/`-separated paths relative to `dir`. A link
-/// is followed (`fs::metadata`), so a linked folder is walked and a linked file
-/// read. An error names the path it failed on.
 fn walk(dir: &Path, prefix: &str, out: &mut Vec<String>) -> Result<(), String> {
     let at = dir.join(prefix);
     let why = |path: &Path, e: std::io::Error| format!("{}: {e}", path.display());

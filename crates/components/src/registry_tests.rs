@@ -1,28 +1,22 @@
-//! Every first-class component's serde defaults agree with its `Default`: a scene
-//! missing any one key loads what `Default` would have put there.
-
 use super::{default_drift, serde_drift, FirstClass};
 use serde::{Deserialize, Serialize};
 
-/// One row's drift against its `Default`. A row whose Add Component default is
-/// not a `Default` (it needs the scene crate's builders) is checked against that
-/// default in `scene::create::defaults`' tests instead: that arm names it.
 macro_rules! drift_of {
     (collider, $ty:path) => {
         Vec::<String>::new()
-    }; // no `Default`: `scene::create::defaults::default_collider`
+    };
     (light, $ty:path) => {
         Vec::<String>::new()
-    }; // no `Default`: `scene::create::defaults::default_light`
+    };
     (material, $ty:path) => {
         Vec::<String>::new()
-    }; // no `Default`: `MaterialComponent::for_entity`
+    };
     (mesh, $ty:path) => {
         Vec::<String>::new()
-    }; // no `Default`: `scene::create::primitive_mesh_component`
+    };
     (rigidbody, $ty:path) => {
         Vec::<String>::new()
-    }; // no `Default`: `scene::create::defaults::default_rigidbody`
+    };
     ($field:ident, $ty:path) => {
         default_drift(&<$ty>::default())
     };

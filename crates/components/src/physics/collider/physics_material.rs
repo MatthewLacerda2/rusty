@@ -1,52 +1,28 @@
-//! crates/components/src/physics/collider/physics_material.rs — per-collider physics material.
-//!
-//! Unity: `PhysicMaterial` — `dynamicFriction`, `bounciness` and a combine mode
-//! for each. Stored **inline** on the collider (#447), not as a shared asset like
-//! `MaterialAsset`: a material is four numbers, a scene document stays
-//! self-contained, and nothing yet needs "edit one, retune every prop". Promoting
-//! it to a shared asset later is additive (an optional asset reference beside the
-//! inline values).
-
 use serde::{Deserialize, Serialize};
 
 rusty_core::named_enum! {
-    /// How two touching colliders' coefficients combine into the contact's value
-    /// (Unity: `PhysicMaterialCombine`). When the two colliders disagree, the mode
-    /// later in this list wins — `Average < Minimum < Multiply < Maximum`, Unity's
-    /// priority and rapier's `CoefficientCombineRule` order alike.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum CombineMode {
-        /// `(a + b) / 2`. The default.
         #[default]
         Average = "Average",
-        /// `min(a, b)` — e.g. ice keeps its slipperiness against anything.
         Minimum = "Minimum",
-        /// `a * b`.
         Multiply = "Multiply",
-        /// `max(a, b)` — e.g. a rubber ball bounces off mud.
         Maximum = "Maximum",
     }
 }
 
-/// Surface response of one collider: how much it grips and how much it bounces.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PhysicsMaterial {
-    /// Coulomb friction coefficient, `>= 0`. `0` is ice; `1` is rubber on concrete.
     pub friction: f32,
-    /// Restitution in `[0, 1]`: `0` absorbs an impact, `1` rebounds at full speed.
     pub bounciness: f32,
     pub friction_combine: CombineMode,
     pub bounce_combine: CombineMode,
 }
 
 impl PhysicsMaterial {
-    /// rapier's own default friction, kept over Unity's `0.6`: the engine's
-    /// physics tests and tuned scenes are built on it.
     const DEFAULT_FRICTION: f32 = 0.5;
 
-    /// A material with the given coefficients clamped into range (friction
-    /// `>= 0`, bounciness `[0, 1]`) and the default `Average` combine modes.
     pub fn new(friction: f32, bounciness: f32) -> Self {
         Self {
             friction: friction.max(0.0),

@@ -1,11 +1,3 @@
-//! crates/components/src/mesh/primitives.rs — procedural primitive geometry.
-//!
-//! CPU-only builders for the engine's built-in shapes (box, sphere, plane,
-//! cylinder, capsule). Each returns `(vertices, indices)` ready for a `MeshComponent`, with
-//! the tangent basis derived from positions + UVs via the asset layer's pure
-//! [`generate_tangents`] so primitives sample normal maps exactly like an imported
-//! mesh (#207). No GPU types — the renderer uploads the result (#494).
-
 use super::Vertex;
 use glam::Vec3;
 use rusty_asset::lightmap_uv::{unwrap_vertices, LightmapUvSettings};
@@ -18,7 +10,6 @@ pub use capsule::generate_capsule;
 pub use cylinder::generate_cylinder;
 pub use plane::{generate_plane, generate_plane_grid, MAX_PLANE_SUBDIVISIONS};
 
-/// Generates a 3D box centered at the origin
 pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u32>) {
     let w = width / 2.0;
     let h = height / 2.0;
@@ -44,12 +35,8 @@ pub fn generate_box(width: f32, height: f32, depth: f32) -> (Vec<Vertex>, Vec<u3
     fill_tangents(vertices, indices)
 }
 
-/// Gutter around each face's lightmap cell, as a fraction of the cell (#438), so
-/// bilinear filtering and the bake's dilation never bleed one face into the next.
 const LIGHTMAP_CELL_PAD: f32 = 0.06;
 
-/// Face `face`'s lightmap UV for its texture UV `uv` (#438): six non-overlapping cells
-/// on a 3 × 2 grid, so a Box is lightmappable with no authored second UV map.
 fn box_lightmap_uv(face: usize, uv: [f32; 2]) -> [f32; 2] {
     let (col, row) = ((face % 3) as f32, (face / 3) as f32);
     let span = 1.0 - 2.0 * LIGHTMAP_CELL_PAD;
@@ -59,11 +46,8 @@ fn box_lightmap_uv(face: usize, uv: [f32; 2]) -> [f32; 2] {
     ]
 }
 
-/// The 6 faces of a cube of half-extents `(w, h, d)`: each entry is the four corner
-/// positions (CCW) followed by the outward face normal.
 fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
     [
-        // Front face (+Z)
         (
             Vec3::new(-w, -h, d),
             Vec3::new(w, -h, d),
@@ -71,7 +55,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
             Vec3::new(-w, h, d),
             Vec3::new(0.0, 0.0, 1.0),
         ),
-        // Back face (-Z)
         (
             Vec3::new(w, -h, -d),
             Vec3::new(-w, -h, -d),
@@ -79,7 +62,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
             Vec3::new(w, h, -d),
             Vec3::new(0.0, 0.0, -1.0),
         ),
-        // Right face (+X)
         (
             Vec3::new(w, -h, d),
             Vec3::new(w, -h, -d),
@@ -87,7 +69,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
             Vec3::new(w, h, d),
             Vec3::new(1.0, 0.0, 0.0),
         ),
-        // Left face (-X)
         (
             Vec3::new(-w, -h, -d),
             Vec3::new(-w, -h, d),
@@ -95,7 +76,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
             Vec3::new(-w, h, -d),
             Vec3::new(-1.0, 0.0, 0.0),
         ),
-        // Top face (+Y)
         (
             Vec3::new(-w, h, d),
             Vec3::new(w, h, d),
@@ -103,7 +83,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
             Vec3::new(-w, h, -d),
             Vec3::new(0.0, 1.0, 0.0),
         ),
-        // Bottom face (-Y)
         (
             Vec3::new(-w, -h, -d),
             Vec3::new(w, -h, -d),
@@ -114,7 +93,6 @@ fn box_faces(w: f32, h: f32, d: f32) -> [(Vec3, Vec3, Vec3, Vec3, Vec3); 6] {
     ]
 }
 
-/// Generates a UV Sphere centered at the origin
 pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, Vec<u32>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
@@ -153,9 +131,6 @@ pub fn generate_sphere(radius: f32, rings: u32, sectors: u32) -> (Vec<Vertex>, V
     fill_tangents_unwrapped(vertices, indices)
 }
 
-/// [`fill_tangents`] after a generated lightmap UV (#831), the unwrap Generate
-/// Lightmap UVs gives a model: a Sphere, a Cylinder or a
-/// Capsule has no flat layout to author.
 fn fill_tangents_unwrapped(vertices: Vec<Vertex>, indices: Vec<u32>) -> (Vec<Vertex>, Vec<u32>) {
     let with_uv = |v: &Vertex, uv| v.with_lightmap_uv(uv);
     let s = LightmapUvSettings::default();
@@ -164,8 +139,6 @@ fn fill_tangents_unwrapped(vertices: Vec<Vertex>, indices: Vec<u32>) -> (Vec<Ver
     fill_tangents(vertices, indices)
 }
 
-/// Overwrite each vertex's `tangent` with the basis derived from positions + UVs. The
-/// `generate_*` builders apply this before returning their geometry.
 fn fill_tangents(mut vertices: Vec<Vertex>, indices: Vec<u32>) -> (Vec<Vertex>, Vec<u32>) {
     let positions: Vec<[f32; 3]> = vertices.iter().map(|v| v.position).collect();
     let normals: Vec<[f32; 3]> = vertices.iter().map(|v| v.normal).collect();

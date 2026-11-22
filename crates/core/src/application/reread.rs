@@ -1,18 +1,10 @@
-//! Re-reading the bound `project.rusty` (#1517, #1522, #1749, #1715): the decal
-//! budgets, the audio settings, the frame log's settings (#2206), the render-scale default and the quality presets are read from the file at each Play, before every write and
-//! before every preset edit, so an edit to the file (by hand or by the agent)
-//! reaches the running editor and a save never writes back a copy from before it.
-
 use super::Application;
 use crate::project::ProjectFile;
 use crate::settings::audio::AudioSettings;
 use crate::settings::decals::DecalLimits;
 
 impl Application {
-    /// Take the bound file's decal budgets and quality presets as the file stands
-    /// now. A no-op unbound (the player, the harness: what opening the project
-    /// read). A file that can't be read or parsed keeps the last good read, and
-    /// says so once per content.
+    /// An unreadable file keeps the last good read and warns once per content.
     pub fn reread(&mut self) {
         let Some(path) = &self.path else {
             return;
@@ -41,30 +33,19 @@ impl Application {
         log::warn!("[Project] {why}; keeping the decal budgets and quality presets last read");
     }
 
-    /// The project's decal budgets, which entering and leaving Play apply to the
-    /// scene: the bound file's as it stands now ([`reread`](Self::reread)), else
-    /// the ones [`set_decal_limits`](Self::set_decal_limits) gave.
     pub fn decal_limits(&mut self) -> DecalLimits {
         self.reread();
         self.decal_limits
     }
 
-    /// The decal budgets an unbound run plays with (the player, the harness: what
-    /// opening the project read).
     pub fn set_decal_limits(&mut self, limits: DecalLimits) {
         self.decal_limits = limits;
     }
 
-    /// The project's audio settings (#1749), which entering and leaving Play apply
-    /// to the audio, as last read: the Build Settings window asks every frame, so this
-    /// reads no file ([`reread`](Self::reread) first for the file as it stands).
     pub fn audio_settings(&self) -> AudioSettings {
         self.audio
     }
 
-    /// Set the project's speed of sound (the Build Settings window and
-    /// `Audio.SetDefaultSpeedOfSound`), writing the
-    /// bound file (if any). Not finite and positive is an error, and nothing changes.
     pub fn set_speed_of_sound(&mut self, c: f32) -> Result<(), String> {
         if !(c.is_finite() && c > 0.0) {
             return Err(format!("speed of sound must be a positive number, got {c}"));

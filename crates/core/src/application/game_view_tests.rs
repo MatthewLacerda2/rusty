@@ -7,7 +7,6 @@ fn setting(size: GameViewSize, low_resolution: bool) -> GameViewSetting {
     }
 }
 
-/// `Free` is the panel's own size: no size of its own, so it draws as it always did.
 #[test]
 fn free_is_the_panel() {
     let free = GameViewSetting::default();
@@ -28,7 +27,6 @@ fn aspect_fits_the_panel() {
     assert_eq!(wide.resolve((0, 0), 1.0), Some((1, 1)));
 }
 
-/// A fixed size is exact whatever the panel and the scale, "1x on HiDPI" included.
 #[test]
 fn fixed_is_exact() {
     for low in [false, true] {
@@ -37,8 +35,6 @@ fn fixed_is_exact() {
     }
 }
 
-/// "1x on HiDPI" sizes `Free` and an aspect by the panel's points; on a 1x panel
-/// it changes nothing.
 #[test]
 fn low_resolution_uses_points() {
     let free = setting(GameViewSize::Free, true);
@@ -52,7 +48,6 @@ fn low_resolution_uses_points() {
     assert_eq!(aspect.resolve((2000, 2000), 2.0), Some((1000, 563)));
 }
 
-/// Both sides from 1 to the texture limit; `Free` always.
 #[test]
 fn validity_bounds_both_sides() {
     assert!(GameViewSize::Free.is_valid());
@@ -61,7 +56,6 @@ fn validity_bounds_both_sides() {
     assert!(!GameViewSize::Aspect(16, MAX_GAME_VIEW_SIDE + 1).is_valid());
 }
 
-/// A preset shows its label; a custom size its numbers.
 #[test]
 fn labels_name_presets_and_customs() {
     assert_eq!(GameViewSize::Free.label(), "Free Aspect");
@@ -71,8 +65,6 @@ fn labels_name_presets_and_customs() {
     assert_eq!(GameViewSize::Aspect(21, 9).label(), "21:9");
 }
 
-/// A script's set reads back at once and reaches the editor at its frame; the
-/// newest of a frame's sets wins, and the editor's own pick is mirrored back.
 #[test]
 fn mailbox_round_trips() {
     let mut app = Application::new();
@@ -91,7 +83,6 @@ fn mailbox_round_trips() {
     assert_eq!(app.game_view_setting().size, GameViewSize::Free, "mirrored");
 }
 
-/// The capture's spelling: `Free`, `W:H`, `WxH`; nonsense and a 0 are refused.
 #[test]
 fn parse_reads_the_three_spellings() {
     assert_eq!(GameViewSize::parse("Free"), Some(GameViewSize::Free));
@@ -110,8 +101,6 @@ fn parse_reads_the_three_spellings() {
     }
 }
 
-/// "1x on HiDPI" reports a display scale of 1 for `Free` and an aspect, never for
-/// a fixed size or with the toggle off.
 #[test]
 fn display_scale_follows_the_density() {
     assert_eq!(setting(GameViewSize::Free, true).display_scale(2.0), 1.0);
@@ -140,8 +129,6 @@ fn letterbox_centres_the_aspect() {
     assert_eq!(x, 120.0);
 }
 
-/// The issue's own case: a 1920x1080 Game view on a Retina window under the
-/// `"match_display"` default renders at its whole pixel count, not half of it.
 #[test]
 fn a_fixed_size_matches_the_display_at_scale_1() {
     use crate::settings::render_scale::RenderScaleDefault;

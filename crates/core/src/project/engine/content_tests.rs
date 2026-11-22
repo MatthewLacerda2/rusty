@@ -1,5 +1,3 @@
-//! The stamp a run carries, and the start-up check that warns.
-
 use super::*;
 
 #[test]
@@ -50,7 +48,6 @@ fn the_stamp_serialises_with_every_field_named() {
 
 #[test]
 fn registering_another_build_warns_once_and_keeps_the_first() {
-    // Alone: `BUILT` is the process's, set once by whoever registers first.
     rusty_test_support::alone!(|| {
         let other = "0000000000000000";
         let logged = rusty_test_support::logs::during(|| {
@@ -66,7 +63,6 @@ fn registering_another_build_warns_once_and_keeps_the_first() {
 
 #[test]
 fn an_unstamped_process_never_reads_the_folder() {
-    // Alone: a sibling hashing the folder or registering a build sets `FOUND`.
     rusty_test_support::alone!(|| {
         assert_eq!(stamp(), EngineStamp::of(None, None));
         assert!(FOUND.get().is_none(), "the folder was hashed");

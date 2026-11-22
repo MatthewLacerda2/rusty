@@ -1,18 +1,10 @@
-//! crates/core/src/wake.rs — ring the window's frame loop from any thread (#1721).
-//!
-//! Outside Play the editor sleeps until something can change what it shows. A window
-//! event wakes it by itself; work that finishes on another thread (a command arriving
-//! on the socket, a file changing on disk, a background import writing its result)
-//! does so through [`frame`]. It is only a nudge to draw: it carries no data and the
-//! sim never sees it, so it cannot touch determinism. With no window (the headless
-//! session, the harness, a test) nothing is installed and [`frame`] does nothing.
+//! Rings the window's frame loop from any thread: a nudge to draw that carries no data
+//! and that the sim never sees. With no window installed [`frame`] does nothing.
 
 use std::sync::OnceLock;
 
-/// What wakes the window's loop. A process runs one event loop, so it is set once.
 static BELL: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
-/// Name what [`frame`] rings. The window's event loop calls this before it runs.
 pub fn install(bell: impl Fn() + Send + Sync + 'static) {
     let _ = BELL.set(Box::new(bell));
 }
@@ -28,10 +20,7 @@ pub fn frame() {
 
 static RINGS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-/// How many times [`frame`] rang in this process. Tests run side by side, so
-/// compare it only as "it went up". A test hook in every build: other crates' tests
-/// call it, and a `#[cfg(test)]` item is invisible outside its crate
-/// (crates/CLAUDE.md, *Test hooks*).
+/// Tests run side by side: compare only as "it went up".
 #[doc(hidden)]
 pub fn rings() -> usize {
     RINGS.load(std::sync::atomic::Ordering::Relaxed)

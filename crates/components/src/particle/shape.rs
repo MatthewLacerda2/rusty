@@ -1,31 +1,21 @@
-//! crates/components/src/particle/shape.rs — emission shapes (#439).
-//!
-//! A shape answers two questions per spawned particle: where it is born (an offset
-//! from the emitter) and which way it launches. Shapes are oriented by the
-//! emitter's `direction` (the shape's axis), so a script can point a hemisphere of
-//! sparks along an impact normal by setting one vector.
-
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
 use rusty_core::random::Random;
 
-/// Where particles are born and which way they launch.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub enum EmitShape {
-    /// From the emitter's origin along `direction` (the pre-#439 behaviour).
     #[default]
     Point,
-    /// A ball of `radius`; launch radially outward.
+    /// Radius in world units.
     Sphere { radius: f32 },
-    /// The half of a ball facing `direction`; launch radially outward.
+    /// Radius in world units.
     Hemisphere { radius: f32 },
-    /// An axis-aligned box of full extents `size`; launch along `direction`.
+    /// Full extents in world units.
     Box { size: Vec3 },
-    /// A cone around `direction`: born on a base disc of `radius`, launched within
-    /// `angle` degrees of the axis (on the rim at exactly `angle` for `Surface`).
+    /// Half-angle in degrees.
     Cone { angle: f32, radius: f32 },
-    /// A disc of `radius` facing `direction`; launch outward in its plane.
+    /// Radius in world units.
     Circle { radius: f32 },
 }
 
@@ -38,10 +28,8 @@ pub enum EmitFrom {
 }
 
 impl EmitShape {
-    /// The shape names the inspector and `Particles.SetShape` accept.
     pub const NAMES: [&'static str; 6] = ["Point", "Sphere", "Hemisphere", "Box", "Cone", "Circle"];
 
-    /// This shape's name (one of [`Self::NAMES`]).
     pub fn name(&self) -> &'static str {
         match self {
             Self::Point => "Point",
@@ -53,8 +41,6 @@ impl EmitShape {
         }
     }
 
-    /// Build the shape `name` (case-insensitive) from its size knobs: `radius`,
-    /// `angle` (cone, degrees) and `size` (box). `None` for an unknown name.
     pub fn from_parts(name: &str, radius: f32, angle: f32, size: Vec3) -> Option<Self> {
         Some(match name.to_ascii_lowercase().as_str() {
             "point" => Self::Point,
@@ -114,7 +100,6 @@ fn disc(surface: bool, rng: &mut Random) -> Vec2 {
     }
 }
 
-/// `(offset, outward direction)`, falling back to `fallback` at the exact centre.
 fn radial(offset: Vec3, fallback: Vec3) -> (Vec3, Vec3) {
     let dir = offset.normalize_or_zero();
     (offset, if dir == Vec3::ZERO { fallback } else { dir })
@@ -129,7 +114,6 @@ fn basis(axis: Vec3) -> (Vec3, Vec3) {
     }
 }
 
-/// A point in the box of half-extents `half`, or on a random face of it.
 fn box_point(half: Vec3, surface: bool, rng: &mut Random) -> Vec3 {
     let mut p = Vec3::new(signed(rng), signed(rng), signed(rng));
     if surface {
@@ -139,14 +123,11 @@ fn box_point(half: Vec3, surface: bool, rng: &mut Random) -> Vec3 {
     p * half
 }
 
-/// A cone spawn: base-disc position, direction within `angle_deg` of `axis`.
 fn cone(angle_deg: f32, radius: f32, surface: bool, axis: Vec3, rng: &mut Random) -> (Vec3, Vec3) {
     let (u, v) = basis(axis);
     let angle = angle_deg.to_radians();
     let d = disc(surface, rng);
     let offset = (u * d.x + v * d.y) * radius;
-    // Surface: the rim particle leans out at exactly `angle`, along its own azimuth.
-    // Volume: a direction uniform over the spherical cap of half-angle `angle`.
     let (theta, phi) = if surface {
         (angle, d.y.atan2(d.x))
     } else {
@@ -160,7 +141,6 @@ fn cone(angle_deg: f32, radius: f32, surface: bool, axis: Vec3, rng: &mut Random
     (offset, dir)
 }
 
-/// Uniform `f32` in `[-1, 1)`.
 pub(super) fn signed(rng: &mut Random) -> f32 {
     rng.value() as f32 * 2.0 - 1.0
 }

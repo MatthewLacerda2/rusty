@@ -1,21 +1,11 @@
-//! crates/components/src/particle/simulation/history.rs — a `Gpu` emitter's step
-//! history (#2170): how many steps it took, and the last [`DT_HISTORY`] steps'
-//! `dt`s and running times, which the renderer replays and jumps by.
-
 use std::collections::VecDeque;
 
 use super::DT_HISTORY;
 
-/// The steps since the last reset (see the module docs).
 #[derive(Clone, Debug)]
 pub(super) struct History {
-    /// Steps taken since the last reset.
     pub(super) steps: u64,
-    /// The `dt` of each of the last steps, the newest at the back; the first is
-    /// step `steps - dts.len() + 1`'s.
     dts: VecDeque<f32>,
-    /// The running time (the `f64` sum of every `dt`) after each of the last
-    /// steps and the one before them, the newest at the back: one more than `dts`.
     times: VecDeque<f64>,
 }
 
@@ -30,7 +20,6 @@ impl Default for History {
 }
 
 impl History {
-    /// Take one step of `dt`.
     pub(super) fn push(&mut self, dt: f32) {
         self.steps += 1;
         if self.dts.len() == DT_HISTORY {
@@ -44,19 +33,16 @@ impl History {
         self.times.push_back(time);
     }
 
-    /// `GpuSim::dt_of`.
     pub(super) fn dt_of(&self, step: u64) -> Option<f32> {
         let first = self.steps + 1 - self.dts.len() as u64;
         let at = step.saturating_sub(first).min(self.dts.len() as u64);
         self.dts.get(at as usize).or(self.dts.back()).copied()
     }
 
-    /// `GpuSim::time`.
     pub(super) fn time(&self) -> f64 {
         self.times.back().copied().unwrap_or(0.0)
     }
 
-    /// `GpuSim::time_at`.
     pub(super) fn time_at(&self, step: u64) -> Option<f64> {
         let oldest = self.steps.checked_sub(self.times.len() as u64 - 1)?;
         let at = step.checked_sub(oldest)?;

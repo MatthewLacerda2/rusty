@@ -1,18 +1,3 @@
-//! crates/components/src/ui/ — the in-game UI's first-class components (#414).
-//!
-//! The uGUI primitives, each pure authoring data: [`CanvasComponent`] (a UI root),
-//! [`RectTransformComponent`] (2D placement inside the parent rect), the
-//! [`ImageComponent`] graphic, the [`TextComponent`] label, the texture-free
-//! [`ShapeComponent`] graphic and the blend / gradient look they share (#425), the
-//! [`CanvasGroupComponent`] (subtree alpha and interaction flags) and the
-//! [`RectMaskComponent`] clip and [`MaskComponent`] graphic clip (#428), the
-//! [`BackdropFilterComponent`] frosted glass (#426), the [`SelectableComponent`] (an interactive
-//! element, #420), and the [`LayoutGroupComponent`] / [`LayoutElementComponent`]
-//! pair that arranges children automatically (#421). An Image, Shape or Text may name a
-//! custom [`UiShader`] (#427). Computed state — rects,
-//! batches — lives in `ui::UiLayout` and the renderer, never here. The model is
-//! recorded in `docs/ui.md`.
-
 pub mod backdrop;
 pub mod image;
 pub mod layout;

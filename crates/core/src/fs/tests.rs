@@ -1,11 +1,8 @@
-//! The atomic write (#1129): no torn file, no litter, no collision.
-
 use super::{
     is_temp_name, is_unique_sibling, unique_sibling, write_atomic, write_cache, TEMP_SUFFIX,
 };
 use std::path::Path;
 
-/// Every file name in `dir`, sorted.
 fn names(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .unwrap()

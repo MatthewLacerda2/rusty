@@ -1,6 +1,5 @@
 use super::{EffectQuality, QualityPreset, QualityPresets, QualityValues};
 
-/// A new project is seeded with `Low`, `Medium`, `High`, and selects `Medium`.
 #[test]
 fn a_new_project_has_the_three_seeded_presets() {
     let presets = QualityPresets::default();
@@ -8,8 +7,6 @@ fn a_new_project_has_the_three_seeded_presets() {
     assert_eq!(presets.initial().map(|p| p.name.as_str()), Some("Medium"));
 }
 
-/// The seeded `Medium` preset's `Medium` level keeps the old Medium tier's SSAO
-/// (8 samples at half resolution), and `High`'s the old High tier's (16 at full).
 #[test]
 fn seeded_presets_hold_the_old_tier_numbers() {
     let presets = QualityPresets::default();
@@ -24,7 +21,6 @@ fn seeded_presets_hold_the_old_tier_numbers() {
     );
 }
 
-/// A level takes the preset's row; `Custom` takes the authored value.
 #[test]
 fn a_level_picks_its_row_and_custom_the_authored_value() {
     let bloom = QualityValues::default().bloom_resolution_divisor;
@@ -33,8 +29,6 @@ fn a_level_picks_its_row_and_custom_the_authored_value() {
     assert_eq!(EffectQuality::Custom.pick(&bloom, 7), 7);
 }
 
-/// The middle preset runs when no `default` names one; a removed selection falls
-/// back to the initial preset; no presets at all run the engine's own values.
 #[test]
 fn resolve_falls_back_to_the_initial_preset() {
     let mut presets = QualityPresets {
@@ -49,8 +43,6 @@ fn resolve_falls_back_to_the_initial_preset() {
     assert_eq!(presets.values(None), QualityValues::default());
 }
 
-/// `set` replaces a preset of the same name in place and appends a new one;
-/// `remove` reports whether there was one.
 #[test]
 fn set_replaces_or_appends_and_remove_reports() {
     let mut presets = QualityPresets::default();
@@ -68,7 +60,6 @@ fn set_replaces_or_appends_and_remove_reports() {
     assert!(presets.unknown("Ultra").contains("Low, Medium, High"));
 }
 
-/// The presets round-trip through JSON, as `project.rusty` stores them.
 #[test]
 fn presets_round_trip_through_json() {
     let presets = QualityPresets::default();
@@ -79,7 +70,6 @@ fn presets_round_trip_through_json() {
     );
 }
 
-/// A partial edit keeps every value it doesn't name; an unknown key is refused.
 #[test]
 fn an_edit_writes_only_what_it_names() {
     let presets = QualityPresets::default();
@@ -97,8 +87,6 @@ fn an_edit_writes_only_what_it_names() {
     assert_eq!(fresh.values, QualityValues::default());
 }
 
-/// A preset that names only some values loads, the rest the seeded `Medium`'s; a
-/// file without `"default"` selects the middle preset.
 #[test]
 fn a_partial_preset_loads_over_the_seeded_medium_values() {
     let text = r#"{ "presets": [

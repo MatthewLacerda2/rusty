@@ -1,29 +1,14 @@
-//! crates/core/src/settings/logs.rs — `LogSettings`: the project's rolling frame log (#2206).
-//!
-//! A dev build can keep a rolling log of how each drawn frame ran, and what the
-//! console said beside it, under `saved/logs/` (`dev::frame_log`), so an agent can
-//! look back at "a minute ago" with nothing armed beforehand. The project's
-//! `project.rusty` says, under `"logs"`, how much it keeps, which hosts write it and
-//! which named channels record. A channel that is off buys the others more history:
-//! the budget is shared.
-
 use serde::{Deserialize, Serialize};
 
-/// The project's frame-log settings.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LogSettings {
     /// The log's size budget in megabytes; the oldest segment is dropped past it.
     /// `0` writes no log.
     pub budget_mb: u32,
-    /// A second, optional bound: a segment whose newest record is older than this
-    /// many minutes is dropped. `None` (or `0`) bounds the log by size alone.
     pub minutes: Option<u32>,
-    /// Whether the editor writes it (on by default: a look-back needs no arming).
     pub editor: bool,
-    /// Whether a `player` dev build writes it (off by default).
     pub player: bool,
-    /// Which channels record.
     pub channels: LogChannels,
 }
 
@@ -49,21 +34,15 @@ impl LogSettings {
     }
 }
 
-/// The named channels of the frame log, each on or off. `frames` is one record per
-/// drawn frame; `gpu_passes` and `systems` ride on it; `console`, `loads` and
-/// `audio` are records of their own.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LogChannels {
-    /// One record per drawn frame: its place, its timings and render counters.
     pub frames: bool,
     /// The GPU ms per render-pass kind, on a frame record.
     pub gpu_passes: bool,
-    /// The systems over the log's threshold this frame, on a frame record.
     pub systems: bool,
     /// `Debug.Log`, warnings and errors.
     pub console: bool,
-    /// A finished scene load's steps and their times.
     pub loads: bool,
     /// What `Debug.AudioEvents` reads: every play action.
     pub audio: bool,
@@ -83,7 +62,6 @@ impl Default for LogChannels {
 }
 
 impl LogChannels {
-    /// Every channel's name, in the order the docs list them.
     pub const NAMES: [&'static str; 6] = [
         "frames",
         "gpu_passes",
@@ -105,13 +83,11 @@ impl LogChannels {
         })
     }
 
-    /// Whether channel `name` records; `None` for a name that is no channel.
     pub fn get(&self, name: &str) -> Option<bool> {
         let mut copy = *self;
         copy.slot(name).map(|on| *on)
     }
 
-    /// Switch channel `name`; an error naming the channels for one that is none.
     pub fn set(&mut self, name: &str, on: bool) -> Result<(), String> {
         match self.slot(name) {
             Some(slot) => {

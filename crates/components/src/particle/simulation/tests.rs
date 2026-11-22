@@ -1,6 +1,3 @@
-//! The `Gpu` emitter's tally (#2170): its live count, slots and births against a
-//! brute-force reference that ages each particle as the CPU path does.
-
 use glam::Vec3;
 
 use super::super::{EmitterFrame, ParticleEmitterComponent, ParticleSimulation};
@@ -11,7 +8,6 @@ fn particle(lifetime: f32) -> Particle {
     Particle::at(Vec3::ZERO, 1.0, [1.0; 4], lifetime)
 }
 
-/// The CPU path's aging, `age += dt; alive = age < lifetime`, one particle each.
 #[derive(Default)]
 struct Reference(Vec<(f32, f32)>);
 
@@ -156,7 +152,6 @@ fn a_local_gpu_emitter_stores_its_births_relative_to_its_first_frame() {
     e.emit_at(at(5.0), 1);
     e.emit_at(at(7.0), 1);
     let stored: Vec<_> = e.runtime.gpu.births().map(|b| b.particle).collect();
-    // Both stored in the first frame's space; drawn moved by 2 with the emitter.
     assert_eq!(
         stored[0].position,
         Vec3::X * 5.0,
@@ -242,10 +237,6 @@ fn the_running_time_is_kept_at_each_recent_step_and_at_each_birth() {
     assert_eq!(GpuSim::default().time_at(0), Some(0.0));
 }
 
-/// A `Local` `Gpu` emitter and its `Cpu` twin, each carried to the scales in
-/// `before`, bursting one particle at scale 0, then carried to the scales in
-/// `after` (all at x = 10): where the `Gpu` one draws its birth, and where the
-/// `Cpu` one holds it.
 fn local_twins_at_scale_0(before: &[f32], after: &[f32]) -> (Vec3, Vec3) {
     let local = |simulation| ParticleEmitterComponent {
         simulation,
@@ -270,15 +261,12 @@ fn local_twins_at_scale_0(before: &[f32], after: &[f32]) -> (Vec3, Vec3) {
 
 #[test]
 fn a_local_gpu_birth_at_scale_0_draws_where_its_cpu_twin_holds_it() {
-    // After a frame with an inverse: both carry it from the scale-2 frame.
     let (drawn, carried) = local_twins_at_scale_0(&[2.0], &[1.0]);
     assert!((drawn - carried).length() < 1e-5, "{drawn} vs {carried}");
     assert!(
         (carried - Vec3::X * 10.0).length() < 1e-5,
         "born on the emitter: {carried}"
     );
-    // Before any (a scale-in from 0 bursting on its first tick): it stays where
-    // it was born, on the emitter, and follows the emitter from its first frame.
     let (drawn, carried) = local_twins_at_scale_0(&[], &[1.0]);
     assert_eq!(carried, Vec3::new(10.0, 0.0, 0.0));
     assert_eq!(drawn, carried, "not carried again under the first frame");

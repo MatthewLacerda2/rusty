@@ -1,7 +1,3 @@
-//! Every built-in primitive winds its triangles counter-clockwise seen from the side
-//! its normals face (#1615): the renderer culls a material's back faces by winding,
-//! so a primitive wound the other way would draw inside-out.
-
 use glam::Vec3;
 
 use super::primitives::{
@@ -10,7 +6,6 @@ use super::primitives::{
 };
 use super::Vertex;
 
-/// How many of `indices`' triangles face against their vertex normals.
 fn inward(vertices: &[Vertex], indices: &[u32]) -> usize {
     let at = |i: u32| &vertices[i as usize];
     indices
@@ -19,7 +14,6 @@ fn inward(vertices: &[Vertex], indices: &[u32]) -> usize {
             let [a, b, c] = [t[0], t[1], t[2]].map(|i| Vec3::from(at(i).position));
             let face = (b - a).cross(c - a);
             let normals: Vec3 = t.iter().map(|&i| Vec3::from(at(i).normal)).sum();
-            // A pole's sliver (two corners a rounding error apart) has no side to face.
             face.length() > 1e-6 && face.dot(normals) <= 0.0
         })
         .count()

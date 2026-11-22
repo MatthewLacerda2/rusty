@@ -1,7 +1,3 @@
-//! The project seam (#829): the `--project` flag, the lookups and the skeleton.
-//! `open` itself moves the working directory, so it is exercised by the binaries,
-//! not here.
-
 use super::locate::{find_engine_dir, find_packaged_project};
 use super::*;
 
@@ -56,7 +52,6 @@ fn any_flag_takes_its_value_and_an_empty_one_is_an_error() {
 #[test]
 fn a_named_project_wins_and_the_default_is_dot_project() {
     assert_eq!(locate(Some("g".into())), PathBuf::from("g"));
-    // A test binary has no packaged project beside it.
     assert_eq!(locate(None), PathBuf::from(DEFAULT_PROJECT_DIR));
 }
 
@@ -75,7 +70,6 @@ fn a_shipped_layout_finds_its_engine_and_project_beside_the_executable() {
     assert_eq!(find_engine_dir(&ship), Some(ship.join("engine")));
     assert_eq!(find_packaged_project(&ship), Some(ship.join("project")));
 
-    // A macOS bundle: Contents/MacOS/<exe>, Contents/Resources/{engine,project}.
     let bundle = fresh("bundle").join("Game.app").join("Contents");
     let (macos, res) = (bundle.join("MacOS"), bundle.join("Resources"));
     std::fs::create_dir_all(&macos).unwrap();

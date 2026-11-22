@@ -1,12 +1,8 @@
-//! The engine check (#853, #1319): which way the engine moved, and what each way
-//! says.
-
 use super::*;
 
 const A: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const B: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
 
-/// A project that recorded `recorded` at `old`, opened by `running` at `new`.
 fn check(recorded: Option<&str>, old: Option<u64>, running: &str, new: Option<u64>) -> EngineCheck {
     EngineCheck {
         recorded: recorded.map(str::to_string),

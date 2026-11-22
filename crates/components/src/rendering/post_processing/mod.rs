@@ -1,12 +1,3 @@
-//! crates/components/src/rendering/post_processing/ — the post-processing volume, Unity's
-//! Volume with its overrides: one settings struct per post effect (#1467), each in
-//! its own file (grading effects under `grading/`, lens effects under `lens/`), plus
-//! the volume's lighting settings (`lighting`), which are no post effect.
-//!
-//! A new effect adds its file, its `mod` line and one field below. The other layers
-//! find it by that field's name (`render::postfx::effects`, whose completeness test
-//! checks every layer has its part).
-
 use serde::{Deserialize, Serialize};
 
 // sorted: one module per effect (or family of effects); none reads another
@@ -43,13 +34,9 @@ pub use ssil::Ssil;
 pub use ssr::Ssr;
 pub use volumetric_fog::VolumetricFog;
 
-/// A post-processing volume. Every field defaults when a file leaves it out, so a
-/// scene names only what it sets, each effect to its own default (the Add Component
-/// menu's, `edit::authoring::default_post_processing`).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PostProcessingComponent {
-    /// Whether the volume applies at all: a camera whose volume is off runs neutral.
     #[serde(default = "on")]
     pub active: bool,
     // sorted: one field per post effect, named as every layer names the effect
@@ -70,14 +57,11 @@ pub struct PostProcessingComponent {
     pub volumetric_fog: VolumetricFog,
     pub white_balance: WhiteBalance,
 
-    /// Directional-shadow cascades and reach (#435).
     pub shadows: ShadowSettings,
-    /// Screen-space ambient occlusion (#436), on by default.
     pub ssao: SsaoSettings,
 }
 
 impl Default for PostProcessingComponent {
-    /// Applies, every effect at its own default: what `{}` loads as.
     fn default() -> Self {
         Self {
             active: on(),
@@ -105,12 +89,9 @@ impl Default for PostProcessingComponent {
 }
 
 impl PostProcessingComponent {
-    /// The fields that are no post effect: the volume's own switch and its lighting
-    /// settings. Every other field is one effect's settings.
     pub const NOT_EFFECTS: [&'static str; 3] = ["active", "shadows", "ssao"];
 }
 
-/// A loaded volume that leaves `active` out applies.
 fn on() -> bool {
     true
 }

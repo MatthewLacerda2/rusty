@@ -1,5 +1,3 @@
-//! The loading budget is Unity's per priority, `BelowNormal` by default (#2123).
-
 use super::LoadingPriority;
 use crate::application::Application;
 

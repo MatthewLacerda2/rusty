@@ -1,5 +1,4 @@
-// Panic-free sim (#195, #962): bare `.unwrap()` is denied in every sim module (use `?`
-// or a documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
+// Bare `.unwrap()` is denied in every sim module: use `?` or a documented `.expect(...)`.
 #![deny(clippy::unwrap_used)]
 
 pub mod application;
@@ -21,7 +20,5 @@ pub mod settings;
 pub mod storage;
 pub mod wake;
 
-/// serde, for [`named_enum!`]'s expansion: a crate calling the macro needs no serde
-/// dependency of its own.
 #[doc(hidden)]
 pub use serde as __serde;

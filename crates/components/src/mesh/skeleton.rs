@@ -1,14 +1,3 @@
-//! crates/components/src/mesh/skeleton.rs — a skinned mesh's binding to its bone
-//! GameObjects (#453), Unity's `SkinnedMeshRenderer.bones`.
-//!
-//! The skeleton is intrinsic to the imported asset, so the bones themselves are
-//! rebuilt from the model on load and never saved (`scene::skeleton`). What the
-//! scene does save is the designer's adjustment: a bone moved while setting the
-//! scene up is recorded here as a per-bone **override**, keyed by bone name, the way
-//! a Unity prefab override records a change against its source. A ragdoll's
-//! per-bone `Rigidbody` and `Joint` (#466) are saved the same way, as
-//! [`BoneBody`]s keyed by bone name, the joint's connected bone by name too.
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -20,33 +9,19 @@ use crate::{
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct BoneBinding {
-    /// The bone entity of each joint slot, in the skin's joint order — what the
-    /// palette build reads. Runtime only: bones get fresh ids every load, and an
-    /// empty or stale list is re-bound by name (`Scene::sync_skeletons`). A
-    /// destroyed bone's slot is `None`, **missing** (#1273): it skins at its bind
-    /// pose until the skeleton is rebuilt, and never holds a dead id a later
-    /// entity could be given.
     #[serde(skip)]
     pub bones: Vec<Option<u32>>,
-    /// Bone name → the local transform a designer gave it, applied when the
-    /// skeleton is (re)built. Filled from the live bones on save and consumed on
-    /// load, so the live value is empty and the bones themselves are authoritative.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub overrides: BTreeMap<String, TransformComponent>,
-    /// Bone name → the physics a bone carries (a ragdoll's body and joint, #466),
-    /// saved and restored like `overrides`: filled on save, consumed on load.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bodies: BTreeMap<String, BoneBody>,
 }
 
 impl BoneBinding {
-    /// Whether there is nothing to save: no override or bone body recorded.
     pub fn is_unmodified(&self) -> bool {
         self.overrides.is_empty() && self.bodies.is_empty()
     }
 
-    /// Every slot's bone, for a test of a whole skeleton: panics on a missing one.
-    /// A test hook: other modules' tests read it.
     #[doc(hidden)]
     pub fn ids(&self) -> Vec<u32> {
         self.bones
@@ -56,11 +31,6 @@ impl BoneBinding {
     }
 }
 
-/// A bone's saved `Rigidbody` and `Joint`. Bones get fresh ids on every load, so
-/// a joint to a bone of the same skeleton is saved as `connected_bone`, that bone's
-/// chain (its name, then its ancestor bones', nearest first, like every bone
-/// reference, #1277), with its id field cleared; one to another skeleton's bone by
-/// `bone_refs`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct BoneBody {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -69,15 +39,11 @@ pub struct BoneBody {
     pub joint: Option<JointComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub connected_bone: Vec<String>,
-    /// A joint to a bone of another skeleton (#1264): the joint names that skinned
-    /// entity, and this the bone, as `Entity::bone_refs` does (keyed `/joint/…`).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub bone_refs: BTreeMap<String, Vec<String>>,
 }
 
 impl MeshComponent {
-    /// Whether `pointer`, under the mesh, is a saved bone joint's id leaf:
-    /// `/skeleton/bodies/<bone>/joint/connected_body`.
     pub fn is_ref_pointer(pointer: &str) -> bool {
         let parts: Vec<&str> = pointer.split('/').collect();
         matches!(
@@ -87,10 +53,6 @@ impl MeshComponent {
     }
 }
 
-/// A saved ragdoll joint names its connected body by id when that body is not a
-/// bone of the same skeleton (that one is `connected_bone`): a prop, or another
-/// skinned entity with the bone in `bone_refs`. It follows the walk (#1264) like any
-/// joint; the live bones' own joints are walked on the bones.
 impl EntityRefs for MeshComponent {
     fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
         for (name, body) in &mut self.skeleton.bodies {
@@ -110,10 +72,6 @@ impl EntityRefs for MeshComponent {
         }
     }
 
-    /// Also marks a bone slot naming a destroyed entity missing (#1273): the slots
-    /// join this one clearing pass (a despawn, a load leaving the entity behind),
-    /// so no path leaves a dead id a later entity could be given. They stay out of
-    /// [`EntityRefs::visit_refs`], the saved-id walk: they are never saved.
     fn forget(&mut self, dead: &dyn Fn(u32) -> bool) {
         self.visit_refs(&mut |_, r| {
             if r.is_some_and(dead) {
@@ -132,7 +90,6 @@ impl EntityRefs for MeshComponent {
         self.each_ref(&mut |_, r| visit(r));
     }
 
-    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         let body = BoneBody {

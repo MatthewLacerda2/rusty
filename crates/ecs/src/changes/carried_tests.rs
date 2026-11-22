@@ -1,7 +1,3 @@
-//! crates/ecs/src/changes/carried_tests.rs — a whole-entity write stamps the columns
-//! the entity carries or carried, and no other (`stamp.rs`, `World::stamp_carried`):
-//! a placement its new row's, a removal its old row's, an overwrite both.
-
 use glam::Vec3;
 
 use crate::{Activity, Changes, Cursor, World};
@@ -9,8 +5,6 @@ use rusty_components::{
     ColliderComponent, Entity, MeshComponent, NavMeshModifierComponent, TextComponent,
 };
 
-/// One cursor per column a casing has (`collider`, `mesh`) or lacks (`text`,
-/// `modifier`), and on `Activity`, which every whole-entity write stamps.
 struct Cursors {
     collider: Cursor<ColliderComponent>,
     mesh: Cursor<MeshComponent>,
@@ -30,7 +24,6 @@ impl Cursors {
         }
     }
 
-    /// What each read: `[collider, mesh, text, modifier, activity]`.
     fn read(&mut self, w: &World) -> [Changes; 5] {
         [
             w.changes(&mut self.collider),
@@ -95,8 +88,8 @@ fn an_overwrite_stamps_the_columns_it_dropped_and_the_ones_it_gained() {
     w.insert_entity(casing(id));
     let mut c = Cursors::open(&w);
     let mut doc = w.entity_document(id).expect("live");
-    doc.collider = None; // dropped
-    doc.text = Some(TextComponent::default()); // gained
+    doc.collider = None;
+    doc.text = Some(TextComponent::default());
     w.replace_entity(doc);
     let [collider, mesh, text, modifier, _] = c.read(&w);
     assert_eq!(collider, ids(&[id]), "the dropped column");
@@ -105,8 +98,6 @@ fn an_overwrite_stamps_the_columns_it_dropped_and_the_ones_it_gained() {
     assert_eq!(modifier, ids(&[]), "a column neither row carries");
 }
 
-/// An Undo of a despawn puts the row back through `restore_entity`: its columns are
-/// stamped as a placement's, under the one rewind the step takes.
 #[test]
 fn a_restored_entity_is_stamped_on_its_columns() {
     let mut w = World::new();

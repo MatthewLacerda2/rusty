@@ -1,19 +1,10 @@
-//! crates/core/src/random.rs — the seeded gameplay RNG (#443).
-//!
-//! The one source of randomness game scripts see: the `Random` namespace and the
-//! sandboxed `math.random` / `math.randomseed` both draw from it. It is a
-//! SplitMix64 stream — tiny, self-contained (no `rand` crate), and a pure function
-//! of its seed, so a headless replay is bit-for-bit identical. It is never seeded
-//! from the wall clock: every Play session restarts it from [`DEFAULT_SEED`], and
-//! only a script's `Random.SetSeed` moves it elsewhere.
+//! SplitMix64: a pure function of its seed, never seeded from the wall clock. Every Play
+//! session restarts from [`DEFAULT_SEED`]; only `Random.SetSeed` moves it.
 
 use glam::{Vec2, Vec3};
 
-/// The seed every Play session starts from. Fixed, so two runs of the same scene
-/// with the same inputs draw the same numbers.
 pub const DEFAULT_SEED: u64 = 0x5EED_0000_0000_0443;
 
-/// Seeded SplitMix64 generator — the per-World gameplay RNG resource.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Random {
     state: u64,
@@ -26,23 +17,18 @@ impl Default for Random {
 }
 
 impl Random {
-    /// A generator whose stream is fully determined by `seed`.
     pub fn new(seed: u64) -> Self {
         Self { state: seed }
     }
 
-    /// Restart the stream from `seed` (Unity's `Random.InitState`).
     pub fn set_seed(&mut self, seed: u64) {
         self.state = seed;
     }
 
-    /// Where the stream stands: two generators with one state draw the same
-    /// numbers from here on (a demo's state digest reads it, #1581).
     pub fn state(&self) -> u64 {
         self.state
     }
 
-    /// The next raw 64-bit value (SplitMix64).
     fn next_u64(&mut self) -> u64 {
         self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.state;
@@ -51,7 +37,6 @@ impl Random {
         z ^ (z >> 31)
     }
 
-    /// Uniform float in `[0, 1)` — the top 53 bits, so every value is exact.
     pub fn value(&mut self) -> f64 {
         (self.next_u64() >> 11) as f64 * (1.0 / (1u64 << 53) as f64)
     }
@@ -75,7 +60,6 @@ impl Random {
         (min as i128 + offset as i128) as i64
     }
 
-    /// A uniformly distributed point inside (or on) the unit sphere.
     pub fn inside_unit_sphere(&mut self) -> Vec3 {
         loop {
             let p = Vec3::new(self.signed(), self.signed(), self.signed());
@@ -85,17 +69,13 @@ impl Random {
         }
     }
 
-    /// A uniformly distributed point on the surface of the unit sphere.
     pub fn on_unit_sphere(&mut self) -> Vec3 {
-        // Archimedes: z uniform in [-1, 1] and a uniform azimuth give a uniform
-        // surface point, with no rejection loop.
         let z = self.signed();
         let phi = self.value() as f32 * std::f32::consts::TAU;
         let r = (1.0 - z * z).max(0.0).sqrt();
         Vec3::new(r * phi.cos(), r * phi.sin(), z)
     }
 
-    /// A uniformly distributed point inside (or on) the unit circle.
     pub fn inside_unit_circle(&mut self) -> Vec2 {
         loop {
             let p = Vec2::new(self.signed(), self.signed());
@@ -105,7 +85,6 @@ impl Random {
         }
     }
 
-    /// Uniform `f32` in `[-1, 1)`.
     fn signed(&mut self) -> f32 {
         (self.value() * 2.0 - 1.0) as f32
     }

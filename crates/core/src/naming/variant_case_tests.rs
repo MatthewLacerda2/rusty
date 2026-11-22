@@ -1,6 +1,3 @@
-//! The mechanism of [`decode`] on small stand-in types: each test pins one rule the
-//! module doc states. The real enums a script reaches are in `enum_case_tests.rs`.
-
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 

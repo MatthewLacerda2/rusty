@@ -1,5 +1,3 @@
-//! Per-tick edge and accumulator semantics of `InputState`.
-
 use super::*;
 
 #[test]

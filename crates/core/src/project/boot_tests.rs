@@ -1,6 +1,3 @@
-//! The boot scene's order (#1618): the editor's remembered scene, then the startup
-//! scene, then an empty one; a run boots the startup scene whatever is remembered.
-
 use super::{boot_scene, remember_scene, scene_to_remember};
 use crate::project::Access;
 use std::path::{Path, PathBuf};

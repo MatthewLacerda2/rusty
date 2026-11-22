@@ -1,6 +1,5 @@
 use super::*;
 
-/// `n` drawn frames, each recording `wall_ms` (and a `forward` pass while `forward`).
 fn frames(stats: &mut FrameStats, values: &[f64], in_session: bool, forward: bool) {
     for v in values {
         stats.record_frame(in_session, |f| {
@@ -13,8 +12,6 @@ fn frames(stats: &mut FrameStats, values: &[f64], in_session: bool, forward: boo
     }
 }
 
-/// A window summarises the newest frames only, counts the ticks and rendered
-/// frames inside, and keeps the session.
 #[test]
 fn window_folds_the_newest_samples() {
     let mut stats = FrameStats::default();
@@ -47,8 +44,6 @@ fn window_folds_the_newest_samples() {
     );
 }
 
-/// A metric that stops being recorded (a pass turned off) leaves a window once
-/// its newest sample is older than it, though older samples of it are kept.
 #[test]
 fn a_metric_that_stopped_leaves_the_window() {
     let mut stats = FrameStats::default();
@@ -71,8 +66,6 @@ fn a_metric_that_stopped_leaves_the_window() {
     );
 }
 
-/// A frame outside the session (edit mode, after Stop) moves a window and not
-/// the session; a sim metric leaves the window once frames pass without a tick.
 #[test]
 fn a_frame_after_stop_moves_the_window_not_the_session() {
     let mut stats = FrameStats::default();
@@ -93,7 +86,6 @@ fn a_frame_after_stop_moves_the_window_not_the_session() {
     assert!(stats.window(3).get("fixed_update_ms").is_some());
 }
 
-/// Only the newest [`RECENT`] samples are kept: a wider window is the whole ring.
 #[test]
 fn window_is_clamped_to_the_ring() {
     let mut stats = FrameStats::default();

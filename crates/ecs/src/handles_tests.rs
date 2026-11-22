@@ -1,5 +1,3 @@
-//! The dense id → handle table (#696): bind, rebind, unbind, gaps and clear.
-
 use super::Handles;
 
 fn two_handles() -> (hecs::Entity, hecs::Entity) {

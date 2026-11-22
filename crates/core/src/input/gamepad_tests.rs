@@ -1,5 +1,3 @@
-//! Pad naming, dead zones, rumble records, and axes' per-tick sampling (#471).
-
 use super::*;
 use crate::input::InputState;
 
@@ -14,7 +12,6 @@ fn pad_zero_is_unnumbered_and_later_pads_carry_their_index() {
 #[test]
 fn radial_dead_zone_cuts_the_centre_and_rescales_the_rest() {
     assert_eq!(radial_dead_zone(0.1, 0.1, 0.15), (0.0, 0.0));
-    // Past the edge the output starts from zero, and full travel reads 1.
     let (x, y) = radial_dead_zone(0.0, 1.0, 0.15);
     assert_eq!((x, y), (0.0, 1.0));
     let (x, _) = radial_dead_zone(0.575, 0.0, 0.15);
@@ -22,10 +19,8 @@ fn radial_dead_zone_cuts_the_centre_and_rescales_the_rest() {
         (x - 0.5).abs() < 1e-6,
         "0.575 is halfway from 0.15 to 1: {x}"
     );
-    // The direction is kept, including its sign.
     let (x, y) = radial_dead_zone(-0.6, 0.6, 0.15);
     assert!(x < 0.0 && y > 0.0 && (x + y).abs() < 1e-6);
-    // A diagonal past the unit circle clamps to magnitude 1.
     let (x, y) = radial_dead_zone(1.0, 1.0, 0.15);
     assert!((x.hypot(y) - 1.0).abs() < 1e-6);
 }
@@ -64,7 +59,6 @@ fn rumble_is_recorded_queued_and_drained() {
         expected,
         "the record outlives the queue"
     );
-    // An out-of-range pad is ignored rather than panicking.
     pads.request_rumble(MAX_PADS, Rumble::new(1.0, 1.0, 1.0));
     assert!(pads.take_rumble().is_empty());
 }

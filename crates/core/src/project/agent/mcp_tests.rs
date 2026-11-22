@@ -1,6 +1,3 @@
-//! The `.mcp.json` an edit-open keeps up to date (#1313): the engine's two entries,
-//! and nothing else of the file.
-
 use serde_json::{json, Value};
 
 use super::super::*;

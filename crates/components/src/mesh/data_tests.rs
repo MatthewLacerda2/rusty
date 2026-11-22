@@ -1,5 +1,3 @@
-//! Tests for `MeshData` (#2059): what it refuses and the geometry it builds.
-
 use super::*;
 
 fn quad() -> MeshData {
@@ -73,8 +71,6 @@ fn past_the_vertex_cap_is_refused() {
 
 #[test]
 fn shared_normals_weigh_each_face_by_its_area() {
-    // Vertex 0 is shared by a big face in the XZ plane (normal +Y) and a small one
-    // in the XY plane (normal +Z): its normal leans to +Y.
     let positions = [
         [0.0, 0.0, 0.0],
         [4.0, 0.0, 0.0],

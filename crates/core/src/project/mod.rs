@@ -1,38 +1,3 @@
-//! crates/core/src/project/ — the open game project (#829).
-//!
-//! A game lives in a **project folder** anywhere on disk, in its own repo — Unity's
-//! model, where the Hub or `-projectPath` opens a folder and the editor's working
-//! directory *is* that folder. rusty does the same: [`open`] creates the skeleton
-//! and makes the project root the process's
-//! working directory. Every path a project stores (scene asset refs, script paths,
-//! build settings) is relative to that root, `/`-separated, so it names the same file
-//! on every machine and the engine code that reads it stays a plain relative read.
-//!
-//! The skeleton is Unity's and Unreal's shape:
-//!
-//! ```text
-//! <project>/
-//!   assets/              the game: scenes, scripts, prefabs, models, textures,
-//!                        audio, materials, authored shaders (Unity's Assets/)
-//!   project.rusty        marks the folder as a project: the engine commit it was
-//!                        last opened with, and the project settings (#853)
-//!   .seeded              the seed manifest (#746)
-//!   cache/               anything the engine can regenerate (Unity's Library/),
-//!                        and the editor's last open scene (`boot`, #1618)
-//!   saved/               the player's save data (Unreal's Saved/)
-//!   CLAUDE.md            the game's instructions for an agent (#1313)
-//!   .mcp.json            registers the engine's MCP with Claude Code
-//! ```
-//!
-//! `cache/` and `saved/` each hold a `.gitignore` of `*`, so they stay out of git
-//! with no root `.gitignore`: version control is the user's. An edit-open also
-//! writes the two agent files (`agent/`), unless the project is inside the engine
-//! checkout.
-//!
-//! The engine's own content (shaders, bundled scripts, the preview model) is not the
-//! project's: it is found by [`engine_dir`], wherever the project is. A stored path
-//! that starts `engine/` names a file there ([`ContentRoots`]).
-
 mod agent;
 mod args;
 pub mod bench;
@@ -63,22 +28,12 @@ pub const ASSETS_DIR: &str = "assets";
 pub const CACHE_DIR: &str = "cache";
 /// The player's save data (Unreal's `Saved/`).
 pub const SAVED_DIR: &str = "saved";
-/// The project a binary opens when none is named: `./project`, the folder the
-/// engine used before projects could live anywhere.
 pub const DEFAULT_PROJECT_DIR: &str = "project";
-/// Where a project keeps its Lua scripts, relative to the root.
 pub const SCRIPTS_DIR: &str = "assets/scripts";
-/// Where a project keeps its textures (baked material maps included).
 pub const TEXTURES_DIR: &str = "assets/textures";
-/// Where a project keeps its generated and authored shaders.
 pub const SHADERS_DIR: &str = "assets/shaders";
-/// Where generated assets live: converted model sources (#1024). Whether a game's
-/// repo versions them is the game's own `.gitignore`'s call: the engine ignores
-/// nothing here (#866). Its one writer is the import cache, `asset::convert`'s
-/// `IMPORT_CACHE_DIR`, a folder of it that a test there holds to this constant.
 pub const GENERATED_DIR: &str = "assets/generated";
 
-/// The folders [`create_skeleton`] makes, relative to the root.
 pub const SKELETON: &[&str] = &[
     "assets/scenes",
     SCRIPTS_DIR,
@@ -92,8 +47,6 @@ pub const SKELETON: &[&str] = &[
     SAVED_DIR,
 ];
 
-/// Create the project skeleton under `dir` (and `dir` itself). Idempotent: what
-/// exists is left alone.
 pub fn create_skeleton(dir: &Path) -> Result<(), String> {
     for sub in SKELETON {
         let path = dir.join(sub);
@@ -109,11 +62,8 @@ pub fn create_skeleton(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// How a binary opens its project: whether it may bring `project.rusty` up to date.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Access {
-    /// The editor and the agent sessions: create a missing `project.rusty` and record
-    /// the running engine's commit, and write `CLAUDE.md` and `.mcp.json`.
     Edit,
     /// The player, scenario runs and captures: check the engine, write nothing. A
     /// shipped game never rewrites its project, and a run over the tracked fixture
@@ -121,28 +71,13 @@ pub enum Access {
     Run,
 }
 
-/// What [`open`] found.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Opened {
-    /// The project root, absolute; now the working directory.
     pub root: PathBuf,
-    /// The engine the project was last opened with against the running one. Opening
-    /// prints its warning on stderr; a frontend with a UI also shows it.
     pub engine: EngineCheck,
-    /// The project's settings, as `project.rusty` holds them (the defaults when it
-    /// has none): the build settings the player and `play` boot (the startup
-    /// scene), the default player graphics options (#1438), the quality presets
-    /// (#1522), the decal budgets (#1517) and the demos kept (#1581).
     pub settings: ProjectSettings,
 }
 
-/// Open the project at `dir`: create its skeleton, check
-/// (and with [`Access::Edit`] record) the engine in `project.rusty`, and make it the
-/// working directory. Call it once, at startup, before anything reads a project path
-/// — and resolve any other relative path the command line named first
-/// ([`std::path::absolute`]), since the working directory moves.
-///
-/// Progress goes to stderr: `session-mcp`'s stdout carries only JSON-RPC.
 pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     let (opened, mut lines) = prepare(dir, access)?;
     let root = &opened.root;
@@ -158,16 +93,12 @@ pub fn open(dir: &Path, access: Access) -> Result<Opened, String> {
     for line in lines {
         eprintln!("[Project] {line}");
     }
-    // A logged warning, not a stderr line: the editor console, the session and the
-    // MCP replies carry what `logging::forward` drains, so the agent sees it (#1319).
     if let Some(upgrade) = opened.engine.upgrade().filter(|_| access == Access::Edit) {
         log::warn!("[Project] {upgrade}");
     }
     Ok(opened)
 }
 
-/// Make `dir` the working directory again: a switch that [`open`]ed a project
-/// and then failed goes back to the one it left (`session-mcp`).
 pub fn return_to(dir: &Path) -> std::io::Result<()> {
     // lint: allow(statement-opt-out) the working-directory restore, not a clock read
     #[expect(
@@ -179,17 +110,12 @@ pub fn return_to(dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
-/// How many times this process moved the working directory to a project ([`open`],
-/// [`return_to`]). A cache keyed by project paths compares it with what it last saw
-/// and drops what it read under another project, on any thread (#1269).
 pub fn moves() -> u64 {
     MOVES.load(Ordering::Relaxed)
 }
 
 static MOVES: AtomicU64 = AtomicU64::new(0);
 
-/// Everything [`open`] does but move the working directory: make the folder a project
-/// and check its engine. Returns what it found and the progress lines to report.
 pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>), String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     let root = std::fs::canonicalize(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
@@ -216,15 +142,10 @@ pub(crate) fn prepare(dir: &Path, access: Access) -> Result<(Opened, Vec<String>
     ))
 }
 
-/// The engine check of the project at `dir`, without opening it or writing anything:
-/// what a picker shows before it opens a project a newer engine last opened.
 pub fn inspect(dir: &Path) -> Result<EngineCheck, String> {
     Ok(file::inspect(dir)?.0)
 }
 
-/// Whether `dir` already holds a project: its [`PROJECT_FILE`], or an `assets/`
-/// folder (a project only ever opened to run has no file). A picker opens only these, so a stray folder
-/// is never filled with a skeleton by accident.
 pub fn is_project(dir: &Path) -> bool {
     dir.join(PROJECT_FILE).is_file() || dir.join(ASSETS_DIR).is_dir()
 }
@@ -235,9 +156,6 @@ pub fn root() -> PathBuf {
     std::env::current_dir().unwrap_or_default()
 }
 
-/// What every binary does first: take `--project` from `args`, find the project
-/// ([`locate`]) and [`open`] it. Exits with status 2 and one line on stderr when the
-/// flag is malformed or the folder can't be opened — a binary can't run without it.
 pub fn open_from_args(args: &mut Vec<String>, access: Access) -> Opened {
     let opened = take_flag(args).and_then(|named| open(&locate(named), access));
     opened.unwrap_or_else(|e| {

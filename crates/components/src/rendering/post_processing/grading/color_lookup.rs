@@ -1,9 +1,7 @@
-//! Color Lookup (#1441), Unity's override of that name: a user LUT file (a `.cube`,
-//! or a Unity strip `.png`) applied last, on the display colour.
+//! Unity's Color Lookup: a user LUT (`.cube` or a Unity strip `.png`) applied last, on the display colour.
 
 use serde::{Deserialize, Serialize};
 
-/// The LUT file and how much of it applies.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ColorLookup {

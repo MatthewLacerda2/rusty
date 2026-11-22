@@ -1,41 +1,28 @@
-//! crates/components/src/particle/render.rs — how an emitter's particles are drawn (#440).
-//!
-//! The render settings are pure authoring data on the emitter; the particle pass
-//! (`render::passes::particles`) reads them. Every default is the plain look — an
-//! unlit, hard-edged, camera-facing sprite with one frame.
-
 use glam::Vec3;
 use serde::{Deserialize, Serialize};
 
 use super::runtime::Particle;
 
 rusty_core::named_enum! {
-    /// The shape each particle is drawn as.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum ParticleRenderMode {
         /// A quad that always faces the camera (smoke, fire, muzzle flash).
         #[default]
         Billboard = "billboard",
-        /// A quad stretched along the particle's velocity (sparks, tracers, streaks).
         Stretched = "stretched",
         /// A quad lying flat in the world XZ plane (ground splashes, shockwave rings).
         Horizontal = "horizontal",
         /// A camera-facing quad that stays upright — turns about world Y only.
         Vertical = "vertical",
-        /// An instanced mesh with its own material (shell casings, debris, glass).
         Mesh = "mesh",
     }
 }
 
-/// A sprite-sheet animation: the texture is a `columns × rows` grid of frames,
-/// read left-to-right, top-to-bottom. `1 × 1` (the default) is a plain sprite.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Flipbook {
     pub columns: u32,
     pub rows: u32,
-    /// How many times the whole sheet plays over one particle's life.
     pub cycles: f32,
-    /// Start each particle on a random frame (varied smoke puffs, debris sprites).
     pub random_start: bool,
 }
 
@@ -51,18 +38,15 @@ impl Default for Flipbook {
 }
 
 impl Flipbook {
-    /// Frames on the sheet (at least 1).
     pub fn frames(&self) -> u32 {
         (self.columns.max(1)) * (self.rows.max(1))
     }
 
-    /// The frame `p` shows now: its start frame plus its life played `cycles` times.
     pub fn frame_of(&self, p: &Particle) -> u32 {
         let frames = self.frames();
         if frames == 1 {
             return 0;
         }
-        // Just short of 1, so a particle on its last tick still shows the last frame.
         let t = p.life_t().min(0.99999);
         let played = (t * self.cycles.max(0.0) * frames as f32).floor() as u64;
         let frame = played + u64::from(p.start_frame);
@@ -70,29 +54,18 @@ impl Flipbook {
     }
 }
 
-/// An emitter's render settings. Serde-defaulted as a block, so an emitter that
-/// omits it loads the default (billboard, unlit, hard, one frame).
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ParticleRender {
     pub mode: ParticleRenderMode,
-    /// `Stretched`: the quad's length as a multiple of its size…
     pub length_scale: f32,
     /// …plus this many world units per unit of speed (faster sparks streak longer).
     pub speed_scale: f32,
-    /// `Mesh`: a primitive name (`"Cube"`) or a model asset path.
     pub mesh: Option<String>,
-    /// `Mesh`: the scene material the meshes are drawn with (engine default if unset).
     pub material: Option<String>,
     pub flipbook: Flipbook,
-    /// Soft particles: fade out over this many world units in front of the scene
-    /// behind, so smoke never cuts a hard line into a wall. `0` disables it.
     pub soft_distance: f32,
-    /// Lit particles: shaded by the ambient / light probes and the scene lights
-    /// (dark in a dark room, lit by a muzzle flash). Off = the sprite's own colour.
     pub lit: bool,
-    /// How reactive the sprites are under TAA (#1845): `Auto` by default, from
-    /// their alpha (`Alpha`) or brightness (`Additive`).
     pub reactive: crate::TaaReactive,
 }
 
@@ -124,7 +97,6 @@ impl ParticleRender {
         self.flipbook.random_start && self.flipbook.frames() > 1
     }
 
-    /// A stretched particle's quad length for a given `size` and `velocity`.
     pub fn stretch_length(&self, size: f32, velocity: Vec3) -> f32 {
         size * self.length_scale + velocity.length() * self.speed_scale
     }

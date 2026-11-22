@@ -1,13 +1,7 @@
-//! The recent ring behind [`FrameStats::window`](super::FrameStats::window): each
-//! series' newest samples, stamped with the tick and drawn frame they were recorded
-//! at, so a window holds only what was recorded inside it.
-
 use std::collections::{BTreeMap, VecDeque};
 
 use super::{Series, RECENT};
 
-/// When a sample was recorded: the ring's tick and frame counts at that moment
-/// (the tick or frame it belongs to, counted from 0), and whether a tick recorded it.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub(super) struct Stamp {
     tick: u64,
@@ -15,23 +9,15 @@ pub(super) struct Stamp {
     on_tick: bool,
 }
 
-/// The newest samples of every series in [`FrameStats`]' three maps, and the
-/// clocks they are stamped on. Unlike the session's counts, both clocks move
-/// outside Play too: the frame clock on every frame [`FrameStats::record_frame`] records.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct Recent {
-    /// Ticks and frames recorded since the last reset.
     pub(super) ticks: u64,
     pub(super) frames: u64,
     pub(super) metrics: BTreeMap<String, VecDeque<(Stamp, f64)>>,
     pub(super) systems: BTreeMap<String, VecDeque<(Stamp, f64)>>,
     pub(super) gpu_passes: BTreeMap<String, VecDeque<(Stamp, f64)>>,
-    /// One stamp per tick, and one per frame that rendered: a window's counts.
     pub(super) tick_marks: VecDeque<Stamp>,
     pub(super) drawn_marks: VecDeque<Stamp>,
-    /// The newest recorded frame's stamp, and whether it joined the session,
-    /// until what is known only once it ended arrives
-    /// ([`FrameStats::frame_ended`](super::FrameStats::frame_ended)).
     pub(super) open: Option<(Stamp, bool)>,
 }
 
@@ -61,7 +47,6 @@ impl Recent {
     }
 }
 
-/// Fold one sample into its session series (when it has one) and its ring.
 pub(super) fn push(
     session: Option<&mut BTreeMap<String, Series>>,
     recent: &mut BTreeMap<String, VecDeque<(Stamp, f64)>>,
@@ -82,7 +67,6 @@ pub(super) fn push(
     bounded(samples, (at, value));
 }
 
-/// Push `item`, dropping the oldest past [`RECENT`].
 pub(super) fn bounded<T>(ring: &mut VecDeque<T>, item: T) {
     if ring.len() == RECENT {
         ring.pop_front();
@@ -90,11 +74,6 @@ pub(super) fn bounded<T>(ring: &mut VecDeque<T>, item: T) {
     ring.push_back(item);
 }
 
-/// Each key's samples within the newest `n` frames that `keep` takes, summarised
-/// as a fresh [`Series`]; a key with none is left out.
-///
-/// Only the samples newer than the window's frame edge are read
-/// ([`Recent::past_edge`]).
 pub(super) fn fold_recent(
     clocks: &Recent,
     recent: &BTreeMap<String, VecDeque<(Stamp, f64)>>,

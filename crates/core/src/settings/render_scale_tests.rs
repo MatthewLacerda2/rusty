@@ -41,11 +41,9 @@ fn the_project_default_runs_while_storage_holds_no_choice() {
         RenderScaleSetting::load(&storage, half).resolve(1.0),
         RenderScale::new(0.5)
     );
-    // A stored player value overrides it.
     RenderScale::new(0.8).store(&mut storage);
     let setting = RenderScaleSetting::load(&storage, half);
     assert_eq!(setting.resolve(1.0), RenderScale::new(0.8));
-    // Forgetting the choice deletes the key, so the default is back next launch.
     let forgot = RenderScaleSetting {
         chosen: None,
         ..setting
@@ -63,7 +61,6 @@ fn match_display_is_one_over_the_display_scale() {
     let matching = RenderScaleDefault::MatchDisplay;
     assert_eq!(matching.resolve(1.0), RenderScale::NATIVE);
     assert_eq!(matching.resolve(2.0), RenderScale::new(0.5));
-    // A monitor change is a new display scale: the next resolve follows it.
     let setting = RenderScaleSetting {
         chosen: None,
         default: matching,
@@ -114,12 +111,10 @@ fn the_graphics_block_round_trips_through_the_project_file() {
         let back = ProjectFile::from_json(&file.to_json()).unwrap();
         assert_eq!(back.graphics.render_scale, default);
     }
-    // The factor is written as the `f32` it is: a hand-edited file reads `0.7`.
     let mut file = ProjectFile::default();
     file.graphics.render_scale = RenderScaleDefault::Fixed(RenderScale::new(0.7));
     let text = file.to_json();
     assert!(text.contains(r#""render_scale": 0.7"#), "{text}");
-    // A bad value still opens the project, on the default.
     let file = ProjectFile::from_json(r#"{"graphics": {"render_scale": "big"}}"#).unwrap();
     assert_eq!(file.graphics, ProjectGraphics::default());
 }

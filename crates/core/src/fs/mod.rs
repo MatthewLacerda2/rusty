@@ -1,17 +1,8 @@
-//! crates/core/src/fs/ — writing a file so no reader ever sees half of it (#1129).
-//!
-//! A plain write truncates first, so a reader in another process (or thread) at
-//! that moment sees an empty or torn file. [`write_atomic`] writes beside the
-//! target and renames over it: a reader gets the whole old file or the whole new
-//! one, and [`write_cache`] does the same without syncing, for a cache the engine
-//! re-makes (the Blender version `asset` keeps). It is the one copy: the import
-//! sidecar, the import cache's stamp, the seed manifest, the authored UI widgets,
-//! imported audio, the bake files, and every authored document (scene, prefab,
-//! animation graph, project file, save data, #1991) all write through it, and the
-//! `atomic-write` rule (`make rules`) flags a `std::fs::rename` anywhere else.
-//! [`written`] is the log of asset files the engine wrote, which path-keyed caches
-//! drain to drop what went stale (#1207), each through a [`freshness::Freshness`]
-//! that also keeps the files it could not read (#1241).
+//! A plain write truncates first, so a concurrent reader sees an empty or torn file.
+//! [`write_atomic`] writes beside the target and renames over it; [`write_cache`] skips
+//! the syncs for a cache the engine re-makes. The `atomic-write` rule (`make rules`)
+//! flags a `std::fs::rename` anywhere else. [`written`] is the log of asset files the
+//! engine wrote, which path-keyed caches drain through a [`freshness::Freshness`].
 
 pub mod freshness;
 pub mod written;
@@ -20,20 +11,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// The suffix of [`write_atomic`]'s temp file, `<path>.<pid>.<n>.tmp`: what a
-/// crash leaves behind, for [`is_unique_sibling`] to spot.
 pub const TEMP_SUFFIX: &str = "tmp";
 
-/// Write `bytes` at `path` through a temp file beside it, renamed into place. The
-/// temp file is synced to the disk before the rename, and the folder after it, so a power cut leaves the old file or the new one, never an empty one (a
-/// rename can reach the disk before the data it names). The temp file is removed
-/// when the write or the rename fails, so a failure leaves no litter. The parent
-/// directory must exist.
-///
-/// Every document the developer authored or the engine reads back whole as the
-/// source of truth (a scene, a prefab, a project file, the save data) is written
-/// with it; only a cache the engine re-makes by itself may use a plain write.
-///
 /// The rename replaces the file's folder entry, so it needs the folder writable,
 /// and a file read-only or linked there becomes a plain file of the default mode.
 pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
@@ -42,16 +21,10 @@ pub fn write_atomic(path: &Path, bytes: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-/// [`write_atomic`] without the syncs, for a cache the engine re-makes by itself
-/// and reads a torn file of as a miss: a reader still sees the whole old file or
-/// the whole new one, but a power cut may leave an empty one. It costs no disk
-/// flush, so a file rewritten on every launch costs the launch nothing to wait on.
 pub fn write_cache(path: &Path, bytes: &[u8]) -> io::Result<()> {
     replace(path, bytes, |temp, bytes| std::fs::write(temp, bytes))
 }
 
-/// Write `bytes` with `write` to a temp file beside `path` and rename it into
-/// place, removing the temp file when either step fails.
 fn replace(
     path: &Path,
     bytes: &[u8],
@@ -65,8 +38,6 @@ fn replace(
     result
 }
 
-/// Write `bytes` to a new file at `path` and sync it (`F_FULLFSYNC` on macOS, where
-/// a plain `fsync` stops at the drive's cache).
 fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     use std::io::Write;
     let mut file = std::fs::File::create(path)?;
@@ -74,9 +45,6 @@ fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
     file.sync_all()
 }
 
-/// Sync the folder holding `path`, so a rename into it, or a removal from it, is on
-/// the disk. A failure is ignored (some file systems refuse to sync a folder): the
-/// file is in place.
 pub fn sync_folder(path: &Path) {
     let folder = match path.parent() {
         Some(p) if !p.as_os_str().is_empty() => p,
@@ -87,8 +55,6 @@ pub fn sync_folder(path: &Path) {
     }
 }
 
-/// `<path>.<pid>.<n>.<suffix>`: a name beside `path` no other call, in this
-/// process or another, is handed at the same time.
 pub fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
     static NEXT: AtomicU64 = AtomicU64::new(0);
     let n = NEXT.fetch_add(1, Ordering::Relaxed);
@@ -100,8 +66,6 @@ pub fn unique_sibling(path: &Path, suffix: &str) -> PathBuf {
     path.with_file_name(name)
 }
 
-/// True when `name` is one [`unique_sibling`] made of the file `of` with `suffix`,
-/// in any process: what a leftover from a crashed write looks like.
 pub fn is_unique_sibling(name: &str, of: &str, suffix: &str) -> bool {
     let middle = name
         .strip_prefix(of)
@@ -113,8 +77,6 @@ pub fn is_unique_sibling(name: &str, of: &str, suffix: &str) -> bool {
         .is_some_and(|(pid, n)| is_number(pid) && is_number(n))
 }
 
-/// True when `name` is a [`write_atomic`] temp file of any target, in any process:
-/// a name that is never an asset, only a write in flight (or a crash's leftover).
 pub fn is_temp_name(name: &str) -> bool {
     let mut parts = name.rsplitn(4, '.');
     parts.next() == Some(TEMP_SUFFIX)

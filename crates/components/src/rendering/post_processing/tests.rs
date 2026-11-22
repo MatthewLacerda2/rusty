@@ -1,6 +1,3 @@
-//! The volume's stored shape (#1467): one object per effect, each defaulting when a
-//! file leaves it, or any of its fields, out.
-
 use super::*;
 
 fn load(json: &str) -> PostProcessingComponent {

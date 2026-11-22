@@ -1,8 +1,4 @@
-//! One test for every enum `named_enum!` declares (#1329): what the macro writes
-//! is the same for all of them, so it is proven once, here.
-
 crate::named_enum! {
-    /// A test enum: one plain variant, one renamed, one with aliases.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     enum Probe {
         Plain = "Plain",

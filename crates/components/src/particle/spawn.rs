@@ -1,9 +1,3 @@
-//! crates/components/src/particle/spawn.rs — building particles from the emitter config.
-//!
-//! One spawn path, shared by the sim's continuous/burst emission, sub-emitter
-//! firings and the scripting `Particles.Emit`/`Burst`, so all of them draw from
-//! the same seeded stream in the same order.
-
 use glam::{Mat4, Vec3};
 
 use super::runtime::{Particle, SubEmitEvent};
@@ -23,9 +17,6 @@ fn draw(range: &Range, rng: &mut Random) -> f32 {
 }
 
 impl ParticleEmitterComponent {
-    /// Seed the runtime PRNG for the current Play session if it hasn't been yet.
-    /// Idempotent — safe to call before any spawn, whether from the sim tick or a
-    /// script-driven `Particles.Emit`/`Burst`.
     pub fn ensure_initialized(&mut self) {
         if !self.runtime.initialized {
             self.runtime.rng = Random::new(self.seed);
@@ -33,11 +24,6 @@ impl ParticleEmitterComponent {
         }
     }
 
-    /// Build one particle at `origin` from the current config: shape offset and
-    /// launch direction, direction jitter, then every start range, all drawn from
-    /// the seeded stream. The offset and launch are in the emitter's own space,
-    /// turned and scaled into the world by its frame `frame` (`space`), whatever
-    /// the simulation space.
     fn spawn_particle(&mut self, frame: &EmitterFrame, origin: Vec3) -> Particle {
         let axis = self.direction.normalize_or_zero();
         let rng = &mut self.runtime.rng;
@@ -57,7 +43,7 @@ impl ParticleEmitterComponent {
         } else {
             self.color.sample(rng.value() as f32)
         };
-        // Render extras (#440) draw only when the settings use them, so an emitter
+        // Render extras draw only when the settings use them, so an emitter
         // that doesn't keeps its seeded stream — and its replays — unchanged.
         let start_frame = if self.render.wants_start_frame() {
             let frames = self.render.flipbook.frames();
@@ -66,7 +52,6 @@ impl ParticleEmitterComponent {
             0
         };
         let axis = if self.render.wants_axis() {
-            // Uniform on the sphere: z uniform in [-1, 1], azimuth uniform.
             let z = signed(rng);
             let phi = rng.value() as f32 * std::f32::consts::TAU;
             let r = (1.0 - z * z).max(0.0).sqrt();
@@ -89,10 +74,6 @@ impl ParticleEmitterComponent {
         }
     }
 
-    /// The particle a script adds by hand (`Particles.SetParticles`) before its
-    /// own fields are written: at the emitter frame `frame`'s origin, with the
-    /// start ranges' minimums, the turn a spawn there gives it, and no draw from
-    /// the seeded stream.
     pub fn placed(&self, frame: &EmitterFrame) -> Particle {
         Particle {
             turn: self.birth_turn(frame),
@@ -105,18 +86,10 @@ impl ParticleEmitterComponent {
         }
     }
 
-    /// Spawn up to `count` particles at the emitter, whose frame
-    /// (`ecs::World::emitter_frame`) is `frame`, honouring the `max_particles` cap (spawns past the cap are
-    /// dropped). Returns the number actually spawned. Seeds the runtime on first
-    /// use, and queues the birth sub-emitter per spawn.
     pub fn emit_at(&mut self, frame: EmitterFrame, count: u32) -> u32 {
         self.spawn(frame, frame.origin(), Vec3::ZERO, count, true)
     }
 
-    /// Spawn a sub-emitter burst: `count` particles at the world point `origin`,
-    /// each carrying `inherited` velocity on top of its own; `frame` is this
-    /// emitter's frame. Never queues birth sub-emitters, so two emitters
-    /// naming each other cannot feed back without bound.
     pub fn emit_sub(
         &mut self,
         frame: EmitterFrame,
@@ -141,9 +114,6 @@ impl ParticleEmitterComponent {
         let birth = self.sub_emitters.birth.filter(|_| births);
         let inherit = self.sub_emitters.inherit_velocity;
         let mut spawned = 0;
-        // A `Local` `Gpu` emitter's births go up under the inverse of the space
-        // its draw places them in (`gpu_space`, read after `carry_to` above), so
-        // each is drawn where it was born, and then follows the emitter.
         let to_local = (self.on_gpu() && self.simulation_space == SimulationSpace::Local)
             .then(|| self.gpu_space())
             .filter(|m| *m != Mat4::IDENTITY)

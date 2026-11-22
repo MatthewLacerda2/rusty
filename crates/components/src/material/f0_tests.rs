@@ -1,11 +1,8 @@
-//! A dielectric's F0 from `ior` and `KHR_materials_specular` (#1998).
-
 use super::{dielectric_f0, dielectric_f90};
 use crate::MaterialAsset;
 
 #[test]
 fn the_default_material_reflects_exactly_the_four_percent_it_always_did() {
-    // The constant the shader held before #1998, bit for bit.
     assert_eq!(MaterialAsset::default().dielectric_f0(), [0.04_f32; 3]);
     assert_eq!(dielectric_f0(1.5, 1.0, [1.0; 3]), [0.04; 3]);
 }
@@ -21,7 +18,6 @@ fn water_reflects_about_two_percent() {
 fn a_pane_doubles_by_its_colour_and_the_colour_and_strength_shape_it() {
     assert_eq!(dielectric_f0(1.5, 1.0, [2.0; 3]), [0.08; 3]);
     assert_eq!(dielectric_f0(1.5, 0.5, [1.0, 0.5, 0.0]), [0.02, 0.01, 0.0]);
-    // The `min` caps a channel at a mirror before the strength scales it.
     assert_eq!(dielectric_f0(1.5, 0.5, [100.0; 3]), [0.5; 3]);
 }
 

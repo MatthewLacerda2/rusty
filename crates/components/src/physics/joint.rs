@@ -1,92 +1,36 @@
-//! crates/components/src/physics/joint.rs — Joint: a constraint between two rigid bodies (#449).
-//!
-//! Unity's `FixedJoint`, `HingeJoint` and `CharacterJoint`, folded into one
-//! component with a [`JointKind`]. It ties its entity's Rigidbody to the
-//! `connected_body`'s — or, with none, to a fixed point in the world:
-//!
-//! - `Fixed` welds the two bodies (breakable debris, a gun in a ragdoll's hand);
-//! - `Hinge` leaves one rotation free, about `axis`, optionally within
-//!   `limits` (doors, elbows, knees);
-//! - `Ball` leaves all three rotations free: twist about `axis` within `limits`,
-//!   a swing of up to `swing_limit` degrees about `swing_axis` (Unity's swing 1)
-//!   and of up to `swing2_limit` about `axis × swing_axis` (swing 2) — so a
-//!   shoulder can swing far forward yet little sideways (shoulders, hips, a
-//!   hanging lamp).
-//!
-//! `anchor`, `axis` and `swing_axis` are in this entity's local space. Under a
-//! negative world scale (the entity's own or a parent's), the joint is the
-//! mirror image of the unmirrored one, twist and hinge limits acting on the
-//! mirror-image side (#1125). `connected_anchor` is in
-//! the connected body's local space — or world space with no connected body —
-//! and is ignored while `auto_configure_connected_anchor` is on, which puts it
-//! wherever `anchor` sits when the joint is built (Unity's default). The joint's
-//! rest pose is the pose the two bodies are in when it is built. A non-zero
-//! `break_force` / `break_torque` breaks the joint when exceeded (see
-//! `physics::joints`). A non-zero `drive_strength` motors the joint toward its
-//! target, `drive_damping` slowing it (Unity's `ConfigurableJoint` slerp drive,
-//! Unreal's physical animation; #1895): the rest pose, or for a ragdoll bone the
-//! pose its Animator samples. The one entity reference, `connected_body`, follows the
-//! entity through prefab save / stamp (its `EntityRefs` impl, the one id-field walk).
-
 use glam::{Vec2, Vec3};
 use serde::{Deserialize, Serialize};
 
 use crate::{EntityRefs, RefVisit};
 
 rusty_core::named_enum! {
-    /// Which rotations a joint leaves free. See the module docs.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum JointKind {
-        /// No relative motion at all.
         #[default]
         Fixed = "Fixed",
-        /// One free rotation, about the joint axis.
         Hinge = "Hinge",
-        /// Three free rotations: twist about the axis plus a swing cone.
         Ball = "Ball",
     }
 }
 
-/// A joint between this entity's Rigidbody and another's. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-// Every field defaults, so a hand-written scene can name only what it sets.
 #[serde(default)]
 pub struct JointComponent {
     pub kind: JointKind,
-    /// The entity whose body this one is joined to; `None` joins it to the world.
     pub connected_body: Option<u32>,
-    /// The joint's pivot, in this entity's local space.
     pub anchor: Vec3,
-    /// The pivot on the connected body (its local space), or in world space with
-    /// no connected body. Ignored while `auto_configure_connected_anchor` is on.
     pub connected_anchor: Vec3,
-    /// Derive `connected_anchor` from `anchor` when the joint is built.
     pub auto_configure_connected_anchor: bool,
-    /// Hinge axis / Ball twist axis, in this entity's local space.
     pub axis: Vec3,
-    /// Ball: the swing-1 axis, in this entity's local space (Unity's
-    /// `swingAxis`). Only its part perpendicular to `axis` counts.
     pub swing_axis: Vec3,
-    /// Whether `limits` (and a Ball's swing limits) apply.
     pub use_limits: bool,
-    /// Hinge angle / Ball twist range, in degrees from the rest pose: `(min, max)`.
     pub limits: Vec2,
-    /// Ball: how far (degrees) the body may swing about `swing_axis` (swing 1).
     pub swing_limit: f32,
-    /// Ball: how far (degrees) the body may swing about `axis × swing_axis`
-    /// (swing 2).
     pub swing2_limit: f32,
-    /// Force (newtons) past which the joint breaks; `0` never breaks.
     pub break_force: f32,
-    /// Torque (newton-metres) past which the joint breaks; `0` never breaks.
     pub break_torque: f32,
-    /// Whether the two joined bodies still collide with each other.
     pub enable_collision: bool,
-    /// How hard the joint's motor turns it toward its target: a stiffness in
-    /// 1/s², scaled by the two bodies' mass (rapier's acceleration-based motor);
-    /// `0` is no motor.
     pub drive_strength: f32,
-    /// How much the motor resists the joint's turning speed (1/s).
     pub drive_damping: f32,
 }
 
@@ -114,12 +58,9 @@ impl Default for JointComponent {
 }
 
 impl JointComponent {
-    /// The JSON pointer (inside the component) of its entity reference — how
-    /// prefab write-back finds the override leaf holding an entity id.
     pub const REF_POINTERS: [&'static str; 1] = ["/connected_body"];
 }
 
-/// A dropped `connected_body` joins the body to the world.
 impl EntityRefs for JointComponent {
     fn visit_refs(&mut self, visit: &mut RefVisit<'_>) {
         visit(Self::REF_POINTERS[0], &mut self.connected_body);
@@ -131,7 +72,6 @@ impl EntityRefs for JointComponent {
         }
     }
 
-    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()

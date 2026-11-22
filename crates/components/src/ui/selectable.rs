@@ -1,23 +1,3 @@
-//! crates/components/src/ui/selectable.rs — Selectable: an interactive UI element (#420).
-//!
-//! Unity's `Selectable`, the base of every widget (Button, Toggle, Slider, … ship as
-//! Lua scripts over it, #422). It marks its entity as something the pointer and the
-//! keyboard focus can interact with, and gives it visual **states** — `Normal`,
-//! `Highlighted` (hovered), `Pressed`, `Selected` (focused) and `Disabled` — shown
-//! through a `transition` on its `target_graphic`:
-//!
-//! - `ColorTint` multiplies the target's colour by the state's colour, fading over
-//!   `fade_duration` seconds of unscaled time (so it animates under a paused game);
-//! - `SpriteSwap` shows the state's sprite instead of the target Image's texture.
-//!
-//! `navigation` says how keyboard focus leaves it: `Automatic` picks the nearest
-//! selectable in the pressed direction by geometry, `Explicit` follows the
-//! `select_on_*` entities, `None` never focuses it. The runtime state (hover, press,
-//! the fade) lives in the `ui::EventSystem` resource, never here — this is pure
-//! authoring data. The entity references (`target_graphic`, `select_on_*`) are
-//! remapped with the entity when a prefab is saved or stamped
-//! (its `EntityRefs` impl, the one id-field walk).
-
 use glam::Vec4;
 use rusty_asset::MapRef;
 use serde::{Deserialize, Serialize};
@@ -25,35 +5,26 @@ use serde::{Deserialize, Serialize};
 use crate::{EntityRefs, RefVisit};
 
 rusty_core::named_enum! {
-    /// How a Selectable shows its state. See the module docs.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum SelectableTransition {
-        /// No visual change.
         None = "None",
-        /// Multiply the target graphic's colour by the state's colour.
         #[default]
         ColorTint = "ColorTint",
-        /// Swap the target Image's texture for the state's sprite.
         SpriteSwap = "SpriteSwap",
     }
 }
 
 rusty_core::named_enum! {
-    /// How keyboard focus moves away from a Selectable.
     #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
     pub enum NavigationMode {
-        /// Never focused by navigation (the pointer can still use it).
         None = "None",
-        /// The nearest selectable in the pressed direction, by geometry.
         #[default]
         Automatic = "Automatic",
-        /// The `select_on_*` entity for the pressed direction.
         Explicit = "Explicit",
     }
 }
 
 rusty_core::named_enum! {
-    /// A visual state of a Selectable, in the order its colours and sprites are stored.
     #[derive(Clone, Copy, Debug, PartialEq, Eq)]
     pub enum SelectionState {
         Normal = "Normal",
@@ -64,28 +35,16 @@ rusty_core::named_enum! {
     }
 }
 
-/// An interactive UI element. See the module docs.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SelectableComponent {
-    /// Whether it accepts input. A `CanvasGroup` with `interactable = false` above it
-    /// disables it too.
     pub interactable: bool,
-    /// How the state shows.
     pub transition: SelectableTransition,
-    /// The entity whose Image / Text the transition drives; `None` is this entity.
     pub target_graphic: Option<u32>,
-    /// `ColorTint` colours per state (display-space RGBA), in [`SelectionState`]
-    /// order: normal, highlighted, pressed, selected, disabled.
     pub colors: [Vec4; 5],
-    /// `ColorTint`: seconds (unscaled) a change of state fades over.
     pub fade_duration: f32,
-    /// `SpriteSwap` textures per state, in [`SelectionState`] order; `None` (and the
-    /// `Normal` slot, always) shows the Image's own texture.
     pub sprites: [Option<MapRef>; 5],
-    /// How keyboard focus leaves it.
     pub navigation: NavigationMode,
-    /// `Explicit` targets: up, down, left, right.
     pub select_on: [Option<u32>; 4],
 }
 
@@ -96,7 +55,6 @@ impl Default for SelectableComponent {
             interactable: true,
             transition: SelectableTransition::ColorTint,
             target_graphic: None,
-            // Unity's ColorBlock.defaultColorBlock.
             colors: [
                 Vec4::ONE,
                 grey(0.961, 1.0),
@@ -113,8 +71,6 @@ impl Default for SelectableComponent {
 }
 
 impl SelectableComponent {
-    /// The JSON pointers (inside the component) of its entity references — how
-    /// prefab write-back finds the override leaves holding entity ids.
     pub const REF_POINTERS: [&'static str; 5] = [
         "/target_graphic",
         "/select_on/0",
@@ -123,12 +79,10 @@ impl SelectableComponent {
         "/select_on/3",
     ];
 
-    /// The colour for `state`.
     pub fn color(&self, state: SelectionState) -> Vec4 {
         self.colors[state as usize]
     }
 
-    /// The sprite for `state` (`None` for `Normal`: the Image's own texture).
     pub fn sprite(&self, state: SelectionState) -> Option<&MapRef> {
         match state {
             SelectionState::Normal => None,
@@ -136,7 +90,6 @@ impl SelectableComponent {
         }
     }
 
-    /// The entity the transition drives, given this Selectable's own `id`.
     pub fn target(&self, id: u32) -> u32 {
         self.target_graphic.unwrap_or(id)
     }
@@ -158,7 +111,6 @@ impl EntityRefs for SelectableComponent {
         }
     }
 
-    /// Test hook: the root's tests build it to reach every id slot.
     #[doc(hidden)]
     fn every_ref() -> Self {
         Self::default()
