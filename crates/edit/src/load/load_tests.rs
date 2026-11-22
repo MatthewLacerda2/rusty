@@ -4,8 +4,10 @@ use super::make_room;
 use crate::to_scene_data;
 use rusty_scene::Scene;
 
+/// No navmesh or lighting sidecar beside this path, so the swap reads none.
 const NO_SIDECAR: &str = "rusty_432_no_such_dir/level.scene";
 
+/// Floor (1) and its child Lamp (2): ids the outgoing scene's survivors can hold.
 fn level() -> Scene {
     let mut level = Scene::new();
     let floor = level.add_entity("Floor".to_string());
@@ -108,5 +110,7 @@ fn a_re_rooted_survivors_bounds_stand_where_it_is_now() {
     let survivors = s.load_survivors();
     crate::load::swap_in(&mut s, to_scene_data(&level()), NO_SIDECAR, &survivors).unwrap();
     let (min, max) = s.world.collider_bounds(crate_).unwrap();
+    // Centred on its local pose, the origin, not 100 along X.
     assert!((min + max).abs().max_element() < 1e-4, "{min} {max}");
+    // The nav bake sees it there too: `tests/nav/load_bounds.rs`.
 }

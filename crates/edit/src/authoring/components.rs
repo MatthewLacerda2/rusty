@@ -34,6 +34,8 @@ macro_rules! component_kinds {
 first_class!(component_kinds);
 
 impl ComponentKind {
+    /// Unity's `RequireComponent` table; `docs/api/Scene.md`, *Component dependencies*, lists it:
+    /// change both.
     pub fn requires(self) -> &'static [ComponentKind] {
         match self {
             ComponentKind::PostProcessing => &[ComponentKind::Camera],
@@ -64,11 +66,13 @@ impl ComponentKind {
 }
 
 pub fn add_component(scene: &mut Scene, id: u32, kind: ComponentKind) -> bool {
+    // `Texture` is the Material kind: it also adds a library asset, and requires nothing.
     if kind == ComponentKind::Texture {
         return attach_default_material(scene, id);
     }
     let added = dependency::add_with_requirements(&mut scene.world, id, kind);
     if added && kind == ComponentKind::Light {
+        // A light added in Play turns realtime and shadowed: no bake can take it in.
         rusty_scene::create::live_in_play(scene, id);
     }
     added

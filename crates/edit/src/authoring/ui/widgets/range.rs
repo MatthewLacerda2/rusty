@@ -1,10 +1,8 @@
-//! crates/edit/src/authoring/ui/widgets/range.rs — `Slider` and `Scrollbar`.
-//!
-//! Both are a track with a handle the script places by anchors: the slider's
-//! `Fill Area/Fill` stretches from the start to the value and its
-//! `Handle Slide Area/Handle` sits at it; the scrollbar's `Sliding Area/Handle`
-//! spans `size` of the track at `value`. Laid out horizontally; the script
-//! reorients them for a vertical `direction`.
+//! A `Slider` and a `Scrollbar` are each a track with a handle the script places by anchors: the
+//! slider's `Fill Area/Fill` stretches from the start to the value and its
+//! `Handle Slide Area/Handle` sits at it; the scrollbar's `Sliding Area/Handle` spans `size` of
+//! the track at `value`. Laid out horizontally; the script reorients them for a vertical
+//! `direction`.
 
 use glam::{Vec2, Vec4};
 

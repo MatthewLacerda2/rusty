@@ -61,6 +61,8 @@ pub(super) fn propagate_from(
     Ok(())
 }
 
+/// Leaves `Pass::finish` and [`finish_rebuild`] to the caller, run once after every instance it
+/// rebuilds.
 pub(super) fn rebuild_instance(
     scene: &mut Scene,
     root_id: u32,
@@ -124,8 +126,7 @@ pub fn list_instance_overrides(scene: &Scene, root_id: u32) -> Result<Vec<String
     Ok(out)
 }
 
-/// A source whose file is missing is skipped, so a deleted `.prefab` never aborts a scene load: the
-/// instance keeps its values and overrides, with no baseline until the source is back.
+/// A source that can't be read is skipped, so a deleted `.prefab` never aborts a scene load.
 pub fn propagate_linked_instances_in(scene: &mut Scene, imports: &mut Imports) {
     let roots = instance_roots(scene, |_| true);
     propagate_roots(scene, roots, true, imports);

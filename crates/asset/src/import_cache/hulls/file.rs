@@ -1,4 +1,4 @@
-//! Little-endian, floats stored as bits:
+//! Little-endian, floats stored as bits so a read is exact:
 //!
 //! ```text
 //! "RHUL"  u32 n  n × u8 decomposer  u32 entries
@@ -99,8 +99,7 @@ impl Reader<'_> {
         self.array().map(u64::from_le_bytes)
     }
 
-    /// Refused when the rest of the file cannot hold `size`-byte items, so a bad
-    /// count never allocates.
+    /// A count the rest of the file cannot hold is refused before allocating.
     fn count(&mut self, size: usize) -> Result<usize, String> {
         let n = self.u32()? as usize;
         if n.saturating_mul(size) > self.bytes.len() - self.at {

@@ -71,6 +71,7 @@ impl std::fmt::Display for ImportError {
 
 impl std::error::Error for ImportError {}
 
+// Each extension list is lowercase: `paths::extension` lowercases before matching.
 /// `fbx` and `blend` go through a cached glTF ([`convert`]).
 pub const MODEL_EXTENSIONS: &[&str] = &["gltf", "glb", "obj", "fbx", "blend"];
 
@@ -94,7 +95,6 @@ pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     import_with(path, &read_target(path)?, &settings_of(path))
 }
 
-/// For a converted source, its cached glTF, brought up to date first.
 fn read_target(path: &Path) -> Result<std::path::PathBuf, ImportError> {
     match convert::converter_for(path) {
         Some(_) => convert::cached_gltf(path),
@@ -136,6 +136,7 @@ fn import_own(
     })
 }
 
+/// Never its own borrowed clips, so a borrow cannot chain or loop.
 fn borrowed_source(from: &str) -> Result<Option<humanoid::borrow::Source>, ImportError> {
     let path = Path::new(from);
     let settings = settings_of(path);

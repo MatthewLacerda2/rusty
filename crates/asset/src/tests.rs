@@ -203,7 +203,7 @@ fn unsupported_format_errors() {
     assert!(is_model_path("a/b/c.GLB"));
     assert!(!is_model_path("a/b/c.png"));
     assert!(is_image_path("a/b/c.JPG") && !is_image_path("a/b/c.glb"));
-    // A missing file is a parse error, not an unsupported one.
+    // A missing file is a parse error, not an unsupported one; `.max` has no importer.
     for ext in MODEL_EXTENSIONS.iter().chain(&["max"]) {
         let err = import_file(&std::path::Path::new("missing").with_extension(ext));
         let unsupported = matches!(err, Err(ImportError::UnsupportedFormat(_)));

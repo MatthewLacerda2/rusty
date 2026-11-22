@@ -17,6 +17,7 @@ pub enum AxisPreset {
 impl AxisPreset {
     pub const ALL: [Self; 4] = [Self::Min, Self::Center, Self::Max, Self::Stretch];
 
+    /// `(anchor_min, anchor_max, pivot)` along the axis.
     fn anchors(self) -> (f32, f32, f32) {
         match self {
             Self::Min => (0.0, 0.0, 0.0),

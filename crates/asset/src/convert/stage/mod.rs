@@ -1,5 +1,6 @@
-//! Swap order: textures folder in, old stamp removed, `.glb` renamed over the old one,
-//! new stamp written (earlier it would bless the old `.glb`), then `clear`.
+//! The swap: (1) the converter stages; (2) textures folder in; (3) old stamp removed, then
+//! the `.glb` renamed over the old one; (4) new stamp written (earlier, it would bless the
+//! old `.glb`); (5) `clear`.
 
 mod clear;
 pub(in crate::convert) mod hook;
@@ -15,7 +16,6 @@ use std::path::{Path, PathBuf};
 
 /// Where one conversion writes: plain files, in a fresh folder of its own.
 pub struct Staging {
-    /// Where the glTF goes.
     pub glb: PathBuf,
     pub textures: PathBuf,
     pub out: PathBuf,
@@ -31,6 +31,7 @@ pub(super) fn convert(
     (stamp, tag): (&str, &str),
 ) -> Result<Converted, ImportError> {
     let (dir, name) = clear::split(out);
+    // Beside the cache, on its filesystem, so every move of the swap is a rename.
     let staging = fs::unique_sibling(&dir.join(format!(".{name}")), STAGING);
     std::fs::create_dir(&staging).map_err(|e| write_error(&staging, &e))?;
     let to = Staging {
@@ -62,7 +63,7 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
     at(Step::TexturesIn);
     let stamp_path = stamp_path(&to.out);
     let glb = remove_file(&stamp_path).and_then(|()| {
-        // lint: allow(atomic-write) step 3 of the swap: the staged `.glb` replaces the old one in one rename
+        // lint: allow(atomic-write) step 3 of the swap: one rename
         std::fs::rename(&to.glb, &to.out)
     });
     if let Err(e) = glb {
@@ -73,13 +74,12 @@ fn swap(to: &Staging, dir: &Path, record: &str) -> Result<(), ImportError> {
         return Err(write_error(&to.out, &e));
     }
     at(Step::GlbIn);
-    // lint: allow(asset-write) the conversion stamp, read by the next freshness check; `note` notes the `.glb` and source after the swap
+    // lint: allow(asset-write) the conversion stamp; `note` notes the `.glb` and source after the swap
     fs::write_atomic(&stamp_path, record.as_bytes()).map_err(|e| write_error(&stamp_path, &e))
 }
 
-/// A `to` that is already a folder holds the same tag's output, so a file name there
-/// holds the same bytes: files are replaced one by one and nothing a reader relies on
-/// changes.
+/// A folder already at `to` holds the same tag's output, same bytes per name, so its files
+/// are replaced one by one.
 fn move_in(from: &Path, to: &Path) -> Result<Option<PathBuf>, ImportError> {
     if !to.is_dir() {
         // lint: allow(atomic-write) step 2 of the swap: a staged folder moves in whole

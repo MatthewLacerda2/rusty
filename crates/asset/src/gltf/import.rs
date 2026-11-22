@@ -1,7 +1,5 @@
-//! glTF 2.0 import (`.gltf` + `.glb`): meshes, materials and skin bindings. Each glTF
-//! mesh is one `SubMesh`; its primitives merge into one stream, each primitive's indices
-//! a `MaterialRange`. Every triangle mode becomes a triangle list; non-surface modes are
-//! skipped with a warning.
+//! Each glTF mesh is one `SubMesh`; its primitives merge into one stream, each primitive's
+//! indices a `MaterialRange`. Every triangle mode becomes a triangle list.
 
 use super::{anim, material, nodes, skin};
 use crate::material_range::push_range;
@@ -39,6 +37,7 @@ pub fn import_as(
 
     let meshes: Vec<gltf::Mesh> = document.meshes().collect();
     let triangles = |m: &gltf::Mesh| m.primitives().map(|p| corners(&p) / 3).sum();
+    // Threaded: a mesh's read and tangents depend on that mesh alone.
     let sub_meshes: Vec<SubMesh> = crate::cook::par::map(meshes, triangles, |mesh| {
         let mut sub = sub_mesh_from_gltf(
             &mesh,
@@ -138,6 +137,7 @@ fn read_primitive(
         .read_normals()
         .map(|n| n.collect::<Vec<_>>())
         .filter(|n| n.len() == positions.len());
+    // Without one normal per position the primitive is shaded flat, as glTF's spec asks.
 
     let uvs: Vec<[f32; 2]> = reader
         .read_tex_coords(0)

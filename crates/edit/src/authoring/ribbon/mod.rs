@@ -17,7 +17,7 @@ pub fn set_width(s: &mut RibbonStyle, width: Curve) {
 }
 
 /// Set the colour gradient along the length; keys clamped to `t ∈ [0, 1]`,
-/// channels `≥ 0`, alpha to `[0, 1]`.
+/// channels `≥ 0` (HDR, so additive tracers bloom), alpha to `[0, 1]`.
 pub fn set_color(s: &mut RibbonStyle, color: Gradient) {
     let mut g = finite_gradient(color);
     for key in &mut g.color_keys {

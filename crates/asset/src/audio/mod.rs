@@ -1,5 +1,3 @@
-//! MP3 is a source format, never shipped: trimmed of encoder delay and padding so a one-shot
-//! fires on its first real sample and a loop has no seam. OGG ships as is.
 //! Channels and rate stay as the source has them (Unity's AudioImporter, "Force To Mono" off).
 
 mod import;
@@ -29,6 +27,7 @@ impl DecodedAudio {
     }
 }
 
+/// The runtime's decoder too (`audio::device::decode`).
 pub fn decode_file(path: &str) -> Result<DecodedAudio, String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     decode_source(Box::new(file))
@@ -42,6 +41,7 @@ fn decode_bytes(bytes: Vec<u8>) -> Result<DecodedAudio, String> {
 /// and padding trimmed.
 fn decode_source(source: Box<dyn MediaSource>) -> Result<DecodedAudio, String> {
     let stream = MediaSourceStream::new(source, Default::default());
+    // No extension hint: the probe sniffs the container from the bytes.
     let mut reader = symphonia::default::get_probe()
         .probe(
             &Default::default(),

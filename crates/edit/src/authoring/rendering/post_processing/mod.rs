@@ -41,6 +41,8 @@ pub const EFFECTS: &[Effect] = &[
     white_balance::EFFECT,
 ];
 
+/// Test hook for the root package's tests: this layer's tables, by name, for
+/// `render::postfx::completeness`.
 pub fn authored() -> rusty_scene::authored::Authored {
     let fields_of = |kind: &str| -> Vec<String> {
         let kind = crate::authoring::fields::find(kind).expect("a first-class component");

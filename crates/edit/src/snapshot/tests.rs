@@ -74,6 +74,7 @@ mod geometry {
         let sphere = create_entity(&mut scene, "S", Some(Primitive::Sphere));
         let sphere = scene.world.mesh(sphere).unwrap().clone();
         scene.world.set_mesh(quad, Some(sphere));
+        // A script-built mesh over the reference: the same source, a new revision.
         let built = MeshComponent::new("Asset", Vec::new(), vec![0, 0, 0]);
         let mut live = scene.world.mesh_mut(re_meshed).unwrap();
         (live.vertices, live.indices) = (built.vertices, built.indices);

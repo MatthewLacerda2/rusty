@@ -1,7 +1,8 @@
 //! A saved scene names an embedded texture by this identity, never by its cache
 //! file (a `.1` suffix can move it). It is the element's own name, as Unity keys
-//! one; a later namesake or an unnamed element is `#<index>`, which is only as
-//! stable as the textures' order.
+//! one. The first of a name keeps it, so a reference saved before a namesake was added still
+//! resolves; a later namesake, an unnamed element or a name starting with `#` (it would read as
+//! an index) is `#<index>`, which is only as stable as the textures' order.
 
 use rusty_core::collections::Map;
 

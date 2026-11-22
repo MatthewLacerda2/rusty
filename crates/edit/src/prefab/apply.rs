@@ -32,6 +32,7 @@ pub fn apply_instance_to_source(scene: &mut Scene, root_id: u32) -> Result<usize
         }
     }
     write_prefab_file(&prefab, &source)?;
+    // The source now holds the edits: rebuilding from it drops the redundant overrides.
     revert_instance_overrides(scene, root_id)?;
     Ok(applied)
 }

@@ -51,7 +51,6 @@ pub fn set_line_spacing(t: &mut TextComponent, spacing: f32) {
     t.line_spacing = non_negative(spacing);
 }
 
-/// Ems; negative tightens.
 pub fn set_letter_spacing(t: &mut TextComponent, spacing: f32) {
     t.letter_spacing = finite(spacing);
 }

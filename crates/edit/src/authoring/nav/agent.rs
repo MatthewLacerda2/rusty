@@ -47,6 +47,7 @@ pub fn set_target(a: &mut NavMeshAgentComponent, target: Vec3) {
     a.target = finite3_or(target, a.target);
 }
 
+/// `finite_f64_or` first: a bare `as u8` would turn NaN into 0, the most important priority.
 pub fn set_avoidance_priority(a: &mut NavMeshAgentComponent, priority: f64) {
     let priority = finite_f64_or(priority, f64::from(a.avoidance_priority));
     a.avoidance_priority = priority.clamp(0.0, f64::from(MAX_AVOIDANCE_PRIORITY)) as u8;

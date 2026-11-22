@@ -1,6 +1,3 @@
-//! The "see what I can place" half of authoring: each sub-object's footprint
-//! (AABB) lets an agent pick "a sedan" and know its size.
-
 use std::path::Path;
 
 use glam::Vec3;
@@ -14,7 +11,7 @@ pub struct SubObjectEntry {
     /// The part after `::`, e.g. `Sedan`.
     pub id: String,
     pub reference: String,
-    /// `None` for an empty mesh.
+    /// In the model's units after its Scale Factor; `None` for an empty mesh.
     pub bounds: Option<(Vec3, Vec3)>,
     /// Distinct materials its runs draw with; `0` when it names none.
     pub material_count: usize,

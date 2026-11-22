@@ -2,8 +2,8 @@
 //! (the image's name, made unique) and referenced as `model.blend#tex/<identity>`; one on disk
 //! is referenced where it lies with its name dropped, since a name could only shadow a made
 //! image's identity.
-//! A made file whose bytes are no format the importer reads is a [`Skip`]: the glTF loses the
-//! image and every texture and material slot sampling it (`drop`).
+//! A made file whose bytes are no format the importer reads is a [`Skip`], dropped with what
+//! samples it (`drop`).
 
 use super::super::stage::hook::{self, Step};
 use super::super::texture_file::{self, file_name, relative_uri, sniff, unique};
@@ -106,6 +106,7 @@ fn buffer(dir: &Path, doc: &mut Value) -> Result<Vec<u8>, ImportError> {
 struct Images<'a> {
     dir: &'a Path,
     to: &'a Staging,
+    /// The final `.glb`'s folder, not staging's: images on disk are referenced from it.
     out_dir: PathBuf,
     made: Map<String, String>,
     written: Vec<String>,

@@ -19,6 +19,7 @@ fn colours_bound_to_a_texture_are_white_times_their_factor() {
     // `Blue`'s `DiffuseColor` is black but bound to a texture: URP takes white × `DiffuseFactor`.
     let half = gamma_to_linear(0.5);
     assert_eq!(blue.base_color, [half, half, half, 1.0]);
+    // `Red`'s emissive colour is a grey placeholder under its map: white instead.
     assert_eq!(red.emissive, [1.0; 3]);
     assert!(red.emissive_map.as_ref().and_then(MapRef::file).is_some());
 }
@@ -30,6 +31,7 @@ fn a_colour_whose_texture_is_not_written_stays_without_its_factor() {
     let gone = material(&materials, "Gone");
     assert_eq!(gone.base_color, [0.2, 0.4, 0.6, 1.0]);
     assert_eq!(gone.base_color_map, None);
+    // An unbound emissive colour, times `EmissiveFactor` (1 here), linearised.
     assert_eq!(gone.emissive, [gamma_to_linear(0.5), 0.0, 0.0]);
     assert_eq!(gone.emissive_map, None);
 }

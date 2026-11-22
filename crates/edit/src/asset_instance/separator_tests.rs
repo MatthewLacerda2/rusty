@@ -25,6 +25,7 @@ fn colon_named_sub_object_survives_save_and_reload() {
 fn model_under_a_colon_folder_is_refused_with_the_rule() {
     let real = write_gltf("rusty_1295_kit.gltf", NO_MATERIAL_GLTF);
     let asset = rusty_asset::imported(std::path::Path::new(&real)).unwrap();
+    // The refusal comes before any file access, so this folder is only named, never made.
     let path = "my::kit/crate.gltf".to_string();
     let mut scene = Scene::new();
     let before = scene.world.collect_entities().len();

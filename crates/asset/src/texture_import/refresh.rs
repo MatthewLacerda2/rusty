@@ -1,7 +1,3 @@
-//! Making an image's compressed cache current at import, never at a draw. Each encode holds the
-//! cache's lock (`convert::lock_cache`), so the worker and a Play refresh never make one cache
-//! twice.
-
 use std::path::{Path, PathBuf};
 
 use super::encode::{self, Cores};
@@ -20,6 +16,7 @@ pub fn refresh(source: &Path, progress: &str) -> Result<bool, String> {
 struct Due {
     settings: crate::sidecar::TextureSettings,
     out: PathBuf,
+    /// The image's size on disk, before `max_size` fits it.
     size: (u32, u32),
 }
 
@@ -102,6 +99,8 @@ pub(super) fn refresh_on(source: &Path, progress: &str, cores: Cores) -> Result<
     // Checked again under the lock: whoever held it may have just made this cache.
     let _lock = convert::lock_cache(&out);
     let bytes = std::fs::read(source).map_err(|e| named(&e))?;
+    // From the bytes encoded, not `due`'s remembered digest, so a file rewritten meanwhile is
+    // stamped right.
     let stamp = cache::stamp(content(&bytes), &settings);
     if cache::is_current(&out, stamp) {
         return Ok(false);
@@ -145,6 +144,8 @@ pub(super) fn files(root: &Path) -> Vec<PathBuf> {
     found
 }
 
+/// `Renderer::uncached_textures`' test, so its audit and the import agree on which files get a
+/// cache.
 pub fn imports(root: &Path, file: &Path) -> bool {
     let absolute = |p: &Path| std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
     let under = |p: &Path| absolute(p).starts_with(absolute(root));

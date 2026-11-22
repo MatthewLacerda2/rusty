@@ -1,5 +1,6 @@
-//! An `.obj`'s `mtllib` files and a `.gltf`'s external buffers; not textures, which
-//! the importer only names. `tobj` takes the rest of an `mtllib` line as one file name.
+//! The files besides the parsed one whose writes make a cached import stale: an
+//! `.obj`'s `mtllib` files and a glTF's external buffers. Not textures, which the
+//! importer only names. `tobj` takes the rest of an `mtllib` line as one file name.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
