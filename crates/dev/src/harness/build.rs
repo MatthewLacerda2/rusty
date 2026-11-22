@@ -12,6 +12,8 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 impl Harness {
+    /// Seeds before building the scene, so the first run and every rerun see the same scripts
+    /// and replay byte for byte.
     pub fn new(out_dir: impl AsRef<Path>, bot_script: &str) -> Self {
         let workspace = Self::workspace_of(&out_dir);
         let samples = fixture_project().join(rusty_edit::DEFAULT_SCRIPTS_DEST_DIR);
@@ -45,6 +47,8 @@ impl Harness {
         settings: ProjectSettings,
         probe: &mut Option<Box<dyn LoadProbe>>,
     ) -> Result<Self, String> {
+        // Standalone before the import, as the player: the scene's models read their cooked
+        // files and write none (`asset::cook::writes`).
         rusty_asset::convert::mark_standalone();
         let read = timed(probe, "document", || {
             let json = rusty_scene::io::read_text(scene_path)?;

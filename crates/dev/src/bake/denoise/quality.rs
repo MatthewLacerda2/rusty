@@ -3,6 +3,7 @@ use glam::{Vec2, Vec3};
 use rusty_core::color::luminance;
 use rusty_lighting::lightmap::{BakeMesh, BakeScene, Lightmap};
 
+// Chart interiors only: the gutter and the dilation's fill are copies no surface shows.
 fn interior(mesh: &BakeMesh, size: u32) -> Vec<bool> {
     let n = size as usize;
     let mut on = vec![false; n * n];
@@ -52,6 +53,7 @@ pub fn error(scene: &BakeScene, maps: &[Lightmap], reference: &[Lightmap]) -> Er
         |f: &dyn Fn(f64, f64) -> f64| pairs.iter().map(|&(v, r)| f(v, r)).sum::<f64>() / n;
     Error {
         mae: average(&|v, r| (v - r).abs()) / mean,
+        // 1% of the mean added to the reference keeps a black texel's relative error finite.
         relative: average(&|v, r| (v - r).abs() / (r + 0.01 * mean)),
     }
 }

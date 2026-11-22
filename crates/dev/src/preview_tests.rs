@@ -98,6 +98,7 @@ fn gpu_a_centimetre_fbx_quad_previews_as_its_red_and_blue_textures() {
     }
     let image = image::open(&out).unwrap().to_rgb8();
     let count = |own: usize| {
+        // Dominant, not pure: the quad's Fresnel sheen of the sky greys both faces.
         let hue = |p: &&image::Rgb<u8>| {
             let others = (0..3).filter(|&c| c != own).map(|c| p[c]).max().unwrap();
             p[own] > 96 && p[own] > others.saturating_add(48)

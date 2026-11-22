@@ -6,9 +6,12 @@ use rusty_scene::Scene;
 
 use super::report::ViewKey;
 
+/// Metres above the floor a spawn or navmesh viewpoint's eye sits.
 pub const EYE_HEIGHT: f32 = 1.7;
 pub const MAX_POINTS: usize = 8;
+/// Degrees, as `Camera` turns: 0 looks along +X, 90 along +Z.
 pub const YAWS: [f32; 4] = [0.0, 90.0, 180.0, 270.0];
+/// Another seed moves every navmesh viewpoint, so no kept report compares with the next run.
 const SEED: u64 = 0x2294_BE7C_5CE7_E5ED;
 
 #[derive(Clone, Debug, PartialEq)]

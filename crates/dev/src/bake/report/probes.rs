@@ -8,6 +8,8 @@ use rusty_render::DEFAULT_BAKE_RESOLUTION;
 use rusty_scene::lighting::probe::{ProbeVolume, BLEND_PROBES};
 use rusty_scene::Scene;
 
+/// Metres to the nearest probe past which an object samples far light: twice the placement's
+/// default spacing.
 pub const FAR: f32 = 8.0;
 
 #[derive(Debug, Default)]
@@ -64,6 +66,7 @@ pub fn report(scene: &Scene, stages: &Stages, scene_print: u64) -> Report {
     let probes = volume.probes();
     let keys: String = probes.iter().map(|p| format!("{:?}", p.position)).collect();
     let fingerprint = keyed(scene_print, &keys);
+    // Plus 16 bytes: the `Vec4` shadowmask occlusion each probe carries beside its SH.
     let per_probe = std::mem::size_of::<rusty_scene::lighting::sh::Sh9>() + 16;
     let output = (probes.len() * per_probe) as u64;
     let settings = json!({ "resolution": DEFAULT_BAKE_RESOLUTION, "blendProbes": BLEND_PROBES });
@@ -147,6 +150,7 @@ pub fn scene_fingerprint(scene: &Scene) -> u64 {
         (&scene.ambient, &scene.sky, &scene.fog),
         (&*scene.lightmaps, &scene.lighting_settings),
     );
+    // Where the light probes stand, never the SH this bake writes into them.
     let probes = scene.probes.probes().iter().map(|p| (p.position, p.manual));
     hash.write(format!("{:?}", probes.collect::<Vec<_>>()).as_bytes());
     hash.write(format!("{environment:?}").as_bytes());

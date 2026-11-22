@@ -3,6 +3,7 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::nav_settings::{navmesh_path, save_navmesh};
 use rusty_scene::Scene;
 
+/// `None`: nothing written, for an unsaved scene or in Play, which refreshes the live navmesh.
 pub fn bake_navmesh(
     scene: &mut Scene,
     nav: &mut NavigationGraph,
@@ -15,6 +16,7 @@ pub fn bake_navmesh(
     let mut stages = Stages::start();
     let bytes: std::sync::Arc<[u8]> = nav.bake_to_bytes(scene).into();
     stages.lap("bake");
+    // Marked baked: the save writes it even over a newer file another process baked.
     scene.put_baked_navmesh(bytes.clone());
     let Some(path) = path else {
         return Ok(None);

@@ -114,6 +114,7 @@ fn a_look_back_is_whole_and_a_cut_is_counted() {
     let got = read(&dir, &LogQuery::default(), 1000);
     assert_eq!((got.records.len(), got.truncated), (DEFAULT_LIMIT, 101));
     let mut out = std::fs::File::create(segment_path(&dir, 1)).unwrap();
+    // One bad byte costs its line, not its segment: t 802 is still read.
     out.write_all(b"{\"ch\":\"console\",\"t\":801,\"msg\":\"\xff\"}\n")
         .unwrap();
     out.write_all(b"{\"ch\":\"console\",\"t\":802,\"msg\":\"ok\"}\n")

@@ -4,6 +4,8 @@ use rusty_core::settings::GraphicsSettings;
 use rusty_core::storage::Storage;
 use rusty_time::Time;
 
+/// What a replay writes over in its host: the editor's world is the operator's, and its
+/// store flushes to `saved/storage.json` at every Stop.
 pub struct Host {
     pub(super) storage: Storage,
     pub(super) video: VideoSettings,
@@ -16,6 +18,7 @@ pub struct Host {
 }
 
 impl Host {
+    /// Leaves the store empty and pathless, so no Stop a replay makes writes its data to disk.
     pub(super) fn take(world: &mut GameWorld) -> Self {
         let storage = std::mem::take(&mut *world.resources.storage.borrow_mut());
         let mut screen = world.resources.screen.borrow_mut();
@@ -39,6 +42,7 @@ impl Host {
         }
     }
 
+    /// Destructures every field, so one added to `Host` fails to compile until it is put back.
     pub(super) fn put(self, world: &mut GameWorld) {
         let Self {
             storage,

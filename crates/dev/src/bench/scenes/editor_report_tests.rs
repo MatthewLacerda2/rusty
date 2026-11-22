@@ -117,6 +117,7 @@ fn a_scene_view_of_another_size_is_said_once_above_the_table() {
         row.trim_end().ends_with("was 1306") && !row.contains('%'),
         "a size, not a percentage: {table}"
     );
+    // 1416.4 rounds to 1416: sizes compare in whole pixels.
     let near = viewed((1416.4, 963.0)).render(Some(&viewed((1416.0, 963.0))));
     assert!(!near.contains("the Scene view is"), "{near}");
     assert!(

@@ -75,6 +75,8 @@ fn replays(demos: &[PathBuf], dir: &Path, stem: &str, report: &mut Report) -> Re
     Ok(())
 }
 
+/// Regenerates into the same path, the first moved aside: a project's own path is written
+/// into some of its files.
 fn deterministic(game: &Game, out: &Path, params: &Params) -> Result<bool, String> {
     generate(game, out, params)?;
     let first = tree::beside(out, "first")?;

@@ -13,6 +13,7 @@ impl Folded {
         if frames.is_empty() || count == 0 {
             return;
         }
+        // A `;` inside a name would split it: folded stacks have no escape.
         let clean: Vec<String> = frames.iter().map(|f| f.replace(';', ",")).collect();
         *self.0.entry(clean.join(";")).or_default() += count;
     }
@@ -43,6 +44,7 @@ impl Folded {
             if let Some(leaf) = frames.last() {
                 *own.entry(leaf).or_default() += n;
             }
+            // A set: a recursive function counts once a sample in total time.
             for f in frames.into_iter().collect::<BTreeSet<_>>() {
                 *total.entry(f).or_default() += n;
             }

@@ -27,6 +27,8 @@ pub struct RenderedFrame {
     pub gpu: Option<GpuTimes>,
 }
 
+/// Holds a slot of the headless budget (`render::setup::budget`) while its renderer
+/// lives: own one per batch of work, never one per process.
 #[derive(Default)]
 pub struct CaptureHost {
     renderer: Option<Renderer>,
@@ -66,6 +68,8 @@ impl CaptureHost {
         if !self.probed {
             self.probed = true;
             let (width, height) = (width.max(1), height.max(1));
+            // Built at the first shot's size; later sizes work because the offscreen path reads
+            // no size off the renderer's `config`.
             self.renderer = pollster::block_on(Renderer::new_headless(width, height));
             if let Some(r) = self.renderer.as_mut() {
                 r.time_stages(true);
