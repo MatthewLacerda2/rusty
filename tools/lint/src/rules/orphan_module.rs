@@ -150,7 +150,7 @@ fn reach(base: &Path, scan: &Scan, roots: BTreeSet<String>) -> BTreeSet<String> 
             match r {
                 Reach::Module { path, mod_rs } => queue.push((path, mod_rs)),
                 Reach::Included(path) => {
-                    // Read as text, never parsed: a module it also is, its `mod` reaches.
+                    // Read, never parsed: if it is also a module, its own `mod` reaches it.
                     reached.insert(path);
                 }
             }
