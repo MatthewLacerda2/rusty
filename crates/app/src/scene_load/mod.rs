@@ -22,6 +22,7 @@ use super::probe::{timed, LoadProbe};
 use super::resources::Resources;
 use super::world::World;
 
+/// The scene file editor Play started in, put back on Stop after a play-mode `Scene.Load`.
 pub struct PlayOrigin {
     path: Option<String>,
 }
@@ -133,7 +134,8 @@ fn activate(
         let mut scene = world.scene.borrow_mut();
         let physics = timed(probe, "physics", || PhysicsWorld::from_scene(&scene));
         *res.physics.borrow_mut() = Some(physics);
-        // Restored from the new scene's saved navmesh, or prepare's bake, or baked once.
+        // Restored from the new scene's saved navmesh, or prepare's bake, or baked once:
+        // the next tick only syncs.
         let mut nav = res.nav.borrow_mut();
         timed(probe, "navmesh", || {
             nav.start_tracked_with(&mut scene, baked.as_deref())

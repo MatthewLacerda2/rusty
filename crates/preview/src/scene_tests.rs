@@ -36,6 +36,8 @@ f 1//1 2//1 3//1
 f 1//1 3//1 4//1
 ";
 
+/// Two parts over x 8..12, neither at the union centre: each recentred alone,
+/// they stack.
 const TWO_PART_OBJ: &str = "\
 o Left
 v 8.0 -1.0 -1.0
@@ -64,7 +66,6 @@ fn subject(scene: &Scene, id: u32) -> u32 {
     scene.world.ancestors(id).last().unwrap_or(id)
 }
 
-/// The spawned position of the scene's single mesh entity's subject.
 fn mesh_position(scene: &Scene) -> Vec3 {
     let id = subject(scene, scene.world.ids_with_mesh()[0]);
     scene.world.transform(id).unwrap().position

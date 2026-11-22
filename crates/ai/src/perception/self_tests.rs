@@ -50,6 +50,8 @@ fn its_own_noise_and_hits_are_not_recorded_and_the_dead_are_no_target() {
         assert_eq!(hit, None, "{own}");
     }
     assert!(a.updates().is_empty());
+    // Despawned in edit mode, so no Play teardown runs; Play entry then
+    // empties the memory, empty here already.
     a.scene.set_playing(false);
     a.scene.destroy_entity(player);
     a.scene.set_playing(true);

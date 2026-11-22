@@ -12,6 +12,7 @@ use rusty_physics::{is_hittable, PhysicsWorld};
 use rusty_scene::{game_camera_from_scene, layer_in_mask, Scene};
 
 pub(super) fn register(app: &mut App) {
+    // `Startup` follows the scripts' `Start`, which may have changed a source's flags.
     app.add_system(Stage::Startup, start_play_on_start);
     app.add_system(Stage::LateUpdate, activity::follow_activity);
     app.add_system(Stage::LateUpdate, advance_mixer);
@@ -20,6 +21,8 @@ pub(super) fn register(app: &mut App) {
 }
 
 impl super::GameWorld {
+    /// Run by the tick and a paused frame, never a system: no device is threaded through
+    /// a deterministic stage.
     pub fn push_audio(&self, seconds: f32) {
         let res = &self.resources;
         let (scene, time) = (&self.world.scene, &res.time);
@@ -32,7 +35,7 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
     let listener = game_camera_from_scene(&res.camera.borrow(), &scene).position;
     let mut ids = scene.world.ids_with_reverb_zone();
     ids.retain(|&id| scene.world.is_active_in_hierarchy(id));
-    ids.sort_unstable();
+    ids.sort_unstable(); // `blend` sums in this order
     let zones: Vec<_> = ids
         .iter()
         .filter_map(|&id| {
@@ -66,6 +69,7 @@ pub(super) fn occluder(
         let Some(physics) = physics.as_ref() else {
             return false;
         };
+        // The source and its ancestors: a voice on a character's child is not hidden by its body.
         let skip: Vec<u32> = std::iter::successors(ignore, |&id| scene.world.parent_id(id))
             .take(64)
             .collect();
@@ -77,6 +81,7 @@ pub(super) fn occluder(
     })
 }
 
+/// On unscaled sim time, not the wall clock, so a replay reads back the same mix.
 fn advance_mixer(_world: &mut World, res: &mut Resources) {
     let now = res.time.borrow().unscaled_time;
     res.audio.borrow_mut().advance_mixer(now);
@@ -86,6 +91,7 @@ fn start_play_on_start(world: &mut World, res: &mut Resources) {
     start_sources(world, res, |_| true);
 }
 
+/// `admit` passes the whole scene at Play, only the incoming entities after a scene load.
 pub(super) fn start_sources(world: &World, res: &Resources, admit: impl Fn(u32) -> bool) {
     type Row = (u32, rusty_components::AudioSourceComponent, [f32; 3]);
     let rows: Vec<Row> = {

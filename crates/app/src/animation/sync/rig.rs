@@ -14,6 +14,8 @@ pub fn walk_marks() -> Vec<SyncMarker> {
     marks(&[("FootL", 0.0), ("FootR", 0.5)])
 }
 
+/// Each foot 0.15 of a cycle later than Walk's (0.09 and 0.39 of 0.6 s), so marker sync and
+/// normalized sync differ.
 pub fn run_marks() -> Vec<SyncMarker> {
     marks(&[("FootL", 0.09), ("FootR", 0.39)])
 }
@@ -27,6 +29,7 @@ pub fn marks(list: &[(&str, f32)]) -> Vec<SyncMarker> {
         .collect()
 }
 
+/// Each clip keys its own joint, so a joint's x says which clip posed it.
 pub fn rig_mesh() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 1.0, WALK),
@@ -35,6 +38,7 @@ pub fn rig_mesh() -> MeshComponent {
     ])
 }
 
+/// Run keys the hips too, so root motion reads both clips while the leg reads Run alone.
 pub fn hips_mesh() -> MeshComponent {
     mesh(vec![
         slide("Walk", &[HIPS], 0.0, 1.0, WALK),

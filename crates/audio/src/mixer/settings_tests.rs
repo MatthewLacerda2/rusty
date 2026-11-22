@@ -33,6 +33,7 @@ fn lerp_hits_both_ends_and_sweeps_cutoff_in_octaves() {
     assert_eq!(from.lerp(&to, 0.0).volume, 1.0);
     let half = from.lerp(&to, 0.5);
     assert_eq!(half.volume, 0.5);
+    // Two octaves down at the end, so one halfway.
     assert!((half.low_pass.cutoff - LOW_PASS_OFF / 2.0).abs() < 1.0);
     assert_eq!(half.low_pass.resonance, 0.25);
     let end = from.lerp(&to, 1.0);

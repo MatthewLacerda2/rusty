@@ -19,7 +19,6 @@ pub use game::{GameWorld, PlayTransition};
 pub use probe::{timed, LoadProbe, SystemProbe};
 pub use registry::{build, App};
 pub use resources::Resources;
-/// Test hook: the fixture project every entry point's test opens.
 #[doc(hidden)]
 pub use scene_load::project_fixture;
 pub use scene_load::{

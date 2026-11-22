@@ -85,6 +85,8 @@ fn a_nested_tree_plays_the_pose_of_its_hand_flattened_leaves() {
         let mut anim = animator(Motion::Tree("Loco"), None, phase);
         for values in SWEEP {
             set(&mut anim, values);
+            // Every clip is linear in x: the blend is the weighted mean of the leaves' x at the
+            // phase.
             let want: f32 = flattened(&anim)
                 .iter()
                 .map(|&(clip, w)| w * CLIPS.iter().find(|c| c.0 == clip).unwrap().1 * phase)

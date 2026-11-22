@@ -71,6 +71,7 @@ fn co_located_source_is_centred() {
 
 #[test]
 fn listener_rotation_rotates_the_pan_axis() {
+    // Turned 180° about Y, its right is -X: a source at +X sits on its left.
     let listener =
         Listener::from_transform(Vec3::ZERO, Quat::from_rotation_y(std::f32::consts::PI));
     let r = spatial::resolve(&listener, Vec3::new(3.0, 0.0, 0.0), 1.0, 1.0, 100.0, 200.0);

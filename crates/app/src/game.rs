@@ -78,6 +78,7 @@ impl GameWorld {
         &self.resources.script_manager
     }
 
+    /// The host's ask, acted on at the next transition; being in Play is `Scene::is_playing`.
     pub fn play_requested(&self) -> bool {
         self.resources.application.borrow().host_play()
     }
@@ -115,7 +116,8 @@ impl GameWorld {
         transition
     }
 
-    /// Process only the play-state transition, without advancing the sim.
+    /// Process only the play-state transition, without advancing the sim. Re-reads the
+    /// UI's texture sizes only when entering Play: outside Play, `edit_frame` does.
     pub fn poll_transition(&mut self) -> PlayTransition {
         let transition = self.transition_tapped();
         self.tap(TapPoint::AfterPoll);
@@ -180,7 +182,6 @@ impl GameWorld {
             audio.stop_all();
             audio.clear_log();
         }
-        // A standalone run has no edit mode to return to.
         if !self.resources.application.borrow().standalone() {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
@@ -191,8 +192,6 @@ impl GameWorld {
             .console
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
-        // ALL `Awake`s, then ALL `Start`s, actives only: a disabled-at-load entity
-        // defers both until its first active tick.
         let started = timed(probe, "scripts", || {
             let init = self.resources.script_manager.init_runtime();
             let ok = self.report_lua_init(init);
@@ -204,6 +203,7 @@ impl GameWorld {
         if !started {
             return false;
         }
+        // After `Start`, so the rapier world holds what the scripts set up.
         timed(probe, "physics", || self.build_physics());
         timed(probe, "startup", || self.run_startup_stage());
         true

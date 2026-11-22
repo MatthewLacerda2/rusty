@@ -30,6 +30,8 @@ fn plants(graph: &AnimationGraph, anim: &mut AnimatorComponent, steps: usize) ->
 #[test]
 fn a_following_motion_fires_each_crossing_once() {
     let graph = planted();
+    // Walk at FootL puts Run at 0.09; through the 0.5 s fade Walk reaches FootR and Run its 0.39,
+    // crossing Plant once.
     let mut anim = into_run(&graph, 0.0, 0.5);
     assert_eq!(plants(&graph, &mut anim, 30), 1);
     assert!(!anim.base.is_crossfading());

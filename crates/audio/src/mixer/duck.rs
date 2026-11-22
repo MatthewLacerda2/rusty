@@ -8,8 +8,11 @@ pub struct Duck {
     pub target: GroupId,
     /// The target's gain at full duck, linear in `[0, 1]`.
     pub volume: f32,
+    /// Seconds to full duck once the trigger plays.
     pub attack: f32,
+    /// Seconds to recover once it falls silent.
     pub release: f32,
+    /// How far ducked now: `0` untouched, `1` fully.
     pub level: f32,
 }
 

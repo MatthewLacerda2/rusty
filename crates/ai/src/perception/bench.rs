@@ -7,7 +7,8 @@ use rusty_components::AIPerceptionComponent;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// The layer the perceivers' bodies stand on.
+/// The bots' layer, not `PLAYER`'s: a `sight_mask` of the target's layer alone
+/// skips the other 29 bots.
 const BOT: u8 = 4;
 
 /// The bench level with 30 perceivers in a 6 × 5 grid of rooms, each a 1.8 m

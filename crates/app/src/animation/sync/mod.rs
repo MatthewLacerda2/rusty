@@ -17,6 +17,8 @@ pub(super) use place::place_pending;
 pub(super) struct Lead<'a> {
     pub clip: &'a AnimationClip,
     pub markers: &'a [SyncMarker],
+    /// The playhead is a tree's normalized phase (one unit is the clip's length), else clip
+    /// seconds.
     pub tree: bool,
 }
 
@@ -124,6 +126,7 @@ impl MotionContext<'_> {
     }
 
     pub(super) fn tree_sync(&self, node: &str, phase: f32, looping: bool) -> Option<TreeSync<'_>> {
+        // Checked first: a tree without markers pays no leader search.
         if !self.marker_synced(node) {
             return None;
         }

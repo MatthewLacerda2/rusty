@@ -18,6 +18,7 @@ use crate::mixer::effects::KeyLevel;
 use crate::mixer::settings::{HIGH_PASS_OFF, LOW_PASS_OFF};
 use crate::mixer::{Filter, GroupId, GroupMix};
 
+/// Voices one track (a group's, or kira's main) plays at once.
 pub const VOICES_PER_GROUP: usize = 256;
 
 /// A linear gain as kira decibels; `0` (and anything at or under −60 dB) is silence.
@@ -48,6 +49,8 @@ impl Effects for MainTrackBuilder {
 struct Strip {
     low_pass: FilterHandle,
     high_pass: FilterHandle,
+    /// Master's, before its rack; a group's volume is its track's, which kira applies
+    /// after the rack.
     volume: Option<VolumeControlHandle>,
     rack: RackHandle,
     wake: Wake,
@@ -86,6 +89,8 @@ impl Strip {
     }
 }
 
+/// On kira's main track: kira sums a send track only into the main track, so only there
+/// does Master's strip hold the reverb bus too.
 pub struct MasterStrip(Strip);
 
 impl MasterStrip {
@@ -168,8 +173,6 @@ impl GroupTracks {
         }
     }
 
-    /// Once a frame: let every rack drop what its audio thread handed back and
-    /// rebuild after a sample-rate change.
     pub fn maintain(&mut self) {
         let levels = &self.levels;
         let key = |g| levels.get(&g).cloned();

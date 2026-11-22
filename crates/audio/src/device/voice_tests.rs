@@ -66,6 +66,8 @@ fn a_voice_retuned_while_paused_resumes_on_its_new_mix() {
     use crate::backend::{AudioBackend, PlayParams, VoiceId};
     use crate::device::backend::backend_tests::{flat, rig};
     use crate::device::capture::RATE;
+    // Whole kira blocks (the backend's `internal_buffer_size`): no frame rendered
+    // under an earlier mix stays buffered.
     const BLOCK: usize = 128;
     let mut b = rig(&[0.5]);
     let params = PlayParams {
@@ -88,8 +90,8 @@ fn a_voice_retuned_while_paused_resumes_on_its_new_mix() {
     b.set_mix(VoiceId(1), &new);
     let first = b.device().render(1)[0];
     let a = LowPass::coefficient(800.0, 1.0 / f64::from(RATE));
-    // The filter's state followed the dry (0.5, 0.5) while open, as it always has,
-    // so the closed filter starts from there; the pan sends it 0 on the right.
+    // The filter's state followed the dry (0.5, 0.5) while open, so
+    // the closed filter starts from there; the pan sends it 0 on the right.
     let mut filter = LowPass::default();
     filter.process(None, (0.5, 0.5));
     let (l, r) = filter.process(a, (0.5, 0.0));

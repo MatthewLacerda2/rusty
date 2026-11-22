@@ -13,6 +13,7 @@ use super::super::{Resources, World};
 
 #[derive(Default)]
 pub struct GraphCache {
+    /// `None` records a failed load, so its error is logged once, not every step.
     loaded: BTreeMap<String, Option<AnimationGraph>>,
 }
 
@@ -41,6 +42,7 @@ impl GraphCache {
         self.loaded.get(path).and_then(Option::as_ref)
     }
 
+    /// Emptied on each Play enter (`enter_play_steps`), so a session sees edits to the graph files.
     pub fn clear(&mut self) {
         self.loaded.clear();
     }
@@ -97,6 +99,7 @@ pub(crate) fn step_graph(anim: &mut AnimatorComponent, graph: &AnimationGraph) {
         }
         fired.push(edge);
     }
+    // After every layer decided: one trigger fires a transition in each layer that reads it.
     for edge in fired {
         consume_edge_triggers(anim, edge);
     }

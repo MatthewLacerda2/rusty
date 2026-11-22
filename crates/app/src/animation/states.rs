@@ -29,6 +29,7 @@ pub fn state_callbacks(
     tracker.layers.resize(tracked, Vec::new());
     let mut out = Vec::new();
     for (layer, prior) in tracker.layers.iter_mut().enumerate() {
+        // The travel `MotionContext::advance` left in `states.travel`, taken so it counts once.
         let moved = playback_mut(anim, layer).map_or(0.0, |p| std::mem::take(&mut p.states.travel));
         let ctx = MotionContext {
             clips,
@@ -126,6 +127,7 @@ fn layer_name(anim: &AnimatorComponent, layer: usize) -> String {
     }
 }
 
+/// The node a crossfade leaves first, then the current one: the order the callbacks report.
 fn actives(playback: &Playback) -> Vec<Active<'_>> {
     let mut out = Vec::with_capacity(2);
     let leaving = playback.states.previous_node.as_deref();
@@ -150,6 +152,8 @@ fn actives(playback: &Playback) -> Vec<Active<'_>> {
     out
 }
 
+/// A non-looping playhead's change once clamped, so its state holds at `normalized_time` 1;
+/// the events read the raw span, which runs on past the end.
 pub(super) fn clamped_travel(bounds: Bounds, step: Step) -> f32 {
     let (from, to) = step.span;
     match bounds {
@@ -158,6 +162,7 @@ pub(super) fn clamped_travel(bounds: Bounds, step: Step) -> f32 {
     }
 }
 
+/// `total` is the playhead unwrapped since entry: seconds for a clip, cycles for a tree.
 fn timing(ctx: &MotionContext<'_>, motion: Motion<'_>, total: f32) -> StateInfo {
     let playhead = ctx.playhead(motion);
     let finite = |x: f32| if x.is_finite() { x } else { 0.0 };

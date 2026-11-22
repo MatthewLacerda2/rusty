@@ -8,9 +8,8 @@ use rusty_scene::{LightComponent, LightType, Scene};
 
 use crate::stand_in;
 
-/// The bundled preview mesh: a hardcoded `.obj`, never a project asset — it
-/// lives in the engine's own content (`engine/`, found from any project), never in
-/// the project's `assets/`, so it is never listed as a project asset.
+/// In the engine's own content (`engine/`), not the project's `assets/`, so it is
+/// never listed as a project asset.
 fn suzanne_path() -> String {
     rusty_core::project::engine_path("models/suzanne.obj")
 }
@@ -30,6 +29,8 @@ rusty_core::named_enum! {
 pub enum PreviewSubject {
     Model(String),
     Texture(String),
+    /// Drawn with the default material;
+    /// `shell::editor::viewport::render_preview_scene` swaps in this shader.
     Shader(String),
     Material(Box<MaterialAsset>),
 }
@@ -79,8 +80,6 @@ pub fn build_preview_scene(
     Ok(scene)
 }
 
-/// A single hardcoded directional light, posed for what is `shown`
-/// ([`stand_in::light_pose`]).
 fn add_key_light(scene: &mut Scene, shown: Option<PreviewMesh>) {
     let id = scene.add_entity("PreviewLight".to_string());
     if let Some(mut transform) = scene.world.transform_mut(id) {
@@ -97,7 +96,7 @@ fn add_key_light(scene: &mut Scene, shown: Option<PreviewMesh>) {
             inner_cone: 0.0,
             outer_cone: 0.0,
             cast_shadows: false,
-            // A preview is never baked: drawn live, as before `Baked` was the default.
+            // A preview is never baked: its light is drawn live.
             mode: LightMode::Mixed,
             shadow_fade_distance: 0.0,
         }),
@@ -187,8 +186,11 @@ fn spawn_fitted(
     ids
 }
 
+/// Metres: a unit cube's bounding radius, so a model that size keeps it.
 const FIT_RADIUS: f32 = 0.866_025_4;
 
+/// Scales the subject, not the camera, which close to a 1 cm model would clip it
+/// with its near plane.
 fn fit_scale(min: Vec3, max: Vec3) -> f32 {
     let radius = (max - min).length() * 0.5;
     if radius > f32::EPSILON && radius.is_finite() {

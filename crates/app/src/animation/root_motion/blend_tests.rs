@@ -76,6 +76,8 @@ fn a_blend_tree_travels_its_clips_weighted_stride() {
     let mut anim = animator(Motion::Tree("Loco"), None, 0.0);
     anim.base.loop_clip = true;
     anim.set_float("speed", 4.0);
+    // Half walk, half run over the blended 1.5 s cycle: (0.5·2 + 0.5·6) m a cycle,
+    // so 4/1.5 m in one second.
     let travelled = steps_with(&mut anim, &mesh, &g);
     assert!((travelled - 4.0 / 1.5).abs() < 1e-3, "{travelled}");
 }

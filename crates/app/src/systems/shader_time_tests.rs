@@ -7,7 +7,7 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-const DT: f32 = 0.25;
+const DT: f32 = 0.25; // seconds: a binary fraction, so the clocks compare exactly
 
 fn world() -> GameWorld {
     GameWorld::new(

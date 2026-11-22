@@ -6,6 +6,7 @@ use super::*;
 use rusty_asset::animation_graph::{AnimationEvent, BlendTree, ChildMotion};
 use rusty_components::Motion;
 
+/// Mostly forward, a little right (`vx`, `vy`), halfway between walking and running (`speed`).
 const FORWARD_RIGHT: [f32; 3] = [0.4, 0.6, 4.0];
 
 fn with_right_steps(graph: &mut AnimationGraph) {

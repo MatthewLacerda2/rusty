@@ -13,6 +13,7 @@ const DT: f32 = 1.0 / 60.0;
 
 fn world_with_a_player() -> GameWorld {
     let mut scene = Scene::new();
+    // Named `Player`, so a camera snap keyed on an entity's name would show.
     let id = scene.add_entity("Player".to_string());
     scene.world.transform_mut(id).unwrap().position = Vec3::new(2.0, 0.0, 3.0);
     let gw = GameWorld::new(

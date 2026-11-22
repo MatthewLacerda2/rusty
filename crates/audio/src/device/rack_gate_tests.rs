@@ -55,6 +55,7 @@ fn one_ring_wakes_every_gate_that_shares_it() {
     run(&mut b, 0.0, HANG + 0.1);
     wake.ring();
     let (ha_level, hb_level) = (ha.level(), hb.level());
+    // A sentinel: awake, an empty rack publishes this block's peak; asleep, it keeps it.
     ha_level.set(9.0);
     hb_level.set(9.0);
     run(&mut a, 0.0, 0.01);
@@ -72,6 +73,7 @@ fn a_delay_echo_plays_after_a_silence_and_not_into_the_next_sound() {
     let after = run(&mut fx, 0.0, 2.9);
     let echo = &after[(1.9 * f64::from(RATE)) as usize..(2.0 * f64::from(RATE)) as usize];
     assert!(peak(echo) > 0.49, "the echo at 2 s: {}", peak(echo));
+    // The line empties and the gate sleeps.
     run(&mut fx, 0.0, 3.0);
     let next = run(&mut fx, 0.5, 0.1);
     assert!(
