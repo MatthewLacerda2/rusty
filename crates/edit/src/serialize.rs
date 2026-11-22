@@ -64,7 +64,8 @@ pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
     apply_rehydrated(scene, RehydratedScene::new(data));
 }
 
-pub fn apply_rehydrated(scene: &mut Scene, document: RehydratedScene) {
+pub fn apply_rehydrated(scene: &mut Scene, mut document: RehydratedScene) {
+    drop_dead_lightmaps(document.data_mut());
     apply(scene, document, true);
 }
 
@@ -103,9 +104,6 @@ fn drop_old_world(scene: &mut Scene) {
 fn apply(scene: &mut Scene, document: RehydratedScene, from_disk: bool) {
     let (mut data, read_at, mut imports) = document.into_parts();
     scene.meshes_read_at = read_at;
-    if from_disk {
-        drop_dead_lightmaps(&mut data);
-    }
 
     take_materials(scene, &mut data);
     rusty_scene::mesh_library::put_back(std::mem::take(&mut data.meshes), &mut scene.meshes);
