@@ -35,19 +35,19 @@ fn a_chunk_reaching_for_a_withheld_library_at_load_is_not_offered_and_says_why()
         let why = offered("a.lua", &format!("local _ = {lib}.x\n{LIFECYCLE}")).unwrap_err();
         assert!(why.contains("attempt to index a nil value"), "{why}");
     }
-    let inside_start = "return { Start = function() os.remove('x') end }";
+    let inside_start = "return { Start = function() os.getenv('x') end }";
     assert_eq!(offered("a.lua", inside_start), Ok(true));
 }
 
 #[test]
 fn a_script_reaching_for_os_at_load_has_no_fields() {
-    let code = "os.remove('x')\nreturn { fields = { speed = 2 } }";
+    let code = "os.getenv('x')\nreturn { fields = { speed = 2 } }";
     assert!(read_fields(Path::new(""), "a.lua", code).is_err());
 }
 
 #[test]
 fn an_error_names_the_script_and_its_line() {
-    let code = "local a = 1\n\nos.remove('x')\nreturn {}";
+    let code = "local a = 1\n\nos.getenv('x')\nreturn {}";
     let why = offered("assets/scripts/bad.lua", code).unwrap_err();
     assert!(why.contains("assets/scripts/bad.lua:3:"), "{why}");
     let why = read_fields(Path::new(""), "assets/scripts/bad.lua", code).unwrap_err();
@@ -57,17 +57,20 @@ fn an_error_names_the_script_and_its_line() {
     );
 }
 
+/// Held against a plain VM seeded 0, not a second inspection: two VMs built in a row share
+/// the clock's second and often an address, so an unseeded draw could repeat.
 #[test]
 fn a_field_default_drawn_from_math_random_is_the_same_every_run() {
     let code = "math.randomseed()\nreturn { fields = { a = math.random(1, 1000000), \
                 b = math.random() } }";
-    let defaults = || -> Vec<ScriptFieldValue> {
-        let fields = read_fields(Path::new(""), "r.lua", code).unwrap();
-        fields.into_iter().map(|f| f.default).collect()
-    };
-    let first = defaults();
-    assert_eq!(first.len(), 2);
-    assert_eq!(first, defaults());
+    let fields = read_fields(Path::new(""), "r.lua", code).unwrap();
+    let defaults: Vec<_> = fields.into_iter().map(|f| f.default).collect();
+    let (a, b): (f64, f64) = mlua::Lua::new()
+        .load("math.randomseed(0)\nreturn math.random(1, 1000000), math.random()")
+        .eval()
+        .unwrap();
+    let pinned = [ScriptFieldValue::Number(a), ScriptFieldValue::Number(b)];
+    assert_eq!(defaults, pinned);
 }
 
 #[test]
