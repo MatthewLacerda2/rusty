@@ -1,5 +1,3 @@
-//! crates/ui/src/text/rich.rs — the rich-text tag subset → styled characters.
-
 use glam::Vec4;
 
 /// The style of one character.

@@ -1,5 +1,3 @@
-//! crates/shell/src/editor/capture/viewport.rs — the capture's Scene/Game viewport.
-
 use std::rc::Rc;
 
 use rusty_app::GameWorld;

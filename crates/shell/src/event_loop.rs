@@ -1,5 +1,3 @@
-//! crates/shell/src/event_loop.rs — the winit application handler both frontends run under.
-
 use std::sync::Arc;
 
 use winit::application::ApplicationHandler;
@@ -14,18 +12,17 @@ use rusty_render::Renderer;
 
 /// Everything a frontend decides before the window exists.
 pub struct Launch<M> {
-    /// The window title.
     pub title: String,
+    /// Linux's desktop identity: the desktop matches it to a `.desktop` entry for the dock
+    /// icon.
     pub app_id: Option<&'static str>,
     /// Whether the window opens filling the screen (the editor) or at its size.
     pub maximized: bool,
     /// What a first launch (no saved video settings) gets.
     pub video_defaults: VideoSettings,
-    /// Builds the frontend once the shell is up.
     pub frontend: M,
 }
 
-/// The loop's state: the launch until the shell starts, then the running shell.
 pub(super) struct App<F, M> {
     game: GameWorld,
     launch: Option<Launch<M>>,
@@ -107,6 +104,7 @@ where
         super::handle_window_event(&event, event_loop, shell, &mut self.game, frontend);
         if !matches!(event, WindowEvent::RedrawRequested) {
             shell.pacer.activity();
+            // Directly as well: macOS runs no `about_to_wait` during a live resize.
             shell.window.request_redraw();
         }
     }
@@ -141,11 +139,13 @@ where
     }
 
     /// Quit boundary: persist the store however the loop is exiting (window close,
-    /// `Application.Quit`). A no-op when the store is pathless.
+    /// `Application.Quit`).
     fn exiting(&mut self, _: &ActiveEventLoop) {
         if let Some((_, frontend)) = self.running.as_mut() {
             frontend.before_exit(&mut self.game);
         }
+        // Only once `settings::load` seeded the cells: before, their defaults would overwrite
+        // the saved settings.
         if self.running.is_some() {
             settings::persist(&self.game);
         }

@@ -1,7 +1,3 @@
-//! crates/shell/src/editor/paint.rs — finishing the egui frame (tessellate, upload textures,
-//! paint over the swapchain), the frame's edits settled, and the dev-only console
-//! REPL drain.
-
 use std::time::Duration;
 
 use super::EditorFrontend;
@@ -10,6 +6,7 @@ use rusty_app::GameWorld;
 use rusty_editor::EditorUi;
 use rusty_render::Renderer;
 
+/// No dithering, which egui-wgpu turns on by default: an undithered capture stays byte-stable.
 pub(in crate::editor) const EGUI_RENDERER: egui_wgpu::RendererOptions =
     egui_wgpu::RendererOptions {
         msaa_samples: 1,
@@ -115,6 +112,7 @@ pub(super) fn drain_repl(editor_ui: &mut EditorUi, game: &GameWorld) {
             &game.resources.console,
             &line,
         );
+        // Outside Play a line may have moved static geometry: the scene is dirty.
         editor_ui.is_dirty |= !game.scene().borrow().is_playing();
     }
 }
@@ -142,7 +140,7 @@ mod tests {
             journal.borrow_mut().take().is_empty(),
             "edit mode: no taint"
         );
-        h.step(1);
+        h.step(1); // enters Play
         ui.is_dirty = true;
         assert!(take_edits(&mut ui, &h.world.borrow()));
         let acts = journal.borrow_mut().take();

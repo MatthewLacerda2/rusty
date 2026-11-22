@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/ribbons/line.rs — the Line card.
-
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
 use rusty_edit::authoring::ComponentKind;
@@ -23,7 +21,7 @@ fn write(
     *dirty = true;
 }
 
-/// 3FL. Line Renderer card: world space, loop, the point list, and the shared
+/// Line Renderer card: world space, loop, the point list, and the shared
 /// Style section.
 pub fn draw_line(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, dirty: &mut bool) {
     let Some(l) = world.line(id).map(|l| l.clone()) else {

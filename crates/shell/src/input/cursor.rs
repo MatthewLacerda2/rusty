@@ -1,5 +1,3 @@
-//! crates/shell/src/input/cursor.rs — applying the game's cursor request to the OS cursor.
-
 use rusty_core::input::CursorState;
 
 /// What the platform last did with the OS cursor.
@@ -10,7 +8,7 @@ pub struct CursorPolicy {
 
 impl CursorPolicy {
     /// The cursor the window should have: the game's request while it has input,
-    /// otherwise a free, visible cursor.
+    /// otherwise a free, visible one, so a script never traps the editor's pointer.
     pub fn effective(requested: CursorState, game_has_input: bool) -> CursorState {
         if game_has_input {
             requested
@@ -37,7 +35,8 @@ impl CursorPolicy {
 }
 
 /// Apply a cursor state to the window. A lock prefers `Locked` (the pointer stays
-/// put, raw motion keeps flowing — macOS/Wayland) and falls back to `Confined`
+/// put, raw motion keeps flowing — macOS/Wayland) and falls back to `Confined` where it is
+/// refused (X11).
 fn apply(cursor: CursorState, window: &winit::window::Window) {
     use winit::window::CursorGrabMode;
     if cursor.locked {

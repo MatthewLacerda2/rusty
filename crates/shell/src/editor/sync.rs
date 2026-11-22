@@ -1,8 +1,3 @@
-//! crates/shell/src/editor/sync.rs — the settings the editor's menus share with the game:
-//! the quality preset, the speaker mode, the Scene view's gizmos and the Game view's
-//! size, each read and written both ways, and the frame stats the Game view's Stats
-//! overlay shows.
-
 use super::EditorFrontend;
 use crate::Shell;
 use rusty_app::GameWorld;
@@ -10,6 +5,8 @@ use rusty_core::application::Application;
 use rusty_editor::viewport::stats::{Clock, Readout};
 use rusty_editor::EditorUi;
 
+/// What scripts may ask of this window, marked before its first frame drains a command,
+/// drawn or not. Each mark only turns on.
 pub(super) fn mark_host(app: &mut Application) {
     app.mark_gizmo_viewer();
     app.mark_game_view_host();
@@ -49,7 +46,8 @@ impl EditorFrontend {
         self.editor_ui.speaker_mode = audio.speaker_mode();
     }
 
-    /// The Scene view's gizmos: take what a script's `Editor.SetGizmo`
+    /// The Scene view's gizmos: take what a script's `Editor.SetGizmo` asked, then mirror
+    /// the toggles back for `Editor.GetGizmo`.
     fn sync_gizmos(&mut self, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
         app.sync_gizmos(&mut self.editor_ui.gizmos);

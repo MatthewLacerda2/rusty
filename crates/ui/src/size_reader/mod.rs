@@ -15,8 +15,8 @@ use rusty_ecs::World;
 pub struct TextureSizeReader {
     freshness: Freshness,
     measured: BTreeMap<MapRef, u64>,
-    /// Refreshes so far.
     refreshes: u64,
+    /// `sizes.edits()` as the last refresh left it; another count means a hand edit since.
     left_at: Option<u64>,
     /// Refreshes that went past the idle check (tests).
     #[cfg(test)]
@@ -29,8 +29,8 @@ impl TextureSizeReader {
         Self::default()
     }
 
-    /// Bring `sizes` up to date with `world`'s Images and the files on disk (see the
-    /// module docs). Touches the shared table only when something changed.
+    /// Bring `sizes` up to date with `world`'s Images and the files on disk. Touches the
+    /// shared table only when something changed.
     pub fn refresh(&mut self, world: &World, sizes: &mut Rc<TextureSizes>) {
         let changes = self.freshness.poll_with(texture_ref::exists);
         let scene_changed = self.scan(world);
@@ -55,6 +55,8 @@ impl TextureSizeReader {
                 .any(|map| texture_ref::is_written(stale, map.as_str()))
     }
 
+    /// Headers are read before the table is touched, so a sweep whose reads all fail copies
+    /// nothing.
     fn sweep(&mut self, stale: Stale, sizes: &mut Rc<TextureSizes>) {
         let measured = &self.measured;
         let is_stale = |p: &str| texture_ref::is_written(&stale, p);
@@ -89,8 +91,7 @@ impl TextureSizeReader {
         }
     }
 
-    /// Mark every path `world`'s Images measure by as seen this refresh. Returns
-    /// whether the set changed: a path is new, or one is no longer used.
+    /// Mark every path `world`'s Images measure by as seen; returns whether the set changed.
     fn scan(&mut self, world: &World) -> bool {
         self.refreshes += 1;
         let (now, measured) = (self.refreshes, &mut self.measured);
@@ -113,7 +114,6 @@ impl TextureSizeReader {
     }
 }
 
-/// The texture `img` measures by, if it measures by one on disk.
 fn measured_map(img: &ImageComponent) -> Option<&MapRef> {
     let by_texture = matches!(img.image_type, ImageType::Simple | ImageType::Filled);
     let map = img.texture.as_ref().filter(|_| by_texture)?;

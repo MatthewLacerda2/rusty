@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/rect.rs — [`UiRect`]: one laid-out element.
-
 use glam::Vec2;
 
 /// One laid-out UI element (the canvas root included).

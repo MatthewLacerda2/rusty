@@ -1,6 +1,4 @@
-//! crates/editor/src/inspector/components/particles/widgets.rs — the card's labelled
-//! rows: clamped numbers, vectors, combos, `[min, max]` ranges, keyframe lists and
-//! colour gradients. The Trail and Line cards reuse them.
+//! The card's labelled rows, which the Trail and Line cards reuse.
 
 use crate::widgets::DragRange;
 use rusty_core::curve::{ColorKey, Curve, Gradient, Key, Range};

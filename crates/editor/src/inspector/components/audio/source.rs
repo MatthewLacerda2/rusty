@@ -8,7 +8,7 @@ use rusty_audio::mixer::DEFAULT_GROUPS;
 use rusty_edit::authoring::audio::source as audio_ops;
 use rusty_scene::AudioSourceComponent;
 
-/// 3F-audio. AudioSource component card. A THIN client: each widget reads the
+/// A THIN client: each widget reads the
 /// field from a snapshot and routes its write through a shared `authoring::audio::source::*`
 /// op (no mutable component borrow); remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {

@@ -1,5 +1,3 @@
-//! crates/ui/src/events/pointer.rs — the mouse half of the event system.
-
 use glam::Vec2;
 
 use super::tree::{ancestors_or_self, nearest};
@@ -11,7 +9,6 @@ use crate::space::ray_to_canvas;
 use crate::{CanvasSpace, UiPointer};
 use rusty_components::NavigationMode;
 
-/// What one button's step sees.
 struct Pointer {
     hit: Option<u32>,
     position: Option<Vec2>,
@@ -45,8 +42,7 @@ impl Pointer {
     }
 }
 
-/// Where `pointer` is on `entity`'s canvas, in its reference units (see
-/// [`PointerEvent::canvas_position`]).
+/// Where `pointer` is on `entity`'s canvas, in its reference units.
 fn canvas_point(f: &Frame, entity: u32, pointer: &UiPointer) -> Option<Vec2> {
     let rect = f.layout.get(entity)?;
     match f.layout.space(rect.canvas) {
@@ -56,7 +52,7 @@ fn canvas_point(f: &Frame, entity: u32, pointer: &UiPointer) -> Option<Vec2> {
 }
 
 impl EventSystem {
-    /// The pointer phase of [`EventSystem::process`].
+    /// Hover first: a pointer arriving and clicking in one tick reads enter, down, up, click.
     pub(super) fn process_pointer(&mut self, f: &Frame, out: &mut Vec<Delivery>) {
         let position = pointer_position(f);
         let delta = match (position, self.pointer) {
@@ -104,6 +100,7 @@ impl EventSystem {
         }
     }
 
+    /// A held press releases before a re-press; a press released within the tick releases after.
     fn process_button(
         &mut self,
         f: &Frame,
@@ -214,7 +211,6 @@ fn press_owner(f: &Frame, hit: u32) -> Option<u32> {
     })
 }
 
-/// Whether `id` handles any of `hooks`.
 fn handles(f: &Frame, id: u32, hooks: &[UiHook]) -> bool {
     hooks.iter().any(|&h| (f.handles)(id, h))
 }

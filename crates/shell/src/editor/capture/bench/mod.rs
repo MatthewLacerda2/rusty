@@ -1,6 +1,3 @@
-//! `make bench-scenes`' editor round: the editor's own costs on a
-//! project scene, which the game rounds never draw.
-
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -18,25 +15,26 @@ mod editor;
 
 use editor::Editor;
 
-/// What the round measures, and where its save goes.
 #[derive(Clone, Debug)]
 pub struct Round {
     pub size: (u32, u32),
     pub warmup: u32,
     pub frames: u32,
     pub runs: u32,
-    /// Build every lazy pipeline (the editor's overlays too) first, off the
-    /// clock, as the editor's window does.
+    /// Build every lazy pipeline (the editor's overlays too) first, off the clock, as the
+    /// editor's window does.
     pub warm: bool,
     /// The renderer's measurement switches, as the game rounds draw with
     /// (`dev::bench::scenes::Options::switches`).
     pub switches: rusty_render::RenderSwitches,
-    /// The folder the save writes into, outside the project; removed after.
+    /// The folder the save goes to, outside the project; removed after.
     pub save_dir: PathBuf,
 }
 
-/// The scene at `scene_path` (under the working directory, the project's root)
+/// The scene at `scene_path` (under the working directory, the project's root) in an
+/// edit-mode world.
 pub fn editor_world(scene_path: &str, settings: ProjectSettings) -> Result<GameWorld, String> {
+    // As the harness: Play's refresh compresses no texture into the project.
     rusty_asset::convert::mark_standalone();
     let (mut scene, mut console) = (Scene::new(), ConsoleLogs::new());
     let plan = BootPlan::of(scene_path);
@@ -92,7 +90,6 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
     Ok(Some(round))
 }
 
-/// One Play entry, one Stop and one save, each a single sample of the run.
 fn play_stop_save(
     editor: &mut Editor,
     game: &mut GameWorld,
@@ -106,6 +103,7 @@ fn play_stop_save(
     game.tick(dt);
     meter.single("play_enter_ms", ms_since(start));
     let rss_after = rusty_dev::memory::rss_now_bytes();
+    // First run only: a Stop's freed pages stay resident for the next Play.
     if let (Some(before), Some(after), true) = (rss_before, rss_after, meter.first_run()) {
         let grew = after.saturating_sub(before) as f64 / (1024.0 * 1024.0);
         meter.single("play_rss_mb", (grew * 10.0).round() / 10.0);
@@ -128,6 +126,8 @@ fn play_stop_save(
     Ok(())
 }
 
+/// A Ctrl+S, not a Save As: the bake files are copied beside `save` with the world's record,
+/// so the save keeps them.
 pub(super) fn stage_save(scene: &Scene, loaded: &str, save: &str) -> Result<(), String> {
     let beside = [
         rusty_scene::nav_settings::navmesh_path,

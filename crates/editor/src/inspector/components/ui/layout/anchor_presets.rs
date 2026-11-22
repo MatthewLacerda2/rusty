@@ -1,7 +1,7 @@
 //! The RectTransform card's anchor-preset picker: Unity's 4×4 grid in a
-//! popup. A click re-anchors without moving the element; held **Shift** also
-//! sets the pivot, held **Alt** also snaps the element onto its anchors. The cell
-//! is applied through `edit::authoring::ui::layout::rect_transform::apply_anchor_preset`, the
+//! popup. Every click goes through the op `RectTransform.SetAnchorPreset` calls: it
+//! re-anchors without moving the element; held **Shift** also sets the pivot, held
+//! **Alt** also snaps the element onto its anchors.
 
 use egui::{Rect, Sense, Stroke, StrokeKind};
 use rusty_components::RectTransformComponent;
@@ -89,7 +89,7 @@ fn cell(ui: &mut egui::Ui, x: AxisPreset, y: AxisPreset, on: bool) -> egui::Resp
         AxisPreset::Stretch => (-0.2, 1.2),
     };
     let ((x0, x1), (y0, y1)) = (span(x), span(y));
-    // y-up presets onto the y-down painter.
+    // Maps the y-up presets onto the y-down painter.
     let at = |u: f32, v: f32| inner.lerp_inside(egui::vec2(u, 1.0 - v));
     let bar = Rect::from_two_pos(at(x0, y0), at(x1, y1)).expand(1.5);
     p.rect_filled(bar, 0.0, colour);
