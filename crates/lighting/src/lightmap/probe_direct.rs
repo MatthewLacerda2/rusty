@@ -13,7 +13,8 @@ use super::trace::{arrival, Tracer, T_MIN};
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::Scene;
 
-/// On the channels the last bake recorded, never assigned here.
+/// Uses the channels the last bake recorded, never assigning any, so each light's occlusion
+/// lands on its own channel.
 pub fn probe_direct(scene: &Scene, positions: &[Vec3]) -> (Vec<Sh9>, Vec<Vec4>) {
     let mut statics = BakeScene::gather(scene, &|_, _| None);
     statics.use_recorded_channels(scene);

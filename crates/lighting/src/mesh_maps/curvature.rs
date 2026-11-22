@@ -9,10 +9,13 @@ use super::{Baked, MeshSource};
 use crate::lightmap::TexelPoint;
 use rusty_core::collections::Map;
 
+/// A share of the bounds diagonal, when the bake names no `curvature_radius`.
 pub const RADIUS: f32 = 0.02;
 
+/// Radians: a smaller dihedral is no crease (a quad's diagonal, float noise).
 const MIN_ANGLE: f32 = 1e-3;
 
+/// Normals whose dot is under `-1 + OPPOSITE` are a face and its reversed copy: no crease.
 const OPPOSITE: f32 = 1e-4;
 
 struct Crease {

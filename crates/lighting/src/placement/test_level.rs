@@ -5,6 +5,7 @@ use glam::Vec3;
 use rusty_components::{ColliderComponent, ColliderShape};
 use rusty_scene::Scene;
 
+// Metres.
 pub const WALL: f32 = 0.3;
 pub const WALL_HEIGHT: f32 = 4.0;
 pub const DOOR: f32 = 2.0;

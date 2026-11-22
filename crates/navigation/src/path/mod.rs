@@ -55,6 +55,7 @@ impl NavigationGraph {
         self.route_path((from, to), &spans, complete, mask)
     }
 
+    /// The path queue builds a sliced search's path with it too, so both kinds come out alike.
     pub(crate) fn route_path(
         &self,
         (from, to): (Vec3, Vec3),

@@ -13,6 +13,7 @@ pub struct BakeView {
     pub view_proj: Mat4,
 }
 
+/// World units off the texel, so its ray misses its own surface.
 const LIFT: f32 = 1e-3;
 
 impl BakeView {

@@ -4,12 +4,19 @@ use super::occupancy::Occupancy;
 use rusty_core::collections::Set;
 use rusty_scene::lighting::floor::FloorGrid;
 
+/// World units up a ray looks for a ceiling: past it is sky.
 const SKY_REACH: f32 = 60.0;
+/// The ring of up rays' tilt from vertical.
 const RING_TILT: f32 = std::f32::consts::FRAC_PI_6;
+/// Rays in the ring.
 const RING: usize = 8;
+/// Per unit of clutter: a room a quarter full takes probes four times as narrow as an empty one.
 pub const CLUTTER_GAIN: f32 = 12.0;
+/// World units a capture point keeps from geometry.
 pub const CAPTURE_CLEARANCE: f32 = 0.5;
+/// Metres over the floor clutter is measured in: a step to a head.
 const BODY: (f32, f32) = (0.4, 1.8);
+/// Square metres: a larger blocked patch is architecture, not clutter.
 pub const CLUTTER_PATCH: f32 = 16.0;
 
 pub fn open_to_sky(occ: &Occupancy, at: Vec3) -> bool {

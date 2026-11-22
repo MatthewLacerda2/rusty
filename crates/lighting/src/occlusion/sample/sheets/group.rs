@@ -2,6 +2,7 @@ use glam::Vec3;
 
 use super::{Member, Sheet, CLEAR};
 
+/// Relative to the largest coordinate a plane's faces reach: a few `f32` steps.
 const NOISE: f32 = 8.0 * f32::EPSILON;
 
 type Keyed = (([i64; 3], i64, u8), u32);

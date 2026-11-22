@@ -35,12 +35,14 @@ use direct::balance;
 use rusty_core::color::luminance;
 use sources::{Picks, Source, Sources};
 
+/// World units, against self-intersection.
 const SURFACE_OFFSET: f32 = 1e-3;
+/// World units.
 pub(super) const T_MIN: f32 = 1e-4;
 /// Cycles' *Clamp Indirect* default: a path is scaled down, hue kept, until its
 /// brightest channel is at most this. The texel's own direct light is never clamped.
 pub(super) const INDIRECT_CLAMP: f32 = 10.0;
-/// Survival odds of Russian roulette: never below the low bound (no firefly
+/// Russian roulette survival: never below the low bound (no firefly
 /// reweighting), never above the high one.
 const ROULETTE: (f32, f32) = (0.05, 0.95);
 

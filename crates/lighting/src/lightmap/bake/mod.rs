@@ -82,7 +82,7 @@ pub fn bake_on(
         let shape = layout(scene, head, &points);
         let (map, lost) = lightmap(scene, (head, &shape), points, light, settings, cleaner);
         orphans.fetch_add(lost, Ordering::Relaxed);
-        // Before `mesh_done`, whose observer hands freed memory back to the system.
+        // Dropped before `mesh_done`, whose observer hands freed memory back to the system.
         drop(shape);
         progress.mesh_done(c);
         map

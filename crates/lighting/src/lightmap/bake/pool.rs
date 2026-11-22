@@ -4,6 +4,7 @@ use std::thread;
 
 use super::super::progress::BakeProgress;
 
+/// Items per batch: small, so a cancel lands at once; large, so the shared counter stays cold.
 pub(in super::super) const BATCH: usize = 64;
 
 pub(crate) fn batches<P>(items: impl IntoIterator<Item = P>) -> Vec<Vec<P>> {

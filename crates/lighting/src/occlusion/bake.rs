@@ -11,6 +11,7 @@ use super::sampler::Sampler;
 use rusty_scene::lighting::occlusion::{BakeStamp, BakedObject, FloorSource, OcclusionData};
 use rusty_scene::Scene;
 
+/// One fixed stream, so a re-bake of an unchanged scene writes the same bytes.
 pub const OCCLUSION_SEED: u64 = 0x5056_5321;
 
 pub use rusty_scene::lighting::occlusion::OCCLUSION_VERSION;
@@ -32,6 +33,8 @@ pub fn gather_with(scene: &Scene, prints: &Fingerprints, reach: Reach) -> Occlus
     }
 }
 
+/// The one walk `gather_with` bakes and `is_current` compares, so the two never disagree on
+/// which objects, or in what order.
 fn walk<'a, T: 'a>(
     scene: &'a Scene,
     read: impl FnMut(u32) -> Option<T> + 'a,

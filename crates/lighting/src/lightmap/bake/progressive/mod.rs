@@ -129,8 +129,8 @@ impl Run<'_> {
                 sink.pass(pass, maps.into_iter().flatten().collect());
                 going = shown;
             }
-            // After the sink took the maps, so the editor's card never counts a pass the viewport
-            // cannot show yet.
+            // Counted after the sink took the maps, so the editor's card never counts a pass the
+            // viewport cannot show yet.
             self.progress.pass_done(pass);
             items = going;
         }

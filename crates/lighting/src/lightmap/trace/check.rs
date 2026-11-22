@@ -2,8 +2,10 @@ use super::super::lights::area::{block_span, PROBE};
 use super::super::rng::Rng;
 use super::own::BLOCKS;
 
+/// Checks a probe that found a panel fully seen adds, one per quadrant: few, as most are.
 pub(super) const LIT_CHECKS: u32 = 4;
 
+/// Two per block, more than `LIT_CHECKS`: a slit the probe missed would leave a texel black.
 pub(super) const HIDDEN_CHECKS: u32 = 2 * BLOCKS as u32;
 
 pub(super) fn check_cells(

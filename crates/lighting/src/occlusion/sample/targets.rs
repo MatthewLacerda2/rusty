@@ -137,6 +137,7 @@ impl Lattice {
     }
 }
 
+/// Metres: one polygon hiding a chunk's box spares every ray to its targets.
 const CHUNK: f32 = 2.0;
 
 pub(super) struct Chunk {

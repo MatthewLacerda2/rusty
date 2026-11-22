@@ -4,6 +4,7 @@ use glam::Vec3;
 
 use super::baking::Targets;
 
+/// A cluster cube's edge, metres: about a room.
 const CLUSTER: f32 = 8.0;
 
 pub(super) struct Cluster {

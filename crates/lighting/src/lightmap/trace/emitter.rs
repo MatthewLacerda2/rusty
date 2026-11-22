@@ -23,9 +23,12 @@ pub(super) struct Emitter {
     hi: Vec3,
 }
 
+/// In multiples of the emitter's `√area`: past it a bounce ray finds it about once in 800.
 const REACH: f32 = 16.0;
+/// World units past the bounds: a glowing floor is found by bounce rays from a room away.
 const MAX_REACH: f32 = 16.0;
 
+/// No emitter: the mark for a run that emits nothing a ray can see.
 pub(super) const NONE: u32 = u32::MAX;
 
 pub(super) fn emitters(scene: &BakeScene) -> (Vec<Emitter>, Vec<Vec<u32>>) {

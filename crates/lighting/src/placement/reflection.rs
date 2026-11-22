@@ -16,6 +16,7 @@ pub struct ReflectionPlacement {
     pub max_probes: usize,
 }
 
+/// World units: below it the probe count grows with the square.
 pub const MIN_REGION: f32 = 2.0;
 
 impl Default for ReflectionPlacement {

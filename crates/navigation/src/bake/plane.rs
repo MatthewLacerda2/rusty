@@ -5,6 +5,7 @@ use glam::{Vec2, Vec3};
 
 use super::super::Surface;
 
+/// Metres.
 pub(super) const TOP_EPS: f32 = 1e-3;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

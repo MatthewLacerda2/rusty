@@ -5,11 +5,14 @@ use super::super::raster::{dilate, fill_rest, TexelPoint};
 use rusty_core::color::luminance;
 use rusty_scene::lighting::settings::Denoiser;
 
+/// Rings of texels a chart grows by before the denoiser sees it, so its edge has lit
+/// neighbours, not black.
 const PAD_PASSES: u32 = 4;
 
 pub trait LightmapDenoiser: Send + Sync {
     /// `size`² row-major texels: linear HDR light, or direction vectors of length ≤ 1 when
-    /// `directional`. An `Err` says why, and the bake filters that chart instead.
+    /// `directional`. On an `Err` the bake drops the message and filters that chart instead: an
+    /// implementation logs it itself.
     fn denoise(&self, image: &mut [Vec3], size: u32, directional: bool) -> Result<(), String>;
 }
 
