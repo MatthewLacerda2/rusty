@@ -5,7 +5,7 @@ use rusty_navigation::NavigationGraph;
 
 /// One restore shared by a seek back (`seek`) and the editor closing a demo
 /// (`editor::demo`), so the two cannot drift. `SceneSnapshot`, as Stop restores, keeps the
-/// scene's identity and file text, so a waiting bake still recognises it.
+/// scene's identity and file text, so a running Generate Lighting still recognises it.
 pub struct Origin {
     snapshot: SceneSnapshot,
 }
@@ -25,7 +25,7 @@ impl Origin {
         self.snapshot.restore(&mut scene);
         *world.nav().borrow_mut() = NavigationGraph::from_scene(&scene);
         drop(scene);
-        // The replay wrote the recorded input every tick: a key held at its last stays held.
+        // Reset, or a key held at the last replayed tick would stay held.
         *world.input().borrow_mut() = InputState::new();
         *world.resources.event_system.borrow_mut() = Default::default();
     }

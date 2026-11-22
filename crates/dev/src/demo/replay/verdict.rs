@@ -19,10 +19,12 @@ impl std::fmt::Display for Divergence {
 #[derive(Clone, Debug, Default)]
 pub struct Verdict {
     pub ticks: u64,
+    /// The ticks the demo holds.
     pub of: u64,
     pub checked: u64,
     pub matched: Option<u64>,
     pub diverged: Option<Divergence>,
     pub taints: Vec<(u64, String)>,
+    /// A scenario on top steps the replay, so it may end before the demo's end on purpose.
     pub scenario: bool,
 }
