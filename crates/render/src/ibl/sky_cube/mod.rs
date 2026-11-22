@@ -1,3 +1,6 @@
+//! The sky as the default reflection probe, as in Unity. For fixed settings `procedural_sky` is
+//! affine in the ambient, so a cube holds two terms and an ambient change never rebakes.
+
 mod gpu;
 mod spare;
 
@@ -8,6 +11,7 @@ use crate::gpu::uniforms::ProceduralSkyUniform;
 use crate::timing::GpuTimer;
 use crate::GpuTexture;
 
+/// In texels: Unity's default environment-reflection resolution.
 pub(crate) const SKY_FACE: u32 = 128;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,6 +54,7 @@ fn procedural_step<K: PartialEq>(
     )
 }
 
+/// The unbound slot once the bound one is filled, so two skies drawn in one frame both stay baked.
 fn bake_slot(current: usize, current_empty: bool) -> usize {
     if current_empty {
         current

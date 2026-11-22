@@ -3,6 +3,7 @@ use glam::Vec3;
 use crate::draw::scene_ambient;
 use rusty_scene::{AmbientMode, Scene};
 
+/// `Color` mode's ambient before the gradient: a frozen reference, never edited to follow a change.
 const TODAY: &str = "
 fn today_ambient(color: vec3<f32>, intensity: f32, N: vec3<f32>) -> vec3<f32> {
     let sky_color = color;
@@ -93,6 +94,8 @@ fn gpu_the_ambient_is_todays_in_color_mode_and_the_cpus_in_both() {
         let gpu = probe(&r, &scene);
         let drift = gpu.iter().map(|(n, t)| (*n - *t).abs().max_element());
         let drift = drift.fold(0.0, f32::max);
+        // Today's expression term for term, so equal (lavapipe: 0); the slack is for a driver
+        // contracting the two copies differently.
         assert!(drift <= 1e-6, "Color drifts {drift} from today");
         assert!(cpu_gap(&scene, &gpu) <= 1e-5, "Color: CPU and GPU disagree");
     }

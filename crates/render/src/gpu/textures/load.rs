@@ -25,6 +25,7 @@ impl Renderer {
         if self.texture_freshness.is_miss(path_str) {
             return Rc::clone(&self.default_texture);
         }
+        // Never on disk: the default, uncached, until the frame that draws it registers it.
         if crate::render_texture::is_render_texture(path_str) {
             return Rc::clone(&self.default_texture);
         }

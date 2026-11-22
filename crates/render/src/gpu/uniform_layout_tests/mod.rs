@@ -1,3 +1,6 @@
+//! Pins each Rust uniform mirror to its WGSL struct, every member offset and the size, as
+//! naga composes it.
+
 use std::mem::{offset_of, size_of};
 
 use super::uniforms::{AmbientLightUniform, CameraUniform, LightingUniform};

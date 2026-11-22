@@ -3,6 +3,7 @@ use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 use crate::ibl::cubemap_capture::face_view_projection;
 use crate::CubemapFace;
 
+/// Built from `face_view_projection`, the stored layout: a hand-rolled basis would desync.
 pub struct FaceProjections {
     view_proj: [Mat4; 6],
     inv_view_proj: [Mat4; 6],
@@ -23,6 +24,7 @@ impl FaceProjections {
         }
     }
 
+    /// Feeds `reflection_prefilter::gpu`'s uniform, whose shader maps directions as this does.
     pub(crate) fn matrices(&self) -> (&[Mat4; 6], &[Mat4; 6]) {
         (&self.view_proj, &self.inv_view_proj)
     }
@@ -59,6 +61,7 @@ impl Default for FaceProjections {
     }
 }
 
+/// Clip-space NDC in [-1, 1]: `u` right, `v` up, so the top image row maps to `v ≈ +1`.
 pub fn face_uv(px: u32, py: u32, res: u32) -> (f32, f32) {
     let u = ((px as f32 + 0.5) / res as f32) * 2.0 - 1.0;
     let v = 1.0 - ((py as f32 + 0.5) / res as f32) * 2.0;
@@ -77,6 +80,7 @@ pub fn sample(proj: &FaceProjections, faces: &[Vec<Vec3>; 6], res: u32, dir: Vec
     faces[face as usize][(py * res + px) as usize]
 }
 
+/// The CPU mirror of `capture` in `engine/shaders/ibl/probe_prefilter.wgsl`: change both together.
 #[cfg(test)]
 pub fn sample_lod(
     proj: &FaceProjections,

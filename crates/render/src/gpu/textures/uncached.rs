@@ -6,6 +6,8 @@ use rusty_asset::texture_import::{self, fits};
 use rusty_asset::MapRef;
 
 impl Renderer {
+    /// Textures uploaded RGBA8 only for want of a current import cache: a headless run's
+    /// memory and load are then not the shipped game's.
     pub fn uncached_textures(&self, root: &Path) -> Uploads {
         let mut found = Uploads::default();
         for (map, tex) in &self.gpu_textures {
@@ -31,6 +33,7 @@ impl Renderer {
         texture_import::format_of(&import).is_some()
             && fits(import.texture_type, kind)
             && compressed::wanted(self.device.features(), &import)
+            // BC blocks are 4×4 texels.
             && w % 4 == 0
             && h % 4 == 0
     }

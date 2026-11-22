@@ -1,3 +1,6 @@
+//! Parsed here, not by `ktx2::Reader`, whose offset sums overflow and panic on a corrupt file.
+//! A missing, corrupt or non-BC6H cube is refused with a reason.
+
 use ktx2::Format;
 
 use super::reflection_prefilter::source::encode_face;
@@ -5,6 +8,7 @@ use super::reflection_probes::MAX_FACE;
 use rusty_asset::lightmap_page::bc6h_texels;
 use rusty_asset::texture_import::blocks_len;
 
+/// Each level packs six faces back-to-back in KTX2 order (+X, -X, +Y, -Y, +Z, -Z).
 pub struct CubemapMips {
     pub size: u32,
     pub format: wgpu::TextureFormat,
@@ -12,10 +16,12 @@ pub struct CubemapMips {
 }
 
 pub(crate) const CUBE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Bc6hRgbUfloat;
+/// Bytes of one 4×4 BC6H block.
 const BLOCK_BYTES: u32 = 16;
 
 pub(crate) type Refusal = &'static str;
 
+// Bytes: the KTX2 header and one level-index entry.
 const HEADER: usize = 80;
 const LEVEL_ENTRY: usize = 24;
 
@@ -68,6 +74,7 @@ pub(crate) struct CubeShape {
     pub mips: u32,
 }
 
+/// Header and level index only, so the probe array budgets a cube without decoding it.
 pub(crate) fn read_cube_shape(path: &str) -> Result<CubeShape, Refusal> {
     use std::io::Read;
     let mut file = std::fs::File::open(path).map_err(|_| "it cannot be opened")?;
@@ -119,6 +126,7 @@ pub(crate) fn cube_shape(header: &[u8; 48]) -> Result<CubeShape, Refusal> {
     )
 }
 
+/// A level under 4×4 holds one padded block per face.
 fn level_ranges(
     index: &[u8],
     shape: CubeShape,
@@ -147,6 +155,8 @@ fn is_rgba8(format: Format) -> bool {
     matches!(format, Format::R8G8B8A8_UNORM | Format::R8G8B8A8_SRGB)
 }
 
+/// Not a `GpuTexture`, whose bind group is the 2D material's: the probe array copies this into
+/// a layer.
 pub struct CubemapTexture {
     pub texture: wgpu::Texture,
     pub size: u32,
