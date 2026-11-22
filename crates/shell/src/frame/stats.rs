@@ -1,6 +1,3 @@
-//! Recording the window's frames into the frame stats, dev builds only: a
-//! build without the `dev` layer records nothing, and these calls do nothing there.
-
 use rusty_app::GameWorld;
 #[cfg(feature = "dev")]
 use rusty_dev::{capture::RenderedFrame, stats::WindowFrame};
@@ -32,10 +29,8 @@ pub fn measured(
     let _ = frames_before;
 }
 
-/// A frame starts: the frame clock has just read the previous frame's wall time,
-/// so it goes onto that frame's stats entry now, before this frame's work, and
-/// whatever reads `Debug.Stats` during the frame (the REPL, `session-mcp --attach`,
-/// a script's `Update`, the Stats overlay) sees it (`rusty_dev::stats::window_ended`).
+/// A frame starts: the clock just read the previous frame's wall time, which goes onto that
+/// frame's stats entry now, so whatever reads `Debug.Stats` during this frame sees it.
 pub fn started(clock: &FrameClock, game: &GameWorld) {
     #[cfg(feature = "dev")]
     {
@@ -48,6 +43,8 @@ pub fn started(clock: &FrameClock, game: &GameWorld) {
     let _ = (clock, game);
 }
 
+/// The stats keep only drawn frames; the frame log still writes this one, so a bake run under
+/// a locked screen can be read back.
 pub fn undrawn(shell: &mut Shell, game: &GameWorld) {
     #[cfg(feature = "dev")]
     if let Some(log) = shell.frame_log.as_mut() {
@@ -72,6 +69,7 @@ pub fn window_frame(
     let render = (cost.frames != frames_before).then(|| RenderedFrame {
         counters: renderer.frame_counters,
         cpu_ms: cost.cpu_ms,
+        // The window reads no stages, so none is copied on every live frame.
         stages: Vec::new(),
         gpu: renderer.take_gpu_times(),
     });

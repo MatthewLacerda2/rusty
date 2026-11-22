@@ -14,7 +14,7 @@ pub struct ScreenSize {
 }
 
 impl ScreenSize {
-    /// Record the game view's pixel size (the platform layer, once per frame).
+    /// Record the game view's size in physical pixels (the platform layer, once per frame).
     pub fn set_game_view(&mut self, width: u32, height: u32) {
         self.game_view = Some((width, height));
     }
@@ -29,13 +29,14 @@ impl ScreenSize {
         self.game_view
     }
 
-    /// Record the display's backing scale (the platform layer, once per frame).
+    /// Record the display's backing scale, physical pixels per point (the platform layer,
+    /// once per frame).
     pub fn set_display_scale(&mut self, scale: f32) {
         self.display_scale = Some(scale);
     }
 
-    /// Put back a scale read with [`reported_display_scale`](Self::reported_display_scale),
-    /// `None` included (a demo replay, as [`restore_game_view`](Self::restore_game_view)).
+    /// Put back a [`reported_display_scale`](Self::reported_display_scale), as
+    /// [`restore_game_view`](Self::restore_game_view) does.
     pub fn restore_display_scale(&mut self, scale: Option<f32>) {
         self.display_scale = scale;
     }
@@ -63,7 +64,8 @@ impl ScreenSize {
         &mut self.textures
     }
 
-    /// The view the UI is computed against: this screen (sized against `video`)
+    /// The view the UI is computed against: this screen sized against `video`, its texture
+    /// sizes, and `camera` when there is one.
     pub fn view(&self, video: &VideoSettings, camera: Option<Camera>) -> UiView {
         let (px, textures) = (self.pixels(video), Rc::clone(&self.textures));
         match camera {

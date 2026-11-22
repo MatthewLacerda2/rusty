@@ -1,4 +1,5 @@
-//! crates/editor/src/project_picker/browse.rs — an in-editor folder browser.
+//! No native file dialogs (no dialog crate): the picker's *New* and *Open* pages
+//! browse folders here.
 
 use std::path::{Path, PathBuf};
 
@@ -29,7 +30,6 @@ impl FolderBrowser {
         browser
     }
 
-    /// The folder being browsed.
     pub fn dir(&self) -> &Path {
         &self.dir
     }

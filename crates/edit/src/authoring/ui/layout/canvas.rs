@@ -7,7 +7,6 @@ pub fn set_render_mode(c: &mut CanvasComponent, mode: CanvasRenderMode) {
     c.render_mode = mode;
 }
 
-/// Higher is on top.
 pub fn set_sort_order(c: &mut CanvasComponent, sort_order: i32) {
     c.sort_order = sort_order;
 }
@@ -16,7 +15,6 @@ pub fn set_reference_resolution(c: &mut CanvasComponent, resolution: Vec2) {
     c.reference_resolution = finite2_or(resolution, c.reference_resolution).max(Vec2::ONE);
 }
 
-/// Width (0) to height (1) scale match.
 pub fn set_match_width_or_height(c: &mut CanvasComponent, value: f32) {
     c.match_width_or_height = unit(value);
 }

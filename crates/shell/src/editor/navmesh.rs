@@ -12,6 +12,8 @@ use rusty_render::{NavMeshPatch, NavMeshRevision, NavMeshSource, Renderer};
 /// How far above its floor a span's quad is drawn, in metres.
 pub(crate) const LIFT: f32 = 0.03;
 
+/// A tile's side, in cells: a Dust2-sized grid (801 × 801 cells) is 26 × 26 tiles, one
+/// draw each.
 pub(crate) const TILE: i32 = 32;
 
 pub(super) fn hand(renderer: &mut Renderer, gizmos: &SceneGizmos, nav: &NavigationGraph) -> u64 {
@@ -90,7 +92,6 @@ fn dirty_tiles(nav: &NavigationGraph, generation: u64) -> Option<Vec<usize>> {
     Some(tiles)
 }
 
-/// Two triangles per walkable span of `tile`, three world positions each.
 pub(crate) fn tile_triangles(nav: &NavigationGraph, tile: usize) -> Vec<Vec3> {
     let across = tiles_across(nav.width).max(1) as usize;
     let (x0, z0) = ((tile % across) as i32 * TILE, (tile / across) as i32 * TILE);

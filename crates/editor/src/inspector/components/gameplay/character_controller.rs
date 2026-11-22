@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/character_controller.rs — the
-//! CharacterController card.
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::physics::character_controller` ops the `CharacterController.*` Lua
 //! setters call. The grounded state is what the last `Move` found, so it is shown
@@ -33,7 +31,6 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, speed: f64) -> Optio
     .inner
 }
 
-/// 3EK. CharacterController Component
 pub fn draw_character_controller(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

@@ -1,7 +1,3 @@
-//! Tests for world-canvas interaction: the camera ray through the pointer
-//! hits a `WorldSpace` canvas — through the screen centre while the cursor is
-//! locked — screen canvases still win, and a wall in front stops the ray.
-
 use glam::{Vec2, Vec3};
 
 use super::fixture::{panel, scene, Handlers, Rig, SCREEN};
@@ -10,8 +6,7 @@ use rusty_components::{CanvasComponent, CanvasRenderMode};
 use rusty_scene::Camera;
 
 /// A 400×200 `WorldSpace` canvas (4×2 m) at the origin with a clickable left half,
-/// seen by a camera 5 m in front of it, 1 m left of its centre. Returns the rig
-/// and the panel.
+/// seen by a camera 5 m in front of it, 1 m left of its centre.
 fn terminal() -> (Rig, u32) {
     let (mut s, canvas) = scene();
     let c = CanvasComponent {
@@ -42,6 +37,7 @@ fn a_locked_cursor_clicks_what_the_screen_centre_looks_at() {
         vec![(left, PointerEnter), (left, PointerClick)]
     );
     assert!(rig.events.is_pointer_over_ui());
+    // Look 1 m right of the canvas centre: the right half has no graphic.
     rig.camera = Some(Camera::new(Vec3::new(1.0, 0.0, 5.0), -90.0, 0.0));
     assert!(click(&mut rig).is_empty());
     assert!(!rig.events.is_pointer_over_ui());
@@ -50,6 +46,7 @@ fn a_locked_cursor_clicks_what_the_screen_centre_looks_at() {
 #[test]
 fn a_free_pointer_casts_its_own_ray_and_screen_canvases_win() {
     let (mut rig, left) = terminal();
+    // The screen centre looks at the left half; the right edge of the screen does not.
     rig.point(SCREEN.x - 1.0, SCREEN.y * 0.5);
     assert!(rig.hooks().is_empty());
     rig.point(SCREEN.x * 0.5, SCREEN.y * 0.5);
@@ -79,6 +76,7 @@ fn a_wall_in_front_stops_the_ray() {
 
 #[test]
 fn the_wall_ray_is_cast_only_when_a_world_canvas_is_laid_out() {
+    // A camera and a screen canvas: the pointer has a ray, but nothing it bounds.
     let (s, _) = scene();
     let mut rig = Rig::new(s, Handlers::default());
     rig.camera = Some(Camera::new(Vec3::new(0.0, 0.0, 5.0), -90.0, 0.0));

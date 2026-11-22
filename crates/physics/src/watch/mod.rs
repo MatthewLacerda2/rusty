@@ -1,8 +1,6 @@
 //! rapier's solver rewrites every active body's pose, a body just turned static included, an
 //! ulp off what was pushed, and no write-back stamps it. So the sync also visits every body
-//! awake around the last step (`Tracked::stepped`), comparing a static one against its last
-//! pushed pose (`Tracked::static_poses`), not rapier's: a re-push every step would wake
-//! whatever rests on it, for good.
+//! awake around the last step (`Tracked::stepped`); `writes` says how a static one is compared.
 
 use std::collections::BTreeSet;
 
@@ -44,6 +42,8 @@ mod stepped_tests;
 #[cfg(test)]
 mod tests;
 
+/// One cursor per channel a sync pass reads (`Named`): a pass given an input on another channel
+/// needs its cursor here, or misses that input's edits.
 pub(super) struct Watch {
     collider: Cursor<ColliderComponent>,
     rigidbody: Cursor<RigidBodyComponent>,
@@ -161,6 +161,8 @@ pub(super) fn carriers(scene: &Scene) -> BTreeSet<u32> {
     out
 }
 
+/// The owner too: its active flag enables the connected body, and can flip while the connected
+/// entity's own (already inactive) flag does not.
 pub(super) fn joint_deps(scene: &Scene) -> BTreeSet<u32> {
     let w = &scene.world;
     let mut out = BTreeSet::new();

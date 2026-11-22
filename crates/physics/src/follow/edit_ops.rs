@@ -92,6 +92,7 @@ fn plank(scene: &mut Scene, rig: u32, i: usize, cube: bool) {
     let built = w
         .collider(id)
         .is_some_and(|c| kept_mesh_name(&c) == Some("plank"));
+    // Only where no Mesh is, so the shape's rebuilds show on the Collider channel alone.
     if id != rig && !built && w.mesh(id).is_none() {
         give_plank(scene, id);
     }

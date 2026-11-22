@@ -12,6 +12,7 @@ pub use parse::compile;
 
 pub const MAX_LEN: usize = 4096;
 
+/// How deep parentheses, calls, unary minus and `^` may nest.
 pub const MAX_DEPTH: usize = 64;
 
 pub const INPUTS: [char; 4] = ['a', 'b', 'c', 'd'];
@@ -19,6 +20,7 @@ pub const INPUTS: [char; 4] = ['a', 'b', 'c', 'd'];
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Program {
     code: Vec<Instr>,
+    /// The most values the stack holds while the code runs.
     stack: usize,
     inputs: [bool; 4],
 }
@@ -32,6 +34,7 @@ impl Program {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SyntaxError {
     pub what: String,
+    /// 1-based, in characters, not bytes.
     pub column: Option<usize>,
     pub fix: String,
 }

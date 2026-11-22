@@ -39,6 +39,7 @@ fn corners_tell_rect_rounded_rect_and_circle_apart() {
 
 #[test]
 fn softness_ramps_inward_from_the_edge() {
+    // Radius 0.3: 0.05 inside the edge, with a 0.1 ramp, reads 0.5.
     let mid = at(ShapeKind::Circle, [0.6, 0.6], 0.1, 0.75, 0.5);
     assert!((mid - 0.5).abs() < 1e-4, "{mid}");
     assert_eq!(at(ShapeKind::Circle, [0.6, 0.6], 0.1, 0.5, 0.5), 1.0);
@@ -47,6 +48,7 @@ fn softness_ramps_inward_from_the_edge() {
 
 #[test]
 fn a_polygon_has_its_vertex_up_and_its_edge_down() {
+    // Circumradius 0.4: the top vertex at v = 0.1, the bottom edge at the apothem, v = 0.7.
     let mut tri = op(ShapeKind::Polygon, [0.8, 0.8], 0.0);
     tri.sides = 3;
     let f = sampler(&tri, Field::Const(0.0));
@@ -58,6 +60,7 @@ fn a_polygon_has_its_vertex_up_and_its_edge_down() {
 
 #[test]
 fn a_star_is_hollow_between_its_points() {
+    // Five points of radius 0.4, the inner vertices at 0.2, 36° off each point.
     let star = op(ShapeKind::Star, [0.8, 0.8], 0.0);
     let f = sampler(&star, Field::Const(0.0));
     let along = |deg: f32, r: f32| {

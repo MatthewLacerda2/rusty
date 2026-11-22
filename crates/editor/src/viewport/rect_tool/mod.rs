@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/rect_tool/ — authoring UI in the Scene view.
-
 pub mod geometry;
 pub mod overlay;
 
@@ -15,6 +13,7 @@ use rusty_ui::events::raycast_pointer;
 use rusty_ui::layout::driven_by_group;
 use rusty_ui::{CanvasSpace, TextureSizes, UiLayout, UiPointer, UiRect, UiView};
 
+/// How close, in viewport points, the pointer must be to grab a handle.
 const HANDLE_RADIUS: f32 = 7.0;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -69,6 +68,7 @@ impl OverlayFrame {
     }
 
     /// The UI screen pixel (bottom-left origin, y-up) under viewport point `p`
+    /// (top-left origin, y-down).
     pub fn pixel(&self, p: Vec2) -> Vec2 {
         let (origin, extent) = self.boxed();
         let q = p - origin;
@@ -94,16 +94,15 @@ impl OverlayFrame {
     }
 }
 
-/// The selected element as the rect tool sees it.
 pub struct Target {
     pub rect: UiRect,
     pub parent: UiRect,
     pub rt: RectTransformComponent,
-    /// Whether the tool may drag it (see the module docs).
+    /// False for a root canvas, a world-anchored marker or an element a layout group
+    /// places: drawn read-only, as Unity greys them.
     pub editable: bool,
 }
 
-/// `id` on a screen canvas of `layout`, or `None` (not UI, or a world canvas).
 pub fn target(world: &World, layout: &UiLayout, id: u32) -> Option<Target> {
     let rect = *layout.get(id)?;
     if layout.space(rect.canvas) != CanvasSpace::Screen {

@@ -1,5 +1,3 @@
-//! crates/ui/src/space.rs — where a canvas lives: on the screen, or on a plane in the world.
-
 use std::rc::Rc;
 
 use glam::{Mat4, Quat, Vec2, Vec3};
@@ -21,7 +19,6 @@ pub struct UiView {
 }
 
 impl UiView {
-    /// A view with no camera: overlay layout only, Images measured by `textures`.
     pub fn screen(screen: Vec2, textures: Rc<TextureSizes>) -> Self {
         Self {
             screen: screen.max(Vec2::ONE),
@@ -30,7 +27,6 @@ impl UiView {
         }
     }
 
-    /// A view through `camera`, Images measured by `textures`.
     pub fn with_camera(screen: Vec2, camera: Camera, textures: Rc<TextureSizes>) -> Self {
         Self {
             screen: screen.max(Vec2::ONE),
@@ -55,7 +51,9 @@ impl UiView {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiPointer {
     pub screen: Option<Vec2>,
+    /// Origin and unit direction, world space.
     pub ray: Option<(Vec3, Vec3)>,
+    /// Metres along `ray` a world canvas may be hit: the nearest wall.
     pub ray_limit: f32,
 }
 
@@ -99,6 +97,8 @@ pub fn canvas_space(
     }
 }
 
+/// Where `ray` crosses a World matrix's plane, either face: reference units, and metres
+/// along the ray.
 pub fn ray_to_canvas(to_world: Mat4, (origin, dir): (Vec3, Vec3)) -> Option<(Vec2, f32)> {
     let local = to_world.inverse();
     let o = local.transform_point3(origin);

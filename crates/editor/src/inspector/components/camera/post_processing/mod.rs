@@ -1,8 +1,3 @@
-//! crates/editor/src/inspector/components/camera/post_processing/ — the Post Processing
-//! inspector card: one section per post effect, each in its own file
-//! (grading and lens effects in their folders), plus the volume's shadow and SSAO
-//! sections (`volume`). [`SECTIONS`] lists them; the card draws them by the display
-
 use egui_phosphor::regular as icon;
 
 use crate::inspector::components::card::{component_card, remove_component};
@@ -112,6 +107,8 @@ pub fn draw_post_processing(
                     ui.label(section.group.unwrap_or_default());
                 }
                 group = section.group;
+                // Keeps each section's widget ids apart, so two sections' combo boxes
+                // never collide.
                 ui.push_id(section.effect, |ui| {
                     (section.draw)(ui, world, id, &vc, is_dirty)
                 });

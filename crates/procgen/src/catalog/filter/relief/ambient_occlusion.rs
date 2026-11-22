@@ -26,7 +26,10 @@ impl Row for AmbientOcclusion {
     );
 }
 
+/// Samples along each direction, evenly out to the radius. Fixed, with no jitter, so a
+/// recipe bakes byte-identically.
 const STEPS: u32 = 16;
+/// The most directions a node searches: bounds its cost.
 const MAX_QUALITY: u32 = 64;
 const DEPTH: f32 = 0.1;
 const QUALITY: u32 = 8;
@@ -41,6 +44,7 @@ pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
     if !(radius > 0.0 && depth > 0.0) {
         return Image::filled(img.size(), [1.0; 4]);
     }
+    // Half a tile: past it the search only wraps onto what it has read.
     let radius = radius.min(0.5);
     let dirs = quality.clamp(1, MAX_QUALITY);
     let rays: Vec<(f32, f32)> = (0..dirs)
@@ -62,6 +66,7 @@ pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
                         (h(u + du * d, v + dv * d) - here) * depth / d
                     })
                     .fold(0.0f32, f32::max);
+                // The sky this direction loses: the sine of its horizon angle.
                 rise / (1.0 + rise * rise).sqrt()
             })
             .sum();
@@ -70,6 +75,8 @@ pub fn occlusion(img: &Image, radius: f32, depth: f32, quality: u32) -> Image {
     })
 }
 
+/// The input's red alone: the search reads it `quality × STEPS` times a pixel, and a quarter
+/// of the bytes keeps more of the reach in cache.
 struct Heights {
     w: i64,
     h: i64,

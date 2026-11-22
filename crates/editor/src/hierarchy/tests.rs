@@ -118,7 +118,7 @@ fn a_big_hierarchy_scrolled_to_its_middle_lays_out_only_the_rows_in_view() {
     let drawn: Vec<usize> = (0..branches.len())
         .filter(|&i| ctx.read_response(node_id(branches[i])).is_some())
         .collect();
-    let in_view = (screen.height() / pitch) as usize / 2;
+    let in_view = (screen.height() / pitch) as usize / 2; // every other row a branch
     assert!(
         !drawn.is_empty() && drawn.len() <= in_view + 2,
         "laid out {} branches, {in_view} in view",

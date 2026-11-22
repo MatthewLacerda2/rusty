@@ -1,6 +1,3 @@
-//! crates/shell/src/input/mod.rs — the input pump and the OS cursor policy, shared by both
-//! frontends.
-
 pub mod clipboard;
 pub mod clipboard_source;
 pub mod cursor;
@@ -63,6 +60,7 @@ pub fn write_text(text: &str, game: &GameWorld) {
     }
 }
 
+/// `\r` reads as `\n`.
 fn typed_text(text: &str) -> String {
     text.chars()
         .filter_map(|c| match c {

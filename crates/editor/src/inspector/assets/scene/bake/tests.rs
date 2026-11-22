@@ -130,7 +130,7 @@ fn gpu_the_probe_step_runs_across_frames() {
     assert!(editor.dev.lightmap_bake.is_none(), "{:?}", console.messages);
     let said = |text: &str| console.messages.iter().any(|(l, _)| l.contains(text));
     if !said("Baking reflection probe 1 of 2") {
-        return;
+        return; // no adapter: the probe step skipped
     }
     assert!(frames_baking >= 2, "a frame per probe, saw {frames_baking}");
     assert!(

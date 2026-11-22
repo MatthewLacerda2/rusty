@@ -1,4 +1,6 @@
-//! crates/editor/src/viewport/scene_nav/scroll.rs — tell a trackpad from a mouse wheel.
+//! egui folds every wheel event into one `smooth_scroll_delta`; this reads the raw
+//! ones, telling a trackpad's `Point` deltas from a wheel's lines or pages (winit's
+//! `PixelDelta` / `LineDelta`).
 
 use glam::Vec2;
 
@@ -27,6 +29,7 @@ pub fn split(events: &[egui::Event], line_points: f32, page_points: f32) -> Scro
         else {
             continue;
         };
+        // egui already turns these into `zoom_delta`, read as pinch zoom.
         if modifiers.command || modifiers.ctrl {
             continue;
         }

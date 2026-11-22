@@ -5,11 +5,11 @@ use rusty_edit::load_parsed;
 use rusty_scene::{parse_scene_text, Scene};
 use rusty_script::scripting::ConsoleLogs;
 
-/// What the follow needs to remember between frames.
 pub struct SceneFollow {
     /// The write-log generation already read.
     seen: u64,
     pending: Option<String>,
+    /// Text that failed to load, not parsed again; `Some` also means the warning was logged.
     failed: Option<String>,
 }
 
@@ -23,7 +23,8 @@ impl SceneFollow {
         }
     }
 
-    /// Once per edit-mode frame, after the watch noted its changes: reload `scene`
+    /// Each edit-mode frame, after the watch's notes: reload `scene` when its
+    /// file changed outside the engine. Returns whether it reloaded.
     pub fn apply(
         &mut self,
         scene: &mut Scene,
@@ -48,6 +49,7 @@ impl SceneFollow {
             return false;
         }
         let Ok(on_disk) = std::fs::read_to_string(path) else {
+            // Deleted or mid-write: still pending, so read again next frame.
             return false;
         };
         if scene.is_disk_text(path, &on_disk) {
@@ -60,7 +62,6 @@ impl SceneFollow {
         self.reload(scene, path, on_disk, selected, console)
     }
 
-    /// Replace `scene` with `on_disk`, the changed text of `path`, and say so.
     fn reload(
         &mut self,
         scene: &mut Scene,
@@ -80,6 +81,7 @@ impl SceneFollow {
                 return false;
             }
         };
+        // Only after the parse: this serialises the live scene, which a broken file must not cost.
         let unsaved = rusty_edit::has_unsaved_edits(scene, path);
         let keep = selected.and_then(|id| name_path(scene, id));
         if let Err(err) = load_parsed(scene, path, on_disk, data) {
@@ -108,8 +110,7 @@ impl EditorFrontend {
         self.scene_id = Some(id);
     }
 
-    /// Reload the open scene when its file changed on disk. The reload is
-    /// the editor's own, so it keeps the selection `follow_scene_swap` would drop.
+    /// Sets `scene_id`, so `follow_scene_swap` keeps the selection this reload remapped.
     pub(in crate::editor) fn follow_scene_file(&mut self, game: &GameWorld) {
         let ui = &mut self.editor_ui;
         let mut scene = game.world.scene.borrow_mut();
@@ -127,7 +128,6 @@ impl EditorFrontend {
     }
 }
 
-/// The names from the root down to `id`, or `None` for a dead id.
 fn name_path(scene: &Scene, id: u32) -> Option<Vec<String>> {
     let mut names = Vec::new();
     let mut at = Some(id);

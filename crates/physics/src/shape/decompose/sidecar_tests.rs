@@ -45,6 +45,8 @@ fn a_second_launch_builds_suzanne_from_her_sidecar_with_no_vhacd() {
     let mesh = import(&path);
     let (first, runs) = play(&mesh);
     assert_eq!(runs, 1, "no sidecar yet: one decomposition");
+    // A parallel test's call may take her pieces instead; it writes them under the lock
+    // this one waits on, so the file is there either way.
     save_pending();
     let key = hulls::key(mesh.0.iter().copied(), &mesh.1);
     let written = file::parse(&std::fs::read(&sidecar).expect("written")).unwrap();

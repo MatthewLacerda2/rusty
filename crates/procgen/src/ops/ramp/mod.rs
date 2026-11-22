@@ -88,6 +88,7 @@ fn scan_ramp(sorted: &[RampStop], interpolation: RampInterpolation, t: f32) -> R
     window.map_or(last.color, |w| blend(w[0], w[1], t, ease))
 }
 
+/// The searches read positions through here, so a test counts the stops a lookup reads.
 #[inline]
 fn pos(stop: &RampStop) -> f32 {
     #[cfg(test)]

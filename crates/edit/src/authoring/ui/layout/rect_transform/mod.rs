@@ -32,7 +32,7 @@ pub fn set_size_delta(r: &mut RectTransformComponent, size_delta: Vec2) {
     r.size_delta = finite2(size_delta);
 }
 
-/// One whose target was destroyed stays hidden until it is given a target.
+/// A marker its destroyed target left hidden (`target_lost`) stays so until given another target.
 pub fn set_world_anchor(r: &mut RectTransformComponent, target: Option<u32>, offset: Vec3) {
     let anchor = r.world_anchor.get_or_insert_with(WorldAnchor::default);
     if anchor.target != target {

@@ -69,6 +69,7 @@ fn the_project_graphs_are_found_outside_hidden_and_build_folders() {
             ("textures/b.graph.json", doc.clone()),
             (".cache/c.graph.json", doc.clone()),
             ("target/d.graph.json", doc.clone()),
+            // Only the root's `target/` is a build's; a deeper one is the project's own.
             ("levels/target/e.graph.json", doc),
         ],
     );
@@ -220,6 +221,7 @@ fn the_engine_graphs_are_listed_after_the_projects_by_their_engine_path() {
         &[
             ("textures/library/rust.graph.json", doc.clone()),
             ("materials/b.graph.json", doc.clone()),
+            // The root's `target/` skip is the project's, not the engine's.
             ("target/t.graph.json", doc),
         ],
     );

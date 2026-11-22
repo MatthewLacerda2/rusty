@@ -17,6 +17,7 @@ use rusty_components::transform::Pose;
 use rusty_components::ScaledShape;
 use rusty_scene::Scene;
 
+/// The most segments one collider's wire holds: a level's collision mesh past it draws its first.
 pub const MAX_SEGMENTS: usize = 32_768;
 
 #[derive(Debug, Default)]
@@ -80,6 +81,7 @@ impl ShapeWire {
     }
 }
 
+/// Test hook for this crate's wire tests: `id`'s wire built afresh, no cache, then placed.
 pub fn collider_wire(scene: &Scene, id: u32) -> Option<ColliderWire> {
     let shape = shape_wire(scene, id)?;
     let segments = shape.placed(scene, id)?.collect();

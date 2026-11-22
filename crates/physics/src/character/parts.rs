@@ -13,6 +13,7 @@ use super::normals::exact_normal;
 /// at the start pose: a pair moving along or away from it is no hit.
 const NEAR_TOI: Real = 1.0e-4;
 
+/// Not parry's `CompositeShapeRef::cast_shape`: it drops the parts' normal constraints.
 pub(super) fn cast_parts(
     dispatcher: &dyn QueryDispatcher,
     g1: &dyn Shape,
@@ -68,7 +69,7 @@ pub(super) fn cast_parts(
     Some(hit)
 }
 
-/// No normal can drop a `Late` hit, so only its time of impact counts until it wins.
+/// No normal drops a `Late` hit: only its time of impact counts until it wins.
 #[derive(Clone, Copy)]
 enum PartHit {
     Done(ShapeCastHit),
@@ -144,8 +145,8 @@ impl Cast<'_> {
 }
 
 /// A hit within [`NEAR_TOI`] is judged again as parry would: by the corrected normal against
-/// `vel`, so a capsule moving along a seam's flat face goes on. Correcting only the normal
-/// and keeping the hit stalled the walk on the same edge.
+/// `vel`, so a capsule sliding along a seam's face goes on. Correcting only the normal
+/// and keeping the hit stalled the walk.
 fn constrained(
     hit: ShapeCastHit,
     constraints: Option<&dyn NormalConstraints>,
@@ -156,6 +157,7 @@ fn constrained(
     let Some(normal) = corrected(&hit, constraints) else {
         return Some(hit);
     };
+    // Not at penetration (`ground_below`'s probe): parry keeps such a hit.
     let rejudged = !options.stop_at_penetration && hit.time_of_impact < NEAR_TOI;
     if rejudged && normal.dot(vel) >= 0.0 {
         return None;

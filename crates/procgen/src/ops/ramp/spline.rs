@@ -65,8 +65,8 @@ fn sample(sorted: &[RampStop], above: usize, t: f32, kind: Spline) -> Rgba {
     })
 }
 
-/// through `p1` and `p2`; the uniform cubic B-spline only near them, its weights
-/// never negative, so it never leaves the points' range.
+/// The cardinal curve passes through `p1` and `p2`; the uniform cubic B-spline only near
+/// them, its weights never negative, so it never leaves the points' range.
 pub(super) fn weights(t: f32, kind: Spline) -> [f32; 4] {
     let (t2, t3) = (t * t, t * t * t);
     let fc = TENSION;

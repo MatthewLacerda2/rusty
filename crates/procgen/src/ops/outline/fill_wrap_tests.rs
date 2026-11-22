@@ -19,6 +19,7 @@ fn a_stretch_ending_a_hair_left_of_zero_spreads_from_column_zero() {
 
 #[test]
 fn a_shape_across_the_left_edge_reads_as_itself_moved() {
+    // Slanted edges cut at x = 0 on many rows; moved by whole pixels, the mask only rolls.
     let tri = |dx: f32| {
         let p = [
             Vec2::new(-0.2 + dx, 0.1),
@@ -40,6 +41,7 @@ fn a_shape_across_the_left_edge_reads_as_itself_moved() {
 
 #[test]
 fn evenodd_never_cancels_a_shape_against_its_own_wrapped_copy() {
+    // A stripe a tile and a half wide overlaps its own copy, which must not cut it.
     let p = [(-0.25, 0.4), (1.25, 0.4), (1.25, 0.6), (-0.25, 0.6)].map(Vec2::from);
     let stripe: Shape = (0..4).map(|i| [p[i], p[(i + 1) % 4]]).collect();
     let c = coverage(&[stripe], Size::new(32, 32), FillRule::Evenodd);

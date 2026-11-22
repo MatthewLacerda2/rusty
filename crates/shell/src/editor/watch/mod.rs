@@ -1,4 +1,5 @@
-//! crates/shell/src/editor/watch/ — the editor's watch on the project's files.
+//! A change is noted in `core::fs::written` as if the engine wrote it: the caches already
+//! follow that log.
 
 pub mod follow;
 mod root;
@@ -14,22 +15,23 @@ use notify::{Event, EventKind, PollWatcher, RecursiveMode, Watcher};
 
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
 
-/// Which `notify` backend watches.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Backend {
     Native,
-    /// Compare the files every interval.
+    /// Compares modification times in whole seconds: a second save within one second waits
+    /// for a later change.
     Poll(Duration),
 }
 
-/// A running watch: its watcher, the events it delivered, the paths not yet noted.
 pub struct Watch {
+    /// Dropping it stops the watch.
     _watcher: Box<dyn Watcher>,
     events: Receiver<notify::Result<Event>>,
     roots: Vec<Root>,
     pending: BTreeSet<String>,
     warned: bool,
     sources: Option<PathBuf>,
+    /// Only the engine writes here, and notes its own writes.
     ignored: Vec<PathBuf>,
 }
 
@@ -40,12 +42,15 @@ impl Watch {
             None => Backend::Native,
         };
         let assets = Path::new(rusty_core::project::ASSETS_DIR);
+        // The same path as `shadergen::engine_shader_dir`; `shell` does not depend on `shadergen`.
         let shaders = rusty_core::project::engine_path("shaders");
         let shaders = Path::new(&shaders);
         let roots: Vec<&Path> = [assets, shaders]
             .into_iter()
             .filter(|r| r.is_dir())
             .collect();
+        // Switched on before the watch starts: one that fails still has conversions' textures
+        // compressed.
         rusty_asset::texture_import::import_in_background();
         let mut watch = Self::start(&roots, backend)
             .map_err(|e| log::warn!("[Editor] not watching the project's files: {e}"))
@@ -95,7 +100,6 @@ impl Watch {
         })
     }
 
-    /// Drain the delivered events into the pending set.
     pub fn collect(&mut self) {
         while let Ok(event) = self.events.try_recv() {
             match event {
@@ -128,8 +132,6 @@ impl Watch {
         self.pend(found);
     }
 
-    /// Add `paths`, already spelled, to the pending set, but for write-in-flight temp
-    /// files and paths under an ignored folder.
     fn pend(&mut self, paths: Vec<PathBuf>) {
         for path in paths {
             let temp = path
@@ -174,8 +176,6 @@ impl Watch {
     }
 }
 
-/// Whether an event is worth a frame: a change, an error to report, or a lost-events
-/// notice ([`Watch::take`] rescans on one).
 fn matters(event: &notify::Result<Event>) -> bool {
     event.as_ref().map_or(true, |e| {
         e.need_rescan() || e.paths.is_empty() || changes(&e.kind)

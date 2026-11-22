@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/group.rs — row and column layout groups.
-
 use glam::{Vec2, Vec4};
 
 use super::grid;
@@ -8,6 +6,7 @@ use super::sizes::{element_sizes, layout_children, own_size, Sizes};
 use rusty_components::{LayoutGroupComponent, LayoutKind};
 use rusty_ecs::World;
 
+/// A child's `(position from the leading edge, size)` along one axis: left for x, top for y.
 type Slot = (f32, f32);
 
 struct Linear<'a> {
@@ -18,7 +17,7 @@ struct Linear<'a> {
     depth: u32,
 }
 
-/// Where the group on `id` puts each of its layout children inside `rect`
+/// Each layout child's `(min, size)` inside `rect`, y-up, in hierarchy order.
 pub(super) fn placements(
     world: &World,
     textures: &TextureSizes,
@@ -91,7 +90,6 @@ impl Linear<'_> {
             .collect()
     }
 
-    /// Each child's width in a `width`-wide group.
     fn widths(&self, width: f32) -> Vec<f32> {
         self.slots(0, width, &[]).into_iter().map(|s| s.1).collect()
     }
@@ -187,11 +185,11 @@ fn totals(g: &LayoutGroupComponent, axis: usize, entries: &[Sizes]) -> Sizes {
     t
 }
 
-/// Whether `axis` is the group's main (stacking) axis.
 fn is_main(g: &LayoutGroupComponent, axis: usize) -> bool {
     (g.kind == LayoutKind::Horizontal) == (axis == 0)
 }
 
+/// `(leading, total)` inset along `axis` from the `(left, bottom, right, top)` padding.
 pub(super) fn padding(p: Vec4, axis: usize) -> (f32, f32) {
     if axis == 0 {
         (p.x, p.x + p.z)

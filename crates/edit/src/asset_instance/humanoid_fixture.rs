@@ -1,4 +1,4 @@
-//! A test hook, compiled in every build: the scripting tests that use it are another crate's.
+//! A test hook, compiled in every build: `rusty-script`'s scripting tests use it.
 
 use std::path::{Path, PathBuf};
 

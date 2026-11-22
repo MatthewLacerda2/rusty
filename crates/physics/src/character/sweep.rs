@@ -17,14 +17,15 @@ use rusty_components::CharacterControllerComponent;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 
+// `|n.y|` past this is a floor or ceiling. Metres past the skin a downward probe reaches.
 const FLAG_EPS: f32 = 1e-3;
 const GROUND_PROBE: f32 = 0.02;
-/// Near-flat floor (within ~2.5° of up): rapier's slope split (`normal × up`) is
-/// ill-conditioned there, and parry's near-contact normals on a flat face scatter by a degree.
+/// `1 - n.y` under this is near-flat (~2.5°): rapier's slope split is ill-conditioned
+/// there, and parry's near-contact normals scatter by a degree.
 const FLAT_FLOOR: f32 = 1e-3;
 
-/// `radius` is the capsule's: autostep needs that much room atop a step, else the
-/// rounded bottom would hop edges taller than the step offset.
+/// Autostep needs a capsule `radius` of room atop a step, or the rounded bottom
+/// hops taller edges.
 pub(crate) fn controller(
     cc: &CharacterControllerComponent,
     radius: f32,
@@ -45,8 +46,8 @@ pub(crate) fn controller(
     }
 }
 
-/// `normal1` is the obstacle's outward normal in world space, `witness2` the touched point in
-/// the capsule's own (upright, unrotated) frame.
+/// `normal1`: the obstacle's outward world normal; `witness2`: the hit in the capsule's
+/// upright frame.
 pub(crate) fn contact_flag(hit: &ShapeCastHit, half_segment: f32) -> u8 {
     let surface_up = hit.normal1.y;
     let y = hit.witness2.y;
@@ -127,7 +128,8 @@ impl PhysicsWorld {
         (pass, flat_hit)
     }
 
-    /// rapier rides up a slope steeper than the limit; Unity's controller treats it as a wall.
+    /// rapier rides up a slope past the limit, a wall to Unity; probed a radius ahead from
+    /// step height, where a step's edge gives way to its tread; a slope stays steep.
     fn steep_climb(&self, m: &MoveCtx, motion: Vec3, pass: &Pass) -> Option<Vec3> {
         let ahead = Vec3::new(motion.x, 0.0, motion.z).normalize_or_zero();
         let steep = |n: Vec3| n.y > FLAG_EPS && !m.walkable(n);

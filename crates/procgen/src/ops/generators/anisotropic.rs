@@ -1,3 +1,7 @@
+//! A whole direction `(a, b)` makes a one-tile step move the `(s, t)` cell lattice by whole
+//! cells, `P = (a·along, −b·across)` along `u` and `Q = (b·along, a·across)` along `v`. A cell
+//! is hashed after reducing it modulo `P` and `Q`, so the field repeats once per tile.
+
 use std::f32::consts::{PI, SQRT_2, TAU};
 
 use super::{count, finite, gray, Sampler};
@@ -6,6 +10,7 @@ use crate::recipe::AnisotropicNoise;
 
 pub const MAX_STEP: i64 = 8;
 
+/// Cells per lattice axis: far past one per pixel at 2048², and finite.
 pub const MAX_CELLS: f32 = 4096.0;
 
 pub fn sampler(p: &AnisotropicNoise, seed: u64) -> Sampler<'static> {
@@ -14,6 +19,7 @@ pub fn sampler(p: &AnisotropicNoise, seed: u64) -> Sampler<'static> {
     let (a, b) = snap(finite(p.angle, 0.0), scale / aniso);
     let len = ((a * a + b * b) as f32).sqrt();
     let across = count(scale / len).min(MAX_CELLS);
+    // On an axis one cell along would hash a whole fibre alike: ruler-straight stripes.
     let floor = if a == 0 || b == 0 { 2.0 } else { 1.0 };
     let along = count(scale / (aniso * len)).clamp(floor, MAX_CELLS);
     let lattice = Lattice::new((a, b), (along as i64, across as i64));
@@ -25,6 +31,8 @@ pub fn sampler(p: &AnisotropicNoise, seed: u64) -> Sampler<'static> {
     })
 }
 
+/// `b ≥ 0`: a fibre has no front, so `angle` and `angle + ½` are one direction. A diagonal
+/// always fits under `limit`.
 pub fn snap(angle: f32, limit: f32) -> (i64, i64) {
     let want = (angle * TAU).rem_euclid(PI);
     let limit = limit.max(SQRT_2 + 1e-4);

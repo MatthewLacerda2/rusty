@@ -10,6 +10,7 @@ pub struct DevEditorState {
     pub repl_input: rusty_dev::console::ReplInput,
     /// A line the user submitted this frame, awaiting evaluation by the front-end.
     pub pending_repl: Option<String>,
+    /// Never saved: `Storage` is the game's store, not the editor's.
     pub show_play_console: bool,
     /// The demo open on the Game view's timeline, if any.
     pub demo: Option<super::demo::DemoView>,

@@ -1,4 +1,3 @@
-//! Scanline accumulation, as `font-rs` and stb_truetype.
 //! Tile units, `u` right, `v` down; a Shape over the tile edge wraps: each copy meeting the tile is
 //! drawn.
 
@@ -72,6 +71,7 @@ fn copies(lo: f32, hi: f32) -> std::ops::RangeInclusive<i64> {
     first..=last
 }
 
+/// Two spare columns a row, for an edge on the right border.
 struct Accumulator {
     w: usize,
     h: usize,

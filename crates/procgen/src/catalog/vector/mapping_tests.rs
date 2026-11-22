@@ -96,7 +96,8 @@ fn a_translation_moves_the_content_back_by_that_much_of_a_tile_wrapped() {
 
 #[test]
 fn a_translation_moves_the_content_before_the_turn() {
-    // The read point is the output point turned, scaled, then offset.
+    // The read point is the output point turned, scaled, then offset: the mark moves back by
+    // the translation in the input, and the turn then carries it.
     let out = run(&mapping([1.0; 2], 0.25, [0.25, 0.0], true), &dot((24, 4)));
     assert_eq!(out, dot(turned((16, 4), 1)));
 }

@@ -1,7 +1,8 @@
 //! The Material card's slot list: one row per sub-mesh run of the entity's
 //! mesh (Unity's `Materials` list, `Element 0`, `Element 1`, …). Each row picks the
 //! library material that run draws with, through the shared
-//! `authoring::material::set_slot` op `Material.SetAt` calls too, and the selected
+//! `authoring::material::set_slot` op `Material.SetAt` calls too; the selected row
+//! is the one the card below edits.
 
 use std::collections::BTreeMap;
 

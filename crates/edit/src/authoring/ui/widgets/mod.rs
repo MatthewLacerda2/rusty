@@ -50,6 +50,7 @@ impl UiWidget {
         Self::InputField,
     ];
 
+    /// Also the prefab's stem; each builder spells it as its root's name: rename both.
     pub fn label(self) -> &'static str {
         match self {
             Self::Canvas => "Canvas",
@@ -141,7 +142,8 @@ pub fn seed() {
     }
 }
 
-/// Through a temp file and a rename, so a concurrent reader never sees a half-written script.
+/// Atomic, so a test process seeding the same workspace never reads half a script; `fs::written`
+/// also tells the script class cache to reload it.
 fn write_if_changed(path: &Path, bytes: &[u8]) {
     // lint: allow(stored-format) seeds scripts and `.prefab`s; the prefab format is `edit::prefab`'s
     if std::fs::read(path).is_ok_and(|old| old == bytes) {

@@ -46,9 +46,15 @@ impl Op for SlopeBlur {
 }
 
 const SAMPLES: u32 = 8;
+/// The most samples a node reads per pixel: bounds its cost.
 pub const MAX_SAMPLES: u32 = 64;
+/// The longest reach, in tiles.
 const MAX_REACH: f32 = 1.0;
+/// Half the span the gradient is taken over, in tiles: a pixel at 128², so from there up a
+/// hard edge reads the same slope, `1 / (2 × SPAN)`.
 pub const SPAN: f32 = 1.0 / 128.0;
+/// Past it a slope of 1e-6 already reaches [`MAX_REACH`]; the bound keeps a flat axis's
+/// `intensity × 0` a 0, where an infinite intensity would read NaN.
 pub const MAX_INTENSITY: f32 = 1e6;
 
 fn samples() -> u32 {
@@ -70,6 +76,7 @@ pub fn slope_blur(img: &Image, slope: &Image, intensity: f32, n: u32, mode: Slop
             (s(0.0, SPAN) - s(0.0, -SPAN)) / (2.0 * SPAN),
         );
         let (du, dv) = reach(intensity, grad);
+        // The pixel itself, read exactly, not bilinearly: all of flat ground, and the first sample.
         let here = img.get_wrapped(x, y);
         if du == 0.0 && dv == 0.0 {
             return here;

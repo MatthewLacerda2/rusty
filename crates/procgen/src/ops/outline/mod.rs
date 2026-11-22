@@ -8,6 +8,7 @@ use glam::Vec2;
 use fill::{Edge, Shape};
 use svg::Subpath;
 
+/// Each subpath closed, as SVG fills an open one.
 pub fn filled(subpaths: &[Subpath]) -> Vec<Shape> {
     subpaths.iter().map(|s| closed(&s.points)).collect()
 }

@@ -26,6 +26,8 @@ macro_rules! kinds {
 
 first_class!(kinds);
 
+/// Serde reads the `Playback` an Animator flattens as a map, typeless, so those fields ask
+/// `Playback`.
 pub(super) fn animator_field_type(name: &'static str) -> (bool, Option<&'static str>) {
     match field_type::<AnimatorComponent>(name) {
         (false, None) => field_type::<Playback>(name),

@@ -1,5 +1,5 @@
-//! A borrow alone makes rapier list a body as modified, and that order decides how the next step
-//! solves new contact pairs.
+//! A borrow alone lists a body as modified in rapier, and that order decides how the next step
+//! solves new pairs.
 
 use std::collections::BTreeSet;
 
@@ -34,7 +34,8 @@ impl PhysicsWorld {
         self.tracked.material_assets = Some(assets);
         #[cfg(test)]
         self.tracked.visits.record(&named, &self.plan);
-        // Before any character sweep, so no sweep sees a stale enabled flag.
+        // First, so no sweep sees a stale enabled flag and `sync_states` compares a
+        // just-enabled body whole.
         self.sync_enabled(scene, &named.activity);
         let collider = &named.collider;
         self.sync_materials(scene, if assets_moved { &Owners::All } else { collider });
@@ -45,14 +46,15 @@ impl PhysicsWorld {
         };
         self.sync_layers(scene, layer);
         self.sync_sensors(scene, collider);
-        // Before the masses: a resized capsule changes its body's volume.
         self.sync_characters(scene, &named.every);
         self.sync_mesh_shapes(scene, reshaped.as_ref());
         self.sync_fits(scene, &named.fits);
+        // After every pass changing a volume it reads: sensor, capsule, shape.
         self.sync_masses(scene, &named.every);
         let owners = match named.every {
             Owners::All => Owners::All,
             Owners::Only(mut named) => {
+                // Stepped bodies revisit only the state pass: a step moves nothing else.
                 named.extend(stepped.iter().filter(|o| self.plan.contains_key(o)));
                 Owners::Only(named)
             }
@@ -82,7 +84,6 @@ impl PhysicsWorld {
             .collect()
     }
 
-    /// Static and kinematic bodies keep their transform (no world<->local round-trip drift).
     pub(super) fn sync_from_rapier(
         &self,
         scene: &mut Scene,
@@ -101,6 +102,7 @@ impl PhysicsWorld {
                 continue;
             }
             let below = scene.world.self_and_descendants(owner).skip(1);
+            // Only later owners: the full pass, ascending, never rewrites an earlier one.
             queue.extend(below.filter(|&d| d > owner && self.plan.contains_key(&d)));
         }
     }
@@ -161,9 +163,9 @@ impl PhysicsWorld {
         (named, Some(c.reshaped()))
     }
 
-    /// Only the ids that can re-home are checked (`Changed::homes`), so a tick where only poses
-    /// moved re-derives no owner. That holds while every reparent, `Collider` or carrier change
-    /// stamps `Activity` or its own column.
+    /// Only ids that can re-home (`Changed::homes`) are checked, so a pose-only tick re-derives
+    /// no owner; every reparent, `Collider` or carrier change must stamp `Activity` or its own
+    /// column.
     fn plan_may_change(&self, scene: &Scene, changed: &Changed) -> bool {
         let t = &self.tracked;
         let w = &scene.world;

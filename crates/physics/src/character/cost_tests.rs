@@ -5,6 +5,8 @@ use rusty_scene::Scene;
 
 const TICKS: usize = 60;
 
+/// Upper bounds per walking Move: rapier runs, mesh casts, triangles visited,
+/// constraint builds, `contact` queries.
 const WALKING: [f64; 5] = [1.0, 3.0, 34.0, 2.0, 2.0];
 
 type Moves = fn(&PhysicsWorld, &mut Scene, u32, usize);

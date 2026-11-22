@@ -1,9 +1,6 @@
-//! crates/editor/src/inspector/assets/nav_areas.rs — the scene's navigation area table
-//!, inside the Navmesh section.
-//! Each row shows an area's id, name and cost; a cost edit and "Add Area" write
-//! through the same `NavMeshSettings::set_area_cost` / `define_area` that
-//! `Navigation.SetAreaCost` / `DefineArea` call, then hand the new costs to the
-//! live graph. Costs are read at search time, so nothing is rebaked.
+//! A cost edit and "Add Area" write through the same `NavMeshSettings::set_area_cost` /
+//! `define_area` that `Navigation.SetAreaCost` / `DefineArea` call, then hand the new
+//! costs to the live graph. Costs are read at search time, so nothing is rebaked.
 
 use crate::widgets::DragRange;
 use rusty_navigation::{NavigationGraph, MIN_AREA_COST};

@@ -35,6 +35,8 @@ impl SeedManifest {
 
     pub fn seed(&mut self, dest: &Path, bundled: &[u8], hint: &str) -> SeedOutcome {
         let key = paths::to_slash(dest);
+        // FNV-1a, not `hash::content`: `.seeded` is committed in game repos, so a new hash
+        // would make every seeded file look user-edited and stop it refreshing.
         let want = fnv1a64(bundled);
         let outcome = match std::fs::read(dest) {
             Err(_) => SeedOutcome::Written,
@@ -52,6 +54,8 @@ impl SeedManifest {
                 return outcome;
             }
             SeedOutcome::Written | SeedOutcome::Refreshed => {
+                // Through `fs::written`: seeded scripts and `.gltf` files are read by
+                // path-keyed caches.
                 if let Err(e) = make_parent(dest)
                     .and_then(|()| fs::written::write(dest, bundled).map_err(|e| e.to_string()))
                 {
@@ -79,6 +83,7 @@ impl SeedManifest {
         self.seed(dest, bundled, hint)
     }
 
+    /// Merged over the file as it is now: tests and tools seed from many processes at once.
     pub fn save(&self) -> Result<(), String> {
         if self.touched.is_empty() {
             return Ok(());

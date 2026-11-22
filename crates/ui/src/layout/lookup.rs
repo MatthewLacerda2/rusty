@@ -1,12 +1,10 @@
-//! crates/ui/src/layout/lookup.rs — one element's rect on demand, without the whole pass.
-
 use super::sizes::layout_children;
 use super::{child_node, group, root_canvas_of, root_node, UiRect};
 use crate::UiView;
 use rusty_ecs::World;
 
-/// The rect of one entity against `view`, computed on demand by walking only its
-/// ancestor chain — identical to what [`UiLayout::compute_in`](super::UiLayout::compute_in)
+/// The rect of one entity against `view`, walking only its ancestor chain through the
+/// `root_node` / `child_node` steps [`UiLayout::compute_in`](super::UiLayout::compute_in) runs.
 pub fn rect_in(world: &World, id: u32, view: &UiView) -> Option<UiRect> {
     let root = root_canvas_of(world, id)?;
     let mut chain = Vec::new();

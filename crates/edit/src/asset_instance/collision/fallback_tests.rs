@@ -32,10 +32,12 @@ fn a_collision_mesh_that_no_longer_loads_falls_back_on_load() {
     )
     .unwrap();
     let mut scene = Scene::new();
+    // A lone part: a whole model is rebuilt from its sidecar on load instead.
     let part = format!("{path}::Chair");
     let id = instantiate_asset(&mut scene, &part, None, glam::Vec3::ZERO).unwrap();
     assert_eq!(triangles(&scene, id), 2);
     let text = serde_json::to_string(&to_scene_data(&scene)).unwrap();
+    // Renamed in the model since the save.
     let text = text.replace("::Chair_col", "::Chair_renamed");
     let mut loaded = Scene::new();
     apply_scene_data(&mut loaded, serde_json::from_str(&text).unwrap());

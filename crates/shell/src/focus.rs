@@ -1,16 +1,14 @@
-//! crates/shell/src/focus.rs — what the window gaining or losing focus means.
-
 use super::frame::Host;
 use super::{boot, capture_clipboard, Shell};
 use rusty_app::GameWorld;
 
-/// Handle a `WindowEvent::Focused(focused)` in the frontend `host`.
 pub(super) fn changed(shell: &mut Shell, game: &mut GameWorld, focused: bool, host: Host) {
     shell.window_focused = focused;
     if focused {
         capture_clipboard(shell, game);
         refresh_assets(game, host);
     } else {
+        // Keys released while unfocused send no key-up.
         game.input().borrow_mut().release_all();
     }
 }

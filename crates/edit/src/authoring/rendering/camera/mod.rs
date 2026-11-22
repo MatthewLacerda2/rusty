@@ -14,7 +14,6 @@ pub use rusty_scene::rules::taa::{
 
 pub use rusty_scene::rules::lens::{MAX_FOV, MIN_CLIP_GAP, MIN_FOV, MIN_NEAR, MIN_ORTHO_SIZE};
 
-/// A NaN takes [`MIN_FOV`] (`f32::clamp` would keep it).
 pub fn set_fov(c: &mut CameraComponent, fov: f32) {
     c.fov = lens::hold_fov(fov);
 }
@@ -24,8 +23,8 @@ pub fn set_fov_axis(c: &mut CameraComponent, axis: FovAxis) {
     c.fov_axis = axis;
 }
 
-/// Unity's holds: a near plane past the far one pushes it out, even where `near + MIN_CLIP_GAP`
-/// rounds back to `near`.
+/// As Unity holds them: a near plane past the far one pushes the far one strictly beyond it, even
+/// where `near + MIN_CLIP_GAP` rounds back to `near`.
 pub fn set_clip_planes(c: &mut CameraComponent, near: f32, far: f32) {
     (c.near, c.far) = lens::hold_clip_planes(near, far);
 }
@@ -86,8 +85,8 @@ pub fn set_use_occlusion_culling(c: &mut CameraComponent, on: bool) {
     c.use_occlusion_culling = on;
 }
 
-/// A guard against a typo allocating gigabytes, not a quality bound (4096² is a 64 MB colour
-/// target).
+/// Pixels per side: a guard against a typo allocating gigabytes, not a quality bound (4096² is a
+/// 64 MB colour target).
 pub const MAX_TARGET_SIZE: u32 = 4096;
 
 pub fn set_projection(c: &mut CameraComponent, projection: Projection) {
