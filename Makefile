@@ -40,7 +40,7 @@ SELF_CHECKS := target-dir inventory
 
 .DEFAULT_GOAL := help
 .NOTPARALLEL:
-.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
+.PHONY: help setup compile-cache check gates quick-gates pre-commit resolved $(SELF_CHECKS) $(GATES) mergeable ruleset queue queue-daemon queue-stop queue-status queue-events queue-quiet blockers checks conflicts reclaim coder coders review-level rebriefs coder-cost mutants-remote test-gpu test-explore test-one-process dead-pub editor-capture library-previews game game-test export import launcher bench bench-scenes ray-scene bench-ab bless-converters fuzz-lock
 
 help: ## List the verbs
 	@grep -E '^[a-z-]+:.*## ' $(firstword $(MAKEFILE_LIST)) | \
@@ -338,6 +338,9 @@ queue-status: ## Does the queue's supervisor run (its lock's PID, checked alive)
 
 queue-events: ## The stream a Monitor runs: hand-backs, merges, ready flips, coders' issue comments; exits 1 once the supervisor is gone
 	@python3 .github/scripts/queue-view.py events
+
+queue-quiet: ## The quiet Monitor: reclaims after each merge and runs the coders' drain itself, says only what needs someone. ARGS=--no-drain
+	@python3 .github/scripts/queue-view.py quiet $(ARGS)
 
 # Diffs each issue body's "Blocked by #N" against GitHub's blocked_by record, both
 # directions: a prose-only blocker is invisible to everything that plans from the
