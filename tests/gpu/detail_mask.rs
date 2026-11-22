@@ -110,8 +110,7 @@ fn the_masks_black_half_draws_no_detail_and_its_white_half_the_whole_detail() {
         let shows = half(&full, &plain, false).min(half(&full, &plain, true));
         let (lone, unread) = (whole(&lone, &plain), whole(&unread, &full));
         eprintln!("[mask] grazing {grazing}: to plain {to_plain:.2}, to full {to_full:.2}, detail shows {shows:.2}, lone {lone:.2}, missing {unread:.2}");
-        // `shows`, head-on / grazing: lavapipe 25.74 / 27.14, Metal 26.30 / 25.92, RTX 2060
-        // 24.76 / 22.71; every `< 0.5` value 0.00 on all.
+        // `shows`, head-on / grazing: lavapipe 25.74 / 27.14; every `< 0.5` value 0.00.
         assert!(shows > 4.0, "the detail shows on both halves ({shows:.2})");
         let near_zero = [
             (to_plain, "the black half draws no detail"),

@@ -90,6 +90,7 @@ fn faces_the_steering_direction_not_the_dodge() {
         if v.length() < 0.5 {
             continue;
         }
+        // Open floor, one straight leg: the steering direction is the bearing to the target.
         let to = Vec3::new(36.0, 0.0, 1.0) - scene.world.transform(a).unwrap().position;
         let steer = to.x.atan2(to.z).to_degrees();
         dodge = dodge.max((v.x.atan2(v.z).to_degrees() - steer).abs());

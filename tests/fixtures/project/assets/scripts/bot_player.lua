@@ -1,5 +1,5 @@
--- DEV-ONLY bot-player: presses keys through the writable Input. It takes the Player's one script
--- slot, so it runs the bundled player_controller's drive() itself each frame, after injecting
+-- DEV-ONLY bot-player: presses keys through the writable Input. Attaching it clears the Player's
+-- scripts, so it runs the bundled player_controller's drive() itself each frame, after injecting
 -- input. Reads scene state + Time only: deterministic.
 
 local Bot = {}

@@ -67,8 +67,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
         .then_some((scene, locker))
 }
 
-/// Mean red of the locker's top and foot from +X, the lamp's side; `host` is shared so the
-/// shots reuse one renderer.
+/// Mean red of the locker's top and foot from +X, the lamp's side.
 pub(super) fn top_and_foot(host: &mut CaptureHost, scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));

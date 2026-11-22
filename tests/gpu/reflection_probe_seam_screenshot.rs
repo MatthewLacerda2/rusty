@@ -84,8 +84,6 @@ fn largest_step(img: &image::RgbImage) -> i32 {
 fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
     let cam = Camera::new(Vec3::new(0.0, 3.0, 4.0), -90.0, -50.0);
     let mut host = CaptureHost::new();
-    // In summed RGB bytes: the cube's own gradient and dither, 9 and 8 on lavapipe, stay
-    // under it; a hard step down the boxes' shared face would not.
     for turn in [0.0, 0.5] {
         let path = crate::temp::dir().join(format!("rusty_gpu_1995_seam_{turn}.png"));
         if !capture_into(&mut host, &scene(turn), &cam, &path, 160, 96).expect("capture") {
@@ -97,6 +95,8 @@ fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
             "[probes] turn {turn}: largest step {step} ({})",
             path.display()
         );
+        // Summed RGB bytes: the cube's own gradient and dither (9 and 8 on lavapipe) stay
+        // under 36; a hard step down the boxes' shared face would not.
         assert!(
             step < 36,
             "turn {turn}: a seam across the floor, step {step}"

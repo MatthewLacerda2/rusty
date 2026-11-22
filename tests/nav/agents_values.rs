@@ -94,7 +94,7 @@ fn waypoint_behind_agent_is_advanced_past() {
     scene.world.transform_mut(id).unwrap().position = start;
     let mut ag = agent_toward(target);
     ag.cached_path = vec![
-        Vec3::new(4.8, 0.0, 5.0), // behind the agent, within reached distance
+        Vec3::new(4.8, 0.0, 5.0), // 0.2 m behind: within `WAYPOINT_REACHED_DISTANCE`'s 0.5 m
         Vec3::new(10.0, 0.0, 5.0),
     ];
     ag.path_cursor = 0;

@@ -3,6 +3,7 @@ use rusty::components::particle::{Flipbook, ParticleRenderMode};
 
 use super::{dump, emitter, lua, scene_with};
 
+/// Every hidden field differs between particles, so a shuffled survivor shows.
 pub(super) fn hidden(n: u32) -> (std::rc::Rc<std::cell::RefCell<rusty::scene::Scene>>, u32) {
     let mut cfg = emitter(n);
     cfg.render.mode = ParticleRenderMode::Mesh;

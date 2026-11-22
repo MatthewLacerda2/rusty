@@ -39,7 +39,7 @@ fn counter(mode: LightMode) -> Scene {
     scene
 }
 
-/// Baked at 8 texels a unit; the -62.2° pitch aims at the spot's mirror image, 0.53 m off its foot.
+/// The -62.2° pitch aims at the spot's mirror image, 0.53 m off its foot.
 fn baked(mut scene: Scene, name: &str, directional: bool) -> Option<Vec<f32>> {
     bake(&mut scene, name, directional, 8.0);
     let mut camera = Camera::new(Vec3::new(-1.0, 0.9, 0.0), 0.0, -62.2);

@@ -1,8 +1,8 @@
 //! A pixel too bright for half-float is stored finite: metal under a lamp reflects
-//! past `Rgba16Float`'s 65504, and forward colour returns through `transparent::finite_hdr`,
-//! so the highlight stays white under bloom. Lavapipe stores an overflowing texel finite even
-//! without the clamp, so on Linux CI this cannot fail; a GPU that rounds to `Inf`, as Metal
-//! does, is where it holds the clamp.
+//! past `Rgba16Float`'s 65504, and an `Inf` there turns bloom's bright pass NaN, a black
+//! block round the highlight. Forward colour returns through `transparent::finite_hdr`,
+//! so the highlight stays white. Lavapipe stores an overflow finite even unclamped, so
+//! this fails only on a GPU that rounds to `Inf`, as Metal does.
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset, MaterialComponent};
@@ -25,7 +25,7 @@ fn scene() -> Scene {
         base_color: [1.0, 1.0, 1.0],
         metallic: 1.0,
         roughness: 0.05,
-        // Past half-float too, so the overflow never hangs on a GGX peak's brightness.
+        // Emissive past half-float too: the overflow holds however bright the GGX peak is.
         emissive: [1e6, 1e6, 1e6],
         ..MaterialAsset::default()
     };

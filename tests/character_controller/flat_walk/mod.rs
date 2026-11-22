@@ -27,7 +27,7 @@ const STICKS: [f32; 2] = [0.0, -0.02];
 const SLACK: f32 = 0.01;
 
 /// A floor: name, primitive, scale, centre height (top face at y = 0), static flag, plane
-/// subdivisions.
+/// subdivisions (its collider's triangle seams).
 pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool, u32);
 
 const BOXES: [Floor; 4] = [
@@ -113,7 +113,7 @@ fn a_walk_across_flat_boxes_covers_every_stride() {
     }
 }
 
-// Each mesh floor runs in its own test, so its own process (nextest).
+// One test per mesh floor: its own process (nextest).
 
 #[test]
 fn a_walk_across_a_mesh_plane_covers_every_stride() {

@@ -1,6 +1,7 @@
 //! A far busy glossy metal floor, the camera turning: the busy map shimmers far
 //! less than its twin (no widening), keeps its light, and is the twin's frame up
-//! close.
+//! close. BC5 reads the importer's per-level length table, uncompressed each sample's
+//! length; both must draw alike.
 
 use glam::Vec3;
 use rusty::components::LightComponent;
@@ -86,7 +87,7 @@ fn a_far_busy_glossy_floor_shimmers_less_keeps_its_light_and_is_unchanged_up_clo
             "{name} moved the energy: {ratio:.3}"
         );
     }
-    // The two routes agree, far and near (BC5's own rounding aside).
+    // Far and near (BC5's own rounding aside).
     let far = bc5.far / rgba.far;
     assert!(
         (0.85..1.15).contains(&far),

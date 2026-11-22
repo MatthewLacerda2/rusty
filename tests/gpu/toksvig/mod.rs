@@ -19,7 +19,8 @@ use rusty::scene::{Camera, Scene};
 pub(super) const W: u32 = 128;
 pub(super) const H: u32 = 96;
 
-// Eye and pitch in degrees: far looks just below the horizon, near down at the map's base level.
+// Eye in metres, pitch in degrees: far looks just below the horizon, near down at the
+// map's base level.
 pub(super) const FAR: (Vec3, f32) = (Vec3::new(0.0, 0.6, 6.5), -4.0);
 pub(super) const NEAR: (Vec3, f32) = (Vec3::new(0.0, 0.25, -2.5), -60.0);
 

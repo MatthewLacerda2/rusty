@@ -41,7 +41,7 @@ fn ticks_to_full_speed(speed_limit: f32, acceleration: f32) -> u32 {
         .expect("never reached full speed")
 }
 
-/// Time to full speed is `speed / acceleration`, landing on `speed` exactly.
+/// Full speed after `speed / acceleration`, landing on `speed` exactly.
 #[test]
 fn time_to_full_speed_is_speed_over_acceleration() {
     // 3.5 / 8 = 0.4375 s = 26.25 ticks; 7 / 8 = 52.5 ticks.
@@ -112,7 +112,8 @@ fn braking_inside_the_stopping_distance_still_moves() {
     assert!((speed(&scene, id) - v).abs() < 1e-5);
 }
 
-/// An arrived agent is not steering, so it does not dodge a passer-by.
+/// An arrived agent still holds its path but is not steering, and only steering agents
+/// solve avoidance: it does not dodge a passer-by.
 #[test]
 fn an_arrived_agent_does_not_dodge() {
     let home = Vec3::new(10.0, 0.0, 10.0);

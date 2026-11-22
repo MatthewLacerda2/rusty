@@ -1,7 +1,7 @@
-//! UI render pass screenshot: the HUD from `hud_scene` rendered headless,
-//! asserted by the colour at known pixels rather than a byte-exact golden (PNG rows
-//! run top-down, hence `row = SIZE - 1 - y`). Covers a 50%-filled bar, a 9-sliced
-//! panel, a faded CanvasGroup blending in display space, and a RectMask clip.
+//! The HUD from `hud_scene` rendered headless, asserted by the colour at known pixels
+//! rather than a byte-exact golden (PNG rows run top-down, hence `row = SIZE - 1 - y`).
+//! Covers a 50%-filled bar, a 9-sliced panel, a faded CanvasGroup blending in display
+//! space, and a RectMask clip.
 
 use glam::Vec3;
 use rusty::dev::screenshot::capture;

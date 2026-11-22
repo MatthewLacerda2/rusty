@@ -1,7 +1,6 @@
-//! Integration coverage for the `Graphics` scripting namespace: the
-//! per-volume post-FX getters/setters write the active `PostProcessingComponent`
-//! / `CameraComponent` (the quality presets: `quality`). These are render-only, one-way writes —
-//! they never feed `FixedUpdate` — so the test only asserts the surface, not sim evolution.
+//! `Graphics`' getters/setters write the active `PostProcessingComponent` / `CameraComponent`
+//! (the quality presets: `quality`). Render-only writes never feed `FixedUpdate`, so the
+//! tests assert the surface, not sim evolution.
 
 use std::cell::RefCell;
 use std::rc::Rc;
