@@ -12,7 +12,7 @@ const WINDOW: usize = 4_410;
 /// Half a cycle of the 6 Hz vibrato: the sine starts at zero, so sharp, then flat.
 const HALF_WOBBLE: usize = 3_675;
 
-/// The fourth vibrato cycle, 4 × 7_350: past the sweep.
+/// Four vibrato cycles in, 4 × 7_350: past the sweep.
 const SHARP_HALF: usize = 29_400;
 
 const FLAT_HALF: usize = SHARP_HALF + HALF_WOBBLE;

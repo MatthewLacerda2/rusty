@@ -1,5 +1,5 @@
-//! voice: one `source → filter → amp` path of a note, and how a patch's layers share the note they
-//! are summed into.
+//! One `source → filter → amp` path of a note, and how a patch's layers share the note they are
+//! summed into.
 
 use super::lfo::Lfos;
 use super::tracks::{cutoff_track, pitch_track};

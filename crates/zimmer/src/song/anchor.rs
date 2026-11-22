@@ -40,8 +40,9 @@ pub(crate) struct Landing {
     pub(crate) section: usize,
 }
 
-/// `None` for an unresolved or out-of-range anchor: `check` refuses both, so only a reader that
-/// does not render meets one.
+/// `None` for a song that pins nothing (`shape::plan` then fits or writes the clock), and for an
+/// unresolved or out-of-range anchor: `check` refuses both, so only a reader that does not render
+/// meets one.
 pub(crate) fn landings(song: &Song) -> Option<Vec<Landing>> {
     if song.anchors.is_empty() {
         return None;

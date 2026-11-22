@@ -40,7 +40,6 @@ impl<'a> Mix<'a> {
         }
     }
 
-    /// A keyed track plays even outside a solo, so the solo hears the duck the mix has.
     pub(super) fn needs(&self, track: usize) -> bool {
         self.scope.heard(track) || self.keys[track].is_some()
     }

@@ -1,4 +1,4 @@
-//! The Chamberlin state-variable filter.
+//! Chamberlin's state-variable filter: one pass yields every `FilterKind`'s output at once.
 
 use std::f32::consts::PI;
 

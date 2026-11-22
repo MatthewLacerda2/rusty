@@ -1,4 +1,4 @@
-//! how far an operator's own modulators bend it, per sample.
+//! How far an operator's own modulators bend it, per sample.
 
 use crate::patch::FM_OPERATORS;
 

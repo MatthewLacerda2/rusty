@@ -1,4 +1,5 @@
-//! Filter bands, from the RBJ cookbook.
+//! Filter bands as RBJ cookbook biquads: `core::filter`'s SVF has no shelf or bell, nor a static
+//! band's exact curve.
 
 mod cookbook;
 
@@ -73,7 +74,8 @@ impl Biquad {
             .all(|c| c.is_finite())
     }
 
-    /// Transposed direct form II: two states, and better conditioned in `f32` on low bands.
+    /// Transposed direct form II: two states, and less `f32` round-off on low bands than direct
+    /// form II.
     fn run(self, buf: &mut [f32]) {
         let (mut z1, mut z2) = (0.0f32, 0.0f32);
         for sample in buf.iter_mut() {
@@ -194,8 +196,7 @@ mod tests {
 
     #[test]
     fn a_gain_of_zero_is_not_an_approximation_of_the_input() {
-        // The property that lets a recipe park a band it is still thinking about: identical
-        // samples, not almost-identical ones.
+        // What lets a recipe park a band: identical samples, not almost-identical ones.
         for kind in [EqKind::LowShelf, EqKind::Peak, EqKind::HighShelf] {
             let original = sine(440.0);
             let mut parked = original.clone();

@@ -1,5 +1,5 @@
-//! sweep — a cutoff moved from outside the note, as the per-sample base
-//! [`super::tracks::cutoff_track`] multiplies.
+//! A cutoff moved from outside the note, as the per-sample base [`super::tracks::cutoff_track`]
+//! multiplies.
 
 /// Sample-frames between reads of the curve, about 0.7 ms; straight lines join the reads.
 const SWEEP_STEP: usize = 32;

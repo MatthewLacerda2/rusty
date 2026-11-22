@@ -1,4 +1,4 @@
-//! gain — how a gain track moves: the ballistics [`super::compress`] and [`super::limiter`] share.
+//! How a gain track moves: the ballistics [`super::compress`] and [`super::limiter`] share.
 
 /// Seconds: half a cycle of 25 Hz, so a kick's ripple is held and read as a level.
 pub(crate) const HOLD: f32 = 0.02;
@@ -35,7 +35,7 @@ impl Ballistics {
         self.hold + 2 * self.attack + settle.ceil() as usize
     }
 
-    /// Linear gains in `0..=1`; each pass only lowers them, so no frame ends above its target.
+    /// Linear gains in `0..=1`; every pass keeps each frame at or under its target.
     pub(crate) fn smooth(&self, target: &[f32]) -> Vec<f32> {
         let depth: Vec<f32> = target.iter().map(|gain| decibels(*gain)).collect();
         let held = deepest(&depth, self.hold, Side::Behind);

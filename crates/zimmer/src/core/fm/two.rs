@@ -1,4 +1,4 @@
-//! two-operator FM.
+//! Two-operator FM.
 
 use std::f32::consts::TAU;
 

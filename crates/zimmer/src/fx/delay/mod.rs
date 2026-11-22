@@ -8,7 +8,7 @@ pub(crate) enum Spacing<'a> {
 }
 
 impl<'a> Spacing<'a> {
-    /// Beats win when given; validation refuses `time` and `beats` together.
+    /// Beats win; validation refuses `time` and `beats` together.
     pub(crate) fn new(time: f32, beats: Option<f32>, tempo: &'a dyn Tempo) -> Self {
         match beats {
             Some(beats) => Self::Beats(beats, tempo),
@@ -16,7 +16,7 @@ impl<'a> Spacing<'a> {
         }
     }
 
-    /// Seconds: sizes the line, so a slowing tempo never reads past what was kept.
+    /// Seconds size the line, so a slowing tempo never reads past it.
     pub(crate) fn longest(self) -> f32 {
         match self {
             Self::Seconds(time) => time,
@@ -26,6 +26,7 @@ impl<'a> Spacing<'a> {
 
     fn at(self, frame: usize, cap: usize, rate: f32) -> usize {
         match self {
+            // A plain ring: `cap` is `time` in samples, so the slot read is the next one written.
             Self::Seconds(_) => cap,
             Self::Beats(beats, tempo) => {
                 let len = (beats * tempo.beat_seconds(frame) * rate).round();
@@ -61,7 +62,7 @@ fn line(
     let Some(cap) = line_length(spacing.longest(), buf.len(), rate) else {
         return;
     };
-    // Under 1 so the tail dies; `crossed` and `tail_seconds` take the same 0.95.
+    // Under 1 so the tail dies; `crossed` and `tail_seconds` share 0.95.
     let feedback = feedback.clamp(0.0, 0.95);
     let mix = mix.clamp(0.0, 1.0);
     let mut line = vec![0.0f32; cap];
@@ -124,7 +125,7 @@ fn crossed(
     }
 }
 
-/// `None` past eight times the signal's length: an echo that far is never heard.
+/// `None` from eight times the signal's length: an echo that far is never heard.
 fn line_length(time: f32, frames: usize, rate: f32) -> Option<usize> {
     if !time.is_finite() || time <= 0.0 {
         return None;
@@ -139,8 +140,8 @@ pub(crate) fn tail_seconds(time: f32, feedback: f32) -> f32 {
     if feedback <= 0.0 {
         return time;
     }
-    // Echo `k` lands at `k · time` at `feedback^(k-1)`; the last one kept is the last still above
-    // −60 dB. The chain's own cap bounds the product.
+    // Echo `k` lands at `k · time`, at `feedback^(k-1)`; the last kept is the last above −60 dB.
+    // The chain's cap bounds the product.
     let repeats = (0.001f32.ln() / feedback.ln()).ceil() + 1.0;
     time * repeats
 }

@@ -204,8 +204,8 @@ pub(super) fn strays(
     Some((outside / held, found))
 }
 
-/// Never given a wrapped copy: copies start before zero, so sort first, and a clash is placed at
-/// the later onset.
+/// Never given a wrapped copy, whose start is below zero: a copy sorts first and a clash is placed
+/// at the later onset, and strays skip copies.
 fn place(song: &Song, note: &Held) -> Place {
     Place {
         section: song

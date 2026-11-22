@@ -20,7 +20,8 @@ pub use stages::{
     MAX_PARTIALS, MAX_PULSE_WIDTH, MAX_VOICES, MIN_PULSE_WIDTH,
 };
 
-/// What every fx chain is checked for: `song::validate` runs it on each track's and the song's.
+/// What every fx chain is checked for: `Patch::check` runs it on the patch's own, `song::validate`
+/// on each track's and the song's.
 pub(crate) fn check_chain(chain: &[Fx]) -> Result<(), SynthError> {
     for fx in chain {
         match fx {

@@ -2,7 +2,8 @@ use super::gain::Ballistics;
 use crate::level::intersample::{Channel, TAPS};
 use crate::stereo::Stereo;
 
-/// −1 dBTP, 10^(−1/20): a decibel of headroom for a lossy codec's reconstruction.
+/// −1 dBTP, 10^(−1/20): a decibel of headroom for a lossy codec's reconstruction, which also
+/// absorbs an overshoot between frames that the per-frame gain misses.
 const CEILING: f32 = 0.891_251;
 /// Seconds; also how far a peak reaches back, which `song::excerpt` renders past a window.
 pub(crate) const LOOKAHEAD: f32 = 0.002;

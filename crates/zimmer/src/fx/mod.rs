@@ -1,4 +1,4 @@
-//! fx — the post-chain: delay, reverb, drive, EQ, compression, chorus, and the mandatory limiter
+//! The post-chain: delay, reverb, drive, EQ, compression, chorus, and the mandatory limiter.
 
 pub(crate) mod chorus;
 pub(crate) mod compress;

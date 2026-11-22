@@ -1,4 +1,4 @@
-//! unison: one written oscillator, several sounding ones.
+//! One written oscillator, several sounding ones.
 
 use crate::hash::unit2;
 use crate::patch::Osc;
@@ -81,8 +81,8 @@ mod tests {
                 assert_ne!(phase, other, "two voices start together in {phases:?}");
             }
         }
-        // And the first voice is where a lone oscillator has always started, which is what keeps a
-        // one-voice entry the samples it always was.
+        // And the first voice starts where a lone oscillator does, so a one-voice entry renders the
+        // same samples.
         assert_eq!(phases[0], unit2(1, 0, PHASE_CHANNEL, 9));
     }
 

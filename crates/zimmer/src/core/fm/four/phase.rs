@@ -1,4 +1,4 @@
-//! where a four-operator note's operators start in their cycles.
+//! Where a four-operator note's operators start in their cycles.
 
 use crate::hash::unit2;
 use crate::patch::FM_OPERATORS;

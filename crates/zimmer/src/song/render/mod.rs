@@ -67,7 +67,6 @@ pub(crate) fn never() -> bool {
     false
 }
 
-/// Asks `stop` before each note it synthesises and before the fold-down; `Ok(None)` if it stopped.
 pub(crate) fn mix_song(
     song: &Song,
     resolve: &dyn PatchResolver,
@@ -87,7 +86,6 @@ pub(crate) fn mix_song(
     }
     let (mut master, tracks) = mix.finish(&sections);
     limit(song, &mut master, arrangement_end)?;
-    // After the limiter: `shape` sets the length, then the fades.
     shape(song, &mut master, arrangement_end);
     // Cut last: the limiter and `shape` run on the piece around the window.
     let (from, to) = walk.scope.keep(master.frames());

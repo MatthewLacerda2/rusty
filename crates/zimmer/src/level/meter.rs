@@ -6,8 +6,7 @@ use super::peaks::FramePeaks;
 const FULL_SCALE: f64 = 1.0;
 
 // Reaching full scale counts: a mix is clamped to exactly 1.0 on its way to a file.
-// Held against the true peak; `fx::limiter`'s `CEILING` sits 1 dB under it, read by the same
-// kernel.
+// Held against the true peak; `fx::limiter`'s `CEILING` sits 1 dB under it.
 const CLIPPING: f64 = FULL_SCALE;
 
 const STEREO: usize = 2;

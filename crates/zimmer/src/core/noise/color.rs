@@ -9,14 +9,14 @@ pub(crate) enum Coloring {
     Brown { level: f32 },
 }
 
-/// Paul Kellett's economical pinking filter, `(decay, feed)` per pole; `PINK_DIRECT` is its
-/// raw-draw term.
+/// Paul Kellett's economical pinking filter, `(decay, feed)` per pole.
 const PINK_POLES: [(f32, f32); 3] = [
     (0.99765, 0.099_046_0),
     (0.96300, 0.296_516_4),
     (0.57000, 1.052_691_3),
 ];
 
+/// The same filter's raw-draw term, added unfiltered.
 const PINK_DIRECT: f32 = 0.1848;
 
 /// Empirical: lands the pink sum on white's RMS.
@@ -28,8 +28,8 @@ const BROWN_LEAK: f32 = 0.995;
 /// Empirical, like `PINK_SCALE`: lands brown on white's RMS.
 const BROWN_SCALE: f32 = 0.1009;
 
-/// Samples primed before the note: about 4.8 time constants (425 samples) of the slowest pink
-/// pole, leaving under 1%.
+/// Samples primed before the note: 4.8 time constants of the slowest pink pole (one is 425
+/// samples), leaving under 1%.
 pub(crate) const WARMUP: usize = 2048;
 
 impl Coloring {

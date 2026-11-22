@@ -23,7 +23,8 @@ pub(crate) fn apply(
     mix: f32,
     rate: f32,
 ) {
-    // Only `rate` is guarded: at zero the two-sample line panics `read`'s clamp.
+    // Only a bad `rate` returns early (at zero the two-sample line panics `read`'s clamp); the
+    // other inputs are clamped.
     if !rate.is_finite() || rate <= 0.0 {
         return;
     }

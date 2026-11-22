@@ -1,9 +1,8 @@
-//! which of the four operators a note actually renders, and what its carriers are divided by.
+//! Which of the four operators a note actually renders, and what its carriers are divided by.
 
 use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
-/// Both bounds exclusive: exactly on Nyquist an operator alternates ±A at a level its start phase
-/// picks. `NaN` fails both.
+/// Both bounds exclusive, as `core::nyquist` says; `NaN` fails both.
 pub(crate) fn sounding(operators: &[Operator; FM_OPERATORS], ceiling: f32) -> [bool; FM_OPERATORS] {
     std::array::from_fn(|i| operators[i].ratio > 0.0 && operators[i].ratio < ceiling)
 }

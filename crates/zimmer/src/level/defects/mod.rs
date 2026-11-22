@@ -15,8 +15,8 @@ pub const WORST: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Defect {
-    /// `None` when in every channel, as a mono file's always are; in some of more than two, the
-    /// lowest.
+    /// `None` when the defect is in every channel (always, in a mono file); the lowest channel it
+    /// is in when that is only some of them.
     pub channel: Option<usize>,
     pub at_seconds: f64,
     pub from_seconds: f64,

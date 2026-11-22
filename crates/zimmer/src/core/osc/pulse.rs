@@ -1,4 +1,4 @@
-//! pulse: a square at any duty cycle.
+//! A square at any duty cycle.
 
 use super::wave::poly_blep;
 use crate::core::lfo::Lfos;

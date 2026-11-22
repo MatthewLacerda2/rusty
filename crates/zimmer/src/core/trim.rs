@@ -1,4 +1,4 @@
-//! trim — where a baked one-shot's file ends.
+//! Where a baked one-shot's file ends.
 
 use crate::level::db_to_gain_f32;
 use crate::stereo::Stereo;

@@ -42,7 +42,7 @@ pub(crate) fn frames_in(file_len: usize) -> usize {
     file_len.saturating_sub(HEADER_LEN) / BYTES_PER_FRAME as usize
 }
 
-/// A test hook: only `crates/zimmer/tests/suite` calls it.
+/// A test hook: only `crates/zimmer/tests/suite` and its own unit test call it.
 pub fn seconds_in(file_len: usize) -> f64 {
     frames_in(file_len) as f64 / f64::from(SAMPLE_RATE)
 }

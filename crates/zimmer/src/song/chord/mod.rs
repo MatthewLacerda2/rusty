@@ -14,7 +14,7 @@ use super::{Articulation, Note, Pitch};
 use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
 
-/// Root octave when `oct` is absent: close chords on it sit around middle C, with room for a
+/// Root octave when `oct` is absent: a close seventh on it spans up to middle C, with room for a
 /// ninth above.
 const DEFAULT_OCT: i32 = 3;
 
