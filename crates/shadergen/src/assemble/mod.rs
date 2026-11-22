@@ -96,7 +96,7 @@ fn assemble_surface(
     new_return.push_str("\n    }");
 
     let header = format!(
-        "// {name}.wgsl — authored surface variant (#272), assembled from {n} block(s).\n\
+        "// {name}.wgsl — authored surface variant, assembled from {n} block(s).\n\
          // Base: the forward/surface pass; lighting kept verbatim, the look varied by\n\
          // the blocks folded into the final color, the UVs or the vertex hook.\n",
         name = recipe.name,

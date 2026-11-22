@@ -40,7 +40,7 @@ fn reference(line: &str) -> Option<String> {
 
 pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     let b = line.as_bytes();
-    let number = |from: usize| {
+    let number = |from: usize, min: usize| {
         let end = (from..b.len())
             .find(|&j| !b[j].is_ascii_digit())
             .unwrap_or(b.len());
@@ -48,7 +48,7 @@ pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
         let closed = b
             .get(end)
             .is_none_or(|c| !(c.is_ascii_alphanumeric() || *c == b'_'));
-        (open && closed && end - from >= refs.min_digits).then_some(end)
+        (open && closed && end - from >= min).then_some(end)
     };
     let foreign = |repo: &str| {
         let name = repo.rsplit('/').next().unwrap_or("").to_ascii_lowercase();
@@ -57,19 +57,36 @@ pub(crate) fn reference_as(line: &str, refs: Refs) -> Option<String> {
     for i in 0..b.len() {
         let anchor = i >= 2 && &b[i - 2..i] == b"](";
         if b[i] == b'#' && (i == 0 || b[i - 1] != b'&') && !anchor {
-            if let Some(end) = number(i + 1).filter(|_| !foreign(repo_before(&line[..i]))) {
+            let min = if named(&line[..i]) {
+                1
+            } else {
+                refs.min_digits
+            };
+            if let Some(end) = number(i + 1, min).filter(|_| !foreign(repo_before(&line[..i]))) {
                 return Some(line[i..end].to_string());
             }
         }
         for seg in ["/issues/", "/pull/"] {
             if b[i..].starts_with(seg.as_bytes()) {
-                if let Some(end) = number(i + seg.len()).filter(|_| !foreign(&line[..i])) {
+                if let Some(end) =
+                    number(i + seg.len(), refs.min_digits).filter(|_| !foreign(&line[..i]))
+                {
                     return Some(line[i..end].to_string());
                 }
             }
         }
     }
     None
+}
+
+/// `issue #` or `PR #` then any number: a reference by its own words, however short.
+fn named(before: &str) -> bool {
+    let word = before.strip_suffix(' ').unwrap_or(before);
+    let word = word
+        .rsplit(|c: char| !c.is_ascii_alphabetic())
+        .next()
+        .unwrap_or("");
+    ["issue", "issues", "pr", "prs"].contains(&word.to_ascii_lowercase().as_str())
 }
 
 fn repo_before(text: &str) -> &str {

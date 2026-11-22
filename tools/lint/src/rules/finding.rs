@@ -32,6 +32,8 @@ pub enum Form {
     Code,
     Lua,
     Markdown,
+    /// Python, a table, a manifest: `# lint: allow(<rule>) <why>`.
+    Hash,
 }
 
 impl Form {
@@ -40,6 +42,8 @@ impl Form {
             Form::Markdown
         } else if path.ends_with(".lua") {
             Form::Lua
+        } else if [".py", ".txt", ".toml"].iter().any(|e| path.ends_with(e)) {
+            Form::Hash
         } else {
             Form::Code
         }
@@ -50,6 +54,7 @@ impl Form {
             Form::Code => "//",
             Form::Lua => "--",
             Form::Markdown => "<!--",
+            Form::Hash => "#",
         }
     }
 
@@ -66,7 +71,7 @@ pub(super) fn parse_allow(line: &str, form: Form) -> Option<(&str, &str)> {
     let why = &rest[close + 1..];
     let why = match form {
         Form::Markdown => why.split_once("-->").map_or(why, |(w, _)| w),
-        Form::Code | Form::Lua => why,
+        Form::Code | Form::Lua | Form::Hash => why,
     };
     Some((rest[..close].trim(), why.trim()))
 }

@@ -33,7 +33,7 @@ impl Now {
 }
 
 const HEADER: &str = "\
-# The converters' output, pinned (#1286): converter version fixture hash tool.
+# The converters' output, pinned: converter version fixture hash tool.
 # Written by `make bless-converters`, never by hand (docs/testing.md).
 ";
 
