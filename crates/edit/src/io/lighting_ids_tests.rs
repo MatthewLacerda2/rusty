@@ -80,3 +80,25 @@ fn an_old_files_entry_for_an_entity_it_does_not_hold_is_dropped_on_load() {
     let warned = said.iter().filter(|l| l.contains("does not hold")).count();
     assert_eq!(warned, 1, "{said:?}");
 }
+
+#[test]
+fn a_file_holding_dead_entries_opens_unedited_and_reloads_without_a_warning() {
+    let path = scratch("unedited");
+    let mut scene = Scene::new();
+    let wall = scene.add_entity("Wall".into());
+    let mut data = crate::to_scene_data(&scene);
+    data.lightmaps.extend([wall, wall + 1].map(entry));
+    std::fs::write(&path, serde_json::to_string_pretty(&data).unwrap()).unwrap();
+
+    let mut back = Scene::new();
+    crate::load_from_file(&mut back, &path).unwrap();
+    assert!(!crate::has_unsaved_edits(&back, &path), "just opened");
+    // The file changes on disk: the follow asks this before it reloads, and warns on `true`.
+    let mut other = Scene::new();
+    other.add_entity("Elsewhere".into());
+    crate::save_to_file(&other, &path).unwrap();
+    assert!(
+        !crate::has_unsaved_edits(&back, &path),
+        "nothing to warn of as discarded"
+    );
+}

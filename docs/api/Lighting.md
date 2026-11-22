@@ -148,7 +148,8 @@ first.
   the file holds, as a Save's does: a lightmapped mesh that exists only in the unsaved
   edits keeps its lightmap in the scene, and the file gets its entry once the scene is
   saved. A file whose lightmaps name an entity it does not hold drops that entry on load,
-  with one warning: a new entity could otherwise take its id and its lightmap.
+  with one warning (a new entity could otherwise take its id and its lightmap), and the
+  drop is not an unsaved edit.
 - **Refused during Play**, as `Scene.Save` is (#1340): it writes the scene file, and the
   World then holds the play state. The editor's button is greyed out while playing.
 - **Needs a saved scene** (the bakes write into folders named after its file,

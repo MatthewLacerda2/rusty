@@ -41,7 +41,8 @@ pub(crate) fn file_lightmaps(scene: &Scene, document: &[Entity]) -> LightmapSet 
     set
 }
 
-fn drop_dead_lightmaps(data: &mut SceneData) {
+/// Silent, for `io::has_unsaved_edits`; returns the dropped ids.
+pub(crate) fn retain_held_lightmaps(data: &mut SceneData) -> Vec<u32> {
     let ids: BTreeSet<u32> = data.entities.iter().map(|e| e.id).collect();
     let dead: Vec<u32> = data
         .lightmaps
@@ -49,6 +50,15 @@ fn drop_dead_lightmaps(data: &mut SceneData) {
         .map(|e| e.entity)
         .filter(|id| !ids.contains(id))
         .collect();
+    if !dead.is_empty() {
+        data.lightmaps.retain(|id| ids.contains(&id));
+    }
+    dead
+}
+
+/// A Play load runs it before `load::make_room` moves ids.
+pub(crate) fn drop_dead_lightmaps(data: &mut SceneData) {
+    let dead = retain_held_lightmaps(data);
     if dead.is_empty() {
         return;
     }
@@ -57,7 +67,6 @@ fn drop_dead_lightmaps(data: &mut SceneData) {
          dropped; the next Save or Generate Lighting writes the file without them",
         dead.len()
     );
-    data.lightmaps.retain(|id| ids.contains(&id));
 }
 
 pub fn apply_scene_data(scene: &mut Scene, data: SceneData) {
