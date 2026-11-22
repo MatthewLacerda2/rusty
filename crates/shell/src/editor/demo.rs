@@ -1,7 +1,7 @@
-//! The editor playing a demo on its timeline: `Editor.OpenDemo(path)` takes
-//! the editor's world, replays the demo on it, and the Game view's timeline plays,
-//! pauses and scrubs it (`dev::demo::seek`). Closing, by the timeline's button, by
-//! Stop or by quitting, puts back the edit scene as the same scene, with no input
+//! Closing, by the timeline's button, by Stop or by quitting, puts back the edit scene as
+//! the same scene, and what the replay overwrote (`dev::demo::lend`): the save data,
+//! settings, seed and clock. Playback is read-only: the Game view hears none of the editor's
+//! input (`game_has_input`).
 
 use rusty_app::{GameWorld, PlayTransition};
 use rusty_core::application::DemoRequest;
@@ -134,6 +134,8 @@ fn open(ui: &mut EditorUi, game: &mut GameWorld, path: &str) -> Result<(), Strin
     Ok(())
 }
 
+/// The quit boundary calls this too, so the quit flush writes the editor's own store and
+/// settings, never the demo's.
 pub fn close(ui: &mut EditorUi, game: &mut GameWorld) -> PlayTransition {
     let Some(view) = ui.dev.demo.take() else {
         return PlayTransition::None;
@@ -148,7 +150,6 @@ pub fn close(ui: &mut EditorUi, game: &mut GameWorld) -> PlayTransition {
     transition
 }
 
-/// The edit scene the demo found, back as it was and as the same scene.
 fn put_back(ui: &mut EditorUi, game: &mut GameWorld, (origin, path): (Origin, Option<String>)) {
     origin.restore(game);
     ui.set_current_scene_path(path);

@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/nav/obstacle.rs — the NavMesh
-//! Obstacle card.
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::obstacle` ops the `NavMeshObstacle.*` Lua setters call.
 //! A carving obstacle changes the navmesh: the editor's per-frame nav sync
@@ -38,7 +36,6 @@ fn drag_row(ui: &mut egui::Ui, label: &str, mut value: f32, speed: f64) -> Optio
     .inner
 }
 
-/// 3EL. NavMeshObstacle Component
 pub fn draw_nav_obstacle(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

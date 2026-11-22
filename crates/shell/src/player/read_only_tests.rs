@@ -1,13 +1,9 @@
-//! The player boots read-only: an exported game, booted, run for a few
-//! frames and given the window focus, leaves its folder byte-identical but for
-//! `saved/` (no file or folder added, changed or removed), and the export carries
-//! what the player no longer makes (a seeded script, an `.mp3`'s `.wav`).
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 use rusty_core::project::{open, Access};
 
+/// Set on the child: which half it runs (`export` or `play`).
 const STEP_VAR: &str = "RUSTY_PLAYER_READ_ONLY_STEP";
 /// Set on the child: the source project.
 const PROJECT_VAR: &str = "RUSTY_PLAYER_READ_ONLY_PROJECT";
@@ -37,6 +33,7 @@ fn an_exported_game_boots_without_writing_into_its_install() {
     let mp3_shipped = shipped.contains_key("assets/audio/loop.mp3");
     assert!(!mp3_shipped, "no MP3 ships");
 
+    // What a seeding or a refresh would act on: a bundled script left out, an MP3 copied in.
     std::fs::remove_file(out.join("assets/scripts/bot.lua")).unwrap();
     std::fs::copy(mp3(), out.join("assets/audio/extra.mp3")).unwrap();
     let shipped = tree(&out);
@@ -61,7 +58,6 @@ fn mp3() -> PathBuf {
     rusty_core::project::checkout().join("crates/asset/src/audio/fixtures/loop.mp3")
 }
 
-/// Run [`child`] in a new process on `step`.
 fn run_child(step: &str, game: &Path, out: &Path) {
     // lint: allow(subprocess) the test binary re-runs itself: opening a project moves the working directory
     let status = std::process::Command::new(std::env::current_exe().expect("test binary"))
@@ -95,6 +91,7 @@ fn child() {
         world.tick(1.0 / 60.0);
     }
     crate::focus::refresh_assets(&world, crate::frame::Host::Player);
+    // What the loop's exit does.
     world.resources.flush_storage();
 }
 

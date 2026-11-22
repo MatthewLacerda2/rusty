@@ -1,5 +1,3 @@
-//! crates/ui/src/events/raycast.rs — which UI graphic is under a point.
-
 use glam::Vec2;
 
 use super::tree::{ancestors_or_self, raycasts_blocked};
@@ -8,7 +6,7 @@ use crate::{CanvasSpace, UiLayout, UiPointer, UiRect};
 use rusty_ecs::World;
 
 /// The raycast target `pointer` hits: the screen canvases first, then the world
-/// canvases along its ray, nearest first (see the module docs). The pointer comes
+/// canvases along its ray, nearest first. The pointer comes
 /// from [`crate::UiView::pointer`].
 pub fn raycast_pointer(world: &World, layout: &UiLayout, pointer: &UiPointer) -> Option<u32> {
     let rects: Vec<(u32, &UiRect)> = layout.iter().collect();
@@ -63,6 +61,8 @@ fn is_raycast_target(world: &World, id: u32) -> bool {
         || world.text(id).is_some_and(|t| t.raycast_target)
 }
 
+/// Whether `p` is inside the final quad: no two edges see it on opposite sides, so a
+/// mirrored quad (reversed winding) hits too; a zero-area one never does.
 fn in_quad(rect: &UiRect, p: Vec2) -> bool {
     let c = rect.corners;
     let sides = (0..4).map(|i| {

@@ -1,5 +1,3 @@
-//! Editor theme — the single source of truth for the editor's look.
-
 pub mod chrome;
 pub mod fonts;
 mod style;
@@ -73,6 +71,8 @@ impl Theme {
         }
     }
 
+    /// Every surface leans toward the accent: Unity's cue that edits made now are
+    /// lost on Stop.
     pub fn for_play_mode(self) -> Self {
         let tint = |c: Color32| lerp(c, self.accent, 0.10);
         Self {
@@ -95,12 +95,12 @@ impl Theme {
         }
     }
 
-    /// Register the editor's fonts (Inter, JetBrains Mono, Phosphor icons). Call once.
     pub fn install_fonts(ctx: &Context) {
         fonts::install(ctx);
     }
 
     pub fn apply(&self, ctx: &Context) {
+        // Dark-only: pinned, so egui never swaps in its light style for a light OS.
         ctx.set_theme(egui::Theme::Dark);
         let mut s = (*ctx.style_of(egui::Theme::Dark)).clone();
         style::configure(self, ctx, &mut s);
@@ -128,7 +128,6 @@ pub fn from_ctx(ctx: &Context) -> Theme {
         .unwrap_or_default()
 }
 
-/// Convenience wrapper around [`from_ctx`] for widgets that only hold a `&Ui`.
 pub fn from_ui(ui: &Ui) -> Theme {
     from_ctx(ui.ctx())
 }

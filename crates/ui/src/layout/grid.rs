@@ -1,5 +1,3 @@
-//! crates/ui/src/layout/grid.rs — the grid layout group.
-
 use glam::Vec2;
 
 use super::group::{padding, start_offset};

@@ -42,7 +42,6 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
 /// `authoring::environment` op, the one `Lighting.Set*` calls.
 fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let t = theme::from_ui(ui);
-    // 1. Skybox Path
     ui.horizontal(|ui| {
         ui.label("Skybox:");
         let mut path = scene.skybox_path.clone();
@@ -60,7 +59,6 @@ fn draw_environment(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene)
     ambient::draw(editor, ui, scene);
     ui.add_space(8.0);
 
-    // 3. Ambient Light Intensity
     ui.label("Ambient Intensity:");
     let mut intensity = scene.ambient_intensity;
     let response = ui.add(crate::widgets::slider(&mut intensity, 0.0..=5.0).text("intensity"));
@@ -135,6 +133,7 @@ fn draw_collision_matrix(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut S
 
 /// The scene fog section. A thin client: each widget edits a snapshot and
 /// routes the write through the shared `authoring::fog` op the `Graphics.SetFog*`
+/// bindings call, so panel and API share one clamp.
 fn draw_fog(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let f = scene.fog;
     let fog = &mut scene.fog;

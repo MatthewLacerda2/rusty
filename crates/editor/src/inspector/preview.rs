@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/preview.rs — the Inspector's "Preview" tab.
-
 pub use rusty_preview::{
     build_preview_scene, framing, subject_for_path, FramedOrbit, OrbitState, PreviewMesh,
     PreviewSubject,
@@ -16,18 +14,17 @@ pub struct PreviewCache {
     pub scene: rusty_scene::Scene,
 }
 
-/// What `shell::editor::viewport::render_preview_scene` needs to render this frame: the orbit
-/// camera and the image rect (its size sizes the offscreen target; `editor-capture`
+/// What `shell::editor::viewport::render_preview_scene` renders: set each frame the tab
+/// draws, so the shell skips the render otherwise.
 pub struct PreviewRequest {
     pub camera: Camera,
-    /// The image's rect, in points, as this frame laid it out.
+    /// The image's rect, in points, as this frame laid it out; its size sizes the target.
     pub rect: egui::Rect,
     /// Set only for [`PreviewSubject::Shader`] — the `.wgsl` path the shell compiles
     /// a one-off pipeline from for this render.
     pub shader_override: Option<String>,
 }
 
-/// A "Details / Preview" tab strip, shared by the assets dispatch (`assets/mod.rs`)
 pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.horizontal(|ui| {
         if chrome::tab(ui, &t, !*active, "Details").clicked() {
@@ -40,6 +37,8 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.add_space(t.space_xs);
 }
 
+/// `editor.preview_texture_id` is set by the shell before the draw, from its last render
+/// (`None` before the first).
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;

@@ -1,9 +1,7 @@
-//! crates/edit/src/authoring/ui/widgets/dropdown.rs — `Dropdown`.
-//!
-//! A button showing the chosen option's `Label`, an `Arrow`, and an inactive
-//! `Template`: a scroll view (vertical bar only) whose `Content` the script fills
-//! with one `Item` per option when it opens. Open, the template is lifted onto a
-//! popup canvas above everything (see `dropdown.lua`).
+//! A `Dropdown` is a button showing the chosen option's `Label`, an `Arrow`, and an inactive
+//! `Template`: a scroll view (vertical bar only) whose `Content` the script fills with one `Item`
+//! per option when it opens. Open, the template is lifted onto a popup canvas above everything (see
+//! `dropdown.lua`).
 
 use glam::{Vec2, Vec4};
 

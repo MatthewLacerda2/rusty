@@ -1,6 +1,3 @@
-//! Unit tests for the Scene view camera's math: orbit keeps the pivot, look
-//! keeps the eye, pan and zoom scale with distance, frame fits the bounds.
-
 use super::*;
 
 fn near(a: Vec3, b: Vec3) -> bool {
@@ -151,6 +148,7 @@ fn frame_fits_the_bounds_in_the_field_of_view() {
         (yaw, pitch),
         "framing keeps the view direction"
     );
+    // The sphere's tangent from the eye sits exactly on the half field of view.
     let half = (DEFAULT_FOV * 0.5).to_radians();
     assert!((2.0 / cam.distance - half.sin()).abs() < 1e-4);
     let near_d = cam.distance;

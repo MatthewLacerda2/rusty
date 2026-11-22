@@ -41,7 +41,6 @@ pub fn draw(
     draw_about_window(editor, ui.ctx());
 }
 
-/// File / Edit / GameObject / Config / About menus, then the transport right-aligned.
 fn draw_menu_bar(
     editor: &mut EditorUi,
     ui: &mut egui::Ui,
@@ -49,6 +48,7 @@ fn draw_menu_bar(
     console: &mut ConsoleLogs,
     is_playing: &mut bool,
 ) {
+    // Only a click outside or an item closes it: Config's toggles keep it open.
     let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
     egui::MenuBar::new().config(config).ui(ui, |ui| {
         file_menu(editor, ui, scene, console, *is_playing);

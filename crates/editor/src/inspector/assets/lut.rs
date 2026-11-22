@@ -1,7 +1,5 @@
-//! crates/editor/src/inspector/assets/lut.rs — the `.cube` colour-lookup card:
-//! what the file holds (its size and domain), or why it is refused, the same
-//! message the renderer logs. A strip `.png` is an image first and keeps the
-//! image card.
+//! A refused table shows the error the renderer logs: both read it through
+//! `rusty_asset::lut::load`.
 
 use egui_phosphor::regular as icon;
 use std::path::Path;

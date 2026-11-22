@@ -43,6 +43,7 @@ impl Rig {
             let tail = egui::Layout::right_to_left(egui::Align::Center);
             ui.with_layout(tail, |ui| super::draw(editor, ui, scene, playing));
         });
+        // No painter here to take the font atlas.
         output.textures_delta.clear();
         let tree = output
             .platform_output

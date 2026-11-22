@@ -1,6 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/nav/agent.rs — the NavMesh Agent
-//! inspector card, split from `physics` to stay under the size cap.
-
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -13,7 +10,6 @@ use rusty_edit::authoring::nav::agent as nav_ops;
 
 type NavOp = fn(&mut rusty_components::NavMeshAgentComponent, f32);
 
-/// 3EH. NavMeshAgent Component
 pub fn draw_nav_agent(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

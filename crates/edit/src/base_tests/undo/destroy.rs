@@ -110,6 +110,8 @@ fn an_undone_destroy_of_a_child_puts_it_back_in_its_parents_children() {
     assert!(!scene.world.is_active_in_hierarchy(child));
 }
 
+/// Undo restores a step's entities in id order: a child older than its parent comes back first
+/// and waits for it.
 #[test]
 fn an_undone_destroy_puts_both_sides_of_a_parent_link_back() {
     for child_first in [false, true] {

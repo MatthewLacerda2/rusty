@@ -30,8 +30,6 @@ pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &
     draw_apply_to_entity(ui, editor, scene, path);
 }
 
-/// Texture import settings: wrap mode, filter mode, mipmap generation,
-/// texture type, compression and max size, kept in the image's `.meta`
 fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.heading("Texture Import Settings");
     ui.add_space(5.0);
@@ -58,6 +56,7 @@ fn draw_import_settings(ui: &mut egui::Ui, path: &str) {
     ui.checkbox(&mut s.generate_mipmaps, "Generate Mipmaps");
     draw_compression(ui, &mut s);
     if s.max_size != stored.max_size {
+        // Picked here, so it is the developer's: a bake no longer changes it.
         s = s.chosen(s.max_size);
     }
     draw_size(ui, source, &s);
@@ -151,7 +150,6 @@ fn combo<T: Copy + PartialEq, const N: usize>(
     });
 }
 
-/// Entity picker that applies this texture to the chosen scene entity.
 fn draw_apply_to_entity(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene, path: &str) {
     ui.heading("Apply to Scene Entity");
     ui.add_space(5.0);

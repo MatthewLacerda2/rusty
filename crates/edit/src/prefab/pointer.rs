@@ -49,6 +49,7 @@ fn descend<'a>(cursor: &'a mut Value, token: &str) -> Option<&'a mut Value> {
     }
 }
 
+// RFC 6901: `~1` before `~0`, or `~01` would decode to `/`.
 fn unescape(token: &str) -> String {
     token.replace("~1", "/").replace("~0", "~")
 }

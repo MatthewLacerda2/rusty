@@ -1,14 +1,12 @@
-//! crates/ui/src/events/focus/actions.rs — input → logical navigation actions.
-
 use glam::Vec2;
 
 use super::DIRECTIONS;
 use rusty_core::input::gamepad::{pad_name, MAX_PADS};
 use rusty_core::input::InputState;
 
-/// A logical navigation action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NavAction {
+    /// `0` up, `1` down, `2` left, `3` right (`select_on` order).
     Move(usize),
     Next,
     Previous,
@@ -20,10 +18,10 @@ pub enum NavAction {
 pub const REPEAT_DELAY: f32 = 0.5;
 /// Seconds between later repeats (Unity's `moveRepeatRate`).
 pub const REPEAT_RATE: f32 = 0.1;
+/// Stick magnitude (0–1) that counts as a Move.
 const STICK_PRESS: f32 = 0.5;
 
-/// The keys whose press is a Move, direction-major in `select_on` order: each
-/// direction's arrow, then every pad slot's d-pad button.
+/// Each direction's arrow, then every pad slot's d-pad button, direction-major.
 fn move_keys() -> impl Iterator<Item = (usize, String)> {
     let dirs = ["UP", "DOWN", "LEFT", "RIGHT"];
     dirs.into_iter().enumerate().flat_map(|(i, d)| {
@@ -34,7 +32,6 @@ fn move_keys() -> impl Iterator<Item = (usize, String)> {
     })
 }
 
-/// Whether `suffix` (a pad button) went down on any pad slot this tick.
 fn any_pad_down(input: &InputState, suffix: &str) -> bool {
     (0..MAX_PADS).any(|pad| input.get_key_down(&pad_name(pad, suffix)))
 }
@@ -64,9 +61,7 @@ pub fn nav_actions(input: &InputState) -> Vec<NavAction> {
     actions
 }
 
-/// The one direction everything held points (`select_on` order): held arrows and
-/// d-pads, plus each stick past [`STICK_PRESS`], summed; the dominant axis wins,
-/// vertical on a tie (Unity's `MoveDirection`).
+/// The one direction held keys and sticks past [`STICK_PRESS`] sum to (Unity's `MoveDirection`).
 pub fn held_direction(input: &InputState) -> Option<usize> {
     let mut v = Vec2::ZERO;
     for (dir, key) in move_keys() {
@@ -91,6 +86,8 @@ pub fn held_direction(input: &InputState) -> Option<usize> {
     }
 }
 
+/// Seconds of slack for f32 rounding in summed dts: at 1/60 s a 0.1 s repeat lands every
+/// 6th tick, not 7th.
 const TICK_SLACK: f32 = 1e-4;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -101,7 +98,8 @@ pub struct MoveRepeat {
 }
 
 impl MoveRepeat {
-    /// This tick's Moves from the held direction after `dt` unscaled seconds.
+    /// The held Move's repeat after `dt` unscaled seconds; a `pressed` edge (already sent)
+    /// restarts it.
     pub fn tick(&mut self, held: Option<usize>, pressed: bool, dt: f32) -> Option<NavAction> {
         if pressed || held != self.dir {
             *self = Self {

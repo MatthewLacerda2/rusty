@@ -1,7 +1,3 @@
-//! crates/shell/src/boot.rs — the boot steps of the two frontends: the editor's asset
-//! refresh, the window, the renderer, the
-//! simulation, audio, and the assembled [`Shell`].
-
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -22,13 +18,15 @@ use rusty_render::{PixelSize, Renderer};
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// The project tree an asset refresh sweeps (Unity's `Assets/`): an `.mp3`
+/// The project tree an asset refresh sweeps (Unity's `Assets/`).
 pub const ASSET_ROOT: &str = rusty_core::project::ASSETS_DIR;
 
 pub fn refresh_assets() -> rusty_asset::audio::Refresh {
     rusty_asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
+/// `maximized` fills the screen (winit maximizes on Linux, zooms to the visible frame on
+/// macOS; never native fullscreen); `size` is then what the window returns to.
 fn window_attributes(
     title: &str,
     app_id: Option<&str>,
@@ -41,6 +39,7 @@ fn window_attributes(
         .with_maximized(maximized);
     #[cfg(target_os = "linux")]
     let attributes = match app_id {
+        // One name sets both Wayland's `app_id` and X11's `WM_CLASS`.
         Some(id) => {
             winit::platform::wayland::WindowAttributesExtWayland::with_name(attributes, id, id)
         }
@@ -65,7 +64,6 @@ pub fn create_window(
     )
 }
 
-/// Build the renderer on `window`. Exits the process if no compatible GPU exists.
 pub fn init_renderer(window: &Arc<winit::window::Window>) -> Renderer {
     let size = pixel_size(window.inner_size());
     match pollster::block_on(Renderer::new(Arc::clone(window), size)) {
@@ -104,6 +102,8 @@ pub fn load_game(plan: &BootPlan) -> GameWorld {
         rusty_dev::lua_surface::install_api();
         rusty_dev::demo::record_project(&mut game);
     }
+    // Only a scene that parsed names the file, so a Save of the empty fallback never
+    // overwrites an unparsable one.
     if let Some(path) = loaded {
         *game.script_manager().scene_path_cell().borrow_mut() = Some(path);
     }
@@ -135,8 +135,6 @@ fn init_audio(game: &GameWorld) {
     }
 }
 
-/// Load the physical→logical key remap (#88) from the persistent store. A missing
-/// binding blob means the identity mapping.
 fn load_keymap(game: &GameWorld) -> Keymap {
     let storage = game.resources.storage.borrow();
     match storage.get(KEYBINDINGS_NAMESPACE, KEYBINDINGS_KEY) {

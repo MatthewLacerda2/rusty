@@ -19,6 +19,7 @@ pub struct Loaded {
     pub sources: Sources,
 }
 
+/// Evaluate only what this returns: procgen reads no files, so the graphs and images load here.
 pub fn load_recipe(recipe: &TextureRecipe, roots: &ContentRoots) -> Result<Loaded, String> {
     let graphs = super::graphs::read_graphs(recipe, roots)?;
     let expanded = expand(recipe, &graphs)?;

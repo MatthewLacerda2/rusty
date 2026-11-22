@@ -57,8 +57,8 @@ pub fn game_object_menu(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Sc
     });
 }
 
-/// Create an entity through the shared authoring path, then select it and mark the
-/// scene dirty — the exact effect the old Hierarchy "Create" button had.
+/// Create through `authoring::create_entity`, the path `Scene.CreateEntity` takes, so
+/// editor and API cannot drift; then select it and mark the scene dirty.
 fn spawn(editor: &mut EditorUi, scene: &mut Scene, name: &str, primitive: Option<Primitive>) {
     let new_id = authoring::create_entity(scene, name, primitive);
     select_new(editor, new_id);
@@ -76,8 +76,7 @@ mod tests {
     use super::*;
 
     // The menu maps each label to the matching `Primitive`; verify the mapping
-    // creates the configured component via the shared authoring path (the UI clicks
-    // themselves are exercised by hand — egui has no headless click harness here).
+    // creates the configured component via the shared authoring path.
     #[test]
     fn spawn_routes_through_authoring() {
         let mut editor = EditorUi::new(Default::default());

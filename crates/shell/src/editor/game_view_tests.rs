@@ -15,7 +15,6 @@ use rusty_navigation::NavigationGraph;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// The editor drawn on a 1600x900 window at 1x, Game tab open, with `size`.
 fn drawn(size: GameViewSize) -> ViewportInteraction {
     drawn_on(ViewportTab::Game, size)
 }
@@ -33,6 +32,7 @@ fn drawn_on(tab: ViewportTab, size: GameViewSize) -> ViewportInteraction {
     let mut nav = NavigationGraph::from_scene(&scene);
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 900.0));
     let mut last = None;
+    // Panels size from the frame before: the third has settled.
     for frame in 0..3 {
         let input = egui::RawInput {
             screen_rect: Some(screen),
@@ -43,7 +43,7 @@ fn drawn_on(tab: ViewportTab, size: GameViewSize) -> ViewportInteraction {
         let texture = Some(egui::TextureId::User(1));
         let playing = &mut false;
         last = Some(ui.draw(&ctx, &mut scene, &mut console, &mut nav, playing, texture));
-        ctx.end_pass().textures_delta.clear();
+        ctx.end_pass().textures_delta.clear(); // egui debug-asserts every delta was handled
     }
     last.expect("drawn")
 }

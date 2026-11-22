@@ -7,11 +7,13 @@ use rusty_scene::Scene;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LightingSave {
     Written,
-    /// The file could not be rewritten field by field (it is a hand-edited document
-    /// loading would change); save the whole scene to keep the lighting.
+    /// The file could not be rewritten field by field (a hand-edited document loading would
+    /// change); save the whole scene to keep the lighting.
     NeedsSceneSave,
 }
 
+/// Writes only the lighting fields and SH sidecar, as Unity's Generate Lighting: unsaved
+/// edits stay unsaved.
 pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
     if scene.is_playing() {
         return Err(super::LIGHTING_IN_PLAY.to_string());
@@ -26,9 +28,12 @@ pub fn save_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> 
     // lint: allow(asset-write) a scene, prefab or lighting document, read whole on load
     rusty_core::fs::write_atomic(std::path::Path::new(path), json.as_bytes())
         .map_err(|e| format!("Failed to write scene file: {e}"))?;
+    // An outside edit the follow has yet to apply is left off the disk-text record: the follow
+    // reloads it, and no Save writes over it.
     if scene.is_disk_text(path, &text) {
         scene.record_disk_text(path, json);
     } else {
+        // The recorded disk text takes the lighting too: the reload finds no unsaved edit.
         add_lighting_to_record(scene, path);
     }
     rusty_scene::lighting::io::save_sh_sidecar(scene, path)?;
@@ -59,6 +64,8 @@ fn parse(json: &str) -> Result<Value, String> {
     serde_json::from_str(json).map_err(|e| format!("Failed to parse scene file: {e}"))
 }
 
+/// Through the text, not `serde_json::to_value`: an `f32` written as its shortest decimal
+/// reads back as another `f64` than the `f32` widened.
 fn to_value(data: &SceneData) -> Result<Value, String> {
     let json =
         serde_json::to_string(data).map_err(|e| format!("Failed to serialize scene: {e}"))?;

@@ -1,4 +1,4 @@
-//! crates/shell/src/input/view.rs — window → game-view pointer mapping and wheel units.
+//! Window → game-view pointer mapping and wheel units.
 
 use winit::event::MouseScrollDelta;
 

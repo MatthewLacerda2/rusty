@@ -1,8 +1,3 @@
-//! crates/shell/src/frame/load/worker.rs — the windowed shell's `SceneLoader`: a
-//! `Scene.LoadAsync` operation is prepared on a thread of its own
-//! (`app::prepare_counted`) while the current scene keeps ticking and drawing, then,
-//! in a loader that [`warms`](Threaded::warming), its GPU resources are made a slice
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{channel, Receiver, TryRecvError};
 use std::sync::Arc;
@@ -68,6 +63,7 @@ fn spawn(
         .spawn(move || {
             let prepare = || prepare_counted(&path, &abandoned, &steps);
             let prepared = rusty_asset::cook::par::beside_play(prepare);
+            // Planned here too, so the tick thread never walks the scene document.
             let plan = |p: &PreparedScene| Warming::plan(p.data());
             let warm = prepared.as_ref().ok().filter(|_| warms).map(plan);
             drop(tx.send((prepared, warm)));
@@ -100,6 +96,7 @@ impl Threaded {
 
 impl SceneLoader for Threaded {
     fn start(&mut self, op: u32, path: String) {
+        // Abandons the job before first: its thread stops at its next prepare step.
         self.job = None;
         let abandoned = Arc::new(AtomicBool::new(false));
         let steps = Arc::new(PrepareSteps::default());
@@ -127,6 +124,7 @@ impl SceneLoader for Threaded {
         }
         match (warms, job.warming()) {
             (true, Some((_, warm))) => warm.is_done(),
+            // A failed job, or one in a loader that does not warm: nothing to warm.
             _ => true,
         }
     }

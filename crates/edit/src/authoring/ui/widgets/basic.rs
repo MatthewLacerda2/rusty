@@ -1,6 +1,3 @@
-//! crates/edit/src/authoring/ui/widgets/basic.rs — Canvas, Panel, Image, Text, Button,
-//! Toggle and Toggle Group.
-
 use glam::{Vec2, Vec4};
 
 use super::parts::{image, label, node, script, selectable, text, Place, DARK, WHITE};

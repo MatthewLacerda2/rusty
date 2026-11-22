@@ -10,10 +10,13 @@ pub fn set_trigger(c: &mut ColliderComponent, is_trigger: bool) {
     c.is_trigger = is_trigger;
 }
 
+/// Through `World::collider_mut`, whose guard refreshes the world AABB when the shape changes.
 pub fn set_shape(c: &mut ColliderComponent, shape: ColliderShape) {
     c.shape = shape;
 }
 
+/// Never touches `material_asset`: a scene load re-runs this op (`fields::hold`), which must keep
+/// the asset.
 // lint: allow(sanitize) both coefficients go through a helper below
 pub fn set_material(c: &mut ColliderComponent, material: PhysicsMaterial) {
     c.material = PhysicsMaterial {

@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/components/gameplay/nav/object_modifier.rs — the NavMesh
-//! Modifier card.
 //! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::object_modifier` ops `Component.Set` calls. A modifier
 //! changes how the bake reads the object's colliders: the editor's per-frame nav
@@ -28,7 +26,6 @@ fn write(
     *is_dirty = true;
 }
 
-/// 3EO. NavMeshModifier Component
 pub fn draw_nav_mesh_modifier(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
