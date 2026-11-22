@@ -1,7 +1,3 @@
-//! A `Shadowmask` bake as an authoring action (#1695): its mask pages beside the
-//! lightmaps, each light's channel and the lights that fell back recorded in the
-//! scene, saved and loaded with it, and a re-bake on `BakedIndirect` clearing them.
-
 use std::path::Path;
 
 use glam::Vec3;
@@ -13,7 +9,6 @@ use rusty_edit::authoring::default_light;
 use rusty_lighting::lightmap::BakeScene;
 use rusty_scene::lighting::MixedLightingMode;
 
-/// `count` shadowed `Mixed` lamps over the floor, all overlapping.
 fn lamps(scene: &mut Scene, count: usize) -> Vec<u32> {
     let light = LightComponent {
         light_type: LightType::Point,
@@ -50,8 +45,6 @@ fn a_shadowmask_bake_writes_mask_pages_and_records_channels_and_fallbacks() {
         [Some(0), Some(1), Some(2), Some(3)]
     );
     assert_eq!(set.fell_back.iter().copied().collect::<Vec<_>>(), [ids[4]]);
-    // The fifth bakes as `Baked`: its direct light is in the lightmap, and the
-    // frame draws it as `Baked`.
     let input = BakeScene::gather(&scene, &|_, _| None);
     let direct: Vec<bool> = input.lights.iter().map(|l| l.bakes_direct).collect();
     assert_eq!(direct, [false, false, false, false, true]);
@@ -60,14 +53,11 @@ fn a_shadowmask_bake_writes_mask_pages_and_records_channels_and_fallbacks() {
     assert_eq!(scene.mask_channel(ids[0]), Some(0));
     assert!(scene.lightmaps.get(floor).is_some());
 
-    // Saved and loaded with the scene.
     let json = serde_json::to_string(&*scene.lightmaps).unwrap();
     let back: rusty_scene::lighting::lightmap_set::LightmapSet =
         serde_json::from_str(&json).unwrap();
     assert_eq!(back, *scene.lightmaps);
 
-    // Back on `BakedIndirect`: the frame ignores the mask at once, the next bake
-    // drops it, and its colour pages are a `BakedIndirect` bake's.
     scene.lighting_settings.mixed_lighting_mode = MixedLightingMode::BakedIndirect;
     assert_eq!(scene.mask_channel(ids[0]), None);
     let masked_pages = scene.lightmaps.pages.clone();
@@ -120,6 +110,5 @@ fn a_rebake_that_makes_the_same_pages_leaves_their_files_alone() {
     let first = files(&scene.lightmaps);
     assert!(!scene.lightmaps.masks.is_empty());
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
-    // The same names, and the same files: neither relinked nor reloaded.
     assert_eq!(files(&scene.lightmaps), first);
 }

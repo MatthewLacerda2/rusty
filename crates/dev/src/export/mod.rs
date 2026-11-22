@@ -1,41 +1,3 @@
-//! crates/dev/src/export/ — ship a project: its runtime files, without its convertible
-//! sources (#1267).
-//!
-//! Unity's Build, for rusty's one runtime: the standalone `player` runs a project
-//! folder, so a shipped game is a project folder holding only what the player
-//! reads. [`export`] first seeds the project and refreshes its audio as the
-//! editor's open does (the bundled scripts, `default.scene` where due, the seed
-//! manifest, a `.wav` for each `.mp3`), since the player boots read-only and does
-//! neither (#1653). It then brings every converted source (`.fbx`, `.blend`) up to date
-//! in the open project's import cache, then copies the project's runtime files
-//! into a fresh folder and leaves those sources behind. The exported project has
-//! no source a converter reads, so its player converts nothing and never starts
-//! Blender, with no mode switch: the player's refresh before Play
-//! (`asset::convert::refresh_sources`) finds nothing, and every load is served
-//! from the cache (`asset::convert::cached_gltf` and `texture_ref` both resolve a
-//! source's cache by its path, the source present or not). Every image's
-//! compressed copy is made current first and shipped beside it (#1574), so the
-//! player never encodes a texture nor writes one into its install. Every baked
-//! shader stale against the engine's shaders is re-baked from its recipe the same
-//! way (#1638, `shadergen::rebake::refresh_all`), so the player composes none; one
-//! that fails is warned of and shipped stale, and the player re-composes it.
-//!
-//! What is copied: `project.rusty` (the build settings, and the mark that makes
-//! the import cache project-relative), the seed manifest, everything under
-//! `assets/` but the convertible sources (Blender's backups of them, and every
-//! `.mp3`, whose `.wav` ships), and the
-//! import cache of each source and each image, under its lock, and each model's
-//! hull sidecar (#1940), so the player runs no V-HACD; a cache whose
-//! source is gone stays behind. What is not: `cache/` (machine-local, regenerable) and `saved/` (this
-//! machine's save data), which the export makes empty, with the rest of the
-//! project skeleton, so the player's first launch writes nothing into an install.
-//! The engine's own content (`engine/`) ships beside the player, not in the
-//! project (`core::project::engine_dir`).
-//!
-//! Authoring, not sim: dev builds only, since it may run Blender. Files are
-//! visited and written in sorted order, so two exports of one project are
-//! byte-identical.
-
 mod copy;
 mod textures;
 
@@ -45,31 +7,17 @@ use rusty_core::paths;
 use rusty_core::project::{create_skeleton, is_project, ASSETS_DIR, PROJECT_FILE, SHADERS_DIR};
 use rusty_edit::io::SEED_MANIFEST_PATH;
 
-/// What an export did.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Exported {
-    /// Files written into the output, as `/`-separated paths relative to it, in the
-    /// order written (the project skeleton's folders aside).
     pub files: Vec<String>,
-    /// Convertible sources brought up to date and left behind, project-relative.
     pub sources: Vec<PathBuf>,
 }
 
-/// Export the open project (the working directory, `core::project::open`) into
-/// `out`, which must pass [`check`]. A source that fails to convert (a model, or
-/// an `.mp3` the audio refresh can't turn into a `.wav`) fails the export, naming
-/// it, before anything is written; a texture a cache names outside
-/// what was copied fails it after, naming each, and the output is emptied again.
 pub fn export(out: &Path) -> Result<Exported, String> {
     let out = std::path::absolute(out).map_err(|e| format!("{}: {e}", out.display()))?;
     check(&rusty_core::project::root(), &out)?;
     seed_and_refresh_audio()?;
-    // An image that fails is warned of and ships uncompressed, as Unity builds
-    // with an import error logged; a model that fails fails the export.
     let sources = import(Path::new(ASSETS_DIR))?.sources;
-    // A baked shader stale against this engine's shaders is re-baked from its
-    // recipe, so the player loads it as shipped (#1638); one that fails is
-    // warned of and ships as it is.
     rusty_shadergen::rebake::refresh_all(Path::new(SHADERS_DIR));
     let existed = out.is_dir();
     let written = copy_runtime_files(Path::new("."), &sources, &out).and_then(|files| {
@@ -79,7 +27,6 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     match written {
         Ok(files) => Ok(Exported { files, sources }),
         Err(e) => {
-            // `out` was absent or empty (`check`): leave it so.
             let _ = std::fs::remove_dir_all(&out);
             if existed {
                 let _ = std::fs::create_dir(&out);
@@ -89,27 +36,10 @@ pub fn export(out: &Path) -> Result<Exported, String> {
     }
 }
 
-/// Bring the import cache of every model and image under `root` up to date in
-/// place (`asset::import::import_strict`), copying nothing: an export's first
-/// step, `make import` (`export --import-only`) on its own and `bench-scenes
-/// IMPORT=1`'s. A model that fails fails it before any image is encoded, naming
-/// each; an image that fails is warned of and stays uncompressed.
 pub fn import(root: &Path) -> Result<rusty_asset::import::Imported, String> {
     rusty_asset::import::import_strict(root)
 }
 
-/// Bring the open project's seeded files and its audio up to date
-/// (`edit::seed_project`, what the editor runs on every open), so the export
-/// ships them and the player, which boots read-only (#1653), neither seeds nor
-/// converts: the bundled scripts, the starter materials, the UI widget kit,
-/// `default.scene` where the seed manifest says it is due, the manifest itself,
-/// and a `.wav` for each `.mp3` (Unity converts audio at build time the same way).
-///
-/// No `.mp3` ships (`copy::left_behind`), so one the refresh could not convert
-/// fails the export, naming each, as a model source that fails to convert does.
-/// One left because a `.wav` of its name already exists is not converted, never
-/// overwriting somebody's file; it is warned of, naming both, since the editor
-/// plays the MP3 and the shipped game the `.wav`.
 fn seed_and_refresh_audio() -> Result<(), String> {
     let refresh = rusty_edit::seed_project();
     let converted = refresh.lines().into_iter().filter(|(warning, _)| !warning);
@@ -138,9 +68,6 @@ fn seed_and_refresh_audio() -> Result<(), String> {
     }
 }
 
-/// Refuse a `project` that is not one (`core::project::is_project`), and an `out`
-/// that is a file, holds anything or overlaps the project: what the `export`
-/// binary asks before it opens the project, so a refusal writes nothing into it.
 pub fn check(project: &Path, out: &Path) -> Result<(), String> {
     if !is_project(project) {
         return Err(format!(
@@ -151,10 +78,6 @@ pub fn check(project: &Path, out: &Path) -> Result<(), String> {
     check_out(project, out)
 }
 
-/// Copy the runtime files of the project at `root` into `out` (see the module
-/// doc), the import caches of `sources` (project-relative) among them, and return
-/// them in the order written. Fails naming every texture a copied cache names
-/// that was not copied.
 fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Vec<String>, String> {
     let mut files = Vec::new();
     for file in [PROJECT_FILE, SEED_MANIFEST_PATH] {
@@ -181,9 +104,6 @@ fn copy_runtime_files(root: &Path, sources: &[PathBuf], out: &Path) -> Result<Ve
     Ok(files)
 }
 
-/// Refuse an output that is a file, holds anything, or overlaps the project: a
-/// copy into the tree it walks would copy itself. Compared through symlinks, the
-/// output by its nearest folder that exists.
 fn check_out(root: &Path, out: &Path) -> Result<(), String> {
     if out.exists() && !out.is_dir() {
         return Err(format!(
@@ -209,8 +129,6 @@ fn check_out(root: &Path, out: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// `path` with its nearest existing ancestor canonicalized (symlinks resolved)
-/// and the rest, which does not exist yet, folded on.
 fn resolved(path: &Path) -> PathBuf {
     let path = paths::fold(&std::path::absolute(path).unwrap_or(path.to_path_buf()));
     for ancestor in path.ancestors() {

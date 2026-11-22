@@ -1,15 +1,3 @@
-//! How close a denoised bake gets to a converged one (#1884), measured by hand in a
-//! release build: `cargo test --release --features dev --lib denoised_bake_error --
-//! --ignored --nocapture` (its two reference bakes take about 8 minutes each, past
-//! nextest's 5-minute kill). A measurement, never a gate; it is what chose
-//! [`BakeSettings::DEFAULT_SAMPLES`]. The level is the occlusion bench's 2 × 2
-//! rooms on two storeys at the default density, a lamp pair in two rooms only, so
-//! the other six are lit by bounce through the doorways; once with the lamps'
-//! direct light baked, once with only their bounce. Each bake is compared with a
-//! raw `REFERENCE`-path one over the charts' interiors (`quality::error`).
-//! `RUSTY_DENOISE_DUMP=<dir>` also writes each bake's four largest lightmaps there
-//! as PNGs, to look at.
-
 use std::time::Instant;
 
 use glam::Vec3;
@@ -23,11 +11,7 @@ use rusty_lighting::occlusion::bench::level::rooms;
 use rusty_scene::lighting::settings::{BakeSettings, Denoiser};
 use rusty_scene::AmbientRadiance;
 
-/// Paths per texel of the converged bake every row is measured against.
 const REFERENCE: u32 = 4096;
-/// The level, closed and with no sky: a point lamp and an Area panel in two of its
-/// eight rooms, their direct light baked too when `direct` (Unity's `Baked` lamps),
-/// else only their bounce (`Mixed`), so the denoiser's work is all there is to see.
 fn level(direct: bool) -> BakeScene {
     let mut scene = BakeScene::gather(&rooms(2), &|_, _| None);
     scene.sky = AmbientRadiance::Hemisphere(Vec3::ZERO);
@@ -61,10 +45,8 @@ fn level(direct: bool) -> BakeScene {
     scene
 }
 
-/// One bake: its samples, its denoiser and its Gaussian's radius.
 type Row = (u32, Denoiser, u32);
 
-/// `scene` baked as `row` says, the seconds it took, and those of them OIDN spent.
 fn baked(scene: &BakeScene, (samples, denoiser, radius): Row) -> (Vec<Lightmap>, f64, f64) {
     let settings = BakeSettings {
         samples,
@@ -83,7 +65,6 @@ fn baked(scene: &BakeScene, (samples, denoiser, radius): Row) -> (Vec<Lightmap>,
     (maps, secs, oidn.spent().1.as_secs_f64())
 }
 
-/// The four largest of `maps`, tone-mapped into `dir/1884_<name>_<k>.png`.
 fn dump(maps: &[Lightmap], name: &str) {
     let Some(dir) = std::env::var_os("RUSTY_DENOISE_DUMP") else {
         return;

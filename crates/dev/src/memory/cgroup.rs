@@ -1,41 +1,23 @@
-//! The memory a process's cgroup (v2) lets it have (#2312): a job run under
-//! `systemd-run -p MemoryMax=…`, or in a container with a memory limit, is killed
-//! at that limit whatever the host has free, so the bake's estimate is held to
-//! the smaller of the two (`Machine::within`).
-//!
-//! The process's cgroup is the `0::<path>` line of `/proc/self/cgroup`; it and
-//! each of its ancestors up to the hierarchy's root may cap it with
-//! `memory.max` ("max" is no cap). The tightest cap is the total; what is free is,
-//! at the level that leaves least, its cap less its `memory.current`, plus the
-//! inactive file cache its `memory.stat` counts there (`inactive_file`), which the
-//! kernel reclaims before it kills, as `MemAvailable` counts it. A cgroup v1
-//! hierarchy is not read: the host's figures stand.
-
 use std::path::Path;
 
 use super::Machine;
 
-/// Where the cgroup v2 hierarchy is mounted.
 #[cfg_attr(
     all(test, not(target_os = "linux")),
     expect(dead_code, reason = "macOS tests read a fake tree")
 )]
 pub const ROOT: &str = "/sys/fs/cgroup";
 
-/// The process's cgroup path from `/proc/self/cgroup`'s text: its v2 line,
-/// `0::<path>`.
 pub fn own_path(proc_cgroup: &str) -> Option<&str> {
     proc_cgroup.lines().find_map(|l| l.strip_prefix("0::"))
 }
 
-/// The memory the cgroup at `path` under `root` and its ancestors allow, `None`
-/// when none of them caps it.
 pub fn bound(root: &Path, path: &str) -> Option<Machine> {
     let own = root.join(path.trim_start_matches('/'));
     let mut bound: Option<Machine> = None;
     for level in own.ancestors().take_while(|l| l.starts_with(root)) {
         let Some(max) = read_number(&level.join("memory.max")) else {
-            continue; // "max", or not a memory-controlled level
+            continue;
         };
         let current = read_number(&level.join("memory.current")).unwrap_or(0);
         let stat = std::fs::read_to_string(level.join("memory.stat")).unwrap_or_default();
@@ -49,12 +31,10 @@ pub fn bound(root: &Path, path: &str) -> Option<Machine> {
     bound
 }
 
-/// A cgroup file holding one number; `None` for "max", a missing file or text.
 fn read_number(file: &Path) -> Option<u64> {
     std::fs::read_to_string(file).ok()?.trim().parse().ok()
 }
 
-/// The `<key> <bytes>` line of a `memory.stat`.
 fn stat_field(stat: &str, key: &str) -> Option<u64> {
     stat.lines().find_map(|l| {
         let (k, v) = l.split_once(' ')?;
@@ -68,8 +48,6 @@ mod tests {
 
     const GB: u64 = 1 << 30;
 
-    /// A fake hierarchy: `levels` are (path under the root, memory.max,
-    /// memory.current, inactive_file).
     fn tree(name: &str, levels: &[(&str, &str, u64, u64)]) -> std::path::PathBuf {
         let root = rusty_test_support::temp::dir().join(format!("rusty_cgroup_{name}"));
         let _ = std::fs::remove_dir_all(&root);

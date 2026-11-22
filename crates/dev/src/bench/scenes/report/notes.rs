@@ -1,14 +1,9 @@
-//! The lines around a scene's table: under its title, what the run changed
-//! and a Scene view of another size; under it, what the run could not measure,
-//! what a row in parts or the load rows are, and what it was compared with.
-
 use std::fmt::Write;
 
 use super::super::editor;
 use super::{Row, SceneReport, PROFILING_NOTE, SCRIPT_NOTE};
 
 impl SceneReport {
-    /// The lines under the table that say what the run could not measure.
     pub(super) fn notes(&self, first: bool) -> String {
         let mut out = String::new();
         let notes = [
@@ -64,7 +59,6 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// What `wall_ms` is and is measured at.
     fn clock_notes(&self) -> [(bool, &'static str); 1] {
         [(
             self.row("wall_ms").is_some(),
@@ -75,10 +69,6 @@ impl SceneReport {
         )]
     }
 
-    /// The notes on a stage timed in parts (#2401): the UI stage's CPU parts
-    /// wherever a UI was prepared, the Hi-Z stage's CPU parts
-    /// wherever it ran, its GPU parts only with GPU timing (an untimed frame
-    /// records the stage in 2 compute passes).
     fn part_notes(&self) -> [(bool, &'static str); 3] {
         [
             (
@@ -100,8 +90,6 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// What the load rows are: the warm loads' figure with the cold one apart,
-    /// or a run's one load, which is cold.
     fn load_notes(&self) -> [(bool, &'static str); 3] {
         let timed = self.row("load.document").is_some();
         [
@@ -126,8 +114,6 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// What the editor round's rows are (#2314), and what of them this adapter
-    /// could not measure.
     fn editor_notes(&self) -> [(bool, &'static str); 3] {
         let round = self.row("editor.ui_ms").is_some();
         let rendered = self.row("editor.renderer_ms").is_some();
@@ -160,8 +146,6 @@ impl SceneReport {
 }
 
 impl SceneReport {
-    /// What the run changed from a plain one, under the title: the `--set`
-    /// overrides, the verb timers.
     pub(super) fn run_notes(&self) -> String {
         let mut out = String::new();
         if !self.set.is_empty() {
@@ -177,8 +161,6 @@ impl SceneReport {
         out
     }
 
-    /// What the table compares with, as its change column and its lines name
-    /// it: the last run, or the kept `BEFORE=` baseline.
     pub(super) fn compared_with(&self) -> (&'static str, &'static str) {
         if self.baseline.is_some() {
             ("before", "the baseline")
@@ -187,17 +169,11 @@ impl SceneReport {
         }
     }
 
-    /// The Scene view's size in the report (`editor::VIEW_ROWS`), in whole
-    /// pixels as printed; `None` without a round, or from before the rows.
     fn view_size(&self) -> Option<(f64, f64)> {
         let [w, h] = editor::VIEW_ROWS.map(|m| self.row(m).map(|row| row.avg.round()));
         w.zip(h)
     }
 
-    /// The line heading the table when the editor round's Scene view was drawn at
-    /// another size than `previous`'s, in whole pixels: a panel's width moves
-    /// every per-pixel pass, so its GPU rows then compare other pixels. `None`
-    /// when the sizes agree or either report lacks them.
     pub(super) fn view_size_moved(&self, previous: &SceneReport) -> Option<String> {
         let (now, before) = (self.view_size()?, previous.view_size()?);
         (now != before).then(|| {
@@ -213,16 +189,12 @@ impl SceneReport {
         })
     }
 
-    /// [`Self::view_size_moved`] against `comparable` as the table's line, or nothing.
     pub(super) fn view_size_line(&self, comparable: Option<&SceneReport>) -> String {
         let moved = comparable.and_then(|p| self.view_size_moved(p));
         moved.map_or_else(String::new, |m| format!("warning: {m}\n"))
     }
 }
 
-/// A Scene view size row's change column (`editor::VIEW_ROWS`): `=` or the
-/// other size in whole pixels, never a percentage that reads as a slowdown;
-/// `None` for any other row. The line above the table says what it means.
 pub(super) fn view_size_delta(before: &Row, now: &Row) -> Option<String> {
     if !editor::VIEW_ROWS.contains(&now.metric.as_str()) {
         return None;

@@ -1,6 +1,3 @@
-//! The bake reports (#1980): written beside the scene with the common block every
-//! one opens with, read back, and each kind's headline signal on a primitive scene.
-
 mod navmesh;
 mod occlusion;
 mod probes;
@@ -10,7 +7,6 @@ use serde_json::json;
 
 use super::{keep, read, report_path, Kind, Report, Stages};
 
-/// A fresh temp dir and a scene path inside it.
 pub(super) fn scene_path(name: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_1980_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -18,7 +14,6 @@ pub(super) fn scene_path(name: &str) -> String {
     dir.join("level.scene").to_string_lossy().into_owned()
 }
 
-/// The keys every report opens with.
 pub(super) const COMMON: [&str; 9] = [
     "kind",
     "engine",
@@ -31,7 +26,6 @@ pub(super) const COMMON: [&str; 9] = [
     "outputBytes",
 ];
 
-/// Assert `report` is a `kind` report carrying the common block.
 pub(super) fn assert_common(report: &serde_json::Value, kind: Kind) {
     for key in COMMON {
         assert!(report.get(key).is_some(), "{key} missing from {report}");
@@ -79,7 +73,6 @@ fn every_kind_names_its_own_file() {
 #[test]
 fn a_report_that_cannot_be_written_is_only_warned() {
     let path = scene_path("blocked");
-    // A file where the folder should be: the write fails, the bake does not.
     std::fs::write(format!("{path}.bake"), b"in the way").unwrap();
     keep(&path, Report::new(Kind::Probes, &Stages::start(), (), 0, 0));
     assert!(read(&path, Kind::Probes).is_none());

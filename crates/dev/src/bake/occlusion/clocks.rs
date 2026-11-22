@@ -1,14 +1,3 @@
-//! The occlusion bake's cells timed on the platform's clock (#1987): the
-//! [`OcclusionObserver`] a bake lends the sim. The sim only says where each cell
-//! starts and ends; this side reads the clock, so no time value ever reaches the
-//! bake. A cell runs on one worker, start to end, so its time is that worker's.
-//!
-//! One counter per cell: the grid is capped at [`MAX_GRID_CELLS`], so the clocks
-//! hold at most 512 KiB, whatever the level. A cell the bake skips (#2328) is
-//! never started, and reads as untimed.
-//!
-//! [`MAX_GRID_CELLS`]: rusty_scene::lighting::occlusion::MAX_GRID_CELLS
-
 use std::cell::Cell;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::OnceLock;
@@ -16,24 +5,18 @@ use std::time::{Duration, Instant};
 
 use rusty_lighting::occlusion::OcclusionObserver;
 
-/// Each cell's sampling time so far, in nanoseconds, by cell index; `UNTIMED`
-/// until it is sampled.
 #[derive(Default)]
 pub struct CellClocks {
     cells: OnceLock<Vec<AtomicU64>>,
 }
 
-/// A cell no worker has sampled.
 const UNTIMED: u64 = u64::MAX;
 
 thread_local! {
-    /// When this thread's cell began: a cell starts and ends on one thread.
     static CELL_STARTED: Cell<Option<Instant>> = const { Cell::new(None) };
 }
 
 impl CellClocks {
-    /// Each cell's time, by cell index, `None` for a cell never sampled; empty
-    /// before the bake laid its grid.
     pub fn times(&self) -> Vec<Option<Duration>> {
         let cells = self.cells.get().map_or(&[][..], Vec::as_slice);
         let time = |nanos: &AtomicU64| match nanos.load(Ordering::Relaxed) {

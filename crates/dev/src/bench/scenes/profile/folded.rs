@@ -1,34 +1,22 @@
-//! Folded stacks (`root;caller;leaf count`, one line per distinct stack, the
-//! format flame-graph tools read) and the two tables a profile prints from them:
-//! the functions by self time (samples where the function was the leaf) and by
-//! total time (samples where it was anywhere on the stack, once per sample even
-//! when it recursed).
-
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write;
 
-/// How many functions each table lists.
 pub const TOP: usize = 40;
 
-/// Functions with their sample counts, most first.
 pub type Ranked = Vec<(String, u64)>;
 
-/// Samples by stack, root first, frames joined with `;`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Folded(pub BTreeMap<String, u64>);
 
 impl Folded {
-    /// Count one sample of `frames`, root first.
     pub fn add(&mut self, frames: &[String], count: u64) {
         if frames.is_empty() || count == 0 {
             return;
         }
-        // A `;` inside a name would split it: folded stacks have no escape.
         let clean: Vec<String> = frames.iter().map(|f| f.replace(';', ",")).collect();
         *self.0.entry(clean.join(";")).or_default() += count;
     }
 
-    /// Add every stack of `other`.
     pub fn merge(&mut self, other: Folded) {
         for (stack, n) in other.0 {
             *self.0.entry(stack).or_default() += n;
@@ -39,7 +27,6 @@ impl Folded {
         self.0.values().sum()
     }
 
-    /// The stacks as text, one `stack count` line each.
     pub fn text(&self) -> String {
         let mut out = String::new();
         for (stack, n) in &self.0 {
@@ -48,8 +35,6 @@ impl Folded {
         out
     }
 
-    /// The functions with the most samples as the leaf, and anywhere on the
-    /// stack: at most [`TOP`] each, most first, ties by name.
     pub fn tops(&self) -> (Ranked, Ranked) {
         let mut own: BTreeMap<&str, u64> = BTreeMap::new();
         let mut total: BTreeMap<&str, u64> = BTreeMap::new();
@@ -65,7 +50,6 @@ impl Folded {
         (ranked(own), ranked(total))
     }
 
-    /// The profile's text: a header line `head`, then both tables.
     pub fn tables(&self, head: &str) -> String {
         let samples = self.samples().max(1) as f64;
         let (own, total) = self.tops();
@@ -108,7 +92,6 @@ mod tests {
         f.add(&frames("main;frame;draw"), 3);
         f.add(&frames("main;frame;step"), 1);
         f.add(&frames("main;frame;draw"), 1);
-        // Recursion counts once in total.
         f.add(&frames("main;walk;walk"), 2);
         let (own, total) = f.tops();
         assert_eq!(own[0], ("draw".to_string(), 4));

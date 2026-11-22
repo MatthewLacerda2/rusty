@@ -1,7 +1,3 @@
-//! The reflection probes' report: which probe each object picks (two probes, an
-//! object in each box and one between), and their overlaps. The picks need no
-//! GPU; the stepped bake writing both probe reports does, and skips without one.
-
 use glam::Vec3;
 
 use super::{assert_common, scene_path};
@@ -9,8 +5,6 @@ use crate::bake::report::{read, reflections, Kind, Stages};
 use rusty_edit::authoring::{create_entity, Primitive};
 use rusty_scene::Scene;
 
-/// Two 4 m rooms side by side, touching at `x = 0` and overlapping by 1 m, with a
-/// box in each and one outside both.
 fn rooms() -> Scene {
     let mut scene = Scene::new();
     for (x, name) in [(-2.5, "West"), (2.5, "East"), (40.0, "Outside")] {
@@ -38,9 +32,6 @@ fn each_object_reports_the_probe_it_picks() {
     assert!(probe("Outside").is_null(), "outside every box: the sky");
 }
 
-/// An L-shaped floor turned 45° about Y between two probes whose boxes meet at
-/// `x = 2.3`: its vertices' world box is centred at `x ≈ 1.77`, but the renderer
-/// takes the centre of its local box under the turn, `x ≈ 2.83`.
 #[test]
 fn a_turned_l_picks_the_probe_the_renderer_does() {
     use rusty_components::{mesh::Vertex, MeshComponent};
@@ -86,8 +77,6 @@ fn the_report_lists_each_probe_with_its_overlaps() {
     assert_eq!(report["probes"][1]["overlaps"], serde_json::json!([0]));
     assert!(report["probes"][0]["seconds"].is_null(), "not timed");
     assert_eq!(report["picks"].as_array().unwrap().len(), 3);
-    // #1995: turning a probe or making it a sphere is a new input, and a sphere
-    // reports its radius, not a box.
     let mut turned = rooms();
     turned
         .reflection_probes

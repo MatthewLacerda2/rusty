@@ -43,7 +43,6 @@ fn the_table_shows_each_rows_change_and_what_the_adapter_lacked() {
         "{first}"
     );
     assert!(first.contains("no previous report"), "{first}");
-    // Lavapipe has no timestamps, and a GL backend no memory report: said, not hidden.
     assert!(first.contains("nothing was rendered"), "{first}");
     assert!(first.contains("no gpu_mb"), "{first}");
     let second = scene(3.0).render(Some(&scene(2.0)));
@@ -65,7 +64,6 @@ fn a_report_round_trips_through_its_file() {
         "table"
     );
     assert_eq!(read(&dir, "missing"), None);
-    // A malformed file is no last run, not an error.
     std::fs::write(path(&dir, "pool"), "{ truncated").unwrap();
     assert_eq!(read(&dir, "pool"), None);
 }
@@ -91,7 +89,6 @@ fn the_summary_is_one_line_per_scene_with_a_dash_where_unmeasured() {
         "{text}"
     );
     assert!(lines[3].trim_end().ends_with('-'), "no gpu_mb: {text}");
-    // `IMPORT=1`: the project's one import_ms, after the scenes.
     let mut first = scene(2.0);
     first.push_value("import_ms", 840.0);
     let text = summary(&[first, scene(3.0)]);

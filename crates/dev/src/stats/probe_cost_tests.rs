@@ -1,18 +1,9 @@
-//! The timing probe's end-of-frame work (its frame-end counter read and the
-//! recording at the tick's end) is `probe_ms`, beside `frame_ms` and never in it:
-//! a shipped game runs no probe, so a budget on the tick never reads it. The
-//! driven clock (`verbs::drive`) charges both steps exactly, each its own cost.
-
 use super::counters::{END_COST, RECORD_COST};
 use super::stats_tick_tests::play;
 
-/// What the probe's counter read charges the driven clock, in ms.
 const COST: u64 = 7;
-/// What the tick's end-of-tick recording charges it, in ms.
 const END: u64 = 3;
 
-/// `ticks` play ticks with the probe's counter read charged [`COST`] each and its
-/// end-of-tick recording [`END`].
 fn costly(name: &str, ticks: u32) -> rusty_core::frame_stats::FrameStats {
     RECORD_COST.with(|c| c.set(COST));
     END_COST.with(|c| c.set(END));

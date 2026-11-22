@@ -1,7 +1,3 @@
-//! The editor's background bake (#808): it applies what the synchronous bake would,
-//! reports progress, and a bake cancelled while tracing or encoding leaves the
-//! previous lightmaps alone.
-
 use std::path::Path;
 use std::time::Duration;
 
@@ -9,8 +5,6 @@ use super::tests::{quick, scene, scene_path};
 use super::*;
 use rusty_lighting::lightmap::BakeProgress;
 
-/// Poll `job` until its worker has finished (a debug-build bake of the test scene
-/// takes well under the bound).
 fn finish(job: &mut LightmapBakeJob, scene: &mut Scene) -> BakeOutcome {
     for _ in 0..12_000 {
         if let Some(outcome) = job.poll(scene) {
@@ -52,7 +46,6 @@ fn a_cancelled_bake_keeps_the_previous_lightmaps() {
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();
     let before = scene.lightmaps.clone();
 
-    // Heavy enough that the cancel lands long before the bake could finish.
     let heavy = BakeSettings {
         samples: 4096,
         ..quick()
@@ -70,7 +63,6 @@ fn a_cancelled_bake_keeps_the_previous_lightmaps() {
 
 #[test]
 fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
-    // The encode itself stops between two levels and makes nothing.
     let input = gather_bake_input(&scene().0);
     let maps = rusty_lighting::lightmap::bake(&input, &quick());
     let cancelled = BakeProgress::default();
@@ -80,7 +72,6 @@ fn a_cancel_during_the_encode_keeps_the_previous_lightmaps() {
     let (made, pages) = cancelled.pages().expect("it began");
     assert!(pages > 0 && made == 0, "and made no page");
 
-    // A cancel that lands after the trace, before `poll` applies, applies nothing.
     let (mut scene, _, _) = scene();
     let path = scene_path("job_cancel_encode");
     bake_scene_lightmaps(&mut scene, Some(&path), &quick()).unwrap();

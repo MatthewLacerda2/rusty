@@ -1,9 +1,3 @@
-//! A run's windows (#2448): a later window's rows are kept under its prefix beside
-//! the first window's, compare against the same rows of the last run, read
-//! "absent" against a run that never measured the window, and leave the first
-//! window's rows as they were. The `gpu_` test renders when an adapter is there;
-//! its assertions hold without one.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -26,7 +20,6 @@ fn a_window_is_its_rows_prefixed_and_reads_back_by_their_plain_names() {
     let names: Vec<_> = kept.metrics.iter().map(|m| m.0.as_str()).collect();
     assert_eq!(names, ["firefight.cpu_ms", "firefight.cpu.follow_bones"]);
     assert_eq!(kept.warnings, ["window `firefight`: the CPU clock moved"]);
-    // A run holding both windows gives each its own rows back.
     let mut run = Report {
         metrics: vec![row("cpu_ms", 9.0)],
         ..Report::default()
@@ -70,7 +63,6 @@ fn a_window_name_is_a_lowercase_word_measured_once() {
     assert_eq!(h.frame(), 0, "a refused window measures nothing");
 }
 
-/// Two runs of a first window then a `firefight` one, through the scenario verb.
 #[test]
 fn gpu_a_run_keeps_both_windows_and_the_next_compares_each() {
     let out = rusty_test_support::temp::dir().join(format!("bench_wins_{}", std::process::id()));
@@ -95,7 +87,6 @@ fn gpu_a_run_keeps_both_windows_and_the_next_compares_each() {
         .unwrap_err();
     assert!(err.to_string().contains("already measured"), "{err}");
 
-    // The next run: both windows' rows carry their change against this one.
     assert!(lua.load(both).eval::<bool>().unwrap());
     let text = std::fs::read_to_string(out.join("bench.txt")).unwrap();
     let frame_rows: Vec<_> = text.lines().filter(|l| l.starts_with("frame_ms")).collect();

@@ -1,7 +1,3 @@
-//! What the shadowmask GPU tests share: a white floor, a shadow-casting point lamp
-//! 2.5 m over it 5 m out, seen from 1.5 m up looking down -Z and a little down,
-//! with no tonemap, so a frame reads back linear; and a bake into a temp folder.
-
 use glam::{Vec2, Vec3};
 
 use crate::bake::lightmap::bake_scene_lightmaps;
@@ -17,7 +13,6 @@ use rusty_scene::{Camera, Scene};
 pub(super) const W: u32 = 96;
 pub(super) const H: u32 = 72;
 
-/// Where the lamp hangs.
 pub(super) const LAMP: Vec3 = Vec3::new(0.0, 2.5, -5.0);
 
 pub(super) fn renderer() -> Option<Renderer> {
@@ -28,7 +23,6 @@ pub(super) fn eye() -> Camera {
     Camera::new(Vec3::new(0.0, 1.5, 0.0), -90.0, -12.0)
 }
 
-/// A box named `name` at `position`, `scale`, white, at `roughness`, static or not.
 pub(super) fn block(
     scene: &mut Scene,
     name: &str,
@@ -53,8 +47,6 @@ pub(super) fn block(
     id
 }
 
-/// The camera, a dim ambient, a floor at `roughness` and the lamp in `mode`, the
-/// scene on `mixed`. Returns it and the lamp.
 pub(super) fn scene(mode: LightMode, mixed: MixedLightingMode, roughness: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -82,7 +74,6 @@ pub(super) fn scene(mode: LightMode, mixed: MixedLightingMode, roughness: f32) -
     (scene, lamp)
 }
 
-/// Bake `scene`'s lightmaps into a temp folder `name`.
 pub(super) fn bake(scene: &mut Scene, name: &str) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_shadowmask_{name}"));
     let _ = std::fs::remove_dir_all(&dir);
@@ -104,7 +95,6 @@ pub(super) fn bake(scene: &mut Scene, name: &str) {
     assert!(maps > 0, "the floor is lightmapped");
 }
 
-/// The last of 3 frames of `scene` drawn into one fresh view from [`eye`].
 pub(super) fn settled(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, W, H);
     let mut last = Vec::new();
@@ -117,7 +107,6 @@ pub(super) fn settled(r: &mut Renderer, scene: &Scene) -> Vec<u8> {
     last
 }
 
-/// The pixel world point `p` lands on through [`eye`].
 pub(super) fn pixel_at(p: Vec3) -> (u32, u32) {
     let clip = eye().build_view_projection(W as f32 / H as f32) * p.extend(1.0);
     let ndc: Vec2 = clip.truncate().truncate() / clip.w;
@@ -126,7 +115,6 @@ pub(super) fn pixel_at(p: Vec3) -> (u32, u32) {
     (x.min(W - 1), y.min(H - 1))
 }
 
-/// The mean linear luminance-ish (summed RGB / 3) of the 3x3 patch around `p`.
 pub(super) fn patch(frame: &[u8], p: Vec3) -> f32 {
     let (x, y) = pixel_at(p);
     let mut sum = 0.0;

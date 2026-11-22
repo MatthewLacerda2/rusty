@@ -24,7 +24,6 @@ fn the_default_stress_scene_is_the_shooter_shaped_worst_case() {
         particle_systems: 4,
     };
     assert_eq!(spawned, want);
-    // Every soldier is a skinned, animated nav agent, standing on the deck.
     let soldiers: Vec<u32> = (0..50)
         .map(|i| scene.find_entity_by_name(&format!("Soldier_{i}")).unwrap())
         .collect();
@@ -33,7 +32,6 @@ fn the_default_stress_scene_is_the_shooter_shaped_worst_case() {
         assert!(w.mesh(id).is_some_and(|m| m.skin.is_some()));
         assert!(w.animator(id).is_some() && w.nav_agent(id).is_some());
     }
-    // Spots never repeat, so no two soldiers start inside each other.
     let mut spots: Vec<_> = (0..50)
         .map(|i| stress::soldier_spot(i).to_array())
         .collect();
@@ -61,8 +59,6 @@ fn an_unknown_load_stress_option_is_an_error() {
     assert_eq!(n, 2);
 }
 
-/// A small stress scene measured for real: the rows a report always carries, and
-/// GPU rows exactly when the adapter has timestamps.
 #[test]
 fn gpu_bench_reports_frame_render_and_counter_rows() {
     let mut h = harness("measure");
@@ -79,8 +75,6 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     let row = |k: &str| report.metrics.iter().find(|(m, _)| m == k).map(|r| r.1);
     assert!(row("frame_ms").is_some() && row("cpu.update_scripts").is_some());
     assert!(row("cpu_ms").is_some() && row("cpu_clock_pct").is_some_and(|s| s.avg > 0.0));
-    // The clock hold and the frame share the harness's renderer: without one both
-    // skip, which is only allowed where no GPU is required (#885).
     let rendered = h.renderer().is_some();
     assert_eq!(row("renderer_ms").is_some(), rendered);
     if !rendered {
@@ -90,7 +84,6 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
         );
         return;
     }
-    // A frame draws, begins passes, submits and writes buffers (#2341).
     for k in [
         "draw_calls",
         "triangles",
@@ -120,7 +113,6 @@ fn gpu_bench_reports_frame_render_and_counter_rows() {
     }
 }
 
-/// One frame's report rows, sampled at the reference clocks.
 fn rows_of(frame: &RenderedFrame) -> Vec<(String, f64)> {
     let speed = Speeds {
         gpu: Some(1.0),
@@ -137,9 +129,6 @@ fn rows_of(frame: &RenderedFrame) -> Vec<(String, f64)> {
     rows.map(|(m, s)| (m, s.avg)).collect()
 }
 
-/// The Hi-Z stage's parts (#2401): with the cull on, `gpu.occlusion.<part>` and
-/// `render.occlusion.<part>` sit beside their stage's row, which stays the
-/// stage's whole time.
 #[test]
 fn the_occlusion_parts_have_rows_inside_their_stage_s() {
     use rusty_render::{GpuPart, GpuPass, GpuTimes};
@@ -185,7 +174,6 @@ fn the_occlusion_parts_have_rows_inside_their_stage_s() {
     assert_eq!(avg("render.other"), Some(0.0), "nothing counted twice");
 }
 
-/// With the cull off the stage laps whole and no part is timed: no part rows.
 #[test]
 fn the_occlusion_parts_have_no_rows_with_the_cull_off() {
     let off = RenderedFrame {
@@ -200,13 +188,11 @@ fn the_occlusion_parts_have_no_rows_with_the_cull_off() {
     assert!(!rows.iter().any(|(m, _)| m.starts_with("render.occlusion.")));
 }
 
-/// `cpu_ms` is the whole tick (#2342): the systems' rows, `cpu.flush_bounds` and
-/// `cpu.other` (what no system held) fold back to it; `taps_ms`, `probe_ms` beside.
 #[test]
 fn cpu_rows_fold_to_the_timed_tick() {
     let mut stats = FrameStats::default();
     for (key, ms) in [("frame_ms", 5.0), ("taps_ms", 1.0), ("probe_ms", 0.5)] {
-        stats.record(key, ms); // a demo's taps and the probe's own work: beside the tick
+        stats.record(key, ms);
     }
     for (name, ms) in [
         ("tick_nav", 2.0),

@@ -1,16 +1,9 @@
-//! A tick's input as the change from the tick before (#1581).
-//!
-//! Most ticks repeat the last one's held keys and pointer and carry no edge, so
-//! a demo writes only the fields of an [`InputFrame`] that changed: an hour of
-//! play is mostly empty ticks, which it does not write at all.
-
 use serde::{Deserialize, Serialize};
 
 use super::format::Exact;
 use rusty_core::input::gamepad::MAX_PADS;
 use rusty_core::input::InputFrame;
 
-/// The fields of a frame that differ from the frame before; `None` is unchanged.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct InputDelta {
@@ -32,12 +25,10 @@ pub struct InputDelta {
     mouse_position: Option<[Exact; 2]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pads: Option<[bool; MAX_PADS]>,
-    /// A clipboard capture this tick: an edge, like `down`, not carried on.
     #[serde(skip_serializing_if = "Option::is_none")]
     clipboard: Option<String>,
 }
 
-/// `Some(now)` when it differs from `before`.
 fn changed<T: PartialEq + Clone>(before: &T, now: &T) -> Option<T> {
     (before != now).then(|| now.clone())
 }
@@ -46,8 +37,6 @@ fn pair(p: (f64, f64)) -> [Exact; 2] {
     [Exact(p.0), Exact(p.1)]
 }
 
-/// A pair's bits: floats compare as the file stores them, so `-0.0` is a change
-/// and a NaN is not one every tick.
 fn pair_bits(p: (f64, f64)) -> (u64, u64) {
     (p.0.to_bits(), p.1.to_bits())
 }
@@ -59,7 +48,6 @@ fn axes_bits(axes: &[(String, f32)]) -> Vec<(&str, u32)> {
 }
 
 impl InputDelta {
-    /// What changed from `before` to `now`.
     pub fn between(before: &InputFrame, now: &InputFrame) -> Self {
         let axes = (axes_bits(&before.axes) != axes_bits(&now.axes)).then(|| {
             now.axes
@@ -85,12 +73,10 @@ impl InputDelta {
         }
     }
 
-    /// Whether nothing changed.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 
-    /// The frame after `before` this delta describes.
     pub fn apply(&self, before: &InputFrame) -> InputFrame {
         let mut now = before.clone();
         let set = |slot: &mut Vec<String>, value: &Option<Vec<String>>| {
@@ -111,7 +97,6 @@ impl InputDelta {
             now.text.clone_from(text);
         }
         if let Some(axes) = &self.axes {
-            // An `f32` widened to `f64` narrows back exactly.
             now.axes = axes.iter().map(|(n, v)| (n.clone(), v.0 as f32)).collect();
         }
         if let Some([x, y]) = self.mouse_position {

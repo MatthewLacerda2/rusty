@@ -1,8 +1,3 @@
-//! `Harness.FindInDemo` / `SeekDemo` / `CutDemo` / `DemoPath` (#1597): a scenario
-//! running on a demo (`play --demo <file> <scenario>`) finds a moment in its
-//! index, replays to it, cuts a range of it into a scenario of its own, and asks
-//! which demo it runs on.
-
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -18,8 +13,6 @@ fn fail(verb: &str, msg: impl std::fmt::Display) -> mlua::Error {
     mlua::Error::RuntimeError(format!("Harness.{verb}: {msg}"))
 }
 
-/// The demo `world` replays: its file and how many ticks it holds, as the
-/// replay read them.
 fn on_demo(world: &Rc<RefCell<GameWorld>>, verb: &str) -> LuaResult<(PathBuf, u64)> {
     let mut world = world.borrow_mut();
     let replayer = world
@@ -29,7 +22,6 @@ fn on_demo(world: &Rc<RefCell<GameWorld>>, verb: &str) -> LuaResult<(PathBuf, u6
 }
 
 pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> {
-    // FindInDemo(query) -> { tick, ... }: the ticks whose index matches, in order.
     let world = world_of(harness);
     t.set(
         "FindInDemo",
@@ -40,7 +32,6 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
         })?,
     )?;
 
-    // SeekDemo(tick): the replay run up to and including `tick`.
     let world = world_of(harness);
     t.set(
         "SeekDemo",
@@ -49,7 +40,6 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
         })?,
     )?;
 
-    // CutDemo(from, to, path): a scenario reproducing ticks `from` to `to`.
     let world = world_of(harness);
     t.set(
         "CutDemo",
@@ -59,7 +49,6 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
         })?,
     )?;
 
-    // DemoPath() -> string | nil: the replayed demo's full path (a cut checks it).
     let world = world_of(harness);
     t.set(
         "DemoPath",
@@ -70,7 +59,6 @@ pub(super) fn register(lua: &Lua, harness: &Shared, t: &Table) -> LuaResult<()> 
     )
 }
 
-/// A `FindInDemo` query: one of `mark`, `log`, `event` or `inside`.
 fn query_of(table: &Table) -> LuaResult<Query> {
     let mut queries = Vec::new();
     for pair in table.pairs::<String, Value>() {
@@ -101,7 +89,6 @@ fn query_of(table: &Table) -> LuaResult<Query> {
     }
 }
 
-/// `inside = { min = {x, y, z}, max = {x, y, z} }`.
 fn inside(value: &Value) -> LuaResult<Query> {
     let bad = || {
         fail(

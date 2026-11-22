@@ -1,12 +1,6 @@
-//! A window frame's `wall_ms` is its own (#2255): its wall time is known only when
-//! the next frame starts, so it lands on the frame that took it, as the frame log's
-//! `ms` does, as the next frame starts, before its work: a read during frame N sees
-//! N-1's, and the newest frame recorded has none yet.
-
 use super::*;
 use crate::frame_log::{now_ms, read, FrameLog, LogQuery};
 
-/// The frame starting after one that took `last_wall_ms`, with renderer index `frame`.
 fn starts(last_wall_ms: f64, frame: u64) -> WindowFrame {
     WindowFrame {
         last_wall_ms,
@@ -15,9 +9,6 @@ fn starts(last_wall_ms: f64, frame: u64) -> WindowFrame {
     }
 }
 
-/// One frame, as the shell runs it: the frame before ends with its wall time
-/// (`shell::frame::stats::started`), then a tick of its systems' CPU ms, then the
-/// window frame is recorded.
 fn run(stats: &mut FrameStats, systems: &[(&'static str, f64)], frame: &WindowFrame) {
     window_ended(stats, frame.last_wall_ms);
     for (name, ms) in systems {
@@ -27,8 +18,6 @@ fn run(stats: &mut FrameStats, systems: &[(&'static str, f64)], frame: &WindowFr
     record_window(stats, frame, true);
 }
 
-/// Frames of 16, 60 and 16 ms, the 60 one running a heavy system: the 60 sits on
-/// that frame, beside its own heaviest system, and the frames after it are clean.
 #[test]
 fn a_spike_is_on_the_frame_that_took_it() {
     let mut stats = FrameStats::default();
@@ -63,22 +52,16 @@ fn a_spike_is_on_the_frame_that_took_it() {
     );
 }
 
-/// A frame the window could not show records no entry: the frame before it gets
-/// its own time as the undrawn one starts, and the undrawn frame's time, ended as
-/// the next drawn frame starts, is dropped rather than put on another frame.
 #[test]
 fn an_undrawn_frame_s_time_is_dropped() {
     let mut stats = FrameStats::default();
     run(&mut stats, &[], &starts(0.0, 0));
-    window_ended(&mut stats, 16.0); // the undrawn frame starts, and records nothing
+    window_ended(&mut stats, 16.0);
     run(&mut stats, &[], &starts(500.0, 1));
     let wall = stats.get("wall_ms").unwrap();
     assert_eq!((wall.samples, wall.last), (1, 16.0));
 }
 
-/// The frame log's `ms` and `Debug.Stats`' `wall_ms` read the same value for the
-/// same `frame`, and a read inside frame N (after it started, before its work)
-/// already sees N-1's.
 #[test]
 fn the_frame_log_and_the_stats_agree_frame_by_frame() {
     let dir = rusty_test_support::temp::dir();
@@ -101,7 +84,6 @@ fn the_frame_log_and_the_stats_agree_frame_by_frame() {
         inside,
         [none, Some(16.0), Some(60.0), Some(16.0), Some(33.0)]
     );
-    // Read inside frame i, the value is frame i - 1's: i starts at 1 here.
     let from_stats: Vec<(u64, f64)> = (inside.iter().enumerate().skip(1))
         .filter_map(|(i, wall)| Some((i as u64 - 1, (*wall)?)))
         .collect();

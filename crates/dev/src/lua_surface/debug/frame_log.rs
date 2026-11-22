@@ -1,14 +1,3 @@
-//! crates/dev/src/lua_surface/debug/frame_log.rs — `Debug.FrameLog`,
-//! `Debug.SetLogChannels` and `Debug.GetLogChannels` (#2206): the rolling frame log
-//! read back, and its channels switched.
-//!
-//! The read goes to the files and the frames the running log still holds
-//! (`frame_log::read`), so it answers during Play, after
-//! Stop, and in a session that never wrote a frame (it reads what the editor
-//! wrote). The channels are the project's (`Application::set_log_channels`), so a
-//! switch is kept in `project.rusty` (when a project is open) and the running log
-//! follows it next frame.
-
 use std::path::Path;
 
 use mlua::{Lua, Table, Value};
@@ -19,10 +8,8 @@ use rusty_core::settings::logs::LogChannels;
 use rusty_script::api::lua_json::to_lua;
 use rusty_script::api::{put, ApiCtx, Reg};
 
-/// The option keys `Debug.FrameLog` takes.
 const OPTIONS: &[&str] = &["last_seconds", "over_ms", "channel", "limit"];
 
-/// Register the three on the `Debug` table.
 pub fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     put(
         table,
@@ -73,8 +60,6 @@ pub fn register(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     )
 }
 
-/// `Debug.FrameLog`'s options as a [`LogQuery`]; an unknown key or a bad value
-/// raises.
 fn query(opts: Option<Table>) -> mlua::Result<LogQuery> {
     let mut query = LogQuery::default();
     let Some(opts) = opts else {

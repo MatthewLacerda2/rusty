@@ -1,30 +1,17 @@
-//! A line's head, read without parsing the line (#2206): what a read filters on.
-//!
-//! The writer opens every line with `{"ch":…,"t":…,"tick":…` and, on a `frames`
-//! record, `"frame"`, `"ms"` (unless unresolved) and `"cpu_ms"` (when it drew),
-//! in that order (`record::line`). Reading those few
-//! bytes is enough to drop a line a query does not want, so a read over the whole
-//! budget parses only the lines it keeps. A line written another way falls back to a full parse.
-
 use std::borrow::Cow;
 
 use serde_json::{Map, Value};
 
-/// The fields a read filters on.
 #[derive(Debug, PartialEq)]
 pub(super) struct Head<'a> {
     pub ch: Cow<'a, str>,
     pub t: u64,
-    /// A `frames` record's drawn-frame index.
     pub frame: Option<u64>,
-    /// A `frames` record's wall ms.
     pub ms: Option<f64>,
-    /// A `frames` record's renderer CPU ms: present when the frame drew.
     pub cpu_ms: Option<f64>,
 }
 
 impl<'a> Head<'a> {
-    /// The head of a line the writer wrote; `None` when it does not open as one.
     pub fn of(line: &'a str) -> Option<Self> {
         let rest = line.strip_prefix(r#"{"ch":""#)?;
         let (ch, mut rest) = rest.split_once('"')?;
@@ -45,7 +32,6 @@ impl<'a> Head<'a> {
         Some(head)
     }
 
-    /// The head of a parsed record, for a line [`Head::of`] could not read.
     pub fn from_map(record: &Map<String, Value>) -> Self {
         let ch = record.get("ch").and_then(Value::as_str).unwrap_or("");
         Self {
@@ -58,8 +44,6 @@ impl<'a> Head<'a> {
     }
 }
 
-/// Take `,"key":<scalar>` off the front of `rest` and return the scalar's text;
-/// `None` (and `rest` untouched) when the next field is not `key`.
 fn scalar<'a>(rest: &mut &'a str, key: &str) -> Option<&'a str> {
     let after = rest
         .strip_prefix(",\"")?

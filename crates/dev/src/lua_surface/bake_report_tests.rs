@@ -1,6 +1,3 @@
-//! `Lighting.GetBakeReport` / `Navigation.GetBakeReport` (#1980): `nil` before a
-//! bake, the file's table after one, and an unknown kind refused.
-
 use crate::bake::report::{Kind, Report};
 use crate::session::Session;
 
@@ -32,8 +29,6 @@ fn a_bake_report_reads_back_as_a_table() {
         "nil",
         "never baked"
     );
-    // A field the bake could not measure is `nil`, not a JSON null sentinel: a
-    // lightmap report writes `invalidTexels` as a real null.
     let stages = crate::bake::report::Stages::start();
     let lightmaps = Report::new(Kind::Lightmaps, &stages, (), 0, 0);
     let written = lightmaps.with(serde_json::json!({ "invalidTexels": null }));

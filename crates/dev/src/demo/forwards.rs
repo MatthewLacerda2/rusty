@@ -1,31 +1,11 @@
-//! The API verbs a scenario's VM makes in the gameplay VM, and the one rule for
-//! making them (#1879, #1893, #1929).
-//!
-//! Each verb here calls script callbacks synchronously, inside the call
-//! (`OnTakeDamage`, `OnControllerColliderHit`), on the live script instances,
-//! and those live in the gameplay VM: a caller's own copy of the namespace would
-//! find none. Two callers make them: the scenario's VM while a demo records
-//! (`bridge::forward`), and the replay's VM (`calls::invoke`). Both go through
-//! [`Forward::run`], so a down runtime (before the first `Harness.Step`) is
-//! handled the same way on both sides, and a replay repeats what was recorded.
-//!
-//! The table lives here, not in `bridge`, so `demo` reads it without importing
-//! `bridge` (which imports `demo`).
-
 use mlua::Result as LuaResult;
 
-/// One namespace's forwarded verbs.
 pub struct Forward {
     pub namespace: &'static str,
     pub verbs: &'static [&'static str],
-    /// Whether a verb runs in the caller's own VM while the gameplay VM is
-    /// down. `Move` does (it moves the edit-mode controller, and there is no
-    /// handler yet to hear it); `Damage.*` refuses: a hit no handler can hear is
-    /// a scenario's mistake.
     pub falls_back: bool,
 }
 
-/// Every forwarded verb, by namespace.
 pub const FORWARDS: [Forward; 2] = [
     Forward {
         namespace: "Damage",
@@ -39,7 +19,6 @@ pub const FORWARDS: [Forward; 2] = [
     },
 ];
 
-/// The entry forwarding `namespace.verb`, if one does.
 pub fn find(namespace: &str, verb: &str) -> Option<&'static Forward> {
     FORWARDS
         .iter()
@@ -47,11 +26,6 @@ pub fn find(namespace: &str, verb: &str) -> Option<&'static Forward> {
 }
 
 impl Forward {
-    /// Make `verb`: `in_game` tries it in the gameplay VM (`None` while that VM
-    /// is down, as `ScriptManager::with_vm` answers); then `own` makes it in the
-    /// caller's VM if this namespace falls back, and it is an error otherwise.
-    /// `in_game` is a closure so a caller's borrow of the world ends before
-    /// `own` runs.
     pub fn run<R>(
         &self,
         verb: &str,

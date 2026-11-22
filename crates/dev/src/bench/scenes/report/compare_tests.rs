@@ -1,7 +1,6 @@
 use super::super::{read_baseline, write};
 use super::*;
 
-/// A one-viewpoint report of `frame_ms`.
 fn scene(frame_ms: f64) -> SceneReport {
     let mut r = SceneReport {
         scene: "pool".into(),
@@ -32,17 +31,14 @@ fn row(avg: f64, lo: f64, hi: f64) -> Row {
 #[test]
 fn a_change_inside_the_spread_is_unresolved_and_one_past_it_is_given() {
     let before = row(2.0, 1.9, 2.1);
-    // 2% slower, but the runs of each overlap: noise, not a change.
     let inside = delta(&before, &row(2.04, 1.95, 2.15));
     assert_eq!(inside, "unresolved (inside the spread)");
     assert!(!inside.contains('%'), "no percentage for noise: {inside}");
-    // 20% slower and clear of the earlier spread: a change.
     assert_eq!(delta(&before, &row(2.4, 2.3, 2.5)), "+0.400 (+20.0%)");
 }
 
 #[test]
 fn without_a_spread_the_change_is_printed_as_measured() {
-    // A run of one, or a one-off row (load, memory): points, never unresolved.
     assert_eq!(
         delta(&row(2.0, 2.0, 2.0), &row(3.0, 3.0, 3.0)),
         "+1.000 (+50.0%)"
@@ -91,8 +87,6 @@ fn a_baseline_is_read_from_a_project_folder_or_the_whole_out_dir() {
     );
 }
 
-/// The Hi-Z parts' notes (#2401): the CPU one wherever the stage ran, the GPU
-/// one (and its pass count) only with GPU timing, which lavapipe lacks.
 #[test]
 fn the_hiz_gpu_parts_note_needs_gpu_timing() {
     let mut cpu = scene(2.0);
@@ -104,8 +98,6 @@ fn the_hiz_gpu_parts_note_needs_gpu_timing() {
     assert!(cpu.notes(true).contains("6 with a clustered batch"));
 }
 
-/// A kept report from before `cpu_ms` timed the whole tick (#2342), which has no
-/// `cpu.flush_bounds` row, is warned of; two runs after it are not.
 #[test]
 fn a_kept_report_from_before_the_whole_tick_timing_is_warned_of() {
     let timed = |flush: bool| {

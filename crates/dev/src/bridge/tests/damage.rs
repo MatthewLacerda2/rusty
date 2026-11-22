@@ -1,5 +1,3 @@
-//! A scenario's `Damage.*` reaches the gameplay VM's `OnTakeDamage` (#1893).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

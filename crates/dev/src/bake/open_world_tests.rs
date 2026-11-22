@@ -1,11 +1,3 @@
-//! A bake in an open world draws at once (#1540). The editor keeps one renderer
-//! for the whole session while Generate Lighting's probe step draws the same scene
-//! through a headless renderer of its own. A re-uploaded mesh used to be a flag the
-//! first renderer cleared, so after a Generate Lightmap UVs re-import the bake's
-//! renderer took the change and the editor's kept the floor's old vertices, with no
-//! lightmap UV: every texel read one black corner of the atlas until Play/Stop
-//! rebuilt the world. Skips when no adapter is present.
-
 use glam::{Quat, Vec3};
 
 use super::lightmap::bake_scene_lightmaps;
@@ -20,8 +12,6 @@ use rusty_test_support::models::quad_file as quad_model;
 
 const SIZE: u32 = 32;
 
-/// The mean brightness of `scene` seen from above through `host`; `None` without
-/// an adapter.
 fn brightness(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<f64> {
     let path = rusty_test_support::temp::dir().join(format!("rusty_1540_{name}.png"));
     let camera = Camera::new(Vec3::new(0.0, 3.0, 0.0), 0.0, -89.0);
@@ -33,9 +23,6 @@ fn brightness(host: &mut CaptureHost, scene: &Scene, name: &str) -> Option<f64> 
     Some(sum / f64::from(3 * SIZE * SIZE))
 }
 
-/// A saved scene, no ambient: a static floor from a glTF quad with no lightmap UV,
-/// under a `Baked` sun, so only its lightmap lights it. Returns it, the model's
-/// path and the scene's.
 fn floor_under_a_baked_sun() -> (Scene, String, String) {
     let model = quad_model("rusty_1540");
     let dir = std::path::Path::new(&model).parent().unwrap();
@@ -46,7 +33,6 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
     let floor = instantiate_asset(&mut scene, &reference, None, Vec3::ZERO).unwrap();
     scene.world.set_static(floor, true);
     let mut t = scene.world.transform_mut(floor).unwrap();
-    // The +Z quad over [0, 1]² turned to face up and spread over [-4, 4]².
     t.position = Vec3::new(-4.0, 0.0, 4.0);
     t.rotation = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     t.scale = Vec3::splat(8.0);
@@ -68,20 +54,15 @@ fn floor_under_a_baked_sun() -> (Scene, String, String) {
 
 #[test]
 fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
-    // The editor's renderer stays alive while the bake builds its own (#1844).
     let _two = rusty_render::test_gpu::pair::headless_pair();
     let (mut scene, model, path) = floor_under_a_baked_sun();
     let mut editor = CaptureHost::new();
-    // As an earlier bake left it: the sun taken in (so not previewed live, #2522),
-    // the floor without a lightmap for want of a UV.
     let sun = scene.world.find_by_name("Sun").unwrap();
     scene.lightmaps.took_in_baked(sun);
-    // The editor has drawn the floor as imported: no lightmap UV, no lightmap.
     let Some(dark) = brightness(&mut editor, &scene, "before") else {
         eprintln!("[1540] no GPU/software adapter — skipping");
         return;
     };
-    // One script, as the game ran it: no frame between the re-import and the bake.
     let on = LightmapUvSettings {
         generate: true,
         ..Default::default()
@@ -92,7 +73,6 @@ fn gpu_a_bake_after_a_lightmap_uv_reimport_lights_the_open_world() {
         bake_scene_lightmaps(&mut scene, Some(&path), &settings),
         Ok(1)
     );
-    // Generate Lighting's probe step, drawing the scene through its own renderer.
     scene.probes.add_probe(Vec3::Y);
     assert_eq!(
         bake_scene_probes(&mut scene, &mut crate::bake::progress::BakeLog::off()),

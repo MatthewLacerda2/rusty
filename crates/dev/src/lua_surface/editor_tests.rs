@@ -1,13 +1,9 @@
-//! `Editor.EnterPlay/ExitPlay/IsPlaying` (#1360): the play switch an agent drives
-//! through the headless session, taking effect at the frame after the call.
-
 use super::super::session::Session;
 
 fn session() -> Session {
     Session::new("").expect("an empty session boots")
 }
 
-/// Run `line` as one channel command, panicking with the Lua error on failure.
 fn run(s: &mut Session, line: &str) -> String {
     s.command(line)
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
@@ -17,7 +13,6 @@ fn run(s: &mut Session, line: &str) -> String {
 fn enter_play_takes_effect_at_the_next_frame() {
     let mut s = session();
     assert_eq!(run(&mut s, "Editor.IsPlaying()"), "false");
-    // The call only requests: inside it, the world is still in edit mode.
     assert_eq!(
         run(
             &mut s,
@@ -25,12 +20,10 @@ fn enter_play_takes_effect_at_the_next_frame() {
         ),
         run_shape(&s, "true", "false")
     );
-    // The command's frame took the request, so the next call runs in Play.
     assert_eq!(run(&mut s, "Editor.IsPlaying()"), "true");
     assert!(s.world().world.scene.borrow().is_playing());
 }
 
-/// How the evaluator renders two results, read from the evaluator itself.
 fn run_shape(s: &Session, a: &str, b: &str) -> String {
     s.eval(&format!("return {a}, {b}"))
         .expect("two literals evaluate")
@@ -50,7 +43,6 @@ fn a_repeated_transition_is_a_no_op_that_returns_false() {
         "false",
         "already playing"
     );
-    // Two requests before one frame: the second sees where the first is heading.
     let both = run(
         &mut s,
         "local a = Editor.ExitPlay(); return a, Editor.ExitPlay()",
@@ -68,10 +60,8 @@ fn exit_play_restores_the_edit_scene_and_drops_play_globals() {
     run(&mut s, &format!("Transform.SetPosition({id}, 9, 9, 9)"));
     run(&mut s, "played = true");
     run(&mut s, "Editor.ExitPlay()");
-    // Stop restored the edit-mode position, as the Stop button does.
     let x = format!("(Transform.GetPosition({id})) == 1");
     assert_eq!(run(&mut s, &x), "true");
-    // Each Play/Stop builds a fresh VM: the play-mode global is gone.
     assert_eq!(run(&mut s, "played == nil"), "true");
 }
 
@@ -89,7 +79,7 @@ fn steps_queued_in_play_run_before_the_next_command() {
 fn a_host_request_pending_this_frame_counts() {
     let s = session();
     let app = &s.world().resources.application;
-    app.borrow_mut().set_host_play(true); // the Play button, pressed this frame
+    app.borrow_mut().set_host_play(true);
     assert_eq!(s.eval("Editor.EnterPlay()").as_deref(), Ok("false"));
     assert_eq!(s.eval("Editor.ExitPlay()").as_deref(), Ok("true"));
 }
@@ -98,7 +88,7 @@ fn a_host_request_pending_this_frame_counts() {
 fn a_standalone_run_refuses_with_a_warning() {
     let mut s = session();
     let app = &s.world().resources.application;
-    app.borrow_mut().mark_standalone(); // a dev-built player, the `play` harness
+    app.borrow_mut().mark_standalone();
     assert_eq!(run(&mut s, "Editor.EnterPlay()"), "false");
     assert_eq!(run(&mut s, "Editor.IsPlaying()"), "false");
     let console = s.world().console().borrow();

@@ -1,6 +1,3 @@
-//! The frame log's segments (#2206): rotation under the budget, a restart, the
-//! period, and a writer that falls behind.
-
 use super::*;
 use crate::frame_log::segments::{numbered, segment_path, Segments};
 
@@ -15,7 +12,6 @@ fn files(dir: &Path) -> Vec<(u64, u64)> {
         .collect()
 }
 
-/// Full segments rotate, the oldest go past the budget, and the newest line is kept.
 #[test]
 fn segments_rotate_and_hold_the_budget() {
     let dir = rusty_test_support::temp::dir();
@@ -33,7 +29,6 @@ fn segments_rotate_and_hold_the_budget() {
     assert!(newest.trim_end().ends_with(r#""i":0199}"#), "{newest}");
 }
 
-/// A log that starts again keeps what is there and numbers on after it.
 #[test]
 fn a_restart_continues_after_the_newest_segment() {
     let dir = rusty_test_support::temp::dir();
@@ -54,7 +49,6 @@ fn a_restart_continues_after_the_newest_segment() {
     );
 }
 
-/// A segment whose newest record is older than the period is deleted.
 #[test]
 fn the_period_drops_a_stale_segment() {
     let dir = rusty_test_support::temp::dir();
@@ -70,8 +64,6 @@ fn the_period_drops_a_stale_segment() {
     assert_eq!(files(&dir).len(), 1, "only the open one is left");
 }
 
-/// A writer that is behind drops a frame's lines, never waits, and says so in
-/// the log once it catches up.
 #[test]
 fn a_writer_behind_drops_and_counts() {
     let dir = rusty_test_support::temp::dir();
@@ -103,7 +95,6 @@ fn a_writer_behind_drops_and_counts() {
     assert_eq!(text.lines().count(), 1 + 2 * QUEUE);
 }
 
-/// The thread writes what was sent, flushed, by the time the writer is dropped.
 #[test]
 fn a_dropped_writer_has_written_everything() {
     let dir = rusty_test_support::temp::dir();
@@ -117,8 +108,6 @@ fn a_dropped_writer_has_written_everything() {
     assert_eq!(text.lines().count(), 50);
 }
 
-/// A second log on a folder another one writes logs nothing and says why; once
-/// the first ends, the folder is free.
 #[test]
 fn a_second_writer_on_one_folder_is_refused() {
     let dir = rusty_test_support::temp::dir();

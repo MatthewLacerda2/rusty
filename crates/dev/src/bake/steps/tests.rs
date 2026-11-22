@@ -1,15 +1,9 @@
-//! The probe bake a step at a time (#1602): no step bakes more than one reflection
-//! probe or a few light probes, each says where it is, and stepping lands where the
-//! bake run in one call does. Skips its GPU half without an adapter.
-
 use glam::Vec3;
 
 use super::super::lighting::{start_lighting, LightingBakeParams};
 use super::{Stage, LIGHT_PROBES_PER_STEP};
 use rusty_scene::Scene;
 
-/// A scene with `light` manual light probes and `reflection` manual reflection
-/// probes at a small resolution, saved under `name`; returns it and its path.
 pub(super) fn probed(name: &str, light: usize, reflection: usize) -> (Scene, String) {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_1602_{name}"));
     std::fs::create_dir_all(&dir).unwrap();
@@ -34,7 +28,7 @@ fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
     let params = LightingBakeParams::default();
     let mut job = start_lighting(&scene, Some(&path), None, params).unwrap();
     if !job.report().ran_reflection_bake {
-        return; // no adapter
+        return;
     }
     let mut lines = Vec::new();
     let mut last = job.stage();
@@ -68,7 +62,6 @@ fn gpu_each_step_bakes_a_reflection_probe_or_a_few_light_probes() {
     assert_eq!(job.stage(), Stage::Done);
 }
 
-/// Stepped and in one call, the same probes: the sync path is the steps run out.
 #[test]
 fn gpu_stepping_bakes_what_one_call_bakes() {
     let (mut stepped, path) = probed("same", 3, 0);
@@ -90,8 +83,6 @@ fn gpu_stepping_bakes_what_one_call_bakes() {
     assert_eq!(sh(&stepped), sh(&whole));
 }
 
-/// Reflection probes with nowhere to write: the bake refuses before it starts, not
-/// after the light probes' whole solve.
 #[test]
 fn unsaved_reflections_refuse_up_front() {
     let (scene, _) = probed("unsaved", 2, 1);

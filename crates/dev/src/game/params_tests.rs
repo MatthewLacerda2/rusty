@@ -36,8 +36,6 @@ fn a_key_must_be_a_lua_name_and_a_pair_needs_its_equals() {
 
 #[test]
 fn a_non_finite_number_reaches_the_recipe_as_a_word() {
-    // `inf` parses as an f64 but is no number a recipe can use; the word is plain,
-    // so it reaches the recipe as a string, for the recipe to refuse.
     let params = Params::parse(["x=inf"]).unwrap();
     assert_eq!(params.to_lua(), r#"{ x = "inf" }"#);
     assert!(Params::parse(["x=NaN"]).is_ok());

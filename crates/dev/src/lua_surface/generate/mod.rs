@@ -1,16 +1,3 @@
-//! `Lighting.Generate()` (and, in `background`, `GenerateAsync` / `IsRunning` /
-//! `GetBakeStatus`, #1999)
-//! and the scene's lighting settings (#832): the one verb
-//! behind the editor's Generate Lighting button (lightmaps, probes and, #1714, the
-//! occlusion culling's PVS), `Lighting.BakeOcclusion()` behind its Bake Occlusion
-//! button (#1958: the PVS alone), and `Lighting.GetSettings()` /
-//! `SetSettings{…}`, the knobs the button's card edits (the lightmap bake's, its
-//! Max Lightmap Size included, #1704, and the
-//! reflection probes' default resolution, memory budget and probe ceiling, #1584,
-//! and the scene's diffuse model, #1698, and the lightmaps' denoiser, #1884, and
-//! Backface Tolerance, #1949, and the progressive bake's samples per pass and
-//! Prioritize View, #1970, and the direct samples, #2355).
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table};
@@ -25,30 +12,22 @@ use rusty_scene::Scene;
 use rusty_script::api::{global_table, put, ApiCell, ApiCtx, Reg};
 use rusty_script::scripting::ConsoleLogs;
 
-/// The knobs a script may override, each optional; `None` keeps `base`'s.
 #[derive(Default)]
 pub(super) struct Overrides {
     pub texels_per_unit: Option<f32>,
     pub samples: Option<u32>,
-    /// Direct Samples, `0` following `samples` (#2355).
     pub direct_samples: Option<u32>,
     pub bounces: Option<u32>,
     pub seed: Option<u64>,
     pub directional: Option<bool>,
-    /// Max Lightmap Size, the atlas page edge (#1704).
     pub max_lightmap_size: Option<u32>,
-    /// What cleans the bounce (#1884).
     pub denoiser: Option<Denoiser>,
-    /// Backface Tolerance (#1949).
     pub backface_tolerance: Option<f32>,
-    /// A progressive bake's paths per texel per pass, and Prioritize View (#1970).
     pub samples_per_pass: Option<u32>,
     pub prioritize_view: Option<bool>,
 }
 
 impl Overrides {
-    /// `base` with these overrides applied, then clamped into
-    /// [`BakeSettings::sanitized`]'s ranges, the editor's.
     pub(super) fn apply(&self, base: BakeSettings) -> BakeSettings {
         BakeSettings {
             texels_per_unit: self.texels_per_unit.unwrap_or(base.texels_per_unit),
@@ -84,8 +63,6 @@ impl Overrides {
     }
 }
 
-/// Add `Generate`, `BakeOcclusion`, `GetSettings` and `SetSettings` to the
-/// `Lighting` table.
 pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     let table = global_table(lua, "Lighting")?;
@@ -120,8 +97,6 @@ pub(super) fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     register_settings(lua, &table, scene)
 }
 
-/// `BakeOcclusion()` (#1958): only the occlusion step of `Generate`, written
-/// beside the scene, as Unity bakes occlusion from its own window.
 fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     let (scene, scene_path, nav, console) = (ctx.scene, ctx.scene_path, ctx.nav, ctx.console);
     put(
@@ -150,9 +125,6 @@ fn register_bake_occlusion(lua: &Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     )
 }
 
-/// Say once, after a bake, when the scene file lacks a material the bake read
-/// (`unsaved_materials_warning`, #1958): to stderr, as the bake's own lines go,
-/// and to the console.
 fn warn_unsaved(console: &RefCell<ConsoleLogs>, scene: &Scene, path: Option<&str>) {
     if let Some(line) = path.and_then(|p| unsaved_materials_warning(scene, p)) {
         eprintln!("{line}");
@@ -160,7 +132,6 @@ fn warn_unsaved(console: &RefCell<ConsoleLogs>, scene: &Scene, path: Option<&str
     }
 }
 
-/// `GetSettings` / `SetSettings`: the bake settings `Generate` uses.
 fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -197,9 +168,6 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
-/// `SetSettings{…}`: the fields `t` names written into the scene's settings, each
-/// clamped. Every field is read and checked before any is written, so a call that
-/// raises (an unknown diffuse model, a value of the wrong type) changes nothing.
 fn set_settings(scene: &mut rusty_scene::Scene, t: &Table) -> mlua::Result<()> {
     let overrides = Overrides::from_table(t)?;
     let model = diffuse_model(t)?;
@@ -214,7 +182,6 @@ fn set_settings(scene: &mut rusty_scene::Scene, t: &Table) -> mlua::Result<()> {
     Ok(())
 }
 
-/// The denoiser `t` names (#1884), if any; an unknown name is an error.
 fn denoiser(t: &Table) -> mlua::Result<Option<Denoiser>> {
     let Some(name) = t.get::<Option<String>>("denoiser")? else {
         return Ok(None);
@@ -224,7 +191,6 @@ fn denoiser(t: &Table) -> mlua::Result<Option<Denoiser>> {
     })
 }
 
-/// The diffuse model `t` names (#1698), if any; an unknown name is an error.
 fn diffuse_model(t: &Table) -> mlua::Result<Option<DiffuseModel>> {
     let Some(name) = t.get::<Option<String>>("diffuseModel")? else {
         return Ok(None);
@@ -236,7 +202,6 @@ fn diffuse_model(t: &Table) -> mlua::Result<Option<DiffuseModel>> {
     })
 }
 
-/// The Mixed Lighting Mode `t` names (#1695), if any; an unknown name is an error.
 fn mixed_lighting_mode(t: &Table) -> mlua::Result<Option<MixedLightingMode>> {
     let Some(name) = t.get::<Option<String>>("mixedLightingMode")? else {
         return Ok(None);
@@ -249,14 +214,12 @@ fn mixed_lighting_mode(t: &Table) -> mlua::Result<Option<MixedLightingMode>> {
     })
 }
 
-/// The reflection probes' defaults, as `GetSettings` returns them (#1584).
 fn put_reflections(out: &Table, r: &ReflectionSettings) -> mlua::Result<()> {
     out.set("reflectionResolution", r.resolution)?;
     out.set("reflectionBudgetMB", r.budget_mb)?;
     out.set("reflectionMaxProbes", r.max_probes)
 }
 
-/// The reflection defaults `t` names written into `r`, then clamped.
 fn set_reflections(t: &Table, r: &mut ReflectionSettings) -> mlua::Result<()> {
     let get = |key: &str| t.get::<Option<u32>>(key);
     r.resolution = get("reflectionResolution")?.unwrap_or(r.resolution);

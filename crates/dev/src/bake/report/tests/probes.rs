@@ -1,6 +1,3 @@
-//! The light probes' report: the dynamic objects sampling far from any probe, and
-//! the timeline that splits a stepped bake into bounces and reflection probes.
-
 use glam::Vec3;
 
 use super::assert_common;
@@ -63,8 +60,6 @@ fn the_timeline_gives_each_stage_its_own_time() {
         total: 4,
     };
     let reflection = |done| Stage::Reflection { done, total: 2 };
-    // Fixed instants, never a real sleep: a scheduler's overshoot is no
-    // property of the timeline (#2011).
     let start = std::time::Instant::now();
     let ms = std::time::Duration::from_millis;
     let stages = [

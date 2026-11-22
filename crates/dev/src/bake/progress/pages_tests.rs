@@ -1,6 +1,3 @@
-//! The lightmap encode as the bake log reads it (#1694): a line for every page
-//! encoded, however soon after the last one, and none while it stands still.
-
 use std::cell::RefCell;
 use std::time::Duration;
 
@@ -9,7 +6,6 @@ use super::{BakeLog, Line, Progress, Step};
 #[test]
 fn every_encoded_page_gets_a_line_within_the_interval() {
     let lines: RefCell<Vec<Line>> = RefCell::default();
-    // A clock that never moves: only a step change or a page can print.
     let mut log = BakeLog::new(|| Duration::ZERO, |l| lines.borrow_mut().push(l));
     let at = |done| Progress {
         step: Step::LightmapPages,

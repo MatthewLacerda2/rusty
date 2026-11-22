@@ -1,12 +1,3 @@
-//! Tests for the no-adapter decision (#885): under `RUSTY_REQUIRE_GPU=1` a capture
-//! that finds no adapter fails instead of skipping, and a capture that does find one
-//! must actually render. Without the variable (a GPU-less dev box) both stay skips.
-//!
-//! The two halves pin different failures. [`no_adapter_fails_exactly_when_required`]
-//! pins the decision itself; [`gpu_capture_renders_when_required`] pins every path
-//! *to* it — a `draw` or `capture_into` that wrongly answers "no adapter" never
-//! reaches [`no_adapter`], so only a test that insists on a frame can see it.
-
 use glam::Vec3;
 
 use super::{no_adapter, CaptureHost};
@@ -14,14 +5,10 @@ use crate::screenshot;
 use rusty_render::{gpu_required, REQUIRE_GPU_ENV};
 use rusty_scene::{Camera, Scene};
 
-/// The variable as this process sees it, read independently of [`gpu_required`].
 fn required_here() -> bool {
     std::env::var(REQUIRE_GPU_ENV).as_deref() == Ok("1")
 }
 
-/// Adapter-free: the decision follows the variable exactly. CI (variable set) proves
-/// the `Err` arm and that the dev layer sees the variable at all; a local run without
-/// it proves the graceful skip.
 #[test]
 fn no_adapter_fails_exactly_when_required() {
     assert_eq!(gpu_required(), required_here());
@@ -43,10 +30,6 @@ fn no_adapter_fails_exactly_when_required() {
     }
 }
 
-/// Where a GPU is required, the dev capture layer must produce frames — both the
-/// host's `draw` and the screenshot entry point every visual test uses. Without this,
-/// a capture path that wrongly reported "no adapter" would skip the whole visual
-/// suite and still come back green (the two MISSED mutants of #885).
 #[test]
 fn gpu_capture_renders_when_required() {
     if !required_here() {
@@ -59,8 +42,6 @@ fn gpu_capture_renders_when_required() {
     );
     let frame = host.draw(&scene, &cam, 8, 8).expect("draw must not error");
     let frame = frame.expect("RUSTY_REQUIRE_GPU=1 but draw produced no frame");
-    // Recording a tiny frame takes a fraction of a millisecond to a few dozen: in
-    // ms, not seconds or µs (#889).
     let ms = frame.cpu_ms;
     assert!(
         0.01 < ms && ms < 1000.0,

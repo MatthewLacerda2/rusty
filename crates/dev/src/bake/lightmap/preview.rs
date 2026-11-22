@@ -1,21 +1,3 @@
-//! A progressive bake's preview on the live scene (#1970, Unity's Progressive
-//! Lightmapper). After each pass the bake's worker hands the lightmaps as they
-//! stand to an encoder thread of its own (`encoder::Encoder`), so the trace goes on at
-//! once; the encoder writes them beside the scene as `lightmap_preview_<bake>_*`
-//! pages,
-//! cheaply (uncompressed PNGs of one level; the renderer uploads a colour or
-//! direction page's one level as it is and makes only a shadowmask's mips), and the editor's next frame points the scene at them
-//! ([`Previews::show`]). A pass not yet shown when the next one is in is skipped,
-//! and the writer removes its pages; while the writer is busy, the bake builds
-//! no lightmaps for a preview at all (`Encoder::busy`).
-//!
-//! The scene's own lightmaps are hidden under the preview, in its set
-//! (`LightmapSet::shown_over`, their one owner), so a save meanwhile writes them,
-//! never a preview's pages, and an edit (a despawn, a clear) reaches them. A
-//! cancel or a failure puts them back and removes the preview pages
-//! ([`Previews::restore`]); a finished bake's write replaces both, its clear of the
-//! folder taking the preview pages with it.
-
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -27,9 +9,6 @@ use rusty_lighting::lightmap::Pass;
 use rusty_scene::lighting::lightmap_set::LightmapSet;
 use rusty_scene::Scene;
 
-/// What the writer and the UI share, under one lock held only to swap or remove
-/// pages, never while one is written: the newest pass written and not yet shown,
-/// and the page stems the scene shows.
 #[derive(Default)]
 pub(super) struct Shared {
     pub latest: Option<(Pass, LightmapSet)>,
@@ -38,21 +17,15 @@ pub(super) struct Shared {
 
 pub(super) type Latest = Arc<Mutex<Shared>>;
 
-/// One bake's previews, as the UI thread sees them: the newest pass written.
 pub(super) struct Previews {
     pub(super) latest: Latest,
     pub(super) dir: PathBuf,
-    /// What this bake's preview pages are named from, `lightmap_preview_<n>`, `n`
-    /// this bake's own: a writer still finishing for a bake dropped (a restart, a
-    /// scene switch) removes its own pages, never another bake's.
     pub(super) prefix: String,
 }
 
-/// The bakes started in this process, numbering their preview pages.
 static BAKES: AtomicU32 = AtomicU32::new(0);
 
 impl Previews {
-    /// Previews written beside `scene_path`.
     pub fn new(scene_path: &str) -> Self {
         let n = BAKES.fetch_add(1, Ordering::Relaxed);
         Self {
@@ -62,11 +35,6 @@ impl Previews {
         }
     }
 
-    /// Show the newest pass on `scene`, if one came in since the last call, and
-    /// say which. The scene's own lightmaps are hidden under it the first time,
-    /// and the pages of the pass shown before are removed; one that cannot be is
-    /// said, and the pass is shown all the same. A frame that finds the writer
-    /// swapping a pass in waits for the next.
     pub fn show(&mut self, scene: &mut Scene) -> Option<Pass> {
         let mut shared = match self.latest.try_lock() {
             Ok(shared) => shared,
@@ -74,14 +42,12 @@ impl Previews {
             Err(TryLockError::WouldBlock) => return None,
         };
         let (pass, mut set) = shared.latest.take()?;
-        // An entity deleted since the pass was handed over stays gone.
         set.retain(|id| scene.world.contains(id));
         let shown = &mut scene.lightmaps;
         let own = shown.shown_over.take();
         set.shown_over = Some(own.unwrap_or_else(|| Box::new((**shown).clone())));
         let keep = stems(&set);
         scene.lightmaps = set.into();
-        // Only the pages shown before: the writer may be writing the next ones.
         let old = std::mem::replace(&mut shared.shown, keep);
         let gone = old.difference(&shared.shown).cloned().collect();
         if let Err(e) = remove_stems(&self.dir, &gone) {
@@ -90,8 +56,6 @@ impl Previews {
         Some(pass)
     }
 
-    /// Put the scene's own lightmaps back, if a preview is shown, and remove the
-    /// preview pages.
     pub fn restore(&mut self, scene: &mut Scene) {
         if let Some(own) = scene.lightmaps.shown_over.take() {
             scene.lightmaps = (*own).into();
@@ -99,8 +63,6 @@ impl Previews {
         self.clear();
     }
 
-    /// Remove this bake's preview pages; the folder may hold none. Once the bake
-    /// is cancelled, a pass the writer is still writing is removed by the writer.
     pub fn clear(&self) {
         let mut shared = lock(&self.latest);
         *shared = Shared::default();

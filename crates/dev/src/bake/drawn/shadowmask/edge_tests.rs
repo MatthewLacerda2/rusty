@@ -1,6 +1,3 @@
-//! A shadowmasked sun at its shadow distance (#1695): a static wall's shadow on a
-//! long floor holds past the cascades in both modes, with no step at the edge.
-
 use glam::Vec3;
 
 use super::fixture::{bake, block, patch, renderer, scene, settled};
@@ -8,15 +5,12 @@ use rusty_components::{LightMode, LightType};
 use rusty_core::settings::quality::ShadowmaskMode;
 use rusty_scene::lighting::MixedLightingMode::Shadowmask;
 
-/// The largest step, as a share of the lit floor, between two neighbouring floor
-/// points in the wall's shadow, either side of the shadow distance.
 const NO_POP: f32 = 0.15;
 
 #[test]
 fn gpu_a_shadowmasked_suns_static_shadow_holds_past_the_shadow_distance() {
     let Some(mut r) = renderer() else { return };
     let (mut s, sun) = scene(LightMode::Mixed, Shadowmask, 1.0);
-    // The sun low from -X, a long static wall along -Z shading the floor beside it
     let mut light = s.world.light(sun).unwrap().clone();
     (light.light_type, light.intensity) = (LightType::Directional, 3.0);
     s.world.set_light(sun, Some(light));

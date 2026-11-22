@@ -1,5 +1,3 @@
-//! A probe stage as the bake log reads it (#1667).
-
 use super::stage_progress;
 use crate::bake::steps::Stage;
 

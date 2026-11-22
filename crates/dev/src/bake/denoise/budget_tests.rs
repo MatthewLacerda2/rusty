@@ -1,12 +1,8 @@
-//! The denoise budget (#2312): large charts run together only while their costs fit
-//! it, one past it still runs alone, and small ones never wait.
-
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 
 use super::budget::{cost, Budget, BUDGET};
 use super::ffi::KEEP_TEXELS;
 
-/// Texels whose denoise costs a little under half the budget: two fit, three do not.
 fn near_half() -> usize {
     let mut texels = KEEP_TEXELS + 1;
     while cost(texels * 2) * 2 < BUDGET {
@@ -16,8 +12,6 @@ fn near_half() -> usize {
     texels
 }
 
-/// `jobs` denoises of `texels` each on as many threads: the most in flight at once,
-/// and the most bytes they were let hold.
 fn run(jobs: usize, texels: usize) -> (usize, u64) {
     let budget = Budget::default();
     let (now, most) = (AtomicUsize::new(0), AtomicUsize::new(0));
@@ -62,7 +56,6 @@ fn a_denoise_past_the_budget_still_runs_alone() {
 fn a_small_denoise_never_waits_on_the_budget() {
     let budget = Budget::default();
     let large = near_half();
-    // Two large ones hold the budget; a small one inside them still runs.
     budget.run(large, || {
         budget.run(large, || assert_eq!(budget.run(KEEP_TEXELS, || 7), 7))
     });

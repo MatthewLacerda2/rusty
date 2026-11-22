@@ -1,6 +1,3 @@
-//! `wall_ms` in a scene's report (#2494): its change against the last run, the
-//! note saying what it is, its column in the run's summary.
-
 use super::super::super::{Report, Summary};
 use super::super::fold::aggregate;
 use super::*;

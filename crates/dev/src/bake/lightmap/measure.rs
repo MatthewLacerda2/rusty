@@ -1,7 +1,3 @@
-//! What an editor lightmap bake measures for its report (#1980), kept beside
-//! the job ([`super::job`]) so the job stays about running the bake: the
-//! settings, the gather's time, each mesh's worker time and what OIDN took.
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -13,7 +9,6 @@ use rusty_lighting::lightmap::{BakeProgress, BakeScene};
 use rusty_scene::lighting::settings::BakeSettings;
 use rusty_scene::Scene;
 
-/// A bake's clocks, from its start to its report.
 pub(super) struct Measure {
     settings: BakeSettings,
     gathered: Duration,
@@ -22,9 +17,6 @@ pub(super) struct Measure {
 }
 
 impl Measure {
-    /// The progress a bake with `settings` counts into, timing each mesh and
-    /// lent OIDN when the settings pick it, and its clocks; the gather took
-    /// `gathered`.
     pub fn start(settings: &BakeSettings, gathered: Duration) -> (BakeProgress, Self) {
         let clocks = Arc::new(MeshClocks::default());
         let (progress, oidn) = lend_denoiser(BakeProgress::observed(clocks.clone()), settings);
@@ -37,8 +29,6 @@ impl Measure {
         (progress, measure)
     }
 
-    /// Write the report of the bake that read `input`, traced for `trace`,
-    /// encoded `pages` for `encode` and wrote them for `write`.
     pub fn keep(
         &self,
         (scene, scene_path): (&Scene, &str),

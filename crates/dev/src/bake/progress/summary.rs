@@ -1,22 +1,10 @@
-//! The end of a bake's log (#1891): what each step took, and the lightmap meshes
-//! that cost the most, so a long bake can say where its time went.
-//!
-//! A step runs from when it began to when the next one did (or the end), and the
-//! first from the bake's start, so the steps add up to the total: the work between
-//! two steps is a step of its own (`BakeLog::enter`). A mesh's
-//! cost is its worker time: the bake's pool (#1656) traces one mesh's batches on
-//! every core at once, so a wall-clock span per mesh would overlap its neighbours,
-//! while the time its batches took, summed over the threads, is what it cost.
-
 use std::time::Duration;
 
 use super::format::{count, duration};
 use super::Step;
 
-/// How many of the slowest lightmap meshes the log names.
 pub const SLOWEST: usize = 15;
 
-/// One lightmap mesh's cost: its entity's name, its texels and its worker time.
 #[derive(Clone, Debug, PartialEq)]
 pub struct MeshCost {
     pub name: String,
@@ -24,7 +12,6 @@ pub struct MeshCost {
     pub busy: Duration,
 }
 
-/// One step as it ran: when it began, and the total of work it last reported.
 pub(super) struct StepRun {
     step: Step,
     from: Duration,
@@ -41,10 +28,6 @@ impl StepRun {
     }
 }
 
-/// The summary's lines, before the total: a line per step, each ending where the
-/// next began or at `end`, then OIDN's lightmaps and worker time when it ran
-/// (#1884, summed over its devices as a mesh's is over threads), then
-/// the [`SLOWEST`] meshes (sorted in place).
 pub(super) fn lines(
     steps: &[StepRun],
     end: Duration,
@@ -74,7 +57,6 @@ pub(super) fn lines(
     out
 }
 
-/// A step's name in the summary: a light-probe bounce says which.
 fn step(step: Step) -> String {
     match step {
         Step::LightProbes { bounce, .. } => format!("light probes (bounce {bounce})"),
@@ -82,7 +64,6 @@ fn step(step: Step) -> String {
     }
 }
 
-/// The step's size, e.g. ` (7.6M texels)`; nothing while its total was unknown.
 fn size(run: &StepRun) -> String {
     let unit = match run.step {
         Step::Lightmaps => "texels",
@@ -97,7 +78,6 @@ fn size(run: &StepRun) -> String {
     }
 }
 
-/// One mesh's line: `  Hall_Ceiling: 210.4k texels, 312.5 s, 673 texels/s`.
 fn mesh(m: &MeshCost) -> String {
     let secs = m.busy.as_secs_f64();
     let rate = match secs > 0.0 {

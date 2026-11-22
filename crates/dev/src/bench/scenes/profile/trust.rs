@@ -1,48 +1,24 @@
-//! Whether a profile can be read. A recording can go wrong without failing:
-//! samples lost or never taken, or kept with no symbol to name (`[unknown]`).
-//! Its tables then read like data and mislead, so before they are written the
-//! samples are counted ([`Tally`]: how many, and where each landed, by the
-//! image its leaf frame ran in) and held to two floors ([`refusal`]): enough of
-//! them resolve to a function of the bench's own binary, and there are not far
-//! fewer than the measured frames' length at the sampling rate should give.
-
 use std::collections::BTreeMap;
 
-/// The least share of samples whose leaf is a named function of the bench's own
-/// binary. A sound profile on a desktop GPU had 58%; the rest sat in the GPU
-/// driver and libc.
 pub const OWN_FLOOR: f64 = 0.20;
-/// The least share of the expected samples (the measured frames' length times
-/// the sampling rate) a profile must have.
 pub const COUNT_FLOOR: f64 = 0.10;
-/// The leaf symbol a sampler prints when it cannot name the function.
 pub const UNKNOWN: &str = "[unknown]";
 
-/// The line a refused profile opens its reasons with.
 pub const REFUSED: &str = "this profile is not to be trusted:";
 
-/// What a recording sampled, by where its leaves landed.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Tally {
     pub samples: u64,
-    /// Samples whose leaf is a named function in the bench's own binary.
     pub own: u64,
-    /// Samples whose leaf has no name.
     pub unknown: u64,
-    /// Samples by the file name of the image their leaf ran in.
     pub images: BTreeMap<String, u64>,
-    /// What the profiler warned of while recording (lost samples).
     pub warnings: Vec<String>,
 }
 
-/// The file name of an image path, which is how both samplers can name it.
 pub fn image_name(path: &str) -> &str {
     path.rsplit('/').next().unwrap_or(path)
 }
 
-/// What a frame is called in the tables: its symbol, or for one with none the
-/// image it ran in (`[libc.so.6]`), so an unnamed row says whose time it is;
-/// [`UNKNOWN`] only for a frame with no image either.
 pub fn frame_name(symbol: &str, image: &str) -> String {
     if !symbol.is_empty() && symbol != UNKNOWN {
         return symbol.to_string();
@@ -54,8 +30,6 @@ pub fn frame_name(symbol: &str, image: &str) -> String {
     }
 }
 
-/// The opening of the refusal's first reason in the profile text `text`
-/// (`only 2.6% of the samples resolve ...`), when it was refused.
 pub fn refusal_gist(text: &str) -> Option<String> {
     let (_, after) = text.split_once(REFUSED)?;
     let first = after
@@ -66,7 +40,6 @@ pub fn refusal_gist(text: &str) -> Option<String> {
     Some(format!("{} ...", words.join(" ")))
 }
 
-/// The file name of the running binary, the image whose functions are "own".
 pub fn own_image() -> String {
     let exe = std::env::current_exe().unwrap_or_default();
     let name = exe.file_name().map(|n| n.to_string_lossy().into_owned());
@@ -74,8 +47,6 @@ pub fn own_image() -> String {
 }
 
 impl Tally {
-    /// Count `n` samples whose leaf is `symbol` in the image at `image`, the
-    /// bench's own image named `own`.
     pub fn count(&mut self, image: &str, symbol: &str, own: &str, n: u64) {
         let image = image_name(image);
         let unknown = symbol.is_empty() || symbol == UNKNOWN;
@@ -100,8 +71,6 @@ impl Tally {
         n as f64 / self.samples.max(1) as f64 * 100.0
     }
 
-    /// Where the samples landed, the five images with the most first:
-    /// `58.1% bench-scenes, 29.0% libnvidia-glcore.so, ...`.
     pub fn images_line(&self) -> String {
         let mut rows: Vec<(&String, &u64)> = self.images.iter().collect();
         rows.sort_by(|a, b| b.1.cmp(a.1).then_with(|| a.0.cmp(b.0)));
@@ -112,8 +81,6 @@ impl Tally {
     }
 }
 
-/// Why the profile counted in `tally` is not to be trusted, when it is not:
-/// `expected` is how many samples the measured frames should have given.
 pub fn refusal(tally: &Tally, expected: f64) -> Option<String> {
     let mut why = Vec::new();
     let own = tally.share(tally.own);

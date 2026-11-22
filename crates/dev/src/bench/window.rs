@@ -1,45 +1,19 @@
-//! A bench run's measured windows (#2448). `Harness.Bench(n)` starts a run: it
-//! measures its first window against the last run kept in the out dir.
-//! `Harness.Bench(n, "firefight")` measures a later window of the **same** run,
-//! after whatever the scenario changed in between: its rows are kept under the
-//! window's prefix (`firefight.cpu_ms`, `firefight.cpu.<system>`, …) beside the
-//! first window's, so one `bench.json` holds the run and every row compares
-//! against its own row of the last run. A window prints as its own table, its rows
-//! by their plain names, so each window's sums (`cpu_ms` = its `cpu.` rows) read
-//! as the first window's do.
-//!
-//! **The kept report always holds the last complete measurement of each window.**
-//! It is written after every window, and a window this run has not measured (yet,
-//! or at all: a run stopped early) keeps the last run's rows for it, so a stopped
-//! run never erases a window it never reached.
-
 use super::report::{read, tick_timed_since, write, Report};
 use super::{clock, measure};
 use crate::harness::Harness;
 use rusty_core::project::EngineStamp;
 
-/// The run so far: the last run it compares against, read once at its start,
-/// and what it has measured.
 #[derive(Default)]
 pub struct Run {
-    /// The kept report of the run before this one (`None` on a fresh out dir).
     previous: Option<Report>,
-    /// Every window measured so far, the later ones' rows prefixed.
     kept: Report,
-    /// Each window's printed table, in order: `bench.txt`.
     text: String,
     started: bool,
-    /// Whether this run measured its first (unprefixed) window.
     first_measured: bool,
-    /// The engine that measured the run, stamped once: its mismatch warning is
-    /// the run's, printed under the first window it measures.
     engine: Option<EngineStamp>,
 }
 
 impl Run {
-    /// Start a run: measure `ticks` frames as its first window, print the table
-    /// with its change against the last run kept in the out dir, and keep the run
-    /// there instead. Returns the window's report.
     pub fn first(&mut self, harness: &mut Harness, ticks: u32) -> Report {
         *self = Run {
             previous: read(harness.out_dir()),
@@ -49,10 +23,6 @@ impl Run {
         self.window(harness, ticks, None)
     }
 
-    /// Measure `ticks` more frames as the run's window `name`, its rows prefixed
-    /// `<name>.` in the returned report and in the kept one. Starts the run when
-    /// none has (a scenario may measure only a later window). An error, measuring
-    /// nothing, for a name that is not a lowercase word or was measured already.
     pub fn then(
         &mut self,
         harness: &mut Harness,
@@ -117,8 +87,6 @@ impl Run {
         report
     }
 
-    /// Add a window's (prefixed) `report` to the run's: the first window gives the
-    /// run its frame count and engine; a later one adds its rows and warnings.
     fn keep(&mut self, report: &Report, name: Option<&str>) {
         let Some(name) = name else {
             self.kept = report.clone();
@@ -134,8 +102,6 @@ impl Run {
         }
     }
 
-    /// What is kept: this run's windows, and for each window the last run
-    /// measured and this one has not, the last run's rows of it.
     fn with_unmeasured(&self) -> Report {
         let mut out = self.kept.clone();
         let Some(last) = &self.previous else {
@@ -163,8 +129,6 @@ impl Run {
     }
 }
 
-/// `report` with every row renamed `<name>.<row>`, and every warning said to be
-/// the window's.
 pub fn prefixed(mut report: Report, name: &str) -> Report {
     for (metric, _) in &mut report.metrics {
         *metric = format!("{name}.{metric}");
@@ -175,9 +139,6 @@ pub fn prefixed(mut report: Report, name: &str) -> Report {
     report
 }
 
-/// Window `name`'s rows of a kept run, by their plain names: what that window
-/// compares against (no rows when the kept run never measured it, so every row
-/// reads "absent on the last run").
 pub fn window_of(run: &Report, name: &str) -> Report {
     let prefix = format!("{name}.");
     let metrics = run.metrics.iter().filter_map(|(metric, s)| {
@@ -193,7 +154,6 @@ pub fn window_of(run: &Report, name: &str) -> Report {
     }
 }
 
-/// What the first window's GPU and CPU rows are, under its table.
 fn footnotes(report: &Report) -> String {
     let mut text = String::new();
     if !report.has("renderer_ms") {

@@ -1,41 +1,14 @@
-//! Memory as the platform reports it: the process's peak resident memory, for
-//! `make bench-scenes`' `rss_peak_mb` (each scene runs in a process of its own, so
-//! the peak is that scene's) and a bake's report (#2312), its current resident
-//! memory, for the editor round's `play_rss_mb` (#2314), and the machine's free
-//! and total memory, which a lightmap bake's estimate is held to before it starts
-//! (`bake::lightmap::fits`).
-//!
-//! Linux reads `VmHWM` (and `VmRSS`) from `/proc/self/status` and `MemAvailable` / `MemTotal`
-//! from `/proc/meminfo`, each held to the process's memory cgroup (v2) when one
-//! caps it (`cgroup`): a bake run under `systemd-run -p MemoryMax=…` is killed at
-//! the cap, not at the host's memory. macOS reads the peak physical footprint
-//! `task_info(TASK_VM_INFO)` reports (`ledger_phys_footprint_peak`, what Activity
-//! Monitor's Memory column counts; `phys_footprint` for the current one), the free and inactive pages
-//! `host_statistics64` counts (what a process can have without swapping), and
-//! `hw.memsize`.
-
-/// The process's peak resident memory in bytes; `None` where it cannot be read.
 pub fn rss_peak_bytes() -> Option<u64> {
     peak()
 }
 
-/// The process's resident memory now, in bytes; `None` where it cannot be read.
 pub fn rss_now_bytes() -> Option<u64> {
     now()
 }
 
-/// Have the allocator hand every large block it frees back to the system at once
-/// (#2312), for a bake: glibc's malloc otherwise raises its mmap threshold each
-/// time a large block is freed, so a bake's per-chart buffers (megabytes each)
-/// come from its heap, and the holes they leave between the lightmaps kept stay
-/// resident; a scene of 4 times the meshes peaked about twice its extra maps
-/// higher. Pinning the threshold at its default (128 KiB) turns the raising off.
-/// Process-wide and lasting, which costs a page fault per large block; idempotent.
-/// On macOS, [`relieve`] asks for freed blocks back instead; others are left alone.
 pub fn return_large_frees() {
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     {
-        /// `M_MMAP_THRESHOLD` in glibc's `malloc.h`.
         const M_MMAP_THRESHOLD: std::ffi::c_int = -3;
         unsafe extern "C" {
             fn mallopt(param: std::ffi::c_int, value: std::ffi::c_int) -> std::ffi::c_int;
@@ -46,10 +19,6 @@ pub fn return_large_frees() {
     }
 }
 
-/// Hand the blocks the allocator holds free back to the system (#2312), after a
-/// bake's chart and each page it encodes: macOS's allocator keeps freed multi-MB
-/// blocks in its regions. On
-/// glibc, [`return_large_frees`] does it as each block is freed; elsewhere, nothing.
 pub fn relieve() {
     #[cfg(target_os = "macos")]
     {
@@ -71,16 +40,12 @@ mod lightmaps_gpu_tests;
 mod textures_gpu_tests;
 pub use heap::{heap, Heap};
 
-/// The machine's memory, in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Machine {
-    /// What a process could take now without the machine swapping.
     pub available: u64,
-    /// All of it.
     pub total: u64,
 }
 
-/// The machine's memory now; `None` where it cannot be read.
 pub fn machine() -> Option<Machine> {
     machine_now()
 }
@@ -110,7 +75,6 @@ fn machine_now() -> Option<Machine> {
 }
 
 impl Machine {
-    /// This machine held to `cap` (a memory cgroup's): the smaller of each.
     pub fn within(self, cap: Machine) -> Machine {
         Machine {
             available: self.available.min(cap.available),
@@ -119,8 +83,6 @@ impl Machine {
     }
 }
 
-/// The `<key>   123456 kB` line of a `/proc` text (`VmHWM:` in `status`,
-/// `MemAvailable:` in `meminfo`), in bytes.
 #[cfg(any(target_os = "linux", test))]
 fn kb_line(text: &str, key: &str) -> Option<u64> {
     let line = text.lines().find(|l| l.starts_with(key))?;
@@ -138,7 +100,6 @@ fn now() -> Option<u64> {
     u64::try_from(vm_info()?.phys_footprint).ok()
 }
 
-/// This task's `task_info(TASK_VM_INFO)`, `None` when the call fails.
 #[cfg(target_os = "macos")]
 fn vm_info() -> Option<mach2::task_info::task_vm_info> {
     use mach2::kern_return::KERN_SUCCESS;
@@ -174,7 +135,6 @@ fn machine_now() -> Option<Machine> {
     use mach2::message::mach_msg_type_number_t;
     use mach2::vm_statistics::vm_statistics64;
 
-    /// `HOST_VM_INFO64` in `mach/host_info.h`.
     const HOST_VM_INFO64: i32 = 4;
     unsafe extern "C" {
         fn host_statistics64(
@@ -225,9 +185,6 @@ fn machine_now() -> Option<Machine> {
     }
     // SAFETY: `vm_page_size` is set by the system before `main`, never written after.
     let page = unsafe { mach2::vm_page_size::vm_page_size } as u64;
-    // Free (which counts the speculative pages already) and inactive: purgeable
-    // pages sit on those queues too, so adding either would count a page twice.
-    // CI's memory floor reads the same (`.github/scripts/memory_floor.py`).
     let available = (u64::from(stats.free_count) + u64::from(stats.inactive_count)) * page;
     Some(Machine { available, total })
 }

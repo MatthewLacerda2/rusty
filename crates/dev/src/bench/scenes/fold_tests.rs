@@ -29,7 +29,6 @@ fn rows_average_the_averages_and_keep_the_worst_p95_and_where() {
     assert_eq!(names, ["frame_ms", "draw_calls", "gpu_ms"]);
     assert_eq!((rows[0].avg, rows[0].p95), (3.0, 9.0));
     assert_eq!(rows[0].worst, "nav 0 yaw 90");
-    // A row one viewpoint lacks averages over the viewpoints that have it.
     assert_eq!((rows[1].avg, rows[1].worst.as_str()), (10.0, "camera A"));
     assert_eq!(rows[2].avg, 1.0);
 }
@@ -70,12 +69,10 @@ fn runs_fold_into_their_average_with_the_lowest_and_highest_as_the_spread() {
     assert_eq!(rows.len(), 1);
     let row = &rows[0];
     assert_eq!((row.avg, row.lo, row.hi, row.p95), (3.0, 2.0, 4.0, 5.0));
-    // One run: no spread.
     let one = over_runs(&[run(2.0, 3.0)]);
     assert_eq!((one[0].lo, one[0].hi), (2.0, 2.0));
 }
 
-/// One viewpoint's report over its frames, each frame's Hi-Z parts as given.
 fn sampled(frames: &[&[(rusty_render::GpuPart, f64)]]) -> Report {
     use super::super::super::{sample, Samples, Speeds};
     use rusty_render::{GpuPass, GpuTimes};
@@ -100,8 +97,6 @@ fn sampled(frames: &[&[(rusty_render::GpuPart, f64)]]) -> Report {
     samples.report()
 }
 
-/// The cluster cull on one frame of one viewpoint only (#2401): its row is its
-/// share of the stage, so the parts still sum to `gpu.occlusion` after the fold.
 #[test]
 fn parts_on_some_frames_only_still_sum_to_their_stage() {
     use rusty_render::GpuPart::{OcclusionClusters as Clusters, OcclusionTest as Test};
@@ -123,8 +118,6 @@ fn parts_on_some_frames_only_still_sum_to_their_stage() {
     assert_eq!(parts, 2.0, "the parts sum to the stage");
 }
 
-/// A CPU part lapped on some frames only (a Mask submitted on one of them), first
-/// or last: each part is averaged over its stage's frames, so the parts sum to it.
 #[test]
 fn cpu_parts_on_some_frames_only_still_sum_to_their_stage() {
     use super::super::super::{sample, Samples, Speeds};

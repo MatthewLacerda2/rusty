@@ -6,7 +6,6 @@ use rusty_scene::Scene;
 
 use super::*;
 
-/// A 20 m floor, a camera at (1, 2, 3) and a `Player` at the floor's centre.
 fn yard() -> Scene {
     let mut scene = Scene::new();
     add_floor(&mut scene, -10.0, 10.0, -10.0, 10.0);
@@ -21,7 +20,6 @@ fn yard() -> Scene {
     scene
         .world
         .set_world_position(player, Vec3::new(0.0, 0.9, 0.0));
-    // Facing +Z: an entity looks down its local -Z.
     scene
         .world
         .set_world_rotation(player, Quat::from_rotation_y(std::f32::consts::PI));
@@ -34,7 +32,6 @@ fn cameras_then_the_spawn_then_navmesh_points_along_four_yaws() {
     let nav = NavigationGraph::from_scene(&scene);
     let views = pick(&scene, &nav);
     assert!(views.warnings.is_empty(), "{:?}", views.warnings);
-    // One camera, the spawn, then 6 navmesh points x 4 yaws: 8 points in all.
     assert_eq!(views.views.len(), 1 + 1 + 6 * YAWS.len());
     assert_eq!(views.views[0].label, "camera Main Camera");
     assert!(matches!(views.views[0].view, View::Camera(_)));
@@ -61,7 +58,6 @@ fn cameras_then_the_spawn_then_navmesh_points_along_four_yaws() {
         assert!((position.y - EYE_HEIGHT).abs() < 0.05, "{position}");
         assert!(position.x.abs() <= 10.0 && position.z.abs() <= 10.0);
     }
-    // The four yaws of a point share its position; the points differ.
     let at = |i: usize| match views.views[i].view {
         View::Pose { position, .. } => position,
         View::Camera(_) => unreachable!(),

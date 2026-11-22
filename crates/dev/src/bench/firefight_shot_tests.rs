@@ -1,12 +1,7 @@
-//! The firefight's shots (`scenarios/bench/firefight.lua`, #2448) cross the yard
-//! as a game's do: from the muzzle, past the shooter's own hitboxes, so a cast
-//! has length and a decal lands on what it hit, not at the shooter's eye.
-
 use glam::Vec3;
 
 use super::firefight_tests::fight;
 
-/// A traced shot: `firefight shot r from s: <root|nothing> at d, eye x y z`.
 struct Shot {
     from: String,
     root: String,
@@ -40,7 +35,7 @@ fn every_shot_leaves_its_muzzle_and_lands_away_from_the_shooter() {
     let before = h.world.borrow().scene().borrow().decals.len();
     let mut shots = Vec::new();
     for _ in 0..40 {
-        h.step(1); // the console keeps 100 lines: read it every tick
+        h.step(1);
         shots.extend(self::shots(&h.console_text()));
         h.console.borrow_mut().messages.clear();
     }
