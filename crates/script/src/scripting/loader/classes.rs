@@ -1,3 +1,10 @@
+//! Script classes: a file is read and compiled once per VM, as Unity compiles a
+//! MonoBehaviour once. Each instance runs the bytecode in a closure of its own, so a
+//! top-level `_ENV` stays private.
+//! A write-log entry naming a class's `.lua` file evicts it; live instances keep their table.
+//! A missing or unreadable file is never cached, so the next spawn retries; a compile error
+//! is cached until its file is written again.
+
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -27,6 +34,7 @@ impl Instantiate {
 pub(in crate::scripting) struct ScriptClasses {
     seen: u64,
     classes: BTreeMap<String, Class>,
+    /// A test hook: the class tests count file reads with it.
     pub(in crate::scripting) reads: u64,
 }
 
@@ -105,6 +113,7 @@ impl ScriptClasses {
     }
 }
 
+/// An expression first, so a file that is a bare table returns it; then a block.
 fn compile(lua: &Lua, script_path: &str, code: &str) -> mlua::Result<Function> {
     let name = format!("@{script_path}");
     lua.load(format!("return {code}"))

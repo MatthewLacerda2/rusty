@@ -8,6 +8,7 @@ use rusty_core::settings::decals::DecalLimits;
 use rusty_scene::decal::DecalSpec;
 use rusty_scene::Scene;
 
+// Metres: the stamp size a script omits, and the floor on the box's depth when it omits that.
 const DEFAULT_SIZE: f32 = 0.5;
 const DEFAULT_DEPTH: f32 = 0.5;
 
@@ -120,6 +121,7 @@ fn clear_keeps_persistent(opts: Option<&mlua::Table>) -> mlua::Result<bool> {
     Ok(opt_bool(opts, "Decals.Clear", "persistent")? == Some(false))
 }
 
+/// Strict, since mlua's `bool` conversion is Lua truthiness: `"false"` or `0` would read true.
 fn opt_bool(opts: &mlua::Table, func: &str, key: &str) -> mlua::Result<Option<bool>> {
     match opts.get::<mlua::Value>(key)? {
         mlua::Value::Nil => Ok(None),

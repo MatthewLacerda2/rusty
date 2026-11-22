@@ -1,5 +1,6 @@
 use super::fixture::{lua_with_sound, tmp};
 
+/// Four beats at 120 bpm: two seconds, so 88,200 frames at 44.1 kHz.
 const LOOP_FRAMES: usize = 88_200;
 
 fn song(extra: &str) -> String {
@@ -17,6 +18,7 @@ fn song(extra: &str) -> String {
     )
 }
 
+/// The left channel `song(extra)` bakes to: past the 44-byte header, in 4-byte stereo frames.
 fn bake(name: &str, extra: &str) -> Vec<i16> {
     let path = tmp(name);
     lua_with_sound()

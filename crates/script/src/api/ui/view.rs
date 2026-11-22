@@ -8,6 +8,8 @@ use rusty_scene::{game_camera_from_scene, Camera, Scene};
 use rusty_ui::events::{WALL_RANGE, WALL_TOLERANCE};
 use rusty_ui::{ScreenSize, UiPointer, UiView};
 
+/// Built as `app`'s `Resources::ui_view` builds the frame's, so the verbs hit what draws: change
+/// both together.
 pub(super) fn ui_view(
     screen: &RefCell<ScreenSize>,
     video: &RefCell<VideoSettings>,

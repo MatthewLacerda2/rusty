@@ -1,3 +1,6 @@
+//! A host's acts on a playing world besides input (a REPL line, a scenario's API call),
+//! kept in order while a demo records so its replay repeats them at the same tick.
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Plain {
     Nil,
@@ -6,9 +9,12 @@ pub enum Plain {
     Number(f64),
     Str(String),
     List(Vec<Plain>),
+    /// String keys, sorted by key.
     Map(Vec<(String, Plain)>),
 }
 
+/// `Taint` is an act no replay can repeat, in a few words: the replay warns it may differ
+/// from that tick on.
 #[derive(Clone, Debug, PartialEq)]
 pub enum HostCall {
     Eval(String),

@@ -18,6 +18,7 @@ pub(super) fn register(
     scene: ApiCell<Scene>,
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
+    // A force acts over one fixed step (F · dt), as `AddForce` does; an impulse applies whole.
     for (name, scale) in [
         ("AddForceAtPosition", FIXED_DELTA_TIME),
         ("AddImpulseAtPosition", 1.0),
@@ -57,6 +58,7 @@ pub(in crate::api) fn apply(
     if rb.is_kinematic {
         return;
     }
+    // Without a live body (outside Play) only the linear part applies; 0.0001 kg floors the mass.
     let (dv, dw) = response.unwrap_or((impulse / rb.mass.max(0.0001), Vec3::ZERO));
     rb.velocity += dv;
     rb.angular_velocity += dw;

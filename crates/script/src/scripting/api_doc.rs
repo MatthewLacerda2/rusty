@@ -1,3 +1,5 @@
+//! The `docs/api/` reference, assembled into one document for the drift gates and MCP.
+//!
 //! It reads the checkout at run time rather than embedding the text at build time,
 //! because an embedded doc is part of the crate's fingerprint: every doc edit would
 //! rebuild the whole crate once per feature set. Its callers are tests and
@@ -10,6 +12,7 @@ pub fn api_doc_dir() -> PathBuf {
     rusty_core::project::checkout().join("docs").join("api")
 }
 
+/// A test hook: `tests/api_doc_drift.rs` and `tests/callback_doc_drift.rs` read it.
 pub fn api_reference() -> Result<String, String> {
     assemble(&api_doc_dir())
 }

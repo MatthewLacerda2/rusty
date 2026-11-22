@@ -1,3 +1,6 @@
+//! The console's side of the frame log (`dev::frame_log`): every line past the buffer's
+//! cap, a repeat counted in `times` instead of folded into `msg (×N)`.
+
 use super::LogLevel;
 
 /// Lines a take may hold: past it, a line is counted in [`FileFeed::lost`]. A take
@@ -19,6 +22,8 @@ pub struct FileFeed {
 }
 
 impl FileFeed {
+    /// `fold`: a `repeated` record, which counts up the newest line only when that one
+    /// was a `repeated` record too, as the buffer folds.
     pub(super) fn push(&mut self, msg: &str, level: &LogLevel, times: u32, fold: bool) {
         if let Some(last) = self.lines.last_mut().filter(|_| fold && self.repeat) {
             if last.msg == msg && last.level == *level {

@@ -34,6 +34,7 @@ fn every_field_reads_back_what_it_wrote() {
         assert_eq!(Field::parse(path), Some(field));
         assert_eq!(field.path(), path);
         assert_eq!(field.arity(), arity);
+        // Inside every hold: unit colours and anchors, a font's 0.5 minimum, a lens in degrees.
         let probe = match path {
             "Camera.fov" => Vec4::splat(60.0),
             _ => Vec4::new(0.75, 0.5, 0.25, 0.625),

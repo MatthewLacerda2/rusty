@@ -5,6 +5,7 @@ fn x(m: &ScriptManager, id: u32) -> String {
     lane(m, "GetPosition", id)
 }
 
+/// Rounded to 3 decimals: f32 steps sum inexactly.
 fn lane(m: &ScriptManager, getter: &str, id: u32) -> String {
     let code = format!("math.floor(({{Transform.{getter}({id})}})[1] * 1000 + 0.5) / 1000");
     m.eval(&code).unwrap()

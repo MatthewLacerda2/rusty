@@ -30,6 +30,7 @@ const FAMILIES: [(&str, Family); 8] = [
     ("bounce", Family::Bounce),
 ];
 
+/// Penner's constant: how far `back` pulls past its ends, about a tenth of the move.
 const BACK: f64 = 1.701_58;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -94,6 +95,7 @@ fn ease_in(family: Family, p: f64) -> f64 {
         Family::Expo if p >= 1.0 => 1.0,
         Family::Expo => 2f64.powf(10.0 * p - 10.0),
         Family::Sine => 1.0 - (p * PI / 2.0).cos(),
+        // Ordered so `back(1)` is exactly 1.
         Family::Back => p * p * (BACK * (p - 1.0) + p),
         Family::Elastic if p <= 0.0 || p >= 1.0 => p,
         Family::Elastic => {
@@ -103,6 +105,7 @@ fn ease_in(family: Family, p: f64) -> f64 {
     }
 }
 
+/// Penner's bounce, played out: four ever-smaller hops, landing on 1.
 fn bounce_out(p: f64) -> f64 {
     const N: f64 = 7.5625;
     const D: f64 = 2.75;

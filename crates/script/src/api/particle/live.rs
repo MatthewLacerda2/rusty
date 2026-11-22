@@ -17,6 +17,7 @@ pub(super) const NAMES: [&str; FIELDS] = [
 pub(super) const FIELDS: usize = 18;
 const PARTICLE: usize = FIELDS * 4;
 const RECORD: usize = 4 + PARTICLE;
+/// A record's source for a table no read handed out; `live.lua` spells it again as `NO_SOURCE`.
 const NO_SOURCE: u32 = u32::MAX;
 const SLOTS: u32 = 32;
 const _: () = assert!(FIELDS as u32 <= SLOTS, "an edit's slot must fit its stride");

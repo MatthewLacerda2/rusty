@@ -1,3 +1,6 @@
+//! Each write in `with_vc_mut` / `with_cam_mut` calls an `edit::authoring` op, so the Inspector
+//! and `Graphics.*` validate alike.
+
 use std::cell::RefCell;
 
 use rusty_components::{CameraComponent, PostProcessingComponent};

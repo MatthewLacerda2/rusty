@@ -82,6 +82,7 @@ impl Field {
             .expect("every Field is listed in FIELDS")
     }
 
+    /// False for exactly the arms `get` reads without `held!`: keep the two in step.
     pub(crate) fn is_held(self) -> bool {
         !matches!(self, Self::Position | Self::Rotation | Self::Scale)
     }
@@ -91,6 +92,7 @@ impl Field {
         let v3 = |v: Vec3| v.extend(0.0);
         let v2 = |v: Vec2| v.extend(0.0).extend(0.0);
         let f = |v: f32| Vec4::new(v, 0.0, 0.0, 0.0);
+        // The field's own op over a copy, so a stored value the op would clamp reads as held.
         macro_rules! held {
             ($get:ident, $field:ident, $op:path) => {{
                 let mut c = (*w.$get(id)?).clone();

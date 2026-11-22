@@ -1,3 +1,6 @@
+//! Each entity's live script tables, as Unity's `GetComponent`: an owning script reaches a
+//! widget's instance to read its state or hand it a callback.
+//!
 //! The index is a table in the Lua registry, `index[id][slot + 1] = { name, table }`,
 //! written when a script loads and cleared when its entity is forgotten; a fresh
 //! VM (every Play) starts with none. `Scene.GetScript` reads it.
@@ -79,7 +82,8 @@ impl super::ScriptManager {
         self.lua.as_ref().map(f).transpose()
     }
 
-    /// A Lua table never leaves the VM that made it.
+    /// For a caller in another VM, which cannot hold the table itself: a Lua table never
+    /// leaves the VM that made it.
     pub fn with_script<R>(
         &self,
         id: u32,

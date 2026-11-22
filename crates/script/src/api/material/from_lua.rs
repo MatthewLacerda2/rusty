@@ -1,6 +1,6 @@
 //! Marshaling goes Lua table or JSON string -> `serde_json::Value` -> `MaterialAsset`; the
-//! validation-bearing fields (`render_mode`, `alpha`, `alpha_cutoff`) are split off into
-//! [`Validated`] so the caller applies them through the shared `set_*` ops.
+//! validation-bearing fields are split off into [`Validated`] so the caller applies them
+//! through the shared `authoring::material` ops.
 
 use mlua::Value;
 
@@ -30,7 +30,7 @@ pub fn asset_from_lua(value: &Value) -> Result<(MaterialAsset, Validated), Strin
     asset_from_json_value(recipe_json(value)?)
 }
 
-/// The validated keys are removed before `from_value` so serde never applies its own handling of
+/// The validated keys are removed before `decode` so serde never applies its own handling of
 /// them.
 fn asset_from_json_value(
     mut value: serde_json::Value,
@@ -100,8 +100,11 @@ fn shader_textures(value: Option<serde_json::Value>) -> Result<Vec<(String, Stri
     Ok(map.into_iter().collect())
 }
 
-/// `MaterialAsset` itself stays lenient: it is also the scene-file shape.
+/// Unknown keys are refused here, not by `MaterialAsset`'s serde: it is also the scene-file
+/// shape, which stays lenient.
 fn refuse_unknown_keys(value: &serde_json::Value) -> Result<(), String> {
+    // Valid keys a default asset never serializes (each skips at its default), so `known`
+    // lacks them.
     const UNWRITTEN: [&str; 5] = [
         "shader_textures",
         "maps",

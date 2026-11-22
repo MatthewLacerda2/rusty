@@ -1,6 +1,10 @@
+//! Finds the project scripts the Add Component menu offers: those returning a table with
+//! at least one lifecycle function, so a plain `require`d helper module is left out.
+//!
 //! Detection evaluates each chunk in a throwaway sandboxed `Lua` and inspects the
 //! returned table — the same eval the runtime does, so the menu can never offer a
-/// script the runtime would reject.
+//! script the runtime would reject.
+
 use std::path::Path;
 
 use mlua::{Table, Value};

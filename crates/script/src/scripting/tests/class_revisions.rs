@@ -38,6 +38,7 @@ fn live_instances_keep_the_revision_they_were_made_from() {
     m.init_runtime().unwrap();
     let path = write_script("class_live", "return { v = 1 }");
     let old = spawn(&mut m, &path, &BTreeMap::new());
+    // A plain `std::fs::write` is not in the write log, so the class stands.
     std::fs::write(&path, "return { v = 2 }").unwrap();
     let same = spawn(&mut m, &path, &BTreeMap::new());
     assert_eq!(field(&m, same, "v"), "1");
@@ -50,6 +51,7 @@ fn live_instances_keep_the_revision_they_were_made_from() {
     assert_eq!(m.classes.reads, 2);
 }
 
+/// One chunk called twice would share its `_ENV` upvalue between instances.
 const PRIVATE_GLOBALS: &str = "_ENV = setmetatable({}, { __index = _G })\n\
     return { set = function(v) mine = v end, get = function() return mine end }";
 

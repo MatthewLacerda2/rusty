@@ -96,6 +96,8 @@ pub fn register_reimport(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
             let scene = &*scene.get(lua)?;
             let mut stored = sidecar::load(Path::new(&path)).map_err(runtime)?;
             let scale = t.get::<Option<f32>>("scaleFactor")?.unwrap_or(stored.scale);
+            // Every key is read and checked before the sidecar is written, so a bad call
+            // writes nothing.
             if let Some(given) = t.get::<Option<Table>>("colliders")? {
                 if colliders::merge(&mut stored.colliders, &given)? {
                     sidecar::save(Path::new(&path), &stored).map_err(runtime)?;
