@@ -27,6 +27,8 @@ impl ShadowRenderer {
             let scene = frame.statics;
             let clean = &self.atlas.clean_tiles;
             let fresh = self.atlas.fresh;
+            // A tile no dynamic caster reaches, whose active texels hold its bake, is left as
+            // it is.
             let work: Vec<usize> = (0..tiles.len())
                 .filter(|&i| fresh || !batches[i].is_empty() || !clean.holds(scene, &tiles[i]))
                 .collect();
@@ -40,6 +42,7 @@ impl ShadowRenderer {
                 }
             }
             self.atlas.fresh &= work.is_empty();
+            // Drawn over: clean again only when nothing dynamic was drawn.
             for &i in &work {
                 self.atlas.clean_tiles.forget(&tiles[i]);
                 if batches[i].is_empty() {
@@ -66,6 +69,8 @@ impl ShadowRenderer {
         if stale.is_empty() {
             return bake;
         }
+        // The bake outlives the frame, so it cannot follow the camera's LOD: every group at
+        // LOD0.
         let finest = LodSelection::finest(frame.scene);
         let drawn: Vec<usize> = stale
             .iter()
@@ -92,6 +97,7 @@ impl ShadowRenderer {
         }
         let rebaked = stale.iter().map(|&i| tiles[i]);
         self.atlas.static_tiles.commit(scene, rebaked);
+        // The active atlas's copy of a re-baked tile is the old bake's.
         stale
             .iter()
             .for_each(|&i| self.atlas.clean_tiles.forget(&tiles[i]));

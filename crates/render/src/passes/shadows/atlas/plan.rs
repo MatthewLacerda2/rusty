@@ -4,11 +4,14 @@ use glam::{Mat4, Vec3};
 use crate::clusters::LocalLight;
 use crate::Frustum;
 
+/// Texels a side, as URP's additional-light atlas.
 pub(crate) const ATLAS_SIZE: u32 = 2048;
+/// Texels a side of one face's tile; `MIN_TILE` is the packing grid's cell too.
 pub(crate) const MAX_TILE: u32 = 512;
 pub(crate) const MIN_TILE: u32 = 128;
 pub(super) const CELLS: u32 = ATLAS_SIZE / MIN_TILE;
 pub(crate) const MAX_TILES: usize = (CELLS * CELLS) as usize;
+/// In `common.wgsl`'s `local_shadow_tile` face order: change both together.
 const CUBE_FACES: [(Vec3, Vec3); 6] = [
     (Vec3::X, Vec3::NEG_Y),
     (Vec3::NEG_X, Vec3::NEG_Y),
@@ -17,6 +20,7 @@ const CUBE_FACES: [(Vec3, Vec3); 6] = [
     (Vec3::Z, Vec3::NEG_Y),
     (Vec3::NEG_Z, Vec3::NEG_Y),
 ];
+/// Degrees: a perspective view stops short of 180.
 const MAX_SPOT_FOV: f32 = 170.0;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -25,7 +29,9 @@ pub(crate) struct Tile {
     pub origin: [u32; 2],
     pub size: u32,
     pub texel: f32,
+    /// Picks the PVS row its casters are culled by.
     pub light: Vec3,
+    /// False for a shadowmasked tile; the static cache keys on it, so a mode change re-bakes.
     pub statics: bool,
 }
 
@@ -50,6 +56,7 @@ pub(super) struct Candidate {
     pub want: f32,
 }
 
+/// With no tile kept from an earlier frame: a bake capture plans so, never moving the live tiles.
 pub(crate) fn plan(lights: &[(LocalLight, bool)], view_proj: Mat4, eye: Vec3) -> AtlasPlan {
     let ids: Vec<u32> = (0..lights.len() as u32).collect();
     let frame = super::slots::Frame {
@@ -77,6 +84,7 @@ pub(super) fn candidates(
         })
         .map(|(i, (light, _))| candidate(i, light, eye))
         .collect();
+    // The light index breaks ties, so the plan is deterministic.
     candidates.sort_by(|a, b| (b.importance.total_cmp(&a.importance)).then(a.light.cmp(&b.light)));
     candidates
 }
@@ -109,6 +117,7 @@ pub(super) fn faces(light: &LocalLight) -> u32 {
     }
 }
 
+/// Metres, close enough for a light against a wall.
 fn near_plane(light: &LocalLight) -> f32 {
     0.05_f32.min(light.range * 0.5)
 }
