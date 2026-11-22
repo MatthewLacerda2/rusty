@@ -9,6 +9,7 @@ fn step_out_of_silence(level: f32) -> Vec<f32> {
     signal
 }
 
+/// Out of silence a step is read against −80 dBFS: a hundredth is then 40 dB, a tenth 60.
 #[test]
 fn the_smallest_click_is_a_hundredth_of_full_scale() {
     for (level, size_db) in [(0.01, 40.0), (0.1, 60.0)] {
@@ -34,6 +35,7 @@ fn zigzag_stepped_by(offset: f32) -> Vec<f32> {
 
 #[test]
 fn a_click_is_four_times_every_jump_around_it() {
+    // −1/32 up to 1/32 + 3/16: exactly 4 × 1/16, and every value exact in binary.
     let defects = found(1, &zigzag_stepped_by(3.0 / 16.0));
     assert_eq!(defects.clicks.count, 1, "{defects:?}");
     let click = &defects.clicks.worst[0];

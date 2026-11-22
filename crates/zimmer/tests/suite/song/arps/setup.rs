@@ -43,6 +43,7 @@ fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
+/// The fixture plays noise: equal samples mean each note took its written-out ordinal and seed.
 pub(crate) fn same(chord: Chord, pitches: &str, div: f32, gate: f32) {
     assert_eq!(
         render(&playing(vec![chord.into()])),

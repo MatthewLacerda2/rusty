@@ -5,7 +5,10 @@ use crate::common::{brightness, opts, render, saw_patch};
 use rusty_zimmer::patch::{Adsr, Filter, FilterKind, Lfo, LfoTarget, Patch, Slope};
 use rusty_zimmer::SAMPLE_RATE;
 
+/// Hz: over the one-second note the sine is at zero at the start, its crest at a quarter, its
+/// trough at three quarters.
 const RATE: f32 = 1.0;
+/// Samples either side of a moment, a twentieth of a second: several periods of the note.
 const WINDOW: usize = SAMPLE_RATE as usize / 20;
 const NARROW: usize = WINDOW / 10;
 

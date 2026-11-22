@@ -11,6 +11,7 @@ use rusty_zimmer::{render_song, SAMPLE_RATE};
 use crate::common::songs::{note, played};
 use crate::common::{channel, saw_patch};
 
+/// Beats in the fixture, at 120 bpm: a beat is half a second and the piece four.
 pub(crate) const BEATS: f32 = 8.0;
 
 pub(crate) fn held(gain: f32) -> Song {

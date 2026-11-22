@@ -1,6 +1,5 @@
-//! Pulse width inside a layer ( over ): a layer's square is moved by the patch's pulse-width LFO
-//! like the top level's, and a width written on a layer's other wave is refused by the layer's
-//! index.
+//! Pulse width inside a layer: a layer's square is moved by the patch's pulse-width LFO like the
+//! top level's, and a width written on a layer's other wave is refused by the layer's index.
 
 use crate::common::render;
 use rusty_zimmer::patch::{LfoTarget, Wave};

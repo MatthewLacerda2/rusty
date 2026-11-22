@@ -54,6 +54,8 @@ pub(super) fn noise(amplitude: f32, samples: usize) -> Vec<f32> {
         .collect()
 }
 
+/// Each is one a careless detector would flag: a saw jumps every period, a low tone ripples, a fade
+/// always moves, and noise is all jumps.
 #[test]
 fn clean_signals_have_no_defects() {
     for (name, signal) in [

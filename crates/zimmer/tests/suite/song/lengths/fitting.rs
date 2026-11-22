@@ -48,6 +48,7 @@ fn once_plays_through_and_pads_the_rest_with_silence() {
     );
 }
 
+/// 4.4 s of the 2 s song is two passes at 109.09 bpm: the last note falls at 3.85 s, not 3.50.
 #[test]
 fn stretching_moves_the_tempo_to_land_on_the_target() {
     let rendered = render(&fitted(4.4, FitMode::Stretch));
@@ -64,6 +65,7 @@ fn stretching_moves_the_tempo_to_land_on_the_target() {
 
 #[test]
 fn stretching_too_far_is_refused_with_the_tempo_it_would_have_needed() {
+    // Two passes in 3 s is 160 bpm against the 120 written: a third faster, past the bound.
     let refused = fitted(3.0, FitMode::Stretch)
         .validate()
         .expect_err("a third faster is too far");

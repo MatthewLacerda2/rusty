@@ -12,6 +12,7 @@ fn fitted(seconds: f32, mode: FitMode, beats: f32, to: f32) -> Song {
     song
 }
 
+/// The fixture is four seconds, so eight is two passes, and the curve spans both.
 #[test]
 fn a_curve_does_not_go_back_when_the_arrangement_loops() {
     let mix = render(&fitted(8.0, FitMode::Loop, BEATS * 2.0, 0.5));
@@ -37,6 +38,7 @@ fn a_looped_bed_with_no_curve_is_the_same_level_both_passes() {
     );
 }
 
+/// Four seconds of 120 bpm stretched to five is 96 bpm: four seconds in is beat 6.4, not 8.
 #[test]
 fn a_stretch_fit_carries_the_curve_along_with_the_tempo() {
     let flat = {

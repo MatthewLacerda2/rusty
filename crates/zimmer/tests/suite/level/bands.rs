@@ -33,6 +33,7 @@ fn a_midrange_tone_reports_its_energy_in_the_mid_band() {
     assert!(high < 0.02, "high {high:.3}");
 }
 
+/// Looser than the low band's 0.9: the coarse crossover leaves a real share of 12 kHz in the mid.
 #[test]
 fn a_high_tone_reports_its_energy_in_the_high_band() {
     let (low, mid, high) = shares(&tone(12_000.0));

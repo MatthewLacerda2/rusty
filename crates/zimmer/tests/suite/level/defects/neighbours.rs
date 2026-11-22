@@ -3,6 +3,7 @@
 
 use super::{found, RATE};
 
+/// The click search's reach in samples: 35 ms at 48 kHz.
 const REACH: usize = 1_680;
 
 fn step_then_small_step(after: usize) -> Vec<f32> {
@@ -13,6 +14,8 @@ fn step_then_small_step(after: usize) -> Vec<f32> {
     signal
 }
 
+/// The 0.04 step at the reach's edge makes the 0.2 one 14 dB; a sample further it stands over the
+/// −80 dBFS floor.
 #[test]
 fn a_click_is_sized_against_jumps_to_the_edge_of_reach() {
     for (after, size_db) in [

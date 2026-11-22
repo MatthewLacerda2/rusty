@@ -8,8 +8,12 @@ use rusty_zimmer::song::InlineOnly;
 use rusty_zimmer::{NoteOpts, Patch, Song, SAMPLE_RATE, SYNTH_VERSION};
 use table::{Row, RECORDED_AT, TABLE};
 
+// Tolerances, never a digest: `sin`, `exp` and `powf` differ in the last bit between platforms.
+/// Stereo frames, one millisecond: where a file's tail is cut can shift by a sample or two.
 const FRAMES: u64 = 44;
+/// Decibels on the whole file's RMS level.
 const DB: f64 = 0.05;
+/// Fraction of the whole energy that each band's share may move.
 const SHARE: f64 = 0.002;
 
 #[test]

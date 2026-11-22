@@ -20,6 +20,7 @@ fn modulated(patch: Patch, depth: f32) -> Patch {
     }
 }
 
+/// A3, 220 Hz, half a second: two whole blocks of `band_power`'s analysis.
 fn note(patch: &Patch) -> Vec<f32> {
     render(patch, 57.0, &opts(0.5))
 }

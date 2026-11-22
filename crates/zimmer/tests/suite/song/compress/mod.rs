@@ -26,6 +26,8 @@ fn compressor(sidechain: Option<&str>) -> Fx {
     }
 }
 
+/// The key track's gain is zero, so whatever moves the steady saw pad is the sidechain, keyed
+/// before the fader.
 fn under_a_silent_kick(chain: Vec<Fx>) -> Song {
     let mut song = song();
     song.tracks[0].gain = 0.0;

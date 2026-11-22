@@ -57,6 +57,7 @@ fn a_loop_is_measured_by_the_whole_passes_it_renders_before_its_cut() {
     song.fit = Some(Fit::lasting(600.0, FitMode::Loop));
     let said = song.validate().expect_err("602 s rendered").to_string();
     assert!(said.contains("602"), "{said}");
+    // 85 whole passes are 595 s.
     song.fit = Some(Fit::lasting(595.0, FitMode::Loop));
     assert_eq!(song.validate(), Ok(()));
 }

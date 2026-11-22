@@ -34,8 +34,10 @@ fn the_answer_does_not_depend_on_how_the_samples_arrived() {
     }
 }
 
+/// Decibels: each frame is measured once against its real neighbours, so runs agree to the bit.
 const IDENTICAL: f64 = 1e-9;
 
+/// A 440 Hz sine has almost nothing between its samples, so whatever reads above 0.9 is the seam.
 #[test]
 fn the_run_length_is_not_in_the_true_peak() {
     let sine: Vec<f32> = (0..96_000)

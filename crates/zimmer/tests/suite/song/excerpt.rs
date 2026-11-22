@@ -70,6 +70,8 @@ fn looped() -> Song {
 fn a_window_is_exactly_that_stretch_of_the_whole_bake() {
     for song in [mixed(), looped()] {
         let all = whole(&song);
+        // (0, 0.98) pins the guard: the pad's compressor, keyed from the bass struck at 1 s, looks
+        // ahead by its 50 ms attack and ducks inside it.
         for (from, to) in [(0.0, 1.0), (0.75, 2.25), (0.0, 0.98), (2.0, 3.5)] {
             let cut = part(&song, &seconds(from, to));
             assert_eq!(

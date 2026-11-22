@@ -11,6 +11,7 @@ fn duet(left: f32, right: f32) -> Song {
     let track = |name: &str, pan: f32| Track {
         name: name.to_owned(),
         patch: PatchRef::Inline(Box::new(saw_patch())),
+        // Under the ceiling: hard over is +3 dB on its side, and the limiter must never act.
         gain: 0.5,
         pan,
         fx: vec![],
@@ -72,6 +73,7 @@ fn a_song_that_pans_nothing_is_the_same_signal_twice() {
     assert_eq!(left, right, "centre is unity on both sides, exactly");
 }
 
+/// One part: two identical parts sum coherently in the middle and not at the edges.
 fn solo(pan: f32) -> Song {
     let mut song = duet(pan, 0.0);
     song.patterns

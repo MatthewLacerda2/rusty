@@ -13,6 +13,8 @@ pub(crate) fn render(song: &Song) -> Vec<f32> {
     render_song(song, &InlineOnly).expect("the song renders")
 }
 
+/// A plucked string: pitched, so a wrong degree fails, and seeded, so equal renders mean equal
+/// ordinals.
 pub(crate) fn playing(key: Option<&str>, entries: Vec<PatternEntry>) -> Song {
     let mut one_pass = song();
     one_pass.arrangement = vec!["verse".into()];

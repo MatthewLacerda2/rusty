@@ -22,6 +22,7 @@ fn each_easing_bends_the_same_segment_its_own_way() {
     }
 }
 
+/// `ease_in_out` and `linear` agree at the midpoint, so a quarter in is where they part.
 #[test]
 fn easing_in_and_out_is_slow_at_both_ends_and_quick_between() {
     let smooth = curve(
@@ -50,6 +51,7 @@ fn a_held_segment_jumps_at_the_next_point_rather_than_travelling() {
     assert_eq!(stepped.value_at(4.0), Some(0.9), "and now it has");
 }
 
+/// `hold` asks it: every other easing reaches a point at the same value from either side.
 #[test]
 fn a_beat_exactly_on_a_point_reads_the_segment_that_starts_there() {
     let stepped = curve(

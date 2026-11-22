@@ -6,10 +6,13 @@ use rusty_zimmer::patch::{Lfo, LfoTarget, PitchEnv};
 
 mod curves;
 
+/// Samples, a tenth of a second: whole cycles of A2, so a count is pitch, not phase.
 const WINDOW: usize = 4_410;
 
+/// Half a cycle of the 6 Hz vibrato: the sine starts at zero, so sharp, then flat.
 const HALF_WOBBLE: usize = 3_675;
 
+/// The fourth vibrato cycle, 4 × 7_350: past the sweep.
 const SHARP_HALF: usize = 29_400;
 
 const FLAT_HALF: usize = SHARP_HALF + HALF_WOBBLE;
@@ -38,6 +41,7 @@ fn a_pitch_envelope_starts_the_note_high_and_lands_it_on_the_played_pitch() {
         hz(&swept, 0),
         hz(&plain, 0)
     );
+    // Within one crossing: a window that is not a whole number of periods counts pitch to ±1.
     assert!(
         hz(&swept, 39_690).abs_diff(hz(&plain, 39_690)) <= 1,
         "and has arrived on the note by the end: {} against {}",

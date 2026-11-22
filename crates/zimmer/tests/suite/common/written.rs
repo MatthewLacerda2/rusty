@@ -4,6 +4,8 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 
+/// Each entry is a key path's tail (`[]` any array entry, a leading `.` the root); a match excuses
+/// that key and every key under it.
 const PREDATES_THE_RULE: &[&str] = &[
     "patch.filter",
     "patch.lfo",

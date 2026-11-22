@@ -65,6 +65,7 @@ fn a_note_on_a_track_that_does_not_exist_is_refused_by_position() {
     );
 }
 
+/// The renderer clamps a negative onset to sample zero, so unrefused the piece plays off the page.
 #[test]
 fn a_note_starting_before_its_pattern_is_refused_by_position() {
     let mut song = song();

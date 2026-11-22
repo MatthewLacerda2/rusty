@@ -8,8 +8,11 @@ use rusty_zimmer::{render_song, Song, SAMPLE_RATE};
 
 pub(crate) const TRACK: &str = "bass";
 
+/// Samples per block of `sounding`'s envelope, far finer than any onset or gate asserted.
 pub(crate) const BLOCK: usize = 64;
 
+/// A saw whose cutoff a full strike opens four octaves, held flat and released at once: level,
+/// tone and gate each read off the samples.
 pub(crate) fn instrument() -> Patch {
     Patch {
         filter: Some(Filter {
@@ -37,6 +40,7 @@ pub(crate) fn note(name: &str, start: f32, dur: f32, vel: f32, mark: Option<Arti
     }
 }
 
+/// Gain and velocities stay low: a peak reaching the master limiter would test the limiter.
 pub(crate) fn playing(entries: Vec<PatternEntry>) -> Song {
     let mut one_pass = song();
     one_pass.arrangement = vec!["verse".into()];
@@ -56,6 +60,7 @@ pub(crate) fn rendered(song: &Song) -> Vec<f32> {
     )
 }
 
+/// Block maxima, not samples: a note starts mid-cycle, so its first sample says phase, not onset.
 pub(crate) fn sounding(buf: &[f32]) -> (usize, usize) {
     let blocks: Vec<f32> = buf
         .chunks(BLOCK)

@@ -103,5 +103,6 @@ fn a_widened_oscillator_is_not_the_narrow_one_over_again() {
     let narrow = render(&stack(1, 20.0), 57.0, &opts(0.3));
     let wide = render(&stack(5, 20.0), 57.0, &opts(0.3));
     assert_ne!(narrow, wide);
+    // A spread of nothing is still five voices, and not the one: each starts at its own phase.
     assert_ne!(render(&stack(5, 0.0), 57.0, &opts(0.3)), narrow);
 }

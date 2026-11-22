@@ -17,9 +17,11 @@ fn a_step_entry_is_told_apart_by_its_fields_and_survives_a_round_trip() {
     );
 
     for confused in [
+        // A chord and a rhythm are two different things to play.
         r#"{ "track": "b", "chord": "Dm7", "steps": "x-xX", "div": 0.5, "start": 0, "dur": 1 }"#,
         // A misspelled field, which would otherwise be a velocity silently at 1.
         r#"{ "track": "b", "steps": "x-xX", "div": 0.5, "vell": 0.4 }"#,
+        // A string with no grid says nothing about when its hits fall.
         r#"{ "track": "b", "steps": "x-xX" }"#,
     ] {
         assert!(
@@ -31,6 +33,7 @@ fn a_step_entry_is_told_apart_by_its_fields_and_survives_a_round_trip() {
 
 #[test]
 fn a_step_entry_writes_down_its_start_only_when_it_has_one() {
+    // The string alone: every other entry kind writes its `start` unconditionally.
     let json = playing(vec![steps("x-xX").into()])
         .to_json()
         .expect("serialise");

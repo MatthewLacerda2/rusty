@@ -106,6 +106,7 @@ fn a_named_instrument_is_taken_from_the_resolver() {
     );
 }
 
+/// One saw note on beat 1, not 0: an early nudge on the first beat is clamped, hiding a sign.
 fn leaning(seed: u64, timing: Option<f32>) -> Song {
     let mut song = Song {
         seed,
@@ -128,6 +129,7 @@ fn onset(mix: &[f32]) -> i64 {
         .expect("the note sounds") as i64
 }
 
+/// A flipped sign still moves every note as far, so two seeds that lean opposite ways pin it.
 #[test]
 fn a_note_lands_where_it_is_written_plus_the_way_the_player_leant() {
     for (seed, drags) in [(0, true), (3, false)] {
