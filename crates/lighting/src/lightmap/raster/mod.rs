@@ -24,6 +24,7 @@ pub(super) use fill::{dilate, fill_rest};
 pub(crate) use overlap::{rasterize_claims, Claim};
 use overlap::{Owner, Owners};
 
+/// In texels.
 pub const MIN_RESOLUTION: u32 = 4;
 
 /// Offsets are `u32` so a point stays 32 bytes.
@@ -77,12 +78,12 @@ struct UvTri {
     area: f32,
 }
 
-/// A texel two triangles share goes to the first in index order; the second pass never takes a
-/// texel from the first.
+/// A texel two triangles share goes to the first in index order, and no later pass takes it.
 pub(super) fn rasterize(mesh: &BakeMesh, size: u32) -> Vec<TexelPoint> {
     rasterize_surface(&mesh.surface(), size, size)
 }
 
+/// Sized once: each doubling frees a block macOS's allocator keeps in the footprint.
 pub(super) fn rasterize_counted(mesh: &BakeMesh, size: u32, count: usize) -> Vec<TexelPoint> {
     walk(
         &mesh.surface(),
@@ -96,7 +97,7 @@ pub(crate) fn rasterize_surface(mesh: &Surface, width: u32, height: u32) -> Vec<
     walk(mesh, (width, height), Vec::new(), None)
 }
 
-/// The owners are the same either way, and the sink may replace a texel's point, never its owner.
+/// `claims` changes no owner: the sink may replace a texel's point, never its owner.
 fn walk(
     mesh: &Surface,
     (width, height): (u32, u32),
@@ -194,6 +195,7 @@ fn barycentric(uv: [Vec2; 3], area: f32, p: Vec2) -> Option<Vec3> {
     let w0 = (uv[1] - p).perp_dot(uv[2] - p) / area;
     let w1 = (uv[2] - p).perp_dot(uv[0] - p) / area;
     let w = Vec3::new(w0, w1, 1.0 - w0 - w1);
+    // Float slack on a shared edge.
     const EPS: f32 = -1e-5;
     (w.x >= EPS && w.y >= EPS && w.z >= EPS).then_some(w)
 }

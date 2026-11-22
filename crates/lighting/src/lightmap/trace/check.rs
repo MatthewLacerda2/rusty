@@ -2,8 +2,10 @@ use super::super::lights::area::{block_span, PROBE};
 use super::super::rng::Rng;
 use super::own::BLOCKS;
 
+/// Checks a probe that found a panel fully seen adds, one per quadrant: few, as most are.
 pub(super) const LIT_CHECKS: u32 = 4;
 
+/// Two per block, more than `LIT_CHECKS`: a slit the probe missed would leave a texel black.
 pub(super) const HIDDEN_CHECKS: u32 = 2 * BLOCKS as u32;
 
 pub(super) fn check_cells(
@@ -33,6 +35,8 @@ fn spread(b: usize, m: u32, pick: u32, take: usize, rng: &mut Rng) -> [u32; 2] {
         block_span(b as u32 % PROBE, m),
         block_span(b as u32 / PROBE, m),
     );
+    // Not on a 2×2 block: there the rule only moves the second check off the diagonal, which
+    // measured worse on a slit.
     let wide = x1 - x0 > 2 && y1 - y0 > 2;
     let block = move || (y0..y1).flat_map(move |y| (x0..x1).map(move |x| y * m + x));
     let mut taken = [pick, u32::MAX, u32::MAX];

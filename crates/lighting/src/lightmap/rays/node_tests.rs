@@ -12,6 +12,8 @@ use crate::lightmap::progressive_tests::lit;
 use crate::lightmap::{BakeScene, Rng};
 use crate::occlusion::test_level::corridors;
 
+/// -0 as +0: an origin on a face gives `tmin.max(-0.0)`, and which zero `f32::max` returns is
+/// unspecified.
 fn key(t: f32) -> u32 {
     (t + 0.0).to_bits()
 }

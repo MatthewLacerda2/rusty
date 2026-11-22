@@ -30,8 +30,10 @@ pub struct ReflectionPlan {
     pub importance: i32,
 }
 
+/// Ranks under every room probe's importance (1).
 pub const OPEN_AIR_IMPORTANCE: i32 = 0;
 
+/// World units over the bounds, so probes cover an actor's head, not only the floor.
 pub const VERTICAL_HEADROOM: f32 = 3.0;
 
 pub struct Site {

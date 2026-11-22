@@ -4,6 +4,7 @@ use std::thread;
 
 use super::super::progress::BakeProgress;
 
+/// Items per batch: small, so a cancel lands at once; large, so the shared counter stays cold.
 pub(in super::super) const BATCH: usize = 64;
 
 pub(crate) fn batches<P>(items: impl IntoIterator<Item = P>) -> Vec<Vec<P>> {
@@ -18,6 +19,8 @@ pub(crate) fn batches<P>(items: impl IntoIterator<Item = P>) -> Vec<Vec<P>> {
     }
 }
 
+// Sized once, never grown: each doubling frees a large block that macOS's allocator keeps in
+// the footprint. `Slot::finish` sizes its own the same way.
 fn flat<P>(batches: Vec<Vec<P>>) -> Vec<P> {
     let mut all = Vec::with_capacity(batches.iter().map(Vec::len).sum());
     batches.into_iter().for_each(|b| all.extend(b));

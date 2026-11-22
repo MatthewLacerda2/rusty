@@ -10,6 +10,7 @@ pub(in super::super) const INSET: f32 = 0.125;
 /// distances, summed) kept off every edge.
 const THIN_SHARE: f32 = 0.25;
 
+/// The most vertices a triangle clipped by seven half-planes can have.
 const MAX_VERTS: usize = 10;
 
 #[derive(Clone, Copy, Default)]

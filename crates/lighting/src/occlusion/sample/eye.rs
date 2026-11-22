@@ -2,6 +2,7 @@ use glam::Vec3;
 
 use super::shaft::Polygons;
 
+/// Polygons a cube remembers.
 const CACHED: usize = 8;
 
 pub(super) type Points = u8;

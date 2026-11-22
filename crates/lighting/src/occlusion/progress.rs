@@ -2,6 +2,8 @@ use std::fmt;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 
+/// A cell starts and finishes on one thread, with no other cell between: observers time cells
+/// per thread.
 pub trait OcclusionObserver: Send + Sync {
     fn cells(&self, total: usize);
     fn cell_started(&self, cell: usize);

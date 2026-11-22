@@ -16,8 +16,10 @@ use rusty_procgen::image_buf::{Image, Size};
 pub use settings::{Settings, MAX_RAYS};
 pub use source::MeshSource;
 
+/// In texels: Substance's 8K.
 pub const MAX_RESOLUTION: u32 = 8192;
 
+/// Texels filled around each UV island: Substance's default dilation width.
 pub const MARGIN: u32 = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

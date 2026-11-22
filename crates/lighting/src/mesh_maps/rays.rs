@@ -3,12 +3,16 @@ use glam::{Vec3, Vec4};
 use super::{Baked, MeshSource};
 use crate::lightmap::{cosine_sample, Rays, Rng, TexelPoint, Tri};
 
+/// Rays per texel: Substance's default *Secondary Rays*.
 pub const SAMPLES: u32 = 64;
 
+/// A share of the bounds diagonal: Substance's *Max Occluder Distance*.
 pub const MAX_DISTANCE: f32 = 1.0;
 
+/// A share of the bounds diagonal, so a ray misses its own triangle at any scale.
 const OFFSET: f32 = 1e-4;
 
+/// One seed stream per map, so AO and thickness draw apart.
 const AO_STREAM: u64 = 1;
 const THICKNESS_STREAM: u64 = 2;
 

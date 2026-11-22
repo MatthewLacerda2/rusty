@@ -16,6 +16,7 @@ pub struct ReflectionPlacement {
     pub max_probes: usize,
 }
 
+/// World units: below it the probe count grows with the square.
 pub const MIN_REGION: f32 = 2.0;
 
 impl Default for ReflectionPlacement {
@@ -64,6 +65,8 @@ pub fn plan_reflection_probes(
         (plans, single)
     };
     let (mut region, (mut plans, mut single)) = (asked, plan(asked));
+    // Clutter divides a region by at most 1 + CLUTTER_GAIN (`cluttered_region`): past this
+    // bound every room is one tile.
     while plans.len() > max && !single && region < widest * (1.0 + CLUTTER_GAIN) {
         region *= (plans.len() as f32 / max as f32).sqrt().max(1.1);
         (plans, single) = plan(region);
