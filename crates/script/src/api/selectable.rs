@@ -1,14 +1,3 @@
-//! crates/script/src/api/selectable.rs — `Selectable` namespace (#420).
-//!
-//! Get/Set over an entity's `SelectableComponent`: interactable, the transition and
-//! its target graphic, per-state colours and sprites, the fade, and navigation
-//! (mode + explicit targets). Every setter routes through the shared
-//! `edit::authoring::ui::selectable` ops the inspector card uses. `IsInteractable` and
-//! `GetState` read the effective, runtime answers (CanvasGroups and the event
-//! system included). Getters return a neutral default without a Selectable; setters
-//! are then no-ops. States, directions and enum values travel as their names
-//! (case-insensitive; unknown names are ignored by setters and read as `nil`).
-
 use std::cell::RefCell;
 
 use glam::Vec4;
@@ -24,7 +13,6 @@ use rusty_scene::Scene;
 use rusty_ui::events::is_interactable;
 use rusty_ui::EventSystem;
 
-/// Register the `Selectable` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, events: ApiCell<EventSystem>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_state(lua, &t, scene, events)?;
@@ -35,19 +23,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, events: ApiCell<EventSystem>) 
         .map_err(|e| e.to_string())
 }
 
-/// `id`'s Selectable, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<SelectableComponent> {
     scene.borrow().world.selectable(id).map(|s| s.clone())
 }
 
-/// Apply `f` to `id`'s Selectable, when it has one.
 fn set(scene: &RefCell<Scene>, id: u32, f: &dyn Fn(&mut SelectableComponent)) {
     if let Some(mut s) = scene.borrow_mut().world.selectable_mut(id) {
         f(&mut s);
     }
 }
 
-/// `Get/SetInteractable`, `IsInteractable`, `GetState`.
 fn register_state(
     lua: &mlua::Lua,
     t: &Table,
@@ -84,8 +69,6 @@ fn register_state(
     put(t, "GetState", f)
 }
 
-/// `Get/SetTransition`, `Get/SetTargetGraphic`, `Get/SetFadeDuration`, then the
-/// per-state pairs.
 fn register_transition(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|s| s.transition.name()))
@@ -125,7 +108,6 @@ fn register_transition(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg
     register_per_state(lua, t, scene)
 }
 
-/// `Get/SetColor` and `Get/SetSprite`, keyed by state name.
 fn register_per_state(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, (id, name): (EntityArg, String)| {
         let scene = &*scene.get(lua)?;
@@ -163,7 +145,6 @@ fn register_per_state(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg 
     put(t, "SetSprite", f)
 }
 
-/// `Get/SetNavigation`, `Get/SetSelectOn`.
 fn register_navigation(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|s| s.navigation.name()))

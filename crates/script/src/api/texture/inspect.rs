@@ -1,6 +1,3 @@
-//! crates/script/src/api/texture/inspect.rs — `Texture.Stats` and `Texture.Preview` (#1486): let
-//! the agent see what every node of a recipe makes, by numbers or by eye.
-
 use mlua::{Lua, Table, Value};
 
 use super::from_lua::parse_recipe;
@@ -12,7 +9,6 @@ use rusty_procgen::runner::preview::write_preview;
 use rusty_procgen::runner::stats::{stats, NodeStats};
 use rusty_procgen::TextureRecipe;
 
-/// Put `Stats` and `Preview` on the `Texture` table.
 pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     put(
         table,
@@ -33,13 +29,8 @@ pub(super) fn register(lua: &Lua, table: &Table) -> Reg {
     )
 }
 
-/// The tile's longer side `Texture.Preview` uses when none is given, or the
-/// recipe's longer side when that is smaller.
 pub const PREVIEW_SIZE: u32 = 128;
 
-/// `{ [node_id] = { min, max, mean, std, p1, p99 } }`, each an `{r, g, b, a}`
-/// sequence, evaluated at `resolution` when given (a `size` recipe keeps its
-/// aspect, as `Material.Rebake` does).
 pub fn stats_table(
     lua: &Lua,
     mut recipe: TextureRecipe,
@@ -76,9 +67,6 @@ fn node_table(lua: &Lua, s: &NodeStats) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// Write the contact sheet and return `{ path, columns, order = { node ids } }`.
-/// The missing folders above `path` are made first when they lie inside `root`, as
-/// `Texture.Bake` makes them (#1850, #2002).
 pub fn preview_table(
     lua: &Lua,
     recipe: &TextureRecipe,

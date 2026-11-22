@@ -1,6 +1,3 @@
-//! How `Timer.*` (#444) fails: bad invoke targets are refused or logged, and a
-//! failing coroutine, invoke or predicate surfaces on the console.
-
 use super::coroutines::{co, log};
 use super::timers::{counted, rig, tick};
 
@@ -95,8 +92,6 @@ fn a_failing_invoke_keeps_repeating_and_a_failing_predicate_retires() {
     assert_eq!(m.eval(&format!("Timer.IsInvoking({id})")).unwrap(), "true");
 }
 
-/// A job whose function belongs to another VM (#1384) never resolves here: it is
-/// cancelled with a console error the first time it comes due, not retried.
 #[test]
 fn a_job_from_another_vm_is_cancelled_once() {
     use crate::scripting::{Target, Wait, Work};
@@ -127,7 +122,6 @@ fn a_job_from_another_vm_is_cancelled_once() {
     assert_eq!(lost, 1, "reported once: {:?}", console.messages);
 }
 
-/// `Timer` refuses a function from a VM the scheduler does not run (#1384).
 #[test]
 fn a_function_from_a_non_gameplay_vm_is_refused() {
     let (m, id) = rig("timer_foreign", &counted(""));

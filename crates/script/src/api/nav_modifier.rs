@@ -1,13 +1,4 @@
-//! crates/script/src/api/nav_modifier.rs — `NavMeshModifierVolume` namespace (#460).
-//!
-//! Unity's `NavMeshModifierVolume`: a box (centre and size, local to the entity)
-//! that assigns a navigation area to the walkable surface inside it at bake time;
-//! area `1` (`NotWalkable`) removes the surface. Look an area's id up with
-//! `Navigation.GetAreaFromName`. Every setter routes through the shared
-//! `edit::authoring::nav::modifier` ops the inspector card uses; the volume is a
-//! bake input, so the next navmesh sync rebakes the cells it covers. Getters return
-//! a neutral default without a volume; setters are then no-ops. Attach one with
-//! `Scene.AddComponent(id, "NavMeshModifierVolume")`.
+//! Getters return a neutral default without a volume; setters are then no-ops.
 
 use std::cell::RefCell;
 
@@ -21,7 +12,6 @@ use rusty_components::NavMeshModifierVolumeComponent as Volume;
 use rusty_edit::authoring::nav::modifier as ops;
 use rusty_scene::Scene;
 
-/// Register the `NavMeshModifierVolume` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_box(lua, &t, scene)?;
@@ -31,19 +21,16 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// `id`'s volume, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<Volume> {
     scene.borrow().world.nav_modifier(id).map(|v| v.clone())
 }
 
-/// Apply a shared op to `id`'s volume, if it has one.
 fn write(scene: &RefCell<Scene>, id: u32, op: impl FnOnce(&mut Volume)) {
     if let Some(mut v) = scene.borrow_mut().world.nav_modifier_mut(id) {
         op(&mut v);
     }
 }
 
-/// `GetCenter` / `SetCenter` and `GetSize` / `SetSize`, as `x, y, z`.
 fn register_box(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     type Field = (fn(&Volume) -> Vec3, fn(&mut Volume, Vec3));
     let fields: [(&str, Field); 2] = [
@@ -67,7 +54,6 @@ fn register_box(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     Ok(())
 }
 
-/// `Active` and `Area` (an area id; `0` without a volume).
 fn register_options(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).is_some_and(|v| v.active))

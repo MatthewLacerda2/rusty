@@ -1,8 +1,3 @@
-//! Tests for the collision callbacks (#448): `OnCollisionEnter` / `OnCollisionStay`
-//! get `(id, other, contact)` as the receiver sees it, `OnCollisionExit` gets
-//! `(id, other)`, and they dispatch after the trigger callbacks of the same tick;
-//! `OnJointBreak` (#449) follows them.
-
 use std::collections::BTreeMap;
 
 use glam::Vec3;
@@ -10,7 +5,6 @@ use glam::Vec3;
 use super::lifecycle::{manager_with_entity, write_script};
 use rusty_physics::{CollisionEvents, CollisionPair, Contact, PhysicsEvents, TriggerEvents};
 
-/// `id` resting on entity 9: `id` sees the floor push up and close at 3 m/s.
 fn landing(id: u32) -> CollisionPair {
     let contact = Contact {
         point: Vec3::new(1.0, 0.0, 2.0),
@@ -44,9 +38,8 @@ fn collision_callbacks_get_the_receivers_contact() {
     );
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
-    m.init_scripts(); // physics callbacks only reach awoken instances (#322)
+    m.init_scripts();
 
-    // Triggers of the tick first, then enter before stay.
     m.dispatch_physics_events(PhysicsEvents {
         triggers: TriggerEvents {
             stayed: vec![(id, 5)],
@@ -83,7 +76,6 @@ fn the_other_side_sees_the_contact_flipped() {
     m.load_entity_script(id, 0, &path, &BTreeMap::new())
         .unwrap();
     m.init_scripts();
-    // Keyed from another entity's side, with `id` as its `b`.
     let mut pair = landing(id + 100);
     pair.b = id;
     m.dispatch_collision_events(CollisionEvents {

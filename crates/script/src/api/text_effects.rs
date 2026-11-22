@@ -1,10 +1,3 @@
-//! crates/script/src/api/text_effects.rs — the `Text` namespace's multi-value accessors (#419).
-//!
-//! The colour and the SDF effects travel as flat number lists — a few leading
-//! scalars, then `r, g, b, a`: `Color` (`r, g, b, a`), `Outline` and `Glow`
-//! (`width, r, g, b, a`), `Shadow` (`dx, dy, r, g, b, a`) — and auto-size as
-//! `enabled, min, max`. Split from `text.rs` to keep each file one responsibility.
-
 use mlua::{Table, Variadic};
 
 use super::text::Effect;
@@ -14,7 +7,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::ui::text as ops;
 use rusty_scene::Scene;
 
-/// `Get<suffix>(id)` / `Set<suffix>(id, …)` for every effect row.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -57,8 +49,6 @@ pub(super) fn register(
     Ok(())
 }
 
-/// `GetAutoSize(id) -> enabled, min, max` / `SetAutoSize(id, enabled[, min, max])`
-/// (omitted bounds keep their values).
 pub(super) fn register_auto_size(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

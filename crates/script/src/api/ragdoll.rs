@@ -1,16 +1,3 @@
-//! crates/script/src/api/ragdoll.rs — `Ragdoll` namespace (#466).
-//!
-//! `Build` is the inspector's *Build Ragdoll* button (Unity's Ragdoll Wizard):
-//! a `Rigidbody` and a `Joint` on each hitbox bone, see `scene::skeleton::ragdoll`.
-//! `Enable` / `Disable` hand a character's bones from the Animator to physics
-//! and back; `Enable` seeds each body with the velocity its animation gave it,
-//! read off the live physics world. Each takes the skinned entity or any ancestor
-//! of it — the `root` a raycast returns works.
-//!
-//! The partial ragdoll (#1895, `scene::skeleton::ragdoll::partial`):
-//! `SetSimulated`, `SetDrive` and `SetBlendWeight` act on the branch at a bone,
-//! and `HitReact` is the one call a game makes when a shot lands.
-
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::rc::Rc;
@@ -25,7 +12,6 @@ use rusty_physics::PhysicsWorld;
 use rusty_scene::skeleton::{Drive, HitReact, RagdollOptions};
 use rusty_scene::Scene;
 
-/// `(id, bone, ix, iy, iz, px, py, pz, opts)`: `HitReact`'s arguments.
 type HitArgs = (
     EntityArg,
     EntityArg,
@@ -38,7 +24,6 @@ type HitArgs = (
     Option<Table>,
 );
 
-/// Register the `Ragdoll` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     put(
@@ -87,7 +72,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>, physics: ApiCell<Option<Physic
     lua.globals().set("Ragdoll", t).map_err(|e| e.to_string())
 }
 
-/// `SetSimulated`, `SetDrive`, `SetBlendWeight` and `HitReact` (#1895).
 fn register_partial(
     lua: &Lua,
     t: &Table,
@@ -128,7 +112,6 @@ fn register_partial(
     register_hit_react(lua, t, scene, physics)
 }
 
-/// `HitReact`: one warning per entity without a ragdoll there.
 fn register_hit_react(
     lua: &Lua,
     t: &Table,
@@ -162,7 +145,6 @@ fn register_hit_react(
     put(t, "HitReact", f)
 }
 
-/// `base` with the `{ strength, damping }` an options table gives ([`Drive::merged`]).
 fn drive_from(opts: Option<&Table>, base: Drive) -> mlua::Result<Drive> {
     let Some(o) = opts else {
         return Ok(base);
@@ -170,7 +152,6 @@ fn drive_from(opts: Option<&Table>, base: Drive) -> mlua::Result<Drive> {
     Ok(base.merged(o.get("strength")?, o.get("damping")?))
 }
 
-/// `HitReact`'s options: `{ duration, strength, damping, up_to }`.
 fn react_from(opts: Option<&Table>) -> mlua::Result<HitReact> {
     let base = HitReact::default();
     let Some(o) = opts else {

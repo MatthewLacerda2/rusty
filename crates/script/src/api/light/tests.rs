@@ -1,12 +1,9 @@
-//! Tests for the `Light` namespace (`api::light`).
-
 use crate::api::bind;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::*;
 
-/// Build a scene with one light-bearing entity; returns `(scene, id)`.
 fn scene_with_light() -> (Rc<RefCell<Scene>>, u32) {
     let mut scene = Scene::default();
     let id = scene.add_entity("Lamp".to_string());
@@ -89,7 +86,6 @@ fn clamps_negatives_and_ignores_unknown_type() {
     let light = e.world.light(id).unwrap().clone();
     assert_eq!(light.intensity, 0.0);
     assert_eq!(light.range, 0.0);
-    // Unknown name kept the original Point type.
     assert_eq!(light.light_type, LightType::Point);
     assert_eq!(
         light.mode,
@@ -98,7 +94,6 @@ fn clamps_negatives_and_ignores_unknown_type() {
     );
 }
 
-/// An Area light: Baked, refusing the rest with a warning, and sized (#1674).
 #[test]
 fn area_light_is_baked_and_sized() {
     let (scene, id) = scene_with_light();

@@ -1,10 +1,3 @@
-//! crates/script/src/api/rect_mask.rs — `RectMask` namespace (#418).
-//!
-//! Get/Set over an entity's `RectMaskComponent` (Unity's `RectMask2D`): the clip's
-//! `Padding` inset and its soft-edge `Feather` (#428). Whether a mask exists is `Scene.AddComponent(id, "RectMask")` /
-//! `RemoveComponent`. The setters route through the shared
-//! `edit::authoring::ui::rect_mask` op the inspector card uses.
-
 use glam::Vec4;
 use mlua::Lua;
 
@@ -14,7 +7,6 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::ui::rect_mask as mask_ops;
 use rusty_scene::Scene;
 
-/// Register the `RectMask` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     put(

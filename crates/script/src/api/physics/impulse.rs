@@ -1,13 +1,3 @@
-//! crates/script/src/api/physics/impulse.rs — forces and impulses at a point (#466).
-//!
-//! Unity's `Rigidbody.AddForceAtPosition` and `AddForceAtPosition(…,
-//! ForceMode.Impulse)`: a push at a world point both moves the body and spins it,
-//! so the shot that kills an enemy throws its ragdoll the way it came. The
-//! velocity change comes from the live body's mass, centre of mass and inertia
-//! (`PhysicsWorld::impulse_response`) and lands on the Rigidbody's velocities,
-//! like `AddForce`. Outside Play (no physics world) only the linear part applies,
-//! `J / mass`. A no-op on a kinematic body or an entity without a Rigidbody.
-
 use std::cell::RefCell;
 
 use glam::Vec3;
@@ -20,17 +10,14 @@ use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 
-/// `(id, x, y, z, px, py, pz)`: a vector and the world point it acts at.
 type AtPoint = (EntityArg, f32, f32, f32, f32, f32, f32);
 
-/// Register `AddForceAtPosition` / `AddImpulseAtPosition` onto `Physics`.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
     scene: ApiCell<Scene>,
     physics: ApiCell<Option<PhysicsWorld>>,
 ) -> Reg {
-    // A continuous force feeds one fixed step, as `AddForce` does: F · dt.
     for (name, scale) in [
         ("AddForceAtPosition", FIXED_DELTA_TIME),
         ("AddImpulseAtPosition", 1.0),
@@ -52,8 +39,6 @@ pub(super) fn register(
     Ok(())
 }
 
-/// Add the velocity change `impulse` at `point` causes to `id`'s Rigidbody
-/// (`Ragdoll.HitReact`'s impulse too, #1895).
 pub(in crate::api) fn apply(
     scene: &RefCell<Scene>,
     physics: &RefCell<Option<PhysicsWorld>>,

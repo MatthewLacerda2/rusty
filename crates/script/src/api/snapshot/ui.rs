@@ -1,8 +1,3 @@
-//! crates/script/src/api/snapshot/ui.rs — the UI components' serializers for the scene-read.
-//!
-//! The leaf `*_value` builders for the Canvas family (#417–#420): the same stable
-//! authoring JSON as `components.rs`, split out by responsibility.
-
 use serde_json::{json, Value};
 
 use rusty_components::{
@@ -10,8 +5,6 @@ use rusty_components::{
     RectTransformComponent, ShapeComponent,
 };
 
-/// Canvas authoring view (#417): render mode, sort order and the scaler. The
-/// computed rect is the entity's `ui_rect`, not part of the component.
 pub(crate) fn canvas_value(c: &CanvasComponent) -> Value {
     json!({
         "render_mode": c.render_mode.name(),
@@ -25,8 +18,6 @@ pub(crate) fn canvas_value(c: &CanvasComponent) -> Value {
     })
 }
 
-/// RectTransform authoring view (#417): anchors, pivot, anchored position and size
-/// delta, each `[x, y]` in reference units. The computed rect is `ui_rect`.
 pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
     let v = |v: glam::Vec2| json!([v.x, v.y]);
     json!({
@@ -47,8 +38,6 @@ pub(crate) fn rect_transform_value(r: &RectTransformComponent) -> Value {
     })
 }
 
-/// Image authoring view (#418): tint, texture, type, 9-slice border and the fill.
-/// Enum values are their `Image.*` names.
 pub(crate) fn image_value(i: &ImageComponent) -> Value {
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
@@ -67,9 +56,6 @@ pub(crate) fn image_value(i: &ImageComponent) -> Value {
     })
 }
 
-/// Shape authoring view (#425): the primitive, its fill, border, effects and blend.
-/// Enum values are their `Shape.*` names; the gradient is the `Shape.SetGradient`
-/// table's shape.
 pub(crate) fn shape_value(s: &ShapeComponent) -> Value {
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
@@ -94,7 +80,6 @@ pub(crate) fn shape_value(s: &ShapeComponent) -> Value {
     })
 }
 
-/// CanvasGroup authoring view (#418): subtree alpha and the interaction flags.
 pub(crate) fn canvas_group_value(g: &CanvasGroupComponent) -> Value {
     json!({
         "alpha": g.alpha,
@@ -103,8 +88,6 @@ pub(crate) fn canvas_group_value(g: &CanvasGroupComponent) -> Value {
     })
 }
 
-/// Selectable authoring view (#420): its runtime state is `UI.List` /
-/// `Selectable.GetState`, not part of the component.
 pub(crate) fn selectable_value(s: &rusty_components::SelectableComponent) -> Value {
     use rusty_components::SelectionState;
     use rusty_edit::authoring::ui::selectable as ops;
@@ -133,19 +116,15 @@ pub(crate) fn selectable_value(s: &rusty_components::SelectableComponent) -> Val
     })
 }
 
-/// RectMask authoring view (#418): the clip's padding (left, bottom, right, top) and
-/// its soft-edge feather (#428).
 pub(crate) fn rect_mask_value(m: &RectMaskComponent) -> Value {
     let p = m.padding;
     json!({ "padding": [p.x, p.y, p.z, p.w], "feather": m.feather })
 }
 
-/// Mask authoring view (#428): whether the mask's own graphic draws.
 pub(crate) fn mask_value(m: &rusty_components::MaskComponent) -> Value {
     json!({ "show_mask_graphic": m.show_mask_graphic })
 }
 
-/// BackdropFilter authoring view (#426): blur radius, tint, saturation, brightness.
 pub(crate) fn backdrop_filter_value(b: &rusty_components::BackdropFilterComponent) -> Value {
     let t = b.tint;
     json!({
@@ -156,7 +135,6 @@ pub(crate) fn backdrop_filter_value(b: &rusty_components::BackdropFilterComponen
     })
 }
 
-/// Text authoring view (#419): the string, fonts, sizing, wrapping and effects.
 pub(crate) fn text_value(t: &rusty_components::TextComponent) -> Value {
     let v4 = |v: glam::Vec4| json!([v.x, v.y, v.z, v.w]);
     json!({
@@ -181,8 +159,6 @@ pub(crate) fn text_value(t: &rusty_components::TextComponent) -> Value {
     })
 }
 
-/// LayoutGroup authoring view (#421): the arrangement and its knobs. Where the
-/// children land is each child's `ui_rect`.
 pub(crate) fn layout_group_value(g: &rusty_components::LayoutGroupComponent) -> Value {
     let p = g.padding;
     json!({
@@ -200,8 +176,6 @@ pub(crate) fn layout_group_value(g: &rusty_components::LayoutGroupComponent) -> 
     })
 }
 
-/// LayoutElement authoring view (#421): the size overrides as `[width, height]`
-/// (`null` = the content's size) and the content fitter per axis.
 pub(crate) fn layout_element_value(e: &rusty_components::LayoutElementComponent) -> Value {
     json!({
         "ignore_layout": e.ignore_layout,

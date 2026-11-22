@@ -1,33 +1,4 @@
--- crates/script/src/api/particle/live.lua — the Lua half of the live-particle
--- calls (#2171). `live.rs` hands an emitter's particles over as one packed
--- string (`read`) and takes them back as one (`write`) or as a list of edits
--- (`edit`), so the per-particle work is done here, by the VM, not one Rust call
--- per field.
---
--- The Rust halves come in `halves` (`api::RUST_HALVES`), each under the verb
--- it serves (`GetParticles`, `SetParticles`, `ForEach`, `ForEach/edit`), and are
--- looked up there at every call, never kept: the dev layer's verb timers replace
--- them in that table.
---
--- `live.rs` owns the layout and passes it in: `PARTICLE`, the format of one
--- particle read; `RECORD`, the format of one record written back (a u32 source,
--- then the particle's fields); `names`, the fields in wire order; and `SLOTS`,
--- the stride of an edit's key. The unpacking and packing below are written out
--- by position for speed, so `ORDER` must equal `names`, and loading fails if
--- not; an edit's slot offsets are read from `names`.
---
--- A table `get` hands out carries its identity: `reads[id]` maps it to the index
--- it was read from, for the emitter's newest read only, with the emitter's
--- revision at that read. `set` sends that source with each entry and the
--- revision once, so a survivor keeps its own hidden fields wherever the script
--- moved it, unless something changed the emitter since (`live.rs` compares the
--- revision); a table with no identity there is sent as an added particle.
---
--- `for_each` hands `fn` one table per call, refilled for each particle; after
--- `fn` each field is compared with the value read, and only the changed ones go
--- back, as edits (an index-and-slot key, a value), so nothing is packed, checked
--- or allocated per particle a rule leaves alone. The table is emptied and killed
--- when the call ends, so one kept past it errors instead of reading on.
+-- `ORDER` must equal `names` (loading fails if not): the unpacking is written out by position for speed.
 local halves, PARTICLE, RECORD, names, SLOTS = ...
 local pack, unpack, concat, type, pcall, error = string.pack, string.unpack, table.concat,
     type, pcall, error
@@ -43,8 +14,6 @@ local NO_SOURCE = 0xFFFFFFFF
 local NONE = {}
 local WEAK = { __mode = "k" }
 
--- The fields in wire order, and each one's 0-based slot (an edit's key is
--- `index * SLOTS + slot`, which `live.rs` splits the same way).
 local FIELDS, SLOT = {}, {}
 for name in names:gmatch("[^,]+") do
     FIELDS[#FIELDS + 1] = name
@@ -55,12 +24,8 @@ local S_AGE, S_LIFE, S_SIZE, S_ROT = SLOT.age, SLOT.lifetime, SLOT.size, SLOT.ro
 local S_R, S_G, S_B, S_A = SLOT.r, SLOT.g, SLOT.b, SLOT.a
 local S_C1, S_C2, S_C3, S_C4 = SLOT.custom1, SLOT.custom2, SLOT.custom3, SLOT.custom4
 
--- The newest read of each emitter: `at` maps a handed-out table to its 0-based
--- source, `rev` is the emitter's revision at that read. Dropped by a write.
 local reads = {}
 
--- The first field of table `p` that is neither nil nor a number, and its type:
--- the named check, run only once a fast path has failed.
 local function wrong(p)
     for k = 1, #FIELDS do
         local x = rawget(p, FIELDS[k])
@@ -73,10 +38,7 @@ local function bad(verb, i, field, kind, level)
         :format(verb, i, field, kind), level)
 end
 
--- The record for table `p`, read from live particle `src` (0-based). A field
--- left out is sent as NaN, which `live.rs` keeps. The `< INF`
--- comparisons are the type check: comparing a string, a boolean or a table with
--- a number raises (`pack` alone would take "2" for 2), with no call per field.
+-- A field left out is sent as NaN, which `live.rs` keeps. The `< INF` comparisons are the type check: comparing a string, boolean or table raises (`pack` alone would take "2" for 2).
 local function record(src, p)
     local x, y, z, vx, vy, vz = p.x, p.y, p.z, p.vx, p.vy, p.vz
     local age, life, size, rot = p.age, p.lifetime, p.size, p.rotation
@@ -120,7 +82,6 @@ local function get(id)
     return list
 end
 
--- Every entry's record into `out`; raises on the first bad entry, unnamed.
 local function records(list, out, at)
     for i = 1, #list do
         local p = list[i]
@@ -152,26 +113,18 @@ local function set(id, list)
     return halves.SetParticles(id, "SetParticles", rev, concat(out))
 end
 
--- What a view kept past its `ForEach` does on any read or write.
 local function dead()
     error("Particles.ForEach: a particle view was used after its ForEach returned; "
         .. "copy the numbers you need out of it inside fn", 2)
 end
 local DEAD = { __index = dead, __newindex = dead, __metatable = false }
 
-
--- Log `v` as edit `key` at `edits[ne]`. The `< INF` is the type check: a
--- string, a boolean or a table raises there, and `for_each` names the field.
--- A value whose metatable answers `<` passes it, and `edit` then refuses its
--- conversion; `misfit` names that one.
 local function log(edits, ne, key, v)
     local _ = v < INF
     edits[ne + 1], edits[ne + 2] = key, v
     return ne + 2
 end
 
--- The first edit in `edits` whose value is not a number, as its 1-based entry,
--- its field and its type.
 local function misfit(edits)
     for k = 2, #edits, 2 do
         local v = edits[k]
@@ -189,9 +142,6 @@ local function for_each(id, fn)
     end
     local s, count, _, snapshot = halves.ForEach(id, true)
     local p, edits, ne, kills, nk, n = {}, {}, 0, {}, 0, 0
-    -- Fill `p` with each particle in turn, run `fn`, and log what it changed:
-    -- a field is compared with the value read, so nothing is called for one
-    -- left alone.
     local function visit()
         local pos = 1
         for i = 1, count do
@@ -232,7 +182,6 @@ local function for_each(id, fn)
     local ok, err = pcall(visit)
     local field, kind = wrong(p)
     for k in next, p do rawset(p, k, nil) end
-    -- A `fn` may have given the view a protected metatable: it stays empty then.
     pcall(setmetatable, p, DEAD)
     if not ok then
         if field then bad("ForEach", n, field, kind, 3) end

@@ -1,32 +1,3 @@
-//! crates/script/src/api/material/asset.rs — standalone named-material-asset authoring (#271).
-//!
-//! The material leg of #174: author a reusable `MaterialAsset` into the per-World
-//! library under a chosen *name*, decoupled from any entity (the per-entity setters in
-//! the parent module mutate the material an entity already references; these define a
-//! material as an asset from scratch). An entity then uses it by pointing its
-//! `MaterialComponent.material` at that name (the existing reference mechanism). The
-//! asset round-trips through `SceneData` like any library material — no special-casing.
-//!
-//! Verbs:
-//! - `Material.DefineAsset(name, recipe)` — build a `MaterialAsset` from a recipe
-//!   (factors + map-slot paths + render mode + alpha/cutoff) and write it into
-//!   `scene.materials` under `name`, overwriting any existing asset of that name. The
-//!   recipe is a Lua table **or** its JSON string (the on-disk form, #410), so a saved
-//!   recipe re-defines through the same verb without a round-trip through Lua.
-//!   A `maps` texture recipe (#409) is baked first, to
-//!   `assets/textures/<name>_<slot>.png`, filling the map paths the recipe
-//!   left empty; a failed bake defines nothing.
-//! - `Material.Rebake(name [, resolution])` — re-bake the stored `maps` recipe,
-//!   optionally at a new resolution the recipe then keeps.
-//! - `Material.GetAsset(name)` — the named asset's canonical JSON (or `nil` if absent),
-//!   so the authored asset is observable through the same surface.
-//! - `Material.HasAsset(name)` — whether the library holds an asset under `name`.
-//!
-//! Single-sourcing: the factors + map slots ride serde, but the THREE validation-bearing
-//! fields (`render_mode` parse, `alpha`/`alpha_cutoff` clamps) are applied through the
-//! shared `authoring::material::set_*` ops — the SAME ops the per-entity setters and the
-//! editor card call — so validation lives once.
-
 use std::cell::RefCell;
 
 use super::from_lua::{asset_from_lua, Validated};
@@ -36,7 +7,6 @@ use rusty_components::{MaterialAsset, RenderMode};
 use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::Scene;
 
-/// Register the standalone asset-authoring verbs onto the `Material` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -85,11 +55,7 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     )
 }
 
-/// Define `asset` under `name` in the library, applying the validation-bearing fields
-/// through the shared `authoring::material::set_*` ops so their parse/clamp stays
-/// single-sourced. We insert the base asset first (so the per-field ops have a target),
-/// then route each authored validated field, and the metallic/roughness factors serde
-/// decoded, through its shared op.
+/// Validated fields (`render_mode`, the alpha clamps) go through the shared `authoring::material::set_*` ops, so validation lives once.
 fn define(
     scene: &RefCell<Scene>,
     name: &str,
@@ -146,7 +112,6 @@ mod tests {
     use super::*;
     use rusty_components::RenderMode;
 
-    /// Register the full `Material` namespace against `scene` and run `script`.
     fn run(scene: &Rc<RefCell<Scene>>, script: &str) {
         let lua = Lua::new();
         super::super::register(&lua, crate::api::bind(&lua, scene)).unwrap();
@@ -252,7 +217,6 @@ mod tests {
         let back: MaterialAsset = serde_json::from_str(&json).expect("GetAsset returns valid JSON");
         assert_eq!(back.metallic, 0.3);
 
-        // An absent name reports false / nil.
         let absent: Option<String> = crate::api::attempt(|| {
             super::super::register(&lua, crate::api::bind(&lua, &scene)).unwrap();
             Ok(lua

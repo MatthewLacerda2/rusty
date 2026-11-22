@@ -1,9 +1,3 @@
-//! Shader-param tweens (#661) without `from`: the start value is read through the
-//! setter's getter (the override, else the material's, else the baked default),
-//! a UI tween stops once its graphic switches shader, and a wrong-arity target
-//! names the path it was given. Pins the survivors of #661's mutation run. A
-//! volume's depth-of-field knob tweens the same way (#1445).
-
 use super::timers::{counted, rig, tick};
 use super::tween_shaders::{eval, Baked};
 
@@ -19,7 +13,6 @@ fn a_material_tween_starts_from_the_entitys_current_override() {
         shader.0
     ))
     .unwrap();
-    // Started between ticks: the next tick is its own (the one-tick rule).
     tick(&mut m, 2);
     let get = format!("Material.GetShaderParam({id}, 'hit_flash.amount')");
     assert_eq!(eval(&m, &get), "0.75", "halfway from 0.5, not from 0");
@@ -71,12 +64,10 @@ fn a_graphics_tween_racks_the_depth_of_field_focus() {
     scene.world.set_camera(id, Some(camera));
     drop(scene);
     tick(&mut m, 1);
-    // A built-in knob (#1445), read from the volume: 10 m, Unity's default.
     m.eval(&format!(
         "Tween.To({id}, 'Graphics.depth_of_field.focus_distance', 2, 2 / 60)"
     ))
     .unwrap();
-    // Started between ticks: the next tick is its own (the one-tick rule).
     tick(&mut m, 2);
     let get = "Graphics.GetDepthOfFieldFocusDistance()";
     assert_eq!(eval(&m, get), "6", "halfway from 10 to 2");
@@ -99,7 +90,6 @@ fn every_effect_knob_tweens_by_its_path() {
     scene.world.set_camera(id, Some(Default::default()));
     drop(scene);
     tick(&mut m, 1);
-    // The lens strengths (#1439's lost tweens) and a nested knob (#1467).
     m.eval(&format!(
         "Tween.To({id}, 'Graphics.vignette.intensity', 0.9, 2 / 60) \
          Tween.To({id}, 'Graphics.exposure.automatic.compensation', 2, 2 / 60)"
@@ -114,7 +104,6 @@ fn every_effect_knob_tweens_by_its_path() {
 
 #[test]
 fn a_taa_camera_knob_tweens_by_its_path() {
-    // A camera effect's knob (#1847) tweens on the camera, with no volume.
     let (mut m, id) = rig("tween_taa", &counted(""));
     m.cells
         .scene

@@ -1,10 +1,3 @@
-//! crates/script/src/api/camera/component.rs — the `Camera` functions that take an entity id and
-//! tune its `CameraComponent` (#430): projection, culling mask (#827), occlusion
-//! culling (#1714) and render-texture target, plus the lens and stacking fields
-//! (`lens`, #1341). Every
-//! setter routes through `edit::authoring::rendering::camera`, the ops the inspector's Camera
-//! card uses. Getters return `nil` without a camera; setters are then no-ops.
-
 use std::cell::RefCell;
 
 use crate::api::entity_arg::EntityArg;
@@ -14,7 +7,6 @@ use rusty_components::{CameraComponent, Projection};
 use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
-/// Register the per-entity camera functions onto the `Camera` table.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -55,9 +47,6 @@ pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> 
     register_target(lua, table, scene)
 }
 
-/// `Get/SetCullingMask`: one bit per layer, Unity's `Camera.cullingMask`. The mask
-/// is taken as any Lua integer and kept to its low 32 bits, so `-1` (`~0`) is
-/// "everything", as in Unity.
 fn register_culling_mask(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -79,8 +68,6 @@ fn register_culling_mask(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Sc
     )
 }
 
-/// `Get/SetUseOcclusionCulling` (#1714): Unity's `Camera.useOcclusionCulling`,
-/// whether the camera skips what the scene's baked PVS hides from its cell.
 fn register_occlusion_culling(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -104,7 +91,6 @@ fn register_occlusion_culling(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCe
     )
 }
 
-/// `Get/SetTargetTexture`, then the target's settings.
 fn register_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -137,7 +123,6 @@ fn register_target(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     register_target_settings(lua, table, scene)
 }
 
-/// `Get/SetTargetPostFx`, `Get/SetTargetUpdateEvery`.
 fn register_target_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -183,7 +168,6 @@ fn register_target_settings(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell
     )
 }
 
-/// `f` over `id`'s camera, `None` without one.
 pub(super) fn read<R>(
     scene: &RefCell<Scene>,
     id: u32,
@@ -192,7 +176,6 @@ pub(super) fn read<R>(
     scene.borrow().world.camera(id).map(|c| f(&c))
 }
 
-/// Run `f` on `id`'s camera when it has one.
 pub(super) fn write(scene: &RefCell<Scene>, id: u32, f: impl FnOnce(&mut CameraComponent)) {
     if let Some(mut c) = scene.borrow_mut().world.camera_mut(id) {
         f(&mut c);

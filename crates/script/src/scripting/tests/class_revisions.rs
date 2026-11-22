@@ -1,7 +1,3 @@
-//! The script-class cache across revisions and instances (#1710): a rewrite
-//! reaches the next instance, a live one keeps its own, and each instance runs in
-//! a closure of its own.
-
 use std::collections::BTreeMap;
 use std::path::Path;
 
@@ -11,8 +7,6 @@ use super::classes::{field, spawn};
 use super::lifecycle::{manager_with_entity, write_script};
 use rusty_core::fs::written::write;
 
-/// The shared cache contract (#1207): a script missing at first loads once it is
-/// written, and a rewrite at the same path loads its new contents.
 #[test]
 fn the_class_cache_follows_rewrites_at_one_path() {
     use rusty_test_support::rebakes::{follows_rebakes, Bake};
@@ -45,7 +39,6 @@ fn live_instances_keep_the_revision_they_were_made_from() {
     let path = write_script("class_live", "return { v = 1 }");
     let old = spawn(&mut m, &path, &BTreeMap::new());
     std::fs::write(&path, "return { v = 2 }").unwrap();
-    // Not in the write log yet: the class stands.
     let same = spawn(&mut m, &path, &BTreeMap::new());
     assert_eq!(field(&m, same, "v"), "1");
     write(Path::new(&path), b"return { v = 2 }").unwrap();
@@ -57,8 +50,6 @@ fn live_instances_keep_the_revision_they_were_made_from() {
     assert_eq!(m.classes.reads, 2);
 }
 
-/// A script that gives itself private globals, as on `main` when every instance
-/// compiled the file: one chunk called twice would share its `_ENV` upvalue.
 const PRIVATE_GLOBALS: &str = "_ENV = setmetatable({}, { __index = _G })\n\
     return { set = function(v) mine = v end, get = function() return mine end }";
 

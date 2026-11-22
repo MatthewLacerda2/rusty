@@ -1,7 +1,3 @@
-//! The `NavMeshModifier` namespace (#1959), through Lua: setters route through the
-//! shared ops, getters read back, and an entity without a modifier reads neutral
-//! defaults and is never given one.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 

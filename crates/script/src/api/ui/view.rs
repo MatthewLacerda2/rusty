@@ -1,10 +1,3 @@
-//! crates/script/src/api/ui/view.rs — the screen + camera the `UI` verbs compute against (#429).
-//!
-//! The same [`UiView`] the per-tick systems build (`app::systems::ui`): the sim's screen
-//! size and texture sizes and the main view (the camera entity's pose and lens when the
-//! scene has one, #1619), so `UI.GetRect`, `UI.Raycast`, `UI.Click` and
-//! `UI.List` see markers and world canvases exactly where they draw and hit.
-
 use std::cell::RefCell;
 
 use glam::Vec2;
@@ -15,7 +8,6 @@ use rusty_scene::{game_camera_from_scene, Camera, Scene};
 use rusty_ui::events::{WALL_RANGE, WALL_TOLERANCE};
 use rusty_ui::{ScreenSize, UiPointer, UiView};
 
-/// The view through the main camera on the sim's screen.
 pub(super) fn ui_view(
     screen: &RefCell<ScreenSize>,
     video: &RefCell<VideoSettings>,

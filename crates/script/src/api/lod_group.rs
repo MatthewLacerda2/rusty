@@ -1,14 +1,3 @@
-//! crates/script/src/api/lod_group.rs — `LODGroup` namespace (#472).
-//!
-//! Get/Set over an entity's `LodGroupComponent`: its size, its levels' screen
-//! heights and renderer lists, and adding/removing levels. Every setter routes
-//! through the shared `edit::authoring::rendering::lod_group` ops the inspector card uses.
-//! Levels are indexed from **0** (`LOD0` is the finest), matching the `_LOD0`
-//! naming. Getters return a neutral default (`0`, `nil`, an empty table) without an
-//! LODGroup or for an out-of-range level; setters are then no-ops. Which level is
-//! *shown* is decided by the renderer each frame and is deliberately not readable
-//! here: the sim never depends on it.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table};
@@ -20,7 +9,6 @@ use rusty_components::LodGroupComponent;
 use rusty_edit::authoring::rendering::lod_group as ops;
 use rusty_scene::Scene;
 
-/// Register the `LODGroup` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_group(lua, &t, scene)?;
@@ -28,12 +16,10 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("LODGroup", t).map_err(|e| e.to_string())
 }
 
-/// `id`'s LODGroup, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<LodGroupComponent> {
     scene.borrow().world.lod_group(id).map(|g| g.clone())
 }
 
-/// Apply `f` to `id`'s LODGroup, when it has one; `None` without one.
 fn set<T>(
     scene: &RefCell<Scene>,
     id: u32,
@@ -44,7 +30,6 @@ fn set<T>(
     Some(f(&mut g))
 }
 
-/// `Get/SetSize`, `GetLevelCount`, `AddLevel`, `RemoveLevel`.
 fn register_group(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map_or(0.0, |g| g.size))
@@ -73,7 +58,6 @@ fn register_group(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "RemoveLevel", f)
 }
 
-/// `Get/SetLevelHeight`, `Get/SetRenderers`.
 fn register_levels(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, (id, level): (EntityArg, usize)| {
         let g = get(&*scene.get(lua)?, id.read());

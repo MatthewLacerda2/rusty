@@ -1,13 +1,3 @@
-//! crates/script/src/api/canvas.rs — `Canvas` namespace (#417).
-//!
-//! Get/Set over an entity's `CanvasComponent` — render mode, sort order and the
-//! *Scale With Screen Size* scaler (reference resolution, width/height match) —
-//! plus the scale factor those produce on the current screen, and the world /
-//! camera canvas knobs (#429): pixels per unit, plane distance, tilt and sway. Every
-//! setter routes
-//! through the shared `edit::authoring::ui::layout::canvas` ops the inspector card uses.
-//! Getters return a neutral default when the entity has no canvas.
-
 use glam::Vec2;
 use mlua::Lua;
 
@@ -21,7 +11,6 @@ use rusty_edit::authoring::ui::layout::canvas as canvas_ops;
 use rusty_scene::Scene;
 use rusty_ui::ScreenSize;
 
-/// Register the `Canvas` namespace onto `lua`.
 pub fn register(
     lua: &Lua,
     scene: ApiCell<Scene>,
@@ -47,8 +36,6 @@ pub fn register(
         .map_err(|e| e.to_string())
 }
 
-/// `GetSortOrder` / `SetSortOrder` and `GetRenderMode` / `SetRenderMode` (by name;
-/// an unknown name is ignored).
 fn register_order_and_mode(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -154,11 +141,8 @@ fn register_scaler(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// A scalar canvas field: its getter and its authoring setter.
 type Scalar = (fn(&CanvasComponent) -> f32, fn(&mut CanvasComponent, f32));
 
-/// The world / camera canvas knobs: `Get/SetPixelsPerUnit`, `Get/SetPlaneDistance`,
-/// `Get/SetSway` (scalars), then [`register_tilt`].
 fn register_world(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let scalars: [(&str, Scalar); 3] = [
         (

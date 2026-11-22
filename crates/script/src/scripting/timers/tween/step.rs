@@ -1,14 +1,8 @@
-//! The timer phase's tween step (#424): sample, write, and retire on completion.
-
 use mlua::{Function, Lua};
 
 use super::super::super::manager::ScriptManager;
 
 impl ScriptManager {
-    /// Advance one due tween: capture its start value on its first step, write
-    /// the sampled value through its property's authoring op, and — on its last
-    /// step — retire it and call its `on_complete(owner)`. A tween whose
-    /// component was removed ends silently.
     pub(in super::super) fn step_tween(&self, lua: &Lua, handle: u64, owner: u32) {
         let t = self.cells.timers.borrow().overshoot(handle);
         let done = {

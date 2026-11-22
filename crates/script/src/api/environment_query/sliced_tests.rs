@@ -1,12 +1,8 @@
-//! `EnvironmentQuery.Request` / `Poll` / `Cancel` through Lua (#2116): pending
-//! until the queue serves it, then exactly `Run`'s answer once, then gone.
-
 use mlua::Lua;
 
 use super::tests::{error, vm, RING};
 use crate::api::ApiCtx;
 
-/// Serve the VM's query queue one tick, as the play loop's query phase does.
 fn serve(lua: &Lua) {
     let c = ApiCtx::default();
     let (queue, nav, rng) = (

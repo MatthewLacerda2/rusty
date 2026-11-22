@@ -1,5 +1,3 @@
-//! Tests for the `Mesh` library verbs (#2059).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -91,7 +89,6 @@ fn replacing_a_mesh_redraws_every_entity_using_it_once() {
     );
 }
 
-/// `Mesh.Create(name, data)` calls that must fail, as `(name, data, why)`.
 const BAD_CREATES: &[(&str, &str, &str)] = &[
     (
         "m",

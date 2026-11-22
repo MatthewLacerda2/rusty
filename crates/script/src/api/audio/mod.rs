@@ -1,21 +1,3 @@
-//! crates/script/src/api/audio/ — `Audio` namespace (#212).
-//!
-//! Script/REPL/bot control over the engine's audio: start/stop an entity's
-//! `AudioSource` (`Play`/`Stop`), set its volume (`SetVolume`/`GetVolume`), fire a
-//! fire-and-forget one-shot at a world position (`PlayAt`), and read/set the single
-//! master volume and the speaker mode (#546) on the `AudioMaestro`, and drive the
-//! mixer's groups, their effects, snapshots and ducks (`groups.rs`, `effects.rs`,
-//! `snapshots.rs`, #465, #1748) and
-//! occlusion (`occlusion.rs`, #467) and doppler (`doppler.rs`, #1749), and read back the listener's blended reverb
-//! zones (`reverb.rs`, #469). One surface, three callers — the same verbs
-//! the editor's play-state and the play-mode systems drive.
-//!
-//! Every verb routes through the shared `AudioMaestro` (a Resource), so a scripted
-//! play and `play_on_start` end up in one device + one introspection log. The clip
-//! and world position for an entity `AudioSource` are read from the live scene; the
-//! action's `tick` is the deterministic frame count (`Time.frameCount`), so the log
-//! orders without any wall clock.
-
 use std::cell::RefCell;
 
 use mlua::Lua;
@@ -42,8 +24,6 @@ use rusty_scene::Camera;
 use rusty_scene::Scene;
 use rusty_time::Time;
 
-/// Register the `Audio` namespace onto `lua`, reaching the scene, the maestro, the
-/// clock, the camera and the project settings (`Application`) through `ctx`.
 pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let (scene, audio, time, camera) = (ctx.scene, ctx.audio, ctx.time, ctx.camera);
     let table = lua.create_table().map_err(|e| e.to_string())?;
@@ -64,28 +44,20 @@ pub fn register(lua: &Lua, ctx: &ApiCtx) -> Reg {
     lua.globals().set("Audio", table).map_err(|e| e.to_string())
 }
 
-/// The listener — the main view, `scene`'s camera entity when it has one (#1619) — as
-/// the spatial math wants it (position + right).
 pub fn listener(camera: &RefCell<Camera>, scene: &Scene) -> Listener {
     let cam = rusty_scene::game_camera_from_scene(&camera.borrow(), scene);
     Listener::new(cam.position, cam.right())
 }
 
-/// An entity's `AudioSource` and the world position it is heard from — the one lookup
-/// behind both `Audio.GetSpatial` and the mix every tick pushes (`frame.rs`, #412, #1579), so the two
-/// always resolve the same emitter. `None` when the entity has no `AudioSource`.
 pub fn emitter(scene: &Scene, id: u32) -> Option<(AudioSourceComponent, Vec3)> {
     let src = scene.world.audio(id)?;
     Some((src.clone(), scene.world.world_position(id)))
 }
 
-/// The current play-mode frame, used as the deterministic event `tick`.
 fn tick(time: &RefCell<Time>) -> u64 {
     time.borrow().frame_count
 }
 
-/// An entity's `(clip, world-position)` for the audio log, read from the live scene.
-/// Returns `None` when the entity has no `AudioSource`.
 fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])> {
     let scene = scene.borrow();
     let src = scene.world.audio(id)?;
@@ -93,7 +65,6 @@ fn source_clip_pos(scene: &RefCell<Scene>, id: u32) -> Option<(String, [f32; 3])
     Some((src.clip.clone(), [p.x, p.y, p.z]))
 }
 
-/// `Play` / `Stop` / `SetVolume` / `GetVolume` — drive an entity's own `AudioSource`.
 fn register_source_control(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -101,8 +72,6 @@ fn register_source_control(
     audio: ApiCell<AudioMaestro>,
     time: ApiCell<Time>,
 ) -> Reg {
-    // Start (or restart) entity `id`'s AudioSource from the start. Returns whether
-    // the entity has a source (the backend may still be silent on a null device).
     put(
         table,
         "Play",
@@ -124,7 +93,6 @@ fn register_source_control(
         }),
     )?;
 
-    // Stop entity `id`'s voice (logs a Stop event).
     put(
         table,
         "Stop",
@@ -141,7 +109,6 @@ fn register_source_control(
     volume::register(lua, table, scene, audio)
 }
 
-/// `Audio.PlayAt(path, x, y, z [, vol [, min_distance, max_distance [, group]]])`.
 type PlayAtArgs = (
     String,
     f32,
@@ -153,7 +120,6 @@ type PlayAtArgs = (
     Option<String>,
 );
 
-/// `PlayAt`'s optional rolloff band: both distances or neither, `0 <= min <= max`.
 fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
     let (min_distance, max_distance) = match (min, max) {
         (None, None) => return Ok(Rolloff::default()),
@@ -172,17 +138,12 @@ fn rolloff_arg(min: Option<f32>, max: Option<f32>) -> Result<Rolloff, String> {
     })
 }
 
-/// `PlayAt` (fire-and-forget one-shot) + master-volume get/set.
 fn register_oneshot_and_master(
     lua: &mlua::Lua,
     table: &mlua::Table,
     audio: ApiCell<AudioMaestro>,
     time: ApiCell<Time>,
 ) -> Reg {
-    // Fire a one-shot at a world position. `vol` defaults to 1.0; `min_distance` /
-    // `max_distance` (both or neither) widen its rolloff band past the 1 → 16 m
-    // default (#575); `group` picks its mixer group (#465, Master by default). Leaves
-    // no persistent component — only the maestro's event log.
     put(
         table,
         "PlayAt",
@@ -247,12 +208,6 @@ fn register_speaker_mode(
     )
 }
 
-/// `GetSpatial` — read the resolved spatial state of an entity's `AudioSource` against
-/// the listener (the active camera). Returns `(gain, pan, playing, occlusion)`:
-/// `gain` is the pre-master volume after distance rolloff + `spatial_blend` and the
-/// occlusion muffle, `pan` is `[-1, 1]` (left→right), `occlusion` the smoothed
-/// factor in `[0, 1]` (#467). This is the agent-facing introspection (#213) for "how a source is
-/// heard right now" — pure math, identical with or without an audio device.
 fn register_spatial(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -269,7 +224,6 @@ fn register_spatial(
             let id = id.read();
             let scene = &scene.borrow();
             let Some((src, pos)) = emitter(scene, id) else {
-                // No source: report silent + centred + not playing + clear.
                 return Ok((0.0_f32, 0.0_f32, false, 0.0_f32));
             };
             let info =

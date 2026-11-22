@@ -1,10 +1,3 @@
-//! crates/script/src/api/text_layout.rs — the `Text` namespace's layout reads (#419, #422).
-//!
-//! `GetPreferredSize` (what the text wants, for layout), `GetLayout` (what it drew:
-//! size, lines, the auto-sized font size, whether it was cut) and `MeasureString`
-//! (an arbitrary string's unwrapped size in the entity's font and size — where an
-//! input field puts its caret). Split from `text.rs` to keep it under the size cap.
-
 use glam::Vec2;
 use mlua::Table;
 
@@ -15,8 +8,6 @@ use rusty_core::settings::video::VideoSettings;
 use rusty_scene::Scene;
 use rusty_ui::{layout, text as ui_text, ScreenSize};
 
-/// `GetPreferredSize(id) -> w, h` (wrapped at the element's current rect width) and
-/// `GetLayout(id) -> { width, height, lines, font_size, truncated }` (what draws).
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,

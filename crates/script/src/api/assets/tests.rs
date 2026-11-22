@@ -5,8 +5,6 @@ use mlua::{Lua, Table};
 use super::refresh_table;
 use rusty_asset::audio::Refresh;
 
-/// A path a script gets back is the path as the filesystem spells it: `/`
-/// separates, and a `\` is part of a name (#1390).
 #[test]
 fn refresh_returns_paths_to_lua_as_spelled() {
     let report = Refresh {

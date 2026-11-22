@@ -1,6 +1,3 @@
-//! Non-square recipes from Lua (#1493): `size = {w, h}` bakes that shape, the
-//! inspectors keep its aspect, and a side that isn't a power of two is refused.
-
 use mlua::{Lua, Table};
 
 use super::register;
@@ -9,7 +6,6 @@ const TRIM: &str = r#"{ size = {64, 16}, nodes = {
     { id = "b", op = "brick", rows = 2, cols = 8 },
     { id = "n", op = "bump_to_normal", strength = 0.5, inputs = {"b"} } } }"#;
 
-/// A Lua VM with `Texture` registered and `OUT` a path named `file` to write to.
 fn lua(file: &str) -> (Lua, std::path::PathBuf) {
     let lua = Lua::new();
     register(&lua).unwrap();
@@ -35,7 +31,6 @@ fn the_preview_keeps_the_aspect_and_stats_rescale_it() {
         .eval()
         .unwrap();
     assert_eq!(r.get::<u32>("columns").unwrap(), 2);
-    // Two 32×8 tiles side by side.
     assert_eq!(image::image_dimensions(&path).unwrap(), (64, 8));
     let stats: Table = lua
         .load(format!("return Texture.Stats({TRIM}, 128)"))
@@ -64,7 +59,6 @@ fn a_side_that_is_not_a_power_of_two_is_refused() {
     assert!(!path.exists(), "nothing written");
 }
 
-/// A one-colour recipe `{w}`×4, cheap at any width; `outputs` for a set bake.
 fn strip(w: u32) -> String {
     format!(
         r#"{{ size = {{{w}, 4}}, nodes = {{ {{ id = "c", op = "constant", color = {{1, 0, 0, 1}} }} }},
@@ -72,7 +66,6 @@ fn strip(w: u32) -> String {
     )
 }
 
-/// The Max Size the import reads for `path`, and whether it has a sidecar.
 fn max_size(path: &std::path::Path) -> (u32, bool) {
     let meta = rusty_asset::sidecar::meta_path(path).exists();
     (rusty_asset::sidecar::texture(path).max_size, meta)

@@ -1,12 +1,3 @@
-//! crates/script/src/scripting/lifecycle/ui.rs — dispatch the UI callbacks (#420).
-//!
-//! The event system (`ui::events`) decides *who* receives each UI event; this file
-//! answers its one question about scripts — does entity `id` have a live script
-//! defining a callback ([`ScriptManager::has_ui_handler`], the bubbling test) — and
-//! fires what it returns ([`ScriptManager::dispatch_ui_events`]), in order. Direct
-//! calls, no event bus. The same active gate as every other
-//! gameplay hook applies: only awoken instances of active entities are called.
-
 use glam::Vec2;
 use mlua::{Lua, Table};
 
@@ -18,7 +9,6 @@ use super::super::callbacks::{
 use super::super::manager::ScriptManager;
 use rusty_ui::events::{Delivery, PointerEvent, UiHook};
 
-/// The callback name a UI hook dispatches as.
 fn callback(hook: UiHook) -> &'static str {
     match hook {
         UiHook::PointerEnter => ON_POINTER_ENTER,
@@ -39,7 +29,6 @@ fn callback(hook: UiHook) -> &'static str {
 }
 
 impl ScriptManager {
-    /// Whether active entity `id` has an awoken script defining `hook`'s callback.
     pub fn has_ui_handler(&self, id: u32, hook: UiHook) -> bool {
         let Some(lua) = &self.lua else {
             return false;
@@ -53,9 +42,6 @@ impl ScriptManager {
         })
     }
 
-    /// Fire `deliveries` in order: each on every awoken script of its (still active)
-    /// entity, in script-index order. The pointer family gets `(id, event)`,
-    /// `OnMove` `(id, { direction, x, y })`, the focus family `(id)`.
     pub fn dispatch_ui_events(&self, deliveries: &[Delivery]) {
         if deliveries.is_empty() {
             return;
@@ -79,7 +65,6 @@ impl ScriptManager {
     }
 }
 
-/// `{ direction, x, y }` — the Move's unit direction (y-up) and its name.
 fn move_table(lua: &Lua, e: &PointerEvent) -> mlua::Result<Table> {
     let d = e.delta;
     let name = match (d.x as i32, d.y as i32) {
@@ -95,8 +80,6 @@ fn move_table(lua: &Lua, e: &PointerEvent) -> mlua::Result<Table> {
     Ok(t)
 }
 
-/// `{ button, position = {x, y}, delta = {x, y}, target, canvas_position = {x, y}
-/// (absent off the canvas), canvas_delta = {x, y} }`.
 fn event_table(lua: &Lua, e: &PointerEvent) -> mlua::Result<Table> {
     let point = |v: Vec2| -> mlua::Result<Table> {
         let t = lua.create_table()?;

@@ -1,13 +1,4 @@
-//! crates/script/src/api/ui/events.rs — the `UI` namespace's pointer and focus verbs (#420).
-//!
-//! Focus (`SetSelected` / `GetSelected`), the gameplay-vs-UI guards
-//! (`IsPointerOverUI` / `IsPointerConsumed`), and the agent verbs: `Raycast` (what
-//! is under a point, computed on demand from the live scene), `FindSelectable`
-//! (where navigation from an element would go — for an `OnMove` handler), `Click` (a real click
-//! at an element's centre, through `Input`) and `List` (every visible Selectable,
-//! with its state and screen rect). Points are UI screen pixels: bottom-left
-//! origin, y-up — the frame of `UI.GetRect(id).screen`. Each point also casts the
-//! camera ray through it, so world canvases answer too (#429).
+//! Points are UI screen pixels: bottom-left origin, y-up, the frame of `UI.GetRect(id).screen`.
 
 use glam::Vec2;
 use mlua::{Lua, Table};
@@ -20,7 +11,6 @@ use rusty_ui::events::{find_selectable, is_interactable, is_under, raycast_point
 use rusty_ui::space::{canvas_to_screen, rect_screen_bounds};
 use rusty_ui::{EventSystem, UiLayout, UiRect, UiView};
 
-/// Add the event verbs to the `UI` table [`super::register`] created.
 pub fn register_events(lua: &Lua, ctx: &ApiCtx) -> Reg {
     let table = &global_table(lua, "UI")?;
     let (scene, input, events) = (ctx.scene, ctx.input, ctx.event_system);
@@ -75,8 +65,6 @@ pub fn register_events(lua: &Lua, ctx: &ApiCtx) -> Reg {
     put(table, "List", f)
 }
 
-/// The selection and pointer state: `SetSelected` / `GetSelected`,
-/// `IsPointerOverUI` and `IsPointerConsumed`.
 fn register_selection(lua: &Lua, table: &Table, events: ApiCell<EventSystem>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         events.get(lua)?.borrow_mut().set_selected(id.get());
@@ -91,7 +79,6 @@ fn register_selection(lua: &Lua, table: &Table, events: ApiCell<EventSystem>) ->
     put(table, "IsPointerConsumed", f)
 }
 
-/// `FindSelectable(id, direction)` — where navigation from `id` would go.
 fn register_find(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     let (scene, screen, video, camera) = (ctx.scene, ctx.screen, ctx.video, ctx.camera);
     let f = lua.create_function(move |lua, (id, dir): (EntityArg, String)| {
@@ -117,7 +104,6 @@ fn register_find(lua: &mlua::Lua, table: &Table, ctx: &ApiCtx) -> Reg {
     put(table, "FindSelectable", f)
 }
 
-/// A direction name as its `select_on` index (case-insensitive).
 fn direction(name: &str) -> Option<usize> {
     ["up", "down", "left", "right"]
         .iter()
@@ -131,7 +117,6 @@ fn centre_px(layout: &UiLayout, r: &UiRect, view: &UiView) -> Option<Vec2> {
     canvas_to_screen(layout.space(r.canvas), r.scale_factor, centre, view)
 }
 
-/// `{ {id, name, state, interactable, selected, rect = {x, y, width, height}}, … }`
 /// for every visible Selectable, in draw order; `rect` in screen pixels (absent for
 /// a world-canvas Selectable behind the camera).
 fn list(

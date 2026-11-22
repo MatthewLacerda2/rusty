@@ -1,13 +1,7 @@
-//! Who holds an image's Max Size after a get-edit-set through Lua (#2259): a
-//! changed `maxSize` is the developer's even when the Get table carries
-//! `maxSizeChosen = false` back, any other edit leaves it the engine's, and a
-//! `maxSizeChosen = false` that flips the stored flag hands it back.
-
 use std::path::{Path, PathBuf};
 
 use mlua::Lua;
 
-/// A Lua VM with `Texture` and `Assets`, `OUT` a 256×4 bake at a fresh `file`.
 fn baked(file: &str) -> (Lua, PathBuf) {
     let lua = Lua::new();
     crate::api::texture::register(&lua).unwrap();
@@ -18,7 +12,6 @@ fn baked(file: &str) -> (Lua, PathBuf) {
     (lua, path)
 }
 
-/// `Texture.Bake` of a one-colour `w`×4 recipe to `OUT`.
 fn bake(lua: &Lua, w: u32) {
     let script = format!(
         r#"Texture.Bake({{ size = {{{w}, 4}}, nodes = {{ {{ id = "c", op = "constant",
@@ -27,7 +20,6 @@ fn bake(lua: &Lua, w: u32) {
     lua.load(script).exec().unwrap();
 }
 
-/// Get `OUT`'s settings, run `edit` on them as `s`, and set them back.
 fn round_trip(lua: &Lua, edit: &str) {
     let script = format!(
         "local s = Assets.GetTextureImportSettings(OUT) {edit} \

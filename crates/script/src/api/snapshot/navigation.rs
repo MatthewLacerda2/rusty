@@ -1,7 +1,3 @@
-//! crates/script/src/api/snapshot/navigation.rs — the NavMeshObstacle (#456), OffMeshLink (#462)
-//! NavMeshModifierVolume (#460) and NavMeshModifier (#1959) snapshots, and AIPerception's (#1900), apart from `components.rs` to keep it
-//! under the size cap.
-
 use serde_json::{json, Value};
 
 use super::vec3;
@@ -11,7 +7,6 @@ use rusty_components::{
     OffMeshLinkComponent,
 };
 
-/// NavMeshObstacle: its shape, its carving options, and whether it carves now.
 pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
     json!({
         "active": o.active,
@@ -29,7 +24,6 @@ pub(crate) fn nav_obstacle_value(o: &NavMeshObstacleComponent) -> Value {
     })
 }
 
-/// OffMeshLink: its local ends and options.
 pub(crate) fn offmesh_link_value(l: &OffMeshLinkComponent) -> Value {
     json!({
         "active": l.active,
@@ -41,7 +35,6 @@ pub(crate) fn offmesh_link_value(l: &OffMeshLinkComponent) -> Value {
     })
 }
 
-/// NavMeshModifierVolume: its local box and the area it assigns.
 pub(crate) fn nav_modifier_value(v: &NavMeshModifierVolumeComponent) -> Value {
     json!({
         "active": v.active,
@@ -51,7 +44,6 @@ pub(crate) fn nav_modifier_value(v: &NavMeshModifierVolumeComponent) -> Value {
     })
 }
 
-/// NavMeshModifier: how the bake reads the object's colliders.
 pub(crate) fn nav_mesh_modifier_value(m: &NavMeshModifierComponent) -> Value {
     json!({
         "active": m.active,
@@ -61,7 +53,6 @@ pub(crate) fn nav_mesh_modifier_value(m: &NavMeshModifierComponent) -> Value {
     })
 }
 
-/// AIPerception: its settings, then what it knows (target ids) and sees now.
 pub(crate) fn ai_perception_value(p: &AIPerceptionComponent) -> Value {
     json!({
         "sight_range": p.sight_range,

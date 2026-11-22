@@ -1,8 +1,3 @@
-//! `Graphics.{Get,Set}Exposure`, `{Get,Set}ExposureMode` and the automatic mode's
-//! knobs (#1444): limits, compensation, adaptation speeds and histogram window, on
-//! the active post-processing volume, through the same
-//! `authoring::rendering::post_processing` ops the Inspector card calls.
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
@@ -10,11 +5,6 @@ use rusty_components::ExposureMode;
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
-/// The mode, the automatic mode's paired knobs, and the knobs on their own (the
-/// fixed EV and the compensation). Without an active volume the getters report what
-/// a new volume starts with. `GetExposure` is the configured EV in both modes, never
-/// the adapted one: scripts run in the sim, and the adapted EV is a GPU readback
-/// (the dev-only `Debug.GetAdaptedExposure` reads that).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -39,7 +29,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     super::knobs::register(lua, table, scene, vc_ops::exposure::EFFECT.knobs)
 }
 
-/// The automatic mode's limits.
 fn register_limits(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let auto = move |lua: &mlua::Lua| -> mlua::Result<_> {
         Ok(with_vc(&*scene.get(lua)?, |vc| vc.exposure.automatic).unwrap_or_default())
@@ -64,7 +53,6 @@ fn register_limits(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// The automatic mode's adaptation speeds and histogram window.
 fn register_adaptation(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let auto = move |lua: &mlua::Lua| -> mlua::Result<_> {
         Ok(with_vc(&*scene.get(lua)?, |vc| vc.exposure.automatic).unwrap_or_default())

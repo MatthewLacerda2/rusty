@@ -1,12 +1,3 @@
-//! crates/script/src/api/transform.rs — `Transform` namespace.
-//!
-//! Unity's naming (#1170): `GetPosition` / `SetPosition` and the rotation pair are
-//! **world** space, read and written through `ecs::world_space`; the `GetLocal*` /
-//! `SetLocal*` pairs are the entity's own Transform, relative to its parent. Scale is
-//! Unity's split too: `SetLocalScale` is the one scale a script writes, and
-//! `GetLossyScale` reads the world one back. `MoveTowards` steps the world position.
-//! A write moves the entity's subtree, colliders included (#1157).
-
 use glam::Vec3;
 use mlua::Lua;
 
@@ -17,14 +8,10 @@ use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_ecs::World;
 use rusty_scene::Scene;
 
-/// A read of `id` as a vector; `None` for a missing entity.
 type Read = fn(&World, u32) -> Option<Vec3>;
-/// A write of a vector to `id`; a no-op for a missing entity.
 type Write = fn(&mut World, u32, Vec3);
-/// A map from one space to another for a vector `id` gives.
 type Map = fn(&World, u32, Vec3) -> Option<Vec3>;
 
-/// Register the `Transform` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     for (name, read, default) in READS {
@@ -44,8 +31,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
 
 const ZERO: Vec3 = Vec3::ZERO;
 
-/// The getters, each with what a missing entity reads as (the world ones read
-/// the API's own dead-id defaults, which are the same values).
 const READS: &[(&str, Read, Vec3)] = &[
     ("GetPosition", |w, id| Some(w.world_position(id)), ZERO),
     (
@@ -162,14 +147,13 @@ fn mapper(
 
 /// `MoveTowards` — step the world position toward a world target, snapping when
 /// within `step`: glam's `move_towards` (Unity's `Vector3.MoveTowards`), which a
-/// negative `step` walks away from the target (#997).
+/// negative `step` walks away from the target.
 fn register_move_towards(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(
         move |lua, (id, tx, ty, tz, step): (EntityArg, f32, f32, f32, f32)| {
             let id = id.live("Transform", "MoveTowards")?;
             let scene = &*scene.get(lua)?;
             let world = &mut scene.borrow_mut().world;
-            // A dead id reads the origin and the write is a no-op.
             let at = world
                 .world_position(id)
                 .move_towards(Vec3::new(tx, ty, tz), step);

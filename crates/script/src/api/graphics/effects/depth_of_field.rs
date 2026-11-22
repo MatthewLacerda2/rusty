@@ -1,8 +1,3 @@
-//! `Graphics.{Get,Set}DepthOfField{Mode,Quality}` (#1522) and one
-//! `{Get,Set}DepthOfField<knob>` pair per numeric knob (#1445), on the active post-processing volume, through the same
-//! `authoring::rendering::post_processing` ops the Inspector card calls. The knobs
-//! come from its knob table, the one the tween paths read too.
-
 use super::super::super::{put, Reg};
 use super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
@@ -10,8 +5,6 @@ use rusty_components::DofMode;
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::Scene;
 
-/// The mode and every knob. Without an active volume the getters report what a new
-/// volume starts with.
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

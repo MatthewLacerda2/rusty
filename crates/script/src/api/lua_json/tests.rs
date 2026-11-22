@@ -1,6 +1,3 @@
-//! The script-visible answers of the serde bridge (#755): each pins one rule the
-//! module doc states, so an mlua upgrade that changes a default fails here.
-
 use mlua::{Lua, Value};
 use serde_json::json;
 

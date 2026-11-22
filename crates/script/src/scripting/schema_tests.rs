@@ -1,6 +1,3 @@
-//! Tests for the script field schema parser (#84). Kept in a sibling file so the
-//! impl module stays well under the size cap.
-
 use super::*;
 use mlua::{Lua, Table};
 use rusty_components::ScriptFieldValue;
@@ -90,7 +87,6 @@ fn apply_uses_override_then_default() {
     overrides.insert("on".to_string(), ScriptFieldValue::Boolean(true));
     apply_field_values(&table, &parse_fields(code), &overrides).unwrap();
 
-    // Overridden field wins; untouched field falls back to schema default.
     assert_eq!(table.get::<f64>("speed").unwrap(), 2.0);
     assert!(table.get::<bool>("on").unwrap());
     assert_eq!(table.get::<String>("title").unwrap(), "base");
@@ -107,8 +103,6 @@ fn apply_without_schema_is_a_noop() {
 
 #[test]
 fn a_script_requiring_a_helper_module_still_parses() {
-    // Slider and Scrollbar `require("ui.range_axis")` at their top level (#996);
-    // the schema read never loads the module, so it neither fails nor touches disk.
     let code = r#"
         local Axis = require("ui.does_not_exist")
         return { fields = { speed = 2 }, Start = function() Axis.parse() end }
@@ -133,7 +127,6 @@ fn type_aliases_parse_and_an_unknown_type_falls_back_to_the_default_s_kind() {
         ScriptFieldValue::Text("x".into())
     );
     assert_eq!(field(&fields, "n").default, ScriptFieldValue::Number(4.0));
-    // Nothing to infer from: a number, zeroed.
     assert_eq!(
         field(&fields, "none").default,
         ScriptFieldValue::Number(0.0)

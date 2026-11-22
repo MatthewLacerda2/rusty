@@ -1,13 +1,9 @@
-//! `Graphics.{Get,Set}ColorLookup(path | nil)` (#1441) and its contribution knob
-//! `Graphics.{Get,Set}ColorLookupContribution`.
-
 use super::super::super::super::{put, Reg};
 use super::super::super::state::{with_vc, with_vc_mut};
 use crate::api::ApiCell;
 use rusty_edit::authoring::rendering::post_processing::grading::color_lookup;
 use rusty_scene::Scene;
 
-/// The LUT path (`nil` without one, or without an active volume) and the knob.
 pub(in crate::api::graphics) fn register(
     lua: &mlua::Lua,
     table: &mlua::Table,

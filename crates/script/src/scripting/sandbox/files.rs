@@ -1,25 +1,3 @@
-//! What a script VM may read from disk (#1062): `require`, `dofile` and
-//! `loadfile`, resolved against the project instead of the process's working
-//! directory. The gameplay VM and the `play` harness's scenario VM both install
-//! it (#1717). The searchers call `package.searchpath` through the `package`
-//! table, so the demo journal's wrap (`dev::demo::calls`) skips that table: a
-//! recorded scenario's fall-through `require` is not noted as a game act.
-//!
-//! `require("ui.range_axis")` searches, in order:
-//! 1. `package.preload`, Lua's own first searcher;
-//! 2. the project's scripts folder: `<workspace>/assets/scripts/ui/range_axis.lua`,
-//!    then `…/ui/range_axis/init.lua`;
-//! 3. the engine's bundled scripts (`edit::io::bundled`), so a widget's helper is
-//!    found even where the project holds no copy;
-//! 4. `package.path`, Lua's stock search, which a game may extend.
-//!
-//! A relative `dofile` / `loadfile` path is taken from the workspace root.
-//!
-//! Reading outside the project stays **allowed**: that is the game developer's call
-//! (operator, 2026-10-17). But such a file is an input the seed doesn't cover and
-//! may be missing on another machine, so the first read of each outside path logs a
-//! console warning. Native (C) modules stay off.
-
 use std::cell::RefCell;
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
@@ -32,8 +10,6 @@ use rusty_core::paths::{self, to_slash};
 use rusty_core::project::SCRIPTS_DIR;
 use rusty_edit::io::bundled;
 
-/// The project root the VM reads against, and the outside paths it already warned
-/// about.
 struct Access {
     workspace: PathBuf,
     console: Rc<RefCell<ConsoleLogs>>,
@@ -41,21 +17,16 @@ struct Access {
 }
 
 impl Access {
-    /// `path` taken from the workspace root (`path` itself when absolute).
     fn resolve(&self, path: &str) -> PathBuf {
         self.workspace.join(path)
     }
 
-    /// The source at `path`, read for `how` (`require("x")`, `dofile`); warns once
-    /// when the file lies outside the project.
     fn read(&self, path: &Path, how: &str) -> Option<String> {
         let code = std::fs::read_to_string(path).ok()?;
         self.check(path, how);
         Some(code)
     }
 
-    /// Warn, once per file, when the existing file at `path` is outside the project
-    /// ([`paths::outside_root`]).
     fn check(&self, path: &Path, how: &str) {
         let Some(real) = paths::outside_root(path, &self.workspace) else {
             return;
@@ -70,9 +41,6 @@ impl Access {
     }
 }
 
-/// Install the project-aware `require` searchers and the `dofile` / `loadfile`
-/// wrappers into `lua`, reading against `workspace`. Safe to call again when the
-/// workspace changes: the stock functions are kept in the registry and rewrapped.
 pub(in crate::scripting) fn install(
     lua: &Lua,
     workspace: &Path,
@@ -107,9 +75,6 @@ fn install_searchers(lua: &Lua, access: &Rc<Access>) -> mlua::Result<()> {
     package.set("cpath", "")
 }
 
-/// `require`'s answer for a module found at `origin`: its chunk, and where it was.
-/// Every searcher answers through here, so every chunk name and origin is the
-/// path as the filesystem spells it, a `\` in a folder's name kept (#1106).
 fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
     let origin = to_slash(origin);
     let chunk = lua
@@ -119,14 +84,8 @@ fn found(lua: &Lua, code: &str, origin: &Path) -> mlua::Result<MultiValue> {
     (chunk, origin).into_lua_multi(lua)
 }
 
-/// Looks a module up under `assets/scripts`. A name that maps to anything but
-/// a relative path of plain components (an empty segment, a `/`, a `..`)
-/// is refused with a `require` error rather than "not found", so `package.path`
-/// is not tried for it either (#1391); `a.b` and `a.init`-style names resolve.
 fn project_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
-        // A leading `/` makes `Path::join` drop the scripts directory and probe
-        // the filesystem root, so every component must be a plain name.
         let plain = |segment: &str| {
             let mut parts = Path::new(segment).components();
             matches!(parts.next(), Some(std::path::Component::Normal(_))) && parts.next().is_none()
@@ -160,8 +119,6 @@ fn engine_searcher(lua: &Lua) -> mlua::Result<Function> {
     })
 }
 
-/// Lua's stock search over `package.path`, read at call time so a game's own
-/// additions apply. Whatever it finds outside the project warns.
 fn path_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     lua.create_function(move |lua, name: String| {
         let package: Table = lua.globals().get("package")?;
@@ -180,10 +137,6 @@ fn path_searcher(lua: &Lua, access: Rc<Access>) -> mlua::Result<Function> {
     })
 }
 
-/// Replace the global `name` (`dofile` / `loadfile`) with one that takes a relative
-/// path from the workspace root and warns on an outside file, then calls the stock
-/// function with the path in `opened_path`'s form, which names the chunk (#1106).
-/// No path (read stdin) is passed through untouched.
 fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<()> {
     let key = format!("rusty.stock_{name}");
     let stock: Function = match lua.named_registry_value::<Option<Function>>(&key)? {
@@ -209,9 +162,6 @@ fn wrap_file_reader(lua: &Lua, access: &Rc<Access>, name: &str) -> mlua::Result<
     lua.globals().set(name, wrapper)
 }
 
-/// `path` as handed to the stock `dofile` / `loadfile`, which open it and name the
-/// chunk after it: untouched, since `\` is a filename character on macOS and Linux
-/// and respelling it would open another file.
 fn opened_path(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }

@@ -1,7 +1,3 @@
-//! The `OffMeshLink` namespace (#462), through Lua: setters route through the
-//! shared ops, getters read back, `IsConnected` reads the baked navmesh, and an
-//! entity without a link reads neutral defaults.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +10,6 @@ use rusty_components::OffMeshLinkComponent;
 use rusty_navigation::{NavBounds, NavigationGraph};
 use rusty_scene::{ColliderComponent, ColliderShape, Scene};
 
-/// A 10 × 10 floor, a link on it, and a bare entity.
 fn scene_with_link() -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     scene.nav_settings.bounds = Some(NavBounds::new(0.0, 10.0, 0.0, 10.0));

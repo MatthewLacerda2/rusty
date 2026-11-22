@@ -1,12 +1,3 @@
-//! crates/script/src/api/reverb_zone.rs — `AudioReverbZone` namespace (#469).
-//!
-//! Get/Set over an entity's `ReverbZoneComponent` (Unity's `AudioReverbZone`): the
-//! full-effect and fade-out radii, the preset, and the raw params. Every setter
-//! routes through the shared `edit::authoring::audio::reverb_zone` ops the inspector card
-//! uses, so picking a preset writes its params and setting params makes the zone
-//! `Custom`. Getters return `nil` without a zone; setters are then an error naming
-//! the entity. The listener's blended result is `Audio.GetReverbState`.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table, Value};
@@ -21,7 +12,6 @@ use rusty_scene::Scene;
 /// The keys a params table carries.
 const KEYS: [&str; 4] = ["decay_time", "pre_delay", "damping", "wet"];
 
-/// Register the `AudioReverbZone` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let t = lua.create_table().map_err(|e| e.to_string())?;
     register_radii(lua, &t, scene)?;
@@ -36,12 +26,10 @@ fn err(message: String) -> mlua::Error {
     mlua::Error::RuntimeError(message)
 }
 
-/// `id`'s zone, cloned, or `None` without one.
 fn get(scene: &RefCell<Scene>, id: u32) -> Option<ReverbZoneComponent> {
     scene.borrow().world.reverb_zone(id).map(|z| z.clone())
 }
 
-/// Apply `f` to `id`'s zone; an error without one.
 fn set(
     scene: &RefCell<Scene>,
     id: u32,
@@ -56,7 +44,6 @@ fn set(
     Ok(())
 }
 
-/// `Get/SetMinDistance`, `Get/SetMaxDistance`.
 fn register_radii(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|z| z.min_distance))
@@ -78,7 +65,6 @@ fn register_radii(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "SetMaxDistance", f)
 }
 
-/// `GetPreset`, `SetPreset`, `GetPresets`.
 fn register_preset(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     let f = lua.create_function(move |lua, id: EntityArg| {
         Ok(get(&*scene.get(lua)?, id.read()).map(|z| z.preset.name()))
@@ -120,7 +106,6 @@ fn register_params(lua: &mlua::Lua, t: &Table, scene: ApiCell<Scene>) -> Reg {
     put(t, "SetParams", f)
 }
 
-/// `p` as a Lua table keyed by [`KEYS`].
 pub(crate) fn params_table(lua: &Lua, p: &ReverbParams) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     t.set("decay_time", p.decay_time)?;

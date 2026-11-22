@@ -1,18 +1,3 @@
-//! crates/script/src/api/application.rs — `Application` namespace.
-//!
-//! Unity's `Application` class, the subset a shipped game needs (#431): quitting,
-//! plus the project's build settings (startup scene, product name, window mode).
-//!
-//! `Quit` only **records** the request on the shared [`Application`] cell; the host
-//! decides what it means — the standalone player closes (after flushing `Storage`),
-//! the editor stops Play, the headless harness ends the run. Nothing here touches a
-//! window, so the namespace is identical in every host and the sim stays window-free.
-//!
-//! The build-settings setters are the API twin of the editor's File → Build Settings
-//! window (the parity rule). In the editor they write the tracked
-//! `project.rusty`; in the player and the harness the cell is unbound,
-//! so a setter changes the in-memory value only.
-
 use std::cell::RefCell;
 
 use mlua::{Lua, Table};
@@ -21,7 +6,6 @@ use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_core::application::{Application, LoadingPriority, WindowMode};
 
-/// Register the `Application` namespace onto `lua`, backed by the shared cell.
 pub fn register(lua: &Lua, app: ApiCell<Application>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -42,7 +26,6 @@ pub fn register(lua: &Lua, app: ApiCell<Application>) -> Reg {
         .map_err(|e| e.to_string())
 }
 
-/// Apply `edit` to the build settings, surfacing a failed file write as a Lua error.
 fn edit(
     app: &RefCell<Application>,
     edit: impl FnOnce(&mut rusty_core::application::BuildSettings),
@@ -52,7 +35,6 @@ fn edit(
         .map_err(mlua::Error::RuntimeError)
 }
 
-/// `Get/SetProductName` and `Get/SetStartupScene`.
 fn register_names(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
     put(
         table,
@@ -87,8 +69,6 @@ fn register_names(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> 
     )
 }
 
-/// `Get/SetWindowMode` — `"Windowed"` or `"Fullscreen"`. An unknown name is ignored
-/// and `SetWindowMode` returns `false`, like `Graphics.SetQuality`'s unknown tiers.
 fn register_window_mode(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
     put(
         table,
@@ -108,10 +88,6 @@ fn register_window_mode(lua: &mlua::Lua, table: &Table, app: ApiCell<Application
     )
 }
 
-/// `Get/SetBackgroundLoadingPriority` — Unity's `backgroundLoadingPriority`: `"Low"`,
-/// `"BelowNormal"` (the default), `"Normal"` or `"High"`, a frame's 2, 4, 10 or 50 ms
-/// for a `Scene.LoadAsync`'s GPU warm-up. An unknown name is ignored and the setter
-/// returns `false`, as `SetWindowMode`'s.
 fn register_loading_priority(lua: &mlua::Lua, table: &Table, app: ApiCell<Application>) -> Reg {
     put(
         table,

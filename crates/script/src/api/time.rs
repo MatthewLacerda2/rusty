@@ -1,13 +1,4 @@
-//! crates/script/src/api/time.rs — `Time` namespace.
-//!
-//! `deltaTime` (scaled) / `unscaledDeltaTime` (raw) / `fixedDeltaTime` /
-//! `frameCount` / `time` / `unscaledTime` accessors plus `SetTimeScale` / `GetTimeScale`, backed by the
-//! `time::Time` resource the `GameWorld` advances once per tick.
-//!
-//! Pause / step / resume (issue #283) live here too: `Pause()` / `Resume()` /
-//! `Step(n)` set the loop-level control fields on the same `Time` resource that the
-//! windowed frame loop reads each frame. `Pause` is a hard loop halt distinct from
-//! `SetTimeScale(0)` — see the field docs on `time::Time` and `docs/api/Time.md`.
+//! `Pause` halts the loop entirely, unlike `SetTimeScale(0)`.
 
 use mlua::Lua;
 
@@ -15,7 +6,6 @@ use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_time::Time;
 
-/// Register the `Time` namespace onto `lua`.
 pub fn register(lua: &Lua, time: ApiCell<Time>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
     register_clock(lua, &table, time)?;
@@ -23,7 +13,6 @@ pub fn register(lua: &Lua, time: ApiCell<Time>) -> Reg {
     lua.globals().set("Time", table).map_err(|e| e.to_string())
 }
 
-/// The read-only clock accessors plus the `time_scale` get/set pair.
 fn register_clock(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> Reg {
     put(
         table,
@@ -45,13 +34,11 @@ fn register_clock(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> 
         "frameCount",
         lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().frame_count)),
     )?;
-    // Scaled game time (#398) — the same clock shaders read as `camera.time`.
     put(
         table,
         "time",
         lua.create_function(move |lua, ()| Ok(time.get(lua)?.borrow().time)),
     )?;
-    // Unscaled time (#427) — the clock custom UI shaders read.
     put(
         table,
         "unscaledTime",
@@ -72,9 +59,6 @@ fn register_clock(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> 
     )
 }
 
-/// Pause / step / resume (issue #283): the loop-level control verbs the windowed
-/// frame loop reads each frame, plus `IsPaused` / `PendingSteps` readers so the
-/// control state is observable through the same surface.
 fn register_pause_step(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>) -> Reg {
     put(
         table,
@@ -96,8 +80,6 @@ fn register_pause_step(lua: &mlua::Lua, table: &mlua::Table, time: ApiCell<Time>
         table,
         "Step",
         lua.create_function(move |lua, n: u32| {
-            // Enqueues N fixed-dt steps **only while paused** (no-op otherwise — see
-            // `Time::request_steps`). The windowed loop drains them at FIXED_DELTA_TIME.
             time.get(lua)?.borrow_mut().request_steps(n);
             Ok(())
         }),

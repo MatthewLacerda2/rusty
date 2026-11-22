@@ -1,7 +1,3 @@
-//! `Graphics.{Get,Set}MotionBlur*` (#1436; its quality, #1522): a **camera** effect, its knobs on the
-//! main camera's `CameraComponent` (Unity's camera property), not on a volume,
-//! through the `authoring::rendering::camera` ops the Camera card calls (#287).
-
 use super::super::state::{with_cam, with_cam_mut};
 use super::knobs::parse_quality;
 use crate::api::ApiCell;
@@ -9,10 +5,6 @@ use crate::api::{put, Reg};
 use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::Scene;
 
-/// Camera motion blur: active, quality level, `Custom` sample count, intensity and
-/// clamp (#1436) over the main camera's component. Without a screen camera nothing
-/// blurs, so every getter reports "off": `false` and `0`, never a new camera's
-/// defaults (the quality reports a new camera's level).
 pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -56,7 +48,6 @@ pub(super) fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scen
     register_shape(lua, table, scene)
 }
 
-/// Motion blur's sample count.
 fn register_samples(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -77,8 +68,6 @@ fn register_samples(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>)
     )
 }
 
-/// Motion blur's intensity (the shutter fraction) and clamp (the longest streak, a
-/// fraction of the view's height), #1436.
 fn register_shape(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

@@ -1,19 +1,5 @@
-//! The easing curves a tween travels on (#424).
-//!
-//! Robert Penner's set — `quad`, `cubic`, `quart`, `expo`, `sine`, `back`,
-//! `elastic`, `bounce`, each `_in` / `_out` / `_in_out` — plus `linear` and the
-//! plain `ease_in` / `ease_out` / `ease_in_out` words. Names are snake_case to
-//! match zimmer's keyframe easings (`back_out`, `ease_in_out`), so a sound fade
-//! and a UI fade are written the same way.
-//!
-//! **The output is not clamped.** `back` and `elastic` pass their ends on the way
-//! — that overshoot is the animation. A property that cannot leave its range
-//! (an alpha, a colour channel) is clamped where it is written, by its authoring
-//! op. Every curve starts at exactly 0 and lands on exactly 1.
-
 use std::f64::consts::PI;
 
-/// One of the three shapes a family is played in.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Mode {
     In,
@@ -21,7 +7,6 @@ pub(crate) enum Mode {
     InOut,
 }
 
-/// A curve family, written as its "ease in" shape; `Out` and `InOut` are derived.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Family {
     Quad,
@@ -45,10 +30,8 @@ const FAMILIES: [(&str, Family); 8] = [
     ("bounce", Family::Bounce),
 ];
 
-/// How far `back` pulls past its ends: Penner's constant, about a tenth of the move.
 const BACK: f64 = 1.701_58;
 
-/// A tween's easing curve.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub(crate) enum Ease {
     #[default]
@@ -57,7 +40,6 @@ pub(crate) enum Ease {
 }
 
 impl Ease {
-    /// Parse an easing name (`"linear"`, `"quad_out"`, `"back_in_out"`, …).
     pub(crate) fn parse(name: &str) -> Option<Self> {
         let plain = match name {
             "linear" => return Some(Self::Linear),
@@ -80,7 +62,6 @@ impl Ease {
         Some(Self::Curve(family, mode))
     }
 
-    /// Every accepted name, for the error a typo gets.
     pub(crate) fn names() -> String {
         let mut names = vec!["linear", "ease_in", "ease_out", "ease_in_out"]
             .into_iter()
@@ -92,7 +73,6 @@ impl Ease {
         names.join(", ")
     }
 
-    /// Reshape linear progress `p` (clamped to `0..=1`) into eased progress.
     pub(crate) fn apply(self, p: f64) -> f64 {
         let p = p.clamp(0.0, 1.0);
         match self {
@@ -105,7 +85,6 @@ impl Ease {
     }
 }
 
-/// The family's "in" curve: 0 at `p = 0`, exactly 1 at `p = 1`.
 fn ease_in(family: Family, p: f64) -> f64 {
     match family {
         Family::Quad => p * p,
@@ -115,7 +94,6 @@ fn ease_in(family: Family, p: f64) -> f64 {
         Family::Expo if p >= 1.0 => 1.0,
         Family::Expo => 2f64.powf(10.0 * p - 10.0),
         Family::Sine => 1.0 - (p * PI / 2.0).cos(),
-        // `p² · ((c + 1)·p − c)`, ordered so `back(1)` is exactly 1.
         Family::Back => p * p * (BACK * (p - 1.0) + p),
         Family::Elastic if p <= 0.0 || p >= 1.0 => p,
         Family::Elastic => {
@@ -125,7 +103,6 @@ fn ease_in(family: Family, p: f64) -> f64 {
     }
 }
 
-/// Penner's bounce, played "out": four ever-smaller hops landing on 1.
 fn bounce_out(p: f64) -> f64 {
     const N: f64 = 7.5625;
     const D: f64 = 2.75;

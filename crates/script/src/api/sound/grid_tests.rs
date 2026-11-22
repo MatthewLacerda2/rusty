@@ -1,12 +1,8 @@
-//! `Sound.Level(path, { sections = seconds })` (#1579): a file measured on a grid
-//! of the caller's own, so a one-second capture reads as rows a scenario can compare.
-
 use mlua::Table;
 
 use super::fixture::lua_with_sound;
 use super::level_tests::write_wav;
 
-/// One second at 44.1 kHz, mono: loud for the first half, silent after.
 fn half_loud() -> String {
     let mut samples = vec![8_000i16; 22_050];
     samples.extend(vec![0i16; 22_050]);

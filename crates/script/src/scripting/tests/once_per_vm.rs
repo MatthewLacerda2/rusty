@@ -1,14 +1,9 @@
-//! The surface is registered once per VM (#1709): what that changes for a script,
-//! and the re-entrant paths the per-phase scope used to cover.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use super::timers::{counted, rig, tick};
 use rusty_core::storage::Storage;
 
-/// A script's change to a namespace table outlives the phase that made it: the
-/// table is the VM's, not one a phase rebuilt.
 #[test]
 fn a_namespace_change_lasts_past_its_phase() {
     let code = "_G.__seen = 'unset'\nlocal M = {}\n\
@@ -20,8 +15,6 @@ fn a_namespace_change_lasts_past_its_phase() {
     assert_eq!(m.eval("type(Time.deltaTime)").unwrap(), "function");
 }
 
-/// A function a script keeps from one phase still works in the next (a scoped one
-/// errored as destructed).
 #[test]
 fn a_stored_api_function_works_in_a_later_phase() {
     let code = "_G.__frames = -1\nlocal M = {}\n\
@@ -35,9 +28,6 @@ fn a_stored_api_function_works_in_a_later_phase() {
     assert_eq!(errors, 0, "{:?}", m.cells.console.borrow().messages);
 }
 
-/// Re-entrancy: `Start` calls `Timer.StartCoroutine`, which runs the coroutine at
-/// once from inside the API call; the coroutine calls the API again (a nested
-/// start, an invoke, a scene read), and the hooks they schedule fire later.
 #[test]
 fn a_hook_reentering_the_api_through_a_coroutine_holds_no_borrow() {
     let start = "Timer.StartCoroutine(id, function(e) \
@@ -54,8 +44,6 @@ fn a_hook_reentering_the_api_through_a_coroutine_holds_no_borrow() {
     assert!(messages.is_empty(), "{messages:?}");
 }
 
-/// A cell injected after the VM started (the app hands over its store) is the one
-/// the surface reaches from the next call on.
 #[test]
 fn a_cell_swapped_on_a_live_vm_is_reattached() {
     let (mut m, _) = rig("once_swap", &counted(""));

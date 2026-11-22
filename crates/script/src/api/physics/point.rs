@@ -1,11 +1,3 @@
-//! crates/script/src/api/physics/point.rs — `Physics.ClosestPoint` / `ContainsPoint` /
-//! `GetBounds`.
-//!
-//! Per-collider point queries (#311). `ClosestPoint`/`ContainsPoint` ask the
-//! live rapier collider (play mode); `GetBounds` surfaces the world-space AABB
-//! the engine already keeps current on the component
-//! (`ColliderComponent::calculate_world_aabb`), so it answers in edit mode too.
-
 use glam::Vec3;
 use mlua::Table;
 
@@ -15,7 +7,6 @@ use crate::api::ApiCell;
 use rusty_physics::PhysicsWorld;
 use rusty_scene::Scene;
 
-/// Register the point-query family onto the `Physics` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -27,10 +18,6 @@ pub(super) fn register(
     register_bounds(lua, table, scene)
 }
 
-/// `ClosestPoint` — `(found, x, y, z)`: the nearest point on the entity's live
-/// collider to the query point (Unity `Collider.ClosestPoint`; a point inside
-/// is its own closest point). found=false ⇒ no live collider for that entity
-/// (edit mode, or no collider) and the query point echoes back.
 fn register_closest(lua: &mlua::Lua, table: &Table, physics: ApiCell<Option<PhysicsWorld>>) -> Reg {
     put(
         table,
@@ -49,8 +36,6 @@ fn register_closest(lua: &mlua::Lua, table: &Table, physics: ApiCell<Option<Phys
     )
 }
 
-/// `ContainsPoint` — whether the point lies inside the entity's live collider;
-/// `false` when the entity has no live collider (edit mode, or no collider).
 fn register_contains(
     lua: &mlua::Lua,
     table: &Table,
@@ -70,11 +55,6 @@ fn register_contains(
     )
 }
 
-/// `GetBounds` — `(found, min_x, min_y, min_z, max_x, max_y, max_z)`: the
-/// collider's world-space AABB, never stale (`World::collider_bounds`): current
-/// the moment a Transform on it or above it moves, or the collider is set or
-/// reshaped. found=false ⇒ the entity has no
-/// collider component and the six extents are 0.
 fn register_bounds(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

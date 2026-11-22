@@ -1,17 +1,3 @@
-//! crates/script/src/api/audio/effects.rs — the `Audio` group-effect verbs (#1748).
-//!
-//! `SetGroupEffects(group, { {kind = "compressor", threshold = -18, ...}, ... })`
-//! replaces a group's ordered effects; `GetGroupEffects(group)` reads them back
-//! with every parameter. The tables cross as the mixer's neutral fields
-//! (`audio::mixer::effects::Fields`), so the checks — an unknown kind or field, a
-//! value out of range, a group that does not exist — live with the effects and
-//! reach the script as Lua errors. A snapshot's `effects` entry is read here too.
-//!
-//! A list must be a list: a table with a non-array key (`{ kind = "limiter" }`
-//! where `{ { kind = "limiter" } }` was meant) or a hole is an error naming the
-//! field, never read as a shorter list. Tables nest one level only (an effect's
-//! `bands`), so a table that holds itself is an error, not a stack overflow.
-
 use mlua::{Lua, Table};
 
 use super::super::{put, Reg};
@@ -51,13 +37,10 @@ pub(super) fn register_effects(lua: &Lua, table: &Table, audio: ApiCell<AudioMae
     )
 }
 
-/// A list of effect tables, the field `what`, as fields in order.
 pub(super) fn field_list(list: &Table, what: &str) -> mlua::Result<Vec<Fields>> {
     tables(list, what, 0)
 }
 
-/// `list` (the field `what`, `depth` lists deep) as fields in order: a table with
-/// keys `1..=n` and no others, each value a table.
 fn tables(list: &Table, what: &str, depth: usize) -> mlua::Result<Vec<Fields>> {
     let n = list.raw_len();
     for pair in list.pairs::<mlua::Value, mlua::Value>() {
@@ -89,8 +72,6 @@ fn tables(list: &Table, what: &str, depth: usize) -> mlua::Result<Vec<Fields>> {
         .collect()
 }
 
-/// One table (`depth` lists deep) as fields: numbers, strings and, at the top
-/// level only, a nested list of tables.
 fn from_lua(t: &Table, depth: usize) -> mlua::Result<Fields> {
     let mut fields = Fields::new();
     for pair in t.pairs::<String, mlua::Value>() {
@@ -116,7 +97,6 @@ fn from_lua(t: &Table, depth: usize) -> mlua::Result<Fields> {
     Ok(fields)
 }
 
-/// Fields as a table.
 fn to_lua(lua: &Lua, fields: &Fields) -> mlua::Result<Table> {
     let t = lua.create_table()?;
     for (key, value) in fields {

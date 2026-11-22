@@ -1,7 +1,3 @@
-//! The transition callbacks' (#323) scope: one entity's edges never touch a
-//! sibling, the unified active gate (a disabled entity gets no `OnTrigger`), and
-//! deterministic dispatch order. Tags as in `transitions.rs`.
-
 use std::collections::BTreeMap;
 
 use rusty_components::ScriptComponent;
@@ -12,14 +8,6 @@ use super::transitions::{DT, LOGGER};
 
 #[test]
 fn destroying_one_entity_leaves_a_sibling_running() {
-    // Destroying A mid-play must touch only A. apply_pending_destroys's two
-    // `!ids.contains` predicates keep every *surviving* entity's script instance
-    // (entity_scripts) AND its load record (load_attempted). Drop the `!` on the
-    // first and B's instance is evicted — B goes silent, no more Update. Drop it on
-    // the second and B is dropped from load_attempted, so the next spawn drain
-    // reloads it — B re-runs Awake/OnEnable/Start on a fresh instance mid-play. A
-    // lone-entity destroy triangulates neither; it needs a surviving sibling, and
-    // the sibling must carry a real ScriptComponent so the reload path is live.
     let (mut m, a) = manager_with_entity();
     let b = m.cells.scene.borrow_mut().add_entity("B".to_string());
     m.init_runtime().unwrap();
@@ -36,16 +24,12 @@ fn destroying_one_entity_leaves_a_sibling_running() {
                 ..Default::default()
             });
     }
-    // The spawn drain owns loading (sets load_attempted); both come alive and run one
-    // active tick together.
     m.load_new_scripts();
     m.init_scripts();
     m.update_scripts(DT);
-    // Destroy A; isolate the log so only the teardown + B's next tick show up.
     m.eval("__log = ''").unwrap();
     m.cells.scene.borrow_mut().request_destroy(a);
     m.apply_pending_destroys();
-    // A full next tick: the spawn drain (the reload path), init, then update.
     m.load_new_scripts();
     m.init_scripts();
     m.update_scripts(DT);
@@ -88,9 +72,6 @@ fn disabled_entity_receives_no_on_trigger() {
     );
 }
 
-/// Loads an `OnEnable`-tagged script at three slots (two entities, one carrying
-/// two scripts), inits once, and returns the concatenated tags — the observable
-/// enable dispatch order. A pure function of its inputs, so replays match.
 fn on_enable_order_log() -> String {
     let (mut m, a) = manager_with_entity();
     let b = m.cells.scene.borrow_mut().add_entity("E2".to_string());

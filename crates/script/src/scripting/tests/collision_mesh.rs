@@ -1,8 +1,3 @@
-//! `Physics.SetColliderShape(id, { kind = "Mesh", mesh = .. })` (#1960): a script
-//! names a collider's collision mesh as a model's sidecar does, falling back to the
-//! entity's own mesh when the model lacks the name; and `Assets.Get/SetModelImportSettings`'
-//! `colliders`, the model inspector's sub-object rows.
-
 use super::collider::manager_with_collider;
 use rusty_edit::asset_instance::collision::chair::write as write_chair;
 use rusty_edit::asset_instance::instantiate_asset;

@@ -1,14 +1,3 @@
-//! crates/script/src/api/probe.rs — `Probe` namespace.
-//!
-//! Placement + query over the scene-level light-probe dataset (`Scene::probes`).
-//! Probes are NOT a first-class component (they're a scene dataset, like the
-//! material library), so this namespace operates on the volume as a whole rather
-//! than on an entity id: add/move/remove single probes, fill a regular grid, run the
-//! analytic fill, and query the interpolated SH irradiance at a world position.
-//!
-//! Editor↔API parity: every probe-placement action a user can take in the editor
-//! has its mirror here. The heavy bake (#241) will reuse `Fill`/the analytic path.
-
 use glam::Vec3;
 use mlua::Lua;
 
@@ -16,7 +5,6 @@ use super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_scene::Scene;
 
-/// Register the `Probe` namespace onto `lua`.
 pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     let table = lua.create_table().map_err(|e| e.to_string())?;
 
@@ -28,7 +16,6 @@ pub fn register(lua: &Lua, scene: ApiCell<Scene>) -> Reg {
     lua.globals().set("Probe", table).map_err(|e| e.to_string())
 }
 
-/// `Add` / `Move` / `Remove` / `Clear` / `Count` over single probes.
 fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -37,7 +24,6 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             let i = scene.probes.add_probe(Vec3::new(x, y, z));
-            // Placed by hand: the bake's auto-placement keeps it (#1737).
             scene.probes.set_manual(i, true);
             Ok(i as u32)
         }),
@@ -50,7 +36,6 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
             let scene = &*scene.get(lua)?;
             let mut scene = scene.borrow_mut();
             scene.probes.move_probe(index as usize, Vec3::new(x, y, z));
-            // A hand edit: the next bake keeps the probe where it was put (#1737).
             scene.probes.set_manual(index as usize, true);
             Ok(())
         }),
@@ -85,7 +70,6 @@ fn register_placement(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene
     )
 }
 
-/// `SetManual` / `IsManual`: whether a bake's auto-placement keeps a probe (#1737).
 fn register_manual(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -115,9 +99,6 @@ fn register_manual(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
     )
 }
 
-/// `FillGrid` (bounds + spacing), `BakeAnalytic` (the deterministic stand-in fill),
-/// (the dev-only `Bake`, the real rendered-capture → SH bake of #241, is installed onto
-/// this table by `dev`, #737).
 fn register_fill(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     type GridArgs = (f32, f32, f32, f32, f32, f32, f32);
     put(
@@ -132,7 +113,6 @@ fn register_fill(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
                     Vec3::new(max_x, max_y, max_z),
                     spacing,
                 );
-                // A grid asked for by hand is manual, so a bake keeps it (#1737).
                 scene
                     .probes
                     .probes_mut()

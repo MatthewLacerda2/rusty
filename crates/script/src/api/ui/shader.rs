@@ -1,13 +1,3 @@
-//! crates/script/src/api/ui/shader.rs — `UI.SetShader` / `GetShader` / `SetShaderParam` /
-//! `GetShaderParam` (#427): a graphic's custom ui shader, Unity's `Graphic.material`.
-//!
-//! Thin adapters over `authoring::ui::shader`. An entity's graphics are its `Image`,
-//! `Shape` and `Text`: `SetShader` names the shader on every one it has, and the param
-//! verbs act on them the same way, checked against the shader's baked layout (a
-//! param it does not expose at runtime, or a wrong number of values, raises an error
-//! listing the runtime params there are). Values are numbers or arrays of numbers,
-//! exactly as `Material.SetShaderParam` takes them (#399).
-
 use mlua::{IntoLua, Value};
 
 use super::super::material::shader::params::floats;
@@ -17,13 +7,11 @@ use crate::api::ApiCell;
 use rusty_edit::authoring::ui::shader as ops;
 use rusty_scene::Scene;
 
-/// Register the four verbs onto the `UI` `table`.
 pub fn register(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     register_name(lua, table, scene)?;
     register_params(lua, table, scene)
 }
 
-/// `SetShader` / `GetShader`.
 fn register_name(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -48,7 +36,6 @@ fn register_name(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) ->
     )
 }
 
-/// `SetShaderParam` / `GetShaderParam`.
 fn register_params(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -70,7 +57,6 @@ fn register_params(lua: &mlua::Lua, table: &mlua::Table, scene: ApiCell<Scene>) 
                 return Err(no_graphic(id));
             }
             if results.is_empty() {
-                // Shaded by none of its graphics: the "name one first" error.
                 results.push(ops::layout(&None).map(drop));
             }
             results.into_iter().collect::<Result<(), _>>().map_err(err)

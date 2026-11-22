@@ -1,37 +1,24 @@
 mod file_feed;
 pub use file_feed::{FileFeed, FileLine, FILE_FEED_CAP};
 
-/// The console log buffer and severity levels shared by gameplay scripts, the
-/// REPL and the editor's bottom panel. The `print` hook and every `Debug.*`
-/// binding funnel through here.
 pub struct ConsoleLogs {
     pub messages: Vec<(String, LogLevel)>,
-    /// The record the newest entry collapses, and how many times it has arrived in a
-    /// row ([`ConsoleLogs::repeated`]).
     repeat: Option<(String, u32)>,
-    /// How many entries were ever added, the dropped ones included: a mark for
-    /// [`ConsoleLogs::since`].
     logged: u64,
-    /// What a recording demo has not taken yet (#1597); `None` while no demo
-    /// records, which makes a mark a no-op.
     feed: Option<DemoFeed>,
     /// Every warning and error since [`keep_warnings`](Self::keep_warnings), none
-    /// dropped by the buffer's cap: what `Harness.Warnings` reads (#2054). `None`
+    /// dropped by the buffer's cap: what `Harness.Warnings` reads. `None`
     /// keeps none, so the editor's long-lived console never grows.
     warnings: Option<Vec<(String, LogLevel)>>,
-    /// What the frame log on disk has not taken yet; `None` while no log runs.
     file: Option<FileFeed>,
 }
 
-/// What the console hands a recording demo's index each tick (#1597).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct DemoFeed {
     pub marks: Vec<Mark>,
-    /// Every line as it came, a repeat the buffer folds into `msg (×N)` included.
     pub lines: Vec<(String, LogLevel)>,
 }
 
-/// A game fact a script marked for a demo's index (`Debug.Mark(label [, value])`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Mark {
     pub label: String,
@@ -63,38 +50,28 @@ impl ConsoleLogs {
         }
     }
 
-    /// Keep every warning and error from now on, past the buffer's cap: a headless
-    /// run's scenario reads them with `Harness.Warnings` (#2054).
     pub fn keep_warnings(&mut self) {
         self.warnings.get_or_insert_with(Vec::new);
     }
 
-    /// The warnings and errors kept since [`keep_warnings`](Self::keep_warnings),
-    /// oldest first, a repeat folded as the buffer shows it (`msg (×3)`).
     pub fn warnings(&self) -> &[(String, LogLevel)] {
         self.warnings.as_deref().unwrap_or_default()
     }
 
-    /// Feed a demo from now on (`true`, a demo started recording), or stop
-    /// (`false`): marks are dropped as they come.
     pub fn feed_demo(&mut self, feed: bool) {
         self.feed = feed.then(DemoFeed::default);
     }
 
-    /// Note a mark; a no-op unless a demo records.
     pub fn mark(&mut self, mark: Mark) {
         if let Some(feed) = &mut self.feed {
             feed.marks.push(mark);
         }
     }
 
-    /// The marks and lines since the last take, oldest first.
     pub fn take_feed(&mut self) -> DemoFeed {
         self.feed.as_mut().map(std::mem::take).unwrap_or_default()
     }
 
-    /// Keep every line for the frame log on disk from now on (`true`; idempotent),
-    /// or stop (`false`).
     pub fn feed_file(&mut self, on: bool) {
         if !on {
             self.file = None;
@@ -103,7 +80,6 @@ impl ConsoleLogs {
         }
     }
 
-    /// The lines since the last take, oldest first (none while no log is fed).
     pub fn take_file_feed(&mut self) -> FileFeed {
         self.file.as_mut().map(std::mem::take).unwrap_or_default()
     }
@@ -126,7 +102,6 @@ impl ConsoleLogs {
         self.add_log(msg, LogLevel::Error);
     }
 
-    /// Log a record that arrived `times` times in a row. When it repeats the newest
     /// entry, that entry counts up instead (`msg (×3)`), as Unity's Console collapses
     /// a repeated warning, so one warning raised every frame cannot push everything
     /// else out of the buffer.
@@ -156,7 +131,6 @@ impl ConsoleLogs {
         self.repeat = Some((msg, times));
     }
 
-    /// How the console shows a record that arrived `count` times in a row.
     pub fn collapsed(msg: &str, count: u32) -> String {
         match count {
             0 | 1 => msg.to_string(),
@@ -164,13 +138,10 @@ impl ConsoleLogs {
         }
     }
 
-    /// A mark to read the entries added after it with [`since`](Self::since).
     pub fn logged(&self) -> u64 {
         self.logged
     }
 
-    /// The entries added since `mark` ([`logged`](Self::logged)) still in the buffer,
-    /// oldest first.
     pub fn since(&self, mark: u64) -> impl Iterator<Item = &(String, LogLevel)> {
         let added = usize::try_from(self.logged - mark).unwrap_or(usize::MAX);
         let kept = added.min(self.messages.len());

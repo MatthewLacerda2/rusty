@@ -1,15 +1,3 @@
-//! crates/script/src/api/animator/montage.rs — the `Animator` montage surface (#1894).
-//!
-//! Unreal's `Montage_Play` family over the animator's slots: `PlayMontage`,
-//! `StopMontage`, `IsMontagePlaying`, `GetMontage`, `JumpToSection` and
-//! `SetNextSection`. A montage is resolved against the animator's graph asset
-//! (read from disk, as `PlayNode` does), else as a clip name on the mesh, and
-//! starts with a copy of what it plays (`components::ActiveMontage`), so the
-//! `animate` system plays it without the graph. Unknown names, and a graph
-//! that fails to load, warn and return `false`, never a Lua error (a graph
-//! that exists but doesn't load never falls back to a clip of the same name);
-//! a non-positive `rate` is one.
-
 use std::path::Path;
 
 use mlua::Table;
@@ -22,7 +10,6 @@ use rusty_asset::animation_graph;
 use rusty_components::{ActiveMontage, MontageRefused};
 use rusty_scene::Scene;
 
-/// Register the montage functions onto the `Animator` table.
 pub(super) fn register(
     lua: &mlua::Lua,
     table: &Table,
@@ -35,7 +22,6 @@ pub(super) fn register(
     register_sections(lua, table, scene)
 }
 
-/// `PlayMontage(id, montage [, { rate, start_section, slot, blend_in, blend_out }])`.
 fn register_play(
     lua: &mlua::Lua,
     table: &Table,
@@ -86,7 +72,6 @@ fn register_play(
     )
 }
 
-/// `PlayMontage`'s options table.
 #[derive(Default)]
 struct Options {
     rate: f32,
@@ -120,7 +105,6 @@ impl Options {
     }
 }
 
-/// Why `name` did not start, as the warning says it.
 fn refused(name: &str, why: &MontageRefused) -> String {
     match why {
         MontageRefused::Unknown => format!("no montage or clip '{name}'"),
@@ -130,7 +114,6 @@ fn refused(name: &str, why: &MontageRefused) -> String {
     }
 }
 
-/// `StopMontage(id [, slot [, blend_out]])`.
 fn register_stop(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -150,7 +133,6 @@ fn register_stop(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
-/// `IsMontagePlaying(id [, slot])` and `GetMontage(id, slot)`.
 fn register_reads(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,
@@ -182,7 +164,6 @@ fn register_reads(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg 
     )
 }
 
-/// `JumpToSection(id, section [, slot])` and `SetNextSection(id, from, to [, slot])`.
 fn register_sections(lua: &mlua::Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     put(
         table,

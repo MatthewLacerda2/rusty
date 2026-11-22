@@ -1,21 +1,9 @@
-//! crates/script/src/api/graphics/options.rs — the player graphics options (#1438).
-//!
-//! `Get/SetOption` read and write the player's live choice in the shared graphics
-//! cell, which the renderer reads next frame and the shell persists to `Storage`
-//! (`graphics.options`, only what the player set) at Stop and quit; `ResetOptions`
-//! puts back the project's defaults and forgets the choices.
-//! `Get/SetDefaultOption` are those defaults, on the `Application` resource: in the
-//! editor a setter writes `project.rusty`, as the Build Settings window does; in the
-//! player and the harness the value changes in memory only. Either way, every
-//! option the player hasn't set follows the new default. Render-only.
-
 use super::super::{put, Reg};
 use crate::api::ApiCell;
 use rusty_core::application::Application;
 use rusty_core::settings::graphics_options::GraphicsOption;
 use rusty_core::settings::GraphicsSettings;
 
-/// The option `name` names, or a Lua error listing the valid names.
 fn option(call: &str, name: &str) -> mlua::Result<GraphicsOption> {
     GraphicsOption::parse(name).ok_or_else(|| {
         mlua::Error::RuntimeError(format!(
@@ -25,8 +13,6 @@ fn option(call: &str, name: &str) -> mlua::Result<GraphicsOption> {
     })
 }
 
-/// `GetOption` / `SetOption` / `ResetOptions` / `GetOptionNames`, then
-/// [`register_defaults`].
 pub(super) fn register_options(
     lua: &mlua::Lua,
     table: &mlua::Table,
@@ -67,7 +53,6 @@ pub(super) fn register_options(
     register_defaults(lua, table, graphics, app)
 }
 
-/// The project defaults' `GetDefaultOption` / `SetDefaultOption`.
 fn register_defaults(
     lua: &mlua::Lua,
     table: &mlua::Table,

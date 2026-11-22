@@ -1,20 +1,15 @@
-//! Unit tests for the structured scene-read (#180). Fixtures are built with the
-//! same authoring verbs the API exposes, so the read reflects what create/add did.
-
 use super::*;
 use glam::Vec2;
 use rusty_edit::authoring::{add_component, create_entity, ComponentKind, Primitive};
 use rusty_scene::Camera;
 use rusty_scene::Scene;
 
-/// The UI screen size the fixtures are snapshotted on.
 const SCREEN: Vec2 = Vec2::new(1920.0, 1080.0);
 
 fn cam() -> Camera {
     Camera::new(Vec3::new(1.0, 2.0, 3.0), 10.0, -5.0)
 }
 
-/// The UI view the fixtures are snapshotted through.
 fn view() -> UiView {
     UiView::with_camera(SCREEN, cam(), Default::default())
 }
@@ -62,7 +57,6 @@ fn mesh_and_material_reflect_authored_values() {
     let mut scene = Scene::new();
     let id = create_entity(&mut scene, "Box", Some(Primitive::Box));
     add_component(&mut scene, id, ComponentKind::Texture);
-    // Edit the entity's referenced library material (the data is shared, not inline).
     let key = scene.world.material(id).unwrap().first().to_string();
     if let Some(mat) = scene.materials.get_mut(&key) {
         mat.base_color = [0.5, 0.25, 0.125];
@@ -103,7 +97,6 @@ fn entity_value_matches_world_entry() {
         &rusty_ui::UiView::screen(SCREEN, Default::default()),
     );
     assert_eq!(direct["name"].as_str(), Some("Solo"));
-    // A transform-only entity has no mesh/collider, so no bounds.
     assert!(direct["bounds"].is_null());
 }
 

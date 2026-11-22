@@ -1,7 +1,3 @@
-//! Each test kind's own table (#1892): `distance = { to = "target" }` and the
-//! rest, read into a [`Measure`] and whether it is a yes/no test (its answer
-//! asked for inside the measure: `visible`, `inside`).
-
 use mlua::Table;
 
 use super::contexts::{Contexts, QUERIER};
@@ -15,7 +11,6 @@ const EYE_HEIGHT: f32 = 1.5;
 /// The `separation` radius when none is given, metres.
 const SEPARATION_RADIUS: f32 = 5.0;
 
-/// Read the table of test kind `kind` at `path`.
 pub fn read(
     t: &Table,
     kind: &str,
@@ -67,7 +62,6 @@ pub fn read(
     })
 }
 
-/// `view = { inside, margin, height }`.
 fn view(t: &Table, path: &str) -> mlua::Result<Measure> {
     only(t, path, &["inside", "margin", "height"])?;
     Ok(Measure::View {
@@ -77,7 +71,6 @@ fn view(t: &Table, path: &str) -> mlua::Result<Measure> {
     })
 }
 
-/// `trace = { from, visible, from_height, item_height, mask }`.
 fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, bool)> {
     let keys = ["from", "visible", "from_height", "item_height", "mask"];
     only(t, path, &keys)?;
@@ -95,7 +88,6 @@ fn trace(t: &Table, path: &str, contexts: &Contexts) -> mlua::Result<(Measure, b
     Ok((measure, true))
 }
 
-/// `mode = "3d"` (the default) or `"2d"`, which measures on the XZ plane.
 fn flat(t: &Table, path: &str) -> mlua::Result<bool> {
     match text(t, path, "mode")?.as_deref() {
         None | Some("3d") => Ok(false),
