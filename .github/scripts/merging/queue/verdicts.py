@@ -1,8 +1,15 @@
 """Each listed pull request's review standing, read from GitHub (#2628).
 
 [`verdict.standing`] decides; this reads what it decides on: the pull request's
-comments (REST, paged), and for a `queue` verdict given on an older head, the
-compare of `main...head` that says whether only merges followed it.
+comments (REST, paged), and for a verdict given on an older head, the compare
+of `main...head` that says whether only merges followed it: a `queue` needs it
+to stand, and the quiet watch ([`view.quiet`]) to tell a round that came back.
+
+**A comment read that fails fails the listing**, so a verdict is never read as
+absent. **A compare that fails does not**: that pull request reads as not
+queued by its verdict (`current` `None`, [`standing.effective`]), its label
+still deciding, and the log names it once per head ([`Reader.unread`]); the
+next listing asks again.
 
 The watch lists the open pull requests on every poll, so the reads are kept
 ([`Reader`]): the comments by the pull request's `updatedAt` (a new comment
@@ -18,6 +25,7 @@ import time
 from typing import Callable
 
 import ghrest
+from merging.queue import outcomes
 from merging.verdict import standing
 
 # How long a pull request's comments are trusted unchanged when its `updatedAt` has not moved.
@@ -27,23 +35,29 @@ FRESH_SECONDS = 600
 class Reader:
     """`fetch(path)` is `gh api path`, parsed, or `None` when it failed."""
 
-    def __init__(self, repo: str, fetch: Callable[[str], object], clock: Callable[[], float] = time.monotonic):
-        self.repo, self.fetch, self.clock = repo, fetch, clock
+    def __init__(self, repo: str, fetch: Callable[[str], object], clock: Callable[[], float] = time.monotonic,
+                 say: Callable[[str], None] = outcomes.say):
+        self.repo, self.fetch, self.clock, self.say = repo, fetch, clock, say
         self.comments: dict[int, tuple[str | None, float, list[dict]]] = {}
         self.compares: dict[tuple[str, str], bool] = {}
+        self.unread: set[tuple[int, str]] = set()
+        self.last: dict[int, dict] = {}
 
     def read(self, pull: dict) -> dict | None:
-        """[`standing.standing`] of `pull`, `None` when GitHub failed."""
+        """[`standing.standing`] of `pull`, `None` when its comments could not be read."""
         comments = self.said(pull)
         if comments is None:
             return None
-        verdict = standing.said(comments)
-        current = True
-        if verdict and verdict[0] == standing.QUEUE:
-            current = self.current(verdict[1], pull.get("headRefOid", ""))
-            if current is None:
-                return None
-        return standing.standing(comments, current)
+        verdict, current = standing.said(comments), None
+        if verdict:
+            number, head = pull.get("number"), pull.get("headRefOid", "")
+            current = self.current(verdict[1], head)
+            if current is None and (number, head) not in self.unread:
+                self.unread.add((number, head))
+                self.say(f"#{number}: GitHub did not show what followed its `{verdict[0]}` verdict on {verdict[1][:7]}"
+                         " (the compare of main...head), so it is not queued by that verdict; asked again on the next listing.")
+        self.last[pull.get("number")] = read = standing.standing(comments, current)
+        return read
 
     def said(self, pull: dict) -> list[dict] | None:
         number, updated, now = pull.get("number"), pull.get("updatedAt"), self.clock()
@@ -67,8 +81,20 @@ class Reader:
                 compared.get("commits") or [], int(compared.get("ahead_by") or 0), since, head)
         return self.compares[(since, head)]
 
+    def again(self, pull: dict) -> dict:
+        """`pull` re-read before a merge, with its standing. When its comments
+        cannot be read, it is judged by its labels alone, unless the standing
+        last read still owed a `Needs:`: that one is kept, so it waits, since a
+        blip must not take a labelled pull request past what it owes."""
+        shaped = self.attach([pull])
+        if shaped:
+            return shaped[0]
+        last = self.last.get(pull.get("number"))
+        return {**pull, "standing": last} if last and last.get("owed") else pull
+
     def attach(self, pulls: list[dict]) -> list[dict] | None:
-        """`pulls` with each ready one based on `main` carrying its `standing`; `None` when GitHub failed."""
+        """`pulls` with each ready one based on `main` carrying its `standing`;
+        `None` when a pull request's comments could not be read."""
         shaped = []
         for pull in pulls:
             if not pull.get("isDraft") and pull.get("baseRefName", "main") == "main":

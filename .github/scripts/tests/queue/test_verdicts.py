@@ -2,9 +2,11 @@
 """#2628: the listing's read of each ready pull request's standing, kept between polls.
 
 Must: attach a standing to a ready pull request based on `main`, ask GitHub's
-compare only for a `queue` given on an older head, keep the comments while
-`updatedAt` stands and re-read them when it moves, and fail the read when
-GitHub fails. Must not: read a draft or a pull request based elsewhere.
+compare only for a verdict given on an older head, keep the comments while
+`updatedAt` stands and re-read them when it moves, fail the read when the
+comments fail, keep what a last read owed when a re-read fails. Must not: fail
+the listing on a compare it cannot read (that one is not queued by its verdict,
+and named once), nor read a draft or a pull request based elsewhere.
 """
 
 from __future__ import annotations
@@ -77,7 +79,29 @@ class Reads(unittest.TestCase):
     def test_github_failing_fails_the_read(self):
         fetch = Fetch({1: [comment(REVIEW)]})
         fetch.down = True
-        self.assertIsNone(verdicts.Reader(REPO, fetch).attach([pull(1)]))
+        self.assertIsNone(verdicts.Reader(REPO, fetch, say=lambda line: None).attach([pull(1)]))
+
+    def test_a_compare_unread_is_not_queued_and_named_once(self):
+        said = []
+        fetch = Fetch({1: [comment(REVIEW)], 2: []}, compare=None)
+        reader = verdicts.Reader(REPO, fetch, say=said.append)
+        for _ in range(2):
+            shaped = reader.attach([pull(1, head="f" * 40), pull(2)])
+            self.assertEqual([p["standing"]["verdict"] for p in shaped], ["round", None])
+            self.assertIsNone(shaped[0]["standing"]["current"])
+        self.assertEqual(len(said), 1)
+        self.assertIn("#1", said[0])
+        self.assertEqual(len([p for p in fetch.asked if "/compare/" in p]), 2)  # asked again, not kept
+
+    def test_a_failed_re_read_keeps_what_the_last_read_owed(self):
+        owing = comment(REVIEW + "\nNeeds: a desktop look")
+        fetch = Fetch({1: [owing], 2: [comment(REVIEW)]})
+        reader = verdicts.Reader(REPO, fetch, say=lambda line: None)
+        reader.attach([pull(1), pull(2)])
+        fetch.down = True
+        again = reader.again(pull(1, updated="t2", labels=[{"name": "queue"}]))
+        self.assertEqual(again["standing"]["owed"], ["a desktop look"])
+        self.assertNotIn("standing", reader.again(pull(2, updated="t2")))  # nothing owed: labels alone
 
 
 if __name__ == "__main__":

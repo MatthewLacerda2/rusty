@@ -9,9 +9,10 @@ says the decision in one machine line, and the watch reads it:
   in a review record (a comment whose first line [`reviewed.decides`] takes:
   `Independent review…`, the outcomes after a round headed the same way, or
   `No review: <why>`), from someone who can push ([`ghrest.can_push`]). `<sha>`
-  is the head it was given on, seven to forty hex digits. The newest such line
-  wins ([`said`]); a record with none leaves the pull request to its label, as
-  before #2628.
+  is the head it was given on, seven to forty hex digits. The newest record
+  decides ([`said`]): its last verdict line is the verdict, and a newest record
+  with none means no verdict, so an older record's `queue` does not survive it
+  and the pull request is left to its label, as before #2628.
 - **It holds for that head only** ([`merges_only`]): commits after it that are
   all merges (of `main`, the queue's own update) keep it; any other commit is
   unreviewed code, so a `queue` there reads `round` ([`effective`]).
@@ -20,6 +21,14 @@ says the decision in one machine line, and the watch reads it:
   full stop aside). While one is owed the pull request is out of line, its
   label or verdict notwithstanding: a desktop measurement nobody took is not
   taken by a label.
+
+The lines accept a `\r` at their end (a comment written from Windows).
+
+**A limit, left unchecked:** [`merges_only`] takes any two-parent commit for a
+merge of `main` without reading what it brought in. A merge commit that also
+carries a hand-made change (an evil merge) keeps a `queue` verdict; the queue's
+own updates and `merge-fixer`'s are plain merges, and the reviewer of the next
+round reads the whole diff.
 
 A bare `No review: <why>` carries no head, so it is not a `queue` here (the
 issue recommended it be): read as one, it would admit every later push
@@ -39,9 +48,9 @@ from merging.verdict import reviewed
 QUEUE, ROUND, HOLD = "queue", "round", "hold"
 
 # The one machine line: its own line, nothing else on it.
-VERDICT = re.compile(r"^[ \t]*Verdict:[ \t]*(queue|round|hold)[ \t]+on[ \t]+([0-9a-f]{7,40})[ \t]*$", re.I | re.M)
-NEEDS = re.compile(r"^[ \t]*Needs:[ \t]*(\S.*?)[ \t]*$", re.I | re.M)
-DONE = re.compile(r"^[ \t]*Done:[ \t]*(\S.*?)[ \t]*$", re.I | re.M)
+VERDICT = re.compile(r"^[ \t]*Verdict:[ \t]*(queue|round|hold)[ \t]+on[ \t]+([0-9a-f]{7,40})[ \t\r]*$", re.I | re.M)
+NEEDS = re.compile(r"^[ \t]*Needs:[ \t]*(\S.*?)[ \t\r]*$", re.I | re.M)
+DONE = re.compile(r"^[ \t]*Done:[ \t]*(\S.*?)[ \t\r]*$", re.I | re.M)
 
 
 def line(word: str, sha: str) -> str:
@@ -59,13 +68,14 @@ def records(comments: list[dict]) -> list[dict]:
 
 
 def said(comments: list[dict]) -> tuple[str, str] | None:
-    """The newest record's verdict, `(word, sha)`, or `None` when no record has one."""
-    for comment in reversed(records(comments)):
-        found = VERDICT.findall(comment.get("body") or "")
-        if found:
-            word, sha = found[-1]
-            return word.lower(), sha.lower()
-    return None
+    """The newest record's verdict, `(word, sha)`, or `None` when there is no
+    record or the newest has no verdict line: an older verdict never outlives it."""
+    found = records(comments)
+    found = VERDICT.findall(found[-1].get("body") or "") if found else []
+    if not found:
+        return None
+    word, sha = found[-1]
+    return word.lower(), sha.lower()
 
 
 def key(text: str) -> str:
@@ -115,16 +125,20 @@ def merges_only(commits: list[dict], ahead: int, since: str, head: str) -> bool:
     return met
 
 
-def effective(verdict: tuple[str, str] | None, current: bool) -> str | None:
-    """What the queue acts on: a `queue` on a head with unreviewed commits since is a `round`."""
+def effective(verdict: tuple[str, str] | None, current: bool | None) -> str | None:
+    """What the queue acts on: a `queue` on a head with unreviewed commits since,
+    or one whose head could not be checked (`current` `None`), is a `round`."""
     if verdict is None:
         return None
-    return ROUND if verdict[0] == QUEUE and not current else verdict[0]
+    return ROUND if verdict[0] == QUEUE and current is not True else verdict[0]
 
 
 def standing(comments: list[dict], current: bool | None = None) -> dict:
     """The plain dictionary a listed pull request carries as `standing`.
-    `current` is [`merges_only`]'s answer for the verdict's head (`None`: not asked)."""
+    `current` is [`merges_only`]'s answer for the verdict's head: `True`, `False`,
+    or `None` when it could not be read (or was not asked). It is kept, so a
+    reader can tell a head that moved past its verdict (`False`) from one never
+    checked."""
     verdict = said(comments)
-    return {"verdict": effective(verdict, bool(current)), "said": verdict and verdict[0],
-            "on": verdict and verdict[1], "owed": owed(comments)}
+    return {"verdict": effective(verdict, current), "said": verdict and verdict[0],
+            "on": verdict and verdict[1], "current": current, "owed": owed(comments)}

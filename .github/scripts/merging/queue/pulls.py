@@ -53,10 +53,9 @@ def look_standing(number: int) -> dict:
     """[`look`], with its review standing ([`verdicts.Reader`]) when it is
     ready: what [`watch.board.queued`] reads when the go-ahead is asked again
     before a merge (#2628). A standing GitHub would not give is left off, so
-    only the labels decide: a verdict unread is no go-ahead."""
-    pull = look(number)
-    shaped = reader(ghrest.slug()).attach([pull])
-    return shaped[0] if shaped else pull
+    only the labels decide: a verdict unread is no go-ahead, and a `Needs:`
+    the last read saw unanswered still keeps it out ([`verdicts.Reader.again`])."""
+    return reader(ghrest.slug()).again(look(number))
 
 
 def quietly(*args: str) -> object | None:

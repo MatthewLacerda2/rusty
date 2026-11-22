@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """#2628: a review record's verdict line, the head it holds on, and what it still owes.
 
-Must read: the newest trusted record's `Verdict:` line anywhere in it, a
+Must read: the newest trusted record's `Verdict:` line anywhere in it (a `\r`
+ending it too), a
 `queue` on an older head followed only by merges, `Needs:` answered by a later
 `Done:`. Must not: a verdict outside a record or by someone who cannot push, a
 line with more on it, a `queue` on a head with a commit of its own after it, a
-bare `No review:` (no head), a `Done:` in the same comment as its `Needs:`.
+bare `No review:` (no head), a `Done:` in the same comment as its `Needs:`, an
+older record's `queue` past a newest record with no line.
 """
 
 from __future__ import annotations
@@ -34,6 +36,20 @@ class Verdict(unittest.TestCase):
         old = record("Verdict: queue on abc1234", at="2026-11-22T09:00:00Z")
         new = record("Verdict: round on def5678", at="2026-11-22T11:00:00Z")
         self.assertEqual(standing.said([new, old]), ("round", "def5678"))
+
+    def test_a_newest_record_without_a_line_is_no_verdict(self):
+        old = record("Verdict: queue on abc1234", at="2026-11-22T09:00:00Z")
+        new = record(at="2026-11-22T11:00:00Z")
+        self.assertIsNone(standing.said([old, new]))
+        self.assertIsNone(standing.standing([old, new], current=True)["verdict"])
+        self.assertEqual(standing.said([old, said("Thanks!", at="2026-11-22T12:00:00Z")]), ("queue", "abc1234"))
+
+    def test_a_carriage_return_ends_a_line(self):
+        need = said("Independent review\r\nVerdict: queue on abc1234\r\nNeeds: a desktop look\r\n")
+        self.assertEqual(standing.said([need]), ("queue", "abc1234"))
+        self.assertEqual(standing.owed([need]), ["a desktop look"])
+        done = said("Done: a desktop look\r\n", at="2026-11-22T12:00:00Z")
+        self.assertEqual(standing.owed([need, done]), [])
 
     def test_the_line_is_the_one_its_writer_is_given(self):
         self.assertEqual(standing.said([record(standing.line("queue", HEAD))]), ("queue", HEAD[:7]))

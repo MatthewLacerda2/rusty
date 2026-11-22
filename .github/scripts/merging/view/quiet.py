@@ -4,7 +4,7 @@
 `Monitor`, and each one wakes a session that re-reads its whole context to
 write two lines: a merge ("fast-forward, `make reclaim`"), a pull request
 opening as a draft, a watch restarting. Whatever a script can do, a script
-does, so this follows the same log ([`events.Tail`], 30 lines back) and:
+does, so this follows the same log ([`events.Tail`]) and:
 
 - **does the routine itself**: on each merge ([`events.MERGED`]) it
   fast-forwards the main checkout to `origin/main` and runs `make reclaim`
@@ -12,13 +12,20 @@ does, so this follows the same log ([`events.Tail`], 30 lines back) and:
   (`make coders`, `drain`) every [`DRAIN_SECONDS`], as the orchestrator's
   loop did, saying a failing pass once, after [`DRAIN_FAILS`] in a row;
 - **says only what someone must act on**, one line each: a pull request
-  turning ready with no review decision, or reviewed with nothing that
-  queues it ([`ready_line`]); a hand-back, a held Dependabot bump, a state file
+  turning ready with no review decision, reviewed with nothing that queues
+  it, or on a head with commits of its own past its standing verdict (a round
+  came back; it stays quiet only while the head is the verdict's, or only
+  merges followed) ([`ready_line`]); a hand-back, a held Dependabot bump, a state file
   not written, a lost mutation request, a supervisor or watch that stopped
   (the lines [`events.KEEP`] passes, less the board's own); a new `bug` issue
   ([`new_bugs`]); a red gating run on `main` ([`red_main`]); and a coder's
   comment on its issue ([`standing.Poll`]). A draft opening, a merge, a
   pull request closing or going back to draft are said by nobody;
+- **after a restart acts on the log's last 30 lines only** ([`events.Tail`]'s
+  replay): a merge, a ready flip or a hand-back older than that is not acted
+  on again, nor said; the merge's fast-forward is caught up by the next
+  merge's, since each moves the main checkout to `origin/main`, not to that
+  merge;
 - **holds nothing a reboot loses**: what it has told of bugs and of `main`'s
   runs is kept in [`STATE`] beside the queue's other files
   (`merging/state.py`), the rest is read again from GitHub and the log, and a
@@ -69,8 +76,14 @@ def ready_line(number: int, pull: dict | None, comments: list[dict] | None) -> s
         return None
     labels = board.names(pull.get("labels"))
     standing = pull.get("standing") or {}
-    if board.HOLD_LABEL in labels or standing.get("verdict") in ("round", "hold"):
-        return None  # a decision someone made and acts on
+    if board.HOLD_LABEL in labels:
+        return None  # a decision someone made by hand and acts on
+    if standing.get("said") and standing.get("current") is False:
+        return (f"{PREFIX} #{number} is ready on {str(pull.get('headRefOid', ''))[:7]}, past its"
+                f" `{standing['said']}` verdict on {standing.get('on')}: a round came back, so review it and give"
+                " the new head its own `Verdict:` line.")
+    if standing.get("verdict") in ("round", "hold"):
+        return None  # still on the head its decision was given on: someone acts on it
     if standing.get("owed"):
         return f"{PREFIX} #{number} is reviewed and owes: {'; '.join(standing['owed'])}. Answer each with `Done: <what>`."
     if reviewed.exempt(pull, False) or reviewed.decided(comments):

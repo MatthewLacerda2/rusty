@@ -4,8 +4,8 @@ Must say: a hand-back, a stopped supervisor, a ready pull request with no review
 decision (or reviewed with nothing that queues it, or owing a `Needs:`), a new
 bug, a red `main` once per head, a drain pass failing three times in a row.
 Must not: a merge (it fast-forwards and reclaims instead, once), a draft opening,
-a close, a ready pull request already queued or under a `round`/`hold`
-verdict, the bugs and red runs a restart already told.
+a close, a ready pull request already queued, or under a `round`/`hold`
+verdict while its head is that verdict's (one past it is a round to review), the bugs and red runs a restart already told.
 """
 
 from __future__ import annotations
@@ -20,10 +20,11 @@ from merging.view import quiet
 RECORD = {"body": "Independent review\nNo findings.", "author_association": "OWNER", "created_at": "t"}
 
 
-def ready(labels=(), verdict=None, owed=(), files=("src/a.rs",)) -> dict:
+def ready(labels=(), verdict=None, owed=(), files=("src/a.rs",), said=None, current=True) -> dict:
     return {"number": 7, "state": "OPEN", "isDraft": False, "baseRefName": "main", "headRefName": "7-x",
-            "labels": [{"name": n} for n in labels], "files": [{"path": f} for f in files],
-            "standing": {"verdict": verdict, "owed": list(owed)}}
+            "headRefOid": "f" * 40, "labels": [{"name": n} for n in labels], "files": [{"path": f} for f in files],
+            "standing": {"verdict": verdict, "said": said or verdict, "on": "abc1234", "current": current,
+                         "owed": list(owed)}}
 
 
 class Effects:
@@ -68,6 +69,9 @@ class Lines(unittest.TestCase):
             (ready(), [RECORD], "nothing queues it"),
             (ready(files=("docs/x.md",)), [], "nothing queues it"),
             (ready(owed=("a desktop look",)), [RECORD], "owes: a desktop look"),
+            (ready(verdict="round", current=False), [RECORD], "a round came back"),  # a round's fix, readied
+            (ready(verdict="round", said="queue", current=False), [RECORD], "past its `queue` verdict"),
+            (ready(verdict="hold", current=False), [RECORD], "a round came back"),
             (None, None, "unknown"),
         ):
             with self.subTest(pull=pull, comments=comments):
@@ -77,6 +81,8 @@ class Lines(unittest.TestCase):
 
     def test_a_ready_pull_request_someone_already_decided(self):
         for pull in (ready(verdict="queue"), ready(labels=("queue",)), ready(verdict="round"), ready(labels=("hold",)),
+                     ready(verdict="round", current=None),  # a compare unread: the listing names it
+                     ready(verdict="round", current=False, labels=("hold",)),
                      {**ready(), "isDraft": True}):
             with self.subTest(pull=pull):
                 self.assertEqual(self.stream(Effects(self.path, pull, [RECORD]), "queue: watch: #7 is ready and unqueued; x"), [])

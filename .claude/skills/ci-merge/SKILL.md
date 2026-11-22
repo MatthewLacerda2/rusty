@@ -62,8 +62,8 @@ A batch runs `make queue ARGS=--watch` under its supervisor, `make queue-daemon`
 (`issue-batch` says how), typically `ARGS="--watch --no-check --for 70"`. The
 watch takes each **ready** PR with its **go-ahead**: a review record's `Verdict:
 queue on <sha>` on that head or one only merges followed (`independent-review`,
-step 2), or the `queue` label by hand; `hold`, a `round`/`hold` verdict or an
-unanswered `Needs:` keeps it out, re-read before each merge. Dependabot's cargo
+step 2), or the `queue` label, whatever the verdict; only the `hold` label or an
+unanswered `Needs:` keeps a labelled PR out, re-read before each merge. Dependabot's cargo
 bumps label themselves. `make queue PRS="a b c"` takes those, go-ahead or not.
 
 **Order.** The PR that textually conflicts with the fewest others in line goes

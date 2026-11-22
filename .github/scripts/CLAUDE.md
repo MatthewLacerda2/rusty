@@ -81,13 +81,18 @@ coder *changing* it must know.
 - **A ready pull request enters the line by its review verdict or a label**
   (`watch.board.queued`): the newest record's `Verdict: queue|round|hold on
   <sha>` line (`merging/verdict/standing.py`, held for that head or one only
-  merges followed), the `queue` label as the override, `hold` as the keep-out,
-  and nothing owed (`Needs:` without a later `Done:`). The listing attaches each
-  ready pull request's `standing` (`merging/queue/verdicts.py`, read once per
-  `updatedAt`); a read that fails fails the listing, so a verdict is never read
-  as absent. A pull request without a `standing` (a draft, a re-read that
-  never asked) is judged by its labels alone, as before: so every re-read that
-  asks `board.queued` goes through `queue.pulls.look_standing`, never `look`.
+  merges followed; a newest record with no line is no verdict), the `queue`
+  label as the override, taking it whatever its verdict, and `hold` as the
+  keep-out. Only the `hold` label and something owed (`Needs:` without a later
+  `Done:`) keep out a labelled one. The listing attaches each ready pull
+  request's `standing` (`merging/queue/verdicts.py`, read once per
+  `updatedAt`); a comment read that fails fails the listing, so a verdict is
+  never read as absent, while a compare that fails reads that pull request as
+  not queued by its verdict, named once in the log. A pull request without a
+  `standing` (a draft, a re-read that failed) is judged by its labels alone,
+  as before, unless the standing last read still owed a `Needs:`
+  (`verdicts.Reader.again`): so every re-read that asks `board.queued` goes
+  through `queue.pulls.look_standing`, never `look`.
 - **The verdict line's form is an interface**: the agent that writes it and the
   skills (`independent-review`, `ci-merge`) quote it; `standing.line` is how a
   script writes it. Change all three together.

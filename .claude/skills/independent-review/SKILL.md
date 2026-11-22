@@ -220,8 +220,9 @@ code first, then:
    with its own verdict line; the newest wins. What only a human can still do
    before it merges (a desktop measurement, a GPU test on the operator's
    adapter) is a `Needs: <what>` line, which keeps it out until a comment says
-   `Done: <what>`. A record without a verdict line counts as the review record
-   and leaves the go-ahead to the `queue` label. It reports, it never instructs: "sent back to the coder", never
+   `Done: <what>`. The newest record decides: one without a verdict line counts
+   as the review record and means no verdict, so an older `queue` does not
+   survive it and the go-ahead is left to the `queue` label. It reports, it never instructs: "sent back to the coder", never
    "fix in this branch" or where the new `Brief` is. A readied session still
    subscribed to the PR reads an instruction there as work, and races the fresh
    session.
