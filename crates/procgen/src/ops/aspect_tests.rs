@@ -1,5 +1,5 @@
-//! The ops with a reach in pixels, on a non-square image: each axis takes its own pixel count,
-//! checked against analytic values.
+//! The ops with a reach in pixels on a non-square image, against analytic values: each axis
+//! takes its own pixel count.
 
 use std::f32::consts::TAU;
 
@@ -56,6 +56,7 @@ fn bump_to_normal_slopes_in_one_unit_on_both_axes() {
     assert!((nx.get_wrapped(32, 3)[0] - ny.get_wrapped(5, 8)[1]).abs() < 1e-6);
 }
 
+/// `d` tile units from the nearest outside pixel's centre, less `half` a pixel of the axis.
 fn expected(d: f32, half: f32, radius: f32) -> f32 {
     ((d - half) / radius).clamp(0.0, 1.0)
 }

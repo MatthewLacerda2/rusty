@@ -157,6 +157,7 @@ fn closest(placed: &[[f32; 2]]) -> f32 {
 
 #[test]
 fn full_spacing_keeps_every_centre_its_gap_apart() {
+    // 300 stamps 0.03 across keep their size apart; 0.1 across, they crowd.
     for (size, want) in [(0.03, 0.03), (0.1, (0.5f32 / 300.0).sqrt())] {
         let gap = place::gap(1.0, 300, size);
         assert_eq!(gap, want);
@@ -195,6 +196,7 @@ fn no_stamps_bake_black_and_bad_numbers_clamp() {
     };
     let s = settings(&huge);
     assert_eq!((s.amount, s.spacing), (65_536, 0.0));
+    // An infinite scale reads one tile, jittered to 1.5: the turned square's half-diagonal.
     let one = Settings {
         amount: 1,
         scale_jitter: 1.0,

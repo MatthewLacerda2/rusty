@@ -30,7 +30,7 @@ fn sliding_blur_matches_the_naive_reference() {
         let h = (u * 91.7 + v * 13.3).sin() * (v * 47.1).cos();
         [h, u * v, 1.0 - u, h * h]
     });
-    // Small, mid, half the 32-pixel tile, and past it, where the window wraps twice.
+    // Small, mid, half the 32-pixel tile, and past it, where the window wraps over itself.
     for r in [1, 3, 8, 16, 40] {
         let (fast, slow) = (
             blur(&img, (r as f32, r as f32), BlurKind::Box),
@@ -99,6 +99,7 @@ fn a_gaussian_spreads_a_bright_pixel_symmetrically_within_its_radius() {
         assert!((on - off).abs() < 0.05 * peak, "{a:?} {on} vs {b:?} {off}");
     }
     assert_eq!(at(13, 0), 0.0, "reaches no further than its radius");
+    // σ² = (12 / 3)² = 16; the kernel is separable, so a row through the centre is g(dx)·g(0).
     let row = (-32..32).map(|dx| (dx * dx) as f32 * at(dx, 0));
     let var = row.sum::<f32>() / peak.sqrt();
     assert!((var - 16.0).abs() < 2.0, "σ² = {var}");
