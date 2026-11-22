@@ -46,11 +46,13 @@ pub(crate) fn exposes_lifecycle(code: &str) -> bool {
 
 /// `Err` (the error's first line) when the chunk fails to load or run; `Ok(false)` for a helper.
 fn offered(code: &str) -> Result<bool, String> {
-    let ran = super::sandbox::inspection_vm().and_then(|lua| lua.load(code).eval::<Value>());
+    let first_line = |e: mlua::Error| e.to_string().lines().next().unwrap_or_default().to_owned();
+    let lua = super::sandbox::inspection_vm().map_err(first_line)?;
+    let ran = lua.load(code).eval::<Value>();
     let table = match ran {
         Ok(Value::Table(table)) => table,
         Ok(_) => return Ok(false),
-        Err(e) => return Err(e.to_string().lines().next().unwrap_or_default().to_owned()),
+        Err(e) => return Err(first_line(e)),
     };
     Ok(LIFECYCLE_CALLBACKS
         .iter()
