@@ -1,9 +1,7 @@
-//! The RectTransform inspector card (#417): anchors, pivot, anchored position and
+//! The RectTransform inspector card: anchors, pivot, anchored position and
 //! size delta. Every write routes through `edit::authoring::ui::layout::rect_transform`. The
 //! Transform card above it keeps rotation and scale; its position is ignored for a
-//! rect-laid-out entity. The *World Anchor* section (#429) makes the element a
-//! marker pinned to a world point. The anchor-preset picker (#423) sits on top;
-//! an element its parent's layout group places is shown read-only, as in Unity.
+//! rect-laid-out entity. The *World Anchor* section makes the element a
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
@@ -19,9 +17,6 @@ use rusty_ui::UiView;
 
 type Setter = fn(&mut RectTransformComponent, glam::Vec2);
 
-/// RectTransform card. A THIN client (#287): widgets read a snapshot and route
-/// each write through a shared op; remove detaches the component. `screen` is the
-/// game view the UI lays out on, which a preset needs to keep the rect in place.
 pub fn draw(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -104,7 +99,6 @@ fn draw_placement(
 }
 
 /// The world anchor section over a snapshot. Returns the edited anchor (`None`
-/// inside: not a marker) when anything changed.
 fn draw_world_anchor(
     ui: &mut egui::Ui,
     anchor: Option<WorldAnchor>,

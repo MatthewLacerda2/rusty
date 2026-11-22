@@ -1,32 +1,5 @@
-//! `make bench-scenes`' editor round (#2314): the editor's own costs on a
+//! `make bench-scenes`' editor round: the editor's own costs on a
 //! project scene, which the game rounds never draw.
-//!
-//! The scene is opened as the editor opens it, in edit mode and not standalone
-//! ([`editor_world`]), so Play takes its edit snapshot and Stop restores it. Each
-//! run draws [`Round::warmup`] frames, then [`Round::frames`] measured ones, of the
-//! editor at the bench's size: the Scene tab, its default gizmos, the scene's first
-//! camera selected, the Scene view posed at the scene's first game viewpoint
-//! (`dev::bench::scenes::views::pick`: its first camera, or the fallbacks after
-//! it), with its pitch; the Scene view keeps its own lens, as the editor's does).
-//! A frame is the windowed editor's outside Play: the world's edit frame
-//! (`GameWorld::edit_frame`, timed as `edit_ms`), then the capture's
-//! ([`super::capture`]): `EditorUi::draw` and egui's tessellation (timed as
-//! `ui_ms`), the viewport's render and egui's paint (the renderer's stages and GPU
-//! passes), waited on. Then one Play entry, one Stop (to the first edit frame
-//! drawn, a frame that probes nothing) and one save each run, into the meter
-//! (`dev::bench::scenes::editor::Meter`), which returns plain rows.
-//!
-//! **The project is read-only.** The save goes to `Round::save_dir` and is
-//! deleted after; the world's store is pathless, so Stop's flush writes nothing;
-//! the process is marked standalone for the asset gate (as the bench's harness
-//! is), so Play's texture refresh compresses nothing into the project, which
-//! leaves that refresh out of `play_enter_ms`.
-//!
-//! **The save is the editor's Ctrl+S of the loaded scene**, not a Save As: the
-//! scene's bake files (`<scene>.navmesh`, `<scene>.occlusion`) are copied beside
-//! the save target first and the world's record of them handed to it
-//! (`BakeFiles::copied`), so the save keeps them, as a save over the loaded scene
-//! does, instead of rewriting every byte a Save As to a new path writes.
 
 use std::cell::RefCell;
 use std::path::PathBuf;
@@ -63,9 +36,6 @@ pub struct Round {
 }
 
 /// The scene at `scene_path` (under the working directory, the project's root)
-/// in an edit-mode editor world on `settings`, unbound: what the editor opens,
-/// minus the window, the project's store and the demo recording. `Err` with the
-/// console's lines when the scene does not load.
 pub fn editor_world(scene_path: &str, settings: ProjectSettings) -> Result<GameWorld, String> {
     rusty_asset::convert::mark_standalone();
     let (mut scene, mut console) = (Scene::new(), ConsoleLogs::new());
@@ -90,8 +60,6 @@ pub fn editor_world(scene_path: &str, settings: ProjectSettings) -> Result<GameW
     Ok(game)
 }
 
-/// Run the round over `game` (an [`editor_world`]): `Ok(None)` with no adapter
-/// (no rows are made up), `Err` when a save fails.
 pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, String> {
     let Some(mut editor) = Editor::new(game, opts) else {
         rusty_dev::capture::no_adapter("bench the editor")?;
@@ -125,8 +93,6 @@ pub fn round(game: &mut GameWorld, opts: &Round) -> Result<Option<EditorRound>, 
 }
 
 /// One Play entry, one Stop and one save, each a single sample of the run.
-/// `play_rss_mb` is the first run's alone: the pages a Stop frees stay resident,
-/// and the next run's Play re-uses them.
 fn play_stop_save(
     editor: &mut Editor,
     game: &mut GameWorld,
@@ -137,7 +103,7 @@ fn play_stop_save(
     let rss_before = rusty_dev::memory::rss_now_bytes();
     let start = Instant::now();
     game.set_playing(true);
-    game.tick(dt); // the transition: the snapshot, `enter_play`, then the first FixedUpdate
+    game.tick(dt);
     meter.single("play_enter_ms", ms_since(start));
     let rss_after = rusty_dev::memory::rss_now_bytes();
     if let (Some(before), Some(after), true) = (rss_before, rss_after, meter.first_run()) {
@@ -146,7 +112,7 @@ fn play_stop_save(
     }
     let start = Instant::now();
     game.set_playing(false);
-    game.tick(dt); // `exit_play`: the restore and the rehydrate
+    game.tick(dt);
     editor.draw(game);
     meter.single("play_stop_ms", ms_since(start));
     let path = opts.save_dir.join("editor-save.scene");
@@ -162,9 +128,6 @@ fn play_stop_save(
     Ok(())
 }
 
-/// Make a save to `save` the save of the scene loaded from `loaded`: its bake
-/// files copied beside `save` (one it has none of removed there), each with the
-/// world's record of it ([`rusty_scene::io::BakeFiles::copied`]).
 pub(super) fn stage_save(scene: &Scene, loaded: &str, save: &str) -> Result<(), String> {
     let beside = [
         rusty_scene::nav_settings::navmesh_path,

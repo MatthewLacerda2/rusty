@@ -1,21 +1,4 @@
-//! crates/ui/src/events/focus/actions.rs — input → logical navigation actions (#420, #672).
-//!
-//! The keyboard and every gamepad slot feed the same actions; only these drive
-//! focus. Unity's `InputSystemUIInputModule` defaults:
-//!
-//! | Action   | Keyboard            | Gamepad (any pad)               |
-//! |----------|---------------------|---------------------------------|
-//! | Move     | arrows              | d-pad, left stick               |
-//! | Next     | Tab                 | —                               |
-//! | Previous | Shift+Tab           | —                               |
-//! | Submit   | Enter, keypad Enter | `A` (south)                     |
-//! | Cancel   | Escape              | `B` (east)                      |
-//!
-//! **Move repeats while held** ([`MoveRepeat`]): a press moves once, then again
-//! after [`REPEAT_DELAY`], then every [`REPEAT_RATE`], counted on the sim tick's
-//! unscaled dt so a paused menu still repeats and a headless run repeats exactly.
-//! A stick counts once its magnitude reaches [`STICK_PRESS`], and its dominant
-//! axis picks the one direction, so a diagonal never moves twice.
+//! crates/ui/src/events/focus/actions.rs — input → logical navigation actions.
 
 use glam::Vec2;
 
@@ -26,7 +9,6 @@ use rusty_core::input::InputState;
 /// A logical navigation action.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum NavAction {
-    /// Move focus: `0` up, `1` down, `2` left, `3` right (the `select_on` order).
     Move(usize),
     Next,
     Previous,
@@ -38,8 +20,6 @@ pub enum NavAction {
 pub const REPEAT_DELAY: f32 = 0.5;
 /// Seconds between later repeats (Unity's `moveRepeatRate`).
 pub const REPEAT_RATE: f32 = 0.1;
-/// How far a stick must lean to count as a Move (Unity's default button press
-/// point). Its axes already passed the pad's radial dead zone at the source.
 const STICK_PRESS: f32 = 0.5;
 
 /// The keys whose press is a Move, direction-major in `select_on` order: each
@@ -59,9 +39,6 @@ fn any_pad_down(input: &InputState, suffix: &str) -> bool {
     (0..MAX_PADS).any(|pad| input.get_key_down(&pad_name(pad, suffix)))
 }
 
-/// This tick's edge actions, in a fixed order: one Move per arrow or d-pad press,
-/// then Next / Previous, Submit, Cancel. A held Move's repeats come from
-/// the event system's held-Move repeat clock, not here.
 pub fn nav_actions(input: &InputState) -> Vec<NavAction> {
     let mut actions: Vec<NavAction> = Vec::new();
     for (dir, key) in move_keys() {
@@ -114,24 +91,17 @@ pub fn held_direction(input: &InputState) -> Option<usize> {
     }
 }
 
-/// Slack for the f32 sum of tick dts, so 30 ticks of 1/60 s reach 0.5 s.
 const TICK_SLACK: f32 = 1e-4;
 
-/// A held Move's repeat clock (Unity's `consecutiveMoveCount` / `lastMoveTime`).
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct MoveRepeat {
-    /// The direction held at the last Move, if still held.
     dir: Option<usize>,
-    /// Seconds the direction has been held.
     held: f32,
-    /// When (in `held` seconds) the next repeat fires.
     next: f32,
 }
 
 impl MoveRepeat {
     /// This tick's Moves from the held direction after `dt` unscaled seconds.
-    /// `pressed` says whether this tick already had a Move edge: an edge restarts
-    /// the clock and its own Move is the press, so none is added here.
     pub fn tick(&mut self, held: Option<usize>, pressed: bool, dt: f32) -> Option<NavAction> {
         if pressed || held != self.dir {
             *self = Self {
@@ -139,7 +109,6 @@ impl MoveRepeat {
                 held: 0.0,
                 next: REPEAT_DELAY,
             };
-            // A stick leaning into a new direction is a press with no key edge.
             return held.filter(|_| !pressed).map(NavAction::Move);
         }
         let dir = self.dir?;

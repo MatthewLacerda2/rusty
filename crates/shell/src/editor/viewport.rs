@@ -14,9 +14,6 @@ use rusty_scene::Scene;
 
 /// (Re)bind a freshly-rendered offscreen `view` to a stable egui texture id so the
 /// `egui::Image` samples this frame's render — registering it lazily on first use.
-/// Shared by the viewport, the Inspector-preview render paths (#183, #352) and the
-/// headless capture. egui samples display-encoded bytes, so it gets the target's
-/// display view, never the sRGB one (#333).
 pub(super) fn rebind_egui_texture(
     egui_renderer: &mut egui_wgpu::Renderer,
     device: &wgpu::Device,
@@ -52,11 +49,6 @@ pub(super) fn target_size(size: egui::Vec2, pixels_per_point: f32) -> Option<(u3
 }
 
 /// Render the Inspector Preview tab's isolated scene into its own offscreen `view`
-/// and rebind it to `texture_id`: the viewport's two-phase contract, against
-/// `EditorUi::preview_request`/`preview_cache` instead of the game world. The window
-/// and the headless capture both call this one function, so they cannot drift. The
-/// rendered `Scene` is `preview_cache`'s freestanding value, never the live scene
-/// (#352). A no-op when the Preview tab isn't showing or the rect is degenerate.
 pub(super) fn render_preview_scene(
     (renderer, egui_renderer): (&mut Renderer, &mut egui_wgpu::Renderer),
     ui: &mut EditorUi,
@@ -69,7 +61,7 @@ pub(super) fn render_preview_scene(
     let Some((px, py)) = target_size(request.rect.size(), pixels_per_point) else {
         return;
     };
-    // A preview is not the screen: it renders natively (#1498).
+    // A preview is not the screen: it renders natively.
     let format = renderer.config.format;
     let view =
         RenderView::ensure_offscreen(view, &renderer.device, format, (px, py), Default::default());
@@ -90,10 +82,6 @@ pub(super) fn render_preview_scene(
 }
 
 impl EditorFrontend {
-    /// Render the 3D scene into the offscreen viewport target sized to the panel's
-    /// image rect, then (re)bind it to the stable egui texture id (#183). The active
-    /// tab selects the camera + mode: **Scene** = the editor's own Scene camera with
-    /// gizmos/grid (#745); **Game** = the active camera entity's view, what the player sees.
     pub(super) fn render_viewport_scene(
         &mut self,
         shell: &mut Shell,
@@ -105,16 +93,11 @@ impl EditorFrontend {
             return;
         };
         let scene_tab = interaction.tab == ViewportTab::Scene;
-        // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
         let (px, py) = interaction.render.unwrap_or(panel);
         if self.demo_size().is_none() {
-            // The UI lays out on the Game view's own size (#417), behind either tab.
             let (sx, sy) = interaction.screen.unwrap_or(panel);
             game.resources.screen.borrow_mut().set_game_view(sx, sy);
         }
-        // Create-or-resize this tab's own view. A view's resize guard checks its own
-        // size, so it never fights the other tab's or the preview's (#355). The Game
-        // view is the screen: its scene renders at the render scale (#1498).
         let renderer = &mut shell.renderer;
         let view = RenderView::ensure_offscreen(
             &mut self.viewport_views[usize::from(!scene_tab)],
@@ -123,8 +106,6 @@ impl EditorFrontend {
             (px, py),
             renderer.render_scale(scene_tab),
         );
-        // `wgpu::TextureView` is a refcounted handle, so this owned view doesn't
-        // borrow `view` and `render` can take it as the output.
         let Some(target_view) = view.color_target_view() else {
             return;
         };
@@ -144,8 +125,6 @@ impl EditorFrontend {
         ));
         renderer.render(view, &scene, &camera, &target_view, scene_tab);
         drop(scene);
-        // The game view is the screen: `Debug.GetAdaptedExposure` reads its adapted
-        // exposure (#1444).
         #[cfg(feature = "dev")]
         if !scene_tab {
             game.scene().borrow_mut().screen_exposure = view.exposure_readout();
@@ -174,13 +153,6 @@ impl EditorFrontend {
         None
     }
 
-    /// Apply the Scene-tab pointer interaction: with the UI overlay on, a drag on the
-    /// selected UI element's rect-tool handles edits its RectTransform (#423);
-    /// otherwise a drag on an axis handle translates the selection (same `Transform`
-    /// path as the inspector). A plain click picks the UI under the cursor, then the
-    /// entity (or deselects on empty space). The Game tab is view-only. Routes
-    /// through the editor's `selected_entity_id`, so inspector and overlay agree.
-    /// Picking works in points: the image rect is already in points.
     pub(super) fn handle_viewport_interaction(
         &mut self,
         game: &GameWorld,
@@ -206,7 +178,6 @@ impl EditorFrontend {
         let frame = game_size::overlay_frame(interaction, pixels_per_point, &ui.ui_textures);
         let point = glam::Vec2::new(local.x, local.y);
 
-        // 1. Continue or start a rect-tool drag, else a gizmo drag, on the selection.
         if interaction.dragging {
             let Some(id) = ui.selected_entity_id else {
                 return;
@@ -218,7 +189,6 @@ impl EditorFrontend {
                 return;
             };
             if interaction.drag_started {
-                // Handle pick radius scales with distance so far handles stay grabbable.
                 let radius = (origin - camera.position).length() * 0.06 + 0.15;
                 ui.gizmo_drag = gizmo::begin_drag(origin, ray, radius);
             }
@@ -231,8 +201,6 @@ impl EditorFrontend {
         }
         (ui.gizmo_drag, ui.rect_drag) = (None, None);
 
-        // 2. A plain click selects the UI under the cursor — the overlay, then world
-        // canvases in front of the nearest mesh — else that mesh, else deselects.
         if interaction.clicked {
             let hit = click_pick(&scene, &frame, point, ui.gizmos.on(Gizmo::Ui), ray);
             ui.selected_entity_id = hit;
@@ -242,9 +210,6 @@ impl EditorFrontend {
     }
 }
 
-/// The camera a viewport tab renders from: the Scene tab's own pose, or the scene's
-/// active camera entity (falling back to the game camera) on the Game tab. Shared
-/// with the headless capture.
 pub(super) fn viewport_camera(
     ui: &EditorUi,
     game: &GameWorld,
@@ -257,9 +222,6 @@ pub(super) fn viewport_camera(
     }
 }
 
-/// Grab (on the drag's first frame, overlay on) or continue a rect-tool drag of
-/// `(id, point)`, the selection and the pointer. Returns whether the rect tool owns
-/// the drag — the move gizmo then stays out of it.
 fn drive_rect_tool(
     ui: &mut EditorUi,
     world: &mut World,
@@ -279,8 +241,6 @@ fn drive_rect_tool(
     true
 }
 
-/// What a click at `point` selects: the UI under it (the overlay while shown, then
-/// world canvases in front of the nearest mesh), else that mesh.
 fn click_pick(
     scene: &Scene,
     frame: &OverlayFrame,

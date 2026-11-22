@@ -1,16 +1,5 @@
-//! crates/shell/src/input/clipboard.rs — the clipboard pump (#612): OS text in, the game's
+//! crates/shell/src/input/clipboard.rs — the clipboard pump: OS text in, the game's
 //! writes out.
-//!
-//! The sim reads a *captured* copy of the clipboard (`core::clipboard`), so a
-//! replay that injects the same text pastes identically. The shell captures only at
-//! the boundaries a paste can follow — a key going down with Ctrl or Cmd held (the
-//! capture lands before that key's tick), and the window regaining focus (the player
-//! copied something in another app) — rather than every frame, because an OS
-//! clipboard read is a round trip to the display server. After each tick it copies
-//! the game's `Input.SetClipboard` request to the OS.
-//!
-//! The source is a trait so tests drive the pump with a fake: CI has no clipboard
-//! to trust. The real one is [`OsClipboard`](super::clipboard_source::OsClipboard).
 
 use winit::keyboard::ModifiersState;
 

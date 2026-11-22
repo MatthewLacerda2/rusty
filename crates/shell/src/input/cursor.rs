@@ -1,10 +1,4 @@
 //! crates/shell/src/input/cursor.rs — applying the game's cursor request to the OS cursor.
-//!
-//! The sim records what the game wants ([`CursorState`]: Play defaults to locked +
-//! hidden, `Input.SetCursorLocked` / `SetCursorVisible` override it); the shell
-//! applies it here, in both frontends, whenever the effective state changes. When the
-//! game does not have input (edit mode, or the editor's Game view unfocused) the
-//! cursor is always free, so a script can never trap the editor's pointer.
 
 use rusty_core::input::CursorState;
 
@@ -44,7 +38,6 @@ impl CursorPolicy {
 
 /// Apply a cursor state to the window. A lock prefers `Locked` (the pointer stays
 /// put, raw motion keeps flowing — macOS/Wayland) and falls back to `Confined`
-/// (X11, which lacks `Locked`).
 fn apply(cursor: CursorState, window: &winit::window::Window) {
     use winit::window::CursorGrabMode;
     if cursor.locked {

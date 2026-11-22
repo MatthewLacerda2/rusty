@@ -1,4 +1,4 @@
-//! `--preview`'s arguments: the mesh name and the selection it needs (#2239).
+//! `--preview`'s arguments: the mesh name and the selection it needs.
 
 use super::*;
 

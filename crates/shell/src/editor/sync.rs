@@ -10,12 +10,6 @@ use rusty_core::application::Application;
 use rusty_editor::viewport::stats::{Clock, Readout};
 use rusty_editor::EditorUi;
 
-/// What the editor window can do for a script, marked once when it is built, before
-/// its first frame drains a command (drawn or not, a locked screen's included): it
-/// has a Scene view, so `Editor.SetGizmo` is welcome (#1909), a Game view whose size
-/// `Editor.SetGameViewSize` sets (#2207), and its frames step Generate Lighting's
-/// job, drawn or not (`EditorUi::frame_work`), so `Lighting.GenerateAsync()` is
-/// (#1999). Each only ever turns on.
 pub(super) fn mark_host(app: &mut Application) {
     app.mark_gizmo_viewer();
     app.mark_game_view_host();
@@ -30,11 +24,6 @@ impl EditorFrontend {
         self.sync_gizmos(game);
     }
 
-    /// The Config menu and `Graphics.SetQuality` (script) select through one
-    /// `Application`: select a preset picked in the menu, mirror the presets and the
-    /// running one back into it, then hand the shared cell to the renderer
-    /// (`settings::apply_graphics`), the player's graphics options beside the
-    /// preset's values (#1438, #1522).
     fn sync_quality(&mut self, shell: &mut Shell, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
         if let Some(name) = self.editor_ui.quality_request.take() {
@@ -60,22 +49,15 @@ impl EditorFrontend {
         self.editor_ui.speaker_mode = audio.speaker_mode();
     }
 
-    /// The Scene view's gizmos (#1909): take what a script's `Editor.SetGizmo`
-    /// asked (welcome here, `mark_host`), then mirror the toggles back for
-    /// `Editor.GetGizmo`.
+    /// The Scene view's gizmos: take what a script's `Editor.SetGizmo`
     fn sync_gizmos(&mut self, game: &GameWorld) {
         let mut app = game.resources.application.borrow_mut();
         app.sync_gizmos(&mut self.editor_ui.gizmos);
-        // The Game view's size (#2207), the same way: a script's set, then mirrored.
+        // The Game view's size, the same way: a script's set, then mirrored.
         app.sync_game_view(&mut self.editor_ui.game_view);
     }
 }
 
-/// The Game view's **Stats** overlay (#2205) reads the frame stats over the last
-/// second, the table `Debug.Stats{ window = 60 }` returns, and only on a frame it
-/// shows (the toggle on, the Game tab open): otherwise it folds nothing. Without
-/// the `dev` layer nothing records them, and it shows the window's `clock` alone.
-/// `timestamps`: whether the renderer times the GPU (`Renderer::times_gpu`).
 pub(super) fn sync_stats(ui: &mut EditorUi, game: &GameWorld, clock: Clock, timestamps: bool) {
     let shown = ui.viewport_tab == rusty_editor::ViewportTab::Game;
     let on = shown && ui.gizmos.on(rusty_core::application::Gizmo::Stats);

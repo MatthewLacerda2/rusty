@@ -1,5 +1,4 @@
-//! crates/ui/src/layout/fit.rs — the content size fitter (#421).
-//!
+//! crates/ui/src/layout/fit.rs — the content size fitter.
 //! Unity's `ContentSizeFitter`, carried by `LayoutElement.horizontal_fit` /
 //! `vertical_fit`: an element its parent does not arrange is laid out by its own
 //! RectTransform, then each fitted axis is resized to the element's min or

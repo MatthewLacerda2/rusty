@@ -1,4 +1,4 @@
-//! CPU text layout: wrapping, overflow, ellipsis, auto-size, alignment (#419).
+//! CPU text layout: wrapping, overflow, ellipsis, auto-size, alignment.
 
 use glam::Vec2;
 

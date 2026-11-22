@@ -1,39 +1,3 @@
-//! crates/ui/src/size_reader/mod.rs — filling the texture sizes the UI lays out with (#1221,
-//! #1241).
-//!
-//! The layout measures an `Image` by its texture's size but never reads a file; a
-//! [`TextureSizeReader`] fills the [`TextureSizes`] table it reads. The reader is
-//! part of the tick: `GameWorld::tick` refreshes the `ScreenSize` resource's table
-//! through it before stepping, so the window, the headless harness and any loop
-//! that calls `tick` lay out alike, and no caller can forget it. Each size comes
-//! from the file's **header**: no decode and no GPU. The header is the source's
-//! size whatever the device or quality preset does with the upload, as Unity's
-//! `Sprite.rect` is. The renderer draws with the same table.
-//!
-//! Only `Simple` and `Filled` Images of a file are read: a `Sliced` or `Tiled` one
-//! measures by its borders, and a render texture is never on disk. A texture an
-//! import extracted (`model.fbx#tex/Skin`) is read where the import cache holds
-//! it ([`MapRef::file`], #1256), and goes stale with its source. Freshness is the
-//! shared [`Freshness`]: a path the engine re-writes (`Texture.Bake` at a new
-//! resolution) is re-read at the next refresh, and a file that could not be read
-//! has no entry and is remembered as a miss, read again once its file appears or
-//! the engine writes it, as the renderer's own texture cache does.
-//!
-//! **A refresh with nothing to do does nothing**: no write of a file it measures
-//! (a write of any other file is passed over), no retry due, the same measured
-//! paths as last time and no hand edit of the table since
-//! ([`TextureSizes::edits`]) cost one walk of the Images and no copy of the
-//! shared table; it allocates only when the engine wrote something. When it did,
-//! even only other files, telling them apart costs a `canonicalize` of each newly
-//! written path and of each measured key ([`Stale`]'s match by another spelling of
-//! the same file), with no sweep after it. Headers are
-//! read before the table is touched, so a retried file that still cannot be read
-//! copies nothing either.
-//!
-//! The table holds only paths the scene's Images measure by: a size set by hand
-//! for any other path is dropped at the next refresh, and one set for a scene path
-//! stays until the engine re-writes that file.
-
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -47,17 +11,12 @@ use rusty_core::fs::freshness::Freshness;
 use rusty_core::fs::written::Stale;
 use rusty_ecs::World;
 
-/// The table's filler: its place in the write log, its misses, and the paths it
-/// measured last. One per `app::GameWorld`.
 #[derive(Debug, Default)]
 pub struct TextureSizeReader {
     freshness: Freshness,
-    /// Each path the scene's Images measure by, with the refresh it was last seen on.
     measured: BTreeMap<MapRef, u64>,
     /// Refreshes so far.
     refreshes: u64,
-    /// The table's [`TextureSizes::edits`] as the last refresh left it: any other
-    /// count means someone edited it by hand since. `None` before the first.
     left_at: Option<u64>,
     /// Refreshes that went past the idle check (tests).
     #[cfg(test)]
@@ -65,7 +24,6 @@ pub struct TextureSizeReader {
 }
 
 impl TextureSizeReader {
-    /// A reader that starts at the write log's current generation.
     #[cfg(test)]
     pub fn new() -> Self {
         Self::default()
@@ -89,10 +47,6 @@ impl TextureSizeReader {
         self.left_at = Some(sizes.edits());
     }
 
-    /// Whether `stale` names a path the scene's Images measure by. With the scene
-    /// and the table unchanged since the last refresh, the table and the misses
-    /// hold only measured paths, so a write of any other file leaves them as
-    /// they are.
     fn concerns(&self, stale: &Stale) -> bool {
         !stale.is_empty()
             && self
@@ -101,9 +55,6 @@ impl TextureSizeReader {
                 .any(|map| texture_ref::is_written(stale, map.as_str()))
     }
 
-    /// Drop what went stale or is no longer measured, then read every measured
-    /// header the table lacks. The headers are read before the table is touched,
-    /// so a refresh whose reads all fail copies nothing.
     fn sweep(&mut self, stale: Stale, sizes: &mut Rc<TextureSizes>) {
         let measured = &self.measured;
         let is_stale = |p: &str| texture_ref::is_written(&stale, p);
@@ -170,7 +121,7 @@ fn measured_map(img: &ImageComponent) -> Option<&MapRef> {
 }
 
 /// The size in texels `map`'s file header gives, a texture an import extracted
-/// read where the import cache holds it (#1256).
+/// read where the import cache holds it.
 fn header(map: &MapRef) -> Option<Vec2> {
     let (w, h) = image::image_dimensions(map.file()?).ok()?;
     Some(Vec2::new(w as f32, h as f32))

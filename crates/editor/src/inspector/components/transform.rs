@@ -3,7 +3,6 @@ use egui_phosphor::regular as icon;
 
 use crate::inspector::components::card::component_card;
 
-/// Transform editor with integrated parenting controls.
 #[expect(
     clippy::too_many_arguments,
     reason = "the inspector card contract: (world, id) plus the shared editor state each card draws from"
@@ -17,7 +16,6 @@ pub fn draw(
     pending_parent_change: &mut Option<Option<u32>>,
     is_dirty: &mut bool,
 ) {
-    // Transform is mandatory: a foldout card with no remove button.
     component_card(ui, icon::ARROWS_OUT_CARDINAL, "Transform", None, |ui| {
         draw_body(
             ui,
@@ -52,7 +50,6 @@ fn draw_body(
     let scl_changed = draw_scale(ui, &mut trans);
     drop(trans);
 
-    // Dropping the guard moved the subtree, colliders included (#1157).
     if pos_changed || rot_changed || scl_changed {
         *is_dirty = true;
     }
@@ -109,10 +106,7 @@ fn draw_rotation(ui: &mut egui::Ui, trans: &mut rusty_components::TransformCompo
 }
 
 /// A single degree drag field clamped to [-180, 180]. Returns whether it changed.
-/// The reflection probe card's *Rotation* uses it too (#1995).
 pub(crate) fn drag_angle(ui: &mut egui::Ui, value: &mut f32) -> bool {
-    // The Euler decomposition yields -0.0, which egui 0.36 prints as "-0". This is
-    // the field's own copy, written back only when the user drags it.
     if *value == 0.0 {
         *value = 0.0;
     }
@@ -141,7 +135,7 @@ fn draw_scale(ui: &mut egui::Ui, trans: &mut rusty_components::TransformComponen
 
 /// A single scale drag field. Unity's scale field is unbounded: negatives (a
 /// mirror), large values and 0 all stay reachable, and a drag crosses zero freely,
-/// so nothing is clamped, shown or dragged (#1142, #1159). Returns whether it changed.
+/// so nothing is clamped, shown or dragged. Returns whether it changed.
 fn drag_scale(ui: &mut egui::Ui, value: &mut f32) -> bool {
     ui.add(egui::DragValue::new(value).speed(0.05)).changed()
 }

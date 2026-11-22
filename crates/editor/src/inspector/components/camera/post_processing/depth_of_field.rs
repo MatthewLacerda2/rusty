@@ -1,5 +1,5 @@
-//! The Post Processing card's Depth of Field section (#1445): the mode, then the
-//! running mode's knobs and its quality level (#1522), through the effect's knob table, the one the `Graphics.*`
+//! The Post Processing card's Depth of Field section: the mode, then the
+//! running mode's knobs and its quality level, through the effect's knob table, the one the `Graphics.*`
 //! functions and the tween paths are made from, so the three reach the same knobs.
 
 use super::{count_row, quality_row, slider_row, Section};

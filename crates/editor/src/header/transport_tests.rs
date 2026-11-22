@@ -1,4 +1,4 @@
-//! The one transport button (#1914): Play outside Play, Stop in its place during
+//! The one transport button: Play outside Play, Stop in its place during
 //! it, the shortcut toggling both ways; and the console choice kept across Play.
 
 use egui::{Event, Key, Modifiers, Pos2};
@@ -43,7 +43,7 @@ impl Rig {
             let tail = egui::Layout::right_to_left(egui::Align::Center);
             ui.with_layout(tail, |ui| super::draw(editor, ui, scene, playing));
         });
-        output.textures_delta.clear(); // no painter here to take the font atlas
+        output.textures_delta.clear();
         let tree = output
             .platform_output
             .accesskit_update

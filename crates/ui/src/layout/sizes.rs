@@ -1,17 +1,4 @@
-//! crates/ui/src/layout/sizes.rs — the min / preferred / flexible sizes layout reads (#421).
-//!
-//! Unity's `ILayoutElement` inputs, per axis (0 width, 1 height): **min**, the size
-//! an element never shrinks below; **preferred**, the size it asks for; and
-//! **flexible**, its relative share of space left over once every sibling has its
-//! preferred size. An element's *content* supplies them — its own `LayoutGroup`
-//! (from its children), its `Text` (the measured block) and its `Image` (the
-//! native texture size); several sources combine by taking the largest. A
-//! `LayoutElement` then overrides any axis it sets. Preferred is never below min.
-//!
-//! Heights depend on widths — wrapped text is taller in a narrower box, and a
-//! nested group's rows depend on how wide its children end up — so the height
-//! queries take the width the element will have, as Unity runs its horizontal
-//! pass before its vertical one.
+//! crates/ui/src/layout/sizes.rs — the min / preferred / flexible sizes layout reads.
 
 use glam::Vec2;
 
@@ -99,9 +86,6 @@ fn content_sizes(
     s
 }
 
-/// The size `id` keeps along `axis` when nothing controls it: its content fitter's
-/// pick, else its RectTransform's `size_delta` (Unity reads `sizeDelta`, which a
-/// fitter writes).
 pub(super) fn own_size(
     world: &World,
     textures: &TextureSizes,
@@ -135,9 +119,6 @@ pub(super) fn layout_children(world: &World, id: u32) -> Vec<u32> {
         .collect()
 }
 
-/// An Image's preferred size (Unity's `Image.preferredWidth/Height`): the texture's
-/// native size from the platform's table, or for `Sliced` / `Tiled` the sum of its
-/// borders. Zero without a texture, or while the table has no size for it.
 fn image_preferred(img: &rusty_components::ImageComponent, textures: &TextureSizes) -> Vec2 {
     let Some(path) = img.texture.as_ref().map(MapRef::as_str) else {
         return Vec2::ZERO;

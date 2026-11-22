@@ -2,10 +2,6 @@
 //! `mod.rs` holds the Lua Script and Animator cards; the physics-flavoured cards
 //! live apart to stay under the size cap: the Collider card in `collider`, the
 //! RigidBody card in `physics`, the NavMesh Agent card in `nav_agent`, the NavMesh
-//! Obstacle card in `nav_obstacle`, the Off-Mesh Link card in `offmesh_link`, the
-//! NavMesh Modifier Volume and Modifier cards in `nav`, the Joint card in `joint`, the
-//! CharacterController card in `character_controller`, the AI Perception card in
-//! `ai_perception`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
@@ -39,8 +35,6 @@ pub fn draw_bodies(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_
     draw_character_controller(ui, world, id, is_dirty);
 }
 
-/// The navigation cards, in inspector order: NavMesh Agent, NavMesh Obstacle,
-/// Off-Mesh Link, NavMesh Modifier Volume, NavMesh Modifier, then the AI card: AI Perception.
 pub fn draw_navigation(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -55,10 +49,7 @@ pub fn draw_navigation(
     draw_ai_perception(ui, world, id, is_dirty);
 }
 
-/// 3D. Script bindings — one card per attached script (#83). An entity can carry
-/// many scripts; each renders as its own removable Lua Script card.
 pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
-    // Collect the index to remove (if any) so we don't mutate the vec mid-draw.
     let mut remove_index: Option<usize> = None;
     let Some(mut scripts) = world.scripts_mut(id) else {
         return;
@@ -81,8 +72,6 @@ pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_
                     format!("{}  File not found!", icon::WARNING_CIRCLE),
                 );
             }
-            // Schema-driven field controls (#84): one typed control per field the
-            // script's optional `fields` table declares. No-op for plain scripts.
             crate::inspector::components::script_fields::draw_script_fields(ui, script, is_dirty);
         });
         if remove {
@@ -95,9 +84,6 @@ pub fn draw_script(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_
     }
 }
 
-/// 3E. Animator Component — the entity's skeletal-animation playback state. The
-/// clips themselves live on the skinned mesh; this card edits which one plays and
-/// how.
 pub fn draw_animator(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -120,9 +106,6 @@ pub fn draw_animator(
     }
 }
 
-/// The Animator card's widgets: every field write routes through the shared
-/// `authoring::animator` ops (#287), the same writes the `Animator.*` Lua
-/// bindings use.
 fn animator_card_body(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -179,7 +162,7 @@ fn animator_card_body(
     draw_parameters(ui, anim);
 }
 
-/// Unity's *Apply Root Motion* toggle and the bone it reads (#1745), through the
+/// Unity's *Apply Root Motion* toggle and the bone it reads, through the
 /// same `authoring::animator` ops as `Animator.SetApplyRootMotion` / `SetRootBone`.
 fn draw_root_motion(
     ui: &mut egui::Ui,
@@ -208,10 +191,8 @@ fn draw_root_motion(
     });
 }
 
-/// The animation-graph reference (#315/#316): the `.animgraph` path driving this
+/// The animation-graph reference: the `.animgraph` path driving this
 /// animator, the auto-evaluation toggle, and (read-only) the active graph state.
-/// Writes route through the shared `authoring::animator` ops, like every other
-/// field on the card.
 fn draw_graph(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -245,9 +226,6 @@ fn draw_graph(
     }
 }
 
-/// Read-only listing of the animator's typed graph parameters (#314). They are
-/// runtime state driven by `Animator.Set*` (and, later, authored defaults on the
-/// graph asset, #315), so the card shows them without offering edits.
 fn draw_parameters(ui: &mut egui::Ui, anim: &rusty_components::AnimatorComponent) {
     if anim.parameters.is_empty() {
         return;

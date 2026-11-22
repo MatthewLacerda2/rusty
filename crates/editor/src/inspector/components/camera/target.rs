@@ -1,4 +1,4 @@
-//! The Camera card's projection mode and render-texture target (#430). Every write
+//! The Camera card's projection mode and render-texture target. Every write
 //! routes through `edit::authoring::rendering::camera`, the ops the `Camera.*` per-entity
 //! functions use.
 

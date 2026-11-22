@@ -1,5 +1,5 @@
 //! crates/shell/src/boot.rs — the boot steps of the two frontends: the editor's asset
-//! refresh (the player boots read-only, #1653), the window, the renderer, the
+//! refresh, the window, the renderer, the
 //! simulation, audio, and the assembled [`Shell`].
 
 use std::cell::RefCell;
@@ -23,22 +23,12 @@ use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
 /// The project tree an asset refresh sweeps (Unity's `Assets/`): an `.mp3`
-/// anywhere under it is converted to `.wav` (#385).
 pub const ASSET_ROOT: &str = rusty_core::project::ASSETS_DIR;
 
-/// Import what arrived in the project since the last look (Unity's asset refresh):
-/// today that is MP3 → WAV. Runs when the editor opens a project
-/// (`edit::seed_project`) and on its window's focus (`focus`); never in the
-/// player.
 pub fn refresh_assets() -> rusty_asset::audio::Refresh {
     rusty_asset::audio::refresh(std::path::Path::new(ASSET_ROOT))
 }
 
-/// The attributes of a window at `size` with `title`, named `app_id` on Linux when one
-/// is given ([`Launch::app_id`](super::Launch::app_id)). `maximized` asks the window
-/// manager to fill the screen (winit: the maximized state on Linux, the
-/// zoom to the visible frame on macOS, never native fullscreen); `size` is then only
-/// the size it returns to.
 fn window_attributes(
     title: &str,
     app_id: Option<&str>,
@@ -51,7 +41,6 @@ fn window_attributes(
         .with_maximized(maximized);
     #[cfg(target_os = "linux")]
     let attributes = match app_id {
-        // winit keeps one name for Wayland's `app_id` and X11's `WM_CLASS`.
         Some(id) => {
             winit::platform::wayland::WindowAttributesExtWayland::with_name(attributes, id, id)
         }
@@ -62,8 +51,6 @@ fn window_attributes(
     attributes
 }
 
-/// Open the window at `size` with `title` and `app_id`, `maximized` or not (the editor
-/// asks for it; the player follows its build's `window_mode` instead).
 pub fn create_window(
     event_loop: &ActiveEventLoop,
     title: &str,
@@ -92,17 +79,11 @@ pub fn init_renderer(window: &Arc<winit::window::Window>) -> Renderer {
 }
 
 /// winit's physical size as the renderer's own [`PixelSize`]: render never names
-/// winit (#988), so the shell converts at the boundary.
+/// winit, so the shell converts at the boundary.
 pub fn pixel_size(size: winit::dpi::PhysicalSize<u32>) -> PixelSize {
     PixelSize::new(size.width, size.height)
 }
 
-/// Build the simulation around the first of `plan`'s scenes that loads
-/// (`app::load_boot_scene`, #1618): shared engine state, baked nav, and the
-/// persistent store bound to its file. Every scene that fails to load is logged to
-/// the console, and when none loads (or the plan is empty) the game holds an
-/// empty, Untitled scene; one whose lighting sidecar alone fails is loaded, with a
-/// warning.
 pub fn load_game(plan: &BootPlan) -> GameWorld {
     let scene = Rc::new(RefCell::new(Scene::new()));
     let console = Rc::new(RefCell::new(ConsoleLogs::new()));
@@ -112,32 +93,21 @@ pub fn load_game(plan: &BootPlan) -> GameWorld {
         plan,
         true,
     );
-    // Baked over the scene's own bounds (#452) — the same path the headless harness takes.
+    // Baked over the scene's own bounds — the same path the headless harness takes.
     let nav = Rc::new(RefCell::new(NavigationGraph::from_scene(&scene.borrow())));
     let input = Rc::new(RefCell::new(InputState::new()));
     let mut game = GameWorld::new(scene, input, nav, console);
-    // A `Scene.LoadAsync` is prepared on a thread while frames go on, and its GPU
-    // resources made a slice per frame before it reads ready (#2123).
     game.set_scene_loader(Box::new(super::frame::load::worker::Threaded::warming()));
-    // Dev builds time the schedule so `Debug.Stats()` answers in a playtest (#433),
-    // add `Debug.*` and the bake verbs to the console's surface (#737), and record.
     #[cfg(feature = "dev")]
     {
         rusty_dev::stats::install(&mut game);
         rusty_dev::lua_surface::install_api();
-        // Every Play session is kept as a demo in `saved/demos/` (#1581).
         rusty_dev::demo::record_project(&mut game);
     }
-    // The current scene file only when the World is that file's: a startup scene
-    // that doesn't parse leaves the editor on Untitled (Unity's way), so a Save can't
-    // write an empty scene over a recoverable file (#1374).
     if let Some(path) = loaded {
         *game.script_manager().scene_path_cell().borrow_mut() = Some(path);
     }
 
-    // Bind the persistent store to its file and load it once — this boundary read is
-    // a sim input. Writes flush at Stop and on loop exit. The harness leaves the store
-    // pathless so headless runs never read this file.
     let opened = game
         .resources
         .storage
@@ -151,8 +121,6 @@ pub fn load_game(plan: &BootPlan) -> GameWorld {
     game
 }
 
-/// Open the real audio device and inject it into the `AudioMaestro` (#212). A box
-/// with no audio device keeps the no-op backend, logging instead of failing.
 fn init_audio(game: &GameWorld) {
     match rusty_audio::KiraBackend::open() {
         Some(backend) => game
@@ -178,10 +146,6 @@ fn load_keymap(game: &GameWorld) -> Keymap {
 }
 
 impl Shell {
-    /// Assemble the shell around a booted `game`: the keymap, the frame clock, the
-    /// dev command channel, and the persisted video/quality settings applied to the
-    /// surface and window. `video_defaults` is what a first launch (no saved video
-    /// settings) gets.
     pub fn new(
         window: Arc<winit::window::Window>,
         renderer: Renderer,
@@ -203,13 +167,11 @@ impl Shell {
             pads: super::input::pads::PadPump::default(),
             modifiers: winit::keyboard::ModifiersState::empty(),
             window_focused: true,
-            // A bind failure logs to the game's console and leaves the channel `None`.
             #[cfg(feature = "dev")]
             cmd_channel: rusty_dev::command_channel::CommandChannel::start(game.console()),
             #[cfg(feature = "dev")]
             frame_log: None,
         };
-        // Boundary read: apply the persisted settings before the first frame.
         settings::load(&mut shell, game, video_defaults);
         shell
     }

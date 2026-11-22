@@ -1,4 +1,4 @@
-//! `Lighting.GenerateAsync()` presses the button (#1999): the editor's next frame
+//! `Lighting.GenerateAsync()` presses the button: the editor's next frame
 //! starts the same job, `Lighting.IsRunning()` reads it running until it ends, and
 //! `Lighting.GetBakeReport` reads what it wrote.
 
@@ -83,10 +83,6 @@ pub(crate) fn status(s: &Session) -> String {
 #[test]
 fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     let (s, mut editor) = open_editor_in("generate_async_fails");
-    // The scene's folder is a file before the job starts (starting it touches no
-    // file), so every write the job makes beside the scene fails, the lighting
-    // included. Swapping it under a running job raced the job's preview writer,
-    // which recreates the folder (#2049).
     let path = editor.current_scene_path().unwrap();
     let folder = std::path::Path::new(&path).parent().unwrap();
     std::fs::remove_dir_all(folder).unwrap();

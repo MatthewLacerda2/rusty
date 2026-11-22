@@ -1,7 +1,6 @@
-//! The volume's lighting sections of the Post Processing card: Shadows (#435) and
-//! Ambient Occlusion (#436), no post effects but drawn among them.
-//!
-//! A THIN client (#287): each widget reads the snapshot and writes through the
+//! The volume's lighting sections of the Post Processing card: Shadows and
+//! Ambient Occlusion, no post effects but drawn among them.
+//! A THIN client: each widget reads the snapshot and writes through the
 //! shared `authoring::rendering::post_processing` op `Graphics.*` calls too.
 
 use super::{count_row, quality_row, slider_row, Section};
@@ -24,7 +23,7 @@ pub(super) const SSAO: Section = Section {
     draw: draw_ssao,
 };
 
-/// The Shadows section: the sun's cascade count and reach (#435).
+/// The Shadows section: the sun's cascade count and reach.
 fn draw_shadows(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -61,8 +60,8 @@ fn draw_shadows(
     });
 }
 
-/// The Ambient Occlusion section (#436): on/off, radius and strength, and its
-/// quality level with the `Custom` samples and divisor (#1522).
+/// The Ambient Occlusion section: on/off, radius and strength, and its
+/// quality level with the `Custom` samples and divisor.
 fn draw_ssao(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

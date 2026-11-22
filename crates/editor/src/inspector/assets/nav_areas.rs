@@ -1,6 +1,5 @@
 //! crates/editor/src/inspector/assets/nav_areas.rs — the scene's navigation area table
-//! (#460), inside the Navmesh section.
-//!
+//!, inside the Navmesh section.
 //! Each row shows an area's id, name and cost; a cost edit and "Add Area" write
 //! through the same `NavMeshSettings::set_area_cost` / `define_area` that
 //! `Navigation.SetAreaCost` / `DefineArea` call, then hand the new costs to the

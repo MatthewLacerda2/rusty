@@ -1,4 +1,4 @@
-//! The **Generate Lighting** card's settings (#810, #832): what the bake reads from
+//! The **Generate Lighting** card's settings: what the bake reads from
 //! the scene's lighting settings, as `Lighting.SetSettings{…}` edits them.
 
 use crate::widgets::DragRange;
@@ -42,7 +42,7 @@ pub(super) fn draw_settings(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     changed | draw_progressive(ui, s)
 }
 
-/// The paths per texel and Unity's *Direct Samples* beside them (#2355); returns
+/// The paths per texel and Unity's *Direct Samples* beside them; returns
 /// whether either changed.
 fn draw_samples(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let mut changed = false;
@@ -81,7 +81,7 @@ fn row(ui: &mut egui::Ui, drag: egui::DragValue, label: &str, hover: &str) -> bo
     .inner
 }
 
-/// The progressive bake's knobs (#1970); returns whether either changed.
+/// The progressive bake's knobs; returns whether either changed.
 fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     let per_pass = egui::DragValue::new(&mut s.samples_per_pass).ranged(BakeSettings::SAMPLES);
     let mut changed = row(
@@ -100,7 +100,7 @@ fn draw_progressive(ui: &mut egui::Ui, s: &mut BakeSettings) -> bool {
     changed
 }
 
-/// Unity's lightmap *Denoiser* (#1884); returns whether it changed.
+/// Unity's lightmap *Denoiser*; returns whether it changed.
 fn draw_denoiser(ui: &mut egui::Ui, denoiser: &mut Denoiser) -> bool {
     let before = *denoiser;
     egui::ComboBox::from_label("Denoiser")
@@ -118,8 +118,6 @@ fn draw_denoiser(ui: &mut egui::Ui, denoiser: &mut Denoiser) -> bool {
     *denoiser != before
 }
 
-/// Unity's *Max Lightmap Size* (#1704): the atlas page edge, a power of two from
-/// [`BakeSettings::MAX_LIGHTMAP_SIZE`]; returns whether it changed.
 fn draw_max_lightmap_size(ui: &mut egui::Ui, size: &mut u32) -> bool {
     let before = *size;
     let (low, high) = BakeSettings::MAX_LIGHTMAP_SIZE.into_inner();
@@ -136,8 +134,6 @@ fn draw_max_lightmap_size(ui: &mut egui::Ui, size: &mut u32) -> bool {
     *size != before
 }
 
-/// The scene's diffuse model (#1698); returns whether it changed. Live lights follow
-/// it at once, baked light from the next Generate Lighting.
 pub(super) fn draw_diffuse_model(ui: &mut egui::Ui, model: &mut DiffuseModel) -> bool {
     let before = *model;
     egui::ComboBox::from_label("Diffuse model")
@@ -154,7 +150,7 @@ pub(super) fn draw_diffuse_model(ui: &mut egui::Ui, model: &mut DiffuseModel) ->
     *model != before
 }
 
-/// The scene's Mixed Lighting Mode (#1695); returns whether it changed. It takes
+/// The scene's Mixed Lighting Mode; returns whether it changed. It takes
 /// effect at the next Generate Lighting.
 pub(super) fn draw_mixed_mode(ui: &mut egui::Ui, mode: &mut MixedLightingMode) -> bool {
     let before = *mode;

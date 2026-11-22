@@ -1,4 +1,4 @@
-//! Row / column layout-group tests (#421): force-expand, preferred sizes with
+//! Row / column layout-group tests: force-expand, preferred sizes with
 //! alignment, the min→preferred lerp, flexible weights, uncontrolled children,
 //! exclusions and nesting. Rects are relative to the panel's bottom-left.
 
@@ -128,7 +128,7 @@ fn ignored_and_inactive_children_keep_their_own_anchors() {
     // Centred by their own point anchors, 10×10.
     assert_rect(f.rect(ignored), [95.0, 45.0], [10.0, 10.0]);
     assert_rect(f.rect(hidden), [95.0, 45.0], [10.0, 10.0]);
-    // Only the arranged child is driven (the editor shows it read-only, #423).
+    // Only the arranged child is driven.
     let w = &f.scene.world;
     assert!(driven_by_group(w, only));
     assert!(!driven_by_group(w, ignored) && !driven_by_group(w, hidden));

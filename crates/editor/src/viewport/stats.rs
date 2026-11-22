@@ -1,11 +1,5 @@
-//! The Game view's **Stats** overlay (#2205), Unity's Game-view Stats: the frame's
+//! The Game view's **Stats** overlay, Unity's Game-view Stats: the frame's
 //! timings and counters over the last second, over the top-right of the image.
-//!
-//! It reads the table `Debug.Stats{ window = STATS_WINDOW }` returns, which the
-//! shell hands in as a [`Readout`] ([`crate::EditorUi::stats`]) only while the
-//! toggle is on, so the operator sees what an agent reads and a closed overlay
-//! costs nothing. A build without the `dev` layer records no stats: the overlay
-//! shows the window's own clock and says the rest needs one.
 
 use rusty_core::frame_stats::{FrameStats, Series};
 
@@ -15,9 +9,6 @@ pub const STATS_WINDOW: usize = 60;
 /// GPU pass kinds listed, heaviest first.
 const PASSES: usize = 4;
 
-/// The window's clock as the shell's frame loop reads it: its last whole-second
-/// FPS reading (`None` before its first second is up), and the last frame's ms.
-/// What the overlay shows without a table.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Clock {
     pub fps: Option<f32>,
@@ -41,9 +32,6 @@ impl From<(Option<f32>, f32)> for Clock {
     }
 }
 
-/// What the overlay shows this frame: the windowed frame stats (`None` without the
-/// `dev` layer, which records them), the window's clock, and whether the
-/// renderer's device takes GPU timestamps (`Renderer::times_gpu`).
 #[derive(Clone, Debug, Default)]
 pub struct Readout {
     pub table: Option<FrameStats>,
@@ -58,10 +46,6 @@ impl Readout {
     }
 }
 
-/// The overlay's lines, top to bottom: what [`paint`] draws, kept apart from egui
-/// so a test can read them. `timestamps` tells GPU times still on their way (they
-/// land a frame or two late, and Play's first tick clears the window) from an
-/// adapter that has none.
 pub fn lines(stats: Option<&FrameStats>, clock: Clock, timestamps: bool) -> Vec<String> {
     let rate = |fps: Option<f64>| fps.map_or("—".to_string(), |fps| format!("{fps:.0}"));
     let Some(stats) = stats else {
@@ -74,8 +58,6 @@ pub fn lines(stats: Option<&FrameStats>, clock: Clock, timestamps: bool) -> Vec<
     let avg = |key: &str| stats.get(key).map(|s| s.avg);
     let ms = |v: Option<f64>| v.map_or("—".to_string(), |v| format!("{v:.2} ms"));
     let fps = rate(avg("fps").or(clock.fps.map(f64::from)));
-    // Drawn mid-frame, so every frame in the window has its wall time (it lands
-    // as the next frame starts); before any frame, the clock's reading.
     let frame = avg("wall_ms").unwrap_or(f64::from(clock.frame_ms).max(0.0));
     let last = |key: &str| stats.get(key).map_or("—".to_string(), |s| count(s.last));
     let mut out = vec![

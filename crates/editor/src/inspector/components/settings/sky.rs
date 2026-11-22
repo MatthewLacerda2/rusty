@@ -1,4 +1,4 @@
-//! The Scene Settings panel's procedural sky section (#1620): the zenith, horizon and
+//! The Scene Settings panel's procedural sky section: the zenith, horizon and
 //! ground colours and the cloud coverage and opacity, each written through its
 //! `authoring::environment` op, the one `Lighting.Set*` calls.
 
@@ -18,8 +18,6 @@ type ColorRow = (
 /// The procedural sky section, collapsed by default like Fog.
 pub(super) fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
     let before = scene.sky;
-    // The colours drawn now, under the ambient the renderer uses (an Ambient light
-    // entity wins over the scene's colour).
     let resolved = before.resolved(scene.drawn_ambient().color);
     let sky = &mut scene.sky;
     let mut changed = false;

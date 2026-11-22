@@ -1,6 +1,6 @@
-//! The Text inspector card (#419): the string, fonts, size, colour, alignment,
+//! The Text inspector card: the string, fonts, size, colour, alignment,
 //! wrapping, overflow, spacing, auto-size, rich text and raycast target, plus the
-//! SDF effects (outline, shadow, glow) and the blend mode (#425). Widgets edit a snapshot; every write
+//! SDF effects (outline, shadow, glow) and the blend mode. Widgets edit a snapshot; every write
 //! routes through `edit::authoring::ui::text`.
 
 use crate::inspector::components::card::remove_component;
@@ -14,7 +14,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::{TextAlignment, TextComponent};
 use rusty_edit::authoring::ui::text::{self as ops, FontSlot};
 
-/// Text card. A THIN client (#287): widgets edit a snapshot and the changed
+/// Text card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back field by field through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.text(id).map(|t| t.clone()) else {

@@ -1,9 +1,7 @@
 //! Ctrl+P (Cmd+P on macOS) toggles Play from wherever the keyboard is, as Unity's
-//! does (#2525): through the whole editor frame, not the header alone, so no panel
+//! does: through the whole editor frame, not the header alone, so no panel
 //! drawn before or after it takes the key. During Play the Game view is showing and
 //! being clicked into, as when the game holds the cursor: the shell hands egui every
-//! window event whatever the game's capture (`EditorFrontend::on_window_event`), so
-//! what the editor does with the key is the whole question.
 
 use egui::{Event, Key, Modifiers, PointerButton, Pos2};
 
@@ -84,7 +82,6 @@ fn ctrl_p_plays_from_a_focused_text_field_and_stops_from_the_game_view() {
     rig.shortcut();
     assert!(rig.playing, "Ctrl+P enters Play with a text field focused");
 
-    // The shell's Play entry: the Game tab, focused and clicked into.
     rig.editor.viewport_tab = ViewportTab::Game;
     rig.click_viewport();
     assert!(rig.playing, "a click in the Game view stays in Play");

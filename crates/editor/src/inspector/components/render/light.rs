@@ -7,10 +7,8 @@ use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::rendering::light as light_ops;
 use rusty_scene::{LightComponent, LightMode, LightType};
 
-/// 3C. Light configuration. A THIN client (#287): every widget reads the field into
+/// 3C. Light configuration. A THIN client: every widget reads the field into
 /// a local and, on change, routes the write through the shared `authoring::rendering::light::*`
-/// op — never mutating `LightComponent` fields directly. Remove detaches the
-/// reference (allowed: not a field mutation).
 pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(light) = world.light(id).map(|l| l.clone()) else {
         return;
@@ -62,7 +60,7 @@ pub fn draw_light(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_d
     }
 }
 
-/// A point or spot light's reach and whether it casts shadows (#468).
+/// A point or spot light's reach and whether it casts shadows.
 fn draw_local_light(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -89,7 +87,7 @@ fn draw_local_light(
     }
 }
 
-/// A shadowed point or spot light's *Shadow Fade Distance* (#1712): `0` is off.
+/// A shadowed point or spot light's *Shadow Fade Distance*: `0` is off.
 fn draw_shadow_fade(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -132,7 +130,7 @@ fn draw_cast_shadows(
     }
 }
 
-/// An Area light's width, height, range and *Cast Shadows* (#1674). The lightmap
+/// An Area light's width, height, range and *Cast Shadows*. The lightmap
 /// bake always shadows it; the flag reaches the spot it stands in as in a bake
 /// capture (`clusters::lights::LocalLight::new`).
 fn draw_area(
@@ -172,9 +170,6 @@ fn draw_area(
     draw_cast_shadows(ui, world, id, light, is_dirty);
 }
 
-/// The light-type selector combo box, offering every type under its one name. The
-/// shared `set_type` seeds a spot's cones when they are still zero. `light` is a
-/// snapshot of the current values; writes route through the shared ops.
 fn draw_light_type(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -202,7 +197,7 @@ fn draw_light_type(
     });
 }
 
-/// The Realtime / Mixed / Baked selector (#438), Unity's Light "Mode" field.
+/// The Realtime / Mixed / Baked selector, Unity's Light "Mode" field.
 fn draw_light_mode(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -211,7 +206,6 @@ fn draw_light_mode(
     is_dirty: &mut bool,
 ) {
     if light.light_type == LightType::Area {
-        // Unity's built-in pipeline bakes area lights only (#1674).
         ui.label("Mode: Baked (Area lights bake only)");
         return;
     }
@@ -235,9 +229,6 @@ fn draw_light_mode(
     });
 }
 
-/// The spotlight cone sliders: outer (FOV) and inner cone. The shared op keeps the
-/// inner cone from exceeding the outer one; here we read both from the snapshot,
-/// edit a local, and route the pair through `set_cones`.
 fn draw_spot_cones(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -252,7 +243,6 @@ fn draw_spot_cones(
             .add(crate::widgets::slider(&mut outer, 0.1..=90.0).suffix("°"))
             .changed()
         {
-            // Outer shrank below inner ⇒ pull inner down with it (op enforces it).
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_cones(&mut l, light.inner_cone, outer);
             }
@@ -266,7 +256,6 @@ fn draw_spot_cones(
             .add(crate::widgets::slider(&mut inner, 0.0..=90.0).suffix("°"))
             .changed()
         {
-            // Inner grew past outer ⇒ raise outer to match (mirrors the old card).
             let outer = light.outer_cone.max(inner);
             if let Some(mut l) = world.light_mut(id) {
                 light_ops::set_cones(&mut l, inner, outer);

@@ -1,42 +1,4 @@
-//! crates/ui/src/layout/mod.rs — the UI layout pass: canvases + rect transforms → rectangles (#417).
-//!
-//! Pure and GPU-free: [`UiLayout::compute_in`] reads the ECS world and a [`UiView`]
-//! (the screen size, the camera and the textures' native sizes, `native`) and
-//! returns every UI element's rect, so the headless harness lays out exactly as
-//! the window does and a bot can reason about (and later hit-test) the UI.
-//!
-//! **Coordinates.** Everything is in the owning canvas's *reference units*, y-up,
-//! origin at the canvas's bottom-left — Unity's convention. Screen pixels are the
-//! same frame multiplied by the canvas scale factor (bottom-left origin, y-up).
-//!
-//! **The walk.** Each *root* canvas (a `Canvas` with no `Canvas` ancestor) spans the
-//! whole screen: its rect is `(0, 0)`–`canvas.size(screen)` and its Transform is
-//! ignored. Below it, every descendant with a `RectTransform` is laid out inside its
-//! parent's rect ([`RectTransformComponent::layout_in`]), then its Transform's
-//! rotation and scale are applied around its pivot and composed with the parent's —
-//! so a rotated panel carries its children with it. A descendant without a
-//! `RectTransform` ends the UI subtree (it and its children get no rect). A nested
-//! `Canvas` below a root is laid out like any other rect. Inactive entities are
-//! still laid out; drawing and hit-testing filter on `active`.
-//!
-//! **Layout groups (#421).** A `LayoutGroup` on an element overrides where its
-//! layout children go: the walk places each at the group's computed rect instead
-//! of its anchors (`group`, `grid`), from the min / preferred / flexible sizes
-//! its content reports (`sizes`). Any other element with a `LayoutElement`
-//! content fitter is resized to its content around its pivot (`fit`). The scene's
-//! RectTransforms are never rewritten — the pass stays a pure function, recomputed
-//! whole each tick.
-//!
-//! **Order.** [`UiLayout::iter`] yields rects in draw order: root canvases by
-//! `sort_order` (ties keep scene insertion order), then each canvas's hierarchy in
-//! pre-order (a later sibling draws on top), as in Unity.
-//!
-//! **Views (#429).** [`UiLayout::compute_in`] lays out against a [`UiView`] — the
-//! screen and the camera. A `WorldSpace` root spans its reference resolution
-//! whatever the screen; every root's [`CanvasSpace`] (screen, or a world plane) is
-//! recorded beside its rects. With a camera, an element carrying a `WorldAnchor`
-//! is a marker placed by projection (`anchor`); a hidden marker is left out with
-//! its subtree. A view with no camera ([`UiView::screen`]) places no marker.
+//! crates/ui/src/layout/mod.rs — the UI layout pass: canvases + rect transforms → rectangles.
 
 use std::collections::BTreeMap;
 
@@ -62,7 +24,6 @@ pub use native::TextureSizes;
 pub use rect::UiRect;
 pub use sizes::Sizes;
 
-/// Every UI element's computed rect, in draw order (a resource; see the module docs).
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UiLayout {
     rects: Vec<(u32, UiRect)>,
@@ -79,7 +40,6 @@ impl UiLayout {
             .filter(|&id| root_canvas_of(world, id) == Some(id))
             .filter_map(|id| Some((world.canvas(id)?.sort_order, id)))
             .collect();
-        // Stable: equal sort orders keep insertion order.
         roots.sort_by_key(|&(order, _)| order);
         let mut layout = Self::default();
         for (_, root) in roots {
@@ -91,10 +51,6 @@ impl UiLayout {
         layout
     }
 
-    /// Place every root's space again through `view`, its rects kept: what a
-    /// layout kept across frames whose rects still hold does when the camera or a
-    /// Canvas's placement (sway, tilt, plane distance) moved. Equals
-    /// [`Self::compute_in`] whenever the rects do.
     pub fn respace(&mut self, world: &World, view: &UiView) {
         for (&root, space) in &mut self.spaces {
             *space = crate::space::space_of(world, root, view);
@@ -115,9 +71,6 @@ impl UiLayout {
             .map(|(id, _)| (*id, self.space(*id)))
     }
 
-    /// Whether any laid-out root canvas lies on a plane in the world: a
-    /// `WorldSpace` canvas, or a `ScreenSpaceCamera` canvas seen through a camera
-    /// ([`crate::space::canvas_space`]). Reads the root spaces only, not the rects.
     pub fn has_world_canvas(&self) -> bool {
         self.spaces
             .values()
@@ -143,7 +96,7 @@ impl UiLayout {
             .collect();
         for child in world.children(id) {
             if self.index.contains_key(&child) {
-                continue; // a malformed hierarchy never loops the walk
+                continue;
             }
             let placed = placed.get(&child).copied();
             if let Some(child_node) = child_node(world, view, child, &node, placed) {
@@ -156,17 +109,10 @@ impl UiLayout {
 /// A laid-out element plus the matrix taking its rect's frame to canvas space.
 struct Node {
     rect: UiRect,
-    /// Maps this element's layout frame (where `rect.rect` lives, and where its
-    /// children's rects are laid out) into canvas reference units.
     to_canvas: Mat4,
-    /// The root canvas's size, when markers are placed on it (a screen-space root
-    /// seen through a camera); `None` otherwise.
     markers: Option<Vec2>,
 }
 
-/// The topmost `Canvas` on `id`'s ancestor chain (`id` itself included) — the root
-/// its UI lays out under. Bounded by the entity count, so a malformed parent cycle
-/// cannot hang it.
 fn root_canvas_of(world: &World, id: u32) -> Option<u32> {
     world
         .self_and_ancestors(id)
@@ -174,8 +120,6 @@ fn root_canvas_of(world: &World, id: u32) -> Option<u32> {
         .last()
 }
 
-/// A root canvas spans the screen (or, `WorldSpace`, its reference resolution) in
-/// reference units; its Transform only places a world canvas's plane.
 fn root_node(world: &World, id: u32, view: &UiView) -> Option<(Node, CanvasSpace)> {
     let canvas = world.canvas(id)?;
     let size = canvas.size(view.screen);
@@ -194,10 +138,6 @@ fn root_node(world: &World, id: u32, view: &UiView) -> Option<(Node, CanvasSpace
     Some((node, canvas_space(world, id, &canvas, view)))
 }
 
-/// Lay `id` out inside `parent` — pinned by its world anchor when it is a marker,
-/// at `placed` when the parent's layout group arranges it, else by its own
-/// RectTransform and content fitter — composing its pivot-centred rotation and
-/// scale. `None` when it is not a UI element, or is a hidden marker.
 fn child_node(
     world: &World,
     view: &UiView,
@@ -243,9 +183,6 @@ fn child_node(
     })
 }
 
-/// Rotation and scale around the pivot point: `T(p) · spin · R · S · T(-p)`, where
-/// `spin` is a marker's turn toward its target. The Transform's position is
-/// deliberately unused — the rect places the element.
 fn pivot_matrix(
     rt: &RectTransformComponent,
     t: &TransformComponent,

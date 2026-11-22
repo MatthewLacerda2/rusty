@@ -8,7 +8,7 @@ use rusty_edit::authoring::material as mat_ops;
 use rusty_scene::MaterialAsset;
 
 /// The map rows, in the Inspector's order: glTF's maps, then the occlusion and
-/// specular-level maps (#2151) and the height map (#2191); `OcclusionStrength` sits
+/// specular-level maps and the height map; `OcclusionStrength` sits
 /// in the surface fields, `HeightScale` in the coordinate fields.
 pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialAsset>, key: &str) {
     for (label, kind) in [
@@ -24,8 +24,6 @@ pub(super) fn draw(ui: &mut egui::Ui, materials: &mut BTreeMap<String, MaterialA
     }
 }
 
-/// Which optional map a checkbox controls — selects the shared setter + the field to
-/// read the current path from.
 #[derive(Clone, Copy)]
 enum MapKind {
     Metallic,
@@ -66,10 +64,6 @@ impl MapKind {
 }
 
 /// A "Use X Map" checkbox that, when ticked, reveals an editable map-path field.
-/// Toggling the checkbox enables (empty path) or clears the optional map; edits route
-/// through the shared op. A setter that drops an empty path (a map that darkens or
-/// scales or displaces: occlusion, specular level, height) leaves the field `None` until a path is typed,
-/// so the tick is also kept in egui's memory, per material and map, meanwhile.
 fn optional_map(
     ui: &mut egui::Ui,
     label: &str,

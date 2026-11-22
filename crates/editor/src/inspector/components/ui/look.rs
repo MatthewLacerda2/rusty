@@ -1,4 +1,4 @@
-//! Widgets the UI graphic cards share (#425): a colour row, a drag row, the blend
+//! Widgets the UI graphic cards share: a colour row, a drag row, the blend
 //! mode picker and the gradient editor (kind, direction or centre/radius, 2–4
 //! stops). They edit a snapshot; the card writes it back through its ops.
 

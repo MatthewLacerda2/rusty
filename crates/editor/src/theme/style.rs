@@ -68,7 +68,6 @@ fn visuals(t: &Theme, style: &mut Style) {
     v.warn_fg_color = t.warning;
     v.error_fg_color = t.danger;
     v.text_cursor.stroke = Stroke::new(1.5, t.accent);
-    // egui 0.27 drew a steady caret; keep it rather than egui's new blink default.
     v.text_cursor.blink = false;
     v.slider_trailing_fill = true;
     v.indent_has_left_vline = true;
@@ -81,7 +80,6 @@ fn visuals(t: &Theme, style: &mut Style) {
     let w = &mut v.widgets;
     // Labels, separators, frames.
     w.noninteractive = state(t.bg_tier1, t.outline, t.text_primary);
-    // Buttons, fields and toggles at rest: a quiet raised fill, no loud edge.
     w.inactive = state(t.bg_hover, t.bg_hover, t.text_primary);
     w.inactive.bg_fill = t.bg_tier0;
     w.hovered = state(t.outline, t.outline, Color32::WHITE);

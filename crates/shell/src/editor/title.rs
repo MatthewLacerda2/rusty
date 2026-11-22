@@ -1,11 +1,7 @@
 //! crates/shell/src/editor/title.rs — the editor window's title, Unity's place for the
-//! open scene's name (#1914): `<project> - <scene>`, with a `*` while the edit scene
+//! open scene's name: `<project> - <scene>`, with a `*` while the edit scene
 //! has unsaved changes (`EditorUi::is_dirty`). The window is told only when the
 //! string changes. The player keeps its launch title.
-//!
-//! The title also keeps the dirty mark honest across Play: what Play edits is
-//! thrown away on Stop, so the mark Play found is put back when it ends, and a
-//! scene swapped in outside Play (a scripted `Scene.Load`) starts clean.
 
 use winit::window::Window;
 
@@ -23,11 +19,8 @@ pub(super) fn text(project: &str, scene: &str, dirty: bool) -> String {
 pub(super) struct Title {
     /// The project's folder name, as Unity titles its window.
     project: String,
-    /// The title the window holds; empty until the first frame sets it.
     shown: String,
-    /// The edit scene's identity, to notice a swap outside Play.
     scene: Option<SceneId>,
-    /// The dirty mark when Play began; `Some` while playing.
     dirty_at_play: Option<bool>,
 }
 
@@ -58,8 +51,6 @@ impl Title {
         }
     }
 
-    /// Keep `dirty` to the edit scene: remember it when Play begins, put it back when
-    /// Play ends, and clear it when another scene arrives outside Play.
     fn track(&mut self, dirty: &mut bool, playing: bool, id: SceneId) {
         match (playing, self.dirty_at_play) {
             (true, None) => self.dirty_at_play = Some(*dirty),

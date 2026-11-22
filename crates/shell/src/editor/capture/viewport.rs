@@ -19,7 +19,7 @@ pub(super) fn render_viewport(
     texture_id: &mut Option<egui::TextureId>,
 ) -> Option<(u32, u32)> {
     let scene_tab = ui.viewport_tab == ViewportTab::Scene;
-    // The Game view's own size, letterboxed: a demo's (#1598) or the dropdown's (#2207).
+    // The Game view's own size, letterboxed: a demo's or the dropdown's.
     let size = drawn.size;
     let panel = (size.x.round() as u32, size.y.round() as u32);
     let (px, py) = drawn.render.unwrap_or(panel);
@@ -27,11 +27,11 @@ pub(super) fn render_viewport(
         return None;
     }
     if ui.demo_size().is_none() {
-        // The Game view's own size behind the Scene tab too, as the window's (#2207).
+        // The Game view's own size behind the Scene tab too, as the window's.
         let (sx, sy) = drawn.screen.unwrap_or(panel);
         game.resources.screen.borrow_mut().set_game_view(sx, sy);
     }
-    // The settings first: the Game view's scene renders at the render scale (#1498).
+    // The settings first: the Game view's scene renders at the render scale.
     let renderer = host.renderer(px, py)?;
     let display_scale = game.resources.screen.borrow().display_scale();
     renderer.apply_graphics(

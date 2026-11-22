@@ -1,26 +1,4 @@
-//! crates/editor/src/viewport/rect_tool/ — authoring UI in the Scene view (#423).
-//!
-//! Unity's Rect Tool over the Scene tab's **UI overlay** (its toggle draws the
-//! screen-space canvases over the scene): drag inside the selected element to move
-//! it (`anchored_position`), its edges and corners to resize it (`size_delta`, the
-//! opposite side held), its pivot disc to move the pivot without moving the rect.
-//! Anchors show as Unity's four triangles. Every write goes through the
-//! `edit::authoring::ui::layout::rect_transform` setters the inspector card and the Lua
-//! `RectTransform.*` verbs use, so nothing here is an editor-only capability.
-//!
-//! **What it edits.** Elements on screen canvases (`ScreenSpaceOverlay`, and
-//! `ScreenSpaceCamera`, whose plane fills the view the overlay shows). An element a
-//! layout group places, a world-anchored marker and a root canvas are drawn
-//! read-only, as Unity greys them. World-space canvases are click-selectable but
-//! not dragged here (their numbers are on the card).
-//!
-//! **Click-select** runs `UI.Raycast`'s hit-test ([`raycast_pointer`]): the overlay
-//! canvases first, then the world canvases along the Scene camera's ray, stopped
-//! at the nearest mesh. So only raycast targets (an `Image` / `Text` with
-//! `raycast_target`) are picked by clicking; anything else is picked in the
-//! hierarchy.
-//!
-//! This module is egui-free maths and state; `overlay` paints it.
+//! crates/editor/src/viewport/rect_tool/ — authoring UI in the Scene view.
 
 pub mod geometry;
 pub mod overlay;
@@ -37,18 +15,8 @@ use rusty_ui::events::raycast_pointer;
 use rusty_ui::layout::driven_by_group;
 use rusty_ui::{CanvasSpace, TextureSizes, UiLayout, UiPointer, UiRect, UiView};
 
-/// How close (viewport points) the pointer must be to grab a handle.
 const HANDLE_RADIUS: f32 = 7.0;
 
-/// The Scene viewport image as the overlay sees it: its size in points, the
-/// pixels per point the offscreen target was sized with, the Game view's own pixel
-/// size when it has one, and the texture sizes the UI lays out with
-/// (`EditorUi::ui_textures`).
-///
-/// The overlay lays the UI out at the screen the game does: the Game view's own
-/// size (`game`), boxed in the Scene image at its aspect ratio as the Game tab
-/// letterboxes it, else the image's own pixels. The renderer draws the screen
-/// canvases into the same box (`UiViewCache::screen_box`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct OverlayFrame {
     pub size: Vec2,
@@ -58,8 +26,6 @@ pub struct OverlayFrame {
 }
 
 impl OverlayFrame {
-    /// The frame of an image `size` points wide at `pixels_per_point`, showing the
-    /// Game view's own size `game` when it has one.
     pub fn new(
         size: Vec2,
         pixels_per_point: f32,
@@ -75,8 +41,6 @@ impl OverlayFrame {
         }
     }
 
-    /// The screen the overlay lays out on: the Game view's own size, else the
-    /// viewport target's pixel size.
     pub fn screen(&self) -> Vec2 {
         match self.game {
             Some((w, h)) => Vec2::new(w as f32, h as f32).max(Vec2::ONE),
@@ -105,15 +69,12 @@ impl OverlayFrame {
     }
 
     /// The UI screen pixel (bottom-left origin, y-up) under viewport point `p`
-    /// (top-left origin, y-down).
     pub fn pixel(&self, p: Vec2) -> Vec2 {
         let (origin, extent) = self.boxed();
         let q = p - origin;
         Vec2::new(q.x, extent.y - q.y) * self.per_point()
     }
 
-    /// The viewport point showing canvas point `c` of a canvas at `scale` pixels
-    /// per reference unit.
     pub fn to_local(&self, c: Vec2, scale: f32) -> Vec2 {
         let (origin, extent) = self.boxed();
         let pt = c * scale / self.per_point();
@@ -163,15 +124,12 @@ pub fn target(world: &World, layout: &UiLayout, id: u32) -> Option<Target> {
     })
 }
 
-/// A live rect-tool drag.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RectDrag {
     pub id: u32,
     pub handle: Handle,
 }
 
-/// Grab a handle of the selected element `id` at viewport point `p`; `None` when
-/// it is read-only, not on the overlay, or `p` misses it.
 pub fn begin(world: &World, frame: &OverlayFrame, id: u32, p: Vec2) -> Option<RectDrag> {
     let t = target(world, &frame.layout(world), id).filter(|t| t.editable)?;
     let to = |c: Vec2| frame.to_local(c, t.rect.scale_factor);
@@ -179,8 +137,6 @@ pub fn begin(world: &World, frame: &OverlayFrame, id: u32, p: Vec2) -> Option<Re
     Some(RectDrag { id, handle })
 }
 
-/// Apply a pointer move of `d` viewport points to the drag through the shared
-/// setters. Returns whether anything was written.
 pub fn apply(world: &mut World, frame: &OverlayFrame, drag: RectDrag, d: Vec2) -> bool {
     let Some(t) = target(world, &frame.layout(world), drag.id) else {
         return false;
@@ -198,9 +154,6 @@ pub fn apply(world: &mut World, frame: &OverlayFrame, drag: RectDrag, d: Vec2) -
     delta != Vec2::ZERO
 }
 
-/// The UI element a click at viewport point `p` picks: the overlay canvases when
-/// `overlay` is on, then the world canvases along `ray` (origin, unit direction)
-/// up to `limit` metres — `UI.Raycast`'s own hit-test.
 pub fn pick(
     world: &World,
     frame: &OverlayFrame,

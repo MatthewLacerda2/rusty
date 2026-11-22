@@ -1,9 +1,8 @@
 //! crates/editor/src/inspector/components/gameplay/offmesh_link.rs — the Off-Mesh Link
-//! card (#462).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! card.
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::nav::offmesh_link` ops the `OffMeshLink.*` Lua setters call. A
-//! link is a navmesh input: the editor's per-frame nav sync (#992) picks an edit
+//! link is a navmesh input: the editor's per-frame nav sync picks an edit
 //! up (links only: no spans change).
 
 use crate::inspector::components::card::remove_component;
@@ -24,7 +23,7 @@ fn write(world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool, op: impl Fn
     *is_dirty = true;
 }
 
-/// The cost override and the area (#460) rows.
+/// The cost override and the area rows.
 fn draw_cost_and_area(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

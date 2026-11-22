@@ -1,18 +1,11 @@
-//! The card's file path fields: the Color Lookup's LUT (#1441) and Bloom's lens
-//! dirt (#1442), one [`PathField`] each in [`FIELDS`]. A path is written when its
+//! The card's file path fields: the Color Lookup's LUT and Bloom's lens
+//! dirt, one [`PathField`] each in [`FIELDS`]. A path is written when its
 //! field is left, not per keystroke, so the renderer never tries, and logs, every
 //! half-typed path. Left means any way: Enter, a click away, or the card no longer
-//! drawn (another entity selected, an asset opened), which egui reports as no focus
-//! loss at all. Escape reverts.
-//!
-//! While a field is focused its text is a [`Draft`] in egui's memory, stamped with
-//! the pass that drew it; [`commit_abandoned`], called by the inspector every pass,
-//! writes a draft whose field was not drawn last pass.
 
 use rusty_edit::authoring::rendering::post_processing as vc_ops;
 use rusty_scene::{PostProcessingComponent, Scene};
 
-/// One path field: what it is called, what it reads and the op that writes it.
 pub(super) struct PathField {
     /// Names its draft in egui's memory.
     pub id: &'static str,
@@ -43,7 +36,6 @@ pub(super) const DIRT: PathField = PathField {
 /// Every path field, for [`commit_abandoned`].
 const FIELDS: &[&PathField] = &[&DIRT, &LUT];
 
-/// The text being typed, for which entity, and the last pass that drew it.
 #[derive(Clone)]
 struct Draft {
     entity: u32,
@@ -96,9 +88,6 @@ pub(super) fn draw(
     }
 }
 
-/// Write each draft whose field was not drawn last pass (its card was left), so a
-/// path typed and then abandoned by selecting something else still lands.
-/// Returns whether the scene changed.
 pub fn commit_abandoned(ctx: &egui::Context, scene: &mut Scene) -> bool {
     let mut changed = false;
     for field in FIELDS {

@@ -1,4 +1,4 @@
-//! Shaped layout (#1328): determinism, ligatures and marks through `layout_text`.
+//! Shaped layout: determinism, ligatures and marks through `layout_text`.
 //! Clusters under spacing, styles and cuts: `cluster_tests`.
 
 use glam::Vec2;

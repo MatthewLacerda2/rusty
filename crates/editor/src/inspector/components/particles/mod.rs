@@ -1,15 +1,4 @@
 //! crates/editor/src/inspector/components/particles/ — the Particle System inspector card.
-//!
-//! Edits every serde-persisted field of `ParticleEmitterComponent`: emission mode,
-//! simulation space and target (CPU or GPU), blend, collision response, the rate/burst/cap counts, the shape and per-particle
-//! motion, the start ranges (`start.rs`), the over-life curves and gradient and
-//! the sub-emitters (`over_life.rs`), how the particles are drawn (`render.rs`),
-//! restitution, and the deterministic seed. The live particle count (transient runtime) is shown
-//! read-only so an author can see the emitter working in Play.
-//!
-//! A THIN client (#287): each widget reads its field from a snapshot and routes
-//! the write through a shared `authoring::particles::*` op. The `Particles.*` Lua
-//! surface's `SetActive` / `SetRate` call the same ops — one shared write.
 
 mod over_life;
 mod render;
@@ -27,9 +16,6 @@ use rusty_components::{ParticleSimulation, SimulationSpace};
 use rusty_edit::authoring::particles as particle_ops;
 use rusty_scene::{CollisionResponse, EmitMode, ParticleEmitterComponent};
 
-/// The Rate and Max Particles fields' ranges for an emitter simulated on
-/// `simulation`: a `Cpu` emitter's gameplay counts, or as many as a `Gpu` one's
-/// fixed cap holds (#2170), a rate that fills it in a second included.
 fn emission_ranges(
     simulation: ParticleSimulation,
 ) -> (std::ops::RangeInclusive<f32>, std::ops::RangeInclusive<u32>) {
@@ -39,7 +25,7 @@ fn emission_ranges(
     }
 }
 
-type Cx<'w> = (&'w mut rusty_ecs::World, u32); // world + entity id, as one param
+type Cx<'w> = (&'w mut rusty_ecs::World, u32);
 /// Routes a field write through the shared particle-authoring op; a no-op absent.
 fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
     if let Some(mut c) = cx.0.particles_mut(cx.1) {
@@ -49,7 +35,6 @@ fn apply(cx: &mut Cx<'_>, f: impl FnOnce(&mut ParticleEmitterComponent)) {
 /// 3F-particles. Particle System component card.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     // The configuration only: the live particles are never copied (a `Gpu`
-    // emitter keeps a birth per live particle).
     let Some((p, live)) = world.particles(id).map(|p| (p.config(), p.live_count())) else {
         return;
     };

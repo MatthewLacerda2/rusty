@@ -1,8 +1,4 @@
-//! crates/shell/src/editor/start/picker.rs — the project picker as a shell prelude (#854).
-//!
-//! egui on the window before any project is open: [`PickerStage`] feeds it window
-//! events, draws [`ProjectPicker`] each frame and opens the folder it chooses. A
-//! folder that fails to open stays in the picker with the error shown.
+//! crates/shell/src/editor/start/picker.rs — the project picker as a shell prelude.
 
 use std::sync::Arc;
 
@@ -80,7 +76,7 @@ impl Prelude for PickerStage {
         }
     }
 
-    /// Nothing moves on the picker: it draws when it is touched (#1721).
+    /// Nothing moves on the picker: it draws when it is touched.
     fn pace(&self) -> Pace {
         Pace::OnDemand {
             next: self.repaint_at,

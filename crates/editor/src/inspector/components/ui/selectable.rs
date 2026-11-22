@@ -1,4 +1,4 @@
-//! The Selectable inspector card (#420): interactable, the transition with its
+//! The Selectable inspector card: interactable, the transition with its
 //! target graphic and per-state colours / sprites, and navigation with its explicit
 //! targets. Widgets edit a snapshot; every write routes through
 //! `edit::authoring::ui::selectable`.
@@ -14,7 +14,7 @@ use rusty_asset::MapRef;
 use rusty_components::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
 use rusty_edit::authoring::ui::selectable as ops;
 
-/// Selectable card. A THIN client (#287): widgets edit a snapshot and the changed
+/// Selectable card. A THIN client: widgets edit a snapshot and the changed
 /// snapshot is written back through the shared ops; remove detaches.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(mut edit) = world.selectable(id).map(|s| s.clone()) else {

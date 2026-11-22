@@ -1,23 +1,4 @@
-//! crates/ui/src/space.rs — where a canvas lives: on the screen, or on a plane in the world (#429).
-//!
-//! Every canvas lays out in its own reference units (`layout`); this module says
-//! where those units end up. A [`CanvasSpace::Screen`] canvas is the overlay: a
-//! reference unit is `scale_factor` screen pixels. A [`CanvasSpace::World`] canvas
-//! is a plane in the scene, reached through one matrix from reference units to
-//! world space — the renderer draws through it and the hit-test intersects the
-//! pointer's camera ray with it, so what is drawn is what is hit.
-//!
-//! - `WorldSpace`: centred on the canvas entity's world transform, facing its +Z,
-//!   `pixels_per_unit` reference units to the metre.
-//! - `ScreenSpaceCamera`: a plane `plane_distance` in front of the camera that fills
-//!   the view there, tilted about its centre and swung about the eye by the sway
-//!   lag (`ui::sway`). Without a camera it is the overlay.
-//!
-//! [`UiView`] is what the UI is computed against — the screen size and the
-//! textures' native sizes (sim inputs, `ScreenSize`) and the camera looking
-//! through it — and makes the [`UiPointer`] a tick's input
-//! hit-tests with: the screen point, and the camera ray through it (the screen
-//! centre while the cursor is locked, for "look at it and press E" terminals).
+//! crates/ui/src/space.rs — where a canvas lives: on the screen, or on a plane in the world.
 
 use std::rc::Rc;
 
@@ -28,7 +9,6 @@ use rusty_components::{CanvasComponent, CanvasRenderMode};
 use rusty_ecs::World;
 use rusty_scene::Camera;
 
-/// The screen and the camera the UI is laid out, drawn and hit-tested against.
 #[derive(Clone)]
 pub struct UiView {
     /// The screen size in pixels (see `ScreenSize`).
@@ -59,8 +39,6 @@ impl UiView {
         }
     }
 
-    /// The pointer for a mouse at `mouse` (UI screen pixels), or a locked cursor
-    /// (`None`): off the screen canvases, its ray through the screen centre.
     pub fn pointer(&self, mouse: Option<Vec2>) -> UiPointer {
         let through = mouse.unwrap_or(self.screen * 0.5);
         UiPointer {
@@ -74,9 +52,6 @@ impl UiView {
     }
 }
 
-/// Where the pointer is this tick: on the screen canvases (`screen`, UI pixels) and
-/// in the world (`ray`, origin + unit direction, reaching `ray_limit` metres — the
-/// nearest wall, so a world canvas behind one is not clicked through it).
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct UiPointer {
     pub screen: Option<Vec2>,
@@ -84,13 +59,10 @@ pub struct UiPointer {
     pub ray_limit: f32,
 }
 
-/// Where one canvas's reference units end up.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum CanvasSpace {
-    /// On the screen: `scale_factor` pixels per reference unit.
     #[default]
     Screen,
-    /// On a plane in the world: reference units `(x, y, 0)` → world space.
     World(Mat4),
 }
 
@@ -127,9 +99,6 @@ pub fn canvas_space(
     }
 }
 
-/// Where `ray` crosses the plane of `to_world` (a [`CanvasSpace::World`] matrix):
-/// the point in the canvas's reference units and the distance along the ray. `None`
-/// when the plane is behind the ray's origin or parallel to it. Both faces hit.
 pub fn ray_to_canvas(to_world: Mat4, (origin, dir): (Vec3, Vec3)) -> Option<(Vec2, f32)> {
     let local = to_world.inverse();
     let o = local.transform_point3(origin);
@@ -146,9 +115,6 @@ pub fn ray_to_canvas(to_world: Mat4, (origin, dir): (Vec3, Vec3)) -> Option<(Vec
     Some((point, (hit - origin).length()))
 }
 
-/// Where a canvas point (reference units) lands on the screen, in UI pixels — or
-/// `None` for a world canvas point behind the camera. `scale` is the canvas's scale
-/// factor.
 pub fn canvas_to_screen(space: CanvasSpace, scale: f32, p: Vec2, view: &UiView) -> Option<Vec2> {
     match (space, &view.camera) {
         (CanvasSpace::Screen, _) => Some(p * scale),
@@ -168,8 +134,6 @@ pub fn space_of(world: &World, id: u32, view: &UiView) -> CanvasSpace {
         .unwrap_or_default()
 }
 
-/// The screen-pixel bounds `(min, max)` of `rect`'s final quad in `space` — the
-/// projected quad for a world canvas, `None` when a corner is behind the camera.
 pub fn rect_screen_bounds(
     space: CanvasSpace,
     rect: &UiRect,

@@ -1,13 +1,5 @@
 //! crates/shell/src/editor/undrawn.rs — the editor's frame on a window that cannot
 //! draw: the screen locked, the window occluded or minimised.
-//!
-//! The shell still runs that frame: it ticks the sim and drains the command channel,
-//! so the attach bridge keeps answering. Only the paint is skipped, and the egui
-//! pass with it. This runs the frame's work that paints nothing, so work an agent
-//! asked for never waits on a redraw: a `Lighting.GenerateAsync()` starts and steps
-//! to its end and an edit reaches the navmesh (`EditorUi::frame_work`, the list a
-//! drawn frame runs too), a file changed on disk reaches the caches and the open
-//! scene follows it.
 
 use super::EditorFrontend;
 use rusty_app::GameWorld;

@@ -1,18 +1,4 @@
-//! crates/editor/src/project_picker/ — the editor's project picker on start (#854).
-//!
-//! Unity Hub's model: the editor started without `--project` shows the projects
-//! opened before, *New Project* and *Open*, and opens nothing until one is chosen.
-//! This is the egui half (what is drawn and what a click means); the shell's
-//! picker stage (`shell::editor::picker`) runs it on the window before any project
-//! is open, opens the chosen folder, and hands the window to the editor.
-//!
-//! [`ProjectPicker::draw`] returns the folder to open only once it is safe to: an
-//! existing folder must already be a project ([`core::project::is_project`]), and
-//! one last opened by another engine asks first ([`check_existing`]). Both rules,
-//! and the recent list, are rusty bench's (`core::project::bench`, #942), shared with
-//! the session MCP.
-//!
-//! [`core::project::is_project`]: rusty_core::project::is_project
+//! crates/editor/src/project_picker/ — the editor's project picker on start.
 
 pub mod browse;
 mod list;
@@ -33,7 +19,6 @@ pub const DEFAULT_NEW_NAME: &str = "My project";
 pub enum Page {
     /// The recent-projects list.
     Projects,
-    /// *New Project*: a parent folder and a name.
     New {
         browser: FolderBrowser,
         name: String,
@@ -59,26 +44,18 @@ pub(crate) enum Action {
 /// The picker's state across frames.
 pub struct ProjectPicker {
     pub recent: RecentProjects,
-    /// Where removals are saved; `None` keeps them in memory (the capture).
     recent_path: Option<PathBuf>,
     pub page: Page,
-    /// A project last opened by another engine, waiting on *Open anyway*: its
-    /// folder and the warning shown.
     pub confirm: Option<(PathBuf, String)>,
     /// The last failure, shown under the page until the next action.
     pub error: Option<String>,
-    /// The project just taken off the list and where it sat, kept for *Undo* until
-    /// the next action.
     pub removed: Option<(usize, RecentProject)>,
-    /// A row to give keyboard focus on the next frame (the capture's focus ring).
     pub focus_row: Option<usize>,
     home: PathBuf,
     fonts_installed: bool,
 }
 
 impl ProjectPicker {
-    /// A picker over `recent`, saving removals to `recent_path`, with `home` as the
-    /// browsers' Home.
     pub fn new(recent: RecentProjects, recent_path: Option<PathBuf>, home: PathBuf) -> Self {
         Self {
             recent,
@@ -121,8 +98,6 @@ impl ProjectPicker {
         self.error = Some(err);
     }
 
-    /// Draw one frame. `now` (Unix seconds) dates the list. Returns the folder to
-    /// open once one is chosen and, if needed, confirmed.
     pub fn draw(&mut self, ctx: &egui::Context, now: u64) -> Option<PathBuf> {
         if !self.fonts_installed {
             crate::theme::Theme::install_fonts(ctx);
@@ -176,8 +151,6 @@ impl ProjectPicker {
         None
     }
 
-    /// Open an existing folder: refused unless it is a project, held for a yes when
-    /// another engine last opened it.
     fn request_existing(&mut self, dir: PathBuf) -> Option<PathBuf> {
         match check_existing(&dir) {
             Ok(None) => Some(dir),
@@ -206,8 +179,6 @@ impl ProjectPicker {
         }
     }
 
-    /// Where the browsers start: the folder holding the latest project that still
-    /// exists, else home.
     fn start_dir(&self) -> PathBuf {
         self.recent
             .projects

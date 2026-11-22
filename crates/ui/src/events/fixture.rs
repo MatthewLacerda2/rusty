@@ -1,4 +1,4 @@
-//! Test fixture for the event system (#420): a 1920×1080 canvas (scale 1, so UI
+//! Test fixture for the event system: a 1920×1080 canvas (scale 1, so UI
 //! pixels are reference units), image panels placed by their bottom-left corner,
 //! a set of script handlers, and a one-call tick.
 
@@ -16,7 +16,6 @@ use rusty_scene::{Camera, Scene};
 
 pub const SCREEN: Vec2 = Vec2::new(1920.0, 1080.0);
 
-/// A scene with one root canvas; returns it and the canvas id.
 pub fn scene() -> (Scene, u32) {
     let mut scene = Scene::new();
     let canvas = scene.add_entity("Canvas".to_string());
@@ -26,7 +25,6 @@ pub fn scene() -> (Scene, u32) {
     (scene, canvas)
 }
 
-/// An Image panel under `parent` covering `min .. min + size` (UI pixels).
 pub fn panel(scene: &mut Scene, parent: u32, min: Vec2, size: Vec2) -> u32 {
     let id = scene.add_entity("Panel".to_string());
     let rt = RectTransformComponent {
@@ -73,7 +71,6 @@ pub struct Rig {
     pub camera: Option<Camera>,
     /// How far the nearest wall is along every ray.
     pub wall: f32,
-    /// How many times the event system has asked for the wall along a ray.
     pub wall_casts: u32,
 }
 

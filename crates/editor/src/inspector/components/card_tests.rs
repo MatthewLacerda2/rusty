@@ -1,4 +1,4 @@
-//! A card's Remove button (#992): the cascading verb behind `Scene.RemoveComponent`,
+//! A card's Remove button: the cascading verb behind `Scene.RemoveComponent`,
 //! so a dependent leaves with what it requires, and the scene is marked unsaved.
 
 use super::remove_component;

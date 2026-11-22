@@ -1,18 +1,3 @@
-//! crates/editor/src/menu_create.rs — the **GameObject** menu (Unity-style authoring).
-//!
-//! The single, discoverable home for creating objects, mirroring Unity's
-//! `GameObject` menu: **Create Empty**, **3D Object ▸** (Cube / Sphere / Plane /
-//! Cylinder / Capsule), **UI ▸** (Canvas, Panel, Image, Text and the widget kit, #422 — via
-//! `widgets::create_ui`, the path `UI.Create` takes) and **Light ▸**
-//! (Directional / Point / Spot). Object creation used to
-//! live in the Hierarchy toolbar (#255); it moved here so the Hierarchy does one
-//! job (show + select the tree).
-//!
-//! Every entry routes through the SAME shared create path the `Scene.CreateEntity`
-//! API uses (`edit::authoring::create_entity`), so editor and API can never drift:
-//! there is no second creation path, just a new entry point that then selects the
-//! new entity and marks the scene dirty.
-
 use egui_phosphor::regular as icon;
 
 use crate::EditorUi;
@@ -82,7 +67,7 @@ fn spawn(editor: &mut EditorUi, scene: &mut Scene, name: &str, primitive: Option
 /// Select a just-created entity and mark the scene dirty.
 fn select_new(editor: &mut EditorUi, new_id: u32) {
     editor.selected_entity_id = Some(new_id);
-    editor.selected_asset_path = None; // entity selection is exclusive of asset selection
+    editor.selected_asset_path = None;
     editor.is_dirty = true;
 }
 

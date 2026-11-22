@@ -1,14 +1,7 @@
-//! The Material card's *Delete* (#1576): take the material the card edits out of
+//! The Material card's *Delete*: take the material the card edits out of
 //! the scene's library, as deleting a material asset in Unity does. A click asks
 //! for a confirm that lists the material's users; confirming deletes it through
 //! the shared `authoring::material::delete_asset` op `Material.DeleteAsset` calls
-//! (with `force`, so each user falls back to its default material). The editor's
-//! Undo (`scene::undo`, #1631) puts the asset and every user it moved back.
-//!
-//! Listing users and deleting need the whole `Scene` (live decals are users), so
-//! the card only emits a [`MaterialAction`], applied after the card pass. The
-//! confirm belongs to the scene it was made in: a scene change drops it
-//! ([`MaterialDelete::keep_scene`]).
 
 use crate::EditorUi;
 use rusty_edit::authoring::material as mat_ops;
@@ -25,13 +18,10 @@ pub struct MaterialDelete {
 struct Confirm {
     scene: SceneId,
     key: String,
-    /// Its users, as the confirm lists them.
     users: Vec<String>,
 }
 
 impl MaterialDelete {
-    /// Drop the confirm when it was made in a scene other than `scene`, the one
-    /// the inspector now shows.
     pub fn keep_scene(&mut self, scene: SceneId) {
         if self.confirm.as_ref().is_some_and(|c| c.scene != scene) {
             self.confirm = None;
@@ -41,15 +31,12 @@ impl MaterialDelete {
 
 /// What a click on the card asked for.
 pub enum MaterialAction {
-    /// Show the confirm for this material.
     Ask(String),
     /// Delete this material.
     Delete(String),
     Cancel,
 }
 
-/// Draw the card's *Delete* row for library material `key`: the confirm while one
-/// is up for `key`, else the delete button.
 pub(super) fn draw(
     ui: &mut egui::Ui,
     state: &MaterialDelete,
@@ -149,7 +136,6 @@ mod tests {
         assert!(!scene.materials.contains_key("tile"));
     }
 
-    /// The editor's one Undo takes a delete back (#1631): the card keeps none.
     #[test]
     fn the_editors_undo_takes_a_delete_back() {
         let mut editor = EditorUi::new(Default::default());

@@ -1,4 +1,4 @@
-//! Tests for gamepad focus navigation (#672): pad buttons and the stick map onto
+//! Tests for gamepad focus navigation: pad buttons and the stick map onto
 //! Move / Submit / Cancel, a held Move repeats on sim time, and a stick short of
 //! its press point does nothing.
 

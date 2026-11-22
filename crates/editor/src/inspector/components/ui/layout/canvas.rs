@@ -1,6 +1,6 @@
-//! The Canvas inspector card (#417): render mode, sort order and the *Scale With
+//! The Canvas inspector card: render mode, sort order and the *Scale With
 //! Screen Size* scaler, plus the world / camera canvas knobs of the chosen mode
-//! (#429). Every write routes through `edit::authoring::ui::layout::canvas`.
+//!. Every write routes through `edit::authoring::ui::layout::canvas`.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;
@@ -11,7 +11,7 @@ use crate::inspector::components::card::component_card;
 use rusty_components::{CanvasComponent, CanvasRenderMode};
 use rusty_edit::authoring::ui::layout::canvas as canvas_ops;
 
-/// Canvas card. A THIN client (#287): widgets read a snapshot and route each write
+/// Canvas card. A THIN client: widgets read a snapshot and route each write
 /// through a shared op; remove detaches the component.
 pub fn draw(ui: &mut egui::Ui, world: &mut rusty_ecs::World, id: u32, is_dirty: &mut bool) {
     let Some(c) = world.canvas(id).map(|c| c.clone()) else {

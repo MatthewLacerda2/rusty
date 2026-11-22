@@ -1,14 +1,4 @@
-//! crates/ui/src/text/lines.rs — measured items → lines: wrapping and overflow (#419).
-//!
-//! **Wrapping** is greedy: a line breaks after the last whitespace that keeps it
-//! within the width; a word wider than the whole width breaks between clusters (a
-//! mark never leaves its base).
-//! Whitespace that ends a wrapped line is not counted in its width, and a soft
-//! break drops the whitespace it lands on. `\n` always breaks.
-//!
-//! **Overflow** keeps the lines that fit the rect's height entirely (`Truncate`,
-//! `Ellipsis`); an unwrapped line wider than the rect loses the clusters past its
-//! edge, and `Ellipsis` ends the last kept line — or any cut line — with `…`.
+//! crates/ui/src/text/lines.rs — measured items → lines: wrapping and overflow.
 
 use super::measure::{Item, LineMetrics, Measurer};
 use rusty_components::TextOverflow;
@@ -73,7 +63,7 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
                     Some(b) => line.split_off(b + 1),
                     None => {
                         if let Some(last) = line.last_mut() {
-                            last.cut(); // a word broken mid-way
+                            last.cut();
                         }
                         Vec::new()
                     }
@@ -82,11 +72,10 @@ pub fn break_lines(items: &[Item], max_width: Option<f32>, empty: LineMetrics) -
                 line = tail;
                 soft = true;
             }
-            // A space carrying a mark is drawn, so it is no break.
             let breakable = it.is_space() && !paragraph.get(i + 1).is_some_and(|n| n.joins);
             if breakable {
                 if line.is_empty() && soft {
-                    continue; // a soft break swallows the space it lands on
+                    continue;
                 }
                 last_space = Some(line.len());
             }
@@ -102,8 +91,6 @@ fn end_pen(items: &[Item]) -> f32 {
     items.iter().map(|it| it.advance).sum()
 }
 
-/// The block height of `lines` at `spacing`: the first ascent, each line-to-line
-/// pitch (descent + gap + next ascent, scaled by `spacing`) and the last descent.
 pub fn block_height(lines: &[Line], spacing: f32) -> f32 {
     let (Some(first), Some(last)) = (lines.first(), lines.last()) else {
         return 0.0;
@@ -149,8 +136,6 @@ pub fn clip(
     cut
 }
 
-/// Drop items from the end of `line` until it (plus an ellipsis, when `mark`) fits
-/// `width`, then append the ellipsis. A line nothing fits in keeps its height.
 fn shorten(line: &mut Line, width: f32, mark: bool, measurer: &Measurer) {
     let Some(style) = line.items.iter().rev().find(|i| !i.is_space()).copied() else {
         return;
@@ -179,7 +164,6 @@ fn shorten(line: &mut Line, width: f32, mark: bool, measurer: &Measurer) {
         if items.is_empty() {
             break;
         }
-        // Drop a whole cluster: a mark never stays without its base, nor goes alone.
         while items.pop().is_some_and(|it| it.joins) {}
     }
     line.metrics = height.max(line.metrics);

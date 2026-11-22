@@ -1,5 +1,5 @@
 //! What one event notes, fed by hand: a folder notes every file under it, a rescan
-//! every file under the roots (#1327).
+//! every file under the roots.
 
 use super::{Watch, POLL};
 use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, Flag, ModifyKind};
@@ -21,7 +21,7 @@ fn pending(watch: &Watch, dir: &std::path::Path, name: &str) -> bool {
     watch.pending().contains(&key)
 }
 
-/// inotify reports every open: a search over `assets/` must not wake the editor (#1721).
+/// inotify reports every open: a search over `assets/` must not wake the editor.
 #[test]
 fn a_read_is_not_worth_a_frame_but_a_change_or_lost_events_are() {
     use crate::editor::watch::matters;

@@ -1,6 +1,6 @@
 //! crates/editor/src/inspector/components/particles/widgets.rs — the card's labelled
 //! rows: clamped numbers, vectors, combos, `[min, max]` ranges, keyframe lists and
-//! colour gradients. The Trail and Line cards (#441) reuse them.
+//! colour gradients. The Trail and Line cards reuse them.
 
 use crate::widgets::DragRange;
 use rusty_core::curve::{ColorKey, Curve, Gradient, Key, Range};
@@ -84,8 +84,6 @@ pub(in crate::inspector::components) fn combo<T: Copy + PartialEq>(
     changed
 }
 
-/// A labelled `[min, max]` row (a constant range shows both equal). Returns the
-/// edited range when either bound changed.
 pub(super) fn range_row(
     ui: &mut egui::Ui,
     label: &str,
@@ -105,8 +103,6 @@ pub(super) fn range_row(
     changed.then(|| Range::new(min, max))
 }
 
-/// A collapsible keyframe list: one `t` / value row per key, a remove button each
-/// and an "Add key" button. Returns the edited curve (keys re-sorted) on change.
 pub(in crate::inspector::components) fn curve_editor(
     ui: &mut egui::Ui,
     label: &str,

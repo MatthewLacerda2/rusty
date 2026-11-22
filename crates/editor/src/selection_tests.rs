@@ -1,4 +1,4 @@
-//! The editor's selection never names a despawned entity (#1264): a destroy made
+//! The editor's selection never names a despawned entity: a destroy made
 //! outside the editor (a script's `Scene.DestroyEntity`, a re-import) is not undone
 //! by the editor pushing its own copy back into the scene on the next frame.
 

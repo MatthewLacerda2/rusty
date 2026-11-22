@@ -1,9 +1,4 @@
-//! crates/editor/src/inspector/assets/prefab.rs — `.prefab` asset inspector (#215).
-//!
-//! Mirrors the model inspector: a metadata card plus an "Instantiate into Scene"
-//! button. Instantiate routes through the shared `edit::prefab` verbs (load +
-//! `instantiate_prefab`), so it stamps an independent copy with fresh deterministic
-//! ids exactly like `Scene.Instantiate` does for a script.
+//! crates/editor/src/inspector/assets/prefab.rs — `.prefab` asset inspector.
 
 use egui_phosphor::regular as icon;
 use std::fs;

@@ -1,5 +1,4 @@
-//! crates/editor/src/inspector/assets/shader.rs — the `.wgsl` inspector card (#352).
-//!
+//! crates/editor/src/inspector/assets/shader.rs — the `.wgsl` inspector card.
 //! Before this, `.wgsl` had no arm in `assets/mod.rs`'s dispatch at all and fell
 //! into the generic "Unsupported file extension" fallback — the only way to see a
 //! baked or hand-written shader was to build a whole scene around it. This card is

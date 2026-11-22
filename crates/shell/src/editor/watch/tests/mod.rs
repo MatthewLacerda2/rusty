@@ -1,6 +1,4 @@
-//! The watch notes a change made outside the engine, once, after Play (#1327).
-//! Driven with `notify` on a temp folder: the polling backend always, the native one
-//! wherever the filesystem gives events.
+//! The watch notes a change made outside the engine, once, after Play.
 
 use super::{changes, Backend, Root, Watch};
 
@@ -35,7 +33,7 @@ fn watched(backend: Backend) -> (Watch, PathBuf) {
     (Watch::start(&[&dir], backend).unwrap(), file)
 }
 
-/// The editor sleeps outside Play (#1721): only a frame collects what the watch saw.
+/// The editor sleeps outside Play: only a frame collects what the watch saw.
 #[test]
 fn a_file_change_wakes_a_sleeping_window() {
     let (mut watch, file) = watched(Backend::Native);

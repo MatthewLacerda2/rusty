@@ -1,11 +1,4 @@
-//! crates/ui/src/sway.rs — the `ScreenSpaceCamera` canvas lag (#429).
-//!
-//! A visor HUD that swings a little behind the view when the camera turns, then
-//! settles back. Each tick, every `ScreenSpaceCamera` canvas's lag grows by how far
-//! the camera turned (yaw, pitch) and decays exponentially with the time constant
-//! [`SWAY_RECOVERY`]; `canvas.sway` scales how much of it shows (`ui::space`). The
-//! state is a runtime-only slot on the canvas (never saved), advanced on the fixed
-//! tick, so the lag is a pure function of the camera's path — deterministic.
+//! crates/ui/src/sway.rs — the `ScreenSpaceCamera` canvas lag.
 
 use glam::Vec2;
 
@@ -23,8 +16,6 @@ const MAX_SWAY: f32 = 30.0;
 const SETTLED: f32 = 1e-4;
 
 /// Advance every `ScreenSpaceCamera` canvas's lag by one `dt`-second tick of `camera`.
-/// A canvas is written only when its lag moved: a write is a change on the World's
-/// change log, which the renderer reads to keep a still canvas's mesh (#2416).
 pub fn update_sway(world: &mut World, camera: &Camera, dt: f32) {
     let look = Vec2::new(camera.yaw, camera.pitch);
     let decay = (-dt.max(0.0) / SWAY_RECOVERY).exp();

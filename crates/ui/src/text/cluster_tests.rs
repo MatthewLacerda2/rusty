@@ -1,4 +1,4 @@
-//! Clusters through layout (#1328): a mark and a ligature under letter spacing,
+//! Clusters through layout: a mark and a ligature under letter spacing,
 //! style tags, overflow cuts and synthesized styles.
 
 use glam::Vec2;

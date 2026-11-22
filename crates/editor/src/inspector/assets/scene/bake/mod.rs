@@ -1,40 +1,3 @@
-//! The scene inspector's **Generate Lighting** button (#832, Unity 5's button in the
-//! Lighting window): lightmaps, then light and reflection probes, with the scene's
-//! own lighting settings, and the result written into the scene file. The same
-//! `dev::bake::generate_lighting` path as the `Lighting.Generate()` script verb (editor↔API
-//! parity, no second path). Dev-only: the bakes write authoring artifacts, so ship
-//! builds carry neither.
-//!
-//! The lightmap step runs in the background (#808): the button starts a
-//! [`LightmapBakeJob`], the card shows its progress with a Cancel button, and
-//! [`poll`] applies the result on the UI thread when the worker finishes. The bake
-//! is progressive (#1970): [`poll`] shows each finished pass on the live scene, the
-//! card says the pass, the samples so far and the time left, and the Scene view's
-//! camera is the bake's Prioritize View. The probe
-//! step then runs one step a frame (#1602, Unity's `BakeAsync`): the probes capture
-//! through the GPU, so they stay on the UI thread, but no frame waits on more than a
-//! reflection probe or a few light probes, and the editor and the MCP keep answering.
-//! Last, the occlusion culling's PVS bakes on a worker (#1714), its cells on the bar.
-//! The card shows the stage (the light probes' bounce, or the reflection probes) on
-//! a line above the bar and `i / n` in it; the console says each pass and probe. Then [`poll`]
-//! commits the probes and writes the lighting, before the PVS bakes. A bake cancelled during the lightmaps
-//! writes nothing. The probe step bakes from a snapshot of the probes and applies them
-//! only at its end, so the scene stays editable while it runs; a probe added, removed
-//! or moved meanwhile drops it with nothing of the probes applied. It has no Cancel
-//! (#1602 kept it out of scope). The
-//! settings under the button (#810's directional mode among them) are the scene's,
-//! as `Lighting.SetSettings{…}` edits them.
-//!
-//! A script's `Lighting.GenerateAsync()` (#1999, Unity's `Lightmapping.BakeAsync`)
-//! presses the button: it sets `Scene::lighting_bake_requested`, and [`poll`] starts
-//! the same job on the next frame. A frame the window cannot draw (a locked screen)
-//! still polls ([`poll_undrawn`], through `EditorUi::frame_work`), so the job starts
-//! and ends with nobody at the screen.
-//!
-//! **Bake Occlusion** beside it (#1958, Unity's Occlusion window) runs only the
-//! last step, the PVS on its worker, and writes it beside the scene: the same
-//! `generate_lighting::apply_occlusion` as `Lighting.BakeOcclusion()`.
-
 use std::path::Path;
 
 use egui_phosphor::regular as icon;
@@ -58,12 +21,6 @@ use progress::draw_progress;
 use settings::{draw_diffuse_model, draw_mixed_mode, draw_settings};
 use start::{start, start_occlusion, take_request};
 
-/// A background Generate Lighting and the scene it belongs to: the scene's runtime
-/// identity and the editor's open scene file when it started. A result for a scene
-/// that has since been replaced (File ▸ Open/New, or the follow reloading the file
-/// after an outside edit, #1374) or saved elsewhere is dropped: its entity ids no
-/// longer mean the same meshes, and its lighting would be written into a file as if
-/// it were current.
 pub struct ActiveBake {
     step: Step,
     scene: SceneId,
@@ -74,14 +31,11 @@ pub struct ActiveBake {
 enum Step {
     /// The lightmaps, on their worker.
     Lightmaps(LightmapBakeJob),
-    /// The probes, a step a frame, once `lightmaps` landed, writing to `path`.
     Probes {
         job: Box<LightingBake>,
         lightmaps: usize,
         path: String,
     },
-    /// The occlusion culling's PVS, on its worker, once the probes committed and
-    /// the lighting was written (`saved` says whether the file took it).
     Occlusion {
         job: OcclusionBakeJob,
         lightmaps: usize,
@@ -89,7 +43,7 @@ enum Step {
         saved: rusty_edit::LightingSave,
         path: String,
     },
-    /// Bake Occlusion (#1958): the PVS alone, on its worker, written to `path`.
+    /// Bake Occlusion: the PVS alone, on its worker, written to `path`.
     OcclusionOnly { job: OcclusionBakeJob, path: String },
 }
 
@@ -117,9 +71,6 @@ pub fn draw(
     let open = is_open_scene(editor, path);
     let button = egui::Button::new(format!("{}  Generate Lighting", icon::LIGHTBULB))
         .min_size(egui::Vec2::new(160.0, 24.0));
-    // It writes the scene file, so Play greys it out as it does Save (#1340): the
-    // inspector is gated on the *requested* play state, so it can still be drawn on
-    // the frame Play starts or stops.
     let live = idle && open && !scene.is_playing();
     let why = if open {
         "Stop Play first, or wait for the bake"
@@ -142,8 +93,6 @@ pub fn draw(
             (generate, occlusion)
         })
         .inner;
-    // The diffuse model is greyed out with the knobs: lightmaps and probes bake one
-    // after the other, and a change between them would save two models as one.
     let settings = &mut scene.lighting_settings;
     let changed = ui
         .add_enabled_ui(idle, |ui| {
@@ -166,7 +115,7 @@ pub fn draw(
 pub(super) const NOT_OPEN: &str = "Open this scene to bake it";
 
 /// Whether the card's scene file is the editor's open scene. Unity bakes the open
-/// scene only, so the button is live on that card alone (#1394). Compared
+/// scene only, so the button is live on that card alone. Compared
 /// canonically: the same file spelled relative and absolute is one scene, while
 /// `DiskText` keys the engine's own writes by exact spelling.
 pub(super) fn is_open_scene(editor: &EditorUi, card: &str) -> bool {

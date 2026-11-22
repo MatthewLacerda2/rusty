@@ -1,4 +1,4 @@
-//! crates/editor/src/inspector/components/ribbons/line.rs — the Line card (#441).
+//! crates/editor/src/inspector/components/ribbons/line.rs — the Line card.
 
 use crate::inspector::components::card::remove_component;
 use egui_phosphor::regular as icon;

@@ -15,7 +15,7 @@ use crate::EditorUi;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// TOP BAR — one row (#1914): the menus (File / Edit / GameObject / Config / About) on
+/// TOP BAR — one row: the menus (File / Edit / GameObject / Config / About) on
 /// the left, the transport (Play, Stop during Play) and the Developer Console button
 /// at the right end. Always visible. The scene's name is in the window title.
 pub fn draw(
@@ -49,14 +49,11 @@ fn draw_menu_bar(
     console: &mut ConsoleLogs,
     is_playing: &mut bool,
 ) {
-    // egui 0.27 menus stayed open until an item closed them or the user clicked
-    // outside; keep that so the Config menu's toggles don't dismiss it.
     let config = MenuConfig::new().close_behavior(PopupCloseBehavior::CloseOnClickOutside);
     egui::MenuBar::new().config(config).ui(ui, |ui| {
         file_menu(editor, ui, scene, console, *is_playing);
         edit_menu::edit_menu(editor, ui, scene);
 
-        // The GameObject menu — the Unity-style home for creating objects (#255).
         menu_create::game_object_menu(editor, ui, scene);
 
         config_menu(editor, ui);
@@ -97,7 +94,6 @@ fn file_menu(
             scene_io::load_scene(editor, scene, console, is_playing);
             ui.close();
         }
-        // Save is refused in Play by the scene layer (#1340); greyed out here.
         if edit_only(ui, is_playing, icon::FLOPPY_DISK, "Save Scene") {
             scene_io::save_scene(editor, scene, console);
             ui.close();
@@ -114,7 +110,6 @@ fn file_menu(
 }
 
 /// A File-menu entry unavailable in Play: greyed out, with a hint, while playing.
-/// Returns whether it was clicked.
 fn edit_only(ui: &mut egui::Ui, is_playing: bool, icon: &str, label: &str) -> bool {
     ui.add_enabled(!is_playing, egui::Button::new(format!("{icon}  {label}")))
         .on_disabled_hover_text("Stop Play first")
@@ -147,8 +142,6 @@ fn config_menu(editor: &mut EditorUi, ui: &mut egui::Ui) {
             .button(format!("{}  Scene Settings", icon::GLOBE))
             .clicked()
         {
-            // Focus the inspector on the active scene: clearing both selections
-            // makes the inspector fall through to its scene-settings view.
             editor.selected_entity_id = None;
             editor.selected_asset_path = None;
             ui.close();

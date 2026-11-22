@@ -1,11 +1,5 @@
 //! crates/editor/src/inspector/components/render/light_probe_proxy_volume.rs — the Light
-//! Probe Proxy Volume card (#1672).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::rendering::light_probe_proxy_volume` ops the
-//! `LightProbeProxyVolume.*` Lua setters call. Unity's layout: the bounding box
-//! mode (with the custom size and origin under `Custom`), the resolution mode
-//! (density, or a count per axis), and the quality.
+//! Probe Proxy Volume card.
 
 use egui_phosphor::regular as icon;
 use glam::Vec3;

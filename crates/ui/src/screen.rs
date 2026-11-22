@@ -1,22 +1,3 @@
-//! crates/ui/src/screen.rs — `ScreenSize`: the screen the UI is laid out on (#417).
-//!
-//! The layout is a pure function of (scene, screen size), so the screen size is a
-//! **sim input**, like the seed and the inputs: same (seed, inputs, dt, screen size)
-//! ⇒ same layout. The windowed platform writes the game view's pixel size here every
-//! frame (in the editor the size the Game view's dropdown gives it, #2207, whichever
-//! tab shows); a headless run never writes it and falls back to the `VideoSettings`
-//! resolution, so the harness lays out exactly as a window of that size would.
-//!
-//! The display's backing scale rides with the size (#1715, `Video.GetDisplayScale`):
-//! physical pixels per point, which the windowed platform writes every frame (so a
-//! move to another monitor is seen the next frame). Headless it is 1. A script reads
-//! it, so it is a sim input too, and a demo records it as it records the size.
-//!
-//! The textures' native sizes ride along (#1221): an `Image` measures by its
-//! texture's size, which the tick reads from the files and writes here
-//! ([`TextureSizes`]) before it steps, so the layout never reads a file. One `Rc` is shared with
-//! every view and the renderer; a write copies it only while one is held.
-
 use std::rc::Rc;
 
 use glam::Vec2;
@@ -25,17 +6,10 @@ use crate::{TextureSizes, UiView};
 use rusty_core::settings::video::VideoSettings;
 use rusty_scene::Camera;
 
-/// The UI's target surface size (a resource). See the module docs.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ScreenSize {
-    /// The game view's size in physical pixels, as the platform last reported it.
-    /// `None` until a platform writes one (always, headless).
     game_view: Option<(u32, u32)>,
-    /// The display's backing scale as the platform last reported it; `None` (read
-    /// as 1) until a platform writes one.
     display_scale: Option<f32>,
-    /// The native size of each texture the scene's Images use, as the platform
-    /// last read them.
     textures: Rc<TextureSizes>,
 }
 
@@ -46,13 +20,11 @@ impl ScreenSize {
     }
 
     /// Put back a size read with [`game_view`](Self::game_view), `None` included:
-    /// a demo replay restoring the screen it started on (#1598).
+    /// a demo replay restoring the screen it started on.
     pub fn restore_game_view(&mut self, game_view: Option<(u32, u32)>) {
         self.game_view = game_view;
     }
 
-    /// The game view's pixel size as the platform last wrote it; `None` headless
-    /// until a run sets one.
     pub fn game_view(&self) -> Option<(u32, u32)> {
         self.game_view
     }
@@ -73,14 +45,10 @@ impl ScreenSize {
         self.display_scale
     }
 
-    /// The display's backing scale: physical pixels per point, 1 when no platform
-    /// reported one or it reported one that is not a positive number.
     pub fn display_scale(&self) -> f32 {
         self.display_scale.filter(|s| *s > 0.0).unwrap_or(1.0)
     }
 
-    /// The screen size in pixels the UI lays out on: the game view when a platform
-    /// reported one, else `video`'s resolution. Each axis is at least 1.
     pub fn pixels(&self, video: &VideoSettings) -> Vec2 {
         let (w, h) = self.game_view.unwrap_or_else(|| video.resolution());
         Vec2::new(w.max(1) as f32, h.max(1) as f32)
@@ -91,14 +59,11 @@ impl ScreenSize {
         &self.textures
     }
 
-    /// The shared table's handle, for the tick's refresh to update in place
-    /// (`ui::TextureSizeReader`): it copies the table only when it changes it.
     pub fn shared_textures_mut(&mut self) -> &mut Rc<TextureSizes> {
         &mut self.textures
     }
 
     /// The view the UI is computed against: this screen (sized against `video`)
-    /// and its texture sizes, through `camera` when there is one.
     pub fn view(&self, video: &VideoSettings, camera: Option<Camera>) -> UiView {
         let (px, textures) = (self.pixels(video), Rc::clone(&self.textures));
         match camera {

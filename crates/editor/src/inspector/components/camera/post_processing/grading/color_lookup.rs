@@ -1,4 +1,4 @@
-//! The Color Lookup (#1441): the LUT file ([`path_field::LUT`]) and its
+//! The Color Lookup: the LUT file ([`path_field::LUT`]) and its
 //! contribution.
 
 use super::super::path_field::{self, LUT};

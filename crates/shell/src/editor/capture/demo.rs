@@ -1,4 +1,4 @@
-//! The editor captured with a demo open on the Game view's timeline (#1598): the
+//! The editor captured with a demo open on the Game view's timeline: the
 //! strip, its marks and the letterboxed replay, for a branch that changes them to
 //! look at.
 
@@ -20,7 +20,7 @@ pub fn capture_demo(
     demo: &Path,
     tick: u64,
 ) -> Result<bool, String> {
-    // The replay repeats a scenario's `Debug.*` calls: the editor's surface (#737).
+    // The replay repeats a scenario's `Debug.*` calls: the editor's surface.
     rusty_dev::lua_surface::install_api();
     let mut ui = initial_ui(game, opts)?;
     let console_before = game.console().borrow().messages.len();
@@ -31,8 +31,6 @@ pub fn capture_demo(
             .borrow_mut()
             .request_demo(request);
         crate::editor::demo::advance(&mut ui, game, 0.0);
-        // Only the timeline's own refusals: a replay that diverges or a script
-        // error in it is still a demo to look at.
         let refused = (game.console().borrow().messages.iter())
             .skip(console_before)
             .find(|(text, level)| *level == LogLevel::Error && is_refusal(text))

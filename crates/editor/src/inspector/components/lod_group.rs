@@ -1,10 +1,4 @@
-//! crates/editor/src/inspector/components/lod_group.rs — the LOD Group card (#472).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
-//! shared `authoring::rendering::lod_group` ops the `LODGroup.*` Lua setters call. One row per
-//! level (finest first): its screen-height threshold as a percentage, the renderer
-//! entities it shows (by name, each removable), an id field to add one, and a button
-//! to drop the level.
+//! crates/editor/src/inspector/components/lod_group.rs — the LOD Group card.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;

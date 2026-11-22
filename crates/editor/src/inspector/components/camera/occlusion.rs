@@ -1,9 +1,3 @@
-//! The Camera card's Occlusion Culling toggle (#1714, Unity's camera has the same
-//! box): whether the camera skips what the scene's baked PVS hides from its cell,
-//! and what its GPU depth pyramid hides (#1963).
-//! Writes through the shared op, so this and `Camera.SetUseOcclusionCulling` are
-//! one path.
-
 use rusty_edit::authoring::rendering::camera as camera_ops;
 use rusty_scene::CameraComponent;
 

@@ -1,13 +1,4 @@
 //! crates/shell/src/event_loop.rs — the winit application handler both frontends run under.
-//!
-//! winit 0.30 hands events to an [`ApplicationHandler`] and only lets a window be
-//! created once the loop is running (`resumed`), so the window, the renderer, the
-//! [`Shell`] and the frontend are built there, from a [`Launch`] the frontend's
-//! `launch()` prepared. Every event after that is routed exactly as before: window
-//! events through the frontend and [`super::handle_window_event`], raw mouse motion
-//! to the frontend (the editor's Scene-view look, #745) and to the game while it has
-//! input. Each time the loop runs out of events, [`super::pace`] decides whether to
-//! draw or to sleep; a window event or a [`rusty_core::wake`] ring ends the sleep.
 
 use std::sync::Arc;
 
@@ -25,9 +16,6 @@ use rusty_render::Renderer;
 pub struct Launch<M> {
     /// The window title.
     pub title: String,
-    /// The window's desktop identity on Linux (Wayland's `app_id`, X11's
-    /// `WM_CLASS`), which the desktop matches to a `.desktop` entry for the dock
-    /// icon and grouping. `None` leaves it unset.
     pub app_id: Option<&'static str>,
     /// Whether the window opens filling the screen (the editor) or at its size.
     pub maximized: bool,
@@ -57,15 +45,12 @@ where
         }
     }
 
-    /// Boot the shell and the frontend on an open window: the one `resumed` made, or
-    /// the one a [`super::prelude`] stage ran in (it gets the launch's title).
     pub(super) fn start(&mut self, window: Arc<Window>, renderer: Renderer) {
         let Some(launch) = self.launch.take() else {
             return;
         };
         window.set_title(&launch.title);
         let shell = Shell::new(window, renderer, &self.game, launch.video_defaults);
-        // The frame log needs the host, which only the frontend's type knows (#2206).
         #[cfg(feature = "dev")]
         let shell = Shell {
             frame_log: super::frame::stats::start_log(F::HOST, &self.game),
@@ -76,8 +61,6 @@ where
     }
 }
 
-/// Run the event loop until the window closes or the game quits. Persists the
-/// settings and flushes `Storage` however the loop exits.
 pub fn run<F, M>(game: GameWorld, launch: Launch<M>)
 where
     F: Frontend,
@@ -97,8 +80,6 @@ where
     F: Frontend,
     M: FnOnce(&Shell, &GameWorld) -> F,
 {
-    /// The first resume opens the window and boots the shell; desktop platforms
-    /// resume once, so later ones (mobile) keep the shell they have.
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let Some(launch) = self.launch.as_ref() else {
             return;
@@ -126,7 +107,6 @@ where
         super::handle_window_event(&event, event_loop, shell, &mut self.game, frontend);
         if !matches!(event, WindowEvent::RedrawRequested) {
             shell.pacer.activity();
-            // Directly as well: macOS runs no `about_to_wait` during a live resize.
             shell.window.request_redraw();
         }
     }
@@ -166,8 +146,6 @@ where
         if let Some((_, frontend)) = self.running.as_mut() {
             frontend.before_exit(&mut self.game);
         }
-        // Only once `settings::load` seeded the cells: before it they hold the
-        // defaults, which would overwrite the player's saved settings.
         if self.running.is_some() {
             settings::persist(&self.game);
         }

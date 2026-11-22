@@ -1,4 +1,4 @@
-//! A background bake belongs to the scene it started on (#1374).
+//! A background bake belongs to the scene it started on.
 
 use super::{is_open_scene, poll, start};
 use crate::EditorUi;
@@ -7,7 +7,6 @@ use rusty_scene::Scene;
 use rusty_script::scripting::{ConsoleLogs, LogLevel};
 
 /// The follow reloads the same file after an outside edit: same path, new World.
-/// The bake's lightmaps (keyed by the old entity ids) are dropped, not applied.
 #[test]
 fn a_bake_is_dropped_when_the_scene_is_reloaded_under_the_same_path() {
     let path = rusty_test_support::temp::dir().join("bake_reload.scene");
@@ -19,7 +18,7 @@ fn a_bake_is_dropped_when_the_scene_is_reloaded_under_the_same_path() {
     start(&mut editor, &mut scene, &mut console);
     assert!(editor.dev.lightmap_bake.is_some(), "{:?}", console.messages);
 
-    scene.renew_id(); // what a reload does to the World's identity
+    scene.renew_id();
     let nav = NavigationGraph::new(-8.0, 8.0, -8.0, 8.0, 1.0);
     let ctx = egui::Context::default();
     poll(&mut editor, &ctx, &mut scene, &mut console, &nav);
@@ -31,7 +30,7 @@ fn a_bake_is_dropped_when_the_scene_is_reloaded_under_the_same_path() {
 }
 
 /// A bake that finishes while the scene plays waits for Stop: Play can start on a
-/// frame the inspector is still drawn (#1374).
+/// frame the inspector is still drawn.
 #[test]
 fn a_bake_waits_while_the_scene_plays() {
     let path = rusty_test_support::temp::dir().join("bake_play.scene");
@@ -53,7 +52,7 @@ fn a_bake_waits_while_the_scene_plays() {
 }
 
 /// Unity bakes the open scene only: another scene asset's card is not it, and the
-/// bake writes the open scene's file, never the card's (#1394).
+/// bake writes the open scene's file, never the card's.
 #[test]
 fn only_the_open_scenes_card_bakes_and_the_bake_writes_the_open_file() {
     let dir = rusty_test_support::temp::dir();
@@ -101,8 +100,6 @@ fn pathdiff(abs: &std::path::Path, from: &std::path::Path) -> String {
         .into_owned()
 }
 
-/// The probe step runs a step a frame (#1602): a frame comes back with the bake
-/// still running and its progress in the console, and the last one writes the lighting.
 #[test]
 fn gpu_the_probe_step_runs_across_frames() {
     let path = rusty_test_support::temp::dir().join("bake_steps.scene");
@@ -133,7 +130,7 @@ fn gpu_the_probe_step_runs_across_frames() {
     assert!(editor.dev.lightmap_bake.is_none(), "{:?}", console.messages);
     let said = |text: &str| console.messages.iter().any(|(l, _)| l.contains(text));
     if !said("Baking reflection probe 1 of 2") {
-        return; // no adapter: the probe step skipped
+        return;
     }
     assert!(frames_baking >= 2, "a frame per probe, saw {frames_baking}");
     assert!(

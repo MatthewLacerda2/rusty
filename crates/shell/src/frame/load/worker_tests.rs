@@ -1,4 +1,4 @@
-//! The windowed loader prepares on a thread (#2123): a job is taken once, by its own
+//! The windowed loader prepares on a thread: a job is taken once, by its own
 //! operation, waiting when the thread is still at it; a bad file fails the job.
 
 use std::sync::atomic::{AtomicBool, Ordering};

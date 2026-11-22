@@ -1,10 +1,7 @@
-//! Generate Lighting's per-frame drive (#808, #1602): the lightmaps' worker polled
+//! Generate Lighting's per-frame drive: the lightmaps' worker polled
 //! and its lightmaps applied, then the probe step taken one step a frame and
 //! committed and the lighting written, then the occlusion culling's worker polled
-//! (#1714) and its PVS written beside it. A bake dropped midway says what reached
-//! the scene: the lightmaps once they landed, the probes and the written lighting
-//! once committed, the PVS never. A failure before the lighting is written leaves
-//! it unwritten, so it marks the scene unsaved.
+//! and its PVS written beside it. A bake dropped midway says what reached
 
 use std::time::{Duration, Instant};
 
@@ -21,24 +18,11 @@ use rusty_scene::lighting::bake_status::BakeStatus;
 use rusty_scene::Scene;
 use rusty_script::scripting::ConsoleLogs;
 
-/// How often the editor repaints while the lightmaps bake, so the bar moves on its
-/// own; the probe step repaints at once, a step a frame.
 const PROGRESS_REPAINT: Duration = Duration::from_millis(100);
 
 /// How long a frame the window cannot draw spends on probe steps ([`poll_undrawn`]).
-/// Such frames come at the pacer's 100 ms retry, where a step each would run the
-/// probe stage at ten steps a second; 80 ms keeps it near the drawn pace and leaves
-/// the retry room for the frame's other work, so a bridge command waits <0.1 s more.
 pub const UNDRAWN_PROBE_BUDGET: Duration = Duration::from_millis(80);
 
-/// Each drawn editor frame (`EditorUi::frame_work`): keep the UI repainting while
-/// a bake runs, apply the lightmaps once they land, then take one probe step a
-/// frame and write the lighting. Starts the button's job when a script asked
-/// (`Lighting.GenerateAsync`, #1999). Runs whether or not the scene card is showing, and waits while the
-/// scene plays. Tells the scene whether a bake is running and how far, so a
-/// script's bake waits its turn and Play says why it waits (#2042). The frame a
-/// bake ends, is dropped or never starts repaints at once: the header read the
-/// refusal before this ran, and outside Play the window sleeps until asked.
 pub fn poll(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -49,9 +33,6 @@ pub fn poll(
     paced(editor, ctx, scene, log, nav, None);
 }
 
-/// [`poll`] on a frame the window cannot draw (a locked screen): nothing is
-/// painted, so the probe stage takes steps for `UNDRAWN_PROBE_BUDGET` (80 ms) instead
-/// of one.
 pub fn poll_undrawn(
     editor: &mut EditorUi,
     ctx: &egui::Context,
@@ -77,11 +58,9 @@ pub(super) fn paced(
     drive(editor, ctx, scene, log, nav, until);
     scene.lighting_bake_running = editor.dev.lightmap_bake.is_some();
     if let Some(active) = &editor.dev.lightmap_bake {
-        // How far it is, for the Play button's refusal (#2042).
         scene.lighting_bake_status = BakeStatus::Running(active.progress());
     }
     if was_busy && !scene.bake_busy() {
-        // Play is free again: draw it enabled without waiting for input (#2042).
         ctx.request_repaint();
     }
 }
@@ -99,15 +78,9 @@ fn drive(
         return;
     };
     if scene.is_playing() {
-        // The World holds the play state; the bake waits for Stop's restore (#1374).
         return ctx.request_repaint_after(PROGRESS_REPAINT);
     }
     if active.scene != scene.id() || active.path != open {
-        // Its result would land on another scene's entities, or be written into a
-        // file the scene no longer is: drop it (dropping the job stops the worker and
-        // deletes its staged cubemaps) rather than apply it.
-        // A replaced scene took any applied lightmaps with it; only Save As keeps
-        // them on the scene in front of the user.
         let line = match active.scene != scene.id() {
             true => format!("{} dropped: the open scene changed", verb(&active.step)),
             false => dropped(&active.step, "the scene was saved elsewhere"),
@@ -115,7 +88,6 @@ fn drive(
         log.warn(line.clone());
         scene.lighting_bake_status = BakeStatus::Failed(line);
         if let (Step::Lightmaps(job), true) = (&mut active.step, active.scene == scene.id()) {
-            // Still the scene in front of the user: put its lightmaps back (#1970).
             scene.unrecorded(|scene| job.restore(scene));
         }
         editor.dev.lightmap_bake = None;
@@ -125,12 +97,9 @@ fn drive(
         match advance(&mut active.step, scene, log, nav) {
             Some(needs_save) => {
                 editor.dev.lightmap_bake = None;
-                // A file that could not take the lighting alone needs the whole scene
-                // saved.
                 editor.is_dirty |= needs_save;
                 return;
             }
-            // An undrawn frame's budget left: another probe step.
             None if matches!(active.step, Step::Probes { .. })
                 && until.is_some_and(|t| Instant::now() < t) => {}
             None if matches!(active.step, Step::Probes { .. }) => return ctx.request_repaint(),
@@ -139,8 +108,6 @@ fn drive(
     }
 }
 
-/// Move the bake on by a frame. Returns `Some` once it ended (baked, cancelled or
-/// failed, each said in the console): whether the scene needs a full save.
 fn advance(
     step: &mut Step,
     scene: &mut Scene,
@@ -154,16 +121,13 @@ fn advance(
         Step::OcclusionOnly { .. } => return advance_occlusion_only(step, scene, log),
     };
     if !job.is_finished() {
-        // A progressive bake's newest pass on the live scene (#1970): no edit.
         scene.unrecorded(|scene| job.show_preview(scene));
         return None;
     }
-    // A bake is no edit (#1631): what it writes never joins an Undo step.
+    // A bake is no edit: what it writes never joins an Undo step.
     scene.unrecorded(|scene| land_lightmaps(step, scene, log, nav))
 }
 
-/// Apply the finished lightmaps, then start the probe step (planning the probe
-/// sets it applies when it commits).
 fn land_lightmaps(
     step: &mut Step,
     scene: &mut Scene,
@@ -193,7 +157,7 @@ fn land_lightmaps(
             };
             None
         }
-        Err(e) => fail(scene, log, e, true), // the lightmaps were applied but never written
+        Err(e) => fail(scene, log, e, true),
     }
 }
 
@@ -225,7 +189,6 @@ fn advance_probes(
                 Err(e) => return fail(scene, log, e, true),
             };
             let needs_save = saved == LightingSave::NeedsSceneSave;
-            // An unchanged PVS is kept, not re-baked (#2348).
             match OcclusionBakeJob::generate(scene, reach(scene, Some(nav))) {
                 Ok(occlusion) => {
                     *step = Step::Occlusion {
@@ -244,15 +207,12 @@ fn advance_probes(
             let line = dropped(step, "the probes changed during the bake");
             log.warn(line.clone());
             scene.lighting_bake_status = BakeStatus::Failed(line);
-            // The lightmaps were applied but never written.
             Some(true)
         }
         Err(e) => fail(scene, log, e, true),
     }
 }
 
-/// Once the occlusion worker finished, apply its PVS and write it beside the
-/// scene; the lighting was written when the probes committed.
 fn advance_occlusion(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) -> Option<bool> {
     let Step::Occlusion {
         job,
@@ -272,13 +232,10 @@ fn advance_occlusion(step: &mut Step, scene: &mut Scene, log: &mut ConsoleLogs) 
     let lighting = (*lightmaps, *probes, *saved);
     match scene.unrecorded(|scene| finish(scene, path, lighting, baked)) {
         Ok(report) => Some(done(scene, log, report.summary(), needs_save)),
-        Err(e) => fail(scene, log, e, true), // the PVS applied, never written
+        Err(e) => fail(scene, log, e, true),
     }
 }
 
-/// Bake Occlusion (#1958): once its worker finished, apply the PVS and write it
-/// beside the scene. A failed bake applied nothing; a PVS applied but never
-/// written needs the scene saved, which writes it (as `advance_occlusion` does).
 fn advance_occlusion_only(
     step: &mut Step,
     scene: &mut Scene,
@@ -293,8 +250,6 @@ fn advance_occlusion_only(
     };
     match scene.unrecorded(|scene| apply_occlusion(scene, path, baked)) {
         Ok(report) => Some(done(scene, log, report.summary(), false)),
-        // `drive` never advances during Play, so only the write can fail here, with
-        // the PVS already on the scene.
         Err(e) => fail_occlusion(scene, log, e, true),
     }
 }

@@ -1,7 +1,5 @@
 //! crates/editor/src/inspector/components/audio/reverb_zone.rs — the AudioReverbZone card
-//! (#469).
-//!
-//! A THIN client (#287): widgets read a snapshot and route every write through the
+//! A THIN client: widgets read a snapshot and route every write through the
 //! shared `authoring::audio::reverb_zone` ops the `AudioReverbZone.*` Lua setters call, so
 //! picking a preset writes its params and editing a param makes the zone `Custom`
 //! in one place.

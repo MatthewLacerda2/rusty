@@ -1,18 +1,10 @@
-//! crates/editor/src/viewport/gizmo.rs — the draggable move gizmo (#183).
-//!
-//! Draws (via the renderer's pre-built axis arrows) at the selected entity's world
-//! position; this module is the *interaction* half: hit-testing the pick ray against
-//! the three axis handles and, on drag, translating the entity along the grabbed
-//! axis. The translation writes `transform.position` and refreshes the collider — the
-//! same mutation the inspector performs — so inspector fields and gizmo stay in
-//! lockstep. Pure glam (no egui/wgpu) so the projection math is unit-testable.
+//! crates/editor/src/viewport/gizmo.rs — the draggable move gizmo.
 
 use glam::Vec3;
 
 use super::pick::Ray;
 use rusty_scene::Scene;
 
-/// Which translation axis a gizmo drag is bound to.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum GizmoAxis {
     X,
@@ -30,25 +22,16 @@ impl GizmoAxis {
     }
 }
 
-/// The length the axis arrows are drawn at (`generate_axis_arrows` uses 2.0), so the
-/// handle hit-test spans the same segment the user sees.
 const AXIS_LENGTH: f32 = 2.0;
 
-/// Live drag state: the grabbed axis and the scalar position along it (the world
-/// point on the axis closest to the pick ray) recorded at the last frame, so each
-/// frame's translation is the delta of that scalar.
 #[derive(Clone, Copy, Debug)]
 pub struct GizmoDrag {
     pub axis: GizmoAxis,
     last_t: f32,
 }
 
-/// Hit-test the pick `ray` against the three axis handles anchored at `origin`,
-/// returning the closest grabbed axis (and the initial along-axis scalar) when the
-/// ray passes within `pick_radius` world units of a handle segment. `None` means the
-/// click missed the gizmo and should fall through to entity picking.
 pub fn begin_drag(origin: Vec3, ray: Ray, pick_radius: f32) -> Option<GizmoDrag> {
-    let mut best: Option<(GizmoAxis, f32)> = None; // (axis, dist)
+    let mut best: Option<(GizmoAxis, f32)> = None;
     for axis in [GizmoAxis::X, GizmoAxis::Y, GizmoAxis::Z] {
         let dist = ray_segment_distance(ray, origin, axis.dir(), AXIS_LENGTH);
         if dist <= pick_radius && best.map(|(_, d)| dist < d).unwrap_or(true) {
@@ -82,10 +65,6 @@ pub fn drag(
     let Some(mut transform) = scene.world.transform_mut(entity_id) else {
         return false;
     };
-    // World-axis translation applied to the local position. With no parent rotation
-    // (the common case) world and local axes coincide; parented entities translate
-    // along the world axis projected by the unchanged local basis, matching how the
-    // inspector edits the same `position` field.
     transform.position += axis * delta;
     true
 }
@@ -93,7 +72,6 @@ pub fn drag(
 /// The scalar `t` such that `origin + t * axis` is the point on the (infinite) axis
 /// line closest to `ray`. The drag tracks the delta of this between frames.
 fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
-    // Closest points between two lines: solve the 2x2 system for the axis parameter.
     let a = axis;
     let b = ray.dir;
     let w0 = origin - ray.origin;
@@ -102,7 +80,7 @@ fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
     let ab = a.dot(b);
     let denom = aa * bb - ab * ab;
     if denom.abs() < 1e-6 {
-        return 0.0; // Axis parallel to the ray: no stable projection.
+        return 0.0;
     }
     let ac = a.dot(w0);
     let bc = b.dot(w0);
@@ -114,7 +92,6 @@ fn closest_t_on_axis(ray: Ray, origin: Vec3, axis: Vec3) -> f32 {
 fn ray_segment_distance(ray: Ray, origin: Vec3, axis: Vec3, len: f32) -> f32 {
     let t = closest_t_on_axis(ray, origin, axis).clamp(0.0, len);
     let on_axis = origin + axis * t;
-    // Closest point on the ray to that axis point (ray is a half-line from origin).
     let s = (on_axis - ray.origin).dot(ray.dir).max(0.0);
     let on_ray = ray.origin + ray.dir * s;
     (on_axis - on_ray).length()
@@ -135,7 +112,6 @@ mod tests {
 
     #[test]
     fn grabs_nearest_axis() {
-        // A ray pointing at the +X arrow (along -Z, offset to x=1) grabs X.
         let r = ray(Vec3::new(1.0, 0.0, 5.0), Vec3::new(0.0, 0.0, -1.0));
         let grab = begin_drag(Vec3::ZERO, r, 0.3).unwrap();
         assert_eq!(grab.axis, GizmoAxis::X);
@@ -143,7 +119,6 @@ mod tests {
 
     #[test]
     fn miss_returns_none() {
-        // A ray far from every handle misses the gizmo entirely.
         let r = ray(Vec3::new(50.0, 50.0, 5.0), Vec3::new(0.0, 0.0, -1.0));
         assert!(begin_drag(Vec3::ZERO, r, 0.3).is_none());
     }
@@ -153,7 +128,6 @@ mod tests {
         let mut scene = Scene::new();
         let id = authoring::create_entity(&mut scene, "Box", Some(Primitive::Box));
         let origin = Vec3::ZERO;
-        // Grab X, then move the ray +2 in X; the entity slides along +X only.
         let r0 = ray(Vec3::new(0.0, 0.0, 5.0), Vec3::new(0.0, 0.0, -1.0));
         let mut g = GizmoDrag {
             axis: GizmoAxis::X,

@@ -2,8 +2,6 @@
 //! `mod.rs`) plus the Post Processing card (`post_processing`, one section per post
 //! effect). Both cards live on the same camera entity. The field of view and its
 //! axis are drawn by `fov`. The Camera card draws the
-//! camera effects' sections (`CAMERA_SECTIONS`: motion blur in `motion_blur`, TAA
-//! in `taa`, FXAA here).
 
 use crate::widgets::DragRange;
 use egui_phosphor::regular as icon;
@@ -21,9 +19,6 @@ use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::{self, rendering::camera as camera_ops, ComponentKind};
 use rusty_scene::{CameraComponent, ClearFlags};
 
-/// Camera Component panel. `named_layers` are the `(index, label)` slots offered in
-/// the culling-mask checklist (layer 0 + named user slots); `view_aspect` is the
-/// editor viewport's width / height, which the field of view converts at (#2038).
 pub fn draw_camera(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -50,15 +45,11 @@ pub fn draw_camera(
         target::draw_target(ui, world, id, &cam, is_dirty);
     });
     if remove {
-        // Cascade to camera-dependent components (PostProcessing) from the
-        // declaration (#359), not a hand-written pair of clears.
         authoring::remove_with_cascade(world, id, ComponentKind::Camera);
         *is_dirty = true;
     }
 }
 
-/// One camera effect's section of the Camera card (#1467): motion blur, FXAA and TAA,
-/// whose settings live on the camera, not on a volume.
 pub(crate) struct CameraSection {
     /// The effect, as `render::postfx::effects` names it.
     pub effect: &'static str,
@@ -67,10 +58,6 @@ pub(crate) struct CameraSection {
     pub draw: fn(&mut egui::Ui, &mut rusty_ecs::World, u32, &CameraComponent, &mut bool),
 }
 
-/// Every post effect the Inspector draws a section for, on either card (the volume's
-/// and the camera's): what the post effects' completeness gate checks the renderer
-/// against (`render::postfx::completeness`). A test hook in every build: the
-/// integration suite's `tests/post_effect_layers.rs` reads it.
 #[doc(hidden)]
 pub fn drawn_effects() -> Vec<&'static str> {
     let volume = post_processing::SECTIONS.iter().map(|s| s.effect);
@@ -106,10 +93,6 @@ fn camera_effects() -> Vec<&'static CameraSection> {
     sections
 }
 
-/// The FXAA toggle (#360): a real checkbox, because FXAA is an effect a shot might
-/// genuinely want off (a pixel-art look, or a screenshot being diffed for raw
-/// edges). Writes through the shared op, so this and `Graphics.SetFxaaActive` are
-/// one path.
 fn draw_fxaa(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -126,8 +109,6 @@ fn draw_fxaa(
     }
 }
 
-/// The projection widgets (FOV and its axis, near/far clip), reading the snapshot
-/// and routing each write through the shared op. `view_aspect` is the viewport's.
 fn draw_projection(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -175,7 +156,6 @@ fn draw_projection(
 
 /// The Unity-style culling-mask checklist: one checkbox per offered layer, plus
 /// Everything/Nothing shortcuts. Each toggle computes the next mask from `mask`
-/// (the snapshot) and routes it through the shared op.
 fn draw_culling_mask(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -213,9 +193,6 @@ fn draw_culling_mask(
     }
 }
 
-/// Camera-stack controls (#93): the stacking `render_order` (Unity "Depth") and the
-/// `clear_flags` that decide how this camera composites over the ones below it.
-/// Reads the snapshot values; routes writes through the shared ops.
 fn draw_stacking(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,

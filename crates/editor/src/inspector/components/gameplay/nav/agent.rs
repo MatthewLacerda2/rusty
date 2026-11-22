@@ -1,8 +1,5 @@
 //! crates/editor/src/inspector/components/gameplay/nav/agent.rs — the NavMesh Agent
 //! inspector card, split from `physics` to stay under the size cap.
-//!
-//! A THIN client (#287): widgets read fields from a snapshot and route every write
-//! through `authoring::nav::agent`, the same ops the `NavMeshAgent.*` Lua setters call.
 
 use crate::inspector::components::card::remove_component;
 use crate::widgets::DragRange;
@@ -14,7 +11,6 @@ use super::super::physics::vec3_row;
 use crate::inspector::components::card::component_card;
 use rusty_edit::authoring::nav::agent as nav_ops;
 
-/// A shared `authoring::nav::agent` scalar setter, one per clamped drag row.
 type NavOp = fn(&mut rusty_components::NavMeshAgentComponent, f32);
 
 /// 3EH. NavMeshAgent Component
@@ -51,7 +47,7 @@ pub fn draw_nav_agent(
 
 /// The nav-agent scalar tuning rows (speed, acceleration, angular speed and
 /// acceleration, stopping distance, radius, base offset), each clamped and routed
-/// through its shared op, then the Update Rotation toggle (#744).
+/// through its shared op, then the Update Rotation toggle.
 fn draw_agent_tuning(
     ui: &mut egui::Ui,
     world: &mut rusty_ecs::World,
@@ -110,8 +106,8 @@ fn draw_agent_tuning(
     }
 }
 
-/// The nav-agent local-avoidance toggle + priority (#463), the off-mesh link
-/// auto-traverse toggle (#462) and the area mask (#460, bit `i` = area `i`), through
+/// The nav-agent local-avoidance toggle + priority, the off-mesh link
+/// auto-traverse toggle and the area mask, through
 /// the shared ops.
 fn draw_agent_avoidance(
     ui: &mut egui::Ui,
