@@ -1,3 +1,5 @@
+//! A test hook: a synthetic skinned rig whose root hangs under a rotated, scaled
+//! `Armature`, the offset a Blender export puts between mesh and skeleton.
 use glam::{Mat4, Quat, Vec3};
 
 use crate::Scene;

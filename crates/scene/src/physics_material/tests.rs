@@ -89,6 +89,7 @@ fn a_deleted_asset_turns_dangling_once_its_removal_is_noted() {
     write(&path, PhysicsMaterial::new(0.3, 0.0)).unwrap();
     let before = generation();
     std::fs::remove_file(&path).unwrap();
+    // The editor's file watch notes a removed file as it notes a changed one.
     rusty_core::fs::written::note_written(&path);
     let shared = with_asset(Some(&path));
     assert!(named(&shared).is_some(), "a lookup alone does not poll");

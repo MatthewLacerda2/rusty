@@ -89,12 +89,16 @@ impl ProbeVolume {
         self.blend(&near, get)
     }
 
+    /// Weights `1/d² − 1/dₙ²`, `dₙ` the next probe's distance: a probe's weight reaches zero as
+    /// the next draws level and replaces it, so a swap never pops.
     fn blend<T: Blend>(&self, near: &index::Nearest, get: &impl Fn(&Probe) -> T) -> T {
         let (blended, next) = near.split_at(BLEND_PROBES);
         let found = || blended.iter().filter(|n| n.1 != usize::MAX);
         if let Some(&(_, i)) = found().find(|n| n.0 <= ON_PROBE) {
             return get(&self.probes[i]);
         }
+        // `1/dₙ²` is 0 with no next probe; the plain weights are the fallback when every blended
+        // probe is as far as the next.
         for fade in [1.0 / next[0].0, 0.0] {
             let (mut sum, mut total) = (T::none(), 0.0);
             for &(d, i) in found() {

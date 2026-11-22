@@ -47,6 +47,8 @@ fn rigs_among_static_meshes_come_back_in_insertion_order() {
     statics(&mut scene, 5);
     let second = armature_owner(&mut scene);
     scene.sync_skeletons();
+    // A despawn swap-removes inside hecs's archetype, so iteration order drifts from
+    // insertion order: the sort on `Core::seq` must restore it.
     scene.destroy_entity(early[0]);
     let third = armature_owner(&mut scene);
     scene.sync_skeletons();

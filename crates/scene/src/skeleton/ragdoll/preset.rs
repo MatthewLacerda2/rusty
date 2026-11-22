@@ -1,6 +1,8 @@
+//! Angles are in degrees, as in Unity's Ragdoll Wizard.
 use rusty_components::JointKind;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Which way a bone flexes, in the character's own space (glTF: +Y up, facing +Z).
 pub(super) enum Bend {
     Forward,
     Backward,
@@ -10,9 +12,11 @@ pub(super) enum Bend {
 pub(super) struct JointPreset {
     pub kind: JointKind,
     pub bend: Bend,
+    /// The asymmetric range `(min, max)`, toward `bend`: the joint's twist range.
     pub flex: (f32, f32),
     /// Swing about the bend direction (Unity's swing 1).
     pub swing1: f32,
+    /// Swing about the bone itself.
     pub swing2: f32,
 }
 

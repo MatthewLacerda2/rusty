@@ -22,6 +22,7 @@ fn a_dangling_parent_reads_as_a_root() {
     scene.world.transform_mut(leaf).unwrap().position = Vec3::Y;
     assert_eq!(scene.world.world_position(leaf), Vec3::Y);
     scene.world.despawn(gone);
+    // A raw link to an id no longer in the world, as only a corrupt file can write.
     scene.world.set_parent_id(leaf, Some(gone));
     let live = scene.world.world_position(leaf);
     let cached = scene.world.world_position(leaf);

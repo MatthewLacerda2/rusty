@@ -1,3 +1,7 @@
+//! What the despawn door drops of a destroyed entity outside its document (its lightmap
+//! entry, its owned decals) rides with the Undo step, and comes back with the entity. Undo
+//! never changes a live entity's entry: a bake is no edit.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::decal::Decal;
@@ -13,6 +17,7 @@ pub(super) struct Side {
 impl Side {
     pub(super) fn of(scene: &Scene, ids: impl IntoIterator<Item = u32>) -> Self {
         let ids: BTreeSet<u32> = ids.into_iter().collect();
+        // The entries a save writes, never a progressive bake's preview.
         let entry = |id: &u32| Some((*id, scene.lightmaps.saved().get(*id)?.clone()));
         let lightmaps = ids.iter().filter_map(entry).collect();
         let owned = |d: &&Decal| d.owner.is_some_and(|o| ids.contains(&o.entity));

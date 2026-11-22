@@ -3,16 +3,22 @@ use crate::Scene;
 use rusty_components::{LightComponent, LightMode, LightType};
 
 impl Scene {
+    /// The mode the renderer acts on, held to what the last bake made of it. A bake decides
+    /// afresh from `effective_mode`, never from this.
     pub fn light_mode(&self, id: u32, light: &LightComponent) -> LightMode {
         self.lightmaps.baked_mode(id, light.effective_mode())
     }
 
+    /// A `Baked` lamp or sun whose direct light no bake holds: dark until Generate Lighting unless
+    /// the frame previews it. An Area panel has no live path to preview.
     pub fn awaits_bake(&self, id: u32, light: &LightComponent) -> bool {
         !matches!(light.light_type, LightType::Area | LightType::Ambient)
             && self.light_mode(id, light) == LightMode::Baked
             && !self.lightmaps.bakes_direct(id)
     }
 
+    /// With `preview`, a light awaiting a bake draws as `Mixed`, so a new light is never silently
+    /// dark in the editor.
     pub fn drawn_mode(&self, id: u32, light: &LightComponent, preview: bool) -> LightMode {
         match preview && self.awaits_bake(id, light) {
             true => LightMode::Mixed,
@@ -50,6 +56,7 @@ pub const NO_CHANNELS: &str = "Probe.Bake: no shadowmask channels are recorded, 
      probes hold no occlusion; run Lighting.BakeLightmaps() first, or Generate Lighting";
 
 impl Scene {
+    /// `lightmaps` for `Lighting.BakeLightmaps`, else `Probe.Bake`.
     pub fn shadowmask_note(&self, lightmaps: bool) -> Option<&'static str> {
         let on = self.lighting_settings.mixed_lighting_mode == MixedLightingMode::Shadowmask;
         if !on || self.probes.is_empty() {

@@ -1,3 +1,6 @@
+//! One evaluation, `AmbientRadiance`, serves the forward shader, the lightmap trace, the
+//! probe fill and the GPU probe bake.
+
 mod radiance;
 mod skybox;
 #[cfg(test)]
@@ -51,6 +54,8 @@ impl Default for AmbientSettings {
         Self {
             mode: AmbientMode::Color,
             sky: DEFAULT_AMBIENT_COLOR,
+            // The default hemisphere at the horizon and straight down, so switching the default
+            // scene to `Gradient` draws the same light.
             equator: DEFAULT_AMBIENT_COLOR * 0.625,
             ground: DEFAULT_AMBIENT_COLOR * 0.25,
         }
@@ -107,6 +112,7 @@ impl Scene {
                 drawn.gradient =
                     Some([self.ambient.sky, self.ambient.equator, self.ambient.ground]);
             }
+            // An Ambient light overrides the sky, so it is projected only when none does.
             AmbientMode::Skybox if !has_light => {
                 drawn.skybox = Some(skybox::sky_radiance(self, self.ambient_color));
             }

@@ -37,6 +37,7 @@ impl Camera {
         let ndc = clip.truncate().truncate() / w;
         ScreenPoint {
             position: (ndc * 0.5 + 0.5) * screen,
+            // Not clip `w`: an orthographic camera's is always 1.
             depth: (p - self.position).dot(self.forward()),
         }
     }

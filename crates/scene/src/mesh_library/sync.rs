@@ -24,6 +24,8 @@ pub(super) fn stale_entries(scene: &mut Scene) -> BTreeSet<String> {
                 .as_deref()
                 .filter(|m| scene_mesh_name(m) == Some(&name));
             if let Some(mesh) = own.filter(|m| m.revision != entry.revision) {
+                // An entity newer than its entry (an Undo put old data back) re-mints the
+                // entry's revision, since the renderer keeps the newest upload for a name.
                 if mesh.revision > entry.revision {
                     entry.revision = MeshRevision::next();
                 }

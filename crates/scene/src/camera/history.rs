@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+/// Cuts asked of each camera by entity, `None` for the free view camera: a part of its
+/// view's `render::motion::HistoryKey`, so a new cut starts every history over.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct HistoryCuts(BTreeMap<Option<u32>, u32>);
 

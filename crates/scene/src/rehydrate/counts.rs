@@ -1,3 +1,6 @@
+//! A test hook (`crates/CLAUDE.md`): the meshes this thread rebuilt from their reference,
+//! counted once [`rebuilds`] was called on it. `rusty-edit`'s tests hold a restore to it.
+
 use std::cell::Cell;
 
 thread_local! {

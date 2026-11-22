@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+/// Unity's 32: an index fits a `u8`, a membership set a `u32` mask.
 pub const LAYER_COUNT: usize = 32;
 
 const DEFAULT_LAYER_NAME: &str = "Default";
@@ -61,6 +62,8 @@ impl LayerRegistry {
             .map(|(i, n)| (i as u8, n.as_str()))
     }
 
+    /// Call after deserializing: restores exactly `LAYER_COUNT` slots with "Default" at 0,
+    /// whatever the file held.
     pub fn normalize(&mut self) {
         self.names.resize(LAYER_COUNT, String::new());
         self.names[0] = DEFAULT_LAYER_NAME.to_string();

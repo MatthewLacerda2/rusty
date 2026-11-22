@@ -20,9 +20,8 @@ pub struct HitReact {
 
 impl HitReact {
     /// These options with every number finite and in range: a NaN or infinite
-    /// duration takes the default, and each drive value takes the joint rule
-    /// (`rules::joint::drive_value`: floored at 0, and 0 when NaN or infinite), so
-    /// `math.huge` never reaches rapier.
+    /// duration takes the default, and each drive value takes `rules::joint::drive_value`,
+    /// so `math.huge` never reaches rapier.
     pub fn sanitized(&self) -> Self {
         let duration = match self.duration.is_finite() {
             true => self.duration.max(0.0),
@@ -101,6 +100,8 @@ impl Scene {
         n
     }
 
+    /// Physics' `drive_joints` calls this, so a drive set through `Joint` chases the
+    /// animation too.
     pub fn track_driven_bone(&mut self, joint: u32) {
         if !self.ragdolls.is_tracked(joint) && self.is_bone(joint) {
             self.track_if_simulated(joint);
@@ -156,6 +157,7 @@ impl Scene {
             }
         }
         let opts = opts.sanitized();
+        // A kinematic body drops an impulse, so it lands on the branch's body nearest `point`.
         let target = match self.is_simulated_body(hit) {
             true => hit,
             false => self.nearest(&bones, point).unwrap_or(root),
@@ -186,6 +188,7 @@ impl Scene {
         }
     }
 
+    /// Run before the ragdoll bones are posed, so a reaction's last tick poses at weight 0.
     pub fn advance_reactions(&mut self, dt: f32) {
         self.ragdolls.take_physics();
         self.ragdolls.advance(dt);
@@ -213,6 +216,7 @@ impl Scene {
         }
     }
 
+    /// Run after the bones are posed, so a released bone's last tick draws at weight 0.
     pub fn end_reactions(&mut self) {
         for b in self.ragdolls.release() {
             self.switch_body(b, None, false);

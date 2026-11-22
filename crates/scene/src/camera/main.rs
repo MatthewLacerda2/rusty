@@ -18,6 +18,7 @@ pub fn screen_cameras(scene: &Scene) -> Vec<u32> {
         .filter(|(_, target)| target.is_none())
         .map(|(id, _)| (render_order(scene, id), id))
         .collect();
+    // Stable: cameras sharing a `render_order` keep entity order.
     ids.sort_by_key(|(order, _)| *order);
     ids.into_iter().map(|(_, id)| id).collect()
 }

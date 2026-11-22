@@ -24,6 +24,7 @@ fn mixed() -> ReflectionProbeSet {
     set
 }
 
+/// Compared by bits: `-0.0` and `0.0` differ here.
 fn bits(b: Option<ProbeBlend>) -> Option<(usize, u32, Option<usize>, u32)> {
     b.map(|b| {
         (
@@ -106,6 +107,8 @@ fn a_nearly_unit_rotation_agrees_past_the_corners() {
     let mut set = ReflectionProbeSet::new();
     set.add(Vec3::ZERO, Vec3::splat(10.0));
     let q = Quat::from_euler(glam::EulerRot::YXZ, 0.9, 0.3, 0.5) * (1.0 - 0.9e-4);
+    // Written straight to the field (`edit` would normalise it): unnormalised, the frame's
+    // turn and glam's disagree by millimetres past the corners.
     (set.probes[0].rotation, set.probes[0].blend_distance) = (q, 2.0);
     let (probe, prepared): (&ReflectionProbe, _) = (&set.probes[0], set.prepared());
     let frame = probe.frame();
