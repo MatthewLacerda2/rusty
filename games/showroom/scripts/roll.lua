@@ -1,4 +1,4 @@
--- roll.lua — rolls its ball along +X at `speed` metres per second until `to_x`,
+-- Rolls its ball along +X at `speed` metres per second until `to_x`,
 -- turning it about Z as a ball of `radius` turns when it rolls without slipping.
 
 local Roll = {

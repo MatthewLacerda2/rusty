@@ -31,5 +31,12 @@ fn main() {
         gates::report(&comments::proof::verdict(std::path::Path::new(""), rev));
         return;
     }
+    if let Some(at) = args.iter().position(|a| a == comments::signals::FLAG) {
+        print!(
+            "{}",
+            comments::signals::run(std::path::Path::new(""), &args[at + 1..])
+        );
+        return;
+    }
     gates::report(&check(std::path::Path::new(""), &args));
 }

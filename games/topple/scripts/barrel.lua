@@ -1,4 +1,4 @@
--- barrel.lua — an explosive barrel: a hard hit or a blast sets it off.
+-- An explosive barrel: a hard hit or a blast sets it off.
 -- The blast is Damage.ApplyRadial's: damage and an impulse away from the
 -- barrel on every body within OUTER metres, falling off linearly from INNER.
 

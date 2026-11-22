@@ -50,8 +50,17 @@ a replay reads the recording's scale, not the monitor it plays on.
 Settings persist through the `video` `Storage` namespace
 (loaded at startup, written back when the app quits; Stop does not store them), so
 the app relaunches as last set. In
-the headless harness there is no window/surface, so the setters are inert.
+the headless harness there is no window/surface to resize, and its `Storage` opens no
+file, so a run starts at the default 1280x720 whatever the machine last saved.
 
-**Determinism.** Like `Graphics`, every `Video` write is **one-way** into
-render/platform state and is never read by `FixedUpdate`, so it cannot change how
-the deterministic sim evolves; a headless replay is unaffected.
+**Determinism.** The screen size is a **sim input**: `UI.GetScreenSize`, canvas
+layout and `Camera.WorldToScreen` / `ScreenToWorldRay` read it inside `FixedUpdate`.
+With a window it is the Game view's size, which the platform writes each frame;
+headless there is none, and the size is the resolution `SetResolution` last set
+(`play --size` gives the run a Game view instead). Neither ever comes from the
+machine's saved settings headless, and a demo records both: the live `Video` settings
+as recording starts (a `SetResolution` made before it included, saved or not) and the
+Game view's size at each change. A replay installs exactly that screen, headless, in a
+session or in the editor's Game view, so its UI lays out and its camera rays aim on the
+recording's screen, never on the host's settings or panel. Vsync and fullscreen are one-way
+into the platform and never read by the sim.

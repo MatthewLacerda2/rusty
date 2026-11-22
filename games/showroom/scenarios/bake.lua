@@ -1,4 +1,4 @@
--- scenarios/bake.lua — with `bake = true` the recipe's tiny lightmap bake
+-- With `bake = true` the recipe's tiny lightmap bake
 -- finished, was written beside the scene, and is applied after the scene is
 -- loaded from disk. Without the parameter it is skipped: the recipe leaves a
 -- `BakeRequested` entity only when it baked, and CI runs the defaults.

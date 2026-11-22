@@ -57,8 +57,10 @@ fn the_full_scan_reads_the_whole_tree_with_git_and_without() {
     let mut want = vec![
         repo.file(".github/scripts/m.py", "x = 1\n"),
         repo.file("build.rs", "fn main() {}\n"),
+        repo.file("crates/a/README.md", "# A\n"),
         repo.file("games/smoke/main.lua", "x = 1\n"),
     ];
+    repo.file("docs/a.md", "# Not read\n");
     repo.file(".claude/worktrees/b/src/a.rs", "//\n");
     assert_eq!(full_scan(&repo.0).0, want);
     let dir = Repo::new("2491-tree-disk", false);
@@ -66,6 +68,8 @@ fn the_full_scan_reads_the_whole_tree_with_git_and_without() {
     dir.file(".claude/worktrees/b/src/a.rs", "//\n");
     dir.file(".git/hooks/x.py", "x = 1\n");
     want.push(dir.file(".github/scripts/m.py", "x = 1\n"));
+    want.push(dir.file("crates/a/README.md", "# A\n"));
+    dir.file("docs/a.md", "# Not read\n");
     let mut found = full_scan(&dir.0).0;
     found.sort();
     want.sort();

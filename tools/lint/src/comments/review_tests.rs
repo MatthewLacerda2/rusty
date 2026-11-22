@@ -34,8 +34,11 @@ fn a_lifetime_opens_no_literal() {
 
 #[test]
 fn a_reference_on_a_free_line_is_still_flagged() {
+    // lint: allow(comment-history) the rule's own input
     assert_eq!(history("// sorted: by name, #1234\n"), 1);
+    // lint: allow(comment-history) the rule's own input
     assert_eq!(history("// lint: allow(dir-size) see #1234\n"), 1);
+    // lint: allow(comment-history) the rule's own input
     assert_eq!(history("// SAFETY: as #1234 says\nunsafe { f() }\n"), 1);
     assert_eq!(
         history("// lint: allow(comment-history) upstream #1234\n"),

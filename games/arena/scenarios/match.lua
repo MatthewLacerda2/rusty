@@ -1,4 +1,4 @@
--- scenarios/match.lua — bots only: the deathmatch reaches its kill limit
+-- Bots only: the deathmatch reaches its kill limit
 -- before its time limit, and every bot both scores and dies at least once (no
 -- bot stuck somewhere on the map). Takes the mid-fight shot on the way.
 

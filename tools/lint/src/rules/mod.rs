@@ -23,6 +23,7 @@ mod fullscreen_triangle;
 mod gpu_default_only;
 mod gpu_ops;
 mod held_warn;
+mod hook_line;
 mod ignored;
 mod log_tag;
 mod markers;
@@ -91,6 +92,7 @@ const RULES: &[(&str, Rule, Allow)] = &[
     (gpu_default_only::RULE, gpu_default_only::run, Allow::Inline),
     (gpu_ops::RULE, gpu_ops::run, Allow::Inline),
     (held_warn::RULE, held_warn::run, Allow::Inline),
+    (hook_line::RULE, hook_line::run, Allow::Inline),
     (ignored::RULE, ignored::run, Allow::Never),
     (log_tag::RULE, log_tag::run, Allow::Inline),
     (markers::RULE, markers::run, Allow::Inline),

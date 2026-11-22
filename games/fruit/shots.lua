@@ -1,4 +1,4 @@
--- shots.lua — the fixed cameras the fruit game is screenshotted from at the start:
+-- The fixed cameras the fruit game is screenshotted from at the start:
 -- the player's view of the empty kitchen, and the counter up close. The game's own
 -- moments (a burst, a cut, game over) are its scenarios' shots, in cache/test/.
 

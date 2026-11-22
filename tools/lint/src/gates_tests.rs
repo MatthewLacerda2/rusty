@@ -42,6 +42,17 @@ fn cases_for(flag: &str) -> Option<Vec<Case>> {
                 )]),
                 "src/wide.rs:1: [comment-width]",
             ),
+            (
+                files(&[("src/a.rs", "//! src/a.rs: the passes, in order.\n")]),
+                "src/a.rs:1: [comment-path]",
+            ),
+            (
+                files(&[(
+                    "src/bake/progress.rs",
+                    "//! The bake's progress.\nfn f() {}\n",
+                )]),
+                "src/bake/progress.rs:1: [comment-echo]",
+            ),
         ],
         "--components" => vec![
             no_registry,

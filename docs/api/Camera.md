@@ -54,7 +54,8 @@ origin, y-up, the frame of `UI.GetRect(id).screen` and the UI pointer (Unity's
 screen space). `Input.GetMousePosition` alone is top-left, y-down: pick with
 `MouseRay` rather than passing it to `ScreenToWorldRay`, which would mirror the
 aim top to bottom. The screen is the
-sim's (`UI.GetScreenSize`), so the answer is the same headless as in the window.
+sim's (`UI.GetScreenSize`, a sim input: [`Video.md`](Video.md), *Determinism*), so the
+answer is the same headless as in a window of that size.
 
 - `WorldToScreen` projects a world point. Pass a canvas id to get that canvas's
   **reference units** instead of pixels (pixels ÷ its scale factor). `depth` is the

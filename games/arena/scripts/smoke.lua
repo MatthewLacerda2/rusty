@@ -1,4 +1,4 @@
--- smoke.lua — a smoke grenade's cloud (combat.lua throws it): it blocks the
+-- A smoke grenade's cloud (combat.lua throws it): it blocks the
 -- bots' sight for `seconds`, stops emitting, and is gone once its last puffs fade.
 
 local Smoke = {

@@ -1,4 +1,4 @@
--- scenarios/settle.lua — every level, left alone, stays standing: between half
+-- Every level, left alone, stays standing: between half
 -- a second in (the stacks have taken their weight) and three seconds in, no
 -- body moves more than TOLERANCE, and every target is still on its platform.
 -- A tower that jitters, creeps or slowly slides fails it.

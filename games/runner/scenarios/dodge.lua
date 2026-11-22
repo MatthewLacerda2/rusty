@@ -1,4 +1,4 @@
--- scenarios/dodge.lua — the bot dodges the fixed seed's first obstacles through
+-- The bot dodges the fixed seed's first obstacles through
 -- the player's own keys and survives 500 m, jumping, sliding and changing lanes
 -- on the way. It takes the shot of a lane change in mid-air.
 

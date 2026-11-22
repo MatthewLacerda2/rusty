@@ -1,4 +1,4 @@
--- shooter.lua — the player: a first-person deathmatch fighter.
+-- The player: a first-person deathmatch fighter.
 --
 --   * Mouse looks (the cursor is locked), WASD walks through the
 --     CharacterController at MOVE_SPEED, Space jumps, the script owns gravity.

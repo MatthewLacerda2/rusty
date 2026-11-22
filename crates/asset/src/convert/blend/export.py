@@ -1,4 +1,4 @@
-# The one place the `.blend` export settings live (#1072). `blend::run` runs it as
+# The one place the `.blend` export settings live. `blend::run` runs it as
 #   blender --background --factory-startup --disable-autoexec <source>
 #           --python-exit-code 1 --python-expr <this file> -- <export dir>
 # and `blend::pack` turns what it writes into the cached `.glb`.

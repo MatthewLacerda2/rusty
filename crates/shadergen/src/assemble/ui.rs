@@ -22,7 +22,7 @@ pub(super) fn assemble(
     let mut out = String::new();
     let _ = writeln!(
         out,
-        "// {name}.wgsl — authored ui variant (#427), assembled from {n} block(s).\n\
+        "// {name}.wgsl — authored ui variant, assembled from {n} block(s).\n\
          // Base: the UI pass (`ui.wgsl`) kept verbatim; `graphic()` folds the blocks\n\
          // over the graphic's premultiplied colour, on screen and world canvases.",
         name = recipe.name,

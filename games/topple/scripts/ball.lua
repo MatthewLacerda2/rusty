@@ -1,4 +1,4 @@
--- ball.lua — a thrown ball: a knock, a puff of dust and a scuff where it
+-- A thrown ball: a knock, a puff of dust and a scuff where it
 -- strikes something hard.
 
 local Ball = {}
