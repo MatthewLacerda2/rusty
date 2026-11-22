@@ -82,7 +82,7 @@ fn draw_code_editor(
 }
 
 /// Entity picker that appends this script as a new `ScriptComponent` on the
-/// chosen scene entity (#83: many scripts per entity).
+/// chosen scene entity.
 fn draw_attach_to_entity(
     ui: &mut egui::Ui,
     editor: &mut EditorUi,
@@ -122,7 +122,7 @@ fn draw_attach_to_entity(
         });
 
     if let Some(entity_id) = clicked_entity_id {
-        // An entity can hold many scripts (#83); this appends rather than replaces.
+        // An entity can hold many scripts; this appends rather than replaces.
         if authoring::add_script(&mut scene.world, entity_id, path, Default::default()) {
             editor.is_dirty = true;
             console.info(format!(

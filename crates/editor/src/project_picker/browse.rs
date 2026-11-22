@@ -1,4 +1,5 @@
-//! crates/editor/src/project_picker/browse.rs — an in-editor folder browser.
+//! The editor has no native file dialogs (no dialog crate), so the picker's *New*
+//! and *Open* pages browse folders here.
 
 use std::path::{Path, PathBuf};
 

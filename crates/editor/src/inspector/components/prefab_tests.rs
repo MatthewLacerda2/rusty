@@ -1,7 +1,5 @@
-//! Tests for the editor prefab-instance override card's logic layer: the
-//! deferred-action dispatch and root resolution. The egui `draw` is left to manual
-//! verification; what matters for correctness is that the buttons map onto the exact
-//! same `edit::authoring` verbs the `Scene.*` API uses — proven here by driving
+//! The card's deferred-action `dispatch` and root resolution; the egui `draw` is left
+//! to manual checks.
 
 use super::*;
 use rusty_edit::authoring::{create_entity, Primitive};

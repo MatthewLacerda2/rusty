@@ -1,6 +1,3 @@
-//! Tests for the model inspector's material wiring: `instantiate` populating
-//! `scene.materials` and the entity `MaterialComponent` with a shared (deduped)
-
 use super::instantiate;
 use crate::EditorUi;
 use rusty_edit::{apply_scene_data, to_scene_data};

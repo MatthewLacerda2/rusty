@@ -43,7 +43,7 @@ pub fn draw(editor: &mut EditorUi, ui: &mut egui::Ui, scene: &mut Scene) {
             if chrome::panel_header(ui, &t, title.0, title.1, icon::CARET_LEFT) {
                 editor.hierarchy_open = false;
             }
-            // The walk's buffers live in egui's memory, so a warm frame allocates none.
+            // The walk's buffers live in egui's memory: a warm frame allocates none.
             let kept = egui::Id::new("hierarchy_flattener");
             let mut flat =
                 ui.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Flattener>(kept)));

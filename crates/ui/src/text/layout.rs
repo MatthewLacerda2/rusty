@@ -1,5 +1,3 @@
-//! crates/ui/src/text/layout.rs — a Text + its rect → placed glyphs.
-
 use glam::{Vec2, Vec4};
 
 use super::lines::{block_height, break_lines, clip, pitch, Line, EPS};
@@ -7,6 +5,7 @@ use super::measure::Measurer;
 use rusty_components::TextComponent;
 use rusty_font::GlyphId;
 
+/// Auto-size's binary-search steps, fixed so its pick is a pure function of the inputs.
 const AUTO_SIZE_STEPS: u32 = 12;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -14,19 +13,19 @@ pub struct PlacedGlyph {
     pub glyph: GlyphId,
     /// Index into [`TextLayout::faces`].
     pub face: usize,
+    /// Pen position on the baseline, plus a mark's offset; rect-local, y-up.
     pub origin: Vec2,
     pub baseline: f32,
     /// Em size, reference units.
     pub size: f32,
     /// Display-space fill, straight alpha (rich-text colour folded in).
     pub color: Vec4,
-    /// Synthesized bold (the renderer dilates the glyph).
+    /// Synthesized bold.
     pub faux_bold: bool,
-    /// Synthesized italic (the renderer shears the glyph).
+    /// Synthesized italic.
     pub faux_italic: bool,
 }
 
-/// A laid-out text.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct TextLayout {
     /// The font path of each face slot (`None`: the default font).
@@ -36,9 +35,7 @@ pub struct TextLayout {
     pub font_size: f32,
     /// The drawn block's size: widest line × block height.
     pub size: Vec2,
-    /// Lines drawn.
     pub lines: usize,
-    /// Whether overflow cut anything.
     pub truncated: bool,
 }
 
@@ -93,7 +90,6 @@ fn wrap(text: &TextComponent, measurer: &Measurer, width: f32) -> Vec<Line> {
     break_lines(&measurer.items(), max, measurer.base_metrics())
 }
 
-/// Whether `text` at `size` fits the rect without overflow.
 fn fits(text: &TextComponent, rect: Vec2, size: f32) -> bool {
     let measurer = Measurer::new(text, size);
     let lines = wrap(text, &measurer, rect.x);

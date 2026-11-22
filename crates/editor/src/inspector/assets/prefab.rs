@@ -1,5 +1,3 @@
-//! crates/editor/src/inspector/assets/prefab.rs — `.prefab` asset inspector.
-
 use egui_phosphor::regular as icon;
 use std::fs;
 use std::path::Path;
