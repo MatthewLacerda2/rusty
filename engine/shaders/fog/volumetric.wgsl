@@ -1,7 +1,7 @@
-// This module reads the volumetric fog. The grid's builder (`volumetric_fog.wgsl`) and every
-// reader go through its slice mapping, so they agree. Camera `volumetric`: x 1 when this camera
-// reads the volume (0: a uniform branch, no fetch), y the slice count, z the far end and w the
-// near end of the exponential slices, both view depths.
+// The volumetric fog is read here. The grid's builder (`volumetric_fog.wgsl`) and every reader go
+// through its slice mapping, so they agree. Camera `volumetric`: x 1 when this camera reads the
+// volume (0: a uniform branch, no fetch), y the slice count, z the far end and w the near end of
+// the exponential slices, both view depths.
 
 #define_import_path fog::volumetric
 

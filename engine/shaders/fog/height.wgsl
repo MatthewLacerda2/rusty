@@ -1,5 +1,4 @@
-// This module holds the height profile of the scene's fog; `common::fog_factor` is its one
-// caller.
+// The scene fog's height profile lives here; `common::fog_factor` is its one caller.
 
 #define_import_path fog::height
 

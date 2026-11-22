@@ -1,5 +1,5 @@
-// This module holds the real L2 spherical-harmonic basis in `scene::Sh9`'s order and
-// constants. Every shader that evaluates SH imports this one copy, so none can disagree.
+// The real L2 spherical-harmonic basis lives here, in `scene::Sh9`'s order and constants. Every
+// shader that evaluates SH imports this one copy, so none can disagree.
 
 #define_import_path lighting::sh
 

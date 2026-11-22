@@ -1,6 +1,5 @@
-// This module holds the value noise the procedural sky's clouds are carved from, as fractal
-// Brownian motion, and how far the clouds' coverage shifts it; `common::procedural_sky` is
-// their one caller.
+// The procedural sky's clouds are carved from this value noise, as fractal Brownian motion, shifted
+// by their coverage; `common::procedural_sky` is the one caller.
 
 #define_import_path sky::noise
 

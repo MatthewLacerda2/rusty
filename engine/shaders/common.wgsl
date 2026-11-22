@@ -1,4 +1,4 @@
-// Baked shaders may import any name here: none moves out.
+// Baked shaders may import any name: none moves out.
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
@@ -26,17 +26,18 @@ struct Clusters {
     dims: vec4<u32>,
 };
 
+// Mirrors `CameraUniform`.
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    // Seconds of scaled game time: frozen while paused, 0 in edit mode.
+    // Scaled game seconds: frozen while paused, 0 in edit mode.
     time: f32,
     fog: Fog,
     clusters: Clusters,
     prev_view_proj: mat4x4<f32>,
     stack: vec4<f32>,
     inv_view_proj: mat4x4<f32>,
-    // x step count, y step length, z minimum smoothness, w fade-in smoothness; zero
+    // x steps, y step length, z minimum smoothness, w fade-in smoothness; zero
     // without SSR.
     ssr: vec4<f32>,
     ssil: vec4<f32>,
@@ -45,11 +46,12 @@ struct CameraUniforms {
     volumetric: vec4<f32>,
 };
 
+// Mirrors `AmbientLightUniform`.
 struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
     gradient_sky: vec3<f32>,
-    // 0: `color`'s hemisphere, 1: trilight, 2: sky's SH (`Skybox`).
+    // 0 `color`'s hemisphere, 1 trilight, 2 the sky SH.
     mode: f32,
     gradient_equator: vec3<f32>,
     _pad_equator: f32,
@@ -69,6 +71,7 @@ struct DirectionalLight {
     mask_channel: f32,
 };
 
+// Mirrors `LightingUniform`.
 struct LightingUniforms {
     ambient: AmbientLight,
     // `sky_gradient.wgsl` reads `ambient`, `sky` as a prefix.
@@ -86,6 +89,7 @@ struct LightingUniforms {
     refl_probes: array<ReflectionProbe, 32>,
 };
 
+// Mirrors `lights::LocalLight`.
 struct LocalLight {
     position: vec3<f32>,
     range: f32,
@@ -225,7 +229,7 @@ fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
 }
 
 // Pushed 0.5 to 2 texels' world size along N, more grazing; taps stay 1.5 texels inside the
-// tile, off its neighbours.
+// tile.
 fn sample_local_shadow(
     tile: ShadowTile,
     atlas: texture_depth_2d,
@@ -312,7 +316,7 @@ fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f
 
 const PI: f32 = 3.14159265359;
 
-// `y` is clamped: rounding can push it past 1, NaN in `acos`.
+// `y` is clamped: rounding can pass 1, a NaN in `acos`.
 fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
     let phi = atan2(dir.z, dir.x);
     let theta = acos(clamp(dir.y, -1.0, 1.0));

@@ -1,8 +1,7 @@
-// This is the fullscreen triangle every fullscreen pass
-// draws: three vertices with no vertex buffer, covering clip space. A pass
-// wraps `triangle` in its own `@vertex` entry point (naga_oil keeps an imported
-// module's entry points out of the importer). It is the only place the triangle is
-// written: `make rules` (`fullscreen-triangle`) flags a copy anywhere else.
+// Every fullscreen pass draws this triangle: three vertices with no vertex buffer, covering clip
+// space. A pass wraps `triangle` in its own `@vertex` entry point (naga_oil keeps an imported
+// module's entry points out of the importer). It is the only place the triangle is written: `make
+// rules` (`fullscreen-triangle`) flags a copy anywhere else.
 
 #define_import_path fullscreen
 
