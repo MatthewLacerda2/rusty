@@ -6,7 +6,9 @@ use crate::ibl::reflection_prefilter;
 use crate::timing::{GpuPass, GpuTimer};
 use crate::GpuTexture;
 
+/// HDR, so a bright panorama keeps its range in a reflection.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+/// Mirrors `@workgroup_size(8, 8, 1)` in `engine/shaders/sky/prefilter.wgsl`.
 const GROUP: u32 = 8;
 
 pub(super) fn mip_count() -> u32 {
@@ -70,6 +72,7 @@ impl Cube {
     }
 }
 
+/// Mirrors `Params` in `engine/shaders/sky/prefilter.wgsl`: change both together.
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Params {

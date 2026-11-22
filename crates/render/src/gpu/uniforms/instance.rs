@@ -1,3 +1,6 @@
+//! Both records mirror their namesakes in `engine/shaders/forward/bindings.wgsl`: change both
+//! together.
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ObjectData {
@@ -28,6 +31,7 @@ impl ObjectData {
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct InstanceData {
     pub object: u32,
+    // Each field below is 0 for none: the sky alone, no proxy volume, no motion history.
     pub reflection_probe: u32,
     pub proxy_volume: u32,
     pub motion: u32,

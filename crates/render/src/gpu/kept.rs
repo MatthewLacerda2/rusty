@@ -1,3 +1,5 @@
+/// Every resource the value holds must be in the key (wgpu compares by identity): one left
+/// out is drawn from after it was replaced.
 pub(crate) struct Kept<K, V> {
     held: Option<(K, V)>,
 }
