@@ -41,3 +41,5 @@ rusty-test-support = { workspace = true }
 rusty-lighting = { workspace = true }
 rusty-procgen = { workspace = true }
 proptest = { workspace = true }
+# The ray tree's tests check its hits against parry's ray cast.
+rapier3d = { workspace = true }

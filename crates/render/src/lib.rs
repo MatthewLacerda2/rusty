@@ -18,6 +18,7 @@ pub(crate) mod motion;
 pub(crate) mod passes;
 pub mod postfx;
 mod preview;
+pub mod rays;
 pub mod readback;
 pub(crate) mod render_texture;
 pub(crate) mod scene;
