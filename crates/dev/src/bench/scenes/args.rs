@@ -26,6 +26,7 @@ pub struct Args {
     pub script: bool,
     pub set: Overrides,
     pub pending_imports: bool,
+    pub rays: bool,
     pub rest: Vec<String>,
 }
 
@@ -61,6 +62,7 @@ pub fn parse(mut args: Vec<String>) -> Result<Args, String> {
         script: take_switch(&mut args, "--script"),
         set: Overrides::parse(&pairs)?,
         pending_imports: take_switch(&mut args, "--pending-imports"),
+        rays: take_switch(&mut args, "--rays"),
         rest: args,
     })
 }
