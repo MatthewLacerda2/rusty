@@ -165,6 +165,8 @@ fn register_harness_actions(lua: &Lua, harness: &Shared, t: &mlua::Table) -> Lua
     )
 }
 
+/// Most frames a `settle` may ask for: at the default camera's TAA blend a still pixel
+/// keeps 0.9^64, about 0.1%, of an old view after 64, so this cap only catches a typo.
 const MAX_SETTLE: u32 = 1024;
 
 #[derive(Default)]

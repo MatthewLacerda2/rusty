@@ -45,6 +45,8 @@ impl Harness {
         settings: ProjectSettings,
         probe: &mut Option<Box<dyn LoadProbe>>,
     ) -> Result<Self, String> {
+        // Standalone before the import, as the player: the scene's models read their cooked
+        // files and write none (`asset::cook::writes`).
         rusty_asset::convert::mark_standalone();
         let read = timed(probe, "document", || {
             let json = rusty_scene::io::read_text(scene_path)?;

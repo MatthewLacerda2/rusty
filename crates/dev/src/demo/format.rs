@@ -9,6 +9,8 @@ use rusty_app::GameWorld;
 use rusty_core::project::ProjectSettings;
 use rusty_script::scripting::{HostCall, Plain};
 
+/// An `f64` kept bit for bit: a JSON number when that reads back to the same bits, else
+/// its bits in hex.
 #[derive(Clone, Copy, Debug)]
 pub struct Exact(pub f64);
 
@@ -96,7 +98,9 @@ impl Header {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Entry {
+    /// The tick, counted from the first after Play was entered (`0`).
     pub t: u64,
+    /// Seconds (an `f32`, widened), written only when it differs from the tick before.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dt: Option<Exact>,
     #[serde(skip_serializing_if = "InputDelta::is_empty")]
@@ -111,6 +115,7 @@ pub struct Entry {
     pub digest: Option<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub loads: Vec<u32>,
+    /// The pending load's progress in percent, when it moved at this tick's head.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub load_progress: Option<u8>,
 }
@@ -165,6 +170,7 @@ pub fn host_call(value: &Value) -> Option<HostCall> {
     Some(HostCall::Call { function, args })
 }
 
+/// The key a float no JSON number carries exactly (a NaN, an infinity) is written under.
 const FLOAT_BITS: &str = "__f64";
 
 pub(super) fn plain_json(value: &Plain) -> Value {

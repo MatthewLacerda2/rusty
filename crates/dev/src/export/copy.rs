@@ -47,6 +47,8 @@ pub(super) fn tree(
         if kind.is_dir() {
             tree(root, &rel, out, written)?;
         } else if kind.is_symlink() && path.is_dir() {
+            // The import walk (`asset::manifest::walk`) skips a symlinked folder too, so a
+            // source in one would ship unconverted.
             return Err(format!(
                 "{}: a symlinked folder; copy its files into the project instead",
                 rel.display()
@@ -105,6 +107,8 @@ pub(super) fn texture_caches(
 ) -> Result<(), String> {
     for image in images {
         let cache = cache_path_in(root, image);
+        // Checked before the lock: an image never compressed has no cache folder, and locking
+        // a path in a missing folder fails with a false warning.
         if !cache.is_file() {
             continue;
         }

@@ -5,6 +5,8 @@ use super::capture::CaptureHost;
 use rusty_components::MaterialAsset;
 use rusty_preview::{PreviewMesh, PreviewSubject};
 
+// Edge lengths in pixels of the square shot; the clamp keeps a typo'd 100000 from
+// allocating a multi-gigabyte target.
 pub const DEFAULT_RESOLUTION: u32 = 512;
 const MIN_RESOLUTION: u32 = 16;
 const MAX_RESOLUTION: u32 = 4096;

@@ -134,6 +134,8 @@ fn start_binds_a_unix_socket_then_drops_cleanly() {
     let path = dir.join(format!("rusty-cmd-test-{}.sock", std::process::id()));
 
     let console = RefCell::new(ConsoleLogs::new());
+    // The path goes to the bind: setting `RUSTY_CMD_SOCK` would leak into every test of
+    // this process.
     let channel =
         CommandChannel::listen(&console, |tx| transport::bind_and_listen(tx, path.clone()))
             .expect("bind the unix socket");

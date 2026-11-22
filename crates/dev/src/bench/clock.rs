@@ -1,5 +1,5 @@
 //! The probes that scale the bench's rows to a reference clock: `docs/testing.md`,
-//! *GPU time and the GPU clock* and *CPU time and the CPU clock*.
+//! *GPU time and the GPU clock* and the section after it.
 
 use std::hint::black_box;
 use std::time::Instant;

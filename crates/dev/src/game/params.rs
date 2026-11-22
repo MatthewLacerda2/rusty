@@ -30,6 +30,7 @@ impl Params {
             .map(|(key, value)| match value {
                 Value::Bool(b) => format!("{key} = {b}"),
                 Value::Number(n) => format!("{key} = {}", lua_number(*n)),
+                // Unescaped: `value_of` takes a word only of letters, digits, `_`, `-` and `.`.
                 Value::Word(w) => format!("{key} = \"{w}\""),
             })
             .collect();
@@ -41,6 +42,7 @@ impl Params {
 }
 
 fn lua_number(n: f64) -> String {
+    // 2^53: every integer below it is exact in an f64, so `as i64` keeps its value.
     const WHOLE: f64 = 9_007_199_254_740_992.0;
     match n.fract() == 0.0 && n.abs() < WHOLE {
         true => format!("{}", n as i64),

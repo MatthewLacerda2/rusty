@@ -2,6 +2,8 @@ use std::collections::BTreeMap;
 
 use mlua::{Lua, Result as LuaResult, Table, Value};
 
+/// Tables a copy may nest: Lua 5.4's own C-call limit is 200, so a deeper chain is
+/// refused before the recursion can overflow the native stack.
 pub const MAX_DEPTH: usize = 200;
 
 pub fn copy(value: &Value, into: &Lua) -> LuaResult<Value> {

@@ -1,8 +1,14 @@
+//! The API verbs a scenario's VM makes in the gameplay VM, where the live scripts whose
+//! callbacks they fire (`OnTakeDamage`) run. Recording (`bridge::forward`) and replay
+//! (`calls::invoke`) both read this table, so a verb replays where it was made.
+
 use mlua::Result as LuaResult;
 
 pub struct Forward {
     pub namespace: &'static str,
     pub verbs: &'static [&'static str],
+    /// Runs in the caller's VM while the game's is down: `Move` moves the edit-mode
+    /// controller, but a `Damage` hit no handler can hear is the scenario's mistake.
     pub falls_back: bool,
 }
 
@@ -26,6 +32,8 @@ pub fn find(namespace: &str, verb: &str) -> Option<&'static Forward> {
 }
 
 impl Forward {
+    /// `in_game` answers `None` while the gameplay VM is down; it is a closure so the
+    /// caller's borrow of the world ends before `own` runs.
     pub fn run<R>(
         &self,
         verb: &str,

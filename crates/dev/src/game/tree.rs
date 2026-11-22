@@ -20,6 +20,8 @@ pub(super) fn beside(out: &Path, suffix: &str) -> Result<PathBuf, String> {
     let name = out
         .file_name()
         .ok_or_else(|| format!("{} has no folder name to set a copy beside", out.display()))?;
+    // From the file name, so `OUT=~/proj.v2` sets `~/proj.v2.first` aside, never the
+    // `~/proj.first` that `with_extension` would.
     let mut aside = name.to_os_string();
     aside.push(format!(".{suffix}"));
     Ok(out.with_file_name(aside))

@@ -27,6 +27,8 @@ pub struct RenderedFrame {
     pub gpu: Option<GpuTimes>,
 }
 
+/// Holds a slot of the headless budget (`render::setup::budget`) while its renderer
+/// lives: own one per batch of work, never one per process.
 #[derive(Default)]
 pub struct CaptureHost {
     renderer: Option<Renderer>,
