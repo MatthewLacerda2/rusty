@@ -10,6 +10,7 @@ pub(crate) use prose::read as reads_prose;
 #[cfg(test)]
 mod review_tests;
 mod rust;
+pub mod signals;
 #[cfg(test)]
 mod tests;
 mod wgsl;
