@@ -95,6 +95,7 @@ fn a_baked_cube_round_trips_within_bc6h_error_and_deterministically() {
         let want = faces(f);
         for (i, got) in face(&bytes, 0, f).iter().enumerate() {
             let err = (*got - want[i]).abs().max_element();
+            // BC6H's error is relative to its block: 5% of its brightest channel.
             let limit = 0.05 * block_max(&want, i as u32);
             assert!(err <= limit, "{f}: {got} vs {}", want[i]);
         }

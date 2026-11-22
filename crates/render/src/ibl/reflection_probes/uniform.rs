@@ -2,6 +2,8 @@ use rusty_core::color::luminance;
 use rusty_scene::lighting::sh::Sh9;
 use rusty_scene::ReflectionProbe;
 
+/// Mirrors `ReflectionProbe` in `engine/shaders/lighting/reflection_probe.wgsl` byte for byte:
+/// change both together.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Default, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct ReflectionProbeUniform {
@@ -55,6 +57,8 @@ pub(crate) fn luminance_sh(sh: Sh9) -> [[f32; 4]; 3] {
     ]
 }
 
+/// The CPU mirror, for this crate's tests, of `probe_normalisation` in
+/// `engine/shaders/forward/reflection.wgsl`; `uniform_tests` holds its constants to the shader's.
 #[cfg(test)]
 pub(crate) fn normalisation(packed: [[f32; 4]; 3], n: glam::Vec3, baked: f32) -> f32 {
     let flat = packed.as_flattened();

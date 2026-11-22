@@ -82,6 +82,7 @@ thread_local! {
     static RECORDINGS: Cell<u64> = const { Cell::new(0) };
 }
 
+/// High bit: keeps a recording's tag apart from any submit count (`ops::submit_seq`).
 const RECORDING_TAG: u64 = 1 << 63;
 
 /// The submit a GPU timer pair taken now goes out in: the open recording's tag

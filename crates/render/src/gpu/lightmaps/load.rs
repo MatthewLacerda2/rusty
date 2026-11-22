@@ -7,6 +7,7 @@ use rusty_scene::lighting::page::{levels, mask_levels};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Kind {
     Colour,
+    /// Never block-compressed: BC7 turned a lamp's direction up to 5° off, a sawtooth on gloss.
     Direction,
     Mask,
 }

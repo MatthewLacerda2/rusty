@@ -7,6 +7,7 @@ use super::mip_count;
 use crate::CubemapCapture;
 use rusty_core::color::{f16_to_f32, f32_to_f16};
 
+/// Bytes: `Rgba16Float`, four halves.
 pub(crate) const TEXEL_BYTES: usize = 8;
 
 pub(crate) fn source_chain(capture: &CubemapCapture) -> Vec<[Vec<Vec3>; 6]> {
@@ -32,6 +33,7 @@ fn halve(face: &[Vec3], size: usize) -> Vec<Vec3> {
         .collect()
 }
 
+/// To half floats, as the GPU's texture stores them, so the CPU reference reads what the GPU reads.
 fn quantize(face: &[Vec3]) -> Vec<Vec3> {
     let round = |c: f32| f16_to_f32(f32_to_f16(c));
     (face.iter())
@@ -57,6 +59,8 @@ pub(crate) fn decode_face(bytes: &[u8]) -> Vec<Vec3> {
         .collect()
 }
 
+/// Mirrors `sample_mip` in `engine/shaders/ibl/probe_prefilter.wgsl`: change both together.
+/// Filtered importance sampling (Křivánek & Colbert, their +1 bias); `a2` is roughness⁴.
 #[cfg(test)]
 pub(crate) fn sample_mip(ndoth: f32, a2: f32, samples: u32, base: u32) -> f32 {
     let d = ndoth * ndoth * (a2 - 1.0) + 1.0;

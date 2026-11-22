@@ -45,6 +45,7 @@ fn gpu_import_settings_choose_the_mips_and_filter_and_follow_a_change() {
     };
     set_texture(std::path::Path::new(&path), point).unwrap();
     let scene = emissive_scene(&path);
+    // Point-sampled: black (up to ~60 on lavapipe, where texel edges blend) or white.
     for (at, c) in middle(&frame(&mut renderer, &scene)) {
         assert!(
             !(100..=230).contains(&c),

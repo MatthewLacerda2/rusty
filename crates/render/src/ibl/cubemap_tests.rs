@@ -47,6 +47,7 @@ pub(super) fn build_cubemap_ktx2(size: u32, format: u32, face_count: u32) -> Vec
     buf
 }
 
+/// `VkFormat` values.
 pub(super) const R8G8B8A8_UNORM: u32 = 37;
 pub(super) const R8G8B8A8_SRGB: u32 = 43;
 pub(super) const R16G16B16A16_SFLOAT: u32 = 97;
