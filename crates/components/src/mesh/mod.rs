@@ -12,15 +12,13 @@ mod skeleton;
 
 pub use data::{area_weighted_normals, MeshData, MAX_INDICES, MAX_VERTICES, SCENE_KIND};
 pub use runs::{clip_runs, material_runs};
-/// A test hook.
+/// A test hook, for `edit`'s tests.
 #[doc(hidden)]
 pub use rusty_asset::mesh_data::shared::copies;
 pub use rusty_asset::Vertex;
 pub use shadow_casting::ShadowCasting;
 pub use skeleton::{BoneBinding, BoneBody};
 
-/// Which edit of a mesh's geometry its vertices are: defined with the
-/// importer, which hands one out per import.
 pub use rusty_asset::MeshRevision;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -59,6 +57,7 @@ pub struct MeshComponent {
     pub max_draw_distance: f32,
     #[serde(default, skip_serializing_if = "is_zero")]
     pub min_screen_size: f32,
+    /// A renderer re-uploads only past it: a whole-buffer write sets a [`MeshRevision::next`].
     #[serde(skip)]
     pub revision: MeshRevision,
     #[serde(skip)]

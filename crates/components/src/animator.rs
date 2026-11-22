@@ -34,6 +34,7 @@ pub struct AnimatorComponent {
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub graph_enabled: bool,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    /// Index `i` is layer `i + 1`: layer 0 is the base.
     pub layers: Vec<LayerState>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ik: Vec<IkConstraint>,
@@ -98,9 +99,6 @@ impl AnimatorComponent {
         self.run();
     }
 
-    /// Crossfade the base layer into `clip` over `duration` seconds. A
-    /// non-positive `duration`, or a fade into the already-current clip, degrades
-    /// to a plain [`play`](Self::play).
     pub fn crossfade(&mut self, clip: String, duration: f32) {
         self.base.crossfade(Motion::Clip(&clip), duration);
         self.run();

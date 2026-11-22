@@ -9,7 +9,6 @@ use super::world::World;
 pub struct Descendants<'w, F> {
     world: &'w World,
     stack: Vec<u32>,
-    /// Membership only, never iterated, so its order reaches no reader.
     seen: Set<u32>,
     descend: F,
 }

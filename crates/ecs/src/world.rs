@@ -148,7 +148,7 @@ impl World {
         &self.order
     }
 
-    /// A test hook: engine code collects without geometry.
+    /// A test hook for this and other crates' tests: engine code collects without geometry.
     #[doc(hidden)]
     pub fn collect_entities(&self) -> Vec<Entity> {
         self.order

@@ -37,6 +37,7 @@ pub struct UiGradient {
     pub angle: f32,
     pub center: Vec2,
     pub radius: f32,
+    /// Ascending `t`, as the authoring ops keep them: the renderer takes the last as the end.
     pub stops: Vec<GradientStop>,
 }
 

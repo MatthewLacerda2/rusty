@@ -65,6 +65,8 @@ pub struct ColliderComponent {
     #[serde(default)]
     pub material: PhysicsMaterial,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    /// While set, the inline `material` is ignored; a path that no longer loads falls back to
+    /// the default, never to it.
     pub material_asset: Option<String>,
     // `physics::shape::build` takes a built `collision_mesh`, else the entity's Mesh, else
     // `shared_mesh`.

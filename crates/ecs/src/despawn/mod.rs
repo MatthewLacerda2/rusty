@@ -44,7 +44,8 @@ macro_rules! world_walk {
 with_ref_components!(world_walk);
 
 impl World {
-    /// A test hook: the engine despawns in batches ([`World::despawn_all`]).
+    /// A test hook for this and other crates' tests: the engine despawns in batches
+    /// ([`World::despawn_all`]).
     #[doc(hidden)]
     pub fn despawn(&mut self, id: u32) {
         self.despawn_all(&BTreeSet::from([id]));

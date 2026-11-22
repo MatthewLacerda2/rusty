@@ -57,7 +57,7 @@ pub(super) fn white() -> [f32; 3] {
     [1.0; 3]
 }
 
-/// The one place F0 is computed; the shader reads it from the record. A hand-written scene
+/// A dielectric's F0, computed only here; the shader reads it from the record. A hand-written scene
 /// skips the setters' clamps, so each input is clamped here, in `f64` so ior 1.5 is exactly 0.04.
 pub fn dielectric_f0(ior: f32, specular: f32, color: [f32; 3]) -> [f32; 3] {
     let n = within(ior, 1.0, f64::MAX);

@@ -30,8 +30,8 @@ pub fn relativize(path: &str, root: &Path) -> String {
         .unwrap_or_else(|| path.to_string())
 }
 
-/// The one rule for an input the project doesn't hold (`require`, a texture recipe's
-/// image). An empty `root` is the working directory. Both sides are canonical.
+/// The rule `require` and a texture recipe's image share for an input the project doesn't
+/// hold. An empty `root` is the working directory. Both sides are canonical.
 pub fn outside_root(file: &Path, root: &Path) -> Option<PathBuf> {
     let real = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
     let root = if root.as_os_str().is_empty() {
