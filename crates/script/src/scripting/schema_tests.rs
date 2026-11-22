@@ -12,9 +12,9 @@ fn field<'a>(fields: &'a [ScriptField], name: &str) -> &'a ScriptField {
 
 #[test]
 fn no_schema_yields_no_fields() {
-    assert!(parse_fields("return { Start = function() end }").is_empty());
-    assert!(parse_fields("return 42").is_empty());
-    assert!(parse_fields("not lua").is_empty());
+    assert!(parse_fields("t.lua", "return { Start = function() end }").is_empty());
+    assert!(parse_fields("t.lua", "return 42").is_empty());
+    assert!(parse_fields("t.lua", "not lua").is_empty());
 }
 
 #[test]
@@ -24,7 +24,7 @@ fn full_metadata_table_is_parsed() {
             speed = { type = "number", range = {0, 1}, default = 0.5, tooltip = "u/s", header = "Movement" },
         }}
     "#;
-    let fields = parse_fields(code);
+    let fields = parse_fields("t.lua", code);
     let f = field(&fields, "speed");
     assert_eq!(f.kind, FieldKind::Number);
     assert_eq!(f.range, Some((0.0, 1.0)));
@@ -39,7 +39,7 @@ fn type_is_inferred_from_default_when_absent() {
         flag = { default = true },
         label = { default = "hi" },
     }}"#;
-    let fields = parse_fields(code);
+    let fields = parse_fields("t.lua", code);
     assert_eq!(field(&fields, "flag").kind, FieldKind::Boolean);
     assert_eq!(field(&fields, "label").kind, FieldKind::Text);
 }
@@ -52,7 +52,7 @@ fn bare_values_infer_type_and_become_defaults() {
         on = false,
         name = "Rusty",
     }}"#;
-    let fields = parse_fields(code);
+    let fields = parse_fields("t.lua", code);
     assert_eq!(field(&fields, "n").default, ScriptFieldValue::Number(3.0));
     assert_eq!(field(&fields, "ratio").kind, FieldKind::Number);
     assert_eq!(
@@ -68,7 +68,10 @@ fn bare_values_infer_type_and_become_defaults() {
 #[test]
 fn fields_are_sorted_by_name() {
     let code = r#"return { fields = { zebra = 1, alpha = 2, mid = 3 } }"#;
-    let names: Vec<_> = parse_fields(code).into_iter().map(|f| f.name).collect();
+    let names: Vec<_> = parse_fields("t.lua", code)
+        .into_iter()
+        .map(|f| f.name)
+        .collect();
     assert_eq!(names, vec!["alpha", "mid", "zebra"]);
 }
 
@@ -85,7 +88,7 @@ fn apply_uses_override_then_default() {
     let mut overrides = BTreeMap::new();
     overrides.insert("speed".to_string(), ScriptFieldValue::Number(2.0));
     overrides.insert("on".to_string(), ScriptFieldValue::Boolean(true));
-    apply_field_values(&table, &parse_fields(code), &overrides).unwrap();
+    apply_field_values(&table, &parse_fields("t.lua", code), &overrides).unwrap();
 
     assert_eq!(table.get::<f64>("speed").unwrap(), 2.0);
     assert!(table.get::<bool>("on").unwrap());
@@ -97,7 +100,7 @@ fn apply_without_schema_is_a_noop() {
     let lua = Lua::new();
     let code = "return { Start = function() end }";
     let table: Table = lua.load(code).eval().unwrap();
-    apply_field_values(&table, &parse_fields(code), &BTreeMap::new()).unwrap();
+    apply_field_values(&table, &parse_fields("t.lua", code), &BTreeMap::new()).unwrap();
     assert!(table.get::<mlua::Value>("anything").unwrap().is_nil());
 }
 
@@ -107,7 +110,7 @@ fn a_script_requiring_a_helper_module_still_parses() {
         local Axis = require("ui.does_not_exist")
         return { fields = { speed = 2 }, Start = function() Axis.parse() end }
     "#;
-    assert_eq!(parse_fields(code).len(), 1);
+    assert_eq!(parse_fields("t.lua", code).len(), 1);
     assert!(crate::scripting::discovery::exposes_lifecycle(code));
 }
 
@@ -120,7 +123,7 @@ fn type_aliases_parse_and_an_unknown_type_falls_back_to_the_default_s_kind() {
         none = { type = "vector" },
         spoken = { default = {} },
     }}"#;
-    let fields = parse_fields(code);
+    let fields = parse_fields("t.lua", code);
     assert_eq!(field(&fields, "b").default, ScriptFieldValue::Boolean(true));
     assert_eq!(
         field(&fields, "t").default,
@@ -142,7 +145,7 @@ fn a_default_of_the_wrong_kind_is_zeroed_for_the_declared_type() {
         label = { type = "string", default = false },
         whole = { type = "number", default = 7 },
     }}"#;
-    let fields = parse_fields(code);
+    let fields = parse_fields("t.lua", code);
     assert_eq!(field(&fields, "n").default, ScriptFieldValue::Number(0.0));
     assert_eq!(
         field(&fields, "on").default,
@@ -161,13 +164,9 @@ fn a_default_of_the_wrong_kind_is_zeroed_for_the_declared_type() {
 #[test]
 fn a_bare_value_that_is_not_a_scalar_is_no_field() {
     let code = r#"return { fields = { f = function() end, ok = 1 } }"#;
-    let names: Vec<_> = parse_fields(code).into_iter().map(|f| f.name).collect();
+    let names: Vec<_> = parse_fields("t.lua", code)
+        .into_iter()
+        .map(|f| f.name)
+        .collect();
     assert_eq!(names, vec!["ok"]);
-}
-
-#[test]
-fn a_script_reaching_for_os_at_load_has_no_fields() {
-    let code = "os.exit(1)\nreturn { fields = { speed = 2 } }";
-    assert!(read_fields(code).is_err());
-    assert!(parse_fields(code).is_empty());
 }

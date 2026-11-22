@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::path::Path;
 
 use mlua::{Table, Value};
 
@@ -21,13 +22,23 @@ pub struct ScriptField {
     pub header: Option<String>,
 }
 
-pub fn parse_fields(code: &str) -> Vec<ScriptField> {
-    read_fields(code).unwrap_or_default()
+/// `path` names the chunk, so an error points at the script's line; `dofile` and
+/// `loadfile` resolve against the working directory, the editor's project.
+pub fn parse_fields(path: &str, code: &str) -> Vec<ScriptField> {
+    read_fields(Path::new(""), path, code).unwrap_or_default()
 }
 
-pub(super) fn read_fields(code: &str) -> mlua::Result<Vec<ScriptField>> {
-    let lua = super::sandbox::inspection_vm()?;
-    let table = lua.load(code).eval::<Table>()?;
+/// `workspace` is what Play's `dofile` and `loadfile` resolve against.
+pub(super) fn read_fields(
+    workspace: &Path,
+    path: &str,
+    code: &str,
+) -> mlua::Result<Vec<ScriptField>> {
+    let lua = super::sandbox::inspection_vm(workspace)?;
+    let table = lua
+        .load(code)
+        .set_name(format!("@{path}"))
+        .eval::<Table>()?;
     let Ok(fields) = table.get::<Table>("fields") else {
         return Ok(Vec::new());
     };

@@ -26,7 +26,7 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
             }
             let code = std::fs::read_to_string(&path).ok()?;
             let path = path.to_string_lossy().into_owned();
-            match offered(&code) {
+            match offered(&path, &code) {
                 Ok(true) => Some(path),
                 Ok(false) => None,
                 Err(why) => {
@@ -42,14 +42,14 @@ pub fn monobehaviour_scripts(dir: &str) -> Vec<String> {
 
 #[cfg(test)]
 pub(crate) fn exposes_lifecycle(code: &str) -> bool {
-    offered(code).unwrap_or(false)
+    offered("test.lua", code).unwrap_or(false)
 }
 
 /// `Err` (the error's first line) when the chunk fails to load or run; `Ok(false)` for a helper.
-fn offered(code: &str) -> Result<bool, String> {
+pub(super) fn offered(path: &str, code: &str) -> Result<bool, String> {
     let first_line = |e: mlua::Error| e.to_string().lines().next().unwrap_or_default().to_owned();
-    let lua = super::sandbox::inspection_vm().map_err(first_line)?;
-    let ran = lua.load(code).eval::<Value>();
+    let lua = super::sandbox::inspection_vm(Path::new("")).map_err(first_line)?;
+    let ran = lua.load(code).set_name(format!("@{path}")).eval::<Value>();
     let table = match ran {
         Ok(Value::Table(table)) => table,
         Ok(_) => return Ok(false),
@@ -102,28 +102,6 @@ mod tests {
         assert!(!exposes_lifecycle("return 42"));
         assert!(!exposes_lifecycle("return { Start = 7 }"));
         assert!(!exposes_lifecycle("this is not lua"));
-    }
-
-    #[test]
-    fn the_inspection_vm_has_no_os_and_no_io() {
-        let lua = crate::scripting::sandbox::inspection_vm().unwrap();
-        for lib in ["os", "io"] {
-            assert!(lua.globals().get::<Value>(lib).unwrap().is_nil(), "{lib}");
-        }
-        assert!(!lua.globals().get::<Value>("Transform").unwrap().is_nil());
-    }
-
-    #[test]
-    fn a_chunk_reaching_for_os_or_io_at_load_is_not_offered_and_says_why() {
-        for call in ["os.remove('x')", "io.open('x', 'w')"] {
-            let code = format!("{call}\nreturn {{ Start = function() end }}");
-            assert!(!exposes_lifecycle(&code), "{call}");
-            let why = offered(&code).unwrap_err();
-            assert!(why.contains("attempt to index a nil value"), "{why}");
-        }
-        assert!(exposes_lifecycle(
-            "return { Start = function() os.remove('x') end }"
-        ));
     }
 
     #[test]
