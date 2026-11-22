@@ -1,7 +1,3 @@
-//! The edit-mode runtime (#1339): the evaluator drives the edit scene outside
-//! Play, Stop brings it back after Play's runtime shuts down, and a host that
-//! never asked for one (the harness) stays without it.
-
 use crate::GameWorld;
 use rusty_core::input::InputState;
 use rusty_navigation::NavigationGraph;
@@ -74,7 +70,6 @@ fn a_scene_reloaded_from_disk_is_what_eval_sees() {
     rusty_edit::save_to_file(&on_disk, &path).unwrap();
     let gw = edit_world();
     eval(&gw, "Scene.CreateEntity(\"Unsaved\")");
-    // What the editor's follow-the-file reload does to the shared cell (#1340).
     rusty_edit::load_from_file(&mut gw.scene().borrow_mut(), &path).unwrap();
     assert_ne!(find(&gw, "FromDisk"), "nil");
     assert_eq!(find(&gw, "Unsaved"), "nil");

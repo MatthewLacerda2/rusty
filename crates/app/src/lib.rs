@@ -1,25 +1,3 @@
-//! crates/app/src/lib.rs — the application spine: a tickable GameWorld driven by a Schedule.
-//!
-//! The simulation is decoupled from winit/wgpu: it lives in `GameWorld::tick`,
-//! which knows nothing about the window or the GPU. That decoupling is what makes
-//! headless play possible.
-//!
-//! The per-frame tick is no longer a hand-wired call sequence. Modules self-register
-//! their systems into ordered stages via `register(&mut App)` (see `app::registry`), and
-//! the resulting [`Schedule`] runs them each frame in
-//! `FixedUpdate → Update → LateUpdate → Render` order, `Startup` once on Play. Order
-//! within a stage is registration order.
-//!
-//! A system is the canonical two-argument `fn(&mut World, &mut Resources)` (issue
-//! #39): [`World`] is the storage of record (a handle to the active `Scene`),
-//! [`Resources`] is the engine singletons. `GameWorld` owns one of each and threads
-//! the pair through the schedule. The engine-state handles inside `Resources` are
-//! still `Rc<RefCell<…>>` — the mlua script closures capture them — but the systems
-//! no longer reach through one opaque blob; the borrow checker now separates world
-//! from resources at the call boundary.
-
-// Panic-free sim core (#195): bare `.unwrap()` is denied here (use `?` or a
-// documented `.expect(...)`); test code is exempt via clippy.toml. See docs/linting.md.
 #![deny(clippy::unwrap_used)]
 
 pub mod animation;
@@ -41,7 +19,7 @@ pub use game::{GameWorld, PlayTransition};
 pub use probe::{timed, LoadProbe, SystemProbe};
 pub use registry::{build, App};
 pub use resources::Resources;
-/// Test hook: the fixture project every entry point's test opens (#1652).
+/// Test hook: the fixture project every entry point's test opens.
 #[doc(hidden)]
 pub use scene_load::project_fixture;
 pub use scene_load::{

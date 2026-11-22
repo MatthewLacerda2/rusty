@@ -1,7 +1,3 @@
-//! A frame over a rig missing a destroyed bone (#1273): the whole tick runs
-//! without a panic and skins the missing slots. `scene`'s half (which slots go
-//! missing) is `scene::skeleton::destroy_bone_tests`.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +10,7 @@ fn a_frame_skins_a_rig_missing_a_destroyed_bone() {
     let rig = armature_owner(&mut scene);
     scene.sync_skeleton(rig);
     let bones = scene.world.mesh(rig).unwrap().skeleton.ids();
-    scene.destroy_entity(bones[1]); // spine and head
+    scene.destroy_entity(bones[1]);
     let scene = Rc::new(RefCell::new(scene));
     let mut game = super::model_writes_tests::game_over(Rc::clone(&scene));
     game.set_playing(true);

@@ -1,8 +1,3 @@
-//! The schedule probe (#433): it watches every per-frame system exactly once, under
-//! the system's short function name, is told when the frame ends, and leaves the sim
-//! untouched — the property that keeps the dev layer's wall-clock timer out of the
-//! determinism rule's way.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,7 +6,6 @@ use super::{build, Resources, Stage, SystemProbe, World};
 
 type Log = Rc<RefCell<Vec<String>>>;
 
-/// Records what it saw instead of timing it; its tick hooks are the defaults.
 struct Recorder(Log);
 
 impl SystemProbe for Recorder {
@@ -81,8 +75,6 @@ fn a_closure_system_reports_a_generic_name() {
     assert_eq!(sched.system_names(Stage::Update), ["system"]);
 }
 
-/// The frame's AABB flush runs on both paths (#2342): a collider moved before the
-/// frame has its stored box at its new pose after it, probe or no probe.
 #[test]
 fn the_flush_stores_the_moved_box_with_and_without_a_probe() {
     use glam::Vec3;

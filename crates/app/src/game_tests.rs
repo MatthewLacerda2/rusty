@@ -1,8 +1,3 @@
-//! Unit tests for `GameWorld` (game.rs): the shared handles, play/stop
-//! transitions, the scaled-dt threading, and the snapshot capture/restore boundary.
-//! All drive the real `tick`, honouring the determinism contract (fixed dt, no
-//! wall-clock, no RNG). What the loop runs (scripts, animators) is `game_loop_tests`.
-
 use super::*;
 use glam::Vec3;
 use rusty_scene::Scene;
@@ -11,7 +6,6 @@ use std::rc::Rc;
 
 pub(crate) const DT: f32 = 1.0 / 60.0;
 
-/// A bare play-mode world over `scene`; nav grid spans the demo bounds.
 pub(crate) fn world_with(scene: Rc<RefCell<Scene>>) -> GameWorld {
     let input = Rc::new(RefCell::new(InputState::new()));
     let nav = Rc::new(RefCell::new(NavigationGraph::new(
@@ -28,7 +22,6 @@ fn empty_world() -> GameWorld {
 #[test]
 fn accessors_expose_shared_handles() {
     let gw = empty_world();
-    // Each accessor returns the very cell the resources hold (same allocation).
     assert!(Rc::ptr_eq(gw.scene(), &gw.world.scene));
     assert!(Rc::ptr_eq(gw.input(), &gw.resources.input));
     assert!(Rc::ptr_eq(gw.nav(), &gw.resources.nav));
@@ -53,24 +46,21 @@ fn set_playing_flips_state() {
 #[test]
 fn transition_is_none_while_steady() {
     let mut gw = empty_world();
-    assert!(gw.tick(DT) == PlayTransition::None); // stays in edit mode
+    assert!(gw.tick(DT) == PlayTransition::None);
     gw.set_playing(true);
     assert!(gw.tick(DT) == PlayTransition::Entered);
-    assert!(gw.tick(DT) == PlayTransition::None); // already playing
+    assert!(gw.tick(DT) == PlayTransition::None);
 }
 
 #[test]
 fn entering_play_resets_frame_and_time() {
     let mut gw = empty_world();
-    // Dirty the clock so we can see the reset on enter_play.
     gw.time().borrow_mut().advance(0.5);
     gw.resources.play_frame = 99;
     gw.set_playing(true);
     let t = gw.tick(DT);
     assert!(t == PlayTransition::Entered);
-    // enter_play resets frame_count to 0 then the tick's own advance makes it 1.
     assert_eq!(gw.time().borrow().frame_count, 1);
-    // advance_frame ran once this tick.
     assert_eq!(gw.play_frame(), 1);
 }
 
@@ -78,12 +68,11 @@ fn entering_play_resets_frame_and_time() {
 fn exiting_play_clears_runtime_state() {
     let mut gw = empty_world();
     gw.set_playing(true);
-    gw.tick(DT); // Entered: builds physics, sets play_frame
+    gw.tick(DT);
     assert!(gw.resources.physics.borrow().is_some());
     gw.set_playing(false);
     let t = gw.tick(DT);
     assert!(t == PlayTransition::Exited);
-    // exit_play tore physics down and reset the counter.
     assert!(gw.resources.physics.borrow().is_none());
     assert_eq!(gw.play_frame(), 0);
 }
@@ -97,11 +86,10 @@ fn stop_restores_the_edit_scene_snapshot() {
     let mut gw = world_with(Rc::clone(&scene));
 
     gw.set_playing(true);
-    gw.tick(DT); // Entered: snapshot captured
-                 // Mutate the entity mid-play.
+    gw.tick(DT);
     scene.borrow_mut().world.transform_mut(id).unwrap().position = Vec3::new(9.0, 9.0, 9.0);
     gw.set_playing(false);
-    gw.tick(DT); // Exited: restore snapshot
+    gw.tick(DT);
     let restored = scene.borrow().world.transform(id).unwrap().position;
     assert!(
         restored.abs_diff_eq(Vec3::new(1.0, 0.0, 0.0), 1e-6),
@@ -113,12 +101,10 @@ fn stop_restores_the_edit_scene_snapshot() {
 fn tick_scales_dt_by_time_scale() {
     let mut gw = empty_world();
     gw.set_playing(true);
-    gw.tick(DT); // Entered resets clock; advance applies scale 1.0
+    gw.tick(DT);
     gw.time().borrow_mut().set_time_scale(0.5);
     gw.tick(DT);
-    // The schedule sees the scaled delta the tick stored in frame_dt.
     assert!((gw.resources.frame_dt - DT * 0.5).abs() < 1e-7);
-    // Raw (unscaled) delta is preserved on the clock.
     assert!((gw.time().borrow().unscaled_delta_time - DT).abs() < 1e-7);
 }
 
@@ -129,6 +115,5 @@ fn play_frame_accumulates_each_tick() {
     for _ in 0..5 {
         gw.tick(DT);
     }
-    // enter_play set 0, then five ticks each run advance_frame once.
     assert_eq!(gw.play_frame(), 5);
 }

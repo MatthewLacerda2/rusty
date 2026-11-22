@@ -1,9 +1,3 @@
-//! Unit tests for `Resources` (resources.rs): the per-frame dt accessor, the
-//! play-frame counter, the debug-path accessor, and the storage-flush boundary
-//! (success no-op when pathless, and the error path that logs to the console), and
-//! the UI screen cell shared with the script runtime (#417).
-//! Determinism contract: no wall-clock, no RNG.
-
 use super::*;
 use rusty_scene::Scene;
 use std::cell::RefCell;
@@ -32,7 +26,6 @@ fn play_frame_reads_the_counter() {
 #[test]
 fn flush_storage_is_a_noop_when_pathless() {
     let res = resources();
-    // The default store is pathless (harness/tests), so flush succeeds silently.
     res.flush_storage();
     assert!(
         res.console.borrow().messages.is_empty(),
@@ -43,8 +36,6 @@ fn flush_storage_is_a_noop_when_pathless() {
 #[test]
 fn flush_storage_logs_on_write_failure() {
     let res = resources();
-    // Bind the store to a path whose parent is a regular file, so create_dir_all and
-    // the write both fail — exercising the error branch that logs to the console.
     let dir = rusty_test_support::temp::dir();
     let blocker = dir.join(format!("rusty_flush_block_{}", std::process::id()));
     std::fs::write(&blocker, b"x").unwrap();

@@ -1,16 +1,3 @@
-//! crates/app/src/game.rs — GameWorld: the simulation, decoupled from window and GPU.
-//!
-//! Owns the world of record ([`World`] — a handle to the active `Scene`) and the
-//! engine singletons ([`Resources`] — input, nav, console, camera, time, the live
-//! rapier world, the script runtime, and the play-mode bookkeeping). It advances
-//! both one frame via `tick(dt)`. The windowed shell and the headless harness drive
-//! the same `tick`; only the input source and the rendering differ.
-//!
-//! A system is the canonical `fn(&mut World, &mut Resources)` (#39): `tick` threads
-//! both through the schedule, so the borrow checker keeps world storage and engine
-//! state apart. The handles inside `Resources` stay `Rc<RefCell<…>>` (the mlua
-//! closures capture them).
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -27,8 +14,6 @@ use super::probe::{timed, LoadProbe};
 use super::tap::TapPoint;
 use super::{Resources, World};
 
-/// Reported by `tick` so the platform layer can react (e.g. grab the cursor)
-/// without the simulation knowing about the window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlayTransition {
     None,
@@ -36,9 +21,6 @@ pub enum PlayTransition {
     Exited,
 }
 
-/// The simulation: the world of record plus its engine singletons. Splits the old
-/// monolithic struct into [`World`] (storage) and [`Resources`] (engine state) so
-/// the two are threaded into systems as distinct `&mut` references.
 pub struct GameWorld {
     pub world: World,
     pub resources: Resources,
@@ -68,66 +50,48 @@ impl GameWorld {
         }
     }
 
-    // --- Accessors: the shared engine-state cells the editor and tools borrow. ---
-
-    /// The active scene (the world of record).
     pub fn scene(&self) -> &Rc<RefCell<Scene>> {
         &self.world.scene
     }
 
-    /// The input resource.
     pub fn input(&self) -> &Rc<RefCell<InputState>> {
         &self.resources.input
     }
 
-    /// The navigation graph resource (test seam for `tests/nav/bounds_boot.rs`).
     pub fn nav(&self) -> &Rc<RefCell<NavigationGraph>> {
         &self.resources.nav
     }
 
-    /// The console log buffer resource.
     pub fn console(&self) -> &Rc<RefCell<ConsoleLogs>> {
         &self.resources.console
     }
 
-    /// The active camera resource.
     pub fn camera(&self) -> &Rc<RefCell<Camera>> {
         &self.resources.camera
     }
 
-    /// The frame-clock resource.
     pub fn time(&self) -> &Rc<RefCell<Time>> {
         &self.resources.time
     }
 
-    /// The live script runtime.
     pub fn script_manager(&self) -> &ScriptManager {
         &self.resources.script_manager
     }
 
-    /// Whether the host asked for Play ([`set_playing`](Self::set_playing)), entered at
-    /// the next tick's transition; *being* in Play is `Scene::is_playing` (#1302).
     pub fn play_requested(&self) -> bool {
         self.resources.application.borrow().host_play()
     }
 
-    /// Ask to enter or leave Play, every host's one way in (the editor transport,
-    /// the player, the harness): the next tick's transition acts on it.
     pub fn set_playing(&mut self, playing: bool) {
         let mut app = self.resources.application.borrow_mut();
         app.set_host_play(playing);
     }
 
-    /// Advance the sim by `dt` seconds, returning the play transition for the platform
-    /// (cursor grab). Every tick reads the UI's texture sizes after the transition, so
-    /// no loop that ticks skips them, and ends by pushing the audio mix. An installed
-    /// probe times it from after the transition to its end.
     pub fn tick(&mut self, dt: f32) -> PlayTransition {
-        self.tap(TapPoint::BeforeTick); // a demo's tap (#1581)
+        self.tap(TapPoint::BeforeTick);
         let transition = self.transition_tapped();
         self.probe_tick(true);
         let dt = self.tap_input(dt);
-        // Publish input written since the last tick as this tick's edges (#416).
         self.resources.input.borrow_mut().begin_tick();
         // `advance` keeps the raw `dt`; the sim integrates the scaled `delta_time`.
         let scaled_dt = {
@@ -136,7 +100,6 @@ impl GameWorld {
             time.delta_time
         };
         if self.world.scene.borrow().is_playing() {
-            // The per-frame stages; `Startup` runs once, in `enter_play`.
             self.resources.frame_dt = scaled_dt;
             self.refresh_ui_textures();
             self.run_schedule_frame();
@@ -146,37 +109,30 @@ impl GameWorld {
         self.sync_render_camera();
         self.sync_shader_time();
         self.push_audio(dt);
-        self.start_loads(); // a `Scene.LoadAsync` this tick opened: prepared meanwhile
+        self.start_loads();
         self.tap_timed(TapPoint::AfterTick);
         self.probe_tick(false);
         transition
     }
 
-    /// Process only the play-state transition, **without advancing the sim** (#283):
-    /// a paused, no-step frame, where a Play/Stop must still take effect. Outside
-    /// Play the caller runs [`edit_frame`](Self::edit_frame) after it, which re-reads
-    /// UI texture sizes after a Stop; entering Play re-reads them here.
+    /// Process only the play-state transition, without advancing the sim.
     pub fn poll_transition(&mut self) -> PlayTransition {
         let transition = self.transition_tapped();
-        self.tap(TapPoint::AfterPoll); // an edit frame ends here too (#1581)
+        self.tap(TapPoint::AfterPoll);
         self.refreshed_after(transition)
     }
 
-    /// Run the schedule's per-frame stages. The schedule is moved out of `Resources`
-    /// for the duration so its systems can take `&mut Resources`.
     fn run_schedule_frame(&mut self) {
         let schedule = std::mem::take(&mut self.resources.schedule);
         schedule.run_frame(&mut self.world, &mut self.resources);
         self.resources.schedule = schedule;
     }
 
-    /// Number of play-mode frames simulated since the last `enter_play`.
     pub fn play_frame(&self) -> u64 {
         self.resources.play_frame
     }
 
     pub(super) fn handle_transition(&mut self) -> PlayTransition {
-        // A script's `Editor.EnterPlay/ExitPlay` (#1360) asks like any host does.
         let scripted = self.resources.application.borrow_mut().take_play_request();
         if let Some(playing) = scripted {
             self.set_playing(playing);
@@ -203,8 +159,6 @@ impl GameWorld {
         }
     }
 
-    /// Enter Play, its steps under the installed entry probe (`set_entry_probe`),
-    /// which is told the scene entered, or `None` when the scripts' runtime failed.
     fn enter_play(&mut self) {
         let mut probe = self.resources.load_probes.entry.take();
         let entered = self.enter_play_steps(&mut probe);
@@ -217,34 +171,28 @@ impl GameWorld {
     }
 
     fn enter_play_steps(&mut self, probe: &mut Option<Box<dyn LoadProbe>>) -> bool {
-        timed(probe, "refresh", || self.refresh_then_hold_imports()); // #1253
+        timed(probe, "refresh", || self.refresh_then_hold_imports());
         self.resources.play_frame = 0;
         self.resources.time.borrow_mut().reset();
-        // Reload animation graphs fresh each Play session (#316), so asset edits
-        // made in between are picked up without restarting the engine.
         self.resources.animation_graphs.clear();
-        // Start the audio log fresh for this Play session (#212) and silence any
-        // voice that lingered from a prior run.
         {
             let mut audio = self.resources.audio.borrow_mut();
             audio.stop_all();
             audio.clear_log();
         }
-        // Snapshot the edit scene so Stop can restore it, discarding play-mode mutations.
-        // A standalone run has no edit mode to return to (#431).
+        // A standalone run has no edit mode to return to.
         if !self.resources.application.borrow().standalone() {
             self.resources.edit_snapshot = Some(SceneSnapshot::capture(&self.world.scene.borrow()));
             self.capture_play_origin();
         }
         self.apply_project_settings();
-        self.world.scene.borrow_mut().set_playing(true); // the one play state (#1302)
+        self.world.scene.borrow_mut().set_playing(true);
         self.resources
             .console
             .borrow_mut()
             .info("Capturing cursor, entering PlayMode!".to_string());
-        // Load every scene entity's scripts, then run the two-phase init (#322):
-        // ALL `Awake`s, then ALL `Start`s, actives only — a disabled-at-load
-        // entity defers both until its first active tick.
+        // ALL `Awake`s, then ALL `Start`s, actives only: a disabled-at-load entity
+        // defers both until its first active tick.
         let started = timed(probe, "scripts", || {
             let init = self.resources.script_manager.init_runtime();
             let ok = self.report_lua_init(init);
@@ -256,28 +204,22 @@ impl GameWorld {
         if !started {
             return false;
         }
-        // Build the rapier world from the (post-start) scene: bodies + colliders
-        // for every entity with a ColliderComponent. Stepped each frame in play.
-        // Shared with the script runtime's Physics.Raycast binding.
         timed(probe, "physics", || self.build_physics());
         timed(probe, "startup", || self.run_startup_stage());
         true
     }
 
     fn exit_play(&mut self) {
-        // Stop is a storage boundary: persist any play-mode writes (PlayerPrefs-style
-        // save data survives even though the scene snapshot is discarded below), and
-        // so are the graphics settings an options menu changed during Play.
+        // Stop is a storage boundary: save data survives the discarded snapshot.
         self.resources.store_graphics();
         self.resources.flush_storage();
         self.resources.script_manager.shutdown();
         self.resources.play_frame = 0;
         self.drop_physics();
-        // Silence every voice on Stop (Unity stops play-mode audio at exit), and
-        // discard play-mode mixer changes (#465) as the scene's are below.
+        // Unity stops play-mode audio at exit; mixer changes are discarded as the scene's are.
         self.resources.audio.borrow_mut().exit_play();
-        self.resources.play_hold = None; // conversion on before the restore (#1253)
-        self.world.scene.borrow_mut().set_playing(false); // before the restore (#1302)
+        self.resources.play_hold = None;
+        self.world.scene.borrow_mut().set_playing(false);
         if let Some(snapshot) = self.resources.edit_snapshot.take() {
             snapshot.restore(&mut self.world.scene.borrow_mut());
             self.resources
@@ -286,8 +228,8 @@ impl GameWorld {
                 .restore_or_bake(&self.world.scene.borrow());
         }
         self.restore_play_origin();
-        self.apply_project_settings(); // a `SetLimits` made in Play ends with it
-        self.restore_edit_runtime(); // after the restore: it binds the edit scene (#1339)
+        self.apply_project_settings();
+        self.restore_edit_runtime();
     }
 }
 
