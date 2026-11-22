@@ -1,5 +1,3 @@
-//! crates/editor/src/viewport/scene_nav.rs — Unity's Scene view controls, read from egui.
-
 use glam::{Vec2, Vec3};
 
 use super::scene_camera::{SceneCamera, POINTS_PER_STEP, ZOOM_PER_STEP};
@@ -7,7 +5,6 @@ use rusty_scene::Scene;
 
 pub mod scroll;
 
-/// The navigation bindings, (input, gesture), for the viewport's help hint.
 pub const BINDINGS: &[(&str, &str)] = &[
     ("RMB drag", "look"),
     ("RMB + WASD / Q E", "fly (Shift faster, scroll = speed)"),
@@ -22,10 +19,10 @@ pub const BINDINGS: &[(&str, &str)] = &[
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SceneView {
-    /// The pose the Scene tab renders from.
     pub camera: SceneCamera,
     /// RMB mouse look is held: the shell hides and locks the cursor.
     pub looking: bool,
+    /// A gesture or Alt is down: LMB is the camera's, not the tools'.
     pub navigating: bool,
 }
 
@@ -62,20 +59,19 @@ pub fn gesture(b: Buttons) -> Option<Gesture> {
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NavFrame {
     pub gesture: Option<Gesture>,
+    /// Points, raw when the OS sends it: a locked cursor still turns.
     pub motion: Vec2,
     /// Pointer movement in points, for pan to track the cursor exactly.
     pub delta: Vec2,
     pub scroll: f32,
     /// Two-finger trackpad scroll in points while hovered (look).
     pub swipe: Vec2,
-    /// Shift + two-finger trackpad scroll in points while hovered (pan).
+    /// As `swipe`, with Shift held (pan).
     pub swipe_pan: Vec2,
-    /// Zoom steps from a pinch this frame, [`pinch_steps`].
     pub pinch: f32,
     pub arrows: Vec2,
     /// Fly axes (right, up, forward) from WASD/QE, each in -1..=1.
     pub fly: Vec3,
-    /// Shift held.
     pub fast: bool,
     /// The viewport's height in points.
     pub viewport_height: f32,
@@ -146,6 +142,8 @@ pub fn selection_bounds(scene: &Scene, id: u32) -> Option<(Vec3, f32)> {
     })
 }
 
+/// `held`: pressed on the image and still down; a drag from a panel never turns the
+/// camera.
 pub fn read(response: &egui::Response, held: bool) -> NavFrame {
     let viewport_height = response.rect.height();
     let line_points = response.ctx.options(|o| o.input_options.line_scroll_speed);

@@ -9,6 +9,8 @@ pub const STATS_WINDOW: usize = 60;
 /// GPU pass kinds listed, heaviest first.
 const PASSES: usize = 4;
 
+/// The window's clock: its last whole-second FPS reading (`None` before the first
+/// second is up) and the last frame's ms.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Clock {
     pub fps: Option<f32>,
@@ -36,6 +38,7 @@ impl From<(Option<f32>, f32)> for Clock {
 pub struct Readout {
     pub table: Option<FrameStats>,
     pub clock: Clock,
+    /// `Renderer::times_gpu`'s answer.
     pub timestamps: bool,
 }
 
