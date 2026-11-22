@@ -8,10 +8,11 @@ pub(super) const LIT: Vec3 = Vec3::new(-1.0, 0.0, -5.0);
 pub(super) const SHADED: Vec3 = Vec3::new(1.6, 0.0, -5.0);
 
 /// The share the masked lamp's lit floor may stray from the `Baked` one's: a 16-sample trace
-/// against a live light.
+/// against a live light. Measured on lavapipe: 0.03.
 const LIKE_BAKED: f32 = 0.2;
 
 /// How many times brighter than a rough floor a glossy one reads where the lamp mirrors.
+/// Measured on lavapipe: 2.06.
 const GLINT: f32 = 1.5;
 
 pub(super) fn pillar(scene: &mut rusty_scene::Scene) {

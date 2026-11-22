@@ -1,3 +1,6 @@
+//! The dev-only verbs of the one Lua surface: they render or record, so they live here and
+//! join it through `api::extend`, and the sim surface never compiles the renderer.
+
 // sorted: one module per dev namespace; kept in order so parallel branches don't collide
 mod bake;
 mod bake_report;

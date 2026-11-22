@@ -1,3 +1,6 @@
+//! A thread owns the segment files, so a frame only hands its lines over and never waits
+//! on a disk.
+
 use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{sync_channel, Receiver, SyncSender, TrySendError};
@@ -8,6 +11,8 @@ use super::now_ms;
 use super::segments::Segments;
 pub use super::segments::LOCK;
 
+/// Frames whose lines may wait for the writer before a frame's are dropped: four seconds
+/// at 60 Hz.
 const QUEUE: usize = 240;
 
 #[derive(Default)]
@@ -72,6 +77,7 @@ impl Drop for Writer {
     }
 }
 
+/// Flushes and prunes once the queue is empty, never per line, so a read soon sees a frame.
 fn drain(rx: Receiver<Vec<String>>, mut segments: Segments, dropped: &Dropped) {
     while let Ok(lines) = rx.recv() {
         let mut next = Some(lines);

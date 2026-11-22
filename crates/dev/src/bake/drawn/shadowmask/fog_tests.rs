@@ -8,7 +8,7 @@ use rusty_scene::lighting::MixedLightingMode::{self, BakedIndirect, Shadowmask};
 use rusty_scene::Scene;
 
 /// Linear brightness the masked room's air may gain over the `BakedIndirect` one's: a sealed
-/// room holds no light either way.
+/// room holds no light either way. Measured on lavapipe: 0, the two equal.
 const SEALED: f32 = 0.01;
 
 fn sun(s: &mut Scene) -> u32 {

@@ -93,7 +93,7 @@ pub(crate) fn bake(n: usize, side: f32, denoiser: Denoiser) -> (u64, u64) {
 }
 
 /// Bytes of each extra chart's freed buffers macOS's footprint may keep counted, even after
-/// `memory::relieve`; Linux's leave (`return_large_frees`).
+/// `memory::relieve`; 0 on Linux, where `return_large_frees` hands them back.
 pub(crate) const FREED_PER_CHART: u64 = (cfg!(target_os = "macos") as u64) * (8 << 20);
 
 pub(crate) fn holds(one: (u64, u64), four: (u64, u64), charts: usize, what: &str) {

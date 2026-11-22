@@ -1,5 +1,6 @@
-//! Demos: every Play session recorded and replayed headless bit for bit, through one
-//! `TickTap` on `GameWorld::tick`; `docs/testing.md`, *Demos*, says what one holds.
+//! Demos: every Play session recorded and replayed headless bit for bit, both
+//! through the one `TickTap` hook on `GameWorld::tick`; `docs/testing.md`, *Demos*, says
+//! what one holds.
 //! stored-format: the `.demo` file a recorded playtest is saved as
 
 mod calls;

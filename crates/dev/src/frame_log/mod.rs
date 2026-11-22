@@ -1,5 +1,5 @@
-//! The rolling frame and console log on disk (`docs/api/Debug.md`, *The frame log*). The
-//! wall clock is written here, display-side: nothing the sim reads changes.
+//! The rolling frame log (`docs/api/Debug.md`, *The frame log*), display-side: the wall
+//! clock it writes never reaches the sim.
 //! stored-format: `saved/logs/frames-<n>.jsonl`, the rolling frame log
 
 use std::cell::OnceCell;
@@ -24,8 +24,7 @@ pub use read::{read, LogQuery, LogRead};
 
 pub const LOGS_DIR: &str = "saved/logs";
 
-/// Milliseconds of CPU over a frame's ticks a system must reach to be written: the ones
-/// worth a look, not the dozens that cost nothing.
+/// Milliseconds of CPU over a frame's ticks a system must reach to be written.
 pub const SYSTEM_MS: f64 = 0.25;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -75,7 +74,7 @@ impl FrameLog {
     }
 
     /// Call after the frame's stats were recorded, so their newest frame is this one.
-    /// `times_gpu`: whether the adapter takes timestamps; only then does a frame wait on them.
+    /// `times_gpu` says the adapter takes timestamps; only then does a frame wait on them.
     pub fn frame(&mut self, game: &GameWorld, frame: &WindowFrame, times_gpu: bool) {
         let channels = game.resources.application.borrow().log_settings().channels;
         let place = OnceCell::new();

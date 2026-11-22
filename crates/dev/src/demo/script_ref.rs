@@ -22,7 +22,7 @@ pub fn note_set(
     journal.borrow_mut().push(act);
 }
 
-/// `with_self`: the first argument was the handle itself (`ref:F(...)`), left out of `args`.
+/// `with_self` says the first argument was the handle itself (`ref:F(...)`), left out of `args`.
 pub fn note_call(
     journal: &RefCell<HostJournal>,
     (id, name): (u32, &str),
