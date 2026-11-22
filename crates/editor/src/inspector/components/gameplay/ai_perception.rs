@@ -192,7 +192,8 @@ fn mask_row(ui: &mut egui::Ui, label: &str, mask: u32) -> Option<u32> {
     .inner
 }
 
-/// What the agent knows, read-only: one line per known target.
+/// What the agent knows, one line per known target: read-only, since that memory is the
+/// senses' own.
 fn draw_known(ui: &mut egui::Ui, p: &Perception) {
     if p.memory.known.is_empty() {
         return;

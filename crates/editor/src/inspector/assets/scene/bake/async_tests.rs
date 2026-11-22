@@ -82,8 +82,8 @@ fn gpu_a_failed_bake_reads_failed_with_its_reason() {
     let (s, mut editor) = open_editor_in("generate_async_fails");
     let path = editor.current_scene_path().unwrap();
     let folder = std::path::Path::new(&path).parent().unwrap();
-    // A file before the job starts, so every write beside the scene fails; swapped
-    // mid-job, it races the preview writer, which recreates the folder.
+    // The folder is a file before the job starts, so every write beside the scene fails;
+    // swapped mid-job, it races the preview writer, which recreates the folder.
     std::fs::remove_dir_all(folder).unwrap();
     std::fs::write(folder, "not a folder").unwrap();
     s.eval("Lighting.GenerateAsync()").unwrap();

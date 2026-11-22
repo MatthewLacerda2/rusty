@@ -1,5 +1,6 @@
 //! crates/shell/src/editor/undrawn.rs — the editor's frame on a window that cannot
-//! draw: the screen locked, the window occluded or minimised.
+//! draw: the screen locked, the window occluded or minimised. It runs `EditorUi::frame_work`,
+//! as a drawn frame does, so work an agent asked for never waits on a redraw.
 
 use super::EditorFrontend;
 use rusty_app::GameWorld;

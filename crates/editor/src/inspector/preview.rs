@@ -15,7 +15,7 @@ pub struct PreviewCache {
 }
 
 /// What `shell::editor::viewport::render_preview_scene` renders: set each frame the tab
-/// draws, `None` otherwise, so the shell skips the render.
+/// draws, so the shell skips the render otherwise.
 pub struct PreviewRequest {
     pub camera: Camera,
     /// The image's rect, in points, as this frame laid it out; its size sizes the target.
@@ -25,7 +25,7 @@ pub struct PreviewRequest {
     pub shader_override: Option<String>,
 }
 
-/// Shared by the asset inspector and the Material card.
+/// The Details / Preview strip, shared with the Material card.
 pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.horizontal(|ui| {
         if chrome::tab(ui, &t, !*active, "Details").clicked() {
@@ -38,8 +38,8 @@ pub fn draw_tab_strip(ui: &mut egui::Ui, active: &mut bool, t: Theme) {
     ui.add_space(t.space_xs);
 }
 
-/// Reads `editor.preview_texture_id`, which the shell sets before the draw from its last
-/// render (`None` before the first).
+/// `editor.preview_texture_id` is set by the shell before the draw, from its last render
+/// (`None` before the first).
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, subject: PreviewSubject) {
     let t = editor.theme;
     let texture = editor.preview_texture_id;

@@ -1,7 +1,7 @@
-//! The Game view's size dropdown, Unity's Game view resolution menu: *Free
-//! Aspect*, 16:9, 16:10, 4:3, 1920x1080, 1280x720, a custom size a script set
-//! (`Editor.SetGameViewSize`), and "1x on HiDPI" (Unity's *Low Resolution Aspect
-//! Ratios*). The setting and how it resolves are `core::application::game_view`'s;
+//! The Game view's size dropdown, Unity's Game view resolution menu: the presets, a
+//! size a script set (`Editor.SetGameViewSize`) and "1x on HiDPI" (Unity's *Low
+//! Resolution Aspect Ratios*). The setting and how it resolves are
+//! `core::application::game_view`'s.
 
 use rusty_core::application::{GameViewSetting, GameViewSize};
 
@@ -38,12 +38,13 @@ pub fn fit(
     setting.resolve((px(panel.x), px(panel.y)), pixels_per_point)
 }
 
-/// The largest size of `width:height`'s aspect ratio that fits in `panel`.
 pub fn letterbox(panel: egui::Vec2, size: (u32, u32)) -> egui::Vec2 {
     let (_, (w, h)) = rusty_core::application::letterbox((panel.x, panel.y), size);
     egui::vec2(w, h)
 }
 
+/// The renderer's `screen_box`, `(x, y, width, height)` in Scene-image pixels: the
+/// letterbox `OverlayFrame` maps clicks through, in points.
 pub fn overlay_box(
     interaction: &super::ViewportInteraction,
     panel: (u32, u32),

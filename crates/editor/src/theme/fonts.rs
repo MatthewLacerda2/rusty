@@ -1,6 +1,6 @@
-//! The editor's typefaces: Inter for the UI, JetBrains Mono for the console
-//! and code, Phosphor for icons. All three are embedded, so the editor looks the
-//! same on every machine. Licences sit next to the files in `engine/fonts/`.
+//! Inter's files carry no Private Use Area codepoints, where Phosphor's icons sit:
+//! Inter leads the family and would draw over them. Phosphor cannot lead instead: it
+//! maps `a`–`z` to the blanks its ligatures are built from.
 
 use egui::{Context, FontData, FontDefinitions, FontFamily, FontId};
 
@@ -8,10 +8,11 @@ const INTER: &[u8] = include_bytes!("../../../../engine/fonts/Inter-Regular.ttf"
 const INTER_SEMIBOLD: &[u8] = include_bytes!("../../../../engine/fonts/Inter-SemiBold.ttf");
 const JETBRAINS_MONO: &[u8] = include_bytes!("../../../../engine/fonts/JetBrainsMono-Regular.ttf");
 
-/// The family name of Inter SemiBold, used for panel titles and card headers.
 const SEMIBOLD: &str = "inter-semibold";
 
 /// A [`FontId`] in Inter SemiBold at `size` points — the editor's "strong" weight.
+/// The regular weight until the fonts load, a pass after `install`: egui panics on a
+/// family it does not know.
 pub fn semibold(ctx: &Context, size: f32) -> FontId {
     let family = FontFamily::Name(SEMIBOLD.into());
     let loaded = ctx.fonts(|f| f.families().contains(&family));

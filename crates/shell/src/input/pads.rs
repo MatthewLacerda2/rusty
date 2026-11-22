@@ -1,11 +1,10 @@
-//! crates/shell/src/input/pads.rs — the gamepad pump: pad snapshots in, `InputState` out.
-
 use rusty_core::input::gamepad::{
     axial_dead_zone, pad_name, radial_dead_zone, DeadZones, Rumble, AXES, BUTTONS, MAX_PADS,
 };
 use rusty_core::input::keymap::Keymap;
 use rusty_core::input::InputState;
 
+/// Raw, before any dead zone: sticks Y-up in `-1..1`, triggers `0..1`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct PadSnapshot {
     pub buttons: [bool; BUTTONS.len()],
@@ -31,6 +30,8 @@ impl PadSnapshot {
 
 /// Where pad state comes from: the OS (gilrs) in a window, a fake in tests.
 pub trait PadSource {
+    /// Every connected pad as `(device id, raw state)`; an id is stable while its pad stays
+    /// connected.
     fn poll(&mut self) -> Vec<(usize, PadSnapshot)>;
     /// Play (or, for an all-zero request, stop) rumble on a device.
     fn rumble(&mut self, device: usize, rumble: Rumble);
@@ -48,7 +49,6 @@ pub struct PadPump {
 }
 
 impl PadPump {
-    /// One frame: (dis)connect, write each pad's changes, forward rumble.
     pub fn pump(
         &mut self,
         source: &mut dyn PadSource,
@@ -62,7 +62,7 @@ impl PadPump {
         let zones = input.pads.dead_zones;
         for (device, raw) in &pads {
             let Some(index) = self.slot_of(*device, input) else {
-                continue;
+                continue; // every slot taken
             };
             let target = if has_input {
                 raw.filtered(zones)
@@ -81,7 +81,6 @@ impl PadPump {
         }
     }
 
-    /// Release and zero every slot whose device is gone, and free it.
     fn disconnect_missing(
         &mut self,
         pads: &[(usize, PadSnapshot)],

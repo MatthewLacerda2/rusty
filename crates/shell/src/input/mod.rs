@@ -1,6 +1,3 @@
-//! crates/shell/src/input/mod.rs — the input pump and the OS cursor policy, shared by both
-//! frontends.
-
 pub mod clipboard;
 pub mod clipboard_source;
 pub mod cursor;
@@ -63,6 +60,8 @@ pub fn write_text(text: &str, game: &GameWorld) {
     }
 }
 
+/// Unity's `inputString` plus tab: `\r` reads as `\n`; backspace, `\n` and tab stay; any
+/// other control character drops.
 fn typed_text(text: &str) -> String {
     text.chars()
         .filter_map(|c| match c {

@@ -50,8 +50,8 @@ fn gpu_play_is_refused_while_the_job_runs_and_taken_after_a_cancel() {
     s.eval("Lighting.GenerateAsync()").unwrap();
     let mut console = ConsoleLogs::new();
     let scene = s.world().scene().clone();
-    // Not a whole frame: on a fast GPU an empty scene's lightmaps can finish inside one,
-    // past the step a cancel applies to.
+    // A whole frame could finish an empty scene's lightmaps on a fast GPU, past the step a
+    // cancel applies to.
     take_request(&mut editor, &mut scene.borrow_mut(), &mut console);
     let why = scene.borrow().play_refusal().expect("a bake runs");
     assert!(why.starts_with("Baking lighting"), "{why}");

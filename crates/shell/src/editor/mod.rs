@@ -126,7 +126,7 @@ impl EditorFrontend {
             shell.renderer.shadow_renderer.invalidate_static_cache();
         }
         if self.demo_size().is_none() {
-            // Before `sync_shared` resolves the render scale on it; a demo keeps its recorded one.
+            // The display scale, before `sync_shared` resolves the render scale on it.
             let scale =
                 (self.editor_ui.game_view).display_scale(shell.window.scale_factor() as f32);
             game.resources.screen.borrow_mut().set_display_scale(scale);

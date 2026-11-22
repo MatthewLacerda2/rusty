@@ -49,7 +49,8 @@ impl Watch {
             .into_iter()
             .filter(|r| r.is_dir())
             .collect();
-        // Before the watch starts: one that fails still has conversions' textures compressed.
+        // Switched on before the watch starts: one that fails still has conversions' textures
+        // compressed.
         rusty_asset::texture_import::import_in_background();
         let mut watch = Self::start(&roots, backend)
             .map_err(|e| log::warn!("[Editor] not watching the project's files: {e}"))

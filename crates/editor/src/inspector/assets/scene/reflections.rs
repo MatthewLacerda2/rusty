@@ -7,7 +7,7 @@ use rusty_components::transform::{euler_degrees, from_euler_degrees};
 use rusty_scene::lighting::settings::ReflectionSettings;
 use rusty_scene::{ProbeShape, ReflectionProbe, Scene};
 
-/// Cube face edges in pixels: Unity's Reflection Probe resolution choices.
+/// Cube face edges in pixels, as Unity's probe offers.
 const SIZES: [u32; 8] = [16, 32, 64, 128, 256, 512, 1024, 2048];
 
 pub fn draw(ui: &mut egui::Ui, editor: &mut EditorUi, scene: &mut Scene) {
@@ -81,7 +81,7 @@ fn draw_probes(ui: &mut egui::Ui, scene: &mut Scene) -> bool {
             let fallback = (probe.fallback != was.fallback).then_some(probe.fallback);
             scene.reflection_probes.edit(i, |p| *p = probe);
             if let Some(on) = fallback {
-                // `edit` leaves another probe's fallback ticked: at most one stays.
+                // `edit` leaves another fallback ticked: keep one.
                 scene.reflection_probes.set_fallback(on.then_some(i));
             }
             changed = true;

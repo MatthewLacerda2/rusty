@@ -7,6 +7,8 @@ use rusty_font::{default_font, FontData, FontHandle};
 
 type Cache = Mutex<Map<Option<String>, FontHandle>>;
 
+/// Process-wide by path, so the sim's layout and the renderer's atlas (`render::ui::text`)
+/// share one parsed font: the same glyph ids.
 fn cache() -> &'static Cache {
     static CACHE: OnceLock<Cache> = OnceLock::new();
     CACHE.get_or_init(|| Mutex::new(Map::default()))

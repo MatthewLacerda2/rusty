@@ -89,8 +89,8 @@ fn draw_entity_inspector(
     let materials = &mut scene.materials;
     let world = &mut scene.world;
     if world.contains(selected_id) {
-        // Before the cards: drop a component whose requirement went (a Camera removed
-        // orphans its PostProcessing).
+        // Drop a component whose requirement is gone (a Camera removed orphans its
+        // PostProcessing) before the cards draw.
         rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(

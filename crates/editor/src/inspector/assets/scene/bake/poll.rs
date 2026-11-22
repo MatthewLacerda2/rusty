@@ -78,7 +78,8 @@ fn drive(
         return ctx.request_repaint_after(PROGRESS_REPAINT);
     }
     if active.scene != scene.id() || active.path != open {
-        // Its ids would name another scene's meshes, or its lighting land in the wrong file.
+        // The result's ids would name another scene's meshes, or its lighting land in the
+        // wrong file.
         let line = match active.scene != scene.id() {
             true => format!("{} dropped: the open scene changed", verb(&active.step)),
             false => dropped(&active.step, "the scene was saved elsewhere"),

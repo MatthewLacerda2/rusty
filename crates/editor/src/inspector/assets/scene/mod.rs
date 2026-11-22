@@ -236,7 +236,7 @@ fn draw_scene_operations(
         )
         .clicked()
     {
-        // `false`: the inspector is an edit-mode panel, so its load is never a play-mode one.
+        // `false`: the inspector is an edit-mode panel, never a play-mode load.
         editor.open_scene(scene, console, path, false);
     }
 

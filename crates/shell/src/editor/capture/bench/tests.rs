@@ -1,4 +1,4 @@
-//! On a primitive project in a temp dir: a floor with a baked navmesh, a camera and a
+//! The project is primitive, in a temp dir: a floor with a baked navmesh, a camera and a
 //! light probe. Without an adapter the round answers `None` and makes no rows up.
 
 use std::collections::BTreeMap;

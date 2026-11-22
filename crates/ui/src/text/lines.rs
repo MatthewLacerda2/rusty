@@ -1,7 +1,7 @@
 use super::measure::{Item, LineMetrics, Measurer};
 use rusty_components::TextOverflow;
 
-/// Slack for float noise when comparing a measure against the rect.
+/// Reference units of slack for float noise against the rect.
 pub const EPS: f32 = 1e-3;
 
 #[derive(Clone, Debug, Default)]
@@ -96,7 +96,7 @@ pub fn block_height(lines: &[Line], spacing: f32) -> f32 {
     first.metrics.ascent + pitches + last.metrics.descent
 }
 
-/// The baseline-to-baseline distance from `a` to the line after it, `b`.
+/// Baseline-to-baseline distance from `a` to the next line, `b`.
 pub fn pitch(a: &Line, b: &Line, spacing: f32) -> f32 {
     (a.metrics.descent + a.metrics.gap + b.metrics.ascent) * spacing
 }
