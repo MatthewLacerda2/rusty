@@ -1,8 +1,3 @@
-//! Recording one camera's selection outline: the mask, the row dilation and the
-//! ring over the post-FX output (#1224), in one encoder of its own, after post-FX
-//! and before the editor's handles. The last two are scissored to the selection's
-//! bounds on screen.
-
 use crate::gpu::groups;
 use crate::gpu::ops::CountedQueue as _;
 use glam::Mat4;
@@ -17,11 +12,6 @@ use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
 impl Renderer {
-    /// Ring the solids `solids` marked for the outline in `view`, seen through
-    /// `view_proj`, onto `output`, the view's finished post-FX image (see the module
-    /// doc). A no-op when nothing is outlined or the selection is off screen.
-    /// `solids` must be this camera's, still uploaded: the mask binds their uniform
-    /// slots and instances.
     pub(crate) fn draw_outline(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -61,7 +51,6 @@ impl Renderer {
             .counted_write_buffer(&mask.uniform, 0, bytemuck::bytes_of(&params));
         self.record_mask(encoder, &mask.mask, &solids.draws);
         let rect = [x, y, w, h];
-        // Unwritten row distances read as "no mask pixel near".
         let rows = (&mask.rows, wgpu::LoadOp::Clear(wgpu::Color::WHITE));
         let dilate = (&self.outline.dilate, &mask.dilate_group);
         self.scissored(encoder, "Selection Dilate Pass", rows, dilate, rect);
@@ -70,8 +59,6 @@ impl Renderer {
         self.scissored(encoder, "Selection Edge Pass", finished, edge, rect);
     }
 
-    /// The outlined draws into the cleared `mask`: each with the forward pass's own
-    /// mesh, per-draw slot, material group and instance.
     fn record_mask(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -82,7 +69,6 @@ impl Renderer {
         let timed = ("Selection Mask Pass", &self.gpu_timer, GpuPass::Outline);
         let mut pass = color_pass(encoder, timed, mask, clear);
         pass.set_bind_group(groups::GLOBAL, &self.global_bind_group, &[]);
-        // The scene group is in the forward layout; the mask reads nothing from it.
         pass.set_bind_group(groups::SCENE, &self.shadow_bind_group, &[]);
         let mut bound = None;
         for draw in &draws.outline {
@@ -102,8 +88,6 @@ impl Renderer {
         }
     }
 
-    /// One fullscreen outline pass: `pipeline` with `group` into `target`, timed as
-    /// the outline and scissored to `rect` (`[x, y, width, height]`).
     fn scissored(
         &self,
         encoder: &mut wgpu::CommandEncoder,

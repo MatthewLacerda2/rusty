@@ -1,6 +1,3 @@
-//! A mesh emitter's model follows the file (#1219): re-imported at a drawn spec it
-//! draws the new mesh, and one that failed to load is picked up once it appears.
-
 use super::{mark_stale, retry_appeared, CachedMesh};
 use crate::MeshId;
 use rusty_components::{ParticleEmitterComponent, ParticleRender, ParticleRenderMode};
@@ -9,9 +6,7 @@ use rusty_core::fs::written::{note_written, written_since, Stale};
 use rusty_test_support::rebakes::{follows_rebakes, Bake};
 use std::collections::HashMap;
 
-/// A two-triangle quad (6 indices).
 const QUAD: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nv 0 1 0\nf 1 2 3\nf 1 3 4\n";
-/// One triangle (3 indices), under the same object name.
 const TRIANGLE: &str = "o Model\nv 0 0 0\nv 1 0 0\nv 1 1 0\nf 1 2 3\n";
 
 fn emitter(spec: &str) -> ParticleEmitterComponent {
@@ -33,8 +28,6 @@ fn indices(bake: Bake) -> u32 {
     }
 }
 
-/// The shared cache contract (#1207): drawn before the model exists (a miss),
-/// imported (A), re-imported (B), each draw shows what is on disk.
 #[test]
 fn gpu_a_reimported_model_reaches_its_mesh_emitter() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(4, 4) else {
@@ -56,8 +49,6 @@ fn gpu_a_reimported_model_reaches_its_mesh_emitter() {
     );
 }
 
-/// A model copied in by an outside tool (no note) after the first draw is picked
-/// up on the next retry, not cached as missing for good.
 #[test]
 fn gpu_a_model_that_appears_later_is_retried() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(4, 4) else {
@@ -80,7 +71,6 @@ fn gpu_a_model_that_appears_later_is_retried() {
     assert_eq!(loaded, Some(6));
 }
 
-/// One spec naming `file`'s `Sub` object, cached as `cached`.
 fn cache(file: &std::path::Path, cached: CachedMesh) -> (String, HashMap<String, CachedMesh>) {
     let spec = format!("{}::Sub", file.to_string_lossy());
     (spec.clone(), HashMap::from([(spec, cached)]))
@@ -113,7 +103,6 @@ fn a_file_that_existed_and_failed_is_not_retried() {
 fn a_note_on_the_source_marks_a_later_load_stale_but_not_its_own() {
     let file = rusty_test_support::temp::dir().join("model.fbx");
     let path = file.to_string_lossy().into_owned();
-    // The load's own import noted the source, then the load finished.
     note_written(&path);
     let at = written_since(u64::MAX).0;
     let id = MeshId("model".into());

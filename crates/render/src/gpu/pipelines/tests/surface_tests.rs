@@ -1,7 +1,3 @@
-//! A material naming a baked surface shader renders with it (#396): differently from
-//! the standard shader, falling back without crashing when the module is missing or
-//! is not a surface shader, and rebuilding when it is re-baked. Skips with no adapter.
-
 use std::collections::BTreeMap;
 
 use glam::Vec3;
@@ -13,14 +9,12 @@ use rusty_shadergen::{bake_recipe, engine_shader_dir};
 
 const RES: u32 = 32;
 
-/// A fresh workspace for this test's baked modules.
 fn workspace(tag: &str) -> String {
     let dir = rusty_test_support::temp::dir().join(format!("rusty_surface_{tag}"));
     std::fs::create_dir_all(&dir).unwrap();
     dir.to_str().unwrap().to_owned()
 }
 
-/// Bake `name` into `dir`: a `pass` module whose one block is a `color` tint.
 fn bake(dir: &str, name: &str, pass: PassKind, color: [f32; 3]) {
     let params = BTreeMap::from([("color".to_string(), ParamValue::Vector(color.to_vec()))]);
     let blocks = vec![BlockSel {
@@ -35,13 +29,11 @@ fn bake(dir: &str, name: &str, pass: PassKind, color: [f32; 3]) {
     bake_recipe(&recipe, engine_shader_dir(), dir).expect("bake succeeds");
 }
 
-/// A lit sphere whose material names `shader` (`""` = the standard one) in `mode`.
 fn sphere(shader: &str, mode: RenderMode) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
     rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let id = create_entity(&mut scene, "Ball", Some(Primitive::Sphere));
-    // Diameter 2: the thresholds below were set on that size.
     scene.world.transform_mut(id).unwrap().scale = Vec3::splat(2.0);
     let key = scene.ensure_material_key(id).unwrap();
     scene.materials.get_mut(&key).unwrap().shader =
@@ -60,7 +52,6 @@ fn render(renderer: &mut Renderer, scene: &Scene) -> Vec<u8> {
     readback::read_texture_rgba8(&renderer.device, &renderer.queue, texture, RES, RES)
 }
 
-/// The summed red and blue of the centre pixel row (where the sphere is).
 fn red_blue(px: &[u8]) -> (u32, u32) {
     let row = &px[(RES / 2 * RES * 4) as usize..((RES / 2 + 1) * RES * 4) as usize];
     let sum = |c: usize| row.chunks(4).map(|p| p[c] as u32).sum();
@@ -94,13 +85,11 @@ fn gpu_a_material_naming_a_baked_shader_renders_with_it() {
         0
     );
 
-    // Transparent materials draw through the variant's own transparent pipeline.
     let clear = red_blue(&render(&mut renderer, &sphere("", RenderMode::Transparent)));
     let glass = red_blue(&render(
         &mut renderer,
         &sphere("blue_only", RenderMode::Transparent),
     ));
-    // One tinted layer: its back faces no longer draw a second (#1615).
     assert!(
         glass.0 * 3 < clear.0 * 2,
         "tinted glass: {glass:?} vs {clear:?}"
@@ -132,7 +121,6 @@ fn gpu_re_baking_a_cached_shader_rebuilds_it() {
         return;
     };
     let scene = sphere("look", RenderMode::Opaque);
-    // Named before it exists: the standard look, until a bake appears.
     let before = render(&mut renderer, &scene);
     bake(&dir, "look", PassKind::Surface, [0.0, 0.0, 1.0]);
     let blue = red_blue(&render(&mut renderer, &scene));
@@ -140,7 +128,6 @@ fn gpu_re_baking_a_cached_shader_rebuilds_it() {
         blue.0 < red_blue(&before).0 / 4,
         "the new bake is picked up: {blue:?}"
     );
-    // Re-baked red (a different length, so the stamp moves on any filesystem).
     bake(&dir, "look", PassKind::Surface, [1.0, 0.25, 0.0]);
     let red = red_blue(&render(&mut renderer, &scene));
     assert!(

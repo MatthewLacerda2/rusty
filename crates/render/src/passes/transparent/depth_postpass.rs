@@ -1,18 +1,3 @@
-//! The transparent depth postpass (#1523), HDRP's *Transparent Depth Postpass*: after
-//! a camera's translucents drew, the ones whose material asks for it
-//! (`depth_postpass`) draw again into the view's depth, and into its velocity
-//! target when it has one, so the post effects that read depth (depth of field,
-//! motion blur) and the passes after it (soft particles, world canvases) see the
-//! surface rather than what is behind it. Fog needs none: the forward shader fogs
-//! each surface itself. SSR runs before the translucents (HDRP's order), so it never
-//! reflects on them.
-//!
-//! Then the ones that write their motion alone (`writes_motion` without
-//! `depth_postpass`, #1845), HDRP's *Transparent Writes Motion Vectors*: into the
-//! velocity target only (their motion, view depth and camera), depth tested against
-//! what the depth writers left but not written, so TAA, motion blur and depth of
-//! field move them as solids. A view with no velocity target draws none of them.
-
 use crate::draw::batch::DrawBatch;
 use crate::gpu::groups;
 use crate::gpu::ops::CountedEncoder as _;
@@ -20,12 +5,10 @@ use crate::gpu::pipelines::surface::SolidPass;
 use crate::timing::GpuPass;
 use crate::{RenderView, Renderer};
 
-/// The batches of `translucents` that write their depth after drawing.
 pub(crate) fn writers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBatch> {
     translucents.iter().filter(|b| b.key.traits.depth_postpass)
 }
 
-/// The batches of `translucents` that write their motion but not their depth.
 pub(crate) fn movers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBatch> {
     let t = |b: &&DrawBatch| b.key.traits;
     translucents
@@ -33,8 +16,6 @@ pub(crate) fn movers(translucents: &[DrawBatch]) -> impl Iterator<Item = &DrawBa
         .filter(move |b| t(b).writes_motion && !t(b).depth_postpass)
 }
 
-/// The pass's colour attachments: none at location 0, and the `velocity` target,
-/// loaded, at location 1 when the view has one.
 fn targets(
     velocity: Option<&wgpu::TextureView>,
 ) -> Vec<Option<wgpu::RenderPassColorAttachment<'_>>> {
@@ -56,8 +37,6 @@ fn targets(
 }
 
 impl Renderer {
-    /// Draw the depth postpass of `translucents` into `view`, then the motion
-    /// writers'; nothing when none asks.
     pub(crate) fn draw_depth_postpass(
         &self,
         encoder: &mut wgpu::CommandEncoder,

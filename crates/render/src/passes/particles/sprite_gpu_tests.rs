@@ -1,7 +1,3 @@
-//! Which sprite a particle batch binds (#2052): an emitter naming no texture
-//! draws the soft-disc default, one whose texture fails to load the checker that
-//! marks a missing map, and the two never merge into one draw.
-
 use std::rc::Rc;
 
 use super::{EmitterRun, Sprites};

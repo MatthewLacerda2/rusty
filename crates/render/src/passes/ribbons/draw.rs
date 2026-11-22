@@ -1,10 +1,3 @@
-//! crates/render/src/passes/ribbons/draw.rs — per-frame ribbon gathering and the pass.
-//!
-//! Gathers each visible trail (newest point first, so `t = 0` is the head at the
-//! entity) and line (local points through the entity's world matrix) into one
-//! vertex + index buffer, orders the ribbons back-to-front by their centroid's
-//! view depth, and draws each with its blend pipeline and texture.
-
 use crate::gpu::ops::{CountedEncoder as _, CountedQueue as _};
 use std::rc::Rc;
 
@@ -23,12 +16,9 @@ use rusty_asset::MapRef;
 use rusty_components::{ParticleBlend, RibbonStyle};
 use rusty_scene::{Camera, Scene};
 
-/// The blended passes' globals (`passes::blended::Globals`).
 const GLOBALS: u32 = 0;
-/// A ribbon's texture.
 const TEXTURE: u32 = 1;
 
-/// One ribbon's slice of the frame's index buffer and how to draw it.
 struct RibbonDraw {
     blend: ParticleBlend,
     texture: Option<MapRef>,
@@ -36,7 +26,6 @@ struct RibbonDraw {
     count: u32,
 }
 
-/// Every visible ribbon of one camera, geometry built, draws farthest first.
 #[derive(Default)]
 struct Ribbons {
     vertices: Vec<RibbonVertex>,
@@ -45,11 +34,6 @@ struct Ribbons {
 }
 
 impl Renderer {
-    /// One camera's blended effects after the world canvases: ribbons, then sprite
-    /// particles. Ribbon draws count toward the frame's draw calls; `instances`
-    /// stays the sprite particles'. `view_proj` is the camera's as the solids drew
-    /// (`CameraCtx::view_proj`: jittered on a TAA view, #1702), so a depth-tested or
-    /// depth-faded effect lines up with the depth it reads.
     pub(crate) fn draw_effects(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -64,9 +48,6 @@ impl Renderer {
         draws
     }
 
-    /// Draw every visible trail and line into `view`'s HDR target for `camera`,
-    /// `stack_index` in its stack (what its reactive texels name, #1845).
-    /// Returns the draw calls issued (one per ribbon) for the frame counters.
     pub(crate) fn draw_ribbons(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
@@ -75,7 +56,6 @@ impl Renderer {
         (camera, stack_index): (&Camera, f32),
         view_proj: Mat4,
     ) -> u32 {
-        // Ribbons are dynamic effects: never baked into a static probe capture.
         if self.capture.static_only {
             return 0;
         }
@@ -91,7 +71,6 @@ impl Renderer {
         let rr = &self.ribbon_renderer;
         self.queue
             .counted_write_buffer(&rr.globals_buffer, 0, bytemuck::bytes_of(&globals));
-        // On a due render only, as the sprite particles (`scene::residency::notes`).
         if self.notes_due() {
             for texture in ribbons.draws.iter().filter_map(|d| d.texture.as_ref()) {
                 self.note_map(scene.id(), texture.as_str());
@@ -106,7 +85,6 @@ impl Renderer {
         ribbons.draws.len() as u32
     }
 
-    /// Record the pass: load the HDR colour + depth, then each ribbon in order.
     fn encode_ribbon_pass(
         &self,
         encoder: &mut wgpu::CommandEncoder,
@@ -149,9 +127,6 @@ impl Renderer {
     }
 }
 
-/// A pass over `view`'s HDR colour and depth that keeps both (loads, never
-/// clears), as every effect pass drawn over the lit scene does, and its reactive
-/// mask where it runs TAA (#1845).
 fn effect_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     view: &'e RenderView,
@@ -174,8 +149,6 @@ fn effect_pass<'e>(
     })
 }
 
-/// Build every ribbon `camera` sees: active, on a layer its mask keeps, with at
-/// least two distinct points.
 fn collect(scene: &Scene, camera: &Camera) -> Ribbons {
     let visible = |id| {
         scene.world.is_active_in_hierarchy(id)
@@ -214,8 +187,6 @@ fn collect(scene: &Scene, camera: &Camera) -> Ribbons {
 }
 
 impl Ribbons {
-    /// Append one ribbon's strip; returns its draw and view depth, or `None` when
-    /// it has nothing to draw.
     fn push(
         &mut self,
         points: &[Vec3],

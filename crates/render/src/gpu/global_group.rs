@@ -1,33 +1,17 @@
-//! The forward renderer's group 0 (camera, lighting, skybox, reflection cube, the
-//! light clusters, the decals and the lightmap pages), built in one place: at setup
-//! and whenever a resource it names is swapped (a new skybox or probe cube array, a grown
-//! cluster or decal buffer, a grown decal atlas, a rebaked lightmap set (its
-//! shadowmask pages too, #1695), a
-//! volumetric fog volume of another grid).
-
 use crate::clusters::ClusterBuffers;
 use crate::decals::DecalBuffers;
 use crate::gpu::lightmaps::LightmapBinding;
 use crate::gpu::ops::CountedDevice as _;
 
-/// What group 0 binds; see `bind_layouts::create_camera_lighting_layout`.
 pub(crate) struct GlobalGroup<'a> {
     pub camera: &'a wgpu::Buffer,
     pub lighting: &'a wgpu::Buffer,
-    /// The sky's reflection cube (#1553).
     pub skybox: &'a wgpu::TextureView,
-    /// The resident reflection probes' cube array (#1206).
     pub cube: &'a wgpu::TextureView,
     pub clusters: &'a ClusterBuffers,
     pub decals: &'a DecalBuffers,
-    /// The baked lightmap pages (#438), their direction (#810) and shadowmask
-    /// (#1695) pages.
     pub lightmaps: LightmapBinding<'a>,
-    /// The integrated volumetric fog (#1703).
     pub fog_volume: &'a wgpu::TextureView,
-    /// The one sampler the sky, the probe cubes, the lightmaps, the shadowmask pages
-    /// (binding 19) and the fog volume read through ([`super::linear_clamp`]); the
-    /// decal atlas keeps its own, so give none of them a sampler of their own.
     pub linear_clamp: &'a wgpu::Sampler,
 }
 

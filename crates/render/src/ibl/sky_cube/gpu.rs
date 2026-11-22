@@ -1,6 +1,3 @@
-//! The sky cube's GPU side (#1553): the cube textures and the compute pass that
-//! captures and prefilters the sky into every mip of one (`sky/prefilter.wgsl`).
-
 use super::SKY_FACE;
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _};
 use crate::gpu::shaders::ShaderRegistry;
@@ -9,19 +6,13 @@ use crate::ibl::reflection_prefilter;
 use crate::timing::{GpuPass, GpuTimer};
 use crate::GpuTexture;
 
-/// The cube's format: HDR, so a bright panorama keeps its range in a reflection.
 const FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
-/// The shader's workgroup edge (`@workgroup_size(8, 8, 1)`).
 const GROUP: u32 = 8;
 
-/// A full mip chain down to 1×1: a probe's prefiltered chain at the sky's face size.
 pub(super) fn mip_count() -> u32 {
     reflection_prefilter::mip_count(SKY_FACE)
 }
 
-/// Mip `level`'s shader params: its roughness (`reflection_prefilter`'s
-/// `level / (mips - 1)`), face size, source (1: the panorama) and the probe
-/// prefilter's sample count.
 pub(super) fn params(level: u32, textured: bool) -> [f32; 4] {
     let roughness = level as f32 / (mip_count() - 1) as f32;
     let size = (SKY_FACE >> level).max(1) as f32;
@@ -29,10 +20,7 @@ pub(super) fn params(level: u32, textured: bool) -> [f32; 4] {
     [roughness, size, f32::from(u8::from(textured)), samples]
 }
 
-/// One sky cube: the texture, its `Cube` view (what group 0 binds) and one
-/// storage view per mip (what the bake writes).
 pub(super) struct Cube {
-    /// Read back by the tests; the views keep it alive otherwise.
     #[cfg(test)]
     pub(super) texture: wgpu::Texture,
     pub(super) view: wgpu::TextureView,
@@ -82,8 +70,6 @@ impl Cube {
     }
 }
 
-/// One mip's params buffer as the shader reads it: [`params`], then the procedural
-/// sky's settings (#1620; ignored for a panorama).
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct Params {
@@ -91,8 +77,6 @@ struct Params {
     sky: ProceduralSkyUniform,
 }
 
-/// The bake pipeline, one params buffer per mip, and the black texel the
-/// procedural bake binds in the panorama's place.
 pub(super) struct Filter {
     pipeline: wgpu::ComputePipeline,
     params: Vec<wgpu::Buffer>,
@@ -145,8 +129,6 @@ impl Filter {
         }
     }
 
-    /// Capture and prefilter `panorama` (`None`: the procedural sky's terms, shaped
-    /// by `sky`) into every mip of `cube`, in one timed compute pass, and submit it.
     pub(super) fn bake(
         &self,
         (device, queue): (&wgpu::Device, &wgpu::Queue),
@@ -194,7 +176,6 @@ impl Filter {
         queue.counted_submit(std::iter::once(encoder.finish()));
     }
 
-    /// One mip's bind group: its params, the source and the mip's storage view.
     fn group(
         &self,
         device: &wgpu::Device,

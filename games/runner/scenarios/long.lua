@@ -1,9 +1,7 @@
--- scenarios/long.lua — a bot that always dodges runs for a minute of game time at
--- the rising speed, accelerating twice as fast as the default so it reaches the top
--- speed within it (a two-minute run at the default rate cost the game's test about
--- 16 s of CPU for the same proof, #2350). Chunks are built ahead and destroyed
--- behind for the whole run, so the entity count stays under a fixed bound instead
--- of growing with the distance. It takes the shot of a run at speed.
+-- A bot that always dodges runs a minute of game time at twice the default
+-- acceleration so it reaches top speed within it (a two-minute run cost about
+-- 16 s of CPU for the same proof). The entity count must stay under a fixed
+-- bound as chunks are built ahead and destroyed behind.
 
 local Bot = require("runner.bot")
 

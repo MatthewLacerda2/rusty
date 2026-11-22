@@ -1,5 +1,3 @@
-//! What a frame bakes into the sky reflection cubes (#1553), GPU-free.
-
 use super::{bake_slot, plan, procedural_step, Bake, Prepared};
 
 #[test]
@@ -8,8 +6,6 @@ fn the_procedural_sky_is_baked_once_per_settings() {
     assert_eq!(plan(true, None), Bake::Nothing);
 }
 
-/// The first bake fills the bound slot; a later one the other, keeping the sky
-/// bound last (#1620).
 #[test]
 fn a_new_sky_is_baked_beside_the_bound_one() {
     assert_eq!(bake_slot(0, true), 0);
@@ -17,9 +13,6 @@ fn a_new_sky_is_baked_beside_the_bound_one() {
     assert_eq!(bake_slot(1, false), 0);
 }
 
-/// Settings the other slot holds only switch group 0 to it, and bake nothing; the
-/// bound slot's settings change nothing; new settings bake beside the bound ones
-/// (#1620).
 #[test]
 fn settings_held_by_the_other_slot_only_rebind() {
     let held = [Some('a'), Some('b')];
@@ -51,8 +44,6 @@ fn the_cube_has_a_full_mip_chain_at_a_probes_face() {
     assert_eq!(super::gpu::mip_count(), 8, "128 down to 1");
 }
 
-/// The sky cube blurs as a probe's prefilter does (#1553): same sample count and
-/// the same roughness per mip, so probe-lit and sky-lit rough metal can't drift.
 #[test]
 fn each_mip_is_filtered_as_a_probes_is() {
     use crate::ibl::reflection_prefilter::{roughness_to_mip, SAMPLE_COUNT};

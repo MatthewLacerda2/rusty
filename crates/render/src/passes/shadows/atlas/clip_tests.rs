@@ -1,7 +1,3 @@
-//! Atlas shadows clip as their casters do (#468, #648): under a spotlight, a slab
-//! whose -X half is cut — a Cutout material's clear texels, or a dissolve burned
-//! through — shadows only its +X half. Skips with no adapter.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -14,7 +10,6 @@ use rusty_components::RenderMode;
 use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::Scene;
 
-/// [`slab_yard`] lit by a shadowing spotlight straight overhead instead of its sun.
 fn under_a_spotlight(shader: Option<&str>) -> (Scene, u32) {
     let (mut scene, slab) = slab_yard(shader);
     for id in scene.world.ids_with_light() {

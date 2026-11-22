@@ -1,8 +1,5 @@
-//! The probe-array slot table (#1206): reuse, spares, growth, eviction and the budget.
-
 use super::{SlotTable, MAX_REFLECTION_PROBES, SPARE_SLOTS};
 
-/// Room for every slot: only growth and the half rule resize.
 const ROOM: usize = MAX_REFLECTION_PROBES;
 
 #[test]
@@ -23,8 +20,6 @@ fn a_resident_cube_keeps_its_slot_and_is_not_copied_again() {
     assert!(plan.copies.is_empty());
 }
 
-/// Pacing across the budget's edge: the cube that left range waits in a spare slot
-/// and comes back without a copy.
 #[test]
 fn a_cube_that_left_range_comes_back_from_a_spare_slot() {
     let mut table = SlotTable::default();

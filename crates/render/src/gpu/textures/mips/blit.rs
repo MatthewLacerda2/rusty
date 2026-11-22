@@ -1,12 +1,3 @@
-//! Drawing a texture's mip chain on the GPU (#1322), `mips.wgsl`: each level is a
-//! fullscreen triangle box-filtering the level above (`textureLoad`, odd sides
-//! weighted by overlap) through the views of the texture's [`TextureKind`], or
-//! through its own format for a 16-bit normal map (`textures::deep`).
-//!
-//! Done on the GPU because the CPU box filter it replaced cost about 42 ms per 2K
-//! texture in an optimised build and 670 ms in the unoptimised dev build the editor
-//! runs (the engine crate is opt-level 0 there), on top of the image's decode.
-
 use super::{view_format, TextureKind};
 use crate::gpu::fullscreen::Fullscreen;
 use crate::gpu::layout_entries::texture_entry;
@@ -15,9 +6,6 @@ use crate::gpu::pipelines::LazyPipeline;
 use crate::gpu::shaders::ShaderRegistry;
 use crate::gpu::textures::deep::DEEP_FORMAT;
 
-/// The downsample pass: one pipeline per view format. The colour one is built
-/// with the renderer, whose default checker draws its mips with it; the data one
-/// waits for the first data map, the deep one for the first 16-bit normal map.
 pub(crate) struct MipGenerator {
     layout: wgpu::BindGroupLayout,
     colour: wgpu::RenderPipeline,
@@ -58,15 +46,10 @@ impl MipGenerator {
         }
     }
 
-    /// The data and deep pipelines, for the windowed renderer to build before its
-    /// first frame.
     pub(crate) fn lazy_pipelines(&self) -> [&LazyPipeline; 2] {
         [&self.data, &self.deep]
     }
 
-    /// Draw every level of `texture` below its base from the one above; nothing
-    /// for a texture of one level. The texture needs `RENDER_ATTACHMENT` usage and
-    /// `kind`'s view format, or be a [`DEEP_FORMAT`] one.
     pub(crate) fn generate(
         &self,
         device: &wgpu::Device,
@@ -77,9 +60,6 @@ impl MipGenerator {
         self.generate_layer(device, queue, (texture, 0), kind);
     }
 
-    /// [`generate`](Self::generate) for one array `layer` of `texture` (the decal
-    /// atlas's, #1364): each level is read and drawn through views of that layer
-    /// alone.
     pub(crate) fn generate_layer(
         &self,
         device: &wgpu::Device,
@@ -119,7 +99,6 @@ impl MipGenerator {
         queue.counted_submit([encoder.finish()]);
     }
 
-    /// Record the pass drawing `target` from `above`.
     fn draw_level(
         &self,
         device: &wgpu::Device,

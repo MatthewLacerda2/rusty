@@ -1,13 +1,9 @@
--- scenarios/ball.lua — the ball rolls from the dark west half into the sunlit
--- east one, and the probe lighting it takes changes as it goes.
 
 local ball = Scene.FindEntityByName("Ball")
 Harness.Expect(ball ~= nil, "the showroom has a Ball")
 
--- What the probe field gives the ball's centre, averaged over the six axis
--- directions: its probe lighting. The probes hold the light bounced into the
--- room (the sun reaches the ball directly, not through them), so a ball over the
--- sunlit patch is lit from below by it.
+-- The probe field at the ball's centre, averaged over the six axis directions.
+-- The sun reaches the ball directly, so the probes hold only the bounced light.
 local AXES = { { 1, 0, 0 }, { -1, 0, 0 }, { 0, 1, 0 }, { 0, -1, 0 }, { 0, 0, 1 }, { 0, 0, -1 } }
 local function light()
     local x, y, z = Transform.GetPosition(ball)
@@ -19,10 +15,8 @@ local function light()
     return x, sum / #AXES
 end
 
--- The ball at its start, in the dark half (cache/test/shots/ball_dark.png, where
--- the check holds it to having an image). Taken here rather than in `shots.lua`,
--- whose shots settle eight frames each: the showroom runs no TAA, so a settle
--- changes no pixel and costs eight renders (#2090).
+-- Taken here rather than in `shots.lua`, whose shots settle eight frames each:
+-- the showroom runs no TAA, so a settle changes no pixel.
 Camera.SetPosition(-2.0, 1.2, -3.6)
 Camera.SetYaw(math.deg(math.atan(-1.0 + 3.6, -5.0 + 2.0)))
 Camera.SetPitch(math.deg(math.atan(0.3 - 1.2, math.sqrt(3.0 ^ 2 + 2.6 ^ 2))))
@@ -33,7 +27,6 @@ end
 
 local x0, l0 = light()
 if l0 == 0 and Reflection.Get(0).cubemap == "" then
-    -- Generated with no GPU or software adapter: the probes were never baked.
     Harness.Log("skipped: the probes are unbaked (no GPU adapter at generation)")
     return
 end
@@ -45,7 +38,6 @@ Harness.Expect(l1 > 2 * l0, "the ball is lit brighter in the sunlit half than in
 local _, _, turned = Transform.GetRotation(ball)
 Harness.Expect(math.abs(turned) > 1, "the ball turns as it rolls")
 
--- The ball in the sunlit half, for looking (cache/test/ball/bright.png).
 Camera.SetPosition(1.0, 1.2, -3.6)
 Camera.SetYaw(math.deg(math.atan(-1.0 + 3.6, 3.5 - 1.0)))
 Camera.SetPitch(-15)

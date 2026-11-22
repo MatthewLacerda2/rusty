@@ -1,6 +1,6 @@
-// engine/shaders/lighting/cascades.wgsl — the sun's cascaded shadow maps as the
-// shaders read them (#435): the forward pass (`forward::bindings::shadow`) and the
-// volumetric fog's froxels (#1703) bind the same uniform.
+// the sun's cascaded shadow maps as the
+// shaders read them: the forward pass (`forward::bindings::shadow`) and the
+// volumetric fog's froxels bind the same uniform.
 
 #define_import_path lighting::cascades
 

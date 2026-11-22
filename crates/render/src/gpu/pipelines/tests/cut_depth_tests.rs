@@ -1,7 +1,3 @@
-//! A surface cut reaches the depth passes (#648): a half-dissolved slab's shadow has
-//! a hole under its burned half, and a crate dissolved away leaves no SSAO behind —
-//! the floor reads as if it were never there. Skips with no adapter.
-
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -13,10 +9,8 @@ use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_entity, default_post_processing, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// Fine enough for SSAO to resolve a crate's contact shadow.
 const RES: u32 = 96;
 
-/// A box at `position` scaled by `scale`; drawn by surface `shader` if any.
 fn block(scene: &mut Scene, position: Vec3, scale: Vec3, shader: Option<&str>) -> u32 {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
@@ -30,8 +24,6 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3, shader: Option<&str>) -
     id
 }
 
-/// Ground under a high sun, and a 6 x 6 slab over it at y = 3 (drawn by `shader` if
-/// any) whose -X half is u < 0.5. Returns the scene and the slab.
 pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -44,13 +36,11 @@ pub(crate) fn slab_yard(shader: Option<&str>) -> (Scene, u32) {
     (scene, slab)
 }
 
-/// Point `id`'s mask at `d`'s and set its `dissolve.amount`.
 pub(crate) fn dissolve(scene: &Rc<RefCell<Scene>>, id: u32, d: &Dissolve, amount: f32) {
     set_texture(scene, id, "mask", &d.mask);
     set_param(scene, id, "dissolve.amount", amount);
 }
 
-/// The frame `cam` sees, as RGBA8.
 fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -59,14 +49,11 @@ fn frame(r: &mut Renderer, scene: &Scene, cam: &Camera) -> Vec<u8> {
     readback::read_texture_rgba8(&r.device, &r.queue, target, RES, RES)
 }
 
-/// [`ground_at`] under both slab halves, `x = ∓1.5`.
 pub(crate) fn ground_halves(r: &mut Renderer, scene: &Scene) -> [f32; 2] {
     [-1.5, 1.5].map(|x| ground_at(r, scene, x))
 }
 
-/// Mean brightness of [`slab_yard`]'s ground at `x`, looked at from beneath the slab.
 pub(crate) fn ground_at(r: &mut Renderer, scene: &Scene, x: f32) -> f32 {
-    // The sun leans the shadow ~0.8 units toward -Z; look where it lands.
     let cam = Camera::new(Vec3::new(x, 1.5, -0.8), -90.0, -89.0);
     let px = frame(r, scene, &cam);
     let rgb = px.chunks(4).flat_map(|p| &p[..3]);
@@ -75,7 +62,6 @@ pub(crate) fn ground_at(r: &mut Renderer, scene: &Scene, x: f32) -> f32 {
 
 #[test]
 fn gpu_a_half_dissolved_slab_casts_a_shadow_with_a_hole() {
-    // Black (cut) where u < 0.5 — the slab's -X half, top and bottom — white beyond.
     let mask = image::RgbaImage::from_fn(4, 1, |x, _| image::Rgba([255 * (x / 2) as u8; 4]));
     let d = Dissolve::with_mask("half", &mask);
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -104,7 +90,6 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    // A floor lit by ambient light alone, under an AO volume, with and without a crate.
     let yard = |with_crate: bool| {
         let mut scene = Scene::new();
         scene.skybox_path = String::new();
@@ -115,7 +100,6 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
         let mut vc = default_post_processing();
         (vc.bloom.active, vc.ssr.active, vc.ssao.active) = (false, false, true);
         scene.world.set_post_processing(volume, Some(vc));
-        // A volume rides on its camera (#1434): that camera is the view's.
         scene
             .world
             .set_camera(volume, Some(rusty_components::CameraComponent::default()));
@@ -143,6 +127,5 @@ fn gpu_a_dissolved_crate_leaves_no_ambient_occlusion() {
         "[cut ssao] channels differing from the bare floor: standing {shown}, dissolved {left}"
     );
     assert!(shown > 60, "control: the crate shows");
-    // Before #648 the prepass still held the crate: ~900 channels darkened around it.
     assert_eq!(left, 0, "the dissolved crate occludes nothing");
 }

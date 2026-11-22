@@ -1,6 +1,6 @@
 // engine/shaders/lighting/ambient.wgsl — the scene's ambient light as the shaders
-// read it (#1647): the `Color` hemisphere, the `Gradient` trilight or the `Skybox`
-// sky's SH (#1675), the WGSL side of `scene::settings::ambient`. The data is `common::AmbientLight` (in
+// read it: the `Color` hemisphere, the `Gradient` trilight or the `Skybox`
+// sky's SH, the WGSL side of `scene::settings::ambient`. The data is `common::AmbientLight` (in
 // `common::LightingUniforms`); the forward pass (`forward::lighting::flat_ambient`)
 // and lit particles evaluate it here.
 

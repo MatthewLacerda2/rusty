@@ -1,13 +1,4 @@
--- games/fruit/recipe.lua — a slice-the-fruit arcade game in 3D (#2033): fruit
--- (spheres and a capsule with Snyder skins) is thrown up from below a lit kitchen
--- counter in bursts, a mouse swipe cuts it into two halves that fall away with a
--- spray of juice, a bomb ends the game, and fruit left alone costs a life. It
--- proves rigidbodies thrown and despawned in bursts, a swipe hit-tested against
--- moving bodies on screen, splitting an object at runtime, particles, UI text and
--- zimmer sounds.
---
--- Run in edit mode by `make game`: `...` is the command line's `--param` table;
--- the defaults below are what CI runs. `fruit.lua` is the game.
+-- `...` is the command line's `--param` table; the defaults are what CI runs.
 
 local p = { lives = 3, bombs = 8, seed = 1 }
 for key, value in pairs(... or {}) do
@@ -17,7 +8,6 @@ end
 
 Scene.New()
 
--- The skins: one Snyder mottle each fruit's material tints, and the flesh's speckle.
 local function ramp(name, scale, lo, hi)
     return Texture.Bake({
         resolution = 64, seed = p.seed,
@@ -33,7 +23,6 @@ local flesh = ramp("flesh", 24.0, { 0.85, 0.85, 0.8, 1 }, { 1, 1, 1, 1 })
 local wood = ramp("wood", 6.0, { 0.3, 0.17, 0.07, 1 }, { 0.6, 0.38, 0.18, 1 })
 local tile = ramp("tile", 3.0, { 0.55, 0.62, 0.66, 1 }, { 0.85, 0.9, 0.92, 1 })
 
--- Each kind's skin and flesh colours, in `fruit/view.lua`'s KINDS order.
 local kinds = {
     apple = { { 0.8, 0.08, 0.06 }, { 0.98, 0.95, 0.75 } },
     orange = { { 1.0, 0.5, 0.05 }, { 1.0, 0.65, 0.2 } },
@@ -50,14 +39,12 @@ Material.DefineAsset("fuse", { base_color = { 1, 0.4, 0.1 }, emissive = { 6, 1.6
 Material.DefineAsset("wood", { base_color_map = wood, roughness = 0.7 })
 Material.DefineAsset("tile", { base_color_map = tile, roughness = 0.5 })
 
--- The kitchen: a counter across the bottom of the view and a tiled back wall the
--- shadows fall on. Fruit flies in front of both on its own layer (fruit/view.lua),
--- which collides with nothing.
+-- Fruit flies in front of both on its own layer, which collides with nothing.
 local function solid(name, x, y, z, sx, sy, sz, material)
     local id = Scene.CreateEntity(name, "Box")
     Transform.SetPosition(id, x, y, z)
     Transform.SetLocalScale(id, sx, sy, sz)
-    Scene.AddComponent(id, "Collider") -- #2051: a primitive gets none of its own yet
+    Scene.AddComponent(id, "Collider") -- a primitive gets none of its own yet
     Material.Set(id, material)
     return id
 end
@@ -70,7 +57,6 @@ Physics.IgnoreLayerCollision(8, 0)
 local sun = Scene.CreateEntity("Sun", "DirectionalLight")
 Light.SetMode(sun, "Mixed") -- live: the level is not baked
 Transform.SetRotation(sun, -55, 20, 0)
--- The flash a bomb sets off: dark until `fruit.lua` raises it.
 local flash = Scene.CreateEntity("Flash", "PointLight")
 Transform.SetPosition(flash, 0, 2, 4)
 Light.SetColor(flash, 1.0, 0.6, 0.25)
@@ -82,8 +68,7 @@ local camera = Scene.CreateEntity("Camera")
 Scene.AddComponent(camera, "Camera")
 Transform.SetPosition(camera, 0, 2, 13) -- looking down -Z: +X is screen right, +Y up
 
--- The juice: a soft disc sprite (#2052: an emitter with no texture draws the
--- checker), one emitter `fruit/view.lua` moves to each cut and tints.
+-- A soft disc sprite: an emitter with no texture draws the renderer's checker.
 local puff = Texture.Bake({
     resolution = 64, seed = p.seed,
     nodes = {
@@ -106,7 +91,6 @@ end
 emitter("Juice", 40, 0.25, 0.6, 5.0)
 emitter("Blast", 120, 0.8, 0.8, 9.0)
 
--- The sounds: a slice, a bomb, a miss and a short loop under it all.
 local function bake(name, patch, note, opts)
     opts.seed = p.seed
     return Sound.Bake(patch, note, "assets/sounds/" .. name .. ".wav", opts)
@@ -134,7 +118,6 @@ Scene.AddScript(game, "assets/scripts/fruit.lua", { lives = p.lives, bombs = p.b
 Scene.AddComponent(game, "AudioSource")
 Component.Set(game, "AudioSource", { clip = loop, loop = true, play_on_start = true, volume = 0.3 })
 
--- The HUD: score and combo top left, lives top right, a banner at game over.
 local canvas = UI.Create("Canvas")
 Scene.SetName(canvas, "HUD")
 local function text(name, ax, ay, x, y, w, h, size, r, g, b)

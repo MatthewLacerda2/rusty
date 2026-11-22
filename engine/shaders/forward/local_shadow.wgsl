@@ -1,14 +1,14 @@
 // engine/shaders/forward/local_shadow.wgsl — a point or spot light's shadow in the
-// forward pass (#468): its atlas tile, PCF, and the per-light shadow fade distance
-// (#1712). `fs_main` in `shader.wgsl` multiplies each local light by it, through
-// `forward::shadowmask` (#1695).
+// forward pass: its atlas tile, PCF, and the per-light shadow fade distance
+//. `fs_main` in `shader.wgsl` multiplies each local light by it, through
+// `forward::shadowmask`.
 
 #define_import_path forward::local_shadow
 
 #import common::{LocalLight, NO_SHADOW, local_shadow_tile, sample_local_shadow}
 #import forward::bindings::{camera, s_shadow, shadow_tiles, t_shadow_atlas}
 
-// How much of `light`'s shadow the camera samples (#1712): all of it within nine
+// How much of `light`'s shadow the camera samples: all of it within nine
 // tenths of its fade distance from the light, falling linearly to none at it
 // (HDRP's linear distance fade); all of it when the fade is off (0).
 fn shadow_fade(light: LocalLight) -> f32 {
@@ -23,7 +23,7 @@ fn shadow_fade(light: LocalLight) -> f32 {
 // visibility (x) and how much of it the camera samples (y, the fade). With no tile
 // or past the fade it is (1, 0) and costs no tap (the fade is uniform per light).
 // `forward::shadowmask::local_mixed_shadow` blends x toward lit by y, and under a
-// shadowmask meets the baked shadow there (#1695).
+// shadowmask meets the baked shadow there.
 fn local_shadow_parts(light: LocalLight, world: vec3<f32>, N: vec3<f32>) -> vec2<f32> {
     let tile = local_shadow_tile(light, world);
     if (tile == NO_SHADOW) {

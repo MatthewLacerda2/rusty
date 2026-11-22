@@ -1,25 +1,8 @@
-//! crates/shadergen/src/compose.rs — the one GPU-free `naga_oil` composition path (#722).
-//!
-//! Every WGSL module the engine compiles goes through here: `ShaderRegistry::load`
-//! for the engine's own shaders, the authored post-FX / UI / preview loaders, and
-//! [`super::validate`] at bake time. Keeping it a single path is what makes
-//! "validated at bake" mean "validated by exactly the code that would later compile
-//! it". It lives in `shadergen`, not `render`, so the sim side (scene authoring, the
-//! Lua `Shader.Bake`) can validate a shader without compiling the renderer: `render`
-//! depends on this module, never the other way.
-//!
-//! **Version lockstep:** `naga_oil 0.13` composes into `naga 0.19`, the same
-//! version wgpu 0.19.x links against. Upgrade all three as a unit.
-
 use naga_oil::compose::{ComposableModuleDescriptor, Composer, NagaModuleDescriptor};
 
-/// A composed, validated shader module — the IR wgpu takes as `ShaderSource::Naga`.
 pub use naga::Module;
 
-/// The composable modules every engine shader is compiled against, in dependency
-/// order (a module is registered after those it imports), as paths under the shader
-/// base. `common.wgsl` names itself here (its import name is `common`); every other
-/// module names itself with `#define_import_path` (#1015).
+/// `naga_oil 0.13` composes into `naga 0.19`, the version wgpu 0.19 links: upgrade all three together.
 pub const MODULES: &[&str] = &[
     "fullscreen.wgsl",
     "lighting/screen_space.wgsl",
@@ -67,11 +50,6 @@ pub const MODULES: &[&str] = &[
     "postfx/grade.wgsl",
 ];
 
-/// Build a composer pre-loaded with [`MODULES`] under `base`: `common.wgsl` as the
-/// `"common"` module, the context every engine shader is compiled in, and the
-/// modules it and the forward pass import.
-///
-/// Returns a message if a module is missing or fails to compose.
 pub fn composer_with_common(base: &str) -> Result<Composer, String> {
     let mut composer = Composer::default();
     for module in MODULES {
@@ -81,14 +59,9 @@ pub fn composer_with_common(base: &str) -> Result<Composer, String> {
         composer
             .add_composable_module(ComposableModuleDescriptor {
                 source: &source,
-                // Only naga_oil's error messages read it: a mutant deleting
-                // this line is equivalent (cargo-mutants, #1601).
                 file_path: module,
-                // The module's import name. naga_oil derives it from a
-                // `#define_import_path` directive in the source or this field;
-                // `common.wgsl` has no directive, so name it here or
-                // `add_composable_module` fails with `NoModuleName` and every
-                // `#import common::…` is unresolvable.
+                // `common.wgsl` has no `#define_import_path`: without this name
+                // `add_composable_module` fails with `NoModuleName`.
                 as_name: (*module == "common.wgsl").then(|| "common".to_owned()),
                 ..Default::default()
             })
@@ -97,17 +70,12 @@ pub fn composer_with_common(base: &str) -> Result<Composer, String> {
     Ok(composer)
 }
 
-/// Register the composable module at `<base>/<module>` (named by its
-/// `#define_import_path`) into `composer`, beside [`MODULES`]: the post effects' modules
-/// (#1467), which `render` registers from its effect list before composing the
-/// composite and the grading bake it assembles from them.
 pub fn add_module(composer: &mut Composer, base: &str, module: &str) -> Result<(), String> {
     let path = format!("{base}/{module}");
     let source = std::fs::read_to_string(&path).map_err(|e| format!("cannot read {path}: {e}"))?;
     add_source(composer, module, &source)
 }
 
-/// [`add_module`] from `source` already read: `module` only labels errors.
 pub fn add_source(composer: &mut Composer, module: &str, source: &str) -> Result<(), String> {
     composer
         .add_composable_module(ComposableModuleDescriptor {
@@ -119,10 +87,6 @@ pub fn add_source(composer: &mut Composer, module: &str, source: &str) -> Result
         .map_err(|e| format!("{module} failed to compose: {e:?}"))
 }
 
-/// Compose a WGSL `source` against the composer's `common` module into a validated
-/// naga module. `file_path` only labels errors. Errors come back as a message, so
-/// each caller picks its own policy: the engine's startup set panics, authored
-/// shaders skip with a warning, the bake rejects.
 pub fn compose(composer: &mut Composer, source: &str, file_path: &str) -> Result<Module, String> {
     composer
         .make_naga_module(NagaModuleDescriptor {

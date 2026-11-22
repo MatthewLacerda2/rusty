@@ -1,7 +1,3 @@
-//! A page list past the device's limits (#1704): refused with a warning, the scene
-//! left unlit by lightmaps, instead of `create_texture` panicking on every load of
-//! a file that holds too many pages.
-
 use super::finish;
 use super::load::Loaded;
 use super::upload::{fits, MAX_ARRAY_BYTES};

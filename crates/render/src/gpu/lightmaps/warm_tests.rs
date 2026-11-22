@@ -1,14 +1,9 @@
-//! A warm-up and the frames of the scene still drawing share one array cache, with
-//! pages read on a worker as a windowed renderer reads them (#2123): neither takes
-//! the other's landing, and each counts only what it uploaded.
-
 use std::time::Duration;
 
 use super::Lightmaps;
 use crate::stats::Uploads;
 use crate::test_gpu::headless_or_skip;
 
-/// A black `edge`² PNG named `name` under the test's temp dir, as a one-page list.
 fn list(name: &str, edge: u32) -> Vec<String> {
     let dir = rusty_test_support::temp::dir().join("rusty_2123_lightmaps");
     std::fs::create_dir_all(&dir).unwrap();
@@ -17,7 +12,6 @@ fn list(name: &str, edge: u32) -> Vec<String> {
     vec![path.to_string_lossy().into_owned()]
 }
 
-/// Call `f` until it answers `true`, sleeping between tries.
 fn until(mut f: impl FnMut() -> bool) {
     for _ in 0..2000 {
         if f() {
@@ -36,7 +30,6 @@ fn gpu_a_list_the_warm_up_lands_is_bound_by_the_next_frame() {
     let (device, writes) = (&renderer.device, (&renderer.queue, &renderer.staging));
     let mut maps = Lightmaps::new(device, false);
     let level = list("retry.png", 2);
-    // A retry of the level whose pages are still being read: the warm-up lands them.
     maps.bind(device, writes, &level, &[], &[]);
     until(|| maps.warm(device, writes, [&level, &[], &[]]));
     assert!(maps.bind(device, writes, &level, &[], &[]), "rebinds");
@@ -56,7 +49,6 @@ fn gpu_a_warm_up_and_the_drawing_scene_never_take_each_others_landing() {
     let mut maps = Lightmaps::new(device, false);
     let (splash, next) = (list("splash.png", 2), list("next.png", 4));
     maps.bind(device, writes, &splash, &[], &[]);
-    // The splash's `Start` loads the next level: its warm-up runs beside its frames.
     let mut warmed = Uploads::default();
     let mut framed = Uploads::default();
     until(|| {

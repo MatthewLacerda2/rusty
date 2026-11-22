@@ -1,5 +1,3 @@
-//! Instance building for the sprite pass (#440): modes, flipbook frames, sorting.
-
 use glam::Vec3;
 
 use super::*;
@@ -45,7 +43,6 @@ fn stretched_carries_velocity_axis_and_length() {
     e.runtime.particles[0].velocity = Vec3::new(4.0, 0.0, 0.0);
     let (inst, _) = emitter_instances(&e, [0.0; 4], EYE);
     assert_eq!(inst[0].mode, 1);
-    // Default size curve is flat, so size stays 1: length = 1·2 + 4·0.5.
     assert_eq!(inst[0].stretch, [1.0, 0.0, 0.0, 4.0]);
 }
 
@@ -80,13 +77,10 @@ fn lit_flag_reaches_every_instance() {
     assert!(inst.iter().all(|i| i.sheet[3] == 0.75));
 }
 
-/// A lit emitter under a probe of a uniform sky of radiance L reads L, the matte
-/// response, not the irradiance πL (#807): the same scale as the flat ambient.
 #[test]
 fn a_probe_lights_a_puff_by_the_sky_radiance_not_its_irradiance() {
     let mut scene = Scene::new();
     let probe = scene.probes.add_probe(Vec3::ZERO);
-    // A uniform radiance L projects onto the DC band alone: c0 = L · Y00 · 4π.
     let l = 0.5;
     let c0 = l * 0.282_094_8 * 4.0 * std::f32::consts::PI;
     scene.probes.probes_mut()[probe].sh.coeffs[0] = [c0; 3];

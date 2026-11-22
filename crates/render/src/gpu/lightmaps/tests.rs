@@ -1,8 +1,3 @@
-//! The lightmap binding's state (#888, after #810's survivors): which page lists
-//! rebind, when direction pages count as bound, and which instances read them. The
-//! zeroed fallback makes a wrong `directional()` invisible in pixels, so these assert
-//! on the state. Skips when no adapter is present.
-
 use glam::Mat4;
 
 use super::Lightmaps;
@@ -11,7 +6,6 @@ use crate::test_gpu::headless_or_skip;
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
-/// Write a black `edge`² PNG named `name` under the test's temp dir.
 fn page(name: &str, edge: u32) -> String {
     let dir = rusty_test_support::temp::dir().join("rusty_888");
     std::fs::create_dir_all(&dir).unwrap();
@@ -69,8 +63,6 @@ fn gpu_lightmaps_rebind_on_colour_pages_and_match_direction_shapes() {
     );
 }
 
-/// The shared cache contract (#1207): a page list that failed before its page was
-/// baked binds once it is, and a re-bake at the same path binds the new page.
 #[test]
 fn gpu_lightmaps_follow_bakes_at_one_path() {
     use rusty_core::fs::written;

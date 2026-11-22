@@ -1,12 +1,8 @@
--- scroll_view.lua — the engine's Scroll View widget (#422), Unity's `ScrollRect`.
---
--- Moves `Viewport/Content` (pinned to the viewport's top-left) by drag and wheel,
--- inside the bounds its size allows. `movement_type`: Elastic springs back past an
--- edge (over `elasticity` seconds, rubber-banding while dragged), Clamped stops at
--- it, Unrestricted never stops. With `inertia` a released drag coasts, slowing by
--- `deceleration_rate` per second. Everything runs on unscaled time, so a paused
--- game's menus still scroll. `Scrollbar Horizontal` / `Scrollbar Vertical`
--- children, when present, follow the content and drive it.
+-- Unity's `ScrollRect`. Moves `Viewport/Content` (pinned to the viewport's
+-- top-left) by drag and wheel. `movement_type`: Elastic springs back past an edge
+-- (over `elasticity` seconds), Clamped stops, Unrestricted never stops. With
+-- `inertia` a released drag coasts, slowing by `deceleration_rate` per second.
+-- Runs on unscaled time, so a paused game's menus still scroll.
 --
 -- Owner API (via `Scene.GetScript(id, "scroll_view")`):
 --   on_value_changed = function(id, x, y) … end   -- normalized position moved
@@ -40,7 +36,6 @@ local function sizes()
     return v.width, v.height, c.width, c.height
 end
 
--- The allowed range per axis: x in [lo, 0], y in [0, hi].
 local function bounds()
     local vw, vh, cw, ch = sizes()
     return { math.min(0, vw - cw), 0 }, { 0, math.max(0, ch - vh) }, vw, vh
@@ -82,7 +77,6 @@ function ScrollView.get_normalized_position()
     return math.max(0, math.min(1, x)), math.max(0, math.min(1, y))
 end
 
--- Write the position, then keep the bars and the owner in step.
 local function apply()
     RectTransform.SetAnchoredPosition(content, pos[1], pos[2])
     local x, y = ScrollView.get_normalized_position()

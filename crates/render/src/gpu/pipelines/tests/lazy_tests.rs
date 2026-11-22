@@ -1,8 +1,3 @@
-//! The forward pass's optional pipelines wait for the first frame that draws them
-//! (#985): an opaque game frame builds none, the editor's overlays build the line
-//! pipeline, and a translucent solid builds the transparent one. Warmed, as a windowed
-//! renderer does at startup, every one of them is a valid pipeline.
-
 use glam::Vec3;
 
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -12,7 +7,6 @@ use rusty_scene::{Camera, MeshComponent, Scene};
 
 const RES: u32 = 16;
 
-/// One box in front of the camera, shaded by a material in `mode`.
 fn box_scene(mode: RenderMode) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -38,7 +32,6 @@ fn draw(renderer: &mut Renderer, scene: &Scene, editor_mode: bool) {
     renderer.render(&mut view, scene, &cam, &out, editor_mode);
 }
 
-/// Which of (transparent, line, outline mask) are built.
 fn built(renderer: &Renderer) -> [bool; 3] {
     [
         super::TransparentBlend::ALL
@@ -72,33 +65,13 @@ fn gpu_optional_forward_pipelines_build_on_first_draw() {
     assert!(built(&renderer)[0], "a translucent solid draws transparent");
 }
 
-/// What a windowed renderer does at startup: every lazy pipeline is built, world-UI
-/// blend modes no test draws included, so a game never compiles one mid-frame. A
-/// shipped game (no editor overlays) leaves only the line and outline ones lazy.
 #[test]
 fn gpu_warm_pipelines_builds_every_lazy_pipeline() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let every = renderer.lazy_pipelines(true);
-    // Every forward-target pass has one pipeline per facing (#1615): `F` of each.
     const F: usize = 3;
-    // one transparent per blend state, again into TAA's reactive mask (#1845), and
-    // the 2 depth postpass (#1523) and its motion-only one (#1845) + the
-    // motion-vector forward and 2 sky (#1435) + the same into the SSR surface target
-    // too (#1526) + the 2 primed forward ones (#1499) and the primed SSR one + the
-    // opaque pass's, the prepass's and its depth-only one's (#2347) mirrored and
-    // two-sided ones (#1615) + SSR's trace,
-    // resolve (#2028) and its hit pyramids' downsample (#2340) + SSAO's occlusion, blur and upsample (#1578) + SSIL's 5 (#1750) + the motion blur's 3 tile
-    // passes and gather (#1436) + TAA's resolve, its upscale (#1702) and its
-    // sharpen (#1847; one output format headless) + both resolves held, the
-    // camera's anti-flicker on (#2228) + the depth of field's 9 (#1445) + bloom's prefilter,
-    // resample, downsample and upsample (#1700) + the lens flare's (#1443; the composite adds it, #1473)
-    // + 2 particle + 2 ribbon, each again reactive (#1845) + the GPU-simulated
-    // particles' 2, again reactive (#2170) + one world canvas per blend mode + 2 mirrored and 2
-    // two-sided shadow (#1571) + the data-mip and 16-bit-normal-mip ones (#2257) + the opaque copy (#1523) + the
-    // editor's line, vertex-coloured line (#1882), probe ball (#1911) and navmesh (#1910), the
-    // outline's mask (one per facing), dilation and edge.
     assert_eq!(
         every.len(),
         2 * super::TransparentBlend::ALL.len() * F

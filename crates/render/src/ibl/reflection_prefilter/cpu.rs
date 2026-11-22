@@ -1,6 +1,3 @@
-//! The CPU GGX prefilter (#245): the reference the GPU one (`super::gpu`, #1602) is
-//! held to, texel for texel. Only tests run it; the bake prefilters on the GPU.
-
 use std::f32::consts::PI;
 
 use glam::{Vec2, Vec3};
@@ -10,9 +7,6 @@ use super::{mip_count, PrefilteredCubemap, SAMPLE_COUNT};
 use crate::ibl::cube_sample::{face_uv, sample_lod, FaceProjections};
 use crate::{CubemapCapture, CubemapFace};
 
-/// GGX-prefilter a captured cubemap into a roughness mip chain. mip0 copies the capture
-/// (a mirror); each rougher mip is importance-sampled from the capture's source mip
-/// chain (`source::source_chain`), every sample at the level its solid angle picks.
 pub(crate) fn prefilter(capture: &CubemapCapture) -> PrefilteredCubemap {
     let base = capture.resolution.max(1);
     let levels = mip_count(base);
@@ -20,7 +14,6 @@ pub(crate) fn prefilter(capture: &CubemapCapture) -> PrefilteredCubemap {
     let chain = source_chain(capture);
     let mut mips = Vec::with_capacity(levels as usize);
 
-    // mip0: a faithful copy of the capture (roughness 0 = a perfect mirror).
     mips.push(chain[0].each_ref().map(|face| encode_face(face)));
 
     for level in 1..levels {
@@ -35,7 +28,6 @@ pub(crate) fn prefilter(capture: &CubemapCapture) -> PrefilteredCubemap {
     }
 }
 
-/// Build one rough mip: every texel of every face GGX-convolved from the source chain.
 fn filter_mip(
     proj: &FaceProjections,
     chain: &[[Vec<Vec3>; 6]],
@@ -55,8 +47,6 @@ fn filter_mip(
     })
 }
 
-/// How a convolution samples: how many taps, and whether each reads the source mip
-/// its solid angle picks or the base level alone.
 #[derive(Clone, Copy)]
 pub(crate) struct Taps {
     pub count: u32,
@@ -64,17 +54,12 @@ pub(crate) struct Taps {
 }
 
 impl Taps {
-    /// The bake's: [`SAMPLE_COUNT`] filtered taps.
     pub(crate) const BAKE: Taps = Taps {
         count: SAMPLE_COUNT,
         filtered: true,
     };
 }
 
-/// GGX split-sum convolution at normal `n` for `roughness`: importance-sample half-vectors
-/// around `n`, reflect the view (= n) across each, and average the source radiance at the
-/// sample's own mip, weighted by `N·L`. Returns linear RGB. Tests convolve with other
-/// [`Taps`] for a ground truth to hold the bake's against.
 pub(crate) fn convolve(
     proj: &FaceProjections,
     chain: &[[Vec<Vec3>; 6]],
@@ -105,7 +90,6 @@ pub(crate) fn convolve(
     }
 }
 
-/// An orthonormal tangent basis around `n`.
 fn basis(n: Vec3) -> (Vec3, Vec3) {
     let up = if n.z.abs() < 0.999 { Vec3::Z } else { Vec3::X };
     let tangent = up.cross(n).normalize_or_zero();
@@ -113,7 +97,6 @@ fn basis(n: Vec3) -> (Vec3, Vec3) {
     (tangent, bitangent)
 }
 
-/// A GGX-distributed half-vector in world space for the low-discrepancy point `xi` (Karis).
 fn importance_sample_ggx(
     xi: Vec2,
     roughness: f32,
@@ -129,14 +112,10 @@ fn importance_sample_ggx(
     (tangent * h_local.x + bitangent * h_local.y + n * h_local.z).normalize_or_zero()
 }
 
-/// The `i`-th of `n` points of the Hammersley low-discrepancy sequence (van der Corput
-/// radical inverse in base 2 on the second axis). Deterministic — no RNG.
 fn hammersley(i: u32, n: u32) -> Vec2 {
     Vec2::new(i as f32 / n as f32, radical_inverse_vdc(i))
 }
 
-/// Base-2 radical inverse: reverse the bits and scale to [0, 1). This is the van der
-/// Corput sequence, the second Hammersley axis.
 fn radical_inverse_vdc(bits: u32) -> f32 {
     bits.reverse_bits() as f32 * 2.328_306_4e-10
 }

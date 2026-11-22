@@ -1,4 +1,4 @@
-// engine/shaders/sky/air.wgsl — the volumetric fog in front of the sky (#1703):
+// the volumetric fog in front of the sky:
 // `skybox.wgsl` and `sky_gradient.wgsl` import it, so both skies read the
 // integrated volume the same way.
 

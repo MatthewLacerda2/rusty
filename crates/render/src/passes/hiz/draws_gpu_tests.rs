@@ -1,10 +1,3 @@
-//! What the cull's passes draw against the cull off, in a view where nothing is
-//! hidden (#2387): no triangle is drawn twice. The cull adds phase one's depth
-//! draw (`hiz_depth_triangles`, a call per depth batch), which stands in for
-//! the depth prepass where one runs, a late-set call per depth batch beside
-//! it, and a clustered batch's draw per instance (`cluster_draws`); the forward
-//! pass draws the triangles it draws with the cull off.
-
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::panel;
@@ -15,7 +8,6 @@ use rusty_lighting::occlusion::test_level::block;
 use rusty_scene::create::default_post_processing;
 use rusty_scene::{Camera, Scene};
 
-/// A scene with its camera entity, AO on its volume when `ssao`.
 pub(super) fn scene(ssao: bool) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -29,7 +21,6 @@ pub(super) fn scene(ssao: bool) -> Scene {
     scene
 }
 
-/// Twelve crates, none in front of another: one batch.
 pub(super) fn crates(scene: &mut Scene) {
     for k in 0..12 {
         let at = Vec3::new(
@@ -41,17 +32,14 @@ pub(super) fn crates(scene: &mut Scene) {
     }
 }
 
-/// Three clustered panels of one mesh side by side: one batch, drawn by cluster.
 fn panels(scene: &mut Scene) {
     for x in [-5.0, -1.5, 2.0] {
         panel(scene, "P", (Vec3::new(x, -1.0, -5.0), 3.0, Quat::IDENTITY));
     }
 }
 
-/// A frame's pixels and counters.
 pub(super) type Shot = (Vec<u8>, RenderCounters);
 
-/// The first `n` frames of `scene` in a new view, the cull `on` or off.
 pub(super) fn frames(r: &mut Renderer, scene: &Scene, on: bool, n: usize) -> Vec<Shot> {
     r.quality.gpu_occlusion_culling = on;
     let cam = Camera::new(Vec3::new(0.0, 1.0, 8.0), -90.0, 0.0);
@@ -59,12 +47,10 @@ pub(super) fn frames(r: &mut Renderer, scene: &Scene, on: bool, n: usize) -> Vec
     (0..n).map(|_| shot(r, &mut view, scene, &cam)).collect()
 }
 
-/// A settled frame: enough that its read backs describe the view held still.
 pub(super) fn settled(r: &mut Renderer, scene: &Scene, on: bool) -> Shot {
     frames(r, scene, on, 6).pop().expect("six frames")
 }
 
-/// The cull off, then on: the counters of each, asserting the pixels equal.
 fn off_and_on(scene: &Scene) -> Option<(RenderCounters, RenderCounters)> {
     let mut r = crate::test_gpu::culling::culling_or_skip(W, H)?;
     let (px_off, off) = settled(&mut r, scene, false);
@@ -96,13 +82,9 @@ fn gpu_with_nothing_hidden_the_cull_draws_no_triangle_twice() {
         let label = format!("ssao {ssao}, clustered {}", on.cluster_tested > 0);
         let depth = on.hiz_depth_triangles;
         assert!(depth > 0, "{label}: phase one drew the view: {on:?}");
-        // One depth batch: phase one's call, and the late set's when the cull
-        // primes a camera no prepass would (with AO the prepass draws it; on
-        // Metal nothing primes, so with neither no late set is drawn).
         let late = if ssao { 0 } else { on.primed_passes };
         let split = on.cluster_draws.saturating_sub(1);
         assert_eq!(on.draw_calls, off.draw_calls + 1 + late + split, "{label}");
-        // Phase one stands in for the prepass where one runs, else adds its own.
         let expected = off.triangles + if ssao { 0 } else { depth };
         assert_eq!(on.triangles, expected, "{label}: {off:?} {on:?}");
     }
@@ -117,7 +99,6 @@ fn gpu_a_clustered_batch_is_one_draw_per_instance_and_its_kept_clusters() {
     };
     assert_eq!(on.cluster_draws, 3, "a draw per panel: {on:?}");
     assert_eq!(off.cluster_draws, 0);
-    // Nothing hidden but what faces away: the panels face the camera.
     assert_eq!(on.cluster_culled, 0, "{on:?}");
     assert_eq!(on.triangles - on.hiz_depth_triangles, off.triangles);
 }
@@ -139,7 +120,6 @@ fn gpu_a_wall_s_hidden_box_is_counted_undrawn() {
     let (_, off) = settled(&mut r, &s, false);
     let (_, on) = settled(&mut r, &s, true);
     assert_eq!(on.hiz_culled, 1, "{on:?}");
-    // Each pass draws the wall alone: a box is 12 triangles.
     assert_eq!(on.hiz_depth_triangles, off.triangles - 12, "{on:?}");
     assert_eq!(on.triangles, 2 * (off.triangles - 12), "{off:?} {on:?}");
 }

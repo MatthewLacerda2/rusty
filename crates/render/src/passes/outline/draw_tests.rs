@@ -1,9 +1,3 @@
-//! The outline draws from the forward pass's own draw (#1175): for a mirrored child
-//! under a moved parent, a posed skin and a LOD-switched group, each outline's mesh,
-//! material, uniform slot (its per-draw uniform and bone palette) and instance (its
-//! world matrix) are the forward draw's. And with no pivot to grow about, a pose far
-//! from its entity's origin is ringed evenly (#1165). Skips with no adapter.
-
 use glam::{Mat4, Vec3};
 
 use super::follow_tests::{lod_switched, posed_sphere};
@@ -13,9 +7,8 @@ use crate::lod::LodSelection;
 use crate::{Frustum, MeshId, Renderer};
 use rusty_scene::{Camera, Scene};
 
-/// The forward draws of `scene` by the camera `frame` looks through at `centre`.
 fn forward_draws(r: &mut Renderer, scene: &Scene, centre: Vec3) -> FrameDraws {
-    frame(r, scene, centre); // makes the meshes resident
+    frame(r, scene, centre);
     let cam = Camera::new(centre + Vec3::Z * 3.0, -90.0, 0.0);
     let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
     let lod = LodSelection::for_camera(scene, &cam);
@@ -28,8 +21,6 @@ fn forward_draws(r: &mut Renderer, scene: &Scene, centre: Vec3) -> FrameDraws {
     .draws
 }
 
-/// `draws` outlines exactly `ids`, each from the forward draw that drew it; returns
-/// each outline's bone palette base, in `ids` order.
 fn assert_outlines_forward(
     r: &Renderer,
     scene: &Scene,
@@ -96,7 +87,6 @@ fn gpu_the_outline_draws_from_the_forward_draw() {
     let bases = assert_outlines_forward(&r, &scene, &draws, &[soldier]);
     assert_ne!(bases, [0], "a posed skin's outline binds its palette");
 
-    // LOD1 shows: selecting the group rings its two renderers, not LOD0.
     let (mut scene, [group, _, body, hat]) = lod_switched();
     scene.selected_entity_id = Some(group);
     let draws = forward_draws(&mut r, &scene, Vec3::ZERO);
@@ -108,7 +98,6 @@ fn gpu_a_root_moved_pose_is_ringed_evenly() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
-    // The clip carried the root 3 m from the entity's origin, unbaked (#1165).
     let pose = Vec3::X * 3.0;
     let (count, centroid, filled) = outline_stats(&frame(&mut r, &posed_sphere(pose), pose));
     eprintln!("[outline, root moved] {count} px, centroid {centroid:?}");

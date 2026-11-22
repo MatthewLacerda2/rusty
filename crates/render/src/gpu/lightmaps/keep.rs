@@ -1,13 +1,6 @@
-//! crates/render/src/gpu/lightmaps/keep.rs — dropping the page lists no kept scene binds
-//! (#2458): the array cache keeps one array per distinct list so two scenes drawn in
-//! one frame cost a lookup, and a load's release (`scene::residency::maps`) drops the
-//! lists of the scene it left.
-
 use super::Lightmaps;
 
 impl Lightmaps {
-    /// Drop every cached list (uploaded, failed or still being read) that `kept`
-    /// refuses and nothing binds now; how many went.
     pub(crate) fn release(&mut self, kept: impl Fn(&[String]) -> bool) -> usize {
         let before = self.cache.len();
         let bound = &self.bound;
@@ -16,7 +9,6 @@ impl Lightmaps {
         before - self.cache.len()
     }
 
-    /// The page lists cached now, sorted.
     #[cfg(test)]
     pub(crate) fn cached_lists(&self) -> Vec<Vec<String>> {
         let mut lists: Vec<Vec<String>> = self.cache.keys().cloned().collect();

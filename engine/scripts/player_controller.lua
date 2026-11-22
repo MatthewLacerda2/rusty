@@ -1,49 +1,26 @@
--- player_controller.lua — bundled DEFAULT player behaviour (ships with the engine).
---
--- This is game logic, not engine logic: it is a normal entity script the engine
--- happens to ship and attach to the Player, exactly like the enemy's bot.lua. The
--- engine play loop runs only systems; movement, the third-person camera, and the
--- weapon all live HERE, so a game can edit or replace them without touching Rust.
---
--- Reproduces what the engine's old `drive_player` + `hitscan` did, verbatim:
---   * WASD moves the Player along the camera's ground plane at MOVE_SPEED, through
---     its CharacterController (#451): walls block it, steps are climbed, and the
---     script applies its own GRAVITY, since Move applies none.
---   * Space jumps (#748): on its RISING edge, only while grounded, the vertical
---     speed is set to JUMP_SPEED, which peaks ≈1.1 m up (CS's jump height). No
---     jump mid-air, and holding Space does not bounce.
---   * Arrow keys turn the follow-camera (yaw/pitch), pitch clamped to +/-80.
---   * The camera trails the Player at -forward*FOLLOW_BACK + up*FOLLOW_UP.
---   * Left mouse (SHOOT_KEY) casts a hitscan on its RISING edge (one cast per
---     press), firing Physics.Raycast from the camera along its forward.
---   * Start frames the camera behind the Player (yaw 90, pitch -10) — this used to
---     be an engine-side snap keyed on the name "Player" (#450).
---
--- Determinism: reads Input + Time only, never the wall clock, so a headless replay
--- is identical every run.
+-- Bundled default player behaviour: an ordinary script a game can replace.
+-- Reads Input + Time only, so a headless replay is identical.
 
 local PlayerController = {}
 
-local MOVE_SPEED = 5.0      -- units/second of ground movement
-local GRAVITY = 20.0        -- units/second² the Player falls at
-local JUMP_HEIGHT = 1.1     -- metres the jump peaks at (CS's ≈45-unit jump)
-local JUMP_SPEED = math.sqrt(2.0 * GRAVITY * JUMP_HEIGHT) -- ≈6.6 units/second launch
-local GROUND_STICK = -1.0   -- vertical speed while grounded, keeping it pressed down
-local LOOK_SPEED = 90.0     -- degrees/second of camera turn
-local PITCH_LIMIT = 80.0    -- clamp camera pitch to +/- this
-local FOLLOW_BACK = 4.5     -- how far the camera trails behind the Player
-local FOLLOW_UP = 1.5       -- how high above the Player the camera sits
-local SHOT_RANGE = 100.0    -- metres the hitscan reaches
-local SHOT_DAMAGE = 25.0    -- what one shot deals (a bot has 100)
-local JUMP_KEY = "SPACE"    -- jumps on its rising edge, while grounded
-local SHOOT_KEY = "Mouse0"  -- the trigger: the left mouse button
-local START_YAW = 90.0      -- initial camera yaw: looking down +Z, across the arena
-local START_PITCH = -10.0   -- initial camera pitch: tilted slightly down
-local START_BACK = 4.5      -- initial camera offset behind the Player (along -Z)
-local START_UP = 1.5        -- initial camera height above the Player
+local MOVE_SPEED = 5.0      -- units/second
+local GRAVITY = 20.0        -- units/second²
+local JUMP_HEIGHT = 1.1     -- metres
+local JUMP_SPEED = math.sqrt(2.0 * GRAVITY * JUMP_HEIGHT)
+local GROUND_STICK = -1.0
+local LOOK_SPEED = 90.0     -- degrees/second
+local PITCH_LIMIT = 80.0    -- degrees
+local FOLLOW_BACK = 4.5
+local FOLLOW_UP = 1.5
+local SHOT_RANGE = 100.0    -- metres
+local SHOT_DAMAGE = 25.0    -- a bot has 100
+local JUMP_KEY = "SPACE"
+local SHOOT_KEY = "Mouse0"
+local START_YAW = 90.0
+local START_PITCH = -10.0
+local START_BACK = 4.5
+local START_UP = 1.5
 
--- Move the Player along the camera's ground plane from WASD, falling under GRAVITY
--- and jumping on JUMP_KEY's rising edge while grounded.
 local function move(self, entity_id, dt)
     local fx, fy, fz = Camera.GetForward()
     local rx, ry, rz = Camera.GetRight()
@@ -71,7 +48,6 @@ local function move(self, entity_id, dt)
     self.vy = vy
 end
 
--- Turn the follow-camera from the arrow keys, then trail it behind the Player.
 local function aim_camera(entity_id, dt)
     local look = LOOK_SPEED * dt
     local yaw = Camera.GetYaw()
@@ -90,17 +66,13 @@ local function aim_camera(entity_id, dt)
     Camera.SetPosition(px - fx * FOLLOW_BACK, py - fy * FOLLOW_BACK + FOLLOW_UP, pz - fz * FOLLOW_BACK)
 end
 
--- Cast a hitscan on the rising edge of the shoot key (one cast per press) and
--- deliver its damage to whatever it struck (`Damage.ApplyPoint`, which reaches
--- the target's OnTakeDamage). Hits on the Player's own hierarchy are skipped, so
--- the shot can't hit the shooter — the "don't hit the Player" rule lives HERE,
--- not as a name check in the engine.
+-- Hits on the Player's own
+-- hierarchy are skipped here, not by a name check in the engine.
 local function shoot(self, entity_id)
     local down = Input.IsKeyDown(SHOOT_KEY)
     if down and not self.shoot_was_down then
         local cx, cy, cz = Camera.GetPosition()
         local fx, fy, fz = Camera.GetForward()
-        -- The nearest hit that isn't the Player itself takes the shot.
         -- Triggers (pickups, zones) don't stop a bullet: query_triggers = false.
         for _, hit in ipairs(Physics.RaycastAll(cx, cy, cz, fx, fy, fz, SHOT_RANGE, nil, false)) do
             if hit.root ~= entity_id then
@@ -113,8 +85,6 @@ local function shoot(self, entity_id)
     self.shoot_was_down = down
 end
 
--- The reusable per-frame drive: movement + camera follow + weapon. The bot-player
--- calls this after injecting its own Input, so it shares the exact same controller.
 function PlayerController.drive(self, entity_id, dt)
     move(self, entity_id, dt)
     aim_camera(entity_id, dt)

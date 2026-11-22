@@ -1,46 +1,26 @@
-//! A view's SSAO targets (#436): the raw occlusion at its quality's resolution, its
-//! blur at that resolution, the full-resolution result the forward pass reads, and
-//! the bind groups over them. The depth they read is the view's own, which the
-//! prepass fills (#1578). Allocated the first frame a view runs SSAO and rebuilt
-//! when its size or the quality's divisor changes, or the view's depth is
-//! reallocated (`RenderView::resize` drops them), so a view with AO off never pays
-//! for them.
-
 use super::{SsaoUniform, AO_FORMAT};
 use crate::gpu::bind_layouts::create_shadow_bind_group;
 use crate::Renderer;
 
-/// One view's SSAO state. Its bind groups reference the renderer's long-lived
-/// buffers and pipelines layouts, which never change for the renderer's lifetime,
-/// and the view's depth.
 pub(crate) struct SsaoTargets {
-    /// `(width, height, divisor)` these were built for.
     key: (u32, u32, u32),
-    /// The raw occlusion target's size (the view's, divided).
     pub(super) raw_size: (u32, u32),
-    /// The textures the views below look into.
     _textures: Vec<wgpu::Texture>,
     pub(super) raw: wgpu::TextureView,
-    /// The blurred occlusion at the raw size; `None` at full resolution, where the
-    /// blur writes `ao` itself and no upsample runs.
     pub(super) blurred: Option<wgpu::TextureView>,
     pub(super) ao: wgpu::TextureView,
     pub(super) uniform: wgpu::Buffer,
     pub(super) ao_group: wgpu::BindGroup,
     pub(super) blur_group: wgpu::BindGroup,
-    /// The upsample's group, over `blurred`; `None` with it.
     pub(super) upsample_group: Option<wgpu::BindGroup>,
-    /// The forward pass's scene group with this view's AO bound.
     pub(crate) forward_group: wgpu::BindGroup,
 }
 
 impl SsaoTargets {
-    /// Are these the targets for a `width` x `height` view at `divisor`?
     pub(super) fn matches(&self, width: u32, height: u32, divisor: u32) -> bool {
         self.key == (width, height, divisor)
     }
 
-    /// The targets for a `width` x `height` view whose depth is `depth`, at `divisor`.
     pub(super) fn new(
         r: &Renderer,
         depth: &wgpu::TextureView,
@@ -86,20 +66,15 @@ impl SsaoTargets {
         }
     }
 
-    /// The full-resolution occlusion the forward pass reads (SSIL's scene group binds
-    /// it beside its own result, #1750).
     pub(crate) fn ao(&self) -> &wgpu::TextureView {
         &self.ao
     }
 
-    /// Where the blur writes: the low-resolution target the upsample reads, or the
-    /// result itself at full resolution.
     pub(super) fn blur_target(&self) -> &wgpu::TextureView {
         self.blurred.as_ref().unwrap_or(&self.ao)
     }
 }
 
-/// An occlusion target the SSAO passes draw and later ones sample, and its view.
 fn target(
     device: &wgpu::Device,
     label: &str,

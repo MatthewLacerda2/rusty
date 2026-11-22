@@ -1,4 +1,4 @@
-// engine/shaders/postfx/effects/vignette.wgsl — the Vignette (#1439), Unity URP's,
+// engine/shaders/postfx/effects/vignette.wgsl — the Vignette, Unity URP's,
 // unrounded, on the graded image. Slot 0: x intensity (`0`: off), y smoothness, zw the
 // centre uv; slot 1: rgb the colour the edges fade to.
 

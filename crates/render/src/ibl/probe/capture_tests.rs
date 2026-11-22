@@ -1,9 +1,3 @@
-//! A light probe bakes against the ambient, not the sky (#1668): where its capture
-//! escapes the scene it projects `AmbientRadiance::incoming`, so an open probe's SH
-//! is the analytic fill's (`scene::analytic_fill`) in `Color` and in `Gradient`.
-//! The projection is held on a synthetic capture (any host) and the whole bake on
-//! the GPU (lavapipe; skips with no adapter).
-
 use glam::Vec3;
 
 use super::ProbeCapture;
@@ -22,9 +16,6 @@ const NORMALS: [Vec3; 6] = [
     Vec3::new(0.0, -0.6, 0.8),
 ];
 
-/// An empty scene in `Color` mode, or `Gradient` with a blue sky over an orange
-/// ground, neither colour the procedural sky's. The grey equator keeps the
-/// trilight's `incoming` non-negative, so the zero clamp leaves it as the fill's.
 fn scene(mode: AmbientMode) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_color = Vec3::new(0.4, 0.8, 1.2);
@@ -36,21 +27,18 @@ fn scene(mode: AmbientMode) -> Scene {
     scene
 }
 
-/// [`scene`] with one probe at the origin.
 fn probed(mode: AmbientMode) -> Scene {
     let mut scene = scene(mode);
     scene.probes.add_probe(Vec3::ZERO);
     scene
 }
 
-/// What the analytic fill gives that probe (its height stand-in is 1 there).
 fn analytic(mode: AmbientMode) -> Sh9 {
     let mut scene = probed(mode);
     analytic_fill(&mut scene);
     scene.probes.probes()[0].sh
 }
 
-/// Both read back as a surface does (irradiance over π), equal at every normal.
 fn assert_matches(got: &Sh9, want: &Sh9, what: &str) {
     for n in NORMALS.map(Vec3::normalize) {
         let (g, w) = (got.eval(n), want.eval(n));
@@ -59,7 +47,6 @@ fn assert_matches(got: &Sh9, want: &Sh9, what: &str) {
     }
 }
 
-/// A black capture open everywhere projects the ambient alone, as the fill does.
 #[test]
 fn an_open_capture_projects_the_ambient() {
     let res = 16;
@@ -76,8 +63,6 @@ fn an_open_capture_projects_the_ambient() {
         let sh = project_light_probe(&capture, ambient);
         assert_matches(&sh, &analytic(mode), mode.name());
     }
-    // A trilight ringing below zero (black equator) is clamped per direction, as the
-    // trace's escaping rays are: never darker than the unclamped fill, else brighter.
     let mut ringing = scene(AmbientMode::Gradient);
     ringing.ambient.equator = Vec3::ZERO;
     let sh = project_light_probe(&capture, ringing.drawn_ambient().radiance());
@@ -87,15 +72,12 @@ fn an_open_capture_projects_the_ambient() {
     let lift = NORMALS.map(|n| sh.eval(n.normalize()) - fill.eval(n.normalize()));
     assert!(lift.iter().all(|d| d.min_element() > -1e-4), "{lift:?}");
     assert!(lift.iter().any(|d| d.max_element() > 1e-2), "{lift:?}");
-    // A covered (black) texel takes no ambient.
     let mut closed = capture;
     closed.open = std::array::from_fn(|_| vec![false; (res * res) as usize]);
     let sh = project_light_probe(&closed, AmbientRadiance::Hemisphere(Vec3::ONE));
     assert_eq!(sh.eval(Vec3::Y), Vec3::ZERO);
 }
 
-/// The GPU bake of an empty scene's probe is the analytic fill, in both modes: the
-/// gradient reaches it, and the procedural sky does not.
 #[test]
 fn gpu_an_empty_scene_bakes_the_analytic_fill() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -110,10 +92,6 @@ fn gpu_an_empty_scene_bakes_the_analytic_fill() {
     }
 }
 
-/// A probe inside a closed room of black, non-emissive static walls sees no open
-/// texel and bakes no light: neither the ambient (the depth test finds every
-/// direction covered) nor the sky reflected off the walls (#1668: a light-probe
-/// capture reflects nothing, and a black dielectric still has a 4% specular).
 #[test]
 fn gpu_a_closed_room_bakes_no_ambient() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {

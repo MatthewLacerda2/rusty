@@ -1,8 +1,3 @@
-//! Pins the Rust uniform mirrors to their WGSL structs byte-for-byte (#398, #434): each
-//! WGSL struct is composed through the engine's own naga_oil path and each member's
-//! offset, plus the total size, is compared against the Rust mirror. A reordered
-//! field or a lost pad fails here, not as garbage on the GPU.
-
 use std::mem::{offset_of, size_of};
 
 use super::uniforms::{AmbientLightUniform, CameraUniform, LightingUniform};
@@ -28,13 +23,10 @@ const PROBE: &str = "#import postfx::params::PostParams\n\
         + decals[0].fade.x + post.camera_pos.x);\n\
 }\n";
 
-/// `(member offset by name, struct size)` of the WGSL struct named `name` in
-/// [`PROBE`].
 fn wgsl_struct(name: &str) -> (Vec<(String, usize)>, usize) {
     wgsl_struct_in(PROBE, name)
 }
 
-/// [`wgsl_struct`] in the composed `probe`.
 pub(crate) fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, usize) {
     let mut composer = compose::composer_with_common(rusty_shadergen::engine_shader_dir()).unwrap();
     let module = compose::compose(&mut composer, probe, "probe.wgsl").unwrap();
@@ -57,12 +49,10 @@ pub(crate) fn wgsl_struct_in(probe: &str, name: &str) -> (Vec<(String, usize)>, 
     found
 }
 
-/// Assert each `(wgsl member, rust offset)` pair and the size agree.
 fn assert_layout(name: &str, pairs: &[(&str, usize)], size: usize) {
     assert_members(wgsl_struct(name), name, pairs, size);
 }
 
-/// Assert `(members, span)` against each `(wgsl member, rust offset)` pair and `size`.
 pub(crate) fn assert_members(
     (members, span): (Vec<(String, usize)>, usize),
     name: &str,
@@ -97,10 +87,6 @@ fn camera_uniform_matches_wgsl_layout() {
         ("volumetric", offset_of!(CameraUniform, volumetric)),
     ];
     assert_layout("CameraUniforms", &pairs, size_of::<CameraUniform>());
-    // `time` rides in the vec3 pad (#398); the cluster block adds 48 bytes (#434),
-    // last frame's matrix 64 (#1435), the stack index 16 (#1436), the inverse 64 (#1523),
-    // the transparent SSR trace 16 (#1736), SSIL's switch 16 (#1750), the material
-    // maps' mip bias 16 (#1702), the volumetric fog's slices 16 (#1703).
     assert_eq!(size_of::<CameraUniform>(), 384);
 }
 

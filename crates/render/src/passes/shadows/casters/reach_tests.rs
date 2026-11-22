@@ -1,8 +1,3 @@
-//! A light volume culled through the caster index keeps exactly what testing every
-//! candidate keeps, in the same order (#1874), adapter-free: over a seeded level of
-//! multi-run entities, some unbounded, some moved since they were indexed, some
-//! never indexed, and volumes that reach a few, all, or none of them.
-
 use glam::camera::rh::proj::directx;
 use glam::camera::rh::view::look_to_mat4;
 use glam::{Mat4, Vec3};
@@ -15,7 +10,6 @@ use crate::draw::batch::IndexRun;
 use crate::gpu::pipelines::winding::Facing;
 use crate::scene::{CasterIndex, MeshHandle, OcclusionBinding};
 
-/// A seeded xorshift's next value in `0..1`.
 fn next(state: &mut u64) -> f32 {
     *state ^= *state << 13;
     *state ^= *state >> 7;
@@ -23,9 +17,6 @@ fn next(state: &mut u64) -> f32 {
     (*state >> 40) as f32 / (1u64 << 24) as f32
 }
 
-/// `n` entities of one to three runs over a 100 m level; every seventh small. The
-/// index holds every one but each fifth, with every eleventh's bounds moved since
-/// and every thirteenth unbounded.
 fn level(n: u32, s: &mut u64) -> (Vec<Candidate>, CasterIndex) {
     let (mut candidates, mut indexed) = (Vec::new(), Vec::new());
     for id in 0..n {

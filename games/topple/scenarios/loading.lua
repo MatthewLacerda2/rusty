@@ -1,7 +1,3 @@
--- scenarios/loading.lua — the next level loads in the background (#2123): the
--- loading canvas comes up over the running level, the operation is ready on the
--- next tick and swapped in at its end, and the new level starts with its own
--- loading canvas hidden. Held back, it waits at 0.9 with the old level running.
 
 Harness.Step(1) -- enter Play: the scripts start
 local level = Scene.GetScript(Scene.FindEntityByName("Level"), "level")

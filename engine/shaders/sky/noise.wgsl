@@ -1,5 +1,5 @@
-// engine/shaders/sky/noise.wgsl — the value noise the procedural sky's clouds are
-// carved from (#256), as fractal Brownian motion, and how far the clouds' coverage
+// the value noise the procedural sky's clouds are
+// carved from, as fractal Brownian motion, and how far the clouds' coverage
 // shifts it: `common::procedural_sky` is their one caller.
 
 #define_import_path sky::noise

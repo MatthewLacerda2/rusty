@@ -1,16 +1,7 @@
-//! A Cutout caster's shadow holes sit where its drawn holes do under its material's
-//! Tiling/Offset and world mapping (#1594): the clip read the albedo at the raw UV0,
-//! so a flipped or triplanar-projected fence cast the holes of its untiled image.
-//! [`slab_yard`]'s slab is clear where its UV0 `u < 0.5` (its -X half); each mapping
-//! below moves the clear texels to its +X half, so the shadow must follow. Skips with
-//! no adapter.
-
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_halves, slab_yard};
 use rusty_components::{MaterialAsset, RenderMode, UvMapping};
 
-/// `[-X, +X]` ground brightness under the Cutout slab, mapped by `map`.
 fn halves_mapped(name: &str, map: impl Fn(&mut MaterialAsset)) -> Option<[f32; 2]> {
-    // Clear where u < 0.5, opaque white beyond.
     let albedo = image::RgbaImage::from_fn(4, 1, |x, _| {
         image::Rgba([255, 255, 255, 255 * (x / 2) as u8])
     });
@@ -32,7 +23,6 @@ fn halves_mapped(name: &str, map: impl Fn(&mut MaterialAsset)) -> Option<[f32; 2
 
 #[test]
 fn gpu_a_tiled_cutouts_shadow_follows_its_tiling_and_offset() {
-    // u' = 1 - u: the clear texels move to the +X half.
     let Some([solid, clear]) = halves_mapped("flipped", |m| {
         (m.tiling, m.offset) = ([-1.0, 1.0], [1.0, 0.0]);
     }) else {
@@ -46,8 +36,6 @@ fn gpu_a_tiled_cutouts_shadow_follows_its_tiling_and_offset() {
 
 #[test]
 fn gpu_a_triplanar_cutouts_shadow_follows_its_projection() {
-    // The slab's faces read the world-XZ projection at a 12 m repeat: x in
-    // [-3, 0) wraps to u in [0.75, 1) (opaque), x in [0, 3) to [0, 0.25) (clear).
     let Some([solid, clear]) = halves_mapped("triplanar", |m| {
         (m.uv_mapping, m.world_size) = (UvMapping::Triplanar, 12.0);
     }) else {

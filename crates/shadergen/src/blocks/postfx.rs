@@ -1,55 +1,5 @@
-//! crates/shadergen/src/blocks/postfx.rs — the postfx building-block family (#272).
-//!
-//! Each block is a fullscreen effect over the tonemapped scene color. Its `helper` is a
-//! pure function `fn pfx_<id>(c: vec3<f32>, uv: vec2<f32>, <params…>) -> vec3<f32>`
-//! and its `call` chains the running color (`{prev}`), the fragment `uv` and the
-//! instance's params (`{args}`). The assembler
-//! emits the postfx scaffolding (the fullscreen-triangle `vs_fullscreen`, the
-//! `t_color`/`s_color` bindings, an `fs_main` that samples the scene then folds
-//! every block) so a baked postfx module has the self-contained fullscreen shape
-//! the engine's postfx contract expects — it reads group(0) binding(0..2) just
-//! like the engine's composite (`render::postfx::effects::assemble`).
-//!
-//! Most effects are per-pixel color grades that need only the sampled color + uv,
-//! plus `game_time()` (#398) for animation (tint, scanline, grayscale, posterize,
-//! damage vignette). **Sampling blocks** (#402: sharpen, radial blur) also tap the module's input at offsets through
-//! the scaffold's `source_tap(uv)` / `source_texel()`. They read the module's
-//! *input* — the colour the chain handed this module — not the running colour of
-//! the blocks before them, and add the offset taps' **difference** from the
-//! centre tap to the running colour. As the first block that is exactly the
-//! re-sampled effect; later in the chain it layers the same detail over
-//! whatever the earlier blocks graded. No new bindings, no new render targets.
-//!
-//! The chain runs authored modules **after tonemapping** (#397), on display-referred
-//! colour in `[0, 1]`. Exposure, saturation and contrast were blocks here too; they
-//! were removed because the volume already owns those knobs (`Graphics.SetExposure`
-//! and friends, applied in HDR where they belong), and so were vignette, film grain
-//! and chromatic aberration when the volume took those over (#1439,
-//! `Graphics.SetVignette*` and friends); this catalog holds only looks the built-in
-//! post stack can't make. `damage_vignette` stays: it is a gameplay overlay (a
-//! tinted hurt edge a script drives), not the lens vignette.
-//!
-//! **CRT blocks** (#1679): `barrel` is the family's one **uv-stage** block, a warp of
-//! where the frame is sampled (Unity's Lens Distortion at a positive intensity, the
-//! glass's curve): every block after it, and the frame itself, reads the warped
-//! image, and what falls past the curved screen draws black (`assemble::postfx`).
-//! Its helper is `fn uv_barrel(uv, amount, corner_radius) -> vec2<f32>`, sending a
-//! point outside the rounded screen to an off-frame sentinel. `phosphor_mask` is a
-//! colour block in **screen pixels**: its call passes the fragment position
-//! `in.pos.xy` instead of `uv`, so the RGB stripes are whole pixels of the image the chain runs at: the scene target
-//! (output × render scale) on the bilinear path, where they beat or wash out at a scale other than 1, or the output on a
-//! camera TAA upscales (#1702), and it multiplies by a gain that keeps each channel's mean (a stripe
-//! lit at 3×, the others at 0, mixed in by `strength`). Its `kind` is a choice param
-//! (`Param::choice`), baked as an index.
-//!
-//! Params marked `runtime` (the strengths and the damage colour, #671) are read from
-//! the module's param uniform instead of a baked `const`, so a script drives them
-//! per frame on the volume with `Graphics.SetPostParam`; structural params (counts,
-//! radii, levels, pulse speed) stay baked.
-
 use super::{Block, Param, Reflection, Stage};
 
-/// The postfx block catalog.
 pub const BLOCKS: &[Block] = &[
     Block {
         id: "tint",

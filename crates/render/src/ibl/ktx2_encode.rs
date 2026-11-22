@@ -1,22 +1,3 @@
-//! crates/render/src/ibl/ktx2_encode.rs — hand-rolled KTX2 writer for baked cubemaps (#245).
-//!
-//! The `ktx2` crate (0.3.0) is PARSE-ONLY — it has a `Reader` but no writer — so the
-//! reflection bake hand-rolls the encode over the same binary layout the crate's `Reader`
-//! validates and parses (`cubemap::parse_ktx2_cubemap_mips`, #244). A KTX2 file is a
-//! fixed 80-byte header, a level index (one 24-byte entry per mip, largest mip first), a
-//! Basic Data Format Descriptor, then the level data. We emit exactly that for an HDR
-//! cubemap with a full roughness mip chain (#1696), so the loader
-//! reads back what we wrote. Since #1885 every face of every mip is BC6H unsigned
-//! float (`VK_FORMAT_BC6H_UFLOAT_BLOCK`, Unity's desktop default for an HDR
-//! cubemap), an eighth of the half-float cube, encoded by the block encoder the
-//! lightmap pages use (`asset::lightmap_page::bc6h_level`). A mip under a block
-//! (2×2, 1×1) is stored as one padded 4×4 block a face, as wgpu uploads it.
-//!
-//! Output is plain baked-asset bytes — a pure function of the prefiltered faces, no
-//! wall-clock / RNG — so the encode is clean under the determinism guard. The
-//! blocks are the same at any thread count (`texture_import::banded`), so a bake's
-//! cubes never depend on the machine.
-
 use glam::Vec3;
 
 use crate::ibl::reflection_prefilter::{PrefilteredCubemap, TEXEL_BYTES};
@@ -29,14 +10,8 @@ const MAGIC: [u8; 12] = [
 ];
 const HEADER_LEN: usize = 80;
 const LEVEL_INDEX_ENTRY_LEN: usize = 24;
-/// `VK_FORMAT_BC6H_UFLOAT_BLOCK` — the format the bake emits and the loader accepts
-/// (#1885).
 pub(crate) const VK_FORMAT_BC6H_UFLOAT_BLOCK: u32 = 143;
 
-/// Encode a prefiltered cubemap into KTX2 bytes: a BC6H unsigned-float cubemap with
-/// one level per roughness mip (largest first), each level holding the six faces'
-/// blocks packed in `CubemapFace::ALL` order. The bytes parse with `ktx2::Reader` and
-/// `parse_ktx2_cubemap_mips`.
 pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     debug_assert!(
         crate::ibl::reflection_prefilter::validate_layout(cube),
@@ -47,7 +22,6 @@ pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     let dfd_offset = HEADER_LEN + levels * LEVEL_INDEX_ENTRY_LEN;
     let level_data_offset = dfd_offset + dfd.len();
 
-    // Lay out level data largest mip first; record each level's (offset, length).
     let mut level_bytes: Vec<u8> = Vec::new();
     let mut index: Vec<(u64, u64)> = Vec::with_capacity(levels);
     for level in 0..levels {
@@ -75,7 +49,6 @@ pub fn encode_cubemap(cube: &PrefilteredCubemap) -> Vec<u8> {
     buf
 }
 
-/// A face's `Rgba16Float` bytes as linear HDR texels (alpha dropped).
 fn half_texels(bytes: &[u8]) -> Vec<Vec3> {
     let half = |b: &[u8]| f16_to_f32(u16::from_le_bytes([b[0], b[1]]));
     (bytes.chunks_exact(TEXEL_BYTES))
@@ -83,14 +56,10 @@ fn half_texels(bytes: &[u8]) -> Vec<Vec3> {
         .collect()
 }
 
-/// The threads a face encodes on: the machine's cores. The blocks do not depend on
-/// it.
 fn threads() -> usize {
     std::thread::available_parallelism().map_or(1, usize::from)
 }
 
-/// Write the 80-byte KTX2 header for a `size × size` BC6H cubemap (`face_count = 6`,
-/// no array layers, no supercompression) with `levels` mips and the given DFD location.
 fn write_header(buf: &mut [u8], size: u32, levels: u32, dfd_offset: usize, dfd_len: usize) {
     buf[0..12].copy_from_slice(&MAGIC);
     put_u32(buf, 12, VK_FORMAT_BC6H_UFLOAT_BLOCK); // vkFormat
@@ -110,8 +79,6 @@ fn write_header(buf: &mut [u8], size: u32, levels: u32, dfd_offset: usize, dfd_l
     put_u64(buf, 72, 0); // sgdByteLength
 }
 
-/// Write the level index: one 24-byte entry per mip (offset, length, uncompressed length;
-/// uncompressed == length, no supercompression). Entry 0 is the largest mip.
 fn write_level_index(buf: &mut [u8], index: &[(u64, u64)]) {
     for (i, (offset, length)) in index.iter().enumerate() {
         let at = HEADER_LEN + i * LEVEL_INDEX_ENTRY_LEN;
@@ -121,22 +88,13 @@ fn write_level_index(buf: &mut [u8], index: &[(u64, u64)]) {
     }
 }
 
-/// A minimal Basic Data Format Descriptor: the 4-byte total-size word
-/// followed by a 24-byte basic-descriptor block header. The loader only checks the format
-/// enum (from the header) and the DFD's presence/bounds, so a compact-but-valid block —
-/// total size word + an empty basic block — satisfies `ktx2::Reader`'s integrity check.
 fn build_dfd() -> Vec<u8> {
-    // descriptorType=0 (basic), vendorId=0, versionNumber=2, descriptorBlockSize=24.
     let block_size: u32 = 24;
     let total: u32 = 4 + block_size;
     let mut dfd = Vec::with_capacity(total as usize);
     dfd.extend_from_slice(&total.to_le_bytes()); // dfdTotalSize
-                                                 // descriptorBlock word 0: vendorId(17) | descriptorType(15)
     dfd.extend_from_slice(&0u32.to_le_bytes());
-    // word 1: versionNumber(16) | descriptorBlockSize(16)
     dfd.extend_from_slice(&((block_size << 16) | 2).to_le_bytes());
-    // words 2..6: colorModel/primaries/transfer/flags, texel block dims, bytesPlanes —
-    // zeroed; the loader doesn't read them. Pads the block to descriptorBlockSize bytes.
     dfd.extend_from_slice(&[0u8; 16]);
     dfd
 }

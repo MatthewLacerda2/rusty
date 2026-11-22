@@ -1,15 +1,8 @@
-//! A frame with no live sun draws no cascade (#1713), and a sun that goes live
-//! mid-Play (a `Light.SetMode`) shadows on its first frame: the static bake a Baked
-//! frame skipped never reads as cached. Turned Baked and back, the sun shadows as
-//! before. Skips with no adapter.
-
 use crate::gpu::pipelines::surface::cut_depth_tests::{ground_at, slab_yard};
 use crate::Renderer;
 use rusty_components::LightMode;
 use rusty_scene::Scene;
 
-/// The ground's brightness under the slab with the sun in `mode`, and the frame's
-/// cascade count and shadow draws.
 fn under_slab(r: &mut Renderer, scene: &mut Scene, mode: LightMode) -> (f32, usize, u32) {
     let sun = scene.world.find_by_name("Sun").expect("the sun");
     scene.world.light_mut(sun).unwrap().mode = mode;
@@ -25,7 +18,6 @@ fn gpu_a_sun_going_live_mid_play_shadows_on_its_first_frame() {
     };
     let (mut scene, slab) = slab_yard(None);
     scene.world.set_static(slab, true);
-    // A bake took the sun in, so while Baked it is drawn no more (#2522).
     let sun = scene.world.find_by_name("Sun").expect("the sun");
     scene.lightmaps.took_in_baked(sun);
 

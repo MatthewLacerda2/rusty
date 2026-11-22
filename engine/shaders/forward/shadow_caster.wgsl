@@ -1,6 +1,6 @@
-// engine/shaders/forward/shadow_caster.wgsl — the shadow pass's own resources
-// (#435, #648): the cascade's matrix and the casters `shader.wgsl`'s `vs_shadow` and
-// `shadow_clip` read. Moved out of `shader.wgsl` for its size cap (#1882).
+// the shadow pass's own resources
+//: the cascade's matrix and the casters `shader.wgsl`'s `vs_shadow` and
+// `shadow_clip` read. Moved out of `shader.wgsl` for its size cap.
 
 #define_import_path forward::shadow_caster
 
@@ -14,10 +14,10 @@ struct ShadowLight {
 @group(0) @binding(6)
 var<uniform> shadow_light: ShadowLight;
 
-// One caster (#470): its world matrix, where its joint palette starts in `bones`
-// (#599; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
-// (#648): the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
-// always 1), read where its material's `mapping` puts it (#1594), clipped below
+// One caster: its world matrix, where its joint palette starts in `bones`
+// (; 0, the shared identity, for a mesh with no skin), and its cutout alpha test
+//: the albedo map's alpha when `use_texture == 1` (a cutout's tint alpha is
+// always 1), read where its material's `mapping` puts it, clipped below
 // `alpha_cutoff` (0 for a material that does not clip).
 // Mirrors `CasterData` (crates/render/src/passes/shadows/casters/buffer.rs) byte-for-byte.
 struct Caster {
@@ -27,7 +27,7 @@ struct Caster {
     use_texture: u32,
     // Padding; a module's names may not start with `_` or end in a digit (naga_oil).
     caster_pad: u32,
-    // Its material's mapping (#1594); not named `mapping`, which is the module's.
+    // Its material's mapping; not named `mapping`, which is the module's.
     terms: mapping::Mapping,
 };
 

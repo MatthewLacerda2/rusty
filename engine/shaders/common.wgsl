@@ -1,16 +1,11 @@
-// engine/shaders/common.wgsl — shared GPU struct definitions and helpers imported by
-// the forward, shadow, skybox, particle and post-FX passes via `#import common::{…}`.
-// Every name here is part of what a baked shader may import, so none ever moves out;
-// a helper only common itself calls may live in a module of its own (`sky/noise.wgsl`).
 
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
 #import sky::noise::{cloud_shift, sky_fbm}
 
-// The scene's distance + height fog (#437). Mirrors the Rust `FogUniform`
-// byte-for-byte (naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`).
-// `mode`: 0 off, 1 linear, 2 exponential, 3 exponential².
+// naga_oil rejects imported names ending `_<digit>`, hence `_pad_a`. `mode`: 0 off, 1
+// linear, 2 exponential, 3 exponential².
 struct Fog {
     color: vec3<f32>,
     mode: u32,
@@ -24,78 +19,43 @@ struct Fog {
     _pad_c: f32,
 };
 
-// How a point finds its light cluster (#434). Mirrors the Rust `ClusterUniform`;
-// built per camera by `render::clusters::ClusterGrid`, which bins on the CPU with
-// the same tiles and slices `cluster_index` reads here.
 struct Clusters {
     // depth = dot(view_z.xyz, p) + view_z.w: distance along the view axis.
     view_z: vec4<f32>,
     // x scale, y bias, z 1 = log2 slices (perspective) / 0 = linear, w near plane.
     slices: vec4<f32>,
-    // Tiles across, tiles up, depth slices; w unused.
     dims: vec4<u32>,
 };
 
 struct CameraUniforms {
     view_proj: mat4x4<f32>,
     camera_pos: vec3<f32>,
-    // The sim's game time in seconds (#398): scaled by the time scale, frozen while
-    // paused, 0 in edit mode and previews. Fills vec3 padding, so no layout change.
+    // Seconds: scaled by the time scale, frozen while paused, 0 in edit mode.
     time: f32,
-    // Rides with the camera so every pass that already binds it fogs for free.
     fog: Fog,
-    // This camera's light-cluster grid (#434).
     clusters: Clusters,
-    // This camera's view-projection last frame (#1435), what motion vectors reproject
-    // through; equal to `view_proj` on a camera's first frame and after a cut.
     prev_view_proj: mat4x4<f32>,
-    // x: this camera's index in its stack, bottom to top (#1436), what the velocity
-    // target's `.a` carries so motion blur orders a higher camera in front. y: last
-    // frame's game time (#1524), what the motion vectors move vertex blocks with (this
-    // frame's `time` where the view has no last frame). zw: TAA's jitter in NDC
-    // (#1702), which the velocity shaders subtract.
     stack: vec4<f32>,
-    // `view_proj`'s inverse (#1523): a transparent surface rebuilds the world point
-    // of the opaque depth behind it from it, for refraction and absorption.
     inv_view_proj: mat4x4<f32>,
-    // What a `receive_ssr` translucent traces (#1570, #1736): x its march's step
-    // count, y its step length, z the *Minimum Smoothness* it reflects down to, w the
-    // smoothness it fades in over above that (`ssr::fade`); all zero where the camera
-    // runs no SSR (`render::postfx::effects::ssr::transparent`).
+    // x step count, y step length, z minimum smoothness, w fade-in smoothness; zero
+    // without SSR.
     ssr: vec4<f32>,
-    // x: 1 in the opaque pass of a base camera running SSIL (#1750,
-    // `forward::lighting::with_ssil_share`), 0 everywhere else, the translucents
-    // after it included. yzw: unused.
     ssil: vec4<f32>,
-    // x: the material maps' mip bias (#1702): `log2(scene/output)` while TAA
-    // upscales the view, else exactly 0 (`forward::mapping` then samples without
-    // one). yzw: unused.
+    // x: log2(scene/output) while TAA upscales, else 0.
     lod: vec4<f32>,
-    // Volumetric fog (#1703, `fog::volumetric`): x 1 where this camera reads the
-    // integrated volume, y its depth slices, z its far end, w the near end of its
-    // exponential slices; zero where it reads none.
     volumetric: vec4<f32>,
 };
 
-// The forward lighting uniform (group 0, binding 1) and its light records. Shared
-// so every pass that shades against the scene lights — the forward pass and lit
-// particles (#440) — reads the one layout. Mirrors the Rust `LightingUniform`.
-
-// The scene's ambient (#1647, `scene::DrawnAmbient`): `color` is the `Color` mode
-// colour, which the procedural sky follows whatever the mode; when `gradient` is 1
-// surfaces take the sky / equator / ground trilight instead. Mirrors the Rust
-// `AmbientLightUniform`; `lighting::ambient` evaluates it.
 struct AmbientLight {
     color: vec3<f32>,
     intensity: f32,
     gradient_sky: vec3<f32>,
-    // 0: `color`'s hemisphere, 1: the trilight, 2: the sky's SH (`Skybox`, #1675).
+    // 0: `color`'s hemisphere, 1: the trilight, 2: the sky's SH (`Skybox`).
     mode: f32,
     gradient_equator: vec3<f32>,
     _pad_equator: f32,
     gradient_ground: vec3<f32>,
     _pad_ground: f32,
-    // `Skybox`'s L2 SH, intensity applied, convolved over pi; `w` unused.
     sky_sh: array<vec4<f32>, 9>,
 };
 
@@ -103,79 +63,46 @@ struct DirectionalLight {
     direction: vec3<f32>,
     color: vec3<f32>,
     intensity: f32,
-    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
-    // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
     bounce_baked: f32,
-    // Its shadowmask channel (#1695, `LightmapSet::channels`), 0 to 3; -1 for none,
-    // and always -1 unless the scene is on `Shadowmask` (`lighting.shadowmask`).
+    // 0 to 3; -1 for none.
     mask_channel: f32,
 };
 
 struct LightingUniforms {
     ambient: AmbientLight,
-    // The procedural sky's settings (#1620), right after `ambient` so the sky pass
-    // reads both through a prefix of this struct.
     sky: ProceduralSky,
-    // Up to four suns (#434); slot 0 is the one casting the cascaded shadows.
     dir_lights: array<DirectionalLight, 4>,
     num_dir_lights: u32,
-    // 1.0 when a skybox panorama is bound at binding 2 (#718); 0.0 means the sky on
-    // screen is the procedural gradient, which the env reflection then reflects too.
     sky_textured: f32,
-    // 1.0 when surfaces reflect the environment (sky and reflection probes); 0.0 in a
-    // light-probe capture (#1668), which bakes no specular, as Unity's does.
     env_reflection: f32,
-    // 1.0 under the scene's `HalfLambert` diffuse model (#1698): `calculate_pbr`
-    // shades a lamp with the squared wrap instead of Lambert, as the bakes do.
     diffuse_wrap: f32,
-    // 1.0 when a directional lightmap adds its one specular lobe
-    // (`forward::lightmap::baked_specular`, #1695); 0.0 in every bake capture, so a
-    // view-dependent highlight is never frozen into a probe.
     baked_specular: f32,
-    // The scene's shadowmask (#1695): 0 off (`BakedIndirect`, or no bake gave a
-    // channel), 1 `Shadowmask`, 2 `DistanceShadowmask` (the quality preset's mode).
     shadowmask: f32,
-    // 1.0 when the shadowmask pages are bound beside the lightmaps.
     masks_bound: f32,
     // Scalars, not a vec3, which would align to 16 and move `refl_probes`.
     baked_specular_pad_c: f32,
-    // The resident reflection probes (#1206); a draw's instance names the two it
-    // blends (`InstanceData.reflection_probe`, packed indices + 1 and weights, #1584). Length is the Rust
-    // `MAX_REFLECTION_PROBES`. Mirrors the Rust `LightingUniform` byte-for-byte.
     refl_probes: array<ReflectionProbe, 32>,
 };
 
-// One point or spot light of the frame (#434), in the storage array at group 0
-// binding 7 (the particle pass's too). Mirrors the Rust `LocalLight`.
 struct LocalLight {
     position: vec3<f32>,
     range: f32,
     color: vec3<f32>,
     intensity: f32,
     direction: vec3<f32>,
-    kind: u32,        // 0 point, 1 spot, 2 an Area light's capture stand-in
-    inner_cone: f32,  // cosine of the inner half-angle
-    outer_cone: f32,  // cosine of the outer half-angle
-    // First tile in the shadow atlas (#468): a spotlight's one, a point light's six
-    // cube faces (+X, -X, +Y, -Y, +Z, -Z); NO_SHADOW when it casts none.
+    kind: u32,
+    inner_cone: f32,
+    outer_cone: f32,
     shadow: u32,
-    // 1.0 for a `Baked` light (#438): a lightmapped surface skips its direct light.
     baked: f32,
-    // Camera distance past which its shadow is not sampled (#1712); 0 never fades.
     shadow_fade: f32,
-    // The distance its inverse square is floored at (#1699): an Area stand-in's
-    // sqrt(area / pi), 0 for a point or spot.
     near: f32,
-    // 1.0 when the lightmap bake took this light in: SSIL gathers none (#1750).
     bounce_baked: f32,
-    // Its shadowmask channel (#1695), as `DirectionalLight::mask_channel`.
     mask_channel: f32,
 };
 
-// The light cluster `world` falls in: its screen tile (from `view_proj`) and its
-// depth slice. A point off screen clamps to the edge tile. Index order is
-// x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
+// Index order is x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
 fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     let clip = view_proj * vec4<f32>(world, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);
@@ -187,10 +114,6 @@ fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     return tile.x + c.dims.x * (tile.y + c.dims.y * slice);
 }
 
-// The radiance a local light delivers at `world`: `light_falloff_near` within its
-// range, its inverse square floored at the larger of its own `near` and the
-// receiver's (a particle sprite's size, #1699; 0 for a surface), and for a spotlight
-// `spot_cone` (an Area stand-in, kind 2, its facing's cosine). Zero out of reach.
 fn local_light_radiance(light: LocalLight, world: vec3<f32>, near: f32) -> vec3<f32> {
     let d = distance(light.position, world);
     if (d >= light.range) {
@@ -199,30 +122,24 @@ fn local_light_radiance(light: LocalLight, world: vec3<f32>, near: f32) -> vec3<
     var cone = 1.0;
     if (light.kind != 0u) {
         let theta = dot((light.position - world) / max(d, 1e-6), -light.direction);
-        // kind 2 is an Area light's capture stand-in: a Lambert emitter's cos.
         cone = select(spot_cone(theta, light.inner_cone, light.outer_cone), max(theta, 0.0), light.kind == 2u);
     }
     return light.color * light.intensity * cone * light_falloff_near(d, light.range, max(near, light.near));
 }
 
-// ---- Surface decals (#638) ----
-// One decal of the frame, in the storage array at group 0 binding 10. Mirrors the
-// Rust `GpuDecal` byte-for-byte. Its box is the unit cube in decal space.
 struct Decal {
     world_to_decal: mat4x4<f32>,
-    right: vec4<f32>,    // xyz the box's right axis (texture u), w the albedo weight
-    up: vec4<f32>,       // xyz its up axis (texture -v), w the normal weight
-    forward: vec4<f32>,  // xyz the axis out of the surface, w cos(angle fade start)
-    color: vec4<f32>,    // albedo tint, a coverage
-    surface: vec4<f32>,  // metallic, roughness, metallic weight, roughness weight
-    fade: vec4<f32>,     // x occlusion added, y cos(angle fade end)
-    layers: vec4<u32>,   // atlas layers: albedo, normal, metallic, roughness
+    right: vec4<f32>,
+    up: vec4<f32>,
+    forward: vec4<f32>,
+    color: vec4<f32>,
+    surface: vec4<f32>,
+    fade: vec4<f32>,
+    layers: vec4<u32>,
 };
 
-// `Decal.layers` for a map the decal does not have.
 const NO_LAYER: u32 = 0xffffffffu;
 
-// The material inputs a decal changes, before any light is summed.
 struct DecalSurface {
     albedo: vec3<f32>,
     normal: vec3<f32>,
@@ -231,11 +148,7 @@ struct DecalSurface {
     occlusion: f32,
 };
 
-// Fold decal `d` into surface `s` at `world`. `facing` is the surface's geometric
-// normal (for the angle fade); `dx`/`dy` are the screen derivatives of `world`,
-// taken in uniform control flow, which give every map sample its gradients from the
-// decal's own UVs (no smallest-mip fringe where the decal crosses a silhouette).
-// Albedo is read through the atlas's sRGB view, the other maps raw.
+// `dx`/`dy` are taken in uniform control flow.
 fn apply_decal(
     s: DecalSurface, d: Decal, world: vec3<f32>, facing: vec3<f32>,
     dx: vec3<f32>, dy: vec3<f32>,
@@ -245,8 +158,6 @@ fn apply_decal(
     if (any(abs(local) > vec3<f32>(0.5))) {
         return s;
     }
-    // Whole while the surface faces the projector within the fade angle, gone a
-    // little past it, and gone near the box's caps.
     let angle = clamp((dot(facing, d.forward.xyz) - d.fade.y) / max(d.forward.w - d.fade.y, 1e-4), 0.0, 1.0);
     let caps = 1.0 - smoothstep(0.35, 0.5, abs(local.z));
     let uv = vec2<f32>(local.x + 0.5, 0.5 - local.y);
@@ -267,8 +178,6 @@ fn apply_decal(
     var out = s;
     out.albedo = mix(s.albedo, texel.rgb * d.color.rgb, coverage * d.right.w);
     if (d.layers.y != NO_LAYER) {
-        // The decal's tangent frame laid onto the surface: its right axis flattened
-        // into the surface plane, so the bend follows a curved receiver.
         let n = textureSampleGrad(t_data, samp, uv, i32(d.layers.y), uv_dx, uv_dy).xyz * 2.0 - 1.0;
         let T = normalize(d.right.xyz - s.normal * dot(d.right.xyz, s.normal));
         let B = cross(s.normal, T);
@@ -289,21 +198,15 @@ fn apply_decal(
     return out;
 }
 
-// `LocalLight.shadow` of a light with no tile in the shadow atlas (#468).
 const NO_SHADOW: u32 = 0xffffffffu;
 
-// One tile of the point/spot shadow atlas (#468): a light face's view-projection,
-// its square in atlas UVs (xy corner, zw size), and in `params.x` the world size of
-// one of its texels a metre from the light. Mirrors the Rust `ShadowTile`.
+// `params.x` is the world size of one texel a metre from the light.
 struct ShadowTile {
     view_proj: mat4x4<f32>,
     rect: vec4<f32>,
     params: vec4<f32>,
 };
 
-// The atlas tile holding `light`'s shadow at `world`: a spotlight's (or an Area
-// stand-in's) one, or the
-// point light's cube face along the major axis from the light; NO_SHADOW if none.
 fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
     if (light.shadow == NO_SHADOW || light.kind != 0u) {
         return light.shadow;
@@ -319,11 +222,6 @@ fn local_shadow_tile(light: LocalLight, world: vec3<f32>) -> u32 {
     return light.shadow + face;
 }
 
-// How lit `world` (normal `N`) is by the light at `light_pos`, through its atlas
-// `tile`: 3x3 PCF of comparison taps, kept inside the tile so a kernel never reads
-// a neighbour. The surface is pushed off along its normal by a texel or two (more
-// at grazing light), sized by the texel footprint at its distance from the light.
-// 1.0 outside the tile's view.
 fn sample_local_shadow(
     tile: ShadowTile,
     atlas: texture_depth_2d,
@@ -358,9 +256,6 @@ fn sample_local_shadow(
     return lit / 9.0;
 }
 
-// Standard mesh vertex layout — position, normal, UVs, skeletal animation data
-// (four joint indices + blend weights; no joint cap, #455), and the tangent basis for normal
-// mapping (`xyz` unit tangent, `w` handedness sign), then the lightmap UV.
 struct VertexInput {
     @location(0) position: vec3<f32>,
     @location(1) normal: vec3<f32>,
@@ -368,14 +263,10 @@ struct VertexInput {
     @location(3) joint_indices: vec4<u32>,
     @location(4) joint_weights: vec4<f32>,
     @location(5) tangent: vec4<f32>,
-    // The lightmap UV (#438): glTF TEXCOORD_1; zeros on a mesh without one.
     @location(6) lightmap_uv: vec2<f32>,
 };
 
-// A vertex's skinning matrix (#599): its four joint matrices blended by `weights`.
-// Zero weights (a vertex no joint moves) skin as identity. The one skinning function
-// the forward and shadow passes share, so a shadow always follows the drawn pose;
-// each pass looks the four matrices up in its own copy of the frame's joint array.
+// Zero weights skin as identity.
 fn blend_joints(
     j0: mat4x4<f32>,
     j1: mat4x4<f32>,
@@ -384,18 +275,13 @@ fn blend_joints(
     weights: vec4<f32>,
 ) -> mat4x4<f32> {
     if (weights.x + weights.y + weights.z + weights.w < 0.01) {
-        // The identity: a diagonal matrix constructor.
         return mat4x4<f32>(vec4<f32>(1.0, 0.0, 0.0, 0.0), vec4<f32>(0.0, 1.0, 0.0, 0.0), vec4<f32>(0.0, 0.0, 1.0, 0.0), vec4<f32>(0.0, 0.0, 0.0, 1.0));
     }
     return j0 * weights.x + j1 * weights.y + j2 * weights.z + j3 * weights.w;
 }
 
-// How far the sky counts as, for fog: past any level's far wall, so the sky is at
-// least as fogged as the farthest geometry in front of it.
 const FOG_SKY_DISTANCE: f32 = 1000.0;
 
-// How fogged (0 clear .. 1 fully fog colour) a point is, seen from `eye`. The one
-// fog formula every pass uses, so surfaces, particles, decals and the sky agree.
 fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
     if (fog.mode == 0u) {
         return 0.0;
@@ -414,72 +300,42 @@ fn fog_factor(fog: Fog, world_pos: vec3<f32>, eye: vec3<f32>) -> f32 {
     return clamp(f, 0.0, 1.0);
 }
 
-// The sky's fog along view direction `dir`: as fogged as a point at
-// FOG_SKY_DISTANCE, faded out above the horizon so the zenith stays sky.
 fn sky_fog(fog: Fog, color: vec3<f32>, dir: vec3<f32>, eye: vec3<f32>) -> vec3<f32> {
     let f = fog_factor(fog, eye + dir * FOG_SKY_DISTANCE, eye);
     let horizon = 1.0 - smoothstep(0.0, 0.4, dir.y);
     return mix(color, fog.color, f * horizon);
 }
 
-// --- The panorama lookup (#995) -----------------------------------------------
 const PI: f32 = 3.14159265359;
 
-// Where direction `dir` lands on an equirectangular panorama: longitude to u (the
-// seam at φ = ±π, along -x), polar angle from +y to v. ONE function, three callers
-// (the skybox pass, the sky reflection cube's bake and post-FX's SSR fallback), so
-// what a surface reflects is the sky on screen. `y` is clamped: a normalised vector
-// can round past 1, and `acos` of that is NaN.
+// Seam at φ = ±π along -x. `y` is clamped: a normalised vector can round past 1, and
+// `acos` of that is NaN.
 fn equirect_uv(dir: vec3<f32>) -> vec2<f32> {
     let phi = atan2(dir.z, dir.x);
     let theta = acos(clamp(dir.y, -1.0, 1.0));
     return vec2<f32>((phi + PI) / (2.0 * PI), theta / PI);
 }
 
-// --- The procedural sky (#256) ------------------------------------------------
-// The scene's procedural sky settings (#1620, `scene::SkySettings`). Mirrors the
-// Rust `ProceduralSkyUniform`. A colour's `w` is 1 when the scene sets it; 0 derives
-// it from the ambient colour as the sky always has.
 struct ProceduralSky {
     zenith: vec4<f32>,
     horizon: vec4<f32>,
     ground: vec4<f32>,
-    // x: cloud coverage (0 clear, 0.5 the default layer, 1 overcast), y: opacity.
     clouds: vec4<f32>,
 };
 
-// The colour of the procedural sky along `dir`, before fog: a ground -> horizon ->
-// zenith gradient plus a cheap, static cloud layer, shaped by `sky` and tinted from
-// `ambient` (the scene's ambient colour) wherever `sky` leaves a colour unset. ONE
-// function, two callers: the sky pass draws it when no panorama is bound
-// (`sky_gradient.wgsl`), and the sky reflection cube bakes it for the forward pass
-// to reflect in the same case (#718, #1553), so a metal surface mirrors the sky that
-// is actually on screen. It must stay **affine in `ambient`** for a fixed `sky`
-// (`a * ambient + b`, `a` one scalar per direction): every colour is either set (a
-// constant) or a scalar multiple of the zenith plus a constant, so it holds, and the
-// cube bakes the two terms once per `sky` and applies the ambient colour per sample
-// (`sky/prefilter.wgsl`). Its clouds are `sky_fbm`, shifted by `cloud_shift`
-// (`sky/noise.wgsl`).
+// Must stay affine in `ambient` for a fixed `sky` (`a * ambient + b`): the prefilter
+// bakes the two terms once.
 
 fn procedural_sky(sky: ProceduralSky, ambient: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
-    // Unset, the zenith is the ambient colour, the horizon a desaturated lift toward
-    // white (the classic default-skybox glow), and the ground the darker quarter of
-    // the zenith, as the forward pass's hemisphere ambient.
     let zenith = select(ambient, sky.zenith.rgb, sky.zenith.w > 0.5);
     let horizon_color = select(mix(zenith, vec3<f32>(1.0), 0.6), sky.horizon.rgb, sky.horizon.w > 0.5);
     let ground_color = select(zenith * 0.25, sky.ground.rgb, sky.ground.w > 0.5);
 
-    // Blend ground -> horizon below the horizon line, horizon -> zenith above it. The
-    // `pow` tightens each band so the horizon glow stays near y = 0.
     let up = clamp(dir.y, 0.0, 1.0);
     let down = clamp(-dir.y, 0.0, 1.0);
     var color = mix(horizon_color, zenith, pow(up, 0.5));
     color = mix(color, ground_color, pow(down, 0.35));
 
-    // Cloud layer, sky hemisphere only. Project the view ray onto a flat sky dome so
-    // cells bunch up toward the horizon, then carve soft cloud shapes out of the FBM
-    // and tint them a hair brighter than the zenith. Coverage fades out near the
-    // horizon (so clouds don't bleed into the glow) and is absent below it.
     if (dir.y > 0.0) {
         let dome = dir.xz / max(dir.y, 0.15);
         let fbm = sky_fbm(dome * 1.6) + cloud_shift(sky.clouds.x);

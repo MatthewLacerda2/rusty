@@ -1,11 +1,7 @@
-//! Reading a cube texture as a shader does, for `texture_cube_tests` (#1615): each
-//! tap is one `textureSampleLevel` of a `texture_cube` view.
-
 use glam::Vec3;
 
 use crate::Renderer;
 
-/// What `cube` returns along each `(direction, lod)`, through a `texture_cube`.
 pub(super) fn sample(r: &Renderer, cube: &wgpu::Texture, taps: &[(Vec3, f32)]) -> Vec<[u8; 4]> {
     let device = &r.device;
     let view = cube.create_view(&wgpu::TextureViewDescriptor {
@@ -55,7 +51,6 @@ pub(super) fn sample(r: &Renderer, cube: &wgpu::Texture, taps: &[(Vec3, f32)]) -
         .collect()
 }
 
-/// Each tap as a `vec4` (direction, lod) in a storage buffer.
 fn taps_buffer(device: &wgpu::Device, taps: &[(Vec3, f32)]) -> wgpu::Buffer {
     let words: Vec<f32> = taps.iter().flat_map(|(d, l)| [d.x, d.y, d.z, *l]).collect();
     wgpu::util::DeviceExt::create_buffer_init(
@@ -68,7 +63,6 @@ fn taps_buffer(device: &wgpu::Device, taps: &[(Vec3, f32)]) -> wgpu::Buffer {
     )
 }
 
-/// The `width × 1` RGBA8 texture the taps are stored into, copyable back.
 fn out_texture(device: &wgpu::Device, width: u32) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: None,
@@ -86,7 +80,6 @@ fn out_texture(device: &wgpu::Device, width: u32) -> wgpu::Texture {
     })
 }
 
-/// The compute pipeline running [`SHADER`], its layout derived from the shader.
 fn pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {
     let module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
         label: None,

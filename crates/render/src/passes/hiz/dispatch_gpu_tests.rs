@@ -1,9 +1,3 @@
-//! A frame's cluster cull is one dispatch a stage whatever its meshes (#2417):
-//! three panels of unequal cluster counts, each its own mesh, and a two-sided
-//! copy of one of them (a batch of its own), half behind a wall, are culled by
-//! one test, one scan and one copy dispatch, and draw what they draw with the
-//! cull off.
-
 use glam::{Quat, Vec3};
 
 use super::cluster_gpu_tests::panel_of;
@@ -44,8 +38,6 @@ fn gpu_meshes_of_unequal_cluster_counts_are_culled_by_one_dispatch_a_stage() {
     assert!(on == off, "the one dispatch moved pixels");
 }
 
-/// A wall half across panels cut 48, 64 and 96 a side (so unequal cluster
-/// counts), each its own mesh, and a two-sided copy of the middle one.
 fn unequal_meshes() -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();

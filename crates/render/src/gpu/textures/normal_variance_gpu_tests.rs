@@ -1,7 +1,3 @@
-//! A BC5 normal map keeps what its mips' normals lost (#1702): the import cache's
-//! table rides the upload into the material record, which the shader reads in
-//! place of the length BC5 cannot store.
-
 use image::{Rgba, RgbaImage};
 
 use super::compressed::FEATURE;
@@ -12,9 +8,6 @@ use rusty_asset::MapRef;
 use rusty_components::MaterialAsset;
 use wgpu::TextureFormat as F;
 
-/// A busy `NormalMap` uploads BC5 with what its mips' normals lost, and its
-/// record reads that table (`use_normal_map` 2), as a map set through
-/// `Material.SetNormalMap` or a glTF import does (#1702's review, item 1).
 #[test]
 fn gpu_a_bc5_normal_map_carries_its_mips_spread_into_the_record() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(16, 16) else {

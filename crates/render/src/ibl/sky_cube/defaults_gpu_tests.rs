@@ -1,16 +1,8 @@
-//! The default procedural sky against today's (#1620): `procedural_sky` fed the
-//! Rust defaults (`SkySettings::default`, so `cloud_shift(0.5)`, opacity 0.6 and the
-//! derived colours) must draw what it drew before the settings existed. Both run in
-//! one compute probe on one adapter, so the clouds' `sin` hash, which drivers round
-//! differently (Metal vs lavapipe), cancels out.
-
 use glam::Vec3;
 
 use crate::gpu::uniforms::ProceduralSkyUniform;
 use rusty_scene::SkySettings;
 
-/// `procedural_sky` as `main` drew it at 01cfc8b, before the settings: frozen here as
-/// the reference, never edited to follow a change.
 const TODAY: &str = "
 fn today_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
     let ground_color = sky_color * 0.25;
@@ -30,15 +22,11 @@ fn today_sky(sky_color: vec3<f32>, dir: vec3<f32>) -> vec3<f32> {
 }
 ";
 
-/// What the probe reads, imported ahead of the `SKY` it declares.
 const IMPORTS: &str = "
 #import common::{ProceduralSky, procedural_sky}
 #import sky::noise::sky_fbm
 ";
 
-/// Per invocation (128): a direction spread over the sphere, biased up where the
-/// clouds are, and one of four ambient colours; writes the sky under `SKY` (the
-/// settings under test), then today's.
 const PROBE: &str = "
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;
 @compute @workgroup_size(1)
@@ -57,7 +45,6 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
 }
 ";
 
-/// `settings` as a WGSL `ProceduralSky` literal, exactly as the uniform carries it.
 fn literal(settings: &SkySettings) -> String {
     let u = ProceduralSkyUniform::from_settings(settings);
     let v = |c: [f32; 4]| format!("vec4<f32>({:?}, {:?}, {:?}, {:?})", c[0], c[1], c[2], c[3]);
@@ -65,7 +52,6 @@ fn literal(settings: &SkySettings) -> String {
     format!("ProceduralSky({fields})")
 }
 
-/// The largest gap, over every sample, between the sky under `settings` and today's.
 fn gap(r: &crate::Renderer, settings: &SkySettings) -> f32 {
     let base = rusty_shadergen::engine_shader_dir();
     let mut composer = rusty_shadergen::compose::composer_with_common(base).unwrap();
@@ -85,7 +71,6 @@ fn gap(r: &crate::Renderer, settings: &SkySettings) -> f32 {
         .fold(0.0, f32::max)
 }
 
-/// A named nudge to one setting.
 type Change = (&'static str, fn(&mut SkySettings));
 
 #[test]
@@ -93,7 +78,6 @@ fn gpu_the_default_sky_is_todays() {
     let Some(r) = crate::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    // Float noise only: the expressions match term for term.
     let tolerance = 1e-5;
     let default = SkySettings::default();
     let got = gap(&r, &default);
@@ -102,7 +86,6 @@ fn gpu_the_default_sky_is_todays() {
         "the default sky drifts {got} from today's"
     );
 
-    // The probe still sees a small change to any default.
     let changes: [Change; 3] = [
         ("coverage", |s| s.cloud_coverage += 0.02),
         ("opacity", |s| s.cloud_opacity += 0.02),

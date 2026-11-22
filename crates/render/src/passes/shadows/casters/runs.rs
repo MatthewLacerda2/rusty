@@ -1,7 +1,3 @@
-//! A caster's material slots as depth draws (#1285): each slot of a multi-material
-//! mesh clips its shadow by its own material, and adjacent runs that clip alike draw
-//! as one; then a sweep's casters grouped into instanced runs of one key (#470).
-
 use std::ops::Range;
 
 use super::super::clips::CasterClip;
@@ -9,19 +5,10 @@ use super::{CasterBatch, CasterData, CasterKey};
 use crate::scene::SlotDraw;
 use rusty_components::RenderFace;
 
-/// How one material slot casts: its clip (`None` casts plainly) and its material's
-/// render face (#1615).
 pub(crate) type SlotCast = (Option<CasterClip>, RenderFace);
 
-/// One depth draw of a caster: an index run and how it casts.
 pub(crate) type ShadowRun = (Range<u32>, SlotCast);
 
-/// An object's slot draws ([`GpuMesh::runs`], kept on its retained slots), joined by
-/// how each slot casts. Derived with the object and kept on it
-/// ([`RenderObject::shadow_runs`]), so a sweep allocates nothing per caster.
-///
-/// [`GpuMesh::runs`]: crate::GpuMesh::runs
-/// [`RenderObject::shadow_runs`]: crate::scene::RenderObject::shadow_runs
 pub(crate) fn shadow_runs(slots: &[SlotDraw]) -> Vec<ShadowRun> {
     let casts = slots
         .iter()
@@ -29,9 +16,6 @@ pub(crate) fn shadow_runs(slots: &[SlotDraw]) -> Vec<ShadowRun> {
     join_alike(casts)
 }
 
-/// A mesh's runs paired with how each casts its shadow (its clip, and its render
-/// face, #1615), adjacent runs that cast alike joined into one: a mesh whose
-/// materials all cast plainly stays one draw.
 pub(super) fn join_alike<T: PartialEq>(
     runs: impl IntoIterator<Item = (Range<u32>, T)>,
 ) -> Vec<(Range<u32>, T)> {
@@ -47,11 +31,6 @@ pub(super) fn join_alike<T: PartialEq>(
     out
 }
 
-/// Group `casters` into instanced runs of one key, returning the packed casters (in
-/// draw order) and the batches. Sorted by key — by facing, and within each plain
-/// casters first, so the clipping pipelines bind last — and stable, so scene order
-/// holds within a run; depth writes make the order between runs irrelevant. With `instancing` off, one draw per caster
-/// in scene order (the pre-#470 path, for comparison).
 pub(super) fn batch_casters(
     mut casters: Vec<(CasterKey, CasterData)>,
     instancing: bool,
@@ -92,7 +71,6 @@ mod tests {
         }
     }
 
-    /// Three slots' runs of nine indices, each paired with `clip_of(slot)`.
     fn runs<T>(clip_of: impl Fn(usize) -> T) -> Vec<(Range<u32>, T)> {
         let slots = [(0, 0..3), (1, 3..6), (2, 6..9)];
         slots.into_iter().map(|(s, r)| (r, clip_of(s))).collect()
@@ -113,9 +91,6 @@ mod tests {
         assert_eq!(shape, vec![(0..3, false), (3..6, true), (6..9, false)]);
     }
 
-    /// Two entities on one mesh, one whose runs all cast plainly (joined into one
-    /// draw) and one whose second run is Cutout: each casts its own shape, so the
-    /// plain halves never merge into one instanced draw of the wrong run.
     #[test]
     fn differently_joined_runs_of_one_mesh_never_share_a_draw() {
         use super::super::{batch_casters, CasterData, CasterKey};

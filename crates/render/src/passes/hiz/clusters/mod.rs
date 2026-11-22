@@ -1,50 +1,3 @@
-//! crates/render/src/passes/hiz/clusters/ — per-cluster occlusion culling (#1968), the
-//! culling half of UE5's Nanite on top of the two-phase Hi-Z (#1963).
-//!
-//! A mesh the import split into clusters (`asset::clusters`: at least
-//! `MIN_TRIANGLES`, not skinned) leases rows of the renderer's one cluster table
-//! and a copy of its indices in one index pool at upload ([`GpuClusters`],
-//! `pool`, #2417). A camera that culls by Hi-Z then draws each opaque batch of
-//! such a mesh **per instance, by cluster**, with no mesh shaders:
-//!
-//! - **Phase one** is unchanged: last frame's visible instances draw whole into
-//!   the depth the pyramid is built from. No cluster history is kept, so phase one
-//!   draws a little more than it must, never less. Its depth is kept (#2336):
-//!   the prepass adds the late set over it, a clustered batch's late instances
-//!   drawn whole.
-//! - **Phase two**, after `cs_test` judged every instance against this frame's
-//!   pyramid: `cs_compact` keeps a clustered batch's instances in place, and
-//!   `hiz_clusters.wgsl` tests each (instance, cluster) of every clustered batch
-//!   by the frustum, its normal cone and the same pyramid (`hiz/hidden.wgsl`'s
-//!   `hidden`), then compacts the kept clusters' indices, in order, into the
-//!   camera's output index list, with one indirect draw per instance. Three
-//!   stages, **one dispatch each for the whole frame**, whatever its meshes and
-//!   cluster counts, since the pool puts every mesh behind one binding (#2417):
-//!   the test, a workgroup per 64-cluster chunk of an instance (`plan::CHUNK`);
-//!   the scan, a workgroup per instance placing its kept clusters by a parallel
-//!   prefix sum and listing them; and the copy, a workgroup per chunk again,
-//!   copying the kept clusters listed in its share of the instance's list, and
-//!   returning at once where that share is empty. Every place is a prefix sum,
-//!   never a racing atomic: one view draws one index stream. A cluster that came
-//!   out from behind a wall is tested against this frame's pyramid, so it is
-//!   drawn this frame, as an instance is.
-//!
-//! **Never culled.** A cluster crossing the near plane; the clusters of an
-//! instance the per-instance test does not judge (a moving material, a ringed
-//! object: `CameraSolids::tested`), and a batch with no judged instance at all
-//! (mesh particles) is not drawn by cluster; a cone test on a batch that does not keep
-//! front faces only (`RenderFace::Both`, `Back`, a mirrored instance), or under a
-//! world matrix that isn't a rotation and uniform scale. A cluster never spans two
-//! draw runs (material slots), since the import splits each run on its own.
-//!
-//! **What it costs.** A clustered batch is one draw per instance rather than one
-//! instanced draw, and its output list has room for every instance's whole run;
-//! past [`plan::MAX_OUT_INDICES`] a batch is drawn by the instance test alone.
-//! Each clustered mesh holds a second copy of its indices in the pool (4 bytes an
-//! index, beside its own index buffer, which every whole draw still binds) and
-//! 64 bytes a cluster of table, whether or not the preset culls by cluster.
-//! The quality preset's `gpu_cluster_culling` turns it on.
-
 mod eye;
 mod gpu;
 mod layout;
@@ -62,9 +15,6 @@ use crate::gpu::pipelines::{lazy_compute, LazyCompute};
 pub(crate) use gpu::GpuClusters;
 pub(crate) use run::ClusterCull;
 
-/// The final draws that stand for a camera's clustered batches: per opaque batch,
-/// the jobs whose indirect args (at `ARGS` each in `args`) draw it from
-/// `indices`, or `None` for a batch drawn whole.
 #[derive(Clone)]
 pub(crate) struct ClusterDraws {
     pub indices: wgpu::Buffer,
@@ -72,8 +22,6 @@ pub(crate) struct ClusterDraws {
     pub draws: Arc<Vec<Option<Range<u32>>>>,
 }
 
-/// The cluster passes' layouts and pipelines, shared by every view, and the
-/// renderer's one cluster pool every clustered mesh leases its table from.
 pub(crate) struct ClusterPipelines {
     pub(crate) test_layout: wgpu::BindGroupLayout,
     pub(crate) scan_layout: wgpu::BindGroupLayout,
@@ -109,9 +57,6 @@ impl ClusterPipelines {
 }
 
 impl crate::Renderer {
-    /// Which of `draws`' opaque batches this camera draws by cluster, with
-    /// `tables` (the instance test's packed bounds) saying which instances are
-    /// judged: none when the preset's `gpu_cluster_culling` is off.
     pub(crate) fn plan_clusters(
         &self,
         draws: &crate::draw::batch::FrameDraws,
@@ -126,8 +71,6 @@ impl crate::Renderer {
         plan::Plan::of(draws.opaque.iter(), instances, clusters_of)
     }
 
-    /// The shared table's cluster range of `batch`, when its mesh is split and
-    /// its run is whole clusters: a batch the cluster cull can draw by cluster.
     pub(crate) fn batch_clusters(
         &self,
         batch: &crate::draw::batch::DrawBatch,
@@ -136,10 +79,6 @@ impl crate::Renderer {
         mesh.covering(batch.key.indices.range())
     }
 
-    /// Whether any of `draws`' opaque batches is drawn by cluster while the
-    /// preset's `gpu_cluster_culling` is on: such a camera culls whatever its
-    /// instance count (the [instance floor](super::MIN_INSTANCES)), since a
-    /// cluster cull's gain grows with a mesh's triangles, not its instances.
     pub(crate) fn draws_clustered(&self, draws: &crate::draw::batch::FrameDraws) -> bool {
         self.cluster_culls()
             && draws

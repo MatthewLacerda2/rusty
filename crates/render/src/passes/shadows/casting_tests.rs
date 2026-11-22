@@ -1,10 +1,3 @@
-//! A mesh's `cast_shadows` (#1571), Unity's *Cast Shadows*, honoured by the sun's
-//! cascades and the spot/point atlas: `Off` casts nothing, `ShadowsOnly` casts as
-//! `On` though no camera draws it, and `TwoSided` casts from a one-sided `Plane`
-//! that faces away from the light, which back-face culling drops otherwise, plain
-//! or Cutout (the clip pipeline's twin). A static caster's cached bake follows a
-//! changed mode with no static flag touched. Skips with no adapter.
-
 use glam::{Quat, Vec3};
 
 use super::mirror_tests::{spot_yard, sun_yard};
@@ -15,8 +8,6 @@ use rusty_components::{RenderMode, ShadowCasting};
 use rusty_scene::create::{create_entity, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A 6 x 6 one-sided `Plane` at y = 3 casting by `mode`; `face_down` turns its
-/// front away from the light overhead, `cutout` gives it a solid Cutout material.
 pub(super) fn card(scene: &mut Scene, mode: ShadowCasting, face_down: bool, cutout: bool) -> u32 {
     let plane = create_entity(scene, "Card", Some(Primitive::Plane));
     let mut t = scene.world.transform_mut(plane).unwrap();
@@ -34,8 +25,6 @@ pub(super) fn card(scene: &mut Scene, mode: ShadowCasting, face_down: bool, cuto
     plane
 }
 
-/// The ground's brightness under each half of the card (none for `None`), lit by
-/// the sun or, with `spot`, by a shadowing spotlight overhead.
 fn shade(r: &mut Renderer, mode: Option<ShadowCasting>, spot: bool, down: bool) -> [f32; 2] {
     let mut scene = if spot { spot_yard() } else { sun_yard() };
     if let Some(mode) = mode {
@@ -90,9 +79,6 @@ fn gpu_cast_shadows_modes_shade_under_a_spotlight() {
     assert_modes(&mut r, true);
 }
 
-/// A static card's shadow is baked once and cached; turning it `Off` re-bakes it
-/// though no static flag moved. A two-sided Cutout card draws through the clip
-/// pipeline's unculled twin.
 #[test]
 fn gpu_a_static_card_turned_off_rebakes_and_a_cutout_casts_two_sided() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {
@@ -102,7 +88,6 @@ fn gpu_a_static_card_turned_off_rebakes_and_a_cutout_casts_two_sided() {
     let mut scene = sun_yard();
     let id = card(&mut scene, ShadowCasting::On, false, false);
     scene.world.set_static(id, true);
-    // One camera throughout, so the cascades keep their volumes and the bake its cache.
     let [baked, cached] = [(); 2].map(|()| ground_at(&mut r, &scene, -1.5));
     scene.world.mesh_mut(id).unwrap().cast_shadows = ShadowCasting::Off;
     let off = ground_at(&mut r, &scene, -1.5);
@@ -123,7 +108,6 @@ fn gpu_a_static_card_turned_off_rebakes_and_a_cutout_casts_two_sided() {
     assert!(shaded(cut, open), "a two-sided Cutout casts from its back");
 }
 
-/// No camera draws a `ShadowsOnly` mesh.
 #[test]
 fn gpu_a_shadows_only_card_is_drawn_by_no_camera() {
     let Some(mut r) = crate::test_gpu::headless_or_skip(32, 32) else {
@@ -133,7 +117,7 @@ fn gpu_a_shadows_only_card_is_drawn_by_no_camera() {
     let mut visible = |mode| {
         let mut scene = sun_yard();
         card(&mut scene, mode, false, false);
-        ground_halves(&mut r, &scene); // makes the meshes resident
+        ground_halves(&mut r, &scene);
         let frustum = Frustum::from_view_proj(cam.build_view_projection(1.0));
         let lod = LodSelection::for_camera(&scene, &cam);
         let (culled, marks) = ((&frustum, &lod), (false, None, Default::default()));

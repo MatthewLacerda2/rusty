@@ -1,16 +1,7 @@
-//! crates/render/src/passes/ribbons/strip.rs — a ribbon's centre line → strip geometry.
-//!
-//! Pure CPU and GPU-free, so it is unit-tested directly. Each point becomes a pair
-//! of vertices (`side` −1 / +1) carrying the centre, the tangent, and the width,
-//! colour and texture `u` the style gives that point's place along the length;
-//! the shader turns the pair to face the camera. Consecutive coincident points
-//! are merged first (a zero-length segment has no direction).
-
 use glam::Vec3;
 
 use rusty_components::{RibbonStyle, TextureMode};
 
-/// One strip vertex (matches `ribbons.wgsl`'s `VertexInput`).
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct RibbonVertex {
@@ -24,12 +15,12 @@ pub(crate) struct RibbonVertex {
 
 impl RibbonVertex {
     const ATTRIBS: [wgpu::VertexAttribute; 6] = wgpu::vertex_attr_array![
-        0 => Float32x3, // center
-        1 => Float32,   // side
-        2 => Float32x3, // tangent
-        3 => Float32,   // width
-        4 => Float32x4, // color
-        5 => Float32,   // u
+        0 => Float32x3,
+        1 => Float32,
+        2 => Float32x3,
+        3 => Float32,
+        4 => Float32x4,
+        5 => Float32,
     ];
 
     pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -41,12 +32,8 @@ impl RibbonVertex {
     }
 }
 
-/// Points closer than this are one point.
 const MERGE: f32 = 1e-5;
 
-/// Append the strip for `points` (world space) to `vertices` / `indices`.
-/// Returns the number of indices added — `0` when fewer than two distinct points
-/// remain. A `looping` strip closes back onto its first point.
 pub(crate) fn build(
     points: &[Vec3],
     looping: bool,
@@ -96,7 +83,6 @@ pub(crate) fn build(
     segments * 6
 }
 
-/// `points` with consecutive near-duplicates (and non-finite points) dropped.
 fn merged(points: &[Vec3]) -> Vec<Vec3> {
     let mut out: Vec<Vec3> = Vec::with_capacity(points.len());
     for &p in points.iter().filter(|p| p.is_finite()) {
@@ -107,7 +93,6 @@ fn merged(points: &[Vec3]) -> Vec<Vec3> {
     out
 }
 
-/// Distance along the line to each point.
 fn cumulative(line: &[Vec3]) -> Vec<f32> {
     let mut acc = 0.0;
     let mut out = vec![0.0];
@@ -118,8 +103,6 @@ fn cumulative(line: &[Vec3]) -> Vec<f32> {
     out
 }
 
-/// The line's direction at point `i`: from the previous point to the next, one
-/// sided at an open end; a closed line wraps across its seam.
 fn tangent_at(line: &[Vec3], i: usize, closed: bool) -> Vec3 {
     let last = line.len() - 1;
     let prev = match (i, closed) {

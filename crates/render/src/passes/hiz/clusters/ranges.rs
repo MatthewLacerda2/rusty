@@ -1,22 +1,12 @@
-//! The ranges a [`ClusterPool`](super::pool::ClusterPool) hands out of one
-//! buffer (#2417): first fit over the holes freed meshes left, else past the
-//! end; a freed range joins its neighbours, and one that ends the used span
-//! shortens it. Pure CPU bookkeeping, in units of the buffer's elements.
-
 use std::ops::Range;
 
-/// A buffer's used span and the holes inside it, in elements.
 #[derive(Debug, Default, PartialEq)]
 pub(super) struct Ranges {
-    /// Where the used span ends: every range handed out lies below it.
     pub(super) end: u32,
-    /// The freed holes below `end`, by start, none touching another.
     holes: Vec<Range<u32>>,
 }
 
 impl Ranges {
-    /// Take `len` elements: the first hole that holds them, else the end of
-    /// the used span, unless that would pass `limit`; `None` then.
     pub(super) fn take(&mut self, len: u32, limit: u32) -> Option<Range<u32>> {
         if let Some(h) = self.holes.iter().position(|h| h.len() as u32 >= len) {
             let hole = &mut self.holes[h];
@@ -33,8 +23,6 @@ impl Ranges {
         Some(taken)
     }
 
-    /// Give `range` back: it joins the holes beside it, and a hole reaching
-    /// the end of the used span is dropped from it.
     pub(super) fn free(&mut self, range: Range<u32>) {
         if range.is_empty() {
             return;
@@ -52,7 +40,6 @@ impl Ranges {
         }
     }
 
-    /// The elements held by ranges handed out and not freed.
     pub(super) fn used(&self) -> u32 {
         self.end - self.holes.iter().map(|h| h.len() as u32).sum::<u32>()
     }

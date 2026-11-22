@@ -1,8 +1,3 @@
-//! crates/shadergen/src/sampling_tests.rs — the sampling / animated postfx blocks (#402)
-//! chain with the grades and keep their declared defaults. Each block composing
-//! alone is `tests::every_catalogued_block_bakes_into_a_composing_module`; the
-//! pixel behaviour is pinned by `tests/gpu/postfx/blocks_screenshot.rs`.
-
 use std::collections::BTreeMap;
 
 use super::assemble::assemble;
@@ -26,7 +21,6 @@ fn recipe(pass: PassKind, ids: &[&str]) -> ShaderRecipe {
 
 #[test]
 fn sampling_blocks_chain_after_grades() {
-    // A sampling block reads the module input, so it composes anywhere in a chain.
     let ids = [
         "tint",
         "sharpen",

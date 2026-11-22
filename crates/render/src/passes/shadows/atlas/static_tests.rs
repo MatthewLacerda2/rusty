@@ -1,8 +1,3 @@
-//! The atlas's static-caster cache on the GPU (#694): a still frame re-bakes no tile
-//! and draws no static caster, and its atlas is bit-identical to a forced full
-//! redraw — also with a dynamic caster moving through a cached tile. A Static flag
-//! flipped re-bakes on its own (#1496). Skips with no adapter.
-
 use glam::Vec3;
 
 use super::gpu_fixture::{dark, lamp};
@@ -13,7 +8,6 @@ use rusty_scene::{Camera, Scene};
 
 pub(super) const RES: u32 = 48;
 
-/// A box at `position` scaled by `scale`, static when `is_static`; returns its id.
 pub(super) fn block(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: bool) -> u32 {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
@@ -23,7 +17,6 @@ pub(super) fn block(scene: &mut Scene, position: Vec3, scale: Vec3, is_static: b
     id
 }
 
-/// A static floor and pillar under a shadowing spotlight and point light (7 tiles).
 pub(super) fn lamp_room() -> Scene {
     let mut scene = dark();
     let floor = Vec3::new(20.0, 1.0, 20.0);
@@ -47,8 +40,6 @@ pub(super) fn lamp_room() -> Scene {
     scene
 }
 
-/// Render one frame of `scene`; returns the active atlas's raw texels (four bytes
-/// each, the Depth32Float values bit for bit).
 pub(super) fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> Vec<u8> {
     let out = view.color_target_view().unwrap();
     let cam = Camera::new(Vec3::new(0.0, 6.0, 6.0), -90.0, -40.0);
@@ -57,13 +48,11 @@ pub(super) fn frame(r: &mut Renderer, view: &mut RenderView, scene: &Scene) -> V
     readback::read_texture_rgba8(&r.device, &r.queue, atlas, ATLAS_SIZE, ATLAS_SIZE)
 }
 
-/// `(cached, rebaked)` tiles of the last frame.
 pub(super) fn bake(r: &Renderer) -> (u32, u32) {
     let c = &r.frame_counters;
     (c.shadow_atlas_cached, c.shadow_atlas_rebaked)
 }
 
-/// Texels nearer than the far plane: what the casters drew.
 fn drawn(atlas: &[u8]) -> usize {
     let far = 1.0f32.to_le_bytes();
     atlas.chunks_exact(4).filter(|t| *t != far).count()
@@ -128,7 +117,7 @@ fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
     };
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
     let mut scene = lamp_room();
-    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight); // cascades (#1713)
+    rusty_scene::create::create_live_light(&mut scene, "Sun", Primitive::DirectionalLight);
     let crate_id = block(
         &mut scene,
         Vec3::new(-1.0, 1.0, 0.0),
@@ -136,7 +125,7 @@ fn gpu_a_static_flag_flip_rebakes_with_no_one_invalidating() {
         false,
     );
     frame(&mut r, &mut view, &scene);
-    scene.world.set_static(crate_id, true); // a script in Play: no editor dirty flag
+    scene.world.set_static(crate_id, true);
     frame(&mut r, &mut view, &scene);
     assert_eq!(bake(&r), (0, 7), "the flip re-bakes every tile");
     let key = super::super::statics_key(&scene);

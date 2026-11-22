@@ -1,7 +1,3 @@
-//! The slots' bookkeeping (#1711): no overlap and no leak over a long random run,
-//! a despawned light or a new scene frees at once, and fragmentation repacks
-//! rather than drops.
-
 use glam::Vec3;
 
 use super::super::persist_tests::{light, step};
@@ -11,8 +7,6 @@ use super::{Frame, ShadowSlots, KEEP_FRAMES};
 use crate::clusters::LocalLight;
 use rusty_scene::{Camera, LightType, Scene};
 
-/// Every tile inside the atlas and no two sharing a texel; the grid and the slots
-/// agreeing on the cells held.
 fn assert_sound(slots: &ShadowSlots, plan: &AtlasPlan) {
     let (grid, by_slots) = slots.held_cells();
     assert_eq!(grid, by_slots, "a tile leaked");
@@ -32,7 +26,6 @@ fn assert_sound(slots: &ShadowSlots, plan: &AtlasPlan) {
     }
 }
 
-/// A small deterministic generator: the test replays the same run every time.
 fn lcg(state: &mut u64) -> u32 {
     *state = state
         .wrapping_mul(6_364_136_223_846_793_005)
@@ -115,8 +108,6 @@ fn a_despawned_light_or_a_new_scene_frees_its_tiles_at_once() {
 
 #[test]
 fn fragmentation_repacks_instead_of_dropping() {
-    // 200 distant spotlights fill 200 single cells, then every other one despawns:
-    // 156 cells free, but no six aligned 4×4 blocks for a near point light.
     let spots: Vec<LocalLight> = (0..200)
         .map(|i| {
             light(

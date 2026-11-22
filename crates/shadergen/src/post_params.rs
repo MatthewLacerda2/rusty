@@ -1,18 +1,3 @@
-//! crates/shadergen/src/post_params.rs — the runtime params of a post-processing volume's
-//! authored effect chain (#671): `Graphics.SetPostParam("damage_vignette.intensity", 0.7)`.
-//!
-//! A postfx module's runtime params are laid out exactly like a surface shader's
-//! ([`ParamLayout`], its `<name>.params.json` sidecar), but the values live on the
-//! active volume (`PostProcessingComponent::custom_effects.params`), not on a material, and a
-//! volume runs a *chain* of modules. So one name addresses the whole chain: it is
-//! checked against each effect's layout in run order, and every effect whose layout
-//! resolves it draws with the stored value (the renderer packs each effect's uniform
-//! from the same map). A name no effect resolves, or a wrong number of values, is an
-//! error naming it and listing the runtime params the chain has.
-//!
-//! Values are stored under the name the script used, so a get answers with what the
-//! matching set wrote; the renderer resolves each stored name per effect.
-
 use std::collections::BTreeMap;
 
 use super::blocks::find;
@@ -20,16 +5,12 @@ use super::params::{unknown_param, ParamLayout, ParamSlot};
 use super::recipe::PassKind;
 use super::DEFAULT_OUT_DIR;
 
-/// The param layouts of a volume's effects, in run order.
 #[derive(Clone, Debug, Default)]
 pub struct PostChain {
     layouts: Vec<ParamLayout>,
 }
 
 impl PostChain {
-    /// Read the sidecar of each module in `effects` from the authored-shader dir the
-    /// renderer loads them from. A module that is not baked yet (or whose sidecar is
-    /// unreadable) has no runtime params, as the renderer skips it.
     pub fn load(effects: &[String]) -> Self {
         let layouts = effects
             .iter()
@@ -39,14 +20,11 @@ impl PostChain {
         Self { layouts }
     }
 
-    /// A chain over already-read layouts.
     #[cfg(test)]
     pub fn from_layouts(layouts: Vec<ParamLayout>) -> Self {
         Self { layouts }
     }
 
-    /// The slot `name` resolves to in the first effect that has it, with that
-    /// effect's layout.
     pub fn resolve(&self, name: &str) -> Result<(&ParamLayout, &ParamSlot), String> {
         self.layouts
             .iter()
@@ -54,7 +32,6 @@ impl PostChain {
             .ok_or_else(|| unknown_param(name, &self.names()))
     }
 
-    /// Every runtime param name of the chain, each effect's in slot order.
     pub fn names(&self) -> Vec<String> {
         let mut names: Vec<String> = Vec::new();
         for n in self.layouts.iter().flat_map(ParamLayout::names) {
@@ -65,7 +42,6 @@ impl PostChain {
         names
     }
 
-    /// Store `value` for `name` in `values`: one number broadcasts to every lane.
     pub fn set(
         &self,
         values: &mut BTreeMap<String, Vec<f32>>,
@@ -78,7 +54,6 @@ impl PostChain {
         Ok(())
     }
 
-    /// The value `name` draws with: the stored one, else its baked default.
     pub fn get(&self, values: &BTreeMap<String, Vec<f32>>, name: &str) -> Result<Vec<f32>, String> {
         let (_, slot) = self.resolve(name)?;
         Ok(values
@@ -88,9 +63,6 @@ impl PostChain {
     }
 }
 
-/// A runtime postfx param's catalog default, for a volume-less read: `name` is
-/// `"<block>.<param>"` or `"<block>.<index>.<param>"` naming a runtime param of a
-/// postfx block.
 pub fn catalog_default(name: &str) -> Result<Vec<f32>, String> {
     let parts: Vec<&str> = name.split('.').collect();
     let (block, param) = match parts[..] {

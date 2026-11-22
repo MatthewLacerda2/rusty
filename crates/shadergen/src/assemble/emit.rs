@@ -1,30 +1,11 @@
-//! crates/shadergen/src/assemble/emit.rs — turn block instances into WGSL text (#272, #393).
-//!
-//! The small, pass-agnostic half of assembly: check a block's recipe params against
-//! its declared ones (#395), render them as per-instance WGSL `const`s, emit each
-//! block's helper once, and fold the chain into one expression. Kept here so
-//! [`super`] (the pass-shape assemblers) stays focused on module structure. All of
-//! it is pure and deterministic — the same inputs always yield the same text.
-//!
-//! A block is an **instance**, not a singleton (#393): its params are emitted as
-//! `<id>_<index>_<param>` (`index` = its position in the recipe) and passed to the
-//! shared helper as arguments, so a recipe may use the same block twice.
-
 use std::fmt::Write as _;
 
 use crate::blocks::{Block, Param, Reflection, Stage};
 use crate::params::ParamLayout;
 use crate::recipe::{BlockSel, ParamValue};
 
-/// One resolved block instance: the catalog block and the recipe entry selecting
-/// it. Its position in the resolved list is its instance index.
 pub type Instance<'a> = (&'static Block, &'a BlockSel);
 
-/// Refuse a param the block doesn't declare, or one whose shape doesn't fit its
-/// arity: a scalar param takes a number, a vector param takes exactly `arity`
-/// numbers or one number (broadcast to every lane), a choice param one of its
-/// names (#1679). Errors name the block, its
-/// recipe index, the bad key and the declared params.
 pub fn check_params(block: &Block, sel: &BlockSel, index: usize) -> Result<(), String> {
     for (key, value) in &sel.params {
         let at = format!("block {:?} (blocks[{index}])", block.id);
@@ -72,10 +53,6 @@ pub fn check_params(block: &Block, sel: &BlockSel, index: usize) -> Result<(), S
     Ok(())
 }
 
-/// Emit every instance's baked params as WGSL `const`s named `<id>_<index>_<param>`,
-/// reading the recipe's value or the declared default; a param `layout` holds is
-/// read from the param uniform instead (#399) and emits nothing here. Params must
-/// already have passed [`check_params`].
 pub fn emit_params(out: &mut String, instances: &[Instance], layout: &ParamLayout) {
     for (index, (block, sel)) in instances.iter().enumerate() {
         for p in block.params {
@@ -93,8 +70,6 @@ pub fn emit_params(out: &mut String, instances: &[Instance], layout: &ParamLayou
     }
 }
 
-/// Emit each distinct block's helper once, in first-use order, however many
-/// instances of it the recipe holds.
 pub fn emit_helpers(out: &mut String, instances: &[Instance]) {
     for (i, (block, _)) in instances.iter().enumerate() {
         if instances[..i].iter().all(|(b, _)| b.id != block.id) {
@@ -103,13 +78,10 @@ pub fn emit_helpers(out: &mut String, instances: &[Instance]) {
     }
 }
 
-/// The per-instance WGSL constant for one param.
 fn const_name(block: &Block, index: usize, p: &Param) -> String {
     format!("{}_{}_{}", block.id, index, p.name)
 }
 
-/// The expression an instance passes for `p`: its uniform slot (swizzled to its
-/// arity) when runtime, else its baked constant.
 fn arg(block: &Block, index: usize, p: &Param, layout: &ParamLayout) -> String {
     let Some(s) = layout.slot_of(index, p.name) else {
         return const_name(block, index, p);
@@ -118,7 +90,6 @@ fn arg(block: &Block, index: usize, p: &Param, layout: &ParamLayout) -> String {
     format!("shader_params.v[{}]{swizzle}", s.slot)
 }
 
-/// The WGSL type for a param's arity.
 fn wgsl_type(p: &Param) -> &'static str {
     match p.arity {
         1 => "f32",
@@ -128,7 +99,6 @@ fn wgsl_type(p: &Param) -> &'static str {
     }
 }
 
-/// Render a param's value as a WGSL literal: a scalar or a `vecN<f32>(...)`.
 fn literal(p: &Param, value: Option<&ParamValue>) -> String {
     let lanes = match value {
         Some(ParamValue::Vector(v)) => v.clone(),
@@ -143,14 +113,10 @@ fn literal(p: &Param, value: Option<&ParamValue>) -> String {
     format!("vec{}<f32>({})", p.arity, parts.join(", "))
 }
 
-/// A choice's index as the `f32` the module bakes; [`check_params`] has already
-/// refused a name that isn't one of `p`'s choices.
 fn choice_index(p: &Param, name: &str) -> f32 {
     p.choices.iter().position(|c| *c == name).unwrap_or(0) as f32
 }
 
-/// Format an `f32` so it is always a valid WGSL float literal (has a decimal
-/// point) and is deterministic across platforms.
 fn fmt_f32(v: f32) -> String {
     let s = format!("{v:?}");
     if s.contains('.') || s.contains('e') || s.contains("inf") || s.contains("nan") {
@@ -160,11 +126,6 @@ fn fmt_f32(v: f32) -> String {
     }
 }
 
-/// Build the chained fold expression for `stage`: starting from `seed`, wrap each
-/// of that stage's instances' `call` around the previous via its `{prev}`
-/// placeholder, in recipe order, with `{args}` filled by that instance's param
-/// constants or uniform slots. Instances of the other stage are skipped but keep
-/// their recipe index, so param names and slots stay stable.
 pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout, stage: Stage) -> String {
     let mut expr = seed.to_string();
     for (index, (block, _)) in instances.iter().enumerate() {
@@ -177,9 +138,6 @@ pub fn chain(instances: &[Instance], seed: &str, layout: &ParamLayout, stage: St
     expr
 }
 
-/// Each cutting instance's [`Block::cut`] call (#648), in recipe order, with
-/// `{args}` filled exactly as [`chain`] fills it — so the depth passes cut where
-/// the colour pass does. Empty when no block cuts.
 pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
     instances
         .iter()
@@ -191,15 +149,6 @@ pub fn cuts(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
         .collect()
 }
 
-/// The statements that scale the SSR record (`ssr_texels`, #1526) and SSIL's
-/// realtime light (`ssil_realtime`, #1750) as the colour blocks scale the colour,
-/// one per colour instance whose [`Block::reflection`] is not [`Reflection::Kept`],
-/// in recipe order, with `{args}` filled as [`chain`] fills it, and the factor
-/// bound once to a `let` both read. A block that is no
-/// per-channel scale ([`Reflection::Dropped`]) zeroes both: SSIL gathers nothing
-/// from a toon-ramped surface rather than light it cannot place. Empty when every
-/// block keeps the reflection; a block that adds light of its own (a rim) adds
-/// none to what SSIL gathers.
 pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<String> {
     instances
         .iter()
@@ -211,8 +160,6 @@ pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<Str
                 Reflection::Scaled(factor) => factor.replace("{args}", &args(block, index, layout)),
                 Reflection::Dropped => "vec3<f32>(0.0)".to_string(),
             };
-            // Bound once: a factor can sample textures (`triplanar_detail` takes
-            // three), and both records read it.
             Some(format!(
                 "let fold_factor_{index} = {factor};\n        \
                  ssr_texels = ssr_surface::scale(ssr_texels, fold_factor_{index});\n        \
@@ -222,7 +169,6 @@ pub fn reflection_folds(instances: &[Instance], layout: &ParamLayout) -> Vec<Str
         .collect()
 }
 
-/// An instance's `{args}`: `, a, b` — its param constants or uniform slots.
 fn args(block: &Block, index: usize, layout: &ParamLayout) -> String {
     block
         .params
