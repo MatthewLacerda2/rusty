@@ -83,7 +83,7 @@ pub fn bc6h_texels(edge: u32, blocks: &[u8]) -> Vec<Vec3> {
     texels
 }
 
-/// Alpha 1; for a GPU without BC compression.
+/// For a GPU without BC compression.
 pub fn to_rgba16f(texels: &[Vec3]) -> Vec<u8> {
     texels
         .iter()

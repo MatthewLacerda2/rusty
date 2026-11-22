@@ -4,14 +4,12 @@ use glam::{Mat4, Quat, Vec3};
 #[derive(Clone, Debug, PartialEq, Default)]
 pub struct SkinData {
     pub inverse_bind: Vec<Mat4>,
-    /// Relative to the skinned mesh node, so the palette is mesh-local.
     pub bind_global: Vec<Mat4>,
     pub local_bind: Vec<JointTransform>,
-    /// Parent joint slot, or `None` for a skeleton root.
+    /// `None` for a skeleton root.
     pub parents: Vec<Option<usize>>,
     /// What animation channels target.
     pub joint_nodes: Vec<usize>,
-    /// Left-multiplying a posed joint global by it gives mesh-local space.
     pub mesh_inverse: Mat4,
     /// `joint_{slot}` when unnamed. Bones re-bind by it.
     pub names: Vec<String>,
