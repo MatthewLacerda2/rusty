@@ -12,6 +12,7 @@ pub const LOCK: &str = ".lock";
 pub(super) struct Closed {
     pub(super) n: u64,
     pub(super) bytes: u64,
+    /// When it closed, ms since the Unix epoch (its mtime, for one found on open).
     pub(super) newest: u64,
 }
 
@@ -105,6 +106,7 @@ impl Segments {
     pub(super) fn close(&mut self) {
         if let Some((n, out, bytes)) = self.open.take() {
             match out.into_inner() {
+                // Synced, so after a power cut every closed segment reads whole.
                 Ok(file) => drop(file.sync_data()),
                 Err(err) => self.fail(err.error()),
             }
@@ -123,6 +125,7 @@ impl Segments {
     }
 
     pub(super) fn prune(&mut self, now: u64) {
+        // The open segment counts as full, so the log holds its budget until the next prune.
         let open = self.per_segment;
         let mut total: u64 = self.closed.iter().map(|c| c.bytes).sum::<u64>() + open;
         while let Some(oldest) = self.closed.front() {
@@ -144,6 +147,8 @@ impl Segments {
     }
 }
 
+/// One writer per folder: the OS frees the lock when the process ends, a crash included, and a
+/// second process logs nothing rather than prune the segments the first one writes.
 fn lock(dir: &Path) -> std::io::Result<File> {
     // lint: allow(asset-write) the frame log's lock file, never read as content
     let file = OpenOptions::new()

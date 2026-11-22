@@ -1,5 +1,6 @@
 use std::path::{Path, PathBuf};
 
+/// As `Harness.DemoPath()` answers it, so a cut's check matches however the demo was named.
 pub fn full_path(path: &Path) -> PathBuf {
     std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
@@ -7,6 +8,7 @@ pub fn full_path(path: &Path) -> PathBuf {
 pub fn scenario(demo: &Path, from: u64, to: u64) -> String {
     let full = full_path(demo);
     let demo = full.display();
+    // A Rust string literal's escapes read the same in Lua: `\\`, `\"`, `\u{..}`.
     let named = format!("{:?}", full.to_string_lossy());
     let seek = match from {
         0 => String::new(),

@@ -37,6 +37,8 @@ pub fn run(
     run_file(harness, scenario_path)
 }
 
+/// A test hook: [`run`] on the default scene in a workspace of the run's own, so a test
+/// never reads a developer's project.
 pub fn run_isolated(scenario_path: &Path, out_dir: &Path) -> Result<RunReport, String> {
     run_file(Harness::new(out_dir, DEFAULT_BOT_SCRIPT), scenario_path)
 }

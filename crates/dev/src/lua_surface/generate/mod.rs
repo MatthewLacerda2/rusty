@@ -168,6 +168,7 @@ fn register_settings(lua: &Lua, table: &Table, scene: ApiCell<Scene>) -> Reg {
     )
 }
 
+/// Reads and checks every field before writing any, so a call that raises changes nothing.
 fn set_settings(scene: &mut rusty_scene::Scene, t: &Table) -> mlua::Result<()> {
     let overrides = Overrides::from_table(t)?;
     let model = diffuse_model(t)?;

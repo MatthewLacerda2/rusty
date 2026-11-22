@@ -9,6 +9,7 @@ fn run(s: &mut Session, line: &str) -> String {
         .unwrap_or_else(|e| panic!("`{line}` failed: {e}"))
 }
 
+/// Leaves out the id allocator: an undone create's id stays retired, so it only moves on.
 fn document(s: &Session) -> String {
     let scene = s.world().world.scene.borrow();
     let mut data = rusty_edit::to_scene_data(&scene);

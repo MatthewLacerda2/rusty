@@ -18,6 +18,7 @@ pub struct Session {
 }
 
 impl Session {
+    /// A test hook: the engine's default settings, no project file bound.
     pub fn new(boot_scene: &str) -> Result<Self, String> {
         Self::boot(&BootPlan::of(boot_scene), ProjectSource::defaults())
     }
@@ -105,6 +106,8 @@ fn boot_scene(opened: &rusty_core::project::Opened) -> BootPlan {
     rusty_core::project::boot_scene(&opened.root, startup, Access::Edit).unwrap_or_default()
 }
 
+/// The windowed command channel frames with this too, so a headless and a windowed
+/// reply are byte-identical.
 pub(crate) fn response_line(outcome: &Result<String, String>, warnings: &[String]) -> String {
     let mut value = match outcome {
         Ok(result) => json!({ "ok": true, "result": result }),

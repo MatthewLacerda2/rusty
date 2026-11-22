@@ -49,6 +49,7 @@ impl Encoder {
             .name("lightmap-preview".into())
             .spawn(move || {
                 while let Some((pass, maps)) = from.take() {
+                    // Written without the shared lock, so the UI never waits on a write.
                     let written = write_preview(&at, &maps, page, &taken);
                     drop(maps);
                     let over = hand_over(&at, &shared, (pass, written), &progress);
@@ -188,6 +189,7 @@ fn write_preview(
 }
 
 fn raw_png(size: u32, rgba: &[u8]) -> Result<Vec<u8>, String> {
+    // Bytes: the pixels, plus slack for the row filter bytes and the blocks' and chunks' headers.
     let mut bytes = Vec::with_capacity(rgba.len() + rgba.len() / 1024 + 1024);
     let png = PngEncoder::new_with_quality(
         &mut bytes,

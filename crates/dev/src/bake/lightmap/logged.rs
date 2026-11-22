@@ -8,6 +8,7 @@ use crate::bake::report::lightmaps::Measured;
 use rusty_lighting::lightmap::{bake_with_progress, BakeProgress, BakeScene};
 use rusty_scene::lighting::settings::BakeSettings;
 
+/// How often the calling thread reads the counters; the log decides what prints.
 const POLL: Duration = Duration::from_millis(200);
 
 pub(super) struct Run {
@@ -73,6 +74,7 @@ pub(in crate::bake) fn watch<P: Sync, T: Send>(
     log: &mut BakeLog,
     work: impl FnOnce(&P) -> Result<T, String> + Send,
 ) -> Result<T, String> {
+    // Before the worker exists: a trace done before the first poll still says it started.
     log.observe(read(progress));
     let (sent, result) = mpsc::channel();
     let done = thread::scope(|scope| {

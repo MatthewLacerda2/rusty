@@ -3,6 +3,7 @@ use crate::bake::lightmap::memory_tests::{bake, holds, DENSITY, MARGIN, SIDE, WO
 use crate::memory::rss_peak_bytes;
 use rusty_scene::lighting::settings::Denoiser;
 
+/// Asked before `alone!`, so a machine that cannot measure starts no child process.
 fn measurable() -> bool {
     rss_peak_bytes().is_some() && available().is_ok()
 }

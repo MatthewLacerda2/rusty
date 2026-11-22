@@ -1,3 +1,6 @@
+//! `CharacterController.Move` timed, since the sim may not read a clock; `physics`'
+//! `character::cost_tests` is the counted gate.
+
 use std::time::Instant;
 
 use rusty_physics::character_bench::{level, stand, walk};

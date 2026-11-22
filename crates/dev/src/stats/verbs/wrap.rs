@@ -6,6 +6,8 @@ use rusty_script::api::{ApiCtx, Reg, RUST_HALVES};
 
 use super::{Event, Top, RECORDER};
 
+/// Only on a thread that armed: wraps the capitalised globals (Lua's own tables are lowercase)
+/// and the Rust halves under `RUST_HALVES`.
 pub(super) fn register(lua: &Lua, _ctx: &ApiCtx) -> Reg {
     if !super::armed() {
         return Ok(());
@@ -80,6 +82,8 @@ fn timed(lua: &Lua, id: usize, f: Function) -> mlua::Result<Function> {
     })
 }
 
+/// mlua wraps a Rust callback's error once, where it reaches Lua: dropping the layer the
+/// inner call added gives the script the bare verb's message (`tests` pins the traceback).
 fn unwrapped(e: mlua::Error) -> mlua::Error {
     match e {
         mlua::Error::CallbackError { cause, .. } => (*cause).clone(),

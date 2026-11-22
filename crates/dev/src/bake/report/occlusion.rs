@@ -143,6 +143,7 @@ pub(super) fn visibility(scene: &Scene, data: &OcclusionData, standable: Option<
     })
 }
 
+/// To the microsecond: most cells take under the millisecond [`super::secs`] rounds to.
 fn cell_secs(d: Duration) -> f64 {
     (d.as_secs_f64() * 1e6).round() / 1e6
 }

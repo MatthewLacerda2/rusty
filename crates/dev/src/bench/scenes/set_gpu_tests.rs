@@ -31,6 +31,7 @@ fn project() -> PathBuf {
         let mut t = yard.world.transform_mut(id).unwrap();
         (t.position, t.scale) = (at, size);
     }
+    // In view: the cull skips a camera testing fewer than `passes::hiz::MIN_INSTANCES` (32).
     for k in 0..32 {
         let id = create_entity(&mut yard, "Crate", Some(Primitive::Box));
         let mut t = yard.world.transform_mut(id).unwrap();

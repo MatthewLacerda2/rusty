@@ -5,6 +5,7 @@ use rusty_navigation::{bake_collider_ids, baked_fingerprint, NavigationGraph};
 use rusty_physics::collider_world_triangles;
 use rusty_scene::Scene;
 
+/// The most islands a report lists, largest first; `count` holds them all.
 pub const ISLANDS: usize = 256;
 
 pub fn report(
@@ -77,6 +78,7 @@ pub(super) fn islands(scene: &Scene, nav: &NavigationGraph) -> Value {
     let mut order: Vec<usize> = (0..all.len()).collect();
     order.sort_by_key(|&i| std::cmp::Reverse(all[i].spans));
     let cell = nav.grid_spacing * nav.grid_spacing;
+    // A span stands at its cell's centre, so the box widens to the cells' outer edges.
     let half = glam::Vec3::new(nav.grid_spacing, 0.0, nav.grid_spacing) * 0.5;
     let listed = order.iter().take(ISLANDS).map(|&i| {
         let island = &all[i];

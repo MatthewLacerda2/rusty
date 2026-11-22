@@ -1,6 +1,9 @@
 use std::collections::BTreeMap;
 
+/// Least share (0 to 1) of samples whose leaf is a named function of the bench's own binary.
 pub const OWN_FLOOR: f64 = 0.20;
+/// Least share of the expected samples (measured seconds times `HZ`); `refusal`'s message
+/// spells it "a tenth".
 pub const COUNT_FLOOR: f64 = 0.10;
 pub const UNKNOWN: &str = "[unknown]";
 

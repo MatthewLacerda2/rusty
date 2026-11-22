@@ -43,6 +43,8 @@ fn gpu_capture_renders_when_required() {
     let frame = host.draw(&scene, &cam, 8, 8).expect("draw must not error");
     let frame = frame.expect("RUSTY_REQUIRE_GPU=1 but draw produced no frame");
     let ms = frame.cpu_ms;
+    // Recording an 8x8 frame takes a fraction of a millisecond to a few dozen: these
+    // bounds tell milliseconds from seconds or microseconds.
     assert!(
         0.01 < ms && ms < 1000.0,
         "cpu_ms {ms} is not in milliseconds"

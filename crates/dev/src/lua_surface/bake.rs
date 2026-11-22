@@ -59,6 +59,8 @@ fn register_probe(lua: &Lua, ctx: &ApiCtx) -> Reg {
     )
 }
 
+/// `lightmaps` is true after the lightmap verb, false after `Probe.Bake`: each warns of the
+/// other half a `Shadowmask` bake lacks.
 fn shadowmask_note(
     scene: &rusty_scene::Scene,
     console: &std::cell::RefCell<rusty_script::scripting::ConsoleLogs>,

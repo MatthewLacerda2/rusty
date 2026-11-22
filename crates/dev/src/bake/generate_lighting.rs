@@ -1,3 +1,6 @@
+//! Generate Lighting: lightmaps, probes, then the PVS. The editor steps these functions
+//! across frames; `Lighting.Generate()` runs the same ones in line, so the two never drift.
+
 use crate::bake::lighting::{run_to_end, start_lighting, LightingBakeParams, LightingBakeReport};
 use crate::bake::lightmap::bake_scene_lightmaps_logged;
 use crate::bake::occlusion::summary::occlusion_summary;
@@ -20,6 +23,7 @@ pub struct GenerateReport {
     pub lightmaps: usize,
     pub probes: LightingBakeReport,
     pub occlusion: OcclusionBakeReport,
+    // Wall-clock milliseconds.
     pub occlusion_ms: u64,
     pub occlusion_kept: bool,
     pub saved: LightingSave,
@@ -81,6 +85,7 @@ pub fn start_probes(
     start_lighting(scene, Some(path), nav, LightingBakeParams::default())
 }
 
+/// Called before the PVS bakes, so a PVS step that fails or never ends loses no lighting.
 pub fn write_lighting(scene: &Scene, path: &str) -> Result<LightingSave, String> {
     refuse_in_play(scene)?;
     save_lighting(scene, path)

@@ -9,6 +9,7 @@ use rusty_script::scripting::{HostCall, HostJournal, Plain, ScriptManager};
 
 pub const HARNESS_VERBS: &[&str] = &["AttachPlayerBot", "LoadStress"];
 
+// Skips `math`: its `random` shims call `Random.*`, which is wrapped, so each draw is noted once.
 const WRAP: &str = r#"
 local note, check, harness_verbs = ...
 local skip = { string = true, table = true, coroutine = true, utf8 = true, math = true,
@@ -41,6 +42,8 @@ for _, name in ipairs(harness_verbs) do
 end
 "#;
 
+/// Nesting a table argument may hold: nothing tracks tables seen, so a cycle ends here too,
+/// refused as nested too deep.
 const MAX_DEPTH: usize = 32;
 
 pub fn journal_calls(lua: &Lua, journal: &Rc<RefCell<HostJournal>>) -> mlua::Result<()> {
@@ -97,6 +100,7 @@ fn table(t: &Table, depth: usize) -> Result<Plain, &'static str> {
         let value = plain(&value, depth + 1)?;
         let key = match key {
             Value::String(s) => s.to_str().map_err(|_| "binary key")?.to_string(),
+            // Zero-padded, so the sort by key below puts indices in numeric order.
             Value::Integer(i) if i >= 1 && i as usize <= len => format!("{i:020}"),
             _ => return Err("table with mixed keys"),
         };

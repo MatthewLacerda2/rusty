@@ -60,6 +60,7 @@ fn gpu_static_casters_leave_a_masked_lamps_map_under_shadowmask_only() {
 fn gpu_with_no_mask_bound_a_static_pillar_still_shadows_the_floor() {
     let Some(mut r) = renderer() else { return };
     let mut s = pillar_scene("unbound", false);
+    // Channels recorded, no page bound: as while a page decodes, or failed to.
     s.lightmaps.masks.clear();
     assert!(!s.lightmaps.channels.is_empty());
     let plain = shade(&mut r, &s, ShadowmaskMode::Shadowmask);

@@ -17,6 +17,7 @@ fn a_frame_of_a_world_is_written_with_what_was_logged() {
         let stats = game.script_manager().stats_cell();
         let mut stats = stats.borrow_mut();
         stats.record("frame_ms", 2.0);
+        // Either side of `SYSTEM_MS` (0.25), so only `step_physics` is written.
         stats.record_system("step_physics", 1.5);
         stats.record_system("tiny", 0.01);
         stats.end_tick();
@@ -120,6 +121,7 @@ fn every_console_line_is_written_and_a_repeat_each_frame() {
         WindowFrame::default(),
     );
     log.frame(game, &frame, false);
+    // Past the console's 100-line buffer, under the file feed's 1024-line cap: none is dropped.
     for i in 0..150 {
         game.console().borrow_mut().info(format!("load step {i}"));
     }

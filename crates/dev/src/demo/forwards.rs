@@ -26,6 +26,10 @@ pub fn find(namespace: &str, verb: &str) -> Option<&'static Forward> {
 }
 
 impl Forward {
+    /// The scenario's live call (`bridge::forward`) and the replay (`calls::invoke`) both come
+    /// here, so a down runtime is met alike and a replay repeats what was recorded.
+    /// `in_game` answers `None` while the gameplay VM is down; it is a closure so the
+    /// caller's borrow of the world ends before `own` runs.
     pub fn run<R>(
         &self,
         verb: &str,
