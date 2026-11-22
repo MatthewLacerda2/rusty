@@ -69,6 +69,7 @@ pub struct Song {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key: Option<String>,
     pub tracks: Vec<Track>,
+    /// Name order: serde, `validate` and the render walk iterate it: saves are byte-identical.
     pub patterns: BTreeMap<String, Pattern>,
     pub arrangement: Vec<ArrangementEntry>,
     #[serde(default, skip_serializing_if = "no_swing")]
@@ -125,12 +126,14 @@ pub struct Pattern {
 }
 
 impl Pattern {
+    /// Document order matters: the render walk seeds each note by its place here.
     pub(crate) fn voices(&self, key: Option<&Key>) -> Result<Vec<Note>, SynthError> {
         let around = Context {
             beats: self.beats,
             key,
         };
         let mut voiced = Vec::with_capacity(self.notes.len());
+        // Per pattern: `near` never leads across its edge, so a pattern voices alike anywhere.
         let mut led = chord::Led::default();
         for entry in &self.notes {
             entry.voice_into(around, &mut led, &mut voiced)?;
@@ -278,6 +281,7 @@ impl Song {
             .reduce(f32::max)
     }
 
+    /// Ignores `tempo`. A test hook: only zimmer's integration tests call it.
     pub fn beat_seconds(&self) -> f32 {
         60.0 / self.bpm
     }

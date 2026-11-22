@@ -50,6 +50,7 @@ fn near_leads_from_the_last_chord_on_its_track() {
     near("Dmaj7", "keys")
         .voice_into(&mut led, &mut out)
         .expect("v");
+    // On another track: root position, and `keys`' next chord still leads from Dmaj7.
     near("Bm7", "pad")
         .voice_into(&mut led, &mut out)
         .expect("v");

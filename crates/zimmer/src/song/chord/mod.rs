@@ -14,6 +14,8 @@ use super::{Articulation, Note, Pitch};
 use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
 
+/// Root octave when `oct` is absent: close chords on it sit around middle C, with room for a
+/// ninth above.
 const DEFAULT_OCT: i32 = 3;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -54,8 +56,8 @@ impl Chord {
             Voicing::Name(name) => self.named(name, led)?,
             Voicing::Pitches(pitches) => self.spelled(pitches)?,
         };
-        // Here rather than beside the spelling that can produce one, because an arpeggio walks
-        // whatever this is and "no voices" has to be a refusal before anything walks it.
+        // Checked here, before any arpeggio walks the voices, rather than in the spelling that
+        // yields none.
         if voices.is_empty() {
             return Err(SynthError::EmptyChord {
                 track: self.track.clone(),
@@ -122,6 +124,8 @@ impl Chord {
             bass: bass.first().copied(),
             upper,
         };
+        // Root position is checked whatever the voicing, so `near` refuses the same documents
+        // with or without a chord before it.
         on_keys(&stack.turned(0))?;
         let midis = match (self.inv, self.voicing) {
             (Some(_), Some(_)) => {
@@ -165,8 +169,7 @@ impl Chord {
         }
         pitches
             .iter()
-            // Resolved here so a pitch that does not parse is reported against the chord holding it
-            // rather than at the sample loop.
+            // Resolved here, so a bad pitch is refused against its chord, not at the sample loop.
             .map(|pitch| pitch.to_midi().map(|_| self.voice(pitch.clone())))
             .collect()
     }

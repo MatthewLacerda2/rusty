@@ -7,6 +7,8 @@ use crate::error::SynthError;
 use crate::note::MIDI_RANGE;
 use crate::song::{one, Articulation, Note, Pitch};
 
+/// Tonic octave when `oct` is absent: degree 1 in C is middle C, a melody's register, above a
+/// chord's 3.
 const DEFAULT_OCT: i32 = 4;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -43,6 +45,8 @@ impl Degree {
                 (rest.parse().map_err(|_| bad())?, alteration)
             }
         };
+        // Zero is refused, not read as the tonic: a zero-based writer's whole part would sound a
+        // step low.
         if degree < 1 {
             return Err(bad());
         }
@@ -57,6 +61,7 @@ impl Degree {
     }
 }
 
+/// `#` and `b` only, as `chord::name::split_root` reads a root's: change the two together.
 fn split_accidentals(text: &str) -> (i32, &str) {
     let mut offset = 0;
     let mut end = 0;

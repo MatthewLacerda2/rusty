@@ -1,5 +1,3 @@
-//! A named chord voiced other than in root position: `"inv": 1`, or `"voicing": "near"`.
-
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -36,6 +34,7 @@ pub(crate) struct Stack {
 }
 
 impl Stack {
+    /// Callers keep `|turns|` below `upper.len()`; beyond `upper.len()` the rotation panics.
     pub(crate) fn turned(&self, turns: i32) -> Vec<i32> {
         let mut upper = self.upper.clone();
         let (up, down) = (turns.max(0) as usize, (-turns).max(0) as usize);
@@ -54,7 +53,9 @@ impl Stack {
         previous: &[f32],
         range: &std::ops::RangeInclusive<i32>,
     ) -> Vec<i32> {
+        // Within an octave of root position, so `near` chords cannot drift along the keyboard.
         let span = self.upper.len() as i32 - 1;
+        // Nearest root position first, then upward: the strict `<` below keeps the first of a tie.
         let turns = (0..=span).flat_map(|n| if n == 0 { vec![0] } else { vec![n, -n] });
         let mut best = (f32::INFINITY, self.turned(0));
         for turn in turns {

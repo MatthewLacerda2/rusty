@@ -51,6 +51,7 @@ impl FromStr for Span {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpanError {
     Malformed,
+    /// Also an equal end: the span is end-exclusive, so `8:8` selects nothing.
     Backwards,
 }
 
