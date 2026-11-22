@@ -50,7 +50,6 @@ pub(super) fn upload(
         usage: super::usage(levels),
         view_formats: &[],
     });
-    // Each 16-bit unorm value as a half float in [0, 1]: eight bytes a texel.
     let bytes: Vec<u8> = image
         .as_raw()
         .iter()
