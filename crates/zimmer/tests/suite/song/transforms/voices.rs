@@ -60,6 +60,7 @@ fn a_tracks_filter_silences_exactly_the_tracks_it_does_not_name() {
     }
 }
 
+/// A silenced note still takes its seed ordinal; the fixture plays noise, so a re-roll is audible.
 #[test]
 fn silencing_a_track_leaves_the_other_notes_bit_identical() {
     let mut duet = song();

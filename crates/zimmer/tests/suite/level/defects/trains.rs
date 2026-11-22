@@ -25,6 +25,7 @@ fn a_splice_at_every_buffer_is_a_click_at_every_buffer() {
             .collect();
         let defects = found(1, &signal);
         let buffers = signal.len() / size;
+        // Three in four, not all: a splice where the tone is barely moving is no jump.
         assert!(
             defects.clicks.count >= buffers * 3 / 4,
             "{} clicks in {buffers} buffers of {size}",

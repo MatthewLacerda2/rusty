@@ -5,13 +5,17 @@ use rusty_core::collections::Map;
 use crate::error::SynthError;
 use crate::song::{Key, Layer, Note};
 
+/// Indexed like the pattern's voiced notes, in walk order: pair by position, never by identity.
 pub(crate) struct Slides {
+    /// Written MIDI; `Layer::played_pitch` transposes it when read.
     midi: Vec<f32>,
     previous: Vec<Option<usize>>,
     last: Vec<Option<usize>>,
 }
 
 impl Slides {
+    /// Every note's pitch resolves here, sounding or not: a note a `tracks` filter silences still
+    /// moves the hand.
     pub(crate) fn of(
         notes: &[Note],
         track_of: &Map<&str, usize>,
@@ -29,12 +33,14 @@ impl Slides {
         let mut previous = vec![None; notes.len()];
         let mut last = vec![None; tracks];
         for (track, mut line) in lines.into_iter().enumerate() {
+            // By onset, then pitch: the last of a simultaneous run is its highest.
             line.sort_by(|a, b| {
                 notes[*a]
                     .start
                     .total_cmp(&notes[*b].start)
                     .then(midi[*a].total_cmp(&midi[*b]))
             });
+            // In runs of one onset: each note slides from `ended`, the top of the run before.
             let mut ended = None;
             let mut running: Option<usize> = None;
             let mut at = f32::NEG_INFINITY;
@@ -127,6 +133,7 @@ mod tests {
 
     #[test]
     fn simultaneous_notes_share_a_previous_and_the_highest_leads_on() {
+        // Spelled top voice first, so the highest and the last written differ.
         let chord = [
             note("keys", "C3", 0.0),
             note("keys", "A4", 1.0),

@@ -1,15 +1,18 @@
-//! Integrated loudness, in LUFS: the one number a delivery is held to.
+//! ITU-R BS.1770-4 integrated loudness, in LUFS; the K-weighting is designed per rate and lands
+//! on its 48 kHz table. Every channel weighs 1.0, without its 1.41 for surround.
 
 use std::f64::consts::PI;
 
 use super::gain::db_to_gain;
 
+/// Makes a 997 Hz tone read its own RMS level, in LUFS, once K-weighted.
 const OFFSET: f64 = -0.691;
 
-const ABSOLUTE_GATE: f64 = -70.0;
+const ABSOLUTE_GATE: f64 = -70.0; // LUFS
 
-const RELATIVE_GATE: f64 = 10.0;
+const RELATIVE_GATE: f64 = 10.0; // LU under the absolute-gated mean
 
+// Four steps make a 400 ms block, so consecutive blocks overlap by three quarters.
 const STEP_SECONDS: f64 = 0.1;
 
 const STEPS_PER_BLOCK: usize = 4;

@@ -26,6 +26,7 @@ impl Anchor {
         }
     }
 
+    /// Only zimmer's tests call it: no baker resolves a `clip` yet.
     pub fn resolved(&self, seconds: f32) -> Self {
         Self::at(self.section, seconds)
     }
@@ -35,9 +36,13 @@ impl Anchor {
 pub(crate) struct Landing {
     pub(crate) beat: f64,
     pub(crate) seconds: f64,
+    /// The section that starts here; `arrangement.len()` for a stretch fit's end.
     pub(crate) section: usize,
 }
 
+/// `None` for a song that pins nothing (`shape::plan` then fits or writes the clock), and for an
+/// unresolved or out-of-range anchor: `check` refuses both, so only a reader that does not render
+/// meets one.
 pub(crate) fn landings(song: &Song) -> Option<Vec<Landing>> {
     if song.anchors.is_empty() {
         return None;

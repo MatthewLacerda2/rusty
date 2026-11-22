@@ -1,8 +1,9 @@
-//! trim — where a baked one-shot's file ends.
+//! Where a baked one-shot's file ends.
 
 use crate::level::db_to_gain_f32;
 use crate::stereo::Stereo;
 
+/// dB below the sound's own peak: RT60, a thousandth of its amplitude, so the cut needs no fade.
 pub(crate) const FLOOR_DB: f32 = -60.0;
 
 pub(crate) fn to_floor(buf: &mut Stereo) {

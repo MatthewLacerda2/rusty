@@ -50,6 +50,7 @@ fn a_song_chain_colours_the_mix_and_rings_past_the_last_note() {
     );
 }
 
+/// Close, not equal: per patch the room runs on each note and is summed in another order.
 #[test]
 fn a_room_on_the_song_is_the_room_every_patch_would_have_had_to_spell_out() {
     let mut per_patch = song();

@@ -1,8 +1,9 @@
-//! where a four-operator note's operators start in their cycles.
+//! Where a four-operator note's operators start in their cycles.
 
 use crate::hash::unit2;
 use crate::patch::FM_OPERATORS;
 
+/// ASCII "F4", not `two`'s "FM": one note seed reaches both renderers.
 const CHANNEL: u64 = 0x4634;
 
 pub(crate) fn starts(seed: u64) -> [f32; FM_OPERATORS] {

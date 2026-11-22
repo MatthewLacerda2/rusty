@@ -8,6 +8,8 @@ use crate::song::clock::Clock;
 use crate::song::shape::SEAM;
 use crate::song::timing::Tail;
 
+/// Frames of slack for the limiter's true-peak reconstruction, which reads `TAPS` (4) frames
+/// either side: generous, since one short breaks exactness.
 const RECONSTRUCTION: usize = 64;
 
 pub(crate) struct Scope {
@@ -34,6 +36,7 @@ impl Scope {
         let (from, to) = excerpt
             .window
             .map_or((0, None), |window| window.frames(clock));
+        // A wrapped song's start sums its end, so under `wrap` no note is late enough to skip.
         let wraps = song.tail() == Tail::Wrap;
         Ok(Self {
             from,

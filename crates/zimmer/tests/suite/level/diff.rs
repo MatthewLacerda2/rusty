@@ -81,6 +81,7 @@ fn a_narrower_version_reads_as_narrower_than_the_one_it_replaced() {
 #[test]
 fn a_mono_file_has_no_width_to_be_compared_against() {
     let mut stereo = Profiler::new(2, SAMPLE_RATE);
+    // Interleaved, this square is one channel at +0.5 against the other at −0.5.
     stereo.feed(&square(0.5, 8_000));
     let mono = profiled(&square(0.5, 4_000));
     let stereo = stereo.finish();
@@ -114,6 +115,7 @@ fn a_move_of_exactly_the_threshold_is_still_a_move() {
         seconds: 0.0,
     };
     assert!(unmoved.is_nothing(), "nothing moved at all");
+    // 0.01 dB and 0.005 of correlation are the floors themselves (`level::diff`'s `NOTHING_*`).
     assert!(!Difference {
         mean_db: Some(0.01),
         ..unmoved

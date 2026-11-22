@@ -1,13 +1,14 @@
-//! The stages a patch is built from: what makes the tone, and what shapes it.
-
 use serde::{Deserialize, Serialize};
 
 use super::fm::{Algorithm, Operator, FM_OPERATORS};
 
+/// Four detuned saws is already a fat lead; past that is CPU for no audible gain.
 pub const MAX_OSCS: usize = 4;
 
+/// The JP-8000 supersaw's seven; four oscillators at seven are already 28 a note.
 pub const MAX_VOICES: usize = 7;
 
+/// A drawbar organ has nine; each is a sine per note, and an uncapped list is unbounded.
 pub const MAX_PARTIALS: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +49,7 @@ pub struct Osc {
     pub pulse_width: f32,
 }
 
+// The clamp `core::osc::pulse` puts on `Osc::pulse_width`: a zero or full width is silence.
 pub const MIN_PULSE_WIDTH: f32 = 0.05;
 
 pub const MAX_PULSE_WIDTH: f32 = 0.95;
@@ -100,6 +102,7 @@ pub enum Source {
 }
 
 impl Source {
+    /// Each arm is the variant's serde tag: a report names a source as a recipe does.
     pub fn kind(&self) -> &'static str {
         match self {
             Self::OscStack { .. } => "osc_stack",
@@ -148,6 +151,7 @@ pub struct PitchEnv {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// One word (`lowpass`, as Web Audio spells it), like `EqKind`: keep the two spellings alike.
 #[serde(rename_all = "lowercase")]
 pub enum FilterKind {
     Lowpass,

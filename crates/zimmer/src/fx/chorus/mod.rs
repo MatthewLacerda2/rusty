@@ -1,5 +1,3 @@
-//! ensemble — several detuned, delayed copies of one signal, spread wide.
-
 pub(crate) mod line;
 pub(crate) mod voices;
 
@@ -9,10 +7,12 @@ use crate::stereo::Stereo;
 use line::read;
 use voices::{ensemble, MAX_VOICES, MIN_VOICES};
 
+/// Under ~10 ms the comb notches colour the tone; over ~30 ms the copies slap back.
 const BASE_SECONDS: f32 = 0.015;
 
 const SWEEP_SECONDS: f32 = 0.010;
 
+/// Hz; faster, the sidebands read as inharmonic tones, not a detune.
 const MAX_RATE: f32 = 10.0;
 
 pub(crate) fn apply(
@@ -23,6 +23,8 @@ pub(crate) fn apply(
     mix: f32,
     rate: f32,
 ) {
+    // Only a bad `rate` returns early (at zero the two-sample line panics `read`'s clamp); the
+    // other inputs are clamped.
     if !rate.is_finite() || rate <= 0.0 {
         return;
     }
@@ -55,10 +57,12 @@ pub(crate) fn apply(
     }
 }
 
+/// Two past the deepest read, so the far tap never reaches the frame being written.
 fn line_len(depth: f32, rate: f32) -> usize {
     (tail_seconds(depth) * rate).ceil() as usize + 2
 }
 
+/// Wrapped, so the phase keeps its `f32` precision over a long buffer.
 fn advance(phase: f32, step: f32) -> f32 {
     (phase + step) % TAU
 }
@@ -149,6 +153,7 @@ mod tests {
     fn a_copy_arrives_exactly_the_centre_delay_behind_the_dry_signal() {
         let mut buf = impulse(4096);
         apply(&mut buf, 0.0, 0.0, 4, 1.0, RATE);
+        // 661.5 samples: only an interpolated read splits the impulse across two taps.
         let at = BASE_SECONDS * RATE;
         assert!(
             (at.fract() - 0.5).abs() < 1e-3,
@@ -192,6 +197,7 @@ mod tests {
             "and they are spread across most of it"
         );
 
+        // Two voices: the left is the first alone, pinning the sweep's sign.
         let mut pair = impulse(4096);
         apply(&mut pair, 0.0, 1.0, 2, 1.0, RATE);
         let alone = &ensemble(2, 0.0, RATE)[0];

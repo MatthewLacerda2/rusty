@@ -6,6 +6,8 @@ pub(crate) mod spectrum;
 use rusty_zimmer::patch::{Adsr, NoiseColor, Osc, Patch, Source, Wave};
 use rusty_zimmer::{NoteOpts, SynthError};
 
+/// A saw at full sustain: the control case, and the width tests' source, since noise arrives as
+/// two uncorrelated channels.
 pub(crate) fn saw_patch() -> Patch {
     Patch {
         layers: Vec::new(),
@@ -90,6 +92,8 @@ pub(crate) fn rising_crossings(buf: &[f32]) -> usize {
         .count()
 }
 
+/// Hz between the first and last rising crossings: a note starts mid-cycle, so the part-cycles
+/// at either end are not pitch error.
 pub(crate) fn measured_hz(buf: &[f32], sample_rate: f32) -> f32 {
     let crossings: Vec<usize> = buf
         .windows(2)
@@ -105,6 +109,7 @@ pub(crate) fn measured_hz(buf: &[f32], sample_rate: f32) -> f32 {
     (crossings.len() - 1) as f32 * sample_rate / (last - first) as f32
 }
 
+/// First-difference energy over signal energy: amplitude-invariant, so quieter is not duller.
 pub(crate) fn brightness(buf: &[f32]) -> f32 {
     let signal: f32 = buf.iter().map(|sample| sample * sample).sum();
     let edges: f32 = buf.windows(2).map(|w| (w[1] - w[0]).powi(2)).sum();
@@ -115,6 +120,7 @@ pub(crate) fn brightness(buf: &[f32]) -> f32 {
     }
 }
 
+/// One channel of an interleaved buffer: read whole as mono, it would double every frequency.
 pub(crate) fn channel(buf: &[f32], index: usize) -> Vec<f32> {
     buf.iter().skip(index).step_by(2).copied().collect()
 }

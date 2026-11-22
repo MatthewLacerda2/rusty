@@ -4,6 +4,7 @@ use super::{apply_one, compress, delay, reverb, NoKeys, Spacing, Tempo};
 use crate::patch::Fx;
 use crate::stereo::Stereo;
 
+/// `sent` should be as long as `buf`: rooms hear silence past a shorter one.
 pub(crate) fn apply_chain_sent(
     buf: &mut Stereo,
     sent: &mut Stereo,
@@ -20,6 +21,7 @@ pub(crate) fn apply_chain_sent(
                 predelay,
             } => {
                 reverb::apply_sent(buf, sent, [*size, *damp, *predelay], *mix, rate);
+                // The room's output goes on in the send too, so a later delay echoes the room.
                 reverb::apply(sent, *size, *damp, *predelay, *mix, rate);
             }
             Fx::Delay {
@@ -46,14 +48,17 @@ pub(crate) fn apply_chain_sent(
                 release,
                 makeup,
                 mix,
+                // Validation refuses a `sidechain` on the song's chain.
                 sidechain: _,
             } => {
                 let compressor =
                     compress::Compressor::new(*threshold, *ratio, *attack, *release, *makeup, *mix);
+                // Cloned before the mix is compressed: the sent mix takes the mix's own gain.
                 let level = buf.clone();
                 compressor.apply(buf, None, rate);
                 compressor.apply(sent, Some(&level), rate);
             }
+            // Drive is not linear, so a `saturate` before a room only approximates the sent share.
             other => {
                 apply_one(buf, other, rate, &NoKeys, tempo);
                 apply_one(sent, other, rate, &NoKeys, tempo);

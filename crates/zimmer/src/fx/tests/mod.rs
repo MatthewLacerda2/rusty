@@ -82,6 +82,7 @@ fn an_eq_reaches_the_signal_it_was_handed() {
         .map(|i| (std::f32::consts::TAU * 250.0 * i as f32 / 44_100.0).sin())
         .collect();
     let mut buf = Stereo::centred(tone);
+    // From 50 ms on: the filter's start-up transient is louder than its settled response.
     let peak = |buf: &[f32]| buf[2205..].iter().fold(0.0f32, |m, s| m.max(s.abs()));
     let before = peak(&buf.l);
     apply_chain(&mut buf, &carve, 44_100.0);
@@ -95,6 +96,7 @@ fn an_eq_reaches_the_signal_it_was_handed() {
 
 #[test]
 fn a_chain_with_no_tracks_to_name_keys_a_compressor_from_its_own_signal() {
+    // Validation refuses this; a fallback that keyed from silence would quietly never compress.
     let asked = [Fx::Compress {
         threshold: -20.0,
         ratio: 8.0,

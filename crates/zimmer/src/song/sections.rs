@@ -4,11 +4,14 @@ use super::shape::plan;
 use super::Song;
 use crate::level::Cut;
 
+/// From the planned clock and passes, not the written ones: a `fit` can change both.
 fn whole(song: &Song) -> Vec<Cut> {
     let (clock, passes) = plan(song);
     if clock.bpm() <= 0.0 {
         return Vec::new();
     }
+    // Beats summed, then converted, as the renderer walks: a boundary lands where a note on that
+    // downbeat does.
     let mut beats = 0.0f32;
     let mut cuts = Vec::new();
     for entry in song
@@ -30,6 +33,7 @@ fn whole(song: &Song) -> Vec<Cut> {
 }
 
 impl Song {
+    /// Only zimmer's tests call it.
     pub fn sections(&self) -> Vec<Cut> {
         whole(self)
     }
@@ -64,6 +68,7 @@ mod tests {
             );
         }
         Song {
+            // 120 bpm: a beat is half a second, so each boundary is a round number.
             bpm: 120.0,
             tempo: vec![],
             seed: 0,

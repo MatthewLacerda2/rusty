@@ -1,4 +1,7 @@
 //! Less of a song: a stretch of it, some of its tracks, or both.
+//!
+//! A window still renders from the top: earlier notes ring into it and their buses decay
+//! across its start.
 
 mod scope;
 mod span;
@@ -15,6 +18,8 @@ pub use span::{Span, SpanError};
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Excerpt {
     pub window: Option<Window>,
+    /// A left-out track keying a sidechain is still played, so a solo keeps the duck; it is just
+    /// not heard.
     pub only: Vec<String>,
 }
 
@@ -65,6 +70,8 @@ impl Window {
         }
     }
 
+    /// On `clock`, the rendered piece's tempo (after `fit` and anchors), the one notes are
+    /// placed with.
     fn frames(self, clock: &Clock) -> (usize, Option<usize>) {
         let seconds = |value: f32| match self.unit {
             Unit::Beats => clock.seconds(value),

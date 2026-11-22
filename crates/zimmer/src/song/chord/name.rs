@@ -12,6 +12,8 @@ const NATURALS: [(char, i32); 7] = [
     ('B', 11),
 ];
 
+// No `M` (a shift key from `m`, meaning the opposite), and no 11ths or 13ths, whose dropped
+// tones are taste: spell those as pitches.
 const QUALITIES: &[(&str, &[i32])] = &[
     ("", &[0, 4, 7]),
     ("maj", &[0, 4, 7]),
@@ -77,6 +79,7 @@ pub(crate) fn spell(name: &str) -> Result<Spelling, SynthError> {
     Ok(Spelling { root, offsets })
 }
 
+/// Also reads `Key::parse`'s tonic, so a key and a chord root spell alike.
 pub(crate) fn split_root(text: &str) -> Option<(i32, &str)> {
     let mut chars = text.chars();
     let letter = chars.next()?;
@@ -87,6 +90,7 @@ pub(crate) fn split_root(text: &str) -> Option<(i32, &str)> {
     let rest = chars.as_str();
     let mut offset = 0;
     let mut end = 0;
+    // `#` and `b` only, not `parse_note`'s `s` and `f`: an `s` would eat the start of `sus`.
     for (index, character) in rest.char_indices() {
         match character {
             '#' => offset += 1,
@@ -121,7 +125,6 @@ mod tests {
     fn a_slash_bass_goes_underneath() {
         let spelled = spell("C/G").expect("a slash chord");
         assert_eq!(spelled.offsets, vec![-5, 0, 4, 7]);
-        // The root named as its own bass is that root doubled an octave down.
         assert_eq!(spell("C/C").expect("legal").offsets, vec![-12, 0, 4, 7]);
     }
 

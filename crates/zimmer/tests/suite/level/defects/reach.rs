@@ -18,6 +18,7 @@ fn a_staircase_in_the_first_quarter_second_is_found() {
     assert!(defects.zipper.worst[0].from_seconds < 0.05, "{defects:?}");
 }
 
+/// 2559 half-millisecond blocks: the stretches every 512 blocks stop 511 short of the end.
 #[test]
 fn a_staircase_past_the_last_whole_stretch_is_found() {
     let seconds = 2_559.0 * 0.0005;
@@ -25,6 +26,7 @@ fn a_staircase_past_the_last_whole_stretch_is_found() {
     assert_eq!(defects.zipper.count, 1, "{defects:?}");
 }
 
+/// A mean square under −70 dB is silence: at 3e-3 the steps run −53 to −68 dB, at 1e-3 −63 to −78.
 #[test]
 fn a_staircase_in_near_silence_is_not_judged() {
     let period = 800.0 / f64::from(RATE);

@@ -1,11 +1,10 @@
-//! the additive series: a spectrum stated rather than carved.
-
 use std::f32::consts::TAU;
 
 use crate::core::nyquist;
 use crate::hash::unit2;
 use crate::patch::Partial;
 
+/// ASCII "AD": no other zimmer draw uses this hash channel, so no source repeats its sequence.
 const PHASE_CHANNEL: u64 = 0x4144;
 
 pub(crate) fn render(
@@ -16,6 +15,7 @@ pub(crate) fn render(
     sample_rate: f32,
 ) {
     let ceiling = nyquist::ratio_ceiling(freqs, sample_rate);
+    // Only partials that sound: counting the dropped ones would quieten a note played higher.
     let total_gain: f32 = partials
         .iter()
         .filter(|partial| sounding(partial, ceiling).is_some())
@@ -44,6 +44,8 @@ fn sounding(partial: &Partial, ceiling: f32) -> Option<f32> {
     (ratio > 0.0 && ratio < ceiling).then_some(ratio)
 }
 
+/// `t` is seconds from the note's start, not the gate's close; a partial that never fades skips
+/// the `exp`.
 #[inline]
 fn decay_at(t: f32, decay: f32) -> f32 {
     if decay <= 0.0 {
@@ -52,6 +54,7 @@ fn decay_at(t: f32, decay: f32) -> f32 {
     (-t / decay).exp()
 }
 
+/// Keyed by the index in the declared list, so a partial dropped at Nyquist moves no other's.
 fn start_phase(index: usize, seed: u64) -> f32 {
     unit2(index as i64, 0, PHASE_CHANNEL, seed)
 }
@@ -64,6 +67,7 @@ mod tests {
 
     const RATE: f32 = 44_100.0;
 
+    /// A tenth of a second: every harmonic of `BASE` completes whole cycles, landing on a bin.
     const WINDOW: usize = 4410;
 
     fn partial(ratio: f32, gain: f32) -> Partial {

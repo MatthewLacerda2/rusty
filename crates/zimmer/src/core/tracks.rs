@@ -6,6 +6,8 @@ use super::RATE;
 use crate::note::Glide;
 use crate::patch::{Filter, LfoTarget, PitchEnv};
 
+/// Semitones either way (ten octaves): unbounded, the exponent reaches `inf` Hz and then a `NaN`
+/// sample.
 const MAX_PITCH_OFFSET: f32 = 120.0;
 
 pub(super) fn pitch_track(
@@ -44,6 +46,7 @@ pub(super) fn pitch_track(
         .collect()
 }
 
+/// Unbounded: `filter::apply` clamps every cutoff into the SVF's stable band.
 pub(super) fn cutoff_track(
     f: &Filter,
     lfos: &Lfos,
@@ -53,6 +56,7 @@ pub(super) fn cutoff_track(
     base: Option<&[f32]>,
 ) -> Vec<f32> {
     let envelope = env::track(&f.adsr, gate, n, RATE);
+    // The written note (60 is middle C), not the pitch track, which carries the vibrato.
     let followed = f.key_track.clamp(0.0, 1.0) * (midi - 60.0) / 12.0;
     let struck = f.vel_octaves * velocity + followed;
     (0..n)
@@ -75,6 +79,8 @@ mod tests {
 
     const BASE: f32 = 440.0;
 
+    /// Not 1 Hz, where `TAU * rate` and `TAU / rate` agree; at 5 Hz a quarter cycle is 2_205
+    /// whole frames.
     const RATE_HZ: f32 = 5.0;
 
     const PEAK: usize = 2_205;

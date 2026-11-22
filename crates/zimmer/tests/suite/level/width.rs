@@ -43,6 +43,8 @@ fn a_channel_against_its_own_negation_reads_as_cancelling() {
     assert!(read >= -1.0, "and never under the range it is defined on");
 }
 
+/// Over whole periods the partials are orthogonal, so the answer is exactly 1/√2; ±1 come out of
+/// many wrong formulas.
 #[test]
 fn a_signal_half_in_common_reads_as_half_in_common() {
     let fundamental = tone(440.0);

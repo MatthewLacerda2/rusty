@@ -1,5 +1,7 @@
 //! A signal's envelope, without its waveform's ripple.
 
+// Olli Niemitalo's 90-degree all-pass pair, squared: within 2 degrees of quadrature from 20 Hz
+// to 20 kHz at 48 kHz.
 const ONE: [f64; 4] = [
     0.479_400_865_6,
     0.876_218_493_5,
@@ -32,6 +34,7 @@ impl Section {
 pub(super) struct Quadrature {
     one: [Section; 4],
     other: [Section; 4],
+    /// The pair reads the first chain one sample late.
     late: f64,
 }
 

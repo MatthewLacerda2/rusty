@@ -59,6 +59,8 @@ fn a_mark_still_opens_a_filter_a_curve_has_already_moved() {
     assert!(peak(&accented) > peak(&plain), "and so was its level");
 }
 
+/// The ghost's own offset is the same under both seeds, so only a sum keeps seed 4 above and 5
+/// below; a subtraction swaps them.
 #[test]
 fn the_players_touch_is_added_to_a_marks_and_not_taken_off_it() {
     let ghost = |seed, timbre| {

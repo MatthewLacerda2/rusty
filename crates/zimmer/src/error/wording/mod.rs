@@ -16,7 +16,8 @@ use super::SynthError;
 
 impl SynthError {
     // Exhaustive, so a refusal with no wording fails to compile. Each arm hands a group to the
-    // `say_*` that words exactly those variants; a table, as the enum is.
+    // `say_*` that words exactly those variants; a table, as the enum is. A `say_*` missing a
+    // variant its arm hands over still compiles and panics in its `unreachable!`.
     #[rustfmt::skip]
     pub(super) fn say(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

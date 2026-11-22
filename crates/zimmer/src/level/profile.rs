@@ -5,6 +5,8 @@ use std::collections::VecDeque;
 use super::bands::{BandMeter, Bands};
 use super::meter::{Loudness, Meter};
 
+/// About a phrase: long enough to skip a transient, short enough to split a section that
+/// changes midway.
 pub(crate) const FALLBACK_SECONDS: f64 = 8.0;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -57,6 +59,8 @@ pub struct Profiler {
     current: Section,
     done: Vec<Span>,
     fed: u64,
+    /// Once these run out the fallback grid takes over, which carries a song's ring-out past its
+    /// last pattern.
     cuts: VecDeque<Cut>,
 }
 
@@ -108,6 +112,8 @@ impl Profiler {
         }
     }
 
+    /// Saturating: a boundary comes from a document, and a 1e30-beat pattern must not overflow
+    /// into a panic.
     fn until_boundary(&self) -> usize {
         let boundary = match self.cuts.front() {
             Some(cut) => self.frame_at(cut.end_seconds),
@@ -126,6 +132,8 @@ impl Profiler {
     }
 
     fn close(&mut self) {
+        // A boundary at the last one's frame adds no empty row, but is still consumed, or `feed`
+        // never advances.
         if self.fed > self.current.from {
             self.done.push(self.current.close(self.fed));
         }

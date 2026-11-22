@@ -1,6 +1,3 @@
-//! the compressor a recipe chooses — and the one effect here that can be listening to something
-//! other than the signal it changes.
-
 use super::gain::Ballistics;
 use crate::level::{db_to_gain_f32, gain_to_db_f32};
 use crate::stereo::Stereo;
@@ -9,8 +6,10 @@ const MIN_THRESHOLD_DB: f32 = -60.0;
 
 const MAX_THRESHOLD_DB: f32 = 0.0;
 
+/// Past 20:1 this is a limiter.
 const MAX_RATIO: f32 = 20.0;
 
+/// About 22 samples at 44.1 kHz: faster, the gain tracks the waveform, not the level.
 const MIN_TIME: f32 = 0.0005;
 
 const MAX_TIME: f32 = 2.0;

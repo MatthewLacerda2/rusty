@@ -8,8 +8,11 @@ use crate::error::SynthError;
 use crate::fx::limiter;
 use crate::stereo::Stereo;
 
+/// Seconds a cut fades over, so its edge does not click.
 pub(super) const SEAM: f32 = 0.02;
 
+/// Folds a `wrap` tail before limiting: the sum can overshoot, so limiting first would hand out
+/// clipping.
 pub(crate) fn limit(
     song: &Song,
     buf: &mut Stereo,
@@ -19,6 +22,8 @@ pub(crate) fn limit(
         limiter::apply(buf, RATE);
         return Ok(());
     }
+    // A stretch fit's loop point is its target: rounding the two apart could leave `shape` cutting
+    // the end.
     let at = fitted(song).map_or(arrangement_end, |(_, seconds)| samples(seconds));
     wrap(buf, at)?;
     limiter::apply_looped(buf, RATE);
@@ -43,6 +48,7 @@ fn wrap(buf: &mut Stereo, at: usize) -> Result<(), SynthError> {
     Ok(())
 }
 
+/// Runs after the limiter: limiting a faded tail would pull it back up.
 pub(crate) fn shape(song: &Song, buf: &mut Stereo, arrangement_end: usize) {
     if song.tail() == Tail::Exact {
         resize(buf, arrangement_end);
@@ -69,6 +75,7 @@ pub(crate) fn plan(song: &Song) -> (Clock, u32) {
         return (written, 1);
     }
     match fit.mode {
+        // Ceil: the buffer is never short of the target, so `shape` cuts a loop and never pads it.
         FitMode::Loop => {
             let passes = passes(seconds / once, f32::ceil);
             (Clock::written(song, passes), passes)

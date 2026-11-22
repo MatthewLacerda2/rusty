@@ -19,6 +19,7 @@ fn held(color: NoiseColor) -> Vec<f32> {
     channel(&render_stereo(&patch, 60.0, &opts(2.0)), 0)
 }
 
+/// Hz, the lowest octave centre fitted: well clear of the brown integrator's 35 Hz corner.
 const LOWEST_HZ: f32 = 125.0;
 const OCTAVES: usize = 7;
 

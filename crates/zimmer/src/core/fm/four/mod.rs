@@ -1,5 +1,3 @@
-//! four-operator FM: four sines, wired by the algorithm the recipe picked.
-
 mod phase;
 mod routing;
 
@@ -9,6 +7,7 @@ use super::{feedback, voicing};
 use crate::core::{env, nyquist, NoteContext};
 use crate::patch::{Algorithm, Operator, FM_OPERATORS};
 
+/// Reads `levels`, never `Operator::level`: `source::fm_levels` folds velocity into them first.
 pub(crate) fn render(
     out: &mut [f32],
     freqs: &[f32],
@@ -35,6 +34,7 @@ fn render_from(
 ) {
     let NoteContext { gate, rate, .. } = note;
     let ceiling = nyquist::ratio_ceiling(freqs, rate);
+    // Sidebands past Nyquist still fold: keep pitch × ratio × (index + 1) under ~20 kHz (Carson).
     let sounding = voicing::sounding(operators, ceiling);
     let norm = voicing::normaliser(algorithm, levels, &sounding);
     let mut fed = [[0.0f32; 2]; FM_OPERATORS];
@@ -80,6 +80,7 @@ mod tests {
 
     const WINDOW: usize = 4410;
 
+    /// Seconds: past every window here, so no envelope releases unless a test asks.
     const HELD: f32 = 10.0;
 
     const SEED: u64 = 7;
@@ -180,8 +181,7 @@ mod tests {
     fn the_modulators_and_the_feedback_add_rather_than_cancel() {
         let mut carrier = op(1.0, 1.0);
         carrier.feedback = 1.0;
-        // An eighth of the sample rate: 5512.5 Hz, whose ratio ceiling is exactly 4, so every
-        // operator here is comfortably inside it.
+        // An eighth of the rate, 5512.5 Hz: its ratio ceiling is exactly 4, above every ratio here.
         let buf = from_phases(
             [0.0; FM_OPERATORS],
             Algorithm::Twin,

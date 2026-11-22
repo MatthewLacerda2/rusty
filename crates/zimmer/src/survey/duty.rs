@@ -1,6 +1,7 @@
 //! How much of a piece a track is actually sounding for.
 
 #[derive(Debug, Default)]
+/// The `(from, to)` beats one track sounds over.
 pub(super) struct Sounding(Vec<(f32, f32)>);
 
 impl Sounding {

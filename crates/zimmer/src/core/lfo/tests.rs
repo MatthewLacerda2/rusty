@@ -4,6 +4,7 @@
 
 use super::*;
 
+// Not 1 Hz, where `TAU * rate` and `TAU / rate` agree.
 const RATE_HZ: f32 = 5.0;
 const PEAK: usize = 2_205;
 const HALF: usize = 4_410;

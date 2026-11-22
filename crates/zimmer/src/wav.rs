@@ -1,8 +1,9 @@
-//! The WAV encoder: `f32` samples → stereo 16-bit PCM RIFF bytes.
+//! Hand-rolled, not a crate, so no encoder's version bump can move a bake's bytes.
 
 use crate::core::SAMPLE_RATE;
 use crate::stereo::CHANNELS;
 
+// Byte counts and the format tag, as the RIFF/WAVE header for 16-bit PCM fixes them.
 const BYTES_PER_SAMPLE: u32 = 2;
 const BYTES_PER_FRAME: u32 = BYTES_PER_SAMPLE * CHANNELS as u32;
 const FMT_CHUNK_LEN: u32 = 16;
@@ -14,6 +15,7 @@ pub(crate) fn encode(samples: &[f32]) -> Vec<u8> {
     let mut out = Vec::with_capacity(HEADER_LEN + data_len as usize);
 
     out.extend_from_slice(b"RIFF");
+    // The bytes after this field: the 44-byte header less `RIFF` and the field itself.
     out.extend_from_slice(&(36 + data_len).to_le_bytes());
     out.extend_from_slice(b"WAVE");
 
@@ -34,10 +36,13 @@ pub(crate) fn encode(samples: &[f32]) -> Vec<u8> {
     out
 }
 
+/// From the length, not the header: only asked of a file [`encode`] wrote, whose length cannot
+/// disagree with its samples.
 pub(crate) fn frames_in(file_len: usize) -> usize {
     file_len.saturating_sub(HEADER_LEN) / BYTES_PER_FRAME as usize
 }
 
+/// A test hook: only `crates/zimmer/tests/suite` and its own unit test call it.
 pub fn seconds_in(file_len: usize) -> f64 {
     frames_in(file_len) as f64 / f64::from(SAMPLE_RATE)
 }

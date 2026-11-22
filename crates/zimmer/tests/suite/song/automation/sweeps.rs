@@ -7,6 +7,7 @@ use super::setup::{at, curve, filtered, frame, render, rms, voiced, BEATS};
 use crate::common::brightness;
 use crate::common::songs::voice;
 
+/// 300 Hz rising to 8300 Hz over eight beats: `300 + 1000·b`, a round number at every beat.
 fn sweep() -> rusty_zimmer::song::Automation {
     curve(Param::Cutoff, vec![at(0.0, 300.0), at(BEATS, 8300.0)])
 }

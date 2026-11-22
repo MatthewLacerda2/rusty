@@ -62,6 +62,8 @@ impl BandsDifference {
     }
 }
 
+// "The same audio", not "close enough", below anything audible: dB, percentage points,
+// correlation and seconds.
 const NOTHING_DB: f64 = 0.01;
 
 const NOTHING_POINTS: f64 = 0.05;

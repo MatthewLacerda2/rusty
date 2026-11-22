@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use super::stages::one;
 use crate::level::bands;
 
+/// A high-pass, both shelves and a few peaks; past that an EQ is a filter bank run per sample.
 pub const MAX_EQ_BANDS: usize = 8;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +19,7 @@ pub enum EqKind {
 }
 
 impl EqKind {
+    /// The pass filters ignore `gain_db`, so `fx::eq`'s zero-gain bypass must not skip them.
     pub fn takes_gain(self) -> bool {
         matches!(self, Self::LowShelf | Self::Peak | Self::HighShelf)
     }

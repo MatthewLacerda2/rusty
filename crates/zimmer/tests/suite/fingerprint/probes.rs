@@ -1,4 +1,7 @@
 //! The probe corpus: a handful of documents reaching every main path.
+//!
+//! Each leans on one part of the path, so a change there moves its row. A probe is never edited
+//! in place: a new path gets a new probe, and the table is re-recorded.
 
 pub(crate) struct Note {
     pub(crate) name: &'static str,

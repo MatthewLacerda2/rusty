@@ -1,19 +1,23 @@
-//! Stepped gain: a level that moves in flat steps at a regular period instead of smoothly.
-
 mod period;
 
 use super::Found;
 use period::{candidates, steps};
 
+// Periods in 0.5 ms blocks, 5 ms (240 samples at 48 kHz, about a 256-sample buffer) to 64 ms
+// (16 fps): shorter would catch a note's own cycle.
 const SHORTEST: usize = 10;
 const LONGEST: usize = 128;
 const STRETCH: usize = 1024;
 const HOP: usize = 512;
 const STEPS: usize = 6;
+/// Steps a run needs to be reported: a game's fade takes a dozen at 60 Hz, a sound's flutter a
+/// handful.
 const REPORTED: usize = 10;
 const WINDOW_STEPS: usize = 12;
 const REPEATS: f64 = 0.08;
 const TRIED: usize = 3;
+/// In blocks: 60 Hz is 33.3 blocks, and a whole-block error drifts a third of a segment in ten
+/// steps.
 const FINE: f64 = 0.05;
 const STEP_DB: f64 = 0.25;
 const FLAT: f64 = 0.3;

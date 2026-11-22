@@ -1,10 +1,12 @@
-//! the Chamberlin state-variable filter.
+//! Chamberlin's state-variable filter: one pass yields every `FilterKind`'s output at once.
 
 use std::f32::consts::PI;
 
 use crate::patch::{Filter, FilterKind};
 
+/// Hz; clear of the zero that would stall the integrators.
 const MIN_CUTOFF: f32 = 20.0;
+/// Fraction of the rate: the 2×-oversampled SVF's stability ceiling.
 const MAX_CUTOFF_RATIO: f32 = 1.0 / 3.0;
 
 const MAX_PAIRS: usize = 2;
@@ -28,7 +30,6 @@ impl Svf {
         match kind {
             FilterKind::Lowpass => self.low,
             FilterKind::Highpass => high,
-            // Already computed as state and, until now, thrown away every sample.
             FilterKind::Bandpass => self.band,
             FilterKind::Notch => high + self.low,
         }
@@ -50,14 +51,16 @@ pub(crate) fn apply(buf: &mut [f32], filter: &Filter, cutoffs: &[f32], sample_ra
     let (mut before, mut last) = (0.0, 0.0);
     for i in 0..buf.len() {
         let current = buf[i];
-        // Past the end, the parabola through the last three samples carries on: a zero there would
-        // be a step, and a step is broadband.
+        // Past the end, the parabola through the last three samples carries on: a zero would be a
+        // broadband step.
         let next = buf
             .get(i + 1)
             .copied()
             .unwrap_or(3.0 * (current - last) + before);
         let cutoff = cutoffs.get(i).copied().unwrap_or(filter.cutoff);
         let f = tuning(cutoff.clamp(MIN_CUTOFF, ceiling), sample_rate);
+        // 2× oversampling: a half-step at the halfway point, then one at this sample, whose output
+        // is kept.
         cascade(
             pairs,
             halfway(before, last, current, next),
@@ -70,6 +73,7 @@ pub(crate) fn apply(buf: &mut [f32], filter: &Filter, cutoffs: &[f32], sample_ra
     }
 }
 
+/// The cubic half-band `[-1, 9, 9, -1] / 16`: holding the sample lets a highpass pass the 2× image.
 #[inline]
 fn halfway(a: f32, b: f32, c: f32, d: f32) -> f32 {
     (9.0 * (b + c) - (a + d)) / 16.0

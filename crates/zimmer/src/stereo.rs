@@ -4,6 +4,7 @@ use std::f32::consts::{FRAC_PI_4, SQRT_2};
 
 pub(crate) const CHANNELS: usize = 2;
 
+/// Two channels always of equal length; every method here keeps them so.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub(crate) struct Stereo {
     pub(crate) l: Vec<f32>,
@@ -81,7 +82,9 @@ impl Stereo {
     }
 }
 
+/// Constant power, scaled so centre is unity: hard over is √2, +3 dB on that side.
 pub(crate) fn pan_gains(pan: f32) -> (f32, f32) {
+    // A literal: `√2·cos(π/4)` is 0.99999994 in `f32`, and an unpanned track must keep its samples.
     if !pan.is_finite() || pan == 0.0 {
         return (1.0, 1.0);
     }
@@ -163,6 +166,8 @@ mod tests {
         let (l, r) = pan_gains(1.0);
         assert_eq!(l, 0.0);
         assert!((r - SQRT_2).abs() < 1e-6, "right is {r}");
+        // ±3, not a larger absurdity: the law is a circle, and these land where an unclamped one is
+        // silent.
         assert_eq!(
             pan_gains(-3.0),
             pan_gains(-1.0),

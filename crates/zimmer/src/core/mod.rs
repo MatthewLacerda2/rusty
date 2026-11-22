@@ -1,4 +1,5 @@
-//! core — the note renderer: patch + note → a stereo pair of `f32` buffers.
+//! Both channels run the whole path even where they are identical: no stage reads a "still mono"
+//! flag.
 
 pub(crate) mod additive;
 pub(crate) mod env;
@@ -23,6 +24,7 @@ use super::stereo::Stereo;
 use lfo::{Lfos, Onset};
 use voice::{layer_seed, Struck, Voice};
 
+/// Hz: CD rate.
 pub const SAMPLE_RATE: u32 = 44_100;
 
 /// What a sound source is told of the note it renders: when it is let go, its seed and the
@@ -36,12 +38,14 @@ pub(crate) struct NoteContext {
 
 pub(crate) const RATE: f32 = SAMPLE_RATE as f32;
 
+/// Seconds, held plus tail: a guard against a typo'd `duration`, which is refused, never cut.
 const MAX_SECONDS: f32 = 60.0;
 
 pub(crate) fn render_note(patch: &Patch, midi: f32, opts: &NoteOpts) -> Result<Stereo, SynthError> {
     render_swept(patch, midi, opts, None, None)
 }
 
+/// `sweep`: the cutoff in Hz per frame from onset, replacing the top filter's `cutoff`.
 pub(crate) fn render_swept(
     patch: &Patch,
     midi: f32,
@@ -86,6 +90,8 @@ fn gate_length(duration: f32) -> Result<f32, SynthError> {
     Ok(duration)
 }
 
+/// Kept apart from [`render_note`]: a song sums unlimited notes, since limiting each would
+/// squash twice.
 pub(crate) fn render_limited(
     patch: &Patch,
     midi: f32,

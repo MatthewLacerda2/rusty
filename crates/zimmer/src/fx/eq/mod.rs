@@ -1,4 +1,5 @@
-//! Filter bands, from the RBJ cookbook.
+//! Filter bands as RBJ cookbook biquads: `core::filter`'s SVF has no shelf or bell, nor a static
+//! band's exact curve.
 
 mod cookbook;
 
@@ -7,12 +8,14 @@ use crate::patch::EqBand;
 
 const MIN_Q: f32 = 0.1;
 
+/// 30 at 250 Hz is 8 Hz wide: narrower rings on its own, a resonator.
 const MAX_Q: f32 = 30.0;
 
 const MAX_GAIN_DB: f32 = 24.0;
 
 const MIN_HZ: f32 = 10.0;
 
+/// Fraction of the rate the top corner may reach: the bilinear warp bends corners near Nyquist.
 const NYQUIST_MARGIN: f32 = 0.45;
 
 pub(crate) fn apply(buf: &mut [f32], bands: &[EqBand], rate: f32) {
@@ -71,6 +74,8 @@ impl Biquad {
             .all(|c| c.is_finite())
     }
 
+    /// Transposed direct form II: two states, and less `f32` round-off on low bands than direct
+    /// form II.
     fn run(self, buf: &mut [f32]) {
         let (mut z1, mut z2) = (0.0f32, 0.0f32);
         for sample in buf.iter_mut() {
@@ -137,7 +142,6 @@ mod tests {
 
     #[test]
     fn a_cut_removes_the_decibels_it_asked_for_and_leaves_the_rest_alone() {
-        // The move the issue is about: 250 Hz out of the pad, the pad kept.
         let cut = band(EqKind::Peak, 250.0, -9.0, 2.0);
         assert!(
             (response_db(cut, 250.0) + 9.0).abs() < 0.5,
@@ -192,8 +196,7 @@ mod tests {
 
     #[test]
     fn a_gain_of_zero_is_not_an_approximation_of_the_input() {
-        // The property that lets a recipe park a band it is still thinking about: identical
-        // samples, not almost-identical ones.
+        // What lets a recipe park a band: identical samples, not almost-identical ones.
         for kind in [EqKind::LowShelf, EqKind::Peak, EqKind::HighShelf] {
             let original = sine(440.0);
             let mut parked = original.clone();

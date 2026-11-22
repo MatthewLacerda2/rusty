@@ -15,6 +15,8 @@ pub(super) struct Sounded {
     pub(super) stated: bool,
 }
 
+/// Mirrors the renderer's expansion (`Pattern::voices`, `plays`, `played_pitch`, `slot_beats`):
+/// change the two together.
 pub(super) fn walk(song: &Song, mut each: impl FnMut(Sounded)) {
     let key = song.key().ok().flatten();
     let mut at = 0.0;
@@ -34,7 +36,9 @@ pub(super) fn walk(song: &Song, mut each: impl FnMut(Sounded)) {
             let mut stated = Vec::new();
             let mut led = Led::default();
             for written in &pattern.notes {
+                // An entry that fails to expand costs only itself; `Song::validate` refuses it.
                 let _ = written.voice_into(around, &mut led, &mut voiced);
+                // A step string without `note` plays its default unstated: percussion's way.
                 let says = !matches!(written, PatternEntry::Steps(Steps { note: None, .. }));
                 stated.resize(voiced.len(), says);
             }

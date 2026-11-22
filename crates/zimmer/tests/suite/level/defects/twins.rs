@@ -3,6 +3,7 @@
 
 use super::{found, RATE};
 
+/// Values this large keep every sample exact, and a twentieth of the 20 jump is exactly 1.
 fn two_jumps(before: f32, after: f32) -> Vec<f32> {
     let (p, q) = (RATE as usize / 4, RATE as usize / 4 + 480);
     let mut signal = vec![0.0; RATE as usize / 2];
@@ -35,6 +36,7 @@ fn a_twin_matches_either_side_to_a_twentieth_of_the_jump() {
     }
 }
 
+/// The last period is the whole 35 ms reach, 1680 samples: that reset's only twin is behind it.
 #[test]
 fn a_twin_the_whole_reach_behind_is_a_twin() {
     let periods = [1_600, 1_600, 1_680, 1_680];
@@ -82,6 +84,7 @@ fn opening_reset(opening: usize, period: usize) -> Vec<f32> {
     signal
 }
 
+/// A twin ahead counts once its two samples after are in, so the reach ahead is 1678, not 1680.
 #[test]
 fn a_twin_ahead_is_seen_two_samples_short_of_the_reach() {
     let twinned = found(1, &opening_reset(4_000, 1_678));

@@ -1,14 +1,19 @@
-//! vary: another take of the same one-shot, from one number.
+//! Each draw scales a number by `2^(amount × reach × u)`, `u` in `-1..1`: a zero stays zero
+//! and a pitch bounce keeps its sign.
 
 use super::{Adsr, Filter, Patch, PitchEnv};
 use crate::hash::unit2;
 
+/// Hash channel "VA", apart from the ones noise and start phases draw on.
 const VARY_CHANNEL: u64 = 0x5641;
 
+// Octaves either way at full `vary`: a timing lands at half to twice, a cutoff an octave off.
 const TIME_REACH: f32 = 1.0;
 const CUTOFF_REACH: f32 = 1.0;
+/// `log2(1.5)` octaves of a pitch envelope's depth: a 12-semitone bounce lands in 8..18.
 const BOUNCE_REACH: f32 = 0.585;
 
+// Fixed draw slots: moving one re-rolls every seed's existing take.
 const CUTOFF_SLOT: i64 = 3;
 const FILTER_SLOTS: i64 = 4;
 const BOUNCE_SLOT: i64 = 7;
@@ -16,6 +21,7 @@ const PITCH_SLOTS: i64 = 8;
 const PATH_SLOTS: i64 = 11;
 
 impl Patch {
+    /// Only rusty-zimmer's own tests call it: no `Sound.*` key reaches it.
     pub fn varied(&self, amount: f32, seed: u64) -> Patch {
         let mut patch = self.clone();
         let amount = if amount.is_finite() {

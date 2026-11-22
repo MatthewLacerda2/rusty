@@ -44,6 +44,7 @@ fn an_oversized_series_says_what_the_limit_is() {
             limit: MAX_PARTIALS,
         })
     );
+    // Exactly the cap is legal: the refusal is past it, not at it.
     minimal(series(vec![partial(1.0, 1.0, 0.0); MAX_PARTIALS]))
         .validate()
         .expect("the cap itself is legal");

@@ -10,6 +10,7 @@ mod read;
 #[cfg(test)]
 mod tests;
 
+/// In beats, a thirty-second note in 4/4: a rub or accidental shorter than this passes.
 pub const PASSING: f32 = 0.125;
 
 pub(super) const CLASHES_LISTED: usize = 5;
@@ -47,6 +48,7 @@ impl fmt::Display for Place {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Clash {
+    /// The track the song lists first, not the lower pitch.
     pub low: Voice,
     pub high: Voice,
     pub beats: f32,
@@ -88,6 +90,7 @@ impl fmt::Display for Stray {
 #[derive(Debug, Clone, PartialEq)]
 pub struct OutOfKey {
     pub track: String,
+    /// Of the track's held time, summed per note, so a chord of three counts three times.
     pub share: f32,
     pub longest: Vec<Stray>,
 }

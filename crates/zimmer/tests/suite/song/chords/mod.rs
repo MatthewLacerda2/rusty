@@ -52,6 +52,8 @@ fn playing(entries: Vec<PatternEntry>) -> Song {
     one_pass
 }
 
+/// The trailing note proves the chord took four ordinals, not one: a note's seed comes from its
+/// ordinal.
 fn spelled(names: [&str; 4]) -> Song {
     let mut voices: Vec<PatternEntry> = names
         .iter()

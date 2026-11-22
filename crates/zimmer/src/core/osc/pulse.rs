@@ -1,9 +1,10 @@
-//! pulse: a square at any duty cycle.
+//! A square at any duty cycle.
 
 use super::wave::poly_blep;
 use crate::core::lfo::Lfos;
 use crate::patch::{LfoTarget, Osc, MAX_PULSE_WIDTH, MIN_PULSE_WIDTH};
 
+/// The LFOs' swing per sample, unclamped: [`width`] clamps it with the written width.
 pub(crate) fn track(lfos: &Lfos, n: usize) -> Option<Vec<f32>> {
     if !lfos.aims_at(LfoTarget::PulseWidth) {
         return None;
@@ -30,6 +31,7 @@ pub(super) fn sample(phase: f32, dt: f32, width: f32) -> f32 {
     // `1.0 - width` first, so at one half the fall is `phase + 0.5` exactly, rounded the way the
     // square always rounded it.
     let fall = (phase + (1.0 - width)).fract();
+    // The pulse averages `2w - 1`; taking it off per sample keeps a moving width from swelling.
     naive + poly_blep(phase, dt) - poly_blep(fall, dt) - (2.0 * width - 1.0)
 }
 
@@ -38,8 +40,10 @@ mod tests {
     use super::*;
     use crate::patch::{Lfo, Wave};
 
+    /// 441 Hz at 44.1 kHz: 100 samples a cycle, so a mean and a time high are whole samples.
     const DT: f32 = 0.01;
 
+    /// Half a sample off the grid, so no sample lands on an edge.
     fn cycle(width: f32) -> Vec<f32> {
         (0..100)
             .map(|n| sample((n as f32 + 0.5) * DT, DT, width))

@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use rusty_zimmer::patch::{Adsr, NoiseColor, Patch, Source};
 use rusty_zimmer::song::{Note, PatchRef, Pattern, PatternEntry, Pitch, Song, Track};
 
+/// Noise, so the song fixtures exercise the per-note seeding path, not a fixed waveform.
 pub(crate) fn blip() -> Patch {
     Patch {
         layers: Vec::new(),

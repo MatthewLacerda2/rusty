@@ -7,6 +7,8 @@ use super::super::Note;
 use super::Chord;
 use crate::error::SynthError;
 
+/// Most notes one arpeggiated chord may sound: the figure is allocated, and a mistyped tiny
+/// `div` would never finish.
 const MAX_FIGURE: usize = 4096;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -18,6 +20,7 @@ pub enum Arp {
 }
 
 impl Arp {
+    /// One traversal in the order the chord voiced, never sorted: a spelled chord walks as written.
     fn figure(self, voices: &[Note]) -> Vec<&Note> {
         match self {
             Self::Up => voices.iter().collect(),
@@ -59,6 +62,8 @@ pub(super) fn spread(
             "`gate` is how long one note of the figure sounds, so it is a positive number of beats",
         );
     }
+    // Whole steps only (a floor); the epsilon, in steps, absorbs a triplet `div` not dividing a
+    // beat exactly.
     let steps = (chord.dur / div + GRID_EPSILON).floor();
     if !steps.is_finite() || steps < 1.0 {
         return refuse(
@@ -70,6 +75,8 @@ pub(super) fn spread(
             "the figure is more than 4096 notes — that is a texture rather than an arpeggio, so raise `div` or shorten the chord",
         );
     }
+    // The figure repeats and is cut where the steps run out: with no written count, a mismatch
+    // is not refused.
     let figure = arp.figure(voices);
     out.extend(
         figure

@@ -8,6 +8,7 @@ use crate::note::DIATONIC;
 
 pub use degree::{Degree, DegreeNote};
 
+/// In rotation order: `rotation` reads the discriminant, so the order is the arithmetic.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Mode {
     Ionian,
@@ -66,6 +67,8 @@ impl Key {
         Ok(Self { tonic, mode })
     }
 
+    /// Semitones above the tonic of zero-based `step`; `degree_midi` converts the page's
+    /// one-based degrees.
     pub fn step_semitones(&self, step: i32) -> i32 {
         let rotation = self.mode.rotation();
         let within = step.rem_euclid(STEPS) as usize;
@@ -150,7 +153,6 @@ mod tests {
             .map(|midi| key.shift(*midi, 1))
             .collect();
         assert_eq!(up, vec![64.0, 65.0, 67.0]);
-        // And back down again, and by a whole octave's worth of steps.
         assert_eq!(key.shift(65.0, -1), 64.0);
         assert_eq!(key.shift(62.0, 7), 74.0);
     }

@@ -17,6 +17,8 @@ fn filter(kind: FilterKind, cutoff: f32) -> Filter {
     }
 }
 
+// Phase in `f64`: `f32` rounding a second in leaves a floor near −72 dB, above the −80 a
+// stopband test asks.
 fn sine(hz: f32) -> Vec<f32> {
     (0..44_100)
         .map(|i| (TAU * f64::from(hz) * f64::from(i) / 44_100.0).sin() as f32)
@@ -84,6 +86,8 @@ fn a_steep_highpass_holds_a_low_tone_far_down() {
         &cutoffs,
         44_100.0,
     );
+    // Four octaves under 9 kHz at 24 dB is −96 dB in theory; the bound catches the 2× image folding
+    // back.
     let db = 20.0 * settled_peak(&low).log10();
     assert!(
         db < -80.0,
@@ -168,6 +172,7 @@ fn resonance_is_a_stronger_control_at_the_steeper_slope() {
 
 #[test]
 fn cascading_at_the_ceiling_stays_finite() {
+    // 14_700 Hz is the ceiling, a third of the rate.
     for cutoff in [20.0, 14_700.0, 1e9] {
         let mut buf = sine(440.0);
         let cutoffs = vec![cutoff; buf.len()];

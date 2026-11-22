@@ -1,4 +1,4 @@
-//! fx — the post-chain: delay, reverb, drive, EQ, compression, chorus, and the mandatory limiter
+//! The post-chain: delay, reverb, drive, EQ, compression, chorus, and the mandatory limiter.
 
 pub(crate) mod chorus;
 pub(crate) mod compress;
@@ -25,10 +25,13 @@ pub(crate) trait Keys {
 }
 
 pub(crate) trait Tempo {
+    /// Seconds one beat lasts at sample-frame `frame`.
     fn beat_seconds(&self, frame: usize) -> f32;
+    /// Seconds the longest beat anywhere lasts: sizes a beat-timed delay line and its tail.
     fn longest_beat(&self) -> f32;
 }
 
+/// A patch's tempo: validation refuses `beats` there, and a 0 s beat makes such a delay a no-op.
 pub(crate) struct NoTempo;
 
 impl Tempo for NoTempo {
@@ -40,6 +43,7 @@ impl Tempo for NoTempo {
     }
 }
 
+/// Patch and song chains: validation refuses a `sidechain` there, so a compressor keys itself.
 struct NoKeys;
 
 impl Keys for NoKeys {
@@ -78,6 +82,7 @@ fn apply_one(buf: &mut Stereo, fx: &Fx, rate: f32, keys: &dyn Keys, tempo: &dyn 
             ping_pong,
         } => {
             let spacing = Spacing::new(*time, *beats, tempo);
+            // Not through `each`: one line's output feeds the other's input, so both sides go in.
             if *ping_pong {
                 delay::ping_pong(buf, spacing, *feedback, *mix, rate);
             } else {

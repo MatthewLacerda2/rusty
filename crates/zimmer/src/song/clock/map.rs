@@ -1,13 +1,15 @@
-//! The arithmetic of a tempo that moves: beats to seconds and back through a song's
-//! [`TempoChange`]s.
+//! `f64` inside: a piece lasts minutes and a frame 23 µs, more than `f32` holds in one number.
 
 use super::super::tempo::TempoChange;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct Map {
+    // Never empty, the first starting on beat 0, so every position from 0 on has a segment.
     segments: Vec<Segment>,
     period: f64,
     pass: f64,
+    // Each pass replays the map from beat 0, so an accelerando restarts and every pass lasts
+    // `pass` seconds.
     passes: u32,
 }
 
@@ -38,6 +40,7 @@ impl Segment {
 }
 
 impl Map {
+    /// `changes` passed `tempo::check`: beats after 0 and ascending, every tempo positive.
     pub(super) fn new(
         bpm: f32,
         changes: &[TempoChange],
@@ -153,6 +156,7 @@ impl Map {
         pass * self.period + self.beats_within(seconds - pass * self.pass)
     }
 
+    /// The last pass keeps everything past its end, so a ring-out runs at the final tempo.
     fn pass_of(&self, passes: f64) -> f64 {
         if passes.is_finite() {
             passes.floor().clamp(0.0, f64::from(self.passes - 1))

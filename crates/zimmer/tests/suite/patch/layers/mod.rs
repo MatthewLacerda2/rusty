@@ -73,6 +73,7 @@ fn the_note_rings_as_long_as_its_longest_layer() {
     )
     .len()
         / 2;
+    // 0.05 s held, then the body layer's 0.3 s release, not the crack's 0.02.
     assert_eq!(layered, ((0.05f32 + 0.3) * 44_100.0).ceil() as usize);
     assert!(layered > top * 4, "{layered} against {top}");
 }
@@ -96,6 +97,7 @@ fn two_noise_layers_are_not_the_same_noise() {
         ),
         0,
     );
+    // The same noise twice would be exactly double; two draws add in power.
     let ratio = peak(&both) / peak(&one);
     assert!(ratio < 1.9, "the layer replayed the top's noise: {ratio}");
 }
