@@ -91,9 +91,10 @@ def full(found: list[tuple[dict, str]]) -> str:
     return f"{len(found)} cloud coders already waiting or running, the limit is {running.LIMIT} (CLAUDE.md): {names}"
 
 
-def wait(line: Path, entries: list[dict], number: int, found: dict, now: datetime, dry: bool, why: str) -> int:
+def wait(line: Path, entries: list[dict], number: int, issue: dict, found: dict, now: datetime, dry: bool,
+         why: str) -> int:
     """Put #`number` in the waiting line `entries` (or, `dry`, say where it would go)."""
-    entries, added = waiting.enqueue(entries, number, found, now)
+    entries, added = waiting.enqueue(entries, number, found, now, issue)
     if not dry and (failed := waiting.save(line, entries)):
         say(f"could not write the waiting line {line}: {failed}")
         return 2
@@ -103,11 +104,14 @@ def wait(line: Path, entries: list[dict], number: int, found: dict, now: datetim
     return 0
 
 
-def turn(entries: list[dict], number: int, found: dict, now: datetime, free: int, taken: set[int]) -> str | None:
+def turn(entries: list[dict], number: int, issue: dict, found: dict, now: datetime, free: int,
+         taken: set[int]) -> str | None:
     """Why #`number` must wait behind the line for one of `free` slots, or `None` when it fits:
-    a hand launch never jumps ahead of an entry asked before it in the line's order. An entry
-    ahead whose issue already holds a slot (`taken`, a round replacing its coder) takes none."""
-    placed, _ = waiting.enqueue([dict(e) for e in entries], number, found, now)
+    a hand launch is placed in the line as an ask would be (rounds first, then priority, then ask
+    time, `waiting.ordered`) and never jumps an entry that order puts ahead of it, but goes before
+    a lower-priority one asked earlier. An entry ahead whose issue already holds a slot (`taken`,
+    a round replacing its coder) takes none."""
+    placed, _ = waiting.enqueue([dict(e) for e in entries], number, found, now, issue)
     ahead = [e for e in waiting.ordered(placed)[:waiting.ahead(placed, number)] if e["issue"] not in taken]
     if len(ahead) < free:
         return None
@@ -142,13 +146,13 @@ def decide(argv: list[str], number: int, issue: dict, found: dict, listed: list[
     if "--over-limit" not in argv and (status := already(entries, number, found, current, dry, line)) is not None:
         return status
     free = running.LIMIT - len(taken)
-    behind = full(holding) if free <= 0 else turn(entries, number, found, now, free, taken)
+    behind = full(holding) if free <= 0 else turn(entries, number, issue, found, now, free, taken)
     if behind and "--over-limit" in argv:
         say(f"--over-limit: launching past {behind}")
     elif behind and "--no-wait" in argv:
         raise brief.Refused(behind + ". Launch when one is ready and reviewed, or pass --over-limit")
     elif behind:
-        return wait(line, entries, number, found, now, dry, behind)
+        return wait(line, entries, number, issue, found, now, dry, behind)
     status = launch.create(number, issue, found, listed, call, ghrest.slug(), clock, env, dry, say)
     if status == 0 and not dry and any(e["issue"] == number for e in entries):
         if failed := waiting.save(line, waiting.without(entries, number)):
