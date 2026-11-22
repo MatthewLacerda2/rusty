@@ -6,7 +6,8 @@ use super::mesh_data::Vertex;
 use super::tangents::Missing;
 use glam::Vec3;
 
-/// A degenerate triangle gets `+Y`: it covers no pixels, so it only has to be finite.
+/// Faces the side `a, b, c` wind counter-clockwise on, glTF's front face. A degenerate
+/// triangle gets `+Y`: it covers no pixels, so it only has to be finite.
 pub fn face_normal(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> [f32; 3] {
     let [a, b, c] = [a, b, c].map(Vec3::from_array);
     (b - a)

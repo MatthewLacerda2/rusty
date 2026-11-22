@@ -29,7 +29,9 @@ pub fn material(
     let emissive_texture = textures.texture(&pbr.emission_color)?;
     let (base, emission) = (factor(&pbr.base_factor), factor(&pbr.emission_factor));
     let ([r, g, b], emissive) = if classic(material.shader_type) {
-        // A colour bound to a texture is the exporter's placeholder, not a tint.
+        // A colour bound to a texture is the exporter's placeholder, not a tint. A texture not
+        // written reads by the unbound rule, as URP's import does when one is missing, so a
+        // skipped emission mask's placeholder glows.
         let base_color = match base_color_texture {
             Some(_) => [gamma_to_linear(base); 3],
             None => rgb(&pbr.base_color, 1.0),

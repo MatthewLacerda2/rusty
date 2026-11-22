@@ -1,6 +1,3 @@
-//! Unity's model prefab: a node placing a mesh the sidecar names as another's collision mesh is not
-//! spawned (spawned empty if nodes hang from it).
-
 mod lod;
 
 use std::borrow::Cow;
@@ -25,8 +22,8 @@ pub fn instantiate_model(scene: &mut Scene, path: &str, asset: &Imported, positi
     instantiate_prefab_linked(scene, &prefab, None, path)
 }
 
-/// Keyed `<path>::#default`, never the scratch entity's own key (it would name another entity of
-/// the destination scene).
+/// Material-less nodes share one default keyed `<path>::#default`: a scratch entity's own key
+/// would name another entity of the scene it is stamped into.
 pub fn model_prefab(path: &str, asset: &Imported) -> PrefabData {
     let mut scratch = Scene::new();
     let root = spawn_tree(&mut scratch, path, asset);
@@ -71,6 +68,7 @@ fn spawn_tree(scene: &mut Scene, path: &str, asset: &Imported) -> u32 {
     for (index, node) in nodes.iter().enumerate() {
         let parent = node.parent.and_then(|p| spawned.get(p).copied());
         let (holder, held) = holder(scene, node, parent.unwrap_or(root));
+        // A collision mesh is never drawn: no entity, or an empty one when nodes hang from it.
         let node = &match node.mesh.as_ref().filter(|m| collision.contains(*m)) {
             None => Cow::Borrowed(node),
             Some(_) if !nodes.iter().any(|n| n.parent == Some(index)) => {
@@ -102,7 +100,7 @@ fn spawn_tree(scene: &mut Scene, path: &str, asset: &Imported) -> u32 {
     root
 }
 
-/// A bone the skeleton lacks leaves the node at the bone's rest pose, relative to the skinned node.
+/// A bone the skeleton lacks leaves the node at that bone's rest pose under `parent`.
 fn holder(scene: &Scene, node: &ModelNode, parent: u32) -> (u32, Mat4) {
     let Some(bone) = &node.bone else {
         return (parent, Mat4::IDENTITY);
@@ -125,6 +123,7 @@ fn spawn_node(
         .mesh
         .as_deref()
         .map(|mesh| instantiate_imported(scene, path, asset, mesh, name, Vec3::ZERO));
+    // A mesh that fails to spawn still leaves its node, a parent for its children.
     let id = match made {
         Some(Ok(id)) => id,
         _ => scene.add_entity(node.name.clone()),
@@ -137,6 +136,7 @@ fn place(scene: &mut Scene, id: u32, before: Mat4, node: &ModelNode) {
     if before != Mat4::IDENTITY {
         return set_matrix(scene, id, before * node.local());
     }
+    // Nothing before it: the authored TRS, never re-split from a matrix.
     if let Some(mut t) = scene.world.transform_mut(id) {
         (t.position, t.rotation, t.scale) = (node.translation, node.rotation, node.scale);
     }

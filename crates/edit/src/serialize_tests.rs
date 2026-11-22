@@ -1,6 +1,7 @@
 use crate::{apply_scene_data, to_scene_data};
 use rusty_scene::Scene;
 
+/// `late` writes the group after the child, so the child loads before its parent.
 fn one_sided(late: bool) -> (Scene, u32, u32) {
     let mut scene = Scene::new();
     let group = scene.add_entity("Group".to_string());
@@ -58,6 +59,7 @@ fn the_taa_camera_knobs_round_trip_through_save_and_load() {
         ..CameraComponent::default()
     };
     scene.world.set_camera(id, Some(cam.clone()));
+    // Through JSON, the stored format: an in-memory document never meets serde.
     let json = serde_json::to_string(&to_scene_data(&scene)).unwrap();
     let data = serde_json::from_str(&json).unwrap();
     let mut loaded = Scene::new();

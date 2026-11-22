@@ -24,8 +24,7 @@ pub fn set_range(l: &mut LightComponent, value: f32) {
 
 pub use rusty_scene::create::defaults::DEFAULT_CONES;
 
-/// Turning one into an Area light leaves `mode` as it was: it acts as `Baked` via `effective_mode`,
-/// so Mixed to Area and back is Mixed again.
+/// An Area light keeps its stored `mode` (it acts as `Baked`), so Mixed to Area and back is Mixed.
 pub fn set_type(l: &mut LightComponent, light_type: LightType) {
     l.light_type = light_type;
     if l.light_type == LightType::Spotlight && l.inner_cone == 0.0 && l.outer_cone == 0.0 {
@@ -33,6 +32,8 @@ pub fn set_type(l: &mut LightComponent, light_type: LightType) {
     }
 }
 
+/// `Component.Get` reads the mode an Area light acts on (`Baked`), so a copied table sets
+/// unrefused.
 pub fn shown(l: &LightComponent, value: &mut serde_json::Value) {
     value["mode"] = serde_json::json!(l.effective_mode().name());
 }
@@ -46,14 +47,14 @@ pub fn set_mode(l: &mut LightComponent, mode: LightMode) -> bool {
     true
 }
 
+/// World units: intensity scales by the panel's area, so a zero-area one emits nothing.
 pub const MIN_AREA_SIDE: f32 = 0.01;
 
-/// Unity's `areaSize`; a size with a NaN or infinite side is refused whole.
 pub fn set_area_size(l: &mut LightComponent, size: Vec2) {
     l.area_size = finite2_or(size, l.area_size).max(Vec2::splat(MIN_AREA_SIDE));
 }
 
-/// Degrees: Unity's spot angle tops out under 180° full.
+/// A half-angle in degrees, so the full cone stays within 180°.
 pub const MAX_CONE: f32 = 90.0;
 
 pub fn set_cones(l: &mut LightComponent, inner: f32, outer: f32) {
@@ -65,7 +66,6 @@ pub fn set_cast_shadows(l: &mut LightComponent, on: bool) {
     l.cast_shadows = on;
 }
 
-/// HDRP's Shadow Fade Distance; `0` turns the fade off.
 pub fn set_shadow_fade_distance(l: &mut LightComponent, value: f32) {
     l.shadow_fade_distance = non_negative(value);
 }

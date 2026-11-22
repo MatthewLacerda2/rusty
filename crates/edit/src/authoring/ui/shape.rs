@@ -22,7 +22,6 @@ pub fn set_inner_radius(s: &mut ShapeComponent, r: f32) {
     s.inner_radius = non_negative(r);
 }
 
-/// Degrees clockwise from 12 o'clock.
 pub fn set_arc(s: &mut ShapeComponent, start: f32, end: f32) {
     (s.arc_start, s.arc_end) = (finite_or(start, s.arc_start), finite_or(end, s.arc_end));
 }

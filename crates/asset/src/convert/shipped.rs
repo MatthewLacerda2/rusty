@@ -9,7 +9,8 @@
 use super::{cache_location, converter_for, lock, stage, stamp_path};
 use std::path::{Path, PathBuf};
 
-/// The one rule `stale` and `Debug.Preview` use for a cache standing in for its source.
+/// `read` false: the source is absent or unreadable. The one rule `stale` and
+/// `Debug.Preview` use for a cache standing in for its source.
 pub fn served_from_cache(read: bool, out: &Path) -> bool {
     !read && out.is_file()
 }

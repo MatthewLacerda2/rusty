@@ -20,6 +20,8 @@ use rusty_scene::runtime::renumber::Moves;
 use rusty_scene::serialize::SceneData;
 use rusty_scene::{Entity, MaterialAsset, Scene};
 
+/// Test hook: this crate's tests and the root package's `tests/` call it; a live load calls
+/// `swap_in_prepared`.
 pub fn swap_in(
     scene: &mut Scene,
     data: SceneData,
@@ -38,7 +40,7 @@ pub fn swap_in_prepared(
         path: _,
         mut document,
         sidecars,
-        baked_navmesh: _,
+        baked_navmesh: _, // taken before the swap, by `app::scene_load::activate`
     } = prepared;
     let carried: Vec<Entity> = scene
         .entity_ids()
@@ -64,6 +66,7 @@ pub fn swap_in_prepared(
         if entity.parent_id.is_some_and(|p| !survivors.contains(&p)) {
             entity.parent_id = None;
         }
+        // A survivor's reference into the outgoing scene goes: that id may now be an incoming one.
         entity.forget(&|r| !survivors.contains(&r));
         scene.world.insert_entity(entity);
     }
@@ -94,6 +97,7 @@ fn carried_meshes(scene: &Scene, carried: &[Entity]) -> rusty_scene::mesh_librar
     found.collect()
 }
 
+/// Moves the incoming ids, never a survivor's: scripts and the UI event system hold those.
 pub(crate) fn make_room(data: &mut SceneData, taken: &BTreeSet<u32>) -> Moves {
     let moves = Moves::out_of_the_way(data, taken);
     data.next_entity_id = moves.next_id();

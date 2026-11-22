@@ -1,5 +1,5 @@
 //! Unity-style `<file>.meta`: import settings only, never identity (references are path-based, so
-//! no GUID); the sub-object map is a regenerated cache.
+//! no GUID).
 //! stored-format: the `<file>.meta` import-settings sidecar
 
 use serde::{Deserialize, Serialize};
@@ -25,13 +25,14 @@ use rusty_core::fs;
 
 const META_EXTENSION: &str = "meta";
 
-/// The sub-object map is only a cache. `#[serde(default)]` so a sparse hand-written sidecar loads.
+/// `#[serde(default)]` so a sparse hand-written sidecar loads.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ImportSettings {
     /// Uniform scale applied to vertices, skeleton and animation translations
     /// (`asset::scale_factor`). Default 1.
     #[serde(default = "default_scale")]
     pub scale: f32,
+    /// Only a cache, regenerated from the import (`with_sub_objects`).
     #[serde(default)]
     pub sub_objects: Vec<String>,
     /// Keyed by sub-object id; a missing key means no collider.
@@ -113,7 +114,8 @@ pub(crate) fn stored(source: &Path) -> Result<Option<ImportSettings>, ImportErro
 }
 
 /// Atomic ([`fs::write_atomic`]): a plain write truncates first, so a concurrent reader sees a
-/// partial file and treats the asset as unavailable.
+/// partial file and treats the asset as unavailable. Noted, so caches following a `.meta` drop
+/// theirs.
 pub fn save(source: &Path, settings: &ImportSettings) -> Result<(), ImportError> {
     let json =
         serde_json::to_string_pretty(settings).map_err(|e| ImportError::Sidecar(e.to_string()))?;

@@ -70,6 +70,7 @@ fn a_rebake_of_the_loaded_bytes_wins_over_a_newer_file() {
     headless.put_baked_occlusion(Some(pvs(2.0)));
     headless.put_baked_navmesh(Arc::from(vec![2u8; 4]));
     crate::save_to_file(&headless, &path).unwrap();
+    // The editor re-bakes an unchanged scene: the bytes it loaded.
     editor.put_baked_occlusion(Some(pvs(1.0)));
     editor.put_baked_navmesh(Arc::from(vec![1u8; 4]));
     crate::save_to_file(&editor, &path).unwrap();

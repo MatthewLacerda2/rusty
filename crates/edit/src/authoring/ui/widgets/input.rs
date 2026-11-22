@@ -1,8 +1,6 @@
-//! crates/edit/src/authoring/ui/widgets/input.rs — `Input Field`.
-//!
-//! A white box whose masked `Text Area` holds, back to front: `Selection` (the
-//! highlight rects the script adds, one per selected line), `Placeholder`, `Text`
-//! (plain, unwrapped — the script scrolls it) and the `Caret`.
+//! An `Input Field` is a white box whose masked `Text Area` holds, back to front: `Selection` (the
+//! highlight rects the script adds, one per selected line), `Placeholder`, `Text` (plain, unwrapped
+//! — the script scrolls it) and the `Caret`.
 
 use glam::{Vec2, Vec4};
 

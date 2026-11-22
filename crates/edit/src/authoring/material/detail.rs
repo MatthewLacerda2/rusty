@@ -13,6 +13,8 @@ pub fn set_detail_map(materials: &mut MaterialLibrary, key: &str, path: Option<S
         return;
     };
     let map = path.filter(|p| !p.is_empty()).map(MapRef::from);
+    // Clearing with no layer writes nothing, so it saves as before; else the layer's other
+    // fields are kept.
     if map.is_none() && m.detail.is_none() {
         return;
     }
@@ -38,6 +40,7 @@ pub fn detail_mask(materials: &MaterialLibrary, key: &str) -> Option<String> {
     layer.mask.as_ref().map(MapRef::to_string)
 }
 
+/// Clamps as each row's `check` clamps a write: a recipe's nested `detail` table skips the rows.
 pub fn clamp_detail(m: &mut MaterialAsset) {
     let Some(layer) = m.detail.as_mut() else {
         return;

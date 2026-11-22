@@ -4,6 +4,7 @@ use crate::authoring::instantiate_asset;
 use crate::{extract_prefab, instantiate_prefab};
 use rusty_scene::Scene;
 
+/// Nodes carry the `_LOD<n>` names (Blender's object names), meshes Blender's `Cube.*` data names.
 const LOD_GLTF: &str = r#"{
   "asset": { "version": "2.0" },
   "scene": 0,
@@ -111,6 +112,7 @@ fn a_scale_factor_scales_the_groups_size_with_its_meshes() {
 fn the_groups_size_follows_the_meshes_whatever_the_sidecar_held() {
     use crate::asset_instance::set_model_scale_factor;
     let path = write_gltf("lod_scale_hand.gltf");
+    // A hand-written factor of 0 imports at the smallest, `MIN_SCALE`.
     std::fs::write(format!("{path}.meta"), r#"{ "scale": 0 }"#).unwrap();
     let mut scene = Scene::new();
     let group = instantiate_asset(&mut scene, &format!("{path}::Crate"), None, Vec3::ZERO);

@@ -3,7 +3,6 @@
 //! values are saved, never GPU buffers: meshes rehydrate from their reference. An imported model is
 //! a source too (Unity's model prefab).
 //! stored-format: the `.prefab` asset (`PrefabData`, instances and overrides)
-//! stored-format: the `.prefab` asset (`PrefabData`, instances and overrides)
 
 pub mod apply;
 pub mod diff;

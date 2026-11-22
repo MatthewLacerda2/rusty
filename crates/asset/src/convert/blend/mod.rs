@@ -1,10 +1,5 @@
 //! Blender runs headless with export settings pinned in `export.py` (+Y up, modifiers applied,
 //! animations and skins on), so two machines with the same Blender make the same glTF.
-//! Time limits: ten seconds for its version, ten minutes to export unless
-//! `RUSTY_BLENDER_TIMEOUT` says otherwise.
-//! A packed image is written flat beside the `.glb` under its name, unique within the export (a
-//! linked library's namesake takes `.1`), referenced as `model.blend#tex/<identity>`.
-// A `let _ =` or `.ok()` here would drop a failure the cache must not be stamped over.
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,

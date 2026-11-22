@@ -2,6 +2,8 @@ use std::path::Path;
 
 use super::{AnimationGraph, GraphError};
 
+/// Sorts the sync markers once valid: `app::animation::sync`'s marker lookup needs time
+/// order.
 pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
     let text = std::fs::read_to_string(path).map_err(|e| GraphError::Io(e.to_string()))?;
     let mut graph: AnimationGraph =
@@ -11,6 +13,8 @@ pub fn load(path: &Path) -> Result<AnimationGraph, GraphError> {
     Ok(graph)
 }
 
+/// Validates first, so code never writes a graph that would not load. A test hook: only tests
+/// write a graph from code.
 pub fn save(path: &Path, graph: &AnimationGraph) -> Result<(), GraphError> {
     graph.validate()?;
     let json = serde_json::to_string_pretty(graph).map_err(|e| GraphError::Parse(e.to_string()))?;

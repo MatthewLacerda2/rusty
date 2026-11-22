@@ -1,5 +1,3 @@
-//! A model's per-sub-mesh work spread over threads, results kept in item order.
-//!
 //! Each item's work is a pure function of that item and lands in its own slot, so the
 //! output is bit-identical whatever the thread count; that is why the count may follow
 //! the machine's cores inside a sim module. [`with_threads`] pins it for tests.
@@ -11,8 +9,10 @@ use std::thread;
 
 use rusty_core::quiet::{holding, say};
 
+/// Triangles of work below which a call stays on the caller's thread: spawning costs more.
 pub const SMALL: usize = 4096;
 
+/// Cores left for the main thread and what serves it (the mixer, the driver's threads).
 pub const KEPT_FOR_PLAY: usize = 2;
 
 thread_local! {
@@ -20,8 +20,8 @@ thread_local! {
     static CAP: Cell<Option<usize>> = const { Cell::new(None) };
 }
 
-/// Run `f` with every [`map`] on this thread capped at the cores less [`KEPT_FOR_PLAY`]:
-/// an import on a worker while a game ticks and draws, like Unity's background loads.
+/// Caps every [`map`] on this thread at the cores less [`KEPT_FOR_PLAY`], for an import
+/// beside a ticking game, as Unity's background loads run.
 pub fn beside_play<R>(f: impl FnOnce() -> R) -> R {
     struct Restore(Option<usize>);
     impl Drop for Restore {

@@ -4,6 +4,8 @@ use super::{entity_material_key, set_slot, MaterialLibrary};
 use rusty_components::{Entity, MaterialComponent, ParticleEmitterComponent};
 use rusty_scene::{MaterialAsset, Scene, SceneId};
 
+/// What names a library material by key: a new kind of user joins `users`, or a delete leaves it
+/// dangling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MaterialUser {
     Slot { id: u32, slot: usize },

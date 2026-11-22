@@ -45,7 +45,7 @@ fn mesh_create_over_one_instance_leaves_its_sibling_and_the_cache_alone() {
         ..Default::default()
     };
     scene.define_mesh("Tri", triangle).unwrap();
-    scene.begin_edits();
+    scene.begin_edits(); // one Undo step, as the editor's frame opens one
     crate::mesh::set_shared_mesh(&mut scene, a, "Tri").unwrap();
     scene.commit_edits(None);
     let buffers = cached(&path);

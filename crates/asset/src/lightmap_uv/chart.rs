@@ -1,7 +1,7 @@
 //! A chart grows breadth-first from its seed (the lowest unassigned triangle)
 //! across edges softer than the hard angle, taking neighbours within
 //! [`CONE_DEGREES`] of the seed (stretch at most `1 / cos`) whose projection
-//! overlaps nothing. A zero-area triangle joins any chart.
+//! overlaps nothing. A zero-area triangle joins any chart: it has no surface to light.
 
 use std::collections::VecDeque;
 
