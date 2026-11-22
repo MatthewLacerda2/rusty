@@ -80,8 +80,9 @@ fn gpu_what_no_camera_shows_opaque_is_left_out() {
     scene.materials.get_mut("both").unwrap().render_mode = RenderMode::Transparent;
     step(&mut r, &scene);
     let none = r.ray_tree(&scene).unwrap().packed();
-    assert!(
-        none.instances.len() < ids.len() - 9,
+    assert_eq!(
+        none.instances.len(),
+        ids.len() - 9,
         "transparent cubes are not traced"
     );
     let before = none.instances.len();

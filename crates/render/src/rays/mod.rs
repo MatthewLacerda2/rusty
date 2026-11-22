@@ -28,7 +28,7 @@ use top::Placed;
 pub const GROUP: u32 = 3;
 
 /// One scene's tree, kept from its retained objects: rebuilt only after a static
-/// object changed ([`touch`](Self::touch)) or the cameras' layers did.
+/// object changed (its `touch`) or the cameras' layers did.
 #[derive(Default)]
 pub struct RayTree {
     meshes: BTreeMap<MeshHandle, (MeshRevision, MeshTree)>,
