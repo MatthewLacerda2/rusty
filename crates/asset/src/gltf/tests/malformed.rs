@@ -84,3 +84,29 @@ fn a_glb_declaring_a_length_under_its_header_is_refused() {
     bytes[8..12].copy_from_slice(&4u32.to_le_bytes());
     assert!(import_slice(&bytes).is_err());
 }
+
+#[test]
+fn a_channel_targeting_an_unknown_property_or_no_node_is_refused() {
+    let path =
+        animated_glb(|d| d["animations"][0]["channels"][0]["target"]["path"] = "tint".into());
+    assert!(import_slice(&path)
+        .unwrap_err()
+        .to_string()
+        .contains("no known property"));
+    let node = animated_glb(|d| d["animations"][0]["channels"][0]["target"]["node"] = 9.into());
+    assert!(import_slice(&node)
+        .unwrap_err()
+        .to_string()
+        .contains("targets no node"));
+}
+
+#[test]
+fn a_node_hierarchy_that_is_not_a_forest_is_refused() {
+    let cycle = animated_glb(|d| d["nodes"][2]["children"] = serde_json::json!([1]));
+    assert!(import_slice(&cycle)
+        .unwrap_err()
+        .to_string()
+        .contains("its own ancestor"));
+    let shared = animated_glb(|d| d["nodes"][0]["children"] = serde_json::json!([2]));
+    assert!(import_slice(&shared).is_err(), "a node with two parents");
+}

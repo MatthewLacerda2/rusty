@@ -1,8 +1,7 @@
-//! Every accessor the import reads exists and has the shape glTF requires of its use.
-//! The `gltf` crate assumes both (its validation indexes a `POSITION` accessor before
-//! checking it exists; its readers panic on a `JOINTS_0` of `VEC2`), so a file breaking
-//! either is refused before the crate looks. So is a `.glb` whose declared length is
-//! under its own 12-byte header, which the crate's reader subtracts from it.
+//! What the `gltf` crate assumes of a file but never checks, checked first so a file
+//! breaking it is refused, not a panic: each accessor the import reads exists and has
+//! the shape its use requires, an animation channel names a node and a property, the
+//! nodes form a forest, and a `.glb`'s declared length covers its 12-byte header.
 
 use crate::ImportError;
 use gltf::accessor::{Accessor, DataType, Dimensions};
@@ -24,17 +23,60 @@ pub(super) fn parse(bytes: &[u8]) -> Result<gltf::Gltf, ImportError> {
     let gltf::Gltf { document, blob } =
         gltf::Gltf::from_slice_without_validation(bytes).map_err(error)?;
     let json = document.into_json();
+    unchecked(&json).map_err(ImportError::Parse)?;
+    let document = gltf::Document::from_json(json).map_err(error)?;
+    check(&document).map_err(ImportError::Parse)?;
+    Ok(gltf::Gltf { document, blob })
+}
+
+fn unchecked(json: &gltf::json::Root) -> Result<(), String> {
     let count = json.accessors.len();
     for (m, mesh) in json.meshes.iter().enumerate() {
         let named = mesh.primitives.iter().flat_map(|p| p.attributes.values());
         if let Some(missing) = named.map(|a| a.value()).find(|&a| a >= count) {
-            let why = format!("mesh {m} names accessor {missing} of {count}");
-            return Err(ImportError::Parse(why));
+            return Err(format!("mesh {m} names accessor {missing} of {count}"));
         }
     }
-    let document = gltf::Document::from_json(json).map_err(error)?;
-    check(&document).map_err(ImportError::Parse)?;
-    Ok(gltf::Gltf { document, blob })
+    forest(&json.nodes)?;
+    for (a, animation) in json.animations.iter().enumerate() {
+        for (c, channel) in animation.channels.iter().enumerate() {
+            let target = &channel.target;
+            if target.node.value() >= json.nodes.len() {
+                return Err(format!("animation {a} channel {c} targets no node"));
+            }
+            if !matches!(target.path, gltf::json::validation::Checked::Valid(_)) {
+                return Err(format!(
+                    "animation {a} channel {c} targets no known property"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Every walk of the hierarchy recurses into children, so a cycle never ends.
+fn forest(nodes: &[gltf::json::Node]) -> Result<(), String> {
+    let mut parent: Vec<Option<usize>> = vec![None; nodes.len()];
+    for (n, node) in nodes.iter().enumerate() {
+        for child in node.children.iter().flatten().map(|c| c.value()) {
+            if child >= nodes.len() || child == n || parent[child].replace(n).is_some() {
+                return Err(format!("node {n}'s child {child} is not a node of its own"));
+            }
+        }
+    }
+    for start in 0..nodes.len() {
+        let mut at = start;
+        for _ in 0..=nodes.len() {
+            match parent[at] {
+                Some(p) => at = p,
+                None => break,
+            }
+        }
+        if parent[at].is_some() {
+            return Err(format!("node {start} is its own ancestor"));
+        }
+    }
+    Ok(())
 }
 
 /// The first accessor whose shape its use does not allow, named for that use.
