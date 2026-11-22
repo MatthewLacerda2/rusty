@@ -1,15 +1,8 @@
-//! Each model file is parsed once, not once per instance, as Unity keeps an
-//! imported model in memory. Keyed by path plus the settings that change
-//! geometry (scale, lightmap UVs, humanoid map and clip sources); one entry per
-//! path. An entry records every file its parse read (including borrowed-clip
-//! sources); written files drop it via the write log, and size plus modified
-//! time catch another process's writes (they only decide whether to re-read,
-//! never what the sim sees). Opening another project drops every entry. A
-//! failed import is not kept.
-//!
-//! One cache per process, so a load worker's imports hit on the ticking thread.
-//! The lock is never held across a parse: two threads may parse one file at once
-//! into the same value.
+//! Each model is parsed once, as Unity keeps an imported model in memory. Keyed
+//! by path plus the geometry-changing settings. An entry records every file its
+//! parse read; the write log drops it, and size plus modified time catch another
+//! process's writes (never read by the sim). One cache per process; its lock is
+//! never held across a parse, so two threads may parse one file into the same value.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 mod counts;
@@ -107,7 +100,6 @@ fn with_cache<T>(f: impl FnOnce(&mut Cache) -> T) -> T {
 pub fn imported(path: &Path) -> Result<Imported, ImportError> {
     count_lookup();
     let key = path.to_string_lossy().into_owned();
-    // A re-conversion notes the source in the write log, which the lookup below drains.
     let read = super::read_target(path).inspect_err(|_| {
         with_cache(|cache| cache.remove(&key));
     })?;

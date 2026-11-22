@@ -1,6 +1,4 @@
-//! Which file a load and a refresh read (#1574): a TGA, which has no signature to
-//! guess it by, decodes by its extension; and whether a cache is current is found
-//! from its head and level lengths alone, agreeing with a full read.
+//! A TGA has no signature to guess it by, so it decodes by its extension.
 
 use image::{Rgba, RgbaImage};
 

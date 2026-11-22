@@ -1,7 +1,5 @@
-//! Like Unity's `AssetDatabase.Refresh`: brings every converted model, its cooked
-//! geometry and every image's compressed copy up to date before returning.
-//! Play's own refresh compresses no texture, so a project the editor never
-//! opened draws uncompressed until this has run.
+//! Like Unity's `AssetDatabase.Refresh`. Play's own refresh compresses no
+//! texture, so a project the editor never opened draws uncompressed until this runs.
 
 use std::path::{Path, PathBuf};
 
@@ -18,9 +16,8 @@ pub struct Imported {
     pub textures: Refreshed,
 }
 
-/// Models first, then images. A first run on a large project encodes for minutes
-/// (BC7 about 8-11 core-seconds per 2048² map). Refused while a world plays on
-/// this thread. A failing source is listed and the rest still run.
+/// A first run encodes for minutes (BC7 about 8-11 core-seconds per 2048² map).
+/// Refused while a world plays on this thread.
 pub fn import_all(root: &Path) -> Result<Imported, String> {
     let (sources, mut failed) = models(root)?;
     let cooked = cook_models(root, &mut failed);
@@ -33,8 +30,7 @@ pub fn import_all(root: &Path) -> Result<Imported, String> {
     })
 }
 
-/// [`import_all`], but stops before any image is encoded when a model fails, so
-/// a broken model fails in seconds, not after minutes of encoding.
+/// Stops before any image is encoded when a model fails, so it fails in seconds.
 pub fn import_strict(root: &Path) -> Result<Imported, String> {
     let (sources, mut failed) = models(root)?;
     refuse(&failed)?;
@@ -67,7 +63,6 @@ pub fn notice(root: &Path) -> String {
     )
 }
 
-/// Converts every stale model source under `root`; returns the failures.
 fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     if !conversion_allowed() {
         return Err("Play is running, and the import waits for Stop: stop first".into());
@@ -83,9 +78,8 @@ fn models(root: &Path) -> Result<(Vec<PathBuf>, Failed), String> {
     Ok((sources, failed))
 }
 
-/// Returns how many cooked files were written. Currency is the load's own test,
-/// not the stamp alone, so an export never ships a file every launch would
-/// refuse. Sources already in `failed` are skipped.
+/// Currency is the load's own test, not the stamp alone, so an export never ships
+/// a cooked file every launch would refuse.
 fn cook_models(root: &Path, failed: &mut Failed) -> usize {
     if !crate::cook::writes() {
         return 0;

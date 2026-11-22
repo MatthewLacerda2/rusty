@@ -1,21 +1,13 @@
-//! crates/asset/src/mesh_data/shared.rs — geometry held once and shared.
+//! Cloning a [`Shared`] clones a pointer; [`Shared::edit`] is the one way in for
+//! writing and copies first when anyone else holds it, so an edit never reaches a
+//! sibling instance or the import cache. Replacing a buffer whole copies nothing.
 //!
-//! A [`Shared`] buffer is one allocation that the import cache's sub-mesh and every
-//! mesh instancing it point at: cloning one clones a pointer. It reads as a slice;
-//! [`Shared::edit`] is its one way in for writing, and copies the buffer first when
-//! anyone else still holds it, so an edit never reaches a sibling instance or the
-//! cache. Replacing a buffer whole (`= vec.into()`) copies nothing.
-//!
-//! [`copies`] is a test hook (crates/CLAUDE.md): it counts the buffers an edit
-//! really copied on this thread, for the tests that hold a load, a Play → Stop or an
-//! Undo to none, compiled in every build since those tests are other crates', and
-//! counting only on a thread that asked once.
+//! [`copies`] is a test hook, compiled in every build because other crates' tests
+//! use it; counts only on a thread that asked once.
 
 use std::cell::Cell;
 use std::sync::Arc;
 
-/// A buffer shared by everything that holds it, copied on its first [`edit`](Self::edit)
-/// by one holder of several.
 #[derive(Debug, PartialEq)]
 pub struct Shared<T>(Arc<Vec<T>>);
 
@@ -24,9 +16,7 @@ thread_local! {
     static COPIES: Cell<usize> = const { Cell::new(0) };
 }
 
-/// Buffers this thread copied to edit them (an [`edit`](Shared::edit) of a buffer
-/// someone else still held) since the first call of this function on it, which
-/// starts the count.
+/// Edits of a held buffer on this thread since the first call, which starts the count.
 #[doc(hidden)]
 pub fn copies() -> usize {
     ARMED.set(true);
@@ -34,8 +24,6 @@ pub fn copies() -> usize {
 }
 
 impl<T: Clone> Shared<T> {
-    /// This buffer, writable: the same allocation when nothing else holds it, else a
-    /// copy of it that this holder alone now points at (`Arc::make_mut`).
     pub fn edit(&mut self) -> &mut Vec<T> {
         if Arc::strong_count(&self.0) > 1 && ARMED.get() {
             COPIES.set(COPIES.get() + 1);
@@ -45,12 +33,10 @@ impl<T: Clone> Shared<T> {
 }
 
 impl<T> Shared<T> {
-    /// Whether `a` and `b` are one allocation: what sharing a buffer means.
     pub fn same(a: &Self, b: &Self) -> bool {
         Arc::ptr_eq(&a.0, &b.0)
     }
 
-    /// Whether nothing else holds this buffer, so freeing it frees its memory.
     pub fn is_unique(&self) -> bool {
         Arc::strong_count(&self.0) == 1
     }

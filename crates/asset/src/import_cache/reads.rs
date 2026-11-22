@@ -1,7 +1,5 @@
-//! The other files a parse reads: an `.obj`'s `mtllib` files and a `.gltf`'s
-//! external `.bin` buffers. Textures are not among them: the importer only names
-//! them. `tobj` takes the rest of an `mtllib` line as one file name. A `data:`
-//! URI and a `.glb`'s own blob are no file; a `.glb`'s JSON chunk is read alone.
+//! An `.obj`'s `mtllib` files and a `.gltf`'s external buffers; not textures, which
+//! the importer only names. `tobj` takes the rest of an `mtllib` line as one file name.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};

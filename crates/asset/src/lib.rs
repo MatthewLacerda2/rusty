@@ -94,9 +94,8 @@ pub fn is_image_path(path: impl AsRef<Path>) -> bool {
     IMAGE_EXTENSIONS.contains(&paths::extension(path).as_str())
 }
 
-/// Applies the sidecar's Scale Factor, then Generate Lightmap UVs (so the unwrap
-/// sees the scaled model), then borrowed clips. Reads the sidecar, never writes it
-/// ([`import_and_sync_sidecar`] does). Always parses; scene builds use [`imported`].
+/// Scale Factor applies before Generate Lightmap UVs, so the unwrap sees the
+/// scaled model. Always parses; scene builds use [`imported`].
 pub fn import_file(path: &Path) -> Result<ImportedAsset, ImportError> {
     import_with(path, &read_target(path)?, &settings_of(path))
 }

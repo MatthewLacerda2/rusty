@@ -1,14 +1,5 @@
 //! An extracted texture has no sidecar, so its import settings are typed by the slots
-//! its model's glTF samples it in ([`settings`]):
-//!
-//! | slots | Texture Type | format |
-//! |---|---|---|
-//! | normal only | `NormalMap` | BC5 |
-//! | occlusion only (red) | `SingleChannel` | BC4 |
-//! | packed data only (metallic-roughness, specular) | `Default`, *sRGB* off | BC7 |
-//! | any colour (albedo, emissive), or a mix | `Default` | BC7 |
-//!
-//! An image shared by two kinds of slot takes `Default` (*sRGB* on when one is colour).
+//! its model's glTF samples it in (`of_slots`); a mix takes `Default`.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
