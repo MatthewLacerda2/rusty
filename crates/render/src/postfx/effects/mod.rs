@@ -71,8 +71,6 @@ pub(crate) struct PostEffect {
     pub passes: &'static [Pass],
 }
 
-/// If no effect reads history, redrawing with no sim step gives the same image, so
-/// `Harness.Screenshot`'s settle draws no more.
 #[derive(Clone, Copy)]
 pub(crate) enum History {
     None(&'static str),

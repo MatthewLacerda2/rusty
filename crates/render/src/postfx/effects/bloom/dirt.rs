@@ -8,7 +8,6 @@ use rusty_components::PostProcessingComponent;
 use rusty_scene::Scene;
 
 impl Renderer {
-    /// Loads a named dirt even at intensity 0, so tweening it up never decodes on that frame.
     pub(crate) fn load_lens_dirt(&mut self, scene: &Scene) {
         let mut cache: DirtCache = std::mem::take(&mut self.post_passes.bloom.dirt);
         cache.refresh();

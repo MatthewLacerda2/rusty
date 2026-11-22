@@ -43,7 +43,6 @@ pub struct Step {
     pub cut: bool,
 }
 
-/// On game time, so a paused game holds its exposure and a capture at tick N replays.
 #[derive(Default)]
 pub struct Clock {
     last: Option<(HistoryKey, bool, f32)>,

@@ -175,7 +175,8 @@ impl PostFx {
             format,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT
                 | wgpu::TextureUsages::TEXTURE_BINDING
-                // Copies: the authored effects keep their result as next frame's history.
+                // Copies: SSR and a reflection capture's readback copy the HDR scene out;
+                // the authored effects keep their result as next frame's history.
                 | wgpu::TextureUsages::COPY_SRC
                 | wgpu::TextureUsages::COPY_DST,
             view_formats: &[],

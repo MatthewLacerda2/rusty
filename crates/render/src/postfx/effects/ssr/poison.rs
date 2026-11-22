@@ -1,4 +1,4 @@
-//! Test hook: an `inf` in the image SSR reads, which the forward pass's `finite_hdr` never
+//! Test-only: an `inf` in the image SSR reads, which the forward pass's `finite_hdr` never
 //! writes, to hold that a non-finite hit is a miss.
 
 use super::pass::SsrTargets;

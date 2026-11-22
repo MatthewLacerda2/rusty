@@ -20,7 +20,6 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     }],
 };
 
-/// Skipped on a frame TAA resolved: Unity's camera has one anti-aliasing mode.
 fn prepare(pfx: &mut PostFx, _: &wgpu::Device, cx: &EffectCx) -> bool {
     cx.full && fxaa_enabled(cx.post, cx.graphics) && !pfx.taa_ran()
 }

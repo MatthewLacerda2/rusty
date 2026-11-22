@@ -2,7 +2,6 @@ use super::passes::BloomPasses;
 use crate::postfx::{PfxTarget, PostFx, HDR_FORMAT};
 use rusty_components::Bloom;
 
-/// Past Jimenez's and UE's 6 mips and Godot's 7.
 pub(crate) const MAX_MIPS: usize = 8;
 
 /// URP's `CalcBloomMipCount`.
@@ -127,7 +126,8 @@ impl BloomTargets {
         &top.view
     }
 
-    /// The unspread first mip: the lens flare reads it, so scatter never reshapes it.
+    /// The first mip, thresholded and unspread: the lens flare reads it so that the scatter
+    /// never reshapes the flare.
     pub(crate) fn prefiltered(&self) -> &wgpu::TextureView {
         &self.down[0].view
     }

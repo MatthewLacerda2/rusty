@@ -58,7 +58,8 @@ pub(crate) fn fade(min_smoothness: f32) -> [f32; 2] {
     [min, width]
 }
 
-/// The opaque pass writes the surface targets exactly when this holds.
+/// The opaque pass writes the surface targets when this holds and the view has no forward
+/// override (`draw_stack`).
 pub(crate) fn ssr_enabled(post: PostSource, graphics: GraphicsSettings, full: bool) -> bool {
     let on = post
         .volume

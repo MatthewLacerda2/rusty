@@ -2,7 +2,8 @@ use super::fixture::{eye, renderer, scene, H, MIRROR, RED, W};
 use crate::gpu::ops::OpCounts;
 use crate::{RenderView, Renderer, OFFSCREEN_FORMAT};
 
-/// Measured: lavapipe 6/0/0/0/1, Metal 6/0/1/0/1.
+/// The trace, the resolve and the hit pyramids' four levels below the first; no submit,
+/// since it records into the camera's encoder.
 const SSR: OpCounts = OpCounts {
     render_passes: 6,
     compute_passes: 0,
