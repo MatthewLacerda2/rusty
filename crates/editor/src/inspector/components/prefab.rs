@@ -10,15 +10,15 @@ use rusty_scene::Scene;
 /// Dispatched once the entity guard drops: the verbs need `&mut Scene`. Whole-object
 /// verbs take the instance root; per-field ones resolve it from `entity`.
 pub enum PrefabAction {
-    /// Drop every override and rebuild from the source (`Scene.RevertPrefabOverrides`).
+    /// `Scene.RevertPrefabOverrides`.
     Revert(u32),
-    /// Re-baseline from the source, re-applying overrides (`Scene.ReimportPrefab`).
+    /// `Scene.ReimportPrefab`.
     Reimport(u32),
     /// `Scene.ApplyPrefabToSource`.
     ApplyToSource(u32),
     /// `Scene.RevertPrefabField`.
     RevertField { entity: u32, path: String },
-    /// `Scene.ApplyPrefabFieldToSource`, which reimports the instance afterwards.
+    /// `Scene.ApplyPrefabFieldToSource`.
     ApplyFieldToSource { entity: u32, path: String },
 }
 
@@ -54,8 +54,7 @@ impl Apply {
         Apply(rusty_edit::prefab::source::is_model_source(source).then_some(Self::MODEL))
     }
 
-    /// Add `button`, enabled with `hover` as its tooltip, or greyed out with the
-    /// reason it is off; returns whether it was clicked.
+    /// Add `button`, enabled with `hover`, or greyed out with the reason it is off.
     fn button(self, ui: &mut egui::Ui, button: egui::Button<'_>, hover: &str) -> bool {
         let response = ui.add_enabled(self.0.is_none(), button);
         match self.0 {
@@ -118,8 +117,6 @@ fn draw_overrides_list(
     }
 }
 
-/// One override row: the blue dot, the field label, a per-field "apply to source"
-/// button, and a per-field Revert button.
 fn draw_override_row(
     ui: &mut egui::Ui,
     blue: egui::Color32,

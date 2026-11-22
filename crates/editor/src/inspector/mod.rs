@@ -25,8 +25,7 @@ pub fn draw(
     console: &mut ConsoleLogs,
     nav: &mut NavigationGraph,
 ) {
-    // A post-processing path field
-    // typed and left by selecting something else.
+    // A post-processing path field typed and left by selecting something else.
     editor.is_dirty |= camera::commit_abandoned_paths(ui.ctx(), scene);
     // The Collider's asset path left the same way, and an asset edit whose drag ended.
     editor.is_dirty |= components::gameplay::commit_abandoned_collider(ui.ctx(), scene);
@@ -47,7 +46,6 @@ pub fn draw(
             }
 
             egui::ScrollArea::vertical().show(ui, |ui| {
-                // Dispatch on the explicit inspector target.
                 match editor.inspector_target() {
                     InspectorTarget::Entity(selected_id) => {
                         draw_entity_inspector(editor, ui, scene, selected_id);
@@ -91,6 +89,8 @@ fn draw_entity_inspector(
     let materials = &mut scene.materials;
     let world = &mut scene.world;
     if world.contains(selected_id) {
+        // Before the cards: drop a component whose requirement went (a Camera removed
+        // orphans its PostProcessing).
         rusty_edit::authoring::reconcile_requirements(world, selected_id);
 
         draw_object_header(
