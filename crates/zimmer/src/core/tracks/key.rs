@@ -1,4 +1,5 @@
 //! Key tracking by the number: how far the cutoff follows the played note.
+//! Each expected cutoff is the base times a power of two, so `assert_eq!` is exact.
 
 use super::cutoff_track;
 use crate::core::lfo::Lfos;

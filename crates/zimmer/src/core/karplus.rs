@@ -2,7 +2,9 @@
 
 use super::noise;
 
+/// Samples: a shorter line is no string, only noise.
 const MIN_DELAY: usize = 2;
+/// Hash channel ("KS") the pluck draws on, so it never mirrors a `noise` source.
 const EXCITATION_CHANNEL: u64 = 0x4b53;
 
 pub(crate) fn render(
@@ -15,6 +17,7 @@ pub(crate) fn render(
 ) {
     let len = delay_len(freq, rate);
     let mut line = excitation(len, brightness.clamp(0.0, 1.0), seed);
+    // Half: each round averages two samples, the string losing its highs.
     let feedback = damping.clamp(0.0, 1.0) * 0.5;
     let mut read = 0usize;
     let mut previous = 0.0f32;
@@ -31,6 +34,7 @@ fn delay_len(freq: f32, rate: f32) -> usize {
     if freq <= 0.0 || !freq.is_finite() {
         return MIN_DELAY;
     }
+    // Less half a sample: the feedback's two-sample average delays by that much.
     ((rate / freq - 0.5).round() as usize).max(MIN_DELAY)
 }
 
@@ -51,6 +55,8 @@ fn excitation(len: usize, brightness: f32, seed: u64) -> Vec<f32> {
 mod tests {
     use super::*;
 
+    /// Autocorrelation: a plucked string's harmonics cross zero several times a cycle, so counting
+    /// zero crossings fails.
     fn estimated_hz(buf: &[f32], rate: f32) -> f32 {
         let best = (20..600)
             .max_by(|&a, &b| {

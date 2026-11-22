@@ -1,5 +1,8 @@
-//! what a note may place above the pitch it was played at.
+//! Callers (`additive`, `fm::voicing`) compare a ratio with a strict `<`: a sine on Nyquist
+//! alternates ±A at a level nobody chose.
 
+/// Measured at the track's top, so a partial a vibrato lifts past Nyquist drops for the whole
+/// note rather than clicking in and out.
 pub(crate) fn ratio_ceiling(freqs: &[f32], sample_rate: f32) -> f32 {
     let top = freqs.iter().fold(0.0f32, |high, f| high.max(*f));
     if top > 0.0 {

@@ -1,5 +1,7 @@
-//! dependency-free deterministic value hashing.
+//! The crate's one source of seeded randomness: a changed constant here moves samples, so it bumps
+//! `SYNTH_VERSION`.
 
+/// The SplitMix64 finalizer.
 #[inline]
 fn mix64(mut z: u64) -> u64 {
     z = (z ^ (z >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
@@ -9,6 +11,7 @@ fn mix64(mut z: u64) -> u64 {
 
 #[inline]
 pub(crate) fn hash2(x: i64, y: i64, seed: u64) -> u32 {
+    // Odd multipliers are bijections on `u64`; distinct ones keep `(x, y)` apart from `(y, x)`.
     let h = seed
         .wrapping_mul(0x9e37_79b9_7f4a_7c15)
         .wrapping_add((x as u64).wrapping_mul(0xff51_afd7_ed55_8ccd))
@@ -21,6 +24,7 @@ pub(crate) fn hash3(x: i64, y: i64, channel: u64, seed: u64) -> u32 {
     hash2(x, y, seed ^ channel.wrapping_mul(0xd6e8_feb8_6659_fd93))
 }
 
+/// The top 24 bits over 2^24: exact in an `f32`, so the result stays in `[0, 1)`.
 #[inline]
 pub(crate) fn to_unit_f32(h: u32) -> f32 {
     (h >> 8) as f32 / (1u32 << 24) as f32

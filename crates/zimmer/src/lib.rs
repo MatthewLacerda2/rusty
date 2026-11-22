@@ -1,6 +1,4 @@
-//! zimmer: sound from a document. A recipe (a [`Patch`] for one note, a [`Song`] for music)
-//! renders to samples and a WAV, a pure function of the document and [`SYNTH_VERSION`]: no I/O,
-//! no clock, no unseeded randomness. The caller does the I/O.
+//! zimmer: sound from a document.
 
 #![deny(clippy::unwrap_used)]
 
@@ -22,8 +20,6 @@ pub use note::{midi_to_freq, parse_note, Glide, NoteOpts};
 pub use patch::Patch;
 pub use song::{render_excerpt, render_song, Excerpt, PatchResolver, Song, Span, Window};
 
-// Bumped with any change to what a recipe renders to, so the sound moves only deliberately: the
-// fingerprint test fails when it moves and this number did not.
 pub const SYNTH_VERSION: u32 = 10;
 
 pub fn bake_note(patch: &Patch, midi: f32, opts: &NoteOpts) -> Result<Bake, SynthError> {
@@ -36,10 +32,13 @@ pub fn bake_note(patch: &Patch, midi: f32, opts: &NoteOpts) -> Result<Bake, Synt
     ))
 }
 
+/// A test hook: only `crates/zimmer/tests/suite` calls it.
 pub fn bake_named_note(patch: &Patch, note: &str, opts: &NoteOpts) -> Result<Bake, SynthError> {
     bake_note(patch, parse_note(note)?, opts)
 }
 
+/// Interleaved stereo, left sample first, and pre-limiter, unlike [`bake_note`].
+/// A test hook: only `crates/zimmer/tests/suite` calls it.
 pub fn render_note(patch: &Patch, midi: f32, opts: &NoteOpts) -> Result<Vec<f32>, SynthError> {
     Ok(core::render_note(patch, midi, opts)?.interleaved())
 }
@@ -57,6 +56,8 @@ pub fn bake_excerpt(
         .map(|bake| bake.expect("a bake nobody can stop runs to the end"))
 }
 
+/// `stop` is asked before each note and before the mix; once it says `true`, `Ok(None)` comes
+/// back.
 pub fn bake_excerpt_unless(
     song: &Song,
     resolve: &dyn PatchResolver,
@@ -75,6 +76,7 @@ pub struct Bake {
 }
 
 impl Bake {
+    /// A test hook: only `crates/zimmer/tests/suite` calls it.
     pub fn loudness(&self) -> &level::Loudness {
         self.profile.loudness()
     }
