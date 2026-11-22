@@ -63,6 +63,8 @@ macro_rules! dispatch {
 
 first_class!(dispatch);
 
+/// Unity's empty Mesh Filter draws nothing; rusty's Mesh is Filter and Renderer in one, so it
+/// arrives as a Box.
 fn add_box_mesh(world: &mut World, id: u32) -> bool {
     let mesh = primitive_mesh_component(Primitive::Box);
     let bounds = bounds_of(mesh.iter().flat_map(|m| &m.vertices).map(|v| v.position));
@@ -76,6 +78,8 @@ fn add_box_mesh(world: &mut World, id: u32) -> bool {
     true
 }
 
+/// The World holds no material library: the default asset is staged, and the Material card or a
+/// scene apply folds it in.
 fn attach_default_material_world(world: &mut World, id: u32) -> bool {
     if !world.set_material(id, Some(MaterialComponent::for_entity(id))) {
         return false;

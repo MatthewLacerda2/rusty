@@ -63,7 +63,7 @@ mod tests {
             .unwrap_err()
             .contains("Plane"));
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()));
-        cube.subdivisions = 4;
+        cube.subdivisions = 4; // a stray count, from a hand-edited file
         assert_eq!(set_subdivisions(&mut cube, 1), Ok(()), "1 clears it");
         assert_eq!(cube.subdivisions, 1);
     }
@@ -116,6 +116,7 @@ mod tests {
     fn scale_in_lightmap_is_held_in_its_range() {
         let mut cube = primitive_mesh_component(Primitive::Box).unwrap();
         assert_eq!(cube.scale_in_lightmap, 1.0);
+        // NaN changes nothing, so the 64 that 1e9 left stands.
         let sets = [(2.5, 2.5), (-1.0, 0.0), (1e9, 64.0), (f32::NAN, 64.0)];
         for (set, held) in sets.into_iter().chain([(f32::INFINITY, 64.0)]) {
             set_scale_in_lightmap(&mut cube, set);

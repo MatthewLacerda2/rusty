@@ -4,6 +4,8 @@ use rusty_asset::MapRef;
 use rusty_components::{NavigationMode, SelectableComponent, SelectableTransition, SelectionState};
 use rusty_scene::rules::sanitize::{non_negative, unit_color};
 
+/// `select_on`'s index order, shared with `ui::events::focus` and
+/// `SelectableComponent::REF_POINTERS`.
 pub const DIRECTIONS: [&str; 4] = ["Up", "Down", "Left", "Right"];
 
 pub fn direction_index(name: &str) -> Option<usize> {

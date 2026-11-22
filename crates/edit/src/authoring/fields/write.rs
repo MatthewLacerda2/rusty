@@ -8,6 +8,7 @@ use rusty_ecs::World;
 pub enum Skip<'a> {
     Held,
     SinceGet(&'a Map<String, Value>),
+    /// A test hook: every key runs its op; this crate's and `script`'s round-trip tests use it.
     Nothing,
 }
 
@@ -71,6 +72,7 @@ fn apply<C: Inspect>(
     run_ops(draft, &changed, &mut |name, e| Err(named(name, e)))
 }
 
+/// `refused` gets each op's error, named by its field: its `Err` stops the walk, its `Ok` goes on.
 pub(super) fn run_ops<C: Inspect>(
     c: &mut C,
     changes: &Map<String, Value>,
@@ -106,6 +108,8 @@ pub(super) fn run_ops<C: Inspect>(
             Access::ReadOnly(_) => continue,
         };
         if let Err(e) = outcome {
+            // Unprefixed: a decode error names its own part (`Values::take`), and the group's
+            // first part may not be a field the caller wrote.
             let name = match field.access {
                 Access::Group(_) => "",
                 _ => field.name,

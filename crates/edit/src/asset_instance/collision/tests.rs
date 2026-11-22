@@ -15,6 +15,7 @@ pub(super) fn spawn(path: &str) -> (Scene, Vec<(String, u32)>) {
     (scene, named)
 }
 
+/// The mesh choice of `physics::shape::build::collider_inputs`: change the two together.
 pub(super) fn triangles(scene: &Scene, id: u32) -> usize {
     let collider = scene.world.collider(id);
     let built_from_mesh = |c: &_| matches!(c, ColliderShape::Mesh { .. });

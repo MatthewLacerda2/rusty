@@ -84,8 +84,11 @@ pub(super) fn add_jacuzzi(scene: &mut Scene) {
     water(scene, "Jacuzzi_Water", at(0.0, level, 0.0), (h - t, h - t));
 }
 
+/// No collider (`create_drawn_entity`): characters wade through, and the navmesh never takes it
+/// for ground.
 fn water(scene: &mut Scene, name: &str, at: Vec3, (hx, hz): (f32, f32)) {
     let id = create_drawn_entity(scene, name, Some(Primitive::Plane));
+    // The plane primitive is 15 m square at unit scale.
     place(
         scene,
         id,

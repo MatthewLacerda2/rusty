@@ -30,6 +30,7 @@ pub fn set_param(
     set_param_with(vc, &chain(vc), name, value)
 }
 
+/// Both `_with`s take a [`chain`] resolved once, for a tween, not the sidecars read each tick.
 pub fn set_param_with(
     vc: &mut PostProcessingComponent,
     chain: &PostChain,

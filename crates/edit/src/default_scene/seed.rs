@@ -21,6 +21,7 @@ pub fn seed_default_assets_into(textures: &Path, shaders: &Path) -> Result<(), S
 
 fn seed_checker(dir: &Path) -> Result<(), String> {
     let file = format!("{FLOOR}_base_color.png");
+    // A copy on disk may be the user's edit: never overwritten.
     if dir.join(&file).exists() {
         return Ok(());
     }
@@ -29,6 +30,7 @@ fn seed_checker(dir: &Path) -> Result<(), String> {
         maps_recipe: Some(checker_recipe()),
         ..MaterialAsset::default()
     };
+    // The checker reads no image files, so the root it would read them from is moot.
     bake_maps(&mut floor, FLOOR, &rusty_core::project::root(), &staging.0)?;
     staging.publish(&[&file])
 }
@@ -46,6 +48,8 @@ fn seed_shader(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// A folder beside the destination, so `rename` stays on one filesystem and is atomic; named per
+/// process and call, as many threads and processes seed at once.
 struct Staging(PathBuf, PathBuf);
 
 impl Staging {

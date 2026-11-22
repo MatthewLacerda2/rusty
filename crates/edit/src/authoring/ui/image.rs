@@ -7,7 +7,6 @@ use rusty_asset::MapRef;
 use rusty_components::{FillMethod, FillOrigin, ImageComponent, ImageType, UiBlend, UiGradient};
 use rusty_scene::rules::sanitize::{finite4, unit, unit_color};
 
-/// Display space, straight alpha.
 pub fn set_color(i: &mut ImageComponent, color: Vec4) {
     i.color = unit_color(color);
 }
@@ -20,7 +19,6 @@ pub fn set_image_type(i: &mut ImageComponent, image_type: ImageType) {
     i.image_type = image_type;
 }
 
-/// Texels: left, bottom, right, top.
 pub fn set_border(i: &mut ImageComponent, border: Vec4) {
     i.border = finite4(border).max(Vec4::ZERO);
 }

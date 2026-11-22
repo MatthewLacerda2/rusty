@@ -50,7 +50,7 @@ pub fn shader_param(
     Ok(stored.cloned().unwrap_or_else(|| slot.default.clone()))
 }
 
-/// The material is created if the entity has none (like every `Material` setter), so the error is
+/// The material is created if the entity has none (as by every `Material` setter): the error is
 /// the missing shader's.
 fn entity_layout(scene: &mut Scene, id: u32) -> Result<(String, ParamLayout), String> {
     let key = ensure_material_key(scene, id).ok_or_else(|| format!("no entity {id}"))?;
@@ -68,6 +68,7 @@ pub fn set_entity_shader_param(
     set_entity_shader_param_with(scene, id, &layout, name, value)
 }
 
+/// Both `_with`s take a layout resolved once, for a tween, not the sidecar read each tick.
 pub fn set_entity_shader_param_with(
     scene: &mut Scene,
     id: u32,

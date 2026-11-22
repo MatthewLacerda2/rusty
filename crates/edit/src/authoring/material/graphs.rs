@@ -12,6 +12,7 @@ pub fn read_graphs(recipe: &TextureRecipe, roots: &ContentRoots) -> Result<Graph
     let mut graphs = Graphs::new();
     let mut pending: Vec<(String, String)> = owned_paths(recipe);
     while let Some((node, path)) = pending.pop() {
+        // A file read once ends a cycle here; `graph::expand` then refuses it, naming the chain.
         if graphs.contains_key(&path) {
             continue;
         }

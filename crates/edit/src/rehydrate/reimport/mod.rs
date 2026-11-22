@@ -12,6 +12,8 @@ mod shared;
 #[cfg(test)]
 mod shared_tests;
 
+/// What a skinned mesh does: `Keep` for a setting that never changes it, since re-binding its rig
+/// would touch its bones for nothing.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Rig {
     Keep,
@@ -84,6 +86,8 @@ fn reimport_where(
             rebuilt.push(id);
         }
     }
+    // A setting that keeps rigs never moves a vertex, and a shared mesh holds only positions and
+    // triangles.
     if rig == Rig::Rebuild {
         shared::reimport_shared(scene, skip, &mut names, &mut imported);
     }
@@ -104,6 +108,7 @@ fn reimport_entity_mesh(
     let Some(bounds) = sub.bounds() else {
         return false;
     };
+    // Taken before the rig is replaced, and re-bound to the new one by name.
     let hung = skinned.then(|| scene.take_skeleton(id));
     if let Some(mut mesh) = scene.world.mesh_mut(id) {
         install_sub_mesh(&mut mesh, sub, revision);

@@ -4,6 +4,7 @@ use crate::to_scene_data;
 use rusty_scene::lighting::lightmap_set::LightmapEntry;
 use rusty_scene::Scene;
 
+/// No navmesh or lighting sidecar beside this path, so the swap reads none.
 const NO_SIDECAR: &str = "rusty_2496_no_such_dir/level.scene";
 
 fn lit_level() -> Scene {

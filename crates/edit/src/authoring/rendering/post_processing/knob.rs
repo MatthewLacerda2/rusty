@@ -3,9 +3,11 @@ use rusty_components::PostProcessingComponent;
 
 #[derive(Debug)]
 pub struct Knob {
-    /// `center.x` for an array's lane: the tween path's last part.
+    /// Its path inside the effect (`automatic.compensation`, `center.x` for a lane): the tween
+    /// path's last part.
     pub field: &'static str,
-    /// White balance's two knobs are one `SetWhiteBalance(temperature, tint)`.
+    /// Registers `Graphics.Get<api>` / `Set<api>`; `None` for a knob sharing a call (white
+    /// balance's two are one `SetWhiteBalance`).
     pub api: Option<&'static str>,
     pub get: fn(&PostProcessingComponent) -> f32,
     pub set: fn(&mut PostProcessingComponent, f32),

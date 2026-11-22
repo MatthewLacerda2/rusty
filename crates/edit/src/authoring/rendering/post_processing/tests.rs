@@ -19,6 +19,7 @@ fn every_knob_resolves_by_its_path_and_reads_what_it_writes() {
             let found = knob(&path).unwrap_or_else(|| panic!("{path}"));
             assert_eq!(found.field, k.field, "{path}");
             let mut vc = default_post_processing();
+            // Near its default, so inside its range (and its pair's).
             let value = (k.get)(&vc) * 0.9 + 0.05;
             (k.set)(&mut vc, value);
             assert_eq!((k.get)(&vc), value, "{path}");
@@ -61,6 +62,7 @@ fn put(json: &mut serde_json::Value, path: &str, value: f32) {
 fn a_load_holds_every_knob_through_the_knobs_own_setter() {
     for effect in EFFECTS {
         for k in effect.knobs {
+            // A knob whose setter the row's body skips would load ±1e6 past its op's clamp.
             for value in [1.0e6, -1.0e6] {
                 let path = format!("{}.{}", effect.name, k.field);
                 let mut json = serde_json::to_value(default_post_processing()).unwrap();
