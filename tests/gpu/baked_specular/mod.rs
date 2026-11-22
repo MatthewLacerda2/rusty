@@ -22,6 +22,7 @@ use rusty::scene::{Camera, Scene};
 
 pub(super) use measure::{mean_gap, most, peak};
 
+/// Capture side, in pixels.
 pub(super) const SIZE: u32 = 96;
 
 pub(super) fn scene(mode: LightMode, roughness: f32) -> Scene {
@@ -87,6 +88,7 @@ pub(super) fn lamp(scene: &mut Scene, at: Vec3, rotation: Quat, light: LightComp
     place(scene, lamp, at, rotation);
 }
 
+/// Lightmap texels per unit most cases bake at.
 pub(super) const DENSITY: f32 = 10.0;
 
 pub(super) fn bake(scene: &mut Scene, name: &str, directional: bool, density: f32) -> String {

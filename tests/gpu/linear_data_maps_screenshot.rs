@@ -1,6 +1,5 @@
 //! Data maps sample their texels raw, not sRGB-decoded: a mid-grey (128) map must
 //! shade like the same value as a scalar. Decoded it reads ≈ 0.22, not ≈ 0.5.
-//! Skips without an adapter (`capture` returns `Ok(false)`).
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset};
@@ -8,7 +7,8 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::{Camera, Scene};
 
 /// The mean absolute per-channel difference (0–255) two frames may differ by and
-/// still read as the same shading: the 128 → 0.502 quantisation, nothing more.
+/// still read as the same shading: the 128 → 0.502 quantisation, nothing more. lavapipe:
+/// at most 0.072 mapped, at least 5.43 for the sRGB-decoded control.
 pub(super) const SAME: f64 = 1.5;
 
 pub(super) fn png(name: &str, rgb: [u8; 3]) -> String {

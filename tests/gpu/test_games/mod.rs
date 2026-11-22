@@ -17,9 +17,9 @@ use std::process::{Command, Output};
 use std::time::Duration;
 
 /// CPU budget of one game's `game --test`, in `calibrate` yardsticks. `showroom`, the
-/// heaviest, reads 216 on CI's ubuntu lavapipe and 292 in a 4-vCPU container; on macOS
-/// Metal games wait on the GPU, so there it only catches a CPU-bound regression
-/// (`docs/testing.md`, *Test games*, says how to re-measure).
+/// heaviest, reads 216 on CI's ubuntu lavapipe and 292 in a 4-vCPU container, so 380 is
+/// 30% over the highest; on macOS Metal games wait on the GPU, so there it only catches a
+/// CPU-bound regression (`docs/testing.md`, *Test games*, says how to re-measure).
 const BUDGET: f64 = 380.0;
 
 /// Wall time after which a game is killed as hung, whatever its budget.

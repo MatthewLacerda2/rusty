@@ -105,7 +105,8 @@ pub(crate) fn relative_temporal_variance(frames: &[Vec<f64>]) -> (f64, f64) {
     (variance / signal.max(1e-9), total)
 }
 
-/// lavapipe: 0.77 unwidened, 0.18 with the AA.
+/// The `relative_temporal_variance` ratio: lavapipe prints 0.175 with the AA; 0.77 was
+/// measured with the roughness unwidened.
 const BOUND: f64 = 0.35;
 /// Peak-luma floor, so a `widen` that turned the metal matte fails. lavapipe: 239 with the AA, 156
 /// matte.

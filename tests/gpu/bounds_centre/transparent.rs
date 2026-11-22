@@ -1,4 +1,4 @@
-//! The smallest repro: a dense red `Transparent` pane modelled in world
+//! A dense red `Transparent` pane modelled in world
 //! coordinates, its origin 21 m away behind the camera, and a dense blue
 //! `Transparent` box 1.5 m in front of it. Sorted by origin, the pane was nearest
 //! and drew last, over the box; sorted by bounds centre, the box draws over it.

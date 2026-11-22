@@ -16,6 +16,8 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
+/// Bright enough that a 4% reflection stays above the 8-bit floor, dark enough that a full
+/// one does not clip.
 fn grey_panorama() -> PathBuf {
     let img = image::RgbaImage::from_pixel(64, 32, image::Rgba([200, 200, 200, 255]));
     let path = crate::temp::dir().join("grey_panorama.png");

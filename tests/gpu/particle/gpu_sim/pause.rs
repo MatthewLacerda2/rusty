@@ -59,8 +59,8 @@ fn a_jump_over_a_pause_ages_by_the_time_that_passed() {
             a.iter().filter(|&&x| x).count() > 50,
             "frame {frame}: drawn"
         );
+        // Measured on lavapipe: 1.0 at every frame.
         let agree = agreement(&a, &b);
-        eprintln!("[MEASURE] {} {agree}", file!());
         assert!(agree > 0.98, "frame {frame}: {agree}");
     }
 }

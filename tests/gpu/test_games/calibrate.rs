@@ -1,5 +1,5 @@
-//! The yardstick the test games' budget is measured in: CPU time of [`TICKS`] ticks of the
-//! default scene in a fresh [`Harness`], sampled in slices while the game runs ([`Sampler`]).
+//! The test games' yardstick: thread CPU time of [`TICKS`] ticks of the default
+//! scene in a fresh [`Harness`], sampled in slices while the game runs ([`Sampler`]).
 //! It meets the machine load the game does, so a game's CPU divided by it reads its own work.
 //! A synthetic workload met load far harder than the game did.
 
@@ -69,6 +69,7 @@ pub(super) fn samples(count: usize) -> Vec<Duration> {
     (0..count).map(|_| slice(&out)).collect()
 }
 
+/// The median slice, not the mean: a stall in one or two slices does not move it.
 pub(super) fn median(samples: &[Duration]) -> Duration {
     let mut sorted = samples.to_vec();
     sorted.sort_unstable();

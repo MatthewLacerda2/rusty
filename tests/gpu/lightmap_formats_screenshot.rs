@@ -80,6 +80,7 @@ fn the_bc6h_page_and_its_png_fallback_light_a_floor_alike() {
         .max()
         .unwrap();
     eprintln!("[1694] worst channel difference {worst}");
+    // Levels of 0 to 255, room for the two encodings' rounding; lavapipe's worst is 1.
     assert!(worst <= 8, "the two paths differ by {worst} levels");
     // Warm stays warm and cool stays cool: no channel moved. Which half is on top is the
     // camera's business, so either order passes.

@@ -1,4 +1,4 @@
-//! Post-FX visual smoke test (issue #14). When a GPU / software adapter (e.g.
+//! Post-FX visual smoke test. When a GPU / software adapter (e.g.
 //! lavapipe) is present, render the same scene twice with different exposure and
 //! assert the average pixel brightness actually changes — i.e. the color-
 //! correction knob reaches the image. When no adapter is available, `capture`

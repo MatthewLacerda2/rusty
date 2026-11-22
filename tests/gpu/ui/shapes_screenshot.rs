@@ -1,4 +1,4 @@
-//! UI look screenshot: the scene from `ui_shapes_scene` rendered headless,
+//! UI look screenshot: the scene from `shapes_scene` rendered headless,
 //! asserted by the colour at known pixels (PNG rows run top-down, hence
 //! `row = SIZE - 1 - y`). Covers chamfered and rounded corners, a ring and an arc,
 //! a linear gradient, a dashed line, a glow, a shadow and the three non-normal

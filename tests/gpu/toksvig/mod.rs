@@ -1,6 +1,6 @@
 //! Toksvig specular AA: a glossy floor with a busy normal map widens its lobe by what the
 //! map's mips lost, far off, and nothing else. Each test draws a busy map against its *twin*
-//! (same x and y, blue pinned at 255: no spread, as before).
+//! (same x and y, blue pinned at 255: the same normals, no spread).
 
 mod mapping;
 mod shimmer;
@@ -19,6 +19,7 @@ use rusty::scene::{Camera, Scene};
 pub(super) const W: u32 = 128;
 pub(super) const H: u32 = 96;
 
+// Eye and pitch in degrees: far looks just below the horizon, near down at the map's base level.
 pub(super) const FAR: (Vec3, f32) = (Vec3::new(0.0, 0.6, 6.5), -4.0);
 pub(super) const NEAR: (Vec3, f32) = (Vec3::new(0.0, 0.25, -2.5), -60.0);
 
