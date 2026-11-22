@@ -59,7 +59,6 @@ pub(super) fn long_close(rest: &str, level: usize) -> Option<usize> {
     rest.find(&close).map(|at| at + close.len())
 }
 
-/// Characters that join into one token (`&&`, `->`): a gap between two of them stays.
 const JOINING: &str = "!#$%&*+-./:<=>?@^|~";
 
 fn keeps_gap(prev: char, next: char) -> bool {

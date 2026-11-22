@@ -164,7 +164,8 @@ mod tests;
 
 #[cfg(test)]
 #[test]
-/// `Entity`'s body alone names only Transform: its other fields come from the registry.
+/// `Entity`'s own body names only `Transform` and `ScriptComponent`: the rest are the
+/// registry's.
 fn the_real_tree_names_the_registry_components() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let scan = Scan::at(&root);

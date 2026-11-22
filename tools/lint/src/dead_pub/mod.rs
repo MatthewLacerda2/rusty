@@ -119,7 +119,7 @@ pub fn check(
 ) -> io::Result<std::collections::BTreeSet<report::Warning>> {
     let mut cargo = Command::new("cargo");
     // Folded into the lib, an integration test's `env!("CARGO_BIN_EXE_<bin>")` is
-    // unset (cargo sets it for test targets only); the binary never runs, so any path.
+    // unset; the binary never runs, so any path does.
     for bin in fold::bins(&fs::read_to_string(tree.join("Cargo.toml"))?) {
         let exe = target.join("dead-pub/never-run").join(&bin.name);
         cargo.env(format!("CARGO_BIN_EXE_{}", bin.name), exe);

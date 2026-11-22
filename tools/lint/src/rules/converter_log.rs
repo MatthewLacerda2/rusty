@@ -4,8 +4,8 @@ use crate::code::{strip_comment, Open};
 
 pub const RULE: &str = "converter-log";
 const ROOT: &str = "src/asset/convert/";
-/// The cache's own modules, not converters: a new one joins this list, or its
-/// logging is a finding.
+/// The cache's own modules, not converters: a new one joins this list, or it
+/// may never log and its root must carry `DENY`.
 const NOT_CONVERTERS: &[&str] = &[
     "converter",
     "depends",

@@ -14,9 +14,7 @@ pub const RULE: &str = "api-parity";
 const AUTHORING: &str = "src/edit/authoring/";
 pub const ROOT: &str = "crate::edit::authoring";
 const EDITOR: &str = "src/editor/";
-/// Where Lua reaches ops: the bindings, and `Component.Set`'s field table.
 const API: &[&str] = &["src/script/api/", "src/edit/authoring/fields/"];
-/// Modules whose own file holds the field-table row that calls their ops by bare name.
 const ROWS: &[&str] = &["src/edit/authoring/rendering/post_processing/"];
 
 type Op = String;
@@ -126,6 +124,7 @@ fn definition(op: &str, authoring: &BTreeMap<String, &str>) -> Option<(String, u
 }
 
 /// Each `lint: allow(api-parity)` in `source`: its line, the line of the item it
+/// excuses (the next code line when it stands alone), and that `set_` op's name.
 fn allows(source: &str) -> Vec<(usize, usize, String)> {
     let lines: Vec<&str> = source.lines().collect();
     let code = code_lines(source);

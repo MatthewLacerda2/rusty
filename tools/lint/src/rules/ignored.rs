@@ -32,7 +32,6 @@ fn finding(path: String) -> Finding {
 
 fn ignored_paths(dir: &str, files: &[String]) -> Result<Vec<String>, String> {
     let mut child = git(Path::new(dir))
-        // `--no-index` matches tracked files too: the next new file beside one goes missing.
         .args(["check-ignore", "--no-index", "--stdin"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())

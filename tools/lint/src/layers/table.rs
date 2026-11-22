@@ -69,7 +69,7 @@ pub const LAYERS: &[Layer] = &[
         &["asset", "components", "core", "procgen", "scene"],
     )
     .uses(&["rapier3d"]),
-    // Sim: the in-game UI's layout runs headless, inside the fixed tick.
+    // Sim: the in-game UI's layout runs headless, a `LateUpdate` system each tick.
     sim(
         "ui",
         &["asset", "components", "core", "ecs", "font", "scene"],
@@ -150,8 +150,6 @@ pub const LAYERS: &[Layer] = &[
         "pollster",
         "wgpu",
     ]),
-    // The dev-only Lua namespaces (`Debug.*`, the bake verbs) bind here: `script` is sim
-    // and may not name a platform crate.
     platform(
         "dev",
         &[

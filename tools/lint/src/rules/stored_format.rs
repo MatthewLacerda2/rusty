@@ -5,7 +5,7 @@ use crate::code::{code_lines, is_ident};
 pub const RULE: &str = "stored-format";
 pub const MARKER: &str = "//! stored-format:";
 
-/// Each matches only as a whole word at its end, so `fs::read` is not `fs::read_dir`.
+/// Each matches only as a whole word, so `fs::read` is not `fs::read_dir`.
 const IO: &[&str] = &[
     "fs::write",
     "fs::read",
@@ -17,7 +17,6 @@ const IO: &[&str] = &[
     "written::write",
 ];
 
-/// The type a codec call moves may be derived anywhere, so the call alone says "a document".
 const CODEC: &[&str] = &["serde_json::to_", "serde_json::from_"];
 
 pub struct Source<'a> {

@@ -34,6 +34,8 @@ struct Setter {
     body: String,
 }
 
+/// Proves each float parameter reaches a helper, not that the helper's result is what is
+/// stored: `let _ = finite(v); c.a = v;` passes.
 pub fn check(path: &str, source: &str, test: &[bool], rules: &[Rule]) -> Vec<Finding> {
     let at = crate::modules::module_path(path);
     if !at.starts_with(DIR) {

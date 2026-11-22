@@ -114,7 +114,6 @@ fn a_sim_member_testing_against_a_platform_sibling_below_it_is_flagged() {
     let found = display("physics", text, &rows, &POLICY);
     assert_eq!(found.len(), 1, "{found:?}");
     assert!(found[0].starts_with("PLATFORM_DEV_CRATE crates/physics/Cargo.toml → rusty-logging"));
-    // A platform row above the sim one is `STRAY_DEV_CRATE`'s alone: one line, one finding.
     let up = "[dev-dependencies]\nrusty-render = { workspace = true }\n";
     assert!(display("physics", up, LAYERS, &POLICY).is_empty());
     assert_eq!(dev_stray("physics", up, LAYERS).len(), 1);
