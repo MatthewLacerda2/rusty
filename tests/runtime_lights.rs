@@ -1,4 +1,4 @@
-//! A light made while the game plays is live (#2522): no bake can take in a light
+//! A light made while the game plays is live: no bake can take in a light
 //! the edit-mode scene never held, so `Baked`, the edit-mode default, would light
 //! nothing in a shipped game. It casts a shadow that fades a few ranges from the
 //! camera. One made in edit mode stays `Baked` and unshadowed.

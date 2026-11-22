@@ -1,4 +1,4 @@
-//! The scenario VM gets the one API surface (#1384): the namespaces a gameplay
+//! The scenario VM gets the one API surface: the namespaces a gameplay
 //! script calls, read-write, plus the scenario-only `Harness`.
 
 use rusty::dev::scenario;

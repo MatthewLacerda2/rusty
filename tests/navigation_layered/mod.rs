@@ -1,10 +1,10 @@
-//! Layered navigation (#454), end to end through the public `NavigationGraph`
+//! Layered navigation, end to end through the public `NavigationGraph`
 //! surface: stacked floors, a bridge over a walkway, real ramps, agents climbing
 //! between floors, and byte-identical replay. Levels are blocked out from primitive
 //! boxes only, as every engine test level is.
 
 // The bake-time measurements time the bake with the wall clock; the sim under test
-// never reads it. Integration tests sit outside the clock ban's gate (#757).
+// never reads it. Integration tests sit outside the clock ban's gate.
 #![allow(
     clippy::disallowed_methods,
     clippy::disallowed_types,

@@ -1,4 +1,4 @@
-//! Light that bounces (#1695's review). A `Mixed` spot's bounce off the floor reaches
+//! Light that bounces. A `Mixed` spot's bounce off the floor reaches
 //! a glossy ceiling from one small patch, directional (about 0.97) though no `Baked`
 //! lamp lights it: no lobe. A `Baked` lamp in a room of bright walls supplies only
 //! part of a texel's light, the walls the rest: its lobe still aims at the lamp, and

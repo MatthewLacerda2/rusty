@@ -1,4 +1,4 @@
-//! Integration coverage for the UI graphics surface (#418): the `Image`,
+//! Integration coverage for the UI graphics surface: the `Image`,
 //! `CanvasGroup` and `RectMask` namespaces write through the shared ops (validation
 //! included), and all three components survive a scene save → load.
 

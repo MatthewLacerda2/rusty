@@ -1,5 +1,5 @@
-//! Shapes on a world canvas (#425): the SDF graphic draws in perspective through
-//! the world pass, respects a RectMask's per-fragment clip there (#619), and the
+//! Shapes on a world canvas: the SDF graphic draws in perspective through
+//! the world pass, respects a RectMask's per-fragment clip there, and the
 //! world pass has a pipeline per blend mode.
 
 use glam::{Vec2, Vec4};

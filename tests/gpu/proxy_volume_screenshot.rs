@@ -1,4 +1,4 @@
-//! Light Probe Proxy Volume on the GPU (#1672): the issue's locker. A 2 m dynamic
+//! Light Probe Proxy Volume on the GPU: the issue's locker. A 2 m dynamic
 //! box stands against a wall beside a `Baked` lamp at 2.2 m, lit only by baked
 //! light probes (no ambient, black sky, and a `Baked` lamp is never drawn live).
 //! With its one probe sample it is one colour top to bottom; with a volume its top,
@@ -59,7 +59,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
     };
     scene.world.set_light(lamp, Some(light));
     // As a lightmap bake would record it: a Baked light no bake took in is
-    // previewed live (#2522), and a probe bake records no light.
+    // previewed live, and a probe bake records no light.
     scene.lightmaps.took_in_baked(lamp);
     scene.world.transform_mut(lamp).unwrap().position = Vec3::new(0.9, 2.2, -0.4);
     let locker = add(
@@ -77,7 +77,7 @@ pub(super) fn baked_room() -> Option<(Scene, u32)> {
 
 /// Mean red level of the locker's top and foot, seen from the lamp's side (+X):
 /// the face whose top looks at the lamp, drawn through `host` so the test's three
-/// shots share one renderer (one each was a third of its time on Metal, #2350).
+/// shots share one renderer (one each was a third of its time on Metal).
 pub(super) fn top_and_foot(host: &mut CaptureHost, scene: &Scene, name: &str) -> (f64, f64) {
     let camera = Camera::new(Vec3::new(3.0, 1.0, 0.0), 180.0, 0.0);
     let path = crate::temp::dir().join(format!("rusty_gpu_1672_proxy_{name}.png"));

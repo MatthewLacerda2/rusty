@@ -1,6 +1,6 @@
-//! Normal-map + emissive-map visual test (issue #207): proves the renderer SAMPLES a
+//! Normal-map + emissive-map visual test: proves the renderer SAMPLES a
 //! material's `normal_map`/`emissive_map` through the per-entity material bind group
-//! (the two map no-ops #178 guarded), building on the #202 path. Light-independent
+//! (the two map no-ops guarded). Light-independent
 //! signals on an up-facing ambient-lit plane:
 //!   - Emissive: factor [1,1,1] modulated by a WHITE map (`*1`, glow kept) vs a BLACK
 //!     map (`*0`, glow cancelled) — white-mapped is brighter.
@@ -55,7 +55,7 @@ pub(super) fn scene(material: MaterialAsset) -> Scene {
     s.world.set_mesh(id, Some(mesh));
     s.world.set_material(id, Some(mat));
     s.world.set_post_processing(id, Some(vc()));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     s.world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));
     s.materials.insert("mat".to_string(), material);

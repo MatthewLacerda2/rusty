@@ -1,4 +1,4 @@
-//! A game's HUD keeps its layout (#2412): a script-built HUD under a `CanvasGroup`, a
+//! A game's HUD keeps its layout: a script-built HUD under a `CanvasGroup`, a
 //! stacked viewmodel camera, a render-texture minimap, a pool of inactive damage
 //! numbers anchored to a moving foe, the UI systems ticking every step, and a sized
 //! FPS text rewritten every thirty frames. The renderer lays out on the first frame

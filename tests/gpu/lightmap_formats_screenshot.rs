@@ -1,4 +1,4 @@
-//! A lightmap page's two paths render alike (#1694): the BC6H KTX2 page (the GPU's
+//! A lightmap page's two paths render alike: the BC6H KTX2 page (the GPU's
 //! own BC decoder, lavapipe's in CI) and its RGBM PNG fallback, decoded on the CPU
 //! to `Rgba16Float`, light a floor to within a few levels of each other, colour for
 //! colour: a channel swapped or a range clipped in the encoder shows here, where a

@@ -1,4 +1,4 @@
-//! The default content (#1893): the bundled bot takes damage through
+//! The default content: the bundled bot takes damage through
 //! `OnTakeDamage`, plays `Hit`, then `Death`, and stops chasing once dead.
 
 use rusty::dev::harness::Harness;

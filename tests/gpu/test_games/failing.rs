@@ -1,6 +1,6 @@
-//! The play-test fails when it should (#2029): a failing scenario exits 1, a recipe
+//! The play-test fails when it should: a failing scenario exits 1, a recipe
 //! error exits 2 and names the recipe, and a scenario whose demo diverges on
-//! replay fails its replay step (#2120).
+//! replay fails its replay step.
 
 use super::game_test;
 

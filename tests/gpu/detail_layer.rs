@@ -1,4 +1,4 @@
-//! A material's detail layer (#1997, HDRP's detail map), drawn: a layer without a
+//! A material's detail layer (HDRP's detail map), drawn: a layer without a
 //! map or with a missing one draws what no layer draws, byte for byte; a busy map
 //! changes a floor under each mapping and a neutral one (0.5) does not; and on a
 //! coloured metal a darkening detail scales its reflection without tinting it.

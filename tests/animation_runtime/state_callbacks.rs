@@ -1,4 +1,4 @@
-//! Graph-state callbacks through the real tick (#1901): binding enters the
+//! Graph-state callbacks through the real tick: binding enters the
 //! entry state, a parameter-driven crossfade enters its target at once and
 //! exits its source when it ends, a state's first marker follows its enter,
 //! `GetCurrentTag` reads the active tag, and every run gives the same log.

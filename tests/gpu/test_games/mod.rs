@@ -1,5 +1,5 @@
 //! Every test game under `games/` generates deterministically, passes its
-//! scenarios and takes its shots (#2029), each as its own test (#2070), so
+//! scenarios and takes its shots, each as its own test, so
 //! nextest runs them side by side and each gets its own [`BUDGET`]. Each runs the
 //! `game` binary as a child, since opening a project moves the working directory.
 
@@ -21,11 +21,11 @@ use std::time::Duration;
 /// How much CPU time (user + system) one game's `game --test` may use at its
 /// defaults, in yardsticks: the median CPU time of `calibrate`'s fixed slice of the
 /// engine's own sim work, sampled on a test thread throughout the game's run
-/// (#2070, #2131, #2243). Not wall time, which a busy machine stretches, nor bare
+///. Not wall time, which a busy machine stretches, nor bare
 /// CPU seconds, which a loaded machine inflates too (a shared SMT core, all-core
 /// clocks, a contended cache), as it does the yardstick sampled in the same window.
 /// A game past it fails by name, so the game whose defaults grew is the one fixed.
-/// The heaviest game is `showroom` since `runner`'s long run was halved (#2350):
+/// The heaviest game is `showroom` since `runner`'s long run was halved:
 /// it reads 216 on CI's ubuntu lavapipe and 292 in a 4-vCPU lavapipe container
 /// (`runner` 154 and 219; one run each, run 44394886578), so 380 is 30% over the
 /// highest count and 12% under the ubuntu count doubled. On CI's macOS Metal the

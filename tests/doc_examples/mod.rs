@@ -1,4 +1,4 @@
-//! The Lua examples in `docs/api/` run (#937). The drift gate (#280) proves every
+//! The Lua examples in `docs/api/` run. The drift gate proves every
 //! documented function *exists*; this proves the examples an agent copies *work*:
 //! a renamed argument or a changed return shape fails here instead of leaving the
 //! doc wrong and every gate green.

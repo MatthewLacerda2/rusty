@@ -1,4 +1,4 @@
-//! World-space UI through the Lua surface in a real Play session (#429):
+//! World-space UI through the Lua surface in a real Play session:
 //! `Camera.WorldToScreen` / `ScreenToWorldRay` / `MouseRay`, a marker pinned with
 //! `RectTransform.SetWorldAnchor`, and a `WorldSpace` terminal clicked through the
 //! screen centre while the cursor is locked.

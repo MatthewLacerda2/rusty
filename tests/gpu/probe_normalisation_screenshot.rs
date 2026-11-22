@@ -1,4 +1,4 @@
-//! Probe normalisation by the baked diffuse (#1697). Two static polished metal floors
+//! Probe normalisation by the baked diffuse. Two static polished metal floors
 //! on a white diffuse ground, under one reflection probe 1.2 m below a `Baked` lamp:
 //! one floor under the lamp, one where no light reaches, so its lightmap is black.
 //! The probe is baked for real (its stored irradiance is the capture's), then pointed

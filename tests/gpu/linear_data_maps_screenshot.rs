@@ -1,4 +1,4 @@
-//! Data maps sample their texels raw, not sRGB-decoded (#647). Each check renders
+//! Data maps sample their texels raw, not sRGB-decoded. Each check renders
 //! a material driven by a mid-grey (128) map against the same material with the
 //! value as a scalar instead, and asserts the two frames match: decoded as sRGB,
 //! 128 reads ≈ 0.22, not ≈ 0.5, and the frames part visibly.

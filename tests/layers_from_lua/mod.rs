@@ -1,4 +1,4 @@
-//! #827: the three layer settings an agent can now set from Lua — a slot's name,
+//! The three layer settings an agent can now set from Lua — a slot's name,
 //! the collision matrix and a camera's culling mask. `values` checks each call
 //! writes the scene and survives a save/load; `contact` checks a matrix change made
 //! mid-play actually stops a contact.

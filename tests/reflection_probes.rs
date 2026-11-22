@@ -1,4 +1,4 @@
-//! Reflection probes (#244): data model + parallax-corrected runtime sampling.
+//! Reflection probes: data model + parallax-corrected runtime sampling.
 //!
 //! Headless + deterministic, no GPU. Asserts (1) the reflection-probe set — positions,
 //! parallax boxes, settings and cubemap PATHS — round-trips through the scene
@@ -53,7 +53,7 @@ fn reflection_probe_set_round_trips() {
     );
 }
 
-/// The acceptance selection logic (#1584, Unity's *Blend Probes*): of two boxes
+/// The acceptance selection logic (Unity's *Blend Probes*): of two boxes
 /// covering a point, both share its reflection, the nearer capture point first; a
 /// point out of every probe's reach selects nothing (the caller reflects the skybox).
 #[test]

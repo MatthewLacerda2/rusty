@@ -1,4 +1,4 @@
-//! A warmed scene's first frame uploads nothing (#2123): its meshes and maps are
+//! A warmed scene's first frame uploads nothing: its meshes and maps are
 //! made while the scene before it draws (a map read on a worker), found by the
 //! extract at the swap; a retry of a resident scene makes nothing at all. A file
 //! swapped in cold uploads on that frame. Skips with no adapter.

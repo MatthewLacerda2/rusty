@@ -1,4 +1,4 @@
-//! Per-scene navmesh bake settings (#276).
+//! Per-scene navmesh bake settings.
 //!
 //! Locks in (a) the fresh-scene defaults equal the historical bake constants, (b) a
 //! minimal scene file that omits the `nav_settings` block rehydrates with those
@@ -12,8 +12,8 @@ use rusty::scene::Scene;
 fn fresh_scene_uses_default_nav_settings() {
     let scene = Scene::new();
     assert_eq!(scene.nav_settings, NavMeshSettings::default());
-    // The defaults equal the historical bake constants, bar the cell (#1887) and the
-    // step, now the default controller's step offset (#2001).
+    // The defaults equal the historical bake constants, bar the cell and the
+    // step, now the default controller's step offset.
     assert_eq!(scene.nav_settings.max_step, 0.3);
     assert_eq!(scene.nav_settings.max_slope, 1.0);
     assert_eq!(scene.nav_settings.grid_spacing, 0.25);

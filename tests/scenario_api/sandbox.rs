@@ -1,6 +1,6 @@
-//! The scenario VM has the gameplay VM's deterministic stdlib (#1408): no `os` /
+//! The scenario VM has the gameplay VM's deterministic stdlib: no `os` /
 //! `io`, `math.random` over the world's seeded `Random`, and the project-aware
-//! `require` / `dofile` / `loadfile` (#1717).
+//! `require` / `dofile` / `loadfile`.
 
 use super::run;
 
@@ -27,7 +27,7 @@ fn math_random_gives_identical_results_run_to_run() {
 }
 
 /// The scenario VM's `require`, `dofile` and `loadfile` read against the project,
-/// as in Play (#1717): a game script it `dofile`s requires a module that requires
+/// as in Play: a game script it `dofile`s requires a module that requires
 /// another, and a file outside the project loads but warns once in the console.
 #[test]
 fn a_scenario_requires_a_project_module_and_warns_once_outside_it() {

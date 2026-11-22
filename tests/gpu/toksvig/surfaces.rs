@@ -1,4 +1,4 @@
-//! What the widening leaves alone (#1702's review, item 2): it spreads a highlight
+//! What the widening leaves alone: it spreads a highlight
 //! and blurs a reflection's mip, but a far glossy dielectric floor keeps its grazing
 //! reflection and a far normal-mapped pane its opacity. Under a blue sky with no
 //! lamp, a busy map's far floor reflects as much blue as its twin's, and a busy

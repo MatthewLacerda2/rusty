@@ -1,4 +1,4 @@
-//! Skinning past joint 63 (#455). The bone palette used to be a fixed 64-matrix
+//! Skinning past joint 63. The bone palette used to be a fixed 64-matrix
 //! uniform: joint 99 of a 100-joint rig read out of bounds and skinned as identity,
 //! so a Mixamo-sized character tore silently.
 //!

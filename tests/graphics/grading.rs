@@ -1,6 +1,6 @@
-//! `Graphics.*` colour grading (#1440): white balance, the Lift / Gamma / Gain
+//! `Graphics.*` colour grading: white balance, the Lift / Gamma / Gain
 //! wheels and the hue shift write the main camera's volume, clamped, read back what
-//! they wrote, and read neutral without a volume; so does the Color Lookup (#1441).
+//! they wrote, and read neutral without a volume; so does the Color Lookup.
 
 use std::cell::RefCell;
 use std::rc::Rc;

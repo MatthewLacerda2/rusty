@@ -1,4 +1,4 @@
-//! The `Input` scripting namespace (#416) against a bare `InputState`: every read,
+//! The `Input` scripting namespace against a bare `InputState`: every read,
 //! the cursor request and the injection verbs, with ticks driven by `begin_tick`
 //! exactly as `GameWorld::tick` drives them.
 

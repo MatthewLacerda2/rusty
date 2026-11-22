@@ -1,5 +1,5 @@
-//! The budget reads CPU time in yardsticks (`calibrate`), not wall time (#2131)
-//! nor bare CPU seconds (#2243): a child that sleeps far past its budget passes,
+//! The budget reads CPU time in yardsticks (`calibrate`), not wall time
+//! nor bare CPU seconds: a child that sleeps far past its budget passes,
 //! one that spins past it fails, one that hangs is killed at the wall-time
 //! ceiling, and one doing twice the work fails a bar its single dose meets. The
 //! children are `sleep` and `sh`, not games, so each proof costs a second or two.

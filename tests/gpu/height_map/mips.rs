@@ -1,5 +1,5 @@
-//! A surface block's lookup under a height map reads as it does without one (#2191's
-//! review): the `emissive_boost` block builds its coordinates with `coords_with`,
+//! A surface block's lookup under a height map reads as it does without one:
+//! the `emissive_boost` block builds its coordinates with `coords_with`,
 //! outside `parallax::displace`, so they are neither shifted nor bent (`bend` 0) and
 //! are read at their own implicit derivatives, the mip a far surface needs. A far,
 //! fine checker shows any other mip as a different frame.

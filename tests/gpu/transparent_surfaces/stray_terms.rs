@@ -1,5 +1,5 @@
-//! Surface terms that must stay where they belong (#1523): an unlit transparent
-//! (a lamp's glass) blends straight, as before #1523, and a blend mode left on an
+//! Surface terms that must stay where they belong: an unlit transparent
+//! (a lamp's glass) blends straight, and a blend mode left on an
 //! Opaque material blends nothing.
 
 use glam::Vec3;

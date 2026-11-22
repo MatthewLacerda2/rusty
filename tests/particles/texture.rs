@@ -1,4 +1,4 @@
-//! `Particles.SetTexture` / `GetTexture` (#2052): the sprite image round-trips,
+//! `Particles.SetTexture` / `GetTexture`: the sprite image round-trips,
 //! `nil` and `""` go back to the default sprite, and both are safe without an
 //! emitter.
 

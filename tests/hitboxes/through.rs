@@ -1,4 +1,4 @@
-//! `raycast_through` over per-bone hitboxes (#830): a shot through the head
+//! `raycast_through` over per-bone hitboxes: a shot through the head
 //! names the bone and the character, and reports how much of the head it crossed.
 
 use glam::Vec3;

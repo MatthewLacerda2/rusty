@@ -1,4 +1,4 @@
-//! Property-based harness invariants (#123). Gated on `dev` like
+//! Property-based harness invariants. Gated on `dev` like
 //! `harness_determinism.rs`: a no-op under a plain `cargo test`, real under
 //! `--features dev`. Strengthens the single-case replay/advancement checks into
 //! invariants over generated step counts.

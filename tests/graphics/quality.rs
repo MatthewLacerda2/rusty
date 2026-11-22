@@ -1,4 +1,4 @@
-//! The quality presets (#1522): `Graphics.SetQuality` selects one of the project's
+//! The quality presets: `Graphics.SetQuality` selects one of the project's
 //! presets by name (an unknown one refused with the list) and puts its values in
 //! the graphics cell the renderer reads; `QualityPresets` lists them; and
 //! `SetQualityPreset` / `RemoveQualityPreset` author them.

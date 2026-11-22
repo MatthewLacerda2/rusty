@@ -1,4 +1,4 @@
-//! The per-entity `Camera` lens and stacking functions (#1341): field of view, clip
+//! The per-entity `Camera` lens and stacking functions: field of view, clip
 //! planes, render order and clear flags through the Lua surface — what a script
 //! needs to build a viewmodel camera over the world one.
 

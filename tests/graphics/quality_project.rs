@@ -1,4 +1,4 @@
-//! The quality presets and `project.rusty` (#1522): the editor re-reads the presets
+//! The quality presets and `project.rusty`: the editor re-reads the presets
 //! from the bound file at each Play, so a hand edit runs, and a save of something
 //! else writes back the file's presets, never a copy from before the edit.
 

@@ -1,4 +1,4 @@
-//! Soft and shaped UI masks (#428), headless: the headline round minimap — a
+//! Soft and shaped UI masks, headless: the headline round minimap — a
 //! render texture shown through a circular soft Mask — a feathered scroll list,
 //! and two nested Masks multiplying. Asserted at known pixels (`px` takes UI
 //! coordinates: bottom-left origin). Child rects are placed relative to their
@@ -24,7 +24,7 @@ fn black_canvas() -> (Scene, u32) {
 }
 
 /// Red-dominant by a ratio, not pure: the red box's plastic reflects a little sky
-/// at an angle (#1543; red at least 4x its other channels on lavapipe and Metal),
+/// at an angle (red at least 4x its other channels on lavapipe and Metal),
 /// while the half-sky rim (about 2x) and the sky (about 1x) stay out.
 fn is_red(p: [u8; 3]) -> bool {
     let rest = u16::from(p[1].max(p[2]));

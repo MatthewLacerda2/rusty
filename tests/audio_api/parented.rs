@@ -1,4 +1,4 @@
-//! A voice on a child is heard and logged at the child's **world** position (#1196):
+//! A voice on a child is heard and logged at the child's **world** position:
 //! a 3D source at local origin under a parent off to the listener's side
 //! is panned and attenuated, and `Play` logs where it stands in the world.
 

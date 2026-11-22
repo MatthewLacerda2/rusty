@@ -1,4 +1,4 @@
-//! Animator parameters (#314) end-to-end: the `Animator.Set*` Lua setters write the
+//! Animator parameters end-to-end: the `Animator.Set*` Lua setters write the
 //! component's typed store, a wrong-typed set is a warned no-op (never an error),
 //! and every parameter kind round-trips through `SceneData` (the same
 //! `to_scene_data` → `apply_scene_data` document a scene save/load uses).

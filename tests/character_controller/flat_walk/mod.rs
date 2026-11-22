@@ -1,4 +1,4 @@
-//! Walking open ground in Play (#2061): a CharacterController moved straight
+//! Walking open ground in Play: a CharacterController moved straight
 //! ahead across a flat floor covers its whole stride every tick and stays
 //! grounded, whatever the floor, the speed or the capsule — Unity's `Move`.
 //! Floors are built the way a script or the editor builds them (a primitive
@@ -32,7 +32,7 @@ const SLACK: f32 = 0.01;
 
 /// A floor: its name, primitive, scale, centre height (every top face at
 /// y = 0), whether it is marked static, and a plane's subdivisions (its
-/// collider's triangle seams, #2075).
+/// collider's triangle seams).
 pub(super) type Floor = (&'static str, Primitive, Vec3, f32, bool, u32);
 
 const BOXES: [Floor; 4] = [

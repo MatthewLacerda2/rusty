@@ -1,5 +1,5 @@
 //! `Graphics.*` lens-flare bindings vs `authoring::rendering::post_processing`'s
-//! lens-flare ops (#1443): the same writes through both reach the same component.
+//! lens-flare ops: the same writes through both reach the same component.
 
 use std::cell::RefCell;
 use std::rc::Rc;

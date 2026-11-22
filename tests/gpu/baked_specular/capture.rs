@@ -12,7 +12,7 @@ use rusty::dev::bake::reflection::{bake_scene_reflections, reflection_dir};
 
 use super::{bake, scene};
 
-/// Every level's channels of the BC6H cube a reflection bake wrote (#1885), decoded.
+/// Every level's channels of the BC6H cube a reflection bake wrote, decoded.
 fn texels(bytes: &[u8]) -> Vec<f32> {
     let reader = ktx2::Reader::new(bytes).expect("a KTX2 cube");
     let size = reader.header().pixel_width;

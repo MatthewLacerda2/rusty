@@ -1,4 +1,4 @@
-//! Pushing dynamic bodies (#1879): a CharacterController pushes a 10 kg box
+//! Pushing dynamic bodies: a CharacterController pushes a 10 kg box
 //! only with the bundled `controller_push.lua` beside it (Unity's documented
 //! pattern), never on its own; a kinematic Rigidbody pushes one by itself.
 

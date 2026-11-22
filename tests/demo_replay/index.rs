@@ -1,4 +1,4 @@
-//! Demos (#1597): the index finds a moment, a seek lands on it bit for bit either
+//! Demos: the index finds a moment, a seek lands on it bit for bit either
 //! way, and a cut scenario reproduces its range.
 
 use std::cell::RefCell;

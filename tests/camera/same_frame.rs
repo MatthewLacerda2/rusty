@@ -1,4 +1,4 @@
-//! Same-frame readers of the main view (#1619): moving the camera entity by
+//! Same-frame readers of the main view: moving the camera entity by
 //! Transform, or its lens through `Camera.SetFov`, is seen by `Camera.WorldToScreen`
 //! and a world-anchored `UI.GetRect` at once, with no tick in between; outside
 //! Play, the UI still takes the entity's lens.

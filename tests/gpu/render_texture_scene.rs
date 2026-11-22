@@ -1,4 +1,4 @@
-//! The scene the render-texture screenshot renders (#430): an emissive red box at
+//! The scene the render-texture screenshot renders: an emissive red box at
 //! the origin, a second camera looking at it into `"rt:pip"`, and a full-height UI
 //! Image over the screen's left half showing that texture. The screen's own camera
 //! (the capture's base) looks away from the box, so red on screen can only have come

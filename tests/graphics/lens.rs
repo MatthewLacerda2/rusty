@@ -1,4 +1,4 @@
-//! `Graphics.*` lens effects (#1439): Vignette, Chromatic Aberration and Film Grain
+//! `Graphics.*` lens effects: Vignette, Chromatic Aberration and Film Grain
 //! write the main camera's volume, clamped, read back what they wrote, and read the
 //! defaults without a volume.
 

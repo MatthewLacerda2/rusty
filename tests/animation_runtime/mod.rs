@@ -1,4 +1,4 @@
-//! Animation runtime end-to-end (#80, #453): a playing animator poses the bone
+//! Animation runtime end-to-end (#80): a playing animator poses the bone
 //! GameObjects through the real `GameWorld::tick`, the mesh is skinned from them,
 //! a child of a bone follows it, a `LateUpdate` script overrides the Animator before
 //! skinning reads the bones, and the whole path is deterministic.

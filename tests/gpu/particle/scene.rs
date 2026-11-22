@@ -1,4 +1,4 @@
-//! Shared fixture for the particle render-mode pixel tests (#440): the fog tests'
+//! Shared fixture for the particle render-mode pixel tests: the fog tests'
 //! black, light-free wall 20 m away, with one emitter holding hand-placed particles.
 //! A sprite then shows its tint alone, so a test can read coverage off a pixel.
 

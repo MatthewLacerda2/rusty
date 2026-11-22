@@ -1,5 +1,5 @@
 //! `Graphics.*` depth-of-field bindings vs `authoring::rendering::post_processing`'s
-//! depth-of-field ops (#1445): the same writes through both reach the same component.
+//! depth-of-field ops: the same writes through both reach the same component.
 
 use std::cell::RefCell;
 use std::rc::Rc;

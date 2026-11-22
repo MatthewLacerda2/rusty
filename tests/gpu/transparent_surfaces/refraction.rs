@@ -1,4 +1,4 @@
-//! Refraction (#1523, HDRP's *Planar* model): clear water with a rippled normal map
+//! Refraction (HDRP's *Planar* model): clear water with a rippled normal map
 //! bends the checker floor under it; with refraction `None` the same water leaves
 //! the floor where flat water leaves it. (The slab casts its own shadow on the
 //! floor either way, so the baseline is flat water, not no water.)

@@ -1,8 +1,8 @@
 //! Integration coverage for the `Camera` namespace: the main view's one pose
-//! (`main_view`, #1619) and its same-frame readers (`same_frame`), the per-entity
-//! lens and stacking functions (`stack_api`, #1341), render-texture targets
-//! (`target_api`, #430), history cuts (`reset_history`, #2003) and the FOV axis
-//! and its conversions (`fov_axis`, #2038).
+//! (`main_view`) and its same-frame readers (`same_frame`), the per-entity
+//! lens and stacking functions (`stack_api`), render-texture targets
+//! (`target_api`), history cuts (`reset_history`) and the FOV axis
+//! and its conversions (`fov_axis`).
 
 mod fov_axis;
 mod main_view;

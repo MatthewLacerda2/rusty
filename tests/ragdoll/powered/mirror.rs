@@ -1,4 +1,4 @@
-//! The drive under a mirroring rig (#1119, #1895): FBX's `(1,1,−1)` scale and a
+//! The drive under a mirroring rig: FBX's `(1,1,−1)` scale and a
 //! −1 X mirror. The engine draws a bone under a mirror as `F·R_local·F`, so the
 //! drive's target is the animated turn the bone is drawn with, not the plain
 //! product of local rotations.

@@ -1,4 +1,4 @@
-//! GPU-simulated emitters on a real adapter (#2170): the compute step moves a
+//! GPU-simulated emitters on a real adapter: the compute step moves a
 //! particle where the closed form says, a `Gpu` and a `Cpu` emitter of one config
 //! and seed cover the same pixels, a `Local` one follows its emitter, and a dead
 //! particle is not drawn. Shared here: a play world over the particle wall scene,

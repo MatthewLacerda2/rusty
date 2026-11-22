@@ -1,4 +1,4 @@
-//! `Camera.ResetHistory([id])` (#2003): a script cuts the main camera's view, or a
+//! `Camera.ResetHistory([id])`: a script cuts the main camera's view, or a
 //! named camera's, and a bare entity or a dead id changes nothing.
 
 use std::cell::RefCell;

@@ -1,4 +1,4 @@
-//! Structural-authoring API end-to-end (issue #181).
+//! Structural-authoring API end-to-end.
 //!
 //! Drives the headless edit-mode session's command channel through the live Lua
 //! evaluator: create an entity, add + configure a component, parent it, and save —
@@ -108,7 +108,7 @@ fn remove_component_round_trips_through_api() {
 
 #[test]
 fn a_box_drops_its_mesh_and_keeps_its_collider() {
-    // #1657: a blockout box stays an invisible collider, same id.
+    // a blockout box stays an invisible collider, same id.
     let session = Session::new("").expect("session boots");
     let id = ok(&session, "Scene.CreateEntity(\"b\", \"Box\")");
     ok(&session, &format!("Scene.AddComponent({id}, \"Collider\")"));

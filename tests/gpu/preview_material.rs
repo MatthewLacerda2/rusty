@@ -1,4 +1,4 @@
-//! `Debug.PreviewMaterial` (#404): a named material asset renders headlessly, whole —
+//! `Debug.PreviewMaterial`: a named material asset renders headlessly, whole —
 //! its base colour, and its authored surface shader with the runtime param values
 //! stored on it. Driven through a real [`Session`], so this is the verb an agent calls.
 //! The render half skips without an adapter (the verb returns `nil`); the

@@ -1,4 +1,4 @@
-//! The CRT postfx blocks (#1679), pixel-tested on lavapipe: `barrel` warps where
+//! The CRT postfx blocks, pixel-tested on lavapipe: `barrel` warps where
 //! the frame is sampled, so a colour block after it still grades the picture inside
 //! the curve while the corners go black; `phosphor_mask` stripes a flat grey without
 //! changing its mean brightness (short of clipping).

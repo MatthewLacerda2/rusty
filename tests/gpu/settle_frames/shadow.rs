@@ -1,7 +1,7 @@
-//! A shadow tile resize the atlas's hysteresis holds back (#1711) is history: each
+//! A shadow tile resize the atlas's hysteresis holds back is history: each
 //! frame drawn counts towards it, so a settled shot after a jump that takes a
 //! shadowed spot light out of its tile's band still draws every frame, and writes
-//! what the full settle wrote before #2092.
+//! what the full settle wrote.
 
 use super::{png, run};
 

@@ -1,4 +1,4 @@
--- assets/scripts/bot_player.lua (the test-fixture project, #829) — DEV-ONLY bot-player (won't ship).
+-- assets/scripts/bot_player.lua (the test-fixture project) — DEV-ONLY bot-player (won't ship).
 --
 -- Attached to the Player, this script plays the game the way a human would: it drives
 -- the WRITABLE Input from Update() — pressing the same W/A/S/D, arrow keys and left

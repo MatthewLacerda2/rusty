@@ -1,4 +1,4 @@
-//! `OnControllerColliderHit` (#1879): raised inside `CharacterController.Move`,
+//! `OnControllerColliderHit`: raised inside `CharacterController.Move`,
 //! once per collider the move touched, in sweep order, the floor included; the
 //! same list on every run; and a handler moving its own controller again does
 //! not recurse.

@@ -1,4 +1,4 @@
-//! Property-based scene round-trip tests (#123). Distinct from the example-based
+//! Property-based scene round-trip tests. Distinct from the example-based
 //! `scene_roundtrip.rs`: here proptest generates thousands of arbitrary scenes and
 //! asserts save -> load preserves their values, shrinking any counterexample to a
 //! minimal failing case. Generators are seeded by proptest (no wall-clock), so the

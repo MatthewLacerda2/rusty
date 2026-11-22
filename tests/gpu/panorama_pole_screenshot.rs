@@ -1,4 +1,4 @@
-//! The skybox panorama does not wrap in V (#1037): v = θ/π runs zenith (0) to nadir
+//! The skybox panorama does not wrap in V: v = θ/π runs zenith (0) to nadir
 //! (1), so its sampler clamps V while U still wraps at the φ = ±π seam.
 //!
 //! The panorama is 8x4: the top two rows red, the bottom two blue. At that size half

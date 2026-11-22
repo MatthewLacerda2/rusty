@@ -1,4 +1,4 @@
-//! A ragdoll built after a bone was destroyed (#1273): the missing bone is no
+//! A ragdoll built after a bone was destroyed: the missing bone is no
 //! direction to point in, so its parent's joint axis is the same as on a whole rig.
 
 use glam::Vec3;

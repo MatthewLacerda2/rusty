@@ -1,4 +1,4 @@
-//! Trail and Line components (#441): the `Trail` / `Line` namespaces, the shared
+//! Trail and Line components: the `Trail` / `Line` namespaces, the shared
 //! style verbs, the scene round-trip, and the trail's fixed-tick recording.
 
 mod line;

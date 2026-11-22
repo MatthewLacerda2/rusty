@@ -1,5 +1,5 @@
 //! A height map whose shift is zero filters every other map as a material without
-//! one does (#2301). Reading a displaced material's maps at explicit derivatives
+//! one does. Reading a displaced material's maps at explicit derivatives
 //! everywhere lost the sampler's anisotropy on lavapipe (it filters an
 //! explicit-gradient read isotropically), so far, grazing detail drew sharper and
 //! shimmered; past the fade or at a negligible scale nothing moves, and nothing may

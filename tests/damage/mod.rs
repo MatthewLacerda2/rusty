@@ -1,4 +1,4 @@
-//! `Damage` and `OnTakeDamage` end to end (#1893): a shot bubbles from a hitbox
+//! `Damage` and `OnTakeDamage` end to end: a shot bubbles from a hitbox
 //! to the character's script, a handler's return is what `Apply` answers, a
 //! barrel's blast chains to the next and a self-feeding loop stops at depth 16
 //! (`chain`), the radial falloff, cover and grouping (`radial`, `cover`), and a

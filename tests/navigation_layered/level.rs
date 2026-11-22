@@ -1,4 +1,4 @@
-//! A CS:GO-sized test level (#454): ~200 m square, three walkable levels, blocked out
+//! A CS:GO-sized test level: ~200 m square, three walkable levels, blocked out
 //! from primitive boxes, slabs and tilted-box ramps only (no detailed geometry).
 //!
 //! A 5 × 5 grid of two-storey blocks, 24 m square each, 40 m apart: a first floor at
@@ -20,7 +20,7 @@ pub const BOUNDS: NavBounds = NavBounds::new(0.0, 200.0, 0.0, 200.0);
 pub fn build() -> Scene {
     let mut scene = Scene::new();
     scene.nav_settings.grid_spacing = 1.0;
-    scene.nav_settings.max_step = 0.5; // built for a 0.5 m step (#2001 lowered the default)
+    scene.nav_settings.max_step = 0.5; // built for a 0.5 m step
     add_box(
         &mut scene,
         Vec3::new(0.0, -0.5, 0.0),

@@ -1,4 +1,4 @@
-//! The headless editor capture (#731): the default scene captures, the image isn't
+//! The headless editor capture: the default scene captures, the image isn't
 //! blank, and the docked panels are where the editor puts them. A smoke check, not a
 //! golden: fonts and anti-aliasing differ across platforms, so no pixel is pinned.
 

@@ -1,4 +1,4 @@
-//! The per-entity `Camera` functions (#430): projection and render-texture target
+//! The per-entity `Camera` functions: projection and render-texture target
 //! through the Lua surface, onto the entity's `CameraComponent`.
 
 use std::cell::RefCell;

@@ -1,4 +1,4 @@
-//! The sky reflection is prefiltered (#1553): with no reflection probe, a rough
+//! The sky reflection is prefiltered: with no reflection probe, a rough
 //! metal reflects a blurred sky and a mirror a sharp one, as Unity's skybox
 //! reflection does. A sphere seen from above reflects the upper sky: banded rings
 //! of a striped panorama, or the procedural sky's clouds. The sphere's middle is

@@ -1,4 +1,4 @@
-//! Non-square bakes (#1493): a `size = [w, h]` recipe samples the same unit tile
+//! Non-square bakes: a `size = [w, h]` recipe samples the same unit tile
 //! with more pixels on one axis, tiles on both, and a square `size` is exactly the
 //! `resolution` it spells out.
 

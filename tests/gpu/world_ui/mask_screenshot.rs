@@ -1,7 +1,7 @@
-//! RectMask on a world canvas (#619): a graphic overflowing its mask is cut at
+//! RectMask on a world canvas: a graphic overflowing its mask is cut at
 //! the mask's edge, per fragment, though the canvas is a plane in perspective —
 //! and so a world-space Scroll View clips its content to its viewport. A graphic
-//! `Mask` (#428) clips there too, through the same coverage texture as on screen.
+//! `Mask` clips there too, through the same coverage texture as on screen.
 
 use glam::{Vec2, Vec4};
 use rusty::components::{

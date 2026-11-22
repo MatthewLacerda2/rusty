@@ -1,5 +1,5 @@
-//! API-doc drift gate (#280): the scripting-API reference (`docs/api/`) must agree with the **live Lua
-//! API surface** about *what exists*. The doc is served to the agent over MCP (#288),
+//! API-doc drift gate: the scripting-API reference (`docs/api/`) must agree with the **live Lua
+//! API surface** about *what exists*. The doc is served to the agent over MCP,
 //! so a drifted doc lies to it. This enforces existence-parity both directions — every
 //! documented `Namespace.Function` is a registered binding, and every registered
 //! binding is documented. Signatures are out of scope (Lua closures are opaque at
@@ -11,8 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use rusty::dev::session::Session;
 
-/// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
-/// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
+/// The committed scripting-API doc, `docs/api/` assembled and read at run time
+///, so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
     rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }

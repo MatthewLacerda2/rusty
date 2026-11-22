@@ -1,4 +1,4 @@
-//! #666, #747 — the default scene's NavMeshAgent bot on the fy_pool_day yard. Chasing
+//! The default scene's NavMeshAgent bot on the fy_pool_day yard. Chasing
 //! a Player who flies past the perimeter wall, it must stay in the yard, stand on the
 //! ground (never half sunk), stop at the wall nearest the Player instead of pushing
 //! into it, and follow the Player back; chasing one in the pool, it must go down a
@@ -25,7 +25,7 @@ pub const WALL_MARGIN: f32 = 1.0;
 /// Enemy_1's base offset: its body is 2 m tall and centred on its origin.
 pub const BASE_OFFSET: f32 = 1.0;
 /// How far the feet may sit off the ground: on a ramp too, they follow its surface,
-/// not their cell's highest point (#781).
+/// not their cell's highest point.
 const GROUND_TOLERANCE: f32 = 0.02;
 
 /// The default scene as the editor boots it (built, then through its saved
@@ -86,7 +86,7 @@ pub fn planar(a: Vec3, b: Vec3) -> f32 {
     Vec3::new(a.x - b.x, 0.0, a.z - b.z).length()
 }
 
-/// Enemy_1's authored stopping distance (1.5 m since #743): how far short of its
+/// Enemy_1's authored stopping distance (1.5 m): how far short of its
 /// path's end it rests, so every "arrived near X" bound adds it.
 pub fn reach(scene: &rusty::scene::Scene, enemy: u32) -> f32 {
     scene.world.nav_agent(enemy).unwrap().stopping_distance

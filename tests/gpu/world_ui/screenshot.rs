@@ -1,4 +1,4 @@
-//! World-space canvas screenshot (#429): a `WorldSpace` canvas is drawn in the
+//! World-space canvas screenshot: a `WorldSpace` canvas is drawn in the
 //! scene, depth-tested — an opaque wall in front of half of it hides that half —
 //! and a `ScreenSpaceCamera` canvas fills the view in front of the camera.
 

@@ -1,4 +1,4 @@
-//! SSAO (#436): where a crate meets the floor the ambient light darkens; an open,
+//! SSAO: where a crate meets the floor the ambient light darkens; an open,
 //! flat floor does not. Each scene renders twice — AO on and off — so the only
 //! difference between the frames is the occlusion. Skips without an adapter.
 
@@ -33,7 +33,7 @@ fn yard(with_crate: bool, ssao: bool) -> Scene {
     vc.ssr.active = false;
     vc.ssao.active = ssao;
     scene.world.set_post_processing(volume, Some(vc));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(volume, Some(rusty::components::CameraComponent::default()));

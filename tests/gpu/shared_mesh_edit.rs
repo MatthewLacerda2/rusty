@@ -1,5 +1,5 @@
 //! An edit in place of one instance of a shared model is drawn on that instance
-//! alone (#2351): `MeshComponent::vertices_mut` gives it geometry of its own, and the
+//! alone: `MeshComponent::vertices_mut` gives it geometry of its own, and the
 //! renderer, which keeps one GPU slot per mesh source, keys the edited one apart, so
 //! its sibling still draws the import's shape (Unity's `MeshFilter.mesh` over
 //! `sharedMesh`).

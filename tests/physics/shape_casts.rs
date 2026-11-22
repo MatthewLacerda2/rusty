@@ -1,4 +1,4 @@
-//! The shape casts (#1881): `CapsuleCast`, `BoxCast` and `SphereCastAll`, each
+//! The shape casts: `CapsuleCast`, `BoxCast` and `SphereCastAll`, each
 //! with a hit and a miss. The oriented volumes and the argument errors are in
 //! `shape_volumes`, over the same corridor.
 //!

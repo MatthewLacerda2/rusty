@@ -1,4 +1,4 @@
-//! Frosted-glass backdrop (#426), headless: a BackdropFilter panel over a world
+//! Frosted-glass backdrop, headless: a BackdropFilter panel over a world
 //! split sharply into red and blue blurs the split under it and nowhere else,
 //! its filter greys and darkens what it shows, and no backdrop means no blur
 //! passes. `px` takes UI coordinates (bottom-left origin).

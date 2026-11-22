@@ -1,6 +1,6 @@
-//! Sampling postfx blocks (#402), pixel-tested on lavapipe: `radial_blur` taps the
+//! Sampling postfx blocks, pixel-tested on lavapipe: `radial_blur` taps the
 //! module's input at offsets, smearing a hard white/black edge into greys. (The
-//! lens effects these tests once covered as blocks are the volume's now, #1439:
+//! lens effects these tests once covered as blocks are the volume's now:
 //! `lens_screenshot`.)
 
 use glam::Vec3;
@@ -84,7 +84,7 @@ fn radial_blur_smears_a_hard_edge() {
     cleanup(name);
 }
 
-/// An authored effect reads the game clock through the scaffold (#398): a pulsing
+/// An authored effect reads the game clock through the scaffold: a pulsing
 /// `damage_vignette` paints different corners half a pulse apart, and the same
 /// corners at the same time.
 #[test]

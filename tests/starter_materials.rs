@@ -1,4 +1,4 @@
-//! Starter material library (#173): the engine ships a small set of ready-to-go
+//! Starter material library: the engine ships a small set of ready-to-go
 //! glTF-PBR materials under `assets/materials/starter.gltf`. They must be
 //! discoverable and referable from scenes the SAME way user/imported materials are
 //! — no engine special-casing. This test drives the ordinary asset path: the

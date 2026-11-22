@@ -1,4 +1,4 @@
-//! Emissive-factor visual test (#222). Proves the renderer READS a material's flat
+//! Emissive-factor visual test. Proves the renderer READS a material's flat
 //! `emissive` factor and adds it to the lit colour through the draw's material
 //! record (`MaterialData`, both sides), not just stores it on the CPU.
 //!
@@ -49,7 +49,7 @@ fn scene(emissive: [f32; 3], bloom: bool) -> Scene {
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
     scene.world.set_post_processing(id, Some(vc(bloom)));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));

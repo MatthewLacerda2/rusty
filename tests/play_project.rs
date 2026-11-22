@@ -1,4 +1,4 @@
-//! `play --project` plays the project's startup scene, or `--scene` (#1343): a
+//! `play --project` plays the project's startup scene, or `--scene`: a
 //! scenario play-tests the game being built, never the engine's demo scene. The
 //! binary runs as a child, since opening a project moves the working directory.
 

@@ -1,4 +1,4 @@
-//! The height map under `Planar` (#2191's review): the projection runs along world
+//! The height map under `Planar`: the projection runs along world
 //! Y, so on a vertical face one UV axis never changes and one repeat stretches
 //! across the face. That face must draw as `Planar` does without a height map
 //! (stretched), not as a march along the stretch (noise); a floor still marches.

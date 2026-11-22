@@ -1,4 +1,4 @@
-//! Bake-level integration for procedural textures (#270): the full recipe → runner →
+//! Bake-level integration for procedural textures: the full recipe → runner →
 //! PNG path, the glTF channel conventions, tiling, determinism, and that a baked file
 //! loads back through the same `image` crate the renderer's `load_texture` uses.
 

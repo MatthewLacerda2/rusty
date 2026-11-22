@@ -1,4 +1,4 @@
-//! Authored post-FX pixel tests (#397): a baked postfx module listed on the volume
+//! Authored post-FX pixel tests: a baked postfx module listed on the volume
 //! reaches the image, a missing or broken module in the list is skipped (the frame
 //! still renders, the rest of the list still runs), the FXAA-off path copies the
 //! result out, and binding 3 hands an effect the previous frame's result.

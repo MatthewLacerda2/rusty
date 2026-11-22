@@ -1,4 +1,4 @@
-//! The API the widgets stand on (#422): hierarchy reads, `SetActive`,
+//! The API the widgets stand on: hierarchy reads, `SetActive`,
 //! `GetScript`, `Text.MeasureString` and `UI.FindSelectable`.
 
 use rusty::edit::authoring::ui::widgets::UiWidget;

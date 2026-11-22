@@ -72,7 +72,7 @@ fn pause_keeps_play_state_unlike_stop() {
 #[test]
 fn harness_snapshot_reports_the_state_not_the_request() {
     // The harness asks for Play at boot, but the World enters it on the first step:
-    // until then its snapshot says `editor`, as `Debug.Snapshot` does (#1304).
+    // until then its snapshot says `editor`, as `Debug.Snapshot` does.
     let h = Harness::new(crate::temp::dir().join("rusty_snapshot_state"), "");
     assert_eq!(h.snapshot()["play_state"].as_str(), Some("editor"));
     h.step(1);

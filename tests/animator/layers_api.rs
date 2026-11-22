@@ -1,4 +1,4 @@
-//! The `Animator` layer surface (#457) end-to-end through Lua: layers addressed by
+//! The `Animator` layer surface end-to-end through Lua: layers addressed by
 //! index or name, `SetLayerWeight` binding the layers from the graph asset when a
 //! script's `Start` runs before the evaluator, the base layer's weight refused,
 //! and `GetCurrentNode` / `PlayNode` per layer.

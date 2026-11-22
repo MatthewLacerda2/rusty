@@ -114,7 +114,7 @@ fn swing() -> AnimationClip {
 /// A `Rig` at `at` with its skeleton spawned and its hitboxes generated; the
 /// Animator plays `Swing` when `swinging`.
 /// Arms the kept bone list's check: every follow on this thread from here on
-/// also walks the skeletons and fails the test if the list went stale (#2345).
+/// also walks the skeletons and fails the test if the list went stale.
 pub fn character(scene: &mut Scene, at: Vec3, swinging: bool) -> u32 {
     rusty::physics::check_kept_bones();
     let skin = skin();

@@ -1,4 +1,4 @@
-//! An emitter on a child spawns at the child's **world** position (#1196), the
+//! An emitter on a child spawns at the child's **world** position, the
 //! one `render::passes::particles::draw` reads: from the play loop's tick and from
 //! `Particles.Emit` / `Particles.Burst` alike.
 

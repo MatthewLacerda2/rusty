@@ -1,4 +1,4 @@
-//! Per-op correctness: generators + color ops (#270). The math/vector/filter ops are
+//! Per-op correctness: generators + color ops. The math/vector/filter ops are
 //! covered in `math.rs`. Each op is exercised through the public runner
 //! (`evaluate`) on a tiny recipe, so the test pins observable pixel behaviour.
 

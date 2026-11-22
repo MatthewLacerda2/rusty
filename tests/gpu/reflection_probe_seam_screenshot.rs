@@ -1,11 +1,11 @@
-//! #1995: an object between two blended box probes reflects them without a seam.
+//! An object between two blended box probes reflects them without a seam.
 //! A curved glossy floor (a flattened sphere) straddles two probe boxes that meet at
 //! x = 0, so half of it lies outside each of its two probes' boxes, the issue's
 //! wedge room on primitives. Both probes hold one smooth cube (its colour is its
 //! direction), so only a jump in how a probe is projected can draw a step. Before
-//! #1995 a fragment past a box face fell to infinite projection: a hard straight
+//! A fragment past a box face fell to infinite projection: a hard straight
 //! step down the floor at x = 0. Now it projects against the box, continuously, and
-//! so does a right box turned like a wedge's slice (an oriented box, #1995).
+//! so does a right box turned like a wedge's slice (an oriented box).
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 
@@ -94,7 +94,7 @@ fn largest_step(img: &image::RgbImage) -> i32 {
 fn a_floor_between_two_box_probes_shows_no_step_at_their_shared_face() {
     let cam = Camera::new(Vec3::new(0.0, 3.0, 4.0), -90.0, -50.0);
     let mut host = CaptureHost::new();
-    // Before #1995 the world-aligned pair stepped by 84 at x = 0 on lavapipe; the
+    // Before the fix the world-aligned pair stepped by 84 at x = 0 on lavapipe; the
     // smooth cube's own gradient and dither stay under 16.
     for turn in [0.0, 0.5] {
         let path = crate::temp::dir().join(format!("rusty_gpu_1995_seam_{turn}.png"));

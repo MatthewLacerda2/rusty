@@ -1,4 +1,4 @@
-//! Reflection probes are picked per object (#1206), Unity's way: two adjacent probe
+//! Reflection probes are picked per object, Unity's way: two adjacent probe
 //! boxes, a red cube in the left one and a green cube in the right, a metal sphere in
 //! each, and the camera inside the left box. Each sphere must reflect its own probe.
 //! When the probe was picked once per camera, both spheres reflected the left (red)
@@ -12,7 +12,7 @@ use rusty::dev::screenshot::capture_into;
 use rusty::edit::authoring::{create_entity, Primitive};
 use rusty::scene::{Camera, Scene};
 
-/// A one-mip `size`² BC6H KTX2 cubemap (what the bake writes, #1885), every face
+/// A one-mip `size`² BC6H KTX2 cubemap (what the bake writes), every face
 /// the solid linear `rgb`. `size` is a multiple of 4.
 pub(crate) fn solid_cube_ktx2(size: u32, rgb: [f32; 3]) -> Vec<u8> {
     let texels = vec![Vec3::from(rgb); (size * size) as usize];

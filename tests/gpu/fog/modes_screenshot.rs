@@ -1,4 +1,4 @@
-//! Scene fog per mode (#437): a red wall 20 m away, fogged toward pure blue, must
+//! Scene fog per mode: a red wall 20 m away, fogged toward pure blue, must
 //! read exactly the fog formula's blend — one pixel per mode, checked against the
 //! analytic factor — height falloff must thin fog for a camera above its base, and
 //! the sky must take the fog colour at the horizon but keep its own overhead.

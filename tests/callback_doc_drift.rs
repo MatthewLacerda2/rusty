@@ -1,6 +1,6 @@
-//! Callback-doc drift gate (#309): the "Script lifecycle callbacks" section of
+//! Callback-doc drift gate: the "Script lifecycle callbacks" section of
 //! `docs/api/index.md` must agree with the callbacks the engine actually
-//! dispatches — the callback sibling of the #280 namespace gate
+//! dispatches — the callback sibling of the namespace gate
 //! (`tests/api_doc_drift.rs`). The ground truth is
 //! `scripting::callbacks::LIFECYCLE_CALLBACKS`, the one list dispatch and
 //! MonoBehaviour discovery both read, so a callback added (or removed) there
@@ -13,8 +13,8 @@ use std::collections::BTreeSet;
 
 use rusty::script::scripting::callbacks::LIFECYCLE_CALLBACKS;
 
-/// The committed scripting-API doc, `docs/api/` assembled (#569) and read at run time
-/// (#931), so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
+/// The committed scripting-API doc, `docs/api/` assembled and read at run time
+///, so the test reads exactly what is in the repo and a doc edit rebuilds nothing.
 fn reference() -> String {
     rusty::script::scripting::api_doc::api_reference().expect("docs/api/ reads")
 }

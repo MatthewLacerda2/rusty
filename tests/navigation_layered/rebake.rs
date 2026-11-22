@@ -1,4 +1,4 @@
-//! The incremental rebake (#456) on the CS:GO-sized level: moving a crate and
+//! The incremental rebake on the CS:GO-sized level: moving a crate and
 //! dropping a carving obstacle rebakes a few cells, and the result is the navmesh
 //! a full bake gives. Ignored by default: full vs incremental timings for the PR.
 

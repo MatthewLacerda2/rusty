@@ -1,4 +1,4 @@
-//! Integration coverage for the `Texture` scripting namespace (#270): an agent
+//! Integration coverage for the `Texture` scripting namespace: an agent
 //! composes a recipe table, bakes it to a PNG, and that PNG path drops straight into
 //! a material map slot via the `Material` namespace — the wired-up day-one consumer.
 

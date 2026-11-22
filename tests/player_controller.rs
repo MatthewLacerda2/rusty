@@ -1,6 +1,6 @@
-//! The bundled Player controller (#748): Space jumps — grounded only, on the rising
+//! The bundled Player controller: Space jumps — grounded only, on the rising
 //! edge, peaking ≈1.1 m — and left mouse (`Mouse0`) shoots once per press,
-//! delivering the shot through `Damage.ApplyPoint` (#1893).
+//! delivering the shot through `Damage.ApplyPoint`.
 
 use rusty::dev::botplayer::attach_player_bot;
 use rusty::dev::harness::Harness;
@@ -70,8 +70,8 @@ fn no_double_jump_mid_air() {
     assert!((player_y(&h) - ground).abs() < 0.05, "back on the floor");
 }
 
-/// Drives the bundled controller (the harness workspace's copy, #782), counting the
-/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life (#1709), so the
+/// Drives the bundled controller (the harness workspace's copy), counting the
+/// casts it fires into `SHOTS` and the hits it delivers into `DELIVERED`. The API is the VM's for its life, so the
 /// wrap is laid once, in `Start`.
 const SHOT_PROBE: &str = r#"
 local Controller = dofile("WORKSPACE/assets/scripts/player_controller.lua")

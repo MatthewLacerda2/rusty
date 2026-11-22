@@ -1,4 +1,4 @@
-//! A level built from linked `.prefab` instances (#2123): activation rebuilds each
+//! A level built from linked `.prefab` instances: activation rebuilds each
 //! instance from its source, and its primitives carry their one revision, so the
 //! warm-up's meshes are what the first frame draws and it uploads nothing.
 

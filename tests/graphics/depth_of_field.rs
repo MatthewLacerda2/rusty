@@ -1,4 +1,4 @@
-//! `Graphics.*` depth of field (#1445): the mode and its knobs write the main
+//! `Graphics.*` depth of field: the mode and its knobs write the main
 //! camera's volume, clamped, read back what they wrote, read Unity's defaults
 //! without a volume, and an unknown mode is an error naming the valid ones. Its
 //! knobs tween as `"Graphics.depth_of_field.<knob>"`.

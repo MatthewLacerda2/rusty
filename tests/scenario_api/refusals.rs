@@ -1,4 +1,4 @@
-//! What a scenario may not do through the one API surface (#1384): hand the timer
+//! What a scenario may not do through the one API surface: hand the timer
 //! scheduler a function from its own VM, which the scheduler never runs.
 
 use super::run;

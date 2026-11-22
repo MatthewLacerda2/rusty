@@ -102,7 +102,7 @@ Camera.SetPitch(0)"#;
 #[test]
 fn gpu_the_exported_quad_renders_red_from_its_cache() {
     // Coloured only by its texture, the quad rendered black before the converter
-    // read a colour the file leaves out as white (#1280).
+    // read a colour the file leaves out as white.
     let game = project(&[QUAD], &format!("local quad = {START}\n{FRAME}"));
     let out = crate::temp::dir().join("out");
     assert!(export(&game, &out).status.success());
@@ -117,13 +117,13 @@ fn gpu_the_exported_quad_renders_red_from_its_cache() {
         "the scenario passes: {results}"
     );
     if !png.is_file() {
-        // Only a real skip may pass (#885).
+        // Only a real skip may pass.
         assert!(!rusty::render::gpu_required(), "no shot: {results}");
         eprintln!("no GPU adapter — skipping the pixels");
         return;
     }
     let image = image::open(&png).unwrap().to_rgb8();
-    // Red-dominant, not pure: a dielectric reflects ~4% of the sky head-on (#1543).
+    // Red-dominant, not pure: a dielectric reflects ~4% of the sky head-on.
     let red = image
         .pixels()
         .filter(|p| p[0] > 96 && p[0] > p[1].max(p[2]).saturating_add(48));

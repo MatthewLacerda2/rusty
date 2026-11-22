@@ -1,4 +1,4 @@
-//! Skinned casters cast their pose's shadow, not their bind pose's (#599). The depth
+//! Skinned casters cast their pose's shadow, not their bind pose's. The depth
 //! pass used to transform by the world matrix alone, so an animated character's
 //! shadow stayed in its T-pose.
 //!

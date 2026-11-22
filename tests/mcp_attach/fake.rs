@@ -1,4 +1,4 @@
-//! The fake engine: a listener speaking the #282 framed line protocol, plus the driver.
+//! The fake engine: a listener speaking the framed line protocol, plus the driver.
 
 use std::io::{BufRead, BufReader, Write};
 use std::os::unix::net::{UnixListener, UnixStream};
@@ -10,7 +10,7 @@ use rusty::dev::mcp::{self, attach::SocketClient};
 
 /// Per-connection: read each command line and reply with a framed JSON line that
 /// echoes the received line back as the `result`, so a test can assert the exact line
-/// crossed the socket. A line that asks for progress (`ASK`, #1999) streams one
+/// crossed the socket. A line that asks for progress (`ASK`) streams one
 /// progress line first and has the ask taken off.
 fn serve(stream: UnixStream) {
     let mut writer = match stream.try_clone() {

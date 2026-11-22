@@ -1,5 +1,5 @@
 //! Values crossing between the scenario VM and the gameplay VM keep their Lua
-//! types (#1384): integer keys stay integers, a mixed table stays mixed, and
+//! types: integer keys stay integers, a mixed table stays mixed, and
 //! non-finite numbers survive, written into the instance and read back out.
 
 use super::run;

@@ -1,4 +1,4 @@
-//! Windowed pause / fixed-dt step / resume control (issue #283).
+//! Windowed pause / fixed-dt step / resume control.
 //!
 //! The windowed frame loop itself (`main.rs`) needs a window + GPU and can't be
 //! instantiated in a test, so we test the two things that *make* it correct:

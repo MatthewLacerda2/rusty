@@ -1,4 +1,4 @@
-//! The reverb-zone verbs (#469): `AudioReverbZone`'s radii, presets and params
+//! The reverb-zone verbs: `AudioReverbZone`'s radii, presets and params
 //! round-trip through the shared ops, its errors name what is wrong, and
 //! `Audio.GetReverbState` reads dry before any zone resolves. The blend itself is
 //! covered in-crate on a ticking world.

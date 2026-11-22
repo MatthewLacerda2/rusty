@@ -1,4 +1,4 @@
-//! Off-mesh links (#462) on the CS:GO-sized level: the bake generates drops off
+//! Off-mesh links on the CS:GO-sized level: the bake generates drops off
 //! the first floors and jumps onto the crates, a moved crate regenerates only the
 //! links near it, matching a full bake, and a path from a roof edge to the street
 //! takes a drop. Ignored by default: bake timings with links on, for the PR.

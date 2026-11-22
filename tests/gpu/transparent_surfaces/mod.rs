@@ -1,4 +1,4 @@
-//! Transparent surfaces à la Unity (#1523): one file per feature, over the shared
+//! Transparent surfaces à la Unity: one file per feature, over the shared
 //! pool fixture here. Every test renders the same primitive scene twice, the knob
 //! off and on, and compares pixels, so no golden is committed. Each skips without
 //! an adapter.

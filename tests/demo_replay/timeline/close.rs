@@ -1,6 +1,6 @@
 //! Closing a demo gives the editor back its scene as the same scene (its identity
 //! and the file text it last read, so its own next write is no outside change) and
-//! no input the replay held (#1598); a drag back on the bar seeks once.
+//! no input the replay held; a drag back on the bar seeks once.
 
 use rusty::app::GameWorld;
 use rusty::core::application::DemoRequest;

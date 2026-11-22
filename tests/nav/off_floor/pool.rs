@@ -1,4 +1,4 @@
-//! #747 — the bot chases a Player into the pool and back out, over the ramps: down
+//! The bot chases a Player into the pool and back out, over the ramps: down
 //! the north ramp from its spawn, across the bottom, and up the south ramp to the
 //! Player's spawn, never dropping in over the pool's walls.
 

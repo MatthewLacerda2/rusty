@@ -1,6 +1,6 @@
 //! Slopes over the limit at every angle, and the ground normal of a move that
 //! never touched the floor — the two cases rapier's controller leaves to
-//! `physics::character::sweep` (#793): a push into a steep slope must not hold
+//! `physics::character::sweep`: a push into a steep slope must not hold
 //! the character on it, and a walkable ramp's normal is read under the capsule.
 
 use glam::Vec3;
@@ -77,7 +77,7 @@ fn a_move_that_never_hits_the_ramp_still_reads_its_normal() {
     }
 }
 
-/// Walking into a steep slope reports it to `OnControllerColliderHit` (#1879):
+/// Walking into a steep slope reports it to `OnControllerColliderHit`:
 /// the walk reaches the slope, and the contact of the pass the sweep reruns
 /// without the push into it is kept, so a push script can push a steep face.
 #[test]

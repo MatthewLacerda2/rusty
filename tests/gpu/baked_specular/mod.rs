@@ -1,4 +1,4 @@
-//! Directional specular from a directional lightmap (#1695, step 1): a `Baked` lamp's
+//! Directional specular from a directional lightmap (step 1): a `Baked` lamp's
 //! highlight on a lightmapped surface, every bit of whose light is baked.
 //!
 //! * `highlight`: on a glossy plane the baked lobe's highlight sits where the same
@@ -10,7 +10,7 @@
 //!   bright-walled room aims its lobe at itself.
 //! * `capture`: a bake capture never draws it.
 //! * `behind`: a two-sided surface's back face reads its front's baked light.
-//! * `stool`, `polished`: the issue's seat and counter (#1996): a rough dielectric
+//! * `stool`, `polished`: the issue's seat and counter: a rough dielectric
 //!   and a mirror-polished one each look as under the same lamp live.
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.

@@ -1,4 +1,4 @@
-//! The editor captured with the Game view at a size of its own (#2207): the image
+//! The editor captured with the Game view at a size of its own: the image
 //! letterboxed in the panel, and the UI's screen (`UI.GetScreenSize`) that size, on
 //! the Game tab and behind the Scene tab alike.
 

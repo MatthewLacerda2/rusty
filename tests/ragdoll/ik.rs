@@ -1,4 +1,4 @@
-//! A ragdolled skeleton is never IK'd (#461 × #466): with an IK target set, an
+//! A ragdolled skeleton is never IK'd (): with an IK target set, an
 //! enabled ragdoll keeps exactly the pose physics gives it, while the same rig,
 //! still animated, is bent by IK.
 

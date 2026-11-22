@@ -1,6 +1,6 @@
 //! A Play/Stop round-trip folds an Add-menu staged default into the library the way
-//! the inspector does (#1215): it fills an empty key and never replaces an authored
-//! asset (#997).
+//! the inspector does: it fills an empty key and never replaces an authored
+//! asset.
 
 use rusty::edit::snapshot::SceneSnapshot;
 use rusty::scene::{MaterialAsset, MaterialComponent, Scene};

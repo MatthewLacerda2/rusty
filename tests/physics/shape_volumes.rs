@@ -1,4 +1,4 @@
-//! The oriented volumes (#1881): an `OverlapBox` / `CheckBox` with an
+//! The oriented volumes: an `OverlapBox` / `CheckBox` with an
 //! orientation and `CheckCapsule`, each with a hit and a miss, a zero size
 //! (valid, as in Unity), plus the argument errors every shape query shares.
 //! The corridor is `shape_casts`'.

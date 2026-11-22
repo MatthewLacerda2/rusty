@@ -1,4 +1,4 @@
-//! A rough dielectric under a `Baked` spot (#1996): the issue's bar-stool seat
+//! A rough dielectric under a `Baked` spot: the issue's bar-stool seat
 //! (black leather, albedo 0.03, roughness 0.55) under a spot 1.35 m up. Its baked
 //! lobe is the live lamp's: the frame matches the same spot `Mixed`, and changing
 //! the seat's roughness or albedo changes the baked frame as it changes the live one.

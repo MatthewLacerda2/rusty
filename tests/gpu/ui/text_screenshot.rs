@@ -1,4 +1,4 @@
-//! SDF text screenshot (#419): an outlined, glowing "I" rendered headless over
+//! SDF text screenshot: an outlined, glowing "I" rendered headless over
 //! black, asserted by pixel properties along the scanline through its stem rather
 //! than a byte-exact golden: black far away, then the cyan glow brightening
 //! towards the glyph, then the red outline, then the white fill at the centre.

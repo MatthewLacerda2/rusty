@@ -1,7 +1,7 @@
-//! Integration coverage for the `Transform` scripting namespace (issue #350):
+//! Integration coverage for the `Transform` scripting namespace:
 //! position/rotation/scale round-trip through the live scene, a missing entity
 //! yields the documented defaults, and `MoveTowards` steps then snaps. The
-//! world-space surface under a parent (#1196) is `world.rs`, and its rotations
+//! world-space surface under a parent is `world.rs`, and its rotations
 //! and local setters `local.rs`.
 
 use std::cell::RefCell;

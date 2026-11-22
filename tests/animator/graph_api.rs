@@ -1,4 +1,4 @@
-//! The `Animator` graph control surface (#316) end-to-end through Lua: `SetGraph`
+//! The `Animator` graph control surface end-to-end through Lua: `SetGraph`
 //! assigns/clears the asset path, `SetGraphEnabled` toggles auto-evaluation,
 //! `PlayNode` jumps to a named state bypassing conditions, `PlayAnimation`
 //! honestly reports whether the mesh carries the clip, and `GetCurrentNode` reads

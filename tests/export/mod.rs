@@ -1,4 +1,4 @@
-//! `make export` end to end (#1267): the `export` binary on a scratch project, then
+//! `make export` end to end: the `export` binary on a scratch project, then
 //! the `play` binary on what it wrote. Both run as children, since opening a project
 //! moves the working directory (`core::project::open`), which every test of this
 //! binary shares.

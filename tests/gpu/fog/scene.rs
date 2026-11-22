@@ -1,7 +1,7 @@
-//! Shared fixture for the scene-fog pixel tests (#437): a flat, light-independent
+//! Shared fixture for the scene-fog pixel tests: a flat, light-independent
 //! wall and a neutral post-FX volume, so a pixel's colour is exactly the fogged
 //! surface colour, sRGB-encoded. Zero ambient + no lights + black albedo + a black
-//! sky (no environment reflection, #1543) leaves a
+//! sky (no environment reflection) leaves a
 //! surface's lit colour equal to its `emissive`; tonemap `None` and neutral grading
 //! pass it through, so a test can predict the pixel from the fog formula.
 
@@ -43,7 +43,7 @@ pub fn wall_scene(distance: f32, color: [f32; 3]) -> Scene {
         },
     );
     scene.world.set_post_processing(id, Some(neutral_volume()));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));

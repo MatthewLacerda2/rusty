@@ -1,4 +1,4 @@
-//! `Scene.RevertPrefabField` (#998): drop one override so the leaf re-tracks the
+//! `Scene.RevertPrefabField`: drop one override so the leaf re-tracks the
 //! source. `true` when an override went, `false` when there was none to drop.
 
 use super::{errors, fixture, run};

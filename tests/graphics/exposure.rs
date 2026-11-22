@@ -1,4 +1,4 @@
-//! `Graphics.*` exposure (#1444): the mode and the automatic knobs write the main
+//! `Graphics.*` exposure: the mode and the automatic knobs write the main
 //! camera's volume, clamped, and `GetExposure` reads the configured EV in both
 //! modes, never the screen's adapted one (a GPU readback is no sim input).
 

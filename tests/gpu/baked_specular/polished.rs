@@ -1,4 +1,4 @@
-//! A polished surface under a `Baked` spot (#1996): the issue's black granite
+//! A polished surface under a `Baked` spot: the issue's black granite
 //! counter (roughness 0.06) a metre under a spot, baked at 8 texels a unit. Its
 //! baked highlight, seen close enough that one lightmap texel covers most of the
 //! frame, is the live lamp's: round and smooth, where a direction page off by a

@@ -1,6 +1,6 @@
 //! A scenario's call that the bridge forwards into the gameplay VM (`Damage.*`,
 //! `CharacterController.Move`) replays forwarded too, so its callbacks fire
-//! again, and one made before the game is up replays as it was made (#1929).
+//! again, and one made before the game is up replays as it was made.
 
 use std::path::Path;
 
@@ -73,7 +73,7 @@ fn a_forwarded_damage_call_replays_with_its_handler() {
     );
     assert_eq!((verdict.diverged, verdict.checked), (None, 3));
     // The harness's scene has no file; the handle that read the health is
-    // no taint (it notes its own writes and calls, #2120).
+    // no taint (it notes its own writes and calls).
     assert_eq!(verdict.taints, [(0, NO_FILE.to_string())]);
 }
 

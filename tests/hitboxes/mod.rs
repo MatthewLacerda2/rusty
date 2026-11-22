@@ -1,4 +1,4 @@
-//! Per-bone hitboxes end to end (#464): a ray names the bone it struck on a posed
+//! Per-bone hitboxes end to end: a ray names the bone it struck on a posed
 //! character, a shot fired in `Update` hits the arm where the animation put it
 //! that frame, and a CharacterController walks through hitboxes.
 

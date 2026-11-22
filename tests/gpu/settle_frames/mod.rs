@@ -1,4 +1,4 @@
-//! A shot's `settle` draws frames only when they can change the image (#2092): with
+//! A shot's `settle` draws frames only when they can change the image: with
 //! nothing reading history, `Harness.Screenshot(path, { settle = 8 })` renders once
 //! and writes what a full settle writes; with TAA, SSIL or a shown render texture
 //! it still draws its eight frames and the shot; and a pending shadow tile resize

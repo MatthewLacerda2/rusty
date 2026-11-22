@@ -1,4 +1,4 @@
-//! The aim chain through the tick, weight 0, determinism (#461).
+//! The aim chain through the tick, weight 0, determinism.
 
 use glam::Vec3;
 

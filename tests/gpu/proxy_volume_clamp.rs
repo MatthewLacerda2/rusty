@@ -1,11 +1,11 @@
-//! A Light Probe Proxy Volume clamps to its box, as Unity's does (#1672): a pixel
+//! A Light Probe Proxy Volume clamps to its box, as Unity's does: a pixel
 //! outside a `Custom` box reads the box's nearest face, never the object's single
 //! sample, so a mesh larger than its box (or an arm swung past its bind-pose
 //! bounds) has no seam where the box ends.
 //!
 //! Run as the second half of `proxy_volume_screenshot`'s test, on its baked room:
 //! the probe bake is nine tenths of either half's time, and one bake serves both
-//! (#2350).
+//!.
 
 use glam::Vec3;
 use rusty::components::{LightProbeProxyVolumeComponent, ProxyBoundsMode, ProxyResolutionMode};

@@ -1,4 +1,4 @@
-//! `Graphics.*` lens flare (#1443): every `SetLensFlare*` writes the main camera's
+//! `Graphics.*` lens flare: every `SetLensFlare*` writes the main camera's
 //! volume, clamped, and its `Get*` reads back what it wrote, the hand-written ghost
 //! count and tint included; without a volume the getters read the defaults.
 

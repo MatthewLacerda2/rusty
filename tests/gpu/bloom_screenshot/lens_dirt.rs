@@ -1,4 +1,4 @@
-//! Bloom's lens dirt (#1442): a white dirt texture is lit only where the bloom
+//! Bloom's lens dirt: a white dirt texture is lit only where the bloom
 //! reaches it, and adds exactly nothing where there is no bloom, with bloom off, or
 //! at a dirt intensity of `0`; and it is cropped to cover the view, not stretched.
 //!
@@ -22,7 +22,7 @@ fn render_at(
     let mut scene = scene;
     for id in scene.world.ids_with_post_processing() {
         let mut vc = scene.world.post_processing_mut(id).unwrap();
-        // The tightest glow (#1700): at the default scatter the chain's glow fills
+        // The tightest glow: at the default scatter the chain's glow fills
         // a view this small, and these tests read where the dirt is lit.
         vc.bloom.scatter = 0.0;
         if let Some((file, k)) = dirt {
@@ -136,7 +136,7 @@ fn lens_dirt_is_cropped_to_cover_a_wider_view() {
     )
     .unwrap();
     // Rows 7..11 read black dirt when cropped, white when stretched. Only that band
-    // is read: the chain's faint tail (#1700) reaches the screen's top and bottom
+    // is read: the chain's faint tail reaches the screen's top and bottom
     // rows, where the dirt is white either way.
     let banded_band = gain(&clean, &got, (24, 7), 4);
     assert!(

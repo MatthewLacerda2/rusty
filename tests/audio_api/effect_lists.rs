@@ -1,4 +1,4 @@
-//! A group-effect list must be a list (#1748): a forgotten outer brace, a hole, a
+//! A group-effect list must be a list: a forgotten outer brace, a hole, a
 //! table nested past an EQ's `bands`, or a table that holds itself is a Lua error
 //! naming the field, never a shorter list (and never a stack overflow).
 

@@ -1,6 +1,6 @@
 //! The navigation tick alone, on the default scene's bake: Enemy_1 retargeted to
 //! the Player's position every frame: the plainest chase (`bot.lua` now heads for a
-//! spot round the Player an `EnvironmentQuery` picks, #1892).
+//! spot round the Player an `EnvironmentQuery` picks).
 
 use glam::Vec3;
 use rusty::navigation::{is_at_target, NavigationGraph};

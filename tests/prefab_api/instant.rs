@@ -1,4 +1,4 @@
-//! #1527: a Lua edit to a linked instance is an override the moment it is made, and
+//! A Lua edit to a linked instance is an override the moment it is made, and
 //! leaving Play or a save/load round trip never takes it back.
 
 use super::{fixture, pos_of, run};

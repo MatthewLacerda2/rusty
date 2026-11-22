@@ -1,5 +1,5 @@
 //! `NavMeshAgent.acceleration` is a constant rate in m/s² and the agent brakes
-//! into its stopping distance at that same rate (#742, Unity's `autoBraking`).
+//! into its stopping distance at that same rate (Unity's `autoBraking`).
 
 use glam::Vec3;
 use rusty::navigation::NavigationGraph;

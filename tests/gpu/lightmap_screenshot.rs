@@ -1,4 +1,4 @@
-//! Baked lightmaps on the GPU (#438). Two proofs:
+//! Baked lightmaps on the GPU. Two proofs:
 //!
 //! * **Bounce only.** A static floor and wall with zero ambient and one `Mixed` spot
 //!   aimed at the wall: no light reaches the floor directly (it is outside the cone),

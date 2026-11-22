@@ -20,7 +20,7 @@ fn level_bakes_three_floors_and_connects_street_to_roof() {
         .expect("street to roof via both ramps");
     let ys = heights(&g, &path);
     assert_eq!((ys[0], *ys.last().expect("path")), (0.0, 8.0), "{ys:?}");
-    // Smoothed (#458): the same climb as a handful of corners, ending on the roof.
+    // Smoothed: the same climb as a handful of corners, ending on the roof.
     let smooth = g.calculate_path(Vec3::new(190.0, 0.0, 190.0), Vec3::new(30.0, 8.0, 15.0));
     assert_eq!(smooth.status, NavPathStatus::Complete);
     assert!(

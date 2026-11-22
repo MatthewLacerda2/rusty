@@ -1,4 +1,4 @@
-//! Dynamic-body gravity opt-out (#209): `use_gravity = false` must exempt a body
+//! Dynamic-body gravity opt-out: `use_gravity = false` must exempt a body
 //! from the world's −9.81, mirroring Unity's `Rigidbody.useGravity`. Pins the wiring
 //! to rapier's `gravity_scale` at body build and on per-tick edit.
 

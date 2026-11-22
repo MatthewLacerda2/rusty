@@ -1,4 +1,4 @@
-//! #1740's generators and params read the same at every resolution: a bake at 128²,
+//! The generators and params read the same at every resolution: a bake at 128²,
 //! 512² and 1024² has the same mean and the same coarse histogram, as the older
 //! generators do (`resolution.rs`). Each is a sampler over the unit tile, so this
 //! holds unless a param slipped into pixels.

@@ -1,4 +1,4 @@
-//! Preserve specular (#1523, URP's *Preserve Specular Lighting*): a nearly clear
+//! Preserve specular (URP's *Preserve Specular Lighting*): a nearly clear
 //! (alpha 0.1), mirror-smooth pane over a black floor keeps its reflection whole when
 //! it is on, and fades it with the alpha when it is off.
 

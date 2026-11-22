@@ -1,5 +1,5 @@
 //! `Graphics.*` lens-effect bindings vs `authoring::rendering::post_processing`'s
-//! lens ops (#1439): the same writes through both reach the same component.
+//! lens ops: the same writes through both reach the same component.
 
 use std::cell::RefCell;
 use std::rc::Rc;

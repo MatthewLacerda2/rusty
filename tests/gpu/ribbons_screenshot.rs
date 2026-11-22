@@ -1,8 +1,8 @@
-//! Trail and Line ribbons render (#441): a line across the view covers the centre
+//! Trail and Line ribbons render: a line across the view covers the centre
 //! pixel in its colour, alpha and additive; it is hidden behind a solid (depth
 //! tested); local points follow the entity; a recorded trail draws; and under
 //! fog that swallows the wall, the ribbon vanishes into the fog colour exactly as
-//! the wall behind it does (#437). Reuses the fog tests' flat black wall.
+//! the wall behind it does. Reuses the fog tests' flat black wall.
 
 use glam::Vec3;
 use rusty::components::{LineComponent, ParticleBlend, RibbonStyle, TrailComponent};

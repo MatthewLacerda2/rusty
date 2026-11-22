@@ -1,6 +1,6 @@
-//! Probe ambient and flat ambient agree (#807). A light probe stores radiance SH and
+//! Probe ambient and flat ambient agree. A light probe stores radiance SH and
 //! `Sh9::eval` reads back irradiance E; a Lambert surface reflects albedo / π × E,
-//! which is what the flat ambient and a lightmap (E / π, #438) already give. So a
+//! which is what the flat ambient and a lightmap (E / π) already give. So a
 //! dynamic floor under a probe projected from a uniform sky of radiance L renders
 //! like a static floor under the flat ambient of the same L. Before the fix the
 //! probe-lit one was π× brighter.

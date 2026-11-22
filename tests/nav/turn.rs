@@ -1,4 +1,4 @@
-//! A `NavMeshAgent` turns itself to face where it steers, at a limited rate (#744).
+//! A `NavMeshAgent` turns itself to face where it steers, at a limited rate.
 
 use std::f32::consts::FRAC_PI_2;
 
@@ -107,7 +107,7 @@ fn faces_the_steering_direction_not_the_dodge() {
     );
 }
 
-/// A scene saved before #744 has no turning fields: they load as Unity's defaults
+/// A scene saved before turning existed has no turning fields: they load as Unity's defaults
 /// (turning on, 120°/s) and the 720°/s² ramp.
 #[test]
 fn older_scenes_load_the_turning_defaults() {

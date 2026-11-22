@@ -1,4 +1,4 @@
-//! Integration coverage for the `Audio` scripting namespace (issue #350), on the
+//! Integration coverage for the `Audio` scripting namespace, on the
 //! `NullBackend` (`AudioMaestro::default()`): the null device accepts voices, so
 //! play/stop/volume bookkeeping and the `GetSpatial` introspection assert
 //! identically with or without hardware — exactly what the harness runs on.

@@ -1,4 +1,4 @@
-//! `Damage.ApplyRadial`'s damage sense (#1900): sensed from the struck body,
+//! `Damage.ApplyRadial`'s damage sense: sensed from the struck body,
 //! once per perceiver per blast, with the largest amount any of its colliders
 //! took.
 

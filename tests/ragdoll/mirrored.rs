@@ -1,4 +1,4 @@
-//! A ragdoll under a mirroring parent (#1119): the rig scaled −1 on X, the way a
+//! A ragdoll under a mirroring parent: the rig scaled −1 on X, the way a
 //! mirrored left/right rig is often built. When physics takes over every limb
 //! starts where the Animator left it, and a body physics turns turns its bone
 //! the same way. Before the fix the bone turned the mirror of the way its body
@@ -96,7 +96,7 @@ fn joint_world_x(world: &PhysicsWorld, bone: u32) -> Vec3 {
     world.joint_world_frame(bone).unwrap() * Vec3::X
 }
 
-/// Each mirrored joint's world X is `dir × bend` on the mirrored bones (#1125):
+/// Each mirrored joint's world X is `dir × bend` on the mirrored bones:
 /// the bone direction reflects and the bend (forward, +Z) doesn't, so it is the
 /// unmirrored joint's X seen as a pseudovector, `−F·x`. Before the fix, the axes
 /// came back reflected and every knee flexed about the wrong sense.

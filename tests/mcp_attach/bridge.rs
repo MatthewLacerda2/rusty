@@ -33,7 +33,7 @@ fn multiple_calls_each_reconnect_and_succeed() {
 }
 
 /// The window's bake progress crosses the socket and reaches the client as MCP
-/// progress for a call that asked (#1999); one that didn't ask gets only its reply.
+/// progress for a call that asked; one that didn't ask gets only its reply.
 #[test]
 fn the_window_s_bake_progress_reaches_a_call_with_a_progress_token() {
     let call = |meta: &str| {

@@ -1,4 +1,4 @@
-//! #1494's acceptance: a linked param varies across the map. A warp whose strength
+//! The acceptance: a linked param varies across the map. A warp whose strength
 //! follows a half-black / half-white mask is the input on one half and the full
 //! warp on the other; a tile whose jitter follows a ramp is ordered at its dark end
 //! and still tiles.

@@ -1,4 +1,4 @@
-//! Integration coverage for the `Joint` namespace (#449): every setter writes
+//! Integration coverage for the `Joint` namespace: every setter writes
 //! through the shared ops (clamped, unknown names ignored), the getters read it
 //! back, the component survives a scene save → load, and its connected body
 //! follows the entity through a prefab extract → stamp.

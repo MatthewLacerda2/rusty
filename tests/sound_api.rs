@@ -1,4 +1,4 @@
-//! Integration coverage for the `Sound` scripting namespace (#357): an agent
+//! Integration coverage for the `Sound` scripting namespace: an agent
 //! authors a patch, bakes a one-shot to `.wav`, and fires that very path through
 //! `Audio.PlayAt` — the wired-up day-one consumer. The audio backend is the
 //! `NullBackend` here, exactly as on the headless harness, so the assertion is on
@@ -104,7 +104,7 @@ fn a_saved_patch_re_bakes_byte_for_byte() {
     }
 }
 
-/// The song verbs end to end (#358): author a song in Lua, bake it, save it with
+/// The song verbs end to end: author a song in Lua, bake it, save it with
 /// `SongToJson`, and re-bake the saved JSON — the two WAVs must be identical. That
 /// exercises all three verbs and pins the promise a saved score is worth keeping:
 /// it re-renders the same asset, so a song can be committed instead of its audio.

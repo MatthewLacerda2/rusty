@@ -1,4 +1,4 @@
-//! #1492's ops in a graph: the *cobblestone* example (docs/api/Texture.md) bevels
+//! The ops in a graph: the *cobblestone* example (docs/api/Texture.md) bevels
 //! Chebyshev Voronoi cells with `distance` and layers a detail normal over them.
 //! The bevel and the blend keep the two procgen promises: seamless and
 //! resolution-independent.

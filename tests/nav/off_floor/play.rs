@@ -1,9 +1,9 @@
 //! The whole frame through `GameWorld` — a script, the CharacterController's physics
 //! body and the navigation tick together — so nothing downstream of the nav move
-//! (defect 5 in #666: physics overriding it) sinks or blocks the bot, on the deck or
-//! down the pool's ramps (#747). The chase there is a plain one (`CHASE`): the
+//! (defect 5 in physics overriding it) sinks or blocks the bot, on the deck or
+//! down the pool's ramps. The chase there is a plain one (`CHASE`): the
 //! default `bot.lua` stops at a spot round the Player an `EnvironmentQuery` picks
-//! (#1892), and its own test holds that.
+//!, and its own test holds that.
 
 use std::cell::RefCell;
 use std::rc::Rc;

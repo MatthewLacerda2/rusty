@@ -1,4 +1,4 @@
-//! The `AIPerception` namespace (#1900): `ReportNoise`, `GetKnown`, `Forget` and
+//! The `AIPerception` namespace: `ReportNoise`, `GetKnown`, `Forget` and
 //! the settings through the shared ops.
 
 use glam::Vec3;

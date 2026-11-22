@@ -1,10 +1,10 @@
 //! A Play world's result is a function of its own scene and inputs, not of what
-//! the process ran before it (#2076): the editor plays a scene after earlier
+//! the process ran before it: the editor plays a scene after earlier
 //! Play sessions, a test binary or `make game-test` after other worlds. The
 //! same scene, played first in the process and again after a different world,
 //! walks to bit-identical poses.
 //!
-//! The scene is #2061's: a static plane (a triangle-mesh floor) under
+//! The scene: a static plane (a triangle-mesh floor) under
 //! script-walked CharacterControllers, with a dynamic Rigidbody box dropped
 //! beside them. The world between is another one: kinematic box floor, more
 //! walkers, other speeds.

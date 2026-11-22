@@ -1,5 +1,5 @@
 //! Both layout components survive a scene save → load, and the reloaded scene lays
-//! out identically — the pass is a pure function of scene and screen size (#421).
+//! out identically — the pass is a pure function of scene and screen size.
 
 use glam::{Vec2, Vec4};
 use rusty::components::{

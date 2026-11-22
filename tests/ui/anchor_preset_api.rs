@@ -1,4 +1,4 @@
-//! `RectTransform.SetAnchorPreset` (#423): the inspector's anchor-preset grid from
+//! `RectTransform.SetAnchorPreset`: the inspector's anchor-preset grid from
 //! Lua — the rect stays put on a plain preset, Alt-style `setPosition` snaps it,
 //! and an unknown name is an error.
 

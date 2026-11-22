@@ -1,4 +1,4 @@
-//! One diffuse model on every path (#1698): a lamp shades a static sphere the same
+//! One diffuse model on every path: a lamp shades a static sphere the same
 //! whether it is `Realtime` (the forward shader's `calculate_pbr`) or `Baked` (the
 //! lightmap trace), under the scene's `Lambert` default and under `HalfLambert`, and
 //! the two models shade it visibly differently.

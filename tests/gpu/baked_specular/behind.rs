@@ -1,4 +1,4 @@
-//! A two-sided surface seen from behind (#1695's review). The bake lights only the
+//! A two-sided surface seen from behind. The bake lights only the
 //! front, so the back face shows the front's baked light, and its normal map and
 //! geometric normal are mirrored through the surface. The directions' rebalance
 //! mirrors the page's direction with them: a normal-mapped back face reads what the

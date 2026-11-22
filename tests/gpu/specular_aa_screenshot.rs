@@ -1,4 +1,4 @@
-//! Geometric specular anti-aliasing (#1702): a glossy, normal-mapped metal sphere
+//! Geometric specular anti-aliasing: a glossy, normal-mapped metal sphere
 //! small on screen, turned a few degrees a frame under one lamp. Without the AA its
 //! highlight breaks into single-pixel sparkles that jump from frame to frame; with
 //! it, the lobe is widened by the spread of normals each pixel covers, and every

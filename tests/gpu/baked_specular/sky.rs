@@ -1,4 +1,4 @@
-//! A sky in the bake (#1695's review). An even sky over a dark ground lights a wall
+//! A sky in the bake. An even sky over a dark ground lights a wall
 //! from above more than from below: its texels are directional (about 0.79) with no
 //! lamp anywhere, and the lobe once took that for a light, putting a highlight near
 //! 14x the sky on a glossy metal wall. The lamp share makes the sky give none, and a

@@ -1,4 +1,4 @@
-//! Simulation Space (#1529): a `Local` emitter carries its live particles when it
+//! Simulation Space: a `Local` emitter carries its live particles when it
 //! moves, turns or scales, through the real play loop; a `World` one leaves them.
 
 mod api;

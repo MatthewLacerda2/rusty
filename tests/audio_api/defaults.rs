@@ -1,4 +1,4 @@
-//! The project's speed of sound (#1749): `Audio.SetDefaultSpeedOfSound` is the
+//! The project's speed of sound: `Audio.SetDefaultSpeedOfSound` is the
 //! Build Settings window's twin on `Application`, apart from the running value.
 
 use super::{fixture, register};

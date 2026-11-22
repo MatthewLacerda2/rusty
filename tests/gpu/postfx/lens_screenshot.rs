@@ -1,4 +1,4 @@
-//! The volume's lens effects (#1439), pixel-tested on lavapipe: the vignette darkens
+//! The volume's lens effects, pixel-tested on lavapipe: the vignette darkens
 //! the corners and not the centre, chromatic aberration fringes a white edge near
 //! the border and not at the centre, film grain is the same at the same tick and
 //! new at the next, and each one at intensity 0 renders byte-identical to off.

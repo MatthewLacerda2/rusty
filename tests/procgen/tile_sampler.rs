@@ -1,4 +1,4 @@
-//! #1742's Tile Sampler params keep `tile`'s promise to tile: each one, with
+//! The Tile Sampler params keep `tile`'s promise to tile: each one, with
 //! stamps pushed across the tile's edge, bakes without a seam.
 
 use rusty::procgen::{evaluate, TextureRecipe};

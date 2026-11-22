@@ -1,4 +1,4 @@
-//! Rigidbody drag (#2062): Unity's `Rigidbody.drag` / `angularDrag` reach
+//! Rigidbody drag: Unity's `Rigidbody.drag` / `angularDrag` reach
 //! rapier's linear and angular damping, at body build and on a change in Play.
 
 use glam::Vec3;
@@ -19,7 +19,7 @@ fn collider(shape: ColliderShape) -> ColliderComponent {
 /// A ball (radius 0.4, a grenade or a can) on a wide static floor, rolling along
 /// +X at 0.3 m/s. A ball and not a cylinder: rapier 0.36 feeds energy into a
 /// cylinder rolling on a box, faster than Unity's default angular drag takes it
-/// out, so a cylinder test would measure that, not drag (#2071).
+/// out, so a cylinder test would measure that, not drag.
 fn rolling_ball(angular_drag: f32) -> (Scene, u32) {
     let mut scene = Scene::new();
     let floor = scene.add_entity("Floor".to_string());

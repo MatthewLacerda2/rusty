@@ -1,4 +1,4 @@
-//! #405's mask-driven `mix` and #408's height-derived masks (`cavity`,
+//! The mask-driven `mix` and the height-derived masks (`cavity`,
 //! `curvature`): what each one picks out, and byte-identical bakes per seed. Their
 //! seams and resolution independence are swept in `procgen_seams` / `_resolution`.
 

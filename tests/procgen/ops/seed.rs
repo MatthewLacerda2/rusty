@@ -1,4 +1,4 @@
-//! A stochastic node's own `seed` (#1487): two nodes that differ only by it differ.
+//! A stochastic node's own `seed`: two nodes that differ only by it differ.
 //! That every seeded op changes with its seed, and that 0 bakes what no seed does,
 //! is checked op by op from the catalog in `procgen::ops`'s `seed_tests`.
 

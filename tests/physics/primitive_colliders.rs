@@ -1,4 +1,4 @@
-//! A primitive made by `Scene.CreateEntity` is solid (#2051), as Unity's
+//! A primitive made by `Scene.CreateEntity` is solid, as Unity's
 //! `GameObject.CreatePrimitive` is: a ray finds a freshly created Box and Plane
 //! with no `AddComponent` or `SetColliderShape`, and misses the Box once a script
 //! removes its collider to make it draw-only.

@@ -1,7 +1,7 @@
-//! Environment reflections on metal (#718). A fully metallic surface has no diffuse
+//! Environment reflections on metal. A fully metallic surface has no diffuse
 //! term, so without the environment reflection it renders black. That term used to run
 //! only behind a camera's SSR toggle; now it always applies, Unity's way, and with no
-//! skybox panorama it reflects the procedural sky (#256) the sky pass draws.
+//! skybox panorama it reflects the procedural sky the sky pass draws.
 //!
 //! The scene has **no lights** and a blue ambient tint, so the only thing that can
 //! light a white metal sphere is the reflected sky: its centre must be well above
@@ -40,7 +40,7 @@ fn scene(ssr: bool) -> Scene {
         vc.bloom.active = false;
         vc.ssr.active = true;
         scene.world.set_post_processing(volume, Some(vc));
-        // A volume rides on its camera (#1434): that camera is the view's.
+        // A volume rides on its camera: that camera is the view's.
         scene
             .world
             .set_camera(volume, Some(rusty::components::CameraComponent::default()));

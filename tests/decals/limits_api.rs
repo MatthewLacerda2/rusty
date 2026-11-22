@@ -1,4 +1,4 @@
-//! The decal budgets through the `Decals` API (#1517): per owner, so one owner's
+//! The decal budgets through the `Decals` API: per owner, so one owner's
 //! marks never evict another's; `SetLimits` / `GetLimits`; and entering Play
 //! applying the project's budgets, which Stop restores.
 

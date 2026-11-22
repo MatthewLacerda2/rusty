@@ -1,4 +1,4 @@
-//! #392's guard: every generator (and `mapping`) bakes **seamless** — the jump across
+//! The guard: every generator (and `mapping`) bakes **seamless** — the jump across
 //! the wrap (last column → first column, last row → first row) is no bigger than the
 //! biggest jump between two neighbouring pixels inside the tile. Params deliberately
 //! include fractional counts, the values that used to open a seam.

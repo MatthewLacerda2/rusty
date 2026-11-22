@@ -1,4 +1,4 @@
-//! End-to-end UI interaction (#420) through a real Play session: `UI.Click` drives
+//! End-to-end UI interaction through a real Play session: `UI.Click` drives
 //! the real input path, a Lua button receives enter → select → click in order and
 //! submits on Enter, gameplay sees the pointer consumed, `UI.List` and
 //! `Selectable.GetState` report the state, the ColorTint reaches the Image, and two

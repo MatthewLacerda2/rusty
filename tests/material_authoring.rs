@@ -1,4 +1,4 @@
-//! Material authoring (#271): author a reusable `MaterialAsset` into the per-World
+//! Material authoring: author a reusable `MaterialAsset` into the per-World
 //! library by NAME (decoupled from any entity) via the `Material.DefineAsset` surface,
 //! and prove the issue's contract — the asset round-trips through `SceneData`, an entity
 //! can use it by name, validation is single-sourced, and map slots land correctly.

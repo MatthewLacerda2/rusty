@@ -1,6 +1,6 @@
-//! Material-map visual test (issue #184 / #202). Proves the renderer SAMPLES a
+//! Material-map visual test. Proves the renderer SAMPLES a
 //! material's map textures (not just its scalar factors) through the per-entity
-//! material bind group added in #202.
+//! material bind group.
 //!
 //! It drives the metallic map: the shader gates the ambient diffuse term by
 //! `(1 - metallic)` (see `shader.wgsl`), so under ambient light a fully-metallic
@@ -65,7 +65,7 @@ fn scene(metallic: f32, metallic_map: Option<String>) -> Scene {
         .world
         .set_material(id, Some(MaterialComponent::new("mat".to_string())));
     scene.world.set_post_processing(id, Some(vc()));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(id, Some(rusty::components::CameraComponent::default()));

@@ -1,4 +1,4 @@
-//! The Lua `Material.*` surface and the shared `authoring::material` ops converge (#287).
+//! The Lua `Material.*` surface and the shared `authoring::material` ops converge.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -10,7 +10,7 @@ use rusty::script::api::bind;
 
 #[test]
 fn lua_material_api_and_shared_op_converge() -> Result<(), Box<dyn std::error::Error>> {
-    // #287: the Lua `Material.*` bindings and the editor's Material card both route
+    // the Lua `Material.*` bindings and the editor's Material card both route
     // through the SAME `authoring::material::*` ops, so applying the same change either
     // way must yield byte-identical `MaterialAsset` state. We pin convergence by
     // driving the Lua surface against one entity and the shared op directly against a

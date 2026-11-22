@@ -1,7 +1,7 @@
 //! A mesh modelled in world coordinates (its entity origin far from its geometry,
 //! like any architecture model) is placed by its world bounds' centre, Unity's
-//! `Renderer.bounds.center`: the transparent sort (#1993) and the light-probe
-//! sample (#1994) both read it, never the origin.
+//! `Renderer.bounds.center`: the transparent sort and the light-probe
+//! sample both read it, never the origin.
 //!
 //! Colours are light-independent where they can be: zero ambient and no lights.
 //! Each test skips (passes without asserting) when no GPU / software adapter exists.

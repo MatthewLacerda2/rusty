@@ -1,6 +1,6 @@
 //! Along a ridge the parallax shift jumps from pixel to pixel, so the shifted
 //! coordinates' implicit derivatives would pick a far mip there; `parallax::bend`
-//! reads those pixels at the unshifted derivatives instead (#2191, #2301). If `bend`
+//! reads those pixels at the unshifted derivatives instead. If `bend`
 //! were 0 everywhere, a line of far mip would follow every ridge.
 //!
 //! The albedo is a three-colour checker (red, green, blue cells, 4 texels each): a

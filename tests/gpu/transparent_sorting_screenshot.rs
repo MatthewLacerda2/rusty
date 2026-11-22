@@ -1,4 +1,4 @@
-//! Transparent back-to-front compositing test (#242). Proves the alpha-blended
+//! Transparent back-to-front compositing test. Proves the alpha-blended
 //! transparent pass sorts its draws by view-space depth, so two overlapping
 //! translucent quads composite the SAME way regardless of the order they were
 //! inserted into the scene — the issue's core acceptance.
@@ -66,7 +66,7 @@ const GREEN: [f32; 3] = [0.0, 1.0, 0.0];
 fn scene(near_first: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 0.0;
-    // One volume, on the view's camera (#1434).
+    // One volume, on the view's camera.
     let volume = scene.add_entity("Volume".to_string());
     scene.world.set_post_processing(volume, Some(vc()));
     let camera = rusty::components::CameraComponent::default();

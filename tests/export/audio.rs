@@ -1,4 +1,4 @@
-//! No `.mp3` ships (#1653): the export converts each to a `.wav` first, so one it
+//! No `.mp3` ships: the export converts each to a `.wav` first, so one it
 //! can't convert fails the export, naming it, and one it leaves because its `.wav`
 //! already exists is warned of, naming both, while the `.wav` ships.
 

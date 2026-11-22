@@ -1,7 +1,7 @@
-//! IK under a mirroring parent (#1119): a rig scaled −1 on X, the way a mirrored
+//! IK under a mirroring parent: a rig scaled −1 on X, the way a mirrored
 //! left/right rig is often built, reaches the mirror of [`super::TARGET`] with
 //! its mirrored arm, not the mirror of where it aimed; an aim chain points its
-//! drawn axis at its target, a tip mirrored by its own scale too (#1125).
+//! drawn axis at its target, a tip mirrored by its own scale too.
 
 use glam::Vec3;
 
@@ -40,7 +40,7 @@ fn look_with(axis: &str, target: Vec3) -> String {
 }
 
 /// The head's drawn `axis` (through its world matrix, mirror and all) meets the
-/// target: an X axis no longer aims 180° away, a diagonal not at its mirror (#1125).
+/// target: an X axis no longer aims 180° away, a diagonal not at its mirror.
 #[test]
 fn an_aim_axis_under_a_mirroring_parent_points_at_the_target() {
     let target = Vec3::new(-3.0, 1.85, 2.0);
@@ -61,9 +61,9 @@ fn an_aim_axis_under_a_mirroring_parent_points_at_the_target() {
     }
 }
 
-/// A tip bone with its own negative scale (FBX keeps one since #1110) under an
+/// A tip bone with its own negative scale (FBX keeps one) under an
 /// unmirrored rig: its default `{0, 0, 1}` axis is drawn along −Z of its world
-/// rotation, and still points at the target (#1125).
+/// rotation, and still points at the target.
 #[test]
 fn an_aim_tip_with_its_own_mirror_points_at_the_target() {
     let target = Vec3::new(-3.0, 1.85, 2.0);

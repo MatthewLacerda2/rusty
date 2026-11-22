@@ -1,4 +1,4 @@
-//! Normals go to world space by the inverse-transpose of the model matrix (#1596):
+//! Normals go to world space by the inverse-transpose of the model matrix:
 //! a sphere squashed to (4,1,1) and lit from straight above shades by its true,
 //! mostly-upward normals, not the slanted ones the model matrix itself would give.
 //! A mirrored (-4,1,1) one shades the same, its normals still outward. Skips

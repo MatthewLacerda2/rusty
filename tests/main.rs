@@ -1,4 +1,4 @@
-//! The integration suite: every file in `tests/` compiled into **one** binary (#483).
+//! The integration suite: every file in `tests/` compiled into **one** binary.
 //!
 //! Cargo's default builds each `tests/*.rs` as its own executable, and each of those
 //! links the whole engine — wgpu/naga, egui, rapier3d, vendored Lua. At 54 files and

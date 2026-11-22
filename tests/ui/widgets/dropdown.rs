@@ -94,7 +94,7 @@ fn press_move_release(ui: &mut Ui, item: u32, up: f32, by: (f32, f32)) {
 #[test]
 fn a_click_follows_the_event_systems_rules() {
     // A (6, 6) wobble is under the 10-pixel drag threshold by distance, so it is
-    // still a click on the item (#996: the old Lua summed |dx| + |dy| and dropped it).
+    // still a click on the item.
     let (mut ui, d, _) = dropdown();
     ui.click(d);
     ui.tick(1);
@@ -107,7 +107,7 @@ fn a_click_follows_the_event_systems_rules() {
 #[test]
 fn sliding_from_one_item_onto_the_next_picks_neither() {
     // Pressed 2 px above item 1's top edge (inside item 0), released 2 px below it:
-    // a click needs press and release on one entity (#996: the old Lua picked item 1).
+    // a click needs press and release on one entity.
     let (mut ui, d, _) = dropdown();
     ui.click(d);
     ui.tick(1);

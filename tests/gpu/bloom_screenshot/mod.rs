@@ -1,7 +1,7 @@
-//! Bloom visual test (#889). A small, very bright emissive box on a black
+//! Bloom visual test. A small, very bright emissive box on a black
 //! background: bloom spreads a glow onto the dark pixels around it, so the frame
 //! with bloom on is brighter than the same frame with bloom off. Before this, no
-//! visual test noticed the bloom pass being skipped entirely (#835's mutation run:
+//! visual test noticed the bloom pass being skipped entirely (mutation run:
 //! `PostFx::run_bloom → ()` survived).
 //!
 //! Skips without a GPU/software adapter, unless one is required.
@@ -28,7 +28,7 @@ fn emissive_box(scene: &mut Scene, name: &str, pos: Vec3, size: Vec3, emissive: 
     let asset = MaterialAsset {
         base_color: [0.0; 3],
         emissive: [emissive; 3],
-        roughness: 1.0, // the least sky reflection (#1543): the pixel is near the emissive alone
+        roughness: 1.0, // the least sky reflection: the pixel is near the emissive alone
         ..MaterialAsset::default()
     };
     scene.materials.insert(name.to_string(), asset);
@@ -46,7 +46,7 @@ pub(crate) fn scene(bloom: bool) -> Scene {
     let mut vc = default_post_processing();
     (vc.bloom.active, vc.ssr.active) = (bloom, false);
     scene.world.set_post_processing(post, Some(vc));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(post, Some(rusty::components::CameraComponent::default()));

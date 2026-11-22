@@ -1,4 +1,4 @@
-//! Pins the scene file format (#941): a change to what a `.scene` or `.prefab` file
+//! Pins the scene file format: a change to what a `.scene` or `.prefab` file
 //! holds must update `scene.fingerprint` beside this file, so it is a decision
 //! someone saw, not a side effect.
 //!

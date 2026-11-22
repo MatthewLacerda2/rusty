@@ -1,4 +1,4 @@
-//! GPU-simulated emitters (#2170) with no adapter: the sim's tally matches a `Cpu`
+//! GPU-simulated emitters with no adapter: the sim's tally matches a `Cpu`
 //! twin tick by tick through the real play loop, the `Particles` pair and the
 //! calls a `Gpu` emitter answers differently, and the field surviving save/load.
 

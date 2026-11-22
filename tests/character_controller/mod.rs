@@ -1,4 +1,4 @@
-//! CharacterController (#451): collide-and-slide `Move` against static geometry —
+//! CharacterController: collide-and-slide `Move` against static geometry —
 //! walls, stairs under and over the step offset, slopes under and over the slope
 //! limit, the grounded state and collision flags, crouching under an overhang —
 //! and determinism across two runs.

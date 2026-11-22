@@ -1,4 +1,4 @@
-//! Toksvig specular AA (#1702): a glossy floor with a busy normal map widens its
+//! Toksvig specular AA: a glossy floor with a busy normal map widens its
 //! lobe by what the map's mips lost, far off, and nothing else. Each test draws a
 //! busy map against its *twin*: the same x and y, blue pinned at 255, so the shader
 //! reads the same normals and no spread, as `main` did. No adapter: skip.

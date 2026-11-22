@@ -1,4 +1,4 @@
-//! The look scene the shape screenshot test renders (#425): SDF shapes, a
+//! The look scene the shape screenshot test renders: SDF shapes, a
 //! gradient, effects and the blend modes on a canvas whose reference resolution
 //! equals the shot (one reference unit = one pixel), over a black backdrop.
 

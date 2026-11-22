@@ -1,4 +1,4 @@
-//! `bench_open` in embed mode, end to end (#942, #1042).
+//! `bench_open` in embed mode, end to end.
 //! Gated on `dev`. Opening a project moves the process's working directory
 //! (`core::project::open`), so the real `Embedded::switch` runs in a `session-mcp`
 //! child: under `cargo test` (and cargo-mutants) every test of this binary shares one

@@ -1,4 +1,4 @@
-//! Montage events through the real tick (#1894): `OnAnimationEvent` gets a
+//! Montage events through the real tick: `OnAnimationEvent` gets a
 //! third argument, `{ montage, slot, interrupted }`, for a montage's
 //! `MontageBlendOut` and `MontageEnd`, and `nil` for every other event.
 

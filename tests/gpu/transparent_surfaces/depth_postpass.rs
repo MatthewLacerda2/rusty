@@ -1,4 +1,4 @@
-//! Depth postpass (#1523, HDRP's *Transparent Depth Postpass*): a near, mostly
+//! Depth postpass (HDRP's *Transparent Depth Postpass*): a near, mostly
 //! opaque checkered pane in front of a far wall, a wide-open lens focused on the
 //! pane. Without the postpass the pane's pixels carry the wall's depth, so the pane
 //! blurs with it; with it, the pane reads as in focus and stays sharp.

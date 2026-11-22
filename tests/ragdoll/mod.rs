@@ -1,8 +1,8 @@
-//! Ragdolls end to end (#466): the builder's bodies and joints, the joints bending
+//! Ragdolls end to end: the builder's bodies and joints, the joints bending
 //! the natural way, a fall that comes to rest, an impulse at the hit point, the
-//! Animator ↔ physics switch, IK leaving a ragdoll alone (#461), a resting one
-//! falling when its floor is switched off (#1707), determinism, and the powered
-//! partial ragdoll: one branch on physics, driven and blended (#1895). Saving is in-crate
+//! Animator ↔ physics switch, IK leaving a ragdoll alone, a resting one
+//! falling when its floor is switched off, determinism, and the powered
+//! partial ragdoll: one branch on physics, driven and blended. Saving is in-crate
 //! (`scene::skeleton::ragdoll::persist_tests`), over the glTF fixture.
 
 mod decapitated;

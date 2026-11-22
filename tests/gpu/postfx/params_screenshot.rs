@@ -1,8 +1,8 @@
-//! Runtime postfx params pixel test (#671): a script's `Graphics.SetPostParam`
+//! Runtime postfx params pixel test: a script's `Graphics.SetPostParam`
 //! drives a baked damage vignette's intensity, and the corner of the frame follows
 //! it with no re-bake — the module's files stay untouched; only the volume's value
 //! (a uniform write) changes between frames. Its own files, not the process-wide
-//! bake generation, which a neighbouring test's bake moves (#794).
+//! bake generation, which a neighbouring test's bake moves.
 
 use std::cell::RefCell;
 use std::rc::Rc;

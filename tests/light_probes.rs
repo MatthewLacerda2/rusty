@@ -1,4 +1,4 @@
-//! Light probes (#240): SH probe data model + analytic ambient sampling.
+//! Light probes: SH probe data model + analytic ambient sampling.
 //!
 //! Headless + deterministic. Asserts (1) probe POSITIONS round-trip through the
 //! scene document while the baked SH round-trips through the `<scene>.lighting.json`

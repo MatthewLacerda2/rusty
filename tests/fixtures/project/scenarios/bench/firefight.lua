@@ -1,4 +1,4 @@
--- tests/fixtures/project/scenarios/bench/firefight.lua — the bench's firefight tick (#2448).
+-- tests/fixtures/project/scenarios/bench/firefight.lua — the bench's firefight tick.
 --
 -- What about four automatic weapons firing ask of the engine every tick, through
 -- the API a game uses: prefab instances spawned and destroyed (casings, one of

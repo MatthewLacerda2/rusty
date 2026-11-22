@@ -1,4 +1,4 @@
-//! #1741's flood fill in a graph: thresholded Voronoi cells, each its own flat
+//! The flood fill in a graph: thresholded Voronoi cells, each its own flat
 //! grey, one value across the tile's edge, mostly the same grey at 128² and
 //! 1024², and thousands of islands kept apart.
 

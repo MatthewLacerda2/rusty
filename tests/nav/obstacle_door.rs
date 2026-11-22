@@ -1,4 +1,4 @@
-//! A carving `NavMeshObstacle` (#456) closing a doorway mid-walk: the agent heading
+//! A carving `NavMeshObstacle` closing a doorway mid-walk: the agent heading
 //! for it re-plans through the other doorway the same tick the door carves, and
 //! arrives; a replay is bit-identical. A non-carving obstacle is steered around.
 

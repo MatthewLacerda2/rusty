@@ -1,4 +1,4 @@
-//! Integration coverage for `Debug.Preview` (#353) — the headless asset preview,
+//! Integration coverage for `Debug.Preview` — the headless asset preview,
 //! driven through a real [`Session`] so the test exercises the *shipped* surface (the
 //! Lua verb an agent actually calls), not the Rust function behind it.
 //!
@@ -9,7 +9,7 @@
 
 use rusty::dev::session::Session;
 
-/// A committed shader, so the arm that matters most for #353 (see what a baked `.wgsl`
+/// A committed shader, so the arm that matters most (see what a baked `.wgsl`
 /// actually renders) is the one covered end to end.
 const SHADER: &str = "engine/shaders/shader.wgsl";
 
@@ -45,7 +45,7 @@ fn previewing_a_shader_writes_the_png_it_returns() {
 
 #[test]
 fn framing_is_deterministic_so_two_shots_are_comparable() {
-    // The whole point of fixed framing (#353): an agent diffs before/after captures of
+    // The whole point of fixed framing: an agent diffs before/after captures of
     // the same asset, so the same input must produce byte-identical output.
     let sess = session();
     let (Some(a), Some(b)) = (

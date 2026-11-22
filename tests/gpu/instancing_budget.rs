@@ -1,10 +1,10 @@
-//! GPU instancing's regression guard (#470): a prop-heavy level — 600 copies of three
+//! GPU instancing's regression guard: a prop-heavy level — 600 copies of three
 //! meshes over the demo scene — must render in a handful of draw calls, not one per
 //! prop. The budget is a draw-call count, deterministic on every adapter; the CPU time
 //! is printed for measurement only (`--nocapture`). `RUSTY_BENCH_FRAMES` renders more
 //! frames for a steadier average.
 //!
-//! The props are also tinted one by one (#1706): `Material.SetColor` gives each its
+//! The props are also tinted one by one: `Material.SetColor` gives each its
 //! own library material, and equal records must still share a draw and a caster run.
 
 use rusty::dev::harness::Harness;
@@ -61,7 +61,7 @@ fn check_budget(name: &str, script: &str) {
         .unwrap_or(1);
     for _ in 0..frames {
         if !h.screenshot(out.join("props.png")) {
-            // The harness folds errors into `false`; only a real skip may pass (#885).
+            // The harness folds errors into `false`; only a real skip may pass.
             assert!(
                 !rusty::render::gpu_required(),
                 "RUSTY_REQUIRE_GPU=1 but no shot"

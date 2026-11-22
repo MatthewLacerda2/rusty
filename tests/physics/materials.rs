@@ -1,4 +1,4 @@
-//! Physics material assets on hits (#1878): a shot through a wood box into a
+//! Physics material assets on hits: a shot through a wood box into a
 //! concrete box reads each crossing's `material` and `thickness`, and prices the
 //! damage left from a Lua table keyed by material, the engine storing no
 //! penetration value of its own.

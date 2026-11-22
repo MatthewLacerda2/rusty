@@ -1,4 +1,4 @@
-//! Scene builders for the soft/shaped mask and backdrop screenshots (#426, #428):
+//! Scene builders for the soft/shaped mask and backdrop screenshots:
 //! a 128-unit overlay canvas at one unit per pixel, placed UI elements, a soft
 //! circle sprite written to disk, and the minimap's render-texture camera.
 

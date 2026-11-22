@@ -87,7 +87,7 @@ fn run_clip() -> AnimationClip {
 /// A skinned `Rig` at `at`, skeleton spawned; its Animator plays `Run` when
 /// `running`.
 /// Arms the kept bone list's check: every follow on this thread from here on
-/// also walks the skeletons and fails the test if the list went stale (#2345).
+/// also walks the skeletons and fails the test if the list went stale.
 pub fn character(scene: &mut Scene, at: Vec3, running: bool) -> u32 {
     rusty::physics::check_kept_bones();
     let skin = skin();

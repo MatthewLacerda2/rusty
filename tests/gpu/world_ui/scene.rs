@@ -1,4 +1,4 @@
-//! Scene builders for the world-space UI screenshots (#429): unlit emissive boxes
+//! Scene builders for the world-space UI screenshots: unlit emissive boxes
 //! (zero ambient, no lights, so a surface's colour is its emissive), canvases and
 //! solid UI elements, and a colour-centroid probe for locating what drew where.
 

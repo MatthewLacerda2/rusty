@@ -1,4 +1,4 @@
-//! The HUD scene the UI screenshot test renders (#418): a canvas whose reference
+//! The HUD scene the UI screenshot test renders: a canvas whose reference
 //! resolution equals the shot (one reference unit = one pixel), over an opaque
 //! black backdrop so every blend is against a known colour.
 

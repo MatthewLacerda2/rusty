@@ -1,4 +1,4 @@
-//! A UI Image samples with its texture's import settings (#1397): a `Point`
+//! A UI Image samples with its texture's import settings: a `Point`
 //! checker magnified 24× stays two flat colours, the default (Trilinear) one blends
 //! at its cell edges, and both clamp, so an image's border never bleeds the
 //! opposite edge in. Asserted at known pixels (`px`: bottom-left origin).

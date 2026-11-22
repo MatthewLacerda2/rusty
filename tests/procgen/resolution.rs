@@ -1,4 +1,4 @@
-//! #394's guard, and the definition of "resolution-independent": a recipe baked at
+//! The guard, and the definition of "resolution-independent": a recipe baked at
 //! 128² must match the same recipe baked at 512² and box-downsampled to 128². Every
 //! op whose params used to be in pixels (`blur`, `bump_to_normal`) or that resampled
 //! nearest-neighbour (`mapping`) is exercised.

@@ -1,8 +1,8 @@
-//! IK end to end (#461), through the real `GameWorld::tick` on the hitbox tests'
+//! IK end to end, through the real `GameWorld::tick` on the hitbox tests'
 //! five-bone rig (`pelvis → spine → {head, arm → finger}`): a script-set target
 //! is reached and skinned, the arm's hitbox follows the IK'd pose, an aim chain
 //! clamps without drifting, weight 0 is an exact no-op, a ragdolled bone is left
-//! to physics, a mirrored rig reaches as well as a plain one (#1119), and the
+//! to physics, a mirrored rig reaches as well as a plain one, and the
 //! whole path is deterministic.
 
 mod aim;

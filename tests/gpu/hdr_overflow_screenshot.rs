@@ -1,4 +1,4 @@
-//! A pixel too bright for half-float is stored finite (#1699). Inverse-square light
+//! A pixel too bright for half-float is stored finite. Inverse-square light
 //! has no ceiling: polished metal a hand's width under a lamp reflects past
 //! `Rgba16Float`'s 65504, and an `Inf` in the HDR target turns bloom's bright pass
 //! NaN, which its blur spreads into a black block around the highlight. Every forward
@@ -53,7 +53,7 @@ fn scene() -> Scene {
     let mut vc = default_post_processing();
     vc.bloom.active = true;
     scene.world.set_post_processing(volume, Some(vc));
-    // A volume rides on its camera (#1434): that camera is the view's.
+    // A volume rides on its camera: that camera is the view's.
     scene
         .world
         .set_camera(volume, Some(rusty::components::CameraComponent::default()));

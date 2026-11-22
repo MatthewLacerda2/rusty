@@ -1,4 +1,4 @@
-//! Booting a Play session in a test (#939): the `GameWorld` over a scene that a
+//! Booting a Play session in a test: the `GameWorld` over a scene that a
 //! dozen modules built by hand, and the "write this Lua and attach it" step half of
 //! them repeated.
 

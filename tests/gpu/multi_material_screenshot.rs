@@ -1,4 +1,4 @@
-//! A mesh with two materials draws each run with its own (#1285): the FBX fixture's
+//! A mesh with two materials draws each run with its own: the FBX fixture's
 //! quad is a `Red` triangle and a `Blue` one, and both show. Pointing slot 1 at a
 //! third material changes only the triangle that slot draws.
 //!

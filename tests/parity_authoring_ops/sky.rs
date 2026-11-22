@@ -1,4 +1,4 @@
-//! The procedural sky's settings (#1620): `Lighting.{Get,Set}Sky*Color` and
+//! The procedural sky's settings: `Lighting.{Get,Set}Sky*Color` and
 //! `Lighting.{Get,Set}Cloud*` vs `authoring::environment`.
 
 use std::cell::RefCell;

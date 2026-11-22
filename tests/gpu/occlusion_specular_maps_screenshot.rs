@@ -1,4 +1,4 @@
-//! The occlusion and specular-level maps (#2151). Each check renders a plane with a
+//! The occlusion and specular-level maps. Each check renders a plane with a
 //! map against the same plane without one (or with the scalar it stands for):
 //!   - Occlusion: a black map darkens the ambient-lit plane, a strength of 0 leaves
 //!     it as unmapped, and under a lamp alone (no ambient, no reflectance) it changes

@@ -1,4 +1,4 @@
-//! `Graphics.*` edits the main camera (#1434): the screen stack's base, Unity's
+//! `Graphics.*` edits the main camera: the screen stack's base, Unity's
 //! `Camera.main`. A render-texture camera created first never takes a write meant for
 //! the window, and the window's post-FX reads the volume `Graphics` edits.
 

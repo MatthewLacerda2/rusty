@@ -1,4 +1,4 @@
-//! A UI Image drawn smaller than its source reads its mip chain (#1397): a
+//! A UI Image drawn smaller than its source reads its mip chain: a
 //! one-texel checker minified 4× averages to grey with *Generate Mipmaps* on, and
 //! keeps its black and white texels with it off. A sampler stuck at the base level
 //! fails the first case. `Point` filtering keeps the base level free of blending.

@@ -1,4 +1,4 @@
-//! FXAA visual test (#360). Renders one aliased scene with the pass on and off and
+//! FXAA visual test. Renders one aliased scene with the pass on and off and
 //! asserts (a) FXAA actually reaches the image and softens edges, and (b) with it off
 //! the chain is a byte-stable pass-through — the composite writes the output directly,
 //! exactly as it did before this pass existed.
@@ -7,7 +7,7 @@
 //! are capped at 150 lines; it is the same kind of test, pinning a different knob.
 //!
 //! When no adapter is available `capture` returns `Ok(false)` and the test passes
-//! without asserting — only a GPU-less machine; every CI job has an adapter (#489).
+//! without asserting — only a GPU-less machine; every CI job has an adapter.
 
 use crate::temp::file as tmp;
 use glam::Vec3;

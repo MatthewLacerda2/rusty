@@ -1,4 +1,4 @@
-//! A camera jump under TAA (#2003): after `Camera.ResetHistory()` a shot is the same
+//! A camera jump under TAA: after `Camera.ResetHistory()` a shot is the same
 //! whatever the view showed before the jump (nothing of it survives, in TAA, motion
 //! vectors, SSIL, fog or exposure); without the cut it is not, and
 //! `Harness.Screenshot(path, { settle = n })` converges on the new view.

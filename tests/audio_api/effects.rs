@@ -1,4 +1,4 @@
-//! The group-effect verbs (#1748), as a script drives them: set and read back a
+//! The group-effect verbs, as a script drives them: set and read back a
 //! chain, Master's default limiter, errors reaching Lua, and a snapshot gliding
 //! an effect's parameter.
 

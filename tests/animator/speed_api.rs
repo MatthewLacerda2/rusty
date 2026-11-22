@@ -1,4 +1,4 @@
-//! `Animator.SetSpeed` / `GetSpeed` (#1342) end-to-end through Lua: the write
+//! `Animator.SetSpeed` / `GetSpeed` end-to-end through Lua: the write
 //! lands on the component's `speed` multiplier (the field the sampler reads),
 //! any finite value is accepted as the inspector's field accepts it, NaN and
 //! infinity raise a Lua error, and a missing animator reads `nil`.

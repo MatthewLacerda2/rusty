@@ -1,4 +1,4 @@
-//! Default hemisphere-ambient defaults (#256).
+//! Default hemisphere-ambient defaults.
 //!
 //! The out-of-the-box ambient is brightened/coloured (blue-ish sky, darker ground,
 //! higher intensity) so differently-oriented faces read without baked probes. These

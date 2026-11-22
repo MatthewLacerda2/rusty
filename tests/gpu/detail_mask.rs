@@ -1,4 +1,4 @@
-//! A material's detail mask (#2258, HDRP Lit's *Detail Mask*), drawn: a lamp-lit
+//! A material's detail mask (HDRP Lit's *Detail Mask*), drawn: a lamp-lit
 //! 16 m plane carries a busy detail map and a mask whose red is black on one half
 //! of the main UV and white on the other. Head-on and at a grazing view, the black
 //! half draws as the plane without the detail does and the white half as the plane
@@ -71,7 +71,7 @@ fn camera(grazing: bool) -> Camera {
 type Detail = Option<(Option<String>, Option<String>)>;
 
 /// `material(d)` from `camera(grazing)` through `h`, one renderer for every shot (one
-/// each was most of the test's time on lavapipe, #2350); `None` without an adapter.
+/// each was most of the test's time on lavapipe); `None` without an adapter.
 fn frame(h: &mut CaptureHost, grazing: bool, d: Detail, name: &str) -> Option<image::RgbImage> {
     let path = crate::temp::dir().join(format!("rusty_2258_{grazing}_{name}.png"));
     capture_into(h, &scene(material(d)), &camera(grazing), &path, SIZE, SIZE)

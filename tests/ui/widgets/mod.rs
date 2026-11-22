@@ -1,4 +1,4 @@
-//! The widget kit (#422) end to end: widgets built by `create_ui` (the Create ▸ UI
+//! The widget kit end to end: widgets built by `create_ui` (the Create ▸ UI
 //! path), run as their engine Lua scripts in a real Play session, and driven only
 //! through the player's input path — `UI.Click`, injected keys, mouse and text.
 

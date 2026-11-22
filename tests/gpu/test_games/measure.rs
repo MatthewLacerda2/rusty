@@ -1,6 +1,6 @@
 //! Run a child and read what it cost: its own CPU time (user + system), which
 //! the test games' budget reads because other tests' load barely moves it, and
-//! its wall time, kept only as a hang guard (#2131). The test reaps the child
+//! its wall time, kept only as a hang guard. The test reaps the child
 //! itself with `wait4`, which hands back the child's rusage on Linux and macOS
 //! alike, so neither the `game` binary nor a new crate has to report it.
 

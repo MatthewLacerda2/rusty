@@ -1,5 +1,5 @@
 //! Scene edits during Play that change what physics carries, run through the
-//! real play loop (#1707): physics syncs only what the change log names, so these
+//! real play loop: physics syncs only what the change log names, so these
 //! are the moves it must still see. A compound body loses a part, a body is
 //! re-parented onto a moving one, and a parent's `SetActive` switches off the wall
 //! under it. A ragdoll at rest losing its floor the same way: `ragdoll::floor_off`.

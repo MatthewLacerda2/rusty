@@ -1,4 +1,4 @@
-//! Capturing the game's final mix in a scenario (#1579): the harness mixes offline
+//! Capturing the game's final mix in a scenario: the harness mixes offline
 //! in step with the fixed tick, so two runs of one scenario write byte-identical
 //! WAVs, and `Sound.Level` measures the capture on a grid of the scenario's choice.
 

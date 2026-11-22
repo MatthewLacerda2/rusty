@@ -1,4 +1,4 @@
--- tests/fixtures/project/scenarios/bench/bench.lua — the shooter-shaped stress run behind `make bench` (#835).
+-- tests/fixtures/project/scenarios/bench/bench.lua — the shooter-shaped stress run behind `make bench`.
 --
 -- Run it with:
 --   make bench

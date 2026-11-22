@@ -1,4 +1,4 @@
-//! `Scene.LoadAsync` and determinism (#2123): an async load leaves the world a sync
+//! `Scene.LoadAsync` and determinism: an async load leaves the world a sync
 //! load of the same file on the same tick leaves, and a demo recorded with the loader
 //! finishing late replays bit for bit on a loader that finishes at another moment.
 

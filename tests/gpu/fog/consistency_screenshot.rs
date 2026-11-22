@@ -1,9 +1,9 @@
-//! Scene fog is consistent across passes (#437) — the issue's key point. Behind
+//! Scene fog is consistent across passes — the issue's key point. Behind
 //! fog that fully swallows a wall, a particle (alpha or additive) in front of that
 //! wall must vanish into the fog colour too, never glow through it. Each case is
 //! also rendered without fog, to prove the effect really covers the centre pixel.
 //! Decals are folded into the surface's own material before it is lit and fogged
-//! (#638), so they share the wall's fog by construction and need no case here.
+//!, so they share the wall's fog by construction and need no case here.
 
 use glam::Vec3;
 use rusty::components::particle::{Particle, ParticleBlend, ParticleEmitterComponent};

@@ -1,7 +1,7 @@
-//! The row-band split is invisible (#1490): each recipe below touches ops that paint
+//! The row-band split is invisible: each recipe below touches ops that paint
 //! by rows, and bakes to the same bytes at 1 band and at N, with an uneven split.
 //!
-//! One row per op or family over a shared prefix (#1837), so a new op adds a row and
+//! One row per op or family over a shared prefix, so a new op adds a row and
 //! two branches land on different lines.
 
 use rusty::procgen::{evaluate, with_bands, TextureRecipe};

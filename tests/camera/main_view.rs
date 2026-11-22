@@ -1,4 +1,4 @@
-//! One pose for the main view (#1619): a chase camera scripted through `Camera.*` in
+//! One pose for the main view: a chase camera scripted through `Camera.*` in
 //! `LateUpdate` moves the main camera entity, and is where the screen stack the
 //! harness and the player render, the editor's Game view and the view camera resource
 //! (the audio listener) all look from, and a script moving the
@@ -51,7 +51,7 @@ fn a_scripted_camera_move_is_one_pose_on_every_path() {
     let (mut game, scene, cam) = session(CHASE, "rusty_1619_chase.lua");
     run(&mut game, 3);
     let want = (Vec3::new(3.0, 3.0, 8.0), -90.0, -20.0);
-    // What the player and every headless capture pass the renderer (#1619).
+    // What the player and every headless capture pass the renderer.
     let main = game.main_view();
     let scene = scene.borrow();
     let stack = build_camera_stack(&main, &scene, true, &Default::default());

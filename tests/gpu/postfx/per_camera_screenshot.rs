@@ -1,4 +1,4 @@
-//! Post-FX reads each view's own camera (#1434), Unity URP's camera-stack rule: the
+//! Post-FX reads each view's own camera, Unity URP's camera-stack rule: the
 //! window uses its screen stack's base camera, a render texture its own camera, and
 //! neither depends on which camera entity was created first.
 

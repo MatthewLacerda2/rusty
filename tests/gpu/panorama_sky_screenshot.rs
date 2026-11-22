@@ -1,4 +1,4 @@
-//! The skybox panorama (#995): the sky pass, the forward reflection and post-FX's
+//! The skybox panorama: the sky pass, the forward reflection and post-FX's
 //! SSR fallback all map a direction onto the equirect image through one
 //! `equirect_uv` (common.wgsl) and sample it through the skybox's own sampler.
 //!
@@ -58,7 +58,7 @@ fn metal_scene(ssr: bool) -> Scene {
         vc.ssr.active = true;
         vc.ssr.quality = EffectQuality::High;
         scene.world.set_post_processing(volume, Some(vc));
-        // A volume rides on its camera (#1434): that camera is the view's.
+        // A volume rides on its camera: that camera is the view's.
         scene
             .world
             .set_camera(volume, Some(rusty::components::CameraComponent::default()));

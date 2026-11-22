@@ -1,4 +1,4 @@
-//! The busy scene the replay tests step (#764): a pile of dynamic boxes that land on
+//! The busy scene the replay tests step: a pile of dynamic boxes that land on
 //! each other, NavMeshAgents crossing paths, and Lua driving timers, tweens, a UI
 //! layout and the seeded `Random` — every sim module that keeps a hash map gets
 //! work to do, so an iteration order that leaks into behaviour shows in the result.
@@ -35,7 +35,7 @@ return B
 "#;
 
 /// Where the busy scripts sit, relative to the harness's workspace root — the form
-/// a scene stores a script path in (#783), so two runs in two scratch
+/// a scene stores a script path in, so two runs in two scratch
 /// directories snapshot the same paths.
 const DIRECTOR_PATH: &str = "assets/scripts/busy_director.lua";
 const BOX_PATH: &str = "assets/scripts/busy_box.lua";

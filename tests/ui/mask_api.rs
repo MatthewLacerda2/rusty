@@ -1,4 +1,4 @@
-//! Integration coverage for the soft/shaped mask and backdrop surface (#426, #428):
+//! Integration coverage for the soft/shaped mask and backdrop surface:
 //! `RectMask.SetFeather`, the `Mask` and `BackdropFilter` namespaces write through
 //! the shared ops (validation included), `Scene.AddComponent` names both new kinds,
 //! and every field survives a scene save → load.

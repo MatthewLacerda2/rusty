@@ -1,4 +1,4 @@
-//! `Scene.SetStatic` / `Scene.IsStatic` (#1496): the inspector's Static checkbox
+//! `Scene.SetStatic` / `Scene.IsStatic`: the inspector's Static checkbox
 //! from Lua, writing the same `World::set_static` flag — live in Play: physics
 //! reads it next tick, and the renderer's static shadow bakes key on the revision
 //! it bumps. The nil-id cases are `entity_arg_api`'s shared table.

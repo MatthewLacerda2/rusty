@@ -87,7 +87,7 @@ fn edit_mode_moves_freely_and_tiny_moves_do_nothing() {
 /// Walking a flat floor under scripted gravity covers (nearly) the full stride
 /// every tick. rapier 0.36's controller can read float noise in the downward
 /// part of the move as a slip on a near-flat floor and drop the whole slide,
-/// stalling the character for a tick (#754); the sweep reruns such a move flat.
+/// stalling the character for a tick; the sweep reruns such a move flat.
 /// The 10% allowance is parry's contact-normal noise, which tilts the floor by a
 /// degree or two near contact and costs a stride ~2% on the odd tick (rapier
 /// 0.19 had the same noise, and hitched a diagonal walk to ~74% on one tick).

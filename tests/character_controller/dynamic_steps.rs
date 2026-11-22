@@ -1,6 +1,6 @@
 //! Autostep and dynamic bodies: the controller never steps onto one, nor lets
 //! one in the way of its clearance, room or landing refuse a step it would
-//! take without it (rapier's `include_dynamic_bodies: false`, #2061).
+//! take without it (rapier's `include_dynamic_bodies: false`).
 
 use glam::{Quat, Vec3};
 use rusty::physics::PhysicsWorld;

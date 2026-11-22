@@ -1,11 +1,11 @@
-//! Directional lightmaps on the GPU (#810): a static, lightmapped floor whose normal
+//! Directional lightmaps on the GPU: a static, lightmapped floor whose normal
 //! map tilts one half one way and the other half the other, lit only by a slanted
 //! `Baked` sun, so every bit of its light comes from the lightmap.
 //!
 //! * **Directional bake:** the halves read the baked light through their own normals,
 //!   so the half tilted toward the sun is visibly brighter than the other.
 //! * **Non-directional bake** (`directional: false`): the lightmap ignores the normal
-//!   map, so the two halves shade nearly alike, as before #810.
+//!   map, so the two halves shade nearly alike, as before directional lightmaps.
 //!
 //! Skips (passes without asserting) when no GPU / software adapter is present.
 

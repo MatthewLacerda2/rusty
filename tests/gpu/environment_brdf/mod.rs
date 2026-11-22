@@ -1,4 +1,4 @@
-//! The environment reflection's weight is URP's environment BRDF (#1543), not a
+//! The environment reflection's weight is URP's environment BRDF, not a
 //! `1 - roughness` scale: a rough metal reflects a blurry, dimmer environment, never
 //! a black one, and a dielectric reflects its 4% F0 head-on, from either side.
 //!

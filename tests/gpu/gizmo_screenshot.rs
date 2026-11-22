@@ -1,4 +1,4 @@
-//! A game screenshot with its gizmos (#1882): `Harness.Screenshot(path, { gizmos =
+//! A game screenshot with its gizmos: `Harness.Screenshot(path, { gizmos =
 //! true })` draws the colliders and the `Debug.Draw*` lines over the frame, and
 //! without the option the frame is byte-for-byte the plain render.
 
