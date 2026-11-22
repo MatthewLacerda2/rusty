@@ -9,18 +9,10 @@ use super::composite::{AtPart, Constraints, Parts};
 use super::cost::{self, Work};
 use super::normals::exact_normal;
 
-/// Under this time of impact parry decides a support-map cast by the contact
-/// normal at the start pose (`cast_shapes_support_map_support_map`'s fallback,
-/// taken with `compute_impact_geometry_on_penetration`, which rapier's
-/// controller always sets): a pair moving along or away from it is no hit.
+/// Under this time of impact parry decides a support-map cast by the contact normal
+/// at the start pose: a pair moving along or away from it is no hit.
 const NEAR_TOI: Real = 1.0e-4;
 
-/// The earliest hit of `g2`, posed at `pos12` in `g1`'s frame and moving by
-/// `vel12`, against any part of the triangle mesh or compound `g1` (`None`
-/// for any other shape): parry's composite traversal, each part cast through
-/// `dispatcher`, its normal made exact ([`exact_normal`]) and held to the
-/// part's normal constraints ([`constrained`]). The hit's `subshape1` is the
-/// struck part, as parry's.
 pub(super) fn cast_parts(
     dispatcher: &dyn QueryDispatcher,
     g1: &dyn Shape,
@@ -49,7 +41,6 @@ pub(super) fn cast_parts(
     };
     let part_hit = |id: u32, best: Real| {
         cost::count(Work::Part);
-        // A part can win only by a hit before the best so far.
         let cast = cast.until(best);
         let mut found = None;
         parts.with_part(id, pos12, vel12, &mut |at, part, constraints| {
@@ -77,10 +68,7 @@ pub(super) fn cast_parts(
     Some(hit)
 }
 
-/// One part's hit as the search holds it: finished (its normal exact and
-/// constrained, in the composite's frame), or `Late`: a support-map hit at
-/// or past [`NEAR_TOI`], as cast in the part's own frame. No normal can drop a
-/// late hit, so only its time of impact counts until it wins.
+/// No normal can drop a `Late` hit, so only its time of impact counts until it wins.
 #[derive(Clone, Copy)]
 enum PartHit {
     Done(ShapeCastHit),
@@ -95,7 +83,6 @@ impl BvhLeafCost for PartHit {
     }
 }
 
-/// What every part of one cast is cast with.
 #[derive(Clone, Copy)]
 struct Cast<'a> {
     dispatcher: &'a dyn QueryDispatcher,
@@ -112,8 +99,6 @@ impl Cast<'_> {
         Self { options, ..self }
     }
 
-    /// `part`'s hit, if any: a composite part cast part by part, a convex
-    /// pair's hit left [`PartHit::Late`] where no normal can drop it.
     fn part(&self, at: &AtPart, part: &dyn Shape, c: Constraints) -> Option<PartHit> {
         let (g2, options) = (self.g2, self.options);
         let (local, vel) = (&at.pos12, at.vel12);
@@ -133,9 +118,6 @@ impl Cast<'_> {
             .map(PartHit::Done)
     }
 
-    /// A late hit that won, finished as [`Self::part`] would have at once:
-    /// its exact normal, then [`constrained`], which past [`NEAR_TOI`] never
-    /// drops it (a debug build checks; a release one keeps the hit).
     fn finish(
         &self,
         raw: ShapeCastHit,
@@ -161,14 +143,9 @@ impl Cast<'_> {
     }
 }
 
-/// A part's `hit` with its normal corrected by the part's `constraints` (none,
-/// or a correction they refuse, leave it as cast), or `None` when it no longer
-/// stands: a hit within [`NEAR_TOI`] is judged again the way parry judged it,
-/// by the corrected normal against `vel`, so a capsule moving along a seam's
-/// flat face goes on instead of stopping on the seam's edge. A cast that
-/// stops at penetration (`ground_below`'s probe) keeps it, as parry does. Correcting only
-/// the reported normal and keeping the hit met the same edge on the next slide
-/// and stalled the walk for good (#2073).
+/// A hit within [`NEAR_TOI`] is judged again as parry would: by the corrected normal against
+/// `vel`, so a capsule moving along a seam's flat face goes on. Correcting only the normal
+/// and keeping the hit stalled the walk on the same edge.
 fn constrained(
     hit: ShapeCastHit,
     constraints: Option<&dyn NormalConstraints>,
@@ -186,8 +163,6 @@ fn constrained(
     Some(with_normal(hit, normal, pos12))
 }
 
-/// `hit`'s normal as `constraints` correct it, or `None` when there are none
-/// or they refuse the correction.
 fn corrected(hit: &ShapeCastHit, constraints: Option<&dyn NormalConstraints>) -> Option<Vector> {
     let mut normal = hit.normal1;
     constraints?
@@ -195,8 +170,6 @@ fn corrected(hit: &ShapeCastHit, constraints: Option<&dyn NormalConstraints>) ->
         .then_some(normal)
 }
 
-/// `hit` with its normal set to `normal` (in the part's frame, `pos12` the
-/// capsule's pose there).
 fn with_normal(mut hit: ShapeCastHit, normal: Vector, pos12: &Pose) -> ShapeCastHit {
     hit.normal1 = normal;
     hit.normal2 = pos12.rotation.inverse() * -normal;

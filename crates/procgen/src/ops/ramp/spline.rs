@@ -1,24 +1,14 @@
-//! `color_ramp`'s `cardinal` and `b_spline` fill, ported from Blender's
-//! `BKE_colorband_evaluate` (`colorband.cc`) and the `key_curve_position_weights` it
-//! calls (`key.cc`): the four stops around a pixel weigh its colour, the end stops
-//! standing in for the neighbours past either end.
-
 use super::super::super::image_buf::Rgba;
 #[cfg(doc)]
 use super::super::super::recipe::RampInterpolation;
 use super::super::super::recipe::RampStop;
 
-/// The two spline fills, the [`RampInterpolation`]s that have weights, so the weights
-/// cannot be asked for a mode that has none.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Spline {
     Cardinal,
     BSpline,
 }
 
-/// The ramp at `t` by the `kind` fill, `above` finding the index of the first stop
-/// past `t` (the binary search, or the reference walk). A NaN `t` reads the last
-/// stop, as the other modes do.
 pub(super) fn fill(
     sorted: &[RampStop],
     kind: Spline,
@@ -35,13 +25,7 @@ pub(super) fn fill(
 /// stop is `0.71` times the difference of its two neighbours.
 const TENSION: f32 = 0.71;
 
-/// The ramp at `t` (not NaN) by Blender's `kind` fill, where `above` is the index of
-/// the first stop past `t` (`sorted.len()` when none is). Between stops `left` and
-/// `right` the fill weighs those two and their outer neighbours. Before the first
-/// stop it runs from a copy of it at position 0, after the last to a copy at 1, so,
-/// as Blender's, a spline ramp is not held flat past its ends. The result is clamped
-/// to `[0, 1]`, as Blender's (`clamp_v4`), which is where a `cardinal` overshoot
-/// stops.
+/// Before the first stop it runs from a copy of it at position 0, after the last to a copy at 1; clamped to `[0, 1]` as Blender's (`clamp_v4`).
 fn sample(sorted: &[RampStop], above: usize, t: f32, kind: Spline) -> Rgba {
     let n = sorted.len();
     if n == 1 {
@@ -80,8 +64,6 @@ fn sample(sorted: &[RampStop], above: usize, t: f32, kind: Spline) -> Rgba {
     })
 }
 
-/// `key_curve_position_weights`: the weights of the four points `p0..p3` at `t` on
-/// the segment from `p1` (`t = 0`) to `p2` (`t = 1`). The cardinal curve passes
 /// through `p1` and `p2`; the uniform cubic B-spline only near them, its weights
 /// never negative, so it never leaves the points' range.
 pub(super) fn weights(t: f32, kind: Spline) -> [f32; 4] {

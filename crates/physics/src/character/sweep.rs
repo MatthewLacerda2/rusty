@@ -17,20 +17,14 @@ use rusty_components::CharacterControllerComponent;
 use rusty_scene::Scene;
 use rusty_time::FIXED_DELTA_TIME;
 
-/// A contact normal this close to horizontal counts as the capsule's side.
 const FLAG_EPS: f32 = 1e-3;
-/// How far below the capsule a grounded move looks for the ground's normal,
-/// beyond the skin.
 const GROUND_PROBE: f32 = 0.02;
-/// A floor normal with `1 - n.y` under this (within ~2.5° of straight up) is
-/// near-flat: rapier's slope split (`normal × up`) is ill-conditioned there, and
-/// parry's near-contact normals on a flat face scatter by about a degree.
+/// Near-flat floor (within ~2.5° of up): rapier's slope split (`normal × up`) is
+/// ill-conditioned there, and parry's near-contact normals on a flat face scatter by a degree.
 const FLAT_FLOOR: f32 = 1e-3;
 
-/// rapier's controller, configured from the component. `radius` is the capsule's
-/// (scaled): autostep must find that much room on top of a step, so a step only
-/// counts when the whole foot clears it — without it the rounded bottom would
-/// hop edges taller than the step offset.
+/// `radius` is the capsule's: autostep needs that much room atop a step, else the
+/// rounded bottom would hop edges taller than the step offset.
 pub(crate) fn controller(
     cc: &CharacterControllerComponent,
     radius: f32,
@@ -51,10 +45,7 @@ pub(crate) fn controller(
     }
 }
 
-/// Which side of the capsule a sweep hit touched, Unity's way: below the lower
-/// cap's centre is `BELOW`, above the upper cap's is `ABOVE`, the rest `SIDES`.
-/// The query pipeline casts the world against the capsule, so `normal1` is the
-/// obstacle's outward normal in world space and `witness2` the touched point in
+/// `normal1` is the obstacle's outward normal in world space, `witness2` the touched point in
 /// the capsule's own (upright, unrotated) frame.
 pub(crate) fn contact_flag(hit: &ShapeCastHit, half_segment: f32) -> u8 {
     let surface_up = hit.normal1.y;
@@ -69,8 +60,6 @@ pub(crate) fn contact_flag(hit: &ShapeCastHit, half_segment: f32) -> u8 {
 }
 
 impl PhysicsWorld {
-    /// What a character's sweep may hit: solid, live colliders on the layers its
-    /// own layer collides with, never its own body.
     pub(super) fn character_filter<'a>(
         &self,
         scene: &Scene,
@@ -87,9 +76,6 @@ impl PhysicsWorld {
         }
     }
 
-    /// The normal of the ground just under the capsule at `pos`, if any: a short
-    /// cast down past the skin, for a move that never hit the floor (walking
-    /// flat).
     fn ground_below(&self, m: &MoveCtx, pos: &Pose) -> Option<Vec3> {
         let probe = ShapeCastOptions::with_max_time_of_impact(m.skin + GROUND_PROBE);
         let view = self.controller_view();
@@ -99,8 +85,6 @@ impl PhysicsWorld {
         hit.and_then(|(_, h)| h.normal1.try_normalize())
     }
 
-    /// One run of rapier's controller for `motion`, rerun without its downward
-    /// part when rapier's near-flat-floor slip rule ate the walk (see [`stalled`]).
     fn pass(&self, m: &MoveCtx, motion: Vec3) -> Pass {
         let (pass, flat_hit) = self.run(m, motion);
         if motion.y < 0.0 && flat_hit && stalled(motion, &pass) {
@@ -110,8 +94,6 @@ impl PhysicsWorld {
         pass
     }
 
-    /// One `move_shape`, and whether it touched a floor flat to within
-    /// [`FLAT_FLOOR`].
     fn run(&self, m: &MoveCtx, motion: Vec3) -> (Pass, bool) {
         let mut flags = 0;
         let mut ground = None;
@@ -145,14 +127,7 @@ impl PhysicsWorld {
         (pass, flat_hit)
     }
 
-    /// The steep slope a pass climbed, if it did. rapier lets a push into a
-    /// slope steeper than the limit ride up it (it reads the push as an intent
-    /// to climb); Unity's controller treats such a slope as a wall. The surface
-    /// is read a radius ahead of the feet, from a step's height up: a slope is
-    /// still steep there, while a step's edge gives way to its flat tread.
-    /// Only a pass that touched something too steep to walk counts: a rise of
-    /// float noise on the floor, with a slope a radius ahead but not yet
-    /// reached, would stop the walk short of it (and of its hit, #1879).
+    /// rapier rides up a slope steeper than the limit; Unity's controller treats it as a wall.
     fn steep_climb(&self, m: &MoveCtx, motion: Vec3, pass: &Pass) -> Option<Vec3> {
         let ahead = Vec3::new(motion.x, 0.0, motion.z).normalize_or_zero();
         let steep = |n: Vec3| n.y > FLAG_EPS && !m.walkable(n);
@@ -172,7 +147,6 @@ impl PhysicsWorld {
         steep(n).then_some(n)
     }
 
-    /// Run the controller for one move: the corrected translation and what it hit.
     pub(super) fn sweep(
         &self,
         scene: &Scene,
@@ -195,7 +169,6 @@ impl PhysicsWorld {
         };
         let mut pass = self.pass(&m, motion);
         if let Some(steep) = self.steep_climb(&m, motion, &pass) {
-            // Again, without the push into the slope: it blocks like a wall.
             pass = self
                 .pass(&m, off_slope(motion, steep))
                 .after(pass.collisions);
@@ -218,8 +191,6 @@ impl PhysicsWorld {
     }
 }
 
-/// One move's fixed inputs: the configured controller, the capsule and where it
-/// starts, and what it may hit.
 struct MoveCtx<'a> {
     controller: KinematicCharacterController,
     shape: Capsule,
@@ -228,8 +199,6 @@ struct MoveCtx<'a> {
     radius: f32,
     skin: f32,
     step: f32,
-    /// Cosine of the slope limit: a ground normal at least this upright is
-    /// walkable.
     slope_cos: f32,
     filter: QueryFilter<'a>,
 }

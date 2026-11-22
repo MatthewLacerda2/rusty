@@ -1,7 +1,5 @@
-//! The recipe is plain serde data, no GPU buffers or handles, so save → load → re-bake is
-//! byte-identical. Parsing is strict: an unknown key anywhere is an error naming it, so a
-//! typo never bakes with a default. A recipe can also be a graph another recipe instances;
-//! [`crate::graph`]'s serde hooks read and write its `{ param = "age" }` placeholders.
+//! Plain serde data, no GPU buffers or handles: save → load → re-bake is byte-identical.
+//! Parsing is strict: an unknown key anywhere is an error naming it.
 mod arity;
 pub mod color;
 mod extent;
@@ -25,7 +23,6 @@ pub use sample::sample_required;
 #[cfg(test)]
 pub(crate) use sample::{reading_sample_op, sample_op};
 
-/// Test hook compiled in every build: the root's Lua enum-case test fills `path` params with it.
 #[doc(hidden)]
 pub const SAMPLE_PATH: &str = "textures/sample.png";
 
@@ -35,7 +32,7 @@ use serde::{Deserialize, Serialize};
 
 use super::graph::{Bound, ParamDecl};
 
-/// One stop in a [`ColorRamp`](OpKind::ColorRamp): position in `[0, 1]` and its color.
+/// A ramp stop: `pos` in `[0, 1]`.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RampStop {
@@ -44,17 +41,15 @@ pub struct RampStop {
     pub color: [f32; 4],
 }
 
-/// The last node in topological order that nothing consumes is the output, unless `output` is set.
-/// `remote = "Self"`: [`crate::graph`] wraps this derive and its reader parses a
+/// [`crate::graph`] wraps this derive (`remote = "Self"`) and its reader parses a
 /// field-for-field mirror, so a field change here is made there too.
 #[derive(Clone, Debug, PartialEq, Serialize)]
 #[serde(remote = "Self")]
 pub struct TextureRecipe {
-    /// The side of a square bake. Ignored when `size` is set, so it may be left out
-    /// then (it reads 0, and is not written).
+    /// Ignored when `size` is set (reads 0, not written).
     #[serde(default, skip_serializing_if = "is_zero")]
     pub resolution: u32,
-    /// `[width, height]`, each a positive power of two, in place of `resolution`.
+    /// `[width, height]`, each a positive power of two.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
@@ -66,16 +61,13 @@ pub struct TextureRecipe {
     pub nodes: Vec<Node>,
     #[serde(default)]
     pub output: Option<String>,
-    /// Slot name → node id, all baked from one evaluation by `Texture.BakeSet`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub outputs: BTreeMap<String, String>,
-    /// Params an instance sets: name → type, default and range.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub params: BTreeMap<String, ParamDecl>,
-    /// Named inputs an instance wires, in order. A recipe with inputs bakes only through an instance.
+    /// A recipe with inputs bakes only through an instance.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub inputs: Vec<String>,
-    /// Node values that are `{ param = … }` placeholders: parsed at the param's default, written back as the placeholder.
     #[serde(skip)]
     pub bound: Vec<Bound>,
 }
@@ -111,7 +103,7 @@ impl TextureRecipe {
         self
     }
 
-    /// Every file path an `image` node reads, once, in node order, with the first node naming it.
+    /// Each path once, in node order, with the first node naming it.
     pub fn image_paths(&self) -> Vec<(&str, &str)> {
         let mut paths: Vec<(&str, &str)> = Vec::new();
         for node in &self.nodes {
@@ -124,7 +116,7 @@ impl TextureRecipe {
         paths
     }
 
-    /// Every font file a `text` node reads, once, in node order, with the first node naming it.
+    /// Each font once, in node order, with the first node naming it.
     pub fn font_paths(&self) -> Vec<(&str, &str)> {
         let mut paths: Vec<(&str, &str)> = Vec::new();
         for node in &self.nodes {
@@ -142,7 +134,6 @@ impl TextureRecipe {
     }
 }
 
-/// Serde's `skip_serializing_if` for a `resolution` a `size` recipe leaves out.
 fn is_zero(n: &u32) -> bool {
     *n == 0
 }

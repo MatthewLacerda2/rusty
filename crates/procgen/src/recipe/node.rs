@@ -55,7 +55,6 @@ pub enum Fault {
     Arity {
         /// The `math` func, whose arity narrows the op's (a unary func takes one input).
         func: Option<String>,
-        /// What to do, when the node's params decide its inputs (`expression`).
         fix: Option<String>,
         given: usize,
         accepts: Arity,
@@ -157,7 +156,6 @@ fn parse(given: &Value) -> Result<Node, NodeError> {
     Ok(node)
 }
 
-/// Only a link is an object among a param's values, so any object counts as one.
 fn refused_link(given: &Value) -> Option<String> {
     let node = given.as_object()?;
     let op = node.get("op")?.as_str()?;

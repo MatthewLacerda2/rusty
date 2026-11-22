@@ -1,12 +1,10 @@
-//! `scatter`'s behaviour (#2187): it tiles, the buckets lose no stamp, raising
+//! `scatter`'s behaviour: it tiles, the buckets lose no stamp, raising
 //! `amount` keeps the stamps already there, and `density`, `spacing` and several
 //! stamp inputs do what they say.
 
 use super::*;
 use crate::recipe::Param;
 
-/// A disc of radius 0.4 on black: red 1 inside, green 0.5, so a stamp's
-/// footprint is its red.
 fn disc(size: u32) -> Image {
     Image::fill_uv(size, |u, v| {
         let d = ((u - 0.5).powi(2) + (v - 0.5).powi(2)).sqrt();
@@ -15,7 +13,6 @@ fn disc(size: u32) -> Image {
     })
 }
 
-/// `p`'s settings, nothing linked, seed 5.
 fn settings(p: &Params) -> Settings<'static> {
     let links: &'static Links<'static> = Box::leak(Box::default());
     Settings::of(p, links, 5)
@@ -30,8 +27,6 @@ fn busy() -> Params {
     }
 }
 
-/// What the bake is, worked out the slow way: every stamp's nine nearest copies at
-/// every pixel, folded under `max` in index order.
 fn brute(inputs: &[&Image], stamps: &[Stamp]) -> Image {
     Image::fill_uv(inputs[0].size(), |u, v| {
         let mut out: Rgba = [0.0, 0.0, 0.0, 1.0];
@@ -149,7 +144,6 @@ fn density_linked_to_a_half_black_mask_leaves_that_half_empty() {
     }
 }
 
-/// The closest two centres of `placed` sit, on the torus.
 fn closest(placed: &[[f32; 2]]) -> f32 {
     let d = |a: f32, b: f32| (a - b).abs().min(1.0 - (a - b).abs());
     let mut best = f32::INFINITY;
@@ -163,7 +157,6 @@ fn closest(placed: &[[f32; 2]]) -> f32 {
 
 #[test]
 fn full_spacing_keeps_every_centre_its_gap_apart() {
-    // 300 stamps 0.03 across keep their size apart; 0.1 across, they crowd.
     for (size, want) in [(0.03, 0.03), (0.1, (0.5f32 / 300.0).sqrt())] {
         let gap = place::gap(1.0, 300, size);
         assert_eq!(gap, want);
@@ -202,8 +195,6 @@ fn no_stamps_bake_black_and_bad_numbers_clamp() {
     };
     let s = settings(&huge);
     assert_eq!((s.amount, s.spacing), (65_536, 0.0));
-    // An infinite scale reads one tile across, so a stamp reaches at most its
-    // turned square's half-diagonal at the largest jitter.
     let one = Settings {
         amount: 1,
         scale_jitter: 1.0,

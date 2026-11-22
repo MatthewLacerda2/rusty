@@ -1,21 +1,14 @@
-//! Curves and arcs cut into chords of at most [`CHORD`] tiles, each point through
-//! `Parser::line`, so it is bounded and checked like any other.
-
 use glam::Vec2;
 
 use super::{Fault, Parser};
 
 /// Longest chord a curve or arc up to a tile long is cut into, tiles: half a
 /// pixel at 1024, two at 4096. A longer one takes [`MAX_CHORDS`] chords of its
-/// length over that. How far a chord strays from the curve is far less than its
-/// length, about length² × curvature / 8.
+/// How far a chord strays from the curve is about length² × curvature / 8.
 const CHORD: f32 = 1.0 / 2048.0;
-/// Most chords one curve or arc is cut into.
 const MAX_CHORDS: u32 = 2048;
 
 impl Parser<'_> {
-    /// A curve or arc command (`kind` upper-case, its coordinates from `origin`):
-    /// its second control point and whether it was cubic, for a smooth one after it.
     pub(super) fn curve(&mut self, kind: u8, origin: Vec2) -> Result<Option<(Vec2, bool)>, Fault> {
         match kind {
             b'C' | b'S' => {
@@ -124,7 +117,6 @@ impl Parser<'_> {
     }
 }
 
-/// Chords for a curve about `len` tiles long.
 fn chords(len: f32) -> u32 {
     let n = (len / CHORD).ceil();
     if n.is_nan() {

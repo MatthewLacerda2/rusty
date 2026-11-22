@@ -1,36 +1,22 @@
-//! SVG path data (`d`) → flattened subpaths, in tile units (#2190).
-//!
-//! The full command set of SVG 1.1's path grammar, absolute and relative: `M L H
-//! V C S Q T A Z`, implicit repeats (coordinates after `M` are `L`s), numbers with
-//! signs, decimals and exponents, separators of whitespace and commas, and arc
-//! flags written run together (`a1 1 0 00 1 1`). Curves and arcs are cut into
-//! chords of at most `curve::CHORD` tiles, so the outline is a pure function of `d`.
-//!
 //! `d` comes from disk, so nothing here may panic, recurse or grow without bound:
 //! `d` is at most [`MAX_BYTES`] long, the flattened points at most
 //! [`MAX_POINTS`], and a point past ±[`REACH`] tiles is refused. Each refusal
-//! names the byte where it happened.
 
 mod curve;
 mod lex;
 
 use glam::Vec2;
 
-/// Longest `d` taken, bytes.
 pub const MAX_BYTES: usize = 1 << 16;
-/// Most points the flattened outline holds.
 pub const MAX_POINTS: usize = 1 << 18;
-/// Farthest a point may lie from the tile's origin, tiles.
 pub const REACH: f32 = 4.0;
 
-/// One subpath: its points, flattened, and whether `Z` closed it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Subpath {
     pub points: Vec<Vec2>,
     pub closed: bool,
 }
 
-/// `d` as subpaths, or what is wrong with it and the byte where.
 pub fn parse(d: &str) -> Result<Vec<Subpath>, String> {
     if d.len() > MAX_BYTES {
         return Err(format!(
@@ -65,7 +51,6 @@ struct Parser<'a> {
     points: usize,
     pen: Vec2,
     start: Vec2,
-    /// The last curve's second control point and whether it was cubic, for `S`/`T`.
     last_control: Option<(Vec2, bool)>,
 }
 
@@ -135,8 +120,6 @@ impl Parser<'_> {
         Ok(())
     }
 
-    /// `Z`: close the subpath, and start the next at the same point, which a
-    /// command after it draws from.
     fn close(&mut self) {
         if let Some(s) = self.out.last_mut() {
             s.closed = true;
@@ -150,8 +133,6 @@ impl Parser<'_> {
         self.points += 1;
     }
 
-    /// The pen reflected through the last curve's control point, when it was the
-    /// same kind (`S` after `C`/`S`, `T` after `Q`/`T`); else the pen.
     fn reflected(&self, cubic: bool) -> Vec2 {
         match self.last_control {
             Some((c, was_cubic)) if was_cubic == cubic => 2.0 * self.pen - c,

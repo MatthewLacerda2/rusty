@@ -1,17 +1,10 @@
-//! Reads a formula into a [`Program`] by recursive descent, emitting postfix code.
-//!
-//! Precedence, loosest first: comparisons (`< <= > >= == !=`), `+ -`, `* /`, unary
-//! minus, `^`. Everything is left-associative but `^`, which binds right (`2 ^ 3 ^
-//! 2` is `2 ^ 9`) and tighter than unary minus (`-a ^ 2` is `-(a ^ 2)`), as in
-//! maths. Every rule that recurses counts one level of depth, so the recursion is
-//! bounded by [`MAX_DEPTH`] whatever the text.
+//! Precedence, loosest first: comparisons, `+ -`, `* /`, unary minus, `^`. Left-associative but `^`, which binds right (`2 ^ 3 ^ 2` is `2 ^ 9`) and tighter than unary minus (`-a ^ 2` is `-(a ^ 2)`).
 
 use super::fault::show;
 use super::fault::{args_hint, func_names, unexpected, unknown_name};
 use super::lex::{tokens, Tok};
 use super::{Func, Instr, Load, Program, SyntaxError, FUNCS, INPUTS, MAX_DEPTH};
 
-/// `src` as a [`Program`], or what is wrong with it.
 pub fn compile(src: &str) -> Result<Program, SyntaxError> {
     let toks = tokens(src)?;
     if toks.len() == 1 {
@@ -40,7 +33,6 @@ pub fn compile(src: &str) -> Result<Program, SyntaxError> {
     })
 }
 
-/// The most values `code` holds on its stack at once.
 fn stack_depth(code: &[Instr]) -> usize {
     let (mut now, mut most) = (0usize, 0usize);
     for i in code {
@@ -71,14 +63,12 @@ impl<'a> Parser<'a> {
         t
     }
 
-    /// Takes the next token when it is the symbol `sym`.
     fn eat(&mut self, sym: &str) -> bool {
         let hit = matches!(self.peek().0, Tok::Sym(s) if s == sym);
         self.pos += usize::from(hit);
         hit
     }
 
-    /// Takes the next token when it is one of the binary operators in `ops`.
     fn eat_op(&mut self, ops: &[(&str, Func)]) -> Option<Func> {
         let Tok::Sym(s) = self.peek().0 else {
             return None;
@@ -92,7 +82,6 @@ impl<'a> Parser<'a> {
         self.code.push(Instr::Call(f));
     }
 
-    /// Refuses going a level deeper than [`MAX_DEPTH`].
     fn deeper(&self, depth: usize) -> Result<usize, SyntaxError> {
         if depth < MAX_DEPTH {
             return Ok(depth + 1);
@@ -171,7 +160,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    /// The symbol `sym`, or an error naming what stands in its place.
     fn close(&mut self, sym: &str) -> Result<(), SyntaxError> {
         if self.eat(sym) {
             return Ok(());
@@ -180,7 +168,6 @@ impl<'a> Parser<'a> {
         Err(unexpected(tok, column, &format!("{sym:?}")))
     }
 
-    /// A variable, an input with its channel, or a call.
     fn name(&mut self, name: &str, column: usize, depth: usize) -> Result<(), SyntaxError> {
         if let Some(&(_, f)) = FUNCS.iter().find(|(n, _)| *n == name) {
             return self.call(name, f, column, depth);
@@ -217,7 +204,6 @@ impl<'a> Parser<'a> {
         Ok(())
     }
 
-    /// Input `slot`, red unless a `.r`, `.g`, `.b` or `.a` follows.
     fn input(&mut self, slot: usize) -> Result<Load, SyntaxError> {
         self.inputs[slot] = true;
         let mut channel = 0;

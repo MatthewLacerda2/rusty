@@ -1,6 +1,5 @@
-//! The `scatter` op (#2187): stamps placed freely over the tile, off any grid,
-//! Substance Designer's *Shape Splatter* and the free half of its *Tile Sampler*.
-
+//! The `scatter` op: stamps placed freely over the tile, off any grid (Substance Designer's
+//! *Shape Splatter*).
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::vector::tile::{TileBlend, TileOutput};
@@ -9,12 +8,10 @@ use crate::image_buf::Image;
 use crate::ops::scatter;
 use crate::recipe::{arity, choice, op, opt, socket, Lit, OpInfo, OpParam, Param, SEED};
 
-/// Free scatter: `amount` stamps (a whole count) at hashed points over the torus,
-/// each one of the 1–8 stamp inputs picked by hash, `scale` tiles across, turned
-/// `rotation` turns, each jittered, and drawn with the chance `density`. `density`,
-/// `scale` and `rotation` link, read once per stamp at its centre. `spacing` (0–1)
-/// keeps the stamps apart. `output` and `blend` mean what `tile`'s do; under `over`
-/// the stamps are laid in their index order. Always tiles.
+/// Free scatter: `amount` stamps at hashed points over the torus, each one of the 1–8 stamp
+/// inputs picked by hash, `scale` tiles across, turned `rotation` turns, jittered, drawn with
+/// chance `density`. `density`, `scale` and `rotation` link, read once per stamp at its
+/// centre. `output` and `blend` mean what `tile`'s do. Always tiles.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Scatter {
     #[serde(default = "amount")]
@@ -41,25 +38,21 @@ pub struct Scatter {
     pub seed: u32,
 }
 
-/// `amount`'s default: 32 stamps per tile (also what a NaN `amount` reads).
 pub(crate) const AMOUNT: f32 = 32.0;
 
 fn amount() -> f32 {
     AMOUNT
 }
 
-/// `scale`'s default: a stamp a fifth of the tile across.
 fn scale() -> Param {
     Param::Num(0.2)
 }
 
-/// `density`'s default: every stamp is drawn.
 fn always() -> Param {
     Param::Num(1.0)
 }
 
 impl Scatter {
-    /// `amount` stamps with every other param at its default.
     pub fn new(amount: f32) -> Self {
         Self {
             amount,

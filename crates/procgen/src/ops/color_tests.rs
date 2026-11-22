@@ -1,5 +1,4 @@
-//! `bright_contrast` and `hue_sat_value` against values worked by hand (#1566), with
-//! numbers and with links read per pixel on an image wider than it is tall.
+//! `bright_contrast` and `hue_sat_value` against values worked by hand, with numbers and with links read per pixel on an image wider than it is tall.
 
 use super::*;
 use crate::image_buf::Size;

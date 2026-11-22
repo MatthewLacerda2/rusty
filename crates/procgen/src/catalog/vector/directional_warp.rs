@@ -1,19 +1,14 @@
-//! The `directional_warp` op: push an image along one angle by a grayscale map
-//! (Substance Designer's *Directional Warp*, #1739).
-
+//! The `directional_warp` op (Substance Designer's *Directional Warp*).
 use serde::{Deserialize, Serialize};
 
 use crate::catalog::{Cx, Op, Row};
 use crate::image_buf::Image;
 use crate::recipe::{arity, op, opt, req, Lit, OpInfo};
 
-/// Input 1 moved `strength × red` tiles along `angle` (turns from the horizontal,
-/// 0 pushing right, 0.25 down), the red read from input 2. Black moves nothing and
-/// white the full `strength`, as in Substance's node; a negative strength pushes
-/// the other way. It is the grayscale, one-direction counterpart of `warp`, which
-/// reads two channels around mid-grey. Both reads are bilinear and wrapped, so two
-/// tiling inputs give a tiling map at any angle. A NaN strength moves nothing; the
-/// push caps at ±16 tiles, whatever the red.
+/// Input 1 moved `strength × red` tiles along `angle` (turns from the horizontal, 0 pushing
+/// right, 0.25 down), the red read from input 2. Black moves nothing; a negative strength
+/// pushes the other way. Reads wrap, so tiling inputs tile. A NaN strength moves nothing; the
+/// push caps at ±16 tiles.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct DirectionalWarp {
     pub strength: f32,
@@ -39,11 +34,9 @@ impl Op for DirectionalWarp {
     }
 }
 
-/// The furthest push, in tiles: a few tiles is already a wrap many times over, and
-/// a bound keeps the sample point's `f32` precise.
+/// The furthest push, in tiles: keeps the sample point's `f32` precise.
 pub const MAX_STRENGTH: f32 = 16.0;
 
-/// `img` pushed `strength × by.red` tiles along `angle` turns.
 pub fn directional_warp(img: &Image, by: &Image, strength: f32, angle: f32) -> Image {
     let strength = if strength.is_nan() {
         0.0
@@ -65,7 +58,6 @@ pub fn directional_warp(img: &Image, by: &Image, strength: f32, angle: f32) -> I
         } else {
             0.0
         };
-        // The content moves along the angle, so each pixel reads from behind it.
         img.sample_bilinear_wrapped(u - cos * d, v - sin * d)
     })
 }

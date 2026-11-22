@@ -20,6 +20,7 @@ pub enum Slot {
     Metallic,
     MetallicRoughness,
     Occlusion,
+    Specular,
     Height,
     Data,
 }

@@ -1,93 +1,54 @@
-//! crates/procgen/src/ops/flood.rs — a mask's islands (#1741): connected-component
-//! labelling on the torus, and what each island knows of itself (its centroid and
-//! its bounding box, in tile units), for the flood-fill ops.
-//!
-//! An island is a set of "on" pixels connected through their 8 neighbours, wrapping
-//! both axes, so a piece crossing a tile edge or a corner is one island. The scan
-//! is a serial flood from each unlabelled pixel in row-major order; each pixel it
-//! reaches gets a *lifted* coordinate (its step from the flood's first pixel,
-//! summed, never wrapped), so an island across an edge measures as one compact
-//! piece. An island that loops round the tile on an axis (a band across it) has no
-//! edge on that axis: its box spans the tile there, starting at 0, and its centre
-//! reads 0.5.
-//!
-//! An island's box and centroid don't depend on the order the scan meets it: they
-//! are the same whichever pixel the flood starts from, so shifting a mask by a wrap
-//! shifts every island's box and centroid with it. Its [`Island::random`] values
-//! come from its identity: the cell its centroid snaps to and its rank among the
-//! islands sharing that cell, in scan order.
+//! 8-connected, wrapping both axes. Each flooded pixel gets a *lifted* coordinate (its step from the first pixel, summed, never wrapped), so an island across an edge measures compact.
+//! An island that loops round the tile on an axis has no edge there: its box spans the tile, starting at 0, and its centre reads 0.5.
 
 use std::collections::BTreeMap;
 
 use crate::hash;
 use crate::image_buf::{Image, Rgba, Size};
 
-/// How finely an island's centroid is snapped before it is hashed to its random
-/// values, in cells per tile. Coarse enough that the same island at another
-/// resolution (its centroid moves by a fraction of a pixel) mostly keeps its cell.
-/// Islands that share a cell (small stones packed densely, a ring and the stone at
-/// its centre, bands that loop both axes and so all read centroid 0.5) are told
-/// apart by their [`Island::rank`] in it.
+/// Coarse enough that the same island at another resolution mostly keeps its cell.
 const IDENTITY_GRID: f32 = 128.0;
 
-/// One island: its centroid, and its bounding box's start and size, in tile units.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Island {
     /// The mean of its pixel centres, wrapped into `[0, 1)`; 0.5 on an axis it spans.
     pub centroid: [f32; 2],
-    /// The box's first edge, wrapped into `[0, 1)`; 0 on an axis it spans.
     pub start: [f32; 2],
-    /// The box's extent, at most 1 (an island that spans the axis).
     pub size: [f32; 2],
-    /// Its place, in scan order, among the islands whose centroid snaps to the same
-    /// identity cell: 0 for the first. An island in another cell never moves it.
     pub rank: u32,
 }
 
 impl Island {
-    /// The box's centre, wrapped into `[0, 1)`.
     pub fn centre(&self) -> [f32; 2] {
         [0, 1].map(|a| (self.start[a] + self.size[a] / 2.0).rem_euclid(1.0))
     }
 
-    /// A uniform `[0, 1)` value for this island on `channel`, from `seed` and the
-    /// island's identity: its centroid's cell on a 1/128-tile grid and its
-    /// [`rank`](Island::rank) there, not the number the scan gave it.
     pub fn random(&self, channel: u64, seed: u64) -> f32 {
         let [x, y] = self.cell();
-        // The rank is salted in as `rank + 1`, so the hash's input is never all
-        // zero (the mixer maps 0 to 0) even at seed 0, cell (0, 0), channel 0.
+        // Salted as `rank + 1`: the mixer maps 0 to 0, so an all-zero input is avoided.
         let salt = (channel << 32) ^ (u64::from(self.rank) + 1);
         hash::unit2(x, y, salt, seed)
     }
 
-    /// The identity cell its centroid snaps to.
     fn cell(&self) -> [i64; 2] {
         self.centroid.map(|c| (c * IDENTITY_GRID).floor() as i64)
     }
 }
 
-/// A labelled mask: which island each pixel belongs to, and the islands.
 pub struct Islands {
     size: Size,
-    /// Per pixel, row-major: 0 off, `k + 1` for island `k`.
     labels: Vec<u32>,
     pub islands: Vec<Island>,
 }
 
 impl Islands {
-    /// The island pixel `(x, y)` belongs to, if it is on.
     pub fn at(&self, x: usize, y: usize) -> Option<&Island> {
         let label = self.labels[y * self.size.width as usize + x];
         label.checked_sub(1).map(|k| &self.islands[k as usize])
     }
 }
 
-/// The islands of `img`'s pixels for which `on` holds, 8-connected and wrapping.
-///
-/// Serial, `O(pixels)`: at 2048² about half a second of one core, holding a
-/// label per pixel (16 MB) and, for a mask that is all one island, a flood stack
-/// as long as the island (up to 32 MB).
+/// Serial, `O(pixels)`.
 pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
     let size = img.size();
     let (w, h) = (size.width as i64, size.height as i64);
@@ -132,17 +93,10 @@ pub fn label(img: &Image, on: impl Fn([f32; 4]) -> bool) -> Islands {
     }
 }
 
-/// The islands a reader takes from its input: `flood_fill`'s output carries them
-/// in its alpha (1 on an island, 0 off), and relabelling that alpha gives back the
-/// same islands, since two of them never touch. Any other image reads by its
-/// alpha the same way: an opaque one is one island, the whole tile.
 pub fn of_label_image(img: &Image) -> Islands {
     label(img, |p| p[3] > 0.5)
 }
 
-/// A grey image over every island's pixels, 0 off them; alpha 1. `per` runs once
-/// per island, before painting (where a hash belongs); `f(&its result, u, v)` runs
-/// per pixel, `u`, `v` the pixel centre in tile units.
 pub fn paint<P: Sync>(
     islands: &Islands,
     per: impl Fn(&Island) -> P,
@@ -154,7 +108,6 @@ pub fn paint<P: Sync>(
     })
 }
 
-/// [`paint`] in colour: `f` on every island's pixels, `off` off them.
 pub fn paint_rgba<P: Sync>(
     islands: &Islands,
     off: Rgba,
@@ -177,7 +130,6 @@ pub fn paint_rgba<P: Sync>(
     out
 }
 
-/// The 8 neighbours' steps.
 const NEIGHBOURS: [(i32, i32); 8] = [
     (-1, -1),
     (0, -1),
@@ -200,8 +152,6 @@ impl Default for Island {
     }
 }
 
-/// An island's lifted pixels as the flood meets them: per axis, the least and
-/// greatest coordinate and their sum.
 struct Extent {
     min: [i64; 2],
     max: [i64; 2],
@@ -228,8 +178,6 @@ impl Extent {
         self.count += 1;
     }
 
-    /// The island in tile units on a `size` tile. An axis the lifted pixels cover
-    /// a whole period of is one the island loops round.
     fn island(&self, size: Size) -> Island {
         let mut island = Island::default();
         for (a, n) in [size.width, size.height].into_iter().enumerate() {

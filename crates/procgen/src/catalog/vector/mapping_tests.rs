@@ -1,8 +1,5 @@
-//! `mapping` turns about the centre (a positive turn turns the content
-//! counter-clockwise as shown, v down), scales about it, moves the content by minus
-//! its translation, and, with `tiling`, snaps to whole repeats and quarter turns so
-//! its output still tiles.
-
+//! A positive turn turns the content counter-clockwise as shown (v down); a translation moves
+//! the content by its negative.
 use super::*;
 use crate::catalog::filter::test_probe::{relief, rolled, run};
 use crate::recipe::OpKind;
@@ -18,14 +15,12 @@ fn mapping(scale: [f32; 2], rotation: f32, translation: [f32; 2], tiling: bool) 
     })
 }
 
-/// A dot one pixel across at `(x, y)` of a 32² tile: the marked corner.
 fn dot((x, y): (i64, i64)) -> Image {
     let mut img = Image::filled(N as u32, [0.0, 0.0, 0.0, 1.0]);
     img.pixels_mut()[(y.rem_euclid(N) * N + x.rem_euclid(N)) as usize] = [1.0; 4];
     img
 }
 
-/// Where a mark at `(x, y)` lands after `quarters` quarter turns.
 fn turned((x, y): (i64, i64), quarters: i64) -> (i64, i64) {
     match quarters.rem_euclid(4) {
         0 => (x, y),
@@ -54,8 +49,7 @@ fn a_turn_moves_the_mark_about_the_centre_counter_clockwise() {
     }
 }
 
-/// Channel 0 is constant on each pair of pixels along `axis`, so a read halfway
-/// between them is exact; channel 1 counts along the other axis.
+/// Channel 0 is constant on each pair of pixels along `axis`, so a half-way read is exact.
 fn pairs(axis: usize) -> Image {
     Image::fill_uv(N as u32, |u, v| {
         let (along, across) = if axis == 0 { (u, v) } else { (v, u) };
@@ -102,8 +96,7 @@ fn a_translation_moves_the_content_back_by_that_much_of_a_tile_wrapped() {
 
 #[test]
 fn a_translation_moves_the_content_before_the_turn() {
-    // The read point is the output point turned, scaled, then offset: the mark moves
-    // back by the translation in the input, and the turn then carries it.
+    // The read point is the output point turned, scaled, then offset.
     let out = run(&mapping([1.0; 2], 0.25, [0.25, 0.0], true), &dot((24, 4)));
     assert_eq!(out, dot(turned((16, 4), 1)));
 }
@@ -136,7 +129,6 @@ fn tiling_snaps_a_scale_to_a_whole_count() {
     }
 }
 
-/// The largest jump across the tile's wrap, and the largest between neighbours inside.
 fn seam_and_step(img: &Image) -> (f32, f32) {
     let (n, at) = (img.width() as i64, |x, y| img.get_wrapped(x, y)[0]);
     let (mut seam, mut step) = (0.0f32, 0.0f32);
