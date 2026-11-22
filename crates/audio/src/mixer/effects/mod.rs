@@ -16,6 +16,7 @@ pub use param::{Fields, Param, Range, Value};
 use super::GroupId;
 
 pub const MAX_EFFECTS: usize = 8;
+/// The EQ's six bands of four: the most parameters one effect has.
 pub const MAX_PARAMS: usize = 24;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -35,6 +36,7 @@ impl KindId {
     }
 }
 
+/// `Copy` and fixed-size, so it crosses to the audio thread without allocating.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EffectParams {
     pub kind: KindId,
@@ -56,9 +58,6 @@ impl EffectParams {
         param::group(self.values[i])
     }
 
-    /// Blend toward `to` by `t` in `[0, 1]`: numbers glide (a log range in
-    /// octaves), choices and groups switch to `to`'s at once. A different kind is
-    /// not blended: it is `to`.
     pub fn lerp(&self, to: &EffectParams, t: f32) -> EffectParams {
         if self.kind != to.kind {
             return *to;
@@ -129,6 +128,7 @@ pub trait Dsp: Send {
     /// `dt` seconds per frame.
     fn process(&mut self, values: &[f32; MAX_PARAMS], block: &mut [Frame], dt: f64);
 
+    /// Still holding sound for silent input (a delay's echo): keeps its group's gate awake.
     fn ringing(&self) -> bool {
         false
     }

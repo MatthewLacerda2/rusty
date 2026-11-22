@@ -55,6 +55,7 @@ fn a_push_with_no_sim_time_keeps_the_rate() {
     let at = Vec3::new(-99.5, 0.0, 0.0);
     maestro.apply_mix(&env(Vec3::ZERO, 0.0), |_| Some((src.clone(), at)));
     assert_eq!(maestro.source_doppler(1), rate, "held through the pause");
+    // Measured from the paused push: 0.5 m in one tick, 50 m/s again.
     let on = Vec3::new(-99.0, 0.0, 0.0);
     maestro.apply_mix(&env(Vec3::ZERO, 0.01), |_| Some((src.clone(), on)));
     assert!((maestro.source_doppler(1) - UP).abs() < 1e-4);

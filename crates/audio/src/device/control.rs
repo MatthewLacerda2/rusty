@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::backend::VoiceMix;
 
 /// An `f32` shared between the backend (writer) and the audio thread (reader).
+/// Relaxed: each field is read whole, and one read a buffer late only delays it a few ms.
 #[derive(Debug, Default)]
 pub(super) struct AtomicF32(AtomicU32);
 
@@ -25,6 +26,7 @@ pub struct VoiceControl {
     pub(super) speed: AtomicF32,
     pub(super) doppler: AtomicF32,
     pub(super) paused: AtomicBool,
+    /// The low-pass cutoff, in Hz.
     pub(super) low_pass: AtomicF32,
     pub(super) stopped: AtomicBool,
     /// Set by the audio thread when a one-shot reaches its end.

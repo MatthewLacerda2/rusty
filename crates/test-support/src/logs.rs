@@ -5,6 +5,8 @@ use std::thread::ThreadId;
 
 static KEPT: Mutex<Vec<(ThreadId, Level, String)>> = Mutex::new(Vec::new());
 
+/// For a crate whose manifest does not name `rusty-logging`: every target, no repeat
+/// counts, no `core::quiet`.
 struct Keep;
 
 impl Log for Keep {
@@ -36,7 +38,7 @@ pub const ANOTHER_LOGGER: &str = "another `log` logger holds this process (most 
     `rusty_logging::init_for_tests` and `rusty_logging::forward`, and never calls \
     `rusty_test_support::logs`";
 
-/// Install the logger for this process; a second call is a no-op. Panics when
+/// Install the logger; a second call is a no-op. Panics when
 /// another logger was installed first, which would leave [`take`] empty.
 pub fn init() {
     static ONCE: Once = Once::new();
@@ -55,8 +57,8 @@ pub fn take() -> Vec<String> {
     take_leveled().into_iter().map(|(_, text)| text).collect()
 }
 
-/// The warnings and errors `f` logs on this thread, with the logger installed and
-/// what earlier code on the thread logged taken first.
+/// The warnings and errors `f` logs on this thread, the logger installed and
+/// earlier records taken first.
 pub fn during(f: impl FnOnce()) -> Vec<String> {
     init();
     take();

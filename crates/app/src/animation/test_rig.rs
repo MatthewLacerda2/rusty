@@ -14,6 +14,7 @@ pub const SPINE: usize = 1;
 pub const LEG: usize = 2;
 pub const HEAD: usize = 3;
 
+/// Every joint binds at identity, so a posed joint's local is its clip's value.
 pub fn mesh(clips: Vec<AnimationClip>) -> MeshComponent {
     let skin = SkinData {
         inverse_bind: vec![Mat4::IDENTITY; 4],

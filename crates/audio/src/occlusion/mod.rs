@@ -17,6 +17,7 @@ pub const OCCLUDED_GAIN: f32 = 0.35;
 pub const OCCLUDED_CUTOFF: f32 = 800.0;
 /// Seconds (unscaled) for the factor to travel the whole `0 ↔ 1` range.
 pub const FADE_SECONDS: f32 = 0.25;
+/// Metres from the source to each outer ray's target, across the line of sight.
 pub const SOURCE_SPREAD: f32 = 0.5;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -48,6 +49,7 @@ pub fn effect(occlusion: f32) -> (f32, f32) {
     )
 }
 
+/// Level with the source (crossed with +Y): no target sits below a footstep, in the floor.
 pub fn ray_targets(listener: Vec3, source: Vec3) -> [Vec3; 3] {
     let side = (source - listener)
         .cross(Vec3::Y)

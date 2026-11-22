@@ -45,6 +45,8 @@ pub fn bone_writes(
         .collect()
 }
 
+/// A root joint's bone hangs off the skinned entity, so the root offset (an `Armature` node) is
+/// folded in; any other bone takes the joint's TRS as is.
 fn bone_local(skin: &SkinData, slot: usize, local: JointTransform) -> TransformComponent {
     if skin.parents.get(slot).copied().flatten().is_some() {
         return TransformComponent {
@@ -98,6 +100,7 @@ pub fn sample_pose<'m>(
     Some((skin, pose))
 }
 
+/// A test hook: [`step`]'s events alone, for this crate's tests.
 pub fn advance(
     anim: &mut AnimatorComponent,
     mesh: Option<&MeshComponent>,
@@ -164,6 +167,7 @@ pub fn step(
             root = Some(stack(below, delta, layer.blending, state.weight));
         }
     }
+    // Montage layer indices start past the base layer (0) and every extra layer (1 to len).
     let (rooted, base) = (skin.zip(bone.as_ref()), graph_layers.len() + 1);
     events.extend(montage::step(anim, clips, dt, base, rooted, &mut root));
     events::sort(&mut events);

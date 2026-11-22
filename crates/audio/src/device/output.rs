@@ -11,9 +11,10 @@ use kira::{Decibels, Frame, Mix, Tween};
 use super::gate::{Gated, Wake};
 use crate::SpeakerMode;
 
+/// Fraction of each channel headphones mode bleeds into the other.
 pub const CROSSFEED: f32 = 0.15;
 
-/// TV compressor: threshold (dBFS), ratio, makeup (dB), attack / release.
+// TV compressor: threshold (dBFS), ratio, makeup (dB), attack / release.
 const THRESHOLD_DB: f64 = -24.0;
 const RATIO: f64 = 4.0;
 const MAKEUP_DB: f32 = 9.0;

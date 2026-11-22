@@ -1,6 +1,6 @@
-//! where an entity **stands**: its feet, not
-//! its Transform, which for a character is its middle. The environment query's
-//! contexts and every perception sense's last-known position read it, so a
+//! Where an entity **stands**: its feet, not its Transform, which for a character
+//! is its middle. The environment query's contexts and the sight and damage
+//! senses' last-known positions read it, so a
 //! trace's eye height and a distance mean the same for every kind of body.
 
 use glam::Vec3;

@@ -1,3 +1,5 @@
+//! Every function here expects `markers` sorted by time, as the graph's load leaves them.
+
 use rusty_asset::animation_graph::SyncMarker;
 use rusty_components::wrap_delta;
 

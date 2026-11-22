@@ -10,6 +10,8 @@ use super::device::KiraBackend;
 use super::maestro::AudioMaestro;
 use wav::WavStream;
 
+/// Engine seconds an offline render covers before a drain: a load hitch never overfills
+/// the tap's ring.
 const MAX_RENDER_SECONDS: f64 = 1.0;
 
 pub struct Recorder {
@@ -72,9 +74,6 @@ impl Recorder {
     }
 }
 
-/// A capture never stopped (the editor quit mid-capture, a run that failed after
-/// `--record-audio` started) still leaves a readable WAV, closed as `stop_capture`
-/// would, best-effort.
 impl Drop for Recorder {
     fn drop(&mut self) {
         if self.file.is_finished() {
@@ -92,6 +91,7 @@ impl AudioMaestro {
             let at = running.path.display();
             return Err(format!("a capture into '{at}' is running; stop it first"));
         }
+        // The file first: a path that cannot be written changes nothing in the run.
         let file = WavStream::create(path)
             .map_err(|e| format!("cannot write '{}': {e}", path.display()))?;
         if self.backend.tap().is_none() {

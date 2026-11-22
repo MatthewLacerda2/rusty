@@ -2,6 +2,8 @@ use std::f32::consts::TAU;
 
 use crate::mixer::settings::LOW_PASS_OFF;
 
+/// The voice's, not its track's: occlusion muffles one voice, not its group. Two one-pole
+/// stages per channel, `[stage][channel]`: 12 dB/octave.
 #[derive(Debug, Default)]
 pub struct LowPass {
     state: [[f32; 2]; 2],
@@ -20,6 +22,7 @@ impl LowPass {
     pub fn process(&mut self, a: Option<f32>, frame: (f32, f32)) -> (f32, f32) {
         let input = [frame.0, frame.1];
         let Some(a) = a else {
+            // Bypassed, the state follows the input, so closing the filter never clicks.
             self.state = [input; 2];
             return frame;
         };

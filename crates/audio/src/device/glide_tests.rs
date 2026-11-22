@@ -4,6 +4,7 @@ use crate::device::backend::backend_tests::{flat, rig};
 use crate::device::capture::RATE;
 use crate::device::decode::CachedClip;
 
+/// One 25 FPS game frame in 48 kHz device frames: how long each retune holds.
 const FRAME: usize = 1_920;
 
 fn toggled(clip: &[f32], a: VoiceMix, b: VoiceMix) -> Vec<(f32, f32)> {
@@ -65,6 +66,7 @@ fn a_spatial_blend_toggled_every_frame_never_jumps() {
         spatial_blend: 1.0,
         ..flat
     };
+    // All left: blend 0 keeps (1, 0), blend 1 downmixes to (½, ½).
     let out = toggled_clip(CachedClip::new(2, RATE, vec![1.0, 0.0]), flat, spatial);
     for side in [|f: &(f32, f32)| f.0, |f: &(f32, f32)| f.1] {
         let jump = largest_jump(&out, 1, side);

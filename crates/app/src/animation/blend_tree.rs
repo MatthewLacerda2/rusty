@@ -7,6 +7,8 @@ use rusty_components::{AnimatorParameter, AnimatorParameters};
 /// space. Johansen's value, and the one Unity's directional trees behave like.
 const ANGLE_WEIGHT: f32 = 2.0;
 
+/// Below this a length, a squared length or a weight total counts as zero (a child at the origin,
+/// two coincident points).
 const EPSILON: f32 = 1e-6;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -52,6 +54,8 @@ fn walk<'a>(
     }
 }
 
+/// Children whose raw weights `child_weights` keeps on the stack, each computed once; a wider
+/// tree recomputes the rest.
 const INLINE_CHILDREN: usize = 32;
 
 pub fn child_weights<'a>(
@@ -79,6 +83,7 @@ pub fn child_weights<'a>(
         }
         total += w;
     }
+    // No weight anywhere (far outside every band): the nearest child plays alone, so a tree poses.
     let fallback = (!(total > EPSILON && total.is_finite())).then(|| nearest(tree, at));
     (0..tree.len()).map(move |i| match fallback {
         None => kept.get(i).copied().unwrap_or_else(|| raw(i)) / total,

@@ -63,6 +63,7 @@ fn a_source_under_a_moving_parent_is_shifted() {
     assert_eq!(rate(&game, speaker), 1.0, "still at the start");
     fly(&mut game, rocket, 50.0 * DT);
     let r = rate(&game, speaker);
+    // 50 m/s toward the listener, sound at 343 m/s.
     assert!((r - 343.0 / 293.0).abs() < 1e-3, "{r}");
 }
 
@@ -89,6 +90,7 @@ fn a_scene_load_forgets_the_listener_motion() {
     scene
         .borrow_mut()
         .request_load(level.to_string_lossy().into_owned());
+    // 1 m in one `DT`: 100 m/s if it were measured. The load lands before the audio push.
     game.resources.camera.borrow_mut().position = Vec3::new(-1.0, 0.0, 0.0);
     game.tick(DT);
     assert!(game.resources.audio.borrow().is_source_playing(speaker));

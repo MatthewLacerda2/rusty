@@ -19,7 +19,10 @@ pub(super) struct LiveVoice {
     pub(super) source: AudioSourceComponent,
     pub(super) source_volume: f32,
     pub(super) position: Vec3,
+    /// Where the last `apply_mix` heard it, which doppler measures from: `occlude` moves
+    /// `position` between pushes too.
     pub(super) heard_at: Vec3,
+    /// Pre-master and unshaped; a push sends a mix only when it differs from this.
     pub(super) mix: VoiceMix,
     pub(super) group: GroupId,
 }

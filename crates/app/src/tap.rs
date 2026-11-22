@@ -4,10 +4,13 @@ use super::game::{GameWorld, PlayTransition};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TapPoint {
+    /// Before the play transition: a host's acts since the last tick are drained.
     BeforeTick,
+    /// Play is about to be entered or left, by a tick or a paused frame's poll: the
+    /// world is still as the last tick or edit mode left it.
     Before(PlayTransition),
-    /// After the transition, before input is published: host acts replay and the `InputFrame` is
-    /// read or written.
+    /// After the transition, before input is published: host acts replay and the
+    /// `InputFrame` is read or written.
     BeforeInput,
     AfterTick,
     Transition(PlayTransition),
@@ -27,6 +30,7 @@ pub trait TickTap: Any {
         ready
     }
 
+    /// `moved`: percent loaded, `None` when unmoved.
     fn load_progress(&mut self, moved: Option<u8>) -> Option<u8> {
         moved
     }
@@ -49,6 +53,7 @@ impl GameWorld {
     pub(super) fn tap(&mut self, point: TapPoint) {
         if let Some(mut tap) = self.resources.tap.take() {
             tap.at(point, self);
+            // A tap that installed a replacement during the call keeps it.
             self.resources.tap.get_or_insert(tap);
         }
     }

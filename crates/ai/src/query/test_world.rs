@@ -1,3 +1,6 @@
+//! Test hook: the arena this module's tests and `rusty-script`'s
+//! `api::environment_query` tests build on.
+
 use glam::{Vec2, Vec3};
 
 use super::{Anchor, QueryWorld};

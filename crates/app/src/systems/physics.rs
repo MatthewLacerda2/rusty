@@ -20,6 +20,8 @@ fn log_rebuild(res: &Resources, rebuilt: rusty_physics::Rebuilt) {
     let rebuilt_from_scene = "the physics world was rebuilt from the scene";
     let message = rebuilt.message;
     let mut console = res.console.borrow_mut();
+    // A repeat carries no frame, so a cause panicking every step collapses into one
+    // counted line.
     if rebuilt.in_a_row <= 1 {
         let frame = res.play_frame();
         console.error(format!(
@@ -31,6 +33,7 @@ fn log_rebuild(res: &Resources, rebuilt: rusty_physics::Rebuilt) {
     }
 }
 
+/// To the pose `LateUpdate` and IK left, so the next tick's casts hit what renders.
 pub(crate) fn follow_bones(world: &mut World, res: &mut Resources) {
     if let Some(physics) = res.physics.borrow_mut().as_mut() {
         physics.follow_bones(&world.scene.borrow());

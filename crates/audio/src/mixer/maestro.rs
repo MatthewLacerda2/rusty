@@ -19,6 +19,7 @@ impl AudioMaestro {
         })
     }
 
+    /// In id order: a parent's id is below its children's, so its track exists first.
     pub(crate) fn sync_groups(&mut self) {
         for (i, group) in self.mixer.groups().iter().enumerate() {
             self.backend.add_group(GroupId(i as u16), group.parent);

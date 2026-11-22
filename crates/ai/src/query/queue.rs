@@ -7,6 +7,7 @@ use super::Item;
 use rusty_core::random::Random;
 use rusty_navigation::{FloodSearch, NavigationGraph};
 
+/// Node expansions a tick by default, spent on the waiting queries oldest first.
 pub const DEFAULT_ITERATIONS_PER_FRAME: u32 = 2_048;
 
 /// A request's handle, never 0.
@@ -21,7 +22,6 @@ pub enum Status {
     Gone,
 }
 
-/// One query waiting for its search.
 struct Waiting {
     ticket: Ticket,
     /// The querier: a destroyed one's requests go with it.
@@ -131,23 +131,22 @@ impl QueryQueue {
         }
     }
 
-    /// Keep only the requests whose querier `keep` accepts.
     pub fn retain_owners(&mut self, keep: impl Fn(u32) -> bool) {
         self.pending.retain(|w| keep(w.owner));
         self.answered.retain(|a| keep(a.1));
     }
 
+    /// Keeps `last_ticket`, so a ticket from before reads as gone, never as a
+    /// later request's.
     pub fn clear(&mut self) {
         self.pending.clear();
         self.answered.clear();
     }
 
-    /// How many queries wait for their search.
     pub fn pending(&self) -> usize {
         self.pending.len()
     }
 
-    /// The node expansions the queue spends each tick.
     pub fn iterations_per_frame(&self) -> u32 {
         self.iterations
     }

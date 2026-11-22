@@ -13,6 +13,7 @@ impl MotionContext<'_> {
         let out = outgoing(playback);
         let step = playback.scaled(dt, speed);
         let forward = step >= 0.0;
+        // The heavier motion leads; on a tie (weight 0.5) the incoming one, Unreal's rule.
         let incoming_leads = playback.crossfade_weight() >= 0.5;
         let from_previous = playback.previous_time;
         let moved = incoming_leads.then(|| {
@@ -38,6 +39,8 @@ impl MotionContext<'_> {
                 let pos = lead_in.position(playback.time, playback.loop_clip);
                 let target = lead_out.place(pos, from_previous, out.looping);
                 let wrap = lead_out.wrap();
+                // Moved as `Playback::follow` moves an incoming follower: the shortest way round
+                // a loop, else by `follow_clamped`.
                 playback.previous_time = match out.looping && wrap > 0.0 {
                     true => from_previous + wrap_delta(target - from_previous, wrap),
                     false => follow_clamped(from_previous, target, wrap.max(0.0), forward),

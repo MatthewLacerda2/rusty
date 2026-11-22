@@ -1,5 +1,5 @@
-//! the line-of-sight ray every AI sense shares:
-//! the environment query's `trace` test and perception's sight sense.
+//! The AI's one line-of-sight test: the environment query's `trace` and perception's
+//! sight both cast it, so the two agree on what blocks.
 
 use glam::Vec3;
 
