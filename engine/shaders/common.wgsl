@@ -1,4 +1,4 @@
-
+// Baked shaders import any name here, so none ever moves out.
 #import fog::height::fog_height_mean
 #import lighting::falloff::{light_falloff_near, spot_cone}
 #import lighting::reflection_probe::ReflectionProbe
@@ -20,7 +20,7 @@ struct Fog {
 };
 
 struct Clusters {
-    // depth = dot(view_z.xyz, p) + view_z.w: distance along the view axis.
+    // Depth along the view axis: dot(view_z.xyz, p) + view_z.w.
     view_z: vec4<f32>,
     // x scale, y bias, z 1 = log2 slices (perspective) / 0 = linear, w near plane.
     slices: vec4<f32>,
@@ -56,6 +56,7 @@ struct AmbientLight {
     _pad_equator: f32,
     gradient_ground: vec3<f32>,
     _pad_ground: f32,
+    // Intensity applied, convolved over π; `w` unused.
     sky_sh: array<vec4<f32>, 9>,
 };
 
@@ -102,7 +103,7 @@ struct LocalLight {
     mask_channel: f32,
 };
 
-// Index order is x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
+// x + tiles_x * (y + tiles_y * slice), as the CPU binner writes it.
 fn cluster_index(c: Clusters, view_proj: mat4x4<f32>, world: vec3<f32>) -> u32 {
     let clip = view_proj * vec4<f32>(world, 1.0);
     let ndc = clip.xy / max(clip.w, 1e-6);

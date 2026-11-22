@@ -1,3 +1,6 @@
+//! Faces are read from the HDR scene target before the composite (no grade, tonemap or
+//! clamp), each row-major, top to bottom.
+
 use glam::Vec3;
 
 use super::faces::mirror_rows;

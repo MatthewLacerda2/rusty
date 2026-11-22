@@ -1,3 +1,5 @@
+//! Not `cfg(test)`: integration tests link the normal build and reach renderers through it.
+
 use std::sync::{Condvar, Mutex};
 use std::thread::ThreadId;
 use std::time::Duration;
@@ -104,6 +106,7 @@ impl Budget {
         if let Some(at) = holder.and_then(|id| held.holders.iter().position(|h| h.thread == id)) {
             held.holders.swap_remove(at);
         }
+        // A pair waits for two slots, so one freed slot must wake every waiter.
         self.released.notify_all();
     }
 

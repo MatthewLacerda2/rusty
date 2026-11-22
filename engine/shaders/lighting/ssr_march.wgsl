@@ -1,7 +1,5 @@
-// One march, two depth sources: the SSR pass reads depth along the view axis from the
-// velocity target's `.z`; a transparent reads the eye distance in the opaque copy's
-// `.a`. A `Frame` says which. No derivatives, so a caller may march in a per-pixel
-// branch.
+// One march, two depth sources (a `Frame`): the velocity target's view-axis `.z`, or the
+// opaque copy's eye-distance `.a`. No derivatives, so it may run in a per-pixel branch.
 
 #define_import_path lighting::ssr_march
 
@@ -117,8 +115,8 @@ fn refine(f: Frame, t_depth: texture_2d<f32>, a: vec3<f32>, b: vec3<f32>, start:
     return go;
 }
 
-// `cone` is the tangent of the half-angle of the surface's GGX lobe (0: a mirror); the
-// hit is read at the mip of `t_color` whose texels match the cone's on-screen width.
+// `cone` is the tangent of the GGX lobe's half-angle (0: a mirror); the hit reads the
+// `t_color` mip whose texels match the cone's on-screen width.
 fn trace(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_color: sampler, origin: vec3<f32>, r: vec3<f32>, steps: i32, step: f32, cone: f32) -> vec4<f32> {
     return trace_hit(f, t_depth, t_color, s_color, origin, r, steps, step, cone, 1.0).colour;
 }
@@ -165,6 +163,8 @@ fn trace_hit(f: Frame, t_depth: texture_2d<f32>, t_color: texture_2d<f32>, s_col
                 let done = f32(i) + distance(prev, back) / len;
                 let far = clamp((f32(steps) - done) / (f32(steps) * REACH_FADE), 0.0, 1.0);
                 let wide = clamp((BLUR_FADE_END - blur) / (BLUR_FADE_END - BLUR_FADE_START), 0.0, 1.0);
+                // The tested depth texel's centre: a refined hit sits on its edge, where a
+                // filtered read bleeds the neighbour.
                 let centre = (floor(clamp(hit.uv, vec2<f32>(0.0), vec2<f32>(0.999999)) * depth_dim) + 0.5) / depth_dim;
                 let colour = textureSampleLevel(t_color, s_color, centre, lod).rgb;
                 return Hit(vec4<f32>(colour, clamp(edge / (SCREEN_FADE + blur), 0.0, 1.0) * far * wide), t);

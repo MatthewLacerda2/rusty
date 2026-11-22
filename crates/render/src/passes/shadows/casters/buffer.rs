@@ -81,6 +81,8 @@ impl CasterRecords {
 
 const FLAT: u32 = 0;
 
+/// One per sweep: every sweep records before one submit, so a shared buffer's later upload
+/// would overwrite earlier casters.
 pub(in crate::passes::shadows) struct CasterBuffer {
     casters: GrowBuffer,
     joints: GrowBuffer,

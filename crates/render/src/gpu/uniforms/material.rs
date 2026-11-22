@@ -1,3 +1,8 @@
+//! Adding a material field: spend a `_pad` word or append a 16-byte run to [`MaterialData`],
+//! mirror it in `forward/bindings.wgsl`, set it in `render::draw::uniforms::material_data`
+//! (and `RecordTraits` if a pass is decided by it, or `records::record_free` if read alone),
+//! and add its row to `uniform_layout_tests::draw`.
+
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub(crate) struct DrawUniform {

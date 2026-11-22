@@ -20,7 +20,7 @@ fn xz(v: Vec3) -> Vec2 {
 }
 
 impl NavigationGraph {
-    /// Visits agents in the ECS's stable order, so the tick stays deterministic.
+    /// In the ECS's stable order, so the tick is deterministic.
     pub fn tick_nav_agents(&self, scene: &mut Scene, delta_time: f32) {
         self.ask_paths(scene);
         self.serve_paths(scene);
@@ -30,7 +30,7 @@ impl NavigationGraph {
             if !scene.world.is_active_in_hierarchy(id) {
                 continue;
             }
-            // Held outside its column so World calls never alias its borrow.
+            // Held outside its column so World calls never alias it.
             let Some(mut agent) = hold_agent(scene, id) else {
                 continue;
             };
@@ -61,6 +61,7 @@ impl NavigationGraph {
             put_back(scene, id, agent);
         }
 
+        // Obstacles follow the agents; zipping with `ticked` stops before them.
         inputs.extend(avoidance_obstacles(scene));
         let velocities = avoidance::solve(&inputs, delta_time);
         for (t, v) in ticked.iter().zip(velocities) {
@@ -96,7 +97,7 @@ impl NavigationGraph {
         if agent.off_mesh_link.is_some() {
             return Vec2::ZERO;
         }
-        // Steer on the XZ plane so a tall step doesn't inflate the move distance.
+        // Steer on XZ so a tall step doesn't inflate the move distance.
         let mut to_next_dir = next_step - current_pos;
         to_next_dir.y = 0.0;
         let to_next_dir = to_next_dir.normalize_or_zero();
@@ -180,7 +181,7 @@ impl NavigationGraph {
     }
 }
 
-/// In place, not a detach, which would change archetype and copy every column.
+/// In place: a detach would change archetype and copy every column.
 fn hold_agent(scene: &mut Scene, id: u32) -> Option<NavMeshAgentComponent> {
     scene
         .world
@@ -232,7 +233,7 @@ fn decelerate(agent: &mut NavMeshAgentComponent, delta_time: f32) {
     agent.velocity = Vec3::new(v.x, 0.0, v.y);
 }
 
-/// A negative step holds still rather than steering away.
+/// A negative step holds still.
 fn move_towards(from: Vec2, to: Vec2, max_delta: f32) -> Vec2 {
     from.move_towards(to, max_delta.max(0.0))
 }

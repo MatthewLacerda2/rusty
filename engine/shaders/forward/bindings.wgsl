@@ -4,9 +4,8 @@
 #import common::{CameraUniforms, Decal, LightingUniforms, LocalLight, ShadowTile, VertexInput, blend_joints}
 #import lighting::cascades::ShadowCascades
 
-// One draw's own data, mirroring `DrawUniform` (crates/render/src/gpu/uniforms/material.rs)
-// byte-for-byte: its transform on top of each instance's (identity for instanced solids), where
-// its joint 0 sits in `bones` (; 0 is the shared identity), and its record in `materials`.
+// Mirrors `DrawUniform` byte for byte: the draw's transform over each instance's (identity
+// for instanced solids), its joint 0 in `bones` (0 the shared identity), its `materials` record.
 struct DrawUniforms {
     model_matrix: mat4x4<f32>,
     bone_base: u32,
@@ -15,8 +14,7 @@ struct DrawUniforms {
     draw_pad_b: u32,
 };
 
-// One material record, mirroring `MaterialData` (crates/render/src/gpu/uniforms/material.rs)
-// byte-for-byte, its `SurfaceUniform` and `MappingUniform` written out flat.
+// Mirrors `MaterialData` byte for byte, its `SurfaceUniform` and `MappingUniform` flat.
 struct MaterialData {
     color_tint: vec4<f32>,
     use_texture: u32,
@@ -30,7 +28,6 @@ struct MaterialData {
     emissive: vec4<f32>,
     use_cutout: u32,
     alpha_cutoff: f32,
-    // 1 when the surface folds in its cluster's decals.
     receive_decals: u32,
     two_sided: u32,
     blend_mode: u32,
@@ -46,8 +43,7 @@ struct MaterialData {
     transmission: vec4<f32>,
     receive_ssr: u32,
     reactive: f32,
-    // 1 when the surface writes its own motion (HDRP's *Transparent Writes Motion Vectors*);
-    // read on the CPU.
+    // HDRP's *Transparent Writes Motion Vectors*; read on the CPU.
     writes_motion: u32,
     surface_pad_c: u32,
     uv_st: vec4<f32>,
@@ -81,11 +77,11 @@ struct MaterialData {
     maps_pad_c: u32,
 };
 
+// Per instance, not uniform across a draw: never gate a texture sample on a field here.
 struct ObjectData {
     model_matrix: mat4x4<f32>,
     use_sh: u32,
-    // Baked lightmap: atlas page + 1 (0 for none), and the scale/offset from the mesh's
-    // lightmap UV into that page.
+    // Lightmap atlas page + 1 (0 for none) and the lightmap UV's scale/offset into it.
     lightmap_page: u32,
     lightmap_directional: u32,
     in_bake: u32,
@@ -132,7 +128,7 @@ var s_decal: sampler;
 @group(0) @binding(14)
 var t_lightmaps: texture_2d_array<f32>;
 // Their direction pages, same layers and UVs: RGB the dominant incoming direction scaled by its
-// directionality, A its lamp share (; `decode_lightmap_direction`); a 1x1 zero page, never
+// directionality, A its lamp share (`decode_lightmap_direction`); a 1x1 zero page, never
 // read, when not baked.
 @group(0) @binding(16)
 var t_lightmap_dirs: texture_2d_array<f32>;
@@ -165,12 +161,11 @@ var<storage, read> proxy_volumes: array<vec4<f32>>;
 @group(3) @binding(4)
 var<storage, read> materials: array<MaterialData>;
 
+// Indexed by the draw's uniform, so its flags are uniform per draw.
 fn material() -> MaterialData {
     return materials[draw.material];
 }
 
-// The vertex placed in the world: skinned by its bones, under the draw's transform (identity for
-// instanced solids) over the instance's own.
 fn vertex_to_world(model: VertexInput, instance: u32) -> mat4x4<f32> {
     let joints = model.joint_indices + vec4<u32>(draw.bone_base);
     let bone_transform = blend_joints(
@@ -262,6 +257,8 @@ var t_ao: texture_2d<f32>;
 var t_shadow_atlas: texture_depth_2d;
 @group(2) @binding(5)
 var<storage, read> shadow_tiles: array<ShadowTile>;
+// The opaque copy, alpha the eye distance; in a base camera's opaque pass running SSIL
+// (`camera.ssil.x`), SSIL's bounce instead.
 @group(2) @binding(6)
 var t_opaque: texture_2d<f32>;
 @group(2) @binding(7)

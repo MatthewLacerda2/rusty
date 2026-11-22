@@ -119,6 +119,8 @@ impl RenderView {
         if (self.size, self.scene_size) == (size, scene) {
             return;
         }
+        // A scale-only change keeps the output target: a consumer may hold a view of it this
+        // frame.
         let output_changed = self.size != size;
         (self.size, self.scene_size) = (size, scene);
         let (depth_texture, depth_view) = create_depth(device, scene.width, scene.height);
