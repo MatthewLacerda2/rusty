@@ -1,5 +1,5 @@
 //! Size and modified time catch another process's writes; the sim never reads them.
-//! No lock is held across a parse: two threads may parse one file into one value.
+//! No lock is held across a parse: two threads may parse one file into equal values.
 //! stored-format: the files the import cache writes beside a model (the hull sidecars)
 
 mod counts;

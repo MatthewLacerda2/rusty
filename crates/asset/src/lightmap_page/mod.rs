@@ -1,7 +1,6 @@
-//! A page is Unity's *Lightmap* texture type. Irradiance is BC6H, HDR stored as is (no
-//! RGBM, so bilinear filtering is linear in the light). A direction page is
-//! RGBA8, never block-compressed: BC7 turned a lamp's direction up to 5° off a
-//! texel, a sawtooth in glossy highlights.
+//! Irradiance is BC6H, HDR stored as is (no RGBM, so bilinear filtering is linear in the
+//! light). A direction page is RGBA8, never block-compressed: BC7 turned a lamp's direction
+//! up to 5° off a texel, a sawtooth in glossy highlights.
 //!
 //! stored-format: the baked lightmap pages in `<scene>.lightmaps/`
 

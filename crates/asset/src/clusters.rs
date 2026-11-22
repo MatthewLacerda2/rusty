@@ -10,7 +10,7 @@ use super::mesh_data::SubMesh;
 
 /// Below it the whole-mesh instance test culls as well, and costs no extra draw.
 pub const MIN_TRIANGLES: usize = 4096;
-/// meshoptimizer's recommendation for GPU culling.
+// meshoptimizer's recommended pair for GPU culling.
 pub const MAX_TRIANGLES: usize = 124;
 pub const MAX_VERTICES: usize = 64;
 const CONE_WEIGHT: f32 = 0.25;

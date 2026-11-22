@@ -86,7 +86,7 @@ pub(super) fn encode(
     })
 }
 
-/// BC7's ultra-fast profiles are quicker still, but like BC1 they flatten a block of two
+/// Not BC7's ultra-fast profiles, though quicker: like BC1 they flatten a block of two
 /// contrasting colours (red beside blue) to one.
 fn variant(
     format: BlockFormat,

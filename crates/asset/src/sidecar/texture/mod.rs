@@ -16,7 +16,7 @@ use crate::ImportError;
 
 /// Texels on the longer side, as Unity's default *Max Size*.
 pub const DEFAULT_MAX_SIZE: u32 = 2048;
-/// The *Max Size* choices, in texels on the longer side.
+/// Unity's *Max Size* choices.
 pub const MAX_SIZES: [u32; 9] = [32, 64, 128, 256, 512, 1024, 2048, 4096, 8192];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]

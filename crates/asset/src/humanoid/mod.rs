@@ -1,6 +1,3 @@
-//! After Godot 4's `BoneMap` and Unity's Humanoid avatar in a simpler form: a model's sidecar
-//! may carry [`HumanoidSettings`], a map from [`CANONICAL`] bones to its own, and `clips_from`
-//! models whose clips play on this one.
 //! Unmapped bones are guessed from common names (`guess`), else said once per import.
 //!
 //! The retarget runs at import (`borrow`): the result is an ordinary clip cached with the
@@ -156,7 +153,7 @@ mod guess_tests;
 mod retarget_pose_tests;
 #[cfg(test)]
 mod retarget_tests;
-/// Test hook, compiled in every build: the root's `app` tests build rigs with it.
+/// Test hook, compiled in every build: `app`'s tests build rigs with it.
 #[doc(hidden)]
 pub mod rig_fixture;
 #[cfg(test)]

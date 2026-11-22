@@ -3,8 +3,8 @@
 const BYTES_PER_SAMPLE: u16 = 2;
 const FORMAT_PCM: u16 = 1;
 
-/// `samples` interleave `channels` a frame, in `-1..1`; clamped and rounded, so an overshoot
-/// cannot wrap into a click.
+/// `samples` holds `channels` interleaved values a frame, each in `-1..1`; clamped and
+/// rounded, so an overshoot cannot wrap into a click.
 pub fn encode(channels: u16, sample_rate: u32, samples: &[f32]) -> Vec<u8> {
     let channels = channels.max(1);
     let block_align = channels * BYTES_PER_SAMPLE;

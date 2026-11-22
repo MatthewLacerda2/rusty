@@ -7,7 +7,7 @@ use crate::gltf::import::import_from;
 use crate::{ImportedAsset, MapRef};
 use std::path::{Path, PathBuf};
 
-/// The fixture copied into a folder of its own, with `decoy` (a white `tex.png` beside
+/// The fixture copied into a folder of its own, with `decoy` (a green `tex.png` beside
 /// `direct.blend`, where the exporter alone would look) or without.
 fn copied(decoy: bool) -> PathBuf {
     let (from, dir) = (fixture("library_image"), rusty_test_support::temp::dir());

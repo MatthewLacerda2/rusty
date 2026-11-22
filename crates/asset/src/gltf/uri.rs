@@ -28,7 +28,6 @@ pub fn encode_path(path: &str) -> String {
     out
 }
 
-/// Inverts `encode_path`, which the converters write a glTF's URIs with: change both together.
 pub fn decode(uri: &str) -> Option<String> {
     let bytes = uri.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());

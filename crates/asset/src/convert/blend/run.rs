@@ -98,8 +98,8 @@ fn run(program: &Path, command: &mut Command, limit: Duration) -> Result<Output,
             stdout: stdout.join().unwrap_or_default(),
             stderr: stderr.join().unwrap_or_default(),
         }),
-        // Killed and reaped; the readers end with the pipes, since a process the program started
-        // may still hold them.
+        // Killed and reaped; readers end with the pipes, which a process it started may still
+        // hold.
         Ok(None) => match child.kill().and_then(|()| child.wait()) {
             Ok(_) => Err(Failed::Timeout(limit)),
             Err(e) => Err(Failed::Start(start_error(program, &e))),
@@ -137,11 +137,12 @@ fn wait(child: &mut Child, limit: Duration) -> std::io::Result<Option<ExitStatus
     }
 }
 
+/// A thread per pipe: one full pipe would stall Blender until its time limit.
 fn drain(pipe: Option<impl Read + Send + 'static>) -> JoinHandle<Vec<u8>> {
     std::thread::spawn(move || {
         let mut bytes = Vec::new();
         if let Some(mut pipe) = pipe {
-            // What was read before a failed read is kept: it is only quoted.
+            // Partial output is kept: it is only quoted.
             if pipe.read_to_end(&mut bytes).is_err() {}
         }
         bytes

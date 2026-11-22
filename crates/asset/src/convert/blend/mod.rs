@@ -1,7 +1,5 @@
 //! Blender runs headless with export settings pinned in `export.py` (+Y up, modifiers applied,
 //! animations and skins on), so two machines with the same Blender make the same glTF.
-// A `let _ =` or `.ok()` here would drop a failure the cache must not be stamped over; a print
-// would bypass the `Skip`s the cache records.
 #![deny(
     clippy::let_underscore_must_use,
     clippy::unused_result_ok,

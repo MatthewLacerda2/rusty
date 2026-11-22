@@ -1,5 +1,3 @@
-//! No converted copy is kept on disk: [`load`] parses the source file each time.
-
 mod cube;
 mod strip;
 

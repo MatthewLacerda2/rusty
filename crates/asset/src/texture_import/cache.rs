@@ -129,7 +129,7 @@ pub(super) fn write(path: &Path, stamp: u64, texture: &Compressed) -> std::io::R
     rusty_core::fs::write_atomic(path, &out)
 }
 
-/// Test hook: every block zero, nothing encoded.
+/// Test hook for `dev`'s memory tests: every block zero, nothing encoded.
 #[doc(hidden)]
 pub fn write_blank(source: &Path, settings: &TextureSettings) -> Result<(), String> {
     let Seen::Read(digest) = source_digest(source) else {

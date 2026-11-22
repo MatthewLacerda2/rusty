@@ -11,11 +11,9 @@ pub struct Converter {
     /// The program's reported version (`5.0.1`), stamped so another re-converts;
     /// `None` inside the engine. An `Err` (missing) keeps the cache.
     pub tool: Option<fn() -> Result<String, ImportError>>,
-    /// Never logs: only what is left out on purpose goes in [`Converted`], any other
-    /// failure is an `Err`, or a partial cache is stamped current. A conversion whose
-    /// stamp was lost meets its own textures folder again (`record::folder_tag`), so a
-    /// written file's name must hold the same bytes whatever is on disk: name every
-    /// embedded file first.
+    /// A conversion whose stamp was lost meets its own textures folder again
+    /// (`record::folder_tag`), so a written file's name must hold the same bytes
+    /// whatever is on disk: name every embedded file before looking at the disk.
     pub convert: fn(source: &Path, to: &Staging) -> Result<Converted, ImportError>,
 }
 

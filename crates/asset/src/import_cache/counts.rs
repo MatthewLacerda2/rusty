@@ -1,5 +1,5 @@
-//! Test hooks, compiled in every build because the root's tests call them. Counts
-//! are kept only on a thread that asked [`lookups`] or [`parses`] once (arming it).
+//! Counts for other crates' tests and `dev`'s load bench, so compiled in every build.
+//! Counts are kept only on a thread that asked [`lookups`] or [`parses`] once (arming it).
 
 use std::cell::Cell;
 

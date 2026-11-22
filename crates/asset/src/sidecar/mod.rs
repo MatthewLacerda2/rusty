@@ -1,5 +1,5 @@
 //! Unity-style `<file>.meta`: import settings only, never identity (references are path-based, so
-//! no GUID); the sub-object map is a regenerated cache.
+//! no GUID).
 //! stored-format: the `<file>.meta` import-settings sidecar
 
 use serde::{Deserialize, Serialize};
@@ -32,6 +32,7 @@ pub struct ImportSettings {
     /// (`asset::scale_factor`). Default 1.
     #[serde(default = "default_scale")]
     pub scale: f32,
+    /// Only a cache, regenerated from the import (`with_sub_objects`).
     #[serde(default)]
     pub sub_objects: Vec<String>,
     /// Keyed by sub-object id; a missing key means no collider.

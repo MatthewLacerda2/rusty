@@ -1,6 +1,5 @@
-//! An import brings every model and image under its folder up to date before it
-//! returns, as Unity's `AssetDatabase.Refresh` does. Play's own refresh compresses no
-//! texture, so a project the editor never opened draws uncompressed until this runs.
+//! Play's own refresh compresses no texture, so a project the editor never opened draws
+//! uncompressed until this runs.
 
 use std::path::{Path, PathBuf};
 

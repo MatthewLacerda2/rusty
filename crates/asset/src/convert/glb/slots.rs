@@ -1,6 +1,3 @@
-//! What an extracted texture is compressed by, since it has no sidecar of its own
-//! (`texture_ref::extracted`). Read from the JSON chunk alone, as [`super::image_uris`] is.
-
 use super::read::json_chunk;
 use serde_json::Value;
 use std::collections::BTreeMap;

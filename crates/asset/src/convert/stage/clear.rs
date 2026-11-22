@@ -65,8 +65,8 @@ fn is_textures_of(entry: &str, name: &str) -> bool {
     middle == "." || tag.is_some_and(|t| t.len() == 16 && t.bytes().all(|b| b.is_ascii_hexdigit()))
 }
 
-/// `out`'s folder (`.` for a bare file name) and file name, lossless: `project_relative`
-/// refuses non-UTF-8 paths, and `temp_path` names lossily.
+/// `out`'s folder (`.` for a bare file name) and file name. The lossy read loses nothing: a
+/// cache path is UTF-8, as `project_relative` refuses any other and `temp_path` builds one.
 pub(super) fn split(out: &Path) -> (PathBuf, String) {
     let dir = match out.parent() {
         Some(dir) if !dir.as_os_str().is_empty() => dir.to_path_buf(),

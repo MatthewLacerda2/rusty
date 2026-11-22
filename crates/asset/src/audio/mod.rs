@@ -27,8 +27,7 @@ impl DecodedAudio {
     }
 }
 
-/// The runtime's decoder too (`audio::device::decode`), so an MP3 not converted yet plays trimmed
-/// the same way.
+/// The runtime's decoder too (`audio::device::decode`).
 pub fn decode_file(path: &str) -> Result<DecodedAudio, String> {
     let file = File::open(path).map_err(|e| e.to_string())?;
     decode_source(Box::new(file))

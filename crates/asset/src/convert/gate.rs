@@ -35,8 +35,8 @@ const ON: Gate = Gate {
     missing: Vec::new(),
 };
 
-// Per thread in every build (integration tests lack `cfg(test)`): a world loads on its
-// ticking thread, and a load elsewhere must take its own hold.
+// Per thread, every build (the library an integration test links lacks `cfg(test)`): a
+// world loads on its ticking thread; a load elsewhere takes its own hold.
 thread_local! {
     static GATE: std::cell::RefCell<Gate> = const { std::cell::RefCell::new(ON) };
 }

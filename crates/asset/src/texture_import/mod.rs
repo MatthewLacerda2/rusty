@@ -30,8 +30,7 @@ pub use shrink::{fit, fitted_size};
 use super::convert::{source_digest, Seen};
 use super::sidecar::{Compression, TextureSettings, TextureType};
 
-/// Bump whenever `encode` writes other blocks for the same input: it re-makes every cached
-/// texture.
+/// Bump when `encode`'s blocks change for one input: it re-makes every cached texture.
 pub const ENCODER_VERSION: u32 = 3;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -99,6 +98,7 @@ pub fn fits(texture_type: TextureType, kind: TextureKind) -> bool {
 pub struct Loaded {
     pub texels: Texels,
     pub source_size: (u32, u32),
+    /// A 16-bit normal map source, whatever this read's slot.
     pub deep_normal: bool,
 }
 
@@ -128,8 +128,8 @@ pub fn load(
         return Some(Loaded {
             texels: Texels::Blocks(blocks),
             source_size,
-            // A 16-bit normal map never has a current cache: `refresh` writes it none, and one
-            // made before was stamped from other bytes or settings.
+            // No cache is current for a 16-bit normal map: `refresh` writes none, and an older
+            // one was stamped from other bytes or settings.
             deep_normal: false,
         });
     }
@@ -167,7 +167,7 @@ fn current(source: &Path, settings: &TextureSettings) -> Option<Compressed> {
     cache::read(&cache_file(source).ok()?, cache::stamp(digest, settings))
 }
 
-/// By extension first, as `image::open` does: a TGA has no signature to guess it by.
+/// By extension first, as `image::open` does: a TGA has no signature.
 fn reader<R: BufRead + Seek>(source: &Path, read: R) -> image::ImageResult<ImageReader<R>> {
     match image::ImageFormat::from_path(source) {
         Ok(format) => Ok(ImageReader::with_format(read, format)),
