@@ -8,6 +8,7 @@ use rusty_scene::Scene;
 const FRAMES: u32 = 16;
 const AT: u32 = 6;
 const CALM: f32 = 0.5;
+/// Measured on lavapipe: 0.5.
 const SAME: f32 = 1.0;
 
 pub(super) fn apart(a: &[Vec<f32>], b: &[Vec<f32>]) -> f32 {
@@ -90,6 +91,7 @@ fn slide(s: &mut Scene, f: u32) {
     s.world.transform_mut(cube).unwrap().position = Vec3::new(x, y, -3.2);
 }
 
+/// Measured on lavapipe: 3.1 held, 3.9 URP's.
 const TRAIL: f32 = 1.0;
 
 #[test]

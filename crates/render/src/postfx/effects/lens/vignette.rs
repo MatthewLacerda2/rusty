@@ -21,6 +21,8 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
     passes: &[],
 };
 
+/// Clamps all but `center`, since a loaded file skips the ops: a zero smoothness makes the shader's
+/// `pow(0, 0)` a NaN.
 fn pack(cx: &EffectCx, slots: &mut [[f32; 4]]) {
     let Some(vc) = cx.volume() else { return };
     let v = &vc.vignette;

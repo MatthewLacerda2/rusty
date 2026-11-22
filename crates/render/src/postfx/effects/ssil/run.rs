@@ -83,6 +83,8 @@ impl Renderer {
         }
     }
 
+    /// The result takes the opaque copy's slot, which the opaque pass never reads, so the group
+    /// binds no more textures than the device's limit.
     fn ssil_scene_group(&self, ssao: Option<&SsaoTargets>, t: &SsilTargets) -> wgpu::BindGroup {
         create_shadow_bind_group(
             &self.device,

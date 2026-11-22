@@ -49,7 +49,8 @@ fn gpu_a_white_floor_alone_bounces_nothing_onto_itself() {
     assert!(most <= 1e-3, "the floor lit itself: {most}");
 }
 
-/// HDR, not the frame: under thick fog an 8-bit frame rounds the bounce away.
+/// HDR, not the frame: under thick fog the 8-bit frame's rounding of the bounce differs by
+/// driver.
 fn result(r: &mut crate::Renderer, scene: &Scene) -> Vec<Vec3> {
     let mut v = crate::test_gpu::ssil::view(r);
     for _ in 0..6 {

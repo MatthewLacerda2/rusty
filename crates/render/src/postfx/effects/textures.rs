@@ -91,6 +91,7 @@ pub(super) fn bound_views<'a>(
         .collect()
 }
 
+/// Never written: wgpu zero-fills a new texture.
 fn black(device: &wgpu::Device) -> wgpu::TextureView {
     let texture = device.create_texture(&wgpu::TextureDescriptor {
         label: Some("PostFX No Effect Texture"),

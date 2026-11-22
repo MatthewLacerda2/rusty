@@ -1,6 +1,7 @@
 use crate::motion::HistoryKey;
 use rusty_components::AutoExposure;
 
+/// Mirrors `Params` in `postfx/exposure.wgsl`.
 #[repr(C)]
 #[derive(Copy, Clone, Debug, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ExposureParams {

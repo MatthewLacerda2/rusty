@@ -39,6 +39,7 @@ pub(crate) const EFFECT: PostEffect = PostEffect {
 /// Metres of view depth where the exponential slices start.
 pub(crate) const VOLUME_NEAR: f32 = 0.5;
 
+/// The share of last frame's froxel each frame keeps.
 pub(crate) const HISTORY_WEIGHT: f32 = 0.85;
 
 /// `HISTORY_WEIGHT ^ GHOST_FRAMES < 0.05`.
@@ -52,6 +53,7 @@ pub(crate) struct VolumetricPlan {
     pub albedo: [f32; 3],
     pub anisotropy: f32,
     pub base_height: f32,
+    /// Per metre above the base height.
     pub falloff: f32,
     pub depth_extent: f32,
     pub ambient: f32,

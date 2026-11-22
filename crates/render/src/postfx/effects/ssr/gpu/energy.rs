@@ -35,6 +35,7 @@ fn green_kept(r: &mut crate::Renderer, z: f32, ssao: bool) -> f32 {
 #[test]
 fn gpu_ssao_occludes_the_reflection_ssr_swaps_in_as_it_did_the_sky() {
     let Some(mut r) = renderer() else { return };
+    // 0.4 m off the cube: the march hits solidly there (Metal missed the 0.1 m crease).
     let kept = |r: &mut _, ssao| green_kept(r, -5.1, ssao);
     let (open, occluded) = (kept(&mut r, false), kept(&mut r, true));
     eprintln!("[ssr] the floor keeps {open} of its green open, {occluded} under SSAO");
