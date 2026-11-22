@@ -9,7 +9,7 @@ pub enum Handle {
     Body,
     /// The pivot disc: moves the pivot, not the rect.
     Pivot,
-    /// An edge or corner: which sides move, -1 = min, +1 = max.
+    /// An edge or corner: -1 = min, +1 = max.
     Resize { x: i8, y: i8 },
 }
 

@@ -75,7 +75,7 @@ fn paint_handles(
 /// from outside the anchor box.
 fn paint_anchors(painter: &Painter, target: &Target, at: impl Fn(Vec2) -> Pos2, colour: Color32) {
     if target.parent == target.rect {
-        return;
+        return; // a root canvas has no parent to anchor in
     }
     let Some(points) = geometry::anchor_points(&target.rt, &target.parent) else {
         return;

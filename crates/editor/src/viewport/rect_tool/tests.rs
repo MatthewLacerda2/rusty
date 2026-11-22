@@ -1,6 +1,3 @@
-//! The rect tool end to end in viewport points: the overlay mapping, what is
-//! editable, a drag written through the shared setters, and click-select.
-
 use glam::{Vec2, Vec3};
 
 use super::*;
@@ -111,6 +108,7 @@ fn a_body_drag_in_points_moves_the_anchored_position() {
     assert!(apply(&mut s.world, &frame(), drag, Vec2::new(5.0, 10.0)));
     let rt = s.world.rect_transform(img).expect("rt").clone();
     assert_eq!(rt.anchored_position, Vec2::new(10.0, -20.0));
+    // The right edge, dragged 10 points right: 20 units wider, the centre pivot following.
     let edge = begin(&s.world, &frame(), img, Vec2::new(535.0, 280.0)).expect("grabbed");
     assert_eq!(edge.handle, Handle::Resize { x: 1, y: 0 });
     apply(&mut s.world, &frame(), edge, Vec2::new(10.0, 0.0));

@@ -1,10 +1,9 @@
-//! crates/editor/src/viewport/scene_camera.rs — the Scene view's own camera.
-
 use glam::{Vec2, Vec3};
 
 use rusty_scene::camera::DEFAULT_FOV;
 pub use rusty_scene::camera::MAX_PITCH;
 use rusty_scene::Camera;
+/// World units; zooming in past it pushes the pivot ahead.
 pub const MIN_DISTANCE: f32 = 0.05;
 /// The farthest zoom-out.
 pub const MAX_DISTANCE: f32 = 5000.0;
@@ -15,6 +14,7 @@ pub const FLY_SPEED_RANGE: (f32, f32) = (0.5, 200.0);
 /// Shift multiplies the fly speed by this.
 pub const FAST_MULTIPLIER: f32 = 3.0;
 const DEGREES_PER_POINT: f32 = 0.25;
+/// Fraction of the pivot distance one scroll step zooms.
 pub const ZOOM_PER_STEP: f32 = 0.15;
 pub const POINTS_PER_STEP: f32 = 50.0;
 
@@ -53,22 +53,18 @@ impl SceneCamera {
         pose
     }
 
-    /// The view direction.
     pub fn forward(&self) -> Vec3 {
         Camera::new(Vec3::ZERO, self.yaw, self.pitch).forward()
     }
 
-    /// Screen-right in world space.
     pub fn right(&self) -> Vec3 {
         Camera::new(Vec3::ZERO, self.yaw, self.pitch).right()
     }
 
-    /// Screen-up in world space.
     pub fn up(&self) -> Vec3 {
         self.right().cross(self.forward())
     }
 
-    /// Where the eye is.
     pub fn position(&self) -> Vec3 {
         self.pivot - self.forward() * self.distance
     }
