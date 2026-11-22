@@ -15,7 +15,7 @@ mod context_tests;
 mod filter_tests;
 #[cfg(test)]
 mod generate_tests;
-// Test hook: the level `rusty-dev`'s `bench::query_cost_tests` times, and
+// Test hook: the level the query cost tests here and in `rusty-dev` time, and
 // `perception::bench` builds on.
 #[cfg(feature = "dev")]
 #[doc(hidden)]

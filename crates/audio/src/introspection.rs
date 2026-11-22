@@ -107,7 +107,7 @@ impl AudioEventLog {
 }
 
 impl AudioMaestro {
-    /// A test hook: `app`'s and the root crate's tests read the log through it.
+    /// A test hook: this crate's, `app`'s and the root crate's tests read the log through it.
     pub fn events(&self) -> &[AudioEvent] {
         self.log.events()
     }

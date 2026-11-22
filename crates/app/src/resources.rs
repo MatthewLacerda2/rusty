@@ -43,6 +43,7 @@ pub struct Resources {
     pub(super) edit_runtime: bool,
     pub(super) play_hold: Option<rusty_asset::convert::PlayHold>,
     pub(super) sources_root: std::path::PathBuf,
+    /// The tick's scaled delta time; 0 in `Startup`.
     pub(super) frame_dt: f32,
     pub(super) schedule: Schedule,
     pub(super) animation_graphs: GraphCache,
@@ -157,7 +158,7 @@ impl Resources {
         self.play_frame
     }
 
-    /// A test hook: `rusty-dev`'s bench rows test adds a fixture system beside the engine's.
+    /// A test hook: `rusty-dev`'s bench rows test adds a fixture system.
     #[doc(hidden)]
     pub fn schedule_mut(&mut self) -> &mut super::Schedule {
         &mut self.schedule

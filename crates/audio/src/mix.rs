@@ -13,7 +13,6 @@ pub struct MixEnv {
     pub listener: Listener,
     pub time_scale: f32,
     pub paused: bool,
-    /// Scaled sim seconds since the last push: the span doppler measures velocity over.
     pub dt: f32,
 }
 
@@ -65,7 +64,6 @@ pub struct Rolloff {
 }
 
 impl Default for Rolloff {
-    /// The `AudioSource` default band, 1 → 16 m.
     fn default() -> Self {
         let source = AudioSourceComponent::default();
         Self {
@@ -218,7 +216,7 @@ impl AudioMaestro {
         }
     }
 
-    /// A test hook: `app`'s audio tests read the pre-master mix last applied.
+    /// A test hook: this crate's and `app`'s tests read the pre-master mix last applied.
     #[doc(hidden)]
     pub fn voice_mix(&self, id: u32) -> Option<VoiceMix> {
         self.entity_voices.get(&id).map(|live| live.mix)

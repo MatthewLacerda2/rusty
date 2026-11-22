@@ -35,7 +35,7 @@ fn resolve_reverb(world: &mut World, res: &mut Resources) {
     let listener = game_camera_from_scene(&res.camera.borrow(), &scene).position;
     let mut ids = scene.world.ids_with_reverb_zone();
     ids.retain(|&id| scene.world.is_active_in_hierarchy(id));
-    ids.sort_unstable(); // zones sum in id order, so two runs blend bit-identically
+    ids.sort_unstable(); // `blend` sums in this order
     let zones: Vec<_> = ids
         .iter()
         .filter_map(|&id| {

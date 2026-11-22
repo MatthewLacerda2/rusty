@@ -1,4 +1,4 @@
-//! The one line-of-sight test: the environment query's `trace` and perception's
+//! The AI's one line-of-sight test: the environment query's `trace` and perception's
 //! sight both cast it, so the two agree on what blocks.
 
 use glam::Vec3;

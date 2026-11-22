@@ -121,8 +121,9 @@ fn blend_poses_lerps_translation_and_hits_the_endpoints() {
     assert_eq!(blend_poses(&a, &b, 1.0), b);
 }
 
+/// Lerped matrices would average +90° and -90° about Z into a zero matrix, which
+/// collapses the tip onto its root.
 #[test]
-/// Lerped matrices would average +90° and -90° about Z into one collapsing the tip onto its root.
 fn crossfade_between_opposite_rotations_keeps_limb_length() {
     let skin = chain_skin();
     let pose = |angle: f32| {

@@ -5,7 +5,7 @@ use std::thread::ThreadId;
 
 static KEPT: Mutex<Vec<(ThreadId, Level, String)>> = Mutex::new(Vec::new());
 
-/// For crates below `script`, so beneath `rusty-logging`: every target, no repeat
+/// For a crate whose manifest does not name `rusty-logging`: every target, no repeat
 /// counts, no `core::quiet`.
 struct Keep;
 

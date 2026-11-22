@@ -29,7 +29,8 @@ pub fn mix_frame(frame: &[f32], pan: f32, spatial_blend: f32) -> (f32, f32) {
 /// Seconds: the time constant a voice's glided parameters, and a rack's, follow with.
 pub const SMOOTHING: f64 = 0.010;
 
-/// Within this a glide lands, so a settled voice plays its values bit for bit (−120 dB).
+/// Within this a glide lands, so a settled voice plays its values bit for bit
+/// (−120 dB on a unit gain).
 const SNAP: f32 = 1e-6;
 
 #[derive(Clone, Copy, Debug, PartialEq)]

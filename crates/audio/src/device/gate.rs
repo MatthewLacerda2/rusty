@@ -52,12 +52,12 @@ impl<B: EffectBuilder> EffectBuilder for Gated<B> {
     }
 }
 
-/// `quiet`: seconds of silent input and output with no tail held.
 struct Gate {
     inner: Box<dyn Effect>,
     wake: Wake,
     seen: u64,
     hold: Option<Hold>,
+    /// Seconds of silent input and output with no tail held.
     quiet: f64,
 }
 

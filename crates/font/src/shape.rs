@@ -11,7 +11,7 @@ use crate::face::{FontData, GlyphId};
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Shaped {
     pub glyph: GlyphId,
-    /// Byte offset in the run of the first character this glyph draws.
+    /// Run byte offset of the first character this glyph draws.
     pub cluster: u32,
     /// Pen advance after this glyph (kerning included).
     pub advance: f32,
@@ -22,8 +22,8 @@ pub struct Shaped {
     pub offset: Vec2,
 }
 
-/// Runs memoised per font, then the memo restarts: a bound, since a counter adds
-/// one per value.
+/// Runs memoised per font before a restart: a bound, as a HUD counter adds a run per
+/// value.
 const MEMO_RUNS: usize = 4096;
 
 pub fn shape(font: &FontData, run: &str, unligated: &[Range<usize>]) -> Arc<[Shaped]> {

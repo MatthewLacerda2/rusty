@@ -131,8 +131,7 @@ fn rebake_nav(world: &mut World, res: &mut Resources) {
     let mut scene = world.scene.borrow_mut();
     rusty_navigation::tick_obstacles(&mut scene, res.frame_dt);
     let mut nav = res.nav.borrow_mut();
-    // Frame 0, or an untracked scene (a `Scene.Load`), restarts from its saved navmesh
-    // or a full bake.
+    // Frame 0 restarts from the scene's saved navmesh or a full bake.
     if res.play_frame == 0 || !nav.tracks(&scene) {
         nav.start_tracked(&mut scene);
     } else {
