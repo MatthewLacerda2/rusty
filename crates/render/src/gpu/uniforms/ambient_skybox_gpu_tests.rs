@@ -1,7 +1,3 @@
-//! `Skybox` mode's ambient on the GPU (#1675): the shader evaluates the sky's SH the
-//! CPU's `AmbientRadiance::at` does, for a panorama and for the procedural sky, and
-//! a different panorama moves it.
-
 use super::ambient_gpu_tests::{cpu_gap, probe};
 use rusty_scene::{AmbientMode, Scene};
 
@@ -10,8 +6,6 @@ fn gpu_the_skybox_ambient_is_the_cpus() {
     let Some(r) = crate::test_gpu::headless_or_skip(8, 8) else {
         return;
     };
-    // The panorama's SH, and the procedural sky's, as the CPU reads
-    // them; a different panorama moves the GPU's too.
     let mut skies = Vec::new();
     for (name, top, bottom) in [
         ("a.png", [60, 100, 220], [160, 110, 60]),

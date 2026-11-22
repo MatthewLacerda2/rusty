@@ -1,18 +1,8 @@
-//! The SSAO depth prepass's pipelines (#436), one per [`Facing`] (#1615): the
-//! clipping ones, whose fragment stage can discard, and the depth-only ones with
-//! no fragment stage at all, for the batches nothing clips (#2347).
-
 use super::{FacedPipeline, Facing, LazyPipeline};
 use crate::gpu::groups::Groups;
 use crate::gpu::mesh::vertex_layout;
 use crate::gpu::DEPTH_FORMAT;
 
-/// The SSAO depth prepass (#436): the solids' depth alone, through the forward vertex
-/// stage (skinning, instancing) and `fragment` — `fs_prepass` (cutout clip), or the
-/// `fs_prepass_cut` of a variant that cuts, moves its UVs or moves its vertices
-/// (#648, #1499, #1524) — one per [`Facing`], so it keeps the triangles the opaque
-/// pass keeps (#1615); the usual one built now. Same layout as the forward pass, so
-/// it records with the same bind groups.
 pub(super) fn prepass_set(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -26,19 +16,12 @@ pub(super) fn prepass_set(
     set
 }
 
-/// The standard shader's prepass pipelines: the clipping `fs_prepass` ones, and the
-/// depth-only ones a batch nothing clips draws with (`BatchKey::depth_only`, #2347).
 pub(crate) struct PrepassPipelines {
     pub clip: FacedPipeline,
     pub depth_only: FacedPipeline,
 }
 
 impl PrepassPipelines {
-    /// Both sets of the forward `shader`: the clipping ones over the forward
-    /// `layout`, their usual facing built now, and the depth-only ones over one of
-    /// the forward pass's global and per-draw groups alone ([`depth_only_layout`]),
-    /// none built until [`Self::prime`] or a draw: the shader preview's throwaway
-    /// set never draws them.
     pub(super) fn new(
         device: &wgpu::Device,
         shader: &wgpu::ShaderModule,
@@ -52,23 +35,16 @@ impl PrepassPipelines {
         }
     }
 
-    /// Build the depth-only set's usual facing now, as the clipping one's is: the
-    /// renderer's own set, which every prepass draws.
     pub(crate) fn prime(&self) {
         self.depth_only.get(Facing::Ccw);
     }
 
-    /// The facings still to build, for warming.
     pub(crate) fn twins(&self) -> impl Iterator<Item = &LazyPipeline> {
         self.clip.twins().chain(self.depth_only.twins())
     }
 }
 
-/// The depth-only prepass (#2347): the same vertex stage, primitive and depth state
-/// as [`prepass_set`]'s, so the depth it writes is bit-identical, but no fragment
-/// stage, so a batch nothing clips pays no fragment work and keeps the GPU's
-/// depth-only fast path. `layout` is [`depth_only_layout`]'s, which has no
-/// material group; nothing is built yet.
+/// Same vertex stage, primitive and depth state as [`prepass_set`]'s, so the depth is bit-identical.
 fn depth_only_set(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,
@@ -79,11 +55,7 @@ fn depth_only_set(
     })
 }
 
-/// The depth-only prepass's layout: the forward pass's global and per-draw groups,
-/// which `vs_main` reads, at their indices (`gpu::groups`), with gaps where the
-/// material and scene groups sit, so a depth-only batch binds no material group.
-/// The pass's scene group stays bound for the next clipping batch, which re-flushes
-/// from the material group up, as a material change does.
+/// Gaps stand where the material and scene groups sit, keeping `vs_main`'s group indices.
 fn depth_only_layout(
     device: &wgpu::Device,
     groups: Groups<&wgpu::BindGroupLayout>,
@@ -96,7 +68,6 @@ fn depth_only_layout(
     groups.layout(device, "Depth-Only Prepass Layout")
 }
 
-/// One prepass pipeline: through `fragment`, or with no fragment stage.
 fn make_prepass(
     device: &wgpu::Device,
     shader: &wgpu::ShaderModule,

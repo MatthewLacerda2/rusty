@@ -1,11 +1,3 @@
-//! Uploading a block-compressed texture (#1574): the levels the import cache holds
-//! (`asset::texture_import`), written as they are, so no mip is drawn on the GPU
-//! (a BC texture cannot be rendered into). Colour formats keep the sRGB storage
-//! and raw data view every image upload has (#647). The renderer never encodes:
-//! a texture without a current cache uploads uncompressed until the import makes
-//! one. With no GPU pass of its own, its levels wait in staging for a submit,
-//! which `gpu::ops::Staging` makes as they pile up (#2372).
-
 use std::collections::BTreeSet;
 use std::sync::{Mutex, Once};
 
@@ -13,12 +5,8 @@ use crate::gpu::ops::CountedQueue as _;
 use rusty_asset::sidecar::{Compression, TextureSettings};
 use rusty_asset::texture_import::{self, BlockFormat, Compressed, TextureKind};
 
-/// The device feature a compressed upload needs.
 pub(crate) const FEATURE: wgpu::Features = wgpu::Features::TEXTURE_COMPRESSION_BC;
 
-/// The format a texture of `format` is stored as, and the one its data view reads
-/// the same blocks as. BC7 is stored sRGB when `srgb` (a colour texture), else
-/// linear (*sRGB* off, `texture_import::is_linear`).
 pub(crate) fn formats(
     format: BlockFormat,
     srgb: bool,
@@ -32,8 +20,6 @@ pub(crate) fn formats(
     }
 }
 
-/// Whether a texture with `import` settings is uploaded compressed on a device
-/// with `features`. Without BC, one warning per process, then RGBA8.
 pub(crate) fn wanted(features: wgpu::Features, import: &TextureSettings) -> bool {
     if import.compression == Compression::None {
         return false;
@@ -51,10 +37,6 @@ pub(crate) fn wanted(features: wgpu::Features, import: &TextureSettings) -> bool
     false
 }
 
-/// Whether a texture with `import` settings, drawn in a slot holding `kind`, is
-/// uploaded compressed on a device with `features`: [`wanted`], and its type fits
-/// the slot (`texture_import::fits`), else it would lose channels there.
-/// A misfit is warned of once per `path`.
 pub(super) fn wanted_for(
     path: &str,
     features: wgpu::Features,
@@ -70,7 +52,6 @@ pub(super) fn wanted_for(
     false
 }
 
-/// Paths whose Texture Type has been warned of as not fitting a slot.
 static MISFITS: Mutex<BTreeSet<String>> = Mutex::new(BTreeSet::new());
 
 fn warn_misfit(path: &str, import: &TextureSettings, kind: TextureKind) {
@@ -85,9 +66,6 @@ fn warn_misfit(path: &str, import: &TextureSettings, kind: TextureKind) {
     }
 }
 
-/// Whether an upload stored as `format` reads right in a slot holding `kind`: an
-/// 8-bit or BC7 one everywhere, BC5 only as a normal map, BC4 only as a mask, a
-/// 16-bit normal map (`super::deep`, no sRGB view) in any slot but colour.
 pub(crate) fn reads_as(format: wgpu::TextureFormat, kind: TextureKind) -> bool {
     use wgpu::TextureFormat as F;
     match format {
@@ -98,8 +76,6 @@ pub(crate) fn reads_as(format: wgpu::TextureFormat, kind: TextureKind) -> bool {
     }
 }
 
-/// Create a texture holding `texture`'s levels, stored sRGB when `srgb`
-/// ([`formats`]); returns it with its data view's format.
 pub(super) fn upload(
     (device, (queue, staging)): (&wgpu::Device, crate::gpu::ops::Writes),
     label: &str,
@@ -111,7 +87,6 @@ pub(super) fn upload(
     let mut usage = wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST;
     // lint: allow(cfg-test-switch) only render's own unit tests read a loaded texture back
     if cfg!(test) {
-        // Tests read the blocks back.
         usage |= wgpu::TextureUsages::COPY_SRC;
     }
     let view_formats = [data_format];
@@ -151,8 +126,6 @@ pub(super) fn upload(
     (gpu, data_format)
 }
 
-/// The bytes `texture` takes on the GPU: every level, in whole blocks for a
-/// compressed format.
 pub(crate) fn gpu_bytes(texture: &wgpu::Texture) -> u64 {
     let format = texture.format();
     let (bw, bh) = format.block_dimensions();

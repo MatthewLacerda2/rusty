@@ -1,13 +1,6 @@
-//! The translucent solids' pipelines (#242, #1523): one per blend state a material can
-//! ask for, each built on its first draw. Unity URP's blend table
-//! (`BaseShaderGUI.SetupMaterialBlendModeInternal`): a material's `BlendMode` sets the
-//! factors, and *Preserve Specular Lighting* lifts the alpha multiply from the blend
-//! into the shader (source factor `One`) under `Alpha` and `Additive`.
-
 use super::{FacedPipeline, Facing, LazyPipeline};
 use crate::gpu::uniforms::SurfaceUniform;
 
-/// The blend state a translucent batch draws with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TransparentBlend {
     /// `Alpha`: `src * a + dst * (1 - a)`.
@@ -23,7 +16,6 @@ pub(crate) enum TransparentBlend {
 }
 
 impl TransparentBlend {
-    /// Every state, in [`TransparentPipelines`]' order.
     pub(crate) const ALL: [Self; 5] = [
         Self::Straight,
         Self::Premultiplied,
@@ -32,10 +24,7 @@ impl TransparentBlend {
         Self::Multiply,
     ];
 
-    /// The state a draw's surface terms ask for (its `BlendMode` index and whether
-    /// the shader premultiplied its diffuse). A surface over the opaque copy
-    /// composites what is behind it itself and writes alpha 1, which the
-    /// premultiplied state lays down whole.
+    /// A surface over the opaque copy composites what is behind it itself and writes alpha 1, which the premultiplied state lays down whole.
     pub(crate) fn of(surface: &SurfaceUniform) -> Self {
         let premultiplied = surface.premultiply_diffuse == 1 || surface.uses_opaque == 1;
         match (surface.blend_mode, premultiplied) {
@@ -47,7 +36,6 @@ impl TransparentBlend {
         }
     }
 
-    /// The wgpu blend state.
     pub(crate) fn state(self) -> wgpu::BlendState {
         use wgpu::{BlendComponent as C, BlendFactor as F, BlendOperation::Add};
         let c = |src_factor, dst_factor| C {
@@ -71,7 +59,6 @@ impl TransparentBlend {
         wgpu::BlendState { color, alpha }
     }
 
-    /// The pipeline's label.
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Straight => "Transparent Pipeline",
@@ -83,16 +70,12 @@ impl TransparentBlend {
     }
 }
 
-/// One shader's translucent pipelines, one per [`TransparentBlend`] and [`Facing`]
-/// (#1615), and again writing TAA's reactive mask for a view running TAA (#1845),
-/// each built on its first draw.
 pub(crate) struct TransparentPipelines {
     plain: [FacedPipeline; 5],
     reactive: [FacedPipeline; 5],
 }
 
 impl TransparentPipelines {
-    /// The set `make(blend, reactive)` builds.
     pub(super) fn new(make: impl Fn(TransparentBlend, bool) -> FacedPipeline) -> Self {
         Self {
             plain: TransparentBlend::ALL.map(|b| make(b, false)),
@@ -100,8 +83,6 @@ impl TransparentPipelines {
         }
     }
 
-    /// The pipeline for `blend`, keeping `facing`'s triangles, writing the reactive
-    /// mask too when `reactive`.
     pub(crate) fn get(
         &self,
         blend: TransparentBlend,
@@ -116,7 +97,6 @@ impl TransparentPipelines {
         set[blend as usize].get(facing)
     }
 
-    /// Whether any of `blend`'s pipelines has been built.
     #[cfg(test)]
     pub(crate) fn is_built(&self, blend: TransparentBlend) -> bool {
         let built = |set: &[FacedPipeline; 5]| {
@@ -127,7 +107,6 @@ impl TransparentPipelines {
         built(&self.plain) || built(&self.reactive)
     }
 
-    /// Every one, for warming.
     pub(crate) fn lazies(&self) -> impl Iterator<Item = &LazyPipeline> {
         let all = self.plain.iter().chain(&self.reactive);
         all.flat_map(FacedPipeline::lazies)

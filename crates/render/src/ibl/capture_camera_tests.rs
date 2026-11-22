@@ -1,7 +1,3 @@
-//! A capture sees through its own lens (#1615): the scene's cameras — a 45° main
-//! camera, an overlay drawn over it — change nothing in a baked cube, and a cube
-//! face's up vector never reaches a scene camera.
-
 use glam::{Quat, Vec3};
 
 use super::texture_cube_tests::patched_room;
@@ -11,8 +7,6 @@ use rusty_scene::{camera_for_entity, Camera, ReflectionProbe, Scene};
 
 const RES: u32 = 32;
 
-/// A screen camera at `pos`, turned off the axes, drawing in `order` (an overlay
-/// above 0, clearing depth only).
 fn add_camera(scene: &mut Scene, name: &str, pos: Vec3, fov: f32, order: i32) -> u32 {
     let id = scene.add_entity(name.to_string());
     let mut c = default_camera();
@@ -43,8 +37,6 @@ fn gpu_a_scene_s_cameras_leave_a_baked_cube_unchanged() {
     );
 }
 
-/// A scene camera starts upright whatever `base` carries: a face camera's up (-Z on
-/// the +Y face) would leave a render-texture camera's basis degenerate.
 #[test]
 fn a_scene_camera_is_upright_whatever_its_base() {
     let mut scene = Scene::new();

@@ -1,11 +1,3 @@
-//! A bind group or draw kept across frames: rebuilt only when a resource it names
-//! was replaced. The Hi-Z cull (#1963) and SSR's targets keep theirs this way.
-
-/// A value built from some resources, kept until one of them is replaced: the
-/// key is the resources themselves (wgpu compares them by identity), so a grown
-/// buffer or a resized texture rebuilds it and nothing else does. So every
-/// resource the value holds must be in the key: one left out is drawn from
-/// after it was replaced (#2021, a cached indirect draw over outgrown args).
 pub(crate) struct Kept<K, V> {
     held: Option<(K, V)>,
 }
@@ -17,7 +9,6 @@ impl<K, V> Default for Kept<K, V> {
 }
 
 impl<K: PartialEq, V> Kept<K, V> {
-    /// The value for `key`, built by `make` when the key changed since last time.
     pub(crate) fn get(&mut self, key: K, make: impl FnOnce() -> V) -> &V {
         if self.held.as_ref().is_none_or(|(k, _)| *k != key) {
             self.held = Some((key, make()));
@@ -25,13 +16,10 @@ impl<K: PartialEq, V> Kept<K, V> {
         &self.held.as_ref().expect("held above").1
     }
 
-    /// The key the held value was built for, if any: a caller holding the key's
-    /// parts borrowed compares them here before building an owned key.
     pub(crate) fn key(&self) -> Option<&K> {
         self.held.as_ref().map(|(k, _)| k)
     }
 
-    /// The value last built, if any.
     pub(crate) fn value(&self) -> Option<&V> {
         self.held.as_ref().map(|(_, v)| v)
     }

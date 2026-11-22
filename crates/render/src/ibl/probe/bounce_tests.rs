@@ -1,10 +1,3 @@
-//! Tests for the multi-bounce probe solve (#285). Sibling of `bounce.rs`;
-//! shares its 300-line source cap.
-//!
-//! The convergence logic (`field_delta` / `pass_converged`) is pure and always runs,
-//! so the early-out decision is covered on any host. The GPU multi-bounce bakes skip
-//! gracefully when no adapter is present — same contract as `bake_tests.rs`.
-
 use glam::Vec3;
 
 use crate::ibl::probe::bounce::{field_delta, pass_converged};
@@ -14,9 +7,6 @@ use rusty_scene::Scene;
 
 const RES: u32 = 32;
 
-// --- Pure convergence logic (no GPU) ------------------------------------------------
-
-/// A non-zero per-coefficient difference is reported as the max absolute delta.
 #[test]
 fn field_delta_is_max_abs_coefficient() {
     let mut a = Sh9::zero();
@@ -27,7 +17,6 @@ fn field_delta_is_max_abs_coefficient() {
     assert!((field_delta(&[a], &[b]) - 0.5).abs() < 1.0e-6);
 }
 
-/// Identical fields have zero delta and count as converged for any positive epsilon.
 #[test]
 fn identical_fields_converge() {
     let f = vec![Sh9::zero(); 3];
@@ -35,8 +24,6 @@ fn identical_fields_converge() {
     assert!(pass_converged(&f, &f, 1.0e-6));
 }
 
-/// `pass_converged` is exactly the delta-below-epsilon predicate: a small change
-/// stops, a large one continues.
 #[test]
 fn pass_converged_thresholds_on_epsilon() {
     let mut a = Sh9::zero();
@@ -53,14 +40,11 @@ fn pass_converged_thresholds_on_epsilon() {
     );
 }
 
-// --- GPU multi-bounce bakes (graceful-skip) -----------------------------------------
-
 fn box_mesh() -> rusty_scene::MeshComponent {
     let (vertices, indices) = rusty_components::mesh::primitives::generate_box(1.0, 1.0, 1.0);
     rusty_scene::MeshComponent::new("Box", vertices, indices)
 }
 
-/// A static box at `pos` (scale `scale`) with the given base colour and emissive.
 fn add_box(
     scene: &mut Scene,
     name: &str,
@@ -92,12 +76,8 @@ fn add_box(
         .set_material(id, Some(rusty_components::MaterialComponent::new(mat_name)));
 }
 
-/// A closed-ish room: a bright emissive light source plus a strongly-coloured red
-/// wall that bounces, and a neutral grey floor/ceiling that re-radiate the red. With
-/// real bounces the red bleed onto the field grows past the first capture.
 fn bleed_room(probe: Vec3) -> Scene {
     let mut scene = Scene::new();
-    // Emissive ceiling panel (the direct light).
     add_box(
         &mut scene,
         "Light",
@@ -106,7 +86,6 @@ fn bleed_room(probe: Vec3) -> Scene {
         [0.0, 0.0, 0.0],
         [6.0, 6.0, 6.0],
     );
-    // Strong red reflective wall on +X.
     add_box(
         &mut scene,
         "RedWall",
@@ -115,7 +94,6 @@ fn bleed_room(probe: Vec3) -> Scene {
         [0.9, 0.05, 0.05],
         [0.0, 0.0, 0.0],
     );
-    // Neutral floor that catches and re-radiates the bounced red.
     add_box(
         &mut scene,
         "Floor",
@@ -128,9 +106,6 @@ fn bleed_room(probe: Vec3) -> Scene {
     scene
 }
 
-/// Multi-bounce signal: the converged field carries MORE indirect red than a single
-/// direct-only capture (`bake_probe`) — bounces ≥2 fed the red wall's reflection back
-/// into the scene. The issue's headline acceptance.
 #[test]
 fn gpu_multibounce_increases_color_bleed() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
@@ -138,17 +113,14 @@ fn gpu_multibounce_increases_color_bleed() {
     };
     let probe = Vec3::new(0.0, 0.0, 0.0);
 
-    // Bounce 1 only (the old single-capture result).
     let b1 = renderer.bake_probe(&bleed_room(probe), probe, RES);
 
-    // Full multi-bounce solve.
     let mut scene = bleed_room(probe);
     let report =
         renderer.bake_probes_multibounce(&mut scene, RES, rusty_lighting::lightmap::probe_direct);
     let converged = scene.probes.probes()[0].sh;
 
     assert!(report.bounces >= 2, "expected ≥2 bounces, got {report:?}");
-    // Toward the red wall (+X), the converged irradiance is redder than bounce 1.
     let toward1 = b1.eval(Vec3::X);
     let toward_n = converged.eval(Vec3::X);
     assert!(
@@ -157,16 +129,12 @@ fn gpu_multibounce_increases_color_bleed() {
     );
 }
 
-/// Early-out: a near-black, low-albedo, unlit scene has almost no light to bounce, so
-/// the field stops changing well before the cap — `converged` fires and `bounces` is
-/// short of [`MAX_BOUNCES`].
 #[test]
 fn gpu_early_out_on_dark_scene() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {
         return;
     };
     let mut scene = Scene::new();
-    // A single very dark, non-emissive box — no source to bounce.
     add_box(
         &mut scene,
         "DarkBox",
@@ -186,7 +154,6 @@ fn gpu_early_out_on_dark_scene() {
     );
 }
 
-/// Determinism: the same scene bakes byte-identical SH across two independent runs.
 #[test]
 fn gpu_multibounce_is_deterministic() {
     let Some(mut renderer) = crate::test_gpu::headless_or_skip(RES, RES) else {

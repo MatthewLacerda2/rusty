@@ -1,10 +1,3 @@
-//! Over a primed depth the unlit solids draw first (#2484): a lit wall tests the
-//! prepass's depth and writes none, so its pixels behind an unlit panel are
-//! rejected only if the panel already wrote its own. Whichever of the two meshes
-//! the renderer interned first, the panel draws ahead of the wall; an unprimed
-//! camera keeps the key order. The scene pass asserts (in a debug build) that the
-//! order it was batched in is the priming it draws with. Skips with no adapter.
-
 use glam::Vec3;
 
 use crate::draw::batch::{BatchKey, OpaqueOrder};
@@ -16,9 +9,6 @@ use rusty_scene::{Camera, Scene};
 
 const RES: u32 = 64;
 
-/// A lit `wall` and, a fifth of a metre in front of it, an unlit `panel` (a
-/// light's own mesh), in one depth bucket (`sort::depth_bucket`), under an AO
-/// volume that primes the camera.
 fn panel_on_a_wall(wall: Primitive, panel: Primitive) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -50,10 +40,6 @@ fn panel_on_a_wall(wall: Primitive, panel: Primitive) -> Scene {
     scene
 }
 
-/// Each opaque draw's key, in draw order, batched as a camera `primed` or not
-/// would batch them, after one frame interned the meshes (and the scene pass
-/// asserted, in a debug build, that its batches were ranked for its priming);
-/// with the frame's primed pass count.
 fn drawn(r: &mut Renderer, scene: &Scene, primed: bool) -> (Vec<BatchKey>, u32) {
     r.depth_priming = primed;
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
@@ -73,14 +59,12 @@ fn drawn(r: &mut Renderer, scene: &Scene, primed: bool) -> (Vec<BatchKey>, u32) 
     (solids.draws.opaque.iter().map(|b| b.key).collect(), passes)
 }
 
-/// Whether each of `keys` is lit (in the prepass).
 fn lit(keys: &[BatchKey]) -> Vec<bool> {
     keys.iter().map(BatchKey::in_prepass).collect()
 }
 
 #[test]
 fn gpu_over_a_primed_depth_the_unlit_panel_draws_before_the_wall_in_both_interning_orders() {
-    // Instancing off skips the sort by key and depth, never the rank.
     for ((wall, panel), instanced) in [
         (Primitive::Box, Primitive::Plane),
         (Primitive::Plane, Primitive::Box),
@@ -94,7 +78,6 @@ fn gpu_over_a_primed_depth_the_unlit_panel_draws_before_the_wall_in_both_interni
         let scene = panel_on_a_wall(wall, panel);
         r.instancing = instanced;
         let (order, passes) = drawn(&mut r, &scene, true);
-        // Metal never primes (`pipelines::priming`): there the pass is unprimed.
         if !r.priming_recommended {
             assert_eq!(passes, 0);
             continue;
@@ -110,8 +93,6 @@ fn gpu_over_a_primed_depth_the_unlit_panel_draws_before_the_wall_in_both_interni
 
 #[test]
 fn gpu_an_unprimed_camera_keeps_the_key_order() {
-    // Unprimed, the two share a depth bucket and their keys alone order them, in
-    // both interning orders, as before #2484: no rank in front of the key.
     for (wall, panel) in [
         (Primitive::Box, Primitive::Plane),
         (Primitive::Plane, Primitive::Box),

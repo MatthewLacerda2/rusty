@@ -1,7 +1,3 @@
-//! crates/render/src/gpu/draw_buffers/objects.rs — the slot tables on the GPU (#1706): the
-//! renderer's `scene::ObjectTable` and material table, each mirrored into one storage
-//! buffer, written where it changed rather than packed per camera.
-
 use super::super::grow_buffer::GrowBuffer;
 use super::{DrawBuffers, ObjectData};
 use crate::scene::{SlotTable, Slotted};
@@ -10,10 +6,6 @@ use crate::scene::{SlotTable, Slotted};
 #[cfg(test)]
 const STRIDE: u64 = std::mem::size_of::<ObjectData>() as u64;
 
-/// Bring `buffer` up to `table`: its dirty slots, in runs, then the current camera's
-/// transient ones past the kept slots. When the array must grow, the new buffer gets
-/// every slot instead, and this returns `true` so the bind group is rebuilt over it.
-/// Adds the bytes it wrote to `written`.
 pub(super) fn sync_table<T: Slotted>(
     (device, queue): (&wgpu::Device, &wgpu::Queue),
     buffer: &mut GrowBuffer,
@@ -46,7 +38,6 @@ pub(super) fn sync_table<T: Slotted>(
 }
 
 impl DrawBuffers {
-    /// Bring the GPU's object array up to `table` ([`sync_table`]).
     pub(super) fn sync_objects(
         &mut self,
         device: &wgpu::Device,
@@ -59,8 +50,6 @@ impl DrawBuffers {
 
 #[cfg(test)]
 impl crate::Renderer {
-    /// Write the object table's dirty slots now, as a camera's upload would, and
-    /// read the GPU's kept slots back.
     pub(crate) fn objects_on_gpu(&mut self) -> Vec<ObjectData> {
         let (device, queue) = (&self.device, &self.queue);
         let buffers = &mut self.draw_buffers;
@@ -71,8 +60,6 @@ impl crate::Renderer {
         read_back(device, queue, buffers.objects.buffer(), size)
     }
 
-    /// Write the material table's dirty slots now, as a camera's upload would, and
-    /// read the GPU's kept slots back.
     pub(crate) fn records_on_gpu(&mut self) -> Vec<crate::MaterialData> {
         let (device, queue) = (&self.device, &self.queue);
         let buffers = &mut self.draw_buffers;

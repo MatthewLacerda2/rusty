@@ -1,15 +1,8 @@
-//! Per-entity shader-param overrides on the GPU (#670): two spheres share one
-//! material and only the overridden one flashes; clearing the override frees what it
-//! owned. And the batching cost, measured: twenty enemies on one material, five
-//! flashing, cost five extra draws — the fifteen others still draw as one. Skips
-//! with no adapter.
-
 use super::{clear_params, halves, set_param, sphere, Flash, RES};
 use crate::{RenderCounters, RenderView, Renderer, OFFSCREEN_FORMAT};
 use rusty_scene::create::{create_live_light, Primitive};
 use rusty_scene::{Camera, Scene};
 
-/// A lit scene of `n` spheres in a row sharing one material named `shader`.
 fn shared(n: u32, shader: &str) -> (Scene, Vec<u32>) {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -70,7 +63,6 @@ fn gpu_an_override_flashes_one_of_two_entities_sharing_a_material() {
     assert_eq!(renderer.materials.params_len(), buffers, "and its buffer");
 }
 
-/// One frame's counters for `scene`.
 fn counters(renderer: &mut Renderer, scene: &Scene) -> RenderCounters {
     let mut view = RenderView::offscreen(&renderer.device, OFFSCREEN_FORMAT, RES, RES);
     let out = view.color_target_view().unwrap();
@@ -98,8 +90,6 @@ fn gpu_twenty_enemies_five_flashing_cost_five_draws_and_the_rest_still_batch() {
         hit.triangles, calm.triangles,
         "the same work reaches the GPU"
     );
-    // The fifteen calm enemies still share one draw; each flashing one is its own.
-    // hit_flash cuts nothing, so the shadow casters are untouched.
     assert_eq!(hit.draw_calls, calm.draw_calls + 5, "{calm:?} -> {hit:?}");
     assert_eq!(hit.shadow_draws, calm.shadow_draws);
 }

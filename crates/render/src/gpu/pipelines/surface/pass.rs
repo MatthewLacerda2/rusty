@@ -1,54 +1,25 @@
-//! Which solids pass a batch draws in, and the pipeline it draws with there: its
-//! material's surface variant (#396) or the standard one, over a primed depth or not
-//! (#1499).
-
 use super::super::{
     DepthPostpassPipelines, FacedPipeline, Facing, PrepassPipelines, PrimedPipelines,
     TransparentBlend, TransparentPipelines, VelocityPipelines,
 };
 use super::SurfaceShaders;
 
-/// Which solids pass a batch is drawn in, carrying that pass's standard pipeline, so
-/// [`SurfaceShaders::pick`] can swap in a material's surface variant (#396).
-///
-/// The opaque passes carry the standard primed pipelines when the view's depth is
-/// primed (#1499): the SSAO prepass already wrote every lit solid's depth, so those
-/// draw through a pipeline that tests it and writes none. A batch the prepass leaves
-/// out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing pipeline.
+/// A batch the prepass leaves out (`BatchKey::in_prepass`: an unlit solid) keeps the depth-writing pipeline.
 #[derive(Clone, Copy)]
 pub(crate) enum SolidPass<'a> {
-    /// The SSAO depth prepass; the standard pipeline unless a variant cuts, moves its
-    /// UVs or moves its vertices (#648, #1499, #1524), or the fragment-less one for a
-    /// batch nothing clips (`BatchKey::depth_only`, #2347).
     Prepass(&'a PrepassPipelines),
-    /// Opaque solids; the standard pipeline is the view's (the preview may swap it).
     Opaque(&'a FacedPipeline, Option<&'a PrimedPipelines>),
-    /// Opaque solids writing motion vectors too (#1435), and the SSR surface target
-    /// when the last field holds (#1526).
     Velocity(&'a VelocityPipelines, Option<&'a PrimedPipelines>, bool),
-    /// Blended solids; each standard pipeline is built only if a batch uses it.
-    /// Into TAA's reactive mask too when the last field holds (#1845).
     Transparent(&'a TransparentPipelines, bool),
-    /// The translucents' depth postpass (#1523), into the view's velocity target
-    /// too when the last field holds.
     DepthPostpass(&'a DepthPostpassPipelines, bool),
-    /// The translucents that write their motion alone (#1845), into the velocity
-    /// target, depth tested but not written.
     MotionPostpass(&'a DepthPostpassPipelines),
 }
 
 impl<'a> SolidPass<'a> {
-    /// Whether this is the SSAO prepass, which draws only the batches
-    /// [`BatchKey::in_prepass`] admits.
-    ///
-    /// [`BatchKey::in_prepass`]: crate::draw::batch::BatchKey::in_prepass
     pub(crate) fn is_prepass(self) -> bool {
         matches!(self, Self::Prepass(_))
     }
 
-    /// The fragment-less pipeline keeping `facing`'s triangles a batch nothing
-    /// clips draws this pass with (`BatchKey::depth_only`, #2347): the prepass's;
-    /// `None` in every other pass.
     pub(crate) fn depth_only(self, facing: Facing) -> Option<&'a wgpu::RenderPipeline> {
         match self {
             Self::Prepass(p) => Some(p.depth_only.get(facing)),
@@ -56,7 +27,6 @@ impl<'a> SolidPass<'a> {
         }
     }
 
-    /// Whether this pass draws over a primed depth (#1499).
     pub(crate) fn primed(self) -> bool {
         matches!(
             self,
@@ -66,11 +36,6 @@ impl<'a> SolidPass<'a> {
 }
 
 impl SurfaceShaders {
-    /// What pipeline `id` draws with in `pass`: its variant's, else the standard one;
-    /// with `primed` (a lit batch in a primed pass, #1499), the one over the primed
-    /// depth; in the transparent pass, the one for its `blend` (#1523); in every
-    /// pass, the one keeping `facing`'s triangles (#1615). In the prepass, the
-    /// clipping one: a batch nothing clips draws [`SolidPass::depth_only`]'s instead.
     pub(crate) fn pick<'a>(
         &'a self,
         pass: SolidPass<'a>,

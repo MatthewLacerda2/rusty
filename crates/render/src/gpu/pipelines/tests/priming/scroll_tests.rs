@@ -1,9 +1,3 @@
-//! A scrolling Cutout surface primes as it draws (#1499): a `uv_scroll` variant with
-//! no cut moves the UVs `fs_main` clips its albedo at, so its prepass must clip at the
-//! moved UVs too. Clipped at the raw ones, the prepass keeps texels the forward pass
-//! drops, and the primed frame shows a hole where the far wall should be. Skips with
-//! no adapter.
-
 use glam::{Quat, Vec3};
 
 use crate::{readback, RenderView, Renderer, OFFSCREEN_FORMAT};
@@ -16,8 +10,6 @@ use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
 const RES: u32 = 64;
 
-/// A `uv_scroll` surface shader moving u by -0.5 a game second, and a Cutout albedo
-/// clear where u < 0.5; both removed on drop.
 struct Scroll {
     shader: String,
     albedo: String,
@@ -55,7 +47,6 @@ impl Drop for Scroll {
     }
 }
 
-/// A box at `position` scaled by `scale`; returns its id.
 fn block(scene: &mut Scene, position: Vec3, scale: Vec3) -> u32 {
     let id = create_entity(scene, "Block", Some(Primitive::Box));
     let mut t = scene.world.transform_mut(id).unwrap();
@@ -63,8 +54,6 @@ fn block(scene: &mut Scene, position: Vec3, scale: Vec3) -> u32 {
     id
 }
 
-/// A far wall, and in front of it the scrolling Cutout wall one game second in,
-/// under an AO volume.
 fn scene(s: &Scroll) -> Scene {
     let mut scene = Scene::new();
     scene.skybox_path = String::new();
@@ -97,7 +86,6 @@ fn scene(s: &Scroll) -> Scene {
     scene
 }
 
-/// One frame of `scene`, primed or not, as RGBA8.
 fn frame(r: &mut Renderer, scene: &Scene, primed: bool) -> Vec<u8> {
     r.depth_priming = primed;
     let mut view = RenderView::offscreen(&r.device, OFFSCREEN_FORMAT, RES, RES);
@@ -123,7 +111,6 @@ fn gpu_a_scrolling_cutout_primes_to_the_unprimed_frame() {
         r.surface_shaders.cut(id).is_some(),
         "the variant built its depth"
     );
-    // On Metal nothing primes: the second frame is unprimed too, and must match.
     let primed = frame(&mut r, &scene, true);
     let differing = plain
         .chunks(4)

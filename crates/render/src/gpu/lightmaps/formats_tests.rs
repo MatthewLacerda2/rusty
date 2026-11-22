@@ -1,8 +1,3 @@
-//! What a lightmap page uploads as (#1694): a KTX2 page as BC6H with its mips where
-//! the GPU has BC, else its PNG decoded to `Rgba16Float` with the same mips; a
-//! scene baked before (a `.png` page) still binds; a windowed renderer reads off
-//! its thread and binds once the read lands. Skips when no adapter is present.
-
 use std::path::Path;
 
 use glam::Vec3;
@@ -13,8 +8,6 @@ use rusty_asset::lightmap_page;
 use rusty_lighting::lightmap::{colour_page, encode_texels};
 use rusty_scene::lighting::page::MIP_LEVELS;
 
-/// A `edge`² page of smooth light written as `name.ktx2` and its `name.png`
-/// fallback; returns the KTX2 path.
 fn page(name: &str, edge: u32) -> String {
     let dir = rusty_test_support::temp::dir().join("rusty_1694");
     std::fs::create_dir_all(&dir).unwrap();
@@ -56,8 +49,6 @@ fn gpu_a_ktx2_page_binds_compressed_with_its_mips_or_from_its_png() {
         "two pages, three levels"
     );
 
-    // A scene baked before #1694 references its PNGs: they bind as linear light,
-    // one level. The list before it stays cached, and counts.
     let ktx2_bytes = maps.gpu_bytes();
     let png = vec![Path::new(&pages[0])
         .with_extension("png")
@@ -109,7 +100,7 @@ fn gpu_a_loader_that_died_is_a_failed_load_not_pending_forever() {
     let mut maps = Lightmaps::new(device, false);
     let list = vec!["dead.ktx2".to_string()];
     let (outbox, inbox) = std::sync::mpsc::channel();
-    drop(outbox); // the worker panicked before it answered
+    drop(outbox);
     maps.cache
         .insert(list.clone(), super::Entry::Pending(inbox));
     maps.bind(device, writes, &list, &[], &[]);

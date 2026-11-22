@@ -1,5 +1,3 @@
-//! `Commands`: one encoder, one submit, and the debug check on its writes.
-
 use super::Commands;
 use crate::gpu::grow_buffer::GrowBuffer;
 use crate::gpu::ops::{self, CountedQueue as _};
@@ -26,7 +24,7 @@ fn panic_of(f: impl FnOnce()) -> Option<String> {
 #[test]
 fn gpu_a_range_written_twice_while_one_encoder_records_is_refused() {
     if !cfg!(debug_assertions) {
-        return; // the check is a debug build's
+        return;
     }
     let Some(r) = headless_or_skip(4, 4) else {
         return;
@@ -53,7 +51,7 @@ fn gpu_a_range_written_twice_while_one_encoder_records_is_refused() {
 #[test]
 fn gpu_a_twice_written_range_names_the_stages_not_the_wrapper() {
     if !cfg!(debug_assertions) {
-        return; // the check is a debug build's
+        return;
     }
     let Some(r) = headless_or_skip(4, 4) else {
         return;
@@ -78,12 +76,12 @@ fn gpu_a_write_after_a_flush_or_to_another_range_or_outside_a_recording_passes()
     let buffer = uniform(&r.device);
     let write = |at: u64| r.queue.counted_write_buffer(&buffer, at, &[0; 16]);
     write(0);
-    write(0); // no recording: nothing to check
+    write(0);
     let mut commands = Commands::new(&r.device, &r.queue, "Once");
     write(0);
-    write(16); // another range
+    write(16);
     commands.flush();
-    write(0); // a new submit: the first write went out with the last one
+    write(0);
     commands.send();
     write(0);
     assert!(!super::recording());

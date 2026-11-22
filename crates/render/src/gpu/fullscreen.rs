@@ -1,14 +1,6 @@
-//! crates/render/src/gpu/fullscreen.rs — the pipeline every fullscreen-triangle pass builds
-//! (#939): no vertex buffers (the vertex stage makes the triangle from its index),
-//! default primitive state, no multisampling. Post-FX, SSAO, the UI backdrop blur
-//! and the shadow-atlas tile blit differ only in their entries, targets and depth.
-//! Also [`color_pass`], the timed colour-only pass the UI and the selection outline
-//! record into.
-
 use crate::gpu::ops::CountedEncoder as _;
 use crate::timing::{GpuPass, GpuTimer};
 
-/// One fullscreen pass's shader, layout and entry points.
 pub(crate) struct Fullscreen<'a> {
     pub(crate) label: &'a str,
     pub(crate) shader: &'a wgpu::ShaderModule,
@@ -18,7 +10,6 @@ pub(crate) struct Fullscreen<'a> {
 }
 
 impl Fullscreen<'_> {
-    /// A pipeline writing `targets`, with no depth attachment.
     pub(crate) fn colour(
         &self,
         device: &wgpu::Device,
@@ -27,7 +18,6 @@ impl Fullscreen<'_> {
         self.build(device, targets, None)
     }
 
-    /// A pipeline writing only depth (no colour targets), through `depth`.
     pub(crate) fn depth_only(
         &self,
         device: &wgpu::Device,
@@ -66,8 +56,6 @@ impl Fullscreen<'_> {
     }
 }
 
-/// A colour-only render pass over `target`, loading or clearing it, timed as `pass`
-/// (#835): the UI's overlay, mask and blur passes, the selection outline's.
 pub(crate) fn color_pass<'e>(
     encoder: &'e mut wgpu::CommandEncoder,
     (label, timer, pass): (&str, &GpuTimer, GpuPass),

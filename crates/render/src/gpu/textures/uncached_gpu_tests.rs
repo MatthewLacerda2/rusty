@@ -1,10 +1,3 @@
-//! `Renderer::uncached_textures` (#2319): a map whose settings ask for compression
-//! but that has no current import cache counts, with its RGBA8 bytes; once the
-//! import made its cache, its upload is compressed and it no longer counts. A
-//! map set to Compression None, too small to block-compress, inside the import
-//! cache but no model's extracted texture, or outside the imported folder (the
-//! engine's own maps) never counts: no import would make it a cache.
-
 use std::path::Path;
 
 use image::{Rgba, RgbaImage};
@@ -19,7 +12,6 @@ fn png(name: &str, side: u32) -> String {
     save(temp_png(name), side)
 }
 
-/// A wanted-compression PNG at `rel` under `base`, made fresh.
 fn png_at(base: &Path, rel: &str) -> String {
     let path = base.join(rel);
     std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -30,7 +22,6 @@ fn save(path: String, side: u32) -> String {
     RgbaImage::from_pixel(side, side, Rgba([9, 99, 199, 255]))
         .save(&path)
         .unwrap();
-    // Outside a project the cache sits in the system temp dir: a dead run's may be there.
     let cache = rusty_asset::texture_import::cache_file(Path::new(&path)).unwrap();
     let _ = std::fs::remove_file(cache);
     path
@@ -64,7 +55,6 @@ fn gpu_a_map_drawn_uncompressed_for_want_of_its_cache_counts_until_imported() {
         return;
     }
     assert_eq!(found.count, 1, "only the map an import would compress");
-    // 16² + 8² + 4² + 2² + 1² texels at four bytes.
     assert_eq!(found.bytes, 341 * 4);
     refresh(Path::new(&wanted), "").unwrap();
     renderer.gpu_textures.clear();

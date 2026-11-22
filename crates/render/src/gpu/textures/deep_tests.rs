@@ -1,7 +1,3 @@
-//! Which uploads are kept at 16 bits and which slots read them (#2257), without an
-//! adapter: the predicates the GPU tests (`deep_gpu_tests`) rest on, so a
-//! platform whose adapter skips them still holds the rule.
-
 use image::{DynamicImage, ImageBuffer, Rgba};
 
 use super::compressed::reads_as;

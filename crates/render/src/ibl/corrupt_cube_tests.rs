@@ -1,16 +1,10 @@
-//! Corrupt and unsupported cube files (#1609): every one is refused, by the header
-//! read and the full parse alike, and none panics.
-
 use super::cubemap_tests::{build_cubemap_ktx2, BC6H_UFLOAT};
 use super::*;
 
-/// A valid 4-texel cube with its three mips, laid out as the bake writes them.
 fn mipped_cube() -> Vec<u8> {
     let mut bytes = build_cubemap_ktx2(4, BC6H_UFLOAT, 6);
     let index = HEADER + 3 * LEVEL_ENTRY;
     let base_at = u64_at(&bytes, HEADER) as usize;
-    // Room for two more index entries, then the 2- and 1-texel levels appended,
-    // one padded block a face each.
     bytes.splice(index - 2 * LEVEL_ENTRY..index - 2 * LEVEL_ENTRY, [0; 48]);
     put_u32(&mut bytes, 40, 3);
     let dfd_at = u32_at(&bytes, 48);
@@ -41,10 +35,8 @@ fn put_u64(b: &mut [u8], at: usize, v: u64) {
     b[at..at + 8].copy_from_slice(&v.to_le_bytes());
 }
 
-/// A change that breaks a valid cube.
 type Corruption = fn(&mut Vec<u8>);
 
-/// The same judgement from the header read (through a file) and the full parse.
 fn judged(bytes: &[u8]) -> (Result<CubeShape, Refusal>, Option<CubeShape>) {
     let path = rusty_test_support::temp::dir().join("cube.ktx2");
     std::fs::write(&path, bytes).unwrap();
@@ -98,8 +90,6 @@ fn every_corrupt_or_unsupported_cube_is_refused_by_both() {
     }
 }
 
-/// Every prefix of a cube and every single corrupted byte is refused or read, never
-/// a panic: the parse runs every one.
 #[test]
 fn no_prefix_or_flipped_byte_panics() {
     let bytes = mipped_cube();

@@ -1,8 +1,3 @@
-//! Choosing each frame's resident reflection probes (#1206): the baked probes whose
-//! volumes (a turned box or a sphere, #1995) are nearest the primary camera
-//! (#1238), as many as the scene's byte budget holds (#1584), each judged by its
-//! cube's header before the cube is read.
-
 use glam::Vec3;
 
 use super::{ProbeArray, MAX_REFLECTION_PROBES, SPARE_SLOTS};
@@ -11,33 +6,11 @@ use crate::{RenderSwitch, Renderer};
 use rusty_scene::{ReflectionProbe, Scene};
 
 impl Renderer {
-    /// Make the baked probes whose volumes are nearest `camera_pos` this frame's
-    /// resident probes (#1206, #1238), and mark group 0 for a rebind when the array
-    /// texture was replaced. They are taken nearest first while the array, with its
-    /// [`SPARE_SLOTS`], stays within the scene's budget
-    /// (`LightingSettings::reflections`, #1584): a cube that would put it past the
-    /// budget is passed over, and nearer ones that fit are still taken, so one big
-    /// cube never empties the set; the nearest is always taken, whatever its size,
-    /// and so is the scene's fallback probe (#1697).
-    /// A cube is judged by its KTX2 header ([`read_cube_shape`]), read once per path,
-    /// and none is read at all once the array is full; only the cubes the array must
-    /// copy in are read whole, and dropped once copied. Cubes that don't fit the
-    /// array are passed over and never uploaded (#1245). Which probes are resident
-    /// depends on the camera's distance to each volume; only ties are broken by scene
-    /// index, and the residents are handed over in scene order, so two runs from one
-    /// camera agree. The scene's fallback probe (#1697) is ranked first, so it is
-    /// resident wherever the camera is, and handed over first, so it is slot 0. A cube that fails to load is refused until it is re-written, and
-    /// the frame's probes are chosen again without it, so no slot is bound to what it
-    /// held before (#1609).
     pub(crate) fn update_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) {
-        // Each pass that fails refuses one more cached shape, so this ends.
         while !self.place_reflection_probes(scene, camera_pos) {}
     }
 
-    /// One pass of [`Self::update_reflection_probes`]: false when a cube it had to
-    /// load was refused.
     fn place_reflection_probes(&mut self, scene: &Scene, camera_pos: Vec3) -> bool {
-        // With the `reflection_probes` switch off none is placed: the sky's cube.
         let probes = &scene.reflection_probes.probes;
         let probes = self.switches.listed(RenderSwitch::ReflectionProbes, probes);
         let budget = scene.lighting_settings.reflections.budget_bytes();
@@ -50,8 +23,6 @@ impl Renderer {
             }
             let path = probes[i].cubemap_path.as_str();
             let cubes = paths.len() + usize::from(!paths.contains(&path)) + SPARE_SLOTS;
-            // Exempt from the budget until the nearest probe is taken: the fallback
-            // first, if any, never evicts the camera's own room's probe (#1697).
             let exempt = wanted.iter().all(|&(j, _)| probes[j].fallback);
             let over = |size: u32| !exempt && array_bytes(face.max(size), cubes, format) > budget;
             if over(0) {
@@ -67,7 +38,6 @@ impl Renderer {
             paths = push_new(paths, path);
             wanted.push((i, shape));
         }
-        // Scene order, the fallback first: the shader finds it in slot 0 (#1697).
         wanted.sort_by_key(|&(i, _)| (!probes[i].fallback, i));
         let wanted: Vec<_> = wanted.into_iter().map(|(i, s)| (&probes[i], s)).collect();
         let (copies, rebuilt) = self.reflection_probes.place(&self.device, &wanted, budget);
@@ -92,9 +62,6 @@ impl Renderer {
 }
 
 impl ProbeArray {
-    /// The shape of the cube at `path`, from its header the first time it is asked
-    /// for (#1584); `None` for a file that is missing, malformed (#1609) or one the
-    /// array does not admit, which warns once.
     fn shape(&mut self, path: &str) -> Option<CubeShape> {
         if let Some(&known) = self.shapes.get(path) {
             return known;
@@ -115,8 +82,6 @@ impl ProbeArray {
         }
     }
 
-    /// Leave the cube at `path` out until it is re-written ([`Self::forget`]), with
-    /// one warning saying `why`: its slot is emptied and its shape cached as `None`.
     fn refuse(&mut self, path: &str, why: Refusal) {
         log::warn!("[Reflection] cubemap {path} is left out: {why}");
         self.table.forget(|p| p == path);
@@ -124,9 +89,6 @@ impl ProbeArray {
     }
 }
 
-/// The bytes an array of `cubes` cubes at a `face`-texel face takes in `format`:
-/// six faces each, at a byte a texel for BC6H (#1885) or 8 for `Rgba16Float`
-/// (#1696), and a third more for the mips.
 pub(crate) fn array_bytes(face: u32, cubes: usize, format: wgpu::TextureFormat) -> u64 {
     let (edge, _) = format.block_dimensions();
     let block = u64::from(format.block_copy_size(None).unwrap_or(8));
@@ -135,7 +97,6 @@ pub(crate) fn array_bytes(face: u32, cubes: usize, format: wgpu::TextureFormat) 
     level * 4 / 3 * cubes as u64
 }
 
-/// `paths` with `path` added, if it is not there yet.
 fn push_new<'a>(mut paths: Vec<&'a str>, path: &'a str) -> Vec<&'a str> {
     if !paths.contains(&path) {
         paths.push(path);
@@ -143,11 +104,6 @@ fn push_new<'a>(mut paths: Vec<&'a str>, path: &'a str) -> Vec<&'a str> {
     paths
 }
 
-/// The indices of the baked probes, the fallback first (#1697: it and the nearest
-/// after it are taken whatever the budget, so it stays resident wherever the camera
-/// is), then nearest volume (`ReflectionProbe::volume_distance_sq`) to
-/// `camera_pos` first (zero inside it), ties to the lower scene index, so the order
-/// is the same every run.
 pub(super) fn ranked(probes: &[ReflectionProbe], camera_pos: Vec3) -> Vec<usize> {
     let mut order: Vec<usize> = (0..probes.len())
         .filter(|&i| !probes[i].cubemap_path.is_empty())

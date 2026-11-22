@@ -1,14 +1,7 @@
-//! `vertex_waves` on a GPU (#1524): its variant builds the depth pipelines that move
-//! the vertex as `vs_main` does, and its analytic normals are the surface's own. The
-//! helper runs as written in the catalog, in a compute probe. Skip with no adapter.
-
 use rusty_shadergen::blocks::find;
 use rusty_shadergen::recipe::{BlockSel, PassKind, ShaderRecipe};
 use rusty_shadergen::{bake_recipe, engine_shader_dir, DEFAULT_OUT_DIR};
 
-/// The variant builds: its vertex stages read the amplitude from the material's
-/// param uniform and `vs_shadow` reads `camera.time`, so both bindings must be
-/// visible to the vertex stage, or wgpu refuses and the water draws flat.
 #[test]
 fn gpu_vertex_waves_builds_its_depth_pipelines() {
     let name = format!("test_vertex_waves_{}", std::process::id());
@@ -36,9 +29,6 @@ fn gpu_vertex_waves_builds_its_depth_pipelines() {
     );
 }
 
-/// Per sample: the helper's normal, then the normal of a central difference of its
-/// positions across the surface. Row 0 is a level surface with Gerstner crests
-/// (`steepness` 0.5); row 1 a tilted one with sine swells.
 const PROBE: &str = "
 struct SurfaceVertex { position: vec3<f32>, normal: vec3<f32>, tangent: vec3<f32> };
 @group(0) @binding(0) var<storage, read_write> out: array<vec4<f32>>;

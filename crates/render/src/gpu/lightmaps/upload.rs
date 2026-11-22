@@ -1,30 +1,15 @@
-//! Creating a lightmap page array and writing its levels (#438, #1694).
-
 use super::load::Loaded;
 use crate::gpu::ops::{CountedQueue as _, Writes};
 
-/// One uploaded page array.
 pub(crate) struct LightmapArray {
-    /// Page edge and page count, to match direction pages to colour pages.
     pub shape: (u32, u32),
-    /// The bytes it takes on the GPU, every level of every page.
     pub bytes: u64,
     pub texture: wgpu::Texture,
     pub view: wgpu::TextureView,
 }
 
-/// The most bytes one lightmap page array may take on the GPU, every level of
-/// every page (#1996). wgpu's limits name no texture-memory bound, so this is a
-/// constant: 1 GiB, which a Dust2-sized level's direction pages stay under at 8
-/// texels a unit (47–74 MiB) and reach at 32 (0.75–1.2 GiB).
 pub(crate) const MAX_ARRAY_BYTES: u64 = 1 << 30;
 
-/// Whether `limits` take a page list of `layers` pages `edge` texels a side,
-/// `bytes` in all, as one array (#1704). A file baked past the bake's `MAX_PAGES`
-/// refusal (`rusty_lighting::lightmap::MAX_PAGES`; a hand edit, another engine
-/// version) would panic `create_texture` in wgpu's default error handler on every
-/// load, and an array past [`MAX_ARRAY_BYTES`] (a dense directional bake) can
-/// exhaust the device's memory; `Err` instead leaves the scene unlit by lightmaps.
 pub(crate) fn fits(
     limits: &wgpu::Limits,
     edge: u32,
@@ -56,7 +41,6 @@ pub(crate) fn fits(
     Ok(())
 }
 
-/// Upload `loaded` as a 2D texture array with its mip chain.
 pub(crate) fn upload(
     device: &wgpu::Device,
     (queue, staging): Writes,
@@ -108,8 +92,6 @@ pub(crate) fn upload(
     }
 }
 
-/// A zeroed `edge`² array of `layers` pages and `levels` mips in `format`, its
-/// view (read through group 0's `gpu::linear_clamp`).
 pub(crate) fn create(
     device: &wgpu::Device,
     format: wgpu::TextureFormat,
@@ -145,11 +127,6 @@ pub(crate) fn create(
 }
 
 impl crate::Renderer {
-    /// A test hook: upload `pages`, each one level of an `edge`² `Rgba16Float`
-    /// page, as a scene's lightmap array is uploaded, and return its texture and
-    /// the pages. The pages are the caller's, made before it measures and handed
-    /// back, so a memory test sees only what the upload holds
-    /// (`dev::memory`'s lightmap test).
     #[doc(hidden)]
     pub fn upload_lightmap_pages(
         &self,

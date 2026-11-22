@@ -1,15 +1,3 @@
-//! A reflection probe's GGX prefilter on the GPU (#1602): the captured cube's source
-//! mip chain (`source::source_chain`) uploaded as an `Rgba16Float` texture array,
-//! every rough mip convolved in one compute pass (`ibl/probe_prefilter.wgsl`) into
-//! an `Rgba16Float` storage texture, and the chain read back for the KTX2 encode.
-//! `Rgba16Float` is a storage format WebGPU guarantees, so every adapter takes the
-//! write (lavapipe, Metal, Vulkan and DX12 GPUs alike).
-//!
-//! The CPU `cpu::prefilter` (test-only) stays the reference: the shader is it
-//! texel for texel (the same face matrices, source chain, per-sample mip, nearest-texel
-//! lookup and sample count), and a GPU test holds the two within a written tolerance. At 512 texels
-//! the CPU pass is ≈ 50 M samples on one core; here it is one compute pass.
-
 use crate::gpu::ops::{CountedDevice as _, CountedEncoder as _, CountedQueue as _, Writes};
 use glam::Vec3;
 
@@ -19,10 +7,8 @@ use crate::gpu::shaders::ShaderRegistry;
 use crate::ibl::cube_sample::FaceProjections;
 use crate::CubemapCapture;
 
-/// The shader's workgroup edge (`@workgroup_size(8, 8, 1)`).
 const GROUP: u32 = 8;
 
-/// The compute pipeline, built once per renderer on its first probe bake.
 pub(crate) struct ProbePrefilter {
     pipeline: wgpu::ComputePipeline,
 }
@@ -43,8 +29,6 @@ impl ProbePrefilter {
         Self { pipeline }
     }
 
-    /// GGX-prefilter `capture` into a roughness mip chain, as the CPU `prefilter`
-    /// does: mip 0 is the capture itself, each rougher mip convolved from it.
     pub(crate) fn run(
         &self,
         (device, writes): (&wgpu::Device, Writes),
@@ -67,8 +51,6 @@ impl ProbePrefilter {
         }
     }
 
-    /// Convolve every rough mip (`sizes`: levels 1.. of the chain) into a texture of
-    /// its own, in one submitted compute pass.
     fn filter(
         &self,
         (device, writes): (&wgpu::Device, Writes),
@@ -124,7 +106,6 @@ impl ProbePrefilter {
         rough
     }
 
-    /// One mip's bind group: its params, the captured faces and the mip's storage view.
     fn group(
         &self,
         device: &wgpu::Device,
@@ -150,8 +131,6 @@ impl ProbePrefilter {
     }
 }
 
-/// A mip's uniform: `[roughness, mip size, capture size]` and the sample count, then
-/// each face camera's view-projection and its inverse (`Params` in the shader).
 fn params(p: [f32; 3], projections: &FaceProjections) -> Vec<f32> {
     let (view_proj, inverse) = projections.matrices();
     let mut out = vec![p[0], p[1], p[2], SAMPLE_COUNT as f32];
@@ -161,8 +140,6 @@ fn params(p: [f32; 3], projections: &FaceProjections) -> Vec<f32> {
     out
 }
 
-/// The source chain as an `Rgba16Float` texture array, one mip per level, the base
-/// `base` texels wide.
 fn upload(
     device: &wgpu::Device,
     (queue, staging): Writes,
@@ -216,8 +193,6 @@ fn upload(
     texture
 }
 
-/// The rough mips' target: six `Rgba16Float` layers, `sizes[0]` at its base, one
-/// level per size.
 fn rough_texture(device: &wgpu::Device, sizes: &[u32]) -> wgpu::Texture {
     device.create_texture(&wgpu::TextureDescriptor {
         label: Some("Reflection Probe Rough Mips"),

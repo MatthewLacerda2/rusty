@@ -1,20 +1,9 @@
-//! The skybox panorama's own sampler (#1037). An equirect image wraps in U (φ = ±π
-//! is one seam) but not in V: v = θ/π runs zenith (0) to nadir (1), so a repeating
-//! V blends the top row into the bottom one at each pole under linear filtering.
-//!
-//! The upload is the material texture's, mip chain included (#1322), so every
-//! equirect read samples an explicit level: derivatives across `equirect_uv`'s atan2
-//! seam would pick the coarsest mip, a flat line down the sky. The sky pass
-//! (`skybox.wgsl`) reads level 0; the sky reflection cube's bake
-//! (`sky/prefilter.wgsl`, #1553) reads the mip each GGX sample's solid angle covers.
-
 use std::rc::Rc;
 
 use crate::{GpuTexture, Renderer};
 use rusty_asset::sidecar::FilterMode;
 use rusty_asset::MapRef;
 
-/// Repeat in U, clamp in V, filtered like every other image texture.
 fn panorama_sampler(device: &wgpu::Device) -> wgpu::Sampler {
     device.create_sampler(&wgpu::SamplerDescriptor {
         label: Some("Skybox Panorama Sampler"),
@@ -29,10 +18,6 @@ fn panorama_sampler(device: &wgpu::Device) -> wgpu::Sampler {
 }
 
 impl Renderer {
-    /// Load `path` as a skybox panorama: the cached image texture (shared with any
-    /// material using the same file, which keeps its repeating sampler) re-bound
-    /// with [`panorama_sampler`], its data view the stored format's raw twin
-    /// (compressed or not, #1574). A failed load yields the default texture, likewise.
     pub(crate) fn load_panorama(&mut self, path: &str) -> Rc<GpuTexture> {
         let image = self.load_texture(&MapRef::from(path));
         Rc::new(Self::finalize_texture(

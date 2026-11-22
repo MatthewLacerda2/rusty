@@ -1,9 +1,3 @@
-//! The forward pass's per-draw uniform and material record (#1616):
-//! `forward/bindings.wgsl`'s `DrawUniforms` and `MaterialData` against `DrawUniform`
-//! and `MaterialData`, member by member, the record's flat surface (#1523) and
-//! mapping (#1573) and detail (#1997) tails and the occlusion, specular-level
-//! (#2151) and height (#2191) terms included.
-
 use std::mem::{offset_of, size_of};
 
 use super::{assert_members, wgsl_struct_in};

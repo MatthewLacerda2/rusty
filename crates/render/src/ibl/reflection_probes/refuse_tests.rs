@@ -1,6 +1,3 @@
-//! A cube whose header passed but whose load fails (#1609): refused with one warning
-//! until it is re-written, and kept out of the frame it failed in.
-
 use glam::Vec3;
 
 use super::super::gpu_tests::{cube_file, probes_at, renderer};
@@ -15,8 +12,6 @@ fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {
         cube_file("fine_4.ktx2", 4, 5),
     );
     let scene = probes_at(&[(-2.0, &broken), (2.0, &fine)]);
-    // Its header is read while whole; the file is cut short before the load, by a
-    // write the freshness watch does not see.
     assert!(renderer.reflection_probes.shape(&broken).is_some());
     let bytes = std::fs::read(&broken).unwrap();
     std::fs::write(&broken, &bytes[..bytes.len() - 1]).unwrap();
@@ -49,7 +44,6 @@ fn gpu_a_cube_that_fails_to_load_is_left_out_until_rewritten() {
     assert_ne!(probes.probe_for(Vec3::new(-2.0, 0.0, 0.0)), 0, "re-written");
 }
 
-/// When every wanted cube is refused, the array sized for it is given back.
 #[test]
 fn gpu_refusing_every_cube_gives_the_array_back() {
     let Some(mut renderer) = renderer() else {
