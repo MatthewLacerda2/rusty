@@ -1,9 +1,5 @@
-//! Post-FX visual smoke test (issue #14). When a GPU / software adapter (e.g.
-//! lavapipe) is present, render the same scene twice with different exposure and
-//! assert the average pixel brightness actually changes — i.e. the color-
-//! correction knob reaches the image. When no adapter is available, `capture`
-//! returns `Ok(false)` and the test passes without asserting (GPU verification
-//! simply wasn't possible in this environment).
+//! The same scene at two exposures must differ in mean brightness: the colour-correction
+//! knob reaches the image.
 
 use crate::gpu::mean_brightness;
 use crate::temp::file as tmp;

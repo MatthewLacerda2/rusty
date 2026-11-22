@@ -10,7 +10,7 @@ use rusty::scene::Scene;
 fn raycast_hit_skips_excluded_and_reports_next() {
     // Two boxes in a line along +Z. The filter rejecting the nearer one must make
     // the ray pass *through* it and report the farther — not miss. This is the
-    // skip-and-continue behaviour the engine hitscan and Lua bindings share (#31).
+    // skip-and-continue behaviour the engine hitscan and Lua bindings share.
     let mut scene = Scene::new();
     let near = scene.add_entity("Near".to_string());
     scene.world.transform_mut(near).unwrap().position = Vec3::new(0.0, 0.0, 3.0);

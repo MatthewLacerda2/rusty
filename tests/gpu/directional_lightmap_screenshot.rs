@@ -57,6 +57,7 @@ fn scene(dir: &std::path::Path) -> Scene {
             ..rusty::edit::authoring::default_light()
         }),
     );
+    // Slanted along the floor's tangent (X), so the two tilted halves face it unequally.
     let down = Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2);
     scene.world.transform_mut(sun).unwrap().rotation = Quat::from_rotation_z(0.8) * down;
     scene

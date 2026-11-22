@@ -9,7 +9,7 @@ use rusty::edit::authoring::{primitive_mesh_component, Primitive};
 use rusty::scene::{Camera, Scene, Sh9};
 
 const SIZE: u32 = 32;
-/// Dim enough that π× it does not clip.
+/// Sky radiance, dim enough that π× it does not clip, so a π× error shows.
 const SKY: f32 = 0.25;
 
 fn floor(is_static: bool) -> Scene {

@@ -9,6 +9,7 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::Camera;
 use rusty::scene::{MeshComponent, Scene};
 
+/// No post-FX volume: FXAA is read off the camera, so it must work in a scene without one.
 fn scene_with_fxaa(on: bool) -> Scene {
     let mut scene = Scene::new();
     scene.ambient_intensity = 1.0;
@@ -29,8 +30,8 @@ fn scene_with_fxaa(on: bool) -> Scene {
     scene
 }
 
-/// Count of horizontally adjacent pixel pairs jumping by more than `HARD_STEP` luma. A
-/// mean-gradient metric fails: flat sky and box faces bury what FXAA touches (~1% of the mean).
+/// Count of horizontally adjacent pixel pairs jumping by more than `HARD_STEP` luma (0 to
+/// 255). A mean gradient fails: flat sky and box faces bury the few pixels FXAA touches.
 fn hard_steps(path: &std::path::Path) -> usize {
     const HARD_STEP: f64 = 24.0;
     let img = image::open(path).expect("png readable").to_rgb8();

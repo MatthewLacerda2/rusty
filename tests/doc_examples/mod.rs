@@ -50,6 +50,7 @@ pub fn check(block: &Block) -> Result<(), String> {
         return Ok(());
     }
     let lua = mlua::Lua::new();
+    // A block may be one expression (a table shape), as `scripting::eval` allows.
     let expr = format!("return {}", block.source);
     if lua.load(&expr).into_function().is_err() {
         lua.load(&block.source)

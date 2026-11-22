@@ -21,6 +21,7 @@ fn step_scene(height: f32) -> (Scene, u32) {
     (scene, id)
 }
 
+/// 0.2 m, under the default 0.3 m step offset.
 #[test]
 fn climbs_a_step_under_the_step_offset() {
     let (mut scene, id) = step_scene(0.2);
@@ -36,6 +37,7 @@ fn climbs_a_step_under_the_step_offset() {
     assert!(last.grounded, "grounded on the step");
 }
 
+/// 0.5 m, over the 0.3 m offset.
 #[test]
 fn is_blocked_by_a_step_over_the_step_offset() {
     let (mut scene, id) = step_scene(0.5);

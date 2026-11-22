@@ -1,5 +1,5 @@
-//! A demo opened in the editor leaves the operator's files and settings alone
-//!: the replay overwrites the save data, settings, seed and clock with the
+//! A demo opened in the editor leaves the operator's files and settings alone:
+//! the replay overwrites the save data, settings, seed and clock with the
 //! demo's, on a store bound to no file, and closing gives the editor's back.
 
 use std::path::Path;

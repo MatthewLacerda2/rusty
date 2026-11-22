@@ -1,6 +1,5 @@
 //! Data maps sample their texels raw, not sRGB-decoded: a mid-grey (128) map must
 //! shade like the same value as a scalar. Decoded it reads ≈ 0.22, not ≈ 0.5.
-//! Skips without an adapter (`capture` returns `Ok(false)`).
 
 use glam::Vec3;
 use rusty::components::{LightComponent, MaterialAsset};
@@ -8,7 +7,8 @@ use rusty::dev::screenshot::capture;
 use rusty::scene::{Camera, Scene};
 
 /// The mean absolute per-channel difference (0–255) two frames may differ by and
-/// still read as the same shading: the 128 → 0.502 quantisation, nothing more.
+/// still read as the same shading: the 128 → 0.502 quantisation, nothing more. lavapipe:
+/// at most 0.072 mapped, at least 5.43 for the sRGB-decoded control.
 pub(super) const SAME: f64 = 1.5;
 
 pub(super) fn png(name: &str, rgb: [u8; 3]) -> String {
@@ -98,6 +98,7 @@ fn a_mid_grey_roughness_map_reads_one_half() {
     let map = png("rusty_647_rough.png", [128, 128, 128]);
     let mat = |roughness, roughness_map| MaterialAsset {
         base_color: [0.9, 0.9, 0.9],
+        // Metallic, so the lamp's highlight, which roughness spreads, is the picture.
         metallic: 1.0,
         roughness,
         roughness_map,

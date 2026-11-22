@@ -1,6 +1,6 @@
 //! A render texture whose camera runs only the display transform
-//! (`Camera.SetTargetPostFx(id, false)`) gets none of its volume's lens effects
-//!: the vignette, chromatic aberration and film grain are post-FX like the
+//! (`Camera.SetTargetPostFx(id, false)`) gets none of its volume's lens effects:
+//! the vignette, chromatic aberration and film grain are post-FX like the
 //! grade, so the tonemap-only stack drops them too.
 
 use crate::temp::dir;

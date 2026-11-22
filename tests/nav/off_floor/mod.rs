@@ -24,6 +24,7 @@ pub fn default_scene() -> (Scene, u32) {
     default_scene_with(rusty::edit::default_scene::BOT_SCRIPT)
 }
 
+/// Built, then round-tripped through its saved document, as the editor boots it.
 pub fn default_scene_with(bot_script: &str) -> (Scene, u32) {
     let mut built = Scene::new();
     rusty::edit::default_scene::build(&mut built, bot_script);

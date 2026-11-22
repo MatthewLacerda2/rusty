@@ -1,7 +1,7 @@
 //! Transparent back-to-front compositing: two overlapping translucent quads composite the
 //! same way whatever order they were inserted in, because the pass sorts by view-space depth.
-//! Zero ambient and no lights make a surface's colour its `emissive`; a near green quad
-//! over a far red one must read green-dominant.
+//! With zero ambient and no lights a quad's `emissive` tint dominates its colour; a near
+//! green quad over a far red one must read green-dominant.
 
 use crate::temp::file as tmp;
 use glam::Vec3;

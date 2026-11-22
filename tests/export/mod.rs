@@ -41,6 +41,7 @@ fn project(models: &[&str], start: &str) -> PathBuf {
 
 const SPAWN: &str = "assets/scripts/spawn.lua";
 
+/// Attaches [`SPAWN`] by its path, spelled out again: change both together.
 pub(super) const SCENARIO: &str = r#"
 Harness.Expect(Harness.AttachPlayerBot("assets/scripts/spawn.lua"), "the player runs the script")
 Harness.Step(3)

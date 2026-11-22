@@ -1,4 +1,4 @@
-//! The `"Asset"` mesh-reference scene variant (issue #74): an imported sub-mesh is
+//! The `"Asset"` mesh-reference scene variant: an imported sub-mesh is
 //! stored as a path-based reference (`path::sub_object`) and rehydrated by
 //! RE-IMPORTING the source file on load — never by inlining GPU buffers.
 

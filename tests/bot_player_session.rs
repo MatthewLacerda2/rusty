@@ -1,4 +1,4 @@
-//! Bot-player end-to-end session (issue #10).
+//! Bot-player end-to-end session.
 //! Gated on `dev`: a no-op under a plain `cargo test`, real under `--features dev`.
 
 use rusty::dev::botplayer::{attach_player_bot, PLAYER_BOT_SCRIPT};

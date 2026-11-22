@@ -12,6 +12,7 @@ use super::{
     pool_middle, reach, INNER, WALL_MARGIN,
 };
 
+/// Straight at the Player: the default `bot.lua` stops at a spot round the Player instead.
 const CHASE: &str = r#"
 local Chase = {}
 function Chase.Update(id, dt)
@@ -90,6 +91,8 @@ fn the_default_bot_holds_a_spot_round_the_player() {
     let (scene, enemy) = default_scene();
     let player_id = scene.find_entity_by_name("Player").expect("Player");
     let mut world = world_of(scene);
+    // `bot.lua`'s query rings the Player 3 to 8 m out; the agent rests within its stopping
+    // distance of the spot it picks.
     let at = play(&mut world, player_id, enemy, home(), 600);
     let d = planar(at, home());
     assert!((2.0..10.0).contains(&d), "{d} m from the Player: {at}");

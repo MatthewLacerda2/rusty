@@ -1,7 +1,3 @@
-//! Per-bone hitboxes end to end: a ray names the bone it struck on a posed
-//! character, a shot fired in `Update` hits the arm where the animation put it
-//! that frame, and a CharacterController walks through hitboxes.
-
 pub mod rig;
 mod through;
 
@@ -72,6 +68,7 @@ fn a_shot_in_update_hits_the_arm_where_the_animation_put_it() {
     crate::play::attach_script(&mut scene, rig, "rusty_464_shooter.lua", SHOOTER);
     let scene = Rc::new(RefCell::new(scene));
     let mut gw = crate::play::playing(scene.clone(), 5.0);
+    // The arm moves 0.1 m a tick, twice its hitbox radius.
     crate::play::run(&mut gw, 40);
     let s = scene.borrow();
     let tally = s

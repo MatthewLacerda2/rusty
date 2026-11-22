@@ -1,7 +1,7 @@
-//! The yardstick the test games' budget is measured in: CPU time of [`TICKS`] ticks of the
-//! default scene in a fresh [`Harness`], sampled in slices while the game runs ([`Sampler`]).
-//! It meets the machine load the game does, so a game's CPU divided by it reads its own work.
-//! A synthetic workload met load far harder than the game did.
+//! The test games' yardstick: thread CPU time of [`TICKS`] ticks of the default
+//! scene in a fresh [`Harness`], sampled while the game runs ([`Sampler`]). It meets the
+//! machine load the game does, where a synthetic workload met far more: a game's CPU over it
+//! is its own work.
 
 use std::path::Path;
 use std::sync::mpsc;
@@ -12,11 +12,13 @@ use rusty::dev::harness::Harness;
 
 const BOT: &str = "assets/scripts/bot.lua";
 
+/// One second of ticks a slice.
 const TICKS: u32 = 60;
 
+/// Between slices: nonstop sampling would compete with the game.
 pub(super) const IDLE: Duration = Duration::from_millis(1500);
 
-/// Slices a run always gets, taken after the game if it ends sooner.
+/// Slices every run gets, taken after the game if it ends sooner.
 const MIN_SAMPLES: usize = 5;
 
 pub(super) struct Sampler {
@@ -27,7 +29,7 @@ pub(super) struct Sampler {
 impl Sampler {
     pub fn start() -> Self {
         let (stop, stopped) = mpsc::channel::<()>();
-        // The test's temp dir is found by its thread's name, so on this thread.
+        // Here: the test's temp dir is found by its thread's name.
         let out = crate::temp::dir().join("yardstick");
         let thread = std::thread::spawn(move || {
             let mut taken = Vec::new();
@@ -69,6 +71,7 @@ pub(super) fn samples(count: usize) -> Vec<Duration> {
     (0..count).map(|_| slice(&out)).collect()
 }
 
+/// The median, not the mean: one or two stalled slices do not move it.
 pub(super) fn median(samples: &[Duration]) -> Duration {
     let mut sorted = samples.to_vec();
     sorted.sort_unstable();

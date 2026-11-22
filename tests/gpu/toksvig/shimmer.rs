@@ -1,7 +1,7 @@
 //! A far busy glossy metal floor, the camera turning: the busy map shimmers far
-//! less than its twin (`main`'s look), keeps its light, and is the twin's frame up
-//! close. The BC5 route (the importer's per-level table) draws what the
-//! uncompressed one (the length in each sample) draws.
+//! less than its twin (no widening), keeps its light, and is the twin's frame up
+//! close. BC5 reads the importer's per-level length table, uncompressed each sample's
+//! length; both must draw alike.
 
 use glam::Vec3;
 use rusty::components::LightComponent;
@@ -11,6 +11,7 @@ use super::{as_bc5, floor, frames, glossy, luma, mean, normal_map, Blue, FAR, NE
 use crate::gpu::specular_aa_screenshot::relative_temporal_variance;
 
 const FRAMES: u32 = 8;
+// Far relative temporal variance; lavapipe: the twin 0.605, the busy map 0.074.
 const TWIN_SHIMMERS: f64 = 0.4;
 const BOUND: f64 = 0.2;
 
@@ -86,7 +87,7 @@ fn a_far_busy_glossy_floor_shimmers_less_keeps_its_light_and_is_unchanged_up_clo
             "{name} moved the energy: {ratio:.3}"
         );
     }
-    // The two routes agree, far and near (BC5's own rounding aside).
+    // Far and near (BC5's own rounding aside).
     let far = bc5.far / rgba.far;
     assert!(
         (0.85..1.15).contains(&far),

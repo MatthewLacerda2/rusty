@@ -53,6 +53,7 @@ fn build_world(scene: Scene) -> Rc<RefCell<GameWorld>> {
     Rc::new(RefCell::new(world))
 }
 
+/// After `frames` ticks: live particles, their max X, and whether any still moves +X.
 fn run(scene: Scene, emitter: u32, frames: u32) -> (usize, f32, bool) {
     let world = build_world(scene);
     {
